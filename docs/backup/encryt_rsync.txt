@@ -19,7 +19,7 @@ Why not just encrypt the file, and use the standard rsync algorithm?
 
 1) Compression cannot be used, since encryption turns the file into essentially random data. This is not very compressible.
 
-2) Any modification to the file will result in all data after that in the file having different ciphertext (in any cipher mode we might want to use). Therefore the rsync algorithm will only be able to detect "same" blocks up until the first modification. This significantly reduces the effectiveness of the process.
+2) Any modification to the file will result in all data after that in the file having different ciphertext (in any cipher mode we might want to use). Therefore the rsync algorithm will only be able to detect "same" blocks up until the first modification.  This significantly reduces the effectiveness of the process.
 
 Note that blocks are not all the same size. The last block in the file is unlikely to be a full block, and if data is inserted which is not a integral multiple of the block size, odd sized blocks need to be created. This is because the server cannot reassemble the blocks, because the contents are opaque to the server.
 
@@ -30,9 +30,9 @@ To produce a list of the changes to send the new version, the client requests th
 
 The client then decrypts the index, and builds a list of the 8 most used block sizes above a certain threshold size.
 
-The new version of the file is then scanned in exactly the same way as rsync for these 8 block sizes. If a block is found, then it is added to a list of found blocks, sorted by position in the file. If a block has already been found at that position, then the old entry is replaced by the new entry.
+The new version of the file is then scanned in exactly the same way as rsync for these 8 block sizes. If a block is found, then it is added to a list of found blocks, sorted by position in the file. If a block has already been found at that position, then the old entry is only replaced by the new entry if the new entry is a "better" (bigger) match.
 
-The smallest block size is searched first, so that larger blocks replace smaller blocks in the found list.
+The block size covering the biggest file area is searched first, so that most of the file can be skipped over after the first pass without expensive checksumming.
 
 A "recipe" is then built from the found list, by trivially discarding overlapping blocks. Each entry consists of a number of bytes of "new" data, a block start number, and a number of blocks from the old file. The data is stored like this as a memory optimisation, assuming that files mostly stay the same rather than having all their blocks reordered.
 

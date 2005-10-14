@@ -28,10 +28,10 @@
 #define	BACKUP_FILE_AVOID_BLOCKS_LESS_THAN		128
 
 // Maximum number of sizes to do an rsync-like scan for
-#define BACKUP_FILE_DIFF_MAX_BLOCK_SIZES		8
+#define BACKUP_FILE_DIFF_MAX_BLOCK_SIZES		64
 
 // When doing rsync scans, do not scan for blocks smaller than
-#define BACKUP_FILE_DIFF_MIN_BLOCK_SIZE			256
+#define BACKUP_FILE_DIFF_MIN_BLOCK_SIZE			128
 
 // A limit to stop diffing running out of control: If more than this
 // times the number of blocks in the original index are found, stop

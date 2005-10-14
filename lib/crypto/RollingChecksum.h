@@ -47,6 +47,17 @@ public:
 	// --------------------------------------------------------------------------
 	//
 	// Function
+	//		Name:    RollingChecksum::RollForwardSeveral(uint8_t*, uint8_t*, unsigned int, unsigned int)
+	//		Purpose: Move the checksum forward a block, given a pointer to the first byte of the current block,
+	//				 and a pointer just after the last byte of the current block and the length of the block and of the skip.
+	//		Created: 7/14/05
+	//
+	// --------------------------------------------------------------------------
+	void RollForwardSeveral(uint8_t *StartOfThisBlock, uint8_t *LastOfNextBlock, unsigned int Length, unsigned int Skip);
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
 	//		Name:    RollingChecksum::GetChecksum()
 	//		Purpose: Returns the checksum
 	//		Created: 6/12/03
