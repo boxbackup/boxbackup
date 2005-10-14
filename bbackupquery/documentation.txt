@@ -1,0 +1,165 @@
+
+bbackupquery utility -- examine store, compare files, restore, etc.
+
+This file has markers for automatic help generation script -- '>' marks a start of a command/help topic,
+and '<' marks the end of a section.
+
+Command line:
+=============
+
+> bbackupquery [-q] [-c configfile] [commands ...]
+
+	-q -- quiet, no information prompts
+	-c -- specify another bbackupd configuation file
+
+The commands following the options are executed, then (if there was no quit
+command) an interactive mode is entered.
+
+If a command contains a space, enclose it in quotes. Example
+
+	bbackupquery "list testdir1" quit
+
+to list the contents of testdir1, and then exit without interactive mode.
+<
+
+Commands:
+=========
+
+All directory names relative to a "current" directory, or from root if they
+start with '/'. The initial directory is always the root directory.
+
+
+> list [options] [directory-name]
+
+	List contents of current directory, or specified directory.
+	
+	-r -- recursively list all files
+	-d -- list deleted files/directories
+	-o -- list old versions of files/directories
+	-I -- don't display object ID
+	-F -- don't display flags
+	-t -- show file modification time
+			(and attr mod time if has the object has attributes, ~ separated)
+	-s -- show file size in blocks used on server
+			(only very approximate indication of size locally)
+
+ls can be used as an alias.
+<
+
+> ls
+
+	Alias for 'list'. Type 'help list' for options.
+<
+
+> cd [options] <directory-name>
+
+	Change directory
+	
+	-d -- consider deleted directories for traversal
+	-o -- consider old versions of directories for traversal
+		(this option should never be useful in a correctly formed store)
+<
+
+> pwd
+
+	Print current directory, always root relative.
+<
+
+> lcd <local-directory-name>
+
+	Change local directory.
+	
+	Type "sh ls" to list the contents.
+<
+
+> sh <shell command>
+
+	All of the parameters after the "sh" are run as a shell command.
+	
+	For example, to list the contents of the location directory, type "sh ls"
+<
+
+> get <object-filename> [<local-filename>]
+get -i <object-id> <local-filename>
+
+	Gets a file from the store. Object is specified as the filename within
+	the current directory, and local filename is optional. Ignores old and
+	deleted files when searching the directory for the file to retrieve.
+	
+	To get an old or deleted file, use the -i option and select the object
+	as a hex object ID (first column in listing). The local filename must
+	be specified.
+<
+
+> compare -a
+compare -l <location-name>
+compare <store-dir-name> <local-dir-name>
+
+	Compares the (current) data on the store with the data on the disc.
+	All the data will be downloaded -- this is potentially a very long
+	operation.
+	
+	-a -- compare all locations
+	-l -- compare one backup location as specified in the configuration file.
+	-c -- set return code
+	-q -- quick compare. Only checks file contents against checksums,
+			doesn't do a full download
+	-E -- ignore exclusion settings
+	
+	Comparing with the root directory is an error, use -a option instead.
+
+	If -c is set, then the return code (if quit is the next command) will be
+		1	Comparison was exact
+		2	Differences were found
+		3	An error occured
+	This can be used for automated tests.
+<
+
+> restore [-d] [-r] [-i] <directory-name> <local-directory-name>
+
+	Restores a directory to the local disc. The local directory specified
+	must not exist (unless a previous restore is being restarted).
+
+	The root cannot be restored -- restore locations individually.
+
+	-d -- restore a deleted directory.
+	-r -- resume an interrupted restoration
+	-i -- directory name is actually an ID
+
+	If a restore operation is interrupted for any reason, it can be restarted
+	using the -r switch. Restore progress information is saved in a file at
+	regular intervals during the restore operation to allow restarts. 
+<
+
+> getobject <object-id> <local-filename>
+
+	Gets the object specified by the object id (in hex) and stores the raw
+	contents in the local file specified.
+
+	This is only useful for debugging as it does not decode files from the
+	stored format, which is encrypted and compressed.
+<
+
+> usage
+
+	Show space used on the server for this account.
+
+	Used: Total amount of space used on the server.
+	Old files: Space used by old files
+	Deleted files: Space used by deleted files
+	Directories: Space used by the directory structure.
+	
+	When Used exceeds the soft limit, the server will start to remove old and
+	deleted files until the usage drops below the soft limit.
+	
+	After a while, you would expect to see the usage stay at just below the
+	soft limit. You only need more space if the space used by old and deleted
+	files is near zero.
+<
+
+> quit
+
+	End session and exit.
+<
+
+
