@@ -758,13 +758,13 @@ CXX = g++
 AR = ar
 RANLIB = ranlib
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG -O2 -Wall $include_paths -D$platform_define$extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -DNDEBUG -O2 -Wall $include_paths -D$platform_define -D$platform_cpu$extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS = -g -Wall $include_paths -D$platform_define$extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -g -Wall $include_paths -D$platform_define -D$platform_cpu$extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
@@ -886,7 +886,7 @@ __E
 		# run make for things we require
 		for my $dep (@all_deps_for_module)
 		{
-			$deps_makeinfo .= "\t\t(cd ../../$dep; $make_command$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
+			$deps_makeinfo .= "\t\t(cd ../../$dep; \$(MAKE)$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
 		}
 		$deps_makeinfo .= ".\tendif\n.endif\n\n";
 	}
@@ -960,7 +960,7 @@ __E
 	print MAKE "clean:\n\t-rm -rf \$(OUTDIR)/*\n.\tifndef SUBCLEAN\n";
 	for my $dep (@all_deps_for_module)
 	{
-		print MAKE "\t(cd ../../$dep; $make_command \$(DEPENDMAKEFLAGS) -D SUBCLEAN clean)\n";
+		print MAKE "\t(cd ../../$dep; \$(MAKE) \$(DEPENDMAKEFLAGS) -D SUBCLEAN clean)\n";
 	}
 	print MAKE ".\tendif\n";
 	

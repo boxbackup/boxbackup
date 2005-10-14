@@ -93,37 +93,33 @@ void *memleakfinder_realloc(void *ptr, size_t size)
 
 	// Check it's been allocated
 	std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
-	if(ptr && i == sMallocBlocks.end())
+	if(i == sMallocBlocks.end())
 	{
 		TRACE1("Block %x realloc(), but not in list. Error? Or allocated in startup static objects?\n", ptr);
+		void *b = ::realloc(ptr, size);
+		memleakfinder_malloc_add_block(b, size, "FOUND-IN-REALLOC", 0);
+		return b;
 	}
 
 	void *b = ::realloc(ptr, size);
-
-	if(ptr && i!=sMallocBlocks.end())
+	
+	// Worked?
+	if(b != 0)
 	{
-		// Worked?
-		if(b != 0)
+		// Update map
+		MallocBlockInfo inf = i->second;
+		inf.size = size;
+		sMallocBlocks.erase(i);
+		sMallocBlocks[b] = inf;
+		
+		if(sTrackMallocInSection)
 		{
-			// Update map
-			MallocBlockInfo inf = i->second;
-			inf.size = size;
-			sMallocBlocks.erase(i);
-			sMallocBlocks[b] = inf;
-
-			if(sTrackMallocInSection)
-			{
-				std::set<void *>::iterator si(sSectionMallocBlocks.find(ptr));
-				if(si != sSectionMallocBlocks.end()) sSectionMallocBlocks.erase(si);
-				sSectionMallocBlocks.insert(b);
-			}
+			std::set<void *>::iterator si(sSectionMallocBlocks.find(ptr));
+			if(si != sSectionMallocBlocks.end()) sSectionMallocBlocks.erase(si);
+			sSectionMallocBlocks.insert(b);
 		}
 	}
-	else
-	{
-		memleakfinder_malloc_add_block(b, size, "FOUND-IN-REALLOC", 0);
-	}
-
+	
 	//TRACE3("realloc(), %d, %08x->%08x\n", size, ptr, b);
 	return b;
 }

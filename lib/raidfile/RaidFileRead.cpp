@@ -317,11 +317,7 @@ RaidFileRead_Raid::RaidFileRead_Raid(int SetNumber, const std::string &Filename,
 	  mEOF(false)
 {
 	// Make sure size of the IOStream::pos_type matches the pos_type used
-#ifdef PLATFORM_LINUX
 	ASSERT(sizeof(pos_type) >= sizeof(off_t));
-#else
-	ASSERT(sizeof(pos_type) == sizeof(off_t));
-#endif
 	
 	// Sanity check handles
 	if(mStripe1Handle != -1 && mStripe2Handle != -1)
@@ -1546,18 +1542,22 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 					continue;
 				}
 				
-				// stat the file to find out what type it is
-/*				struct stat st;
-				std::string fullName(dn + DIRECTORY_SEPARATOR + en->d_name);
-				if(::stat(fullName.c_str(), &st) != 0)
-				{
-					THROW_EXCEPTION(RaidFileException, OSError)
-				}*/
-				
 				// Entry...
 				std::string name;
 				unsigned int countToAdd = 1;
-				if(DirReadType == DirReadType_FilesOnly && en->d_type == DT_REG) // (st.st_mode & S_IFDIR) == 0)
+
+				// stat the file to find out what type it is
+#ifdef PLATFORM_SUNOS
+				struct stat st;
+				std::string fullName(dn + DIRECTORY_SEPARATOR + en->d_name);
+				if(::lstat(fullName.c_str(), &st) != 0)
+				{
+					THROW_EXCEPTION(RaidFileException, OSError)
+				}
+				if(DirReadType == DirReadType_FilesOnly && (st.st_mode & S_IFDIR) == 0)
+#else
+				if(DirReadType == DirReadType_FilesOnly && en->d_type == DT_REG)
+#endif
 				{
 					// File. Complex, need to check the extension
 					int dot = -1;
@@ -1585,7 +1585,11 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 						}
 					}
 				}
-				if(DirReadType == DirReadType_DirsOnly && en->d_type == DT_DIR) // (st.st_mode & S_IFDIR))
+#ifdef PLATFORM_SUNOS
+				if(DirReadType == DirReadType_DirsOnly && (st.st_mode & S_IFDIR))
+#else
+				if(DirReadType == DirReadType_DirsOnly && en->d_type == DT_DIR)
+#endif
 				{
 					// Directory, and we want directories
 					name = en->d_name;

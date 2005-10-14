@@ -52,13 +52,10 @@ public:
 	static void SetBlowfishKey(const void *pKey, int KeyLength);
 	static void SetAttributeHashSecret(const void *pSecret, int SecretLength);
 	
-	static uint64_t GenerateAttributeHash(struct stat &st, const std::string &filename, const std::string &leafname);
-	static void FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename);
+	static uint64_t GenerateAttributeHash(struct stat &st, const std::string &rFilename);
 
 private:
-	static void FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st, bool ZeroModificationTimes);
-	static void FillAttributesLink(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st);
-	void WriteExtendedAttr(const char *Filename, int xattrOffset) const;
+	void ReadAttributesLink(const char *Filename, void *pst, bool ZeroModificationTimes);
 
 	void RemoveClear() const;
 	void EnsureClearAvailable() const;

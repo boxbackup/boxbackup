@@ -154,10 +154,6 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 #ifndef PLATFORM_stat_NO_st_flags
 		currentStateChecksum.Add(&st.st_flags, sizeof(st.st_flags));
 #endif // n PLATFORM_stat_NO_st_flags
-
-		StreamableMemBlock xattr;
-		BackupClientFileAttributes::FillExtendedAttr(xattr, rLocalPath.c_str());
-		currentStateChecksum.Add(xattr.GetBuffer(), xattr.GetSize());
 	}
 	
 	// Read directory entries, building arrays of names
@@ -526,7 +522,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			fileSize = st.st_size;
 			inodeNum = st.st_ino;
 			hasMultipleHardLinks = (st.st_nlink > 1);
-			attributesHash = BackupClientFileAttributes::GenerateAttributeHash(st, filename, *f);
+			attributesHash = BackupClientFileAttributes::GenerateAttributeHash(st, *f);
 		}
 
 		// See if it's in the listing (if we have one)

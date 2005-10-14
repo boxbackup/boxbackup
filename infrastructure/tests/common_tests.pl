@@ -143,22 +143,6 @@ int main(int argc, char *argv[])
 }
 __E
 
-		# see if FS extended attributes support is available
-		do_test('Name' => 'Linux XATTR support',
-			'RunCode' => 0,
-			'SuccessCompileFlags' => '-DPLATFORM_HAVE_XATTR',
-			'Code' => <<__E);
-#include <cstdlib>
-#include <sys/types.h>
-#include <sys/xattr.h>
-int main(int argc, char *argv[])
-{
-	const char* filename = "file";
-	listxattr(filename, NULL, 0);
-	return 0;
-}
-__E
-
 	}
 
 	# USE_MALLOC doesn't work on some < gcc3 platforms
