@@ -99,7 +99,7 @@ for my $parcel (@parcels)
 		if($type eq 'bin')
 		{
 			my $exeext = ($build_os eq 'CYGWIN')?'.exe':'';
-			print MAKE "\t(cd bin/$name; $make_command $release_flag)\n";
+			print MAKE "\t(cd bin/$name; \$(MAKE) $release_flag)\n";
 			print MAKE "\tcp release/bin/$name/$name$exeext $dir\n";
 		}
 		elsif ($type eq 'script')
@@ -144,7 +144,7 @@ __E
 
 for(@parcels)
 {
-	print INSTALLMSG "    make install-".$_."\n";
+	print INSTALLMSG "    $make_command install-".$_."\n";
 }
 print INSTALLMSG "\n";
 
