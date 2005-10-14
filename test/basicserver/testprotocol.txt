@@ -1,0 +1,42 @@
+# test protocol file
+
+Name 			Test
+IdentString		Test-0.00
+ServerContextClass	TestContext	TestContext.h
+
+BEGIN_OBJECTS
+
+Error		0	IsError(Type,SubType)	Reply
+	int32	Type
+	int32	SubType
+
+Hello		1	Command(Hello)	Reply
+	int32	Number32
+	int16	Number16
+	int8	Number8
+	string	Text
+
+Lists		2	Command(ListsReply)
+	vector<string>	LotsOfText
+
+ListsReply	3	Reply
+	int32	NumberOfStrings
+
+Quit		4	Command(Quit)	Reply	EndsConversation
+
+Simple		5	Command(SimpleReply)
+	int32	Value
+
+SimpleReply	6	Reply
+	int32	ValuePlusOne
+
+GetStream	7	Command(GetStream)	Reply
+	int32	StartingValue
+	bool	UncertainSize
+
+SendStream	8	Command(GetStream)	StreamWithCommand
+	int64	Value
+
+String		9	Command(String)	Reply
+	string	Test
+

@@ -1,0 +1,242 @@
+#!/usr/bin/perl
+use strict;
+
+# should be running as root
+if($> != 0)
+{
+	printf "\nWARNING: this should be run as root\n\n"
+}
+
+# check and get command line parameters
+if($#ARGV < 2)
+{
+	print <<__E;
+
+Setup bbstored config utility.
+
+Bad command line parameters.
+Usage:
+	bbstored-config config-dir server-hostname username [raidfile-config]
+
+config-dir usually /etc/box
+server-hostname is the hostname used by clients to connect to this server
+username is the user to run the server under
+raidfile-config is optional. Use if you have a non-standard raidfile.conf file.
+
+__E
+	exit(1);
+}
+
+# check for OPENSSL_CONF environment var being set
+if(exists $ENV{'OPENSSL_CONF'})
+{
+	print <<__E;
+
+---------------------------------------
+
+WARNING:
+    You have the OPENSSL_CONF environment variable set.
+    Use of non-standard openssl configs may cause problems.
+
+---------------------------------------
+
+__E
+}
+
+# default locations
+my $default_config_location = '/etc/box/bbstored.conf';
+
+# command line parameters
+my ($config_dir,$server,$username,$raidfile_config) = @ARGV;
+
+$raidfile_config = $config_dir . '/raidfile.conf' unless $raidfile_config ne '';
+
+# check server exists, but don't bother checking that it's actually this machine.
+{
+	my @r = gethostbyname($server);
+	if($#r < 0)
+	{
+		die "Server '$server' not found. (check server name, test DNS lookup failed.)"
+	}
+}
+
+# check this exists
+if(!-f $raidfile_config)
+{
+	print "The RaidFile configuration file $raidfile_config doesn't exist.\nYou may need to create it with raidfile-config.\nWon't configure bbstored without it.\n";
+	exit(1);
+}
+
+# check that the user exists
+die "You shouldn't run bbstored as root" if $username eq 'root';
+my $user_uid = 0;
+(undef,undef,$user_uid) = getpwnam($username);
+if($user_uid == 0)
+{
+	die "User $username doesn't exist\n";
+}
+
+# check that directories are writeable
+open RAIDCONF,$raidfile_config or die "Can't open $raidfile_config";
+{
+	my %done = ();
+	while(<RAIDCONF>)
+	{
+		next unless m/Dir\d\s*=\s*(.+)/;
+		my $d = $1;
+		$d = $d.'/backup' if -e $d.'/backup';
+		print "Checking permissions on $d\n";
+		my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = stat($d);
+		my $req_perms = ($uid == $user_uid)?0700:0007;
+		if(($mode & $req_perms) != $req_perms)
+		{
+			print "$username doesn't appear to have the necessary permissions on $d\n";
+			print "Either adjust permissions, or create a directory 'backup' inside the\n";
+			print "directory specified in raidfile.conf which is writable.\n";
+			exit(1);
+		}
+	}
+}
+close RAIDCONF;
+
+# ssl stuff
+my $private_key = "$config_dir/bbstored/$server-key.pem";
+my $certificate_request = "$config_dir/bbstored/$server-csr.pem";
+my $certificate = "$config_dir/bbstored/$server-cert.pem";
+my $ca_root_cert = "$config_dir/bbstored/clientCA.pem";
+
+# other files
+my $config_file = "$config_dir/bbstored.conf";
+my $accounts_file = "$config_dir/bbstored/accounts.txt";
+
+# summarise configuration
+
+print <<__E;
+
+Setup bbstored config utility.
+
+Configuration:
+   Writing configuration file: $config_file
+   Writing empty accounts file: $accounts_file
+   Server hostname: $server
+   RaidFile config: $raidfile_config
+
+__E
+
+# create directories
+if(!-d $config_dir)
+{
+	print "Creating $config_dir...\n";
+	mkdir $config_dir,0755 or die "Can't create $config_dir";
+}
+
+if(!-d "$config_dir/bbstored")
+{
+	print "Creating $config_dir/bbstored\n";
+	mkdir "$config_dir/bbstored",0755 or die "Can't create $config_dir/bbstored";
+}
+
+# create blank accounts file
+if(!-f $accounts_file)
+{
+	print "Creating blank accounts file\n";
+	open ACC,">$accounts_file";
+	close ACC;
+}
+
+# generate the private key for the server
+if(!-f $private_key)
+{
+	print "Generating private key...\n";
+	if(system("openssl genrsa -out $private_key 2048") != 0)
+	{
+		die "Couldn't generate private key."
+	}
+}
+
+# generate a certificate request
+if(!-f $certificate_request)
+{
+	die "Couldn't run openssl for CSR generation" unless
+		open(CSR,"|openssl req -new -key $private_key -sha1 -out $certificate_request");
+	print CSR <<__E;
+.
+.
+.
+.
+.
+$server
+.
+.
+.
+
+__E
+	close CSR;
+	print "\n\n";
+	die "Certificate request wasn't created.\n" unless -f $certificate_request
+}
+
+# write the configuration file
+print "Writing configuration file $config_file\n";
+open CONFIG,">$config_file" or die "Can't open config file for writing";
+print CONFIG <<__E;
+
+RaidFileConf = $raidfile_config
+AccountDatabase = $accounts_file
+
+# Uncomment this line to see exactly what commands are being received from clients.
+# ExtendedLogging = yes
+
+# scan all accounts for files which need deleting every 15 minutes.
+
+TimeBetweenHousekeeping = 900
+
+Server
+{
+	PidFile = /var/run/bbstored.pid
+	User = $username
+	ListenAddresses = inet:$server
+	CertificateFile = $certificate
+	PrivateKeyFile = $private_key
+	TrustedCAsFile = $ca_root_cert
+}
+
+
+__E
+
+close CONFIG;
+
+# explain to the user what they need to do next
+my $daemon_args = ($config_file eq $default_config_location)?'':" $config_file";
+
+print <<__E;
+
+===================================================================
+
+bbstored basic configuration complete.
+
+What you need to do now...
+
+1) Sign $certificate_request
+   using the bbstored-certs utility.
+
+2) Install the server certificate and root CA certificate as
+      $certificate
+      $ca_root_cert
+
+3) You may wish to read the configuration file
+      $config_file
+   and adjust as appropraite.
+
+4) Create accounts with bbstoreaccounts
+
+5) Start the backup store daemon with the command
+      /usr/local/bin/bbstored$daemon_args
+   in /etc/rc.local, or your local equivalent.
+
+===================================================================
+
+__E
+
+
+

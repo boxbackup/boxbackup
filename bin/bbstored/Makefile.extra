@@ -1,0 +1,9 @@
+
+MAKEPROTOCOL = ../../lib/server/makeprotocol.pl
+
+GEN_CMD_SRV = $(MAKEPROTOCOL) Server backupprotocol.txt
+
+# AUTOGEN SEEDING
+autogen_BackupProtocolServer.cpp autogen_BackupProtocolServer.h:	$(MAKEPROTOCOL) backupprotocol.txt
+	perl $(GEN_CMD_SRV)
+

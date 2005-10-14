@@ -1,0 +1,70 @@
+EXCEPTION BackupStore 4
+
+Internal						0
+BadAccountDatabaseFile			1
+AccountDatabaseNoSuchEntry		2
+InvalidBackupStoreFilename		3
+UnknownFilenameEncoding			4
+CouldntReadEntireStructureFromStream	5
+BadDirectoryFormat				6
+CouldNotFindEntryInDirectory	7
+OutputFileAlreadyExists			8
+OSFileError						9
+StreamDoesntHaveRequiredFeatures		10
+BadBackupStoreFile				11
+CouldNotLoadStoreInfo			12
+BadStoreInfoOnLoad				13
+StoreInfoIsReadOnly				14
+StoreInfoDirNotInList			15
+StoreInfoBlockDeltaMakesValueNegative	16
+DirectoryHasBeenDeleted			17
+StoreInfoNotInitialised			18
+StoreInfoAlreadyLoaded			19
+StoreInfoNotLoaded				20
+ReadFileFromStreamTimedOut		21
+FileWrongSizeAfterBeingStored	22
+AddedFileDoesNotVerify			23
+StoreInfoForWrongAccount		24
+ContextIsReadOnly				25
+AttributesNotLoaded				26
+AttributesNotUnderstood			27
+WrongServerVersion				28			# client side
+ClientMarkerNotAsExpected		29	Another process logged into the store and modified it while this process was running. Check you're not running two or more clients on the same account.
+NameAlreadyExistsInDirectory	30
+BerkelyDBFailure				31			# client side
+InodeMapIsReadOnly				32			# client side
+InodeMapNotOpen					33			# client side
+FilenameEncryptionKeyNotKnown	34
+FilenameEncryptionNoKeyForSpecifiedMethod	35
+FilenameEncryptionNotSetup		36
+CouldntLoadClientKeyMaterial	37
+BadEncryptedAttributes			38
+EncryptedAttributesHaveUnknownEncoding	39
+OutputSizeTooSmallForChunk		40
+BadEncodedChunk					41
+NotEnoughSpaceToDecodeChunk		42
+ChunkHasUnknownEncoding			43
+ChunkContainsBadCompressedData	44
+CantWriteToEncodedFileStream	45
+Temp_FileEncodeStreamDidntReadBuffer	46
+CantWriteToDecodedFileStream	47
+WhenDecodingExpectedToReadButCouldnt	48
+BackupStoreFileFailedIntegrityCheck		49
+ThereIsNoDataInASymLink			50
+IVLengthForEncodedBlockSizeDoesntMeetLengthRequirements	51
+BlockEntryEncodingDidntGiveExpectedLength	52
+CouldNotFindUnusedIDDuringAllocation	53
+AddedFileExceedsStorageLimit	54
+CannotDiffAnIncompleteStoreFile	55
+CannotDecodeDiffedFilesWithoutCombining	56
+FailedToReadBlockOnCombine		57
+OnCombineFromFileIsIncomplete	58
+BadNotifySysadminEventCode		59
+InternalAlgorithmErrorCheckIDNotMonotonicallyIncreasing	60
+CouldNotLockStoreAccount		61	Another process is accessing this account -- is a client connected to the server?
+AttributeHashSecretNotSet		62
+AEScipherNotSupportedByInstalledOpenSSL	63	The system needs to be compiled with support for OpenSSL 0.9.7 or later to be able to decode files encrypted with AES
+SignalReceived					64	A signal was received by the process, restart or terminate needed. Exception thrown to abort connection.
+IncompatibleFromAndDiffFiles	65	Attempt to use a diff and a from file together, when they're not related
+DiffFromIDNotFoundInDirectory	66	When uploading via a diff, the diff from file must be in the same directory
+PatchChainInfoBadInDirectory	67	A directory contains inconsistent information. Run bbstoreaccounts check to fix it.

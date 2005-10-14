@@ -1,0 +1,25 @@
+EXCEPTION RaidFile 2
+
+Internal						0
+CantOpenConfigFile				1	The raidfile.conf file is not accessible. Check that it is present in the default location or daemon configuration files point to the correct location.
+BadConfigFile					2
+NoSuchDiscSet					3
+CannotOverwriteExistingFile		4
+AlreadyOpen						5
+ErrorOpeningWriteFile			6
+NotOpen							7
+OSError							8	Error when accessing an underlying file. Check file permissions allow files to be read and written in the configured raid directories.
+WriteFileOpenOnTransform		9
+WrongNumberOfDiscsInSet			10	There should be three directories in each disc set.
+RaidFileDoesntExist				11
+ErrorOpeningFileForRead			12
+FileIsDamagedNotRecoverable		13
+InvalidRaidFile					14
+DirectoryIncomplete				15
+UnexpectedFileInDirPlace		16
+FileExistsInDirectoryCreation	17
+UnsupportedReadWriteOrClose		18
+CanOnlyGetUsageBeforeCommit		19
+CanOnlyGetFileSizeBeforeCommit	20
+ErrorOpeningWriteFileOnTruncate	21
+FileIsCurrentlyOpenForWriting	22

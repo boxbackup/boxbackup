@@ -1,0 +1,319 @@
+#!/usr/bin/perl
+use strict;
+
+# validity period for root certificates -- default is a very long time
+my $root_sign_period = '10000';
+
+# but less so for client certificates
+my $sign_period = '5000';
+
+# check and get command line parameters
+if($#ARGV < 1)
+{
+	print <<__E;
+
+bbstored certificates utility.
+
+Bad command line parameters.
+Usage:
+	bbstored-certs certs-dir command [arguments]
+
+certs-dir is the directory holding the root keys and certificates for the backup system
+command is the action to perform, taking parameters.
+
+Commands are
+
+	init
+		-- generate initial root certificates (certs-dir must not already exist)
+	sign certificate-name
+		-- sign a client certificate
+	sign-server certificate-name
+		-- sign a server certificate
+
+Signing requires confirmation that the certificate is correct and should be signed.
+
+__E
+	exit(1);
+}
+
+# check for OPENSSL_CONF environment var being set
+if(exists $ENV{'OPENSSL_CONF'})
+{
+	print <<__E;
+
+---------------------------------------
+
+WARNING:
+    You have the OPENSSL_CONF environment variable set.
+    Use of non-standard openssl configs may cause problems.
+
+---------------------------------------
+
+__E
+}
+
+# directory structure:
+#
+# roots/
+#	clientCA.pem -- root certificate for client (used on server)
+#	serverCA.pem -- root certificate for servers (used on clients)
+# keys/
+#   clientRootKey.pem -- root key for clients
+#   serverRootKey.pem -- root key for servers
+# servers/
+#   hostname.pem -- certificate for server 'hostname'
+# clients/
+#   account.pem -- certficiate for account 'account' (ID in hex)
+#
+
+
+# check parameters
+my ($cert_dir,$command,@args) = @ARGV;
+
+# check directory exists
+if($command ne 'init')
+{
+	if(!-d $cert_dir)
+	{
+		die "$cert_dir does not exist";
+	}
+}
+
+# run command
+if($command eq 'init') {&cmd_init;}
+elsif($command eq 'sign') {&cmd_sign;}
+elsif($command eq 'sign-server') {&cmd_sign_server;}
+else
+{
+	die "Unknown command $command"
+}
+
+sub cmd_init
+{
+	# create directories
+	unless(mkdir($cert_dir,0700)
+		&& mkdir($cert_dir.'/roots',0700)
+		&& mkdir($cert_dir.'/keys',0700)
+		&& mkdir($cert_dir.'/servers',0700)
+		&& mkdir($cert_dir.'/clients',0700))
+	{
+		die "Failed to create directory structure"
+	}
+
+	# create root keys and certrs
+	cmd_init_create_root('client');
+	cmd_init_create_root('server');
+}
+
+sub cmd_init_create_root
+{
+	my $entity = $_[0];
+
+	my $cert = "$cert_dir/roots/".$entity.'CA.pem';
+	my $serial = "$cert_dir/roots/".$entity.'CA.srl';
+	my $key = "$cert_dir/keys/".$entity.'RootKey.pem';
+	my $csr = "$cert_dir/keys/".$entity.'RootCSR.pem';
+
+	# generate key
+	if(system("openssl genrsa -out $key 2048") != 0)
+	{
+		die "Couldn't generate private key."
+	}
+	
+	# make CSR
+	die "Couldn't run openssl for CSR generation" unless
+		open(CSR,"|openssl req -new -key $key -sha1 -out $csr");
+	print CSR <<__E;
+.
+.
+.
+.
+.
+Backup system $entity root
+.
+.
+.
+
+__E
+	close CSR;
+	print "\n\n";
+	die "Certificate request wasn't created.\n" unless -f $csr;
+	
+	# sign it to make a self-signed root CA key
+	if(system("openssl x509 -req -in $csr -sha1 -extensions v3_ca -signkey $key -out $cert -days $root_sign_period") != 0)
+	{
+		die "Couldn't generate root certificate."
+	}
+	
+	# write the initial serial number
+	open SERIAL,">$serial" or die "Can't open $serial for writing";
+	print SERIAL "00\n";
+	close SERIAL;
+}
+
+sub cmd_sign
+{
+	my $csr = $args[0];
+	
+	if(!-f $csr)
+	{
+		die "$csr does not exist";
+	}
+	
+	# get the common name specified in this certificate
+	my $common_name = get_csr_common_name($csr);
+	
+	# look OK?
+	unless($common_name =~ m/\ABACKUP-([A-Fa-f0-9]+)\Z/)
+	{
+		die "The certificate presented does not appear to be a backup client certificate"
+	}
+	
+	my $acc = $1;
+	
+	# check against filename
+	if(!($csr =~ m/(\A|\/)([A-Fa-f0-9]+)-/) || $2 ne $acc)
+	{
+		die "Certificate request filename does not match name in certificate ($common_name)"
+	}
+		
+	print <<__E;
+
+This certificate is for backup account
+
+   $acc
+
+Ensure this matches the account number you are expecting. The filename is
+
+   $csr
+
+which should include this account number, and additionally, you should check
+that you received it from the right person.
+
+Signing the wrong certificate compromises the security of your backup system.
+
+Would you like to sign this certificate? (type 'yes' to confirm)
+__E
+
+	return unless get_confirmation();
+
+	# out certificate
+	my $out_cert = "$cert_dir/clients/$acc"."-cert.pem";
+
+	# sign it!
+	if(system("openssl x509 -req -in $csr -sha1 -extensions usr_crt -CA $cert_dir/roots/clientCA.pem -CAkey $cert_dir/keys/clientRootKey.pem -out $out_cert -days $sign_period") != 0)
+	{
+		die "Signing failed"
+	}
+	
+	# tell user what to do next
+	print <<__E;
+
+
+Certificate signed.
+
+Send the files
+
+   $out_cert
+   $cert_dir/roots/serverCA.pem
+
+to the client.
+
+__E
+}
+
+sub cmd_sign_server
+{
+	my $csr = $args[0];
+	
+	if(!-f $csr)
+	{
+		die "$csr does not exist";
+	}
+	
+	# get the common name specified in this certificate
+	my $common_name = get_csr_common_name($csr);
+	
+	# look OK?
+	if($common_name !~ m/\A[-a-zA-Z0-9.]+\Z/)
+	{
+		die "Invalid server name"
+	}
+	
+	print <<__E;
+
+This certificate is for backup server
+
+   $common_name
+
+Signing the wrong certificate compromises the security of your backup system.
+
+Would you like to sign this certificate? (type 'yes' to confirm)
+__E
+
+	return unless get_confirmation();
+
+	# out certificate
+	my $out_cert = "$cert_dir/servers/$common_name"."-cert.pem";
+
+	# sign it!
+	if(system("openssl x509 -req -in $csr -sha1 -extensions usr_crt -CA $cert_dir/roots/serverCA.pem -CAkey $cert_dir/keys/serverRootKey.pem -out $out_cert -days $sign_period") != 0)
+	{
+		die "Signing failed"
+	}
+	
+	# tell user what to do next
+	print <<__E;
+
+
+Certificate signed.
+
+Install the files
+
+   $out_cert
+   $cert_dir/roots/clientCA.pem
+
+on the server.
+
+__E
+}
+
+
+sub get_csr_common_name
+{
+	my $csr = $_[0];
+	
+	open CSRTEXT,"openssl req -text -in $csr |" or die "Can't open openssl for reading";
+	
+	my $subject;
+	while(<CSRTEXT>)
+	{
+		$subject = $1 if m/Subject:.+?CN=([-\.\w]+)/
+	}	
+	close CSRTEXT;
+
+	if($subject eq '')
+	{
+		die "No subject found in CSR $csr"
+	}
+	
+	return $subject
+}
+
+sub get_confirmation()
+{
+	my $line = <STDIN>;
+	chomp $line;
+	if(lc $line ne 'yes')
+	{
+		print "CANCELLED\n";
+		return 0;
+	}
+	
+	return 1;
+}
+
+
+
+
+

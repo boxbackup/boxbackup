@@ -1,0 +1,27 @@
+TITLE CompressStream
+
+This implements a compressing stream class, which compresses and decompresses data sent to an underlying stream object. Data is likely to be buffered.
+
+
+WARNING: Use WriteAllBuffered() (after objects which need to be sent in their entirity) and Close() (after you have finished writing to the stream) otherwise the compression buffering will lose the last bit of data for you.
+
+
+The class works as a filter to an existing stream. Ownership can optionally be taken so that the source stream is deleted when this object is deleted.
+
+It can operate in one or two directions at any time. Data written to the stream is compressed, data read from the stream is decompressed. If a direction is not being (de)compressed, then it can act as a pass-through without touching the data.
+
+The constructor specifies the actions to be taken:
+
+CompressStream(IOStream *pStream, bool TakeOwnership,
+	bool DecompressRead, bool CompressWrite,
+	bool PassThroughWhenNotCompressed = false);
+
+pStream - stream to filter
+TakeOwnership - if true, delete the stream when this object is deleted.
+DecompressRead - reads pass through a decompress filter
+CompressWrite - writes pass through a compression filter
+PassThroughWhenNotCompressed - if not filtering a direction, pass through the data unaltered, otherwise exception if an attempt is made on that direction.
+
+
+Note that the buffering and compression will result in different behaviour than the underlying stream: data may not be written in one go, and data being read may come out in different sized chunks.
+

@@ -1,0 +1,10 @@
+================================================================================================================
+Bugs
+================================================================================================================
+
+* need a test to check that small files aren't tracked
+* things like object ids don't have proper typedefs
+* if a file changes while it's being streamed to the server, bad things will happen (exception in bbackupd, or corrupt file on server)
+* if bbackupd gets an error then a signal, it may not wait it's full 100 seconds before retrying. And then won't stop the cycle...
+* bbackupquery restore, if not root, then won't do file ownership properly, but won't alert the user to this fact
+* empty (real) directories in the store aren't deleted when they're empty (and will never be used again) -- uses up disc space unnecessarily
