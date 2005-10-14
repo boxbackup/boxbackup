@@ -1,0 +1,7 @@
+
+MAKEEXCEPTION = ../../lib/common/makeexception.pl
+
+# AUTOGEN SEEDING
+autogen_RaidFileException.h autogen_RaidFileException.cpp:	$(MAKEEXCEPTION) RaidFileException.txt
+	perl $(MAKEEXCEPTION) RaidFileException.txt
+

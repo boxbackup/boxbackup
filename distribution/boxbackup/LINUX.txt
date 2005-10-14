@@ -1,0 +1,27 @@
+
+For instructions on building an RPM of Box Backup, see the contrib/rpm
+directory. This is primarily for RedHat style systems, but notes are provided
+on what needs to be modified for SUSE.
+
+
+Requirements:
+
+	OpenSSL 0.9.7
+
+Require zlib and openssl headers for compilation -- may not be included when
+installing the packages. (libssl-dev + libz-dev packages under debian)
+
+Bekerley DB v1 support is required. The configure script should find an
+appropriate db package -- and if not, use an in-memory version of the code.
+However, the in-memory version is not desirable as it will lose information
+over restarts of the daemon.
+
+Ideally, include the readline headers -- libreadline4-dev, probably.
+
+
+
+(OpenSSL 0.9.7 is required as it implements new interfaces which make encryption
+using the same key faster by avoiding key setup each time around. Configure it with
+./config shared , then copy the libs and headers into the required places.)
+
+

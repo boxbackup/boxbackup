@@ -1,0 +1,49 @@
+
+# first entry is module name, next entries are dependencies or -l<libname> library includes
+
+# put !<platform-name>,<platform-name> after a module / library to exclude it from a particular platform
+# put !+<platform-name>,... to include it only on those platforms
+
+# -l libaries must be in the order they should appear on the command line.
+# Note that order is important on platforms which do not have shared libraries.
+
+# Generic support code and modules
+
+OMIT:CYGWIN
+lib/raidfile
+END-OMIT
+lib/crypto			-lcrypto
+lib/server			-lssl -lcrypto
+lib/compress		-lz
+test/common
+test/crypto			lib/crypto
+test/compress		lib/compress
+test/basicserver	lib/server
+OMIT:CYGWIN
+test/raidfile		lib/raidfile
+END-OMIT
+
+# IF_DISTRIBUTION(boxbackup)
+
+# Backup system
+
+lib/backupclient	lib/server	lib/crypto	lib/compress
+OMIT:CYGWIN
+lib/backupstore		lib/server	lib/raidfile	lib/backupclient
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
+bin/bbstoreaccounts	lib/raidfile	lib/backupstore
+bin/bbackupobjdump	lib/backupclient lib/backupstore
+END-OMIT
+bin/bbackupd		lib/server	lib/backupclient	-lLINUX_DB!+Linux
+bin/bbackupquery	-lreadline!Darwin,NetBSD -ledit!+NetBSD	-lcurses	lib/server	lib/backupclient
+bin/bbackupctl		lib/server	lib/backupclient
+OMIT:CYGWIN
+test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
+test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd
+test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
+test/backupdiff		lib/backupclient
+test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient
+END-OMIT
+
+# END_IF_DISTRIBUTION
+

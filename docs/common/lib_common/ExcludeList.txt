@@ -1,0 +1,21 @@
+TITLE ExcludeList
+
+A class implementing a list of strings which are to be excluded in some way. Entries can be added as strings to be matched exactly, or as regular expressions.
+
+Multiple entries can be added in a single function call in a manner designed to work with the multi-value entries store in a Configuation object.
+
+
+FUNCTION ExcludeList::AddDefiniteEntries()
+
+Definite entries are exact strings to match.
+
+
+FUNCTION ExcludeList::AddRegexEntries()
+
+Regular expressions as defined by POSIX, and supported by the host platform. Will throw an exception if regular expressions are not supported by the platform.
+
+
+FUNCTION ExcludeList::IsExcluded()
+
+Test a string for being excluded by definite or regex entries.
+

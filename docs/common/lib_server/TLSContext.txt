@@ -1,0 +1,16 @@
+CLASS TLSContext
+
+A wrapper over the OpenSSL context object.
+
+Note: you need to call SSLLib::Initialise at the beginning of your program to use these functions.
+
+
+SUBTITLE Construction
+
+The constuctor takes the following parameters
+
+* Boolean for whether this is acting as a server or a client
+* The .pem file containing the certificate which will be used
+* The .pem file containing the private key for this certificate
+* The .pem file containing the certificates which will certify the other end of the connection.
+

@@ -1,0 +1,5 @@
+TITLE Guards.h
+
+This file contains a couple of classes for using file and memory. When the class goes out of scope, the underlying object is closed or freed, respectively.
+
+

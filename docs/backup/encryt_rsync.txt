@@ -1,0 +1,66 @@
+TITLE Encrypted rsync algorithm
+
+The backup system uses a modified version of the rsync algorithm. A description of the plain algorithm can be found here:
+
+	http://samba.anu.edu.au/rsync/tech_report/
+
+The algorithm is modified to allow the server side to be encrypted, yet still benefit from the reduced bandwidth usage. For a single file transfer, the result will be only slightly less efficient than plain rsync. For a backup of a large directory, the overall bandwidth may be less due to the way the backup client daemon detects changes.
+
+This document assumes you have read the rsync document.
+
+The code is in lib/backupclient/BackupStoreFile*.*.
+
+
+SUBTITLE Blocks
+
+Each file is broken up into small blocks. These are individually compressed and encrypted, and have an entry in an index which contains, encrypted, it's weak and strong checksums and decoded plaintext size. This is all done on the client.
+
+Why not just encrypt the file, and use the standard rsync algorithm?
+
+1) Compression cannot be used, since encryption turns the file into essentially random data. This is not very compressible.
+
+2) Any modification to the file will result in all data after that in the file having different ciphertext (in any cipher mode we might want to use). Therefore the rsync algorithm will only be able to detect "same" blocks up until the first modification. This significantly reduces the effectiveness of the process.
+
+Note that blocks are not all the same size. The last block in the file is unlikely to be a full block, and if data is inserted which is not a integral multiple of the block size, odd sized blocks need to be created. This is because the server cannot reassemble the blocks, because the contents are opaque to the server.
+
+
+SUBTITLE Modifed algorithm
+
+To produce a list of the changes to send the new version, the client requests the block index of the file. This is the same step as requesting the weak and strong checksums from the remote side with rsync.
+
+The client then decrypts the index, and builds a list of the 8 most used block sizes above a certain threshold size.
+
+The new version of the file is then scanned in exactly the same way as rsync for these 8 block sizes. If a block is found, then it is added to a list of found blocks, sorted by position in the file. If a block has already been found at that position, then the old entry is replaced by the new entry.
+
+The smallest block size is searched first, so that larger blocks replace smaller blocks in the found list.
+
+A "recipe" is then built from the found list, by trivially discarding overlapping blocks. Each entry consists of a number of bytes of "new" data, a block start number, and a number of blocks from the old file. The data is stored like this as a memory optimisation, assuming that files mostly stay the same rather than having all their blocks reordered.
+
+The file is then encoded, with new data being sent as blocks of data, and references to blocks in the old file. The new index is built completely, as the checksums and size need to be rencrypted to match their position in the index.
+
+
+SUBTITLE Combination on server
+
+The "diff" which is sent from the client is assembled into a full file on the server, simply by adding in blocks from the old file where they are specified in the block index.
+
+
+SUBTITLE Storage on server
+
+Given that the server will in general store several versions of a file, combining old and new files to form a new file is not terribly efficient on storage space. Particularly for large multi-Gb database files.
+
+An alternative scheme is outlined below, however, it is significantly more complex to implement, and so is not implemented in this version.
+
+1) In the block index of the files, store the file ID of the file which each block is source from. This allows a single file to reference blocks from many files.
+
+2) When the file is downloaded, the server combines the blocks from all the files into a new file as it is streamed to the client. (This is not particuarly complicated to do.)
+
+This all sounds fine, until housekeeping is considered. Old versions need to be deleted, without losing any blocks necessary for future versions.
+
+Instead of just deleting a file, the server works out which blocks are still required, and rebuilds the file omitting those blocks which aren't required.
+
+This complicates working out how much space a file will release when it is "deleted", and indeed, adds a whole new level of complexity to the housekeeping process. (And the tests!)
+
+The directory structure will need an additional flag, "Partial file", which specifies that the entry cannot be built as previous blocks are no longer available. Entries with this flag should never be sent to the client.
+
+
+

@@ -1,0 +1,20 @@
+First line
+	Second line    
+   Third
+# comment
+	# comment 		
+	
+	sdf hjjk
+	    
+	     test #coment  	
+	     test#not comment
+	     test#not comment    #comment
+	    	
+nice line	
+fish  
+
+ping
+#comment
+
+	Nothing
+  Nothing

@@ -1,0 +1,24 @@
+lib/common
+lib/crypto
+lib/server
+lib/compress
+test/common
+test/common/testfiles
+test/basicserver
+test/basicserver/testfiles
+test/crypto
+test/compress
+docs/common notes
+docs/common/lib_common notes/lib_common
+docs/common/lib_crypto notes/lib_crypto
+docs/common/lib_server notes/lib_server
+MKDIR infrastructure
+infrastructure/buildenv-testmain-template.cpp
+infrastructure/makebuildenv.pl
+infrastructure/BoxPlatform.pm
+infrastructure/makeparcels.pl
+MKDIR infrastructure/tests
+infrastructure/tests/common_tests.pl
+parcels.txt
+configure
+runtest.pl

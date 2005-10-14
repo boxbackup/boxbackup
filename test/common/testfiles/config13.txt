@@ -1,0 +1,15 @@
+test1
+{
+	value=12
+	string1 = carrots in may  
+	string2 =on the string
+}
+
+TOPlevel= value
+
+ping
+{
+	carrots=324
+	string = casrts
+}
+

@@ -1,0 +1,83 @@
+$ openssl genrsa -out rootkey.pem 1024
+
+$ openssl req -new -key rootkey.pem -sha1 -out rootreq.pem
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) []:GB
+State or Province Name (full name) []:London
+Locality Name (eg, city) []:London
+Organization Name (eg, company) []:Test
+Organizational Unit Name (eg, section) []:basic server
+Common Name (eg, fully qualified host name) []:ROOT
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+$ openssl x509 -req -in rootreq.pem -sha1 -extensions v3_ca -signkey rootkey.pem -out rootcert.pem -days 10000
+Signature ok
+subject=/C=GB/ST=London/L=London/O=Test/OU=basic server/CN=ROOT
+Getting Private key
+
+$ cp rootcert.pem serverTrustedCAs.pem
+$ cp rootcert.pem clientTrustedCAs.pem
+
+$ openssl genrsa -out clientPrivKey.pem 1024
+$ openssl req -new -key clientPrivKey.pem -sha1 -out clientReq.pem
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) []:GB
+State or Province Name (full name) []:London
+Locality Name (eg, city) []:London
+Organization Name (eg, company) []:Test
+Organizational Unit Name (eg, section) []:basic server
+Common Name (eg, fully qualified host name) []:CLIENT
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+$ cat rootcert.pem rootkey.pem > root.pem
+
+$ echo 01 > root.srl
+
+$ openssl x509 -req -in clientReq.pem -sha1 -extensions usr_crt -CA root.pem -CAkey root.pem -out clientCerts.pem -days 10000
+
+$ openssl genrsa -out serverPrivKey.pem 1024
+$ openssl req -new -key serverPrivKey.pem -sha1 -out serverReq.pem
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) []:GB
+State or Province Name (full name) []:London
+Locality Name (eg, city) []:London
+Organization Name (eg, company) []:Test
+Organizational Unit Name (eg, section) []:basic server
+Common Name (eg, fully qualified host name) []:SERVER
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+$ openssl x509 -req -in serverReq.pem -sha1 -extensions usr_crt -CA root.pem -CAkey root.pem -out serverCerts.pem -days 10000
+

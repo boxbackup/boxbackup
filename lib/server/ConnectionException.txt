@@ -1,0 +1,27 @@
+EXCEPTION Connection 7
+
+# for historic reasons not all numbers are used
+
+SocketWriteError			6	Probably a network issue between client and server.
+SocketReadError				7	Probably a network issue between client and server.
+SocketNameLookupError		9	Check hostname specified.
+SocketShutdownError			12
+SocketConnectError			15	Probably a network issue between client and server, bad hostname, or server not running.
+TLSHandshakeFailed			30
+TLSShutdownFailed			32
+TLSWriteFailed				33	Probably a network issue between client and server.
+TLSReadFailed				34	Probably a network issue between client and server.
+TLSNoPeerCertificate		36
+TLSPeerCertificateInvalid	37	Check certification process
+TLSClosedWhenWriting		38
+TLSHandshakeTimedOut		39
+Protocol_Timeout			41	Probably a network issue between client and server.
+Protocol_ObjTooBig			42
+Protocol_BadCommandRecieved				44
+Protocol_UnknownCommandRecieved			45
+Protocol_TriedToExecuteReplyCommand		46
+Protocol_UnexpectedReply				47	Server probably reported an error.
+Protocol_HandshakeFailed				48
+Protocol_StreamWhenObjExpected			49
+Protocol_ObjWhenStreamExpected			50
+Protocol_TimeOutWhenSendingStream		52	Probably a network issue between client and server.
