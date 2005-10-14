@@ -1,0 +1,14 @@
+TITLE Generic type conversion
+
+Conversion.h provides generic type conversion. Within the BoxConvert namespace, it defines the templated function
+
+	ToType Convert<ToType, FromType>(FromType From)
+
+which converts the data type as expected. In general, from and to types have to be specified explicitly.
+
+Templates rather than overloaded functions are used, firstly to be absolutely explicit about the conversion required, and secondly because overloaded functions can't have differing return types for the same argument type.
+
+The function is specialised for various types, and the generic version uses C++ type conversion.
+
+Exceptions may be thrown if the conversion is not possible. These are all of the ConversionException type.
+

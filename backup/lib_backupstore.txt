@@ -1,0 +1,30 @@
+TITLE lib/backupstore
+
+Classes which are shared amongst the server side store utilities, bbstored and bbstoreaccounts. Note also depends on lib/backupclient, as a lot of code is shared between the client and server.
+
+
+SUBTITLE BackupStoreAccountDatabase
+
+A simple implementation of an account database. This will be replaced with a more suitable implementation.
+
+
+SUBTITLE BackupStoreAccounts
+
+An interface to the account database, and knowledge of how to initialise an account on disc.
+
+
+SUBTITLE BackupStoreConfigVerify
+
+The same configuration file is used by all the utilities. This is the Configuration verification structure for this file.
+
+
+SUBTITLE BackupStoreInfo
+
+The "header" information about an account, specifying current disc usage, space limits, etc.
+
+
+SUBTITLE StoreStructure
+
+Functions specifying how the files are laid out on disc in the store.
+
+

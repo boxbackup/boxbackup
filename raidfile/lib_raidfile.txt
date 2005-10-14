@@ -1,0 +1,73 @@
+TITLE lib/raidfile
+
+Implements RAID type abilities in files in userland, along with simple transaction like semantics for writing and reading files.
+
+IOStream interfaces are used to read and write files.
+
+Eventually a raid file daemon will be written to "raidify" files in the background. This will allow fast streaming of data to a single disc, followed by splitting into separate raid files later.
+
+There is an option to disable raidification for use on systems with only one hard disc, or a hardware RAID array.
+
+
+SUBTITLE Controller
+
+The raid disc sets are managed by RaidFileController. This reads the configuration file, /etc/box/raidfile.conf, and then stores the sets of discs for use by the other classes.
+
+In the code, files are referenced using an integer set number, and a filename within that set. For example, (0, "dir/subdir/filename.ext"). The RAID file controller turns this into actual physcial filenames transparently.
+
+The files are devided into blocks, which should match the fragment/block size of the underlying filesystem for maximum space efficiency.
+
+If the directories specified in the configuration files are all equal, then userland RAID is disabled. The files will not be processed into the redundant parts.
+
+
+SUBTITLE Writing
+
+Files are written (and modified) using the RaidFileWrite class. This behaves as a seekable IOStream for writing.
+
+When all data has been written, the file is committed. This makes it available to be read. Processing to split it into the three files can be delayed.
+
+If the data is not commited, the temporary write file will be deleted.
+
+RaidFileWrite will optionally refuse to overwrite another file. If it is being overwritten, a read to that file will get the old file until it has been committed.
+
+
+SUBTITLE Reading
+
+File are opened and read with RaidFileRead::Open. This returns an IOStream (with some extras) which reads a file.
+
+If the file has been turned into the RAID representation, then if an EIO error occurs on any operation, it will switch transparently into recovery mode where the file will be regenerated from the remaining two files using the parity file. (and log an error to syslog)
+
+
+SUBTITLE Layout on disc
+
+The directory structure is replicated onto each of the three directories within the disc set.
+
+Given a filename x, within the disc set, one of the three discs is chosen as the 0th disc for this file. This is done by hashing the filename. This ensures that an equal load is placed on each disc -- otherwise one disc would only be accessed when a RAID file was being written.
+
+When the file is being written, the actual physical file is "x.rfwX". This just a striaght normal file -- nothing is done to the data.
+
+When it is commited, it is renamed to "x.rfw".
+
+Then, when it is turned into the raid representation, it is split across three discs, each file named "x.rf".
+
+When trying to open a file, the first attempt is for "x.rfw". If this exists, it is used as is.
+
+If this fails, two of the "x.rf" files are attempted to be opened. If this succeeds, the file is opened in RAID mode.
+
+This procedure guarenettes that a file will be opened either as a normal file, or as the correct three RAID file elements, even if a new version is being commited at the same time, or another process is working to turn it into a raid file.
+
+
+SUBTITLE Raid file representation
+
+The file is split into three files, stripe 1, stripe 2 and parity.
+
+Considering the file as a set of blocks of the size specified in the configuration, odd numbered blocks go in stripe 1, even blocks in stripe 2, and a XOR of the corresponding blocks in parity.
+
+Thus only two files are needed to recreate the original.
+
+The complexity comes because the size of the file is not stored inside the files at any point. This means if stripe 2 is missing, it is ambiguous as to how big the file is.
+
+Size is stored as a 64 bit integer. This is appended to the parity file, unless it can be stored by XORing it into the last 8 bytes of the parity file.
+
+This scheme is complex to implement (see the RaidFileRead.cpp!) but minimises the disc spaced wasted.
+

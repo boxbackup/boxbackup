@@ -1,0 +1,32 @@
+CLASS RollingChecksum
+
+Implementing the rsync rolling checksum algorithm. Read it's description first:
+
+http://samba.anu.edu.au/rsync/tech_report/node3.html
+
+
+SUBTITLE Construction and initial checksum calculation
+
+The constructor takes a pointer to a block of data and a size, and calculates the checksum of this block. It can now be "rolled forward" to find the checksum of the block of the same size, one byte forward, with minimal calculation.
+
+
+FUNCTION RollingChecksum::GetChecksum()
+
+Returns the checksum for the current block.
+
+
+FUNCTION RollingChecksum::RollForward()
+
+This function takes the byte at the start of the current block, and the last byte of the block it's rolling forward to, and moves the checksum on.
+
+If the block is
+
+	char *pBlock = <something>;
+
+with size s, then it should be called with
+
+	RollForward(pBlock[0], pBlock[s])
+
+and now GetChecksum will return the checksum of the block (pBlock+1) of size s.
+
+

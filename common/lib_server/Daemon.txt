@@ -1,0 +1,96 @@
+CLASS Daemon
+
+Implement a UNIX daemon which
+
+* Daemonises (detach from console, etc)
+* Sets up signal handlers, and does useful things with them
+* Reads configuration files
+* Writes PID file
+* Opens syslog
+
+all the usual UNIX basic daemon behaviour.
+
+The daemon exe takes optional arguments: The first is a configuration file filename which overrides the default. If the second argument is 'SINGLEPROCESS' the daemon will not daemonise.
+
+The configuration file must have a section like this
+
+Server
+{
+	PidFile = /var/run/daemon.pid
+	User = username
+}
+
+Use DAEMON_VERIFY_SERVER_KEYS (defined in Daemon.h) to include the necessary keys in your configuration file's verify structure.
+
+The "User" line is optional, and if it is present the Daemon will change user to this username just before it daemonises. Note that unless the directory the PID file is written to has write permission for this user, the PID file will not be deleted on exit.
+
+
+To implement a daemon, derive a class from Daemon, and override Run().
+
+Then in your main file, do something like
+
+int main(int argc, const char *argv[])
+{
+	MAINHELPER_START
+
+	BackupDaemon daemon;
+	return daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+	
+	MAINHELPER_END
+}
+
+and that's it. Obviously it's worth doing a few more things as well, but that's it.
+
+
+FUNCTION Daemon::Run()
+
+Override with the main daemon code. It should behave like this
+
+void SomethingDaemon::Run()
+{
+	// Read configuration file
+
+	// Do lots of work until StopRun() returns true
+	while(!StopRun())
+	{
+		::sleep(10);
+	}
+
+	// Clean up nicely
+}
+
+which allows the base class to implement the standard start, terminate and -HUP behaviours correctly.
+
+
+FUNCTION Daemon::DaemonName()
+
+Returns the name of the daemon, for use in syslog.
+
+
+FUNCTION Daemon::DaemonBanner()
+
+Returns the banner to be displayed on startup, or 0 for no banner.
+
+
+FUNCTION Daemon::GetConfigVerify()
+
+Returns a configuration verify structure for verifying the config file. Note that this configuration structure should include a sub-configuration called "Server, and have entries defined by DAEMON_VERIFY_SERVER_KEYS. See one of the bin/bbackupd for an example.
+
+
+FUNCTION Daemon::StopRun()
+
+Returns true when the daemon needs to be terminated or restarted. Use IsReloadConfigWanted() and IsTerminateWanted() to find out which one, if you need to know.
+
+
+FUNCTION Daemon::SetupInInitialProcess()
+
+Override to perform additional functions in the initial process, before forking and detachment happens.
+
+
+FUNCTION Daemon::EnterChild()
+
+Called when a child is entered. If you override it, remember to call the base class.
+
+
+
+

@@ -1,0 +1,7 @@
+TITLE BoxTime
+
+Not strictly a class, but time is presented in the project as 64 bit integers as microseconds since the UNIX Epoch.
+
+There are a number of utility functions in the BoxTime*.h files, which are useful.
+
+To get BoxTime values from a struct stat, use the FileModificationTime.h functions.

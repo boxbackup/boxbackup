@@ -1,0 +1,26 @@
+CLASS CollectInBufferStream
+
+This class is essentially a buffer. Data is written to it, and stored in memory. Then when all data is written which will be written, it can be read out again.
+
+Useful for building streams in memory.
+
+
+FUNCTION CollectInBufferStream::SetForReading()
+
+After you've written all the data, call this to set it to read mode.
+
+
+FUNCTION CollectInBufferStream::Reset()
+
+Reset the stream to the state where is has no data, and is about to have data written.
+
+
+FUNCTION CollectInBufferStream::GetSize()
+
+Get the size of the buffered data -- the entire data. Use the interface function BytesLeftToRead() in most cases. 
+
+
+FUNCTION CollectInBufferStream::GetBuffer()
+
+Get the buffer, so you can do bad things with it if you're feeling naughty.
+

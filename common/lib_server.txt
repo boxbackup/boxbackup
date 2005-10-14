@@ -1,0 +1,9 @@
+TITLE lib/server
+
+This provides various classes for implementing client/server applications (and UNIX daemons).
+
+The stars of the show are ServerTLS and Protocol, which allow client server applications which communicate using TLS (SSL successor) to be built with surprisingly few lines of code.
+
+All details in the respective class files.
+
+Look at test/basicserver for examples.

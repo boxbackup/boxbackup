@@ -1,0 +1,28 @@
+TITLE lib/crypto
+
+Provides cryptographic primatives using the OpenSSL implementation.
+
+
+SUBTITLE CipherContexts and CipherDescriptions
+
+A CipherContext is the interface to encryption and decryption, providing a generic interface.
+
+It is constructed with a decrypt or encrypt flag, and a CipherDescription. The CipherDescription specifies which cipher is to be used, the key, and all other cipher specific paramteres.
+
+The CipherContext has support for padding and initialisation vectors.
+
+
+SUBTITLE Random numbers
+
+An interface to the OpenSSL psuedo random number generater is provided.
+
+
+SUBTITLE Digests
+
+An interface to the MD5 digest is provided.
+
+
+SUBTITLE RollingChecksum
+
+The rsync rolling checksum is implemented. The interface is a little tricky to be efficient as the caller must track the position and provide relevant bytes to advance the checksum.
+
