@@ -225,7 +225,6 @@ void StreamableMemBlock::AllocateBlock(int Size)
 // --------------------------------------------------------------------------
 void StreamableMemBlock::ResizeBlock(int Size)
 {
-	ASSERT(mpBuffer != 0);
 	ASSERT(Size > 0);
 	if(Size > 0)
 	{
