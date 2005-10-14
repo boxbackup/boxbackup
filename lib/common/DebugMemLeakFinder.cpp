@@ -216,12 +216,12 @@ void memleakfinder_traceblocksinsection()
 		}
 		else
 		{
-			TRACE4("Block 0x%08x size %d allocated at %s:%d\n", (int)i->first, i->second.size, i->second.file, i->second.line);
+			TRACE4("Block 0x%08lx size %d allocated at %s:%d\n", (long)i->first, i->second.size, i->second.file, i->second.line);
 		}
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sSectionObjectBlocks.begin()); i != sSectionObjectBlocks.end(); ++i)
 	{
-		TRACE5("Object%s 0x%08x size %d allocated at %s:%d\n", i->second.array?" []":"", (int)i->first, i->second.size, i->second.file, i->second.line);
+		TRACE5("Object%s 0x%08lx size %d allocated at %s:%d\n", i->second.array?" []":"", (long)i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 
@@ -246,11 +246,11 @@ void memleakfinder_reportleaks_file(FILE *file)
 {
 	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Block 0x%08x size %d allocated at %s:%d\n", (int)i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Block 0x%08lx size %d allocated at %s:%d\n", (long)i->first, i->second.size, i->second.file, i->second.line);
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%08x size %d allocated at %s:%d\n", i->second.array?" []":"", (int)i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%08lx size %d allocated at %s:%d\n", i->second.array?" []":"", (long)i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 

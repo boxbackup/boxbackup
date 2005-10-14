@@ -139,7 +139,6 @@ int test(int argc, const char *argv[])
 		void *block = ::malloc(12);
 		TEST_THAT(memleakfinder_numleaks() == 1);
 		void *b2 = ::realloc(block, 128*1024);
-		TEST_THAT(block != b2);
 		TEST_THAT(memleakfinder_numleaks() == 1);
 		::free(b2);
 		TEST_THAT(memleakfinder_numleaks() == 0);
