@@ -17,7 +17,7 @@
 CipherContext BackupStoreFileCryptVar::sBlowfishEncrypt;
 CipherContext BackupStoreFileCryptVar::sBlowfishDecrypt;
 
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	CipherContext BackupStoreFileCryptVar::sAESEncrypt;
 	CipherContext BackupStoreFileCryptVar::sAESDecrypt;
 #endif

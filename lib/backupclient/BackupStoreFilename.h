@@ -30,7 +30,7 @@ class IOStream;
 	// If this is changed, change GetClearFilename() back to returning a reference.
 #else
 	typedef std::string BackupStoreFilename_base;
-#endif // PLATFORM_HAVE_STL_MALLOC_ALLOC
+#endif
 
 // --------------------------------------------------------------------------
 //

@@ -16,266 +16,76 @@
 
 #define PLATFORM_DEV_NULL			"/dev/null"
 
+#include "config.h"
 
-// Other flags which might be useful...
-//
-//	#define PLATFORM_BERKELEY_DB_NOT_SUPPORTED
-//    -- dbopen etc not on this platform
-//
-//  #define PLATFORM_REGEX_NOT_SUPPORTED
-//	  -- regex support not available on this platform
-
-
-#ifdef PLATFORM_OPENBSD
-
+#ifdef HAVE_SYS_TYPES_H
 	#include <sys/types.h>
-
-	#define PLATFORM_HAVE_setproctitle
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-	
-	#define PLATFORM_HAVE_getpeereid
-
-	#define PLATFORM_RANDOM_DEVICE	"/dev/arandom"
-
-#endif // PLATFORM_OPENBSD
-
-#ifdef PLATFORM_NETBSD
-
-	#include <sys/types.h>
-
-	#define PLATFORM_HAVE_setproctitle
-
-	#define PLATFORM_NO_BUILT_IN_SWAP64
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-	
-	#define PLATFORM_KQUEUE_NOT_SUPPORTED
-
-	#define PLATFORM_RANDOM_DEVICE	"/dev/urandom"
-
 #endif
-
-#ifdef PLATFORM_FREEBSD
-
-	#include <sys/types.h>
-	#include <netinet/in.h>
-
-	#define PLATFORM_HAVE_setproctitle
-
-	#define PLATFORM_NO_BUILT_IN_SWAP64
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-
-	#define PLATFORM_HAVE_getpeereid
-
-	#define PLATFORM_RANDOM_DEVICE  "/dev/urandom"
-
-#endif // PLATFORM_FREEBSD
-
-#ifdef PLATFORM_DARWIN
-
-	#include <sys/types.h>
-	#include <netdb.h>
-	
-	// types 'missing'
-	#ifndef _SOCKLEN_T
-		typedef int socklen_t;
+#ifdef HAVE_INTTYPES_H
+	#include <inttypes.h>
+#else
+	#ifdef HAVE_STDINT_H
+		#include <stdint.h>
 	#endif
-	typedef u_int8_t uint8_t;
-	typedef signed char int8_t;
-	typedef u_int64_t uint64_t;
-	typedef u_int32_t uint32_t;
-	typedef u_int16_t uint16_t;
-	
-	// poll() emulator on Darwin misses this declaration
-	#define INFTIM		-1
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-	
-	#define PLATFORM_LCHOWN_NOT_SUPPORTED
-	
-	#define PLATFORM_READLINE_NOT_SUPPORTED
-
-	#define PLATFORM_RANDOM_DEVICE	"/dev/random"
-	
-#endif // PLATFORM_DARWIN
-
-#ifdef PLATFORM_LINUX
-	
-	#include <sys/types.h>
-
-	// for ntohl etc...
-	#include <netinet/in.h>
-
-	// types 'missing'
-	typedef u_int8_t uint8_t;
-	typedef signed char int8_t;
-	typedef u_int32_t uint32_t;
-	typedef u_int16_t uint16_t;
-	typedef u_int64_t uint64_t;
-
-	// not defined in Linux, a BSD thing
-	#define INFTIM -1
-
-	#define LLONG_MAX    9223372036854775807LL
-	#define LLONG_MIN    (-LLONG_MAX - 1LL)
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-
-	#define PLATFORM_HAVE_getsockopt_SO_PEERCRED
-
-	// load in installation specific linux configuration
-	#include "../../local/_linux_platform.h"
-
-	#define PLATFORM_KQUEUE_NOT_SUPPORTED
-	#define PLATFORM_dirent_BROKEN_d_type
-	#define PLATFORM_stat_SHORT_mtime
-	#define PLATFORM_stat_NO_st_flags
-	#define PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#define PLATFORM_open_USE_flock
-	#define PLATFORM_sockaddr_NO_len
-
-	#define PLATFORM_RANDOM_DEVICE	"/dev/urandom"
-
-	// If large file support is on, can't do the intercepts in the test/raidfile
-	#if _FILE_OFFSET_BITS == 64
-		#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-	#endif
-
-#endif // PLATFORM_LINUX
-
-#ifdef PLATFORM_SUNOS
-
-	#include <sys/types.h>
-
-	// for ntohl etc...
-	#include <netinet/in.h>
-
-	// types 'missing'
-	typedef uint8_t u_int8_t;
-//	typedef signed char int8_t;
-	typedef uint32_t u_int32_t;
-	typedef uint16_t u_int16_t;
-	typedef uint64_t u_int64_t;
-
-	// not defined in Solaris, a BSD thing
-	#define INFTIM -1
-
-	//#define LLONG_MAX    9223372036854775807LL
-	//#define LLONG_MIN    (-LLONG_MAX - 1LL)
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-
-	#define PLATFORM_BERKELEY_DB_NOT_SUPPORTED
-	#define PLATFORM_KQUEUE_NOT_SUPPORTED       // This may be in Solaris 10
-	#define PLATFORM_dirent_BROKEN_d_type       // Well, no d_type at all actually
-	#define PLATFORM_stat_SHORT_mtime
-	#define PLATFORM_stat_NO_st_flags
-	#define PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#define PLATFORM_open_USE_fcntl
-	#define PLATFORM_sockaddr_NO_len
-
-	#define PLATFORM_RANDOM_DEVICE	"/dev/urandom"
-
-#endif // PLATFORM_SUNOS
-
-#ifdef PLATFORM_CYGWIN
-
-	#define PLATFORM_BERKELEY_DB_NOT_SUPPORTED
-
-	#define PLATFORM_KQUEUE_NOT_SUPPORTED
-	#define PLATFORM_dirent_BROKEN_d_type
-	#define PLATFORM_stat_SHORT_mtime
-	#define PLATFORM_stat_NO_st_flags
-	#define PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#define PLATFORM_open_USE_flock
-	#define PLATFORM_sockaddr_NO_len
-	#define PLATFORM_NO_BUILT_IN_SWAP64
-
-	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
-
-	#define PLATFORM_READLINE_NOT_SUPPORTED
-
-	#define LLONG_MAX    9223372036854775807LL
-	#define LLONG_MIN    (-LLONG_MAX - 1LL)
-
-	#define INFTIM -1
-
-	// File listing canonical interesting mount points.  
-	#define MNTTAB          _PATH_MNTTAB   
-
-	// File listing currently active mount points.  
-	#define MOUNTED         _PATH_MOUNTED   
-
-	#define __need_FILE
-
-	// Extra includes
-	#include <stdint.h>
-	#include <stdlib.h>
-	#include <netinet/in.h>
-	#include <sys/socket.h>
-	#include <sys/stat.h>
-	#include <sys/types.h>
-	#include <dirent.h>
-	#include <stdio.h>
-	#include <paths.h>
-
-	// No easy random entropy source
-	#define PLATFORM_RANDOM_DEVICE_NONE
-
-#endif // PLATFORM_CYGWIN
-
-
-// Check the processor type
-#ifdef PLATFORM_SPARC
-	#define PLATFORM_ALIGN_INT
 #endif
-
-#ifdef PLATFORM_ARM
-	#define PLATFORM_ALIGN_INT
-#endif
-
 
 // Find out if credentials on UNIX sockets can be obtained
-#ifndef PLATFORM_HAVE_getpeereid
-	#ifndef PLATFORM_HAVE_getsockopt_SO_PEERCRED
+#ifndef HAVE_GETPEEREID
+	#if !HAVE_DECL_SO_PEERCRED
 		#define PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 	#endif
 #endif
 
-
-// Compiler issues
-#ifdef __GNUC__
-
-	#ifdef PLATFORM_GCC3
-
-		// GCC v3 doesn't like pragmas in #defines
-		#define STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
-		
-		// But fortunately, the STL allocations are much better behaved.
-	
-	#else
-	
-		// Force STL to use malloc() for memory allocation
-		// -- slower, but doesn't gradually use more and more memory
-		// HOWEVER -- this 'fix' is broken on some platforms. Lots of fun!
-		#ifndef PLATFORM_STL_USE_MALLOC_BROKEN
-			#define __USE_MALLOC
-		#endif
-		
-		// set packing to one bytes (can't use push/pop on gcc)
-		#define BEGIN_STRUCTURE_PACKING_FOR_WIRE	#pragma pack(1)
-		
-		// Use default packing
-		#define END_STRUCTURE_PACKING_FOR_WIRE		#pragma pack()
-
-	#endif
-
-#else
-	compiler not supported!
+// Cannot do the intercepts in test/raidfile if large file support is enabled
+#ifdef HAVE_LARGE_FILE_SUPPORT
+	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif
 
+#ifdef HAVE_DEFINE_PRAGMA
+	// set packing to one bytes (can't use push/pop on gcc)
+	#define BEGIN_STRUCTURE_PACKING_FOR_WIRE	#pragma pack(1)
+
+	// Use default packing
+	#define END_STRUCTURE_PACKING_FOR_WIRE		#pragma pack()
+#else
+	#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
+#endif
+
+// Define missing types
+#ifndef HAVE_UINT8_T
+	typedef u_int8_t uint8_t;
+#endif
+
+#ifndef HAVE_UINT16_T
+	typedef u_int16_t uint16_t;
+#endif
+
+#ifndef HAVE_UINT32_T
+	typedef u_int32_t uint32_t;
+#endif
+
+#ifndef HAVE_UINT64_T
+	typedef u_int64_t uint64_t;
+#endif
+
+#ifndef HAVE_U_INT8_T
+	typedef uint8_t u_int8_t;
+#endif
+
+#ifndef HAVE_U_INT16_T
+	typedef uint16_t u_int16_t;
+#endif
+
+#ifndef HAVE_U_INT32_T
+	typedef uint32_t u_int32_t;
+#endif
+
+#ifndef HAVE_U_INT64_T
+	typedef uint64_t u_int64_t;
+#endif
+
+#if !HAVE_DECL_INFTIM
+	#define INFTIM -1
+#endif
 
 #endif // BOXPLATFORM__H
-

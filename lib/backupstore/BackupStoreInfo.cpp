@@ -19,7 +19,7 @@
 #include "MemLeakFindOn.h"
 
 // set packing to one byte
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "BeginStructPackForWire.h"
 #else
 BEGIN_STRUCTURE_PACKING_FOR_WIRE
@@ -49,7 +49,7 @@ typedef struct
 #define INFO_MAGIC_VALUE	0x34832476
 
 // Use default packing
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "EndStructPackForWire.h"
 #else
 END_STRUCTURE_PACKING_FOR_WIRE
@@ -111,13 +111,13 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 		htonl(INFO_MAGIC_VALUE), // mMagicValue
 		htonl(AccountID), // mAccountID
 		0, // mClientStoreMarker
-		hton64(1), // mLastObjectIDUsed (which is the root directory)
+		box_hton64(1), // mLastObjectIDUsed (which is the root directory)
 		0, // mBlocksUsed
 		0, // mBlocksInOldFiles
 		0, // mBlocksInDeletedFiles
 		0, // mBlocksInDirectories
-		hton64(BlockSoftLimit), // mBlocksSoftLimit
-		hton64(BlockHardLimit), // mBlocksHardLimit
+		box_hton64(BlockSoftLimit), // mBlocksSoftLimit
+		box_hton64(BlockHardLimit), // mBlocksHardLimit
 		0, // mCurrentMarkNumber
 		0, // mOptionsPresent
 		0 // mNumberDeletedDirectories
@@ -179,17 +179,17 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 	info->mReadOnly = ReadOnly;
 	
 	// Insert info from file
-	info->mClientStoreMarker	= ntoh64(hdr.mClientStoreMarker);
-	info->mLastObjectIDUsed		= ntoh64(hdr.mLastObjectIDUsed);
-	info->mBlocksUsed 			= ntoh64(hdr.mBlocksUsed);
-	info->mBlocksInOldFiles 	= ntoh64(hdr.mBlocksInOldFiles);
-	info->mBlocksInDeletedFiles	= ntoh64(hdr.mBlocksInDeletedFiles);
-	info->mBlocksInDirectories	= ntoh64(hdr.mBlocksInDirectories);
-	info->mBlocksSoftLimit		= ntoh64(hdr.mBlocksSoftLimit);
-	info->mBlocksHardLimit		= ntoh64(hdr.mBlocksHardLimit);
+	info->mClientStoreMarker	= box_ntoh64(hdr.mClientStoreMarker);
+	info->mLastObjectIDUsed		= box_ntoh64(hdr.mLastObjectIDUsed);
+	info->mBlocksUsed 			= box_ntoh64(hdr.mBlocksUsed);
+	info->mBlocksInOldFiles 	= box_ntoh64(hdr.mBlocksInOldFiles);
+	info->mBlocksInDeletedFiles	= box_ntoh64(hdr.mBlocksInDeletedFiles);
+	info->mBlocksInDirectories	= box_ntoh64(hdr.mBlocksInDirectories);
+	info->mBlocksSoftLimit		= box_ntoh64(hdr.mBlocksSoftLimit);
+	info->mBlocksHardLimit		= box_ntoh64(hdr.mBlocksHardLimit);
 	
 	// Load up array of deleted objects
-	int64_t numDelObj = ntoh64(hdr.mNumberDeletedDirectories);
+	int64_t numDelObj = box_ntoh64(hdr.mNumberDeletedDirectories);
 	
 	// Then load them in
 	if(numDelObj > 0)
@@ -210,7 +210,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 			// Add them
 			for(int t = 0; t < b; ++t)
 			{
-				info->mDeletedDirectories.push_back(ntoh64(objs[t]));
+				info->mDeletedDirectories.push_back(box_ntoh64(objs[t]));
 			}
 			
 			// Number loaded
@@ -298,17 +298,17 @@ void BackupStoreInfo::Save()
 	info_StreamFormat hdr;
 	hdr.mMagicValue 				= htonl(INFO_MAGIC_VALUE);
 	hdr.mAccountID 					= htonl(mAccountID);
-	hdr.mClientStoreMarker			= hton64(mClientStoreMarker);
-	hdr.mLastObjectIDUsed			= hton64(mLastObjectIDUsed);
-	hdr.mBlocksUsed 				= hton64(mBlocksUsed);
-	hdr.mBlocksInOldFiles 			= hton64(mBlocksInOldFiles);
-	hdr.mBlocksInDeletedFiles 		= hton64(mBlocksInDeletedFiles);
-	hdr.mBlocksInDirectories		= hton64(mBlocksInDirectories);
-	hdr.mBlocksSoftLimit			= hton64(mBlocksSoftLimit);
-	hdr.mBlocksHardLimit			= hton64(mBlocksHardLimit);
+	hdr.mClientStoreMarker			= box_hton64(mClientStoreMarker);
+	hdr.mLastObjectIDUsed			= box_hton64(mLastObjectIDUsed);
+	hdr.mBlocksUsed 				= box_hton64(mBlocksUsed);
+	hdr.mBlocksInOldFiles 			= box_hton64(mBlocksInOldFiles);
+	hdr.mBlocksInDeletedFiles 		= box_hton64(mBlocksInDeletedFiles);
+	hdr.mBlocksInDirectories		= box_hton64(mBlocksInDirectories);
+	hdr.mBlocksSoftLimit			= box_hton64(mBlocksSoftLimit);
+	hdr.mBlocksHardLimit			= box_hton64(mBlocksHardLimit);
 	hdr.mCurrentMarkNumber			= 0;
 	hdr.mOptionsPresent				= 0;
-	hdr.mNumberDeletedDirectories	= hton64(mDeletedDirectories.size());
+	hdr.mNumberDeletedDirectories	= box_hton64(mDeletedDirectories.size());
 	
 	// Write header
 	rf.Write(&hdr, sizeof(hdr));
@@ -329,7 +329,7 @@ void BackupStoreInfo::Save()
 			for(int t = 0; t < b; ++t)
 			{
 				ASSERT(i != mDeletedDirectories.end());
-				objs[t] = hton64((*i));
+				objs[t] = box_hton64((*i));
 				i++;
 			}
 

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+aclocal -I infrastructure/m4
+autoheader
+autoconf

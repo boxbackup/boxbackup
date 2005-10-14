@@ -59,7 +59,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 	// Build an index of common blocks.
 	// For each block in the from file, we want to know it's index in the 
 	// diff file. Allocate memory for this information.
-	int64_t fromNumBlocks = ntoh64(hdr.mNumBlocks);
+	int64_t fromNumBlocks = box_ntoh64(hdr.mNumBlocks);
 	int64_t *pfromIndexInfo = (int64_t*)::malloc(fromNumBlocks * sizeof(int64_t));
 	if(pfromIndexInfo == 0)
 	{
@@ -96,7 +96,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 		}
 
 		// And then read in each entry
-		int64_t diffNumBlocks = ntoh64(diffIdxHdr.mNumBlocks);
+		int64_t diffNumBlocks = box_ntoh64(diffIdxHdr.mNumBlocks);
 		for(int64_t b = 0; b < diffNumBlocks; ++b)
 		{
 			file_BlockIndexEntry e;
@@ -106,7 +106,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 			}
 
 			// Where's the block?
-			int64_t blockEn = ntoh64(e.mEncodedSize);
+			int64_t blockEn = box_ntoh64(e.mEncodedSize);
 			if(blockEn > 0)
 			{
 				// Block is in the delta file, is ignored for now -- not relevant to rebuilding the from file
@@ -136,7 +136,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 			THROW_EXCEPTION(BackupStoreException, CouldntReadEntireStructureFromStream)
 		}
 		if(ntohl(fromIdxHdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
-			|| ntoh64(fromIdxHdr.mOtherFileID) != 0)
+			|| box_ntoh64(fromIdxHdr.mOtherFileID) != 0)
 		{
 			THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 		}
@@ -153,7 +153,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 			}
 
 			// Get size
-			int64_t blockSize = hton64(e.mEncodedSize);
+			int64_t blockSize = box_hton64(e.mEncodedSize);
 			if(blockSize < 0)
 			{
 				THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
@@ -204,7 +204,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 		}
 		
 		// Then write the index, modified header first
-		fromIdxHdr.mOtherFileID = isCompletelyDifferent?0:(hton64(ObjectIDOfFrom));
+		fromIdxHdr.mOtherFileID = isCompletelyDifferent?0:(box_hton64(ObjectIDOfFrom));
 		rOut.Write(&fromIdxHdr, sizeof(fromIdxHdr));
 
 		// Move to start of index entries
@@ -225,7 +225,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 			// Adjust to reflect real block index (remember 0 has a different meaning here)
 			if(s < 0) ++s;
 			// Insert
-			e.mEncodedSize = hton64(s);
+			e.mEncodedSize = box_hton64(s);
 			// Write
 			rOut.Write(&e, sizeof(e));
 		}

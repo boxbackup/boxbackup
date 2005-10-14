@@ -10,7 +10,7 @@
 #ifndef EVENTWATCHFILESYSTEMOBJECT__H
 #define EVENTWATCHFILESYSTEMOBJECT__H
 
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	#include <sys/event.h>
 #endif
 
@@ -34,7 +34,7 @@ private:
 	EventWatchFilesystemObject &operator=(const EventWatchFilesystemObject &);
 public:
 
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	void FillInKEvent(struct kevent &rEvent, int Flags = 0) const;
 #else
 	void FillInPoll(int &fd, short &events, int Flags = 0) const;

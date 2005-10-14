@@ -397,7 +397,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(lock1.TryAndGetLock("testfiles/lock1") == true);
 		// Try to lock something using the same lock
 		TEST_CHECK_THROWS(lock1.TryAndGetLock("testfiles/non-exist/lock2"), CommonException, NamedLockAlreadyLockingSomething);		
-#ifndef PLATFORM_open_USE_fcntl
+#if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
 		// And again on that name
 		NamedLock lock2;
 		TEST_THAT(lock2.TryAndGetLock("testfiles/lock1") == false);
@@ -485,7 +485,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(elist.SizeOfDefiniteList() == 4);
 
 		// Add regex entries
-		#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+		#ifdef HAVE_REGEX_H
 			elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$"));
 			elist.AddRegexEntries(std::string(""));
 			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[:not_valid")), CommonException, BadRegularExpression);
@@ -500,7 +500,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(elist.IsExcluded(std::string("ThingDefThree")) == true);
 		TEST_THAT(elist.IsExcluded(std::string("AnotherDef")) == true);
 		TEST_THAT(elist.IsExcluded(std::string("dir/DefNumberTwo")) == false);
-		#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+		#ifdef HAVE_REGEX_H
 			TEST_THAT(elist.IsExcluded(std::string("b.reg")) == true);
 			TEST_THAT(elist.IsExcluded(std::string("e.reg")) == false);
 			TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == false);

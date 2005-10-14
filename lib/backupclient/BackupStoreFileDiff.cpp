@@ -104,7 +104,7 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 	}
 	
 	// Work out where the index is
-	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
+	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
 	int64_t blockHeaderPosFromEnd = ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
 	
 	// Sanity check
@@ -297,7 +297,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	}
 	
 	// Check that we're not trying to diff against a file which references blocks from another file
-	if(((int64_t)ntoh64(hdr.mOtherFileID)) != 0)
+	if(((int64_t)box_ntoh64(hdr.mOtherFileID)) != 0)
 	{
 		THROW_EXCEPTION(BackupStoreException, CannotDiffAnIncompleteStoreFile)
 	}
@@ -306,8 +306,8 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	rCanDiffFromThis = true;
 
 	// Get basic information
-	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
-	uint64_t entryIVBase = ntoh64(hdr.mEntryIVBase);
+	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
+	uint64_t entryIVBase = box_ntoh64(hdr.mEntryIVBase);
 	
 	//TODO: Verify that these sizes look reasonable
 	
@@ -334,7 +334,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 			uint64_t iv = entryIVBase;
 			iv += b;
 			// Network byte order
-			iv = hton64(iv);
+			iv = box_hton64(iv);
 			sBlowfishDecryptBlockEntry.SetIV(&iv);			
 			
 			// Decrypt the encrypted section
@@ -347,7 +347,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 			}
 
 			// Check that we're not trying to diff against a file which references blocks from another file
-			if(((int64_t)ntoh64(entry.mEncodedSize)) <= 0)
+			if(((int64_t)box_ntoh64(entry.mEncodedSize)) <= 0)
 			{
 				THROW_EXCEPTION(BackupStoreException, CannotDiffAnIncompleteStoreFile)
 			}

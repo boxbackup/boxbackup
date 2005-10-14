@@ -92,9 +92,9 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 	file_BlockIndexHeader hdr;
 	TEST_THAT(enc.ReadFullBuffer(&hdr, sizeof(hdr), 0));
 	TEST_THAT(hdr.mMagicValue == (int32_t)htonl(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1));
-	TEST_THAT((uint64_t)ntoh64(hdr.mOtherFileID) == (uint64_t)OtherFileID);
+	TEST_THAT((uint64_t)box_ntoh64(hdr.mOtherFileID) == (uint64_t)OtherFileID);
 	// number of blocks
-	int64_t nblocks = ntoh64(hdr.mNumBlocks);
+	int64_t nblocks = box_ntoh64(hdr.mNumBlocks);
 	TRACE2("Reading index from '%s', has %lld blocks\n", filename, nblocks);
 	TRACE0("======== ===== ========== ======== ========\n   Index Where  EncSz/Idx     Size  WChcksm\n");
 	// Read them all in
@@ -103,7 +103,7 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 	{
 		file_BlockIndexEntry en;
 		TEST_THAT(enc.ReadFullBuffer(&en, sizeof(en), 0));
-		int64_t s = ntoh64(en.mEncodedSize);
+		int64_t s = box_ntoh64(en.mEncodedSize);
 		if(s > 0)
 		{
 			nnew++;
@@ -115,7 +115,7 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 			TRACE2("%8lld other i=%8lld", b, 0 - s);		
 		}
 		// Decode the rest
-		uint64_t iv = ntoh64(hdr.mEntryIVBase);
+		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
 		iv += b;
 		sBlowfishDecryptBlockEntry.SetIV(&iv);			
 		file_BlockIndexEntryEnc entryEnc;

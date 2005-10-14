@@ -62,7 +62,7 @@ public:
 	
 	void UsePadding(bool Padding = true);
 
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	void OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut);
 #endif
 	
@@ -72,7 +72,7 @@ private:
 	bool mWithinTransform;
 	bool mPaddingOn;
 	uint8_t mGeneratedIV[CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH];
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	CipherFunction mFunction;
 	CipherDescription *mpDescription;
 #endif

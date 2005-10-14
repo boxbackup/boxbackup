@@ -113,7 +113,7 @@ public:
 
 	// Crypto setup
 	static void SetBlowfishKeys(const void *pKey, int KeyLength, const void *pBlockEntryKey, int BlockEntryKeyLength);
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	static void SetAESKey(const void *pKey, int KeyLength);
 #endif
 

@@ -27,11 +27,11 @@
 //
 // --------------------------------------------------------------------------
 EventWatchFilesystemObject::EventWatchFilesystemObject(const char *Filename)
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	: mDescriptor(::open(Filename, O_RDONLY /*O_EVTONLY*/, 0))
 #endif
 {
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	if(mDescriptor == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
@@ -77,7 +77,7 @@ EventWatchFilesystemObject::EventWatchFilesystemObject(const EventWatchFilesyste
 }
 
 
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 // --------------------------------------------------------------------------
 //
 // Function

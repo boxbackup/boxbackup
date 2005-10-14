@@ -45,8 +45,8 @@ void SSLLib::Initialise()
 	::SSL_load_error_strings();
 
 	// Extra seeding over and above what's already done by the library
-#ifndef PLATFORM_RANDOM_DEVICE_NONE
-	if(::RAND_load_file(PLATFORM_RANDOM_DEVICE, 1024) != 1024)
+#ifdef HAVE_RANDOM_DEVICE
+	if(::RAND_load_file(RANDOM_DEVICE, 1024) != 1024)
 	{
 		THROW_EXCEPTION(ServerException, SSLRandomInitFailed)
 	}

@@ -11,7 +11,7 @@
 #define CIPHERAES__H
 
 // Only available in new versions of openssl
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 
 #include "CipherDescription.h"
 
@@ -44,7 +44,7 @@ private:
 	const void *mpInitialisationVector;
 };
 
-#endif // n PLATFORM_OLD_OPENSSL
+#endif // n HAVE_OLD_SSL
 
 #endif // CIPHERAES__H
 

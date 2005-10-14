@@ -22,7 +22,7 @@ namespace BackupStoreFileCryptVar
 	extern CipherContext sBlowfishEncrypt;
 	extern CipherContext sBlowfishDecrypt;
 	// Use AES when available
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	extern CipherContext sAESEncrypt;
 	extern CipherContext sAESDecrypt;
 #endif

@@ -12,9 +12,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
-#ifdef PLATFORM_open_USE_flock
+#ifdef HAVE_FLOCK
 	#include <sys/file.h>
-#endif // PLATFORM_open_USE_flock
+#endif
 
 #include "NamedLock.h"
 #include "CommonException.h"
@@ -68,14 +68,31 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 	}
 
 	// See if the lock can be got
-#if defined(PLATFORM_open_USE_flock) || defined(PLATFORM_open_USE_fcntl)
+#if HAVE_DECL_O_EXLOCK
+	int fd = ::open(Filename, O_WRONLY | O_NONBLOCK | O_CREAT | O_TRUNC | O_EXLOCK, mode);
+	if(fd != -1)
+	{
+		// Got a lock, lovely
+		mFileDescriptor = fd;
+		return true;
+	}
+	
+	// Failed. Why?
+	if(errno != EWOULDBLOCK)
+	{
+		// Not the expected error
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+
+	return false;
+#else
 	int fd = ::open(Filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
 
-#ifdef PLATFORM_open_USE_flock
+#ifdef HAVE_FLOCK
 	if(::flock(fd, LOCK_EX | LOCK_NB) != 0)
 	{
 		::close(fd);
@@ -112,23 +129,6 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 	mFileDescriptor = fd;
 
 	return true;
-#else
-	int fd = ::open(Filename, O_WRONLY | O_NONBLOCK | O_CREAT | O_TRUNC | O_EXLOCK, mode);
-	if(fd != -1)
-	{
-		// Got a lock, lovely
-		mFileDescriptor = fd;
-		return true;
-	}
-	
-	// Failed. Why?
-	if(errno != EWOULDBLOCK)
-	{
-		// Not the expected error
-		THROW_EXCEPTION(CommonException, OSFileError)
-	}
-
-	return false;
 #endif
 }
 

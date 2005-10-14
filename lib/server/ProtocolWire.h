@@ -13,7 +13,7 @@
 #include <sys/types.h>
 
 // set packing to one byte
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "BeginStructPackForWire.h"
 #else
 BEGIN_STRUCTURE_PACKING_FOR_WIRE
@@ -33,7 +33,7 @@ typedef struct
 #define SPECIAL_STREAM_OBJECT_TYPE		0xffffffff
 
 // Use default packing
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "EndStructPackForWire.h"
 #else
 END_STRUCTURE_PACKING_FOR_WIRE

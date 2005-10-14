@@ -10,7 +10,7 @@
 #ifndef WAITFOREVENT__H
 #define WAITFOREVENT__H
 
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	#include <sys/event.h>
 	#include <sys/time.h>
 #else
@@ -42,7 +42,7 @@ public:
 
 	void *Wait();
 
-#ifdef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifndef HAVE_KQUEUE
 	typedef struct
 	{
 		int fd;
@@ -63,7 +63,7 @@ public:
 	void Add(const T *pItem, int Flags = 0)
 	{
 		ASSERT(pItem != 0);
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 		struct kevent e;
 		pItem->FillInKEvent(e, Flags);
 		// Fill in extra flags to say what to do
@@ -100,7 +100,7 @@ public:
 	void Remove(const T *pItem, int Flags = 0)
 	{
 		ASSERT(pItem != 0);
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 		struct kevent e;
 		pItem->FillInKEvent(e, Flags);
 		// Fill in extra flags to say what to do
@@ -128,7 +128,7 @@ public:
 	}
 
 private:
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	int mKQueue;
 	struct timespec mTimeout;
 	struct timespec *mpTimeout;

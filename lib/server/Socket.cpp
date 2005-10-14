@@ -49,7 +49,7 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 				if(phost->h_addr_list[0] != 0)
 				{
 					sockAddrLen = sizeof(addr.sa_inet);
-#ifndef PLATFORM_sockaddr_NO_len
+#ifdef HAVE_STRUCT_SOCKADDR_IN_SIN_LEN
 					addr.sa_inet.sin_len = sizeof(addr.sa_inet);
 #endif
 					addr.sa_inet.sin_family = PF_INET;
@@ -82,7 +82,7 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 				THROW_EXCEPTION(ServerException, SocketNameUNIXPathTooLong);
 			}
 			sockAddrLen = nameLen + (((char*)(&(addr.sa_unix.sun_path[0]))) - ((char*)(&addr.sa_unix)));
-#ifndef PLATFORM_sockaddr_NO_len
+#ifdef HAVE_STRUCT_SOCKADDR_IN_SIN_LEN
 			addr.sa_unix.sun_len = sockAddrLen;
 #endif
 			addr.sa_unix.sun_family = PF_UNIX;
