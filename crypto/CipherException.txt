@@ -1,0 +1,18 @@
+EXCEPTION Cipher 5
+
+Internal							0
+UnknownCipherMode					1
+AlreadyInitialised					2
+BadArguments						3
+EVPInitFailure						4
+EVPUpdateFailure					5
+EVPFinalFailure						6
+NotInitialised						7
+OutputBufferTooSmall				8
+EVPBadKeyLength						9
+BeginNotCalled						10
+IVSizeImplementationLimitExceeded	11
+PseudoRandNotAvailable				12
+EVPSetPaddingFailure				13
+RandomInitFailed					14	Failed to read from random device
+LengthRequestedTooLongForRandomHex	15
