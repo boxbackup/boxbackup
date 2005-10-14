@@ -14,6 +14,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <algorithm>
+#include <new>
+#include <vector>
+#ifdef PLATFORM_HAVE_XATTR
+#include <cerrno>
+#include <sys/xattr.h>
+#endif
 
 #include "BackupClientFileAttributes.h"
 #include "CommonException.h"
@@ -48,6 +55,14 @@ typedef struct
 	u_int32_t	FileGenerationNumber;
 	u_int16_t	Mode;
 	// Symbolic link filename may follow
+	// Extended attribute (xattr) information may follow, format is:
+	//   u_int32_t     Size of extended attribute block (excluding this word)
+	// For each of NumberOfAttributes (sorted by AttributeName):
+	//   u_int16_t     AttributeNameLength
+	//   char          AttributeName[AttributeNameLength]
+	//   u_int32_t     AttributeValueLength
+	//   unsigned char AttributeValue[AttributeValueLength]
+	// AttributeName is 0 terminated, AttributeValue is not (and may be binary data)
 } attr_StreamFormat;
 
 // This has wire packing so it's compatible across platforms
@@ -248,7 +263,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	unsigned int size = mpClearAttributes->GetSize();
 	if(size > sizeof(attr_StreamFormat))
 	{
-		// Symlink strings don't match
+		// Symlink strings don't match. This also compares xattrs
 		if(::memcmp(a1 + 1, a2 + 1, size - sizeof(attr_StreamFormat)) != 0)
 		{
 			return false;
@@ -289,51 +304,19 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		if(pFileSize) {*pFileSize = st.st_size;}
 		if(pInodeNumber) {*pInodeNumber = st.st_ino;}
 		if(pHasMultipleLinks) {*pHasMultipleLinks = (st.st_nlink > 1);}
-		
+
+		pnewAttr = new StreamableMemBlock;
+
+		FillAttributes(*pnewAttr, Filename, st, ZeroModificationTimes);
+
 		// Is it a link?
 		if((st.st_mode & S_IFMT) == S_IFLNK)
 		{
-			ReadAttributesLink(Filename, &st, ZeroModificationTimes);
-			return;
+			FillAttributesLink(*pnewAttr, Filename, st);
 		}
-		ASSERT((st.st_mode & S_IFMT) != S_IFLNK);
-	
-		// Now, can allocate the block
-		pnewAttr = new StreamableMemBlock(sizeof(attr_StreamFormat));
-		
-		// Fill in the entries
-		attr_StreamFormat *pattr = (attr_StreamFormat*)pnewAttr->GetBuffer();
-		
-#define FILL_IN_ATTRIBUTES	\
-		::memset(pattr, 0, sizeof(attr_StreamFormat));				\
-		ASSERT(pattr != 0);											\
-		pattr->AttributeType = htonl(ATTRIBUTETYPE_GENERIC_UNIX);	\
-		pattr->UID = htonl(st.st_uid);								\
-		pattr->GID = htonl(st.st_gid);								\
-		if(ZeroModificationTimes)									\
-		{															\
-			pattr->ModificationTime = 0;							\
-			pattr->AttrModificationTime = 0;						\
-		}															\
-		else														\
-		{															\
-			pattr->ModificationTime = hton64(FileModificationTime(st));	\
-			pattr->AttrModificationTime = hton64(FileAttrModificationTime(st));	\
-		}															\
-		pattr->Mode = htons(st.st_mode);
-#ifdef PLATFORM_stat_NO_st_flags
-	#define FILL_IN_ATTRIBUTES_2	\
-		pattr->UserDefinedFlags = 0;				\
-		pattr->FileGenerationNumber = 0;
-#else
-	#define FILL_IN_ATTRIBUTES_2	\
-		pattr->UserDefinedFlags = htonl(st.st_flags);				\
-		pattr->FileGenerationNumber = htonl(st.st_gen);
-#endif
-		
-		FILL_IN_ATTRIBUTES
-		FILL_IN_ATTRIBUTES_2
-		
+
+		FillExtendedAttr(*pnewAttr, Filename);
+
 		// Attributes ready. Encrypt into this block
 		EncryptAttr(*pnewAttr);
 		
@@ -355,57 +338,184 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 //
 // Function
 //		Name:    BackupClientFileAttributes::ReadAttributesLink()
+//		Purpose: Private function, handles standard attributes for all objects
+//		Created: 2003/10/07
+//
+// --------------------------------------------------------------------------
+void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st, bool ZeroModificationTimes)
+{
+	outputBlock.ResizeBlock(sizeof(attr_StreamFormat));
+	attr_StreamFormat *pattr = (attr_StreamFormat*)outputBlock.GetBuffer();
+	ASSERT(pattr != 0);
+
+	// Fill in the entries
+	pattr->AttributeType = htonl(ATTRIBUTETYPE_GENERIC_UNIX);
+	pattr->UID = htonl(st.st_uid);
+	pattr->GID = htonl(st.st_gid);
+	if(ZeroModificationTimes)
+	{
+		pattr->ModificationTime = 0;
+		pattr->AttrModificationTime = 0;
+	}
+	else
+	{
+		pattr->ModificationTime = hton64(FileModificationTime(st));
+		pattr->AttrModificationTime = hton64(FileAttrModificationTime(st));
+	}
+	pattr->Mode = htons(st.st_mode);
+
+#ifdef PLATFORM_stat_NO_st_flags
+	pattr->UserDefinedFlags = 0;
+	pattr->FileGenerationNumber = 0;
+#else
+	pattr->UserDefinedFlags = htonl(st.st_flags);
+	pattr->FileGenerationNumber = htonl(st.st_gen);
+#endif
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::ReadAttributesLink()
 //		Purpose: Private function, handles the case where a symbolic link is needed
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::ReadAttributesLink(const char *Filename, void *pst, bool ZeroModificationTimes)
+void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st)
 {
-	StreamableMemBlock *pnewAttr = 0;
+	// Make sure we're only called for symbolic links
+	ASSERT((st.st_mode & S_IFMT) == S_IFLNK);
+
+	// Get the filename the link is linked to
+	char linkedTo[PATH_MAX+4];
+	int linkedToSize = ::readlink(Filename, linkedTo, PATH_MAX);
+	if(linkedToSize == -1)
+	{
+		THROW_EXCEPTION(CommonException, OSFileError);
+	}
+
+	int oldSize = outputBlock.GetSize();
+	outputBlock.ResizeBlock(oldSize+linkedToSize+1);
+	char* buffer = static_cast<char*>(outputBlock.GetBuffer());
+
+	// Add the path name for the symbolic link, and add 0 termination
+	std::memcpy(buffer+oldSize, linkedTo, linkedToSize);
+	buffer[oldSize+linkedToSize] = '\0';
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::ReadExtendedAttr(const char *, unsigned char**)
+//		Purpose: Private function, read the extended attributes of the file into the block
+//		Created: 2005/06/12
+//
+// --------------------------------------------------------------------------
+void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename)
+{
+#ifdef PLATFORM_HAVE_XATTR
+	int listBufferSize = 1000;
+	char* list = new char[listBufferSize];
+
 	try
 	{
-		// Avoid needing to have struct stat available when including header file
-		struct stat &st = *((struct stat *)pst);
-		// Make sure we're only called for symbolic links
-		ASSERT((st.st_mode & S_IFMT) == S_IFLNK);
-	
-		// Get the filename the link is linked to
-		char linkedTo[PATH_MAX+4];
-		int linkedToSize = ::readlink(Filename, linkedTo, PATH_MAX);
-		if(linkedToSize == -1)
+		// This returns an unordered list of attribute names, each 0 terminated,
+		// concatenated together
+		int listSize = ::llistxattr(Filename, list, listBufferSize);
+
+		if(listSize>listBufferSize)
 		{
-			THROW_EXCEPTION(CommonException, OSFileError)
+			delete[] list, list = NULL;
+			list = new char[listSize];
+			listSize = ::llistxattr(Filename, list, listSize);
 		}
-	
-		// Now, can allocate the block
-		pnewAttr = new StreamableMemBlock(sizeof(attr_StreamFormat) + linkedToSize + 1);
-		
-		// Fill in the entries
-		attr_StreamFormat *pattr = (attr_StreamFormat*)pnewAttr->GetBuffer();
-	
-		FILL_IN_ATTRIBUTES
-		FILL_IN_ATTRIBUTES_2
-	
-		// Add the path name for the symbolic link
-		::memcpy(pattr + 1, linkedTo, linkedToSize);
-		// Make sure it's neatly terminated
-		((char*)(pattr + 1))[linkedToSize] = '\0';
-		
-		// Attributes ready. Encrypt into this block
-		EncryptAttr(*pnewAttr);
-		
-		// Store the new attributes
-		RemoveClear();
-		mpClearAttributes = pnewAttr;
-		pnewAttr = 0;
+
+		if(listSize>0)
+		{
+			// Extract list of attribute names so we can sort them
+			std::vector<std::string> attrKeys;
+			for(int i = 0; i<listSize; ++i)
+			{
+				std::string attrKey(list+i);
+				i += attrKey.size();
+				attrKeys.push_back(attrKey);
+			}
+			sort(attrKeys.begin(), attrKeys.end());
+
+			// Make initial space in block
+			int xattrSize = outputBlock.GetSize();
+			int xattrBufferSize = (xattrSize+listSize)>500 ? (xattrSize+listSize)*2 : 1000;
+			outputBlock.ResizeBlock(xattrBufferSize);
+			unsigned char* buffer = static_cast<unsigned char*>(outputBlock.GetBuffer());
+
+			// Leave space for attr block size later
+			int xattrBlockSizeOffset = xattrSize;
+			xattrSize += sizeof(u_int32_t);
+
+			// Loop for each attribute
+			for(std::vector<std::string>::const_iterator attrKeyI = attrKeys.begin(); attrKeyI!=attrKeys.end(); ++attrKeyI)
+			{
+				std::string attrKey(*attrKeyI);
+
+				if(xattrSize+sizeof(u_int16_t)+attrKey.size()+1+sizeof(u_int32_t)>static_cast<unsigned int>(xattrBufferSize))
+				{
+					xattrBufferSize = (xattrBufferSize+sizeof(u_int16_t)+attrKey.size()+1+sizeof(u_int32_t))*2;
+					outputBlock.ResizeBlock(xattrBufferSize);
+					buffer = static_cast<unsigned char*>(outputBlock.GetBuffer());
+				}
+
+				// Store length and text for attibute name
+				u_int16_t keyLength = htons(attrKey.size()+1);
+				std::memcpy(buffer+xattrSize, &keyLength, sizeof(u_int16_t));
+				xattrSize += sizeof(u_int16_t);
+				std::memcpy(buffer+xattrSize, attrKey.c_str(), attrKey.size()+1);
+				xattrSize += attrKey.size()+1;
+
+				// Leave space for value size
+				int valueSizeOffset = xattrSize;
+				xattrSize += sizeof(u_int32_t);
+
+				// This gets the attribute value (may be text or binary), no termination
+				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
+
+				if(xattrSize+valueSize>xattrBufferSize)
+				{
+					xattrBufferSize = (xattrBufferSize+valueSize)*2;
+					outputBlock.ResizeBlock(xattrBufferSize);
+					buffer = static_cast<unsigned char*>(outputBlock.GetBuffer());
+
+					valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
+				}
+
+				if(valueSize<0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+				xattrSize += valueSize;
+
+				// Fill in value size
+				u_int32_t valueLength = htonl(valueSize);
+				std::memcpy(buffer+valueSizeOffset, &valueLength, sizeof(u_int32_t));
+			}
+
+			// Fill in attribute block size
+			u_int32_t xattrBlockLength = htonl(xattrSize-xattrBlockSizeOffset-sizeof(u_int32_t));
+			std::memcpy(buffer+xattrBlockSizeOffset, &xattrBlockLength, sizeof(u_int32_t));
+
+			outputBlock.ResizeBlock(xattrSize);
+		}
+		else if(listSize<0 && errno!=EOPNOTSUPP)
+		{
+			THROW_EXCEPTION(CommonException, OSFileError);
+		}
 	}
 	catch(...)
 	{
-		// clean up
-		delete pnewAttr;
-		pnewAttr = 0;
+		delete[] list;
 		throw;
 	}
+	delete[] list;
+#endif
 }
 
 
@@ -451,7 +561,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 
 	// Get pointer to structure
 	attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
-	
+	int xattrOffset = sizeof(attr_StreamFormat);
+
 	// is it a symlink?
 	int16_t mode = ntohs(pattr->Mode);
 	if((mode & S_IFMT) == S_IFLNK)
@@ -469,6 +580,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
+
+		xattrOffset += std::strlen(reinterpret_cast<char*>(pattr+1))+1;
 	}
 	
 	// If working as root, set user IDs
@@ -491,7 +604,12 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 			}
 		#endif
 	}
-	
+
+	if(static_cast<int>(xattrOffset+sizeof(u_int32_t))<=mpClearAttributes->GetSize())
+	{
+		WriteExtendedAttr(Filename, xattrOffset);
+	}
+
 	// Stop now if symlink, because otherwise it'll just be applied to the target
 	if((mode & S_IFMT) == S_IFLNK)
 	{
@@ -588,6 +706,59 @@ void BackupClientFileAttributes::EnsureClearAvailable() const
 	{
 		mpClearAttributes = MakeClear(*this);
 	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::WriteExtendedAttr(const char *Filename, int xattrOffset)
+//		Purpose: Private function, apply the stored extended attributes to the file
+//		Created: 2005/06/13
+//
+// --------------------------------------------------------------------------
+void BackupClientFileAttributes::WriteExtendedAttr(const char *Filename, int xattrOffset) const
+{
+#ifdef PLATFORM_HAVE_XATTR
+	const char* buffer = static_cast<char*>(mpClearAttributes->GetBuffer());
+
+	u_int32_t xattrBlockLength = 0;
+	std::memcpy(&xattrBlockLength, buffer+xattrOffset, sizeof(u_int32_t));
+	int xattrBlockSize = ntohl(xattrBlockLength);
+	xattrOffset += sizeof(u_int32_t);
+
+	int xattrEnd = xattrOffset+xattrBlockSize;
+	if(xattrEnd>mpClearAttributes->GetSize())
+	{
+		// Too small
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	while(xattrOffset<xattrEnd)
+	{
+		u_int16_t keyLength = 0;
+		std::memcpy(&keyLength, buffer+xattrOffset, sizeof(u_int16_t));
+		int keySize = ntohs(keyLength);
+		xattrOffset += sizeof(u_int16_t);
+
+		const char* key = buffer+xattrOffset;
+		xattrOffset += keySize;
+
+		u_int32_t valueLength = 0;
+		std::memcpy(&valueLength, buffer+xattrOffset, sizeof(u_int32_t));
+		int valueSize = ntohl(valueLength);
+		xattrOffset += sizeof(u_int32_t);
+
+		// FIXME: Warn on EOPNOTSUPP
+		if(::lsetxattr(Filename, key, buffer+xattrOffset, valueSize, 0)!=0 && errno!=EOPNOTSUPP)
+		{
+			THROW_EXCEPTION(CommonException, OSFileError);
+		}
+
+		xattrOffset += valueSize;
+	}
+
+	ASSERT(xattrOffset==xattrEnd);
+#endif
 }
 
 
@@ -735,14 +906,14 @@ void BackupClientFileAttributes::SetAttributeHashSecret(const void *pSecret, int
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::GenerateAttributeHash(struct stat &, const std::string &)
+//		Name:    BackupClientFileAttributes::GenerateAttributeHash(struct stat &, const std::string &, const std::string &)
 //		Purpose: Generate a 64 bit hash from the attributes, used to detect changes.
 //				 Include filename in the hash, so that it changes from one file to another,
 //				 so don't reveal identical attributes.
 //		Created: 25/4/04
 //
 // --------------------------------------------------------------------------
-uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, const std::string &rFilename)
+uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, const std::string &filename, const std::string &leafname)
 {
 	if(sAttributeHashSecretLength == 0)
 	{
@@ -757,10 +928,14 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, cons
 	hashData.gid = htonl(st.st_gid);
 	hashData.mode = htonl(st.st_mode);
 
+	StreamableMemBlock xattr;
+	FillExtendedAttr(xattr, filename.c_str());
+
 	// Create a MD5 hash of the data, filename, and secret
 	MD5Digest digest;
 	digest.Add(&hashData, sizeof(hashData));
-	digest.Add(rFilename.c_str(), rFilename.size());
+	digest.Add(xattr.GetBuffer(), xattr.GetSize());
+	digest.Add(leafname.c_str(), leafname.size());
 	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);
 	digest.Finish();
 	
