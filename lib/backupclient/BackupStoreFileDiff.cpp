@@ -41,7 +41,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES]);
 static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> &rFoundBlocks, BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES]);
 static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t BlockSize, BlocksAvailableEntry **pHashTable);
-static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber, 
+static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber,
 BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks);
 static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksAvailableEntry *pIndex, int64_t NumBlocks, std::map<int64_t, int64_t> &rFoundBlocks, int64_t SizeOfInputFile);
 
@@ -103,20 +103,20 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// Work out where the index is
 	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
 	int64_t blockHeaderPosFromEnd = ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
-	
+
 	// Sanity check
 	if(blockHeaderPosFromEnd > static_cast<int64_t>(fileSize - sizeof(file_StreamFormat)))
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// Seek to that position
 	rStream.Seek(0 - blockHeaderPosFromEnd, IOStream::SeekType_End);
-	
+
 	// Done. Stream now in right position (as long as the file is formatted correctly)
 }
 
@@ -131,7 +131,7 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 //				 The timeout is the timeout value for reading the diff block index.
 //				 If pIsCompletelyDifferent != 0, it will be set to true if the
 //				 the two files are completely different (do not share any block), false otherwise.
-//				 
+//
 //		Created: 12/1/04
 //
 // --------------------------------------------------------------------------
@@ -163,7 +163,7 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, in
 	bool canDiffFromThis = false;
 	LoadIndex(rDiffFromBlockIndex, DiffFromObjectID, &pindex, blocksInIndex, Timeout, canDiffFromThis);
 	//TRACE1("Diff: Blocks in index: %lld\n", blocksInIndex);
-	
+
 	if(!canDiffFromThis)
 	{
 		// Don't do diffing...
@@ -173,22 +173,22 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, in
 		}
 		return EncodeFile(Filename, ContainerID, rStoreFilename, pModificationTime);
 	}
-	
+
 	// Pointer to recipe we're going to create
 	BackupStoreFileEncodeStream::Recipe *precipe = 0;
 
 	// Start the timeout timer, so that the operation doesn't continue for ever
 	StartDiffTimer();
-	
+
 	try
 	{
 		// Find which sizes should be scanned
 		int32_t sizesToScan[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES];
 		FindMostUsedSizes(pindex, blocksInIndex, sizesToScan);
-		
+
 		// Flag for reporting to the user
 		bool completelyDifferent;
-			
+
 		// BLOCK
 		{
 			// Search the file to find matching blocks
@@ -201,34 +201,34 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, in
 				sizeOfInputFile = file.BytesLeftToRead();
 				// Find all those lovely matching blocks
 				SearchForMatchingBlocks(file, foundBlocks, pindex, blocksInIndex, sizesToScan);
-				
+
 				// Is it completely different?
 				completelyDifferent = (foundBlocks.size() == 0);
 			}
-			
+
 			// Create a recipe -- if the two files are completely different, don't put the from file ID in the recipe.
 			precipe = new BackupStoreFileEncodeStream::Recipe(pindex, blocksInIndex, completelyDifferent?(0):(DiffFromObjectID));
 			BlocksAvailableEntry *pindexKeptRef = pindex;	// we need this later, but must set pindex == 0 now, because of exceptions
 			pindex = 0;		// Recipe now has ownership
-			
+
 			// Fill it in
 			GenerateRecipe(*precipe, pindexKeptRef, blocksInIndex, foundBlocks, sizeOfInputFile);
 		}
 		// foundBlocks no longer required
-		
+
 		// Create the stream
 		std::auto_ptr<IOStream> stream(new BackupStoreFileEncodeStream);
-	
+
 		// Do the initial setup
 		((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename, precipe, ContainerID, rStoreFilename, pModificationTime);
 		precipe = 0;	// Stream has taken ownership of this
-		
+
 		// Tell user about completely different status?
 		if(pIsCompletelyDifferent != 0)
 		{
 			*pIsCompletelyDifferent = completelyDifferent;
 		}
-	
+
 		// Return the stream for the caller
 		return stream;
 	}
@@ -263,7 +263,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	// Reset
 	rNumBlocksOut = 0;
 	rCanDiffFromThis = false;
-	
+
 	// Read header
 	file_BlockIndexHeader hdr;
 	if(!rBlockIndex.ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */, Timeout))
@@ -277,14 +277,14 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	if(hdr.mMagicValue == (int32_t)htonl(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V0))
 	{
 		// Won't diff against old version
-		
+
 		// Absorb rest of stream
 		char buffer[2048];
 		while(rBlockIndex.StreamDataLeft())
 		{
 			rBlockIndex.Read(buffer, sizeof(buffer), 1000 /* 1 sec timeout */);
 		}
-		
+
 		// Tell caller
 		rCanDiffFromThis = false;
 		return;
@@ -296,7 +296,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// Check that we're not trying to diff against a file which references blocks from another file
 	if(((int64_t)ntoh64(hdr.mOtherFileID)) != 0)
 	{
@@ -309,18 +309,18 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	// Get basic information
 	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
 	uint64_t entryIVBase = ntoh64(hdr.mEntryIVBase);
-	
+
 	//TODO: Verify that these sizes look reasonable
-	
+
 	// Allocate space for the index
 	BlocksAvailableEntry *pindex = (BlocksAvailableEntry*)::malloc(sizeof(BlocksAvailableEntry) * numBlocks);
 	if(pindex == 0)
 	{
 		throw std::bad_alloc();
 	}
-	
+
 	try
-	{	
+	{
 		for(int64_t b = 0; b < numBlocks; ++b)
 		{
 			// Read an entry from the stream
@@ -329,15 +329,15 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 			{
 				// Couldn't read entry
 				THROW_EXCEPTION(BackupStoreException, CouldntReadEntireStructureFromStream)
-			}	
-		
+			}
+
 			// Calculate IV for this entry
 			uint64_t iv = entryIVBase;
 			iv += b;
 			// Network byte order
 			iv = hton64(iv);
-			sBlowfishDecryptBlockEntry.SetIV(&iv);			
-			
+			sBlowfishDecryptBlockEntry.SetIV(&iv);
+
 			// Decrypt the encrypted section
 			file_BlockIndexEntryEnc entryEnc;
 			int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
@@ -352,20 +352,20 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 			{
 				THROW_EXCEPTION(BackupStoreException, CannotDiffAnIncompleteStoreFile)
 			}
-			
+
 			// Store all the required information
 			pindex[b].mpNextInHashList = 0;	// hash list not set up yet
 			pindex[b].mSize = ntohl(entryEnc.mSize);
 			pindex[b].mWeakChecksum = ntohl(entryEnc.mWeakChecksum);
 			::memcpy(pindex[b].mStrongChecksum, entryEnc.mStrongChecksum, sizeof(pindex[b].mStrongChecksum));
 		}
-		
+
 		// Store index pointer for called
 		ASSERT(ppIndex != 0);
 		*ppIndex = pindex;
 
 		// Store number of blocks for caller
-		rNumBlocksOut = numBlocks;	
+		rNumBlocksOut = numBlocks;
 
 	}
 	catch(...)
@@ -399,7 +399,7 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 
 	// Array for collecting sizes
 	std::map<int32_t, int64_t> foundSizes;
-	
+
 	// Run through blocks and make a count of the entries
 	for(int64_t b = 0; b < NumBlocks; ++b)
 	{
@@ -420,7 +420,7 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 			}
 		}
 	}
-	
+
 	// Make the block sizes
 	for(std::map<int32_t, int64_t>::const_iterator i(foundSizes.begin()); i != foundSizes.end(); ++i)
 	{
@@ -437,17 +437,17 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 					Sizes[s] = Sizes[s-1];
 					sizeCounts[s] = sizeCounts[s-1];
 				}
-				
+
 				// Insert this size
 				Sizes[t] = i->first;
 				sizeCounts[t] = i->second;
-				
+
 				// Shouldn't do any more searching
 				break;
 			}
 		}
 	}
-	
+
 	// trace the size table in debug builds
 #ifndef NDEBUG
 	if(BackupStoreFile::TraceDetailsOfDiffProcess)
@@ -491,7 +491,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// TODO: Use buffered file class
 	// Because we read in the file a scanned block size at a time, it is likely to be
 	// inefficient. Probably will be much better to use a buffering IOStream class which
@@ -508,11 +508,11 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			// If a buffer got allocated, it will be cleaned up in the catch block
 			throw std::bad_alloc();
 		}
-		
+
 		// Flag to abort the run, if too many blocks are found -- avoid using
 		// huge amounts of processor time when files contain many similar blocks.
 		bool abortSearch = false;
-		
+
 		// Search for each block size in turn
 		// NOTE: Do the smallest size first, so that the scheme for adding
 		// entries in the found list works as expected and replaces smallers block
@@ -521,35 +521,35 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		{
 			ASSERT(Sizes[s] <= bufSize);
 			//TRACE2("Diff pass %d, for block size %d\n", s, Sizes[s]);
-			
+
 			// Check we haven't finished
 			if(Sizes[s] == 0)
 			{
 				// empty entry, try next size
 				continue;
 			}
-			
+
 			// Set up the hash table entries
 			SetupHashTable(pIndex, NumBlocks, Sizes[s], phashTable);
-		
+
 			// Shift file position to beginning
 			rFile.Seek(0, IOStream::SeekType_Absolute);
-			
+
 			// Read first block
 			if(rFile.Read(pbuffer0, Sizes[s]) != Sizes[s])
 			{
 				// Size of file too short to match -- do next size
 				continue;
 			}
-			
+
 			// Setup block pointers
 			uint8_t *beginnings = pbuffer0;
 			uint8_t *endings = pbuffer1;
 			int offset = 0;
-			
+
 			// Calculate the first checksum, ready for rolling
 			RollingChecksum rolling(beginnings, Sizes[s]);
-			
+
 			// Then roll, until the file is exhausted
 			int64_t fileBlockNumber = 0;
 			int64_t fileOffset = 0;
@@ -565,21 +565,23 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 				{
 					int spaceLeft = bytesInEndings - offset;
 					int thisRoll = (rollOverInitialBytes > spaceLeft) ? spaceLeft : rollOverInitialBytes;
-					
+
 					rolling.RollForwardSeveral(beginnings+offset, endings+offset, Sizes[s], thisRoll);
 
 					offset += thisRoll;
 					fileOffset += thisRoll;
 					rollOverInitialBytes -= thisRoll;
 
-					if(rollOverInitialBytes)
+					if(rollOverInitialBytes) {
 						goto refresh;
+					}
 				}
 
-				if(goodnessOfFit.count(fileOffset))
+				if(goodnessOfFit.count(fileOffset)) {
 					tmp = goodnessOfFit[fileOffset];
-				else
+				} else {
 					tmp = 0;
+				}
 
 				if(tmp >= Sizes[s])
 				{
@@ -587,15 +589,16 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					rollOverInitialBytes = tmp;
 					int spaceLeft = bytesInEndings - offset;
 					int thisRoll = (rollOverInitialBytes > spaceLeft) ? spaceLeft : rollOverInitialBytes;
-					
+
 					rolling.RollForwardSeveral(beginnings+offset, endings+offset, Sizes[s], thisRoll);
 
 					offset += thisRoll;
 					fileOffset += thisRoll;
 					rollOverInitialBytes -= thisRoll;
 
-					if(rollOverInitialBytes)
+					if(rollOverInitialBytes) {
 						goto refresh;
+					}
 				}
 
 				while(offset < bytesInEndings)
@@ -627,27 +630,26 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 							// Not all the bytes necessary will have been skipped, so get them
 							// skipped after the next block is loaded.
 							rollOverInitialBytes = skip;
-							
+
 							// End this loop, so the final byte isn't used again
 							break;
 						}
-						
-						if(static_cast<int64_t>(rFoundBlocks.size()) > (NumBlocks * BACKUP_FILE_DIFF_MAX_BLOCK_FIND_MULTIPLE)
-							|| sDiffTimedOut)
+
+						if(static_cast<int64_t>(rFoundBlocks.size()) > (NumBlocks * BACKUP_FILE_DIFF_MAX_BLOCK_FIND_MULTIPLE) || sDiffTimedOut)
 						{
 							abortSearch = true;
 							break;
 						}
 					}
-					
+
 					// Roll checksum forward
 					rolling.RollForward(beginnings[offset], endings[offset], Sizes[s]);
-				
+
 					// Increment offsets
 					++offset;
 					++fileOffset;
 				}
-				
+
 				if(abortSearch) break;
 
 			refresh:
@@ -660,14 +662,15 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					uint16_t hash = rolling.GetComponentForHashing();
 					if(phashTable[hash] != 0 && (goodnessOfFit.count(fileOffset) == 0 || goodnessOfFit[fileOffset] < Sizes[s]))
 					{
-						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks))
+						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks)) {
 							goodnessOfFit[fileOffset] = Sizes[s];
+						}
 					}
 
 					// finish
 					break;
 				}
-				
+
 				// Switch buffers, reset offset
 				beginnings = endings;
 				endings = (beginnings == pbuffer0)?(pbuffer1):(pbuffer0);	// ie the other buffer
@@ -679,7 +682,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 
 			if(abortSearch) break;
 		}
-		
+
 		// Free buffers and hash table
 		::free(pbuffer1);
 		pbuffer1 = 0;
@@ -696,7 +699,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		if(phashTable != 0) ::free(phashTable);
 		throw;
 	}
-	
+
 #ifndef NDEBUG
 	if(BackupStoreFile::TraceDetailsOfDiffProcess)
 	{
@@ -739,7 +742,7 @@ static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int3
 		{
 			// Get the value under which to hash this entry
 			uint16_t hash = RollingChecksum::ExtractHashingComponent(pIndex[b].mWeakChecksum);
-			
+
 			// Already present in table?
 			if(pHashTable[hash] != 0)
 			{
@@ -788,8 +791,9 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 		}
 		scan = scan->mpNextInHashList;
 	}
-	if(!found)
+	if(!found) {
 		return false;
+	}
 
 	// Calculate the strong MD5 digest for this block
 	MD5Digest strong;
@@ -801,7 +805,7 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 		strong.Add(pEndings, Offset);
 	}
 	strong.Finish();
-	
+
 	// Then go through the entries in the hash list, comparing with the strong digest calculated
 	scan = pFirstInHashList;
 	//TRACE0("second stage match\n");
@@ -810,7 +814,7 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 		//TRACE3("scan size %d, block size %d, hash %d\n", scan->mSize, BlockSize, Hash);
 		ASSERT(scan->mSize == BlockSize);
 		ASSERT(RollingChecksum::ExtractHashingComponent(scan->mWeakChecksum) == Hash);
-	
+
 		// Compare?
 		if(strong.DigestMatches(scan->mStrongChecksum))
 		{
@@ -818,21 +822,21 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 			// Found! Add to list of found blocks...
 			int64_t fileOffset = (FileBlockNumber * BlockSize) + Offset;
 			int64_t blockIndex = (scan - pIndex);	// pointer arthmitic is frowned upon. But most efficient way of doing it here -- alternative is to use more memory
-			
+
 			// We do NOT search for smallest blocks first, as this code originally assumed.
 			// To prevent this from potentially overwriting a better match, the caller must determine
 			// the relative "goodness" of any existing match and this one, and avoid the call if it
 			// could be detrimental.
 			rFoundBlocks[fileOffset] = blockIndex;
-			
+
 			// No point in searching further, report success
 			return true;
 		}
-	
+
 		// Next
 		scan = scan->mpNextInHashList;
 	}
-	
+
 	// Not matched
 	return false;
 }
@@ -871,15 +875,15 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	{
 		// No blocks, just a load of space
 		instruction.mSpaceBefore = SizeOfInputFile;
-		rRecipe.push_back(instruction);	
-	
+		rRecipe.push_back(instruction);
+
 		#ifndef NDEBUG
 		if(BackupStoreFile::TraceDetailsOfDiffProcess)
 		{
 			TRACE1("Diff: Default recipe generated, %lld bytes of file\n", SizeOfInputFile);
 		}
 		#endif
-		
+
 		// Don't do anything
 		return;
 	}
@@ -896,11 +900,11 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	int64_t debug_NewBytesFound = 0;
 	int64_t debug_OldBlocksUsed = 0;
 #endif
-	
+
 	for(; i != rFoundBlocks.end(); ++i)
 	{
 		// Remember... map is (position in file) -> (index of block in pIndex)
-		
+
 		if(i->first < loc)
 		{
 			// This block overlaps the last one
@@ -923,7 +927,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			debug_NewBytesFound += instruction.mSpaceBefore;
 #endif
 		}
-		
+
 		// First, does the current instruction need pushing back, because this block is not
 		// sequential to the last one?
 		if(instruction.mpStartBlock != 0 && (pIndex + i->second) != (instruction.mpStartBlock + instruction.mBlocks))
@@ -931,7 +935,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			rRecipe.push_back(instruction);
 			RESET_INSTRUCTION
 		}
-		
+
 		// Add in this block
 		if(instruction.mpStartBlock == 0)
 		{
@@ -952,10 +956,10 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 		// Move location forward
 		loc += pIndex[i->second].mSize;
 	}
-	
+
 	// Push the last instruction generated
 	rRecipe.push_back(instruction);
-	
+
 	// Is there any space left at the end which needs sending?
 	if(loc != SizeOfInputFile)
 	{
@@ -964,9 +968,9 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 #ifndef NDEBUG
 		debug_NewBytesFound += instruction.mSpaceBefore;
 #endif
-		rRecipe.push_back(instruction);		
+		rRecipe.push_back(instruction);
 	}
-	
+
 	// dump out the recipe
 #ifndef NDEBUG
 	TRACE2("Diff: %lld new bytes found, %lld old blocks used\n", debug_NewBytesFound, debug_OldBlocksUsed);
@@ -1030,7 +1034,7 @@ void StartDiffTimer()
 	{
 		TRACE0("WARNING: couldn't set diff timeout\n");
 	}
-	
+
 	// Unset flag (last thing)
 	sDiffTimedOut = false;
 }

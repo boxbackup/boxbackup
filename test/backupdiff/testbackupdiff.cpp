@@ -35,12 +35,12 @@ bool files_identical(const char *file1, const char *file2)
 {
 	FileStream f1(file1);
 	FileStream f2(file2);
-	
+
 	if(f1.BytesLeftToRead() != f2.BytesLeftToRead())
 	{
 		return false;
 	}
-	
+
 	while(f1.StreamDataLeft())
 	{
 		char buffer1[2048];
@@ -55,33 +55,33 @@ bool files_identical(const char *file1, const char *file2)
 			return false;
 		}
 	}
-	
+
 	if(f2.StreamDataLeft())
 	{
 		return false;
 	}
-	
+
 	return true;
 }
 
-void make_file_of_zeros(const char *filename, int size)
+void make_file_of_zeros(const char *filename, size_t size)
 {
-	if(size & 0xFFFF == 0) {
-		void *b = malloc(0x10000);
-		memset(b, 0, 0x10000);
-		FILE *f = fopen(filename, "wb");
-		for(int i=0; i < (size >> 16); i++)
-			fwrite(b, 0x10000, 1, f);
-		fclose(f);
-		free(b);
-	} else {
-		void *b = malloc(size);
-		memset(b, 0, size);
-		FILE *f = fopen(filename, "wb");
-		fwrite(b, size, 1, f);
-		fclose(f);
-		free(b);
+	static const size_t bs = 0x10000;
+	size_t remSize = size;
+	void *b = malloc(bs);
+	memset(b, 0, bs);
+	FILE *f = fopen(filename, "wb");
+
+	// Using largish blocks like this is much faster, while not consuming too much RAM
+	while(remSize > bs)
+	{
+		fwrite(b, bs, 1, f);
+		remSize -= bs;
 	}
+	fwrite(b, remSize, 1, f);
+
+	fclose(f);
+	free(b);
 
 	TEST_THAT(TestGetFileSize(filename) == size);
 }
@@ -90,12 +90,12 @@ void make_file_of_zeros(const char *filename, int size)
 void check_encoded_file(const char *filename, int64_t OtherFileID, int new_blocks_expected, int old_blocks_expected)
 {
 	FileStream enc(filename);
-	
+
 	// Use the interface verify routine
 	int64_t otherIDFromFile = 0;
 	TEST_THAT(BackupStoreFile::VerifyEncodedFileFormat(enc, &otherIDFromFile));
 	TEST_THAT(otherIDFromFile == OtherFileID);
-	
+
 	// Now do our own reading
 	enc.Seek(0, IOStream::SeekType_Absolute);
 	BackupStoreFile::MoveStreamPositionToBlockIndex(enc);
@@ -123,17 +123,17 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		else
 		{
 			nold++;
-			TRACE2("%8lld other i=%8lld", b, 0 - s);		
+			TRACE2("%8lld other i=%8lld", b, 0 - s);
 		}
 		// Decode the rest
 		uint64_t iv = ntoh64(hdr.mEntryIVBase);
 		iv += b;
-		sBlowfishDecryptBlockEntry.SetIV(&iv);			
+		sBlowfishDecryptBlockEntry.SetIV(&iv);
 		file_BlockIndexEntryEnc entryEnc;
 		sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
 				en.mEnEnc, sizeof(en.mEnEnc));
 		TRACE2(" %8d %08x\n", ntohl(entryEnc.mSize), ntohl(entryEnc.mWeakChecksum));
-		
+
 	}
 	TRACE0("======== ===== ========== ======== ========\n");
 	TEST_THAT(new_blocks_expected == nnew);
@@ -163,7 +163,7 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 	sprintf(from_rebuild, "testfiles/f%d.rebuilt", to);
 	char from_rebuild_dec[256];
 	sprintf(from_rebuild_dec, "testfiles/f%d.rebuilt_dec", to);
-	
+
 	// Then call the encode varient for diffing files
 	bool completelyDifferent = !expect_completely_different;	// oposite of what we want
 	{
@@ -175,14 +175,14 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 		encoded->CopyStreamTo(out);
 	}
 	TEST_THAT(completelyDifferent == expect_completely_different);
-	
+
 	// Test that the number of blocks in the file match what's expected
 	check_encoded_file(to_diff, expect_completely_different?(0):(1000 + from), new_blocks_expected, old_blocks_expected);
 
 	// filename
 	char to_testdec[256];
 	sprintf(to_testdec, "testfiles/f%d.testdec", to);
-	
+
 	if(!completelyDifferent)
 	{
 		// Then produce a combined file
@@ -193,7 +193,7 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 			FileStream out(to_encoded, O_WRONLY | O_CREAT | O_EXCL);
 			BackupStoreFile::CombineFile(diff, diff2, from, out);
 		}
-		
+
 		// And check it
 		check_encoded_file(to_encoded, 0, new_blocks_expected + old_blocks_expected, 0);
 	}
@@ -211,7 +211,7 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 		BackupStoreFile::DecodeFile(enc, to_testdec, IOStream::TimeOutInfinite);
 		TEST_THAT(files_identical(to_orig, to_testdec));
 	}
-	
+
 	// Then do some comparisons against the block index
 	{
 		FileStream index(to_encoded);
@@ -225,7 +225,7 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 		BackupStoreFile::MoveStreamPositionToBlockIndex(index);
 		TEST_THAT(BackupStoreFile::CompareFileContentsAgainstBlockIndex(from_orig, index, IOStream::TimeOutInfinite) == files_identical(from_orig, to_orig));
 	}
-	
+
 	// Check that combined index creation works as expected
 	{
 		// Load a combined index into memory
@@ -242,7 +242,7 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 		TEST_THAT(indexCmb.GetSize() == index.GetSize());
 		TEST_THAT(::memcmp(indexCmb.GetBuffer(), index.GetBuffer(), index.GetSize()) == 0);
 	}
-	
+
 	// Check that reverse delta can be made, and that it decodes OK
 	{
 		// Create reverse delta
@@ -297,7 +297,7 @@ void test_combined_diff(int version1, int version2, int serial)
 
 	// Then do a combine on it, and check that it decodes to the right thing
 	char orig_enc[256];
-	sprintf(orig_enc, "testfiles/f%d.encoded", version1);	
+	sprintf(orig_enc, "testfiles/f%d.encoded", version1);
 	char combined_out[256];
 	sprintf(combined_out, "testfiles/comb%d_%d.out", version1, version2);
 
@@ -354,7 +354,7 @@ int test(int argc, const char *argv[])
 	create_test_files();
 
 	// Setup the crypto
-	BackupClientCryptoKeys_Setup("testfiles/backup.keys");	
+	BackupClientCryptoKeys_Setup("testfiles/backup.keys");
 
 	// Encode the first file
 	{
@@ -364,7 +364,7 @@ int test(int argc, const char *argv[])
 		encoded->CopyStreamTo(out);
 		check_encoded_file("testfiles/f0.encoded", 0, 33, 0);
 	}
-	
+
 	// Check the "seek to index" code
 	{
 		FileStream enc("testfiles/f0.encoded");
@@ -377,7 +377,7 @@ int test(int argc, const char *argv[])
 
 	// Diff some files -- parameters are from number, to number,
 	// then the number of new blocks expected, and the number of old blocks expected.
-	
+
 	// Diff the original file to a copy of itself, and check that there is no data in the file
 	// This checks that the hash table is constructed properly, because two of the blocks share
 	// the same weak checksum.
@@ -400,20 +400,20 @@ int test(int argc, const char *argv[])
 	// a file with some new content at the very beginning
 	// NOTE: You might expect the last numbers to be 2, 29, but the small 1 byte block isn't searched for
 	test_diff(5, 6, 3, 28);
-	
+
 	// some new content at the very end
 	// NOTE: 1 byte block deleted, so number aren't what you'd initial expect.
 	test_diff(6, 7, 2, 30);
-	
+
 	// a completely different file, with no blocks matching.
 	test_diff(7, 8, 14, 0, true /* completely different expected */);
-	
+
 	// diff to zero sized file
 	test_diff(8, 9, 0, 0, true /* completely different expected */);
-	
+
 	// Test that combining diffs works
 	test_combined_diffs();
-	
+
 	// Check zero sized file works OK to encode on its own, using normal encoding
 	{
 		{
@@ -422,7 +422,7 @@ int test(int argc, const char *argv[])
 			FileStream out("testfiles/f9.zerotest", O_WRONLY | O_CREAT | O_EXCL);
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f9", 1 /* dir ID */, fn));
 			encoded->CopyStreamTo(out);
-			check_encoded_file("testfiles/f9.zerotest", 0, 0, 0);		
+			check_encoded_file("testfiles/f9.zerotest", 0, 0, 0);
 		}
 		{
 			// Decode
@@ -431,7 +431,7 @@ int test(int argc, const char *argv[])
 			TEST_THAT(files_identical("testfiles/f9", "testfiles/f9.testdec.zero"));
 		}
 	}
-	
+
 	// Check that symlinks aren't diffed
 	TEST_THAT(::symlink("f2", "testfiles/f2.symlink") == 0)
 	// And go and diff it against the previous encoded file
@@ -440,7 +440,7 @@ int test(int argc, const char *argv[])
 		{
 			FileStream blockindex("testfiles/f1.encoded");
 			BackupStoreFile::MoveStreamPositionToBlockIndex(blockindex);
-			
+
 			BackupStoreFilenameClear f1name("filename");
 			FileStream out("testfiles/f2.symlink.diff", O_WRONLY | O_CREAT | O_EXCL);
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFileDiff("testfiles/f2.symlink", 1 /* dir ID */, f1name,
@@ -449,14 +449,14 @@ int test(int argc, const char *argv[])
 			encoded->CopyStreamTo(out);
 		}
 		TEST_THAT(completelyDifferent == true);
-		check_encoded_file("testfiles/f2.symlink.diff", 0, 0, 0);		
+		check_encoded_file("testfiles/f2.symlink.diff", 0, 0, 0);
 	}
 
 	// Check that diffing against a file which isn't "complete" and referes another isn't allowed
 	{
 		FileStream blockindex("testfiles/f1.diff");
 		BackupStoreFile::MoveStreamPositionToBlockIndex(blockindex);
-		
+
 		BackupStoreFilenameClear f1name("filename");
 		FileStream out("testfiles/f2.testincomplete", O_WRONLY | O_CREAT | O_EXCL);
 		TEST_CHECK_THROWS(BackupStoreFile::EncodeFileDiff("testfiles/f2", 1 /* dir ID */, f1name,

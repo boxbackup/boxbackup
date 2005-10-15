@@ -20,16 +20,16 @@
 //		Created: 6/12/03
 //
 // --------------------------------------------------------------------------
-RollingChecksum::RollingChecksum(const void *data, unsigned int Length)
+RollingChecksum::RollingChecksum(const void * const data, const unsigned int Length)
 	: a(0),
 	  b(0)
 {
-	uint8_t *block = (uint8_t *)data;
+	uint8_t * const block = (uint8_t * const)data;
 	for(unsigned int x = Length; x >= 1; --x)
 	{
 		a += (*block);
 		b += x * (*block);
-		
+
 		++block;
 	}
 }
@@ -43,19 +43,20 @@ RollingChecksum::RollingChecksum(const void *data, unsigned int Length)
 //		Created: 7/14/05
 //
 // --------------------------------------------------------------------------
-void RollingChecksum::RollForwardSeveral(uint8_t *StartOfThisBlock, uint8_t *LastOfNextBlock, unsigned int Length, unsigned int Skip)
+void RollingChecksum::RollForwardSeveral(const uint8_t * const StartOfThisBlock, const uint8_t * const LastOfNextBlock, const unsigned int Length, const unsigned int Skip)
 {
 	// IMPLEMENTATION NOTE: Everything is implicitly mod 2^16 -- uint16_t's will overflow nicely.
 	unsigned int i;
-	uint16_t sum_begin=0, j,k;
-	
-	for(i=0; i < Skip; i++) {
+	uint16_t sumBegin=0, j,k;
+
+	for(i=0; i < Skip; i++)
+	{
 		j = StartOfThisBlock[i];
 		k = LastOfNextBlock[i];
-		sum_begin += j;
+		sumBegin += j;
 		a += (k - j);
 		b += a;
 	}
-	
-	b -= Length * sum_begin;
+
+	b -= Length * sumBegin;
 }
