@@ -24,7 +24,7 @@ RollingChecksum::RollingChecksum(const void * const data, const unsigned int Len
 	: a(0),
 	  b(0)
 {
-	uint8_t * const block = (uint8_t * const)data;
+	const uint8_t *block = (const uint8_t *)data;
 	for(unsigned int x = Length; x >= 1; --x)
 	{
 		a += (*block);
