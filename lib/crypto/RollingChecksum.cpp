@@ -29,7 +29,7 @@ RollingChecksum::RollingChecksum(const void * const data, const unsigned int Len
 	{
 		a += (*block);
 		b += x * (*block);
-
+		
 		++block;
 	}
 }

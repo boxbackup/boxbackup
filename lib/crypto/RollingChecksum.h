@@ -62,16 +62,16 @@ public:
 	//		Purpose: Returns the checksum
 	//		Created: 6/12/03
 	//
-	// --------------------------------------------------------------------------
+	// --------------------------------------------------------------------------	
 	const inline uint32_t GetChecksum()
 	{
 		return ((uint32_t)a) | (((uint32_t)b) << 16);
 	}
-
+	
 	// Components, just in case they're handy
 	const inline uint16_t GetComponent1() {return a;}
 	const inline uint16_t GetComponent2() {return b;}
-
+	
 	// --------------------------------------------------------------------------
 	//
 	// Function
@@ -84,7 +84,7 @@ public:
 	{
 		return b;
 	}
-
+	
 	// --------------------------------------------------------------------------
 	//
 	// Function
@@ -97,7 +97,7 @@ public:
 	{
 		return Checksum >> 16;
 	}
-
+	
 private:
 	uint16_t a;
 	uint16_t b;

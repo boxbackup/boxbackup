@@ -66,13 +66,13 @@ void test_cipher()
 		unsigned int buf1_de_used = decrypt1.TransformBlock(buf1_de, sizeof(buf1_de), buf1, buf1_used);
 		TEST_THAT(buf1_de_used == sizeof(STRING1));
 		TEST_THAT(memcmp(STRING1, buf1_de, sizeof(STRING1)) == 0);
-
+		
 		// Use them again...
 		char buf1_de2[256];
 		unsigned int buf1_de2_used = decrypt1.TransformBlock(buf1_de2, sizeof(buf1_de2), buf1, buf1_used);
 		TEST_THAT(buf1_de2_used == sizeof(STRING1));
 		TEST_THAT(memcmp(STRING1, buf1_de2, sizeof(STRING1)) == 0);
-
+		
 		// Test the interface
 		char buf2[256];
 		TEST_CHECK_THROWS(encrypt1.Transform(buf2, sizeof(buf2), STRING1, sizeof(STRING1)),
@@ -85,7 +85,7 @@ void test_cipher()
 		e += encrypt1.Transform(buf2 + e, sizeof(buf2) - e, STRING2 + sizeof(STRING2) - 16, 16);
 		e += encrypt1.Final(buf2 + e, sizeof(buf2) - e);
 		TEST_THAT(e >= (int)sizeof(STRING2));
-
+		
 		// Then decrypt
 		char buf2_de[256];
 		decrypt1.Begin();
@@ -96,13 +96,13 @@ void test_cipher()
 		d += decrypt1.Final(buf2_de + d, sizeof(buf2_de) - d);
 		TEST_THAT(d == sizeof(STRING2));
 		TEST_THAT(memcmp(STRING2, buf2_de, sizeof(STRING2)) == 0);
-
+		
 		// Try a reset and rekey
 		encrypt1.Reset();
 		encrypt1.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY2, sizeof(KEY2)));
 		buf1_used = encrypt1.TransformBlock(buf1, sizeof(buf1), STRING1, sizeof(STRING1));
 	}
-
+	
 	// Test initialisation vectors
 	{
 		// Init with random IV
@@ -114,10 +114,10 @@ void test_cipher()
 		TEST_THAT(ivLen == BLOCKSIZE);	// block size
 		TEST_THAT(ivGen != 0);
 		memcpy(iv2, ivGen, ivLen);
-
+		
 		char buf3[256];
 		unsigned int buf3_used = encrypt2.TransformBlock(buf3, sizeof(buf3), STRING2, sizeof(STRING2));
-
+		
 		// Encrypt again with different IV
 		char iv3[BLOCKSIZE];
 		int ivLen3;
@@ -134,7 +134,7 @@ void test_cipher()
 		// check encryptions are different
 		TEST_THAT(buf3_used == buf4_used);
 		TEST_THAT(memcmp(buf3, buf4, buf3_used) != 0);
-
+		
 		// Test that decryption with the right IV works
 		CipherContext decrypt2;
 		decrypt2.Init(CipherContext::Decrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY), iv2));
@@ -142,27 +142,27 @@ void test_cipher()
 		unsigned int buf3_de_used = decrypt2.TransformBlock(buf3_de, sizeof(buf3_de), buf3, buf3_used);
 		TEST_THAT(buf3_de_used == sizeof(STRING2));
 		TEST_THAT(memcmp(STRING2, buf3_de, sizeof(STRING2)) == 0);
-
+		
 		// And that using the wrong one doesn't
 		decrypt2.SetIV(iv3);
 		buf3_de_used = decrypt2.TransformBlock(buf3_de, sizeof(buf3_de), buf3, buf3_used);
 		TEST_THAT(buf3_de_used == sizeof(STRING2));
-		TEST_THAT(memcmp(STRING2, buf3_de, sizeof(STRING2)) != 0);
+		TEST_THAT(memcmp(STRING2, buf3_de, sizeof(STRING2)) != 0);		
 	}
-
+	
 	// Test with padding off.
 	{
 		CipherContext encrypt3;
 		encrypt3.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
 		encrypt3.UsePadding(false);
-
+		
 		// Should fail because the encrypted size is not a multiple of the block size
 		char buf4[256];
 		encrypt3.Begin();
 		ZERO_BUFFER(buf4);
 		int buf4_used = encrypt3.Transform(buf4, sizeof(buf4), STRING2, 6);
 		TEST_CHECK_THROWS(encrypt3.Final(buf4, sizeof(buf4)), CipherException, EVPFinalFailure);
-
+		
 		// Check a nice encryption with the correct block size
 		CipherContext encrypt4;
 		encrypt4.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
@@ -195,7 +195,7 @@ void test_cipher()
 		buf4_de_used += decrypt4.Final(buf4_de+buf4_de_used, sizeof(buf4_de));
 		TEST_THAT(buf4_de_used == 16);
 		TEST_THAT(::memcmp(buf4_de, STRING2, 16) == 0);
-
+		
 		// Test that the TransformBlock thing works as expected too with blocks the same size as the input
 		TEST_THAT(encrypt4.TransformBlock(buf4, 16, STRING2, 16) == 16);
 		// But that it exceptions if we try the trick with padding on
@@ -240,7 +240,7 @@ void test_cipher()
 		buf4_de_used += decrypt4.Final(buf4_de+buf4_de_used, sizeof(buf4_de));
 		TEST_THAT(buf4_de_used == (BLOCKSIZE*3));
 		TEST_THAT(::memcmp(buf4_de, STRING2, (BLOCKSIZE*3)) == 0);
-
+		
 		// Test that the TransformBlock thing works as expected too with blocks the same size as the input
 		TEST_THAT(encrypt4.TransformBlock(buf4, (BLOCKSIZE*3), STRING2, (BLOCKSIZE*3)) == (BLOCKSIZE*3));
 		// But that it exceptions if we try the trick with padding on
@@ -262,7 +262,7 @@ int test(int argc, const char *argv[])
 #else
 	::printf("Skipping AES -- not supported by version of OpenSSL in use.\n");
 #endif
-
+	
 	::printf("Misc...\n");
 	// Check rolling checksums
 	uint8_t *checkdata_blk = (uint8_t *)malloc(CHECKSUM_DATA_SIZE);
@@ -279,10 +279,10 @@ int test(int argc, const char *argv[])
 		//printf("size = %d\n", size);
 		// Checksum to roll
 		RollingChecksum roll(checkdata, size);
-
+		
 		// Roll forward
 		for(int l = 0; l < CHECKSUM_ROLLS; ++l)
-		{
+		{			
 			// Calculate new one
 			RollingChecksum calc(checkdata, size);
 
@@ -290,10 +290,10 @@ int test(int argc, const char *argv[])
 
 			// Compare them!
 			TEST_THAT(calc.GetChecksum() == roll.GetChecksum());
-
+			
 			// Roll it onwards
 			roll.RollForward(checkdata[0], checkdata[size], size);
-
+	
 			// increment
 			++checkdata;
 		}
