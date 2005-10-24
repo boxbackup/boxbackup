@@ -1,0 +1,119 @@
+<HTML>
+  <HEAD>
+	 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+	 <LINK REL="stylesheet" TYPE="text/css" HREF="../../../../boost.css">
+         <TITLE>Boost Numeric Conversion Library - Index</TITLE>
+  </HEAD>
+  <BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000ff" VLINK="#800080">
+	 <TABLE BORDER="0" CELLPADDING="7" CELLSPACING="0" WIDTH="100%"
+	  SUMMARY="header">
+		<TR>
+		  <TH VALIGN="top" WIDTH="300">
+			 <H3><A HREF="../../../../index.htm"><IMG HEIGHT="86" WIDTH="277"
+				ALT="C++ Boost" SRC="../../../../boost.png" BORDER="0"></A></H3> </TH>
+		  <TH VALIGN="top">
+			 <H1 ALIGN="center">Boost Numeric Conversion Library</H1> </TH>
+		</TR>
+	 </TABLE>
+         <HR>
+         <table border="0" cellpadding="0" width="100%">
+         <tr>
+           <td width="50%" valign="top"><font size="4">This Document</font><br><br>
+              &nbsp;&nbsp;&nbsp; <a href="#Overview">Overview</a><br>
+      &nbsp;&nbsp;&nbsp; <a href="#Ack">History and Acknowledgments</a><br>
+              &nbsp;&nbsp;&nbsp; <a href="#Ref">Bibliography</a><br>
+           </td>
+           <td width="50%"><font size="4">Other Documents</font><br><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="definitions.html">Definitions</A><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="converter.html"><code>converter&lt;&gt;</code>  function object</A><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="requirements.html">Type Requirements and User-defined-types support</A><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="bounds.html"><code>bounds&lt;&gt;</code> traits class</A><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="conversion_traits.html"><code>conversion_traits&lt;&gt;</code>  traits class</A><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="converter_policies.html">Numeric Converter Policy Classes</A><br>
+              &nbsp;&nbsp;&nbsp; <A HREF="numeric_cast.html">Improved numeric_cast&lt;&gt;</A><br>
+           </td>
+         </tr>
+         </table>
+
+<hr>
+<H2><A NAME="Overview"></A>Overview</H2>
+<P>The Boost Numeric Conversion library is a collection of tools to describe and perform
+conversions between values of different <a href="definitions.html#numtypes">numeric types</a>.</p>
+<p>The library includes a special alternative for a subset of <code>std::numeric_limits&lt;&gt;</code>,
+the <A HREF="bounds.html"><code>bounds&lt;&gt;</code></A> traits class, which provides
+a consistent way to obtain the <a href="definitions.html#range">boundary</a> values for the
+<a href="definitions.html#range">range</a> of a numeric type.</p>
+<p>It also includes a set of <A HREF="conversion_traits.html">trait classes</A> which
+  describes the compile-time properties of a conversion from a source to a target
+  numeric type. Both <a href="definitions.html#stdtypes">arithmetic</a> and <a href="definitions.html#numtypes">user-defined
+  numeric types</a> can be used.</p>
+<p>A policy-based <A HREF="converter.html">converter</A> object which uses <code>conversion_traits</code>
+to select an optimized implementation is supplied.
+Such implementation uses an optimal range checking code suitable for the source/target combination.<br>
+  The converter's out-of-range behavior can be customized via an <A HREF="converter_policies.html#oh">OverflowHandler</A>
+  policy.<br>
+For floating-point to integral conversions, the rounding mode can be selected via
+the <A HREF="converter_policies.html#f2i">Float2IntRounder</A> policy.<br>
+  A custom low-level conversion routine (for UDTs for instance) can be passed
+  via a <A HREF="converter_policies.html#rawc">RawConverter</A> policy.<br>
+  The optimized automatic range-checking logic can be overridden via a <A HREF="converter_policies.html#rc">UserRangeChecker</A>
+  policy.</p>
+<hr>
+<H2><A NAME="Ack"></A>History and Acknowledgments</H2>
+<p>Pre-formal review:</p>
+<blockquote>
+<p>Kevlin Henney, with help from David Abrahams and Beman Dawes, originally contributed
+the previous version of numeric_cast&lt;&gt; which already presented the idea of a runtime range check.<br>
+    Later, Eric Ford, Kevin Lynch and the author spotted some genericity problems
+    with that numeric_cast&lt;&gt; which prevented it from being used in a generic
+    layer of math functions.<br>
+An improved numeric_cast&lt;&gt; which properly handled all combinations of arithmetic types was presented.<br>
+    David Abrahams and Beman Dawes acknowledged the need of an improved version
+    of numeric_cast&lt;&gt; and supported the submission as originally laid out.
+    Daryl Walker and Darin Adler made some important comments and proposed fixes
+    to the original submission.</p>
+  <p>Special thanks go to Björn Karlsoon who helped the author considerably. Having
+    found the problems with numeric_cast&lt;&gt; himself, he revised very carefully
+    the original submission and spot a subtle bug in the range checking implementation.
+    He also wrote part of this documentation and proof-read and corrected other
+    parts. And most importantly: the features now presented here in this library
+    evolved from the original submission as a result of the useful private communications
+    between Björn and the author.</p>
+</blockquote>
+<p>Post-formal review:</p>
+<p>Guillaume Melquiond spoted some documentation and code issues, particularly about rounding conversions.<br>
+The following people contributed an important review of the design, documentation and code: Kevin Lynch, Thorsten Ottosen, Paul Bristow,
+Daryle Walker, Jhon Torjo, Eric Ford, Gennadiy Rozental.
+</p>
+<hr>
+<H2><A NAME="Ref"></A>Bibliography</H2>
+<ul>
+  <li>Standard Documents:
+    <ol>
+<li>ISO/IEC 14882:98  (C++98 Standard)</li>
+<li>ISO/IEC 9899:1999 (C99 Standard)</li>
+<li>ISO/IEC 10967-1 (Language Independent Arithmetic (LIA), Part I, 1994)</li>
+<li>ISO/IEC 2382-1:1993 (Information Technology - Vocabulary - Part I: Fundamental Terms)</li>
+<li>ANSI/IEEE 754-1985 [and IEC 60559:1989] (Binary floating-point)</li>
+<li>ANSI/IEEE 854-1988 (Radix Independent floating-point)</li>
+<li>ANSI X3/TR-1-82 (Dictionary for Information Processing Systems)</li>
+<li><a href="http://anubis.dkuug.dk/JTC1/SC22/WG14/www/docs/n753.htm">ISO/IEC JTC1/SC22/WG14/N753</a> C9X Revision Proposal: LIA-1 Binding: Rationale</li>
+</ol>
+</li>
+<li>Papers:
+<ol>
+<li>David Goldberg <A href="http://citeseer.nj.nec.com/goldberg91what.html">
+    What Every Computer Scientist Should Know About Floating-Point Arithmetic</A></li>
+<li><A href="http://www.cs.berkeley.edu/~wkahan/">Prof. William Kahan</A> papers on floating-point.</li>
+</ol>
+</li>
+</ul>
+<HR>
+<P>Revised 23 June 2004</P>
+<p>© Copyright Fernando Luis Cacciola Carballal, 2004</p>
+<p> Use, modification, and distribution are subject to the Boost Software
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+</body>
+</HTML>

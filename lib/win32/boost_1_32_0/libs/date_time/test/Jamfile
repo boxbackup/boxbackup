@@ -1,0 +1,128 @@
+
+# Testing Jamfile 
+subproject libs/date_time/test ;
+
+# bring in rules for testing
+import testing ;
+
+# Make tests run by default.
+DEPENDS all : test ;
+
+local DATE_TIME_DYNAMIC_PROPERTIES = <define>BOOST_ALL_DYN_LINK <runtime-link>dynamic <define>BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG <define>BOOST_ALL_NO_LIB ;
+local DATE_TIME_PROPERTIES = <define>BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG <define>BOOST_DATE_TIME_STATIC_LINK std::locale-support <define>BOOST_ALL_NO_LIB ;
+
+
+{
+  # look in BOOST_ROOT for sources first, just in this Jamfile
+  local SEARCH_SOURCE = $(BOOST_ROOT) $(SEARCH_SOURCE) ;
+
+   test-suite date_time_core
+     : 
+    [ run testint_adapter.cpp ]
+    [ run testtime_resolution_traits.cpp ]
+    [ run testwrapping_int.cpp ]
+    [ run testconstrained_value.cpp ]
+    [ run testgregorian_calendar.cpp ]
+    [ run testgeneric_period.cpp ]
+   ; 
+
+   test-suite date_time_gregorian
+     : 
+   [ run gregorian/testdate.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testdate_duration.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testgreg_durations.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testperiod.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testdate_iterator.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testfacet.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES)  ]
+   [ run gregorian/testformatters.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testgenerators.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testgreg_cal.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testgreg_day.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]     
+   [ run gregorian/testgreg_month.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testgreg_year.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+   [ run gregorian/testparse_date.cpp <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) ]
+ ;
+test-suite date_time_gregorian_dll
+     : 
+   [ run gregorian/testdate.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testdate_dll ]
+   [ run gregorian/testdate_duration.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testdate_duration_dll ]
+   [ run gregorian/testperiod.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testperiod_dll ]
+   [ run gregorian/testdate_iterator.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testdate_iterator_dll ]
+   [ run gregorian/testfacet.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testfacet_dll ]
+   [ run gregorian/testformatters.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testformatters_dll ]
+   [ run gregorian/testgenerators.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testgenerators_dll ]
+   [ run gregorian/testgreg_cal.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testgreg_cal_dll ]
+   [ run gregorian/testgreg_day.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testgreg_day_dll ]     
+   [ run gregorian/testgreg_month.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testgreg_month_dll ]
+   [ run gregorian/testgreg_year.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testgreg_year_dll ]
+   # this next test is commented out because it crashes on VC6 (cause unknown):
+#  [ run gregorian/testparse_date.cpp <dll>../build/boost_date_time : : : $(DATE_TIME_DYNAMIC_PROPERTIES) : testparse_date_dll ]
+  ;
+
+   test-suite date_time_posixtime
+     : 
+   [ run posix_time/testfiletime_functions.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testlocal_adjustor.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testc_local_adjustor.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testclock.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testdst_rules.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testduration.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testiterator.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testparse_time.cpp
+     <lib>../build/boost_date_time 
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testtime_period.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testtime.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testmicrosec_time_clock.cpp
+     <lib>../build/boost_date_time
+    : : : $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/teststreams.cpp
+     <lib>../build/boost_date_time
+    : : : $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testtime_formatters.cpp
+     <lib>../build/boost_date_time
+    : : : $(DATE_TIME_PROPERTIES) ]
+   [ run posix_time/testgreg_duration_operators.cpp
+     <lib>../build/boost_date_time
+    : : :  $(DATE_TIME_PROPERTIES) ]
+ ;
+
+   test-suite date_time_wide_streaming
+    :
+   [ run gregorian/testgreg_wstream.cpp
+     <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) : testgreg_wstream ]
+   [ run posix_time/testtime_wstream.cpp
+     <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES) : testtime_wstream_std_config ]
+   [ run posix_time/testtime_wstream.cpp
+     <lib>../build/boost_date_time : : : $(DATE_TIME_PROPERTIES)  : testtime_wstream ]
+ ;
+
+
+
+}
+
+# Copyright (c) 2000-2004
+# CrystalClear Software, Inc.
+# Subject to the Boost Software License, Version 1.0. 
+# (See accompanying file LICENSE-1.0 or 
+# http://www.boost.org/LICENSE-1.0)
+
+

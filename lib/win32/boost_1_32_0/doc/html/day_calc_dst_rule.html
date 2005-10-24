@@ -1,0 +1,78 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template day_calc_dst_rule</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id376648" title="Header &lt;boost/date_time/dst_transition_generators.hpp&gt;">
+<link rel="prev" href="dst_day_calc_rule.html" title="Class template dst_day_calc_rule">
+<link rel="next" href="time_from_ftime.html" title="Function template time_from_ftime">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="dst_day_calc_rule.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id376648"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="time_from_ftime.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="day_calc_dst_rule"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template day_calc_dst_rule</span></h2>
+<p>boost::date_time::day_calc_dst_rule &#8212; <p>Canonical form for a class that provides day rule calculation. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> spec&gt; 
+<span class="bold"><b>class</b></span> day_calc_dst_rule
+  :  : <span class="bold"><b>public</b></span> boost::date_time::dst_day_calc_rule&lt; spec::date_type &gt;
+{
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> spec::date_type      date_type; 
+  <span class="bold"><b>typedef</b></span> date_type::year_type year_type; 
+  <span class="bold"><b>typedef</b></span> spec::start_rule     start_rule;
+  <span class="bold"><b>typedef</b></span> spec::end_rule       end_rule;  
+
+  <span class="emphasis"><em>// <a href="day_calc_dst_rule.html#day_calc_dst_ruleconstruct-copy-destruct">construct/copy/destruct</a></em></span>
+  <a href="day_calc_dst_rule.html#id382829-bb">day_calc_dst_rule</a>(start_rule, end_rule);
+
+  <span class="emphasis"><em>// <a href="day_calc_dst_rule.html#id396452-bb">public member functions</a></em></span>
+  <span class="type"><span class="bold"><b>virtual</b></span> date_type</span> <a href="day_calc_dst_rule.html#id418477-bb">start_day</a>(year_type) <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>virtual</b></span> date_type</span> <a href="day_calc_dst_rule.html#id360393-bb">end_day</a>(year_type) <span class="bold"><b>const</b></span>;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id489842"></a><h2>Description</h2>
+<p>This class is used to generate specific sets of dst rules</p>
+<p></p>
+<div class="refsect2" lang="en">
+<a name="id489851"></a><h3>
+<a name="day_calc_dst_ruleconstruct-copy-destruct"></a><tt class="computeroutput">day_calc_dst_rule</tt> construct/copy/destruct</h3>
+<div class="orderedlist"><ol type="1"><li><pre class="literallayout"><a name="id382829-bb"></a>day_calc_dst_rule(start_rule dst_start, end_rule dst_end);</pre></li></ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id489891"></a><h3>
+<a name="id396452-bb"></a><tt class="computeroutput">day_calc_dst_rule</tt> public member functions</h3>
+<div class="orderedlist"><ol type="1">
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>virtual</b></span> date_type</span> <a name="id418477-bb"></a>start_day(year_type y) <span class="bold"><b>const</b></span>;</pre></li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>virtual</b></span> date_type</span> <a name="id360393-bb"></a>end_day(year_type y) <span class="bold"><b>const</b></span>;</pre></li>
+</ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="dst_day_calc_rule.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id376648"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="time_from_ftime.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Chapter 19. Installation</title>
+<link rel="stylesheet" href="../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="../bbv2.html" title="Part III. Boost.Build v2 User Manual">
+<link rel="prev" href="howto.html" title="Chapter 18. How to use this document">
+<link rel="next" href="tutorial.html" title="Chapter 20. Tutorial">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../boost.png"></td>
+<td align="center"><a href="../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="howto.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="../bbv2.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="tutorial.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+<div class="chapter" lang="en">
+<div class="titlepage"><div><div><h2 class="title">
+<a name="bbv2.installation"></a>Chapter 19. Installation</h2></div></div></div>
+<p>
+      This section describes how to install Boost.Build from a
+      released source distribution. All paths are given relative to
+      the <i class="firstterm">Boost.Build v2 root directory</i>, which is 
+
+      
+
+      located in the <tt class="filename">tools/build/v2</tt> subdirectory
+      of a full <a href="http://www.boost.org" target="_top">Boost</a>
+      distribution.
+    </p>
+<div class="orderedlist"><ol type="1">
+<li>
+          Boost.Build uses <a href="../../../tools/build/jam_src/index.html" target="_top">Boost.Jam</a>, an
+          extension of the <a href="http://www.perforce.com/jam/jam.html" target="_top">Perforce
+          Jam</a> portable <span><b class="command">make</b></span> replacement. The
+          recommended way to get Boost.Jam is to <span class="bold"><b><a href="http://sourceforge.net/project/showfiles.php?group_id=7586&amp;package_id=72941" target="_top">download
+          a prebuilt executable</a></b></span> from SourceForge.
+          If a prebuilt executable is not provided for your platform
+          or you are using Boost's sources in an unreleased state, it
+          may be neccessary to <a href="../../../tools/build/jam_src/index.html#building_bjam" target="_top">build <span><b class="command">bjam</b></span>
+          from sources</a> included in the Boost source tree.
+        </li>
+<li>
+<p>
+
+          To install Boost.Jam, copy the executable,
+          called <span><b class="command">bjam</b></span>
+          or <span><b class="command">bjam.exe</b></span> to a location accessible in
+          your <tt class="envar">PATH</tt>.  Go to the Boost.Build root
+          directory and
+          run <span><b class="command">bjam <tt class="option">--version</tt></b></span>. You
+          should see:
+
+          </p>
+<pre class="screen">
+            Boost.Build V2 (Milestone N)
+            Boost.Jam xx.xx.xx 
+          </pre>
+<p>
+
+          where N is the version of Boost.Build you're using.
+        </p>
+</li>
+<li>
+          Configure Boost.Build to recognize the build resources (such
+          as compilers and libraries) you have installed on your
+          system.  Open the
+          <tt class="filename">user-config.jam</tt> file in the Boost.Build
+          root directory and follow the instructions there to describe
+          your toolsets and libraries, and, if neccessary, where they
+          are located.
+        </li>
+<li>
+          You should now be able to go to the
+          <tt class="filename">example/hello/</tt> directory and run
+          <span><b class="command">bjam</b></span> there. A simple application will be
+          built. You can also play with other projects in the
+          <tt class="filename">example/</tt> directory. 
+    </li>
+</ol></div>
+<p>
+      If you are using Boost's CVS state, be sure to
+      rebuild <span><b class="command">bjam</b></span> even if you have a previous
+      version.  The CVS version of Boost.Build requires the CVS
+      version of Boost.Jam.
+    </p>
+<p>
+      When <span><b class="command">bjam</b></span> is invoked, it always needs to be
+      able to find the Boost.Build root directory, where the
+      interpreted source code of Boost.Build is located.  There are
+      two ways to tell <span><b class="command">bjam</b></span> about the root directory:
+    </p>
+<div class="itemizedlist"><ul type="disc">
+<li>
+          Set the environment variable <tt class="envar">BOOST_BUILD_PATH</tt>
+          to the absolute path of the Boost.Build root directory.
+        </li>
+<li>
+<p>
+          At the root directory of your project or in any of its
+          parent directories, create a file called
+          <tt class="filename">boost-build.jam</tt>, with a single line:
+
+</p>
+<pre class="programlisting">
+boost-build <i class="replaceable"><tt>/path/to/boost.build</tt></i> ;
+</pre>
+</li>
+</ul></div>
+<p><span class="bold"><b>N.B.</b></span>
+  When <span><b class="command">bjam</b></span> is invoked from anywhere in the Boost
+  directory tree <span class="emphasis"><em>other than</em></span> the Boost.Build root
+  and its subdirectories, <a href="../../../tools/build" target="_top">Boost.Build
+  v1</a> is used by default. To override the default and use
+  Boost.Build v2, you have to add the <tt class="option">--v2</tt> command
+  line option to all <span><b class="command">bjam</b></span> invocations.</p>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small></small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="howto.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="../bbv2.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="tutorial.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

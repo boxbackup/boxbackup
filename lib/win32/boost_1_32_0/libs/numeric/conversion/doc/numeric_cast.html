@@ -1,0 +1,123 @@
+<HTML>
+  <HEAD>
+         <LINK REL="stylesheet" TYPE="text/css" HREF="../../../../boost.css">
+         <TITLE>Boost Numeric Conversion Library - numeric_cast</TITLE>
+  </HEAD>
+  <BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+	 <TABLE BORDER="0" CELLPADDING="7" CELLSPACING="0" WIDTH="100%"
+	  SUMMARY="header">
+		<TR>
+		  <TH VALIGN="top" WIDTH="300">
+			 <H3><A HREF="../../../../index.htm"><IMG HEIGHT="86" WIDTH="277"
+				ALT="C++ Boost" SRC="../../../../boost.png" BORDER="0"></A></H3> </TH> 
+		  <TH VALIGN="top"> 
+			 <H1 ALIGN="center">Boost Numeric Conversion Library</H1> 
+			 <H1><A HREF="http://www.boost.org">Header </A><A
+				HREF="../../../../boost/numeric/conversion/cast.hpp">boost/numeric/conversion/cast.hpp</A></H1> </TH>
+		</TR>
+	 </TABLE><HR>
+	 <H2>Contents</H2>
+	 <UL>
+		<LI><A HREF="#introduction">Introduction</A></LI>
+		<LI><A HREF="#numeric_cast"><CODE>numeric_cast</CODE></A></LI>
+		<LI><A HREF="#examples">Examples</A></LI>
+	 </UL> <HR>
+	 <H2><A NAME="introduction">Introduction</A></H2>
+	 <P>The lack of preservation of range makes conversions between numeric
+		types error prone. This is true for both implicit conversions and explicit
+		conversions (through static_cast). <A HREF="#numeric_cast"> numeric_cast</A>
+		detects loss of range when a numeric type is converted, and throws an
+		exception if the range cannot be preserved.</P>
+	 <P>There are several situations where conversions are unsafe: </P>
+	 <UL>
+		<LI>Conversions from an integral type with a wider range than the target
+		  integral type.</LI>
+		<LI> Conversions from unsigned to signed (and vice versa) integral
+		  types.</LI>
+		<LI> Conversions from floating point types to integral types.</LI>
+	 </UL>
+	 <P>The C++ Standard does not specify the behavior when a numeric type is
+		assigned a value that cannot be represented by the type, except for unsigned
+		integral types [3.9.1.4], which must obey the laws of arithmetic modulo
+		2<SUP>n</SUP> (this implies that the result will be reduced modulo the number
+		that is one greater than the largest value that can be represented). The fact
+		that the behavior for overflow is undefined for all conversions (except the
+		aforementioned unsigned to unsigned) makes any code that may produce positive
+		or negative overflows exposed to portability issues.</P>
+	 <P>numeric_cast adheres to the rules for implicit conversions mandated by
+		the C++ Standard, such as truncating floating point types when converting to
+		integral types. The implementation must guarantee that for a conversion to a
+		type that can hold all possible values of the source type, there will be no
+		runtime overhead. <BR> <BR> </P> <HR>
+	 <H2><A NAME="numeric_cast"><CODE>numeric_cast</CODE></A></H2>
+	 <BLOCKQUOTE>
+		<PRE>template&lt;typename Target, typename Source&gt; inline
+typename boost::numeric::converter&lt;Traget,Source&gt;::result_type
+numeric_cast ( Source arg )
+{
+   return boost::numeric::converter&lt;Traget,Source&gt;::convert(arg);
+}
+</PRE> </BLOCKQUOTE>
+	 <P>numeric_cast returns the result of converting a value of type Source to a value of type
+		Target. If out-of-range is detected, an exception is thrown (see
+		<A HREF="#bad_numeric_cast">bad_numeric_cast</A>, <A
+		HREF="#positive_overflow">positive_overflow</A> and
+		<A HREF="#negative_overflow">negative_overflow</A>). <BR> <BR> </P> <HR>
+	 <H2><A NAME="examples">Examples</A></H2>
+	 <P>The following example performs some typical conversions between numeric
+		types: </P>
+	 <BLOCKQUOTE>
+		<PRE>#include &lt;boost/numeric_cast.hpp&gt;
+#include &lt;iostream&gt;
+
+int main()
+{
+   using boost::numeric_cast;
+   using boost::bad_numeric_cast;
+   using boost::positive_overflow;
+   using boost::negative_overflow;
+      try {
+      int i=42;
+      short s=numeric_cast&lt;short&gt;(i);
+   }
+   catch(negative_overflow&amp; e) {
+      std::cout &lt;&lt; e.what();
+   }
+   catch(positive_overflow&amp; e) {
+      std::cout &lt;&lt; e.what();
+   }
+
+   try {
+      float f=-42.1234;
+      // This will cause a boost::negative_underflow exception to be thrown
+      unsigned int i=numeric_cast&lt;unsigned int&gt;(f);
+
+      double d=f+numeric_cast&lt;double&gt;(i);
+
+      unsigned long l=std::numeric_limits&lt;unsigned long&gt;::max();
+      // This works, because unsigned integral types cannot cause overflow.
+      unsigned char c=numeric_cast&lt;unsigned char&gt;(l);
+
+      unsigned short us=std::numeric_limits&lt;unsigned short&gt;::max();
+      // This will cause an positive_overflow exception to be thrown
+      short s=numeric_cast&lt;short&gt;(us);
+
+   }
+   catch(bad_numeric_cast&amp; e) {
+      std::cout &lt;&lt; e.what();
+   }
+
+   return 0;
+}</PRE> </BLOCKQUOTE> <BR> <BR> <HR>
+<HR>
+<P>Back to <A HREF="index.html">Numeric Conversion library index</A></P>
+<HR>
+<P>Revised 23 June 2004</P>
+<p>© Copyright Boost 1999</p>
+<p>© Copyright Fernando Luis Cacciola Carballal, 1999,2004</p>
+<p> Use, modification, and distribution are subject to the Boost Software
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+</BODY>
+</HTML>

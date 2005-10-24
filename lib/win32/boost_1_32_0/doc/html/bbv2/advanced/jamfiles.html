@@ -1,0 +1,417 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Writing Jamfiles</title>
+<link rel="stylesheet" href="../../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="../advanced.html" title="Chapter 21. User documentation">
+<link rel="prev" href="../advanced.html" title="Chapter 21. User documentation">
+<link rel="next" href="build_process.html" title="Build process">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../../boost.png"></td>
+<td align="center"><a href="../../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="../advanced.html"><img src="../../images/prev.png" alt="Prev"></a><a accesskey="u" href="../advanced.html"><img src="../../images/up.png" alt="Up"></a><a accesskey="h" href="../../index.html"><img src="../../images/home.png" alt="Home"></a><a accesskey="n" href="build_process.html"><img src="../../images/next.png" alt="Next"></a>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="bbv2.advanced.jamfiles"></a>Writing Jamfiles</h2></div></div></div>
+<div class="toc"><dl>
+<dt><span class="section"><a href="jamfiles.html#bbv2.advanced.overview">Overview</a></span></dt>
+<dt><span class="section"><a href="jamfiles.html#bbv2.advanced.targets">Main targets</a></span></dt>
+<dt><span class="section"><a href="jamfiles.html#bbv2.advanced.projects">Projects</a></span></dt>
+<dt><span class="section"><a href="jamfiles.html#bbv2.advanced.other-rules">Additional Jamfile rules</a></span></dt>
+<dt><span class="section"><a href="jamfiles.html#bbv2.advanced.project-root">Project root</a></span></dt>
+</dl></div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="bbv2.advanced.overview"></a>Overview</h3></div></div></div>
+<p>Jamfiles are the thing which is most important to the user,
+      bacause they declare the targets which should be build. Jamfiles are
+      also used for organizing targets -- each Jamfile is a separate project,
+      which can be build independently from the other projects.</p>
+<p>Jamfile mostly contain calls to Boost.Build functions, which do
+        all the work, specifically:
+        </p>
+<div class="itemizedlist"><ul type="disc">
+<li><p><a href="jamfiles.html#bbv2.advanced.targets" title="Main targets">declare main
+                targets</a></p></li>
+<li><p><a href="jamfiles.html#bbv2.advanced.projects" title="Projects">define
+            project properties</a></p></li>
+<li><p><a href="jamfiles.html#bbv2.advanced.other-rules" title="Additional Jamfile rules">do various other
+            things</a></p></li>
+</ul></div>
+<p>In addition to Jamfiles, Boost.Build has another user-editable
+        file, project-root.jam, which is mostly useful to declare constants
+        global to all the projects. It is described in more detail <a href="jamfiles.html#bbv2.advanced.project-root" title="Project root">below</a>.
+      </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="bbv2.advanced.targets"></a>Main targets</h3></div></div></div>
+<p><a name="bbv2.advanced.targets.main"></a><span class="emphasis"><em>Main target</em></span> is a user-defined named
+        entity which can be build, for example a named executable file.
+        Declaring a main target is usually done using one of <a href="builtins/targets.html" title="Builtin target types">main target functions</a>.  The
+        user can also declare <a href="../extending/rules.html" title="Main target rules"> custom
+        main target function</a>.</p>
+<p>Most main targets rules in Boost.Build use similiar
+        syntax:</p>
+<a name="bbv2.main-target-rule-syntax"></a><pre class="programlisting">
+function-name main-target-name 
+    : sources 
+    : requirements 
+    : default-build 
+    : usage-requirements 
+    ;
+</pre>
+<div class="itemizedlist"><ul type="disc">
+<li>
+            "main-target-name" is the name used to request the target
+            on command line and to use it from other main targets. Main
+            target name may contain alphanumeric characters and symbols '-'
+            and '_';
+          </li>
+<li>
+            "sources" is the list of source files and other main
+            targets that must be combined. 
+          </li>
+<li>
+            "requirements" is the list of properties that must always
+            be present when this main target is built.
+          </li>
+<li>
+            "default-build" is the list of properties that will be used
+            unless some other value of the same feature is already
+            specified.
+          </li>
+<li>
+            "usage-requirements" is the list of properties that will be
+            propagated to all main targets that use this one, i.e. to all
+            dependents.
+          </li>
+</ul></div>
+<p>Note that the actual requirements, default-build and
+        usage-requirements attributes for a target are obtained by combining
+        the explicitly specified one with those specified for the project
+        where a target is declared.
+      </p>
+<p>          
+        Some main target rules have shorter list of parameters, and
+        you should consult their documentation for details.
+      </p>
+<p>The list of sources specifies what should be processed to get
+        the resulting targets. Most of the time, it's just a list of
+        files. Sometimes, you'd want to use all files with the same
+        extension as sources, in which case you can use the "glob"
+        rule. Here are two examples:
+</p>
+<pre class="programlisting">
+exe a : a.cpp ;
+exe b : [ glob *.cpp ] ;
+</pre>
+<p>
+        Unless you specify a files with absolute path, the name is
+        considered relative to the source directory -- which is typically
+        the same as directory when Jamfile is located, but can be changed as
+        described <a href="jamfiles.html#bbv2.advanced.projects.attributes.projectrule">here</a></p>
+<p>
+        The list of sources can also reference other main targets. The
+        targets in the same project can be referred by using the name, and
+        targets in other project need to specify directory or a symbolic
+        name of the other project. For example:
+</p>
+<pre class="programlisting">
+lib helper : helper.cpp ;
+exe a : a.cpp helper ;
+exe b : b.cpp ..//utils ;
+exe c : c.cpp /boost/program_options//program_opions ;
+</pre>
+<p>
+        The first exe uses the library defined in the same project. The
+        second one uses some target (most likely library) defined by Jamfile
+        one level higher. Finally, the third target uses some <a href="http://boost.org" target="_top">C++ Boost</a> library, using the
+        symbolic name to refer to it. More information about it can be found
+        in <a href="../tutorial/libs.html" title="Libraries and Dependent Targets">tutorial</a> and in 
+        <a href="../reference/definitions.html#bbv2.reference.ids" title="Target identifiers and references">target id reference</a>.          
+      </p>
+<p>Requirements are the properties that should always be present when
+        building a target. Typically, they are includes and defines:
+</p>
+<pre class="programlisting">
+exe hello : hello.cpp : &lt;include&gt;/opt/boost &lt;define&gt;MY_DEBUG ;
+</pre>
+<p>
+        In special circumstances, other properties can be used, for example if
+        a library does not work if it's shared, or a file can't be compiled
+        with optimization due to a compiler bug, one can use
+</p>
+<pre class="programlisting">
+lib util : util.cpp : &lt;link&gt;static ;
+obj main : main.cpp : &lt;optimization&gt;off ;
+</pre>
+<p>Sometimes, requirements are necessary only for a specific
+        compiler, or build variant. The 
+        <a href="../reference/definitions.html#bbv2.reference.variants.propcond" title="Conditional properties">conditional
+        properties</a> can be used in that case:
+</p>
+<pre class="programlisting">
+lib util : util.cpp : &lt;toolset&gt;msvc:&lt;link&gt;static ;
+</pre>
+<p>
+        In means when whenever <tt class="computeroutput">&lt;toolset&gt;msvc</tt> property is
+        in build properties, the <tt class="computeroutput">&lt;link&gt;static</tt> property will
+        be included as well. The conditional requirements can be "chained":
+</p>
+<pre class="programlisting">
+lib util : util.cpp : &lt;toolset&gt;msvc:&lt;link&gt;static 
+                      &lt;link&gt;static:&lt;define&gt;STATIC_LINK ;
+</pre>
+<p>
+        will set of static link and the <tt class="computeroutput">STATIC_LINK</tt> define on the
+        <tt class="computeroutput">msvc</tt> toolset.
+      </p>
+<p>The default-build attribute is
+        a set of properties which should be used if build request does not
+        specify a value. For example:
+</p>
+<pre class="programlisting">
+exe hello : hello.cpp : : &lt;threading&gt;multi ;
+</pre>
+<p>
+        would build the target in multi-threaded mode, unless the user
+        explicitly requests single-threaded version. The difference between
+        requirements and default-build is that requirements cannot be
+        overriden in any way.
+      </p>
+<p>A target of the same name can be declared several times. In that
+        case is declaration is called an
+        <i class="firstterm">alternative</i>. When the target is build, one of
+        the alternatives will be selected and use. Alternatives need not be
+        defined by the same main target rule. The following is OK:
+</p>
+<pre class="programlisting">
+lib helpers : helpers.hpp ;
+alias helpers : helpers.lib : &lt;toolset&gt;msvc ;
+</pre>
+<p>Building of the same main target can differ greatly from
+        platform to platform. For example, you might have different list
+        of sources for different compilers, or different options for those
+        compilers. Two approaches to this are explained in the 
+        <a href="../tutorial/conditions.html" title="Conditions and alternatives">tutorial</a>.
+      </p>
+<p>Sometimes a main target is really needed only by some other main
+        target. For example, a rule that declares a test-suite uses a main
+        target that represent test, but those main targets are rarely needed
+        by themself.</p>
+<p>It is possible to declare target inline, i.e. the "sources"
+        parameter may include call to other main rules. For example:</p>
+<pre class="programlisting">
+exe hello : hello.cpp 
+    [ obj helpers : helpers.cpp : &lt;optimization&gt;off ] ;
+</pre>
+<p>
+        Will cause "helpers.cpp" to be always compiled without
+        optimization. It's possible to request main targets declared
+        inline, but since they are considered local, they are renamed to
+        "parent-main-target_name..main-target-name". In the example above,
+        to build only helpers, one should run "bjam hello..helpers".
+      </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="bbv2.advanced.projects"></a>Projects</h3></div></div></div>
+<p>As mentioned before, targets are grouped into project, and each
+        Jamfile is a separate project. Projects are useful because it allows
+        to group related targets together, define properties common to all
+        those targets, and assign a symbolic name to the project, allowing to
+        easily refer to the targets in the project. Two last goals are
+        accompished with the "project" rule.
+      </p>
+<p>The rule has this syntax
+</p>
+<pre class="programlisting">
+project id : &lt;attributes&gt; ;
+</pre>
+<p>
+        Here, attributes is a sequence of (attribute-name,
+        attribute-value) pairs. The list of attribute names along with its
+        handling is also shown in the table below. For example, it is
+        possible to write:
+</p>
+<pre class="programlisting">
+project tennis 
+    : requirements &lt;threading&gt;multi 
+    : default-build release
+    ;
+</pre>
+<p>The possible attributes are listed below.</p>
+<p><span class="emphasis"><em>Project id</em></span> is a short way to denote a project, as
+        opposed to the Jamfile's pathname. It is a hierarchical path,
+        unrelated to filesystem, such as "boost/thread". <a href="../reference/definitions.html#bbv2.reference.ids" title="Target identifiers and references">Target references</a> make use of project ids to
+        specify a target.</p>
+<p><span class="emphasis"><em>Source location</em></span> specifies the directory where sources
+        for the project are located.</p>
+<p><span class="emphasis"><em>Project requirements</em></span> are requirements that apply to
+        all the targets in the projects as well as all subprojects.</p>
+<p><span class="emphasis"><em>Default build</em></span> is the build request that should be
+        used when no build request is specified explicitly.</p>
+<p><a name="bbv2.advanced.projects.attributes.projectrule"></a>
+        The default values for those attributes are
+        given in the table below.
+
+        </p>
+<div class="table">
+<a name="id671872"></a><p class="title"><b>Table 21.1. </b></p>
+<table class="table" summary="">
+<colgroup>
+<col>
+<col>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th>Attribute</th>
+<th>Name for the 'project' rule</th>
+<th>Default value</th>
+<th>Handling by the 'project' rule</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Project id</td>
+<td>none</td>
+<td>none</td>
+<td>Assigned from the first parameter of the 'project' rule.
+                  It is assumed to denote absolute project id.</td>
+</tr>
+<tr>
+<td>Source location</td>
+<td><tt class="literal">source-location</tt></td>
+<td>The location of jamfile for the project</td>
+<td>Sets to the passed value</td>
+</tr>
+<tr>
+<td>Requirements</td>
+<td><tt class="literal">requirements</tt></td>
+<td>The parent's requirements</td>
+<td>The parent's requirements are refined with the passed
+                  requirement and the result is used as the project
+                  requirements.</td>
+</tr>
+<tr>
+<td>Default build</td>
+<td><tt class="literal">default-build</tt></td>
+<td>none</td>
+<td>Sets to the passed value</td>
+</tr>
+<tr>
+<td>Build directory</td>
+<td><tt class="literal">build-dir</tt></td>
+<td>If parent has a build dir set, the value of it, joined
+                  with the relative path from parent to the current project.
+                  Otherwise, empty</td>
+<td>Sets to the passed value, interpreted as relative to the
+                  project's location.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="bbv2.advanced.other-rules"></a>Additional Jamfile rules</h3></div></div></div>
+<p>There's a number of other helper rules which can be used in
+      Jamfile, described in the following table.</p>
+<div class="table">
+<a name="id671992"></a><p class="title"><b>Table 21.2. </b></p>
+<table class="table" summary="">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th>Rule</th>
+<th>Semantic</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><a href="jamfiles.html#bbv2.advanced.projects.attributes.projectrule">project</a></td>
+<td>Define project attributes.</td>
+</tr>
+<tr>
+<td><a href="../../">use-project</a></td>
+<td>Make another project known.</td>
+</tr>
+<tr>
+<td><a href="../../">build-project</a></td>
+<td>Build another project when this one is built.</td>
+</tr>
+<tr>
+<td><a href="../../">explicit</a></td>
+<td>States that the target should be built only by explicit
+                request.</td>
+</tr>
+<tr>
+<td>glob</td>
+<td>Takes a list of wildcards, and returns the list of files
+                which match any of the wildcards.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="bbv2.advanced.project-root"></a>Project root</h3></div></div></div>
+<p>Each project is also associated with <span class="emphasis"><em>project root</em></span>.
+        That's a root for a tree of projects, which specifies some global
+        properties.</p>
+<p>
+          Project root for a projects is the nearest parent directory
+          which contains a file called
+          <tt class="filename">project-root.jam</tt>. That file defines
+          certain properties which apply to all projects under project
+          root. It can:
+
+        </p>
+<div class="itemizedlist"><ul type="disc">
+<li>
+              configure toolsets, via call to <tt class="literal">toolset.using</tt>
+</li>
+<li>
+              refer to other projects, via the <tt class="literal">use-project</tt>
+              rule
+            </li>
+<li>
+              declare constants, via the <tt class="literal">constant</tt> and
+              <tt class="literal">path-constant</tt> rules.
+            </li>
+</ul></div>
+<p>To facilitate declaration of simple projects, Jamfile and
+        project-root can be merged together. To achieve this effect, the
+        project root file should call the <tt class="literal">project</tt> rule. The
+        semantic is precisely the same as if the call was made in
+        Jamfile, except that project-root.jam will start to serve as
+        Jamfile. The Jamfile in the directory of project-root.jam will be
+        ignored, and project-root.jam will be able to declare main
+        targets as usual.</p>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small></small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="../advanced.html"><img src="../../images/prev.png" alt="Prev"></a><a accesskey="u" href="../advanced.html"><img src="../../images/up.png" alt="Up"></a><a accesskey="h" href="../../index.html"><img src="../../images/home.png" alt="Home"></a><a accesskey="n" href="build_process.html"><img src="../../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

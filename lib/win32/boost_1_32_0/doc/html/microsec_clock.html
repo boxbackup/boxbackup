@@ -1,0 +1,82 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template microsec_clock</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id331390" title="Header &lt;boost/date_time/microsec_time_clock.hpp&gt;">
+<link rel="prev" href="acst_dst_trait.html" title="Struct template acst_dst_trait">
+<link rel="next" href="id417225.html" title="Type ymd_order_spec">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="acst_dst_trait.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id331390"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="id417225.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="microsec_clock"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template microsec_clock</span></h2>
+<p>boost::date_time::microsec_clock &#8212; <p>A clock providing microsecond level resolution. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> time_type&gt; 
+<span class="bold"><b>class</b></span> microsec_clock {
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> time_type::date_type          date_type;             
+  <span class="bold"><b>typedef</b></span> time_type::time_duration_type time_duration_type;    
+  <span class="bold"><b>typedef</b></span> time_duration_type::rep_type  resolution_traits_type;
+
+  <span class="emphasis"><em>// <a href="microsec_clock.html#id430932-bb">public static functions</a></em></span>
+  <span class="type">time_type</span> <a href="microsec_clock.html#id310198-bb">local_time</a>() ;
+
+  <span class="emphasis"><em>// <a href="microsec_clock.html#id427143-bb">private static functions</a></em></span>
+  <span class="type">time_type</span> <a href="microsec_clock.html#id427149-bb">create_time</a>(timeval *) ;
+  <span class="type">time_type</span> <a href="microsec_clock.html#id405249-bb">local_time</a>() ;
+  <span class="type">time_type</span> <a href="microsec_clock.html#id439095-bb">create_time</a>(FILETIME &amp;) ;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id499666"></a><h2>Description</h2>
+<p>A high precision clock that measures the local time at a resolution up to microseconds and adjusts to the resolution of the time system. For example, for the a library configuration with nano second resolution, the last 3 places of the fractional seconds will always be 000 since there are 1000 nano-seconds in a micro second. </p>
+<div class="refsect2" lang="en">
+<a name="id499678"></a><h3>
+<a name="id430932-bb"></a><tt class="computeroutput">microsec_clock</tt> public static functions</h3>
+<div class="orderedlist"><ol type="1"><li>
+<pre class="literallayout"><span class="type">time_type</span> <a name="id310198-bb"></a>local_time() ;</pre>
+<p>Return the local time based on computer clock settings. </p>
+</li></ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id499722"></a><h3>
+<a name="id427143-bb"></a><tt class="computeroutput">microsec_clock</tt> private static functions</h3>
+<div class="orderedlist"><ol type="1">
+<li><pre class="literallayout"><span class="type">time_type</span> <a name="id427149-bb"></a>create_time(timeval * tv) ;</pre></li>
+<li>
+<pre class="literallayout"><span class="type">time_type</span> <a name="id405249-bb"></a>local_time() ;</pre>
+<p>Return the local time based on computer clock settings. </p>
+</li>
+<li><pre class="literallayout"><span class="type">time_type</span> <a name="id439095-bb"></a>create_time(FILETIME &amp; ft) ;</pre></li>
+</ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="acst_dst_trait.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id331390"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="id417225.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

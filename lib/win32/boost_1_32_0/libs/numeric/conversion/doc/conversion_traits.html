@@ -1,0 +1,334 @@
+<HTML>
+  <HEAD>
+	 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+	 <LINK REL="stylesheet" TYPE="text/css" HREF="../../../../boost.css">
+         <TITLE>Boost Numeric Conversion Library - Conversion Traits</TITLE>
+  </HEAD>
+  <BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000ff" VLINK="#800080">
+	 <TABLE BORDER="0" CELLPADDING="7" CELLSPACING="0" WIDTH="100%"
+	  SUMMARY="header">
+		<TR>
+		  <TH VALIGN="top" WIDTH="300">
+			 <H3><A HREF="../../../../index.htm"><IMG HEIGHT="86" WIDTH="277"
+				ALT="C++ Boost" SRC="../../../../boost.png" BORDER="0"></A></H3> </TH>
+		  <TH VALIGN="top">
+			 <H1 ALIGN="center">Boost Numeric Conversion Library</H1>
+
+      <H1><A HREF="http://www.boost.org">Header </A><A
+				HREF="../../../../boost/numeric/conversion/conversion_traits.hpp">boost/numeric/conversion/conversion_traits.hpp</A></H1>
+			 </TH>
+		</TR>
+	 </TABLE> <HR>
+	 <H2>Contents</H2>
+	 <DL CLASS="page-index">
+           <DT><A HREF="#types">Types</A></DT>
+	 </DL>
+	 <UL>
+
+  <LI><A HREF="#ncm"><CODE>enumeration boost::numeric::int_float_mixture_enum;</CODE></A></LI>
+  <LI><A HREF="#ncsm"><CODE>enumeration boost::numeric::sign_mixture_enum;</CODE></A></LI>
+  <LI><A HREF="#ncum"><CODE>enumeration boost::numeric::udt_builtin_mixture_enum;</CODE></A></LI>
+  <LI><A HREF="#ifm"><CODE>template class boost::numeric::int_float_mixture&lt;T,S&gt;</CODE></A></LI>
+  <LI><A HREF="#sm"><CODE>template class boost::numeric::sign_mixture&lt;T,S&gt;</CODE></A></LI>
+  <LI><A HREF="#ubm"><CODE>template class boost::numeric::udt_builtin_mixture&lt;T,S&gt;</CODE></A></LI>
+  <LI><A HREF="#isr"><CODE>template class boost::numeric::is_subranged&lt;T,S&gt;</CODE></A></LI>
+  <LI><A HREF="#nct"><CODE>template class boost::numeric::conversion_traits&lt;T,S&gt;</CODE></A></LI>
+	 </UL>
+	 <DL><DT><A HREF="#examples">Example(s)</A></DT></DL>
+         <HR>
+
+<H2><A NAME="types"></A>Types</H2>
+
+<H2><CODE><A NAME="ncm">enumeration int_float_mixture</A>_enum</CODE></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+  enum int_float_mixture_enum
+  {
+     integral_to_integral
+    ,integral_to_float
+    ,float_to_integral
+    ,float_to_float
+  } ;
+
+} } // namespace boost::numeric
+</PRE>
+
+<H2><CODE><A NAME="ncsm">enumeration sign_mixture</A>_enum</CODE></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+enum sign_mixture_enum
+  {
+     unsigned_to_unsigned
+    ,signed_to_signed
+    ,signed_to_unsigned
+    ,unsigned_to_signed
+  } ;
+
+} } // namespace boost::numeric</PRE>
+
+<H2><CODE><A NAME="ncum">enumeration  udt_builtin_mixture</A>_enum</CODE></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+  enum udt_builtin_mixture_enum
+  {
+     builtin_to_builtin
+    ,builtin_to_udt
+    ,udt_to_builtin
+    ,udt_to_udt
+  } ;
+
+} } // namespace boost::numeric</PRE>
+
+<hr>
+
+<H2><A NAME="ifm"><CODE>template class int_float_mixture&lt;&gt;</CODE></A></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+  template &lt;class T, class S&gt;
+  struct int_float_mixture : mpl::integral_c&lt;int_float_mixture_enum, <i>impl-def-value</i>&gt; {} ;
+
+} } // namespace boost::numeric
+</PRE>
+<p>Classifying <code>S</code> and <code>T</code> as either <code>integral</code>
+or <code>float</code>, this <a href="../../../mpl/doc/refmanual/integral-constant.html">MPL's Integral Constant</a>
+indicates the combination of these attributes. <br>
+Its <code>::value</code> is of enumeration type <A HREF="#ncm"><CODE>boost::numeric::int_float_mixture_enum</CODE></A>
+</p>
+
+<hr>
+
+<H2><A NAME="sm"><CODE>template class sign_mixture&lt;&gt;</CODE></A></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+  template &lt;class T, class S&gt;
+  struct sign_mixture : mpl::integral_c&lt;sign_mixture_enum, <i>impl-def-value</i>&gt; {} ;
+
+} } // namespace boost::numeric
+</PRE>
+<p>Classifying <code>S</code> and <code>T</code> as either <code>signed</code>
+or <code>unsigned</code>, this <a href="../../../mpl/doc/refmanual/integral-constant.html">MPL's Integral Constant</a>
+indicates the combination of these attributes. <br>
+Its <code>::value</code> is of enumeration type <A HREF="#ncm"><CODE>boost::numeric::sign_mixture_enum</CODE></A>
+</p>
+
+<hr>
+
+<H2><A NAME="ubm"><CODE>template class udt_builtin_mixture&lt;&gt;</CODE></A></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+  template &lt;class T, class S&gt;
+  struct udt_builtin_mixture : mpl::integral_c&lt;udt_builtin__mixture_enum, <i>impl-def-value</i>&gt; {} ;
+
+} } // namespace boost::numeric
+</PRE>
+<p>Classifying <code>S</code> and <code>T</code> as either <code>user-defined</code>
+or <code>builtin</code>, this <a href="../../../mpl/doc/refmanual/integral-constant.html">MPL's Integral Constant</a>
+indicates the combination of these attributes. <br>
+Its <code>::value</code> is of enumeration type <A HREF="#ncm"><CODE>boost::numeric::udt_builtin_mixture_enum</CODE></A>
+</p>
+
+<hr>
+
+<H2><A NAME="isr"><CODE>template class is_subranged&lt;&gt;</CODE></A></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+  template &lt;class T, class S&gt;
+  struct is_subranged : mpl::bool_&lt;<i>impl-def-value</i>&gt; {} ;
+
+} } // namespace boost::numeric
+</PRE>
+<p>Indicates if the range of the target type T is a subset of the range of the source type S.
+That is: if there are some source values which fall out of the Target type's range.<br>
+It is a boolean <a href="../../../mpl/doc/refmanual/integral-constant.html">MPL's Integral Constant</a>..<br>
+It does not indicate if
+a <i>particular</i> conversion is effectively out of range; it indicates that
+some conversion <i>might be</i> out of range because not all the source values
+are representable as Target type.</p>
+
+<hr>
+
+<H2><A NAME="nct"><CODE>template class numeric_conversion_traits&lt;&gt;</CODE></A></H2>
+
+<PRE>namespace boost { namespace numeric {
+
+
+  template &lt;class T, class S&gt;
+  struct numeric_conversion_traits
+  {
+    mpl::integral_c&lt;int_float_mixture_enum  , ...&gt; int_float_mixture ;
+    mpl::integral_c&lt;sign_mixture_enum       , ...&gt; sign_mixture;
+    mpl::integral_c&lt;udt_builtin_mixture_enum, ...&gt; udt_builtin_mixture ;
+
+    mpl::bool_&lt;...&gt; subranged ;
+    mpl::bool_&lt;...&gt; trivial ;
+
+    typedef ... target_type   ;
+    typedef ... source_type   ;
+    typedef ... argument_type ;
+    typedef ... result_type   ;
+    typedef ... supertype     ;
+    typedef ... subtype       ;
+  } ;
+
+} } // namespace numeric, namespace boost
+</PRE>
+<BLOCKQUOTE>
+
+  <P>This traits class indicates some properties of a <i>numeric conversion direction</i>:
+    from a source type to a target type. It does not indicate the properties of
+    a <i>specific</i> conversion, but of the conversion <i>direction</i>. See
+    <A href="definitions.html#subranged">Definitions</A> for details.<br>
+  </P>
+
+  <P>The traits class provides the following
+     <a href="../../../mpl/doc/refmanual/integral-constant.html">MPL's Integral Constants</a>
+     of enumeration type. They express the <i>combination</i> of certain attributes of the Source and
+    Target types (thus they are call <i>mixture</i>):</P>
+		<TABLE BORDER="1">
+		  <TR>
+			 <TD>&nbsp;<CODE><B>int_float_mixture</B></CODE>&nbsp;</TD>
+
+      <TD>
+        <P>Same as given by the traits class <A HREF="#ifm"><CODE>int_float_mixture</CODE></A></P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE><B>sign_mixture</B></CODE>&nbsp;</TD>
+
+      <TD>
+        <P>Same as given by the traits class <A HREF="#sm"><CODE>sign_mixture</CODE></A></P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE><B>udt_builtin_mixture</B></CODE>&nbsp;</TD>
+
+      <TD>
+        <P>Same as given by the traits class <A HREF="#ubm"><CODE>udt_builtin_mixture</CODE></A></P>
+      </TD>
+		  </TR>
+		</TABLE>
+
+  <P>The traits class provides the following
+     <a href="../../../mpl/doc/refmanual/integral-constant.html">MPL's Integral Constants</a>
+    of boolean type which indicates indirectly the relation between the Source and Target
+    <i>ranges</i>
+    (see <A href="definitions.html#range">Definitions</A> for details).</P>
+		<TABLE BORDER="1">
+		  <TR>
+			 <TD>&nbsp;<CODE> <B>subranged</B></CODE>&nbsp;</TD>
+
+      <TD>
+        <P>Same as given by <A HREF="#isr"><CODE>is_subranged</CODE></A></P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE> <B>trivial</B></CODE>&nbsp;</TD>
+
+      <TD>
+        <P>Indicates if both Source and Target, <u>without cv-qualifications</u>, are
+          the same type.<br>
+          Its <code>::value</code> is of boolean type.</P>
+      </TD>
+		  </TR>
+		</TABLE>
+
+  <P>The traits class provides the following types. They are the Source and Target
+    types classified and qualified for different purposes.</P>
+
+  <TABLE BORDER="1" width="720">
+    <TR>
+			 <TD>&nbsp;<CODE><B>target_type</B></CODE>&nbsp;</TD>
+			 <TD>
+
+        <P>The template parameter <CODE>T</CODE><EM> without cv-qualifications</EM></P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE><B>source_type</B></CODE>&nbsp;</TD>
+			 <TD>
+
+        <P>The template parameter <CODE>S</CODE><EM> without cv-qualifications</EM></P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE><B>argument_type</B></CODE>&nbsp;</TD>
+			 <TD>
+ 		<P>This type is either <CODE>source_type</CODE> or <CODE>source_type
+const&amp;</CODE>. <BR> It represents the <I>optimal</I> argument type for the
+ 		  <A HREF="converter.html">converter</A> member functions.<BR>
+          If <CODE>S</CODE> is a built-in type, this is <CODE>source_type</CODE>,
+          otherwise, this is <CODE>source_type const&amp;</CODE>. </P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE><B>result_type</B></CODE></TD>
+			 <TD>
+				<P>This type is either <CODE>target_type</CODE> or <CODE>target_type
+const&amp;</CODE> <BR> It represents the return type of the
+				  <A HREF="converter.html">converter</A> member functions.<BR>
+          If <CODE>T==S</CODE>, it is <CODE>target_type const&amp;</CODE>, otherwise,
+          it is <CODE>target_type</CODE>.</P>
+      </TD>
+		  </TR>
+		  <TR>
+
+      <TD height="37">&nbsp;<CODE><B>supertype</B></CODE></TD>
+
+      <TD height="37">
+        <P>If the conversion is <CODE>subranged</CODE>, it is <CODE>source_type</CODE>,
+          otherwise, it is <CODE>target_type</CODE></P>
+      </TD>
+		  </TR>
+		  <TR>
+			 <TD>&nbsp;<CODE><B>subtype</B></CODE></TD>
+      <TD height="37">
+        <P>If the conversion is <CODE>subranged</CODE>, it is <CODE>target_type</CODE>,
+          otherwise, it is <CODE>source_type</CODE></P>
+      </TD>
+		  </TR>
+		</TABLE> </BLOCKQUOTE> <HR>
+
+<H2><A NAME="examples">Examples</A></H2>
+<BLOCKQUOTE>
+  <PRE>#include &lt;boost/numeric/conversion_traits.hpp&gt;
+
+int main() {
+
+  // A trivial conversion.
+  typedef boost::numeric::conversion_traits&lt;short,short&gt; Short2Short_Traits ;
+  assert ( Short2Short_Traits::trivial::value ) ;
+
+  // A subranged conversion.
+  typedef boost::numeric::conversion_traits&lt;double,unsigned int&gt; UInt2Double_Traits ;
+  assert (  UInt2Double_Traits::mixture::value == boost::numeric::integral_to_float ) ;
+  assert (  UInt2Double_Traits::sign_mixture::value == boost::numeric::unsigned_to_signed ) ;
+  assert ( !UInt2Double_Traits::subranged::value ) ;
+  assert ( typeid(UInt2Double_Traits::supertype) == typeid(double) ) ;
+  assert ( typeid(UInt2Double_Traits::subtype) == typeid(unsigned int) ) ;
+
+  // A doubly subranged conversion.
+  assert (    boost::numeric::conversion_traits&lt;short, unsigned short&gt;::subranged::value
+           &amp;&amp; boost::numeric::conversion_traits&lt;unsigned short, short&gt;::subranged::value
+         )
+
+  return 0;
+}</PRE>
+   </BLOCKQUOTE>
+<HR>
+<P>Back to <A HREF="index.html">Numeric Conversion library index</A></P>
+<HR>
+<P>Revised 23 June 2004</P>
+<p>© Copyright Fernando Luis Cacciola Carballal, 2004</p>
+<p> Use, modification, and distribution are subject to the Boost Software
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+</BODY>
+</HTML>

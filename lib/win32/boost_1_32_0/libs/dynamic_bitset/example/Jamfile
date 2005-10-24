@@ -1,0 +1,20 @@
+exe timing_tests
+    : timing_tests.cpp
+    : <include>$(BOOST_ROOT)
+    ;
+
+exe example1
+    : example1.cpp
+    : <include>$(BOOST_ROOT)
+    ;
+
+exe example2
+    : example2.cpp
+    : <include>$(BOOST_ROOT)
+    ;
+
+exe example3
+    : example3.cpp
+    : <include>$(BOOST_ROOT)
+    ;
+

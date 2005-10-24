@@ -1,0 +1,20 @@
+
+# bring in the rules for testing
+import testing ;
+
+# type_traits in V1 seem to have two modes: standalone, triggered
+# by a command line option, and a regular. For now, just imitate
+# regular               
+
+rule all-tests {
+     local result ;
+     for local source in [ glob *_test.cpp ] udt_specialisations.cpp
+     {
+         result += [ run $(source) ] ;
+     }
+     return $(result) ;     
+}
+            
+test-suite type_traits : [ all-tests ] ;
+
+

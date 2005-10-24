@@ -1,0 +1,268 @@
+<HTML>
+
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="stylesheet" TYPE="text/css" HREF="../../../../boost.css">
+<TITLE>Boost Numeric Conversion Library - Policy-based Converter</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000ff" VLINK="#800080">
+<TABLE BORDER="0" CELLPADDING="7" CELLSPACING="0" WIDTH="100%"
+ SUMMARY="header">
+<TR>
+<TD VALIGN="top" WIDTH="300"> <H3><A HREF="http://www.boost.org"><IMG
+HEIGHT="86" WIDTH="277" ALT="C++ Boost" SRC="../../../../boost.png"
+BORDER="0"></A> </H3>
+</TD>
+<TD VALIGN="top"> <H1 ALIGN="center">Boost Numeric Conversion Library</H1>
+      <H1><A HREF="http://www.boost.org">Header </A><A
+HREF="../../../../boost/numeric/conversion/converter.hpp">boost/numeric/conversion/converter.hpp</A></H1>
+</TD>
+</TR>
+</TABLE>
+<HR>
+<H2>Contents</H2>
+<DT><A HREF="#synposis">Synopsis</A></DT>
+<DT><A HREF="requirements.html">User Defined Types support</A></DT>
+<DT><A HREF="#rchklogic">Range Checking Logic</A></DT>
+<DT><A HREF="#examples">Examples</A></DT>
+
+<HR>
+<H2><A NAME="synopsis">Synopsis</A></H2>
+<PRE>namespace boost { namespace numeric {
+
+
+template&lt;class T,
+         class S,
+         class Traits,          = conversion_traits&lt;T,S&gt;
+         class OverflowHandler  = def_overflow_handler,
+         class Float2IntRounder = Trunc&lt; typename Traits::source_type &gt;,
+         class RawConverter     = raw_converter&lt;Traits&gt;,
+         class UserRangeChecker = UseInternalRangeChecker
+        &gt;
+struct converter
+{
+  typedef Traits traits ;
+
+  typedef typename Traits::source_type   source_type   ;
+  typedef typename Traits::argument_type argument_type ;
+  typedef typename Traits::result_type   result_type   ;
+
+  static result_type convert ( argument_type s ) ;
+
+  result_type operator() ( argument_type s ) const ;
+
+  // Internal member functions:
+
+    static range_check_result out_of_range      ( argument_type s ) ;
+    static void               validate_range    ( argument_type s ) ;
+    static result_type        low_level_convert ( argument_type s ) ;
+    static source_type        nearbyint         ( argument_type s ) ;
+
+} ;
+
+} } // namespace numeric, boost
+</PRE>
+
+<P><code>boost::numeric::converter&lt;&gt;</code> is a
+<a href="http://www.sgi.com/tech/stl/UnaryFunction.html">Unary Function Object</a>
+encapsulating the code to perform a numeric conversion with the direction and properties specified
+  by the <CODE>Traits</CODE> template parameter. It can optionally take some
+  <A HREF="converter_policies.html">policies</a>
+  which can be used to customize its behavior. The Traits parameter is not a policy but
+  the parameter that defines the conversion.
+</P>
+<hr>
+<h2>Template parameters:</h2>
+<TABLE BORDER="1">
+  <TR>
+    <TD>&nbsp;<CODE>Traits</CODE>&nbsp;</TD>
+    <TD>&nbsp;This must be a conversion traits class with the interface of
+     <A HREF="conversion_traits.html">boost::numeric::conversion_traits</A>
+    </TD>
+  </TR>
+  <TR>
+    <TD>&nbsp;<A HREF="converter_policies.html#oh"><CODE>OverflowHandler</CODE></A>&nbsp;</TD>
+    <TD>&nbsp;<B>Stateless Policy</B> called to administrate the result of the
+      range checking.<br>
+      &nbsp;It is a <b>Function Object</b> which receives the result of <CODE>out_of_range()</CODE>
+      and is called inside the <CODE>validate_range()</CODE> static member function
+      exposed by the converter.</TD>
+  </TR>
+  <TR>
+    <TD>&nbsp;<A HREF="converter_policies.html#f2i"><CODE>Float2IntRounder</CODE></A>&nbsp;</TD>
+    <TD>&nbsp;<B>Stateless Policy</B> which specifies the rounding mode used for
+      float to integral conversions.<br>
+      &nbsp;It supplies the <CODE>nearbyint()</CODE> static member function exposed
+      by the converter.</TD>
+  </TR>
+  <TR>
+    <TD>&nbsp;<A HREF="converter_policies.html#rawc"><CODE>RawConverter</CODE></A>&nbsp;</TD>
+    <TD>&nbsp;<B>Stateless Policy</B> which is used to perform the actual conversion.
+      <br>
+      &nbsp;It supplies the<CODE> low_level_convert()</CODE> static member function
+      exposed by the converter.</TD>
+  </TR>
+  <TR>
+    <TD>&nbsp;<A HREF="converter_policies.html#rangecheck"><CODE>UserRangeChecker</CODE></A>&nbsp;</TD>
+    <TD><i>Special and Optional</i> <b>Stateless Policy</b> which can be used to override
+      the internal range checking logic.<br>
+      If given, supplies alternative code for the out_of_range() and validate_range()
+      static member functions exposed by the converter.</TD>
+  </TR>
+</TABLE>
+<br>
+<hr>
+<h2>Member functions:</h2>
+<P><CODE>static result_type converter&lt;&gt;::convert ( argument_type s ) ; //
+  throw</CODE></P>
+<BLOCKQUOTE>
+  <P>This static member function converts an rvalue of type source_type to an rvalue
+    of type target_type.<BR>
+    If the conversion requires it, it performs a range checking before the conversion
+    and passes the result of the check to the overflow handler policy (the default
+    policy throws an exception if out-of-range is detected)<BR>
+    The implementation of this function is actually built from the policies and
+    is basically as follows:</P>
+  <PRE>   result_type converter<>::convert ( argument_type s )
+   {
+     validate_range(s); // Implemented by the internal range checking logic
+                        // (which also calls the OverflowHandler policy)
+                        // or externally supplied by the UserRangeChecker policy.
+
+     s = nearbyint(s); // Externally supplied by the Float2IntRounder policy.
+                       // NOTE: This is actually called only for float to int conversions.
+
+     return low_level_convert(s); // Externally supplied by the RawConverter policy.
+   }
+</PRE>
+
+  <P>&quot;converter&lt;&gt;::operator() const&quot; just calls <CODE>convert()</CODE></P>
+</BLOCKQUOTE>
+<P><CODE>static range_check_result numeric_converter&lt;&gt;::out_of_range (
+argument_type s ) ;</CODE></P>
+<BLOCKQUOTE>
+  <P>This <A HREF="#int">internal</A> static member function determines if the
+    value 's' can be represented by the target type without overflow. <BR>
+    It does not determine if the conversion is <EM>exact</EM>; that is, it does
+    not detect <i>inexact</i> conversions, only <i>out-of-range</i> conversions
+    (see the <a href="definitions.html#roundoff">Definitions</a> for further details).<BR>
+    The return value is of enum type
+    <A HREF="converter_policies.html#rcr"><CODE>boost::numeric::range_check_result</CODE></A><BR>
+    The actual code for the range checking logic is optimized for the combined
+    properties of the source and target types. For example, a non-subranged conversion
+    (i.e: int-&gt;float), requires no range checking, so out_of_range() returns
+    cInRange directly. See the following <A HREF="#rchklogic">table</A> for more
+    details.<br>
+    If the user supplied a <a href="converter_policies.html#rangecheck">UserRangeChecker</a>
+    policy, is this policy which implements this function, so the implementation
+    is user defined, although it is expected to perform the same conceptual check
+    and return the appropriate result.</P>
+</BLOCKQUOTE>
+<P><CODE>static void numeric_converter&lt;&gt;::validate_range ( argument_type
+s ) ; // no throw</CODE></P>
+<BLOCKQUOTE>
+  <P>This <A HREF="#int">internal</A> static member function calls <CODE>out_of_range(s)</CODE>,
+    and passes the result to the <A
+HREF="converter_policies.html#oh"><CODE>OverflowHandler</CODE></A> policy class
+    <BR>
+    For those Target/Source combinations which don't require range checking, this
+    is an <U>empty inline function</U>.<br>
+    If the user supplied a <a href="converter_policies.html#rangecheck">UserRangeChecker</a>
+    policy, is this policy which implements this function, so the implementation
+    is user defined, although it is expected to perform the same action as the
+    default. In particular, it is expected to pass the result of the check to
+    the overflow handler.</P>
+</BLOCKQUOTE>
+<P><CODE>static result_type numeric_converter&lt;&gt;::low_level_convert (
+argument_type s ) ;</CODE></P>
+<BLOCKQUOTE>
+  <P>This <A HREF="#int">internal</A> static member function performs the actual
+    conversion.<BR>
+This function is externally supplied by the <A
+HREF="converter_policies.html#rawc"><CODE>RawConverter</CODE></A> policy class.</P>
+</BLOCKQUOTE>
+<P><CODE>static source_type converter&lt;&gt;::nearbyint (
+argument_type s ) ;</CODE></P>
+<BLOCKQUOTE>
+  <P>This <A HREF="#int">internal</A> static member function, which is <U>only
+    used</U> for float to int conversions, returns an <I>integer value of <U>floating-point
+    type</U></I> according to some rounding direction. <BR>
+    This function is externally supplied by the <A
+HREF="converter_policies.html#f2i"><CODE>Float2IntRounder</CODE></A> policy class
+    which encapsulates the specific rounding mode.</P>
+</BLOCKQUOTE>
+<hr>
+<P><A NAME="int"><B>Internal Member Functions</B>:</A> These static member functions
+  build the actual conversion code used by <CODE>convert()</CODE>. The user does
+  not have to call these if calling convert(), since convert() calls them infernally,
+  but they can be called separately for specific needs.</P>
+<hr>
+<H2><A NAME="rchklogic">Range Checking Logic</A></H2>
+<P>The Following table summarizes the internal range checking logic performed
+  for each combination of the properties of Source and Target.<br>
+  LowestT/HighestT denotes the highest and lowest values of the Target type, respectively.<br>
+  S(n) is short for &quot;static_cast&lt;S&gt;(n)&quot; (S denotes the Source
+  type).<br>
+  &quot;NONE&quot; indicates that for this case there is no range checking.</P>
+<Pre>&nbsp; int_to_int    |--> sig_to_sig     |--> subranged     |--> ( s >= S(LowestT) ) && ( s <= S(HighestT) )
+                |                   |--> not subranged |--> NONE
+                |
+                |--> unsig_to_unsig |--> subranged     |--> ( s >= S(LowestT) ) && ( s <= S(HighestT) )
+                |                   |--> not subranged |--> NONE
+                |
+                |--> sig_to_unsig   |--> pos subranged     |--> ( s >= S(0) ) && ( s <= S(HighestT) )
+                |                   |--> not pos subranged |--> ( s >= S(0) )
+                |
+                |--> unsig_to_sig   |--> subranged     |--> ( s <= S(HighestT) )
+                |                   |--> not subranged |--> NONE
+
+ int_to_float   |--> NONE
+
+ float_to_int   |--> round_to_zero         |--> ( s >  S(LowestT)-S(1)   ) && ( s <  S(HighestT)+S(1)   )
+                |--> round_to_even_nearest |--> ( s >= S(LowestT)-S(0.5) ) && ( s &lt;  S(HighestT)+S(0.5) )
+                |--> round_to_infinity     |--> ( s >  S(LowestT)-S(1)   ) && ( s <= S(HighestT)        )
+                |--> round_to_neg_infinity |--> ( s >= S(LowestT)        ) && ( s <  S(HighestT)+S(1)   )
+
+ float_to_float |--> subranged     |--> ( s >= S(LowestT) ) && ( s <= S(HighestT) )
+                |--> not subranged |--> NONE
+
+</Pre>
+<HR>
+<H2><A NAME="examples">Examples</A></H2>
+<BLOCKQUOTE>
+  <PRE>#include &lt;boost/numeric/conversion/converter.hpp&gt;
+
+int main() {
+
+  typedef boost::numeric::converter&lt;int,doublegt; Double2Int ;
+
+  int x = Double2Int::convert(2.0);
+  assert ( x == 2 );
+
+  int y = Double2Int()(3.14); // As a function object.
+  assert ( y == 3 ) ; // The default rounding is trunc.
+
+  try
+  {
+    double m = boost::numeric::bounds&lt;double&gt;::highest();
+    int z = Double2Int::convert(m); // By default throws positive_overflow()
+  }
+  catch ( boost::numeric::positive_overflow const&amp; )
+  {
+  }
+
+  return 0;
+}</PRE>
+   </BLOCKQUOTE>
+<HR>
+<P>Back to <A HREF="index.html">Numeric Conversion library index</A></P>
+<HR>
+<P>Revised 23 June 2004</P>
+<p>© Copyright Fernando Luis Cacciola Carballal, 2004</p>
+<p> Use, modification, and distribution are subject to the Boost Software
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+</BODY>
+</HTML>

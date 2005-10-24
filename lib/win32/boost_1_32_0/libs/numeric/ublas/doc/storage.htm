@@ -1,0 +1,548 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content=
+"HTML Tidy for Linux/x86 (vers 1st March 2004), see www.w3.org" />
+<meta http-equiv="Content-Type" content=
+"text/html; charset=us-ascii" />
+<link href="ublas.css" type="text/css" />
+<title>Storage</title>
+</head>
+<body>
+<h1><img src="../../../../boost.png" alt="boost.png" align="middle" />
+Storage</h1>
+<h2><a name="unbounded_array" id="unbounded_array"></a> Unbounded
+Array</h2>
+<h4>Description</h4>
+<p>The templated class <code>unbounded_array&lt;T, ALLOC&gt;</code> implements a unbounded storage array using an allocator. The unbounded array is similar to a <code>std::vector</code> in that in can grow in size beyond any fixed bound.</p>
+<p>When resized <code>unbounded_array</code> will reallocate it's storage even if the new size requirement is smaller. It is therefore inefficient to resize a <code>unbounded_array</code></p>
+<h4>Example</h4>
+<pre>
+#include &lt;boost/numeric/ublas/storage.hpp&gt;
+
+int main () {
+    using namespace boost::numeric::ublas;
+    unbounded_array&lt;double&gt; a (3);
+    for (unsigned i = 0; i &lt; a.size (); ++ i) {
+        a [i] = i;
+        std::cout &lt;&lt; a [i] &lt;&lt; std::endl;
+    }
+}
+</pre>
+<h4>Definition</h4>
+<p>Defined in the header storage.hpp.</p>
+<h4>Template parameters</h4>
+<table border="1" summary="parameters">
+<tbody>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td>The type of object stored in the array.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ALLOC</code></td>
+<td>An STL Allocator</td>
+<td>std::allocator</td>
+</tr>
+</tbody>
+</table>
+<h4>Model of</h4>
+<p>Random Access Container.</p>
+<h4>Type requirements</h4>
+<p>None, except for those imposed by the requirements of Random
+Access Container.</p>
+<h4>Public base classes</h4>
+<p>None.</p>
+<h4>Members</h4>
+<table border="1" summary="members">
+<tbody>
+<tr>
+<th>Member</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><code>explicit unbounded_array (ALLOC &amp;a = ALLOC())</code></td>
+<td>
+Allocates an initialized <code>unbounded_array</code> that
+holds at most zero elements, using a specified allocator.</td>
+</tr>
+<tr>
+<td><code>explicit unbounded_array (size_type size, ALLOC &amp;a = ALLOC())</code></td>
+<td>
+Allocates an initialized <code>unbounded_array</code> that
+holds at most <code>size</code> elements.
+using a specified allocator.
+</td>
+</tr>
+<tr>
+<td><code>explicit unbounded_array (size_type size, no_init, ALLOC &amp;a = ALLOC())</code></td>
+<td>
+Allocates an <strong>uninitialized</strong> <code>unbounded_array</code> that
+holds at most <code>size</code> elements, using a specified allocator.
+</td>
+</tr>
+<tr>
+<td><code>unbounded_array (const unbounded_array &amp;a)</code></td>
+<td>The copy constructor.</td>
+</tr>
+<tr>
+<td><code>~unbounded_array ()</code></td>
+<td>Deallocates the <code>unbounded_array</code> itself.</td>
+</tr>
+<tr>
+<td><code>void resize (size_type size, value_type init)</code></td>
+<td>Resizes an <code>unbounded_array</code> to hold at most
+<code>size</code> elements.<br />
+The <code>unbounded_array</code> is reallocated only if the size changes.
+Element values are preserved, additional elements are assigned the value of init.</td>
+</tr>
+<tr>
+<td><code>void resize (size_type size)</code></td>
+<td>Resizes an <code>unbounded_array</code> to hold at most
+<code>size</code> elements.<br />
+The <code>unbounded_array</code> is reallocated only if the size changes.
+The elements values are undefined.</td>
+</tr>
+<tr>
+<td><code>size_type size () const</code></td>
+<td>Returns the size of the <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_reference operator [] (size_type i)
+const</code></td>
+<td>Returns a <code>const</code> reference of the <code>i</code>
+-th element.</td>
+</tr>
+<tr>
+<td><code>reference operator [] (size_type i)</code></td>
+<td>Returns a reference of the <code>i</code>-th element.</td>
+</tr>
+<tr>
+<td><code>unbounded_array &amp;operator = (const unbounded_array
+&amp;a)</code></td>
+<td>The assignment operator.</td>
+</tr>
+<tr>
+<td><code>unbounded_array &amp;assign_temporary (unbounded_array
+&amp;a)</code></td>
+<td>Assigns a temporary. May change the array <code>a</code>.</td>
+</tr>
+<tr>
+<td><code>void swap (unbounded_array &amp;a)</code></td>
+<td>Swaps the contents of the arrays.</td>
+</tr>
+<tr>
+<td><code>const_iterator begin () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the beginning
+of the <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_iterator end () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the end of
+the <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>iterator begin ()</code></td>
+<td>Returns a <code>iterator</code> pointing to the beginning of
+the <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>iterator end ()</code></td>
+<td>Returns a <code>iterator</code> pointing to the end of the
+<code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rbegin () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+beginning of the reversed <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rend () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+end of the reversed <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>reverse_iterator rbegin ()</code></td>
+<td>Returns a <code>reverse_iterator</code> pointing to the
+beginning of the reversed <code>unbounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>reverse_iterator rend ()</code></td>
+<td>Returns a <code>reverse_iterator</code> pointing to the end of
+the reversed <code>unbounded_array</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2><a name="bounded_array" id="bounded_array"></a> Bounded
+Array</h2>
+<h4>Description</h4>
+<p>The templated class <code>bounded_array&lt;T, N, ALLOC&gt;</code> implements a bounded storage array. The bounded array is similar to a C++ array type in that its maximum size is bounded by N. Similarly a <code>bounded_array</code> requires no secondary storage and ALLOC is only used to specify<code>size_type</code> and <code>difference_type</code>.
+</p>
+<p>When resized <code>bounded_array</code> uses the same storage with the same bound!. It is therefore efficient to resize a <code>bounded_array</code></p>
+<h4>Example</h4>
+<pre>
+#include &lt;boost/numeric/ublas/storage.hpp&gt;
+
+int main () {
+    using namespace boost::numeric::ublas;
+    bounded_array&lt;double, 3&gt; a (3);
+    for (unsigned i = 0; i &lt; a.size (); ++ i) {
+        a [i] = i;
+        std::cout &lt;&lt; a [i] &lt;&lt; std::endl;
+    }
+}
+</pre>
+<h4>Definition</h4>
+<p>Defined in the header storage.hpp.</p>
+<h4>Template parameters</h4>
+<table border="1" summary="parameters">
+<tbody>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td>The type of object stored in the array.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td>The allocation size of the array.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ALLOC</code></td>
+<td>An STL Allocator</td>
+<td>std::allocator</td>
+</tr>
+</tbody>
+</table>
+<h4>Model of</h4>
+<p>Random Access Container.</p>
+<h4>Type requirements</h4>
+<p>None, except for those imposed by the requirements of Random
+Access Container.</p>
+<h4>Public base classes</h4>
+<p>None.</p>
+<h4>Members</h4>
+<table border="1" summary="members">
+<tbody>
+<tr>
+<th>Member</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><code>bounded_array ()</code></td>
+<td>Allocates an initialized <code>bounded_array</code> that holds at most <strong>ZERO</strong> elements.</td>
+</tr>
+<tr>
+<td><code>explicit bounded_array (size_type size)</code></td>
+<td>Allocates an initialized <code>bounded_array</code> that
+holds at most <code>size</code> elements.</td>
+</tr>
+<tr>
+<td><code>bounded_array (size_type size, no_init)</code></td>
+<td>Allocates an <strong>uninitialized</strong> <code>bounded_array</code> that
+holds at most <code>size</code> elements.</td>
+</tr>
+<tr>
+<tr>
+<td><code>bounded_array (const bounded_array &amp;c)</code></td>
+<td>The copy constructor.</td>
+</tr>
+<tr>
+<td><code>~bounded_array ()</code></td>
+<td>Deallocates the <code>bounded_array</code> itself.</td>
+</tr>
+<tr>
+<td><code>void resize (size_type size, value_type init)</code></td>
+<td>Resizes a <code>bounded_array</code> to hold at most
+<code>size</code> elements. Element values are preserved, additional
+elements are assigned the value of init. Throws a <code>bad_size</code> exception
+if the size exeeds the bound.</td>
+</tr>
+<tr>
+<td><code>void resize (size_type size)</code></td>
+<td>Resizes a <code>bounded_array</code> to hold at most
+<code>size</code> elements. The elements values are undefined. Throws a <code>bad_size</code> exception
+if the size exeeds the bound.</td>
+</tr>
+<tr>
+<td><code>size_type size () const</code></td>
+<td>Returns the size of the <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_reference operator [] (size_type i)
+const</code></td>
+<td>Returns a <code>const</code> reference of the <code>i</code>
+-th element.</td>
+</tr>
+<tr>
+<td><code>reference operator [] (size_type i)</code></td>
+<td>Returns a reference of the <code>i</code>-th element.</td>
+</tr>
+<tr>
+<td><code>bounded_array &amp;operator = (const bounded_array
+&amp;a)</code></td>
+<td>The assignment operator.</td>
+</tr>
+<tr>
+<td><code>bounded_array &amp;assign_temporary (bounded_array
+&amp;a)</code></td>
+<td>Assigns a temporary. May change the array <code>a</code>.</td>
+</tr>
+<tr>
+<td><code>const_iterator begin () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the beginning
+of the <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_iterator end () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the end of
+the <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>iterator begin ()</code></td>
+<td>Returns a <code>iterator</code> pointing to the beginning of
+the <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>iterator end ()</code></td>
+<td>Returns a <code>iterator</code> pointing to the end of the
+<code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rbegin () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+beginning of the reversed <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rend () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+end of the reversed <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>reverse_iterator rbegin ()</code></td>
+<td>Returns a <code>reverse_iterator</code> pointing to the
+beginning of the reversed <code>bounded_array</code>.</td>
+</tr>
+<tr>
+<td><code>reverse_iterator rend ()</code></td>
+<td>Returns a <code>reverse_iterator</code> pointing to the end of
+the reversed <code>bounded_array</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2><a name="range" id="range"></a> Range</h2>
+<h4>Description</h4>
+<p>The class <code>range</code> specifies a range of indicies.
+It can therefore be specify ranges for vectors and matrices.</p>
+<h4>Example</h4>
+<pre>
+#include &lt;boost/numeric/ublas/storage.hpp&gt;
+
+int main () {
+    using namespace boost::numeric::ublas;
+    range r (0, 3);
+    for (unsigned i = 0; i &lt; r.size (); ++ i) {
+        std::cout &lt;&lt; r (i) &lt;&lt; std::endl;
+    }
+}
+</pre>
+<h4>Definition</h4>
+<p>Defined in the header storage.hpp.</p>
+<h4>Model of</h4>
+<p>Reversible Container.</p>
+<h4>Type requirements</h4>
+<p>None, except for those imposed by the requirements of Reversible
+Container.</p>
+<h4>Public base classes</h4>
+<p>None.</p>
+<h4>Members</h4>
+<table border="1" summary="members">
+<tbody>
+<tr>
+<th>Member</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><code>range (size_type start, size_type stop)</code></td>
+<td>Constructs a range of indicies from <code>start</code> to <code>stop (excluded)</code>
+.</td>
+</tr>
+<tr>
+<td><code>size_type start () const</code></td>
+<td>Returns the beginning of the <code>range</code>.</td>
+</tr>
+<tr>
+<td><code>size_type size () const</code></td>
+<td>Returns the size of the <code>range</code>.</td>
+</tr>
+<tr>
+<td><code>const_reference operator [] (size_type i)
+const</code></td>
+<td>Returns the value <code>start + i</code> of the <code>i</code>
+-th element.</td>
+</tr>
+<tr>
+<td><code>range compose (const range &amp;r) const</code></td>
+<td>Returns the composite range from <code>start + r.start
+()</code> to <code>start + r.start () + r.size ()</code>.</td>
+</tr>
+<tr>
+<td><code>bool operator == (const range &amp;r) const</code></td>
+<td>Tests two ranges for equality.</td>
+</tr>
+<tr>
+<td><code>bool operator != (const range &amp;r) const</code></td>
+<td>Tests two ranges for inequality.</td>
+</tr>
+<tr>
+<td><code>const_iterator begin () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the beginning
+of the <code>range</code>.</td>
+</tr>
+<tr>
+<td><code>const_iterator end () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the end of
+the <code>range</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rbegin () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+beginning of the reversed <code>range</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rend () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+end of the reversed <code>range</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4>Preconditions</h4>
+<ul>
+<li><code>start () &lt;= stop ()</code></li>
+</ul>
+
+<h2><a name="slice" id="slice"></a> Slice</h2>
+<h4>Description</h4>
+<p>The class <code>range</code> specifies a 'slice' of indicies.
+It can therefore be specify slices for vectors and matrices.</p>
+<h4>Example</h4>
+<pre>
+#include &lt;boost/numeric/ublas/storage.hpp&gt;
+
+int main () {
+    using namespace boost::numeric::ublas;
+    slice s (0, 1, 3);
+    for (unsigned i = 0; i &lt; s.size (); ++ i) {
+        std::cout &lt;&lt; s (i) &lt;&lt; std::endl;
+    }
+}
+</pre>
+<h4>Definition</h4>
+<p>Defined in the header storage.hpp.</p>
+<h4>Model of</h4>
+<p>Reversible Container.</p>
+<h4>Type requirements</h4>
+<p>None, except for those imposed by the requirements of Reversible
+Container.</p>
+<h4>Public base classes</h4>
+<p>None.</p>
+<h4>Members</h4>
+<table border="1" summary="members">
+<tbody>
+<tr>
+<th>Member</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><code>slice (size_type start, size_type stride, size_type
+size)</code></td>
+<td>Constructs a slice <code>start,start+stride,start+2*stride...</code> with 
+<code>size</code> elements.</td>
+</tr>
+<tr>
+<td><code>size_type start () const</code></td>
+<td>Returns the beginning of the <code>slice</code>.</td>
+</tr>
+<tr>
+<td><code>size_type stride () const</code></td>
+<td>Returns the stride of the <code>slice</code>.</td>
+</tr>
+<tr>
+<td><code>size_type size () const</code></td>
+<td>Returns the size of the <code>slice</code>.</td>
+</tr>
+<tr>
+<td><code>const_reference operator [] (size_type i)
+const</code></td>
+<td>Returns the value <code>start + i * stride</code> of the
+<code>i</code>-th element.</td>
+</tr>
+<tr>
+<td><code>slice compose (const range &amp;r) const</code></td>
+<td>Returns the composite slice from <code>start + stride * r.start
+()</code> to <code>start + stride * (r.start () + r.size ())</code>
+with stride <code>stride</code>.</td>
+</tr>
+<tr>
+<td><code>slice compose (const slice &amp;s) const</code></td>
+<td>Returns the composite slice from <code>start + stride * s.start
+()</code> to <code>start + stride * s.stride () * (s.start () +
+s.size ())</code> with stride <code>stride * s.stride ()</code>
+.</td>
+</tr>
+<tr>
+<td><code>bool operator == (const slice &amp;s) const</code></td>
+<td>Tests two slices for equality.</td>
+</tr>
+<tr>
+<td><code>bool operator != (const slice &amp;s) const</code></td>
+<td>Tests two slices for inequality.</td>
+</tr>
+<tr>
+<td><code>const_iterator begin () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the beginning
+of the <code>slice</code>.</td>
+</tr>
+<tr>
+<td><code>const_iterator end () const</code></td>
+<td>Returns a <code>const_iterator</code> pointing to the end of
+the <code>slice</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rbegin () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+beginning of the reversed <code>slice</code>.</td>
+</tr>
+<tr>
+<td><code>const_reverse_iterator rend () const</code></td>
+<td>Returns a <code>const_reverse_iterator</code> pointing to the
+end of the reversed <code>slice</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4>Preconditions</h4>
+<ul>
+<li>None all strides are vaild. However when an index is returned or an iterator is dereferenced its
+value must be representable as the size_type.</li>
+</ul>
+<hr />
+<p>Copyright (&copy;) 2000-2002 Joerg Walter, Mathias Koch<br />
+Permission to copy, use, modify, sell and distribute this document
+is granted provided this copyright notice appears in all copies.
+This document is provided ``as is'' without express or implied
+warranty, and with no claim as to its suitability for any
+purpose.</p>
+<p>Last revised: 24/06/2004</p>
+</body>
+</html>

@@ -1,0 +1,59 @@
+# Lambda library
+
+# Copyright (C) 2001-2003 Jaakko Järvi
+
+# Use, modification and distribution is subject to the Boost Software License, 
+# Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at 
+# http://www.boost.org/LICENSE_1_0.txt) 
+
+# For more information, see http://www.boost.org/
+
+
+subproject libs/lambda/test ;
+
+# bring in rules for testing
+SEARCH on testing.jam = $(BOOST_BUILD_PATH) ;
+include testing.jam ;
+
+# Make tests run by default.
+DEPENDS all : test ;
+
+{
+  # look in BOOST_ROOT for sources first, just in this Jamfile
+  local SEARCH_SOURCE = $(BOOST_ROOT) $(SEARCH_SOURCE) ;
+
+  test-suite lambda
+    : 
+  [ run libs/lambda/test/algorithm_test.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/bind_tests_simple.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/bind_tests_advanced.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/bind_tests_simple_f_refs.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/bll_and_function.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/cast_test.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/constructor_tests.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/control_structures.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/exception_test.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/extending_rt_traits.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/is_instance_of_test.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/member_pointer_test.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/operator_tests_simple.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/phoenix_control_structures.cpp :  :  :  :  ]
+
+  [ run libs/lambda/test/switch_construct.cpp :  :  :  :  ]
+ ;
+
+}
+      

@@ -1,0 +1,196 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template recursive_wrapper</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="variant/reference.html#id352292" title="Header &lt;boost/variant/recursive_wrapper.hpp&gt;">
+<link rel="prev" href="id276892.html" title="Class template make_recursive_variant_over">
+<link rel="next" href="is_recursive_wrapper.html" title="Class template is_recursive_wrapper">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="id276892.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="variant/reference.html#id352292"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="is_recursive_wrapper.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="recursive_wrapper"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template recursive_wrapper</span></h2>
+<p>boost::recursive_wrapper &#8212; Solves circular dependencies, enabling recursive types.</p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T&gt; 
+<span class="bold"><b>class</b></span> recursive_wrapper {
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> T type;
+
+  <span class="emphasis"><em>// <a href="recursive_wrapper.html#recursive_wrapperconstruct-copy-destruct">construct/copy/destruct</a></em></span>
+  <a href="recursive_wrapper.html#id419143-bb">recursive_wrapper</a>();
+  <a href="recursive_wrapper.html#id455143-bb">recursive_wrapper</a>(<span class="bold"><b>const</b></span> recursive_wrapper &amp;);
+  <a href="recursive_wrapper.html#id521823-bb">recursive_wrapper</a>(<span class="bold"><b>const</b></span> T &amp;);
+  <a href="recursive_wrapper.html#id267948-bb">~recursive_wrapper</a>();
+
+  <span class="emphasis"><em>// <a href="recursive_wrapper.html#id440910-bb">modifiers</a></em></span>
+  <span class="type"><span class="bold"><b>void</b></span></span> <a href="recursive_wrapper.html#id337749-bb">swap</a>(recursive_wrapper &amp;);
+  <span class="type">recursive_wrapper &amp;</span> <a href="recursive_wrapper.html#id523522-bb"><span class="bold"><b>operator</b></span>=</a>(<span class="bold"><b>const</b></span> recursive_wrapper &amp;);
+  <span class="type">recursive_wrapper &amp;</span> <a href="recursive_wrapper.html#id325835-bb"><span class="bold"><b>operator</b></span>=</a>(<span class="bold"><b>const</b></span> T &amp;);
+
+  <span class="emphasis"><em>// <a href="recursive_wrapper.html#id432813-bb">queries</a></em></span>
+  <span class="type">T &amp;</span> <a href="recursive_wrapper.html#id232939-bb">get</a>();
+  <span class="type"><span class="bold"><b>const</b></span> T &amp;</span> <a href="recursive_wrapper.html#id288118-bb">get</a>() <span class="bold"><b>const</b></span>;
+  <span class="type">T *</span> <a href="recursive_wrapper.html#id280820-bb">get_pointer</a>();
+  <span class="type"><span class="bold"><b>const</b></span> T *</span> <a href="recursive_wrapper.html#id339517-bb">get_pointer</a>() <span class="bold"><b>const</b></span>;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id650802"></a><h2>Description</h2>
+<p>The <tt class="computeroutput">recursive_wrapper</tt> class template has an
+          interface similar to a simple value container, but its content is
+          allocated dynamically. This allows <tt class="computeroutput">recursive_wrapper</tt> to
+          hold types <tt class="computeroutput">T</tt> whose member data leads to a circular
+          dependency (e.g., a data member of <tt class="computeroutput">T</tt> has a data member
+          of type <tt class="computeroutput">T</tt>).</p>
+<p>The application of <tt class="computeroutput">recursive_wrapper</tt> is easiest
+          understood in context. See
+          <a href="variant/tutorial.html#variant.tutorial.recursive.recursive-wrapper" title="Recursive types with recursive_wrapper">the section called &#8220;Recursive types with <tt class="computeroutput">recursive_wrapper</tt>&#8221;</a> for a
+          demonstration of a common use of the class template.</p>
+<p><span class="bold"><b>Notes</b></span>:</p>
+<div class="itemizedlist"><ul type="disc"><li>Any type specified as the template argument to
+            <tt class="computeroutput">recursive_wrapper</tt> must be capable of construction via
+            <tt class="computeroutput">operator new</tt>. Thus, for instance, references are not
+            supported.</li></ul></div>
+<div class="refsect2" lang="en">
+<a name="id650893"></a><h3>
+<a name="recursive_wrapperconstruct-copy-destruct"></a><tt class="computeroutput">recursive_wrapper</tt> construct/copy/destruct</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><a name="id419143-bb"></a>recursive_wrapper();</pre>
+<p>Initializes <tt class="computeroutput">*this</tt> by default construction of
+            <tt class="computeroutput">T</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Requires</span></b>:
+
+    <tt class="computeroutput">T</tt> must fulfill the requirements of the
+            <span class="emphasis"><em>DefaultConstructible</em></span> [20.1.4]
+            concept.<br><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    May fail with any exceptions arising from the default
+            constructor of <tt class="computeroutput">T</tt> or, in the event of
+            insufficient memory, with <tt class="computeroutput">std::bad_alloc</tt>.</p>
+</li>
+<li>
+<pre class="literallayout"><a name="id455143-bb"></a>recursive_wrapper(<span class="bold"><b>const</b></span> recursive_wrapper &amp; other);</pre>
+<p>Copies the content of <tt class="computeroutput">other</tt> into
+            <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    May fail with any exceptions arising from the
+            copy constructor of <tt class="computeroutput">T</tt> or, in the event of
+            insufficient memory, with <tt class="computeroutput">std::bad_alloc</tt>.</p>
+</li>
+<li>
+<pre class="literallayout"><a name="id521823-bb"></a>recursive_wrapper(<span class="bold"><b>const</b></span> T &amp; operand);</pre>
+<p>Copies <tt class="computeroutput">operand</tt> into
+            <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    May fail with any exceptions arising from the
+            copy constructor of <tt class="computeroutput">T</tt> or, in the event of
+            insufficient memory, with <tt class="computeroutput">std::bad_alloc</tt>.</p>
+</li>
+<li>
+<pre class="literallayout"><a name="id267948-bb"></a>~recursive_wrapper();</pre>
+<p>Deletes the content of <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    Will not throw.</p>
+</li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id651157"></a><h3>
+<a name="id440910-bb"></a><tt class="computeroutput">recursive_wrapper</tt> modifiers</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>void</b></span></span> <a name="id337749-bb"></a>swap(recursive_wrapper &amp; other);</pre>
+<p>Exchanges contents of <tt class="computeroutput">*this</tt> and
+              <tt class="computeroutput">other</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    Will not throw.</p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">recursive_wrapper &amp;</span> <a name="id523522-bb"></a><span class="bold"><b>operator</b></span>=(<span class="bold"><b>const</b></span> recursive_wrapper &amp; rhs);</pre>
+<p>Assigns the content of <tt class="computeroutput">rhs</tt> to the content of
+              <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Requires</span></b>:
+
+    <tt class="computeroutput">T</tt> must fulfill the requirements of
+            the <a href="Assignable.html" title="Concept Assignable">Assignable</a>
+            concept.<br><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    May fail with any exceptions arising from the assignment
+              operator of <tt class="computeroutput">T</tt>.</p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">recursive_wrapper &amp;</span> <a name="id325835-bb"></a><span class="bold"><b>operator</b></span>=(<span class="bold"><b>const</b></span> T &amp; rhs);</pre>
+<p>Assigns <tt class="computeroutput">rhs</tt> into the content of
+              <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Requires</span></b>:
+
+    <tt class="computeroutput">T</tt> must fulfill the requirements of the
+              <a href="Assignable.html" title="Concept Assignable">Assignable</a>
+              concept.<br><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    May fail with any exceptions arising from the assignment
+              operator of <tt class="computeroutput">T</tt>.</p>
+</li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id651406"></a><h3>
+<a name="id432813-bb"></a><tt class="computeroutput">recursive_wrapper</tt> queries</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<p><a name="id457164-bb"></a></p>
+<pre class="literallayout"><span class="type">T &amp;</span> <a name="id232939-bb"></a>get();
+<span class="type"><span class="bold"><b>const</b></span> T &amp;</span> <a name="id288118-bb"></a>get() <span class="bold"><b>const</b></span>;</pre>
+<p>Returns a reference to the content of
+              <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    Will not throw.</p>
+</li>
+<li>
+<p><a name="id508770-bb"></a></p>
+<pre class="literallayout"><span class="type">T *</span> <a name="id280820-bb"></a>get_pointer();
+<span class="type"><span class="bold"><b>const</b></span> T *</span> <a name="id339517-bb"></a>get_pointer() <span class="bold"><b>const</b></span>;</pre>
+<p>Returns a pointer to the content of
+              <tt class="computeroutput">*this</tt>.</p>
+<p><b xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision"><span class="term">Throws</span></b>:
+
+    Will not throw.</p>
+</li>
+</ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2002, 2003 Eric Friedman, Itay Maman</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="id276892.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="variant/reference.html#id352292"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="is_recursive_wrapper.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

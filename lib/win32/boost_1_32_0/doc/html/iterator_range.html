@@ -1,0 +1,140 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template iterator_range</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="string_algo/reference.html#id365349" title="Header &lt;boost/algorithm/string/iterator_range.hpp&gt;">
+<link rel="prev" href="empty_formatter.html" title="Function template empty_formatter">
+<link rel="next" href="id282639.html" title="Function template operator&lt;&lt;">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="empty_formatter.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="string_algo/reference.html#id365349"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="id282639.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="iterator_range"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template iterator_range</span></h2>
+<p>boost::algorithm::iterator_range &#8212; iterator_range class </p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> IteratorT&gt; 
+<span class="bold"><b>class</b></span> iterator_range {
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; IteratorT &gt; type;                   <span class="emphasis"><em>// this type </em></span>
+  <span class="bold"><b>typedef</b></span> <span class="emphasis"><em>unspecified</em></span>                 value_type;             <span class="emphasis"><em>// Encapsulated value type. </em></span>
+  <span class="bold"><b>typedef</b></span> <span class="emphasis"><em>unspecified</em></span>                 reference;              <span class="emphasis"><em>// Reference type. </em></span>
+  <span class="bold"><b>typedef</b></span> <span class="emphasis"><em>unspecified</em></span>                 difference_type;        <span class="emphasis"><em>// Difference type. </em></span>
+  <span class="bold"><b>typedef</b></span> <span class="emphasis"><em>unspecified</em></span>                 size_type;              <span class="emphasis"><em>// Size type. </em></span>
+  <span class="bold"><b>typedef</b></span> IteratorT                   const_iterator;         <span class="emphasis"><em>// const_iterator type </em></span>
+  <span class="bold"><b>typedef</b></span> IteratorT                   iterator;               <span class="emphasis"><em>// iterator type </em></span>
+  <span class="bold"><b>typedef</b></span> iterator(iterator_range::*  unspecified_bool_type;  <span class="emphasis"><em>// Safe bool conversion. </em></span>
+
+  <span class="emphasis"><em>// <a href="iterator_range.html#iterator_rangeconstruct-copy-destruct">construct/copy/destruct</a></em></span>
+  <a href="iterator_range.html#id474291-bb">iterator_range</a>();
+  <a href="iterator_range.html#id385891-bb">iterator_range</a>(iterator, iterator);
+  <a href="iterator_range.html#id429521-bb">iterator_range</a>(<span class="bold"><b>const</b></span> std::pair&lt; IteratorT, IteratorT &gt; &amp;);
+  <a href="iterator_range.html#id233951-bb">iterator_range</a>(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a> &amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+    <a href="iterator_range.html#id507697-bb">iterator_range</a>(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp;);
+  iterator_range&amp; <a href="iterator_range.html#id234126-bb"><span class="bold"><b>operator</b></span>=</a>(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a> &amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+    iterator_range&amp; <a href="iterator_range.html#id245568-bb"><span class="bold"><b>operator</b></span>=</a>(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp;);
+
+  <span class="emphasis"><em>// <a href="iterator_range.html#id339322-bb">public member functions</a></em></span>
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="iterator_range.html#id403577-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp;) <span class="bold"><b>const</b></span>;
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="iterator_range.html#id370894-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp;) <span class="bold"><b>const</b></span>;
+  <span class="type">IteratorT</span> <a href="iterator_range.html#id354027-bb">begin</a>() <span class="bold"><b>const</b></span>;
+  <span class="type">IteratorT</span> <a href="iterator_range.html#id427176-bb">end</a>() <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="iterator_range.html#id401116-bb">empty</a>() <span class="bold"><b>const</b></span>;
+  <span class="type">difference_type</span> <a href="iterator_range.html#id420698-bb">size</a>() <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>void</b></span></span> <a href="iterator_range.html#id430101-bb">swap</a>(<a href="iterator_range.html" title="Class template iterator_range">iterator_range</a> &amp;) ;
+  <a href="iterator_range.html#id280232-bb"><span class="bold"><b>operator</b></span> unspecified_bool_type</a>() <span class="bold"><b>const</b></span>;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id598897"></a><h2>Description</h2>
+<p>An <tt class="computeroutput">iterator_range</tt>  delimits a range in a sequence by beginning and ending iterators. An iterator_range can be passed to an algorithm which requires a sequence as an input. For example, the <tt class="computeroutput">toupper()</tt>  function may most frequently be used on strings, but can also be used on iterator_ranges:</p>
+<pre class="programlisting">                boost::tolower( find( s, "UPPERCASE STRING" ) );
+</pre>
+<p>Many algorithms working with sequences take a pair of iterators, delimiting a working range, as arguments. The <tt class="computeroutput">iterator_range</tt>  class is an encapsulation of a range identified by a pair of iterators. It provides a collection interface, so it is possible to pass an instance to an algorithm requiring a collection as an input. </p>
+<div class="refsect2" lang="en">
+<a name="id598943"></a><h3>
+<a name="iterator_rangeconstruct-copy-destruct"></a><tt class="computeroutput">iterator_range</tt> construct/copy/destruct</h3>
+<div class="orderedlist"><ol type="1">
+<li><pre class="literallayout"><a name="id474291-bb"></a>iterator_range();</pre></li>
+<li><pre class="literallayout"><a name="id385891-bb"></a>iterator_range(iterator Begin, iterator End);</pre></li>
+<li><pre class="literallayout"><a name="id429521-bb"></a>iterator_range(<span class="bold"><b>const</b></span> std::pair&lt; IteratorT, IteratorT &gt; &amp; Range);</pre></li>
+<li><pre class="literallayout"><a name="id233951-bb"></a>iterator_range(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a> &amp; Other);</pre></li>
+<li>
+<pre class="literallayout"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+  <a name="id507697-bb"></a>iterator_range(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp; Other);</pre>
+<p>This constructor is provided to allow conversion between const and mutable iterator instances of this class template </p>
+</li>
+<li><pre class="literallayout">iterator_range&amp; <a name="id234126-bb"></a><span class="bold"><b>operator</b></span>=(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a> &amp; Other);</pre></li>
+<li><pre class="literallayout"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+  iterator_range&amp; <a name="id245568-bb"></a><span class="bold"><b>operator</b></span>=(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp; Other);</pre></li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id599186"></a><h3>
+<a name="id339322-bb"></a><tt class="computeroutput">iterator_range</tt> public member functions</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a name="id403577-bb"></a><span class="bold"><b>operator</b></span>==(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp; Other) <span class="bold"><b>const</b></span>;</pre>
+<p>Compare operands for equality </p>
+</li>
+<li>
+<pre class="literallayout"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> OtherItT&gt; 
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a name="id370894-bb"></a><span class="bold"><b>operator</b></span>!=(<span class="bold"><b>const</b></span> <a href="iterator_range.html" title="Class template iterator_range">iterator_range</a>&lt; OtherItT &gt; &amp; Other) <span class="bold"><b>const</b></span>;</pre>
+<p>Compare operands for non-equality </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">IteratorT</span> <a name="id354027-bb"></a>begin() <span class="bold"><b>const</b></span>;</pre>
+<p>Retrieve the begin iterator </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">IteratorT</span> <a name="id427176-bb"></a>end() <span class="bold"><b>const</b></span>;</pre>
+<p>Retrieve the end iterator </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id401116-bb"></a>empty() <span class="bold"><b>const</b></span>;</pre>
+<p>Test whether the range is empty </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">difference_type</span> <a name="id420698-bb"></a>size() <span class="bold"><b>const</b></span>;</pre>
+<p>Retrieve the size of the range </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>void</b></span></span> <a name="id430101-bb"></a>swap(<a href="iterator_range.html" title="Class template iterator_range">iterator_range</a> &amp; Other) ;</pre>
+<p>Swap two ranges </p>
+</li>
+<li><pre class="literallayout"><a name="id280232-bb"></a><span class="bold"><b>operator</b></span> unspecified_bool_type() <span class="bold"><b>const</b></span>;</pre></li>
+</ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2002-2004 Pavol Droba</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="empty_formatter.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="string_algo/reference.html#id365349"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="id282639.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

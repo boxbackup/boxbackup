@@ -1,0 +1,43 @@
+# Copyright David Abrahams 2003. Permission to copy, use,
+# modify, sell and distribute this software is granted provided this
+# copyright notice appears in all copies. This software is provided
+# "as is" without express or implied warranty, and with no claim as
+# to its suitability for any purpose.
+
+# For more information, see http://www.boost.org/
+
+subproject libs/utility/test ;
+
+# bring in rules for testing
+import testing ;
+
+# Make tests run by default.
+DEPENDS all : test ;
+
+local test_monitor = <lib>@boost/libs/test/build/boost_test_exec_monitor ;
+
+# Please keep the tests ordered by filename
+test-suite utility
+    :
+        [ run ../addressof_test.cpp $(test_monitor) ]
+        [ run ../assert_test.cpp ]
+        [ run ../base_from_member_test.cpp ]
+        [ run ../binary_search_test.cpp ]
+        [ run ../call_traits_test.cpp : -u ]
+        [ compile-fail ../checked_delete_test.cpp ]
+        [ run ../compressed_pair_test.cpp $(test_monitor) : -u ]
+        [ run ../current_function_test.cpp : : : <test-info>always_show_run_output ]
+        [ run ../iterators_test.cpp $(test_monitor) ]
+        [ run next_prior_test.cpp $(test_monitor) ]
+        [ compile-fail ../noncopyable_test.cpp ]
+        [ run ../numeric_traits_test.cpp ]
+        [ run ../operators_test.cpp $(test_monitor) ]
+        [ compile ../ref_ct_test.cpp  ]
+        [ run ../ref_test.cpp $(test_monitor) ]
+        [ compile result_of_test.cpp ]
+        [ run ../shared_iterator_test.cpp ]
+        [ run ../value_init_test.cpp ]
+        [ compile-fail ../value_init_test_fail1.cpp ]
+        [ compile-fail ../value_init_test_fail2.cpp ]
+        [ compile-fail ../value_init_test_fail3.cpp ]
+    ;

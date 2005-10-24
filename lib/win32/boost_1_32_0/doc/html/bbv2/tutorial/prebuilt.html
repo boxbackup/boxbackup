@@ -1,0 +1,118 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Prebuilt targets</title>
+<link rel="stylesheet" href="../../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<style type="text/css">
+body { background-image: url('http://docbook.sourceforge.net/release/images/draft.png');
+       background-repeat: no-repeat;
+       background-position: top left;
+       /* The following properties make the watermark "fixed" on the page. */
+       /* I think that's just a bit too distracting for the reader... */
+       /* background-attachment: fixed; */
+       /* background-position: center center; */
+     }</style>
+<link rel="start" href="../../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="../tutorial.html" title="Chapter 20. Tutorial">
+<link rel="prev" href="conditions.html" title="Conditions and alternatives">
+<link rel="next" href="../advanced.html" title="Chapter 21. User documentation">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../../boost.png"></td>
+<td align="center"><a href="../../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="conditions.html"><img src="../../images/prev.png" alt="Prev"></a><a accesskey="u" href="../tutorial.html"><img src="../../images/up.png" alt="Up"></a><a accesskey="h" href="../../index.html"><img src="../../images/home.png" alt="Home"></a><a accesskey="n" href="../advanced.html"><img src="../../images/next.png" alt="Next"></a>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="bbv2.tutorial.prebuilt"></a>Prebuilt targets</h2></div></div></div>
+<p>
+      We've just learned how to use libraries which are created by
+      Boost.Build. But some libraries are not. At the same time, those
+      libraries can have different versions (release and debug, for
+      example), that we
+      should select depending on build properties. Prebuilt targets
+      provide a mechanism for that. Jamfile in util/lib2 can contain:
+
+</p>
+<pre class="programlisting">
+lib lib2
+    : 
+    : &lt;file&gt;lib2_release.a &lt;variant&gt;release
+    ;
+
+lib lib2
+    : 
+    : &lt;file&gt;lib2_debug.a &lt;variant&gt;debug
+    ;
+</pre>
+<p>
+
+      This defines two alternatives for target "lib2", and for each
+      one names a prebuilt file. Naturally, there are no sources.
+      Instead, the &lt;file&gt; feature is used to specify the file name.
+      Which alternative is selected depends on properties of dependents.
+      If "app" binary should use "lib2", we can write:
+
+</p>
+<pre class="programlisting">
+exe app : app.cpp ../util/lib2//lib2 ;
+</pre>
+<p>
+
+      If we build release version of "app", then it will be linked
+      with "lib2_release.a", and debug version will use "lib2_debug.a".
+      Another important kind of prebuilt targets are system libraries
+      &#8212; more specifically, libraries which are automatically found
+      by the compiler. E.g. gcc uses "-l" switch for that. Such libraries
+      should be declared almost like regular ones:
+
+</p>
+<pre class="programlisting">
+lib zlib : : &lt;name&gt;z ;
+</pre>
+<p>
+
+      We again don't specify any sources, but give a name which
+      should be passed to the compiler. In this example, and for gcc
+      compiler, the "-lz" option will be added. Paths where library
+      should be searched can also be specified:
+
+</p>
+<pre class="programlisting">
+lib zlib : : &lt;name&gt;z &lt;search&gt;/opt/lib ;
+</pre>
+<p>
+
+      And, of course, two variants can be used:
+
+</p>
+<pre class="programlisting">
+lib zlib : : &lt;name&gt;z &lt;variant&gt;release ;
+lib zlib : : &lt;name&gt;z_d &lt;variant&gt;debug ;
+</pre>
+<p>
+
+      Of course, you'll probably never in your life need debug
+      version of zlib, but for other libraries this is quite reasonable.
+    </p>
+<p>More advanced use of prebuilt target is described in <a href="../recipies/site-config.html" title="Targets in site-config.jam">a FAQ entry</a>.</p>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small></small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="conditions.html"><img src="../../images/prev.png" alt="Prev"></a><a accesskey="u" href="../tutorial.html"><img src="../../images/up.png" alt="Up"></a><a accesskey="h" href="../../index.html"><img src="../../images/home.png" alt="Home"></a><a accesskey="n" href="../advanced.html"><img src="../../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

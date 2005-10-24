@@ -1,0 +1,109 @@
+<HTML>
+  <HEAD>
+	 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+	 <LINK REL="stylesheet" TYPE="text/css" HREF="../../../../boost.css">
+         <TITLE>Boost Numeric Conversion Library - Bounds</TITLE>
+  </HEAD>
+  <BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+	 <TABLE BORDER="0" CELLPADDING="7" CELLSPACING="0" WIDTH="100%"
+	  SUMMARY="header">
+		<TR>
+		  <TH VALIGN="top" WIDTH="300">
+			 <H3><A HREF="../../../../index.htm"><IMG HEIGHT="86" WIDTH="277"
+				ALT="C++ Boost" SRC="../../../../boost.png" BORDER="0"></A></H3> </TH> 
+		  <TH VALIGN="top"> 
+			 <H1 ALIGN="center">Boost Numeric Conversion Library</H1> 
+			 
+      <H1><A HREF="http://www.boost.org">Header </A><A
+				HREF="../../../../boost/numeric/conversion/bounds.hpp">boost/numeric/conversion/bounds.hpp</A></H1>
+    </TH>
+		</TR>
+	 </TABLE><HR>
+	 <H2>Contents</H2>
+	 <UL>
+		<LI><A HREF="#introduction">Introduction</A></LI>
+		<LI><A HREF="#bounds"><code>template class bounds&ltN&gt</CODE></A></LI>
+		<LI><A HREF="#examples">Examples</A></LI>
+		<LI><A HREF="#implementation">Implementation</A></LI>
+		<LI><A HREF="#portability">Portability</A></LI>
+	 </UL> <HR>
+	 <H2><A NAME="introduction">Introduction</A></H2>
+	 <P>To determine the ranges of numeric types with std:: numeric_limits
+		[18.2.1], different syntax have to be used depending on numeric type.
+		Specifically, numeric_limits&lt;T&gt;::min() for integral types returns the
+		minimum finite value, whereas for floating point types it returns the minimum
+		positive normalized value. The difference in semantics makes client code
+		unnecessarily complex and error prone. <BR> <BR>
+  boost::numeric::bounds&lt;&gt; provides a consistent interface for retrieving
+  the maximum finite value, the minimum finite value and the minimum positive
+  normalized value (0 for integral types) for numeric types. The selection of
+  implementation is performed at compile time, so there is no runtime overhead.
+  <BR>
+   <BR> </P> <HR>
+	 <H2><A NAME="bounds"><CODE>traits class bounds&lt;N&gt;</CODE></A></H2>
+	 <BLOCKQUOTE>
+
+  <PRE>template&lt;class N&gt;
+struct bounds
+{
+  static N lowest  () { return <i>implementation_defined</i>; }
+  static N highest () { return <i>implementation_defined</i>; }
+  static N smallest() { return <i>implementation_defined</i>; }
+};</PRE>
+   </BLOCKQUOTE>
+	 <H3>Members</H3>
+	 <PRE>lowest()</PRE>
+	 <P>Returns the minimum finite value, equivalent to
+		numeric_limits&lt;T&gt;::min() when T is an integral type, and to
+		-numeric_limits&lt;T&gt;::max() when T is a floating point type. </P>
+	 <PRE>highest()</PRE>
+	 <P>Returns the maximum finite value, equivalent to
+		numeric_limits&lt;T&gt;::max(). </P>
+	 <PRE>smallest()</PRE>
+
+<P>Returns the smallest positive normalized value for floating point types with
+  denormalization, or returns 0 for integral types. <BR>
+   <BR>
+		</P> <HR>
+	 <H2><A NAME="examples">Examples</A></H2>
+
+<P>The following example demonstrates the use of numeric::bounds&lt;&gt; and the
+  equivalent code using numeric_limits: </P>
+
+<BLOCKQUOTE>
+  <PRE>#include &lt;iostream&gt;
+
+#include &lt;boost/numeric/conversion/bounds.hpp&gt;
+#include &lt;boost/limits.hpp&gt;
+
+int main() {
+
+  std::cout &lt;&lt; "numeric::bounds versus numeric_limits example.\n";
+
+  std::cout &lt;&lt; "The maximum value for float:\n";
+  std::cout &lt;&lt; boost::numeric::bounds&lt;float&gt;::highest() &lt;&lt; "\n";
+  std::cout &lt;&lt; std::numeric_limits&lt;float&gt;::max() &lt;&lt; "\n";
+
+  std::cout &lt;&lt; "The minimum value for float:\n";
+  std::cout &lt;&lt; boost::numeric::bounds&lt;float&gt;::lowest() &lt;&lt; "\n";
+  std::cout &lt;&lt; -std::numeric_limits&lt;float&gt;::max() &lt;&lt; "\n";
+
+  std::cout &lt;&lt; "The smallest positive value for float:\n";
+  std::cout &lt;&lt; boost::numeric::bounds&lt;float&gt;::smallest() &lt;&lt; "\n";
+  std::cout &lt;&lt; std::numeric_limits&lt;float&gt;::min() &lt;&lt; "\n";
+
+  return 0;
+}</PRE>
+   </BLOCKQUOTE>
+
+<hr>
+<P>Back to <A HREF="index.html">Numeric Conversion library index</A></P>
+<HR>
+<P>Revised 23 June 2004</P>
+<p>© Copyright Fernando Luis Cacciola Carballal, 2004</p>
+<p> Use, modification, and distribution are subject to the Boost Software
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+</BODY>
+</HTML>

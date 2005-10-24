@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE library PUBLIC "-//Boost//DTD BoostBook XML V1.0//EN" 
+"../../../tools/boostbook/dtd/boostbook.dtd">
+
+<!-- Copyright (c) 2001-2004 CrystalClear Software, Inc.
+     Subject to the Boost Software License, Version 1.0. 
+     (See accompanying file LICENSE-1.0 or  http://www.boost.org/LICENSE-1.0)
+-->
+
+<section id="date_time.gregorian.date_period">
+  <title>Date Period</title>
+
+  <link linkend="period_intro">Introduction</link> --
+  <link linkend="period_header">Header</link> --
+  <link linkend="period_construction">Construction</link> --
+  <link linkend="period_accessors">Accessors</link> --
+  <link linkend="period_convert_to_string">Convert to String</link> --
+  <link linkend="period_operators">Operators</link>
+
+  <anchor id="period_intro" />
+  <bridgehead renderas="sect3">Introduction</bridgehead>
+  <para>
+    The class boost::gregorian::date_period provides direct representation for ranges between two dates. Periods provide the ability to simplify some types of calculations by simplifying the conditional logic of the program. For example, testing if a date is within an irregular schedule such as a weekend or holiday can be accomplished using collections of date periods. This is facilitated by several methods that allow evaluation if a date_period intersects with another date period, and to generate the period resulting from the intersection. The <link linkend="date_time.examples.period_calc">period calculation example</link> provides an example of this.
+  </para>
+  <para>
+    Date periods used in combination with infinity values have the ability to represent complex concepts such as 'until further notice'. 
+  </para>
+
+  <anchor id="period_header" />
+  <bridgehead renderas="sect3">Header</bridgehead>
+  <para>
+    <programlisting>
+      #include "boost/date_time/gregorian/gregorian.hpp" //include all types plus i/o
+      or
+      #include "boost/date_time/gregorian/gregorian_types.hpp" //no i/o just types
+    </programlisting>
+  </para>
+
+  <anchor id="period_construction" />
+  <bridgehead renderas="sect3">Construction</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>date_period(date begin, date end)</entry>
+	  <entry> Create a period as [begin, end). If last is &lt;= begin then the period will be defined as null.</entry>
+	  <entry>date_period dp(date(2002,Jan,10), date(2002,Jan,12));</entry>
+	</row>
+	<row>
+	  <entry>date_period(date start, date_duration len)</entry>
+	  <entry> Create a period as [begin, begin+len). If len is &lt;= zero then the period will be defined as null.</entry>
+	  <entry>date_period dp(date(2002,Jan,10), date_duration(2));</entry>
+	</row>
+	<row>
+	  <entry>date_period(date_period rhs)</entry>
+	  <entry> Copy constructor</entry>
+	  <entry> date_period dp1(dp)</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+
+  <anchor id="period_accessors" />
+  <bridgehead renderas="sect3">Accessors</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>date begin() const</entry>
+	  <entry> Return first day of period.</entry>
+	  <entry>
+	    date_period dp(date(2002,Jan,1), date(2002,Jan,10));
+	    dp.begin() --> 2002-Jan-01
+	  </entry>
+	</row>
+	<row>
+	  <entry>date last() const</entry>
+	  <entry>Return last date in the period</entry>
+	  <entry>
+	    date_period dp(date(2002,Jan,1), date(2002,Jan,10));
+	    dp.last() --> 2002-Jan-09
+	  </entry>
+	</row>
+	<row>
+	  <entry>date end() const</entry>
+	  <entry>Return one past the last in period</entry>
+	  <entry>
+	    date_period dp(date(2002,Jan,1), date(2002,Jan,10));
+	    dp.end() --> 2002-Jan-10
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_duration length() const</entry>
+	  <entry>Return the length of the date_period</entry>
+	  <entry>
+	    date_period dp(date(2002,Jan,1), date_duration(2));
+	    dp.length() --> 2
+	  </entry>
+	</row>
+	<row>
+	  <entry>bool is_null() const</entry>
+	  <entry>True if period is not well formed. eg: start less than end</entry>
+	  <entry>
+	    date_period dp(date(2002,Jan,10), date(2002,Jan,1));
+	    dp.begin() --> true
+	  </entry>
+	</row>
+	<row>
+	  <entry>bool contains(date) const</entry>
+	  <entry>True if date is within the period</entry>
+	  <entry>
+	    date_period dp(date(2002,Jan,1), date(2002,Jan,10));
+	    dp.contains(date(2002,Jan,2)) --> true
+	  </entry>
+	</row>
+	<row>
+	  <entry>bool contains(date_period) const</entry>
+	  <entry>True if date period is within the period</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,10));
+	    date_period dp2(date(2002,Jan,2), date(2002,Jan,3));
+	    dp1.contains(dp2) --> true
+	    dp2.contains(dp1) --> false
+	  </entry>
+	</row>
+	<row>
+	  <entry>bool intersects(date_period) const</entry>
+	  <entry>True if periods overlap</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,10));
+	    date_period dp2(date(2002,Jan,2), date(2002,Jan,3));
+	    dp2.intersects(dp1) --> true
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period intersection(date_period) const</entry>
+	  <entry>Calculate the intersection of 2 periods. Null if no intersection.</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,10));
+	    date_period dp2(date(2002,Jan,2), date(2002,Jan,3));
+	    dp2.intersection(dp1) --> dp2
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period is_adjacent(date_period) const</entry>
+	  <entry>Check if two periods are adjacent, but not overlapping.</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,3));
+	    date_period dp2(date(2002,Jan,3), date(2002,Jan,10));
+	    dp2.is_adjacent(dp1) --> true
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period is_after(date) const</entry>
+	  <entry>Determine the period is after a given date.</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,10), date(2002,Jan,30));
+	    date d(2002,Jan,3);
+	    dp1.is_after(d) --> true
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period is_before(date) const</entry>
+	  <entry>Determine the period is before a given date.</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,3));
+	    date d(2002,Jan,10);
+	    dp1.is_before(d) --> true
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period merge(date_period) const</entry>
+	  <entry>Returns union of two periods. Null if no intersection.</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,10));
+	    date_period dp2(date(2002,Jan,9), date(2002,Jan,31));
+	    dp2.merge(dp1) --> 2002-Jan-01/2002-Jan-31
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period span(date_period) const</entry>
+	  <entry>Combines two periods and any gap between them such that start = min(p1.start, p2.start) and end = max(p1.end , p2.end)</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,5));
+	    date_period dp2(date(2002,Jan,9), date(2002,Jan,31));
+	    dp2.hull(dp1) --> 2002-Jan-01/2002-Jan-31
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_period shift(date_duration)</entry>
+	  <entry>Add duration to both start and end.</entry>
+	  <entry>
+	    date_period dp1(date(2002,Jan,1), date(2002,Jan,10));
+	    dp1.shift(date_duration(1)); --> 2002-Jan-02/2002-Jan-11
+	  </entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+
+  <anchor id="period_convert_to_string" />
+  <bridgehead renderas="sect3">Convert to String</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>std::string to_simple_string(date_period dp)</entry>
+	  <entry>To [YYYY-mmm-DD/YYYY-mmm-DD] string where mmm is 3 char month name.</entry>
+	  <entry>[2002-Jan-01/2002-Jan-31]</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+
+  <anchor id="period_operators" />
+  <bridgehead renderas="sect3">Operators</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>operator&lt;&lt;</entry>
+	  <entry>ostream operator for date_period. Uses facet to format time points. Typical output: [2002-Jan-01/2002-Jan-31].</entry>
+	  <entry>std::cout &lt;&lt; dp &lt;&lt; std::endl;</entry>
+	</row>
+	<row>
+	  <entry>
+	    operator==, operator!=,
+	    operator>, operator&lt;
+	  </entry>
+	  <entry>A full complement of comparison operators</entry>
+	  <entry> dp1 == dp2, etc</entry>
+	</row>
+	<row>
+	  <entry>operator&lt;</entry>
+	  <entry>True if dp1.end() less than dp2.begin()</entry>
+	  <entry> dp1 &lt; dp2, etc</entry>
+	</row>
+	<row>
+	  <entry>operator></entry>
+	  <entry>True if dp1.begin() greater than dp2.end()</entry>
+	  <entry>dp1 > dp2, etc</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <link linkend="top">top</link>
+</section>

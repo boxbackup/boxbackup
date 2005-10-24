@@ -1,0 +1,49 @@
+
+subproject libs/program_options/build ;
+
+SOURCES = cmdline config_file options_description parsers variables_map 
+          value_semantic positional_options utf8_codecvt_facet convert
+          winmain
+;
+
+lib boost_program_options
+     : ../src/$(SOURCES).cpp
+     : # build requirements
+       [ common-names ] # magic for install and auto-link features
+       <include>$(BOOST_ROOT) <sysinclude>$(BOOST_ROOT)
+       std::locale-support
+     : debug release  # build variants
+     ;
+
+dll boost_program_options
+     : ../src/$(SOURCES).cpp
+     : # build requirements
+       [ common-names ]  # magic for install and auto-link features
+       <define>BOOST_ALL_DYN_LINK=1  # tell source we're building dll's
+       <runtime-link>dynamic  # build only for dynamic runtimes
+       <include>$(BOOST_ROOT) <sysinclude>$(BOOST_ROOT)
+       # The following really turns on static runtime linking
+       # which leads to runtime crashes when using DLL, so
+       # seem DLL is not usable on Metrowerks 8
+       # std::facet-support std::locale-support
+     : debug release  # build variants
+     ;
+
+install program_options lib
+     : <lib>boost_program_options <dll>boost_program_options
+     ;
+
+stage stage/lib : <lib>boost_program_options <dll>boost_program_options
+    :
+        # copy to a path rooted at BOOST_ROOT:
+        <locate>$(BOOST_ROOT)
+        # make sure the names of the libraries are correctly named:
+        [ common-names ]
+        # add this target to the "stage" and "all" psuedo-targets:
+        <target>stage
+        <target>all
+    :
+        debug release
+    ;
+
+# end

@@ -1,0 +1,78 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template date_itr</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id391588" title="Header &lt;boost/date_time/date_iterator.hpp&gt;">
+<link rel="prev" href="date_itr_base.html" title="Class template date_itr_base">
+<link rel="next" href="date_names_put.html" title="Class template date_names_put">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="date_itr_base.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id391588"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="date_names_put.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="date_itr"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template date_itr</span></h2>
+<p>boost::date_time::date_itr &#8212; <p>Overrides the base date iterator providing hook for functors. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> offset_functor, <span class="bold"><b>typename</b></span> date_type&gt; 
+<span class="bold"><b>class</b></span> date_itr : <span class="bold"><b>public</b></span> boost::date_time::date_itr_base&lt; date_type &gt; {
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> date_type::duration_type duration_type;
+
+  <span class="emphasis"><em>// <a href="date_itr.html#date_itrconstruct-copy-destruct">construct/copy/destruct</a></em></span>
+  <a href="date_itr.html#id312028-bb">date_itr</a>(date_type, <span class="bold"><b>int</b></span> = 1);
+
+  <span class="emphasis"><em>// <a href="date_itr.html#id354910-bb">public member functions</a></em></span>
+
+  <span class="emphasis"><em>// <a href="date_itr.html#id359787-bb">private member functions</a></em></span>
+  <span class="type"><span class="bold"><b>virtual</b></span> duration_type</span> <a href="date_itr.html#id352233-bb">get_offset</a>(<span class="bold"><b>const</b></span> date_type &amp;) <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>virtual</b></span> duration_type</span> <a href="date_itr.html#id332011-bb">get_neg_offset</a>(<span class="bold"><b>const</b></span> date_type &amp;) <span class="bold"><b>const</b></span>;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id483847"></a><h2>Description</h2>
+<div class="refsect2" lang="en">
+<a name="id483851"></a><h3>
+<a name="date_itrconstruct-copy-destruct"></a><tt class="computeroutput">date_itr</tt> construct/copy/destruct</h3>
+<div class="orderedlist"><ol type="1"><li><pre class="literallayout"><a name="id312028-bb"></a>date_itr(date_type d, <span class="bold"><b>int</b></span> factor = 1);</pre></li></ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id483895"></a><h3>
+<a name="id354910-bb"></a><tt class="computeroutput">date_itr</tt> public member functions</h3>
+<div class="orderedlist"><ol type="1"></ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id483916"></a><h3>
+<a name="id359787-bb"></a><tt class="computeroutput">date_itr</tt> private member functions</h3>
+<div class="orderedlist"><ol type="1">
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>virtual</b></span> duration_type</span> <a name="id352233-bb"></a>get_offset(<span class="bold"><b>const</b></span> date_type &amp; current) <span class="bold"><b>const</b></span>;</pre></li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>virtual</b></span> duration_type</span> <a name="id332011-bb"></a>get_neg_offset(<span class="bold"><b>const</b></span> date_type &amp; current) <span class="bold"><b>const</b></span>;</pre></li>
+</ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="date_itr_base.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id391588"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="date_names_put.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

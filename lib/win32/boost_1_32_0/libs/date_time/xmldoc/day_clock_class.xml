@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE library PUBLIC "-//Boost//DTD BoostBook XML V1.0//EN" 
+"../../../tools/boostbook/dtd/boostbook.dtd">
+
+<!-- Copyright (c) 2001-2004 CrystalClear Software, Inc.
+     Subject to the Boost Software License, Version 1.0. 
+     (See accompanying file LICENSE-1.0 or  http://www.boost.org/LICENSE-1.0)
+-->
+
+<section id="date_time.gregorian.day_clock_class">
+  <title>Class day_clock</title>
+  <link linkend="date_construct_from_clock">Class day_clock</link>
+  <!-- day_clock is documented as part of the date class. 
+  This file serves as a link generator for day_clock -->
+</section>

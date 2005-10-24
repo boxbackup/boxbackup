@@ -1,0 +1,111 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template split_timedate_system</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id354130" title="Header &lt;boost/date_time/time_system_split.hpp&gt;">
+<link rel="prev" href="counted_time_system.html" title="Class template counted_time_system">
+<link rel="next" href="wrapping_int.html" title="Class template wrapping_int">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="counted_time_system.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id354130"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="wrapping_int.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="split_timedate_system"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template split_timedate_system</span></h2>
+<p>boost::date_time::split_timedate_system &#8212; <p>An unadjusted time system implementation. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> config, boost::int32_t ticks_per_second&gt; 
+<span class="bold"><b>class</b></span> split_timedate_system {
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> config::time_rep_type                                              time_rep_type;     
+  <span class="bold"><b>typedef</b></span> config::date_type                                                  date_type;         
+  <span class="bold"><b>typedef</b></span> config::time_duration_type                                         time_duration_type;
+  <span class="bold"><b>typedef</b></span> config::date_duration_type                                         date_duration_type;
+  <span class="bold"><b>typedef</b></span> config::int_type                                                   int_type;          
+  <span class="bold"><b>typedef</b></span> config::resolution_traits                                          resolution_traits; 
+  <span class="bold"><b>typedef</b></span> <a href="wrapping_int.html" title="Class template wrapping_int">date_time::wrapping_int</a>&lt; int_type, INT64_C(86400)*ticks_per_second wrap_int_type;     
+  <span class="bold"><b>typedef</b></span> <a href="wrapping_int.html" title="Class template wrapping_int">date_time::wrapping_int</a>&lt; int_type, ticks_per_day &gt;                 wrap_int_type;     
+
+  <span class="emphasis"><em>// <a href="split_timedate_system.html#id309506-bb">public static functions</a></em></span>
+  <span class="type">time_rep_type</span> 
+  <a href="split_timedate_system.html#id302000-bb">get_time_rep</a>(<span class="bold"><b>const</b></span> date_type &amp;, <span class="bold"><b>const</b></span> time_duration_type &amp;, 
+               date_time::dst_flags = not_dst) ;
+  <span class="type">date_type</span> <a href="split_timedate_system.html#id366478-bb">get_date</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;) ;
+  <span class="type">time_duration_type</span> <a href="split_timedate_system.html#id436153-bb">get_time_of_day</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;) ;
+  <span class="type">std::string</span> <a href="split_timedate_system.html#id427464-bb">zone_name</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;) ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="split_timedate_system.html#id361895-bb">is_equal</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, <span class="bold"><b>const</b></span> time_rep_type &amp;) ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="split_timedate_system.html#id363003-bb">is_less</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, <span class="bold"><b>const</b></span> time_rep_type &amp;) ;
+  <span class="type">time_rep_type</span> <a href="split_timedate_system.html#id308532-bb">add_days</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, <span class="bold"><b>const</b></span> date_duration_type &amp;) ;
+  <span class="type">time_rep_type</span> 
+  <a href="split_timedate_system.html#id394837-bb">subtract_days</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, <span class="bold"><b>const</b></span> date_duration_type &amp;) ;
+  <span class="type">time_rep_type</span> 
+  <a href="split_timedate_system.html#id414253-bb">subtract_time_duration</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, <span class="bold"><b>const</b></span> time_duration_type &amp;) ;
+  <span class="type">time_rep_type</span> <a href="split_timedate_system.html#id322360-bb">add_time_duration</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, time_duration_type) ;
+  <span class="type">time_duration_type</span> 
+  <a href="split_timedate_system.html#id383508-bb">subtract_times</a>(<span class="bold"><b>const</b></span> time_rep_type &amp;, <span class="bold"><b>const</b></span> time_rep_type &amp;) ;
+
+  <span class="emphasis"><em>// <a href="split_timedate_system.html#id352903-bb">private member functions</a></em></span>
+  <span class="type"></span> <a href="split_timedate_system.html#id321227-bb">BOOST_STATIC_CONSTANT</a>(int_type, 
+                         ticks_per_day = INT64_C(86400)*config::tick_per_second) ;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id511655"></a><h2>Description</h2>
+<div class="refsect2" lang="en">
+<a name="id511663"></a><h3>
+<a name="id309506-bb"></a><tt class="computeroutput">split_timedate_system</tt> public static functions</h3>
+<div class="orderedlist"><ol type="1">
+<li><pre class="literallayout"><span class="type">time_rep_type</span> 
+<a name="id302000-bb"></a>get_time_rep(<span class="bold"><b>const</b></span> date_type &amp; day, <span class="bold"><b>const</b></span> time_duration_type &amp; tod, 
+             date_time::dst_flags dst = not_dst) ;</pre></li>
+<li><pre class="literallayout"><span class="type">date_type</span> <a name="id366478-bb"></a>get_date(<span class="bold"><b>const</b></span> time_rep_type &amp; val) ;</pre></li>
+<li><pre class="literallayout"><span class="type">time_duration_type</span> <a name="id436153-bb"></a>get_time_of_day(<span class="bold"><b>const</b></span> time_rep_type &amp; val) ;</pre></li>
+<li><pre class="literallayout"><span class="type">std::string</span> <a name="id427464-bb"></a>zone_name(<span class="bold"><b>const</b></span> time_rep_type &amp; ) ;</pre></li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id361895-bb"></a>is_equal(<span class="bold"><b>const</b></span> time_rep_type &amp; lhs, <span class="bold"><b>const</b></span> time_rep_type &amp; rhs) ;</pre></li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id363003-bb"></a>is_less(<span class="bold"><b>const</b></span> time_rep_type &amp; lhs, <span class="bold"><b>const</b></span> time_rep_type &amp; rhs) ;</pre></li>
+<li><pre class="literallayout"><span class="type">time_rep_type</span> 
+<a name="id308532-bb"></a>add_days(<span class="bold"><b>const</b></span> time_rep_type &amp; base, <span class="bold"><b>const</b></span> date_duration_type &amp; dd) ;</pre></li>
+<li><pre class="literallayout"><span class="type">time_rep_type</span> 
+<a name="id394837-bb"></a>subtract_days(<span class="bold"><b>const</b></span> time_rep_type &amp; base, <span class="bold"><b>const</b></span> date_duration_type &amp; dd) ;</pre></li>
+<li><pre class="literallayout"><span class="type">time_rep_type</span> 
+<a name="id414253-bb"></a>subtract_time_duration(<span class="bold"><b>const</b></span> time_rep_type &amp; base, 
+                       <span class="bold"><b>const</b></span> time_duration_type &amp; td) ;</pre></li>
+<li><pre class="literallayout"><span class="type">time_rep_type</span> 
+<a name="id322360-bb"></a>add_time_duration(<span class="bold"><b>const</b></span> time_rep_type &amp; base, time_duration_type td) ;</pre></li>
+<li><pre class="literallayout"><span class="type">time_duration_type</span> 
+<a name="id383508-bb"></a>subtract_times(<span class="bold"><b>const</b></span> time_rep_type &amp; lhs, <span class="bold"><b>const</b></span> time_rep_type &amp; rhs) ;</pre></li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id512040"></a><h3>
+<a name="id352903-bb"></a><tt class="computeroutput">split_timedate_system</tt> private member functions</h3>
+<div class="orderedlist"><ol type="1"><li><pre class="literallayout"><span class="type"></span> <a name="id321227-bb"></a>BOOST_STATIC_CONSTANT(int_type , 
+                       ticks_per_day  = INT64_C(86400)*config::tick_per_second) ;</pre></li></ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="counted_time_system.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id354130"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="wrapping_int.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

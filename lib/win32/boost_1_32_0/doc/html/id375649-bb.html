@@ -1,0 +1,114 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class simple_format&lt;wchar_t&gt;</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id383059" title="Header &lt;boost/date_time/date_format_simple.hpp&gt;">
+<link rel="prev" href="simple_format.html" title="Class template simple_format">
+<link rel="next" href="month_formatter.html" title="Class template month_formatter">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="simple_format.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id383059"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="month_formatter.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="id375649-bb"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class simple_format&lt;wchar_t&gt;</span></h2>
+<p>boost::date_time::simple_format&lt;wchar_t&gt; &#8212; <p>Specialization of formmating rules for wchar_t. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis">
+<span class="bold"><b>class</b></span> simple_format&lt;<span class="bold"><b>wchar_t</b></span>&gt; {
+<span class="bold"><b>public</b></span>:
+
+  <span class="emphasis"><em>// <a href="id375649-bb.html#id417252-bb">public static functions</a></em></span>
+  <span class="type"><span class="bold"><b>const</b></span> <span class="bold"><b>wchar_t</b></span> *</span> <a href="id375649-bb.html#id445896-bb">not_a_date</a>() ;
+  <span class="type"><span class="bold"><b>const</b></span> <span class="bold"><b>wchar_t</b></span> *</span> <a href="id375649-bb.html#id336577-bb">pos_infinity</a>() ;
+  <span class="type"><span class="bold"><b>const</b></span> <span class="bold"><b>wchar_t</b></span> *</span> <a href="id375649-bb.html#id298755-bb">neg_infinity</a>() ;
+  <span class="type">month_format_spec</span> <a href="id375649-bb.html#id395190-bb">month_format</a>() ;
+  <span class="type">ymd_order_spec</span> <a href="id375649-bb.html#id367689-bb">date_order</a>() ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="id375649-bb.html#id425145-bb">has_date_sep_chars</a>() ;
+  <span class="type"><span class="bold"><b>wchar_t</b></span></span> <a href="id375649-bb.html#id285721-bb">year_sep_char</a>() ;
+  <span class="type"><span class="bold"><b>wchar_t</b></span></span> <a href="id375649-bb.html#id395132-bb">month_sep_char</a>() ;
+  <span class="type"><span class="bold"><b>wchar_t</b></span></span> <a href="id375649-bb.html#id385336-bb">day_sep_char</a>() ;
+  <span class="type"><span class="bold"><b>wchar_t</b></span></span> <a href="id375649-bb.html#id320379-bb">hour_sep_char</a>() ;
+  <span class="type"><span class="bold"><b>wchar_t</b></span></span> <a href="id375649-bb.html#id411507-bb">minute_sep_char</a>() ;
+  <span class="type"><span class="bold"><b>wchar_t</b></span></span> <a href="id375649-bb.html#id360282-bb">second_sep_char</a>() ;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id476662"></a><h2>Description</h2>
+<div class="refsect2" lang="en">
+<a name="id476666"></a><h3>
+<a name="id417252-bb"></a><tt class="computeroutput">simple_format</tt> public static functions</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>const</b></span> <span class="bold"><b>wchar_t</b></span> *</span> <a name="id445896-bb"></a>not_a_date() ;</pre>
+<p>String used printed is date is invalid. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>const</b></span> <span class="bold"><b>wchar_t</b></span> *</span> <a name="id336577-bb"></a>pos_infinity() ;</pre>
+<p>String used to for positive infinity value. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>const</b></span> <span class="bold"><b>wchar_t</b></span> *</span> <a name="id298755-bb"></a>neg_infinity() ;</pre>
+<p>String used to for positive infinity value. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">month_format_spec</span> <a name="id395190-bb"></a>month_format() ;</pre>
+<p>Describe month format. </p>
+</li>
+<li><pre class="literallayout"><span class="type">ymd_order_spec</span> <a name="id367689-bb"></a>date_order() ;</pre></li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id425145-bb"></a>has_date_sep_chars() ;</pre>
+<p>This format uses '-' to separate date elements. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>wchar_t</b></span></span> <a name="id285721-bb"></a>year_sep_char() ;</pre>
+<p>Char to sep? </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>wchar_t</b></span></span> <a name="id395132-bb"></a>month_sep_char() ;</pre>
+<p>char between year-month </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>wchar_t</b></span></span> <a name="id385336-bb"></a>day_sep_char() ;</pre>
+<p>Char to separate month-day. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>wchar_t</b></span></span> <a name="id320379-bb"></a>hour_sep_char() ;</pre>
+<p>char between date-hours </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>wchar_t</b></span></span> <a name="id411507-bb"></a>minute_sep_char() ;</pre>
+<p>char between hour and minute </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>wchar_t</b></span></span> <a name="id360282-bb"></a>second_sep_char() ;</pre>
+<p>char for second </p>
+</li>
+</ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="simple_format.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id383059"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="month_formatter.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

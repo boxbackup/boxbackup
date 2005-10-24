@@ -1,0 +1,29 @@
+# Inspect Jamfile
+
+# © Copyright Beman Dawes, 2002
+# Copyright Rene Rivera 2004.
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at www.boost.org/LICENSE_1_0.txt)
+
+subproject tools/inspect/build ;
+
+exe inspect
+  :
+  ../inspect.cpp ../license_check.cpp ../link_check.cpp ../long_name_check.cpp ../tab_check.cpp ../crlf_check.cpp ../copyright_check.cpp
+  <lib>../../../libs/filesystem/build/boost_filesystem
+  <lib>../../../libs/regex/build/boost_regex
+  :
+  <sysinclude>$(BOOST_ROOT)
+  <define>BOOST_ALL_NO_LIB=1
+  :
+        release
+  ;
+
+stage run
+    :
+        <exe>inspect
+    :
+    :
+        release
+        <suppress>true
+    ;

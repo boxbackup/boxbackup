@@ -1,0 +1,186 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Chapter 14. Getting Started</title>
+<link rel="stylesheet" href="../../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="../../boostbook.html" title="Part II. The BoostBook Documentation Format">
+<link rel="prev" href="../../ch13.html" title="Chapter 13. Introduction">
+<link rel="next" href="../fop.html" title="Configuring Apache FOP for PostScript/PDF Output">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../../boost.png"></td>
+<td align="center"><a href="../../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="../../ch13.html"><img src="../../images/prev.png" alt="Prev"></a><a accesskey="u" href="../../boostbook.html"><img src="../../images/up.png" alt="Up"></a><a accesskey="h" href="../../index.html"><img src="../../images/home.png" alt="Home"></a><a accesskey="n" href="../fop.html"><img src="../../images/next.png" alt="Next"></a>
+</div>
+<div class="chapter" lang="en">
+<div class="titlepage"><div><div><h2 class="title">
+<a name="boostbook.getting.started"></a>Chapter 14. Getting Started</h2></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<dl>
+<dt><span class="section"><a href="started.html#boostbook.docbook.config">Configuring local DocBook XSL and DTD distributions</a></span></dt>
+<dt><span class="section"><a href="../fop.html">Configuring Apache FOP for PostScript/PDF Output</a></span></dt>
+<dt><span class="section"><a href="../doxygen.html">Configuring Doxygen for Documentation Extraction</a></span></dt>
+<dt><span class="section"><a href="../troubleshooting.html">Troubleshooting</a></span></dt>
+</dl>
+</div>
+<p>To use the Boost documentation tools, you will need an
+    <a href="http://www.w3c.org/Style/XSL/" target="_top">XSLT</a>
+    processor. There are many XSLT processors available, but for now
+    we suggest that you use <tt class="computeroutput">xsltproc</tt>, part of <a href="http://xmlsoft.org/XSLT/" target="_top">libxslt</a>. There are several
+    ways to get libxslt, depending on your platform:</p>
+<div class="itemizedlist"><ul type="disc">
+<li><p>On Unix: Build and install <a href="http://xmlsoft.org/" target="_top">libxml2</a> and then <a href="http://xmlsoft.org/XSLT/" target="_top">libxslt</a>. Both
+        libraries are part of the <a href="http://www.gnome.org" target="_top">GNOME</a> project.</p></li>
+<li>
+<p>On Windows:</p>
+<div class="itemizedlist"><ul type="circle">
+<li><p>With <a href="http://www.cygwin.com/" target="_top">Cygwin</a>, select the
+            libxml2 and libxslt packages</p></li>
+<li><p>Without Cygwin, you need a patched version of the tools available from 
+            <a href="http://www.meta-comm.com/engineering/boost/xsltproc-win32.zip" target="_top">
+            here</a>.</p></li>
+</ul></div>
+</li>
+<li>
+<p>On MacOS X:</p>
+<div class="itemizedlist"><ul type="circle"><li>
+<p>If you have Fink, just get the <tt class="computeroutput">libxslt</tt> and <tt class="computeroutput">doxygen</tt> packages.</p>
+<p>Without Fink, you can <a href="http://www.zveno.com/open_source/libxml2xslt.html" target="_top">download the libxslt binaries</a>.</p>
+</li></ul></div>
+</li>
+</ul></div>
+<p>You will also need a recent checkout of Boost from <a href="http://www.boost.org/more/download.html#CVS" target="_top">CVS</a>. If
+    you would like to limit your network bandwidth or limit delays in
+    building documentation, now might be a good time to download the
+    DocBook DTD and XSL stylesheets as described in <a href="started.html#boostbook.docbook.config" title="Configuring local DocBook XSL and DTD distributions">the section called &#8220;Configuring local DocBook XSL and DTD distributions&#8221;</a>. You should delete or make
+    writable the <tt class="computeroutput">.html</tt> files in
+    <tt class="computeroutput">$BOOST_ROOT/doc/html</tt> before continuing.</p>
+<p>Now we can build some documentation. Change to the directory
+    <tt class="computeroutput">$BOOST_ROOT/doc</tt> and run <tt class="computeroutput">bjam --v2</tt> to
+    build HTML documentation. You should see several warnings like
+    these while DocBook documentation is being built from BoostBook
+    documentation:</p>
+<pre class="programlisting">Cannot find function named 'checked_delete'
+Cannot find function named 'checked_array_delete'
+Cannot find function named 'next'</pre>
+<p>These warnings are emitted when the Boost documentation
+    tools cannot find documentation for functions, methods, or classes
+    that are referenced in the source, and are not harmful in any
+    way. Once Boost.Jam has completed its execution, HTML
+    documentation for Boost will be available in
+    <tt class="computeroutput">$BOOST_ROOT/doc/html</tt>. You can also create HTML
+    documentation in a single (large!) HTML file with the command line
+    <tt class="computeroutput">bjam --v2 onehtml</tt>, or Unix man pages with the command
+    line <tt class="computeroutput">bjam --v2 man</tt>. The complete list of output
+    formats is listed in <a href="started.html#boostbook.output.formats" title="Table 14.1. BoostBook Output Formats">Table 14.1, &#8220;BoostBook Output Formats&#8221;</a>. Several output formats can
+    be passed to a single invocation of <tt class="computeroutput">bjam</tt>, e.g.,
+    <tt class="computeroutput">bjam --v2 html man docbook</tt> would generate HTML
+    (multiple files), man pages, and DocBook documentation.</p>
+<div class="table">
+<a name="boostbook.output.formats"></a><p class="title"><b>Table 14.1. BoostBook Output Formats</b></p>
+<table class="table" summary="BoostBook Output Formats">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th>Format</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>html</td>
+<td><p>HTML output (multiple files). This is the default</p></td>
+</tr>
+<tr>
+<td>onehtml</td>
+<td><p>HTML output in a single HTML file.</p></td>
+</tr>
+<tr>
+<td>man</td>
+<td><p>Unix man pages.</p></td>
+</tr>
+<tr>
+<td>pdf</td>
+<td><p>PDF. Requires <a href="http://xml.apache.org/fop/index.html" target="_top">Apache FOP</a>.</p></td>
+</tr>
+<tr>
+<td>ps</td>
+<td><p>Postscript. Requires <a href="http://xml.apache.org/fop/index.html" target="_top">Apache FOP</a>.</p></td>
+</tr>
+<tr>
+<td>docbook</td>
+<td>
+<a href="http://www.docbook.org/" target="_top">DocBook</a>.</td>
+</tr>
+<tr>
+<td>fo</td>
+<td><a href="http://www.w3.org/TR/xsl/" target="_top">XSL Formatting Objects</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="boostbook.docbook.config"></a>Configuring local DocBook XSL and DTD distributions</h2></div></div></div>
+<p>By default, the DocBook DTD and XSL stylesheets are
+      accessed over a network automatically by the XSLT
+      processor. However, these documents tend to be large and
+      introduce a noticeable delay in the XSLT transformation
+      step. This section describes how to configure Boost.Build to use
+      local copies of the DocBook DTD and XSL stylesheets to improve
+      processing time. There are a few requirements:
+
+      </p>
+<div class="itemizedlist"><ul type="disc">
+<li><p>Norman Walsh's DocBook XSL stylesheets,
+        available at the <a href="http://docbook.sourceforge.net" target="_top">DocBook sourceforge
+        site</a>. Extract the DocBook XSL stylesheets to a
+        directory on your hard disk (which we'll refer to as the
+        <tt class="computeroutput">DOCBOOK_XSL_DIR</tt>).</p></li>
+<li><p>The DocBook DTD, available as a ZIP archive at
+        the <a href="http://www.oasis-open.org/docbook/xml/4.2/index.shtml" target="_top">OASIS
+        DocBook site</a>. The package is called "DocBook XML
+        4.2". Extract the DocBook DTD to a directory on your hard disk
+        (which we'll refer to as the
+        <tt class="computeroutput">DOCBOOK_DTD_DIR</tt>).</p></li>
+</ul></div>
+<p>In the directory <tt class="computeroutput">tools/build/v2</tt> is a file
+      named <tt class="filename">user-config.jam</tt>. Copy it to your home
+      directory (or edit it in-place), and add a directive telling
+      Boost.Build where to find the DocBook DTD and XSL stylesheets,
+      replacing <tt class="computeroutput">DOCBOOK_XSL_DIR</tt> and
+      <tt class="computeroutput">DOCBOOK_DTD_DIR</tt> with the paths of the DocBook XSL
+      stylsheets and DTD, respectively:
+
+</p>
+<pre class="programlisting">#  BoostBook configuration
+using boostbook : DOCBOOK_XSL_DIR
+                : DOCBOOK_DTD_DIR
+                ;</pre>
+<p>Future invocations of <span><b class="command">bjam</b></span> will use the
+      specified local copies of the DTD and XSL stylesheets in lieu of
+      downloading the same sources over the network.</p>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2003 Douglas Gregor</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="../../ch13.html"><img src="../../images/prev.png" alt="Prev"></a><a accesskey="u" href="../../boostbook.html"><img src="../../images/up.png" alt="Up"></a><a accesskey="h" href="../../index.html"><img src="../../images/home.png" alt="Home"></a><a accesskey="n" href="../fop.html"><img src="../../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

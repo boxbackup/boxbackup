@@ -1,0 +1,184 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Reference</title>
+<link rel="stylesheet" href="../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="../function.html" title="Chapter 4. Boost.Function">
+<link rel="prev" href="tutorial.html" title="Tutorial">
+<link rel="next" href="../bad_function_call.html" title="Class bad_function_call">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../boost.png"></td>
+<td align="center"><a href="../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="tutorial.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="../function.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="../bad_function_call.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="function.reference"></a>Reference</h3></div></div></div>
+<div class="toc"><dl>
+<dt><span class="section"><a href="reference.html#function.definitions">Definitions</a></span></dt>
+<dt><span class="section"><a href="reference.html#header.boost.function.hpp">Header &lt;boost/function.hpp&gt;</a></span></dt>
+<dt><span class="section"><a href="reference.html#id330862">Header &lt;boost/function_equal.hpp&gt;</a></span></dt>
+</dl></div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="function.definitions"></a>Definitions</h4></div></div></div>
+<div class="itemizedlist"><ul type="disc">
+<li>
+<p>A function object <tt class="computeroutput">f</tt> is
+      <span class="emphasis"><em>compatible</em></span> if for the given set of argument
+      types <tt class="computeroutput">Arg1</tt>,
+      <tt class="computeroutput">Arg2</tt>, ...,
+      <tt class="computeroutput">ArgN</tt> and a
+      return type <tt class="computeroutput">ResultType</tt>, the
+      appropriate following function is well-formed:
+</p>
+<pre class="programlisting"><span class="emphasis"><em>// if ResultType is not <span class="bold"><b>void</b></span></em></span>
+  ResultType foo(Arg1 arg1, Arg2 arg2, ..., Arg<span class="emphasis"><em>N</em></span> arg<span class="emphasis"><em>N</em></span>)
+  {
+    <span class="bold"><b>return</b></span> f(arg1, arg2, ..., arg<span class="emphasis"><em>N</em></span>);
+  }
+
+  <span class="emphasis"><em>// if ResultType is <span class="bold"><b>void</b></span></em></span>
+  ResultType foo(Arg1 arg1, Arg2 arg2, ..., Arg<span class="emphasis"><em>N</em></span> arg<span class="emphasis"><em>N</em></span>)
+  {
+    f(arg1, arg2, ..., arg<span class="emphasis"><em>N</em></span>);
+  }
+</pre>
+<p> A special provision is made for pointers to member
+      functions. Though they are not function objects, Boost.Function
+      will adapt them internally to function objects. This requires
+      that a pointer to member function of the form <tt class="computeroutput">R
+      (X::*mf)(Arg1, Arg2, ..., ArgN)
+      cv-quals</tt> be adapted to a
+      function object with the following function call operator
+      overloads:
+</p>
+<pre class="programlisting"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename P</b></span>&gt;
+  R <span class="bold"><b>operator</b></span>()(<span class="emphasis"><em>cv-quals</em></span> P&amp; x, Arg1 arg1, Arg2 arg2, ..., Arg<span class="emphasis"><em>N</em></span> arg<span class="emphasis"><em>N</em></span>) <span class="bold"><b>const</b></span>
+  {
+    <span class="bold"><b>return</b></span> (*x).*mf(arg1, arg2, ..., arg<span class="emphasis"><em>N</em></span>);
+  }
+</pre>
+</li>
+<li><p>A function object <tt class="computeroutput">f</tt> of
+      type <tt class="computeroutput">F</tt> is
+      <span class="emphasis"><em>stateless</em></span> if it is a function pointer or if
+      <tt class="computeroutput">boost::is_stateless&lt;T&gt;</tt>
+      is true. The construction of or copy to a Boost.Function object
+      from a stateless function object will not cause exceptions to be
+      thrown and will not allocate any storage.
+      </p></li>
+</ul></div>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="header.boost.function.hpp"></a>Header &lt;<a href="../../../boost/function.hpp" target="_top">boost/function.hpp</a>&gt;</h4></div></div></div>
+<pre class="synopsis"><span class="bold"><b>namespace</b></span> boost {
+  <span class="bold"><b>class</b></span> <a href="../bad_function_call.html" title="Class bad_function_call">bad_function_call</a>;
+  <span class="bold"><b>class</b></span> <a href="../function_base.html" title="Class function_base">function_base</a>;
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> R, <span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, 
+           <span class="bold"><b>typename</b></span> Allocator = std::allocator&lt;<span class="bold"><b>void</b></span>&gt; &gt; 
+    <span class="bold"><b>class</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>;
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator&gt; 
+    <span class="type"><span class="bold"><b>void</b></span></span> <a href="../functionN.html#id243473">swap</a>(<a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;, 
+              <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id367263-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;, Functor);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id304156-bb"><span class="bold"><b>operator</b></span>==</a>(Functor, <span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id307683-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;, 
+                    <a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id418996-bb"><span class="bold"><b>operator</b></span>==</a>(<a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;, 
+                    <span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator1, 
+           <span class="bold"><b>typename</b></span> U1, <span class="bold"><b>typename</b></span> U2, ..., <span class="bold"><b>typename</b></span> UN, <span class="bold"><b>typename</b></span> Allocator2&gt; 
+    <span class="type"><span class="bold"><b>void</b></span></span> <a href="../functionN.html#id340873-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator1&gt;&amp;, 
+                    <span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;U1, U2, ..., UN, Allocator2&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id273475-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;, Functor);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id345580-bb"><span class="bold"><b>operator</b></span>!=</a>(Functor, <span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id393309-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;, 
+                    <a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator, 
+           <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../functionN.html#id403770-bb"><span class="bold"><b>operator</b></span>!=</a>(<a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;, 
+                    <span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> T1, <span class="bold"><b>typename</b></span> T2, ..., <span class="bold"><b>typename</b></span> TN, <span class="bold"><b>typename</b></span> Allocator1, 
+           <span class="bold"><b>typename</b></span> U1, <span class="bold"><b>typename</b></span> U2, ..., <span class="bold"><b>typename</b></span> UN, <span class="bold"><b>typename</b></span> Allocator2&gt; 
+    <span class="type"><span class="bold"><b>void</b></span></span> <a href="../functionN.html#id372280-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;T1, T2, ..., TN, Allocator1&gt;&amp;, 
+                    <span class="bold"><b>const</b></span> <a href="../functionN.html" title="Class template functionN">functionN</a>&lt;U1, U2, ..., UN, Allocator2&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator = std::allocator&lt;<span class="bold"><b>void</b></span>&gt; &gt; 
+    <span class="bold"><b>class</b></span> <a href="../boost/function.html" title="Class template function">function</a>;
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator&gt; 
+    <span class="type"><span class="bold"><b>void</b></span></span> <a href="../boost/function.html#id354066">swap</a>(<a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;, 
+              <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id235870-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;, Functor);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id318513-bb"><span class="bold"><b>operator</b></span>==</a>(Functor, <span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id262984-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;, 
+                    <a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id349308-bb"><span class="bold"><b>operator</b></span>==</a>(<a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;, 
+                    <span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature1, <span class="bold"><b>typename</b></span> Allocator1, <span class="bold"><b>typename</b></span> Signature2, 
+           <span class="bold"><b>typename</b></span> Allocator2&gt; 
+    <span class="type"><span class="bold"><b>void</b></span></span> <a href="../boost/function.html#id242840-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature1, Allocator1&gt;&amp;, 
+                    <span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature2, Allocator2&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id256291-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;, Functor);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id428210-bb"><span class="bold"><b>operator</b></span>!=</a>(Functor, <span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id425558-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;, 
+                    <a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature, <span class="bold"><b>typename</b></span> Allocator, <span class="bold"><b>typename</b></span> Functor&gt; 
+    <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../boost/function.html#id409074-bb"><span class="bold"><b>operator</b></span>!=</a>(<a href="../reference_wrapper.html" title="Class template reference_wrapper">reference_wrapper</a>&lt;Functor&gt;, 
+                    <span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature, Allocator&gt;&amp;);
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> Signature1, <span class="bold"><b>typename</b></span> Allocator1, <span class="bold"><b>typename</b></span> Signature2, 
+           <span class="bold"><b>typename</b></span> Allocator2&gt; 
+    <span class="type"><span class="bold"><b>void</b></span></span> <a href="../boost/function.html#id316198-bb"><span class="bold"><b>operator</b></span>!=</a>(<span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature1, Allocator1&gt;&amp;, 
+                    <span class="bold"><b>const</b></span> <a href="../boost/function.html" title="Class template function">function</a>&lt;Signature2, Allocator2&gt;&amp;);
+}</pre>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="id330862"></a>Header &lt;<a href="../../../boost/function_equal.hpp" target="_top">boost/function_equal.hpp</a>&gt;</h4></div></div></div>
+<pre class="synopsis"><span class="bold"><b>namespace</b></span> boost {
+  <span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> F, <span class="bold"><b>typename</b></span> G&gt; <span class="type"><span class="bold"><b>bool</b></span></span> <a href="../function_equal.html" title="Function template function_equal">function_equal</a>(<span class="bold"><b>const</b></span> F&amp;, <span class="bold"><b>const</b></span> G&amp;);
+}</pre>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 Douglas Gregor</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="tutorial.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="../function.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="../bad_function_call.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

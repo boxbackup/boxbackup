@@ -1,0 +1,14 @@
+0. add description of empty () for list_of(), list_inserter.
+1. add repeat description
+
+3. docs may mention whether hash_map/set can be used
+   as well as upcoming boost::unordered_map/set.
+
+  Maybe exotic containers as circular_buffer and/or
+  multi index container can be shown in example as well.
+
+4. update docs wrt member function addresses + std namespace
+5. update email example to use a local functor
+
+6: find conversion problem in g++ with nested list_of().
+7. add repeat etc to header overview.

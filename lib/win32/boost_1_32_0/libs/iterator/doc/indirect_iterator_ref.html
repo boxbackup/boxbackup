@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.3.6: http://docutils.sourceforge.net/" />
+<title></title>
+<link rel="stylesheet" href="default.css" type="text/css" />
+</head>
+<body>
+<div class="document">
+<pre class="literal-block">
+template &lt;
+    class Iterator
+  , class Value = use_default
+  , class CategoryOrTraversal = use_default
+  , class Reference = use_default
+  , class Difference = use_default
+&gt;
+class indirect_iterator
+{
+ public:
+    typedef /* see below */ value_type;
+    typedef /* see below */ reference;
+    typedef /* see below */ pointer;
+    typedef /* see below */ difference_type;
+    typedef /* see below */ iterator_category;
+
+    indirect_iterator();
+    indirect_iterator(Iterator x);
+
+    template &lt;
+        class Iterator2, class Value2, class Category2
+      , class Reference2, class Difference2
+    &gt;
+    indirect_iterator(
+        indirect_iterator&lt;
+             Iterator2, Value2, Category2, Reference2, Difference2
+        &gt; const&amp; y
+      , typename enable_if_convertible&lt;Iterator2, Iterator&gt;::type* = 0 // exposition
+    );
+
+    Iterator const&amp; base() const;
+    reference operator*() const;
+    indirect_iterator&amp; operator++();
+    indirect_iterator&amp; operator--();
+private:
+   Iterator m_iterator; // exposition
+};
+</pre>
+<p>The member types of <tt class="literal"><span class="pre">indirect_iterator</span></tt> are defined according to
+the following pseudo-code, where <tt class="literal"><span class="pre">V</span></tt> is
+<tt class="literal"><span class="pre">iterator_traits&lt;Iterator&gt;::value_type</span></tt></p>
+<pre class="literal-block">
+if (Value is use_default) then
+    typedef remove_const&lt;pointee&lt;V&gt;::type&gt;::type value_type;
+else
+    typedef remove_const&lt;Value&gt;::type value_type;
+
+if (Reference is use_default) then
+    if (Value is use_default) then
+        typedef indirect_reference&lt;V&gt;::type reference;
+    else
+        typedef Value&amp; reference;
+else
+    typedef Reference reference;
+
+if (Value is use_default) then 
+    typedef pointee&lt;V&gt;::type* pointer;
+else 
+    typedef Value* pointer;
+
+if (Difference is use_default)
+    typedef iterator_traits&lt;Iterator&gt;::difference_type difference_type;
+else
+    typedef Difference difference_type;
+
+if (CategoryOrTraversal is use_default)
+    typedef <em>iterator-category</em> (
+        iterator_traversal&lt;Iterator&gt;::type,``reference``,``value_type``
+    ) iterator_category;
+else
+    typedef <em>iterator-category</em> (
+        CategoryOrTraversal,``reference``,``value_type``
+    ) iterator_category;
+</pre>
+<div class="section" id="indirect-iterator-requirements">
+<h1><a name="indirect-iterator-requirements"><tt class="literal"><span class="pre">indirect_iterator</span></tt> requirements</a></h1>
+<p>The expression <tt class="literal"><span class="pre">*v</span></tt>, where <tt class="literal"><span class="pre">v</span></tt> is an object of
+<tt class="literal"><span class="pre">iterator_traits&lt;Iterator&gt;::value_type</span></tt>, shall be valid
+expression and convertible to <tt class="literal"><span class="pre">reference</span></tt>.  <tt class="literal"><span class="pre">Iterator</span></tt> shall
+model the traversal concept indicated by <tt class="literal"><span class="pre">iterator_category</span></tt>.
+<tt class="literal"><span class="pre">Value</span></tt>, <tt class="literal"><span class="pre">Reference</span></tt>, and <tt class="literal"><span class="pre">Difference</span></tt> shall be chosen so
+that <tt class="literal"><span class="pre">value_type</span></tt>, <tt class="literal"><span class="pre">reference</span></tt>, and <tt class="literal"><span class="pre">difference_type</span></tt> meet
+the requirements indicated by <tt class="literal"><span class="pre">iterator_category</span></tt>.</p>
+<p>[Note: there are further requirements on the
+<tt class="literal"><span class="pre">iterator_traits&lt;Iterator&gt;::value_type</span></tt> if the <tt class="literal"><span class="pre">Value</span></tt>
+parameter is not <tt class="literal"><span class="pre">use_default</span></tt>, as implied by the algorithm for
+deducing the default for the <tt class="literal"><span class="pre">value_type</span></tt> member.]</p>
+</div>
+<div class="section" id="indirect-iterator-models">
+<h1><a name="indirect-iterator-models"><tt class="literal"><span class="pre">indirect_iterator</span></tt> models</a></h1>
+<p>In addition to the concepts indicated by <tt class="literal"><span class="pre">iterator_category</span></tt>
+and by <tt class="literal"><span class="pre">iterator_traversal&lt;indirect_iterator&gt;::type</span></tt>, a
+specialization of <tt class="literal"><span class="pre">indirect_iterator</span></tt> models the following
+concepts, Where <tt class="literal"><span class="pre">v</span></tt> is an object of
+<tt class="literal"><span class="pre">iterator_traits&lt;Iterator&gt;::value_type</span></tt>:</p>
+<blockquote>
+<ul class="simple">
+<li>Readable Iterator if <tt class="literal"><span class="pre">reference(*v)</span></tt> is convertible to
+<tt class="literal"><span class="pre">value_type</span></tt>.</li>
+<li>Writable Iterator if <tt class="literal"><span class="pre">reference(*v)</span> <span class="pre">=</span> <span class="pre">t</span></tt> is a valid
+expression (where <tt class="literal"><span class="pre">t</span></tt> is an object of type
+<tt class="literal"><span class="pre">indirect_iterator::value_type</span></tt>)</li>
+<li>Lvalue Iterator if <tt class="literal"><span class="pre">reference</span></tt> is a reference type.</li>
+</ul>
+</blockquote>
+<p><tt class="literal"><span class="pre">indirect_iterator&lt;X,V1,C1,R1,D1&gt;</span></tt> is interoperable with
+<tt class="literal"><span class="pre">indirect_iterator&lt;Y,V2,C2,R2,D2&gt;</span></tt> if and only if <tt class="literal"><span class="pre">X</span></tt> is
+interoperable with <tt class="literal"><span class="pre">Y</span></tt>.</p>
+</div>
+<div class="section" id="indirect-iterator-operations">
+<h1><a name="indirect-iterator-operations"><tt class="literal"><span class="pre">indirect_iterator</span></tt> operations</a></h1>
+<p>In addition to the operations required by the concepts described
+above, specializations of <tt class="literal"><span class="pre">indirect_iterator</span></tt> provide the
+following operations.</p>
+<p><tt class="literal"><span class="pre">indirect_iterator();</span></tt></p>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Requires:</th><td class="field-body"><tt class="literal"><span class="pre">Iterator</span></tt> must be Default Constructible.</td>
+</tr>
+<tr class="field"><th class="field-name">Effects:</th><td class="field-body">Constructs an instance of <tt class="literal"><span class="pre">indirect_iterator</span></tt> with 
+a default-constructed <tt class="literal"><span class="pre">m_iterator</span></tt>.</td>
+</tr>
+</tbody>
+</table>
+<p><tt class="literal"><span class="pre">indirect_iterator(Iterator</span> <span class="pre">x);</span></tt></p>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Effects:</th><td class="field-body">Constructs an instance of <tt class="literal"><span class="pre">indirect_iterator</span></tt> with
+<tt class="literal"><span class="pre">m_iterator</span></tt> copy constructed from <tt class="literal"><span class="pre">x</span></tt>.</td>
+</tr>
+</tbody>
+</table>
+<pre class="literal-block">
+template &lt;
+    class Iterator2, class Value2, unsigned Access, class Traversal
+  , class Reference2, class Difference2
+&gt;
+indirect_iterator(
+    indirect_iterator&lt;
+         Iterator2, Value2, Access, Traversal, Reference2, Difference2
+    &gt; const&amp; y
+  , typename enable_if_convertible&lt;Iterator2, Iterator&gt;::type* = 0 // exposition
+);
+</pre>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Requires:</th><td class="field-body"><tt class="literal"><span class="pre">Iterator2</span></tt> is implicitly convertible to <tt class="literal"><span class="pre">Iterator</span></tt>.</td>
+</tr>
+<tr class="field"><th class="field-name">Effects:</th><td class="field-body">Constructs an instance of <tt class="literal"><span class="pre">indirect_iterator</span></tt> whose 
+<tt class="literal"><span class="pre">m_iterator</span></tt> subobject is constructed from <tt class="literal"><span class="pre">y.base()</span></tt>.</td>
+</tr>
+</tbody>
+</table>
+<p><tt class="literal"><span class="pre">Iterator</span> <span class="pre">const&amp;</span> <span class="pre">base()</span> <span class="pre">const;</span></tt></p>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><tt class="literal"><span class="pre">m_iterator</span></tt></td>
+</tr>
+</tbody>
+</table>
+<p><tt class="literal"><span class="pre">reference</span> <span class="pre">operator*()</span> <span class="pre">const;</span></tt></p>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><tt class="literal"><span class="pre">**m_iterator</span></tt></td>
+</tr>
+</tbody>
+</table>
+<p><tt class="literal"><span class="pre">indirect_iterator&amp;</span> <span class="pre">operator++();</span></tt></p>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Effects:</th><td class="field-body"><tt class="literal"><span class="pre">++m_iterator</span></tt></td>
+</tr>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><tt class="literal"><span class="pre">*this</span></tt></td>
+</tr>
+</tbody>
+</table>
+<p><tt class="literal"><span class="pre">indirect_iterator&amp;</span> <span class="pre">operator--();</span></tt></p>
+<table class="field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Effects:</th><td class="field-body"><tt class="literal"><span class="pre">--m_iterator</span></tt></td>
+</tr>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><tt class="literal"><span class="pre">*this</span></tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<hr class="footer" />
+<div class="footer">
+<a class="reference" href="indirect_iterator_ref.rst">View document source</a>.
+Generated by <a class="reference" href="http://docutils.sourceforge.net/">Docutils</a> from <a class="reference" href="http://docutils.sourceforge.net/rst.html">reStructuredText</a> source.
+</div>
+</body>
+</html>

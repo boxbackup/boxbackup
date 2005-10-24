@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE library PUBLIC "-//Boost//DTD BoostBook XML V1.0//EN" 
+"../../../tools/boostbook/dtd/boostbook.dtd">
+
+<!-- Copyright (c) 2001-2004 CrystalClear Software, Inc.
+     Subject to the Boost Software License, Version 1.0. 
+     (See accompanying file LICENSE-1.0 or  http://www.boost.org/LICENSE-1.0)
+-->
+
+<section id="date_time.gregorian.date_class">
+  <title>Date Class</title>
+
+  <link linkend="date_intro">Introduction</link> --
+  <link linkend="date_header">Header</link> --
+  <link linkend="date_construction">Construction</link> --
+  <link linkend="date_construct_from_string">Construct from String</link> --
+  <link linkend="date_construct_from_clock">Construct from Clock</link> --
+  <link linkend="date_accessors">Accessors</link> --
+  <link linkend="date_convert_to_string">Convert to String</link> --
+  <link linkend="date_operators">Operators</link>
+
+  <anchor id="date_intro" />
+  <bridgehead renderas="sect3">Introduction</bridgehead>
+  <para>
+    The class boost::gregorian::date is the primary interface for date programming. In general, the date class is immutable once constructed although it does allow assignment. 
+  </para>
+  <para>
+    Other techniques for creating dates include <link linkend="date_time.gregorian.date_iterators">date iterators</link> and <link linkend="date_time.gregorian.date_algorithms">date algorithms or generators</link>. 
+  </para>
+
+  <anchor id="date_header" />
+  <bridgehead renderas="sect3">Header</bridgehead>
+  <para>
+    <programlisting>
+      #include "boost/date_time/gregorian/gregorian.hpp" //include all types plus i/o
+      or
+      #include "boost/date_time/gregorian/gregorian_types.hpp" //no i/o just types
+    </programlisting>
+  </para>
+
+  <anchor id="date_construction" />
+  <bridgehead renderas="sect3">Construction</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>date(greg_year year, greg_month month, greg_day day)</entry>
+	  <entry>Construct from parts of date. Throws bad_year, bad_day_of_month, or bad_day_month (derivatives of std::out_of_range) if the year, month or day are out of range.</entry>
+	  <entry>date d(2002,Jan,10)</entry>
+	</row>
+	<row>
+	  <entry>date(date d)</entry>
+	  <entry>Copy constructor</entry>
+	  <entry>date d1(d)</entry>
+	</row>
+	<row>
+	  <entry>date(special_values sv)</entry>
+	  <entry>Constructor for infinities, not-a-date-time, max_date_time, and min_date_time</entry>
+	  <entry>
+	    date d1(neg_infin);
+	    date d2(pos_infin);
+	    date d3(not_a_date_time);
+	    date d4(max_date_time);
+	    date d5(min_date_time);</entry>
+	</row>
+	<row>
+	  <entry>date;</entry>
+	  <entry>Default constructor. Creates a date object initialized to not_a_date_time. NOTE: this constructor can be disabled by defining DATE_TIME_NO_DEFAULT_CONSTRUCTOR (see compiler_config.hpp)</entry>
+	  <entry>date d; // d =&gt; not_a_date_time</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="date_construct_from_string" />
+  <bridgehead renderas="sect3">Construct from String</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>date from_string(const std::string&amp;)</entry>
+	  <entry>From delimited date string where with order year-month-day eg: 2002-1-25</entry>
+	  <entry>
+	    std::string ds("2002/1/25");
+	    date d(from_string(ds))</entry>
+	</row>
+	<row>
+	  <entry>date from_undelimited_string(const std::string&amp;)</entry>
+	  <entry>From iso type date string where with order year-month-day eg: 20020125</entry>
+	  <entry>
+	    std::string ds("20020125");
+	    date d(from_undelimited_string(ds))</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="date_construct_from_clock" />
+  <bridgehead renderas="sect3">Construct from Clock</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>day_clock::local_day()</entry>
+	  <entry>Get the local day based on the time zone settings of the computer.</entry>
+	  <entry>date d(day_clock::local_day())</entry>
+	</row>
+	<row>
+	  <entry>day_clock::universal_day()</entry>
+	  <entry>Get the UTC day.</entry>
+	  <entry>date d(day_clock::universal_day())</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="date_accessors" />
+  <bridgehead renderas="sect3">Accessors</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>greg_year year() const</entry>
+	  <entry>Get the year part of the date.</entry>
+	  <entry>
+	    date d(2002,Jan,10); 
+	    d.year() --> 2002;</entry>
+	</row>
+	<row>
+	  <entry>greg_month month() const</entry>
+	  <entry>Get the month part of the date.</entry>
+	  <entry>
+	    date d(2002,Jan,10); 
+	    d.month() --> 1;</entry>
+	</row>
+	<row>
+	  <entry>greg_day day() const</entry>
+	  <entry> Get the day part of the date.</entry>
+	  <entry>
+	    date d(2002,Jan,10); 
+	    d.day() --> 10;</entry>
+	</row>
+	<row>
+	  <entry>greg_ymd year_month_day() const</entry>
+	  <entry>Return a year_month_day struct. More efficient when all 3 parts of the date are needed.</entry>
+	  <entry>
+	    date d(2002,Jan,10);
+	    date::ymd_type ymd = d.year_month_day();
+	    ymd.year --> 2002, ymd.month --> 1, ymd.day --> 10</entry>
+	</row>
+	<row>
+	  <entry>greg_day_of_week day_of_week() const</entry>
+	  <entry>Get the day of the week (eg: Sunday, Monday, etc.</entry>
+	  <entry>
+	    date d(2002,Jan,10);
+	    d.day() --> Thursday;</entry>
+	</row>
+	<row>
+	  <entry>bool is_infinity() const</entry>
+	  <entry>Returns true if date is either positive or negative infinity</entry>
+	  <entry>
+	    date d(pos_infin); 
+	    d.is_infinity() --> true;</entry>
+	</row>
+	<row>
+	  <entry>bool is_neg_infinity() const</entry>
+	  <entry>Returns true if date is negative infinity</entry>
+	  <entry>
+	    date d(neg_infin);
+	    d.is_neg_infinity() --> true;</entry>
+	</row>
+	<row>
+	  <entry>bool is_pos_infinity() const</entry>
+	  <entry>Returns true if date is positive infinity</entry>
+	  <entry>
+	    date d(neg_infin); 
+	    d.is_pos_infinity() --> true;</entry>
+	</row>
+	<row>
+	  <entry>bool is_not_a_date() const</entry>
+	  <entry>Returns true if value is not a date</entry>
+	  <entry>
+	    date d(not_a_date_time);
+	    d.is_not_a_date() --> true;</entry>
+	</row>
+	<row>
+	  <entry>long modjulian_day() const</entry>
+	  <entry>Returns the modified julian day for the date.</entry>
+	  <entry></entry>
+	</row>
+	<row>
+	  <entry>long julian_day() const</entry>
+	  <entry>Returns the julian day for the date.</entry>
+	  <entry></entry>
+	</row>
+	<row>
+	  <entry>int week_number() const</entry>
+	  <entry>Returns the ISO 8601 week number for the date.</entry>
+	  <entry></entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="date_convert_to_string" />
+  <bridgehead renderas="sect3">Convert to String</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>std::string to_simple_string(date d)</entry>
+	  <entry>To YYYY-mmm-DD string where mmm 3 char month name.</entry>
+	  <entry>2002-Jan-01</entry>
+	</row>
+	<row>
+	  <entry>std::string to_iso_string(date d)</entry>
+	  <entry>To YYYYMMDD where all components are integers.</entry>
+	  <entry>20020131</entry>
+	</row>
+	<row>
+	  <entry>std::string to_iso_extended_string(date d)</entry>
+	  <entry> To YYYY-MM-DD where all components are integers.</entry>
+	  <entry>2002-01-31</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="date_operators" />
+  <bridgehead renderas="sect3">Operators</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>operator&lt;&lt;</entry>
+	  <entry>Stream output operator</entry>
+	  <entry>
+	    date d(2002,Jan,1)
+	    std::cout &lt;&lt; d &lt;&lt; std::endl;
+	  </entry>
+	</row>
+	<row>
+	  <entry> 
+	    operator==, operator!=,
+	    operator>, operator&lt;
+	    operator>=, operator&lt;=</entry>
+	  <entry>A full complement of comparison operators</entry>
+	  <entry>d1 == d2, etc</entry>
+	</row>
+	<row>
+	  <entry>date operator+(date_duration) const</entry>
+	  <entry>Return a date adding a day offset</entry>
+	  <entry>
+	    date d(2002,Jan,1);
+	    date_duration dd(1);
+	    date d2 = d + dd;
+	  </entry>
+	</row>
+	<row>
+	  <entry>date operator-(date_duration) const</entry>
+	  <entry>Return a date by adding a day offset</entry>
+	  <entry>
+	    date d(2002,Jan,1);
+	    date_duration dd(1);
+	    date d2 = d - dd;
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_duration operator-(date) const</entry>
+	  <entry>Return a date duration by subtracting two dates</entry>
+	  <entry>
+	    date d1(2002,Jan,1);
+	    date d2(2002,Jan,2);
+	    date_duration dd = d2-d1;
+	  </entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+  
+  <link linkend="top">top</link>
+</section>

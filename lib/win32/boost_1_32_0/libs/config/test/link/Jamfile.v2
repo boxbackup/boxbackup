@@ -1,0 +1,10 @@
+# copyright John Maddock 2003
+
+lib link_test : link_test.cpp 
+    : <link>shared <link-runtime>shared 
+      # This is needed to make the test work, I'm unsure if this
+      # should be set globally.
+      <define>BOOST_DYN_LINK=1
+    : 
+        debug release
+    ;

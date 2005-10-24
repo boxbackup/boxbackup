@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE library PUBLIC "-//Boost//DTD BoostBook XML V1.0//EN" 
+"../../../tools/boostbook/dtd/boostbook.dtd">
+
+<!-- Copyright (c) 2001-2004 CrystalClear Software, Inc.
+     Subject to the Boost Software License, Version 1.0. 
+     (See accompanying file LICENSE-1.0 or  http://www.boost.org/LICENSE-1.0)
+-->
+
+<section id="date_time.posix_time.local_time_adjust">
+  <title>Local Time Adjustment</title>
+
+  <link linkend="local_utc_intro">Introduction</link> --
+  <link linkend="local_utc_header">Header</link> --
+  <link linkend="local_utc_overview">Overview</link>
+
+  <anchor id="local_utc_intro" />
+  <bridgehead renderas="sect3">Introduction</bridgehead>
+  <para>
+    A frequent problem in time representation is the conversion between various local time systems. In general this is accomplished by using a reference time system. The reference time system is typically UTC. 
+  </para>
+  <para>
+    Since the posix_time system does no internal time adjustment it can be used to represent both local times and UTC times. However, the user is currently left to handle conversions and time zone knowledge explicitly. 
+  </para>
+  <para>
+    The library offers two different ways to perform UTC to local conversions. The first is using the time zone settings of the computer. This is a useful solution for converting a UTC time for a user machine. This approach depends on the ctime API and will provide incorrect results if the environment is set incorrectly. The other approach allows conversion from any zone to UTC and back independent of the settings of the time zone settings of the computer. The <link linkend="date_time.examples.local_utc_conversion">local utc conversion example</link> demonstrates both of these techniques. 
+  </para>
+
+  <anchor id="local_utc_header" />
+  <bridgehead renderas="sect3">Header</bridgehead>
+  <para>
+    <programlisting>
+      #include "boost/date_time/gregorian/gregorian.hpp" //include all types plus i/o
+      or
+      #include "boost/date_time/gregorian/gregorian_types.hpp" //no i/o just types
+    </programlisting>
+  </para>
+
+  <anchor id="local_utc_overview" />
+  <bridgehead renderas="sect3">Overview</bridgehead>
+  <para>
+    <informaltable frame="all">
+      <tgroup cols="3">
+	<thead>
+	  <row>
+	    <entry>Class</entry>
+	    <entry>Description</entry>
+	    <entry>Example</entry>
+	  </row>
+	</thead>
+	<tbody>
+	  <row>
+	    <entry>date_time::c_local_adjustor&lt;ptime>::utc_to_local(ptime)</entry>
+	    <entry>Calculate local machine time from a UTC time based on time zone settings and the C API.</entry>
+	    <entry>
+	      typedef boost::date_time::c_local_adjustor&lt;ptime> local_adj;
+	      ptime t10(date(2002,Jan,1), hours(7));
+	      ptime t11 = local_adj::utc_to_local(t10);
+	    </entry>
+	  </row>
+	  <row>
+	    <entry>date_time::local_adjustor&lt;ptime, utc_offset, dst_rules>::utc_to_local(ptime)</entry>
+	    <entry>Calculate local machine time from a UTC time based daylight savings rules and utc offset</entry>
+	    <entry><link linkend="date_time.examples.local_utc_conversion">example</link></entry>
+	  </row>
+	  <row>
+	    <entry>date_time::local_adjustor&lt;ptime, utc_offset, dst_rules>::local_to_utc(ptime)</entry>
+	    <entry>Calculate UTC time based on daylight savings rules and utc offset.</entry>
+	    <entry><link linkend="date_time.examples.local_utc_conversion">example</link></entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </informaltable>
+  </para>
+
+
+  <link linkend="top">top</link>
+</section>

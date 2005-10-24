@@ -1,0 +1,69 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Configuring Apache FOP for PostScript/PDF Output</title>
+<link rel="stylesheet" href="../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="getting/started.html" title="Chapter 14. Getting Started">
+<link rel="prev" href="getting/started.html" title="Chapter 14. Getting Started">
+<link rel="next" href="doxygen.html" title="Configuring Doxygen for Documentation Extraction">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../boost.png"></td>
+<td align="center"><a href="../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="getting/started.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="getting/started.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="doxygen.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="boostbook.fop"></a>Configuring Apache FOP for PostScript/PDF Output</h2></div></div></div>
+<p>This section describes the steps required to configure
+      <a href="http://xml.apache.org/fop/index.html" target="_top">Apache
+      FOP</a> to generate PostScript and PDF output for BoostBook
+      documents. To begin, you will need two pieces of software:
+        </p>
+<div class="itemizedlist"><ul type="disc">
+<li>A Java interpreter, available at <a href="http://java.sun.com" target="_top">http://java.sun.com</a>.</li>
+<li>Apache FOP, available at <a href="http://xml.apache.org/fop/download.html" target="_top">http://xml.apache.org/fop/download.html</a>. Version 0.20.4 seems to be most stable.</li>
+</ul></div>
+<p>Once Java is installed (we'll call Java's directory
+      <tt class="computeroutput">JAVA_HOME</tt>) and Apache FOP has been extracted into a
+      directory (we'll call FOP's directory <tt class="computeroutput">FOP_DIR</tt>), we
+      need to configure Boost.Build to use FOP. Edit your
+      <tt class="filename">user-config.jam</tt> or
+      <tt class="filename">site-config.jam</tt> and add the following,
+      replacing <tt class="computeroutput">FOP_DIR</tt> with the directory where Apache
+      FOP is installed, and replace <tt class="computeroutput">JAVA_HOME</tt> with the
+      directory where Java is installed:
+
+</p>
+<pre class="programlisting">using fop : FOP_DIR
+          : JAVA_HOME
+          ;</pre>
+<p>
+
+      In some cases, <tt class="computeroutput">JAVA_HOME</tt> is optional, but it often
+      helps to specify it.</p>
+<p>To test PDF generation, switch to the directory <tt class="filename">$BOOST_ROOT/doc</tt> and execute the
+      command <span><b class="command">bjam --v2 pdf</b></span>. In the absence of any
+      errors, Apache FOP will be executed to transform the XSL:FO
+      output of DocBook into a PDF file.</p>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2003 Douglas Gregor</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="getting/started.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="getting/started.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="doxygen.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

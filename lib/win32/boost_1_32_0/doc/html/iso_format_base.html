@@ -1,0 +1,149 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template iso_format_base</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id387443" title="Header &lt;boost/date_time/iso_format.hpp&gt;">
+<link rel="prev" href="id384987.html" title="Function template operator&lt;&lt;">
+<link rel="next" href="id301674-bb.html" title="Class iso_format_base&lt;wchar_t&gt;">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="id384987.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id387443"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="id301674-bb.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="iso_format_base"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template iso_format_base</span></h2>
+<p>boost::date_time::iso_format_base &#8212; <p>Class to provide common iso formatting spec. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> charT&gt; 
+<span class="bold"><b>class</b></span> iso_format_base {
+<span class="bold"><b>public</b></span>:
+
+  <span class="emphasis"><em>// <a href="iso_format_base.html#id285752-bb">public static functions</a></em></span>
+  <span class="type">month_format_spec</span> <a href="iso_format_base.html#id423503-bb">month_format</a>() ;
+  <span class="type"><span class="bold"><b>const</b></span> charT *</span> <a href="iso_format_base.html#id313806-bb">not_a_date</a>() ;
+  <span class="type"><span class="bold"><b>const</b></span> charT *</span> <a href="iso_format_base.html#id387091-bb">pos_infinity</a>() ;
+  <span class="type"><span class="bold"><b>const</b></span> charT *</span> <a href="iso_format_base.html#id435399-bb">neg_infinity</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id375757-bb">year_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id396391-bb">month_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id366361-bb">day_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id398109-bb">hour_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id312872-bb">minute_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id347104-bb">second_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id372481-bb">period_start_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id422169-bb">time_start_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id425211-bb">week_start_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id352864-bb">period_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id412722-bb">time_sep_char</a>() ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id382708-bb">fractional_time_sep_char</a>() ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="iso_format_base.html#id353866-bb">is_component_sep</a>(charT) ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="iso_format_base.html#id322883-bb">is_fractional_time_sep</a>(charT) ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="iso_format_base.html#id306355-bb">is_timezone_sep</a>(charT) ;
+  <span class="type">charT</span> <a href="iso_format_base.html#id334743-bb">element_sep_char</a>() ;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id494735"></a><h2>Description</h2>
+<div class="refsect2" lang="en">
+<a name="id494739"></a><h3>
+<a name="id285752-bb"></a><tt class="computeroutput">iso_format_base</tt> public static functions</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><span class="type">month_format_spec</span> <a name="id423503-bb"></a>month_format() ;</pre>
+<p>Describe month format -- its an integer in iso format. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>const</b></span> charT *</span> <a name="id313806-bb"></a>not_a_date() ;</pre>
+<p>String used printed is date is invalid. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>const</b></span> charT *</span> <a name="id387091-bb"></a>pos_infinity() ;</pre>
+<p>String used to for positive infinity value. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>const</b></span> charT *</span> <a name="id435399-bb"></a>neg_infinity() ;</pre>
+<p>String used to for positive infinity value. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id375757-bb"></a>year_sep_char() ;</pre>
+<p>ISO char for a year -- used in durations. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id396391-bb"></a>month_sep_char() ;</pre>
+<p>ISO char for a month. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id366361-bb"></a>day_sep_char() ;</pre>
+<p>ISO char for a day. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id398109-bb"></a>hour_sep_char() ;</pre>
+<p>char for minute </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id312872-bb"></a>minute_sep_char() ;</pre>
+<p>char for minute </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id347104-bb"></a>second_sep_char() ;</pre>
+<p>char for second </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id372481-bb"></a>period_start_char() ;</pre>
+<p>ISO char for a period. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id422169-bb"></a>time_start_char() ;</pre>
+<p>Used in time in mixed strings to set start of time. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id425211-bb"></a>week_start_char() ;</pre>
+<p>Used in mixed strings to identify start of a week number. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id352864-bb"></a>period_sep_char() ;</pre>
+<p>Separators for periods. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id412722-bb"></a>time_sep_char() ;</pre>
+<p>Separator for hh:mm:ss. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type">charT</span> <a name="id382708-bb"></a>fractional_time_sep_char() ;</pre>
+<p>Preferred Separator for hh:mm:ss,decimal_fraction. </p>
+</li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id353866-bb"></a>is_component_sep(charT sep) ;</pre></li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id322883-bb"></a>is_fractional_time_sep(charT sep) ;</pre></li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id306355-bb"></a>is_timezone_sep(charT sep) ;</pre></li>
+<li><pre class="literallayout"><span class="type">charT</span> <a name="id334743-bb"></a>element_sep_char() ;</pre></li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id495236"></a><h3>Specializations</h3>
+<div class="itemizedlist"><ul type="disc"><li><p><a href="id301674-bb.html" title="Class iso_format_base&lt;wchar_t&gt;">Class iso_format_base&lt;wchar_t&gt;</a></p></li></ul></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="id384987.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id387443"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="id301674-bb.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

@@ -1,0 +1,103 @@
+
+
+# Declare a handy alias for date/time library
+alias date_time : ../build//boost_date_time ;
+alias date_time_dll : ../build//boost_date_time/<link>shared ;
+
+
+local DATE_TIME_PROPERTIES = <define>BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG <define>BOOST_DATE_TIME_STATIC_LINK ;
+
+{
+   test-suite date_time_core
+     : 
+    [ run testint_adapter.cpp ]
+    [ run testtime_resolution_traits.cpp ]
+    [ run testwrapping_int.cpp ]
+    [ run testconstrained_value.cpp ]
+    [ run testgregorian_calendar.cpp ]
+   ; 
+
+   test-suite date_time_gregorian
+     : 
+   [ run gregorian/testdate.cpp date_time ]
+   [ run gregorian/testdate_duration.cpp date_time ]
+   [ run gregorian/testperiod.cpp date_time ]
+   [ run gregorian/testdate_iterator.cpp date_time ]
+   [ run gregorian/testfacet.cpp date_time : : : $(DATE_TIME_PROPERTIES)  ]
+   [ run gregorian/testformatters.cpp date_time ]
+   [ run gregorian/testgenerators.cpp date_time ]
+   [ run gregorian/testgreg_cal.cpp date_time ]
+   [ run gregorian/testgreg_day.cpp date_time ]     
+   [ run gregorian/testgreg_month.cpp date_time ]
+   [ run gregorian/testgreg_year.cpp date_time ]
+   [ run gregorian/testparse_date.cpp date_time ]
+ ;
+
+   test-suite date_time_gregorian_dll
+     : 
+   [ run gregorian/testdate.cpp date_time_dll : : : <link-runtime>shared : testdate_dll ]
+   [ run gregorian/testdate_duration.cpp date_time_dll : : : <link-runtime>shared : testdate_duration_dll ]
+   [ run gregorian/testperiod.cpp date_time_dll : : : <link-runtime>shared : testperiod_dll ]
+   [ run gregorian/testdate_iterator.cpp date_time_dll : : : <link-runtime>shared : testdate_iterator_dll ]
+   [ run gregorian/testfacet.cpp date_time_dll : : : <link-runtime>shared : testfacet_dll ]
+   [ run gregorian/testformatters.cpp date_time_dll : : : <link-runtime>shared : testformatters_dll ]
+   [ run gregorian/testgenerators.cpp date_time_dll : : : <link-runtime>shared : testgenerators_dll ]
+   [ run gregorian/testgreg_cal.cpp date_time_dll : : : <link-runtime>shared : testgreg_cal_dll ]
+   [ run gregorian/testgreg_day.cpp date_time_dll : : : <link-runtime>shared : testgreg_day_dll ]     
+   [ run gregorian/testgreg_month.cpp date_time_dll : : : <link-runtime>shared : testgreg_month_dll ]
+   [ run gregorian/testgreg_year.cpp date_time_dll : : : <link-runtime>shared : testgreg_year_dll ]
+   # this next test is commented out because it crashes on VC6 (cause unknown):
+  # [ run gregorian/testparse_date.cpp date_time_dll : : : <define>BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG <define>BOOST_ALL_DYN_LINK <runtime-link>dynamic : testparse_date_dll ]
+ ;
+
+   test-suite date_time_posixtime
+     : 
+   [ run posix_time/testlocal_adjustor.cpp
+     date_time ]
+   [ run posix_time/testc_local_adjustor.cpp
+     date_time ]
+   [ run posix_time/testclock.cpp
+     date_time ]
+   [ run posix_time/testdst_rules.cpp
+     date_time ]
+   [ run posix_time/testduration.cpp
+     date_time ]
+   [ run posix_time/testiterator.cpp
+     date_time ]
+   [ run posix_time/testparse_time.cpp
+     date_time ]
+   [ run posix_time/testtime_period.cpp
+     date_time ]
+   [ run posix_time/testtime.cpp
+     date_time ]
+   [ run posix_time/testmicrosec_time_clock.cpp
+     date_time ]
+   [ run posix_time/teststreams.cpp
+     date_time ]
+   [ run posix_time/testtime_formatters.cpp
+     date_time ]
+ ;
+
+   test-suite date_time_wide_streaming
+    :
+   [ run gregorian/testgreg_wstream.cpp
+     date_time : : : : test_greg_wstream ]
+   [ run posix_time/testtime_wstream.cpp
+     date_time : : :  : test_time_wstream_std_config ]
+   [ run posix_time/testtime_wstream.cpp
+     date_time : : : : test_time_wstream ]
+ ;
+
+
+}
+
+# Copyright (c) 2000
+# CrystalClear Software, Inc.
+#
+# Permission to use, copy, modify, distribute and sell this software
+# and its documentation for any purpose is hereby granted without fee,
+# provided that the above copyright notice appear in all copies and
+# that both that copyright notice and this permission notice appear
+# in supporting documentation.  CrystalClear Software makes no
+# representations about the suitability of this software for any
+# purpose.  It is provided "as is" without express or implied warranty.

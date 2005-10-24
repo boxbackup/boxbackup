@@ -1,0 +1,14 @@
+table {
+  border-width: medium;
+  background-color: #F8F8F8;
+  margin:1em;
+}
+
+td {
+  padding-left: 0.5em;
+  padding-right:0.5em;
+}
+
+th {
+  text-align:left; 
+} 

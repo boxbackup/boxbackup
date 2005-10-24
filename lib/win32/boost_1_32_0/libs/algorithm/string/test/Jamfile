@@ -1,0 +1,85 @@
+#  Boost string_algo library test suite Jamfile  ----------------------------
+#
+#  Copyright Pavol Droba 2002-2003. Use, modification and
+#  distribution is subject to the Boost Software License, Version
+#  1.0. (See accompanying file LICENSE_1_0.txt or copy at
+#  http://www.boost.org/LICENSE_1_0.txt)
+#
+#  See http://www.boost.org for updates, documentation, and revision history.
+
+subproject libs/algorithm/string/test ;
+
+# bring in rules for testing
+import testing ;
+
+# Make tests run by default.
+DEPENDS all : test ;
+
+{
+    test-suite algorithm/string
+        : [ run
+                container_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : container
+            ]
+          [ run 
+                trim_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : trim
+            ]
+          [ run 
+                conv_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : conv
+            ]
+          [ run 
+                predicate_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : predicate
+            ]
+          [ run 
+                find_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : find
+            ]
+          [ run
+                split_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : split
+            ]
+          [ run 
+                replace_test.cpp
+              : :
+                :
+                std::locale-support
+                std::facet-support
+                : replace
+            ]
+          [ run 
+                regex_test.cpp
+                <lib>../../../regex/build/boost_regex
+              : :
+                :   
+                : regex
+            ]
+        ;
+}
+

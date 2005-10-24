@@ -1,0 +1,23 @@
+# Boost Numeric Conversion Library test Jamfile
+
+subproject libs/numeric/conversion/test ;
+
+# bring in rules for testing
+SEARCH on testing.jam = $(BOOST_BUILD_PATH) ;
+include testing.jam ;
+
+# Make tests run by default.
+DEPENDS all : test ;
+
+{
+  # look in BOOST_ROOT for sources first, just in this Jamfile
+  local SEARCH_SOURCE = $(BOOST_ROOT) $(SEARCH_SOURCE) ;
+
+  test-suite numeric/conversion :
+     [ run libs/numeric/conversion/test/bounds_test.cpp ]
+     [ run libs/numeric/conversion/test/traits_test.cpp ]
+     [ run libs/numeric/conversion/test/converter_test.cpp ]
+     [ run libs/numeric/conversion/test/udt_support_test.cpp ]
+     [ run libs/numeric/conversion/test/numeric_cast_test.cpp ]
+  ;
+}

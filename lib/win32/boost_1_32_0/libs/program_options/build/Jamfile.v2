@@ -1,0 +1,20 @@
+
+project boost/program_options 
+    : source-location ../src 
+    ;
+
+SOURCES = cmdline config_file options_description parsers variables_map 
+          value_semantic positional_options utf8_codecvt_facet
+          convert winmain
+      ;
+
+import os ;
+if [ os.name ] = NT
+{
+    linkage = <link>static ;
+}
+
+lib program_options
+  : $(SOURCES).cpp
+  : $(linkage)
+    ;

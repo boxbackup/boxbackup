@@ -1,0 +1,88 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Configuring Doxygen for Documentation Extraction</title>
+<link rel="stylesheet" href="../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="getting/started.html" title="Chapter 14. Getting Started">
+<link rel="prev" href="fop.html" title="Configuring Apache FOP for PostScript/PDF Output">
+<link rel="next" href="troubleshooting.html" title="Troubleshooting">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../boost.png"></td>
+<td align="center"><a href="../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="fop.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="getting/started.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="troubleshooting.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="boostbook.doxygen"></a>Configuring Doxygen for Documentation Extraction</h2></div></div></div>
+<p>This section details the steps necessary to use Doxygen to
+      extract documentation and comments from source code to build a
+      BoostBook document (and transform it into end-user
+      documentation). You will need a somewhat recent version of <a href="http://www.doxygen.org" target="_top">Doxygen</a>; 1.2.18 or newer should suffice.</p>
+<p>Boost.Build can be configured for Doxygen support by editing
+      <tt class="filename">user-config.jam</tt> or
+      <tt class="filename">site-config.jam</tt> to add:
+
+        </p>
+<pre class="programlisting">using doxygen : DOXYGEN ;</pre>
+<p><tt class="filename">DOXYGEN</tt> should be replaced with the name of
+      the <span><b class="command">doxygen</b></span> executable (with full path
+      name). If the right <span><b class="command">doxygen</b></span> executable can be
+      found via the path, this parameter can be omitted.</p>
+<div class="important" style="margin-left: 0.5in; margin-right: 0.5in;">
+<h3 class="title">Important</h3>
+<p>The relative order of declarations in 
+        <tt class="filename">user-config.jam</tt> / <tt class="filename">site-config.jam</tt>
+        files is significant. In particular, <tt class="literal">using doxygen</tt> 
+        line should come <span class="emphasis"><em>after</em></span> the
+        <tt class="literal">using boostbook</tt> declaration.
+        </p>
+</div>
+<p>Generating of documentation from source files using
+      Doxygen requires two steps. The first step involves identifying
+      the source files so that Doxygen can process them. The second
+      step is to specify that the output of this process, a file in
+      the Doxygen XML format, is input for a BoostBook document. The
+      following <tt class="filename">Jamfile.v2</tt> illustrates a simple
+      case of generating reference documentation for the
+      <a href="../any.html" title="Chapter 1. Boost.Any">Any</a> library: </p>
+<pre class="programlisting">project boost/any/doc ;
+import boostbook : boostbook ; 
+import doxygen : doxygen ;
+
+doxygen any.doxygen : ../../../boost/any.hpp ;
+boostbook any : any.doxygen ;</pre>
+<p>In this example, we generate the Doxygen XML
+      representation in the file <tt class="filename">any.doxygen</tt> from
+      the source file <tt class="filename">../../../boost/any.hpp</tt> by
+      invocing Doxygen. We then use <tt class="filename">any.doxygen</tt>
+      as a source for the BoostBook target <tt class="computeroutput">any</tt>, which
+      will generate documentation in any format the user requests. The
+      actual sequence of events in this transformation is:</p>
+<div class="orderedlist"><ol type="1">
+<li>Doxygen parses the header file <tt class="filename">../../../boost/any.hpp</tt> and outputs a single XML file <tt class="filename">any.doxygen</tt>.</li>
+<li>The XSLT processor applies the stylesheet <tt class="filename">doxygen2boostbook.xsl</tt> to transform <tt class="filename">any.doxygen</tt> into the BoostBook file <tt class="filename">any.xml</tt>.</li>
+<li>The XSLT processor applies the stylesheet <tt class="filename">docbook.xsl</tt> to transform <tt class="filename">any.xml</tt> into the DocBook XML document <tt class="filename">any.docbook</tt>.</li>
+<li>Further transformations may generate HTML, FO, PDF, etc. from <tt class="filename">any.docbook</tt>.</li>
+</ol></div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2003 Douglas Gregor</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="fop.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="getting/started.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="troubleshooting.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

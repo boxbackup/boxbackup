@@ -1,0 +1,143 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Class template date_duration</title>
+<link rel="stylesheet" href="boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="index.html" title="The Boost C++ Libraries">
+<link rel="up" href="date_time/doxy.html#id432576" title="Header &lt;boost/date_time/date_duration.hpp&gt;">
+<link rel="prev" href="day_clock.html" title="Class template day_clock">
+<link rel="next" href="duration_traits_long.html" title="Struct duration_traits_long">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../boost.png"></td>
+<td align="center"><a href="../../index.htm">Home</a></td>
+<td align="center"><a href="../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../people/people.htm">People</a></td>
+<td align="center"><a href="../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="day_clock.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id432576"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="duration_traits_long.html"><img src="images/next.png" alt="Next"></a>
+</div>
+<div class="refentry" lang="en">
+<a name="date_duration"></a><div class="titlepage"></div>
+<div class="refnamediv">
+<h2><span class="refentrytitle">Class template date_duration</span></h2>
+<p>boost::date_time::date_duration &#8212; <p>Duration type with date level resolution. </p></p>
+</div>
+<h2 xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv-title">Synopsis</h2>
+<div xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" class="refsynopsisdiv"><pre class="synopsis"><span class="bold"><b>template</b></span>&lt;<span class="bold"><b>typename</b></span> duration_rep_traits&gt; 
+<span class="bold"><b>class</b></span> date_duration {
+<span class="bold"><b>public</b></span>:
+  <span class="emphasis"><em>// types</em></span>
+  <span class="bold"><b>typedef</b></span> duration_rep_traits::int_type  duration_rep_type;
+  <span class="bold"><b>typedef</b></span> duration_rep_traits::impl_type duration_rep;     
+
+  <span class="emphasis"><em>// <a href="date_duration.html#date_durationconstruct-copy-destruct">construct/copy/destruct</a></em></span>
+  <a href="date_duration.html#id424728-bb">date_duration</a>(duration_rep);
+  <a href="date_duration.html#id383990-bb">date_duration</a>(special_values);
+  <a href="date_duration.html#id411493-bb">date_duration</a>(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a>&lt; duration_rep_traits &gt; &amp;);
+
+  <span class="emphasis"><em>// <a href="date_duration.html#id423776-bb">public member functions</a></em></span>
+  <span class="type">duration_rep</span> <a href="date_duration.html#id383623-bb">get_rep</a>() <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="date_duration.html#id321140-bb">is_special</a>() <span class="bold"><b>const</b></span>;
+  <span class="type">duration_rep_type</span> <a href="date_duration.html#id302579-bb">days</a>() <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="date_duration.html#id410273-bb"><span class="bold"><b>operator</b></span>==</a>(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp;) <span class="bold"><b>const</b></span>;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="date_duration.html#id328694-bb"><span class="bold"><b>operator</b></span>&lt;</a>(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp;) <span class="bold"><b>const</b></span>;
+  <span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a href="date_duration.html#id324924-bb"><span class="bold"><b>operator</b></span>-=</a>(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp;) ;
+  <span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a href="date_duration.html#id363569-bb"><span class="bold"><b>operator</b></span>+=</a>(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp;) ;
+  <span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a href="date_duration.html#id319793-bb"><span class="bold"><b>operator</b></span>-</a>() <span class="bold"><b>const</b></span>;
+  <span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a>&lt; duration_rep_traits &gt;</span> <a href="date_duration.html#id324889-bb"><span class="bold"><b>operator</b></span>/=</a>(<span class="bold"><b>int</b></span>) ;
+  <span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a>&lt; duration_rep_traits &gt;</span> <a href="date_duration.html#id416013-bb"><span class="bold"><b>operator</b></span>/</a>(<span class="bold"><b>int</b></span>) ;
+  <span class="type"><span class="bold"><b>bool</b></span></span> <a href="date_duration.html#id244232-bb">is_negative</a>() <span class="bold"><b>const</b></span>;
+
+  <span class="emphasis"><em>// <a href="date_duration.html#id400391-bb">public static functions</a></em></span>
+  <span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a href="date_duration.html#id400394-bb">unit</a>() ;
+};</pre></div>
+<div class="refsect1" lang="en">
+<a name="id472034"></a><h2>Description</h2>
+<div class="refsect2" lang="en">
+<a name="id472038"></a><h3>
+<a name="date_durationconstruct-copy-destruct"></a><tt class="computeroutput">date_duration</tt> construct/copy/destruct</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><a name="id424728-bb"></a>date_duration(duration_rep day_count);</pre>
+<p>Construct from a day count. </p>
+</li>
+<li>
+<pre class="literallayout"><a name="id383990-bb"></a>date_duration(special_values sv);</pre>
+<p>construct from special_values - only works when instantiated with duration_traits_adapted </p>
+</li>
+<li>
+<pre class="literallayout"><a name="id411493-bb"></a>date_duration(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a>&lt; duration_rep_traits &gt; &amp; other);</pre>
+<p>Construct from another date_duration (Copy Constructor). </p>
+</li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id472133"></a><h3>
+<a name="id423776-bb"></a><tt class="computeroutput">date_duration</tt> public member functions</h3>
+<div class="orderedlist"><ol type="1">
+<li>
+<pre class="literallayout"><span class="type">duration_rep</span> <a name="id383623-bb"></a>get_rep() <span class="bold"><b>const</b></span>;</pre>
+<p>returns days_ as it's instantiated type - used for streaming </p>
+</li>
+<li><pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id321140-bb"></a>is_special() <span class="bold"><b>const</b></span>;</pre></li>
+<li>
+<pre class="literallayout"><span class="type">duration_rep_type</span> <a name="id302579-bb"></a>days() <span class="bold"><b>const</b></span>;</pre>
+<p>returns days as value, not object. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id410273-bb"></a><span class="bold"><b>operator</b></span>==(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp; rhs) <span class="bold"><b>const</b></span>;</pre>
+<p>Equality. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id328694-bb"></a><span class="bold"><b>operator</b></span>&lt;(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp; rhs) <span class="bold"><b>const</b></span>;</pre>
+<p>Less. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a name="id324924-bb"></a><span class="bold"><b>operator</b></span>-=(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp; rhs) ;</pre>
+<p>Subtract another duration -- result is signed. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a name="id363569-bb"></a><span class="bold"><b>operator</b></span>+=(<span class="bold"><b>const</b></span> <a href="date_duration.html" title="Class template date_duration">date_duration</a> &amp; rhs) ;</pre>
+<p>Add a duration -- result is signed. </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a name="id319793-bb"></a><span class="bold"><b>operator</b></span>-() <span class="bold"><b>const</b></span>;</pre>
+<p>unary- Allows for dd = -date_duration(2); -&gt; dd == -2 </p>
+</li>
+<li>
+<pre class="literallayout"><span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a>&lt; duration_rep_traits &gt;</span> <a name="id324889-bb"></a><span class="bold"><b>operator</b></span>/=(<span class="bold"><b>int</b></span> divisor) ;</pre>
+<p>Division operations on a duration with an integer. </p>
+</li>
+<li><pre class="literallayout"><span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a>&lt; duration_rep_traits &gt;</span> <a name="id416013-bb"></a><span class="bold"><b>operator</b></span>/(<span class="bold"><b>int</b></span> divisor) ;</pre></li>
+<li>
+<pre class="literallayout"><span class="type"><span class="bold"><b>bool</b></span></span> <a name="id244232-bb"></a>is_negative() <span class="bold"><b>const</b></span>;</pre>
+<p>return sign information </p>
+</li>
+</ol></div>
+</div>
+<div class="refsect2" lang="en">
+<a name="id472594"></a><h3>
+<a name="id400391-bb"></a><tt class="computeroutput">date_duration</tt> public static functions</h3>
+<div class="orderedlist"><ol type="1"><li>
+<pre class="literallayout"><span class="type"><a href="date_duration.html" title="Class template date_duration">date_duration</a></span> <a name="id400394-bb"></a>unit() ;</pre>
+<p>Returns the smallest duration -- used by to calculate 'end'. </p>
+</li></ol></div>
+</div>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"></td>
+<td align="right"><small>Copyright © 2001-2004 CrystalClear Software, Inc</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="day_clock.html"><img src="images/prev.png" alt="Prev"></a><a accesskey="u" href="date_time/doxy.html#id432576"><img src="images/up.png" alt="Up"></a><a accesskey="h" href="index.html"><img src="images/home.png" alt="Home"></a><a accesskey="n" href="duration_traits_long.html"><img src="images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

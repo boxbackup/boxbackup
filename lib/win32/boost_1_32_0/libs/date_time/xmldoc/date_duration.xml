@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE library PUBLIC "-//Boost//DTD BoostBook XML V1.0//EN" 
+"../../../tools/boostbook/dtd/boostbook.dtd">
+
+<!-- Copyright (c) 2001-2004 CrystalClear Software, Inc.
+     Subject to the Boost Software License, Version 1.0. 
+     (See accompanying file LICENSE-1.0 or  http://www.boost.org/LICENSE-1.0)
+-->
+
+<section id="date_time.gregorian.date_duration">
+  <title>Date Duration (aka Days)</title>
+
+  <link linkend="duration_intro">Introduction</link> --
+  <link linkend="duration_header">Header</link> --
+  <link linkend="duration_construction">Construction</link> --
+  <link linkend="duration_operators">Operators</link>
+
+  <anchor id="duration_intro" />
+  <bridgehead renderas="sect3">Introduction</bridgehead>
+  <para>
+    As of version 1_32 the date_duration class has been typdefed as days in the boost::gregorian namespace. Throughout the examples you will find days used instead of date_duration.
+  </para>
+  <para>
+    The class boost::gregorian::date_duration is a simple day count used for arithmetic with <link linkend="date_time.gregorian.date_class">gregorian::date</link>. A duration can be either positive or negative. 
+  </para>
+
+  <anchor id="duration_header" />
+  <bridgehead renderas="sect3">Header</bridgehead>
+  <para>
+    <programlisting>
+      #include "boost/date_time/gregorian/gregorian.hpp" //include all types plus i/o
+      or
+      #include "boost/date_time/gregorian/gregorian_types.hpp" //no i/o just types
+    </programlisting>
+  </para>
+
+  <anchor id="duration_construction" />
+  <bridgehead renderas="sect3">Construction</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>date_duration(long)</entry>
+	  <entry>Create a duration count.</entry>
+	  <entry> date_duration dd(3); //3 days</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="duration_accessors" />
+  <bridgehead renderas="sect3">Accessors</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>long days() const</entry>
+	  <entry> Get the day count.</entry>
+	  <entry>date_duration dd(3); dd.days() --> 3</entry>
+	</row>
+	<row>
+	  <entry>bool is_negative() const</entry>
+	  <entry>True if number of days is less than zero.</entry>
+	  <entry>date_duration dd(-1); dd.is_negative() --> true</entry>
+	</row>
+	<row>
+	  <entry>static date_duration unit()</entry>
+	  <entry>Return smallest possible unit of duration type.</entry>
+	  <entry>date_duration::unit() --> date_duration(1)</entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <anchor id="duration_operators" />
+  <bridgehead renderas="sect3">Operators</bridgehead>
+  <informaltable frame="all">
+    <tgroup cols="3">
+      <thead>
+	<row>
+	  <entry>Syntax</entry>
+	  <entry>Description</entry>
+	  <entry>Example</entry>
+	</row>
+      </thead>
+      <tbody>
+	<row>
+	  <entry>
+	    operator==, operator!=,
+	    operator>, operator&lt;
+	    operator>=, operator&lt;=
+	  </entry>
+	  <entry>A full complement of comparison operators</entry>
+	  <entry>dd1 == dd2, etc</entry>
+	</row>
+	<row>
+	  <entry>date_duration operator+(date_duration) const</entry>
+	  <entry>Add date durations.</entry>
+	  <entry>
+	    date_duration dd1(3);
+	    date_duration dd2(5);
+	    date_duration dd3 = dd1 + dd2;
+	  </entry>
+	</row>
+	<row>
+	  <entry>date_duration operator-(date_duration) const</entry>
+	  <entry>Subtract durations.</entry>
+	  <entry>
+	    date_duration dd1(3);
+	    date_duration dd2(5);
+	    date_duration dd3 = dd1 - dd2;
+	  </entry>
+	</row>
+      </tbody>
+    </tgroup>
+  </informaltable>
+
+  <link linkend="top">top</link>
+</section>

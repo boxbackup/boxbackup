@@ -1,0 +1,417 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Design Topics</title>
+<link rel="stylesheet" href="../boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.66.1">
+<link rel="start" href="../index.html" title="The Boost C++ Libraries">
+<link rel="up" href="../string_algo.html" title="Chapter 9. Boost String Algorithms Library">
+<link rel="prev" href="quickref.html" title="Quick Reference">
+<link rel="next" href="concept.html" title="Concepts">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%">
+<td valign="top"><img alt="boost.png (6897 bytes)" width="277" height="86" src="../../../boost.png"></td>
+<td align="center"><a href="../../../index.htm">Home</a></td>
+<td align="center"><a href="../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="../../../people/people.htm">People</a></td>
+<td align="center"><a href="../../../more/faq.htm">FAQ</a></td>
+<td align="center"><a href="../../../more/index.htm">More</a></td>
+</table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="quickref.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="../string_algo.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="concept.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="string_algo.design"></a>Design Topics</h3></div></div></div>
+<div class="toc"><dl>
+<dt><span class="section"><a href="design.html#string_algo.string">String Representation</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.iterator_range"><tt class="computeroutput">iterator_range</tt> class</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.collection_traits">Collection Traits</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.sequence_traits">Sequence Traits</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.find">Find Algorithms</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.replace">Replace Algorithms</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.split">Find Iterators &amp; Split Algorithms</a></span></dt>
+<dt><span class="section"><a href="design.html#string_algo.exception">Exception Safety</a></span></dt>
+</dl></div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.string"></a>String Representation</h4></div></div></div>
+<p>
+            As the name suggest, this library works mainly with strings. However, in the context of this library,
+            a string is not restricted to any particular implementation (like <tt class="computeroutput">std::basic_string</tt>),
+            rather it is a concept. This allows the algorithms in this library to be reused for any string type,
+            that satisfies the given requirements.
+        </p>
+<p><span class="bold"><b>Definition:</b></span> A string is a 
+            <a href="../../../libs/utility/Collection.html" target="_top">collection</a> of characters accessible in sequential
+            ordered fashion. Character is any value type with "cheap" copying and assignment.                
+        </p>
+<p>
+            First requirement of string-type is that it must accessible using 
+            <a href="design.html#string_algo.collection_traits" title="Collection Traits">collection traits</a>. This facility allows to access
+            the elements inside the string in a uniform iterator-based fashion. 
+            This requirement is actually less stringent than that of collection concept. It implements 
+            an <a href="../../../libs/algorithm/string/doc/external_concepts.html" target="_top">external</a> collection interface.
+            This is sufficient for our library
+        </p>
+<p>            
+            Second requirement defines the way in which the characters are stored in the string. Algorithms in 
+            this library work with an assumption that copying a character is cheaper then allocating extra 
+            storage to cache results. This is a natural assumption for common character types. Algorithms will 
+            work even if this requirement is not satisfied, however at the cost of performance degradation.
+        </p>
+<p></p>
+<p>
+            In addition some algorithms have additional requirements on the string-type. Particularly, it is required
+            that an algorithm can create a new string of the given type. In this case, it is required that
+            the type satisfies the sequence (Std §23.1.1) requirements.
+        </p>
+<p>
+            In the reference and also in the code, requirement on the string type is designated by the name of
+            template argument. <tt class="computeroutput">CollectionT</tt> means that the basic collection requirements must hold.
+            <tt class="computeroutput">SequenceT</tt> designates extended sequence requirements.
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.iterator_range"></a><tt class="computeroutput">iterator_range</tt> class</h4></div></div></div>
+<p>
+            An <a href="../iterator_range.html" title="Class template iterator_range">iterator_range</a> is an encapsulation of a pair of iterators that
+            delimit a sequence (or, a range). This concept is widely used by 
+            sequence manipulating algorithms. Although being so useful, there no direct support 
+            for it in the standard library (The closest thing is that some algorithms return a pair of iterators). 
+            Instead all STL algorithms have two distinct parameters for beginning and end of a range. This design 
+            is natural for implementation of generic algorithms, but it forbids to work with a range as a single value. 
+        </p>
+<p>
+            It is possible to encapsulate a range in <tt class="computeroutput">std::pair&lt;&gt;</tt>, but
+            <tt class="computeroutput">std::pair&lt;&gt;</tt> is an overly generic encapsulation, so it is not best match for a range.
+            For instance, it does not enforce that begin and end iterators be of the same type.
+        </p>
+<p>
+            Naturally the range concept is heavily used also in this library. During the development of
+            the library, it was discovered, that there is a need for a reasonable encapsulation for it, since
+            core part of the library deals with substring searching algorithms and any such algorithm
+            returns a range delimiting the result of the search. <tt class="computeroutput">std::pair&lt;&gt;</tt> was deemed as 
+            unsuitable. Therefore the <tt class="computeroutput">iterator_range</tt> was defined.
+        </p>
+<p>
+            The intention of the <tt class="computeroutput">iterator_range</tt> class is to manage a range as a single value and provide 
+            a basic interface for common operations. Its interface is similar to that of a collection. 
+            In addition to <tt class="computeroutput">begin()</tt>
+            and <tt class="computeroutput">end()</tt> accessors, it has member functions for checking whether the range is empty,
+            or to determine the size of the range. It also has a set of member typedefs that extract
+            type information from the encapsulated iterators. As such, the interface is compatible with 
+            the <a href="design.html#string_algo.collection_traits" title="Collection Traits">collection traits</a> requirements so
+            it is possible to use this class as a parameter to many algorithms in this library.
+        </p>
+<p><a href="../iterator_range.html" title="Class template iterator_range">iterator_range</a> will be moved to Boost.Range library in the future
+            releases. The internal version will be deprecated then.
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.collection_traits"></a>Collection Traits</h4></div></div></div>
+<p>
+            Collection traits provide uniform access to different types of 
+            <a href="../../../libs/utility/Collection.html" target="_top">collections</a> . 
+            This functionality allows to write generic algorithms which work with several 
+            different kinds of collections. For this library it means, that, for instance,
+            many algorithms work with <tt class="computeroutput">std::string</tt> as well as with <tt class="computeroutput">char[]</tt>.
+            This facility implements the
+            <a href="../../../libs/algorithm/string/doc/external_concepts.html" target="_top">external</a> collection
+            concept.
+        </p>
+<p>
+            The following collection types are supported:
+            </p>
+<div class="itemizedlist"><ul type="disc">
+<li>
+                    Standard containers
+                </li>
+<li>
+                    Built-in arrays (like int[])
+                </li>
+<li>
+                    Null terminated strings (this includes char[],wchar_t[],char*, and wchar_t*)
+                </li>
+<li>
+                    std::pair&lt;iterator,iterator&gt;
+                </li>
+</ul></div>
+<p>
+            Collection traits support a subset of the container concept (Std §23.1). This subset 
+            can be described as an input container concept, e.g. a container with immutable content. 
+            Its definition can be found in the header <a href="reference.html#id407166" title="Header &lt;boost/algorithm/string/collection_traits.hpp&gt;">boost/algorithm/string/collection_traits.hpp</a>.
+        </p>
+<p>
+            In the table C denotes a container and c is an object of C. 
+        </p>
+<div class="table">
+<a name="id579062"></a><p class="title"><b>Table 9.11. Collection Traits</b></p>
+<table class="table" summary="Collection Traits">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th align="left">Name</th>
+<th align="left">Standard collection equivalent</th>
+<th align="left">Description</th>
+</tr></thead>
+<tbody>
+<tr>
+<td align="left">
+<a href="../value_type_of.html" title="Struct template value_type_of">value_type_of&lt;C&gt;</a>::type</td>
+<td align="left"><tt class="computeroutput">C::value_type</tt></td>
+<td align="left">Type of contained values</td>
+</tr>
+<tr>
+<td align="left">
+<a href="../difference_type_of.html" title="Struct template difference_type_of">difference_type_of&lt;C&gt;</a>::type</td>
+<td align="left"><tt class="computeroutput">C::difference_type</tt></td>
+<td align="left">difference type of the collection</td>
+</tr>
+<tr>
+<td align="left">
+<a href="../iterator_of.html" title="Struct template iterator_of">iterator_of&lt;C&gt;</a>::type</td>
+<td align="left"><tt class="computeroutput">C::iterator</tt></td>
+<td align="left">iterator type of the collection</td>
+</tr>
+<tr>
+<td align="left">
+<a href="../const_iterator_of.html" title="Struct template const_iterator_of">const_iterator_of&lt;C&gt;</a>::type</td>
+<td align="left"><tt class="computeroutput">C::const_iterator</tt></td>
+<td align="left">const_iterator type of the collection</td>
+</tr>
+<tr>
+<td align="left">
+<a href="../result_iterator_of.html" title="Struct template result_iterator_of">result_iterator_of&lt;C&gt;</a>::type</td>
+<td align="left"> </td>
+<td align="left">
+                            result_iterator type of the collection. This type maps to <tt class="computeroutput">C::iterator</tt>
+                            for mutable collection and <tt class="computeroutput">C::const_iterator</tt> for const collection.
+                        </td>
+</tr>
+<tr>
+<td align="left"><a href="../begin.html" title="Function begin">begin(c)</a></td>
+<td align="left"><tt class="computeroutput">c.begin()</tt></td>
+<td align="left">
+                            Gets the iterator pointing to the start of the collection.
+                        </td>
+</tr>
+<tr>
+<td align="left"><a href="../end.html" title="Function end">end(c)</a></td>
+<td align="left"><tt class="computeroutput">c.end()</tt></td>
+<td align="left">
+                            Gets the iterator pointing to the end of the collection.
+                        </td>
+</tr>
+<tr>
+<td align="left"><a href="../size.html" title="Function template size">size(c)</a></td>
+<td align="left"><tt class="computeroutput">c.size()</tt></td>
+<td align="left">
+                            Gets the size of the collection.
+                        </td>
+</tr>
+<tr>
+<td align="left"><a href="../empty.html" title="Function template empty">empty(c)</a></td>
+<td align="left"><tt class="computeroutput">c.empty()</tt></td>
+<td align="left">
+                            Checks if the collection is empty.
+                        </td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>
+            The collection traits are only a temporary part of this library. They will be replaced in the future
+            releases by Boost.Range library. Use of the internal implementation will be deprecated then.
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.sequence_traits"></a>Sequence Traits</h4></div></div></div>
+<p>
+            The major difference between <tt class="computeroutput">std::list</tt> and <tt class="computeroutput">std::vector</tt> is not in the interfaces
+            they provide, but rather in the inner details of the class and the way how it performs 
+            various operations. The problem is that it is not possible to infer this difference from the 
+            definitions of classes without some special mechanism.
+            However, some algorithms can run significantly faster with the knowledge of the properties
+            of a particular container.
+        </p>
+<p>
+            Sequence traits allow one to specify additional properties of a sequence container (see Std.§32.2).
+            These properties are then used by algorithms to select optimized handling for some operations.
+            The sequence traits are declared in the header 
+            <a href="reference.html#id264095" title="Header &lt;boost/algorithm/string/sequence_traits.hpp&gt;">boost/algorithm/string/sequence_traits.hpp</a>.
+        </p>
+<p>
+            In the table C denotes a container and c is an object of C.
+        </p>
+<div class="table">
+<a name="id579361"></a><p class="title"><b>Table 9.12. Sequence Traits</b></p>
+<table class="table" summary="Sequence Traits">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th align="left">Trait</th>
+<th align="left">Description</th>
+</tr></thead>
+<tbody>
+<tr>
+<td align="left">
+<a href="../has_native_replace.html" title="Class template has_native_replace">has_native_replace&lt;C&gt;</a>::value</td>
+<td align="left">Specifies that the sequence has std::string like replace method</td>
+</tr>
+<tr>
+<td align="left">
+<a href="../has_stable_iterators.html" title="Class template has_stable_iterators">has_stable_iterators&lt;C&gt;</a>::value</td>
+<td align="left">
+                            Specifies that the sequence has stable iterators. It means,
+                            that operations like <tt class="computeroutput">insert</tt>/<tt class="computeroutput">erase</tt>/<tt class="computeroutput">replace</tt> 
+                            do not invalidate iterators.
+                        </td>
+</tr>
+<tr>
+<td align="left">
+<a href="../has_const_time_insert.html" title="Class template has_const_time_insert">has_const_time_insert&lt;C&gt;</a>::value</td>
+<td align="left">
+                            Specifies that the insert method of the sequence has 
+                            constant time complexity.
+                        </td>
+</tr>
+<tr>
+<td align="left">
+<a href="../has_const_time_erase.html" title="Class template has_const_time_erase">has_const_time_erase&lt;C&gt;</a>::value</td>
+<td align="left">
+                            Specifies that the erase method of the sequence has constant time complexity
+                        </td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>
+            Current implementation contains specializations for std::list&lt;T&gt; and
+            std::basic_string&lt;T&gt; from the standard library and SGI's std::rope&lt;T&gt; and std::slist&lt;T&gt;.
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.find"></a>Find Algorithms</h4></div></div></div>
+<p>
+            Find algorithms have similar functionality to <tt class="computeroutput">std::search()</tt> algorithm. They provide a different 
+            interface which is more suitable for common string operations. 
+            Instead of returning just the start of matching subsequence they return a range which is necessary 
+            when the length of the matching subsequence is not known beforehand. 
+            This feature also allows a partitioning of  the input sequence into three 
+            parts: a prefix, a substring and a suffix. 
+        </p>
+<p>
+            Another difference is an addition of various searching methods besides find_first, including find_regex. 
+        </p>
+<p>
+            It the library, find algorithms are implemented in terms of 
+            <a href="concept.html#string_algo.finder_concept" title="Finder Concept">Finders</a>. Finders are used also by other facilities 
+            (replace,split).
+            For convenience, there are also function wrappers for these finders to simplify find operations.
+        </p>
+<p>
+            Currently the library contains only naive implementation of find algorithms with complexity 
+            O(n * m) where n is the size of the input sequence and m is the size of the search sequence. 
+            There are algorithms with complexity O(n), but for smaller sequence a constant overhead is 
+            rather big. For small m &lt;&lt; n (m by magnitude smaller than n) the current implementation 
+            provides acceptable efficiency. 
+            Even the C++ standard defines the required complexity for search algorithm as O(n * m). 
+            It is possible that a future version of library will also contain algorithms with linear 
+            complexity as an option
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.replace"></a>Replace Algorithms</h4></div></div></div>
+<p>
+            The implementation of replace algorithms follows the layered structure of the library. The 
+            lower layer implements generic substitution of a range in the input sequence. 
+            This layer takes a <a href="concept.html#string_algo.finder_concept" title="Finder Concept">Finder</a> object and a 
+            <a href="concept.html#string_algo.formatter_concept" title="Formatter concept">Formatter</a> object as an input. These two 
+            functors define what to replace and what to replace it with. The upper layer functions 
+            are just wrapping calls to the lower layer. Finders are shared with the find and split facility. 
+        </p>
+<p>
+            As usual, the implementation of the lower layer is designed to work with a generic sequence while
+            taking advantage of specific features if possible 
+            (by using <a href="design.html#string_algo.sequence_traits" title="Sequence Traits">Sequence traits</a>)
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.split"></a>Find Iterators &amp; Split Algorithms</h4></div></div></div>
+<p>
+            Find iterators are a logical extension of the <a href="design.html#string_algo.find" title="Find Algorithms">find facility</a>.
+            Instead of searching for one match, the whole input can be iteratively searched for multiple matches.
+            The result of the search is then used to partition the input. It depends on the algorithms which parts 
+            are returned as the result. They can be the matching parts (<a href="../find_iterator.html" title="Class template find_iterator">find_iterator</a>) of the parts in
+            between (<a href="../split_iterator.html" title="Class template split_iterator">split_iterator</a>). 
+        </p>
+<p>
+            In addition the split algorithms like <a href="../find_all.html" title="Function template find_all">find_all()</a> and <a href="../id479732.html" title="Function template split">split()</a>
+            can simplify the common operations. They use a find iterator to search the whole input and copy the 
+            matches they found into the supplied container.
+        </p>
+</div>
+<div class="section" lang="en">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="string_algo.exception"></a>Exception Safety</h4></div></div></div>
+<p>
+            The library requires that all operations on types used as template
+            or function arguments provide the <span class="emphasis"><em>basic exception-safety guarantee</em></span>. 
+            In turn, all functions and algorithms in this library, except where stated
+            otherwise, will provide the <span class="emphasis"><em>basic exception-safety guarantee</em></span>.
+            In other words:
+            The library maintains its invariants and does not leak resources in
+            the face of exceptions.  Some library operations give stronger
+            guarantees, which are documented on an individual basis.
+        </p>
+<p>
+            Some functions can provide the <span class="emphasis"><em>strong exception-safety guarantee</em></span>.
+            That means that following statements are true:    
+            </p>
+<div class="itemizedlist"><ul type="disc">
+<li>
+                    If an exception is thrown, there are no effects other than those
+                    of the function 
+                </li>
+<li>
+                    If an exception is thrown other than by the function, there are no effects
+                </li>
+</ul></div>
+<p>
+            This guarantee can be provided under the condition that the operations 
+            on the types used for arguments for these functions either
+            provide the strong exception guarantee or do not alter the global state .
+         </p>
+<p>
+            In the reference, under the term <span class="emphasis"><em>strong exception-safety guarantee</em></span>, we mean the
+            guarantee as defined above.            
+        </p>
+<p>
+            For more information about the exception safety topics, follow this 
+            <a href="../../../more/generic_exception_safety.html" target="_top">link</a></p>
+</div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"><small><p>Last revised: July 16, 2004 at 09:06:39 GMT</p></small></td>
+<td align="right"><small>Copyright © 2002-2004 Pavol Droba</small></td>
+</tr></table>
+<hr>
+<div class="spirit-nav">
+<a accesskey="p" href="quickref.html"><img src="../images/prev.png" alt="Prev"></a><a accesskey="u" href="../string_algo.html"><img src="../images/up.png" alt="Up"></a><a accesskey="h" href="../index.html"><img src="../images/home.png" alt="Home"></a><a accesskey="n" href="concept.html"><img src="../images/next.png" alt="Next"></a>
+</div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+
+subproject libs/program_options/example ;
+
+rule program-options-example ( name extra-sources * )
+{
+    exe $(name) : $(name).cpp <lib>../build/boost_program_options $(extra-sources)
+    : <include>$(BOOST_ROOT) ;
+}
+
+program-options-example first ;
+program-options-example options_description ;
+program-options-example multiple_sources ;
+program-options-example custom_syntax ;
+program-options-example response_file ;
+program-options-example option_groups ;
+program-options-example real ;
+program-options-example regex <lib>../../regex/build/boost_regex ;
+
+
+#program-options-example prefix ;
+
+
+

@@ -1,0 +1,24 @@
+
+project
+    : requirements 
+    <library>../build//program_options
+    <library>/boost/test//boost_test_exec_monitor
+    <hardcode-dll-paths>true
+    
+#    <define>_GLIBCXX_CONCEPT_CHECKS
+#    <define>_GLIBCXX_DEBUG
+    ;
+
+test-suite program_options :
+
+    [ run options_description_test.cpp ] 
+    [ run parsers_test.cpp ]
+    [ run variable_map_test.cpp ]
+    [ run cmdline_test.cpp ]
+    [ run positional_options_test.cpp ]
+    [ run unicode_test.cpp ] 
+    [ run winmain.cpp ] 
+    ;
+        
+exe test_convert : test_convert.cpp ../build//program_options ;   
+

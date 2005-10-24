@@ -1,0 +1,116 @@
+<HTML>
+  <HEAD>
+	 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+	 <LINK REL="stylesheet" TYPE="text/css" HREF="../../../../boost.css">
+	 <TITLE>Boost Numeric Conversion Library - Type Requirements and User-defined-types support</TITLE>
+  </HEAD>
+  <BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000ff" VLINK="#800080">
+	 <TABLE BORDER="0" CELLPADDING="7" CELLSPACING="0" WIDTH="100%"
+	  SUMMARY="header">
+		<TR>
+		  <TH VALIGN="top" WIDTH="300">
+			 <H3><A HREF="../../../../index.htm"><IMG HEIGHT="86" WIDTH="277"
+				ALT="C++ Boost" SRC="../../../../boost.png" BORDER="0"></A></H3> </TH> 
+		  <TH VALIGN="top"> 
+			 <H1 ALIGN="center">Boost Numeric Conversion Library</H1>
+                         <H1 ALIGN="center">Type Requirements<br>and<br>User-defined-types support</H1>
+			 </TH>
+		</TR>
+	 </TABLE> <HR>
+	 <H2>Contents</H2>
+	 <DL CLASS="page-index">
+	     <DT><A HREF="#req">Type Requirements</A></DT>
+	     <DT><A HREF="#sem">UDT's special semantics</A></DT>
+	     <DT><A HREF="#hooks">Special Policies</A></DT>
+	 </DL>
+
+
+	 <HR>
+
+<H2><A NAME="req"></A>Type Requirements</H2>
+<P>Both arithmetic (built-in) and user-defined numeric types require proper specialization of
+<CODE>std::numeric_limits<></CODE> (that is, with (in-class) integral constants).<br>
+The library uses <CODE>std::numeric_limits&lt;T&gt;::is_specialized</CODE> to detect whether
+  the type is builtin or user defined, and <CODE>std::numeric_limits&lt;T&gt;::is_integer,
+  std::numeric_limits&lt;T&gt;::is_signed</CODE>
+  to detect whether the type is integer or floating point; and whether it is signed/unsigned.</P>
+<P>The default Float2IntRounder policies uses unqualified calls to functions <CODE>floor()
+  and ceil()</CODE>; but the standard functions are introduced in scope by a
+  using directive:</P>
+<PRE>using std::floor ; return floor(s); </PRE>
+<P>Therefore, for builtin arithmetic types, the std functions will be used.
+  User defined types should provide overloaded versions of these functions in
+  order to use the default rounder policies. If these overloads are defined within a user namespace
+  argument dependent lookup (ADL) should find them, but if your compiler has a weak ADL
+  you might need to put these functions some place else or write your own rounder policy.</P>
+<P>The default Trunc&lt;&gt; rounder policy needs to determine if the source value
+  is positive or not, and for this it evaluates the expression &quot;s &lt; static_cast&lt;S&gt;(0)&quot;.
+  Therefore, user defined types require a visible operator &lt; in order to use
+  the Trunc<> policy (the default).<br>
+</P>
+
+<HR>
+<H2><A NAME="sem"></A>UDT's special semantics</H2>
+
+<p><u>Conversion Traits</u></p>
+<p>If a User Defined Type is involved in a conversion, it is <i>assumed</i> that
+  the UDT has <a href="definitions.html#range">wider range</a> than any built-in
+  type, and consequently the values of some <code>converter_traits&lt;&gt;</code>
+  members are hardwired regardless of the reality. The following table summarizes
+  this:</p>
+
+<li>Target=UDT and Source=built-in
+  <blockquote><code>subranged=false</code><br>
+    <code>supertype=Target</code><br>
+    <code>subtype=Source</code></blockquote>
+  </li>
+
+  <li>Target=built-in and Source=UDT
+    <blockquote><code>subranged=true</code><br>
+    <code>supertype=Source</code><br>
+    <code>subtype=Target</code></blockquote>
+  </li>
+
+<li>Target=UDT and Source=UDT
+  <blockquote><code>subranged=false</code><br>
+    <code>supertype=Target</code><br>
+    <code>subtype=Source</code></blockquote>
+  </li>
+<p>The Traits member <code>udt_mixture</code> can be used to detect whether a
+  UDT is involved and to infer the validity of the other members as shown above.</p>
+<p><u>Range Checking</u></p>
+<p>Because User Defined Numeric Types might have peculiar ranges (such as an unbounded
+  range), this library does not attempt to supply a meaningful range checking
+  logic when UDTs are involved in a conversion. Therefore, if either Target or
+  Source are not built-in types, the bundled range checking of the <code>converter&lt;&gt;</code>
+  function object is automatically disabled. However, it is possible to supply
+  a user-defined range-checker. See <A HREF="#hooks">Special Policies</A></p>
+
+<HR>
+<H2><A NAME="hooks"></A>Special Policies</H2>
+<p>There are two components of the <code>converter&lt;&gt;</code> class that might
+  require special behavior if User Defined Numeric Types are involved: the Range
+  Checking and the Raw Conversion.</p>
+<p>When both Target and Source are built-in types, the converter class uses an
+  <i>internal</i> range checking logic which is optimized and customized for the
+  combined properties of the types.<br>
+  However, this internal logic is disabled when either type is User Defined. In
+  this case, the user can specify an <i>external</i> range checking policy which
+  will be used in place of the internal code.
+  See <a HREF="converter_policies.html#rc">UserRangeChecker</a> policy for details.</p>
+<p>The converter class performs the actual conversion using a Raw Converter policy.
+  The default raw converter simply performs a <code>&quot;static_cast&lt;Target&gt;(source)&quot;.</code><br>
+  However, if the a UDT is involved, the static_cast might not work. In this case,
+  the user can implement and pass a different raw converter policy.
+  See <a HREF="converter_policies.html#rawc">RawConverter</a> policy for details </p>
+<HR>
+<P>Back to <A HREF="index.html">Numeric Conversion library index</A></P>
+<HR>
+<P>Revised 23 June 2004</P>
+<p>© Copyright Fernando Luis Cacciola Carballal, 2004</p>
+<p> Use, modification, and distribution are subject to the Boost Software
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+</BODY>
+</HTML>

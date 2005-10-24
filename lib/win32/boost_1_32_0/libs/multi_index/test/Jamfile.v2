@@ -1,0 +1,29 @@
+# Boost.MultiIndex tests Jamfile
+#
+# Copyright 2003-2004 Joaquín M López Muñoz.
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at
+# http://www.boost.org/LICENSE_1_0.txt)
+#
+# See http://www.boost.org/libs/multi_index for library home page.
+
+test-suite "multi_index" :
+    [ run test_basic.cpp            test_basic_main.cpp            ]
+    [ run test_capacity.cpp         test_capacity_main.cpp         ]
+    [ run test_comparison.cpp       test_comparison_main.cpp       ]
+    [ run test_composite_key.cpp    test_composite_key_main.cpp    ]
+    [ run test_conv_iterators.cpp   test_conv_iterators_main.cpp   ]
+    [ run test_copy_assignment.cpp  test_copy_assignment_main.cpp  ]
+    [ run test_iterators.cpp        test_iterators_main.cpp        ]
+    [ run test_key_extractors.cpp   test_key_extractors_main.cpp   ]
+    [ run test_list_ops.cpp         test_list_ops_main.cpp         ]
+    [ run test_modifiers.cpp        test_modifiers_main.cpp        ]
+    [ run test_mpl_ops.cpp          test_mpl_ops_main.cpp          ]
+    [ run test_projection.cpp       test_projection_main.cpp       ]
+    [ run test_range.cpp            test_range_main.cpp            ]
+    [ run test_safe_mode.cpp        test_safe_mode_main.cpp        ]
+    [ run test_set_ops.cpp          test_set_ops_main.cpp          ]
+    [ run test_special_list_ops.cpp test_special_list_ops_main.cpp ]
+    [ run test_special_set_ops.cpp  test_special_set_ops_main.cpp  ]
+    [ run test_update.cpp           test_update_main.cpp           ]
+    ;
