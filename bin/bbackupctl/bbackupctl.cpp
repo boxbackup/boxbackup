@@ -37,6 +37,7 @@ void PrintUsageAndExit()
 int main(int argc, const char *argv[])
 {
 	int returnCode = 0;
+	::openlog("Box Backup", 0, 0);
 
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", "bbackupctl")
 
@@ -91,18 +92,28 @@ int main(int argc, const char *argv[])
 	// Easier coding
 	const Configuration &conf(*config);
 
+#ifndef WIN32
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
 		printf("Daemon isn't using a control socket, could not execute command.\nAdd a CommandSocket declaration to the bbackupd.conf file.\n");
 		return 1;
 	}
-	
+
 	// Connect to socket
 	SocketStream connection;
+#else
+	WinNamedPipe connection;
+#endif
+	
+
 	try
 	{
+#ifdef WIN32	
+		connection.open();
+#else
 		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str());
+#endif
 	}
 	catch(...)
 	{
@@ -113,17 +124,23 @@ int main(int argc, const char *argv[])
 			"  * Another bbackupctl process is communicating with the daemon\n"	\
 			"  * Daemon is waiting to recover from an error\n"
 		);
+		syslog(LOG_ERR,"Failed to connect to the command socket");
 		return 1;
 	}
 	
 	// For receiving data
+#ifdef WIN32
+	PipeGetLine getLine(connection);
+#else
 	IOStreamGetLine getLine(connection);
+#endif
 	
 	// Wait for the configuration summary
 	std::string configSummary;
 	if(!getLine.GetLine(configSummary))
 	{
 		printf("Failed to receive configuration summary from daemon\n");
+		syslog(LOG_ERR,"Failed to receive configuration summary from daemon");
 		return 1;
 	}
 
@@ -131,6 +148,7 @@ int main(int argc, const char *argv[])
 	if(getLine.IsEOF())
 	{
 		printf("Server rejected the connection. Are you running bbackupctl as the same user as the daemon?\n");
+		syslog(LOG_ERR,"Server rejected the connection. Are you running bbackupctl as the same user as the daemon?");
 		return 1;
 	}
 
@@ -212,6 +230,7 @@ int main(int argc, const char *argv[])
 	}
 
 	MAINHELPER_END
+	closelog();
 	
 	return returnCode;
 }
