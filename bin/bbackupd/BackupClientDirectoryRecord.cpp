@@ -32,6 +32,8 @@
 
 #include "MemLeakFindOn.h"
 
+typedef std::map<std::string, BackupStoreDirectory::Entry *> DecryptedEntriesMap_t;
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -204,6 +206,10 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
 					TRACE1("Stat failed for '%s' (contents)\n", filename.c_str());
+					//Question to Ben:
+					//If this fails the exception takes us all the way out
+					//are ther not times when you still want to continue with the 
+					//backup
 					THROW_EXCEPTION(CommonException, OSFileError)
 				}
 
@@ -475,6 +481,24 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 {
 	bool allUpdatedSuccessfully = true;
 
+	// Decrypt all the directory entries.
+	// It would be nice to be able to just compare the encrypted versions, however this doesn't work
+	// in practise because there can be multiple encodings of the same filename using different 
+	// methods (although each method will result in the same string for the same filename.) This
+	// happens when the server fixes a broken store, and gives plain text generated filenames.
+	// So if we didn't do things like this, then you wouldn't be able to recover from bad things
+	// happening with the server.
+	DecryptedEntriesMap_t decryptedEntries;
+	if(pDirOnStore != 0)
+	{
+		BackupStoreDirectory::Iterator i(*pDirOnStore);
+		BackupStoreDirectory::Entry *en = 0;
+		while((en = i.Next()) != 0)
+		{
+			decryptedEntries[BackupStoreFilenameClear(en->GetName()).GetClearFilename()] = en;
+		}
+	}
+
 	// Do files
 	for(std::vector<std::string>::const_iterator f = rFiles.begin();
 		f != rFiles.end(); ++f)
@@ -486,7 +510,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		box_time_t modTime = 0;
 		uint64_t attributesHash = 0;
 		int64_t fileSize = 0;
-		ino_t inodeNum = 0;
+		InodeRefType inodeNum = 0;
 		bool hasMultipleHardLinks = true;
 		// BLOCK
 		{
@@ -511,10 +535,10 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		int64_t latestObjectID = 0;
 		if(pDirOnStore != 0)
 		{
-			BackupStoreDirectory::Iterator i(*pDirOnStore);
-			en = i.FindMatchingClearName(storeFilename);
-			if(en)
+			DecryptedEntriesMap_t::iterator i(decryptedEntries.find(*f));
+			if(i != decryptedEntries.end())
 			{
+				en = i->second;
 				latestObjectID = en->GetObjectID();
 			}
 		}
@@ -788,8 +812,11 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		BackupStoreDirectory::Entry *en = 0;
 		if(pDirOnStore != 0)
 		{
-			BackupStoreDirectory::Iterator i(*pDirOnStore);
-			en = i.FindMatchingClearName(storeFilename);
+			DecryptedEntriesMap_t::iterator i(decryptedEntries.find(*d));
+			if(i != decryptedEntries.end())
+			{
+				en = i->second;
+			}
 		}
 		
 		// Check that the entry which might have been found is in fact a directory
@@ -837,7 +864,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 
 				// Get attributes
 				box_time_t attrModTime = 0;
-				ino_t inodeNum = 0;
+				InodeRefType inodeNum = 0;
 				BackupClientFileAttributes attr;
 				attr.ReadAttributes(dirname.c_str(), true /* directories have zero mod times */,
 					0 /* not interested in mod time */, &attrModTime, 0 /* not file size */,
@@ -1021,8 +1048,6 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(SyncParams &rPara
 	}
 }
 
-
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1057,14 +1082,23 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				// Found an old version -- get the index
 				std::auto_ptr<IOStream> blockIndexStream(connection.ReceiveStream());
 			
+				//
 				// Diff the file
+				//
+
+				rParams.mrContext.ManageDiffProcess();
+
 				bool isCompletelyDifferent = false;
 				std::auto_ptr<IOStream> patchStream(BackupStoreFile::EncodeFileDiff(rFilename.c_str(),
 						mObjectID,	/* containing directory */
 						rStoreFilename, diffFromID, *blockIndexStream,
 						connection.GetTimeout(), 0 /* not interested in the modification time */, &isCompletelyDifferent));
 	
+				rParams.mrContext.UnManageDiffProcess();
+
+				//
 				// Upload the patch to the store
+				//
 				std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
 						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *patchStream));
 				
@@ -1090,6 +1124,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 	}
 	catch(BoxException &e)
 	{
+		rParams.mrContext.UnManageDiffProcess();
+
 		if(e.GetType() == ConnectionException::ExceptionType && e.GetSubType() == ConnectionException::Protocol_UnexpectedReply)
 		{
 			// Check and see what error the protocol has -- as it might be an error...
@@ -1102,7 +1138,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
 			}
 		}
-	
+
 		// Send the error on it's way
 		throw;
 	}
@@ -1171,5 +1207,147 @@ BackupClientDirectoryRecord::SyncParams::~SyncParams()
 {
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
+{
+	// Make deletion recursive
+	DeleteSubDirectories();
 
+	// Delete maps
+	if(mpPendingEntries != 0)
+	{
+		delete mpPendingEntries;
+		mpPendingEntries = 0;
+	}
 
+	//
+	//
+	//
+	rArchive >> mObjectID >> mSubDirName >> mInitialSyncDone >> mSyncDone;
+
+	//
+	//
+	//
+	int64_t iCount = 0;
+	rArchive.Get(iCount);
+
+	if (iCount != sizeof(mStateChecksum)/sizeof(mStateChecksum[0]))
+	{
+		// we have some kind of internal system representation change: throw for now
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	for (int v = 0; v < iCount; v++)
+		/**** LOAD ****/ rArchive.Get(mStateChecksum[v]);
+
+	//
+	//
+	//
+	iCount = 0;
+	rArchive.Get(iCount);
+
+	if (iCount > 0)
+	{
+		/**** LOAD ****/ mpPendingEntries = new std::map<std::string, box_time_t>;
+		if (!mpPendingEntries)
+			throw std::bad_alloc();
+
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			box_time_t btItem;
+
+			rArchive >> strItem >> btItem;
+			(*mpPendingEntries)[strItem] = btItem;
+		}
+	}
+
+	//
+	//
+	//
+	iCount = 0;
+	rArchive.Get(iCount);
+
+	if (iCount > 0)
+	{
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			rArchive.Get(strItem);
+
+			BackupClientDirectoryRecord* pSubDirRecord = new BackupClientDirectoryRecord(0, ""); // will be deserialized anyway, give it id 0 for now
+			if (!pSubDirRecord)
+				throw std::bad_alloc();
+
+			/***** RECURSE *****/
+			pSubDirRecord->Deserialize(rArchive);
+			mSubDirectories[strItem] = pSubDirRecord;
+		}
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientDirectoryRecord::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	rArchive << mObjectID << mSubDirName << mInitialSyncDone << mSyncDone;
+
+	//
+	//
+	//
+	int64_t iCount = 0;
+
+	iCount = sizeof(mStateChecksum)/sizeof(mStateChecksum[0]);
+	rArchive.Add(iCount); // add count to see if we have crossed build-level mods
+	for (int v = 0; v < iCount; v++)
+		rArchive.Add(mStateChecksum[v]);
+
+	//
+	//
+	//
+	if (!mpPendingEntries)
+	{
+		iCount = 0;
+		rArchive.Add(iCount);
+	}
+	else
+	{
+		iCount = mpPendingEntries->size();
+		rArchive.Add(iCount);
+
+		for (std::map<std::string, box_time_t>::const_iterator i = mpPendingEntries->begin(); i != mpPendingEntries->end(); i++)
+			rArchive << (*i).first << (*i).second;
+	}
+	//
+	//
+	//
+	iCount = mSubDirectories.size();
+	rArchive.Add(iCount);
+
+	for (std::map<std::string, BackupClientDirectoryRecord*>::const_iterator i = mSubDirectories.begin(); i != mSubDirectories.end(); i++)
+	{
+		const BackupClientDirectoryRecord* pSubItem = (*i).second;
+		ASSERT(pSubItem);
+
+		rArchive.Add((*i).first);
+		pSubItem->Serialize(rArchive);
+	}
+}

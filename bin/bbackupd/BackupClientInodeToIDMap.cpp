@@ -16,6 +16,8 @@
 	#include <limits.h>
 	#ifdef PLATFORM_LINUX
 		#include "../../local/_linux_db.h"
+	#elif defined( BERKELY_V4 ) 
+		#include "db_cxx.h"
 	#else
 		#include <db.h>
 	#endif
@@ -69,7 +71,11 @@ BackupClientInodeToIDMap::~BackupClientInodeToIDMap()
 #ifndef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 	if(dbp != 0)
 	{
+#ifdef BERKELY_V4
+		dbp->close(0);
+#elif
 		dbp->close(dbp);
+#endif
 	}
 #endif
 }
@@ -94,7 +100,14 @@ void BackupClientInodeToIDMap::Open(const char *Filename, bool ReadOnly, bool Cr
 	ASSERT(!mEmpty);
 	
 	// Open the database file
+#ifdef BERKELY_V4
+	dbp = new Db(0,0);
+	dbp->set_pagesize(1024);		/* Page size: 1K. */
+	dbp->set_cachesize(0, 32 * 1024, 0);
+	dbp->open(NULL, Filename, NULL, DB_HASH, DB_CREATE, 0664);
+#elif
 	dbp = dbopen(Filename, (CreateNew?O_CREAT:0) | (ReadOnly?O_RDONLY:O_RDWR), S_IRUSR | S_IWUSR | S_IRGRP, TABLE_DATABASE_TYPE, NULL);
+#endif
 	if(dbp == NULL)
 	{
 		THROW_EXCEPTION(BackupStoreException, BerkelyDBFailure);
@@ -139,7 +152,11 @@ void BackupClientInodeToIDMap::Close()
 #ifndef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 	if(dbp != 0)
 	{
+#ifdef BERKELY_V4
+		if(dbp->close(0) != 0)
+#elif
 		if(dbp->close(dbp) != 0)
+#endif
 		{
 			THROW_EXCEPTION(BackupStoreException, BerkelyDBFailure);
 		}
@@ -176,6 +193,15 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 	IDBRecord rec;
 	rec.mObjectID = ObjectID;
 	rec.mInDirectory = InDirectory;
+
+#ifdef BERKELY_V4
+	Dbt key(&InodeRef, sizeof(InodeRef));
+	Dbt data(&rec, sizeof(rec));
+
+	if (dbp->put(0, &key, &data, 0) != 0) {
+		THROW_EXCEPTION(BackupStoreException, BerkelyDBFailure);
+	}
+#elif
 	
 	DBT key;
 	key.data = &InodeRef;
@@ -190,6 +216,7 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 	{
 		THROW_EXCEPTION(BackupStoreException, BerkelyDBFailure);
 	}
+#endif
 #endif
 }
 
@@ -228,7 +255,11 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 	{
 		THROW_EXCEPTION(BackupStoreException, InodeMapNotOpen);
 	}
-
+#ifdef BERKELY_V4
+	Dbt key(&InodeRef, sizeof(InodeRef));
+	Dbt data(0, 0);
+	switch(dbp->get(NULL, &key, &data, 0))
+#elif
 	DBT key;
 	key.data = &InodeRef;
 	key.size = sizeof(InodeRef);
@@ -238,6 +269,7 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 	data.size = 0;
 
 	switch(dbp->get(dbp, &key, &data, 0))
+#endif
 	{
 	case 1:	// key not in file
 		return false;
@@ -252,7 +284,23 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 	}
 
 	// Check for sensible return
+#ifdef BERKELY_V4
+	if(key.get_data() == 0 || data.get_size() != sizeof(IDBRecord))
+	{
+		// Assert in debug version
+		ASSERT(key.get_data() == 0 || data.get_size() != sizeof(IDBRecord));
+		
+		// Invalid entries mean it wasn't found
+		return false;
+	}
+
+	// Data alignment isn't guarentted to be on a suitable bounday
+	IDBRecord rec;
+
+	::memcpy(&rec, data.get_data(), sizeof(rec));
+#elif
 	if(key.data == 0 || data.size != sizeof(IDBRecord))
+
 	{
 		// Assert in debug version
 		ASSERT(key.data == 0 || data.size != sizeof(IDBRecord));
@@ -260,10 +308,12 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 		// Invalid entries mean it wasn't found
 		return false;
 	}
-	
+
 	// Data alignment isn't guarentted to be on a suitable bounday
 	IDBRecord rec;
+
 	::memcpy(&rec, data.data, sizeof(rec));
+#endif
 	
 	// Return data
 	rObjectIDOut = rec.mObjectID;

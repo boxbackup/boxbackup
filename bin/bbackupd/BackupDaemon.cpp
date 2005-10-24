@@ -11,13 +11,17 @@
 
 #include <unistd.h>
 #include <syslog.h>
+#ifndef WIN32
 #include <sys/param.h>
 #include <sys/mount.h>
+
+
 #include <signal.h>
 #ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
 	#include <mntent.h>
 #endif
 #include <sys/wait.h>
+#endif
 
 #include "Configuration.h"
 #include "IOStream.h"
@@ -200,7 +204,173 @@ void BackupDaemon::DeleteAllLocations()
 	mIDMapMounts.clear();
 }
 
+#ifdef WIN32
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HelperThread()
+//		Purpose: Background thread function to help with communications with
+//               control communications
+//		Created: 18/2/04
+//
+// --------------------------------------------------------------------------
+DWORD WINAPI HelperThread( LPVOID lpParam ) 
+{ 
+	printf( "Parameter = %d.", *(DWORD*)lpParam ); 
+	((BackupDaemon *)lpParam)->helperThread();
 
+	return 0;
+
+}
+void BackupDaemon::helperThread(void)
+{
+	mpCommandSocketInfo = new CommandSocketInfo;
+	this->mReceivedCommandConn = false;
+
+	//mpCommandSocketInfo->mListeningSocket = CreateNamedPipeW(L"\\\\.\\pipe\\boxbackup",PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 4096, 4096, NMPWAIT_USE_DEFAULT_WAIT, (LPSECURITY_ATTRIBUTES) NULL);
+
+
+	while ( !IsTerminateWanted() )
+	{
+		try
+		{
+			mpCommandSocketInfo->mListeningSocket = CreateNamedPipeW( 
+				L"\\\\.\\pipe\\boxbackup", // pipe name 
+				PIPE_ACCESS_DUPLEX,        // read/write access 
+				PIPE_TYPE_MESSAGE |        // message type pipe 
+				PIPE_READMODE_MESSAGE |    // message-read mode 
+				PIPE_WAIT,                 // blocking mode 
+				PIPE_UNLIMITED_INSTANCES,  // max. instances  
+				4096,                      // output buffer size 
+				4096,                      // input buffer size 
+				NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
+				NULL);                     // default security attribute 
+
+			if ( mpCommandSocketInfo->mListeningSocket == INVALID_HANDLE_VALUE )
+			{
+				::syslog(LOG_ERR, "Failed to open named pipe");
+				mpCommandSocketInfo = 0;
+			}
+
+
+			if ( !ConnectNamedPipe(mpCommandSocketInfo->mListeningSocket, (LPOVERLAPPED) NULL))
+			{
+				CloseHandle(mpCommandSocketInfo->mListeningSocket);
+				::syslog(LOG_ERR, "Failed to open named pipe - connect");
+				mpCommandSocketInfo = 0;
+			}
+			//when we get here we have got a connection from a client 
+
+			//This next section comes from Ben's origional function
+			// Log
+			::syslog(LOG_INFO, "Connection from command socket");
+
+			// Send a header line summarising the configuration and current state
+			const Configuration &conf(GetConfiguration());
+			char summary[256];
+			int summarySize = sprintf(summary, "bbackupd: %d %d %d %d\nstate %d\n",
+				conf.GetKeyValueBool("AutomaticBackup"),
+				conf.GetKeyValueInt("UpdateStoreInterval"),
+				conf.GetKeyValueInt("MinimumFileAge"),
+				conf.GetKeyValueInt("MaxUploadWait"),
+				mState);
+
+			DWORD cbWritten,fSuccess;
+
+			fSuccess = WriteFile( 
+				mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
+				summary,      // buffer to write from 
+				summarySize, // number of bytes to write 
+				&cbWritten,   // number of bytes written 
+				NULL);        // not overlapped I/O 
+
+			if (! fSuccess || summarySize != cbWritten)
+			{
+				this->CloseCommandConnection();
+				continue;
+			}
+
+			fSuccess = WriteFile( 
+				mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
+				"ping\n",      // buffer to write from 
+				5, // number of bytes to write 
+				&cbWritten,   // number of bytes written 
+				NULL);        // not overlapped I/O 
+
+			if (! fSuccess || 5 != cbWritten)
+			{
+				this->CloseCommandConnection();
+				continue;
+			}
+
+			DWORD cbBytesRead;
+
+			PipeGetLine readLine(mpCommandSocketInfo->mListeningSocket);
+			std::string command;
+
+			while ( readLine.GetLine(command) )
+			{
+				TRACE1("Receiving command '%s' over command socket\n", command.c_str());
+
+				bool sendOK = false;
+				bool sendResponse = true;
+
+				// Command to process!
+				if(command == "quit" || command == "")
+				{
+					// Close the socket.
+					CloseCommandConnection();
+					sendResponse = false;
+				}
+				else if(command == "sync")
+				{
+					// Sync now!
+					this->mDoSyncFlagOut = true;
+					this->mSyncIsForcedOut = false;
+					sendOK = true;
+				}
+				else if(command == "force-sync")
+				{
+					// Sync now (forced -- overrides any SyncAllowScript)
+					this->mDoSyncFlagOut = true;
+					this->mSyncIsForcedOut = true;
+					sendOK = true;
+				}
+				else if(command == "reload")
+				{
+					// Reload the configuration
+					SetReloadConfigWanted();
+					sendOK = true;
+				}
+				else if(command == "terminate")
+				{
+					// Terminate the daemon cleanly
+					SetTerminateWanted();
+					sendOK = true;
+				}
+
+				// Send a response back?
+				if(sendResponse)
+				{
+					fSuccess = WriteFile( 
+						mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
+						sendOK?"ok\n":"error\n",      // buffer to write from 
+						sendOK?3:6, // number of bytes to write 
+						&cbWritten,   // number of bytes written 
+						NULL);        // not overlapped I/O 
+				}
+				this->mReceivedCommandConn = true;
+			}
+
+			CloseHandle(mpCommandSocketInfo->mListeningSocket);
+		}
+		catch (...)
+		{
+			//Mmmm not sure what to do here - perhaps just log...
+		}
+	}
+} 
+#endif
 // --------------------------------------------------------------------------
 //
 // Function
@@ -211,6 +381,27 @@ void BackupDaemon::DeleteAllLocations()
 // --------------------------------------------------------------------------
 void BackupDaemon::Run()
 {
+#ifdef WIN32
+
+	// Yes, create a local inet socket
+	//mpCommandSocketInfo = new CommandSocketInfo;
+	//mpCommandSocketInfo->mListeningSocket.Listen(Socket::TypeINET, "127.0.0.1", COMMAND_PORT);
+	HANDLE hThread;
+	DWORD dwThreadId;
+
+    hThread = CreateThread( 
+        NULL,                        // default security attributes 
+        0,                           // use default stack size  
+        HelperThread,                  // thread function 
+        this,                        // argument to thread function 
+        0,                           // use default creation flags 
+        &dwThreadId);                // returns the thread identifier 
+
+	//init our own timer - for the timeoputs in calculating
+	//diffs in files
+	initTimer();
+
+#else
 	// Ignore SIGPIPE (so that if a command connection is broken, the daemon doesn't terminate)
 	::signal(SIGPIPE, SIG_IGN);
 
@@ -224,7 +415,7 @@ void BackupDaemon::Run()
 		::unlink(socketName);
 		mpCommandSocketInfo->mListeningSocket.Listen(Socket::TypeUNIX, socketName);
 	}
-
+#endif
 	// Handle things nicely on exceptions
 	try
 	{
@@ -247,6 +438,10 @@ void BackupDaemon::Run()
 		delete mpCommandSocketInfo;
 		mpCommandSocketInfo = 0;
 	}
+#ifdef WIN32
+	//clean up windows specific stuff.
+	finiTimer();
+#endif
 }
 
 // --------------------------------------------------------------------------
@@ -270,10 +465,14 @@ void BackupDaemon::Run2()
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
-	// Set maximum diffing time?
+	// max diffing time, keep-alive time
 	if(conf.KeyExists("MaximumDiffingTime"))
 	{
-		BackupStoreFile::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+		BackupClientContext::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+	}
+	if(conf.KeyExists("KeepAliveTime"))
+	{
+		BackupClientContext::SetKeepAliveTime(conf.GetKeyValueInt("KeepAliveTime"));
 	}
 
 	// Setup various timings
@@ -298,10 +497,14 @@ void BackupDaemon::Run2()
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	box_time_t lastSyncTime = 0;
 	
-	// --------------------------------------------------------------------------------------------
-
 	// And what's the current client store marker?
 	int64_t clientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;		// haven't contacted the store yet
+
+	// --------------------------------------------------------------------------------------------
+
+	DeserializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+
+	// --------------------------------------------------------------------------------------------
 
 	// Set state
 	SetState(State_Idle);
@@ -502,6 +705,13 @@ void BackupDaemon::Run2()
 
 				// Log
 				::syslog(LOG_INFO, "Finished scan of local files");
+
+				// --------------------------------------------------------------------------------------------
+
+				// We had a successful backup, save the store info
+				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+
+				// --------------------------------------------------------------------------------------------
 			}
 			catch(BoxException &e)
 			{
@@ -659,6 +869,29 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 // --------------------------------------------------------------------------
 void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut)
 {
+#ifdef WIN32
+	//Really could use some interprocess protection, mutex etc
+	//any side effect should be too bad???? :)
+	DWORD timeout = BoxTimeToMilliSeconds(RequiredDelay);
+
+	while ( this->mReceivedCommandConn == false )
+	{
+		Sleep(1);
+
+		if ( timeout == 0 )
+		{
+			DoSyncFlagOut = false;
+			SyncIsForcedOut = false;
+			return;
+		}
+		timeout--;
+	}
+	this->mReceivedCommandConn = false;
+	DoSyncFlagOut = this->mDoSyncFlagOut;
+	SyncIsForcedOut = this->mSyncIsForcedOut;
+
+	return;
+#else
 	ASSERT(mpCommandSocketInfo != 0);
 	if(mpCommandSocketInfo == 0) {::sleep(1); return;} // failure case isn't too bad
 	
@@ -688,7 +921,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			{
 #ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				bool uidOK = true;
-				::syslog(LOG_ERR, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
+				::syslog(LOG_WARNING, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
 #else
 				// Security check -- does the process connecting to this socket have
 				// the same UID as this process?
@@ -827,6 +1060,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			CloseCommandConnection();
 		}
 	}
+#endif
 }
 
 
@@ -843,13 +1077,18 @@ void BackupDaemon::CloseCommandConnection()
 	try
 	{
 		TRACE0("Closing command connection\n");
-	
+#ifdef WIN32
+		FlushFileBuffers(mpCommandSocketInfo->mListeningSocket); 
+		DisconnectNamedPipe(mpCommandSocketInfo->mListeningSocket); 
+		CloseHandle(mpCommandSocketInfo->mListeningSocket); 
+#else
 		if(mpCommandSocketInfo->mpGetLine)
 		{
 			delete mpCommandSocketInfo->mpGetLine;
 			mpCommandSocketInfo->mpGetLine = 0;
 		}
 		mpCommandSocketInfo->mpConnectedSocket.reset();
+#endif
 	}
 	catch(...)
 	{
@@ -1339,6 +1578,10 @@ void BackupDaemon::CommitIDMapsAfterSync()
 		std::string newmap(target + ".n");
 		
 		// Try to rename
+#ifdef WIN32
+		//win32 remove doesn't overwrite
+		::remove(target.c_str());
+#endif
 		if(::rename(newmap.c_str(), target.c_str()) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
@@ -1367,8 +1610,8 @@ void BackupDaemon::DeleteIDMapVector(std::vector<BackupClientInodeToIDMap *> &rV
 		rVector.pop_back();
 		
 		// Close and delete
-		toDel->Close();
-		delete toDel;
+			toDel->Close();
+			delete toDel;
 	}
 	ASSERT(rVector.size() == 0);
 }
@@ -1551,6 +1794,18 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 	mUnusedRootDirEntries.clear();
 }
 
+// --------------------------------------------------------------------------
+
+typedef struct
+{
+	int32_t mMagicValue;	// also the version number
+	int32_t mNumEntries;
+	int64_t mObjectID;		// this object ID
+	int64_t mContainerID;	// ID of container
+	uint64_t mAttributesModTime;
+	int32_t mOptionsPresent;	// bit mask of optional sections / features present
+
+} loc_StreamFormat;
 
 // --------------------------------------------------------------------------
 //
@@ -1590,6 +1845,173 @@ BackupDaemon::Location::~Location()
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::Location::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::Location::Deserialize(Archive & rArchive)
+{
+	//
+	//
+	//
+	mpDirectoryRecord.reset(NULL);
+	if (mpExcludeFiles)
+	{
+		delete mpExcludeFiles;
+		mpExcludeFiles = NULL;
+	}
+	if (mpExcludeDirs)
+	{
+		delete mpExcludeDirs;
+		mpExcludeDirs = NULL;
+	}
+
+	//
+	//
+	//
+	rArchive >> mName >> mPath >> mIDMapIndex;
+
+	//
+	//
+	//
+	int64_t aMagicMarker = 0;
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		BackupClientDirectoryRecord *pSubRecord = new BackupClientDirectoryRecord(0, "");
+		if (!pSubRecord)
+			throw std::bad_alloc();
+
+		mpDirectoryRecord.reset(pSubRecord);
+		mpDirectoryRecord->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	//
+	//
+	//
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeFiles = new ExcludeList;
+		if (!mpExcludeFiles)
+			throw std::bad_alloc();
+
+		mpExcludeFiles->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	//
+	//
+	//
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeDirs = new ExcludeList;
+		if (!mpExcludeDirs)
+			throw std::bad_alloc();
+
+		mpExcludeDirs->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::Location::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::Location::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	rArchive << mName << mPath << mIDMapIndex;
+
+	//
+	//
+	//
+	if (mpDirectoryRecord.get() == NULL)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpDirectoryRecord->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if (!mpExcludeFiles)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpExcludeFiles->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if (!mpExcludeDirs)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpExcludeDirs->Serialize(rArchive);
+	}
+}
 
 // --------------------------------------------------------------------------
 //
@@ -1622,3 +2044,191 @@ BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime)
+//		Purpose: Serializes remote directory and file information into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+
+static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
+static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
+static const int STOREOBJECTINFO_VERSION = 1;
+
+void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
+{
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile") || GetConfiguration().GetKeyValue("StoreObjectInfoFile").size() <= 0)
+		return;
+
+	try
+	{
+		FileStream aFile(GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), O_WRONLY | O_CREAT | O_TRUNC);
+		IOStreamArchive anArchive(aFile, 0);
+
+		anArchive << STOREOBJECTINFO_MAGIC_ID_VALUE << STOREOBJECTINFO_MAGIC_ID_STRING << STOREOBJECTINFO_VERSION
+					<< GetConfiguration().GetModTime()
+					<< aClientStoreMarker << theLastSyncTime << theNextSyncTime;
+
+		//
+		//
+		//
+		int64_t iCount = mLocations.size();
+		anArchive.Add(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			ASSERT(mLocations[v]);
+			mLocations[v]->Serialize(anArchive);
+		}
+
+		//
+		//
+		//
+		iCount = mIDMapMounts.size();
+		anArchive.Add(iCount);
+
+		for (int v = 0; v < iCount; v++)
+			anArchive.Add(mIDMapMounts[v]);
+
+		//
+		//
+		//
+		aFile.Close();
+		::syslog(LOG_INFO, "Saved store object info file '%s'", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+	}
+	catch (...)
+	{
+		::syslog(LOG_WARNING, "Requested store object info file '%s' not accessible or could not be created", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+//		Purpose: Deserializes remote directory and file information from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+{
+	//
+	//
+	//
+	DeleteAllLocations();
+
+	//
+	//
+	//
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile") || GetConfiguration().GetKeyValue("StoreObjectInfoFile").size() <=0)
+		return;
+
+	try
+	{
+		FileStream aFile(GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), O_RDONLY);
+		IOStreamArchive anArchive(aFile, 0);
+
+		//
+		// see if the content has a chance to be what we think it is
+		//
+		int iMagicValue = 0;
+		anArchive.Get(iMagicValue);
+
+		if (iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' is not what you think it is: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+			return;
+		}
+
+		//
+		// get a bit optimistic and read in a string identifier
+		//
+		std::string strMagicValue;
+		anArchive.Get(strMagicValue);
+
+		if (strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' is not what you think it is: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+			return;
+		}
+
+		//
+		// ok, check if we are not loading some future development version by mistake
+		//
+		int iVersion = 0;
+		anArchive.Get(iVersion);
+
+		if (iVersion != STOREOBJECTINFO_VERSION)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' version [%d] unsupported: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), iVersion);
+			return;
+		}
+
+		//
+		// check if this state file is even valid for the loaded bbackupd.conf file
+		//
+		box_time_t lastKnownConfigModTime;
+		anArchive.Get(lastKnownConfigModTime);
+
+		if (lastKnownConfigModTime != GetConfiguration().GetModTime())
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' out of date: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+			return;
+		}
+
+		//
+		// this is it, go at it
+		//
+		anArchive >> aClientStoreMarker >> theLastSyncTime >> theNextSyncTime;
+
+		//
+		//
+		//
+		int64_t iCount = 0;
+		anArchive.Get(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			Location* pLocation = new Location;
+			if (!pLocation)
+				throw std::bad_alloc();
+
+			pLocation->Deserialize(anArchive);
+			mLocations.push_back(pLocation);
+		}
+
+		//
+		//
+		//
+		iCount = 0;
+		anArchive.Get(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			anArchive.Get(strItem);
+
+			mIDMapMounts.push_back(strItem);
+		}
+
+		//
+		//
+		//
+		aFile.Close();
+		::syslog(LOG_INFO, "Loaded store object info file '%s', version [%04d]", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), iVersion);
+	}
+	catch (...)
+	{
+		DeleteAllLocations();
+
+		aClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;
+		theLastSyncTime = 0;
+		theNextSyncTime = 0;
+
+		::syslog(LOG_WARNING, "Requested store object info file '%s' does not exist, not accessible, or inconsistent: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+	}
+}
