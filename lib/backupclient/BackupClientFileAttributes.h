@@ -1,0 +1,70 @@
+// --------------------------------------------------------------------------
+//
+// File
+//		Name:    BackupClientFileAttributes.h
+//		Purpose: Storage of file attributes
+//		Created: 2003/10/07
+//
+// --------------------------------------------------------------------------
+
+#ifndef BACKUPCLIENTFILEATTRIBUTES__H
+#define BACKUPCLIENTFILEATTRIBUTES__H
+
+#include <string>
+
+#include "StreamableMemBlock.h"
+#include "BoxTime.h"
+
+struct stat;
+
+// --------------------------------------------------------------------------
+//
+// Class
+//		Name:    BackupClientFileAttributes
+//		Purpose: Storage, streaming and application of file attributes
+//		Created: 2003/10/07
+//
+// --------------------------------------------------------------------------
+class BackupClientFileAttributes : public StreamableMemBlock
+{
+public:
+	BackupClientFileAttributes();
+	BackupClientFileAttributes(const BackupClientFileAttributes &rToCopy);
+	BackupClientFileAttributes(const StreamableMemBlock &rToCopy);
+	~BackupClientFileAttributes();
+	BackupClientFileAttributes &operator=(const BackupClientFileAttributes &rAttr);
+	BackupClientFileAttributes &operator=(const StreamableMemBlock &rAttr);
+	bool operator==(const BackupClientFileAttributes &rAttr) const;
+//	bool operator==(const StreamableMemBlock &rAttr) const; // too dangerous?
+
+	bool Compare(const BackupClientFileAttributes &rAttr, bool IgnoreAttrModTime = false, bool IgnoreModTime = false) const;
+	
+	// Prevent access to base class members accidently
+	void Set();
+
+	void ReadAttributes(const char *Filename, bool ZeroModificationTimes = false,
+		box_time_t *pModTime = 0, box_time_t *pAttrModTime = 0, int64_t *pFileSize = 0,
+		ino_t *pInodeNumber = 0, bool *pHasMultipleLinks = 0);
+	void WriteAttributes(const char *Filename) const;
+
+	bool IsSymLink() const;
+
+	static void SetBlowfishKey(const void *pKey, int KeyLength);
+	static void SetAttributeHashSecret(const void *pSecret, int SecretLength);
+	
+	static uint64_t GenerateAttributeHash(struct stat &st, const std::string &rFilename);
+
+private:
+	void ReadAttributesLink(const char *Filename, void *pst, bool ZeroModificationTimes);
+
+	void RemoveClear() const;
+	void EnsureClearAvailable() const;
+	static StreamableMemBlock *MakeClear(const StreamableMemBlock &rEncrypted);
+	void EncryptAttr(const StreamableMemBlock &rToEncrypt);
+
+private:
+	mutable StreamableMemBlock *mpClearAttributes;
+};
+
+#endif // BACKUPCLIENTFILEATTRIBUTES__H
+

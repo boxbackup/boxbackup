@@ -1,0 +1,8 @@
+TITLE lib/compress
+
+This is a horrid C++ interface to zlib. It is written this way to avoid having to buffer any data, and so be unnecessarily inefficient. But this does end up just being a wrapper to the zlib interface.
+
+See test/compress for an example of how to use it. But it should be very familiar.
+
+For an easier interface, use CompressStream.
+

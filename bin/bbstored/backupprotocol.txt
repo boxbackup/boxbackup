@@ -1,0 +1,221 @@
+#
+# backup protocol definition
+#
+
+Name 				Backup
+IdentString			Box-Backup:v=B
+ServerContextClass	BackupContext	BackupContext.h
+
+ClientType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
+ServerType		Filename	BackupStoreFilename			BackupStoreFilename.h
+
+ImplementLog	Server	syslog
+ImplementLog	Client	syslog
+ImplementLog	Client	file
+
+LogTypeToText	Client	Filename	\"%s\"	VAR.GetClearFilename().c_str()
+
+BEGIN_OBJECTS
+
+# -------------------------------------------------------------------------------------
+#  Session commands
+# -------------------------------------------------------------------------------------
+
+Error		0	IsError(Type,SubType)	Reply
+	int32		Type
+	int32		SubType
+	CONSTANT	ErrorType						1000
+	CONSTANT	Err_WrongVersion				1
+	CONSTANT	Err_NotInRightProtocolPhase		2
+	CONSTANT	Err_BadLogin					3
+	CONSTANT	Err_CannotLockStoreForWriting	4
+	CONSTANT	Err_SessionReadOnly				5
+	CONSTANT	Err_FileDoesNotVerify			6
+	CONSTANT	Err_DoesNotExist				7
+	CONSTANT	Err_DirectoryAlreadyExists		8
+	CONSTANT	Err_CannotDeleteRoot			9
+	CONSTANT	Err_TargetNameExists			10
+	CONSTANT	Err_StorageLimitExceeded		11
+	CONSTANT	Err_DiffFromFileDoesNotExist	12
+	CONSTANT	Err_DoesNotExistInDirectory		13
+	CONSTANT	Err_PatchConsistencyError		14
+
+Version		1	Command(Version)	Reply
+	int32	Version
+
+
+Login		2	Command(LoginConfirmed)
+	int32		ClientID
+	int32		Flags
+	CONSTANT	Flags_ReadOnly	1
+
+
+LoginConfirmed	3	Reply
+	int64		ClientStoreMarker
+	int64		BlocksUsed
+	int64		BlocksSoftLimit
+	int64		BlocksHardLimit
+
+
+Finished	4	Command(Finished)	Reply	EndsConversation
+
+
+# generic success object
+Success		5	Reply
+	int64		ObjectID
+
+
+SetClientStoreMarker	6	Command(Success)
+	int64		ClientStoreMarker
+
+
+# -------------------------------------------------------------------------------------
+#  Generic object commands
+# -------------------------------------------------------------------------------------
+
+GetObject	10	Command(Success)
+	int64		ObjectID
+	CONSTANT	NoObject	0
+	# reply has stream following, if ObjectID != NoObject
+
+
+MoveObject	11	Command(Success)
+	int64		ObjectID
+	int64		MoveFromDirectory
+	int64		MoveToDirectory
+	int32		Flags
+	Filename	NewFilename
+	
+	CONSTANT Flags_MoveAllWithSameName			1
+	CONSTANT Flags_AllowMoveOverDeletedObject	2
+
+# consider this an object command as, although it deals with directory entries,
+# it's not specific to either a file or a directory
+
+
+GetObjectName	12	Command(ObjectName)
+	int64		ObjectID
+	int64		ContainingDirectoryID
+	CONSTANT	ObjectID_DirectoryOnly	0
+
+	# set ObjectID to ObjectID_DirectoryOnly to only get info on the directory
+
+
+ObjectName		13	Reply
+	int32		NumNameElements
+	int64		ModificationTime
+	int64		AttributesHash
+	int16		Flags
+	# NumNameElements is zero if the object doesn't exist
+	CONSTANT	NumNameElements_ObjectDoesntExist	0
+	# a stream of Filename objects follows, if and only if NumNameElements > 0
+
+
+# -------------------------------------------------------------------------------------
+#  Directory commands
+# -------------------------------------------------------------------------------------
+
+CreateDirectory	20	Command(Success)	StreamWithCommand
+	int64		ContainingDirectoryID
+	int64		AttributesModTime
+	Filename	DirectoryName
+	# stream following containing attributes
+
+
+ListDirectory	21	Command(Success)
+	int64		ObjectID
+	int16		FlagsMustBeSet
+	int16		FlagsNotToBeSet
+	bool		SendAttributes
+	# make sure these flags are synced with those in BackupStoreDirectory
+	CONSTANT	Flags_INCLUDE_EVERYTHING 	-1
+	CONSTANT	Flags_EXCLUDE_NOTHING 		0
+	CONSTANT	Flags_EXCLUDE_EVERYTHING	15
+	CONSTANT	Flags_File			1
+	CONSTANT	Flags_Dir			2
+	CONSTANT	Flags_Deleted			4
+	CONSTANT	Flags_OldVersion		8
+	# make sure this is the same as in BackupStoreConstants.h
+	CONSTANT	RootDirectory			1
+
+	# reply has stream following Success object, containing a stored BackupStoreDirectory
+
+
+ChangeDirAttributes	22	Command(Success)	StreamWithCommand
+	int64		ObjectID
+	int64		AttributesModTime
+	# stream following containing attributes
+
+
+DeleteDirectory	23	Command(Success)
+	int64		ObjectID
+
+UndeleteDirectory	24	Command(Success)
+	int64		ObjectID
+	# may not have exactly the desired effect if files within in have been deleted before the directory was deleted.
+
+
+# -------------------------------------------------------------------------------------
+#  File commands
+# -------------------------------------------------------------------------------------
+
+StoreFile	30	Command(Success)	StreamWithCommand
+	int64		DirectoryObjectID
+	int64		ModificationTime
+	int64		AttributesHash
+	int64		DiffFromFileID		# 0 if the file is not a diff
+	Filename	Filename
+	# then send a stream containing the encoded file
+
+
+GetFile		31	Command(Success)
+	int64		InDirectory
+	int64		ObjectID
+	# error returned if not a file, or does not exist
+	# reply has stream following, containing an encoded file IN STREAM ORDER
+	# (use GetObject to get it in file order)
+
+
+SetReplacementFileAttributes	32	Command(Success)	StreamWithCommand
+	int64		InDirectory
+	int64		AttributesHash
+	Filename	Filename
+	# stream follows containing attributes
+
+
+DeleteFile	33	Command(Success)
+	int64		InDirectory
+	Filename	Filename
+	# will return 0 if the object couldn't be found in the specified directory
+
+
+GetBlockIndexByID	34	Command(Success)
+	int64		ObjectID
+
+	# stream of the block index follows the reply
+	# returns an error if the object didn't exist
+
+
+GetBlockIndexByName	35	Command(Success)
+	int64		InDirectory
+	Filename	Filename
+
+	# Success object contains the found ID -- or 0 if the entry wasn't found in the directory
+	# stream of the block index follows the reply if found ID != 0
+
+
+# -------------------------------------------------------------------------------------
+#  Information commands
+# -------------------------------------------------------------------------------------
+
+GetAccountUsage	40	Command(AccountUsage)
+	# no data members
+
+AccountUsage	41	Reply
+	int64	BlocksUsed
+	int64	BlocksInOldFiles
+	int64	BlocksInDeletedFiles
+	int64	BlocksInDirectories
+	int64	BlocksSoftLimit
+	int64	BlocksHardLimit
+	int32	BlockSize

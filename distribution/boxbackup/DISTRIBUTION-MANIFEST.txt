@@ -1,0 +1,28 @@
+lib/raidfile
+test/raidfile
+test/raidfile/testfiles
+lib/backupclient
+lib/backupstore
+bin/bbstored
+bin/bbstoreaccounts
+bin/bbackupd
+bin/bbackupquery
+bin/bbackupctl
+bin/bbackupobjdump
+test/backupstore
+test/backupstore/testfiles
+test/backupstorefix
+test/backupstorefix/testfiles
+test/backupstorepatch
+test/bbackupd
+test/bbackupd/testfiles
+test/backupdiff
+docs/raidfile notes
+docs/raidfile/lib_raidfile notes/lib_raidfile
+docs/backup notes
+TODO.txt
+BUGS.txt
+distribution/boxbackup/contrib contrib
+NO-LICENSE-IN-DIR contrib/rpm
+distribution/boxbackup/contrib/rpm contrib/rpm
+REPLACE-VERSION-IN contrib/rpm/boxbackup.spec

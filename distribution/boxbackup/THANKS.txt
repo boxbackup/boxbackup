@@ -1,0 +1,33 @@
+
+Many individuals have helped with the development of Box Backup by testing, reporting experiences, and making suggestions. In particular, thanks are due to
+
+Pascal Lalonde
+  - Comprehensive and accurate bug reports, and constructive feedback
+
+Paul Arch
+  - Cygwin client port
+
+Ben Lovett
+  - Help with odd architectures, suggesting small changes
+
+Martin Ebourne
+  - RPM specification for RedHat based Linux distributions
+  - Patch to fix problems on 64 bit architectures
+
+Tim Fletcher
+David Harris
+Richard Eigenmann
+  - Testing many attempts at clean compiles on various Linux distributions
+
+Eduardo Alvarenga
+  - Valuable feedback and persuasion to include new features
+
+Joe Gillespie
+  - Web site design
+
+JŽr™me Schell
+  - Fixes to build+config problems on Linux
+
+John Pybus
+  - Ideas and feature requests
+  - Useful little patches to code

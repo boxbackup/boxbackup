@@ -1,0 +1,88 @@
+TITLE bin/bbackupd
+
+The backup client daemon.
+
+This aims to maintain as little information as possible to record which files have been uploaded to the server, while minimising the amount of queries which have to be made to the server.
+
+
+SUBTITLE Scanning
+
+The daemon is given a length of time, t, which files over this age should be uploaded to the server. This is to stop recently updated files being uploaded immediately to avoid uploading something repeatedly (on the assumption that if a file has been written, it is likely to be modified again shortly).
+
+It will scan the files at a configured interval, and connect to the server if it needs to upload files or make queries about files and directories.
+
+The scan interval is actually varied slightly between each run by adding a random number up to a 64th of the configured time. This is to reduce cyclic patterns of load on the backup servers -- otherwise if all the boxes are turned on at about 9am, every morning at 9am there will be a huge spike in load on the server.
+
+Each scan chooses a time interval, which ends at the current time - t. This will be from 0 to current time - t on the first run, then the next run takes the start time as the end time of the previous run. The scan is only performed if the difference between the start and end times is greater or equal to t.
+
+For each configured location, the client scans the directories on disc recursively.
+
+For each directory
+
+* If the directory has never been scanned before (in this invocation of the daemon) or the modified time on the directory is not that recorded, the listing on the server is downloaded.
+
+* For each file, if it's modified time is within the time period, it is uploaded. If the directory has been downloaded, it is compared against that, and only uploaded if it's changed.
+
+* Find all the new files, and upload them if they lie within the time interval.
+
+* Recurse to sub directories, creating them on the server if necessary.
+
+Hence, the first time it runs, it will download and compare the entries on the disc to those on the server, but in future runs it will use the file and directory modification times to work out if there is anything which needs uploading.
+
+If there aren't any changes, it won't even need to connect to the server.
+
+There are some extra details which allow this to work reliably, but they are documented in the source.
+
+
+SUBTITLE File attributes
+
+The backup client will update the file attributes on files as soon as it notices they are changed. It records most of the details from stat(), but only a few can be restored. Attributes will only be considered changed if the user id, group id or mode is changed. Detection is by a 64 bit hash, so detection is strictly speaking probablistic.
+
+
+SUBTITLE Encryption
+
+All the user data is encrypted. There is a separate file, backup_encryption.txt which describes this, and where in the code to look to verify it works as described.
+
+
+SUBTITLE Tracking files and directories
+
+Renaming files is a difficult problem under this minimal data scanning scheme, because you don't really know whether a file has been renamed, or another file deleted and new one created.
+
+The solution is to keep (on disc) a map of inode numbers to server object IDs for all directories and files over a certain user configurable threshold. Then, when a new file is discovered, it is first checked to see if it's in this map. If so, a rename is considered, which will take place if the local object corresponding to the name of the tracked object doesn't exist any more.
+
+Because of the renaming requirement, deletions of objects from the server are recorded and delayed until the end of the scan.
+
+
+SUBTITLE Running out of space
+
+If the store server indicates on login to the backup client, it will scan, but not upload anything nor adjust it's internal stored details of the local objects. However, deletions and renames happen.
+
+This is to allow deletions to still work and reduce the amount of storage space used on the server, in the hope that in the future there will be enough space.
+
+Just not doing anything would mean that one big file created and then deleted at the wrong time would stall the whole backup process.
+
+
+SUBTITLE BackupDaemon
+
+This is the daemon class for the backup daemon. It handles setting up of all the objects, and implements calulcation of the time intervals for the scanning.
+
+
+SUBTITLE BackupClientContext
+
+State information for the scans, including maintaining a connection to the store server if required.
+
+
+SUBTITLE BackupClientDirectoryRecord
+
+A record of state of a directory on the local filesystem. Containing the recursive scanning function, which is long and entertaining, but very necessary. It contains lots of comments which explain the exact details of what's going on.
+
+
+SUBTITLE BackupClientInodeToIDMap
+
+A implementation of a map of inode number to object ID on the server. If Berkeley DB is available on the platform, it is stored on disc, otherwise there is an in memory version which isn't so good.
+
+
+
+
+
+

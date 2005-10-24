@@ -1,0 +1,21 @@
+
+# this file describes which binaries and scripts go to make
+# up a parcel -- a group of files and scripts needed to perform
+# a particular task
+
+backup-client
+	bin bbackupd
+	bin bbackupquery
+	bin bbackupctl
+	script bin/bbackupd/bbackupd-config
+
+OMIT:CYGWIN
+
+backup-server
+	bin bbstored
+	bin bbstoreaccounts
+	script bin/bbstored/bbstored-certs
+	script bin/bbstored/bbstored-config
+	script lib/raidfile/raidfile-config
+
+END-OMIT
