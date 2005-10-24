@@ -23,11 +23,6 @@ typedef struct
 	int64_t mTotalFileStreamSize;
 } BackupStoreFileStats;
 
-// BOX_PRIVATE_BEGIN
-// Interal builds don't have backwards compatibility
-#define BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
-// BOX_PRIVATE_END
-
 // --------------------------------------------------------------------------
 //
 // Class

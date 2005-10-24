@@ -82,12 +82,7 @@
 	// Box Backup builds release get extra information for exception logging
 	#define EXCEPTION_CODENAMES_EXTENDED
 	#define EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION
-	
-	// But in private builds, these get disabled
-	// BOX_PRIVATE_BEGIN
-	#undef EXCEPTION_CODENAMES_EXTENDED
-	#undef EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION
-	// BOX_PRIVATE_END
+
 #endif
 
 #ifdef BOX_MEMORY_LEAK_TESTING
