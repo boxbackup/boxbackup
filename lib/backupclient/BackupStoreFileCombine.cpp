@@ -321,9 +321,12 @@ static void CopyData(IOStream &rDiffData, IOStream &rDiffIndex, int64_t DiffNumB
 			rOut.Write(buffer, blockSize);
 		}
 		
-		// Free buffer
-		::free(buffer);
-		buffer = 0;
+		// Free buffer, if allocated
+		if(buffer != 0)
+		{
+			::free(buffer);
+			buffer = 0;
+		}
 	}
 	catch(...)
 	{

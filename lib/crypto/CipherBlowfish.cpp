@@ -110,6 +110,13 @@ void CipherBlowfish::SetIV(const void *pIV)
 // --------------------------------------------------------------------------
 CipherBlowfish::~CipherBlowfish()
 {
+#ifdef PLATFORM_OLD_OPENSSL
+	// Zero copy of key
+	for(unsigned int l = 0; l < mKey.size(); ++l)
+	{
+		mKey[l] = '\0';
+	}
+#endif
 }
 
 

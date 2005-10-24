@@ -42,12 +42,20 @@ public:
 	virtual bool GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut);
 
 protected:
+#ifdef WIN32
+	SOCKET GetSocketHandle();
+#else
 	int GetSocketHandle();
+#endif
 	void MarkAsReadClosed() {mReadClosed = true;}
 	void MarkAsWriteClosed() {mWriteClosed = true;}
 
 private:
+#ifdef WIN32
+	SOCKET mSocketHandle;
+#else
 	int mSocketHandle;
+#endif
 	bool mReadClosed;
 	bool mWriteClosed;
 };

@@ -349,9 +349,11 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 	
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
-		delete getline[c];
+		if ( getline[c] ) delete getline[c];
+		getline[c] = 0;
 	}
-	delete [] getline;
+	if ( getline ) delete [] getline;
+	getline = 0;
 }
 
 void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainstream)

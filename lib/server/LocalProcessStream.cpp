@@ -9,7 +9,9 @@
 
 #include "Box.h"
 
+#ifndef WIN32
 #include <sys/socket.h>
+#endif
 #include <unistd.h>
 
 #include "LocalProcessStream.h"
@@ -36,6 +38,7 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	// Split up command
 	std::vector<std::string> command;
 	SplitString(std::string(CommandLine), ' ', command);
+#ifndef WIN32
 	// Build arguments
 	char *args[MAX_ARGUMENTS + 4];
 	{
@@ -94,6 +97,12 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	// Return the stream object and PID
 	rPidOut = pid;
 	return stream;	
+#else
+	::syslog(LOG_ERR, "vfork not implimented - LocalProcessStream.cpp");
+	std::auto_ptr<IOStream> stream;
+	return stream;
+#endif
+
 }
 
 

@@ -11,11 +11,13 @@
 
 #include <unistd.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <sys/socket.h>
 #include <netdb.h>
 #include <syslog.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
 
 #include <string.h>
 #include <stdio.h>
@@ -71,7 +73,8 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 			}
 		}
 		break;
-	
+
+#ifndef WIN32
 	case TypeUNIX:
 		sockDomain = AF_UNIX;
 		{
@@ -89,7 +92,8 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 			::strcpy(addr.sa_unix.sun_path, Name);
 		}
 		break;
-		
+#endif
+
 	default:
 		THROW_EXCEPTION(CommonException, BadArguments)
 		break;

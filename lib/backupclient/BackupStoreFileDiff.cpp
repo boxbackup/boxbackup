@@ -12,7 +12,11 @@
 #include <new>
 #include <map>
 #include <signal.h>
+#ifdef WIN32
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 
 #include "BackupStoreFile.h"
 #include "BackupStoreFileWire.h"
@@ -44,29 +48,23 @@ static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int3
 static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, uint16_t Hash, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber, BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks);
 static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksAvailableEntry *pIndex, int64_t NumBlocks, std::map<int64_t, int64_t> &rFoundBlocks, int64_t SizeOfInputFile);
 
-// Avoid running on too long with diffs
-static int sMaximumDiffTime = 10;		// maximum time to spend diffing
+// control whether a currently active diff should be terminated ASAP
 static bool sDiffTimedOut = false;
-static bool sSetTimerSignelHandler = false;
-static void TimerSignalHandler(int signal);
-static void StartDiffTimer();
-
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreFile::SetMaximumDiffingTime(int)
-//		Purpose: Sets the maximum time to spend diffing, in seconds. Time is
-//				 process virutal time.
-//		Created: 19/3/04
+//		Name:    BackupStoreFile::SuspendFileDiff()
+//		Purpose: Notifies BackupStoreFile object that a diff operation should be
+//				 terminated ASAP. Usually called from an external timer.
+//
+//		Created: 12/1/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::SetMaximumDiffingTime(int Seconds)
+void BackupStoreFile::SuspendFileDiff()
 {
-	sMaximumDiffTime = Seconds;
-	TRACE1("Set maximum diffing time to %d seconds\n", Seconds);
+	sDiffTimedOut = true;
 }
-
 
 // --------------------------------------------------------------------------
 //
@@ -175,9 +173,6 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, in
 	
 	// Pointer to recipe we're going to create
 	BackupStoreFileEncodeStream::Recipe *precipe = 0;
-
-	// Start the timeout timer, so that the operation doesn't continue for ever
-	StartDiffTimer();
 	
 	try
 	{
@@ -470,6 +465,9 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> &rFoundBlocks,
 	BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES])
 {
+	// reset state in case we got timing/call-order mess-up somewhere else
+	sDiffTimedOut = false;
+
 	// Allocate the hash lookup table
 	BlocksAvailableEntry **phashTable = (BlocksAvailableEntry **)::malloc(sizeof(BlocksAvailableEntry *) * (64*1024));
 
@@ -911,7 +909,11 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			for(unsigned int e = 0; e < rRecipe.size(); ++e)
 			{
 				char b[64];
+#ifdef WIN32
+				sprintf(b, "%8I64d", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
+#else
 				sprintf(b, "%8lld", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
+#endif
 				TRACE3("%8lld %s %8lld\n", rRecipe[e].mSpaceBefore, (rRecipe[e].mpStartBlock == 0)?"       -":b, (int64_t)rRecipe[e].mBlocks);
 			}
 		}
@@ -919,55 +921,3 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	}
 #endif
 }
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    static TimerSignalHandler(int)
-//		Purpose: Signal handler
-//		Created: 19/3/04
-//
-// --------------------------------------------------------------------------
-void TimerSignalHandler(int signal)
-{
-	sDiffTimedOut = true;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    static StartDiffTimer()
-//		Purpose: Starts the diff timeout timer
-//		Created: 19/3/04
-//
-// --------------------------------------------------------------------------
-void StartDiffTimer()
-{
-	// Set timer signal handler
-	if(!sSetTimerSignelHandler)
-	{
-		::signal(SIGVTALRM, TimerSignalHandler);
-		sSetTimerSignelHandler = true;
-	}
-
-	struct itimerval timeout;
-	// Don't want this to repeat
-	timeout.it_interval.tv_sec = 0;
-	timeout.it_interval.tv_usec = 0;
-	// Single timeout after the specified number of seconds
-	timeout.it_value.tv_sec = sMaximumDiffTime;
-	timeout.it_value.tv_usec = 0;
-	// Set timer
-	if(::setitimer(ITIMER_VIRTUAL, &timeout, NULL) != 0)
-	{
-		TRACE0("WARNING: couldn't set diff timeout\n");
-	}
-	
-	// Unset flag (last thing)
-	sDiffTimedOut = false;
-}
-
-
-

@@ -139,7 +139,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		
 		// Let the derived class have a go at setting up stuff in the initial process
 		SetupInInitialProcess();
-		
+#ifndef WIN32		
 		// Set signal handler
 		if(::signal(SIGHUP, SignalHandler) == SIG_ERR || ::signal(SIGTERM, SignalHandler) == SIG_ERR)
 		{
@@ -215,12 +215,14 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				break;
 			}
 		}
+#endif
 
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
 		// Log the start message
 		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " BOX_VERSION ")", configfile);
 
+#ifndef WIN32
 		// Write PID to file
 		char pid[32];
 		int pidsize = sprintf(pid, "%d", (int)getpid());
@@ -229,6 +231,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			::syslog(LOG_ERR, "can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
+#endif
 		
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING
@@ -241,11 +244,12 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	
 		if(asDaemon)
 		{
+#ifndef WIN32
 			// Close standard streams
 			::close(0);
 			::close(1);
 			::close(2);
-			
+		
 			// Open and redirect them into /dev/null
 			int devnull = ::open(PLATFORM_DEV_NULL, O_RDWR, 0);
 			if(devnull == -1)
@@ -261,7 +265,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			{
 				::close(devnull);
 			}
-			
+#endif			
 			// And definately don't try and send anything to those file descriptors
 			// -- this has in the past sent text to something which isn't expecting it.
 			TRACE_TO_STDOUT(false);
@@ -353,9 +357,11 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 // --------------------------------------------------------------------------
 void Daemon::EnterChild()
 {
+#ifndef WIN32
 	// Unset signal handlers
 	::signal(SIGHUP, SIG_DFL);
 	::signal(SIGTERM, SIG_DFL);
+#endif
 }
 
 
@@ -369,6 +375,7 @@ void Daemon::EnterChild()
 // --------------------------------------------------------------------------
 void Daemon::SignalHandler(int sigraised)
 {
+#ifndef WIN32
 	if(spDaemon != 0)
 	{
 		switch(sigraised)
@@ -385,6 +392,7 @@ void Daemon::SignalHandler(int sigraised)
 			break;
 		}
 	}
+#endif
 }
 
 // --------------------------------------------------------------------------

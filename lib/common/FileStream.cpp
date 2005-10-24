@@ -22,14 +22,25 @@
 //
 // --------------------------------------------------------------------------
 FileStream::FileStream(const char *Filename, int flags, int mode)
+#ifdef WIN32
+	: mOSFileHandle(::openfile(Filename, flags, mode)),
+#else
 	: mOSFileHandle(::open(Filename, flags, mode)),
+#endif
 	  mIsEOF(false)
 {
+#ifdef WIN32
+	if(mOSFileHandle == 0)
+#else
 	if(mOSFileHandle < 0)
+#endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
+#ifdef WIN32
+	this->fileName = Filename;
+#endif
 }
 
 
@@ -41,7 +52,11 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
+#ifdef WIN32
+FileStream::FileStream(HANDLE FileDescriptor)
+#else
 FileStream::FileStream(int FileDescriptor)
+#endif
 	: mOSFileHandle(FileDescriptor),
 	  mIsEOF(false)
 {
@@ -61,6 +76,7 @@ FileStream::FileStream(int FileDescriptor)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
+#ifndef WIN32
 FileStream::FileStream(const FileStream &rToCopy)
 	: mOSFileHandle(::dup(rToCopy.mOSFileHandle)),
 	  mIsEOF(rToCopy.mIsEOF)
@@ -71,7 +87,7 @@ FileStream::FileStream(const FileStream &rToCopy)
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
 }
-
+#endif
 // --------------------------------------------------------------------------
 //
 // Function
@@ -98,8 +114,30 @@ FileStream::~FileStream()
 // --------------------------------------------------------------------------
 int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	if(mOSFileHandle == -1) {THROW_EXCEPTION(CommonException, FileClosed)}
+	if(mOSFileHandle == INVALID_FILE) {THROW_EXCEPTION(CommonException, FileClosed)}
+
+#ifdef WIN32
+	int r;
+	DWORD numBytesRead = 0;
+	BOOL valid = ReadFile(
+		this->mOSFileHandle,
+		pBuffer,
+		NBytes,
+		&numBytesRead,
+		NULL
+		);
+
+	if ( valid )
+	{
+        r = numBytesRead;
+	}
+	else
+	{
+		r = -1;
+	}
+#else
 	int r = ::read(mOSFileHandle, pBuffer, NBytes);
+#endif
 	if(r == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileReadError)
@@ -143,11 +181,30 @@ IOStream::pos_type FileStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 void FileStream::Write(const void *pBuffer, int NBytes)
 {
-	if(mOSFileHandle == -1) {THROW_EXCEPTION(CommonException, FileClosed)}
+	if(mOSFileHandle == INVALID_FILE) {THROW_EXCEPTION(CommonException, FileClosed)}
+#ifdef WIN32
+	DWORD numBytesWritten = 0;
+	BOOL res = WriteFile(
+		this->mOSFileHandle,
+		pBuffer,
+		NBytes,
+		&numBytesWritten,
+		NULL
+		);
+
+	if ( (res == 0) || (numBytesWritten != NBytes))
+	{
+		DWORD err = GetLastError();
+		THROW_EXCEPTION(CommonException, OSFileWriteError)
+	}
+
+
+#else
 	if(::write(mOSFileHandle, pBuffer, NBytes) != NBytes)
 	{
 		THROW_EXCEPTION(CommonException, OSFileWriteError)
 	}
+#endif
 }
 
 
@@ -161,7 +218,18 @@ void FileStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 IOStream::pos_type FileStream::GetPosition() const
 {
-	if(mOSFileHandle == -1) {THROW_EXCEPTION(CommonException, FileClosed)}
+#ifdef WIN32
+	LARGE_INTEGER conv;
+
+	conv.HighPart = 0;
+	conv.LowPart = 0;
+
+	conv.LowPart = SetFilePointer(this->mOSFileHandle, 0, &conv.HighPart, FILE_CURRENT);
+
+	return (IOStream::pos_type)conv.QuadPart;
+
+#else
+	if(mOSFileHandle == INVALID_FILE) {THROW_EXCEPTION(CommonException, FileClosed)}
 	off_t p = ::lseek(mOSFileHandle, 0, SEEK_CUR);
 	if(p == -1)
 	{
@@ -169,6 +237,7 @@ IOStream::pos_type FileStream::GetPosition() const
 	}
 	
 	return (IOStream::pos_type)p;
+#endif
 }
 
 
@@ -182,12 +251,24 @@ IOStream::pos_type FileStream::GetPosition() const
 // --------------------------------------------------------------------------
 void FileStream::Seek(IOStream::pos_type Offset, int SeekType)
 {
-	if(mOSFileHandle == -1) {THROW_EXCEPTION(CommonException, FileClosed)}
+	if(mOSFileHandle == INVALID_FILE) {THROW_EXCEPTION(CommonException, FileClosed)}
+
+#ifdef WIN32
+	LARGE_INTEGER conv;
+
+	conv.QuadPart = Offset;
+	DWORD retVal = SetFilePointer(this->mOSFileHandle, conv.LowPart, &conv.HighPart, ConvertSeekTypeToOSWhence(SeekType));
+
+	if ( retVal == INVALID_SET_FILE_POINTER && (GetLastError() != NO_ERROR) )
+	{
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+#else
 	if(::lseek(mOSFileHandle, Offset, ConvertSeekTypeToOSWhence(SeekType)) == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
-	
+#endif
 	// Not end of file any more!
 	mIsEOF = false;
 }
@@ -207,12 +288,22 @@ void FileStream::Close()
 	{
 		THROW_EXCEPTION(CommonException, FileAlreadyClosed)
 	}
+#ifdef WIN32
+	if(::CloseHandle(mOSFileHandle) == 0)
+	{
+		THROW_EXCEPTION(CommonException, OSFileCloseError)
+	}
+	mOSFileHandle = NULL;
+	mIsEOF = true;
+#else
 	if(::close(mOSFileHandle) != 0)
 	{
 		THROW_EXCEPTION(CommonException, OSFileCloseError)
 	}
 	mOSFileHandle = -1;
 	mIsEOF = true;
+#endif
+	
 }
 
 

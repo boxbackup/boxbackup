@@ -311,6 +311,10 @@ public:
 	$classname_base$cmd(const $classname_base$cmd &rToCopy);
 	~$classname_base$cmd();
 	int GetType() const;
+	enum
+	{
+		TypeID = $cmd_id{$cmd}
+	};
 __E
 	# constants
 	if(exists $cmd_constants{$cmd})
@@ -521,6 +525,8 @@ public:
 	$classname_base(IOStream &rStream);
 	virtual ~$classname_base();
 
+	std::auto_ptr<$derive_objects_from> Receive();
+	void Send(const ${derive_objects_from} &rObject);
 __E
 if($implement_syslog)
 {
@@ -648,6 +654,63 @@ print CPP <<__E;
 	}
 }
 __E
+# write receieve and send functions
+print CPP <<__E;
+std::auto_ptr<$derive_objects_from> ${prefix}Receive()
+{
+	std::auto_ptr<${derive_objects_from}> preply((${derive_objects_from}*)(Protocol::Receive().release()));
+
+__E
+	if($implement_syslog)
+	{
+		print CPP <<__E;
+	if(mLogToSysLog)
+	{
+		preply->LogSysLog("Receive");
+	}
+__E
+	}
+	if($implement_filelog)
+	{
+		print CPP <<__E;
+	if(mLogToFile != 0)
+	{
+		preply->LogFile("Receive", mLogToFile);
+	}
+__E
+	}
+print CPP <<__E;
+
+	return preply;
+}
+
+void ${prefix}Send(const ${derive_objects_from} &rObject)
+{
+__E
+	if($implement_syslog)
+	{
+		print CPP <<__E;
+	if(mLogToSysLog)
+	{
+		rObject.LogSysLog("Send");
+	}
+__E
+	}
+	if($implement_filelog)
+	{
+		print CPP <<__E;
+	if(mLogToFile != 0)
+	{
+		rObject.LogFile("Send", mLogToFile);
+	}
+__E
+	}
+
+print CPP <<__E;
+	Protocol::Send(rObject);
+}
+
+__E
 # write server function?
 if($type eq 'Server')
 {
@@ -662,8 +725,7 @@ void ${prefix}DoServer($context_class &rContext)
 	while(inProgress)
 	{
 		// Get an object from the conversation
-		std::auto_ptr<ProtocolObject> o1(Receive());
-		std::auto_ptr<${derive_objects_from}> pobj((${derive_objects_from}*)o1.release());
+		std::auto_ptr<${derive_objects_from}> pobj(Receive());
 
 __E
 	if($implement_syslog)
@@ -801,54 +863,11 @@ __E
 			print CPP <<__E;
 std::auto_ptr<$classname_base$reply> ${classname_base}::Query(const $classname_base$cmd &rQuery$argextra)
 {
-__E
-	if($implement_syslog)
-	{
-		print CPP <<__E;
-	if(mLogToSysLog)
-	{
-		rQuery.LogSysLog("Send");
-	}
-__E
-	}
-	if($implement_filelog)
-	{
-		print CPP <<__E;
-	if(mLogToFile != 0)
-	{
-		rQuery.LogFile("Send", mLogToFile);
-	}
-__E
-	}
-	print CPP <<__E;
-	
 	// Send query
 	Send(rQuery);
 	$send_stream_extra
 	// Wait for the reply
-	std::auto_ptr<${derive_objects_from}> preply((${derive_objects_from}*)(Receive().release()));
-
-__E
-	if($implement_syslog)
-	{
-		print CPP <<__E;
-	if(mLogToSysLog)
-	{
-		preply->LogSysLog("Receive");
-	}
-__E
-	}
-	if($implement_filelog)
-	{
-		print CPP <<__E;
-	if(mLogToFile != 0)
-	{
-		preply->LogFile("Receive", mLogToFile);
-	}
-__E
-	}
-	print CPP <<__E;
-
+	std::auto_ptr<${derive_objects_from}> preply(Receive().release());
 
 	if(preply->GetType() == $reply_id)
 	{

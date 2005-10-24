@@ -373,6 +373,8 @@ int test_bbackupd()
 		TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir") == 0);
 		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755) == 0);
 		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
+		// NOTE: create a file within the directory to avoid deletion by the housekeeping process later
+		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents") == 0);
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
@@ -380,13 +382,35 @@ int test_bbackupd()
 
 		// And the inverse, replace a directory with a file/symlink
 		printf("Replace directory with symlink\n");
+		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents") == 0);
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
-		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		// And then, put it back to how it was before.
+		printf("Replace symlink with directory (which was a symlink)\n");
+		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file") == 0);
+		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
+		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
+		wait_for_backup_operation();
+		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_THAT(compareReturnValue == 1*256);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		
+		// And finally, put it back to how it was before it was put back to how it was before
+		// This gets lots of nasty things in the store with directories over other old directories.
+		printf("Put it all back to how it was\n");
+		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
+		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
+		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
+		wait_for_backup_operation();
+		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_THAT(compareReturnValue == 1*256);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 		// case which went wrong: rename a tracked file over a deleted file
 		printf("Rename an existing file over a deleted file\n");
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", "testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);

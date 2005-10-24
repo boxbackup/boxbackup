@@ -10,16 +10,23 @@
 #ifndef SOCKET__H
 #define SOCKET__H
 
+#ifdef WIN32
+#include "emu.h"
+typedef int socklen_t;
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
+#endif
 
 #include <string>
 
 typedef union {
 	struct sockaddr sa_generic;
 	struct sockaddr_in sa_inet;
+#ifndef WIN32
 	struct sockaddr_un sa_unix;
+#endif
 } SocketAllAddr;
 
 // --------------------------------------------------------------------------

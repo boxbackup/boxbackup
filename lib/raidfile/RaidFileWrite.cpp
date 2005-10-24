@@ -182,7 +182,7 @@ IOStream::pos_type RaidFileWrite::GetPosition() const
 	}
 	
 	// Use lseek to find the current file position
-	off_t p = ::lseek(mOSFileHandle, SEEK_CUR, 0);
+	off_t p = ::lseek(mOSFileHandle, 0, SEEK_CUR);
 	if(p == -1)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)

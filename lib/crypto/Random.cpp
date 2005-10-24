@@ -59,6 +59,37 @@ void Random::Generate(void *pOutput, int Length)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    Random::GenerateHex(int)
+//		Purpose: Generate Length bytes of hex encoded data. Note that the
+//				 maximum length requested is limited. (Returns a string
+//				 2 x Length characters long.)
+//		Created: 1/11/04
+//
+// --------------------------------------------------------------------------
+std::string Random::GenerateHex(int Length)
+{
+	uint8_t r[256];
+	if(Length > sizeof(r))
+	{
+		THROW_EXCEPTION(CipherException, LengthRequestedTooLongForRandomHex)
+	}
+	Random::Generate(r, Length);
+	
+	std::string o;
+	static const char *h = "0123456789abcdef";
+	for(int l = 0; l < Length; ++l)
+	{
+		o += h[r[l] >> 4];
+		o += h[r[l] & 0xf];
+	}
+	
+	return o;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    Random::RandomInt(int)
 //		Purpose: Return a random integer between 0 and MaxValue inclusive.
 //		Created: 21/1/04

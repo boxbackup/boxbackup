@@ -8,10 +8,13 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
-
+#ifdef WIN32
+    #include <boost/regex.hpp>
+#else
 #ifndef PLATFORM_REGEX_NOT_SUPPORTED
 	#include <regex.h>
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
+#endif
 #endif
 
 #include "ExcludeList.h"
@@ -44,6 +47,9 @@ ExcludeList::ExcludeList()
 // --------------------------------------------------------------------------
 ExcludeList::~ExcludeList()
 {
+#ifdef WIN32
+	//under win32 and boost - we didn't use pointers so all should aotu distruct.
+#else
 #ifndef PLATFORM_REGEX_NOT_SUPPORTED
 	// free regex memory
 	while(mRegex.size() > 0)
@@ -54,6 +60,7 @@ ExcludeList::~ExcludeList()
 		::regfree(pregex);
 		delete pregex;
 	}
+#endif
 #endif
 
 	// Clean up exceptions list
@@ -106,6 +113,31 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 // --------------------------------------------------------------------------
 void ExcludeList::AddRegexEntries(const std::string &rEntries)
 {
+#ifdef WIN32
+	//Under Win32 we use the boost library for the regular expression matching
+
+	// Split strings up
+	std::vector<std::string> ens;
+	SplitString(rEntries, Configuration::MultiValueSeparator, ens);
+	
+	// Create and add new regular expressions
+	for(std::vector<std::string>::const_iterator i(ens.begin()); i != ens.end(); ++i)
+	{
+		if(i->size() > 0)
+		{
+			try{
+				boost::regex ourReg(i->c_str());
+				this->mRegex.push_back(ourReg);
+				// Store in list of regular expression string for Serialize
+				this->mRegexStr.push_back(i->c_str());
+			}
+			catch(...)
+			{
+				THROW_EXCEPTION(CommonException, BadRegularExpression)
+			}
+		}
+	}
+#else
 #ifndef PLATFORM_REGEX_NOT_SUPPORTED
 
 	// Split strings up
@@ -130,6 +162,8 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				
 				// Store in list of regular expressions
 				mRegex.push_back(pregex);
+				// Store in list of regular expression string for Serialize
+				mRegexStr.push_back(i->c_str());
 			}
 			catch(...)
 			{
@@ -141,6 +175,7 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 
 #else
 	THROW_EXCEPTION(CommonException, RegexNotSupportedOnThisPlatform)
+#endif
 #endif
 }
 
@@ -173,6 +208,26 @@ bool ExcludeList::IsExcluded(const std::string &rTest) const
 	}
 	
 	// Check against regular expressions
+#ifdef WIN32
+	for(std::vector<boost::regex>::const_iterator i(mRegex.begin()); i != mRegex.end(); ++i)
+	{
+		// Test against this expression
+		try
+		{
+		boost::smatch what;
+		if(boost::regex_match(rTest, what, *i, boost::match_extra))
+		{
+			// match happened
+			return true;
+		}
+		// In all other cases, including an error, just continue to the next expression
+		}
+		catch(...)
+		{
+			//just continue of no match
+		}
+	}
+#else
 #ifndef PLATFORM_REGEX_NOT_SUPPORTED
 	for(std::vector<regex_t *>::const_iterator i(mRegex.begin()); i != mRegex.end(); ++i)
 	{
@@ -184,6 +239,7 @@ bool ExcludeList::IsExcluded(const std::string &rTest) const
 		}
 		// In all other cases, including an error, just continue to the next expression
 	}
+#endif
 #endif
 
 	return false;
@@ -213,7 +269,187 @@ void ExcludeList::SetAlwaysIncludeList(ExcludeList *pAlwaysInclude)
 	mpAlwaysInclude = pAlwaysInclude;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ExcludeList::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void ExcludeList::Deserialize(Archive & rArchive)
+{
+	//
+	//
+	//
+	mDefinite.clear();
 
-	
+#ifdef WIN32
+	//under win32 and boost - we didn't use pointers so all should aotu distruct.
+#else
+#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+	// free regex memory
+	while(mRegex.size() > 0)
+	{
+		regex_t *pregex = mRegex.back();
+		mRegex.pop_back();
+		// Free regex storage, and the structure itself
+		::regfree(pregex);
+		delete pregex;
+	}
 
+	mRegexStr.clear();
+#endif
+#endif
 
+	// Clean up exceptions list
+	if(mpAlwaysInclude != 0)
+	{
+		delete mpAlwaysInclude;
+		mpAlwaysInclude = 0;
+	}
+
+	//
+	//
+	//
+	int64_t iCount = 0;
+	rArchive.Get(iCount);
+
+	if (iCount > 0)
+	{
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			rArchive.Get(strItem);
+
+			/**** LOAD ****/ mDefinite.insert(strItem);
+		}
+	}
+
+	//
+	//
+	//
+#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+	rArchive.Get(iCount);
+
+	if (iCount > 0)
+	{
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			rArchive.Get(strItem);
+
+#ifdef WIN32
+			try
+			{
+				boost::regex ourReg(strItem.c_str());
+				this->mRegex.push_back(ourReg);
+				// Store in list of regular expression string for Serialize
+				/**** LOAD ****/ this->mRegexStr.push_back(strItem);
+			}
+			catch(...)
+			{
+				THROW_EXCEPTION(CommonException, BadRegularExpression)
+			}
+#else
+			// Allocate memory
+			regex_t* pregex = new regex_t;
+			
+			try
+			{
+				// Compile
+				if(::regcomp(pregex, strItem.c_str(), REG_EXTENDED | REG_NOSUB) != 0)
+				{
+					THROW_EXCEPTION(CommonException, BadRegularExpression)
+				}
+				
+				// Store in list of regular expressions
+				/**** LOAD ****/ mRegex.push_back(pregex);
+				// Store in list of regular expression string for Serialize
+				/**** LOAD ****/ mRegexStr.push_back(strItem);
+			}
+			catch(...)
+			{
+				delete pregex;
+				throw;
+			}
+#endif
+		}
+	}
+#endif // PLATFORM_REGEX_NOT_SUPPORTED
+
+	//
+	//
+	//
+	int64_t aMagicMarker = 0;
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		/**** LOAD ****/ mpAlwaysInclude = new ExcludeList;
+		if (!mpAlwaysInclude)
+			throw std::bad_alloc();
+
+		mpAlwaysInclude->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ExcludeList::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void ExcludeList::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	int64_t iCount = mDefinite.size();
+	rArchive.Add(iCount);
+
+	for (std::set<std::string>::const_iterator i = mDefinite.begin(); i != mDefinite.end(); i++)
+		rArchive.Add(*i);
+
+	//
+	//
+	//
+#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+	ASSERT(mRegex.size() == mRegexStr.size()); 	// don't even try to save compiled regular expressions - use string copies
+
+	iCount = mRegexStr.size();
+	rArchive.Add(iCount);
+
+	for (std::vector<std::string>::const_iterator i = mRegexStr.begin(); i != mRegexStr.end(); i++)
+		rArchive.Add(*i);
+#endif // PLATFORM_REGEX_NOT_SUPPORTED
+
+	//
+	//
+	//
+	if (!mpAlwaysInclude)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpAlwaysInclude->Serialize(rArchive);
+	}
+}

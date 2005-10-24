@@ -23,6 +23,20 @@ typedef struct
 	int64_t mTotalFileStreamSize;
 } BackupStoreFileStats;
 
+// BOX_PRIVATE_BEGIN
+// Interal builds don't have backwards compatibility
+#define BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
+// BOX_PRIVATE_END
+
+
+// Output buffer to EncodeChunk and input data to DecodeChunk must
+// have specific alignment, see function comments.
+#define BACKUPSTOREFILE_CODING_BLOCKSIZE		16
+#define BACKUPSTOREFILE_CODING_OFFSET			15
+
+// Have some memory allocation commands, note closing "Off" at end of file.
+#include "MemLeakFindOn.h"
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -105,12 +119,64 @@ public:
 	static void SetAESKey(const void *pKey, int KeyLength);
 #endif
 
-	// Limits
-	static void SetMaximumDiffingTime(int Seconds);
+	// Allocation of properly aligning chunks for decoding and encoding chunks
+	inline static void *CodingChunkAlloc(int Size)
+	{
+		uint8_t *a = (uint8_t*)malloc((Size) + (BACKUPSTOREFILE_CODING_BLOCKSIZE * 3));
+		if(a == 0) return 0;
+		// Align to main block size
+		ASSERT(sizeof(uint32_t) == sizeof(void*));	// make sure casting the right pointer size, will need to fix on platforms with 64 bit pointers
+		uint32_t adjustment = BACKUPSTOREFILE_CODING_BLOCKSIZE - (((uint32_t)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
+		uint8_t *b = (a + adjustment);
+		// Store adjustment
+		*b = (uint8_t)adjustment;
+		// Return offset
+		return b + BACKUPSTOREFILE_CODING_OFFSET;
+	}
+	inline static void CodingChunkFree(void *Block)
+	{
+		// Check alignment is as expected
+		ASSERT(sizeof(uint32_t) == sizeof(void*));	// make sure casting the right pointer size, will need to fix on platforms with 64 bit pointers
+		ASSERT((((uint32_t)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+		uint8_t *a = (uint8_t*)Block;
+		a -= BACKUPSTOREFILE_CODING_OFFSET;
+		// Adjust downwards...
+		a -= *a;
+		free(a);
+	}
+
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupStoreFile::SuspendFileDiff()
+	//		Purpose: Notifies BackupStoreFile object that a diff operation should be
+	//				 terminated ASAP. Usually called from an external timer.
+	//
+	//		Created: 12/1/04
+	//
+	// --------------------------------------------------------------------------
+	static void SuspendFileDiff();
 
 	// Building blocks
+	class EncodingBuffer
+	{
+	public:
+		EncodingBuffer();
+		~EncodingBuffer();
+	private:
+		// No copying
+		EncodingBuffer(const EncodingBuffer &);
+		EncodingBuffer &operator=(const EncodingBuffer &);
+	public:
+		void Allocate(int Size);
+		void Reallocate(int NewSize);
+		
+		uint8_t *mpBuffer;
+		int mBufferSize;
+	};
 	static int MaxBlockSizeForChunkSize(int ChunkSize);
-	static int EncodeChunk(const void *Chunk, int ChunkSize, void *Output, int OutputSize);
+	static int EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFile::EncodingBuffer &rOutput);
 
 	// Caller should know how big the output size is, but also allocate a bit more memory to cover various
 	// overheads allowed for in checks
@@ -133,6 +199,8 @@ public:
 	// For decoding encoded files
 	static void DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFile);
 };
+
+#include "MemLeakFindOff.h"
 
 #endif // BACKUPSTOREFILE__H
 

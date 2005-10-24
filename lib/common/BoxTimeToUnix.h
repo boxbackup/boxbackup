@@ -10,7 +10,11 @@
 #ifndef FILEMODIFICATIONTIMETOTIMEVAL__H
 #define FILEMODIFICATIONTIMETOTIMEVAL__H
 
+#ifdef WIN32
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 
 #include "BoxTime.h"
 

@@ -16,6 +16,8 @@
 #include <string>
 #include <memory>
 
+#include "BoxTime.h"
+
 // For defining tests
 enum
 {
@@ -58,11 +60,13 @@ class FdGetLine;
 class Configuration
 {
 private:
-	Configuration(const std::string &rName);
+	Configuration(const std::string &rName, box_time_t configModTime);
 public:
 	Configuration(const Configuration &rToCopy);
 	~Configuration();
 	
+	box_time_t GetModTime() const { return mConfigModTime; }
+
 	enum
 	{
 		// The character to separate multi-values
@@ -88,7 +92,8 @@ public:
 	SubConfigListType mSubConfigurations;
 	// Order of keys, not preserved
 	std::map<std::string, std::string> mKeys;
-	
+protected:
+	box_time_t mConfigModTime;
 private:
 	static bool LoadInto(Configuration &rConfig, FdGetLine &rGetLine, std::string &rErrorMsg, bool RootLevel);
 	static bool Verify(Configuration &rConfig, const ConfigurationVerify &rVerify, const std::string &rLevel, std::string &rErrorMsg);

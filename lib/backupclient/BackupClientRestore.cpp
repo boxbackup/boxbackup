@@ -15,6 +15,7 @@
 #include <set>
 #include <unistd.h>
 #include <limits.h>
+#include <stdio.h>
 
 #include "BackupClientRestore.h"
 #include "autogen_BackupProtocolClient.h"
@@ -223,12 +224,31 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 	Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
 
 	// Create the local directory (if not already done) -- path and owner set later, just use restrictive owner mode
-	if(ObjectExists(rLocalDirectoryName.c_str()) != ObjectExists_Dir)
+	switch(ObjectExists(rLocalDirectoryName.c_str()))
 	{
-		if(::mkdir(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
-		{
-			THROW_EXCEPTION(CommonException, OSFileError);
-		}
+		case ObjectExists_Dir:
+			// Do nothing
+			break;
+		case ObjectExists_File:
+			{
+				// File exists with this name, which is fun. Get rid of it.
+				::printf("WARNING: File present with name '%s', removing out of the way of restored directory. Use specific restore with ID to restore this object.", rLocalDirectoryName.c_str());
+				if(::unlink(rLocalDirectoryName.c_str()) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+				TRACE1("In restore, directory name collision with file %s", rLocalDirectoryName.c_str());
+			}
+			// follow through to... (no break)
+		case ObjectExists_NoObject:
+			if(::mkdir(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
+			{
+				THROW_EXCEPTION(CommonException, OSFileError);
+			}
+			break;
+		default:
+			ASSERT(false);
+			break;
 	}
 	
 	// Fetch the directory listing from the server -- getting a list of files which is approparite to the restore type

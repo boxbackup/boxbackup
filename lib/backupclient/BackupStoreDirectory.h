@@ -181,7 +181,10 @@ public:
 			// Return entry, and increment
 			return (*(i++));
 		}
-	
+
+		// WARNING: This function is really very inefficient.
+		// Only use when you want to look up ONE filename, not in a loop looking up lots.
+		// In a looping situation, cache the decrypted filenames in another memory structure.
 		BackupStoreDirectory::Entry *FindMatchingClearName(const BackupStoreFilenameClear &rFilename, int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
 			// Skip over things which don't match the required flags or filename
