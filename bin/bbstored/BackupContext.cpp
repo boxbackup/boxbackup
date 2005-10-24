@@ -858,7 +858,7 @@ int64_t BackupContext::AddDirectory(int64_t InDirectory, const BackupStoreFilena
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING,
-			BackupStoreDirectory::Entry::Flags_Deleted)) != 0)	// Ignore deleted directories
+			BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_OldVersion)) != 0)	// Ignore deleted and old directories
 		{
 			if(en->GetName() == rFilename)
 			{

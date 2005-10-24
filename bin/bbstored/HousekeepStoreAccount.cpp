@@ -105,6 +105,23 @@ void HousekeepStoreAccount::DoHousekeeping()
 	// This will also remove elegiable items marked with RemoveASAP
 	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID);
 
+	// If scan directory stopped for some reason, probably parent instructed to teminate, stop now.
+	if(!continueHousekeeping)
+	{
+		// If any files were marked "delete now", then update the size of the store.
+		if(mBlocksUsedDelta != 0 || mBlocksInOldFilesDelta != 0 || mBlocksInDeletedFilesDelta != 0)
+		{
+			info->ChangeBlocksUsed(mBlocksUsedDelta);
+			info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
+			info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
+			
+			// Save the store info back
+			info->Save();
+		}
+	
+		return;
+	}
+
 	// Log any difference in opinion between the values recorded in the store info, and
 	// the values just calculated for space usage.
 	// BLOCK
@@ -136,12 +153,6 @@ void HousekeepStoreAccount::DoHousekeeping()
 		}
 	}
 	
-	// If scan directory stopped for some reason, probably parent instructed to teminate, stop now.
-	if(!continueHousekeeping)
-	{
-		return;
-	}
-
 	// Reset the delta counts for files, as they will include RemoveASAP flagged files deleted
 	// during the initial scan.
 	int64_t removeASAPBlocksUsedDelta = mBlocksUsedDelta;	// keep for reporting
