@@ -156,7 +156,7 @@ void BackupQueries::DoCommand(const char *Command)
 	
 	// Data about commands
 	static const char *commandNames[] = {"quit", "exit", "list",	 "pwd", "cd", "lcd",	"sh", "getobject", "get", "compare", "restore", "help", "usage", "undelete", 0};
-	static const char *validOptions[] = {"",	 "",	 "rodIFtsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dr",      "",     "",      "",		 0};
+	static const char *validOptions[] = {"",	 "",	 "rodIFtsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dri",     "",     "",      "",		 0};
 	#define COMMAND_Quit		0
 	#define COMMAND_Exit		1
 	#define COMMAND_List		2
@@ -380,7 +380,11 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		{
 			// add object ID to line
 			char oid[32];
+#ifdef WIN32
+			sprintf(oid, "%08I64x ", en->GetObjectID());
+#else
 			sprintf(oid, "%08llx ", en->GetObjectID());
+#endif
 			line += oid;
 		}
 		
@@ -404,6 +408,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			}
 			// attributes flags
 			*(f++) = (en->HasAttributes())?'a':'-';
+
 			// terminate
 			*(f++) = ' ';
 			*(f++) = '\0';
@@ -424,14 +429,22 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		if(opts[LIST_OPTION_DISPLAY_HASH])
 		{
 			char hash[64];
+#ifdef WIN32
+			::sprintf(hash, "%016I64x ", en->GetAttributesHash());
+#else
 			::sprintf(hash, "%016llx ", en->GetAttributesHash());
+#endif
 			line += hash;
 		}
 		
 		if(opts[LIST_OPTION_SIZEINBLOCKS])
 		{
 			char num[32];
+#ifdef WIN32
+			sprintf(num, "%05I64d ", en->GetSizeInBlocks());
+#else
 			sprintf(num, "%05lld ", en->GetSizeInBlocks());
+#endif
 			line += num;
 		}
 		
@@ -1034,7 +1047,7 @@ void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries:
 		}
 				
 		// Then get it compared
-		Compare(std::string("/") + rLocation, loc.GetKeyValue("Path"), rParams);
+		Compare(std::string(DIRECTORY_SEPARATOR) + rLocation, loc.GetKeyValue("Path"), rParams);
 	}
 	catch(...)
 	{
@@ -1165,7 +1178,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 
 #ifdef PLATFORM_dirent_BROKEN_d_type
 			std::string fn(rLocalDir);
-			fn += '/';
+			fn += DIRECTORY_SEPARATOR_ASCHAR;
 			fn += localDirEn->d_name;
 			struct stat st;
 			if(::lstat(fn.c_str(), &st) != 0)
@@ -1233,7 +1246,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeFiles.begin(); i != storeFiles.end(); ++i)
 		{
 			// Does the file exist locally?
-			std::set<std::string>::const_iterator local(localFiles.find(i->first));
+			std::set<std::string>::iterator local(localFiles.find(i->first));
 			if(local == localFiles.end())
 			{
 				// Not found -- report
@@ -1438,7 +1451,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeDirs.begin(); i != storeDirs.end(); ++i)
 		{
 			// Does the directory exist locally?
-			std::set<std::string>::const_iterator local(localDirs.find(i->first));
+			std::set<std::string>::iterator local(localDirs.find(i->first));
 			if(local == localDirs.end())
 			{
 				// Not found -- report
@@ -1497,7 +1510,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	// Check arguments
 	if(args.size() != 2)
 	{
-		printf("Incorrect usage.\nrestore [-d] <directory-name> <local-directory-name>\n");
+		printf("Incorrect usage.\nrestore [-d] [-r] [-i] <directory-name> <local-directory-name>\n");
 		return;
 	}
 
@@ -1505,7 +1518,22 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	bool restoreDeleted = opts['d'];
 
 	// Get directory ID
-	int64_t dirID = FindDirectoryObjectID(args[0], false /* no old versions */, restoreDeleted /* find deleted dirs */);
+	int64_t dirID = 0;
+	if(opts['i'])
+	{
+		// Specified as ID. 
+		dirID = ::strtoll(args[0].c_str(), 0, 16);
+		if(dirID == LLONG_MIN || dirID == LLONG_MAX || dirID == 0)
+		{
+			printf("Not a valid object ID (specified in hex)\n");
+			return;
+		}
+	}
+	else
+	{
+		// Look up directory ID
+		dirID = FindDirectoryObjectID(args[0], false /* no old versions */, restoreDeleted /* find deleted dirs */);
+	}
 	
 	// Allowable?
 	if(dirID == 0)

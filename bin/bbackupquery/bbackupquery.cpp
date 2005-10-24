@@ -50,6 +50,14 @@ int main(int argc, const char *argv[])
 {
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupquery.memleaks", "bbackupquery")
 
+#ifdef WIN32
+	WSADATA info;
+	//First off initialize sockets - which we have to do under Win32
+    if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) {
+        //throw error?    perhaps give it its own id in the furture
+        THROW_EXCEPTION(BackupStoreException, Internal)
+    }
+#endif
 	// Really don't want trace statements happening, even in debug mode
 	#ifndef NDEBUG
 		BoxDebugTraceOn = false;
@@ -237,7 +245,13 @@ int main(int argc, const char *argv[])
 	
 	MAINHELPER_END
 	
-	exit(returnCode);	
+#ifdef WIN32
+	//Clean up our sockets
+    WSACleanup();
+#else
+
+	exit(returnCode);
+#endif
 	return returnCode;
 }
 

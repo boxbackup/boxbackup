@@ -115,7 +115,7 @@ compare <store-dir-name> <local-dir-name>
 	This can be used for automated tests.
 <
 
-> restore [-d] <directory-name> <local-directory-name>
+> restore [-d] [-r] [-i] <directory-name> <local-directory-name>
 
 	Restores a directory to the local disc. The local directory specified
 	must not exist (unless a previous restore is being restarted).
@@ -124,6 +124,7 @@ compare <store-dir-name> <local-dir-name>
 
 	-d -- restore a deleted directory.
 	-r -- resume an interrupted restoration
+	-i -- directory name is actually an ID
 
 	If a restore operation is interrupted for any reason, it can be restarted
 	using the -r switch. Restore progress information is saved in a file at
