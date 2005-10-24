@@ -1,8 +1,0 @@
-
-test-suite dynamic_bitset :
-
-    [ run dyn_bitset_unit_tests1.cpp ]
-    [ run dyn_bitset_unit_tests2.cpp ]
-    [ run dyn_bitset_unit_tests3.cpp ]
-    [ run dyn_bitset_unit_tests4.cpp ]
-    ;

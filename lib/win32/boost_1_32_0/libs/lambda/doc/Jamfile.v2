@@ -1,5 +1,0 @@
-project boost/doc ;
-import boostbook : boostbook ;
-
-boostbook lambda-doc : lambda.xml ;
-

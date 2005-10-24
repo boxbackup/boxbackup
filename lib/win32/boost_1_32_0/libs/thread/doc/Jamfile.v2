@@ -1,6 +1,0 @@
-
-import toolset ;
-toolset.using doxygen ;
-
-boostbook thread : thread.xml ;
-
