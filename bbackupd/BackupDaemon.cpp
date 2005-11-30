@@ -15,7 +15,12 @@
 #include <sys/mount.h>
 #include <signal.h>
 #ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#include <mntent.h>
+	#ifdef PLATFORM_SUNOS
+		#include <cstdio>
+		#include <sys/mnttab.h>
+	#else
+		#include <mntent.h>
+	#endif
 #endif
 #include <sys/wait.h>
 
@@ -953,21 +958,53 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	int numIDMaps = 0;
 
 #ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	// Linux can't tell you where a directory is mounted. So we have to
-	// read the mount entries from /etc/mtab! Bizarre that the OS itself
-	// can't tell you, but there you go.
+	// Linux and others can't tell you where a directory is mounted. So we
+	// have to read the mount entries from /etc/mtab! Bizarre that the OS
+	// itself can't tell you, but there you go.
 	std::set<std::string, mntLenCompare> mountPoints;
 	// BLOCK
 	FILE *mountPointsFile = 0;
+#ifdef PLATFORM_SUNOS
+	// Open mounts file
+	mountPointsFile = ::fopen("/etc/mnttab", "r");
+	if(mountPointsFile == 0)
+	{
+		THROW_EXCEPTION(CommonException, OSFileError);
+	}
+
 	try
 	{
+
+		// Read all the entries, and put them in the set
+		struct mnttab entry;
+		while(getmntent(mountPointsFile, &entry) == 0)
+		{
+			TRACE1("Found mount point at %s\n", entry.mnt_mountp);
+			mountPoints.insert(std::string(entry.mnt_mountp));
+		}
+
+		// Close mounts file
+		::fclose(mountPointsFile);
+	}
+	catch(...)
+	{
+		::fclose(mountPointsFile);
+		throw;
+	}
+#else
 		// Open mounts file
+	mountPointsFile = ::setmntent("/proc/mounts", "r");
+	if(mountPointsFile == 0)
+	{
 		mountPointsFile = ::setmntent("/etc/mtab", "r");
+	}
 		if(mountPointsFile == 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError);
 		}
 		
+	try
+	{
 		// Read all the entries, and put them in the set
 		struct mntent *entry = 0;
 		while((entry = ::getmntent(mountPointsFile)) != 0)
@@ -981,12 +1018,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	}
 	catch(...)
 	{
-		if(mountPointsFile != 0)
-		{
 			::endmntent(mountPointsFile);
-		}
 		throw;
 	}
+#endif
 	// Check sorting and that things are as we expect
 	ASSERT(mountPoints.size() > 0);
 #ifndef NDEBUG
