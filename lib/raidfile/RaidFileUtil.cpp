@@ -54,7 +54,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 			if(pRevisionID != 0)
 			{
 				(*pRevisionID) = FileModificationTime(st);
-#ifdef PLATFORM_LINUX
+#ifdef PLATFORM_stat_SHORT_mtime
 				// On linux, the time resolution is very low for modification times.
 				// So add the size to it to give a bit more chance of it changing.
 				// TODO: Make this better.
@@ -71,7 +71,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 	int64_t revisionID = 0;
 	int setSize = rDiscSet.size();
 	int rfCount = 0;
-#ifdef PLATFORM_LINUX
+#ifdef PLATFORM_stat_SHORT_mtime
 	// TODO: replace this with better linux revision ID detection
 	int64_t revisionIDplus = 0;
 #endif
@@ -92,7 +92,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 			{
 				int64_t rid = FileModificationTime(st);
 				if(rid > revisionID) revisionID = rid;
-#ifdef PLATFORM_LINUX
+#ifdef PLATFORM_stat_SHORT_mtime
 				revisionIDplus += st.st_size;
 #endif
 			}
@@ -101,7 +101,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 	if(pRevisionID != 0)
 	{
 		(*pRevisionID) = revisionID;
-#ifdef PLATFORM_LINUX
+#ifdef PLATFORM_stat_SHORT_mtime
 		(*pRevisionID) += revisionIDplus;
 #endif
 	}

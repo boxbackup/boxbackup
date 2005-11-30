@@ -397,9 +397,11 @@ int test(int argc, const char *argv[])
 		TEST_THAT(lock1.TryAndGetLock("testfiles/lock1") == true);
 		// Try to lock something using the same lock
 		TEST_CHECK_THROWS(lock1.TryAndGetLock("testfiles/non-exist/lock2"), CommonException, NamedLockAlreadyLockingSomething);		
+#ifndef PLATFORM_open_USE_fcntl
 		// And again on that name
 		NamedLock lock2;
 		TEST_THAT(lock2.TryAndGetLock("testfiles/lock1") == false);
+#endif
 	}
 	{
 		// Check that it unlocked when it went out of scope

@@ -525,8 +525,10 @@ void test_overwrites()
 		writeA.Write("TESTTEST", 8);
 	
 		{
+#ifndef PLATFORM_open_USE_fcntl
 			RaidFileWrite writeA2(0, "overwrite_A");
 			TEST_CHECK_THROWS(writeA2.Open(), RaidFileException, FileIsCurrentlyOpenForWriting);
+#endif
 		}
 	}
 	
