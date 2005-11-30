@@ -34,7 +34,7 @@
 	extern "C" off_t
 	TEST_lseek(int fildes, off_t offset, int whence);
 #else
-	#ifdef PLATFORM_LINUX
+	#if defined(PLATFORM_LINUX) || defined(PLATFORM_SUNOS)
 		#undef __syscall
 		#define __syscall syscall
 	#else
@@ -51,7 +51,7 @@
 bool intercept_enabled = false;
 const char *intercept_filename = 0;
 int intercept_filedes = -1;
-unsigned int intercept_errorafter = 0;
+off_t intercept_errorafter = 0;
 int intercept_errno = 0;
 int intercept_syscall = 0;
 off_t intercept_filepos = 0;
@@ -97,7 +97,7 @@ bool intercept_errornow(int d, int size, int syscallnum)
 			return true;
 		}
 		// where are we in the file?
-		if(intercept_filepos >= intercept_errorafter || intercept_filepos >= ((int)intercept_errorafter - size))
+		if(intercept_filepos >= intercept_errorafter || intercept_filepos >= ((off_t)intercept_errorafter - size))
 		{
 			TRACE3("Returning error %d for syscall %d, file pos %d\n", intercept_errno, syscallnum, (int)intercept_filepos);
 			return true;
@@ -236,9 +236,11 @@ lseek(int fildes, off_t offset, int whence)
 #ifdef PLATFORM_DARWIN
 	int r = TEST_lseek(fildes, offset, whence);
 #else
-	#ifdef PLATFORM_LINUX
+	#if defined(PLATFORM_LINUX) || defined(PLATFORM_SUNOS)
 		off_t r = __syscall(SYS_lseek, fildes, offset, whence);
 	#else
+		// Should swap this condition round. No reason to assume that most OS
+		// do this syscall wierdness, default should be the sensible way
 		off_t r = __syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
 	#endif
 #endif

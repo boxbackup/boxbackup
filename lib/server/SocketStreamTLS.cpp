@@ -14,7 +14,7 @@
 #include <openssl/bio.h>
 #include <poll.h>
 #include <errno.h>
-#include <sys/ioctl.h>
+#include <fcntl.h>
 
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
@@ -132,12 +132,23 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	}
 
 	// Make the socket non-blocking so timeouts on Read work
-	int nonblocking = true;
-	if(::ioctl(socket, FIONBIO, &nonblocking) == -1)
+	// This is more portable than using ioctl with FIONBIO
+	int statusFlags = 0;
+	if(::fcntl(socket, F_GETFL, &statusFlags) < 0
+	   || ::fcntl(socket, F_SETFL, statusFlags | O_NONBLOCK) == -1)
 	{
 		THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
 	}
 	
+	// FIXME: This is less portable than the above. However, it MAY be needed
+	// for cygwin, which has/had bugs with fcntl
+	//
+	// int nonblocking = true;
+	// if(::ioctl(socket, FIONBIO, &nonblocking) == -1)
+	// {
+	// 	THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
+	// }
+
 	// Set the two to know about each other
 	::SSL_set_bio(mpSSL, mpBIO, mpBIO);
 

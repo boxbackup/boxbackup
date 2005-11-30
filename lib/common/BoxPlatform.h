@@ -133,7 +133,7 @@
 	#define PLATFORM_stat_SHORT_mtime
 	#define PLATFORM_stat_NO_st_flags
 	#define PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#define PLATFORM_open_NO_O_EXLOCK
+	#define PLATFORM_open_USE_flock
 	#define PLATFORM_sockaddr_NO_len
 
 	#define PLATFORM_RANDOM_DEVICE	"/dev/urandom"
@@ -145,6 +145,41 @@
 
 #endif // PLATFORM_LINUX
 
+#ifdef PLATFORM_SUNOS
+
+	#include <sys/types.h>
+
+	// for ntohl etc...
+	#include <netinet/in.h>
+
+	// types 'missing'
+	typedef uint8_t u_int8_t;
+//	typedef signed char int8_t;
+	typedef uint32_t u_int32_t;
+	typedef uint16_t u_int16_t;
+	typedef uint64_t u_int64_t;
+
+	// not defined in Solaris, a BSD thing
+	#define INFTIM -1
+
+	//#define LLONG_MAX    9223372036854775807LL
+	//#define LLONG_MIN    (-LLONG_MAX - 1LL)
+
+	#define PLATFORM_STATIC_TEMP_DIRECTORY_NAME	"/tmp"
+
+	#define PLATFORM_BERKELEY_DB_NOT_SUPPORTED
+	#define PLATFORM_KQUEUE_NOT_SUPPORTED       // This may be in Solaris 10
+	#define PLATFORM_dirent_BROKEN_d_type       // Well, no d_type at all actually
+	#define PLATFORM_stat_SHORT_mtime
+	#define PLATFORM_stat_NO_st_flags
+	#define PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
+	#define PLATFORM_open_USE_fcntl
+	#define PLATFORM_sockaddr_NO_len
+
+	#define PLATFORM_RANDOM_DEVICE	"/dev/urandom"
+
+#endif // PLATFORM_SUNOS
+
 #ifdef PLATFORM_CYGWIN
 
 	#define PLATFORM_BERKELEY_DB_NOT_SUPPORTED
@@ -154,7 +189,7 @@
 	#define PLATFORM_stat_SHORT_mtime
 	#define PLATFORM_stat_NO_st_flags
 	#define PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#define PLATFORM_open_NO_O_EXLOCK
+	#define PLATFORM_open_USE_flock
 	#define PLATFORM_sockaddr_NO_len
 	#define PLATFORM_NO_BUILT_IN_SWAP64
 
@@ -190,6 +225,16 @@
 	#define PLATFORM_RANDOM_DEVICE_NONE
 
 #endif // PLATFORM_CYGWIN
+
+
+// Check the processor type
+#ifdef PLATFORM_SPARC
+	#define PLATFORM_ALIGN_INT
+#endif
+
+#ifdef PLATFORM_ARM
+	#define PLATFORM_ALIGN_INT
+#endif
 
 
 // Find out if credentials on UNIX sockets can be obtained

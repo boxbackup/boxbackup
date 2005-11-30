@@ -1,7 +1,7 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $make_command $bsd_make $platform_define $gcc_v3 $gcc_v4 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra/;
+@EXPORT = qw/$build_os $build_cpu $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $gcc_v4 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra/;
 
 BEGIN
 {
@@ -9,13 +9,17 @@ BEGIN
 	# which OS are we building under?
 	$build_os = `uname`;
 	chomp $build_os;
+	$build_cpu = `uname -p`;
+	chomp $build_cpu;
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
+	
     $build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
 
-	$make_command = ($build_os ne 'Darwin')?'make':'bsdmake';
-	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN');
+	$make_command = ($build_os eq 'Darwin') ? 'bsdmake' : ($build_os eq 'SunOS') ? 'gmake' : 'make';
+	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' && $build_os ne "SunOS");
     $platform_define = 'PLATFORM_'.uc($build_os);
+	$platform_cpu = 'PLATFORM_'.uc($build_cpu);
 
 	# blank extra flags by default
 	$platform_compile_line_extra = '';
@@ -62,6 +66,11 @@ BEGIN
 			$platform_compile_line_extra = '-I/sw/include ';
 			$platform_link_line_extra = '-L/sw/lib ';
 		}
+	}
+
+	if($build_os eq 'SunOS')
+	{
+		$platform_link_line_extra = '-lrt ';
 	}
 }
 
