@@ -112,10 +112,21 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	}
 	
 	// Get a lock on the write file
+#ifdef PLATFORM_open_USE_fcntl
+	int errnoBlock = EAGAIN;
+	struct flock desc;
+	desc.l_type = F_WRLCK;
+	desc.l_whence = SEEK_SET;
+	desc.l_start = 0;
+	desc.l_len = 0;
+	if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
+#else
+	int errnoBlock = EWOULDBLOCK;
 	if(::flock(mOSFileHandle, LOCK_EX | LOCK_NB) != 0)
+#endif
 	{
 		// Lock was not obtained.
-		bool wasLocked = (errno == EWOULDBLOCK);
+		bool wasLocked = (errno == errnoBlock);
 		// Close the file
 		::close(mOSFileHandle);
 		mOSFileHandle = -1;
@@ -376,7 +387,7 @@ void RaidFileWrite::TransformToRaidStorage()
 	// Then open them all for writing (in strict order)
 	try
 	{
-#ifdef PLATFORM_LINUX
+#if defined(PLATFORM_open_USE_flock) || defined(PLATFORM_open_USE_fcntl)
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe1(stripe1FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe2(stripe2FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> parity(parityFilenameW.c_str());
@@ -448,11 +459,7 @@ void RaidFileWrite::TransformToRaidStorage()
 					{
 						// XOR in the size at the end of the parity block
 						ASSERT(sizeof(RaidFileRead::FileSizeType) == (2*sizeof(unsigned int)));
-#ifdef PLATFORM_LINUX
 						ASSERT(sizeof(RaidFileRead::FileSizeType) >= sizeof(off_t));
-#else
-						ASSERT(sizeof(RaidFileRead::FileSizeType) == sizeof(off_t));
-#endif
 						int sizePos = (blockSize/sizeof(unsigned int)) - 2;
 						RaidFileRead::FileSizeType sw = hton64(writeFileStat.st_size);
 						unsigned int *psize = (unsigned int *)(&sw);
@@ -509,11 +516,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		// if it can't be worked out some other means -- size is required to rebuild the file if one of the stripe files is missing
 		if(sizeRecordRequired)
 		{
-#ifdef PLATFORM_LINUX
 			ASSERT(sizeof(writeFileStat.st_size) <= sizeof(RaidFileRead::FileSizeType));
-#else
-			ASSERT(sizeof(writeFileStat.st_size) == sizeof(RaidFileRead::FileSizeType));
-#endif
 			RaidFileRead::FileSizeType sw = hton64(writeFileStat.st_size);
 			ASSERT((::lseek(parity, 0, SEEK_CUR) % blockSize) == 0);
 			if(::write(parity, &sw, sizeof(sw)) != sizeof(sw))

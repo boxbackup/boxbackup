@@ -12,12 +12,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
-#ifdef PLATFORM_LINUX
+#ifdef PLATFORM_open_USE_flock
 	#include <sys/file.h>
-#endif // PLATFORM_LINUX
-#ifdef PLATFORM_CYGWIN
-	#include <sys/file.h>
-#endif // PLATFORM_CYGWIN
+#endif // PLATFORM_open_USE_flock
 
 #include "NamedLock.h"
 #include "CommonException.h"
@@ -71,12 +68,14 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 	}
 
 	// See if the lock can be got
-#ifdef PLATFORM_open_NO_O_EXLOCK
+#if defined(PLATFORM_open_USE_flock) || defined(PLATFORM_open_USE_fcntl)
 	int fd = ::open(Filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
+
+#ifdef PLATFORM_open_USE_flock
 	if(::flock(fd, LOCK_EX | LOCK_NB) != 0)
 	{
 		::close(fd);
@@ -89,6 +88,25 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
+#else
+	struct flock desc;
+	desc.l_type = F_WRLCK;
+	desc.l_whence = SEEK_SET;
+	desc.l_start = 0;
+	desc.l_len = 0;
+	if(::fcntl(fd, F_SETLK, &desc) != 0)
+	{
+		::close(fd);
+		if(errno == EAGAIN)
+		{
+			return false;
+		}
+		else
+		{
+			THROW_EXCEPTION(CommonException, OSFileError)
+		}
+	}
+#endif
 
 	// Success
 	mFileDescriptor = fd;
