@@ -124,7 +124,7 @@ public:
 		if(a == 0) return 0;
 		// Align to main block size
 		ASSERT(sizeof(uint32_t) == sizeof(void*));	// make sure casting the right pointer size, will need to fix on platforms with 64 bit pointers
-		uint32_t adjustment = BACKUPSTOREFILE_CODING_BLOCKSIZE - (((uint32_t)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
+		uint32_t adjustment = BACKUPSTOREFILE_CODING_BLOCKSIZE - (((uint32_t)(long)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
 		uint8_t *b = (a + adjustment);
 		// Store adjustment
 		*b = (uint8_t)adjustment;
@@ -135,7 +135,7 @@ public:
 	{
 		// Check alignment is as expected
 		ASSERT(sizeof(uint32_t) == sizeof(void*));	// make sure casting the right pointer size, will need to fix on platforms with 64 bit pointers
-		ASSERT((((uint32_t)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+		ASSERT((((uint32_t)(long)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 		uint8_t *a = (uint8_t*)Block;
 		a -= BACKUPSTOREFILE_CODING_OFFSET;
 		// Adjust downwards...
