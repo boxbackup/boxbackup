@@ -144,7 +144,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		struct sigaction sa;
 		sa.sa_handler = SignalHandler;
 		sa.sa_flags = 0;
-		::sigemptyset(&sa.sa_mask);
+		sigemptyset(&sa.sa_mask);		// macro
 		if(::sigaction(SIGHUP, &sa, NULL) != 0 || ::sigaction(SIGTERM, &sa, NULL) != 0)
 		{
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
@@ -361,7 +361,7 @@ void Daemon::EnterChild()
 	struct sigaction sa;
 	sa.sa_handler = SIG_DFL;
 	sa.sa_flags = 0;
-	::sigemptyset(&sa.sa_mask);
+	sigemptyset(&sa.sa_mask);			// macro
 	::sigaction(SIGHUP, &sa, NULL);
 	::sigaction(SIGTERM, &sa, NULL);
 }

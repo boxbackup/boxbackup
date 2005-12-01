@@ -65,6 +65,8 @@ print MAKE <<__E;
 #
 #
 
+MAKE = $make_command
+
 __E
 
 print MAKE "all:\t",join(' ',map {parcel_target($_)} @parcels),"\n\n";
