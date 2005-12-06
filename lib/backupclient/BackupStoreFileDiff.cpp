@@ -572,14 +572,18 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					fileOffset += thisRoll;
 					rollOverInitialBytes -= thisRoll;
 
-					if(rollOverInitialBytes) {
+					if(rollOverInitialBytes)
+					{
 						goto refresh;
 					}
 				}
 
-				if(goodnessOfFit.count(fileOffset)) {
+				if(goodnessOfFit.count(fileOffset))
+				{
 					tmp = goodnessOfFit[fileOffset];
-				} else {
+				}
+				else
+				{
 					tmp = 0;
 				}
 
@@ -596,7 +600,8 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					fileOffset += thisRoll;
 					rollOverInitialBytes -= thisRoll;
 
-					if(rollOverInitialBytes) {
+					if(rollOverInitialBytes)
+					{
 						goto refresh;
 					}
 				}
@@ -662,7 +667,8 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					uint16_t hash = rolling.GetComponentForHashing();
 					if(phashTable[hash] != 0 && (goodnessOfFit.count(fileOffset) == 0 || goodnessOfFit[fileOffset] < Sizes[s]))
 					{
-						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks)) {
+						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks))
+						{
 							goodnessOfFit[fileOffset] = Sizes[s];
 						}
 					}
@@ -785,13 +791,15 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	bool found=false;
 	while(scan != 0)
 	{
-		if(scan->mWeakChecksum == Checksum) {
+		if(scan->mWeakChecksum == Checksum)
+		{
 			found = true;
 			break;
 		}
 		scan = scan->mpNextInHashList;
 	}
-	if(!found) {
+	if(!found)
+	{
 		return false;
 	}
 

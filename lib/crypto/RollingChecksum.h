@@ -63,14 +63,14 @@ public:
 	//		Created: 6/12/03
 	//
 	// --------------------------------------------------------------------------	
-	const inline uint32_t GetChecksum()
+	inline uint32_t GetChecksum() const
 	{
 		return ((uint32_t)a) | (((uint32_t)b) << 16);
 	}
 	
 	// Components, just in case they're handy
-	const inline uint16_t GetComponent1() {return a;}
-	const inline uint16_t GetComponent2() {return b;}
+	inline uint16_t GetComponent1() const {return a;}
+	inline uint16_t GetComponent2() const {return b;}
 	
 	// --------------------------------------------------------------------------
 	//
@@ -80,7 +80,7 @@ public:
 	//		Created: 6/12/03
 	//
 	// --------------------------------------------------------------------------
-	const inline uint16_t GetComponentForHashing()
+	inline uint16_t GetComponentForHashing() const
 	{
 		return b;
 	}
@@ -93,7 +93,7 @@ public:
 	//		Created: 14/1/04
 	//
 	// --------------------------------------------------------------------------
-	static const inline uint16_t ExtractHashingComponent(const uint32_t Checksum)
+	static inline uint16_t ExtractHashingComponent(const uint32_t Checksum) const
 	{
 		return Checksum >> 16;
 	}
