@@ -93,7 +93,7 @@ public:
 	//		Created: 14/1/04
 	//
 	// --------------------------------------------------------------------------
-	static inline uint16_t ExtractHashingComponent(const uint32_t Checksum) const
+	static inline uint16_t ExtractHashingComponent(const uint32_t Checksum)
 	{
 		return Checksum >> 16;
 	}
