@@ -140,6 +140,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		// Let the derived class have a go at setting up stuff in the initial process
 		SetupInInitialProcess();
 		
+#ifndef WIN32		
 		// Set signal handler
 		struct sigaction sa;
 		sa.sa_handler = SignalHandler;
@@ -219,12 +220,14 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				break;
 			}
 		}
+#endif // ! WIN32
 
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
 		// Log the start message
 		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " BOX_VERSION ")", configfile);
 
+#ifndef WIN32
 		// Write PID to file
 		char pid[32];
 		int pidsize = sprintf(pid, "%d", (int)getpid());
@@ -233,6 +236,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			::syslog(LOG_ERR, "can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
+#endif
 		
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING
@@ -245,6 +249,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	
 		if(asDaemon)
 		{
+#ifndef WIN32
 			// Close standard streams
 			::close(0);
 			::close(1);
@@ -265,8 +270,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			{
 				::close(devnull);
 			}
-			
-			// And definately don't try and send anything to those file descriptors
+#endif // ! WIN32
+
+			// And definitely don't try and send anything to those file descriptors
 			// -- this has in the past sent text to something which isn't expecting it.
 			TRACE_TO_STDOUT(false);
 		}		
@@ -357,6 +363,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 // --------------------------------------------------------------------------
 void Daemon::EnterChild()
 {
+#ifndef WIN32
 	// Unset signal handlers
 	struct sigaction sa;
 	sa.sa_handler = SIG_DFL;
@@ -364,6 +371,7 @@ void Daemon::EnterChild()
 	::sigemptyset(&sa.sa_mask);
 	::sigaction(SIGHUP, &sa, NULL);
 	::sigaction(SIGTERM, &sa, NULL);
+#endif
 }
 
 
@@ -377,6 +385,7 @@ void Daemon::EnterChild()
 // --------------------------------------------------------------------------
 void Daemon::SignalHandler(int sigraised)
 {
+#ifndef WIN32
 	if(spDaemon != 0)
 	{
 		switch(sigraised)
@@ -393,6 +402,7 @@ void Daemon::SignalHandler(int sigraised)
 			break;
 		}
 	}
+#endif
 }
 
 // --------------------------------------------------------------------------
@@ -534,5 +544,3 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	
 #endif // HAVE_SETPROCTITLE
 }
-
-

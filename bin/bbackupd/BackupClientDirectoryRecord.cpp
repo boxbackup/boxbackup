@@ -206,6 +206,10 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
 					TRACE1("Stat failed for '%s' (contents)\n", filename.c_str());
+					//Question to Ben:
+					//If this fails the exception takes us all the way out
+					//are ther not times when you still want to continue with the 
+					//backup
 					THROW_EXCEPTION(CommonException, OSFileError)
 				}
 
@@ -506,7 +510,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		box_time_t modTime = 0;
 		uint64_t attributesHash = 0;
 		int64_t fileSize = 0;
-		ino_t inodeNum = 0;
+		InodeRefType inodeNum = 0;
 		bool hasMultipleHardLinks = true;
 		// BLOCK
 		{
@@ -865,7 +869,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 
 				// Get attributes
 				box_time_t attrModTime = 0;
-				ino_t inodeNum = 0;
+				InodeRefType inodeNum = 0;
 				BackupClientFileAttributes attr;
 				attr.ReadAttributes(dirname.c_str(), true /* directories have zero mod times */,
 					0 /* not interested in mod time */, &attrModTime, 0 /* not file size */,
@@ -1109,8 +1113,12 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(rFilename.c_str(), mObjectID, rStoreFilename));
 		
 			// Send to store
-			std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
-					AttributesHash, 0 /* no diff from file ID */, rStoreFilename, *upload));
+			std::auto_ptr<BackupProtocolClientSuccess> stored(
+				connection.QueryStoreFile(
+					mObjectID, ModificationTime,
+					AttributesHash, 
+					0 /* no diff from file ID */, 
+					rStoreFilename, *upload));
 	
 			// Get object ID from the result		
 			objID = stored->GetObjectID();
@@ -1130,7 +1138,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
 			}
 		}
-	
+		
 		// Send the error on it's way
 		throw;
 	}

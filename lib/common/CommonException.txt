@@ -42,3 +42,4 @@ KEventErrorWait							34
 KEventErrorRemove						35
 KQueueNotSupportedOnThisPlatform		36
 IOStreamGetLineNotEnoughDataToIgnore	37	Bad value passed to IOStreamGetLine::IgnoreBufferedData()
+TempDirPathTooLong				38	Your temporary directory path is too long. Check the TMP and TEMP environment variables.

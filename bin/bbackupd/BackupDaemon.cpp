@@ -10,20 +10,23 @@
 #include "Box.h"
 
 #include <unistd.h>
-#include <syslog.h>
-#include <sys/param.h>
-#include <signal.h>
+
+#ifndef WIN32
+	#include <signal.h>
+	#include <syslog.h>
+	#include <sys/param.h>
+	#include <sys/wait.h>
+#endif
 #ifdef HAVE_SYS_MOUNT_H
-  #include <sys/mount.h>
+	#include <sys/mount.h>
 #endif
 #ifdef HAVE_MNTENT_H
-  #include <mntent.h>
-#endif
+	#include <mntent.h>
+#endif 
 #ifdef HAVE_SYS_MNTTAB_H
 	#include <cstdio>
 	#include <sys/mnttab.h>
 #endif
-#include <sys/wait.h>
 
 #include "Configuration.h"
 #include "IOStream.h"
@@ -160,8 +163,9 @@ const ConfigurationVerify *BackupDaemon::GetConfigVerify() const
 //
 // Function
 //		Name:    BackupDaemon::SetupInInitialProcess()
-//		Purpose: Platforms with non-checkable credientals on local sockets only.
-//				 Prints a warning if the command socket is used.
+//		Purpose: Platforms with non-checkable credentials on 
+//			local sockets only.
+//			Prints a warning if the command socket is used.
 //		Created: 25/2/04
 //
 // --------------------------------------------------------------------------
@@ -206,7 +210,173 @@ void BackupDaemon::DeleteAllLocations()
 	mIDMapMounts.clear();
 }
 
+#ifdef WIN32
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HelperThread()
+//		Purpose: Background thread function to help with communications with
+//               control communications
+//		Created: 18/2/04
+//
+// --------------------------------------------------------------------------
+DWORD WINAPI HelperThread( LPVOID lpParam ) 
+{ 
+	printf( "Parameter = %d.", *(DWORD*)lpParam ); 
+	((BackupDaemon *)lpParam)->helperThread();
 
+	return 0;
+
+}
+void BackupDaemon::helperThread(void)
+{
+	mpCommandSocketInfo = new CommandSocketInfo;
+	this->mReceivedCommandConn = false;
+
+	//mpCommandSocketInfo->mListeningSocket = CreateNamedPipeW(L"\\\\.\\pipe\\boxbackup",PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 4096, 4096, NMPWAIT_USE_DEFAULT_WAIT, (LPSECURITY_ATTRIBUTES) NULL);
+
+
+	while ( !IsTerminateWanted() )
+	{
+		try
+		{
+			mpCommandSocketInfo->mListeningSocket = CreateNamedPipeW( 
+				L"\\\\.\\pipe\\boxbackup", // pipe name 
+				PIPE_ACCESS_DUPLEX,        // read/write access 
+				PIPE_TYPE_MESSAGE |        // message type pipe 
+				PIPE_READMODE_MESSAGE |    // message-read mode 
+				PIPE_WAIT,                 // blocking mode 
+				PIPE_UNLIMITED_INSTANCES,  // max. instances  
+				4096,                      // output buffer size 
+				4096,                      // input buffer size 
+				NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
+				NULL);                     // default security attribute 
+
+			if ( mpCommandSocketInfo->mListeningSocket == INVALID_HANDLE_VALUE )
+			{
+				::syslog(LOG_ERR, "Failed to open named pipe");
+				mpCommandSocketInfo = 0;
+			}
+
+
+			if ( !ConnectNamedPipe(mpCommandSocketInfo->mListeningSocket, (LPOVERLAPPED) NULL))
+			{
+				CloseHandle(mpCommandSocketInfo->mListeningSocket);
+				::syslog(LOG_ERR, "Failed to open named pipe - connect");
+				mpCommandSocketInfo = 0;
+			}
+			//when we get here we have got a connection from a client 
+
+			//This next section comes from Ben's origional function
+			// Log
+			::syslog(LOG_INFO, "Connection from command socket");
+
+			// Send a header line summarising the configuration and current state
+			const Configuration &conf(GetConfiguration());
+			char summary[256];
+			int summarySize = sprintf(summary, "bbackupd: %d %d %d %d\nstate %d\n",
+				conf.GetKeyValueBool("AutomaticBackup"),
+				conf.GetKeyValueInt("UpdateStoreInterval"),
+				conf.GetKeyValueInt("MinimumFileAge"),
+				conf.GetKeyValueInt("MaxUploadWait"),
+				mState);
+
+			DWORD cbWritten,fSuccess;
+
+			fSuccess = WriteFile( 
+				mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
+				summary,      // buffer to write from 
+				summarySize, // number of bytes to write 
+				&cbWritten,   // number of bytes written 
+				NULL);        // not overlapped I/O 
+
+			if (! fSuccess || summarySize != cbWritten)
+			{
+				this->CloseCommandConnection();
+				continue;
+			}
+
+			fSuccess = WriteFile( 
+				mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
+				"ping\n",      // buffer to write from 
+				5, // number of bytes to write 
+				&cbWritten,   // number of bytes written 
+				NULL);        // not overlapped I/O 
+
+			if (! fSuccess || 5 != cbWritten)
+			{
+				this->CloseCommandConnection();
+				continue;
+			}
+
+			DWORD cbBytesRead;
+
+			PipeGetLine readLine(mpCommandSocketInfo->mListeningSocket);
+			std::string command;
+
+			while ( readLine.GetLine(command) )
+			{
+				TRACE1("Receiving command '%s' over command socket\n", command.c_str());
+
+				bool sendOK = false;
+				bool sendResponse = true;
+
+				// Command to process!
+				if(command == "quit" || command == "")
+				{
+					// Close the socket.
+					CloseCommandConnection();
+					sendResponse = false;
+				}
+				else if(command == "sync")
+				{
+					// Sync now!
+					this->mDoSyncFlagOut = true;
+					this->mSyncIsForcedOut = false;
+					sendOK = true;
+				}
+				else if(command == "force-sync")
+				{
+					// Sync now (forced -- overrides any SyncAllowScript)
+					this->mDoSyncFlagOut = true;
+					this->mSyncIsForcedOut = true;
+					sendOK = true;
+				}
+				else if(command == "reload")
+				{
+					// Reload the configuration
+					SetReloadConfigWanted();
+					sendOK = true;
+				}
+				else if(command == "terminate")
+				{
+					// Terminate the daemon cleanly
+					SetTerminateWanted();
+					sendOK = true;
+				}
+
+				// Send a response back?
+				if(sendResponse)
+				{
+					fSuccess = WriteFile( 
+						mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
+						sendOK?"ok\n":"error\n",      // buffer to write from 
+						sendOK?3:6, // number of bytes to write 
+						&cbWritten,   // number of bytes written 
+						NULL);        // not overlapped I/O 
+				}
+				this->mReceivedCommandConn = true;
+			}
+
+			CloseHandle(mpCommandSocketInfo->mListeningSocket);
+		}
+		catch (...)
+		{
+			//Mmmm not sure what to do here - perhaps just log...
+		}
+	}
+} 
+#endif
 // --------------------------------------------------------------------------
 //
 // Function
@@ -217,6 +387,25 @@ void BackupDaemon::DeleteAllLocations()
 // --------------------------------------------------------------------------
 void BackupDaemon::Run()
 {
+#ifdef WIN32
+
+	// Create a local inet socket
+	HANDLE hThread;
+	DWORD dwThreadId;
+
+	hThread = CreateThread( 
+        	NULL,                        // default security attributes 
+        	0,                           // use default stack size  
+        	HelperThread,                // thread function 
+        	this,                        // argument to thread function 
+        	0,                           // use default creation flags 
+        	&dwThreadId);                // returns the thread identifier 
+
+	// init our own timer for file diff timeouts
+	initTimer();
+
+#else // ! WIN32
+
 	// Ignore SIGPIPE (so that if a command connection is broken, the daemon doesn't terminate)
 	::signal(SIGPIPE, SIG_IGN);
 
@@ -230,6 +419,8 @@ void BackupDaemon::Run()
 		::unlink(socketName);
 		mpCommandSocketInfo->mListeningSocket.Listen(Socket::TypeUNIX, socketName);
 	}
+	
+#endif // WIN32
 
 	// Handle things nicely on exceptions
 	try
@@ -253,6 +444,11 @@ void BackupDaemon::Run()
 		delete mpCommandSocketInfo;
 		mpCommandSocketInfo = 0;
 	}
+
+#ifdef WIN32
+	//clean up windows specific stuff.
+	finiTimer();
+#endif
 }
 
 // --------------------------------------------------------------------------
@@ -303,9 +499,9 @@ void BackupDaemon::Run2()
 
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	box_time_t lastSyncTime = 0;
-	
-	// --------------------------------------------------------------------------------------------
 
+	// --------------------------------------------------------------------------------------------
+	
 	// And what's the current client store marker?
 	int64_t clientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;		// haven't contacted the store yet
 
@@ -665,6 +861,29 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 // --------------------------------------------------------------------------
 void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut)
 {
+#ifdef WIN32
+	// Really could use some interprocess protection, mutex etc
+	// any side effect should be too bad???? :)
+	DWORD timeout = BoxTimeToMilliSeconds(RequiredDelay);
+
+	while ( this->mReceivedCommandConn == false )
+	{
+		Sleep(1);
+
+		if ( timeout == 0 )
+		{
+			DoSyncFlagOut = false;
+			SyncIsForcedOut = false;
+			return;
+		}
+		timeout--;
+	}
+	this->mReceivedCommandConn = false;
+	DoSyncFlagOut = this->mDoSyncFlagOut;
+	SyncIsForcedOut = this->mSyncIsForcedOut;
+
+	return;
+#else // ! WIN32
 	ASSERT(mpCommandSocketInfo != 0);
 	if(mpCommandSocketInfo == 0) {::sleep(1); return;} // failure case isn't too bad
 	
@@ -713,9 +932,9 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 						}
 					}
 				}
-#endif
+#endif // WIN32
 				
-				// Is this an acceptible connection?
+				// Is this an acceptable connection?
 				if(!uidOK)
 				{
 					// Dump the connection
@@ -833,6 +1052,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			CloseCommandConnection();
 		}
 	}
+#endif // WIN32
 }
 
 
@@ -849,13 +1069,19 @@ void BackupDaemon::CloseCommandConnection()
 	try
 	{
 		TRACE0("Closing command connection\n");
-	
+		
+#ifdef WIN32
+		FlushFileBuffers(mpCommandSocketInfo->mListeningSocket); 
+		DisconnectNamedPipe(mpCommandSocketInfo->mListeningSocket); 
+		CloseHandle(mpCommandSocketInfo->mListeningSocket); 
+#else
 		if(mpCommandSocketInfo->mpGetLine)
 		{
 			delete mpCommandSocketInfo->mpGetLine;
 			mpCommandSocketInfo->mpGetLine = 0;
 		}
 		mpCommandSocketInfo->mpConnectedSocket.reset();
+#endif
 	}
 	catch(...)
 	{
@@ -1376,6 +1602,10 @@ void BackupDaemon::CommitIDMapsAfterSync()
 		std::string newmap(target + ".n");
 		
 		// Try to rename
+#ifdef WIN32
+		// win32 rename doesn't overwrite existing files
+		::remove(target.c_str());
+#endif
 		if(::rename(newmap.c_str(), target.c_str()) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
@@ -1658,4 +1888,3 @@ BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
 		mpGetLine = 0;
 	}
 }
-

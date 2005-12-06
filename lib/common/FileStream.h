@@ -17,12 +17,26 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifdef WIN32
+	#define INVALID_FILE NULL
+	typedef HANDLE tOSFileHandle;
+#else
+	#define INVALID_FILE -1
+	typedef int tOSFileHandle;
+#endif
+
 class FileStream : public IOStream
 {
 public:
-	FileStream(const char *Filename, int flags = O_RDONLY, int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
-	FileStream(int FileDescriptor);
-	FileStream(const FileStream &rToCopy);
+	FileStream(const char *Filename, 
+#ifdef WIN32
+		int flags = (O_RDONLY | O_BINARY),
+#else
+		int flags = O_RDONLY,
+#endif
+		int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+	FileStream(tOSFileHandle FileDescriptor);
+	
 	virtual ~FileStream();
 	
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
@@ -36,8 +50,14 @@ public:
 	virtual bool StreamClosed();
 
 private:
-	int mOSFileHandle;
+	tOSFileHandle mOSFileHandle;
 	bool mIsEOF;
+	FileStream(const FileStream &rToCopy) { /* do not call */ }
+
+#ifdef WIN32
+	// for debugging..
+	std::string fileName;
+#endif
 };
 
 

@@ -94,7 +94,11 @@ public:
 	{
 		if(mSocketHandle != -1)
 		{
+#ifdef WIN32
+			if(::closesocket(mSocketHandle) == -1)
+#else
 			if(::close(mSocketHandle) == -1)
+#endif
 			{
 				THROW_EXCEPTION(ServerException, SocketCloseError)
 			}
@@ -128,8 +132,12 @@ public:
 		}
 		
 		// Set an option to allow reuse (useful for -HUP situations!)
+#ifdef WIN32
+		if(::setsockopt(mSocketHandle, SOL_SOCKET, SO_REUSEADDR, "", 0) == -1)
+#else
 		int option = true;
 		if(::setsockopt(mSocketHandle, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option)) == -1)
+#endif
 		{
 			THROW_EXCEPTION(ServerException, SocketOpenError)
 		}

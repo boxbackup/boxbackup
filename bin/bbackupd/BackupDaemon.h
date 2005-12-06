@@ -146,7 +146,11 @@ private:
 		CommandSocketInfo(const CommandSocketInfo &);	// no copying
 		CommandSocketInfo &operator=(const CommandSocketInfo &);
 	public:
+#ifdef WIN32
+		HANDLE mListeningSocket;
+#else
 		SocketListen<SocketStream, 1 /* listen backlog */> mListeningSocket;
+#endif
 		std::auto_ptr<SocketStream> mpConnectedSocket;
 		IOStreamGetLine *mpGetLine;
 	};
@@ -160,6 +164,12 @@ private:
 	// Unused entries in the root directory wait a while before being deleted
 	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
 	std::vector<std::pair<int64_t,std::string> > mUnusedRootDirEntries;
+#ifdef WIN32
+	public:
+	void helperThread(void);
+	private:
+	bool mDoSyncFlagOut, mSyncIsForcedOut, mReceivedCommandConn;
+#endif
 };
 
 #endif // BACKUPDAEMON__H

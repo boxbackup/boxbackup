@@ -38,6 +38,10 @@ int main(int argc, const char *argv[])
 {
 	int returnCode = 0;
 
+#if defined WIN32 && ! defined NDEBUG
+	::openlog("Box Backup", 0, 0);
+#endif
+
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", "bbackupctl")
 
 	MAINHELPER_START
@@ -91,6 +95,7 @@ int main(int argc, const char *argv[])
 	// Easier coding
 	const Configuration &conf(*config);
 
+#ifndef WIN32
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
@@ -100,9 +105,17 @@ int main(int argc, const char *argv[])
 	
 	// Connect to socket
 	SocketStream connection;
+#else /* WIN32 */
+	WinNamedPipe connection;
+#endif /* ! WIN32 */
+	
 	try
 	{
+#ifdef WIN32	
+		connection.open();
+#else
 		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str());
+#endif
 	}
 	catch(...)
 	{
@@ -113,17 +126,31 @@ int main(int argc, const char *argv[])
 			"  * Another bbackupctl process is communicating with the daemon\n"	\
 			"  * Daemon is waiting to recover from an error\n"
 		);
+
+#if defined WIN32 && ! defined NDEBUG
+		syslog(LOG_ERR,"Failed to connect to the command socket");
+#endif
+
 		return 1;
 	}
 	
 	// For receiving data
+#ifdef WIN32
+	PipeGetLine getLine(connection);
+#else
 	IOStreamGetLine getLine(connection);
+#endif
 	
 	// Wait for the configuration summary
 	std::string configSummary;
 	if(!getLine.GetLine(configSummary))
 	{
 		printf("Failed to receive configuration summary from daemon\n");
+
+#if defined WIN32 && ! defined NDEBUG
+		syslog(LOG_ERR,"Failed to receive configuration summary from daemon");
+#endif
+
 		return 1;
 	}
 
@@ -131,6 +158,11 @@ int main(int argc, const char *argv[])
 	if(getLine.IsEOF())
 	{
 		printf("Server rejected the connection. Are you running bbackupctl as the same user as the daemon?\n");
+
+#if defined WIN32 && ! defined NDEBUG
+		syslog(LOG_ERR,"Server rejected the connection. Are you running bbackupctl as the same user as the daemon?");
+#endif
+
 		return 1;
 	}
 
@@ -212,6 +244,10 @@ int main(int argc, const char *argv[])
 	}
 
 	MAINHELPER_END
+
+#if defined WIN32 && ! defined NDEBUG
+	closelog();
+#endif
 	
 	return returnCode;
 }

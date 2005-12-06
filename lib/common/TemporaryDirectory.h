@@ -12,15 +12,35 @@
 
 #include <string>
 
-#ifdef TEMP_DIRECTORY_NAME
-	// Prefix name with Box to avoid clashing with OS API names
-	inline std::string BoxGetTemporaryDirectoryName()
-	{
-		return std::string(TEMP_DIRECTORY_NAME);
-	}
-#else
-	non-static temporary directory names not supported yet
+#ifdef WIN32
+	#include <windows.h>
 #endif
 
-#endif // TEMPORARYDIRECTORY__H
+// Prefix name with Box to avoid clashing with OS API names
+std::string BoxGetTemporaryDirectoryName()
+{
+#ifdef WIN32
+	// http://msdn.microsoft.com/library/default.asp?
+	// url=/library/en-us/fileio/fs/creating_and_using_a_temporary_file.asp
 
+	DWORD dwRetVal;
+	DWORD dwBufSize = BUFSIZE;
+	char lpPathBuffer[BUFSIZE];
+	
+	// Get the temp path.
+	dwRetVal = GetTempPath(dwBufSize,     // length of the buffer
+						   lpPathBuffer); // buffer for path 
+	if (dwRetVal > dwBufSize)
+	{
+		THROW_EXCEPTION(CommonException, TempDirPathTooLong)
+	}
+	
+	return std::string(lpPathBuffer);
+#elif defined TEMP_DIRECTORY_NAME
+	return std::string(TEMP_DIRECTORY_NAME);
+#else	
+	#error non-static temporary directory names not supported yet
+#endif
+}
+
+#endif // TEMPORARYDIRECTORY__H

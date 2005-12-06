@@ -287,7 +287,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 //
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroModificationTimes, box_time_t *pModTime,
-	box_time_t *pAttrModTime, int64_t *pFileSize, ino_t *pInodeNumber, bool *pHasMultipleLinks)
+	box_time_t *pAttrModTime, int64_t *pFileSize, InodeRefType *pInodeNumber, bool *pHasMultipleLinks)
 {
 	StreamableMemBlock *pnewAttr = 0;
 	try
@@ -316,6 +316,29 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		}
 
 		FillExtendedAttr(*pnewAttr, Filename);
+
+#ifdef WIN32
+		//this is to catch those problems with invalid time stamps stored...
+		//need to find out the reason why - but also a catch as well.
+		
+		//__time64_t winTime = BoxTimeToSeconds(pattr->ModificationTime);
+
+		box_time_t bob = BoxTimeToSeconds(pattr->ModificationTime);
+		__time64_t winTime = bob;
+		if (_gmtime64(&winTime) == 0 )
+		{
+			::syslog(LOG_ERR, "Corrupt value in store Modification Time in file %s", Filename);
+			pattr->ModificationTime = 0;
+		}
+
+		bob = BoxTimeToSeconds(pattr->AttrModificationTime);
+		winTime = bob;
+		if (_gmtime64(&winTime) == 0 )
+		{
+			::syslog(LOG_ERR, "Corrupt value in store Attr Modification Time in file %s", Filename);
+			pattr->AttrModificationTime = 0;
+		}
+#endif
 
 		// Attributes ready. Encrypt into this block
 		EncryptAttr(*pnewAttr);
@@ -943,6 +966,3 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, cons
 	uint64_t result = *((uint64_t *)(digest.DigestAsData()));
 	return result;
 }
-
-
-

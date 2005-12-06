@@ -25,7 +25,7 @@ BEGIN
 	$platform_lib_files = '@LIBS@';
 
 	# get version
-	open VERSION,"VERSION.txt";
+	open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
 	$product_version = <VERSION>;
 	chomp $product_version;
 	$product_name = <VERSION>;
