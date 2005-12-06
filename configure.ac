@@ -134,12 +134,6 @@ fi
 AC_CHECK_FUNCS([flock])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
-if test "x$ac_cv_func_flock" != "xyes" && \
-   test "x$ac_cv_have_decl_O_EXLOCK" != "xyes" && \
-   test "x$ac_cv_have_decl_F_SETLK" != "xyes"
-then
-  AC_MSG_ERROR([[cannot work out how to do file locking on your platform]])
-fi
 
 ## Get tmpdir
 temp_directory_name="/tmp"
