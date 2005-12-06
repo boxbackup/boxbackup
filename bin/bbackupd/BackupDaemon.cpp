@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <stdio.h>
 #include <unistd.h>
 
 #ifndef WIN32
@@ -1184,6 +1185,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	std::map<std::string, int> mounts;
 	int numIDMaps = 0;
 
+#ifdef HAVE_MOUNTS
 #ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
 	// Linux and others can't tell you where a directory is mounted. So we
 	// have to read the mount entries from /etc/mtab! Bizarre that the OS
@@ -1222,7 +1224,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			::endmntent(mountPointsFile);
 		throw;
 	}
-#else
+#else // ! HAVE_STRUCT_MNTENT_MNT_DIR
 	// Open mounts file
 	mountPointsFile = ::fopen("/etc/mnttab", "r");
 	if(mountPointsFile == 0)
@@ -1249,7 +1251,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		::fclose(mountPointsFile);
 		throw;
 	}
-#endif
+#endif // HAVE_STRUCT_MNTENT_MNT_DIR
 	// Check sorting and that things are as we expect
 	ASSERT(mountPoints.size() > 0);
 #ifndef NDEBUG
@@ -1259,6 +1261,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	}
 #endif // n NDEBUG
 #endif // n HAVE_STRUCT_STATFS_F_MNTONNAME
+#endif // HAVE_MOUNTS
 
 	// Then... go through each of the entries in the configuration,
 	// making sure there's a directory created for it.
@@ -1280,6 +1283,7 @@ TRACE0("new location\n");
 			
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
+#ifdef HAVE_MOUNTS
 #ifdef HAVE_STRUCT_STATFS_F_MNTONNAME
 				// BSD style statfs -- includes mount point, which is nice.
 				struct statfs s;
@@ -1317,6 +1321,9 @@ TRACE0("new location\n");
 					TRACE2("mount point chosen for %s is %s\n", ploc->mPath.c_str(), mountName.c_str());
 				}
 #endif
+#else // !HAVE_MOUNTS
+				std::string mountName = "none";
+#endif // HAVE_MOUNTS
 				
 				// Got it?
 				std::map<std::string, int>::iterator f(mounts.find(mountName));

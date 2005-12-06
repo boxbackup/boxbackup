@@ -3,6 +3,7 @@ dnl
 dnl This macro will find out how to get mount point information if possible.
 dnl
 dnl The following defines will be set as appropriate:
+dnl HAVE_MOUNTS
 dnl HAVE_MNTENT_H
 dnl HAVE_SYS_MNTTAB_H
 dnl HAVE_SYS_MOUNT_H
@@ -35,6 +36,7 @@ AC_DEFUN([AX_CHECK_MOUNT_POINT], [
      test "x$ac_cv_member_struct_mntent_mnt_dir" = "xyes" || \
      test "x$ac_cv_member_struct_mnttab_mnt_mountp" = "xyes"
   then
+    AC_DEFINE([HAVE_MOUNTS], [1], [Define to 1 if this platform supports mounts])
     m4_ifvaln([$1],[$1],[:])dnl
     m4_ifvaln([$2],[else $2])dnl
   fi
