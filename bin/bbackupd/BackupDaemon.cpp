@@ -223,7 +223,7 @@ void BackupDaemon::DeleteAllLocations()
 // --------------------------------------------------------------------------
 DWORD WINAPI HelperThread( LPVOID lpParam ) 
 { 
-	printf( "Parameter = %d.", *(DWORD*)lpParam ); 
+	printf( "Parameter = %lu.", *(DWORD*)lpParam ); 
 	((BackupDaemon *)lpParam)->helperThread();
 
 	return 0;
@@ -275,7 +275,8 @@ void BackupDaemon::helperThread(void)
 			// Send a header line summarising the configuration and current state
 			const Configuration &conf(GetConfiguration());
 			char summary[256];
-			int summarySize = sprintf(summary, "bbackupd: %d %d %d %d\nstate %d\n",
+			size_t summarySize = sprintf(summary, 
+				"bbackupd: %d %d %d %d\nstate %d\n",
 				conf.GetKeyValueBool("AutomaticBackup"),
 				conf.GetKeyValueInt("UpdateStoreInterval"),
 				conf.GetKeyValueInt("MinimumFileAge"),
@@ -309,8 +310,6 @@ void BackupDaemon::helperThread(void)
 				this->CloseCommandConnection();
 				continue;
 			}
-
-			DWORD cbBytesRead;
 
 			PipeGetLine readLine(mpCommandSocketInfo->mListeningSocket);
 			std::string command;
