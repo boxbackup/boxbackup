@@ -30,3 +30,7 @@ with size s, then it should be called with
 and now GetChecksum will return the checksum of the block (pBlock+1) of size s.
 
 
+FUNCTION RollingChecksum::RollForwardSeveral()
+
+Similar to RollForward(), but is more efficient for skipping several bytes at once.  Takes pointers to the data buffer rather than the actual data values.
+

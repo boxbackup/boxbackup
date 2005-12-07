@@ -270,6 +270,12 @@ int test(int argc, const char *argv[])
 	RAND_pseudo_bytes(checkdata, CHECKSUM_DATA_SIZE);
 	for(int size = CHECKSUM_BLOCK_SIZE_BASE; size <= CHECKSUM_BLOCK_SIZE_LAST; ++size)
 	{
+		// Test skip-roll code
+		RollingChecksum rollFast(checkdata, size);
+		rollFast.RollForwardSeveral(checkdata, checkdata+size, size, CHECKSUM_ROLLS/2);
+		RollingChecksum calc(checkdata + (CHECKSUM_ROLLS/2), size);
+		TEST_THAT(calc.GetChecksum() == rollFast.GetChecksum());
+
 		//printf("size = %d\n", size);
 		// Checksum to roll
 		RollingChecksum roll(checkdata, size);
