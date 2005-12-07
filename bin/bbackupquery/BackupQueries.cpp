@@ -1163,7 +1163,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				continue;
 			}
 
-#ifdef PLATFORM_dirent_BROKEN_d_type
+#ifndef HAVE_VALID_DIRENT_D_TYPE
 			std::string fn(rLocalDir);
 			fn += '/';
 			fn += localDirEn->d_name;
@@ -1196,7 +1196,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				// Directory
 				localDirs.insert(std::string(localDirEn->d_name));
 			}
-#endif // PLATFORM_dirent_BROKEN_d_type
+#endif
 		}
 		// Close directory
 		if(::closedir(dirhandle) != 0)

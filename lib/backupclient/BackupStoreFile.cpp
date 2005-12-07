@@ -154,7 +154,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 	int64_t headerEnd = rFile.GetPosition();
 	
 	// Get number of blocks
-	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
+	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
 	
 	// Calculate where the block index will be, check it's reasonable
 	int64_t blockIndexLoc = fileSize - ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
@@ -179,7 +179,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		&& ntohl(blkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V0
 #endif
 		)
-		|| (int64_t)ntoh64(blkhdr.mNumBlocks) != numBlocks)
+		|| (int64_t)box_ntoh64(blkhdr.mNumBlocks) != numBlocks)
 	{
 		// Bad header -- either magic value or number of blocks is wrong
 		return false;
@@ -201,7 +201,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		}
 		
 		// Check size and location
-		int64_t blkSize = ntoh64(blk.mEncodedSize);
+		int64_t blkSize = box_ntoh64(blk.mEncodedSize);
 		if(blkSize <= 0)
 		{
 			// Mark that this file references another file
@@ -228,7 +228,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 	}
 	
 	// Check that if another block is references, then the ID is there, and if one isn't there is no ID.
-	int64_t otherID = ntoh64(blkhdr.mOtherFileID);
+	int64_t otherID = box_ntoh64(blkhdr.mOtherFileID);
 	if((otherID != 0 && blockFromOtherFileReferenced == false)
 		|| (otherID == 0 && blockFromOtherFileReferenced == true))
 	{
@@ -245,7 +245,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 	// Does the caller want the container ID?
 	if(pContainerIDOut)
 	{
-		*pContainerIDOut = ntoh64(hdr.mContainerID);
+		*pContainerIDOut = box_ntoh64(hdr.mContainerID);
 	}
 
 	// Passes all tests
@@ -494,7 +494,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		int64_t endOfHeaderPos = mrEncodedFile.GetPosition();
 		
 		// Work out where the index is
-		int64_t numBlocks = ntoh64(hdr.mNumBlocks);
+		int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
 		int64_t blockHeaderPos = fileSize - ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
 		
 		// Seek to that position
@@ -508,7 +508,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 	}
 	
 	// Check view of blocks from block header and file header match
-	if(mNumBlocks != (int64_t)ntoh64(hdr.mNumBlocks))
+	if(mNumBlocks != (int64_t)box_ntoh64(hdr.mNumBlocks))
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
@@ -523,7 +523,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		for(int64_t e = 0; e < mNumBlocks; e++)
 		{
 			// Get the clear and encoded size
-			int32_t encodedSize = ntoh64(entry[e].mEncodedSize);
+			int32_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
 			ASSERT(encodedSize > 0);
 			
 			// Larger?
@@ -587,10 +587,10 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 	}
 	
 	// Get the number of blocks out of the header
-	mNumBlocks = ntoh64(blkhdr.mNumBlocks);
+	mNumBlocks = box_ntoh64(blkhdr.mNumBlocks);
 	
 	// Read the IV base
-	mEntryIVBase = ntoh64(blkhdr.mEntryIVBase);
+	mEntryIVBase = box_ntoh64(blkhdr.mEntryIVBase);
 	
 	// Load the block entries in?
 	if(mNumBlocks > 0)
@@ -673,7 +673,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		
 			// Get the size from the block index
 			const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
-			int32_t encodedSize = ntoh64(entry[mCurrentBlock].mEncodedSize);
+			int32_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
 			if(encodedSize <= 0)
 			{
 				// The caller is attempting to decode a file which is the direct result of a diff
@@ -697,7 +697,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			iv += mCurrentBlock;
 			// Convert to network byte order before encrypting with it, so that restores work on
 			// platforms with different endiannesses.
-			iv = hton64(iv);
+			iv = box_hton64(iv);
 			sBlowfishDecryptBlockEntry.SetIV(&iv);
 			
 			// Decrypt the encrypted section
@@ -865,7 +865,7 @@ void BackupStoreFile::SetBlowfishKeys(const void *pKey, int KeyLength, const voi
 }
 
 
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1036,7 +1036,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 		THROW_EXCEPTION(BackupStoreException, ChunkHasUnknownEncoding)
 	}
 	
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	// Choose cipher
 	CipherContext &cipher((encodingType == HEADER_AES_ENCODING)?sAESDecrypt:sBlowfishDecrypt);
 #else
@@ -1177,7 +1177,7 @@ std::auto_ptr<IOStream> BackupStoreFile::ReorderFileToStreamOrder(IOStream *pStr
 	}
 	
 	// Get number of blocks
-	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
+	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
 	
 	// Calculate where the block index will be, check it's reasonable
 	int64_t blockIndexSize = ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
@@ -1277,8 +1277,8 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 #endif
 
 	// Get basic information
-	int64_t numBlocks = ntoh64(hdr.mNumBlocks);
-	uint64_t entryIVBase = ntoh64(hdr.mEntryIVBase);
+	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
+	uint64_t entryIVBase = box_ntoh64(hdr.mEntryIVBase);
 	
 	//TODO: Verify that these sizes look reasonable
 	
@@ -1303,7 +1303,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 			// Calculate IV for this entry
 			uint64_t iv = entryIVBase;
 			iv += b;
-			iv = hton64(iv);
+			iv = box_hton64(iv);
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
 			if(isOldVersion)
 			{

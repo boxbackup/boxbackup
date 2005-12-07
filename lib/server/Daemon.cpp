@@ -520,7 +520,7 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	// -- make sure other platforms include the image name somewhere so ps listings give
 	// useful information.
 
-#ifdef PLATFORM_HAVE_setproctitle
+#ifdef HAVE_SETPROCTITLE
 	// optional arguments
 	va_list args;
 	va_start(args, format);
@@ -532,7 +532,7 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	// Set process title
 	::setproctitle("%s", title);
 	
-#endif // PLATFORM_HAVE_setproctitle
+#endif // HAVE_SETPROCTITLE
 }
 
 

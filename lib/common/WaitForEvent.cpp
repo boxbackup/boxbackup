@@ -25,7 +25,7 @@
 //		Created: 9/3/04
 //
 // --------------------------------------------------------------------------
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 WaitForEvent::WaitForEvent(int Timeout)
 	: mKQueue(::kqueue()),
 	  mpTimeout(0)
@@ -56,7 +56,7 @@ WaitForEvent::WaitForEvent(int Timeout)
 // --------------------------------------------------------------------------
 WaitForEvent::~WaitForEvent()
 {
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	::close(mKQueue);
 	mKQueue = -1;
 #else
@@ -79,7 +79,7 @@ WaitForEvent::~WaitForEvent()
 // --------------------------------------------------------------------------
 void WaitForEvent::SetTimeout(int Timeout)
 {
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	// Generate timeout
 	if(Timeout != TimeoutInfinite)
 	{
@@ -106,7 +106,7 @@ void WaitForEvent::SetTimeout(int Timeout)
 // --------------------------------------------------------------------------
 void *WaitForEvent::Wait()
 {
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	// Event return structure
 	struct kevent e;
 	::memset(&e, 0, sizeof(e));

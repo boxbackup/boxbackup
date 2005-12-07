@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <new>
 #include <vector>
-#ifdef PLATFORM_HAVE_XATTR
+#ifdef HAVE_SYS_XATTR_H
 #include <cerrno>
 #include <sys/xattr.h>
 #endif
@@ -34,7 +34,7 @@
 #include "MemLeakFindOn.h"
 
 // set packing to one byte
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "BeginStructPackForWire.h"
 #else
 BEGIN_STRUCTURE_PACKING_FOR_WIRE
@@ -73,7 +73,7 @@ typedef struct
 } attributeHashData;
 
 // Use default packing
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "EndStructPackForWire.h"
 #else
 END_STRUCTURE_PACKING_FOR_WIRE
@@ -359,12 +359,12 @@ void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock,
 	}
 	else
 	{
-		pattr->ModificationTime = hton64(FileModificationTime(st));
-		pattr->AttrModificationTime = hton64(FileAttrModificationTime(st));
+		pattr->ModificationTime = box_hton64(FileModificationTime(st));
+		pattr->AttrModificationTime = box_hton64(FileAttrModificationTime(st));
 	}
 	pattr->Mode = htons(st.st_mode);
 
-#ifdef PLATFORM_stat_NO_st_flags
+#ifndef HAVE_STRUCT_STAT_ST_FLAGS
 	pattr->UserDefinedFlags = 0;
 	pattr->FileGenerationNumber = 0;
 #else
@@ -413,7 +413,7 @@ void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBl
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename)
 {
-#ifdef PLATFORM_HAVE_XATTR
+#ifdef HAVE_SYS_XATTR_H
 	int listBufferSize = 1000;
 	char* list = new char[listBufferSize];
 
@@ -587,7 +587,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 	// If working as root, set user IDs
 	if(::geteuid() == 0)
 	{
-		#ifdef PLATFORM_LCHOWN_NOT_SUPPORTED
+		#ifndef HAVE_LCHOWN
 			// only if not a link, can't set their owner on this platform
 			if((mode & S_IFMT) != S_IFLNK)
 			{
@@ -617,7 +617,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 	}
 
 	// Set modification time?
-	box_time_t modtime = ntoh64(pattr->ModificationTime);
+	box_time_t modtime = box_ntoh64(pattr->ModificationTime);
 	if(modtime != 0)
 	{
 		// Work out times as timevals
@@ -718,7 +718,7 @@ void BackupClientFileAttributes::EnsureClearAvailable() const
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::WriteExtendedAttr(const char *Filename, int xattrOffset) const
 {
-#ifdef PLATFORM_HAVE_XATTR
+#ifdef HAVE_SYS_XATTR_H
 	const char* buffer = static_cast<char*>(mpClearAttributes->GetBuffer());
 
 	u_int32_t xattrBlockLength = 0;

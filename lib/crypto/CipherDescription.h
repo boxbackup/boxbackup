@@ -47,7 +47,7 @@ public:
 		Mode_OFB = 3
 	} CipherMode;
 
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	// For the old version of OpenSSL, we need to be able to store cipher descriptions.
 	virtual CipherDescription *Clone() const = 0;
 	// And to be able to store new IVs

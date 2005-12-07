@@ -54,7 +54,7 @@ void BackupClientCryptoKeys_Setup(const char *KeyMaterialFilename)
 	// Tell the files how to encrypt
 	BackupStoreFile::SetBlowfishKeys(KeyMaterial + BACKUPCRYPTOKEYS_ATTRIBUTES_KEY_START, BACKUPCRYPTOKEYS_ATTRIBUTES_KEY_LENGTH,
 		KeyMaterial + BACKUPCRYPTOKEYS_FILE_BLOCK_ENTRY_KEY_START, BACKUPCRYPTOKEYS_FILE_BLOCK_ENTRY_KEY_LENGTH);
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	// Use AES where available
 	BackupStoreFile::SetAESKey(KeyMaterial + BACKUPCRYPTOKEYS_FILE_AES_KEY_START, BACKUPCRYPTOKEYS_FILE_AES_KEY_LENGTH);
 #endif

@@ -19,7 +19,7 @@
 #include "MemLeakFindOn.h"
 
 // set packing to one byte
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "BeginStructPackForWire.h"
 #else
 BEGIN_STRUCTURE_PACKING_FOR_WIRE
@@ -59,7 +59,7 @@ typedef struct
 } en_StreamFormatDepends;
 
 // Use default packing
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "EndStructPackForWire.h"
 #else
 END_STRUCTURE_PACKING_FOR_WIRE
@@ -135,9 +135,9 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	}
 	
 	// Get data
-	mObjectID = ntoh64(hdr.mObjectID);
-	mContainerID = ntoh64(hdr.mContainerID);
-	mAttributesModTime = ntoh64(hdr.mAttributesModTime);
+	mObjectID = box_ntoh64(hdr.mObjectID);
+	mContainerID = box_ntoh64(hdr.mContainerID);
+	mAttributesModTime = box_ntoh64(hdr.mAttributesModTime);
 	
 	// Options
 	int32_t options = ntohl(hdr.mOptionsPresent);
@@ -231,9 +231,9 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	dir_StreamFormat hdr;
 	hdr.mMagicValue = htonl(OBJECTMAGIC_DIR_MAGIC_VALUE);
 	hdr.mNumEntries = htonl(count);
-	hdr.mObjectID = hton64(mObjectID);
-	hdr.mContainerID = hton64(mContainerID);
-	hdr.mAttributesModTime = hton64(mAttributesModTime);
+	hdr.mObjectID = box_hton64(mObjectID);
+	hdr.mContainerID = box_hton64(mContainerID);
+	hdr.mAttributesModTime = box_hton64(mAttributesModTime);
 	hdr.mOptionsPresent = htonl(options);
 	
 	// Write header
@@ -480,10 +480,10 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 	mAttributes.ReadFromStream(rStream, Timeout);
 
 	// Store the rest of the bits
-	mModificationTime =		ntoh64(entry.mModificationTime);
-	mObjectID = 			ntoh64(entry.mObjectID);
-	mSizeInBlocks = 		ntoh64(entry.mSizeInBlocks);
-	mAttributesHash =		ntoh64(entry.mAttributesHash);
+	mModificationTime =		box_ntoh64(entry.mModificationTime);
+	mObjectID = 			box_ntoh64(entry.mObjectID);
+	mSizeInBlocks = 		box_ntoh64(entry.mSizeInBlocks);
+	mAttributesHash =		box_ntoh64(entry.mAttributesHash);
 	mFlags = 				ntohs(entry.mFlags);
 	mName =					name;
 }
@@ -501,10 +501,10 @@ void BackupStoreDirectory::Entry::WriteToStream(IOStream &rStream) const
 {
 	// Build a structure
 	en_StreamFormat entry;
-	entry.mModificationTime = 	hton64(mModificationTime);
-	entry.mObjectID = 			hton64(mObjectID);
-	entry.mSizeInBlocks = 		hton64(mSizeInBlocks);
-	entry.mAttributesHash =		hton64(mAttributesHash);
+	entry.mModificationTime = 	box_hton64(mModificationTime);
+	entry.mObjectID = 			box_hton64(mObjectID);
+	entry.mSizeInBlocks = 		box_hton64(mSizeInBlocks);
+	entry.mAttributesHash =		box_hton64(mAttributesHash);
 	entry.mFlags = 				htons(mFlags);
 	
 	// Write it
@@ -536,8 +536,8 @@ void BackupStoreDirectory::Entry::ReadFromStreamDependencyInfo(IOStream &rStream
 	}
 
 	// Store the data
-	mDependsNewer = ntoh64(depends.mDependsNewer);
-	mDependsOlder = ntoh64(depends.mDependsOlder);
+	mDependsNewer = box_ntoh64(depends.mDependsNewer);
+	mDependsOlder = box_ntoh64(depends.mDependsOlder);
 }
 
 
@@ -553,8 +553,8 @@ void BackupStoreDirectory::Entry::WriteToStreamDependencyInfo(IOStream &rStream)
 {
 	// Build structure
 	en_StreamFormatDepends depends;	
-	depends.mDependsNewer = hton64(mDependsNewer);
-	depends.mDependsOlder = hton64(mDependsOlder);
+	depends.mDependsNewer = box_hton64(mDependsNewer);
+	depends.mDependsOlder = box_hton64(mDependsOlder);
 	// Write
 	rStream.Write(&depends, sizeof(depends));
 }

@@ -29,10 +29,6 @@
 #include "RaidFileController.h"
 #include "RaidFileUtil.h"
 
-#ifdef PLATFORM_LINUX
-	#include "LinuxWorkaround.h"
-#endif
-
 #include "MemLeakFindOn.h"
 
 #define READ_NUMBER_DISCS_REQUIRED	3
@@ -715,7 +711,7 @@ int RaidFileRead_Raid::ReadRecovered(void *pBuffer, int NBytes)
 					if(mLastBlockHasSize)
 					{
 						int sizeXorOffset = (mBlockSize - sizeof(FileSizeType)) + ((mStripe1Handle != -1)?mBlockSize:0);
-						*((FileSizeType*)(mRecoveryBuffer + sizeXorOffset)) ^= ntoh64(mFileSize);
+						*((FileSizeType*)(mRecoveryBuffer + sizeXorOffset)) ^= box_ntoh64(mFileSize);
 					}
 				}
 				else
@@ -1233,7 +1229,7 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			if(parityIntegralPlusOffT)
 			{
 				// Wonderful! Have the value
-				length = ntoh64(parityLastData);
+				length = box_ntoh64(parityLastData);
 			}
 			else
 			{
@@ -1298,7 +1294,7 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 						// Lovely!
 						length = stripe1LastData ^ parityLastData;
 						// Convert to host byte order
-						length = ntoh64(length);
+						length = box_ntoh64(length);
 						ASSERT(length <= (paritySize + stripe1Size));
 						// Mark is as having this to aid code later
 						lastBlockHasSize = true;
@@ -1531,10 +1527,6 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 			struct dirent *en = 0;
 			while((en = ::readdir(dirHandle)) != 0)
 			{
-#ifdef PLATFORM_LINUX
-			LinuxWorkaround_FinishDirentStruct(en, dn.c_str());
-#endif
-
 				if(en->d_name[0] == '.' && 
 					(en->d_name[1] == '\0' || (en->d_name[1] == '.' && en->d_name[2] == '\0')))
 				{
@@ -1547,7 +1539,9 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 				unsigned int countToAdd = 1;
 
 				// stat the file to find out what type it is
-#ifdef PLATFORM_SUNOS
+#ifdef HAVE_VALID_DIRENT_D_TYPE
+				if(DirReadType == DirReadType_FilesOnly && en->d_type == DT_REG)
+#else
 				struct stat st;
 				std::string fullName(dn + DIRECTORY_SEPARATOR + en->d_name);
 				if(::lstat(fullName.c_str(), &st) != 0)
@@ -1555,8 +1549,6 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 					THROW_EXCEPTION(RaidFileException, OSError)
 				}
 				if(DirReadType == DirReadType_FilesOnly && (st.st_mode & S_IFDIR) == 0)
-#else
-				if(DirReadType == DirReadType_FilesOnly && en->d_type == DT_REG)
 #endif
 				{
 					// File. Complex, need to check the extension
@@ -1585,10 +1577,10 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 						}
 					}
 				}
-#ifdef PLATFORM_SUNOS
-				if(DirReadType == DirReadType_DirsOnly && (st.st_mode & S_IFDIR))
-#else
+#ifdef HAVE_VALID_DIRENT_D_TYPE
 				if(DirReadType == DirReadType_DirsOnly && en->d_type == DT_DIR)
+#else
+				if(DirReadType == DirReadType_DirsOnly && (st.st_mode & S_IFDIR))
 #endif
 				{
 					// Directory, and we want directories

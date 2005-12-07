@@ -12,11 +12,11 @@
 
 #include <string>
 
-#ifdef PLATFORM_STATIC_TEMP_DIRECTORY_NAME
+#ifdef TEMP_DIRECTORY_NAME
 	// Prefix name with Box to avoid clashing with OS API names
 	inline std::string BoxGetTemporaryDirectoryName()
 	{
-		return std::string(PLATFORM_STATIC_TEMP_DIRECTORY_NAME);
+		return std::string(TEMP_DIRECTORY_NAME);
 	}
 #else
 	non-static temporary directory names not supported yet

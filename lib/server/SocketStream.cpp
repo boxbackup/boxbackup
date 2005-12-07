@@ -372,7 +372,7 @@ int SocketStream::GetSocketHandle()
 // --------------------------------------------------------------------------
 bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 {
-#ifdef PLATFORM_HAVE_getpeereid
+#ifdef HAVE_GETPEEREID
 	uid_t remoteEUID = 0xffff;
 	gid_t remoteEGID = 0xffff;
 
@@ -382,9 +382,9 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 		rGidOut = remoteEGID;
 		return true;
 	}
-#endif // PLATFORM_HAVE_getpeereid
+#endif
 
-#ifdef PLATFORM_HAVE_getsockopt_SO_PEERCRED
+#if HAVE_DECL_SO_PEERCRED
 	struct ucred cred;
 	socklen_t credLen = sizeof(cred);
 
@@ -394,7 +394,7 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 		rGidOut = cred.gid;
 		return true;
 	}
-#endif // PLATFORM_HAVE_getsockopt_SO_PEERCRED
+#endif
 
 	// Not available
 	return false;

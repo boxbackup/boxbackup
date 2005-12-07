@@ -26,10 +26,6 @@
 #include "BackupDaemon.h"
 #include "BackupStoreException.h"
 
-#ifdef PLATFORM_LINUX
-	#include "LinuxWorkaround.h"
-#endif
-
 #include "MemLeakFindOn.h"
 
 typedef std::map<std::string, BackupStoreDirectory::Entry *> DecryptedEntriesMap_t;
@@ -151,9 +147,9 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		currentStateChecksum.Add(&st.st_gid, sizeof(st.st_gid));
 		// Inode to be paranoid about things moving around
 		currentStateChecksum.Add(&st.st_ino, sizeof(st.st_ino));
-#ifndef PLATFORM_stat_NO_st_flags
+#ifdef HAVE_STRUCT_STAT_ST_FLAGS
 		currentStateChecksum.Add(&st.st_flags, sizeof(st.st_flags));
-#endif // n PLATFORM_stat_NO_st_flags
+#endif
 
 		StreamableMemBlock xattr;
 		BackupClientFileAttributes::FillExtendedAttr(xattr, rLocalPath.c_str());

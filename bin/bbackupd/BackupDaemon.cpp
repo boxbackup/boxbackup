@@ -12,15 +12,16 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/param.h>
-#include <sys/mount.h>
 #include <signal.h>
-#ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
-	#ifdef PLATFORM_SUNOS
-		#include <cstdio>
-		#include <sys/mnttab.h>
-	#else
-		#include <mntent.h>
-	#endif
+#ifdef HAVE_SYS_MOUNT_H
+  #include <sys/mount.h>
+#endif
+#ifdef HAVE_MNTENT_H
+  #include <mntent.h>
+#endif
+#ifdef HAVE_SYS_MNTTAB_H
+	#include <cstdio>
+	#include <sys/mnttab.h>
 #endif
 #include <sys/wait.h>
 
@@ -894,7 +895,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 
 
 
-#ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
+#ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
 	// string comparison ordering for when mount points are handled
 	// by code, rather than the OS.
 	typedef struct
@@ -957,14 +958,45 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	std::map<std::string, int> mounts;
 	int numIDMaps = 0;
 
-#ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
+#ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
 	// Linux and others can't tell you where a directory is mounted. So we
 	// have to read the mount entries from /etc/mtab! Bizarre that the OS
 	// itself can't tell you, but there you go.
 	std::set<std::string, mntLenCompare> mountPoints;
 	// BLOCK
 	FILE *mountPointsFile = 0;
-#ifdef PLATFORM_SUNOS
+
+#ifdef HAVE_STRUCT_MNTENT_MNT_DIR
+	// Open mounts file
+	mountPointsFile = ::setmntent("/proc/mounts", "r");
+	if(mountPointsFile == 0)
+	{
+		mountPointsFile = ::setmntent("/etc/mtab", "r");
+	}
+	if(mountPointsFile == 0)
+	{
+		THROW_EXCEPTION(CommonException, OSFileError);
+	}
+
+	try
+	{
+		// Read all the entries, and put them in the set
+		struct mntent *entry = 0;
+		while((entry = ::getmntent(mountPointsFile)) != 0)
+		{
+			TRACE1("Found mount point at %s\n", entry->mnt_dir);
+			mountPoints.insert(std::string(entry->mnt_dir));
+		}
+
+		// Close mounts file
+		::endmntent(mountPointsFile);
+	}
+	catch(...)
+	{
+			::endmntent(mountPointsFile);
+		throw;
+	}
+#else
 	// Open mounts file
 	mountPointsFile = ::fopen("/etc/mnttab", "r");
 	if(mountPointsFile == 0)
@@ -991,36 +1023,6 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		::fclose(mountPointsFile);
 		throw;
 	}
-#else
-		// Open mounts file
-	mountPointsFile = ::setmntent("/proc/mounts", "r");
-	if(mountPointsFile == 0)
-	{
-		mountPointsFile = ::setmntent("/etc/mtab", "r");
-	}
-		if(mountPointsFile == 0)
-		{
-			THROW_EXCEPTION(CommonException, OSFileError);
-		}
-		
-	try
-	{
-		// Read all the entries, and put them in the set
-		struct mntent *entry = 0;
-		while((entry = ::getmntent(mountPointsFile)) != 0)
-		{
-			TRACE1("Found mount point at %s\n", entry->mnt_dir);
-			mountPoints.insert(std::string(entry->mnt_dir));
-		}
-		
-		// Close mounts file
-		::endmntent(mountPointsFile);
-	}
-	catch(...)
-	{
-			::endmntent(mountPointsFile);
-		throw;
-	}
 #endif
 	// Check sorting and that things are as we expect
 	ASSERT(mountPoints.size() > 0);
@@ -1030,7 +1032,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		ASSERT(*i == "/");
 	}
 #endif // n NDEBUG
-#endif // PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
+#endif // n HAVE_STRUCT_STATFS_F_MNTONNAME
 
 	// Then... go through each of the entries in the configuration,
 	// making sure there's a directory created for it.
@@ -1052,7 +1054,17 @@ TRACE0("new location\n");
 			
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
-#ifdef PLATFORM_USES_MTAB_FILE_FOR_MOUNTS
+#ifdef HAVE_STRUCT_STATFS_F_MNTONNAME
+				// BSD style statfs -- includes mount point, which is nice.
+				struct statfs s;
+				if(::statfs(ploc->mPath.c_str(), &s) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError)
+				}
+
+				// Where the filesystem is mounted
+				std::string mountName(s.f_mntonname);
+#else
 				// Warn in logs if the directory isn't absolute
 				if(ploc->mPath[0] != '/')
 				{
@@ -1078,16 +1090,6 @@ TRACE0("new location\n");
 					}
 					TRACE2("mount point chosen for %s is %s\n", ploc->mPath.c_str(), mountName.c_str());
 				}
-#else
-				// BSD style statfs -- includes mount point, which is nice.
-				struct statfs s;
-				if(::statfs(ploc->mPath.c_str(), &s) != 0)
-				{
-					THROW_EXCEPTION(CommonException, OSFileError)
-				}
-				
-				// Where the filesystem is mounted
-				std::string mountName(s.f_mntonname);
 #endif
 				
 				// Got it?

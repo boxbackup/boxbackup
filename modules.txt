@@ -12,9 +12,9 @@
 OMIT:CYGWIN
 lib/raidfile
 END-OMIT
-lib/crypto			-lcrypto
-lib/server			-lssl -lcrypto
-lib/compress		-lz
+lib/crypto
+lib/server
+lib/compress
 test/common
 test/crypto			lib/crypto
 test/compress		lib/compress
@@ -34,8 +34,8 @@ bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
 bin/bbstoreaccounts	lib/raidfile	lib/backupstore
 bin/bbackupobjdump	lib/backupclient lib/backupstore
 END-OMIT
-bin/bbackupd		lib/server	lib/backupclient	-lLINUX_DB!+Linux
-bin/bbackupquery	-lreadline!Darwin,NetBSD -ledit!+NetBSD	-lcurses	lib/server	lib/backupclient
+bin/bbackupd		lib/server	lib/backupclient
+bin/bbackupquery	lib/server	lib/backupclient
 bin/bbackupctl		lib/server	lib/backupclient
 OMIT:CYGWIN
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile

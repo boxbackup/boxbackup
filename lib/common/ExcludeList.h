@@ -45,7 +45,7 @@ public:
 	// Mainly for tests
 	unsigned int SizeOfDefiniteList() const {return mDefinite.size();}
 	unsigned int SizeOfRegexList() const
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 		{return mRegex.size();}
 #else
 		{return 0;}
@@ -53,7 +53,7 @@ public:
 
 private:
 	std::set<std::string> mDefinite;
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	std::vector<regex_t *> mRegex;
 #endif
 
