@@ -63,7 +63,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 		// Record position
 		diff1DataStarts = rDiff1.GetPosition();
 		// Skip to index
-		rDiff1.Seek(0 - (((ntoh64(diff1Hdr.mNumBlocks)) * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader)), IOStream::SeekType_End);
+		rDiff1.Seek(0 - (((box_ntoh64(diff1Hdr.mNumBlocks)) * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader)), IOStream::SeekType_End);
 	}
 
 	// Read the index of the first diff
@@ -77,7 +77,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	int64_t diff1NumBlocks = ntoh64(diff1IdxHdr.mNumBlocks);
+	int64_t diff1NumBlocks = box_ntoh64(diff1IdxHdr.mNumBlocks);
 	// Allocate some memory
 	int64_t *diff1BlockStartPositions = (int64_t*)::malloc((diff1NumBlocks + 1) * sizeof(int64_t));
 	if(diff1BlockStartPositions == 0)
@@ -106,7 +106,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 			}
 	
 			// Where's the block?
-			int64_t blockEn = ntoh64(e.mEncodedSize);
+			int64_t blockEn = box_ntoh64(e.mEncodedSize);
 			if(blockEn <= 0)
 			{
 				// Just store the negated block number
@@ -157,7 +157,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 		{
 			THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 		}
-		int64_t diff2NumBlocks = ntoh64(diff2IdxHdr.mNumBlocks);
+		int64_t diff2NumBlocks = box_ntoh64(diff2IdxHdr.mNumBlocks);
 		int64_t diff2IndexEntriesStart = rDiff2b.GetPosition();
 		
 		// Then read all the entries
@@ -177,7 +177,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 			bool fromFileDiff1 = false;
 	
 			// Where's the block?
-			int64_t blockEn = ntoh64(e.mEncodedSize);
+			int64_t blockEn = box_ntoh64(e.mEncodedSize);
 			if(blockEn > 0)
 			{
 				// Block is present in this file -- copy to out
@@ -274,7 +274,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 			}
 	
 			// Where's the block?
-			int64_t blockEn = ntoh64(e.mEncodedSize);
+			int64_t blockEn = box_ntoh64(e.mEncodedSize);
 		
 			// If it's not in this file, it needs modification...
 			if(blockEn <= 0)
@@ -292,12 +292,12 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 						ASSERT(nb <= diff1NumBlocks);
 					}
 					int64_t size = diff1BlockStartPositions[nb] - diff1BlockStartPositions[blockIndex];
-					e.mEncodedSize = hton64(size);
+					e.mEncodedSize = box_hton64(size);
 				}
 				else
 				{
 					// Block in the original file, use translated value
-					e.mEncodedSize = hton64(diff1BlockStartPositions[blockIndex]);
+					e.mEncodedSize = box_hton64(diff1BlockStartPositions[blockIndex]);
 				}
 			}
 			

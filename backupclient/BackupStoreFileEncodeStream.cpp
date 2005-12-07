@@ -178,9 +178,9 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEnc
 		// Header
 		file_StreamFormat hdr;
 		hdr.mMagicValue = htonl(OBJECTMAGIC_FILE_MAGIC_VALUE_V1);
-		hdr.mNumBlocks = (mSendData)?(hton64(mTotalBlocks)):(0);
-		hdr.mContainerID = hton64(ContainerID);
-		hdr.mModificationTime = hton64(modTime);
+		hdr.mNumBlocks = (mSendData)?(box_hton64(mTotalBlocks)):(0);
+		hdr.mContainerID = box_hton64(ContainerID);
+		hdr.mModificationTime = box_hton64(modTime);
 		// add a bit to make it harder to tell what's going on -- try not to give away too much info about file size
 		hdr.mMaxBlockClearSize = htonl(maxBlockClearSize + 128);
 		hdr.mOptions = 0;		// no options defined yet
@@ -221,9 +221,9 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEnc
 			// Write an empty block index for the symlink
 			file_BlockIndexHeader blkhdr;
 			blkhdr.mMagicValue = htonl(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1);
-			blkhdr.mOtherFileID = hton64(0);	// not other file ID
-			blkhdr.mEntryIVBase = hton64(0);
-			blkhdr.mNumBlocks = hton64(0);
+			blkhdr.mOtherFileID = box_hton64(0);	// not other file ID
+			blkhdr.mEntryIVBase = box_hton64(0);
+			blkhdr.mNumBlocks = box_hton64(0);
 			mData.Write(&blkhdr, sizeof(blkhdr));
 		}
 	
@@ -338,12 +338,12 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 						file_BlockIndexHeader blkhdr;
 						blkhdr.mMagicValue = htonl(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1);
 						ASSERT(mpRecipe != 0);
-						blkhdr.mOtherFileID = hton64(mpRecipe->GetOtherFileID());
-						blkhdr.mNumBlocks = hton64(mTotalBlocks);
+						blkhdr.mOtherFileID = box_hton64(mpRecipe->GetOtherFileID());
+						blkhdr.mNumBlocks = box_hton64(mTotalBlocks);
 						
 						// Generate the IV base
 						Random::Generate(&mEntryIVBase, sizeof(mEntryIVBase));
-						blkhdr.mEntryIVBase = hton64(mEntryIVBase);
+						blkhdr.mEntryIVBase = box_hton64(mEntryIVBase);
 						
 						mData.Write(&blkhdr, sizeof(blkhdr));
 					}
@@ -568,7 +568,7 @@ void BackupStoreFileEncodeStream::StoreBlockIndexEntry(int64_t EncSizeOrBlkIndex
 
 	// Then the clear section
 	file_BlockIndexEntry entry;
-	entry.mEncodedSize = hton64(((uint64_t)EncSizeOrBlkIndex));
+	entry.mEncodedSize = box_hton64(((uint64_t)EncSizeOrBlkIndex));
 	
 	// Then encrypt the encryted section
 	// Generate the IV from the block number
@@ -580,7 +580,7 @@ void BackupStoreFileEncodeStream::StoreBlockIndexEntry(int64_t EncSizeOrBlkIndex
 	iv += mAbsoluteBlockNumber;
 	// Convert to network byte order before encrypting with it, so that restores work on
 	// platforms with different endiannesses.
-	iv = hton64(iv);
+	iv = box_hton64(iv);
 	sBlowfishEncryptBlockEntry.SetIV(&iv);
 
 	// Encode the data

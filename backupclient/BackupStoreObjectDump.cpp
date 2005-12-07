@@ -152,9 +152,9 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 	}
 
 	OutputLine(file, ToTrace, "File object.\nContainer ID: %llx\nModification time: %llx\n"\
-		"Max block clear size: %d\nOptions: %08x\nNum blocks: %d\n", ntoh64(hdr.mContainerID),
-			ntoh64(hdr.mModificationTime), ntohl(hdr.mMaxBlockClearSize), ntohl(hdr.mOptions),
-			ntoh64(hdr.mNumBlocks));
+		"Max block clear size: %d\nOptions: %08x\nNum blocks: %d\n", box_ntoh64(hdr.mContainerID),
+			box_ntoh64(hdr.mModificationTime), ntohl(hdr.mMaxBlockClearSize), ntohl(hdr.mOptions),
+			box_ntoh64(hdr.mNumBlocks));
 
 	// Read the next two objects
 	BackupStoreFilename fn;
@@ -178,9 +178,9 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 		OutputLine(file, ToTrace, "WARNING: Block header doesn't have the correct magic\n");
 	}
 	// number of blocks
-	int64_t nblocks = ntoh64(bhdr.mNumBlocks);
+	int64_t nblocks = box_ntoh64(bhdr.mNumBlocks);
 	OutputLine(file, ToTrace, "Other file ID (for block refs): %llx\nNum blocks (in blk hdr): %lld\n",
-		ntoh64(bhdr.mOtherFileID), nblocks);
+		box_ntoh64(bhdr.mOtherFileID), nblocks);
 
 	// Dump info about each block
 	OutputLine(file, ToTrace, "======== ===== ==========\n   Index Where  EncSz/Idx\n");
@@ -193,7 +193,7 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 			OutputLine(file, ToTrace, "Didn't manage to read block %lld from file\n", b);
 			continue;
 		}
-		int64_t s = ntoh64(en.mEncodedSize);
+		int64_t s = box_ntoh64(en.mEncodedSize);
 		if(s > 0)
 		{
 			nnew++;

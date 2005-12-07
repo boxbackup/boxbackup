@@ -423,13 +423,13 @@ void Protocol::Read(int64_t &rOut)
 	READ_START_CHECK
 	READ_CHECK_BYTES_AVAILABLE(sizeof(int64_t))
 	
-#ifdef PLATFORM_ALIGN_INT
+#ifdef HAVE_ALIGNED_ONLY_INT64
 	int64_t nvalue;
 	memcpy(&nvalue, mpBuffer + mReadOffset, sizeof(int64_t));
 #else
 	int64_t nvalue = *((int64_t*)(mpBuffer + mReadOffset));
 #endif
-	rOut = ntoh64(nvalue);
+	rOut = box_ntoh64(nvalue);
 
 	mReadOffset += sizeof(int64_t);
 }
@@ -447,7 +447,7 @@ void Protocol::Read(int32_t &rOut)
 	READ_START_CHECK
 	READ_CHECK_BYTES_AVAILABLE(sizeof(int32_t))
 	
-#ifdef PLATFORM_ALIGN_INT
+#ifdef HAVE_ALIGNED_ONLY_INT32
 	int32_t nvalue;
 	memcpy(&nvalue, mpBuffer + mReadOffset, sizeof(int32_t));
 #else
@@ -558,8 +558,8 @@ void Protocol::Write(int64_t Value)
 	WRITE_START_CHECK
 	WRITE_ENSURE_BYTES_AVAILABLE(sizeof(int64_t))
 
-	int64_t nvalue = hton64(Value);
-#ifdef PLATFORM_ALIGN_INT
+	int64_t nvalue = box_hton64(Value);
+#ifdef HAVE_ALIGNED_ONLY_INT64
 	memcpy(mpBuffer + mWriteOffset, &nvalue, sizeof(int64_t));
 #else
 	*((int64_t*)(mpBuffer + mWriteOffset)) = nvalue;
@@ -582,7 +582,7 @@ void Protocol::Write(int32_t Value)
 	WRITE_ENSURE_BYTES_AVAILABLE(sizeof(int32_t))
 
 	int32_t nvalue = htonl(Value);
-#ifdef PLATFORM_ALIGN_INT
+#ifdef HAVE_ALIGNED_ONLY_INT32
 	memcpy(mpBuffer + mWriteOffset, &nvalue, sizeof(int32_t));
 #else
 	*((int32_t*)(mpBuffer + mWriteOffset)) = nvalue;

@@ -16,7 +16,7 @@
 #include <poll.h>
 #include <memory>
 #include <string>
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	#include <sys/event.h>
 	#include <sys/time.h>
 #endif
@@ -226,7 +226,7 @@ public:
 	
 	// Functions to allow adding to WaitForEvent class, for efficient waiting
 	// on multiple sockets.
-#ifndef PLATFORM_KQUEUE_NOT_SUPPORTED
+#ifdef HAVE_KQUEUE
 	// --------------------------------------------------------------------------
 	//
 	// Function

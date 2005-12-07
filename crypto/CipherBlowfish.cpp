@@ -11,7 +11,7 @@
 
 #include <openssl/evp.h>
 
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	#include <string.h>
 	#include <strings.h>
 #endif
@@ -34,7 +34,7 @@
 CipherBlowfish::CipherBlowfish(CipherDescription::CipherMode Mode, const void *pKey, unsigned int KeyLength, const void *pInitialisationVector)
 	: CipherDescription(),
 	  mMode(Mode)
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	, mpKey(pKey),
 	  mKeyLength(KeyLength),
 	  mpInitialisationVector(pInitialisationVector)
@@ -66,7 +66,7 @@ CipherBlowfish::CipherBlowfish(CipherDescription::CipherMode Mode, const void *p
 CipherBlowfish::CipherBlowfish(const CipherBlowfish &rToCopy)
 	: CipherDescription(rToCopy),
 	  mMode(rToCopy.mMode),
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	  mpKey(rToCopy.mpKey),
 	  mKeyLength(rToCopy.mKeyLength),
 	  mpInitialisationVector(rToCopy.mpInitialisationVector)
@@ -80,7 +80,7 @@ CipherBlowfish::CipherBlowfish(const CipherBlowfish &rToCopy)
 #endif
 
 
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 // Hack functions to support old OpenSSL API
 CipherDescription *CipherBlowfish::Clone() const
 {
@@ -110,7 +110,7 @@ void CipherBlowfish::SetIV(const void *pIV)
 // --------------------------------------------------------------------------
 CipherBlowfish::~CipherBlowfish()
 {
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	// Zero copy of key
 	for(unsigned int l = 0; l < mKey.size(); ++l)
 	{
@@ -134,7 +134,7 @@ CipherBlowfish &CipherBlowfish::operator=(const CipherBlowfish &rToCopy)
 	CipherDescription::operator=(rToCopy);
 
 	mMode = rToCopy.mMode;
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	mpKey = rToCopy.mpKey;
 	mKeyLength = rToCopy.mKeyLength;
 	mpInitialisationVector = rToCopy.mpInitialisationVector;
@@ -196,7 +196,7 @@ void CipherBlowfish::SetupParameters(EVP_CIPHER_CTX *pCipherContext) const
 	ASSERT(pCipherContext != 0);
 	
 	// Set key length
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	if(EVP_CIPHER_CTX_set_key_length(pCipherContext, mKeyLength) != 1)
 #else
 	if(EVP_CIPHER_CTX_set_key_length(pCipherContext, mKey.size()) != 1)
@@ -205,7 +205,7 @@ void CipherBlowfish::SetupParameters(EVP_CIPHER_CTX *pCipherContext) const
 		THROW_EXCEPTION(CipherException, EVPBadKeyLength)
 	}
 	// Set key
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	if(EVP_CipherInit_ex(pCipherContext, NULL, NULL, (unsigned char*)mpKey, (unsigned char*)mpInitialisationVector, -1) != 1)
 #else
 	if(EVP_CipherInit(pCipherContext, NULL, (unsigned char*)mKey.c_str(), (unsigned char*)mInitialisationVector, -1) != 1)
