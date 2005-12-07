@@ -56,11 +56,7 @@
 	#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #endif
 
-#ifdef WIN32
-	#ifdef __MINGW32__
-		#include <basetyps.h>
-	#endif
-
+#if defined WIN32 && !defined __MINGW32__
 	typedef __int8  int8_t;
 	typedef __int16 int16_t;
 	typedef __int32 int32_t;
@@ -75,7 +71,11 @@
 	#define HAVE_UINT16_T
 	#define HAVE_UINT32_T
 	#define HAVE_UINT64_T
-#endif // WIN32
+
+	typedef unsigned int uid_t;
+	typedef unsigned int gid_t;
+	typedef int pid_t;
+#endif // WIN32 && !__MINGW32__
 
 // Define missing types
 #ifndef HAVE_UINT8_T
@@ -116,9 +116,6 @@
 
 #ifdef WIN32
 	typedef u_int64_t InodeRefType;
-	typedef unsigned int uid_t;
-	typedef unsigned int gid_t;
-	typedef int pid_t;
 #else
 	typedef ino_t InodeRefType;
 #endif
