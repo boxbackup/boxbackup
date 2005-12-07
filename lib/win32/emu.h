@@ -3,6 +3,10 @@
 #ifndef EMU_INCLUDE
 #define EMU_INCLUDE
 
+#warning FIX ME
+#define __time64_t time_t
+#define _gmtime64 gmtime
+
 #define _STAT_DEFINED
 #define _INO_T_DEFINED
 
@@ -22,8 +26,6 @@
 //#include <sys/stat.h>
 
 #include <string>
-
-#include "BoxPlatform.h"
 
 #define gmtime_r( _clock, _result ) \
 	( *(_result) = *gmtime( (_clock) ), \
@@ -75,6 +77,19 @@ inline struct passwd * getpwnam(const char * name)
 #define S_ISUID 4
 #define S_ISGID 8
 #define S_ISVTX 16
+
+#ifndef __MINGW32__
+	//not sure if these are correct
+	//S_IWRITE -   writing permitted
+	//_S_IREAD -    reading permitted
+	//_S_IREAD | _S_IWRITE - 
+	#define S_IRUSR S_IWRITE
+	#define S_IWUSR S_IREAD
+	#define S_IRWXU (S_IREAD|S_IWRITE|S_IEXEC)
+
+	#define S_ISREG(x) (S_IFREG & x)
+	#define S_ISDIR(x) (S_IFDIR & x)
+#endif
 
 inline int utimes(const char * Filename, timeval[])
 {
@@ -133,10 +148,12 @@ inline int getuid(void)
 	return 0;
 }
 
-
-
+#ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
+#endif
 
+// MinGW provides a getopt implementation
+#ifndef __MINGW32__
 
 //this will need to be implimented if we see fit that command line
 //options are going to be used! (probably then:)
@@ -145,14 +162,15 @@ extern char *optarg;
 //optind looks like an index into the string - how far we have moved along
 extern int optind;
 extern char nextchar;
+
 inline int getopt(int count, char * const * args, char * tolookfor)
 {
 	if ( optind >= count ) return -1;
 
 	std::string str((const char *)args[optind]);
 	std::string interestin(tolookfor);
-	size_t opttolookfor = 0;
-	size_t index = -1;
+	int opttolookfor = 0;
+	int index = -1;
 	//just initialize the string - just in case it is used.
 	//optarg[0] = 0;
 	std::string opt;
@@ -188,6 +206,7 @@ inline int getopt(int count, char * const * args, char * tolookfor)
 	//indicate we have finished
 	return opt[0];
 }
+#endif // !__MINGW32__
 
 #define timespec timeval
 
@@ -201,28 +220,26 @@ struct itimerval
 //win32 deals in usec not nsec - so need to ensure this follows through
 #define tv_nsec tv_usec 
 
-typedef unsigned __int64 u_int64_t;
-typedef unsigned __int64 uint64_t;
-typedef __int64 int64_t;
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int32 u_int32_t;
-typedef __int32 int32_t;
-typedef unsigned __int16 uint16_t;
-typedef __int16 int16_t;
-typedef unsigned __int8 uint8_t;
-typedef __int8 int8_t;
+#ifndef __MINGW32__
+	typedef unsigned __int64 u_int64_t;
+	typedef unsigned __int64 uint64_t;
+	typedef __int64 int64_t;
+	typedef unsigned __int32 uint32_t;
+	typedef unsigned __int32 u_int32_t;
+	typedef __int32 int32_t;
+	typedef unsigned __int16 uint16_t;
+	typedef __int16 int16_t;
+	typedef unsigned __int8 uint8_t;
+	typedef __int8 int8_t;
 
-typedef int socklen_t;
+	typedef int socklen_t;
+#endif
 
 // I (re-)defined here for the moment; has to be removed later !!! 
+#ifndef BOX_VERSION
 #define BOX_VERSION "0.09hWin32"
+#endif
 
-//not sure if these are correct
-//S_IWRITE -   writing permitted
-//_S_IREAD -    reading permitted
-//_S_IREAD | _S_IWRITE - 
-#define S_IRUSR S_IWRITE
-#define S_IWUSR S_IREAD
 #define S_IRGRP S_IWRITE
 #define S_IWGRP S_IREAD
 #define S_IROTH S_IWRITE | S_IREAD
@@ -231,8 +248,7 @@ typedef int socklen_t;
 //again need to verify these
 #define S_IFLNK 1
 
-#define S_IRWXU (S_IREAD|S_IWRITE|S_IEXEC)
-
+#define S_ISLNK(x) ( false )
 
 //nasty implimentation to get working - to get get the win32 equiv
 #ifdef _DEBUG
@@ -241,37 +257,42 @@ typedef int socklen_t;
 
 #define vsnprintf _vsnprintf
 
+#ifndef __MINGW32__
 typedef unsigned int mode_t;
+#endif
+
 inline int mkdir(const char *pathname, mode_t mode)
 {
 	return mkdir(pathname);
 }
 
-inline int strcasecmp(const char *s1, const char *s2)
-{
-	return _stricmp(s1,s2);
-}
+#ifdef __MINGW32__
+	#include <dirent.h>
+#else
+	inline int strcasecmp(const char *s1, const char *s2)
+	{
+		return _stricmp(s1,s2);
+	}
 
-struct dirent
-{
-	char *d_name;
-};
+	struct dirent
+	{
+		char *d_name;
+	};
 
+	struct DIR
+	{
+		intptr_t		fd;	// filedescriptor
+		// struct _finddata_t	info;
+		struct _wfinddata_t	info;
+		// struct _finddata_t 	info;
+		struct dirent		result;	// d_name (first time null)
+		wchar_t			*name;	// null-terminated byte string
+	};
 
-struct DIR
-{
-	intptr_t               fd;     // filedescriptor
-	//struct _finddata_t	   info;
-	struct _wfinddata_t	   info;
-	//struct _finddata_t info;
-	struct dirent			result; // d_name (first time null)
-	wchar_t					*name;  // null-terminated byte string
-};
-
-
-DIR *opendir(const char *name);
-struct dirent *readdir(DIR *dp);
-int closedir(DIR *dp);
+	DIR *opendir(const char *name);
+	struct dirent *readdir(DIR *dp);
+	int closedir(DIR *dp);
+#endif
 
 HANDLE openfile(const char *filename, int flags, int mode);
 
@@ -301,11 +322,9 @@ inline void closelog(void)
 
 void syslog(int loglevel, const char *fmt, ...);
 
-
-inline long long int strtoll(const char *nptr, char **endptr, int base)
-{
-	return (long long int) ::_strtoi64(nptr,endptr,base);
-}
+#ifndef __MINGW32__
+#define strtoll _strtoi64
+#endif
 
 inline unsigned int sleep(unsigned int secs)
 {
@@ -366,7 +385,9 @@ struct stat {
 	time_t st_ctime;
 };
 
+#ifndef __MINGW32__
 typedef u_int64_t _ino_t;
+#endif
 
 int ourstat(const char * name, struct stat * st);
 int ourfstat(HANDLE file, struct stat * st);
@@ -398,10 +419,6 @@ inline time_t convertFileTimetoTime_t(FILETIME *fileTime)
 #define stat(x,y) ourstat(x,y)
 #define fstat(x,y) ourfstat(x,y)
 #define lstat(x,y) ourstat(x,y)
-
-#define S_ISREG(x) (S_IFREG & x)
-#define S_ISLNK(x) ( false )
-#define S_ISDIR(x) (S_IFDIR & x)
 
 int poll (struct pollfd *ufds, unsigned long nfds, int timeout);
 bool EnableBackupRights( void );
