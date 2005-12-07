@@ -9,7 +9,9 @@
 
 #include "Box.h"
 
-#include <sys/syscall.h>
+#ifdef HAVE_SYS_SYSCALL_H
+	#include <sys/syscall.h>
+#endif
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/uio.h>
@@ -17,8 +19,12 @@
 
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
-#ifdef PLATFORM_DARWIN
-	// For some reason, __syscall just doesn't work on Darwin
+#if !defined(HAVE_SYSCALL) && !defined(HAVE___SYSCALL) && !defined(HAVE___SYSCALL_NEED_DEFN)
+	#define PLATFORM_NO_SYSCALL
+#endif
+
+#ifdef PLATFORM_NO_SYSCALL
+	// For some reason, syscall just doesn't work on Darwin
 	// so instead, we build functions using assembler in a varient
 	// of the technique used in the Darwin Libc
 	extern "C" int
@@ -34,12 +40,13 @@
 	extern "C" off_t
 	TEST_lseek(int fildes, off_t offset, int whence);
 #else
-	#if defined(PLATFORM_LINUX) || defined(PLATFORM_SUNOS)
-		#undef __syscall
-		#define __syscall syscall
-	#else
-		// Need this, not declared in syscall.h
+	#ifdef HAVE___SYSCALL_NEED_DEFN
+		// Need this, not declared in syscall.h nor unistd.h
 		extern "C" off_t __syscall(quad_t number, ...);
+	#endif
+	#ifndef HAVE_SYSCALL
+		#undef syscall
+		#define syscall __syscall
 	#endif
 #endif
 
@@ -137,10 +144,10 @@ open(const char *path, int flags, mode_t mode)
 			return -1;
 		}
 	}
-#ifdef PLATFORM_DARWIN
+#ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_open(path, flags, mode);
 #else
-	int r = __syscall(SYS_open, path, flags, mode);
+	int r = syscall(SYS_open, path, flags, mode);
 #endif
 	if(intercept_enabled && intercept_filedes == -1)
 	{
@@ -158,10 +165,10 @@ extern "C" int
 close(int d)
 {
 	CHECK_FOR_FAKE_ERROR_COND(d, SIZE_ALWAYS_ERROR, SYS_close, -1);
-#ifdef PLATFORM_DARWIN
+#ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_close(d);
 #else
-	int r = __syscall(SYS_close, d);
+	int r = syscall(SYS_close, d);
 #endif
 	if(r == 0)
 	{
@@ -177,10 +184,10 @@ extern "C" ssize_t
 write(int d, const void *buf, size_t nbytes)
 {
 	CHECK_FOR_FAKE_ERROR_COND(d, nbytes, SYS_write, -1);
-#ifdef PLATFORM_DARWIN
+#ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_write(d, buf, nbytes);
 #else
-	int r = __syscall(SYS_write, d, buf, nbytes);
+	int r = syscall(SYS_write, d, buf, nbytes);
 #endif
 	if(r != -1)
 	{
@@ -193,10 +200,10 @@ extern "C" ssize_t
 read(int d, void *buf, size_t nbytes)
 {
 	CHECK_FOR_FAKE_ERROR_COND(d, nbytes, SYS_read, -1);
-#ifdef PLATFORM_DARWIN
+#ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_read(d, buf, nbytes);
 #else
-	int r = __syscall(SYS_read, d, buf, nbytes);
+	int r = syscall(SYS_read, d, buf, nbytes);
 #endif
 	if(r != -1)
 	{
@@ -216,10 +223,10 @@ readv(int d, const struct iovec *iov, int iovcnt)
 	}
 
 	CHECK_FOR_FAKE_ERROR_COND(d, nbytes, SYS_readv, -1);
-#ifdef PLATFORM_DARWIN
+#ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_readv(d, iov, iovcnt);
 #else
-	int r = __syscall(SYS_readv, d, iov, iovcnt);
+	int r = syscall(SYS_readv, d, iov, iovcnt);
 #endif
 	if(r != -1)
 	{
@@ -233,15 +240,13 @@ lseek(int fildes, off_t offset, int whence)
 {
 	// random magic for lseek syscall, see /usr/src/lib/libc/sys/lseek.c
 	CHECK_FOR_FAKE_ERROR_COND(fildes, 0, SYS_lseek, -1);
-#ifdef PLATFORM_DARWIN
+#ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_lseek(fildes, offset, whence);
 #else
-	#if defined(PLATFORM_LINUX) || defined(PLATFORM_SUNOS)
-		off_t r = __syscall(SYS_lseek, fildes, offset, whence);
+	#ifdef HAVE_LSEEK_DUMMY_PARAM
+		off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
 	#else
-		// Should swap this condition round. No reason to assume that most OS
-		// do this syscall wierdness, default should be the sensible way
-		off_t r = __syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
+		off_t r = syscall(SYS_lseek, fildes, offset, whence);
 	#endif
 #endif
 	if(r != -1)

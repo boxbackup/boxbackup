@@ -411,11 +411,11 @@ int test(int argc, const char *argv[])
 				} h;
 				TEST_THAT(file->Read(&h, sizeof(h)) == sizeof(h));
 				// Modify
-				TEST_THAT(ntoh64(h.hdr.mOtherFileID) == 0);
-				TEST_THAT(ntoh64(h.hdr.mNumBlocks) >= 2);
-				h.hdr.mOtherFileID = hton64(2345); // don't worry about endianness
-				h.e[0].mEncodedSize = hton64((ntoh64(h.e[0].mEncodedSize)) + (ntoh64(h.e[1].mEncodedSize)));
-				h.e[1].mOtherBlockIndex = hton64(-2);
+				TEST_THAT(box_ntoh64(h.hdr.mOtherFileID) == 0);
+				TEST_THAT(box_ntoh64(h.hdr.mNumBlocks) >= 2);
+				h.hdr.mOtherFileID = box_hton64(2345); // don't worry about endianness
+				h.e[0].mEncodedSize = box_hton64((box_ntoh64(h.e[0].mEncodedSize)) + (box_ntoh64(h.e[1].mEncodedSize)));
+				h.e[1].mOtherBlockIndex = box_hton64(static_cast<uint64_t>(-2));
 				// Write to modified file
 				f.Write(&h, sizeof(h));
 				// Commit new version

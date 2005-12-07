@@ -256,7 +256,7 @@ int test(int argc, const char *argv[])
 	// Cipher type
 	::printf("Blowfish...\n");
 	test_cipher<CipherBlowfish, 8>();
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	::printf("AES...\n");
 	test_cipher<CipherAES, 16>();
 #else
