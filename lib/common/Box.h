@@ -21,12 +21,13 @@
 //#define MEMLEAKFINDER_FULL_MALLOC_MONITORING
 
 #ifndef NDEBUG
-	// not available on OpenBSD... oh well.
-	//#define SHOW_BACKTRACE_ON_EXCEPTION
+	#ifdef HAVE_EXECINFO_H
+		#define SHOW_BACKTRACE_ON_EXCEPTION
+	#endif
 #endif
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
-	// include "Utils.h"
+  #include "Utils.h"
 	#define OPTIONAL_DO_BACKTRACE DumpStackBacktrace();
 #else
 	#define OPTIONAL_DO_BACKTRACE
@@ -126,55 +127,17 @@ inline uint64_t box_swap64(uint64_t x)
 		(x & 0xff00000000000000LL) >> 56);
 }
 
-// Does the platform provide a built in SWAP64 we can use?
-#ifdef PLATFORM_NO_BUILT_IN_SWAP64
-
-	#define hton64(x) box_swap64(x)
-	#define ntoh64(x) box_swap64(x)
-
+#ifdef WORDS_BIGENDIAN
+	#define box_hton64(x) (x)
+	#define box_ntoh64(x) (x)
 #else
+	#define box_hton64(x) box_swap64(x)
+	#define box_ntoh64(x) box_swap64(x)
+#endif
 
-	#if BYTE_ORDER == BIG_ENDIAN
-	
-		// Less hassle than trying to find some working things
-		// on Darwin PPC
-		#define hton64(x) (x)
-		#define ntoh64(x) (x)
-	
-	#else
-	
-		#ifdef PLATFORM_LINUX
-			// On Linux, use some internal kernal stuff to do this
-			#include <asm/byteorder.h>
-			#define hton64 __cpu_to_be64
-			#define ntoh64 __be64_to_cpu
-		#else
-			#define hton64 htobe64
-			#define ntoh64 betoh64
-		#endif
-	
-		// hack to make some of these work
-		// version in  /usr/include/sys/endian.h  doesn't include the 'LL' at the end of the constants
-		// provoking complaints from the compiler
-		#ifdef __GNUC__
-		#undef __swap64gen
-		#define __swap64gen(x) __extension__({                                  \
-				u_int64_t __swap64gen_x = (x);                                  \
-																				\
-				(u_int64_t)((__swap64gen_x & 0xff) << 56 |                      \
-					(__swap64gen_x & 0xff00LL) << 40 |                            \
-					(__swap64gen_x & 0xff0000LL) << 24 |                          \
-					(__swap64gen_x & 0xff000000LL) << 8 |                         \
-					(__swap64gen_x & 0xff00000000LL) >> 8 |                       \
-					(__swap64gen_x & 0xff0000000000LL) >> 24 |                    \
-					(__swap64gen_x & 0xff000000000000LL) >> 40 |                  \
-					(__swap64gen_x & 0xff00000000000000LL) >> 56);                \
-		})
-		#endif // __GNUC__
-	
-	#endif // n BYTE_ORDER == BIG_ENDIAN
-
-#endif // PLATFORM_NO_BUILT_IN_SWAP64
+#ifdef HAVE_NETINET_IN_H
+	#include <netinet/in.h>
+#endif
 
 #endif // BOX__H
 

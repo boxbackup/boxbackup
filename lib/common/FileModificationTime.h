@@ -16,7 +16,7 @@
 
 inline box_time_t FileModificationTime(struct stat &st)
 {
-#ifdef PLATFORM_stat_SHORT_mtime
+#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
 #else
 	box_time_t datamodified = (((int64_t)st.st_mtimespec.tv_nsec) / NANO_SEC_IN_USEC_LL)
@@ -28,7 +28,7 @@ inline box_time_t FileModificationTime(struct stat &st)
 
 inline box_time_t FileAttrModificationTime(struct stat &st)
 {
-#ifdef PLATFORM_stat_SHORT_mtime
+#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t statusmodified = ((int64_t)st.st_ctime) * (MICRO_SEC_IN_SEC_LL);
 #else
 	box_time_t statusmodified = (((int64_t)st.st_ctimespec.tv_nsec) / NANO_SEC_IN_USEC_LL)
@@ -40,7 +40,7 @@ inline box_time_t FileAttrModificationTime(struct stat &st)
 
 inline box_time_t FileModificationTimeMaxModAndAttr(struct stat &st)
 {
-#ifdef PLATFORM_stat_SHORT_mtime
+#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
 	box_time_t statusmodified = ((int64_t)st.st_ctime) * (MICRO_SEC_IN_SEC_LL);
 #else

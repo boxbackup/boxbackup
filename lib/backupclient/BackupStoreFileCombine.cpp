@@ -94,7 +94,7 @@ void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &r
 	}
 	
 	// Allocate memory for the block index of the From file
-	int64_t fromNumBlocks = ntoh64(fromHdr.mNumBlocks);
+	int64_t fromNumBlocks = box_ntoh64(fromHdr.mNumBlocks);
 	// NOTE: An extra entry is required so that the length of the last block can be calculated
 	FromIndexEntry *pFromIndex = (FromIndexEntry*)::malloc((fromNumBlocks+1) * sizeof(FromIndexEntry));
 	if(pFromIndex == 0)
@@ -110,7 +110,7 @@ void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &r
 		
 		// Read in the block index of the Diff file in small chunks, and output data
 		// for each block, either from this file, or the other file.
-		int64_t diffNumBlocks = ntoh64(hdr.mNumBlocks);
+		int64_t diffNumBlocks = box_ntoh64(hdr.mNumBlocks);
 		CopyData(rDiff /* positioned at start of data */, rDiff2, diffNumBlocks, rFrom, pFromIndex, fromNumBlocks, rOut);
 		
 		// Read in the block index again, and output the new block index, simply
@@ -160,7 +160,7 @@ static void LoadFromIndex(IOStream &rFrom, FromIndexEntry *pIndex, int64_t NumEn
 		THROW_EXCEPTION(BackupStoreException, FailedToReadBlockOnCombine)
 	}
 	if(ntohl(blkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
-		|| (int64_t)ntoh64(blkhdr.mNumBlocks) != NumEntries)
+		|| (int64_t)box_ntoh64(blkhdr.mNumBlocks) != NumEntries)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
@@ -179,7 +179,7 @@ static void LoadFromIndex(IOStream &rFrom, FromIndexEntry *pIndex, int64_t NumEn
 		pIndex[b].mFilePosition = filePos;
 
 		// Encoded size?
-		int64_t encodedSize = ntoh64(en.mEncodedSize);
+		int64_t encodedSize = box_ntoh64(en.mEncodedSize);
 		// Check that the block is actually there
 		if(encodedSize <= 0)
 		{
@@ -220,7 +220,7 @@ static void CopyData(IOStream &rDiffData, IOStream &rDiffIndex, int64_t DiffNumB
 		THROW_EXCEPTION(BackupStoreException, FailedToReadBlockOnCombine)
 	}
 	if(ntohl(diffBlkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
-		|| (int64_t)ntoh64(diffBlkhdr.mNumBlocks) != DiffNumBlocks)
+		|| (int64_t)box_ntoh64(diffBlkhdr.mNumBlocks) != DiffNumBlocks)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
@@ -245,7 +245,7 @@ static void CopyData(IOStream &rDiffData, IOStream &rDiffIndex, int64_t DiffNumB
 			}
 			
 			// What's the size value stored in the entry
-			int64_t encodedSize = ntoh64(en.mEncodedSize);
+			int64_t encodedSize = box_ntoh64(en.mEncodedSize);
 			
 			// How much data will be read?
 			int32_t blockSize = 0;
@@ -362,13 +362,13 @@ static void WriteNewIndex(IOStream &rDiff, int64_t DiffNumBlocks, FromIndexEntry
 		THROW_EXCEPTION(BackupStoreException, FailedToReadBlockOnCombine)
 	}
 	if(ntohl(diffBlkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
-		|| (int64_t)ntoh64(diffBlkhdr.mNumBlocks) != DiffNumBlocks)
+		|| (int64_t)box_ntoh64(diffBlkhdr.mNumBlocks) != DiffNumBlocks)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
 	
 	// Write it out with a blanked out other file ID
-	diffBlkhdr.mOtherFileID = hton64(0);
+	diffBlkhdr.mOtherFileID = box_hton64(0);
 	rOut.Write(&diffBlkhdr, sizeof(diffBlkhdr));
 	
 	// Rewrite the index
@@ -381,7 +381,7 @@ static void WriteNewIndex(IOStream &rDiff, int64_t DiffNumBlocks, FromIndexEntry
 		}
 		
 		// What's the size value stored in the entry
-		int64_t encodedSize = ntoh64(en.mEncodedSize);
+		int64_t encodedSize = box_ntoh64(en.mEncodedSize);
 		
 		// Need to adjust it?
 		if(encodedSize <= 0)
@@ -396,7 +396,7 @@ static void WriteNewIndex(IOStream &rDiff, int64_t DiffNumBlocks, FromIndexEntry
 			// Calculate size. This operation is safe because of the extra entry at the end
 			int32_t blockSize = pFromIndex[blockIdx + 1].mFilePosition - pFromIndex[blockIdx].mFilePosition;
 			// Then replace entry
-			en.mEncodedSize = hton64(((uint64_t)blockSize));
+			en.mEncodedSize = box_hton64(((uint64_t)blockSize));
 		}
 		
 		// Write entry

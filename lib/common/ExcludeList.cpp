@@ -9,7 +9,7 @@
 
 #include "Box.h"
 
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	#include <regex.h>
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
 #endif
@@ -44,7 +44,7 @@ ExcludeList::ExcludeList()
 // --------------------------------------------------------------------------
 ExcludeList::~ExcludeList()
 {
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	// free regex memory
 	while(mRegex.size() > 0)
 	{
@@ -106,7 +106,7 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 // --------------------------------------------------------------------------
 void ExcludeList::AddRegexEntries(const std::string &rEntries)
 {
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 
 	// Split strings up
 	std::vector<std::string> ens;
@@ -173,7 +173,7 @@ bool ExcludeList::IsExcluded(const std::string &rTest) const
 	}
 	
 	// Check against regular expressions
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	for(std::vector<regex_t *>::const_iterator i(mRegex.begin()); i != mRegex.end(); ++i)
 	{
 		// Test against this expression

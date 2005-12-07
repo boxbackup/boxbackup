@@ -10,7 +10,7 @@
 #ifndef CIPHERBLOWFISH__H
 #define CIPHERBLOWFISH__H
 
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	#include <string>
 #endif
 
@@ -38,14 +38,14 @@ public:
 	// Setup any other parameters
 	virtual void SetupParameters(EVP_CIPHER_CTX *pCipherContext) const;
 
-#ifdef PLATFORM_OLD_OPENSSL
+#ifdef HAVE_OLD_SSL
 	CipherDescription *Clone() const;
 	void SetIV(const void *pIV);
 #endif
 
 private:
 	CipherDescription::CipherMode mMode;
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 	const void *mpKey;
 	unsigned int mKeyLength;
 	const void *mpInitialisationVector;

@@ -10,7 +10,7 @@
 #include "Box.h"
 
 // Only available in new versions of openssl
-#ifndef PLATFORM_OLD_OPENSSL
+#ifndef HAVE_OLD_SSL
 
 #include <openssl/evp.h>
 
@@ -159,5 +159,5 @@ void CipherAES::SetupParameters(EVP_CIPHER_CTX *pCipherContext) const
 
 
 
-#endif // n PLATFORM_OLD_OPENSSL
+#endif // n HAVE_OLD_SSL
 

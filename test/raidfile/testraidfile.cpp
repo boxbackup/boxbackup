@@ -525,7 +525,7 @@ void test_overwrites()
 		writeA.Write("TESTTEST", 8);
 	
 		{
-#ifndef PLATFORM_open_USE_fcntl
+#if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
 			RaidFileWrite writeA2(0, "overwrite_A");
 			TEST_CHECK_THROWS(writeA2.Open(), RaidFileException, FileIsCurrentlyOpenForWriting);
 #endif

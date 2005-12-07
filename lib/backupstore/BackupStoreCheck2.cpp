@@ -377,7 +377,7 @@ void BackupStoreCheck::InsertObjectIntoDirectory(int64_t ObjectID, int64_t Direc
 			THROW_EXCEPTION(BackupStoreException, Internal)
 		}
 		// This tells us nice things
-		modTime = ntoh64(hdr.mModificationTime);
+		modTime = box_ntoh64(hdr.mModificationTime);
 		// And the filename comes next
 		objectStoreFilename.ReadFromStream(*file, IOStream::TimeOutInfinite);
 	}

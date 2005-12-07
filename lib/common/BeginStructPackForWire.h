@@ -9,7 +9,7 @@
 
 // No header guard -- this is intentional
 
-#ifdef STRUCTURE_PATCKING_FOR_WIRE_USE_HEADERS
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 
 #pragma pack(1)
 

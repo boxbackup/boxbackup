@@ -156,10 +156,10 @@ void BSFCombinedIndexStream::Initialise(IOStream &rFrom)
 	}
 	
 	// Read relevant data.
-	mNumEntriesToGo = ntoh64(mHeader.mNumBlocks);
+	mNumEntriesToGo = box_ntoh64(mHeader.mNumBlocks);
 	
 	// Adjust a bit to reflect the fact it's no longer a diff
-	mHeader.mOtherFileID = hton64(0);
+	mHeader.mOtherFileID = box_hton64(0);
 	
 	// Now look at the from file: Read header
 	file_BlockIndexHeader fromHdr;
@@ -173,7 +173,7 @@ void BSFCombinedIndexStream::Initialise(IOStream &rFrom)
 	}
 	
 	// Then... allocate memory for the list of sizes
-	mNumEntriesInFromFile = ntoh64(fromHdr.mNumBlocks);
+	mNumEntriesInFromFile = box_ntoh64(fromHdr.mNumBlocks);
 	mFromBlockSizes = (int64_t*)::malloc(mNumEntriesInFromFile * sizeof(int64_t));
 	if(mFromBlockSizes == 0)
 	{
@@ -190,7 +190,7 @@ void BSFCombinedIndexStream::Initialise(IOStream &rFrom)
 		}
 		
 		// Check that the from file isn't a delta in itself
-		if(ntoh64(e.mEncodedSize) <= 0)
+		if(box_ntoh64(e.mEncodedSize) <= 0)
 		{
 			THROW_EXCEPTION(BackupStoreException, OnCombineFromFileIsIncomplete)
 		}
@@ -256,7 +256,7 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 		}
 		
 		// Does this need adjusting?
-		int s = ntoh64(poutput[b].mEncodedSize);
+		int s = box_ntoh64(poutput[b].mEncodedSize);
 		if(s <= 0)
 		{
 			// A reference to a block in the from file

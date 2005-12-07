@@ -16,7 +16,7 @@
 #include <utility>
 
 // Use in memory implementation if there isn't access to the Berkely DB on this platform
-#ifdef PLATFORM_BERKELEY_DB_NOT_SUPPORTED
+#ifndef HAVE_DB
 	#define BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 #endif
 

@@ -112,7 +112,10 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	}
 	
 	// Get a lock on the write file
-#ifdef PLATFORM_open_USE_fcntl
+#ifdef HAVE_FLOCK
+	int errnoBlock = EWOULDBLOCK;
+	if(::flock(mOSFileHandle, LOCK_EX | LOCK_NB) != 0)
+#else
 	int errnoBlock = EAGAIN;
 	struct flock desc;
 	desc.l_type = F_WRLCK;
@@ -120,9 +123,6 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	desc.l_start = 0;
 	desc.l_len = 0;
 	if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
-#else
-	int errnoBlock = EWOULDBLOCK;
-	if(::flock(mOSFileHandle, LOCK_EX | LOCK_NB) != 0)
 #endif
 	{
 		// Lock was not obtained.
@@ -387,14 +387,14 @@ void RaidFileWrite::TransformToRaidStorage()
 	// Then open them all for writing (in strict order)
 	try
 	{
-#if defined(PLATFORM_open_USE_flock) || defined(PLATFORM_open_USE_fcntl)
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> parity(parityFilenameW.c_str());
-#else
+#if HAVE_DECL_O_EXLOCK
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> stripe1(stripe1FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> stripe2(stripe2FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> parity(parityFilenameW.c_str());
+#else
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe1(stripe1FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe2(stripe2FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> parity(parityFilenameW.c_str());
 #endif
 
 		// Then... read in data...
@@ -461,7 +461,7 @@ void RaidFileWrite::TransformToRaidStorage()
 						ASSERT(sizeof(RaidFileRead::FileSizeType) == (2*sizeof(unsigned int)));
 						ASSERT(sizeof(RaidFileRead::FileSizeType) >= sizeof(off_t));
 						int sizePos = (blockSize/sizeof(unsigned int)) - 2;
-						RaidFileRead::FileSizeType sw = hton64(writeFileStat.st_size);
+						RaidFileRead::FileSizeType sw = box_hton64(writeFileStat.st_size);
 						unsigned int *psize = (unsigned int *)(&sw);
 						pparity[sizePos+0] = pstripe1[sizePos+0] ^ psize[0];
 						pparity[sizePos+1] = pstripe1[sizePos+1] ^ psize[1];
@@ -517,7 +517,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		if(sizeRecordRequired)
 		{
 			ASSERT(sizeof(writeFileStat.st_size) <= sizeof(RaidFileRead::FileSizeType));
-			RaidFileRead::FileSizeType sw = hton64(writeFileStat.st_size);
+			RaidFileRead::FileSizeType sw = box_hton64(writeFileStat.st_size);
 			ASSERT((::lseek(parity, 0, SEEK_CUR) % blockSize) == 0);
 			if(::write(parity, &sw, sizeof(sw)) != sizeof(sw))
 			{
