@@ -182,6 +182,7 @@ sub make_obj_symlink
 print "Scanning code...\n";
 
 my $modules_omitted = 0;
+my $modules_omitting = 0;
 
 # process lines in flattened modules files
 for(@modules_files)
@@ -191,16 +192,20 @@ for(@modules_files)
 	next unless m/\S/;
 	
 	# omit bits on some platforms?
-	next if m/\AEND-OMIT/;
+	if(m/\AEND-OMIT/)
+	{
+		$modules_omitting = 0;
+		next;
+	}
+
+	next if $modules_omitting;
+
 	if(m/\AOMIT:(.+)/)
 	{
-		if($1 eq $build_os)
+		if($1 eq $build_os or $1 eq $target_os)
 		{
 			$modules_omitted = 1;
-			while(<MODULES>)
-			{
-				last if m/\AEND-OMIT/;	
-			}
+			$modules_omitting = 1;
 		}
 		next;
 	}
@@ -402,8 +407,10 @@ __E
 			close TESTFILE;
 		}
 		
-		writetestfile("$mod/_t", './test $1 $2 $3 $4 $5', $mod);
-		writetestfile("$mod/_t-gdb", 'gdb ./test', $mod);
+		writetestfile("$mod/_t", 
+			'./test${platform_exe_ext} $1 $2 $3 $4 $5', $mod);
+		writetestfile("$mod/_t-gdb", 
+			'gdb ./test${platform_exe_ext}', $mod);
 		
 	}
 	
@@ -440,15 +447,26 @@ __E
 	
 
 	# make include path
-	my $include_paths = join(' ',map {'-I../../'.$_} @all_deps_for_module);
+	my $include_paths = "-I../../lib/win32 " .
+		join(' ',map {'-I../../'.$_} @all_deps_for_module);
 
 	# is target a library?
 	my $target_is_library = ($type ne 'bin' && $type ne 'test');
 
 	# make target name
 	my $end_target = $name;
-	$end_target .= '.a' if $target_is_library;
-	$end_target = 'test' if $type eq 'test';
+
+	if ($target_is_library)
+	{
+		$end_target .= '.a';
+	}
+	else
+	{
+		$end_target .= $platform_exe_ext;
+	}
+
+	$end_target = 'test'.$platform_exe_ext if $type eq 'test';
+
 	# adjust for outdir
 	$end_target = '$(OUTDIR)/' . $end_target;
 
