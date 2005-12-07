@@ -11,10 +11,13 @@
 
 #include <stdio.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
+
+#ifndef WIN32
+#include <syslog.h>
+#endif
 
 #include "Daemon.h"
 #include "Configuration.h"
