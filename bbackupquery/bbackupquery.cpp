@@ -12,12 +12,18 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
-#ifndef PLATFORM_READLINE_NOT_SUPPORTED
-	#ifdef PLATFORM_LINUX
-		#include "../../local/_linux_readline.h"
-	#else
+#ifdef HAVE_LIBREADLINE
+	#ifdef HAVE_READLINE_READLINE_H
 		#include <readline/readline.h>
+	#elif defined(HAVE_READLINE_H)
+		#include <readline.h>
+	#endif
+#endif
+#ifdef HAVE_READLINE_HISTORY
+	#ifdef HAVE_READLINE_HISTORY_H
 		#include <readline/history.h>
+	#elif defined(HAVE_HISTORY_H)
+		#include <history.h>
 	#endif
 #endif
 
@@ -185,8 +191,10 @@ int main(int argc, const char *argv[])
 	}
 	
 	// Get commands from input
-#ifndef PLATFORM_READLINE_NOT_SUPPORTED
+#ifdef HAVE_LIBREADLINE
+#ifdef HAVE_READLINE_HISTORY
 	using_history();
+#endif
 	char *last_cmd = 0;
 	while(!context.Stop())
 	{
@@ -203,10 +211,18 @@ int main(int argc, const char *argv[])
 		}
 		else
 		{
+#ifdef HAVE_READLINE_HISTORY
 			add_history(command);
+#else
+			free(last_cmd);
+#endif
 			last_cmd = command;
 		}
 	}
+#ifndef HAVE_READLINE_HISTORY
+	free(last_cmd);
+	last_cmd = 0;
+#endif
 #else
 	// Version for platforms which don't have readline by default
 	FdGetLine getLine(fileno(stdin));

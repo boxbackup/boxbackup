@@ -9,16 +9,12 @@
 
 #include "Box.h"
 
-#ifndef PLATFORM_BERKELEY_DB_NOT_SUPPORTED
+#ifdef HAVE_DB
 	// Include db headers and other OS files if they're needed for the disc implementation
 	#include <sys/types.h>
 	#include <fcntl.h>
 	#include <limits.h>
-	#ifdef PLATFORM_LINUX
-		#include "../../local/_linux_db.h"
-	#else
-		#include <db.h>
-	#endif
+	#include DB_HEADER
 	#include <sys/stat.h>
 #endif
 
