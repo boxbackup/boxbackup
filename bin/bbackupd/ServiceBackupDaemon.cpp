@@ -6,6 +6,7 @@
 #include "BackupDaemon.h"
 #include "MainHelper.h"
 #include "BoxPortsAndFiles.h"
+#include "BackupStoreException.h"
 
 #include "MemLeakFindOn.h"
 
