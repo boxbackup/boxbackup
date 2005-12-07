@@ -24,8 +24,8 @@ std::string BoxGetTemporaryDirectoryName()
 	// url=/library/en-us/fileio/fs/creating_and_using_a_temporary_file.asp
 
 	DWORD dwRetVal;
-	DWORD dwBufSize = BUFSIZE;
-	char lpPathBuffer[BUFSIZE];
+	char lpPathBuffer[1024];
+	DWORD dwBufSize = sizeof(lpPathBuffer);
 	
 	// Get the temp path.
 	dwRetVal = GetTempPath(dwBufSize,     // length of the buffer
