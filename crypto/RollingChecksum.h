@@ -24,7 +24,7 @@
 class RollingChecksum
 {
 public:
-	RollingChecksum(const void *data, unsigned int Length);
+	RollingChecksum(const void * const data, const unsigned int Length);
 
 	// --------------------------------------------------------------------------
 	//
@@ -35,7 +35,7 @@ public:
 	//		Created: 6/12/03
 	//
 	// --------------------------------------------------------------------------
-	inline void RollForward(uint8_t StartOfThisBlock, uint8_t LastOfNextBlock, unsigned int Length)
+	inline void RollForward(const uint8_t StartOfThisBlock, const uint8_t LastOfNextBlock, const unsigned int Length)
 	{
 		// IMPLEMENTATION NOTE: Everything is implicitly mod 2^16 -- uint16_t's will overflow nicely.
 		a -= StartOfThisBlock;
@@ -47,19 +47,30 @@ public:
 	// --------------------------------------------------------------------------
 	//
 	// Function
+	//		Name:    RollingChecksum::RollForwardSeveral(uint8_t*, uint8_t*, unsigned int, unsigned int)
+	//		Purpose: Move the checksum forward a block, given a pointer to the first byte of the current block,
+	//				 and a pointer just after the last byte of the current block and the length of the block and of the skip.
+	//		Created: 7/14/05
+	//
+	// --------------------------------------------------------------------------
+	void RollForwardSeveral(const uint8_t * const StartOfThisBlock, const uint8_t * const LastOfNextBlock, const unsigned int Length, const unsigned int Skip);
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
 	//		Name:    RollingChecksum::GetChecksum()
 	//		Purpose: Returns the checksum
 	//		Created: 6/12/03
 	//
 	// --------------------------------------------------------------------------	
-	inline uint32_t GetChecksum()
+	inline uint32_t GetChecksum() const
 	{
 		return ((uint32_t)a) | (((uint32_t)b) << 16);
 	}
 	
 	// Components, just in case they're handy
-	inline uint16_t GetComponent1() {return a;}
-	inline uint16_t GetComponent2() {return b;}
+	inline uint16_t GetComponent1() const {return a;}
+	inline uint16_t GetComponent2() const {return b;}
 	
 	// --------------------------------------------------------------------------
 	//
@@ -69,7 +80,7 @@ public:
 	//		Created: 6/12/03
 	//
 	// --------------------------------------------------------------------------
-	inline uint16_t GetComponentForHashing()
+	inline uint16_t GetComponentForHashing() const
 	{
 		return b;
 	}
@@ -82,7 +93,7 @@ public:
 	//		Created: 14/1/04
 	//
 	// --------------------------------------------------------------------------
-	static inline uint16_t ExtractHashingComponent(uint32_t Checksum)
+	static inline uint16_t ExtractHashingComponent(const uint32_t Checksum)
 	{
 		return Checksum >> 16;
 	}
