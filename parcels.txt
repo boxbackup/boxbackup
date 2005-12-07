@@ -9,6 +9,7 @@ backup-client
 	bin bbackupctl
 	script bin/bbackupd/bbackupd-config
 
+OMIT:mingw32
 OMIT:CYGWIN
 
 backup-server
