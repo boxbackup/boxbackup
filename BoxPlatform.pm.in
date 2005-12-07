@@ -1,7 +1,7 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $build_cpu $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $gcc_v4 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra/;
+@EXPORT = qw/$build_os $build_cpu $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files/;
 
 BEGIN
 {
@@ -18,24 +18,11 @@ BEGIN
 
 	$make_command = ($build_os eq 'Darwin') ? 'bsdmake' : ($build_os eq 'SunOS') ? 'gmake' : 'make';
 	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' && $build_os ne "SunOS");
-    $platform_define = 'PLATFORM_'.uc($build_os);
-	$platform_cpu = 'PLATFORM_'.uc($build_cpu);
 
 	# blank extra flags by default
-	$platform_compile_line_extra = '';
-	$platform_link_line_extra = '';
-	
-	# compiler version?
-	$gcc_v3 = 0;
-	$gcc_v4 = 0;
-	open COMPILER,"gcc -v 2>&1 |" or die "Can't open gcc -v";
-	while(<COMPILER>)
-	{
-		$gcc_v3 = 1 if (m/version gcc 3/ || m/gcc version 3/ || m/gcc \(GCC\) 3/i || m/gcc.Version\s+3/i);
-		$gcc_v4 = 1 if (m/version gcc 4/ || m/gcc version 4/ || m/gcc \(GCC\) 4/i || m/gcc.Version\s+4/i);
-	}
-	close COMPILER;
-	$gcc_v3 = 1 if $gcc_v4;		# hacks are about the same
+	$platform_compile_line_extra = '@CPPFLAGS@ @CXXFLAGS@ @CXXFLAGS_STRICT@';
+	$platform_link_line_extra = '@LDFLAGS@';
+	$platform_lib_files = '@LIBS@';
 
 	# get version
 	open VERSION,"VERSION.txt";
@@ -46,7 +33,7 @@ BEGIN
 	close VERSION;
 	
 	# where to put the files
-	$install_into_dir = '/usr/local/bin';
+	$install_into_dir = '@bindir@';
 	
 	# if it's Darwin,
 	if($build_os eq 'Darwin')
@@ -66,11 +53,6 @@ BEGIN
 			$platform_compile_line_extra = '-I/sw/include ';
 			$platform_link_line_extra = '-L/sw/lib ';
 		}
-	}
-
-	if($build_os eq 'SunOS')
-	{
-		$platform_link_line_extra = '-lrt ';
 	}
 }
 

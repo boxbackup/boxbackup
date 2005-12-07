@@ -12,7 +12,7 @@ $|=1;
 
 # note: Mac OS X resource forks and .DS_Store files are explicity ignored
 
-print "Box build environment setup.\n\nChecking environment...\n";
+print "Box build environment setup.\n\n";
 
 
 my $implicit_dep = 'lib/common';
@@ -21,43 +21,12 @@ my $implicit_dep = 'lib/common';
 use lib 'infrastructure';
 use BoxPlatform;
 
-# don't allow old versions of openssl by default.
-my $old_version_of_openssl_ok = 0;
-
 # keep copy of command line args
 my $makebuildenv_args = join(' ',@ARGV);
 
 # do command line arguments
 my $compile_line_extra = $platform_compile_line_extra;
 my $link_line_extra = $platform_link_line_extra;
-for(@ARGV)
-{
-	if($_ eq 'allow-old-openssl')
-	{
-		$old_version_of_openssl_ok = 1;
-		next;
-	}
-	my ($k,$v) = split /:/,$_,2;
-	if($k eq 'compile')
-	{
-		$compile_line_extra .= $v . ' ';
-	}
-	elsif($k eq 'link')
-	{
-		$link_line_extra .= $v . ' ';
-	}
-	elsif($k eq 'openssl')
-	{
-		# assume that the bin/lib/include dirs are under the specified path
-		chop $v if ($v =~ /\/$/);
-		$compile_line_extra = "-I$v/include $compile_line_extra"; 
-		$link_line_extra    = "-L$v/lib $link_line_extra";
-	}
-	else
-	{
-		die "invalid option $_ specified on command line"
-	}
-}
 
 # make sure local files directory exists
 unless(-d 'local')
@@ -68,261 +37,8 @@ unless(-d 'local')
 
 # flags about the environment
 my %env_flags;
-# messages on test failure
-my $test_failure_text;
-
-# run all tests
-{
-	opendir DIR,'infrastructure/tests' or die "Can't read the tests directory";
-	my @tests = grep {m/_tests\.pl\Z/} readdir DIR;
-	closedir DIR;
-	for(@tests)
-	{
-		require "infrastructure/tests/$_";
-	}
-}
-
-
-# ---- LINUX start --------------------------------------------------------------------------
-# do configuration on Linux... find out what's available, and configure appropraitely.
-if($build_os eq 'Linux')
-{
-	# setup the basic library translation flags -- these will omit those libraries from the compile line
-	$env_flags{'LIBTRANS_-lreadline'} = '';
-	$env_flags{'LIBTRANS_-lLINUX_DB'} = '';
-
-	my $curses_lib = '-lcurses';
-	if((!exists($env_flags{'curses_PRESENT'})) && exists($env_flags{'ncurses_PRESENT'}))
-	{
-		# got to use ncurses instead...
-		$env_flags{'LIBTRANS_-lcurses'} = '-lncurses';
-		$curses_lib = '-lncurses';
-	}
-
-	my ($linux_readline_h, $linux_db_h);
-	my $db_ver = -1;
-	
-	open H_FILES,"find /usr/include |" or die "Can't open find";
-	while(<H_FILES>)
-	{
-		chomp;
-		
-		if(m~/readline.h\Z~)
-		{
-			my $rlh = strip_h_name($_);
-			if(check_readline_h($rlh,$curses_lib))
-			{
-				$linux_readline_h = $rlh;
-				# allow readline library to be used
-				delete $env_flags{'LIBTRANS_-lreadline'};
-			}
-		}
-		if(m~/db(|_1\d+).h\Z~)
-		{
-			# version?
-			my $dv = 0;
-			$dv = $1 if m~(\d+)/db~;
-			my $fn = $_;
-
-			# check this file mentions dbopen
-			open DB_H,$_ or die "Can't open $_";
-			my $found = 0;
-			while(<DB_H>)
-			{
-				if(m/dbopen/)
-				{
-					$found = 1;
-					last;
-				}
-			}
-			close DB_H;
-			next unless $found;
-
-			# see if this version works
-			print("Checking db version...\n");
-			my $db_h = strip_h_name($fn);
-			my $db_lib = 'db';
-			$db_lib .= $db_ver if $db_ver > 0;
-			if(!check_db_lib($db_h, $db_lib))
-			{
-				# try another
-				$db_lib = 'db';
-				next unless check_db_lib($db_h, $db_lib)
-			}
-
-	 		# good version?
-			if($dv > $db_ver)
-			{
-				$linux_db_h = $db_h;
-				$db_ver = $dv;
-				$env_flags{'LIBTRANS_-lLINUX_DB'} = '-l'.$db_lib;
-			}
-		}
-	}
-	print "Finished checking headers\n";
-	close H_FILES;
-
-	# write the platform file accordingly and tell the user what's happened.
-	open LIN,">local/_linux_platform.h" or die "Can't open file for writing";
-	if($linux_readline_h eq '')
-	{
-		print("---------------------\nWARNING: readline isn't installed\n---------------------\n");
-		print LIN "#define PLATFORM_READLINE_NOT_SUPPORTED\n";
-
-	}
-	else
-	{
-		open RL_H,">local/_linux_readline.h" or die "Can't open file for writing";
-		print RL_H "#include <$linux_readline_h>\n";
-		my $hist = $linux_readline_h;
-		$hist =~ s/readline\.h/history.h/;
-		print RL_H "#include <$hist>\n";
-		close RL_H;
-	}
-	if($linux_db_h eq '')
-	{
-		print("---------------------\nWARNING: db is not installed -- will run in reduced efficiency mode without it.\n---------------------\n");
-		print LIN "#define PLATFORM_BERKELEY_DB_NOT_SUPPORTED\n";
-	}	
-	else
-	{
-		open DB_H,">local/_linux_db.h" or die "Can't open file for writing";
-		print DB_H "#include <$linux_db_h>\n";
-		close DB_H;
-	}
-	close LIN;
-}
-sub strip_h_name
-{
-	my $i = $_[0];
-	$i =~ s~\A/usr/include/~~;
-	return $i;
-}
-sub check_readline_h
-{
-	my ($h,$curses_lib) = @_;
-	print "Check readline from $h...\n";
-	my $hist = $h;
-	$hist =~ s/readline\.h/history.h/;
-	open READLINEH,">readlineh.cpp" or die "Can't open readline test file for writing";
-	print READLINEH <<__E;
-#include <unistd.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <$h>
-#include <$hist>
-int main(int argc, char *argv[])
-{
-	using_history();
-	add_history(0);
-	readline(0);
-	return 0;
-}
-__E
-	close READLINEH;
-	# attempt to compile
-	my $r = system("g++ readlineh.cpp -lreadline $curses_lib -o readlineh $compile_line_extra $link_line_extra 2>/dev/null >/dev/null");
-	# delete test files
-	unlink 'readlineh';
-	unlink 'readlineh.cpp';
-	return $r == 0; # compilation succeeded
-}
-sub check_db_lib
-{
-	my ($h,$db) = @_;
-	open TESTDBLIB,">testdblib.cpp" or die "Can't open db test file for writing";
-	print TESTDBLIB <<__E;
-#include <$h>
-int main(int argc, char *argv[])
-{
-	DB *dbp = 0;
-	dbp = dbopen(0, 0, 0, DB_HASH, 0);
-	dbp->close(dbp);
-	DBT data;
-	dbp->put(dbp, &data, &data, 0);
-	dbp->get(dbp, &data, &data, 0);
-	return 0;
-}
-__E
-	close TESTDBLIB;
-	# attempt to compile
-	my $r = system("g++ testdblib.cpp -l$db -o testdblib $compile_line_extra $link_line_extra 2>/dev/null >/dev/null");
-	# delete test files
-	unlink 'testdblib';
-	unlink 'testdblib.cpp';
-	return $r == 0; # compilation succeeded
-}
-# ---- LINUX end --------------------------------------------------------------------------
 
 # print "Flag: $_\n" for(keys %env_flags);
-
-# check the version of openssl installed
-if(!exists $env_flags{'OPENSSL_OK'})
-{
-	# failed somehow...
-
-	# is an old version present?
-	my $old_version = (exists $env_flags{'OLD_OPENSSL_OK'});
-
-	if(!$old_version && !-e '/usr/include/openssl/evp.h')
-	{
-		# headers not installed?
-		print "\n\nERROR: OpenSSL library and headers need to be installed.\n\nSee documentation on web site if you need to add extra search paths.\n\n";
-		exit(1);
-	}
-	else
-	{
-		if($old_version)
-		{
-			if($old_version_of_openssl_ok)
-			{
-				print "\n\nWARNING: Configuring for old version of OpenSSL.\nPerformance will be lower than with version 0.9.7\n\n";
-				$compile_line_extra .= '-DPLATFORM_OLD_OPENSSL ';
-			}
-			else
-			{
-				# tell user how they might try anyway with an old version of openssl
-				print <<__E;
-
-===============================================================================
-
-You appear to have a version of OpenSSL installed which is less than 0.9.7.
-
-It is possible to configure to use this old version, but performance will be
-lower than if you have 0.9.7 -- the later version is recommended.
-
-If you wish to use this old version, repeat the configuration with the extra
-argument 'allow-old-openssl', like this:
-
-   ./configure allow-old-openssl
-
-* Please do not distribute binary packages with this option enabled.
-
-* Please do not distribute ports which set this option by default.
-
-IMPORTANT: Support for older versions of OpenSSL should be considered
-experimental. It is not recommended for production use, but provided to allow
-easier evaluation of this software before installing the latest OpenSSL.
-
-===============================================================================
-
-__E
-				exit(1);
-			}
-		}
-		else
-		{
-			print "\n\nERROR: You need to install OpenSSL, preferably at least version 0.9.7.\n\n";
-			print "If you believe you have installed OpenSSL, check that the headers are installed\nas well ('dev' packages?)\n\nSee documentation on web site if you need to add extra search paths.\n\n";
-			exit(1);
-		}
-	}
-}
-
-
-# finished checking the environment
-print "done\n\n";
-
 
 # seed autogen code
 print "Seeding autogen code...\n";
@@ -397,14 +113,6 @@ close FL;
 
 # extra platform defines
 my $extra_platform_defines = '';
-if($gcc_v3 && !$gcc_v4)
-{
-	$extra_platform_defines .= ' -DPLATFORM_GCC3'
-}
-if($gcc_v4)
-{
-	$extra_platform_defines .= ' -DPLATFORM_GCC4'
-}
 
 # read in module definitions file, and any files it includes
 my @modules_files;
@@ -758,13 +466,13 @@ CXX = g++
 AR = ar
 RANLIB = ranlib
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG -O2 -Wall $include_paths -D$platform_define -D$platform_cpu$extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -DNDEBUG -O2 -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS = -g -Wall $include_paths -D$platform_define -D$platform_cpu$extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -g -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
@@ -939,7 +647,7 @@ __E
 		}
 	
 		# link line...
-		print MAKE "\t\$(CXX) $link_line_extra -o $end_target $o_file_list $lib_files$lo\n";
+		print MAKE "\t\$(CXX) $link_line_extra -o $end_target $o_file_list $lib_files$lo $platform_lib_files\n";
 	}
 	# tests need to copy the test file over
 	if($type eq 'test')
@@ -1006,8 +714,6 @@ __E
 
 print "\nType 'cd <module_dir>; $make_command' to build a module\n\n";
 
-print $test_failure_text;
-
 if($modules_omitted)
 {
 	print "\nNOTE: Some modules have been omitted on this platform\n\n"
@@ -1062,65 +768,3 @@ sub ignore_module
 {
 	exists $env_flags{'IGNORE_'.$_[0]}
 }
-
-# how to run a test
-sub do_test
-{
-	my %t = @_;
-	
-	print $t{'Name'},':';
-	open TEST_CODE,">envtest.cpp" or die "Can't open envtest.cpp for writing";
-	print TEST_CODE $t{'Code'};
-	close TEST_CODE;
-	my $result = (system("g++ envtest.cpp ".$t{'TestCompileFlags'}." -o envtest $compile_line_extra $link_line_extra 2>/dev/null >/dev/null") == 0);
-	if($result && exists $t{'RunCode'})
-	{
-		$result = 0 unless (system('./envtest') == 0);
-	}
-	unlink 'envtest.cpp';
-	unlink 'envtest';
-	print $result?" yes\n":" no\n";
-	if($result)
-	{
-		# success
-		if(exists $t{'SuccessFlags'})
-		{
-			for(@{$t{'SuccessFlags'}})
-			{
-				my ($k,$v) = split /=>/,$_;
-				$v = 1 if $v eq '';
-				$env_flags{$k} = $v
-			}
-		}
-		$compile_line_extra .= $t{'SuccessCompileFlags'}.' ' if exists $t{'SuccessCompileFlags'};
-		$link_line_extra .= $t{'SuccessLinkFlags'}.' ' if exists $t{'SuccessLinkFlags'};
-	}
-	else
-	{
-		# aborting failure?
-		if(exists $t{'AbortOnFailure'})
-		{
-			print $t{'FailureText'};
-			print "\nAborting configuration, cannot build in this environment.\n";
-			exit(1);
-		}
-	
-		# failure
-		if(exists $t{'FailureFlags'})
-		{
-			for(@{$t{'FailureFlags'}})
-			{
-				my ($k,$v) = split /=>/,$_;
-				$v = 1 if $v eq '';
-				$env_flags{$k} = $v
-			}
-		}
-		$compile_line_extra .= $t{'FailureCompileFlags'}.' ' if exists $t{'FailureCompileFlags'};
-		$link_line_extra .= $t{'FailureLinkFlags'}.' ' if exists $t{'FailureLinkFlags'};
-		$test_failure_text .= $t{'FailureText'} if exists $t{'FailureText'};
-	}
-	$result
-}
-
-
-
