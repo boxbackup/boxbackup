@@ -10,7 +10,6 @@
 #ifndef SERVERSTREAM__H
 #define SERVERSTREAM__H
 
-
 #include <stdlib.h>
 #include <errno.h>
 
