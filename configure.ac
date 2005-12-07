@@ -6,6 +6,10 @@ AC_INIT([Box Backup], 0.09, [box@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/config.h])
 
+touch install-sh
+AC_CANONICAL_SYSTEM
+# echo "Build target OS: '$target_os'"
+[ -s install-sh ] && rm install-sh
 
 ### Checks for programs.
 
@@ -148,7 +152,7 @@ AC_ARG_ENABLE(
   [static-bin],
   [AC_HELP_STRING([--enable-static-bin], [Link binaries with static libraries])])
 if test "x$enable_static_bin" = "xyes"; then
-  AC_CHECK_LIB([ssl],[SSL_read])
+  AC_CHECK_LIB([ssl],[SSL_read],[],[],[crypto])
   LIBS="-Wl,-Bstatic $LIBS -Wl,-Bdynamic"
 fi
 
