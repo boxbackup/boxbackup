@@ -64,14 +64,25 @@ bool files_identical(const char *file1, const char *file2)
 	return true;
 }
 
-void make_file_of_zeros(const char *filename, int size)
+void make_file_of_zeros(const char *filename, size_t size)
 {
-	void *b = malloc(size);
-	memset(b, 0, size);
+	static const size_t bs = 0x10000;
+	size_t remSize = size;
+	void *b = malloc(bs);
+	memset(b, 0, bs);
 	FILE *f = fopen(filename, "wb");
-	fwrite(b, size, 1, f);
+
+	// Using largish blocks like this is much faster, while not consuming too much RAM
+	while(remSize > bs)
+	{
+		fwrite(b, bs, 1, f);
+		remSize -= bs;
+	}
+	fwrite(b, remSize, 1, f);
+
 	fclose(f);
 	free(b);
+
 	TEST_THAT(TestGetFileSize(filename) == size);
 }
 
@@ -455,8 +466,8 @@ int test(int argc, const char *argv[])
 
 	// Found a nasty case where files of lots of the same thing sock up lots of processor
 	// time -- because of lots of matches found. Check this out!
-	make_file_of_zeros("testfiles/zero.0", 20*1024);
-	make_file_of_zeros("testfiles/zero.1", 200*1024);
+	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
+	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
 	// Generate a first encoded file
 	{
 		BackupStoreFilenameClear f0name("zero.0");
