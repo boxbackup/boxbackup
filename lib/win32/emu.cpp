@@ -5,7 +5,7 @@
 
 #include <windows.h>
 #include <fcntl.h>
-#include <atlenc.h>
+// #include <atlenc.h>
 
 #include <string>
 #include <list>
@@ -476,13 +476,14 @@ HANDLE openfile(const char *filename, int flags, int mode)
 
 }
 
-
-
+// MinGW provides a getopt implementation
+#ifndef __MINGW32__
 //works with getopt
 char *optarg;
 //optind looks like an index into the string - how far we have moved along
 int optind = 1;
 char nextchar = -1;
+#endif
 
 // --------------------------------------------------------------------------
 //
@@ -811,7 +812,10 @@ int statfs(const char * name, struct statfs * s)
 
 HANDLE syslogH = 0;
 
+// MinGW provides opendir(), etc. via <dirent.h>
+// MSVC does not provide these, so emulation is needed
 
+#ifndef __MINGW32__
 // --------------------------------------------------------------------------
 //
 // Function
@@ -848,15 +852,15 @@ DIR *opendir(const char *name)
 				int strlen = MultiByteToWideChar(
 					CP_UTF8,               // code page
 					0,                     // character-type options
-					dirName.c_str(),        // string to map
-					(int)dirName.length(),       // number of bytes in string
+					dirName.c_str(),       // string to map
+					(int)dirName.length(), // number of bytes in string
 					NULL,                  // wide-character buffer
 					0                      // size of buffer - work out how much space we need
 					);
 
 				dir->name = new wchar_t[strlen+1];
 
-				if ( dir->name == NULL )
+				if (dir->name == NULL)
 				{
 					delete dir;
 					dir   = 0;
@@ -873,7 +877,7 @@ DIR *opendir(const char *name)
 					strlen                 // size of buffer
 					);
 
-				if ( strlen == 0 )
+				if (strlen == 0)
 				{
 					delete dir->name;
 					delete dir;
@@ -884,8 +888,12 @@ DIR *opendir(const char *name)
 
 				dir->name[strlen] = L'\0';
 
-				if((dir->fd = _wfindfirst((const wchar_t*)dir->name, &dir->info)) != -1)
-					//if((dir->fd = _wfindfirst(dir->name, &dir->info)) != -1)
+				
+				dir->fd = _wfindfirst(
+					(const wchar_t*)dir->name,
+					&dir->info);
+
+				if (dir->fd != -1)
 				{
 					dir->result.d_name = 0;
 				}
@@ -934,15 +942,19 @@ struct dirent *readdir(DIR *dp)
 {
 	try
 	{
-		struct dirent *den=NULL;
-		if(dp && dp->fd != -1)
+		struct dirent *den = NULL;
+
+		if (dp && dp->fd != -1)
 		{
-			if(!dp->result.d_name || _wfindnext(dp->fd, &dp->info) != -1)
+			if (!dp->result.d_name || 
+				_wfindnext(dp->fd, &dp->info) != -1)
 			{
 				den         = &dp->result;
 				std::wstring input(dp->info.name);
 				memset(tempbuff, 0, sizeof(tempbuff));
-				WideCharToMultiByte(CP_UTF8, 0, dp->info.name, -1, &tempbuff[0], sizeof (tempbuff), NULL, NULL);
+				WideCharToMultiByte(CP_UTF8, 0, dp->info.name, 
+					-1, &tempbuff[0], sizeof (tempbuff), 
+					NULL, NULL);
 				//den->d_name = (char *)dp->info.name;
 				den->d_name = &tempbuff[0];
 			}
@@ -953,7 +965,7 @@ struct dirent *readdir(DIR *dp)
 		}
 		return den;
 	}
-	catch(...)
+	catch (...)
 	{
 		printf("Caught readdir");
 	}
@@ -973,7 +985,7 @@ int closedir(DIR *dp)
 	try
 	{
 		int finres = -1;
-		if(dp)
+		if (dp)
 		{
 			if(dp->fd != -1)
 			{
@@ -984,26 +996,27 @@ int closedir(DIR *dp)
 			delete dp;
 		}
 
-		if(finres == -1) // errors go to EBADF 
+		if (finres == -1) // errors go to EBADF 
 		{
 			errno = EBADF;
 		}
 
 		return finres;
 	}
-	catch(...)
+	catch (...)
 	{
 		printf("Caught closedir");
 	}
 	return -1;
 }
-
+#endif // !__MINGW32__
 
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    poll
-//		Purpose: a weak implimentation (just enough for box) of the unix poll for winsock2
+//		Purpose: a weak implimentation (just enough for box) 
+//			of the unix poll for winsock2
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
@@ -1011,73 +1024,76 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 {
 	try
 	{
-		int noffds;
-
-		fd_set writefd;
-		writefd.fd_count=0;
 		fd_set readfd;
-		readfd.fd_count=0;
-		struct pollfd *ufdsTmp=ufds;
+		fd_set writefd;
+
+		readfd.fd_count = 0;
+		writefd.fd_count = 0;
+
+		struct pollfd *ufdsTmp = ufds;
+
 		timeval timOut;
 		timeval *tmpptr; 
-		if(timeout==INFTIM)
-			tmpptr=NULL;
+
+		if (timeout == INFTIM)
+			tmpptr = NULL;
 		else
-			tmpptr=&timOut;
+			tmpptr = &timOut;
 
-		timOut.tv_sec=timeout/1000;
-		timOut.tv_usec=timeout*1000;
+		timOut.tv_sec  = timeout / 1000;
+		timOut.tv_usec = timeout * 1000;
 
-		if(ufds->events&POLLIN)
+		if (ufds->events & POLLIN)
 		{
-			for(unsigned long i=0;i<nfds; i++)
+			for (unsigned long i = 0; i < nfds; i++)
 			{
-				readfd.fd_array[i]=ufdsTmp->fd;
+				readfd.fd_array[i] = ufdsTmp->fd;
 				readfd.fd_count++;
 			}
-
 		}
 
-		if(ufds->events&POLLOUT)
+		if (ufds->events & POLLOUT)
 		{
-			for(unsigned long i=0;i<nfds; i++)
+			for (unsigned long i = 0; i < nfds; i++)
 			{
 
 				writefd.fd_array[i]=ufdsTmp->fd;
 				writefd.fd_count++;
 			}
-
 		}	
 
-		if((noffds=select(0,&readfd,&writefd,0,tmpptr))==SOCKET_ERROR)
+		int noffds = select(0, &readfd, &writefd, 0, tmpptr);
+
+		if (noffds == SOCKET_ERROR)
 		{
 			int errval = WSAGetLastError();
 
-			ufdsTmp=ufds;
-			for(unsigned long i=0;i<nfds; i++)
+			ufdsTmp = ufds;
+			for (unsigned long i = 0; i < nfds; i++)
 			{
-				ufdsTmp->revents=POLLERR;
+				ufdsTmp->revents = POLLERR;
 				ufdsTmp++;
 			}
 			return (-1);
 		}
-		return noffds;
 
+		return noffds;
 	}
-	catch(...)
+	catch (...)
 	{
 		printf("Caught poll");
 	}
+
+	return -1;
 }
 
 void syslog(int loglevel, const char *frmt, ...)
 {
 	DWORD errinfo;
-	//char temp[512];
-	char *buffer;// = &temp[0];
+	char* buffer;
 	std::string sixfour(frmt);
 
-	switch(loglevel)
+	switch (loglevel)
 	{
 	case LOG_INFO:
 		errinfo = EVENTLOG_INFORMATION_TYPE;
@@ -1097,10 +1113,9 @@ void syslog(int loglevel, const char *frmt, ...)
 	//taken from MSDN
 	try
 	{
-		va_list args;
-		int len;
 
-		size_t sixfourpos;
+
+		int sixfourpos;
 		while ( ( sixfourpos = sixfour.find("%ll")) != -1 )
 		{
 			//maintain portability - change the 64 bit formater...
@@ -1109,32 +1124,50 @@ void syslog(int loglevel, const char *frmt, ...)
 			temp += sixfour.substr(sixfourpos+3, sixfour.length());
 			sixfour = temp;
 		}
-		//printf("parsed string is:%s\r\n", sixfour.c_str());
-		va_start( args, frmt );
-		len = _vscprintf( sixfour.c_str(), args );
-		len=len+1;
-		buffer = new char[len];
-		memset(buffer, 0, len);
-		int len2 = vsprintf( buffer, sixfour.c_str(), args );
-		//printf("length is %i was %i\r\n", len, len2);
-		//formatStr( buffer, frmt, args );
 
+		//printf("parsed string is:%s\r\n", sixfour.c_str());
+
+		va_list args;
+		va_start(args, frmt);
+
+#ifdef __MINGW32__
+		// no _vscprintf, use a fixed size buffer
+		buffer = new char[1024];
+		int len = 1023;
+#else
+		int len = _vscprintf( sixfour.c_str(), args );
+		ASSERT(len > 0)
+
+		len = len + 1;
+		char* buffer = new char[len];
+#endif
+
+		ASSERT(buffer)
+		memset(buffer, 0, len);
+
+		int len2 = vsnprintf(buffer, len, sixfour.c_str(), args);
+		ASSERT(len2 <= len);
+
+		va_end(args);
 	}
-	catch(...)
+	catch (...)
 	{
 		printf("Caught syslog: %s", sixfour.c_str());
+		return;
 	}
+
 	try
 	{
 
-		if (!ReportEvent(syslogH,           // event log handle 
-			errinfo,			  // event type 
+		if (!ReportEvent(syslogH,     // event log handle 
+			errinfo,              // event type 
 			0,                    // category zero 
-			MSG_ERR_EXIST,	      // event identifier - we will call them all the same
+			MSG_ERR_EXIST,	      // event identifier - 
+			                      // we will call them all the same
 			NULL,                 // no user security identifier 
 			1,                    // one substitution string 
 			0,                    // no data 
-			(LPCSTR*)&buffer,           // pointer to string array 
+			(LPCSTR*)&buffer,     // pointer to string array 
 			NULL))                // pointer to data 
 
 		{
@@ -1143,13 +1176,11 @@ void syslog(int loglevel, const char *frmt, ...)
 		}
 
 		printf("%s\r\n", buffer);
-		
 
-		if ( buffer ) delete [] buffer;
+		if (buffer) delete [] buffer;
 	}
-	catch(...)
+	catch (...)
 	{
-		printf("Caught syslog My Report Event");
+		printf("Caught syslog ReportEvent");
 	}
-
 }
