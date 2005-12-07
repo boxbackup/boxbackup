@@ -12,9 +12,12 @@
 #define TLS_CLASS_IMPLEMENTATION_CPP
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
-#include <poll.h>
 #include <errno.h>
 #include <fcntl.h>
+
+#ifndef WIN32
+#include <poll.h>
+#endif
 
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
