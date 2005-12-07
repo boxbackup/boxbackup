@@ -11,8 +11,11 @@
 
 #include <unistd.h>
 #include <sys/types.h>
-#include <poll.h>
 #include <errno.h>
+
+#ifndef WIN32
+#include <poll.h>
+#endif
 
 #include "SocketStream.h"
 #include "ServerException.h"
