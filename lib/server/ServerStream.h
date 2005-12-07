@@ -10,10 +10,14 @@
 #ifndef SERVERSTREAM__H
 #define SERVERSTREAM__H
 
-#include <syslog.h>
+
 #include <stdlib.h>
 #include <errno.h>
-#include <sys/wait.h>
+
+#ifndef WIN32
+	#include <syslog.h>
+	#include <sys/wait.h>
+#endif
 
 #include "Daemon.h"
 #include "SocketListen.h"
