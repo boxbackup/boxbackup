@@ -12,14 +12,19 @@
 
 #include <errno.h>
 #include <unistd.h>
-#include <new>
-#include <poll.h>
-#include <memory>
-#include <string>
+
 #ifdef HAVE_KQUEUE
 	#include <sys/event.h>
 	#include <sys/time.h>
 #endif
+
+#ifndef WIN32
+	#include <poll.h>
+#endif
+
+#include <new>
+#include <memory>
+#include <string>
 
 #include "Socket.h"
 #include "ServerException.h"
