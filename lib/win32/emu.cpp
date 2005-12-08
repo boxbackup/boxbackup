@@ -16,114 +16,122 @@
 //our implimentation for a timer
 //based on a simple thread which sleeps for a
 //period of time
-static bool finishTimer;
-static CRITICAL_SECTION lock;
+static bool gFinishTimer;
+static CRITICAL_SECTION gLock;
+
 typedef struct 
 {
 	int countDown;
 	int interval;
-}timers;
+}
+tTimer;
 
-std::list<timers> timerList;
-static void (__cdecl *timerFunc ) (int) = NULL;
-
+std::list<tTimer> gTimerList;
+static void (__cdecl *gTimerFunc) (int) = NULL;
 
 int setitimer(int type , struct itimerval *timeout, int)
 {
 	if ( SIGVTALRM == type || ITIMER_VIRTUAL == type )
 	{
-		EnterCriticalSection(&lock);
-		//we only need seconds for the mo!
-		if ( timeout->it_value.tv_sec == 0 && timeout->it_value.tv_usec == 0 )
+		EnterCriticalSection(&gLock);
+		// we only need seconds for the mo!
+		if (timeout->it_value.tv_sec  == 0 && 
+		    timeout->it_value.tv_usec == 0)
 		{
-			timerList.clear();
+			gTimerList.clear();
 		}
 		else
 		{
-			timers ourTimer;
+			tTimer ourTimer;
 			ourTimer.countDown = timeout->it_value.tv_sec;
-			ourTimer.interval = timeout->it_interval.tv_sec;
-			timerList.push_back(ourTimer);
+			ourTimer.interval  = timeout->it_interval.tv_sec;
+			gTimerList.push_back(ourTimer);
 		}
-		LeaveCriticalSection(&lock);
+		LeaveCriticalSection(&gLock);
 	}
-	//indictae success
+	// indicate success
 	return 0;
 }
 
-
-static DWORD WINAPI runTimer(LPVOID lpParameter)
+static DWORD WINAPI RunTimer(LPVOID lpParameter)
 {
-	finishTimer = false;
+	gFinishTimer = false;
 
-	while (!finishTimer)
+	while (!gFinishTimer)
 	{
-		std::list<timers>::iterator it;
-		EnterCriticalSection(&lock);
+		std::list<tTimer>::iterator it;
+		EnterCriticalSection(&gLock);
 
-		for ( it = timerList.begin() ; it != timerList.end() ; it++  )
+		for (it = gTimerList.begin(); it != gTimerList.end(); it++)
 		{
-			(*it).countDown --;
-			if ( (*it).countDown == 0 )
+			tTimer& rTimer(*it);
+
+			rTimer.countDown --;
+			if (rTimer.countDown == 0)
 			{
-				if ( timerFunc != NULL )
+				if (gTimerFunc != NULL)
 				{
-					timerFunc(0);
+					gTimerFunc(0);
 				}
-				if ( (*it).interval )
+				if (rTimer.interval)
 				{
-					(*it).countDown = (*it).interval;
+					rTimer.countDown = rTimer.interval;
 				}
 				else
 				{
-					//mark for deletion
-					(*it).countDown = -1;
+					// mark for deletion
+					rTimer.countDown = -1;
 				}
 			}
 		}
 
-		for ( it = timerList.begin() ; it != timerList.end() ; it++  )
+		for (it = gTimerList.begin(); it != gTimerList.end(); it++)
 		{
-			if ( (*it).countDown == -1 )
+			tTimer& rTimer(*it);
+
+			if (rTimer.countDown == -1)
 			{
-				timerList.erase(it);
+				gTimerList.erase(it);
 				//if we don't do this the search is on a corrupt list
-				it = timerList.begin();
+				it = gTimerList.begin();
 			}
 		}
 
-		LeaveCriticalSection(&lock);
-		//we only need to have a 1 second resolution
+		LeaveCriticalSection(&gLock);
+		// we only need to have a 1 second resolution
 		Sleep(1000);
 	}
 
 	return 0;
 }
 
- int setTimerHandler(void (__cdecl *func ) (int))
+int SetTimerHandler(void (__cdecl *func ) (int))
 {
-	timerFunc = func;
+	gTimerFunc = func;
 	return 0;
 }
-void initTimer(void)
-{
-	InitializeCriticalSection(&lock);
 
-	//create our thread
-	HANDLE ourThread = CreateThread(NULL,0,runTimer,0,CREATE_SUSPENDED ,NULL);
+void InitTimer(void)
+{
+	InitializeCriticalSection(&gLock);
+
+	// create our thread
+	HANDLE ourThread = CreateThread(NULL, 0, RunTimer, 0, 
+		CREATE_SUSPENDED, NULL);
 	SetThreadPriority(ourThread, THREAD_PRIORITY_LOWEST);
 	ResumeThread(ourThread);
 }
-void finiTimer(void)
+
+void FiniTimer(void)
 {
-	finishTimer = true;
-	EnterCriticalSection(&lock);
-	DeleteCriticalSection(&lock);
+	gFinishTimer = true;
+	EnterCriticalSection(&gLock);
+	DeleteCriticalSection(&gLock);
 }
 
 //Our constants we need to keep track of
 //globals
-struct passwd tempPasswd;
+struct passwd gTempPasswd;
 
 bool EnableBackupRights( void )
 {
@@ -330,11 +338,11 @@ int ourfstat(HANDLE hdir, struct stat * st)
 
 		//get the time information
 		//ctime
-		st->st_ctime = convertFileTimetoTime_t(&fi.ftCreationTime);
+		st->st_ctime = ConvertFileTimeToTime_t(&fi.ftCreationTime);
 		//atime
-		st->st_atime = convertFileTimetoTime_t(&fi.ftLastAccessTime);
+		st->st_atime = ConvertFileTimeToTime_t(&fi.ftLastAccessTime);
 		//mtime
-		st->st_mtime = convertFileTimetoTime_t(&fi.ftLastWriteTime);
+		st->st_mtime = ConvertFileTimeToTime_t(&fi.ftLastWriteTime);
 
 		//size of the file
 		LARGE_INTEGER st_size;
@@ -541,7 +549,7 @@ int statfs(const char * name, struct statfs * s)
 			CP_UTF8,               // code page
 			0,                     // character-type options
 			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),       // number of bytes in string
+			(int)tmpStr.length(),  // number of bytes in string
 			NULL,                  // wide-character buffer
 			0                      // size of buffer - work out how much space we need
 			);
@@ -557,7 +565,7 @@ int statfs(const char * name, struct statfs * s)
 			CP_UTF8,               // code page
 			0,                     // character-type options
 			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),       // number of bytes in string
+			(int)tmpStr.length(),  // number of bytes in string
 			buffer,                // wide-character buffer
 			strlen                 // size of buffer
 			);
@@ -606,7 +614,7 @@ int statfs(const char * name, struct statfs * s)
 		//convert it into a string
 		_ui64toa( fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
 		//_ui64tow( fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
-		//sudo unix mount point
+		//pseudo unix mount point
 		s->f_mntonname[0] = DIRECTORY_SEPARATOR_ASCHAR;
 
 		//This next example is how we get our INODE (equivalent) information
@@ -624,7 +632,7 @@ int statfs(const char * name, struct statfs * s)
 
 
 
-HANDLE syslogH = 0;
+
 
 // MinGW provides opendir(), etc. via <dirent.h>
 // MSVC does not provide these, so emulation is needed
@@ -901,6 +909,8 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 	return -1;
 }
 
+HANDLE gSyslogH = 0;
+
 void syslog(int loglevel, const char *frmt, ...)
 {
 	DWORD errinfo;
@@ -973,7 +983,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	try
 	{
 
-		if (!ReportEvent(syslogH,     // event log handle 
+		if (!ReportEvent(gSyslogH,    // event log handle 
 			errinfo,              // event type 
 			0,                    // category zero 
 			MSG_ERR_EXIST,	      // event identifier - 

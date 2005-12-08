@@ -38,10 +38,8 @@
 #define ITIMER_VIRTUAL 0
 
 int setitimer(int type , struct itimerval *timeout, int);
-void initTimer(void);
-void finiTimer(void);
-
-int setTimerHandler(void (__cdecl *func ) (int));
+void InitTimer(void);
+void FiniTimer(void);
 
 inline int geteuid(void)
 {
@@ -62,14 +60,14 @@ struct passwd {
 	time_t pw_expire;
 };
 
-extern passwd tempPasswd;
+extern passwd gTempPasswd;
 inline struct passwd * getpwnam(const char * name)
 {
 	//for the mo pretend to be root
-	tempPasswd.pw_uid = 0;
-	tempPasswd.pw_gid = 0;
+	gTempPasswd.pw_uid = 0;
+	gTempPasswd.pw_gid = 0;
 
-	return &tempPasswd;
+	return &gTempPasswd;
 }
 
 #define S_IRWXG 1
@@ -96,14 +94,14 @@ inline int utimes(const char * Filename, timeval[])
 	//again I am guessing this is quite important to
 	//be functioning, as large restores would be a problem
 
-	//indicate sucsess
+	//indicate success
 	return 0;
 }
 inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 {
-	//important - this needs implimenting
+	//important - this needs implementing
 	//If a large restore is required then 
-	//it needs to resore files AND permissions
+	//it needs to restore files AND permissions
 	//reference AdjustTokenPrivileges
 	//GetAccountSid
 	//InitializeSecurityDescriptor
@@ -111,7 +109,7 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 	//The next function looks like the guy to use...
 	//SetFileSecurity
 
-	//indicate sucsess
+	//indicate success
 	return 0;
 }
 
@@ -250,7 +248,7 @@ struct itimerval
 
 #define S_ISLNK(x) ( false )
 
-//nasty implimentation to get working - to get get the win32 equiv
+// nasty implementation to get working - TODO get the win32 equiv
 #ifdef _DEBUG
 #define getpid() 1
 #endif
@@ -302,23 +300,22 @@ HANDLE openfile(const char *filename, int flags, int mode);
 #define LOG_PID 0
 #define LOG_LOCAL6 0
 
-extern HANDLE syslogH;
+extern HANDLE gSyslogH;
 void MyReportEvent(LPCTSTR *szMsg, DWORD errinfo);
 inline void openlog(const char * daemonName, int, int)
 {
-	syslogH = RegisterEventSource(NULL,  // uses local computer 
+	gSyslogH = RegisterEventSource(
+		NULL,  // uses local computer 
 		daemonName);    // source name
-	if (syslogH == NULL) 
+	if (gSyslogH == NULL) 
 	{
 	}
-
 }
 
 inline void closelog(void)
 {
-	DeregisterEventSource(syslogH); 
+	DeregisterEventSource(gSyslogH); 
 }
-
 
 void syslog(int loglevel, const char *fmt, ...);
 
@@ -394,9 +391,9 @@ int ourfstat(HANDLE file, struct stat * st);
 int statfs(const char * name, struct statfs * s);
 
 //need this for converstions
-inline time_t convertFileTimetoTime_t(FILETIME *fileTime)
+inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 {
-    SYSTEMTIME stUTC;
+	SYSTEMTIME stUTC;
 	struct tm timeinfo;
 
 	// Convert the last-write time to local time.
