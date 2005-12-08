@@ -3,6 +3,9 @@
 
 //#include <windows.h>
 #include "Box.h"
+
+#ifdef WIN32
+
 #include "../../bin/bbackupd/BackupDaemon.h"
 #include "BoxPortsAndFiles.h"
 
@@ -114,5 +117,4 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-
-
+#endif // WIN32
