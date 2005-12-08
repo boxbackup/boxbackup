@@ -20,10 +20,10 @@ Download OpenSSL 0.9.7 from
 
 Configure Box with:
 
-	export CXX="i386-mingw32-g++ -mno-cygwin"
+	export CXX="i386-mingw32-g++"
 	export AR=i386-mingw32-ar
 	export RANLIB=i386-mingw32-ranlib
 	export CFLAGS=-mno-cygwin
-	export LIBS="-lws2_32 -lgdi32"
+	export LIBS="-lws2_32 -lgdi32 -lcrypto"
 	./configure --target=i386-mingw32
 	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB"
