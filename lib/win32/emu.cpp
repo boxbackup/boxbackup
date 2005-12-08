@@ -1,6 +1,9 @@
 // Box Backup Win32 native port by Nick Knight
 
 #include "Box.h"
+
+#ifdef WIN32
+
 #include "emu.h"
 
 #include <windows.h>
@@ -118,199 +121,9 @@ void finiTimer(void)
 	DeleteCriticalSection(&lock);
 }
 
-
-
-WinNamedPipe::WinNamedPipe()
-{
-
-}
-WinNamedPipe::~WinNamedPipe()
-{
-
-}
-
-HANDLE WinNamedPipe::getHandle(void)
-{
-	return this->mPipe;
-}
-
-void WinNamedPipe::Write(const char *buff, int length)
-{
-	DWORD fSuccess, cbWritten;
-
-	fSuccess = WriteFile( 
-		this->mPipe,                  // pipe handle 
-		buff,                         // message 
-		length,                       // message length 
-		&cbWritten,                   // bytes written 
-		NULL);                        // not overlapped 
-
-	if (!fSuccess) 
-	{
-		throw;
-	}
-}
-
-bool WinNamedPipe::open(void)
-{
-	while (1)
-	{
-		this->mPipe = CreateFileW( 
-			L"\\\\.\\pipe\\boxbackup",   // pipe name 
-			GENERIC_READ |  // read and write access 
-			GENERIC_WRITE, 
-			0,              // no sharing 
-			NULL,           // default security attributes
-			OPEN_EXISTING,
-			0,              // default attributes 
-			NULL);          // no template file 
-
-		// Break if the pipe handle is valid. 
-
-		if (this->mPipe != INVALID_HANDLE_VALUE)
-		{
-			break;
-		}
-
-		// All pipe instances are busy, so wait for 20 seconds. 
-
-		if (!WaitNamedPipeW(L"\\\\.\\pipe\\boxbackup", 20000)) 
-		{ 
-			printf("Could not open pipe aftwer waiting"); 
-			throw;
-		}
-	}
-	return true;
-}
-
-
-PipeGetLine::PipeGetLine(WinNamedPipe pipe)
-{
-	this->mPipe = pipe.getHandle();
-	this->mEOF = false;
-
-	mBufferBegin = 0;
-	mBytesInBuffer = 0;
-}
-
-PipeGetLine::PipeGetLine(HANDLE pipe)
-{
-	this->mPipe = pipe;
-	this->mEOF = false;
-
-	mBufferBegin = 0;
-	mBytesInBuffer = 0;
-}
-
-PipeGetLine::~PipeGetLine()
-{
-
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    PipeGetLine::GetLine
-//		Purpose: getline for windows pipes, most of it taen from Ben's functin:) thanks Ben
-//               examples for pipes taken from MSDN
-//		Created: 15th Jan 2005
-//
-// --------------------------------------------------------------------------
-bool PipeGetLine::GetLine(std::string &line)
-{
-	if(mEOF) {THROW_EXCEPTION(CommonException, GetLineEOF)}
-	
-	// Initialise string to stored into
-	std::string r(mPendingString);
-	mPendingString.erase();
-
-	bool foundLineEnd = false;
-
-	while(!foundLineEnd && !mEOF)
-	{
-		// Use any bytes left in the buffer
-		while(mBufferBegin < mBytesInBuffer)
-		{
-			int c = mBuffer[mBufferBegin++];
-			if(c == '\r')
-			{
-				// Ignore nasty Windows line ending extra chars
-			}
-			else if(c == '\n')
-			{
-				// Line end!
-				foundLineEnd = true;
-				break;
-			}
-			else
-			{
-				// Add to string
-				r += c;
-			}
-			
-			// Implicit line ending at EOF
-			if(mBufferBegin >= mBytesInBuffer)
-			{
-				foundLineEnd = true;
-			}
-		}
-		
-		// Check size
-		if(r.size() > 256)
-		{
-			THROW_EXCEPTION(CommonException, GetLineTooLarge)
-		}
-		
-		// Read more in?
-		if(!foundLineEnd && mBufferBegin >= mBytesInBuffer)
-		{
-			DWORD fSuccess;
-			DWORD cbRead;
-
-			fSuccess = ReadFile( 
-				this->mPipe,    // pipe handle 
-				mBuffer,    // buffer to receive reply 
-				sizeof(mBuffer),  // size of buffer 
-				&cbRead,  // number of bytes read 
-				NULL);    // not overlapped 
-
-			if ( GetLastError() == ERROR_BROKEN_PIPE )
-			{
-				mEOF = true;
-				return false;
-			}
-
-			//if (! fSuccess && GetLastError() != ERROR_MORE_DATA) 
-			//	THROW_EXCEPTION(CommonException, GetLineTooLarge)
-			
-			// Adjust buffer info
-			mBytesInBuffer = cbRead;
-			mBufferBegin = 0;
-			
-			// No data returned?
-			if(cbRead == 0)
-			{
-				// store string away
-				mPendingString = r;
-				// Return false;
-				return false;
-			}
-		}
-	}
-
-	line = r;
-	return true;
-}
-
-bool PipeGetLine::IsEOF(void)
-{
-	return this->mEOF;
-}
-
 //Our constants we need to keep track of
 //globals
 struct passwd tempPasswd;
-
 
 bool EnableBackupRights( void )
 {
@@ -362,6 +175,7 @@ bool EnableBackupRights( void )
 		return true;
 	}
 }
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -458,8 +272,8 @@ HANDLE openfile(const char *filename, int flags, int mode)
 
 		if ( hdir == INVALID_HANDLE_VALUE )
 		{
-			DWORD err = GetLastError();
-			//syslog(EVENTLOG_WARNING_TYPE, "Couldn't open file %s, err %i\n", filename, err);
+			// DWORD err = GetLastError();
+			// syslog(EVENTLOG_WARNING_TYPE, "Couldn't open file %s, err %i\n", filename, err);
 			delete [] buffer;
 			return NULL;
 		}
@@ -547,7 +361,7 @@ int ourfstat(HANDLE hdir, struct stat * st)
 		}
 		else
 		{
-			DWORD res = GetLastError();
+			// DWORD res = GetLastError();
 			return 1;
 		}
 	}
@@ -591,7 +405,7 @@ int ourstat(const char * name, struct stat * st)
 			char wd[PATH_MAX];
 			if(::getcwd(wd, PATH_MAX) == 0)
 			{
-				return NULL;
+				return -1;
 			}
 			tmpStr += wd;
 			if (tmpStr[tmpStr.length()] != '\\')
@@ -712,7 +526,7 @@ int statfs(const char * name, struct statfs * s)
 			char wd[PATH_MAX];
 			if(::getcwd(wd, PATH_MAX) == 0)
 			{
-				return NULL;
+				return -1;
 			}
 			tmpStr += wd;
 			if (tmpStr[tmpStr.length()] != '\\')
@@ -1066,7 +880,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 
 		if (noffds == SOCKET_ERROR)
 		{
-			int errval = WSAGetLastError();
+			// int errval = WSAGetLastError();
 
 			ufdsTmp = ufds;
 			for (unsigned long i = 0; i < nfds; i++)
@@ -1184,3 +998,5 @@ void syslog(int loglevel, const char *frmt, ...)
 		printf("Caught syslog ReportEvent");
 	}
 }
+
+#endif // WIN32

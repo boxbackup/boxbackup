@@ -1,6 +1,6 @@
 // emulates unix syscalls to win32 functions
 
-#ifndef EMU_INCLUDE
+#if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
 #warning FIX ME
@@ -430,41 +430,4 @@ bool EnableBackupRights( void );
 //
 #define MSG_ERR_EXIST                         ((DWORD)0xC0000004L)
 
-class WinNamedPipe
-{
-public:
-	WinNamedPipe();
-	~WinNamedPipe();
-
-	bool open(void);
-	HANDLE getHandle();
-
-	void Write(const char *buff, int length);
-
-private:
-	HANDLE mPipe;
-	
-};
-
-class PipeGetLine
-{
-public:
-	PipeGetLine(WinNamedPipe pipe);
-	PipeGetLine(HANDLE pipe);
-	~PipeGetLine();
-	bool GetLine(std::string &line);
-	bool IsEOF(void);
-
-private:
-	std::string mPendingString;
-	HANDLE mPipe;
-	bool mEOF;
-
-	char mBuffer[256];
-
-	int mBufferBegin,mBytesInBuffer;
-
-};
-
-
-#endif
+#endif // !EMU_INCLUDE && WIN32
