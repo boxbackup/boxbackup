@@ -348,7 +348,7 @@ void BackupDaemon::Run()
         	&dwThreadId);                // returns the thread identifier 
 
 	// init our own timer for file diff timeouts
-	initTimer();
+	InitTimer();
 
 #else // ! WIN32
 
@@ -393,7 +393,7 @@ void BackupDaemon::Run()
 
 #ifdef WIN32
 	//clean up windows specific stuff.
-	finiTimer();
+	FiniTimer();
 #endif
 }
 
@@ -1233,8 +1233,9 @@ TRACE0("new location\n");
 			
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
-#ifdef HAVE_MOUNTS
-#ifdef HAVE_STRUCT_STATFS_F_MNTONNAME
+
+#if defined HAVE_STRUCT_STATFS_F_MNTONNAME || defined WIN32
+
 				// BSD style statfs -- includes mount point, which is nice.
 				struct statfs s;
 				if(::statfs(ploc->mPath.c_str(), &s) != 0)
@@ -1244,7 +1245,9 @@ TRACE0("new location\n");
 
 				// Where the filesystem is mounted
 				std::string mountName(s.f_mntonname);
-#else
+
+#else // !HAVE_STRUCT_STATFS_F_MNTONNAME && !WIN32
+
 				// Warn in logs if the directory isn't absolute
 				if(ploc->mPath[0] != '/')
 				{
@@ -1270,10 +1273,8 @@ TRACE0("new location\n");
 					}
 					TRACE2("mount point chosen for %s is %s\n", ploc->mPath.c_str(), mountName.c_str());
 				}
+
 #endif
-#else // !HAVE_MOUNTS
-				std::string mountName = "none";
-#endif // HAVE_MOUNTS
 				
 				// Got it?
 				std::map<std::string, int>::iterator f(mounts.find(mountName));
