@@ -12,19 +12,19 @@
 
 #include "ServiceBackupDaemon.h"
 
-ServiceBackupDaemon daemonService;
-extern HANDLE stopServiceEvent;
+ServiceBackupDaemon gDaemonService;
+extern HANDLE gStopServiceEvent;
 
-DWORD WINAPI runService(LPVOID lpParameter)
+DWORD WINAPI RunService(LPVOID lpParameter)
 {
-	DWORD retVal = daemonService.WinService();
-	SetEvent( stopServiceEvent );
+	DWORD retVal = gDaemonService.WinService();
+	SetEvent( gStopServiceEvent );
 	return retVal;
 }
 
-void terminateService(void)
+void TerminateService(void)
 {
-	daemonService.SetTerminateWanted();
+	gDaemonService.SetTerminateWanted();
 }
 
 DWORD ServiceBackupDaemon::WinService(void)

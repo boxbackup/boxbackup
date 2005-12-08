@@ -16,15 +16,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern void terminateService(void);
-extern DWORD WINAPI runService(LPVOID lpParameter);
+extern void TerminateService(void);
+extern DWORD WINAPI RunService(LPVOID lpParameter);
 
 // Global variables
 
-TCHAR* serviceName = TEXT("Beeper Service");
-SERVICE_STATUS serviceStatus;
-SERVICE_STATUS_HANDLE serviceStatusHandle = 0;
-HANDLE stopServiceEvent = 0;
+TCHAR* gServiceName = TEXT("Box Backup Service");
+SERVICE_STATUS gServiceStatus;
+SERVICE_STATUS_HANDLE gServiceStatusHandle = 0;
+HANDLE gStopServiceEvent = 0;
 
 #define SERVICE_NAME "boxbackup"
 
@@ -46,11 +46,11 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 		case SERVICE_CONTROL_SHUTDOWN:
 		case SERVICE_CONTROL_STOP:
 			Beep(1000,100);
-			terminateService();
-			serviceStatus.dwCurrentState = SERVICE_STOP_PENDING;
-			SetServiceStatus( serviceStatusHandle, &serviceStatus );
+			TerminateService();
+			gServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
+			SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
-			SetEvent( stopServiceEvent );
+			SetEvent(gStopServiceEvent);
 			return;
 
 		case SERVICE_CONTROL_PAUSE:
@@ -68,7 +68,7 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 				break;
 	}
 
-	SetServiceStatus( serviceStatusHandle, &serviceStatus );
+	SetServiceStatus( gServiceStatusHandle, &gServiceStatus );
 }
 
 // ServiceMain is called when the SCM wants to
@@ -82,58 +82,70 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 VOID ServiceMain(DWORD argc, LPTSTR *argv) 
 {
    // initialise service status
-    serviceStatus.dwServiceType = SERVICE_WIN32;
-    serviceStatus.dwCurrentState = SERVICE_STOPPED;
-    serviceStatus.dwControlsAccepted = 0;
-    serviceStatus.dwWin32ExitCode = NO_ERROR;
-    serviceStatus.dwServiceSpecificExitCode = NO_ERROR;
-    serviceStatus.dwCheckPoint = 0;
-    serviceStatus.dwWaitHint = 0;
+    gServiceStatus.dwServiceType = SERVICE_WIN32;
+    gServiceStatus.dwCurrentState = SERVICE_STOPPED;
+    gServiceStatus.dwControlsAccepted = 0;
+    gServiceStatus.dwWin32ExitCode = NO_ERROR;
+    gServiceStatus.dwServiceSpecificExitCode = NO_ERROR;
+    gServiceStatus.dwCheckPoint = 0;
+    gServiceStatus.dwWaitHint = 0;
 
-    serviceStatusHandle = RegisterServiceCtrlHandler( serviceName, ServiceControlHandler );
+    gServiceStatusHandle = RegisterServiceCtrlHandler(gServiceName, 
+	ServiceControlHandler);
 
-    if ( serviceStatusHandle )
+    if (gServiceStatusHandle)
     {
         // service is starting
-        serviceStatus.dwCurrentState = SERVICE_START_PENDING;
-        SetServiceStatus( serviceStatusHandle, &serviceStatus );
+        gServiceStatus.dwCurrentState = SERVICE_START_PENDING;
+        SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
         // do initialisation here
-        stopServiceEvent = CreateEvent( 0, TRUE, FALSE, 0 );
-		if (!stopServiceEvent)
+        gStopServiceEvent = CreateEvent( 0, TRUE, FALSE, 0 );
+		if (!gStopServiceEvent)
 		{
-			serviceStatus.dwControlsAccepted &= ~(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
-			serviceStatus.dwCurrentState = SERVICE_STOPPED;
-			SetServiceStatus( serviceStatusHandle, &serviceStatus );
+			gServiceStatus.dwControlsAccepted &= 
+				~(SERVICE_ACCEPT_STOP | 
+				  SERVICE_ACCEPT_SHUTDOWN);
+			gServiceStatus.dwCurrentState = SERVICE_STOPPED;
+			SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 			return;
 		}
 
-		HANDLE ourThread = CreateThread(NULL,0,runService,0,CREATE_SUSPENDED ,NULL);
+		HANDLE ourThread = CreateThread(
+			NULL,
+			0,
+			RunService,
+			0,
+			CREATE_SUSPENDED,
+			NULL);
+
 		SetThreadPriority(ourThread, THREAD_PRIORITY_LOWEST);
 		ResumeThread(ourThread);
 
-        // running we are now runnint so tell the SCM
-        serviceStatus.dwControlsAccepted |= (SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
-        serviceStatus.dwCurrentState = SERVICE_RUNNING;
-        SetServiceStatus( serviceStatusHandle, &serviceStatus );
+		// we are now running so tell the SCM
+		gServiceStatus.dwControlsAccepted |= 
+		(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+		gServiceStatus.dwCurrentState = SERVICE_RUNNING;
+		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
 		// do cleanup here
-		WaitForSingleObject(stopServiceEvent, INFINITE);
-        CloseHandle( stopServiceEvent );
-        stopServiceEvent = 0;
+		WaitForSingleObject(gStopServiceEvent, INFINITE);
+		CloseHandle(gStopServiceEvent);
+		gStopServiceEvent = 0;
 
-        // service was stopped
-        serviceStatus.dwCurrentState = SERVICE_STOP_PENDING;
-        SetServiceStatus( serviceStatusHandle, &serviceStatus );
+		// service was stopped
+		gServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
+		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
-        // service is now stopped
-        serviceStatus.dwControlsAccepted &= ~(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
-        serviceStatus.dwCurrentState = SERVICE_STOPPED;
-        SetServiceStatus( serviceStatusHandle, &serviceStatus );
+		// service is now stopped
+		gServiceStatus.dwControlsAccepted &= 
+			~(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+		gServiceStatus.dwCurrentState = SERVICE_STOPPED;
+		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
     }
 }
 
-void ourService(void)
+void OurService(void)
 {
 	SERVICE_TABLE_ENTRY serviceTable[] = 
 	{ 
@@ -150,7 +162,7 @@ void ourService(void)
 	}
 }
 
-void installService(void)
+void InstallService(void)
 {
 	SC_HANDLE newService, scm;
 
@@ -161,13 +173,22 @@ void installService(void)
 	char buf[MAX_PATH];
 	
 	GetModuleFileName(NULL, buf, sizeof(buf));
-	newService = CreateService(scm, SERVICE_NAME, "Box Backup", SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, buf, 0,0,0,0,0);
+	newService = CreateService(
+		scm, 
+		SERVICE_NAME, 
+		"Box Backup", 
+		SERVICE_ALL_ACCESS, 
+		SERVICE_WIN32_OWN_PROCESS, 
+		SERVICE_DEMAND_START, 
+		SERVICE_ERROR_NORMAL, 
+		buf, 
+		0,0,0,0,0);
 
-	if ( newService ) CloseServiceHandle(newService);
+	if (newService) CloseServiceHandle(newService);
 	CloseServiceHandle(scm);
 }
 
-void removeService(void)
+void RemoveService(void)
 {
 	SC_HANDLE service, scm;
 	SERVICE_STATUS status;

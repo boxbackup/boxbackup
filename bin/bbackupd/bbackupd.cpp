@@ -19,7 +19,7 @@
 	#include "bbwinservice.h"
 	#include "ServiceBackupDaemon.h"
 
-	extern ServiceBackupDaemon daemonService;
+	extern ServiceBackupDaemon gDaemonService;
 #endif
 
 int main(int argc, const char *argv[])
@@ -43,7 +43,7 @@ int main(int argc, const char *argv[])
 
 		EnableBackupRights();
 
-		int ExitCode = daemonService.Main(
+		int ExitCode = gDaemonService.Main(
 			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, 
 			argc, argv);
 
@@ -63,12 +63,12 @@ int main(int argc, const char *argv[])
 	}
 	if(argc == 2 && ::strcmp(argv[1], "-r") == 0)
 	{
-		removeService();
+		RemoveService();
 		return 0;
 	}
 	if(argc == 2 && ::strcmp(argv[1], "-i") == 0)
 	{
-		installService();
+		InstallService();
 		return 0;
 	}
 
@@ -76,7 +76,7 @@ int main(int argc, const char *argv[])
 
 	//if no match we assume it is the service starting
 	//syslog(LOG_INFO,"Starting Box Backup Service");
-	ourService();
+	OurService();
 		
 	return 0;
 

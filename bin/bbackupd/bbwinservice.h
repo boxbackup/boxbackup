@@ -12,8 +12,8 @@
 #ifndef BBWINSERVICE__H
 #define BBWINSERVICE__H
 
-void removeService(void);
-void installService(void);
-void ourService(void);
+void RemoveService(void);
+void InstallService(void);
+void OurService(void);
 
 #endif
