@@ -224,51 +224,23 @@ void BackupDaemon::DeleteAllLocations()
 DWORD WINAPI HelperThread( LPVOID lpParam ) 
 { 
 	printf( "Parameter = %lu.", *(DWORD*)lpParam ); 
-	((BackupDaemon *)lpParam)->helperThread();
+	((BackupDaemon *)lpParam)->RunHelperThread();
 
 	return 0;
-
 }
-void BackupDaemon::helperThread(void)
+
+void BackupDaemon::RunHelperThread(void)
 {
 	mpCommandSocketInfo = new CommandSocketInfo;
 	this->mReceivedCommandConn = false;
-
-	//mpCommandSocketInfo->mListeningSocket = CreateNamedPipeW(L"\\\\.\\pipe\\boxbackup",PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 4096, 4096, NMPWAIT_USE_DEFAULT_WAIT, (LPSECURITY_ATTRIBUTES) NULL);
-
 
 	while ( !IsTerminateWanted() )
 	{
 		try
 		{
-			mpCommandSocketInfo->mListeningSocket = CreateNamedPipeW( 
-				L"\\\\.\\pipe\\boxbackup", // pipe name 
-				PIPE_ACCESS_DUPLEX,        // read/write access 
-				PIPE_TYPE_MESSAGE |        // message type pipe 
-				PIPE_READMODE_MESSAGE |    // message-read mode 
-				PIPE_WAIT,                 // blocking mode 
-				PIPE_UNLIMITED_INSTANCES,  // max. instances  
-				4096,                      // output buffer size 
-				4096,                      // input buffer size 
-				NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
-				NULL);                     // default security attribute 
+			mpCommandSocketInfo->mListeningSocket.Accept(NULL);
 
-			if ( mpCommandSocketInfo->mListeningSocket == INVALID_HANDLE_VALUE )
-			{
-				::syslog(LOG_ERR, "Failed to open named pipe");
-				mpCommandSocketInfo = 0;
-			}
-
-
-			if ( !ConnectNamedPipe(mpCommandSocketInfo->mListeningSocket, (LPOVERLAPPED) NULL))
-			{
-				CloseHandle(mpCommandSocketInfo->mListeningSocket);
-				::syslog(LOG_ERR, "Failed to open named pipe - connect");
-				mpCommandSocketInfo = 0;
-			}
-			//when we get here we have got a connection from a client 
-
-			//This next section comes from Ben's origional function
+			// This next section comes from Ben's original function
 			// Log
 			::syslog(LOG_INFO, "Connection from command socket");
 
@@ -283,35 +255,10 @@ void BackupDaemon::helperThread(void)
 				conf.GetKeyValueInt("MaxUploadWait"),
 				mState);
 
-			DWORD cbWritten,fSuccess;
+			mpCommandSocketInfo->mListeningSocket.Write(summary, summarySize);
+			mpCommandSocketInfo->mListeningSocket.Write("ping\n", 5);
 
-			fSuccess = WriteFile( 
-				mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
-				summary,      // buffer to write from 
-				summarySize, // number of bytes to write 
-				&cbWritten,   // number of bytes written 
-				NULL);        // not overlapped I/O 
-
-			if (! fSuccess || summarySize != cbWritten)
-			{
-				this->CloseCommandConnection();
-				continue;
-			}
-
-			fSuccess = WriteFile( 
-				mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
-				"ping\n",      // buffer to write from 
-				5, // number of bytes to write 
-				&cbWritten,   // number of bytes written 
-				NULL);        // not overlapped I/O 
-
-			if (! fSuccess || 5 != cbWritten)
-			{
-				this->CloseCommandConnection();
-				continue;
-			}
-
-			PipeGetLine readLine(mpCommandSocketInfo->mListeningSocket);
+			IOStreamGetLine readLine(mpCommandSocketInfo->mListeningSocket);
 			std::string command;
 
 			while ( readLine.GetLine(command) )
@@ -356,27 +303,26 @@ void BackupDaemon::helperThread(void)
 				}
 
 				// Send a response back?
-				if(sendResponse)
+				if (sendResponse)
 				{
-					fSuccess = WriteFile( 
-						mpCommandSocketInfo->mListeningSocket,        // handle to pipe 
-						sendOK?"ok\n":"error\n",      // buffer to write from 
-						sendOK?3:6, // number of bytes to write 
-						&cbWritten,   // number of bytes written 
-						NULL);        // not overlapped I/O 
+					const char* response = sendOK ? "ok\n" : "error\n";
+					mpCommandSocketInfo->mListeningSocket.Write(
+						response, strlen(response));
 				}
+
 				this->mReceivedCommandConn = true;
 			}
 
-			CloseHandle(mpCommandSocketInfo->mListeningSocket);
+			mpCommandSocketInfo->mListeningSocket.Close();
 		}
 		catch (...)
 		{
-			//Mmmm not sure what to do here - perhaps just log...
+			::syslog(LOG_ERR, "Communication error with control client");
 		}
 	}
 } 
 #endif
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -389,7 +335,7 @@ void BackupDaemon::Run()
 {
 #ifdef WIN32
 
-	// Create a local inet socket
+	// Create a thread to handle the named pipe
 	HANDLE hThread;
 	DWORD dwThreadId;
 
@@ -1071,9 +1017,7 @@ void BackupDaemon::CloseCommandConnection()
 		TRACE0("Closing command connection\n");
 		
 #ifdef WIN32
-		FlushFileBuffers(mpCommandSocketInfo->mListeningSocket); 
-		DisconnectNamedPipe(mpCommandSocketInfo->mListeningSocket); 
-		CloseHandle(mpCommandSocketInfo->mListeningSocket); 
+		mpCommandSocketInfo->mListeningSocket.Close();
 #else
 		if(mpCommandSocketInfo->mpGetLine)
 		{
@@ -1101,10 +1045,16 @@ void BackupDaemon::CloseCommandConnection()
 // --------------------------------------------------------------------------
 void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 {
-
 	// The bbackupctl program can't rely on a state change, because it may never
 	// change if the server doesn't need to be contacted.
 	
+#ifdef WIN32
+	if (mpCommandSocketInfo->mListeningSocket.IsConnected())
+	{
+		const char* message = SendStart ? "start-sync\n" : "finish-sync\n";
+		mpCommandSocketInfo->mListeningSocket.Write(message, strlen(message));
+	}
+#else
 	if(mpCommandSocketInfo != 0 && mpCommandSocketInfo->mpConnectedSocket.get() != 0)
 	{
 		try
@@ -1116,6 +1066,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 			CloseCommandConnection();
 		}
 	}
+#endif
 }
 
 
@@ -1693,14 +1644,32 @@ void BackupDaemon::SetState(int State)
 	// Set process title
 	const static char *stateText[] = {"idle", "connected", "error -- waiting for retry", "over limit on server -- not backing up"};
 	SetProcessTitle(stateText[State]);
-	
+
 	// If there's a command socket connected, then inform it -- disconnecting from the
 	// command socket if there's an error
+
+	char newState[64];
+	char newStateSize = sprintf(newState, "state %d\n", State);
+
+#ifdef WIN32
+	#warning FIX ME: race condition
+	// what happens if the socket is closed by the other thread before
+	// we can write to it? Null pointer deref at best.
+	if (mpCommandSocketInfo->mListeningSocket.IsConnected())
+	{
+		try
+		{
+			mpCommandSocketInfo->mListeningSocket.Write(newState, newStateSize);
+		}
+		catch(...)
+		{
+			CloseCommandConnection();
+		}
+	}
+#else
 	if(mpCommandSocketInfo != 0 && mpCommandSocketInfo->mpConnectedSocket.get() != 0)
 	{
 		// Something connected to the command socket, tell it about the new state
-		char newState[64];
-		char newStateSize = sprintf(newState, "state %d\n", State);
 		try
 		{
 			mpCommandSocketInfo->mpConnectedSocket->Write(newState, newStateSize);
@@ -1710,6 +1679,7 @@ void BackupDaemon::SetState(int State)
 			CloseCommandConnection();
 		}
 	}
+#endif
 }
 
 

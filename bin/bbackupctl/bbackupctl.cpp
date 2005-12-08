@@ -19,6 +19,10 @@
 #include "SocketStream.h"
 #include "IOStreamGetLine.h"
 
+#ifdef WIN32
+	#include "WinNamedPipeStream.h"
+#endif
+
 #include "MemLeakFindOn.h"
 
 void PrintUsageAndExit()
@@ -95,7 +99,6 @@ int main(int argc, const char *argv[])
 	// Easier coding
 	const Configuration &conf(*config);
 
-#ifndef WIN32
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
@@ -104,15 +107,17 @@ int main(int argc, const char *argv[])
 	}
 	
 	// Connect to socket
+
+#ifndef WIN32
 	SocketStream connection;
 #else /* WIN32 */
-	WinNamedPipe connection;
+	WinNamedPipeStream connection;
 #endif /* ! WIN32 */
 	
 	try
 	{
-#ifdef WIN32	
-		connection.open();
+#ifdef WIN32
+		connection.Connect(NULL);
 #else
 		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str());
 #endif
@@ -135,11 +140,7 @@ int main(int argc, const char *argv[])
 	}
 	
 	// For receiving data
-#ifdef WIN32
-	PipeGetLine getLine(connection);
-#else
 	IOStreamGetLine getLine(connection);
-#endif
 	
 	// Wait for the configuration summary
 	std::string configSummary;
@@ -157,10 +158,12 @@ int main(int argc, const char *argv[])
 	// Was the connection rejected by the server?
 	if(getLine.IsEOF())
 	{
-		printf("Server rejected the connection. Are you running bbackupctl as the same user as the daemon?\n");
+		printf("Server rejected the connection. "
+			"Are you running bbackupctl as the same user as the daemon?\n");
 
 #if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR,"Server rejected the connection. Are you running bbackupctl as the same user as the daemon?");
+		syslog(LOG_ERR, "Server rejected the connection. "
+			"Are you running bbackupctl as the same user as the daemon?");
 #endif
 
 		return 1;
