@@ -35,6 +35,21 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 			}
 			next;
 		}
+
+		if (m'\AONLY:(.+)')
+		{
+			my @only_targets = split m'\,', $1;
+
+			if (not grep {$_ eq $build_os or $_ eq $target_os}
+				@only_targets)
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-ONLY';
+				}
+				next;
+			}
+		}
 		
 		# new parcel, or a new parcel definition?
 		if(m/\A\s+(.+)\Z/)

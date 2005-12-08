@@ -8,6 +8,9 @@ backup-client
 	bin bbackupquery
 	bin bbackupctl
 	script bin/bbackupd/bbackupd-config
+	script bin/bbackupd/win32/installer.iss 
+	script bin/bbackupd/win32/ReadMe.txt 
+	script bin/bbackupd/win32/bbackupd.conf
 
 OMIT:mingw32
 OMIT:CYGWIN
