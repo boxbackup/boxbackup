@@ -1,10 +1,13 @@
 // Box Backup Win32 native port by Nick Knight
 
+// Need at least 0x0500 to use GetFileSizeEx on Cygwin/MinGW
+#define WINVER 0x0500
+
 #include "Box.h"
 
 #ifdef WIN32
 
-#include "emu.h"
+// #include "emu.h"
 
 #include <windows.h>
 #include <fcntl.h>
