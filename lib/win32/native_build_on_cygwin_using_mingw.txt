@@ -1,0 +1,36 @@
+How to build Box Backup on Win32 using Cygwin and MinGW
+By Chris Wilson, 2005-12-07
+
+Install Cygwin on your Windows box [http://www.cygwin.org]
+Make sure to include the follwing packages:
+* Devel/gcc
+* Devel/gcc-c++
+* Mingw/mingw-zlib
+
+Download OpenSSL from 
+[http://www.openssl.org/source/openssl-0.9.7i.tar.gz]
+
+Open a Cygwin shell, and unpack OpenSSL:
+
+	tar xzvf openssl-0.9.7i.tar.gz
+
+Configure OpenSSL for MinGW compilation, and build and install it:
+
+	cd openssl-0.9.7i
+	./Configure --prefix=/usr/i686-pc-mingw32/ mingw
+	make
+	make install
+
+Now unpack the Box Backup sources, enter the source directory,
+and configure like this:
+
+	export CXX="g++ -mno-cygwin"
+	export LD="g++ -mno-cygwin"
+	export CFLAGS="-mno-cygwin"
+	export CXXFLAGS="-mno-cygwin"
+	export LDFLAGS="-mno-cygwin"
+	export LIBS="-lws2_32 -lgdi32 -lcrypto"
+	(if you don't have a "configure" file, run "./bootstrap")
+	./configure
+	make
+
