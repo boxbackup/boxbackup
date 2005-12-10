@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "Box.h"
+
 extern void TerminateService(void);
 extern DWORD WINAPI RunService(LPVOID lpParameter);
 
@@ -30,8 +32,12 @@ HANDLE gStopServiceEvent = 0;
 
 void ErrorHandler(char *s, DWORD err)
 {
-	MessageBox(0, s, "Error", 
-			MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
+	char buf[256];
+	memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
+	::syslog(LOG_ERR, "%s", buf);
+	MessageBox(0, buf, "Error", 
+		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
 	ExitProcess(err);
 }
 
@@ -149,7 +155,8 @@ void OurService(void)
 {
 	SERVICE_TABLE_ENTRY serviceTable[] = 
 	{ 
-		{ SERVICE_NAME,(LPSERVICE_MAIN_FUNCTION) ServiceMain},{ NULL, NULL }
+		{ SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
+		{ NULL, NULL }
 	};
 	BOOL success;
 
@@ -158,7 +165,9 @@ void OurService(void)
 
 	if (!success)
 	{
-		ErrorHandler("In StartServiceCtrlDispatcher", GetLastError());
+		ErrorHandler("Failed to start service. Did you start it "
+			"from the Service Control Manager? "
+			"(StartServiceCtrlDispatcher)", GetLastError());
 	}
 }
 
@@ -170,9 +179,14 @@ void InstallService(void)
 
 	if (!scm) return;
 
-	char buf[MAX_PATH];
-	
-	GetModuleFileName(NULL, buf, sizeof(buf));
+	char cmd[MAX_PATH];
+	GetModuleFileName(NULL, cmd, sizeof(cmd)-1);
+	cmd[sizeof(cmd)-1] = 0;
+
+	char cmd_args[MAX_PATH];
+	snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
+	cmd_args[sizeof(cmd_args)-1] = 0;
+
 	newService = CreateService(
 		scm, 
 		SERVICE_NAME, 
@@ -181,7 +195,7 @@ void InstallService(void)
 		SERVICE_WIN32_OWN_PROCESS, 
 		SERVICE_DEMAND_START, 
 		SERVICE_ERROR_NORMAL, 
-		buf, 
+		cmd_args, 
 		0,0,0,0,0);
 
 	if (newService) CloseServiceHandle(newService);
