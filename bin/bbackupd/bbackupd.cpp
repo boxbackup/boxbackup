@@ -28,31 +28,6 @@ int main(int argc, const char *argv[])
 
 #ifdef WIN32
 
-	if(argc == 3 && ::strcmp(argv[1], "-c") == 0)
-	{
-		// Under win32 we must initialise the Winsock library
-		// before using sockets
-		
-		WSADATA info;
-
-		if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
-		{
-			// box backup will not run without sockets
-			THROW_EXCEPTION(BackupStoreException, Internal)
-		}
-
-		EnableBackupRights();
-
-		int ExitCode = gDaemonService.Main(
-			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, 
-			argc, argv);
-
-		// Clean up our sockets
-		WSACleanup();
-
-		return ExitCode;
-	}
-	
 	if(argc == 2 &&
 		(::strcmp(argv[1], "--help") == 0 ||
 		 ::strcmp(argv[1], "-h") == 0))
@@ -71,20 +46,44 @@ int main(int argc, const char *argv[])
 		InstallService();
 		return 0;
 	}
+		
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+		
+	WSADATA info;
+
+	if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
+	{
+		// box backup will not run without sockets
+		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
+		THROW_EXCEPTION(BackupStoreException, Internal)
+	}
 
 	EnableBackupRights();
 
-	//if no match we assume it is the service starting
-	//syslog(LOG_INFO,"Starting Box Backup Service");
-	OurService();
-		
-	return 0;
+	int ExitCode = 0;
 
-#else // ! WIN32
+	if (argc == 2 && ::strcmp(argv[1], "--service") == 0)
+	{
+		syslog(LOG_INFO,"Starting Box Backup Service");
+		OurService();
+	}
+	else
+	{
+		ExitCode = gDaemonService.Main(
+			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+	}
+
+	// Clean up our sockets
+	WSACleanup();
+
+	return ExitCode;
+
+#else // !WIN32
 
 	BackupDaemon daemon;
 	return daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
-	
+
 #endif // WIN32
 
 	MAINHELPER_END
