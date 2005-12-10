@@ -216,14 +216,15 @@ void BackupDaemon::DeleteAllLocations()
 //
 // Function
 //		Name:    HelperThread()
-//		Purpose: Background thread function to help with communications with
-//               control communications
+//		Purpose: Background thread function, called by Windows,
+//			calls the BackupDaemon's RunHelperThread method
+//			to listen for and act on control communications
 //		Created: 18/2/04
 //
 // --------------------------------------------------------------------------
-DWORD WINAPI HelperThread( LPVOID lpParam ) 
+unsigned int WINAPI HelperThread( LPVOID lpParam ) 
 { 
-	printf( "Parameter = %lu.", *(DWORD*)lpParam ); 
+	printf( "Parameter = %lu.\n", *(DWORD*)lpParam ); 
 	((BackupDaemon *)lpParam)->RunHelperThread();
 
 	return 0;
@@ -261,18 +262,20 @@ void BackupDaemon::RunHelperThread(void)
 			IOStreamGetLine readLine(mpCommandSocketInfo->mListeningSocket);
 			std::string command;
 
-			while ( readLine.GetLine(command) )
+			while (mpCommandSocketInfo->mListeningSocket.IsConnected() &&
+			       readLine.GetLine(command) )
 			{
 				TRACE1("Receiving command '%s' over command socket\n", command.c_str());
 
 				bool sendOK = false;
 				bool sendResponse = true;
+				bool disconnect = false;
 
 				// Command to process!
 				if(command == "quit" || command == "")
 				{
 					// Close the socket.
-					CloseCommandConnection();
+					disconnect = true;
 					sendResponse = false;
 				}
 				else if(command == "sync")
@@ -310,10 +313,20 @@ void BackupDaemon::RunHelperThread(void)
 						response, strlen(response));
 				}
 
+				if (disconnect) 
+				{
+					break;
+				}
+
 				this->mReceivedCommandConn = true;
 			}
 
 			mpCommandSocketInfo->mListeningSocket.Close();
+		}
+		catch (BoxException &e)
+		{
+			::syslog(LOG_ERR, "Communication error with "
+				"control client: %s", e.what());
 		}
 		catch (...)
 		{
@@ -337,9 +350,9 @@ void BackupDaemon::Run()
 
 	// Create a thread to handle the named pipe
 	HANDLE hThread;
-	DWORD dwThreadId;
+	unsigned int dwThreadId;
 
-	hThread = CreateThread( 
+	hThread = (HANDLE) _beginthreadex( 
         	NULL,                        // default security attributes 
         	0,                           // use default stack size  
         	HelperThread,                // thread function 
@@ -392,7 +405,7 @@ void BackupDaemon::Run()
 	}
 
 #ifdef WIN32
-	//clean up windows specific stuff.
+	// clean up windows specific stuff.
 	FiniTimer();
 #endif
 }
@@ -551,6 +564,8 @@ void BackupDaemon::Run2()
 			// Do sync
 			bool errorOccurred = false;
 			int errorCode = 0, errorSubCode = 0;
+			const char* errorString = "unknown";
+
 			try
 			{
 				// Set state and log start
@@ -654,6 +669,7 @@ void BackupDaemon::Run2()
 			catch(BoxException &e)
 			{
 				errorOccurred = true;
+				errorString = e.what();
 				errorCode = e.GetType();
 				errorSubCode = e.GetSubType();
 			}
@@ -697,8 +713,13 @@ void BackupDaemon::Run2()
 				{
 					// Not restart/terminate, pause and retry
 					SetState(State_Error);
-					::syslog(LOG_ERR, "Exception caught (%d/%d), reset state and waiting to retry...", errorCode, errorSubCode);
-					::sleep(100);
+					::syslog(LOG_ERR, 
+						"Exception caught (%s %d/%d), "
+						"reset state and waiting "
+						"to retry...", 
+						errorString, errorCode, 
+						errorSubCode);
+					::sleep(10);
 				}
 			}
 
@@ -878,7 +899,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 						}
 					}
 				}
-#endif // WIN32
+#endif // PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				
 				// Is this an acceptable connection?
 				if(!uidOK)
@@ -1048,25 +1069,30 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 	// The bbackupctl program can't rely on a state change, because it may never
 	// change if the server doesn't need to be contacted.
 	
+	if (mpCommandSocketInfo != NULL &&
 #ifdef WIN32
-	if (mpCommandSocketInfo->mListeningSocket.IsConnected())
+	    mpCommandSocketInfo->mListeningSocket.IsConnected()
+#else
+	    mpCommandSocketInfo->mpConnectedSocket.get() != 0
+#endif
+	    )
 	{
 		const char* message = SendStart ? "start-sync\n" : "finish-sync\n";
-		mpCommandSocketInfo->mListeningSocket.Write(message, strlen(message));
-	}
-#else
-	if(mpCommandSocketInfo != 0 && mpCommandSocketInfo->mpConnectedSocket.get() != 0)
-	{
 		try
 		{
-			mpCommandSocketInfo->mpConnectedSocket->Write(SendStart?"start-sync\n":"finish-sync\n", SendStart?11:12);
+#ifdef WIN32
+			mpCommandSocketInfo->mListeningSocket.Write(message, 
+				strlen(message));
+#else
+			mpCommandSocketInfo->mpConnectedSocket->Write(message,
+				strlen(message));
+#endif
 		}
 		catch(...)
 		{
 			CloseCommandConnection();
 		}
 	}
-#endif
 }
 
 
@@ -1656,7 +1682,8 @@ void BackupDaemon::SetState(int State)
 	#warning FIX ME: race condition
 	// what happens if the socket is closed by the other thread before
 	// we can write to it? Null pointer deref at best.
-	if (mpCommandSocketInfo->mListeningSocket.IsConnected())
+	if (mpCommandSocketInfo && 
+	    mpCommandSocketInfo->mListeningSocket.IsConnected())
 	{
 		try
 		{
