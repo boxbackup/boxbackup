@@ -28,6 +28,8 @@ int main(int argc, const char *argv[])
 
 #ifdef WIN32
 
+	::openlog("Box Backup (bbackupd)", 0, 0);
+
 	if(argc == 2 &&
 		(::strcmp(argv[1], "--help") == 0 ||
 		 ::strcmp(argv[1], "-h") == 0))
@@ -76,6 +78,8 @@ int main(int argc, const char *argv[])
 
 	// Clean up our sockets
 	WSACleanup();
+
+	::closelog();
 
 	return ExitCode;
 

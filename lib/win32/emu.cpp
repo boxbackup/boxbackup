@@ -1001,8 +1001,8 @@ void syslog(int loglevel, const char *frmt, ...)
 
 		{
 			DWORD err = GetLastError();
-			printf("Unable to send message to Event Log: %i\r\n", 
-				err);
+			printf("Unable to send message to Event Log "
+				"(error %i):\r\n", err);
 		}
 
 		printf("%s\r\n", buffer);
