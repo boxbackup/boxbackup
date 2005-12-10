@@ -12,6 +12,7 @@
 #include <windows.h>
 #include <fcntl.h>
 // #include <atlenc.h>
+#include <unistd.h>
 
 #include <string>
 #include <list>
@@ -52,11 +53,12 @@ int setitimer(int type , struct itimerval *timeout, int)
 		}
 		LeaveCriticalSection(&gLock);
 	}
+	
 	// indicate success
 	return 0;
 }
 
-static DWORD WINAPI RunTimer(LPVOID lpParameter)
+static unsigned int WINAPI RunTimer(LPVOID lpParameter)
 {
 	gFinishTimer = false;
 
@@ -119,7 +121,7 @@ void InitTimer(void)
 	InitializeCriticalSection(&gLock);
 
 	// create our thread
-	HANDLE ourThread = CreateThread(NULL, 0, RunTimer, 0, 
+	HANDLE ourThread = (HANDLE)_beginthreadex(NULL, 0, RunTimer, 0, 
 		CREATE_SUSPENDED, NULL);
 	SetThreadPriority(ourThread, THREAD_PRIORITY_LOWEST);
 	ResumeThread(ourThread);
@@ -999,7 +1001,8 @@ void syslog(int loglevel, const char *frmt, ...)
 
 		{
 			DWORD err = GetLastError();
-			printf("Unable to send message to Event Log: %i", err);
+			printf("Unable to send message to Event Log: %i\r\n", 
+				err);
 		}
 
 		printf("%s\r\n", buffer);
