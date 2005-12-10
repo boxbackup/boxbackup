@@ -9,7 +9,7 @@ AC_CONFIG_HEADERS([lib/common/config.h])
 touch install-sh
 AC_CANONICAL_SYSTEM
 # echo "Build target OS: '$target_os'"
-test -s install-sh && rm install-sh
+test -s install-sh || rm install-sh
 
 ### Checks for programs.
 
@@ -30,9 +30,9 @@ fi
 
 
 ### Checks for libraries.
-if test "$target_os" != "mingw32"; then
+if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
 AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes], 
-	[AC_MSG_ERROR([[Cannot find a short sleep function (nanosleep or Sleep)]])])
+	[AC_MSG_ERROR([[Cannot find a short sleep function (nanosleep)]])])
 fi
 
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[Cannot find zlib]])])
@@ -95,7 +95,11 @@ AX_CHECK_DIRENT_D_TYPE
 AC_SYS_LARGEFILE
 AX_CHECK_LLONG_MINMAX
 AX_CHECK_DEFINE_PRAGMA
+
+if test "$target_os" != "mingw32"; then
 AX_RANDOM_DEVICE
+fi
+
 AX_CHECK_MOUNT_POINT([],[])
 AX_CHECK_MALLOC_WORKAROUND
 
