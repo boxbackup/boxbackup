@@ -23,6 +23,12 @@
 
 #include "config.h"
 
+#ifdef WIN32
+	// need msvcrt version 6.1 or higher for _gmtime64()
+	// must define this before importing <sys/types.h>
+	#define __MSVCRT_VERSION__ 0x0601
+#endif
+
 #ifdef HAVE_SYS_TYPES_H
 	#include <sys/types.h>
 #endif
