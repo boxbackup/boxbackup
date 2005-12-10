@@ -12,14 +12,15 @@
 
 #ifdef WIN32
 
-#include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <windows.h>
 
 #include "Box.h"
 
 extern void TerminateService(void);
-extern DWORD WINAPI RunService(LPVOID lpParameter);
+extern unsigned int WINAPI RunService(LPVOID lpParameter);
 
 // Global variables
 
@@ -117,7 +118,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 			return;
 		}
 
-		HANDLE ourThread = CreateThread(
+		HANDLE ourThread = (HANDLE)_beginthreadex(
 			NULL,
 			0,
 			RunService,
@@ -165,8 +166,8 @@ void OurService(void)
 
 	if (!success)
 	{
-		ErrorHandler("Failed to start service. Did you start it "
-			"from the Service Control Manager? "
+		ErrorHandler("Failed to start service. Did you start "
+			"Box Backup from the Service Control Manager? "
 			"(StartServiceCtrlDispatcher)", GetLastError());
 	}
 }

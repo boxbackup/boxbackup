@@ -15,7 +15,7 @@
 ServiceBackupDaemon gDaemonService;
 extern HANDLE gStopServiceEvent;
 
-DWORD WINAPI RunService(LPVOID lpParameter)
+unsigned int WINAPI RunService(LPVOID lpParameter)
 {
 	DWORD retVal = gDaemonService.WinService();
 	SetEvent( gStopServiceEvent );
