@@ -12,12 +12,12 @@
 
 #ifdef WIN32
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <windows.h>
-
 #include "Box.h"
+
+//#include <stdio.h>
+//#include <stdlib.h>
+#include <unistd.h>
+//#include <windows.h>
 
 extern void TerminateService(void);
 extern unsigned int WINAPI RunService(LPVOID lpParameter);
