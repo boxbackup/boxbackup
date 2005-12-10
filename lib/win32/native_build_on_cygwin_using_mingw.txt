@@ -31,6 +31,6 @@ and configure like this:
 	export LDFLAGS="-mno-cygwin"
 	export LIBS="-lws2_32 -lgdi32 -lcrypto"
 	(if you don't have a "configure" file, run "./bootstrap")
-	./configure
+	./configure --target=i686-pc-mingw32
 	make
 
