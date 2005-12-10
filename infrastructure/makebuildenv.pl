@@ -474,6 +474,13 @@ __E
 	my $mk_name_extra = ($bsd_make)?'':'X';
 	open MAKE,">$mod/Makefile".$mk_name_extra or die "Can't open Makefile for $mod\n";
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
+
+	my $release_flags = "-O2";
+	if ($target_os eq "mingw32")
+	{
+		$release_flags = "-O0 -g";
+	}
+
 	print MAKE <<__E;
 #
 # AUTOMATICALLY GENERATED FILE
@@ -484,7 +491,7 @@ CXX = g++
 AR = ar
 RANLIB = ranlib
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG -O2 -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
@@ -585,6 +592,7 @@ __E
 	my $has_deps = ($#{$module_dependency{$mod}} >= 0);
 # ----- # always has dependencies with debug library
 	$has_deps = 1;
+	$has_deps = 0 if $target_is_library;
 
 	# Depenency stuff
 	my $deps_makeinfo;
@@ -631,7 +639,7 @@ __E
 
 	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
 	print MAKE $end_target,': ',$o_file_list;
-	print MAKE ' dep_modules' if !$bsd_make;
+	print MAKE ' dep_modules' if $has_deps and not $bsd_make;
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
@@ -676,7 +684,7 @@ __E
 	# dependency line?
 	print MAKE "\n";
 
-	# module dependcies for GNU make?
+	# module dependencies for GNU make?
 	print MAKE $deps_makeinfo if !$bsd_make;
 	
 	# print the rest of the file
