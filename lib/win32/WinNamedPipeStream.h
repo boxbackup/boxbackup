@@ -39,7 +39,7 @@ public:
 	virtual void Close();
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
-	bool IsConnected() { return (mSocketHandle != NULL); }
+	bool IsConnected() { return mIsConnected; }
 
 	// virtual void Shutdown(bool Read = true, bool Write = true);
 
@@ -56,6 +56,7 @@ private:
 	bool mReadClosed;
 	bool mWriteClosed;
 	bool mIsServer;
+	bool mIsConnected;
 };
 
 #endif // WINNAMEDPIPESTREAM__H

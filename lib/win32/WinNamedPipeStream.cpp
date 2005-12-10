@@ -35,7 +35,8 @@ WinNamedPipeStream::WinNamedPipeStream()
 	: mSocketHandle(NULL),
 	  mReadClosed(false),
 	  mWriteClosed(false),
-	  mIsServer(false)
+	  mIsServer(false),
+	  mIsConnected(false)
 {
 }
 
@@ -79,7 +80,7 @@ void WinNamedPipeStream::Accept(const char* Name)
 		PIPE_TYPE_MESSAGE |        // message type pipe 
 		PIPE_READMODE_MESSAGE |    // message-read mode 
 		PIPE_WAIT,                 // blocking mode 
-		PIPE_UNLIMITED_INSTANCES,  // max. instances  
+		1,                         // max. instances  
 		4096,                      // output buffer size 
 		4096,                      // input buffer size 
 		NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
@@ -87,21 +88,26 @@ void WinNamedPipeStream::Accept(const char* Name)
 
 	if (mSocketHandle == NULL)
 	{
-		::syslog(LOG_ERR, "CreateNamedPipeW failed: %d", GetLastError());
+		::syslog(LOG_ERR, "CreateNamedPipeW failed: %d", 
+			GetLastError());
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
-	if (!ConnectNamedPipe(mSocketHandle, (LPOVERLAPPED) NULL))
+	bool connected = ConnectNamedPipe(mSocketHandle, (LPOVERLAPPED) NULL);
+
+	if (!connected)
 	{
+		::syslog(LOG_ERR, "ConnectNamedPipe failed: %d", 
+			GetLastError());
 		CloseHandle(mSocketHandle);
-		::syslog(LOG_ERR, "ConnectNamedPipe failed: %d", GetLastError());
 		mSocketHandle = NULL;
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 	
 	mReadClosed  = FALSE;
 	mWriteClosed = FALSE;
-	mIsServer    = TRUE; // must DisconnectNamedPipe rather than CloseFile
+	mIsServer    = TRUE; // must flush and disconnect before closing
+	mIsConnected = TRUE;
 }
 
 // --------------------------------------------------------------------------
@@ -137,6 +143,11 @@ void WinNamedPipeStream::Connect(const char* Name)
 			GetLastError());
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
+
+	mReadClosed  = FALSE;
+	mWriteClosed = FALSE;
+	mIsServer    = FALSE; // just close the socket
+	mIsConnected = TRUE;
 }
 
 // --------------------------------------------------------------------------
@@ -229,20 +240,21 @@ void WinNamedPipeStream::Close()
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
-	
-	if (!FlushFileBuffers(mSocketHandle))
-	{
-		::syslog(LOG_ERR, "FlushFileBuffers failed: %d", GetLastError());
-		THROW_EXCEPTION(ServerException, SocketCloseError)
-	}
-	
+
 	if (mIsServer)
-	{
+	{	
+		if (!FlushFileBuffers(mSocketHandle))
+		{
+			::syslog(LOG_INFO, "FlushFileBuffers failed: %d", 
+				GetLastError());
+		}
+	
 		if (!DisconnectNamedPipe(mSocketHandle))
 		{
-			::syslog(LOG_ERR, "DisconnectNamedPipe failed: %d", GetLastError());
-			THROW_EXCEPTION(ServerException, SocketCloseError)
+			::syslog(LOG_ERR, "DisconnectNamedPipe failed: %d", 
+				GetLastError());
 		}
+
 		mIsServer = false;
 	}
 
@@ -253,6 +265,7 @@ void WinNamedPipeStream::Close()
 	}
 	
 	mSocketHandle = NULL;
+	mIsConnected = FALSE;
 }
 
 // --------------------------------------------------------------------------
