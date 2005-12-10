@@ -133,7 +133,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		{
 			// The directory has probably been deleted, so just ignore this error.
 			// In a future scan, this deletion will be noticed, deleted from server, and this object deleted.
-			TRACE1("Stat failed for '%s' (directory)\n", rLocalPath.c_str());
+			TRACE1("Stat failed for '%s' (directory)\n", 
+				rLocalPath.c_str());
 			return;
 		}
 		// Store inode number in map so directories are tracked in case they're renamed
@@ -202,15 +203,18 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 
 				// Stat file to get info
-				filename = rLocalPath + DIRECTORY_SEPARATOR + en->d_name;
+				filename = rLocalPath + DIRECTORY_SEPARATOR + 
+					en->d_name;
+
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
-					TRACE1("Stat failed for '%s' (contents)\n", filename.c_str());
-					//Question to Ben:
-					//If this fails the exception takes us all the way out
-					//are ther not times when you still want to continue with the 
-					//backup
-					THROW_EXCEPTION(CommonException, OSFileError)
+					// Report the error (logs and 
+					// eventual email to administrator)
+					SetErrorWhenReadingFilesystemObject(
+						rParams, filename.c_str());
+
+					// Ignore this entry for now.
+					continue;
 				}
 
 				int type = st.st_mode & S_IFMT;
