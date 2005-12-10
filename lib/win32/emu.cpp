@@ -324,63 +324,67 @@ int ourfstat(HANDLE hdir, struct stat * st)
 {
 	ULARGE_INTEGER conv;
 
-	try
+	if (hdir == INVALID_HANDLE_VALUE)
 	{
+		::syslog(LOG_ERR, "Error: invalid file handle in ourfstat()");
+		errno = EBADF;
+		return -1;
+	}
 
-		if (hdir == INVALID_HANDLE_VALUE)
+	BY_HANDLE_FILE_INFORMATION fi;
+	if (!GetFileInformationByHandle(hdir, &fi))
+	{
+		::syslog(LOG_WARNING, "Failed to read file information: "
+			"error %d", GetLastError());
+		errno = EACCES;
+		return -1;
+	}
+
+	// This next example is how we get our INODE (equivalent) information
+	conv.HighPart = fi.nFileIndexHigh;
+	conv.LowPart = fi.nFileIndexLow;
+	st->st_ino = conv.QuadPart;
+
+	// get the time information
+	st->st_ctime = ConvertFileTimeToTime_t(&fi.ftCreationTime);
+	st->st_atime = ConvertFileTimeToTime_t(&fi.ftLastAccessTime);
+	st->st_mtime = ConvertFileTimeToTime_t(&fi.ftLastWriteTime);
+
+	// size of the file
+	LARGE_INTEGER st_size;
+	if (!GetFileSizeEx(hdir, &st_size))
+	{
+		::syslog(LOG_WARNING, "Failed to get file size: error %d",
+			GetLastError());
+		errno = EACCES;
+		return -1;
+	}
+
+	conv.HighPart = st_size.HighPart;
+	conv.LowPart = st_size.LowPart;
+	st->st_size = conv.QuadPart;
+
+	//the mode of the file
+	st->st_mode = 0;
+	//DWORD res = GetFileAttributes((LPCSTR)tmpStr.c_str());
+
+	if (INVALID_FILE_ATTRIBUTES != fi.dwFileAttributes)
+	{
+		if (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			errno = GetLastError();
-			return -1;
-		}
-
-		BY_HANDLE_FILE_INFORMATION fi;
-		GetFileInformationByHandle(hdir, &fi);
-
-		//This next example is how we get our INODE (equivalent) information
-		conv.HighPart = fi.nFileIndexHigh;
-		conv.LowPart = fi.nFileIndexLow;
-		st->st_ino = conv.QuadPart;
-
-		//get the time information
-		//ctime
-		st->st_ctime = ConvertFileTimeToTime_t(&fi.ftCreationTime);
-		//atime
-		st->st_atime = ConvertFileTimeToTime_t(&fi.ftLastAccessTime);
-		//mtime
-		st->st_mtime = ConvertFileTimeToTime_t(&fi.ftLastWriteTime);
-
-		//size of the file
-		LARGE_INTEGER st_size;
-		GetFileSizeEx(hdir, &st_size);
-		conv.HighPart = st_size.HighPart;
-		conv.LowPart = st_size.LowPart;
-		st->st_size = conv.QuadPart;
-
-		//the mode of the file
-		st->st_mode = 0;
-		//DWORD res = GetFileAttributes((LPCSTR)tmpStr.c_str());
-
-
-		if ( INVALID_FILE_ATTRIBUTES != fi.dwFileAttributes )
-		{
-			if ( FILE_ATTRIBUTE_DIRECTORY & fi.dwFileAttributes )
-			{
-				st->st_mode |= S_IFDIR;
-			}
-			else
-			{
-				st->st_mode |= S_IFREG;
-			}
+			st->st_mode |= S_IFDIR;
 		}
 		else
 		{
-			// DWORD res = GetLastError();
-			return 1;
+			st->st_mode |= S_IFREG;
 		}
 	}
-	catch(...)
+	else
 	{
-		printf("Caught ourfstat");
+		::syslog(LOG_WARNING, "Failed to get file attributes: "
+			"error %d", GetLastError());
+		errno = EACCES;
+		return -1;
 	}
 
 	return 0;
@@ -389,248 +393,204 @@ int ourfstat(HANDLE hdir, struct stat * st)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ourstat 
-//		Purpose: replacement for the lstat and stat functions, works with unicode filenames supplied in utf8 format
-//		Created: 25th October 2004
+//		Name:    OpenFileByNameUtf8
+//		Purpose: Converts filename to Unicode and returns 
+//			a handle to it. In case of error, sets errno,
+//			logs the error and returns NULL.
+//		Created: 10th December 2004
 //
 // --------------------------------------------------------------------------
-int ourstat(const char * name, struct stat * st)
+HANDLE OpenFileByNameUtf8(const char* pName)
 {
+	//some string thing - required by ms to indicate long/unicode filename
+	std::string tmpStr("\\\\?\\");
 
-	wchar_t *buffer;
-
-	try 
+	// is the path relative or otherwise
+	std::string fileN(pName);
+	if (fileN[1] != ':')
 	{
-
-		//at the mo
-		st->st_uid = 0;
-		st->st_gid = 0;
-		st->st_nlink = 1;
-
-		//some string thing - required by ms to indicate long/unicode filename
-		std::string tmpStr("\\\\?\\");
-
-		//is the path relative or otherwise
-		std::string fileN(name);
-		if ( ( fileN[1] != ':' ) )
+		// we need to get the current directory
+		char wd[PATH_MAX];
+		if(::getcwd(wd, PATH_MAX) == 0)
 		{
-			//we need to get the current directory
-			char wd[PATH_MAX];
-			if(::getcwd(wd, PATH_MAX) == 0)
-			{
-				return -1;
-			}
-			tmpStr += wd;
-			if (tmpStr[tmpStr.length()] != '\\')
-			{
-				tmpStr += '\\';
-			}
+			::syslog(LOG_WARNING, 
+				"Failed to open '%s': path too long", pName);
+			errno = ENAMETOOLONG;
+			return NULL;
 		}
 
-		tmpStr += fileN;
-
-		int strlen = MultiByteToWideChar(
-			CP_UTF8,               // code page
-			0,                     // character-type options
-			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),       // number of bytes in string
-			NULL,                  // wide-character buffer
-			0                      // size of buffer - work out how much space we need
-			);
-
-		buffer = new wchar_t[strlen+1];
-		if ( buffer == NULL )
+		tmpStr += wd;
+		if (tmpStr[tmpStr.length()] != '\\')
 		{
-			return -1;
+			tmpStr += '\\';
 		}
+	}
 
-		strlen = MultiByteToWideChar(
-			CP_UTF8,               // code page
-			0,                     // character-type options
-			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),       // number of bytes in string
-			buffer,                // wide-character buffer
-			strlen                 // size of buffer
-			);
+	tmpStr += fileN;
 
-		if ( strlen == 0 )
-		{
-			delete [] buffer;
-			return -1;
-		}
+	int strlen = MultiByteToWideChar(
+		CP_UTF8,               // code page
+		0,                     // character-type options
+		tmpStr.c_str(),        // string to map
+		(int)tmpStr.length(),  // number of bytes in string
+		NULL,                  // wide-character buffer
+		0                      // size of buffer - work out 
+		                       //   how much space we need
+		);
 
-		buffer[strlen] = L'\0';
+	wchar_t* buffer = new wchar_t[strlen+1];
 
-		HANDLE hdir = CreateFileW(buffer, 
-			FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA, 
-			FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
+	if (buffer == NULL)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to open '%s': out of memory", pName);
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	strlen = MultiByteToWideChar(
+		CP_UTF8,               // code page
+		0,                     // character-type options
+		tmpStr.c_str(),        // string to map
+		(int)tmpStr.length(),  // number of bytes in string
+		buffer,                // wide-character buffer
+		strlen                 // size of buffer
+		);
+
+	if (strlen == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to open '%s': could not convert "
+			"file name to Unicode", pName);
+		errno = EACCES;
+		delete [] buffer;
+		return NULL;
+	}
+
+	buffer[strlen] = L'\0';
+
+	HANDLE handle = CreateFileW(buffer, 
+		FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA, 
+		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
+		NULL, 
+		OPEN_EXISTING, 
+		FILE_FLAG_BACKUP_SEMANTICS,
+		NULL);
+
+	if (handle == INVALID_HANDLE_VALUE)
+	{
+		// if our open fails we should always be able to 
+		// open in this mode - to get the inode information
+		// at least one process must have the file open - 
+		// in this case someone else does.
+		handle = CreateFileW(buffer, 
+			0, 
+			FILE_SHARE_READ, 
 			NULL, 
 			OPEN_EXISTING, 
 			FILE_FLAG_BACKUP_SEMANTICS,
 			NULL);
-
-		if ( hdir == INVALID_HANDLE_VALUE )
-		{
-			//if our open fails we should always be able to 
-			//open in this mode - to get the inode information
-			//at least one process must have the file open - in this
-			//case someone else does.
-			hdir = CreateFileW(buffer, 
-				0, 
-				FILE_SHARE_READ, 
-				NULL, 
-				OPEN_EXISTING, 
-				FILE_FLAG_BACKUP_SEMANTICS,
-				NULL);
-
-		}
-
-		if ( hdir == INVALID_HANDLE_VALUE )
-		{
-			DWORD err = GetLastError();
-			if ( err == ERROR_FILE_NOT_FOUND )
-			{
-				errno = ENOENT;
-			}
-			//syslog(EVENTLOG_WARNING_TYPE, "Couldn't stat %s\n", name);
-			delete [] buffer;
-			return -1;
-		}
-
-
-		delete [] buffer;
-
-		int retVal = ourfstat(hdir, st);
-
-		// close the handle
-		CloseHandle(hdir);
-
-
-		return retVal;
-
 	}
-	catch(...)
+
+	delete [] buffer;
+
+	if (handle == INVALID_HANDLE_VALUE)
 	{
 		DWORD err = GetLastError();
-		printf("Caught ourstat on %s, %i", name, err);
+
+		if (err == ERROR_FILE_NOT_FOUND)
+		{
+			::syslog(LOG_WARNING, 
+				"Failed to open '%s': file not found", pName);
+			errno = ENOENT;
+		}
+		else
+		{
+			::syslog(LOG_WARNING, 
+				"Failed to open '%s': error %d", pName);
+			errno = EACCES;
+		}
+
+		return NULL;
 	}
 
-	return -1;
+	return handle;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ourstat 
+//		Purpose: replacement for the lstat and stat functions, 
+//			works with unicode filenames supplied in utf8 format
+//		Created: 25th October 2004
+//
+// --------------------------------------------------------------------------
+int ourstat(const char * pName, struct stat * st)
+{
+	// at the mo
+	st->st_uid = 0;
+	st->st_gid = 0;
+	st->st_nlink = 1;
+
+	HANDLE handle = OpenFileByNameUtf8(pName);
+
+	if (handle == NULL)
+	{
+		// errno already set and error logged by OpenFileByNameUtf8()
+		return -1;
+	}
+
+	int retVal = ourfstat(handle, st);
+	if (retVal != 0)
+	{
+		// error logged, but without filename
+		::syslog(LOG_WARNING, "Failed to get file information "
+			"for '%s'", pName);
+	}
+
+	// close the handle
+	CloseHandle(handle);
+
+	return retVal;
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    statfs
-//		Purpose: returns the mount point of where a file is located - in this case the volume serial number
+//		Purpose: returns the mount point of where a file is located - 
+//			in this case the volume serial number
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int statfs(const char * name, struct statfs * s)
+int statfs(const char * pName, struct statfs * s)
 {
-	try
+	HANDLE handle = OpenFileByNameUtf8(pName);
+
+	if (handle == NULL)
 	{
-		std::string tmpStr("\\\\?\\");
-		std::string fileN(name);
-
-		if ( fileN[1] != ':' )
-		{
-			//we need to get the current directory
-			char wd[PATH_MAX];
-			if(::getcwd(wd, PATH_MAX) == 0)
-			{
-				return -1;
-			}
-			tmpStr += wd;
-			if (tmpStr[tmpStr.length()] != '\\')
-			{
-				tmpStr += '\\';
-			}
-		}
-		tmpStr += fileN;
-		wchar_t *buffer;
-
-		int strlen = MultiByteToWideChar(
-			CP_UTF8,               // code page
-			0,                     // character-type options
-			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),  // number of bytes in string
-			NULL,                  // wide-character buffer
-			0                      // size of buffer - work out how much space we need
-			);
-
-		buffer = new wchar_t[strlen+1];
-
-		if ( buffer == NULL )
-		{
-			return -1;
-		}
-
-		strlen = MultiByteToWideChar(
-			CP_UTF8,               // code page
-			0,                     // character-type options
-			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),  // number of bytes in string
-			buffer,                // wide-character buffer
-			strlen                 // size of buffer
-			);
-
-		if ( strlen == 0 )
-		{
-			return -1;
-		}
-
-		buffer[strlen] = L'\0';
-
-		HANDLE hdir = CreateFileW(buffer, 
-			FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA, 
-			FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
-			NULL, 
-			OPEN_EXISTING, 
-			FILE_FLAG_BACKUP_SEMANTICS,
-			NULL);
-
-		if ( hdir == INVALID_HANDLE_VALUE )
-		{
-			//if our open fails we should always be able to 
-			//open in this mode - to get the inode information
-			//at least one process must have the file open - in this
-			//case someone else does.
-			hdir = CreateFileW(buffer, 
-				0, 
-				FILE_SHARE_READ, 
-				NULL, 
-				OPEN_EXISTING, 
-				FILE_FLAG_BACKUP_SEMANTICS,
-				NULL);
-
-		}
-		delete [] buffer;
-
-		if (hdir == INVALID_HANDLE_VALUE)
-		{
-			//syslog(EVENTLOG_WARNING_TYPE, "Couldn't statfs %s\n", name);
-			return -1;   
-		}
-
-		BY_HANDLE_FILE_INFORMATION fi;
-		GetFileInformationByHandle(hdir, &fi);
-
-		//convert it into a string
-		_ui64toa( fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
-		//_ui64tow( fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
-		//pseudo unix mount point
-		s->f_mntonname[0] = DIRECTORY_SEPARATOR_ASCHAR;
-
-		//This next example is how we get our INODE (equivalent) information
-		//inode = (((DWORDLONG) fi.nFileIndexHigh) << 32) | fi.nFileIndexLow;
-
-		CloseHandle(hdir);   // close the handle
+		// errno already set and error logged by OpenFileByNameUtf8()
+		return -1;
 	}
-	catch(...)
+
+	BY_HANDLE_FILE_INFORMATION fi;
+	if (!GetFileInformationByHandle(handle, &fi))
 	{
-		printf("Caught statfs");
+		::syslog(LOG_WARNING, "Failed to get file information "
+			"for '%s': error %d", pName, GetLastError());
+		CloseHandle(handle);
+		errno = EACCES;
+		return -1;
 	}
+
+	// convert volume serial number to a string
+	_ui64toa(fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
+
+	// pseudo unix mount point
+	s->f_mntonname[0] = DIRECTORY_SEPARATOR_ASCHAR;
+
+	CloseHandle(handle);   // close the handle
 
 	return 0;
 }
