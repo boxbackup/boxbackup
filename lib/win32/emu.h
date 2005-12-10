@@ -3,10 +3,6 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
-#warning FIX ME
-#define __time64_t time_t
-#define _gmtime64 gmtime
-
 #define _STAT_DEFINED
 #define _INO_T_DEFINED
 
