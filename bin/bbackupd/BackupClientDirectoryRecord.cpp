@@ -1139,7 +1139,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				&& subtype == BackupProtocolClientError::Err_StorageLimitExceeded)
 			{
 				// The hard limit was exceeded on the server, notify!
-				rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+				// rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
 			}
 		}
 		

@@ -72,7 +72,6 @@ public:
 		NotifyEvent__MAX = 1
 		// When adding notifications, remember to add strings to NotifySysadmin()
 	};
-	void NotifySysadmin(int Event);
 
 private:
 	void Run2();
@@ -80,39 +79,11 @@ private:
 	void DeleteAllLocations();
 	void SetupLocations(BackupClientContext &rClientContext, const Configuration &rLocationsConf);
 
-	void DeleteIDMapVector(std::vector<BackupClientInodeToIDMap *> &rVector);
-	void DeleteAllIDMaps()
-	{
-		DeleteIDMapVector(mCurrentIDMaps);
-		DeleteIDMapVector(mNewIDMaps);
-	}
-	void FillIDMapVector(std::vector<BackupClientInodeToIDMap *> &rVector, bool NewMaps);
 	
 	void SetupIDMapsForSync();
 	void CommitIDMapsAfterSync();
-	void DeleteCorruptBerkelyDbFiles();
-	
-	void MakeMapBaseName(unsigned int MountNumber, std::string &rNameOut) const;
-
-	void SetState(int State);
-	
-	void WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut);
 	void CloseCommandConnection();
-	void SendSyncStartOrFinish(bool SendStart);
 	
-	void TouchFileInWorkingDir(const char *Filename);
-
-	void DeleteUnusedRootDirEntries(BackupClientContext &rContext);
-
-	/*
-#ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
-	// For warning user about potential security hole
-	virtual void SetupInInitialProcess();
-#endif
-	*/
-
-	int UseScriptToSeeIfSyncAllowed();
-
 private:
 	class Location
 	{

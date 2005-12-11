@@ -424,14 +424,14 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 		{
 			// Location name -- look up in daemon's records
 			std::string locPath;
-			if(!mrDaemon.FindLocationPathName(elementName.GetClearFilename(), locPath))
-			{
+			// if(!mrDaemon.FindLocationPathName(elementName.GetClearFilename(), locPath))
+			// {
 				// Didn't find the location... so can't give the local filename
 				return false;
-			}
+			// }
 
 			// Add in location path
-			path = (path.empty())?(locPath):(locPath + DIRECTORY_SEPARATOR_ASCHAR + path);
+			// path = (path.empty())?(locPath):(locPath + DIRECTORY_SEPARATOR_ASCHAR + path);
 		}
 	}
 
