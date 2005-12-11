@@ -213,6 +213,45 @@ void BackupDaemon::DeleteAllLocations()
 }
 
 #ifdef WIN32
+
+void ConnectorConnectPipe()
+{
+	HANDLE SocketHandle = CreateFileW( 
+		L"\\\\.\\pipe\\boxbackup",   // pipe name 
+		GENERIC_READ |  // read and write access 
+		GENERIC_WRITE, 
+		0,              // no sharing 
+		NULL,           // default security attributes
+		OPEN_EXISTING,
+		0,              // default attributes 
+		NULL);          // no template file 
+
+	if (SocketHandle == INVALID_HANDLE_VALUE)
+	{
+		printf("Connector: Error connecting to named pipe: %d\n", 
+			GetLastError());
+		return;
+	}
+
+	if (!CloseHandle(SocketHandle))
+	{
+		printf("Connector: CloseHandle failed: %d\n", GetLastError());
+	}
+}
+
+unsigned int WINAPI ConnectorThread(LPVOID lpParam)
+{
+	Sleep(1000);
+
+	while (1)
+	{
+		ConnectorConnectPipe();
+		Sleep(1000);
+	}
+
+	return 0;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -324,11 +363,16 @@ void BackupDaemon::RunHelperThread(void)
 
 				this->mReceivedCommandConn = true;
 			}
-
-			mpCommandSocketInfo->mListeningSocket.Close();
 		}
 		catch (BoxException &e)
 		{
+			if (e.GetType()    == ConnectionException::ExceptionType &&
+			    e.GetSubType() == ConnectionException::SocketConnectError)
+			{
+				::syslog(LOG_ERR, "Impossible error in "
+					"this thread! Aborting.");
+				exit(1);
+			}
 			::syslog(LOG_ERR, "Communication error with "
 				"control client: %s", e.what());
 		}
@@ -336,6 +380,8 @@ void BackupDaemon::RunHelperThread(void)
 		{
 			::syslog(LOG_ERR, "Communication error with control client");
 		}
+
+		CloseCommandConnection();
 	}
 } 
 #endif
@@ -363,6 +409,14 @@ void BackupDaemon::Run()
         	this,                        // argument to thread function 
         	0,                           // use default creation flags 
         	&dwThreadId);                // returns the thread identifier 
+
+	_beginthreadex( 
+        	NULL,                        // default security attributes 
+        	0,                           // use default stack size  
+        	ConnectorThread,             // thread function 
+        	this,                        // argument to thread function 
+        	0,                           // use default creation flags 
+        	NULL);                       // returns the thread identifier 
 
 	// init our own timer for file diff timeouts
 	InitTimer();
