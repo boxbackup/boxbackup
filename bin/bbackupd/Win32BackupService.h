@@ -1,7 +1,7 @@
 // Box Backup service daemon implementation by Nick Knight
 
-#ifndef SERVICEBACKUPDAEMON__H
-#define SERVICEBACKUPDAEMON__H
+#ifndef WIN32BACKUPSERVICE_H
+#define WIN32BACKUPSERVICE_H
 
 #ifdef WIN32
 
@@ -9,7 +9,7 @@ class Configuration;
 class ConfigurationVerify;
 class BackupDaemon;
 
-class ServiceBackupDaemon : public BackupDaemon
+class Win32BackupService : public BackupDaemon
 {
 public:
 	DWORD WinService(void);
@@ -17,5 +17,5 @@ public:
 
 #endif // WIN32
 
-#endif // SERVICEBACKUPDAEMON__H
+#endif // WIN32BACKUPSERVICE_H
 

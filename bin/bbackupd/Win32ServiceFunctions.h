@@ -9,8 +9,8 @@
 // for the Box Backup for Windows native port.
 //***************************************************************
 
-#ifndef BBWINSERVICE__H
-#define BBWINSERVICE__H
+#ifndef WIN32SERVICEFUNCTIONS_H
+#define WIN32SERVICEFUNCTIONS_H
 
 void RemoveService(void);
 void InstallService(void);

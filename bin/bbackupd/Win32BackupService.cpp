@@ -10,9 +10,9 @@
 
 #include "MemLeakFindOn.h"
 
-#include "ServiceBackupDaemon.h"
+#include "Win32BackupService.h"
 
-ServiceBackupDaemon gDaemonService;
+Win32BackupService gDaemonService;
 extern HANDLE gStopServiceEvent;
 
 unsigned int WINAPI RunService(LPVOID lpParameter)
@@ -27,7 +27,7 @@ void TerminateService(void)
 	gDaemonService.SetTerminateWanted();
 }
 
-DWORD ServiceBackupDaemon::WinService(void)
+DWORD Win32BackupService::WinService(void)
 {
 	int argc = 2;
 	//first off get the path name for the default 

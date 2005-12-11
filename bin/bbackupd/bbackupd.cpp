@@ -16,10 +16,10 @@
 #include "MemLeakFindOn.h"
 
 #ifdef WIN32
-	#include "bbwinservice.h"
-	#include "ServiceBackupDaemon.h"
+	#include "Win32ServiceFunctions.h"
+	#include "Win32BackupService.h"
 
-	extern ServiceBackupDaemon gDaemonService;
+	extern Win32BackupService gDaemonService;
 #endif
 
 int main(int argc, const char *argv[])
