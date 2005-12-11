@@ -65,17 +65,15 @@ WinNamedPipeStream::~WinNamedPipeStream()
 //		Created: 2005/12/07
 //
 // --------------------------------------------------------------------------
-void WinNamedPipeStream::Accept(const char* Name)
+void WinNamedPipeStream::Accept(const wchar_t* pName)
 {
-	if (mSocketHandle != NULL) 
+	if (mSocketHandle != NULL || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
 
-	ASSERT(Name == NULL)
-
 	mSocketHandle = CreateNamedPipeW( 
-		L"\\\\.\\pipe\\boxbackup", // pipe name 
+		pName,                     // pipe name 
 		PIPE_ACCESS_DUPLEX,        // read/write access 
 		PIPE_TYPE_MESSAGE |        // message type pipe 
 		PIPE_READMODE_MESSAGE |    // message-read mode 
@@ -118,17 +116,15 @@ void WinNamedPipeStream::Accept(const char* Name)
 //		Created: 2005/12/07
 //
 // --------------------------------------------------------------------------
-void WinNamedPipeStream::Connect(const char* Name)
+void WinNamedPipeStream::Connect(const wchar_t* pName)
 {
-	if (mSocketHandle != NULL) 
+	if (mSocketHandle != NULL || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
 	
-	ASSERT(Name == NULL)
-
 	mSocketHandle = CreateFileW( 
-		L"\\\\.\\pipe\\boxbackup",   // pipe name 
+		pName,          // pipe name 
 		GENERIC_READ |  // read and write access 
 		GENERIC_WRITE, 
 		0,              // no sharing 
@@ -139,8 +135,8 @@ void WinNamedPipeStream::Connect(const char* Name)
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "Error connecting to server's named pipe: %d", 
-			GetLastError());
+		::syslog(LOG_ERR, "Failed to connect to server's named pipe: "
+			"error %d", GetLastError());
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
@@ -163,7 +159,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 	// TODO no support for timeouts yet
 	ASSERT(Timeout == IOStream::TimeOutInfinite)
 	
-	if (mSocketHandle == NULL) 
+	if (mSocketHandle == NULL || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -201,28 +197,36 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 {
-	if (mSocketHandle == NULL) 
+	if (mSocketHandle == NULL || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
 	
 	// Buffer in byte sized type.
-	// ASSERT(sizeof(char) == 1);
-	// const char *buffer = (char *)pBuffer;
+	ASSERT(sizeof(char) == 1);
+	const char *pByteBuffer = (char *)pBuffer;
 	
-	DWORD NumBytesWritten;
-	
-	bool Success = WriteFile( 
-		mSocketHandle,    // pipe handle 
-		pBuffer,          // message 
-		NBytes,           // message length 
-		&NumBytesWritten, // bytes written 
-		NULL);            // not overlapped 
+	int NumBytesWrittenTotal = 0;
 
-	if (!Success)
+	while (NumBytesWrittenTotal < NBytes)
 	{
-		mWriteClosed = true;	// assume can't write again
-		THROW_EXCEPTION(ConnectionException, Conn_SocketWriteError)
+		DWORD NumBytesWrittenThisTime = 0;
+
+		bool Success = WriteFile( 
+			mSocketHandle,    // pipe handle 
+			pByteBuffer + NumBytesWrittenTotal, // message 
+			NBytes      - NumBytesWrittenTotal, // message length 
+			&NumBytesWrittenThisTime, // bytes written this time
+			NULL);            // not overlapped 
+
+		if (!Success)
+		{
+			mWriteClosed = true;	// assume can't write again
+			THROW_EXCEPTION(ConnectionException, 
+				Conn_SocketWriteError)
+		}
+
+		NumBytesWrittenTotal += NumBytesWrittenThisTime;
 	}
 }
 
@@ -236,7 +240,7 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Close()
 {
-	if (mSocketHandle == NULL) 
+	if (mSocketHandle == NULL || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -271,34 +275,6 @@ void WinNamedPipeStream::Close()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    WinNamedPipeStream::Shutdown(bool, bool)
-//		Purpose: Shuts down a socket for further reading and/or writing
-//		Created: 2003/07/31
-//
-// --------------------------------------------------------------------------
-/*
-void WinNamedPipeStream::Shutdown(bool Read, bool Write)
-{
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
-	
-	// Do anything?
-	if(!Read && !Write) return;
-	
-	int how = SHUT_RDWR;
-	if(Read && !Write) how = SHUT_RD;
-	if(!Read && Write) how = SHUT_WR;
-	
-	// Shut it down!
-	if(::shutdown(mSocketHandle, how) == -1)
-	{
-		THROW_EXCEPTION(ConnectionException, Conn_SocketShutdownError)
-	}
-}
-*/
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    WinNamedPipeStream::StreamDataLeft()
 //		Purpose: Still capable of reading data?
 //		Created: 2003/08/02
@@ -321,64 +297,5 @@ bool WinNamedPipeStream::StreamClosed()
 {
 	return mWriteClosed;
 }
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    WinNamedPipeStream::GetSocketHandle()
-//		Purpose: Returns socket handle for this stream (derived classes only).
-//				 Will exception if there's no valid socket.
-//		Created: 2003/08/06
-//
-// --------------------------------------------------------------------------
-/*
-tOSSocketHandle SocketStream::GetSocketHandle()
-{
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
-	return mSocketHandle;
-}
-*/
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    WinNamedPipeStream::GetPeerCredentials(uid_t &, gid_t &)
-//		Purpose: Returns true if the peer credientials are available.
-//				 (will work on UNIX domain sockets only)
-//		Created: 19/2/04
-//
-// --------------------------------------------------------------------------
-/*
-bool WinNamedPipeStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
-{
-#ifdef HAVE_GETPEEREID
-	uid_t remoteEUID = 0xffff;
-	gid_t remoteEGID = 0xffff;
-
-	if(::getpeereid(mSocketHandle, &remoteEUID, &remoteEGID) == 0)
-	{
-		rUidOut = remoteEUID;
-		rGidOut = remoteEGID;
-		return true;
-	}
-#endif
-
-#if HAVE_DECL_SO_PEERCRED
-	struct ucred cred;
-	socklen_t credLen = sizeof(cred);
-
-	if(::getsockopt(mSocketHandle, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0)
-	{
-		rUidOut = cred.uid;
-		rGidOut = cred.gid;
-		return true;
-	}
-#endif
-
-	// Not available
-	return false;
-}
-*/
 
 #endif // WIN32

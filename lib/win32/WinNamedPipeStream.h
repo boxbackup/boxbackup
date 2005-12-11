@@ -27,10 +27,10 @@ public:
 	~WinNamedPipeStream();
 
 	// server side - create the named pipe and listen for connections
-	void Accept(const char* Name);
+	void Accept(const wchar_t* Name);
 
 	// client side - connect to a waiting server
-	void Connect(const char* Name);
+	void Connect(const wchar_t* Name);
 
 	// both sides
 	virtual int Read(void *pBuffer, int NBytes, 
@@ -40,8 +40,6 @@ public:
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	bool IsConnected() { return mIsConnected; }
-
-	// virtual void Shutdown(bool Read = true, bool Write = true);
 
 protected:
 	HANDLE GetSocketHandle();
