@@ -160,34 +160,6 @@ const ConfigurationVerify *BackupDaemon::GetConfigVerify() const
 	return &BackupDaemonConfigVerify;
 }
 
-#ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::SetupInInitialProcess()
-//		Purpose: Platforms with non-checkable credentials on 
-//			local sockets only.
-//			Prints a warning if the command socket is used.
-//		Created: 25/2/04
-//
-// --------------------------------------------------------------------------
-void BackupDaemon::SetupInInitialProcess()
-{
-	// Print a warning on this platform if the CommandSocket is used.
-	if(GetConfiguration().KeyExists("CommandSocket"))
-	{
-		printf(
-				"============================================================================================\n" \
-				"SECURITY WARNING: This platform cannot check the credentials of connections to the\n" \
-				"command socket. This is a potential DoS security problem.\n" \
-				"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl is not used.\n" \
-				"============================================================================================\n"
-			);
-	}
-}
-#endif
-
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -286,8 +258,10 @@ void BackupDaemon::RunHelperThread(void)
 			// Log
 			::syslog(LOG_INFO, "Connection from command socket");
 
+			/*
 			// Send a header line summarising the configuration 
 			// and current state
+
 			const Configuration &conf(GetConfiguration());
 			char summary[256];
 			size_t summarySize = sprintf(summary, 
@@ -363,6 +337,7 @@ void BackupDaemon::RunHelperThread(void)
 
 				this->mReceivedCommandConn = true;
 			}
+			*/
 		}
 		catch (BoxException &e)
 		{
@@ -373,12 +348,16 @@ void BackupDaemon::RunHelperThread(void)
 					"this thread! Aborting.");
 				exit(1);
 			}
+			/*
 			::syslog(LOG_ERR, "Communication error with "
 				"control client: %s", e.what());
+			*/
 		}
 		catch (...)
 		{
+			/*
 			::syslog(LOG_ERR, "Communication error with control client");
+			*/
 		}
 
 		CloseCommandConnection();
@@ -886,6 +865,7 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 // --------------------------------------------------------------------------
 void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut)
 {
+	/*
 #ifdef WIN32
 	// Really could use some interprocess protection, mutex etc
 	// any side effect should be too bad???? :)
@@ -1006,7 +986,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		// Wait for a command or something on the socket
 		std::string command;
 		while(mpCommandSocketInfo->mpGetLine != 0 && !mpCommandSocketInfo->mpGetLine->IsEOF()
-			&& mpCommandSocketInfo->mpGetLine->GetLine(command, false /* no preprocessing */, timeout))
+			&& mpCommandSocketInfo->mpGetLine->GetLine(command, false, timeout))
 		{
 			TRACE1("Receiving command '%s' over command socket\n", command.c_str());
 			
@@ -1078,6 +1058,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		}
 	}
 #endif // WIN32
+	*/
 }
 
 
