@@ -61,6 +61,7 @@
 #include "LocalProcessStream.h"
 #include "IOStreamGetLine.h"
 #include "Conversion.h"
+#include "Socket.h"
 
 #include "MemLeakFindOn.h"
 
@@ -84,7 +85,7 @@ BackupDaemon::BackupDaemon()
 	  mDeleteUnusedRootDirEntriesAfter(0)
 {
 	// Only ever one instance of a daemon
-	SSLLib::Initialise();
+	// SSLLib::Initialise();
 	
 	// Initialise notifcation sent status
 	for(int l = 0; l <= NotifyEvent__MAX; ++l)
@@ -337,25 +338,28 @@ void BackupDaemon::Run()
 // --------------------------------------------------------------------------
 void BackupDaemon::Run2()
 {
-	// Read in the certificates creating a TLS context
-	TLSContext tlsContext;
-	const Configuration &conf(GetConfiguration());
-	std::string certFile(conf.GetKeyValue("CertificateFile"));
-	std::string keyFile(conf.GetKeyValue("PrivateKeyFile"));
-	std::string caFile(conf.GetKeyValue("TrustedCAsFile"));
-	tlsContext.Initialise(false /* as client */, certFile.c_str(), keyFile.c_str(), caFile.c_str());
+	// Setup parameters based on type, looking up names if required
+	int sockDomain = 0;
+	SocketAllAddr addr;
+	int addrLen = 0;
+	Socket::NameLookupToSockAddr(addr, sockDomain, 
+		Socket::TypeINET, "1.2.3.4", 1234, addrLen);
+
+	// Create the socket
+	int handle = ::socket(sockDomain, SOCK_STREAM, 
+		0 /* let OS choose protocol */);
+	if(handle == -1)
+	{
+		THROW_EXCEPTION(ServerException, SocketOpenError)
+	}
 	
-	// Set up the keys for various things
-	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
-
-	// Then create a client context object 
-	// (don't just connect, as this may be unnecessary)
-	BackupClientContext clientContext(*this, tlsContext, 
-		conf.GetKeyValue("StoreHostname"),
-		conf.GetKeyValueInt("AccountNumber"), 
-		conf.GetKeyValueBool("ExtendedLogging"));
-
-	BackupProtocolClient &connection(clientContext.GetConnection());
+	// Connect it
+	if(::connect(handle, &addr.sa_generic, addrLen) == -1)
+	{
+		// Dispose of the socket
+		::closesocket(handle);
+		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
+	}
 }
 
 
