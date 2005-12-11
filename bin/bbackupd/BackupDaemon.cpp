@@ -33,6 +33,7 @@
 #include "IOStream.h"
 #include "MemBlockStream.h"
 #include "CommonException.h"
+#include "BoxPortsAndFiles.h"
 
 #include "SSLLib.h"
 #include "TLSContext.h"
@@ -239,13 +240,15 @@ void BackupDaemon::RunHelperThread(void)
 	{
 		try
 		{
-			mpCommandSocketInfo->mListeningSocket.Accept(NULL);
+			mpCommandSocketInfo->mListeningSocket.Accept(
+				BOX_NAMED_PIPE_NAME);
 
 			// This next section comes from Ben's original function
 			// Log
 			::syslog(LOG_INFO, "Connection from command socket");
 
-			// Send a header line summarising the configuration and current state
+			// Send a header line summarising the configuration 
+			// and current state
 			const Configuration &conf(GetConfiguration());
 			char summary[256];
 			size_t summarySize = sprintf(summary, 
@@ -265,7 +268,8 @@ void BackupDaemon::RunHelperThread(void)
 			while (mpCommandSocketInfo->mListeningSocket.IsConnected() &&
 			       readLine.GetLine(command) )
 			{
-				TRACE1("Receiving command '%s' over command socket\n", command.c_str());
+				TRACE1("Receiving command '%s' over "
+					"command socket\n", command.c_str());
 
 				bool sendOK = false;
 				bool sendResponse = true;

@@ -30,7 +30,8 @@ void PrintUsageAndExit()
 	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
 	"Commands are:\n"
 	"  sync -- start a syncronisation run now\n"
-	"  force-sync -- force the start of a syncronisation run, even if SyncAllowScript says no\n"
+	"  force-sync -- force the start of a syncronisation run, "
+	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
@@ -43,10 +44,11 @@ int main(int argc, const char *argv[])
 	int returnCode = 0;
 
 #if defined WIN32 && ! defined NDEBUG
-	::openlog("Box Backup", 0, 0);
+	::openlog("Box Backup (bbackupctl)", 0, 0);
 #endif
 
-	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", "bbackupctl")
+	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", 
+		"bbackupctl")
 
 	MAINHELPER_START
 
@@ -117,18 +119,18 @@ int main(int argc, const char *argv[])
 	try
 	{
 #ifdef WIN32
-		connection.Connect(NULL);
+		connection.Connect(BOX_NAMED_PIPE_NAME);
 #else
 		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str());
 #endif
 	}
 	catch(...)
 	{
-		printf("Failed to connect to daemon control socket.\n"	\
-			"Possible causes:\n"								\
-			"  * Daemon not running\n"							\
-			"  * Daemon busy syncing with store server\n"		\
-			"  * Another bbackupctl process is communicating with the daemon\n"	\
+		printf("Failed to connect to daemon control socket.\n"
+			"Possible causes:\n"
+			"  * Daemon not running\n"
+			"  * Daemon busy syncing with store server\n"
+			"  * Another bbackupctl process is communicating with the daemon\n"
 			"  * Daemon is waiting to recover from an error\n"
 		);
 
@@ -146,10 +148,11 @@ int main(int argc, const char *argv[])
 	std::string configSummary;
 	if(!getLine.GetLine(configSummary))
 	{
-		printf("Failed to receive configuration summary from daemon\n");
-
 #if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR,"Failed to receive configuration summary from daemon");
+		syslog(LOG_ERR, "Failed to receive configuration summary "
+			"from daemon");
+#else
+		printf("Failed to receive configuration summary from daemon\n");
 #endif
 
 		return 1;
@@ -158,12 +161,14 @@ int main(int argc, const char *argv[])
 	// Was the connection rejected by the server?
 	if(getLine.IsEOF())
 	{
-		printf("Server rejected the connection. "
-			"Are you running bbackupctl as the same user as the daemon?\n");
-
 #if defined WIN32 && ! defined NDEBUG
 		syslog(LOG_ERR, "Server rejected the connection. "
-			"Are you running bbackupctl as the same user as the daemon?");
+			"Are you running bbackupctl as the same user "
+			"as the daemon?");
+#else
+		printf("Server rejected the connection. "
+			"Are you running bbackupctl as the same user "
+			"as the daemon?\n");
 #endif
 
 		return 1;
