@@ -12,55 +12,38 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#ifndef WIN32
-	#include <signal.h>
-	#include <syslog.h>
-	#include <sys/param.h>
-	#include <sys/wait.h>
-#endif
-#ifdef HAVE_SYS_MOUNT_H
-	#include <sys/mount.h>
-#endif
-#ifdef HAVE_MNTENT_H
-	#include <mntent.h>
-#endif 
-#ifdef HAVE_SYS_MNTTAB_H
-	#include <cstdio>
-	#include <sys/mnttab.h>
-#endif
-
 #include "Configuration.h"
-#include "IOStream.h"
-#include "MemBlockStream.h"
+// #include "IOStream.h"
+// #include "MemBlockStream.h"
 #include "CommonException.h"
 #include "BoxPortsAndFiles.h"
 
-#include "SSLLib.h"
-#include "TLSContext.h"
+// #include "SSLLib.h"
+// #include "TLSContext.h"
 
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
-#include "BackupClientContext.h"
-#include "BackupClientDirectoryRecord.h"
-#include "BackupStoreDirectory.h"
-#include "BackupClientFileAttributes.h"
-#include "BackupStoreFilenameClear.h"
-#include "BackupClientInodeToIDMap.h"
-#include "autogen_BackupProtocolClient.h"
-#include "BackupClientCryptoKeys.h"
-#include "BannerText.h"
-#include "BackupStoreFile.h"
-#include "Random.h"
-#include "ExcludeList.h"
-#include "BackupClientMakeExcludeList.h"
+// #include "BackupClientContext.h"
+// #include "BackupClientDirectoryRecord.h"
+// #include "BackupStoreDirectory.h"
+// #include "BackupClientFileAttributes.h"
+// #include "BackupStoreFilenameClear.h"
+// #include "BackupClientInodeToIDMap.h"
+// #include "autogen_BackupProtocolClient.h"
+// #include "BackupClientCryptoKeys.h"
+// #include "BannerText.h"
+// #include "BackupStoreFile.h"
+// #include "Random.h"
+// #include "ExcludeList.h"
+// #include "BackupClientMakeExcludeList.h"
 #include "IOStreamGetLine.h"
-#include "Utils.h"
-#include "FileStream.h"
-#include "BackupStoreException.h"
-#include "BackupStoreConstants.h"
+// #include "Utils.h"
+// #include "FileStream.h"
+// #include "BackupStoreException.h"
+// #include "BackupStoreConstants.h"
 #include "LocalProcessStream.h"
-#include "IOStreamGetLine.h"
-#include "Conversion.h"
+// #include "IOStreamGetLine.h"
+// #include "Conversion.h"
 #include "Socket.h"
 
 #include "MemLeakFindOn.h"
@@ -80,19 +63,8 @@
 //
 // --------------------------------------------------------------------------
 BackupDaemon::BackupDaemon()
-	: mState(BackupDaemon::State_Initialising),
-	  mpCommandSocketInfo(0),
-	  mDeleteUnusedRootDirEntriesAfter(0)
-{
-	// Only ever one instance of a daemon
-	// SSLLib::Initialise();
-	
-	// Initialise notifcation sent status
-	for(int l = 0; l <= NotifyEvent__MAX; ++l)
-	{
-		mNotificationsSent[l] = false;
-	}
-}
+	: mpCommandSocketInfo(0)
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -104,9 +76,6 @@ BackupDaemon::BackupDaemon()
 // --------------------------------------------------------------------------
 BackupDaemon::~BackupDaemon()
 {
-	// DeleteAllLocations();
-	// DeleteAllIDMaps();
-	
 	if(mpCommandSocketInfo != 0)
 	{
 		delete mpCommandSocketInfo;
@@ -138,12 +107,7 @@ const char *BackupDaemon::DaemonName() const
 // --------------------------------------------------------------------------
 const char *BackupDaemon::DaemonBanner() const
 {
-#ifndef NDEBUG
-	// Don't display banner in debug builds
-	return 0;
-#else
-	return BANNER_TEXT("Backup Client");
-#endif
+	return "Backup Client";
 }
 
 
@@ -159,30 +123,6 @@ const ConfigurationVerify *BackupDaemon::GetConfigVerify() const
 {
 	// Defined elsewhere
 	return &BackupDaemonConfigVerify;
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::DeleteAllLocations()
-//		Purpose: Deletes all records stored
-//		Created: 2003/10/08
-//
-// --------------------------------------------------------------------------
-void BackupDaemon::DeleteAllLocations()
-{
-	// Run through, and delete everything
-	for(std::vector<Location *>::iterator i = mLocations.begin();
-		i != mLocations.end(); ++i)
-	{
-		delete *i;
-	}
-
-	// Clear the contents of the map, so it is empty
-	mLocations.clear();
-	
-	// And delete everything from the assoicated mount vector
-	mIDMapMounts.clear();
 }
 
 void ConnectorConnectPipe()
@@ -376,17 +316,7 @@ void BackupDaemon::CloseCommandConnection()
 	try
 	{
 		TRACE0("Closing command connection\n");
-		
-#ifdef WIN32
 		mpCommandSocketInfo->mListeningSocket.Close();
-#else
-		if(mpCommandSocketInfo->mpGetLine)
-		{
-			delete mpCommandSocketInfo->mpGetLine;
-			mpCommandSocketInfo->mpGetLine = 0;
-		}
-		mpCommandSocketInfo->mpConnectedSocket.reset();
-#endif
 	}
 	catch(...)
 	{
@@ -397,54 +327,13 @@ void BackupDaemon::CloseCommandConnection()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupDaemon::Location::Location()
-//		Purpose: Constructor
-//		Created: 11/11/03
-//
-// --------------------------------------------------------------------------
-BackupDaemon::Location::Location()
-	: mIDMapIndex(0),
-	  mpExcludeFiles(0),
-	  mpExcludeDirs(0)
-{
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::Location::~Location()
-//		Purpose: Destructor
-//		Created: 11/11/03
-//
-// --------------------------------------------------------------------------
-BackupDaemon::Location::~Location()
-{
-	// Clean up exclude locations
-	if(mpExcludeDirs != 0)
-	{
-		delete mpExcludeDirs;
-		mpExcludeDirs = 0;
-	}
-	if(mpExcludeFiles != 0)
-	{
-		delete mpExcludeFiles;
-		mpExcludeFiles = 0;
-	}
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    BackupDaemon::CommandSocketInfo::CommandSocketInfo()
 //		Purpose: Constructor
 //		Created: 18/2/04
 //
 // --------------------------------------------------------------------------
 BackupDaemon::CommandSocketInfo::CommandSocketInfo()
-	: mpGetLine(0)
-{
-}
+{ }
 
 
 // --------------------------------------------------------------------------
@@ -456,10 +345,4 @@ BackupDaemon::CommandSocketInfo::CommandSocketInfo()
 //
 // --------------------------------------------------------------------------
 BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
-{
-	if(mpGetLine)
-	{
-		delete mpGetLine;
-		mpGetLine = 0;
-	}
-}
+{ }

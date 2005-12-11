@@ -50,20 +50,6 @@ public:
 	virtual const char *DaemonBanner() const;
 	const ConfigurationVerify *GetConfigVerify() const;
 
-	bool FindLocationPathName(const std::string &rLocationName, std::string &rPathOut) const;
-
-	enum
-	{
-		// Add stuff to this, make sure the textual equivalents in SetState() are changed too.
-		State_Initialising = -1,
-		State_Idle = 0,
-		State_Connected = 1,
-		State_Error = 2,
-		State_StorageLimitExceeded = 3
-	};
-
-	int GetState() {return mState;}
-
 	// Allow other classes to call this too
 	enum
 	{
@@ -76,40 +62,9 @@ public:
 private:
 	void Run2();
 
-	void DeleteAllLocations();
-	void SetupLocations(BackupClientContext &rClientContext, const Configuration &rLocationsConf);
-
-	
-	void SetupIDMapsForSync();
-	void CommitIDMapsAfterSync();
 	void CloseCommandConnection();
 	
 private:
-	class Location
-	{
-	public:
-		Location();
-		~Location();
-	private:
-		Location(const Location &);	// copy not allowed
-		Location &operator=(const Location &);
-	public:
-		std::string mName;
-		std::string mPath;
-		std::auto_ptr<BackupClientDirectoryRecord> mpDirectoryRecord;
-		int mIDMapIndex;
-		ExcludeList *mpExcludeFiles;
-		ExcludeList *mpExcludeDirs;
-	};
-
-	int mState;		// what the daemon is currently doing
-
-	std::vector<Location *> mLocations;
-	
-	std::vector<std::string> mIDMapMounts;
-	std::vector<BackupClientInodeToIDMap *> mCurrentIDMaps;
-	std::vector<BackupClientInodeToIDMap *> mNewIDMaps;
-	
 	// For the command socket
 	class CommandSocketInfo
 	{
@@ -120,32 +75,17 @@ private:
 		CommandSocketInfo(const CommandSocketInfo &);	// no copying
 		CommandSocketInfo &operator=(const CommandSocketInfo &);
 	public:
-#ifdef WIN32
 		WinNamedPipeStream mListeningSocket;
-#else
-		SocketListen<SocketStream, 1 /* listen backlog */> mListeningSocket;
-		std::auto_ptr<SocketStream> mpConnectedSocket;
-#endif
-		IOStreamGetLine *mpGetLine;
 	};
 	
 	// Using a socket?
 	CommandSocketInfo *mpCommandSocketInfo;
 	
-	// Stop notifications being repeated.
-	bool mNotificationsSent[NotifyEvent__MAX + 1];
-
-	// Unused entries in the root directory wait a while before being deleted
-	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
-	std::vector<std::pair<int64_t,std::string> > mUnusedRootDirEntries;
-
-#ifdef WIN32
 	public:
 	void RunHelperThread(void);
 
 	private:
 	bool mDoSyncFlagOut, mSyncIsForcedOut, mReceivedCommandConn;
-#endif
 };
 
 #endif // BACKUPDAEMON__H
