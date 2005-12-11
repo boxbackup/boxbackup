@@ -7,19 +7,20 @@
 //
 // --------------------------------------------------------------------------
 
-#include "Box.h"
+#define THROW_EXCEPTION(type, subtype)	\
+	{	\
+		throw type(type::subtype);	\
+	}
+
+// #include "Box.h"
 
 #include <stdio.h>
 #include <unistd.h>
 
-#include "CommonException.h"
-// #include "BoxPortsAndFiles.h"
+#include "ServerException.h"
 
 #include "BackupDaemon.h"
-#include "LocalProcessStream.h"
 #include "Socket.h"
-
-// #include "MemLeakFindOn.h"
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
 	
@@ -242,7 +243,6 @@ void BackupDaemon::CloseCommandConnection()
 {
 	try
 	{
-		TRACE0("Closing command connection\n");
 		mpCommandSocketInfo->mListeningSocket.Close();
 	}
 	catch(...)

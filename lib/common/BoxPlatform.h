@@ -77,10 +77,6 @@
 	#define HAVE_UINT16_T
 	#define HAVE_UINT32_T
 	#define HAVE_UINT64_T
-
-	typedef unsigned int uid_t;
-	typedef unsigned int gid_t;
-	typedef int pid_t;
 #endif // WIN32 && !__MINGW32__
 
 // Define missing types

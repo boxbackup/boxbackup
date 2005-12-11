@@ -23,6 +23,8 @@
 
 #include <string>
 
+#include "../common/config.h"
+
 #define gmtime_r( _clock, _result ) \
 	( *(_result) = *gmtime( (_clock) ), \
 	(_result) )
@@ -93,7 +95,7 @@ inline int utimes(const char * Filename, timeval[])
 	//indicate success
 	return 0;
 }
-inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
+inline int chown(const char * Filename, uint32_t uid, uint32_t gid)
 {
 	//important - this needs implementing
 	//If a large restore is required then 
@@ -366,13 +368,13 @@ struct statfs
 
 struct stat {
 	//_dev_t st_dev;
-	u_int64_t st_ino;
+	uint64_t st_ino;
 	DWORD st_mode;
 	short st_nlink;
 	short st_uid;
 	short st_gid;
 	//_dev_t st_rdev;
-	u_int64_t st_size;
+	uint64_t st_size;
 	time_t st_atime;
 	time_t st_mtime;
 	time_t st_ctime;

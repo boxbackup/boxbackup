@@ -10,6 +10,8 @@
 #if ! defined WINNAMEDPIPESTREAM__H && defined WIN32
 #define WINNAMEDPIPESTREAM__H
 
+#include <windows.h>
+
 #include "IOStream.h"
 
 // --------------------------------------------------------------------------
