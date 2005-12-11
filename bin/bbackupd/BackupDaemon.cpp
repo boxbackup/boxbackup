@@ -12,48 +12,17 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "Configuration.h"
-// #include "IOStream.h"
-// #include "MemBlockStream.h"
 #include "CommonException.h"
-#include "BoxPortsAndFiles.h"
-
-// #include "SSLLib.h"
-// #include "TLSContext.h"
+// #include "BoxPortsAndFiles.h"
 
 #include "BackupDaemon.h"
-#include "BackupDaemonConfigVerify.h"
-// #include "BackupClientContext.h"
-// #include "BackupClientDirectoryRecord.h"
-// #include "BackupStoreDirectory.h"
-// #include "BackupClientFileAttributes.h"
-// #include "BackupStoreFilenameClear.h"
-// #include "BackupClientInodeToIDMap.h"
-// #include "autogen_BackupProtocolClient.h"
-// #include "BackupClientCryptoKeys.h"
-// #include "BannerText.h"
-// #include "BackupStoreFile.h"
-// #include "Random.h"
-// #include "ExcludeList.h"
-// #include "BackupClientMakeExcludeList.h"
-#include "IOStreamGetLine.h"
-// #include "Utils.h"
-// #include "FileStream.h"
-// #include "BackupStoreException.h"
-// #include "BackupStoreConstants.h"
 #include "LocalProcessStream.h"
-// #include "IOStreamGetLine.h"
-// #include "Conversion.h"
 #include "Socket.h"
 
-#include "MemLeakFindOn.h"
+// #include "MemLeakFindOn.h"
 
-#define 	MAX_SLEEP_TIME	((unsigned int)1024)
-
-// Make the actual sync period have a little bit of extra time, up to a 64th of the main sync period.
-// This prevents repetative cycles of load on the server
-#define		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY	6
-
+#define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
+	
 // --------------------------------------------------------------------------
 //
 // Function
@@ -83,52 +52,10 @@ BackupDaemon::~BackupDaemon()
 	}
 }
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::DaemonName()
-//		Purpose: Get name of daemon
-//		Created: 2003/10/08
-//
-// --------------------------------------------------------------------------
-const char *BackupDaemon::DaemonName() const
-{
-	return "bbackupd";
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::DaemonBanner()
-//		Purpose: Daemon banner
-//		Created: 1/1/04
-//
-// --------------------------------------------------------------------------
-const char *BackupDaemon::DaemonBanner() const
-{
-	return "Backup Client";
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::GetConfigVerify()
-//		Purpose: Get configuration specification
-//		Created: 2003/10/08
-//
-// --------------------------------------------------------------------------
-const ConfigurationVerify *BackupDaemon::GetConfigVerify() const
-{
-	// Defined elsewhere
-	return &BackupDaemonConfigVerify;
-}
-
 void ConnectorConnectPipe()
 {
 	HANDLE SocketHandle = CreateFileW( 
-		L"\\\\.\\pipe\\boxbackup",   // pipe name 
+		BOX_NAMED_PIPE_NAME,   // pipe name 
 		GENERIC_READ |  // read and write access 
 		GENERIC_WRITE, 
 		0,              // no sharing 
@@ -186,7 +113,7 @@ void BackupDaemon::RunHelperThread(void)
 	mpCommandSocketInfo = new CommandSocketInfo;
 	this->mReceivedCommandConn = false;
 
-	while ( !IsTerminateWanted() )
+	while (true)
 	{
 		try
 		{

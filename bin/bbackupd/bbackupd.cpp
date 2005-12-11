@@ -26,8 +26,6 @@ int main(int argc, const char *argv[])
 {
 	MAINHELPER_START
 
-#ifdef WIN32
-
 	::openlog("Box Backup (bbackupd)", 0, 0);
 
 	if(argc == 2 &&
@@ -63,8 +61,6 @@ int main(int argc, const char *argv[])
 
 	EnableBackupRights();
 
-	int ExitCode = 0;
-
 	if (argc == 2 && ::strcmp(argv[1], "--service") == 0)
 	{
 		syslog(LOG_INFO,"Starting Box Backup Service");
@@ -72,23 +68,14 @@ int main(int argc, const char *argv[])
 	}
 	else
 	{
-		ExitCode = gDaemonService.Main(
-			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+		gDaemonService.Run();
 	}
 
 	// Clean up our sockets
 	WSACleanup();
-
 	::closelog();
 
-	return ExitCode;
-
-#else // !WIN32
-
-	BackupDaemon daemon;
-	return daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
-
-#endif // WIN32
+	return 0;
 
 	MAINHELPER_END
 }

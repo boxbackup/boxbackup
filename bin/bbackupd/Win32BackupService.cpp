@@ -24,7 +24,7 @@ unsigned int WINAPI RunService(LPVOID lpParameter)
 
 void TerminateService(void)
 {
-	gDaemonService.SetTerminateWanted();
+	// gDaemonService.SetTerminateWanted();
 }
 
 DWORD Win32BackupService::WinService(void)
@@ -43,7 +43,8 @@ DWORD Win32BackupService::WinService(void)
 
 	MAINHELPER_START
 
-	return this->Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+	this->Run();
+	return 0;
 
 	MAINHELPER_END
 }

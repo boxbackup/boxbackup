@@ -21,13 +21,6 @@
 #include "SocketStream.h"
 #include "WinNamedPipeStream.h"
 
-class BackupClientDirectoryRecord;
-class BackupClientContext;
-class Configuration;
-class BackupClientInodeToIDMap;
-class ExcludeList;
-class IOStreamGetLine;
-
 // --------------------------------------------------------------------------
 //
 // Class
@@ -36,7 +29,7 @@ class IOStreamGetLine;
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-class BackupDaemon : public Daemon
+class BackupDaemon
 {
 public:
 	BackupDaemon();
@@ -46,9 +39,6 @@ private:
 public:
 
 	void Run();
-	virtual const char *DaemonName() const;
-	virtual const char *DaemonBanner() const;
-	const ConfigurationVerify *GetConfigVerify() const;
 
 	// Allow other classes to call this too
 	enum

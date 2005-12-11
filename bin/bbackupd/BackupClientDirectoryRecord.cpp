@@ -102,7 +102,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	const std::string &rLocalPath, bool ThisDirHasJustBeenCreated)
 {
 	// Signal received by daemon?
-	if(rParams.mrDaemon.StopRun())
+	if(false)
 	{
 		// Yes. Stop now.
 		THROW_EXCEPTION(BackupStoreException, SignalReceived)
