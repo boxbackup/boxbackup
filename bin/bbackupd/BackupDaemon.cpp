@@ -43,29 +43,8 @@ private:
 
 	void CloseCommandConnection();
 
-	/*	
-private:
-	// For the command socket
-	class CommandSocketInfo
-	{
-	public:
-		CommandSocketInfo();
-		~CommandSocketInfo();
-	private:
-		CommandSocketInfo(const CommandSocketInfo &);	// no copying
-		CommandSocketInfo &operator=(const CommandSocketInfo &);
-	public:
-	*/
-
 	WinNamedPipeStream mListeningSocket;
 
-	/*
-	};
-	
-	// Using a socket?
-	CommandSocketInfo *mpCommandSocketInfo;
-	*/
-	
 	public:
 	void RunHelperThread(void);
 };
@@ -74,10 +53,8 @@ private:
 #define LOG_WARNING 4
 #define LOG_ERR 3
 
-void syslog(int loglevel, const char *fmt, ...);
-
-void InitTimer(void);
-void FiniTimer(void);
+// void InitTimer(void);
+// void FiniTimer(void);
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
 
@@ -172,7 +149,7 @@ void BackupDaemon::RunHelperThread(void)
 			if (e.GetType()    == ConnectionException::ExceptionType &&
 			    e.GetSubType() == ConnectionException::SocketConnectError)
 			{
-				::syslog(LOG_ERR, "Impossible error in "
+				printf("Impossible error in "
 					"this thread! Aborting.");
 				exit(1);
 			}
@@ -213,7 +190,7 @@ void BackupDaemon::Run()
         	NULL);                       // returns the thread identifier 
 
 	// init our own timer for file diff timeouts
-	InitTimer();
+	// InitTimer();
 
 	// Handle things nicely on exceptions
 	try
@@ -226,7 +203,7 @@ void BackupDaemon::Run()
 	}
 	
 	// clean up windows specific stuff.
-	FiniTimer();
+	// FiniTimer();
 }
 
 // --------------------------------------------------------------------------
@@ -268,7 +245,7 @@ void BackupDaemon::Run2()
 	{
 		// Dispose of the socket
 		::closesocket(handle);
-		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
+		THROW_EXCEPTION(ConnectionException, SocketConnectError)
 	}
 }
 
