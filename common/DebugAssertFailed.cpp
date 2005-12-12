@@ -12,7 +12,12 @@
 #include "Box.h"
 
 #include <stdio.h>
-#include <syslog.h>
+
+#ifdef WIN32
+	#include "emu.h"
+#else
+	#include <syslog.h>
+#endif
 
 #include "MemLeakFindOn.h"
 
