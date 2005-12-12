@@ -34,9 +34,6 @@ public:
 
 private:
 	void Run2();
-
-	public:
-	void RunHelperThread(void);
 };
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
@@ -82,26 +79,10 @@ unsigned int WINAPI ConnectorThread(LPVOID lpParam)
 	return 0;
 }
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HelperThread()
-//		Purpose: Background thread function, called by Windows,
-//			calls the BackupDaemon's RunHelperThread method
-//			to listen for and act on control communications
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
-unsigned int WINAPI HelperThread( LPVOID lpParam ) 
-{ 
-	printf( "Parameter = %lu.\n", *(DWORD*)lpParam ); 
-	((BackupDaemon *)lpParam)->RunHelperThread();
-
-	return 0;
-}
-
-void NamedPipeAccept(const wchar_t* pName)
+void AcceptorAcceptPipe(const wchar_t* pName)
 {
+	printf(".");
+
 	HANDLE handle;
 
 	handle = CreateNamedPipeW( 
@@ -148,13 +129,13 @@ void NamedPipeAccept(const wchar_t* pName)
 	}
 }
 
-void BackupDaemon::RunHelperThread(void)
-{
+unsigned int WINAPI AcceptorThread( LPVOID lpParam ) 
+{ 
 	while (true)
 	{
 		try
 		{
-			NamedPipeAccept(BOX_NAMED_PIPE_NAME);
+			AcceptorAcceptPipe(BOX_NAMED_PIPE_NAME);
 		}
 		catch (int i)
 		{
@@ -166,16 +147,10 @@ void BackupDaemon::RunHelperThread(void)
 			}
 		}
 	}
-} 
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::Run()
-//		Purpose: Run function for daemon
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
+	return 0;
+}
+
 void BackupDaemon::Run()
 {
 	// Create a thread to handle the named pipe
@@ -185,7 +160,7 @@ void BackupDaemon::Run()
 	hThread = (HANDLE) _beginthreadex( 
         	NULL,                        // default security attributes 
         	0,                           // use default stack size  
-        	HelperThread,                // thread function 
+        	AcceptorThread,              // thread function 
         	this,                        // argument to thread function 
         	0,                           // use default creation flags 
         	&dwThreadId);                // returns the thread identifier 
