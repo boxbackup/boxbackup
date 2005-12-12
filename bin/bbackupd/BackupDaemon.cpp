@@ -7,27 +7,20 @@
 //
 // --------------------------------------------------------------------------
 
-#define THROW_EXCEPTION(type, subtype)	\
-	{	\
-		throw type(type::subtype);	\
-	}
-
 #include <stdio.h>
 #include <unistd.h>
 #include <windows.h>
-
-#include "ServerException.h"
-// #include "WinNamedPipeStream.h"
 
 class BackupDaemon
 {
 public:
 	BackupDaemon();
 	~BackupDaemon();
-private:
-	BackupDaemon(const BackupDaemon &);
-public:
 
+private:
+	BackupDaemon(const BackupDaemon &) { /* do not call */ }
+
+public:
 	void Run();
 
 	// Allow other classes to call this too
@@ -48,27 +41,8 @@ private:
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::BackupDaemon()
-//		Purpose: constructor
-//		Created: 2003/10/08
-//
-// --------------------------------------------------------------------------
-BackupDaemon::BackupDaemon()
-{ }
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::~BackupDaemon()
-//		Purpose: Destructor
-//		Created: 2003/10/08
-//
-// --------------------------------------------------------------------------
-BackupDaemon::~BackupDaemon()
-{ }
+BackupDaemon::BackupDaemon() { }
+BackupDaemon::~BackupDaemon() { }
 
 void ConnectorConnectPipe()
 {
@@ -145,7 +119,7 @@ void NamedPipeAccept(const wchar_t* pName)
 	if (handle == NULL)
 	{
 		printf("CreateNamedPipeW failed: %d\n", GetLastError());
-		THROW_EXCEPTION(ServerException, SocketOpenError)
+		throw 1;
 	}
 
 	bool connected = ConnectNamedPipe(handle, (LPOVERLAPPED) NULL);
@@ -154,7 +128,7 @@ void NamedPipeAccept(const wchar_t* pName)
 	{
 		printf("ConnectNamedPipe failed: %d\n", GetLastError());
 		CloseHandle(handle);
-		THROW_EXCEPTION(ServerException, SocketOpenError)
+		throw 1;
 	}
 
 	if (!FlushFileBuffers(handle))
@@ -170,7 +144,7 @@ void NamedPipeAccept(const wchar_t* pName)
 	if (!CloseHandle(handle))
 	{
 		printf("CloseHandle failed: %d\n", GetLastError());
-		THROW_EXCEPTION(ServerException, SocketCloseError)
+		throw 1;
 	}
 }
 
@@ -182,10 +156,9 @@ void BackupDaemon::RunHelperThread(void)
 		{
 			NamedPipeAccept(BOX_NAMED_PIPE_NAME);
 		}
-		catch (ConnectionException &e)
+		catch (int i)
 		{
-			if (e.GetType()    == ConnectionException::ExceptionType &&
-			    e.GetSubType() == ConnectionException::SocketConnectError)
+			if (i == 2)
 			{
 				printf("Impossible error in "
 					"this thread! Aborting.\n");
@@ -267,7 +240,7 @@ void BackupDaemon::Run2()
 		0 /* let OS choose protocol */);
 	if(handle == -1)
 	{
-		THROW_EXCEPTION(ServerException, SocketOpenError)
+		throw 2;
 	}
 	
 	// Connect it
@@ -275,6 +248,6 @@ void BackupDaemon::Run2()
 	{
 		// Dispose of the socket
 		::closesocket(handle);
-		THROW_EXCEPTION(ConnectionException, SocketConnectError)
+		throw 2;
 	}
 }
