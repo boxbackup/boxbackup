@@ -14,7 +14,9 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
+#ifndef WIN32
 #include <syslog.h>
+#endif
 
 #include "SSLLib.h"
 #include "ServerException.h"

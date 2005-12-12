@@ -105,7 +105,7 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
-#else
+#elif HAVE_DECL_F_SETLK
 	struct flock desc;
 	desc.l_type = F_WRLCK;
 	desc.l_whence = SEEK_SET;

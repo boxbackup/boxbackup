@@ -12,9 +12,12 @@
 #define TLS_CLASS_IMPLEMENTATION_CPP
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
-#include <poll.h>
 #include <errno.h>
 #include <fcntl.h>
+
+#ifndef WIN32
+#include <poll.h>
+#endif
 
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
@@ -120,7 +123,8 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		SSLLib::LogError("Create socket bio");
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
-	int socket = GetSocketHandle();
+
+	tOSSocketHandle socket = GetSocketHandle();
 	BIO_set_fd(mpBIO, socket, BIO_NOCLOSE);
 	
 	// Then the SSL object
@@ -131,6 +135,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
+#ifndef WIN32
 	// Make the socket non-blocking so timeouts on Read work
 	// This is more portable than using ioctl with FIONBIO
 	int statusFlags = 0;
@@ -139,6 +144,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	{
 		THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
 	}
+#endif
 	
 	// FIXME: This is less portable than the above. However, it MAY be needed
 	// for cygwin, which has/had bugs with fcntl
@@ -464,5 +470,3 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	// Done.
 	return std::string(commonName);
 }
-
-

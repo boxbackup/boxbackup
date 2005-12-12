@@ -11,8 +11,11 @@
 
 #include <unistd.h>
 #include <sys/types.h>
-#include <poll.h>
 #include <errno.h>
+
+#ifndef WIN32
+#include <poll.h>
+#endif
 
 #include "SocketStream.h"
 #include "ServerException.h"
@@ -140,7 +143,11 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
 		// Dispose of the socket
+#ifdef WIN32
+		::closesocket(mSocketHandle);
+#else
 		::close(mSocketHandle);
+#endif
 		mSocketHandle = -1;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
 	}
@@ -191,7 +198,11 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		}
 	}
 
+#ifdef WIN32
+	int r = ::recv(mSocketHandle, (char*)pBuffer, NBytes, 0);
+#else
 	int r = ::read(mSocketHandle, pBuffer, NBytes);
+#endif
 	if(r == -1)
 	{
 		if(errno == EINTR)
@@ -236,7 +247,11 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 	while(bytesLeft > 0)
 	{
 		// Try to send.
+#ifdef WIN32
+		int sent = ::send(mSocketHandle, buffer, bytesLeft, 0);
+#else
 		int sent = ::write(mSocketHandle, buffer, bytesLeft);
+#endif
 		if(sent == -1)
 		{
 			// Error.
@@ -283,8 +298,11 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 void SocketStream::Close()
 {
 	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
-	
+#ifdef WIN32
+	if(::closesocket(mSocketHandle) == -1)
+#else
 	if(::close(mSocketHandle) == -1)
+#endif
 	{
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
@@ -354,7 +372,7 @@ bool SocketStream::StreamClosed()
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-int SocketStream::GetSocketHandle()
+tOSSocketHandle SocketStream::GetSocketHandle()
 {
 	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
 	return mSocketHandle;
