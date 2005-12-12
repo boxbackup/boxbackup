@@ -133,7 +133,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		{
 			// The directory has probably been deleted, so just ignore this error.
 			// In a future scan, this deletion will be noticed, deleted from server, and this object deleted.
-			TRACE1("Stat failed for '%s' (directory)\n", rLocalPath.c_str());
+			TRACE1("Stat failed for '%s' (directory)\n", 
+				rLocalPath.c_str());
 			return;
 		}
 		// Store inode number in map so directories are tracked in case they're renamed
@@ -202,11 +203,18 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 
 				// Stat file to get info
-				filename = rLocalPath + DIRECTORY_SEPARATOR + en->d_name;
+				filename = rLocalPath + DIRECTORY_SEPARATOR + 
+					en->d_name;
+
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
-					TRACE1("Stat failed for '%s' (contents)\n", filename.c_str());
-					THROW_EXCEPTION(CommonException, OSFileError)
+					// Report the error (logs and 
+					// eventual email to administrator)
+					SetErrorWhenReadingFilesystemObject(
+						rParams, filename.c_str());
+
+					// Ignore this entry for now.
+					continue;
 				}
 
 				int type = st.st_mode & S_IFMT;
@@ -506,7 +514,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		box_time_t modTime = 0;
 		uint64_t attributesHash = 0;
 		int64_t fileSize = 0;
-		ino_t inodeNum = 0;
+		InodeRefType inodeNum = 0;
 		bool hasMultipleHardLinks = true;
 		// BLOCK
 		{
@@ -865,7 +873,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 
 				// Get attributes
 				box_time_t attrModTime = 0;
-				ino_t inodeNum = 0;
+				InodeRefType inodeNum = 0;
 				BackupClientFileAttributes attr;
 				attr.ReadAttributes(dirname.c_str(), true /* directories have zero mod times */,
 					0 /* not interested in mod time */, &attrModTime, 0 /* not file size */,
@@ -1109,8 +1117,12 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(rFilename.c_str(), mObjectID, rStoreFilename));
 		
 			// Send to store
-			std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
-					AttributesHash, 0 /* no diff from file ID */, rStoreFilename, *upload));
+			std::auto_ptr<BackupProtocolClientSuccess> stored(
+				connection.QueryStoreFile(
+					mObjectID, ModificationTime,
+					AttributesHash, 
+					0 /* no diff from file ID */, 
+					rStoreFilename, *upload));
 	
 			// Get object ID from the result		
 			objID = stored->GetObjectID();
@@ -1130,7 +1142,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
 			}
 		}
-	
+		
 		// Send the error on it's way
 		throw;
 	}

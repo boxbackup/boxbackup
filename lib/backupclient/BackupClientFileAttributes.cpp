@@ -287,7 +287,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 //
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroModificationTimes, box_time_t *pModTime,
-	box_time_t *pAttrModTime, int64_t *pFileSize, ino_t *pInodeNumber, bool *pHasMultipleLinks)
+	box_time_t *pAttrModTime, int64_t *pFileSize, InodeRefType *pInodeNumber, bool *pHasMultipleLinks)
 {
 	StreamableMemBlock *pnewAttr = 0;
 	try
@@ -309,13 +309,45 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 
 		FillAttributes(*pnewAttr, Filename, st, ZeroModificationTimes);
 
+#ifndef WIN32
 		// Is it a link?
 		if((st.st_mode & S_IFMT) == S_IFLNK)
 		{
 			FillAttributesLink(*pnewAttr, Filename, st);
 		}
+#endif
 
 		FillExtendedAttr(*pnewAttr, Filename);
+
+#ifdef WIN32
+		//this is to catch those problems with invalid time stamps stored...
+		//need to find out the reason why - but also a catch as well.
+
+		attr_StreamFormat *pattr = 
+			(attr_StreamFormat*)pnewAttr->GetBuffer();
+		ASSERT(pattr != 0);
+		
+		// __time64_t winTime = BoxTimeToSeconds(
+		// pnewAttr->ModificationTime);
+
+		box_time_t bob = BoxTimeToSeconds(pattr->ModificationTime);
+		__time64_t winTime = bob;
+		if (_gmtime64(&winTime) == 0 )
+		{
+			::syslog(LOG_ERR, "Corrupt value in store "
+				"Modification Time in file %s", Filename);
+			pattr->ModificationTime = 0;
+		}
+
+		bob = BoxTimeToSeconds(pattr->AttrModificationTime);
+		winTime = bob;
+		if (_gmtime64(&winTime) == 0 )
+		{
+			::syslog(LOG_ERR, "Corrupt value in store "
+				"Attr Modification Time in file %s", Filename);
+			pattr->AttrModificationTime = 0;
+		}
+#endif
 
 		// Attributes ready. Encrypt into this block
 		EncryptAttr(*pnewAttr);
@@ -372,7 +404,7 @@ void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock,
 	pattr->FileGenerationNumber = htonl(st.st_gen);
 #endif
 }
-
+#ifndef WIN32
 // --------------------------------------------------------------------------
 //
 // Function
@@ -402,6 +434,7 @@ void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBl
 	std::memcpy(buffer+oldSize, linkedTo, linkedToSize);
 	buffer[oldSize+linkedToSize] = '\0';
 }
+#endif
 
 // --------------------------------------------------------------------------
 //
@@ -574,12 +607,18 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 			THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
 		}
 	
+#ifdef WIN32
+		::syslog(LOG_WARNING, 
+			"Cannot create symbolic links on Windows: %s", 
+			Filename);
+#else
 		// Make a symlink, first deleting anything in the way
 		::unlink(Filename);
 		if(::symlink((char*)(pattr + 1), Filename) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
+#endif
 
 		xattrOffset += std::strlen(reinterpret_cast<char*>(pattr+1))+1;
 	}
@@ -943,6 +982,3 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, cons
 	uint64_t result = *((uint64_t *)(digest.DigestAsData()));
 	return result;
 }
-
-
-

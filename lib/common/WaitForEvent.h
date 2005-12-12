@@ -15,7 +15,9 @@
 	#include <sys/time.h>
 #else
 	#include <vector>
-	#include <poll.h>
+	#ifndef WIN32
+		#include <poll.h>
+	#endif
 #endif
 
 #include "CommonException.h"

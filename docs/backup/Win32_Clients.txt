@@ -1,0 +1,13 @@
+The basic client tools now run on Win32 natively. 
+The port was done by nick@omniis.com.
+
+* bbackupd
+* bbackupquery
+* bbackupctl
+
+Have been ported. bbackupd runs as a NT style service.
+
+Known limitations:
+
+* File attributes and permissions are not backed up.
+

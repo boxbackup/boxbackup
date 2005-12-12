@@ -12,7 +12,11 @@
 #include <new>
 #include <map>
 #include <signal.h>
+#ifdef WIN32
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 
 #include "BackupStoreFile.h"
 #include "BackupStoreFileWire.h"
@@ -989,7 +993,11 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			for(unsigned int e = 0; e < rRecipe.size(); ++e)
 			{
 				char b[64];
+#ifdef WIN32
+				sprintf(b, "%8I64d", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
+#else
 				sprintf(b, "%8lld", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
+#endif
 				TRACE3("%8lld %s %8lld\n", rRecipe[e].mSpaceBefore, (rRecipe[e].mpStartBlock == 0)?"       -":b, (int64_t)rRecipe[e].mBlocks);
 			}
 		}

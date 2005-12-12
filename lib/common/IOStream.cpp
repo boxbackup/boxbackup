@@ -105,6 +105,17 @@ int IOStream::ConvertSeekTypeToOSWhence(int SeekType)
 	int ostype = SEEK_SET;
 	switch(SeekType)
 	{
+#ifdef WIN32
+	case SeekType_Absolute:
+		ostype = FILE_BEGIN;
+		break;
+	case SeekType_Relative:
+		ostype = FILE_CURRENT;
+		break;
+	case SeekType_End:
+		ostype = FILE_END;
+		break;
+#else // ! WIN32
 	case SeekType_Absolute:
 		ostype = SEEK_SET;
 		break;
@@ -114,6 +125,7 @@ int IOStream::ConvertSeekTypeToOSWhence(int SeekType)
 	case SeekType_End:
 		ostype = SEEK_END;
 		break;
+#endif // WIN32
 	
 	default:
 		THROW_EXCEPTION(CommonException, IOStreamBadSeekType)

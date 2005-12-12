@@ -15,7 +15,9 @@
 #include <new>
 #include <string.h>
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
-	#include <syslog.h>
+	#ifndef WIN32
+		#include <syslog.h>
+	#endif
 	#include <stdio.h>
 #endif
 

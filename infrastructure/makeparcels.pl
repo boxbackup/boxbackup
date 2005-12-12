@@ -26,7 +26,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 		next if m/\AEND-OMIT/;
 		if(m/\AOMIT:(.+)/)
 		{
-			if($1 eq $build_os)
+			if($1 eq $build_os or $1 eq $target_os)
 			{
 				while(<PARCELS>)
 				{
@@ -34,6 +34,21 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 				}
 			}
 			next;
+		}
+
+		if (m'\AONLY:(.+)')
+		{
+			my @only_targets = split m'\,', $1;
+
+			if (not grep {$_ eq $build_os or $_ eq $target_os}
+				@only_targets)
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-ONLY';
+				}
+				next;
+			}
 		}
 		
 		# new parcel, or a new parcel definition?
@@ -100,7 +115,7 @@ for my $parcel (@parcels)
 		
 		if($type eq 'bin')
 		{
-			my $exeext = ($build_os eq 'CYGWIN')?'.exe':'';
+			my $exeext = $platform_exe_ext;
 			print MAKE "\t(cd bin/$name; \$(MAKE) $release_flag)\n";
 			print MAKE "\tcp release/bin/$name/$name$exeext $dir\n";
 		}
