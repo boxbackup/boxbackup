@@ -1,0 +1,31 @@
+How to build Box Backup for Windows (Native) on Linux using MinGW
+By Chris Wilson, 2005-12-07
+
+Install the MinGW cross-compiler for Windows:
+
+- Debian users can "apt-get install mingw32"
+- Fedora and SuSE users can download RPM packages from 
+  [http://mirzam.it.vu.nl/mingw/]
+
+Download Zlib from [http://www.zlib.net/], unpack and enter source directory:
+
+	export CC=i386-mingw32-gcc 
+	export AR="i386-mingw32-ar rc" 
+	export RANLIB="i386-mingw32-ranlib"
+	./configure
+	make
+	make install prefix=/usr/local/i386-mingw32
+
+Download OpenSSL 0.9.7 from 
+
+Configure Box with:
+
+	export CXX="i386-mingw32-g++"
+	export AR=i386-mingw32-ar
+	export RANLIB=i386-mingw32-ranlib
+	export CFLAGS="-mthreads"
+	export CXXFLAGS="-mthreads"
+	export LDFLAGS="-mthreads"
+	export LIBS="-lcrypto -lws2_32 -lgdi32"
+	./configure --target=i386-mingw32
+	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB"
