@@ -197,11 +197,9 @@ void FileStream::Write(const void *pBuffer, int NBytes)
 
 	if ( (res == 0) || (numBytesWritten != NBytes))
 	{
-		DWORD err = GetLastError();
+		// DWORD err = GetLastError();
 		THROW_EXCEPTION(CommonException, OSFileWriteError)
 	}
-
-
 #else
 	if(::write(mOSFileHandle, pBuffer, NBytes) != NBytes)
 	{

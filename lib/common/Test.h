@@ -108,6 +108,116 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	return pid;
 }
 
+#ifdef WIN32
+
+#include "WinNamedPipeStream.h"
+#include "IOStreamGetLine.h"
+#include "BoxPortsAndFiles.h"
+
+bool SendCommands(const std::string& rCmd)
+{
+	WinNamedPipeStream connection;
+
+	try
+	{
+		connection.Connect(BOX_NAMED_PIPE_NAME);
+	}
+	catch(...)
+	{
+		printf("Failed to connect to daemon control socket.\n");
+		return false;
+	}
+
+	// For receiving data
+	IOStreamGetLine getLine(connection);
+	
+	// Wait for the configuration summary
+	std::string configSummary;
+	if(!getLine.GetLine(configSummary))
+	{
+		printf("Failed to receive configuration summary from daemon\n");
+		return false;
+	}
+
+	// Was the connection rejected by the server?
+	if(getLine.IsEOF())
+	{
+		printf("Server rejected the connection.\n");
+		return false;
+	}
+
+	// Decode it
+	int autoBackup, updateStoreInterval, minimumFileAge, maxUploadWait;
+	if(::sscanf(configSummary.c_str(), "bbackupd: %d %d %d %d", 
+			&autoBackup, &updateStoreInterval, 
+			&minimumFileAge, &maxUploadWait) != 4)
+	{
+		printf("Config summary didn't decode\n");
+		return false;
+	}
+
+	std::string cmds;
+	bool expectResponse;
+
+	if (rCmd != "")
+	{
+		cmds = rCmd;
+		cmds += "\nquit\n";
+		expectResponse = true;
+	}
+	else
+	{
+		cmds = "quit\n";
+		expectResponse = false;
+	}
+	
+	connection.Write(cmds.c_str(), cmds.size());
+	
+	// Read the response
+	std::string line;
+	bool statusOk = !expectResponse;
+
+	while (expectResponse && !getLine.IsEOF() && getLine.GetLine(line))
+	{
+		// Is this an OK or error line?
+		if (line == "ok")
+		{
+			statusOk = true;
+		}
+		else if (line == "error")
+		{
+			printf("ERROR (%s)\n", rCmd.c_str());
+			break;
+		}
+		else
+		{
+			printf("WARNING: Unexpected response to command '%s': "
+				"%s", rCmd.c_str(), line.c_str());
+		}
+	}
+	
+	return statusOk;
+}
+
+inline bool ServerIsAlive()
+{
+	return SendCommands("");
+}
+
+inline bool HUPServer(int pid)
+{
+	return SendCommands("reload");
+}
+
+inline bool KillServer(int pid)
+{
+	TEST_THAT(SendCommands("terminate"));
+	::sleep(1);
+	return !ServerIsAlive();
+}
+
+#else // !WIN32
+
 inline bool ServerIsAlive(int pid)
 {
 	if(pid == 0) return false;
@@ -128,6 +238,8 @@ inline bool KillServer(int pid)
 	::sleep(1);
 	return !ServerIsAlive(pid);
 }
+
+#endif // WIN32
 
 inline void TestRemoteProcessMemLeaks(const char *filename)
 {

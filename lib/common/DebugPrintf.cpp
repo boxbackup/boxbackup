@@ -13,7 +13,12 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-#include <syslog.h>
+
+#ifdef WIN32
+	#include "emu.h"
+#else
+	#include <syslog.h>
+#endif
 
 #include "MemLeakFindOn.h"
 
