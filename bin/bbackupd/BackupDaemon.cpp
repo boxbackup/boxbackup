@@ -12,17 +12,23 @@
 		throw type(type::subtype);	\
 	}
 
-// #include "Box.h"
-
 #include <stdio.h>
 #include <unistd.h>
 
 #include "ServerException.h"
 
 #include "BackupDaemon.h"
-// #include "Socket.h"
 
-#include "emu.h"
+// #include "emu.h"
+
+#define LOG_INFO 6
+#define LOG_WARNING 4
+#define LOG_ERR 3
+
+void syslog(int loglevel, const char *fmt, ...);
+
+void InitTimer(void);
+void FiniTimer(void);
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
 
