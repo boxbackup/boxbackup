@@ -70,7 +70,11 @@ const char *BlockSizeToString(int64_t Blocks, int DiscSet)
 	double mb = (Blocks * BlockSizeOfDiscSet(DiscSet)) / (1024.0*1024.0);
 	
 	// Format string
+#ifdef WIN32
+	sprintf(string, "%I64d (%.2fMb)", Blocks, mb);
+#else
 	sprintf(string, "%lld (%.2fMb)", Blocks, mb);
+#endif
 	
 	return string;
 }

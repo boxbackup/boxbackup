@@ -380,7 +380,11 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		{
 			// add object ID to line
 			char oid[32];
+#ifdef WIN32
+			sprintf(oid, "%08I64x ", en->GetObjectID());
+#else
 			sprintf(oid, "%08llx ", en->GetObjectID());
+#endif
 			line += oid;
 		}
 		
@@ -404,6 +408,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			}
 			// attributes flags
 			*(f++) = (en->HasAttributes())?'a':'-';
+
 			// terminate
 			*(f++) = ' ';
 			*(f++) = '\0';
@@ -424,14 +429,22 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		if(opts[LIST_OPTION_DISPLAY_HASH])
 		{
 			char hash[64];
+#ifdef WIN32
+			::sprintf(hash, "%016I64x ", en->GetAttributesHash());
+#else
 			::sprintf(hash, "%016llx ", en->GetAttributesHash());
+#endif
 			line += hash;
 		}
 		
 		if(opts[LIST_OPTION_SIZEINBLOCKS])
 		{
 			char num[32];
+#ifdef WIN32
+			sprintf(num, "%05I64d ", en->GetSizeInBlocks());
+#else
 			sprintf(num, "%05lld ", en->GetSizeInBlocks());
+#endif
 			line += num;
 		}
 		
@@ -1034,7 +1047,8 @@ void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries:
 		}
 				
 		// Then get it compared
-		Compare(std::string("/") + rLocation, loc.GetKeyValue("Path"), rParams);
+		Compare(std::string(DIRECTORY_SEPARATOR) + rLocation, 
+			loc.GetKeyValue("Path"), rParams);
 	}
 	catch(...)
 	{
@@ -1165,7 +1179,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 
 #ifndef HAVE_VALID_DIRENT_D_TYPE
 			std::string fn(rLocalDir);
-			fn += '/';
+			fn += DIRECTORY_SEPARATOR_ASCHAR;
 			fn += localDirEn->d_name;
 			struct stat st;
 			if(::lstat(fn.c_str(), &st) != 0)

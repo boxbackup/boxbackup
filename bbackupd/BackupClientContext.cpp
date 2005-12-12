@@ -9,7 +9,9 @@
 
 #include "Box.h"
 
+#ifndef WIN32
 #include <syslog.h>
+#endif
 
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"

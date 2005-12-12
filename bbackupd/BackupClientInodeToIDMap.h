@@ -20,11 +20,13 @@
 	#define BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 #endif
 
-typedef ino_t InodeRefType;
-
 // avoid having to include the DB files when not necessary
 #ifndef BACKIPCLIENTINODETOIDMAP_IMPLEMENTATION
+#ifdef BERKELY_V4
+	class Db;
+#else
 	class DB;
+#endif
 #endif
 
 // --------------------------------------------------------------------------
@@ -58,8 +60,12 @@ private:
 #else
 	bool mReadOnly;
 	bool mEmpty;
+#ifdef BERKELY_V4
+	Db *dbp;	// c++ style implimentation
+#else
 	DB *dbp;	// C style interface, use notation from documentation
-#endif
+#endif // BERKELY_V4
+#endif // BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 };
 
 #endif // BACKUPCLIENTINODETOIDMAP__H
