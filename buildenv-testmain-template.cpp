@@ -20,10 +20,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <syslog.h>
 #include <stdarg.h>
 #include <fcntl.h>
 #include <errno.h>
+
+#ifdef WIN32
+	#include "emu.h"
+#else
+	#include <syslog.h>
+#endif
 
 #include "MemLeakFindOn.h"
 
@@ -38,6 +43,14 @@ int test(int argc, const char *argv[]);
 int failures = 0;
 
 int filedes_open_at_beginning = -1;
+
+#ifdef WIN32
+
+// any way to check for open file descriptors on Win32?
+inline int count_filedes() { return 0; }
+inline bool checkfilesleftopen() { return false; }
+
+#else // !WIN32
 
 int count_filedes()
 {
@@ -70,6 +83,8 @@ bool checkfilesleftopen()
 	// Count the file descriptors open
 	return filedes_open_at_beginning != count_filedes();
 }
+
+#endif
 
 int main(int argc, const char *argv[])
 {

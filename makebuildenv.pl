@@ -408,9 +408,9 @@ __E
 		}
 		
 		writetestfile("$mod/_t", 
-			'./test${platform_exe_ext} $1 $2 $3 $4 $5', $mod);
+			'./test' . $platform_exe_ext . '$1 $2 $3 $4 $5', $mod);
 		writetestfile("$mod/_t-gdb", 
-			'gdb ./test${platform_exe_ext}', $mod);
+			'gdb ./test ' . $platform_exe_ext, $mod);
 		
 	}
 	
