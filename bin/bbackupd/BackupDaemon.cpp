@@ -141,7 +141,7 @@ unsigned int WINAPI AcceptorThread( LPVOID lpParam )
 		{
 			if (i == 2)
 			{
-				printf("Impossible error in "
+				printf("BAD: Impossible error in "
 					"this thread! Aborting.\n");
 				exit(1);
 			}
@@ -180,7 +180,7 @@ void BackupDaemon::Run()
 	}
 	catch(...)
 	{
-		printf("Caught exception in Run()");
+		printf("OK: Caught exception in Run()");
 	}
 }
 
