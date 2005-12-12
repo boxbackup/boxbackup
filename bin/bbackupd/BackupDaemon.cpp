@@ -14,9 +14,10 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <windows.h>
 
 #include "ServerException.h"
-#include "WinNamedPipeStream.h"
+// #include "WinNamedPipeStream.h"
 
 class BackupDaemon
 {
@@ -41,20 +42,9 @@ public:
 private:
 	void Run2();
 
-	void CloseCommandConnection();
-
-	WinNamedPipeStream mListeningSocket;
-
 	public:
 	void RunHelperThread(void);
 };
-
-#define LOG_INFO 6
-#define LOG_WARNING 4
-#define LOG_ERR 3
-
-// void InitTimer(void);
-// void FiniTimer(void);
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
 
@@ -136,13 +126,61 @@ unsigned int WINAPI HelperThread( LPVOID lpParam )
 	return 0;
 }
 
+void NamedPipeAccept(const wchar_t* pName)
+{
+	HANDLE handle;
+
+	handle = CreateNamedPipeW( 
+		pName,                     // pipe name 
+		PIPE_ACCESS_DUPLEX,        // read/write access 
+		PIPE_TYPE_MESSAGE |        // message type pipe 
+		PIPE_READMODE_MESSAGE |    // message-read mode 
+		PIPE_WAIT,                 // blocking mode 
+		1,                         // max. instances  
+		4096,                      // output buffer size 
+		4096,                      // input buffer size 
+		NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
+		NULL);                     // default security attribute 
+
+	if (handle == NULL)
+	{
+		printf("CreateNamedPipeW failed: %d\n", GetLastError());
+		THROW_EXCEPTION(ServerException, SocketOpenError)
+	}
+
+	bool connected = ConnectNamedPipe(handle, (LPOVERLAPPED) NULL);
+
+	if (!connected)
+	{
+		printf("ConnectNamedPipe failed: %d\n", GetLastError());
+		CloseHandle(handle);
+		THROW_EXCEPTION(ServerException, SocketOpenError)
+	}
+
+	if (!FlushFileBuffers(handle))
+	{
+		printf("FlushFileBuffers failed: %d\n", GetLastError());
+	}
+
+	if (!DisconnectNamedPipe(handle))
+	{
+		printf("DisconnectNamedPipe failed: %d\n", GetLastError());
+	}
+
+	if (!CloseHandle(handle))
+	{
+		printf("CloseHandle failed: %d\n", GetLastError());
+		THROW_EXCEPTION(ServerException, SocketCloseError)
+	}
+}
+
 void BackupDaemon::RunHelperThread(void)
 {
 	while (true)
 	{
 		try
 		{
-			mListeningSocket.Accept(BOX_NAMED_PIPE_NAME);
+			NamedPipeAccept(BOX_NAMED_PIPE_NAME);
 		}
 		catch (ConnectionException &e)
 		{
@@ -150,12 +188,10 @@ void BackupDaemon::RunHelperThread(void)
 			    e.GetSubType() == ConnectionException::SocketConnectError)
 			{
 				printf("Impossible error in "
-					"this thread! Aborting.");
+					"this thread! Aborting.\n");
 				exit(1);
 			}
 		}
-
-		CloseCommandConnection();
 	}
 } 
 
@@ -189,9 +225,6 @@ void BackupDaemon::Run()
         	0,                           // use default creation flags 
         	NULL);                       // returns the thread identifier 
 
-	// init our own timer for file diff timeouts
-	// InitTimer();
-
 	// Handle things nicely on exceptions
 	try
 	{
@@ -201,9 +234,6 @@ void BackupDaemon::Run()
 	{
 		printf("Caught exception in Run()");
 	}
-	
-	// clean up windows specific stuff.
-	// FiniTimer();
 }
 
 // --------------------------------------------------------------------------
@@ -246,26 +276,5 @@ void BackupDaemon::Run2()
 		// Dispose of the socket
 		::closesocket(handle);
 		THROW_EXCEPTION(ConnectionException, SocketConnectError)
-	}
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::CloseCommandConnection()
-//		Purpose: Close the command connection, ignoring any errors
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
-void BackupDaemon::CloseCommandConnection()
-{
-	try
-	{
-		mListeningSocket.Close();
-	}
-	catch(...)
-	{
-		// Ignore any errors
 	}
 }
