@@ -20,10 +20,12 @@
 #include "ServerException.h"
 
 #include "BackupDaemon.h"
-#include "Socket.h"
+// #include "Socket.h"
+
+#include "emu.h"
 
 #define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
-	
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -206,13 +208,22 @@ void BackupDaemon::Run()
 // --------------------------------------------------------------------------
 void BackupDaemon::Run2()
 {
-	// Setup parameters based on type, looking up names if required
-	int sockDomain = 0;
-	SocketAllAddr addr;
-	int addrLen = 0;
-	Socket::NameLookupToSockAddr(addr, sockDomain, 
-		Socket::TypeINET, "1.2.3.4", 1234, addrLen);
+	int sockAddrLen = 0;
+	int sockDomain = AF_INET;
+	struct sockaddr_in addr;
 
+	// Lookup hostname
+	struct hostent *phost = ::gethostbyname("1.2.3.4");
+
+	sockAddrLen = sizeof(addr);
+	addr.sin_family = PF_INET;
+	addr.sin_port = htons(2201);
+	addr.sin_addr = *((in_addr*)phost->h_addr_list[0]);
+	for(unsigned int l = 0; l < sizeof(addr.sin_zero); ++l)
+	{
+		addr.sin_zero[l] = 0;
+	}
+	
 	// Create the socket
 	int handle = ::socket(sockDomain, SOCK_STREAM, 
 		0 /* let OS choose protocol */);
@@ -222,7 +233,7 @@ void BackupDaemon::Run2()
 	}
 	
 	// Connect it
-	if(::connect(handle, &addr.sa_generic, addrLen) == -1)
+	if(::connect(handle, (struct sockaddr*)&addr, sockAddrLen) == -1)
 	{
 		// Dispose of the socket
 		::closesocket(handle);
