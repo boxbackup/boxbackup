@@ -20,12 +20,17 @@
 #define BOX_RAIDFILE_ROOT_BBSTORED			"backup"
 
 // Backup client daemon
+#ifdef WIN32
+#define BOX_FILE_BBACKUPD_DEFAULT_CONFIG	"C:\\Program Files\\Box Backup\\bbackupd.conf"
+#else
 #define BOX_FILE_BBACKUPD_DEFAULT_CONFIG	"/etc/box/bbackupd.conf"
+#endif
 
-
-// RaidFile conf location efault
+// RaidFile conf location default
 #define BOX_FILE_RAIDFILE_DEFAULT_CONFIG	"/etc/box/raidfile.conf"
 
+// Default name of the named pipe
+#define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
 
 #endif // BOXPORTSANDFILES__H
 

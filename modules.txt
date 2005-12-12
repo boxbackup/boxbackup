@@ -9,16 +9,21 @@
 
 # Generic support code and modules
 
+OMIT:mingw32
 OMIT:CYGWIN
 lib/raidfile
 END-OMIT
+
 lib/crypto
 lib/server
+lib/win32		lib/server
 lib/compress
 test/common
 test/crypto			lib/crypto
 test/compress		lib/compress
 test/basicserver	lib/server
+
+OMIT:mingw32
 OMIT:CYGWIN
 test/raidfile		lib/raidfile
 END-OMIT
@@ -28,15 +33,20 @@ END-OMIT
 # Backup system
 
 lib/backupclient	lib/server	lib/crypto	lib/compress
+
+OMIT:mingw32
 OMIT:CYGWIN
 lib/backupstore		lib/server	lib/raidfile	lib/backupclient
-bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
-bin/bbstoreaccounts	lib/raidfile	lib/backupstore
-bin/bbackupobjdump	lib/backupclient lib/backupstore
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	lib/win32
+bin/bbstoreaccounts	lib/raidfile	lib/backupstore	lib/win32
+bin/bbackupobjdump	lib/backupclient lib/backupstore	lib/win32
 END-OMIT
-bin/bbackupd		lib/server	lib/backupclient
-bin/bbackupquery	lib/server	lib/backupclient
-bin/bbackupctl		lib/server	lib/backupclient
+
+bin/bbackupd		lib/server	lib/backupclient	lib/win32
+bin/bbackupquery	lib/server	lib/backupclient	lib/win32
+bin/bbackupctl		lib/server	lib/backupclient	lib/win32
+
+OMIT:mingw32
 OMIT:CYGWIN
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd

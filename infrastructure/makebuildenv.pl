@@ -182,6 +182,7 @@ sub make_obj_symlink
 print "Scanning code...\n";
 
 my $modules_omitted = 0;
+my $modules_omitting = 0;
 
 # process lines in flattened modules files
 for(@modules_files)
@@ -191,16 +192,20 @@ for(@modules_files)
 	next unless m/\S/;
 	
 	# omit bits on some platforms?
-	next if m/\AEND-OMIT/;
+	if(m/\AEND-OMIT/)
+	{
+		$modules_omitting = 0;
+		next;
+	}
+
+	next if $modules_omitting;
+
 	if(m/\AOMIT:(.+)/)
 	{
-		if($1 eq $build_os)
+		if($1 eq $build_os or $1 eq $target_os)
 		{
 			$modules_omitted = 1;
-			while(<MODULES>)
-			{
-				last if m/\AEND-OMIT/;	
-			}
+			$modules_omitting = 1;
 		}
 		next;
 	}
@@ -402,8 +407,10 @@ __E
 			close TESTFILE;
 		}
 		
-		writetestfile("$mod/_t", './test $1 $2 $3 $4 $5', $mod);
-		writetestfile("$mod/_t-gdb", 'gdb ./test', $mod);
+		writetestfile("$mod/_t", 
+			'./test${platform_exe_ext} $1 $2 $3 $4 $5', $mod);
+		writetestfile("$mod/_t-gdb", 
+			'gdb ./test${platform_exe_ext}', $mod);
 		
 	}
 	
@@ -440,15 +447,26 @@ __E
 	
 
 	# make include path
-	my $include_paths = join(' ',map {'-I../../'.$_} @all_deps_for_module);
+	my $include_paths = "-I../../lib/win32 " .
+		join(' ',map {'-I../../'.$_} @all_deps_for_module);
 
 	# is target a library?
 	my $target_is_library = ($type ne 'bin' && $type ne 'test');
 
 	# make target name
 	my $end_target = $name;
-	$end_target .= '.a' if $target_is_library;
-	$end_target = 'test' if $type eq 'test';
+
+	if ($target_is_library)
+	{
+		$end_target .= '.a';
+	}
+	else
+	{
+		$end_target .= $platform_exe_ext;
+	}
+
+	$end_target = 'test'.$platform_exe_ext if $type eq 'test';
+
 	# adjust for outdir
 	$end_target = '$(OUTDIR)/' . $end_target;
 
@@ -456,6 +474,13 @@ __E
 	my $mk_name_extra = ($bsd_make)?'':'X';
 	open MAKE,">$mod/Makefile".$mk_name_extra or die "Can't open Makefile for $mod\n";
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
+
+	my $release_flags = "-O2";
+	if ($target_os eq "mingw32")
+	{
+		$release_flags = "-O0 -g";
+	}
+
 	print MAKE <<__E;
 #
 # AUTOMATICALLY GENERATED FILE
@@ -466,7 +491,7 @@ CXX = g++
 AR = ar
 RANLIB = ranlib
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG -O2 -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
@@ -567,6 +592,7 @@ __E
 	my $has_deps = ($#{$module_dependency{$mod}} >= 0);
 # ----- # always has dependencies with debug library
 	$has_deps = 1;
+	$has_deps = 0 if $target_is_library;
 
 	# Depenency stuff
 	my $deps_makeinfo;
@@ -613,7 +639,7 @@ __E
 
 	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
 	print MAKE $end_target,': ',$o_file_list;
-	print MAKE ' dep_modules' if !$bsd_make;
+	print MAKE ' dep_modules' if $has_deps and not $bsd_make;
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
@@ -658,7 +684,7 @@ __E
 	# dependency line?
 	print MAKE "\n";
 
-	# module dependcies for GNU make?
+	# module dependencies for GNU make?
 	print MAKE $deps_makeinfo if !$bsd_make;
 	
 	# print the rest of the file

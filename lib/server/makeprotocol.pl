@@ -182,7 +182,11 @@ __E
 
 if($implement_syslog)
 {
-	print H qq~#include <syslog.h>\n~;
+	print H <<EOF;
+#ifndef WIN32
+#include <syslog.h>
+#endif
+EOF
 }
 
 

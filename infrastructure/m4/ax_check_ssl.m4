@@ -27,7 +27,7 @@ AC_DEFUN([AX_CHECK_SSL], [
 
   ax_check_ssl_found=yes
   AC_CHECK_HEADERS([openssl/ssl.h],, [ax_check_ssl_found=no])
-  AC_CHECK_LIB([ssl], [SSL_read],, [ax_check_ssl_found=no])
+  AC_CHECK_LIB([ssl], [SSL_read],, [ax_check_ssl_found=no], [-lcrypto])
 
   if test "x$ax_check_ssl_found" = "xyes"; then
     AC_DEFINE([HAVE_SSL], 1, [Define to 1 if SSL is available])
