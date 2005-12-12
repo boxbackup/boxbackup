@@ -16,10 +16,59 @@
 #include <unistd.h>
 
 #include "ServerException.h"
+#include "WinNamedPipeStream.h"
 
-#include "BackupDaemon.h"
+class BackupDaemon
+{
+public:
+	BackupDaemon();
+	~BackupDaemon();
+private:
+	BackupDaemon(const BackupDaemon &);
+public:
 
-// #include "emu.h"
+	void Run();
+
+	// Allow other classes to call this too
+	enum
+	{
+		NotifyEvent_StoreFull = 0,
+		NotifyEvent_ReadError = 1,
+		NotifyEvent__MAX = 1
+		// When adding notifications, remember to add strings to NotifySysadmin()
+	};
+
+private:
+	void Run2();
+
+	void CloseCommandConnection();
+
+	/*	
+private:
+	// For the command socket
+	class CommandSocketInfo
+	{
+	public:
+		CommandSocketInfo();
+		~CommandSocketInfo();
+	private:
+		CommandSocketInfo(const CommandSocketInfo &);	// no copying
+		CommandSocketInfo &operator=(const CommandSocketInfo &);
+	public:
+	*/
+
+	WinNamedPipeStream mListeningSocket;
+
+	/*
+	};
+	
+	// Using a socket?
+	CommandSocketInfo *mpCommandSocketInfo;
+	*/
+	
+	public:
+	void RunHelperThread(void);
+};
 
 #define LOG_INFO 6
 #define LOG_WARNING 4
@@ -41,7 +90,6 @@ void FiniTimer(void);
 //
 // --------------------------------------------------------------------------
 BackupDaemon::BackupDaemon()
-	: mpCommandSocketInfo(0)
 { }
 
 // --------------------------------------------------------------------------
@@ -53,13 +101,7 @@ BackupDaemon::BackupDaemon()
 //
 // --------------------------------------------------------------------------
 BackupDaemon::~BackupDaemon()
-{
-	if(mpCommandSocketInfo != 0)
-	{
-		delete mpCommandSocketInfo;
-		mpCommandSocketInfo = 0;
-	}
-}
+{ }
 
 void ConnectorConnectPipe()
 {
@@ -119,15 +161,11 @@ unsigned int WINAPI HelperThread( LPVOID lpParam )
 
 void BackupDaemon::RunHelperThread(void)
 {
-	mpCommandSocketInfo = new CommandSocketInfo;
-	this->mReceivedCommandConn = false;
-
 	while (true)
 	{
 		try
 		{
-			mpCommandSocketInfo->mListeningSocket.Accept(
-				BOX_NAMED_PIPE_NAME);
+			mListeningSocket.Accept(BOX_NAMED_PIPE_NAME);
 		}
 		catch (ConnectionException &e)
 		{
@@ -184,22 +222,9 @@ void BackupDaemon::Run()
 	}
 	catch(...)
 	{
-		if(mpCommandSocketInfo != 0)
-		{
-			delete mpCommandSocketInfo;
-			mpCommandSocketInfo = 0;
-		}
-
-		throw;
+		printf("Caught exception in Run()");
 	}
 	
-	// Clean up
-	if(mpCommandSocketInfo != 0)
-	{
-		delete mpCommandSocketInfo;
-		mpCommandSocketInfo = 0;
-	}
-
 	// clean up windows specific stuff.
 	FiniTimer();
 }
@@ -260,33 +285,10 @@ void BackupDaemon::CloseCommandConnection()
 {
 	try
 	{
-		mpCommandSocketInfo->mListeningSocket.Close();
+		mListeningSocket.Close();
 	}
 	catch(...)
 	{
 		// Ignore any errors
 	}
 }
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::CommandSocketInfo::CommandSocketInfo()
-//		Purpose: Constructor
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
-BackupDaemon::CommandSocketInfo::CommandSocketInfo()
-{ }
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
-//		Purpose: Destructor
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
-BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
-{ }
