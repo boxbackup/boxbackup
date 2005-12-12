@@ -43,7 +43,7 @@ void check_random_int(uint32_t max)
 	}
 }
 
-#define ZERO_BUFFER(x) ::bzero(x, sizeof(x));
+#define ZERO_BUFFER(x) ::memset(x, 0, sizeof(x));
 
 template<typename CipherType, int BLOCKSIZE>
 void test_cipher()

@@ -38,7 +38,7 @@ else
 		next if m/\AEND-OMIT/;
 		if(m/\AOMIT:(.+)/)
 		{
-			if($1 eq $build_os)
+			if($1 eq $build_os or $1 eq $target_os)
 			{
 				while(<MODULES>)
 				{

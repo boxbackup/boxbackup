@@ -181,7 +181,8 @@ int test(int argc, const char *argv[])
 
 	// First, test the FdGetLine class -- rather important this works!
 	{
-		FileHandleGuard<O_RDONLY> file("testfiles/fdgetlinetest.txt");
+		FileHandleGuard<O_RDONLY> file("testfiles"
+			DIRECTORY_SEPARATOR "fdgetlinetest.txt");
 		FdGetLine getline(file);
 		
   		int l = 0;
@@ -198,8 +199,10 @@ int test(int argc, const char *argv[])
 	}
 	// and again without pre-processing
 	{
-		FileHandleGuard<O_RDONLY> file("testfiles/fdgetlinetest.txt");
-		FILE *file2 = fopen("testfiles/fdgetlinetest.txt", "r");
+		FileHandleGuard<O_RDONLY> file("testfiles"
+			DIRECTORY_SEPARATOR "fdgetlinetest.txt");
+		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR 
+			"fdgetlinetest.txt", "r");
 		TEST_THAT_ABORTONFAIL(file2 != 0);
 		FdGetLine getline(file);
 		char ll[512];
@@ -227,7 +230,8 @@ int test(int argc, const char *argv[])
 	
 	// Then the IOStream version of get line, seeing as we're here...
 	{
-		FileStream file("testfiles/fdgetlinetest.txt", O_RDONLY);
+		FileStream file("testfiles" DIRECTORY_SEPARATOR 
+			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
 		
   		int l = 0;
@@ -247,10 +251,12 @@ int test(int argc, const char *argv[])
 	}
 	// and again without pre-processing
 	{
-		FileStream file("testfiles/fdgetlinetest.txt", O_RDONLY);
+		FileStream file("testfiles" DIRECTORY_SEPARATOR 
+			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
 
-		FILE *file2 = fopen("testfiles/fdgetlinetest.txt", "r");
+		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR 
+			"fdgetlinetest.txt", "r");
 		TEST_THAT_ABORTONFAIL(file2 != 0);
 		char ll[512];
 		
@@ -281,13 +287,20 @@ int test(int argc, const char *argv[])
 	// Doesn't exist
 	{
 		std::string errMsg;
-		TEST_CHECK_THROWS(std::auto_ptr<Configuration> pconfig(Configuration::LoadAndVerify("testfiles/DOESNTEXIST", &verify, errMsg)), CommonException, OSFileOpenError);
+		TEST_CHECK_THROWS(std::auto_ptr<Configuration> pconfig(
+			Configuration::LoadAndVerify(
+				"testfiles" DIRECTORY_SEPARATOR "DOESNTEXIST", 
+				&verify, errMsg)), 
+			CommonException, OSFileOpenError);
 	}
 
 	// Basic configuration test
 	{
 		std::string errMsg;
-		std::auto_ptr<Configuration> pconfig(Configuration::LoadAndVerify("testfiles/config1.txt", &verify, errMsg));
+		std::auto_ptr<Configuration> pconfig(
+			Configuration::LoadAndVerify(
+				"testfiles" DIRECTORY_SEPARATOR "config1.txt", 
+				&verify, errMsg));
 		if(!errMsg.empty())
 		{
 			printf("UNEXPECTED error msg is:\n------\n%s------\n", errMsg.c_str());
@@ -332,22 +345,38 @@ int test(int argc, const char *argv[])
 
 	static const char *file[] =
 	{
-		"testfiles/config2.txt", // Value missing from root
-		"testfiles/config3.txt", // Unexpected {
-		"testfiles/config4.txt", // Missing }
-		"testfiles/config5.txt", // { expected, but wasn't there
-		"testfiles/config6.txt", // Duplicate key
-		"testfiles/config7.txt", // Invalid key (no name)
-		"testfiles/config8.txt", // Not all sub blocks terminated
-		"testfiles/config9.txt", // Not valid integer
-		"testfiles/config9b.txt", // Not valid integer
-		"testfiles/config9c.txt", // Not valid integer
-		"testfiles/config9d.txt", // Not valid integer
-		"testfiles/config10.txt", // Missing key (in subblock)
-		"testfiles/config11.txt", // Unknown key
-		"testfiles/config12.txt", // Missing block
-		"testfiles/config13.txt", // Subconfig (wildcarded) should exist, but missing (ie nothing present)
-		"testfiles/config16.txt", // bad boolean value
+		"testfiles" DIRECTORY_SEPARATOR "config2.txt", 
+			// Value missing from root
+		"testfiles" DIRECTORY_SEPARATOR "config3.txt", 
+			// Unexpected {
+		"testfiles" DIRECTORY_SEPARATOR "config4.txt", 
+			// Missing }
+		"testfiles" DIRECTORY_SEPARATOR "config5.txt", 
+			// { expected, but wasn't there
+		"testfiles" DIRECTORY_SEPARATOR "config6.txt", 
+			// Duplicate key
+		"testfiles" DIRECTORY_SEPARATOR "config7.txt", 
+			// Invalid key (no name)
+		"testfiles" DIRECTORY_SEPARATOR "config8.txt", 
+			// Not all sub blocks terminated
+		"testfiles" DIRECTORY_SEPARATOR "config9.txt", 
+			// Not valid integer
+		"testfiles" DIRECTORY_SEPARATOR "config9b.txt", 
+			// Not valid integer
+		"testfiles" DIRECTORY_SEPARATOR "config9c.txt", 
+			// Not valid integer
+		"testfiles" DIRECTORY_SEPARATOR "config9d.txt", 
+			// Not valid integer
+		"testfiles" DIRECTORY_SEPARATOR "config10.txt", 
+			// Missing key (in subblock)
+		"testfiles" DIRECTORY_SEPARATOR "config11.txt", 
+			// Unknown key
+		"testfiles" DIRECTORY_SEPARATOR "config12.txt", 
+			// Missing block
+		"testfiles" DIRECTORY_SEPARATOR "config13.txt", 
+			// Subconfig (wildcarded) should exist, but missing (ie nothing present)
+		"testfiles" DIRECTORY_SEPARATOR "config16.txt", 
+			// bad boolean value
 		0
 	};
 
@@ -364,7 +393,10 @@ int test(int argc, const char *argv[])
 	// (single value in a multivalue already checked)
 	{
 		std::string errMsg;
-		std::auto_ptr<Configuration> pconfig(Configuration::LoadAndVerify("testfiles/config14.txt", &verify, errMsg));
+		std::auto_ptr<Configuration> pconfig(
+			Configuration::LoadAndVerify(
+				"testfiles" DIRECTORY_SEPARATOR "config14.txt",
+			&verify, errMsg));
 		TEST_THAT(pconfig.get() != 0);
 		TEST_THAT(errMsg.empty());
 		TEST_THAT(pconfig->KeyExists("MultiValue"));
@@ -378,7 +410,10 @@ int test(int argc, const char *argv[])
 	// Check boolean values	
 	{
 		std::string errMsg;
-		std::auto_ptr<Configuration> pconfig(Configuration::LoadAndVerify("testfiles/config15.txt", &verify, errMsg));
+		std::auto_ptr<Configuration> pconfig(
+			Configuration::LoadAndVerify(
+				"testfiles" DIRECTORY_SEPARATOR "config15.txt",
+			&verify, errMsg));
 		TEST_THAT(pconfig.get() != 0);
 		TEST_THAT(errMsg.empty());
 		TEST_THAT(pconfig->GetKeyValueBool("BoolTrue1") == true);
@@ -391,32 +426,50 @@ int test(int argc, const char *argv[])
 	{
 		NamedLock lock1;
 		// Try and get a lock on a name in a directory which doesn't exist
-		TEST_CHECK_THROWS(lock1.TryAndGetLock("testfiles/non-exist/lock"), CommonException, OSFileError);
+		TEST_CHECK_THROWS(lock1.TryAndGetLock(
+				"testfiles" 
+				DIRECTORY_SEPARATOR "non-exist"
+				DIRECTORY_SEPARATOR "lock"), 
+			CommonException, OSFileError);
+
 		// And a more resonable request
-		TEST_THAT(lock1.TryAndGetLock("testfiles/lock1") == true);
+		TEST_THAT(lock1.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
+
 		// Try to lock something using the same lock
-		TEST_CHECK_THROWS(lock1.TryAndGetLock("testfiles/non-exist/lock2"), CommonException, NamedLockAlreadyLockingSomething);		
+		TEST_CHECK_THROWS(
+			lock1.TryAndGetLock(
+				"testfiles" 
+				DIRECTORY_SEPARATOR "non-exist"
+				DIRECTORY_SEPARATOR "lock2"), 
+			CommonException, NamedLockAlreadyLockingSomething);		
 #if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
 		// And again on that name
 		NamedLock lock2;
-		TEST_THAT(lock2.TryAndGetLock("testfiles/lock1") == false);
+		TEST_THAT(lock2.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == false);
 #endif
 	}
 	{
 		// Check that it unlocked when it went out of scope
 		NamedLock lock3;
-		TEST_THAT(lock3.TryAndGetLock("testfiles/lock1") == true);
+		TEST_THAT(lock3.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
 	}
 	{
 		// And unlocking works
 		NamedLock lock4;
-		TEST_CHECK_THROWS(lock4.ReleaseLock(), CommonException, NamedLockNotHeld);		
-		TEST_THAT(lock4.TryAndGetLock("testfiles/lock4") == true);
+		TEST_CHECK_THROWS(lock4.ReleaseLock(), CommonException, 
+			NamedLockNotHeld);
+		TEST_THAT(lock4.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock4") == true);
 		lock4.ReleaseLock();
 		NamedLock lock5;
-		TEST_THAT(lock5.TryAndGetLock("testfiles/lock4") == true);
+		TEST_THAT(lock5.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock4") == true);
 		// And can reuse it
-		TEST_THAT(lock4.TryAndGetLock("testfiles/lock5") == true);
+		TEST_THAT(lock4.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
 	}
 
 	// Test the ReadGatherStream
