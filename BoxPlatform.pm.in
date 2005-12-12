@@ -1,7 +1,7 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $build_cpu $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files/;
+@EXPORT = qw/$build_os $build_cpu $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext/;
 
 BEGIN
 {
@@ -23,9 +23,11 @@ BEGIN
 	$platform_compile_line_extra = '@CPPFLAGS@ @CXXFLAGS@ @CXXFLAGS_STRICT@';
 	$platform_link_line_extra = '@LDFLAGS@';
 	$platform_lib_files = '@LIBS@';
+	$target_os = '@target_os@';
+	$platform_exe_ext = '@EXEEXT@';
 
 	# get version
-	open VERSION,"VERSION.txt";
+	open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
 	$product_version = <VERSION>;
 	chomp $product_version;
 	$product_name = <VERSION>;
