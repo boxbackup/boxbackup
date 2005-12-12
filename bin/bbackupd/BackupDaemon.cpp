@@ -226,3 +226,28 @@ void BackupDaemon::Run2()
 		throw 2;
 	}
 }
+
+int main(int argc, const char *argv[])
+{
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+		
+	WSADATA info;
+
+	if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
+	{
+		// box backup will not run without sockets
+		printf("Failed to initialise Windows Sockets\n");
+		exit(1);
+	}
+
+	// EnableBackupRights();
+
+	BackupDaemon Daemon;
+	Daemon.Run();
+
+	// Clean up our sockets
+	WSACleanup();
+
+	return 0;
+}
