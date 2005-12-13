@@ -489,6 +489,9 @@ int test(int argc, const char *argv[])
 		encoded->CopyStreamTo(out);
 		TEST_THAT(time(0) < (beginTime + 20));
 	}
+	// Remove zero-files to save disk space
+	remove("testfiles/zero.0");
+	remove("testfiles/zero.1");
 
 #if 0
 	// Code for a nasty real world example! (16Mb files, won't include them in the distribution
