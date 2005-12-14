@@ -72,11 +72,17 @@ int32_t BoxConvert::_ConvertStringToInt(const char *pString, int Size)
 	{
 	case 32:
 		{
-			// No extra checking needed, if this assert holds true
-			ASSERT(sizeof(long) == sizeof(int32_t));
+			// No extra checking needed if long is an int32
+			if(sizeof(long) > sizeof(int32_t))
+			{
+				if(r <= (0 - 0x7fffffffL) || r > 0x7fffffffL)
+				{
+					THROW_EXCEPTION(ConversionException, IntOverflowInConvertFromString)
+				}
+			}
+			break;
 		}
-		break;
-		
+
 	case 16:
 		{
 			if(r <= (0 - 0x7fff) || r > 0x7fff)
