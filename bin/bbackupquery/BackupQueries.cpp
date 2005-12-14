@@ -333,16 +333,21 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 			return;
 		}
 	}
-	
-	// List it
-	List(rootDir, listRoot, opts, true /* first level to list */);
+
+	try
+	{	
+		// List it
+		List(rootDir, listRoot, opts, true /* first level to list */);
+	} catch (BoxException &e) {
+		printf("Error from server: %s\n", e.what());
+	}
 }
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::CommandList2(int64_t, const std::string &, const bool *)
+//		Name:    BackupQueries::List(int64_t, const std::string &, const bool *)
 //		Purpose: Do the actual listing of directories and files
 //		Created: 2003/10/10
 //
@@ -355,11 +360,29 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 	if(!opts[LIST_OPTION_ALLOWDELETED]) excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
 
 	// Do communication
-	mrConnection.QueryListDirectory(
+	BackupProtocolClientListDirectory send(
 			DirID,
 			BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
 			excludeFlags,
 			true /* want attributes */);
+
+	try 
+	{
+		mrConnection.Query(send);
+	}
+	catch (BoxException &e)
+	{
+		int type, subtype;
+		if (send.IsError(type, subtype) &&
+			type == BackupProtocolClientError::ErrorType)
+		{
+			throw ConnectionException(subtype);
+		}
+		else
+		{
+			throw ConnectionException(e.GetSubType());
+		}
+	}
 
 	// Retrieve the directory from the stream following
 	BackupStoreDirectory dir;
