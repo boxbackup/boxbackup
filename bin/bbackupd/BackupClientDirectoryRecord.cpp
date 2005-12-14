@@ -101,8 +101,14 @@ void BackupClientDirectoryRecord::DeleteSubDirectories()
 void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::SyncParams &rParams, int64_t ContainingDirectoryID,
 	const std::string &rLocalPath, bool ThisDirHasJustBeenCreated)
 {
+	rParams.GetProgressNotifier().NotifyScanDirectory(this, rLocalPath);
+	
+	// Check for connections and commands on the command socket
+	if (rParams.mpCommandSocket)
+		rParams.mpCommandSocket->Wait(0);
+	
 	// Signal received by daemon?
-	if(rParams.mrDaemon.StopRun())
+	if(rParams.StopRun())
 	{
 		// Yes. Stop now.
 		THROW_EXCEPTION(BackupStoreException, SignalReceived)
@@ -133,8 +139,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		{
 			// The directory has probably been deleted, so just ignore this error.
 			// In a future scan, this deletion will be noticed, deleted from server, and this object deleted.
-			TRACE1("Stat failed for '%s' (directory)\n", 
-				rLocalPath.c_str());
+			rParams.GetProgressNotifier().NotifyDirStatFailed(
+				this, rLocalPath, strerror(errno));
 			return;
 		}
 		// Store inode number in map so directories are tracked in case they're renamed
@@ -162,6 +168,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	std::vector<std::string> dirs;
 	std::vector<std::string> files;
 	bool downloadDirectoryRecordBecauseOfFutureFiles = false;
+	
 	// BLOCK
 	{		
 		// read the contents...
@@ -210,6 +217,10 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				{
 					// Report the error (logs and 
 					// eventual email to administrator)
+ 					rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
+ 						filename, strerror(errno));
+					
+					// FIXME move to NotifyFileStatFailed()
 					SetErrorWhenReadingFilesystemObject(
 						rParams, filename.c_str());
 
@@ -268,8 +279,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					// Log that this has happened
 					if(!rParams.mHaveLoggedWarningAboutFutureFileTimes)
 					{
-						::syslog(LOG_ERR, "Some files have modification times excessively in the future. Check clock syncronisation.\n");
-						::syslog(LOG_ERR, "Example file (only one shown) : %s\n", filename.c_str());
+						rParams.GetProgressNotifier().NotifyFileModifiedInFuture(
+							this, filename);
 						rParams.mHaveLoggedWarningAboutFutureFileTimes = true;
 					}
 				}
@@ -522,6 +533,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			struct stat st;
 			if(::lstat(filename.c_str(), &st) != 0)
 			{
+				rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
+					filename, strerror(errno));
 				THROW_EXCEPTION(CommonException, OSFileError)
 			}
 			
@@ -693,6 +706,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				{
 					// Connection errors should just be passed on to the main handler, retries
 					// would probably just cause more problems.
+					rParams.GetProgressNotifier().NotifyFileUploadException(this,
+						filename, e);
 					throw;
 				}
 				catch(BoxException &e)
@@ -702,7 +717,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					// Log it.
 					SetErrorWhenReadingFilesystemObject(rParams, filename.c_str());
 					// Log error.
-					::syslog(LOG_ERR, "Error code when uploading was (%d/%d), %s", e.GetType(), e.GetSubType(), e.what());
+					rParams.GetProgressNotifier().NotifyFileUploadException(this,
+						filename, e);
 				}
 
 				// Update structures if the file was uploaded successfully.
@@ -714,6 +730,11 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 						mpPendingEntries->erase(*f);
 					}
 				}
+			}
+			else
+			{
+				rParams.GetProgressNotifier().NotifyFileSkippedServerFull(this,
+					filename);
 			}
 		}
 		else if(en != 0 && en->GetAttributesHash() != attributesHash)
@@ -796,6 +817,9 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				}
 			}
 		}
+		
+		rParams.GetProgressNotifier().NotifyFileSynchronised(this, filename, 
+			fileSize);
 	}
 
 	// Erase contents of files to save space when recursing
@@ -1070,6 +1094,8 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(SyncParams &rPara
 int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::SyncParams &rParams, const std::string &rFilename, const BackupStoreFilename &rStoreFilename,
 			int64_t FileSize, box_time_t ModificationTime, box_time_t AttributesHash, bool NoPreviousVersionOnServer)
 {
+	rParams.GetProgressNotifier().NotifyFileUploading(this, rFilename);
+	
 	// Get the connection
 	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
 
@@ -1090,7 +1116,11 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 			
 			if(diffFromID != 0)
 			{
-				// Found an old version -- get the index
+				// Found an old version
+				rParams.GetProgressNotifier().NotifyFileUploadingPatch(this, 
+					rFilename);
+
+				// Get the index
 				std::auto_ptr<IOStream> blockIndexStream(connection.ReceiveStream());
 			
 				// Diff the file
@@ -1139,13 +1169,15 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				&& subtype == BackupProtocolClientError::Err_StorageLimitExceeded)
 			{
 				// The hard limit was exceeded on the server, notify!
-				rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+				rParams.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
 			}
 		}
 		
 		// Send the error on it's way
 		throw;
 	}
+
+	rParams.GetProgressNotifier().NotifyFileUploaded(this, rFilename, FileSize);
 
 	// Return the new object ID of this file
 	return objID;
@@ -1167,7 +1199,8 @@ void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(BackupClie
 	::memset(mStateChecksum, 0, sizeof(mStateChecksum));
 
 	// Log the error
-	::syslog(LOG_ERR, "Backup object failed, error when reading %s", Filename);
+	rParams.GetProgressNotifier().NotifyFileReadFailed(this, 
+		Filename, strerror(errno));
 
 	// Mark that an error occured in the parameters object
 	rParams.mReadErrorsOnFilesystemObjects = true;
@@ -1183,14 +1216,20 @@ void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(BackupClie
 //		Created: 8/3/04
 //
 // --------------------------------------------------------------------------
-BackupClientDirectoryRecord::SyncParams::SyncParams(BackupDaemon &rDaemon, BackupClientContext &rContext)
-	: mSyncPeriodStart(0),
+BackupClientDirectoryRecord::SyncParams::SyncParams(
+	RunStatusProvider &rRunStatusProvider, 
+	SysadminNotifier &rSysadminNotifier,
+	ProgressNotifier &rProgressNotifier,
+	BackupClientContext &rContext)
+	: mrRunStatusProvider(rRunStatusProvider),
+	  mrSysadminNotifier(rSysadminNotifier),
+	  mrProgressNotifier(rProgressNotifier),
+	  mSyncPeriodStart(0),
 	  mSyncPeriodEnd(0),
 	  mMaxUploadWait(0),
 	  mMaxFileTimeInFuture(99999999999999999LL),
 	  mFileTrackingSizeThreshold(16*1024),
 	  mDiffingUploadSizeThreshold(16*1024),
-	  mrDaemon(rDaemon),
 	  mrContext(rContext),
 	  mReadErrorsOnFilesystemObjects(false),
 	  mUploadAfterThisTimeInTheFuture(99999999999999999LL),
@@ -1210,6 +1249,3 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(BackupDaemon &rDaemon, Backu
 BackupClientDirectoryRecord::SyncParams::~SyncParams()
 {
 }
-
-
-

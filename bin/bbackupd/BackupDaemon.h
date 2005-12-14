@@ -15,18 +15,13 @@
 #include <memory>
 
 #include "Daemon.h"
-#include "BoxTime.h"
-#include "Socket.h"
-#include "SocketListen.h"
-#include "SocketStream.h"
-#include "WinNamedPipeStream.h"
+#include "CommandSocketManager.h"
+#include "BackupClientContext.h"
+#include "BackupClientDirectoryRecord.h"
 
-class BackupClientDirectoryRecord;
-class BackupClientContext;
 class Configuration;
 class BackupClientInodeToIDMap;
 class ExcludeList;
-class IOStreamGetLine;
 
 // --------------------------------------------------------------------------
 //
@@ -36,7 +31,8 @@ class IOStreamGetLine;
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-class BackupDaemon : public Daemon
+class BackupDaemon : public Daemon, CommandListener, LocationResolver,
+	RunStatusProvider, SysadminNotifier, ProgressNotifier
 {
 public:
 	BackupDaemon();
@@ -50,19 +46,10 @@ public:
 	virtual const char *DaemonBanner() const;
 	const ConfigurationVerify *GetConfigVerify() const;
 
-	bool FindLocationPathName(const std::string &rLocationName, std::string &rPathOut) const;
+	bool FindLocationPathName(const std::string &rLocationName, 
+		std::string &rPathOut) const;
 
-	enum
-	{
-		// Add stuff to this, make sure the textual equivalents in SetState() are changed too.
-		State_Initialising = -1,
-		State_Idle = 0,
-		State_Connected = 1,
-		State_Error = 2,
-		State_StorageLimitExceeded = 3
-	};
-
-	int GetState() {return mState;}
+	state_t GetState() {return mState;}
 
 	// Allow other classes to call this too
 	enum
@@ -94,11 +81,7 @@ private:
 	
 	void MakeMapBaseName(unsigned int MountNumber, std::string &rNameOut) const;
 
-	void SetState(int State);
-	
-	void WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut);
-	void CloseCommandConnection();
-	void SendSyncStartOrFinish(bool SendStart);
+	void SetState(state_t State);
 	
 	void TouchFileInWorkingDir(const char *Filename);
 
@@ -111,7 +94,6 @@ private:
 
 	int UseScriptToSeeIfSyncAllowed();
 
-private:
 	class Location
 	{
 	public:
@@ -129,7 +111,7 @@ private:
 		ExcludeList *mpExcludeDirs;
 	};
 
-	int mState;		// what the daemon is currently doing
+	state_t mState; // what the daemon is currently doing
 
 	std::vector<Location *> mLocations;
 	
@@ -137,28 +119,9 @@ private:
 	std::vector<BackupClientInodeToIDMap *> mCurrentIDMaps;
 	std::vector<BackupClientInodeToIDMap *> mNewIDMaps;
 	
-	// For the command socket
-	class CommandSocketInfo
-	{
-	public:
-		CommandSocketInfo();
-		~CommandSocketInfo();
-	private:
-		CommandSocketInfo(const CommandSocketInfo &);	// no copying
-		CommandSocketInfo &operator=(const CommandSocketInfo &);
-	public:
-#ifdef WIN32
-		WinNamedPipeStream mListeningSocket;
-#else
-		SocketListen<SocketStream, 1 /* listen backlog */> mListeningSocket;
-		std::auto_ptr<SocketStream> mpConnectedSocket;
-#endif
-		IOStreamGetLine *mpGetLine;
-	};
-	
-	// Using a socket?
-	CommandSocketInfo *mpCommandSocketInfo;
-	
+  	// Using a socket?
+ 	CommandSocketManager *mpCommandSocketInfo;
+
 	// Stop notifications being repeated.
 	bool mNotificationsSent[NotifyEvent__MAX + 1];
 
@@ -166,12 +129,81 @@ private:
 	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
 	std::vector<std::pair<int64_t,std::string> > mUnusedRootDirEntries;
 
+ 	bool mSyncRequested;
+ 	bool mSyncForced;
+ 
+ 	void SetReloadConfigWanted() { this->Daemon::SetReloadConfigWanted(); }
+ 	void SetTerminateWanted()    { this->Daemon::SetTerminateWanted(); }
+ 	void SetSyncRequested()      { mSyncRequested = true; }
+ 	void SetSyncForced()         { mSyncForced    = true; }
+ 	
+ 	bool StopRun() { return this->Daemon::StopRun(); }
+ 
+ 	/* ProgressNotifier implementation */
+ 	virtual void NotifyScanDirectory(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) { }
+ 	virtual void NotifyDirStatFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath, 
+ 		const std::string& rErrorMsg)
+ 	{
+ 		TRACE2("Stat failed for '%s' (directory): %s\n", 
+ 			rLocalPath.c_str(), rErrorMsg.c_str());
+ 	}
+ 	virtual void NotifyFileStatFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const std::string& rErrorMsg)
+ 	{
+ 		TRACE1("Stat failed for '%s' (contents)\n", rLocalPath.c_str());
+ 	}
+ 	virtual void NotifyFileReadFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const std::string& rErrorMsg)
+ 	{
+ 		::syslog(LOG_ERR, "Backup object failed, error when reading %s", 
+ 			rLocalPath.c_str());
+ 	}
+ 	virtual void NotifyFileModifiedInFuture(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath)
+ 	{
+ 		::syslog(LOG_ERR, "Some files have modification times "
+ 			"excessively in the future. Check clock syncronisation.\n");
+ 		::syslog(LOG_ERR, "Example file (only one shown) : %s\n", 
+ 			rLocalPath.c_str());
+ 	}
+ 	virtual void NotifyFileSkippedServerFull(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) { }
+ 	virtual void NotifyFileUploadException(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const BoxException& rException)
+ 	{
+ 		::syslog(LOG_ERR, "Error code when uploading was (%d/%d), %s", 
+			rException.GetType(), rException.GetSubType(), rException.what());
+ 	}
+ 	virtual void NotifyFileUploading(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) { }
+ 	virtual void NotifyFileUploadingPatch(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) { }
+ 	virtual void NotifyFileUploaded(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		int64_t FileSize) { }
+ 	virtual void NotifyFileSynchronised(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		int64_t FileSize) { }
+
 #ifdef WIN32
 	public:
 	void RunHelperThread(void);
-
-	private:
-	bool mDoSyncFlagOut, mSyncIsForcedOut, mReceivedCommandConn;
 #endif
 };
 
