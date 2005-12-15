@@ -72,6 +72,11 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
 
+	SECURITY_ATTRIBUTES Security;
+	Security.nLength = sizeof(SECURITY_ATTRIBUTES);
+	Security.lpSecurityDescriptor = NULL; // inherit from process
+	Security.bInheritHandle = FALSE; // don't pass to new processes
+
 	mSocketHandle = CreateNamedPipeW( 
 		pName,                     // pipe name 
 		PIPE_ACCESS_DUPLEX,        // read/write access 
@@ -82,7 +87,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		4096,                      // output buffer size 
 		4096,                      // input buffer size 
 		NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
-		NULL);                     // default security attribute 
+		&Security);                // use our security attributes
 
 	if (mSocketHandle == NULL)
 	{
@@ -136,6 +141,20 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
 		::syslog(LOG_ERR, "Failed to connect to server's named pipe: "
+			"error %d", GetLastError());
+		CloseHandle(mSocketHandle);
+		mSocketHandle = NULL;
+		THROW_EXCEPTION(ServerException, SocketOpenError)
+	}
+
+	if (!SetNamedPipeHandleState(
+		mSocketHandle,          // pipe handle
+		PIPE_READMODE_MESSAGE | // put this end into message mode
+		PIPE_WAIT,              // put this end into blocking mode
+		NULL,                   // don't change the collection count
+		NULL))                  // don't change the collect timeout
+	{
+		::syslog(LOG_ERR, "Failed to put pipe into message mode: "
 			"error %d", GetLastError());
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
