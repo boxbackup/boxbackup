@@ -18,9 +18,9 @@ AC_DEFUN([AX_CHECK_BDB_V1], [
                    [ac_bdb_header=$ac_header; break], [ac_bdb_header=""])
   if test "x$ac_bdb_header" != x; then
     AC_SEARCH_LIBS([__db185_open],
-                   [db db-4.3 db-4.2 db-4.1 db-4.0 db-3],
+                   [db db-4.4 db-4.3 db-4.2 db-4.1 db-4.0 db4 db-3 db3],
                    [ac_have_bdb=yes],
-                   [AC_SEARCH_LIBS([dbopen], [db-1 db], [ac_have_bdb=yes])])
+                   [AC_SEARCH_LIBS([dbopen], [db-1 db1 db], [ac_have_bdb=yes])])
   fi
   if test "x$ac_have_bdb" = "xyes"; then
     AC_MSG_CHECKING([whether found db libraries work])
