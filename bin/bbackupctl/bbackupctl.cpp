@@ -207,6 +207,13 @@ int main(int argc, const char *argv[])
 		// Yes... set the flag so we know what we're waiting for a sync to start
 		areWaitingForSync = true;
 	}
+	// Is the command the "ping" command? We're now connected to the daemon,
+	// so we have pinged it successfully and we can just exit.
+	else if(::strcmp(argv[0], "ping") == 0)
+	{
+		std::string cmd("quit\n");
+		connection.Write(cmd.c_str(), cmd.size());		
+	}
 	else
 	{
 		// No? Just send the command given plus a quit command.
