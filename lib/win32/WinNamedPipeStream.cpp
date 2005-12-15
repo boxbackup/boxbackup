@@ -147,10 +147,12 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
+	DWORD Flags = PIPE_READMODE_MESSAGE | // put this end into message mode
+		PIPE_WAIT;                    // put this end into blocking mode
+
 	if (!SetNamedPipeHandleState(
 		mSocketHandle,          // pipe handle
-		PIPE_READMODE_MESSAGE | // put this end into message mode
-		PIPE_WAIT,              // put this end into blocking mode
+		&Flags,                 // mode flags
 		NULL,                   // don't change the collection count
 		NULL))                  // don't change the collect timeout
 	{
