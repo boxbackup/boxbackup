@@ -157,7 +157,8 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(Backu
 	CHECK_PHASE(Phase_Commands)
 
 	// Ask the context for a directory
-	try {
+	try 
+	{
 		const BackupStoreDirectory &rdir(
 			rContext.GetDirectory(mObjectID));
 	
@@ -174,7 +175,9 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(Backu
 
 		return std::auto_ptr<ProtocolObject>(
 			new BackupProtocolServerSuccess(mObjectID));
-	} catch (RaidFileException &e) {
+	} 
+	catch(RaidFileException &e) 
+	{
 		return std::auto_ptr<ProtocolObject>(
 			new BackupProtocolServerError(
 				BackupProtocolServerError::ErrorType, 
