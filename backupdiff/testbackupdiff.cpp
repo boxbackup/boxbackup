@@ -487,7 +487,7 @@ int test(int argc, const char *argv[])
 			2000 /* object ID of the file diffing from */, blockindex, IOStream::TimeOutInfinite,
 			0, 0));
 		encoded->CopyStreamTo(out);
-		TEST_THAT(time(0) < (beginTime + 20));
+		TEST_THAT(time(0) < (beginTime + 40));
 	}
 	// Remove zero-files to save disk space
 	remove("testfiles/zero.0");
