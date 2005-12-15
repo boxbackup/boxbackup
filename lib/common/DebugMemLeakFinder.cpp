@@ -180,7 +180,9 @@ void memleakfinder_notaleak(void *ptr)
 	}
 	else
 	{
-		sNotLeaksPre[sNotLeaksPreNum++] = ptr;
+		if ( sNotLeaksPreNum < 
+			 (unsigned)( sizeof(sNotLeaksPre)/sizeof(*sNotLeaksPre) ) )
+			sNotLeaksPre[sNotLeaksPreNum++] = ptr;
 	}
 /*	{
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
