@@ -10,7 +10,7 @@ SocketConnectError			15	Probably a network issue between client and server, bad 
 TLSHandshakeFailed			30
 TLSShutdownFailed			32
 TLSWriteFailed				33	Probably a network issue between client and server.
-TLSReadFailed				34	Probably a network issue between client and server.
+TLSReadFailed				34	Probably a network issue between client and server, or account corrupted on server.
 TLSNoPeerCertificate		36
 TLSPeerCertificateInvalid	37	Check certification process
 TLSClosedWhenWriting		38
