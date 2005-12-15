@@ -12,6 +12,7 @@
 #include <syslog.h>
 
 #include "autogen_BackupProtocolServer.h"
+#include "autogen_RaidFileException.h"
 #include "BackupConstants.h"
 #include "BackupContext.h"
 #include "CollectInBufferStream.h"
@@ -156,18 +157,31 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(Backu
 	CHECK_PHASE(Phase_Commands)
 
 	// Ask the context for a directory
-	const BackupStoreDirectory &rdir(rContext.GetDirectory(mObjectID));
+	try {
+		const BackupStoreDirectory &rdir(
+			rContext.GetDirectory(mObjectID));
 	
-	// Store the listing to a stream
-	std::auto_ptr<CollectInBufferStream> stream(new CollectInBufferStream);
-	rdir.WriteToStream(*stream, mFlagsMustBeSet, mFlagsNotToBeSet, mSendAttributes,
-		false /* never send dependency info to the client */);
-	stream->SetForReading();
+		// Store the listing to a stream
+		std::auto_ptr<CollectInBufferStream> stream(
+			new CollectInBufferStream);
+		rdir.WriteToStream(*stream, mFlagsMustBeSet, 
+			mFlagsNotToBeSet, mSendAttributes,
+			false /* never send dependency info to the client */);
+		stream->SetForReading();
 	
-	// Get the protocol to send the stream
-	rProtocol.SendStreamAfterCommand(stream.release());
+		// Get the protocol to send the stream
+		rProtocol.SendStreamAfterCommand(stream.release());
 
-	return std::auto_ptr<ProtocolObject>(new BackupProtocolServerSuccess(mObjectID));
+		return std::auto_ptr<ProtocolObject>(
+			new BackupProtocolServerSuccess(mObjectID));
+	} catch (RaidFileException &e) {
+		return std::auto_ptr<ProtocolObject>(
+			new BackupProtocolServerError(
+				BackupProtocolServerError::ErrorType, 
+				BackupProtocolServerError::Err_RaidFileDoesntExist
+				)
+			);
+	}
 }
 
 // --------------------------------------------------------------------------

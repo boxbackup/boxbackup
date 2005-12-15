@@ -39,6 +39,7 @@ Error		0	IsError(Type,SubType)	Reply
 	CONSTANT	Err_DiffFromFileDoesNotExist	12
 	CONSTANT	Err_DoesNotExistInDirectory		13
 	CONSTANT	Err_PatchConsistencyError		14
+	CONSTANT	Err_RaidFileDoesntExist		15
 
 Version		1	Command(Version)	Reply
 	int32	Version
