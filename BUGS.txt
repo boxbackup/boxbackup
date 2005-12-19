@@ -8,3 +8,40 @@ Bugs
 * if bbackupd gets an error then a signal, it may not wait it's full 100 seconds before retrying. And then won't stop the cycle...
 * bbackupquery restore, if not root, then won't do file ownership properly, but won't alert the user to this fact
 * empty (real) directories in the store aren't deleted when they're empty (and will never be used again) -- uses up disc space unnecessarily
+
+--
+
+Problem with running as a Cygwin service
+Reported by E.W. Peter Jalajas <pjalajas@tebuco.com>
+
+~/trunk/distribution/boxbackup/contrib/cygwin/install-cygwin-service.pl
+
+gave:
+
+cygrunsrv: Error starting a service: QueryServiceStatus:  Win32 error
+1062:
+
+And the log showed:
+
+bbackupd: exception Common OSFileOpenError (Can't open a file --
+attempted to load a non-existant config file or bad file referenced
+within?) (1/2)
+So I tweaked the registry:
+
+HKLM/System/CurrentControlSet/Services/BoxBackup/Parameters/AppArgs
+
+from:
+
+/etc/box/bbackupd.conf SINGLEPROCESS
+
+to:
+
+C:\cygwin\etc\box\bbackupd.conf SINGLEPROCESS
+
+and that resulted in the log output:
+
+Starting daemon (config: C:\cygwin\etc\box\bbackupd.conf) (version
+0.09_autoconf_win32)
+Parameter = 5274340.
+exception Server BadSocketHandle (3/4) -- terminating
+
