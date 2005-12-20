@@ -3,7 +3,7 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
-#define _STAT_DEFINED
+// #define _STAT_DEFINED
 #define _INO_T_DEFINED
 
 #include <winsock2.h>
@@ -178,7 +178,7 @@ inline int getopt(int count, char * const * args, char * tolookfor)
 			str = str.substr(index+1, str.size());
 		}
 
-		index = str.find('-');
+		index = (int)str.find('-');
 
 		if ( index == -1 ) return -1;
 
@@ -187,7 +187,7 @@ inline int getopt(int count, char * const * args, char * tolookfor)
 		optind ++;
 		str = args[optind];
 	}
-	while ( ( opttolookfor = interestin.find(opt)) == -1 );
+	while ( ( opttolookfor = (int)interestin.find(opt)) == -1 );
 
 	if ( interestin[opttolookfor+1] == ':' ) 
 	{
@@ -257,7 +257,7 @@ typedef unsigned int mode_t;
 
 inline int mkdir(const char *pathname, mode_t mode)
 {
-	return mkdir(pathname);
+	return _mkdir(pathname);
 }
 
 #ifdef __MINGW32__
@@ -358,6 +358,7 @@ struct statfs
 	TCHAR f_mntonname[MAX_PATH];
 };
 
+#if 0
 // I think this should get us going
 // Although there is a warning about 
 // mount points in win32 can now exists - which means inode number can be 
@@ -381,6 +382,7 @@ struct stat {
 #ifndef __MINGW32__
 typedef u_int64_t _ino_t;
 #endif
+#endif // 0
 
 int ourstat(const char * name, struct stat * st);
 int ourfstat(HANDLE file, struct stat * st);
