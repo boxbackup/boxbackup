@@ -8,7 +8,6 @@ AC_CONFIG_HEADERS([lib/common/config.h])
 
 touch install-sh
 AC_CANONICAL_SYSTEM
-# echo "Build target OS: '$target_os'"
 test -s install-sh || rm install-sh
 
 ### Checks for programs.
@@ -30,11 +29,11 @@ fi
 
 
 ### Checks for libraries.
-if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
-AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes], 
-	[AC_MSG_ERROR([[Cannot find a short sleep function (nanosleep)]])])
-fi
 
+if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
+  AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes],
+                 [AC_MSG_ERROR([[Cannot find a short sleep function (nanosleep)]])])
+fi
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[Cannot find zlib]])])
 AX_CHECK_BDB_V1
 VL_LIB_READLINE
@@ -95,12 +94,14 @@ AX_CHECK_DIRENT_D_TYPE
 AC_SYS_LARGEFILE
 AX_CHECK_LLONG_MINMAX
 AX_CHECK_DEFINE_PRAGMA
-
 if test "$target_os" != "mingw32"; then
-AX_RANDOM_DEVICE
+  AX_RANDOM_DEVICE
 fi
-
-AX_CHECK_MOUNT_POINT([],[])
+AX_CHECK_MOUNT_POINT(,[
+  if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
+    AC_MSG_ERROR([[cannot work out how to discover mount points on your platform]])
+  fi
+  ])
 AX_CHECK_MALLOC_WORKAROUND
 
 
@@ -134,6 +135,13 @@ fi
 AC_CHECK_FUNCS([flock])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
+if test "x$ac_cv_func_flock" != "xyes" && \
+   test "x$ac_cv_have_decl_O_EXLOCK" != "xyes" && \
+   test "x$ac_cv_have_decl_F_SETLK" != "xyes" && \
+   test "$target_os" != "mingw32" -a "$target_os" != "winnt"
+then
+  AC_MSG_ERROR([[cannot work out how to do file locking on your platform]])
+fi
 
 ## Get tmpdir
 temp_directory_name="/tmp"
@@ -148,7 +156,7 @@ AC_ARG_ENABLE(
   [static-bin],
   [AC_HELP_STRING([--enable-static-bin], [Link binaries with static libraries])])
 if test "x$enable_static_bin" = "xyes"; then
-  AC_CHECK_LIB([ssl],[SSL_read],[],[],[crypto])
+  AC_CHECK_LIB([ssl],[SSL_read],,, [crypto])
   LIBS="-Wl,-Bstatic $LIBS -Wl,-Bdynamic"
 fi
 
