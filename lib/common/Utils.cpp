@@ -76,7 +76,9 @@ void DumpStackBacktrace()
 	for(i = 0; i < size; i++)
 		printf("%s\n", strings[i]);
 
+#ifndef MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
 	free (strings);
+#endif
 }
 #endif
 
