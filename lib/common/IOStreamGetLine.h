@@ -52,16 +52,16 @@ public:
 	// For doing interesting stuff with the remaining data...
 	// Be careful with this!
 	const void *GetBufferedData() const {return mBuffer + mBufferBegin;}
-	int GetSizeOfBufferedData() const {return mBytesInBuffer - mBufferBegin;}
-	void IgnoreBufferedData(int BytesToIgnore);
+	size_t GetSizeOfBufferedData() const {return mBytesInBuffer - mBufferBegin;}
+	void IgnoreBufferedData(size_t BytesToIgnore);
 	IOStream &GetUnderlyingStream() {return mrStream;}
 	
 private:
 	char mBuffer[IOSTREAMGETLINE_BUFFER_SIZE];
 	IOStream &mrStream;
 	int mLineNumber;
-	int mBufferBegin;
-	int mBytesInBuffer;
+	size_t mBufferBegin;
+	size_t mBytesInBuffer;
 	bool mPendingEOF;
 	bool mEOF;
 	std::string mPendingString;

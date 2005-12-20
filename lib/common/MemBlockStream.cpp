@@ -108,7 +108,7 @@ MemBlockStream::~MemBlockStream()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-int MemBlockStream::Read(void *pBuffer, int NBytes, int Timeout)
+IOStream::pos_type MemBlockStream::Read(void *pBuffer, pos_type NBytes, int Timeout)
 {
 	// Adjust to number of bytes left
 	if(NBytes > (mBytesInBuffer - mReadPosition))
@@ -117,9 +117,10 @@ int MemBlockStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 	ASSERT(NBytes >= 0);
 	if(NBytes <= 0) return 0;	// careful now
-	
+
+	ASSERT(sizeof(size_t) >= sizeof(pos_type))	
 	// Copy in the requested number of bytes and adjust the read pointer
-	::memcpy(pBuffer, mpBuffer + mReadPosition, NBytes);
+	::memcpy(pBuffer, mpBuffer + mReadPosition, (size_t)NBytes);
 	mReadPosition += NBytes;
 	
 	return NBytes;
@@ -141,12 +142,12 @@ IOStream::pos_type MemBlockStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    MemBlockStream::Write(void *, int)
+//		Name:    MemBlockStream::Write(void *, pos_type)
 //		Purpose: As interface. But only works in write phase
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void MemBlockStream::Write(const void *pBuffer, int NBytes)
+void MemBlockStream::Write(const void *pBuffer, pos_type NBytes)
 {
 	THROW_EXCEPTION(CommonException, MemBlockStreamNotSupported)
 }
@@ -175,7 +176,7 @@ IOStream::pos_type MemBlockStream::GetPosition() const
 // --------------------------------------------------------------------------
 void MemBlockStream::Seek(pos_type Offset, int SeekType)
 {
-	int newPos = 0;
+	pos_type newPos = 0;
 	switch(SeekType)
 	{
 	case IOStream::SeekType_Absolute:

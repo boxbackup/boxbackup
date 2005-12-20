@@ -14,8 +14,11 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <new>
+
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 #include "CommonException.h"
 

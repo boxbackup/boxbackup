@@ -52,7 +52,7 @@ private:
 	MemoryBlockGuard<char*> mBuffer;
 	int mBufferSize;
 	int mBytesInBuffer;
-	int mReadPosition;
+	pos_type mReadPosition;
 	bool mInWritePhase;
 };
 

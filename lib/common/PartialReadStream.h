@@ -31,7 +31,7 @@ private:
 	PartialReadStream(const PartialReadStream &);
 	
 public:
-	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes);
 	virtual bool StreamDataLeft();
@@ -39,7 +39,7 @@ public:
 
 private:
 	IOStream &mrSource;
-	int mBytesLeft;
+	size_t mBytesLeft;
 };
 
 #endif // PARTIALREADSTREAM__H

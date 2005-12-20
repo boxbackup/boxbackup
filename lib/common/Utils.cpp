@@ -39,7 +39,7 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 	while(e = String.find_first_of(SplitOn, b), e != String.npos)
 	{
 		// Get this string
-		unsigned int len = e - b;
+		std::string::size_type len = e - b;
 		if(len >= 1)
 		{
 			rOutput.push_back(String.substr(b, len));

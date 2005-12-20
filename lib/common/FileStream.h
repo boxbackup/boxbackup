@@ -15,7 +15,10 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #ifdef WIN32
 	#define INVALID_FILE NULL

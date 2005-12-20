@@ -10,7 +10,10 @@
 #include "Box.h"
 
 #include <sys/types.h>
+
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "FdGetLine.h"
 #include "CommonException.h"
@@ -151,8 +154,8 @@ std::string FdGetLine::GetLine(bool Preprocess)
 	else
 	{
 		// Check for comment char, but char before must be whitespace
-		int end = 0;
-		int size = r.size();
+		size_t end = 0;
+		size_t size = r.size();
 		while(end < size)
 		{
 			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
@@ -163,7 +166,7 @@ std::string FdGetLine::GetLine(bool Preprocess)
 		}
 		
 		// Remove whitespace
-		int begin = 0;
+		size_t begin = 0;
 		while(begin < size && iw(r[begin]))
 		{
 			begin++;

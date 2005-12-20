@@ -34,9 +34,9 @@ public:
 	~MemBlockStream();
 public:
 
-	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual pos_type Read(void *pBuffer, pos_type NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, pos_type NBytes);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual bool StreamDataLeft();
@@ -44,8 +44,8 @@ public:
 
 private:
 	const char *mpBuffer;
-	int mBytesInBuffer;
-	int mReadPosition;
+	size_t      mBytesInBuffer;
+	pos_type    mReadPosition;
 };
 
 #endif // MEMBLOCKSTREAM__H

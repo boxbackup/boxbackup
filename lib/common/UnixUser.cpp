@@ -11,9 +11,8 @@
 
 #ifndef WIN32
 #include <pwd.h>
-#endif
-
 #include <unistd.h>
+#endif
 
 #include "UnixUser.h"
 #include "CommonException.h"

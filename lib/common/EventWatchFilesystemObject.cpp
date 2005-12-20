@@ -10,7 +10,10 @@
 #include "Box.h"
 
 #include <fcntl.h>
+
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "EventWatchFilesystemObject.h"
 #include "autogen_CommonException.h"

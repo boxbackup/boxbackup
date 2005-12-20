@@ -61,9 +61,9 @@ int CollectInBufferStream::Read(void *pBuffer, int NBytes, int Timeout)
 	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
 	// Adjust to number of bytes left
-	if(NBytes > (mBytesInBuffer - mReadPosition))
+	if(NBytes > (int)(mBytesInBuffer - mReadPosition))
 	{
-		NBytes = (mBytesInBuffer - mReadPosition);
+		NBytes = (int)(mBytesInBuffer - mReadPosition);
 	}
 	ASSERT(NBytes >= 0);
 	if(NBytes <= 0) return 0;	// careful now
@@ -157,7 +157,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 {
 	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
-	int newPos = 0;
+	pos_type newPos = 0;
 	switch(SeekType)
 	{
 	case IOStream::SeekType_Absolute:

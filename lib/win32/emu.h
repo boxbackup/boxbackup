@@ -27,11 +27,18 @@
 	( *(_result) = *gmtime( (_clock) ), \
 	(_result) )
 
-
 //signal in unix SIGVTALRM does not exist in win32 - but looking at the 
 #define SIGVTALRM 254
 #define SIGALRM SIGVTALRM
 #define ITIMER_VIRTUAL 0
+
+// Microsoft decided to deprecate the standard POSIX functions. Great!
+#define open(file,flags,mode) _open(file,flags,mode)
+#define close(fd)             _close(fd)
+#define dup(fd)               _dup(fd)
+#define read(fd,buf,count)    _read(fd,buf,count)
+#define write(fd,buf,count)   _write(fd,buf,count)
+#define lseek(fd,off,whence)  _lseek(fd,off,whence)
 
 int setitimer(int type , struct itimerval *timeout, int);
 void InitTimer(void);
