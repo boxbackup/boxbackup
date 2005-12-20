@@ -64,7 +64,7 @@
 
 #include "MemLeakFindOn.h"
 
-#define 	MAX_SLEEP_TIME	((unsigned int)1024)
+static const time_t MAX_SLEEP_TIME = 1024;
 
 // Make the actual sync period have a little bit of extra time, up to a 64th of the main sync period.
 // This prevents repetative cycles of load on the server
@@ -444,16 +444,16 @@ void BackupDaemon::Run2()
 	// Setup various timings
 	
 	// How often to connect to the store (approximate)
-	box_time_t updateStoreInterval = SecondsToBoxTime((uint32_t)conf.GetKeyValueInt("UpdateStoreInterval"));
+	box_time_t updateStoreInterval = SecondsToBoxTime(conf.GetKeyValueInt("UpdateStoreInterval"));
 
 	// But are we connecting automatically?
 	bool automaticBackup = conf.GetKeyValueBool("AutomaticBackup");
 	
 	// The minimum age a file needs to be before it will be considered for uploading
-	box_time_t minimumFileAge = SecondsToBoxTime((uint32_t)conf.GetKeyValueInt("MinimumFileAge"));
+	box_time_t minimumFileAge = SecondsToBoxTime(conf.GetKeyValueInt("MinimumFileAge"));
 
 	// The maximum time we'll wait to upload a file, regardless of how often it's modified
-	box_time_t maxUploadWait = SecondsToBoxTime((uint32_t)conf.GetKeyValueInt("MaxUploadWait"));
+	box_time_t maxUploadWait = SecondsToBoxTime(conf.GetKeyValueInt("MaxUploadWait"));
 	// Adjust by subtracting the minimum file age, so is relative to sync period end in comparisons
 	maxUploadWait = (maxUploadWait > minimumFileAge)?(maxUploadWait - minimumFileAge):(0);
 
@@ -492,7 +492,8 @@ void BackupDaemon::Run2()
 				// Pause a while, but no more than MAX_SLEEP_TIME seconds (use the conditional because times are unsigned)
 				box_time_t requiredDelay = (nextSyncTime < currentTime)?(0):(nextSyncTime - currentTime);
 				// If there isn't automatic backup happening, set a long delay. And limit delays at the same time.
-				if(!automaticBackup || requiredDelay > SecondsToBoxTime((uint32_t)MAX_SLEEP_TIME)) requiredDelay = SecondsToBoxTime((uint32_t)MAX_SLEEP_TIME);
+				if(!automaticBackup || requiredDelay > SecondsToBoxTime(MAX_SLEEP_TIME))
+					requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
 
 				// Only do the delay if there is a delay required
 				if(requiredDelay > 0)
@@ -506,7 +507,7 @@ void BackupDaemon::Run2()
 					else
 					{
 						// No command socket or connection, just do a normal sleep
-						int sleepSeconds = BoxTimeToSeconds(requiredDelay);
+						time_t sleepSeconds = BoxTimeToSeconds(requiredDelay);
 						::sleep((sleepSeconds <= 0)?1:sleepSeconds);
 					}
 				}
@@ -528,7 +529,7 @@ void BackupDaemon::Run2()
 			if(d > 0)
 			{
 				// Script has asked for a delay
-				nextSyncTime = GetCurrentBoxTime() + SecondsToBoxTime((uint32_t)d);
+				nextSyncTime = GetCurrentBoxTime() + SecondsToBoxTime(d);
 				doSync = false;
 			}
 		}
@@ -562,7 +563,7 @@ void BackupDaemon::Run2()
 				// files which are modified after the scan run started.
 				// Of course, they may be eligable to be synced again the next time round,
 				// but this should be OK, because the changes only upload should upload no data.
-				syncPeriodEndExtended += SecondsToBoxTime((uint32_t)(356*24*3600));
+				syncPeriodEndExtended += SecondsToBoxTime((time_t)(356*24*3600));
 			}
 			
 			// Do sync
@@ -587,7 +588,7 @@ void BackupDaemon::Run2()
 				params.mMaxUploadWait = maxUploadWait;
 				params.mFileTrackingSizeThreshold = conf.GetKeyValueInt("FileTrackingSizeThreshold");
 				params.mDiffingUploadSizeThreshold = conf.GetKeyValueInt("DiffingUploadSizeThreshold");
-				params.mMaxFileTimeInFuture = SecondsToBoxTime((uint32_t)conf.GetKeyValueInt("MaxFileTimeInFuture"));
+				params.mMaxFileTimeInFuture = SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
 				
 				// Set store marker
 				clientContext.SetClientStoreMarker(clientStoreMarker);
@@ -1397,7 +1398,7 @@ TRACE0("new location\n");
 		ASSERT(mUnusedRootDirEntries.size() > 0);
 		// Time to delete them
 		mDeleteUnusedRootDirEntriesAfter =
-			GetCurrentBoxTime() + SecondsToBoxTime((uint32_t)BACKUP_DELETE_UNUSED_ROOT_ENTRIES_AFTER);
+			GetCurrentBoxTime() + SecondsToBoxTime(BACKUP_DELETE_UNUSED_ROOT_ENTRIES_AFTER);
 	}
 }
 

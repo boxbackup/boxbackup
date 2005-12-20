@@ -33,7 +33,7 @@ void BackupStoreDaemon::HousekeepingProcess()
 {
 	// Get the time between housekeeping runs
 	const Configuration &rconfig(GetConfiguration());
-	int64_t housekeepingInterval = SecondsToBoxTime((uint32_t)rconfig.GetKeyValueInt("TimeBetweenHousekeeping"));
+	int64_t housekeepingInterval = SecondsToBoxTime(rconfig.GetKeyValueInt("TimeBetweenHousekeeping"));
 	
 	int64_t lastHousekeepingRun = 0;
 
@@ -108,7 +108,7 @@ void BackupStoreDaemon::HousekeepingProcess()
 		
 		// Calculate how long should wait before doing the next housekeeping run
 		timeNow = GetCurrentBoxTime();
-		int64_t secondsToGo = BoxTimeToSeconds((lastHousekeepingRun + housekeepingInterval) - timeNow);
+		time_t secondsToGo = BoxTimeToSeconds((lastHousekeepingRun + housekeepingInterval) - timeNow);
 		if(secondsToGo < 1) secondsToGo = 1;
 		if(secondsToGo > 60) secondsToGo = 60;
 		int32_t millisecondsToGo = ((int)secondsToGo) * 1000;
