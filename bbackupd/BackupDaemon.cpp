@@ -724,7 +724,7 @@ void BackupDaemon::Run2()
 						"to retry...", 
 						errorString, errorCode, 
 						errorSubCode);
-					::sleep(10);
+					::sleep(100);
 				}
 			}
 
