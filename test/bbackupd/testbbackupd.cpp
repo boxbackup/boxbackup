@@ -452,7 +452,7 @@ int test_bbackupd()
 			fclose(f);
 			// and then move the time backwards!
 			struct timeval times[2];
-			BoxTimeToTimeval(SecondsToBoxTime((uint32_t)(365*24*60*60)), times[1]);
+			BoxTimeToTimeval(SecondsToBoxTime((time_t)(365*24*60*60)), times[1]);
 			times[0] = times[1];
 			TEST_THAT(::utimes("testfiles/TestDir1/sub23/rand.h", times) == 0);
 		}
@@ -646,7 +646,7 @@ int test_bbackupd()
 			fclose(f);
 			// and then move the time forwards!
 			struct timeval times[2];
-			BoxTimeToTimeval(GetCurrentBoxTime() + SecondsToBoxTime((uint32_t)(365*24*60*60)), times[1]);
+			BoxTimeToTimeval(GetCurrentBoxTime() + SecondsToBoxTime((time_t)(365*24*60*60)), times[1]);
 			times[0] = times[1];
 			TEST_THAT(::utimes("testfiles/TestDir1/sub23/in-the-future", times) == 0);
 		}

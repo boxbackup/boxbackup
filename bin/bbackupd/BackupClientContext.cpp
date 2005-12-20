@@ -201,7 +201,7 @@ void BackupClientContext::CloseAnyOpenConnection()
 			if(mClientStoreMarker == ClientStoreMarker_NotKnown)
 			{
 				// Yes, choose one, the current time will do
-				int64_t marker = GetCurrentBoxTime();
+				box_time_t marker = GetCurrentBoxTime();
 				
 				// Set it on the store
 				mpConnection->QuerySetClientStoreMarker(marker);

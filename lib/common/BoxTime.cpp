@@ -25,8 +25,7 @@
 // --------------------------------------------------------------------------
 box_time_t GetCurrentBoxTime()
 {
-	ASSERT(sizeof(uint32_t) == sizeof(time_t));
-	return SecondsToBoxTime((uint32_t)time(0));
+	return SecondsToBoxTime(time(0));
 }
 
 
