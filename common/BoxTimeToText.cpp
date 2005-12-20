@@ -29,7 +29,7 @@ std::string BoxTimeToISO8601String(box_time_t Time)
 {
 #ifdef WIN32
 	struct tm *time;
-	box_time_t bob = BoxTimeToSeconds(Time);
+	time_t bob = BoxTimeToSeconds(Time);
 
 	__time64_t winTime = bob;
 
@@ -46,7 +46,7 @@ std::string BoxTimeToISO8601String(box_time_t Time)
 		time->tm_mon + 1, time->tm_mday, time->tm_hour, 
 		time->tm_min, time->tm_sec);
 #else // ! WIN32
-	time_t timeInSecs = (time_t)BoxTimeToSeconds(Time);
+	time_t timeInSecs = BoxTimeToSeconds(Time);
 	struct tm time;
 	gmtime_r(&timeInSecs, &time);
 	
