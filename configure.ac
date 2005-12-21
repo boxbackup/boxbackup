@@ -4,7 +4,7 @@
 AC_PREREQ(2.59)
 AC_INIT([Box Backup], 0.09, [box@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
-AC_CONFIG_HEADERS([lib/common/config.h])
+AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
 touch install-sh
 AC_CANONICAL_SYSTEM
