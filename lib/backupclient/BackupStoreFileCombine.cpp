@@ -96,7 +96,7 @@ void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &r
 	// Allocate memory for the block index of the From file
 	int64_t fromNumBlocks = box_ntoh64(fromHdr.mNumBlocks);
 	// NOTE: An extra entry is required so that the length of the last block can be calculated
-	FromIndexEntry *pFromIndex = (FromIndexEntry*)::malloc((fromNumBlocks+1) * sizeof(FromIndexEntry));
+	FromIndexEntry *pFromIndex = (FromIndexEntry*)::malloc(((int)fromNumBlocks+1) * sizeof(FromIndexEntry));
 	if(pFromIndex == 0)
 	{
 		throw std::bad_alloc();
@@ -252,7 +252,7 @@ static void CopyData(IOStream &rDiffData, IOStream &rDiffIndex, int64_t DiffNumB
 			if(encodedSize > 0)
 			{
 				// The block is actually in the diff file
-				blockSize = encodedSize;
+				blockSize = (int32_t)encodedSize;
 			}
 			else
 			{
@@ -264,7 +264,9 @@ static void CopyData(IOStream &rDiffData, IOStream &rDiffIndex, int64_t DiffNumB
 					THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 				}
 				// Calculate size. This operation is safe because of the extra entry at the end
-				blockSize = pFromIndex[blockIdx + 1].mFilePosition - pFromIndex[blockIdx].mFilePosition;
+				blockSize = (int32_t)( 
+					pFromIndex[blockIdx + 1].mFilePosition -
+					pFromIndex[blockIdx].mFilePosition );
 			}
 			ASSERT(blockSize > 0);
 			
@@ -394,7 +396,9 @@ static void WriteNewIndex(IOStream &rDiff, int64_t DiffNumBlocks, FromIndexEntry
 				THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 			}
 			// Calculate size. This operation is safe because of the extra entry at the end
-			int32_t blockSize = pFromIndex[blockIdx + 1].mFilePosition - pFromIndex[blockIdx].mFilePosition;
+			int32_t blockSize = (int32_t)( 
+				pFromIndex[blockIdx + 1].mFilePosition - 
+				pFromIndex[blockIdx].mFilePosition );
 			// Then replace entry
 			en.mEncodedSize = box_hton64(((uint64_t)blockSize));
 		}

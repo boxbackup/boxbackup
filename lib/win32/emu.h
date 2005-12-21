@@ -39,6 +39,11 @@
 #define read(fd,buf,count)    _read(fd,buf,count)
 #define write(fd,buf,count)   _write(fd,buf,count)
 #define lseek(fd,off,whence)  _lseek(fd,off,whence)
+#define unlink(file)          _unlink(file)
+#define chmod(file,mode)      _chmod(file,mode)
+#define getcwd(buf,length)    _getcwd(buf,length)
+#define fileno(struct_file)   _fileno(struct_file)
+#define chdir(dir)            _chdir(dir)
 
 int setitimer(int type , struct itimerval *timeout, int);
 void InitTimer(void);
@@ -116,7 +121,7 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 	return 0;
 }
 
-inline int chmod(const char * Filename, int uid)
+inline int _chmod(const char * Filename, int uid)
 {
 	//indicate sucsess
 	return 0;
@@ -252,9 +257,9 @@ struct itimerval
 #define S_ISLNK(x) ( false )
 
 // nasty implementation to get working - TODO get the win32 equiv
-#ifdef _DEBUG
-#define getpid() 1
-#endif
+//#ifdef _DEBUG
+//#define getpid() 1
+//#endif
 
 #define vsnprintf _vsnprintf
 

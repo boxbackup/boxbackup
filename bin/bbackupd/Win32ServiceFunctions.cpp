@@ -14,10 +14,12 @@
 
 #include "Box.h"
 
-//#include <stdio.h>
-//#include <stdlib.h>
-#include <unistd.h>
-//#include <windows.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
+#endif
 
 extern void TerminateService(void);
 extern unsigned int WINAPI RunService(LPVOID lpParameter);
@@ -31,17 +33,22 @@ HANDLE gStopServiceEvent = 0;
 
 #define SERVICE_NAME "boxbackup"
 
+void ShowMessage(char *s)
+{
+	MessageBox(0, s, "Box Backup Message", 
+		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
+}
+
 void ErrorHandler(char *s, DWORD err)
 {
 	char buf[256];
 	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
+	_snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
 	::syslog(LOG_ERR, "%s", buf);
 	MessageBox(0, buf, "Error", 
 		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
 	ExitProcess(err);
 }
-
 
 void WINAPI ServiceControlHandler( DWORD controlCode )
 {
@@ -118,6 +125,8 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 			return;
 		}
 
+		ShowMessage("Starting...");
+
 		HANDLE ourThread = (HANDLE)_beginthreadex(
 			NULL,
 			0,
@@ -185,7 +194,7 @@ void InstallService(void)
 	cmd[sizeof(cmd)-1] = 0;
 
 	char cmd_args[MAX_PATH];
-	snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
+	_snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
 	cmd_args[sizeof(cmd_args)-1] = 0;
 
 	newService = CreateService(

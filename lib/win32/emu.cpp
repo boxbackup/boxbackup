@@ -12,10 +12,17 @@
 #include <windows.h>
 #include <fcntl.h>
 // #include <atlenc.h>
-#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 
 #include <string>
 #include <list>
+
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
+#endif
 
 //our implimentation for a timer
 //based on a simple thread which sleeps for a
@@ -343,7 +350,7 @@ int ourfstat(HANDLE hdir, struct stat * st)
 	// This next example is how we get our INODE (equivalent) information
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart = fi.nFileIndexLow;
-	st->st_ino = conv.QuadPart;
+	st->st_ino = (_ino_t)conv.QuadPart;
 
 	// get the time information
 	st->st_ctime = ConvertFileTimeToTime_t(&fi.ftCreationTime);
@@ -362,7 +369,7 @@ int ourfstat(HANDLE hdir, struct stat * st)
 
 	conv.HighPart = st_size.HighPart;
 	conv.LowPart = st_size.LowPart;
-	st->st_size = conv.QuadPart;
+	st->st_size = (_off_t)conv.QuadPart;
 
 	//the mode of the file
 	st->st_mode = 0;
@@ -878,7 +885,7 @@ HANDLE gSyslogH = 0;
 
 void syslog(int loglevel, const char *frmt, ...)
 {
-	DWORD errinfo;
+	WORD errinfo;
 	char* buffer;
 	std::string sixfour(frmt);
 
@@ -905,7 +912,7 @@ void syslog(int loglevel, const char *frmt, ...)
 
 
 		int sixfourpos;
-		while ( ( sixfourpos = sixfour.find("%ll")) != -1 )
+		while ( (sixfourpos = (int)sixfour.find("%ll")) != -1 )
 		{
 			//maintain portability - change the 64 bit formater...
 			std::string temp = sixfour.substr(0,sixfourpos);

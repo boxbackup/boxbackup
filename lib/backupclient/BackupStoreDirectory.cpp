@@ -192,7 +192,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo) const
 {
 	// Get count of entries
-	int32_t count = mEntries.size();
+	std::vector<Entry*>::size_type count = mEntries.size();
 	if(FlagsMustBeSet != Entry::Flags_INCLUDE_EVERYTHING || FlagsNotToBeSet != Entry::Flags_EXCLUDE_NOTHING)
 	{
 		// Need to count the entries
@@ -230,7 +230,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	// Build header
 	dir_StreamFormat hdr;
 	hdr.mMagicValue = htonl(OBJECTMAGIC_DIR_MAGIC_VALUE);
-	hdr.mNumEntries = htonl(count);
+	hdr.mNumEntries = htonl((u_long)count);
 	hdr.mObjectID = box_hton64(mObjectID);
 	hdr.mContainerID = box_hton64(mContainerID);
 	hdr.mAttributesModTime = box_hton64(mAttributesModTime);

@@ -54,7 +54,7 @@ int main(int argc, const char *argv[])
 		
 	WSADATA info;
 
-	if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
+	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
 	{
 		// box backup will not run without sockets
 		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");

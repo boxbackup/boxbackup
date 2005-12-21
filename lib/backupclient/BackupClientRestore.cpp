@@ -9,11 +9,14 @@
 
 #include "Box.h"
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string>
 #include <set>
-#include <unistd.h>
 #include <limits.h>
 #include <stdio.h>
 
@@ -101,9 +104,9 @@ public:
 			// ID
 			rWrite.Write(&mNextLevelID, sizeof(mNextLevelID));
 			// Name string
-			int32_t nsize = mNextLevelLocalName.size();
+			std::string::size_type nsize = mNextLevelLocalName.size();
 			rWrite.Write(&nsize, sizeof(nsize));
-			rWrite.Write(mNextLevelLocalName.c_str(), nsize);
+			rWrite.Write(mNextLevelLocalName.c_str(), (int)nsize);
 			// And then the level itself
 			mpNextLevel->SaveLevel(rWrite);
 		}

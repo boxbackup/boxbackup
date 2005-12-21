@@ -9,10 +9,13 @@
 
 #include "Box.h"
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <unistd.h>
 #include <limits.h>
 #include <algorithm>
 #include <new>
@@ -620,7 +623,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 		}
 #endif
 
-		xattrOffset += std::strlen(reinterpret_cast<char*>(pattr+1))+1;
+		xattrOffset += (int)std::strlen(reinterpret_cast<char*>(pattr+1))+1;
 	}
 	
 	// If working as root, set user IDs
@@ -974,7 +977,7 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, cons
 	MD5Digest digest;
 	digest.Add(&hashData, sizeof(hashData));
 	digest.Add(xattr.GetBuffer(), xattr.GetSize());
-	digest.Add(leafname.c_str(), leafname.size());
+	digest.Add(leafname.c_str(), (int)leafname.size());
 	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);
 	digest.Finish();
 	

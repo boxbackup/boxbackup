@@ -317,7 +317,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	//TODO: Verify that these sizes look reasonable
 	
 	// Allocate space for the index
-	BlocksAvailableEntry *pindex = (BlocksAvailableEntry*)::malloc(sizeof(BlocksAvailableEntry) * numBlocks);
+	BlocksAvailableEntry *pindex = (BlocksAvailableEntry*)::malloc(sizeof(BlocksAvailableEntry) * (size_t)numBlocks);
 	if(pindex == 0)
 	{
 		throw std::bad_alloc();

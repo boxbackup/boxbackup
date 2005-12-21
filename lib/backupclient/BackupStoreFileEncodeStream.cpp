@@ -270,7 +270,7 @@ void BackupStoreFileEncodeStream::CalculateBlockSizes(int64_t DataSize, int64_t 
 	} while(rBlockSizeOut <= BACKUP_FILE_MAX_BLOCK_SIZE && rNumBlocksOut > BACKUP_FILE_INCREASE_BLOCK_SIZE_AFTER);
 	
 	// Last block size
-	rLastBlockSizeOut = DataSize - ((rNumBlocksOut - 1) * rBlockSizeOut);
+	rLastBlockSizeOut = (int32_t)(DataSize - ((rNumBlocksOut - 1) * rBlockSizeOut));
 	
 	// Avoid small blocks?
 	if(rLastBlockSizeOut < BACKUP_FILE_AVOID_BLOCKS_LESS_THAN
@@ -451,7 +451,7 @@ void BackupStoreFileEncodeStream::SkipPreviousBlocksInInstruction()
 	}
 
 	// Index of the first block in old file (being diffed from)
-	int firstIndex = mpRecipe->BlockPtrToIndex((*mpRecipe)[mInstructionNumber].mpStartBlock);
+	int firstIndex = (int)mpRecipe->BlockPtrToIndex((*mpRecipe)[mInstructionNumber].mpStartBlock);
 	
 	int64_t sizeToSkip = 0;
 
