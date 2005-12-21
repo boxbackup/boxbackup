@@ -11,14 +11,16 @@
 #ifndef GUARDS__H
 #define GUARDS__H
 
+#include "Box.h"
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <new>
-
-#ifndef WIN32
-#include <unistd.h>
-#endif
 
 #include "CommonException.h"
 

@@ -16,14 +16,14 @@
 #undef realloc
 #undef free
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <map>
 #include <stdio.h>
 #include <string.h>
 #include <set>
-
-#ifndef WIN32
-#include <unistd.h>
-#endif
 
 bool memleakfinder_global_enable = false;
 

@@ -145,15 +145,15 @@ int IOStream::ConvertSeekTypeToOSWhence(int SeekType)
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-bool IOStream::ReadFullBuffer(void *pBuffer, size_t NBytes, size_t *pNBytesRead, int Timeout)
+bool IOStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout)
 {
-	size_t bytesToGo = NBytes;
+	int bytesToGo = NBytes;
 	char *buffer = (char*)pBuffer;
 	if(pNBytesRead) (*pNBytesRead) = 0;
 	
 	while(bytesToGo > 0)
 	{
-		size_t bytesRead = Read(buffer, bytesToGo, Timeout);
+		int bytesRead = Read(buffer, bytesToGo, Timeout);
 		if(bytesRead == 0)
 		{
 			// Timeout or something
@@ -222,7 +222,7 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 	while(StreamDataLeft())
 	{
 		// Read some data
-		size_t bytes = Read(buffer, BufferSize, Timeout);
+		int bytes = Read(buffer, BufferSize, Timeout);
 		if(bytes == 0 && StreamDataLeft())
 		{
 			return false;	// incomplete, timed out

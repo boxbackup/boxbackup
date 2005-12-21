@@ -131,12 +131,12 @@ CompressStream &CompressStream::operator=(const CompressStream &)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    CompressStream::Read(void *, size_t, int)
+//		Name:    CompressStream::Read(void *, int, int)
 //		Purpose: As interface
 //		Created: 27/5/04
 //
 // --------------------------------------------------------------------------
-size_t CompressStream::Read(void *pBuffer, size_t NBytes, int Timeout)
+int CompressStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
 	USE_READ_COMPRESSOR
 	if(pDecompress == 0)
@@ -155,7 +155,7 @@ size_t CompressStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 	}
 
 	// Read data into the buffer -- read as much as possible in one go
-	size_t s = mpStream->Read(pbuf, BUFFER_SIZE, Timeout);
+	int s = mpStream->Read(pbuf, BUFFER_SIZE, Timeout);
 	if(s == 0)
 	{
 		return 0;
@@ -172,12 +172,12 @@ size_t CompressStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    CompressStream::Write(const void *, size_t)
+//		Name:    CompressStream::Write(const void *, int)
 //		Purpose: As interface
 //		Created: 27/5/04
 //
 // --------------------------------------------------------------------------
-void CompressStream::Write(const void *pBuffer, size_t NBytes)
+void CompressStream::Write(const void *pBuffer, int NBytes)
 {
 	USE_WRITE_COMPRESSOR
 	if(pCompress == 0)
@@ -262,7 +262,7 @@ void CompressStream::WriteCompressedData(bool SyncFlush)
 	USE_WRITE_COMPRESSOR
 	if(pCompress == 0) {THROW_EXCEPTION(CompressException, Internal)}
 	
-	size_t s = 0;
+	int s = 0;
 	do
 	{
 		s = pCompress->Output(mpBuffer, BUFFER_SIZE, SyncFlush);

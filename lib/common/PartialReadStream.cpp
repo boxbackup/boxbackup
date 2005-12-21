@@ -54,10 +54,10 @@ PartialReadStream::~PartialReadStream()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-size_t PartialReadStream::Read(void *pBuffer, size_t NBytes, int Timeout)
+int PartialReadStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
 	// Finished?
-	if(mBytesLeft == 0)
+	if(mBytesLeft <= 0)
 	{
 		return 0;
 	}
@@ -70,7 +70,7 @@ size_t PartialReadStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 	}
 	
 	// Route the request to the source
-	size_t read = mrSource.Read(pBuffer, NBytes, Timeout);
+	int read = mrSource.Read(pBuffer, NBytes, Timeout);
 	ASSERT(read <= mBytesLeft);
 	
 	// Adjust the count

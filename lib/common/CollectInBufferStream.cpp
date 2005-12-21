@@ -61,7 +61,7 @@ int CollectInBufferStream::Read(void *pBuffer, int NBytes, int Timeout)
 	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
 	// Adjust to number of bytes left
-	if(NBytes > (int)(mBytesInBuffer - mReadPosition))
+	if(NBytes > (mBytesInBuffer - mReadPosition))
 	{
 		NBytes = (int)(mBytesInBuffer - mReadPosition);
 	}

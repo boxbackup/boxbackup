@@ -11,8 +11,8 @@
 
 #include <sys/types.h>
 
-#ifndef WIN32
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
 #endif
 
 #include "FdGetLine.h"
@@ -154,8 +154,8 @@ std::string FdGetLine::GetLine(bool Preprocess)
 	else
 	{
 		// Check for comment char, but char before must be whitespace
-		size_t end = 0;
-		size_t size = r.size();
+		std::string::size_type end = 0;
+		std::string::size_type size = r.size();
 		while(end < size)
 		{
 			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
@@ -166,7 +166,7 @@ std::string FdGetLine::GetLine(bool Preprocess)
 		}
 		
 		// Remove whitespace
-		size_t begin = 0;
+		std::string::size_type begin = 0;
 		while(begin < size && iw(r[begin]))
 		{
 			begin++;

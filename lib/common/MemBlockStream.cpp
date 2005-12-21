@@ -108,19 +108,18 @@ MemBlockStream::~MemBlockStream()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-IOStream::pos_type MemBlockStream::Read(void *pBuffer, pos_type NBytes, int Timeout)
+int MemBlockStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
 	// Adjust to number of bytes left
 	if(NBytes > (mBytesInBuffer - mReadPosition))
 	{
-		NBytes = (mBytesInBuffer - mReadPosition);
+		NBytes = (int)(mBytesInBuffer - mReadPosition);
 	}
 	ASSERT(NBytes >= 0);
 	if(NBytes <= 0) return 0;	// careful now
-
-	ASSERT(sizeof(size_t) >= sizeof(pos_type))	
+	
 	// Copy in the requested number of bytes and adjust the read pointer
-	::memcpy(pBuffer, mpBuffer + mReadPosition, (size_t)NBytes);
+	::memcpy(pBuffer, mpBuffer + mReadPosition, NBytes);
 	mReadPosition += NBytes;
 	
 	return NBytes;
@@ -142,12 +141,12 @@ IOStream::pos_type MemBlockStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    MemBlockStream::Write(void *, pos_type)
+//		Name:    MemBlockStream::Write(void *, int)
 //		Purpose: As interface. But only works in write phase
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void MemBlockStream::Write(const void *pBuffer, pos_type NBytes)
+void MemBlockStream::Write(const void *pBuffer, int NBytes)
 {
 	THROW_EXCEPTION(CommonException, MemBlockStreamNotSupported)
 }

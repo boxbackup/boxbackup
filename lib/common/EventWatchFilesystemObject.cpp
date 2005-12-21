@@ -11,8 +11,8 @@
 
 #include <fcntl.h>
 
-#ifndef WIN32
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
 #endif
 
 #include "EventWatchFilesystemObject.h"

@@ -64,12 +64,12 @@ ReadGatherStream::~ReadGatherStream()
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-size_t ReadGatherStream::AddComponent(IOStream *pStream)
+int ReadGatherStream::AddComponent(IOStream *pStream)
 {
 	ASSERT(pStream != 0);
 
 	// Just add the component to the list, returning it's index.
-	size_t index = mComponents.size();
+	int index = (int)mComponents.size();
 	mComponents.push_back(pStream);
 	return index;
 }
@@ -116,9 +116,9 @@ void ReadGatherStream::AddBlock(int Component, pos_type Length, bool Seek, pos_t
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-size_t ReadGatherStream::Read(void *pBuffer, size_t NBytes, int Timeout)
+int ReadGatherStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	size_t bytesToRead = NBytes;
+	int bytesToRead = NBytes;
 	uint8_t *buffer = (uint8_t*)pBuffer;
 	
 	while(bytesToRead > 0)
@@ -145,18 +145,16 @@ size_t ReadGatherStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 		if(mPositionInCurrentBlock < mBlocks[mCurrentBlock].mLength)
 		{
 			// Read!
-			pos_type s = mBlocks[mCurrentBlock].mLength 
-				- mPositionInCurrentBlock;
+			int s = (int)(mBlocks[mCurrentBlock].mLength - 
+				mPositionInCurrentBlock);
 			if(s > bytesToRead) s = bytesToRead;
-		
-			ASSERT(sizeof(size_t) >= sizeof(pos_type))
-			pos_type r = mComponents[mBlocks[mCurrentBlock]
-				.mComponent]->Read(buffer, (size_t)s, Timeout);
+			
+			int r = mComponents[mBlocks[mCurrentBlock].mComponent]->Read(buffer, s, Timeout);
 			
 			// update variables
 			mPositionInCurrentBlock += r;
 			buffer += r;
-			bytesToRead -= (size_t)r;
+			bytesToRead -= r;
 			mCurrentPosition += r;
 			
 			if(r != s)

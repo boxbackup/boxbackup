@@ -113,7 +113,7 @@ bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout
 		// Read more in?
 		if(!foundLineEnd && mBufferBegin >= mBytesInBuffer && !mPendingEOF)
 		{
-			size_t bytes = mrStream.Read(mBuffer, sizeof(mBuffer), Timeout);
+			int bytes = mrStream.Read(mBuffer, sizeof(mBuffer), Timeout);
 			
 			// Adjust buffer info
 			mBytesInBuffer = bytes;
@@ -151,8 +151,8 @@ bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout
 	else
 	{
 		// Check for comment char, but char before must be whitespace
-		size_t end = 0;
-		size_t size = r.size();
+		std::string::size_type end = 0;
+		std::string::size_type size = r.size();
 		while(end < size)
 		{
 			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
@@ -163,7 +163,7 @@ bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout
 		}
 		
 		// Remove whitespace
-		size_t begin = 0;
+		std::string::size_type begin = 0;
 		while(begin < size && iw(r[begin]))
 		{
 			begin++;
@@ -193,7 +193,7 @@ bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout
 void IOStreamGetLine::DetachFile()
 {
 	// Adjust file pointer
-	size_t bytesOver = mBytesInBuffer - mBufferBegin;
+	int bytesOver = mBytesInBuffer - mBufferBegin;
 	ASSERT(bytesOver >= 0);
 	if(bytesOver > 0)
 	{
@@ -213,10 +213,10 @@ void IOStreamGetLine::DetachFile()
 //		Created: 22/12/04
 //
 // --------------------------------------------------------------------------
-void IOStreamGetLine::IgnoreBufferedData(size_t BytesToIgnore)
+void IOStreamGetLine::IgnoreBufferedData(int BytesToIgnore)
 {
-	size_t bytesInBuffer = mBytesInBuffer - mBufferBegin;
-	if(BytesToIgnore > bytesInBuffer)
+	int bytesInBuffer = mBytesInBuffer - mBufferBegin;
+	if(BytesToIgnore < 0 || BytesToIgnore > bytesInBuffer)
 	{
 		THROW_EXCEPTION(CommonException, IOStreamGetLineNotEnoughDataToIgnore)
 	}

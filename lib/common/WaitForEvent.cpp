@@ -9,8 +9,8 @@
 
 #include "Box.h"
 
-#ifndef WIN32
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
 #endif
 
 #include <errno.h>
@@ -163,8 +163,7 @@ void *WaitForEvent::Wait()
 	}
 	
 	// Poll!
-	ASSERT(sizeof(unsigned long) > sizeof(size_t))
-	switch(::poll(mpPollInfo, (unsigned long)mItems.size(), mTimeout))
+	switch(::poll(mpPollInfo, (unsigned int)mItems.size(), mTimeout))
 	{
 	case -1:
 		// Interrupted system calls aren't an error, just equivalent to a timeout

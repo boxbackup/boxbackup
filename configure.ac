@@ -65,7 +65,7 @@ Upgrade or read the documentation for alternatives]])
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([execinfo.h netinet/in.h regex.h sys/types.h sys/xattr.h])
+AC_CHECK_HEADERS([execinfo.h netinet/in.h regex.h sys/types.h sys/xattr.h pwd.h])
 
 
 ### Checks for typedefs, structures, and compiler characteristics.

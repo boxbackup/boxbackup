@@ -85,19 +85,17 @@ public:
 	//		Created: 5/12/03
 	//
 	// --------------------------------------------------------------------------
-	void Input(const void *pInBuffer, size_t InLength)
+	void Input(const void *pInBuffer, int InLength)
 	{
 		// Check usage
 		if(mStream.avail_in != 0)
 		{
 			THROW_EXCEPTION(CompressException, BadUsageInputNotRequired)
 		}
-
-		ASSERT(sizeof(uInt) >= sizeof(size_t))
 		
 		// Store info
 		mStream.next_in = (unsigned char *)pInBuffer;
-		mStream.avail_in = (uInt)InLength;
+		mStream.avail_in = InLength;
 	}
 	
 	// --------------------------------------------------------------------------
@@ -121,19 +119,17 @@ public:
 	//		Created: 5/12/03
 	//
 	// --------------------------------------------------------------------------
-	size_t Output(void *pOutBuffer, size_t OutLength, bool SyncFlush = false)
+	int Output(void *pOutBuffer, int OutLength, bool SyncFlush = false)
 	{
 		// need more input?
 		if(mStream.avail_in == 0 && mFlush != Z_FINISH && !SyncFlush)
 		{
 			return 0;
 		}
-
-		ASSERT(sizeof(int) <= sizeof(size_t))
 	
 		// Buffers
 		mStream.next_out = (unsigned char *)pOutBuffer;
-		mStream.avail_out = (unsigned int)OutLength;
+		mStream.avail_out = OutLength;
 		
 		// Call one of the functions
 		int flush = mFlush;

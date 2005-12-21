@@ -73,13 +73,11 @@
 	typedef unsigned __int32 u_int32_t;
 	typedef unsigned __int64 u_int64_t;
 
-	#define HAVE_UINT8_T
-	#define HAVE_UINT16_T
-	#define HAVE_UINT32_T
-	#define HAVE_UINT64_T
+	#define HAVE_U_INT8_T
+	#define HAVE_U_INT16_T
+	#define HAVE_U_INT32_T
+	#define HAVE_U_INT64_T
 
-	typedef unsigned int uid_t;
-	typedef unsigned int gid_t;
 	typedef int pid_t;
 #endif // WIN32 && !__MINGW32__
 

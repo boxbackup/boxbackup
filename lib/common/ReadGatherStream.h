@@ -32,10 +32,10 @@ private:
 	ReadGatherStream &operator=(const ReadGatherStream &);
 public:
 
-	size_t AddComponent(IOStream *pStream);
+	int AddComponent(IOStream *pStream);
 	void AddBlock(int Component, pos_type Length, bool Seek = false, pos_type SeekTo = 0);
 
-	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes);
 	virtual bool StreamDataLeft();
