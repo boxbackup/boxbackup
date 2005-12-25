@@ -112,7 +112,7 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle])
+AC_CHECK_FUNCS([be64toh getpeereid kqueue lchown setproctitle])
 AX_FUNC_SYSCALL
 AX_CHECK_SYSCALL_LSEEK
 
