@@ -138,7 +138,11 @@ inline uint64_t box_swap64(uint64_t x)
 	#ifdef HAVE_SYS_ENDIAN_H
 		#include <sys/endian.h>
 		#define box_hton64(x) htobe64(x)
-		#define box_ntoh64(x) betoh64(x)
+		#ifdef HAVE_BE64TOH
+			#define box_ntoh64(x) be64toh(x)
+		#else
+			#define box_ntoh64(x) betoh64(x)
+		#endif
 	#elif HAVE_ASM_BYTEORDER_H
 		#include <asm/byteorder.h>
 		#define box_hton64(x) __cpu_to_be64(x)
