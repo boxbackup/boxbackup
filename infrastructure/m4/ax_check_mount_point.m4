@@ -19,10 +19,18 @@ dnl @license AllPermissive
 
 AC_DEFUN([AX_CHECK_MOUNT_POINT], [
   AC_CHECK_FUNCS([getmntent statfs])
-  AC_CHECK_HEADERS([mntent.h sys/mnttab.h sys/mount.h],,, [[#include <stdio.h>]])
+  AC_CHECK_HEADERS([sys/param.h])
+  AC_CHECK_HEADERS([mntent.h sys/mnttab.h sys/mount.h],,, [[
+    #include <stdio.h>
+    #ifdef HAVE_SYS_PARAM_H
+      #include <sys/param.h>
+    #endif
+    ]])
   # BSD
   AC_CHECK_MEMBERS([struct statfs.f_mntonname],,, [[
-    #include <sys/param.h>
+    #ifdef HAVE_SYS_PARAM_H
+      #include <sys/param.h>
+    #endif
     #include <sys/mount.h>
     ]])
   # Linux
