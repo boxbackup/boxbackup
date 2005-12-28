@@ -78,6 +78,10 @@ sub copy_from_list
 		{
 			replace_version_in($dst);
 		}
+		elsif($src eq 'NO-LICENSE')
+		{
+			$no_license{$dst} = 1;
+		}
 		elsif(-d $src)
 		{
 			$modules_included{$_} = 1;
@@ -205,8 +209,8 @@ sub copy_file
 		}
 	}
 	
-	# make sure perl scripts are marked as executable, and other things aren't
-	if($ext eq 'pl' || $ext eq '')
+	# copy executable bit from src
+	if(-x $fn)
 	{
 		system 'chmod','a+x',"$base_name/$dst_fn"
 	}
