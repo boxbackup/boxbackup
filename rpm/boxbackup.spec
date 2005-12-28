@@ -3,7 +3,7 @@
 
 # Detect distribution. So far we only special-case SUSE. If you need to make
 # any distro specific changes to get the package building on your system
-# please email them to martin@zepler.org
+# please email them to boxbackup-dev@fluffy.co.uk
 #%define is_fc   %(test -e %{_sysconfdir}/fedora-release && echo 1 || echo 0)
 #%define is_mdk  %(test -e %{_sysconfdir}/mandrake-release && echo 1 || echo 0)
 #%define is_rh   %(test -e %{_sysconfdir}/redhat-release && echo 1 || echo 0)
@@ -25,7 +25,7 @@ Version: ###DISTRIBUTION-VERSION-NUMBER###
 Release: 1
 License: BSD
 Group: Applications/Archiving
-Packager: Martin Ebourne <martin@zepler.org>
+Packager: Martin Ebourne <boxbackup-dev@fluffy.co.uk>
 URL: http://www.fluffy.co.uk/boxbackup/
 Source0: %{ident}.tgz
 Requires: openssl >= 0.9.7a
