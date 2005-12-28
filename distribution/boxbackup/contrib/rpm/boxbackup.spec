@@ -72,7 +72,8 @@ This package contains the server.
 %setup -q
 
 %build
-./configure
+test -e configure || ./bootstrap
+%configure
 
 make
 
@@ -194,6 +195,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sbindir}/raidfile-config
 
 %changelog
+* Wed Dec 28 2005 Martin Ebourne <martin@zepler.org>
+- Box now uses autoconf so use configure macro
+
 * Fri Oct  1 2004 Martin Ebourne <martin@zepler.org> - 0.08-3
 - Moved most of the exes to /usr/sbin
 - SUSE updates from Chris Smith
