@@ -137,12 +137,10 @@ inline uint64_t box_swap64(uint64_t x)
 #else
 	#ifdef HAVE_SYS_ENDIAN_H
 		#include <sys/endian.h>
+		// betoh64 (OpenBSD) is sometimes called be64toh (FreeBSD, NetBSD).
+		// Rather than check for it just reuse htobe64 since they are symmetrical
 		#define box_hton64(x) htobe64(x)
-		#ifdef HAVE_BE64TOH
-			#define box_ntoh64(x) be64toh(x)
-		#else
-			#define box_ntoh64(x) betoh64(x)
-		#endif
+		#define box_ntoh64(x) htobe64(x)
 	#elif HAVE_ASM_BYTEORDER_H
 		#include <asm/byteorder.h>
 		#define box_hton64(x) __cpu_to_be64(x)
