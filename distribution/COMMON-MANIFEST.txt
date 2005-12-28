@@ -15,10 +15,15 @@ docs/common/lib_server notes/lib_server
 MKDIR infrastructure
 infrastructure/buildenv-testmain-template.cpp
 infrastructure/makebuildenv.pl
-infrastructure/BoxPlatform.pm
+infrastructure/BoxPlatform.pm.in
 infrastructure/makeparcels.pl
-MKDIR infrastructure/tests
-infrastructure/tests/common_tests.pl
+configure.ac
+NO-LICENSE config.sub
+config.sub
+NO-LICENSE config.guess
+config.guess
+bootstrap
 parcels.txt
-configure
 runtest.pl
+NO-LICENSE-IN-DIR infrastructure/m4
+infrastructure/m4
