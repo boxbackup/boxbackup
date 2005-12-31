@@ -21,7 +21,7 @@
 
 #define PLATFORM_DEV_NULL			"/dev/null"
 
-#include "config.h"
+#include "BoxConfig.h"
 
 #ifdef WIN32
 	// need msvcrt version 6.1 or higher for _gmtime64()

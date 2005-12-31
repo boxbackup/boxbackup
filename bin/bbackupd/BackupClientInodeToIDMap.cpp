@@ -14,7 +14,7 @@
 	#include <sys/types.h>
 	#include <fcntl.h>
 	#include <limits.h>
-	#include DB_HEADER
+	#include <db.h>
 	#include <sys/stat.h>
 #endif
 
@@ -65,7 +65,7 @@ BackupClientInodeToIDMap::~BackupClientInodeToIDMap()
 #ifndef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 	if(dbp != 0)
 	{
-#ifdef BERKELY_V4
+#if BDB_VERSION_MAJOR >= 3
 		dbp->close(0);
 #else
 		dbp->close(dbp);
@@ -94,7 +94,7 @@ void BackupClientInodeToIDMap::Open(const char *Filename, bool ReadOnly, bool Cr
 	ASSERT(!mEmpty);
 	
 	// Open the database file
-#ifdef BERKELY_V4
+#if BDB_VERSION_MAJOR >= 3
 	dbp = new Db(0,0);
 	dbp->set_pagesize(1024);		/* Page size: 1K. */
 	dbp->set_cachesize(0, 32 * 1024, 0);
@@ -146,7 +146,7 @@ void BackupClientInodeToIDMap::Close()
 #ifndef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 	if(dbp != 0)
 	{
-#ifdef BERKELY_V4
+#if BDB_VERSION_MAJOR >= 3
 		if(dbp->close(0) != 0)
 #else
 		if(dbp->close(dbp) != 0)
@@ -188,7 +188,7 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 	rec.mObjectID = ObjectID;
 	rec.mInDirectory = InDirectory;
 
-#ifdef BERKELY_V4
+#if BDB_VERSION_MAJOR >= 3
 	Dbt key(&InodeRef, sizeof(InodeRef));
 	Dbt data(&rec, sizeof(rec));
 
@@ -250,7 +250,7 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 		THROW_EXCEPTION(BackupStoreException, InodeMapNotOpen);
 	}
 
-#ifdef BERKELY_V4
+#if BDB_VERSION_MAJOR >= 3
 	Dbt key(&InodeRef, sizeof(InodeRef));
 	Dbt data(0, 0);
 	switch(dbp->get(NULL, &key, &data, 0))
@@ -280,7 +280,7 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 	}
 
 	// Check for sensible return
-#ifdef BERKELY_V4
+#if BDB_VERSION_MAJOR >= 3
 	if(key.get_data() == 0 || data.get_size() != sizeof(IDBRecord))
 	{
 		// Assert in debug version

@@ -19,6 +19,10 @@
 #include "BackupClientContext.h"
 #include "BackupClientDirectoryRecord.h"
 
+#ifndef WIN32
+	#include <syslog.h>
+#endif
+
 class Configuration;
 class BackupClientInodeToIDMap;
 class ExcludeList;

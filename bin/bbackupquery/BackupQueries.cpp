@@ -979,7 +979,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		{
 			// Files modified after this time shouldn't be on the server, so report errors slightly differently
 			params.mLatestFileUploadTime = FileModificationTime(st)
-					- SecondsToBoxTime((uint32_t)mrConfiguration.GetKeyValueInt("MinimumFileAge"));
+					- SecondsToBoxTime(mrConfiguration.GetKeyValueInt("MinimumFileAge"));
 		}
 		else
 		{

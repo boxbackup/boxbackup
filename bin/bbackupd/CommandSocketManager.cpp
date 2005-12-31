@@ -7,7 +7,9 @@
 //
 // --------------------------------------------------------------------------
 
-#include <syslog.h>
+#ifndef WIN32
+	#include <syslog.h>
+#endif
 
 #include "Box.h"
 #include "IOStreamGetLine.h"

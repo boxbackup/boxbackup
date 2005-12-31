@@ -3,7 +3,7 @@
 
 # Detect distribution. So far we only special-case SUSE. If you need to make
 # any distro specific changes to get the package building on your system
-# please email them to martin@zepler.org
+# please email them to boxbackup-dev@fluffy.co.uk
 #%define is_fc   %(test -e %{_sysconfdir}/fedora-release && echo 1 || echo 0)
 #%define is_mdk  %(test -e %{_sysconfdir}/mandrake-release && echo 1 || echo 0)
 #%define is_rh   %(test -e %{_sysconfdir}/redhat-release && echo 1 || echo 0)
@@ -25,7 +25,7 @@ Version: ###DISTRIBUTION-VERSION-NUMBER###
 Release: 1
 License: BSD
 Group: Applications/Archiving
-Packager: Martin Ebourne <martin@zepler.org>
+Packager: Martin Ebourne <boxbackup-dev@fluffy.co.uk>
 URL: http://www.fluffy.co.uk/boxbackup/
 Source0: %{ident}.tgz
 Requires: openssl >= 0.9.7a
@@ -72,7 +72,8 @@ This package contains the server.
 %setup -q
 
 %build
-./configure
+test -e configure || ./bootstrap
+%configure
 
 make
 
@@ -194,6 +195,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sbindir}/raidfile-config
 
 %changelog
+* Wed Dec 28 2005 Martin Ebourne <martin@zepler.org>
+- Box now uses autoconf so use configure macro
+
 * Fri Oct  1 2004 Martin Ebourne <martin@zepler.org> - 0.08-3
 - Moved most of the exes to /usr/sbin
 - SUSE updates from Chris Smith

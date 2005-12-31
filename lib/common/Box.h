@@ -114,6 +114,10 @@
 
 // extra macros for converting to network byte order
 
+#ifdef HAVE_NETINET_IN_H
+	#include <netinet/in.h>
+#endif
+
 // Always define a swap64 function, as it's useful.
 inline uint64_t box_swap64(uint64_t x)
 {
@@ -131,12 +135,20 @@ inline uint64_t box_swap64(uint64_t x)
 	#define box_hton64(x) (x)
 	#define box_ntoh64(x) (x)
 #else
-	#define box_hton64(x) box_swap64(x)
-	#define box_ntoh64(x) box_swap64(x)
-#endif
-
-#ifdef HAVE_NETINET_IN_H
-	#include <netinet/in.h>
+	#ifdef HAVE_SYS_ENDIAN_H
+		#include <sys/endian.h>
+		// betoh64 (OpenBSD) is sometimes called be64toh (FreeBSD, NetBSD).
+		// Rather than check for it just reuse htobe64 since they are symmetrical
+		#define box_hton64(x) htobe64(x)
+		#define box_ntoh64(x) htobe64(x)
+	#elif HAVE_ASM_BYTEORDER_H
+		#include <asm/byteorder.h>
+		#define box_hton64(x) __cpu_to_be64(x)
+		#define box_ntoh64(x) __be64_to_cpu(x)
+	#else
+		#define box_hton64(x) box_swap64(x)
+		#define box_ntoh64(x) box_swap64(x)
+	#endif
 #endif
 
 #endif // BOX__H

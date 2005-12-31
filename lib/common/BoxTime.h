@@ -23,19 +23,15 @@ typedef uint64_t	box_time_t;
 
 box_time_t GetCurrentBoxTime();
 
-inline box_time_t SecondsToBoxTime(uint32_t Seconds)
+inline box_time_t SecondsToBoxTime(time_t Seconds)
 {
 	return ((box_time_t)Seconds * MICRO_SEC_IN_SEC_LL);
 }
-inline box_time_t SecondsToBoxTime(uint64_t Seconds)
-{
-	return ((box_time_t)Seconds * MICRO_SEC_IN_SEC_LL);
-}
-inline box_time_t BoxTimeToSeconds(box_time_t Time)
+inline time_t BoxTimeToSeconds(box_time_t Time)
 {
 	return Time / MICRO_SEC_IN_SEC_LL;
 }
-inline box_time_t BoxTimeToMilliSeconds(box_time_t Time)
+inline uint64_t BoxTimeToMilliSeconds(box_time_t Time)
 {
 	return Time / MILLI_SEC_IN_NANO_SEC_LL;
 }
