@@ -163,7 +163,11 @@ AC_DEFUN([AX_PATH_BDB_NO_OPTIONS], [
     AC_PREPROC_IFELSE([
       AC_LANG_SOURCE([[
 #include <db.h>
+#ifdef DB_VERSION_MAJOR
 AX_PATH_BDB_STUFF DB_VERSION_MAJOR,DB_VERSION_MINOR,DB_VERSION_PATCH
+#else
+AX_PATH_BDB_STUFF 1,0,0
+#endif
       ]])
     ],[
       # Extract version from preprocessor output.
@@ -364,9 +368,14 @@ int main(int argc,char **argv)
   (void) argv;
   db_version(&major,&minor,&patch);
   if (argc > 1)
+#ifdef DB_VERSION_MAJOR
     printf("%d.%d.%d\n",DB_VERSION_MAJOR,DB_VERSION_MINOR,DB_VERSION_PATCH);
   if (DB_VERSION_MAJOR == major && DB_VERSION_MINOR == minor &&
       DB_VERSION_PATCH == patch)
+#else
+    printf("1.0.0\n");
+  if (major == 1)
+#endif
     return 0;
   else
     return 1;
@@ -424,9 +433,14 @@ int main(int argc,char **argv)
   (void) argv;
   db_version(&major,&minor,&patch);
   if (argc > 1)
+#ifdef DB_VERSION_MAJOR
     printf("%d.%d.%d\n",DB_VERSION_MAJOR,DB_VERSION_MINOR,DB_VERSION_PATCH);
   if (DB_VERSION_MAJOR == major && DB_VERSION_MINOR == minor &&
       DB_VERSION_PATCH == patch)
+#else
+    printf("1.0.0\n");
+  if (major == 1)
+#endif
     return 0;
   else
     return 1;
@@ -483,7 +497,11 @@ int main(int argc,char **argv)
 {
   (void) argv;
   if (argc > 1)
+#ifdef DB_VERSION_MAJOR
     printf("%d.%d.%d\n",DB_VERSION_MAJOR,DB_VERSION_MINOR,DB_VERSION_PATCH);
+#else
+    printf("1.0.0\n");
+#endif
   return 0;
 }
     ]])
