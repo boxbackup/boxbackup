@@ -364,21 +364,27 @@ AC_DEFUN([AX_PATH_BDB_PATH_GET_VERSION], [
 #include <db.h>
 int main(int argc,char **argv)
 {
-  int major,minor,patch;
   (void) argv;
+#ifdef DB_VERSION_MAJOR
+  int major,minor,patch;
   db_version(&major,&minor,&patch);
   if (argc > 1)
-#ifdef DB_VERSION_MAJOR
     printf("%d.%d.%d\n",DB_VERSION_MAJOR,DB_VERSION_MINOR,DB_VERSION_PATCH);
   if (DB_VERSION_MAJOR == major && DB_VERSION_MINOR == minor &&
       DB_VERSION_PATCH == patch)
-#else
-    printf("1.0.0\n");
-  if (major == 1)
-#endif
     return 0;
   else
     return 1;
+#else
+  DB *dbp = dbopen(0, 0, 0, DB_HASH, 0);
+  if(dbp) dbp->close(dbp);
+  if (argc > 1)
+    printf("1.0.0\n");
+  if (dbp)
+    return 0;
+  else
+    return 1;
+#endif
 }
       ]])
     ],[
@@ -429,21 +435,27 @@ AC_DEFUN([AX_PATH_BDB_ENV_CONFIRM_LIB], [
 #include <db.h>
 int main(int argc,char **argv)
 {
-  int major,minor,patch;
   (void) argv;
+#ifdef DB_VERSION_MAJOR
+  int major,minor,patch;
   db_version(&major,&minor,&patch);
   if (argc > 1)
-#ifdef DB_VERSION_MAJOR
     printf("%d.%d.%d\n",DB_VERSION_MAJOR,DB_VERSION_MINOR,DB_VERSION_PATCH);
   if (DB_VERSION_MAJOR == major && DB_VERSION_MINOR == minor &&
       DB_VERSION_PATCH == patch)
-#else
-    printf("1.0.0\n");
-  if (major == 1)
-#endif
     return 0;
   else
     return 1;
+#else
+  DB *dbp = dbopen(0, 0, 0, DB_HASH, 0);
+  if(dbp) dbp->close(dbp);
+  if (argc > 1)
+    printf("1.0.0\n");
+  if (dbp)
+    return 0;
+  else
+    return 1;
+#endif
 }
     ]])
   ],[
