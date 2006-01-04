@@ -35,9 +35,7 @@ if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
                  [AC_MSG_ERROR([[cannot find a short sleep function (nanosleep)]])])
 fi
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
-VL_LIB_READLINE
-have_libreadline=no
-test "x$vl_cv_lib_readline" != "xno" && have_libreadline=yes
+VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 
 ## Check for Berkely DB. Restrict to certain versions
 AX_PATH_BDB(, [
@@ -212,7 +210,7 @@ case "$vl_cv_lib_readline" in
   *readline*)
     echo
     AC_MSG_WARN([[do not distribute binaries compiled against GNU readline,
-as this would violate the GNU readline licence, which is GPL. You may use
+as this could violate the GNU readline licence, which is GPL. You may use
 libedit or libeditline instead.]])
     ;;
 esac
