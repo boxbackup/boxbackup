@@ -125,6 +125,8 @@ AC_FUNC_STAT
 AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle])
 AX_FUNC_SYSCALL
 AX_CHECK_SYSCALL_LSEEK
+AC_CHECK_FUNCS([listxattr llistxattr getxattr lgetxattr setxattr lsetxattr])
+AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
 
 
 ### Miscellaneous complicated feature checks
