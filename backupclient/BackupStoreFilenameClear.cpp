@@ -184,28 +184,30 @@ void BackupStoreFilenameClear::MakeClearAvailable() const
 // Buffer for encoding and decoding -- do this all in one single buffer to
 // avoid lots of string allocation, which stuffs up memory usage.
 // These static memory vars are, of course, not thread safe, but we don't use threads.
-#ifndef NDEBUG
-static int sEncDecBufferSize = 2;	// small size for debug builds
-#else
-static int sEncDecBufferSize = 256;
-#endif
-static MemoryBlockGuard<uint8_t *> spEncDecBuffer(sEncDecBufferSize);
+static int sEncDecBufferSize = 0;
+static MemoryBlockGuard<uint8_t *> *spEncDecBuffer = 0;
 
-// fudge to stop leak reporting
-#ifdef BOX_MEMORY_LEAK_TESTING
-namespace
+static void EnsureEncDecBufferSize(int BufSize)
 {
-	class leak_off
+	if(spEncDecBuffer == 0)
 	{
-	public:
-		leak_off()
+		TRACE1("Allocating filename encoding/decoding buffer with size %d\n", BufSize);
+		spEncDecBuffer = new MemoryBlockGuard<uint8_t *>(BufSize);
+		MEMLEAKFINDER_NOT_A_LEAK(spEncDecBuffer);
+		MEMLEAKFINDER_NOT_A_LEAK(*spEncDecBuffer);
+		sEncDecBufferSize = BufSize;
+	}
+	else
+	{
+		if(sEncDecBufferSize < BufSize)
 		{
-			MEMLEAKFINDER_NOT_A_LEAK(spEncDecBuffer);
+			TRACE2("Reallocating filename encoding/decoding buffer from %d to %d\n", sEncDecBufferSize, BufSize);
+			spEncDecBuffer->Resize(BufSize);
+			sEncDecBufferSize = BufSize;
+			MEMLEAKFINDER_NOT_A_LEAK(*spEncDecBuffer);
 		}
-	};
-	leak_off dont_report_as_leak;
+	}
 }
-#endif
 
 // --------------------------------------------------------------------------
 //
@@ -221,16 +223,10 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rToEncode.size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
-	if(sEncDecBufferSize < maxOutSize)
-	{
-		TRACE2("Reallocating filename encoding/decoding buffer from %d to %d\n", sEncDecBufferSize, maxOutSize);
-		spEncDecBuffer.Resize(maxOutSize);
-		sEncDecBufferSize = maxOutSize;
-	}
+	EnsureEncDecBufferSize(maxOutSize);
 	
 	// Pointer to buffer
-	uint8_t *buffer = spEncDecBuffer;
-	MEMLEAKFINDER_NOT_A_LEAK(buffer);
+	uint8_t *buffer = *spEncDecBuffer;
 	
 	// Encode -- do entire block in one go
 	int encSize = rCipherContext.TransformBlock(buffer + 2, sEncDecBufferSize - 2, rToEncode.c_str(), rToEncode.size());
@@ -259,16 +255,10 @@ void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) con
 	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
-	if(sEncDecBufferSize < maxOutSize)
-	{
-		TRACE2("Reallocating filename encoding/decoding buffer from %d to %d\n", sEncDecBufferSize, maxOutSize);
-		spEncDecBuffer.Resize(maxOutSize);
-		sEncDecBufferSize = maxOutSize;
-	}
+	EnsureEncDecBufferSize(maxOutSize);
 	
 	// Pointer to buffer
-	uint8_t *buffer = spEncDecBuffer;
-	MEMLEAKFINDER_NOT_A_LEAK(buffer);
+	uint8_t *buffer = *spEncDecBuffer;
 	
 	// Decrypt
 	const char *str = c_str() + 2;
