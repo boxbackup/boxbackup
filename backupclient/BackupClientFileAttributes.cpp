@@ -511,6 +511,10 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				// Find size of attribute (must call with buffer and length 0 on some platforms,
 				// as -1 is returned if the data doesn't fit.)
 				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), 0, 0);
+				if(valueSize<0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
 
 				// Resize block, if needed
 				if(xattrSize+valueSize>xattrBufferSize)
@@ -522,7 +526,6 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 
 				// This gets the attribute value (may be text or binary), no termination
 				valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
-
 				if(valueSize<0)
 				{
 					THROW_EXCEPTION(CommonException, OSFileError);
