@@ -33,19 +33,6 @@
 
 #include "MemLeakFindOn.h"
 
-// Handle differing xattr APIs
-#ifdef HAVE_SYS_XATTR_H
-	#if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define llistxattr(a,b,c) listxattr(a,b,c,XATTR_NOFOLLOW)
-	#endif
-	#if !defined(HAVE_LGETXATTR) && defined(HAVE_GETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define lgetxattr(a,b,c,d) getxattr(a,b,c,d,0,XATTR_NOFOLLOW)
-	#endif
-	#if !defined(HAVE_LSETXATTR) && defined(HAVE_SETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define lsetxattr(a,b,c,d,e) setxattr(a,b,c,d,0,(e)|XATTR_NOFOLLOW)
-	#endif
-#endif
-
 // set packing to one byte
 #ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 #include "BeginStructPackForWire.h"
@@ -521,17 +508,20 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				int valueSizeOffset = xattrSize;
 				xattrSize += sizeof(u_int32_t);
 
-				// This gets the attribute value (may be text or binary), no termination
-				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
+				// Find size of attribute (must call with buffer and length 0 on some platforms,
+				// as -1 is returned if the data doesn't fit.)
+				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), 0, 0);
 
+				// Resize block, if needed
 				if(xattrSize+valueSize>xattrBufferSize)
 				{
 					xattrBufferSize = (xattrBufferSize+valueSize)*2;
 					outputBlock.ResizeBlock(xattrBufferSize);
 					buffer = static_cast<unsigned char*>(outputBlock.GetBuffer());
-
-					valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
 				}
+
+				// This gets the attribute value (may be text or binary), no termination
+				valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
 
 				if(valueSize<0)
 				{
