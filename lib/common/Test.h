@@ -16,10 +16,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <signal.h>
-
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
+#include <unistd.h>
 
 #include <stdio.h>
  

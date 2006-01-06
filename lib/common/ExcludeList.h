@@ -43,11 +43,10 @@ public:
 	bool IsExcluded(const std::string &rTest) const;
 	
 	// Mainly for tests
-	unsigned int SizeOfDefiniteList() const 
-		{return (unsigned int)mDefinite.size();}
+	unsigned int SizeOfDefiniteList() const {return mDefinite.size();}
 	unsigned int SizeOfRegexList() const
 #ifdef HAVE_REGEX_H
-		{return (unsigned int)mRegex.size();}
+		{return mRegex.size();}
 #else
 		{return 0;}
 #endif

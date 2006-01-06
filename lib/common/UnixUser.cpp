@@ -9,13 +9,11 @@
 
 #include "Box.h"
 
-#ifdef HAVE_PWD_H
-	#include <pwd.h>
+#ifndef WIN32
+#include <pwd.h>
 #endif
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
+#include <unistd.h>
 
 #include "UnixUser.h"
 #include "CommonException.h"

@@ -69,7 +69,7 @@ int ReadGatherStream::AddComponent(IOStream *pStream)
 	ASSERT(pStream != 0);
 
 	// Just add the component to the list, returning it's index.
-	int index = (int)mComponents.size();
+	int index = mComponents.size();
 	mComponents.push_back(pStream);
 	return index;
 }
@@ -145,8 +145,7 @@ int ReadGatherStream::Read(void *pBuffer, int NBytes, int Timeout)
 		if(mPositionInCurrentBlock < mBlocks[mCurrentBlock].mLength)
 		{
 			// Read!
-			int s = (int)(mBlocks[mCurrentBlock].mLength - 
-				mPositionInCurrentBlock);
+			int s = mBlocks[mCurrentBlock].mLength - mPositionInCurrentBlock;
 			if(s > bytesToRead) s = bytesToRead;
 			
 			int r = mComponents[mBlocks[mCurrentBlock].mComponent]->Read(buffer, s, Timeout);

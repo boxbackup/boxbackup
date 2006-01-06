@@ -11,11 +11,7 @@
 
 #include <fcntl.h>
 #include <errno.h>
-
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
+#include <unistd.h>
 #ifdef HAVE_FLOCK
 	#include <sys/file.h>
 #endif

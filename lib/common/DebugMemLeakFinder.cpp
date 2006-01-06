@@ -16,11 +16,8 @@
 #undef realloc
 #undef free
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <map>
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <set>

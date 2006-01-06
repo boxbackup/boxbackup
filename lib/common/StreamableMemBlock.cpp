@@ -115,7 +115,7 @@ void StreamableMemBlock::Set(IOStream &rStream, int Timeout)
 	}
 	
 	// Allocate a new block (this way to be exception safe)
-	char *pblock = (char*)malloc((size_t)size);
+	char *pblock = (char*)malloc(size);
 	if(pblock == 0)
 	{
 		throw std::bad_alloc();
@@ -124,7 +124,7 @@ void StreamableMemBlock::Set(IOStream &rStream, int Timeout)
 	try
 	{
 		// Read in
-		if(!rStream.ReadFullBuffer(pblock, (int)size, 0 /* not interested in bytes read if this fails */))
+		if(!rStream.ReadFullBuffer(pblock, size, 0 /* not interested in bytes read if this fails */))
 		{
 			THROW_EXCEPTION(CommonException, StreamableMemBlockIncompleteRead)
 		}
@@ -141,7 +141,7 @@ void StreamableMemBlock::Set(IOStream &rStream, int Timeout)
 	// store...
 	ASSERT(mpBuffer == 0);
 	mpBuffer = pblock;
-	mSize = (int)size;
+	mSize = size;
 }
 
 

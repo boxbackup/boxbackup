@@ -13,13 +13,10 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <new>
 
 #include "CommonException.h"

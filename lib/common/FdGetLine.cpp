@@ -10,10 +10,7 @@
 #include "Box.h"
 
 #include <sys/types.h>
-
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
+#include <unistd.h>
 
 #include "FdGetLine.h"
 #include "CommonException.h"
