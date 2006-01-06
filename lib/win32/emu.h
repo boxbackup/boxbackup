@@ -3,7 +3,7 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
-// #define _STAT_DEFINED
+#define _STAT_DEFINED
 #define _INO_T_DEFINED
 
 #include <winsock2.h>
@@ -27,18 +27,11 @@
 	( *(_result) = *gmtime( (_clock) ), \
 	(_result) )
 
+
 //signal in unix SIGVTALRM does not exist in win32 - but looking at the 
 #define SIGVTALRM 254
 #define SIGALRM SIGVTALRM
 #define ITIMER_VIRTUAL 0
-
-// Microsoft decided to deprecate the standard POSIX functions. Great!
-#define open(file,flags,mode) _open(file,flags,mode)
-#define close(fd)             _close(fd)
-#define dup(fd)               _dup(fd)
-#define read(fd,buf,count)    _read(fd,buf,count)
-#define write(fd,buf,count)   _write(fd,buf,count)
-#define lseek(fd,off,whence)  _lseek(fd,off,whence)
 
 int setitimer(int type , struct itimerval *timeout, int);
 void InitTimer(void);
@@ -185,7 +178,7 @@ inline int getopt(int count, char * const * args, char * tolookfor)
 			str = str.substr(index+1, str.size());
 		}
 
-		index = (int)str.find('-');
+		index = str.find('-');
 
 		if ( index == -1 ) return -1;
 
@@ -194,7 +187,7 @@ inline int getopt(int count, char * const * args, char * tolookfor)
 		optind ++;
 		str = args[optind];
 	}
-	while ( ( opttolookfor = (int)interestin.find(opt)) == -1 );
+	while ( ( opttolookfor = interestin.find(opt)) == -1 );
 
 	if ( interestin[opttolookfor+1] == ':' ) 
 	{
@@ -264,7 +257,7 @@ typedef unsigned int mode_t;
 
 inline int mkdir(const char *pathname, mode_t mode)
 {
-	return _mkdir(pathname);
+	return mkdir(pathname);
 }
 
 #ifdef __MINGW32__
@@ -365,7 +358,6 @@ struct statfs
 	TCHAR f_mntonname[MAX_PATH];
 };
 
-#if 0
 // I think this should get us going
 // Although there is a warning about 
 // mount points in win32 can now exists - which means inode number can be 
@@ -388,7 +380,6 @@ struct stat {
 
 #ifndef __MINGW32__
 typedef u_int64_t _ino_t;
-#endif
 #endif
 
 int ourstat(const char * name, struct stat * st);
