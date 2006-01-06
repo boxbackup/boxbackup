@@ -44,6 +44,11 @@
 
 #include "MemLeakFindOn.h"
 
+// ENOATTR may be defined in a separate header file which we may not have
+#ifndef ENOATTR
+#define ENOATTR ENODATA
+#endif
+
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
@@ -194,7 +199,7 @@ bool write_xattr_test(const char *filename, const char *attrName, unsigned int l
 	}
 	else
 	{
-		char data[4096];
+		char data[1024];
 		if(length > sizeof(data)) length = sizeof(data);
 		
 		if(::fread(data, length, 1, xattrTestDataHandle) != 1)
@@ -327,7 +332,7 @@ int test_basics()
 #ifdef HAVE_SYS_XATTR_H
 	// Write some attributes to the file, checking for ENOTSUP
 	bool xattrNotSupported = false;
-	if(!write_xattr_test("testfiles/test1", "attr_1", 1276, &xattrNotSupported) && xattrNotSupported)
+	if(!write_xattr_test("testfiles/test1", "user.attr_1", 1000, &xattrNotSupported) && xattrNotSupported)
 	{
 		::printf("***********\nYour platform supports xattr, but your filesystem does not.\nSkipping tests.\n***********\n");
 	}
@@ -336,8 +341,8 @@ int test_basics()
 		BackupClientFileAttributes x1, x2, x3, x4;
 
 		// Write more attributes
-		TEST_THAT(write_xattr_test("testfiles/test1", "attr_2", 3427));
-		TEST_THAT(write_xattr_test("testfiles/test1", "sadfohij39998.3hj", 123));
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.attr_2", 947));
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.sadfohij39998.3hj", 123));
 	
 		// Read file attributes
 		x1.ReadAttributes("testfiles/test1");
@@ -352,7 +357,7 @@ int test_basics()
 		
 		// Add more attributes to a file
 		x2.ReadAttributes("testfiles/test1");
-		TEST_THAT(write_xattr_test("testfiles/test1", "328989sj..sdf", 23));
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.328989sj..sdf", 23));
 		
 		// Read them again, and check that the Compare() function detects that they're different
 		x3.ReadAttributes("testfiles/test1");
@@ -360,7 +365,7 @@ int test_basics()
 		TEST_THAT(!x1.Compare(x3, true, true));
 		
 		// Change the value of one of them, leaving the size the same.
-		TEST_THAT(write_xattr_test("testfiles/test1", "328989sj..sdf", 23));
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.328989sj..sdf", 23));
 		x4.ReadAttributes("testfiles/test1");
 		TEST_THAT(!x1.Compare(x4, true, true));
 	}
