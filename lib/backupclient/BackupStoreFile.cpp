@@ -519,17 +519,18 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 	if(mNumBlocks > 0)
 	{
 		// Find the maximum encoded data size
-		int32_t maxEncodedDataSize = 0;
+		uint64_t maxEncodedDataSize = 0;
 		const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
 		ASSERT(entry != 0);
 		for(int64_t e = 0; e < mNumBlocks; e++)
 		{
 			// Get the clear and encoded size
-			int32_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
+			uint64_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
 			ASSERT(encodedSize > 0);
 			
 			// Larger?
-			if(encodedSize > maxEncodedDataSize) maxEncodedDataSize = encodedSize;
+			if(encodedSize > maxEncodedDataSize) 
+				maxEncodedDataSize = encodedSize;
 		}
 		
 		// Allocate those blocks!
@@ -675,7 +676,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		
 			// Get the size from the block index
 			const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
-			int32_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
+			uint64_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
 			if(encodedSize <= 0)
 			{
 				// The caller is attempting to decode a file which is the direct result of a diff
@@ -931,7 +932,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 	}
 	
 	// Check alignment of the block
-	ASSERT((((uint32_t)(long)rOutput.mpBuffer) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+	ASSERT((((long long)rOutput.mpBuffer) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 
 	// Want to compress it?
 	bool compressChunk = (ChunkSize >= BACKUP_FILE_MIN_COMPRESSED_CHUNK_SIZE);
@@ -1019,7 +1020,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Output, int OutputSize)
 {
 	// Check alignment of the encoded block
-	ASSERT((((uint32_t)(long)Encoded) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+	ASSERT((((long long)Encoded) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 
 	// First check
 	if(EncodedSize < 1)
