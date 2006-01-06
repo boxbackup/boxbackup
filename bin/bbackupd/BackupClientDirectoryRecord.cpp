@@ -9,10 +9,7 @@
 
 #include "Box.h"
 
-#ifdef HAVE_DIRENT_H
-	#include <dirent.h>
-#endif
-
+#include <dirent.h>
 #include <errno.h>
 #include <string.h>
 
@@ -260,7 +257,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				checksum_info.mAttributeModificationTime = FileAttrModificationTime(st);
 				checksum_info.mSize = st.st_size;
 				currentStateChecksum.Add(&checksum_info, sizeof(checksum_info));
-				currentStateChecksum.Add(en->d_name, (int)strlen(en->d_name));
+				currentStateChecksum.Add(en->d_name, strlen(en->d_name));
 				
 				// If the file has been modified madly into the future, download the 
 				// directory record anyway to ensure that it doesn't get uploaded

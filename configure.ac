@@ -65,7 +65,7 @@ Upgrade or read the documentation for alternatives]])
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([execinfo.h netinet/in.h regex.h sys/types.h sys/xattr.h pwd.h process.h sys/socket.h dirent.h])
+AC_CHECK_HEADERS([execinfo.h netinet/in.h regex.h sys/types.h sys/xattr.h pwd.h])
 
 
 ### Checks for typedefs, structures, and compiler characteristics.
@@ -110,7 +110,7 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle getpid])
+AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle])
 AX_FUNC_SYSCALL
 AX_CHECK_SYSCALL_LSEEK
 

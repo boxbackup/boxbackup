@@ -9,9 +9,7 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
+#include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
 #ifdef HAVE_LIBREADLINE
@@ -64,7 +62,7 @@ int main(int argc, const char *argv[])
 	// Under Win32 we must initialise the Winsock library
 	// before using it.
 	
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
+	if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
 	{
 		// throw error?    perhaps give it its own id in the furture
 		THROW_EXCEPTION(BackupStoreException, Internal)

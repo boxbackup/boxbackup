@@ -638,7 +638,7 @@ void Protocol::Write(const std::string &rValue)
 	Write((int32_t)(rValue.size()));
 	
 	WRITE_ENSURE_BYTES_AVAILABLE(rValue.size())
-	Write(rValue.c_str(), (int)rValue.size());
+	Write(rValue.c_str(), rValue.size());
 }
 
 // --------------------------------------------------------------------------
@@ -706,11 +706,11 @@ void Protocol::SendStream(IOStream &rStream)
 	}
 	
 	// Inform sub class
-	InformStreamSending((u_int32_t)streamSize);
+	InformStreamSending(streamSize);
 	
 	// Make header
 	PW_ObjectHeader objHeader;
-	objHeader.mObjSize = htonl((u_long)(uncertainSize?(ProtocolStream_SizeUncertain):streamSize));
+	objHeader.mObjSize = htonl(uncertainSize?(ProtocolStream_SizeUncertain):streamSize);
 	objHeader.mObjType = htonl(SPECIAL_STREAM_OBJECT_TYPE);
 
 	// Write header

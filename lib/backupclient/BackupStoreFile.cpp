@@ -9,10 +9,7 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
+#include <unistd.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <new>
@@ -522,22 +519,21 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 	if(mNumBlocks > 0)
 	{
 		// Find the maximum encoded data size
-		uint64_t maxEncodedDataSize = 0;
+		int32_t maxEncodedDataSize = 0;
 		const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
 		ASSERT(entry != 0);
 		for(int64_t e = 0; e < mNumBlocks; e++)
 		{
 			// Get the clear and encoded size
-			uint64_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
+			int32_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
 			ASSERT(encodedSize > 0);
 			
 			// Larger?
-			if(encodedSize > maxEncodedDataSize) 
-				maxEncodedDataSize = encodedSize;
+			if(encodedSize > maxEncodedDataSize) maxEncodedDataSize = encodedSize;
 		}
 		
 		// Allocate those blocks!
-		mpEncodedData = (uint8_t*)BackupStoreFile::CodingChunkAlloc((int)maxEncodedDataSize + 32);
+		mpEncodedData = (uint8_t*)BackupStoreFile::CodingChunkAlloc(maxEncodedDataSize + 32);
 
 		// Allocate the block for the clear data, using the hint from the header.
 		// If this is wrong, things will exception neatly later on, so it can't be used
@@ -605,15 +601,14 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 		int64_t indexSize = sizeof(file_BlockIndexEntry) * mNumBlocks;
 		
 		// Allocate some memory
-		mpBlockIndex = ::malloc((size_t)indexSize);
+		mpBlockIndex = ::malloc(indexSize);
 		if(mpBlockIndex == 0)
 		{
 			throw std::bad_alloc();
 		}
 		
 		// Read it in
-		if(!mrEncodedFile.ReadFullBuffer(mpBlockIndex, (int)indexSize, 
-			0 /* not interested in bytes read if this fails */, mTimeout))
+		if(!mrEncodedFile.ReadFullBuffer(mpBlockIndex, indexSize, 0 /* not interested in bytes read if this fails */, mTimeout))
 		{
 			// Couldn't read header
 			THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
@@ -680,7 +675,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		
 			// Get the size from the block index
 			const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
-			uint64_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
+			int32_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
 			if(encodedSize <= 0)
 			{
 				// The caller is attempting to decode a file which is the direct result of a diff
@@ -690,16 +685,14 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			}
 			
 			// Load in next block
-			if(!mrEncodedFile.ReadFullBuffer(mpEncodedData, (int)encodedSize, 
-				0 /* not interested in bytes read if this fails */, mTimeout))
+			if(!mrEncodedFile.ReadFullBuffer(mpEncodedData, encodedSize, 0 /* not interested in bytes read if this fails */, mTimeout))
 			{
 				// Couldn't read header
 				THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
 			}
 			
 			// Decode the data
-			mCurrentBlockClearSize = BackupStoreFile::DecodeChunk(mpEncodedData, 
-				(int)encodedSize, mpClearData, mClearDataSize);
+			mCurrentBlockClearSize = BackupStoreFile::DecodeChunk(mpEncodedData, encodedSize, mpClearData, mClearDataSize);
 
 			// Calculate IV for this entry
 			uint64_t iv = mEntryIVBase;
@@ -938,7 +931,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 	}
 	
 	// Check alignment of the block
-	ASSERT((((long long)rOutput.mpBuffer) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+	ASSERT((((uint32_t)(long)rOutput.mpBuffer) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 
 	// Want to compress it?
 	bool compressChunk = (ChunkSize >= BACKUP_FILE_MIN_COMPRESSED_CHUNK_SIZE);
@@ -1026,7 +1019,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Output, int OutputSize)
 {
 	// Check alignment of the encoded block
-	ASSERT((((long long)Encoded) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+	ASSERT((((uint32_t)(long)Encoded) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 
 	// First check
 	if(EncodedSize < 1)

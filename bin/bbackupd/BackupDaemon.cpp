@@ -10,10 +10,7 @@
 #include "Box.h"
 
 #include <stdio.h>
-
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
+#include <unistd.h>
 
 #ifndef WIN32
 	#include <signal.h>
@@ -30,9 +27,6 @@
 #ifdef HAVE_SYS_MNTTAB_H
 	#include <cstdio>
 	#include <sys/mnttab.h>
-#endif
-#ifdef HAVE_PROCESS_H
-	#include <process.h>
 #endif
 
 #include "Configuration.h"
@@ -265,7 +259,7 @@ void BackupDaemon::RunHelperThread(void)
 				conf.GetKeyValueInt("MaxUploadWait"),
 				mState);
 
-			mpCommandSocketInfo->mListeningSocket.Write(summary, (int)summarySize);
+			mpCommandSocketInfo->mListeningSocket.Write(summary, summarySize);
 			mpCommandSocketInfo->mListeningSocket.Write("ping\n", 5);
 
 			IOStreamGetLine readLine(mpCommandSocketInfo->mListeningSocket);
@@ -320,7 +314,7 @@ void BackupDaemon::RunHelperThread(void)
 				{
 					const char* response = sendOK ? "ok\n" : "error\n";
 					mpCommandSocketInfo->mListeningSocket.Write(
-						response, (int)strlen(response));
+						response, strlen(response));
 				}
 
 				if (disconnect) 
@@ -514,7 +508,7 @@ void BackupDaemon::Run2()
 					{
 						// No command socket or connection, just do a normal sleep
 						time_t sleepSeconds = BoxTimeToSeconds(requiredDelay);
-						::sleep((unsigned int)((sleepSeconds <= 0)?1:sleepSeconds));
+						::sleep((sleepSeconds <= 0)?1:sleepSeconds);
 					}
 				}
 				
@@ -669,8 +663,7 @@ void BackupDaemon::Run2()
 				}
 				
 				// Calculate when the next sync run should be
-				nextSyncTime = currentSyncStartTime + updateStoreInterval + 
-					Random::RandomInt((uint32_t)updateStoreInterval >> SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
+				nextSyncTime = currentSyncStartTime + updateStoreInterval + Random::RandomInt(updateStoreInterval >> SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 			
 				// Commit the ID Maps
 				CommitIDMapsAfterSync();
@@ -843,7 +836,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 #ifdef WIN32
 	// Really could use some interprocess protection, mutex etc
 	// any side effect should be too bad???? :)
-	DWORD timeout = (DWORD)BoxTimeToMilliSeconds(RequiredDelay);
+	DWORD timeout = BoxTimeToMilliSeconds(RequiredDelay);
 
 	while ( this->mReceivedCommandConn == false )
 	{
@@ -1094,7 +1087,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 		{
 #ifdef WIN32
 			mpCommandSocketInfo->mListeningSocket.Write(message, 
-				(int)strlen(message));
+				strlen(message));
 #else
 			mpCommandSocketInfo->mpConnectedSocket->Write(message,
 				strlen(message));
@@ -1691,9 +1684,7 @@ void BackupDaemon::SetState(int State)
 	char newStateSize = sprintf(newState, "state %d\n", State);
 
 #ifdef WIN32
-#ifndef _MSC_VER
-#warning FIX ME: race condition
-#endif
+	#warning FIX ME: race condition
 	// what happens if the socket is closed by the other thread before
 	// we can write to it? Null pointer deref at best.
 	if (mpCommandSocketInfo && 

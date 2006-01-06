@@ -55,7 +55,7 @@
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
-// #define HAVE_DIRENT_H 1
+#define HAVE_DIRENT_H 1
 
 /* define if the compiler supports exceptions */
 #define HAVE_EXCEPTIONS 
@@ -119,8 +119,6 @@
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 /* #undef HAVE_NETINET_IN_H */
-
-#define HAVE_PROCESS_H 1
 
 /* Define to 1 if SSL is pre-0.9.7 */
 /* #undef HAVE_OLD_SSL */

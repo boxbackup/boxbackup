@@ -125,7 +125,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	}
 
 	tOSSocketHandle socket = GetSocketHandle();
-	BIO_set_fd(mpBIO, (int)socket, BIO_NOCLOSE);
+	BIO_set_fd(mpBIO, socket, BIO_NOCLOSE);
 	
 	// Then the SSL object
 	mpSSL = ::SSL_new(rContext.GetRawContext());

@@ -9,11 +9,8 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <stdio.h>
+#include <unistd.h>
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>

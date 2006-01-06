@@ -9,10 +9,7 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
+#include <unistd.h>
 #include <sys/types.h>
 #include <errno.h>
 
@@ -70,7 +67,7 @@ SocketStream::SocketStream(int socket)
 //
 // --------------------------------------------------------------------------
 SocketStream::SocketStream(const SocketStream &rToCopy)
-	: mSocketHandle(::dup((int)rToCopy.mSocketHandle)),
+	: mSocketHandle(::dup(rToCopy.mSocketHandle)),
 	  mReadClosed(rToCopy.mReadClosed),
 	  mWriteClosed(rToCopy.mWriteClosed)
 

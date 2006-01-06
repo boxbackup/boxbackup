@@ -11,10 +11,7 @@
 
 #ifdef WIN32
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
+#include <unistd.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <windows.h>

@@ -60,7 +60,7 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 	// For each block in the from file, we want to know it's index in the 
 	// diff file. Allocate memory for this information.
 	int64_t fromNumBlocks = box_ntoh64(hdr.mNumBlocks);
-	int64_t *pfromIndexInfo = (int64_t*)::malloc((size_t)fromNumBlocks * sizeof(int64_t));
+	int64_t *pfromIndexInfo = (int64_t*)::malloc(fromNumBlocks * sizeof(int64_t));
 	if(pfromIndexInfo == 0)
 	{
 		throw std::bad_alloc();
@@ -176,21 +176,21 @@ void BackupStoreFile::ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream
 						bufferSize = 0;
 					}
 					// Allocate new block
-					buffer = ::malloc((size_t)blockSize);
+					buffer = ::malloc(blockSize);
 					if(buffer == 0)
 					{
 						throw std::bad_alloc();
 					}
-					bufferSize = (int)blockSize;
+					bufferSize = blockSize;
 				}
 				ASSERT(bufferSize >= blockSize);
 				
 				// Copy the block
-				if(!rFrom.ReadFullBuffer(buffer, (int)blockSize, 0))
+				if(!rFrom.ReadFullBuffer(buffer, blockSize, 0))
 				{
 					THROW_EXCEPTION(BackupStoreException, FailedToReadBlockOnCombine)
 				}
-				rOut.Write(buffer, (int)blockSize);
+				rOut.Write(buffer, blockSize);
 
 				// Store the size
 				pfromIndexInfo[b] = blockSize;

@@ -26,7 +26,7 @@ inline void BoxTimeToTimeval(box_time_t Time, struct timeval &tv)
 
 inline void BoxTimeToTimespec(box_time_t Time, struct timespec &tv)
 {
-	tv.tv_sec = (long)(Time / MICRO_SEC_IN_SEC_LL);
+	tv.tv_sec = (time_t)(Time / MICRO_SEC_IN_SEC_LL);
 	tv.tv_nsec = ((long)(Time % MICRO_SEC_IN_SEC_LL)) * NANO_SEC_IN_USEC;
 }
 

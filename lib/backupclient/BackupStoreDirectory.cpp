@@ -230,7 +230,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	// Build header
 	dir_StreamFormat hdr;
 	hdr.mMagicValue = htonl(OBJECTMAGIC_DIR_MAGIC_VALUE);
-	hdr.mNumEntries = htonl((u_long)count);
+	hdr.mNumEntries = htonl(count);
 	hdr.mObjectID = box_hton64(mObjectID);
 	hdr.mContainerID = box_hton64(mContainerID);
 	hdr.mAttributesModTime = box_hton64(mAttributesModTime);

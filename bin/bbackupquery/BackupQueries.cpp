@@ -9,21 +9,15 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#ifdef HAVE_DIRENT_H
-	#include <dirent.h>
-#endif
+#include <dirent.h>
 
 #include <set>
 
@@ -1253,7 +1247,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeFiles.begin(); i != storeFiles.end(); ++i)
 		{
 			// Does the file exist locally?
-			std::set<std::string>::iterator local(localFiles.find(i->first));
+			std::set<std::string>::const_iterator local(localFiles.find(i->first));
 			if(local == localFiles.end())
 			{
 				// Not found -- report
@@ -1421,7 +1415,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		}
 		
 		// Report any files which exist on the locally, but not on the store
-		for(std::set<std::string>::iterator i = localFiles.begin(); i != localFiles.end(); ++i)
+		for(std::set<std::string>::const_iterator i = localFiles.begin(); i != localFiles.end(); ++i)
 		{
 			std::string localName(rLocalDir + DIRECTORY_SEPARATOR + *i);
 			// Should this be ignored (ie is excluded)?
@@ -1458,7 +1452,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeDirs.begin(); i != storeDirs.end(); ++i)
 		{
 			// Does the directory exist locally?
-			std::set<std::string>::iterator local(localDirs.find(i->first));
+			std::set<std::string>::const_iterator local(localDirs.find(i->first));
 			if(local == localDirs.end())
 			{
 				// Not found -- report

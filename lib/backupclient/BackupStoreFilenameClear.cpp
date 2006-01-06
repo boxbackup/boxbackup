@@ -218,7 +218,7 @@ namespace
 void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, CipherContext &rCipherContext, int StoreAsEncoding)
 {
 	// Work out max size
-	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize((int)rToEncode.size()) + 4;
+	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rToEncode.size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
 	if(sEncDecBufferSize < maxOutSize)
@@ -233,7 +233,7 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 	MEMLEAKFINDER_NOT_A_LEAK(buffer);
 	
 	// Encode -- do entire block in one go
-	int encSize = rCipherContext.TransformBlock(buffer + 2, sEncDecBufferSize - 2, rToEncode.c_str(), (int)rToEncode.size());
+	int encSize = rCipherContext.TransformBlock(buffer + 2, sEncDecBufferSize - 2, rToEncode.c_str(), rToEncode.size());
 	// and add in header size
 	encSize += 2;
 	
@@ -256,7 +256,7 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) const
 {
 	// Work out max size
-	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize((int)size()) + 4;
+	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
 	if(sEncDecBufferSize < maxOutSize)
@@ -272,7 +272,7 @@ void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) con
 	
 	// Decrypt
 	const char *str = c_str() + 2;
-	int sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, (int)size() - 2);
+	int sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, size() - 2);
 	
 	// Assign to this
 	mClearFilename.assign((char*)buffer, sizeOut);

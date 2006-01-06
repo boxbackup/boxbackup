@@ -274,11 +274,7 @@ void memleakfinder_reportleaks_appendfile(const char *filename, const char *mark
 	{
 		if(memleakfinder_numleaks() > 0)
 		{
-#ifdef HAVE_GETPID
 			fprintf(file, "MEMORY LEAKS FROM PROCESS %d (%s)\n", getpid(), markertext);
-#else
-			fprintf(file, "MEMORY LEAKS (%s)\n", markertext);
-#endif
 			memleakfinder_reportleaks_file(file);
 		}
 	

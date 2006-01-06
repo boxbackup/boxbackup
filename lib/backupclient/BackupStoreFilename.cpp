@@ -141,7 +141,7 @@ void BackupStoreFilename::WriteToProtocol(Protocol &rProtocol) const
 {
 	CheckValid();
 	
-	rProtocol.Write(c_str(), (int)size());
+	rProtocol.Write(c_str(), size());
 }
 
 // --------------------------------------------------------------------------
@@ -216,7 +216,7 @@ void BackupStoreFilename::WriteToStream(IOStream &rStream) const
 {
 	CheckValid();
 	
-	rStream.Write(c_str(), (int)size());
+	rStream.Write(c_str(), size());
 }
 
 // --------------------------------------------------------------------------

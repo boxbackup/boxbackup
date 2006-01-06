@@ -174,7 +174,7 @@ void BSFCombinedIndexStream::Initialise(IOStream &rFrom)
 	
 	// Then... allocate memory for the list of sizes
 	mNumEntriesInFromFile = box_ntoh64(fromHdr.mNumBlocks);
-	mFromBlockSizes = (int64_t*)::malloc((size_t)mNumEntriesInFromFile * sizeof(int64_t));
+	mFromBlockSizes = (int64_t*)::malloc(mNumEntriesInFromFile * sizeof(int64_t));
 	if(mFromBlockSizes == 0)
 	{
 		throw std::bad_alloc();
@@ -241,7 +241,7 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 	int entriesToWrite = NBytes / sizeof(file_BlockIndexEntry);
 	if(entriesToWrite > mNumEntriesToGo)
 	{
-		entriesToWrite = (int)mNumEntriesToGo;
+		entriesToWrite = mNumEntriesToGo;
 	}
 	
 	// Setup ready to go
@@ -256,7 +256,7 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 		}
 		
 		// Does this need adjusting?
-		int s = (int)box_ntoh64(poutput[b].mEncodedSize);
+		int s = box_ntoh64(poutput[b].mEncodedSize);
 		if(s <= 0)
 		{
 			// A reference to a block in the from file
