@@ -47,11 +47,6 @@
 	#endif
 #endif
 
-// Cannot do the intercepts in test/raidfile if large file support is enabled
-#ifdef HAVE_LARGE_FILE_SUPPORT
-	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-#endif
-
 #ifdef HAVE_DEFINE_PRAGMA
 	// set packing to one bytes (can't use push/pop on gcc)
 	#define BEGIN_STRUCTURE_PACKING_FOR_WIRE	#pragma pack(1)
