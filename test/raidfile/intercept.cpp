@@ -162,6 +162,15 @@ open(const char *path, int flags, mode_t mode)
 }
 
 extern "C" int
+open64(const char *path, int flags, mode_t mode)
+{
+	// With _FILE_OFFSET_BITS set to 64 this should really use (flags |
+	// O_LARGEFILE) here, but not actually necessary for the tests and not
+	// worth the trouble finding O_LARGEFILE
+	return open(path, flags, mode);
+}
+
+extern "C" int
 close(int d)
 {
 	CHECK_FOR_FAKE_ERROR_COND(d, SIZE_ALWAYS_ERROR, SYS_close, -1);
@@ -245,6 +254,10 @@ lseek(int fildes, off_t offset, int whence)
 #else
 	#ifdef HAVE_LSEEK_DUMMY_PARAM
 		off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
+	#elif defined(_FILE_OFFSET_BITS)
+		// Don't bother trying to call SYS__llseek on 32 bit since it is
+		// fiddly and not needed for the tests
+		off_t r = syscall(SYS_lseek, fildes, (uint32_t)offset, whence);
 	#else
 		off_t r = syscall(SYS_lseek, fildes, offset, whence);
 	#endif
