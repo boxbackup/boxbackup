@@ -40,6 +40,12 @@
 	#endif
 #endif
 
+// Slight hack; disable interception on Darwin within raidfile test
+#ifdef __APPLE__
+	// TODO: Replace with autoconf test
+	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+#endif
+
 // Find out if credentials on UNIX sockets can be obtained
 #ifndef HAVE_GETPEEREID
 	#if !HAVE_DECL_SO_PEERCRED
