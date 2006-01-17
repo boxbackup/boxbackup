@@ -1,0 +1,54 @@
+TITLE bin/bbstored
+
+The backup store daemon.
+
+Maintains a store of encrypted files, and every so often goes through deleting unnecessary data.
+
+Uses an implementation of Protocol to communicate with the backup client daemon. See bin/bbstored/backupprotocol.txt for details.
+
+
+SUBTITLE Data storage
+
+The data is arranged as a set of objects within a RaidFile disc set. Each object has a 64 bit object ID, which is turned into a filename in a mildly complex manner which ensure that directories don't have too many objects in them, but there is a minimal number of nested directories. See StoreStructure::MakeObjectFilename in lib/backupstore/StoreStructure.cpp for more details.
+
+An object can be a directory or a file. Directories contain files and other directories.
+
+Files in directories are supersceded by new versions when uploaded, but the old versions are flagged as such. A new version has a different object ID to the old version.
+
+Every so often, a housekeeping process works out what can be deleted, and deletes unnecessary files to take them below the storage limits set in the store info file.
+
+
+SUBTITLE Note about file storage and downloading
+
+There's one slight entertainment to file storage, in that the format of the file streamed depends on whether it's being downloaded or uploaded.
+
+The problem is that it contains an index of all the blocks. For efficiency in managing these blocks, they all need to be in the same place.
+
+Files are encoded and decoded as they are streamed to and from the server. With encoding, the index is only completely known at the end of the process, so it's sent last, and lives in the filesystem last.
+
+When it's downloaded, it can't be decoded without knowing the index. So the index is sent first, followed by the data.
+
+
+SUBTITLE BackupContext
+
+The context of the current connection, and the object which modifies the store.
+
+Maintains a cache of directories, to avoid reading them continuously, and keeps a track of a BackupStoreInfo object which is written back periodiocally.
+
+
+SUBTITLE BackupStoreDaemon
+
+A ServerTLS daemon which forks off a separate housekeeping process as it starts up.
+
+Handling connections is delegated to a Protocol implementation.
+
+
+SUBTITLE BackupCommands.cpp
+
+Implementation of all the commands. Work which requires writing is handled in the context, read only commands mainly in this file.
+
+
+SUBTITLE HousekeepStoreAccount
+
+A class which performs housekeeping on a single account.
+

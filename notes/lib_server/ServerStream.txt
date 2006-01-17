@@ -1,0 +1,29 @@
+CLASS ServerStream
+
+ServerStream implementes a Daemon which accepts stream connections over sockets, and forks into a child process to handle them.
+
+To implement a daemon, derive from
+
+	ServerStream<SocketStream, SERVER_LISTEN_PORT>
+
+The type SocketStream specifies that incoming connections should be treated as normal sockets, and SERVER_LISTEN_PORT is the port to listen to (if it's a inet socket, and if not overridden in the config file). The actual addresses (or names) to bind to are specified in the configuration file by the user.
+
+Make sure SERVERSTREAM_VERIFY_SERVER_KEYS(0) is included in the configuration verification structure in the "Server" sub configuration. 0 could be replaced with a default address, for example "unix:/var/run/server.sock" to specific a default UNIX socket in the filesystem.
+
+See test/basicserver for a simple example.
+
+The ListenAddresses key in the Server subconfiguration is a comma separated list of addresses, specified as family:name. Internet sockets are family 'inet', for example 'inet:localhost' (or 'inet:localhost:1080' to specify a port number as well), and unix domain sockets are 'unix', example above.
+
+
+Override Connection to handle the connection.
+
+Remember to override Daemon functions like the server name, and start it up, just like a generic Daemon.
+
+
+FUNCTION ServerStream::Connection
+
+This function takes a connected stream as it's argument. It should then proceed to do whatever it needs to do to talk to the client.
+
+Using IOStreamGetLine or a Protocol class to communicate may be quick ways of implementing this functionality.
+
+

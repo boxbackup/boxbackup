@@ -1,0 +1,8 @@
+CLASS SocketStream
+
+A implementation of IOStream which wraps a socket connection.
+
+It can either be created by attaching to an existing object, or use the Open() function to open a connection to a named host on a specific port (or a local UNIX socket in the filesystem).
+
+Follows stream interface.
+

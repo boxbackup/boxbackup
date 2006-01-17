@@ -1,0 +1,102 @@
+CLASS Configuration
+
+Implements the reading of multi-level configuration files. This is intended to be a generic way of representing configuration implementation.
+
+Basic validation is performed on files as they are read, specified by a data structure.
+
+test/common has some examples of usage. 
+
+
+SUBTITLE Configuration file format
+
+The format is simple, a list of Key = Value pairs. For example
+
+Key1 = Value1
+Key2 = Value2
+
+Optionally, multiple values for the same key are allowed.
+
+Lists of configurations can be nested to any level. These are called Sub-configurations:
+
+SubConfig
+{
+	SubKey1 = ValueX
+	SubKey2 = ValueY
+}
+
+
+SUBTITLE Verification
+
+The verification structure specifies what keys are required, what are optional, and what sub-configurations are expected. Default values can be specified.
+
+See Configuration.h for the structures.
+
+RaidFileController::Initialise has a good example of a simple verification layout.
+
+Wildcards can be used for SubConfigurations, by specifying a name of "*". This allows you to use multiple sections to configure any number of items.
+
+Each item has a number of flags, which are combined to say whether an item is required, should be an integer or boolean, and rather importantly, whether it's the last item in the list.
+
+Verification is limited, so you may wish to do more verification the file. There are unimplemented hooks for custom verification functions to be included in the verification definitions. Should be done at some point.
+
+Boolean keys have possible values "true", "yes", "false", "no" (case insensitive). 
+
+
+FUNCTION Configuration::LoadAndVerify()
+
+Loads the configuration from disc, and verifies it. If there are problems with the verification, it returns some text which can be used to tell the user the problems with the file. These are fairly basic error messages, but do say what should be done to get it to parse properly.
+
+This returns a Configuration object, which can then be queries for Keys and Values. Sub-configurations are implemented through an interface which returns a reference to another Configuration object.
+
+
+
+FUNCTION Configuration::KeyExists()
+
+Does a specified key exist?
+
+Use this for optional key values only -- specify them in the verification structure if they are required.
+
+
+FUNCTION Configuration::GetKeyValue()
+
+Get the value of a key as a string.
+
+If ConfigTest_MultiValueAllowed is set in the relevant entry in the verify structure, this string may contain multiple values, separated by a single byte with value 0x01 (use Configuration::MultiValueSeparator in code). Use SplitString() defined in Utils.h to split it into components.
+
+This representation was chosen as multi-values are probably rare, and unlikely to justify writing a nicer (but more memory intensive and complex) solution.
+
+
+FUNCTION Configuration::GetKeyValueInt()
+
+Get the value of a key as an integer. Make sure the AsInt property is requried in the verification structure.
+
+
+FUNCTION Configuration::GetKeyValueBool()
+
+Get the value of a key as a boolean value. Make sure the AsBool property is requried in the verification structure.
+
+Default to "false", should this verification not be performed and an unknown value is specified.
+
+
+FUNCTION Configuration::GetKeyNames()
+
+Return a list of all the keys in this configuration.
+
+
+FUNCTION Configuration::SubConfigurationExists()
+
+Does a specified sub-configuration exist?
+
+
+FUNCTION Configuration::GetSubConfiguration()
+
+Return another Configuration object representing the sub section.
+
+
+FUNCTION Configuration::GetSubConfigurationNames()
+
+Get a list of all the sub configurations.
+
+As there isn't a particularly neat way that configurations can be iterated over, mSubConfigurations is public. (BAD!)
+
+

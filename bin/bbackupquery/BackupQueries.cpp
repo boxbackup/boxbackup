@@ -1,0 +1,1739 @@
+// distribution boxbackup-0.09
+// 
+//  
+// Copyright (c) 2003, 2004
+//      Ben Summers.  All rights reserved.
+//  
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. All use of this software and associated advertising materials must 
+//    display the following acknowledgement:
+//        This product includes software developed by Ben Summers.
+// 4. The names of the Authors may not be used to endorse or promote
+//    products derived from this software without specific prior written
+//    permission.
+// 
+// [Where legally impermissible the Authors do not disclaim liability for 
+// direct physical injury or death caused solely by defects in the software 
+// unless it is modified by a third party.]
+// 
+// THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR
+// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY DIRECT,
+// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+// ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//  
+//  
+//  
+// --------------------------------------------------------------------------
+//
+// File
+//		Name:    BackupQueries.cpp
+//		Purpose: Perform various queries on the backup store server.
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+
+#include "Box.h"
+
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+#include <set>
+
+#include "BackupQueries.h"
+#include "Utils.h"
+#include "Configuration.h"
+#include "autogen_BackupProtocolClient.h"
+#include "BackupStoreFilenameClear.h"
+#include "BackupStoreDirectory.h"
+#include "IOStream.h"
+#include "BoxTimeToText.h"
+#include "FileStream.h"
+#include "BackupStoreFile.h"
+#include "TemporaryDirectory.h"
+#include "FileModificationTime.h"
+#include "BackupClientFileAttributes.h"
+#include "CommonException.h"
+#include "BackupClientRestore.h"
+#include "BackupStoreException.h"
+#include "ExcludeList.h"
+#include "BackupClientMakeExcludeList.h"
+
+#include "MemLeakFindOn.h"
+
+#define COMPARE_RETURN_SAME			1
+#define COMPARE_RETURN_DIFFERENT	2
+#define COMPARE_RETURN_ERROR		3
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::BackupQueries()
+//		Purpose: Constructor
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+BackupQueries::BackupQueries(BackupProtocolClient &rConnection, const Configuration &rConfiguration)
+	: mrConnection(rConnection),
+	  mrConfiguration(rConfiguration),
+	  mQuitNow(false),
+	  mRunningAsRoot(false),
+	  mWarnedAboutOwnerAttributes(false),
+	  mReturnCode(0)		// default return code
+{
+	mRunningAsRoot = (::geteuid() == 0);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::~BackupQueries()
+//		Purpose: Destructor
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+BackupQueries::~BackupQueries()
+{
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::DoCommand(const char *)
+//		Purpose: Perform a command
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+void BackupQueries::DoCommand(const char *Command)
+{
+	// is the command a shell command?
+	if(Command[0] == 's' && Command[1] == 'h' && Command[2] == ' ' && Command[3] != '\0')
+	{
+		// Yes, run shell command
+		::system(Command + 3);
+		return;
+	}
+
+	// split command into components
+	std::vector<std::string> cmdElements;
+	std::string options;
+	{
+		const char *c = Command;
+		bool inQuoted = false;
+		bool inOptions = false;
+		
+		std::string s;
+		while(*c != 0)
+		{
+			// Terminating char?
+			if(*c == ((inQuoted)?'"':' '))
+			{
+				if(!s.empty()) cmdElements.push_back(s);
+				s.resize(0);
+				inQuoted = false;
+				inOptions = false;
+			}
+			else
+			{
+				// No. Start of quoted parameter?
+				if(s.empty() && *c == '"')
+				{
+					inQuoted = true;
+				}
+				// Start of options?
+				else if(s.empty() && *c == '-')
+				{
+					inOptions = true;
+				}
+				else
+				{
+					if(inOptions)
+					{
+						// Option char
+						options += *c;
+					}
+					else
+					{
+						// Normal string char
+						s += *c;
+					}
+				}
+			}
+		
+			++c;
+		}
+		if(!s.empty()) cmdElements.push_back(s);
+	}
+	
+	// Check...
+	if(cmdElements.size() < 1)
+	{
+		// blank command
+		return;
+	}
+	
+	// Data about commands
+	static const char *commandNames[] = {"quit", "exit", "list",	 "pwd", "cd", "lcd",	"sh", "getobject", "get", "compare", "restore", "help", "usage", "undelete", 0};
+	static const char *validOptions[] = {"",	 "",	 "rodIFtsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dri",     "",     "",      "",		 0};
+	#define COMMAND_Quit		0
+	#define COMMAND_Exit		1
+	#define COMMAND_List		2
+	#define COMMAND_pwd			3
+	#define COMMAND_cd			4
+	#define COMMAND_lcd			5
+	#define COMMAND_sh			6
+	#define COMMAND_GetObject	7
+	#define COMMAND_Get			8
+	#define COMMAND_Compare		9
+	#define COMMAND_Restore		10
+	#define COMMAND_Help		11
+	#define COMMAND_Usage		12
+	#define COMMAND_Undelete	13
+	static const char *alias[] = {"ls",			0};
+	static const int aliasIs[] = {COMMAND_List, 0};
+	
+	// Work out which command it is...
+	int cmd = 0;
+	while(commandNames[cmd] != 0 && ::strcmp(cmdElements[0].c_str(), commandNames[cmd]) != 0)
+	{
+		cmd++;
+	}
+	if(commandNames[cmd] == 0)
+	{
+		// Check for aliases
+		int a;
+		for(a = 0; alias[a] != 0; ++a)
+		{
+			if(::strcmp(cmdElements[0].c_str(), alias[a]) == 0)
+			{
+				// Found an alias
+				cmd = aliasIs[a];
+				break;
+			}
+		}
+	
+		// No such command
+		if(alias[a] == 0)
+		{
+			printf("Unrecognised command: %s\n", Command);
+			return;
+		}
+	}
+
+	// Arguments
+	std::vector<std::string> args(cmdElements.begin() + 1, cmdElements.end());
+
+	// Set up options
+	bool opts[256];
+	for(int o = 0; o < 256; ++o) opts[o] = false;
+	// BLOCK
+	{
+		// options
+		const char *c = options.c_str();
+		while(*c != 0)
+		{
+			// Valid option?
+			if(::strchr(validOptions[cmd], *c) == NULL)
+			{
+				printf("Invalid option '%c' for command %s\n", *c, commandNames[cmd]);
+				return;
+			}
+			opts[(int)*c] = true;
+			++c;
+		}
+	}
+
+	if(cmd != COMMAND_Quit && cmd != COMMAND_Exit)
+	{
+		// If not a quit command, set the return code to zero
+		SetReturnCode(0);
+	}
+
+	// Handle command
+	switch(cmd)
+	{
+	case COMMAND_Quit:
+	case COMMAND_Exit:
+		mQuitNow = true;
+		break;
+		
+	case COMMAND_List:
+		CommandList(args, opts);
+		break;
+		
+	case COMMAND_pwd:
+		{
+			// Simple implementation, so do it here
+			std::string dir(GetCurrentDirectoryName());
+			printf("%s (%08llx)\n", dir.c_str(), GetCurrentDirectoryID());
+		}
+		break;
+
+	case COMMAND_cd:
+		CommandChangeDir(args, opts);
+		break;
+		
+	case COMMAND_lcd:
+		CommandChangeLocalDir(args);
+		break;
+		
+	case COMMAND_sh:
+		printf("The command to run must be specified as an argument.\n");
+		break;
+		
+	case COMMAND_GetObject:
+		CommandGetObject(args, opts);
+		break;
+		
+	case COMMAND_Get:
+		CommandGet(args, opts);
+		break;
+		
+	case COMMAND_Compare:
+		CommandCompare(args, opts);
+		break;
+		
+	case COMMAND_Restore:
+		CommandRestore(args, opts);
+		break;
+		
+	case COMMAND_Usage:
+		CommandUsage();
+		break;
+		
+	case COMMAND_Help:
+		CommandHelp(args);
+		break;
+
+	case COMMAND_Undelete:
+		CommandUndelete(args, opts);
+		break;
+		
+	default:
+		break;
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandList(const std::vector<std::string> &, const bool *)
+//		Purpose: List directories (optionally recursive)
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandList(const std::vector<std::string> &args, const bool *opts)
+{
+	#define LIST_OPTION_RECURSIVE		'r'
+	#define LIST_OPTION_ALLOWOLD		'o'
+	#define LIST_OPTION_ALLOWDELETED	'd'
+	#define LIST_OPTION_NOOBJECTID		'I'
+	#define LIST_OPTION_NOFLAGS			'F'
+	#define LIST_OPTION_TIMES			't'
+	#define LIST_OPTION_SIZEINBLOCKS	's'
+	#define LIST_OPTION_DISPLAY_HASH	'h'
+
+	// default to using the current directory
+	int64_t rootDir = GetCurrentDirectoryID();
+
+	// name of base directory
+	std::string listRoot;	// blank
+
+	// Got a directory in the arguments?
+	if(args.size() > 0)
+	{
+		// Attempt to find the directory
+		rootDir = FindDirectoryObjectID(args[0], opts[LIST_OPTION_ALLOWOLD], opts[LIST_OPTION_ALLOWDELETED]);
+		if(rootDir == 0)
+		{
+			printf("Directory %s not found on store\n", args[0].c_str());
+			return;
+		}
+	}
+	
+	// List it
+	List(rootDir, listRoot, opts, true /* first level to list */);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandList2(int64_t, const std::string &, const bool *)
+//		Purpose: Do the actual listing of directories and files
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool *opts, bool FirstLevel)
+{
+	// Generate exclude flags
+	int16_t excludeFlags = BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING;
+	if(!opts[LIST_OPTION_ALLOWOLD]) excludeFlags |= BackupProtocolClientListDirectory::Flags_OldVersion;
+	if(!opts[LIST_OPTION_ALLOWDELETED]) excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
+
+	// Do communication
+	mrConnection.QueryListDirectory(
+			DirID,
+			BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
+			excludeFlags,
+			true /* want attributes */);
+
+	// Retrieve the directory from the stream following
+	BackupStoreDirectory dir;
+	std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
+	dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
+
+	// Then... display everything
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *en = 0;
+	while((en = i.Next()) != 0)
+	{
+		// Display this entry
+		BackupStoreFilenameClear clear(en->GetName());
+		std::string line;
+		
+		// Object ID?
+		if(!opts[LIST_OPTION_NOOBJECTID])
+		{
+			// add object ID to line
+			char oid[32];
+			sprintf(oid, "%08llx ", en->GetObjectID());
+			line += oid;
+		}
+		
+		// Flags?
+		if(!opts[LIST_OPTION_NOFLAGS])
+		{
+			static const char *flags = BACKUPSTOREDIRECTORY_ENTRY_FLAGS_DISPLAY_NAMES;
+			char displayflags[16];
+			// make sure f is big enough
+			ASSERT(sizeof(displayflags) >= sizeof(BACKUPSTOREDIRECTORY_ENTRY_FLAGS_DISPLAY_NAMES) + 3);
+			// Insert flags
+			char *f = displayflags;
+			const char *t = flags;
+			int16_t en_flags = en->GetFlags();
+			while(*t != 0)
+			{
+				*f = ((en_flags&1) == 0)?'-':*t;
+				en_flags >>= 1;
+				f++;
+				t++;
+			}
+			// attributes flags
+			*(f++) = (en->HasAttributes())?'a':'-';
+			// terminate
+			*(f++) = ' ';
+			*(f++) = '\0';
+			line += displayflags;
+			if(en_flags != 0)
+			{
+				line += "[ERROR: Entry has additional flags set] ";
+			}
+		}
+		
+		if(opts[LIST_OPTION_TIMES])
+		{
+			// Show times...
+			line += BoxTimeToISO8601String(en->GetModificationTime());
+			line += ' ';
+		}
+		
+		if(opts[LIST_OPTION_DISPLAY_HASH])
+		{
+			char hash[64];
+			::sprintf(hash, "%016llx ", en->GetAttributesHash());
+			line += hash;
+		}
+		
+		if(opts[LIST_OPTION_SIZEINBLOCKS])
+		{
+			char num[32];
+			sprintf(num, "%05lld ", en->GetSizeInBlocks());
+			line += num;
+		}
+		
+		// add name
+		if(!FirstLevel)
+		{
+			line += rListRoot;
+			line += '/';
+		}
+		line += clear.GetClearFilename().c_str();
+		
+		if(!en->GetName().IsEncrypted())
+		{
+			line += "[FILENAME NOT ENCRYPTED]";
+		}
+		
+		// print line
+		printf("%s\n", line.c_str());
+		
+		// Directory?
+		if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
+		{
+			// Recurse?
+			if(opts[LIST_OPTION_RECURSIVE])
+			{
+				std::string subroot(rListRoot);
+				if(!FirstLevel) subroot += '/';
+				subroot += clear.GetClearFilename();
+				List(en->GetObjectID(), subroot, opts, false /* not the first level to list */);
+			}
+		}
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::FindDirectoryObjectID(const std::string &)
+//		Purpose: Find the object ID of a directory on the store, or return 0 for not found.
+//				 If pStack != 0, the object is set to the stack of directories.
+//				 Will start from the current directory stack.
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName, bool AllowOldVersion,
+			bool AllowDeletedDirs, std::vector<std::pair<std::string, int64_t> > *pStack)
+{
+	// Split up string into elements
+	std::vector<std::string> dirElements;
+	SplitString(rDirName, DIRECTORY_SEPARATOR_ASCHAR, dirElements);
+
+	// Start from current stack, or root, whichever is required
+	std::vector<std::pair<std::string, int64_t> > stack;
+	int64_t dirID = BackupProtocolClientListDirectory::RootDirectory;
+	if(rDirName.size() > 0 && rDirName[0] == '/')
+	{
+		// Root, do nothing
+	}
+	else
+	{
+		// Copy existing stack
+		stack = mDirStack;
+		if(stack.size() > 0)
+		{
+			dirID = stack[stack.size() - 1].second;
+		}
+	}
+
+	// Generate exclude flags
+	int16_t excludeFlags = BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING;
+	if(!AllowOldVersion) excludeFlags |= BackupProtocolClientListDirectory::Flags_OldVersion;
+	if(!AllowDeletedDirs) excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
+
+	// Read directories
+	for(unsigned int e = 0; e < dirElements.size(); ++e)
+	{
+		if(dirElements[e].size() > 0)
+		{
+			if(dirElements[e] == ".")
+			{
+				// Ignore.
+			}
+			else if(dirElements[e] == "..")
+			{
+				// Up one!
+				if(stack.size() > 0)
+				{
+					// Remove top element
+					stack.pop_back();
+					
+					// New dir ID
+					dirID = (stack.size() > 0)?(stack[stack.size() - 1].second):BackupProtocolClientListDirectory::RootDirectory;
+				}
+				else
+				{	
+					// At root anyway
+					dirID = BackupProtocolClientListDirectory::RootDirectory;
+				}
+			}
+			else
+			{
+				// Not blank element. Read current directory.
+				std::auto_ptr<BackupProtocolClientSuccess> dirreply(mrConnection.QueryListDirectory(
+						dirID,
+						BackupProtocolClientListDirectory::Flags_Dir,	// just directories
+						excludeFlags,
+						true /* want attributes */));
+
+				// Retrieve the directory from the stream following
+				BackupStoreDirectory dir;
+				std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
+				dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
+
+				// Then... find the directory within it
+				BackupStoreDirectory::Iterator i(dir);
+				BackupStoreFilenameClear dirname(dirElements[e]);
+				BackupStoreDirectory::Entry *en = i.FindMatchingClearName(dirname);
+				if(en == 0)
+				{
+					// Not found
+					return 0;
+				}
+				
+				// Object ID for next round of searching
+				dirID = en->GetObjectID();
+
+				// Push onto stack
+				stack.push_back(std::pair<std::string, int64_t>(dirElements[e], dirID));
+			}
+		}
+	}
+	
+	// If required, copy the new stack to the caller
+	if(pStack)
+	{
+		*pStack = stack;
+	}
+
+	return dirID;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::GetCurrentDirectoryID()
+//		Purpose: Returns the ID of the current directory
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+int64_t BackupQueries::GetCurrentDirectoryID()
+{
+	// Special case for root
+	if(mDirStack.size() == 0)
+	{
+		return BackupProtocolClientListDirectory::RootDirectory;
+	}
+	
+	// Otherwise, get from the last entry on the stack
+	return mDirStack[mDirStack.size() - 1].second;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::GetCurrentDirectoryName()
+//		Purpose: Gets the name of the current directory
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+std::string BackupQueries::GetCurrentDirectoryName()
+{
+	// Special case for root
+	if(mDirStack.size() == 0)
+	{
+		return std::string("/");
+	}
+
+	// Build path
+	std::string r;
+	for(unsigned int l = 0; l < mDirStack.size(); ++l)
+	{
+		r += "/";
+		r += mDirStack[l].first;
+	}
+	
+	return r;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandChangeDir(const std::vector<std::string> &)
+//		Purpose: Change directory command
+//		Created: 2003/10/10
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandChangeDir(const std::vector<std::string> &args, const bool *opts)
+{
+	if(args.size() != 1 || args[0].size() == 0)
+	{
+		printf("Incorrect usage.\ncd [-o] [-d] <directory>\n");
+		return;
+	}
+	
+	std::vector<std::pair<std::string, int64_t> > newStack;
+	int64_t id = FindDirectoryObjectID(args[0], opts['o'], opts['d'], &newStack);
+	
+	if(id == 0)
+	{
+		printf("Directory '%s' not found\n", args[0].c_str());
+		return;
+	}
+	
+	// Store new stack
+	mDirStack = newStack;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &)
+//		Purpose: Change local directory command
+//		Created: 2003/10/11
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
+{
+	if(args.size() != 1 || args[0].size() == 0)
+	{
+		printf("Incorrect usage.\nlcd <local-directory>\n");
+		return;
+	}
+	
+	// Try changing directory
+	if(::chdir(args[0].c_str()) != 0)
+	{
+		printf((errno == ENOENT || errno == ENOTDIR)?"Directory '%s' does not exist\n":"Error changing dir to '%s'\n",
+			args[0].c_str());
+		return;
+	}
+	
+	// Report current dir
+	char wd[PATH_MAX];
+	if(::getcwd(wd, PATH_MAX) == 0)
+	{
+		printf("Error getting current directory\n");
+		return;
+	}
+	
+	printf("Local current directory is now '%s'\n", wd);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandGetObject(const std::vector<std::string> &, const bool *)
+//		Purpose: Gets an object without any translation.
+//		Created: 2003/10/11
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const bool *opts)
+{
+	// Check args
+	if(args.size() != 2)
+	{
+		printf("Incorrect usage.\ngetobject <object-id> <local-filename>\n");
+		return;
+	}
+	
+	int64_t id = ::strtoll(args[0].c_str(), 0, 16);
+	if(id == LLONG_MIN || id == LLONG_MAX || id == 0)
+	{
+		printf("Not a valid object ID (specified in hex)\n");
+		return;
+	}
+	
+	// Does file exist?
+	struct stat st;
+	if(::stat(args[1].c_str(), &st) == 0 || errno != ENOENT)
+	{
+		printf("The local file %s already exists\n", args[1].c_str());
+		return;
+	}
+	
+	// Open file
+	FileStream out(args[1].c_str(), O_WRONLY | O_CREAT | O_EXCL);
+	
+	// Request that object
+	try
+	{
+		// Request object
+		std::auto_ptr<BackupProtocolClientSuccess> getobj(mrConnection.QueryGetObject(id));
+		if(getobj->GetObjectID() != BackupProtocolClientGetObject::NoObject)
+		{
+			// Stream that object out to the file
+			std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+			objectStream->CopyStreamTo(out);
+			
+			printf("Object ID %08llx fetched successfully.\n", id);
+		}
+		else
+		{
+			printf("Object does not exist on store.\n");
+			::unlink(args[1].c_str());
+		}
+	}
+	catch(...)
+	{
+		::unlink(args[1].c_str());
+		printf("Error occured fetching object.\n");
+	}
+}
+
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandGet(const std::vector<std::string> &, const bool *)
+//		Purpose: Command to get a file from the store
+//		Created: 2003/10/12
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool *opts)
+{
+	// At least one argument?
+	// Check args
+	if(args.size() < 1 || (opts['i'] && args.size() != 2) || args.size() > 2)
+	{
+		printf("Incorrect usage.\ngetobject <object-id> <local-filename>\n or get -i <object-id> <local-filename>\n");
+		return;
+	}
+
+	// Find object ID somehow
+	int64_t id;
+	std::string localName;
+	// BLOCK
+	{
+		// Need to look it up in the current directory
+		mrConnection.QueryListDirectory(
+				GetCurrentDirectoryID(),
+				BackupProtocolClientListDirectory::Flags_File,	// just files
+				(opts['i'])?(BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING):(BackupProtocolClientListDirectory::Flags_OldVersion | BackupProtocolClientListDirectory::Flags_Deleted), // only current versions
+				false /* don't want attributes */);
+
+		// Retrieve the directory from the stream following
+		BackupStoreDirectory dir;
+		std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
+		dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
+
+		if(opts['i'])
+		{
+			// Specified as ID. 
+			id = ::strtoll(args[0].c_str(), 0, 16);
+			if(id == LLONG_MIN || id == LLONG_MAX || id == 0)
+			{
+				printf("Not a valid object ID (specified in hex)\n");
+				return;
+			}
+			
+			// Check that the item is actually in the directory
+			if(dir.FindEntryByID(id) == 0)
+			{
+				printf("ID '%08llx' not found in current directory on store.\n(You can only download objects by ID from the current directory.)\n", id);
+				return;
+			}
+			
+			// Must have a local name in the arguments (check at beginning of function ensures this)
+			localName = args[1];
+		}
+		else
+		{				
+			// Specified by name, find the object in the directory to get the ID
+			BackupStoreDirectory::Iterator i(dir);
+			BackupStoreFilenameClear fn(args[0]);
+			BackupStoreDirectory::Entry *en = i.FindMatchingClearName(fn);
+			
+			if(en == 0)
+			{
+				printf("Filename '%s' not found in current directory on store.\n(Subdirectories in path not searched.)\n", args[0].c_str());
+				return;
+			}
+			
+			id = en->GetObjectID();
+			
+			// Local name is the last argument, which is either the looked up filename, or
+			// a filename specified by the user.
+			localName = args[args.size() - 1];
+		}
+	}
+	
+	// Does local file already exist? (don't want to overwrite)
+	struct stat st;
+	if(::stat(localName.c_str(), &st) == 0 || errno != ENOENT)
+	{
+		printf("The local file %s already exists, will not overwrite it.\n", localName.c_str());
+		return;
+	}
+	
+	// Request it from the store
+	try
+	{
+		// Request object
+		mrConnection.QueryGetFile(GetCurrentDirectoryID(), id);
+
+		// Stream containing encoded file
+		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+		
+		// Decode it
+		BackupStoreFile::DecodeFile(*objectStream, localName.c_str(), mrConnection.GetTimeout());
+
+		// Done.
+		printf("Object ID %08llx fetched sucessfully.\n", id);
+	}
+	catch(...)
+	{
+		::unlink(args[1].c_str());
+		printf("Error occured fetching file.\n");
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CompareParams::CompareParams()
+//		Purpose: Constructor
+//		Created: 29/1/04
+//
+// --------------------------------------------------------------------------
+BackupQueries::CompareParams::CompareParams()
+	: mQuickCompare(false),
+	  mIgnoreExcludes(false),
+	  mDifferences(0),
+	  mDifferencesExplainedByModTime(0),
+	  mExcludedDirs(0),
+	  mExcludedFiles(0),
+	  mpExcludeFiles(0),
+	  mpExcludeDirs(0),
+	  mLatestFileUploadTime(0)
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CompareParams::~CompareParams()
+//		Purpose: Destructor
+//		Created: 29/1/04
+//
+// --------------------------------------------------------------------------
+BackupQueries::CompareParams::~CompareParams()
+{
+	DeleteExcludeLists();
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CompareParams::DeleteExcludeLists()
+//		Purpose: Delete the include lists contained
+//		Created: 29/1/04
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CompareParams::DeleteExcludeLists()
+{
+	if(mpExcludeFiles != 0)
+	{
+		delete mpExcludeFiles;
+		mpExcludeFiles = 0;
+	}
+	if(mpExcludeDirs != 0)
+	{
+		delete mpExcludeDirs;
+		mpExcludeDirs = 0;
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandCompare(const std::vector<std::string> &, const bool *)
+//		Purpose: Command to compare data on the store with local data
+//		Created: 2003/10/12
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandCompare(const std::vector<std::string> &args, const bool *opts)
+{
+	// Parameters, including count of differences
+	BackupQueries::CompareParams params;
+	params.mQuickCompare = opts['q'];
+	params.mIgnoreExcludes = opts['E'];
+	
+	// Try and work out the time before which all files should be on the server
+	{
+		std::string syncTimeFilename(mrConfiguration.GetKeyValue("DataDirectory") + DIRECTORY_SEPARATOR_ASCHAR);
+		syncTimeFilename += "last_sync_start";
+		// Stat it to get file time
+		struct stat st;
+		if(::stat(syncTimeFilename.c_str(), &st) == 0)
+		{
+			// Files modified after this time shouldn't be on the server, so report errors slightly differently
+			params.mLatestFileUploadTime = FileModificationTime(st)
+					- SecondsToBoxTime((uint32_t)mrConfiguration.GetKeyValueInt("MinimumFileAge"));
+		}
+		else
+		{
+			printf("Warning: couldn't determine the time of the last syncronisation -- checks not performed.\n");
+		}
+	}
+
+	// Quick compare?
+	if(params.mQuickCompare)
+	{
+		printf("WARNING: Quick compare used -- file attributes are not checked.\n");
+	}
+	
+	if(!opts['l'] && opts['a'] && args.size() == 0)
+	{
+		// Compare all locations
+		const Configuration &locations(mrConfiguration.GetSubConfiguration("BackupLocations"));
+		for(std::list<std::pair<std::string, Configuration> >::const_iterator i = locations.mSubConfigurations.begin();
+				i != locations.mSubConfigurations.end(); ++i)
+		{
+			CompareLocation(i->first, params);
+		}
+	}
+	else if(opts['l'] && !opts['a'] && args.size() == 1)
+	{
+		// Compare one location
+		CompareLocation(args[0], params);
+	}
+	else if(!opts['l'] && !opts['a'] && args.size() == 2)
+	{
+		// Compare directory to directory
+		
+		// Can't be bothered to do all the hard work to work out which location it's on, and hence which exclude list
+		if(!params.mIgnoreExcludes)
+		{
+			printf("Cannot use excludes on directory to directory comparison -- use -E flag to specify ignored excludes\n");
+			return;
+		}
+		else
+		{
+			// Do compare
+			Compare(args[0], args[1], params);
+		}
+	}
+	else
+	{
+		printf("Incorrect usage.\ncompare -a\n or compare -l <location-name>\n or compare <store-dir-name> <local-dir-name>\n");
+		return;
+	}
+	
+	printf("\n[ %d (of %d) differences probably due to file modifications after the last upload ]\nDifferences: %d (%d dirs excluded, %d files excluded)\n",
+		params.mDifferencesExplainedByModTime, params.mDifferences, params.mDifferences, params.mExcludedDirs, params.mExcludedFiles);
+	
+	// Set return code?
+	if(opts['c'])
+	{
+		SetReturnCode((params.mDifferences == 0)?COMPARE_RETURN_SAME:COMPARE_RETURN_DIFFERENT);
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CompareLocation(const std::string &, BackupQueries::CompareParams &)
+//		Purpose: Compare a location
+//		Created: 2003/10/13
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries::CompareParams &rParams)
+{
+	// Find the location's sub configuration
+	const Configuration &locations(mrConfiguration.GetSubConfiguration("BackupLocations"));
+	if(!locations.SubConfigurationExists(rLocation.c_str()))
+	{
+		printf("Location %s does not exist.\n", rLocation.c_str());
+		return;
+	}
+	const Configuration &loc(locations.GetSubConfiguration(rLocation.c_str()));
+	
+	try
+	{
+		// Generate the exclude lists
+		if(!rParams.mIgnoreExcludes)
+		{
+			rParams.mpExcludeFiles = BackupClientMakeExcludeList_Files(loc);
+			rParams.mpExcludeDirs = BackupClientMakeExcludeList_Dirs(loc);
+		}
+				
+		// Then get it compared
+		Compare(std::string("/") + rLocation, loc.GetKeyValue("Path"), rParams);
+	}
+	catch(...)
+	{
+		// Clean up
+		rParams.DeleteExcludeLists();
+		throw;
+	}
+	
+	// Delete exclude lists
+	rParams.DeleteExcludeLists();
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::Compare(const std::string &, const std::string &, BackupQueries::CompareParams &)
+//		Purpose: Compare a store directory against a local directory
+//		Created: 2003/10/13
+//
+// --------------------------------------------------------------------------
+void BackupQueries::Compare(const std::string &rStoreDir, const std::string &rLocalDir, BackupQueries::CompareParams &rParams)
+{
+	// Get the directory ID of the directory -- only use current data
+	int64_t dirID = FindDirectoryObjectID(rStoreDir);
+	
+	// Found?
+	if(dirID == 0)
+	{
+		printf("Local directory '%s' exists, but server directory '%s' does not exist\n", rLocalDir.c_str(), rStoreDir.c_str());		
+		rParams.mDifferences ++;
+		return;
+	}
+	
+	// Go!
+	Compare(dirID, rStoreDir, rLocalDir, rParams);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::Compare(int64_t, const std::string &, BackupQueries::CompareParams &)
+//		Purpose: Compare a store directory against a local directory
+//		Created: 2003/10/13
+//
+// --------------------------------------------------------------------------
+void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const std::string &rLocalDir, BackupQueries::CompareParams &rParams)
+{
+	// Get info on the local directory
+	struct stat st;
+	if(::lstat(rLocalDir.c_str(), &st) != 0)
+	{
+		// What kind of error?
+		if(errno == ENOTDIR)
+		{
+			printf("Local object '%s' is a file, server object '%s' is a directory\n", rLocalDir.c_str(), rStoreDir.c_str());
+			rParams.mDifferences ++;
+		}
+		else if(errno == ENOENT)
+		{
+			printf("Local directory '%s' does not exist (compared to server directory '%s')\n", rLocalDir.c_str(), rStoreDir.c_str());
+		}
+		else
+		{
+			printf("ERROR: stat on local dir '%s'\n", rLocalDir.c_str());
+		}
+		return;
+	}
+
+	// Get the directory listing from the store
+	mrConnection.QueryListDirectory(
+			DirID,
+			BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	// get everything
+			BackupProtocolClientListDirectory::Flags_OldVersion | BackupProtocolClientListDirectory::Flags_Deleted,	// except for old versions and deleted files
+			true /* want attributes */);
+
+	// Retrieve the directory from the stream following
+	BackupStoreDirectory dir;
+	std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
+	dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
+
+	// Test out the attributes
+	if(!dir.HasAttributes())
+	{
+		printf("Store directory '%s' doesn't have attributes.\n", rStoreDir.c_str());
+	}
+	else
+	{
+		// Fetch the attributes
+		const StreamableMemBlock &storeAttr(dir.GetAttributes());
+		BackupClientFileAttributes attr(storeAttr);
+
+		// Get attributes of local directory
+		BackupClientFileAttributes localAttr;
+		localAttr.ReadAttributes(rLocalDir.c_str(), true /* directories have zero mod times */);
+
+		if(!(attr.Compare(localAttr, true, true /* ignore modification times */)))
+		{
+			printf("Local directory '%s' has different attributes to store directory '%s'.\n",
+				rLocalDir.c_str(), rStoreDir.c_str());
+			rParams.mDifferences ++;
+		}
+	}
+
+	// Open the local directory
+	DIR *dirhandle = ::opendir(rLocalDir.c_str());
+	if(dirhandle == 0)
+	{
+		printf("ERROR: opendir on local dir '%s'\n", rLocalDir.c_str());
+		return;
+	}
+	try
+	{
+		// Read the files and directories into sets
+		std::set<std::string> localFiles;
+		std::set<std::string> localDirs;
+		struct dirent *localDirEn = 0;
+		while((localDirEn = readdir(dirhandle)) != 0)
+		{
+			// Not . and ..!
+			if(localDirEn->d_name[0] == '.' && 
+				(localDirEn->d_name[1] == '\0' || (localDirEn->d_name[1] == '.' && localDirEn->d_name[2] == '\0')))
+			{
+				// ignore, it's . or ..
+				continue;
+			}
+
+#ifdef PLATFORM_dirent_BROKEN_d_type
+			std::string fn(rLocalDir);
+			fn += '/';
+			fn += localDirEn->d_name;
+			struct stat st;
+			if(::lstat(fn.c_str(), &st) != 0)
+			{
+			    THROW_EXCEPTION(CommonException, OSFileError)
+			}
+			
+			// Entry -- file or dir?
+			if(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))
+			{	
+			    // File or symbolic link
+			    localFiles.insert(std::string(localDirEn->d_name));
+			}
+			else if(S_ISDIR(st.st_mode))
+			{
+			    // Directory
+			    localDirs.insert(std::string(localDirEn->d_name));
+			}			
+#else
+			// Entry -- file or dir?
+			if(localDirEn->d_type == DT_REG || localDirEn->d_type == DT_LNK)
+			{
+				// File or symbolic link
+				localFiles.insert(std::string(localDirEn->d_name));
+			}
+			else if(localDirEn->d_type == DT_DIR)
+			{
+				// Directory
+				localDirs.insert(std::string(localDirEn->d_name));
+			}
+#endif // PLATFORM_dirent_BROKEN_d_type
+		}
+		// Close directory
+		if(::closedir(dirhandle) != 0)
+		{
+			printf("ERROR: closedir on local dir '%s'\n", rLocalDir.c_str());
+		}
+		dirhandle = 0;
+	
+		// Do the same for the store directories
+		std::set<std::pair<std::string, BackupStoreDirectory::Entry *> > storeFiles;
+		std::set<std::pair<std::string, BackupStoreDirectory::Entry *> > storeDirs;
+		
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *storeDirEn = 0;
+		while((storeDirEn = i.Next()) != 0)
+		{
+			// Decrypt filename
+			BackupStoreFilenameClear name(storeDirEn->GetName());
+		
+			// What is it?
+			if((storeDirEn->GetFlags() & BackupStoreDirectory::Entry::Flags_File) == BackupStoreDirectory::Entry::Flags_File)
+			{
+				// File
+				storeFiles.insert(std::pair<std::string, BackupStoreDirectory::Entry *>(name.GetClearFilename(), storeDirEn));
+			}
+			else
+			{
+				// Dir
+				storeDirs.insert(std::pair<std::string, BackupStoreDirectory::Entry *>(name.GetClearFilename(), storeDirEn));
+			}
+		}
+		
+		// Now compare files.
+		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeFiles.begin(); i != storeFiles.end(); ++i)
+		{
+			// Does the file exist locally?
+			std::set<std::string>::const_iterator local(localFiles.find(i->first));
+			if(local == localFiles.end())
+			{
+				// Not found -- report
+				printf("Local file '%s/%s' does not exist, but store file '%s/%s' does.\n",
+					rLocalDir.c_str(), i->first.c_str(), rStoreDir.c_str(), i->first.c_str());
+				rParams.mDifferences ++;
+			}
+			else
+			{
+				try
+				{
+					// make local name of file for comparison
+					std::string localName(rLocalDir + DIRECTORY_SEPARATOR + i->first);
+
+					// Files the same flag?
+					bool equal = true;
+					
+					// File modified after last sync flag
+					bool modifiedAfterLastSync = false;
+						
+					if(rParams.mQuickCompare)
+					{
+						// Compare file -- fetch it
+						mrConnection.QueryGetBlockIndexByID(i->second->GetObjectID());
+
+						// Stream containing block index
+						std::auto_ptr<IOStream> blockIndexStream(mrConnection.ReceiveStream());
+						
+						// Compare
+						equal = BackupStoreFile::CompareFileContentsAgainstBlockIndex(localName.c_str(), *blockIndexStream, mrConnection.GetTimeout());
+					}
+					else
+					{
+						// Compare file -- fetch it
+						mrConnection.QueryGetFile(DirID, i->second->GetObjectID());
+	
+						// Stream containing encoded file
+						std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+	
+						// Decode it
+						std::auto_ptr<BackupStoreFile::DecodedStream> fileOnServerStream;
+						// Got additional attibutes?
+						if(i->second->HasAttributes())
+						{
+							// Use these attributes
+							const StreamableMemBlock &storeAttr(i->second->GetAttributes());
+							BackupClientFileAttributes attr(storeAttr);
+							fileOnServerStream.reset(BackupStoreFile::DecodeFileStream(*objectStream, mrConnection.GetTimeout(), &attr).release());
+						}
+						else
+						{
+							// Use attributes stored in file
+							fileOnServerStream.reset(BackupStoreFile::DecodeFileStream(*objectStream, mrConnection.GetTimeout()).release());
+						}
+						
+						// Should always be something in the auto_ptr, it's how the interface is defined. But be paranoid.
+						if(!fileOnServerStream.get())
+						{
+							THROW_EXCEPTION(BackupStoreException, Internal)
+						}
+						
+						// Compare attributes
+						BackupClientFileAttributes localAttr;
+						box_time_t fileModTime = 0;
+						localAttr.ReadAttributes(localName.c_str(), false /* don't zero mod times */, &fileModTime);					
+						modifiedAfterLastSync = (fileModTime > rParams.mLatestFileUploadTime);
+						if(!localAttr.Compare(fileOnServerStream->GetAttributes(),
+								true /* ignore attr mod time */,
+								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
+						{
+							printf("Local file '%s/%s' has different attributes to store file '%s/%s'.\n",
+								rLocalDir.c_str(), i->first.c_str(), rStoreDir.c_str(), i->first.c_str());						
+							rParams.mDifferences ++;
+							if(modifiedAfterLastSync)
+							{
+								rParams.mDifferencesExplainedByModTime ++;
+								printf("(the file above was modified after the last sync time -- might be reason for difference)\n");
+							}
+							else if(i->second->HasAttributes())
+							{
+								printf("(the file above has had new attributes applied)\n");
+							}
+						}
+	
+						// Compare contents, if it's a regular file not a link
+						// Remember, we MUST read the entire stream from the server.
+						if(!fileOnServerStream->IsSymLink())
+						{
+							// Open the local file
+							FileStream l(localName.c_str());
+							
+							// Size
+							IOStream::pos_type fileSizeLocal = l.BytesLeftToRead();
+							IOStream::pos_type fileSizeServer = 0;
+							
+							// Test the contents
+							char buf1[2048];
+							char buf2[2048];
+							while(fileOnServerStream->StreamDataLeft() && l.StreamDataLeft())
+							{
+								int size = fileOnServerStream->Read(buf1, sizeof(buf1), mrConnection.GetTimeout());
+								fileSizeServer += size;
+								
+								if(l.Read(buf2, size) != size
+										|| ::memcmp(buf1, buf2, size) != 0)
+								{
+									equal = false;
+									break;
+								}
+							}
+	
+							// Check read all the data from the server and file -- can't be equal if local and remote aren't the same length
+							// Can't use StreamDataLeft() test on file, because if it's the same size, it won't know
+							// it's EOF yet.
+							if(fileOnServerStream->StreamDataLeft() || fileSizeServer != fileSizeLocal)
+							{
+								equal = false;
+							}
+
+							// Must always read the entire decoded string, if it's not a symlink
+							if(fileOnServerStream->StreamDataLeft())
+							{
+								// Absorb all the data remaining
+								char buffer[2048];
+								while(fileOnServerStream->StreamDataLeft())
+								{
+									fileOnServerStream->Read(buffer, sizeof(buffer), mrConnection.GetTimeout());
+								}
+							}
+						}
+					}
+
+					// Report if not equal.
+					if(!equal)
+					{
+						printf("Local file '%s/%s' has different contents to store file '%s/%s'.\n",
+							rLocalDir.c_str(), i->first.c_str(), rStoreDir.c_str(), i->first.c_str());
+						rParams.mDifferences ++;
+						if(modifiedAfterLastSync)
+						{
+							rParams.mDifferencesExplainedByModTime ++;
+							printf("(the file above was modified after the last sync time -- might be reason for difference)\n");
+						}
+						else if(i->second->HasAttributes())
+						{
+							printf("(the file above has had new attributes applied)\n");
+						}
+					}
+				}
+				catch(BoxException &e)
+				{
+					printf("ERROR: (%d/%d) during file fetch and comparsion for '%s/%s'\n",
+						e.GetType(),
+						e.GetSubType(),
+						rStoreDir.c_str(), i->first.c_str());
+				}
+				catch(...)
+				{
+					printf("ERROR: (unknown) during file fetch and comparsion for '%s/%s'\n", rStoreDir.c_str(), i->first.c_str());
+				}
+
+				// Remove from set so that we know it's been compared
+				localFiles.erase(local);
+			}
+		}
+		
+		// Report any files which exist on the locally, but not on the store
+		for(std::set<std::string>::const_iterator i = localFiles.begin(); i != localFiles.end(); ++i)
+		{
+			std::string localName(rLocalDir + DIRECTORY_SEPARATOR + *i);
+			// Should this be ignored (ie is excluded)?
+			if(rParams.mpExcludeFiles == 0 || !(rParams.mpExcludeFiles->IsExcluded(localName)))
+			{
+				printf("Local file '%s/%s' exists, but store file '%s/%s' does not exist.\n",
+					rLocalDir.c_str(), (*i).c_str(), rStoreDir.c_str(), (*i).c_str());
+				rParams.mDifferences ++;
+				
+				// Check the file modification time
+				{
+					struct stat st;
+					if(::stat(localName.c_str(), &st) == 0)
+					{
+						if(FileModificationTime(st) > rParams.mLatestFileUploadTime)
+						{
+							rParams.mDifferencesExplainedByModTime ++;
+							printf("(the file above was modified after the last sync time -- might be reason for difference)\n");
+						}
+					}
+				}
+			}
+			else
+			{
+				rParams.mExcludedFiles ++;
+			}
+		}		
+		
+		// Finished with the files, clear the sets to reduce memory usage slightly
+		localFiles.clear();
+		storeFiles.clear();
+		
+		// Now do the directories, recusively to check subdirectories
+		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeDirs.begin(); i != storeDirs.end(); ++i)
+		{
+			// Does the directory exist locally?
+			std::set<std::string>::const_iterator local(localDirs.find(i->first));
+			if(local == localDirs.end())
+			{
+				// Not found -- report
+				printf("Local directory '%s/%s' does not exist, but store directory '%s/%s' does.\n",
+					rLocalDir.c_str(), i->first.c_str(), rStoreDir.c_str(), i->first.c_str());
+				rParams.mDifferences ++;
+			}
+			else
+			{
+				// Compare directory
+				Compare(i->second->GetObjectID(), rStoreDir + "/" + i->first, rLocalDir + DIRECTORY_SEPARATOR + i->first, rParams);
+				
+				// Remove from set so that we know it's been compared
+				localDirs.erase(local);
+			}
+		}
+		
+		// Report any files which exist on the locally, but not on the store
+		for(std::set<std::string>::const_iterator i = localDirs.begin(); i != localDirs.end(); ++i)
+		{
+			std::string localName(rLocalDir + DIRECTORY_SEPARATOR + *i);
+			// Should this be ignored (ie is excluded)?
+			if(rParams.mpExcludeDirs == 0 || !(rParams.mpExcludeDirs->IsExcluded(localName)))
+			{
+				printf("Local directory '%s/%s' exists, but store directory '%s/%s' does not exist.\n",
+					rLocalDir.c_str(), (*i).c_str(), rStoreDir.c_str(), (*i).c_str());
+				rParams.mDifferences ++;
+			}
+			else
+			{
+				rParams.mExcludedDirs ++;
+			}
+		}		
+		
+	}
+	catch(...)
+	{
+		if(dirhandle != 0)
+		{
+			::closedir(dirhandle);
+		}
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandRestore(const std::vector<std::string> &, const bool *)
+//		Purpose: Restore a directory
+//		Created: 23/11/03
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandRestore(const std::vector<std::string> &args, const bool *opts)
+{
+	// Check arguments
+	if(args.size() != 2)
+	{
+		printf("Incorrect usage.\nrestore [-d] [-r] [-i] <directory-name> <local-directory-name>\n");
+		return;
+	}
+
+	// Restoring deleted things?
+	bool restoreDeleted = opts['d'];
+
+	// Get directory ID
+	int64_t dirID = 0;
+	if(opts['i'])
+	{
+		// Specified as ID. 
+		dirID = ::strtoll(args[0].c_str(), 0, 16);
+		if(dirID == LLONG_MIN || dirID == LLONG_MAX || dirID == 0)
+		{
+			printf("Not a valid object ID (specified in hex)\n");
+			return;
+		}
+	}
+	else
+	{
+		// Look up directory ID
+		dirID = FindDirectoryObjectID(args[0], false /* no old versions */, restoreDeleted /* find deleted dirs */);
+	}
+	
+	// Allowable?
+	if(dirID == 0)
+	{
+		printf("Directory %s not found on server\n", args[0].c_str());
+		return;
+	}
+	if(dirID == BackupProtocolClientListDirectory::RootDirectory)
+	{
+		printf("Cannot restore the root directory -- restore locations individually.\n");
+		return;
+	}
+	
+	// Go and restore...
+	switch(BackupClientRestore(mrConnection, dirID, args[1].c_str(), true /* print progress dots */, restoreDeleted, 
+		false /* don't undelete after restore! */, opts['r'] /* resume? */))
+	{
+	case Restore_Complete:
+		printf("Restore complete\n");
+		break;
+	
+	case Restore_ResumePossible:
+		printf("Resume possible -- repeat command with -r flag to resume\n");
+		break;
+	
+	case Restore_TargetExists:
+		printf("The target directory exists. You cannot restore over an existing directory.\n");
+		break;
+		
+	default:
+		printf("ERROR: Unknown restore result.\n");
+		break;
+	}
+}
+
+
+
+// These are autogenerated by a script.
+extern char *help_commands[];
+extern char *help_text[];
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandHelp(const std::vector<std::string> &args)
+//		Purpose: Display help on commands
+//		Created: 15/2/04
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandHelp(const std::vector<std::string> &args)
+{
+	if(args.size() == 0)
+	{
+		// Display a list of all commands
+		printf("Available commands are:\n");
+		for(int c = 0; help_commands[c] != 0; ++c)
+		{
+			printf("    %s\n", help_commands[c]);
+		}
+		printf("Type \"help <command>\" for more information on a command.\n\n");
+	}
+	else
+	{
+		// Display help on a particular command
+		int c;
+		for(c = 0; help_commands[c] != 0; ++c)
+		{
+			if(::strcmp(help_commands[c], args[0].c_str()) == 0)
+			{
+				// Found the command, print help
+				printf("\n%s\n", help_text[c]);
+				break;
+			}
+		}
+		if(help_commands[c] == 0)
+		{
+			printf("No help found for command '%s'\n", args[0].c_str());
+		}
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandUsage()
+//		Purpose: Display storage space used on server
+//		Created: 19/4/04
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandUsage()
+{
+	// Request full details from the server
+	std::auto_ptr<BackupProtocolClientAccountUsage> usage(mrConnection.QueryGetAccountUsage());
+
+	// Display each entry in turn
+	int64_t hardLimit = usage->GetBlocksHardLimit();
+	int32_t blockSize = usage->GetBlockSize();
+	CommandUsageDisplayEntry("Used", usage->GetBlocksUsed(), hardLimit, blockSize);
+	CommandUsageDisplayEntry("Old files", usage->GetBlocksInOldFiles(), hardLimit, blockSize);
+	CommandUsageDisplayEntry("Deleted files", usage->GetBlocksInDeletedFiles(), hardLimit, blockSize);
+	CommandUsageDisplayEntry("Directories", usage->GetBlocksInDirectories(), hardLimit, blockSize);
+	CommandUsageDisplayEntry("Soft limit", usage->GetBlocksSoftLimit(), hardLimit, blockSize);
+	CommandUsageDisplayEntry("Hard limit", hardLimit, hardLimit, blockSize);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandUsageDisplayEntry(const char *, int64_t, int64_t, int32_t)
+//		Purpose: Display an entry in the usage table
+//		Created: 19/4/04
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size, int64_t HardLimit, int32_t BlockSize)
+{
+	// Calculate size in Mb
+	double mb = (((double)Size) * ((double)BlockSize)) / ((double)(1024*1024));
+	int64_t percent = (Size * 100) / HardLimit;
+
+	// Bar graph
+	char bar[41];
+	unsigned int b = (int)((Size * (sizeof(bar)-1)) / HardLimit);
+	if(b > sizeof(bar)-1) {b = sizeof(bar)-1;}
+	for(unsigned int l = 0; l < b; l++)
+	{
+		bar[l] = '*';
+	}
+	bar[b] = '\0';
+
+	// Print the entryj
+	::printf("%14s %10.1fMb %3d%% %s\n", Name, mb, (int32_t)percent, bar);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandUndelete(const std::vector<std::string> &, const bool *)
+//		Purpose: Undelete a directory
+//		Created: 23/11/03
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandUndelete(const std::vector<std::string> &args, const bool *opts)
+{
+	// Check arguments
+	if(args.size() != 1)
+	{
+		printf("Incorrect usage.\nundelete <directory-name>\n");
+		return;
+	}
+
+	// Get directory ID
+	int64_t dirID = FindDirectoryObjectID(args[0], false /* no old versions */, true /* find deleted dirs */);
+	
+	// Allowable?
+	if(dirID == 0)
+	{
+		printf("Directory %s not found on server\n", args[0].c_str());
+		return;
+	}
+	if(dirID == BackupProtocolClientListDirectory::RootDirectory)
+	{
+		printf("Cannot restore the root directory -- restore locations individually.\n");
+		return;
+	}
+
+	// Undelete
+	mrConnection.QueryUndeleteDirectory(dirID);
+}
+
+
+
+
+

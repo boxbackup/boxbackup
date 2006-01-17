@@ -1,0 +1,8 @@
+
+Install perl
+
+Install OpenSSL 0.9.7 or later.
+
+Not a completely working port -- symlinks don't get backed up or restored properly.
+(run test/bbackupd)
+

@@ -1,0 +1,85 @@
+
+bbackupd
+========
+
+better handling of timeouts?
+
+do we need any checks other than the client store marker to check that the store is the same store it connected to last time?
+
+check that symlinks to directories are not followed!
+
+
+bbackupquery
+============
+
+Make the default verify option to use MD5 checksums when system has been used a bit more?
+	- this may want to verify attributes too, at present it doesn't.
+
+
+bbstored
+========
+
+make bbstored more robust, eg asking for dir which doesn't exist gives raid file exception, which causes the child to exit.
+
+Backup -- Do we want to use the deleted dir list in the store info? If so, implement...
+
+bstored -- if a really large file is being uploaded which would exceed the hard limit, need to do something about it before it all arrives.
+	Just saves bandwidth for legitiamte clients -- DoS attack would still work just by starting the upload again, unless connection limits implemented.
+
+
+
+RaidFile system
+===============
+
+RaidFileController::Initialise -- cope with config files which don't
+specify all sets in numerical order
+
+RaidFile recovery daemons (check all slowly, and recover notified files)
+
+RaidFile raidify daemon
+
+Test really big Raid File. (done once, but maybe more formal and exhaustive test?)
+
+consider buffering to disc natural block size in RaidFile for extra performance -- if it's a problem.
+
+
+
+In general
+==========
+
+Check that an exception is thrown when new fails (_set_new_handler?)
+
+operator=() on things with copy constructors
+
+Buildsystem -- only carry -l<x> over to dependencies if it's a lib/ module
+	-- better still, rewrite it. It's nasty now.
+
+
+
+lib/server
+==========
+
+Check what happens when network connections are broken unexpectedly
+ie SIGPIPE handling for sockets / daemons
+
+In forking daemons, better behaviour to kill -HUP and -TERM
+
+Review TLS/SSL options
+
+Certificate revokation lists
+
+Better exception handling in Protocol.
+
+Better Protocol test, including what happens when things go wrong.
+
+In Protocol, handle end of read/write streams properly, instead of relying on client being nice.
+
+
+
+Platform -- Linux
+=================
+
+Check all instances of O_EXLOCK (not supported on linux) and do whatever's necessary for giving equivalent semantics on this platform
+
+
+

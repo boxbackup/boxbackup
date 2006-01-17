@@ -1,0 +1,46 @@
+TITLE lib/backupclient
+
+Classes used on the store and on the server.
+
+See documentation in the files for more details.
+
+
+SUBTITLE BackupStoreDirectory
+
+The directory listing class, containing a number of entries, representing files.
+
+
+SUBTITLE BackupStoreFile
+
+Handles compressing and encrypting files, and decoding files downloaded from the server.
+
+
+SUBTITLE BackupStoreFilename
+
+An encrypted filename.
+
+
+SUBTITLE BackupStoreFilenameClear
+
+Derived from BackupStoreFilename, but with the ability to encrypt and decrypt filenames. Client side only.
+
+
+SUBTITLE BackupClientFileAttributes
+
+Only used on the client -- the server treats attributes as blocks of opaque data.
+
+This reads attributes from files on discs, stores them, encrypts them, and applies them to new files.
+
+Also has a static function to generate filename attribute hashes given a struct stat and the filename.
+
+
+SUBTITLE BackupClientRestore
+
+Routines to restore files from the server onto the client filesystem.
+
+
+SUBTITLE BackupClientCryptoKeys
+
+This reads the key material from disc, and sets up the crypto for storing files, attributes and directories.
+
+
