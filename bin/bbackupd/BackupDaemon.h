@@ -59,6 +59,8 @@
 #include "SocketListen.h"
 #include "SocketStream.h"
 
+#include "Archive.h"
+
 class BackupClientDirectoryRecord;
 class BackupClientContext;
 class Configuration;
@@ -79,6 +81,10 @@ class BackupDaemon : public Daemon
 public:
 	BackupDaemon();
 	~BackupDaemon();
+
+	// methods below do partial (specialized) serialization of client state only
+	void SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const;
+	void DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime);
 private:
 	BackupDaemon(const BackupDaemon &);
 public:
@@ -155,6 +161,9 @@ private:
 	public:
 		Location();
 		~Location();
+
+		void Deserialize(Archive & rArchive);
+		void Serialize(Archive & rArchive) const;
 	private:
 		Location(const Location &);	// copy not allowed
 		Location &operator=(const Location &);

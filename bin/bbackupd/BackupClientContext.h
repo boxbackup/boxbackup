@@ -173,6 +173,55 @@ public:
 		bool &rIsCurrentVersionOut, box_time_t *pModTimeOnServer = 0, box_time_t *pAttributesHashOnServer = 0,
 		BackupStoreFilenameClear *pLeafname = 0); // not const as may connect to server
 
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupClientContext::SetMaximumDiffingTime()
+	//		Purpose: Sets the maximum time that will be spent diffing a file
+	//		Created: 04/19/2005
+	//
+	// --------------------------------------------------------------------------
+	static void SetMaximumDiffingTime(int iSeconds);
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupClientContext::SetKeepAliveTime()
+	//		Purpose: Sets the time interval for repetitive keep-alive operation
+	//		Created: 04/19/2005
+	//
+	// --------------------------------------------------------------------------
+	static void SetKeepAliveTime(int iSeconds);
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupClientContext::ManageDiffProcess()
+	//		Purpose: Initiates an SSL connection/session keep-alive process
+	//		Created: 04/19/2005
+	//
+	// --------------------------------------------------------------------------
+	void ManageDiffProcess();
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupClientContext::UnManageDiffProcess()
+	//		Purpose: Suspends an SSL connection/session keep-alive process
+	//		Created: 04/19/2005
+	//
+	// --------------------------------------------------------------------------
+	void UnManageDiffProcess();
+
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupClientContext::DoKeepAlive()
+	//		Purpose: Does something inconsequential over the SSL link to keep it up
+	//		Created: 04/19/2005
+	//
+	// --------------------------------------------------------------------------
+	void DoKeepAlive();
 private:
 	BackupDaemon &mrDaemon;
 	TLSContext &mrTLSContext;
@@ -188,6 +237,8 @@ private:
 	bool mStorageLimitExceeded;
 	ExcludeList *mpExcludeFiles;
 	ExcludeList *mpExcludeDirs;
+
+	bool mbIsManaged;
 };
 
 

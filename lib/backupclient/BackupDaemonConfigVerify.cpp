@@ -123,6 +123,8 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	{"ExtendedLogging",	"no", ConfigTest_IsBool, 0},			// make value "yes" to enable in config file
 
 	{"CommandSocket", 0, 0, 0},				// not compulsory to have this
+	{"StoreObjectInfoFile", 0, 0, 0},				// optional
+	{"KeepAliveTime", 0, ConfigTest_IsInt, 0},				// optional
 
 	{"NotifyScript", 0, 0, 0},				// optional script to run when backup needs attention, eg store full
 	

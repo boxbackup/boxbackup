@@ -309,10 +309,14 @@ void BackupDaemon::Run2()
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
-	// Set maximum diffing time?
+	// max diffing time, keep-alive time
 	if(conf.KeyExists("MaximumDiffingTime"))
 	{
-		BackupStoreFile::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+		BackupClientContext::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+	}
+	if(conf.KeyExists("KeepAliveTime"))
+	{
+		BackupClientContext::SetKeepAliveTime(conf.GetKeyValueInt("KeepAliveTime"));
 	}
 
 	// Setup various timings
@@ -337,10 +341,14 @@ void BackupDaemon::Run2()
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	box_time_t lastSyncTime = 0;
 	
-	// --------------------------------------------------------------------------------------------
-
 	// And what's the current client store marker?
 	int64_t clientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;		// haven't contacted the store yet
+
+	// --------------------------------------------------------------------------------------------
+
+	DeserializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+
+	// --------------------------------------------------------------------------------------------
 
 	// Set state
 	SetState(State_Idle);
@@ -541,6 +549,13 @@ void BackupDaemon::Run2()
 
 				// Log
 				::syslog(LOG_INFO, "Finished scan of local files");
+
+				// --------------------------------------------------------------------------------------------
+
+				// We had a successful backup, save the store info
+				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+
+				// --------------------------------------------------------------------------------------------
 			}
 			catch(BoxException &e)
 			{
@@ -727,7 +742,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			{
 #ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				bool uidOK = true;
-				::syslog(LOG_ERR, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
+				::syslog(LOG_WARNING, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
 #else
 				// Security check -- does the process connecting to this socket have
 				// the same UID as this process?
@@ -1590,6 +1605,18 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 	mUnusedRootDirEntries.clear();
 }
 
+// --------------------------------------------------------------------------
+
+typedef struct
+{
+	int32_t mMagicValue;	// also the version number
+	int32_t mNumEntries;
+	int64_t mObjectID;		// this object ID
+	int64_t mContainerID;	// ID of container
+	uint64_t mAttributesModTime;
+	int32_t mOptionsPresent;	// bit mask of optional sections / features present
+
+} loc_StreamFormat;
 
 // --------------------------------------------------------------------------
 //
@@ -1599,6 +1626,7 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 //		Created: 11/11/03
 //
 // --------------------------------------------------------------------------
+
 BackupDaemon::Location::Location()
 	: mIDMapIndex(0),
 	  mpExcludeFiles(0),
@@ -1629,6 +1657,173 @@ BackupDaemon::Location::~Location()
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::Location::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::Location::Deserialize(Archive & rArchive)
+{
+	//
+	//
+	//
+	mpDirectoryRecord.reset(NULL);
+	if (mpExcludeFiles)
+	{
+		delete mpExcludeFiles;
+		mpExcludeFiles = NULL;
+	}
+	if (mpExcludeDirs)
+	{
+		delete mpExcludeDirs;
+		mpExcludeDirs = NULL;
+	}
+
+	//
+	//
+	//
+	rArchive >> mName >> mPath >> mIDMapIndex;
+
+	//
+	//
+	//
+	int64_t aMagicMarker = 0;
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		BackupClientDirectoryRecord *pSubRecord = new BackupClientDirectoryRecord(0, "");
+		if (!pSubRecord)
+			throw std::bad_alloc();
+
+		mpDirectoryRecord.reset(pSubRecord);
+		mpDirectoryRecord->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	//
+	//
+	//
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeFiles = new ExcludeList;
+		if (!mpExcludeFiles)
+			throw std::bad_alloc();
+
+		mpExcludeFiles->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	//
+	//
+	//
+	rArchive.Get(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeDirs = new ExcludeList;
+		if (!mpExcludeDirs)
+			throw std::bad_alloc();
+
+		mpExcludeDirs->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::Location::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::Location::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	rArchive << mName << mPath << mIDMapIndex;
+
+	//
+	//
+	//
+	if (mpDirectoryRecord.get() == NULL)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpDirectoryRecord->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if (!mpExcludeFiles)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpExcludeFiles->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if (!mpExcludeDirs)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Add(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Add(aMagicMarker);
+
+		mpExcludeDirs->Serialize(rArchive);
+	}
+}
 
 // --------------------------------------------------------------------------
 //
@@ -1661,3 +1856,191 @@ BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime)
+//		Purpose: Serializes remote directory and file information into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+
+static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
+static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
+static const int STOREOBJECTINFO_VERSION = 1;
+
+void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
+{
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile") || GetConfiguration().GetKeyValue("StoreObjectInfoFile").size() <= 0)
+		return;
+
+	try
+	{
+		FileStream aFile(GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), O_WRONLY | O_CREAT | O_TRUNC);
+		IOStreamArchive anArchive(aFile, 0);
+
+		anArchive << STOREOBJECTINFO_MAGIC_ID_VALUE << STOREOBJECTINFO_MAGIC_ID_STRING << STOREOBJECTINFO_VERSION
+					<< GetConfiguration().GetModTime()
+					<< aClientStoreMarker << theLastSyncTime << theNextSyncTime;
+
+		//
+		//
+		//
+		int64_t iCount = mLocations.size();
+		anArchive.Add(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			ASSERT(mLocations[v]);
+			mLocations[v]->Serialize(anArchive);
+		}
+
+		//
+		//
+		//
+		iCount = mIDMapMounts.size();
+		anArchive.Add(iCount);
+
+		for (int v = 0; v < iCount; v++)
+			anArchive.Add(mIDMapMounts[v]);
+
+		//
+		//
+		//
+		aFile.Close();
+		::syslog(LOG_INFO, "Saved store object info file '%s'", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+	}
+	catch (...)
+	{
+		::syslog(LOG_WARNING, "Requested store object info file '%s' not accessible or could not be created", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+//		Purpose: Deserializes remote directory and file information from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+{
+	//
+	//
+	//
+	DeleteAllLocations();
+
+	//
+	//
+	//
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile") || GetConfiguration().GetKeyValue("StoreObjectInfoFile").size() <=0)
+		return;
+
+	try
+	{
+		FileStream aFile(GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), O_RDONLY);
+		IOStreamArchive anArchive(aFile, 0);
+
+		//
+		// see if the content has a chance to be what we think it is
+		//
+		int iMagicValue = 0;
+		anArchive.Get(iMagicValue);
+
+		if (iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' is not what you think it is: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+			return;
+		}
+
+		//
+		// get a bit optimistic and read in a string identifier
+		//
+		std::string strMagicValue;
+		anArchive.Get(strMagicValue);
+
+		if (strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' is not what you think it is: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+			return;
+		}
+
+		//
+		// ok, check if we are not loading some future development version by mistake
+		//
+		int iVersion = 0;
+		anArchive.Get(iVersion);
+
+		if (iVersion != STOREOBJECTINFO_VERSION)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' version [%d] unsupported: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), iVersion);
+			return;
+		}
+
+		//
+		// check if this state file is even valid for the loaded bbackupd.conf file
+		//
+		box_time_t lastKnownConfigModTime;
+		anArchive.Get(lastKnownConfigModTime);
+
+		if (lastKnownConfigModTime != GetConfiguration().GetModTime())
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' out of date: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+			return;
+		}
+
+		//
+		// this is it, go at it
+		//
+		anArchive >> aClientStoreMarker >> theLastSyncTime >> theNextSyncTime;
+
+		//
+		//
+		//
+		int64_t iCount = 0;
+		anArchive.Get(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			Location* pLocation = new Location;
+			if (!pLocation)
+				throw std::bad_alloc();
+
+			pLocation->Deserialize(anArchive);
+			mLocations.push_back(pLocation);
+		}
+
+		//
+		//
+		//
+		iCount = 0;
+		anArchive.Get(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			anArchive.Get(strItem);
+
+			mIDMapMounts.push_back(strItem);
+		}
+
+		//
+		//
+		//
+		aFile.Close();
+		::syslog(LOG_INFO, "Loaded store object info file '%s', version [%04d]", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str(), iVersion);
+	}
+	catch (...)
+	{
+		DeleteAllLocations();
+
+		aClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;
+		theLastSyncTime = 0;
+		theNextSyncTime = 0;
+
+		::syslog(LOG_WARNING, "Requested store object info file '%s' does not exist, not accessible, or inconsistent: no harm done, will re-cache from store", GetConfiguration().GetKeyValue("StoreObjectInfoFile").c_str());
+	}
+}

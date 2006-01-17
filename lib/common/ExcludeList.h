@@ -58,6 +58,8 @@
 	typedef int regex_t;
 #endif
 
+#include "Archive.h"
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -71,6 +73,9 @@ class ExcludeList
 public:
 	ExcludeList();
 	~ExcludeList();
+
+	void Deserialize(Archive & rArchive);
+	void Serialize(Archive & rArchive) const;
 
 	void AddDefiniteEntries(const std::string &rEntries);
 	void AddRegexEntries(const std::string &rEntries);
@@ -94,6 +99,7 @@ private:
 	std::set<std::string> mDefinite;
 #ifndef PLATFORM_REGEX_NOT_SUPPORTED
 	std::vector<regex_t *> mRegex;
+	std::vector<std::string> mRegexStr;	// save original regular expression string-based source for Serialize
 #endif
 
 	// For exceptions to the excludes

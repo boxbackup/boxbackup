@@ -180,8 +180,17 @@ public:
 		free(a);
 	}
 
-	// Limits
-	static void SetMaximumDiffingTime(int Seconds);
+	// --------------------------------------------------------------------------
+	//
+	// Function
+	//		Name:    BackupStoreFile::SuspendFileDiff()
+	//		Purpose: Notifies BackupStoreFile object that a diff operation should be
+	//				 terminated ASAP. Usually called from an external timer.
+	//
+	//		Created: 12/1/04
+	//
+	// --------------------------------------------------------------------------
+	static void SuspendFileDiff();
 
 	// Building blocks
 	class EncodingBuffer

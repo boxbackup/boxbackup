@@ -49,6 +49,8 @@
 #include "Box.h"
 
 #include <syslog.h>
+#include <signal.h>
+#include <sys/time.h>
 
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"
@@ -59,6 +61,7 @@
 #include "BackupStoreException.h"
 #include "BackupDaemon.h"
 #include "autogen_BackupProtocolClient.h"
+#include "BackupStoreFile.h"
 
 #include "MemLeakFindOn.h"
 
@@ -85,7 +88,8 @@ BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLS
 	  mpNewIDMap(0),
 	  mStorageLimitExceeded(false),
 	  mpExcludeFiles(0),
-	  mpExcludeDirs(0)
+	  mpExcludeDirs(0),
+	  mbIsManaged(false)
 {
 }
 
@@ -489,4 +493,170 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 	return true;
 }
 
+//
+//
+//
 
+// maximum time to spend diffing
+static int sMaximumDiffTime = 10;
+// maximum time of SSL inactivity (keep-alive interval)
+static int sKeepAliveTime = 0;
+// total time elapsed to keep track of what is going on
+static time_t sTimeMgmtEpoch = 0;
+
+void BackupClientContext::SetMaximumDiffingTime(int iSeconds)
+{
+	sMaximumDiffTime = iSeconds < 0 ? 0 : iSeconds;
+	TRACE1("Set maximum diffing time to %d seconds\n", sMaximumDiffTime);
+}
+
+void BackupClientContext::SetKeepAliveTime(int iSeconds)
+{
+	sKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
+	TRACE1("Set keep-alive time to %d seconds\n", sKeepAliveTime);
+}
+
+static BackupClientContext* pThisCtxInst = NULL;
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    static TimerSigHandler(int)
+//		Purpose: Signal handler
+//		Created: 19/3/04
+//
+// --------------------------------------------------------------------------
+void TimerSigHandler(int iUnused)
+{
+	ASSERT(pThisCtxInst);
+	ASSERT(sTimeMgmtEpoch > 0);
+
+	time_t tTotalRunIntvl = time(NULL) - sTimeMgmtEpoch;
+	if (sMaximumDiffTime > 0 && tTotalRunIntvl >= sMaximumDiffTime)
+	{
+		TRACE0("MaximumDiffingTime reached - suspending file diff\n");
+		BackupStoreFile::SuspendFileDiff();
+	}
+	else if (sKeepAliveTime > 0)
+	{
+		// well, we have only two sources of timer events...
+		TRACE0("KeepAliveTime reached - initiating keep-alive\n");
+		pThisCtxInst->DoKeepAlive();
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientContext::ManageDiffProcess()
+//		Purpose: Initiates a file diff control timer
+//		Created: 04/19/2005
+//
+// --------------------------------------------------------------------------
+void BackupClientContext::ManageDiffProcess()
+{
+	if (mbIsManaged || !mpConnection)
+		return;
+
+	ASSERT(pThisCtxInst == NULL);
+	ASSERT(sTimeMgmtEpoch == 0);
+
+#ifdef PLATFORM_CYGWIN
+	::signal(SIGALRM, TimerSigHandler);
+#else
+	::signal(SIGVTALRM, TimerSigHandler);
+#endif // PLATFORM_CYGWIN
+
+	struct itimerval timeout;
+	memset(&timeout, 0, sizeof(timeout));
+
+	//
+	//
+	//
+	if (sMaximumDiffTime <= 0 && sKeepAliveTime <= 0)
+	{
+		TRACE0("Diff control not requested - letting things run wild\n");
+		return;
+	}
+	else if (sMaximumDiffTime > 0 && sKeepAliveTime > 0)
+	{
+		timeout.it_value.tv_sec = sKeepAliveTime < sMaximumDiffTime ? sKeepAliveTime : sMaximumDiffTime;
+		timeout.it_interval.tv_sec = sKeepAliveTime < sMaximumDiffTime ? sKeepAliveTime : sMaximumDiffTime;
+	}
+	else
+	{
+		timeout.it_value.tv_sec = sKeepAliveTime > 0 ? sKeepAliveTime : sMaximumDiffTime;
+		timeout.it_interval.tv_sec = sKeepAliveTime > 0 ? sKeepAliveTime : sMaximumDiffTime;
+	}
+
+	// avoid race
+	pThisCtxInst = this;
+	sTimeMgmtEpoch = time(NULL);
+
+#ifdef PLATFORM_CYGWIN
+	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
+#else
+	if(::setitimer(ITIMER_VIRTUAL, &timeout, NULL) != 0)
+#endif // PLATFORM_CYGWIN
+	{
+		sTimeMgmtEpoch = 0;
+		pThisCtxInst = NULL;
+
+		TRACE0("WARNING: couldn't set file diff control timeout\n");
+		THROW_EXCEPTION(BackupStoreException, Internal)
+	}
+
+	mbIsManaged = true;
+	TRACE0("Initiated timer for file diff control\n");
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientContext::UnManageDiffProcess()
+//		Purpose: suspends file diff control timer
+//		Created: 04/19/2005
+//
+// --------------------------------------------------------------------------
+void BackupClientContext::UnManageDiffProcess()
+{
+	if (!mbIsManaged /* don't test for active connection, just do it */)
+		return;
+
+	ASSERT(pThisCtxInst != NULL);
+
+	struct itimerval timeout;
+	memset(&timeout, 0, sizeof(timeout));
+
+#ifdef PLATFORM_CYGWIN
+	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
+#else
+	if(::setitimer(ITIMER_VIRTUAL, &timeout, NULL) != 0)
+#endif // PLATFORM_CYGWIN
+	{
+		TRACE0("WARNING: couldn't clear file diff control timeout\n");
+		THROW_EXCEPTION(BackupStoreException, Internal)
+	}
+
+	mbIsManaged = false;
+	pThisCtxInst = NULL;
+	sTimeMgmtEpoch = 0;
+
+	TRACE0("Suspended timer for file diff control\n");
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientContext::DoKeepAlive()
+//		Purpose: Does something inconsequential over the SSL link to keep it up
+//		Created: 04/19/2005
+//
+// --------------------------------------------------------------------------
+void BackupClientContext::DoKeepAlive()
+{
+	if (!mpConnection)
+		return;
+
+	mpConnection->QueryGetIsAlive();
+}
