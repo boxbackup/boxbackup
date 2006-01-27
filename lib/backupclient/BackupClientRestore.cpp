@@ -101,7 +101,7 @@ public:
 			// ID
 			rWrite.Write(&mNextLevelID, sizeof(mNextLevelID));
 			// Name string
-			std::string::size_type nsize = mNextLevelLocalName.size();
+			int32_t nsize = (int32_t)( mNextLevelLocalName.size() );
 			rWrite.Write(&nsize, sizeof(nsize));
 			rWrite.Write(mNextLevelLocalName.c_str(), nsize);
 			// And then the level itself

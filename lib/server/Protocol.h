@@ -94,7 +94,7 @@ public:
 	void Read(int32_t &rOut);
 	void Read(int16_t &rOut);
 	void Read(int8_t &rOut);
-	void Read(bool &rOut) {bool read; Read(read); rOut = (read == true);}
+	void Read(bool &rOut) {int8_t read; Read(read); rOut = (read == (int8_t)true);}
 	void Read(std::string &rOut);
 	template<typename type>
 	void Read(type &rOut)

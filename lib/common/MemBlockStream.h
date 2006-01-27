@@ -45,7 +45,7 @@ public:
 private:
 	const char *mpBuffer;
 	int mBytesInBuffer;
-	pos_type mReadPosition;
+	int mReadPosition;
 };
 
 #endif // MEMBLOCKSTREAM__H

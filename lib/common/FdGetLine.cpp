@@ -151,11 +151,11 @@ std::string FdGetLine::GetLine(bool Preprocess)
 	else
 	{
 		// Check for comment char, but char before must be whitespace
-		int end = 0; // can be negative
+		std::string::size_type end  = 1;
 		std::string::size_type size = r.size();
-		while(end < size)
+		while(end - 1 < size)
 		{
-			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
+			if(r[end - 1] == '#' && (end == 1 || (iw(r[end-2]))))
 			{
 				break;
 			}
@@ -163,19 +163,19 @@ std::string FdGetLine::GetLine(bool Preprocess)
 		}
 		
 		// Remove whitespace
-		int begin = 0; // should be positive, but compared with "end"
+		std::string::size_type begin = 0;
 		while(begin < size && iw(r[begin]))
 		{
 			begin++;
 		}
-		if(!iw(r[end])) end--;
-		while(end > begin && iw(r[end]))
+		if(!iw(r[end - 1])) end--;
+		while(end - 1> begin && iw(r[end - 1]))
 		{
 			end--;
 		}
 		
 		// Return a sub string
-		return r.substr(begin, end - begin + 1);
+		return r.substr(begin, end - begin);
 	}
 }
 
