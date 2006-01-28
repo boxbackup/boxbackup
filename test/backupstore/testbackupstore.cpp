@@ -1072,9 +1072,16 @@ int test_server(const char *hostname)
 			// Do the patching
 			bool isCompletelyDifferent = false;
 			int64_t modtime;
-			std::auto_ptr<IOStream> patchstream(BackupStoreFile::EncodeFileDiff(TEST_FILE_FOR_PATCHING ".mod", BackupProtocolClientListDirectory::RootDirectory,
-					uploads[UPLOAD_PATCH_EN].name, uploads[UPLOAD_PATCH_EN].allocated_objid, *blockIndexStream,
-					IOStream::TimeOutInfinite, &modtime, &isCompletelyDifferent));
+			std::auto_ptr<IOStream> patchstream(
+				BackupStoreFile::EncodeFileDiff(
+					TEST_FILE_FOR_PATCHING ".mod", 
+					BackupProtocolClientListDirectory::RootDirectory,
+					uploads[UPLOAD_PATCH_EN].name, 
+					uploads[UPLOAD_PATCH_EN].allocated_objid, 
+					*blockIndexStream,
+					IOStream::TimeOutInfinite, 
+					NULL, // pointer to DiffTimer impl
+					&modtime, &isCompletelyDifferent));
 			TEST_THAT(isCompletelyDifferent == false);
 			// Sent this to a file, so we can check the size, rather than uploading it directly
 			{

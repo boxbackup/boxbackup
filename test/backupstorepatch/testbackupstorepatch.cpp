@@ -376,10 +376,17 @@ int test(int argc, const char *argv[])
 					char filename[64];
 					::sprintf(filename, "testfiles/%d.test", f);
 					bool isCompletelyDifferent = false;
-					std::auto_ptr<IOStream> patchStream(BackupStoreFile::EncodeFileDiff(filename,
+					std::auto_ptr<IOStream> patchStream(
+						BackupStoreFile::EncodeFileDiff(
+							filename,
 							BackupProtocolClientListDirectory::RootDirectory,	/* containing directory */
-							storeFilename, diffFromID, *blockIndexStream,
-							protocol.GetTimeout(), 0 /* not interested in the modification time */, &isCompletelyDifferent));
+							storeFilename, 
+							diffFromID, 
+							*blockIndexStream,
+							protocol.GetTimeout(), 
+							NULL, // DiffTimer impl
+							0 /* not interested in the modification time */, 
+							&isCompletelyDifferent));
 		
 					// Upload the patch to the store
 					std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(

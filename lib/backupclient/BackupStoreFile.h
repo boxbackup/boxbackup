@@ -38,6 +38,24 @@ typedef struct
 // --------------------------------------------------------------------------
 //
 // Class
+//		Name:    DiffTimer
+//		Purpose: Interface for classes that can keep track of diffing time,
+//				 and send SSL keepalive messages
+//		Created: 2006/01/19
+//
+// --------------------------------------------------------------------------
+class DiffTimer
+{
+public:
+	virtual void   DoKeepAlive() = 0;
+	virtual time_t GetTimeMgmtEpoch() = 0;
+	virtual int    GetMaximumDiffingTime() = 0;
+	virtual int    GetKeepaliveTime() = 0;
+};
+
+// --------------------------------------------------------------------------
+//
+// Class
 //		Name:    BackupStoreFile
 //		Purpose: Class to hold together utils for maniplating files.
 //		Created: 2003/08/28
@@ -95,9 +113,16 @@ public:
 
 	// Main interface
 	static std::auto_ptr<IOStream> EncodeFile(const char *Filename, int64_t ContainerID, const BackupStoreFilename &rStoreFilename, int64_t *pModificationTime = 0);
-	static std::auto_ptr<IOStream> EncodeFileDiff(const char *Filename, int64_t ContainerID,
-		const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, IOStream &rDiffFromBlockIndex,
-		int Timeout, int64_t *pModificationTime = 0, bool *pIsCompletelyDifferent = 0);
+	static std::auto_ptr<IOStream> EncodeFileDiff
+	(
+		const char *Filename, int64_t ContainerID,
+		const BackupStoreFilename &rStoreFilename, 
+		int64_t DiffFromObjectID, IOStream &rDiffFromBlockIndex,
+		int Timeout, 
+		DiffTimer *pDiffTimer,
+		int64_t *pModificationTime = 0, 
+		bool *pIsCompletelyDifferent = 0
+	);
 	static bool VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFromObjectIDOut = 0, int64_t *pContainerIDOut = 0);
 	static void CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &rFrom, IOStream &rOut);
 	static void CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream &rDiff2b, IOStream &rOut);
@@ -144,8 +169,7 @@ public:
 		free(a);
 	}
 
-	// Limits
-	static void SetMaximumDiffingTime(int Seconds);
+	static void DiffTimerExpired();
 
 	// Building blocks
 	class EncodingBuffer
@@ -192,4 +216,3 @@ public:
 #include "MemLeakFindOff.h"
 
 #endif // BACKUPSTOREFILE__H
-
