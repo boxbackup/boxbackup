@@ -435,10 +435,14 @@ void BackupDaemon::Run2()
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
-	// Set maximum diffing time?
+	// max diffing time, keep-alive time
 	if(conf.KeyExists("MaximumDiffingTime"))
 	{
-		BackupStoreFile::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+		BackupClientContext::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+	}
+	if(conf.KeyExists("KeepAliveTime"))
+	{
+		BackupClientContext::SetKeepAliveTime(conf.GetKeyValueInt("KeepAliveTime"));
 	}
 
 	// Setup various timings
@@ -885,7 +889,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			{
 #ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				bool uidOK = true;
-				::syslog(LOG_ERR, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
+				::syslog(LOG_WARNING, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
 #else
 				// Security check -- does the process connecting to this socket have
 				// the same UID as this process?

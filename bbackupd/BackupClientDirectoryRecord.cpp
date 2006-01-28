@@ -1093,14 +1093,28 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				// Found an old version -- get the index
 				std::auto_ptr<IOStream> blockIndexStream(connection.ReceiveStream());
 			
+				//
 				// Diff the file
+				//
+
+				rParams.mrContext.ManageDiffProcess();
+
 				bool isCompletelyDifferent = false;
-				std::auto_ptr<IOStream> patchStream(BackupStoreFile::EncodeFileDiff(rFilename.c_str(),
+				std::auto_ptr<IOStream> patchStream(
+					BackupStoreFile::EncodeFileDiff(
+						rFilename.c_str(),
 						mObjectID,	/* containing directory */
 						rStoreFilename, diffFromID, *blockIndexStream,
-						connection.GetTimeout(), 0 /* not interested in the modification time */, &isCompletelyDifferent));
+						connection.GetTimeout(), 
+						&rParams.mrContext, // DiffTimer implementation
+						0 /* not interested in the modification time */, 
+						&isCompletelyDifferent));
 	
+				rParams.mrContext.UnManageDiffProcess();
+
+				//
 				// Upload the patch to the store
+				//
 				std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
 						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *patchStream));
 				
@@ -1130,6 +1144,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 	}
 	catch(BoxException &e)
 	{
+		rParams.mrContext.UnManageDiffProcess();
+
 		if(e.GetType() == ConnectionException::ExceptionType && e.GetSubType() == ConnectionException::Protocol_UnexpectedReply)
 		{
 			// Check and see what error the protocol has -- as it might be an error...
@@ -1210,6 +1226,3 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(BackupDaemon &rDaemon, Backu
 BackupClientDirectoryRecord::SyncParams::~SyncParams()
 {
 }
-
-
-
