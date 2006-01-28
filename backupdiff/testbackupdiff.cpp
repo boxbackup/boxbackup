@@ -169,9 +169,17 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 	{
 		BackupStoreFilenameClear f1name("filename");
 		FileStream out(to_diff, O_WRONLY | O_CREAT | O_EXCL);
-		std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFileDiff(to_orig, 1 /* dir ID */, f1name,
-			1000 + from /* object ID of the file diffing from */, blockindex, IOStream::TimeOutInfinite,
-			0, &completelyDifferent));
+		std::auto_ptr<IOStream> encoded(
+			BackupStoreFile::EncodeFileDiff(
+				to_orig, 
+				1 /* dir ID */, 
+				f1name,
+				1000 + from /* object ID of the file diffing from */, 
+				blockindex, 
+				IOStream::TimeOutInfinite,
+				NULL, // DiffTimer interface
+				0, 
+				&completelyDifferent));
 		encoded->CopyStreamTo(out);
 	}
 	TEST_THAT(completelyDifferent == expect_completely_different);
@@ -443,9 +451,17 @@ int test(int argc, const char *argv[])
 			
 			BackupStoreFilenameClear f1name("filename");
 			FileStream out("testfiles/f2.symlink.diff", O_WRONLY | O_CREAT | O_EXCL);
-			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFileDiff("testfiles/f2.symlink", 1 /* dir ID */, f1name,
-				1001 /* object ID of the file diffing from */, blockindex, IOStream::TimeOutInfinite,
-				0, &completelyDifferent));
+			std::auto_ptr<IOStream> encoded(
+				BackupStoreFile::EncodeFileDiff(
+					"testfiles/f2.symlink", 
+					1 /* dir ID */, 
+					f1name,
+					1001 /* object ID of the file diffing from */, 
+					blockindex, 
+					IOStream::TimeOutInfinite,
+					NULL, // DiffTimer interface
+					0, 
+					&completelyDifferent));
 			encoded->CopyStreamTo(out);
 		}
 		TEST_THAT(completelyDifferent == true);
