@@ -8,14 +8,14 @@ backup-client
 	bin bbackupquery
 	bin bbackupctl
 	script bin/bbackupd/bbackupd-config
+
+ONLY:mingw32
 	script bin/bbackupd/win32/installer.iss 
 	script bin/bbackupd/win32/ReadMe.txt 
 	script bin/bbackupd/win32/bbackupd.conf
-
-	ONLY:mingw32
 	script /bin/mgwz.dll
 	script /bin/mingwm10.dll
-	END-ONLY
+END-ONLY
 
 OMIT:mingw32
 OMIT:CYGWIN
