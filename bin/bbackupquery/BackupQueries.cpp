@@ -779,7 +779,9 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 	// Check args
 	if(args.size() < 1 || (opts['i'] && args.size() != 2) || args.size() > 2)
 	{
-		printf("Incorrect usage.\ngetobject <object-id> <local-filename>\n or get -i <object-id> <local-filename>\n");
+		printf("Incorrect usage.\n"
+			"get <remote-filename> [<local-filename>] or\n"
+			"get -i <object-id> <local-filename>\n");
 		return;
 	}
 

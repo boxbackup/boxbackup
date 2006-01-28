@@ -330,21 +330,25 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		// __time64_t winTime = BoxTimeToSeconds(
 		// pnewAttr->ModificationTime);
 
-		box_time_t bob = BoxTimeToSeconds(pattr->ModificationTime);
-		__time64_t winTime = bob;
+		u_int64_t  modTime = box_ntoh64(pattr->ModificationTime);
+		box_time_t modSecs = BoxTimeToSeconds(modTime);
+		__time64_t winTime = modSecs;
+
 		if (_gmtime64(&winTime) == 0 )
 		{
-			::syslog(LOG_ERR, "Corrupt value in store "
-				"Modification Time in file %s", Filename);
+			::syslog(LOG_ERR, "Invalid Modification Time "
+				"caught for file: %s", Filename);
 			pattr->ModificationTime = 0;
 		}
 
-		bob = BoxTimeToSeconds(pattr->AttrModificationTime);
-		winTime = bob;
+		modTime = box_ntoh64(pattr->AttrModificationTime);
+		modSecs = BoxTimeToSeconds(modTime);
+		winTime = modSecs;
+
 		if (_gmtime64(&winTime) == 0 )
 		{
-			::syslog(LOG_ERR, "Corrupt value in store "
-				"Attr Modification Time in file %s", Filename);
+			::syslog(LOG_ERR, "Invalid Attribute Modification "
+				"Time caught for file: %s", Filename);
 			pattr->AttrModificationTime = 0;
 		}
 #endif

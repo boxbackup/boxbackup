@@ -12,6 +12,11 @@ backup-client
 	script bin/bbackupd/win32/ReadMe.txt 
 	script bin/bbackupd/win32/bbackupd.conf
 
+	ONLY:mingw32
+	script /bin/mgwz.dll
+	script /bin/mingwm10.dll
+	END-ONLY
+
 OMIT:mingw32
 OMIT:CYGWIN
 
