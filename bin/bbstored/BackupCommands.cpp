@@ -859,3 +859,20 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetAccountUsage::DoCommand(Bac
 	));
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolServerGetIsAlive::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Purpose: Return the amount of disc space used
+//		Created: 19/4/04
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetIsAlive::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+{
+	CHECK_PHASE(Phase_Commands)
+
+	//
+	// NOOP
+	//
+	return std::auto_ptr<ProtocolObject>(new BackupProtocolServerIsAlive());
+}
