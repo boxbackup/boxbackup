@@ -169,7 +169,7 @@ close INSTALLMSG;
 
 sub parcel_root
 {
-	$product_name.'-'.$product_version.'-'.$_[0].'-'.$build_os.$os_suffix
+	$product_name.'-'.$product_version.'-'.$_[0].'-'.$target_os.$os_suffix
 }
 
 sub parcel_dir

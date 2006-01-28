@@ -500,8 +500,6 @@ HANDLE OpenFileByNameUtf8(const char* pName)
 
 		if (err == ERROR_FILE_NOT_FOUND)
 		{
-			::syslog(LOG_WARNING, 
-				"Failed to open '%s': file not found", pName);
 			errno = ENOENT;
 		}
 		else
