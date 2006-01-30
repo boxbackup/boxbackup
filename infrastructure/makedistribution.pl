@@ -82,6 +82,15 @@ sub copy_from_list
 		{
 			$no_license{$dst} = 1;
 		}
+		elsif($src eq 'RUN')
+		{
+			print "Running $dst...\n";
+			if(system($dst) != 0)
+			{
+				print "Error running $dst. Aborting.\n";
+				exit(1);
+			}
+		}
 		elsif(-d $src)
 		{
 			$modules_included{$_} = 1;

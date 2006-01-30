@@ -1,3 +1,4 @@
+RUN ./bootstrap
 lib/common
 lib/crypto
 lib/server
@@ -27,3 +28,4 @@ parcels.txt
 runtest.pl
 NO-LICENSE-IN-DIR infrastructure/m4
 infrastructure/m4
+configure
