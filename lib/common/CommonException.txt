@@ -43,3 +43,4 @@ KEventErrorRemove						35
 KQueueNotSupportedOnThisPlatform		36
 IOStreamGetLineNotEnoughDataToIgnore	37	Bad value passed to IOStreamGetLine::IgnoreBufferedData()
 TempDirPathTooLong				38	Your temporary directory path is too long. Check the TMP and TEMP environment variables.
+ArchiveBlockIncompleteRead		39	The Store Object Info File is too short or corrupted, and will be rewritten automatically when the next backup completes.

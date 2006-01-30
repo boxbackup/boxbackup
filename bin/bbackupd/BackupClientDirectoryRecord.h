@@ -18,6 +18,7 @@
 #include "BackupStoreDirectory.h"
 #include "MD5Digest.h"
 
+class Archive;
 class BackupClientContext;
 class BackupDaemon;
 
@@ -34,6 +35,9 @@ class BackupClientDirectoryRecord
 public:
 	BackupClientDirectoryRecord(int64_t ObjectID, const std::string &rSubDirName);
 	~BackupClientDirectoryRecord();
+
+	void Deserialize(Archive & rArchive);
+	void Serialize(Archive & rArchive) const;
 private:
 	BackupClientDirectoryRecord(const BackupClientDirectoryRecord &);
 public:

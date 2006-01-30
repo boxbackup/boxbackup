@@ -9,14 +9,15 @@
 
 #include "Box.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
 
-#ifndef WIN32
-#include <syslog.h>
+#ifdef HAVE_SYSLOG_H
+	#include <syslog.h>
 #endif
 
 #include "Daemon.h"
@@ -24,6 +25,7 @@
 #include "ServerException.h"
 #include "Guards.h"
 #include "UnixUser.h"
+#include "FileModificationTime.h"
 
 #include "MemLeakFindOn.h"
 
@@ -92,22 +94,21 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	}
 
 	std::string pidFileName;
-	const char *configfile = 0;
 
 	try
 	{
 		// Find filename of config file
-		configfile = DefaultConfigFile;
+		mConfigFileName = DefaultConfigFile;
 		if(argc >= 2)
 		{
 			// First argument is config file, or it's -c and the next arg is the config file
 			if(::strcmp(argv[1], "-c") == 0 && argc >= 3)
 			{
-				configfile = argv[2];
+				mConfigFileName = argv[2];
 			}
 			else
 			{
-				configfile = argv[1];
+				mConfigFileName = argv[1];
 			}
 		}
 		
@@ -123,19 +124,25 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 		// Load the configuration file.
 		std::string errors;
-		std::auto_ptr<Configuration> pconfig = Configuration::LoadAndVerify(configfile, GetConfigVerify(), errors);
+		std::auto_ptr<Configuration> pconfig = 
+			Configuration::LoadAndVerify(
+				mConfigFileName.c_str(), 
+				GetConfigVerify(), errors);
 
 		// Got errors?
 		if(pconfig.get() == 0 || !errors.empty())
 		{
 			// Tell user about errors
-			fprintf(stderr, "%s: Errors in config file %s:\n%s", DaemonName(), configfile, errors.c_str());
+			fprintf(stderr, "%s: Errors in config file %s:\n%s", 
+				DaemonName(), mConfigFileName.c_str(), 
+				errors.c_str());
 			// And give up
 			return 1;
 		}
 		
 		// Store configuration
 		mpConfiguration = pconfig.release();
+		mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
 		
 		// Server configuration
 		const Configuration &serverConfig(mpConfiguration->GetSubConfiguration("Server"));
@@ -228,7 +235,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
 		// Log the start message
-		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " BOX_VERSION ")", configfile);
+		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " 
+			BOX_VERSION ")", mConfigFileName.c_str());
 
 #ifndef WIN32
 		// Write PID to file
@@ -306,15 +314,23 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			if(mReloadConfigWanted && !mTerminateWanted)
 			{
 				// Need to reload that config file...
-				::syslog(LOG_INFO, "Reloading configuration (config: %s)", configfile);
+				::syslog(LOG_INFO, "Reloading configuration "
+					"(config: %s)", 
+					mConfigFileName.c_str());
 				std::string errors;
-				std::auto_ptr<Configuration> pconfig = Configuration::LoadAndVerify(configfile, GetConfigVerify(), errors);
+				std::auto_ptr<Configuration> pconfig = 
+					Configuration::LoadAndVerify(
+						mConfigFileName.c_str(),
+						GetConfigVerify(), errors);
 
 				// Got errors?
 				if(pconfig.get() == 0 || !errors.empty())
 				{
 					// Tell user about errors
-					::syslog(LOG_ERR, "Errors in config file %s:\n%s", configfile, errors.c_str());
+					::syslog(LOG_ERR, "Errors in config "
+						"file %s:\n%s", 
+						mConfigFileName.c_str(),
+						errors.c_str());
 					// And give up
 					return 1;
 				}
@@ -325,6 +341,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 				// Store configuration
 				mpConfiguration = pconfig.release();
+				mLoadedConfigModifiedTime =
+					GetConfigFileModifiedTime();
 				
 				// Stop being marked for loading config again
 				mReloadConfigWanted = false;
@@ -547,3 +565,49 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	
 #endif // HAVE_SETPROCTITLE
 }
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Daemon::GetConfigFileModifiedTime()
+//		Purpose: Returns the timestamp when the configuration file
+//			 was last modified
+//
+//		Created: 2006/01/29
+//
+// --------------------------------------------------------------------------
+
+box_time_t Daemon::GetConfigFileModifiedTime() const
+{
+	struct stat st;
+
+	if(::stat(GetConfigFileName().c_str(), &st) != 0)
+	{
+		if (errno == ENOENT)
+		{
+			return 0;
+		}
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+	
+	return FileModificationTime(st);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Daemon::GetLoadedConfigModifiedTime()
+//		Purpose: Returns the timestamp when the configuration file
+//			 had been last modified, at the time when it was 
+//			 loaded
+//
+//		Created: 2006/01/29
+//
+// --------------------------------------------------------------------------
+
+box_time_t Daemon::GetLoadedConfigModifiedTime() const
+{
+	return mLoadedConfigModifiedTime;
+}
+

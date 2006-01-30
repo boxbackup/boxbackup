@@ -85,6 +85,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 
 	{"CommandSocket", 0, 0, 0},				// not compulsory to have this
 	{"KeepAliveTime", 0, ConfigTest_IsInt, 0},				// optional
+ 	{"StoreObjectInfoFile", 0, 0, 0},				// optional
 
 	{"NotifyScript", 0, 0, 0},				// optional script to run when backup needs attention, eg store full
 	
@@ -103,4 +104,3 @@ const ConfigurationVerify BackupDaemonConfigVerify =
 	ConfigTest_Exists | ConfigTest_LastEntry,
 	0
 };
-

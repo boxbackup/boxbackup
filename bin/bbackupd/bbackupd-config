@@ -382,6 +382,14 @@ MaximumDiffingTime = 20
 
 CommandSocket = /var/run/bbackupd.sock
 
+# Uncomment the StoreObjectInfoFile to enable the experimental archiving
+# of the daemon's state (including client store marker and configuration)
+# between backup runs. This saves time and increases efficiency when
+# bbackupd is frequently stopped and started, since it removes the need
+# to rescan all directories on the remote server. However, it is new and
+# not yet heavily tested, so use with caution.
+
+# StoreObjectInfoFile = $working_dir/bbackupd.state
 
 Server
 {
