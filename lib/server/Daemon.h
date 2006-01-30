@@ -16,6 +16,10 @@
 #ifndef DAEMON__H
 #define DAEMON__H
 
+#include <string>
+
+#include "BoxTime.h"
+
 class Configuration;
 class ConfigurationVerify;
 
@@ -40,7 +44,8 @@ public:
 	
 	virtual void Run();
 	const Configuration &GetConfiguration() const;
-	
+	const std::string &GetConfigFileName() const {return mConfigFileName;}
+
 	virtual const char *DaemonName() const;
 	virtual const char *DaemonBanner() const;
 	virtual const ConfigurationVerify *GetConfigVerify() const;
@@ -57,12 +62,18 @@ public:
 	virtual void EnterChild();
 	
 	static void SetProcessTitle(const char *format, ...);
+
+protected:
+	box_time_t GetLoadedConfigModifiedTime() const;
 	
 private:
 	static void SignalHandler(int sigraised);
+	box_time_t GetConfigFileModifiedTime() const;
 	
 private:
+	std::string mConfigFileName;
 	Configuration *mpConfiguration;
+	box_time_t mLoadedConfigModifiedTime;
 	bool mReloadConfigWanted;
 	bool mTerminateWanted;
 	static Daemon *spDaemon;
