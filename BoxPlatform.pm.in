@@ -21,6 +21,7 @@ BEGIN
 
 	# blank extra flags by default
 	$platform_compile_line_extra = '@CPPFLAGS@ @CXXFLAGS@ @CXXFLAGS_STRICT@';
+	$platform_compile_line_extra =~ s/ -O2//;
 	$platform_link_line_extra = '@LDFLAGS@';
 	$platform_lib_files = '@LIBS@';
 	$target_os = '@target_os@';
