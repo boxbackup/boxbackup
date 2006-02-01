@@ -47,6 +47,9 @@ typedef struct
 class DiffTimer
 {
 public:
+	DiffTimer();
+	virtual ~DiffTimer();
+public:
 	virtual void   DoKeepAlive() = 0;
 	virtual time_t GetTimeMgmtEpoch() = 0;
 	virtual int    GetMaximumDiffingTime() = 0;
