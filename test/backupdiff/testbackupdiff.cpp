@@ -83,7 +83,7 @@ void make_file_of_zeros(const char *filename, size_t size)
 	fclose(f);
 	free(b);
 
-	TEST_THAT(TestGetFileSize(filename) == size);
+	TEST_THAT((size_t)TestGetFileSize(filename) == size);
 }
 
 

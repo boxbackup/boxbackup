@@ -835,7 +835,9 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	ASSERT(pFirstInHashList != 0);
 	ASSERT(pIndex != 0);
 
-	uint16_t Hash = fastSum.GetComponentForHashing();
+#ifndef NDEBUG
+	uint16_t DEBUG_Hash = fastSum.GetComponentForHashing();
+#endif
 	uint32_t Checksum = fastSum.GetChecksum();
 
 	// Before we go to the expense of the MD5, make sure it's a darn good match on the checksum we already know.
@@ -873,7 +875,7 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	{
 		//TRACE3("scan size %d, block size %d, hash %d\n", scan->mSize, BlockSize, Hash);
 		ASSERT(scan->mSize == BlockSize);
-		ASSERT(RollingChecksum::ExtractHashingComponent(scan->mWeakChecksum) == Hash);
+		ASSERT(RollingChecksum::ExtractHashingComponent(scan->mWeakChecksum) == DEBUG_Hash);
 	
 		// Compare?
 		if(strong.DigestMatches(scan->mStrongChecksum))
