@@ -1499,3 +1499,27 @@ void BackupStoreFile::EncodingBuffer::Reallocate(int NewSize)
 }
 
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    DiffTimer::DiffTimer();
+//		Purpose: Constructor
+//		Created: 2005/02/01
+//
+// --------------------------------------------------------------------------
+DiffTimer::DiffTimer()
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    DiffTimer::DiffTimer();
+//		Purpose: Destructor
+//		Created: 2005/02/01
+//
+// --------------------------------------------------------------------------
+DiffTimer::~DiffTimer()
+{	
+}
