@@ -64,3 +64,6 @@ JŽr™me Schell
 John Pybus
   - Ideas and feature requests
   - Useful little patches to code
+
+Stefan Norlin
+  - Help with testing and fixes on lots of different Solaris platforms
