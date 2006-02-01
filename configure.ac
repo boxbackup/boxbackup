@@ -52,6 +52,8 @@ AX_PATH_BDB(, [
 ])
 
 ## Check for Open SSL, use old versions only if explicitly requested
+AC_SEARCH_LIBS([gethostbyname], [nsl socket resolv])
+AC_SEARCH_LIBS([shutdown], [nsl socket resolv])
 AX_CHECK_SSL(, [AC_MSG_ERROR([[OpenSSL is not installed but is required]])])
 AC_ARG_ENABLE(
   [old-ssl],
