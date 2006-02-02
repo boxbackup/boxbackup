@@ -38,6 +38,13 @@ unless(-d 'local')
 # flags about the environment
 my %env_flags;
 
+my $windows_include_path = "-I../../lib/win32 ";
+if ($target_os ne "mingw32" && $target_os ne "winnt")
+{
+	$windows_include_path = "";
+	$env_flags{'IGNORE_lib/win32'} = 1;
+}
+
 # print "Flag: $_\n" for(keys %env_flags);
 
 # seed autogen code
@@ -447,7 +454,7 @@ __E
 	
 
 	# make include path
-	my $include_paths = "-I../../lib/win32 " .
+	my $include_paths = $windows_include_path .
 		join(' ',map {'-I../../'.$_} @all_deps_for_module);
 
 	# is target a library?

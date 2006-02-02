@@ -19,7 +19,9 @@
 #include "Socket.h"
 #include "SocketListen.h"
 #include "SocketStream.h"
-#include "WinNamedPipeStream.h"
+#ifdef WIN32
+	#include "WinNamedPipeStream.h"
+#endif
 
 class BackupClientDirectoryRecord;
 class BackupClientContext;
