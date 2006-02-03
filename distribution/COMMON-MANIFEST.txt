@@ -3,12 +3,14 @@ lib/common
 lib/crypto
 lib/server
 lib/compress
+lib/win32
 test/common
 test/common/testfiles
 test/basicserver
 test/basicserver/testfiles
 test/crypto
 test/compress
+test/win32
 docs/common notes
 docs/common/lib_common notes/lib_common
 docs/common/lib_crypto notes/lib_crypto
