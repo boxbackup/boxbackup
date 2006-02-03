@@ -3,7 +3,6 @@ test/raidfile
 test/raidfile/testfiles
 lib/backupclient
 lib/backupstore
-lib/win32
 bin/bbstored
 bin/bbstoreaccounts
 bin/bbackupd
