@@ -350,8 +350,8 @@ for my $mod (@modules, $implicit_dep)
 {
 	opendir DIR,$mod;
 	for my $h (grep /\.h\Z/i, readdir DIR)
-	{	
-		next if /\A\._/;	# Temp Mac OS Resource hack
+	{
+		next if $h =~ /\A\./;		# Ignore Mac resource forks, autosaves, etc
 
 		open FL,"$mod/$h" or die "can't open $mod/$h";
 		my $f;

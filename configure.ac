@@ -77,9 +77,8 @@ AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS([execinfo.h regex.h signal.h syslog.h time.h])
-AC_CHECK_HEADERS([asm/byteorder.h])
 AC_CHECK_HEADERS([netinet/in.h])
-AC_CHECK_HEADERS([sys/endian.h sys/param.h sys/types.h sys/wait.h sys/xattr.h sys/time.h])
+AC_CHECK_HEADERS([sys/param.h sys/types.h sys/wait.h sys/xattr.h sys/time.h])
 
 
 ### Checks for typedefs, structures, and compiler characteristics.
@@ -109,6 +108,9 @@ AX_CHECK_DIRENT_D_TYPE
 AC_SYS_LARGEFILE
 AX_CHECK_LLONG_MINMAX
 AX_CHECK_DEFINE_PRAGMA
+if test "x$ac_cv_c_bigendian" != "xyes"; then
+  AX_BSWAP64
+fi
 if test "$target_os" != "mingw32"; then
   AX_RANDOM_DEVICE
 fi
