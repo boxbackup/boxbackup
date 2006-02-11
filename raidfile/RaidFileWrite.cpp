@@ -462,6 +462,9 @@ void RaidFileWrite::TransformToRaidStorage()
 						ASSERT(sizeof(RaidFileRead::FileSizeType) >= sizeof(off_t));
 						int sizePos = (blockSize/sizeof(unsigned int)) - 2;
 						RaidFileRead::FileSizeType sw = box_hton64(writeFileStat.st_size);
+#ifdef HAVE_PPC_WORKAROUND
+                                                static RaidFileRead::FileSizeType ppcWorkaround = sw;
+#endif
 						unsigned int *psize = (unsigned int *)(&sw);
 						pparity[sizePos+0] = pstripe1[sizePos+0] ^ psize[0];
 						pparity[sizePos+1] = pstripe1[sizePos+1] ^ psize[1];
