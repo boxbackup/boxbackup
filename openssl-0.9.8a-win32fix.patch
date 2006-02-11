@@ -1,0 +1,356 @@
+diff -ru openssl-0.9.8a/apps/ca.c openssl-0.9.8a-win32fix/apps/ca.c
+--- openssl-0.9.8a/apps/ca.c	2005-09-30 17:47:15.000000000 +0100
++++ openssl-0.9.8a-win32fix/apps/ca.c	2005-12-20 17:32:23.388875000 +0000
+@@ -845,7 +845,7 @@
+ 	       that to access().  However, time's too short to do that just
+ 	       now.
+ 	    */
+-		if (access(outdir,R_OK|W_OK|X_OK) != 0)
++		if (_access(outdir,R_OK|W_OK|X_OK) != 0)
+ 			{
+ 			BIO_printf(bio_err,"I am unable to access the %s directory\n",outdir);
+ 			perror(outdir);
+diff -ru openssl-0.9.8a/apps/s_apps.h openssl-0.9.8a-win32fix/apps/s_apps.h
+--- openssl-0.9.8a/apps/s_apps.h	2005-04-26 18:43:52.000000000 +0100
++++ openssl-0.9.8a-win32fix/apps/s_apps.h	2005-12-20 17:35:14.795125000 +0000
+@@ -118,7 +118,7 @@
+ #endif
+ 
+ #ifdef OPENSSL_SYS_MSDOS
+-#define _kbhit kbhit
++//#define _kbhit kbhit
+ #endif
+ 
+ #if defined(OPENSSL_SYS_VMS) && !defined(FD_SET)
+diff -ru openssl-0.9.8a/apps/s_client.c openssl-0.9.8a-win32fix/apps/s_client.c
+--- openssl-0.9.8a/apps/s_client.c	2005-10-01 00:38:19.000000000 +0100
++++ openssl-0.9.8a-win32fix/apps/s_client.c	2005-12-20 17:36:36.357625000 +0000
+@@ -924,7 +924,7 @@
+ #ifdef CHARSET_EBCDIC
+ 			ascii2ebcdic(&(sbuf[sbuf_off]),&(sbuf[sbuf_off]),sbuf_len);
+ #endif
+-			i=write(fileno(stdout),&(sbuf[sbuf_off]),sbuf_len);
++			i=_write(_fileno(stdout),&(sbuf[sbuf_off]),sbuf_len);
+ 
+ 			if (i <= 0)
+ 				{
+@@ -1011,7 +1011,7 @@
+ 				{
+ 				int j, lf_num;
+ 
+-				i=read(fileno(stdin),cbuf,BUFSIZZ/2);
++				i=_read(_fileno(stdin),cbuf,BUFSIZZ/2);
+ 				lf_num = 0;
+ 				/* both loops are skipped when i <= 0 */
+ 				for (j = 0; j < i; j++)
+@@ -1030,7 +1030,7 @@
+ 				assert(lf_num == 0);
+ 				}
+ 			else
+-				i=read(fileno(stdin),cbuf,BUFSIZZ);
++				i=_read(_fileno(stdin),cbuf,BUFSIZZ);
+ 
+ 			if ((!c_ign_eof) && ((i <= 0) || (cbuf[0] == 'Q')))
+ 				{
+diff -ru openssl-0.9.8a/apps/s_server.c openssl-0.9.8a-win32fix/apps/s_server.c
+--- openssl-0.9.8a/apps/s_server.c	2005-09-02 13:27:02.000000000 +0100
++++ openssl-0.9.8a-win32fix/apps/s_server.c	2005-12-20 17:34:43.576375000 +0000
+@@ -1291,7 +1291,7 @@
+ 				{
+ 				int j, lf_num;
+ 
+-				i=read(fileno(stdin), buf, bufsize/2);
++				i=_read(_fileno(stdin), buf, bufsize/2);
+ 				lf_num = 0;
+ 				/* both loops are skipped when i <= 0 */
+ 				for (j = 0; j < i; j++)
+@@ -1310,7 +1310,7 @@
+ 				assert(lf_num == 0);
+ 				}
+ 			else
+-				i=read(fileno(stdin),buf,bufsize);
++				i=_read(_fileno(stdin),buf,bufsize);
+ 			if (!s_quiet)
+ 				{
+ 				if ((i <= 0) || (buf[0] == 'Q'))
+@@ -1426,7 +1426,7 @@
+ #ifdef CHARSET_EBCDIC
+ 					ascii2ebcdic(buf,buf,i);
+ #endif
+-					write(fileno(stdout),buf,
++					_write(_fileno(stdout),buf,
+ 						(unsigned int)i);
+ 					if (SSL_pending(con)) goto again;
+ 					break;
+diff -ru openssl-0.9.8a/apps/s_socket.c openssl-0.9.8a-win32fix/apps/s_socket.c
+--- openssl-0.9.8a/apps/s_socket.c	2005-06-13 04:21:00.000000000 +0100
++++ openssl-0.9.8a-win32fix/apps/s_socket.c	2005-12-20 17:37:11.154500000 +0000
+@@ -276,7 +276,7 @@
+ #endif
+ 
+ 	if (connect(s,(struct sockaddr *)&them,sizeof(them)) == -1)
+-		{ close(s); perror("connect"); return(0); }
++		{ _close(s); perror("connect"); return(0); }
+ 	*sock=s;
+ 	return(1);
+ 	}
+Only in openssl-0.9.8a-win32fix/crypto/bf/asm: b_win32.asm
+diff -ru openssl-0.9.8a/crypto/bio/bss_file.c openssl-0.9.8a-win32fix/crypto/bio/bss_file.c
+--- openssl-0.9.8a/crypto/bio/bss_file.c	2005-09-29 21:18:05.000000000 +0100
++++ openssl-0.9.8a-win32fix/crypto/bio/bss_file.c	2005-12-20 16:53:47.557750000 +0000
+@@ -272,7 +272,7 @@
+ #endif
+ 		{
+ #if defined(OPENSSL_SYS_WINDOWS)
+-		int fd = fileno((FILE*)ptr);
++		int fd = _fileno((FILE*)ptr);
+ 		if (num & BIO_FP_TEXT)
+ 			_setmode(fd,_O_TEXT);
+ 		else
+diff -ru openssl-0.9.8a/crypto/des/enc_read.c openssl-0.9.8a-win32fix/crypto/des/enc_read.c
+--- openssl-0.9.8a/crypto/des/enc_read.c	2001-10-24 22:20:26.000000000 +0100
++++ openssl-0.9.8a-win32fix/crypto/des/enc_read.c	2005-12-20 16:50:42.245250000 +0000
+@@ -147,7 +147,7 @@
+ 	/* first - get the length */
+ 	while (net_num < HDRSIZE) 
+ 		{
+-		i=read(fd,(void *)&(net[net_num]),HDRSIZE-net_num);
++		i=_read(fd,(void *)&(net[net_num]),HDRSIZE-net_num);
+ #ifdef EINTR
+ 		if ((i == -1) && (errno == EINTR)) continue;
+ #endif
+@@ -169,7 +169,7 @@
+ 	net_num=0;
+ 	while (net_num < rnum)
+ 		{
+-		i=read(fd,(void *)&(net[net_num]),rnum-net_num);
++		i=_read(fd,(void *)&(net[net_num]),rnum-net_num);
+ #ifdef EINTR
+ 		if ((i == -1) && (errno == EINTR)) continue;
+ #endif
+diff -ru openssl-0.9.8a/crypto/des/enc_writ.c openssl-0.9.8a-win32fix/crypto/des/enc_writ.c
+--- openssl-0.9.8a/crypto/des/enc_writ.c	2001-10-24 22:20:26.000000000 +0100
++++ openssl-0.9.8a-win32fix/crypto/des/enc_writ.c	2005-12-20 16:51:06.839000000 +0000
+@@ -153,7 +153,7 @@
+ 		{
+ 		/* eay 26/08/92 I was not doing writing from where we
+ 		 * got up to. */
+-		i=write(fd,(void *)&(outbuf[j]),outnum-j);
++		i=_write(fd,(void *)&(outbuf[j]),outnum-j);
+ 		if (i == -1)
+ 			{
+ #ifdef EINTR
+diff -ru openssl-0.9.8a/crypto/rand/randfile.c openssl-0.9.8a-win32fix/crypto/rand/randfile.c
+--- openssl-0.9.8a/crypto/rand/randfile.c	2005-05-21 18:39:52.000000000 +0100
++++ openssl-0.9.8a-win32fix/crypto/rand/randfile.c	2005-12-20 16:56:38.385875000 +0000
+@@ -181,7 +181,7 @@
+ 	if (out == NULL) goto err;
+ 
+ #ifndef NO_CHMOD
+-	chmod(file,0600);
++	_chmod(file,0600);
+ #endif
+ 	n=RAND_DATA;
+ 	for (;;)
+diff -ru openssl-0.9.8a/crypto/ui/ui_openssl.c openssl-0.9.8a-win32fix/crypto/ui/ui_openssl.c
+--- openssl-0.9.8a/crypto/ui/ui_openssl.c	2005-09-26 03:40:18.000000000 +0100
++++ openssl-0.9.8a-win32fix/crypto/ui/ui_openssl.c	2005-12-20 17:05:08.917125000 +0000
+@@ -678,7 +678,7 @@
+ #ifdef WIN16TTY
+ 		i=_inchar();
+ #else
+-		i=getch();
++		i=_getch();
+ #endif
+ 		if (i == '\r') i='\n';
+ 		*(p++)=i;
+diff -ru openssl-0.9.8a/engines/e_aep.c openssl-0.9.8a-win32fix/engines/e_aep.c
+--- openssl-0.9.8a/engines/e_aep.c	2005-07-16 12:13:08.000000000 +0100
++++ openssl-0.9.8a-win32fix/engines/e_aep.c	2005-12-20 17:05:52.448375000 +0000
+@@ -863,7 +863,7 @@
+ 	CRYPTO_w_lock(CRYPTO_LOCK_ENGINE);
+ 
+ #ifndef NETWARE_CLIB
+-	curr_pid = getpid();
++	curr_pid = _getpid();
+ #else
+ 	curr_pid = GetThreadID();
+ #endif
+diff -ru openssl-0.9.8a/ssl/d1_clnt.c openssl-0.9.8a-win32fix/ssl/d1_clnt.c
+--- openssl-0.9.8a/ssl/d1_clnt.c	2005-10-01 00:38:19.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/d1_clnt.c	2005-12-20 17:29:34.029500000 +0000
+@@ -144,7 +144,7 @@
+ int dtls1_connect(SSL *s)
+ 	{
+ 	BUF_MEM *buf=NULL;
+-	unsigned long Time=time(NULL),l;
++	unsigned long Time=(unsigned long)time(NULL),l;
+ 	long num1;
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+ 	int ret= -1;
+@@ -544,7 +544,7 @@
+ 		/* else use the pre-loaded session */
+ 
+ 		p=s->s3->client_random;
+-		Time=time(NULL);			/* Time */
++		Time=(unsigned long)time(NULL);			/* Time */
+ 		l2n(Time,p);
+ 		RAND_pseudo_bytes(p,SSL3_RANDOM_SIZE-sizeof(Time));
+ 
+diff -ru openssl-0.9.8a/ssl/d1_srvr.c openssl-0.9.8a-win32fix/ssl/d1_srvr.c
+--- openssl-0.9.8a/ssl/d1_srvr.c	2005-10-01 00:38:19.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/d1_srvr.c	2005-12-20 17:29:17.279500000 +0000
+@@ -144,7 +144,7 @@
+ int dtls1_accept(SSL *s)
+ 	{
+ 	BUF_MEM *buf;
+-	unsigned long l,Time=time(NULL);
++	unsigned long l,Time=(unsigned long)time(NULL);
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+ 	long num1;
+ 	int ret= -1;
+@@ -666,7 +666,7 @@
+ 		{
+ 		buf=(unsigned char *)s->init_buf->data;
+ 		p=s->s3->server_random;
+-		Time=time(NULL);			/* Time */
++		Time=(unsigned long)time(NULL);			/* Time */
+ 		l2n(Time,p);
+ 		RAND_pseudo_bytes(p,SSL3_RANDOM_SIZE-sizeof(Time));
+ 		/* Do the message type and length last */
+diff -ru openssl-0.9.8a/ssl/s23_clnt.c openssl-0.9.8a-win32fix/ssl/s23_clnt.c
+--- openssl-0.9.8a/ssl/s23_clnt.c	2005-08-06 00:52:07.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/s23_clnt.c	2005-12-20 17:28:27.607625000 +0000
+@@ -88,7 +88,7 @@
+ int ssl23_connect(SSL *s)
+ 	{
+ 	BUF_MEM *buf=NULL;
+-	unsigned long Time=time(NULL);
++	unsigned long Time=(unsigned long)time(NULL);
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+ 	int ret= -1;
+ 	int new_state,state;
+@@ -236,7 +236,7 @@
+ #endif
+ 
+ 		p=s->s3->client_random;
+-		Time=time(NULL);			/* Time */
++		Time=(unsigned long)time(NULL);			/* Time */
+ 		l2n(Time,p);
+ 		if (RAND_pseudo_bytes(p,SSL3_RANDOM_SIZE-4) <= 0)
+ 			return -1;
+diff -ru openssl-0.9.8a/ssl/s23_srvr.c openssl-0.9.8a-win32fix/ssl/s23_srvr.c
+--- openssl-0.9.8a/ssl/s23_srvr.c	2005-10-11 11:16:20.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/s23_srvr.c	2005-12-20 17:25:18.326375000 +0000
+@@ -140,7 +140,7 @@
+ int ssl23_accept(SSL *s)
+ 	{
+ 	BUF_MEM *buf;
+-	unsigned long Time=time(NULL);
++	unsigned long Time=(unsigned long)time(NULL);
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+ 	int ret= -1;
+ 	int new_state,state;
+diff -ru openssl-0.9.8a/ssl/s2_clnt.c openssl-0.9.8a-win32fix/ssl/s2_clnt.c
+--- openssl-0.9.8a/ssl/s2_clnt.c	2005-08-06 00:52:07.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/s2_clnt.c	2005-12-20 17:19:56.870250000 +0000
+@@ -144,7 +144,7 @@
+ 
+ int ssl2_connect(SSL *s)
+ 	{
+-	unsigned long l=time(NULL);
++	unsigned long l=(unsigned long)time(NULL);
+ 	BUF_MEM *buf=NULL;
+ 	int ret= -1;
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+diff -ru openssl-0.9.8a/ssl/s2_srvr.c openssl-0.9.8a-win32fix/ssl/s2_srvr.c
+--- openssl-0.9.8a/ssl/s2_srvr.c	2005-08-06 00:52:07.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/s2_srvr.c	2005-12-20 17:19:09.276500000 +0000
+@@ -144,7 +144,7 @@
+ 
+ int ssl2_accept(SSL *s)
+ 	{
+-	unsigned long l=time(NULL);
++	unsigned long l=(unsigned long)time(NULL);
+ 	BUF_MEM *buf=NULL;
+ 	int ret= -1;
+ 	long num1;
+diff -ru openssl-0.9.8a/ssl/s3_clnt.c openssl-0.9.8a-win32fix/ssl/s3_clnt.c
+--- openssl-0.9.8a/ssl/s3_clnt.c	2005-10-01 00:38:19.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/s3_clnt.c	2005-12-20 17:24:44.576375000 +0000
+@@ -159,7 +159,7 @@
+ int ssl3_connect(SSL *s)
+ 	{
+ 	BUF_MEM *buf=NULL;
+-	unsigned long Time=time(NULL),l;
++	unsigned long Time=(unsigned long)time(NULL),l;
+ 	long num1;
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+ 	int ret= -1;
+@@ -541,7 +541,7 @@
+ 		/* else use the pre-loaded session */
+ 
+ 		p=s->s3->client_random;
+-		Time=time(NULL);			/* Time */
++		Time=(unsigned long)time(NULL);			/* Time */
+ 		l2n(Time,p);
+ 		if (RAND_pseudo_bytes(p,SSL3_RANDOM_SIZE-4) <= 0)
+ 			goto err;
+diff -ru openssl-0.9.8a/ssl/s3_srvr.c openssl-0.9.8a-win32fix/ssl/s3_srvr.c
+--- openssl-0.9.8a/ssl/s3_srvr.c	2005-10-01 00:38:20.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/s3_srvr.c	2005-12-20 17:23:17.217000000 +0000
+@@ -164,7 +164,7 @@
+ int ssl3_accept(SSL *s)
+ 	{
+ 	BUF_MEM *buf;
+-	unsigned long l,Time=time(NULL);
++	unsigned long l,Time=(unsigned long)time(NULL);
+ 	void (*cb)(const SSL *ssl,int type,int val)=NULL;
+ 	long num1;
+ 	int ret= -1;
+@@ -1038,7 +1038,7 @@
+ 		{
+ 		buf=(unsigned char *)s->init_buf->data;
+ 		p=s->s3->server_random;
+-		Time=time(NULL);			/* Time */
++		Time=(unsigned long)time(NULL);			/* Time */
+ 		l2n(Time,p);
+ 		if (RAND_pseudo_bytes(p,SSL3_RANDOM_SIZE-4) <= 0)
+ 			return -1;
+diff -ru openssl-0.9.8a/ssl/ssl_asn1.c openssl-0.9.8a-win32fix/ssl/ssl_asn1.c
+--- openssl-0.9.8a/ssl/ssl_asn1.c	2005-04-20 22:48:48.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/ssl_asn1.c	2005-12-20 17:30:54.998250000 +0000
+@@ -344,7 +344,7 @@
+ 		OPENSSL_free(ai.data); ai.data=NULL; ai.length=0;
+ 		}
+ 	else
+-		ret->time=time(NULL);
++		ret->time=(unsigned long)time(NULL);
+ 
+ 	ai.length=0;
+ 	M_ASN1_D2I_get_EXP_opt(aip,d2i_ASN1_INTEGER,2);
+diff -ru openssl-0.9.8a/ssl/ssl_lib.c openssl-0.9.8a-win32fix/ssl/ssl_lib.c
+--- openssl-0.9.8a/ssl/ssl_lib.c	2005-10-01 00:38:20.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/ssl_lib.c	2005-12-20 17:30:04.404500000 +0000
+@@ -1901,7 +1901,7 @@
+ 			?s->ctx->stats.sess_connect_good
+ 			:s->ctx->stats.sess_accept_good) & 0xff) == 0xff)
+ 			{
+-			SSL_CTX_flush_sessions(s->ctx,time(NULL));
++			SSL_CTX_flush_sessions(s->ctx,(unsigned long)time(NULL));
+ 			}
+ 		}
+ 	}
+diff -ru openssl-0.9.8a/ssl/ssl_sess.c openssl-0.9.8a-win32fix/ssl/ssl_sess.c
+--- openssl-0.9.8a/ssl/ssl_sess.c	2005-04-29 21:10:06.000000000 +0100
++++ openssl-0.9.8a-win32fix/ssl/ssl_sess.c	2005-12-20 17:30:31.420125000 +0000
+@@ -118,7 +118,7 @@
+ 	ss->verify_result = 1; /* avoid 0 (= X509_V_OK) just in case */
+ 	ss->references=1;
+ 	ss->timeout=60*5+4; /* 5 minute timeout by default */
+-	ss->time=time(NULL);
++	ss->time=(unsigned long)time(NULL);
+ 	ss->prev=NULL;
+ 	ss->next=NULL;
+ 	ss->compress_meth=0;
+Only in openssl-0.9.8a-win32fix: tmp32dll
