@@ -13,8 +13,8 @@ BEGIN
 	chomp $build_cpu;
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
-	
-    $build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
+
+	$build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
 
 	$make_command = ($build_os eq 'Darwin') ? 'bsdmake' : ($build_os eq 'SunOS') ? 'gmake' : 'make';
 	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' && $build_os ne "SunOS");
@@ -34,10 +34,10 @@ BEGIN
 	$product_name = <VERSION>;
 	chomp $product_name;
 	close VERSION;
-	
+
 	# where to put the files
-	$install_into_dir = '@bindir@';
-	
+	$install_into_dir = '@bindir_expanded@';
+
 	# if it's Darwin,
 	if($build_os eq 'Darwin')
 	{
