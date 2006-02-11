@@ -4,13 +4,6 @@ use strict;
 use lib 'infrastructure';
 use BoxPlatform;
 
-my $os_suffix = '';
-if($build_os eq 'OpenBSD')
-{
-	$os_suffix = `uname -r`;
-	$os_suffix =~ tr/0-9//cd;
-}
-
 my @parcels;
 my %parcel_contents;
 
@@ -169,7 +162,7 @@ close INSTALLMSG;
 
 sub parcel_root
 {
-	$product_name.'-'.$product_version.'-'.$_[0].'-'.$target_os.$os_suffix
+	$product_name.'-'.$product_version.'-'.$_[0].'-'.$target_os
 }
 
 sub parcel_dir
