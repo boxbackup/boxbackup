@@ -10,17 +10,6 @@ touch install-sh
 AC_CANONICAL_SYSTEM
 test -s install-sh || rm install-sh
 
-
-### Temporary hacks
-AC_ARG_ENABLE(
-  [ppc-workaround],
-  [AC_HELP_STRING([--enable-ppc-workaround],
-                  [Enable a workaround for a compiler bug in GCC on PPC platforms (raidfile tests fail).])])
-if test "x$enable_ppc_workaround" = "xyes"; then
-  AC_DEFINE([HAVE_PPC_WORKAROUND], 1, [Define to 1 to workaround a GCC compiler bug on PPC])
-fi
-
-
 ### Checks for programs.
 
 AC_LANG([C++])
