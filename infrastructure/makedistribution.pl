@@ -47,7 +47,9 @@ open LICENSE,"$dist_root/LICENSE.txt" or die "Can't open $dist_root/LICENSE.txt"
 my $license_f;
 read LICENSE,$license_f,100000;
 close LICENSE;
-my @license = ('distribution '.$base_name,'',split(/\n/,$license_f));
+my $svnversion = `svnversion .`;
+chomp $svnversion;
+my @license = ('distribution '.$base_name.' (svn version: '.$svnversion.')',split(/\n/,$license_f));
 
 # copy files, make a note of all the modules included
 my %modules_included;
