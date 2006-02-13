@@ -11,7 +11,10 @@
 #define SOCKETLISTEN__H
 
 #include <errno.h>
-#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 
 #ifdef HAVE_KQUEUE
 	#include <sys/event.h>

@@ -191,7 +191,9 @@ static void EnsureEncDecBufferSize(int BufSize)
 {
 	if(spEncDecBuffer == 0)
 	{
+#ifndef WIN32
 		TRACE1("Allocating filename encoding/decoding buffer with size %d\n", BufSize);
+#endif
 		spEncDecBuffer = new MemoryBlockGuard<uint8_t *>(BufSize);
 		MEMLEAKFINDER_NOT_A_LEAK(spEncDecBuffer);
 		MEMLEAKFINDER_NOT_A_LEAK(*spEncDecBuffer);
@@ -201,7 +203,9 @@ static void EnsureEncDecBufferSize(int BufSize)
 	{
 		if(sEncDecBufferSize < BufSize)
 		{
+#ifndef WIN32
 			TRACE2("Reallocating filename encoding/decoding buffer from %d to %d\n", sEncDecBufferSize, BufSize);
+#endif
 			spEncDecBuffer->Resize(BufSize);
 			sEncDecBufferSize = BufSize;
 			MEMLEAKFINDER_NOT_A_LEAK(*spEncDecBuffer);

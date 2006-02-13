@@ -45,10 +45,11 @@ public:
 	BackupDaemon();
 	~BackupDaemon();
 
+private:
 	// methods below do partial (specialized) serialization of client state only
 	void SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const;
-	void DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime);
-private:
+	bool DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime);
+	bool DeleteStoreObjectInfo() const;
 	BackupDaemon(const BackupDaemon &);
 public:
 

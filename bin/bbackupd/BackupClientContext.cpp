@@ -57,9 +57,7 @@ BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLS
 	  mpExcludeFiles(0),
 	  mpExcludeDirs(0),
 	  mbIsManaged(false),
-	  mTimeMgmtEpoch(0),
-	  mMaximumDiffTime(600),
-	  mKeepAliveTime(0)
+	  mTimeMgmtEpoch(0)
 {
 }
 
@@ -511,6 +509,9 @@ void BackupClientContext::ManageDiffProcess()
 
 #ifdef PLATFORM_CYGWIN
 	::signal(SIGALRM, TimerSigHandler);
+#elif defined WIN32
+	// no support for SIGVTALRM
+	SetTimerHandler(TimerSigHandler);
 #else
 	::signal(SIGVTALRM, TimerSigHandler);
 #endif // PLATFORM_CYGWIN
@@ -599,7 +600,10 @@ void BackupClientContext::UnManageDiffProcess()
 void BackupClientContext::DoKeepAlive()
 {
 	if (!mpConnection)
+	{
+		::syslog(LOG_ERR, "DoKeepAlive() called with no connection!");
 		return;
+	}
 
 	mpConnection->QueryGetIsAlive();
 }
@@ -620,10 +624,10 @@ time_t BackupClientContext::GetTimeMgmtEpoch()
 
 int BackupClientContext::GetMaximumDiffingTime() 
 {
-	return mMaximumDiffTime;
+	return sMaximumDiffTime;
 }
 
 int BackupClientContext::GetKeepaliveTime() 
 {
-	return mKeepAliveTime;
+	return sKeepAliveTime;
 }

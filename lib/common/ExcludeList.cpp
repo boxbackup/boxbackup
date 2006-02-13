@@ -232,7 +232,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 	//
 	mDefinite.clear();
 
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	// free regex memory
 	while(mRegex.size() > 0)
 	{
@@ -273,7 +273,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 	//
 	//
 	//
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	rArchive.Read(iCount);
 
 	if (iCount > 0)
@@ -310,7 +310,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 			}
 		}
 	}
-#endif // PLATFORM_REGEX_NOT_SUPPORTED
+#endif // HAVE_REGEX_H
 
 	//
 	//
@@ -365,7 +365,7 @@ void ExcludeList::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-#ifndef PLATFORM_REGEX_NOT_SUPPORTED
+#ifdef HAVE_REGEX_H
 	// don't even try to save compiled regular expressions,
 	// use string copies instead.
 	ASSERT(mRegex.size() == mRegexStr.size()); 	
@@ -378,7 +378,7 @@ void ExcludeList::Serialize(Archive & rArchive) const
 	{
 		rArchive.Write(*i);
 	}
-#endif // PLATFORM_REGEX_NOT_SUPPORTED
+#endif // HAVE_REGEX_H
 
 	//
 	//

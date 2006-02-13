@@ -11,8 +11,10 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 #ifdef HAVE_SIGNAL_H
 	#include <signal.h>
 #endif
@@ -34,6 +36,9 @@
 #ifdef HAVE_SYS_MNTTAB_H
 	#include <cstdio>
 	#include <sys/mnttab.h>
+#endif
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
 #endif
 
 #include "Configuration.h"
@@ -78,6 +83,25 @@ static const time_t MAX_SLEEP_TIME = 1024;
 // This prevents repetative cycles of load on the server
 #define		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY	6
 
+#ifdef WIN32
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HelperThread()
+//		Purpose: Background thread function, called by Windows,
+//			calls the BackupDaemon's RunHelperThread method
+//			to listen for and act on control communications
+//		Created: 18/2/04
+//
+// --------------------------------------------------------------------------
+unsigned int WINAPI HelperThread(LPVOID lpParam) 
+{ 
+	((BackupDaemon *)lpParam)->RunHelperThread();
+
+	return 0;
+}
+#endif
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -99,6 +123,20 @@ BackupDaemon::BackupDaemon()
 	{
 		mNotificationsSent[l] = false;
 	}
+
+#ifdef WIN32
+	// Create a thread to handle the named pipe
+	HANDLE hThread;
+	unsigned int dwThreadId;
+
+	hThread = (HANDLE) _beginthreadex( 
+        	NULL,                        // default security attributes 
+        	0,                           // use default stack size  
+        	HelperThread,                // thread function 
+        	this,                        // argument to thread function 
+        	0,                           // use default creation flags 
+        	&dwThreadId);                // returns the thread identifier 
+#endif
 }
 
 // --------------------------------------------------------------------------
@@ -185,11 +223,12 @@ void BackupDaemon::SetupInInitialProcess()
 	if(GetConfiguration().KeyExists("CommandSocket"))
 	{
 		printf(
-				"============================================================================================\n" \
-				"SECURITY WARNING: This platform cannot check the credentials of connections to the\n" \
-				"command socket. This is a potential DoS security problem.\n" \
-				"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl is not used.\n" \
-				"============================================================================================\n"
+				"==============================================================================\n"
+				"SECURITY WARNING: This platform cannot check the credentials of connections to\n"
+				"the command socket. This is a potential DoS security problem.\n"
+				"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl\n"
+				"is not used.\n"
+				"==============================================================================\n"
 			);
 	}
 }
@@ -221,30 +260,13 @@ void BackupDaemon::DeleteAllLocations()
 }
 
 #ifdef WIN32
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HelperThread()
-//		Purpose: Background thread function, called by Windows,
-//			calls the BackupDaemon's RunHelperThread method
-//			to listen for and act on control communications
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
-unsigned int WINAPI HelperThread( LPVOID lpParam ) 
-{ 
-	printf( "Parameter = %lu.\n", *(DWORD*)lpParam ); 
-	((BackupDaemon *)lpParam)->RunHelperThread();
-
-	return 0;
-}
-
 void BackupDaemon::RunHelperThread(void)
 {
 	mpCommandSocketInfo = new CommandSocketInfo;
 	this->mReceivedCommandConn = false;
 
-	while ( !IsTerminateWanted() )
+	// loop until the parent process exits
+	while (TRUE)
 	{
 		try
 		{
@@ -359,24 +381,21 @@ void BackupDaemon::RunHelperThread(void)
 void BackupDaemon::Run()
 {
 #ifdef WIN32
-
-	// Create a thread to handle the named pipe
-	HANDLE hThread;
-	unsigned int dwThreadId;
-
-	hThread = (HANDLE) _beginthreadex( 
-        	NULL,                        // default security attributes 
-        	0,                           // use default stack size  
-        	HelperThread,                // thread function 
-        	this,                        // argument to thread function 
-        	0,                           // use default creation flags 
-        	&dwThreadId);                // returns the thread identifier 
-
 	// init our own timer for file diff timeouts
 	InitTimer();
 
-#else // ! WIN32
+	try
+	{
+		Run2();
+	}
+	catch(...)
+	{
+		FiniTimer();
+		throw;
+	}
 
+	FiniTimer();
+#else // ! WIN32
 	// Ignore SIGPIPE (so that if a command connection is broken, the daemon doesn't terminate)
 	::signal(SIGPIPE, SIG_IGN);
 
@@ -390,8 +409,6 @@ void BackupDaemon::Run()
 		::unlink(socketName);
 		mpCommandSocketInfo->mListeningSocket.Listen(Socket::TypeUNIX, socketName);
 	}
-	
-#endif // WIN32
 
 	// Handle things nicely on exceptions
 	try
@@ -402,23 +419,28 @@ void BackupDaemon::Run()
 	{
 		if(mpCommandSocketInfo != 0)
 		{
-			delete mpCommandSocketInfo;
+			try 
+			{
+				delete mpCommandSocketInfo;
+			}
+			catch(...)
+			{
+				::syslog(LOG_WARNING,
+					"Error closing command socket "
+					"after exception, ignored.");
+			}
 			mpCommandSocketInfo = 0;
 		}
 
 		throw;
 	}
-	
+
 	// Clean up
 	if(mpCommandSocketInfo != 0)
 	{
 		delete mpCommandSocketInfo;
 		mpCommandSocketInfo = 0;
 	}
-
-#ifdef WIN32
-	// clean up windows specific stuff.
-	FiniTimer();
 #endif
 }
 
@@ -482,8 +504,8 @@ void BackupDaemon::Run2()
 		BackupClientContext::ClientStoreMarker_NotKnown;
 	// haven't contacted the store yet
 
- 	DeserializeStoreObjectInfo(clientStoreMarker, lastSyncTime, 
-		nextSyncTime);
+ 	bool deserialised = DeserializeStoreObjectInfo(clientStoreMarker, 
+		lastSyncTime, nextSyncTime);
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -584,6 +606,17 @@ void BackupDaemon::Run2()
 				// Of course, they may be eligable to be synced again the next time round,
 				// but this should be OK, because the changes only upload should upload no data.
 				syncPeriodEndExtended += SecondsToBoxTime((time_t)(356*24*3600));
+			}
+
+			// Delete the serialised store object file,
+			// so that we don't try to reload it after a
+			// partially completed backup
+			if(deserialised && !DeleteStoreObjectInfo())
+			{
+				::syslog(LOG_ERR, "Failed to delete the "
+					"StoreObjectInfoFile, backup cannot "
+					"continue safely.");
+				continue;
 			}
 			
 			// Do sync
@@ -751,7 +784,12 @@ void BackupDaemon::Run2()
 						"to retry...", 
 						errorString, errorCode, 
 						errorSubCode);
-					::sleep(100);
+					::sleep(10);
+					nextSyncTime = currentSyncStartTime + 
+						SecondsToBoxTime(90) +
+						Random::RandomInt(
+							updateStoreInterval >> 
+							SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 				}
 			}
 
@@ -863,7 +901,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 #ifdef WIN32
 	// Really could use some interprocess protection, mutex etc
 	// any side effect should be too bad???? :)
-	DWORD timeout = BoxTimeToMilliSeconds(RequiredDelay);
+	DWORD timeout = (DWORD)BoxTimeToMilliSeconds(RequiredDelay);
 
 	while ( this->mReceivedCommandConn == false )
 	{
@@ -1065,25 +1103,23 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 // --------------------------------------------------------------------------
 void BackupDaemon::CloseCommandConnection()
 {
+#ifndef WIN32
 	try
 	{
 		TRACE0("Closing command connection\n");
 		
-#ifdef WIN32
-		mpCommandSocketInfo->mListeningSocket.Close();
-#else
 		if(mpCommandSocketInfo->mpGetLine)
 		{
 			delete mpCommandSocketInfo->mpGetLine;
 			mpCommandSocketInfo->mpGetLine = 0;
 		}
 		mpCommandSocketInfo->mpConnectedSocket.reset();
-#endif
 	}
 	catch(...)
 	{
 		// Ignore any errors
 	}
+#endif
 }
 
 
@@ -1100,7 +1136,11 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 {
 	// The bbackupctl program can't rely on a state change, because it may never
 	// change if the server doesn't need to be contacted.
-	
+
+#ifdef __MINGW32__
+#warning race condition: what happens if socket is closed?
+#endif
+
 	if (mpCommandSocketInfo != NULL &&
 #ifdef WIN32
 	    mpCommandSocketInfo->mListeningSocket.IsConnected()
@@ -1114,7 +1154,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 		{
 #ifdef WIN32
 			mpCommandSocketInfo->mListeningSocket.Write(message, 
-				strlen(message));
+				(int)strlen(message));
 #else
 			mpCommandSocketInfo->mpConnectedSocket->Write(message,
 				strlen(message));
@@ -1711,7 +1751,10 @@ void BackupDaemon::SetState(int State)
 	char newStateSize = sprintf(newState, "state %d\n", State);
 
 #ifdef WIN32
-	#warning FIX ME: race condition
+	#ifndef _MSC_VER
+		#warning FIX ME: race condition
+	#endif
+
 	// what happens if the socket is closed by the other thread before
 	// we can write to it? Null pointer deref at best.
 	if (mpCommandSocketInfo && 
@@ -2196,7 +2239,7 @@ void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 //		Created: 2005/04/11
 //
 // --------------------------------------------------------------------------
-void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
 {
 	//
 	//
@@ -2208,7 +2251,7 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 	//
 	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
 	{
-		return;
+		return false;
 	}
 
 	std::string StoreObjectInfoFile = 
@@ -2216,7 +2259,7 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 
 	if (StoreObjectInfoFile.size() <= 0)
 	{
-		return;
+		return false;
 	}
 
 	try
@@ -2236,7 +2279,7 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 				"is not a valid or compatible serialised "
 				"archive. Will re-cache from store.", 
 				StoreObjectInfoFile.c_str());
-			return;
+			return false;
 		}
 
 		//
@@ -2251,7 +2294,7 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 				"is not a valid or compatible serialised "
 				"archive. Will re-cache from store.", 
 				StoreObjectInfoFile.c_str());
-			return;
+			return false;
 		}
 
 		//
@@ -2264,11 +2307,11 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		if (iVersion != STOREOBJECTINFO_VERSION)
 		{
 			::syslog(LOG_WARNING, "Store object info file '%s' "
-				"version [%d] unsupported. "
+				"version %d unsupported. "
 				"Will re-cache from store.", 
 				StoreObjectInfoFile.c_str(), 
 				iVersion);
-			return;
+			return false;
 		}
 
 		//
@@ -2283,7 +2326,7 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 			::syslog(LOG_WARNING, "Store object info file '%s' "
 				"out of date. Will re-cache from store", 
 				StoreObjectInfoFile.c_str());
-			return;
+			return false;
 		}
 
 		//
@@ -2331,12 +2374,7 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 			"version [%d]", StoreObjectInfoFile.c_str(), 
 			iVersion);
 
-		if (::unlink(StoreObjectInfoFile.c_str()) != 0)
-		{
-			::syslog(LOG_ERR, "Failed to delete the old "
-				"store object info file '%s': %s",
-				StoreObjectInfoFile.c_str(), strerror(errno));
-		}
+		return true;
 	}
 	catch (...)
 	{
@@ -2352,4 +2390,38 @@ void BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 			"Will re-cache from store.", 
 			StoreObjectInfoFile.c_str());
 	}
+
+	return false;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::DeleteStoreObjectInfo()
+//		Purpose: Deletes the serialised state file, to prevent us
+//			 from using it again if a backup is interrupted.
+//
+//		Created: 2006/02/12
+//
+// --------------------------------------------------------------------------
+
+bool BackupDaemon::DeleteStoreObjectInfo() const
+{
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
+	{
+		return false;
+	}
+
+	std::string StoreObjectInfoFile = 
+		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
+
+	if (::unlink(StoreObjectInfoFile.c_str()) != 0)
+	{
+		::syslog(LOG_ERR, "Failed to delete the old "
+			"store object info file '%s': %s",
+			StoreObjectInfoFile.c_str(), strerror(errno));
+		return false;
+	}
+
+	return true;
 }

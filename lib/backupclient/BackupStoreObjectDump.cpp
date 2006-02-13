@@ -96,18 +96,18 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 		int depends_l = 0;
 		if((*i)->GetDependsNewer() != 0)
 		{
-#ifdef WIN32
+#ifdef _MSC_VER
 			depends_l += ::sprintf(depends + depends_l, " depNew(%I64x)", (*i)->GetDependsNewer());
 #else
-			depends_l += ::sprintf(depends + depends_l, " depNew(%llx)", (*i)->GetDependsNewer());
+			depends_l += ::sprintf(depends + depends_l, " depNew(%llx)", (long long)((*i)->GetDependsNewer()));
 #endif
 		}
 		if((*i)->GetDependsOlder() != 0)
 		{
-#ifdef WIN32
+#ifdef _MSC_VER
 			depends_l += ::sprintf(depends + depends_l, " depOld(%I64x)", (*i)->GetDependsOlder());
 #else
-			depends_l += ::sprintf(depends + depends_l, " depOld(%llx)", (*i)->GetDependsOlder());
+			depends_l += ::sprintf(depends + depends_l, " depOld(%llx)", (long long)((*i)->GetDependsOlder()));
 #endif
 		}
 

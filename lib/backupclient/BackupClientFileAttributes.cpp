@@ -9,10 +9,13 @@
 
 #include "Box.h"
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <unistd.h>
 #include <limits.h>
 #include <algorithm>
 #include <new>
@@ -334,7 +337,12 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		box_time_t modSecs = BoxTimeToSeconds(modTime);
 		__time64_t winTime = modSecs;
 
-		if (_gmtime64(&winTime) == 0 )
+		// _MAX__TIME64_T doesn't seem to be defined, but the code below
+		// will throw an assertion failure if we exceed it :-)
+		// Microsoft says dates up to the year 3000 are valid, which
+		// is a bit more than 15 * 2^32. Even that doesn't seem
+		// to be true (still aborts), but it can at least hold 2^32.
+		if (winTime >= 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
 			::syslog(LOG_ERR, "Invalid Modification Time "
 				"caught for file: %s", Filename);
@@ -345,7 +353,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		modSecs = BoxTimeToSeconds(modTime);
 		winTime = modSecs;
 
-		if (_gmtime64(&winTime) == 0 )
+		if (winTime > 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
 			::syslog(LOG_ERR, "Invalid Attribute Modification "
 				"Time caught for file: %s", Filename);

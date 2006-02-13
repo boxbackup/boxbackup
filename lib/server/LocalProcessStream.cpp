@@ -9,10 +9,13 @@
 
 #include "Box.h"
 
-#ifndef WIN32
-#include <sys/socket.h>
+#ifdef HAVE_SYS_SOCKET_H
+	#include <sys/socket.h>
 #endif
-#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 
 #include "LocalProcessStream.h"
 #include "SocketStream.h"
