@@ -40,6 +40,7 @@
 SocketStreamTLS::SocketStreamTLS()
 	: mpSSL(0), mpBIO(0)
 {
+	ResetCounters();
 }
 
 // --------------------------------------------------------------------------
@@ -101,6 +102,7 @@ void SocketStreamTLS::Open(const TLSContext &rContext, int Type, const char *Nam
 {
 	SocketStream::Open(Type, Name, Port);
 	Handshake(rContext);
+	ResetCounters();
 }
 
 
@@ -295,6 +297,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 		{
 		case SSL_ERROR_NONE:
 			// No error, return number of bytes read
+			mBytesRead += r;
 			return r;
 			break;
 
@@ -358,6 +361,7 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 		{
 		case SSL_ERROR_NONE:
 			// No error, data sent, return success
+			mBytesWritten += r;
 			return;
 			break;
 
