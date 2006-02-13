@@ -48,13 +48,19 @@ int main(int argc, const char *argv[])
 		InstallService();
 		return 0;
 	}
-		
+
+	bool runAsWin32Service = false;
+	if (argc == 2 && ::strcmp(argv[1], "--service") == 0)
+	{
+		runAsWin32Service = true;
+	}
+	
 	// Under win32 we must initialise the Winsock library
 	// before using sockets
 		
 	WSADATA info;
 
-	if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
+	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
 	{
 		// box backup will not run without sockets
 		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
@@ -65,7 +71,7 @@ int main(int argc, const char *argv[])
 
 	int ExitCode = 0;
 
-	if (argc == 2 && ::strcmp(argv[1], "--service") == 0)
+	if (runAsWin32Service)
 	{
 		syslog(LOG_INFO,"Starting Box Backup Service");
 		OurService();
