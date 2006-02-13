@@ -8,7 +8,7 @@
 
 #include "../../bin/bbackupd/BackupDaemon.h"
 #include "BoxPortsAndFiles.h"
-
+#include "emu.h"
 
 int main(int argc, char* argv[])
 {
