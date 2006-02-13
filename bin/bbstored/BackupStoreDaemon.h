@@ -61,6 +61,8 @@ protected:
 	void HousekeepingProcess();
 	bool CheckForInterProcessMsg(int AccountNum = 0, int MaximumWaitTime = 0);
 
+	void LogConnectionStats(const char *commonName, const SocketStreamTLS &s);
+
 private:
 	BackupStoreAccountDatabase *mpAccountDatabase;
 	BackupStoreAccounts *mpAccounts;

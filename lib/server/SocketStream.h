@@ -56,6 +56,15 @@ private:
 	tOSSocketHandle mSocketHandle;
 	bool mReadClosed;
 	bool mWriteClosed;
+
+protected:
+	off_t mBytesRead;
+	off_t mBytesWritten;
+
+public:
+	off_t GetBytesRead() const {return mBytesRead;}
+	off_t GetBytesWritten() const {return mBytesWritten;}
+	void ResetCounters() {mBytesRead = mBytesWritten = 0;}
 };
 
 #endif // SOCKETSTREAM__H

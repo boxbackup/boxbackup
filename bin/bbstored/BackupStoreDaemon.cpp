@@ -278,7 +278,25 @@ void BackupStoreDaemon::Connection(SocketStreamTLS &rStream)
 	BackupProtocolServer server(rStream);
 	server.SetLogToSysLog(mExtendedLogging);
 	server.SetTimeout(BACKUP_STORE_TIMEOUT);
-	server.DoServer(context);
+	try
+	{
+		server.DoServer(context);
+	}
+	catch(...)
+	{
+		LogConnectionStats(clientCommonName.c_str(), rStream);
+		throw;
+	}
+	LogConnectionStats(clientCommonName.c_str(), rStream);
 	context.CleanUp();
 }
 
+void BackupStoreDaemon::LogConnectionStats(const char *commonName,
+		const SocketStreamTLS &s)
+{
+	// Log the amount of data transferred
+	::syslog(LOG_INFO, "Connection statistics for %s: "
+			"IN=%lld OUT=%lld TOTAL=%lld\n", commonName,
+			s.GetBytesRead(), s.GetBytesWritten(),
+			s.GetBytesRead() + s.GetBytesWritten());
+}
