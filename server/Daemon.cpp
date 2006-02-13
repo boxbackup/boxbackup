@@ -9,9 +9,12 @@
 
 #include "Box.h"
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <errno.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
@@ -124,10 +127,34 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 		// Load the configuration file.
 		std::string errors;
-		std::auto_ptr<Configuration> pconfig = 
-			Configuration::LoadAndVerify(
+		std::auto_ptr<Configuration> pconfig;
+
+		try
+		{
+			pconfig = Configuration::LoadAndVerify(
 				mConfigFileName.c_str(), 
 				GetConfigVerify(), errors);
+		}
+		catch(BoxException &e)
+		{
+			if(e.GetType() == CommonException::ExceptionType &&
+				e.GetSubType() == CommonException::OSFileOpenError)
+			{
+				fprintf(stderr, "%s: failed to start: "
+					"failed to open configuration file: "
+					"%s", DaemonName(), 
+					mConfigFileName.c_str());
+#ifdef WIN32
+				::syslog(LOG_ERR, "%s: failed to start: "
+					"failed to open configuration file: "
+					"%s", DaemonName(), 
+					mConfigFileName.c_str());
+#endif
+				return 1;
+			}
+
+			throw;
+		}
 
 		// Got errors?
 		if(pconfig.get() == 0 || !errors.empty())
@@ -136,6 +163,11 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			fprintf(stderr, "%s: Errors in config file %s:\n%s", 
 				DaemonName(), mConfigFileName.c_str(), 
 				errors.c_str());
+#ifdef WIN32
+			::syslog(LOG_ERR, "%s: Errors in config file %s:\n%s",
+				DaemonName(), mConfigFileName.c_str(), 
+				errors.c_str());
+#endif
 			// And give up
 			return 1;
 		}
@@ -143,9 +175,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		// Store configuration
 		mpConfiguration = pconfig.release();
 		mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
-		
-		// Server configuration
-		const Configuration &serverConfig(mpConfiguration->GetSubConfiguration("Server"));
 		
 		// Let the derived class have a go at setting up stuff in the initial process
 		SetupInInitialProcess();
@@ -161,6 +190,10 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
 		
+		// Server configuration
+		const Configuration &serverConfig(
+			mpConfiguration->GetSubConfiguration("Server"));
+
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
@@ -290,17 +323,33 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	}
 	catch(BoxException &e)
 	{
-		fprintf(stderr, "%s: exception %s (%d/%d)\n", DaemonName(), e.what(), e.GetType(), e.GetSubType());
+		fprintf(stderr, "%s: failed to start: exception %s (%d/%d)\n", 
+			DaemonName(), e.what(), e.GetType(), e.GetSubType());
+#ifdef WIN32
+		::syslog(LOG_ERR, "%s: failed to start: "
+			"exception %s (%d/%d)\n", DaemonName(), 
+			e.what(), e.GetType(), e.GetSubType());
+#endif
 		return 1;
 	}
 	catch(std::exception &e)
 	{
-		fprintf(stderr, "%s: exception %s\n", DaemonName(), e.what());
+		fprintf(stderr, "%s: failed to start: exception %s\n", 
+			DaemonName(), e.what());
+#ifdef WIN32
+		::syslog(LOG_ERR, "%s: failed to start: exception %s\n", 
+			DaemonName(), e.what());
+#endif
 		return 1;
 	}
 	catch(...)
 	{
-		fprintf(stderr, "%s: unknown exception\n", DaemonName());
+		fprintf(stderr, "%s: failed to start: unknown exception\n", 
+			DaemonName());
+#ifdef WIN32
+		::syslog(LOG_ERR, "%s: failed to start: unknown exception\n", 
+			DaemonName());
+#endif
 		return 1;
 	}
 	
@@ -357,17 +406,21 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	}
 	catch(BoxException &e)
 	{
-		::syslog(LOG_ERR, "exception %s (%d/%d) -- terminating", e.what(), e.GetType(), e.GetSubType());
+		::syslog(LOG_ERR, "%s: terminating due to exception %s "
+			"(%d/%d)", DaemonName(), e.what(), e.GetType(), 
+			e.GetSubType());
 		return 1;
 	}
 	catch(std::exception &e)
 	{
-		::syslog(LOG_ERR, "exception %s -- terminating", e.what());
+		::syslog(LOG_ERR, "%s: terminating due to exception %s", 
+			DaemonName(), e.what());
 		return 1;
 	}
 	catch(...)
 	{
-		::syslog(LOG_ERR, "unknown exception -- terminating");
+		::syslog(LOG_ERR, "%s: terminating due to unknown exception",
+			DaemonName());
 		return 1;
 	}
 	

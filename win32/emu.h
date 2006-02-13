@@ -3,7 +3,6 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
-#define _STAT_DEFINED
 #define _INO_T_DEFINED
 
 #include <winsock2.h>
@@ -17,9 +16,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
-//#include <winsock.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
 
 #include <string>
 
@@ -27,13 +23,21 @@
 	( *(_result) = *gmtime( (_clock) ), \
 	(_result) )
 
-
-//signal in unix SIGVTALRM does not exist in win32 - but looking at the 
-#define SIGVTALRM 254
-#define SIGALRM SIGVTALRM
 #define ITIMER_VIRTUAL 0
 
-int setitimer(int type , struct itimerval *timeout, int);
+#ifdef _MSC_VER
+// Microsoft decided to deprecate the standard POSIX functions. Great!
+#define open(file,flags,mode) _open(file,flags,mode)
+#define close(fd)             _close(fd)
+#define dup(fd)               _dup(fd)
+#define read(fd,buf,count)    _read(fd,buf,count)
+#define write(fd,buf,count)   _write(fd,buf,count)
+#define lseek(fd,off,whence)  _lseek(fd,off,whence)
+#define fileno(struct_file)   _fileno(struct_file)
+#endif
+
+int SetTimerHandler(void (__cdecl *func ) (int));
+int setitimer(int type, struct itimerval *timeout, void *arg);
 void InitTimer(void);
 void FiniTimer(void);
 
@@ -109,11 +113,43 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 	return 0;
 }
 
-inline int chmod(const char * Filename, int uid)
-{
-	//indicate sucsess
-	return 0;
-}
+int   emu_chdir (const char* pDirName);
+int   emu_unlink(const char* pFileName);
+char* emu_getcwd(char* pBuffer, int BufSize);
+
+#ifdef _MSC_VER
+	inline int emu_chmod(const char * Filename, int mode)
+	{
+		// indicate success
+		return 0;
+	}
+
+	#define chmod(file, mode)    emu_chmod(file, mode)
+	#define chdir(directory)     emu_chdir(directory)
+	#define unlink(file)         emu_unlink(file)
+	#define getcwd(buffer, size) emu_getcwd(buffer, size)
+#else
+	inline int chmod(const char * Filename, int mode)
+	{
+		// indicate success
+		return 0;
+	}
+
+	inline int chdir(const char* pDirName)
+	{
+		return emu_chdir(pDirName);
+	}
+
+	inline char* getcwd(char* pBuffer, int BufSize)
+	{
+		return emu_getcwd(pBuffer, BufSize);
+	}
+
+	inline int unlink(const char* pFileName)
+	{
+		return emu_unlink(pFileName);
+	}
+#endif
 
 //I do not perceive a need to change the user or group on a backup client
 //at any rate the owner of a service can be set in the service settings
@@ -149,55 +185,56 @@ inline int getuid(void)
 // MinGW provides a getopt implementation
 #ifndef __MINGW32__
 
-//this will need to be implimented if we see fit that command line
-//options are going to be used! (probably then:)
-//where the calling function looks for the parsed parameter
+// this will need to be implemented if we see fit that command line
+// options are going to be used! (probably then:)
+// where the calling function looks for the parsed parameter
 extern char *optarg;
-//optind looks like an index into the string - how far we have moved along
+
+// optind looks like an index into the string - how far we have moved along
 extern int optind;
 extern char nextchar;
 
-inline int getopt(int count, char * const * args, char * tolookfor)
+inline int getopt(int count, char * const * args, const char * tolookfor)
 {
-	if ( optind >= count ) return -1;
+	if (optind >= count) return -1;
 
 	std::string str((const char *)args[optind]);
 	std::string interestin(tolookfor);
 	int opttolookfor = 0;
 	int index = -1;
-	//just initialize the string - just in case it is used.
-	//optarg[0] = 0;
+	// just initialize the string - just in case it is used.
+	// optarg[0] = 0;
 	std::string opt;
 
-	if ( count == 0 ) return -1;
+	if (count == 0) return -1;
 
 	do 
 	{
-		if ( index != -1 )
+		if (index != -1)
 		{
 			str = str.substr(index+1, str.size());
 		}
 
-		index = str.find('-');
+		index = (int)str.find('-');
 
-		if ( index == -1 ) return -1;
+		if (index == -1) return -1;
 
 		opt = str[1];
 
 		optind ++;
 		str = args[optind];
 	}
-	while ( ( opttolookfor = interestin.find(opt)) == -1 );
+	while ((opttolookfor = (int)interestin.find(opt)) == -1);
 
-	if ( interestin[opttolookfor+1] == ':' ) 
+	if (interestin[opttolookfor+1] == ':') 
 	{
 
-		//strcpy(optarg, str.c_str());
+		// strcpy(optarg, str.c_str());
 		optarg = args[optind];
 		optind ++;
 	}
 
-	//indicate we have finished
+	// indicate we have finished
 	return opt[0];
 }
 #endif // !__MINGW32__
@@ -244,49 +281,44 @@ struct itimerval
 
 #define S_ISLNK(x) ( false )
 
-// nasty implementation to get working - TODO get the win32 equiv
-#ifdef _DEBUG
-#define getpid() 1
-#endif
-
 #define vsnprintf _vsnprintf
 
 #ifndef __MINGW32__
 typedef unsigned int mode_t;
 #endif
 
-inline int mkdir(const char *pathname, mode_t mode)
+int emu_mkdir(const char* pPathName);
+
+inline int mkdir(const char *pPathName, mode_t mode)
 {
-	return mkdir(pathname);
+	return emu_mkdir(pPathName);
 }
 
-#ifdef __MINGW32__
-	#include <dirent.h>
-#else
-	inline int strcasecmp(const char *s1, const char *s2)
-	{
-		return _stricmp(s1,s2);
-	}
-
-	struct dirent
-	{
-		char *d_name;
-	};
-
-	struct DIR
-	{
-		intptr_t		fd;	// filedescriptor
-		// struct _finddata_t	info;
-		struct _wfinddata_t	info;
-		// struct _finddata_t 	info;
-		struct dirent		result;	// d_name (first time null)
-		wchar_t			*name;	// null-terminated byte string
-	};
-
-	DIR *opendir(const char *name);
-	struct dirent *readdir(DIR *dp);
-	int closedir(DIR *dp);
+#ifndef __MINGW32__
+inline int strcasecmp(const char *s1, const char *s2)
+{
+	return _stricmp(s1,s2);
+}
 #endif
+
+struct dirent
+{
+	char *d_name;
+};
+
+struct DIR
+{
+	intptr_t		fd;	// filedescriptor
+	// struct _finddata_t	info;
+	struct _wfinddata_t	info;
+	// struct _finddata_t 	info;
+	struct dirent		result;	// d_name (first time null)
+	wchar_t			*name;	// null-terminated byte string
+};
+
+DIR *opendir(const char *name);
+struct dirent *readdir(DIR *dp);
+int closedir(DIR *dp);
 
 HANDLE openfile(const char *filename, int flags, int mode);
 
@@ -358,6 +390,7 @@ struct statfs
 	TCHAR f_mntonname[MAX_PATH];
 };
 
+#if 0
 // I think this should get us going
 // Although there is a warning about 
 // mount points in win32 can now exists - which means inode number can be 
@@ -381,9 +414,10 @@ struct stat {
 #ifndef __MINGW32__
 typedef u_int64_t _ino_t;
 #endif
+#endif
 
-int ourstat(const char * name, struct stat * st);
-int ourfstat(HANDLE file, struct stat * st);
+int emu_stat(const char * name, struct stat * st);
+int emu_fstat(HANDLE file, struct stat * st);
 int statfs(const char * name, struct statfs * s);
 
 //need this for converstions
@@ -395,7 +429,8 @@ inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 	// Convert the last-write time to local time.
 	FileTimeToSystemTime(fileTime, &stUTC);
 	// SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
-	
+
+	memset(&timeinfo, 0, sizeof(timeinfo));	
 	timeinfo.tm_sec = stUTC.wSecond;
 	timeinfo.tm_min = stUTC.wMinute;
 	timeinfo.tm_hour = stUTC.wHour;
@@ -405,16 +440,34 @@ inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 	// timeinfo.tm_yday = ...;
 	timeinfo.tm_year = stUTC.wYear - 1900;
 
-	time_t retVal = mktime(&timeinfo);
+	time_t retVal = mktime(&timeinfo) - _timezone;
 	return retVal;
 }
 
-#define stat(x,y) ourstat(x,y)
-#define fstat(x,y) ourfstat(x,y)
-#define lstat(x,y) ourstat(x,y)
+#ifdef _MSC_VER
+	#define stat(filename,  struct) emu_stat (filename, struct)
+	#define lstat(filename, struct) emu_stat (filename, struct)
+	#define fstat(handle,   struct) emu_fstat(handle,   struct)
+#else
+	inline int stat(const char* filename, struct stat* stat)
+	{
+		return emu_stat(filename, stat);
+	}
+	inline int lstat(const char* filename, struct stat* stat)
+	{
+		return emu_stat(filename, stat);
+	}
+	inline int fstat(HANDLE handle, struct stat* stat)
+	{
+		return emu_fstat(handle, stat);
+	}
+#endif
 
-int poll (struct pollfd *ufds, unsigned long nfds, int timeout);
+int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
 bool EnableBackupRights( void );
+
+bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
+bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 
 //
 // MessageId: MSG_ERR_EXIST
@@ -422,5 +475,8 @@ bool EnableBackupRights( void );
 //  Box Backup.
 //
 #define MSG_ERR_EXIST                         ((DWORD)0xC0000004L)
+
+// replacement for _cgetws which requires a relatively recent C runtime lib
+int console_read(char* pBuffer, size_t BufferSize);
 
 #endif // !EMU_INCLUDE && WIN32

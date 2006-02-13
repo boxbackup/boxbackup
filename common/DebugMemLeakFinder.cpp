@@ -16,8 +16,11 @@
 #undef realloc
 #undef free
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <map>
-#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <set>
@@ -220,12 +223,12 @@ void memleakfinder_traceblocksinsection()
 		}
 		else
 		{
-			TRACE4("Block 0x%08lx size %d allocated at %s:%d\n", (long)i->first, i->second.size, i->second.file, i->second.line);
+			TRACE4("Block 0x%08p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
 		}
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sSectionObjectBlocks.begin()); i != sSectionObjectBlocks.end(); ++i)
 	{
-		TRACE5("Object%s 0x%08lx size %d allocated at %s:%d\n", i->second.array?" []":"", (long)i->first, i->second.size, i->second.file, i->second.line);
+		TRACE5("Object%s 0x%08p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 
@@ -250,11 +253,11 @@ void memleakfinder_reportleaks_file(FILE *file)
 {
 	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Block 0x%08lx size %d allocated at %s:%d\n", (long)i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Block 0x%08p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%08lx size %d allocated at %s:%d\n", i->second.array?" []":"", (long)i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%08p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 
@@ -271,7 +274,11 @@ void memleakfinder_reportleaks_appendfile(const char *filename, const char *mark
 	{
 		if(memleakfinder_numleaks() > 0)
 		{
+#ifdef HAVE_GETPID
 			fprintf(file, "MEMORY LEAKS FROM PROCESS %d (%s)\n", getpid(), markertext);
+#else
+			fprintf(file, "MEMORY LEAKS (%s)\n", markertext);
+#endif
 			memleakfinder_reportleaks_file(file);
 		}
 	
