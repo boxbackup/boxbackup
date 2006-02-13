@@ -208,11 +208,6 @@ private:
 	bool mbIsManaged;
 	// unix time when diff was started
 	time_t mTimeMgmtEpoch;
-	// maximum time to spend diffing, in seconds
-	int mMaximumDiffTime;
-	// maximum time of SSL inactivity (keep-alive interval), in seconds
-	int mKeepAliveTime;
-
 };
 
 

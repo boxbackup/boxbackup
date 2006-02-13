@@ -14,10 +14,12 @@
 
 #include "Box.h"
 
-//#include <stdio.h>
-//#include <stdlib.h>
-#include <unistd.h>
-//#include <windows.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
+#endif
 
 extern void TerminateService(void);
 extern unsigned int WINAPI RunService(LPVOID lpParameter);
@@ -31,17 +33,22 @@ HANDLE gStopServiceEvent = 0;
 
 #define SERVICE_NAME "boxbackup"
 
+void ShowMessage(char *s)
+{
+	MessageBox(0, s, "Box Backup Message", 
+		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
+}
+
 void ErrorHandler(char *s, DWORD err)
 {
 	char buf[256];
 	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
+	_snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
 	::syslog(LOG_ERR, "%s", buf);
 	MessageBox(0, buf, "Error", 
 		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
 	ExitProcess(err);
 }
-
 
 void WINAPI ServiceControlHandler( DWORD controlCode )
 {
@@ -88,7 +95,7 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 
 VOID ServiceMain(DWORD argc, LPTSTR *argv) 
 {
-   // initialise service status
+    // initialise service status
     gServiceStatus.dwServiceType = SERVICE_WIN32;
     gServiceStatus.dwCurrentState = SERVICE_STOPPED;
     gServiceStatus.dwControlsAccepted = 0;
@@ -178,14 +185,19 @@ void InstallService(void)
 
 	scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
-	if (!scm) return;
+	if (!scm) 
+	{
+		syslog(LOG_ERR, "Failed to open service control manager: "
+			"error %d", GetLastError());
+		return;
+	}
 
 	char cmd[MAX_PATH];
 	GetModuleFileName(NULL, cmd, sizeof(cmd)-1);
 	cmd[sizeof(cmd)-1] = 0;
 
 	char cmd_args[MAX_PATH];
-	snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
+	_snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
 	cmd_args[sizeof(cmd_args)-1] = 0;
 
 	newService = CreateService(
@@ -194,12 +206,31 @@ void InstallService(void)
 		"Box Backup", 
 		SERVICE_ALL_ACCESS, 
 		SERVICE_WIN32_OWN_PROCESS, 
-		SERVICE_DEMAND_START, 
+		SERVICE_AUTO_START, 
 		SERVICE_ERROR_NORMAL, 
 		cmd_args, 
 		0,0,0,0,0);
 
-	if (newService) CloseServiceHandle(newService);
+	if (!newService) 
+	{
+		::syslog(LOG_ERR, "Failed to create Box Backup service: "
+			"error %d", GetLastError());
+		return;
+	}
+
+	::syslog(LOG_INFO, "Created Box Backup service");
+	
+	SERVICE_DESCRIPTION desc;
+	desc.lpDescription = "Backs up your data files over the Internet";
+	
+	if (!ChangeServiceConfig2(newService, SERVICE_CONFIG_DESCRIPTION,
+		&desc))
+	{
+		::syslog(LOG_WARNING, "Failed to set description for "
+			"Box Backup service: error %d", GetLastError());
+	}
+
+	CloseServiceHandle(newService);
 	CloseServiceHandle(scm);
 }
 
@@ -210,23 +241,31 @@ void RemoveService(void)
 
 	scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
-	if (!scm) return;
+	if (!scm) 
+	{
+		syslog(LOG_ERR, "Failed to open service control manager: "
+			"error %d", GetLastError());
+		return;
+	}
 
 	service = OpenService(scm, SERVICE_NAME, SERVICE_ALL_ACCESS|DELETE);
 	ControlService(service, SERVICE_CONTROL_STOP, &status);
 
 	if (!service)
 	{
-		printf("Failed to open service manager");
+		syslog(LOG_ERR, "Failed to open Box Backup service: "
+			"error %d", GetLastError());
 		return;
 	}
+
 	if (DeleteService(service))
 	{
-		printf("Service removed");
+		syslog(LOG_INFO, "Box Backup service deleted");
 	}
 	else
 	{
-		printf("Failed to remove service");
+		syslog(LOG_ERR, "Failed to remove Box Backup service: "
+			"error %d", GetLastError());
 	}
 
 	CloseServiceHandle(service);

@@ -12,14 +12,14 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="Debug"
-			IntermediateDirectory="Debug"
+			OutputDirectory="..\..\..\Debug"
+			IntermediateDirectory="..\..\..\Debug"
 			ConfigurationType="1"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\db-4.2.52.NC\build_win32&quot;;&quot;$(SolutionDir)..\boost_1_31_0&quot;;&quot;$(SolutionDir)..\openssl\include&quot;;&quot;$(SolutionDir)..\zlib\include&quot;;&quot;$(SolutionDir)lib\backupclient&quot;;&quot;$(SolutionDir)lib\server&quot;;&quot;$(SolutionDir)lib\crypto&quot;;&quot;$(SolutionDir)lib\compress&quot;;&quot;$(SolutionDir)lib\win32&quot;;&quot;$(SolutionDir)lib\common\&quot;"
+				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\..\..\db-4.2.52.NC\build_win32&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0&quot;;&quot;$(SolutionDir)..\..\..\..\openssl\include&quot;;&quot;$(SolutionDir)..\..\..\..\zlib\include&quot;;&quot;$(SolutionDir)..\..\..\lib\backupclient&quot;;&quot;$(SolutionDir)..\..\..\lib\server&quot;;&quot;$(SolutionDir)..\..\..\lib\crypto&quot;;&quot;$(SolutionDir)..\..\..\lib\compress&quot;;&quot;$(SolutionDir)..\..\..\lib\win32&quot;;&quot;$(SolutionDir)..\..\..\lib\common\&quot;"
 				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -32,7 +32,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\zlib\lib\zdll.lib $(ProjectDir)..\openssl\lib\libeay32.lib $(ProjectDir)..\openssl\lib\ssleay32.lib $(ProjectDir)Debug\common.lib $(ProjectDir)lib\win32\Debug\boost_regex.lib $(ProjectDir)..\db-4.2.52.NC\build_win32\Debug\libdb42d.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\lib\win32\Debug\boost_regex.lib $(ProjectDir)..\..\..\..\db-4.2.52.NC\build_win32\Debug\libdb42d.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="2"
 				IgnoreAllDefaultLibraries="FALSE"
@@ -63,8 +63,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="Release"
-			IntermediateDirectory="Release"
+			OutputDirectory="..\..\..\Release"
+			IntermediateDirectory="..\..\..\Release"
 			ConfigurationType="1"
 			CharacterSet="2"
 			WholeProgramOptimization="TRUE">
@@ -72,7 +72,7 @@
 				Name="VCCLCompilerTool"
 				EnableFiberSafeOptimizations="TRUE"
 				OptimizeForProcessor="1"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)lib\backupclient&quot;;&quot;$(ProjectDir)lib\server&quot;;&quot;$(ProjectDir)lib\crypto&quot;;&quot;$(ProjectDir)..\openssl\include&quot;;&quot;$(ProjectDir)lib\compress&quot;;&quot;$(ProjectDir)..\zlib\include&quot;;&quot;$(ProjectDir)lib\win32&quot;;&quot;$(ProjectDir)lib\common\&quot;;&quot;$(SolutionDir)..\boost_1_31_0&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;BOOST_REGEX_NO_LIB"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="FALSE"
@@ -84,7 +84,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\zlib\lib\zdll.lib $(ProjectDir)..\openssl\lib\libeay32.lib $(ProjectDir)..\openssl\lib\ssleay32.lib $(ProjectDir)Release\common.lib $(ProjectDir)lib\win32\Release\boost_regex.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\lib\win32\Release\boost_regex.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames=""
@@ -130,28 +130,28 @@
 					Name="bbackupd"
 					Filter="">
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientContext.cpp">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientContext.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientDeleteList.cpp">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientDeleteList.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientDirectoryRecord.cpp">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientDirectoryRecord.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientInodeToIDMap.cpp">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientInodeToIDMap.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupDaemon.cpp">
+						RelativePath="..\..\..\bin\bbackupd\BackupDaemon.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\bbackupd.cpp">
+						RelativePath="..\..\..\bin\bbackupd\bbackupd.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\bbwinservice.cpp">
+						RelativePath="..\..\..\bin\bbackupd\bbwinservice.cpp">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\ServiceBackupDaemon.cpp">
+						RelativePath="..\..\..\bin\bbackupd\ServiceBackupDaemon.cpp">
 					</File>
 				</Filter>
 			</Filter>
@@ -167,25 +167,25 @@
 					Name="bbackupd"
 					Filter="">
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientContext.h">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientContext.h">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientDeleteList.h">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientDeleteList.h">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientDirectoryRecord.h">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientDirectoryRecord.h">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupClientInodeToIDMap.h">
+						RelativePath="..\..\..\bin\bbackupd\BackupClientInodeToIDMap.h">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\BackupDaemon.h">
+						RelativePath="..\..\..\bin\bbackupd\BackupDaemon.h">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\bbwinservice.h">
+						RelativePath="..\..\..\bin\bbackupd\bbwinservice.h">
 					</File>
 					<File
-						RelativePath=".\bin\bbackupd\ServiceBackupDaemon.h">
+						RelativePath="..\..\..\bin\bbackupd\ServiceBackupDaemon.h">
 					</File>
 				</Filter>
 			</Filter>
@@ -196,7 +196,7 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 		</Filter>
 		<File
-			RelativePath=".\ReadMe.txt">
+			RelativePath="..\..\..\ReadMe.txt">
 		</File>
 	</Files>
 	<Globals>

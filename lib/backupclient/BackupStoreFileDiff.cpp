@@ -577,6 +577,31 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			int rollOverInitialBytes = 0;
 			while(true)
 			{
+				if(sDiffTimerExpired)
+				{
+					ASSERT(TimeMgmtEpoch > 0);
+					ASSERT(pDiffTimer != NULL);
+					
+					time_t tTotalRunIntvl = time(NULL) - TimeMgmtEpoch;
+					
+					if(MaximumDiffingTime > 0 && 
+						tTotalRunIntvl >= MaximumDiffingTime)
+					{
+						TRACE0("MaximumDiffingTime reached - "
+							"suspending file diff\n");
+						abortSearch = true;
+						break;
+					}
+					else if(KeepAliveTime > 0)
+					{
+						TRACE0("KeepAliveTime reached - "
+							"initiating keep-alive\n");
+						pDiffTimer->DoKeepAlive();
+					}
+
+					sDiffTimerExpired = false;
+				}
+
 				// Load in another block of data, and record how big it is
 				int bytesInEndings = rFile.Read(endings, Sizes[s]);
 				int tmp;
@@ -661,38 +686,12 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 							break;
 						}
 
-						bool DiffTimedOut = false;
-						
-						if(sDiffTimerExpired)
-						{
-							ASSERT(TimeMgmtEpoch > 0);
-							ASSERT(pDiffTimer != NULL);
-							
-							time_t tTotalRunIntvl = time(NULL) - TimeMgmtEpoch;
-							
-							if(MaximumDiffingTime > 0 && 
-								tTotalRunIntvl >= MaximumDiffingTime)
-							{
-								TRACE0("MaximumDiffingTime reached - "
-									"suspending file diff\n");
-								DiffTimedOut = true;
-							}
-							else if(KeepAliveTime > 0)
-							{
-								TRACE0("KeepAliveTime reached - "
-									"initiating keep-alive\n");
-								pDiffTimer->DoKeepAlive();
-							}
-
-							sDiffTimerExpired = false;
-						}
-
 						int64_t NumBlocksFound = static_cast<int64_t>(
 							rFoundBlocks.size());
 						int64_t MaxBlocksFound = NumBlocks * 
 							BACKUP_FILE_DIFF_MAX_BLOCK_FIND_MULTIPLE;
 						
-						if(NumBlocksFound > MaxBlocksFound || DiffTimedOut)
+						if(NumBlocksFound > MaxBlocksFound)
 						{
 							abortSearch = true;
 							break;

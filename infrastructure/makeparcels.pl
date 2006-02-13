@@ -40,9 +40,10 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 				{
 					last if m'\AEND-ONLY';
 				}
-				next;
 			}
+			next;
 		}
+		next if (m'\AEND-ONLY');
 		
 		# new parcel, or a new parcel definition?
 		if(m/\A\s+(.+)\Z/)
@@ -105,6 +106,12 @@ for my $parcel (@parcels)
 	for(@{$parcel_contents{$parcel}})
 	{
 		my ($type,$name) = split /\s+/;
+		my $optional = '';
+
+		if ($type eq 'optional')
+		{
+			($optional,$type,$name) = split /\s+/;
+		}
 		
 		if($type eq 'bin')
 		{
@@ -114,7 +121,14 @@ for my $parcel (@parcels)
 		}
 		elsif ($type eq 'script')
 		{
-			print MAKE "\tcp $name $dir\n";
+			if ($optional)
+			{
+				print MAKE "\ttest -r $name && cp $name $dir\n";
+			}
+			else
+			{
+				print MAKE "\tcp $name $dir\n";
+			}
 			# remove path from script name
 			$name =~ m~/([^/]+)\Z~;
 			$name = $1;

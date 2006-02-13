@@ -9,7 +9,10 @@
 
 #include "Box.h"
 
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #ifndef WIN32
 #include <sys/socket.h>

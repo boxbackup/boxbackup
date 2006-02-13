@@ -73,13 +73,21 @@ Upgrade or read the documentation for alternatives]])
 
 ### Checks for header files.
 
-AC_HEADER_DIRENT
+if test "$target_os" != "mingw32"; then
+  AC_HEADER_DIRENT
+fi
+
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([execinfo.h regex.h signal.h syslog.h time.h])
+AC_CHECK_HEADERS([execinfo.h process.h pwd.h regex.h signal.h])
+AC_CHECK_HEADERS([syslog.h time.h])
 AC_CHECK_HEADERS([netinet/in.h])
-AC_CHECK_HEADERS([sys/param.h sys/types.h sys/wait.h sys/xattr.h sys/time.h])
+AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
+AC_CHECK_HEADERS([sys/xattr.h])
 
+if test "$ac_cv_header_regex_h" = "yes"; then
+  AC_SEARCH_LIBS([regcomp], [pcreposix])
+fi
 
 ### Checks for typedefs, structures, and compiler characteristics.
 
@@ -128,7 +136,7 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle])
+AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle getpid])
 AX_FUNC_SYSCALL
 AX_CHECK_SYSCALL_LSEEK
 AC_CHECK_FUNCS([listxattr llistxattr getxattr lgetxattr setxattr lsetxattr])

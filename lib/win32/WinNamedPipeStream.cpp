@@ -11,7 +11,10 @@
 
 #ifdef WIN32
 
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <errno.h>
 #include <windows.h>
@@ -97,15 +100,14 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 	{
 		::syslog(LOG_ERR, "ConnectNamedPipe failed: %d", 
 			GetLastError());
-		CloseHandle(mSocketHandle);
-		mSocketHandle = NULL;
+		Close();
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 	
-	mReadClosed  = FALSE;
-	mWriteClosed = FALSE;
-	mIsServer    = TRUE; // must flush and disconnect before closing
-	mIsConnected = TRUE;
+	mReadClosed  = false;
+	mWriteClosed = false;
+	mIsServer    = true; // must flush and disconnect before closing
+	mIsConnected = true;
 }
 
 // --------------------------------------------------------------------------
@@ -140,10 +142,10 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
-	mReadClosed  = FALSE;
-	mWriteClosed = FALSE;
-	mIsServer    = FALSE; // just close the socket
-	mIsConnected = TRUE;
+	mReadClosed  = false;
+	mWriteClosed = false;
+	mIsServer    = false; // just close the socket
+	mIsConnected = true;
 }
 
 // --------------------------------------------------------------------------
@@ -240,7 +242,14 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Close()
 {
-	if (mSocketHandle == NULL || !mIsConnected) 
+	if (mSocketHandle == NULL && mIsConnected)
+	{
+		fprintf(stderr, "Inconsistent connected state\n");
+		::syslog(LOG_ERR, "Inconsistent connected state");
+		mIsConnected = false;
+	}
+
+	if (mSocketHandle == NULL) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -262,14 +271,16 @@ void WinNamedPipeStream::Close()
 		mIsServer = false;
 	}
 
-	if (!CloseHandle(mSocketHandle))
+	bool result = CloseHandle(mSocketHandle);
+
+	mSocketHandle = NULL;
+	mIsConnected = false;
+
+	if (!result) 
 	{
 		::syslog(LOG_ERR, "CloseHandle failed: %d", GetLastError());
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
-	
-	mSocketHandle = NULL;
-	mIsConnected = FALSE;
 }
 
 // --------------------------------------------------------------------------

@@ -14,7 +14,10 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 
 #include <stdio.h>
  
