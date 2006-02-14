@@ -758,7 +758,7 @@ int test_bbackupd()
 
 			printf("Keep on continuously updating file, check it is uploaded eventually\n");
 
-			for(int l = 0; l < 18; ++l)
+			for(int l = 0; l < 28; ++l)
 			{
 				FILE *f = ::fopen("testfiles/TestDir1/continousupdate", "w+");
 				TEST_THAT(f != 0);
