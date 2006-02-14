@@ -581,6 +581,8 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 		return -1;
 	}
 
+	memset(st, 0, sizeof(*st));
+
 	// This next example is how we get our INODE (equivalent) information
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart = fi.nFileIndexLow;
