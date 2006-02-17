@@ -555,7 +555,7 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 
 			outputBlock.ResizeBlock(xattrSize);
 		}
-		else if(listSize<0 && errno!=EOPNOTSUPP)
+		else if(listSize<0 && errno!=EOPNOTSUPP && errno!=EACCES)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError);
 		}
