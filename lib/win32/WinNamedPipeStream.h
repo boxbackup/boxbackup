@@ -36,13 +36,15 @@ public:
 	virtual int Read(void *pBuffer, int NBytes, 
 		int Timeout = IOStream::TimeOutInfinite);
 	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void WriteAllBuffered();
 	virtual void Close();
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	bool IsConnected() { return mIsConnected; }
+	HANDLE GetSocketHandle() { return mSocketHandle; }
+	HANDLE GetReadableEvent() { return mReadableEvent; }
 
 protected:
-	HANDLE GetSocketHandle();
 	void MarkAsReadClosed()  {mReadClosed  = true;}
 	void MarkAsWriteClosed() {mWriteClosed = true;}
 
@@ -51,6 +53,10 @@ private:
 		{ /* do not call */ }
 
 	HANDLE mSocketHandle;
+	HANDLE mReadableEvent;
+	OVERLAPPED mReadOverlap;
+	uint8_t mReadBuffer[4096];
+	size_t  mBytesInBuffer;
 	bool mReadClosed;
 	bool mWriteClosed;
 	bool mIsServer;
