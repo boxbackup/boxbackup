@@ -183,6 +183,9 @@ private:
 
 	private:
 	bool mDoSyncFlagOut, mSyncIsForcedOut, mReceivedCommandConn;
+	HANDLE mhMessageToSendEvent;
+	CRITICAL_SECTION mMessageQueueLock;
+	std::vector<std::string> mMessageList;
 #endif
 };
 
