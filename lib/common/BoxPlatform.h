@@ -46,6 +46,12 @@
 	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif
 
+// Disable memory testing under Darwin, it just doesn't like it very much.
+#ifdef __APPLE__
+	// TODO: We really should get some decent leak detection code.
+	#define PLATFORM_DISABLE_MEM_LEAK_TESTING
+#endif
+
 // Find out if credentials on UNIX sockets can be obtained
 #ifndef HAVE_GETPEEREID
 	#if !HAVE_DECL_SO_PEERCRED
