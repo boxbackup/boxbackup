@@ -23,7 +23,7 @@
 				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -32,7 +32,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\lib\win32\Debug\boost_regex.lib $(ProjectDir)..\..\..\..\db-4.2.52.NC\build_win32\Debug\libdb42d.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="2"
 				IgnoreAllDefaultLibraries="FALSE"
@@ -84,7 +84,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\lib\win32\Release\boost_regex.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames=""
@@ -148,10 +148,13 @@
 						RelativePath="..\..\..\bin\bbackupd\bbackupd.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\bin\bbackupd\bbwinservice.cpp">
+						RelativePath="..\..\..\bin\bbackupd\Win32BackupService.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\bin\bbackupd\ServiceBackupDaemon.cpp">
+						RelativePath="..\..\..\bin\bbackupd\Win32ServiceFunctions.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp">
 					</File>
 				</Filter>
 			</Filter>
@@ -182,10 +185,13 @@
 						RelativePath="..\..\..\bin\bbackupd\BackupDaemon.h">
 					</File>
 					<File
-						RelativePath="..\..\..\bin\bbackupd\bbwinservice.h">
+						RelativePath="..\..\..\bin\bbackupd\Win32BackupService.h">
 					</File>
 					<File
-						RelativePath="..\..\..\bin\bbackupd\ServiceBackupDaemon.h">
+						RelativePath="..\..\..\bin\bbackupd\Win32ServiceFunctions.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h">
 					</File>
 				</Filter>
 			</Filter>

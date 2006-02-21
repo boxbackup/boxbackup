@@ -23,7 +23,7 @@
 				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -169,9 +169,6 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\IOStreamGetLine.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\lib\common\LinuxWorkaround.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\MemBlockStream.cpp">
