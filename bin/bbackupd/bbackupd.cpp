@@ -19,7 +19,7 @@
 	#include "Win32ServiceFunctions.h"
 	#include "Win32BackupService.h"
 
-	extern Win32BackupService gDaemonService;
+	extern Win32BackupService* gpDaemonService;
 #endif
 
 int main(int argc, const char *argv[])
@@ -67,6 +67,8 @@ int main(int argc, const char *argv[])
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
 
+	gpDaemonService = new Win32BackupService();
+
 	EnableBackupRights();
 
 	int ExitCode = 0;
@@ -78,7 +80,7 @@ int main(int argc, const char *argv[])
 	}
 	else
 	{
-		ExitCode = gDaemonService.Main(
+		ExitCode = gpDaemonService->Main(
 			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 	}
 

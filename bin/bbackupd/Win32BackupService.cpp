@@ -12,19 +12,19 @@
 
 #include "Win32BackupService.h"
 
-Win32BackupService gDaemonService;
+Win32BackupService* gpDaemonService = NULL;
 extern HANDLE gStopServiceEvent;
 
 unsigned int WINAPI RunService(LPVOID lpParameter)
 {
-	DWORD retVal = gDaemonService.WinService();
+	DWORD retVal = gpDaemonService->WinService();
 	SetEvent( gStopServiceEvent );
 	return retVal;
 }
 
 void TerminateService(void)
 {
-	gDaemonService.SetTerminateWanted();
+	gpDaemonService->SetTerminateWanted();
 }
 
 DWORD Win32BackupService::WinService(void)
