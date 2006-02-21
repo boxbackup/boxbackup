@@ -23,7 +23,7 @@
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -32,7 +32,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\db-4.2.52.NC\build_win32\Debug\libdb42d.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib"
 				OutputFile="$(OutDir)/bbackupctl.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
@@ -131,6 +131,9 @@
 					<File
 						RelativePath="..\..\..\bin\bbackupctl\bbackupctl.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp">
+					</File>
 				</Filter>
 			</Filter>
 		</Filter>
@@ -138,6 +141,9 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
+			<File
+				RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h">
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"

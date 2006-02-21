@@ -24,7 +24,7 @@
 				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -33,7 +33,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\lib\win32\Debug\boost_regex.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib"
 				OutputFile="$(OutDir)/bbackupquery.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
@@ -84,7 +84,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\lib\win32\Release\boost_regex.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib"
 				OutputFile="$(OutDir)/bbackupquery.exe"
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames=""
