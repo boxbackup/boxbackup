@@ -692,6 +692,11 @@ void BackupDaemon::Run2()
 					"continue safely.");
 				continue;
 			}
+
+			// In case the backup throws an exception,
+			// we should not try to delete the store info
+			// object file again.
+			deserialised = false;
 			
 			// Do sync
 			bool errorOccurred = false;
@@ -802,6 +807,9 @@ void BackupDaemon::Run2()
 
 				// We had a successful backup, save the store info
 				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+				// Next time around, make sure we delete
+				// the store info object file.
+				deserialised = true;
 
 				// --------------------------------------------------------------------------------------------
 			}
