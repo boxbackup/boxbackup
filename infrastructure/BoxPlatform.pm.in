@@ -34,6 +34,27 @@ BEGIN
 	$product_name = <VERSION>;
 	chomp $product_name;
 	close VERSION;
+	if($product_version eq 'USE_SVN_VERSION')
+	{
+		# for developers, use SVN version
+		my $svnversion = `svnversion .`;
+		chomp $svnversion;
+		$svnversion =~ tr/0-9A-Za-z/_/c;
+		open INFO,'svn info . |';
+		my $svnurl;
+		while(<INFO>)
+		{
+			if(m/^URL: (.+?)[\n\r]+/)
+			{
+				$svnurl = $1
+			}
+		}
+		close INFO;
+		$svnurl =~ m!box/(.+)$!;
+		my $svndir = $1;
+		$svndir =~ tr/0-9A-Za-z/_/c;
+		$product_version = $svndir.'_'.$svnversion;
+	}
 
 	# where to put the files
 	$install_into_dir = '@bindir_expanded@';
