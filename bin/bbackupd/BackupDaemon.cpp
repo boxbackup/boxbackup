@@ -1251,7 +1251,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 
 
 
-#ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
+#if !defined(HAVE_STRUCT_STATFS_F_MNTONNAME) && !defined(HAVE_STRUCT_STATVFS_F_NMTONNAME)
 	// string comparison ordering for when mount points are handled
 	// by code, rather than the OS.
 	typedef struct
@@ -1315,7 +1315,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	int numIDMaps = 0;
 
 #ifdef HAVE_MOUNTS
-#ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
+#if !defined(HAVE_STRUCT_STATFS_F_MNTONNAME) && !defined(HAVE_STRUCT_STATVFS_F_MNTONNAME)
 	// Linux and others can't tell you where a directory is mounted. So we
 	// have to read the mount entries from /etc/mtab! Bizarre that the OS
 	// itself can't tell you, but there you go.
@@ -1389,7 +1389,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		ASSERT(*i == "/");
 	}
 #endif // n NDEBUG
-#endif // n HAVE_STRUCT_STATFS_F_MNTONNAME
+#endif // n HAVE_STRUCT_STATFS_F_MNTONNAME || n HAVE_STRUCT_STATVFS_F_MNTONNAME
 #endif // HAVE_MOUNTS
 
 	// Then... go through each of the entries in the configuration,
@@ -1413,11 +1413,16 @@ TRACE0("new location\n");
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
 
-#if defined HAVE_STRUCT_STATFS_F_MNTONNAME || defined WIN32
+#if defined HAVE_STRUCT_STATFS_F_MNTONNAME || defined HAVE_STRUCT_STATVFS_F_MNTONNAME || defined WIN32
 
 				// BSD style statfs -- includes mount point, which is nice.
+#ifdef HAVE_STRUCT_STATVFS_F_MNTONNAME
+				struct statvfs s;
+				if(::statvfs(ploc->mPath.c_str(), &s) != 0)
+#else // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				struct statfs s;
 				if(::statfs(ploc->mPath.c_str(), &s) != 0)
+#endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
 					THROW_EXCEPTION(CommonException, OSFileError)
 				}

@@ -1,2 +1,2 @@
-0.09_trunk
+USE_SVN_VERSION
 boxbackup
