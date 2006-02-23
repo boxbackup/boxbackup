@@ -104,7 +104,7 @@ install -m 755 contrib/%{dist}/bbackupd $RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbackupd $RPM_BUILD_ROOT%{_sbindir}/rcbbackupd
 %endif
-%define client_dir parcels/%{ident}-backup-client-Linux
+%define client_dir parcels/%{ident}-backup-client-linux-gnu
 install %{client_dir}/bbackupd $RPM_BUILD_ROOT%{_sbindir}
 install %{client_dir}/bbackupquery $RPM_BUILD_ROOT%{_sbindir}
 install %{client_dir}/bbackupctl $RPM_BUILD_ROOT%{_sbindir}
@@ -117,7 +117,7 @@ install -m 755 contrib/%{dist}/bbstored $RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}/rcbbstored
 %endif
-%define server_dir parcels/%{ident}-backup-server-Linux
+%define server_dir parcels/%{ident}-backup-server-linux-gnu
 install %{server_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}
 install %{server_dir}/bbstoreaccounts $RPM_BUILD_ROOT%{_sbindir}
 install %{server_dir}/bbstored-certs $RPM_BUILD_ROOT%{_bindir}
