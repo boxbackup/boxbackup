@@ -136,7 +136,13 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle getpid])
+AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid])
+# NetBSD implements kqueue too differently for us to get it fixed by 0.10
+# TODO: Remove this when NetBSD kqueue implementation is working
+netbsd_hack=`echo $target_os | sed 's/netbsd.*/netbsd/'`
+if test "$netbsd_hack" != "netbsd"; then
+  AC_CHECK_FUNCS([kqueue])
+fi
 AX_FUNC_SYSCALL
 AX_CHECK_SYSCALL_LSEEK
 AC_CHECK_FUNCS([listxattr llistxattr getxattr lgetxattr setxattr lsetxattr])
