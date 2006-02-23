@@ -20,7 +20,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\bin\bbackupd&quot;;&quot;$(ProjectDir)..\..\..\..\db-4.2.52.NC\build_win32&quot;;&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;NDEBUG "
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
