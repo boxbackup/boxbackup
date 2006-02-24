@@ -581,6 +581,14 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 		return -1;
 	}
 
+	if (INVALID_FILE_ATTRIBUTES == fi.dwFileAttributes)
+	{
+		::syslog(LOG_WARNING, "Failed to get file attributes: "
+			"error %d", GetLastError());
+		errno = EACCES;
+		return -1;
+	}
+
 	memset(st, 0, sizeof(*st));
 
 	// This next example is how we get our INODE (equivalent) information
@@ -607,27 +615,32 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	conv.LowPart = st_size.LowPart;
 	st->st_size = (_off_t)conv.QuadPart;
 
-	//the mode of the file
-	st->st_mode = 0;
-	//DWORD res = GetFileAttributes((LPCSTR)tmpStr.c_str());
+	// at the mo
+	st->st_uid = 0;
+	st->st_gid = 0;
+	st->st_nlink = 1;
 
-	if (INVALID_FILE_ATTRIBUTES != fi.dwFileAttributes)
+	// the mode of the file
+	// mode zero will make it impossible to restore on Unix
+	// (no access to anybody, including the owner).
+	// we'll fake a sensible mode:
+	// all objects get user read (0400)
+	// if it's a directory it gets user execute (0100)
+	// if it's not read-only it gets user write (0200)
+	st->st_mode = 0400;
+
+	if (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
-		if (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-		{
-			st->st_mode |= S_IFDIR;
-		}
-		else
-		{
-			st->st_mode |= S_IFREG;
-		}
+		st->st_mode |= S_IFDIR | 0100;
 	}
 	else
 	{
-		::syslog(LOG_WARNING, "Failed to get file attributes: "
-			"error %d", GetLastError());
-		errno = EACCES;
-		return -1;
+		st->st_mode |= S_IFREG;
+	}
+
+	if (!(fi.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
+	{
+		st->st_mode |= 0200;
 	}
 
 	return 0;
@@ -719,11 +732,6 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 // --------------------------------------------------------------------------
 int emu_stat(const char * pName, struct stat * st)
 {
-	// at the mo
-	st->st_uid = 0;
-	st->st_gid = 0;
-	st->st_nlink = 1;
-
 	HANDLE handle = OpenFileByNameUtf8(pName);
 
 	if (handle == NULL)
