@@ -162,7 +162,7 @@ void BackupQueries::DoCommand(const char *Command)
 	
 	// Data about commands
 	static const char *commandNames[] = {"quit", "exit", "list",	 "pwd", "cd", "lcd",	"sh", "getobject", "get", "compare", "restore", "help", "usage", "undelete", 0};
-	static const char *validOptions[] = {"",	 "",	 "rodIFtsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dri",     "",     "",      "",		 0};
+	static const char *validOptions[] = {"",	 "",	 "rodIFtTsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dri",     "",     "",      "",		 0};
 	#define COMMAND_Quit		0
 	#define COMMAND_Exit		1
 	#define COMMAND_List		2
@@ -318,8 +318,9 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	#define LIST_OPTION_ALLOWOLD		'o'
 	#define LIST_OPTION_ALLOWDELETED	'd'
 	#define LIST_OPTION_NOOBJECTID		'I'
-	#define LIST_OPTION_NOFLAGS			'F'
-	#define LIST_OPTION_TIMES			't'
+	#define LIST_OPTION_NOFLAGS		'F'
+	#define LIST_OPTION_TIMES_LOCAL		't'
+	#define LIST_OPTION_TIMES_UTC		'T'
 	#define LIST_OPTION_SIZEINBLOCKS	's'
 	#define LIST_OPTION_DISPLAY_HASH	'h'
 
@@ -361,7 +362,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::CommandList2(int64_t, const std::string &, const bool *)
+//		Name:    BackupQueries::List(int64_t, const std::string &, const bool *, bool)
 //		Purpose: Do the actual listing of directories and files
 //		Created: 2003/10/10
 //
@@ -436,11 +437,19 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			}
 		}
 		
-		if(opts[LIST_OPTION_TIMES])
+		if(opts[LIST_OPTION_TIMES_UTC])
 		{
-			// Show times...
+			// Show UTC times...
 			std::string time = BoxTimeToISO8601String(
-				en->GetModificationTime());
+				en->GetModificationTime(), false);
+			printf("%s ", time.c_str());
+		}
+
+		if(opts[LIST_OPTION_TIMES_LOCAL])
+		{
+			// Show local times...
+			std::string time = BoxTimeToISO8601String(
+				en->GetModificationTime(), true);
 			printf("%s ", time.c_str());
 		}
 		

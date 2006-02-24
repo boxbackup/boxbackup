@@ -20,23 +20,31 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BoxTimeToISO8601String(box_time_t)
-//		Purpose: Convert a 64 bit box time to a ISO 8601 complient string
+//		Name:    BoxTimeToISO8601String(box_time_t, bool)
+//		Purpose: Convert a 64 bit box time to a ISO 8601 compliant 
+//			string, either in local or UTC time
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-std::string BoxTimeToISO8601String(box_time_t Time)
+std::string BoxTimeToISO8601String(box_time_t Time, bool localTime)
 {
+	time_t timeInSecs = BoxTimeToSeconds(Time);
+	char str[128];	// more than enough space
+
 #ifdef WIN32
 	struct tm *time;
-	time_t bob = BoxTimeToSeconds(Time);
+	__time64_t winTime = timeInSecs;
 
-	__time64_t winTime = bob;
+	if(localTime)
+	{
+		time = _localtime64(&winTime);
+	}
+	else
+	{
+		time = _gmtime64(&winTime);
+	}
 
-	time = _gmtime64(&winTime);
-	char str[128];	// more than enough space
-	
-	if ( time == NULL )
+	if(time == NULL)
 	{
 		// ::sprintf(str, "%016I64x ", bob);
 		return std::string("unable to convert time");
@@ -46,11 +54,17 @@ std::string BoxTimeToISO8601String(box_time_t Time)
 		time->tm_mon + 1, time->tm_mday, time->tm_hour, 
 		time->tm_min, time->tm_sec);
 #else // ! WIN32
-	time_t timeInSecs = BoxTimeToSeconds(Time);
 	struct tm time;
-	gmtime_r(&timeInSecs, &time);
+
+	if(localTime)
+	{
+		localtime_r(&timeInSecs, &time);
+	}
+	else
+	{
+		gmtime_r(&timeInSecs, &time);
+	}
 	
-	char str[128];	// more than enough space
 	sprintf(str, "%04d-%02d-%02dT%02d:%02d:%02d", time.tm_year + 1900,
 		time.tm_mon + 1, time.tm_mday, time.tm_hour, 
 		time.tm_min, time.tm_sec);
