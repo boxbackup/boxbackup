@@ -394,6 +394,10 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\win32\getopt_long.cxx"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp"
 						>
 					</File>
@@ -761,6 +765,10 @@
 					>
 					<File
 						RelativePath="..\..\..\lib\win32\emu.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt.h"
 						>
 					</File>
 					<File
