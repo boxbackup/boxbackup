@@ -184,59 +184,7 @@ inline int getuid(void)
 
 // MinGW provides a getopt implementation
 #ifndef __MINGW32__
-
-// this will need to be implemented if we see fit that command line
-// options are going to be used! (probably then:)
-// where the calling function looks for the parsed parameter
-extern char *optarg;
-
-// optind looks like an index into the string - how far we have moved along
-extern int optind;
-extern char nextchar;
-
-inline int getopt(int count, char * const * args, const char * tolookfor)
-{
-	if (optind >= count) return -1;
-
-	std::string str((const char *)args[optind]);
-	std::string interestin(tolookfor);
-	int opttolookfor = 0;
-	int index = -1;
-	// just initialize the string - just in case it is used.
-	// optarg[0] = 0;
-	std::string opt;
-
-	if (count == 0) return -1;
-
-	do 
-	{
-		if (index != -1)
-		{
-			str = str.substr(index+1, str.size());
-		}
-
-		index = (int)str.find('-');
-
-		if (index == -1) return -1;
-
-		opt = str[1];
-
-		optind ++;
-		str = args[optind];
-	}
-	while ((opttolookfor = (int)interestin.find(opt)) == -1);
-
-	if (interestin[opttolookfor+1] == ':') 
-	{
-
-		// strcpy(optarg, str.c_str());
-		optarg = args[optind];
-		optind ++;
-	}
-
-	// indicate we have finished
-	return opt[0];
-}
+#include "getopt.h"
 #endif // !__MINGW32__
 
 #define timespec timeval
