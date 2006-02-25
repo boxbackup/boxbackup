@@ -130,10 +130,10 @@ int main(int argc, char* argv[])
 
 	closelog();
 
+	/*
 	//first off get the path name for the default 
 	char buf[MAX_PATH];
 	
-	/*
 	GetModuleFileName(NULL, buf, sizeof(buf));
 	std::string buffer(buf);
 	std::string conf("-c " + buffer.substr(0,(buffer.find("win32test.exe"))) + "bbackupd.conf");
