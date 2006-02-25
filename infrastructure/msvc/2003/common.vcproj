@@ -287,6 +287,12 @@
 					<File
 						RelativePath="..\..\..\lib\win32\emu.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt_long.cxx">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp">
+					</File>
 				</Filter>
 				<Filter
 					Name="server"
@@ -568,6 +574,12 @@
 					Filter="">
 					<File
 						RelativePath="..\..\..\lib\win32\emu.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h">
 					</File>
 				</Filter>
 				<Filter
