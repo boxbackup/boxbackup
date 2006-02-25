@@ -33,17 +33,17 @@ void PrintUsageAndExit()
 	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
 	"Commands are:\n"
 	"  sync -- start a syncronisation run now\n"
-	"  force_sync -- force the start of a syncronisation run, "
+	"  force-sync -- force the start of a syncronisation run, "
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
-	"  wait_for_sync -- wait until the next sync starts, then exit\n"
-	"  sync_and_wait -- start sync, wait until it finishes, then exit\n"
+	"  wait-for-sync -- wait until the next sync starts, then exit\n"
+	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"
 	);
 	exit(1);
 }
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	int returnCode = 0;
 
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, argv, "qc:l:")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "qc:l:")) != -1)
 	{
 		switch(c)
 		{
@@ -108,7 +108,10 @@ int main(int argc, char *argv[])
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
-		printf("Daemon isn't using a control socket, could not execute command.\nAdd a CommandSocket declaration to the bbackupd.conf file.\n");
+		printf("Daemon isn't using a control socket, "
+			"could not execute command.\n"
+			"Add a CommandSocket declaration to the "
+			"bbackupd.conf file.\n");
 		return 1;
 	}
 	
@@ -221,17 +224,10 @@ int main(int argc, char *argv[])
 	bool areWaitingForSync = false;
 	bool areWaitingForSyncEnd = false;
 
-	if(::strcmp(argv[0], "force_sync") == 0)
-	{
-		argv[0] = "force-sync";
-	}
-
-	if(::strcmp(argv[0], "wait-for-sync") == 0 ||
-		::strcmp(argv[0], "wait_for_sync") == 0)
+	if(::strcmp(argv[0], "wait-for-sync") == 0)
 	{
 		// Check that it's not in non-automatic mode, 
 		// because then it'll never start
-
 		if(!autoBackup)
 		{
 			printf("ERROR: Daemon is not in automatic mode -- "
@@ -239,12 +235,11 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	
-		// Yes... set the flag so we know what we're 
-		// waiting for a sync to start
+		// Yes... set the flag so we know that 
+		// we're waiting for a sync to start
 		areWaitingForSync = true;
 	}
-	else if (::strcmp(argv[0], "sync-and-wait") == 0 ||
-		::strcmp(argv[0], "sync_and_wait") == 0)
+	else if (::strcmp(argv[0], "sync-and-wait") == 0)
 	{
 		// send a sync command
 		std::string cmd("force-sync\n");
