@@ -250,7 +250,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	}
 
 	std::string parentDirectoryName(rLocalDirectoryName);
-	if(parentDirectoryName[parentDirectoryName.size() - 1] == '/')
+	if(parentDirectoryName[parentDirectoryName.size() - 1] == 
+		DIRECTORY_SEPARATOR_ASCHAR)
 	{
 		parentDirectoryName.resize(parentDirectoryName.size() - 1);
 	}
