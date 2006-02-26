@@ -578,9 +578,8 @@ void BackupDaemon::Run2()
 		BackupClientContext::ClientStoreMarker_NotKnown;
 	// haven't contacted the store yet
 
- 	bool deserialised = DeserializeStoreObjectInfo(clientStoreMarker, 
-		lastSyncTime, nextSyncTime);
-	bool was_deserialised = deserialised;
+ 	bool deleteStoreObjectInfoFile = DeserializeStoreObjectInfo(
+		clientStoreMarker, lastSyncTime, nextSyncTime);
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -686,7 +685,8 @@ void BackupDaemon::Run2()
 			// Delete the serialised store object file,
 			// so that we don't try to reload it after a
 			// partially completed backup
-			if(deserialised && !DeleteStoreObjectInfo())
+			if(deleteStoreObjectInfoFile && 
+				!DeleteStoreObjectInfo())
 			{
 				::syslog(LOG_ERR, "Failed to delete the "
 					"StoreObjectInfoFile, backup cannot "
@@ -697,8 +697,7 @@ void BackupDaemon::Run2()
 			// In case the backup throws an exception,
 			// we should not try to delete the store info
 			// object file again.
-			was_deserialised = deserialised;
-			deserialised = false;
+			deleteStoreObjectInfoFile = false;
 			
 			// Do sync
 			bool errorOccurred = false;
@@ -807,11 +806,14 @@ void BackupDaemon::Run2()
 
 				// --------------------------------------------------------------------------------------------
 
-				// We had a successful backup, save the store info
-				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
-				// Next time around, make sure we delete
-				// the store info object file.
-				deserialised = was_deserialised;
+				// We had a successful backup, save the store 
+				// info. If we save successfully, we must 
+				// delete the file next time we start a backup
+
+				deleteStoreObjectInfoFile = 
+					SerializeStoreObjectInfo(
+						clientStoreMarker, 
+						lastSyncTime, nextSyncTime);
 
 				// --------------------------------------------------------------------------------------------
 			}
@@ -2250,11 +2252,11 @@ static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
 static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
 static const int STOREOBJECTINFO_VERSION = 1;
 
-void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
+bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
 {
 	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
 	{
-		return;
+		return false;
 	}
 
 	std::string StoreObjectInfoFile = 
@@ -2262,13 +2264,17 @@ void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 
 	if (StoreObjectInfoFile.size() <= 0)
 	{
-		return;
+		return false;
 	}
+
+	bool created = false;
 
 	try
 	{
 		FileStream aFile(StoreObjectInfoFile.c_str(), 
 			O_WRONLY | O_CREAT | O_TRUNC);
+		created = true;
+
 		Archive anArchive(aFile, 0);
 
 		anArchive.Write(STOREOBJECTINFO_MAGIC_ID_VALUE);
@@ -2313,6 +2319,8 @@ void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 			"not accessible or could not be created", 
 			StoreObjectInfoFile.c_str());
 	}
+
+	return created;
 }
 
 // --------------------------------------------------------------------------
