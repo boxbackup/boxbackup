@@ -863,7 +863,7 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		if(!ConvertConsoleToUtf8(args[0].c_str(), fileName))
 			return;
 #else
-		const std::string& fileName(args[0]);
+		std::string fileName(args[0]);
 #endif
 
 		if(!opts['i'])
@@ -1756,6 +1756,12 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		printf("The target directory exists. You cannot restore over an existing directory.\n");
 		break;
 		
+	case Restore_TargetPathNotFound:
+		printf("The target directory path does not exist.\n"
+			"To restore to a directory whose parent "
+			"does not exist, create the parent first.\n");
+		break;
+
 	default:
 		printf("ERROR: Unknown restore result.\n");
 		break;
