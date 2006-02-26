@@ -580,6 +580,7 @@ void BackupDaemon::Run2()
 
  	bool deserialised = DeserializeStoreObjectInfo(clientStoreMarker, 
 		lastSyncTime, nextSyncTime);
+	bool was_deserialised = deserialised;
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -696,6 +697,7 @@ void BackupDaemon::Run2()
 			// In case the backup throws an exception,
 			// we should not try to delete the store info
 			// object file again.
+			was_deserialised = deserialised;
 			deserialised = false;
 			
 			// Do sync
@@ -809,7 +811,7 @@ void BackupDaemon::Run2()
 				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
 				// Next time around, make sure we delete
 				// the store info object file.
-				deserialised = true;
+				deserialised = was_deserialised;
 
 				// --------------------------------------------------------------------------------------------
 			}
@@ -1237,8 +1239,8 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 			LeaveCriticalSection(&mMessageQueueLock);
 #else
 			message += "\n";
-			mpCommandSocketInfo->mpConnectedSocket->Write(message,
-				strlen(message));
+			mpCommandSocketInfo->mpConnectedSocket->Write(
+				message.c_str(), message.size());
 #endif
 		}
 		catch(...)
