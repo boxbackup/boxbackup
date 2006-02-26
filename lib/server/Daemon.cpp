@@ -142,7 +142,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			{
 				fprintf(stderr, "%s: failed to start: "
 					"failed to open configuration file: "
-					"%s", DaemonName(), 
+					"%s\n", DaemonName(), 
 					mConfigFileName.c_str());
 #ifdef WIN32
 				::syslog(LOG_ERR, "%s: failed to start: "
