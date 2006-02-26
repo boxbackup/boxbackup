@@ -263,10 +263,11 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				break;
 			}
 		}
-#endif // ! WIN32
 
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
+#endif // ! WIN32
+
 		// Log the start message
 		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " 
 			BOX_VERSION ")", mConfigFileName.c_str());
