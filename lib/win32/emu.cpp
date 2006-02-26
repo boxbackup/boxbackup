@@ -695,7 +695,8 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 	{
 		DWORD err = GetLastError();
 
-		if (err == ERROR_FILE_NOT_FOUND)
+		if (err == ERROR_FILE_NOT_FOUND ||
+			err == ERROR_PATH_NOT_FOUND)
 		{
 			errno = ENOENT;
 		}
