@@ -372,6 +372,7 @@ for my $mod (@modules, $implicit_dep)
 
 print "done\n\nGenerating Makefiles...\n";
 
+my %module_resources_win32;
 
 # Then write a makefile for each module
 for my $mod (@modules, $implicit_dep)
@@ -544,7 +545,7 @@ __E
 		@items = (@items, @autogen_items);
 	}
 	
-	# first, obtain a list of depenencies within the .h files
+	# first, obtain a list of dependencies within the .h files
 	my %headers;
 	for my $h (grep /\.h\Z/i, @items)
 	{
@@ -564,19 +565,30 @@ __E
 	
 	# then... do the cpp files...
 	my @obj_base;
-	for my $cpp (@items)
+	for my $file (@items)
 	{
-		next unless $cpp =~ m/\A(.+)\.cpp\Z/i;
-		next if $cpp =~ /\A\._/;	# Temp Mac OS Resource hack
+		my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
+		my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
+
+		if ($target_os eq "mingw32")
+		{
+			next if not $is_cpp and not $is_rc;
+		}
+		else
+		{
+			next if not $is_rc;
+		}
+
+		next if $file =~ /\A\._/; # Temp Mac OS Resource hack
 
 		# store for later
 		my $base = $1;
-		push @obj_base,$base;
+		push @obj_base,$base unless $is_rc;
 	
 		# get the file...
-		open FL,"$mod/$cpp";
+		open FL,"$mod/$file";
 		my $f;
-		read FL,$f,-s "$mod/$cpp";
+		read FL,$f,-s "$mod/$file";
 		close FL;
 		
 		my %dep;
@@ -590,10 +602,29 @@ __E
 		my $out_name = '$(OUTDIR)/'.$base.'.o';
 		
 		# write the line for this cpp file
-		$make .= $out_name.': '.join(' ',$cpp,map
-			{ ($hfiles{$_} eq $mod)?$_:'../../'.$hfiles{$_}."/$_" } keys %dep)."\n";
-		$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra -c $cpp -o $out_name\n\n";
+		my @dep_paths = map 
+		{ 
+			($hfiles{$_} eq $mod)
+			? $_ 
+			: '../../'.$hfiles{$_}."/$_"
+		}
+		keys %dep;
 
+		$make .= $out_name.': '.join(' ',$file,@dep_paths)."\n";
+
+		if ($is_cpp)
+		{
+			$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra ".
+				"-c $file -o $out_name\n\n";
+		}
+		elsif ($is_rc)
+		{
+			$make .= "\twindres $file $out_name\n\n";
+			my $res_list = $module_resources_win32{$mod};
+			$res_list ||= [];
+			push @$res_list, $base.'.o';
+			$module_resources_win32{$mod} = $res_list;
+		}
 	}
 
 	my $has_deps = ($#{$module_dependency{$mod}} >= 0);
@@ -645,11 +676,23 @@ __E
 	additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
 
 	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
+
 	print MAKE $end_target,': ',$o_file_list;
 	print MAKE ' dep_modules' if $has_deps and not $bsd_make;
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
+	if ($target_os eq "mingw32")
+	{
+		foreach my $dep (@all_deps_for_module)
+		{
+			my $res_list = $module_resources_win32{$dep};
+			next unless $res_list;
+			$o_file_list .= ' '.join(' ', 
+				map {'$(OUTBASE)/'.$dep."/$_"} @$res_list);
+		}
+	}
+
 	# stuff to make the final target...
 	if($target_is_library)
 	{

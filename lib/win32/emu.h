@@ -276,24 +276,9 @@ HANDLE openfile(const char *filename, int flags, int mode);
 #define LOG_PID 0
 #define LOG_LOCAL6 0
 
-extern HANDLE gSyslogH;
-void MyReportEvent(LPCTSTR *szMsg, DWORD errinfo);
-inline void openlog(const char * daemonName, int, int)
-{
-	gSyslogH = RegisterEventSource(
-		NULL,  // uses local computer 
-		daemonName);    // source name
-	if (gSyslogH == NULL) 
-	{
-	}
-}
-
-inline void closelog(void)
-{
-	DeregisterEventSource(gSyslogH); 
-}
-
-void syslog(int loglevel, const char *fmt, ...);
+void openlog (const char * daemonName, int, int);
+void closelog(void);
+void syslog  (int loglevel, const char *fmt, ...);
 
 #ifndef __MINGW32__
 #define strtoll _strtoi64
@@ -416,13 +401,6 @@ bool EnableBackupRights( void );
 
 bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
 bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
-
-//
-// MessageId: MSG_ERR_EXIST
-// MessageText:
-//  Box Backup.
-//
-#define MSG_ERR_EXIST                         ((DWORD)0xC0000004L)
 
 // replacement for _cgetws which requires a relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
