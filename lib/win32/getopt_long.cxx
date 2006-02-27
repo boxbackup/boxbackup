@@ -95,6 +95,7 @@ static void warnx(const char* fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
+	fprintf(stderr, "\n");
 }
 
 static int getopt_internal(int, char * const *, const char *,
