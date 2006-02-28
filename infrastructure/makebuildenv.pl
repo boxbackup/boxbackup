@@ -583,7 +583,7 @@ __E
 
 		# store for later
 		my $base = $1;
-		push @obj_base,$base unless $is_rc;
+		push @obj_base,$base;
 	
 		# get the file...
 		open FL,"$mod/$file";
