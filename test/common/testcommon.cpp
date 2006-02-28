@@ -24,7 +24,6 @@
 #include "CommonException.h"
 #include "Conversion.h"
 #include "autogen_ConversionException.h"
-#include "MemBufferStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -565,56 +564,6 @@ int test(int argc, const char *argv[])
 	}
 
 	test_conversions();
-
-	{
-		StreamableMemBlock temp;
-
-		{
-			MemBufferStream buf;
-
-			TEST_THAT(buf.GetPosition() == 0);
-			TEST_THAT(buf.BytesLeftToRead() == 0);
-
-			buf.Write("hello ", 6);
-			TEST_THAT(buf.GetPosition() == 0);
-			TEST_THAT(buf.BytesLeftToRead() == 6);
-
-			buf.Write("world!", 7);
-			TEST_THAT(buf.GetPosition() == 0);
-			TEST_THAT(buf.BytesLeftToRead() == 13);
-
-			temp = buf.GetBuffer();
-			TEST_THAT(temp.GetSize() == 13);
-		}
-
-		{
-			MemBufferStream buf(temp);
-
-			TEST_THAT(buf.GetPosition() == 0);
-			TEST_THAT(buf.BytesLeftToRead() == 13);
-			TEST_THAT(buf.StreamDataLeft());
-
-			char target[13];
-			memset(target, 0, sizeof(target));
-
-			TEST_THAT(buf.Read(target, 6, 0) == 6);
-			TEST_THAT(strcmp(target, "hello ") == 0);
-			TEST_THAT(buf.GetPosition() == 6);
-			TEST_THAT(buf.BytesLeftToRead() == 7);
-			TEST_THAT(buf.StreamDataLeft());
-
-			TEST_THAT(buf.Read(target, 12, 0) == 7);
-			TEST_THAT(strcmp(target, "world!") == 0);
-			TEST_THAT(buf.GetPosition() == 13);
-			TEST_THAT(buf.BytesLeftToRead() == 0);
-			
-			TEST_THAT(buf.Read(target, 12, 0) == 0);
-			TEST_THAT(buf.GetPosition() == 13);
-			TEST_THAT(buf.BytesLeftToRead() == 0);
-			TEST_THAT(!buf.StreamDataLeft());
-			TEST_THAT(!buf.StreamClosed());
-		}
-	}
 
 	return 0;
 }
