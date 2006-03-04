@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!@PERL@ -w
 
 
 # Contributed to the boxbackup project by Per Reedtz Thomsen. pthomsen@reedtz.com
