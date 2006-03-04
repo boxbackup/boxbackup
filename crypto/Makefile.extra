@@ -3,5 +3,5 @@ MAKEEXCEPTION = ../../lib/common/makeexception.pl
 
 # AUTOGEN SEEDING
 autogen_CipherException.cpp autogen_CipherException.h:	$(MAKEEXCEPTION) CipherException.txt
-	perl $(MAKEEXCEPTION) CipherException.txt
+	$(PERL) $(MAKEEXCEPTION) CipherException.txt
 
