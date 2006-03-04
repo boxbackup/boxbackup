@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([Box Backup], 0.09, [box@fluffy.co.uk])
+AC_INIT([Box Backup], 0.10, [box@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
@@ -25,6 +25,12 @@ if test "x$GXX" = "xyes"; then
   AC_SUBST([CXXFLAGS_STRICT], ['-Wall'])
   # Use -rdynamic if we have gcc. This is needed for backtrace
   AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
+fi
+AC_PATH_PROG([PERL], [perl], [no])
+if test "x$PERL" != "xno"; then
+  AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$PERL"], [Location of the perl executable])
+else
+  AC_MSG_ERROR([[perl executable was not found]])
 fi
 
 
@@ -203,13 +209,27 @@ AC_SUBST([bindir_expanded])
 
 
 ### Output files
-AC_CONFIG_FILES([infrastructure/BoxPlatform.pm])
+AC_CONFIG_FILES([bin/bbackupd/bbackupd-config
+                 bin/bbackupquery/makedocumentation.pl
+                 bin/bbstored/bbstored-certs
+                 bin/bbstored/bbstored-config
+                 infrastructure/BoxPlatform.pm
+                 infrastructure/makebuildenv.pl
+                 infrastructure/makeparcels.pl
+                 lib/common/makeexception.pl
+                 lib/raidfile/raidfile-config
+                 lib/server/makeprotocol.pl
+                 runtest.pl
+                 test/backupstorefix/testfiles/testbackupstorefix.pl
+                 test/bbackupd/testfiles/extcheck1.pl
+                 test/bbackupd/testfiles/extcheck2.pl
+                 test/bbackupd/testfiles/notifyscript.pl])
 AC_OUTPUT
 
 # Configure the Box build system
 echo
-perl ./infrastructure/makebuildenv.pl &&
-  perl ./infrastructure/makeparcels.pl
+$PERL ./infrastructure/makebuildenv.pl &&
+  $PERL ./infrastructure/makeparcels.pl
 
 # Write summary of important info
 cat <<EOC

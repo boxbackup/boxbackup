@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 
 # validity period for root certificates -- default is a very long time

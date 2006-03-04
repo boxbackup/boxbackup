@@ -6,16 +6,16 @@ GEN_CMD_CLI = $(MAKEPROTOCOL) Client testprotocol.txt
 
 # AUTOGEN SEEDING
 autogen_TestProtocolServer.cpp:	$(MAKEPROTOCOL) testprotocol.txt
-	perl $(GEN_CMD_SRV)
+	$(PERL) $(GEN_CMD_SRV)
 
 autogen_TestProtocolServer.h:	$(MAKEPROTOCOL) testprotocol.txt
-	perl $(GEN_CMD_SRV)
+	$(PERL) $(GEN_CMD_SRV)
 
 
 # AUTOGEN SEEDING
 autogen_TestProtocolClient.cpp:	$(MAKEPROTOCOL) testprotocol.txt
-	perl $(GEN_CMD_CLI)
+	$(PERL) $(GEN_CMD_CLI)
 
 autogen_TestProtocolClient.h:	$(MAKEPROTOCOL) testprotocol.txt
-	perl $(GEN_CMD_CLI)
+	$(PERL) $(GEN_CMD_CLI)
 

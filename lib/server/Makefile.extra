@@ -3,9 +3,9 @@ MAKEEXCEPTION = ../../lib/common/makeexception.pl
 
 # AUTOGEN SEEDING
 autogen_ServerException.h autogen_ServerException.cpp:	$(MAKEEXCEPTION) ServerException.txt
-	perl $(MAKEEXCEPTION) ServerException.txt
+	$(PERL) $(MAKEEXCEPTION) ServerException.txt
 
 # AUTOGEN SEEDING
 autogen_ConnectionException.h autogen_ConnectionException.cpp:	$(MAKEEXCEPTION) ConnectionException.txt
-	perl $(MAKEEXCEPTION) ConnectionException.txt
+	$(PERL) $(MAKEEXCEPTION) ConnectionException.txt
 

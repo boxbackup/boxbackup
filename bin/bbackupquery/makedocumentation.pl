@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 
 print "Creating built-in documentation for bbackupquery...\n";
