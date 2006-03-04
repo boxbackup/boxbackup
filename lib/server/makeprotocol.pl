@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 
 # Make protocol C++ classes from a protocol description file

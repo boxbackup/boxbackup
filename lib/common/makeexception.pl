@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 
 # global exception list file
 my $global_list = '../../ExceptionCodes.txt';

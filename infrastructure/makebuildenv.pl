@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 use Symbol;
 
@@ -497,6 +497,7 @@ __E
 CXX = g++
 AR = ar
 RANLIB = ranlib
+PERL = \@PERL\@
 .ifdef RELEASE
 CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release

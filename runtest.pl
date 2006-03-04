@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 
 use lib 'infrastructure';
 use BoxPlatform;
