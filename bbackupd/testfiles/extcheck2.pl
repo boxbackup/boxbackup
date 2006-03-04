@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 
 unless(open IN,"../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac\" quit|")
