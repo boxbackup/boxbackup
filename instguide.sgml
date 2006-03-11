@@ -2,7 +2,7 @@
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 "http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
 <book>
-  <title>Box Backup Installation &amp; Configuration Guide</title>
+  <title>Box Backup Build and Installation Guide</title>
 
   <preface>
     <title>License</title>
@@ -732,7 +732,7 @@ bbackupd.exe -i</programlisting>
     and probably others too.</para>
 
     <para>Given that you have the correct development packages installed
-    simply execute this command (replacing the version number): </para>
+    simply execute this command (replacing the version number):</para>
 
     <programlisting>rpmbuild -ta boxbackup-0.00.tgz</programlisting>
 
@@ -745,6 +745,6 @@ bbackupd.exe -i</programlisting>
     book</ulink>.</para>
 
     <para>If you wish to customise the package you can find the spec file in
-    the contrib/rpm directory. </para>
+    the contrib/rpm directory.</para>
   </appendix>
 </book>
