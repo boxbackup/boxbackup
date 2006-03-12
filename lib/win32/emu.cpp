@@ -555,8 +555,6 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 // --------------------------------------------------------------------------
 int emu_fstat(HANDLE hdir, struct stat * st)
 {
-	ULARGE_INTEGER conv;
-
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
 		::syslog(LOG_ERR, "Error: invalid file handle in emu_fstat()");
@@ -584,6 +582,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	memset(st, 0, sizeof(*st));
 
 	// This next example is how we get our INODE (equivalent) information
+	ULARGE_INTEGER conv;
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart = fi.nFileIndexLow;
 	st->st_ino = (_ino_t)conv.QuadPart;
@@ -593,19 +592,28 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	st->st_atime = ConvertFileTimeToTime_t(&fi.ftLastAccessTime);
 	st->st_mtime = ConvertFileTimeToTime_t(&fi.ftLastWriteTime);
 
-	// size of the file
-	LARGE_INTEGER st_size;
-	if (!GetFileSizeEx(hdir, &st_size))
+	if (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
-		::syslog(LOG_WARNING, "Failed to get file size: error %d",
-			GetLastError());
-		errno = EACCES;
-		return -1;
+		st->st_size = 0;
 	}
+	else
+	{
+		// size of the file
+		LARGE_INTEGER st_size;
+		memset(&st_size, 0, sizeof(st_size));
 
-	conv.HighPart = st_size.HighPart;
-	conv.LowPart = st_size.LowPart;
-	st->st_size = (_off_t)conv.QuadPart;
+		if (!GetFileSizeEx(hdir, &st_size))
+		{
+			::syslog(LOG_WARNING, "Failed to get file size: "
+				"error %d", GetLastError());
+			errno = EACCES;
+			return -1;
+		}
+
+		conv.HighPart = st_size.HighPart;
+		conv.LowPart = st_size.LowPart;
+		st->st_size = (_off_t)conv.QuadPart;
+	}
 
 	// at the mo
 	st->st_uid = 0;
@@ -668,7 +676,8 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 	}
 
 	HANDLE handle = CreateFileW(pBuffer, 
-		FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA, 
+		FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA |
+		READ_CONTROL, 
 		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
 		NULL, 
 		OPEN_EXISTING, 
@@ -682,7 +691,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 		// at least one process must have the file open - 
 		// in this case someone else does.
 		handle = CreateFileW(pBuffer, 
-			0, 
+			READ_CONTROL, 
 			FILE_SHARE_READ, 
 			NULL, 
 			OPEN_EXISTING, 
