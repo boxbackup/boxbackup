@@ -209,21 +209,22 @@ AC_SUBST([bindir_expanded])
 
 
 ### Output files
-AC_CONFIG_FILES([bin/bbackupd/bbackupd-config
-                 bin/bbackupquery/makedocumentation.pl
-                 bin/bbstored/bbstored-certs
-                 bin/bbstored/bbstored-config
-                 infrastructure/BoxPlatform.pm
-                 infrastructure/makebuildenv.pl
-                 infrastructure/makeparcels.pl
-                 lib/common/makeexception.pl
-                 lib/raidfile/raidfile-config
-                 lib/server/makeprotocol.pl
-                 runtest.pl
-                 test/backupstorefix/testfiles/testbackupstorefix.pl
-                 test/bbackupd/testfiles/extcheck1.pl
-                 test/bbackupd/testfiles/extcheck2.pl
-                 test/bbackupd/testfiles/notifyscript.pl])
+AC_CONFIG_FILES([infrastructure/BoxPlatform.pm])
+AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
+                   bin/bbackupquery/makedocumentation.pl
+                   bin/bbstored/bbstored-certs
+                   bin/bbstored/bbstored-config
+                   infrastructure/makebuildenv.pl
+                   infrastructure/makeparcels.pl
+                   lib/common/makeexception.pl
+                   lib/raidfile/raidfile-config
+                   lib/server/makeprotocol.pl
+                   runtest.pl
+                   test/backupstorefix/testfiles/testbackupstorefix.pl
+                   test/bbackupd/testfiles/extcheck1.pl
+                   test/bbackupd/testfiles/extcheck2.pl
+                   test/bbackupd/testfiles/notifyscript.pl])
+# TODO: Need to do contrib/cygwin/install-cygwin-service.pl but location varies
 AC_OUTPUT
 
 # Configure the Box build system
