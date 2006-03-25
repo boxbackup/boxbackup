@@ -19,15 +19,18 @@ AC_DEFUN([AX_CHECK_SSL], [
   AC_ARG_WITH(
     [ssl-headers],
     [AC_HELP_STRING([--with-ssl-headers=DIR], [SSL include files location])],
-    [CPPFLAGS="$CPPFLAGS -I$withval"])
+    [ CPPFLAGS="$CPPFLAGS -I$withval"
+      ax_check_ssl_headers="--with-ssl-headers=\"$withval\"" ])
   AC_ARG_WITH(
     [ssl-lib],
     [AC_HELP_STRING([--with-ssl-lib=DIR], [SSL library location])],
-    [LDFLAGS="$LDFLAGS -L$withval"])
+    [ LDFLAGS="$LDFLAGS -L$withval" 
+      ax_check_ssl_lib="--with-ssl-lib=\"$withval\"" ])
 
   ax_check_ssl_found=yes
   AC_CHECK_HEADERS([openssl/ssl.h],, [ax_check_ssl_found=no])
-  AC_CHECK_LIB([ssl], [SSL_read],, [ax_check_ssl_found=no], [-lcrypto])
+  AC_CHECK_LIB([ssl],    [SSL_read],, [ax_check_ssl_found=no], [-lcrypto])
+  AC_CHECK_LIB([crypto], [BIO_read],, [ax_check_ssl_found=no])
 
   if test "x$ax_check_ssl_found" = "xyes"; then
     AC_DEFINE([HAVE_SSL], 1, [Define to 1 if SSL is available])

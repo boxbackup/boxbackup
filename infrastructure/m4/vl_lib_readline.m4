@@ -1,4 +1,4 @@
-dnl @synopsis VL_LIB_READLINE
+dnl @synopsis VL_LIB_READLINE([ACTION-IF-TRUE], [ACTION-IF-FALSE])
 dnl
 dnl Searches for a readline compatible library. If found, defines
 dnl `HAVE_LIBREADLINE'. If the found library has the `add_history'
@@ -46,6 +46,8 @@ dnl
 dnl Modifications to add --enable-gnu-readline to work around licensing
 dnl problems between the traditional BSD licence and the GPL.
 dnl Martin Ebourne, 2005/7/11
+dnl Rewrite to match headers with libraries and be more selective.
+dnl Martin Ebourne, 2006/1/4
 dnl
 dnl @category InstalledPackages
 dnl @author Ville Laurikari <vl@iki.fi>
@@ -56,16 +58,34 @@ AC_DEFUN([VL_LIB_READLINE], [
   AC_ARG_ENABLE(
     [gnu-readline],
     AC_HELP_STRING([--enable-gnu-readline],
-                   [Allow use of GNU readline (may violate GNU licence)])
+                   [Use GNU readline if present (may violate GNU licence)])
   )
-  vl_gnu_readline_lib=""
+  vl_cv_lib_readline_compat_found=no
   if test "x$enable_gnu_readline" = "xyes"; then
-    vl_gnu_readline_lib=readline
+    VL_LIB_READLINE_CHECK([readline],
+                          [readline],
+                          [readline/readline.h readline.h],
+                          [readline/history.h history.h])
   fi
-  AC_CACHE_CHECK([for a readline compatible library],
-                 vl_cv_lib_readline, [
+  if test "x$vl_cv_lib_readline_compat_found" = "xno"; then
+    VL_LIB_READLINE_CHECK([editline],
+                          [edit editline],
+	  		  [editline/readline.h],
+			  [editline/readline.h])
+  fi
+  if test "x$vl_cv_lib_readline_compat_found" = "xyes"; then
+    m4_ifvaln([$1],[$1],[:])dnl
+    m4_ifvaln([$2],[else $2])dnl
+  fi
+])
+
+dnl VL_LIB_READLINE_CHECK(name, libraries, headers, history headers)
+AC_DEFUN([VL_LIB_READLINE_CHECK], [
+  AC_CACHE_CHECK([for $1 library],
+                 [vl_cv_lib_$1], [
     ORIG_LIBS="$LIBS"
-    for readline_lib in edit editline $vl_gnu_readline_lib; do
+    vl_cv_lib_$1=""
+    for readline_lib in $2; do
       for termcap_lib in "" termcap curses ncurses; do
         if test -z "$termcap_lib"; then
           TRY_LIB="-l$readline_lib"
@@ -73,34 +93,43 @@ AC_DEFUN([VL_LIB_READLINE], [
           TRY_LIB="-l$readline_lib -l$termcap_lib"
         fi
         LIBS="$ORIG_LIBS $TRY_LIB"
-        AC_TRY_LINK_FUNC(readline, vl_cv_lib_readline="$TRY_LIB")
-        if test -n "$vl_cv_lib_readline"; then
+        AC_TRY_LINK_FUNC([readline], [vl_cv_lib_$1="$TRY_LIB"])
+        if test -n "$vl_cv_lib_$1"; then
           break
         fi
       done
-      if test -n "$vl_cv_lib_readline"; then
+      if test -n "$vl_cv_lib_$1"; then
         break
       fi
     done
-    if test -z "$vl_cv_lib_readline"; then
-      vl_cv_lib_readline="no"
+    if test -z "$vl_cv_lib_$1"; then
+      vl_cv_lib_$1=no
       LIBS="$ORIG_LIBS"
     fi
   ])
 
-  if test "x$vl_cv_lib_readline" != "xno"; then
-    AC_DEFINE(HAVE_LIBREADLINE, 1,
+  vl_cv_lib_readline_compat_found=no
+  if test "x$vl_cv_lib_$1" != "xno"; then
+    AC_CHECK_HEADERS([$3], [vl_cv_lib_readline_compat_found=yes])
+  fi
+
+  if test "x$vl_cv_lib_readline_compat_found" = "xyes"; then
+    AC_DEFINE([HAVE_LIBREADLINE], 1,
               [Define if you have a readline compatible library])
-    AC_CHECK_HEADERS(readline.h readline/readline.h)
-    AC_CACHE_CHECK([whether readline supports history],
-                   vl_cv_lib_readline_history, [
-      vl_cv_lib_readline_history="no"
-      AC_TRY_LINK_FUNC(add_history, vl_cv_lib_readline_history="yes")
+
+    AC_CACHE_CHECK([whether $1 supports history],
+                   [vl_cv_lib_$1_history], [
+      vl_cv_lib_$1_history=no
+      AC_TRY_LINK_FUNC([add_history], [vl_cv_lib_$1_history=yes])
     ])
-    if test "x$vl_cv_lib_readline_history" = "xyes"; then
-      AC_DEFINE(HAVE_READLINE_HISTORY, 1,
-                [Define if your readline library has \`add_history'])
-      AC_CHECK_HEADERS(history.h readline/history.h)
+    if test "x$vl_cv_lib_$1_history" = "xyes"; then
+      vl_cv_lib_$1_history=no
+      AC_CHECK_HEADERS(
+        [$4],
+	[AC_DEFINE([HAVE_READLINE_HISTORY], [1],
+                   [Define if your readline library has add_history])])
     fi
+  else
+    LIBS="$ORIG_LIBS"
   fi
 ])dnl

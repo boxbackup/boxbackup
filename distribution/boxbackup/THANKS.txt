@@ -1,5 +1,33 @@
 
+The following developers contributed code to version 0.10:
+
+Nick Knight
+  - ported Box Backup to Windows (properly, not using Cygwin)
+ 
+Gary Niemcewicz
+  - added client/server (SSL) keepalives to keep the connection to the
+    server alive during a long diff, and saving the daemon's state across restarts
+
+Martin Ebourne
+  - ported to Solaris; wrote extended attribute support (xattr);
+    converted to use autoconf for automatic compiler configuration.
+
+Chris Wilson
+  - updated Nick's and Gary's work to fit in with the new trunk,
+    fixed some issues pointed out by Ben and Martin, made it compile
+    on Windows with the free MinGW compiler.
+
+Jonathan Morton
+  - vastly improved the performance and efficiency of the file-diffing code, and
+    obtained a free G5 PowerMac from IBM as his reward.
+
+
+----
+
 Many individuals have helped with the development of Box Backup by testing, reporting experiences, and making suggestions. In particular, thanks are due to
+
+Charles Lecklider
+  - Helped with the finer details of Win32 programming
 
 Pascal Lalonde
   - Comprehensive and accurate bug reports, and constructive feedback
@@ -17,6 +45,7 @@ Martin Ebourne
 
 Per Thomsen
   - Cygwin Windows service install scripts and build notes
+  - Answering queries on the boxbackup mailing list
 
 Tim Fletcher
 David Harris
@@ -35,3 +64,6 @@ JŽr™me Schell
 John Pybus
   - Ideas and feature requests
   - Useful little patches to code
+
+Stefan Norlin
+  - Help with testing and fixes on lots of different Solaris platforms

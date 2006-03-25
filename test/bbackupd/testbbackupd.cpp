@@ -16,6 +16,11 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef HAVE_SYS_XATTR_H
+#include <cerrno>
+#include <sys/xattr.h>
+#endif
+#include <map>
 
 #include "Test.h"
 #include "BackupClientFileAttributes.h"
@@ -39,6 +44,11 @@
 
 #include "MemLeakFindOn.h"
 
+// ENOATTR may be defined in a separate header file which we may not have
+#ifndef ENOATTR
+#define ENOATTR ENODATA
+#endif
+
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
@@ -57,11 +67,187 @@ void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
 
 int bbstored_pid = 0;
 
+#ifdef HAVE_SYS_XATTR_H
+bool readxattr_into_map(const char *filename, std::map<std::string,std::string> &rOutput)
+{
+	rOutput.clear();
+	
+	ssize_t xattrNamesBufferSize = llistxattr(filename, NULL, 0);
+	if(xattrNamesBufferSize < 0)
+	{
+		return false;
+	}
+	else if(xattrNamesBufferSize > 0)
+	{
+		// There is some data there to look at
+		char *xattrNamesBuffer = (char*)malloc(xattrNamesBufferSize + 4);
+		if(xattrNamesBuffer == NULL) return false;
+		char *xattrDataBuffer = 0;
+		int xattrDataBufferSize = 0;
+		// note: will leak these buffers if a read error occurs. (test code, so doesn't matter)
+		
+		ssize_t ns = llistxattr(filename, xattrNamesBuffer, xattrNamesBufferSize);
+		if(ns < 0)
+		{
+			return false;
+		}
+		else if(ns > 0)
+		{
+			// Read all the attribute values
+			const char *xattrName = xattrNamesBuffer;
+			while(xattrName < (xattrNamesBuffer + ns))
+			{
+				// Store size of name
+				int xattrNameSize = strlen(xattrName);
+				
+				bool ok = true;
+					
+				ssize_t dataSize = lgetxattr(filename, xattrName, NULL, 0);
+				if(dataSize < 0)
+				{
+					if(errno == ENOATTR)
+					{
+						// Deleted from under us
+						ok = false;
+					}
+					else
+					{
+						return false;
+					}
+				}
+				else if(dataSize == 0)
+				{
+					// something must have removed all the data from under us
+					ok = false;
+				}
+				else
+				{
+					// Make sure there's enough space in the buffer to get the attribute
+					if(xattrDataBuffer == 0)
+					{
+						xattrDataBuffer = (char*)malloc(dataSize + 4);
+						xattrDataBufferSize = dataSize + 4;
+					}
+					else if(xattrDataBufferSize < (dataSize + 4))
+					{
+						char *resized = (char*)realloc(xattrDataBuffer, dataSize + 4);
+						if(resized == NULL) return false;
+						xattrDataBuffer = resized;
+						xattrDataBufferSize = dataSize + 4;
+					}
+				}
+
+				// Read the data!
+				dataSize = 0;
+				if(ok)
+				{
+					dataSize = lgetxattr(filename, xattrName, xattrDataBuffer,
+						xattrDataBufferSize - 1 /*for terminator*/);
+					if(dataSize < 0)
+					{
+						if(errno == ENOATTR)
+						{
+							// Deleted from under us
+							ok = false;
+						}
+						else
+						{
+							return false;
+						}
+					}
+					else if(dataSize == 0)
+					{
+						// something must have deleted this from under us
+						ok = false;
+					}
+					else
+					{
+						// Terminate the data
+						xattrDataBuffer[dataSize] = '\0';
+					}
+					// Got the data in the buffer
+				}
+				
+				// Store in map
+				if(ok)
+				{
+					rOutput[std::string(xattrName)] = std::string(xattrDataBuffer, dataSize);
+				}
+
+				// Next attribute
+				xattrName += xattrNameSize + 1;
+			}
+		}
+		
+		if(xattrNamesBuffer != 0) ::free(xattrNamesBuffer);
+		if(xattrDataBuffer != 0) ::free(xattrDataBuffer);
+	}
+
+	return true;
+}
+
+static FILE *xattrTestDataHandle = 0;
+bool write_xattr_test(const char *filename, const char *attrName, unsigned int length, bool *pNotSupported = 0)
+{
+	if(xattrTestDataHandle == 0)
+	{
+		xattrTestDataHandle = ::fopen("testfiles/test3.tgz", "rb");	// largest test file
+	}
+	if(xattrTestDataHandle == 0)
+	{
+		return false;
+	}
+	else
+	{
+		char data[1024];
+		if(length > sizeof(data)) length = sizeof(data);
+		
+		if(::fread(data, length, 1, xattrTestDataHandle) != 1)
+		{
+			return false;
+		}
+		
+		if(::lsetxattr(filename, attrName, data, length, 0) != 0)
+		{
+			if(pNotSupported != 0)
+			{
+				*pNotSupported = (errno == ENOTSUP);
+			}
+			return false;
+		}
+	}
+
+	return true;
+}
+void finish_with_write_xattr_test()
+{
+	if(xattrTestDataHandle != 0)
+	{
+		::fclose(xattrTestDataHandle);
+	}
+}
+#endif // HAVE_SYS_XATTR_H
+
 bool attrmatch(const char *f1, const char *f2)
 {
 	struct stat s1, s2;
 	TEST_THAT(::lstat(f1, &s1) == 0);
 	TEST_THAT(::lstat(f2, &s2) == 0);
+
+#ifdef HAVE_SYS_XATTR_H
+	{
+		std::map<std::string,std::string> xattr1, xattr2;
+		if(!readxattr_into_map(f1, xattr1)
+			|| !readxattr_into_map(f2, xattr2))
+		{
+			return false;
+		}
+		if(!(xattr1 == xattr2))
+		{
+			return false;
+		}
+	}
+#endif // HAVE_SYS_XATTR_H
 
 	// if link, just make sure other file is a link too, and that the link to names match
 	if((s1.st_mode & S_IFMT) == S_IFLNK)
@@ -142,6 +328,49 @@ int test_basics()
 	TEST_THAT(t1b == t1b_r);
 	TEST_THAT(t1_r == t1b);
 	TEST_THAT(t1b_r == t1);
+
+#ifdef HAVE_SYS_XATTR_H
+	// Write some attributes to the file, checking for ENOTSUP
+	bool xattrNotSupported = false;
+	if(!write_xattr_test("testfiles/test1", "user.attr_1", 1000, &xattrNotSupported) && xattrNotSupported)
+	{
+		::printf("***********\nYour platform supports xattr, but your filesystem does not.\nSkipping tests.\n***********\n");
+	}
+	else
+	{
+		BackupClientFileAttributes x1, x2, x3, x4;
+
+		// Write more attributes
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.attr_2", 947));
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.sadfohij39998.3hj", 123));
+	
+		// Read file attributes
+		x1.ReadAttributes("testfiles/test1");
+		
+		// Write file attributes
+		FILE *f = fopen("testfiles/test1_nx", "w");
+		fclose(f);
+		x1.WriteAttributes("testfiles/test1_nx");
+		
+		// Compare to see if xattr copied
+		TEST_THAT(attrmatch("testfiles/test1", "testfiles/test1_nx"));
+		
+		// Add more attributes to a file
+		x2.ReadAttributes("testfiles/test1");
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.328989sj..sdf", 23));
+		
+		// Read them again, and check that the Compare() function detects that they're different
+		x3.ReadAttributes("testfiles/test1");
+		TEST_THAT(x1.Compare(x2, true, true));
+		TEST_THAT(!x1.Compare(x3, true, true));
+		
+		// Change the value of one of them, leaving the size the same.
+		TEST_THAT(write_xattr_test("testfiles/test1", "user.328989sj..sdf", 23));
+		x4.ReadAttributes("testfiles/test1");
+		TEST_THAT(!x1.Compare(x4, true, true));
+	}
+	finish_with_write_xattr_test();
+#endif // HAVE_SYS_XATTR_H
 
 	return 0;
 }
@@ -287,7 +516,7 @@ int test_bbackupd()
 	// unpack the files for the initial test
 	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
 	TEST_THAT(::system("mkdir testfiles/TestDir1") == 0);
-	TEST_THAT(::system("tar xzf testfiles/spacetest1.tgz -C testfiles/TestDir1/") == 0);
+	TEST_THAT(::system("gzip -d < testfiles/spacetest1.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
 
 	int pid = LaunchServer("../../bin/bbackupd/bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
 	TEST_THAT(pid != -1 && pid != 0);
@@ -306,7 +535,7 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Unpack some more files
-		TEST_THAT(::system("tar xzf testfiles/spacetest2.tgz -C testfiles/TestDir1/") == 0);
+		TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/d1/f3") == 0);
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d3/d4") == 0);
@@ -327,7 +556,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		
 		// unpack the initial files again
-		TEST_THAT(::system("tar xzf testfiles/test_base.tgz -C testfiles/") == 0);
+		TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
 
 		// wait for it to do it's stuff
 		wait_for_backup_operation();
@@ -427,7 +656,7 @@ int test_bbackupd()
 		// Add some more files
 		// Because the 'm' option is not used, these files will look very old to the daemon.
 		// Lucky it'll upload them then!
-		TEST_THAT(::system("tar xzf testfiles/test2.tgz -C testfiles/") == 0);
+		TEST_THAT(::system("gzip -d < testfiles/test2.tgz | ( cd  testfiles && tar xf - )") == 0);
 		::chmod("testfiles/TestDir1/sub23/dhsfdss/blf.h", 0415);
 		
 		// Wait and test
@@ -464,7 +693,7 @@ int test_bbackupd()
 
 		// Add some files and directories which are marked as excluded
 		printf("Add files and dirs for exclusion test\n");
-		TEST_THAT(::system("tar xzf testfiles/testexclude.tgz -C testfiles/") == 0);
+		TEST_THAT(::system("gzip -d < testfiles/testexclude.tgz | ( cd testfiles && tar xf - )") == 0);
 		// Wait and test
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3c.log \"compare -ac\" quit");
@@ -529,7 +758,7 @@ int test_bbackupd()
 
 			printf("Keep on continuously updating file, check it is uploaded eventually\n");
 
-			for(int l = 0; l < 18; ++l)
+			for(int l = 0; l < 28; ++l)
 			{
 				FILE *f = ::fopen("testfiles/TestDir1/continousupdate", "w+");
 				TEST_THAT(f != 0);
@@ -601,7 +830,7 @@ int test_bbackupd()
 	
 		// Add some more files and modify others
 		// Use the m flag this time so they have a recent modification time
-		TEST_THAT(::system("tar xzmf testfiles/test3.tgz -C testfiles/") == 0);
+		TEST_THAT(::system("gzip -d < testfiles/test3.tgz | ( cd testfiles && tar xmf - )") == 0);
 		
 		// Wait and test
 		wait_for_backup_operation();
@@ -806,7 +1035,7 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Initial files
-	TEST_THAT(::system("tar xzf testfiles/test_base.tgz -C testfiles/") == 0);
+	TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
 
 	// Do the tests
 

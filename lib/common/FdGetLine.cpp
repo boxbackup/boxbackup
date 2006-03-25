@@ -10,7 +10,10 @@
 #include "Box.h"
 
 #include <sys/types.h>
-#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 
 #include "FdGetLine.h"
 #include "CommonException.h"
@@ -117,7 +120,21 @@ std::string FdGetLine::GetLine(bool Preprocess)
 		// Read more in?
 		if(!foundLineEnd && mBufferBegin >= mBytesInBuffer && !mPendingEOF)
 		{
+#ifdef WIN32
+			int bytes;
+
+			if (mFileHandle == _fileno(stdin))
+			{
+				bytes = console_read(mBuffer, sizeof(mBuffer));
+			}
+			else
+			{
+				bytes = ::read(mFileHandle, mBuffer, 
+					sizeof(mBuffer));
+			}
+#else // !WIN32
 			int bytes = ::read(mFileHandle, mBuffer, sizeof(mBuffer));
+#endif // WIN32
 			
 			// Error?
 			if(bytes == -1)

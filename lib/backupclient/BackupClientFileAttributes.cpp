@@ -9,10 +9,13 @@
 
 #include "Box.h"
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <unistd.h>
 #include <limits.h>
 #include <algorithm>
 #include <new>
@@ -330,21 +333,30 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		// __time64_t winTime = BoxTimeToSeconds(
 		// pnewAttr->ModificationTime);
 
-		box_time_t bob = BoxTimeToSeconds(pattr->ModificationTime);
-		__time64_t winTime = bob;
-		if (_gmtime64(&winTime) == 0 )
+		u_int64_t  modTime = box_ntoh64(pattr->ModificationTime);
+		box_time_t modSecs = BoxTimeToSeconds(modTime);
+		__time64_t winTime = modSecs;
+
+		// _MAX__TIME64_T doesn't seem to be defined, but the code below
+		// will throw an assertion failure if we exceed it :-)
+		// Microsoft says dates up to the year 3000 are valid, which
+		// is a bit more than 15 * 2^32. Even that doesn't seem
+		// to be true (still aborts), but it can at least hold 2^32.
+		if (winTime >= 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
-			::syslog(LOG_ERR, "Corrupt value in store "
-				"Modification Time in file %s", Filename);
+			::syslog(LOG_ERR, "Invalid Modification Time "
+				"caught for file: %s", Filename);
 			pattr->ModificationTime = 0;
 		}
 
-		bob = BoxTimeToSeconds(pattr->AttrModificationTime);
-		winTime = bob;
-		if (_gmtime64(&winTime) == 0 )
+		modTime = box_ntoh64(pattr->AttrModificationTime);
+		modSecs = BoxTimeToSeconds(modTime);
+		winTime = modSecs;
+
+		if (winTime > 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
-			::syslog(LOG_ERR, "Corrupt value in store "
-				"Attr Modification Time in file %s", Filename);
+			::syslog(LOG_ERR, "Invalid Attribute Modification "
+				"Time caught for file: %s", Filename);
 			pattr->AttrModificationTime = 0;
 		}
 #endif
@@ -508,18 +520,24 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				int valueSizeOffset = xattrSize;
 				xattrSize += sizeof(u_int32_t);
 
-				// This gets the attribute value (may be text or binary), no termination
-				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
+				// Find size of attribute (must call with buffer and length 0 on some platforms,
+				// as -1 is returned if the data doesn't fit.)
+				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), 0, 0);
+				if(valueSize<0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
 
+				// Resize block, if needed
 				if(xattrSize+valueSize>xattrBufferSize)
 				{
 					xattrBufferSize = (xattrBufferSize+valueSize)*2;
 					outputBlock.ResizeBlock(xattrBufferSize);
 					buffer = static_cast<unsigned char*>(outputBlock.GetBuffer());
-
-					valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
 				}
 
+				// This gets the attribute value (may be text or binary), no termination
+				valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
 				if(valueSize<0)
 				{
 					THROW_EXCEPTION(CommonException, OSFileError);
@@ -537,7 +555,7 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 
 			outputBlock.ResizeBlock(xattrSize);
 		}
-		else if(listSize<0 && errno!=EOPNOTSUPP)
+		else if(listSize<0 && errno!=EOPNOTSUPP && errno!=EACCES)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError);
 		}

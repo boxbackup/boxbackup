@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([Box Backup], 0.09, [box@fluffy.co.uk])
+AC_INIT([Box Backup], 0.10, [box@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
@@ -26,6 +26,12 @@ if test "x$GXX" = "xyes"; then
   # Use -rdynamic if we have gcc. This is needed for backtrace
   AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
 fi
+AC_PATH_PROG([PERL], [perl], [no])
+if test "x$PERL" != "xno"; then
+  AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$PERL"], [Location of the perl executable])
+else
+  AC_MSG_ERROR([[perl executable was not found]])
+fi
 
 
 ### Checks for libraries.
@@ -35,9 +41,7 @@ if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
                  [AC_MSG_ERROR([[cannot find a short sleep function (nanosleep)]])])
 fi
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
-VL_LIB_READLINE
-have_libreadline=no
-test "x$vl_cv_lib_readline" != "xno" && have_libreadline=yes
+VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 
 ## Check for Berkely DB. Restrict to certain versions
 AX_PATH_BDB(, [
@@ -54,6 +58,8 @@ AX_PATH_BDB(, [
 ])
 
 ## Check for Open SSL, use old versions only if explicitly requested
+AC_SEARCH_LIBS([gethostbyname], [nsl socket resolv])
+AC_SEARCH_LIBS([shutdown], [nsl socket resolv])
 AX_CHECK_SSL(, [AC_MSG_ERROR([[OpenSSL is not installed but is required]])])
 AC_ARG_ENABLE(
   [old-ssl],
@@ -73,12 +79,22 @@ Upgrade or read the documentation for alternatives]])
 
 ### Checks for header files.
 
-AC_HEADER_DIRENT
+if test "$target_os" != "mingw32"; then
+  AC_HEADER_DIRENT
+fi
+
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([execinfo.h netinet/in.h regex.h sys/types.h sys/xattr.h])
+AC_CHECK_HEADERS([execinfo.h process.h pwd.h regex.h signal.h])
+AC_CHECK_HEADERS([syslog.h time.h])
+AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
+AC_CHECK_HEADERS([sys/xattr.h])
 AC_CHECK_HEADERS([sys/endian.h asm/byteorder.h])
 
+if test "$ac_cv_header_regex_h" = "yes"; then
+  AC_SEARCH_LIBS([regcomp], [pcreposix])
+fi
 
 ### Checks for typedefs, structures, and compiler characteristics.
 
@@ -107,6 +123,9 @@ AX_CHECK_DIRENT_D_TYPE
 AC_SYS_LARGEFILE
 AX_CHECK_LLONG_MINMAX
 AX_CHECK_DEFINE_PRAGMA
+if test "x$ac_cv_c_bigendian" != "xyes"; then
+  AX_BSWAP64
+fi
 if test "$target_os" != "mingw32"; then
   AX_RANDOM_DEVICE
 fi
@@ -124,25 +143,29 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid kqueue lchown setproctitle])
+AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid])
+# NetBSD implements kqueue too differently for us to get it fixed by 0.10
+# TODO: Remove this when NetBSD kqueue implementation is working
+netbsd_hack=`echo $target_os | sed 's/netbsd.*/netbsd/'`
+if test "$netbsd_hack" != "netbsd"; then
+  AC_CHECK_FUNCS([kqueue])
+fi
 AX_FUNC_SYSCALL
 AX_CHECK_SYSCALL_LSEEK
+AC_CHECK_FUNCS([listxattr llistxattr getxattr lgetxattr setxattr lsetxattr])
+AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
 
 
 ### Miscellaneous complicated feature checks
 
 ## Check for large file support active. AC_SYS_LARGEFILE has already worked
-## out how to enable it if necessary, we need to know if we've got it so we
-## can disable the raidfile intercepts
+## out how to enable it if necessary, we just use this to report to the user
 AC_CACHE_CHECK([if we have large file support enabled], [have_large_file_support],
   [AC_RUN_IFELSE([AC_LANG_PROGRAM([[$ac_includes_default]], [[
       return sizeof(off_t)==4;
     ]])],
     [have_large_file_support=yes], [have_large_file_support=no]
   )])
-if test "x$have_large_file_support" = "xyes"; then
-  AC_DEFINE([HAVE_LARGE_FILE_SUPPORT], 1, [Define to 1 large file support is in use])
-fi
 
 ## Find out how to do file locking
 AC_CHECK_FUNCS([flock])
@@ -173,15 +196,42 @@ if test "x$enable_static_bin" = "xyes"; then
   LIBS="-Wl,-Bstatic $LIBS -Wl,-Bdynamic"
 fi
 
+## Kludge to allow makeparcels.pl to use bindir. This is not a good long term
+## solution because it prevents use of "make exec_prefix=/some/dir"
+saved_prefix=$prefix
+saved_exec_prefix=$exec_prefix
+test "x$prefix" = xNONE && prefix=$ac_default_prefix
+test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
+bindir_expanded=`eval "echo $bindir"`
+bindir_expanded=`eval "echo $bindir_expanded"`
+prefix=$saved_prefix
+exec_prefix=$saved_exec_prefix
+AC_SUBST([bindir_expanded])
+
 
 ### Output files
 AC_CONFIG_FILES([infrastructure/BoxPlatform.pm])
+AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
+                   bin/bbackupquery/makedocumentation.pl
+                   bin/bbstored/bbstored-certs
+                   bin/bbstored/bbstored-config
+                   infrastructure/makebuildenv.pl
+                   infrastructure/makeparcels.pl
+                   lib/common/makeexception.pl
+                   lib/raidfile/raidfile-config
+                   lib/server/makeprotocol.pl
+                   runtest.pl
+                   test/backupstorefix/testfiles/testbackupstorefix.pl
+                   test/bbackupd/testfiles/extcheck1.pl
+                   test/bbackupd/testfiles/extcheck2.pl
+                   test/bbackupd/testfiles/notifyscript.pl])
+# TODO: Need to do contrib/cygwin/install-cygwin-service.pl but location varies
 AC_OUTPUT
 
 # Configure the Box build system
 echo
-perl ./infrastructure/makebuildenv.pl &&
-  perl ./infrastructure/makeparcels.pl
+$PERL ./infrastructure/makebuildenv.pl &&
+  $PERL ./infrastructure/makeparcels.pl
 
 # Write summary of important info
 cat <<EOC
@@ -212,7 +262,7 @@ case "$vl_cv_lib_readline" in
   *readline*)
     echo
     AC_MSG_WARN([[do not distribute binaries compiled against GNU readline,
-as this would violate the GNU readline licence, which is GPL. You may use
+as this could violate the GNU readline licence, which is GPL. You may use
 libedit or libeditline instead.]])
     ;;
 esac

@@ -11,11 +11,11 @@
 
 #include <new>
 #include <map>
-#include <signal.h>
-#ifdef WIN32
-#include <time.h>
-#else
-#include <sys/time.h>
+
+#ifdef HAVE_TIME_H
+	#include <time.h>
+#elif HAVE_SYS_TIME_H
+	#include <sys/time.h>
 #endif
 
 #include "BackupStoreFile.h"
@@ -43,33 +43,37 @@ using namespace BackupStoreFileCreation;
 
 static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntry **ppIndex, int64_t &rNumBlocksOut, int Timeout, bool &rCanDiffFromThis);
 static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES]);
-static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> &rFoundBlocks, BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES]);
+static void SearchForMatchingBlocks(IOStream &rFile, 
+	std::map<int64_t, int64_t> &rFoundBlocks, BlocksAvailableEntry *pIndex, 
+	int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES],
+	DiffTimer *pDiffTimer);
 static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t BlockSize, BlocksAvailableEntry **pHashTable);
 static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber,
 BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks);
 static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksAvailableEntry *pIndex, int64_t NumBlocks, std::map<int64_t, int64_t> &rFoundBlocks, int64_t SizeOfInputFile);
 
-// Avoid running on too long with diffs
-static int sMaximumDiffTime = 600;		// maximum time to spend diffing
-static bool sDiffTimedOut = false;
-static bool sSetTimerSignelHandler = false;
-static void TimerSignalHandler(int signal);
-static void StartDiffTimer();
+// sDiffTimerExpired flags when the diff timer has expired. When true, the 
+// diff routine should check the wall clock as soon as possible, to determine 
+// whether it's time for a keepalive to be sent, or whether the diff has been 
+// running for too long and should be terminated.
+static bool sDiffTimerExpired = false;
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreFile::SetMaximumDiffingTime(int)
-//		Purpose: Sets the maximum time to spend diffing, in seconds. Time is
-//				 process virutal time.
-//		Created: 19/3/04
+//		Name:    BackupStoreFile::DiffTimerExpired()
+//		Purpose: Notifies BackupStoreFile object that the diff operation
+//				 timer has expired, which may mean that a keepalive should
+//				 be sent, or the diff should be terminated. Called from an
+//				 external timer, so it should not do more than set a flag.
+//
+//		Created: 19/1/06
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::SetMaximumDiffingTime(int Seconds)
+void BackupStoreFile::DiffTimerExpired()
 {
-	sMaximumDiffTime = Seconds;
-	TRACE1("Set maximum diffing time to %d seconds\n", Seconds);
+	sDiffTimerExpired = true;
 }
 
 
@@ -139,9 +143,12 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 //		Created: 12/1/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, int64_t ContainerID,
-	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, IOStream &rDiffFromBlockIndex,
-	int Timeout, int64_t *pModificationTime, bool *pIsCompletelyDifferent)
+std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
+(
+	const char *Filename, int64_t ContainerID,
+	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, 
+	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer, 
+	int64_t *pModificationTime, bool *pIsCompletelyDifferent)
 {
 	// Is it a symlink?
 	{
@@ -180,9 +187,6 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, in
 	
 	// Pointer to recipe we're going to create
 	BackupStoreFileEncodeStream::Recipe *precipe = 0;
-
-	// Start the timeout timer, so that the operation doesn't continue for ever
-	StartDiffTimer();
 	
 	try
 	{
@@ -204,7 +208,8 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff(const char *Filename, in
 				// Get size of file
 				sizeOfInputFile = file.BytesLeftToRead();
 				// Find all those lovely matching blocks
-				SearchForMatchingBlocks(file, foundBlocks, pindex, blocksInIndex, sizesToScan);
+				SearchForMatchingBlocks(file, foundBlocks, pindex, 
+					blocksInIndex, sizesToScan, pDiffTimer);
 				
 				// Is it completely different?
 				completelyDifferent = (foundBlocks.size() == 0);
@@ -475,8 +480,20 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 //
 // --------------------------------------------------------------------------
 static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> &rFoundBlocks,
-	BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES])
+	BlocksAvailableEntry *pIndex, int64_t NumBlocks, 
+	int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES], DiffTimer *pDiffTimer)
 {
+	time_t TimeMgmtEpoch   = 0;
+	int MaximumDiffingTime = 0;
+	int KeepAliveTime      = 0;
+
+	if (pDiffTimer)
+	{
+		TimeMgmtEpoch      = pDiffTimer->GetTimeMgmtEpoch();
+		MaximumDiffingTime = pDiffTimer->GetMaximumDiffingTime();
+		KeepAliveTime      = pDiffTimer->GetKeepaliveTime();
+	}
+	
 	std::map<int64_t, int32_t> goodnessOfFit;
 
 	// Allocate the hash lookup table
@@ -560,6 +577,31 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			int rollOverInitialBytes = 0;
 			while(true)
 			{
+				if(sDiffTimerExpired)
+				{
+					ASSERT(TimeMgmtEpoch > 0);
+					ASSERT(pDiffTimer != NULL);
+					
+					time_t tTotalRunIntvl = time(NULL) - TimeMgmtEpoch;
+					
+					if(MaximumDiffingTime > 0 && 
+						tTotalRunIntvl >= MaximumDiffingTime)
+					{
+						TRACE0("MaximumDiffingTime reached - "
+							"suspending file diff\n");
+						abortSearch = true;
+						break;
+					}
+					else if(KeepAliveTime > 0)
+					{
+						TRACE0("KeepAliveTime reached - "
+							"initiating keep-alive\n");
+						pDiffTimer->DoKeepAlive();
+					}
+
+					sDiffTimerExpired = false;
+				}
+
 				// Load in another block of data, and record how big it is
 				int bytesInEndings = rFile.Read(endings, Sizes[s]);
 				int tmp;
@@ -643,8 +685,13 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 							// End this loop, so the final byte isn't used again
 							break;
 						}
+
+						int64_t NumBlocksFound = static_cast<int64_t>(
+							rFoundBlocks.size());
+						int64_t MaxBlocksFound = NumBlocks * 
+							BACKUP_FILE_DIFF_MAX_BLOCK_FIND_MULTIPLE;
 						
-						if(static_cast<int64_t>(rFoundBlocks.size()) > (NumBlocks * BACKUP_FILE_DIFF_MAX_BLOCK_FIND_MULTIPLE) || sDiffTimedOut)
+						if(NumBlocksFound > MaxBlocksFound)
 						{
 							abortSearch = true;
 							break;
@@ -787,7 +834,9 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	ASSERT(pFirstInHashList != 0);
 	ASSERT(pIndex != 0);
 
-	uint16_t Hash = fastSum.GetComponentForHashing();
+#ifndef NDEBUG
+	uint16_t DEBUG_Hash = fastSum.GetComponentForHashing();
+#endif
 	uint32_t Checksum = fastSum.GetChecksum();
 
 	// Before we go to the expense of the MD5, make sure it's a darn good match on the checksum we already know.
@@ -825,7 +874,7 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	{
 		//TRACE3("scan size %d, block size %d, hash %d\n", scan->mSize, BlockSize, Hash);
 		ASSERT(scan->mSize == BlockSize);
-		ASSERT(RollingChecksum::ExtractHashingComponent(scan->mWeakChecksum) == Hash);
+		ASSERT(RollingChecksum::ExtractHashingComponent(scan->mWeakChecksum) == DEBUG_Hash);
 	
 		// Compare?
 		if(strong.DigestMatches(scan->mStrongChecksum))
@@ -1005,55 +1054,3 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	}
 #endif
 }
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    static TimerSignalHandler(int)
-//		Purpose: Signal handler
-//		Created: 19/3/04
-//
-// --------------------------------------------------------------------------
-void TimerSignalHandler(int signal)
-{
-	sDiffTimedOut = true;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    static StartDiffTimer()
-//		Purpose: Starts the diff timeout timer
-//		Created: 19/3/04
-//
-// --------------------------------------------------------------------------
-void StartDiffTimer()
-{
-	// Set timer signal handler
-	if(!sSetTimerSignelHandler)
-	{
-		::signal(SIGVTALRM, TimerSignalHandler);
-		sSetTimerSignelHandler = true;
-	}
-
-	struct itimerval timeout;
-	// Don't want this to repeat
-	timeout.it_interval.tv_sec = 0;
-	timeout.it_interval.tv_usec = 0;
-	// Single timeout after the specified number of seconds
-	timeout.it_value.tv_sec = sMaximumDiffTime;
-	timeout.it_value.tv_usec = 0;
-	// Set timer
-	if(::setitimer(ITIMER_VIRTUAL, &timeout, NULL) != 0)
-	{
-		TRACE0("WARNING: couldn't set diff timeout\n");
-	}
-	
-	// Unset flag (last thing)
-	sDiffTimedOut = false;
-}
-
-
-

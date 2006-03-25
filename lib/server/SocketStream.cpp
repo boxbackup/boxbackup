@@ -9,7 +9,10 @@
 
 #include "Box.h"
 
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <errno.h>
 
@@ -35,7 +38,9 @@
 SocketStream::SocketStream()
 	: mSocketHandle(-1),
 	  mReadClosed(false),
-	  mWriteClosed(false)
+	  mWriteClosed(false),
+	  mBytesRead(0),
+	  mBytesWritten(0)
 {
 }
 
@@ -50,7 +55,9 @@ SocketStream::SocketStream()
 SocketStream::SocketStream(int socket)
 	: mSocketHandle(socket),
 	  mReadClosed(false),
-	  mWriteClosed(false)
+	  mWriteClosed(false),
+	  mBytesRead(0),
+	  mBytesWritten(0)
 {
 	if(socket < 0)
 	{
@@ -69,7 +76,9 @@ SocketStream::SocketStream(int socket)
 SocketStream::SocketStream(const SocketStream &rToCopy)
 	: mSocketHandle(::dup(rToCopy.mSocketHandle)),
 	  mReadClosed(rToCopy.mReadClosed),
-	  mWriteClosed(rToCopy.mWriteClosed)
+	  mWriteClosed(rToCopy.mWriteClosed),
+	  mBytesRead(rToCopy.mBytesRead),
+	  mBytesWritten(rToCopy.mBytesWritten)
 
 {
 	if(rToCopy.mSocketHandle < 0)
@@ -111,6 +120,7 @@ void SocketStream::Attach(int socket)
 	if(mSocketHandle != -1) {THROW_EXCEPTION(ServerException, SocketAlreadyOpen)}
 
 	mSocketHandle = socket;
+	ResetCounters();
 }
 
 
@@ -151,6 +161,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 		mSocketHandle = -1;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
 	}
+	ResetCounters();
 }
 
 // --------------------------------------------------------------------------
@@ -222,6 +233,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		mReadClosed = true;
 	}
 	
+	mBytesRead += r;
 	return r;
 }
 
@@ -263,6 +275,8 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 		bytesLeft -= sent;
 		// Move buffer pointer
 		buffer += sent;
+
+		mBytesWritten += sent;
 		
 		// Need to wait until it can send again?
 		if(bytesLeft > 0)

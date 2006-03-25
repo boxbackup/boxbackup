@@ -9,12 +9,16 @@
 
 #include "Box.h"
 
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <sys/types.h>
 #ifdef HAVE_LIBREADLINE
 	#ifdef HAVE_READLINE_READLINE_H
 		#include <readline/readline.h>
+	#elif defined(HAVE_EDITLINE_READLINE_H)
+		#include <editline/readline.h>
 	#elif defined(HAVE_READLINE_H)
 		#include <readline.h>
 	#endif
@@ -46,8 +50,13 @@
 
 void PrintUsageAndExit()
 {
-	printf("Usage: bbackupquery [-q] [-c config_file] [-l log_file] [commands]\nAs many commands as you require.\n"	\
-	"If commands are multiple words, remember to enclose the command in quotes.\n"	\
+	printf("Usage: bbackupquery [-q] [-w] "
+#ifdef WIN32
+	"[-u] "
+#endif
+	"\n\t[-c config_file] [-l log_file] [commands]\n"
+	"As many commands as you require.\n"
+	"If commands are multiple words, remember to enclose the command in quotes.\n"
 	"Remember to use quit command if you don't want to drop into interactive mode.\n");
 	exit(1);
 }
@@ -62,7 +71,7 @@ int main(int argc, const char *argv[])
 	// Under Win32 we must initialise the Winsock library
 	// before using it.
 	
-	if (WSAStartup(MAKELONG(1, 1), &info) == SOCKET_ERROR) 
+	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
 	{
 		// throw error?    perhaps give it its own id in the furture
 		THROW_EXCEPTION(BackupStoreException, Internal)
@@ -86,10 +95,17 @@ int main(int argc, const char *argv[])
 	// Flags
 	bool quiet = false;
 	bool readWrite = false;
-	
+
+#ifdef WIN32
+	const char* validOpts = "qwuc:l:";
+	bool unicodeConsole = false;
+#else
+	const char* validOpts = "qwc:l:";
+#endif
+
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "qwc:l:")) != -1)
+	while((c = getopt(argc, (char * const *)argv, validOpts)) != -1)
 	{
 		switch(c)
 		{
@@ -116,6 +132,12 @@ int main(int argc, const char *argv[])
 				printf("Can't open log file '%s'\n", optarg);
 			}
 			break;
+
+#ifdef WIN32
+		case 'u':
+			unicodeConsole = true;
+			break;
+#endif
 		
 		case '?':
 		default:
@@ -132,6 +154,30 @@ int main(int argc, const char *argv[])
 		const char *banner = BANNER_TEXT("Backup Query Tool");
 		printf(banner);
 	}
+
+#ifdef WIN32
+	if (unicodeConsole)
+	{
+		if (!SetConsoleCP(CP_UTF8))
+		{
+			fprintf(stderr, "Failed to set input codepage: "
+				"error %d\n", GetLastError());
+		}
+
+		if (!SetConsoleOutputCP(CP_UTF8))
+		{
+			fprintf(stderr, "Failed to set output codepage: "
+				"error %d\n", GetLastError());
+		}
+
+		// enable input of Unicode characters
+		if (_setmode(_fileno(stdin), _O_TEXT) == -1)
+		{
+			perror("Failed to set the console input to "
+				"binary mode");
+		}
+	}
+#endif // WIN32
 
 	// Read in the configuration file
 	if(!quiet) printf("Using configuration file %s\n", configFilename);

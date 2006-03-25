@@ -1,6 +1,0 @@
-
-# link-extra: intercept-lseek.o intercept-close.o intercept-open.o intercept-read.o intercept-readv.o intercept-write.o
-
-$(OUTDIR)/intercept-lseek.o:	make-darwin-intercepts.pl $(OUTDIR)
-	./make-darwin-intercepts.pl $(OUTDIR)
-

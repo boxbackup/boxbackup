@@ -17,6 +17,7 @@
 #include "ExcludeList.h"
 #include "Utils.h"
 #include "Configuration.h"
+#include "Archive.h"
 
 #include "MemLeakFindOn.h"
 
@@ -130,6 +131,8 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				
 				// Store in list of regular expressions
 				mRegex.push_back(pregex);
+				// Store in list of regular expression string for Serialize
+				mRegexStr.push_back(i->c_str());
 			}
 			catch(...)
 			{
@@ -213,7 +216,183 @@ void ExcludeList::SetAlwaysIncludeList(ExcludeList *pAlwaysInclude)
 	mpAlwaysInclude = pAlwaysInclude;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ExcludeList::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void ExcludeList::Deserialize(Archive & rArchive)
+{
+	//
+	//
+	//
+	mDefinite.clear();
 
-	
+#ifdef HAVE_REGEX_H
+	// free regex memory
+	while(mRegex.size() > 0)
+	{
+		regex_t *pregex = mRegex.back();
+		mRegex.pop_back();
+		// Free regex storage, and the structure itself
+		::regfree(pregex);
+		delete pregex;
+	}
 
+	mRegexStr.clear();
+#endif
 
+	// Clean up exceptions list
+	if(mpAlwaysInclude != 0)
+	{
+		delete mpAlwaysInclude;
+		mpAlwaysInclude = 0;
+	}
+
+	//
+	//
+	//
+	int64_t iCount = 0;
+	rArchive.Read(iCount);
+
+	if (iCount > 0)
+	{
+		for (int v = 0; v < iCount; v++)
+		{
+			// load each one
+			std::string strItem;
+			rArchive.Read(strItem);
+			mDefinite.insert(strItem);
+		}
+	}
+
+	//
+	//
+	//
+#ifdef HAVE_REGEX_H
+	rArchive.Read(iCount);
+
+	if (iCount > 0)
+	{
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			rArchive.Read(strItem);
+
+			// Allocate memory
+			regex_t* pregex = new regex_t;
+			
+			try
+			{
+				// Compile
+				if(::regcomp(pregex, strItem.c_str(), 
+					REG_EXTENDED | REG_NOSUB) != 0)
+				{
+					THROW_EXCEPTION(CommonException, 
+						BadRegularExpression)
+				}
+				
+				// Store in list of regular expressions
+				mRegex.push_back(pregex);
+
+				// Store in list of regular expression strings
+				// for Serialize
+				mRegexStr.push_back(strItem);
+			}
+			catch(...)
+			{
+				delete pregex;
+				throw;
+			}
+		}
+	}
+#endif // HAVE_REGEX_H
+
+	//
+	//
+	//
+	int64_t aMagicMarker = 0;
+	rArchive.Read(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpAlwaysInclude = new ExcludeList;
+		if (!mpAlwaysInclude)
+		{
+			throw std::bad_alloc();
+		}
+
+		mpAlwaysInclude->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ExcludeList::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void ExcludeList::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	int64_t iCount = mDefinite.size();
+	rArchive.Write(iCount);
+
+	for (std::set<std::string>::const_iterator i = mDefinite.begin(); 
+		i != mDefinite.end(); i++)
+	{
+		rArchive.Write(*i);
+	}
+
+	//
+	//
+	//
+#ifdef HAVE_REGEX_H
+	// don't even try to save compiled regular expressions,
+	// use string copies instead.
+	ASSERT(mRegex.size() == mRegexStr.size()); 	
+
+	iCount = mRegexStr.size();
+	rArchive.Write(iCount);
+
+	for (std::vector<std::string>::const_iterator i = mRegexStr.begin(); 
+		i != mRegexStr.end(); i++)
+	{
+		rArchive.Write(*i);
+	}
+#endif // HAVE_REGEX_H
+
+	//
+	//
+	//
+	if (!mpAlwaysInclude)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpAlwaysInclude->Serialize(rArchive);
+	}
+}

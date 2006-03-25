@@ -40,16 +40,23 @@
 	#endif
 #endif
 
+// Slight hack; disable interception on Darwin within raidfile test
+#ifdef __APPLE__
+	// TODO: Replace with autoconf test
+	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+#endif
+
+// Disable memory testing under Darwin, it just doesn't like it very much.
+#ifdef __APPLE__
+	// TODO: We really should get some decent leak detection code.
+	#define PLATFORM_DISABLE_MEM_LEAK_TESTING
+#endif
+
 // Find out if credentials on UNIX sockets can be obtained
 #ifndef HAVE_GETPEEREID
 	#if !HAVE_DECL_SO_PEERCRED
 		#define PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 	#endif
-#endif
-
-// Cannot do the intercepts in test/raidfile if large file support is enabled
-#ifdef HAVE_LARGE_FILE_SUPPORT
-	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif
 
 #ifdef HAVE_DEFINE_PRAGMA
@@ -60,6 +67,19 @@
 	#define END_STRUCTURE_PACKING_FOR_WIRE		#pragma pack()
 #else
 	#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
+#endif
+
+// Handle differing xattr APIs
+#ifdef HAVE_SYS_XATTR_H
+	#if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+		#define llistxattr(a,b,c) listxattr(a,b,c,XATTR_NOFOLLOW)
+	#endif
+	#if !defined(HAVE_LGETXATTR) && defined(HAVE_GETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+		#define lgetxattr(a,b,c,d) getxattr(a,b,c,d,0,XATTR_NOFOLLOW)
+	#endif
+	#if !defined(HAVE_LSETXATTR) && defined(HAVE_SETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+		#define lsetxattr(a,b,c,d,e) setxattr(a,b,c,d,0,(e)|XATTR_NOFOLLOW)
+	#endif
 #endif
 
 #if defined WIN32 && !defined __MINGW32__
@@ -73,13 +93,11 @@
 	typedef unsigned __int32 u_int32_t;
 	typedef unsigned __int64 u_int64_t;
 
-	#define HAVE_UINT8_T
-	#define HAVE_UINT16_T
-	#define HAVE_UINT32_T
-	#define HAVE_UINT64_T
+	#define HAVE_U_INT8_T
+	#define HAVE_U_INT16_T
+	#define HAVE_U_INT32_T
+	#define HAVE_U_INT64_T
 
-	typedef unsigned int uid_t;
-	typedef unsigned int gid_t;
 	typedef int pid_t;
 #endif // WIN32 && !__MINGW32__
 

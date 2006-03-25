@@ -5,12 +5,12 @@ GEN_CMD_SRV = $(MAKEPROTOCOL) Client ../../bin/bbstored/backupprotocol.txt
 
 # AUTOGEN SEEDING
 autogen_BackupProtocolClient.cpp autogen_BackupProtocolClient.h:	$(MAKEPROTOCOL) ../../bin/bbstored/backupprotocol.txt
-	perl $(GEN_CMD_SRV)
+	$(PERL) $(GEN_CMD_SRV)
 
 
 MAKEEXCEPTION = ../../lib/common/makeexception.pl
 
 # AUTOGEN SEEDING
 autogen_BackupStoreException.h autogen_BackupStoreException.cpp:	$(MAKEEXCEPTION) BackupStoreException.txt
-	perl $(MAKEEXCEPTION) BackupStoreException.txt
+	$(PERL) $(MAKEEXCEPTION) BackupStoreException.txt
 

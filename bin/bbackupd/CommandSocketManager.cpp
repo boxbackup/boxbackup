@@ -66,21 +66,35 @@ CommandSocketManager::~CommandSocketManager()
 void CommandSocketManager::Wait(box_time_t RequiredDelay)
 {
 #ifdef WIN32
-	// Another thread is listening on the command socket, 
-	// no need for us to do anything here.
-	DWORD timeout = BoxTimeToMilliSeconds(RequiredDelay);
+	// Really could use some interprocess protection, mutex etc
+	// any side effect should be too bad???? :)
+	DWORD timeout = (DWORD)BoxTimeToMilliSeconds(RequiredDelay);
 
-	if (timeout > 0)
+	while ( this->mReceivedCommandConn == false )
 	{
-		Sleep(timeout);
+		Sleep(1);
+
+		if ( timeout == 0 )
+		{
+			DoSyncFlagOut = false;
+			SyncIsForcedOut = false;
+			return;
+		}
+		timeout--;
 	}
-#else // !WIN32
+	this->mReceivedCommandConn = false;
+	DoSyncFlagOut = this->mDoSyncFlagOut;
+	SyncIsForcedOut = this->mSyncIsForcedOut;
+
+	return;
+#else // ! WIN32
+	
 	TRACE1("Wait on command socket, delay = %lld\n", RequiredDelay);
 	
 	try
 	{
 		// Timeout value for connections and things
-		int timeout = ((int)BoxTimeToMilliSeconds(RequiredDelay));
+		int timeout = ((int)BoxTimeToMilliSeconds(RequiredDelay)) + 1;
 		// Handle bad boundary cases
 		if(timeout <= 0) timeout = 1;
 		if(timeout == INFTIM) timeout = 100000;
@@ -101,19 +115,20 @@ void CommandSocketManager::Wait(box_time_t RequiredDelay)
 			{
 #ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				bool uidOK = true;
-				::syslog(LOG_ERR, "On this platform, no security check "
-					"can be made on the credientials of peers connecting "
-					"to the command socket. (bbackupctl)");
+				::syslog(LOG_WARNING, "On this platform, "
+					"no security check can be made on the "
+					"credentials of peers connecting to "
+					"the command socket. (bbackupctl)");
 #else
-				// Security check -- does the process connecting
+				// Security check -- does the process connecting 
 				// to this socket have the same UID as this process?
 				bool uidOK = false;
 				// BLOCK
 				{
 					uid_t remoteEUID = 0xffff;
 					gid_t remoteEGID = 0xffff;
-					if(mpConnectedSocket->GetPeerCredentials(remoteEUID, 
-						remoteEGID))
+					if(mpConnectedSocket->GetPeerCredentials(
+						remoteEUID, remoteEGID))
 					{
 						// Credentials are available -- check UID
 						if(remoteEUID == ::getuid())
@@ -125,7 +140,7 @@ void CommandSocketManager::Wait(box_time_t RequiredDelay)
 				}
 #endif // PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				
-				// Is this an acceptible connection?
+				// Is this an acceptable connection?
 				if(!uidOK)
 				{
 					// Dump the connection
@@ -135,25 +150,25 @@ void CommandSocketManager::Wait(box_time_t RequiredDelay)
 					mpConnectedSocket.reset();
 					return;
 				}
-
-				// Log
-				::syslog(LOG_INFO, "Incoming connection to command socket");
-				TRACE0("Accepted new command connection\n");
-				
-				// Send a header line summarising the configuration and current state
-				char summary[256];
-				int summarySize = sprintf(summary, "bbackupd: %d %d %d %d\n"
-					"state %d\n",
-					mConf.GetKeyValueBool("AutomaticBackup"),
-					mConf.GetKeyValueInt("UpdateStoreInterval"),
-					mConf.GetKeyValueInt("MinimumFileAge"),
-					mConf.GetKeyValueInt("MaxUploadWait"),
-					mState);
-				mpConnectedSocket->Write(summary, summarySize);
-				
-				// Set the timeout to something very small, so we don't
-				// spend too long on waiting for any incoming data
-				timeout = 10; // milliseconds
+				else
+				{
+					// Log
+					::syslog(LOG_INFO, "Connection from command socket");
+					
+					// Send a header line summarising the configuration and current state
+					char summary[256];
+					int summarySize = sprintf(summary, "bbackupd: %d %d %d %d\nstate %d\n",
+						mConf.GetKeyValueBool("AutomaticBackup"),
+						mConf.GetKeyValueInt("UpdateStoreInterval"),
+						mConf.GetKeyValueInt("MinimumFileAge"),
+						mConf.GetKeyValueInt("MaxUploadWait"),
+						mState);
+					mpConnectedSocket->Write(summary, summarySize);
+					
+					// Set the timeout to something very small, so we don't wait too long on waiting
+					// for any incoming data
+					timeout = 10; // milliseconds
+				}
 			}
 		}
 
@@ -171,7 +186,9 @@ void CommandSocketManager::Wait(box_time_t RequiredDelay)
 		// Don't do this if the timeout requested was zero, as we don't want
 		// to flood the connection during background polling
 		if (RequiredDelay > 0)
+		{
 			mpConnectedSocket->Write("ping\n", 5);
+		}
 		
 		// Wait for a command or something on the socket
 		std::string command;
@@ -260,25 +277,23 @@ void CommandSocketManager::Wait(box_time_t RequiredDelay)
 // --------------------------------------------------------------------------
 void CommandSocketManager::CloseConnection()
 {
+#ifndef WIN32
 	try
 	{
 		TRACE0("Closing command connection\n");
-	
-#ifdef WIN32
-		mListeningSocket.Close();
-#else
+		
 		if(mpGetLine)
 		{
 			delete mpGetLine;
 			mpGetLine = 0;
 		}
 		mpConnectedSocket.reset();
-#endif
 	}
 	catch(...)
 	{
 		// Ignore any errors
 	}
+#endif
 }
 
 
@@ -296,18 +311,21 @@ void CommandSocketManager::SendSyncStartOrFinish(bool SendStart)
 	// The bbackupctl program can't rely on a state change, because it may never
 	// change if the server doesn't need to be contacted.
 
+#ifdef __MINGW32__
+#warning race condition: what happens if socket is closed?
+#endif
+
 #ifdef WIN32
-    if (mListeningSocket.IsConnected())
+	if (mListeningSocket.IsConnected())
 #else
 	if (mpConnectedSocket.get() != 0)
 #endif
 	{
 		const char* message = SendStart ? "start-sync\n" : "finish-sync\n";
-		
 		try
 		{
 #ifdef WIN32
-			mListeningSocket.Write(message, strlen(message));
+			mListeningSocket.Write(message, (int)strlen(message));
 #else
 			mpConnectedSocket->Write(message, strlen(message));
 #endif
@@ -322,34 +340,36 @@ void CommandSocketManager::SendSyncStartOrFinish(bool SendStart)
 void CommandSocketManager::SendStateUpdate(state_t State)
 {
 	mState = State;
-	
+
 	// If there's a command socket connected, then inform it -- 
 	// disconnecting from the command socket if there's an error
 
+	char newState[64];
+	char newStateSize = sprintf(newState, "state %d\n", State);
+
 #ifdef WIN32
-	#warning FIX ME: race condition
+	#ifndef _MSC_VER
+		#warning FIX ME: race condition
+	#endif
+
 	// what happens if the socket is closed by the other thread before
 	// we can write to it? Null pointer deref at best.
 	if (mListeningSocket.IsConnected())
-		return;
-#else	
-	if(mpConnectedSocket.get() == 0)
-		return;
-#endif
-	
-	// Something connected to the command socket, tell it about the new state
-	char newState[64];
-	char newStateSize = sprintf(newState, "state %d\n", State);
-	try
-	{
-#ifdef WIN32
-		mListeningSocket.Write(newState, newStateSize);
 #else
-		mpConnectedSocket->Write(newState, newStateSize);
+	if (mpConnectedSocket.get() != 0)
 #endif
-	}
-	catch(...)
 	{
-		CloseConnection();
+		try
+		{
+#ifdef WIN32
+			mListeningSocket.Write(newState, newStateSize);
+#else
+			mpConnectedSocket->Write(newState, newStateSize);
+#endif
+		}
+		catch(...)
+		{
+			CloseConnection();
+		}
 	}
 }

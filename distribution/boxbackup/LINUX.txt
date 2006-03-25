@@ -11,12 +11,14 @@ Requirements:
 Require zlib and openssl headers for compilation -- may not be included when
 installing the packages. (libssl-dev + libz-dev packages under debian)
 
-Bekerley DB v1 support is required. The configure script should find an
+Bekerley DB v1 or v4 support is required. The configure script should find an
 appropriate db package -- and if not, use an in-memory version of the code.
 However, the in-memory version is not desirable as it will lose information
 over restarts of the daemon.
 
-Ideally, include the readline headers -- libreadline4-dev, probably.
+Ideally, use libeditline as a readline replacement. If not available then use
+GNU readline (libreadline4-dev, probably) and pass --enable-gnu-readline to
+./configure.
 
 
 

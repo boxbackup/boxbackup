@@ -461,10 +461,11 @@ void RaidFileWrite::TransformToRaidStorage()
 						ASSERT(sizeof(RaidFileRead::FileSizeType) == (2*sizeof(unsigned int)));
 						ASSERT(sizeof(RaidFileRead::FileSizeType) >= sizeof(off_t));
 						int sizePos = (blockSize/sizeof(unsigned int)) - 2;
-						RaidFileRead::FileSizeType sw = box_hton64(writeFileStat.st_size);
-						unsigned int *psize = (unsigned int *)(&sw);
-						pparity[sizePos+0] = pstripe1[sizePos+0] ^ psize[0];
-						pparity[sizePos+1] = pstripe1[sizePos+1] ^ psize[1];
+						union { RaidFileRead::FileSizeType l; unsigned int i[2]; } sw;
+
+						sw.l = box_hton64(writeFileStat.st_size);
+						pparity[sizePos+0] = pstripe1[sizePos+0] ^ sw.i[0];
+						pparity[sizePos+1] = pstripe1[sizePos+1] ^ sw.i[1];
 					}
 					else
 					{

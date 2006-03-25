@@ -9,11 +9,14 @@
 
 #include "Box.h"
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string>
 #include <set>
-#include <unistd.h>
 #include <limits.h>
 #include <stdio.h>
 

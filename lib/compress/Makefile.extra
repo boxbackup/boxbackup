@@ -3,5 +3,5 @@ MAKEEXCEPTION = ../../lib/common/makeexception.pl
 
 # AUTOGEN SEEDING
 autogen_CompressException.h autogen_CompressException.cpp:	$(MAKEEXCEPTION) CompressException.txt
-	perl $(MAKEEXCEPTION) CompressException.txt
+	$(PERL) $(MAKEEXCEPTION) CompressException.txt
 

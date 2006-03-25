@@ -10,6 +10,7 @@ dnl HAVE_SYS_MOUNT_H
 dnl HAVE_STRUCT_MNTENT_MNT_DIR
 dnl HAVE_STRUCT_MNTTAB_MNT_MOUNTP
 dnl HAVE_STRUCT_STATFS_F_MNTONNAME
+dnl HAVE_STRUCT_STATVFS_F_MNTONNAME
 dnl Also ACTION-IF-TRUE and ACTION-IF-FALSE are run as appropriate
 dnl
 dnl @category C
@@ -33,6 +34,13 @@ AC_DEFUN([AX_CHECK_MOUNT_POINT], [
     #endif
     #include <sys/mount.h>
     ]])
+  # NetBSD
+  AC_CHECK_MEMBERS([struct statvfs.f_mntonname],,, [[
+    #ifdef HAVE_SYS_PARAM_H
+      #include <sys/param.h>
+    #endif
+    #include <sys/mount.h>
+    ]])
   # Linux
   AC_CHECK_MEMBERS([struct mntent.mnt_dir],,, [[#include <mntent.h>]])
   # Solaris
@@ -41,6 +49,7 @@ AC_DEFUN([AX_CHECK_MOUNT_POINT], [
     #include <sys/mnttab.h>
     ]])
   if test "x$ac_cv_member_struct_statfs_f_mntonname" = "xyes" || \
+     test "x$ac_cv_member_struct_statvfs_f_mntonname" = "xyes" || \
      test "x$ac_cv_member_struct_mntent_mnt_dir" = "xyes" || \
      test "x$ac_cv_member_struct_mnttab_mnt_mountp" = "xyes"
   then

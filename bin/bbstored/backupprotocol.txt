@@ -3,7 +3,7 @@
 #
 
 Name 				Backup
-IdentString			Box-Backup:v=B
+IdentString			Box-Backup:v=C
 ServerContextClass	BackupContext	BackupContext.h
 
 ClientType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
@@ -220,3 +220,10 @@ AccountUsage	41	Reply
 	int64	BlocksSoftLimit
 	int64	BlocksHardLimit
 	int32	BlockSize
+
+GetIsAlive	42	Command(IsAlive)
+	# no data members
+
+IsAlive	43	Reply
+	# no data members
+

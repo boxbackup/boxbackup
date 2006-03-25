@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 use Symbol;
 
@@ -47,7 +47,9 @@ open LICENSE,"$dist_root/LICENSE.txt" or die "Can't open $dist_root/LICENSE.txt"
 my $license_f;
 read LICENSE,$license_f,100000;
 close LICENSE;
-my @license = ('distribution '.$base_name,'',split(/\n/,$license_f));
+my $svnversion = `svnversion .`;
+chomp $svnversion;
+my @license = ('distribution '.$base_name.' (svn version: '.$svnversion.')',split(/\n/,$license_f));
 
 # copy files, make a note of all the modules included
 my %modules_included;
@@ -81,6 +83,15 @@ sub copy_from_list
 		elsif($src eq 'NO-LICENSE')
 		{
 			$no_license{$dst} = 1;
+		}
+		elsif($src eq 'RUN')
+		{
+			print "Running $dst...\n";
+			if(system($dst) != 0)
+			{
+				print "Error running $dst. Aborting.\n";
+				exit(1);
+			}
 		}
 		elsif(-d $src)
 		{

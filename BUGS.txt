@@ -8,3 +8,8 @@ Bugs
 * if bbackupd gets an error then a signal, it may not wait it's full 100 seconds before retrying. And then won't stop the cycle...
 * bbackupquery restore, if not root, then won't do file ownership properly, but won't alert the user to this fact
 * empty (real) directories in the store aren't deleted when they're empty (and will never be used again) -- uses up disc space unnecessarily
+* need unit tests for SSL keepalives and state saving (serialisation)
+* make Archive derive from Protocol
+* more automated tests for win32
+* change off_t to box_off_t in preparation for win32 large file support
+* support large files on win32 by using native *i64 functions instead of posix

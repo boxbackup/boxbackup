@@ -69,7 +69,7 @@ void Random::Generate(void *pOutput, int Length)
 std::string Random::GenerateHex(int Length)
 {
 	uint8_t r[256];
-	if(Length > sizeof(r))
+	if(Length > (int)sizeof(r))
 	{
 		THROW_EXCEPTION(CipherException, LengthRequestedTooLongForRandomHex)
 	}

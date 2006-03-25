@@ -22,6 +22,23 @@ Configure OpenSSL for MinGW compilation, and build and install it:
 	make
 	make install
 
+Download PCRE from 
+[http://prdownloads.sourceforge.net/pcre/pcre-6.3.tar.bz2?download]
+
+Open a Cygwin shell, and unpack PCRE:
+
+	tar xjvf pcre-6.3.tar.bz2
+
+Configure PCRE for MinGW compilation, and build and install it:
+	
+	cd pcre-6.3
+	export CFLAGS="-mno-cygwin"
+	./configure
+	make winshared
+	cp .libs/pcreposix.dll /bin
+	cp .libs/pcreposix.dll.a /usr/i686-pc-mingw32/lib
+	cp pcreposix.h /usr/i686-pc-mingw32/include/regex.h
+
 Now unpack the Box Backup sources, enter the source directory,
 and configure like this:
 

@@ -36,7 +36,7 @@ typedef struct
 	// Then a StreamableMemBlock for attributes
 } dir_StreamFormat;
 
-enum
+typedef enum
 {
 	Option_DependencyInfoPresent = 1
 } dir_StreamFormatOptions;

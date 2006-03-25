@@ -12,14 +12,20 @@
 #include <windows.h>
 #include <fcntl.h>
 // #include <atlenc.h>
-#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
+#endif
 
 #include <string>
 #include <list>
 
-//our implimentation for a timer
-//based on a simple thread which sleeps for a
-//period of time
+// our implementation for a timer, based on a 
+// simple thread which sleeps for a period of time
+
 static bool gFinishTimer;
 static CRITICAL_SECTION gLock;
 
@@ -28,14 +34,14 @@ typedef struct
 	int countDown;
 	int interval;
 }
-tTimer;
+Timer_t;
 
-std::list<tTimer> gTimerList;
+std::list<Timer_t> gTimerList;
 static void (__cdecl *gTimerFunc) (int) = NULL;
 
-int setitimer(int type , struct itimerval *timeout, int)
+int setitimer(int type, struct itimerval *timeout, void *arg)
 {
-	if ( SIGVTALRM == type || ITIMER_VIRTUAL == type )
+	if (ITIMER_VIRTUAL == type)
 	{
 		EnterCriticalSection(&gLock);
 		// we only need seconds for the mo!
@@ -46,7 +52,7 @@ int setitimer(int type , struct itimerval *timeout, int)
 		}
 		else
 		{
-			tTimer ourTimer;
+			Timer_t ourTimer;
 			ourTimer.countDown = timeout->it_value.tv_sec;
 			ourTimer.interval  = timeout->it_interval.tv_sec;
 			gTimerList.push_back(ourTimer);
@@ -64,12 +70,12 @@ static unsigned int WINAPI RunTimer(LPVOID lpParameter)
 
 	while (!gFinishTimer)
 	{
-		std::list<tTimer>::iterator it;
+		std::list<Timer_t>::iterator it;
 		EnterCriticalSection(&gLock);
 
 		for (it = gTimerList.begin(); it != gTimerList.end(); it++)
 		{
-			tTimer& rTimer(*it);
+			Timer_t& rTimer(*it);
 
 			rTimer.countDown --;
 			if (rTimer.countDown == 0)
@@ -92,13 +98,18 @@ static unsigned int WINAPI RunTimer(LPVOID lpParameter)
 
 		for (it = gTimerList.begin(); it != gTimerList.end(); it++)
 		{
-			tTimer& rTimer(*it);
+			Timer_t& rTimer(*it);
 
 			if (rTimer.countDown == -1)
 			{
 				gTimerList.erase(it);
-				//if we don't do this the search is on a corrupt list
+				
+				// the iterator is now invalid, so restart search
 				it = gTimerList.begin();
+
+				// if the list is now empty, don't try to increment 
+				// the iterator again
+				if (it == gTimerList.end()) break;
 			}
 		}
 
@@ -148,7 +159,8 @@ bool EnableBackupRights( void )
 		TOKEN_ADJUST_PRIVILEGES, 
 		&hToken ))
 	{
-		printf( "Cannot open process token - err = %d\n", GetLastError( ) );
+		printf( "Cannot open process token: error %d\n", 
+			(int)GetLastError() );
 		return false;
 	}
 
@@ -159,7 +171,8 @@ bool EnableBackupRights( void )
 		SE_BACKUP_NAME, //the name of the privilege
 		&( token_priv.Privileges[0].Luid )) ) //result
 	{
-		printf( "Cannot lookup backup privilege - err = %d\n", GetLastError( ) );
+		printf( "Cannot lookup backup privilege: error %d\n", 
+			(int)GetLastError( ) );
 		return false;
 	}
 
@@ -179,7 +192,8 @@ bool EnableBackupRights( void )
 		//this function is a little tricky - if we were adjusting
 		//more than one privilege, it could return success but not
 		//adjust them all - in the general case, you need to trap this
-		printf( "Could not enable backup privileges - err = %d\n", GetLastError( ) );
+		printf( "Could not enable backup privileges: error %d\n", 
+			(int)GetLastError( ) );
 		return false;
 
 	}
@@ -192,115 +206,342 @@ bool EnableBackupRights( void )
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    ConvertToWideString
+//		Purpose: Converts a string from specified codepage to 
+//			 a wide string (WCHAR*). Returns a buffer which 
+//			 MUST be freed by the caller with delete[].
+//			 In case of fire, logs the error and returns NULL.
+//		Created: 4th February 2006
+//
+// --------------------------------------------------------------------------
+WCHAR* ConvertToWideString(const char* pString, unsigned int codepage)
+{
+	int len = MultiByteToWideChar
+	(
+		codepage, // source code page
+		0,        // character-type options
+		pString,  // string to map
+		-1,       // number of bytes in string - auto detect
+		NULL,     // wide-character buffer
+		0         // size of buffer - work out 
+		          //   how much space we need
+	);
+
+	if (len == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert string to wide string: "
+			"error %d", GetLastError());
+		errno = EINVAL;
+		return NULL;
+	}
+
+	WCHAR* buffer = new WCHAR[len];
+
+	if (buffer == NULL)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert string to wide string: "
+			"out of memory");
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	len = MultiByteToWideChar
+	(
+		codepage, // source code page
+		0,        // character-type options
+		pString,  // string to map
+		-1,       // number of bytes in string - auto detect
+		buffer,   // wide-character buffer
+		len       // size of buffer
+	);
+
+	if (len == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert string to wide string: "
+			"error %i", GetLastError());
+		errno = EACCES;
+		delete [] buffer;
+		return NULL;
+	}
+
+	return buffer;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ConvertUtf8ToWideString
+//		Purpose: Converts a string from UTF-8 to a wide string.
+//			 Returns a buffer which MUST be freed by the caller 
+//			 with delete[].
+//			 In case of fire, logs the error and returns NULL.
+//		Created: 4th February 2006
+//
+// --------------------------------------------------------------------------
+WCHAR* ConvertUtf8ToWideString(const char* pString)
+{
+	return ConvertToWideString(pString, CP_UTF8);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ConvertFromWideString
+//		Purpose: Converts a wide string to a narrow string in the
+//			 specified code page. Returns a buffer which MUST 
+//			 be freed by the caller with delete[].
+//			 In case of fire, logs the error and returns NULL.
+//		Created: 4th February 2006
+//
+// --------------------------------------------------------------------------
+char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
+{
+	int len = WideCharToMultiByte
+	(
+		codepage, // destination code page
+		0,        // character-type options
+		pString,  // string to map
+		-1,       // number of bytes in string - auto detect
+		NULL,     // output buffer
+		0,        // size of buffer - work out 
+		          //   how much space we need
+		NULL,     // replace unknown chars with system default
+		NULL      // don't tell us when that happened
+	);
+
+	if (len == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert wide string to narrow: "
+			"error %d", GetLastError());
+		errno = EINVAL;
+		return NULL;
+	}
+
+	char* buffer = new char[len];
+
+	if (buffer == NULL)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert wide string to narrow: "
+			"out of memory");
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	len = WideCharToMultiByte
+	(
+		codepage, // source code page
+		0,        // character-type options
+		pString,  // string to map
+		-1,       // number of bytes in string - auto detect
+		buffer,   // output buffer
+		len,      // size of buffer
+		NULL,     // replace unknown chars with system default
+		NULL      // don't tell us when that happened
+	);
+
+	if (len == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert wide string to narrow: "
+			"error %i", GetLastError());
+		errno = EACCES;
+		delete [] buffer;
+		return NULL;
+	}
+
+	return buffer;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ConvertUtf8ToConsole
+//		Purpose: Converts a string from UTF-8 to the console 
+//			 code page. On success, replaces contents of rDest 
+//			 and returns true. In case of fire, logs the error 
+//			 and returns false.
+//		Created: 4th February 2006
+//
+// --------------------------------------------------------------------------
+bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
+{
+	WCHAR* pWide = ConvertToWideString(pString, CP_UTF8);
+	if (pWide == NULL)
+	{
+		return false;
+	}
+
+	char* pConsole = ConvertFromWideString(pWide, GetConsoleOutputCP());
+	delete [] pWide;
+
+	if (!pConsole)
+	{
+		return false;
+	}
+
+	rDest = pConsole;
+	delete [] pConsole;
+
+	return true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ConvertConsoleToUtf8
+//		Purpose: Converts a string from the console code page
+//			 to UTF-8. On success, replaces contents of rDest
+//			 and returns true. In case of fire, logs the error 
+//			 and returns false.
+//		Created: 4th February 2006
+//
+// --------------------------------------------------------------------------
+bool ConvertConsoleToUtf8(const char* pString, std::string& rDest)
+{
+	WCHAR* pWide = ConvertToWideString(pString, GetConsoleCP());
+	if (pWide == NULL)
+	{
+		return false;
+	}
+
+	char* pConsole = ConvertFromWideString(pWide, CP_UTF8);
+	delete [] pWide;
+
+	if (!pConsole)
+	{
+		return false;
+	}
+
+	rDest = pConsole;
+	delete [] pConsole;
+
+	return true;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ConvertPathToAbsoluteUnicode
+//		Purpose: Converts relative paths to absolute (with unicode marker)
+//		Created: 4th February 2006
+//
+// --------------------------------------------------------------------------
+std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
+{
+	std::string tmpStr("\\\\?\\");
+	
+	// Is the path relative or absolute?
+	// Absolute paths on Windows are always a drive letter
+	// followed by ':'
+	
+	if (pFileName[1] != ':')
+	{
+		// Must be relative. We need to get the 
+		// current directory to make it absolute.
+		
+		char wd[PATH_MAX];
+		if (::getcwd(wd, PATH_MAX) == 0)
+		{
+			::syslog(LOG_WARNING, 
+				"Failed to open '%s': path too long", 
+				pFileName);
+			errno = ENAMETOOLONG;
+			tmpStr = "";
+			return tmpStr;
+		}
+		
+		tmpStr += wd;
+		if (tmpStr[tmpStr.length()] != '\\')
+		{
+			tmpStr += '\\';
+		}
+	}
+	
+	tmpStr += pFileName;
+	return tmpStr;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    openfile
 //		Purpose: replacement for any open calls - handles unicode filenames - supplied in utf8
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-HANDLE openfile(const char *filename, int flags, int mode)
+HANDLE openfile(const char *pFileName, int flags, int mode)
 {
-	try{
-
-		wchar_t *buffer;
-		std::string fileN(filename);
-
-		std::string tmpStr("\\\\?\\");
-		//is the path relative or otherwise
-		if ( fileN[1] != ':' )
-		{
-			//we need to get the current directory
-			char wd[PATH_MAX];
-			if(::getcwd(wd, PATH_MAX) == 0)
-			{
-				return NULL;
-			}
-			tmpStr += wd;
-			if (tmpStr[tmpStr.length()] != '\\')
-			{
-				tmpStr += '\\';
-			}
-		}
-		tmpStr += filename;
-
-		int strlen = MultiByteToWideChar(
-			CP_UTF8,               // code page
-			0,                     // character-type options
-			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),       // number of bytes in string
-			NULL,                  // wide-character buffer
-			0                      // size of buffer - work out how much space we need
-			);
-
-		buffer = new wchar_t[strlen+1];
-		if ( buffer == NULL )
-		{
-			return NULL;
-		}
-
-		strlen = MultiByteToWideChar(
-			CP_UTF8,               // code page
-			0,                     // character-type options
-			tmpStr.c_str(),        // string to map
-			(int)tmpStr.length(),       // number of bytes in string
-			buffer,                // wide-character buffer
-			strlen                 // size of buffer
-			);
-
-		if ( strlen == 0 )
-		{
-			delete [] buffer;
-			return NULL;
-		}
-
-		buffer[strlen] = L'\0';
-
-		//flags could be O_WRONLY | O_CREAT | O_RDONLY
-		DWORD createDisposition = OPEN_EXISTING;
-		DWORD shareMode = FILE_SHARE_READ;
-		DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA;
-
-		if ( flags & O_WRONLY )
-		{
-			createDisposition = OPEN_EXISTING;
-			shareMode |= FILE_SHARE_READ ;//| FILE_SHARE_WRITE;
-		}
-		if ( flags & O_CREAT )
-		{
-			createDisposition = OPEN_ALWAYS;
-			shareMode |= FILE_SHARE_READ ;//| FILE_SHARE_WRITE;
-			accessRights |= FILE_WRITE_ATTRIBUTES | FILE_WRITE_DATA | FILE_WRITE_EA | FILE_ALL_ACCESS;
-		}
-		if ( flags & O_TRUNC )
-		{
-			createDisposition = OPEN_ALWAYS;
-		}
-
-		HANDLE hdir = CreateFileW(buffer, 
-			accessRights, 
-			shareMode, 
-			NULL, 
-			createDisposition, 
-			FILE_FLAG_BACKUP_SEMANTICS,
-			NULL);
-
-		if ( hdir == INVALID_HANDLE_VALUE )
-		{
-			// DWORD err = GetLastError();
-			// syslog(EVENTLOG_WARNING_TYPE, "Couldn't open file %s, err %i\n", filename, err);
-			delete [] buffer;
-			return NULL;
-		}
-
-		delete [] buffer;
-		return hdir;
-
-	}
-	catch(...)
+	std::string AbsPathWithUnicode = ConvertPathToAbsoluteUnicode(pFileName);
+	
+	if (AbsPathWithUnicode.size() == 0)
 	{
-		printf("Caught openfile:%s\r\n", filename);
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return NULL;
 	}
-	return NULL;
+	
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
+	// We are responsible for freeing pBuffer
+	
+	if (pBuffer == NULL)
+	{
+		// error already logged by ConvertUtf8ToWideString()
+		return NULL;
+	}
 
+	// flags could be O_WRONLY | O_CREAT | O_RDONLY
+	DWORD createDisposition = OPEN_EXISTING;
+	DWORD shareMode = FILE_SHARE_READ;
+	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA;
+
+	if (flags & O_WRONLY)
+	{
+		shareMode = FILE_SHARE_WRITE;
+	}
+	if (flags & O_RDWR)
+	{
+		shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+	}
+	if (flags & O_CREAT)
+	{
+		createDisposition = OPEN_ALWAYS;
+		shareMode |= FILE_SHARE_WRITE;
+		accessRights |= FILE_WRITE_ATTRIBUTES 
+			| FILE_WRITE_DATA | FILE_WRITE_EA 
+			| FILE_ALL_ACCESS;
+	}
+	if (flags & O_TRUNC)
+	{
+		createDisposition = CREATE_ALWAYS;
+	}
+	if (flags & O_EXCL)
+	{
+		shareMode = 0;
+	}
+
+	HANDLE hdir = CreateFileW(pBuffer, 
+		accessRights, 
+		shareMode, 
+		NULL, 
+		createDisposition, 
+		FILE_FLAG_BACKUP_SEMANTICS,
+		NULL);
+	
+	delete [] pBuffer;
+
+	if (hdir == INVALID_HANDLE_VALUE)
+	{
+		::syslog(LOG_WARNING, "Failed to open file %s: "
+			"error %i", pFileName, GetLastError());
+		return NULL;
+	}
+
+	return hdir;
 }
 
 // MinGW provides a getopt implementation
@@ -315,18 +556,18 @@ char nextchar = -1;
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ourfstat
+//		Name:    emu_fstat
 //		Purpose: replacement for fstat supply a windows handle
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int ourfstat(HANDLE hdir, struct stat * st)
+int emu_fstat(HANDLE hdir, struct stat * st)
 {
 	ULARGE_INTEGER conv;
 
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "Error: invalid file handle in ourfstat()");
+		::syslog(LOG_ERR, "Error: invalid file handle in emu_fstat()");
 		errno = EBADF;
 		return -1;
 	}
@@ -340,10 +581,12 @@ int ourfstat(HANDLE hdir, struct stat * st)
 		return -1;
 	}
 
+	memset(st, 0, sizeof(*st));
+
 	// This next example is how we get our INODE (equivalent) information
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart = fi.nFileIndexLow;
-	st->st_ino = conv.QuadPart;
+	st->st_ino = (_ino_t)conv.QuadPart;
 
 	// get the time information
 	st->st_ctime = ConvertFileTimeToTime_t(&fi.ftCreationTime);
@@ -362,7 +605,7 @@ int ourfstat(HANDLE hdir, struct stat * st)
 
 	conv.HighPart = st_size.HighPart;
 	conv.LowPart = st_size.LowPart;
-	st->st_size = conv.QuadPart;
+	st->st_size = (_off_t)conv.QuadPart;
 
 	//the mode of the file
 	st->st_mode = 0;
@@ -400,76 +643,26 @@ int ourfstat(HANDLE hdir, struct stat * st)
 //		Created: 10th December 2004
 //
 // --------------------------------------------------------------------------
-HANDLE OpenFileByNameUtf8(const char* pName)
+HANDLE OpenFileByNameUtf8(const char* pFileName)
 {
-	//some string thing - required by ms to indicate long/unicode filename
-	std::string tmpStr("\\\\?\\");
-
-	// is the path relative or otherwise
-	std::string fileN(pName);
-	if (fileN[1] != ':')
+	std::string AbsPathWithUnicode = ConvertPathToAbsoluteUnicode(pFileName);
+	
+	if (AbsPathWithUnicode.size() == 0)
 	{
-		// we need to get the current directory
-		char wd[PATH_MAX];
-		if(::getcwd(wd, PATH_MAX) == 0)
-		{
-			::syslog(LOG_WARNING, 
-				"Failed to open '%s': path too long", pName);
-			errno = ENAMETOOLONG;
-			return NULL;
-		}
-
-		tmpStr += wd;
-		if (tmpStr[tmpStr.length()] != '\\')
-		{
-			tmpStr += '\\';
-		}
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return NULL;
 	}
-
-	tmpStr += fileN;
-
-	int strlen = MultiByteToWideChar(
-		CP_UTF8,               // code page
-		0,                     // character-type options
-		tmpStr.c_str(),        // string to map
-		(int)tmpStr.length(),  // number of bytes in string
-		NULL,                  // wide-character buffer
-		0                      // size of buffer - work out 
-		                       //   how much space we need
-		);
-
-	wchar_t* buffer = new wchar_t[strlen+1];
-
-	if (buffer == NULL)
+	
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
+	// We are responsible for freeing pBuffer
+	
+	if (pBuffer == NULL)
 	{
-		::syslog(LOG_WARNING, 
-			"Failed to open '%s': out of memory", pName);
-		errno = ENOMEM;
+		// error already logged by ConvertUtf8ToWideString()
 		return NULL;
 	}
 
-	strlen = MultiByteToWideChar(
-		CP_UTF8,               // code page
-		0,                     // character-type options
-		tmpStr.c_str(),        // string to map
-		(int)tmpStr.length(),  // number of bytes in string
-		buffer,                // wide-character buffer
-		strlen                 // size of buffer
-		);
-
-	if (strlen == 0)
-	{
-		::syslog(LOG_WARNING, 
-			"Failed to open '%s': could not convert "
-			"file name to Unicode", pName);
-		errno = EACCES;
-		delete [] buffer;
-		return NULL;
-	}
-
-	buffer[strlen] = L'\0';
-
-	HANDLE handle = CreateFileW(buffer, 
+	HANDLE handle = CreateFileW(pBuffer, 
 		FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA, 
 		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
 		NULL, 
@@ -483,7 +676,7 @@ HANDLE OpenFileByNameUtf8(const char* pName)
 		// open in this mode - to get the inode information
 		// at least one process must have the file open - 
 		// in this case someone else does.
-		handle = CreateFileW(buffer, 
+		handle = CreateFileW(pBuffer, 
 			0, 
 			FILE_SHARE_READ, 
 			NULL, 
@@ -492,7 +685,7 @@ HANDLE OpenFileByNameUtf8(const char* pName)
 			NULL);
 	}
 
-	delete [] buffer;
+	delete [] pBuffer;
 
 	if (handle == INVALID_HANDLE_VALUE)
 	{
@@ -500,14 +693,12 @@ HANDLE OpenFileByNameUtf8(const char* pName)
 
 		if (err == ERROR_FILE_NOT_FOUND)
 		{
-			::syslog(LOG_WARNING, 
-				"Failed to open '%s': file not found", pName);
 			errno = ENOENT;
 		}
 		else
 		{
 			::syslog(LOG_WARNING, 
-				"Failed to open '%s': error %d", pName);
+				"Failed to open '%s': error %d", pFileName, err);
 			errno = EACCES;
 		}
 
@@ -520,13 +711,13 @@ HANDLE OpenFileByNameUtf8(const char* pName)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ourstat 
+//		Name:    emu_stat 
 //		Purpose: replacement for the lstat and stat functions, 
 //			works with unicode filenames supplied in utf8 format
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int ourstat(const char * pName, struct stat * st)
+int emu_stat(const char * pName, struct stat * st)
 {
 	// at the mo
 	st->st_uid = 0;
@@ -541,7 +732,7 @@ int ourstat(const char * pName, struct stat * st)
 		return -1;
 	}
 
-	int retVal = ourfstat(handle, st);
+	int retVal = emu_fstat(handle, st);
 	if (retVal != 0)
 	{
 		// error logged, but without filename
@@ -595,14 +786,6 @@ int statfs(const char * pName, struct statfs * s)
 	return 0;
 }
 
-
-
-
-
-// MinGW provides opendir(), etc. via <dirent.h>
-// MSVC does not provide these, so emulation is needed
-
-#ifndef __MINGW32__
 // --------------------------------------------------------------------------
 //
 // Function
@@ -613,110 +796,56 @@ int statfs(const char * pName, struct statfs * s)
 // --------------------------------------------------------------------------
 DIR *opendir(const char *name)
 {
-	try
+	if (!name || !name[0])
 	{
-		DIR *dir = 0;
-		std::string dirName(name);
-
-		//append a '\' win32 findfirst is sensitive to this
-		if ( dirName[dirName.size()] != '\\' || dirName[dirName.size()] != '/' )
-		{
-			dirName += '\\';
-		}
-
-		//what is the search string? - everything
-		dirName += '*';
-
-		if(name && name[0])
-		{
-			if ( ( dir = new DIR ) != 0 )
-			{
-				//mbstowcs(dir->name, dirName.c_str(),100);
-				//wcscpy((wchar_t*)dir->name, (const wchar_t*)dirName.c_str());
-				//mbstowcs(dir->name, dirName.c_str(), dirName.size()+1);
-				//wchar_t *buffer;
-
-				int strlen = MultiByteToWideChar(
-					CP_UTF8,               // code page
-					0,                     // character-type options
-					dirName.c_str(),       // string to map
-					(int)dirName.length(), // number of bytes in string
-					NULL,                  // wide-character buffer
-					0                      // size of buffer - work out how much space we need
-					);
-
-				dir->name = new wchar_t[strlen+1];
-
-				if (dir->name == NULL)
-				{
-					delete dir;
-					dir   = 0;
-					errno = ENOMEM;
-					return NULL;
-				}
-
-				strlen = MultiByteToWideChar(
-					CP_UTF8,               // code page
-					0,                     // character-type options
-					dirName.c_str(),        // string to map
-					(int)dirName.length(),       // number of bytes in string
-					dir->name,                // wide-character buffer
-					strlen                 // size of buffer
-					);
-
-				if (strlen == 0)
-				{
-					delete dir->name;
-					delete dir;
-					dir   = 0;
-					errno = ENOMEM;
-					return NULL;
-				}
-
-				dir->name[strlen] = L'\0';
-
-				
-				dir->fd = _wfindfirst(
-					(const wchar_t*)dir->name,
-					&dir->info);
-
-				if (dir->fd != -1)
-				{
-					dir->result.d_name = 0;
-				}
-				else // go back
-				{
-					delete [] dir->name;
-					delete dir;
-					dir = 0;
-				}
-			}
-			else // backwards again
-			{
-				delete dir;
-				dir   = 0;
-				errno = ENOMEM;
-			}
-		}
-		else
-		{
-			errno = EINVAL;
-		}
-
-		return dir;
-
+		errno = EINVAL;
+		return NULL;
 	}
-	catch(...)
+	
+	std::string dirName(name);
+
+	//append a '\' win32 findfirst is sensitive to this
+	if ( dirName[dirName.size()] != '\\' || dirName[dirName.size()] != '/' )
 	{
-		printf("Caught opendir");
+		dirName += '\\';
 	}
 
-	return NULL;
+	// what is the search string? - everything
+	dirName += '*';
+
+	DIR *pDir = new DIR;
+	if (pDir == NULL)
+	{
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	pDir->name = ConvertUtf8ToWideString(dirName.c_str());
+	// We are responsible for freeing dir->name
+	
+	if (pDir->name == NULL)
+	{
+		delete pDir;
+		return NULL;
+	}
+
+	pDir->fd = _wfindfirst((const wchar_t*)pDir->name, &(pDir->info));
+
+	if (pDir->fd == -1)
+	{
+		delete [] pDir->name;
+		delete pDir;
+		return NULL;
+	}
+		
+	pDir->result.d_name = 0;
+	return pDir;
 }
 
-//this kinda makes it not thread friendly!
-//but I don't think it needs to be.
+// this kinda makes it not thread friendly!
+// but I don't think it needs to be.
 char tempbuff[MAX_PATH];
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -796,7 +925,6 @@ int closedir(DIR *dp)
 	}
 	return -1;
 }
-#endif // !__MINGW32__
 
 // --------------------------------------------------------------------------
 //
@@ -875,11 +1003,12 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 }
 
 HANDLE gSyslogH = 0;
+static bool sHaveWarnedEventLogFull = false;
 
 void syslog(int loglevel, const char *frmt, ...)
 {
-	DWORD errinfo;
-	char* buffer;
+	WORD errinfo;
+	char buffer[1024];
 	std::string sixfour(frmt);
 
 	switch (loglevel)
@@ -898,81 +1027,203 @@ void syslog(int loglevel, const char *frmt, ...)
 		break;
 	}
 
-
-	//taken from MSDN
-	try
+	// taken from MSDN
+	int sixfourpos;
+	while ( (sixfourpos = (int)sixfour.find("%ll")) != -1 )
 	{
+		// maintain portability - change the 64 bit formater...
+		std::string temp = sixfour.substr(0,sixfourpos);
+		temp += "%I64";
+		temp += sixfour.substr(sixfourpos+3, sixfour.length());
+		sixfour = temp;
+	}
 
+	// printf("parsed string is:%s\r\n", sixfour.c_str());
 
-		int sixfourpos;
-		while ( ( sixfourpos = sixfour.find("%ll")) != -1 )
+	va_list args;
+	va_start(args, frmt);
+
+	int len = vsnprintf(buffer, sizeof(buffer)-1, sixfour.c_str(), args);
+	ASSERT(len < sizeof(buffer))
+	buffer[sizeof(buffer)-1] = 0;
+
+	va_end(args);
+
+	LPCSTR strings[] = { buffer, NULL };
+
+	if (!ReportEvent(gSyslogH, // event log handle 
+		errinfo,               // event type 
+		0,                     // category zero 
+		MSG_ERR_EXIST,	       // event identifier - 
+		                       // we will call them all the same
+		NULL,                  // no user security identifier 
+		1,                     // one substitution string 
+		0,                     // no data 
+		strings,               // pointer to string array 
+		NULL))                 // pointer to data 
+
+	{
+		DWORD err = GetLastError();
+		if (err == ERROR_LOG_FILE_FULL)
 		{
-			//maintain portability - change the 64 bit formater...
-			std::string temp = sixfour.substr(0,sixfourpos);
-			temp += "%I64";
-			temp += sixfour.substr(sixfourpos+3, sixfour.length());
-			sixfour = temp;
+			if (!sHaveWarnedEventLogFull)
+			{
+				printf("Unable to send message to Event Log "
+					"(Event Log is full):\r\n");
+				sHaveWarnedEventLogFull = TRUE;
+			}
 		}
-
-		//printf("parsed string is:%s\r\n", sixfour.c_str());
-
-		va_list args;
-		va_start(args, frmt);
-
-#ifdef __MINGW32__
-		// no _vscprintf, use a fixed size buffer
-		buffer = new char[1024];
-		int len = 1023;
-#else
-		int len = _vscprintf( sixfour.c_str(), args );
-		ASSERT(len > 0)
-
-		len = len + 1;
-		char* buffer = new char[len];
-#endif
-
-		ASSERT(buffer)
-		memset(buffer, 0, len);
-
-		int len2 = vsnprintf(buffer, len, sixfour.c_str(), args);
-		ASSERT(len2 <= len);
-
-		va_end(args);
-	}
-	catch (...)
-	{
-		printf("Caught syslog: %s", sixfour.c_str());
-		return;
-	}
-
-	try
-	{
-
-		if (!ReportEvent(gSyslogH,    // event log handle 
-			errinfo,              // event type 
-			0,                    // category zero 
-			MSG_ERR_EXIST,	      // event identifier - 
-			                      // we will call them all the same
-			NULL,                 // no user security identifier 
-			1,                    // one substitution string 
-			0,                    // no data 
-			(LPCSTR*)&buffer,     // pointer to string array 
-			NULL))                // pointer to data 
-
+		else
 		{
-			DWORD err = GetLastError();
-			printf("Unable to send message to Event Log "
-				"(error %i):\r\n", err);
+			printf("Unable to send message to Event Log: "
+				"error %i:\r\n", (int)err);
 		}
-
-		printf("%s\r\n", buffer);
-
-		if (buffer) delete [] buffer;
 	}
-	catch (...)
+	else
 	{
-		printf("Caught syslog ReportEvent");
+		sHaveWarnedEventLogFull = false;
 	}
+
+	printf("%s\r\n", buffer);
+}
+
+int emu_chdir(const char* pDirName)
+{
+	WCHAR* pBuffer = ConvertUtf8ToWideString(pDirName);
+	if (!pBuffer) return -1;
+	int result = SetCurrentDirectoryW(pBuffer);
+	delete [] pBuffer;
+	if (result != 0) return 0;
+	errno = EACCES;
+	return -1;
+}
+
+char* emu_getcwd(char* pBuffer, int BufSize)
+{
+	DWORD len = GetCurrentDirectoryW(0, NULL);
+	if (len == 0)
+	{
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if (len > BufSize)
+	{
+		errno = ENAMETOOLONG;
+		return NULL;
+	}
+
+	WCHAR* pWide = new WCHAR [len];
+	if (!pWide)
+	{
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	DWORD result = GetCurrentDirectoryW(len, pWide);
+	if (result <= 0 || result >= len)
+	{
+		errno = EACCES;
+		return NULL;
+	}
+
+	char* pUtf8 = ConvertFromWideString(pWide, CP_UTF8);
+	delete [] pWide;
+
+	if (!pUtf8)
+	{
+		return NULL;
+	}
+
+	strncpy(pBuffer, pUtf8, BufSize - 1);
+	pBuffer[BufSize - 1] = 0;
+	delete [] pUtf8;
+
+	return pBuffer;
+}
+
+int emu_mkdir(const char* pPathName)
+{
+	WCHAR* pBuffer = ConvertToWideString(pPathName, CP_UTF8);
+	if (!pBuffer)
+	{
+		return -1;
+	}
+
+	BOOL result = CreateDirectoryW(pBuffer, NULL);
+	delete [] pBuffer;
+
+	if (!result)
+	{
+		errno = EACCES;
+		return -1;
+	}
+
+	return 0;
+}
+
+int emu_unlink(const char* pFileName)
+{
+	WCHAR* pBuffer = ConvertToWideString(pFileName, CP_UTF8);
+	if (!pBuffer)
+	{
+		return -1;
+	}
+
+	BOOL result = DeleteFileW(pBuffer);
+	delete [] pBuffer;
+
+	if (!result)
+	{
+		errno = EACCES;
+		return -1;
+	}
+
+	return 0;
+}
+
+int console_read(char* pBuffer, size_t BufferSize)
+{
+	HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
+
+	if (hConsole == INVALID_HANDLE_VALUE)
+	{
+		::fprintf(stderr, "Failed to get a handle on standard input: "
+			"error %d\n", GetLastError());
+		return -1;
+	}
+
+	int WideSize = BufferSize / 5;
+	WCHAR* pWideBuffer = new WCHAR [WideSize];
+
+	if (!pWideBuffer)
+	{
+		::perror("Failed to allocate wide character buffer");
+		return -1;
+	}
+
+	DWORD numCharsRead = 0;
+
+	if (!ReadConsoleW(
+			hConsole,
+			pWideBuffer,
+			WideSize - 1,
+			&numCharsRead,
+			NULL // reserved
+		)) 
+	{
+		::fprintf(stderr, "Failed to read from console: error %d\n",
+			GetLastError());
+		return -1;
+	}
+
+	pWideBuffer[numCharsRead] = 0;
+
+	char* pUtf8 = ConvertFromWideString(pWideBuffer, GetConsoleCP());
+	strncpy(pBuffer, pUtf8, BufferSize);
+	delete [] pUtf8;
+
+	return strlen(pBuffer);
 }
 
 #endif // WIN32

@@ -10,12 +10,21 @@
 #include "Box.h"
 
 #include <stdio.h>
-#include <unistd.h>
+#include <string.h>
 
-#ifndef WIN32
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+#ifdef HAVE_SIGNAL_H
 	#include <signal.h>
+#endif
+#ifdef HAVE_SYSLOG_H
 	#include <syslog.h>
+#endif
+#ifdef HAVE_SYS_PARAM_H
 	#include <sys/param.h>
+#endif
+#ifdef HAVE_SYS_WAIT_H
 	#include <sys/wait.h>
 #endif
 #ifdef HAVE_SYS_MOUNT_H
@@ -27,6 +36,9 @@
 #ifdef HAVE_SYS_MNTTAB_H
 	#include <cstdio>
 	#include <sys/mnttab.h>
+#endif
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
 #endif
 
 #include "Configuration.h"
@@ -61,6 +73,7 @@
 #include "LocalProcessStream.h"
 #include "IOStreamGetLine.h"
 #include "Conversion.h"
+#include "Archive.h"
 
 #include "MemLeakFindOn.h"
 
@@ -69,6 +82,25 @@ static const time_t MAX_SLEEP_TIME = 1024;
 // Make the actual sync period have a little bit of extra time, up to a 64th of the main sync period.
 // This prevents repetative cycles of load on the server
 #define		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY	6
+
+#ifdef WIN32
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HelperThread()
+//		Purpose: Background thread function, called by Windows,
+//			calls the BackupDaemon's RunHelperThread method
+//			to listen for and act on control communications
+//		Created: 18/2/04
+//
+// --------------------------------------------------------------------------
+unsigned int WINAPI HelperThread(LPVOID lpParam) 
+{ 
+	((BackupDaemon *)lpParam)->RunHelperThread();
+
+	return 0;
+}
+#endif
 
 // --------------------------------------------------------------------------
 //
@@ -91,6 +123,20 @@ BackupDaemon::BackupDaemon()
 	{
 		mNotificationsSent[l] = false;
 	}
+
+#ifdef WIN32
+	// Create a thread to handle the named pipe
+	HANDLE hThread;
+	unsigned int dwThreadId;
+
+	hThread = (HANDLE) _beginthreadex( 
+        	NULL,                        // default security attributes 
+        	0,                           // use default stack size  
+        	HelperThread,                // thread function 
+        	this,                        // argument to thread function 
+        	0,                           // use default creation flags 
+        	&dwThreadId);                // returns the thread identifier 
+#endif
 }
 
 // --------------------------------------------------------------------------
@@ -177,11 +223,12 @@ void BackupDaemon::SetupInInitialProcess()
 	if(GetConfiguration().KeyExists("CommandSocket"))
 	{
 		printf(
-				"============================================================================================\n" \
-				"SECURITY WARNING: This platform cannot check the credentials of connections to the\n" \
-				"command socket. This is a potential DoS security problem.\n" \
-				"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl is not used.\n" \
-				"============================================================================================\n"
+				"==============================================================================\n"
+				"SECURITY WARNING: This platform cannot check the credentials of connections to\n"
+				"the command socket. This is a potential DoS security problem.\n"
+				"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl\n"
+				"is not used.\n"
+				"==============================================================================\n"
 			);
 	}
 }
@@ -213,30 +260,13 @@ void BackupDaemon::DeleteAllLocations()
 }
 
 #ifdef WIN32
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HelperThread()
-//		Purpose: Background thread function, called by Windows,
-//			calls the BackupDaemon's RunHelperThread method
-//			to listen for and act on control communications
-//		Created: 18/2/04
-//
-// --------------------------------------------------------------------------
-unsigned int cdecl HelperThread( LPVOID lpParam ) 
-{ 
-	printf( "Parameter = %lu.\n", *(DWORD*)lpParam ); 
-	((BackupDaemon *)lpParam)->RunHelperThread();
-
-	return 0;
-}
-
 void BackupDaemon::RunHelperThread(void)
 {
 	mpCommandSocketInfo = new CommandSocketInfo;
 	this->mReceivedCommandConn = false;
 
-	while ( !IsTerminateWanted() )
+	// loop until the parent process exits
+	while (TRUE)
 	{
 		try
 		{
@@ -349,24 +379,21 @@ void BackupDaemon::RunHelperThread(void)
 void BackupDaemon::Run()
 {
 #ifdef WIN32
-
-	// Create a thread to handle the named pipe
-	HANDLE hThread;
-	unsigned int dwThreadId;
-
-	hThread = (HANDLE) _beginthreadex( 
-        	NULL,                        // default security attributes 
-        	0,                           // use default stack size  
-        	HelperThread,                // thread function 
-        	this,                        // argument to thread function 
-        	0,                           // use default creation flags 
-        	&dwThreadId);                // returns the thread identifier 
-
 	// init our own timer for file diff timeouts
 	InitTimer();
 
-#else // ! WIN32
+	try
+	{
+		Run2();
+	}
+	catch(...)
+	{
+		FiniTimer();
+		throw;
+	}
 
+	FiniTimer();
+#else // ! WIN32
 	// Ignore SIGPIPE (so that if a command connection is broken, the daemon doesn't terminate)
 	::signal(SIGPIPE, SIG_IGN);
 
@@ -378,8 +405,6 @@ void BackupDaemon::Run()
 		const char *socketName = conf.GetKeyValue("CommandSocket").c_str();
 		mpCommandSocketInfo = new CommandSocketManager(conf, this, socketName);
 	}
-	
-#endif // WIN32
 
 	// Handle things nicely on exceptions
 	try
@@ -390,23 +415,28 @@ void BackupDaemon::Run()
 	{
 		if(mpCommandSocketInfo != 0)
 		{
-			delete mpCommandSocketInfo;
+			try 
+			{
+				delete mpCommandSocketInfo;
+			}
+			catch(...)
+			{
+				::syslog(LOG_WARNING,
+					"Error closing command socket "
+					"after exception, ignored.");
+			}
 			mpCommandSocketInfo = 0;
 		}
 
 		throw;
 	}
-	
+
 	// Clean up
 	if(mpCommandSocketInfo != 0)
 	{
 		delete mpCommandSocketInfo;
 		mpCommandSocketInfo = 0;
 	}
-
-#ifdef WIN32
-	// clean up windows specific stuff.
-	FiniTimer();
 #endif
 }
 
@@ -432,10 +462,14 @@ void BackupDaemon::Run2()
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
-	// Set maximum diffing time?
+	// max diffing time, keep-alive time
 	if(conf.KeyExists("MaximumDiffingTime"))
 	{
-		BackupStoreFile::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+		BackupClientContext::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+	}
+	if(conf.KeyExists("KeepAliveTime"))
+	{
+		BackupClientContext::SetKeepAliveTime(conf.GetKeyValueInt("KeepAliveTime"));
 	}
 
 	// Setup various timings
@@ -460,10 +494,18 @@ void BackupDaemon::Run2()
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	box_time_t lastSyncTime = 0;
 
+ 	// --------------------------------------------------------------------------------------------
+ 
+	// And what's the current client store marker?
+	int64_t clientStoreMarker = 
+		BackupClientContext::ClientStoreMarker_NotKnown;
+	// haven't contacted the store yet
+
+ 	bool deserialised = DeserializeStoreObjectInfo(clientStoreMarker, 
+		lastSyncTime, nextSyncTime);
+ 
 	// --------------------------------------------------------------------------------------------
 	
-	// And what's the current client store marker?
-	int64_t clientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;		// haven't contacted the store yet
 
 	// Set state
 	SetState(State_Idle);
@@ -529,6 +571,7 @@ void BackupDaemon::Run2()
 			{
 				// Script has asked for a delay
 				nextSyncTime = GetCurrentBoxTime() + SecondsToBoxTime(d);
+				doSync = false;
 			}
 			else
 			{
@@ -569,6 +612,20 @@ void BackupDaemon::Run2()
 				// Of course, they may be eligable to be synced again the next time round,
 				// but this should be OK, because the changes only upload should upload no data.
 				syncPeriodEndExtended += SecondsToBoxTime((time_t)(356*24*3600));
+			}
+
+			// Delete the serialised store object file,
+			// so that we don't try to reload it after a
+			// partially completed backup
+			if(deserialised && !DeleteStoreObjectInfo())
+			{
+				::syslog(LOG_ERR, "Failed to delete the "
+					"StoreObjectInfoFile, backup cannot "
+					"continue safely.");
+				// prevent runaway process where the logs fill up -- without this
+				// the log message will be emitted in a tight loop.
+				::sleep(60); 
+				continue;
 			}
 			
 			// Do sync
@@ -677,6 +734,13 @@ void BackupDaemon::Run2()
 
 				// Log
 				::syslog(LOG_INFO, "Finished scan of local files");
+
+				// --------------------------------------------------------------------------------------------
+
+				// We had a successful backup, save the store info
+				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+
+				// --------------------------------------------------------------------------------------------
 			}
 			catch(BoxException &e)
 			{
@@ -747,6 +811,11 @@ void BackupDaemon::Run2()
 						// normal sleep
  						::sleep(100);
  					}
+					nextSyncTime = currentSyncStartTime + 
+						SecondsToBoxTime(90) +
+						Random::RandomInt(
+							updateStoreInterval >> 
+							SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 				}
 			}
 
@@ -843,7 +912,7 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 }
 
 
-#ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
+#if !defined(HAVE_STRUCT_STATFS_F_MNTONNAME) && !defined(HAVE_STRUCT_STATVFS_F_NMTONNAME)
 	// string comparison ordering for when mount points are handled
 	// by code, rather than the OS.
 	typedef struct
@@ -907,7 +976,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	int numIDMaps = 0;
 
 #ifdef HAVE_MOUNTS
-#ifndef HAVE_STRUCT_STATFS_F_MNTONNAME
+#if !defined(HAVE_STRUCT_STATFS_F_MNTONNAME) && !defined(HAVE_STRUCT_STATVFS_F_MNTONNAME)
 	// Linux and others can't tell you where a directory is mounted. So we
 	// have to read the mount entries from /etc/mtab! Bizarre that the OS
 	// itself can't tell you, but there you go.
@@ -981,7 +1050,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		ASSERT(*i == "/");
 	}
 #endif // n NDEBUG
-#endif // n HAVE_STRUCT_STATFS_F_MNTONNAME
+#endif // n HAVE_STRUCT_STATFS_F_MNTONNAME || n HAVE_STRUCT_STATVFS_F_MNTONNAME
 #endif // HAVE_MOUNTS
 
 	// Then... go through each of the entries in the configuration,
@@ -1005,11 +1074,16 @@ TRACE0("new location\n");
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
 
-#if defined HAVE_STRUCT_STATFS_F_MNTONNAME || defined WIN32
+#if defined HAVE_STRUCT_STATFS_F_MNTONNAME || defined HAVE_STRUCT_STATVFS_F_MNTONNAME || defined WIN32
 
 				// BSD style statfs -- includes mount point, which is nice.
+#ifdef HAVE_STRUCT_STATVFS_F_MNTONNAME
+				struct statvfs s;
+				if(::statvfs(ploc->mPath.c_str(), &s) != 0)
+#else // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				struct statfs s;
 				if(::statfs(ploc->mPath.c_str(), &s) != 0)
+#endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
 					THROW_EXCEPTION(CommonException, OSFileError)
 				}
@@ -1538,6 +1612,18 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 	mUnusedRootDirEntries.clear();
 }
 
+// --------------------------------------------------------------------------
+
+typedef struct
+{
+	int32_t mMagicValue;	// also the version number
+	int32_t mNumEntries;
+	int64_t mObjectID;		// this object ID
+	int64_t mContainerID;	// ID of container
+	uint64_t mAttributesModTime;
+	int32_t mOptionsPresent;	// bit mask of optional sections / features present
+
+} loc_StreamFormat;
 
 // --------------------------------------------------------------------------
 //
@@ -1575,4 +1661,462 @@ BackupDaemon::Location::~Location()
 		delete mpExcludeFiles;
 		mpExcludeFiles = 0;
 	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::Location::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::Location::Deserialize(Archive &rArchive)
+{
+	//
+	//
+	//
+	mpDirectoryRecord.reset(NULL);
+	if (mpExcludeFiles)
+	{
+		delete mpExcludeFiles;
+		mpExcludeFiles = NULL;
+	}
+	if (mpExcludeDirs)
+	{
+		delete mpExcludeDirs;
+		mpExcludeDirs = NULL;
+	}
+
+	//
+	//
+	//
+	rArchive.Read(mName);
+	rArchive.Read(mPath);
+	rArchive.Read(mIDMapIndex);
+
+	//
+	//
+	//
+	int64_t aMagicMarker = 0;
+	rArchive.Read(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		BackupClientDirectoryRecord *pSubRecord = new BackupClientDirectoryRecord(0, "");
+		if (!pSubRecord)
+			throw std::bad_alloc();
+
+		mpDirectoryRecord.reset(pSubRecord);
+		mpDirectoryRecord->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	//
+	//
+	//
+	rArchive.Read(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeFiles = new ExcludeList;
+		if (!mpExcludeFiles)
+			throw std::bad_alloc();
+
+		mpExcludeFiles->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	//
+	//
+	//
+	rArchive.Read(aMagicMarker);
+
+	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeDirs = new ExcludeList;
+		if (!mpExcludeDirs)
+			throw std::bad_alloc();
+
+		mpExcludeDirs->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::Location::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void BackupDaemon::Location::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	rArchive.Write(mName);
+	rArchive.Write(mPath);
+	rArchive.Write(mIDMapIndex);
+
+	//
+	//
+	//
+	if (mpDirectoryRecord.get() == NULL)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpDirectoryRecord->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if (!mpExcludeFiles)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpExcludeFiles->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if (!mpExcludeDirs)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpExcludeDirs->Serialize(rArchive);
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime)
+//		Purpose: Serializes remote directory and file information into a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+
+static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
+static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
+static const int STOREOBJECTINFO_VERSION = 1;
+
+void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
+{
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
+	{
+		return;
+	}
+
+	std::string StoreObjectInfoFile = 
+		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
+
+	if (StoreObjectInfoFile.size() <= 0)
+	{
+		return;
+	}
+
+	try
+	{
+		FileStream aFile(StoreObjectInfoFile.c_str(), 
+			O_WRONLY | O_CREAT | O_TRUNC);
+		Archive anArchive(aFile, 0);
+
+		anArchive.Write(STOREOBJECTINFO_MAGIC_ID_VALUE);
+		anArchive.Write(STOREOBJECTINFO_MAGIC_ID_STRING); 
+		anArchive.Write(STOREOBJECTINFO_VERSION);
+		anArchive.Write(GetLoadedConfigModifiedTime());
+		anArchive.Write(aClientStoreMarker);
+		anArchive.Write(theLastSyncTime);
+		anArchive.Write(theNextSyncTime);
+
+		//
+		//
+		//
+		int64_t iCount = mLocations.size();
+		anArchive.Write(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			ASSERT(mLocations[v]);
+			mLocations[v]->Serialize(anArchive);
+		}
+
+		//
+		//
+		//
+		iCount = mIDMapMounts.size();
+		anArchive.Write(iCount);
+
+		for (int v = 0; v < iCount; v++)
+			anArchive.Write(mIDMapMounts[v]);
+
+		//
+		//
+		//
+		aFile.Close();
+		::syslog(LOG_INFO, "Saved store object info file '%s'", 
+			StoreObjectInfoFile.c_str());
+	}
+	catch (...)
+	{
+		::syslog(LOG_WARNING, "Requested store object info file '%s' "
+			"not accessible or could not be created", 
+			StoreObjectInfoFile.c_str());
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+//		Purpose: Deserializes remote directory and file information from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_time_t & theLastSyncTime, box_time_t & theNextSyncTime)
+{
+	//
+	//
+	//
+	DeleteAllLocations();
+
+	//
+	//
+	//
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
+	{
+		return false;
+	}
+
+	std::string StoreObjectInfoFile = 
+		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
+
+	if (StoreObjectInfoFile.size() <= 0)
+	{
+		return false;
+	}
+
+	try
+	{
+		FileStream aFile(StoreObjectInfoFile.c_str(), O_RDONLY);
+		Archive anArchive(aFile, 0);
+
+		//
+		// see if the content looks like a valid serialised archive
+		//
+		int iMagicValue = 0;
+		anArchive.Read(iMagicValue);
+
+		if (iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' "
+				"is not a valid or compatible serialised "
+				"archive. Will re-cache from store.", 
+				StoreObjectInfoFile.c_str());
+			return false;
+		}
+
+		//
+		// get a bit optimistic and read in a string identifier
+		//
+		std::string strMagicValue;
+		anArchive.Read(strMagicValue);
+
+		if (strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' "
+				"is not a valid or compatible serialised "
+				"archive. Will re-cache from store.", 
+				StoreObjectInfoFile.c_str());
+			return false;
+		}
+
+		//
+		// check if we are loading some future format
+		// version by mistake
+		//
+		int iVersion = 0;
+		anArchive.Read(iVersion);
+
+		if (iVersion != STOREOBJECTINFO_VERSION)
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' "
+				"version %d unsupported. "
+				"Will re-cache from store.", 
+				StoreObjectInfoFile.c_str(), 
+				iVersion);
+			return false;
+		}
+
+		//
+		// check if this state file is even valid 
+		// for the loaded bbackupd.conf file
+		//
+		box_time_t lastKnownConfigModTime;
+		anArchive.Read(lastKnownConfigModTime);
+
+		if (lastKnownConfigModTime != GetLoadedConfigModifiedTime())
+		{
+			::syslog(LOG_WARNING, "Store object info file '%s' "
+				"out of date. Will re-cache from store", 
+				StoreObjectInfoFile.c_str());
+			return false;
+		}
+
+		//
+		// this is it, go at it
+		//
+		anArchive.Read(aClientStoreMarker);
+		anArchive.Read(theLastSyncTime);
+		anArchive.Read(theNextSyncTime);
+
+		//
+		//
+		//
+		int64_t iCount = 0;
+		anArchive.Read(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			Location* pLocation = new Location;
+			if (!pLocation)
+				throw std::bad_alloc();
+
+			pLocation->Deserialize(anArchive);
+			mLocations.push_back(pLocation);
+		}
+
+		//
+		//
+		//
+		iCount = 0;
+		anArchive.Read(iCount);
+
+		for (int v = 0; v < iCount; v++)
+		{
+			std::string strItem;
+			anArchive.Read(strItem);
+
+			mIDMapMounts.push_back(strItem);
+		}
+
+		//
+		//
+		//
+		aFile.Close();
+		::syslog(LOG_INFO, "Loaded store object info file '%s', "
+			"version [%d]", StoreObjectInfoFile.c_str(), 
+			iVersion);
+
+		return true;
+	}
+	catch (...)
+	{
+		DeleteAllLocations();
+
+		aClientStoreMarker = 
+			BackupClientContext::ClientStoreMarker_NotKnown;
+		theLastSyncTime = 0;
+		theNextSyncTime = 0;
+
+		::syslog(LOG_WARNING, "Requested store object info file '%s' "
+			"does not exist, not accessible, or inconsistent. "
+			"Will re-cache from store.", 
+			StoreObjectInfoFile.c_str());
+	}
+
+	return false;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::DeleteStoreObjectInfo()
+//		Purpose: Deletes the serialised state file, to prevent us
+//			 from using it again if a backup is interrupted.
+//
+//		Created: 2006/02/12
+//
+// --------------------------------------------------------------------------
+
+bool BackupDaemon::DeleteStoreObjectInfo() const
+{
+	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
+	{
+		return false;
+	}
+
+	std::string storeObjectInfoFile(GetConfiguration().GetKeyValue("StoreObjectInfoFile"));
+
+	// Check to see if the file exists
+	if(!FileExists(storeObjectInfoFile.c_str()))
+	{
+		// File doesn't exist -- so can't be deleted. But something isn't quite right, so log a message
+		::syslog(LOG_ERR, "Expected to be able to delete "
+			"store object info file '%s', but the file did not exist.",
+			storeObjectInfoFile.c_str());
+		// Return true to stop things going around in a loop
+		return true;
+	}
+
+	// Actually delete it
+	if(::unlink(storeObjectInfoFile.c_str()) != 0)
+	{
+		::syslog(LOG_ERR, "Failed to delete the old "
+			"store object info file '%s': %s",
+			storeObjectInfoFile.c_str(), strerror(errno));
+		return false;
+	}
+
+	return true;
 }

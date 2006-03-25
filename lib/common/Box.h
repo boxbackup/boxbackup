@@ -10,6 +10,10 @@
 #ifndef BOX__H
 #define BOX__H
 
+#if defined BOXI && !defined _SAND_BOX_H
+	#error Include SandBox.h before Box.h when building Boxi!
+#endif
+
 // Use the same changes as gcc3 for gcc4
 #ifdef PLATFORM_GCC4
 	#define PLATFORM_GCC3
@@ -134,6 +138,16 @@ inline uint64_t box_swap64(uint64_t x)
 #ifdef WORDS_BIGENDIAN
 	#define box_hton64(x) (x)
 	#define box_ntoh64(x) (x)
+#elif defined(HAVE_BSWAP64)
+	#ifdef HAVE_SYS_ENDIAN_H
+		#include <sys/endian.h>
+	#endif
+	#ifdef HAVE_ASM_BYTEORDER_H
+		#include <asm/byteorder.h>
+	#endif
+
+	#define box_hton64(x) BSWAP64(x)
+	#define box_ntoh64(x) BSWAP64(x)
 #else
 	#ifdef HAVE_SYS_ENDIAN_H
 		#include <sys/endian.h>
