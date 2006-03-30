@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
-"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+<!ENTITY __ExceptionCodes__elfjz3fu SYSTEM "ExceptionCodes.xml">
+]>
 <book>
   <title>Box Backup administrator's guide</title>
 
   <preface>
     <title>License</title>
 
-    <para>Copyright (c) &lt;YEAR&gt;, &lt;OWNER&gt;</para>
-
-    <para>All rights reserved.</para>
+    <para>Copyright © 2003 - 2006, Ben Summers and contributors. All rights
+    reserved.</para>
 
     <para>Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are
@@ -29,9 +30,9 @@
       </listitem>
 
       <listitem>
-        <para>Neither the name of the &lt;ORGANIZATION&gt; nor the names of
-        its contributors may be used to endorse or promote products derived
-        from this software without specific prior written permission</para>
+        <para>Neither the name of the authors nor the names of its
+        contributors may be used to endorse or promote products derived from
+        this software without specific prior written permission</para>
       </listitem>
     </itemizedlist>
 
@@ -123,8 +124,8 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
         authority directory is intended to be stored on another server. It
         should not be kept on the backup server to limit the impact of a
         server compromise. The instructions and the script assume that it will
-        be kept elsewhere, so will ask you to copy files to and from the CA.
-        </para>
+        be kept elsewhere, so will ask you to copy files to and from the
+        CA.</para>
 
         <para><emphasis role="bold">Clock time warning</emphasis>: SSL
         certificates contain validity dates, including a "valid from" time. If
@@ -134,7 +135,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
         on all machines. If you get strange errors when attempting to use new
         certificates, check the clocks! You will probably just need to wait a
         while until the certificates become valid, rather than having to
-        regenerate them. </para>
+        regenerate them.</para>
 
         <section>
           <title>Set up a CA</title>
@@ -147,11 +148,11 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
 
           <programlisting>/usr/local/bin/bbstored-certs ca init</programlisting>
 
-          <para>(See <link linkend="instguide.sgml">OpenSSL notes</link> if
-          you get an OpenSSL error)</para>
+          <para>(See <link linkend="instguide.xml">OpenSSL notes</link> if you
+          get an OpenSSL error)</para>
 
           <para>This creates the directory 'ca' in the current directory, and
-          initialises it with basic keys. </para>
+          initialises it with basic keys.</para>
         </section>
 
         <section>
@@ -166,7 +167,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
           <para>This signs the certificate for the server. Follow the
           instructions in the output on which files to install on the server.
           The CSR file is now no longer needed. Make sure you run this command
-          from the directory above the directory 'ca'. </para>
+          from the directory above the directory 'ca'.</para>
 
           <para>TODO: Explain instructions in output.</para>
         </section>
@@ -247,8 +248,8 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
           correct! Then send the two files back to the user, as instructed by
           the script.</para>
 
-          <para>Please read the Troubleshooting page if you have problems.
-          </para>
+          <para>Please read the Troubleshooting page if you have
+          problems.</para>
 
           <para>TODO: Link to troubleshooting...</para>
         </section>
@@ -299,7 +300,7 @@ touch /var/log/raidfile</programlisting>
         up a single user's files by running it as that user. (Tip: specify a
         directory other than /etc/box, and then give the alternate config file
         as the first argument to bbackupd). However, it will fall over if you
-        don't give yourself read access to one of your files. </para>
+        don't give yourself read access to one of your files.</para>
 
         <section>
           <title id="BasicConfig">Basic configuration</title>
@@ -325,7 +326,7 @@ touch /var/log/raidfile</programlisting>
           catch bad configuration of this nature!</para>
 
           <para>You may also want to consider changing the mode from lazy to
-          snapshot, depending on what your system is used for. </para>
+          snapshot, depending on what your system is used for.</para>
 
           <itemizedlist>
             <listitem>
@@ -333,7 +334,7 @@ touch /var/log/raidfile</programlisting>
               scans the files, with only a rough schedule. It uploads files as
               and when they are changed, if the latest version is more than a
               set age. This is good for backing up user's documents stored on
-              a server, and spreads the load out over the day. </para>
+              a server, and spreads the load out over the day.</para>
             </listitem>
 
             <listitem>
@@ -342,8 +343,8 @@ touch /var/log/raidfile</programlisting>
               of the filesystem. The backup daemon does absolutely nothing
               until it is instructed to make a backup using the bbackupctl
               utility (probably as a cron job), at which point it uploads all
-              files which have been changed since the last time it uploaded.
-              </para>
+              files which have been changed since the last time it
+              uploaded.</para>
             </listitem>
           </itemizedlist>
 
@@ -450,7 +451,7 @@ touch /var/log/raidfile</programlisting>
           directive.</para>
 
           <para>If a directive ends in Regex, then it is a regular expression
-          rather than a explicit full pathname. See </para>
+          rather than a explicit full pathname. See</para>
 
           <programlisting> man 7 re_format</programlisting>
 
@@ -571,7 +572,7 @@ What you need to do now...
         and -c allows an alternative configuration file to be
         specified.</para>
 
-        <para>Valid commands are: </para>
+        <para>Valid commands are:</para>
 
         <itemizedlist>
           <listitem>
@@ -617,14 +618,14 @@ What you need to do now...
         traditional backup software.</para>
 
         <para>Use bbackupd-config to write a configuration file in snapshot
-        mode, and then run the following command as a cron job. </para>
+        mode, and then run the following command as a cron job.</para>
 
         <programlisting>/usr/local/bin/bbackupctl -q sync</programlisting>
 
         <para>This will cause the backup daemon to upload all changed files
         immediately. <emphasis role="bold">bbackupctl</emphasis> will exit
         almost immediately, and will not output anything unless there is an
-        error. </para>
+        error.</para>
       </section>
 
       <section>
@@ -677,7 +678,7 @@ What you need to do now...
 
         <para>On systems where GNU readline is available (by default) it uses
         that for command line history and editing. Otherwise it falls back to
-        very basic UNIX text entry. </para>
+        very basic UNIX text entry.</para>
 
         <para>TODO: Did the readline dependency change to editline?</para>
 
@@ -687,7 +688,7 @@ What you need to do now...
           <para>bbackupquery is the tool you use to verify, restore and
           investigate your backup files with. When invoked, it simply logs
           into the server using the certificates you have listed in
-          bbackupd.conf. </para>
+          bbackupd.conf.</para>
 
           <para>After you run bbackupquery, you will see a prompt, allowing
           you to execute commands. The list (or ls) command lets you view
@@ -818,7 +819,7 @@ query &gt;</programlisting>
           correctly.</para>
 
           <para>You may wish to run either one as a cron job while testing
-          this system. </para>
+          this system.</para>
         </section>
 
         <section>
@@ -843,7 +844,7 @@ query &gt;</programlisting>
           backed up directory to make sure it doesn't start uploading the
           restored files.)</para>
 
-          <para>Type: </para>
+          <para>Type:</para>
 
           <programlisting>/usr/local/bin/bbackupquery</programlisting>
 
@@ -876,7 +877,7 @@ query &gt;</programlisting>
           versions will make this far more user-friendly.</para>
 
           <para>Firstly, run bbackupquery in interactive mode. It behaves in a
-          similar manner to a command line sftp client. </para>
+          similar manner to a command line sftp client.</para>
 
           <programlisting>/usr/local/bin/bbackupquery</programlisting>
 
@@ -919,7 +920,7 @@ query &gt;</programlisting>
           <para>(this is a listing from a server which is used as a Samba
           server for a network of Windows clients.) You now need to fetch the
           file using it's ID, rather than it's name. The ID is the hex number
-          in the first column. Fetch it like this: </para>
+          in the first column. Fetch it like this:</para>
 
           <programlisting>query &gt; get -i 0000437e NTUSER.DAT
 Object ID 0000437e fetched successfully.</programlisting>
@@ -960,7 +961,7 @@ Object ID 0000437e fetched successfully.</programlisting>
 
       <para>These instructions assume you're working on account 1234,
       subsitute this for whatever account you're actually working on. These
-      will need to be repeated for all affected accounts. </para>
+      will need to be repeated for all affected accounts.</para>
 
       <section>
         <title>Stop bbackupd</title>
@@ -983,7 +984,7 @@ Object ID 0000437e fetched successfully.</programlisting>
         retrieve any files you need. Then move the old store directories aside
         (in case you need them) and start afresh with new accounts, and let
         the clients upload all their data again. These utilities will be
-        written shortly! </para>
+        written shortly!</para>
 
         <para>TODO: Is this true anymore???</para>
       </section>
@@ -1008,7 +1009,7 @@ Object ID 0000437e fetched successfully.</programlisting>
 
         <para><emphasis role="bold">NOTE</emphasis>: The utility may adjust
         the soft and hard limits on the account to make sure that housekeeping
-        will not remove anything -- check these afterwards. </para>
+        will not remove anything -- check these afterwards.</para>
       </section>
 
       <section>
@@ -1023,8 +1024,8 @@ Object ID 0000437e fetched successfully.</programlisting>
         directory of the store.</para>
 
         <para>You can skip this step if you are sure that the client machine
-        is fine -- in this case, bbackupd will bring the store up to date.
-        </para>
+        is fine -- in this case, bbackupd will bring the store up to
+        date.</para>
       </section>
 
       <section>
@@ -1061,7 +1062,7 @@ Object ID 0000437e fetched successfully.</programlisting>
       <para>Some common causes of exceptions are listed below.</para>
 
       <para>Please email me with any other codes you get, and I will let you
-      know what they mean, and add notes here. </para>
+      know what they mean, and add notes here.</para>
 
       <section>
         <title>RaidFile (2/8)</title>
@@ -1101,7 +1102,7 @@ Object ID 0000437e fetched successfully.</programlisting>
 
         <para><emphasis role="bold">Resolution</emphasis>: Edit bbstored.conf
         to point to the correct location of this additional configuration
-        file. </para>
+        file.</para>
       </section>
 
       <section>
@@ -1116,7 +1117,7 @@ Object ID 0000437e fetched successfully.</programlisting>
 
         <para><emphasis role="bold">Resolution</emphasis>: Edit bbstored.conf
         and correct the ListenAddresses line. You should replace the server
-        address with the IP address of your machine. </para>
+        address with the IP address of your machine.</para>
       </section>
 
       <section>
@@ -1184,6 +1185,8 @@ make</programlisting>
     </section>
   </chapter>
 
+  &__ExceptionCodes__elfjz3fu;
+
   <appendix>
     <title id="WORoot">Running without root</title>
 
@@ -1200,7 +1203,7 @@ make</programlisting>
 
       <para>To run it entirely as a non-root user, edit the bbstored.conf
       file, and remove the User directive from the Server section. Then simply
-      run the server as your desired user. </para>
+      run the server as your desired user.</para>
     </section>
 
     <section>
@@ -1223,8 +1226,7 @@ make</programlisting>
       logs for reports of this failure.</para>
 
       <para>Non-root operation of the backup client is recommended only for
-      testing, and should not be relied on in a production environment.
-      </para>
+      testing, and should not be relied on in a production environment.</para>
     </section>
   </appendix>
 </book>
