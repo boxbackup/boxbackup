@@ -12,13 +12,13 @@ all: adminguide instguide
 
 adminguide: adminguide/index.html 
 
-adminguide/index.html: adminguide.xml ExceptionCodes.xml bb-book.xsl
+adminguide/index.html: adminguide.xml ExceptionCodes.xml $(BOOKXSL)
 	# docname=`echo $@ | sed -e 's/\/index.html//'`
 	$(DBPROC) -o adminguide/ $(BOOKXSL) adminguide.xml
 
-instguide: instguide/index.html bb-book.xsl
+instguide: instguide/index.html 
 
-instguide/index.html: instguide.xml bb-book.xsl
+instguide/index.html: instguide.xml $(BOOKXSL)
 	$(DBPROC) -o instguide/ $(BOOKXSL) instguide.xml
 
 ExceptionCodes.xml: ../../ExceptionCodes.txt
@@ -30,6 +30,7 @@ dockit: instguide adminguide
 clean:
 	rm -rf ./instguide/
 	rm -rf ./adminguide/
+	rm ExceptionCodes.xml
 	rm documentation-kit-0.10.tar.gz
 
 
