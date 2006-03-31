@@ -68,4 +68,7 @@ EOD
 }
 
 print DOCBOOK "</appendix>\n";
+
+close EXCEPT;
+close DOCBOOK;
         
