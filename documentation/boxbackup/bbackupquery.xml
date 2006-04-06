@@ -344,6 +344,37 @@
   <refsection>
     <title>Bugs</title>
 
-    <para>TODO: get known bugs for 0.10 in here.</para>
+    <para>If you find a bug in Box Backup, and you want to let us know about
+    it, join the <ulink
+    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
+    list</ulink>, and send a description of the problem there.</para>
+
+    <para>To report a bug, give us at least the following information:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The version of Box Backup you are running</para>
+      </listitem>
+
+      <listitem>
+        <para>The platform you are running on (Hardware and OS), for both
+        client and server.</para>
+      </listitem>
+
+      <listitem>
+        <para>If possible attach your config files (bbstored.conf,
+        bbackupd.conf) to the bug report.</para>
+      </listitem>
+
+      <listitem>
+        <para>Also attach any log file output that helps shed light on the
+        problem you are seeing.</para>
+      </listitem>
+
+      <listitem>
+        <para>And last but certainly not least, a description of what you are
+        seeing, in as much detail as possible.</para>
+      </listitem>
+    </itemizedlist>
   </refsection>
 </refentry>
