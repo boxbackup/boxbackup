@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry>
+  <refmeta>
+    <refentrytitle>bbackupctl</refentrytitle>
+
+    <manvolnum>1</manvolnum>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbackupctl</refname>
+
+    <refpurpose>Control the bbackupd daemon </refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>bbackupctl [-q] [-c config-file] command</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para><literal>bbackupctl</literal> lets the user control the bbackupd
+    daemon on a client machine. The main use is to force a sync with the store
+    server. This is especially important if bbackupd(1) is configured to do
+    snapshot backups. In that case <literal>bbackupctl</literal> is the only
+    way to effect a backup.</para>
+
+    <para>Communication with the bbackupd daemon takes place over a local
+    socket. Some platforms (notably Windows) can't determine if the user
+    connecting on this socket has the correct credentials to execute the
+    commands, leaving a rather sizeable security hole open. To avoid this,
+    unset the CommandSocket parameter in <literal>bbackupd.conf</literal>(8).
+    That disables the command socket, so bbackupd is secure. This does,
+    however, render bbackupctl unusable.</para>
+
+    <refsection>
+      <title>Options</title>
+
+      <itemizedlist>
+        <listitem>
+          <para>-q -- quiet. Do not output status messages.</para>
+        </listitem>
+
+        <listitem>
+          <para>-c config_file -- Use a different config file from the default
+          one. Can be a full or a relative path.</para>
+        </listitem>
+      </itemizedlist>
+    </refsection>
+
+    <refsection>
+      <title>Commands</title>
+
+      <para>The following commands are available in bbackupctl:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para><literal>terminate</literal></para>
+
+          <para>This command stops the bbackupd server. This is the equivalent
+          of killing (kill -KILL) the bbackupd process.</para>
+        </listitem>
+
+        <listitem>
+          <para><literal>reload</literal></para>
+
+          <para>Causes the bbackupd daemon to re-read all its configuration
+          files. Equivalent to kill -HUP.</para>
+        </listitem>
+
+        <listitem>
+          <para><literal>sync</literal></para>
+
+          <para>Initiates a backup to the store of whatever needs to be backed
+          up.</para>
+        </listitem>
+      </itemizedlist>
+    </refsection>
+  </refsection>
+
+  <refsection>
+    <title>Author</title>
+
+    <para>Ben Summers and contributors. For help, please go to the <ulink
+    url="http://boxbackup.hostworks.ca/">Wiki</ulink>, or subscribe to the Box
+    Backup <ulink
+    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
+    list.</ulink></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><literal>bbackupd.conf(8)</literal></para>
+
+    <para>bbackupd(1)</para>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><literal>bbackupctl</literal> uses the Box Backup client
+    configuration file, usually located in
+    <filename>/etc/box/bbackupd.conf</filename>. On Windows this file is
+    usually located in the installation directory, and is named
+    <filename>bbackupd.conf</filename> as well.</para>
+  </refsection>
+
+  <refsection>
+    <title>Bugs</title>
+
+    <para>If you find a bug in Box Backup, and you want to let us know about
+    it, join the <ulink
+    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
+    list</ulink>, and send a description of the problem there.</para>
+
+    <para>To report a bug, give us at least the following information:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The version of Box Backup you are running</para>
+      </listitem>
+
+      <listitem>
+        <para>The platform you are running on (Hardware and OS), for both
+        client and server.</para>
+      </listitem>
+
+      <listitem>
+        <para>If possible attach your config files (bbstored.conf,
+        bbackupd.conf) to the bug report.</para>
+      </listitem>
+
+      <listitem>
+        <para>Also attach any log file output that helps shed light on the
+        problem you are seeing.</para>
+      </listitem>
+
+      <listitem>
+        <para>And last but certainly not least, a description of what you are
+        seeing, in as much detail as possible.</para>
+      </listitem>
+    </itemizedlist>
+  </refsection>
+</refentry>
