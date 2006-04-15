@@ -59,6 +59,6 @@ clean:
 	if [ -d ./$(HTMLPREFIX) ]; then rm -rf $(HTMLPREFIX) ; fi
 	if [ -d ./man-pages ]; then  rm -rf ./man-pages/; fi
 	if [ -f ExceptionCodes.xml ]; then rm ExceptionCodes.xml; fi
-	if [ -f docuemtation-kit-0.10.tar.gz ]; then rm documentation-kit-0.10.tar.gz; fi
+	if [ -f documentation-kit-0.10.tar.gz ]; then rm documentation-kit-0.10.tar.gz; fi
 
 
