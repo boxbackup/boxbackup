@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry>
+  <refmeta>
+    <refentrytitle>raidfile-config</refentrytitle>
+
+    <manvolnum>1</manvolnum>
+  </refmeta>
+
+  <refnamediv>
+    <refname>raidfile-config</refname>
+
+    <refpurpose>Configure Box Backup's RAID files</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>raidfile-config &lt;configdir&gt; &lt;blocksize&gt;
+      &lt;dir1&gt; [&lt;dir2&gt; &lt;dir3&gt;]</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>raidfile-config creates a raidfile.conf file for Box Backup. This
+    file holds information about the directories used to store backups in. Box
+    Backup supports userland RAID, in a restricted RAID5 configuration, where
+    3 and only 3 'drives' are supported. You can read more about RAID5 (and
+    other RAID-levels) <ulink
+    url="http://en.wikipedia.org/wiki/Redundant_array_of_independent_disks#RAID_5">here</ulink>.
+    </para>
+
+    <refsection>
+      <title>Parameters</title>
+
+      <para>The parameters are as follows:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para><literal>configdir</literal>: The directory path where
+          configuration files are located. Usually this is
+          <literal>/etc/box</literal>. <literal>raidfile.conf</literal> will
+          be written in this directory.</para>
+        </listitem>
+
+        <listitem>
+          <para><literal>blocksize</literal>: The block size used for file
+          storage in the system, in bytes. Using a multple of the file system
+          block size is a good strategy. Depending on the size of the files
+          you will be backing up, this multiple varies. Of course it also
+          depends on the native block size of your file system.</para>
+        </listitem>
+
+        <listitem>
+          <para><literal>dir1</literal>: The first directory in the built-in
+          RAID array.</para>
+        </listitem>
+
+        <listitem>
+          <para><literal>dir2</literal>: The second directory in the built-in
+          RAID array. If you are not using the built-in RAID functionality,
+          this field should be ignored. You should not use the built-in RAID,
+          when you have a hardware RAID solution, or if you're using another
+          type of software RAID (like md on Linux).</para>
+        </listitem>
+
+        <listitem>
+          <para><literal>dir3</literal>: The third directory in the built-in
+          RAID array. The same notes that apply to <literal>dir2</literal>
+          also apply to <literal>dir3</literal>.</para>
+        </listitem>
+      </itemizedlist>
+
+      <para>Note that there are currently no way to add multiple disk sets to
+      the raidfile.conf file using command line tools, etc. See
+      raidfile.conf(5) for details on adding more disks</para>
+    </refsection>
+  </refsection>
+
+  <refsection>
+    <title>Author</title>
+
+    <para>Ben Summers and contributors. For help, please go to the <ulink
+    url="http://boxbackup.hostworks.ca/">Wiki</ulink>, or subscribe to the Box
+    Backup <ulink
+    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
+    list.</ulink></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><literal>bbstored-config(1)</literal></para>
+
+    <para><literal>bbstored.conf(5)</literal></para>
+
+    <para><literal>raidfile.conf(5)</literal></para>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><literal>raidfile-config</literal> generates the raidfile.conf(5)
+    file.</para>
+  </refsection>
+
+  <refsection>
+    <title>Bugs</title>
+
+    <para>If you find a bug in Box Backup, and you want to let us know about
+    it, join the <ulink
+    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
+    list</ulink>, and send a description of the problem there.</para>
+
+    <para>To report a bug, give us at least the following information:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>The version of Box Backup you are running</para>
+      </listitem>
+
+      <listitem>
+        <para>The platform you are running on (Hardware and OS), for both
+        client and server.</para>
+      </listitem>
+
+      <listitem>
+        <para>If possible attach your config files (bbstored.conf,
+        bbackupd.conf) to the bug report.</para>
+      </listitem>
+
+      <listitem>
+        <para>Also attach any log file output that helps shed light on the
+        problem you are seeing.</para>
+      </listitem>
+
+      <listitem>
+        <para>And last but certainly not least, a description of what you are
+        seeing, in as much detail as possible.</para>
+      </listitem>
+    </itemizedlist>
+  </refsection>
+</refentry>
