@@ -36,9 +36,9 @@ $(HTMLPREFIX)/man-html/.there:
 man-pages/.there:
 	if [ ! -d man-pages ]; then mkdir man-pages; touch man-pages/.there; fi
 
-man-nroff: bbackupquery.1 bbackupctl.1 bbstoreaccounts.1
+man-nroff: bbackupquery.1 bbackupctl.1 bbstoreaccounts.1 bbstored-config.1 raidfile-config.1 bbstored-certs.1
 
-man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html
+man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html bbstored-config.html raidfile-config.html bbstored-certs.html
 
 %.html: %.xml
 	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
