@@ -112,7 +112,7 @@
 
           <para>Display information about the given account. Example:</para>
 
-          <programlisting> root]# bbstoreaccounts info 1
+          <programlisting>[root]# bbstoreaccounts info 1
                   Account ID: 00000001
               Last object ID: 58757
                  Blocks used: 9864063 (38531.50Mb)
@@ -141,7 +141,7 @@ Blocks used by deleted files: 34025 (132.91Mb)
               numbers infer more directories in the structure, so as an
               example 3952697264 as the last object ID gives 0xEB995FB0, which
               translates to a backup pathname of
-              <literal>0e/b9/95/f0/b0.rfw.</literal></para>
+              <literal>eb/99/5f/ob0.rfw.</literal></para>
             </listitem>
 
             <listitem>
@@ -160,8 +160,8 @@ Blocks used by deleted files: 34025 (132.91Mb)
 
             <listitem>
               <para>Blocks used by deleted files: The number of blocks used by
-              files that have been deleted on the client. This data is at risk
-              for being removed during housekeeping.</para>
+              files that have been deleted on the client. Thi s data is at
+              risk for being removed during housekeeping.</para>
             </listitem>
 
             <listitem>
