@@ -253,6 +253,12 @@ int InstallService(const char* pConfigFileName)
 			::syslog(LOG_ERR, "Failed to create Box Backup "
 				"service: it is waiting to be deleted");
 		}
+		else if (err == ERROR_DUPLICATE_SERVICE_NAME)
+		{
+			::syslog(LOG_ERR, "Failed to create Box Backup "
+				"service: a service with this name "
+				"already exists");
+		}
 		else
 		{
 			::syslog(LOG_ERR, "Failed to create Box Backup "
