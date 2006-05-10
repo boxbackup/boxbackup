@@ -1282,6 +1282,17 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				(localDirEn->d_name[1] == '\0' || (localDirEn->d_name[1] == '.' && localDirEn->d_name[2] == '\0')))
 			{
 				// ignore, it's . or ..
+				
+#ifdef HAVE_VALID_DIRENT_D_TYPE
+				if (localDirEn->d_type != DT_DIR)
+				{
+					fprintf(stderr, "ERROR: d_type does "
+						"not really work on your "
+						"platform. Reconfigure Box!\n");
+					return;
+				}
+#endif
+				
 				continue;
 			}
 
@@ -1305,7 +1316,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			{
 			    // Directory
 			    localDirs.insert(std::string(localDirEn->d_name));
-			}			
+			}
 #else
 			// Entry -- file or dir?
 			if(localDirEn->d_type == DT_REG || localDirEn->d_type == DT_LNK)
