@@ -1187,7 +1187,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	std::string localDirDisplay;
 	std::string storeDirDisplay;
 
-	if(!ConvertUtf8ToConsole(rLocalDir.c_str(), localDirDirsplay)) return;
+	if(!ConvertUtf8ToConsole(rLocalDir.c_str(), localDirDisplay)) return;
 	if(!ConvertUtf8ToConsole(rStoreDir.c_str(), storeDirDisplay)) return;
 #else
 	const std::string& localDirDisplay(rLocalDir);
@@ -1560,7 +1560,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			// File name is also in UTF-8 encoding, 
 			// need to convert to console
 			std::string fileNameDisplay;
-			if(!ConvertUtf8ToConsole(*i, fileNameDisplay)) return;
+			if(!ConvertUtf8ToConsole(i->c_str(), fileNameDisplay)) 
+				return;
 #else
 			const std::string& fileNameDisplay(*i);
 #endif
@@ -1613,7 +1614,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			// Directory name is also in UTF-8 encoding, 
 			// need to convert to console
 			std::string subdirNameDisplay;
-			if(!ConvertUtf8ToConsole(i->first, subdirNameDisplay))
+			if(!ConvertUtf8ToConsole(i->first.c_str(), 
+				subdirNameDisplay))
 				return;
 #else
 			const std::string& subdirNameDisplay(i->first);
@@ -1652,7 +1654,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			// File name is also in UTF-8 encoding, 
 			// need to convert to console
 			std::string fileNameDisplay;
-			if(!ConvertUtf8ToConsole(*i, fileNameDisplay))
+			if(!ConvertUtf8ToConsole(i->c_str(), fileNameDisplay))
 				return;
 #else
 			const std::string& fileNameDisplay(*i);
