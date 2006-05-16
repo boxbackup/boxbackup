@@ -223,8 +223,9 @@ int InstallService(const char* pConfigFileName)
 
 	if (pConfigFileName != NULL)
 	{
-		cmdWithArgs += " ";
+		cmdWithArgs += " \"";
 		cmdWithArgs += pConfigFileName;
+		cmdWithArgs += "\"";
 	}
 
 	SC_HANDLE newService = CreateService(

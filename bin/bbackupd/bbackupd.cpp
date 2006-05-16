@@ -53,7 +53,7 @@ int main(int argc, const char *argv[])
 	}
 
 	bool runAsWin32Service = false;
-	if ((argc == 2 || argc == 3) && ::strcmp(argv[1], "--service") == 0)
+	if (argc >= 2 && ::strcmp(argv[1], "--service") == 0)
 	{
 		runAsWin32Service = true;
 	}
@@ -81,7 +81,7 @@ int main(int argc, const char *argv[])
 		syslog(LOG_INFO, "Box Backup service starting");
 
 		char* config = NULL;
-		if (argc == 3)
+		if (argc >= 3)
 		{
 			config = strdup(argv[2]);
 		}
