@@ -21,7 +21,7 @@ Download Zlib from [http://www.zlib.net/], unpack and enter source directory:
 	make
 	make install prefix=/usr/local/i386-mingw32
 
-Download OpenSSL 0.9.8a from 
+Download OpenSSL 0.9.8b from 
 [http://www.openssl.org/source/openssl-0.9.8b.tar.gz]
 
 Unpack and configure:
@@ -45,4 +45,4 @@ Configure Box with:
 	export LIBS="-lcrypto -lws2_32 -lgdi32"
 	(if you don't have a "configure" file, run "./bootstrap")
 	./configure --target=i386-mingw32
-	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB"
+	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB" WINDRES="i386-mingw32-windres"
