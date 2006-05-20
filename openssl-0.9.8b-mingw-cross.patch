@@ -1,0 +1,324 @@
+diff -ru openssl-0.9.8b/makefile.one openssl-0.9.8b-mingw/makefile.one
+--- openssl-0.9.8b/makefile.one	2006-05-20 17:01:12.000000000 +0000
++++ openssl-0.9.8b-mingw/makefile.one	2006-05-20 16:41:31.000000000 +0000
+@@ -15,8 +15,8 @@
+ 
+ # Set your compiler options
+ PLATFORM=
+-CC=cc
+-CFLAG=-O -DTERMIO -DOPENSSL_NO_RC5 -DOPENSSL_NO_MDC2 -DOPENSSL_NO_KRB5 -DOPENSSL_NO_DYNAMIC_ENGINE    
++CC=i586-mingw32msvc-gcc
++CFLAG=-O -DOPENSSL_NO_RC5 -DOPENSSL_NO_MDC2 -DOPENSSL_NO_KRB5 -DOPENSSL_NO_DYNAMIC_ENGINE    
+ APP_CFLAG=
+ LIB_CFLAG=
+ SHLIB_CFLAG=
+@@ -24,7 +24,7 @@
+ SHLIB_EX_OBJ=
+ # add extra libraries to this define, for solaris -lsocket -lnsl would
+ # be added
+-EX_LIBS=
++EX_LIBS=-lgdi32 -lws2_32
+ 
+ # The OpenSSL directory
+ SRC_D=.
+@@ -65,11 +65,11 @@
+ PERL=perl
+ CP=/bin/cp
+ RM=/bin/rm -f
+-RANLIB=/usr/bin/ranlib
++RANLIB=i586-mingw32msvc-ranlib
+ MKDIR=-mkdir
+-MKLIB=ar r
++MKLIB=i586-mingw32msvc-ar r
+ MLFLAGS=
+-ASM=as
++ASM=i586-mingw32msvc-as
+ 
+ ######################################################
+ # You should not need to touch anything below this point
+@@ -160,7 +160,8 @@
+ 	$(INCO_D)/ui_compat.h $(INCO_D)/krb5_asn.h $(INCO_D)/store.h \
+ 	$(INCO_D)/pqueue.h $(INCO_D)/pq_compat.h $(INCO_D)/ssl.h \
+ 	$(INCO_D)/ssl2.h $(INCO_D)/ssl3.h $(INCO_D)/ssl23.h \
+-	$(INCO_D)/tls1.h $(INCO_D)/dtls1.h $(INCO_D)/kssl.h 
++	$(INCO_D)/tls1.h $(INCO_D)/dtls1.h $(INCO_D)/kssl.h \
++	$(INCO_D)/x509.h $(INCO_D)/x509_vfy.h 
+ 
+ T_OBJ=$(OBJ_D)/md2test.o \
+ 	$(OBJ_D)/md4test.o $(OBJ_D)/md5test.o $(OBJ_D)/shatest.o \
+@@ -361,7 +362,15 @@
+ 	$(OBJ_D)/str_meth.o $(OBJ_D)/str_mem.o $(OBJ_D)/pqueue.o \
+ 	$(OBJ_D)/e_4758cca.o $(OBJ_D)/e_aep.o $(OBJ_D)/e_atalla.o \
+ 	$(OBJ_D)/e_cswift.o $(OBJ_D)/e_gmp.o $(OBJ_D)/e_chil.o \
+-	$(OBJ_D)/e_nuron.o $(OBJ_D)/e_sureware.o $(OBJ_D)/e_ubsec.o 
++	$(OBJ_D)/e_nuron.o $(OBJ_D)/e_sureware.o $(OBJ_D)/e_ubsec.o \
++	$(OBJ_D)/x86cpuid-elf.o $(OBJ_D)/x509_err.o $(OBJ_D)/x509_obj.o \
++	$(OBJ_D)/x509_cmp.o $(OBJ_D)/x509_ext.o $(OBJ_D)/x509_v3.o \
++	$(OBJ_D)/x509name.o $(OBJ_D)/x509_def.o  $(OBJ_D)/x509_req.o \
++	$(OBJ_D)/x509_att.o $(OBJ_D)/x_all.o $(OBJ_D)/x509rset.o \
++	$(OBJ_D)/x509_vfy.o $(OBJ_D)/x509_vpm.o $(OBJ_D)/x509_trs.o \
++	$(OBJ_D)/x509_lu.o $(OBJ_D)/x509_d2.o $(OBJ_D)/by_dir.o \
++	$(OBJ_D)/by_file.o $(OBJ_D)/x509type.o $(OBJ_D)/x509_txt.o \
++	$(OBJ_D)/x509_set.o $(OBJ_D)/x509spki.o $(OBJ_D)/x509cset.o
+ 
+ T_EXE=$(TEST_D)/md2test \
+ 	$(TEST_D)/md4test $(TEST_D)/md5test $(TEST_D)/shatest \
+@@ -422,8 +431,7 @@
+ 
+ 
+ test: $(T_EXE)
+-	cd $(BIN_D)
+-	../ms/test
++	( cd $(BIN_D); ../ms/test.sh; )
+ 
+ clean:
+ 	$(RM) $(TMP_D)/*.*
+@@ -753,6 +761,12 @@
+ $(INCO_D)/x509v3.h: $(SRC_D)/crypto/x509v3/x509v3.h
+ 	$(CP) $(SRC_D)/crypto/x509v3/x509v3.h $(INCO_D)/x509v3.h
+ 
++$(INCO_D)/x509.h: $(SRC_D)/crypto/x509/x509.h
++	$(CP) $(SRC_D)/crypto/x509/x509.h $(INCO_D)/x509.h
++
++$(INCO_D)/x509_vfy.h: $(SRC_D)/crypto/x509/x509_vfy.h
++	$(CP) $(SRC_D)/crypto/x509/x509_vfy.h $(INCO_D)/x509_vfy.h
++
+ $(INCO_D)/conf.h: $(SRC_D)/crypto/conf/conf.h
+ 	$(CP) $(SRC_D)/crypto/conf/conf.h $(INCO_D)/conf.h
+ 
+@@ -2100,6 +2114,75 @@
+ $(OBJ_D)/x_x509.o: $(SRC_D)/crypto/asn1/x_x509.c
+ 	$(CC) -o $(OBJ_D)/x_x509.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/asn1/x_x509.c
+ 
++$(OBJ_D)/by_dir.o: $(SRC_D)/crypto/x509/by_dir.c
++	$(CC) -o $(OBJ_D)/by_dir.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/by_dir.c
++
++$(OBJ_D)/by_file.o: $(SRC_D)/crypto/x509/by_file.c
++	$(CC) -o $(OBJ_D)/by_file.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/by_file.c
++
++$(OBJ_D)/x509_att.o: $(SRC_D)/crypto/x509/x509_att.c
++	$(CC) -o $(OBJ_D)/x509_att.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_att.c
++
++$(OBJ_D)/x509_cmp.o: $(SRC_D)/crypto/x509/x509_cmp.c
++	$(CC) -o $(OBJ_D)/x509_cmp.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_cmp.c
++
++$(OBJ_D)/x509cset.o: $(SRC_D)/crypto/x509/x509cset.c
++	$(CC) -o $(OBJ_D)/x509cset.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509cset.c
++
++$(OBJ_D)/x509_d2.o: $(SRC_D)/crypto/x509/x509_d2.c
++	$(CC) -o $(OBJ_D)/x509_d2.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_d2.c
++
++$(OBJ_D)/x509_def.o: $(SRC_D)/crypto/x509/x509_def.c
++	$(CC) -o $(OBJ_D)/x509_def.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_def.c
++
++$(OBJ_D)/x509_err.o: $(SRC_D)/crypto/x509/x509_err.c
++	$(CC) -o $(OBJ_D)/x509_err.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_err.c
++
++$(OBJ_D)/x509_ext.o: $(SRC_D)/crypto/x509/x509_ext.c
++	$(CC) -o $(OBJ_D)/x509_ext.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_ext.c
++
++$(OBJ_D)/x509_lu.o: $(SRC_D)/crypto/x509/x509_lu.c
++	$(CC) -o $(OBJ_D)/x509_lu.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_lu.c
++
++$(OBJ_D)/x509name.o: $(SRC_D)/crypto/x509/x509name.c
++	$(CC) -o $(OBJ_D)/x509name.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509name.c
++
++$(OBJ_D)/x509_obj.o: $(SRC_D)/crypto/x509/x509_obj.c
++	$(CC) -o $(OBJ_D)/x509_obj.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_obj.c
++
++$(OBJ_D)/x509_req.o: $(SRC_D)/crypto/x509/x509_req.c
++	$(CC) -o $(OBJ_D)/x509_req.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_req.c
++
++$(OBJ_D)/x509rset.o: $(SRC_D)/crypto/x509/x509rset.c
++	$(CC) -o $(OBJ_D)/x509rset.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509rset.c
++
++$(OBJ_D)/x509_set.o: $(SRC_D)/crypto/x509/x509_set.c
++	$(CC) -o $(OBJ_D)/x509_set.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_set.c
++
++$(OBJ_D)/x509spki.o: $(SRC_D)/crypto/x509/x509spki.c
++	$(CC) -o $(OBJ_D)/x509spki.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509spki.c
++
++$(OBJ_D)/x509_trs.o: $(SRC_D)/crypto/x509/x509_trs.c
++	$(CC) -o $(OBJ_D)/x509_trs.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_trs.c
++
++$(OBJ_D)/x509_txt.o: $(SRC_D)/crypto/x509/x509_txt.c
++	$(CC) -o $(OBJ_D)/x509_txt.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_txt.c
++
++$(OBJ_D)/x509type.o: $(SRC_D)/crypto/x509/x509type.c
++	$(CC) -o $(OBJ_D)/x509type.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509type.c
++
++$(OBJ_D)/x509_v3.o: $(SRC_D)/crypto/x509/x509_v3.c
++	$(CC) -o $(OBJ_D)/x509_v3.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_v3.c
++
++$(OBJ_D)/x509_vfy.o: $(SRC_D)/crypto/x509/x509_vfy.c
++	$(CC) -o $(OBJ_D)/x509_vfy.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_vfy.c
++
++$(OBJ_D)/x509_vpm.o: $(SRC_D)/crypto/x509/x509_vpm.c
++	$(CC) -o $(OBJ_D)/x509_vpm.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x509_vpm.c
++
++$(OBJ_D)/x_all.o: $(SRC_D)/crypto/x509/x_all.c
++	$(CC) -o $(OBJ_D)/x_all.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/x509/x_all.c
++
+ $(OBJ_D)/x_x509a.o: $(SRC_D)/crypto/asn1/x_x509a.c
+ 	$(CC) -o $(OBJ_D)/x_x509a.o  $(LIB_CFLAGS) -c $(SRC_D)/crypto/asn1/x_x509a.c
+ 
+@@ -2647,3 +2730,9 @@
+ $(BIN_D)/$(E_EXE): $(E_OBJ) $(LIBS_DEP)
+ 	$(LINK) -o $(BIN_D)/$(E_EXE) $(LFLAGS) $(E_OBJ) $(L_LIBS) $(EX_LIBS)
+ 
++$(OBJ_D)/x86cpuid-elf.o: $(SRC_D)/crypto/x86cpuid-elf.s
++	$(CC) -o $(OBJ_D)/x86cpuid-elf.o $(LIB_CFLAGS) -c $(SRC_D)/crypto/x86cpuid-elf.s
++
++$(SRC_D)/crypto/x86cpuid-elf.s: $(SRC_D)/crypto/x86cpuid.pl $(SRC_D)/crypto/perlasm/x86asm.pl
++	( cd $(SRC_D)/crypto; $(PERL) x86cpuid.pl a.out $(CFLAGS) $(PROCESSOR) > x86cpuid-elf.s; )
++
+
+--- openssl-0.9.8b/ms/test.sh	1970-01-01 00:00:00.000000000 +0000
++++ openssl-0.9.8b-mingw/ms/test.sh	2006-05-20 16:59:05.000000000 +0000
+@@ -0,0 +1,146 @@
++#!/bin/sh
++
++test=../ms
++PATH=../ms:$PATH
++OPENSSL_CONF=../apps/openssl.cnf
++
++# run this from inside the bin directory
++
++echo rsa_test
++./rsa_test || exit 1
++
++echo destest
++./destest || exit 1
++
++echo ideatest
++./ideatest || exit 1
++
++echo bftest
++./bftest || exit 1
++
++echo shatest
++./shatest || exit 1
++
++echo sha1test
++./sha1test || exit 1
++
++echo md5test
++./md5test || exit 1
++
++echo md2test
++./md2test || exit 1
++
++echo rc2test
++./rc2test || exit 1
++
++echo rc4test
++./rc4test || exit 1
++
++echo randtest
++./randtest || exit 1
++
++echo dhtest
++./dhtest || exit 1
++
++echo exptest
++./exptest || exit 1
++
++echo dsatest
++./dsatest || exit 1
++
++echo ectest
++./ectest || exit 1
++
++# echo testenc
++# $test/testenc openssl || exit 1
++
++# echo testpem
++# $test/testpem openssl || exit 1
++
++echo verify
++cat ../certs/*.pem > cert.tmp
++./openssl verify -CAfile cert.tmp ../certs/*.pem || exit 1
++
++# echo testss
++# $test/testss openssl || exit 1
++
++SSL_TEST="./ssltest -key $test/keyU.ss -cert $test/certU.ss -c_key $test/keyU.ss -c_cert $test/certU.ss -CAfile $test/certCA.ss"
++
++echo test sslv2
++./ssltest -ssl2 || exit 1
++
++echo test sslv2 with server authentication
++$SSL_TEST -ssl2 -server_auth || exit 1
++
++echo test sslv2 with client authentication
++$SSL_TEST -ssl2 -client_auth || exit 1
++
++echo test sslv2 with both client and server authentication
++$SSL_TEST -ssl2 -server_auth -client_auth || exit 1
++
++echo test sslv3
++./ssltest -ssl3 || exit 1
++
++echo test sslv3 with server authentication
++$SSL_TEST -ssl3 -server_auth || exit 1
++
++echo test sslv3 with client authentication
++$SSL_TEST -ssl3 -client_auth || exit 1
++
++echo test sslv3 with both client and server authentication
++$SSL_TEST -ssl3 -server_auth -client_auth || exit 1
++
++echo test sslv2/sslv3
++./ssltest || exit 1
++
++echo test sslv2/sslv3 with server authentication
++$SSL_TEST -server_auth || exit 1
++
++echo test sslv2/sslv3 with client authentication
++$SSL_TEST -client_auth || exit 1
++
++echo test sslv2/sslv3 with both client and server authentication
++$SSL_TEST -server_auth -client_auth || exit 1
++
++echo test sslv2 via BIO pair
++./ssltest -bio_pair -ssl2 || exit 1
++
++echo test sslv2/sslv3 with 1024 bit DHE via BIO pair
++./ssltest -bio_pair -dhe1024dsa -v || exit 1
++
++echo test sslv2 with server authentication via BIO pair
++$SSL_TEST -bio_pair -ssl2 -server_auth || exit 1
++
++echo test sslv2 with client authentication via BIO pair
++$SSL_TEST -bio_pair -ssl2 -client_auth || exit 1
++
++echo test sslv2 with both client and server authentication via BIO pair
++$SSL_TEST -bio_pair -ssl2 -server_auth -client_auth || exit 1
++
++echo test sslv3 via BIO pair
++./ssltest -bio_pair -ssl3 || exit 1
++
++echo test sslv3 with server authentication via BIO pair
++$SSL_TEST -bio_pair -ssl3 -server_auth || exit 1
++
++echo test sslv3 with client authentication  via BIO pair
++$SSL_TEST -bio_pair -ssl3 -client_auth || exit 1
++
++echo test sslv3 with both client and server authentication via BIO pair
++$SSL_TEST -bio_pair -ssl3 -server_auth -client_auth || exit 1
++
++echo test sslv2/sslv3 via BIO pair
++./ssltest -bio_pair || exit 1
++
++echo test sslv2/sslv3 with server authentication
++$SSL_TEST -bio_pair -server_auth || exit 1
++
++echo test sslv2/sslv3 with client authentication via BIO pair
++$SSL_TEST -bio_pair -client_auth || exit 1
++
++echo test sslv2/sslv3 with both client and server authentication via BIO pair
++$SSL_TEST -bio_pair -server_auth -client_auth || exit 1
++
++rm cert.tmp
++
++echo passed all tests
