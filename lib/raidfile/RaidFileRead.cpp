@@ -14,10 +14,20 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
+
+#ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
+#endif
+
+#ifdef HAVE_SYSLOG_H
 #include <syslog.h>
+#endif
+
 #include <stdarg.h>
+
+#ifdef HAVE_DIRENT_H
 #include <dirent.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>

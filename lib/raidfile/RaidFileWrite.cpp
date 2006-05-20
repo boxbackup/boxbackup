@@ -115,7 +115,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 #ifdef HAVE_FLOCK
 	int errnoBlock = EWOULDBLOCK;
 	if(::flock(mOSFileHandle, LOCK_EX | LOCK_NB) != 0)
-#else
+#elif HAVE_DECL_F_SETLK
 	int errnoBlock = EAGAIN;
 	struct flock desc;
 	desc.l_type = F_WRLCK;
@@ -123,6 +123,9 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	desc.l_start = 0;
 	desc.l_len = 0;
 	if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
+#else
+	int errnoBlock = ENOSYS;
+	if (0)
 #endif
 	{
 		// Lock was not obtained.

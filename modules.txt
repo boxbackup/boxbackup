@@ -9,10 +9,8 @@
 
 # Generic support code and modules
 
-OMIT:mingw32
-OMIT:mingw32msvc
 OMIT:CYGWIN
-lib/raidfile
+lib/raidfile		lib/win32
 END-OMIT
 
 lib/crypto
@@ -26,8 +24,10 @@ test/compress		lib/compress	lib/win32
 OMIT:mingw32
 OMIT:mingw32msvc
 test/basicserver	lib/server	lib/win32
+END-OMIT
+
 OMIT:CYGWIN
-test/raidfile		lib/raidfile
+test/raidfile		lib/raidfile	lib/win32
 END-OMIT
 
 # IF_DISTRIBUTION(boxbackup)

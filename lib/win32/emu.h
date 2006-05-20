@@ -278,6 +278,7 @@ HANDLE openfile(const char *filename, int flags, int mode);
 #define LOG_WARNING 4
 #define LOG_ERR 3
 #define LOG_PID 0
+#define LOG_LOCAL5 0
 #define LOG_LOCAL6 0
 
 void openlog (const char * daemonName, int, int);
@@ -408,5 +409,13 @@ bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 
 // replacement for _cgetws which requires a relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
+
+struct iovec {
+	void *iov_base;   /* Starting address */
+	size_t iov_len;   /* Number of bytes */
+};
+
+int readv (int filedes, const struct iovec *vector, size_t count);
+int writev(int filedes, const struct iovec *vector, size_t count);
 
 #endif // !EMU_INCLUDE && WIN32

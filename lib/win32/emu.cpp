@@ -1374,4 +1374,40 @@ int console_read(char* pBuffer, size_t BufferSize)
 	return strlen(pBuffer);
 }
 
+int readv (int filedes, const struct iovec *vector, size_t count)
+{
+	int bytes = 0;
+	
+	for (int i = 0; i < count; i++)
+	{
+		int result = read(filedes, vector[i].iov_base, 
+			vector[i].iov_len);
+		if (result < 0)
+		{
+			return result;
+		}
+		bytes += result;
+	}
+
+	return bytes;
+}
+
+int writev(int filedes, const struct iovec *vector, size_t count)
+{
+	int bytes = 0;
+	
+	for (int i = 0; i < count; i++)
+	{
+		int result = write(filedes, vector[i].iov_base, 
+			vector[i].iov_len);
+		if (result < 0)
+		{
+			return result;
+		}
+		bytes += result;
+	}
+
+	return bytes;
+}
+
 #endif // WIN32

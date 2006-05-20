@@ -12,7 +12,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+
+#ifdef HAVE_SYSCALL
 #include <sys/syscall.h>
+#endif
 
 #include <string.h>
 
