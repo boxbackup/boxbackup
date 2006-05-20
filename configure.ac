@@ -30,10 +30,15 @@ fi
 
 ### Checks for libraries.
 
-if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
+case $target_os in
+mingw32*) ;;
+winnt)    ;;
+*)
   AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes],
                  [AC_MSG_ERROR([[cannot find a short sleep function (nanosleep)]])])
-fi
+	;;
+esac
+
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
 VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 
@@ -73,9 +78,13 @@ Upgrade or read the documentation for alternatives]])
 
 ### Checks for header files.
 
-if test "$target_os" != "mingw32"; then
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
   AC_HEADER_DIRENT
-fi
+  ;;
+esac
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
@@ -121,14 +130,18 @@ AX_CHECK_DEFINE_PRAGMA
 if test "x$ac_cv_c_bigendian" != "xyes"; then
   AX_BSWAP64
 fi
-if test "$target_os" != "mingw32"; then
+
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
   AX_RANDOM_DEVICE
-fi
-AX_CHECK_MOUNT_POINT(,[
-  if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
+  AX_CHECK_MOUNT_POINT(,[
     AC_MSG_ERROR([[cannot work out how to discover mount points on your platform]])
-  fi
   ])
+;;
+esac
+
 AX_CHECK_MALLOC_WORKAROUND
 
 
@@ -166,13 +179,19 @@ AC_CACHE_CHECK([if we have large file support enabled], [have_large_file_support
 AC_CHECK_FUNCS([flock])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
+
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
 if test "x$ac_cv_func_flock" != "xyes" && \
    test "x$ac_cv_have_decl_O_EXLOCK" != "xyes" && \
-   test "x$ac_cv_have_decl_F_SETLK" != "xyes" && \
-   test "$target_os" != "mingw32" -a "$target_os" != "winnt"
+   test "x$ac_cv_have_decl_F_SETLK" != "xyes"
 then
   AC_MSG_ERROR([[cannot work out how to do file locking on your platform]])
 fi
+;;
+esac
 
 ## Get tmpdir
 temp_directory_name="/tmp"

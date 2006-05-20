@@ -39,7 +39,7 @@ unless(-d 'local')
 my %env_flags;
 
 my $windows_include_path = "-I../../lib/win32 ";
-if ($target_os ne "mingw32" && $target_os ne "winnt")
+if ($target_os !~ m'^mingw32' && $target_os ne "winnt")
 {
 	$windows_include_path = "";
 	$env_flags{'IGNORE_lib/win32'} = 1;
@@ -484,7 +484,7 @@ __E
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
 	my $release_flags = "-O2";
-	if ($target_os eq "mingw32")
+	if ($target_os =~ m'^mingw32')
 	{
 		$release_flags = "-O0 -g";
 	}
@@ -498,6 +498,7 @@ __E
 CXX = g++
 AR = ar
 RANLIB = ranlib
+WINDRES = windres
 .ifdef RELEASE
 CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
@@ -569,8 +570,9 @@ __E
 	{
 		my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
 		my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
+		my $base = $1;
 
-		if ($target_os eq "mingw32")
+		if ($target_os =~ m'^mingw32')
 		{
 			next if not $is_cpp and not $is_rc;
 		}
@@ -582,7 +584,6 @@ __E
 		next if $file =~ /\A\._/; # Temp Mac OS Resource hack
 
 		# store for later
-		my $base = $1;
 		push @obj_base,$base;
 	
 		# get the file...
@@ -619,7 +620,7 @@ __E
 		}
 		elsif ($is_rc)
 		{
-			$make .= "\twindres $file $out_name\n\n";
+			$make .= "\t\$(WINDRES) $file $out_name\n\n";
 			my $res_list = $module_resources_win32{$mod};
 			$res_list ||= [];
 			push @$res_list, $base.'.o';
@@ -682,7 +683,7 @@ __E
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
-	if ($target_os eq "mingw32")
+	if ($target_os =~ m'^mingw32')
 	{
 		foreach my $dep (@all_deps_for_module)
 		{
