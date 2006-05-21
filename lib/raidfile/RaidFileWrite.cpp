@@ -104,7 +104,8 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	writeFilename += 'X';
 
 	// Attempt to open
-	mOSFileHandle = ::open(writeFilename.c_str(), O_WRONLY | O_CREAT,
+	mOSFileHandle = ::open(writeFilename.c_str(), 
+		O_WRONLY | O_CREAT | O_BINARY,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(mOSFileHandle == -1)
 	{
@@ -245,23 +246,46 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	}
 	
 	// Rename it into place -- BEFORE it's closed so lock remains
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
-	// Get the filename for the write file
-	std::string renameTo(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
-	// And the current name
-	std::string renameFrom(renameTo + 'X');
-	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
-	{
-		THROW_EXCEPTION(RaidFileException, OSError)
-	}
-	
+
+#ifdef WIN32
+	// Except on Win32 which doesn't allow renaming open files
 	// Close file...
 	if(::close(mOSFileHandle) != 0)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 	mOSFileHandle = -1;
+#endif // WIN32
+
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
+	// Get the filename for the write file
+	std::string renameTo(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
+	// And the current name
+	std::string renameFrom(renameTo + 'X');
+
+#ifdef WIN32
+	// need to delete the target first
+	if(::unlink(renameTo.c_str()) != 0 && 
+		GetLastError() != ERROR_FILE_NOT_FOUND)
+	{
+		THROW_EXCEPTION(RaidFileException, OSError)
+	}
+#endif
+
+	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
+	{
+		THROW_EXCEPTION(RaidFileException, OSError)
+	}
+
+#ifndef WIN32	
+	// Close file...
+	if(::close(mOSFileHandle) != 0)
+	{
+		THROW_EXCEPTION(RaidFileException, OSError)
+	}
+	mOSFileHandle = -1;
+#endif // !WIN32
 	
 	// Raid it?
 	if(ConvertToRaidNow)
@@ -295,12 +319,19 @@ void RaidFileWrite::Discard()
 	writeFilename += 'X';
 	
 	// Unlink and close it
-	if((::unlink(writeFilename.c_str()) != 0)
-		|| (::close(mOSFileHandle) != 0))
+
+#ifdef WIN32
+	// On Win32 we must close it first
+	if (::close(mOSFileHandle) != 0 ||
+		::unlink(writeFilename.c_str()) != 0)
+#else // !WIN32
+	if (::unlink(writeFilename.c_str()) != 0 ||
+		::close(mOSFileHandle) != 0))
+#endif // !WIN32
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-	
+
 	// reset file handle
 	mOSFileHandle = -1;
 }
@@ -391,13 +422,13 @@ void RaidFileWrite::TransformToRaidStorage()
 	try
 	{
 #if HAVE_DECL_O_EXLOCK
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> parity(parityFilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe1(stripe1FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe2(stripe2FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> parity(parityFilenameW.c_str());
 #else
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> parity(parityFilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe1(stripe1FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe2(stripe2FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> parity(parityFilenameW.c_str());
 #endif
 
 		// Then... read in data...

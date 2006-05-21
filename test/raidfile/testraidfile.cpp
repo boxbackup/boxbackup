@@ -210,16 +210,24 @@ void testReadingFileContents(int set, const char *filename, void *data, int data
 		bytesread += r;
 	}
 	TEST_THAT(!readstream4.StreamDataLeft());		// check IOStream interface is correct
+	pread.reset();
 
 	// Be nasty, and create some errors for the RAID stuff to recover from...
 	if(TestRAIDProperties)
 	{
 		char stripe1fn[256], stripe1fnRename[256];
-		sprintf(stripe1fn, "testfiles/%d_%d/%s.rf", set, startDisc, filename);
-		sprintf(stripe1fnRename, "testfiles/%d_%d/%s.rf-REMOVED", set, startDisc, filename);
+		sprintf(stripe1fn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf", set, startDisc, filename);
+		sprintf(stripe1fnRename, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf-REMOVED", set, startDisc, 
+			filename);
 		char stripe2fn[256], stripe2fnRename[256];
-		sprintf(stripe2fn, "testfiles/%d_%d/%s.rf", set, (startDisc + 1) % RAID_NUMBER_DISCS, filename);
-		sprintf(stripe2fnRename, "testfiles/%d_%d/%s.rf-REMOVED", set, (startDisc + 1) % RAID_NUMBER_DISCS, filename);
+		sprintf(stripe2fn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf", set, 
+			(startDisc + 1) % RAID_NUMBER_DISCS, filename);
+		sprintf(stripe2fnRename, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf-REMOVED", set, 
+			(startDisc + 1) % RAID_NUMBER_DISCS, filename);
 
 		// Read with stripe1 + parity		
 		TEST_THAT(::rename(stripe2fn, stripe2fnRename) == 0);
@@ -255,9 +263,15 @@ void testReadingFileContents(int set, const char *filename, void *data, int data
 		}
 		mungefilename[m++] = '\0';
 		char stripe1munge[256];
-		sprintf(stripe1munge, "testfiles/%d_%d/.raidfile-unreadable/%s", set, startDisc, mungefilename);
+		sprintf(stripe1munge, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR ".raidfile-unreadable"
+			DIRECTORY_SEPARATOR "%s", set, startDisc, 
+			mungefilename);
 		char stripe2munge[256];
-		sprintf(stripe2munge, "testfiles/%d_%d/.raidfile-unreadable/%s", set, (startDisc + 1) % RAID_NUMBER_DISCS, mungefilename);
+		sprintf(stripe2munge, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR ".raidfile-unreadable"
+			DIRECTORY_SEPARATOR "%s", set, 
+			(startDisc + 1) % RAID_NUMBER_DISCS, mungefilename);
 		
 
 #ifdef TRF_CAN_INTERCEPT
@@ -362,10 +376,12 @@ void testReadWriteFileDo(int set, const char *filename, void *data, int datasize
 	write4.Write(data, datasize);
 	// This time, don't discard and transform it to a RAID File
 	char writefnPre[256];
-	sprintf(writefnPre, "testfiles/%d_%d/%s.rfwX", set, startDisc, filename);
+	sprintf(writefnPre, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+		DIRECTORY_SEPARATOR "%s.rfwX", set, startDisc, filename);
 	TEST_THAT(TestFileExists(writefnPre));
 	char writefn[256];
-	sprintf(writefn, "testfiles/%d_%d/%s.rfw", set, startDisc, filename);
+	sprintf(writefn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+		DIRECTORY_SEPARATOR "%s.rfw", set, startDisc, filename);
 	int usageInBlocks = write4.GetDiscUsageInBlocks();
 	write4.Commit(DoTransform);
 	// Check that files are nicely done...
@@ -393,14 +409,19 @@ void testReadWriteFileDo(int set, const char *filename, void *data, int datasize
 			fs1 = ((fullblocks / 2)+1) * RAID_BLOCK_SIZE;
 		}
 		char stripe1fn[256];
-		sprintf(stripe1fn, "testfiles/%d_%d/%s.rf", set, startDisc, filename);
+		sprintf(stripe1fn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf", set, startDisc, filename);
 		TEST_THAT(TestGetFileSize(stripe1fn) == fs1);
 		char stripe2fn[256];
-		sprintf(stripe2fn, "testfiles/%d_%d/%s.rf", set, (startDisc + 1) % RAID_NUMBER_DISCS, filename);
+		sprintf(stripe2fn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf", set, 
+			(startDisc + 1) % RAID_NUMBER_DISCS, filename);
 		TEST_THAT(TestGetFileSize(stripe2fn) == (int)(datasize - fs1));
 		// Parity file size
 		char parityfn[256];
-		sprintf(parityfn, "testfiles/%d_%d/%s.rf", set, (startDisc + 2) % RAID_NUMBER_DISCS, filename);
+		sprintf(parityfn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
+			DIRECTORY_SEPARATOR "%s.rf", set, 
+			(startDisc + 2) % RAID_NUMBER_DISCS, filename);
 		// Mildly complex calculation
 		unsigned int blocks = datasize / RAID_BLOCK_SIZE;
 		unsigned int bytesOver = datasize % RAID_BLOCK_SIZE;
@@ -439,14 +460,16 @@ void testReadWriteFileDo(int set, const char *filename, void *data, int datasize
 		if(datasize > (3*1024))
 		{
 			int f;
-			TEST_THAT((f = ::open(stripe1fn, O_RDONLY, 0)) != -1);
+			TEST_THAT((f = ::open(stripe1fn, O_RDONLY | O_BINARY, 
+				0)) != -1);
 			TEST_THAT(sizeof(testblock) == ::read(f, testblock, sizeof(testblock)));
 			for(unsigned int q = 0; q < sizeof(testblock); ++q)
 			{
 				TEST_THAT(testblock[q] == ((char*)data)[q]);
 			}
 			::close(f);
-			TEST_THAT((f = ::open(stripe2fn, O_RDONLY, 0)) != -1);
+			TEST_THAT((f = ::open(stripe2fn, O_RDONLY | O_BINARY, 
+				0)) != -1);
 			TEST_THAT(sizeof(testblock) == ::read(f, testblock, sizeof(testblock)));
 			for(unsigned int q = 0; q < sizeof(testblock); ++q)
 			{
@@ -539,7 +562,9 @@ void test_overwrites()
 	
 	// Generate a random pre-existing write file (and ensure that it doesn't exist already)
 	int f;
-	TEST_THAT((f = ::open("testfiles/0_2/overwrite_B.rfwX", O_WRONLY | O_CREAT | O_EXCL, 0755)) != -1);
+	TEST_THAT((f = ::open("testfiles" DIRECTORY_SEPARATOR "0_2" 
+		DIRECTORY_SEPARATOR "overwrite_B.rfwX", 
+		O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755)) != -1);
 	TEST_THAT(::write(f, "TESTTEST", 8) == 8);
 	::close(f);
 
@@ -560,7 +585,7 @@ int test(int argc, const char *argv[])
 
 	// Initialise the controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
-	rcontroller.Initialise("testfiles/raidfile.conf");
+	rcontroller.Initialise("testfiles" DIRECTORY_SEPARATOR "raidfile.conf");
 
 	// some data
 	char data[TEST_DATA_SIZE];
@@ -577,9 +602,12 @@ int test(int argc, const char *argv[])
 	
 	// Try creating a directory
 	RaidFileWrite::CreateDirectory(0, "test-dir");
-	TEST_THAT(TestDirExists("testfiles/0_0/test-dir"));
-	TEST_THAT(TestDirExists("testfiles/0_1/test-dir"));
-	TEST_THAT(TestDirExists("testfiles/0_2/test-dir"));
+	TEST_THAT(TestDirExists("testfiles" DIRECTORY_SEPARATOR "0_0" 
+		DIRECTORY_SEPARATOR "test-dir"));
+	TEST_THAT(TestDirExists("testfiles" DIRECTORY_SEPARATOR "0_1"
+		DIRECTORY_SEPARATOR "test-dir"));
+	TEST_THAT(TestDirExists("testfiles" DIRECTORY_SEPARATOR "0_2"
+		DIRECTORY_SEPARATOR "test-dir"));
 	TEST_THAT(RaidFileRead::DirectoryExists(0, "test-dir"));
 	TEST_THAT(!RaidFileRead::DirectoryExists(0, "test-dir-not"));
 
@@ -611,9 +639,12 @@ int test(int argc, const char *argv[])
 	
 	// Before it's deleted, check to see the contents are as expected
 	int f;
-	TEST_THAT((f = ::open("testfiles/0_2/test1.rfwX", O_RDONLY, 0)) >= 0);
+	TEST_THAT((f = ::open("testfiles" DIRECTORY_SEPARATOR "0_2"
+		DIRECTORY_SEPARATOR "test1.rfwX", O_RDONLY | O_BINARY, 0)) 
+		>= 0);
 	char buffer[sizeof(data)];
-	TEST_THAT(::read(f, buffer, sizeof(buffer)) == sizeof(buffer));
+	int bytes_read = ::read(f, buffer, sizeof(buffer));
+	TEST_THAT(bytes_read == sizeof(buffer));
 	for(unsigned int l = 0; l < 1024; ++l)
 	{
 		TEST_THAT(buffer[l] == data[l]);
@@ -627,7 +658,8 @@ int test(int argc, const char *argv[])
 		TEST_THAT(buffer[l+2048+sizeof(data2)] == data2[l]);
 	}
 	TEST_THAT(::lseek(f, sizeof(data), SEEK_SET) == sizeof(buffer));
-	TEST_THAT(::read(f, buffer, sizeof(buffer)) == sizeof(buffer));
+	bytes_read = ::read(f, buffer, sizeof(buffer));
+	TEST_THAT(bytes_read == sizeof(buffer));
 	for(unsigned int l = 0; l < 1024; ++l)
 	{
 		TEST_THAT(buffer[l] == data[l]);
@@ -638,7 +670,9 @@ int test(int argc, const char *argv[])
 	
 	// Commit the data
 	write1.Commit();
-	TEST_THAT((f = ::open("testfiles/0_2/test1.rfw", O_RDONLY, 0)) >= 0);
+	TEST_THAT((f = ::open("testfiles" DIRECTORY_SEPARATOR "0_2"
+		DIRECTORY_SEPARATOR "test1.rfw", O_RDONLY | O_BINARY, 0)) 
+		>= 0);
 	::close(f);
 
 	// Now try and read it
@@ -690,7 +724,9 @@ int test(int argc, const char *argv[])
 	write2.Write(data, sizeof(data));
 	// This time, discard it
 	write2.Discard();
-	TEST_THAT((f = ::open("testfiles/0_2/test1.rfw", O_RDONLY, 0)) == -1);
+	TEST_THAT((f = ::open("testfiles" DIRECTORY_SEPARATOR "0_2"
+		DIRECTORY_SEPARATOR "test1.rfw", O_RDONLY | O_BINARY, 0)) 
+		== -1);
 	
 	// And leaving it there...
 	RaidFileWrite writeLeave(0, "test1");
@@ -698,7 +734,9 @@ int test(int argc, const char *argv[])
 	writeLeave.Write(data, sizeof(data));
 	// This time, commit it
 	writeLeave.Commit();
-	TEST_THAT((f = ::open("testfiles/0_2/test1.rfw", O_RDONLY, 0)) != -1);
+	TEST_THAT((f = ::open("testfiles" DIRECTORY_SEPARATOR "0_2" 
+		DIRECTORY_SEPARATOR "test1.rfw", O_RDONLY | O_BINARY, 0)) 
+		!= -1);
 	::close(f);
 	
 	// Then check that the thing will refuse to open it again.
@@ -715,7 +753,8 @@ int test(int argc, const char *argv[])
 	write3b.Write(data + 3, sizeof(data) - 3);
 	write3b.Commit();
 	// Test it
-	testReadingFileContents(0, "test1", data+3, sizeof(data) - 3, false /*TestRAIDProperties*/);
+	testReadingFileContents(0, "test1", data+3, sizeof(data) - 3, false 
+		/* TestRAIDProperties */);
 
 	// And once again, but this time making it a raid file
 	RaidFileWrite write3c(0, "test1");
@@ -724,7 +763,8 @@ int test(int argc, const char *argv[])
 	write3c.Write(data + 7, sizeof(data) - 7);
 	write3c.Commit(true);	// make RAID
 	// Test it
-	testReadingFileContents(0, "test1", data+7, sizeof(data) - 7, false /*TestRAIDProperties*/);
+	testReadingFileContents(0, "test1", data+7, sizeof(data) - 7, false 
+		/*TestRAIDProperties*/);
 
 	// Test opening a file which doesn't exist
 	TEST_CHECK_THROWS(
@@ -739,20 +779,23 @@ int test(int argc, const char *argv[])
 		w.Commit(true);
 
 		// Try removing the parity file
-		TEST_THAT(::rename("testfiles/0_0/damage.rf", "testfiles/0_0/damage.rf-NT") == 0);
+		TEST_THAT(::rename("testfiles" DIRECTORY_SEPARATOR "0_0"
+			DIRECTORY_SEPARATOR "damage.rf", 
+			"testfiles" DIRECTORY_SEPARATOR "0_0"
+			DIRECTORY_SEPARATOR "damage.rf-NT") == 0);
 		{
 			std::auto_ptr<RaidFileRead> pr0 = RaidFileRead::Open(0, "damage");
 			pr0->Read(buffer, sizeof(data));
 		}		
-		TEST_THAT(::rename("testfiles/0_0/damage.rf-NT", "testfiles/0_0/damage.rf") == 0);
-		
+		TEST_THAT(::rename("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf-NT", "testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf") == 0);
+	
 		// Delete one of the files
-		TEST_THAT(::unlink("testfiles/0_1/damage.rf") == 0);	// stripe 1
+		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_1" DIRECTORY_SEPARATOR "damage.rf") == 0); // stripe 1
 		
 #ifdef TRF_CAN_INTERCEPT
 		// Open it and read...
 		{
-			intercept_setup_error("testfiles/0_2/damage.rf", 0, EIO, SYS_read);	// stripe 2
+			intercept_setup_error("testfiles" DIRECTORY_SEPARATOR "0_2" DIRECTORY_SEPARATOR "damage.rf", 0, EIO, SYS_read);	// stripe 2
 			std::auto_ptr<RaidFileRead> pr1 = RaidFileRead::Open(0, "damage");
 			TEST_CHECK_THROWS(
 				pr1->Read(buffer, sizeof(data)),
@@ -764,7 +807,7 @@ int test(int argc, const char *argv[])
 #endif //TRF_CAN_INTERCEPT
 
 		// Delete another
-		TEST_THAT(::unlink("testfiles/0_0/damage.rf") == 0);		// parity
+		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf") == 0); // parity
 		
 		TEST_CHECK_THROWS(
 			std::auto_ptr<RaidFileRead> pread2 = RaidFileRead::Open(0, "damage"),
@@ -775,22 +818,22 @@ int test(int argc, const char *argv[])
 	{
 		RaidFileWrite::CreateDirectory(0, "dirread");
 		// Make some contents
-		RaidFileWrite::CreateDirectory(0, "dirread/dfsdf1");
-		RaidFileWrite::CreateDirectory(0, "dirread/ponwq2");
+		RaidFileWrite::CreateDirectory(0, "dirread" DIRECTORY_SEPARATOR "dfsdf1");
+		RaidFileWrite::CreateDirectory(0, "dirread" DIRECTORY_SEPARATOR "ponwq2");
 		{
-			RaidFileWrite w(0, "dirread/sdf9873241");
+			RaidFileWrite w(0, "dirread" DIRECTORY_SEPARATOR "sdf9873241");
 			w.Open();
 			w.Write(data, sizeof(data));
 			w.Commit(true);
 		}
 		{
-			RaidFileWrite w(0, "dirread/fsdcxjni3242");
+			RaidFileWrite w(0, "dirread" DIRECTORY_SEPARATOR "fsdcxjni3242");
 			w.Open();
 			w.Write(data, sizeof(data));
 			w.Commit(true);
 		}
 		{
-			RaidFileWrite w(0, "dirread/cskjnds3");
+			RaidFileWrite w(0, "dirread" DIRECTORY_SEPARATOR "cskjnds3");
 			w.Open();
 			w.Write(data, sizeof(data));
 			w.Commit(false);
@@ -806,15 +849,15 @@ int test(int argc, const char *argv[])
 		TEST_THAT(true == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_DirsOnly, names));
 		TEST_THAT(list_matches(names, dir_list1));
 		// Delete things
-		TEST_THAT(::unlink("testfiles/0_0/dirread/sdf9873241.rf") == 0);
+		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
 		TEST_THAT(true == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_FilesOnly, names));
 		TEST_THAT(list_matches(names, file_list1));
 		// Delete something else so that it's not recoverable
-		TEST_THAT(::unlink("testfiles/0_1/dirread/sdf9873241.rf") == 0);
+		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_1" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
 		TEST_THAT(false == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_FilesOnly, names));
 		TEST_THAT(list_matches(names, file_list1));
 		// And finally...
-		TEST_THAT(::unlink("testfiles/0_2/dirread/sdf9873241.rf") == 0);
+		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_2" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
 		TEST_THAT(true == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_FilesOnly, names));
 		TEST_THAT(list_matches(names, file_list2));
 	}
