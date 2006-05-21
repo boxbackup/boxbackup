@@ -189,6 +189,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		{
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
+#endif // !WIN32
 		
 		// Server configuration
 		const Configuration &serverConfig(
@@ -197,7 +198,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
-		
+	
+#ifndef WIN32	
 		// Handle changing to a different user
 		if(serverConfig.KeyExists("User"))
 		{
@@ -263,25 +265,29 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				break;
 			}
 		}
+#endif // ! WIN32
 
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
-#endif // ! WIN32
 
 		// Log the start message
 		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " 
 			BOX_VERSION ")", mConfigFileName.c_str());
 
-#ifndef WIN32
 		// Write PID to file
 		char pid[32];
+
+#ifdef WIN32
+		int pidsize = sprintf(pid, "%d", (int)GetCurrentProcessId());
+#else
 		int pidsize = sprintf(pid, "%d", (int)getpid());
+#endif
+
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
 			::syslog(LOG_ERR, "can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
-#endif
 		
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING

@@ -84,6 +84,15 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 #ifdef WIN32
 	PROCESS_INFORMATION procInfo;
 
+	STARTUPINFO startInfo;
+	startInfo.cb = sizeof(startInfo);
+	startInfo.lpReserved = NULL;
+	startInfo.lpDesktop  = NULL;
+	startInfo.lpTitle    = NULL;
+	startInfo.dwFlags = 0;
+	startInfo.cbReserved2 = 0;
+	startInfo.lpReserved2 = NULL;
+
 	CHAR* tempCmd = strdup(CommandLine);
 
 	DWORD result = CreateProcess
@@ -96,13 +105,13 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 		0,           // dwCreationFlags
 		NULL,        // lpEnvironment
 		NULL,        // lpCurrentDirectory
-		NULL,        // lpStartupInfo
+		&startInfo,  // lpStartupInfo
 		&procInfo    // lpProcessInformation
 	);
 
 	free(tempCmd);
 
-	if (result != 0)
+	if (result == 0)
 	{
 		DWORD err = GetLastError();
 		printf("Launch failed: %s: error %d\n", CommandLine, (int)err);

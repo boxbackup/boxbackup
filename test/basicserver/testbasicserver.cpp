@@ -436,21 +436,37 @@ int test(int argc, const char *argv[])
 
 	// Launch a basic server
 	{
-		int pid = LaunchServer("./test srv1 testfiles/srv1.conf", "testfiles/srv1.pid");
+#ifdef WIN32
+		int pid = LaunchServer("test srv1 testfiles\\srv1.conf", 
+			"testfiles\\srv1.pid");
+#else
+		int pid = LaunchServer("./test srv1 testfiles/srv1.conf", 
+			"testfiles/srv1.pid");
+#endif
+
 		TEST_THAT(pid != -1 && pid != 0);
 		if(pid > 0)
 		{
 			// Check that it's written the expected file
-			TEST_THAT(TestFileExists("testfiles/srv1.test1"));
+			TEST_THAT(TestFileExists("testfiles" 
+				DIRECTORY_SEPARATOR "srv1.test1"));
 			TEST_THAT(ServerIsAlive(pid));
 			// Move the config file over
-			TEST_THAT(::rename("testfiles/srv1b.conf", "testfiles/srv1.conf") != -1);
+#ifdef WIN32
+			TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR 
+				"srv1.conf") != -1);
+#endif
+			TEST_THAT(::rename(
+				"testfiles" DIRECTORY_SEPARATOR "srv1b.conf", 
+				"testfiles" DIRECTORY_SEPARATOR "srv1.conf") 
+				!= -1);
 			// Get it to reread the config file
 			TEST_THAT(HUPServer(pid));
 			::sleep(1);
 			TEST_THAT(ServerIsAlive(pid));
 			// Check that new file exists
-			TEST_THAT(TestFileExists("testfiles/srv1.test2"));
+			TEST_THAT(TestFileExists("testfiles" 
+				DIRECTORY_SEPARATOR "srv1.test2"));
 			// Kill it off
 			TEST_THAT(KillServer(pid));
 			TestRemoteProcessMemLeaks("generic-daemon.memleaks");
@@ -459,7 +475,14 @@ int test(int argc, const char *argv[])
 	
 	// Launch a test forking server
 	{
-		int pid = LaunchServer("./test srv2 testfiles/srv2.conf", "testfiles/srv2.pid");
+#ifdef WIN32
+		int pid = LaunchServer("test srv2 testfiles\\srv2.conf", 
+			"testfiles\\srv2.pid");
+#else
+		int pid = LaunchServer("./test srv2 testfiles/srv2.conf", 
+			"testfiles/srv2.pid");
+#endif
+
 		TEST_THAT(pid != -1 && pid != 0);
 		if(pid > 0)
 		{
