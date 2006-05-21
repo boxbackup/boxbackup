@@ -62,10 +62,14 @@ void basicdaemon::Run()
 
 void testservers_pause_before_reply()
 {
-	 struct timespec t;
-	 t.tv_sec = 0;
-	 t.tv_nsec = COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000 * 1000;	// convert to ns
-	 ::nanosleep(&t, NULL);
+#ifdef WIN32
+	Sleep(COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000);
+#else
+	struct timespec t;
+	t.tv_sec = 0;
+	t.tv_nsec = COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000 * 1000;	// convert to ns
+	::nanosleep(&t, NULL);
+#endif
 }
 
 #define LARGE_DATA_BLOCK_SIZE 19870

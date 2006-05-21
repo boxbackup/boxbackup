@@ -18,11 +18,7 @@ test/common		lib/win32
 test/crypto		lib/crypto	lib/win32
 test/compress		lib/compress	lib/win32
 test/raidfile		lib/raidfile	lib/win32
-
-OMIT:mingw32
-OMIT:mingw32msvc
 test/basicserver	lib/server	lib/win32
-END-OMIT
 
 # IF_DISTRIBUTION(boxbackup)
 

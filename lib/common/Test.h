@@ -81,12 +81,45 @@ inline int TestGetFileSize(const char *Filename)
 
 inline int LaunchServer(const char *CommandLine, const char *pidFile)
 {
+#ifdef WIN32
+	PROCESS_INFORMATION procInfo;
+
+	CHAR* tempCmd = strdup(CommandLine);
+
+	DWORD result = CreateProcess
+	(
+		NULL,        // lpApplicationName, naughty!
+		tempCmd,     // lpCommandLine
+		NULL,        // lpProcessAttributes
+		NULL,        // lpThreadAttributes
+		false,       // bInheritHandles
+		0,           // dwCreationFlags
+		NULL,        // lpEnvironment
+		NULL,        // lpCurrentDirectory
+		NULL,        // lpStartupInfo
+		&procInfo    // lpProcessInformation
+	);
+
+	free(tempCmd);
+
+	if (result != 0)
+	{
+		DWORD err = GetLastError();
+		printf("Launch failed: %s: error %d\n", CommandLine, (int)err);
+		return -1;
+	}
+
+	CloseHandle(procInfo.hProcess);
+	CloseHandle(procInfo.hThread);
+#else // !WIN32
 	if(::system(CommandLine) != 0)
 	{
 		printf("Server: %s\n", CommandLine);
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
+#endif // WIN32
+
 	// time for it to start up
 	::sleep(1);
 	
@@ -107,8 +140,41 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 		return -1;
 	}
 	fclose(f);
-	
+
+#ifdef WIN32
+	if (pid != (int)procInfo.dwProcessId)
+	{
+		printf("Server wrote wrong pid to file (%s): expected %d "
+			"but found %d\n", pidFile, 
+			(int)procInfo.dwProcessId, pid);
+		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");	
+		return -1;
+	}
+#endif
+
 	return pid;
+}
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+inline bool ServerIsAlive(int pid)
+{
+#ifdef WIN32
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
+	if (hProcess == NULL)
+	{
+		printf("Failed to open process %d: error %d\n",
+			pid, (int)GetLastError());
+		return false;
+	}
+	CloseHandle(hProcess);
+	return true;
+#else // !WIN32
+	if(pid == 0) return false;
+	return ::kill(pid, 0) != -1;
+#endif // WIN32
 }
 
 #ifdef WIN32
@@ -117,7 +183,7 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 #include "IOStreamGetLine.h"
 #include "BoxPortsAndFiles.h"
 
-bool SendCommands(const std::string& rCmd)
+inline bool SendCommands(const std::string& rCmd)
 {
 	WinNamedPipeStream connection;
 
@@ -202,11 +268,6 @@ bool SendCommands(const std::string& rCmd)
 	return statusOk;
 }
 
-inline bool ServerIsAlive()
-{
-	return SendCommands("");
-}
-
 inline bool HUPServer(int pid)
 {
 	return SendCommands("reload");
@@ -216,16 +277,10 @@ inline bool KillServer(int pid)
 {
 	TEST_THAT(SendCommands("terminate"));
 	::sleep(1);
-	return !ServerIsAlive();
+	return !ServerIsAlive(pid);
 }
 
 #else // !WIN32
-
-inline bool ServerIsAlive(int pid)
-{
-	if(pid == 0) return false;
-	return ::kill(pid, 0) != -1;
-}
 
 inline bool HUPServer(int pid)
 {
