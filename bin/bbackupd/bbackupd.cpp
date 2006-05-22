@@ -57,18 +57,6 @@ int main(int argc, const char *argv[])
 	{
 		runAsWin32Service = true;
 	}
-	
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-		
-	WSADATA info;
-
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
-	{
-		// box backup will not run without sockets
-		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
 
 	gpDaemonService = new Win32BackupService();
 
@@ -100,9 +88,6 @@ int main(int argc, const char *argv[])
 		ExitCode = gpDaemonService->Main(
 			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 	}
-
-	// Clean up our sockets
-	WSACleanup();
 
 	::closelog();
 

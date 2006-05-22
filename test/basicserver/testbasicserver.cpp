@@ -431,6 +431,14 @@ int test(int argc, const char *argv[])
 		}
 	}
 
+#ifdef WIN32
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+
+	WSADATA info;
+	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
+#endif
+
 //printf("SKIPPING TESTS------------------------\n");
 //goto protocolserver;
 
@@ -460,6 +468,7 @@ int test(int argc, const char *argv[])
 				"testfiles" DIRECTORY_SEPARATOR "srv1b.conf", 
 				"testfiles" DIRECTORY_SEPARATOR "srv1.conf") 
 				!= -1);
+#ifndef WIN32
 			// Get it to reread the config file
 			TEST_THAT(HUPServer(pid));
 			::sleep(1);
@@ -467,9 +476,12 @@ int test(int argc, const char *argv[])
 			// Check that new file exists
 			TEST_THAT(TestFileExists("testfiles" 
 				DIRECTORY_SEPARATOR "srv1.test2"));
+#endif // !WIN32
 			// Kill it off
 			TEST_THAT(KillServer(pid));
+#ifndef WIN32
 			TestRemoteProcessMemLeaks("generic-daemon.memleaks");
+#endif // !WIN32
 		}
 	}
 	
@@ -488,36 +500,46 @@ int test(int argc, const char *argv[])
 		{
 			// Will it restart?
 			TEST_THAT(ServerIsAlive(pid));
+#ifndef WIN32
 			TEST_THAT(HUPServer(pid));
 			::sleep(1);
 			TEST_THAT(ServerIsAlive(pid));
+#endif // !WIN32
 			// Make some connections
 			{
 				SocketStream conn1;
 				conn1.Open(Socket::TypeINET, "localhost", 2003);
+#ifndef WIN32
 				SocketStream conn2;
 				conn2.Open(Socket::TypeUNIX, "testfiles/srv2.sock");
 				SocketStream conn3;
 				conn3.Open(Socket::TypeINET, "localhost", 2003);
+#endif // !WIN32
 				// Quick check that reconnections fail
 				TEST_CHECK_THROWS(conn1.Open(Socket::TypeUNIX, "testfiles/srv2.sock");, ServerException, SocketAlreadyOpen);
 				// Stuff some data around
 				std::vector<IOStream *> conns;
 				conns.push_back(&conn1);
+#ifndef WIN32
 				conns.push_back(&conn2);
 				conns.push_back(&conn3);
+#endif // !WIN32
 				Srv2TestConversations(conns);
 				// Implicit close
 			}
+#ifndef WIN32
 			// HUP again
 			TEST_THAT(HUPServer(pid));
 			::sleep(1);
 			TEST_THAT(ServerIsAlive(pid));
+#endif // !WIN32
 			// Kill it
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
 			TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 			TestRemoteProcessMemLeaks("test-srv2.memleaks");
+#endif // !WIN32
 		}
 	}
 

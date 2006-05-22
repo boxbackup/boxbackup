@@ -174,8 +174,11 @@ inline bool ServerIsAlive(int pid)
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
 	if (hProcess == NULL)
 	{
-		printf("Failed to open process %d: error %d\n",
-			pid, (int)GetLastError());
+		if (GetLastError() != ERROR_INVALID_PARAMETER)
+		{
+			printf("Failed to open process %d: error %d\n",
+				pid, (int)GetLastError());
+		}
 		return false;
 	}
 	CloseHandle(hProcess);
@@ -284,7 +287,24 @@ inline bool HUPServer(int pid)
 
 inline bool KillServer(int pid)
 {
-	TEST_THAT(SendCommands("terminate"));
+	HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, false, pid);
+	if (hProcess == NULL)
+	{
+		printf("Failed to open process %d: error %d\n",
+			pid, (int)GetLastError());
+		return false;
+	}
+
+	if (!TerminateProcess(hProcess, 1))
+	{
+		printf("Failed to terminate process %d: error %d\n",
+			pid, (int)GetLastError());
+		CloseHandle(hProcess);
+		return false;
+	}
+
+	CloseHandle(hProcess);
+
 	::sleep(1);
 	return !ServerIsAlive(pid);
 }

@@ -23,6 +23,10 @@
 	#include <syslog.h>
 #endif
 
+#ifdef WIN32
+	#include <ws2tcpip.h>
+#endif
+
 #include "Daemon.h"
 #include "Configuration.h"
 #include "ServerException.h"
@@ -359,6 +363,20 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 #endif
 		return 1;
 	}
+
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+
+	WSADATA info;
+
+	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
+	{
+		// will not run without sockets
+		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	int retcode = 0;
 	
 	// Main Daemon running
 	try
@@ -388,7 +406,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 						mConfigFileName.c_str(),
 						errors.c_str());
 					// And give up
-					return 1;
+					retcode = 1;
+					break;
 				}
 				
 				// delete old configuration
@@ -416,22 +435,24 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		::syslog(LOG_ERR, "%s: terminating due to exception %s "
 			"(%d/%d)", DaemonName(), e.what(), e.GetType(), 
 			e.GetSubType());
-		return 1;
+		retcode = 1;
 	}
 	catch(std::exception &e)
 	{
 		::syslog(LOG_ERR, "%s: terminating due to exception %s", 
 			DaemonName(), e.what());
-		return 1;
+		retcode = 1;
 	}
 	catch(...)
 	{
 		::syslog(LOG_ERR, "%s: terminating due to unknown exception",
 			DaemonName());
-		return 1;
+		retcode = 1;
 	}
+
+	WSACleanup();
 	
-	return 0;
+	return retcode;
 }
 
 // --------------------------------------------------------------------------
