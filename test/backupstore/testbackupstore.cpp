@@ -1520,35 +1520,48 @@ int test3(int argc, const char *argv[])
 		
 		// The test block to a file
 		{
-			FileStream f("testfiles/testenc1", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream f("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1", O_WRONLY | O_CREAT | O_EXCL);
 			f.Write(encfile, sizeof(encfile));
 		}
 		
 		// Encode it
 		{
-			FileStream out("testfiles/testenc1_enc", O_WRONLY | O_CREAT | O_EXCL);
-			BackupStoreFilenameClear name("testfiles/testenc1");
+			FileStream out("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1_enc", O_WRONLY | O_CREAT | O_EXCL);
+			BackupStoreFilenameClear name("testfiles"
+				DIRECTORY_SEPARATOR "testenc1");
 
-			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testenc1", 32, name));
+			std::auto_ptr<IOStream> encoded(
+				BackupStoreFile::EncodeFile(
+					"testfiles" DIRECTORY_SEPARATOR
+					"testenc1", 32, name));
 			encoded->CopyStreamTo(out);
 		}
 		
 		// Verify it
 		{
-			FileStream enc("testfiles/testenc1_enc");
+			FileStream enc("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1_enc");
 			TEST_THAT(BackupStoreFile::VerifyEncodedFileFormat(enc) == true);
 		}
 		
 		// Decode it
 		{
-			FileStream enc("testfiles/testenc1_enc");
-			BackupStoreFile::DecodeFile(enc, "testfiles/testenc1_orig", IOStream::TimeOutInfinite);
+			FileStream enc("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1_enc");
+			BackupStoreFile::DecodeFile(enc, "testfiles"
+				DIRECTORY_SEPARATOR "testenc1_orig", 
+				IOStream::TimeOutInfinite);
 		}
 		
 		// Read in rebuilt original, and compare contents
 		{
-			TEST_THAT(TestGetFileSize("testfiles/testenc1_orig") == sizeof(encfile));
-			FileStream in("testfiles/testenc1_orig");
+			TEST_THAT(TestGetFileSize("testfiles" 
+				DIRECTORY_SEPARATOR "testenc1_orig") 
+				== sizeof(encfile));
+			FileStream in("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1_orig");
 			int encfile_i[ENCFILE_SIZE];
 			in.Read(encfile_i, sizeof(encfile_i));
 			TEST_THAT(memcmp(encfile, encfile_i, sizeof(encfile)) == 0);
@@ -1556,7 +1569,8 @@ int test3(int argc, const char *argv[])
 		
 		// Check how many blocks it had, and test the stream based interface
 		{
-			FileStream enc("testfiles/testenc1_enc");
+			FileStream enc("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1_enc");
 			std::auto_ptr<BackupStoreFile::DecodedStream> decoded(BackupStoreFile::DecodeFileStream(enc, IOStream::TimeOutInfinite));
 			CollectInBufferStream d;
 			decoded->CopyStreamTo(d, IOStream::TimeOutInfinite, 971 /* buffer block size */);
@@ -1570,10 +1584,14 @@ int test3(int argc, const char *argv[])
 		// Test that the last block in a file, if less than 256 bytes, gets put into the last block
 		{
 			#define FILE_SIZE_JUST_OVER	((4096*2)+58)
-			FileStream f("testfiles/testenc2", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream f("testfiles" DIRECTORY_SEPARATOR 
+				"testenc2", O_WRONLY | O_CREAT | O_EXCL);
 			f.Write(encfile + 2, FILE_SIZE_JUST_OVER);
 			BackupStoreFilenameClear name("testenc2");
-			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testenc2", 32, name));
+			std::auto_ptr<IOStream> encoded(
+				BackupStoreFile::EncodeFile(
+					"testfiles" DIRECTORY_SEPARATOR
+					"testenc2", 32, name));
 			CollectInBufferStream e;
 			encoded->CopyStreamTo(e);
 			e.SetForReading();
@@ -1589,7 +1607,8 @@ int test3(int argc, const char *argv[])
 		
 		// Test that reordered streams work too
 		{
-			FileStream enc("testfiles/testenc1_enc");
+			FileStream enc("testfiles" DIRECTORY_SEPARATOR 
+				"testenc1_enc");
 			std::auto_ptr<IOStream> reordered(BackupStoreFile::ReorderFileToStreamOrder(&enc, false));
 			std::auto_ptr<BackupStoreFile::DecodedStream> decoded(BackupStoreFile::DecodeFileStream(*reordered, IOStream::TimeOutInfinite));
 			CollectInBufferStream d;
@@ -1600,7 +1619,8 @@ int test3(int argc, const char *argv[])
 
 			TEST_THAT(decoded->GetNumBlocks() == 3);
 		}
-		
+
+#ifndef WIN32		
 		// Try out doing this on a symlink
 		{
 			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
@@ -1614,6 +1634,7 @@ int test3(int argc, const char *argv[])
 			// Decode it
 			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 		}
+#endif
 	}
 
 	// Store info
@@ -1666,9 +1687,9 @@ int test3(int argc, const char *argv[])
 	// Context
 	TLSContext context;
 	context.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
+			"testfiles" DIRECTORY_SEPARATOR "clientCerts.pem",
+			"testfiles" DIRECTORY_SEPARATOR "clientPrivKey.pem",
+			"testfiles" DIRECTORY_SEPARATOR "clientTrustedCAs.pem");
 
 	// First, try logging in without an account having been created... just make sure login fails.
 	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
@@ -1865,7 +1886,11 @@ int test(int argc, const char *argv[])
 
 	// Use the setup crypto command to set up all these keys, so that the bbackupquery command can be used
 	// for seeing what's going on.
+#ifdef WIN32
+	BackupClientCryptoKeys_Setup("testfiles\\bbackupd.keys");	
+#else
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");	
+#endif
 	
 	// encode in some filenames -- can't do static initialisation because the key won't be set up when these are initialised
 	for(unsigned int l = 0; l < sizeof(ens_filenames) / sizeof(ens_filenames[0]); ++l)

@@ -25,24 +25,25 @@ test/basicserver	lib/server	lib/win32
 # Backup system
 
 lib/backupclient	lib/server	lib/crypto	lib/compress
+lib/backupstore		lib/server	lib/raidfile	lib/backupclient
 
 OMIT:mingw32
 OMIT:mingw32msvc
 OMIT:CYGWIN
-lib/backupstore		lib/server	lib/raidfile	lib/backupclient
-bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	lib/win32
-bin/bbstoreaccounts	lib/raidfile	lib/backupstore	lib/win32
 bin/bbackupobjdump	lib/backupclient lib/backupstore	lib/win32
 END-OMIT
 
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	lib/win32
+bin/bbstoreaccounts	lib/raidfile	lib/backupstore	lib/win32
 bin/bbackupd		lib/server	lib/backupclient	lib/win32
 bin/bbackupquery	lib/server	lib/backupclient	lib/win32
 bin/bbackupctl		lib/server	lib/backupclient	lib/win32
 
+test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
+
 OMIT:mingw32
 OMIT:mingw32msvc
 OMIT:CYGWIN
-test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
 test/backupdiff		lib/backupclient

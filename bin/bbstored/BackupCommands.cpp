@@ -9,7 +9,9 @@
 
 #include "Box.h"
 
+#ifdef HAVE_SYSLOG_H
 #include <syslog.h>
+#endif
 
 #include "autogen_BackupProtocolServer.h"
 #include "BackupConstants.h"

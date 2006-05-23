@@ -11,8 +11,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <syslog.h>
 #include <signal.h>
+
+#ifdef HAVE_SYSLOG_H
+#include <syslog.h>
+#endif
 
 #include "BackupContext.h"
 #include "BackupStoreDaemon.h"
@@ -155,7 +158,8 @@ void BackupStoreDaemon::Run()
 	mExtendedLogging = false;
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
-	
+
+#ifndef WIN32	
 	// Fork off housekeeping daemon -- must only do this the first time Run() is called
 	if(!mHaveForkedHousekeeping)
 	{
@@ -211,6 +215,7 @@ void BackupStoreDaemon::Run()
 			THROW_EXCEPTION(ServerException, SocketCloseError)
 		}
 	}
+#endif // !WIN32
 
 	if(mIsHousekeepingProcess)
 	{
