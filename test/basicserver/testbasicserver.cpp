@@ -63,7 +63,7 @@ void basicdaemon::Run()
 void testservers_pause_before_reply()
 {
 #ifdef WIN32
-	Sleep(COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000);
+	Sleep(COMMS_SERVER_WAIT_BEFORE_REPLYING);
 #else
 	struct timespec t;
 	t.tv_sec = 0;
@@ -545,15 +545,24 @@ int test(int argc, const char *argv[])
 
 	// Launch a test SSL server
 	{
+#ifdef WIN32
+		int pid = LaunchServer("test srv3 testfiles\\srv3.conf", 
+			"testfiles\\srv3.pid");
+#else
 		int pid = LaunchServer("./test srv3 testfiles/srv3.conf", "testfiles/srv3.pid");
+#endif
 		TEST_THAT(pid != -1 && pid != 0);
 		if(pid > 0)
 		{
 			// Will it restart?
 			TEST_THAT(ServerIsAlive(pid));
+
+#ifndef WIN32
 			TEST_THAT(HUPServer(pid));
 			::sleep(1);
 			TEST_THAT(ServerIsAlive(pid));
+#endif
+
 			// Make some connections
 			{
 				// SSL library
@@ -568,36 +577,50 @@ int test(int argc, const char *argv[])
 
 				SocketStreamTLS conn1;
 				conn1.Open(context, Socket::TypeINET, "localhost", 2003);
+#ifndef WIN32
 				SocketStreamTLS conn2;
 				conn2.Open(context, Socket::TypeUNIX, "testfiles/srv3.sock");
 				SocketStreamTLS conn3;
 				conn3.Open(context, Socket::TypeINET, "localhost", 2003);
+#endif
 				// Quick check that reconnections fail
 				TEST_CHECK_THROWS(conn1.Open(context, Socket::TypeUNIX, "testfiles/srv3.sock");, ServerException, SocketAlreadyOpen);
 				// Stuff some data around
 				std::vector<IOStream *> conns;
 				conns.push_back(&conn1);
+#ifndef WIN32
 				conns.push_back(&conn2);
 				conns.push_back(&conn3);
+#endif
 				Srv2TestConversations(conns);
 				// Implicit close
 			}
+#ifndef WIN32
 			// HUP again
 			TEST_THAT(HUPServer(pid));
 			::sleep(1);
 			TEST_THAT(ServerIsAlive(pid));
+#endif
 			// Kill it
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
 			TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 			TestRemoteProcessMemLeaks("test-srv3.memleaks");
+#endif
 		}
 	}
 	
 //protocolserver:
 	// Launch a test protocol handling server
 	{
-		int pid = LaunchServer("./test srv4 testfiles/srv4.conf", "testfiles/srv4.pid");
+#ifdef WIN32
+		int pid = LaunchServer("test srv4 testfiles\\srv4.conf", 
+			"testfiles\\srv4.pid");
+#else
+		int pid = LaunchServer("./test srv4 testfiles/srv4.conf", 
+			"testfiles/srv4.pid");
+#endif
 		TEST_THAT(pid != -1 && pid != 0);
 		if(pid > 0)
 		{
@@ -606,7 +629,11 @@ int test(int argc, const char *argv[])
 
 			// Open a connection to it		
 			SocketStream conn;
+#ifdef WIN32
+			conn.Open(Socket::TypeINET, "localhost", 2003);
+#else
 			conn.Open(Socket::TypeUNIX, "testfiles/srv4.sock");
+#endif
 			
 			// Create a protocol
 			TestProtocolClient protocol(conn);
@@ -669,7 +696,9 @@ int test(int argc, const char *argv[])
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
 			TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 			TestRemoteProcessMemLeaks("test-srv4.memleaks");
+#endif
 		}
 	}
 

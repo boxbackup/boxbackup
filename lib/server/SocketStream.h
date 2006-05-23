@@ -56,6 +56,7 @@ private:
 	tOSSocketHandle mSocketHandle;
 	bool mReadClosed;
 	bool mWriteClosed;
+	static const tOSSocketHandle mInvalidHandle = -1;
 
 protected:
 	off_t mBytesRead;

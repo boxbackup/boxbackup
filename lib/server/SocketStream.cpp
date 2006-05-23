@@ -36,7 +36,7 @@
 //
 // --------------------------------------------------------------------------
 SocketStream::SocketStream()
-	: mSocketHandle(-1),
+	: mSocketHandle(mInvalidHandle),
 	  mReadClosed(false),
 	  mWriteClosed(false),
 	  mBytesRead(0),
@@ -85,7 +85,7 @@ SocketStream::SocketStream(const SocketStream &rToCopy)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle);
 	}
-	if(mSocketHandle == -1)
+	if(mSocketHandle == mInvalidHandle)
 	{
 		THROW_EXCEPTION(ServerException, DupError);
 	}
@@ -101,7 +101,7 @@ SocketStream::SocketStream(const SocketStream &rToCopy)
 // --------------------------------------------------------------------------
 SocketStream::~SocketStream()
 {
-	if(mSocketHandle != -1)
+	if(mSocketHandle != mInvalidHandle)
 	{
 		Close();
 	}
@@ -117,7 +117,10 @@ SocketStream::~SocketStream()
 // --------------------------------------------------------------------------
 void SocketStream::Attach(int socket)
 {
-	if(mSocketHandle != -1) {THROW_EXCEPTION(ServerException, SocketAlreadyOpen)}
+	if(mSocketHandle != mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
+	}
 
 	mSocketHandle = socket;
 	ResetCounters();
@@ -134,7 +137,10 @@ void SocketStream::Attach(int socket)
 // --------------------------------------------------------------------------
 void SocketStream::Open(int Type, const char *Name, int Port)
 {
-	if(mSocketHandle != -1) {THROW_EXCEPTION(ServerException, SocketAlreadyOpen)}
+	if(mSocketHandle != mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
+	}
 	
 	// Setup parameters based on type, looking up names if required
 	int sockDomain = 0;
@@ -144,7 +150,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 
 	// Create the socket
 	mSocketHandle = ::socket(sockDomain, SOCK_STREAM, 0 /* let OS choose protocol */);
-	if(mSocketHandle == -1)
+	if(mSocketHandle == mInvalidHandle)
 	{
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -158,7 +164,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 #else
 		::close(mSocketHandle);
 #endif
-		mSocketHandle = -1;
+		mSocketHandle = mInvalidHandle;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
 	}
 	ResetCounters();
@@ -174,7 +180,10 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 // --------------------------------------------------------------------------
 int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
+	if(mSocketHandle == mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, BadSocketHandle)
+	}
 
 	if(Timeout != IOStream::TimeOutInfinite)
 	{
@@ -247,7 +256,10 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStream::Write(const void *pBuffer, int NBytes)
 {
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
+	if(mSocketHandle == mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, BadSocketHandle)
+	}
 	
 	// Buffer in byte sized type.
 	ASSERT(sizeof(char) == 1);
@@ -311,7 +323,10 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void SocketStream::Close()
 {
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
+	if(mSocketHandle == mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, BadSocketHandle)
+	}
 #ifdef WIN32
 	if(::closesocket(mSocketHandle) == -1)
 #else
@@ -333,7 +348,10 @@ void SocketStream::Close()
 // --------------------------------------------------------------------------
 void SocketStream::Shutdown(bool Read, bool Write)
 {
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
+	if(mSocketHandle == mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, BadSocketHandle)
+	}
 	
 	// Do anything?
 	if(!Read && !Write) return;
@@ -388,7 +406,10 @@ bool SocketStream::StreamClosed()
 // --------------------------------------------------------------------------
 tOSSocketHandle SocketStream::GetSocketHandle()
 {
-	if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
+	if(mSocketHandle == mInvalidHandle) 
+	{
+		THROW_EXCEPTION(ServerException, BadSocketHandle)
+	}
 	return mSocketHandle;
 }
 
