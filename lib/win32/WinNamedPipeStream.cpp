@@ -35,7 +35,7 @@
 //
 // --------------------------------------------------------------------------
 WinNamedPipeStream::WinNamedPipeStream()
-	: mSocketHandle(NULL),
+	: mSocketHandle(INVALID_HANDLE_VALUE),
 	  mReadableEvent(INVALID_HANDLE_VALUE),
 	  mBytesInBuffer(0),
 	  mReadClosed(false),
@@ -55,7 +55,7 @@ WinNamedPipeStream::WinNamedPipeStream()
 // --------------------------------------------------------------------------
 WinNamedPipeStream::~WinNamedPipeStream()
 {
-	if (mSocketHandle != NULL)
+	if (mSocketHandle != INVALID_HANDLE_VALUE)
 	{
 		Close();
 	}
@@ -72,7 +72,7 @@ WinNamedPipeStream::~WinNamedPipeStream()
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Accept(const wchar_t* pName)
 {
-	if (mSocketHandle != NULL || mIsConnected) 
+	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
@@ -90,7 +90,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
 		NULL);                     // default security attribute 
 
-	if (mSocketHandle == NULL)
+	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
 		::syslog(LOG_ERR, "CreateNamedPipeW failed: %d", 
 			GetLastError());
@@ -154,7 +154,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Connect(const wchar_t* pName)
 {
-	if (mSocketHandle != NULL || mIsConnected) 
+	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
@@ -198,7 +198,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		THROW_EXCEPTION(CommonException, AssertFailed)
 	}
 	
-	if (mSocketHandle == NULL || !mIsConnected) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -306,7 +306,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 {
-	if (mSocketHandle == NULL || !mIsConnected) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -349,14 +349,14 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Close()
 {
-	if (mSocketHandle == NULL && mIsConnected)
+	if (mSocketHandle == INVALID_HANDLE_VALUE && mIsConnected)
 	{
 		fprintf(stderr, "Inconsistent connected state\n");
 		::syslog(LOG_ERR, "Inconsistent connected state");
 		mIsConnected = false;
 	}
 
-	if (mSocketHandle == NULL) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -399,7 +399,7 @@ void WinNamedPipeStream::Close()
 
 	bool result = CloseHandle(mSocketHandle);
 
-	mSocketHandle = NULL;
+	mSocketHandle = INVALID_HANDLE_VALUE;
 	mIsConnected = false;
 	mReadClosed  = true;
 	mWriteClosed = true;
@@ -447,7 +447,7 @@ bool WinNamedPipeStream::StreamClosed()
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::WriteAllBuffered()
 {
-	if (mSocketHandle == NULL || !mIsConnected) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
