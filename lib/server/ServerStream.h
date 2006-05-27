@@ -56,6 +56,8 @@ public:
 		return "generic-stream-server";
 	}
 
+	virtual void OnIdle() { }
+
 	virtual void Run()
 	{
 		// Set process title as appropraite
@@ -267,7 +269,9 @@ public:
 					}
 				}
 
-#ifndef WIN32				
+#ifdef WIN32
+				OnIdle();
+#else // !WIN32
 				// Clean up child processes (if forking daemon)
 				if(ForkToHandleRequests)
 				{
