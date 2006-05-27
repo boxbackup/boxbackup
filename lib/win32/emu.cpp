@@ -371,7 +371,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 // --------------------------------------------------------------------------
 bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
 {
-	WCHAR* pWide = ConvertToWideString(pString, CP_UTF8);
+	WCHAR* pWide = ConvertUtf8ToWideString(pString);
 	if (pWide == NULL)
 	{
 		return false;
@@ -435,13 +435,26 @@ bool ConvertConsoleToUtf8(const char* pString, std::string& rDest)
 // --------------------------------------------------------------------------
 std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 {
+	std::string filename;
+	for (int i = 0; pFileName[i] != 0; i++)
+	{
+		if (pFileName[i] == '/')
+		{
+			filename += '\\';
+		}
+		else
+		{
+			filename += pFileName[i];
+		}
+	}
+
 	std::string tmpStr("\\\\?\\");
 	
 	// Is the path relative or absolute?
 	// Absolute paths on Windows are always a drive letter
 	// followed by ':'
 	
-	if (pFileName[1] != ':')
+	if (filename[1] != ':')
 	{
 		// Must be relative. We need to get the 
 		// current directory to make it absolute.
@@ -464,7 +477,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 		}
 	}
 	
-	tmpStr += pFileName;
+	tmpStr += filename;
 	return tmpStr;
 }
 
@@ -478,7 +491,8 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 // --------------------------------------------------------------------------
 HANDLE openfile(const char *pFileName, int flags, int mode)
 {
-	std::string AbsPathWithUnicode = ConvertPathToAbsoluteUnicode(pFileName);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pFileName);
 	
 	if (AbsPathWithUnicode.size() == 0)
 	{
@@ -514,7 +528,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		shareMode |= FILE_SHARE_WRITE;
 		accessRights |= FILE_WRITE_ATTRIBUTES 
 			| FILE_WRITE_DATA | FILE_WRITE_EA 
-			| FILE_ALL_ACCESS;
+			/*| FILE_ALL_ACCESS */;
 	}
 	if (flags & O_TRUNC)
 	{
@@ -658,7 +672,8 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 // --------------------------------------------------------------------------
 HANDLE OpenFileByNameUtf8(const char* pFileName)
 {
-	std::string AbsPathWithUnicode = ConvertPathToAbsoluteUnicode(pFileName);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pFileName);
 	
 	if (AbsPathWithUnicode.size() == 0)
 	{
@@ -1219,6 +1234,12 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	LPCSTR strings[] = { buffer, NULL };
 
+	if (gSyslogH == 0)
+	{
+		printf("%s\r\n", buffer);
+		return;
+	}
+
 	if (!ReportEvent(gSyslogH, // event log handle 
 		errinfo,               // event type 
 		0,                     // category zero 
@@ -1257,7 +1278,16 @@ void syslog(int loglevel, const char *frmt, ...)
 
 int emu_chdir(const char* pDirName)
 {
-	WCHAR* pBuffer = ConvertUtf8ToWideString(pDirName);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pDirName);
+
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	if (!pBuffer) return -1;
 	int result = SetCurrentDirectoryW(pBuffer);
 	delete [] pBuffer;
@@ -1312,7 +1342,16 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 
 int emu_mkdir(const char* pPathName)
 {
-	WCHAR* pBuffer = ConvertToWideString(pPathName, CP_UTF8);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pPathName);
+
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	if (!pBuffer)
 	{
 		return -1;
@@ -1332,7 +1371,16 @@ int emu_mkdir(const char* pPathName)
 
 int emu_unlink(const char* pFileName)
 {
-	WCHAR* pBuffer = ConvertToWideString(pFileName, CP_UTF8);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pFileName);
+
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	if (!pBuffer)
 	{
 		return -1;
