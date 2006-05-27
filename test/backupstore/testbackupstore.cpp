@@ -425,7 +425,8 @@ void test_test_file(int t, IOStream &rStream)
 	}
 	
 	free(data);
-	unlink("testfiles/test_download");
+	in.Close();
+	TEST_THAT(unlink("testfiles/test_download") == 0);
 }
 
 void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
@@ -930,6 +931,7 @@ int test_server(const char *hostname)
 		// Check marker is 0
 		TEST_THAT(loginConf->GetClientStoreMarker() == 0);
 
+#ifndef WIN32
 		// Check that we can't open a new connection which requests write permissions
 		{
 			SocketStreamTLS conn;
@@ -941,10 +943,12 @@ int test_server(const char *hostname)
 				ConnectionException, Conn_Protocol_UnexpectedReply);
 			protocol.QueryFinished();
 		}
+#endif
 		
 		// Set the client store marker
 		protocol.QuerySetClientStoreMarker(0x8732523ab23aLL);
 
+#ifndef WIN32
 		// Open a new connection which is read only
 		SocketStreamTLS connReadOnly;
 		connReadOnly.Open(context, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
@@ -963,10 +967,11 @@ int test_server(const char *hostname)
 			// Check client store marker
 			TEST_THAT(loginConf->GetClientStoreMarker() == 0x8732523ab23aLL);
 		}
+#else // WIN32
+		BackupProtocolClient& protocolReadOnly(protocol);
+#endif
 
 		test_server_1(protocol, protocolReadOnly);
-
-
 		// Create and upload some test files
 		int64_t maxID = 0;
 		for(int t = 0; t < UPLOAD_NUM; ++t)
@@ -1438,11 +1443,15 @@ int test_server(const char *hostname)
 		}
 			
 		// Finish the connections
+#ifndef WIN32
 		protocolReadOnly.QueryFinished();
+#endif
 		protocol.QueryFinished();
 		
 		// Close logs
+#ifndef WIN32
 		::fclose(protocolReadOnlyLog);
+#endif
 		::fclose(protocolLog);
 	}
 	
@@ -1587,6 +1596,7 @@ int test3(int argc, const char *argv[])
 			FileStream f("testfiles" DIRECTORY_SEPARATOR 
 				"testenc2", O_WRONLY | O_CREAT | O_EXCL);
 			f.Write(encfile + 2, FILE_SIZE_JUST_OVER);
+			f.Close();
 			BackupStoreFilenameClear name("testenc2");
 			std::auto_ptr<IOStream> encoded(
 				BackupStoreFile::EncodeFile(
@@ -1640,9 +1650,14 @@ int test3(int argc, const char *argv[])
 	// Store info
 	{
 		RaidFileWrite::CreateDirectory(0, "test-info");
-		BackupStoreInfo::CreateNew(76, "test-info/", 0, 3461231233455433LL, 2934852487LL);
-		TEST_CHECK_THROWS(BackupStoreInfo::CreateNew(76, "test-info/", 0, 0, 0), RaidFileException, CannotOverwriteExistingFile);
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
+		BackupStoreInfo::CreateNew(76, "test-info" DIRECTORY_SEPARATOR, 
+			0, 3461231233455433LL, 2934852487LL);
+		TEST_CHECK_THROWS(BackupStoreInfo::CreateNew(76, 
+			"test-info" DIRECTORY_SEPARATOR, 0, 0, 0), 
+			RaidFileException, CannotOverwriteExistingFile);
+		std::auto_ptr<BackupStoreInfo> info(
+			BackupStoreInfo::Load(76, 
+				"test-info" DIRECTORY_SEPARATOR, 0, true));
 		TEST_CHECK_THROWS(info->Save(), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksUsed(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInOldFiles(1), BackupStoreException, StoreInfoIsReadOnly);
@@ -1651,7 +1666,8 @@ int test3(int argc, const char *argv[])
 		TEST_CHECK_THROWS(info->AddDeletedDirectory(2), BackupStoreException, StoreInfoIsReadOnly);
 	}
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, false));
+		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, 
+			"test-info" DIRECTORY_SEPARATOR, 0, false));
 		info->ChangeBlocksUsed(8);
 		info->ChangeBlocksInOldFiles(9);
 		info->ChangeBlocksInDeletedFiles(10);
@@ -1669,7 +1685,8 @@ int test3(int argc, const char *argv[])
 		info->Save();
 	}
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
+		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, 
+			"test-info" DIRECTORY_SEPARATOR, 0, true));
 		TEST_THAT(info->GetBlocksUsed() == 7);
 		TEST_THAT(info->GetBlocksInOldFiles() == 5);
 		TEST_THAT(info->GetBlocksInDeletedFiles() == 1);
@@ -1692,7 +1709,13 @@ int test3(int argc, const char *argv[])
 			"testfiles" DIRECTORY_SEPARATOR "clientTrustedCAs.pem");
 
 	// First, try logging in without an account having been created... just make sure login fails.
+
+#ifdef WIN32
+	int pid = LaunchServer("..\\..\\bin\\bbstored\\bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+#else
 	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+#endif
+
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
@@ -1721,8 +1744,13 @@ int test3(int argc, const char *argv[])
 		}
 
 		// Create an account for the test client
+#ifdef WIN32
+		TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 10000B 20000B") == 0);
+#else
 		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 10000B 20000B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
+
 		TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
 		TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
 		TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
@@ -1746,15 +1774,27 @@ int test3(int argc, const char *argv[])
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 		
 		// Set a new limit on the account -- leave the hard limit high to make sure the target for
 		// freeing space is the soft limit.
+
+#ifdef WIN32
+		TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20000B") == 0);
+#else
 		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20000B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 
 		// Start things up
+#ifdef WIN32
+		pid = LaunchServer("..\\..\\bin\\bbstored\\bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+#else
 		pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+#endif
+
 		::sleep(1);
 		TEST_THAT(ServerIsAlive(pid));
 		
@@ -1779,8 +1819,12 @@ printf("after.objectsNotDel=%i, deleted=%i, old=%i\n",after.objectsNotDel, after
 		TEST_THAT(after.old == 0);
 		
 		// Set a really small hard limit
+#ifdef WIN32
+		TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20B") == 0);
+#else
 		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 
 		// Try to upload a file and create a directory, and check an error is generated
 		{
@@ -1829,7 +1873,10 @@ printf("after.objectsNotDel=%i, deleted=%i, old=%i\n",after.objectsNotDel, after
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
+
+#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 	}
 
 	return 0;
@@ -1841,10 +1888,19 @@ int multi_server()
 
 	// Create an account for the test client
 	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
+
+#ifndef WIN32
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 
 	// First, try logging in without an account having been created... just make sure login fails.
+
+#ifdef WIN32
+	int pid = LaunchServer("..\\..\\bin\\bbstored\\bbstored testfiles/bbstored_multi.conf", "testfiles/bbstored.pid");
+#else
 	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored_multi.conf", "testfiles/bbstored.pid");
+#endif
+
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
@@ -1861,15 +1917,63 @@ int multi_server()
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 	}
 
 
 	return 0;
 }
 
+WCHAR* ConvertUtf8ToWideString(const char* pString);
+std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
+
 int test(int argc, const char *argv[])
 {
+#ifdef WIN32
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+
+	WSADATA info;
+	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
+
+	// this had better work, or bbstored will die when combining diffs
+	char* file = "foo";
+	std::string abs = ConvertPathToAbsoluteUnicode(file);
+	WCHAR* wfile = ConvertUtf8ToWideString(abs.c_str());
+
+	DWORD accessRights = FILE_READ_ATTRIBUTES | 
+		FILE_LIST_DIRECTORY | FILE_READ_EA | FILE_WRITE_ATTRIBUTES |
+		FILE_WRITE_DATA | FILE_WRITE_EA /*| FILE_ALL_ACCESS*/;
+	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+
+	HANDLE h1 = CreateFileW(wfile, accessRights, shareMode,
+		NULL, OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	assert(h1 != INVALID_HANDLE_VALUE);
+	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
+
+	accessRights = FILE_READ_ATTRIBUTES | 
+		FILE_LIST_DIRECTORY | FILE_READ_EA;
+
+	HANDLE h2 = CreateFileW(wfile, accessRights, shareMode,
+		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	assert(h2 != INVALID_HANDLE_VALUE);
+	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
+
+	CloseHandle(h2);
+	CloseHandle(h1);
+
+	h1 = openfile("foo", O_CREAT | O_RDWR, 0);
+	assert(h1);
+	TEST_THAT(h1);
+	h2 = openfile("foo", O_RDWR, 0);
+	assert(h2);
+	TEST_THAT(h2);
+	CloseHandle(h2);
+	CloseHandle(h1);
+#endif
+
 	// SSL library
 	SSLLib::Initialise();
 	
