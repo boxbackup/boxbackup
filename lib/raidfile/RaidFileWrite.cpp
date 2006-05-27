@@ -564,6 +564,13 @@ void RaidFileWrite::TransformToRaidStorage()
 		parity.Close();
 		stripe2.Close();
 		stripe1.Close();
+
+#ifdef WIN32
+		// Must delete before renaming
+		::unlink(stripe1Filename.c_str());
+		::unlink(stripe2Filename.c_str());
+		::unlink(parityFilename.c_str());
+#endif
 		
 		// Rename them into place
 		if(::rename(stripe1FilenameW.c_str(), stripe1Filename.c_str()) != 0
