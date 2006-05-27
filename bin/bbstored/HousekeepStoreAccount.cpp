@@ -225,6 +225,7 @@ void HousekeepStoreAccount::MakeObjectFilename(int64_t ObjectID, std::string &rF
 // --------------------------------------------------------------------------
 bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 {
+#ifndef WIN32
 	if((--mCountUntilNextInterprocessMsgCheck) <= 0)
 	{
 		mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
@@ -235,6 +236,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 			return false;
 		}
 	}
+#endif
 
 	// Get the filename
 	std::string objectFilename;
@@ -485,6 +487,7 @@ bool HousekeepStoreAccount::DeleteFiles()
 	// (there is likely to be more in the set than should be actually deleted).
 	for(std::set<DelEn, DelEnCompare>::iterator i(mPotentialDeletions.begin()); i != mPotentialDeletions.end(); ++i)
 	{
+#ifndef WIN32
 		if((--mCountUntilNextInterprocessMsgCheck) <= 0)
 		{
 			mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
@@ -495,6 +498,7 @@ bool HousekeepStoreAccount::DeleteFiles()
 				return true;
 			}
 		}
+#endif
 
 		// Load up the directory it's in
 		// Get the filename
@@ -729,6 +733,7 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories()
 		// Go through list
 		for(std::vector<int64_t>::const_iterator i(mEmptyDirectories.begin()); i != mEmptyDirectories.end(); ++i)
 		{
+#ifndef WIN32
 			if((--mCountUntilNextInterprocessMsgCheck) <= 0)
 			{
 				mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
@@ -739,6 +744,7 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories()
 					return true;
 				}
 			}
+#endif
 
 			// Do not delete the root directory
 			if(*i == BACKUPSTORE_ROOT_DIRECTORY_ID)
