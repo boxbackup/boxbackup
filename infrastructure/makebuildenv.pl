@@ -39,7 +39,7 @@ unless(-d 'local')
 my %env_flags;
 
 my $windows_include_path = "-I../../lib/win32 ";
-if ($target_os !~ m'^mingw32' && $target_os ne "winnt")
+if (not $target_windows)
 {
 	$windows_include_path = "";
 	$env_flags{'IGNORE_lib/win32'} = 1;
@@ -484,7 +484,7 @@ __E
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
 	my $release_flags = "-O2";
-	if ($target_os =~ m'^mingw32')
+	if ($target_windows)
 	{
 		$release_flags = "-O0 -g";
 	}
@@ -572,7 +572,7 @@ __E
 		my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
 		my $base = $1;
 
-		if ($target_os =~ m'^mingw32')
+		if ($target_windows)
 		{
 			next if not $is_cpp and not $is_rc;
 		}
@@ -683,7 +683,7 @@ __E
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
-	if ($target_os =~ m'^mingw32')
+	if ($target_windows)
 	{
 		foreach my $dep (@all_deps_for_module)
 		{
