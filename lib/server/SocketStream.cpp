@@ -36,7 +36,7 @@
 //
 // --------------------------------------------------------------------------
 SocketStream::SocketStream()
-	: mSocketHandle(mInvalidHandle),
+	: mSocketHandle(INVALID_SOCKET_VALUE),
 	  mReadClosed(false),
 	  mWriteClosed(false),
 	  mBytesRead(0),
@@ -85,7 +85,7 @@ SocketStream::SocketStream(const SocketStream &rToCopy)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle);
 	}
-	if(mSocketHandle == mInvalidHandle)
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, DupError);
 	}
@@ -101,7 +101,7 @@ SocketStream::SocketStream(const SocketStream &rToCopy)
 // --------------------------------------------------------------------------
 SocketStream::~SocketStream()
 {
-	if(mSocketHandle != mInvalidHandle)
+	if(mSocketHandle != INVALID_SOCKET_VALUE)
 	{
 		Close();
 	}
@@ -117,7 +117,7 @@ SocketStream::~SocketStream()
 // --------------------------------------------------------------------------
 void SocketStream::Attach(int socket)
 {
-	if(mSocketHandle != mInvalidHandle) 
+	if(mSocketHandle != INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
@@ -137,7 +137,7 @@ void SocketStream::Attach(int socket)
 // --------------------------------------------------------------------------
 void SocketStream::Open(int Type, const char *Name, int Port)
 {
-	if(mSocketHandle != mInvalidHandle) 
+	if(mSocketHandle != INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
@@ -150,7 +150,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 
 	// Create the socket
 	mSocketHandle = ::socket(sockDomain, SOCK_STREAM, 0 /* let OS choose protocol */);
-	if(mSocketHandle == mInvalidHandle)
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -164,7 +164,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 #else
 		::close(mSocketHandle);
 #endif
-		mSocketHandle = mInvalidHandle;
+		mSocketHandle = INVALID_SOCKET_VALUE;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
 	}
 	ResetCounters();
@@ -180,7 +180,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 // --------------------------------------------------------------------------
 int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	if(mSocketHandle == mInvalidHandle) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -256,7 +256,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStream::Write(const void *pBuffer, int NBytes)
 {
-	if(mSocketHandle == mInvalidHandle) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -323,7 +323,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void SocketStream::Close()
 {
-	if(mSocketHandle == mInvalidHandle) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -335,7 +335,7 @@ void SocketStream::Close()
 	{
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
-	mSocketHandle = -1;
+	mSocketHandle = INVALID_SOCKET_VALUE;
 }
 
 // --------------------------------------------------------------------------
@@ -348,7 +348,7 @@ void SocketStream::Close()
 // --------------------------------------------------------------------------
 void SocketStream::Shutdown(bool Read, bool Write)
 {
-	if(mSocketHandle == mInvalidHandle) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -406,7 +406,7 @@ bool SocketStream::StreamClosed()
 // --------------------------------------------------------------------------
 tOSSocketHandle SocketStream::GetSocketHandle()
 {
-	if(mSocketHandle == mInvalidHandle) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
