@@ -42,7 +42,10 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mExtendedLogging(false),
 	  mHaveForkedHousekeeping(false),
 	  mIsHousekeepingProcess(false),
-	  mInterProcessComms(mInterProcessCommsSocket)
+#ifndef WIN32
+	  mInterProcessComms(mInterProcessCommsSocket),
+#endif
+	  mHousekeepingInited(false)
 {
 }
 
@@ -215,7 +218,6 @@ void BackupStoreDaemon::Run()
 			THROW_EXCEPTION(ServerException, SocketCloseError)
 		}
 	}
-#endif // !WIN32
 
 	if(mIsHousekeepingProcess)
 	{
@@ -224,9 +226,11 @@ void BackupStoreDaemon::Run()
 	}
 	else
 	{
+#endif // !WIN32
 		// In server process -- use the base class to do the magic
 		ServerTLS<BOX_PORT_BBSTORED>::Run();
-		
+	
+#ifndef WIN32	
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())
 		{
@@ -237,6 +241,7 @@ void BackupStoreDaemon::Run()
 			mInterProcessCommsSocket.Write("t\n", 2);
 		}
 	}
+#endif
 }
 
 
@@ -302,6 +307,8 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 	// Log the amount of data transferred
 	::syslog(LOG_INFO, "Connection statistics for %s: "
 			"IN=%lld OUT=%lld TOTAL=%lld\n", commonName,
-			s.GetBytesRead(), s.GetBytesWritten(),
-			s.GetBytesRead() + s.GetBytesWritten());
+			(long long)s.GetBytesRead(), 
+			(long long)s.GetBytesWritten(),
+			(long long)s.GetBytesRead() + 
+			(long long)s.GetBytesWritten());
 }
