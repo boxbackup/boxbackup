@@ -1,6 +1,9 @@
 #!/usr/bin/perl
 use strict;
 
+use lib "../../infrastructure";
+use BoxPlatform;
+
 # Make protocol C++ classes from a protocol description file
 
 # built in type info (values are is basic type, C++ typename)
@@ -981,8 +984,15 @@ sub make_log_strings
 		{
 			# need to translate it
 			my ($format,$arg) = @{$log_display_types{$ty}};
-			push @str,$format;
 			$arg =~ s/VAR/m$nm/g;
+
+			if ($format eq "0x%llx" and $target_windows)
+			{
+				$format = "0x%I64x";
+				$arg = "(uint64_t)$arg";
+			}
+
+			push @str,$format;
 			push @arg,$arg;
 		}
 		else
