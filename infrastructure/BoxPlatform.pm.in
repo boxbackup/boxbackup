@@ -32,7 +32,15 @@ BEGIN
 		or $target_os eq "winnt";
 
 	# get version
-	open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
+	if (! -r "VERSION.txt" and -r "../../VERSION.txt")
+	{
+		open VERSION,"../../VERSION.txt" or die "../../VERSION.txt: $!";
+	}
+	else
+	{
+		open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
+	}
+
 	$product_version = <VERSION>;
 	chomp $product_version;
 	$product_name = <VERSION>;
