@@ -38,11 +38,13 @@ private:
 	BackupStoreDaemon(const BackupStoreDaemon &rToCopy);
 public:
 
+#ifndef WIN32
 	// For BackupContext to comminicate with housekeeping process
 	void SendMessageToHousekeepingProcess(const void *Msg, int MsgLen)
 	{
 		mInterProcessCommsSocket.Write(Msg, MsgLen);
 	}
+#endif
 
 protected:
 	
@@ -56,12 +58,15 @@ protected:
 	virtual const char *DaemonBanner() const;
 
 	const ConfigurationVerify *GetConfigVerify() const;
-	
+
+#ifndef WIN32	
 	// Housekeeping functions
 	void HousekeepingProcess();
 	bool CheckForInterProcessMsg(int AccountNum = 0, int MaximumWaitTime = 0);
+#endif
 
 	void LogConnectionStats(const char *commonName, const SocketStreamTLS &s);
+
 
 private:
 	BackupStoreAccountDatabase *mpAccountDatabase;
@@ -69,9 +74,20 @@ private:
 	bool mExtendedLogging;
 	bool mHaveForkedHousekeeping;
 	bool mIsHousekeepingProcess;
-	
+
+#ifndef WIN32	
 	SocketStream mInterProcessCommsSocket;
 	IOStreamGetLine mInterProcessComms;
+#endif
+
+#ifdef WIN32
+	virtual void OnIdle();
+	bool mHousekeepingInited;
+#endif
+
+	void HousekeepingInit();
+	void RunHousekeepingIfNeeded();
+	int64_t mLastHousekeepingRun;
 };
 
 
