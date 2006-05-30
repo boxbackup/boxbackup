@@ -567,9 +567,17 @@ void RaidFileWrite::TransformToRaidStorage()
 
 #ifdef WIN32
 		// Must delete before renaming
-		::unlink(stripe1Filename.c_str());
-		::unlink(stripe2Filename.c_str());
-		::unlink(parityFilename.c_str());
+		#define CHECK_UNLINK(file) \
+		{ \
+			if (::unlink(file) != 0 && errno != ENOENT) \
+			{ \
+				THROW_EXCEPTION(RaidFileException, OSError); \
+			} \
+		}
+		CHECK_UNLINK(stripe1Filename.c_str());
+		CHECK_UNLINK(stripe2Filename.c_str());
+		CHECK_UNLINK(parityFilename.c_str());
+		#undef CHECK_UNLINK
 #endif
 		
 		// Rename them into place
