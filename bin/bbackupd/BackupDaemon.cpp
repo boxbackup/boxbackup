@@ -125,10 +125,20 @@ BackupDaemon::BackupDaemon()
 	}
 
 #ifdef WIN32
-	// Create the event object to signal when new messages are
-	// queued to be sent.
+	// Create the event object to signal from main thread to worker
+	// when new messages are queued to be sent to the command socket.
 	mhMessageToSendEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	if (mhMessageToSendEvent == INVALID_HANDLE_VALUE)
+	{
+		syslog(LOG_ERR, "Failed to create event object: error %d",
+			GetLastError);
+		exit(1);
+	}
+
+	// Create the event object to signal from worker to main thread
+	// when a command has been received on the command socket.
+	mhCommandReceivedEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (mhCommandReceivedEvent == INVALID_HANDLE_VALUE)
 	{
 		syslog(LOG_ERR, "Failed to create event object: error %d",
 			GetLastError);
@@ -276,7 +286,7 @@ void BackupDaemon::DeleteAllLocations()
 void BackupDaemon::RunHelperThread(void)
 {
 	mpCommandSocketInfo = new CommandSocketInfo;
-	this->mReceivedCommandConn = false;
+	// this->mReceivedCommandConn = false;
 	WinNamedPipeStream& rSocket(mpCommandSocketInfo->mListeningSocket);
 
 	// loop until the parent process exits
@@ -426,7 +436,7 @@ void BackupDaemon::RunHelperThread(void)
 					break;
 				}
 
-				this->mReceivedCommandConn = true;
+				// this->mReceivedCommandConn = true;
 			}
 
 			rSocket.Close();
@@ -985,25 +995,27 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut)
 {
 #ifdef WIN32
-	// Really could use some interprocess protection, mutex etc
-	// any side effect should be too bad???? :)
-	DWORD timeout = (DWORD)BoxTimeToMilliSeconds(RequiredDelay);
+	DWORD requiredDelayMs = BoxTimeToMilliSeconds(RequiredDelay);
 
-	while ( this->mReceivedCommandConn == false )
+	DWORD result = WaitForSingleObject(mhCommandReceivedEvent, 
+		(DWORD)requiredDelayMs);
+
+	if (result == WAIT_OBJECT_0)
 	{
-		Sleep(1);
-
-		if ( timeout == 0 )
-		{
-			DoSyncFlagOut = false;
-			SyncIsForcedOut = false;
-			return;
-		}
-		timeout--;
+		DoSyncFlagOut = this->mDoSyncFlagOut;
+		SyncIsForcedOut = this->mSyncIsForcedOut;
+		ResetEvent(mhCommandReceivedEvent);
 	}
-	this->mReceivedCommandConn = false;
-	DoSyncFlagOut = this->mDoSyncFlagOut;
-	SyncIsForcedOut = this->mSyncIsForcedOut;
+	else if (result == WAIT_TIMEOUT)
+	{
+		DoSyncFlagOut = false;
+		SyncIsForcedOut = false;
+	}
+	else
+	{
+		::syslog(LOG_ERR, "Unexpected result from "
+			"WaitForSingleObject: error %d", GetLastError());
+	}
 
 	return;
 #else // ! WIN32
@@ -1106,8 +1118,10 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		while(mpCommandSocketInfo->mpGetLine != 0 && !mpCommandSocketInfo->mpGetLine->IsEOF()
 			&& mpCommandSocketInfo->mpGetLine->GetLine(command, false /* no preprocessing */, timeout))
 		{
-			TRACE1("Receiving command '%s' over command socket\n", command.c_str());
-			
+			TRACE1("Receiving command '%s' over command socket\n", 
+				command.c_str());
+			SetEvent(mhCommandReceivedEvent);
+
 			bool sendOK = false;
 			bool sendResponse = true;
 		

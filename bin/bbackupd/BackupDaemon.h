@@ -185,8 +185,8 @@ private:
 	void RunHelperThread(void);
 
 	private:
-	bool mDoSyncFlagOut, mSyncIsForcedOut, mReceivedCommandConn;
-	HANDLE mhMessageToSendEvent;
+	bool mDoSyncFlagOut, mSyncIsForcedOut;
+	HANDLE mhMessageToSendEvent, mhCommandReceivedEvent;
 	CRITICAL_SECTION mMessageQueueLock;
 	std::vector<std::string> mMessageList;
 #endif
