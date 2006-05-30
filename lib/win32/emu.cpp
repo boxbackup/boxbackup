@@ -485,7 +485,8 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 //
 // Function
 //		Name:    openfile
-//		Purpose: replacement for any open calls - handles unicode filenames - supplied in utf8
+//		Purpose: replacement for any open calls - handles unicode 
+//			filenames - supplied in utf8
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
@@ -1387,11 +1388,29 @@ int emu_unlink(const char* pFileName)
 	}
 
 	BOOL result = DeleteFileW(pBuffer);
+	DWORD err = GetLastError();
 	delete [] pBuffer;
 
 	if (!result)
 	{
-		errno = EACCES;
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		{
+			errno = ENOENT;
+		}
+		else if (err == ERROR_SHARING_VIOLATION)
+		{
+			errno = EBUSY;
+		}
+		else if (err == ERROR_ACCESS_DENIED)
+		{
+			errno = EACCES;
+		}
+		else
+		{
+			::syslog(LOG_WARNING, "Failed to delete file "
+				"'%s': error %d", pFileName, (int)err);
+			errno = ENOSYS;
+		}
 		return -1;
 	}
 
@@ -1423,7 +1442,7 @@ int console_read(char* pBuffer, size_t BufferSize)
 	if (!ReadConsoleW(
 			hConsole,
 			pWideBuffer,
-			WideSize - 1,
+			WideSize, // will not be null terminated by ReadConsole
 			&numCharsRead,
 			NULL // reserved
 		)) 
