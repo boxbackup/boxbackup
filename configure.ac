@@ -97,6 +97,7 @@ AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 AC_CHECK_HEADER([regex.h], [have_regex_h=yes])
 
 if test "$have_regex_h" = "yes"; then
+  AC_DEFINE([HAVE_REGEX_H], [1], [Define to 1 if regex.h is available])
   AC_SEARCH_LIBS([regcomp], [pcreposix])
 fi
 
@@ -238,6 +239,7 @@ A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
 
+Regular expressions: $have_regex_h
 Large files:         $have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
