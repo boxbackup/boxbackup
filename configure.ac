@@ -43,7 +43,7 @@ AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
 VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 
 ## Check for Berkely DB. Restrict to certain versions
-AX_PATH_BDB("1.x or 4.1", [
+AX_PATH_BDB([1.x or 4.1], [
   LIBS="$BDB_LIBS $LIBS"
   LDFLAGS="$BDB_LDFLAGS $LDFLAGS"
   CPPFLAGS="$CPPFLAGS $BDB_CPPFLAGS"
