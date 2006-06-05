@@ -13,6 +13,9 @@
 #include <syslog.h>
 #endif
 
+#include <set>
+#include <sstream>
+
 #include "autogen_BackupProtocolServer.h"
 #include "BackupConstants.h"
 #include "BackupContext.h"
@@ -317,7 +320,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 		// OK! The last entry in the chain is the full file, the others are patches back from it.
 		// Open the last one, which is the current from file
 		std::auto_ptr<IOStream> from(rContext.OpenObject(patchChain[patchChain.size() - 1]));
-		
+
 		// Then, for each patch in the chain, do a combine
 		for(int p = ((int)patchChain.size()) - 2; p >= 0; --p)
 		{
@@ -329,8 +332,15 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			std::auto_ptr<IOStream> diff2(rContext.OpenObject(patchID));
 			
 			// Choose a temporary filename for the result of the combination
-			std::string tempFn(RaidFileController::DiscSetPathToFileSystemPath(rContext.GetStoreDiscSet(), rContext.GetStoreRoot() + ".recombinetemp",
-				p + 16 /* rotate which disc it's on */));
+#ifdef WIN32
+			std::ostringstream fs(rContext.GetStoreRoot());
+			fs << ".recombinetemp.";
+			fs << p;
+			std::string tempFn(fs.str());
+			tempFn = RaidFileController::DiscSetPathToFileSystemPath(rContext.GetStoreDiscSet(), tempFn, p + 16);
+#else
+			std::string tempFn(RaidFileController::DiscSetPathToFileSystemPath(rContext.GetStoreDiscSet(), rContext.GetStoreRoot() + ".recombinetemp", p + 16 /* rotate which disc it's on */));
+#endif
 			
 			// Open the temporary file
 			std::auto_ptr<IOStream> combined;
@@ -338,14 +348,23 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			{
 				{
 					// Write nastily to allow this to work with gcc 2.x
+#ifdef WIN32
+					combined.reset(new FileStream(
+						tempFn.c_str(), 
+						O_RDWR | O_CREAT | O_EXCL | 
+						O_BINARY | O_TRUNC));
+#else
 					std::auto_ptr<IOStream> t(new FileStream(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL));
 					combined = t;
+#endif
 				}
+#ifndef WIN32
 				// Unlink immediately as it's a temporary file
 				if(::unlink(tempFn.c_str()) != 0)
 				{
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
+#endif
 			}
 			catch(...)
 			{
@@ -361,6 +380,9 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			combined->Seek(0, IOStream::SeekType_Absolute);
 			
 			// Then shuffle round for the next go
+#ifdef WIN32
+			if (from.get()) from->Close();
+#endif
 			from = combined;
 		}
 		
@@ -398,14 +420,15 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			stream = t;
 		}
 
-		// Object will be deleted when the stream is deleted, so can release the object auto_ptr here to
-		// avoid premature deletiong
+		// Object will be deleted when the stream is deleted, 
+		// so can release the object auto_ptr here to avoid 
+		// premature deletion
 		object.release();
 	}
 
 	// Stream the reordered stream to the peer
 	rProtocol.SendStreamAfterCommand(stream.get());
-	
+
 	// Don't delete the stream here
 	stream.release();
 
