@@ -372,5 +372,19 @@ inline void TestRemoteProcessMemLeaks(const char *filename)
 #endif
 }
 
+// Wait a given number of seconds for something to complete
+inline void wait_for_operation(int seconds)
+{
+	printf("waiting: ");
+	fflush(stdout);
+	for(int l = 0; l < seconds; ++l)
+	{
+		sleep(1);
+		printf(".");
+		fflush(stdout);
+	}
+	printf("\n");
+}
+
 #endif // TEST__H
 
