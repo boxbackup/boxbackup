@@ -39,11 +39,11 @@ bin/bbackupctl		lib/server	lib/backupclient	lib/win32
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd
+test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
 
 OMIT:mingw32
 OMIT:mingw32msvc
 OMIT:CYGWIN
-test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient
 END-OMIT
