@@ -456,8 +456,10 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 			{
 				// Open it twice
 #ifdef WIN32
-				FileStream diff(tempFn.c_str(), O_RDWR | O_CREAT);
-				FileStream diff2(tempFn.c_str(), O_RDWR);
+				FileStream diff(tempFn.c_str(), 
+					O_RDWR | O_CREAT | O_BINARY);
+				FileStream diff2(tempFn.c_str(), 
+					O_RDWR | O_BINARY);
 #else
 				FileStream diff(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL);
 				FileStream diff2(tempFn.c_str(), O_RDONLY);
