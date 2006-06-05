@@ -253,6 +253,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 	// Read the directory in
 	BackupStoreDirectory dir;
 	dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
+	dirStream->Close();
 	
 	// Is it empty?
 	if(dir.GetNumberOfEntries() == 0)
