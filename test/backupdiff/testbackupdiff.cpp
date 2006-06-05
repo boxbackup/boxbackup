@@ -118,12 +118,20 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		if(s > 0)
 		{
 			nnew++;
+			#ifdef WIN32
+			TRACE2("%8I64d this  s=%8I64d", b, s);
+			#else
 			TRACE2("%8lld this  s=%8lld", b, s);
+			#endif
 		}
 		else
 		{
 			nold++;
+			#ifdef WIN32
+			TRACE2("%8I64d other i=%8I64d", b, 0 - s);		
+			#else
 			TRACE2("%8lld other i=%8lld", b, 0 - s);		
+			#endif
 		}
 		// Decode the rest
 		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
@@ -207,10 +215,18 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 	}
 	else
 	{
+#ifdef WIN32
+		// Emulate the above stage!
+		char src[256], dst[256];
+		sprintf(src, "testfiles\\f%d.diff", to);
+		sprintf(dst, "testfiles\\f%d.encoded", to);
+		TEST_THAT(CopyFile(src, dst, FALSE) != 0)
+#else
 		// Emulate the above stage!
 		char cmd[256];
 		sprintf(cmd, "cp testfiles/f%d.diff testfiles/f%d.encoded", to, to);
 		::system(cmd);
+#endif
 	}
 
 	// Decode it
@@ -370,6 +386,7 @@ int test(int argc, const char *argv[])
 		FileStream out("testfiles/f0.encoded", O_WRONLY | O_CREAT | O_EXCL);
 		std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f0", 1 /* dir ID */, f0name));
 		encoded->CopyStreamTo(out);
+		out.Close();
 		check_encoded_file("testfiles/f0.encoded", 0, 33, 0);
 	}
 	
@@ -430,6 +447,7 @@ int test(int argc, const char *argv[])
 			FileStream out("testfiles/f9.zerotest", O_WRONLY | O_CREAT | O_EXCL);
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f9", 1 /* dir ID */, fn));
 			encoded->CopyStreamTo(out);
+			out.Close();
 			check_encoded_file("testfiles/f9.zerotest", 0, 0, 0);		
 		}
 		{
@@ -439,7 +457,8 @@ int test(int argc, const char *argv[])
 			TEST_THAT(files_identical("testfiles/f9", "testfiles/f9.testdec.zero"));
 		}
 	}
-	
+
+#ifndef WIN32	
 	// Check that symlinks aren't diffed
 	TEST_THAT(::symlink("f2", "testfiles/f2.symlink") == 0)
 	// And go and diff it against the previous encoded file
@@ -467,8 +486,10 @@ int test(int argc, const char *argv[])
 		TEST_THAT(completelyDifferent == true);
 		check_encoded_file("testfiles/f2.symlink.diff", 0, 0, 0);		
 	}
+#endif
 
-	// Check that diffing against a file which isn't "complete" and referes another isn't allowed
+	// Check that diffing against a file which isn't "complete" and 
+	// references another isn't allowed
 	{
 		FileStream blockindex("testfiles/f1.diff");
 		BackupStoreFile::MoveStreamPositionToBlockIndex(blockindex);
@@ -480,8 +501,9 @@ int test(int argc, const char *argv[])
 			0, 0), BackupStoreException, CannotDiffAnIncompleteStoreFile);
 	}
 
-	// Found a nasty case where files of lots of the same thing sock up lots of processor
-	// time -- because of lots of matches found. Check this out!
+	// Found a nasty case where files of lots of the same thing 
+	// suck up lots of processor time -- because of lots of matches 
+	// found. Check this out!
 	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
 	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
 	// Generate a first encoded file
