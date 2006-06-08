@@ -141,6 +141,16 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	}
 #endif // WIN32
 
+	int pid = -1;
+
+#ifdef WIN32
+	if (pidFile == NULL)
+	{
+		pid = (int)procInfo.dwProcessId;
+	}
+	else
+	{
+#endif
 	// time for it to start up
 	::sleep(1);
 	
@@ -153,7 +163,6 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	}
 	
 	FILE *f = fopen(pidFile, "r");
-	int pid = -1;
 	if(f == NULL || fscanf(f, "%d", &pid) != 1)
 	{
 		printf("Server: %s (pidfile %s)\n", CommandLine, pidFile);
@@ -171,6 +180,7 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");	
 		return -1;
 	}
+	} // if (pidFile != NULL)
 #endif
 
 	return pid;
