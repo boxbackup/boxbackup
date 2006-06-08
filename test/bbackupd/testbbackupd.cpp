@@ -14,12 +14,17 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
-#ifdef HAVE_SYS_XATTR_H
-#include <cerrno>
-#include <sys/xattr.h>
+
+#ifdef HAVE_SYS_WAIT_H
+	#include <sys/wait.h>
 #endif
+
+#ifdef HAVE_SYS_XATTR_H
+	#include <cerrno>
+	#include <sys/xattr.h>
+#endif
+
 #include <map>
 
 #include "Test.h"
@@ -51,6 +56,16 @@
 
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
+
+#ifdef WIN32
+#define BBACKUPQUERY "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
+#define BBACKUPCTL "..\\..\\bin\\bbackupctl\\bbackupctl"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
+#else
+#define BBACKUPQUERY "../../bin/bbackupquery/bbackupquery"
+#define BBACKUPCTL "../../bin/bbackupctl/bbackupctl"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
+#endif
 
 void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
 {
@@ -252,6 +267,9 @@ bool attrmatch(const char *f1, const char *f2)
 	// if link, just make sure other file is a link too, and that the link to names match
 	if((s1.st_mode & S_IFMT) == S_IFLNK)
 	{
+#ifdef WIN32
+		TEST_FAIL_WITH_MESSAGE("No symlinks on win32!")
+#else
 		if((s2.st_mode & S_IFMT) != S_IFLNK) return false;
 		
 		char p1[PATH_MAX], p2[PATH_MAX];
@@ -262,6 +280,7 @@ bool attrmatch(const char *f1, const char *f2)
 		p1[p1l] = '\0';
 		p2[p2l] = '\0';
 		return strcmp(p1, p2) == 0;
+#endif
 	}
 
 	// modification times
@@ -280,12 +299,15 @@ int test_basics()
 	BackupClientFileAttributes t1;
 	t1.ReadAttributes("testfiles/test1");
 	TEST_THAT(!t1.IsSymLink());
+
+#ifndef WIN32
 	BackupClientFileAttributes t2;
 	t2.ReadAttributes("testfiles/test2");
 	TEST_THAT(t2.IsSymLink());
 	// Check that it's actually been encrypted (search for symlink name encoded in it)
 	void *te = ::memchr(t2.GetBuffer(), 't', t2.GetSize() - 3);
 	TEST_THAT(te == 0 || ::memcmp(te, "test", 4) != 0);
+#endif
 	
 	BackupClientFileAttributes t3;
 	TEST_CHECK_THROWS(t3.ReadAttributes("doesn't exist"), CommonException, OSFileError);
@@ -298,13 +320,20 @@ int test_basics()
 	
 	// Apply attributes to these new files
 	t1.WriteAttributes("testfiles/test1_n");
+#ifdef WIN32
+	t1.WriteAttributes("testfiles/test2_n");
+#else
 	t2.WriteAttributes("testfiles/test2_n");
+#endif
+
+#ifndef WIN32
 	TEST_CHECK_THROWS(t1.WriteAttributes("testfiles/test1_nXX"), CommonException, OSFileError);
 	TEST_CHECK_THROWS(t3.WriteAttributes("doesn't exist"), BackupStoreException, AttributesNotLoaded);
 
-	// Test that atttributes are vaguely similar
+	// Test that attributes are vaguely similar
 	TEST_THAT(attrmatch("testfiles/test1", "testfiles/test1_n"));
 	TEST_THAT(attrmatch("testfiles/test2", "testfiles/test2_n"));
+#endif
 	
 	// Check encryption, and recovery from encryption
 	// First, check that two attributes taken from the same thing have different encrypted values (think IV)
@@ -377,14 +406,22 @@ int test_basics()
 
 int test_setupaccount()
 {
+#ifdef WIN32
+	TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 1000B 2000B") == 0);
+#else
 	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 1000B 2000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 	return 0;
 }
 
 int test_run_bbstored()
 {
+#ifdef WIN32
+	bbstored_pid = LaunchServer("..\\..\\bin\\bbstored\\bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+#else
 	bbstored_pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+#endif
 	TEST_THAT(bbstored_pid != -1 && bbstored_pid != 0);
 	if(bbstored_pid > 0)
 	{
@@ -437,6 +474,7 @@ void terminate_on_alarm(int sigraised)
 	abort();
 }
 
+#ifndef WIN32
 void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 {
 	int pid = 0;
@@ -499,7 +537,7 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 		}
 	}
 }
-
+#endif
 
 int test_bbackupd()
 {
@@ -515,10 +553,18 @@ int test_bbackupd()
 
 	// unpack the files for the initial test
 	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
-	TEST_THAT(::system("mkdir testfiles/TestDir1") == 0);
+	TEST_THAT(::mkdir("testfiles/TestDir1") == 0);
+#ifdef WIN32
+	TEST_THAT(::system("tar xzvf testfiles/spacetest1.tgz -C testfiles/TestDir1") == 0);
+#else
 	TEST_THAT(::system("gzip -d < testfiles/spacetest1.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
+#endif
 
+#ifdef WIN32
+	int pid = LaunchServer("..\\..\\bin\\bbackupd\\bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
+#else
 	int pid = LaunchServer("../../bin/bbackupd/bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
+#endif
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
@@ -531,24 +577,36 @@ int test_bbackupd()
 		// Set limit to something very small
 		// About 28 blocks will be used at this point. bbackupd will only pause if the size used is
 		// greater than soft limit + 1/3 of (hard - soft). Set small values for limits accordingly.
+#ifdef WIN32
+		TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 40B") == 0);
+#else
 		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 40B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 
 		// Unpack some more files
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/spacetest2.tgz -C testfiles/TestDir1") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
+#endif
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/d1/f3") == 0);
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d3/d4") == 0);
 		wait_for_backup_operation();
 
 		// Make sure there are some differences
-		int compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query0a.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 2*256);
+		int compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query0a.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Put the limit back
+#ifdef WIN32
+		TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 1000B 2000B") == 0);
+#else
 		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 1000B 2000B") == 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+		testRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 		
 		// Check that the notify script was run
 		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
@@ -556,24 +614,30 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		
 		// unpack the initial files again
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/test_base.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
+#endif
 
 		// wait for it to do it's stuff
 		wait_for_backup_operation();
 		
 		// Check that the contents of the store are the same as the contents
 		// of the disc (-a = all, -c = give result in return code)
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query1.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query1.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		printf("Delete file and update another, create symlink.\n");
 		
 		// Delete a file
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+#ifndef WIN32
 		// New symlink
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/symlink-to-dir") == 0);
-		
+#endif		
+
 		// Update a file (will be uploaded as a diff)
 		{
 			// Check that the file is over the diffing threshold in the bbstored.conf file
@@ -589,63 +653,84 @@ int test_bbackupd()
 	
 		// wait for backup daemon to do it's stuff, and compare again
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query2.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query2.log \"compare -ac\" quit");
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		TEST_RETURN(compareReturnValue, 1);
+
 		// Try a quick compare, just for fun
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query2q.log \"compare -acq\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query2q.log \"compare -acq\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("Replace symlink with directory, add new directory\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir") == 0);
+#endif
 		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755) == 0);
 		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
 		// NOTE: create a file within the directory to avoid deletion by the housekeeping process later
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents") == 0);
+#endif
+
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
 		// And the inverse, replace a directory with a file/symlink
 		printf("Replace directory with symlink\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents") == 0);
+#endif
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
+#endif
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		// And then, put it back to how it was before.
 		printf("Replace symlink with directory (which was a symlink)\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file") == 0);
+#endif
 		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
+#endif
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		// And finally, put it back to how it was before it was put back to how it was before
 		// This gets lots of nasty things in the store with directories over other old directories.
 		printf("Put it all back to how it was\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
+#endif
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
+#endif
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// case which went wrong: rename a tracked file over a deleted file
 		printf("Rename an existing file over a deleted file\n");
+#ifdef WIN32
+		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd"));
+#endif
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", "testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		printf("Add files with old times, update attributes of one to latest time\n");
@@ -656,51 +741,81 @@ int test_bbackupd()
 		// Add some more files
 		// Because the 'm' option is not used, these files will look very old to the daemon.
 		// Lucky it'll upload them then!
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/test2.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/test2.tgz | ( cd  testfiles && tar xf - )") == 0);
 		::chmod("testfiles/TestDir1/sub23/dhsfdss/blf.h", 0415);
+#endif
 		
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		// Check that modifying files with old timestamps still get added
 		printf("Modify existing file, but change timestamp to rather old\n");
 		// Time critical, so sync
-		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -q -c testfiles/bbackupd.conf wait-for-sync") == 0);
+		TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+			"wait-for-sync") == 0);
 		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 		// Then wait a second, to make sure the scan is complete
 		::sleep(1);
 		// Then modify an existing file
 		{
-			chmod("testfiles/TestDir1/sub23/rand.h", 0777);	// in the archive, it's read only
-			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h", "w+");
+			// in the archive, it's read only
+#ifdef WIN32
+			TEST_THAT(::system("chmod 0777 testfiles/TestDir1/sub23/rand.h") == 0);
+#else
+			TEST_THAT(chmod("testfiles/TestDir1/sub23/rand.h", 0777) == 0);
+#endif
+			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h", 
+				"w+");
+
+			if (f == 0)
+			{
+				perror("Failed to open");
+			}
+
 			TEST_THAT(f != 0);
-			fprintf(f, "MODIFIED!\n");
-			fclose(f);
+
+			if (f != 0)
+			{
+				fprintf(f, "MODIFIED!\n");
+				fclose(f);
+			}
+
 			// and then move the time backwards!
 			struct timeval times[2];
 			BoxTimeToTimeval(SecondsToBoxTime((time_t)(365*24*60*60)), times[1]);
 			times[0] = times[1];
 			TEST_THAT(::utimes("testfiles/TestDir1/sub23/rand.h", times) == 0);
 		}
+
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Add some files and directories which are marked as excluded
 		printf("Add files and dirs for exclusion test\n");
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/testexclude.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/testexclude.tgz | ( cd testfiles && tar xf - )") == 0);
+#endif
+
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3c.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3c.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3d.log \"compare -acE\" quit");
-		TEST_THAT(compareReturnValue == 2*256);	// should find differences
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3d.log \"compare -acE\" quit");
+
+		// should find differences
+		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// These tests only work as non-root users.
@@ -717,9 +832,12 @@ int test_bbackupd()
 			}
 			// Wait and test...
 			wait_for_backup_operation();
-			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
-			TEST_THAT(compareReturnValue == 2*256);	// should find differences
+			compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
+
+			// should find differences
+			TEST_RETURN(compareReturnValue, 2);	
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 			// Check that it was reported correctly
 			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.1"));
 			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
@@ -731,7 +849,8 @@ int test_bbackupd()
 		printf("Continuously update file, check isn't uploaded\n");
 		
 		// Make sure everything happens at the same point in the sync cycle: wait until exactly the start of a sync
-		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -c testfiles/bbackupd.conf wait-for-sync") == 0);
+		TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+			"wait-for-sync") == 0);
 		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 		// Then wait a second, to make sure the scan is complete
 		::sleep(1);
@@ -752,8 +871,8 @@ int test_bbackupd()
 			printf("\n");
 			
 			// Check there's a difference
-			compareReturnValue = ::system("testfiles/extcheck1.pl");
-			TEST_THAT(compareReturnValue == 1*256);
+			compareReturnValue = ::system("perl testfiles/extcheck1.pl");
+			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			printf("Keep on continuously updating file, check it is uploaded eventually\n");
@@ -771,8 +890,8 @@ int test_bbackupd()
 			}
 			printf("\n");
 
-			compareReturnValue = ::system("testfiles/extcheck2.pl");
-			TEST_THAT(compareReturnValue == 1*256);
+			compareReturnValue = ::system("perl testfiles/extcheck2.pl");
+			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 		
@@ -785,8 +904,8 @@ int test_bbackupd()
 		
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
 		printf("Restore files and directories\n");
@@ -806,11 +925,6 @@ int test_bbackupd()
 
 			// Test the restoration
 			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-Test1", true /* print progress dots */) == Restore_Complete);
-
-			// Compare it
-			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query10.log \"compare -cE Test1 testfiles/restore-Test1\" quit");
-			TEST_THAT(compareReturnValue == 1*256);
-			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Make sure you can't restore a restored directory
 			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-Test1", true /* print progress dots */) == Restore_TargetExists);
@@ -833,28 +947,37 @@ int test_bbackupd()
 			protocol.QueryFinished();
 		}
 
+		// Compare the restored files
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query10.log \"compare -cE Test1 testfiles/restore-Test1\" quit");
+		TEST_RETURN(compareReturnValue, 1);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 		printf("Add files with current time\n");
 	
 		// Add some more files and modify others
 		// Use the m flag this time so they have a recent modification time
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvmf testfiles/test3.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/test3.tgz | ( cd testfiles && tar xmf - )") == 0);
+#endif
 		
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query5.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query5.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		// Rename directory
 		printf("Rename directory\n");
 		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", "testfiles/TestDir1/renamed-dir") == 0);
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		// and again, but with quick flag
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query6q.log \"compare -acq\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query6q.log \"compare -acq\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Rename some files -- one under the threshold, others above
@@ -863,14 +986,15 @@ int test_bbackupd()
 		TEST_THAT(rename("testfiles/TestDir1/df324", "testfiles/TestDir1/df324-ren") == 0);
 		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl", "testfiles/TestDir1/find2perl-ren") == 0);
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Check that modifying files with madly in the future timestamps still get added
 		printf("Create a file with timestamp to way ahead in the future\n");
 		// Time critical, so sync
-		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -q -c testfiles/bbackupd.conf wait-for-sync") == 0);
+		TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+			"wait-for-sync") == 0);
 		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 		// Then wait a second, to make sure the scan is complete
 		::sleep(1);
@@ -886,10 +1010,11 @@ int test_bbackupd()
 			times[0] = times[1];
 			TEST_THAT(::utimes("testfiles/TestDir1/sub23/in-the-future", times) == 0);
 		}
+
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 1*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		printf("Change client store marker\n");
@@ -940,10 +1065,11 @@ int test_bbackupd()
 
 		// Wait and test that there *are* differences
 		wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2); // little bit longer than usual
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
-		TEST_THAT(compareReturnValue == 2*256);
+		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
+		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		
+	
+#ifndef WIN32	
 		printf("Interrupted restore\n");
 		{
 			do_interrupted_restore(context, restoredirid);
@@ -968,10 +1094,15 @@ int test_bbackupd()
 			protocol.QueryFinished();
 
 			// Then check it has restored the correct stuff
-			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query14.log \"compare -cE Test1 testfiles/restore-interrupt\" quit");
-			TEST_THAT(compareReturnValue == 1*256);
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query14.log "
+				"\"compare -cE Test1 "
+				"testfiles/restore-interrupt\" quit");
+			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
+#endif
 
 		printf("Check restore deleted files\n");
 		{
@@ -987,8 +1118,11 @@ int test_bbackupd()
 			protocol.QueryFinished();
 
 			// Do a compare with the now undeleted files
-			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query11.log \"compare -cE Test1/x1 testfiles/restore-Test1-x1-2\" quit");
-			TEST_THAT(compareReturnValue == 1*256);
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query11.log "
+				"\"compare -cE Test1/x1 testfiles/restore-Test1-x1-2\" quit");
+			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 		
@@ -1009,8 +1143,10 @@ int test_bbackupd()
 		{
 			// Wait and comapre
 			wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2); // little bit longer than usual
-			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac\" quit");
-			TEST_THAT(compareReturnValue == 1*256);
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query4.log \"compare -ac\" quit");
+			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Kill it again
@@ -1022,7 +1158,8 @@ int test_bbackupd()
 	}
 
 	// List the files on the server
-	::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/queryLIST.log \"list -rotdh\" quit");
+	::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf "
+		"-l testfiles/queryLIST.log \"list -rotdh\" quit");
 	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
 	if(::getuid() == 0)
@@ -1035,6 +1172,14 @@ int test_bbackupd()
 
 int test(int argc, const char *argv[])
 {
+#ifdef WIN32
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+
+	WSADATA info;
+	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
+#endif
+
 	// SSL library
 	SSLLib::Initialise();
 
@@ -1042,7 +1187,11 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Initial files
+#ifdef WIN32
+	TEST_THAT(::system("tar xzvf testfiles/test_base.tgz -C testfiles") == 0);
+#else
 	TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
+#endif
 
 	// Do the tests
 
