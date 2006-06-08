@@ -1063,7 +1063,10 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					BackupClientDirectoryRecord *rec = e->second;
 					mSubDirectories.erase(e);
 					delete rec;
-					TRACE2("Deleted directory record for %s/%s\n", rLocalPath.c_str(), dirname.GetClearFilename().c_str());
+					TRACE2("Deleted directory record for "
+						"%s" DIRECTORY_SEPARATOR "%s\n",
+						rLocalPath.c_str(), 
+						dirname.GetClearFilename().c_str());
 				}				
 			}
 		}
