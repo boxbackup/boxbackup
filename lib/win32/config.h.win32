@@ -318,12 +318,6 @@
 /* Define to 1 if __syscall is available but needs a definition */
 /* #undef HAVE___SYSCALL_NEED_DEFN */
 
-/* max value of long long calculated by configure */
-/* #undef LLONG_MAX */
-
-/* min value of long long calculated by configure */
-/* #undef LLONG_MIN */
-
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
 /* #undef LSTAT_FOLLOWS_SLASHED_SYMLINK */
