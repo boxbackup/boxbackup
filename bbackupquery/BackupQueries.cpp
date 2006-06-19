@@ -26,6 +26,7 @@
 #endif
 
 #include <set>
+#include <limits>
 
 #include "BackupQueries.h"
 #include "Utils.h"
@@ -777,7 +778,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	}
 	
 	int64_t id = ::strtoll(args[0].c_str(), 0, 16);
-	if(id == LLONG_MIN || id == LLONG_MAX || id == 0)
+	if(id == std::numeric_limits<long long>::min() || id == std::numeric_limits<long long>::max() || id == 0)
 	{
 		printf("Not a valid object ID (specified in hex)\n");
 		return;
@@ -863,7 +864,7 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		{
 			// Specified as ID. 
 			id = ::strtoll(args[0].c_str(), 0, 16);
-			if(id == LLONG_MIN || id == LLONG_MAX || id == 0)
+			if(id == std::numeric_limits<long long>::min() || id == std::numeric_limits<long long>::max() || id == 0)
 			{
 				printf("Not a valid object ID (specified in hex)\n");
 				return;
@@ -1733,7 +1734,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	{
 		// Specified as ID. 
 		dirID = ::strtoll(args[0].c_str(), 0, 16);
-		if(dirID == LLONG_MIN || dirID == LLONG_MAX || dirID == 0)
+		if(dirID == std::numeric_limits<long long>::min() || dirID == std::numeric_limits<long long>::max() || dirID == 0)
 		{
 			printf("Not a valid object ID (specified in hex)\n");
 			return;
