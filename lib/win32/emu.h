@@ -216,7 +216,7 @@ struct itimerval
 
 // I (re-)defined here for the moment; has to be removed later !!! 
 #ifndef BOX_VERSION
-#define BOX_VERSION "0.09hWin32"
+#define BOX_VERSION "0.10_msvc"
 #endif
 
 #define S_IRGRP S_IWRITE
