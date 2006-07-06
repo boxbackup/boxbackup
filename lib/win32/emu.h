@@ -151,33 +151,6 @@ char* emu_getcwd(char* pBuffer, int BufSize);
 	}
 #endif
 
-//I do not perceive a need to change the user or group on a backup client
-//at any rate the owner of a service can be set in the service settings
-inline int setegid(int)
-{
-	return true;
-}
-inline int seteuid(int)
-{
-	return true;
-}
-inline int setgid(int)
-{
-	return true;
-}
-inline int setuid(int)
-{
-	return true;
-}
-inline int getgid(void)
-{
-	return 0;
-}
-inline int getuid(void)
-{
-	return 0;
-}
-
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
 #endif
@@ -212,11 +185,6 @@ struct itimerval
 	typedef __int8 int8_t;
 
 	typedef int socklen_t;
-#endif
-
-// I (re-)defined here for the moment; has to be removed later !!! 
-#ifndef BOX_VERSION
-#define BOX_VERSION "0.10_msvc"
 #endif
 
 #define S_IRGRP S_IWRITE
