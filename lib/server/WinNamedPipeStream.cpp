@@ -171,8 +171,17 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "Failed to connect to server's named pipe: "
-			"error %d", GetLastError());
+		DWORD err = GetLastError();
+		if (err == ERROR_PIPE_BUSY)
+		{
+			::syslog(LOG_ERR, "Failed to connect to backup "
+				"daemon: it is busy with another connection");
+		}
+		else
+		{
+			::syslog(LOG_ERR, "Failed to connect to backup "
+				"daemon: error %d", err);
+		}
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
@@ -216,6 +225,12 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 			if (err == ERROR_HANDLE_EOF)
 			{
+				mReadClosed = true;
+			}
+			else if (err == ERROR_BROKEN_PIPE)
+			{
+				::syslog(LOG_ERR, 
+					"Control client disconnected");
 				mReadClosed = true;
 			}
 			else
