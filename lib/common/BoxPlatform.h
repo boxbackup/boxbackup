@@ -21,7 +21,12 @@
 
 #define PLATFORM_DEV_NULL			"/dev/null"
 
+#ifdef _MSC_VER
+#include "BoxConfig-MSVC.h"
+#include "BoxVersion.h"
+#else
 #include "BoxConfig.h"
+#endif
 
 #ifdef WIN32
 	// need msvcrt version 6.1 or higher for _gmtime64()
