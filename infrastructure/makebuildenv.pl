@@ -14,8 +14,7 @@ $|=1;
 
 print "Box build environment setup.\n\n";
 
-
-my $implicit_dep = 'lib/common';
+my @implicit_deps = ('lib/common');
 
 # work out platform variables
 use lib 'infrastructure';
@@ -39,10 +38,14 @@ unless(-d 'local')
 my %env_flags;
 
 my $windows_include_path = "-I../../lib/win32 ";
-if (not $target_windows)
+if ($target_windows)
+{
+	push @implicit_deps, "lib/win32";
+}
+else
 {
 	$windows_include_path = "";
-	$env_flags{'IGNORE_lib/win32'} = 1;
+	# $env_flags{'IGNORE_lib/win32'} = 1;
 }
 
 # print "Flag: $_\n" for(keys %env_flags);
@@ -270,7 +273,7 @@ for(@modules_files)
 			push @md,$_ unless ignore_module($_)
 		}
 	}
-	$module_dependency{$mod} = [$implicit_dep,@md];
+	$module_dependency{$mod} = [@implicit_deps,@md];
 	$module_library_link_opts{$mod} = [@lo];
 	
 	# make directories, but not if we're using an external library and this a library module
@@ -285,8 +288,11 @@ for(@modules_files)
 }
 
 # make dirs for implicit dep
-mkdir "release/$implicit_dep",0755;
-mkdir "debug/$implicit_dep",0755;
+foreach my $dep (@implicit_deps)
+{
+	mkdir "release/$dep",0755;
+	mkdir "debug/$dep",0755;
+}
 
 # write a list of all the modules we've configured to use
 open CONFIGURED_MODS,'>local/modules.h' or die "Can't write configured modules list";
@@ -295,7 +301,7 @@ print CONFIGURED_MODS <<__E;
 #ifndef _CONFIGURED_MODULES__H
 #define _CONFIGURED_MODULES__H
 __E
-for($implicit_dep,@modules)
+for(@implicit_deps,@modules)
 {
 	my $m = $_;
 	$m =~ s~/~_~;
@@ -309,7 +315,7 @@ close CONFIGURED_MODS;
 
 # now make a list of all the .h files we can find, recording which module they're in
 my %hfiles;
-for my $mod (@modules, $implicit_dep)
+for my $mod (@modules, @implicit_deps)
 {
 	opendir DIR,$mod;
 	my @items = readdir DIR;
@@ -346,7 +352,7 @@ for my $mod (@modules, $implicit_dep)
 	}
 }
 
-for my $mod (@modules, $implicit_dep)
+for my $mod (@modules, @implicit_deps)
 {
 	opendir DIR,$mod;
 	for my $h (grep /\.h\Z/i, readdir DIR)
@@ -375,7 +381,7 @@ print "done\n\nGenerating Makefiles...\n";
 my %module_resources_win32;
 
 # Then write a makefile for each module
-for my $mod (@modules, $implicit_dep)
+for my $mod (@modules, @implicit_deps)
 {
 	print $mod,"\n";
 	

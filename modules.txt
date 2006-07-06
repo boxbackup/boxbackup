@@ -9,16 +9,15 @@
 
 # Generic support code and modules
 
-lib/raidfile		lib/win32
+lib/raidfile
 lib/crypto
 lib/server
-lib/win32		lib/server
 lib/compress
-test/common		lib/win32
-test/crypto		lib/crypto	lib/win32
-test/compress		lib/compress	lib/win32
-test/raidfile		lib/raidfile	lib/win32
-test/basicserver	lib/server	lib/win32
+test/common
+test/crypto		lib/crypto
+test/compress		lib/compress
+test/raidfile		lib/raidfile
+test/basicserver	lib/server
 
 # IF_DISTRIBUTION(boxbackup)
 
@@ -27,17 +26,17 @@ test/basicserver	lib/server	lib/win32
 lib/backupclient	lib/server	lib/crypto	lib/compress
 lib/backupstore		lib/server	lib/raidfile	lib/backupclient
 
-bin/bbackupobjdump	lib/backupclient lib/backupstore	lib/win32
-bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	lib/win32
-bin/bbstoreaccounts	lib/raidfile	lib/backupstore	lib/win32
-bin/bbackupd		lib/server	lib/backupclient	lib/win32
-bin/bbackupquery	lib/server	lib/backupclient	lib/win32
-bin/bbackupctl		lib/server	lib/backupclient	lib/win32
+bin/bbackupobjdump	lib/backupclient lib/backupstore
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
+bin/bbstoreaccounts	lib/raidfile	lib/backupstore
+bin/bbackupd		lib/server	lib/backupclient
+bin/bbackupquery	lib/server	lib/backupclient
+bin/bbackupctl		lib/server	lib/backupclient
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
-test/backupdiff		lib/backupclient	lib/win32
+test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient
 
 # END_IF_DISTRIBUTION
