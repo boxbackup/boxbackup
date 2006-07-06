@@ -32,12 +32,13 @@ void PrintUsageAndExit()
 {
 	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
 	"Commands are:\n"
-	"  sync -- start a syncronisation run now\n"
-	"  force-sync -- force the start of a syncronisation run, "
+	"  sync -- start a synchronisation (backup) run now\n"
+	"  force-sync -- force the start of a synchronisation run, "
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
+	"  wait-for-end  -- wait until the next sync finishes, then exit\n"
 	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"
 	);
 	exit(1);
@@ -224,7 +225,8 @@ int main(int argc, const char *argv[])
 	bool areWaitingForSync = false;
 	bool areWaitingForSyncEnd = false;
 
-	if(::strcmp(argv[0], "wait-for-sync") == 0)
+	if(::strcmp(argv[0], "wait-for-sync") == 0 ||
+	   ::strcmp(argv[0], "wait-for-end") == 0)
 	{
 		// Check that it's not in non-automatic mode, 
 		// because then it'll never start
@@ -236,8 +238,15 @@ int main(int argc, const char *argv[])
 		}
 	
 		// Yes... set the flag so we know that 
-		// we're waiting for a sync to start
-		areWaitingForSync = true;
+		// we're waiting for a sync to start/end
+		if(::strcmp(argv[0], "wait-for-sync") == 0)
+		{
+			areWaitingForSync = true;
+		}
+		else if (::strcmp(argv[0], "wait-for-end") == 0)
+		{
+			areWaitingForSyncEnd = true;
+		}
 	}
 	else if (::strcmp(argv[0], "sync-and-wait") == 0)
 	{
