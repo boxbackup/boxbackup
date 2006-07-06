@@ -257,6 +257,14 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	}
 
 	int lastSlash = parentDirectoryName.rfind(DIRECTORY_SEPARATOR_ASCHAR);
+
+	if(lastSlash == std::string::npos)
+	{
+		// might be a forward slash separator, 
+		// especially in the unit tests!
+		lastSlash = parentDirectoryName.rfind('/');
+	}
+
 	if(lastSlash != std::string::npos)
 	{
 		// the target directory is a deep path, remove the last
