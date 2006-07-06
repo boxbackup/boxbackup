@@ -290,9 +290,6 @@
 					<File
 						RelativePath="..\..\..\lib\win32\getopt_long.cxx">
 					</File>
-					<File
-						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp">
-					</File>
 				</Filter>
 				<Filter
 					Name="server"
@@ -333,6 +330,10 @@
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.cpp">
+					</File>
+
 				</Filter>
 			</Filter>
 		</Filter>
@@ -481,6 +482,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\WaitForEvent.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\BoxVersion.h">
 					</File>
 				</Filter>
 				<Filter
@@ -632,6 +636,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.h">
 					</File>
 				</Filter>
 			</Filter>
