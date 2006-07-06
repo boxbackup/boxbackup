@@ -7,10 +7,24 @@ BEGIN
 {
 
 	# which OS are we building under?
-	$build_os = `uname`;
-	chomp $build_os;
-	$build_cpu = `uname -p`;
-	chomp $build_cpu;
+	$target_os = '@target_os@';
+	$target_windows = 0;
+	$target_windows = 1 if $target_os =~ m'^mingw32' 
+		or $target_os eq "winnt";
+
+	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
+	{
+		$build_os = "winnt";
+		$build_cpu = "ix86";
+	}
+	else
+	{
+		$build_os = `uname`;
+		chomp $build_os;
+		$build_cpu = `uname -p`;
+		chomp $build_cpu;
+	}
+
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
 
@@ -24,12 +38,7 @@ BEGIN
 	$platform_compile_line_extra =~ s/ -O2//;
 	$platform_link_line_extra = '@LDFLAGS@';
 	$platform_lib_files = '@LIBS@';
-	$target_os = '@target_os@';
 	$platform_exe_ext = '@EXEEXT@';
-
-	$target_windows = 0;
-	$target_windows = 1 if $target_os =~ m'^mingw32' 
-		or $target_os eq "winnt";
 
 	# get version
 	if (! -r "VERSION.txt" and -r "../../VERSION.txt")
