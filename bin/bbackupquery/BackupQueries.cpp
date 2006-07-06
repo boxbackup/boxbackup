@@ -84,6 +84,12 @@ BackupQueries::~BackupQueries()
 {
 }
 
+typedef struct cmd_info
+{
+	const char* name;
+	const char* opts;
+} cmd_info_t;
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -161,8 +167,24 @@ void BackupQueries::DoCommand(const char *Command)
 	}
 	
 	// Data about commands
-	static const char *commandNames[] = {"quit", "exit", "list",	 "pwd", "cd", "lcd",	"sh", "getobject", "get", "compare", "restore", "help", "usage", "undelete", 0};
-	static const char *validOptions[] = {"",	 "",	 "rodIFtTsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dri",     "",     "",      "",		 0};
+	static cmd_info_t commands[] = 
+	{
+		{ "quit", "" },
+		{ "exit", "" },
+		{ "list", "rodIFtTsh", },
+		{ "pwd",  "" },
+		{ "cd",   "od" },
+		{ "lcd",  "" },
+		{ "sh",   "" },
+		{ "getobject", "" },
+		{ "get",  "i" },
+		{ "compare", "alcqAE" },
+		{ "restore", "dri" },
+		{ "help", "" },
+		{ "usage", "" },
+		{ "undelete", "" },
+		{ NULL, NULL } 
+	};
 	#define COMMAND_Quit		0
 	#define COMMAND_Exit		1
 	#define COMMAND_List		2
@@ -182,11 +204,11 @@ void BackupQueries::DoCommand(const char *Command)
 	
 	// Work out which command it is...
 	int cmd = 0;
-	while(commandNames[cmd] != 0 && ::strcmp(cmdElements[0].c_str(), commandNames[cmd]) != 0)
+	while(commands[cmd].name != 0 && ::strcmp(cmdElements[0].c_str(), commands[cmd].name) != 0)
 	{
 		cmd++;
 	}
-	if(commandNames[cmd] == 0)
+	if(commands[cmd].name == 0)
 	{
 		// Check for aliases
 		int a;
@@ -221,9 +243,10 @@ void BackupQueries::DoCommand(const char *Command)
 		while(*c != 0)
 		{
 			// Valid option?
-			if(::strchr(validOptions[cmd], *c) == NULL)
+			if(::strchr(commands[cmd].opts, *c) == NULL)
 			{
-				printf("Invalid option '%c' for command %s\n", *c, commandNames[cmd]);
+				printf("Invalid option '%c' for command %s\n", 
+					*c, commands[cmd].name);
 				return;
 			}
 			opts[(int)*c] = true;
@@ -990,6 +1013,7 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 BackupQueries::CompareParams::CompareParams()
 	: mQuickCompare(false),
 	  mIgnoreExcludes(false),
+	  mIgnoreAttributes(false),
 	  mDifferences(0),
 	  mDifferencesExplainedByModTime(0),
 	  mExcludedDirs(0),
@@ -1052,6 +1076,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	BackupQueries::CompareParams params;
 	params.mQuickCompare = opts['q'];
 	params.mIgnoreExcludes = opts['E'];
+	params.mIgnoreAttributes = opts['A'];
 	
 	// Try and work out the time before which all files should be on the server
 	{
@@ -1484,11 +1509,12 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						}
 						
 						// Compare attributes
-						BackupClientFileAttributes localAttr;
 						box_time_t fileModTime = 0;
+						BackupClientFileAttributes localAttr;
 						localAttr.ReadAttributes(localPath.c_str(), false /* don't zero mod times */, &fileModTime);					
 						modifiedAfterLastSync = (fileModTime > rParams.mLatestFileUploadTime);
-						if(!localAttr.Compare(fileOnServerStream->GetAttributes(),
+						if(!rParams.mIgnoreAttributes &&
+						   !localAttr.Compare(fileOnServerStream->GetAttributes(),
 								true /* ignore attr mod time */,
 								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
 						{
