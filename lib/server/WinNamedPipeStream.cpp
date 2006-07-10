@@ -212,35 +212,60 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
 
+	if (mReadClosed)
+	{
+		THROW_EXCEPTION(ConnectionException, SocketShutdownError)
+	}
+
 	DWORD NumBytesRead;
 
 	if (mIsServer)
 	{
-		// overlapped I/O completed successfully? (wait if needed)
-
-		if (!GetOverlappedResult(mSocketHandle,
-			&mReadOverlap, &NumBytesRead, TRUE))
+		// satisfy from buffer if possible, to avoid
+		// blocking on read.
+		bool needAnotherRead = false;
+		if (mBytesInBuffer == 0)
 		{
-			DWORD err = GetLastError();
+			// overlapped I/O completed successfully? 
+			// (wait if needed)
 
-			if (err == ERROR_HANDLE_EOF)
+			if (GetOverlappedResult(mSocketHandle,
+				&mReadOverlap, &NumBytesRead, TRUE))
 			{
-				mReadClosed = true;
-			}
-			else if (err == ERROR_BROKEN_PIPE)
-			{
-				::syslog(LOG_ERR, 
-					"Control client disconnected");
-				mReadClosed = true;
+				needAnotherRead = true;
 			}
 			else
 			{
-				::syslog(LOG_ERR, "Failed to wait for "
-					"ReadFile to complete: error %d", err);
-				Close();
-				THROW_EXCEPTION(ConnectionException, 
-					Conn_SocketReadError)
+				DWORD err = GetLastError();
+
+				if (err == ERROR_HANDLE_EOF)
+				{
+					mReadClosed = true;
+				}
+				else 
+				{
+					if (err == ERROR_BROKEN_PIPE)
+					{
+						::syslog(LOG_ERR, "Control "
+							"client disconnected");
+					}
+					else
+					{
+						::syslog(LOG_ERR, 
+							"Failed to wait for "
+							"ReadFile to complete: "
+							"error %d", err);
+					}
+
+					Close();
+					THROW_EXCEPTION(ConnectionException, 
+						Conn_SocketReadError)
+				}
 			}
+		}
+		else
+		{
+			NumBytesRead = 0;
 		}
 
 		size_t BytesToCopy = NumBytesRead + mBytesInBuffer;
@@ -259,7 +284,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		NumBytesRead = BytesToCopy;
 
 		// start the next overlapped read
-		if (!ReadFile(mSocketHandle, 
+		if (needAnotherRead && !ReadFile(mSocketHandle, 
 			mReadBuffer + mBytesInBuffer, 
 			sizeof(mReadBuffer) - mBytesInBuffer,
 			NULL, &mReadOverlap))
@@ -267,10 +292,19 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			DWORD err = GetLastError();
 			if (err == ERROR_IO_PENDING)
 			{
-				ResetEvent(mReadableEvent);
+				// Don't reset yet, there might be data
+				// in the buffer waiting to be read, 
+				// will check below.
+				// ResetEvent(mReadableEvent);
 			}
 			else if (err == ERROR_HANDLE_EOF)
 			{
+				mReadClosed = true;
+			}
+			else if (err == ERROR_BROKEN_PIPE)
+			{
+				::syslog(LOG_ERR, 
+					"Control client disconnected");
 				mReadClosed = true;
 			}
 			else
@@ -286,6 +320,25 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		// If the read succeeded immediately, leave the event 
 		// signaled, so that we will be called again to process 
 		// the newly read data and start another overlapped read.
+		if (needAnotherRead && !mReadClosed)
+		{
+			// leave signalled
+		}
+		else if (!needAnotherRead && mBytesInBuffer > 0)
+		{
+			// leave signalled
+		}
+		else
+		{
+			// nothing left to read, reset the event
+			ResetEvent(mReadableEvent);
+			// FIXME: a pending read could have signalled
+			// the event (again) while we were busy reading.
+			// that signal would be lost, and the reading
+			// thread would block. Should be pretty obvious
+			// if this happens in practice: control client
+			// hangs.
+		}
 	}
 	else
 	{
