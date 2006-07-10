@@ -7,8 +7,9 @@
 
 #ifdef WIN32
 
-#include <windows.h>
+#include <assert.h>
 #include <fcntl.h>
+#include <windows.h>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
@@ -517,19 +518,19 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	if (flags & O_WRONLY)
 	{
+		accessRights = FILE_WRITE_ATTRIBUTES 
+			| FILE_WRITE_DATA | FILE_WRITE_EA;
 		shareMode = FILE_SHARE_WRITE;
 	}
-	if (flags & O_RDWR)
+	if (flags & (O_RDWR | O_CREAT))
 	{
-		shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+		accessRights |= FILE_WRITE_ATTRIBUTES 
+			| FILE_WRITE_DATA | FILE_WRITE_EA;
+		shareMode |= FILE_SHARE_WRITE;
 	}
 	if (flags & O_CREAT)
 	{
 		createDisposition = OPEN_ALWAYS;
-		shareMode |= FILE_SHARE_WRITE;
-		accessRights |= FILE_WRITE_ATTRIBUTES 
-			| FILE_WRITE_DATA | FILE_WRITE_EA 
-			/*| FILE_ALL_ACCESS */;
 	}
 	if (flags & O_TRUNC)
 	{
@@ -984,7 +985,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		timOut.tv_sec  = timeout / 1000;
 		timOut.tv_usec = timeout * 1000;
 
-		for (int i = 0; i < nfds; i++)
+		for (unsigned long i = 0; i < nfds; i++)
 		{
 			struct pollfd* ufd = &(ufds[i]);
 
@@ -1022,7 +1023,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		}
 		else if (nready > 0)
 		{
-			for (int i = 0; i < nfds; i++)
+			for (unsigned long i = 0; i < nfds; i++)
 			{
 				struct pollfd *ufd = &(ufds[i]);
 
@@ -1228,7 +1229,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	va_start(args, frmt);
 
 	int len = vsnprintf(buffer, sizeof(buffer)-1, sixfour.c_str(), args);
-	ASSERT(len < sizeof(buffer))
+	assert(len < sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
 
 	va_end(args);
@@ -1465,7 +1466,7 @@ int readv (int filedes, const struct iovec *vector, size_t count)
 {
 	int bytes = 0;
 	
-	for (int i = 0; i < count; i++)
+	for (size_t i = 0; i < count; i++)
 	{
 		int result = read(filedes, vector[i].iov_base, 
 			vector[i].iov_len);
@@ -1483,7 +1484,7 @@ int writev(int filedes, const struct iovec *vector, size_t count)
 {
 	int bytes = 0;
 	
-	for (int i = 0; i < count; i++)
+	for (size_t i = 0; i < count; i++)
 	{
 		int result = write(filedes, vector[i].iov_base, 
 			vector[i].iov_len);
