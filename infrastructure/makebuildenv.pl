@@ -37,14 +37,14 @@ unless(-d 'local')
 # flags about the environment
 my %env_flags;
 
-my $windows_include_path = "-I../../lib/win32 ";
+my $windows_include_path = "";
 if ($target_windows)
 {
+	$windows_include_path = "-I../../lib/win32 -I../../lib/common ";
 	push @implicit_deps, "lib/win32";
 }
 else
 {
-	$windows_include_path = "";
 	# $env_flags{'IGNORE_lib/win32'} = 1;
 }
 
