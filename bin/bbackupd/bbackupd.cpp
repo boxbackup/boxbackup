@@ -91,6 +91,8 @@ int main(int argc, const char *argv[])
 
 	::closelog();
 
+	delete gpDaemonService;
+
 	return ExitCode;
 
 #else // !WIN32
