@@ -292,12 +292,12 @@ int main(int argc, const char *argv[])
 		{
 			if(line == "start-sync")
 			{
-				printf("Sync started...\n");
+				if (!quiet) printf("Sync started...\n");
 				syncIsRunning = true;
 			}
 			else if(line == "finish-sync" && syncIsRunning)
 			{
-				printf("Sync finished.\n");
+				if (!quiet) printf("Sync finished.\n");
 				// Send a quit command to finish nicely
 				connection.Write("quit\n", 5);
 				
@@ -306,7 +306,7 @@ int main(int argc, const char *argv[])
 			}
 			else if(line == "finish-sync")
 			{
-				printf("Previous sync finished.\n");
+				if (!quiet) printf("Previous sync finished.\n");
 			}
 			// daemon must still be busy
 		}
