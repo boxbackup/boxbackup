@@ -44,6 +44,8 @@ extern std::string first_fail_file;
 // NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
 #define TEST_CHECK_THROWS(statement, excepttype, subtype)									\
 	{																						\
+		printf("[Test] Expect an exception below: (" \
+			#excepttype "/" #subtype ")\n"); \
 		bool didthrow = false;																\
 		try																					\
 		{																					\
@@ -210,25 +212,6 @@ inline bool ServerIsAlive(int pid)
 	return ::kill(pid, 0) != -1;
 #endif // WIN32
 }
-
-#ifndef WIN32
-
-inline bool HUPServer(int pid)
-{
-	if(pid == 0) return false;
-	return ::kill(pid, SIGHUP) != -1;
-}
-
-inline bool KillServer(int pid)
-{
-	if(pid == 0 || pid == -1) return false;
-	bool KilledOK = ::kill(pid, SIGTERM) != -1;
-	TEST_THAT(KilledOK);
-	::sleep(1);
-	return !ServerIsAlive(pid);
-}
-
-#endif // !WIN32
 
 inline void TestRemoteProcessMemLeaks(const char *filename)
 {
