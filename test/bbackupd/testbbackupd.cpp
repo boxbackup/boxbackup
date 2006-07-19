@@ -1212,10 +1212,8 @@ int test_bbackupd()
 
 		// Test that locked files cannot be backed up,
 		// and the appropriate error is reported.
-		// force a sync, since otherwise we will have to wait
-		// forever because of the ClientStoreMarker error above
 		// Wait for the sync to finish, so that we have time to work
-		sync_and_wait();
+		wait_for_sync();
 		// Now we have about three seconds to work
 
 		HANDLE handle = openfile("testfiles/TestDir1/lockedfile",
