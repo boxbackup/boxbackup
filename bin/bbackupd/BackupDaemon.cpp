@@ -286,15 +286,34 @@ void BackupDaemon::DeleteAllLocations()
 void BackupDaemon::RunHelperThread(void)
 {
 	mpCommandSocketInfo = new CommandSocketInfo;
-	// this->mReceivedCommandConn = false;
 	WinNamedPipeStream& rSocket(mpCommandSocketInfo->mListeningSocket);
 
 	// loop until the parent process exits
-	while (TRUE)
+	while (!IsTerminateWanted())
 	{
 		try
 		{
 			rSocket.Accept(BOX_NAMED_PIPE_NAME);
+		}
+		catch (BoxException &e)
+		{
+			::syslog(LOG_ERR, "Failed to open command socket: %s",
+				e.what());
+			SetTerminateWanted();
+			break; // this is fatal
+		}
+		catch (...)
+		{
+			::syslog(LOG_ERR, "Failed to open command socket: "
+				"unknown error");
+			SetTerminateWanted();
+			break; // this is fatal
+		}
+
+		try
+		{
+			// Errors here do not kill the thread,
+			// only the current connection.
 
 			// This next section comes from Ben's original function
 			// Log
@@ -324,7 +343,7 @@ void BackupDaemon::RunHelperThread(void)
 			IOStreamGetLine readLine(rSocket);
 			std::string command;
 
-			while (rSocket.IsConnected())
+			while (rSocket.IsConnected() && !IsTerminateWanted())
 			{
 				HANDLE handles[2];
 				handles[0] = mhMessageToSendEvent;
