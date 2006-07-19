@@ -15,14 +15,23 @@ while(<IN>)
 	next unless m/\S/;
 	if(m/continousupdate/)
 	{
-		$ret = 2 unless m/exists/;
+		unless (/exists/)
+		{
+			print "FAIL: continousupdate line does not match\n";
+			$ret = 2;
+		}
 		$seen = 1;
 	}
 	else
 	{
-		$ret = 2 unless m/\AWARNING/ || m/\ADifferences/ || /might be reason/ || /probably due to file mod/;
+		unless (/\AWARNING/ or /\ADifferences/ or /might be reason/
+			or /probably due to file mod/)
+		{
+			print "FAIL: Summary line does not match\n";
+			$ret = 2;
+		}
 	}
-	print;
+	print "READ: $_";
 }
 
 close IN;
