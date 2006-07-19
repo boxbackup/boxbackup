@@ -40,7 +40,8 @@ my %env_flags;
 my $windows_include_path = "";
 if ($target_windows)
 {
-	$windows_include_path = "-I../../lib/win32 -I../../lib/common ";
+	$windows_include_path = "-I../../lib/win32 -I ../../lib/common " .
+		"-I../../lib/server ";
 	push @implicit_deps, "lib/win32";
 }
 else
