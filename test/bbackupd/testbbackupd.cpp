@@ -562,6 +562,13 @@ void wait_for_sync_end()
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 }
 
+void sync_and_wait()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"force-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
 void terminate_bbackupd(int pid)
 {
 	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
@@ -915,7 +922,12 @@ int test_bbackupd()
 			printf("\n");
 			
 			// Check there's a difference
+			#ifdef WIN32
+			compareReturnValue = ::system("perl testfiles/extcheck1.pl A");
+			#else
 			compareReturnValue = ::system("perl testfiles/extcheck1.pl");
+			#endif
+
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -935,7 +947,12 @@ int test_bbackupd()
 			}
 			printf("\n");
 
+			#ifdef WIN32
+			compareReturnValue = ::system("perl testfiles/extcheck2.pl A");
+			#else
 			compareReturnValue = ::system("perl testfiles/extcheck2.pl");
+			#endif
+
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
@@ -1190,13 +1207,15 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
-		#if 0 // WIN32
+		#ifdef WIN32
 		printf("Testing locked file behaviour:\n");
 
 		// Test that locked files cannot be backed up,
 		// and the appropriate error is reported.
-		// Wait for a sync to finish, so that we have time to work
-		wait_for_sync_end();
+		// force a sync, since otherwise we will have to wait
+		// forever because of the ClientStoreMarker error above
+		// Wait for the sync to finish, so that we have time to work
+		sync_and_wait();
 		// Now we have about three seconds to work
 
 		HANDLE handle = openfile("testfiles/TestDir1/lockedfile",
@@ -1207,19 +1226,19 @@ int test_bbackupd()
 		{
 			// first sync will ignore the file, it's too new
 			wait_for_sync_end();
-			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 			// this sync should try to back up the file, 
 			// and fail, because it's locked
 			wait_for_sync_end();
-			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.2"));
-			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.3"));
+			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.1"));
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
 			// now close the file and check that it is
 			// backed up on the next run.
 			CloseHandle(handle);
 			wait_for_sync_end();
-			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.3"));
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
 			// compare, and check that it works
 			// reports the correct error message (and finishes)
@@ -1240,7 +1259,7 @@ int test_bbackupd()
 				" -q -c testfiles/bbackupd.conf "
 				"-l testfiles/query15.log "
 				"\"compare -ac\" quit");
-			TEST_RETURN(compareReturnValue, 2);
+			TEST_RETURN(compareReturnValue, 3);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// close the file again, check that compare

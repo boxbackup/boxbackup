@@ -1,7 +1,9 @@
 #!/usr/bin/perl
 use strict;
 
-unless(open IN,"../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac\" quit|")
+my $flags = $ARGV[0] or "";
+
+unless(open IN,"../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac$flags\" quit|")
 {
 	print "Couldn't open compare utility\n";
 	exit 2;
