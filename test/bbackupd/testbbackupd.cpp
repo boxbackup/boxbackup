@@ -438,7 +438,9 @@ int test_kill_bbstored()
 	TEST_THAT(KillServer(bbstored_pid));
 	::sleep(1);
 	TEST_THAT(!ServerIsAlive(bbstored_pid));
+#ifndef WIN32
 	TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 	return 0;
 }
 
@@ -538,6 +540,45 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 	}
 }
 #endif
+
+void force_sync()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"force-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+void wait_for_sync()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"wait-for-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+void wait_for_sync_end()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"wait-for-end") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+void terminate_bbackupd(int pid)
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"terminate") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+
+	for (int i = 0; i < 20; i++)
+	{
+		if (!ServerIsAlive(pid)) break;
+		fprintf(stdout, ".");
+		fflush(stdout);
+		sleep(1);
+	}
+
+	TEST_THAT(!ServerIsAlive(pid));
+	TestRemoteProcessMemLeaks("bbackupd.memleaks");
+}
 
 int test_bbackupd()
 {
@@ -756,12 +797,8 @@ int test_bbackupd()
 		
 		// Check that modifying files with old timestamps still get added
 		printf("Modify existing file, but change timestamp to rather old\n");
-		// Time critical, so sync
-		TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-			"wait-for-sync") == 0);
-		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-		// Then wait a second, to make sure the scan is complete
-		::sleep(1);
+		wait_for_sync_end();
+
 		// Then modify an existing file
 		{
 			// in the archive, it's read only
@@ -794,7 +831,9 @@ int test_bbackupd()
 		}
 
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_sync_end(); // files too new
+		wait_for_sync_end(); // should (not) be backed up this time
+
 		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -808,7 +847,9 @@ int test_bbackupd()
 #endif
 
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_sync_end();
+		wait_for_sync_end();
+
 		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query3c.log \"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -818,6 +859,7 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+#ifndef WIN32
 		// These tests only work as non-root users.
 		if(::getuid() != 0)
 		{
@@ -845,13 +887,14 @@ int test_bbackupd()
 			::chmod("testfiles/TestDir1/sub23/read-fail-test-dir", 0770);
 			::chmod("testfiles/TestDir1/read-fail-test-file", 0770);
 		}
+#endif
 
 		printf("Continuously update file, check isn't uploaded\n");
 		
-		// Make sure everything happens at the same point in the sync cycle: wait until exactly the start of a sync
-		TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-			"wait-for-sync") == 0);
-		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+		// Make sure everything happens at the same point in the 
+		// sync cycle: wait until exactly the start of a sync
+		wait_for_sync();
+
 		// Then wait a second, to make sure the scan is complete
 		::sleep(1);
 
@@ -863,10 +906,11 @@ int test_bbackupd()
 				TEST_THAT(f != 0);
 				fprintf(f, "Loop iteration %d\n", l);
 				fflush(f);
-				sleep(1);
+				fclose(f);
+
 				printf(".");
 				fflush(stdout);
-				::fclose(f);
+				sleep(1);
 			}
 			printf("\n");
 			
@@ -883,10 +927,11 @@ int test_bbackupd()
 				TEST_THAT(f != 0);
 				fprintf(f, "Loop 2 iteration %d\n", l);
 				fflush(f);
-				sleep(1);
+				fclose(f);
+
 				printf(".");
 				fflush(stdout);
-				::fclose(f);
+				sleep(1);
 			}
 			printf("\n");
 
@@ -948,7 +993,15 @@ int test_bbackupd()
 		}
 
 		// Compare the restored files
-		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query10.log \"compare -cE Test1 testfiles/restore-Test1\" quit");
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10.log "
+		#ifdef WIN32
+			"\"compare -cAE Test1 testfiles/restore-Test1\" "
+		#else
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+		#endif
+			"quit");
+
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -993,11 +1046,11 @@ int test_bbackupd()
 		// Check that modifying files with madly in the future timestamps still get added
 		printf("Create a file with timestamp to way ahead in the future\n");
 		// Time critical, so sync
-		TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-			"wait-for-sync") == 0);
-		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+		wait_for_sync();
+
 		// Then wait a second, to make sure the scan is complete
 		::sleep(1);
+
 		// Then modify an existing file
 		{
 			FILE *f = fopen("testfiles/TestDir1/sub23/in-the-future", "w");
@@ -1054,8 +1107,8 @@ int test_bbackupd()
 		
 		printf("Check change of store marker pauses daemon\n");
 		
-		// Make a change to a file, to detect whether or not it's hanging around
-		// waiting to retry.
+		// Make a change to a file, to detect whether or not 
+		// it's hanging around waiting to retry.
 		{
 			FILE *f = ::fopen("testfiles/TestDir1/fileaftermarker", "w");
 			TEST_THAT(f != 0);
@@ -1064,7 +1117,7 @@ int test_bbackupd()
 		}
 
 		// Wait and test that there *are* differences
-		wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2); // little bit longer than usual
+		wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION * 3) / 2); // little bit longer than usual
 		compareReturnValue = ::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -1121,7 +1174,14 @@ int test_bbackupd()
 			compareReturnValue = ::system(BBACKUPQUERY 
 				" -q -c testfiles/bbackupd.conf "
 				"-l testfiles/query11.log "
-				"\"compare -cE Test1/x1 testfiles/restore-Test1-x1-2\" quit");
+				"\"compare "
+			#ifdef WIN32
+				// cannot restore attributes, so don't compare
+				"-cAE "
+			#else
+				"-cE "
+			#endif
+				"Test1/x1 testfiles/restore-Test1-x1-2\" quit");
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
@@ -1130,18 +1190,82 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
+		#if 0 // WIN32
+		printf("Testing locked file behaviour:\n");
+
+		// Test that locked files cannot be backed up,
+		// and the appropriate error is reported.
+		// Wait for a sync to finish, so that we have time to work
+		wait_for_sync_end();
+		// Now we have about three seconds to work
+
+		HANDLE handle = openfile("testfiles/TestDir1/lockedfile",
+			O_CREAT | O_EXCL, 0);
+		TEST_THAT(handle != 0);
+
+		if (handle != 0)
+		{
+			// first sync will ignore the file, it's too new
+			wait_for_sync_end();
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
+
+			// this sync should try to back up the file, 
+			// and fail, because it's locked
+			wait_for_sync_end();
+			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.2"));
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.3"));
+
+			// now close the file and check that it is
+			// backed up on the next run.
+			CloseHandle(handle);
+			wait_for_sync_end();
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.3"));
+
+			// compare, and check that it works
+			// reports the correct error message (and finishes)
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query15a.log "
+				"\"compare -ac\" quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// open the file again, compare and check that compare
+			// reports the correct error message (and finishes)
+			handle = openfile("testfiles/TestDir1/lockedfile",
+				O_CREAT | O_EXCL, 0);
+			TEST_THAT(handle != 0);
+
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query15.log "
+				"\"compare -ac\" quit");
+			TEST_RETURN(compareReturnValue, 2);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// close the file again, check that compare
+			// works again
+			CloseHandle(handle);
+
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query15a.log "
+				"\"compare -ac\" quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		}
+		#endif
+
 		// Kill the daemon
-		TEST_THAT(KillServer(pid));
-		::sleep(1);
-		TEST_THAT(!ServerIsAlive(pid));
-		TestRemoteProcessMemLeaks("bbackupd.memleaks");
+		terminate_bbackupd(pid);
 		
 		// Start it again
-		pid = LaunchServer("../../bin/bbackupd/bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
+		pid = LaunchServer("../../bin/bbackupd/bbackupd "
+			"testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
 		TEST_THAT(pid != -1 && pid != 0);
 		if(pid != -1 && pid != 0)
 		{
-			// Wait and comapre
+			// Wait and compare
 			wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2); // little bit longer than usual
 			compareReturnValue = ::system(BBACKUPQUERY 
 				" -q -c testfiles/bbackupd.conf "
@@ -1150,10 +1274,7 @@ int test_bbackupd()
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Kill it again
-			TEST_THAT(KillServer(pid));
-			::sleep(1);
-			TEST_THAT(!ServerIsAlive(pid));
-			TestRemoteProcessMemLeaks("bbackupd.memleaks");
+			terminate_bbackupd(pid);
 		}
 	}
 
@@ -1161,11 +1282,13 @@ int test_bbackupd()
 	::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf "
 		"-l testfiles/queryLIST.log \"list -rotdh\" quit");
 	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-	
+
+#ifndef WIN32	
 	if(::getuid() == 0)
 	{
 		::printf("WARNING: This test was run as root. Some tests have been omitted.\n");
 	}
+#endif
 	
 	return 0;
 }
