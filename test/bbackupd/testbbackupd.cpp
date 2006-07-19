@@ -46,6 +46,7 @@
 #include "Utils.h"
 #include "BoxTime.h"
 #include "BoxTimeToUnix.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 

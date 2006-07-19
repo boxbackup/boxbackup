@@ -28,9 +28,9 @@
 #include "TestContext.h"
 #include "autogen_TestProtocolClient.h"
 #include "autogen_TestProtocolServer.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
-
 
 #define SERVER_LISTEN_PORT	2003
 

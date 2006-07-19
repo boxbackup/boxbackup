@@ -29,6 +29,7 @@
 #include "RaidFileException.h"
 #include "StoreStructure.h"
 #include "BackupStoreFileWire.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
