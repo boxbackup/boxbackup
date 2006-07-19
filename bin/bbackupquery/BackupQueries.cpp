@@ -1016,6 +1016,7 @@ BackupQueries::CompareParams::CompareParams()
 	  mIgnoreAttributes(false),
 	  mDifferences(0),
 	  mDifferencesExplainedByModTime(0),
+	  mUncheckedFiles(0),
 	  mExcludedDirs(0),
 	  mExcludedFiles(0),
 	  mpExcludeFiles(0),
@@ -1139,13 +1140,29 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		return;
 	}
 	
-	printf("\n[ %d (of %d) differences probably due to file modifications after the last upload ]\nDifferences: %d (%d dirs excluded, %d files excluded)\n",
-		params.mDifferencesExplainedByModTime, params.mDifferences, params.mDifferences, params.mExcludedDirs, params.mExcludedFiles);
+	printf("\n[ %d (of %d) differences probably due to file "
+		"modifications after the last upload ]\n"
+		"Differences: %d (%d dirs excluded, %d files excluded, "
+		"%d files not checked)\n",
+		params.mDifferencesExplainedByModTime, params.mDifferences, 
+		params.mDifferences, params.mExcludedDirs, 
+		params.mExcludedFiles, params.mUncheckedFiles);
 	
 	// Set return code?
 	if(opts['c'])
 	{
-		SetReturnCode((params.mDifferences == 0)?COMPARE_RETURN_SAME:COMPARE_RETURN_DIFFERENT);
+		if (params.mUncheckedFiles != 0)
+		{
+			SetReturnCode(COMPARE_RETURN_ERROR);
+		} 
+		else if (params.mDifferences != 0)
+		{
+			SetReturnCode(COMPARE_RETURN_DIFFERENT);
+		}
+		else
+		{
+			SetReturnCode(COMPARE_RETURN_SAME);
+		}
 	}
 }
 
@@ -1279,11 +1296,13 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				"(compared to server directory '%s')\n",
 				localDirDisplay.c_str(), 
 				storeDirDisplay.c_str());
+			rParams.mDifferences ++;
 		}
 		else
 		{
 			printf("ERROR: stat on local dir '%s'\n", 
 				localDirDisplay.c_str());
+			rParams.mUncheckedFiles ++;
 		}
 		return;
 	}
@@ -1333,6 +1352,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	{
 		printf("ERROR: opendir on local dir '%s'\n", 
 			localDirDisplay.c_str());
+		rParams.mUncheckedFiles ++;
 		return;
 	}
 	try
@@ -1609,10 +1629,12 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						e.GetType(),
 						e.GetSubType(),
 						storePathDisplay.c_str());
+					rParams.mUncheckedFiles ++;
 				}
 				catch(...)
-				{
+				{	
 					printf("ERROR: (unknown) during file fetch and comparison for '%s'\n", storePathDisplay.c_str());
+					rParams.mUncheckedFiles ++;
 				}
 
 				// Remove from set so that we know it's been compared
