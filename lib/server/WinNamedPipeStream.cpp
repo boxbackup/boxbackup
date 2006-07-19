@@ -107,6 +107,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 	
+	mBytesInBuffer = 0;
 	mReadClosed  = false;
 	mWriteClosed = false;
 	mIsServer    = true; // must flush and disconnect before closing
