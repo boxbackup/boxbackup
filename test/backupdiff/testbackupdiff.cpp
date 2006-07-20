@@ -371,7 +371,9 @@ int test(int argc, const char *argv[])
 {
 	// Want to trace out all the details
 	#ifndef NDEBUG
+	#ifndef WIN32
 	BackupStoreFile::TraceDetailsOfDiffProcess = true;
+	#endif
 	#endif
 
 	// Create all the test files
@@ -526,8 +528,10 @@ int test(int argc, const char *argv[])
 			0, 0));
 		encoded->CopyStreamTo(out);
 
+		printf("Time taken: %d seconds\n", time(0) - beginTime);
+
 		#ifdef WIN32
-		TEST_THAT(time(0) < (beginTime + 160));
+		TEST_THAT(time(0) < (beginTime + 120));
 		#else
 		TEST_THAT(time(0) < (beginTime + 80));
 		#endif
