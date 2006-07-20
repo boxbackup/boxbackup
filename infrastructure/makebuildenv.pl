@@ -40,8 +40,7 @@ my %env_flags;
 my $windows_include_path = "";
 if ($target_windows)
 {
-	$windows_include_path = "-I../../lib/win32 -I ../../lib/common " .
-		"-I../../lib/server ";
+	$module_dependency{"lib/common"} = ["lib/win32"];
 	push @implicit_deps, "lib/win32";
 }
 else
@@ -382,7 +381,7 @@ print "done\n\nGenerating Makefiles...\n";
 my %module_resources_win32;
 
 # Then write a makefile for each module
-for my $mod (@modules, @implicit_deps)
+for my $mod (@implicit_deps, @modules)
 {
 	print $mod,"\n";
 	
@@ -448,14 +447,14 @@ __E
 		add_mod_deps(\@deps_raw, $mod);
 		# and then dedup and reorder them
 		my %d_done;
-		for(my $a = $#deps_raw; $a >= 0; $a--)
+		foreach my $dep (reverse @deps_raw)
 		{
-			if(!exists $d_done{$deps_raw[$a]})
+			if(!exists $d_done{$dep})
 			{
 				# insert
-				push @all_deps_for_module, $deps_raw[$a];
+				push @all_deps_for_module, $dep;
 				# mark as done
-				$d_done{$deps_raw[$a]} = 1;
+				$d_done{$dep} = 1;
 			}
 		}
 	}	
@@ -685,8 +684,13 @@ __E
 
 	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
 
+	if ($has_deps and not $bsd_make)
+	{
+		print MAKE ".PHONY: all\n" .
+			"all: dep_modules $end_target\n\n";
+	}
+
 	print MAKE $end_target,': ',$o_file_list;
-	print MAKE ' dep_modules' if $has_deps and not $bsd_make;
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
