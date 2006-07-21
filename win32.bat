@@ -3,6 +3,8 @@
 echo quick and dirty to get up and running by generating the required files 
 echo using Cygwin and Perl
 
+copy .\infrastructure\BoxPlatform.pm.in .\infrastructure\BoxPlatform.pm
+
 cd .\bin\bbackupquery\ & perl ./../../bin/bbackupquery/makedocumentation.pl
 cd ..\..\
 
