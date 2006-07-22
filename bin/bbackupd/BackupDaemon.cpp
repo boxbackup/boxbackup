@@ -1139,7 +1139,10 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		{
 			TRACE1("Receiving command '%s' over command socket\n", 
 				command.c_str());
+
+			#ifdef WIN32
 			SetEvent(mhCommandReceivedEvent);
+			#endif
 
 			bool sendOK = false;
 			bool sendResponse = true;
