@@ -3,7 +3,7 @@
 // Need at least 0x0500 to use GetFileSizeEx on Cygwin/MinGW
 #define WINVER 0x0500
 
-#include "Box.h"
+#include "emu.h"
 
 #ifdef WIN32
 
@@ -11,12 +11,10 @@
 #include <fcntl.h>
 #include <windows.h>
 
-#ifdef HAVE_UNISTD_H
+#ifdef __MINGW32__
 	#include <unistd.h>
 #endif
-#ifdef HAVE_PROCESS_H
-	#include <process.h>
-#endif
+#include <process.h>
 
 #include <string>
 #include <list>
@@ -806,7 +804,7 @@ int statfs(const char * pName, struct statfs * s)
 	_ui64toa(fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
 
 	// pseudo unix mount point
-	s->f_mntonname[0] = DIRECTORY_SEPARATOR_ASCHAR;
+	s->f_mntonname[0] = '\\';
 
 	CloseHandle(handle);   // close the handle
 
