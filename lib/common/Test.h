@@ -44,8 +44,6 @@ extern std::string first_fail_file;
 // NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
 #define TEST_CHECK_THROWS(statement, excepttype, subtype)									\
 	{																						\
-		printf("[Test] Expect an exception below: (" \
-			#excepttype "/" #subtype ")\n"); \
 		bool didthrow = false;																\
 		try																					\
 		{																					\
@@ -91,6 +89,31 @@ inline int TestGetFileSize(const char *Filename)
 		return st.st_size;
 	}
 	return -1;
+}
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+inline bool ServerIsAlive(int pid)
+{
+#ifdef WIN32
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
+	if (hProcess == NULL)
+	{
+		if (GetLastError() != ERROR_INVALID_PARAMETER)
+		{
+			printf("Failed to open process %d: error %d\n",
+				pid, (int)GetLastError());
+		}
+		return false;
+	}
+	CloseHandle(hProcess);
+	return true;
+#else // !WIN32
+	if(pid == 0) return false;
+	return ::kill(pid, 0) != -1;
+#endif // WIN32
 }
 
 inline int LaunchServer(const char *CommandLine, const char *pidFile)
@@ -154,16 +177,40 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	{
 #endif
 	// time for it to start up
-	::sleep(1);
-	
-	// read pid file
-	if(!TestFileExists(pidFile))
+	::fprintf(stdout, "Starting server: %s\n", CommandLine);
+	::fprintf(stdout, "Waiting for server to start: ");
+
+	for (int i = 0; i < 5; i++)
 	{
-		printf("Server: %s\n", CommandLine);
+		if (TestFileExists(pidFile))	
+			break;
+		if (!ServerIsAlive((int)procInfo.dwProcessId))
+			break;
+		::fprintf(stdout, ".");
+		::fflush(stdout);
+		::sleep(1);
+	}
+
+	#ifdef WIN32
+	if (!ServerIsAlive((int)procInfo.dwProcessId))
+	{
+		::fprintf(stdout, "server died!\n");
+		TEST_FAIL_WITH_MESSAGE("Server died!");	
+		return -1;
+	}
+	else 
+	#endif
+	if (!TestFileExists(pidFile))
+	{
+		::fprintf(stdout, "timed out!\n");
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
 		return -1;
 	}
-	
+	else
+	{
+		::fprintf(stdout, "done.\n");
+	}
+
 	FILE *f = fopen(pidFile, "r");
 	if(f == NULL || fscanf(f, "%d", &pid) != 1)
 	{
@@ -186,31 +233,6 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 #endif
 
 	return pid;
-}
-
-#ifdef WIN32
-#include <windows.h>
-#endif
-
-inline bool ServerIsAlive(int pid)
-{
-#ifdef WIN32
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
-	if (hProcess == NULL)
-	{
-		if (GetLastError() != ERROR_INVALID_PARAMETER)
-		{
-			printf("Failed to open process %d: error %d\n",
-				pid, (int)GetLastError());
-		}
-		return false;
-	}
-	CloseHandle(hProcess);
-	return true;
-#else // !WIN32
-	if(pid == 0) return false;
-	return ::kill(pid, 0) != -1;
-#endif // WIN32
 }
 
 inline void TestRemoteProcessMemLeaks(const char *filename)
@@ -244,6 +266,35 @@ inline void TestRemoteProcessMemLeaks(const char *filename)
 	}
 #endif
 }
+
+#ifdef WIN32
+#define BBACKUPCTL "..\\..\\bin\\bbackupctl\\bbackupctl"
+#define BBACKUPQUERY "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
+#else
+#define BBACKUPCTL "../../bin/bbackupctl/bbackupctl"
+#define BBACKUPQUERY "../../bin/bbackupquery/bbackupquery"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
+#endif
+
+inline void terminate_bbackupd(int pid)
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"terminate") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+
+	for (int i = 0; i < 20; i++)
+	{
+		if (!ServerIsAlive(pid)) break;
+		fprintf(stdout, ".");
+		fflush(stdout);
+		sleep(1);
+	}
+
+	TEST_THAT(!ServerIsAlive(pid));
+	TestRemoteProcessMemLeaks("bbackupd.memleaks");
+}
+
 
 // Wait a given number of seconds for something to complete
 inline void wait_for_operation(int seconds)
