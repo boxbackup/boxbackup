@@ -333,18 +333,19 @@ int test(int argc, const char *argv[])
 			wait_for_operation(14);
 
 			// That'll do nicely, stop the server	
+			#ifdef WIN32
+			terminate_bbackupd(bbackupd_pid);
+			// implicit check for memory leaks
+			#else
 			TEST_THAT(KillServer(bbackupd_pid));
-#ifndef WIN32
 			TestRemoteProcessMemLeaks("bbackupd.memleaks");
-#endif
+			#endif
 		}
 		
 		// Generate a list of all the object IDs
-#ifdef WIN32
-		TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbackupquery\\bbackupquery -q -c testfiles/bbackupd.conf \"list -r\" quit > testfiles/initial-listing.txt") == 0);
-#else
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf \"list -r\" quit > testfiles/initial-listing.txt") == 0);
-#endif
+		TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf \"list -r\" quit "
+			"> testfiles/initial-listing.txt") == 0);
 
 		// And load it in
 		{
