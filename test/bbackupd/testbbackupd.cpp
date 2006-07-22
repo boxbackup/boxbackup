@@ -58,16 +58,6 @@
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
-#ifdef WIN32
-#define BBACKUPQUERY "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
-#define BBACKUPCTL "..\\..\\bin\\bbackupctl\\bbackupctl"
-#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
-#else
-#define BBACKUPQUERY "../../bin/bbackupquery/bbackupquery"
-#define BBACKUPCTL "../../bin/bbackupctl/bbackupctl"
-#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
-#endif
-
 void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
 {
 	printf("waiting: ");
@@ -568,24 +558,6 @@ void sync_and_wait()
 	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
 		"force-sync") == 0);
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-}
-
-void terminate_bbackupd(int pid)
-{
-	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-		"terminate") == 0);
-	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-
-	for (int i = 0; i < 20; i++)
-	{
-		if (!ServerIsAlive(pid)) break;
-		fprintf(stdout, ".");
-		fflush(stdout);
-		sleep(1);
-	}
-
-	TEST_THAT(!ServerIsAlive(pid));
-	TestRemoteProcessMemLeaks("bbackupd.memleaks");
 }
 
 int test_bbackupd()
