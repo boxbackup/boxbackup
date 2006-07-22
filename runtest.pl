@@ -17,15 +17,26 @@ runtest.pl (test|ALL) [release|debug]
 Mode defaults to debug.
 
 __E
-	exit(0);
+	exit(2);
 }
 
 my @results;
+my $exitcode = 0;
 
 if($test_name ne 'ALL')
 {
-	# run one test
-	runtest($test_name);
+	# run one or more specified test
+	if ($test_name =~ m/,/)
+	{
+		foreach my $test (split m/,/, $test_name)
+		{
+			runtest($test);
+		}
+	}
+	else
+	{
+		runtest($test_name);
+	}
 }
 else
 {
@@ -57,6 +68,8 @@ else
 # report results
 print "--------\n",join("\n",@results),"\n";
 
+exit $exit_code;
+
 sub runtest
 {
 	my ($t) = @_;
@@ -67,6 +80,7 @@ sub runtest
 	if($make_res != 0)
 	{
 		push @results,"$t: make failed";
+		$exit_code = 2;
 		return;
 	}
 	
@@ -82,8 +96,14 @@ sub runtest
 			$last = $_ if m/\w/;
 		}
 		close RESULTS;
+
 		chomp $last;
 		push @results,"$t: $last";
+
+		if ($last ne "PASSED") 
+		{ 
+			$result = 1;
+		}
 	}
 	else
 	{
