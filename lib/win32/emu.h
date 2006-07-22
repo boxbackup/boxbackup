@@ -5,6 +5,12 @@
 
 #define _INO_T_DEFINED
 
+#define WIN32_LEAN_AND_MEAN
+
+#ifndef __MSVCRT_VERSION__
+#define __MSVCRT_VERSION__ 0x0601
+#endif
+
 #include <winsock2.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -36,22 +42,18 @@
 #define fileno(struct_file)   _fileno(struct_file)
 #endif
 
+typedef uint32_t u_int32_t;
+
 int SetTimerHandler(void (__cdecl *func ) (int));
 int setitimer(int type, struct itimerval *timeout, void *arg);
 void InitTimer(void);
 void FiniTimer(void);
 
-inline int geteuid(void)
-{
-	//lets pretend to be root!
-	return 0;
-}
-
 struct passwd {
 	char *pw_name;
 	char *pw_passwd;
-	uid_t pw_uid;
-	gid_t pw_gid;
+	int pw_uid;
+	int pw_gid;
 	time_t pw_change;
 	char *pw_class;
 	char *pw_gecos;
