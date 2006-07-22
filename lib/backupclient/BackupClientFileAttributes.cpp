@@ -642,6 +642,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 	}
 	
 	// If working as root, set user IDs
+	#ifndef WIN32
 	if(::geteuid() == 0)
 	{
 		#ifndef HAVE_LCHOWN
@@ -661,6 +662,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 			}
 		#endif
 	}
+	#endif
 
 	if(static_cast<int>(xattrOffset+sizeof(u_int32_t))<=mpClearAttributes->GetSize())
 	{
