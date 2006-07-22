@@ -66,11 +66,24 @@ bool files_identical(const char *file1, const char *file2)
 
 void make_file_of_zeros(const char *filename, size_t size)
 {
+	#ifdef WIN32
+	HANDLE handle = openfile(filename, O_WRONLY | O_CREAT | O_EXCL, 0);
+	TEST_THAT(handle != NULL);
+	SetFilePointer(handle, size, NULL, FILE_BEGIN);
+	TEST_THAT(GetLastError() == NO_ERROR);
+	TEST_THAT(SetEndOfFile(handle) == true);
+	TEST_THAT(CloseHandle(handle)  == true);
+	#else
+	TEST_THAT(truncate(filename, size) == 0);
+	#endif
+
+	/*
 	static const size_t bs = 0x10000;
 	size_t remSize = size;
 	void *b = malloc(bs);
 	memset(b, 0, bs);
 	FILE *f = fopen(filename, "wb");
+	TEST_THAT(f != NULL);
 
 	// Using largish blocks like this is much faster, while not consuming too much RAM
 	while(remSize > bs)
@@ -82,6 +95,7 @@ void make_file_of_zeros(const char *filename, size_t size)
 
 	fclose(f);
 	free(b);
+	*/
 
 	TEST_THAT((size_t)TestGetFileSize(filename) == size);
 }
@@ -506,8 +520,16 @@ int test(int argc, const char *argv[])
 	// Found a nasty case where files of lots of the same thing 
 	// suck up lots of processor time -- because of lots of matches 
 	// found. Check this out!
+
+	#ifdef WIN32
+	::fprintf(stdout, "Testing diffing two large streams, "
+		"may take a while!\n");
+	::fflush(stdout);
+	#endif
+
 	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
 	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
+
 	// Generate a first encoded file
 	{
 		BackupStoreFilenameClear f0name("zero.0");
@@ -528,12 +550,12 @@ int test(int argc, const char *argv[])
 			0, 0));
 		encoded->CopyStreamTo(out);
 
-		printf("Time taken: %d seconds\n", time(0) - beginTime);
+		printf("Time taken: %d seconds\n", (int)(time(0) - beginTime));
 
 		#ifdef WIN32
-		TEST_THAT(time(0) < (beginTime + 120));
+		TEST_THAT(time(0) < (beginTime + 300));
 		#else
-		TEST_THAT(time(0) < (beginTime + 80));
+		TEST_THAT(time(0) < (beginTime + 20));
 		#endif
 	}
 	// Remove zero-files to save disk space
