@@ -21,7 +21,7 @@ BEGIN
 	{
 		$build_os = `uname`;
 		chomp $build_os;
-		$build_cpu = `uname -p`;
+		$build_cpu = `uname -m`;
 		chomp $build_cpu;
 	}
 
