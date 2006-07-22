@@ -584,7 +584,7 @@ __E
 		}
 		else
 		{
-			next if not $is_rc;
+			next if not $is_cpp;
 		}
 
 		next if $file =~ /\A\._/; # Temp Mac OS Resource hack
