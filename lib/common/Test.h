@@ -268,11 +268,13 @@ inline void TestRemoteProcessMemLeaks(const char *filename)
 }
 
 #ifdef WIN32
-#define BBACKUPCTL "..\\..\\bin\\bbackupctl\\bbackupctl"
+#define BBACKUPCTL   "..\\..\\bin\\bbackupctl\\bbackupctl"
+#define BBACKUPD     "..\\..\\bin\\bbackupd\\bbackupd"
 #define BBACKUPQUERY "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
 #define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
 #else
-#define BBACKUPCTL "../../bin/bbackupctl/bbackupctl"
+#define BBACKUPCTL   "../../bin/bbackupctl/bbackupctl"
+#define BBACKUPD     "../../bin/bbackupd/bbackupd"
 #define BBACKUPQUERY "../../bin/bbackupquery/bbackupquery"
 #define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
 #endif
