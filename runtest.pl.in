@@ -1,11 +1,14 @@
 #!@PERL@
 
+use strict;
+use warnings;
+
 use lib 'infrastructure';
 use BoxPlatform;
 
 my ($test_name,$test_mode) = @ARGV;
 
-$test_mode = 'debug' if $test_mode eq '';
+$test_mode = 'debug' if not defined $test_mode or $test_mode eq '';
 
 if($test_name eq '' || ($test_mode ne 'debug' && $test_mode ne 'release'))
 {
@@ -21,7 +24,7 @@ __E
 }
 
 my @results;
-my $exitcode = 0;
+my $exit_code = 0;
 
 if($test_name ne 'ALL')
 {
@@ -102,7 +105,7 @@ sub runtest
 
 		if ($last ne "PASSED") 
 		{ 
-			$result = 1;
+			$exit_code = 1;
 		}
 	}
 	else
