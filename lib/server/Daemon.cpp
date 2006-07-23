@@ -364,6 +364,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		return 1;
 	}
 
+#ifdef WIN32
 	// Under win32 we must initialise the Winsock library
 	// before using sockets
 
@@ -375,6 +376,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
 		THROW_EXCEPTION(CommonException, Internal)
 	}
+#endif
 
 	int retcode = 0;
 	
@@ -450,7 +452,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		retcode = 1;
 	}
 
+#ifdef WIN32
 	WSACleanup();
+#endif
 	
 	return retcode;
 }
