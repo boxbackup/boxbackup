@@ -315,7 +315,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(ServerIsAlive(pid));
 
 		// Run the perl script to create the initial directories
-		TEST_THAT_ABORTONFAIL(::system("perl testfiles/testbackupstorefix.pl init") == 0);
+		TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl init") == 0);
 
 #ifdef WIN32
 		int bbackupd_pid = LaunchServer("..\\..\\bin\\bbackupd\\bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
@@ -380,14 +380,18 @@ int test(int argc, const char *argv[])
 			random.Write("test", 4);
 			random.Commit(true);
 		}
+
 		// Fix it
 		RUN_CHECK
-		// Check everything is as it was
 
-		TEST_THAT(::system("perl testfiles/testbackupstorefix.pl check 0") == 0);
+		// Check everything is as it was
+		TEST_THAT(::system(PERL_EXECUTABLE 
+			" testfiles/testbackupstorefix.pl check 0") == 0);
+
 		// Check the random file doesn't exist
 		{
-			TEST_THAT(!RaidFileRead::FileExists(discSetNum, storeRoot + "01/randomfile"));
+			TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
+				storeRoot + "01/randomfile"));
 		}
 
 		// ------------------------------------------------------------------------------------------------		
@@ -444,7 +448,7 @@ int test(int argc, const char *argv[])
 			// Fix it
 			RUN_CHECK
 			// Check
-			TEST_THAT(::system("perl testfiles/testbackupstorefix.pl check 1") == 0);
+			TEST_THAT(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl check 1") == 0);
 
 			// Check the modified file doesn't exist
 			TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
@@ -490,7 +494,7 @@ int test(int argc, const char *argv[])
 		// Fix it
 		RUN_CHECK
 		// Check everything is as it should be
-		TEST_THAT(::system("perl testfiles/testbackupstorefix.pl check 2") == 0);
+		TEST_THAT(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl check 2") == 0);
 		{
 			BackupStoreDirectory dir;
 			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -546,7 +550,7 @@ int test(int argc, const char *argv[])
 		// Fix it
 		RUN_CHECK
 		// Check everything is as it should be
-		TEST_THAT(::system("perl testfiles/testbackupstorefix.pl check 3") == 0);
+		TEST_THAT(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl check 3") == 0);
 		{
 			BackupStoreDirectory dir;
 			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -560,7 +564,7 @@ int test(int argc, const char *argv[])
 		// Fix it
 		RUN_CHECK
 		// Check everything is where it is predicted to be
-		TEST_THAT(::system("perl testfiles/testbackupstorefix.pl check 4") == 0);
+		TEST_THAT(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl check 4") == 0);
 
 		// ------------------------------------------------------------------------------------------------		
 		::printf("  === Corrupt file and dir\n");
@@ -571,7 +575,7 @@ int test(int argc, const char *argv[])
 		// Fix it
 		RUN_CHECK
 		// Check everything is where it should be
-		TEST_THAT(::system("perl testfiles/testbackupstorefix.pl check 5") == 0);
+		TEST_THAT(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl check 5") == 0);
 
 		// ------------------------------------------------------------------------------------------------		
 		::printf("  === Overwrite root with a file\n");
@@ -585,7 +589,7 @@ int test(int argc, const char *argv[])
 		// Fix it
 		RUN_CHECK
 		// Check everything is where it should be
-		TEST_THAT(::system("perl testfiles/testbackupstorefix.pl reroot 6") == 0);
+		TEST_THAT(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl reroot 6") == 0);
 
 
 		// ------------------------------------------------------------------------------------------------		

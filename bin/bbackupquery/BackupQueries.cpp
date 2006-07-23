@@ -26,6 +26,7 @@
 #endif
 
 #include <set>
+#include <limits>
 
 #include "BackupQueries.h"
 #include "Utils.h"
@@ -813,7 +814,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	}
 	
 	int64_t id = ::strtoll(args[0].c_str(), 0, 16);
-	if(id == LLONG_MIN || id == LLONG_MAX || id == 0)
+	if(id == std::numeric_limits<long long>::min() || id == std::numeric_limits<long long>::max() || id == 0)
 	{
 		printf("Not a valid object ID (specified in hex)\n");
 		return;
@@ -930,7 +931,8 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		{
 			// Specified as ID. 
 			fileId = ::strtoll(args[0].c_str(), 0, 16);
-			if(fileId == LLONG_MIN || fileId == LLONG_MAX || 
+			if(fileId == std::numeric_limits<long long>::min() || 
+				fileId == std::numeric_limits<long long>::max() || 
 				fileId == 0)
 			{
 				printf("Not a valid object ID (specified in hex)\n");
@@ -1372,6 +1374,17 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				(localDirEn->d_name[1] == '\0' || (localDirEn->d_name[1] == '.' && localDirEn->d_name[2] == '\0')))
 			{
 				// ignore, it's . or ..
+				
+#ifdef HAVE_VALID_DIRENT_D_TYPE
+				if (localDirEn->d_type != DT_DIR)
+				{
+					fprintf(stderr, "ERROR: d_type does "
+						"not really work on your "
+						"platform. Reconfigure Box!\n");
+					return;
+				}
+#endif
+				
 				continue;
 			}
 
@@ -1395,7 +1408,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			{
 			    // Directory
 			    localDirs.insert(std::string(localDirEn->d_name));
-			}			
+			}
 #else
 			// Entry -- file or dir?
 			if(localDirEn->d_type == DT_REG || localDirEn->d_type == DT_LNK)
@@ -1815,7 +1828,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	{
 		// Specified as ID. 
 		dirID = ::strtoll(args[0].c_str(), 0, 16);
-		if(dirID == LLONG_MIN || dirID == LLONG_MAX || dirID == 0)
+		if(dirID == std::numeric_limits<long long>::min() || dirID == std::numeric_limits<long long>::max() || dirID == 0)
 		{
 			printf("Not a valid object ID (specified in hex)\n");
 			return;

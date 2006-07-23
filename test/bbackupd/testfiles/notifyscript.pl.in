@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 
 
 my $f = 'testfiles/notifyran.'.$ARGV[0].'.';

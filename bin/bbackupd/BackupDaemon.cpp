@@ -720,6 +720,9 @@ void BackupDaemon::Run2()
 				::syslog(LOG_ERR, "Failed to delete the "
 					"StoreObjectInfoFile, backup cannot "
 					"continue safely.");
+				// prevent runaway process where the logs fill up -- without this
+				// the log message will be emitted in a tight loop.
+				::sleep(60); 
 				continue;
 			}
 
@@ -2541,14 +2544,25 @@ bool BackupDaemon::DeleteStoreObjectInfo() const
 		return false;
 	}
 
-	std::string StoreObjectInfoFile = 
-		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
+	std::string storeObjectInfoFile(GetConfiguration().GetKeyValue("StoreObjectInfoFile"));
 
-	if (::unlink(StoreObjectInfoFile.c_str()) != 0)
+	// Check to see if the file exists
+	if(!FileExists(storeObjectInfoFile.c_str()))
+	{
+		// File doesn't exist -- so can't be deleted. But something isn't quite right, so log a message
+		::syslog(LOG_ERR, "Expected to be able to delete "
+			"store object info file '%s', but the file did not exist.",
+			storeObjectInfoFile.c_str());
+		// Return true to stop things going around in a loop
+		return true;
+	}
+
+	// Actually delete it
+	if(::unlink(storeObjectInfoFile.c_str()) != 0)
 	{
 		::syslog(LOG_ERR, "Failed to delete the old "
 			"store object info file '%s': %s",
-			StoreObjectInfoFile.c_str(), strerror(errno));
+			storeObjectInfoFile.c_str(), strerror(errno));
 		return false;
 	}
 

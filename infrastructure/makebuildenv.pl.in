@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!@PERL@
 use strict;
 use Symbol;
 
@@ -61,6 +61,7 @@ while(<FINDAUTOGEN>)
 	my $dir = $1;
 	open FL,$file or die "Can't open $_ for reading";
 	my %vars;
+	$vars{PERL} = "@PERL@";
 	my $do_cmds = 0;
 	while(<FL>)
 	{
@@ -504,6 +505,7 @@ __E
 CXX = g++
 AR = ar
 RANLIB = ranlib
+PERL = "@PERL@"
 WINDRES = windres
 .ifdef RELEASE
 CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
