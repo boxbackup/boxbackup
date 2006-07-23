@@ -58,7 +58,7 @@ protected:
 	virtual const char *DaemonBanner() const;
 
 	const ConfigurationVerify *GetConfigVerify() const;
-
+	
 #ifndef WIN32	
 	// Housekeeping functions
 	void HousekeepingProcess();
@@ -67,22 +67,19 @@ protected:
 
 	void LogConnectionStats(const char *commonName, const SocketStreamTLS &s);
 
-
 private:
 	BackupStoreAccountDatabase *mpAccountDatabase;
 	BackupStoreAccounts *mpAccounts;
 	bool mExtendedLogging;
 	bool mHaveForkedHousekeeping;
 	bool mIsHousekeepingProcess;
-
-#ifndef WIN32	
-	SocketStream mInterProcessCommsSocket;
-	IOStreamGetLine mInterProcessComms;
-#endif
-
+	
 #ifdef WIN32
 	virtual void OnIdle();
 	bool mHousekeepingInited;
+#else
+	SocketStream mInterProcessCommsSocket;
+	IOStreamGetLine mInterProcessComms;
 #endif
 
 	void HousekeepingInit();

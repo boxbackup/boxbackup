@@ -161,7 +161,7 @@ void BackupStoreDaemon::Run()
 	mExtendedLogging = false;
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
-
+	
 #ifndef WIN32	
 	// Fork off housekeeping daemon -- must only do this the first time Run() is called
 	if(!mHaveForkedHousekeeping)
@@ -229,7 +229,7 @@ void BackupStoreDaemon::Run()
 #endif // !WIN32
 		// In server process -- use the base class to do the magic
 		ServerTLS<BOX_PORT_BBSTORED>::Run();
-	
+		
 #ifndef WIN32	
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())

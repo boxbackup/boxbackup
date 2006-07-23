@@ -320,7 +320,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 		// OK! The last entry in the chain is the full file, the others are patches back from it.
 		// Open the last one, which is the current from file
 		std::auto_ptr<IOStream> from(rContext.OpenObject(patchChain[patchChain.size() - 1]));
-
+		
 		// Then, for each patch in the chain, do a combine
 		for(int p = ((int)patchChain.size()) - 2; p >= 0; --p)
 		{
@@ -428,7 +428,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 
 	// Stream the reordered stream to the peer
 	rProtocol.SendStreamAfterCommand(stream.get());
-
+	
 	// Don't delete the stream here
 	stream.release();
 

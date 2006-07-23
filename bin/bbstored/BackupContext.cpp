@@ -464,7 +464,7 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 				FileStream diff(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL);
 				FileStream diff2(tempFn.c_str(), O_RDONLY);
 
-				// Unlink it immediately, so it definately goes away
+				// Unlink it immediately, so it definitely goes away
 				if(::unlink(tempFn.c_str()) != 0)
 				{
 					THROW_EXCEPTION(CommonException, OSFileError);
