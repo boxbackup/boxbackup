@@ -27,4 +27,4 @@ echo server parts - which appears as though some of the clients rely on
 cd .\lib\server & perl ./../../lib/common/makeexception.pl ServerException.txt & perl ./../../lib/common/makeexception.pl ConnectionException.txt
 cd ..\..\
 
-copy lib\win32\config.h.win32 lib\common\BoxConfig.h
+perl -i.orig -pe 's/@PERL@/perl/' ./test/bbackupd/testfiles/bbackupd.conf
