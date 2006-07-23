@@ -317,11 +317,8 @@ int test(int argc, const char *argv[])
 		// Run the perl script to create the initial directories
 		TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE " testfiles/testbackupstorefix.pl init") == 0);
 
-#ifdef WIN32
-		int bbackupd_pid = LaunchServer("..\\..\\bin\\bbackupd\\bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
-#else
-		int bbackupd_pid = LaunchServer("../../bin/bbackupd/bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
-#endif
+		int bbackupd_pid = LaunchServer(BBACKUPD
+			" testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
 
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
 		if(bbackupd_pid > 0)
