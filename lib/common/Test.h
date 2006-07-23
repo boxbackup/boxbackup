@@ -180,7 +180,7 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	::fprintf(stdout, "Starting server: %s\n", CommandLine);
 	::fprintf(stdout, "Waiting for server to start: ");
 
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 15; i++)
 	{
 		if (TestFileExists(pidFile))	
 			break;
