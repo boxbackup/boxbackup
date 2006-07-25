@@ -32,6 +32,8 @@ AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
 case $target_os in
 mingw*) 
 	AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["perl"], [Command to run Perl])
+	PERL_NATIVE=perl
+	AC_SUBST([PERL_NATIVE])
 	;;
 *)
 	AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$PERL"], 
