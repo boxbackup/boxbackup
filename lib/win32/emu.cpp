@@ -852,6 +852,7 @@ int emu_utimes(const char * pName, const struct timeval times[])
 		return 1;
 	}
 
+	CloseHandle(handle);
 	return 0;
 }
 
