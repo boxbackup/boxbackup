@@ -91,14 +91,7 @@ inline struct passwd * getpwnam(const char * name)
 	#define S_ISDIR(x) (S_IFDIR & x)
 #endif
 
-inline int utimes(const char * Filename, timeval[])
-{
-	//again I am guessing this is quite important to
-	//be functioning, as large restores would be a problem
 
-	//indicate success
-	return 0;
-}
 inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 {
 	//important - this needs implementing
@@ -118,6 +111,9 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 int   emu_chdir (const char* pDirName);
 int   emu_unlink(const char* pFileName);
 char* emu_getcwd(char* pBuffer, int BufSize);
+int   emu_utimes(const char* pName, const struct timeval[]);
+
+#define utimes(buffer, times) emu_utimes(buffer, times)
 
 #ifdef _MSC_VER
 	inline int emu_chmod(const char * Filename, int mode)
@@ -126,10 +122,10 @@ char* emu_getcwd(char* pBuffer, int BufSize);
 		return 0;
 	}
 
-	#define chmod(file, mode)    emu_chmod(file, mode)
-	#define chdir(directory)     emu_chdir(directory)
-	#define unlink(file)         emu_unlink(file)
-	#define getcwd(buffer, size) emu_getcwd(buffer, size)
+	#define chmod(file, mode)     emu_chmod(file, mode)
+	#define chdir(directory)      emu_chdir(directory)
+	#define unlink(file)          emu_unlink(file)
+	#define getcwd(buffer, size)  emu_getcwd(buffer, size)
 #else
 	inline int chmod(const char * Filename, int mode)
 	{
@@ -328,7 +324,7 @@ int emu_stat(const char * name, struct stat * st);
 int emu_fstat(HANDLE file, struct stat * st);
 int statfs(const char * name, struct statfs * s);
 
-//need this for converstions
+// need this for conversions
 inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 {
 	SYSTEMTIME stUTC;
@@ -336,7 +332,6 @@ inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 
 	// Convert the last-write time to local time.
 	FileTimeToSystemTime(fileTime, &stUTC);
-	// SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
 
 	memset(&timeinfo, 0, sizeof(timeinfo));	
 	timeinfo.tm_sec = stUTC.wSecond;
@@ -350,6 +345,38 @@ inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 
 	time_t retVal = mktime(&timeinfo) - _timezone;
 	return retVal;
+}
+
+inline bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
+{
+	time_t adjusted = from + _timezone;
+	struct tm *time_breakdown = gmtime(&adjusted);
+	if (time_breakdown == NULL)
+	{
+		::syslog(LOG_ERR, "Error: failed to convert time format: "
+			"%d is not a valid time\n", from);
+		return false;
+	}
+
+	SYSTEMTIME stUTC;
+	stUTC.wSecond       = time_breakdown->tm_sec;
+	stUTC.wMinute       = time_breakdown->tm_min;
+	stUTC.wHour         = time_breakdown->tm_hour;
+	stUTC.wDay          = time_breakdown->tm_mday;
+	stUTC.wDayOfWeek    = time_breakdown->tm_wday;
+	stUTC.wMonth        = time_breakdown->tm_mon  + 1;
+	stUTC.wYear         = time_breakdown->tm_year + 1900;
+	stUTC.wMilliseconds = 0;
+
+	// Convert the last-write time to local time.
+	if (!SystemTimeToFileTime(&stUTC, pTo))
+	{
+		syslog(LOG_ERR, "Failed to convert between time formats: "
+			"error %d", GetLastError());
+		return false;
+	}
+
+	return true;
 }
 
 #ifdef _MSC_VER

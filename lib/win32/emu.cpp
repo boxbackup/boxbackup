@@ -516,16 +516,16 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	if (flags & O_WRONLY)
 	{
-		accessRights = FILE_WRITE_ATTRIBUTES 
-			| FILE_WRITE_DATA | FILE_WRITE_EA;
+		accessRights = FILE_WRITE_DATA;
 		shareMode = FILE_SHARE_WRITE;
 	}
-	if (flags & (O_RDWR | O_CREAT))
+	else if (flags & (O_RDWR | O_CREAT))
 	{
 		accessRights |= FILE_WRITE_ATTRIBUTES 
 			| FILE_WRITE_DATA | FILE_WRITE_EA;
 		shareMode |= FILE_SHARE_WRITE;
 	}
+
 	if (flags & O_CREAT)
 	{
 		createDisposition = OPEN_ALWAYS;
@@ -595,7 +595,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 
 	memset(st, 0, sizeof(*st));
 
-	// This next example is how we get our INODE (equivalent) information
+	// This is how we get our INODE (equivalent) information
 	ULARGE_INTEGER conv;
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart = fi.nFileIndexLow;
@@ -670,7 +670,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 //		Created: 10th December 2004
 //
 // --------------------------------------------------------------------------
-HANDLE OpenFileByNameUtf8(const char* pFileName)
+HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 {
 	std::string AbsPathWithUnicode = 
 		ConvertPathToAbsoluteUnicode(pFileName);
@@ -691,8 +691,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 	}
 
 	HANDLE handle = CreateFileW(pBuffer, 
-		FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA |
-		READ_CONTROL, 
+		flags,
 		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
 		NULL, 
 		OPEN_EXISTING, 
@@ -706,7 +705,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 		// at least one process must have the file open - 
 		// in this case someone else does.
 		handle = CreateFileW(pBuffer, 
-			READ_CONTROL, 
+			READ_CONTROL,
 			FILE_SHARE_READ, 
 			NULL, 
 			OPEN_EXISTING, 
@@ -749,7 +748,8 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 // --------------------------------------------------------------------------
 int emu_stat(const char * pName, struct stat * st)
 {
-	HANDLE handle = OpenFileByNameUtf8(pName);
+	HANDLE handle = OpenFileByNameUtf8(pName, 
+		FILE_READ_ATTRIBUTES | FILE_READ_EA);
 
 	if (handle == NULL)
 	{
@@ -782,7 +782,8 @@ int emu_stat(const char * pName, struct stat * st)
 // --------------------------------------------------------------------------
 int statfs(const char * pName, struct statfs * s)
 {
-	HANDLE handle = OpenFileByNameUtf8(pName);
+	HANDLE handle = OpenFileByNameUtf8(pName,
+		FILE_READ_ATTRIBUTES | FILE_READ_EA);
 
 	if (handle == NULL)
 	{
@@ -807,6 +808,49 @@ int statfs(const char * pName, struct statfs * s)
 	s->f_mntonname[0] = '\\';
 
 	CloseHandle(handle);   // close the handle
+
+	return 0;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    emu_fstat
+//		Purpose: replacement for fstat supply a windows handle
+//		Created: 25th October 2004
+//
+// --------------------------------------------------------------------------
+int emu_utimes(const char * pName, const struct timeval times[])
+{
+	FILETIME creationTime;
+	if (!ConvertTime_tToFileTime(times[0].tv_sec, &creationTime))
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	FILETIME modificationTime;
+	if (!ConvertTime_tToFileTime(times[1].tv_sec, &modificationTime))
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	HANDLE handle = OpenFileByNameUtf8(pName, FILE_WRITE_ATTRIBUTES);
+
+	if (handle == NULL)
+	{
+		// errno already set and error logged by OpenFileByNameUtf8()
+		return -1;
+	}
+
+	if (!SetFileTime(handle, &creationTime, NULL, &modificationTime))
+	{
+		::syslog(LOG_ERR, "Failed to set times on '%s': error %d",
+			pName, GetLastError());
+		CloseHandle(handle);
+		return 1;
+	}
 
 	return 0;
 }
@@ -1227,7 +1271,14 @@ void syslog(int loglevel, const char *frmt, ...)
 	va_start(args, frmt);
 
 	int len = vsnprintf(buffer, sizeof(buffer)-1, sixfour.c_str(), args);
-	assert(len < sizeof(buffer));
+	assert(len >= 0);
+	if (len < 0) 
+	{
+		printf("%s\r\n", buffer);
+		return;
+	}
+	
+	assert((size_t)len < sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
 
 	va_end(args);
@@ -1305,7 +1356,7 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 		return NULL;
 	}
 
-	if (len > BufSize)
+	if ((int)len > BufSize)
 	{
 		errno = ENAMETOOLONG;
 		return NULL;
