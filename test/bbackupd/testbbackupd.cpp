@@ -560,6 +560,21 @@ void sync_and_wait()
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 }
 
+bool set_file_time(const char* filename, FILETIME creationTime, 
+	FILETIME lastModTime, FILETIME lastAccessTime)
+{
+	HANDLE handle = openfile(filename, O_RDWR, 0);
+	TEST_THAT(handle != INVALID_HANDLE_VALUE);
+	if (handle == INVALID_HANDLE_VALUE) return false;
+		
+	BOOL success = SetFileTime(handle, &creationTime, &lastAccessTime,
+		&lastModTime);
+	TEST_THAT(success);
+
+	TEST_THAT(CloseHandle(handle));
+	return success;
+}
+
 int test_bbackupd()
 {
 //	// First, wait for a normal period to make sure the last changes attributes are within a normal backup timeframe.
@@ -985,15 +1000,91 @@ int test_bbackupd()
 		// Compare the restored files
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf -l testfiles/query10.log "
-		#ifdef WIN32
-			"\"compare -cAE Test1 testfiles/restore-Test1\" "
-		#else
 			"\"compare -cE Test1 testfiles/restore-Test1\" "
-		#endif
 			"quit");
-
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		
+		#ifdef WIN32
+		// make one of the files read-only, expect a compare failure
+		compareReturnValue = ::system("attrib +r "
+			"testfiles\\restore-Test1\\f1.dat");
+		TEST_RETURN(compareReturnValue, 0);
+
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 2);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+	
+		// set it back, expect no failures
+		compareReturnValue = ::system("attrib -r "
+			"testfiles\\restore-Test1\\f1.dat");
+		TEST_RETURN(compareReturnValue, 0);
+
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 1);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		// change the timestamp on a file, expect a compare failure
+		char* testfile = "testfiles\\restore-Test1\\f1.dat";
+		HANDLE handle = openfile(testfile, O_RDWR, 0);
+		TEST_THAT(handle != INVALID_HANDLE_VALUE);
+		
+		FILETIME creationTime, lastModTime, lastAccessTime;
+		TEST_THAT(GetFileTime(handle, &creationTime, &lastAccessTime, 
+			&lastModTime) != 0);
+		TEST_THAT(CloseHandle(handle));
+
+		FILETIME dummyTime = lastModTime;
+		dummyTime.dwHighDateTime -= 100;
+
+		// creation time is backed up, so changing it should cause
+		// a compare failure
+		TEST_THAT(set_file_time(testfile, dummyTime, lastModTime,
+			lastAccessTime));
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 2);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		// last access time is not backed up, so it cannot be compared
+		TEST_THAT(set_file_time(testfile, creationTime, lastModTime,
+			dummyTime));
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 1);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		// last write time is backed up, so changing it should cause
+		// a compare failure
+		TEST_THAT(set_file_time(testfile, creationTime, dummyTime,
+			lastAccessTime));
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 2);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		// set back to original values, check that compare succeeds
+		TEST_THAT(set_file_time(testfile, creationTime, lastModTime,
+			lastAccessTime));
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"\"compare -cE Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 1);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		#endif
 
 		printf("Add files with current time\n");
 	
@@ -1164,13 +1255,7 @@ int test_bbackupd()
 			compareReturnValue = ::system(BBACKUPQUERY 
 				" -q -c testfiles/bbackupd.conf "
 				"-l testfiles/query11.log "
-				"\"compare "
-			#ifdef WIN32
-				// cannot restore attributes, so don't compare
-				"-cAE "
-			#else
-				"-cE "
-			#endif
+				"\"compare -cE "
 				"Test1/x1 testfiles/restore-Test1-x1-2\" quit");
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -1189,9 +1274,9 @@ int test_bbackupd()
 		wait_for_sync();
 		// Now we have about three seconds to work
 
-		HANDLE handle = openfile("testfiles/TestDir1/lockedfile",
+		handle = openfile("testfiles/TestDir1/lockedfile",
 			O_CREAT | O_EXCL, 0);
-		TEST_THAT(handle != 0);
+		TEST_THAT(handle != INVALID_HANDLE_VALUE);
 
 		if (handle != 0)
 		{
@@ -1224,7 +1309,7 @@ int test_bbackupd()
 			// reports the correct error message (and finishes)
 			handle = openfile("testfiles/TestDir1/lockedfile",
 				O_CREAT | O_EXCL, 0);
-			TEST_THAT(handle != 0);
+			TEST_THAT(handle != INVALID_HANDLE_VALUE);
 
 			compareReturnValue = ::system(BBACKUPQUERY 
 				" -q -c testfiles/bbackupd.conf "
