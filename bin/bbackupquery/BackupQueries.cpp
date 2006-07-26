@@ -897,7 +897,7 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		if(!opts['i'])
 		{
 			// does this remote filename include a path?
-			int index = fileName.rfind('/');
+			std::string::size_type index = fileName.rfind('/');
 			if(index != std::string::npos)
 			{
 				std::string dirName(fileName.substr(0, index));
@@ -1550,9 +1550,17 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						BackupClientFileAttributes localAttr;
 						localAttr.ReadAttributes(localPath.c_str(), false /* don't zero mod times */, &fileModTime);					
 						modifiedAfterLastSync = (fileModTime > rParams.mLatestFileUploadTime);
+						bool ignoreAttrModTime = true;
+
+						#ifdef WIN32
+						// attr mod time is really
+						// creation time, so check it
+						ignoreAttrModTime = false;
+						#endif
+
 						if(!rParams.mIgnoreAttributes &&
 						   !localAttr.Compare(fileOnServerStream->GetAttributes(),
-								true /* ignore attr mod time */,
+								ignoreAttrModTime,
 								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
 						{
 							printf("Local file '%s' "
