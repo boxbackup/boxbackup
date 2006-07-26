@@ -170,8 +170,8 @@ close IN;
 
 # open files
 my $h_filename = 'autogen_'.$protocol_name.'Protocol'.$type.'.h';
-open CPP,'>autogen_'.$protocol_name.'Protocol'.$type.'.cpp';
-open H,">$h_filename";
+open CPP,'>autogen_'.$protocol_name.'Protocol'.$type.'.cpp.new';
+open H,">$h_filename.new";
 
 print CPP <<__E;
 
@@ -915,6 +915,8 @@ __E
 close H;
 close CPP;
 
+update_if_changed('autogen_'.$protocol_name.'Protocol'.$type.'.cpp');
+update_if_changed($h_filename);
 
 sub obj_is_type
 {
