@@ -218,6 +218,12 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		THROW_EXCEPTION(ConnectionException, SocketShutdownError)
 	}
 
+	// ensure safe to cast NBytes to unsigned
+	if (NBytes < 0)
+	{
+		THROW_EXCEPTION(CommonException, AssertFailed)
+	}
+
 	DWORD NumBytesRead;
 
 	if (mIsServer)
@@ -272,7 +278,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		size_t BytesToCopy = NumBytesRead + mBytesInBuffer;
 		size_t BytesRemaining = 0;
 
-		if (BytesToCopy > NBytes)
+		if (BytesToCopy > (size_t)NBytes)
 		{
 			BytesRemaining = BytesToCopy - NBytes;
 			BytesToCopy = NBytes;
