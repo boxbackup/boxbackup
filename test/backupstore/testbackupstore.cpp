@@ -1966,11 +1966,9 @@ int test(int argc, const char *argv[])
 	CloseHandle(h1);
 
 	h1 = openfile("foo", O_CREAT | O_RDWR, 0);
-	assert(h1);
-	TEST_THAT(h1);
+	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
 	h2 = openfile("foo", O_RDWR, 0);
-	assert(h2);
-	TEST_THAT(h2);
+	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
 	CloseHandle(h2);
 	CloseHandle(h1);
 #endif

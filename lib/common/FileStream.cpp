@@ -30,7 +30,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 	  mIsEOF(false)
 {
 #ifdef WIN32
-	if(mOSFileHandle == 0)
+	if(mOSFileHandle == INVALID_HANDLE_VALUE)
 #else
 	if(mOSFileHandle < 0)
 #endif

@@ -112,25 +112,19 @@ int   emu_chdir (const char* pDirName);
 int   emu_unlink(const char* pFileName);
 char* emu_getcwd(char* pBuffer, int BufSize);
 int   emu_utimes(const char* pName, const struct timeval[]);
+int   emu_chmod (const char* pName, mode_t mode);
 
 #define utimes(buffer, times) emu_utimes(buffer, times)
 
 #ifdef _MSC_VER
-	inline int emu_chmod(const char * Filename, int mode)
-	{
-		// indicate success
-		return 0;
-	}
-
 	#define chmod(file, mode)     emu_chmod(file, mode)
 	#define chdir(directory)      emu_chdir(directory)
 	#define unlink(file)          emu_unlink(file)
 	#define getcwd(buffer, size)  emu_getcwd(buffer, size)
 #else
-	inline int chmod(const char * Filename, int mode)
+	inline int chmod(const char * pName, mode_t mode)
 	{
-		// indicate success
-		return 0;
+		return emu_chmod(pName, mode);
 	}
 
 	inline int chdir(const char* pDirName)
@@ -325,59 +319,8 @@ int emu_fstat(HANDLE file, struct stat * st);
 int statfs(const char * name, struct statfs * s);
 
 // need this for conversions
-inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
-{
-	SYSTEMTIME stUTC;
-	struct tm timeinfo;
-
-	// Convert the last-write time to local time.
-	FileTimeToSystemTime(fileTime, &stUTC);
-
-	memset(&timeinfo, 0, sizeof(timeinfo));	
-	timeinfo.tm_sec = stUTC.wSecond;
-	timeinfo.tm_min = stUTC.wMinute;
-	timeinfo.tm_hour = stUTC.wHour;
-	timeinfo.tm_mday = stUTC.wDay;
-	timeinfo.tm_wday = stUTC.wDayOfWeek;
-	timeinfo.tm_mon = stUTC.wMonth - 1;
-	// timeinfo.tm_yday = ...;
-	timeinfo.tm_year = stUTC.wYear - 1900;
-
-	time_t retVal = mktime(&timeinfo) - _timezone;
-	return retVal;
-}
-
-inline bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
-{
-	time_t adjusted = from + _timezone;
-	struct tm *time_breakdown = gmtime(&adjusted);
-	if (time_breakdown == NULL)
-	{
-		::syslog(LOG_ERR, "Error: failed to convert time format: "
-			"%d is not a valid time\n", from);
-		return false;
-	}
-
-	SYSTEMTIME stUTC;
-	stUTC.wSecond       = time_breakdown->tm_sec;
-	stUTC.wMinute       = time_breakdown->tm_min;
-	stUTC.wHour         = time_breakdown->tm_hour;
-	stUTC.wDay          = time_breakdown->tm_mday;
-	stUTC.wDayOfWeek    = time_breakdown->tm_wday;
-	stUTC.wMonth        = time_breakdown->tm_mon  + 1;
-	stUTC.wYear         = time_breakdown->tm_year + 1900;
-	stUTC.wMilliseconds = 0;
-
-	// Convert the last-write time to local time.
-	if (!SystemTimeToFileTime(&stUTC, pTo))
-	{
-		syslog(LOG_ERR, "Failed to convert between time formats: "
-			"error %d", GetLastError());
-		return false;
-	}
-
-	return true;
-}
+time_t ConvertFileTimeToTime_t(FILETIME *fileTime);
+bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 
 #ifdef _MSC_VER
 	#define stat(filename,  struct) emu_stat (filename, struct)

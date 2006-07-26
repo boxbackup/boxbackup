@@ -497,7 +497,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	if (AbsPathWithUnicode.size() == 0)
 	{
 		// error already logged by ConvertPathToAbsoluteUnicode()
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 	
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
@@ -506,7 +506,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	if (pBuffer == NULL)
 	{
 		// error already logged by ConvertUtf8ToWideString()
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
 	// flags could be O_WRONLY | O_CREAT | O_RDONLY
@@ -553,7 +553,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	{
 		::syslog(LOG_WARNING, "Failed to open file %s: "
 			"error %i", pFileName, GetLastError());
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
 	return hdir;
@@ -641,11 +641,11 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	// all objects get user read (0400)
 	// if it's a directory it gets user execute (0100)
 	// if it's not read-only it gets user write (0200)
-	st->st_mode = 0400;
+	st->st_mode = S_IREAD;
 
 	if (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
-		st->st_mode |= S_IFDIR | 0100;
+		st->st_mode |= S_IFDIR | S_IEXEC;
 	}
 	else
 	{
@@ -654,7 +654,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 
 	if (!(fi.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
 	{
-		st->st_mode |= 0200;
+		st->st_mode |= S_IWRITE;
 	}
 
 	return 0;
@@ -815,9 +815,11 @@ int statfs(const char * pName, struct statfs * s)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    emu_fstat
-//		Purpose: replacement for fstat supply a windows handle
-//		Created: 25th October 2004
+//		Name:    emu_utimes
+//		Purpose: replacement for the POSIX utimes() function,
+//			works with unicode filenames supplied in utf8 format,
+//			sets creation time instead of last access time.
+//		Created: 25th July 2006
 //
 // --------------------------------------------------------------------------
 int emu_utimes(const char * pName, const struct timeval times[])
@@ -855,6 +857,69 @@ int emu_utimes(const char * pName, const struct timeval times[])
 	CloseHandle(handle);
 	return 0;
 }
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    emu_chmod
+//		Purpose: replacement for the POSIX chmod function,
+//			works with unicode filenames supplied in utf8 format
+//		Created: 26th July 2006
+//
+// --------------------------------------------------------------------------
+int emu_chmod(const char * pName, mode_t mode)
+{
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pName);
+	
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+	
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
+	// We are responsible for freeing pBuffer
+	
+	if (pBuffer == NULL)
+	{
+		// error already logged by ConvertUtf8ToWideString()
+		free(pBuffer);
+		return -1;
+	}
+
+	DWORD attribs = GetFileAttributesW(pBuffer);
+	if (attribs == INVALID_FILE_ATTRIBUTES)
+	{
+		::syslog(LOG_ERR, "Failed to get file attributes of '%s': "
+			"error %d", pName, GetLastError());
+		errno = EACCES;
+		free(pBuffer);
+		return -1;
+	}
+
+	if (mode & S_IWRITE)
+	{
+		attribs &= ~FILE_ATTRIBUTE_READONLY;
+	}
+	else
+	{
+		attribs |= FILE_ATTRIBUTE_READONLY;
+	}
+
+	if (!SetFileAttributesW(pBuffer, attribs))
+	{
+		::syslog(LOG_ERR, "Failed to set file attributes of '%s': "
+			"error %d", pName, GetLastError());
+		errno = EACCES;
+		free(pBuffer);
+		return -1;
+	}
+
+	free(pBuffer);
+	return 0;
+}
+
 
 // --------------------------------------------------------------------------
 //
@@ -1547,5 +1612,61 @@ int writev(int filedes, const struct iovec *vector, size_t count)
 
 	return bytes;
 }
+
+// need this for conversions
+time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
+{
+	SYSTEMTIME stUTC;
+	struct tm timeinfo;
+
+	// Convert the last-write time to local time.
+	FileTimeToSystemTime(fileTime, &stUTC);
+
+	memset(&timeinfo, 0, sizeof(timeinfo));	
+	timeinfo.tm_sec = stUTC.wSecond;
+	timeinfo.tm_min = stUTC.wMinute;
+	timeinfo.tm_hour = stUTC.wHour;
+	timeinfo.tm_mday = stUTC.wDay;
+	timeinfo.tm_wday = stUTC.wDayOfWeek;
+	timeinfo.tm_mon = stUTC.wMonth - 1;
+	// timeinfo.tm_yday = ...;
+	timeinfo.tm_year = stUTC.wYear - 1900;
+
+	time_t retVal = mktime(&timeinfo) - _timezone;
+	return retVal;
+}
+
+bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
+{
+	time_t adjusted = from + _timezone;
+	struct tm *time_breakdown = gmtime(&adjusted);
+	if (time_breakdown == NULL)
+	{
+		::syslog(LOG_ERR, "Error: failed to convert time format: "
+			"%d is not a valid time\n", from);
+		return false;
+	}
+
+	SYSTEMTIME stUTC;
+	stUTC.wSecond       = time_breakdown->tm_sec;
+	stUTC.wMinute       = time_breakdown->tm_min;
+	stUTC.wHour         = time_breakdown->tm_hour;
+	stUTC.wDay          = time_breakdown->tm_mday;
+	stUTC.wDayOfWeek    = time_breakdown->tm_wday;
+	stUTC.wMonth        = time_breakdown->tm_mon  + 1;
+	stUTC.wYear         = time_breakdown->tm_year + 1900;
+	stUTC.wMilliseconds = 0;
+
+	// Convert the last-write time to local time.
+	if (!SystemTimeToFileTime(&stUTC, pTo))
+	{
+		syslog(LOG_ERR, "Failed to convert between time formats: "
+			"error %d", GetLastError());
+		return false;
+	}
+
+	return true;
+}
+
 
 #endif // WIN32

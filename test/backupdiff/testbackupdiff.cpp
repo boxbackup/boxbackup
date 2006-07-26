@@ -68,7 +68,7 @@ void make_file_of_zeros(const char *filename, size_t size)
 {
 	#ifdef WIN32
 	HANDLE handle = openfile(filename, O_WRONLY | O_CREAT | O_EXCL, 0);
-	TEST_THAT(handle != NULL);
+	TEST_THAT(handle != INVALID_HANDLE_VALUE);
 	SetFilePointer(handle, size, NULL, FILE_BEGIN);
 	TEST_THAT(GetLastError() == NO_ERROR);
 	TEST_THAT(SetEndOfFile(handle) == true);
