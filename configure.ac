@@ -135,6 +135,7 @@ AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   ]])
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
+AC_CHECK_DECLS([O_BINARY],,,)
 AC_HEADER_TIME
 AC_STRUCT_TM
 AX_CHECK_DIRENT_D_TYPE
