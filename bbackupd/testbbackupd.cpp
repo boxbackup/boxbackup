@@ -718,7 +718,7 @@ int test_bbackupd()
 			// Wait and test...
 			wait_for_backup_operation();
 			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
-			TEST_THAT(compareReturnValue == 2*256);	// should find differences
+			TEST_THAT(compareReturnValue == 3*256);	// should find differences
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 			// Check that it was reported correctly
 			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.1"));

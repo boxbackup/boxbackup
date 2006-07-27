@@ -14,7 +14,11 @@
 #endif
 #include <sys/types.h>
 #include <unistd.h>
+
+#ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
+#endif
+
 #include <errno.h>
 
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE

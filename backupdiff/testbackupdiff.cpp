@@ -66,22 +66,20 @@ bool files_identical(const char *file1, const char *file2)
 
 void make_file_of_zeros(const char *filename, size_t size)
 {
-	static const size_t bs = 0x10000;
-	size_t remSize = size;
-	void *b = malloc(bs);
-	memset(b, 0, bs);
-	FILE *f = fopen(filename, "wb");
-
-	// Using largish blocks like this is much faster, while not consuming too much RAM
-	while(remSize > bs)
-	{
-		fwrite(b, bs, 1, f);
-		remSize -= bs;
-	}
-	fwrite(b, remSize, 1, f);
-
-	fclose(f);
-	free(b);
+	#ifdef WIN32
+	HANDLE handle = openfile(filename, O_WRONLY | O_CREAT | O_EXCL, 0);
+	TEST_THAT(handle != INVALID_HANDLE_VALUE);
+	SetFilePointer(handle, size, NULL, FILE_BEGIN);
+	TEST_THAT(GetLastError() == NO_ERROR);
+	TEST_THAT(SetEndOfFile(handle) == true);
+	TEST_THAT(CloseHandle(handle)  == true);
+	#else
+	int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
+	if (fd < 0) perror(filename);
+	TEST_THAT(fd >= 0);
+	TEST_THAT(ftruncate(fd, size) == 0);
+	TEST_THAT(close(fd) == 0);
+	#endif
 
 	TEST_THAT((size_t)TestGetFileSize(filename) == size);
 }
@@ -118,12 +116,20 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		if(s > 0)
 		{
 			nnew++;
+			#ifdef WIN32
+			TRACE2("%8I64d this  s=%8I64d", b, s);
+			#else
 			TRACE2("%8lld this  s=%8lld", b, s);
+			#endif
 		}
 		else
 		{
 			nold++;
+			#ifdef WIN32
+			TRACE2("%8I64d other i=%8I64d", b, 0 - s);		
+			#else
 			TRACE2("%8lld other i=%8lld", b, 0 - s);		
+			#endif
 		}
 		// Decode the rest
 		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
@@ -207,10 +213,18 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 	}
 	else
 	{
+#ifdef WIN32
+		// Emulate the above stage!
+		char src[256], dst[256];
+		sprintf(src, "testfiles\\f%d.diff", to);
+		sprintf(dst, "testfiles\\f%d.encoded", to);
+		TEST_THAT(CopyFile(src, dst, FALSE) != 0)
+#else
 		// Emulate the above stage!
 		char cmd[256];
 		sprintf(cmd, "cp testfiles/f%d.diff testfiles/f%d.encoded", to, to);
 		::system(cmd);
+#endif
 	}
 
 	// Decode it
@@ -355,7 +369,9 @@ int test(int argc, const char *argv[])
 {
 	// Want to trace out all the details
 	#ifndef NDEBUG
+	#ifndef WIN32
 	BackupStoreFile::TraceDetailsOfDiffProcess = true;
+	#endif
 	#endif
 
 	// Create all the test files
@@ -370,6 +386,7 @@ int test(int argc, const char *argv[])
 		FileStream out("testfiles/f0.encoded", O_WRONLY | O_CREAT | O_EXCL);
 		std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f0", 1 /* dir ID */, f0name));
 		encoded->CopyStreamTo(out);
+		out.Close();
 		check_encoded_file("testfiles/f0.encoded", 0, 33, 0);
 	}
 	
@@ -430,6 +447,7 @@ int test(int argc, const char *argv[])
 			FileStream out("testfiles/f9.zerotest", O_WRONLY | O_CREAT | O_EXCL);
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f9", 1 /* dir ID */, fn));
 			encoded->CopyStreamTo(out);
+			out.Close();
 			check_encoded_file("testfiles/f9.zerotest", 0, 0, 0);		
 		}
 		{
@@ -440,6 +458,7 @@ int test(int argc, const char *argv[])
 		}
 	}
 	
+#ifndef WIN32	
 	// Check that symlinks aren't diffed
 	TEST_THAT(::symlink("f2", "testfiles/f2.symlink") == 0)
 	// And go and diff it against the previous encoded file
@@ -467,8 +486,10 @@ int test(int argc, const char *argv[])
 		TEST_THAT(completelyDifferent == true);
 		check_encoded_file("testfiles/f2.symlink.diff", 0, 0, 0);		
 	}
+#endif
 
-	// Check that diffing against a file which isn't "complete" and referes another isn't allowed
+	// Check that diffing against a file which isn't "complete" and 
+	// references another isn't allowed
 	{
 		FileStream blockindex("testfiles/f1.diff");
 		BackupStoreFile::MoveStreamPositionToBlockIndex(blockindex);
@@ -480,10 +501,19 @@ int test(int argc, const char *argv[])
 			0, 0), BackupStoreException, CannotDiffAnIncompleteStoreFile);
 	}
 
-	// Found a nasty case where files of lots of the same thing sock up lots of processor
-	// time -- because of lots of matches found. Check this out!
+	// Found a nasty case where files of lots of the same thing 
+	// suck up lots of processor time -- because of lots of matches 
+	// found. Check this out!
+
+	#ifdef WIN32
+	::fprintf(stdout, "Testing diffing two large streams, "
+		"may take a while!\n");
+	::fflush(stdout);
+	#endif
+
 	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
 	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
+
 	// Generate a first encoded file
 	{
 		BackupStoreFilenameClear f0name("zero.0");
@@ -503,7 +533,14 @@ int test(int argc, const char *argv[])
 			2000 /* object ID of the file diffing from */, blockindex, IOStream::TimeOutInfinite,
 			0, 0));
 		encoded->CopyStreamTo(out);
+
+		printf("Time taken: %d seconds\n", (int)(time(0) - beginTime));
+
+		#ifdef WIN32
+		TEST_THAT(time(0) < (beginTime + 300));
+		#else
 		TEST_THAT(time(0) < (beginTime + 40));
+		#endif
 	}
 	// Remove zero-files to save disk space
 	remove("testfiles/zero.0");
