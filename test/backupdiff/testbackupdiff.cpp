@@ -473,7 +473,7 @@ int test(int argc, const char *argv[])
 			TEST_THAT(files_identical("testfiles/f9", "testfiles/f9.testdec.zero"));
 		}
 	}
-
+	
 #ifndef WIN32	
 	// Check that symlinks aren't diffed
 	TEST_THAT(::symlink("f2", "testfiles/f2.symlink") == 0)
@@ -555,7 +555,7 @@ int test(int argc, const char *argv[])
 		#ifdef WIN32
 		TEST_THAT(time(0) < (beginTime + 300));
 		#else
-		TEST_THAT(time(0) < (beginTime + 20));
+		TEST_THAT(time(0) < (beginTime + 40));
 		#endif
 	}
 	// Remove zero-files to save disk space
