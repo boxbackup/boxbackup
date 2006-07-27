@@ -645,34 +645,75 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		// Need to update?
 		//
 		// Condition for upload:
-		//    modifiction time within sync period
+		//    modification time within sync period
 		//    if it's been seen before but not uploaded, is the time from this first sight longer than the MaxUploadWait
 		//	  and if we know about it from a directory listing, that it hasn't got the same upload time as on the store
-		if(
-			(
-				// Check the file modified within the acceptable time period we're checking
-				// If the file isn't on the server, the acceptable time starts at zero.
-				// Check pDirOnStore and en, because if we didn't download a directory listing,
-				// pDirOnStore will be zero, but we know it's on the server.
-				( ((pDirOnStore != 0 && en == 0) || (modTime >= rParams.mSyncPeriodStart)) && modTime < rParams.mSyncPeriodEnd)
 
-				// However, just in case things are continually modified, we check the first seen time.
-				// The two compares of syncPeriodEnd and pendingFirstSeenTime are because the values are unsigned.
-				|| (pendingFirstSeenTime != 0 &&
-					(rParams.mSyncPeriodEnd > pendingFirstSeenTime)
-						&& ((rParams.mSyncPeriodEnd - pendingFirstSeenTime) > rParams.mMaxUploadWait))
+		bool doUpload = false;
 
-				// Then make sure that if files are added with a time less than the sync period start
-				// (which can easily happen on file server), it gets uploaded. The directory contents checksum
-				// will pick up the fact it has been added, so the store listing will be available when this happens.
-				|| ((modTime <= rParams.mSyncPeriodStart) && (en != 0) && (en->GetModificationTime() != modTime))
-				
-				// And just to catch really badly off clocks in the future for file server clients,
-				// just upload the file if it's madly in the future.
-				|| (modTime > rParams.mUploadAfterThisTimeInTheFuture)
-			)			
-			// But even then, only upload it if the mod time locally is different to that on the server.
-			&& (en == 0 || en->GetModificationTime() != modTime))
+		// Only upload a file if the mod time locally is 
+		// different to that on the server.
+
+		if (en == 0 || en->GetModificationTime() != modTime)
+		{
+			// Check the file modified within the acceptable time period we're checking
+			// If the file isn't on the server, the acceptable time starts at zero.
+			// Check pDirOnStore and en, because if we didn't download a directory listing,
+			// pDirOnStore will be zero, but we know it's on the server.
+			if (modTime < rParams.mSyncPeriodEnd)
+			{
+				if (pDirOnStore != 0 && en == 0)
+				{
+					doUpload = true;
+				}
+				else if (modTime >= rParams.mSyncPeriodStart)
+				{
+					doUpload = true;
+				}
+			}
+
+			// However, just in case things are continually 
+			// modified, we check the first seen time.
+			// The two compares of syncPeriodEnd and 
+			// pendingFirstSeenTime are because the values 
+			// are unsigned.
+
+			if (!doUpload && 
+				pendingFirstSeenTime != 0 &&
+				rParams.mSyncPeriodEnd > pendingFirstSeenTime &&
+				(rParams.mSyncPeriodEnd - pendingFirstSeenTime) 
+				> rParams.mMaxUploadWait)
+			{
+				doUpload = true;
+			}
+
+			// Then make sure that if files are added with a 
+			// time less than the sync period start
+			// (which can easily happen on file server), it 
+			// gets uploaded. The directory contents checksum
+			// will pick up the fact it has been added, so the 
+			// store listing will be available when this happens.
+
+			if (!doUpload &&
+				modTime <= rParams.mSyncPeriodStart && 
+				en != 0 && 
+				en->GetModificationTime() != modTime)
+			{
+				doUpload = true;
+			}
+
+			// And just to catch really badly off clocks in 
+			// the future for file server clients,
+			// just upload the file if it's madly in the future.
+
+			if (!doUpload && modTime > 
+				rParams.mUploadAfterThisTimeInTheFuture)
+			{
+				doUpload = true;
+			}
+		}
+
+		if (doUpload)
 		{
 			// Make sure we're connected -- must connect here so we know whether
 			// the storage limit has been exceeded, and hence whether or not
@@ -1022,7 +1063,10 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					BackupClientDirectoryRecord *rec = e->second;
 					mSubDirectories.erase(e);
 					delete rec;
-					TRACE2("Deleted directory record for %s/%s\n", rLocalPath.c_str(), dirname.GetClearFilename().c_str());
+					TRACE2("Deleted directory record for "
+						"%s" DIRECTORY_SEPARATOR "%s\n",
+						rLocalPath.c_str(), 
+						dirname.GetClearFilename().c_str());
 				}				
 			}
 		}
