@@ -118,7 +118,7 @@ sub update_if_changed ($)
 	if (-r $file)
 	{
 		die "$file.new: not found" unless -r "$file.new";
-		if (system("diff -u $file $file.new") == 0)
+		if (system("diff --brief $file $file.new") == 0)
 		{
 			unlink "$file.new";
 			return;
