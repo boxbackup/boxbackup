@@ -326,7 +326,7 @@ void RaidFileWrite::Discard()
 		::unlink(writeFilename.c_str()) != 0)
 #else // !WIN32
 	if (::unlink(writeFilename.c_str()) != 0 ||
-		::close(mOSFileHandle) != 0))
+		::close(mOSFileHandle) != 0)
 #endif // !WIN32
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
