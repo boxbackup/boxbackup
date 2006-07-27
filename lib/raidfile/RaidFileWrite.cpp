@@ -277,7 +277,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-
+	
 #ifndef WIN32	
 	// Close file...
 	if(::close(mOSFileHandle) != 0)
@@ -331,7 +331,7 @@ void RaidFileWrite::Discard()
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-
+	
 	// reset file handle
 	mOSFileHandle = -1;
 }

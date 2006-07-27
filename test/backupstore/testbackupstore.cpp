@@ -1630,7 +1630,7 @@ int test3(int argc, const char *argv[])
 
 			TEST_THAT(decoded->GetNumBlocks() == 3);
 		}
-
+		
 #ifndef WIN32		
 		// Try out doing this on a symlink
 		{

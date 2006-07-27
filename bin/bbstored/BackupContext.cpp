@@ -527,7 +527,7 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 			}
 #endif
 		}
-
+		
 		// Get the blocks used
 		blocksUsed = storeFile.GetDiscUsageInBlocks();
 		
