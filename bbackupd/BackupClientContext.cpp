@@ -176,7 +176,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			// no -- flag so only things like deletions happen
 			mStorageLimitExceeded = true;
 			// Log
-			::syslog(LOG_INFO, "Exceeded storage limits on server -- not uploading changes to files");
+			::syslog(LOG_WARNING, "Exceeded storage limits on server -- not uploading changes to files");
 		}
 	}
 	catch(...)

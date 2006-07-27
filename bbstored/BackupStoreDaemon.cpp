@@ -11,8 +11,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <syslog.h>
 #include <signal.h>
+
+#ifdef HAVE_SYSLOG_H
+#include <syslog.h>
+#endif
 
 #include "BackupContext.h"
 #include "BackupStoreDaemon.h"
@@ -39,7 +42,11 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mExtendedLogging(false),
 	  mHaveForkedHousekeeping(false),
 	  mIsHousekeepingProcess(false),
+#ifdef WIN32
+	  mHousekeepingInited(false)
+#else
 	  mInterProcessComms(mInterProcessCommsSocket)
+#endif
 {
 }
 
@@ -156,6 +163,7 @@ void BackupStoreDaemon::Run()
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
 	
+#ifndef WIN32	
 	// Fork off housekeeping daemon -- must only do this the first time Run() is called
 	if(!mHaveForkedHousekeeping)
 	{
@@ -219,9 +227,11 @@ void BackupStoreDaemon::Run()
 	}
 	else
 	{
+#endif // !WIN32
 		// In server process -- use the base class to do the magic
 		ServerTLS<BOX_PORT_BBSTORED>::Run();
 		
+#ifndef WIN32	
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())
 		{
@@ -232,6 +242,7 @@ void BackupStoreDaemon::Run()
 			mInterProcessCommsSocket.Write("t\n", 2);
 		}
 	}
+#endif
 }
 
 
@@ -297,6 +308,8 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 	// Log the amount of data transferred
 	::syslog(LOG_INFO, "Connection statistics for %s: "
 			"IN=%lld OUT=%lld TOTAL=%lld\n", commonName,
-			s.GetBytesRead(), s.GetBytesWritten(),
-			s.GetBytesRead() + s.GetBytesWritten());
+			(long long)s.GetBytesRead(), 
+			(long long)s.GetBytesWritten(),
+			(long long)s.GetBytesRead() + 
+			(long long)s.GetBytesWritten());
 }

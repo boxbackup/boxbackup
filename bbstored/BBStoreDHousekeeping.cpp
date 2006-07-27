@@ -10,7 +10,10 @@
 #include "Box.h"
 
 #include <stdio.h>
+
+#ifdef HAVE_SYSLOG_H
 #include <syslog.h>
+#endif
 
 #include "BackupStoreDaemon.h"
 #include "BackupStoreAccountDatabase.h"
@@ -29,86 +32,28 @@
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
+void BackupStoreDaemon::HousekeepingInit()
+{
+
+	mLastHousekeepingRun = 0;
+}
+
+#ifndef WIN32
 void BackupStoreDaemon::HousekeepingProcess()
 {
+	HousekeepingInit();
+
 	// Get the time between housekeeping runs
 	const Configuration &rconfig(GetConfiguration());
 	int64_t housekeepingInterval = SecondsToBoxTime(rconfig.GetKeyValueInt("TimeBetweenHousekeeping"));
-	
-	int64_t lastHousekeepingRun = 0;
 
 	while(!StopRun())
 	{
-		// Time now
-		int64_t timeNow = GetCurrentBoxTime();
-		// Do housekeeping if the time interval has elapsed since the last check
-		if((timeNow - lastHousekeepingRun) >= housekeepingInterval)
-		{
-			// Store the time
-			lastHousekeepingRun = timeNow;
-			::syslog(LOG_INFO, "Starting housekeeping");
+		RunHousekeepingIfNeeded();
 
-			// Get the list of accounts
-			std::vector<int32_t> accounts;
-			if(mpAccountDatabase)
-			{
-				mpAccountDatabase->GetAllAccountIDs(accounts);
-			}
-			
-			SetProcessTitle("housekeeping, active");
-			
-			// Check them all
-			for(std::vector<int32_t>::const_iterator i = accounts.begin(); i != accounts.end(); ++i)
-			{
-				try
-				{
-					if(mpAccounts)
-					{
-						// Get the account root
-						std::string rootDir;
-						int discSet = 0;
-						mpAccounts->GetAccountRoot(*i, rootDir, discSet);
-						
-						// Do housekeeping on this account
-						HousekeepStoreAccount housekeeping(*i, rootDir, discSet, *this);
-						housekeeping.DoHousekeeping();
-					}
-				}
-				catch(BoxException &e)
-				{
-					::syslog(LOG_ERR, "while housekeeping account %08X, exception %s (%d/%d) -- aborting housekeeping run for this account",
-						*i, e.what(), e.GetType(), e.GetSubType());
-				}
-				catch(std::exception &e)
-				{
-					::syslog(LOG_ERR, "while housekeeping account %08X, exception %s -- aborting housekeeping run for this account",
-						*i, e.what());
-				}
-				catch(...)
-				{
-					::syslog(LOG_ERR, "while housekeeping account %08X, unknown exception -- aborting housekeeping run for this account",
-						*i);
-				}
-				
-				// Check to see if there's any message pending
-				CheckForInterProcessMsg(0 /* no account */);
-		
-				// Stop early?
-				if(StopRun())
-				{
-					break;
-				}
-			}
-			
-			::syslog(LOG_INFO, "Finished housekeeping");
-		}
-
-		// Placed here for accuracy, if StopRun() is true, for example.
-		SetProcessTitle("housekeeping, idle");
-		
 		// Calculate how long should wait before doing the next housekeeping run
-		timeNow = GetCurrentBoxTime();
-		time_t secondsToGo = BoxTimeToSeconds((lastHousekeepingRun + housekeepingInterval) - timeNow);
+		int64_t timeNow = GetCurrentBoxTime();
+		time_t secondsToGo = BoxTimeToSeconds((mLastHousekeepingRun + housekeepingInterval) - timeNow);
 		if(secondsToGo < 1) secondsToGo = 1;
 		if(secondsToGo > 60) secondsToGo = 60;
 		int32_t millisecondsToGo = ((int)secondsToGo) * 1000;
@@ -117,7 +62,98 @@ void BackupStoreDaemon::HousekeepingProcess()
 		CheckForInterProcessMsg(0 /* no account */, millisecondsToGo);
 	}
 }
+#endif
 
+void BackupStoreDaemon::RunHousekeepingIfNeeded()
+{
+	// Get the time between housekeeping runs
+	const Configuration &rconfig(GetConfiguration());
+	int64_t housekeepingInterval = SecondsToBoxTime(rconfig.GetKeyValueInt("TimeBetweenHousekeeping"));
+
+	// Time now
+	int64_t timeNow = GetCurrentBoxTime();
+	// Do housekeeping if the time interval has elapsed since the last check
+	if((timeNow - mLastHousekeepingRun) < housekeepingInterval)
+	{
+		return;
+	}
+
+	// Store the time
+	mLastHousekeepingRun = timeNow;
+	::syslog(LOG_INFO, "Starting housekeeping");
+
+	// Get the list of accounts
+	std::vector<int32_t> accounts;
+	if(mpAccountDatabase)
+	{
+		mpAccountDatabase->GetAllAccountIDs(accounts);
+	}
+			
+	SetProcessTitle("housekeeping, active");
+			
+	// Check them all
+	for(std::vector<int32_t>::const_iterator i = accounts.begin(); i != accounts.end(); ++i)
+	{
+		try
+		{
+			if(mpAccounts)
+			{
+				// Get the account root
+				std::string rootDir;
+				int discSet = 0;
+				mpAccounts->GetAccountRoot(*i, rootDir, discSet);
+				
+				// Do housekeeping on this account
+				HousekeepStoreAccount housekeeping(*i, rootDir, discSet, *this);
+				housekeeping.DoHousekeeping();
+			}
+		}
+		catch(BoxException &e)
+		{
+			::syslog(LOG_ERR, "while housekeeping account %08X, exception %s (%d/%d) -- aborting housekeeping run for this account",
+				*i, e.what(), e.GetType(), e.GetSubType());
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "while housekeeping account %08X, exception %s -- aborting housekeeping run for this account",
+				*i, e.what());
+		}
+		catch(...)
+		{
+			::syslog(LOG_ERR, "while housekeeping account %08X, unknown exception -- aborting housekeeping run for this account",
+				*i);
+		}
+	
+#ifndef WIN32	
+		// Check to see if there's any message pending
+		CheckForInterProcessMsg(0 /* no account */);
+#endif
+
+		// Stop early?
+		if(StopRun())
+		{
+			break;
+		}
+	}
+		
+	::syslog(LOG_INFO, "Finished housekeeping");
+
+	// Placed here for accuracy, if StopRun() is true, for example.
+	SetProcessTitle("housekeeping, idle");
+}
+
+#ifdef WIN32
+void BackupStoreDaemon::OnIdle()
+{
+	if (!mHousekeepingInited)
+	{
+		HousekeepingInit();
+		mHousekeepingInited = true;
+	}
+
+	RunHousekeepingIfNeeded();
+}
+#endif
 
 // --------------------------------------------------------------------------
 //
@@ -128,6 +164,7 @@ void BackupStoreDaemon::HousekeepingProcess()
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
+#ifndef WIN32
 bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitTime)
 {
 	// First, check to see if it's EOF -- this means something has gone wrong, and the housekeeping should terminate.
@@ -171,5 +208,6 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 	
 	return false;
 }
+#endif
 
 
