@@ -74,28 +74,12 @@ void make_file_of_zeros(const char *filename, size_t size)
 	TEST_THAT(SetEndOfFile(handle) == true);
 	TEST_THAT(CloseHandle(handle)  == true);
 	#else
-	TEST_THAT(truncate(filename, size) == 0);
+	int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
+	if (fd < 0) perror(filename);
+	TEST_THAT(fd >= 0);
+	TEST_THAT(ftruncate(fd, size) == 0);
+	TEST_THAT(close(fd) == 0);
 	#endif
-
-	/*
-	static const size_t bs = 0x10000;
-	size_t remSize = size;
-	void *b = malloc(bs);
-	memset(b, 0, bs);
-	FILE *f = fopen(filename, "wb");
-	TEST_THAT(f != NULL);
-
-	// Using largish blocks like this is much faster, while not consuming too much RAM
-	while(remSize > bs)
-	{
-		fwrite(b, bs, 1, f);
-		remSize -= bs;
-	}
-	fwrite(b, remSize, 1, f);
-
-	fclose(f);
-	free(b);
-	*/
 
 	TEST_THAT((size_t)TestGetFileSize(filename) == size);
 }
