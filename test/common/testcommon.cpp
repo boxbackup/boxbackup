@@ -24,6 +24,8 @@
 #include "CommonException.h"
 #include "Conversion.h"
 #include "autogen_ConversionException.h"
+#include "CollectInBufferStream.h"
+#include "Archive.h"
 
 #include "MemLeakFindOn.h"
 
@@ -564,6 +566,64 @@ int test(int argc, const char *argv[])
 	}
 
 	test_conversions();
+
+	// test that we can use Archive and CollectInBufferStream
+	// to read and write arbitrary types to a memory buffer
+
+	{
+		CollectInBufferStream buffer;
+		ASSERT(buffer.GetPosition() == 0);
+
+		{
+			Archive archive(buffer, 0);
+			ASSERT(buffer.GetPosition() == 0);
+
+			archive.Write((bool) true);
+			archive.Write((bool) false);
+			archive.Write((int) 0x12345678);
+			archive.Write((int) 0x87654321);
+			archive.Write((int64_t)  0x0badfeedcafebabeLL);
+			archive.Write((uint64_t) 0xfeedfacedeadf00dLL);
+			archive.Write((uint8_t)  0x01);
+			archive.Write((uint8_t)  0xfe);
+			archive.Write(std::string("hello world!"));
+			archive.Write(std::string("goodbye cruel world!"));
+		}
+
+		CollectInBufferStream buf2;
+		buf2.Write(buffer.GetBuffer(), buffer.GetSize());
+		TEST_THAT(buf2.GetPosition() == buffer.GetSize());
+
+		buf2.SetForReading();
+		TEST_THAT(buf2.GetPosition() == 0);
+
+		{
+			Archive archive(buf2, 0);
+			TEST_THAT(buf2.GetPosition() == 0);
+
+			bool b;
+			archive.Read(b); TEST_THAT(b == true);
+			archive.Read(b); TEST_THAT(b == false);
+
+			int i;
+			archive.Read(i); TEST_THAT(i == 0x12345678);
+			archive.Read(i); TEST_THAT((unsigned int)i == 0x87654321);
+
+			uint64_t i64;
+			archive.Read(i64); TEST_THAT(i64 == 0x0badfeedcafebabeLL);
+			archive.Read(i64); TEST_THAT(i64 == 0xfeedfacedeadf00dLL);
+
+			uint8_t i8;
+			archive.Read(i8); TEST_THAT(i8 == 0x01);
+			archive.Read(i8); TEST_THAT(i8 == 0xfe);
+
+			std::string s;
+			archive.Read(s); TEST_THAT(s == "hello world!");
+			archive.Read(s); TEST_THAT(s == "goodbye cruel world!");
+
+			TEST_THAT(!buf2.StreamDataLeft());
+		}
+	}
 
 	return 0;
 }

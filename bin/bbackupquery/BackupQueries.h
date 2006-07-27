@@ -68,8 +68,10 @@ private:
 		void DeleteExcludeLists();
 		bool mQuickCompare;
 		bool mIgnoreExcludes;
+		bool mIgnoreAttributes;
 		int mDifferences;
 		int mDifferencesExplainedByModTime;
+		int mUncheckedFiles;
 		int mExcludedDirs;
 		int mExcludedFiles;
 		const ExcludeList *mpExcludeFiles;

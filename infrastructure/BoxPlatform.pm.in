@@ -1,16 +1,30 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $build_cpu $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext/;
+@EXPORT = qw/$build_os $build_cpu $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows update_if_changed/;
 
 BEGIN
 {
 
 	# which OS are we building under?
-	$build_os = `uname`;
-	chomp $build_os;
-	$build_cpu = `uname -p`;
-	chomp $build_cpu;
+	$target_os = '@target_os@';
+	$target_windows = 0;
+	$target_windows = 1 if $target_os =~ m'^mingw32' 
+		or $target_os eq "winnt";
+
+	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
+	{
+		$build_os = "winnt";
+		$build_cpu = "ix86";
+	}
+	else
+	{
+		$build_os = `uname`;
+		chomp $build_os;
+		$build_cpu = `uname -m`;
+		chomp $build_cpu;
+	}
+
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
 
@@ -24,11 +38,18 @@ BEGIN
 	$platform_compile_line_extra =~ s/ -O2//;
 	$platform_link_line_extra = '@LDFLAGS@';
 	$platform_lib_files = '@LIBS@';
-	$target_os = '@target_os@';
 	$platform_exe_ext = '@EXEEXT@';
 
 	# get version
-	open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
+	if (! -r "VERSION.txt" and -r "../../VERSION.txt")
+	{
+		open VERSION,"../../VERSION.txt" or die "../../VERSION.txt: $!";
+	}
+	else
+	{
+		open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
+	}
+
 	$product_version = <VERSION>;
 	chomp $product_version;
 	$product_name = <VERSION>;
@@ -87,6 +108,35 @@ sub make_flag
 		return "-D $_[0]"
 	}
 	return $_[0].'=1';
+}
+
+sub update_if_changed ($)
+{
+	my ($file) = @_;
+	die "$file.new: not found" unless -r "$file.new";
+
+	if (-r $file)
+	{
+		die "$file.new: not found" unless -r "$file.new";
+		if (system("diff --brief $file $file.new") == 0)
+		{
+			unlink "$file.new";
+			return;
+		}
+	}
+
+	if (system("cp $file.new $file") != 0)
+	{
+		die "failed to copy $file.new to $file";
+	}
+
+	if (system("diff --brief $file $file.new") != 0)
+	{
+		die "$file and $file.new are still different";
+	}
+
+	unlink "$file.new";
+	return;
 }
 
 1;

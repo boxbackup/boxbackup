@@ -14,8 +14,10 @@
 
 #ifdef WIN32
 	typedef SOCKET tOSSocketHandle;
+	#define INVALID_SOCKET_VALUE (tOSSocketHandle)(-1)
 #else
 	typedef int tOSSocketHandle;
+	#define INVALID_SOCKET_VALUE -1
 #endif
 
 // --------------------------------------------------------------------------

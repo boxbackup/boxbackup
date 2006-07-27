@@ -1,11 +1,14 @@
 #!@PERL@
 
+use strict;
+use warnings;
+
 use lib 'infrastructure';
 use BoxPlatform;
 
 my ($test_name,$test_mode) = @ARGV;
 
-$test_mode = 'debug' if $test_mode eq '';
+$test_mode = 'debug' if not defined $test_mode or $test_mode eq '';
 
 if($test_name eq '' || ($test_mode ne 'debug' && $test_mode ne 'release'))
 {
@@ -17,15 +20,26 @@ runtest.pl (test|ALL) [release|debug]
 Mode defaults to debug.
 
 __E
-	exit(0);
+	exit(2);
 }
 
 my @results;
+my $exit_code = 0;
 
 if($test_name ne 'ALL')
 {
-	# run one test
-	runtest($test_name);
+	# run one or more specified test
+	if ($test_name =~ m/,/)
+	{
+		foreach my $test (split m/,/, $test_name)
+		{
+			runtest($test);
+		}
+	}
+	else
+	{
+		runtest($test_name);
+	}
 }
 else
 {
@@ -57,6 +71,8 @@ else
 # report results
 print "--------\n",join("\n",@results),"\n";
 
+exit $exit_code;
+
 sub runtest
 {
 	my ($t) = @_;
@@ -67,6 +83,7 @@ sub runtest
 	if($make_res != 0)
 	{
 		push @results,"$t: make failed";
+		$exit_code = 2;
 		return;
 	}
 	
@@ -82,8 +99,14 @@ sub runtest
 			$last = $_ if m/\w/;
 		}
 		close RESULTS;
+
 		chomp $last;
 		push @results,"$t: $last";
+
+		if ($last ne "PASSED") 
+		{ 
+			$exit_code = 1;
+		}
 	}
 	else
 	{
