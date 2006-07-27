@@ -1895,11 +1895,13 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		printf("The target directory exists. You cannot restore over an existing directory.\n");
 		break;
 		
+	#ifdef WIN32
 	case Restore_TargetPathNotFound:
 		printf("The target directory path does not exist.\n"
 			"To restore to a directory whose parent "
 			"does not exist, create the parent first.\n");
 		break;
+	#endif
 
 	default:
 		printf("ERROR: Unknown restore result.\n");
