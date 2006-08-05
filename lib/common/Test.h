@@ -235,12 +235,21 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	return pid;
 }
 
-inline void TestRemoteProcessMemLeaks(const char *filename)
+#define TestRemoteProcessMemLeaks(filename) \
+	TestRemoteProcessMemLeaksFunc(filename, __FILE__, __LINE__)
+
+inline void TestRemoteProcessMemLeaksFunc(const char *filename,
+	const char* file, int line)
 {
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Does the file exist?
 	if(!TestFileExists(filename))
 	{
+		if (failures == 0)
+		{
+			first_fail_file = file;
+			first_fail_line = line;
+		}
 		++failures;
 		printf("FAILURE: MemLeak report not available (file %s)\n", filename);
 	}
@@ -249,8 +258,14 @@ inline void TestRemoteProcessMemLeaks(const char *filename)
 		// Is it empty?
 		if(TestGetFileSize(filename) > 0)
 		{
+			if (failures == 0)
+			{
+				first_fail_file = file;
+				first_fail_line = line;
+			}
 			++failures;
-			printf("FAILURE: Memory leaks found in other process (file %s)\n==========\n", filename);
+			printf("FAILURE: Memory leaks found in other process "
+				"(file %s)\n==========\n", filename);
 			FILE *f = fopen(filename, "r");
 			char line[512];
 			while(::fgets(line, sizeof(line), f) != 0)
