@@ -113,7 +113,7 @@ int main(int argc, const char *argv[])
 			if(memleakfinder_numleaks() != 0)
 			{
 				failures++;
-				printf("FAILURE: Memory leaks detected\n");
+				printf("FAILURE: Memory leaks detected in test code\n");
 				printf("==== MEMORY LEAKS =================================\n");
 				memleakfinder_reportleaks();
 				printf("===================================================\n");
