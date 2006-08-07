@@ -32,14 +32,12 @@ void PrintUsageAndExit()
 {
 	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
 	"Commands are:\n"
-	"  sync -- start a synchronisation (backup) run now\n"
-	"  force-sync -- force the start of a synchronisation run, "
+	"  sync -- start a syncronisation run now\n"
+	"  force-sync -- force the start of a syncronisation run, "
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
-	"  wait-for-end  -- wait until the next sync finishes, then exit\n"
-	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"
 	);
 	exit(1);
 }
@@ -109,10 +107,7 @@ int main(int argc, const char *argv[])
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
-		printf("Daemon isn't using a control socket, "
-			"could not execute command.\n"
-			"Add a CommandSocket declaration to the "
-			"bbackupd.conf file.\n");
+		printf("Daemon isn't using a control socket, could not execute command.\nAdd a CommandSocket declaration to the bbackupd.conf file.\n");
 		return 1;
 	}
 	
@@ -193,74 +188,27 @@ int main(int argc, const char *argv[])
 	// Print summary?
 	if(!quiet)
 	{
-		printf("Daemon configuration summary:\n"
-			"  AutomaticBackup = %s\n"
-			"  UpdateStoreInterval = %d seconds\n"
-			"  MinimumFileAge = %d seconds\n"
-			"  MaxUploadWait = %d seconds\n",
-			autoBackup?"true":"false", updateStoreInterval, 
-			minimumFileAge, maxUploadWait);
-	}
-
-	std::string stateLine;
-	if(!getLine.GetLine(stateLine) || getLine.IsEOF())
-	{
-#if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR, "Failed to receive state line from daemon");
-#else
-		printf("Failed to receive state line from daemon\n");
-#endif
-		return 1;
-	}
-
-	// Decode it
-	int currentState;
-	if(::sscanf(stateLine.c_str(), "state %d", &currentState) != 1)
-	{
-		printf("State line didn't decode\n");
-		return 1;
+		printf("Daemon configuration summary:\n"	\
+			   "  AutomaticBackup = %s\n"			\
+			   "  UpdateStoreInterval = %d seconds\n"	\
+			   "  MinimumFileAge = %d seconds\n"	\
+			   "  MaxUploadWait = %d seconds\n",
+			   autoBackup?"true":"false", updateStoreInterval, minimumFileAge, maxUploadWait);
 	}
 
 	// Is the command the "wait for sync to start" command?
 	bool areWaitingForSync = false;
-	bool areWaitingForSyncEnd = false;
-
-	if(::strcmp(argv[0], "wait-for-sync") == 0 ||
-	   ::strcmp(argv[0], "wait-for-end") == 0)
+	if(::strcmp(argv[0], "wait-for-sync") == 0)
 	{
-		// Check that it's not in non-automatic mode, 
-		// because then it'll never start
+		// Check that it's not in non-automatic mode, because then it'll never start
 		if(!autoBackup)
 		{
-			printf("ERROR: Daemon is not in automatic mode -- "
-				"sync will never start!\n");
+			printf("ERROR: Daemon is not in automatic mode -- sync will never start!\n");
 			return 1;
 		}
 	
-		// Yes... set the flag so we know that 
-		// we're waiting for a sync to start/end
-		if(::strcmp(argv[0], "wait-for-sync") == 0)
-		{
-			areWaitingForSync = true;
-		}
-		else if (::strcmp(argv[0], "wait-for-end") == 0)
-		{
-			areWaitingForSyncEnd = true;
-		}
-	}
-	else if (::strcmp(argv[0], "sync-and-wait") == 0)
-	{
-		// send a sync command
-		std::string cmd("force-sync\n");
-		connection.Write(cmd.c_str(), cmd.size());
-		connection.WriteAllBuffered();
-		areWaitingForSyncEnd = true;
-
-		if (currentState != 0)
-		{
-			printf("Waiting for current sync/error state "
-				"to finish...\n");
-		}
+		// Yes... set the flag so we know what we're waiting for a sync to start
+		areWaitingForSync = true;
 	}
 	else
 	{
@@ -272,8 +220,6 @@ int main(int argc, const char *argv[])
 	
 	// Read the response
 	std::string line;
-	bool syncIsRunning = false;
-
 	while(!getLine.IsEOF() && getLine.GetLine(line))
 	{
 		if(areWaitingForSync)
@@ -287,28 +233,6 @@ int main(int argc, const char *argv[])
 				// And we're done
 				break;
 			}		
-		}
-		else if(areWaitingForSyncEnd)
-		{
-			if(line == "start-sync")
-			{
-				if (!quiet) printf("Sync started...\n");
-				syncIsRunning = true;
-			}
-			else if(line == "finish-sync" && syncIsRunning)
-			{
-				if (!quiet) printf("Sync finished.\n");
-				// Send a quit command to finish nicely
-				connection.Write("quit\n", 5);
-				
-				// And we're done
-				break;
-			}
-			else if(line == "finish-sync")
-			{
-				if (!quiet) printf("Previous sync finished.\n");
-			}
-			// daemon must still be busy
 		}
 		else
 		{
