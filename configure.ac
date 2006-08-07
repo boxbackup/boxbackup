@@ -26,20 +26,13 @@ if test "x$GXX" = "xyes"; then
   # Use -rdynamic if we have gcc. This is needed for backtrace
   AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
 fi
+AC_PATH_PROG([PERL], [perl], [no])
+if test "x$PERL" != "xno"; then
+  AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$PERL"], [Location of the perl executable])
+else
+  AC_MSG_ERROR([[perl executable was not found]])
+fi
 
-AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
-
-case $target_os in
-mingw*) 
-	AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["perl"], [Command to run Perl])
-	PERL_NATIVE=perl
-	AC_SUBST([PERL_NATIVE])
-	;;
-*)
-	AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$PERL"], 
-		[Location of the perl executable])
-	;;
-esac
 
 ### Checks for libraries.
 
