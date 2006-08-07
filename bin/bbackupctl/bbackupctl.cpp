@@ -28,16 +28,26 @@
 
 #include "MemLeakFindOn.h"
 
+enum Command
+{
+	Default,
+	WaitForSyncStart,
+	WaitForSyncEnd,
+	SyncAndWaitForEnd,
+};
+
 void PrintUsageAndExit()
 {
 	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
 	"Commands are:\n"
-	"  sync -- start a syncronisation run now\n"
-	"  force-sync -- force the start of a syncronisation run, "
+	"  sync -- start a synchronisation (backup) run now\n"
+	"  force-sync -- force the start of a synchronisation run, "
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
+	"  wait-for-end  -- wait until the next sync finishes, then exit\n"
+	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"
 	);
 	exit(1);
 }
@@ -107,7 +117,10 @@ int main(int argc, const char *argv[])
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
-		printf("Daemon isn't using a control socket, could not execute command.\nAdd a CommandSocket declaration to the bbackupd.conf file.\n");
+		printf("Daemon isn't using a control socket, "
+			"could not execute command.\n"
+			"Add a CommandSocket declaration to the "
+			"bbackupd.conf file.\n");
 		return 1;
 	}
 	
@@ -188,68 +201,161 @@ int main(int argc, const char *argv[])
 	// Print summary?
 	if(!quiet)
 	{
-		printf("Daemon configuration summary:\n"	\
-			   "  AutomaticBackup = %s\n"			\
-			   "  UpdateStoreInterval = %d seconds\n"	\
-			   "  MinimumFileAge = %d seconds\n"	\
-			   "  MaxUploadWait = %d seconds\n",
-			   autoBackup?"true":"false", updateStoreInterval, minimumFileAge, maxUploadWait);
+		printf("Daemon configuration summary:\n"
+			"  AutomaticBackup = %s\n"
+			"  UpdateStoreInterval = %d seconds\n"
+			"  MinimumFileAge = %d seconds\n"
+			"  MaxUploadWait = %d seconds\n",
+			autoBackup?"true":"false", updateStoreInterval, 
+			minimumFileAge, maxUploadWait);
 	}
 
-	// Is the command the "wait for sync to start" command?
-	bool areWaitingForSync = false;
-	if(::strcmp(argv[0], "wait-for-sync") == 0)
+	std::string stateLine;
+	if(!getLine.GetLine(stateLine) || getLine.IsEOF())
 	{
-		// Check that it's not in non-automatic mode, because then it'll never start
-		if(!autoBackup)
-		{
-			printf("ERROR: Daemon is not in automatic mode -- sync will never start!\n");
-			return 1;
-		}
-	
-		// Yes... set the flag so we know what we're waiting for a sync to start
-		areWaitingForSync = true;
+#if defined WIN32 && ! defined NDEBUG
+		syslog(LOG_ERR, "Failed to receive state line from daemon");
+#else
+		printf("Failed to receive state line from daemon\n");
+#endif
+		return 1;
 	}
-	else
+
+	// Decode it
+	int currentState;
+	if(::sscanf(stateLine.c_str(), "state %d", &currentState) != 1)
 	{
-		// No? Just send the command given plus a quit command.
-		std::string cmd(argv[0]);
-		cmd += "\nquit\n";
-		connection.Write(cmd.c_str(), cmd.size());
+		printf("State line didn't decode\n");
+		return 1;
+	}
+
+	Command command = Default;
+	std::string commandName(argv[0]);
+
+	if (commandName == "wait-for-sync")
+	{
+		command = WaitForSyncStart;
+	}
+	else if (commandName == "wait-for-end")
+	{
+		command = WaitForSyncEnd;
+	}
+	else if (commandName == "sync-and-wait")
+	{
+		command = SyncAndWaitForEnd;
+	}
+
+	switch (command)
+	{
+		case WaitForSyncStart:
+		case WaitForSyncEnd:
+		{
+			// Check that it's not in non-automatic mode, 
+			// because then it'll never start
+
+			if(!autoBackup)
+			{
+				printf("ERROR: Daemon is not in automatic mode -- "
+					"sync will never start!\n");
+				return 1;
+			}
+
+		}
+		break;
+
+		case SyncAndWaitForEnd:
+		{
+			// send a sync command
+			std::string cmd("force-sync\n");
+			connection.Write(cmd.c_str(), cmd.size());
+			connection.WriteAllBuffered();
+
+			if (currentState != 0)
+			{
+				printf("Waiting for current sync/error state "
+					"to finish...\n");
+			}
+		}
+		break;
+
+		default:
+		{
+			// Normal case, just send the command given 
+			// plus a quit command.
+			std::string cmd = commandName;
+			cmd += "\nquit\n";
+			connection.Write(cmd.c_str(), cmd.size());
+		}
 	}
 	
 	// Read the response
 	std::string line;
-	while(!getLine.IsEOF() && getLine.GetLine(line))
+	bool syncIsRunning = false;
+	bool finished = false;
+
+	while(!finished && !getLine.IsEOF() && getLine.GetLine(line))
 	{
-		if(areWaitingForSync)
+		switch (command)
 		{
-			// Need to wait for the state change...
-			if(line == "start-sync")
+			case WaitForSyncStart:
 			{
-				// Send a quit command to finish nicely
-				connection.Write("quit\n", 5);
-				
-				// And we're done
-				break;
-			}		
-		}
-		else
-		{
-			// Is this an OK or error line?
-			if(line == "ok")
-			{
-				if(!quiet)
+				// Need to wait for the state change...
+				if(line == "start-sync")
 				{
-					printf("Succeeded.\n");
+					// Send a quit command to finish nicely
+					connection.Write("quit\n", 5);
+					
+					// And we're done
+					finished = true;
 				}
-				break;
 			}
-			else if(line == "error")
+			break;
+
+			case WaitForSyncEnd:
+			case SyncAndWaitForEnd:
 			{
-				printf("ERROR. (Check command spelling)\n");
-				returnCode = 1;
-				break;
+				if(line == "start-sync")
+				{
+					if (!quiet) printf("Sync started...\n");
+					syncIsRunning = true;
+				}
+				else if(line == "finish-sync")
+				{
+					if (syncIsRunning)
+					{
+						if (!quiet) printf("Sync finished.\n");
+						// Send a quit command to finish nicely
+						connection.Write("quit\n", 5);
+					
+						// And we're done
+						finished = true;
+					}
+					else
+					{
+						if (!quiet) printf("Previous sync finished.\n");
+					}
+					// daemon must still be busy
+				}
+			}
+			break;
+
+			default:
+			{
+				// Is this an OK or error line?
+				if(line == "ok")
+				{
+					if(!quiet)
+					{
+						printf("Succeeded.\n");
+					}
+					finished = true;
+				}
+				else if(line == "error")
+				{
+					printf("ERROR. (Check command spelling)\n");
+					returnCode = 1;
+					finished = true;
+				}
 			}
 		}
 	}
