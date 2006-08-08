@@ -250,8 +250,8 @@ int main(int argc, const char *argv[])
 		case WaitForSyncStart:
 		case WaitForSyncEnd:
 		{
-			// Check that it's not in non-automatic mode, 
-			// because then it'll never start
+			// Check that it's in automatic mode, 
+			// because otherwise it'll never start
 
 			if(!autoBackup)
 			{
