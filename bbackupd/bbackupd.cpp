@@ -43,14 +43,19 @@ int main(int argc, const char *argv[])
 		RemoveService();
 		return 0;
 	}
-	if(argc == 2 && ::strcmp(argv[1], "-i") == 0)
+	if((argc == 2 || argc == 3) && ::strcmp(argv[1], "-i") == 0)
 	{
-		InstallService();
+		const char* config = NULL;
+		if (argc == 3)
+		{
+			config = argv[2];
+		}
+		InstallService(config);
 		return 0;
 	}
 
 	bool runAsWin32Service = false;
-	if (argc == 2 && ::strcmp(argv[1], "--service") == 0)
+	if (argc >= 2 && ::strcmp(argv[1], "--service") == 0)
 	{
 		runAsWin32Service = true;
 	}
@@ -73,8 +78,22 @@ int main(int argc, const char *argv[])
 
 	if (runAsWin32Service)
 	{
-		syslog(LOG_INFO,"Starting Box Backup Service");
-		OurService();
+		syslog(LOG_INFO, "Box Backup service starting");
+
+		char* config = NULL;
+		if (argc >= 3)
+		{
+			config = strdup(argv[2]);
+		}
+
+		OurService(config);
+
+		if (config)
+		{
+			free(config);
+		}
+
+		syslog(LOG_INFO, "Box Backup service shut down");
 	}
 	else
 	{
