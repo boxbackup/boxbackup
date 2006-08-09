@@ -12,51 +12,40 @@
 
 #include "Win32BackupService.h"
 
-Win32BackupService* gpDaemonService = NULL;
+Win32BackupService gDaemonService;
 extern HANDLE gStopServiceEvent;
 
 unsigned int WINAPI RunService(LPVOID lpParameter)
 {
-	DWORD retVal = gpDaemonService->WinService((const char*) lpParameter);
-	SetEvent(gStopServiceEvent);
+	DWORD retVal = gDaemonService.WinService();
+	SetEvent( gStopServiceEvent );
 	return retVal;
 }
 
 void TerminateService(void)
 {
-	gpDaemonService->SetTerminateWanted();
+	gDaemonService.SetTerminateWanted();
 }
 
-DWORD Win32BackupService::WinService(const char* pConfigFileName)
+DWORD Win32BackupService::WinService(void)
 {
-	char exepath[MAX_PATH];
-	GetModuleFileName(NULL, exepath, sizeof(exepath));
-
-	std::string configfile;
+	int argc = 2;
+	//first off get the path name for the default 
+	char buf[MAX_PATH];
 	
-	if (pConfigFileName != NULL)
-	{
-		configfile = pConfigFileName;
-	}
-	else
-	{
-		// make the default config file name,
-		// based on the program path
-		configfile = exepath;
-		configfile = configfile.substr(0,
-			configfile.rfind(DIRECTORY_SEPARATOR_ASCHAR));
-		configfile += DIRECTORY_SEPARATOR "bbackupd.conf";
-	}
+	GetModuleFileName(NULL, buf, sizeof(buf));
+	std::string buffer(buf);
+	std::string conf( "-c");
+	std::string cfile(buffer.substr(0,(buffer.find("bbackupd.exe"))) 
+			+ "bbackupd.conf");
 
-	const char *argv[] = {exepath, "-c", configfile.c_str()};
-	int argc = sizeof(argv) / sizeof(*argv);
-	DWORD ret;
+	const char *argv[] = {conf.c_str(), cfile.c_str()};
 
 	MAINHELPER_START
-	ret = this->Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
-	MAINHELPER_END
 
-	return ret;
+	return this->Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+
+	MAINHELPER_END
 }
 
 #endif // WIN32
