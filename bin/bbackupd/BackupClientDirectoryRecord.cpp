@@ -645,7 +645,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		// Need to update?
 		//
 		// Condition for upload:
-		//    modifiction time within sync period
+		//    modification time within sync period
 		//    if it's been seen before but not uploaded, is the time from this first sight longer than the MaxUploadWait
 		//	  and if we know about it from a directory listing, that it hasn't got the same upload time as on the store
 		if(
