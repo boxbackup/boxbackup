@@ -114,7 +114,7 @@ close FINDAUTOGEN;
 print "done\n\n";
 
 
-# open test main program template file
+# open test mail program template file
 my $test_template_file = 'infrastructure/buildenv-testmain-template.cpp';
 open FL,$test_template_file or die "Can't open test template file\n";
 my $test_template;
@@ -296,8 +296,7 @@ foreach my $dep (@implicit_deps)
 }
 
 # write a list of all the modules we've configured to use
-open CONFIGURED_MODS,'>local/modules.h.new' or die 
-	"Can't write configured modules list";
+open CONFIGURED_MODS,'>local/modules.h' or die "Can't write configured modules list";
 print CONFIGURED_MODS <<__E;
 // automatically generated file, do not edit
 #ifndef _CONFIGURED_MODULES__H
@@ -313,7 +312,7 @@ print CONFIGURED_MODS <<__E;
 #endif // _CONFIGURED_MODULES__H
 __E
 close CONFIGURED_MODS;
-update_if_changed("local/modules.h");
+
 
 # now make a list of all the .h files we can find, recording which module they're in
 my %hfiles;
@@ -394,19 +393,15 @@ for my $mod (@implicit_deps, @modules)
 	{
 		my $testmain = $test_template;
 		$testmain =~ s/TEST_NAME/$name/g;
-		open TESTMAIN,">$mod/_main.cpp.new" or die 
-			"Can't open test main file for $mod for writing\n";
+		open TESTMAIN,">$mod/_main.cpp" or die "Can't open test main file for $mod for writing\n";
 		print TESTMAIN $testmain;
 		close TESTMAIN;
-		update_if_changed("$mod/_main.cpp");
 		
 		# test file...
 		sub writetestfile
 		{
 			my ($filename,$runcmd,$module) = @_;		
-			open TESTFILE,">$filename.new" or die 
-				"Can't open test script file for $module " .
-				"for writing\n";
+			open TESTFILE,">$filename" or die "Can't open test script file for $module for writing\n";
 			print TESTFILE "#!/bin/sh\necho TEST: $module\n";
 			if(-d "$module/testfiles")
 			{
@@ -425,7 +420,6 @@ __E
 			}
 			print TESTFILE "$runcmd\n";
 			close TESTFILE;
-			update_if_changed($filename);
 		}
 		
 		writetestfile("$mod/_t", 
@@ -493,8 +487,7 @@ __E
 
 	# start the makefile
 	my $mk_name_extra = ($bsd_make)?'':'X';
-	open MAKE,">$mod/Makefile".$mk_name_extra.".new" or die 
-		"Can't open Makefile for $mod\n";
+	open MAKE,">$mod/Makefile".$mk_name_extra or die "Can't open Makefile for $mod\n";
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
 	my $release_flags = "-O2";
@@ -792,8 +785,8 @@ __E
 	if(!$bsd_make)
 	{
 		# need to post process this into a GNU makefile
-		open MAKE,">$mod/Makefile.new" or die $!;
-		open MAKEB,"$mod/MakefileX.new" or die $!;
+		open MAKE,">$mod/Makefile";
+		open MAKEB,"$mod/MakefileX";
 
 		while(<MAKEB>)
 		{
@@ -805,10 +798,8 @@ __E
 
 		close MAKEB;
 		close MAKE;
-		unlink "$mod/MakefileX.new";
+		unlink "$mod/MakefileX";
 	}
-
-	update_if_changed("$mod/Makefile");
 }
 
 print "\nType 'cd <module_dir>; $make_command' to build a module\n\n";

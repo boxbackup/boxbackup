@@ -1,7 +1,7 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $build_cpu $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows update_if_changed/;
+@EXPORT = qw/$build_os $build_cpu $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
 
 BEGIN
 {
@@ -108,35 +108,6 @@ sub make_flag
 		return "-D $_[0]"
 	}
 	return $_[0].'=1';
-}
-
-sub update_if_changed ($)
-{
-	my ($file) = @_;
-	die "$file.new: not found" unless -r "$file.new";
-
-	if (-r $file)
-	{
-		die "$file.new: not found" unless -r "$file.new";
-		if (system("diff --brief $file $file.new") == 0)
-		{
-			unlink "$file.new";
-			return;
-		}
-	}
-
-	if (system("cp $file.new $file") != 0)
-	{
-		die "failed to copy $file.new to $file";
-	}
-
-	if (system("diff --brief $file $file.new") != 0)
-	{
-		die "$file and $file.new are still different";
-	}
-
-	unlink "$file.new";
-	return;
 }
 
 1;
