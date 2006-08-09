@@ -102,8 +102,6 @@
 	#define HAVE_U_INT16_T
 	#define HAVE_U_INT32_T
 	#define HAVE_U_INT64_T
-
-	typedef int pid_t;
 #endif // WIN32 && !__MINGW32__
 
 // Define missing types
