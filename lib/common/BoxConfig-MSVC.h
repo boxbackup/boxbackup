@@ -56,6 +56,10 @@
    you don't. */
 #define HAVE_DECL_XATTR_NOFOLLOW 0
 
+/* Define to 1 if you have the declaration of `O_BINARY', and to 0 if you
+   don't. */
+#define HAVE_DECL_O_BINARY 1
+
 /* Define to 1 if #define of pragmas works */
 /* #undef HAVE_DEFINE_PRAGMA */
 
