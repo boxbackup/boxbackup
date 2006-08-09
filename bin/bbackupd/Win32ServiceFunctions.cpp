@@ -114,8 +114,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
 		// do initialisation here
-		gStopServiceEvent = CreateEvent( 0, TRUE, FALSE, 0 );
-
+		gStopServiceEvent = CreateEvent(0, TRUE, FALSE, 0);
 		if (!gStopServiceEvent)
 		{
 			gServiceStatus.dwControlsAccepted &= 
@@ -139,7 +138,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 
 		// we are now running so tell the SCM
 		gServiceStatus.dwControlsAccepted |= 
-		(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+			(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
 		gServiceStatus.dwCurrentState = SERVICE_RUNNING;
 		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
