@@ -12,7 +12,7 @@
 #ifndef WIN32SERVICEFUNCTIONS_H
 #define WIN32SERVICEFUNCTIONS_H
 
-void RemoveService(void);
+int  RemoveService(void);
 void InstallService(void);
 void OurService(void);
 

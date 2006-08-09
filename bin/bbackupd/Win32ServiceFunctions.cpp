@@ -236,42 +236,71 @@ void InstallService(void)
 	CloseServiceHandle(scm);
 }
 
-void RemoveService(void)
+int RemoveService(void)
 {
-	SC_HANDLE service, scm;
-	SERVICE_STATUS status;
-
-	scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+	SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
 	if (!scm) 
 	{
 		syslog(LOG_ERR, "Failed to open service control manager: "
 			"error %d", GetLastError());
-		return;
+		return 1;
 	}
 
-	service = OpenService(scm, SERVICE_NAME, SERVICE_ALL_ACCESS|DELETE);
-	ControlService(service, SERVICE_CONTROL_STOP, &status);
+	SC_HANDLE service = OpenService(scm, SERVICE_NAME, 
+		SERVICE_ALL_ACCESS|DELETE);
+	DWORD err = GetLastError();
+	CloseServiceHandle(scm);
 
 	if (!service)
 	{
-		syslog(LOG_ERR, "Failed to open Box Backup service: "
-			"error %d", GetLastError());
-		return;
+		if (err == ERROR_SERVICE_DOES_NOT_EXIST ||
+			err == ERROR_IO_PENDING) 
+			// hello microsoft? anyone home?
+		{
+			syslog(LOG_ERR, "Failed to open Box Backup service: "
+				"not installed or not found");
+		}
+		else
+		{
+			syslog(LOG_ERR, "Failed to open Box Backup service: "
+				"error %d", err);
+		}
+		return 1;
 	}
 
-	if (DeleteService(service))
+	SERVICE_STATUS status;
+	if (!ControlService(service, SERVICE_CONTROL_STOP, &status))
+	{
+		err = GetLastError();
+		if (err != ERROR_SERVICE_NOT_ACTIVE)
+		{
+			syslog(LOG_WARNING, "Failed to stop Box Backup "
+				"service: error %d", err);
+		}
+	}
+
+	BOOL deleted = DeleteService(service);
+	err = GetLastError();
+	CloseServiceHandle(service);
+
+	if (deleted)
 	{
 		syslog(LOG_INFO, "Box Backup service deleted");
+		return 0;
+	}
+	else if (err == ERROR_SERVICE_MARKED_FOR_DELETE)
+	{
+		syslog(LOG_ERR, "Failed to remove Box Backup service: "
+			"it is already being deleted");
 	}
 	else
 	{
 		syslog(LOG_ERR, "Failed to remove Box Backup service: "
-			"error %d", GetLastError());
+			"error %d", err);
 	}
 
-	CloseServiceHandle(service);
-	CloseServiceHandle(scm);
+	return 1;
 }
 
 #endif // WIN32
