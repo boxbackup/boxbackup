@@ -362,7 +362,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::CommandList2(int64_t, const std::string &, const bool *)
+//		Name:    BackupQueries::List(int64_t, const std::string &, const bool *)
 //		Purpose: Do the actual listing of directories and files
 //		Created: 2003/10/10
 //
