@@ -93,30 +93,28 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 // It also returns on any error because the
 // service cannot start if there is an eror.
 
-static char* spConfigFileName;
-
 VOID ServiceMain(DWORD argc, LPTSTR *argv) 
 {
-	// initialise service status
-	gServiceStatus.dwServiceType = SERVICE_WIN32;
-	gServiceStatus.dwCurrentState = SERVICE_STOPPED;
-	gServiceStatus.dwControlsAccepted = 0;
-	gServiceStatus.dwWin32ExitCode = NO_ERROR;
-	gServiceStatus.dwServiceSpecificExitCode = NO_ERROR;
-	gServiceStatus.dwCheckPoint = 0;
-	gServiceStatus.dwWaitHint = 0;
+    // initialise service status
+    gServiceStatus.dwServiceType = SERVICE_WIN32;
+    gServiceStatus.dwCurrentState = SERVICE_STOPPED;
+    gServiceStatus.dwControlsAccepted = 0;
+    gServiceStatus.dwWin32ExitCode = NO_ERROR;
+    gServiceStatus.dwServiceSpecificExitCode = NO_ERROR;
+    gServiceStatus.dwCheckPoint = 0;
+    gServiceStatus.dwWaitHint = 0;
 
-	gServiceStatusHandle = RegisterServiceCtrlHandler(gServiceName, 
-		ServiceControlHandler);
+    gServiceStatusHandle = RegisterServiceCtrlHandler(gServiceName, 
+	ServiceControlHandler);
 
-	if (gServiceStatusHandle)
-	{
-		// service is starting
-		gServiceStatus.dwCurrentState = SERVICE_START_PENDING;
-		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
+    if (gServiceStatusHandle)
+    {
+        // service is starting
+        gServiceStatus.dwCurrentState = SERVICE_START_PENDING;
+        SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
-		// do initialisation here
-		gStopServiceEvent = CreateEvent(0, TRUE, FALSE, 0);
+        // do initialisation here
+        gStopServiceEvent = CreateEvent( 0, TRUE, FALSE, 0 );
 		if (!gStopServiceEvent)
 		{
 			gServiceStatus.dwControlsAccepted &= 
@@ -131,7 +129,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 			NULL,
 			0,
 			RunService,
-			spConfigFileName,
+			0,
 			CREATE_SUSPENDED,
 			NULL);
 
@@ -140,7 +138,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 
 		// we are now running so tell the SCM
 		gServiceStatus.dwControlsAccepted |= 
-			(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+		(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
 		gServiceStatus.dwCurrentState = SERVICE_RUNNING;
 		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
@@ -158,13 +156,11 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 			~(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
 		gServiceStatus.dwCurrentState = SERVICE_STOPPED;
 		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
-	}
+    }
 }
 
-void OurService(char* pConfigFileName)
+void OurService(void)
 {
-	spConfigFileName = pConfigFileName;
-
 	SERVICE_TABLE_ENTRY serviceTable[] = 
 	{ 
 		{ SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
@@ -183,52 +179,28 @@ void OurService(char* pConfigFileName)
 	}
 }
 
-int InstallService(const char* pConfigFileName)
+void InstallService(void)
 {
-	if (pConfigFileName != NULL)
-	{
-		struct stat st;
+	SC_HANDLE newService, scm;
 
-		if (emu_stat(pConfigFileName, &st) != 0)
-		{
-			syslog(LOG_ERR, "Failed to open configuration file: "
-				"%s: %s", pConfigFileName, strerror(errno));
-			return 1;
-		}
-
-		if (! st.st_mode & S_IFREG)
-		{
-	
-			syslog(LOG_ERR, "Failed to open configuration file: "
-				"%s: not a file", pConfigFileName);
-			return 1;
-		}
-	}
-
-	SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+	scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
 	if (!scm) 
 	{
 		syslog(LOG_ERR, "Failed to open service control manager: "
 			"error %d", GetLastError());
-		return 1;
+		return;
 	}
 
 	char cmd[MAX_PATH];
 	GetModuleFileName(NULL, cmd, sizeof(cmd)-1);
 	cmd[sizeof(cmd)-1] = 0;
 
-	std::string cmdWithArgs(cmd);
-	cmdWithArgs += " --service";
+	char cmd_args[MAX_PATH];
+	_snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
+	cmd_args[sizeof(cmd_args)-1] = 0;
 
-	if (pConfigFileName != NULL)
-	{
-		cmdWithArgs += " \"";
-		cmdWithArgs += pConfigFileName;
-		cmdWithArgs += "\"";
-	}
-
-	SC_HANDLE newService = CreateService(
+	newService = CreateService(
 		scm, 
 		SERVICE_NAME, 
 		"Box Backup", 
@@ -236,36 +208,14 @@ int InstallService(const char* pConfigFileName)
 		SERVICE_WIN32_OWN_PROCESS, 
 		SERVICE_AUTO_START, 
 		SERVICE_ERROR_NORMAL, 
-		cmdWithArgs.c_str(),
+		cmd_args, 
 		0,0,0,0,0);
-
-	DWORD err = GetLastError();
-	CloseServiceHandle(scm);
 
 	if (!newService) 
 	{
-		if (err == ERROR_SERVICE_EXISTS)
-		{
-			::syslog(LOG_ERR, "Failed to create Box Backup "
-				"service: it already exists");
-		}
-		else if (err == ERROR_SERVICE_MARKED_FOR_DELETE)
-		{
-			::syslog(LOG_ERR, "Failed to create Box Backup "
-				"service: it is waiting to be deleted");
-		}
-		else if (err == ERROR_DUPLICATE_SERVICE_NAME)
-		{
-			::syslog(LOG_ERR, "Failed to create Box Backup "
-				"service: a service with this name "
-				"already exists");
-		}
-		else
-		{
-			::syslog(LOG_ERR, "Failed to create Box Backup "
-				"service: error %d", err);
-		}
-		return 1;
+		::syslog(LOG_ERR, "Failed to create Box Backup service: "
+			"error %d", GetLastError());
+		return;
 	}
 
 	::syslog(LOG_INFO, "Created Box Backup service");
@@ -281,75 +231,45 @@ int InstallService(const char* pConfigFileName)
 	}
 
 	CloseServiceHandle(newService);
-
-	return 0;
+	CloseServiceHandle(scm);
 }
 
-int RemoveService(void)
+void RemoveService(void)
 {
-	SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+	SC_HANDLE service, scm;
+	SERVICE_STATUS status;
+
+	scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
 	if (!scm) 
 	{
 		syslog(LOG_ERR, "Failed to open service control manager: "
 			"error %d", GetLastError());
-		return 1;
+		return;
 	}
 
-	SC_HANDLE service = OpenService(scm, SERVICE_NAME, 
-		SERVICE_ALL_ACCESS|DELETE);
-	DWORD err = GetLastError();
-	CloseServiceHandle(scm);
+	service = OpenService(scm, SERVICE_NAME, SERVICE_ALL_ACCESS|DELETE);
+	ControlService(service, SERVICE_CONTROL_STOP, &status);
 
 	if (!service)
 	{
-		if (err == ERROR_SERVICE_DOES_NOT_EXIST ||
-			err == ERROR_IO_PENDING) 
-			// hello microsoft? anyone home?
-		{
-			syslog(LOG_ERR, "Failed to open Box Backup service: "
-				"not installed or not found");
-		}
-		else
-		{
-			syslog(LOG_ERR, "Failed to open Box Backup service: "
-				"error %d", err);
-		}
-		return 1;
+		syslog(LOG_ERR, "Failed to open Box Backup service: "
+			"error %d", GetLastError());
+		return;
 	}
 
-	SERVICE_STATUS status;
-	if (!ControlService(service, SERVICE_CONTROL_STOP, &status))
-	{
-		err = GetLastError();
-		if (err != ERROR_SERVICE_NOT_ACTIVE)
-		{
-			syslog(LOG_WARNING, "Failed to stop Box Backup "
-				"service: error %d", err);
-		}
-	}
-
-	BOOL deleted = DeleteService(service);
-	err = GetLastError();
-	CloseServiceHandle(service);
-
-	if (deleted)
+	if (DeleteService(service))
 	{
 		syslog(LOG_INFO, "Box Backup service deleted");
-		return 0;
-	}
-	else if (err == ERROR_SERVICE_MARKED_FOR_DELETE)
-	{
-		syslog(LOG_ERR, "Failed to remove Box Backup service: "
-			"it is already being deleted");
 	}
 	else
 	{
 		syslog(LOG_ERR, "Failed to remove Box Backup service: "
-			"error %d", err);
+			"error %d", GetLastError());
 	}
 
-	return 1;
+	CloseServiceHandle(service);
+	CloseServiceHandle(scm);
 }
 
 #endif // WIN32
