@@ -89,6 +89,12 @@ BackupQueries::~BackupQueries()
 {
 }
 
+typedef struct cmd_info
+{
+	const char* name;
+	const char* opts;
+} cmd_info_t;
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -166,8 +172,24 @@ void BackupQueries::DoCommand(const char *Command)
 	}
 	
 	// Data about commands
-	static const char *commandNames[] = {"quit", "exit", "list",	 "pwd", "cd", "lcd",	"sh", "getobject", "get", "compare", "restore", "help", "usage", "undelete", 0};
-	static const char *validOptions[] = {"",	 "",	 "rodIFtsh", "",	   "od", "",	"",	  "",		   "i",   "alcqE",   "dri",     "",     "",      "",		 0};
+	static cmd_info_t commands[] = 
+	{
+		{ "quit", "" },
+		{ "exit", "" },
+		{ "list", "rodIFtTsh", },
+		{ "pwd",  "" },
+		{ "cd",   "od" },
+		{ "lcd",  "" },
+		{ "sh",   "" },
+		{ "getobject", "" },
+		{ "get",  "i" },
+		{ "compare", "alcqAE" },
+		{ "restore", "dri" },
+		{ "help", "" },
+		{ "usage", "" },
+		{ "undelete", "" },
+		{ NULL, NULL } 
+	};
 	#define COMMAND_Quit		0
 	#define COMMAND_Exit		1
 	#define COMMAND_List		2
@@ -187,11 +209,11 @@ void BackupQueries::DoCommand(const char *Command)
 	
 	// Work out which command it is...
 	int cmd = 0;
-	while(commandNames[cmd] != 0 && ::strcmp(cmdElements[0].c_str(), commandNames[cmd]) != 0)
+	while(commands[cmd].name != 0 && ::strcmp(cmdElements[0].c_str(), commands[cmd].name) != 0)
 	{
 		cmd++;
 	}
-	if(commandNames[cmd] == 0)
+	if(commands[cmd].name == 0)
 	{
 		// Check for aliases
 		int a;
@@ -226,9 +248,10 @@ void BackupQueries::DoCommand(const char *Command)
 		while(*c != 0)
 		{
 			// Valid option?
-			if(::strchr(validOptions[cmd], *c) == NULL)
+			if(::strchr(commands[cmd].opts, *c) == NULL)
 			{
-				printf("Invalid option '%c' for command %s\n", *c, commandNames[cmd]);
+				printf("Invalid option '%c' for command %s\n", 
+					*c, commands[cmd].name);
 				return;
 			}
 			opts[(int)*c] = true;
