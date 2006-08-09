@@ -40,8 +40,7 @@ int main(int argc, const char *argv[])
 	}
 	if(argc == 2 && ::strcmp(argv[1], "-r") == 0)
 	{
-		RemoveService();
-		return 0;
+		return RemoveService();
 	}
 	if((argc == 2 || argc == 3) && ::strcmp(argv[1], "-i") == 0)
 	{
@@ -50,8 +49,7 @@ int main(int argc, const char *argv[])
 		{
 			config = argv[2];
 		}
-		InstallService(config);
-		return 0;
+		return InstallService(config);
 	}
 
 	bool runAsWin32Service = false;
