@@ -504,8 +504,8 @@ void BackupDaemon::Run2()
 		BackupClientContext::ClientStoreMarker_NotKnown;
 	// haven't contacted the store yet
 
- 	bool deserialised = DeserializeStoreObjectInfo(clientStoreMarker, 
-		lastSyncTime, nextSyncTime);
+ 	bool deleteStoreObjectInfoFile = DeserializeStoreObjectInfo(
+		clientStoreMarker, lastSyncTime, nextSyncTime);
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -611,7 +611,8 @@ void BackupDaemon::Run2()
 			// Delete the serialised store object file,
 			// so that we don't try to reload it after a
 			// partially completed backup
-			if(deserialised && !DeleteStoreObjectInfo())
+			if(deleteStoreObjectInfoFile && 
+				!DeleteStoreObjectInfo())
 			{
 				::syslog(LOG_ERR, "Failed to delete the "
 					"StoreObjectInfoFile, backup cannot "
@@ -621,6 +622,11 @@ void BackupDaemon::Run2()
 				::sleep(60); 
 				continue;
 			}
+
+			// In case the backup throws an exception,
+			// we should not try to delete the store info
+			// object file again.
+			deleteStoreObjectInfoFile = false;
 			
 			// Do sync
 			bool errorOccurred = false;
@@ -729,8 +735,14 @@ void BackupDaemon::Run2()
 
 				// --------------------------------------------------------------------------------------------
 
-				// We had a successful backup, save the store info
-				SerializeStoreObjectInfo(clientStoreMarker, lastSyncTime, nextSyncTime);
+				// We had a successful backup, save the store 
+				// info. If we save successfully, we must 
+				// delete the file next time we start a backup
+
+				deleteStoreObjectInfoFile = 
+					SerializeStoreObjectInfo(
+						clientStoreMarker, 
+						lastSyncTime, nextSyncTime);
 
 				// --------------------------------------------------------------------------------------------
 			}
