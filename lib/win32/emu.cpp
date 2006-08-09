@@ -1544,7 +1544,7 @@ int console_read(char* pBuffer, size_t BufferSize)
 		return -1;
 	}
 
-	int WideSize = BufferSize / 5;
+	size_t WideSize = BufferSize / 5;
 	WCHAR* pWideBuffer = new WCHAR [WideSize];
 
 	if (!pWideBuffer)
