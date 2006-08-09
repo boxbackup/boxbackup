@@ -5,26 +5,25 @@ echo using Cygwin and Perl
 
 copy .\infrastructure\BoxPlatform.pm.in .\infrastructure\BoxPlatform.pm
 
-cd .\bin\bbackupquery\ & perl ./../../bin/bbackupquery/makedocumentation.pl
+cd .\bin\bbackupquery\ & perl ./../../bin/bbackupquery/makedocumentation.pl.in
 cd ..\..\
 
-cd .\lib\backupclient & perl ./../../lib/common/makeexception.pl BackupStoreException.txt
-perl ./../../lib/server/makeprotocol.pl Client ./../../bin/bbstored/backupprotocol.txt
+cd .\lib\backupclient & perl ./../../lib/common/makeexception.pl.in BackupStoreException.txt & perl ./../../lib/server/makeprotocol.pl.in Client ./../../bin/bbstored/backupprotocol.txt
 cd ..\..\
 
-cd .\lib\compress & perl ./../../lib/common/makeexception.pl CompressException.txt
+cd .\lib\compress & perl ./../../lib/common/makeexception.pl.in CompressException.txt
 cd ..\..\
 
-cd .\lib\common & perl ./../../lib/common/makeexception.pl CommonException.txt & perl ./../../lib/common/makeexception.pl ConversionException.txt
+cd .\lib\common & perl ./../../lib/common/makeexception.pl.in CommonException.txt & perl ./../../lib/common/makeexception.pl.in ConversionException.txt
 
 cd ..\..\
 
-cd .\lib\crypto & perl ./../../lib/common/makeexception.pl CipherException.txt
+cd .\lib\crypto & perl ./../../lib/common/makeexception.pl.in CipherException.txt
 cd ..\..\
 
 echo server parts - which appears as though some of the clients rely on
 
-cd .\lib\server & perl ./../../lib/common/makeexception.pl ServerException.txt & perl ./../../lib/common/makeexception.pl ConnectionException.txt
+cd .\lib\server & perl ./../../lib/common/makeexception.pl.in ServerException.txt & perl ./../../lib/common/makeexception.pl.in ConnectionException.txt
 cd ..\..\
 
-perl -i.orig -pe 's/@PERL@/perl/' ./test/bbackupd/testfiles/bbackupd.conf
+perl -pe 's/@PERL@/perl/' ./test/bbackupd/testfiles/bbackupd.conf.in > .\test\bbackupd\testfiles\bbackupd.conf
