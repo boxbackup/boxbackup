@@ -2173,11 +2173,11 @@ static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
 static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
 static const int STOREOBJECTINFO_VERSION = 1;
 
-void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
+bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
 {
 	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
 	{
-		return;
+		return false;
 	}
 
 	std::string StoreObjectInfoFile = 
@@ -2185,13 +2185,17 @@ void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 
 	if (StoreObjectInfoFile.size() <= 0)
 	{
-		return;
+		return false;
 	}
+
+	bool created = false;
 
 	try
 	{
 		FileStream aFile(StoreObjectInfoFile.c_str(), 
 			O_WRONLY | O_CREAT | O_TRUNC);
+		created = true;
+
 		Archive anArchive(aFile, 0);
 
 		anArchive.Write(STOREOBJECTINFO_MAGIC_ID_VALUE);
@@ -2236,6 +2240,8 @@ void BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 			"not accessible or could not be created", 
 			StoreObjectInfoFile.c_str());
 	}
+
+	return created;
 }
 
 // --------------------------------------------------------------------------
