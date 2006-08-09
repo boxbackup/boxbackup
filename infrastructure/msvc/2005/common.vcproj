@@ -29,6 +29,9 @@
 				CommandLine="perl $(InputDir)..\getversion.pl"
 			/>
 			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -507,7 +510,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\common\BoxConfig.h"
+						RelativePath="..\..\..\lib\common\BoxConfig-MSVC.h"
 						>
 					</File>
 					<File
