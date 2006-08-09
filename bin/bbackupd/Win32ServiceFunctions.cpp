@@ -95,26 +95,27 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 
 VOID ServiceMain(DWORD argc, LPTSTR *argv) 
 {
-    // initialise service status
-    gServiceStatus.dwServiceType = SERVICE_WIN32;
-    gServiceStatus.dwCurrentState = SERVICE_STOPPED;
-    gServiceStatus.dwControlsAccepted = 0;
-    gServiceStatus.dwWin32ExitCode = NO_ERROR;
-    gServiceStatus.dwServiceSpecificExitCode = NO_ERROR;
-    gServiceStatus.dwCheckPoint = 0;
-    gServiceStatus.dwWaitHint = 0;
+	// initialise service status
+	gServiceStatus.dwServiceType = SERVICE_WIN32;
+	gServiceStatus.dwCurrentState = SERVICE_STOPPED;
+	gServiceStatus.dwControlsAccepted = 0;
+	gServiceStatus.dwWin32ExitCode = NO_ERROR;
+	gServiceStatus.dwServiceSpecificExitCode = NO_ERROR;
+	gServiceStatus.dwCheckPoint = 0;
+	gServiceStatus.dwWaitHint = 0;
 
-    gServiceStatusHandle = RegisterServiceCtrlHandler(gServiceName, 
-	ServiceControlHandler);
+	gServiceStatusHandle = RegisterServiceCtrlHandler(gServiceName, 
+		ServiceControlHandler);
 
-    if (gServiceStatusHandle)
-    {
-        // service is starting
-        gServiceStatus.dwCurrentState = SERVICE_START_PENDING;
-        SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
+	if (gServiceStatusHandle)
+	{
+		// service is starting
+		gServiceStatus.dwCurrentState = SERVICE_START_PENDING;
+		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 
-        // do initialisation here
-        gStopServiceEvent = CreateEvent( 0, TRUE, FALSE, 0 );
+		// do initialisation here
+		gStopServiceEvent = CreateEvent( 0, TRUE, FALSE, 0 );
+
 		if (!gStopServiceEvent)
 		{
 			gServiceStatus.dwControlsAccepted &= 
@@ -156,7 +157,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 			~(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
 		gServiceStatus.dwCurrentState = SERVICE_STOPPED;
 		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
-    }
+	}
 }
 
 void OurService(void)
