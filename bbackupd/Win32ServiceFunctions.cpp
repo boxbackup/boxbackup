@@ -93,6 +93,8 @@ void WINAPI ServiceControlHandler( DWORD controlCode )
 // It also returns on any error because the
 // service cannot start if there is an eror.
 
+static char* spConfigFileName;
+
 VOID ServiceMain(DWORD argc, LPTSTR *argv) 
 {
 	// initialise service status
@@ -129,7 +131,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 			NULL,
 			0,
 			RunService,
-			0,
+			spConfigFileName,
 			CREATE_SUSPENDED,
 			NULL);
 
