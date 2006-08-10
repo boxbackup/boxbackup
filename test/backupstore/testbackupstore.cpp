@@ -1927,8 +1927,10 @@ int multi_server()
 	return 0;
 }
 
+#ifdef WIN32
 WCHAR* ConvertUtf8ToWideString(const char* pString);
 std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
+#endif
 
 int test(int argc, const char *argv[])
 {
