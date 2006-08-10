@@ -184,8 +184,14 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	{
 		if (TestFileExists(pidFile))	
 			break;
+
+		#ifdef WIN32
 		if (!ServerIsAlive((int)procInfo.dwProcessId))
+		#else
+		if (!ServerIsAlive(pid))
+		#endif
 			break;
+
 		::fprintf(stdout, ".");
 		::fflush(stdout);
 		::sleep(1);
