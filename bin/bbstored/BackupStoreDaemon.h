@@ -72,14 +72,14 @@ private:
 	BackupStoreAccounts *mpAccounts;
 	bool mExtendedLogging;
 	bool mHaveForkedHousekeeping;
-	bool mIsHousekeepingProcess;
 	
 #ifdef WIN32
-	virtual void OnIdle();
 	bool mHousekeepingInited;
+	virtual void OnIdle();
 #else
 	SocketStream mInterProcessCommsSocket;
 	IOStreamGetLine mInterProcessComms;
+	bool mIsHousekeepingProcess;
 #endif
 
 	void HousekeepingInit();
