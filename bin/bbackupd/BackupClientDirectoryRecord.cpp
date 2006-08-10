@@ -97,6 +97,32 @@ void BackupClientDirectoryRecord::DeleteSubDirectories()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    MakeFullPath(const std::string& rDir, const std::string& rFile)
+//		Purpose: Combine directory and file name
+//		Created: 2006/08/10
+//
+// --------------------------------------------------------------------------
+static std::string MakeFullPath(const std::string& rDir, 
+	const std::string& rFile)
+{
+	std::string result;
+
+	if (rDir[rDir.size()-1] == DIRECTORY_SEPARATOR_ASCHAR)
+	{
+		result = rDir + rFile;
+	}
+	else
+	{
+		result = rDir + DIRECTORY_SEPARATOR + rFile;
+	}
+
+	return result;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::SyncParams &, int64_t, const std::string &, bool)
 //		Purpose: Syncronise, recusively, a local directory with the server.
 //		Created: 2003/10/08
@@ -207,8 +233,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 
 				// Stat file to get info
-				filename = rLocalPath + DIRECTORY_SEPARATOR + 
-					en->d_name;
+				filename = MakeFullPath(rLocalPath, en->d_name);
 
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
@@ -254,7 +279,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				{
 					continue;
 				}
-				
+
 				// Here if the object is something to back up (file, symlink or dir, not excluded)
 				// So make the information for adding to the checksum
 				checksum_info.mModificationTime = FileModificationTime(st);
@@ -512,7 +537,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		f != rFiles.end(); ++f)
 	{
 		// Filename of this file
-		std::string filename(rLocalPath + DIRECTORY_SEPARATOR + *f);
+		std::string filename = MakeFullPath(rLocalPath, *f);
 
 		// Get relevant info about file
 		box_time_t modTime = 0;
@@ -859,7 +884,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		d != rDirs.end(); ++d)
 	{
 		// Get the local filename
-		std::string dirname(rLocalPath + DIRECTORY_SEPARATOR + *d);		
+		std::string dirname = MakeFullPath(rLocalPath, *d);		
 	
 		// See if it's in the listing (if we have one)
 		BackupStoreFilenameClear storeFilename(*d);
@@ -1063,10 +1088,13 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					BackupClientDirectoryRecord *rec = e->second;
 					mSubDirectories.erase(e);
 					delete rec;
-					TRACE2("Deleted directory record for "
-						"%s" DIRECTORY_SEPARATOR "%s\n",
-						rLocalPath.c_str(), 
-						dirname.GetClearFilename().c_str());
+
+					std::string name = MakeFullPath(
+						rLocalPath, 
+						dirname.GetClearFilename());
+
+					TRACE1("Deleted directory record for "
+						"%s\n", name.c_str());
 				}				
 			}
 		}
