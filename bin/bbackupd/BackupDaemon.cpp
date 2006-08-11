@@ -415,6 +415,7 @@ void BackupDaemon::RunHelperThread(void)
 					this->mDoSyncFlagOut = true;
 					this->mSyncIsForcedOut = false;
 					sendOK = true;
+					SetEvent(mhCommandReceivedEvent);
 				}
 				else if(command == "force-sync")
 				{
@@ -422,18 +423,21 @@ void BackupDaemon::RunHelperThread(void)
 					this->mDoSyncFlagOut = true;
 					this->mSyncIsForcedOut = true;
 					sendOK = true;
+					SetEvent(mhCommandReceivedEvent);
 				}
 				else if(command == "reload")
 				{
 					// Reload the configuration
 					SetReloadConfigWanted();
 					sendOK = true;
+					SetEvent(mhCommandReceivedEvent);
 				}
 				else if(command == "terminate")
 				{
 					// Terminate the daemon cleanly
 					SetTerminateWanted();
 					sendOK = true;
+					SetEvent(mhCommandReceivedEvent);
 				}
 				else
 				{
@@ -454,8 +458,6 @@ void BackupDaemon::RunHelperThread(void)
 				{
 					break;
 				}
-
-				// this->mReceivedCommandConn = true;
 			}
 
 			rSocket.Close();
@@ -470,6 +472,9 @@ void BackupDaemon::RunHelperThread(void)
 			::syslog(LOG_ERR, "Communication error with control client");
 		}
 	}
+
+	CloseHandle(mhCommandReceivedEvent);
+	CloseHandle(mhMessageToSendEvent);
 } 
 #endif
 
@@ -1142,10 +1147,6 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		{
 			TRACE1("Receiving command '%s' over command socket\n", 
 				command.c_str());
-
-			#ifdef WIN32
-			SetEvent(mhCommandReceivedEvent);
-			#endif
 
 			bool sendOK = false;
 			bool sendResponse = true;
