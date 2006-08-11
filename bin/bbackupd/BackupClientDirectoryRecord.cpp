@@ -235,6 +235,9 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				// Stat file to get info
 				filename = MakeFullPath(rLocalPath, en->d_name);
 
+				#ifdef WIN32
+				int type = en->d_type;
+				#else
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
 					// Report the error (logs and 
@@ -247,6 +250,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 
 				int type = st.st_mode & S_IFMT;
+				#endif
+
 				if(type == S_IFREG || type == S_IFLNK)
 				{
 					// File or symbolic link
@@ -277,11 +282,31 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 				else
 				{
+					#ifdef WIN32
+					::syslog(LOG_ERR, "Unknown file type: "
+						"%d (%s)", type, 
+						filename.c_str());
+					#endif
 					continue;
 				}
 
 				// Here if the object is something to back up (file, symlink or dir, not excluded)
 				// So make the information for adding to the checksum
+
+				#ifdef WIN32
+				if(::lstat(filename.c_str(), &st) != 0)
+				{
+					// Report the error (logs and 
+					// eventual email to administrator)
+					SetErrorWhenReadingFilesystemObject(
+						rParams, filename.c_str());
+
+					// Ignore this entry for now.
+					continue;
+				}
+				#endif
+
+
 				checksum_info.mModificationTime = FileModificationTime(st);
 				checksum_info.mAttributeModificationTime = FileAttrModificationTime(st);
 				checksum_info.mSize = st.st_size;
