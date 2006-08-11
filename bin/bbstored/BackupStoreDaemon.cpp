@@ -41,10 +41,10 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mpAccounts(0),
 	  mExtendedLogging(false),
 	  mHaveForkedHousekeeping(false),
-	  mIsHousekeepingProcess(false),
 #ifdef WIN32
 	  mHousekeepingInited(false)
 #else
+	  mIsHousekeepingProcess(false),
 	  mInterProcessComms(mInterProcessCommsSocket)
 #endif
 {
