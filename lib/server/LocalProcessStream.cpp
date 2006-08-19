@@ -114,56 +114,56 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	secAttr.bInheritHandle = TRUE; 
 	secAttr.lpSecurityDescriptor = NULL; 
 
-	HANDLE WriteInChild, ReadFromChild;
-	if (!CreatePipe(&ReadFromChild, &WriteInChild, &secAttr, 0))
+	HANDLE writeInChild, readFromChild;
+	if(!CreatePipe(&readFromChild, &writeInChild, &secAttr, 0))
 	{
 		::syslog(LOG_ERR, "Failed to CreatePipe for child process: "
 			"error %d", GetLastError());
 		THROW_EXCEPTION(ServerException, SocketPairFailed)
 	}
-	SetHandleInformation(ReadFromChild, HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(readFromChild, HANDLE_FLAG_INHERIT, 0);
 
-	PROCESS_INFORMATION ProcInfo; 
-	STARTUPINFO StartupInfo;
+	PROCESS_INFORMATION procInfo; 
+	STARTUPINFO startupInfo;
 
-	ZeroMemory(&ProcInfo,    sizeof(ProcInfo));
-	ZeroMemory(&StartupInfo, sizeof(StartupInfo));
-	StartupInfo.cb         = sizeof(StartupInfo);
-	StartupInfo.hStdError  = WriteInChild;
-	StartupInfo.hStdOutput = WriteInChild;
-	StartupInfo.hStdInput  = INVALID_HANDLE_VALUE;
-	StartupInfo.dwFlags   |= STARTF_USESTDHANDLES;
+	ZeroMemory(&procInfo,    sizeof(procInfo));
+	ZeroMemory(&startupInfo, sizeof(startupInfo));
+	startupInfo.cb         = sizeof(startupInfo);
+	startupInfo.hStdError  = writeInChild;
+	startupInfo.hStdOutput = writeInChild;
+	startupInfo.hStdInput  = INVALID_HANDLE_VALUE;
+	startupInfo.dwFlags   |= STARTF_USESTDHANDLES;
 
-	CHAR* CommandLineCopy = (CHAR*)malloc(strlen(CommandLine) + 1);
-	strcpy(CommandLineCopy, CommandLine);
+	CHAR* commandLineCopy = (CHAR*)malloc(strlen(CommandLine) + 1);
+	strcpy(commandLineCopy, CommandLine);
 
-	bool result = CreateProcess(NULL, 
-		CommandLineCopy, // command line 
+	BOOL result = CreateProcess(NULL, 
+		commandLineCopy, // command line 
 		NULL,          // process security attributes 
 		NULL,          // primary thread security attributes 
 		TRUE,          // handles are inherited 
 		0,             // creation flags 
 		NULL,          // use parent's environment 
 		NULL,          // use parent's current directory 
-		&StartupInfo,  // STARTUPINFO pointer 
-		&ProcInfo);    // receives PROCESS_INFORMATION 
+		&startupInfo,  // STARTUPINFO pointer 
+		&procInfo);    // receives PROCESS_INFORMATION 
 
-	free(CommandLineCopy);
+	free(commandLineCopy);
    
-	if (!result)
+	if(!result)
 	{
 		::syslog(LOG_ERR, "Failed to CreateProcess: '%s': "
 			"error %d", CommandLine, GetLastError());
-		CloseHandle(WriteInChild);
-		CloseHandle(ReadFromChild);
+		CloseHandle(writeInChild);
+		CloseHandle(readFromChild);
 		THROW_EXCEPTION(ServerException, ServerForkError)
 	}
 
-	CloseHandle(ProcInfo.hProcess);
-	CloseHandle(ProcInfo.hThread);
-	CloseHandle(WriteInChild);
+	CloseHandle(procInfo.hProcess);
+	CloseHandle(procInfo.hThread);
+	CloseHandle(writeInChild);
 
-	std::auto_ptr<IOStream> stream(new FileStream(ReadFromChild));
+	std::auto_ptr<IOStream> stream(new FileStream(readFromChild));
 	return stream;
 #endif // ! WIN32
 }
