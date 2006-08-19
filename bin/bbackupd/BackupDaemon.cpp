@@ -965,7 +965,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			{
 #ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 				bool uidOK = true;
-				::syslog(LOG_WARNING, "On this platform, no security check can be made on the credientials of peers connecting to the command socket. (bbackupctl)");
+				::syslog(LOG_WARNING, "On this platform, no security check can be made on the credentials of peers connecting to the command socket. (bbackupctl)");
 #else
 				// Security check -- does the process connecting to this socket have
 				// the same UID as this process?
@@ -1149,8 +1149,8 @@ void BackupDaemon::CloseCommandConnection()
 // --------------------------------------------------------------------------
 void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 {
-	// The bbackupctl program can't rely on a state change, because it may never
-	// change if the server doesn't need to be contacted.
+	// The bbackupctl program can't rely on a state change, because it 
+	// may never change if the server doesn't need to be contacted.
 
 #ifdef __MINGW32__
 #warning race condition: what happens if socket is closed?
