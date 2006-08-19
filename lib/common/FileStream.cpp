@@ -43,6 +43,54 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 #endif
 }
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    FileStream::FileStream(tOSFileHandle)
+//		Purpose: Constructor, using existing file descriptor
+//		Created: 2003/08/28
+//
+// --------------------------------------------------------------------------
+FileStream::FileStream(tOSFileHandle FileDescriptor)
+	: mOSFileHandle(FileDescriptor),
+	  mIsEOF(false)
+{
+#ifdef WIN32
+	if(mOSFileHandle == INVALID_HANDLE_VALUE)
+#else
+	if(mOSFileHandle < 0)
+#endif
+	{
+		MEMLEAKFINDER_NOT_A_LEAK(this);
+		THROW_EXCEPTION(CommonException, OSFileOpenError)
+	}
+#ifdef WIN32
+	this->fileName = "HANDLE";
+#endif
+}
+
+#if 0
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    FileStream::FileStream(const FileStream &)
+//		Purpose: Copy constructor, creates a duplicate of the file handle
+//		Created: 2003/07/31
+//
+// --------------------------------------------------------------------------
+FileStream::FileStream(const FileStream &rToCopy)
+	: mOSFileHandle(::dup(rToCopy.mOSFileHandle)),
+	  mIsEOF(rToCopy.mIsEOF)
+{
+	if(mOSFileHandle < 0)
+	{
+		MEMLEAKFINDER_NOT_A_LEAK(this);
+		THROW_EXCEPTION(CommonException, OSFileOpenError)
+	}
+}
+#endif // 0
+
 // --------------------------------------------------------------------------
 //
 // Function
