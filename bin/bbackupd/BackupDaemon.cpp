@@ -59,6 +59,7 @@
 #include "BackupStoreFilenameClear.h"
 #include "BackupClientInodeToIDMap.h"
 #include "autogen_BackupProtocolClient.h"
+#include "autogen_ConversionException.h"
 #include "BackupClientCryptoKeys.h"
 #include "BannerText.h"
 #include "BackupStoreFile.h"
@@ -982,8 +983,21 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 			}
 			else
 			{
-				// How many seconds to wait?
-				waitInSeconds = BoxConvert::Convert<int32_t, const std::string&>(line);
+				try
+				{
+					// How many seconds to wait?
+					waitInSeconds = BoxConvert::Convert<int32_t, const std::string&>(line);
+				}
+				catch(ConversionException &e)
+				{
+					::syslog(LOG_ERR, "Invalid output "
+						"from SyncAllowScript '%s': "
+						"'%s'", 
+						conf.GetKeyValue("SyncAllowScript").c_str(),
+						line.c_str());
+					throw;
+				}
+
 				::syslog(LOG_INFO, "Delaying sync by %d seconds (SyncAllowScript '%s')", waitInSeconds, conf.GetKeyValue("SyncAllowScript").c_str());
 			}
 		}
