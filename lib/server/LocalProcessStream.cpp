@@ -18,9 +18,14 @@
 #endif
 
 #include "LocalProcessStream.h"
-#include "SocketStream.h"
 #include "autogen_ServerException.h"
 #include "Utils.h"
+
+#ifdef WIN32
+	#include "FileStream.h"
+#else
+	#include "SocketStream.h"
+#endif
 
 #include "MemLeakFindOn.h"
 
@@ -101,9 +106,64 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	// Return the stream object and PID
 	rPidOut = pid;
 	return stream;	
+
 #else // WIN32
-	::syslog(LOG_ERR, "vfork not implemented - LocalProcessStream.cpp");
-	std::auto_ptr<IOStream> stream;
+
+	SECURITY_ATTRIBUTES secAttr; 
+	secAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+	secAttr.bInheritHandle = TRUE; 
+	secAttr.lpSecurityDescriptor = NULL; 
+
+	HANDLE WriteInChild, ReadFromChild;
+	if (!CreatePipe(&ReadFromChild, &WriteInChild, &secAttr, 0))
+	{
+		::syslog(LOG_ERR, "Failed to CreatePipe for child process: "
+			"error %d", GetLastError());
+		THROW_EXCEPTION(ServerException, SocketPairFailed)
+	}
+	SetHandleInformation(ReadFromChild, HANDLE_FLAG_INHERIT, 0);
+
+	PROCESS_INFORMATION ProcInfo; 
+	STARTUPINFO StartupInfo;
+
+	ZeroMemory(&ProcInfo,    sizeof(ProcInfo));
+	ZeroMemory(&StartupInfo, sizeof(StartupInfo));
+	StartupInfo.cb         = sizeof(StartupInfo);
+	StartupInfo.hStdError  = WriteInChild;
+	StartupInfo.hStdOutput = WriteInChild;
+	StartupInfo.hStdInput  = INVALID_HANDLE_VALUE;
+	StartupInfo.dwFlags   |= STARTF_USESTDHANDLES;
+
+	CHAR* CommandLineCopy = (CHAR*)malloc(strlen(CommandLine) + 1);
+	strcpy(CommandLineCopy, CommandLine);
+
+	bool result = CreateProcess(NULL, 
+		CommandLineCopy, // command line 
+		NULL,          // process security attributes 
+		NULL,          // primary thread security attributes 
+		TRUE,          // handles are inherited 
+		0,             // creation flags 
+		NULL,          // use parent's environment 
+		NULL,          // use parent's current directory 
+		&StartupInfo,  // STARTUPINFO pointer 
+		&ProcInfo);    // receives PROCESS_INFORMATION 
+
+	free(CommandLineCopy);
+   
+	if (!result)
+	{
+		::syslog(LOG_ERR, "Failed to CreateProcess: '%s': "
+			"error %d", CommandLine, GetLastError());
+		CloseHandle(WriteInChild);
+		CloseHandle(ReadFromChild);
+		THROW_EXCEPTION(ServerException, ServerForkError)
+	}
+
+	CloseHandle(ProcInfo.hProcess);
+	CloseHandle(ProcInfo.hThread);
+	CloseHandle(WriteInChild);
+
+	std::auto_ptr<IOStream> stream(new FileStream(ReadFromChild));
 	return stream;
 #endif // ! WIN32
 }
