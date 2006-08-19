@@ -1349,6 +1349,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	if (len < 0) 
 	{
 		printf("%s\r\n", buffer);
+		fflush(stdout);
 		return;
 	}
 	
@@ -1362,6 +1363,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	if (gSyslogH == 0)
 	{
 		printf("%s\r\n", buffer);
+		fflush(stdout);
 		return;
 	}
 
@@ -1384,6 +1386,7 @@ void syslog(int loglevel, const char *frmt, ...)
 			{
 				printf("Unable to send message to Event Log "
 					"(Event Log is full):\r\n");
+				fflush(stdout);
 				sHaveWarnedEventLogFull = TRUE;
 			}
 		}
@@ -1391,6 +1394,7 @@ void syslog(int loglevel, const char *frmt, ...)
 		{
 			printf("Unable to send message to Event Log: "
 				"error %i:\r\n", (int)err);
+			fflush(stdout);
 		}
 	}
 	else
@@ -1399,6 +1403,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	}
 
 	printf("%s\r\n", buffer);
+	fflush(stdout);
 }
 
 int emu_chdir(const char* pDirName)
