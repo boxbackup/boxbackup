@@ -71,7 +71,12 @@ void make_file_of_zeros(const char *filename, size_t size)
 	TEST_THAT(handle != INVALID_HANDLE_VALUE);
 	SetFilePointer(handle, size, NULL, FILE_BEGIN);
 	TEST_THAT(GetLastError() == NO_ERROR);
-	TEST_THAT(SetEndOfFile(handle) == true);
+	bool result = SetEndOfFile(handle);
+	if (!result)
+	{
+		printf("Error %d\n", (int)GetLastError());
+	}
+	TEST_THAT(result == true);
 	TEST_THAT(CloseHandle(handle)  == true);
 	#else
 	int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
