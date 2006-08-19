@@ -185,9 +185,27 @@ void OurService(char* pConfigFileName)
 
 int InstallService(const char* pConfigFileName)
 {
-	SC_HANDLE newService, scm;
+	if (pConfigFileName != NULL)
+	{
+		struct stat st;
 
-	scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+		if (emu_stat(pConfigFileName, &st) != 0)
+		{
+			syslog(LOG_ERR, "Failed to open configuration file: "
+				"%s: %s", pConfigFileName, strerror(errno));
+			return 1;
+		}
+
+		if (! st.st_mode & S_IFREG)
+		{
+	
+			syslog(LOG_ERR, "Failed to open configuration file: "
+				"%s: not a file", pConfigFileName);
+			return 1;
+		}
+	}
+
+	SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
 	if (!scm) 
 	{
@@ -200,11 +218,17 @@ int InstallService(const char* pConfigFileName)
 	GetModuleFileName(NULL, cmd, sizeof(cmd)-1);
 	cmd[sizeof(cmd)-1] = 0;
 
-	char cmd_args[MAX_PATH];
-	_snprintf(cmd_args, sizeof(cmd_args)-1, "%s --service", cmd);
-	cmd_args[sizeof(cmd_args)-1] = 0;
+	std::string cmdWithArgs(cmd);
+	cmdWithArgs += " --service";
 
-	newService = CreateService(
+	if (pConfigFileName != NULL)
+	{
+		cmdWithArgs += " \"";
+		cmdWithArgs += pConfigFileName;
+		cmdWithArgs += "\"";
+	}
+
+	SC_HANDLE newService = CreateService(
 		scm, 
 		SERVICE_NAME, 
 		"Box Backup", 
@@ -212,13 +236,45 @@ int InstallService(const char* pConfigFileName)
 		SERVICE_WIN32_OWN_PROCESS, 
 		SERVICE_AUTO_START, 
 		SERVICE_ERROR_NORMAL, 
-		cmd_args, 
+		cmdWithArgs.c_str(),
 		0,0,0,0,0);
+
+	DWORD err = GetLastError();
+	CloseServiceHandle(scm);
 
 	if (!newService) 
 	{
-		::syslog(LOG_ERR, "Failed to create Box Backup service: "
-			"error %d", GetLastError());
+		switch (err)
+		{
+			case ERROR_SERVICE_EXISTS:
+			{
+				::syslog(LOG_ERR, "Failed to create Box Backup "
+					"service: it already exists");
+			}
+			break;
+
+			case ERROR_SERVICE_MARKED_FOR_DELETE:
+			{
+				::syslog(LOG_ERR, "Failed to create Box Backup "
+					"service: it is waiting to be deleted");
+			}
+			break;
+
+			case ERROR_DUPLICATE_SERVICE_NAME:
+			{
+				::syslog(LOG_ERR, "Failed to create Box Backup "
+					"service: a service with this name "
+					"already exists");
+			}
+			break;
+
+			default:
+			{
+				::syslog(LOG_ERR, "Failed to create Box Backup "
+					"service: error %d", err);
+			}
+		}
+
 		return 1;
 	}
 
@@ -235,7 +291,6 @@ int InstallService(const char* pConfigFileName)
 	}
 
 	CloseServiceHandle(newService);
-	CloseServiceHandle(scm);
 
 	return 0;
 }
