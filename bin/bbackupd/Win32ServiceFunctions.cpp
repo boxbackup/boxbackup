@@ -161,8 +161,10 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 	}
 }
 
-void OurService(void)
+void OurService(char* pConfigFileName)
 {
+	spConfigFileName = pConfigFileName;
+
 	SERVICE_TABLE_ENTRY serviceTable[] = 
 	{ 
 		{ SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
@@ -181,7 +183,7 @@ void OurService(void)
 	}
 }
 
-void InstallService(void)
+int InstallService(const char* pConfigFileName)
 {
 	SC_HANDLE newService, scm;
 
@@ -191,7 +193,7 @@ void InstallService(void)
 	{
 		syslog(LOG_ERR, "Failed to open service control manager: "
 			"error %d", GetLastError());
-		return;
+		return 1;
 	}
 
 	char cmd[MAX_PATH];
@@ -217,7 +219,7 @@ void InstallService(void)
 	{
 		::syslog(LOG_ERR, "Failed to create Box Backup service: "
 			"error %d", GetLastError());
-		return;
+		return 1;
 	}
 
 	::syslog(LOG_INFO, "Created Box Backup service");
@@ -234,6 +236,8 @@ void InstallService(void)
 
 	CloseServiceHandle(newService);
 	CloseServiceHandle(scm);
+
+	return 0;
 }
 
 int RemoveService(void)
