@@ -70,7 +70,11 @@ BackupQueries::BackupQueries(BackupProtocolClient &rConnection, const Configurat
 	  mWarnedAboutOwnerAttributes(false),
 	  mReturnCode(0)		// default return code
 {
+	#ifdef WIN32
+	mRunningAsRoot = TRUE;
+	#else
 	mRunningAsRoot = (::geteuid() == 0);
+	#endif
 }
 
 // --------------------------------------------------------------------------
