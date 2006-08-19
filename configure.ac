@@ -253,7 +253,8 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    test/bbackupd/testfiles/bbackupd.conf
                    test/bbackupd/testfiles/extcheck1.pl
                    test/bbackupd/testfiles/extcheck2.pl
-                   test/bbackupd/testfiles/notifyscript.pl])
+                   test/bbackupd/testfiles/notifyscript.pl
+                   test/bbackupd/testfiles/syncallowscript.pl])
 # TODO: Need to do contrib/cygwin/install-cygwin-service.pl but location varies
 AC_OUTPUT
 
