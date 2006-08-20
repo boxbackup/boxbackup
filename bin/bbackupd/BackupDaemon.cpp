@@ -932,32 +932,24 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 			}
 		}
 		
-		// Wait and then cleanup child process
-		int status = 0;
-		::waitpid(pid, &status, 0);
 	}
 	catch(std::exception &e)
 	{
 		::syslog(LOG_ERR, "Internal error running SyncAllowScript: "
 			"%s", e.what());
-		// Clean up
-		if(pid != 0)
-		{
-			int status = 0;
-			::waitpid(pid, &status, 0);
-		}
 	}
 	catch(...)
 	{
 		// Ignore any exceptions
 		// Log that something bad happened
 		::syslog(LOG_ERR, "Error running SyncAllowScript '%s'", conf.GetKeyValue("SyncAllowScript").c_str());
-		// Clean up though
-		if(pid != 0)
-		{
-			int status = 0;
-			::waitpid(pid, &status, 0);
-		}
+	}
+
+	// Wait and then cleanup child process, if any
+	if (pid != 0)
+	{
+		int status = 0;
+		::waitpid(pid, &status, 0);
 	}
 
 	return waitInSeconds;
@@ -1157,7 +1149,17 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 	{
 		::syslog(LOG_ERR, "Internal error in command socket thread: "
 			"%s", e.what());
-		throw; // thread will die
+		// If an error occurs, and there is a connection active, just close that
+		// connection and continue. Otherwise, let the error propagate.
+		if(mpCommandSocketInfo->mpConnectedSocket.get() == 0)
+		{
+			throw; // thread will die
+		}
+		else
+		{
+			// Close socket and ignore error
+			CloseCommandConnection();
+		}
 	}
 	catch(...)
 	{
