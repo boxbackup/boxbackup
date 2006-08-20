@@ -274,13 +274,6 @@ void BackupDaemon::RunHelperThread(void)
 		{
 			rSocket.Accept(BOX_NAMED_PIPE_NAME);
 		}
-		catch(BoxException &e)
-		{
-			::syslog(LOG_ERR, "Failed to open command socket: %s",
-				e.what());
-			SetTerminateWanted();
-			break; // this is fatal to listening thread
-		}
 		catch(std::exception &e)
 		{
 			::syslog(LOG_ERR, "Failed to open command socket: "
@@ -465,7 +458,7 @@ void BackupDaemon::Run()
 			}
 			catch(std::exception &e)
 			{
-				::syslog(LOG_ERR, "Internal error while "
+				::syslog(LOG_WARNING, "Internal error while "
 					"closing command socket after "
 					"another exception: %s", e.what());
 			}
