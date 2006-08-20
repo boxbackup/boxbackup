@@ -7,6 +7,12 @@
 //
 // --------------------------------------------------------------------------
 
+#ifdef WIN32
+// we need features from Windows 2000 and above for ACL support
+#define WINVER 0x0500
+#define _WIN32_WINNT 0x0500
+#endif
+
 #include "Box.h"
 
 #ifdef HAVE_UNISTD_H
@@ -25,6 +31,13 @@
 #include <sys/xattr.h>
 #endif
 
+#ifdef WIN32
+#include <windows.h>
+#include <AccCtrl.h>
+#include <Aclapi.h>
+#include <Sddl.h>
+#endif
+
 #include "BackupClientFileAttributes.h"
 #include "CommonException.h"
 #include "FileModificationTime.h"
@@ -33,55 +46,12 @@
 #include "CipherContext.h"
 #include "CipherBlowfish.h"
 #include "MD5Digest.h"
+#include "CollectInBufferStream.h"
+#include "Archive.h"
 
 #include "MemLeakFindOn.h"
 
-// set packing to one byte
-#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#include "BeginStructPackForWire.h"
-#else
-BEGIN_STRUCTURE_PACKING_FOR_WIRE
-#endif
-
-#define ATTRIBUTETYPE_GENERIC_UNIX	1
-
 #define ATTRIBUTE_ENCODING_BLOWFISH	2
-
-typedef struct 
-{
-	int32_t		AttributeType;
-	u_int32_t	UID;
-	u_int32_t	GID;
-	u_int64_t	ModificationTime;
-	u_int64_t	AttrModificationTime;
-	u_int32_t	UserDefinedFlags;
-	u_int32_t	FileGenerationNumber;
-	u_int16_t	Mode;
-	// Symbolic link filename may follow
-	// Extended attribute (xattr) information may follow, format is:
-	//   u_int32_t     Size of extended attribute block (excluding this word)
-	// For each of NumberOfAttributes (sorted by AttributeName):
-	//   u_int16_t     AttributeNameLength
-	//   char          AttributeName[AttributeNameLength]
-	//   u_int32_t     AttributeValueLength
-	//   unsigned char AttributeValue[AttributeValueLength]
-	// AttributeName is 0 terminated, AttributeValue is not (and may be binary data)
-} attr_StreamFormat;
-
-// This has wire packing so it's compatible across platforms
-// Use wider than necessary sizes, just to be careful.
-typedef struct
-{
-	int32_t uid, gid, mode;
-} attributeHashData;
-
-// Use default packing
-#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#include "EndStructPackForWire.h"
-#else
-END_STRUCTURE_PACKING_FOR_WIRE
-#endif
-
 
 #define MAX_ATTRIBUTE_HASH_SECRET_LENGTH	256
 
@@ -234,45 +204,106 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	
 	// Then check the elements of the two things
 	// Bytes are checked in network order, but this doesn't matter as we're only checking for equality.
-	attr_StreamFormat *a1 = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
-	attr_StreamFormat *a2 = (attr_StreamFormat*)rAttr.mpClearAttributes->GetBuffer();
+	attr_StreamFormat_Generic *a1 = (attr_StreamFormat_Generic*)
+		mpClearAttributes->GetBuffer();
+	attr_StreamFormat_Generic *a2 = (attr_StreamFormat_Generic*)
+		rAttr.mpClearAttributes->GetBuffer();
 	
-	if(a1->AttributeType != a2->AttributeType
-		|| a1->UID != a2->UID
-		|| a1->GID != a2->GID
-		|| a1->UserDefinedFlags != a2->UserDefinedFlags
-		|| a1->Mode != a2->Mode)
+	if(a1->AttributeType != a2->AttributeType)
 	{
 		return false;
 	}
-	
-	if(!IgnoreModTime)
+
+	if (ntohl(a1->AttributeType) == ATTRIBUTETYPE_GENERIC_UNIX)
 	{
-		if(a1->ModificationTime != a2->ModificationTime)
+		attr_StreamFormat_Unix* ua1 = (attr_StreamFormat_Unix*)a1;
+		attr_StreamFormat_Unix* ua2 = (attr_StreamFormat_Unix*)a2;
+		if (ua1->UID != ua2->UID
+			|| ua1->GID != ua2->GID
+			|| ua1->UserDefinedFlags != ua2->UserDefinedFlags
+			|| ua1->Mode != ua2->Mode)
 		{
 			return false;
 		}
+		
+		if(!IgnoreModTime)
+		{
+			if(ua1->ModificationTime != ua2->ModificationTime)
+			{
+				return false;
+			}
+		}
+
+		if(!IgnoreAttrModTime)
+		{
+			if(ua1->AttrModificationTime != ua2->AttrModificationTime)
+			{
+				return false;
+			}
+		}
+		
+		// Check symlink string?
+		unsigned int size = mpClearAttributes->GetSize();
+		if(size == sizeof(attr_StreamFormat_Unix))
+		{
+			return true;
+		}
+
+		// Check whether symlink strings and xattrs match
+		if(::memcmp(ua1 + 1, ua2 + 1, 
+			size - sizeof(attr_StreamFormat_Unix)) != 0)
+		{
+			return false;
+		}
+
+		return true;
+	}
+	else if (ntohl(a1->AttributeType) == ATTRIBUTETYPE_GENERIC_WINDOWS)
+	{
+		attr_StreamFormat_Windows* wa1 = (attr_StreamFormat_Windows*)a1;
+		attr_StreamFormat_Windows* wa2 = (attr_StreamFormat_Windows*)a2;
+
+		if(wa1->Attributes != wa2->Attributes)
+		{
+			return false;
+		}
+
+		if(wa1->CreationTime != wa2->CreationTime)
+		{
+			return false;
+		}
+		
+		if(!IgnoreModTime)
+		{
+			if(wa1->LastWriteTime != wa2->LastWriteTime)
+			{
+				return false;
+			}
+		}
+
+		unsigned int size = mpClearAttributes->GetSize();
+		if(size == sizeof(attr_StreamFormat_Windows))
+		{
+			return true;
+		}
+
+		// The rest of the record is the Windows ACL data, 
+		// which we can compare byte-for-byte for now.
+
+		if(::memcmp(wa1 + 1, wa2 + 1, 
+			size - sizeof(attr_StreamFormat_Windows)) != 0)
+		{
+			return false;
+		}
+
+		return true;
+	}
+	else
+	{
+		// unknown attribute type
+		return false;
 	}
 
-	if(!IgnoreAttrModTime)
-	{
-		if(a1->AttrModificationTime != a2->AttrModificationTime)
-		{
-			return false;
-		}
-	}
-	
-	// Check symlink string?
-	unsigned int size = mpClearAttributes->GetSize();
-	if(size > sizeof(attr_StreamFormat))
-	{
-		// Symlink strings don't match. This also compares xattrs
-		if(::memcmp(a1 + 1, a2 + 1, size - sizeof(attr_StreamFormat)) != 0)
-		{
-			return false;
-		}
-	}
-	
 	// Passes all test, must be OK
 	return true;
 }
@@ -292,7 +323,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroModificationTimes, box_time_t *pModTime,
 	box_time_t *pAttrModTime, int64_t *pFileSize, InodeRefType *pInodeNumber, bool *pHasMultipleLinks)
 {
-	StreamableMemBlock *pnewAttr = 0;
+	StreamableMemBlock *pAttrBlock = 0;
 	try
 	{
 		struct stat st;
@@ -308,72 +339,40 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		if(pInodeNumber) {*pInodeNumber = st.st_ino;}
 		if(pHasMultipleLinks) {*pHasMultipleLinks = (st.st_nlink > 1);}
 
-		pnewAttr = new StreamableMemBlock;
+		pAttrBlock = new StreamableMemBlock;
 
-		FillAttributes(*pnewAttr, Filename, st, ZeroModificationTimes);
+#ifdef WIN32
+		FillAttributesWindows(*pAttrBlock, Filename, st, 
+			ZeroModificationTimes);
+#else // !WIN32
+		FillAttributes(*pAttrBlock, Filename, st, 
+			ZeroModificationTimes);
 
-#ifndef WIN32
 		// Is it a link?
 		if((st.st_mode & S_IFMT) == S_IFLNK)
 		{
-			FillAttributesLink(*pnewAttr, Filename, st);
-		}
-#endif
-
-		FillExtendedAttr(*pnewAttr, Filename);
-
-#ifdef WIN32
-		//this is to catch those problems with invalid time stamps stored...
-		//need to find out the reason why - but also a catch as well.
-
-		attr_StreamFormat *pattr = 
-			(attr_StreamFormat*)pnewAttr->GetBuffer();
-		ASSERT(pattr != 0);
-		
-		// __time64_t winTime = BoxTimeToSeconds(
-		// pnewAttr->ModificationTime);
-
-		u_int64_t  modTime = box_ntoh64(pattr->ModificationTime);
-		box_time_t modSecs = BoxTimeToSeconds(modTime);
-		__time64_t winTime = modSecs;
-
-		// _MAX__TIME64_T doesn't seem to be defined, but the code below
-		// will throw an assertion failure if we exceed it :-)
-		// Microsoft says dates up to the year 3000 are valid, which
-		// is a bit more than 15 * 2^32. Even that doesn't seem
-		// to be true (still aborts), but it can at least hold 2^32.
-		if (winTime >= 0x100000000LL || _gmtime64(&winTime) == 0)
-		{
-			::syslog(LOG_ERR, "Invalid Modification Time "
-				"caught for file: %s", Filename);
-			pattr->ModificationTime = 0;
+			FillAttributesLink(*pAttrBlock, Filename, st);
 		}
 
-		modTime = box_ntoh64(pattr->AttrModificationTime);
-		modSecs = BoxTimeToSeconds(modTime);
-		winTime = modSecs;
-
-		if (winTime > 0x100000000LL || _gmtime64(&winTime) == 0)
-		{
-			::syslog(LOG_ERR, "Invalid Attribute Modification "
-				"Time caught for file: %s", Filename);
-			pattr->AttrModificationTime = 0;
-		}
-#endif
+		FillExtendedAttr(*pAttrBlock, Filename);
+#endif // WIN32
 
 		// Attributes ready. Encrypt into this block
-		EncryptAttr(*pnewAttr);
+		EncryptAttr(*pAttrBlock);
 		
 		// Store the new attributes
 		RemoveClear();
-		mpClearAttributes = pnewAttr;
-		pnewAttr = 0;
+		mpClearAttributes = pAttrBlock;
+		pAttrBlock = 0;
 	}
 	catch(...)
 	{
 		// clean up
-		delete pnewAttr;
-		pnewAttr = 0;
+		if (pAttrBlock)
+		{
+			delete pAttrBlock;
+			pAttrBlock = 0;
+		}
 		throw;
 	}
 }
@@ -388,8 +387,9 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st, bool ZeroModificationTimes)
 {
-	outputBlock.ResizeBlock(sizeof(attr_StreamFormat));
-	attr_StreamFormat *pattr = (attr_StreamFormat*)outputBlock.GetBuffer();
+	outputBlock.ResizeBlock(sizeof(attr_StreamFormat_Unix));
+	attr_StreamFormat_Unix *pattr = (attr_StreamFormat_Unix*)
+		outputBlock.GetBuffer();
 	ASSERT(pattr != 0);
 
 	// Fill in the entries
@@ -416,6 +416,242 @@ void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock,
 	pattr->FileGenerationNumber = htonl(st.st_gen);
 #endif
 }
+
+
+#ifdef WIN32
+void WriteSid(Archive& rArchiver, PSID pSID)
+{
+	CHAR* pSidString;
+	if (!ConvertSidToStringSid(pSID, &pSidString))
+	{
+		::syslog(LOG_WARNING, "Failed to convert Security Identifier "
+			"to a string: error %d", GetLastError());
+		THROW_EXCEPTION(BackupStoreException, LookupAccountFailed)
+	}
+
+	std::string sid(pSidString);
+	LocalFree((HLOCAL)pSidString);
+
+	char namebuf[1024];
+	char domainbuf[1024];
+	SID_NAME_USE nametype;
+	DWORD namelen = sizeof(namebuf);
+	DWORD domainlen = sizeof(domainbuf);
+
+	if(!LookupAccountSid(NULL, pSID, namebuf, &namelen,
+		domainbuf, &domainlen, &nametype))
+	{
+		::syslog(LOG_WARNING, "Failed to find account details for "
+			"'%s': error %d", sid.c_str(), GetLastError());
+		THROW_EXCEPTION(BackupStoreException, LookupAccountFailed)
+	}
+
+	std::string domain(domainbuf);
+	std::string name(namebuf);
+
+	rArchiver.Write((int)nametype);
+	rArchiver.Write(sid);
+	rArchiver.Write(domain);
+	rArchiver.Write(name);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::FillAttributesWindows()
+//		Purpose: Private function, handles Windows attributes (ACL)
+//		Created: 2006/02/27
+//
+// --------------------------------------------------------------------------
+void BackupClientFileAttributes::FillAttributesWindows
+(
+	StreamableMemBlock &rOutputBlock, const char *pFilename, 
+	struct stat &rStat, bool ZeroLastWriteTime
+)
+{
+	rOutputBlock.ResizeBlock(sizeof(attr_StreamFormat_Windows));
+	attr_StreamFormat_Windows *pAttr = (attr_StreamFormat_Windows*)
+		rOutputBlock.GetBuffer();
+	ASSERT(pAttr != 0);
+
+	// Fill in the entries
+	pAttr->AttributeType = htonl(ATTRIBUTETYPE_GENERIC_WINDOWS);
+	pAttr->CreationTime = box_hton64(rStat.st_ctime * MICRO_SEC_IN_SEC_LL);
+
+	if(ZeroLastWriteTime)
+	{
+		pAttr->LastWriteTime = 0;
+	}
+	else
+	{
+		pAttr->LastWriteTime = box_hton64(FileModificationTime(rStat));
+	}
+
+	// not very efficient to stat the file again, but emu_fstat
+	// doesn't return the information that we need.
+
+	HANDLE handle = OpenFileByNameUtf8(pFilename);
+
+	if (handle == INVALID_HANDLE_VALUE)
+	{
+		::syslog(LOG_WARNING, "Failed to open file to read "
+			"Windows attributes: '%s': error %d", 
+			pFilename, GetLastError());
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+
+	BY_HANDLE_FILE_INFORMATION fi;
+	bool result = GetFileInformationByHandle(handle, &fi);
+
+	if (!result)
+	{
+		CloseHandle(handle);
+		::syslog(LOG_WARNING, "Failed to read Windows "
+			"file attributes for '%s': error %d", 
+			pFilename, GetLastError());
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+
+	if (INVALID_FILE_ATTRIBUTES == fi.dwFileAttributes)
+	{
+		CloseHandle(handle);
+		::syslog(LOG_WARNING, "Failed to read valid Windows "
+			"file attributes for '%s': error %d", 
+			pFilename, GetLastError());
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+
+	pAttr->Attributes = fi.dwFileAttributes;
+
+	// Now start writing our custom data, with the magic and version
+	CollectInBufferStream buffer;
+	Archive archiver(buffer, 0);
+
+	archiver.Write((int) ACL_FORMAT_MAGIC);
+	archiver.Write((int) ACL_FORMAT_VERSION);
+
+	PSID psidOwner = NULL;
+	PSID psidGroup = NULL;
+	PACL pDacl = NULL;
+	PSECURITY_DESCRIPTOR pSecurityDesc = NULL;
+	PEXPLICIT_ACCESS pEntries = NULL;
+
+	try
+	{
+		DWORD result = GetSecurityInfo(
+			handle, // object handle
+			SE_FILE_OBJECT, // ObjectType
+			DACL_SECURITY_INFORMATION  | // SecurityInfo
+			GROUP_SECURITY_INFORMATION |
+			OWNER_SECURITY_INFORMATION,
+			&psidOwner, // ppsidOwner,
+			&psidGroup, // ppsidGroup,
+			&pDacl,     // ppDacl,
+			NULL,       // ppSacl,
+			&pSecurityDesc // ppSecurityDescriptor
+		);
+
+		CloseHandle(handle);
+
+		if (result != ERROR_SUCCESS)
+		{
+			::syslog(LOG_WARNING, "Failed to get Windows "
+				"security info for '%s': error %d",
+				pFilename, result);
+			THROW_EXCEPTION(CommonException, OSFileError)
+		}
+
+		WriteSid(archiver, psidOwner);
+		WriteSid(archiver, psidGroup);
+
+		ULONG numEntries;
+		result = GetExplicitEntriesFromAcl
+		(
+			pDacl,       // pAcl
+			&numEntries, // pcCountOfExplicitEntries,
+			&pEntries    // pListOfExplicitEntries
+		);
+
+		if(result != ERROR_SUCCESS)
+		{
+			::syslog(LOG_WARNING, "Failed to get Windows "
+				"access control list entries for '%s': "
+				"error %d", pFilename, result);
+			THROW_EXCEPTION(CommonException, OSFileError)
+		}
+
+		archiver.Write((int)numEntries);
+
+		for (ULONG i = 0; i < numEntries; i++)
+		{
+			EXPLICIT_ACCESS* pEntry = &(pEntries[i]);
+
+			archiver.Write((int)pEntry->grfAccessPermissions);
+			archiver.Write((int)pEntry->grfAccessMode);
+			archiver.Write((int)pEntry->grfInheritance);
+			archiver.Write((int)pEntry->Trustee.TrusteeForm);
+			archiver.Write((int)pEntry->Trustee.TrusteeType);
+
+			if(pEntry->Trustee.pMultipleTrustee != NULL)
+			{
+				::syslog(LOG_WARNING, "Failed to process "
+					"access control entry for '%s': "
+					"multiple trustees not supported",
+					pFilename);
+				THROW_EXCEPTION(CommonException, OSFileError);
+			}
+
+			if(pEntry->Trustee.MultipleTrusteeOperation != 
+				NO_MULTIPLE_TRUSTEE)
+			{
+				::syslog(LOG_WARNING, "Failed to process "
+					"access control entry for '%s': "
+					"multiple trustees not supported (2)",
+					pFilename);
+				THROW_EXCEPTION(CommonException, OSFileError);
+			}
+
+			switch(pEntry->Trustee.TrusteeForm)
+			{
+			case TRUSTEE_IS_SID:
+				{
+					PSID trusteeSid = (PSID)(
+						pEntry->Trustee.ptstrName);
+					WriteSid(archiver, trusteeSid);
+				}
+				break;
+			default:
+				::syslog(LOG_WARNING, "Failed to process "
+					"access control entry for '%s': "
+					"trustee form %d not supported",
+					pFilename, 
+					pEntry->Trustee.TrusteeForm);
+				THROW_EXCEPTION(CommonException, OSFileError);
+			}
+
+		}
+	}
+	catch(...)
+	{
+		if (pEntries)      LocalFree((HLOCAL)pEntries);
+		if (pSecurityDesc) LocalFree((HLOCAL)pSecurityDesc);
+		throw;
+	}
+
+	LocalFree((HLOCAL)pEntries);
+	LocalFree((HLOCAL)pSecurityDesc);
+
+	// Copy the serialised data into the output block
+	buffer.SetForReading();
+	rOutputBlock.ResizeBlock(rOutputBlock.GetSize() + buffer.GetSize());
+
+	// block might have moved after resize
+	pAttr = (attr_StreamFormat_Windows *)(rOutputBlock.GetBuffer());
+	memcpy(pAttr + 1, buffer.GetBuffer(), buffer.GetSize());
+}
+#endif // WIN32
+
+
 #ifndef WIN32
 // --------------------------------------------------------------------------
 //
@@ -597,6 +833,15 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 	}
 	int32_t *type = (int32_t*)mpClearAttributes->GetBuffer();
 	ASSERT(type != 0);
+
+#ifdef WIN32
+	if(ntohl(*type) == ATTRIBUTETYPE_GENERIC_WINDOWS)
+	{
+		WriteAttributesWindows(Filename);
+		return;
+	}
+#endif
+
 	if(ntohl(*type) != ATTRIBUTETYPE_GENERIC_UNIX)
 	{
 		// Don't know what to do with these
@@ -604,22 +849,24 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 	}
 	
 	// Check there is enough space for an attributes block
-	if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat))
+	if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat_Unix))
 	{
 		// Too small
 		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
 	}
 
 	// Get pointer to structure
-	attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
-	int xattrOffset = sizeof(attr_StreamFormat);
+	attr_StreamFormat_Unix *pattr = (attr_StreamFormat_Unix*)
+		mpClearAttributes->GetBuffer();
+	int xattrOffset = sizeof(attr_StreamFormat_Unix);
 
 	// is it a symlink?
 	int16_t mode = ntohs(pattr->Mode);
 	if((mode & S_IFMT) == S_IFLNK)
 	{
 		// Check things are sensible
-		if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat) + 1)
+		if(mpClearAttributes->GetSize() < 
+			(int)sizeof(attr_StreamFormat_Unix) + 1)
 		{
 			// Too small
 			THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
@@ -715,6 +962,245 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 }
 
 
+#ifdef WIN32
+bool ReadSid(Archive& rArchive, PSID* pPSID)
+{
+	int nametype;
+	rArchive.Read(nametype);
+
+	std::string sid;
+	rArchive.Read(sid);
+
+	std::string domain;
+	rArchive.Read(domain);
+
+	std::string name;
+	rArchive.Read(name);
+
+	name = domain + '\\' + name;
+
+	DWORD sidBufSize = 0;
+	DWORD domainBufSize = 0;
+	SID_NAME_USE use;
+
+	// TODO: if we don't find the account name, 
+	// use the stored SID instead
+
+	if (!LookupAccountName(NULL, name.c_str(), NULL, &sidBufSize,
+		NULL, &domainBufSize, &use) && 
+		GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+	{
+		::syslog(LOG_ERR, "Failed to lookup account details for "
+			"'%s': error %d", name.c_str(), GetLastError());
+		return false;
+	}
+
+	*pPSID = malloc(sidBufSize);
+	TCHAR* domainstr = (TCHAR *)malloc(domainBufSize);
+
+	BOOL result = LookupAccountName(NULL, name.c_str(),
+		*pPSID, &sidBufSize, domainstr, &domainBufSize, &use);
+	free(domainstr);
+
+	if (!result)
+	{
+		::syslog(LOG_ERR, "Failed to lookup account details for "
+			"'%s': error %d", name.c_str(), GetLastError());
+		free(*pPSID);
+		*pPSID = NULL;
+		return false;
+	}
+
+	return true;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::WriteAttributesWindows(
+//			 const char *)
+//		Purpose: Apply the stored Windows attributes to the file
+//		Created: 2006/03/12
+//
+// --------------------------------------------------------------------------
+void BackupClientFileAttributes::WriteAttributesWindows(const char *Filename) 
+const
+{
+	// Check there is enough space for an attributes block
+	if(mpClearAttributes->GetSize() < 
+		(int)sizeof(attr_StreamFormat_Windows))
+	{
+		// Too small
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	// Get pointer to structure
+	attr_StreamFormat_Windows *pAttr = (attr_StreamFormat_Windows*)
+		mpClearAttributes->GetBuffer();
+
+	std::wstring wideName;
+	if (!GetFileNameWide(Filename, wideName))
+	{
+		THROW_EXCEPTION(CommonException, OSFileError);
+	}
+
+	DWORD attributes = pAttr->Attributes;
+	attributes &= ~FILE_ATTRIBUTE_OFFLINE;
+	attributes &= ~FILE_ATTRIBUTE_REPARSE_POINT;
+
+	if (!SetFileAttributesW(wideName.c_str(), attributes))
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes of '%s': "
+			"error %d", Filename, GetLastError());
+		return;
+	}
+
+	CollectInBufferStream buffer;
+	buffer.Write(pAttr + 1, mpClearAttributes->GetSize() -
+		sizeof(attr_StreamFormat_Windows));
+	buffer.SetForReading();
+
+	Archive archive(buffer, 0);
+	int data;
+
+	archive.Read(data);
+	if (data != ACL_FORMAT_MAGIC)
+	{
+		::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+			"wrong magic in attribute block", Filename);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	archive.Read(data);
+	if (data != ACL_FORMAT_VERSION)
+	{
+		::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+			"wrong version in attribute block", Filename);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	PACL pNewAcl = NULL;
+	PSID pSidOwner = NULL, pSidGroup = NULL;
+
+	if (!ReadSid(archive, &pSidOwner))
+	{
+		::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+			"failed to decode file owner", Filename);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	if (!ReadSid(archive, &pSidGroup))
+	{
+		::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+			"failed to decode file group", Filename);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	int numEntries;
+	archive.Read(numEntries);
+
+	EXPLICIT_ACCESS* pEntries = (EXPLICIT_ACCESS*)calloc(numEntries, 
+		sizeof(EXPLICIT_ACCESS));
+
+	if (!pEntries)
+	{
+		::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+			"out of memory", Filename);
+		if (pSidOwner) free(pSidOwner);
+		if (pSidGroup) free(pSidGroup);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+	
+	for (int i = 0; i < numEntries; i++)
+	{
+		PEXPLICIT_ACCESS pEntry = &(pEntries[i]);
+
+		int data;
+		archive.Read(data); pEntry->grfAccessPermissions = data;
+		archive.Read(data); pEntry->grfAccessMode = (ACCESS_MODE)data;
+		archive.Read(data); pEntry->grfInheritance = data;
+		archive.Read(data); pEntry->Trustee.TrusteeForm = 
+			(TRUSTEE_FORM)data;
+		archive.Read(data); pEntry->Trustee.TrusteeType = 
+			(TRUSTEE_TYPE)data;
+
+		if (pEntry->Trustee.TrusteeForm != TRUSTEE_IS_SID)
+		{
+			::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+				"only SID trustees are supported", Filename);
+			if (pSidOwner) free(pSidOwner);
+			if (pSidGroup) free(pSidGroup);
+			THROW_EXCEPTION(BackupStoreException, 
+				AttributesNotLoaded);
+		}
+
+		LPSTR* pPSIDstr = &pEntry->Trustee.ptstrName;
+		if (!ReadSid(archive, (PSID*)pPSIDstr))
+		{
+			::syslog(LOG_ERR, "Failed to restore ACL of '%s': "
+				"failed to read ACL entry %d SID", Filename, i);
+			if (pSidOwner) free(pSidOwner);
+			if (pSidGroup) free(pSidGroup);
+			THROW_EXCEPTION(BackupStoreException, 
+				AttributesNotLoaded);
+		}
+	}
+		
+	DWORD result = SetEntriesInAcl(numEntries, pEntries, NULL, &pNewAcl);
+
+	for (int i = 0; i < numEntries; i++)
+	{
+		PEXPLICIT_ACCESS pEntry = &(pEntries[i]);
+		PSID pSid = (PSID)(pEntry->Trustee.ptstrName);
+		free(pSid);
+	}
+
+	free(pEntries);
+
+	if (result != ERROR_SUCCESS)
+	{
+		::syslog(LOG_ERR, "Failed to create access control list "
+			"for '%s': error %d", Filename, result);
+		if (pSidOwner) free(pSidOwner);
+		if (pSidGroup) free(pSidGroup);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	WCHAR* pNameBuffer = new WCHAR [wideName.size() + 1];
+	if (!pNameBuffer)
+	{
+		::syslog(LOG_ERR, "Failed to create access control list "
+			"for '%s': out of memory", Filename);
+		if (pSidOwner) free(pSidOwner);
+		if (pSidGroup) free(pSidGroup);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	memcpy(pNameBuffer, wideName.c_str(), wideName.size() * sizeof(WCHAR));
+
+	result = SetNamedSecurityInfoW(pNameBuffer, SE_FILE_OBJECT,
+		DACL_SECURITY_INFORMATION | 
+		OWNER_SECURITY_INFORMATION |
+		GROUP_SECURITY_INFORMATION
+		/* | UNPROTECTED_DACL_SECURITY_INFORMATION */,
+		pSidOwner, pSidGroup, pNewAcl, NULL);
+
+	delete [] pNameBuffer;
+	LocalFree((HLOCAL)pNewAcl);
+
+	if (result != ERROR_SUCCESS)
+	{
+		::syslog(LOG_ERR, "Failed to apply access control list "
+			"to '%s': error %d", Filename, result);
+		if (pSidOwner) free(pSidOwner);
+		if (pSidGroup) free(pSidGroup);
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+}
+#endif
+
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -736,10 +1222,12 @@ bool BackupClientFileAttributes::IsSymLink() const
 	// Get the type of attributes stored
 	int32_t *type = (int32_t*)mpClearAttributes->GetBuffer();
 	ASSERT(type != 0);
-	if(ntohl(*type) == ATTRIBUTETYPE_GENERIC_UNIX && mpClearAttributes->GetSize() > (int)sizeof(attr_StreamFormat))
+	if(ntohl(*type) == ATTRIBUTETYPE_GENERIC_UNIX && 
+		mpClearAttributes->GetSize() > (int)sizeof(attr_StreamFormat_Unix))
 	{
 		// Check link
-		attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
+		attr_StreamFormat_Unix *pattr = (attr_StreamFormat_Unix*)
+			mpClearAttributes->GetBuffer();
 		return ((ntohs(pattr->Mode)) & S_IFMT) == S_IFLNK;
 	}
 	

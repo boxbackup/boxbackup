@@ -75,6 +75,7 @@
 #include "IOStreamGetLine.h"
 #include "Conversion.h"
 #include "Archive.h"
+#include "BoxTimeToText.h"
 
 #include "MemLeakFindOn.h"
 
@@ -852,6 +853,12 @@ void BackupDaemon::Run2()
 					SerializeStoreObjectInfo(
 						clientStoreMarker, 
 						lastSyncTime, nextSyncTime);
+				std::string last(BoxTimeToISO8601String(
+					lastSyncTime, true));
+				std::string next(BoxTimeToISO8601String(
+					nextSyncTime, true));
+				printf("Last sync was at %s, next will be %s\n",
+					last.c_str(), next.c_str());
 
 				// --------------------------------------------------------------------------------------------
 			}

@@ -663,6 +663,43 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    GetFileNameWide(const std::string& rIn, std::wstring&
+//			rOut)
+//		Purpose: Converts filename to Unicode and returns it
+//			in rOut, returning true. In case of error, 
+//			sets errno, logs the error and returns false.
+//		Created: 2006/03/13
+//
+// --------------------------------------------------------------------------
+bool GetFileNameWide(const std::string& rIn, std::wstring& rOut)
+{
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(rIn.c_str());
+	
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return false;
+	}
+	
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
+	// We are responsible for freeing pBuffer
+	
+	if (pBuffer == NULL)
+	{
+		// error already logged by ConvertUtf8ToWideString()
+		return false;
+	}
+
+	rOut = pBuffer;
+	delete [] pBuffer;
+	return true;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    OpenFileByNameUtf8
 //		Purpose: Converts filename to Unicode and returns 
 //			a handle to it. In case of error, sets errno,

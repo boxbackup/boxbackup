@@ -325,7 +325,12 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	// Apply attributes to the directory
 	const StreamableMemBlock &dirAttrBlock(dir.GetAttributes());
 	BackupClientFileAttributes dirAttr(dirAttrBlock);
+
+	// too early to apply attributes on Win32: 
+	// might prevent us from accessing or writing to the directory
+#ifndef WIN32
 	dirAttr.WriteAttributes(rLocalDirectoryName.c_str());
+#endif
 
 	int64_t bytesWrittenSinceLastRestoreInfoSave = 0;
 	
@@ -437,6 +442,10 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 			}
 		}
 	}
+
+#ifdef WIN32
+	dirAttr.WriteAttributes(rLocalDirectoryName.c_str());
+#endif
 
 	return Restore_Complete;
 }

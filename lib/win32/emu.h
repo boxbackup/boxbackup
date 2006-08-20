@@ -365,6 +365,10 @@ bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 // replacement for _cgetws which requires a relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
 
+// used by BackupClientFileAttributes to get Windows file attributes
+HANDLE OpenFileByNameUtf8(const char* pFileName);
+bool GetFileNameWide(const std::string& rIn, std::wstring& rOut);
+
 struct iovec {
 	void *iov_base;   /* Starting address */
 	size_t iov_len;   /* Number of bytes */

@@ -68,3 +68,4 @@ SignalReceived					64	A signal was received by the process, restart or terminate
 IncompatibleFromAndDiffFiles	65	Attempt to use a diff and a from file together, when they're not related
 DiffFromIDNotFoundInDirectory	66	When uploading via a diff, the diff from file must be in the same directory
 PatchChainInfoBadInDirectory	67	A directory contains inconsistent information. Run bbstoreaccounts check to fix it.
+LookupAccountFailed		68	The file's security information refers to an account that could not be found

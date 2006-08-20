@@ -329,6 +329,12 @@ int main(int argc, char* argv[])
 
 	closelog();
 
+	struct stat st;
+	assert(!emu_stat("c:\\cygwin\\home\\administrator\\pcre-6.3\\.libs", &st));
+	printf("%lld\n", (long long)st.st_size);
+	assert(!emu_stat("c:\\cygwin\\home\\administrator\\pcre-6.3\\.libs", &st));
+	printf("%lld\n", (long long)st.st_size);
+
 	/*
 	//first off get the path name for the default 
 	char buf[MAX_PATH];

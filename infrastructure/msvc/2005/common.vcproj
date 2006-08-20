@@ -220,6 +220,14 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\DiscardStream.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\DiscardStream.h"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\EventWatchFilesystemObject.cpp"
 						>
 					</File>

@@ -156,6 +156,12 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	// Build the current state checksum to compare against while getting info from dirs
 	// Note checksum is used locally only, so byte order isn't considered.
 	MD5Digest currentStateChecksum;
+
+	bool logChanges = false;
+	if (rLocalPath == "C:\\Cygwin\\Home\\Administrator\\pcre-6.3")
+	{
+		logChanges = true;
+	}
 	
 	// Stat the directory, to get attribute info
 	{
@@ -186,6 +192,14 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		StreamableMemBlock xattr;
 		BackupClientFileAttributes::FillExtendedAttr(xattr, rLocalPath.c_str());
 		currentStateChecksum.Add(xattr.GetBuffer(), xattr.GetSize());
+
+		if (logChanges)
+		{
+			::syslog(LOG_INFO, "%s: mode %.3o, uid %d, gid %d, "
+				"ino %d, xattr %d\n", rLocalPath.c_str(), 
+				st.st_mode, st.st_uid, st.st_gid, st.st_ino,
+				xattr.GetSize());
+		}
 	}
 	
 	// Read directory entries, building arrays of names
@@ -235,6 +249,11 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 
 				// Stat file to get info
 				filename = MakeFullPath(rLocalPath, en->d_name);
+
+				if (logChanges && strcmp(en->d_name, ".libs") == 0)
+				{
+					printf("foo");
+				}
 
 				#ifdef WIN32
 				int type = en->d_type;
@@ -312,6 +331,15 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				checksum_info.mSize = st.st_size;
 				currentStateChecksum.Add(&checksum_info, sizeof(checksum_info));
 				currentStateChecksum.Add(en->d_name, strlen(en->d_name));
+				if (logChanges && strcmp(en->d_name, ".libs") == 0)
+				{
+					::syslog(LOG_INFO, "%s: mod %lld, "
+						"attr %lld, size %lld\n",
+						filename.c_str(),
+						(long long)checksum_info.mModificationTime,
+						(long long)checksum_info.mAttributeModificationTime,
+						(long long)checksum_info.mSize);
+				}
 				
 				// If the file has been modified madly into the future, download the 
 				// directory record anyway to ensure that it doesn't get uploaded
@@ -352,6 +380,12 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	{
 		// The checksum is the same, and there was one to compare with
 		checksumDifferent = false;
+	}
+	else
+	{
+		std::string digest(currentStateChecksum.DigestAsString());
+		::syslog(LOG_INFO, "Checksum changed on %s: %s\n", 
+			rLocalPath.c_str(), digest.c_str());
 	}
 
 	// Pointer to potentially downloaded store directory info

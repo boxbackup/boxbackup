@@ -39,9 +39,10 @@ start with '/'. The initial directory is always the root directory.
 	-I -- don't display object ID
 	-F -- don't display flags
 	-t -- show file modification time
-			(and attr mod time if has the object has attributes, ~ separated)
+	      (and attr mod time if has the object has attributes, ~ separated)
 	-s -- show file size in blocks used on server
-			(only very approximate indication of size locally)
+	      (only very approximate indication of size locally)
+	-w -- show Windows attributes and access control list
 
 ls can be used as an alias.
 <

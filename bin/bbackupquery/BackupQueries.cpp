@@ -7,6 +7,11 @@
 //
 // --------------------------------------------------------------------------
 
+#ifdef WIN32
+// we need features from Windows 2000 and above for ACL support
+#define WINVER 0x0500
+#endif
+
 #include "Box.h"
 
 #ifdef HAVE_UNISTD_H
@@ -28,6 +33,12 @@
 #include <set>
 #include <limits>
 
+#ifdef WIN32
+#include <AccCtrl.h>
+#include <Aclapi.h>
+#include <Sddl.h>
+#endif
+
 #include "BackupQueries.h"
 #include "Utils.h"
 #include "Configuration.h"
@@ -46,6 +57,9 @@
 #include "BackupStoreException.h"
 #include "ExcludeList.h"
 #include "BackupClientMakeExcludeList.h"
+#include "DiscardStream.h"
+#include "Archive.h"
+#include "CollectInBufferStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -180,7 +194,7 @@ void BackupQueries::DoCommand(const char *Command)
 	{
 		{ "quit", "" },
 		{ "exit", "" },
-		{ "list", "rodIFtTsh", },
+		{ "list", "rodIFtTshw", },
 		{ "pwd",  "" },
 		{ "cd",   "od" },
 		{ "lcd",  "" },
@@ -355,6 +369,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	#define LIST_OPTION_TIMES_UTC		'T'
 	#define LIST_OPTION_SIZEINBLOCKS	's'
 	#define LIST_OPTION_DISPLAY_HASH	'h'
+	#define LIST_OPTION_WINDOWS_ATTR        'w'
 
 	// default to using the current directory
 	int64_t rootDir = GetCurrentDirectoryID();
@@ -389,6 +404,264 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	// List it
 	List(rootDir, listRoot, opts, true /* first level to list */);
 }
+
+
+#ifdef WIN32
+bool PrintSid(Archive& rArchive)
+{
+	int nametype;
+	rArchive.Read(nametype);
+
+	std::string sid;
+	rArchive.Read(sid);
+
+	std::string domain;
+	rArchive.Read(domain);
+
+	std::string name;
+	rArchive.Read(name);
+
+	printf("%s\\%s (%s)", domain.c_str(), name.c_str(), sid.c_str());
+	return true;
+}
+
+void PrintWindowsAttributes(const StreamableMemBlock& rBlock)
+{
+	attr_StreamFormat_Generic* attr = 
+		(attr_StreamFormat_Generic*)
+		rBlock.GetBuffer();
+
+	if (attr->AttributeType != htonl(ATTRIBUTETYPE_GENERIC_WINDOWS))
+	{
+		return;
+	}
+
+	attr_StreamFormat_Windows* wattr = 
+		(attr_StreamFormat_Windows*)
+		rBlock.GetBuffer();
+
+	DWORD attribs = wattr->Attributes;
+	printf("\tFile attributes: ");
+
+	#define PRINT_ATTR(x) \
+		if (attribs & FILE_ATTRIBUTE_ ## x) \
+		{ \
+			printf(#x " "); \
+			attribs &= ~FILE_ATTRIBUTE_ ## x; \
+		}
+
+	PRINT_ATTR(ARCHIVE);
+	PRINT_ATTR(COMPRESSED);
+	PRINT_ATTR(DIRECTORY);
+	PRINT_ATTR(ENCRYPTED);
+	PRINT_ATTR(HIDDEN);
+	PRINT_ATTR(OFFLINE);
+	PRINT_ATTR(READONLY);
+	PRINT_ATTR(REPARSE_POINT);
+	PRINT_ATTR(SPARSE_FILE);
+	PRINT_ATTR(SYSTEM);
+	PRINT_ATTR(TEMPORARY);
+
+	#undef PRINT_ATTR
+
+	attribs &= ~FILE_ATTRIBUTE_NORMAL;
+
+	if (wattr->Attributes)
+	{
+		if (attribs)
+		{
+			printf("Other (%08x)", 
+				(unsigned int)attribs);
+		}
+	}
+	else
+	{
+		printf("None");
+	}
+
+	printf("\n");
+
+	CollectInBufferStream buffer;
+	buffer.Write(wattr + 1, 
+		rBlock.GetSize() - sizeof(attr_StreamFormat_Windows));
+	buffer.SetForReading();
+
+	Archive archive(buffer, 0);
+	int data;
+
+	#define ERR_MSG "\tWindows attributes error: "
+
+	archive.Read(data);
+	if (data != ACL_FORMAT_MAGIC)
+	{
+		printf(ERR_MSG "wrong magic\n");
+		return;
+	}
+
+	archive.Read(data);
+	if (data != ACL_FORMAT_VERSION)
+	{
+		printf(ERR_MSG "wrong version\n");
+		return;
+	}
+
+	EXPLICIT_ACCESS* pEntries = NULL;
+
+	try
+	{
+		printf("\tOwner: ");
+		if (!PrintSid(archive))
+		{
+			printf(ERR_MSG "failed to read owner\n");
+			throw 1;
+		}
+
+		printf("\n\tGroup: ");
+		if (!PrintSid(archive))
+		{
+			printf(ERR_MSG "failed to read group\n");
+			throw 1;
+		}
+		printf("\n");
+
+		int numEntries;
+		archive.Read(numEntries);
+
+		pEntries = (EXPLICIT_ACCESS*)calloc(numEntries,
+			sizeof(EXPLICIT_ACCESS));
+
+		if (!pEntries)
+		{
+			printf(ERR_MSG "failed to allocate enough memory\n");
+			throw 1;
+		}
+
+		for (int i = 0; i < numEntries; i++)
+		{
+			PEXPLICIT_ACCESS pEntry = &(pEntries[i]);
+			
+			archive.Read(data); pEntry->grfAccessPermissions = 
+				data;
+			archive.Read(data); pEntry->grfAccessMode =
+				(ACCESS_MODE)data;
+			archive.Read(data); pEntry->Trustee.TrusteeForm =
+				(TRUSTEE_FORM)data;
+			archive.Read(data); pEntry->Trustee.TrusteeType =
+				(TRUSTEE_TYPE)data;
+
+			if (pEntry->Trustee.TrusteeForm != TRUSTEE_IS_SID)
+			{
+				printf(ERR_MSG "trustee is not a SID\n");
+				throw 1;
+			}
+
+			printf("\t");
+			if (!PrintSid(archive))
+			{
+				printf(ERR_MSG "failed to read trustee SID\n");
+				throw 1;
+			}
+
+			printf(" (");
+			switch(pEntry->Trustee.TrusteeType)
+			{
+			case TRUSTEE_IS_UNKNOWN:
+				printf("unknown type"); break;
+			case TRUSTEE_IS_USER:
+				printf("user"); break;
+			case TRUSTEE_IS_GROUP:
+				printf("group"); break;
+			case TRUSTEE_IS_DOMAIN:
+				printf("domain"); break;
+			case TRUSTEE_IS_ALIAS:
+				printf("alias"); break;
+			case TRUSTEE_IS_WELL_KNOWN_GROUP:
+				printf("well-known group"); break;
+			case TRUSTEE_IS_DELETED:
+				printf("deleted account"); break;
+			case TRUSTEE_IS_INVALID:
+				printf("invalid trustee type"); break;
+			case TRUSTEE_IS_COMPUTER:
+				printf("computer\n"); break;
+			default:
+				printf("unknown type %d\n", 
+					pEntry->Trustee.TrusteeType); 
+			}
+
+			printf("): ");
+
+			switch(pEntry->grfAccessMode)
+			{
+			case NOT_USED_ACCESS:
+				printf("NOT_USED_ACCESS "); break;
+			case GRANT_ACCESS:
+				printf("Grant "); break;
+			case DENY_ACCESS:
+				printf("Deny "); break;
+			case REVOKE_ACCESS:
+				printf("Revoke "); break;
+			case SET_AUDIT_SUCCESS:
+				printf("Audit Success "); break;
+			case SET_AUDIT_FAILURE:
+				printf("Audit Failure "); break;
+			default:
+				printf("Unknown (%08x)\n", 
+					pEntry->grfAccessMode);
+			}
+
+			data = pEntry->grfAccessPermissions;
+
+			#define PRINT_PERM(name) \
+			if (data & name == name) \
+			{ \
+				printf(#name " "); \
+				data &= ~name; \
+			}
+
+			PRINT_PERM(FILE_ADD_FILE);
+			PRINT_PERM(FILE_ADD_SUBDIRECTORY);
+			PRINT_PERM(FILE_ALL_ACCESS);
+			PRINT_PERM(FILE_APPEND_DATA);
+			PRINT_PERM(FILE_CREATE_PIPE_INSTANCE);
+			PRINT_PERM(FILE_DELETE_CHILD);
+			PRINT_PERM(FILE_EXECUTE);
+			PRINT_PERM(FILE_LIST_DIRECTORY);
+			PRINT_PERM(FILE_READ_ATTRIBUTES);
+			PRINT_PERM(FILE_READ_DATA);
+			PRINT_PERM(FILE_READ_EA);
+			PRINT_PERM(FILE_TRAVERSE);
+			PRINT_PERM(FILE_WRITE_ATTRIBUTES);
+			PRINT_PERM(FILE_WRITE_DATA);
+			PRINT_PERM(FILE_WRITE_EA);
+			PRINT_PERM(STANDARD_RIGHTS_READ);
+			PRINT_PERM(STANDARD_RIGHTS_WRITE);
+			PRINT_PERM(SYNCHRONIZE);
+			PRINT_PERM(DELETE);
+			PRINT_PERM(READ_CONTROL);
+			PRINT_PERM(WRITE_DAC);
+			PRINT_PERM(WRITE_OWNER);
+			PRINT_PERM(MAXIMUM_ALLOWED);
+			PRINT_PERM(GENERIC_ALL);
+			PRINT_PERM(GENERIC_EXECUTE);
+			PRINT_PERM(GENERIC_WRITE);
+			PRINT_PERM(GENERIC_READ);
+
+			if (data)
+			{
+				printf(" and others (%08x)", data);
+			}
+
+			printf("\n");
+		}
+
+		free(pEntries);
+	}
+	catch(...)
+	{
+		if (pEntries) free(pEntries);
+	}
+}
+#endif
 
 
 // --------------------------------------------------------------------------
@@ -534,6 +807,75 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		}
 
 		printf("\n");
+
+		BackupClientFileAttributes storeAttr;
+
+#ifdef WIN32
+		if (opts[LIST_OPTION_WINDOWS_ATTR])
+		{
+			if (en->HasAttributes())
+			{
+				const StreamableMemBlock &storeAttrEnc(
+					en->GetAttributes());
+				storeAttr = BackupClientFileAttributes(storeAttrEnc);
+			}
+			else if (en->GetFlags() & 
+				BackupStoreDirectory::Entry::Flags_Dir)
+			{
+				// TODO: find a way to read the attributes of a directory
+				// without reading and discarding its contents :-(
+
+				mrConnection.QueryListDirectory(
+					en->GetObjectID(),
+					BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	
+					// both files and directories
+					excludeFlags,
+					true /* want attributes */);
+
+				// Retrieve the directory from the stream following
+				BackupStoreDirectory dummy;
+				std::auto_ptr<IOStream> dummydirstream(
+					mrConnection.ReceiveStream());
+				dummy.ReadFromStream(*dummydirstream, 
+					mrConnection.GetTimeout());
+
+				const StreamableMemBlock &storeAttrEnc(
+					dummy.GetAttributes());
+				storeAttr = BackupClientFileAttributes(
+					storeAttrEnc);
+			}
+			else
+			{
+				// TODO: find a way to read the attributes of a file
+				// without reading and discarding its contents :-(
+
+				mrConnection.QueryGetFile(DirID, en->GetObjectID());
+			
+				// Stream containing encoded file
+				std::auto_ptr<IOStream> objectStream(
+					mrConnection.ReceiveStream());
+
+				DiscardStream out;
+
+				// Get the decoding stream
+				std::auto_ptr<BackupStoreFile::DecodedStream> stream(
+					BackupStoreFile::DecodeFileStream(
+						*objectStream, mrConnection.GetTimeout(), NULL));
+			
+				// Is it a symlink?
+				if(!stream->IsSymLink())
+				{
+					// Copy it out to the file
+					stream->CopyStreamTo(out);
+				}
+			
+				storeAttr = stream->GetAttributes();
+			}
+
+			StreamableMemBlock attrBlock(storeAttr.GetAttributes());
+			PrintWindowsAttributes(attrBlock);
+		}
+#endif // WIN32
 		
 		// Directory?
 		if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
