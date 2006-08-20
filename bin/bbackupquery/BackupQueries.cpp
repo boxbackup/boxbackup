@@ -93,11 +93,11 @@ BackupQueries::~BackupQueries()
 {
 }
 
-typedef struct cmd_info
+typedef struct
 {
 	const char* name;
 	const char* opts;
-} cmd_info_t;
+} QueryCommandSpecification;
 
 // --------------------------------------------------------------------------
 //
@@ -176,7 +176,7 @@ void BackupQueries::DoCommand(const char *Command)
 	}
 	
 	// Data about commands
-	static cmd_info_t commands[] = 
+	static QueryCommandSpecification commands[] = 
 	{
 		{ "quit", "" },
 		{ "exit", "" },
