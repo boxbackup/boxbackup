@@ -107,7 +107,8 @@ static std::string MakeFullPath(const std::string& rDir,
 {
 	std::string result;
 
-	if (rDir[rDir.size()-1] == DIRECTORY_SEPARATOR_ASCHAR)
+	if (rDir.size() > 0 && 
+		rDir[rDir.size()-1] == DIRECTORY_SEPARATOR_ASCHAR)
 	{
 		result = rDir + rFile;
 	}
@@ -289,10 +290,10 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					#endif
 					continue;
 				}
-
+				
 				// Here if the object is something to back up (file, symlink or dir, not excluded)
 				// So make the information for adding to the checksum
-
+				
 				#ifdef WIN32
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
@@ -305,7 +306,6 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					continue;
 				}
 				#endif
-
 
 				checksum_info.mModificationTime = FileModificationTime(st);
 				checksum_info.mAttributeModificationTime = FileAttrModificationTime(st);
@@ -562,7 +562,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		f != rFiles.end(); ++f)
 	{
 		// Filename of this file
-		std::string filename = MakeFullPath(rLocalPath, *f);
+		std::string filename(MakeFullPath(rLocalPath, *f));
 
 		// Get relevant info about file
 		box_time_t modTime = 0;
@@ -909,7 +909,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		d != rDirs.end(); ++d)
 	{
 		// Get the local filename
-		std::string dirname = MakeFullPath(rLocalPath, *d);		
+		std::string dirname(MakeFullPath(rLocalPath, *d));
 	
 		// See if it's in the listing (if we have one)
 		BackupStoreFilenameClear storeFilename(*d);
