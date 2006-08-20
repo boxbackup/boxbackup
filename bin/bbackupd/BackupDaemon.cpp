@@ -2333,11 +2333,31 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 		::syslog(LOG_INFO, "Saved store object info file '%s'", 
 			StoreObjectInfoFile.c_str());
 	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Internal error writing store object "
+			"info file (%s): %s",
+			StoreObjectInfoFile.c_str(), e.what());
+	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "Internal error writing store object "
+			"info file (%s): unknown error",
+			StoreObjectInfoFile.c_str());
+	}
+
+	DeleteAllLocations();
+	catch(std::exception &e)
+	{
+		::syslog(LOG_WARNING, "Requested store object info file '%s' "
+			"not accessible or could not be created: %s", 
+			StoreObjectInfoFile.c_str(), e.what());
+	}
 	catch(...)
 	{
 		::syslog(LOG_WARNING, "Requested store object info file '%s' "
-			"not accessible or could not be created", 
-			StoreObjectInfoFile.c_str());
+			"not accessible or could not be created: "
+			"unknown error", StoreObjectInfoFile.c_str());
 	}
 
 	return created;
@@ -2492,12 +2512,14 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 	catch(std::exception &e)
 	{
 		::syslog(LOG_ERR, "Internal error reading store object "
-			"info file: %s", e.what());
+			"info file (%s): %s",
+			StoreObjectInfoFile.c_str(), e.what());
 	}
 	catch(...)
 	{
 		::syslog(LOG_ERR, "Internal error reading store object "
-			"info file: unknown error");
+			"info file (%s): unknown error",
+			StoreObjectInfoFile.c_str());
 	}
 
 	DeleteAllLocations();
