@@ -2346,20 +2346,6 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 			StoreObjectInfoFile.c_str());
 	}
 
-	DeleteAllLocations();
-	catch(std::exception &e)
-	{
-		::syslog(LOG_WARNING, "Requested store object info file '%s' "
-			"not accessible or could not be created: %s", 
-			StoreObjectInfoFile.c_str(), e.what());
-	}
-	catch(...)
-	{
-		::syslog(LOG_WARNING, "Requested store object info file '%s' "
-			"not accessible or could not be created: "
-			"unknown error", StoreObjectInfoFile.c_str());
-	}
-
 	return created;
 }
 
