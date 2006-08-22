@@ -10,6 +10,7 @@
 #include "Box.h"
 
 #include <time.h>
+#include <sys/time.h>
 
 #include "BoxTime.h"
 
@@ -25,7 +26,14 @@
 // --------------------------------------------------------------------------
 box_time_t GetCurrentBoxTime()
 {
-	return SecondsToBoxTime(time(0));
+	struct timeval tv;
+	int result = gettimeofday(&tv, NULL);
+	if (result != 0)
+	{
+		TRACE1("Error: gettimeofday returned %d, approximating\n", result);
+		return SecondsToBoxTime(time(0));
+	}
+	return ((uint64_t)tv.tv_sec * MICRO_SEC_IN_SEC_LL) + tv.tv_usec;
 }
 
 

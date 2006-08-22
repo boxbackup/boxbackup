@@ -74,6 +74,7 @@
 #include "IOStreamGetLine.h"
 #include "Conversion.h"
 #include "Archive.h"
+#include "BoxTimeToText.h"
 
 #include "MemLeakFindOn.h"
 
@@ -536,6 +537,7 @@ void BackupDaemon::Run2()
 				// If there isn't automatic backup happening, set a long delay. And limit delays at the same time.
 				if(!automaticBackup || requiredDelay > SecondsToBoxTime(MAX_SLEEP_TIME))
 					requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
+				TRACE3("Current time is %lld, next backup at %lld, waiting %lld us\n", currentTime, nextSyncTime, requiredDelay);
 
 				// Only do the delay if there is a delay required
 				if(requiredDelay > 0)
@@ -554,13 +556,31 @@ void BackupDaemon::Run2()
 					}
 				}
 				
+				if (!automaticBackup)
+				{
+					TRACE0("No automatic backups, still waiting for a backup command.\n");
+				}
+				else if (currentTime < nextSyncTime)
+				{
+					std::string next = BoxTimeToISO8601String(nextSyncTime);
+					TRACE1("Still waiting for next backup at %s\n", next.c_str());
+				}
 			} while((!automaticBackup || (currentTime < nextSyncTime)) && !doSync && !StopRun());
+			if (doSync)
+			{
+				TRACE0("User requested a sync, starting now.\n");
+			}
+			else if (StopRun())
+			{
+				TRACE0("User requested program shutdown.\n");
+			}
 		}
 
 		// Time of sync start, and if it's time for another sync (and we're doing automatic syncs), set the flag
 		box_time_t currentSyncStartTime = GetCurrentBoxTime();
 		if(automaticBackup && currentSyncStartTime >= nextSyncTime)
 		{
+			TRACE0("Time for another sync.\n");
 			doSync = true;
 		}
 		
@@ -570,6 +590,7 @@ void BackupDaemon::Run2()
 			int d = UseScriptToSeeIfSyncAllowed();
 			if(d > 0)
 			{
+				TRACE1("SyncAllowScript asked for a delay of %d seconds\n", d);
 				// Script has asked for a delay
 				nextSyncTime = GetCurrentBoxTime() + SecondsToBoxTime(d);
 				doSync = false;
@@ -725,7 +746,9 @@ void BackupDaemon::Run2()
 				}
 				
 				// Calculate when the next sync run should be
-				nextSyncTime = currentSyncStartTime + updateStoreInterval + Random::RandomInt(updateStoreInterval >> SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
+				int64_t randomBit = Random::RandomInt(updateStoreInterval >> SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
+				TRACE3("Next sync at %lld (last start) + %lld (update interval) + %lld (random bit)\n", currentSyncStartTime, updateStoreInterval, randomBit);
+				nextSyncTime = currentSyncStartTime + updateStoreInterval + randomBit;
 			
 				// Commit the ID Maps
 				CommitIDMapsAfterSync();
@@ -761,6 +784,8 @@ void BackupDaemon::Run2()
 			
 			if(errorOccurred)
 			{
+				TRACE0("An error occured during the backup run.\n");
+
 				// Is it a berkely db failure?
 				bool isBerkelyDbFailure = (errorCode == BackupStoreException::ExceptionType
 					&& errorSubCode == BackupStoreException::BerkelyDBFailure);
@@ -959,6 +984,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			{
 				// If a connection didn't arrive, there was a timeout, which means we've
 				// waited long enough and it's time to go.
+				TRACE1("Returned due to timeout (waited %d ms).\n", timeout);
 				return;
 			}
 			else
