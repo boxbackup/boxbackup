@@ -263,15 +263,30 @@ void BackupDaemon::DeleteAllLocations()
 void BackupDaemon::RunHelperThread(void)
 {
 	mpCommandSocketInfo = new CommandSocketInfo;
-	this->mReceivedCommandConn = false;
+	WinNamedPipeStream& rSocket(mpCommandSocketInfo->mListeningSocket);
 
-	// loop until the parent process exits
-	while (TRUE)
+	// loop until the parent process exits, or we decide
+	// to kill the thread ourselves
+	while (!IsTerminateWanted())
 	{
 		try
 		{
-			mpCommandSocketInfo->mListeningSocket.Accept(
-				BOX_NAMED_PIPE_NAME);
+			rSocket.Accept(BOX_NAMED_PIPE_NAME);
+		}
+		catch (BoxException &e)
+		{
+			::syslog(LOG_ERR, "Failed to open command socket: %s",
+				e.what());
+			SetTerminateWanted();
+			break; // this is fatal to listening thread
+		}
+		catch (...)
+		{
+			::syslog(LOG_ERR, "Failed to open command socket: "
+				"unknown error");
+			SetTerminateWanted();
+			break; // this is fatal to listening thread
+		}
 		}
 		catch(std::exception &e)
 		{
@@ -287,6 +302,11 @@ void BackupDaemon::RunHelperThread(void)
 			SetTerminateWanted();
 			break; // this is fatal to listening thread
 		}
+
+		try
+		{
+			// Errors here do not kill the thread,
+			// only the current connection.
 
 			// This next section comes from Ben's original function
 			// Log
@@ -304,16 +324,17 @@ void BackupDaemon::RunHelperThread(void)
 				conf.GetKeyValueInt("MaxUploadWait"),
 				mState);
 
-			mpCommandSocketInfo->mListeningSocket.Write(summary, summarySize);
-			mpCommandSocketInfo->mListeningSocket.Write("ping\n", 5);
+			rSocket.Write(summary, summarySize);
+			rSocket.Write("ping\n", 5);
 
-			IOStreamGetLine readLine(mpCommandSocketInfo->mListeningSocket);
+			IOStreamGetLine readLine(rSocket);
 			std::string command;
 
-			while (mpCommandSocketInfo->mListeningSocket.IsConnected() &&
-			       readLine.GetLine(command) )
+			while (rSocket.IsConnected() && 
+				readLine.GetLine(command) &&
+				!IsTerminateWanted())
 			{
-				TRACE1("Receiving command '%s' over "
+				TRACE1("Received command '%s' over "
 					"command socket\n", command.c_str());
 
 				bool sendOK = false;
@@ -353,12 +374,18 @@ void BackupDaemon::RunHelperThread(void)
 					SetTerminateWanted();
 					sendOK = true;
 				}
+				else
+				{
+					::syslog(LOG_ERR, "Received unknown command '%s' from client", command.c_str());
+					sendResponse = true;
+					sendOK = false;
+				}
 
 				// Send a response back?
 				if (sendResponse)
 				{
 					const char* response = sendOK ? "ok\n" : "error\n";
-					mpCommandSocketInfo->mListeningSocket.Write(
+					rSocket.Write(
 						response, strlen(response));
 				}
 
@@ -370,7 +397,7 @@ void BackupDaemon::RunHelperThread(void)
 				this->mReceivedCommandConn = true;
 			}
 
-			mpCommandSocketInfo->mListeningSocket.Close();
+			rSocket.Close();
 		}
 		catch(BoxException &e)
 		{
