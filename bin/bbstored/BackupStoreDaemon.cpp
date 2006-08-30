@@ -300,6 +300,8 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 	// Log the amount of data transferred
 	::syslog(LOG_INFO, "Connection statistics for %s: "
 			"IN=%lld OUT=%lld TOTAL=%lld\n", commonName,
-			s.GetBytesRead(), s.GetBytesWritten(),
-			s.GetBytesRead() + s.GetBytesWritten());
+			(long long)s.GetBytesRead(), 
+			(long long)s.GetBytesWritten(),
+			(long long)s.GetBytesRead() + 
+			(long long)s.GetBytesWritten());
 }
