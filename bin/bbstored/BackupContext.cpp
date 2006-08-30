@@ -125,6 +125,7 @@ void BackupContext::ReceivedFinishCommand()
 // --------------------------------------------------------------------------
 bool BackupContext::AttemptToGetWriteLock()
 {
+#ifndef WIN32
 	// Make the filename of the write lock file
 	std::string writeLockFile;
 	StoreStructure::MakeWriteLockFilename(mStoreRoot, mStoreDiscSet, writeLockFile);
@@ -150,7 +151,7 @@ bool BackupContext::AttemptToGetWriteLock()
 			
 		} while(!gotLock && tries > 0);
 	}
-	
+
 	if(gotLock)
 	{
 		// Got the lock, mark as not read only
@@ -158,6 +159,10 @@ bool BackupContext::AttemptToGetWriteLock()
 	}
 	
 	return gotLock;
+#else // WIN32
+	// no housekeeping process, we do have the lock
+	return true;
+#endif // !WIN32
 }
 
 
@@ -453,13 +458,21 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 			try
 			{
 				// Open it twice
+#ifdef WIN32
+				FileStream diff(tempFn.c_str(), 
+					O_RDWR | O_CREAT | O_BINARY);
+				FileStream diff2(tempFn.c_str(), 
+					O_RDWR | O_BINARY);
+#else
 				FileStream diff(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL);
 				FileStream diff2(tempFn.c_str(), O_RDONLY);
-				// Unlink it immediately, so it definately goes away
+
+				// Unlink it immediately, so it definitely goes away
 				if(::unlink(tempFn.c_str()) != 0)
 				{
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
+#endif
 				
 				// Stream the incoming diff to this temporary file
 				if(!rFile.CopyStreamTo(diff, BACKUP_STORE_TIMEOUT))
@@ -508,6 +521,14 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 				::unlink(tempFn.c_str());
 				throw;
 			}
+
+#ifdef WIN32
+			// we can't delete the file while it's open, above
+			if(::unlink(tempFn.c_str()) != 0)
+			{
+				THROW_EXCEPTION(CommonException, OSFileError);
+			}
+#endif
 		}
 		
 		// Get the blocks used
