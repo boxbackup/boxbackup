@@ -11,8 +11,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <syslog.h>
 #include <signal.h>
+
+#ifdef HAVE_SYSLOG_H
+	#include <syslog.h>
+#endif
 
 #include "BackupContext.h"
 #include "BackupStoreDaemon.h"
