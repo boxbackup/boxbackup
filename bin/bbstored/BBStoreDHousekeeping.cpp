@@ -10,7 +10,10 @@
 #include "Box.h"
 
 #include <stdio.h>
-#include <syslog.h>
+
+#ifdef HAVE_SYSLOG_H
+	#include <syslog.h>
+#endif
 
 #include "BackupStoreDaemon.h"
 #include "BackupStoreAccountDatabase.h"
