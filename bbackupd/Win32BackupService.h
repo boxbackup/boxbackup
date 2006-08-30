@@ -12,7 +12,7 @@ class BackupDaemon;
 class Win32BackupService : public BackupDaemon
 {
 public:
-	DWORD WinService(const char* pConfigFileName);
+	DWORD WinService(void);
 };
 
 #endif // WIN32
