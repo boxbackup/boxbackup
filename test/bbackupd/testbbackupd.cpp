@@ -576,7 +576,7 @@ int test_bbackupd()
 		
 		// Update a file (will be uploaded as a diff)
 		{
-			// Check that the file is over the diffing threshold in the bbstored.conf file
+			// Check that the file is over the diffing threshold in the bbackupd.conf file
 			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") > 1024);
 			
 			// Add a bit to the end
@@ -1055,4 +1055,3 @@ int test(int argc, const char *argv[])
 
 	return 0;
 }
-
