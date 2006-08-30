@@ -74,6 +74,10 @@ private:
 	
 	SocketStream mInterProcessCommsSocket;
 	IOStreamGetLine mInterProcessComms;
+
+	void HousekeepingInit();
+	void RunHousekeepingIfNeeded();
+	int64_t mLastHousekeepingRun;
 };
 
 
