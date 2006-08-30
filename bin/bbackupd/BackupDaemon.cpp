@@ -272,6 +272,21 @@ void BackupDaemon::RunHelperThread(void)
 		{
 			mpCommandSocketInfo->mListeningSocket.Accept(
 				BOX_NAMED_PIPE_NAME);
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Failed to open command socket: "
+				"%s", e.what());
+			SetTerminateWanted();
+			break; // this is fatal to listening thread
+		}
+		catch(...)
+		{
+			::syslog(LOG_ERR, "Failed to open command socket: "
+				"unknown error");
+			SetTerminateWanted();
+			break; // this is fatal to listening thread
+		}
 
 			// This next section comes from Ben's original function
 			// Log
@@ -357,12 +372,17 @@ void BackupDaemon::RunHelperThread(void)
 
 			mpCommandSocketInfo->mListeningSocket.Close();
 		}
-		catch (BoxException &e)
+		catch(BoxException &e)
 		{
 			::syslog(LOG_ERR, "Communication error with "
 				"control client: %s", e.what());
 		}
-		catch (...)
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Internal error in command socket "
+				"thread: %s", e.what());
+		}
+		catch(...)
 		{
 			::syslog(LOG_ERR, "Communication error with control client");
 		}
@@ -422,6 +442,12 @@ void BackupDaemon::Run()
 			try 
 			{
 				delete mpCommandSocketInfo;
+			}
+			catch(std::exception &e)
+			{
+				::syslog(LOG_ERR, "Internal error while "
+					"closing command socket after "
+					"another exception: %s", e.what());
 			}
 			catch(...)
 			{
@@ -753,6 +779,12 @@ void BackupDaemon::Run2()
 				errorCode = e.GetType();
 				errorSubCode = e.GetSubType();
 			}
+			catch(std::exception &e)
+			{
+				::syslog(LOG_ERR, "Internal error during "
+					"backup run: %s", e.what());
+				errorOccurred = true;
+			}
 			catch(...)
 			{
 				// TODO: better handling of exceptions here... need to be very careful
@@ -883,6 +915,17 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 		// Wait and then cleanup child process
 		int status = 0;
 		::waitpid(pid, &status, 0);
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Internal error running SyncAllowScript: "
+			"%s", e.what());
+		// Clean up
+		if(pid != 0)
+		{
+			int status = 0;
+			::waitpid(pid, &status, 0);
+		}
 	}
 	catch(...)
 	{
@@ -1090,13 +1133,19 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			CloseCommandConnection();
 		}
 	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Internal error in command socket thread: "
+			"%s", e.what());
+		throw; // thread will die
+	}
 	catch(...)
 	{
 		// If an error occurs, and there is a connection active, just close that
 		// connection and continue. Otherwise, let the error propagate.
 		if(mpCommandSocketInfo->mpConnectedSocket.get() == 0)
 		{
-			throw;
+			throw; // thread will die
 		}
 		else
 		{
@@ -1129,6 +1178,11 @@ void BackupDaemon::CloseCommandConnection()
 			mpCommandSocketInfo->mpGetLine = 0;
 		}
 		mpCommandSocketInfo->mpConnectedSocket.reset();
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Internal error while closing command "
+			"socket: %s", e.what());
 	}
 	catch(...)
 	{
@@ -1174,6 +1228,12 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 			mpCommandSocketInfo->mpConnectedSocket->Write(message,
 				strlen(message));
 #endif
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Internal error while sending to "
+				"command socket client: %s", e.what());
+			CloseCommandConnection();
 		}
 		catch(...)
 		{
@@ -1284,7 +1344,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	}
 	catch(...)
 	{
-			::endmntent(mountPointsFile);
+		::endmntent(mountPointsFile);
 		throw;
 	}
 #else // ! HAVE_STRUCT_MNTENT_MNT_DIR
@@ -1784,6 +1844,12 @@ void BackupDaemon::SetState(int State)
 		{
 			mpCommandSocketInfo->mListeningSocket.Write(newState, newStateSize);
 		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Internal error while writing state "
+				"to command socket: %s", e.what());
+			CloseCommandConnection();
+		}
 		catch(...)
 		{
 			CloseCommandConnection();
@@ -1796,6 +1862,12 @@ void BackupDaemon::SetState(int State)
 		try
 		{
 			mpCommandSocketInfo->mpConnectedSocket->Write(newState, newStateSize);
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Internal error while writing state "
+				"to command socket: %s", e.what());
+			CloseCommandConnection();
 		}
 		catch(...)
 		{
@@ -2246,7 +2318,7 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 		::syslog(LOG_INFO, "Saved store object info file '%s'", 
 			StoreObjectInfoFile.c_str());
 	}
-	catch (...)
+	catch(...)
 	{
 		::syslog(LOG_WARNING, "Requested store object info file '%s' "
 			"not accessible or could not be created", 
@@ -2401,21 +2473,28 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 			iVersion);
 
 		return true;
-	}
-	catch (...)
+	} 
+	catch(std::exception &e)
 	{
-		DeleteAllLocations();
-
-		aClientStoreMarker = 
-			BackupClientContext::ClientStoreMarker_NotKnown;
-		theLastSyncTime = 0;
-		theNextSyncTime = 0;
-
-		::syslog(LOG_WARNING, "Requested store object info file '%s' "
-			"does not exist, not accessible, or inconsistent. "
-			"Will re-cache from store.", 
-			StoreObjectInfoFile.c_str());
+		::syslog(LOG_ERR, "Internal error reading store object "
+			"info file: %s", e.what());
 	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "Internal error reading store object "
+			"info file: unknown error");
+	}
+
+	DeleteAllLocations();
+
+	aClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;
+	theLastSyncTime = 0;
+	theNextSyncTime = 0;
+
+	::syslog(LOG_WARNING, "Requested store object info file '%s' "
+		"does not exist, not accessible, or inconsistent. "
+		"Will re-cache from store.", 
+		StoreObjectInfoFile.c_str());
 
 	return false;
 }
