@@ -14,10 +14,6 @@
 
 #ifdef NDEBUG
 	#define FDGETLINE_BUFFER_SIZE		1024
-#elif defined WIN32
-	// need enough space for at least one unicode character 
-	// in UTF-8 when calling console_read() from bbackupquery
-	#define FDGETLINE_BUFFER_SIZE		5
 #else
 	#define FDGETLINE_BUFFER_SIZE		4
 #endif
