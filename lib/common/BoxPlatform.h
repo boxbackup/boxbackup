@@ -40,8 +40,8 @@
 	#endif
 #endif
 
-// Slight hack; disable interception in raidfile test on Darwin and Windows
-#if defined __APPLE__ || defined WIN32
+// Slight hack; disable interception on Darwin within raidfile test
+#ifdef __APPLE__
 	// TODO: Replace with autoconf test
 	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif
@@ -136,11 +136,6 @@
 
 #if !HAVE_DECL_INFTIM
 	#define INFTIM -1
-#endif
-
-// for Unix compatibility with Windows :-)
-#if !HAVE_DECL_O_BINARY
-	#define O_BINARY 0
 #endif
 
 #ifdef WIN32
