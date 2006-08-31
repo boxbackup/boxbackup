@@ -14,10 +14,19 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include <sys/uio.h>
-#include <syslog.h>
 #include <stdarg.h>
-#include <dirent.h>
+
+#ifdef HAVE_SYS_UIO_H
+	#include <sys/uio.h>
+#endif
+
+#ifdef HAVE_SYSLOG_H
+	#include <syslog.h>
+#endif
+
+#ifdef HAVE_DIRENT_H
+	#include <dirent.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -583,7 +592,8 @@ void RaidFileRead_Raid::AttemptToRecoverFromIOError(bool Stripe1)
 
 	// Open the parity file
 	std::string parityFilename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, (2 + startDisc) % READ_NUMBER_DISCS_REQUIRED));
-	mParityHandle = ::open(parityFilename.c_str(), O_RDONLY, 0555);
+	mParityHandle = ::open(parityFilename.c_str(), 
+		O_RDONLY | O_BINARY, 0555);
 	if(mParityHandle == -1)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
@@ -1017,7 +1027,8 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 		std::string writeFilename(RaidFileUtil::MakeWriteFileName(rdiscSet, Filename));
 
 		// Attempt to open
-		int osFileHandle = ::open(writeFilename.c_str(), O_RDONLY, 0);
+		int osFileHandle = ::open(writeFilename.c_str(), 
+			O_RDONLY | O_BINARY, 0);
 		if(osFileHandle == -1)
 		{
 			THROW_EXCEPTION(RaidFileException, ErrorOpeningFileForRead)
@@ -1055,13 +1066,15 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 		try
 		{
 			// Open stripe1
-			stripe1 = ::open(stripe1Filename.c_str(), O_RDONLY, 0555);
+			stripe1 = ::open(stripe1Filename.c_str(), 
+				O_RDONLY | O_BINARY, 0555);
 			if(stripe1 == -1)
 			{
 				stripe1errno = errno;
 			}
 			// Open stripe2
-			stripe2 = ::open(stripe2Filename.c_str(), O_RDONLY, 0555);
+			stripe2 = ::open(stripe2Filename.c_str(), 
+				O_RDONLY | O_BINARY, 0555);
 			if(stripe2 == -1)
 			{
 				stripe2errno = errno;
@@ -1169,7 +1182,8 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			// Open stripe1?
 			if(existingFiles & RaidFileUtil::Stripe1Exists)
 			{
-				stripe1 = ::open(stripe1Filename.c_str(), O_RDONLY, 0555);
+				stripe1 = ::open(stripe1Filename.c_str(), 
+					O_RDONLY | O_BINARY, 0555);
 				if(stripe1 == -1)
 				{
 					THROW_EXCEPTION(RaidFileException, OSError)
@@ -1178,14 +1192,16 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			// Open stripe2?
 			if(existingFiles & RaidFileUtil::Stripe2Exists)
 			{
-				stripe2 = ::open(stripe2Filename.c_str(), O_RDONLY, 0555);
+				stripe2 = ::open(stripe2Filename.c_str(), 
+					O_RDONLY | O_BINARY, 0555);
 				if(stripe2 == -1)
 				{
 					THROW_EXCEPTION(RaidFileException, OSError)
 				}
 			}
 			// Open parity
-			parity = ::open(parityFilename.c_str(), O_RDONLY, 0555);
+			parity = ::open(parityFilename.c_str(), 
+				O_RDONLY | O_BINARY, 0555);
 			if(parity == -1)
 			{
 				THROW_EXCEPTION(RaidFileException, OSError)
