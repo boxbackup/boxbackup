@@ -1,10 +1,8 @@
 #!@PERL@
 
-use lib "../../infrastructure";
-use BoxPlatform;
-
 # global exception list file
 my $global_list = '../../ExceptionCodes.txt';
+
 
 my @exception;
 my @exception_desc;
@@ -48,8 +46,8 @@ close EXCEPTION_DESC;
 # write the code
 print "Generating $class exception...\n";
 
-open CPP,">autogen_${class}Exception.cpp.new" or die "Can't open cpp file for writing";
-open H,">autogen_${class}Exception.h.new" or die "Can't open h file for writing";
+open CPP,">autogen_${class}Exception.cpp" or die "Can't open cpp file for writing";
+open H,">autogen_${class}Exception.h" or die "Can't open h file for writing";
 
 # write header file
 my $guardname = uc 'AUTOGEN_'.$class.'EXCEPTION_H';
@@ -201,9 +199,6 @@ __E
 
 close H;
 close CPP;
-
-update_if_changed("autogen_${class}Exception.cpp");
-update_if_changed("autogen_${class}Exception.h");
 
 # update the global exception list
 my $list_before;
