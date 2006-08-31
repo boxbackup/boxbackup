@@ -289,8 +289,6 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 			// Copy it out to the file
 			stream->CopyStreamTo(out);
 		}
-
-		out.Close();
 		
 		// Write the attributes
 		stream->GetAttributes().WriteAttributes(DecodedFilename);
