@@ -38,13 +38,13 @@ private:
 	BackupStoreDaemon(const BackupStoreDaemon &rToCopy);
 public:
 
-#ifndef WIN32
 	// For BackupContext to communicate with housekeeping process
 	void SendMessageToHousekeepingProcess(const void *Msg, int MsgLen)
 	{
+#ifndef WIN32
 		mInterProcessCommsSocket.Write(Msg, MsgLen);
-	}
 #endif
+	}
 
 protected:
 	
