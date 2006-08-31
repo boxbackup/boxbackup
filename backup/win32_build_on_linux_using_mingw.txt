@@ -7,11 +7,6 @@ Install the MinGW cross-compiler for Windows:
 - Fedora and SuSE users can download RPM packages from 
   [http://mirzam.it.vu.nl/mingw/]
 
-You will need to know the prefix used by the cross-compiler executables.
-It will usually be something like "ix86-mingw32*-". All the binaries in the
-cross-compiler package will start with this prefix. The documentation below
-assumes that it is "i386-mingw32-". Adjust to taste.
-
 Download Zlib from [http://www.zlib.net/], unpack and enter source directory:
 
 	export CC=i386-mingw32-gcc 
@@ -21,18 +16,7 @@ Download Zlib from [http://www.zlib.net/], unpack and enter source directory:
 	make
 	make install prefix=/usr/local/i386-mingw32
 
-Download OpenSSL 0.9.8b from 
-[http://www.openssl.org/source/openssl-0.9.8b.tar.gz]
-
-Unpack and configure:
-
-	tar xzvf openssl-0.9.8b.tar.gz
-	cd openssl-0.9.8b
-	./Configure mingw
-	make makefile.one
-	wget http://bbdev.fluffy.co.uk/svn/box/chris/win32/support/openssl-0.9.8b-mingw-cross.patch
-	patch -p1 < openssl-0.9.8b-mingw-cross.patch
-	make -f makefile.one
+Download OpenSSL 0.9.7 from 
 
 Configure Box with:
 
@@ -43,6 +27,5 @@ Configure Box with:
 	export CXXFLAGS="-mthreads"
 	export LDFLAGS="-mthreads"
 	export LIBS="-lcrypto -lws2_32 -lgdi32"
-	(if you don't have a "configure" file, run "./bootstrap")
 	./configure --target=i386-mingw32
-	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB" WINDRES="i386-mingw32-windres"
+	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB"
