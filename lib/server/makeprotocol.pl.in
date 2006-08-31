@@ -1,9 +1,6 @@
 #!@PERL@
 use strict;
 
-use lib "../../infrastructure";
-use BoxPlatform;
-
 # Make protocol C++ classes from a protocol description file
 
 # built in type info (values are is basic type, C++ typename)
@@ -170,8 +167,8 @@ close IN;
 
 # open files
 my $h_filename = 'autogen_'.$protocol_name.'Protocol'.$type.'.h';
-open CPP,'>autogen_'.$protocol_name.'Protocol'.$type.'.cpp.new';
-open H,">$h_filename.new";
+open CPP,'>autogen_'.$protocol_name.'Protocol'.$type.'.cpp';
+open H,">$h_filename";
 
 print CPP <<__E;
 
@@ -915,8 +912,6 @@ __E
 close H;
 close CPP;
 
-update_if_changed('autogen_'.$protocol_name.'Protocol'.$type.'.cpp');
-update_if_changed($h_filename);
 
 sub obj_is_type
 {
@@ -986,15 +981,8 @@ sub make_log_strings
 		{
 			# need to translate it
 			my ($format,$arg) = @{$log_display_types{$ty}};
-			$arg =~ s/VAR/m$nm/g;
-
-			if ($format eq "0x%llx" and $target_windows)
-			{
-				$format = "0x%I64x";
-				$arg = "(uint64_t)$arg";
-			}
-
 			push @str,$format;
+			$arg =~ s/VAR/m$nm/g;
 			push @arg,$arg;
 		}
 		else
