@@ -1,26 +1,14 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
+@EXPORT = qw/$build_os $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext/;
 
 BEGIN
 {
 
 	# which OS are we building under?
-	$target_os = '@target_os@';
-	$target_windows = 0;
-	$target_windows = 1 if $target_os =~ m'^mingw32' 
-		or $target_os eq "winnt";
-
-	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
-	{
-		$build_os = "winnt";
-	}
-	else
-	{
-		$build_os = `uname`;
-		chomp $build_os;
-	}
+	$build_os = `uname`;
+	chomp $build_os;
 
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
@@ -34,18 +22,11 @@ BEGIN
 	$platform_compile_line_extra =~ s/ -O2//;
 	$platform_link_line_extra = '@LDFLAGS@';
 	$platform_lib_files = '@LIBS@';
+	$target_os = '@target_os@';
 	$platform_exe_ext = '@EXEEXT@';
 
 	# get version
-	if (! -r "VERSION.txt" and -r "../../VERSION.txt")
-	{
-		open VERSION,"../../VERSION.txt" or die "../../VERSION.txt: $!";
-	}
-	else
-	{
-		open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
-	}
-
+	open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
 	$product_version = <VERSION>;
 	chomp $product_version;
 	$product_name = <VERSION>;
