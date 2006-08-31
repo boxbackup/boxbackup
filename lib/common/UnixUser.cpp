@@ -78,8 +78,12 @@ UnixUser::~UnixUser()
 	if(mRevertOnDestruction)
 	{
 		// Revert to "real" user and group id of the process
+		#ifdef WIN32
+		if(0)
+		#else
 		if(::setegid(::getgid()) != 0
 			|| ::seteuid(::getuid()) != 0)
+		#endif
 		{
 			THROW_EXCEPTION(CommonException, CouldNotRestoreProcessUser)
 		}
@@ -101,8 +105,12 @@ void UnixUser::ChangeProcessUser(bool Temporary)
 	if(Temporary)
 	{
 		// Change temporarily (change effective only)
+		#ifdef WIN32
+		if(0)
+		#else
 		if(::setegid(mGID) != 0
 			|| ::seteuid(mUID) != 0)
+		#endif
 		{
 			THROW_EXCEPTION(CommonException, CouldNotChangeProcessUser)
 		}
@@ -112,9 +120,13 @@ void UnixUser::ChangeProcessUser(bool Temporary)
 	}
 	else
 	{
-		// Change perminantely (change all UIDs and GIDs)
+		// Change permanently (change all UIDs and GIDs)
+		#ifdef WIN32
+		if(0)
+		#else
 		if(::setgid(mGID) != 0
 			|| ::setuid(mUID) != 0)
+		#endif
 		{
 			THROW_EXCEPTION(CommonException, CouldNotChangeProcessUser)
 		}
