@@ -137,12 +137,8 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
+#ifndef WIN32
 	// Make the socket non-blocking so timeouts on Read work
-
-#ifdef WIN32
-	u_long nonblocking = 1;
-	ioctlsocket(socket, FIONBIO, &nonblocking);
-#else // !WIN32
 	// This is more portable than using ioctl with FIONBIO
 	int statusFlags = 0;
 	if(::fcntl(socket, F_GETFL, &statusFlags) < 0
@@ -313,7 +309,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 
 		case SSL_ERROR_WANT_READ:
 		case SSL_ERROR_WANT_WRITE:
-			// wait for the required data
+			// wait for the requried data
 			// Will only get once around this loop, so don't need to calculate timeout values
 			if(WaitWhenRetryRequired(se, Timeout) == false)
 			{
