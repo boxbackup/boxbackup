@@ -332,15 +332,11 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			std::auto_ptr<IOStream> diff2(rContext.OpenObject(patchID));
 			
 			// Choose a temporary filename for the result of the combination
-#ifdef WIN32
 			std::ostringstream fs(rContext.GetStoreRoot());
 			fs << ".recombinetemp.";
 			fs << p;
 			std::string tempFn(fs.str());
 			tempFn = RaidFileController::DiscSetPathToFileSystemPath(rContext.GetStoreDiscSet(), tempFn, p + 16);
-#else
-			std::string tempFn(RaidFileController::DiscSetPathToFileSystemPath(rContext.GetStoreDiscSet(), rContext.GetStoreRoot() + ".recombinetemp", p + 16 /* rotate which disc it's on */));
-#endif
 			
 			// Open the temporary file
 			std::auto_ptr<IOStream> combined;
@@ -380,9 +376,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			combined->Seek(0, IOStream::SeekType_Absolute);
 			
 			// Then shuffle round for the next go
-#ifdef WIN32
 			if (from.get()) from->Close();
-#endif
 			from = combined;
 		}
 		
