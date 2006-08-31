@@ -56,10 +56,6 @@ public:
 		return "generic-stream-server";
 	}
 
-	#ifdef WIN32
-	virtual void OnIdle() { }
-	#endif
-
 	virtual void Run()
 	{
 		// Set process title as appropraite
@@ -219,7 +215,6 @@ public:
 					if(connection.get())
 					{
 						// Since this is a template parameter, the if() will be optimised out by the compiler
-						#ifndef WIN32 // no fork on Win32
 						if(ForkToHandleRequests)
 						{
 							pid_t pid = ::fork();
@@ -260,20 +255,14 @@ public:
 						}
 						else
 						{
-						#endif // !WIN32
 							// Just handle in this connection
 							SetProcessTitle("handling");
 							HandleConnection(*connection);
 							SetProcessTitle("idle");										
-						#ifndef WIN32
 						}
-						#endif // !WIN32
 					}
 				}
-
-				#ifdef WIN32
-				OnIdle();
-				#else // !WIN32
+				
 				// Clean up child processes (if forking daemon)
 				if(ForkToHandleRequests)
 				{
@@ -288,7 +277,6 @@ public:
 						}
 					} while(p > 0);
 				}
-				#endif // !WIN32
 			}
 		}
 		catch(...)
@@ -313,11 +301,7 @@ protected:
 	// depends on the forking model in case someone changes it later.
 	bool WillForkToHandleRequests()
 	{
-		#ifdef WIN32
-		return false;
-		#else
 		return ForkToHandleRequests;
-		#endif // WIN32
 	}
 
 private:
