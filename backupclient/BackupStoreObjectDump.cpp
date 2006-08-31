@@ -113,7 +113,13 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 
 		// Output item
 		int16_t f = (*i)->GetFlags();
-		OutputLine(file, ToTrace, "%06llx %4lld %016llx %4d %3d %4d%s%s%s%s%s%s\n",
+#ifdef WIN32
+		OutputLine(file, ToTrace, 
+			"%06I64x %4I64d %016I64x %4d %3d %4d%s%s%s%s%s%s\n",
+#else
+		OutputLine(file, ToTrace, 
+			"%06llx %4lld %016llx %4d %3d %4d%s%s%s%s%s%s\n",
+#endif
 			(*i)->GetObjectID(),
 			(*i)->GetSizeInBlocks(),
 			(*i)->GetAttributesHash(),
