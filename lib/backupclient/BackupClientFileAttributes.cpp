@@ -642,7 +642,11 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 	}
 	
 	// If working as root, set user IDs
+	#ifdef WIN32
+	if(0)
+	#else
 	if(::geteuid() == 0)
+	#endif
 	{
 		#ifndef HAVE_LCHOWN
 			// only if not a link, can't set their owner on this platform
