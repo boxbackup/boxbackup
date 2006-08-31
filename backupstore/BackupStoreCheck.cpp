@@ -328,8 +328,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 	std::string dirName;
 	StoreStructure::MakeObjectFilename(StartID, mStoreRoot, mDiscSetNumber, dirName, false /* don't make sure the dir exists */);
 	// Check expectations
-	ASSERT(dirName.size() > 4 && 
-		dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR);
+	ASSERT(dirName.size() > 4 && dirName[dirName.size() - 4] == '/');
 	// Remove the filename from it
 	dirName.resize(dirName.size() - 4); // four chars for "/o00"
 	
@@ -378,9 +377,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			::printf("Spurious file %s" DIRECTORY_SEPARATOR "%s "
-				"found%s\n", dirName.c_str(), (*i).c_str(), 
-				mFixErrors?", deleting":"");
+			::printf("Spurious file %s/%s found%s\n", dirName.c_str(), (*i).c_str(), mFixErrors?", deleting":"");
 			++mNumberErrorsFound;
 			if(mFixErrors)
 			{
@@ -469,11 +466,10 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID, const std::string &rF
 		}
 		
 		// Add to usage counts
-		int64_t s = file->GetDiscUsageInBlocks();
-		mBlocksUsed += s;
+		mBlocksUsed += size;
 		if(!isFile)
 		{
-			mBlocksInDirectories += s;
+			mBlocksInDirectories += size;
 		}
 	}
 	catch(...)
