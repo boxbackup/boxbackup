@@ -44,7 +44,7 @@ AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
 VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 
 ## Check for Berkely DB. Restrict to certain versions
-AX_PATH_BDB(, [
+AX_PATH_BDB([1.x or 4.1], [
   LIBS="$BDB_LIBS $LIBS"
   LDFLAGS="$BDB_LDFLAGS $LDFLAGS"
   CPPFLAGS="$CPPFLAGS $BDB_CPPFLAGS"
@@ -89,7 +89,7 @@ AC_CHECK_HEADERS([execinfo.h process.h pwd.h regex.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
-AC_CHECK_HEADERS([sys/xattr.h])
+AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 
 if test "$ac_cv_header_regex_h" = "yes"; then
   AC_SEARCH_LIBS([regcomp], [pcreposix])
@@ -116,6 +116,7 @@ AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   ]])
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
+AC_CHECK_DECLS([O_BINARY],,,)
 AC_HEADER_TIME
 AC_STRUCT_TM
 AX_CHECK_DIRENT_D_TYPE
@@ -124,14 +125,14 @@ AX_CHECK_DEFINE_PRAGMA
 if test "x$ac_cv_c_bigendian" != "xyes"; then
   AX_BSWAP64
 fi
+
 if test "$target_os" != "mingw32"; then
   AX_RANDOM_DEVICE
-fi
-AX_CHECK_MOUNT_POINT(,[
-  if test "$target_os" != "mingw32" -a "$target_os" != "winnt"; then
+  AX_CHECK_MOUNT_POINT(,[
     AC_MSG_ERROR([[cannot work out how to discover mount points on your platform]])
-  fi
   ])
+fi
+
 AX_CHECK_MALLOC_WORKAROUND
 
 
@@ -238,6 +239,7 @@ A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
 
+Regular expressions: $ac_cv_header_regex_h
 Large files:         $have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
