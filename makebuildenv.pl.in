@@ -14,7 +14,8 @@ $|=1;
 
 print "Box build environment setup.\n\n";
 
-my @implicit_deps = ('lib/common');
+
+my $implicit_dep = 'lib/common';
 
 # work out platform variables
 use lib 'infrastructure';
@@ -37,15 +38,11 @@ unless(-d 'local')
 # flags about the environment
 my %env_flags;
 
-my $windows_include_path = "";
-if ($target_windows)
+my $windows_include_path = "-I../../lib/win32 ";
+if ($target_os ne "mingw32" && $target_os ne "winnt")
 {
-	$module_dependency{"lib/common"} = ["lib/win32"];
-	push @implicit_deps, "lib/win32";
-}
-else
-{
-	# $env_flags{'IGNORE_lib/win32'} = 1;
+	$windows_include_path = "";
+	$env_flags{'IGNORE_lib/win32'} = 1;
 }
 
 # print "Flag: $_\n" for(keys %env_flags);
@@ -114,7 +111,7 @@ close FINDAUTOGEN;
 print "done\n\n";
 
 
-# open test main program template file
+# open test mail program template file
 my $test_template_file = 'infrastructure/buildenv-testmain-template.cpp';
 open FL,$test_template_file or die "Can't open test template file\n";
 my $test_template;
@@ -274,7 +271,7 @@ for(@modules_files)
 			push @md,$_ unless ignore_module($_)
 		}
 	}
-	$module_dependency{$mod} = [@implicit_deps,@md];
+	$module_dependency{$mod} = [$implicit_dep,@md];
 	$module_library_link_opts{$mod} = [@lo];
 	
 	# make directories, but not if we're using an external library and this a library module
@@ -289,21 +286,17 @@ for(@modules_files)
 }
 
 # make dirs for implicit dep
-foreach my $dep (@implicit_deps)
-{
-	mkdir "release/$dep",0755;
-	mkdir "debug/$dep",0755;
-}
+mkdir "release/$implicit_dep",0755;
+mkdir "debug/$implicit_dep",0755;
 
 # write a list of all the modules we've configured to use
-open CONFIGURED_MODS,'>local/modules.h.new' or die 
-	"Can't write configured modules list";
+open CONFIGURED_MODS,'>local/modules.h' or die "Can't write configured modules list";
 print CONFIGURED_MODS <<__E;
 // automatically generated file, do not edit
 #ifndef _CONFIGURED_MODULES__H
 #define _CONFIGURED_MODULES__H
 __E
-for(@implicit_deps,@modules)
+for($implicit_dep,@modules)
 {
 	my $m = $_;
 	$m =~ s~/~_~;
@@ -313,11 +306,11 @@ print CONFIGURED_MODS <<__E;
 #endif // _CONFIGURED_MODULES__H
 __E
 close CONFIGURED_MODS;
-update_if_changed("local/modules.h");
+
 
 # now make a list of all the .h files we can find, recording which module they're in
 my %hfiles;
-for my $mod (@modules, @implicit_deps)
+for my $mod (@modules, $implicit_dep)
 {
 	opendir DIR,$mod;
 	my @items = readdir DIR;
@@ -354,7 +347,7 @@ for my $mod (@modules, @implicit_deps)
 	}
 }
 
-for my $mod (@modules, @implicit_deps)
+for my $mod (@modules, $implicit_dep)
 {
 	opendir DIR,$mod;
 	for my $h (grep /\.h\Z/i, readdir DIR)
@@ -380,10 +373,9 @@ for my $mod (@modules, @implicit_deps)
 
 print "done\n\nGenerating Makefiles...\n";
 
-my %module_resources_win32;
 
 # Then write a makefile for each module
-for my $mod (@implicit_deps, @modules)
+for my $mod (@modules, $implicit_dep)
 {
 	print $mod,"\n";
 	
@@ -394,19 +386,15 @@ for my $mod (@implicit_deps, @modules)
 	{
 		my $testmain = $test_template;
 		$testmain =~ s/TEST_NAME/$name/g;
-		open TESTMAIN,">$mod/_main.cpp.new" or die 
-			"Can't open test main file for $mod for writing\n";
+		open TESTMAIN,">$mod/_main.cpp" or die "Can't open test main file for $mod for writing\n";
 		print TESTMAIN $testmain;
 		close TESTMAIN;
-		update_if_changed("$mod/_main.cpp");
 		
 		# test file...
 		sub writetestfile
 		{
 			my ($filename,$runcmd,$module) = @_;		
-			open TESTFILE,">$filename.new" or die 
-				"Can't open test script file for $module " .
-				"for writing\n";
+			open TESTFILE,">$filename" or die "Can't open test script file for $module for writing\n";
 			print TESTFILE "#!/bin/sh\necho TEST: $module\n";
 			if(-d "$module/testfiles")
 			{
@@ -425,13 +413,12 @@ __E
 			}
 			print TESTFILE "$runcmd\n";
 			close TESTFILE;
-			update_if_changed($filename);
 		}
 		
 		writetestfile("$mod/_t", 
-			'./test' . $platform_exe_ext . ' $1 $2 $3 $4 $5', $mod);
+			'./test' . $platform_exe_ext . '$1 $2 $3 $4 $5', $mod);
 		writetestfile("$mod/_t-gdb", 
-			'gdb ./test' . $platform_exe_ext, $mod);
+			'gdb ./test ' . $platform_exe_ext, $mod);
 		
 	}
 	
@@ -454,14 +441,14 @@ __E
 		add_mod_deps(\@deps_raw, $mod);
 		# and then dedup and reorder them
 		my %d_done;
-		foreach my $dep (reverse @deps_raw)
+		for(my $a = $#deps_raw; $a >= 0; $a--)
 		{
-			if(!exists $d_done{$dep})
+			if(!exists $d_done{$deps_raw[$a]})
 			{
 				# insert
-				push @all_deps_for_module, $dep;
+				push @all_deps_for_module, $deps_raw[$a];
 				# mark as done
-				$d_done{$dep} = 1;
+				$d_done{$deps_raw[$a]} = 1;
 			}
 		}
 	}	
@@ -493,12 +480,11 @@ __E
 
 	# start the makefile
 	my $mk_name_extra = ($bsd_make)?'':'X';
-	open MAKE,">$mod/Makefile".$mk_name_extra.".new" or die 
-		"Can't open Makefile for $mod\n";
+	open MAKE,">$mod/Makefile".$mk_name_extra or die "Can't open Makefile for $mod\n";
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
 	my $release_flags = "-O2";
-	if ($target_windows)
+	if ($target_os eq "mingw32")
 	{
 		$release_flags = "-O0 -g";
 	}
@@ -513,7 +499,6 @@ CXX = g++
 AR = ar
 RANLIB = ranlib
 PERL = "@PERL@"
-WINDRES = windres
 .ifdef RELEASE
 CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
@@ -561,7 +546,7 @@ __E
 		@items = (@items, @autogen_items);
 	}
 	
-	# first, obtain a list of dependencies within the .h files
+	# first, obtain a list of depenencies within the .h files
 	my %headers;
 	for my $h (grep /\.h\Z/i, @items)
 	{
@@ -581,30 +566,19 @@ __E
 	
 	# then... do the cpp files...
 	my @obj_base;
-	for my $file (@items)
+	for my $cpp (@items)
 	{
-		my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
-		my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
-		my $base = $1;
-
-		if ($target_windows)
-		{
-			next if not $is_cpp and not $is_rc;
-		}
-		else
-		{
-			next if not $is_cpp;
-		}
-
-		next if $file =~ /\A\._/; # Temp Mac OS Resource hack
+		next unless $cpp =~ m/\A(.+)\.cpp\Z/i;
+		next if $cpp =~ /\A\._/;	# Temp Mac OS Resource hack
 
 		# store for later
+		my $base = $1;
 		push @obj_base,$base;
 	
 		# get the file...
-		open FL,"$mod/$file";
+		open FL,"$mod/$cpp";
 		my $f;
-		read FL,$f,-s "$mod/$file";
+		read FL,$f,-s "$mod/$cpp";
 		close FL;
 		
 		my %dep;
@@ -618,29 +592,10 @@ __E
 		my $out_name = '$(OUTDIR)/'.$base.'.o';
 		
 		# write the line for this cpp file
-		my @dep_paths = map 
-		{ 
-			($hfiles{$_} eq $mod)
-			? $_ 
-			: '../../'.$hfiles{$_}."/$_"
-		}
-		keys %dep;
+		$make .= $out_name.': '.join(' ',$cpp,map
+			{ ($hfiles{$_} eq $mod)?$_:'../../'.$hfiles{$_}."/$_" } keys %dep)."\n";
+		$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra -c $cpp -o $out_name\n\n";
 
-		$make .= $out_name.': '.join(' ',$file,@dep_paths)."\n";
-
-		if ($is_cpp)
-		{
-			$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra ".
-				"-c $file -o $out_name\n\n";
-		}
-		elsif ($is_rc)
-		{
-			$make .= "\t\$(WINDRES) $file $out_name\n\n";
-			my $res_list = $module_resources_win32{$mod};
-			$res_list ||= [];
-			push @$res_list, $base.'.o';
-			$module_resources_win32{$mod} = $res_list;
-		}
 	}
 
 	my $has_deps = ($#{$module_dependency{$mod}} >= 0);
@@ -692,28 +647,11 @@ __E
 	additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
 
 	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
-
-	if ($has_deps and not $bsd_make)
-	{
-		print MAKE ".PHONY: all\n" .
-			"all: dep_modules $end_target\n\n";
-	}
-
 	print MAKE $end_target,': ',$o_file_list;
+	print MAKE ' dep_modules' if $has_deps and not $bsd_make;
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
-	if ($target_windows)
-	{
-		foreach my $dep (@all_deps_for_module)
-		{
-			my $res_list = $module_resources_win32{$dep};
-			next unless $res_list;
-			$o_file_list .= ' '.join(' ', 
-				map {'$(OUTBASE)/'.$dep."/$_"} @$res_list);
-		}
-	}
-
 	# stuff to make the final target...
 	if($target_is_library)
 	{
@@ -792,8 +730,8 @@ __E
 	if(!$bsd_make)
 	{
 		# need to post process this into a GNU makefile
-		open MAKE,">$mod/Makefile.new" or die $!;
-		open MAKEB,"$mod/MakefileX.new" or die $!;
+		open MAKE,">$mod/Makefile";
+		open MAKEB,"$mod/MakefileX";
 
 		while(<MAKEB>)
 		{
@@ -805,10 +743,8 @@ __E
 
 		close MAKEB;
 		close MAKE;
-		unlink "$mod/MakefileX.new";
+		unlink "$mod/MakefileX";
 	}
-
-	update_if_changed("$mod/Makefile");
 }
 
 print "\nType 'cd <module_dir>; $make_command' to build a module\n\n";
