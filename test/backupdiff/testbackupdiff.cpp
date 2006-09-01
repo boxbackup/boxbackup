@@ -486,7 +486,8 @@ int test(int argc, const char *argv[])
 	}
 #endif
 
-	// Check that diffing against a file which isn't "complete" and referes another isn't allowed
+	// Check that diffing against a file which isn't "complete" and 
+	// references another isn't allowed
 	{
 		FileStream blockindex("testfiles/f1.diff");
 		BackupStoreFile::MoveStreamPositionToBlockIndex(blockindex);
@@ -498,8 +499,10 @@ int test(int argc, const char *argv[])
 			0, 0), BackupStoreException, CannotDiffAnIncompleteStoreFile);
 	}
 
-	// Found a nasty case where files of lots of the same thing sock up lots of processor
-	// time -- because of lots of matches found. Check this out!
+	// Found a nasty case where files of lots of the same thing 
+	// suck up lots of processor time -- because of lots of matches 
+	// found. Check this out!
+
 	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
 	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
 	// Generate a first encoded file
