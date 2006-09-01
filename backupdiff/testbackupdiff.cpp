@@ -66,22 +66,20 @@ bool files_identical(const char *file1, const char *file2)
 
 void make_file_of_zeros(const char *filename, size_t size)
 {
-	static const size_t bs = 0x10000;
-	size_t remSize = size;
-	void *b = malloc(bs);
-	memset(b, 0, bs);
-	FILE *f = fopen(filename, "wb");
-
-	// Using largish blocks like this is much faster, while not consuming too much RAM
-	while(remSize > bs)
-	{
-		fwrite(b, bs, 1, f);
-		remSize -= bs;
-	}
-	fwrite(b, remSize, 1, f);
-
-	fclose(f);
-	free(b);
+	#ifdef WIN32
+	HANDLE handle = openfile(filename, O_WRONLY | O_CREAT | O_EXCL, 0);
+	TEST_THAT(handle != INVALID_HANDLE_VALUE);
+	SetFilePointer(handle, size, NULL, FILE_BEGIN);
+	TEST_THAT(GetLastError() == NO_ERROR);
+	TEST_THAT(SetEndOfFile(handle) == true);
+	TEST_THAT(CloseHandle(handle)  == true);
+	#else
+	int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
+	if (fd < 0) perror(filename);
+	TEST_THAT(fd >= 0);
+	TEST_THAT(ftruncate(fd, size) == 0);
+	TEST_THAT(close(fd) == 0);
+	#endif
 
 	TEST_THAT((size_t)TestGetFileSize(filename) == size);
 }
