@@ -57,3 +57,27 @@ END-OMIT
 
 # END_IF_DISTRIBUTION
 
+# IF_DISTRIBUTION(boxwaf)
+
+# database interface
+lib/dbdriver
+lib/dbdrv_sqlite	lib/dbdriver	-lsqlite
+lib/dbdrv_mysql		lib/dbdriver	-lmysqlclient
+lib/dbdrv_postgresql		lib/dbdriver	-lpq	-lpgtypes
+# explicitly include the dbdriver module for when no drivers are compiled in
+lib/database		lib/dbdriver	lib/dbdrv_sqlite	lib/dbdrv_mysql	lib/dbdrv_postgresql
+test/database		lib/database
+
+# send emails
+lib/smtpclient		lib/server
+test/smtpclient		lib/smtpclient
+
+# web application system
+
+lib/httpserver		lib/server
+test/httpserver		lib/httpserver
+lib/webappframework	lib/httpserver
+test/webappframework	lib/webappframework	lib/database	lib/crypto
+
+# END_IF_DISTRIBUTION
+

@@ -1,0 +1,9 @@
+EXCEPTION SMTPClient 16
+
+Internal						0
+Timeout							1
+UnexpectedServerResponse		2
+ServerReportedError				3	Wrong reply code class received from server
+ClientAlreadyInUse				4	Tried to send another email while one is already in process
+InternalClaimError				5	Claim released by wrong sender
+NoRecipientsSet					6	At least one recipient must be set when sending an email

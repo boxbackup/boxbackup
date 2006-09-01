@@ -1,0 +1,127 @@
+TITLE Rapid web application development
+
+A method of rapidly producing web applications, by generating code to implement the various pages on the web application.
+
+Other files document the system in detail. The following order of reading documents is recommended.
+
+This document
+WebAppStructure
+Example
+Units
+Code
+Translations
+TemplateUnits
+Forms
+OtherUnits
+ImplementingTemplates
+GeneratedHandlers
+
+
+SUBTITLE Motivation
+
+The usual web scripting languages provide a general-purpose programming syntax which happens to output web pages. This results in a lot of similar code being written for each page, for example, form handling code. This is inefficient. In addition, useful tasks such as templates to separate the presentation from the logic has to be written anew for each project, and internationlisation is difficult.
+
+There exists a number of potential solutions. However, the emphasis for these is to provide an "easy to program" way of generating web applications, without regard to the efficiency of the solution when deployed. They also have a tendancy to require a lot of additional software (such as java, large intepreter libraries) and force the author into a strict way of thinking.
+
+These systems generally have no pre-processing stage, that is, the code written by the author is run directly on the web server, and the complex handling of the user's input and page generation done dynamically, with lots of processing to essentially generate the same HTML each time the code is executed.
+
+Also, a single language is used, which has it's pros and cons, for example, easy text processing but lacking in efficiency.
+
+This system presents an alternative way of thinking, to generate a web application using a set of perl scripts which generate C++ code. The perl does all the complex generation of page elements, and produces the simpliest possible C++ code to generate the page. As much of the processing is done at this "compile" time.
+
+The C++ compiles to a simple web server. This is designed to run on a server behind another web server, for example squid or Apache with mod_proxy. The front end server handles the interactions with the actual user, and efficiently transmits the generated HTML, leaving the web application ready to generate another page.
+
+This approach allows the system to concentrate on being easy to use, rather than have to worry about efficiency of the end code. It doesn't matter if it takes a while to produce the code, but it'll run as fast as possible.
+
+
+SUBTITLE Design overview
+
+The author writes a number of 'pages'. These are snippets of perl script, which generates some C++ code to handle the page. In addition, a framework script generates a partial Makefile, and the specific code for the web server (for example, the request to handler dispatch mechanism).
+
+As way of an example, a section at the end of this document walks through the test web application.
+
+Design aims:
+
+* Separate look and feel from executable code.
+
+* Fully internationalisable, with translators not required to touch any files containing code.
+
+* Efficient standalone code written.
+
+* Possible to implement anything, but especially good for database driven web application.
+
+* Easy to add new, reusable entities
+
+* Provide a set of general purpose tools to do common things: list items from databases, display information about objects, handle forms
+
+When actions are performed as a result of form submissions, the same page handles the submission as generates the form data. Movements to other pages as a result of a submission are done through browser redirects.
+
+
+SUBTITLE Concepts
+
+* Page
+
+Single "page" of the application, for example, listing items out of a database table, or a form and the associated code to perform the required actions when the form is submitted.
+
+
+* Page definition script
+
+A snippet of perl script which uses the framework modules to write executable C++ code for the page.
+
+
+* Module
+
+The C++ code which is the result of executing a page definition script. This is the actual code which is executed on the server.
+
+This code uses a few external C++ classes, including a mini-HTTP server and associated framework. It contains the exact code necessary for the page -- all look and feel HTML is embedded, and if statements for configuration are performed in the code writing stage, not final execution.
+
+
+* Parameters
+
+The application has a small number of global variables (eg user and login information), and each page a number of arguments (on a per page basis). These parameters are passed in the URI of the current page, as
+
+/appname/language/page_name/app_parameters/page_parameters
+
+Each request must contain exactly the right number of parameters, otherwise an error is displayed.
+
+Parameters definitions contain defaults, but these are only used when generating a link to that page, not when they are missed out from the URI. This is so that relative URI's can be generated when linking to a page from itself, reducing the amount of HTML which needs to be sent and the code to generate this link. To maximum the benefit of this scheme, the ordering of parameters needs to be considered carefully, placing the most often changed at the end of the list.
+
+
+* Variables
+
+A variable is a named, strongly typed, item of data available at runtime. Each source of data is within a specific namespace, and variable are references as namespace.variable_name. Available namespaces are
+
+	- params (page parameters)
+	- formname (form variables, where formname is the name of the form)
+	- formdata (raw form data)
+	- cookie (cookies available in HTTP request)
+	- config (directives in the root of the config file)
+	- fn (local function variables)
+
+Variables are used to specify the source of data for all framework functions which require data. While they are strongly typed, in most cases automatic conversion will take place. If a variable is in an invalid format for the conversion (eg alpha characters in a string being converted to a number) an exception will be thrown at runtime.
+
+
+* Unit
+
+A Unit is a single functional unit of a page, for example, a form. It handles both display and any user initiated actions.
+
+They are implemented as perl objects which are created in the page definition script, and then used by the framework to write the C++ code which displays and performs the necessary actions.
+
+A Unit stores references to other Units, providing a heirarchy of Units. (A tree of all the Units is included in the generated C++ files to show what exactly was used!) There are three types of references stored:
+
+* pre-Unit -- these are output just before this Unit is output
+* post-Unit -- output just after this Unit is output
+* positioned -- Given a simple text string as a position name, the sub-Unit is then output at an appropraite point. This depends on the implementation of the Unit, for example, the PageTemplate Unit outputs the Unit at the corresponding marker in the HTML template.
+
+(see below for more details on forms)
+
+Units can be considered as containers which surrouding the HTML created by the contained units with other HTML to form a complete HTML page.
+
+
+* Language
+
+The framework is fully internationalisable. The pages are written in a default language, for ease of development. To produce the translated versions, all strings pass through a translator. Translation files are automatically maintained, with new strings being added ready for translation as they are first used.
+
+The $language variable is set, so the page definition script can do differnet things in page scripts or units to reflect different layouts for different languages. However, there are limitations -- for example, a form must have exactly the same fields in in all translations.
+
+

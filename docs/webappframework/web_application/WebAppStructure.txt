@@ -1,0 +1,84 @@
+TITLE Web application structure
+
+This document describes how the files within the application's source directory are structured.
+
+
+SUBTITLE Application description file
+
+This file is named after the application name with a .pl extension. It lives at the root level. It's simply a perl script fragment. The $webapp variable is a WebAppFramework object, which should be initialised for the web application. This includes
+
+* Setting up languages
+
+* Defining global paramters
+
+* Defining each page, the page's short name, and the page's paramters
+
+* Implement a setup_page() method.
+
+In addition, default for various units could be set up.
+
+Each page has both a long and short name. The long name is for use within the page description scripts, and should be as descriptive as possible. The short name is used in the page URL, and should be exactly four characters long.
+
+The setup_page() method must return a Unit. This is should be set up for all the common elements of each page, mostly look and feel boilerplate, and any global code.
+
+If the application requires extra configuration directives in it's .conf file, use $webapp->add_extra_config_directive(type, name) to add them, where type is 'int' or 'string', and name is the name of the directorive.
+
+To retrieve these values in a page's handler, the utility function GetConfigurationVariable() is provided for easy access.
+
+The configuration object will be passed to the application object's ChildStart() and RequestStart() functions.
+
+
+SUBTITLE Application home page
+
+The URI for the home page (the '/' of the web server) is set by $webapp->set_homepage(type, uri)
+
+'type' is either 'rewrite', in which case the URI is rewritten behind the scenes, or 'redirect', in which case the browser is redirected and the user will see the URI displayed in the address bar.
+
+Use rewrite with caution. Links to the same page may not work if parameters are used in any way. Test carefully!
+
+
+SUBTITLE Makefile.extra
+
+This Makefile fragment runs 
+
+   ../../lib/webappframework/WebApplication.pl TestWebApp.pl make
+
+where TestWebApp.pl is the application description file.
+
+
+SUBTITLE Makefile.webapp
+
+This is automatically generated.
+
+
+SUBTITLE Template directory
+
+This contains all the template HTML files for the application.
+
+
+SUBTITLE Languages directory
+
+This contains the language files. Each is named 'language.txt' except the default language, which is 'default.txt'.
+
+
+SUBTITLE Pages directory
+
+This contains all the page description scripts. These are perl fragments. The following variables are set:
+
+$webapp -- WebAppFramework object
+
+$page -- a Unit initialised by setup_page() and the WebAppFramework object.
+
+$langauge -- the name of the current language being generated. This can be used to do different things for different languages -- but generally shouldn't need to be used unless the order of the elements of the page needs to change on a per language basis. (Text should be translated automatically.)
+
+The page description scripts are free to alter the root Unit however they want.
+
+
+SUBTITLE WebAppName.*
+
+A class with the exact name of the web application's name is expected to be implemented, and will be included as a member variable of the mini-HTTP server named mApplication.
+
+This must be derived from WebApplicationObject.
+
+
+

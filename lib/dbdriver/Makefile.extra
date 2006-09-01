@@ -1,0 +1,6 @@
+
+MAKEEXCEPTION = ../../lib/common/makeexception.pl
+
+# AUTOGEN SEEDING
+autogen_DatabaseException.h autogen_DatabaseException.cpp:	$(MAKEEXCEPTION) DatabaseException.txt
+	perl $(MAKEEXCEPTION) DatabaseException.txt

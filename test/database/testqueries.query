@@ -1,0 +1,28 @@
+
+This file contains some test queries. Note that all text outside the query
+markers is ignored.
+
+SQL Query
+[
+	Name: Test2
+	Statement: SELECT fInteger,fString FROM tTest1 WHERE fInteger=$1 AND fString=$2
+	Parameters: int, std::string StringParam NULL?
+	Results: int Integer, std::string String NULL?
+]
+
+SQL Query
+[
+	Name: Test3
+	Statement: SELECT fString FROM tTest1 WHERE fInteger=$1
+	Parameters: int
+	Results: std::string String
+	Flags: SingleValue
+]
+
+SQL Query
+[
+	Name: TestRuntimeQuery
+	Statement: runtime
+	Results: int Integer, std::string String
+]
+

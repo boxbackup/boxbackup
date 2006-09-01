@@ -1,0 +1,19 @@
+TITLE Static files
+
+Most applications require some static files, for example images and possibly the home page. Ideally these should be served from a separate web server and integrated using the front end reverse proxy, but this is unhelpful for testing and means that the application executable is not everything which is required for deployment.
+
+To that end, a facility for including static files is included.
+
+In the bin/webapp directory, create one or more directories containing static files. Then, in the main web application .pl file, include lines like
+
+  $webapp->add_static_directory('Static', 'static');
+
+The first parameter is the name of the directory, and the second the name of the directory on the web server under which they should appear.
+
+If the second name is null, then they appear in the root directory. To set the home page, use the $webapp->set_homepage() function. See WebAppStructure.txt.
+
+The framework knows the mime type for some common file extensions, and if an extension is unknown an error will result. To add a new type mapping, use
+
+  $webapp->add_file_ext_to_mime_type('ext', 'mime/type');
+
+Once files have been added using these two functions, they can be using in the pages using absolute paths.

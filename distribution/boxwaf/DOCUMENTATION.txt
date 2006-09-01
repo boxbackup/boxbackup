@@ -1,0 +1,5 @@
+
+See the notes/ directory for documentation.
+
+Start with notes/web_application/GettingStarted.txt
+

@@ -1,0 +1,64 @@
+TITLE Using the template Units
+
+A number of template Units are implemented. This document describes how to use them, and another document describes how to produce new templated Units using the base classes.
+
+The intention is for a single template document to be able to template all the HTML for the entire application, and be able to viewed in a web browser to see a reasonable rendition of the look and feel. The designer simply uses text and HTML comment markers to describe how the template should be used.
+
+
+SUBTITLE Template files
+
+Template files are stored within a 'Templates' subdirectory, and are named name.language.html.
+
+The name of the template is given as simply 'name' to the template classes. If a template exists for the specific language, that template will be used, otherwise the template for the default language will be used.
+
+
+SUBTITLE PageTemplate
+
+Parameters: Template => name of template to use
+
+This Unit inserts sub-Units into a HTML page at specific markers. Markers are specified as ###name###, which will be replaced with the Unit at position 'name'.
+
+To allow the same template to be used for FragmentsTemplate based templates, HTML within the comment markers <!--PageTemplate-Omit-Begin--> and <!--PageTemplate-Omit-End--> is ignored.
+
+
+SUBTITLE SectionTemplate
+
+Parameters: Template => name of template to use
+	Marker => Marker used to delimit HTML snippet in template
+
+This is very similar to the PageTemplate unit, except that instead of taking the entire file and snipping out the middle, it takes a chunk from the middle delimited by HTML comments.
+
+For example, you might set the Marker parameter to Section1, and then in your template file have something like
+
+<!--Section1-->
+	html
+	###insertPoint###
+	more html
+<!--Section1-->
+
+in the middle of the file. This is then extracted, and units inserted at the insertation points.
+
+
+SUBTITLE FragmentsTemplate
+
+Parameters: Template => name of template to use
+	FragmentsName => name of fragments to pull out of the file
+
+This is a base class for generic fragment based templates -- templates which build complex HTML structures from small fragements of HTML.
+
+Within the HTML file, fragments are marked within <!--name-fragname--> <!--name/--> where 'name' is the name specified in the FragmentsName unit attribute, and 'fragname' is the name of the fragment. The fragments required depend on the derived class.
+
+
+SUBTITLE TableContainer
+
+Parameters: Template => name of template to use
+	FragmentsName => name of fragments to pull out of the file
+
+Derived from FragmentsTemplate. It requires fragments named
+
+  Begin RowBegin CellBegin CellEnd RowEnd EmptyCell End
+
+to be present in the template. From these, it builds HTML table structures, with sub-units positioned in the cells. The position of a cell is specified by the named position as 'x_y'. So position 2_1 is column 2, row 1, with columns and rows numbered from 0.
+
+You can specify more than one type of cell, by adding CellBeing-X and CellEnd-X fragements, and adding the type to the position, eg x_y_X, where X is any alphanumeric string.
+

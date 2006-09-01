@@ -1,0 +1,24 @@
+TITLE Getting started
+
+There's a bit of boilerplate code which needs to be written to start an application. This needs to be customised slightly to the names of the web application. A script is provided to do the hard work.
+
+Extract the archive to get a directory like 'boxwaf-0.00'. Then
+
+cd boxwaf-0.00
+lib/webappframework/genstarterapp.pl
+
+and answer the questions. Then follow the instructions for building and running the application which the script will emit.
+
+
+SUBTITLE Example
+
+The web application in test/webappframework illustrates the use of all the Units documented. To build and try this, do
+
+cd test/webappframework
+make
+cd ../../debug/test/webappframework
+./t
+
+and then follow the instructions for running the test application. This has two "languages", one which is normal english, and the other where everything is in captial letters.
+
+

@@ -1,0 +1,115 @@
+Notes for Translators
+=====================
+
+IMPORTANT NOTE.
+
+Read all this file before commencing work.
+
+You must work on all files with a text editor which supports editing files in the UTF-8 character set. If you are not sure whether your software is suitable, please check before commencing work. Translations performed in other character sets are often useless.
+
+Make sure your software is actually a text editor. Software like Microsoft Word is not a text editor. Text editors do not offer the ability to style text (for example, making text bold).
+
+It cannot be stressed enough that you must edit the files in a suitable text editor!
+
+Because your translations are processed by a computer program, there are rigid rules on what you can and cannot do. Please follow them exactly to avoid wasting work.
+
+If you are not sure about something, ask.
+
+Please translate a few items, and send them back for checking before doing all the work, just in case!
+
+
+HTML FILES
+
+Some of the text you are asked to translate will be in the form of HTML files. Please edit the files in the UTF-8 charset, and maintain the formatting whereever possible.
+
+
+LANGUAGE FILES
+
+Most of the text is in a text file, formatted to make it easy to translate. An example entry looks like this
+
+========
+# 15505f2831f5703de81dcb263d1d7b23-h
+@ Main RequestInfo AnotherPage
+> The rain in Spain falls
+> mainly on the plain.
+
+The rain in Spain falls
+mainly on the plain.
+
+========
+
+In order, the lines are
+
+Text identifier (line begins #)
+Pages on which the text appears (line begins @)
+Original text (lines beginning >)
+
+The rest of the text is original text repeated. This is the text you need to edit.
+
+Do not change any lines beginning with #, @ or > . If you change these lines, your language file will not work.
+
+The original text is provided to help you. Do not change it!
+
+The list of pages the text appears on is provided to help you see the text in context, if needed. Do not change the list.
+
+Leave a blank line above and below your translated text. It doesn't matter how many lines your translation takes up.
+
+
+As an example of what is required, the above entry might be translated as
+
+========
+# 15505f2831f5703de81dcb263d1d7b23-h
+@ Main RequestInfo AnotherPage
+> The rain in Spain falls
+> mainly on the plain.
+
+La lluvia en
+Espana cae principalmente
+en el llano.
+
+========
+
+
+COMPUTER READABLE MARKERS
+
+Within some of the strings, you may find computer readable markers and HTML markup. You MUST NOT translate these markers.
+
+HTML is entities within angle brackets, for example, <b>.
+
+The markers are entities within curly brackets, for example, {name.Other}.
+
+HTML and the markers should be left untranslated, and with their brackets intact.
+
+For example, consider this
+
+========
+# with_markup-h
+@ RequestInfo
+> This is a sentence with some <b>HTML markup.</b>
+> This is a link {['Name', 'Param' => 'Value']}. This is a marker to
+> show where to insert from data from the system: {widgets.Item},
+> and this is another: {=std::string userID}.
+
+This is a sentence with some <b>HTML markup.</b>
+This is a link {['Name', 'Param' => 'Value']}. This is a marker to
+show where to insert from data from the system: {widgets.Item},
+and this is another: {=std::string userID}.
+
+========
+
+Within this example, the following strings must not be translated:
+
+  <b>
+  </b>
+  {['Name', 'Param' => 'Value']}
+  {widgets.Item}
+  {=std::string userID}
+
+
+
+
+Thank you for your tolerance!
+
+
+
+

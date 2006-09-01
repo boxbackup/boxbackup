@@ -1,0 +1,28 @@
+TITLE Validators
+
+Validators are perl modules which write code to validate variables against a preset criteria. The main use is for extending the validation capabilities of the TextField form item.
+
+The built-in validators are referenced by strings of the form name(args) and the (args) can be omitted if they are to be the default, or the validator takes no arguments.
+
+Additional validators can be written by users. Anywhere which accepts a validator string will accept a reference to a validator. Dervive the module from WebAppFramework::Validator, and see the comments in the .pm file for exactly what needs to be provided.
+
+Note that validators are allowed to modify the variable they validate, for example, to move it to a canonical form.
+
+
+SUBTITLE email address Validator
+
+The WebAppFramework::Validator::email module validates a string for being a valid email address. If it has arguments 'no-lookup', then the domain name is not looked up in DNS. This is useful for login forms where users might need to enter an invalid email address to regain access to an account.
+
+In a TextField, specify it as 'email' or 'email(no-lookup)'.
+
+Use requires lib/smtpclient to be included in the depenencies for the app in modules.txt.
+
+
+SUBTITLE phone number Validator
+
+The WebAppFramework::Validator::phone module validates a string for being a valid phone number. This means it contains only whitespace, digits, '+', '.' and ','.
+
+The canonical form has leading and trailing whitespace removed, and whitespace within collapsed to a single space.
+
+In a TextField, specify validation as 'phone'.
+

@@ -1,0 +1,34 @@
+MKDIR bin
+lib/dbdriver
+lib/dbdrv_sqlite
+lib/dbdrv_mysql
+lib/dbdrv_postgresql
+lib/database
+lib/database/Database
+lib/perl
+test/database
+lib/httpserver
+test/httpserver
+test/httpserver/testfiles
+lib/smtpclient
+test/smtpclient
+lib/webappframework
+lib/webappframework/WebAppFramework
+lib/webappframework/WebAppFramework/Unit
+lib/webappframework/WebAppFramework/Unit/Database
+lib/webappframework/WebAppFramework/Unit/DataSource
+lib/webappframework/WebAppFramework/Unit/FormItem
+lib/webappframework/WebAppFramework/Unit/Localised
+lib/webappframework/WebAppFramework/Locale
+lib/webappframework/WebAppFramework/Validator
+test/webappframework
+test/webappframework/testfiles
+test/webappframework/Languages
+test/webappframework/Pages
+test/webappframework/Templates
+docs/database notes
+docs/database/lib_database notes/lib_database
+docs/webappframework notes
+docs/webappframework/web_application notes/web_application
+infrastructure/tests/database_tests.pl
+infrastructure/setupexternal.pl

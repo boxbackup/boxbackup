@@ -1,0 +1,11 @@
+TITLE Form Containers
+
+Form Containers are simply Units which contain other objects, and are using with Forms. They implement a few extra methods to support Form functions. None is strictly necessary -- the Form object will provide sensible defaults.
+
+
+SUBTITLE get_form_template_fragment(fragment_name)
+
+Returns a text fragment for use in templating (not subject to translation), or undef if the default should be used. The null string may have special meaning.
+
+See Forms.txt, Form Unit subsection, for a list of markers which could be supported.
+

@@ -1,0 +1,156 @@
+TITLE Units
+
+Various Units are defined, and an author should expect to implement a few Units when developing their application.
+
+
+SUBTITLE Common functionality
+
+The Unit base class implements most of the required functionality. In many cases only a write_unit() function will need to be implemented.
+
+
+* Construction and attributes
+
+The default new() operator takes a hash array style set of named attributes. It is intended that this should, in general, be the only necessary configuration.
+
+Attributes can be changed or added later using the set(attribute, value) method.
+
+
+* Default attributes
+
+Every Unit has defaults. Since the parameters are effectively a hash array, the set_defaults() method sets a default set of parameters, and actual arguments to the new() method override these.
+
+The set_defaults is generally called in the application objects setup_page() method, to set up look and feel type options.
+
+
+* Unit heirarchy building
+
+add_pre_unit(unit) adds a Unit to the pre units list (see overview)
+
+add_post_unit(unit) adds a Unit to the post units list
+
+add_unit(position, unit) adds a Unit in the named position.
+
+When implementing another Unit, it should only be necessary consider the positioned Units, as the default write() method will handle pre and post Units in the correct order.
+
+Units can also be added at positions in the new() operator by delaring an attribute of '@position', for example,
+
+WebAppFramework::Unit::OutputIf->new('Condition' => "WAF::Var('Security.IsAuthenticated')",
+		'@true' => WebAppFramework::Unit::Variable->new('Variable' => 'Security.Username'),
+		'@false' => WebAppFramework::Unit::TranslatedText->new('Text' => '(no user logged in)'));
+
+creates an OutputIf unit with a Variable unit at the 'true' position and a TranslatedText unit at the 'false' position.
+
+
+* Finding a unit within a heirarchy
+
+It's sometimes necessary to find a unit within a heirarchy, for example, to add or modify units with the default page. On a unit, use the find_unit method to search for units below it. (Not including that unit itself.)
+
+Parameters are: partial type, parameter specifications. The type is matched so that the right most part of the type matches the string.
+
+For example, $page->find_unit('Form', 'Name' => 'login') will find the Form Unit with the name 'login'.
+
+
+* Helper functions
+
+add_text(position, text) adds translated text in the specified position. Returns the text Unit added. You can interpolate the value of page variables by enclosing them in {} braces. For example,
+
+  $unit->add_text('position', 'Hello {params.Username}!');
+
+would include the runtime value of this variable in the text. This interpolation is done by the TranslatedText unit.
+
+link_to(link_specification) surrounds the Unit with a <a href=""></a> HTML link as a matched pair of pre and post Units. Returns the link object, so additional attributes can be set. Note that you can use {[link_spec]} notation to include raw links in the HTML generated, avoiding clumsy use of the link_to function.
+
+
+SUBTITLE Producing output from a Unit
+
+To generate the code, the write(output, phase) method is called repeatedly, once per output phase. Each output phase corresponds to a section in the output files, for example function declarations, page handling, and HTML output. Refer to the constants at the top of Unit.pm for exact details.
+
+An Output object is used to mediate the writing of code and HTML. In the case of HTML, the output is collected together, and only written in the largest possible chunk for efficiency. write_code(text) writes code, unchunked, and write_text(text) writes HTML.
+
+All Output should be written via this object to avoid buffered output causing problems with incorrectly ordered HTML output.
+
+The base class implements a write() function, which calls write_unit(output, phase) to perform the Unit specific functions.
+
+
+SUBTITLE Variables
+
+To retrieve an expression which evaluates to a variable, use get_variable(var_name). This returns a CppVariable containing the type and name of the expression (or will error and terminate the compilation if the variable can't be found). This can then be used, perhaps converting it to the required type.
+
+If a CppVariable is passed in, then it will be returned unmodified. This allows you to use CppVariable objects anywhere where variable names are expected.
+
+If a string is passed in which starts with a =, then the rest of the string is parsed as a CppVariable specification string, and the result returned. For example, if you have a local variable declared as
+
+  int32_t someValue;
+
+then you can use it anywhere which expects a page variable name by using the string '=int32_t someValue'.
+
+If the string is enclosed in [], then is evaluated as a link specification, and returned as an expression evaluating to a std::string containing the link. For example
+
+  ['Page', 'Param' => 'CONSTANT:2']
+
+Note that in some contexts, such as outputing translated text with interpolated values, the output is optimised to write constant text whereever possible. The resulting HTML generated when the page is requested is the same in every case.
+
+(You can pass in a CppVariable or a string of the '=type name' form to anything which expectes a page variable name, for example, in link specifications and interpolated text.)
+
+The root Unit maintains a list of all the Variable namespaces. register_variable_namespace(name, array_ref) registers a reference to an array of CppVariables describing all the members of that namespace.
+
+
+SUBTITLE Generating links to other pages
+
+Each page has a number of parameters. URI's to pages which specify all these parameters are called page addresses. The Unit base class provides the necessary functionality to generate these links.
+
+A page address is specified in function arguments as
+
+(PageName, ParameterName => Value, ParameterName2 => Value2, ...)
+
+The values can be a Variable name (see concepts section in main document) or a constant, prefixed with CONSTANT:, eg 'CONSTANT:42' for a constant number or string.
+
+To use an arbitary local variable in the link, use 'LOCAL:type name' to specify the variable and it's type.
+
+Not all parameters need to be specified. If a parameter is not specified, the following rules are used to find a value:
+
+- if the link is to the current page, the current value (at runtime) of that parameter on this page
+
+- if the parameter is a global parameter, the current value of that global parameter
+
+- the default value set when the parameter was declared
+
+If none of these produce a value, then an error will be thrown at code generation time.
+
+To write into the HTML output, call write_page_address(output, specificartion). write_page_address_this(output, partial_specifiction) is similar, but omits the page name from the specification, and links to the current page.
+
+To obtain an expression which evaluates to a std::string containing the URL, use generate_page_address_expression(specification), but note that this can only be used after the Unit heirarchy is complete, and everything has been initialised and registered all the namespace variables.
+
+If you are generating code to output via an Output object, you could also use link_spec_to_WAF_code(link_spec) to return a 'WAF::Link()' psuedo-function call. The link specification can be passed in as a plain set of arguments, or as a reference to an anonymous array.
+
+
+SUBTITLE Redirect code
+
+make_redirect_code(link_specification) will return code which will return a redirect to the given link to the user's browser. This code can only be used in the preparation phase of a handler, before the output has started being generated.
+
+
+SUBTITLE Headers
+
+The code created by Units may require extra headers to be included in the .cpp file. Implement get_required_headers_this(type) to add new headers. Type is HEADERS_SYSTEM or HEADERS_PROJECT for system and project headers respectively.
+
+(This is not implemented as a writing phase, as it would probably lead to duplicated #include directives.)
+
+
+SUBTITLE Global file and detection of default page
+
+There are phases for writing to a global file. This contains code for units which are used on many pages.
+
+A unit can tell whether it is part of the basic page (created in the setup_page() subroutine) or inserted in a page file since in_default_page() is called for every Unit in this default page before any write_unit() subroutines are called.
+
+Units can only write to the global files if they are created in setup_page().
+
+
+SUBTITLE Other Unit functionality
+
+get_webapp() -- return the web application object
+
+get_root() -- return the root Unit, which contains all other Units. (This Unit contains additonal data, such as the list of parameters for the page.)
+
+get_pagename() -- return the name of the page
+
+

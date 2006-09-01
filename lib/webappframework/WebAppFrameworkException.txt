@@ -1,0 +1,8 @@
+EXCEPTION WebAppFramework 11
+
+Internal						0
+TranslatedStringsNotSet			1
+BadDateFormat					2
+BadTimeFormat					3
+FixedPointScaleTooLarge			4	ScaleDigits > WAFUTILITY_FIXEDPOINT_MAX_SCALE_DIGITS
+FixedPointOverflow				5

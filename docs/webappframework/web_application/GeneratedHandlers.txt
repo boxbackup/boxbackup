@@ -1,0 +1,32 @@
+TITLE Generated Handlers
+
+This document describes how the generated handler functions work.
+
+
+SUBTITLE Request process
+
+The generated mini-HTTP server uses the lib/httpserver library to handle incoming requests. This calls the Handle function with references to request and response objects.
+
+The URL is decoded, fairly strictly. The URL specifies the language and page. These are dispatched using a long switch statement, with language and page names converted to 32 bit integers.
+
+The per page per language handler function then:
+
+* Decodes the paramters into a parameter data class named 'params'
+
+* Does any necessary processing, for example, reading and validating forms, and checking security. This is done first, so redirects to other pages can be done easily without having to discard any HTML generated.
+
+* HTML generation, where the HTML to send to the client is written into the Response object. Static HTML is collected into strings, which are written in one chunk.
+
+
+SUBTITLE Generation mechanism
+
+To generate all the modules, a control script scans the directory full of the page description scripts. It then runs each one in turn (via the WebAppFramework.pl script which contains all the boilerplate code), with command line arguments describing which language (or common code) to generate. Creation of a Makefile which automates this is done by the WebAppFramework.pl script.
+
+Code generation is done by repeatedly calling the write() function, once per phase. Phases are defined in the Unit.pm file.
+
+There is the facility for sub-phases. If a Unit must repeat output in a phase, for example, if it is doing a conditional on some part of the block, then it will call the write() function multiple times, each with a different sub-phase number.
+
+The special phase, PHASE_INITIALISE, is called just after everything else has been set up, with a undefined output object. One time initialisation should be done in this phase.
+
+The write function will recusively call the write() function of all the Units below it in the heirarchy.
+

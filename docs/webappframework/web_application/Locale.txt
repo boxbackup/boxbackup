@@ -1,0 +1,30 @@
+TITLE Locale support
+
+The framework provides basic locale support, implemented through compile time perl modules and runtime C++ classes.
+
+The perl modules provide translations of basic phrases, such as time and date related words, and orderings for form elements (eg dates).
+
+The C++ classes provide runtime access to lists of localised text (for example, month and day names) and format data to local specifications.
+
+Each page handler has a "locale" local variable, which is a WAFLocale derived class for the current language. This can be used by code, or passed to functions called.
+
+
+SUBTITLE Locale selection
+
+The framework attempts to select a suitable locale object based on the language identified passed to $webapp->add_language(). If this doesn't work (because there isn't a default language module of that name) then create one explicitly and pass it in, for example,
+
+  $webapp->add_language('test', WebAppFramework::Locale::en->new());
+
+
+SUBTITLE Creating a new locale
+
+This involves creating a new perl module under WebAppFramework::Locale, and implementing a C++ class derived from WAFLocale. See the WebAppFramework::Locale.pm module for more information.
+
+
+SUBTITLE Date specification
+
+A date specification is a list of items. The first is the type, and the following are the paramters.
+
+'ymd' -- followed by three page variable for the year, month and day respectively.
+
+'WAFFormItemDate' -- followed by a page variable referring to a field of type WAFFormItemDate

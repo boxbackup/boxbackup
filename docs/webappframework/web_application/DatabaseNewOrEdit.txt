@@ -1,0 +1,32 @@
+TITLE Database NewOrEdit Pattern
+
+It is a common requirement to create and then edit items in a database. To avoid having to write two forms and two sets of handling code, the WebAppFramework::Unit::Database::FormNewOrEdit unit allows a single form to be used for both.
+
+The FormNewOrEdit unit will modify the form accordingly, and write all the code to take the different actions depending if the form is in new or edit mode.
+
+Fields can be made conditional in the edit version, for example, replacing them with data read from the database. To change the page title, use OutputIf units. To change the label on a submit button, add an OutputIf unit in the Label position.
+
+There are three sets of (potentially) multiple database queries specified. The New queries, for creating a new object. The Read queries, for reading existing data out of the database. And finally, the Update queries, for modifying an existing object when the form is submitted.
+
+There are lots of parameters to the new statment:
+
+NewCondition => C++ expression evaluating to true when the form is set to create a new object
+ReplaceFieldsInEdit => ['FieldName' => 'Replacement', ...] to replace fields when the form is in edit mode
+QueryNew => query(s) to create the object
+QueryRead => query(s) to read existing data about the object from the database
+QueryUpdate => query(s) to update the object in the database
+ArgsNew => For the New query(s), override finding of arguments from the form object
+ArgsRead => For the Read query(s), override finding of arguments from the form object
+ArgsUpdate => For the Update query(s), override finding of arguments from the form object
+ReadQueryNamespace => If present, the read query is registered as the named namespace, for access via page variables (in edit mode only!)
+ItemOverrideForUpdate => ['FieldName' => 'default', ...] to override then initial state for the update form
+RedirectTo => Page to redirect the user to after success
+RedirectOnNoReadResults => Page to redirect the use to if there are no results from the read
+PreExecuteCode => Any additional code to write before the database query is run
+PostExecuteCode => Any additional code to write after the database query is run
+
+The form this refers to must be a positioned sub-unit of this unit. The defaults in the items of the form should be set to those for the new version. Defaults will be modified accordingly.
+
+In the Query* parameters, the data is a Database::Query object which should be executed, a hash array of Query constructor args (names automatically generated if not specified), or a array of Database::Query or hash arrays to represent a list of queries which should be executed.
+
+If a New or Update query has an auto-increment value, then it will be made available in the local variable <name>_AutoIncrementValue where <name> is the given name of the query. It can therefore be accessed as a page variable like '=int32_t query_AutoIncrementValue'.

@@ -1,0 +1,8 @@
+
+MAKEEXCEPTION = ../../lib/common/makeexception.pl
+
+# AUTOGEN SEEDING
+autogen_WebAppFrameworkException.h autogen_WebAppFrameworkException.cpp:	$(MAKEEXCEPTION) WebAppFrameworkException.txt
+	perl $(MAKEEXCEPTION) WebAppFrameworkException.txt
+
+

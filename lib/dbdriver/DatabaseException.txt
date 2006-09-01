@@ -1,0 +1,32 @@
+EXCEPTION Database 14
+
+Internal						0
+DriverNotAvailable				1	Driver name incorrect, or driver not compiled in
+QueryNotExecuted				2	Need to execute the query first
+NotConnected					3
+AlreadyConnected				4
+BadQueryParameters				5
+FailedToConnect					6
+BadSQLStatement					7
+AttemptToMoveBeyondQueryEnd		8
+NoRowAvailable					9
+ColumnOutOfRange				10
+TooManyParametersToExecute		11	DatabaseQueryGeneric::Execute(types, ...) has too many arguments
+UnknownTypeCharacter			12	DatabaseQueryGeneric::Execute(types, ...) was given an unknown type char in the types string
+BadInsertationMarker			13	Check insertation markers ($n, n = 1 ...)
+InsertationMarkerOutOfRange		14	Marker doesn't have corresponding parameter
+InsertationMarkersNotInOrder	15	For compatibility with multiple database servers, insertation markers must be specified in order
+UnknownValueType				16	An unknown value type was encountered
+MustCallNextBeforeReadingData	17	Data cannot be read from a query until Next() has been called
+QueryContainedMoreThanSingleValue	18	Check that the query will only return one value
+BadConnectionString				19
+ErrorExecutingSQL				20
+UnexpectedLibraryBehaviour		21	The library behaved unexpectedly when processing a request
+TooManyArgumentsToGeneric		22	A generic representaiton in a query string has too many arguments
+GenericNotKnownByDriver			23	A generic representation used in a query string was not recognised by a driver
+BadGenericTranslation			24	A driver provided a bad translation string for a generic
+FailedToRetrieveAutoIncValue	25	A driver couldn't retrieve the auto increment value
+TooManyParameters				26	There is a compiled in limit on the number of parameters to a query -- adjust in DatabaseTypes.h if necessary.
+PostgreSQLUnhandledBinaryType	27	A value was retrieved by the PostgreSQL driver, but it was in a binary format which could not be parsed. Check the column has the correct type in your query definition.
+IntegerOverflow					28	An integer value was returned by a database which was too large to fit in the requested integer return type.
+PostgreSQLBadConversionFromNumericType	29	A numeric type returned by PostgreSQL overflowed, or there was another problem converting it to int.

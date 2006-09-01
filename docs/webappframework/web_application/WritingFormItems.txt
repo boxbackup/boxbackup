@@ -1,0 +1,137 @@
+TITLE Writing FormItem Units
+
+This document describes how to implement new form items, which output fields within Forms.
+
+All form items should be derived off FormItem, and various methods implemented. Most will have a default implementation which is suitable for most methods.
+
+
+SUBTITLE HTML form IDs
+
+HTML form elements require names for posting. This are refered to as IDs in this documentation. A single FormItem may use more than one ID.
+
+IDs are allocated by the Form object, and are opaque. They are not the name of the FormItem.
+
+
+SUBTITLE Acceptor code
+
+To accept data from the form, the item must write code to take a std::string and turn it into the data item. This is called acceptor code. It must also perform any validation required.
+
+
+SUBTITLE Utility methods
+
+* get_id()
+
+When a FormItem has just one ID, this function will return it.
+
+
+* get_item_name()
+
+Return the name of the item (from the Name attribute)
+
+
+* get_item_label()
+
+Return item label (pre translation), abort if not set
+
+
+* get_item_validation()
+
+Return item validation string, abort if not set
+
+
+* get_form()
+
+Return a reference to the Form object containing this item.
+
+
+* get_tag_attributes()
+
+Return a string containing any extra attributes for the class. The first character is a space, for neat additions. Or the empty string if there are none.
+
+
+* get_value_page_variable()
+
+Returns a page variable name referencing the current value entered by the user. Uses get_form_variables() to discover where it can be found -- errors if there's more than one value.
+
+
+SUBTITLE Methods to override
+
+* get_num_ids_required()
+
+Return the number of IDs required by the item. set_ids() will be called later by the Form object with a list of all required IDs.
+
+Default: return 1
+
+
+* get_form_variables()
+
+Return a list of the data members required in the data object (CppVariables, without the 'm' prefix in the name).
+
+Default: Use get_form_variable_type() to find the C++ type of the data member for the form object, and return a variable with the item's name.
+
+
+* get_form_variable_type()
+
+Return the type of data member for the form data object.
+
+No default. Only necessary if the get_form_variables() used.
+
+
+* requires_acceptor_code()
+
+Whether or not this field requires acceptor code written.
+
+Default: return true
+
+
+* write_value_acceptance_code(output, data_source, valid_boolean_name)
+
+This method writes the acceptor code to the output. The acceptor code converts and stores the string data given, and validates it.
+
+data_source is a CppVariable which describes where the value the user entered can be obtained.
+
+valid_boolean_name is the name of the variable, type bool, which should be set to true if the data for the field is valid.
+
+
+* write_validation_fail_message(output)
+
+Write the validation fail message. Text and/or straight text acceptable.
+
+Default: See if the ValidationFailMsg is set, and if so, output that (translated). Otherwise, use get_values_of_validation_fail_messages() to see if there are multiple error codes. If not, use make_validation_fail_message() to generate a string, and output that (translated). If there are multiple codes, call make_validation_fail_message() multiple times, with the argument of the error code.
+
+
+* make_validation_fail_message()
+
+Returns a generated string which describes why the field failed to pass validation -- use to automatically generate error messages. Results will be translated.
+
+
+* make_validation_fail_message()
+
+Return a list of all possible error codes. Entries may contain several values which generate the same string separated by the | character.
+
+Default: return empty list
+
+
+* write_unit()
+
+The standard write unit must be overridden. This will be called twice, with subphases OUTPUT_SUB_PHASE_DEFAULT and PHASE_LANG_CPP_HANDLE_REDISPLAY. The former is for when the object is in the default state, and the latter for when it is being redisplayed.
+
+The default state should display a default value, and the item should have some provision for stating it, if appropraite. The redisplay option must use data from the form object.
+
+
+* disable_error_marker()
+
+Whether or not the error marker should be disabled, and never displayed for this item.
+
+Default: return false
+
+
+* always_passes_validation()
+
+Whether this item always passes validation -- shortcuts writing error code, for example.
+
+Default: return false;
+
+
+
+

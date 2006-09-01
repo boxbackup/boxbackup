@@ -1,0 +1,24 @@
+TITLE Fixed point integers
+
+The framework supports the use of fixed point numbers in various places, notably the NumberField form item.
+
+Since these numbers will be generally displayed to humans, they are implemented with multiplication factors of powers of ten. This avoids problems with number representation causing different values to be stored than the user expected.
+
+Two values are used to specify the fixed point parameters. Firstly, the number of scale digits. This is effectively the power of 10 which the real number is multipled by to get the fixed point number. In addition, there is a number of display digits, which is the minimum number of digits which will be displayed when formatting the number. For example, for currency display you would use a value of 2.
+
+
+SUBTITLE NumberField form item
+
+See FormItems.txt
+
+
+SUBTITLE FixedPointNumber unnit
+
+WebAppFramework::Unit::FixedPointNumber outputs a formated fixed point number
+
+new() parameters:
+	Variable => name of variable
+	ScaleDigits => number of digits for (base 10) fixed point values
+	DisplayDigits => min number of digits to use for the fractional part. Defaults to ScaleDigits.
+
+

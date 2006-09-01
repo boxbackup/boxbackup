@@ -1,0 +1,72 @@
+TITLE Database integration
+
+Units are provided which perform common tasks for database access.
+
+All database objects assume that the mApplication member variable of the application (derived from the WebApplicationObject class) has a method of the form
+
+   DatabaseConnection &GetDatabaseConnection();
+
+which returns a connected database connection for the various queries to be run on.
+
+
+SUBTITLE Creating a C++ query object
+
+Use the Unit WebAppFramework::Unit::Database::QueryObject to generate the C++ class for a query. The written object can then be used in your code.
+
+This takes two parameters, 'Query', which is either a Database::Query object or a ref to a hash array of the Query parameters, and 'Where', which specifies where the object is to be written. This can be 'Global', where the object is written to the global file and is available everywhere (make sure it's created in the setup_page() function), 'Page' for the current page, and 'Language' for the current language only. If Where is not specified, it defaults to 'Page'.
+
+
+SUBTITLE Running a query when a form is submitted
+
+The object WebAppFramework::Unit::Database::OnSubmitExecSQL will run a one or more queries when a form is submitted. Simply add it as a unit to the form object, and the magic will happen.
+
+$form->add_unit('OnSubmit',
+	WebAppFramework::Unit::Database::OnSubmitExecSQL->new(...));
+
+Parameters:
+
+Query: A Database::Query object (see lib_database/AutogenQuery.txt), or a anon hash array of the parameters, or a anon array of either.
+Args: Override data sources (see below)
+RedirectTo: (optional) Link specification for a redirect when the query is executed.
+PreExecuteCode: Additional code to execute when the form is submitted but before the query is executed.
+PostExecuteCode: Additional code to execute when the form is submitted but before the query is executed.
+
+Queries specified as hash arrays of paramters do not need a name explicitly set. A name will be generated if needed.
+
+By default, all the parameters from the query are filled in from the form items in the form which have the same names (as in the Query parameters specification.) This means that you can insert values into a database query without even having to specify which ones go where.
+
+However, you may need to override this behaviour for certain fields. Args is an anonymous array, which contains a list of parameter name and data source pairs. The data source is a standard page variable. For example, 
+
+    'Args' => ['CreatedBy' => 'params.Username'],
+
+retrieves a value from the page parameters.
+
+RedirectTo is a standard link specification. However, if a data source is 'QUERY_AUTO_INCREMENT_VALUE', then it will be replaced with the auto-increment value of the query. You will need to include the AutoIncrementValue paramter to the Database::Query object. This will only work if there is a single query with an AutoIncrementValue set.
+
+If multiple queries are specified, then they are executed in order. The AutoIncrementValue is made available from each which specifies it in the database paramters.
+
+If PreExecuteCode is present, then that code will be output just before the generated code to execute the query.
+
+If PostExecuteCode is present, then that code will be output just after the generated code has executed the query. If there's an auto-incremented value in the query, then autoIncrementValue will be set to the value this value.
+
+
+SUBTITLE Running a query when a page is loaded
+
+It's often useful to a run a query when the page is loaded, for example, using an ID from the page parameters to fetch a row from the database table. WebAppFramework::Unit::Database::ExecuteQuery will do this for you, and then register the namespace of the query so that the values can be picked up as page variables.
+
+Parameters:
+
+Name: Name of the object (will be registered as a namespace)
+Query: Database::Query object which should be executed
+Args: Arguments for the Execute() function on the query
+RedirectToOnNoRow => Page to redirect the user to if there's no row available (optional)
+
+RedirectToOnNoRow is a standard link specification.
+
+Note that this object should probably be added as a post unit onto the page root object. Otherwise it may end up being executed too early before other objects (such as forms) have been initialised and their values are valid.
+
+
+SUBTITLE Displaying the results from queries
+
+See DatabaseDisplay.txt
+

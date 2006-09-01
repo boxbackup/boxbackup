@@ -1,0 +1,33 @@
+SUBTITLE Implementing new template Units
+
+This document describes how to use the template base classes to implement new types of templates, all of which read the HTML used from the templates files using the standard language based naming conventions.
+
+
+SUBTITLE Templated
+
+Parameters: Template => base name of template filename
+
+This base class simply loads the named template, and makes it available to the derived class for extracting the required text.
+
+Just before using the template, call ensure_template_loaded(output, phase). This will load the template if it has not already been loaded, taking into account the current language. (ie the template will be reloaded if the language has changed, that is, everything happens as expected.)
+
+This will call process_template(ref_to_file_text), with a reference to the entire text of the file in one single scalar. The derived class should do whatever processing is required to store fragments of this text.
+
+See PageTemplate for an example of usage.
+
+
+SUBTITLE FragmentsTemplate
+
+Parameters: Template => name of template to use
+	FragmentsName => name of fragments to pull out of the file
+
+This is a base class for generic fragment based templates -- templates which build complex HTML structures from small fragements of HTML.
+
+It is derived from Templated, and implements the process_template() method. The derived class should implement get_required_fragments(), which should return an array containing a list of all the named fragements which are required by the Unit. An error will be thown if any of these is not present.
+
+The fragments are stored in a hash array, and a references to this hash array stored in $$self{'_fragments'}.
+
+The utility method write_fragment_text(output, phase, fragname) writes the contents of the fragment as HTML to the output object if the phase is PHASE_LANG_CPP_HANDLE_OUTPUT. This can be used to write the fragment HTML without worrying about the correct phase, simplifying the code.
+
+See TableContainer for an example of usage.
+

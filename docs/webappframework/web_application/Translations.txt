@@ -1,0 +1,119 @@
+TITLE Translations
+
+Multiple versions of the same page can be produced for internationalisable applications. The language is choosen by including the language name in the URL of the page.
+
+There is an additional documentation file, NotesForTranslators.txt, which is aimed at helping a translator work on the language files.
+
+
+SUBTITLE Templates
+
+Template files are used as the source of HTML for several Units. Templates are named "name.language.html", so to translate, simply author additional templates.
+
+Alternatively, surround strings in the file with <!--T--> markers, and the text between them will be translated through the translation system.
+
+
+SUBTITLE Strings
+
+All other strings used should be passed through the translation system. The intention is for the application to be written in the default language. Additional languages are written by translating these strings using a lookup table read from a file.
+
+Strings starting with *key* have that prefix removed, and the 'key' used as the key for looking up translated strings.
+
+
+SUBTITLE Translation files
+
+Each language has a single translation file in the Languages directory. Each translated string has an entry, which looks like this:
+
+=========
+# Key
+@ Page list
+> Original text
+
+Translated text
+
+=========
+
+The key is either
+
+* A user supplied key
+* The text, with whitespace collapsed and turned into _
+* A hash of the text
+
+This must never be edited -- it is used to look up strings. Editing the key will result in duplicate strings being added.
+
+The line beginning with @ is a list of all the pages the string is found on. This is maintained, so is up to date at the end of every run.
+
+Lines beginning with > are the original text, and should be never edited. It will be updated on every run.
+
+The translated text can be freely edited, even in the default language, although this is not advisable.
+
+
+SUBTITLE User supplied keys
+
+If you start some translated text with *key*, then 'key' is used as the key for the text. Even if you modify the text, a new entry will not be created, and translations will be tracked using this key.
+
+This is useful when you have text which might be edited in the default language in the pages themselves.
+
+If the text is more than one or two words long or might be edited in the future, use a user supplied key!
+
+
+SUBTITLE How to translate an application
+
+Take the corresponding language file, and translates all the strings. Do not alter the Key or Page list -- this will break the translation system.
+
+The language file can be returned to the directory even if more strings have been added to the application. Additional strings will be added when the application is compiled again.
+
+WARNING: The default make system does not rebuild pages when the language file changes. This is because they are overwritten each time the application is regenerated, and would result in every file being rebuild every time the application was made.
+
+
+SUBTITLE Using translated strings
+
+The output object passed to each Unit's write() method maintains translations. Any string which will be shown to the user (and wasn't sourced from a template file) should be translated through this object.
+
+Call write_text_translated(text) to write text which is to be translated.
+
+Use translate_text(text) to obtain a translated text string (without writing it).
+
+
+SUBTITLE Using translated strings in code not in the main handler cpp file
+
+It's slightly more tricky to translate strings which aren't in the main handler file for that language. A table of strings can be created, which can then be passed to functions called from the handler function.
+
+Call add_translated_string(name, string) on any Unit. This will add a string to be translated to the table, and add a #define to the page's .h file as the index of the string in the table.
+
+The table has the name PageTranslatedStrings (a static const char **), and #defines are named
+
+	PAGE_TRANSLATED_STRING_name
+
+where PAGE is the name of the page in upper case, and name is the name of the string given in the add method.
+
+
+SUBTITLE Varying the pages on a per language basis.
+
+Some translations will require a little more than just translating strings. The $language variable is set to the current language, so the page definition script can do differnet things in page scripts or units to reflect different layouts for different languages.
+
+Restrictions:
+
+* Every language must have the same set of parameters
+
+* Every form must have exactly the same set field names (all spelled the same, all present)
+
+
+SUBTITLE Strategies
+
+* A form must be more different than simply being rearranged
+
+Use two pages, and on the pages which link to them, use a different page name depending on the $language variable.
+
+
+* One default language string maps to several other strings in another language
+
+For example, a string may need to be subtly different depending on the context in a different language.
+
+In the page description scripts, prefix the string with some identified, for example:
+
+	"Use 1: My lovely string"
+	"Use 2: My lovely string"
+
+Then, in the default.txt file, edit the new entries so that the text is just "My lovely string" in both cases. In the other languages, edit appropraitly.
+
+

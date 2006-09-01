@@ -1,0 +1,120 @@
+TITLE Other Units
+
+Details of other Units provided.
+
+SUBTITILE TranslatedText
+
+Parameters: Text => text to output
+
+The text is in the default language, and will be subject to translation when output in other languages.
+
+Usually added implicitly with the Unit::add_text() method.
+
+The string is translated, then subject to interpolation. To include the runtime value of page variables, enclose the name in {} braces. For example,
+
+  $unit->add_text('position', 'Hello {params.Username}!');
+
+would include the runtime value of this variable in the text. Note you can use the = notation to include local variables. Translations can add new variables, change the order, and remove variables.
+
+
+SUBTITLE RawHTML
+
+Parameters: HTML => raw HTML to output
+
+The HTML is output without any translation.
+
+
+SUBTITLE LinkToPage
+
+Parameters: Link => link specification 
+   * => any other attributes which should be output
+
+Unit to output a <a href="" ...> link. Doesn't output a closing link (use RawHTML). Often added implicitly with the Unit::link_to() method.
+
+The link is specified as an array ref to the link specificaiton parameters, ie [$pagename, @parameters].
+
+Other attributes are written as attributes in the <a> HTML tag, for example, 'class' => 'large' will outputs class="large" as a tag attribute, applying a CSS class to that link.
+
+
+SUBTITLE ListOfLinks
+
+Parameters:
+Links: Array of link, as [['Translate this', [linkspec]], ...]
+Separator: raw HTML separator, if ' ' not acceptable (optional)
+* => any other attributes which should be output
+	(eg 'class' => 'large' for CSS class, outputs class="large" as attribute)
+
+This will output a simple set of links, with the links names translated. Especially useful for action links in the display of database queries.
+
+
+SUBTITLE Menu
+
+Parameters:
+	Items => array of items, each of which is anonymous array ['Name (translated)', [link spec], 'optional C++ condition for addition "this page" check']
+	DifferentOnThisPage => if set, use the alternative ItemThisPage fragment when we're on the page we're linking to
+
+
+This is a FragmentsTemplate based unit. Required fragements are:
+
+Begin - top of menu
+Item - item template, when link isn't to the current page
+ItemThisPage - item template, when link is to current page
+End - bottom of menu
+
+For each entry in the menu, either Item or ItemThisPage will be choosen. Within that fragement, [URL] will be replaced by a link to that page, and [TEXT] with the name of the item (after translation).
+
+The Item/ItemThisPage separation is to allow different representations of the current page within the menu (for example, not including a link to it) when the DontLinkOnPage parameter is set.
+
+
+SUBTITLE Variable
+
+Parameters: Variable => name of variable
+
+This Unit writes the contents of a named variable to the HTML output, in defanged form.
+
+
+SUBTITLE ChoiceLookup
+
+Parameters: Variable => name of variable
+	Choices => list for translation, | separated
+
+This unit displays one of the options from the Choices list (specified as a string with | separated items) using the variable as an integer index into the list. The list of choices is translated.
+
+
+SUBTITLE ChoiceLookupList
+
+Parameters: Variable => name of variable
+	Choices => list for translation, | separated
+	Separator => raw HTML to separate items in the list (not translated)
+
+Similar to ChoiceLookup, except that the page variable is expected to be a string containing a , separated list of integers. Each integer outputs an item from the list.
+
+
+
+SUBTITLE SimpleContainer
+
+This simply outputs the sub-units in perl sort() order, optionally separating them with the raw HTML in the Separator attribute (not subject to translation).
+
+It also exports the utility function join_units(), similar to the perl join function. The first parameter is (untranslated) HTML to separate the units, then the other parameters are either units or text strings (to be translated). It returns a SimpleContainer structure with all the units added.
+
+
+SUBTITLE OutputIf
+
+Parameters: Condition => Condition to evaluate.
+
+The condition is C++ code evaluating to true or false, for example, "WAF::Var('form.IntegerValue') == 3". Units are placed at positions 'true' and 'false', and the appropraite Unit is output when the expression is evaluated at runtime.
+
+Note that it is only the HTML output phase which is conditional. Code in all other phases will still be written (and excecuted) regardless of the conditional.
+
+
+SUBTITLE IncludeOnPages
+
+Parameters:
+	Pages => list of pages the sub units should be included on
+	NotPages => list of pages the sub units should not be included on
+(one or the other can be used, but not both)
+
+This Unit only outputs it's sub units on specific pages. On other pages, the sub-units are actually deleted.
+
+It's useful for including in the setup_page function where some units should only be used on a specific subset of pages.
+

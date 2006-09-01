@@ -1,0 +1,18 @@
+
+# A comment
+
+CREATE TABLE tTest1 (
+	fID `AUTO_INCREMENT_INT,
+	fInteger INTEGER,
+	fString VARCHAR(32)
+);
+
+
+CREATE TABLE tTest2 (
+	fI1 INTEGER, 	# a comment within a query
+	fS2 VARCHAR(45)
+);
+
+INSERT INTO tTest2 (fI1,fS2) VALUES(234,'Test');
+INSERT INTO tTest2 (fI1,fS2) VALUES(223,'Two');
+

@@ -1,0 +1,93 @@
+TITLE C++ Code
+
+The web application framework generates C++ code. Extra code is added by the developer of the application to perform application specific tasks. As well as snippits of code supplied to units (for example, the post submission code for a Form) you can add arbitary code using the Code unit.
+
+
+SUBTITLE Pseudo functions
+
+The code will need to access other entities in the page structure, for example, page variables. This complicates things, because the information to resolve these is not available until the first pass of the tree when writing the C++ files.
+
+To get around this, a number of pseudo functions are provided. These are translated into actual C++ code when the C++ file is written. They are all in the 'WAF' namespace.
+
+They have a few pecularities:
+
+* They look like C++ functions, but are handled internally by translation.
+
+* You can't use ( ) brackets anywhere in the parameters (regex limitation).
+
+* The arguments, while looking like C++, are actually perl arguments and data structures.
+
+* If a function is cast to another data type, this actually changes the return type of the generated code rather than taking the original type and casting it. In effect, it is an implicit conversion, which will exception if the data being converted in invalid.
+
+* You can only use them within the handler function in the page language files, because they need to access local variables in that function.
+
+
+SUBTITLE WAF::Var('page_variable')
+
+Replaced with code evaluating to the page variable. Use a cast to convert between types. The type is the default type of that variable.
+
+
+SUBTITLE WAF::Link(<link specification>)
+
+See "Generating links to other pages" in Units.txt for information on how to form a link specification. Note this is in perl notation, even though it's supposedly C++ code.
+
+This will be substituted for an expression evaluating to a std::string containing the URL of the page.
+
+This is not the most efficient way of writing a link. If possible, use a Unit which will call write_page_address() to output the URL, as it will take advantage of unchanged parameters and other optimisations.
+
+It is an error to try and cast this function.
+
+
+SUBTITLE WAF::SetCookie('cookie_name', 'page_variable')
+
+Substituted with code which will set the cookie to the value of the specified page variable. The namespace for the Cookie is '/app_name' so that the cookie is only returned for pages within this web application.
+
+
+SUBTITLE <<<<Translated and Interpolated Text>>>>
+
+If there is some text bounded by <<<< and >>>>, it is replaced by an expression evaluating to this text in std::string. The text is translated using the normal mechanism, and any page variables surrounded by {} have their values interpolated into the string. For example
+
+std::string text(<<<<This some text.
+
+Username {params.Username}.
+>>>>);
+
+Whitespace is respected (as long as the translations expect it). There is no compulsion for a translation to include every page variable, in fact it could include more.
+
+
+SUBTITLE Code Unit
+
+The WebAppFramework::Unit::Code unit takes two parameters:
+
+Code: The code to insert into the generated page.
+Phase: Either the phase name, or an array of phase names, when the code should be inserted.
+Headers: List of header files to include on relevant page.
+SystemHeaders: List of system headers to include.
+
+Phase names are:
+
+When generating the global code file:
+
+	global_declaration - cpp file, declare objects
+	global_code - cpp file, code
+	global_h - h file
+
+When generating the language C++ file:
+
+	lang_declaration - declarations before the handler function
+	lang_vars - declaration of variables within the handler function
+	lang_security - security handling code
+	lang_prepare - code to prepare before writing HTML (can only redirect here)
+	lang_output - code to output the HTML
+	lang_finish - code to clean up after generating the HTML
+
+When generating the main C++ file for a page:
+	
+	main_declaration - declare vars and functions
+	main_code - Implement functions
+
+And finally, the .h file for the page:
+
+	main_h - declaractions available for main and language C++ files
+
+

@@ -1,0 +1,6 @@
+
+MAKEEXCEPTION = ../../lib/common/makeexception.pl
+
+# AUTOGEN SEEDING
+autogen_SMTPClientException.h autogen_SMTPClientException.cpp:	$(MAKEEXCEPTION) SMTPClientException.txt
+	perl $(MAKEEXCEPTION) SMTPClientException.txt

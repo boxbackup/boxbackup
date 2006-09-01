@@ -1,0 +1,13 @@
+
+# AUTOGEN SEEDING
+Makefile.webapp:	TestWebApp.pl
+	perl ../../lib/webappframework/WebApplication.pl TestWebApp.pl make
+
+# include-makefile: Makefile.webapp
+
+# AUTOGEN SEEDING
+autogen_db/testdb_schema.cpp:	testdb.schema
+	../../lib/database/makedbmake.pl .
+
+# include-makefile: Makefile.db
+

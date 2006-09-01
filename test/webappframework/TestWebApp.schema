@@ -1,0 +1,35 @@
+
+CREATE TABLE tItems (
+	fID `AUTO_INCREMENT_INT,
+	fName VARCHAR(64) NOT NULL,
+	fString VARCHAR(64) NOT NULL,
+	fInteger INT NOT NULL,
+	fColour INT NOT NULL,
+	fBoolean TINYINT NOT NULL,
+	fCreatedBy VARCHAR(64) NOT NULL
+);
+
+INSERT INTO tItems(fName,fString,fInteger,fColour,fBoolean,fCreatedBy) VALUES('One','Bath',23,2,0,'DEFAULT');
+INSERT INTO tItems(fName,fString,fInteger,fColour,fBoolean,fCreatedBy) VALUES('Two','Oxford',245,8,1,'DEFAULT');
+
+CREATE TABLE tUsers (
+	fID `AUTO_INCREMENT_INT,
+	fUsername VARCHAR(64) NOT NULL,
+	fPassword VARCHAR(64) NOT NULL
+);
+
+INSERT INTO tUsers(fUsername,fPassword) VALUES('user1', 'one');
+INSERT INTO tUsers(fUsername,fPassword) VALUES('second', 'two');
+
+CREATE TABLE tColours (
+	fColourID INT NOT NULL,
+	fColourName VARCHAR(64) NOT NULL
+);
+
+INSERT INTO tColours(fColourID,fColourName) VALUES(2,'Blue');
+INSERT INTO tColours(fColourID,fColourName) VALUES(3,'Green');
+INSERT INTO tColours(fColourID,fColourName) VALUES(5,'Orange');
+INSERT INTO tColours(fColourID,fColourName) VALUES(6,'Red');
+INSERT INTO tColours(fColourID,fColourName) VALUES(7,'Pink');
+INSERT INTO tColours(fColourID,fColourName) VALUES(8,'Violet');
+

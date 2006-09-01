@@ -1,0 +1,57 @@
+TITLE DataSource units
+
+DataSource units are derived from WebAppFramework::Unit::DataSource, and represent a source of data, in the form of ordered (key,string) pairs. They are designed for use in Choice fields in forms, but are generic enough to be used elsewhere.
+
+This document lists the available data sources, and documents how to write a new DataSource object.
+
+
+SUBTITLE WebAppFramework::Unit::DataSource::DatabaseQuery
+
+Parameters:
+ 	Query => database query to use, or an anonymous hash of the Query parameters.
+	Args => Arguments for query
+
+This source takes a database query, or a definition for a query. The query must have two columns, the first is the 'key' used by the system and the second is the 'string' displayed to the user.
+
+The 'Args' parameter can be used to specify the sources of data for the parameters of the query, in the usual notation.
+
+
+SUBTITLE WebAppFramework::Unit::DataSource::CppSTLContainer
+
+Parameters:
+	Container => page variable containing typed container variable
+	IgnoreBlank => if set, blank strings are ignored
+
+This source iterates over a STL container. The container is specified as a page variable, but most likely will be something other than a variable registered by a Unit. For example
+
+  'Container' => '=std::vector<std::string> containerName'
+
+If the container contains a std::pair (or implicitly as a std::map) then first is used as the key, and second as the string. If not, an integer key is assumed as the location in the vector.
+
+
+SUBTITLE WebAppFramework::Unit::DataSource::StaticStrings
+
+This object is primarly used by the Choices unit to automatically write out large numbers of choices efficiently.
+
+It's one parameter, Strings, is either a | separated list of strings to translate, or a reference to an array of strings which are NOT translated.
+
+
+SUBTITLE WebAppFramework::Unit::DataSource::Null
+
+This is a DataSource which emits no data, and only writes blank code.
+
+
+
+SUBTITLE Creating a DataSource
+
+DataSource objects are full Units, and will always be placed as sub-units of the units which use them. This is so that they can take advantage of the Unit infrastructure to include relevant header files and write code in addition to the actual data loop.
+
+The main function a DataSource must implement is write_bound_item(). This writes the loop which will output the data. It's arguments are a reference to a function, and the output, phase and subphase.
+
+The function will write the code which uses the data. The DataSource is expected to write code which iterates over the data, and so will execute the code written by this function once per item.
+
+The function takes two C++ expressions which evaluate to the key and string respectively. The key can be either an integer or a string, but must correspond to the result of the key_is_integer() method.
+
+By default, the string is written 'de-fanged', which is not as efficient as just writing the string out. If the string_is_trusted() method returns true, it is simple written out. But this should only return true if the string is sourced from the application author or translators.
+
+Finally, if the DataSource knows either of the limits of an integer key at compile time, it can return the (min,max) values from get_integer_range(). These are used as an additional validation for the form values. Either can be undefined, in which case the corresponding check is omitted from the generated code.

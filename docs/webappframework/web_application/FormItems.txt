@@ -1,0 +1,142 @@
+TITLE Form items (fields)
+
+This document describes the form items implemented.
+
+
+SUBTITLE TextField
+
+This implements a text (or password) input field.
+
+Attributes are:
+
+Name - Form item name
+Default - source of default value (variable, can be CONSTANT:value for constant values)
+DisplayAsPassword - if present, then display the field as a password entry
+Size - size of field (either x or x,y for textarea)
+MaxLength - max size of entered text, if browser respects this
+Validation => Validation information
+ValidationFailMsg => Text to display when validation fails, if default isn't good enough
+BlankAllowed - if present, then a blank field is an acceptable value which passes validation
+
+Validation options are:
+
+none -- always passes validation
+external -- always failes validation, and will be checked externally
+length(min,max) -- length is in a certain range. Omit either min or max for unbounded ranges
+x(y) -- name and arguments for a standard validator. See Validators.txt.
+reference -- or a reference to a Validator object
+
+If the size field is not present, or a single number, a normal text field is output. If the size field is of the form "x,y", for example, "4,8" then a textarea is output, with the set sizes.
+
+Note that email type validation ('email' or 'email(no-lookup)') will remove whitespace from the entered text, and requires lib/smtpclient to be included in the depenencies for the app in modules.txt.
+
+If BlankAllowed is set, then additional code is written to accept a blank value as valid input completely independently of the other validation options specified.
+
+
+SUBTITLE NumberField
+
+This implement an integer number input field.
+
+Attributes are:
+
+Name - Form item name
+Default - source of default value (variable, can be CONSTANT:value for constant values)
+DefaultNumber - default for data member in form. Should only be displayed when the number is outside the normal int32_t range
+FixedPointScaleDigits - number of digits for (base 10) fixed point values
+FixedPointDisplayDigits - min number of digits to use for the fractional part. Defaults to FixedPointScaleDigits.
+Validation => Validation information
+ValidationFailMsg => Text to display when validation fails, if default isn't good enough
+BlankValue - if set, then blank entries are allowed, and the field data value will be set to this value
+Size - size of text field (maxlength is set automatically to something which is appropraite for the range allowed)
+
+Validation options are:
+
+none -- no range validation, but number must be entered unless BlankValue set
+range(min,max) -- must be within range, omit for unbounded values.
+
+Note: When fixed point in use, specify all numbers in human readable form, eg 1.01
+
+See FixedPoint.txt for definitions of ScaleDigits and DisplayDigits.
+
+
+SUBTITLE SubmitButton
+
+This implements a submit button for the form.
+
+Attributes are:
+
+Name - Form item name
+Text - Text to be displayed in the button, subject to translation
+Report - If set, will report on whether the button was clicked.
+
+If reporting of clicks is on, then the name of the variable will be the Name + 'Clicked' to distinguish it from a value result.
+
+If a 'Label' sub-unit is added, then the Text parameter will be ignored and that unit output as a lable. Be careful that this unit just outputs text. Use this to output variable labels.
+
+
+SUBTITLE Checkbox
+
+This implements a checkbox for the form. Checkboxes never have validation, and are always passed as validated. (Use custom validation otherwise.)
+
+Attributes are:
+
+Name - Form item name
+Label - Value text (will be translated)
+Default - source of default value (can be CONSTANT:true/false for constant values)
+
+
+SUBTITLE Choice
+
+A flexible item to allow the user to choose from a static list of items. Multiple and single choices are allowed and validated, and the list can be shown in select (HTML select entity) or items (checkboxes or radio buttons).
+
+Attributes are:
+
+Name - Form item name
+Choices => | separated list of choices (will be translated)
+				(only if DataSource not used)
+Default => see below
+Style => select (HTML select widget) or items (checkboxes or radio buttons)
+Size => rows visible (for select mode only)
+Columns => number of columns (for items mode only)
+Validation =>
+	none	- no checking (single choice widget)
+	single	- single choice must be made (single choice widget)
+	choices(x,y)	- numbers allowed within range x to y inclusive. Omit for unbounded range. (multiple choice widget)
+
+Default specified either a constant value, as CONSTANT:entry (where entry is an untranslated default choice from the Choices list), or a variable, which should convert to an integer which is a zero based item number. If this is not included, a blank item will be displayed.
+
+The variable in the data object, for single selections, is an zero based int32_t index of the item selected, or -1 for no selection. For multiple selections, a std::vector<int32_t> is used to list all items, in no particular order.
+
+Alternatively, the list of choices can be determined from a DataSource, by adding a data source unit in the 'DataSource' position. If the 'key' of the data source is a string, then the form variable will be a string, otherwise an integer as per normal. See the DataSource.txt file for more information.
+
+
+SUBTITLE Date
+
+An item to request a date using three drop down lists. Order of these items is controlled by the current Locale object. The date is validated, including knowledge of leap years.
+
+The data member is of type WAFFormItemDate, call GetYear(), GetMonth(), GetDay() to retrieve the values.
+
+Attributes are:
+
+Name => Form item name
+Default => standard date specifier (optional)
+Optional => set if the field is optional
+StartYear => first year displayed
+EndYear => last year displayed
+ValidationFailMsg => text to display on error
+
+See Locale.txt for the specification of the standard date specifier.
+
+
+SUBTITLE ExtraDataMember
+
+This is primarily used to pass extra variables out from a validation function. It has a single attribute:
+
+Variable => CppVariable style variable specification
+
+For example:
+
+$form->add_unit('extra', WebAppFramework::Unit::FormItem::ExtraDataMember->new('Variable' => 'int32_t ValidatedID'));
+
+will add an extra data member and accessor function, which can be set in the Validate function and access outside via page variables.
+

@@ -1,0 +1,27 @@
+TITLE Localised data units
+
+Units are provided to display data in formats appropraite to the locale.
+
+
+SUBTITLE WebAppFramework::Unit::Localised::Date
+
+Displays a localised date.
+
+Attributes:
+
+Date => standard date specification
+Style => Long or Short (defaults to Long)
+
+See Locale.txt for the specification of the standard date specifier.
+
+
+SUBTITLE WebAppFramework::Unit::Localised::DateTime
+
+Slightly different to the above. Displays a localised date and time from a single integer variable.
+
+Attributes:
+
+DateTime => Page variable
+InFormat => YYYYMMDD or UNIXEpoch (defaults to UNIXEpoch if not specified)
+Style => Any format specified in WAFLocale.h (defaults to DateTimeFormatLong if not specified)
+

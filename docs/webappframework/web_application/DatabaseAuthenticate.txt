@@ -1,0 +1,161 @@
+TITLE Authentication against a database
+
+The WebAppFramework::Unit::Database::Authentication unit allows users to be authenticated against a database.
+
+
+SUBTITLE Concepts
+
+A user is identified to the system by a ID, and authenticated using a Token.
+
+The ID might be the textual username, or a numeric user ID. The Token might be the password, or the password hashed with a secret, or even a random number allocated on each login.
+
+Credentials are the combination of ID and Token in a single string for convenience. The Credentials are obtained automatically from a specified page variable by the unit -- the source could be a cookie, a form variable, or a page parameter.
+
+
+SUBTITLE General usage
+
+First of all, decide what the ID and Token will be. If it's not the username (as entered by the user) and the password (perhaps filtered) then you'll have to write more custom code -- but it's not too difficult.
+
+The authentication is based around a query. This is an example:
+
+	my $security = WebAppFramework::Unit::Database::Authenticate->new(
+		'Name' => 'Security',
+		'Query' => {'Statement' => 'SELECT fID,fUsername,fPassword FROM tUsers WHERE fUsername = $1',
+					'Parameters' => 'std::string Username',
+					'Results' => 'int ID, std::string Username, std::string Password'},
+		'TokenColumn' => 'Password',
+		'CredentialsSource' => 'cookie.Credentials',
+		'RedirectToOnAuthFailure' => ['Login'],
+		'DisableRedirectOnPages' => 'Login');
+
+(The Query parameter can either be a Query object, or an anonymous hash array to it's parameters, optionally omitting the name. In the latter case, a suitable query is generated.)
+
+The query should
+
+* Have one or two parameters (corresponding to the Username, and optionally the Token if the token is directly stored in the database)
+
+* Obtain as many columns from the table as is useful for the rest of the page. They will be made available in the namespace given for the 'Name' parameter.
+
+* Return the Token, or the column which will be transformed into the Token. The 'TokenColumn' should be set to the name of this column, so the unit can find it.
+
+The 'Results' from the Query object will be availabile via the page variables, but only if authentication worked. If they are used in any other case, the database driver will throw an exception.
+
+The 'CredentialsSource' parameter specifies where the credentials are obtained from. This can only really be a cookie, something in formdata, or a page parameter, as nothing else will have evaluated before then. The query is exected before anything else, in a special SECURITY phase.
+
+If 'RedirectToOnAuthFailure' is a link specification, then the browser will be directed to this link if the authentication failed. Otherwise, the Name.IsAuthenticated page variable will evaluate to false.
+
+Of course, some pages shouldn't be redirected away from if the authentication fails, for example, the login page to allow the user to authenticate! Disable specific pages in using the 'DisableRedirectOnPages' parameter.
+
+If the credentials are required for any reason, the Name.Credentials page variable will retrieve them after successful authentication.
+
+
+SUBTITLE Filtering the token
+
+Using the examples shown does result in the user's password being visible either in the URL or in a cookie. The token can therefore be optionally filtered by running it through a MD5 hash. To enable this, add the following parameters to the Authenticate unit:
+
+		'TokenFilter' => 'MD5',
+		'MD5SecretConfigVar' => 'CredentialTokenSecret',
+
+The first specifies that MD5 should be used to filter the token, the second the source of a secret to add to the password in the hash. This is obtained from the applications configuration file -- be sure to add that name to the generated configuration verification by adding this in the main application description file:
+
+$webapp->add_extra_config_directive('string', 'CredentialTokenSecret');
+
+
+SUBTITLE Logging in
+
+The process of logging in is expected to use a form, which will only validate correctly if the password is correct. This allows the log in process to use the existing mechanism for displaying form errors.
+
+Once the form is submitted, the 'HandleSubmission' code should generate the credentials from the security object using the MakeCredentials(id, token) function and set the source of the credentials to this value:
+
+Cookie: Use rResponse.SetCookie()
+
+Persistant form data: Set whatever local variable will ensure that the credentials will be carried through to future requests.
+
+Page parameter: Redirect the user to a new page using the link specification to place the credentials in the URL.
+
+
+SUBTITLE Generating Validation code
+
+(See the example validation code below for details of what this generates.)
+
+In the Form unit, set the following parameters:
+	'FormValidation' => 'simple',
+	'ArgsToValidate' => 'Application'
+
+You will probably need to find the authentication unit from the default page:
+
+my $auth = $page->find_unit('Authenticate', 'Name' => 'Security');
+
+(changing the name as a approprate.) Then use the set_validate_function_on_form(webapp, form, id_field, token_field) method, where webapp is the web application object, and form is the relevant form. id_field and token_field are the fieldnames within the form corresponding to the id and token respectively. For example:
+
+$auth->set_validate_function_on_form($webapp, $form, 'Username', 'Password');
+
+If you need to include extra validation in the function, use $auth->generate_validate_code(id_field, token_field), which returns a string containing the body of the function generated above, for inclusion into a function which you write.
+
+
+SUBTITLE Generating Submission handling code
+
+(See the example submission code below.)
+
+Use the set_HandleSubmission_on_form(form, id_field, token_field, link_spec) method to set suitable HandleSubmission code for a form. For example,
+
+$auth->set_HandleSubmission_on_form($form, 'Username', 'Password',
+	['Main', 'Username' => 'login.Username', 'Value' => 'CONSTANT:1']);
+
+This will set the credentials in the approprate place (using CredentialsSource parmater of the Autenticate unit) and then redirect to the given link specification.
+
+If a "params" source is specified, the given link specification is modified automatically. Do not include the parameter in the list.
+
+
+SUBTITLE Example validation
+
+The following snippet of code writes a suitable validation routine. Note that the form unit must be set to pass the Application objects to the validation function. ('ArgsToValidate' => 'Application')
+
+my $validation = WebAppFramework::Unit::Code->new('Phase' => 'main_code', 'Code' => <<__E);
+	void TestWebAppFormLogin::Validate(TestWebApp &rApplication)
+	{
+		SecurityBase query(rApplication.GetDatabaseConnection());
+		query.Execute(mUsername);
+		if(query.Next())
+		{
+			if(query.GetPassword() == mPassword)
+			{
+				mPasswordValidityError = WebAppForm::Valid;
+			}
+		}
+	}
+__E
+$page->add_post_unit($validation);
+
+The name of the Authentication unit here is 'Security'. This uses the query object generated, 'SecurityBase', and executes it. If the username is found, the password is checked and if correct, the password field is marked as valid.
+
+
+SUBTITLE Example submission handling
+
+This example sets the submission handler on the form to set a cookie with the required credentials.
+
+$form->set('HandleSubmission' => <<__E);
+		// Set the credentials
+		std::string credentials(Security.MakeCredentials(login.GetUsername(), login.GetPassword()));
+		rResponse.SetCookie("Credentials", credentials.c_str());
+
+		// Set redirect
+		std::string uri(WAF::Link('Main', 'Username' => 'login.Username', 'Value' => 'CONSTANT:1', 'Text' => 'CONSTANT:start'));
+		rResponse.SetAsRedirect(uri.c_str());
+
+		return true;
+__E
+
+Firstly, it obtains the credentials using the username and password from the form, 'login', sets a cookie with this value, and then redirects the user to another page.
+
+
+SUBTITLE Logging out
+
+When loggin out, simply reset the source of the credentials to the empty string, and call the SetToUnauthenticated() method. For example, to log out from a log in by the above example, use
+
+my $logout = WebAppFramework::Unit::Code->new('Phase' => 'lang_prepare', 'Code' => <<__E);
+	login.SetToUnauthenticated();
+	rResponse.SetCookie("Credentials", "");
+__E
+$page->add_post_unit($logout);
+

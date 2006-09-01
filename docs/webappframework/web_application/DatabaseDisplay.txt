@@ -1,0 +1,118 @@
+TITLE Displaying the results of database queries
+
+The WebAppFramework::Unit::Database::DisplayQuery unit will display the results of a query, outputing it's sub-units once per row of a query.
+
+The WebAppFramework::Unit::Database::Table unit is derived from DisplayQuery, and will display the results of a query in an HTML table, with various options for display, including manipulation of headings and columns.
+
+Future enhancements:
+
+* Paging of results
+* Sort order by clicking on headings
+
+These will be implemented by addition attributes to the unit.
+
+
+SUBTITLE WebAppFramework::Unit::Database::DisplayQuery
+
+This unit is based on the FragementsTemplate unit, so takes the two attributes
+
+Template: base name of template filename
+FragmentsName: name of fragments to pull out of the file
+
+These are most likely set in the application setup using the defaults. See below for the fragements expected.
+
+Then, the query is specified like this
+
+Name => Name of the object (will be registered as a namespace)
+Query => Database::Query object which should be executed
+Args => Arguments to query (optional)
+
+The arguments are specified as for the ExecuteQuery unit, eg
+
+	'Args' => ['CreatedBy' => 'params.Username'],
+
+and the source is either CppVariable objects or page variable names.
+
+To add more code before and after the query is executed, to prepare variables or extra information, use
+
+PreQueryCode => code to output just before the query is made
+QueryCode => code to output to execute the query
+PostQueryCode => code to output just after the query is executed.
+
+The name of the query object is specified in the Name parameter.
+
+
+The query will be executed, and then the sub-units displayed once per row. Use the registered namespace to access the results of the query. For example, if a query specifies
+
+  'Results' => 'std::string Text,int32_t Integer'
+
+and the Name of the DisplayQuery object is 'query', then to display the entries you could add a TranslatedText query with the text "Text: {query.Text}, Integer: {query.Integer}<p>" to display the results, one per line.
+
+
+SUBTITLE Queries with runtime statements
+
+If the query has a runtime statement (with "runtime" as Statement) then you need to supply the Query code to execute this statement. This includes creating the correct object with the same name as the name of the Unit.
+
+Tip: Write the code at first without the runtime query, then copy and paste the code from the generated language cpp file, and modify it.
+
+
+SUBTITLE WebAppFramework::Unit::Database::Table
+
+This unit takes all the parameters of DisplayQuery, plus
+
+HideFields => Array of fields to hide. (optional)
+
+In the table, the number of columns, order, and default headings are deduced from the 'Results' attribute of the query object.
+
+
+SUBTITLE Fragments
+
+See FragementsTemplate documentation in TemplatesUnits.txt. The following fragment names are expected:
+
+Begin - beginning of table
+RowBegin - begin a row (used for headings and data rows)
+HeadingCellBegin - start of a heading entry
+HeadingCellEnd - end of a heading
+DataCellBegin - start of a data entry (repeated)
+DataCellEnd - end of a data entry
+RowEnd - end a row
+End - end the table
+
+
+SUBTITLE Adjusting the display of data
+
+To display a field in a different way to the default, which is to simply convert it to text, add a unit at the position <Field>_Display. So if you had a field called Colour which was to be displayed different, add a unit at Colour_Display. This unit can retrieve the value to display from the page variable name.Colour (where 'name' is the Name attribute specified for the Table object).
+
+To add additional columns, add units with specific names. To add a column before a field, add Column_Before_<Field>. To add a column at the right hand side, add Column_Last. If you want to have multiple added columns in any one space, append _<anything> to the name, and they will be added sorted in alphabetical order.
+
+In all these columns, use page variables in the units to retrieve the value of the fields of the query.
+
+
+SUBTITLE Adjusting the headings
+
+The default heading for a column is the name of the result field (specified in the Query object) with spaces inserted before capitalised words. So MultiWordField would have a heading "Multi Word Field".
+
+For a simple data cell, the heading can be adjusted by adding a unit with the position <Field>_Heading, for example, to change the heading of the column which displays the field 'Colour', add a unit for Colour_Heading. This can most easily be done like this
+
+  $list->add_text('Colour_Heading', 'Item colour');
+
+if you just want to change the text without doing anything more fancy.
+
+To insert headings for other columns (ie ones inserted as above) simply add a unit for <pos>_Heading, where <pos> is the position of the Unit which displays that column. So if you added Column_Last_N1, the heading position should be Column_Last_N1_Heading.
+
+
+SUBTITLE Adding action links
+
+To add links to the last column, the most convenient way is to use the WebAppFramework::Unit::ListOfLinks unit, and link to pages which perform the actions, specifiying page parameters as variables from the query. For example,
+
+$list->add_unit('Column_Last', WebAppFramework::Unit::ListOfLinks->new(
+	'Links' => 
+		[
+			['Display', ['DisplayEntry', 'EntryID' => 'entry.ID']],
+			['Delete', ['DeleteEntry', 'EntryID' => 'entry.ID']]
+		]
+	));
+
+will add "Display" and "Delete" links.
+
+
