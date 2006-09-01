@@ -931,6 +931,7 @@ int test_server(const char *hostname)
 		// Check marker is 0
 		TEST_THAT(loginConf->GetClientStoreMarker() == 0);
 
+#ifndef WIN32
 		// Check that we can't open a new connection which requests write permissions
 		{
 			SocketStreamTLS conn;
@@ -942,10 +943,12 @@ int test_server(const char *hostname)
 				ConnectionException, Conn_Protocol_UnexpectedReply);
 			protocol.QueryFinished();
 		}
+#endif
 		
 		// Set the client store marker
 		protocol.QuerySetClientStoreMarker(0x8732523ab23aLL);
 
+#ifndef WIN32
 		// Open a new connection which is read only
 		SocketStreamTLS connReadOnly;
 		connReadOnly.Open(context, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
@@ -964,9 +967,11 @@ int test_server(const char *hostname)
 			// Check client store marker
 			TEST_THAT(loginConf->GetClientStoreMarker() == 0x8732523ab23aLL);
 		}
+#else // WIN32
+		BackupProtocolClient& protocolReadOnly(protocol);
+#endif
 
 		test_server_1(protocol, protocolReadOnly);
-
 
 		// Create and upload some test files
 		int64_t maxID = 0;
@@ -1439,11 +1444,15 @@ int test_server(const char *hostname)
 		}
 			
 		// Finish the connections
+#ifndef WIN32
 		protocolReadOnly.QueryFinished();
+#endif
 		protocol.QueryFinished();
 		
 		// Close logs
+#ifndef WIN32
 		::fclose(protocolReadOnlyLog);
+#endif
 		::fclose(protocolLog);
 	}
 	
