@@ -116,12 +116,20 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		if(s > 0)
 		{
 			nnew++;
+			#ifdef WIN32
+			TRACE2("%8I64d this  s=%8I64d", b, s);
+			#else
 			TRACE2("%8lld this  s=%8lld", b, s);
+			#endif
 		}
 		else
 		{
 			nold++;
+			#ifdef WIN32
+			TRACE2("%8I64d other i=%8I64d", b, 0 - s);		
+			#else
 			TRACE2("%8lld other i=%8lld", b, 0 - s);		
+			#endif
 		}
 		// Decode the rest
 		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
