@@ -384,6 +384,7 @@ int test(int argc, const char *argv[])
 		FileStream out("testfiles/f0.encoded", O_WRONLY | O_CREAT | O_EXCL);
 		std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f0", 1 /* dir ID */, f0name));
 		encoded->CopyStreamTo(out);
+		out.Close();
 		check_encoded_file("testfiles/f0.encoded", 0, 33, 0);
 	}
 	
@@ -444,6 +445,7 @@ int test(int argc, const char *argv[])
 			FileStream out("testfiles/f9.zerotest", O_WRONLY | O_CREAT | O_EXCL);
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/f9", 1 /* dir ID */, fn));
 			encoded->CopyStreamTo(out);
+			out.Close();
 			check_encoded_file("testfiles/f9.zerotest", 0, 0, 0);		
 		}
 		{
