@@ -425,7 +425,8 @@ void test_test_file(int t, IOStream &rStream)
 	}
 	
 	free(data);
-	unlink("testfiles/test_download");
+	in.Close();
+	TEST_THAT(unlink("testfiles/test_download") == 0);
 }
 
 void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
