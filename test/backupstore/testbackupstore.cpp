@@ -1632,6 +1632,7 @@ int test3(int argc, const char *argv[])
 			TEST_THAT(decoded->GetNumBlocks() == 3);
 		}
 		
+#ifndef WIN32 // no symlinks on Win32
 		// Try out doing this on a symlink
 		{
 			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
@@ -1645,6 +1646,7 @@ int test3(int argc, const char *argv[])
 			// Decode it
 			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 		}
+#endif
 	}
 
 	// Store info
