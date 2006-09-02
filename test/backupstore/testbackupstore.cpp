@@ -1765,7 +1765,9 @@ int test3(int argc, const char *argv[])
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 		
 		// Set a new limit on the account -- leave the hard limit high to make sure the target for
 		// freeing space is the soft limit.
@@ -1848,7 +1850,10 @@ printf("after.objectsNotDel=%i, deleted=%i, old=%i\n",after.objectsNotDel, after
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
+
+#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 	}
 
 	return 0;
@@ -1860,7 +1865,10 @@ int multi_server()
 
 	// Create an account for the test client
 	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
+
+#ifndef WIN32
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+#endif
 
 	// First, try logging in without an account having been created... just make sure login fails.
 	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored_multi.conf", "testfiles/bbstored.pid");
@@ -1880,15 +1888,63 @@ int multi_server()
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
+#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+#endif
 	}
 
 
 	return 0;
 }
 
+#ifdef WIN32
+WCHAR* ConvertUtf8ToWideString(const char* pString);
+std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
+#endif
+
 int test(int argc, const char *argv[])
 {
+#ifdef WIN32
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+
+	WSADATA info;
+	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
+
+	// this had better work, or bbstored will die when combining diffs
+	char* file = "foo";
+	std::string abs = ConvertPathToAbsoluteUnicode(file);
+	WCHAR* wfile = ConvertUtf8ToWideString(abs.c_str());
+
+	DWORD accessRights = FILE_READ_ATTRIBUTES | 
+		FILE_LIST_DIRECTORY | FILE_READ_EA | FILE_WRITE_ATTRIBUTES |
+		FILE_WRITE_DATA | FILE_WRITE_EA /*| FILE_ALL_ACCESS*/;
+	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+
+	HANDLE h1 = CreateFileW(wfile, accessRights, shareMode,
+		NULL, OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	assert(h1 != INVALID_HANDLE_VALUE);
+	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
+
+	accessRights = FILE_READ_ATTRIBUTES | 
+		FILE_LIST_DIRECTORY | FILE_READ_EA;
+
+	HANDLE h2 = CreateFileW(wfile, accessRights, shareMode,
+		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	assert(h2 != INVALID_HANDLE_VALUE);
+	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
+
+	CloseHandle(h2);
+	CloseHandle(h1);
+
+	h1 = openfile("foo", O_CREAT | O_RDWR, 0);
+	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
+	h2 = openfile("foo", O_RDWR, 0);
+	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
+	CloseHandle(h2);
+	CloseHandle(h1);
+#endif
+
 	// SSL library
 	SSLLib::Initialise();
 	
