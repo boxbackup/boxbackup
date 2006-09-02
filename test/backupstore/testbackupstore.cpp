@@ -1740,7 +1740,7 @@ int test3(int argc, const char *argv[])
 		}
 
 		// Create an account for the test client
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 10000B 20000B") == 0);
+		TEST_THAT_ABORTONFAIL(RunCommand("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 10000B 20000B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 		TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
 		TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
@@ -1771,7 +1771,7 @@ int test3(int argc, const char *argv[])
 		
 		// Set a new limit on the account -- leave the hard limit high to make sure the target for
 		// freeing space is the soft limit.
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20000B") == 0);
+		TEST_THAT_ABORTONFAIL(RunCommand("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20000B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Start things up
@@ -1800,7 +1800,7 @@ printf("after.objectsNotDel=%i, deleted=%i, old=%i\n",after.objectsNotDel, after
 		TEST_THAT(after.old == 0);
 		
 		// Set a really small hard limit
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20B") == 0);
+		TEST_THAT_ABORTONFAIL(RunCommand("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Try to upload a file and create a directory, and check an error is generated
@@ -1864,7 +1864,7 @@ int multi_server()
 	printf("Starting server for connection from remote machines...\n");
 
 	// Create an account for the test client
-	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
+	TEST_THAT_ABORTONFAIL(RunCommand("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
 
 #ifndef WIN32
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
