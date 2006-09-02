@@ -103,6 +103,14 @@ int main(int argc, const char *argv[])
 
 		// banner
 		printf("Running test TEST_NAME in " MODE_TEXT " mode...\n");
+
+		#ifdef WIN32
+			// Under win32 we must initialise the Winsock library
+			// before using sockets
+
+			WSADATA info;
+			TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
+		#endif
 	}
 	try
 	{
