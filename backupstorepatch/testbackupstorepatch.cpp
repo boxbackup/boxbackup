@@ -579,9 +579,18 @@ int test(int argc, const char *argv[])
 				writedir.Commit(true);
 			}
 
-			// Send the server a restart signal, so it does housekeeping immedaitely, and wait for it to happen
-			::sleep(1);	// wait for old connections to terminate
+#ifdef WIN32
+			// Cannot signal bbstored to do housekeeping now,
+			// so just wait until we're sure it's done
+			wait_for_operation(12);
+#else
+			// Send the server a restart signal, so it does 
+			// housekeeping immediately, and wait for it to happen
+			// Wait for old connections to terminate
+			::sleep(1);	
 			::kill(pid, SIGHUP);
+#endif
+
 			// Get the revision number of the info file
 			int64_t first_revision = 0;
 			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
