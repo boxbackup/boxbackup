@@ -54,7 +54,7 @@ elsif($ARGV[0] eq 'check')
 	open INITIAL,'testfiles/initial-listing.txt' or die "Can't open original listing";
 	while(<INITIAL>)
 	{
-		chomp;
+		chomp; s/\r//;
 		$expected{$_} = 1;
 		m/\A(.+?) .+? (.+)\Z/;
 		$filenames{$2} = $_;
@@ -99,7 +99,7 @@ elsif($ARGV[0] eq 'check')
 	while(<LISTING>)
 	{
 		print LISTING_COPY;
-		chomp;
+		chomp; s/\r//;
 		s/\[FILENAME NOT ENCRYPTED\]//;
 		if(exists $expected{$_})
 		{
