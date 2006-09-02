@@ -283,14 +283,6 @@ void test_depends_in_dirs()
 
 int test(int argc, const char *argv[])
 {
-#ifdef WIN32
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-
-	WSADATA info;
-	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
-#endif
-
 	// Allocate a buffer
 	buffer = ::malloc(BUFFER_SIZE);
 	TEST_THAT(buffer != 0);
@@ -317,12 +309,8 @@ int test(int argc, const char *argv[])
 			"testfiles/clientTrustedCAs.pem");
 
 	// Create an account
-#ifdef WIN32
-	TEST_THAT_ABORTONFAIL(::system("..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
-#else
 	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-#endif
 
 	// Create test files
 	create_test_files();
@@ -331,12 +319,7 @@ int test(int argc, const char *argv[])
 	test_depends_in_dirs();
 
 	// First, try logging in without an account having been created... just make sure login fails.
-#ifdef WIN32
-	int pid = LaunchServer("..\\..\\bin\\bbstored\\bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
-#else
 	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
-#endif
-
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
@@ -414,13 +397,7 @@ int test(int argc, const char *argv[])
 					// Store details
 					test_files[f].IDOnServer = stored->GetObjectID();
 					test_files[f].IsCompletelyDifferent = isCompletelyDifferent;
-
-#ifdef WIN32
-					printf("ID %I64d, completely different: %s\n",
-#else
-					printf("ID %lld, completely different: %s\n", 
-#endif
-						test_files[f].IDOnServer,
+					printf("ID %lld, completely different: %s\n", test_files[f].IDOnServer,
 						test_files[f].IsCompletelyDifferent?"yes":"no");			
 				}
 				else
@@ -588,14 +565,9 @@ int test(int argc, const char *argv[])
 				writedir.Commit(true);
 			}
 
-#ifdef WIN32
-			wait_for_operation(12);
-#else
-			// Send the server a restart signal, so it does housekeeping immediately, and wait for it to happen
+			// Send the server a restart signal, so it does housekeeping immedaitely, and wait for it to happen
 			::sleep(1);	// wait for old connections to terminate
 			::kill(pid, SIGHUP);
-#endif
-
 			// Get the revision number of the info file
 			int64_t first_revision = 0;
 			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
@@ -639,10 +611,7 @@ int test(int argc, const char *argv[])
 		// Kill store server
 		TEST_THAT(KillServer(pid));
 		TEST_THAT(!ServerIsAlive(pid));
-
-		#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
-		#endif
 	}
 	
 	::free(buffer);
