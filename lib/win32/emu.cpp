@@ -716,7 +716,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 		// at least one process must have the file open - 
 		// in this case someone else does.
 		handle = CreateFileW(pBuffer, 
-			0, 
+			READ_CONTROL,
 			FILE_SHARE_READ, 
 			NULL, 
 			OPEN_EXISTING, 
