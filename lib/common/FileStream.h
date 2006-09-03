@@ -21,7 +21,7 @@
 #endif
 
 #ifdef WIN32
-	#define INVALID_FILE NULL
+	#define INVALID_FILE INVALID_HANDLE_VALUE
 	typedef HANDLE tOSFileHandle;
 #else
 	#define INVALID_FILE -1
