@@ -580,8 +580,6 @@ char nextchar = -1;
 // --------------------------------------------------------------------------
 int emu_fstat(HANDLE hdir, struct stat * st)
 {
-	ULARGE_INTEGER conv;
-
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
 		::syslog(LOG_ERR, "Error: invalid file handle in emu_fstat()");
@@ -598,9 +596,18 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 		return -1;
 	}
 
+	if (INVALID_FILE_ATTRIBUTES == fi.dwFileAttributes)
+	{
+		::syslog(LOG_WARNING, "Failed to get file attributes: "
+			"error %d", GetLastError());
+		errno = EACCES;
+		return -1;
+	}
+
 	memset(st, 0, sizeof(*st));
 
-	// This next example is how we get our INODE (equivalent) information
+	// This is how we get our INODE (equivalent) information
+	ULARGE_INTEGER conv;
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart = fi.nFileIndexLow;
 	st->st_ino = (_ino_t)conv.QuadPart;
