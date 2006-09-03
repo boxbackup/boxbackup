@@ -681,9 +681,10 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 //		Created: 10th December 2004
 //
 // --------------------------------------------------------------------------
-HANDLE OpenFileByNameUtf8(const char* pFileName)
+HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 {
-	std::string AbsPathWithUnicode = ConvertPathToAbsoluteUnicode(pFileName);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pFileName);
 	
 	if (AbsPathWithUnicode.size() == 0)
 	{
@@ -701,7 +702,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 	}
 
 	HANDLE handle = CreateFileW(pBuffer, 
-		FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA, 
+		flags,
 		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
 		NULL, 
 		OPEN_EXISTING, 
@@ -757,12 +758,8 @@ HANDLE OpenFileByNameUtf8(const char* pFileName)
 // --------------------------------------------------------------------------
 int emu_stat(const char * pName, struct stat * st)
 {
-	// at the mo
-	st->st_uid = 0;
-	st->st_gid = 0;
-	st->st_nlink = 1;
-
-	HANDLE handle = OpenFileByNameUtf8(pName);
+	HANDLE handle = OpenFileByNameUtf8(pName, 
+		FILE_READ_ATTRIBUTES | FILE_READ_EA);
 
 	if (handle == NULL)
 	{
@@ -795,7 +792,8 @@ int emu_stat(const char * pName, struct stat * st)
 // --------------------------------------------------------------------------
 int statfs(const char * pName, struct statfs * s)
 {
-	HANDLE handle = OpenFileByNameUtf8(pName);
+	HANDLE handle = OpenFileByNameUtf8(pName,
+		FILE_READ_ATTRIBUTES | FILE_READ_EA);
 
 	if (handle == NULL)
 	{
