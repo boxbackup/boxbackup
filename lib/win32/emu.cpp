@@ -436,13 +436,26 @@ bool ConvertConsoleToUtf8(const char* pString, std::string& rDest)
 // --------------------------------------------------------------------------
 std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 {
+	std::string filename;
+	for (int i = 0; pFileName[i] != 0; i++)
+	{
+		if (pFileName[i] == '/')
+		{
+			filename += '\\';
+		}
+		else
+		{
+			filename += pFileName[i];
+		}
+	}
+
 	std::string tmpStr("\\\\?\\");
 	
 	// Is the path relative or absolute?
 	// Absolute paths on Windows are always a drive letter
 	// followed by ':'
 	
-	if (pFileName[1] != ':')
+	if (filename.length() >= 2 && filename[1] != ':')
 	{
 		// Must be relative. We need to get the 
 		// current directory to make it absolute.
@@ -465,7 +478,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 		}
 	}
 	
-	tmpStr += pFileName;
+	tmpStr += filename;
 	return tmpStr;
 }
 
