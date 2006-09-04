@@ -1159,8 +1159,146 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 	return -1;
 }
 
-HANDLE gSyslogH = 0;
+// copied from MSDN: http://msdn.microsoft.com/library/default.asp?url=/library/en-us/eventlog/base/adding_a_source_to_the_registry.asp
+
+BOOL AddEventSource
+(
+	LPTSTR pszSrcName, // event source name
+	DWORD  dwNum       // number of categories
+)
+{
+	// Work out the executable file name, to register ourselves
+	// as the event source
+
+	char cmd[MAX_PATH];
+	if (GetModuleFileName(NULL, cmd, sizeof(cmd)-1) == 0)
+	{
+		::syslog(LOG_ERR, "Failed to get the program file name: "
+			"error %d", GetLastError());
+		return FALSE;
+	}
+	cmd[sizeof(cmd)-1] = 0;
+ 	std::string exepath(cmd);
+
+	// Create the event source as a subkey of the log. 
+
+	std::string regkey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\"
+		"Application\\");
+	regkey += pszSrcName; 
+ 
+	HKEY hk;
+	DWORD dwDisp;
+
+	if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(), 
+			 0, NULL, REG_OPTION_NON_VOLATILE,
+			 KEY_WRITE, NULL, &hk, &dwDisp)) 
+	{
+		::syslog(LOG_ERR, "Failed to create the registry key: "
+			"error %d", GetLastError()); 
+		return FALSE;
+	}
+
+	// Set the name of the message file. 
+ 
+	if (RegSetValueEx(hk,                // subkey handle 
+			 "EventMessageFile", // value name 
+			 0,                  // must be zero 
+			 REG_EXPAND_SZ,      // value type 
+			 (LPBYTE) exepath.c_str(),  // pointer to value data 
+			 (DWORD) (exepath.size()))) // data size
+	{
+		::syslog(LOG_ERR, "Failed to set the event message file: "
+			"error %d", GetLastError()); 
+		RegCloseKey(hk); 
+		return FALSE;
+	}
+ 
+	// Set the supported event types. 
+ 
+	DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | 
+		  EVENTLOG_INFORMATION_TYPE; 
+ 
+	if (RegSetValueEx(hk,               // subkey handle 
+			  "TypesSupported", // value name 
+			  0,                // must be zero 
+			  REG_DWORD,        // value type 
+			  (LPBYTE) &dwData, // pointer to value data 
+			  sizeof(DWORD)))   // length of value data 
+	{
+		::syslog(LOG_ERR, "Failed to set the supported types: "
+			"error %d", GetLastError()); 
+		RegCloseKey(hk); 
+		return FALSE;
+	}
+ 
+	// Set the category message file and number of categories.
+
+	if (RegSetValueEx(hk,                        // subkey handle 
+			  "CategoryMessageFile",     // value name 
+			  0,                         // must be zero 
+			  REG_EXPAND_SZ,             // value type 
+			  (LPBYTE) exepath.c_str(),  // pointer to value data 
+			  (DWORD) (exepath.size()))) // data size
+	{
+		::syslog(LOG_ERR, "Failed to set the category message file: "
+			"error %d", GetLastError());
+		RegCloseKey(hk); 
+		return FALSE;
+	}
+ 
+	if (RegSetValueEx(hk,              // subkey handle 
+			  "CategoryCount", // value name 
+			  0,               // must be zero 
+			  REG_DWORD,       // value type 
+			  (LPBYTE) &dwNum, // pointer to value data 
+			  sizeof(DWORD)))  // length of value data 
+	{
+		::syslog(LOG_ERR, "Failed to set the category count: "
+			"error %d", GetLastError());
+		RegCloseKey(hk); 
+		return FALSE;
+	}
+
+	RegCloseKey(hk); 
+	return TRUE;
+}
+
+static HANDLE gSyslogH = 0;
 static bool sHaveWarnedEventLogFull = false;
+
+void openlog(const char * daemonName, int, int)
+{
+	// register a default event source, so that we can
+	// log errors with the process of adding or registering our own.
+	gSyslogH = RegisterEventSource(
+		NULL,        // uses local computer 
+		daemonName); // source name
+	if (gSyslogH == NULL) 
+	{
+	}
+
+	if (!AddEventSource("Box Backup", 0))
+	{
+		::syslog(LOG_ERR, "Failed to add our own event source");
+		return;
+	}
+
+	HANDLE newSyslogH = RegisterEventSource(NULL, "Box Backup");
+	if (newSyslogH == NULL)
+	{
+		::syslog(LOG_ERR, "Failed to register our own event source: "
+			"error %d", GetLastError());
+		return;
+	}
+
+	DeregisterEventSource(gSyslogH);
+	gSyslogH = newSyslogH;
+}
+
+void closelog(void)
+{
+	DeregisterEventSource(gSyslogH); 
+}
 
 void syslog(int loglevel, const char *frmt, ...)
 {
@@ -1201,17 +1339,32 @@ void syslog(int loglevel, const char *frmt, ...)
 	va_start(args, frmt);
 
 	int len = vsnprintf(buffer, sizeof(buffer)-1, sixfour.c_str(), args);
-	ASSERT(len < sizeof(buffer))
+	assert(len >= 0);
+	if (len < 0) 
+	{
+		printf("%s\r\n", buffer);
+		fflush(stdout);
+		return;
+	}
+	
+	assert((size_t)len < sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
 
 	va_end(args);
 
 	LPCSTR strings[] = { buffer, NULL };
 
+	if (gSyslogH == 0)
+	{
+		printf("%s\r\n", buffer);
+		fflush(stdout);
+		return;
+	}
+
 	if (!ReportEvent(gSyslogH, // event log handle 
 		errinfo,               // event type 
 		0,                     // category zero 
-		MSG_ERR_EXIST,	       // event identifier - 
+		MSG_ERR,	       // event identifier - 
 		                       // we will call them all the same
 		NULL,                  // no user security identifier 
 		1,                     // one substitution string 
@@ -1227,6 +1380,7 @@ void syslog(int loglevel, const char *frmt, ...)
 			{
 				printf("Unable to send message to Event Log "
 					"(Event Log is full):\r\n");
+				fflush(stdout);
 				sHaveWarnedEventLogFull = TRUE;
 			}
 		}
@@ -1234,6 +1388,7 @@ void syslog(int loglevel, const char *frmt, ...)
 		{
 			printf("Unable to send message to Event Log: "
 				"error %i:\r\n", (int)err);
+			fflush(stdout);
 		}
 	}
 	else
@@ -1242,6 +1397,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	}
 
 	printf("%s\r\n", buffer);
+	fflush(stdout);
 }
 
 int emu_chdir(const char* pDirName)
