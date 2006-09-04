@@ -1559,7 +1559,7 @@ int console_read(char* pBuffer, size_t BufferSize)
 		return -1;
 	}
 
-	int WideSize = BufferSize / 5;
+	size_t WideSize = BufferSize / 5;
 	WCHAR* pWideBuffer = new WCHAR [WideSize];
 
 	if (!pWideBuffer)
@@ -1573,7 +1573,7 @@ int console_read(char* pBuffer, size_t BufferSize)
 	if (!ReadConsoleW(
 			hConsole,
 			pWideBuffer,
-			WideSize - 1,
+			WideSize, // will not be null terminated by ReadConsole
 			&numCharsRead,
 			NULL // reserved
 		)) 
