@@ -213,10 +213,18 @@ void test_diff(int from, int to, int new_blocks_expected, int old_blocks_expecte
 	}
 	else
 	{
+#ifdef WIN32
+		// Emulate the above stage!
+		char src[256], dst[256];
+		sprintf(src, "testfiles\\f%d.diff", to);
+		sprintf(dst, "testfiles\\f%d.encoded", to);
+		TEST_THAT(CopyFile(src, dst, FALSE) != 0)
+#else
 		// Emulate the above stage!
 		char cmd[256];
 		sprintf(cmd, "cp testfiles/f%d.diff testfiles/f%d.encoded", to, to);
 		::system(cmd);
+#endif
 	}
 
 	// Decode it
