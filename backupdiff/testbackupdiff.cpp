@@ -369,7 +369,9 @@ int test(int argc, const char *argv[])
 {
 	// Want to trace out all the details
 	#ifndef NDEBUG
+	#ifndef WIN32
 	BackupStoreFile::TraceDetailsOfDiffProcess = true;
+	#endif
 	#endif
 
 	// Create all the test files
@@ -503,8 +505,15 @@ int test(int argc, const char *argv[])
 	// suck up lots of processor time -- because of lots of matches 
 	// found. Check this out!
 
+	#ifdef WIN32
+	::fprintf(stdout, "Testing diffing two large streams, "
+		"may take a while!\n");
+	::fflush(stdout);
+	#endif
+
 	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
 	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
+
 	// Generate a first encoded file
 	{
 		BackupStoreFilenameClear f0name("zero.0");
@@ -524,7 +533,14 @@ int test(int argc, const char *argv[])
 			2000 /* object ID of the file diffing from */, blockindex, IOStream::TimeOutInfinite,
 			0, 0));
 		encoded->CopyStreamTo(out);
+
+		printf("Time taken: %d seconds\n", (int)(time(0) - beginTime));
+
+		#ifdef WIN32
+		TEST_THAT(time(0) < (beginTime + 300));
+		#else
 		TEST_THAT(time(0) < (beginTime + 40));
+		#endif
 	}
 	// Remove zero-files to save disk space
 	remove("testfiles/zero.0");
