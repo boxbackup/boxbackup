@@ -1,5 +1,8 @@
 package BoxPlatform;
+
 use Exporter;
+use English;
+
 @ISA = qw/Exporter/;
 @EXPORT = qw/$build_os $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
 
@@ -12,7 +15,7 @@ BEGIN
 	$target_windows = 1 if $target_os =~ m'^mingw32' 
 		or $target_os eq "winnt";
 
-	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
+	if ($OSNAME eq "MSWin32" and not -x "/usr/bin/uname")
 	{
 		$build_os = "winnt";
 	}
