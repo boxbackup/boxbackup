@@ -456,6 +456,7 @@ int test(int argc, const char *argv[])
 		}
 	}
 	
+#ifndef WIN32	
 	// Check that symlinks aren't diffed
 	TEST_THAT(::symlink("f2", "testfiles/f2.symlink") == 0)
 	// And go and diff it against the previous encoded file
@@ -483,6 +484,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(completelyDifferent == true);
 		check_encoded_file("testfiles/f2.symlink.diff", 0, 0, 0);		
 	}
+#endif
 
 	// Check that diffing against a file which isn't "complete" and referes another isn't allowed
 	{
