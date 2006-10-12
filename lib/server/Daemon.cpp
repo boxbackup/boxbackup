@@ -23,6 +23,10 @@
 	#include <syslog.h>
 #endif
 
+#ifdef WIN32
+	#include <ws2tcpip.h>
+#endif
+
 #include "Daemon.h"
 #include "Configuration.h"
 #include "ServerException.h"
@@ -142,7 +146,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			{
 				fprintf(stderr, "%s: failed to start: "
 					"failed to open configuration file: "
-					"%s", DaemonName(), 
+					"%s\n", DaemonName(), 
 					mConfigFileName.c_str());
 #ifdef WIN32
 				::syslog(LOG_ERR, "%s: failed to start: "
@@ -189,6 +193,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		{
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
+#endif // !WIN32
 		
 		// Server configuration
 		const Configuration &serverConfig(
@@ -197,7 +202,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
-		
+	
+#ifndef WIN32	
 		// Handle changing to a different user
 		if(serverConfig.KeyExists("User"))
 		{
@@ -267,20 +273,25 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
+
 		// Log the start message
 		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " 
 			BOX_VERSION ")", mConfigFileName.c_str());
 
-#ifndef WIN32
 		// Write PID to file
 		char pid[32];
+
+#ifdef WIN32
+		int pidsize = sprintf(pid, "%d", (int)GetCurrentProcessId());
+#else
 		int pidsize = sprintf(pid, "%d", (int)getpid());
+#endif
+
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
 			::syslog(LOG_ERR, "can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
-#endif
 		
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING
@@ -352,6 +363,22 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 #endif
 		return 1;
 	}
+
+#ifdef WIN32
+	// Under win32 we must initialise the Winsock library
+	// before using sockets
+
+	WSADATA info;
+
+	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
+	{
+		// will not run without sockets
+		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+#endif
+
+	int retcode = 0;
 	
 	// Main Daemon running
 	try
@@ -381,7 +408,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 						mConfigFileName.c_str(),
 						errors.c_str());
 					// And give up
-					return 1;
+					retcode = 1;
+					break;
 				}
 				
 				// delete old configuration
@@ -409,22 +437,26 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		::syslog(LOG_ERR, "%s: terminating due to exception %s "
 			"(%d/%d)", DaemonName(), e.what(), e.GetType(), 
 			e.GetSubType());
-		return 1;
+		retcode = 1;
 	}
 	catch(std::exception &e)
 	{
 		::syslog(LOG_ERR, "%s: terminating due to exception %s", 
 			DaemonName(), e.what());
-		return 1;
+		retcode = 1;
 	}
 	catch(...)
 	{
 		::syslog(LOG_ERR, "%s: terminating due to unknown exception",
 			DaemonName());
-		return 1;
+		retcode = 1;
 	}
+
+#ifdef WIN32
+	WSACleanup();
+#endif
 	
-	return 0;
+	return retcode;
 }
 
 // --------------------------------------------------------------------------
