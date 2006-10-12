@@ -56,6 +56,8 @@ public:
 		return "generic-stream-server";
 	}
 
+	virtual void OnIdle() { }
+
 	virtual void Run()
 	{
 		// Set process title as appropraite
@@ -215,7 +217,7 @@ public:
 					if(connection.get())
 					{
 						// Since this is a template parameter, the if() will be optimised out by the compiler
-						if(ForkToHandleRequests)
+						if(WillForkToHandleRequests())
 						{
 							pid_t pid = ::fork();
 							switch(pid)
@@ -262,9 +264,11 @@ public:
 						}
 					}
 				}
-				
+
+				OnIdle();
+
 				// Clean up child processes (if forking daemon)
-				if(ForkToHandleRequests)
+				if(WillForkToHandleRequests())
 				{
 					int status = 0;
 					int p = 0;
@@ -301,7 +305,11 @@ protected:
 	// depends on the forking model in case someone changes it later.
 	bool WillForkToHandleRequests()
 	{
+		#ifdef WIN32
+		return false;
+		#else
 		return ForkToHandleRequests;
+		#endif // WIN32
 	}
 
 private:
