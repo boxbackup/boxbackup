@@ -24,7 +24,7 @@
 
 #include "MemLeakFindOn.h"
 
-template <int flags = O_RDONLY, int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)>
+template <int flags = O_RDONLY | O_BINARY, int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)>
 class FileHandleGuard
 {
 public:
