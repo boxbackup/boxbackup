@@ -41,6 +41,8 @@ int test(int argc, const char *argv[]);
 #endif
 
 int failures = 0;
+int first_fail_line;
+std::string first_fail_file;
 
 int filedes_open_at_beginning = -1;
 
@@ -128,7 +130,10 @@ int main(int argc, const char *argv[])
 			}
 			if(failures > 0)
 			{
-				printf("FAILED: %d tests failed\n", failures);
+				printf("FAILED: %d tests failed (first at "
+					"%s:%d)\n", failures, 
+					first_fail_file.c_str(),
+					first_fail_line);
 			}
 			else
 			{
