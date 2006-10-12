@@ -14,8 +14,7 @@ $|=1;
 
 print "Box build environment setup.\n\n";
 
-
-my $implicit_dep = 'lib/common';
+my @implicit_deps = ('lib/common');
 
 # work out platform variables
 use lib 'infrastructure';
@@ -38,11 +37,15 @@ unless(-d 'local')
 # flags about the environment
 my %env_flags;
 
-my $windows_include_path = "-I../../lib/win32 ";
-if ($target_os ne "mingw32" && $target_os ne "winnt")
+my $windows_include_path = "";
+if ($target_windows)
 {
-	$windows_include_path = "";
-	$env_flags{'IGNORE_lib/win32'} = 1;
+	$module_dependency{"lib/common"} = ["lib/win32"];
+	push @implicit_deps, "lib/win32";
+}
+else
+{
+	# $env_flags{'IGNORE_lib/win32'} = 1;
 }
 
 # print "Flag: $_\n" for(keys %env_flags);
@@ -271,7 +274,7 @@ for(@modules_files)
 			push @md,$_ unless ignore_module($_)
 		}
 	}
-	$module_dependency{$mod} = [$implicit_dep,@md];
+	$module_dependency{$mod} = [@implicit_deps,@md];
 	$module_library_link_opts{$mod} = [@lo];
 	
 	# make directories, but not if we're using an external library and this a library module
@@ -286,8 +289,11 @@ for(@modules_files)
 }
 
 # make dirs for implicit dep
-mkdir "release/$implicit_dep",0755;
-mkdir "debug/$implicit_dep",0755;
+foreach my $dep (@implicit_deps)
+{
+	mkdir "release/$dep",0755;
+	mkdir "debug/$dep",0755;
+}
 
 # write a list of all the modules we've configured to use
 open CONFIGURED_MODS,'>local/modules.h' or die "Can't write configured modules list";
@@ -296,7 +302,7 @@ print CONFIGURED_MODS <<__E;
 #ifndef _CONFIGURED_MODULES__H
 #define _CONFIGURED_MODULES__H
 __E
-for($implicit_dep,@modules)
+for(@implicit_deps,@modules)
 {
 	my $m = $_;
 	$m =~ s~/~_~;
@@ -310,7 +316,7 @@ close CONFIGURED_MODS;
 
 # now make a list of all the .h files we can find, recording which module they're in
 my %hfiles;
-for my $mod (@modules, $implicit_dep)
+for my $mod (@modules, @implicit_deps)
 {
 	opendir DIR,$mod;
 	my @items = readdir DIR;
@@ -347,7 +353,7 @@ for my $mod (@modules, $implicit_dep)
 	}
 }
 
-for my $mod (@modules, $implicit_dep)
+for my $mod (@modules, @implicit_deps)
 {
 	opendir DIR,$mod;
 	for my $h (grep /\.h\Z/i, readdir DIR)
@@ -373,9 +379,10 @@ for my $mod (@modules, $implicit_dep)
 
 print "done\n\nGenerating Makefiles...\n";
 
+my %module_resources_win32;
 
 # Then write a makefile for each module
-for my $mod (@modules, $implicit_dep)
+for my $mod (@implicit_deps, @modules)
 {
 	print $mod,"\n";
 	
@@ -416,9 +423,9 @@ __E
 		}
 		
 		writetestfile("$mod/_t", 
-			'./test' . $platform_exe_ext . '$1 $2 $3 $4 $5', $mod);
+			'./test' . $platform_exe_ext . ' $1 $2 $3 $4 $5', $mod);
 		writetestfile("$mod/_t-gdb", 
-			'gdb ./test ' . $platform_exe_ext, $mod);
+			'gdb ./test' . $platform_exe_ext, $mod);
 		
 	}
 	
@@ -441,14 +448,14 @@ __E
 		add_mod_deps(\@deps_raw, $mod);
 		# and then dedup and reorder them
 		my %d_done;
-		for(my $a = $#deps_raw; $a >= 0; $a--)
+		foreach my $dep (reverse @deps_raw)
 		{
-			if(!exists $d_done{$deps_raw[$a]})
+			if(!exists $d_done{$dep})
 			{
 				# insert
-				push @all_deps_for_module, $deps_raw[$a];
+				push @all_deps_for_module, $dep;
 				# mark as done
-				$d_done{$deps_raw[$a]} = 1;
+				$d_done{$dep} = 1;
 			}
 		}
 	}	
@@ -484,7 +491,7 @@ __E
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
 	my $release_flags = "-O2";
-	if ($target_os eq "mingw32")
+	if ($target_windows)
 	{
 		$release_flags = "-O0 -g";
 	}
@@ -499,6 +506,7 @@ CXX = g++
 AR = ar
 RANLIB = ranlib
 PERL = "@PERL@"
+WINDRES = windres
 .ifdef RELEASE
 CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
@@ -546,7 +554,7 @@ __E
 		@items = (@items, @autogen_items);
 	}
 	
-	# first, obtain a list of depenencies within the .h files
+	# first, obtain a list of dependencies within the .h files
 	my %headers;
 	for my $h (grep /\.h\Z/i, @items)
 	{
@@ -566,19 +574,30 @@ __E
 	
 	# then... do the cpp files...
 	my @obj_base;
-	for my $cpp (@items)
+	for my $file (@items)
 	{
-		next unless $cpp =~ m/\A(.+)\.cpp\Z/i;
-		next if $cpp =~ /\A\._/;	# Temp Mac OS Resource hack
+		my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
+		my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
+		my $base = $1;
+
+		if ($target_windows)
+		{
+			next if not $is_cpp and not $is_rc;
+		}
+		else
+		{
+			next if not $is_cpp;
+		}
+
+		next if $file =~ /\A\._/; # Temp Mac OS Resource hack
 
 		# store for later
-		my $base = $1;
 		push @obj_base,$base;
 	
 		# get the file...
-		open FL,"$mod/$cpp";
+		open FL,"$mod/$file";
 		my $f;
-		read FL,$f,-s "$mod/$cpp";
+		read FL,$f,-s "$mod/$file";
 		close FL;
 		
 		my %dep;
@@ -592,10 +611,29 @@ __E
 		my $out_name = '$(OUTDIR)/'.$base.'.o';
 		
 		# write the line for this cpp file
-		$make .= $out_name.': '.join(' ',$cpp,map
-			{ ($hfiles{$_} eq $mod)?$_:'../../'.$hfiles{$_}."/$_" } keys %dep)."\n";
-		$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra -c $cpp -o $out_name\n\n";
+		my @dep_paths = map 
+		{ 
+			($hfiles{$_} eq $mod)
+			? $_ 
+			: '../../'.$hfiles{$_}."/$_"
+		}
+		keys %dep;
 
+		$make .= $out_name.': '.join(' ',$file,@dep_paths)."\n";
+
+		if ($is_cpp)
+		{
+			$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra ".
+				"-c $file -o $out_name\n\n";
+		}
+		elsif ($is_rc)
+		{
+			$make .= "\t\$(WINDRES) $file $out_name\n\n";
+			my $res_list = $module_resources_win32{$mod};
+			$res_list ||= [];
+			push @$res_list, $base.'.o';
+			$module_resources_win32{$mod} = $res_list;
+		}
 	}
 
 	my $has_deps = ($#{$module_dependency{$mod}} >= 0);
@@ -647,11 +685,28 @@ __E
 	additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
 
 	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
+
+	if ($has_deps and not $bsd_make)
+	{
+		print MAKE ".PHONY: all\n" .
+			"all: dep_modules $end_target\n\n";
+	}
+
 	print MAKE $end_target,': ',$o_file_list;
-	print MAKE ' dep_modules' if $has_deps and not $bsd_make;
 	print MAKE " ",$lib_files unless $target_is_library;
 	print MAKE "\n";
 	
+	if ($target_windows)
+	{
+		foreach my $dep (@all_deps_for_module)
+		{
+			my $res_list = $module_resources_win32{$dep};
+			next unless $res_list;
+			$o_file_list .= ' '.join(' ', 
+				map {'$(OUTBASE)/'.$dep."/$_"} @$res_list);
+		}
+	}
+
 	# stuff to make the final target...
 	if($target_is_library)
 	{
