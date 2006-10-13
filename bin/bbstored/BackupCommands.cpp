@@ -29,6 +29,7 @@
 #include "BackupStoreInfo.h"
 #include "RaidFileController.h"
 #include "FileStream.h"
+#include "InvisibleTempFileStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -344,23 +345,14 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			{
 				{
 					// Write nastily to allow this to work with gcc 2.x
-#ifdef WIN32
-					combined.reset(new FileStream(
-						tempFn.c_str(), 
-						O_RDWR | O_CREAT | O_EXCL | 
-						O_BINARY | O_TRUNC));
-#else
-					std::auto_ptr<IOStream> t(new FileStream(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL));
+					std::auto_ptr<IOStream> t(
+						new InvisibleTempFileStream(
+							tempFn.c_str(), 
+							O_RDWR | O_CREAT | 
+							O_EXCL | O_BINARY | 
+							O_TRUNC));
 					combined = t;
-#endif
 				}
-#ifndef WIN32
-				// Unlink immediately as it's a temporary file
-				if(::unlink(tempFn.c_str()) != 0)
-				{
-					THROW_EXCEPTION(CommonException, OSFileError);
-				}
-#endif
 			}
 			catch(...)
 			{
