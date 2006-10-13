@@ -69,7 +69,7 @@ UnixUser::UnixUser(uid_t UID, gid_t GID)
 //
 // Function
 //		Name:    UnixUser::~UnixUser()
-//		Purpose: Destructor -- reverts to previous user if the change wasn't perminant
+//		Purpose: Destructor -- reverts to previous user if the change wasn't permanant
 //		Created: 21/1/04
 //
 // --------------------------------------------------------------------------
@@ -112,7 +112,7 @@ void UnixUser::ChangeProcessUser(bool Temporary)
 	}
 	else
 	{
-		// Change perminantely (change all UIDs and GIDs)
+		// Change permanently (change all UIDs and GIDs)
 		if(::setgid(mGID) != 0
 			|| ::setuid(mUID) != 0)
 		{
