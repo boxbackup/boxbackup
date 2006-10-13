@@ -274,7 +274,7 @@ void FileStream::Seek(IOStream::pos_type Offset, int SeekType)
 	conv.QuadPart = Offset;
 	DWORD retVal = SetFilePointer(this->mOSFileHandle, conv.LowPart, &conv.HighPart, ConvertSeekTypeToOSWhence(SeekType));
 
-	if ( retVal == INVALID_SET_FILE_POINTER && (GetLastError() != NO_ERROR) )
+	if(retVal == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR)
 	{
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
@@ -300,25 +300,25 @@ void FileStream::Seek(IOStream::pos_type Offset, int SeekType)
 // --------------------------------------------------------------------------
 void FileStream::Close()
 {
-	if(mOSFileHandle < 0)
+	if(mOSFileHandle == INVALID_FILE)
 	{
 		THROW_EXCEPTION(CommonException, FileAlreadyClosed)
 	}
+
 #ifdef WIN32
 	if(::CloseHandle(mOSFileHandle) == 0)
 	{
 		THROW_EXCEPTION(CommonException, OSFileCloseError)
 	}
-	mOSFileHandle = NULL;
-	mIsEOF = true;
 #else
 	if(::close(mOSFileHandle) != 0)
 	{
 		THROW_EXCEPTION(CommonException, OSFileCloseError)
 	}
-	mOSFileHandle = -1;
-	mIsEOF = true;
 #endif
+
+	mOSFileHandle = INVALID_FILE;
+	mIsEOF = true;
 }
 
 
