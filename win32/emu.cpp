@@ -521,7 +521,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		accessRights = FILE_WRITE_DATA;
 		shareMode = FILE_SHARE_WRITE;
 	}
-	else if (flags & (O_RDWR | O_CREAT))
+	else if (flags & O_RDWR)
 	{
 		accessRights |= FILE_WRITE_ATTRIBUTES 
 			| FILE_WRITE_DATA | FILE_WRITE_EA;
@@ -541,12 +541,19 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		shareMode = 0;
 	}
 
+	DWORD winFlags = FILE_FLAG_BACKUP_SEMANTICS;
+	if (flags & O_TEMPORARY)
+	{
+		winFlags  |= FILE_FLAG_DELETE_ON_CLOSE;
+		shareMode |= FILE_SHARE_DELETE;
+	}
+
 	HANDLE hdir = CreateFileW(pBuffer, 
 		accessRights, 
 		shareMode, 
 		NULL, 
 		createDisposition, 
-		FILE_FLAG_BACKUP_SEMANTICS,
+		winFlags,
 		NULL);
 	
 	delete [] pBuffer;
