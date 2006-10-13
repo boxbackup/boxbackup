@@ -16,6 +16,7 @@
 #include "FdGetLine.h"
 #include "Guards.h"
 #include "FileStream.h"
+#include "InvisibleTempFileStream.h"
 #include "IOStreamGetLine.h"
 #include "NamedLock.h"
 #include "ReadGatherStream.h"
@@ -134,6 +135,54 @@ ConfigurationVerify verify =
 
 int test(int argc, const char *argv[])
 {
+	// Test self-deleting temporary file streams
+	std::string tempfile("testfiles/tempfile");
+	TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()), 
+		CommonException, OSFileOpenError);
+	InvisibleTempFileStream fs(tempfile.c_str(), O_CREAT);
+
+#ifdef WIN32
+	// file is still visible under Windows
+	TEST_THAT(TestFileExists(tempfile.c_str()));
+
+	// opening it again should work
+	InvisibleTempFileStream fs2(tempfile.c_str());
+	TEST_THAT(TestFileExists(tempfile.c_str()));
+
+	// opening it to create should work
+	InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+	TEST_THAT(TestFileExists(tempfile.c_str()));
+
+	// opening it to create exclusively should fail
+	TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(), 
+		O_CREAT | O_EXCL), CommonException, OSFileOpenError);
+
+#else
+	// file is not visible under Unix
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+	// opening it again should fail
+	TEST_CHECK_THROWS(InvisibleTempFileStream fs2(tempfile.c_str()),
+		CommonException, OSFileOpenError);
+
+	// opening it to create should work
+	InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+	// opening it to create exclusively should work
+	InvisibleTempFileStream fs4(tempfile.c_str(), O_CREAT | O_EXCL);
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+	fs4.Close();
+#endif
+
+	fs.Close();
+	fs2.Close();
+	fs3.Close();
+
+	// now that it's closed, it should be invisible on all platforms
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
+
 	// Test memory leak detection
 #ifdef BOX_MEMORY_LEAK_TESTING
 	{
