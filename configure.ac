@@ -92,7 +92,7 @@ AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
 AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 
 if test "$ac_cv_header_regex_h" = "yes"; then
-  AC_SEARCH_LIBS([regcomp], [pcreposix])
+  AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"])
 fi
 
 ### Checks for typedefs, structures, and compiler characteristics.
