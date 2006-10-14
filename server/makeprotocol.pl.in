@@ -1,6 +1,9 @@
 #!@PERL@
 use strict;
 
+use lib "../../infrastructure";
+use BoxPlatform;
+
 # Make protocol C++ classes from a protocol description file
 
 # built in type info (values are is basic type, C++ typename)
@@ -911,6 +914,7 @@ __E
 # close files
 close H;
 close CPP;
+
 
 sub obj_is_type
 {
