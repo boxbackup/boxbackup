@@ -49,6 +49,10 @@
 
 #include "MemLeakFindOn.h"
 
+// min() and max() macros from stdlib.h break numeric_limits<>::min(), etc.
+#undef min
+#undef max
+
 #define COMPARE_RETURN_SAME			1
 #define COMPARE_RETURN_DIFFERENT	2
 #define COMPARE_RETURN_ERROR		3
