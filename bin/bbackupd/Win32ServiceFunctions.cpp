@@ -196,7 +196,7 @@ int InstallService(const char* pConfigFileName)
 			return 1;
 		}
 
-		if (! st.st_mode & S_IFREG)
+		if (!(st.st_mode & S_IFREG))
 		{
 	
 			syslog(LOG_ERR, "Failed to open configuration file: "
