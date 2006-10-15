@@ -125,6 +125,7 @@ void BackupContext::ReceivedFinishCommand()
 // --------------------------------------------------------------------------
 bool BackupContext::AttemptToGetWriteLock()
 {
+#ifndef WIN32
 	// Make the filename of the write lock file
 	std::string writeLockFile;
 	StoreStructure::MakeWriteLockFilename(mStoreRoot, mStoreDiscSet, writeLockFile);
@@ -158,6 +159,10 @@ bool BackupContext::AttemptToGetWriteLock()
 	}
 	
 	return gotLock;
+#else // WIN32
+	// no housekeeping process, we do have the lock
+	return true;
+#endif // !WIN32
 }
 
 
@@ -461,6 +466,12 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 #else
 				FileStream diff(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL);
 				FileStream diff2(tempFn.c_str(), O_RDONLY);
+
+				// Unlink it immediately, so it definitely goes away
+				if(::unlink(tempFn.c_str()) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
 #endif
 				
 				// Stream the incoming diff to this temporary file
@@ -503,14 +514,6 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 				spaceAdjustFromDiff = from->GetDiscUsageInBlocks() - oldVersionNewBlocksUsed;
 
 				// Everything cleans up here...
-				diff.Close();
-				diff2.Close();
-
-				// Unlink the temporary file
-				if(::unlink(tempFn.c_str()) != 0)
-				{
-					THROW_EXCEPTION(CommonException, OSFileError);
-				}
 			}
 			catch(...)
 			{
