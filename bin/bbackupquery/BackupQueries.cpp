@@ -102,12 +102,12 @@ typedef struct
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::DoCommand(const char *)
+//		Name:    BackupQueries::DoCommand(const char *, bool)
 //		Purpose: Perform a command
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-void BackupQueries::DoCommand(const char *Command)
+void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 {
 	// is the command a shell command?
 	if(Command[0] == 's' && Command[1] == 'h' && Command[2] == ' ' && Command[3] != '\0')
@@ -168,6 +168,25 @@ void BackupQueries::DoCommand(const char *Command)
 		if(!s.empty()) cmdElements.push_back(s);
 	}
 	
+	#ifdef WIN32
+	if (isFromCommandLine)
+	{
+		for (std::vector<std::string>::iterator 
+			i  = cmdElements.begin();
+			i != cmdElements.end(); i++)
+		{
+			std::string converted;
+			if (!ConvertEncoding(*i, CP_ACP, converted, 
+				GetConsoleCP()))
+			{
+				printf("Failed to convert encoding");
+				return;
+			}
+			*i = converted;
+		}
+	}
+	#endif
+		
 	// Check...
 	if(cmdElements.size() < 1)
 	{
@@ -394,7 +413,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::List(int64_t, const std::string &, const bool *)
+//		Name:    BackupQueries::List(int64_t, const std::string &, const bool *, bool)
 //		Purpose: Do the actual listing of directories and files
 //		Created: 2003/10/10
 //
@@ -871,7 +890,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 //		Created: 2003/10/12
 //
 // --------------------------------------------------------------------------
-void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool *opts)
+void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 {
 	// At least one argument?
 	// Check args
@@ -891,12 +910,20 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 	// BLOCK
 	{
 #ifdef WIN32
-		std::string fileName;
-		if(!ConvertConsoleToUtf8(args[0].c_str(), fileName))
-			return;
-#else
-		std::string fileName(args[0]);
+		for (std::vector<std::string>::iterator 
+			i = args.begin(); i != args.end(); i++)
+		{
+			std::string out;
+			if(!ConvertConsoleToUtf8(i->c_str(), out))
+			{
+				fprintf(stderr, "failed to convert encoding\n");
+				return;
+			}
+			*i = out;
+		}
 #endif
+
+		std::string fileName(args[0]);
 
 		if(!opts['i'])
 		{
@@ -961,14 +988,6 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		{				
 			// Specified by name, find the object in the directory to get the ID
 			BackupStoreDirectory::Iterator i(dir);
-#ifdef WIN32
-			std::string fileName;
-			if(!ConvertConsoleToUtf8(args[0].c_str(), fileName))
-				return;
-			BackupStoreFilenameClear fn(fileName);
-#else
-			BackupStoreFilenameClear fn(args[0]);
-#endif
 			BackupStoreDirectory::Entry *en = i.FindMatchingClearName(fn);
 			
 			if(en == 0)
