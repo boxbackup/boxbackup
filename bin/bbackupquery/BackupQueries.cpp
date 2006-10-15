@@ -884,13 +884,44 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 	}
 
 	// Find object ID somehow
-	int64_t id;
+	int64_t fileId;
+	int64_t dirId = GetCurrentDirectoryID();
 	std::string localName;
+
 	// BLOCK
 	{
+#ifdef WIN32
+		std::string fileName;
+		if(!ConvertConsoleToUtf8(args[0].c_str(), fileName))
+			return;
+#else
+		std::string fileName(args[0]);
+#endif
+
+		if(!opts['i'])
+		{
+			// does this remote filename include a path?
+			std::string::size_type index = fileName.rfind('/');
+			if(index != std::string::npos)
+			{
+				std::string dirName(fileName.substr(0, index));
+				fileName = fileName.substr(index + 1);
+
+				dirId = FindDirectoryObjectID(dirName);
+				if(dirId == 0)
+				{
+					printf("Directory '%s' not found\n", 
+						dirName.c_str());
+					return;
+				}
+			}
+		}
+
+		BackupStoreFilenameClear fn(fileName);
+
 		// Need to look it up in the current directory
 		mrConnection.QueryListDirectory(
-				GetCurrentDirectoryID(),
+				dirId,
 				BackupProtocolClientListDirectory::Flags_File,	// just files
 				(opts['i'])?(BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING):(BackupProtocolClientListDirectory::Flags_OldVersion | BackupProtocolClientListDirectory::Flags_Deleted), // only current versions
 				false /* don't want attributes */);
@@ -903,17 +934,23 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		if(opts['i'])
 		{
 			// Specified as ID. 
-			id = ::strtoll(args[0].c_str(), 0, 16);
-			if(id == std::numeric_limits<long long>::min() || id == std::numeric_limits<long long>::max() || id == 0)
+			fileId = ::strtoll(args[0].c_str(), 0, 16);
+			if(fileId == std::numeric_limits<long long>::min() || 
+				fileId == std::numeric_limits<long long>::max() || 
+				fileId == 0)
 			{
 				printf("Not a valid object ID (specified in hex)\n");
 				return;
 			}
 			
 			// Check that the item is actually in the directory
-			if(dir.FindEntryByID(id) == 0)
+			if(dir.FindEntryByID(fileId) == 0)
 			{
-				printf("ID '%08llx' not found in current directory on store.\n(You can only download objects by ID from the current directory.)\n", id);
+				printf("ID '%08llx' not found in current "
+					"directory on store.\n"
+					"(You can only download objects by ID "
+					"from the current directory.)\n", 
+					fileId);
 				return;
 			}
 			
@@ -936,14 +973,18 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 			
 			if(en == 0)
 			{
-				printf("Filename '%s' not found in current directory on store.\n(Subdirectories in path not searched.)\n", args[0].c_str());
+				printf("Filename '%s' not found in current "
+					"directory on store.\n"
+					"(Subdirectories in path not "
+					"searched.)\n", args[0].c_str());
 				return;
 			}
 			
-			id = en->GetObjectID();
+			fileId = en->GetObjectID();
 			
-			// Local name is the last argument, which is either the looked up filename, or
-			// a filename specified by the user.
+			// Local name is the last argument, which is either 
+			// the looked up filename, or a filename specified 
+			// by the user.
 			localName = args[args.size() - 1];
 		}
 	}
@@ -960,7 +1001,7 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 	try
 	{
 		// Request object
-		mrConnection.QueryGetFile(GetCurrentDirectoryID(), id);
+		mrConnection.QueryGetFile(dirId, fileId);
 
 		// Stream containing encoded file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
@@ -969,7 +1010,7 @@ void BackupQueries::CommandGet(const std::vector<std::string> &args, const bool 
 		BackupStoreFile::DecodeFile(*objectStream, localName.c_str(), mrConnection.GetTimeout());
 
 		// Done.
-		printf("Object ID %08llx fetched sucessfully.\n", id);
+		printf("Object ID %08llx fetched sucessfully.\n", fileId);
 	}
 	catch(...)
 	{
