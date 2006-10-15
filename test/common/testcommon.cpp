@@ -157,6 +157,7 @@ int test(int argc, const char *argv[])
 	TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(), 
 		O_CREAT | O_EXCL), CommonException, OSFileOpenError);
 
+	fs2.Close();
 #else
 	// file is not visible under Unix
 	TEST_THAT(!TestFileExists(tempfile.c_str()));
@@ -177,7 +178,6 @@ int test(int argc, const char *argv[])
 #endif
 
 	fs.Close();
-	fs2.Close();
 	fs3.Close();
 
 	// now that it's closed, it should be invisible on all platforms
