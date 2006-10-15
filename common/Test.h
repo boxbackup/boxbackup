@@ -108,7 +108,7 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 {
 	if(RunCommand(pCommandLine) != 0)
 	{
-		printf("Server: %s\n", command.c_str());
+		printf("Server: %s\n", pCommandLine);
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
@@ -118,7 +118,7 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 	// read pid file
 	if(!TestFileExists(pidFile))
 	{
-		printf("Server: %s\n", command.c_str());
+		printf("Server: %s\n", pCommandLine);
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
 		return -1;
 	}
@@ -127,7 +127,7 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 	int pid = -1;
 	if(f == NULL || fscanf(f, "%d", &pid) != 1)
 	{
-		printf("Server: %s (pidfile %s)\n", command.c_str(), pidFile);
+		printf("Server: %s (pidfile %s)\n", pCommandLine, pidFile);
 		TEST_FAIL_WITH_MESSAGE("Couldn't read PID file");	
 		return -1;
 	}
