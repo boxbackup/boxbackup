@@ -35,6 +35,9 @@
 // Must have this number of discs in the set
 #define TRANSFORM_NUMBER_DISCS_REQUIRED	3
 
+// we want to use POSIX fstat() for now, not the emulated one
+#undef fstat
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -567,18 +570,17 @@ void RaidFileWrite::TransformToRaidStorage()
 
 #ifdef WIN32
 		// Must delete before renaming
-		if (::unlink(stripe1Filename.c_str()) != 0 && errno != ENOENT)
-		{
-			THROW_EXCEPTION(RaidFileException, OSError);
+		#define CHECK_UNLINK(file) \
+		{ \
+			if (::unlink(file) != 0 && errno != ENOENT) \
+			{ \
+				THROW_EXCEPTION(RaidFileException, OSError); \
+			} \
 		}
-		if (::unlink(stripe2Filename.c_str()) != 0 && errno != ENOENT)
-		{
-			THROW_EXCEPTION(RaidFileException, OSError);
-		}
-		if (::unlink(parityFilename.c_str()) != 0 && errno != ENOENT)
-		{
-			THROW_EXCEPTION(RaidFileException, OSError);
-		}
+		CHECK_UNLINK(stripe1Filename.c_str());
+		CHECK_UNLINK(stripe2Filename.c_str());
+		CHECK_UNLINK(parityFilename.c_str());
+		#undef CHECK_UNLINK
 #endif
 		
 		// Rename them into place
