@@ -14,7 +14,7 @@
 
 #ifdef WIN32
 	typedef SOCKET tOSSocketHandle;
-	#define INVALID_SOCKET_VALUE INVALID_SOCKET
+	#define INVALID_SOCKET_VALUE (tOSSocketHandle)(-1)
 #else
 	typedef int tOSSocketHandle;
 	#define INVALID_SOCKET_VALUE -1
@@ -67,6 +67,7 @@ public:
 	off_t GetBytesRead() const {return mBytesRead;}
 	off_t GetBytesWritten() const {return mBytesWritten;}
 	void ResetCounters() {mBytesRead = mBytesWritten = 0;}
+	bool IsOpened() { return mSocketHandle != INVALID_SOCKET_VALUE; }
 };
 
 #endif // SOCKETSTREAM__H
