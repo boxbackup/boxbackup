@@ -63,6 +63,11 @@ private:
 	std::vector<std::string> mRegexStr;	// save original regular expression string-based source for Serialize
 #endif
 
+#ifdef WIN32
+	std::string ReplaceSlashesDefinite(const std::string& input) const;
+	std::string ReplaceSlashesRegex   (const std::string& input) const;
+#endif	
+
 	// For exceptions to the excludes
 	ExcludeList *mpAlwaysInclude;
 };
