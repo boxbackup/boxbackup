@@ -47,7 +47,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    FileStream::FileStream(int)
+//		Name:    FileStream::FileStream(tOSFileHandle)
 //		Purpose: Constructor, using existing file descriptor
 //		Created: 2003/08/28
 //
@@ -65,6 +65,9 @@ FileStream::FileStream(tOSFileHandle FileDescriptor)
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
+#ifdef WIN32
+	this->fileName = "HANDLE";
+#endif
 }
 
 #if 0
@@ -138,8 +141,14 @@ int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 	{
 		r = numBytesRead;
 	}
+	else if (GetLastError() == ERROR_BROKEN_PIPE)
+	{
+		r = 0;
+	}
 	else
 	{
+		::syslog(LOG_ERR, "Failed to read from file: error %d",
+			GetLastError());
 		r = -1;
 	}
 #else
@@ -307,15 +316,12 @@ void FileStream::Close()
 
 #ifdef WIN32
 	if(::CloseHandle(mOSFileHandle) == 0)
-	{
-		THROW_EXCEPTION(CommonException, OSFileCloseError)
-	}
 #else
 	if(::close(mOSFileHandle) != 0)
+#endif
 	{
 		THROW_EXCEPTION(CommonException, OSFileCloseError)
 	}
-#endif
 
 	mOSFileHandle = INVALID_FILE;
 	mIsEOF = true;
