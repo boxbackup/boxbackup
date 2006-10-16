@@ -25,6 +25,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Determining Version Number"
+				CommandLine="perl $(InputDir)..\getversion.pl"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -394,7 +396,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp"
+						RelativePath="..\..\..\lib\win32\getopt_long.cxx"
 						>
 					</File>
 				</Filter>
@@ -447,6 +449,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.cpp"
 						>
 					</File>
 				</Filter>
@@ -504,7 +510,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\common\BoxConfig.h"
+						RelativePath="..\..\..\lib\common\BoxConfig-MSVC.h"
 						>
 					</File>
 					<File
@@ -529,6 +535,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\BoxTimeToUnix.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\BoxVersion.h"
 						>
 					</File>
 					<File
@@ -764,7 +774,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h"
+						RelativePath="..\..\..\lib\win32\getopt.h"
 						>
 					</File>
 				</Filter>
@@ -833,6 +843,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.h"
 						>
 					</File>
 				</Filter>
