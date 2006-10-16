@@ -16,7 +16,9 @@ enum
 {
 	Restore_Complete = 0,
 	Restore_ResumePossible = 1,
-	Restore_TargetExists = 2
+	Restore_TargetExists = 2,
+	Restore_TargetPathNotFound = 3,
+	Restore_UnknownError = 4,
 };
 
 int BackupClientRestore(BackupProtocolClient &rConnection, int64_t DirectoryID, const char *LocalDirectoryName,
