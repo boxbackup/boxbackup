@@ -20,7 +20,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0\&quot;"
-				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING"
+				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;NDEBUG "
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -287,6 +287,9 @@
 					<File
 						RelativePath="..\..\..\lib\win32\emu.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt_long.cxx">
+					</File>
 				</Filter>
 				<Filter
 					Name="server"
@@ -327,6 +330,10 @@
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.cpp">
+					</File>
+
 				</Filter>
 			</Filter>
 		</Filter>
@@ -476,6 +483,9 @@
 					<File
 						RelativePath="..\..\..\lib\common\WaitForEvent.h">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\common\BoxVersion.h">
+					</File>
 				</Filter>
 				<Filter
 					Name="backupclient"
@@ -569,6 +579,12 @@
 					<File
 						RelativePath="..\..\..\lib\win32\emu.h">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h">
+					</File>
 				</Filter>
 				<Filter
 					Name="server"
@@ -620,6 +636,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.h">
 					</File>
 				</Filter>
 			</Filter>

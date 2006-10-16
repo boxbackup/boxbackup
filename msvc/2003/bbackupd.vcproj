@@ -20,7 +20,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\..\..\db-4.2.52.NC\build_win32&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0&quot;;&quot;$(SolutionDir)..\..\..\..\openssl\include&quot;;&quot;$(SolutionDir)..\..\..\..\zlib\include&quot;;&quot;$(SolutionDir)..\..\..\lib\backupclient&quot;;&quot;$(SolutionDir)..\..\..\lib\server&quot;;&quot;$(SolutionDir)..\..\..\lib\crypto&quot;;&quot;$(SolutionDir)..\..\..\lib\compress&quot;;&quot;$(SolutionDir)..\..\..\lib\win32&quot;;&quot;$(SolutionDir)..\..\..\lib\common\&quot;"
-				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
+				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;NDEBUG "
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -200,6 +200,9 @@
 			Name="Resource Files"
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+			<File
+				RelativePath="..\..\..\lib\win32\messages.rc">
+			</File>
 		</Filter>
 		<File
 			RelativePath="..\..\..\ReadMe.txt">
