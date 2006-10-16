@@ -23,6 +23,7 @@
 #include "SSLLib.h"
 #include "ServerException.h"
 #include "TLSContext.h"
+#include "BoxTime.h"
 
 #include "MemLeakFindOn.h"
 
@@ -244,20 +245,30 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 		break;
 	}
 	p.revents = 0;
-	switch(::poll(&p, 1, (Timeout == IOStream::TimeOutInfinite)?INFTIM:Timeout))
+
+	int64_t start, end;
+	start = BoxTimeToMilliSeconds(GetCurrentBoxTime());
+	end   = start + Timeout;
+	int result;
+
+	do
+	{
+		int64_t now = BoxTimeToMilliSeconds(GetCurrentBoxTime());
+		int poll_timeout = (int)(end - now);
+		if (poll_timeout < 0) poll_timeout = 0;
+		if (Timeout == IOStream::TimeOutInfinite)
+		{
+			poll_timeout = INFTIM;
+		}
+		result = ::poll(&p, 1, poll_timeout);
+	}
+	while(result == -1 && errno == EINTR);
+
+	switch(result)
 	{
 	case -1:
-		// error
-		if(errno == EINTR)
-		{
-			// Signal. Do "time out"
-			return false;
-		}
-		else
-		{
-			// Bad!
-			THROW_EXCEPTION(ServerException, SocketPollError)
-		}
+		// error - Bad!
+		THROW_EXCEPTION(ServerException, SocketPollError)
 		break;
 
 	case 0:
