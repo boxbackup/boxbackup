@@ -227,7 +227,7 @@ bool SendCommands(const std::string& rCmd)
 	return statusOk;
 }
 
-inline bool ServerIsAlive()
+inline bool ServerIsAlive(int pid)
 {
 	return SendCommands("");
 }
@@ -237,11 +237,9 @@ inline bool HUPServer(int pid)
 	return SendCommands("reload");
 }
 
-inline bool KillServer(int pid)
+inline bool KillServerInternal(int pid)
 {
 	TEST_THAT(SendCommands("terminate"));
-	::sleep(1);
-	return !ServerIsAlive();
 }
 
 #else // !WIN32
@@ -258,16 +256,44 @@ inline bool HUPServer(int pid)
 	return ::kill(pid, SIGHUP) != -1;
 }
 
-inline bool KillServer(int pid)
+inline bool KillServerInternal(int pid)
 {
 	if(pid == 0 || pid == -1) return false;
-	bool KilledOK = ::kill(pid, SIGTERM) != -1;
-	TEST_THAT(KilledOK);
-	::sleep(1);
-	return !ServerIsAlive(pid);
+	TEST_THAT(::kill(pid, SIGTERM) != -1);
 }
 
 #endif // WIN32
+
+inline bool KillServer(int pid)
+{
+	KillServerInternal(pid);
+
+	for (int i = 0; i < 30; i++)
+	{
+		if (!ServerIsAlive(pid)) break;
+		::sleep(1);
+		if (!ServerIsAlive(pid)) break;
+
+		if (i == 0) 
+		{
+			printf("waiting for server to die");
+		}
+		printf(".");
+		fflush(stdout);
+	}
+
+	if (!ServerIsAlive(pid))
+	{
+		printf("done.\n");
+	}
+	else
+	{
+		printf("failed!\n");
+	}
+	fflush(stdout);
+
+	return !ServerIsAlive(pid);
+}
 
 inline void TestRemoteProcessMemLeaks(const char *filename)
 {
