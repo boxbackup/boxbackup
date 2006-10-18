@@ -60,7 +60,7 @@ public:
 
 	virtual void Run()
 	{
-		// Set process title as appropraite
+		// Set process title as appropriate
 		SetProcessTitle(ForkToHandleRequests?"server":"idle");
 	
 		// Handle exceptions and child task quitting gracefully.
@@ -217,7 +217,8 @@ public:
 					if(connection.get())
 					{
 						// Since this is a template parameter, the if() will be optimised out by the compiler
-						if(WillForkToHandleRequests())
+						#ifndef WIN32 // no fork on Win32
+						if(ForkToHandleRequests)
 						{
 							pid_t pid = ::fork();
 							switch(pid)
@@ -257,18 +258,22 @@ public:
 						}
 						else
 						{
+						#endif // !WIN32
 							// Just handle in this connection
 							SetProcessTitle("handling");
 							HandleConnection(*connection);
 							SetProcessTitle("idle");										
+						#ifndef WIN32
 						}
+						#endif // !WIN32
 					}
 				}
 
 				OnIdle();
 
+				#ifndef WIN32
 				// Clean up child processes (if forking daemon)
-				if(WillForkToHandleRequests())
+				if(ForkToHandleRequests)
 				{
 					int status = 0;
 					int p = 0;
@@ -281,6 +286,7 @@ public:
 						}
 					} while(p > 0);
 				}
+				#endif // !WIN32
 			}
 		}
 		catch(...)
@@ -301,7 +307,7 @@ public:
 	virtual void Connection(StreamType &rStream) = 0;
 	
 protected:
-	// For checking code in dervied classes -- use if you have an algorithm which
+	// For checking code in derived classes -- use if you have an algorithm which
 	// depends on the forking model in case someone changes it later.
 	bool WillForkToHandleRequests()
 	{
