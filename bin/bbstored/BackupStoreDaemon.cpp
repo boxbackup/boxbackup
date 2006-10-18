@@ -228,13 +228,38 @@ void BackupStoreDaemon::Run()
 	else
 	{
 		// In server process -- use the base class to do the magic
-		ServerTLS<BOX_PORT_BBSTORED>::Run();
-		
+		try
+		{
+			ServerTLS<BOX_PORT_BBSTORED>::Run();
+		}
+		catch(BoxException &e)
+		{
+			::syslog(LOG_ERR, "%s: disconnecting due to "
+				"exception %s (%d/%d)", DaemonName(), 
+				e.what(), e.GetType(), e.GetSubType());
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "%s: disconnecting due to "
+				"exception %s", DaemonName(), e.what());
+		}
+		catch(...)
+		{
+			::syslog(LOG_ERR, "%s: disconnecting due to "
+				"unknown exception", DaemonName());
+		}
+
+		if (!mInterProcessCommsSocket.IsOpened())
+		{
+			return;
+		}
+
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())
 		{
 			mInterProcessCommsSocket.Write("h\n", 2);
 		}
+
 		if(IsTerminateWanted())
 		{
 			mInterProcessCommsSocket.Write("t\n", 2);
