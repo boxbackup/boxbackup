@@ -42,6 +42,7 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mExtendedLogging(false),
 	  mHaveForkedHousekeeping(false),
 	  mIsHousekeepingProcess(false),
+	  mHousekeepingInited(false),
 	  mInterProcessComms(mInterProcessCommsSocket)
 {
 }
@@ -159,6 +160,9 @@ void BackupStoreDaemon::Run()
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
 	
+#ifdef WIN32	
+	// Housekeeping runs synchronously on Win32
+#else
 	// Fork off housekeeping daemon -- must only do this the first time Run() is called
 	if(!mHaveForkedHousekeeping)
 	{
@@ -214,6 +218,7 @@ void BackupStoreDaemon::Run()
 			THROW_EXCEPTION(ServerException, SocketCloseError)
 		}
 	}
+#endif // WIN32
 
 	if(mIsHousekeepingProcess)
 	{
