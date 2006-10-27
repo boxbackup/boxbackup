@@ -3,15 +3,13 @@
 // Need at least 0x0500 to use GetFileSizeEx on Cygwin/MinGW
 #define WINVER 0x0500
 
-#include "Box.h"
+#include "emu.h"
 
 #ifdef WIN32
 
-// #include "emu.h"
-
-#include <windows.h>
+#include <assert.h>
 #include <fcntl.h>
-// #include <atlenc.h>
+#include <windows.h>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
