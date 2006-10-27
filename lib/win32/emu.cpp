@@ -486,18 +486,20 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 //
 // Function
 //		Name:    openfile
-//		Purpose: replacement for any open calls - handles unicode filenames - supplied in utf8
+//		Purpose: replacement for any open calls - handles unicode 
+//			filenames - supplied in utf8
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
 HANDLE openfile(const char *pFileName, int flags, int mode)
 {
-	std::string AbsPathWithUnicode = ConvertPathToAbsoluteUnicode(pFileName);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pFileName);
 	
 	if (AbsPathWithUnicode.size() == 0)
 	{
 		// error already logged by ConvertPathToAbsoluteUnicode()
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 	
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
@@ -506,7 +508,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	if (pBuffer == NULL)
 	{
 		// error already logged by ConvertUtf8ToWideString()
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
 	// flags could be O_WRONLY | O_CREAT | O_RDONLY
@@ -553,7 +555,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	{
 		::syslog(LOG_WARNING, "Failed to open file %s: "
 			"error %i", pFileName, GetLastError());
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
 	return hdir;
