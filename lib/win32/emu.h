@@ -372,29 +372,9 @@ int emu_stat(const char * name, struct stat * st);
 int emu_fstat(HANDLE file, struct stat * st);
 int statfs(const char * name, struct statfs * s);
 
-//need this for converstions
-inline time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
-{
-	SYSTEMTIME stUTC;
-	struct tm timeinfo;
-
-	// Convert the last-write time to local time.
-	FileTimeToSystemTime(fileTime, &stUTC);
-	// SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
-
-	memset(&timeinfo, 0, sizeof(timeinfo));	
-	timeinfo.tm_sec = stUTC.wSecond;
-	timeinfo.tm_min = stUTC.wMinute;
-	timeinfo.tm_hour = stUTC.wHour;
-	timeinfo.tm_mday = stUTC.wDay;
-	timeinfo.tm_wday = stUTC.wDayOfWeek;
-	timeinfo.tm_mon = stUTC.wMonth - 1;
-	// timeinfo.tm_yday = ...;
-	timeinfo.tm_year = stUTC.wYear - 1900;
-
-	time_t retVal = mktime(&timeinfo) - _timezone;
-	return retVal;
-}
+// need this for conversions
+time_t ConvertFileTimeToTime_t(FILETIME *fileTime);
+bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 
 #ifdef _MSC_VER
 	#define stat(filename,  struct) emu_stat (filename, struct)
