@@ -79,11 +79,31 @@ inline int TestGetFileSize(const char *Filename)
 	return -1;
 }
 
-inline int LaunchServer(const char *CommandLine, const char *pidFile)
+inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 {
-	if(::system(CommandLine) != 0)
+#ifdef WIN32
+	// convert UNIX paths to native
+
+	std::string command;
+	for (int i = 0; pCommandLine[i] != 0; i++)
 	{
-		printf("Server: %s\n", CommandLine);
+		if (pCommandLine[i] == '/')
+		{
+			command += '\\';
+		}
+		else
+		{
+			command += pCommandLine[i];
+		}
+	}
+
+#else // !WIN32
+	std::string command = pCommandLine;
+#endif
+
+	if(::system(command.c_str()) != 0)
+	{
+		printf("Server: %s\n", command.c_str());
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
@@ -93,7 +113,7 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	// read pid file
 	if(!TestFileExists(pidFile))
 	{
-		printf("Server: %s\n", CommandLine);
+		printf("Server: %s\n", command.c_str());
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
 		return -1;
 	}
@@ -102,7 +122,7 @@ inline int LaunchServer(const char *CommandLine, const char *pidFile)
 	int pid = -1;
 	if(f == NULL || fscanf(f, "%d", &pid) != 1)
 	{
-		printf("Server: %s (pidfile %s)\n", CommandLine, pidFile);
+		printf("Server: %s (pidfile %s)\n", command.c_str(), pidFile);
 		TEST_FAIL_WITH_MESSAGE("Couldn't read PID file");	
 		return -1;
 	}
