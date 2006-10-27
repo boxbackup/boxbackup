@@ -60,7 +60,7 @@ public:
 
 	virtual void Run()
 	{
-		// Set process title as appropraite
+		// Set process title as appropriate
 		SetProcessTitle(ForkToHandleRequests?"server":"idle");
 	
 		// Handle exceptions and child task quitting gracefully.
