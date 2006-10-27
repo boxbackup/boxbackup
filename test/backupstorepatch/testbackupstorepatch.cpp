@@ -317,7 +317,10 @@ int test(int argc, const char *argv[])
 			"testfiles/clientTrustedCAs.pem");
 
 	// Create an account
-	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
+	TEST_THAT_ABORTONFAIL(RunCommand(
+		"../../bin/bbstoreaccounts/bbstoreaccounts "
+		"-c testfiles/bbstored.conf "
+		"create 01234567 0 30000B 40000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Create test files
