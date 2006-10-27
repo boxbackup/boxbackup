@@ -3,7 +3,48 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
-#define _INO_T_DEFINED
+// basic types, may be required by other headers since we
+// don't include sys/types.h
+
+#ifdef __MINGW32__
+	#include <stdint.h>
+	typedef uint32_t u_int32_t;
+#else // MSVC
+	typedef __int64 int64_t;
+	typedef __int32 int32_t;
+	typedef __int16 int16_t;
+	typedef __int8  int8_t;
+	
+	typedef unsigned __int64 u_int64_t;
+	typedef unsigned __int32 u_int32_t;
+	
+	typedef unsigned __int64 uint64_t;
+	typedef unsigned __int32 uint32_t;
+	typedef unsigned __int16 uint16_t;
+	typedef unsigned __int8  uint8_t;
+#endif
+
+// emulated types, present on MinGW but not MSVC or vice versa
+
+#ifdef _MSC_VER
+	typedef unsigned int mode_t;
+	typedef unsigned int pid_t;
+
+	// must define _INO_T_DEFINED before including <sys/types.h>
+	// to replace it with our own.
+	typedef u_int64_t _ino_t;
+	#define _INO_T_DEFINED
+#endif
+
+// set up to include the necessary parts of Windows headers
+
+#define WIN32_LEAN_AND_MEAN
+
+#ifndef __MSVCRT_VERSION__
+#define __MSVCRT_VERSION__ 0x0601
+#endif
+
+// Windows headers
 
 #include <winsock2.h>
 #include <fcntl.h>
@@ -18,6 +59,8 @@
 #include <time.h>
 
 #include <string>
+
+// emulated functions
 
 #define gmtime_r( _clock, _result ) \
 	( *(_result) = *gmtime( (_clock) ), \
@@ -50,8 +93,8 @@ inline int geteuid(void)
 struct passwd {
 	char *pw_name;
 	char *pw_passwd;
-	uid_t pw_uid;
-	gid_t pw_gid;
+	int pw_uid;
+	int pw_gid;
 	time_t pw_change;
 	char *pw_class;
 	char *pw_gecos;
@@ -252,17 +295,6 @@ struct itimerval
 #define tv_nsec tv_usec 
 
 #ifndef __MINGW32__
-	typedef unsigned __int64 u_int64_t;
-	typedef unsigned __int64 uint64_t;
-	typedef __int64 int64_t;
-	typedef unsigned __int32 uint32_t;
-	typedef unsigned __int32 u_int32_t;
-	typedef __int32 int32_t;
-	typedef unsigned __int16 uint16_t;
-	typedef __int16 int16_t;
-	typedef unsigned __int8 uint8_t;
-	typedef __int8 int8_t;
-
 	typedef int socklen_t;
 #endif
 
@@ -282,10 +314,6 @@ struct itimerval
 #define S_ISLNK(x) ( false )
 
 #define vsnprintf _vsnprintf
-
-#ifndef __MINGW32__
-typedef unsigned int mode_t;
-#endif
 
 int emu_mkdir(const char* pPathName);
 
@@ -410,10 +438,6 @@ struct stat {
 	time_t st_mtime;
 	time_t st_ctime;
 };
-
-#ifndef __MINGW32__
-typedef u_int64_t _ino_t;
-#endif
 #endif
 
 int emu_stat(const char * name, struct stat * st);
