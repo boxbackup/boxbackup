@@ -21,6 +21,10 @@
 #include <string>
 #include <list>
 
+// message resource definitions for syslog()
+
+#include "messages.h"
+
 // our implementation for a timer, based on a 
 // simple thread which sleeps for a period of time
 
