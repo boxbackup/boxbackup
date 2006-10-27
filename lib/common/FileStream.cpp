@@ -30,7 +30,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 	  mIsEOF(false)
 {
 #ifdef WIN32
-	if(mOSFileHandle == 0)
+	if(mOSFileHandle == INVALID_HANDLE_VALUE)
 #else
 	if(mOSFileHandle < 0)
 #endif
@@ -56,7 +56,11 @@ FileStream::FileStream(tOSFileHandle FileDescriptor)
 	: mOSFileHandle(FileDescriptor),
 	  mIsEOF(false)
 {
+#ifdef WIN32
+	if(mOSFileHandle == INVALID_HANDLE_VALUE)
+#else
 	if(mOSFileHandle < 0)
+#endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
@@ -76,7 +80,11 @@ FileStream::FileStream(const FileStream &rToCopy)
 	: mOSFileHandle(::dup(rToCopy.mOSFileHandle)),
 	  mIsEOF(rToCopy.mIsEOF)
 {
+#ifdef WIN32
+	if(mOSFileHandle == INVALID_HANDLE_VALUE)
+#else
 	if(mOSFileHandle < 0)
+#endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
