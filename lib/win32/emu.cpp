@@ -372,7 +372,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 // --------------------------------------------------------------------------
 bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
 {
-	WCHAR* pWide = ConvertToWideString(pString, CP_UTF8);
+	WCHAR* pWide = ConvertUtf8ToWideString(pString);
 	if (pWide == NULL)
 	{
 		return false;
