@@ -1079,10 +1079,10 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		fd_set readfd;
 		fd_set writefd;
 
-		readfd.fd_count = 0;
-		writefd.fd_count = 0;
+		FD_ZERO(&readfd);
+		FD_ZERO(&writefd);
 
-		struct pollfd *ufdsTmp = ufds;
+		// struct pollfd *ufdsTmp = ufds;
 
 		timeval timOut;
 		timeval *tmpptr; 
@@ -1095,41 +1095,61 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		timOut.tv_sec  = timeout / 1000;
 		timOut.tv_usec = timeout * 1000;
 
-		if (ufds->events & POLLIN)
+		for (unsigned long i = 0; i < nfds; i++)
 		{
-			for (unsigned long i = 0; i < nfds; i++)
+			struct pollfd* ufd = &(ufds[i]);
+
+			if (ufd->events & POLLIN)
 			{
-				readfd.fd_array[i] = ufdsTmp->fd;
-				readfd.fd_count++;
+				FD_SET(ufd->fd, &readfd);
 			}
-		}
 
-		if (ufds->events & POLLOUT)
-		{
-			for (unsigned long i = 0; i < nfds; i++)
+			if (ufd->events & POLLOUT)
 			{
+				FD_SET(ufd->fd, &writefd);
+			}
 
-				writefd.fd_array[i]=ufdsTmp->fd;
-				writefd.fd_count++;
+			if (ufd->events & ~(POLLIN | POLLOUT))
+			{
+				printf("Unsupported poll bits %d",
+					ufd->events);
+				return -1;
 			}
 		}	
 
-		int noffds = select(0, &readfd, &writefd, 0, tmpptr);
+		int nready = select(0, &readfd, &writefd, 0, tmpptr);
 
-		if (noffds == SOCKET_ERROR)
+		if (nready == SOCKET_ERROR)
 		{
 			// int errval = WSAGetLastError();
 
-			ufdsTmp = ufds;
+			struct pollfd* pufd = ufds;
 			for (unsigned long i = 0; i < nfds; i++)
 			{
-				ufdsTmp->revents = POLLERR;
-				ufdsTmp++;
+				pufd->revents = POLLERR;
+				pufd++;
 			}
 			return (-1);
 		}
+		else if (nready > 0)
+		{
+			for (unsigned long i = 0; i < nfds; i++)
+			{
+				struct pollfd *ufd = &(ufds[i]);
 
-		return noffds;
+				if (FD_ISSET(ufd->fd, &readfd))
+				{
+					ufd->revents |= POLLIN;
+				}
+
+				if (FD_ISSET(ufd->fd, &writefd))
+				{
+					ufd->revents |= POLLOUT;
+				}
+			}
+		}
+
+		return nready;
 	}
 	catch (...)
 	{
