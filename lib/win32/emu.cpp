@@ -561,15 +561,6 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	return hdir;
 }
 
-// MinGW provides a getopt implementation
-#ifndef __MINGW32__
-//works with getopt
-char *optarg;
-//optind looks like an index into the string - how far we have moved along
-int optind = 1;
-char nextchar = -1;
-#endif
-
 // --------------------------------------------------------------------------
 //
 // Function
