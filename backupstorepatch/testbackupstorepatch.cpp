@@ -283,14 +283,6 @@ void test_depends_in_dirs()
 
 int test(int argc, const char *argv[])
 {
-#ifdef WIN32
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-
-	WSADATA info;
-	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
-#endif
-
 	// Allocate a buffer
 	buffer = ::malloc(BUFFER_SIZE);
 	TEST_THAT(buffer != 0);
