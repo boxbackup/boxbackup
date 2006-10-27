@@ -266,9 +266,14 @@ inline int strcasecmp(const char *s1, const char *s2)
 }
 #endif
 
+#ifdef _DIRENT_H_
+#error You must not include MinGW's dirent.h!
+#endif
+
 struct dirent
 {
 	char *d_name;
+	unsigned long d_type;
 };
 
 struct DIR
