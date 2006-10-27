@@ -1402,7 +1402,16 @@ void syslog(int loglevel, const char *frmt, ...)
 
 int emu_chdir(const char* pDirName)
 {
-	WCHAR* pBuffer = ConvertUtf8ToWideString(pDirName);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pDirName);
+
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	if (!pBuffer) return -1;
 	int result = SetCurrentDirectoryW(pBuffer);
 	delete [] pBuffer;
@@ -1420,7 +1429,7 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 		return NULL;
 	}
 
-	if (len > BufSize)
+	if ((int)len > BufSize)
 	{
 		errno = ENAMETOOLONG;
 		return NULL;
@@ -1457,7 +1466,16 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 
 int emu_mkdir(const char* pPathName)
 {
-	WCHAR* pBuffer = ConvertToWideString(pPathName, CP_UTF8);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pPathName);
+
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	if (!pBuffer)
 	{
 		return -1;
@@ -1477,18 +1495,45 @@ int emu_mkdir(const char* pPathName)
 
 int emu_unlink(const char* pFileName)
 {
-	WCHAR* pBuffer = ConvertToWideString(pFileName, CP_UTF8);
+	std::string AbsPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pFileName);
+
+	if (AbsPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	if (!pBuffer)
 	{
 		return -1;
 	}
 
 	BOOL result = DeleteFileW(pBuffer);
+	DWORD err = GetLastError();
 	delete [] pBuffer;
 
 	if (!result)
 	{
-		errno = EACCES;
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		{
+			errno = ENOENT;
+		}
+		else if (err == ERROR_SHARING_VIOLATION)
+		{
+			errno = EBUSY;
+		}
+		else if (err == ERROR_ACCESS_DENIED)
+		{
+			errno = EACCES;
+		}
+		else
+		{
+			::syslog(LOG_WARNING, "Failed to delete file "
+				"'%s': error %d", pFileName, (int)err);
+			errno = ENOSYS;
+		}
 		return -1;
 	}
 
