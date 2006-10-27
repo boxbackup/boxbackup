@@ -518,19 +518,19 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	if (flags & O_WRONLY)
 	{
+		accessRights = FILE_WRITE_DATA;
 		shareMode = FILE_SHARE_WRITE;
 	}
-	if (flags & O_RDWR)
+	else if (flags & (O_RDWR | O_CREAT))
 	{
-		shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+		accessRights |= FILE_WRITE_ATTRIBUTES 
+			| FILE_WRITE_DATA | FILE_WRITE_EA;
+		shareMode |= FILE_SHARE_WRITE;
 	}
+
 	if (flags & O_CREAT)
 	{
 		createDisposition = OPEN_ALWAYS;
-		shareMode |= FILE_SHARE_WRITE;
-		accessRights |= FILE_WRITE_ATTRIBUTES 
-			| FILE_WRITE_DATA | FILE_WRITE_EA 
-			| FILE_ALL_ACCESS;
 	}
 	if (flags & O_TRUNC)
 	{
