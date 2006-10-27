@@ -405,7 +405,13 @@ int test(int argc, const char *argv[])
 					// Store details
 					test_files[f].IDOnServer = stored->GetObjectID();
 					test_files[f].IsCompletelyDifferent = isCompletelyDifferent;
-					printf("ID %lld, completely different: %s\n", test_files[f].IDOnServer,
+
+#ifdef WIN32
+					printf("ID %I64d, completely different: %s\n",
+#else
+					printf("ID %lld, completely different: %s\n", 
+#endif
+						test_files[f].IDOnServer,
 						test_files[f].IsCompletelyDifferent?"yes":"no");			
 				}
 				else
