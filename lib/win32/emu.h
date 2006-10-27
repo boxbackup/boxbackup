@@ -132,14 +132,6 @@ inline struct passwd * getpwnam(const char * name)
 	#define S_ISDIR(x) (S_IFDIR & x)
 #endif
 
-inline int utimes(const char * Filename, timeval[])
-{
-	//again I am guessing this is quite important to
-	//be functioning, as large restores would be a problem
-
-	//indicate success
-	return 0;
-}
 inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 {
 	//important - this needs implementing
@@ -159,23 +151,20 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 int   emu_chdir (const char* pDirName);
 int   emu_unlink(const char* pFileName);
 char* emu_getcwd(char* pBuffer, int BufSize);
+int   emu_utimes(const char* pName, const struct timeval[]);
+int   emu_chmod (const char* pName, mode_t mode);
+
+#define utimes(buffer, times) emu_utimes(buffer, times)
 
 #ifdef _MSC_VER
-	inline int emu_chmod(const char * Filename, int mode)
-	{
-		// indicate success
-		return 0;
-	}
-
-	#define chmod(file, mode)    emu_chmod(file, mode)
-	#define chdir(directory)     emu_chdir(directory)
-	#define unlink(file)         emu_unlink(file)
-	#define getcwd(buffer, size) emu_getcwd(buffer, size)
+	#define chmod(file, mode)     emu_chmod(file, mode)
+	#define chdir(directory)      emu_chdir(directory)
+	#define unlink(file)          emu_unlink(file)
+	#define getcwd(buffer, size)  emu_getcwd(buffer, size)
 #else
-	inline int chmod(const char * Filename, int mode)
+	inline int chmod(const char * pName, mode_t mode)
 	{
-		// indicate success
-		return 0;
+		return emu_chmod(pName, mode);
 	}
 
 	inline int chdir(const char* pDirName)
@@ -502,5 +491,13 @@ bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 
 // replacement for _cgetws which requires a relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
+
+struct iovec {
+	void *iov_base;   /* Starting address */
+	size_t iov_len;   /* Number of bytes */
+};
+
+int readv (int filedes, const struct iovec *vector, size_t count);
+int writev(int filedes, const struct iovec *vector, size_t count);
 
 #endif // !EMU_INCLUDE && WIN32
