@@ -1002,7 +1002,7 @@ struct dirent *readdir(DIR *dp)
 			if (!dp->result.d_name || 
 				_wfindnext(dp->fd, &dp->info) != -1)
 			{
-				den         = &dp->result;
+				den = &dp->result;
 				std::wstring input(dp->info.name);
 				memset(tempbuff, 0, sizeof(tempbuff));
 				WideCharToMultiByte(CP_UTF8, 0, dp->info.name, 
@@ -1010,6 +1010,14 @@ struct dirent *readdir(DIR *dp)
 					NULL, NULL);
 				//den->d_name = (char *)dp->info.name;
 				den->d_name = &tempbuff[0];
+				if (dp->info.attrib & FILE_ATTRIBUTE_DIRECTORY)
+				{
+					den->d_type = S_IFDIR;
+				}
+				else
+				{
+					den->d_type = S_IFREG;
+				}
 			}
 		}
 		else
