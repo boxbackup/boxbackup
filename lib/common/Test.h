@@ -79,7 +79,7 @@ inline int TestGetFileSize(const char *Filename)
 	return -1;
 }
 
-inline int LaunchServer(const char *pCommandLine, const char *pidFile)
+inline int RunCommand(const char *pCommandLine)
 {
 #ifdef WIN32
 	// convert UNIX paths to native
@@ -101,7 +101,12 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 	std::string command = pCommandLine;
 #endif
 
-	if(::system(command.c_str()) != 0)
+	return ::system(command.c_str());
+}
+
+inline int LaunchServer(const char *pCommandLine, const char *pidFile)
+{
+	if(RunCommand(pCommandLine) != 0)
 	{
 		printf("Server: %s\n", command.c_str());
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
