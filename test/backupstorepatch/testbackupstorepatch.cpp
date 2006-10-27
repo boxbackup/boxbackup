@@ -634,7 +634,10 @@ int test(int argc, const char *argv[])
 		// Kill store server
 		TEST_THAT(KillServer(pid));
 		TEST_THAT(!ServerIsAlive(pid));
+
+		#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
+		#endif
 	}
 	
 	::free(buffer);
