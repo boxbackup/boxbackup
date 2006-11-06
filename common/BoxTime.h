@@ -35,6 +35,9 @@ inline uint64_t BoxTimeToMilliSeconds(box_time_t Time)
 {
 	return Time / MILLI_SEC_IN_NANO_SEC_LL;
 }
+inline uint64_t BoxTimeToMicroSeconds(box_time_t Time)
+{
+	return Time;
+}
 
 #endif // BOXTIME__H
-
