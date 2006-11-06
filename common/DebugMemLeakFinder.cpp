@@ -55,7 +55,7 @@ namespace
 	static std::set<void *> sNotLeaks;
 
 	void *sNotLeaksPre[1024];
-	int sNotLeaksPreNum = 0;
+	size_t sNotLeaksPreNum = 0;
 }
 
 void memleakfinder_malloc_add_block(void *b, size_t size, const char *file, int line)
@@ -161,7 +161,7 @@ void memleakfinder_free(void *ptr)
 void memleakfinder_notaleak_insert_pre()
 {
 	if(!memleakfinder_global_enable) return;
-	for(int l = 0; l < sNotLeaksPreNum; l++)
+	for(size_t l = 0; l < sNotLeaksPreNum; l++)
 	{
 		sNotLeaks.insert(sNotLeaksPre[l]);
 	}
@@ -184,7 +184,7 @@ void memleakfinder_notaleak(void *ptr)
 	else
 	{
 		if ( sNotLeaksPreNum < 
-			 (unsigned)( sizeof(sNotLeaksPre)/sizeof(*sNotLeaksPre) ) )
+			 sizeof(sNotLeaksPre)/sizeof(*sNotLeaksPre) )
 			sNotLeaksPre[sNotLeaksPreNum++] = ptr;
 	}
 /*	{
@@ -255,11 +255,11 @@ void memleakfinder_reportleaks_file(FILE *file)
 {
 	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Block 0x%08p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Block 0x%p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%08p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 
