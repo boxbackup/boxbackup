@@ -1,0 +1,65 @@
+// --------------------------------------------------------------------------
+//
+// File
+//		Name:    Timer.h
+//		Purpose: Generic timers which execute arbitrary code when
+//			 they expire.
+//		Created: 5/11/2006
+//
+// --------------------------------------------------------------------------
+
+#ifndef TIMER__H
+#define TIMER__H
+
+#include <sys/time.h>
+
+#include <vector>
+
+#include "MemLeakFindOn.h"
+#include "BoxTime.h"
+
+class Timer
+{
+public:
+	Timer(size_t timeoutSecs);
+	virtual ~Timer();
+	Timer(const Timer &);
+	Timer &operator=(const Timer &);
+
+public:
+	box_time_t   GetExpiryTime() { return mExpires; }
+	bool         HasExpired   () { return mExpired; }
+	virtual void OnExpire     ();
+	
+private:
+	box_time_t mExpires;
+	bool       mExpired;
+};
+
+// --------------------------------------------------------------------------
+//
+// Class
+//		Name:    Timers
+//		Purpose: Static class to manage all timers and arrange 
+//			 efficient delivery of wakeup signals
+//		Created: 19/3/04
+//
+// --------------------------------------------------------------------------
+class Timers
+{
+	private:
+	static std::vector<Timer*> sTimers;
+	static bool sInitialised;
+	static void Reschedule();
+	
+	public:
+	static void Init();
+	static void Cleanup();
+	static void Add   (Timer& rTimer);
+	static void Remove(Timer& rTimer);
+	static void Signal();
+};
+
+#include "MemLeakFindOff.h"
+
+#endif // TIMER__H
