@@ -28,6 +28,7 @@
 // our implementation for a timer, based on a 
 // simple thread which sleeps for a period of time
 
+static bool gTimerInitialised = false;
 static bool gFinishTimer;
 static CRITICAL_SECTION gLock;
 
@@ -43,6 +44,8 @@ static void (__cdecl *gTimerFunc) (int) = NULL;
 
 int setitimer(int type, struct itimerval *timeout, void *arg)
 {
+	ASSERT(gTimerInitialised);
+	
 	if (ITIMER_VIRTUAL == type)
 	{
 		EnterCriticalSection(&gLock);
@@ -131,20 +134,25 @@ int SetTimerHandler(void (__cdecl *func ) (int))
 
 void InitTimer(void)
 {
+	ASSERT(!gTimerInitialised);
 	InitializeCriticalSection(&gLock);
-
+	
 	// create our thread
 	HANDLE ourThread = (HANDLE)_beginthreadex(NULL, 0, RunTimer, 0, 
 		CREATE_SUSPENDED, NULL);
 	SetThreadPriority(ourThread, THREAD_PRIORITY_LOWEST);
 	ResumeThread(ourThread);
+
+	gTimerInitialised = true;
 }
 
 void FiniTimer(void)
 {
+	ASSERT(gTimerInitialised);
 	gFinishTimer = true;
 	EnterCriticalSection(&gLock);
 	DeleteCriticalSection(&gLock);
+	gTimerInitialised = false;
 }
 
 //Our constants we need to keep track of
