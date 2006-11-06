@@ -27,6 +27,7 @@
 #include "autogen_ConversionException.h"
 #include "CollectInBufferStream.h"
 #include "Archive.h"
+#include "Timer.h"
 
 #include "MemLeakFindOn.h"
 
@@ -204,6 +205,56 @@ int test(int argc, const char *argv[])
 	}
 #endif // BOX_MEMORY_LEAK_TESTING
 	
+	// Check that using timer methods without initialisation
+	// throws an exception
+	TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL), 
+		CommonException, AssertFailed);
+	TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
+		CommonException, AssertFailed);
+	TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
+	TEST_CHECK_THROWS(Timers::Cleanup(), CommonException, AssertFailed);
+	
+	// Check that we can initialise the timers
+	Timers::Init();
+	
+	// Check that double initialisation throws an exception
+	TEST_CHECK_THROWS(Timers::Init(), CommonException, AssertFailed);
+
+	// Check that we can clean up the timers
+	Timers::Cleanup();
+	
+	// Check that double cleanup throws an exception
+	TEST_CHECK_THROWS(Timers::Cleanup(), CommonException, AssertFailed);
+
+	Timers::Init();
+
+	Timer t1(1);
+	Timer t2(2);
+	Timer t3(3);
+	
+	TEST_THAT(!t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
+	
+	sleep(1);
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
+	
+	sleep(1);
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
+	
+	t1 = Timer(1);
+	t2 = Timer(2);
+	TEST_THAT(!t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	
+	sleep(1);
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(t3.HasExpired());
 
 	static char *testfilelines[] =
 	{
