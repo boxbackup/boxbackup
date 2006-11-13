@@ -653,7 +653,7 @@ bool BackupStoreDirectory::CheckAndFix()
 			if(dependsOlder != 0 && FindEntryByID(dependsOlder) == 0)
 			{
 				// Has an older version marked, but this doesn't exist. Remove this mark
-				TRACE2("Entry id %llx was marked that %llx depended on it, which doesn't exist, dependency info cleaered\n", (*i)->GetObjectID(), dependsOlder);
+				TRACE2("Entry id %llx was marked that %llx depended on it, which doesn't exist, dependency info cleared\n", (*i)->GetObjectID(), dependsOlder);
 
 				(*i)->SetDependsOlder(0);
 				
