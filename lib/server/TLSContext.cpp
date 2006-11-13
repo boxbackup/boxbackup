@@ -61,6 +61,11 @@ TLSContext::~TLSContext()
 // --------------------------------------------------------------------------
 void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const char *PrivateKeyFile, const char *TrustedCAsFile)
 {
+	if(mpContext != 0)
+	{
+		::SSL_CTX_free(mpContext);
+	}
+
 	mpContext = ::SSL_CTX_new(AsServer?TLSv1_server_method():TLSv1_client_method());
 	if(mpContext == NULL)
 	{
