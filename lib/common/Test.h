@@ -239,7 +239,9 @@ inline bool HUPServer(int pid)
 
 inline bool KillServerInternal(int pid)
 {
-	TEST_THAT(SendCommands("terminate"));
+	bool sent = SendCommands("terminate");
+	TEST_THAT(sent);
+	return sent;
 }
 
 #else // !WIN32
@@ -259,14 +261,19 @@ inline bool HUPServer(int pid)
 inline bool KillServerInternal(int pid)
 {
 	if(pid == 0 || pid == -1) return false;
-	TEST_THAT(::kill(pid, SIGTERM) != -1);
+	bool killed = (::kill(pid, SIGTERM) == 0);
+	TEST_THAT(killed);
+	return killed;
 }
 
 #endif // WIN32
 
 inline bool KillServer(int pid)
 {
-	KillServerInternal(pid);
+	if (!KillServerInternal(pid))
+	{
+		return false;
+	}
 
 	for (int i = 0; i < 30; i++)
 	{
