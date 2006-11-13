@@ -30,6 +30,8 @@
 	#include <syslog.h>
 #endif
 
+#include "Timer.h"
+
 #include "MemLeakFindOn.h"
 
 int test(int argc, const char *argv[]);
@@ -118,7 +120,9 @@ int main(int argc, const char *argv[])
 		memleakfinder_init();
 		#endif
 
+		Timers::Init();
 		int returncode = test(argc, argv);
+		Timers::Cleanup();
 		
 		// check for memory leaks, if enabled
 		#ifdef BOX_MEMORY_LEAK_TESTING
