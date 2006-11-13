@@ -114,6 +114,10 @@ int main(int argc, const char *argv[])
 	}
 	try
 	{
+		#ifdef BOX_MEMORY_LEAK_TESTING
+		memleakfinder_init();
+		#endif
+
 		int returncode = test(argc, argv);
 		
 		// check for memory leaks, if enabled
