@@ -63,7 +63,10 @@ void PrintUsageAndExit()
 
 int main(int argc, const char *argv[])
 {
+	int returnCode = 0;
+
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupquery.memleaks", "bbackupquery")
+	MAINHELPER_START
 
 #ifdef WIN32
 	WSADATA info;
@@ -82,10 +85,6 @@ int main(int argc, const char *argv[])
 	#ifndef NDEBUG
 		BoxDebugTraceOn = false;
 	#endif
-	
-	int returnCode = 0;
-
-	MAINHELPER_START
 	
 	FILE *logFile = 0;
 
@@ -314,13 +313,13 @@ int main(int argc, const char *argv[])
 	
 	// Let everything be cleaned up on exit.
 	
-	MAINHELPER_END
-	
 #ifdef WIN32
 	// Clean up our sockets
 	WSACleanup();
 #endif
 
+	MAINHELPER_END
+	
 	return returnCode;
 }
 
