@@ -75,6 +75,7 @@
 #include "IOStreamGetLine.h"
 #include "Conversion.h"
 #include "Archive.h"
+#include "Timer.h"
 
 #include "MemLeakFindOn.h"
 
@@ -429,21 +430,19 @@ void BackupDaemon::RunHelperThread(void)
 // --------------------------------------------------------------------------
 void BackupDaemon::Run()
 {
+	// initialise global timer mechanism
+	Timers::Init();
+	
 #ifdef WIN32
-	// init our own timer for file diff timeouts
-	InitTimer();
-
 	try
 	{
 		Run2();
 	}
 	catch(...)
 	{
-		FiniTimer();
+		Timers::Cleanup();
 		throw;
 	}
-
-	FiniTimer();
 #else // ! WIN32
 	// Ignore SIGPIPE (so that if a command connection is broken, the daemon doesn't terminate)
 	::signal(SIGPIPE, SIG_IGN);
@@ -487,6 +486,8 @@ void BackupDaemon::Run()
 			mpCommandSocketInfo = 0;
 		}
 
+		Timers::Cleanup();
+		
 		throw;
 	}
 
@@ -497,6 +498,8 @@ void BackupDaemon::Run()
 		mpCommandSocketInfo = 0;
 	}
 #endif
+	
+	Timers::Cleanup();
 }
 
 // --------------------------------------------------------------------------
