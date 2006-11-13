@@ -228,12 +228,18 @@ void BackupStoreDaemon::Run()
 	{
 		// In server process -- use the base class to do the magic
 		ServerTLS<BOX_PORT_BBSTORED>::Run();
-		
+
+		if (!mInterProcessCommsSocket.IsOpened())
+		{
+			return;
+		}
+
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())
 		{
 			mInterProcessCommsSocket.Write("h\n", 2);
 		}
+
 		if(IsTerminateWanted())
 		{
 			mInterProcessCommsSocket.Write("t\n", 2);
