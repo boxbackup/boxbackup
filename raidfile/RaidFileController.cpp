@@ -66,6 +66,8 @@ RaidFileController::RaidFileController(const RaidFileController &rController)
 // --------------------------------------------------------------------------
 void RaidFileController::Initialise(const char *ConfigFilename)
 {
+	MEMLEAKFINDER_NO_LEAKS;
+
 	static const ConfigurationVerifyKey verifykeys[] =
 	{
 		{"SetNumber",	0,	ConfigTest_Exists | ConfigTest_IsInt, 0},
