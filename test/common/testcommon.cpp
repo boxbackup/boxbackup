@@ -137,56 +137,67 @@ ConfigurationVerify verify =
 int test(int argc, const char *argv[])
 {
 	// Test self-deleting temporary file streams
-	std::string tempfile("testfiles/tempfile");
-	TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()), 
-		CommonException, OSFileOpenError);
-	InvisibleTempFileStream fs(tempfile.c_str(), O_CREAT);
+	{
+		std::string tempfile("testfiles/tempfile");
+		TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()), 
+			CommonException, OSFileOpenError);
+		InvisibleTempFileStream fs(tempfile.c_str(), O_CREAT);
 
-#ifdef WIN32
-	// file is still visible under Windows
-	TEST_THAT(TestFileExists(tempfile.c_str()));
+	#ifdef WIN32
+		// file is still visible under Windows
+		TEST_THAT(TestFileExists(tempfile.c_str()));
 
-	// opening it again should work
-	InvisibleTempFileStream fs2(tempfile.c_str());
-	TEST_THAT(TestFileExists(tempfile.c_str()));
+		// opening it again should work
+		InvisibleTempFileStream fs2(tempfile.c_str());
+		TEST_THAT(TestFileExists(tempfile.c_str()));
 
-	// opening it to create should work
-	InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
-	TEST_THAT(TestFileExists(tempfile.c_str()));
+		// opening it to create should work
+		InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+		TEST_THAT(TestFileExists(tempfile.c_str()));
 
-	// opening it to create exclusively should fail
-	TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(), 
-		O_CREAT | O_EXCL), CommonException, OSFileOpenError);
+		// opening it to create exclusively should fail
+		TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(), 
+			O_CREAT | O_EXCL), CommonException, OSFileOpenError);
 
-	fs2.Close();
-#else
-	// file is not visible under Unix
-	TEST_THAT(!TestFileExists(tempfile.c_str()));
+		fs2.Close();
+	#else
+		// file is not visible under Unix
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
 
-	// opening it again should fail
-	TEST_CHECK_THROWS(InvisibleTempFileStream fs2(tempfile.c_str()),
-		CommonException, OSFileOpenError);
+		// opening it again should fail
+		TEST_CHECK_THROWS(InvisibleTempFileStream fs2(tempfile.c_str()),
+			CommonException, OSFileOpenError);
 
-	// opening it to create should work
-	InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
-	TEST_THAT(!TestFileExists(tempfile.c_str()));
+		// opening it to create should work
+		InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
 
-	// opening it to create exclusively should work
-	InvisibleTempFileStream fs4(tempfile.c_str(), O_CREAT | O_EXCL);
-	TEST_THAT(!TestFileExists(tempfile.c_str()));
+		// opening it to create exclusively should work
+		InvisibleTempFileStream fs4(tempfile.c_str(), O_CREAT | O_EXCL);
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
 
-	fs4.Close();
-#endif
+		fs4.Close();
+	#endif
 
-	fs.Close();
-	fs3.Close();
+		fs.Close();
+		fs3.Close();
 
-	// now that it's closed, it should be invisible on all platforms
-	TEST_THAT(!TestFileExists(tempfile.c_str()));
+		// now that it's closed, it should be invisible on all platforms
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
+	}
 
-	// Test memory leak detection
+	// Test that memory leak detection doesn't crash
+	{
+		char *test = new char[1024];
+		delete [] test;
+		MemBlockStream *s = new MemBlockStream(test,12);
+		delete s;
+	}
+
 #ifdef BOX_MEMORY_LEAK_TESTING
 	{
+		Timers::Cleanup();
+
 		TEST_THAT(memleakfinder_numleaks() == 0);
 		void *block = ::malloc(12);
 		TEST_THAT(memleakfinder_numleaks() == 1);
@@ -202,8 +213,13 @@ int test(int argc, const char *argv[])
 		TEST_THAT(memleakfinder_numleaks() == 1);
 		delete [] test;
 		TEST_THAT(memleakfinder_numleaks() == 0);
+
+		Timers::Init();
 	}
 #endif // BOX_MEMORY_LEAK_TESTING
+
+	// test main() initialises timers for us, so uninitialise them
+	Timers::Cleanup();
 	
 	// Check that using timer methods without initialisation
 	// throws an exception
