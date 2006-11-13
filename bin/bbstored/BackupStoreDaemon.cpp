@@ -227,38 +227,13 @@ void BackupStoreDaemon::Run()
 	else
 	{
 		// In server process -- use the base class to do the magic
-		try
-		{
-			ServerTLS<BOX_PORT_BBSTORED>::Run();
-		}
-		catch(BoxException &e)
-		{
-			::syslog(LOG_ERR, "%s: disconnecting due to "
-				"exception %s (%d/%d)", DaemonName(), 
-				e.what(), e.GetType(), e.GetSubType());
-		}
-		catch(std::exception &e)
-		{
-			::syslog(LOG_ERR, "%s: disconnecting due to "
-				"exception %s", DaemonName(), e.what());
-		}
-		catch(...)
-		{
-			::syslog(LOG_ERR, "%s: disconnecting due to "
-				"unknown exception", DaemonName());
-		}
-
-		if (!mInterProcessCommsSocket.IsOpened())
-		{
-			return;
-		}
-
+		ServerTLS<BOX_PORT_BBSTORED>::Run();
+		
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())
 		{
 			mInterProcessCommsSocket.Write("h\n", 2);
 		}
-
 		if(IsTerminateWanted())
 		{
 			mInterProcessCommsSocket.Write("t\n", 2);
@@ -266,16 +241,48 @@ void BackupStoreDaemon::Run()
 	}
 }
 
-
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    BackupStoreDaemon::Connection(SocketStreamTLS &)
-//		Purpose: Handles a connection
+//		Purpose: Handles a connection, by catching exceptions and
+//			 delegating to Connection2
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
 void BackupStoreDaemon::Connection(SocketStreamTLS &rStream)
+{
+	try
+	{
+		Connection2(rStream);
+	}
+	catch(BoxException &e)
+	{
+		::syslog(LOG_ERR, "%s: disconnecting due to "
+			"exception %s (%d/%d)", DaemonName(), 
+			e.what(), e.GetType(), e.GetSubType());
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "%s: disconnecting due to "
+			"exception %s", DaemonName(), e.what());
+	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "%s: disconnecting due to "
+			"unknown exception", DaemonName());
+	}
+}
+	
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDaemon::Connection2(SocketStreamTLS &)
+//		Purpose: Handles a connection from bbackupd
+//		Created: 2006/11/12
+//
+// --------------------------------------------------------------------------
+void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 {
 	// Get the common name from the certificate
 	std::string clientCommonName(rStream.GetPeerCommonName());
