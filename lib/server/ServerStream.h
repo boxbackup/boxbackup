@@ -259,7 +259,7 @@ public:
 						else
 						{
 						#endif // !WIN32
-							// Just handle in this connection
+							// Just handle in this process
 							SetProcessTitle("handling");
 							HandleConnection(*connection);
 							SetProcessTitle("idle");										
