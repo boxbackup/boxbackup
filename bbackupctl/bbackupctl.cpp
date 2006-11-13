@@ -56,14 +56,14 @@ int main(int argc, const char *argv[])
 {
 	int returnCode = 0;
 
-#if defined WIN32 && ! defined NDEBUG
-	::openlog("Box Backup (bbackupctl)", 0, 0);
-#endif
-
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", 
 		"bbackupctl")
 
 	MAINHELPER_START
+
+#if defined WIN32 && ! defined NDEBUG
+	::openlog("Box Backup (bbackupctl)", 0, 0);
+#endif
 
 	// Filename for configuraiton file?
 	const char *configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
