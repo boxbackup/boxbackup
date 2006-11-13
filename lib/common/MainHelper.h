@@ -17,6 +17,7 @@
 #define MAINHELPER_START									\
 	if(argc == 2 && ::strcmp(argv[1], "--version") == 0)	\
 	{ printf(BOX_VERSION "\n"); return 0; }					\
+	MEMLEAKFINDER_INIT \
 	MEMLEAKFINDER_START										\
 	try {
 #define MAINHELPER_END																\
