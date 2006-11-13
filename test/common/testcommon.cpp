@@ -244,33 +244,42 @@ int test(int argc, const char *argv[])
 
 	Timers::Init();
 
+	Timer t0(0); // should never expire
 	Timer t1(1);
 	Timer t2(2);
 	Timer t3(3);
 	
+	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(!t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
 	
 	sleep(1);
+	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
 	
 	sleep(1);
+	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
 	
 	t1 = Timer(1);
 	t2 = Timer(2);
+	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(!t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
 	
 	sleep(1);
+	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
 	TEST_THAT(t3.HasExpired());
+
+	// Leave timers initialised for rest of test.
+	// Test main() will cleanup after test finishes.
 
 	static char *testfilelines[] =
 	{
