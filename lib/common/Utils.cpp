@@ -74,11 +74,13 @@ void DumpStackBacktrace()
 	printf ("Obtained %zd stack frames.\n", size);
 
 	for(i = 0; i < size; i++)
+	{
 		printf("%s\n", strings[i]);
+	}
 
-#ifndef MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
+#include "MemLeakFindOff.h"
 	free (strings);
-#endif
+#include "MemLeakFindOn.h"
 }
 #endif
 
