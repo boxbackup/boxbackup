@@ -16,8 +16,7 @@
 
 #include "MemLeakFindOn.h"
 
-std::vector<Timer*> Timers::sTimers;
-bool Timers::sInitialised = false;
+std::vector<Timer*>* Timers::spTimers = NULL;
 
 // --------------------------------------------------------------------------
 //
@@ -42,7 +41,7 @@ static void TimerSigHandler(int iUnused)
 // --------------------------------------------------------------------------
 void Timers::Init()
 {
-	ASSERT(!sInitialised);
+	ASSERT(!spTimers);
 	
 	#ifdef PLATFORM_CYGWIN
 		ASSERT(::signal(SIGALRM, TimerSigHandler) == 0);
@@ -54,7 +53,7 @@ void Timers::Init()
 		ASSERT(::signal(SIGALRM, TimerSigHandler) == 0);
 	#endif // PLATFORM_CYGWIN
 	
-	sInitialised = true;
+	spTimers = new std::vector<Timer*>;
 }
 
 // --------------------------------------------------------------------------
@@ -67,7 +66,7 @@ void Timers::Init()
 // --------------------------------------------------------------------------
 void Timers::Cleanup()
 {
-	ASSERT(sInitialised);
+	ASSERT(spTimers);
 	
 	#ifdef PLATFORM_CYGWIN
 		ASSERT(::signal(SIGALRM, NULL) == TimerSigHandler);
@@ -79,9 +78,9 @@ void Timers::Cleanup()
 		ASSERT(::signal(SIGALRM, NULL) == TimerSigHandler);
 	#endif // PLATFORM_CYGWIN
 
-	sTimers.clear();
-	
-	sInitialised = false;
+	spTimers->clear();
+	delete spTimers;
+	spTimers = NULL;
 }
 
 // --------------------------------------------------------------------------
@@ -94,8 +93,8 @@ void Timers::Cleanup()
 // --------------------------------------------------------------------------
 void Timers::Add(Timer& rTimer)
 {
-	ASSERT(sInitialised);
-	sTimers.push_back(&rTimer);
+	ASSERT(spTimers);
+	spTimers->push_back(&rTimer);
 	Reschedule();
 }
 
@@ -110,18 +109,18 @@ void Timers::Add(Timer& rTimer)
 // --------------------------------------------------------------------------
 void Timers::Remove(Timer& rTimer)
 {
-	ASSERT(sInitialised);
+	ASSERT(spTimers);
 
 	bool restart = true;
 	while (restart)
 	{
 		restart = false;
-		for (std::vector<Timer*>::iterator i = sTimers.begin();
-			i != sTimers.end(); i++)
+		for (std::vector<Timer*>::iterator i = spTimers->begin();
+			i != spTimers->end(); i++)
 		{
 			if (&rTimer == *i)
 			{
-				sTimers.erase(i);
+				spTimers->erase(i);
 				restart = true;
 				break;
 			}
@@ -141,13 +140,13 @@ void Timers::Remove(Timer& rTimer)
 // --------------------------------------------------------------------------
 void Timers::Reschedule()
 {
-	ASSERT(sInitialised);
+	ASSERT(spTimers);
 
 	box_time_t timeNow = GetCurrentBoxTime();
 	box_time_t timeToNextEvent = 0;
 	
-	for (std::vector<Timer*>::iterator i = sTimers.begin();
-		i != sTimers.end(); i++)
+	for (std::vector<Timer*>::iterator i = spTimers->begin();
+		i != spTimers->end(); i++)
 	{
 		Timer& rTimer = **i;
 		ASSERT(!rTimer.HasExpired());
@@ -192,11 +191,11 @@ void Timers::Reschedule()
 // --------------------------------------------------------------------------
 void Timers::Signal()
 {
-	ASSERT(sInitialised);
+	ASSERT(spTimers);
 
 	box_time_t timeNow = GetCurrentBoxTime();
 
-	std::vector<Timer*> timersCopy = sTimers;
+	std::vector<Timer*> timersCopy = *spTimers;
 	
 	for (std::vector<Timer*>::iterator i = timersCopy.begin();
 		i != timersCopy.end(); i++)
@@ -211,7 +210,7 @@ void Timers::Signal()
 			rTimer.OnExpire();
 		}
 	}		
-		
+	
 	Reschedule();
 }
 

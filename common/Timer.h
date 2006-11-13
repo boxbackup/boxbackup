@@ -48,8 +48,7 @@ private:
 class Timers
 {
 	private:
-	static std::vector<Timer*> sTimers;
-	static bool sInitialised;
+	static std::vector<Timer*>* spTimers;
 	static void Reschedule();
 	
 	public:
