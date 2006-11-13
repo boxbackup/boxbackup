@@ -95,15 +95,18 @@
 	// Memory leak testing
 	#include "MemLeakFinder.h"
 	#define MEMLEAKFINDER_NOT_A_LEAK(x)	memleakfinder_notaleak(x);
+	#define MEMLEAKFINDER_NO_LEAKS		MemLeakSuppressionGuard _guard;
+	#define MEMLEAKFINDER_INIT		memleakfinder_init();
 	#define MEMLEAKFINDER_START {memleakfinder_global_enable = true;}
-	#define MEMLEAKFINDER_STOP {memleakfinder_global_enable = false;}
+	#define MEMLEAKFINDER_STOP  {memleakfinder_global_enable = false;}
 #else
 	#define DEBUG_NEW new
 	#define MEMLEAKFINDER_NOT_A_LEAK(x)
+	#define MEMLEAKFINDER_NO_LEAKS
+	#define MEMLEAKFINDER_INIT
 	#define MEMLEAKFINDER_START
 	#define MEMLEAKFINDER_STOP
 #endif
-
 
 #define THROW_EXCEPTION(type, subtype)														\
 	{																						\
