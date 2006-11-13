@@ -89,7 +89,7 @@ int main(int argc, const char *argv[])
 	
 	FILE *logFile = 0;
 
-	// Filename for configuraiton file?
+	// Filename for configuration file?
 	const char *configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
 	
 	// Flags
