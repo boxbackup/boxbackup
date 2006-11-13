@@ -202,9 +202,12 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 
 void test_dir_fixing()
 {
-	fnames[0].SetAsClearFilename("x1");
-	fnames[1].SetAsClearFilename("x2");
-	fnames[2].SetAsClearFilename("x3");
+	{
+		MEMLEAKFINDER_NO_LEAKS;
+		fnames[0].SetAsClearFilename("x1");
+		fnames[1].SetAsClearFilename("x2");
+		fnames[2].SetAsClearFilename("x3");
+	}
 
 	{
 		BackupStoreDirectory dir;
@@ -344,6 +347,7 @@ int test(int argc, const char *argv[])
 				TEST_THAT(::sscanf(line, "%x %s %s", &id, flags, name) == 3);
 				bool isDir = (::strcmp(flags, "-d---") == 0);
 				//TRACE3("%x,%d,%s\n", id, isDir, name);
+				MEMLEAKFINDER_NO_LEAKS;
 				nameToID[std::string(name)] = id;
 				objectIsDir[id] = isDir;
 			}
