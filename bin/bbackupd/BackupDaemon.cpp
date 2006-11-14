@@ -697,9 +697,25 @@ void BackupDaemon::Run2()
 				SetState(State_Connected);
 				::syslog(LOG_INFO, "Beginning scan of local files");
 
-				// Then create a client context object (don't just connect, as this may be unnecessary)
-				BackupClientContext clientContext(*this, tlsContext, conf.GetKeyValue("StoreHostname"),
-					conf.GetKeyValueInt("AccountNumber"), conf.GetKeyValueBool("ExtendedLogging"));
+				std::string extendedLogFile;
+				if (conf.KeyExists("ExtendedLogFile"))
+				{
+					extendedLogFile = conf.GetKeyValue(
+						"ExtendedLogFile");
+				}
+				
+				// Then create a client context object (don't 
+				// just connect, as this may be unnecessary)
+				BackupClientContext clientContext
+				(
+					*this, 
+					tlsContext, 
+					conf.GetKeyValue("StoreHostname"),
+					conf.GetKeyValueInt("AccountNumber"), 
+					conf.GetKeyValueBool("ExtendedLogging"),
+					conf.KeyExists("ExtendedLogFile"),
+					extendedLogFile
+				);
 					
 				// Set up the sync parameters
 				BackupClientDirectoryRecord::SyncParams params(*this, clientContext);

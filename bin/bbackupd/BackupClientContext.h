@@ -35,8 +35,16 @@ class BackupStoreFilenameClear;
 class BackupClientContext : public DiffTimer
 {
 public:
-	BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLSContext, const std::string &rHostname,
-		int32_t AccountNumber, bool ExtendedLogging);
+	BackupClientContext
+	(
+		BackupDaemon &rDaemon, 
+		TLSContext &rTLSContext, 
+		const std::string &rHostname,
+		int32_t AccountNumber, 
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile
+	);
 	virtual ~BackupClientContext();
 private:
 	BackupClientContext(const BackupClientContext &);
@@ -197,6 +205,9 @@ private:
 	SocketStreamTLS *mpSocket;
 	BackupProtocolClient *mpConnection;
 	bool mExtendedLogging;
+	bool mExtendedLogToFile;
+	std::string mExtendedLogFile;
+	FILE* mpExtendedLogFileHandle;
 	int64_t mClientStoreMarker;
 	BackupClientDeleteList *mpDeleteList;
 	const BackupClientInodeToIDMap *mpCurrentIDMap;
