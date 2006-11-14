@@ -35,13 +35,21 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientContext::BackupClientContext(BackupDaemon &, TLSContext &, const std::string &, int32_t, bool)
+//		Name:    BackupClientContext::BackupClientContext(BackupDaemon &, TLSContext &, const std::string &, int32_t, bool, bool, std::string)
 //		Purpose: Constructor
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLSContext, const std::string &rHostname,
-			int32_t AccountNumber, bool ExtendedLogging)
+BackupClientContext::BackupClientContext
+(
+	BackupDaemon &rDaemon, 
+	TLSContext &rTLSContext, 
+	const std::string &rHostname,
+	int32_t AccountNumber, 
+	bool ExtendedLogging,
+	bool ExtendedLogToFile,
+	std::string ExtendedLogFile
+)
 	: mrDaemon(rDaemon),
 	  mrTLSContext(rTLSContext),
 	  mHostname(rHostname),
@@ -49,6 +57,9 @@ BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLS
 	  mpSocket(0),
 	  mpConnection(0),
 	  mExtendedLogging(ExtendedLogging),
+	  mExtendedLogToFile(ExtendedLogToFile),
+	  mExtendedLogFile(ExtendedLogFile),
+	  mpExtendedLogFileHandle(NULL),
 	  mClientStoreMarker(ClientStoreMarker_NotKnown),
 	  mpDeleteList(0),
 	  mpCurrentIDMap(0),
@@ -125,6 +136,24 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		
 		// Set logging option
 		mpConnection->SetLogToSysLog(mExtendedLogging);
+		
+		if (mExtendedLogToFile)
+		{
+			ASSERT(mpExtendedLogFileHandle == NULL);
+			
+			mpExtendedLogFileHandle = fopen(
+				mExtendedLogFile.c_str(), "w");
+
+			if (!mpExtendedLogFileHandle)
+			{
+				::syslog(LOG_ERR, "Failed to open extended "
+					"log file: %s", strerror(errno));
+			}
+			else
+			{
+				mpConnection->SetLogToFile(mpExtendedLogFileHandle);
+			}
+		}
 		
 		// Handshake
 		mpConnection->Handshake();
@@ -255,6 +284,12 @@ void BackupClientContext::CloseAnyOpenConnection()
 	{
 		delete mpDeleteList;
 		mpDeleteList = 0;
+	}
+
+	if (mpExtendedLogFileHandle != NULL)
+	{
+		fclose(mpExtendedLogFileHandle);
+		mpExtendedLogFileHandle = NULL;
 	}
 }
 
