@@ -22,6 +22,10 @@
 #endif
 #include <map>
 
+#ifdef HAVE_SYSCALL
+#include <sys/syscall.h>
+#endif
+
 #include "Test.h"
 #include "BackupClientFileAttributes.h"
 #include "CommonException.h"
@@ -41,6 +45,10 @@
 #include "Utils.h"
 #include "BoxTime.h"
 #include "BoxTimeToUnix.h"
+#include "BackupDaemon.h"
+#include "Timer.h"
+#include "FileStream.h"
+#include "IOStreamGetLine.h"
 
 #include "MemLeakFindOn.h"
 
@@ -500,6 +508,74 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 	}
 }
 
+void intercept_setup_delay(const char *filename, unsigned int delay_after, 
+	int delay_ms, int syscall_to_delay);
+bool intercept_triggered();
+
+int start_internal_daemon()
+{
+	// ensure that no child processes end up running tests!
+	int own_pid = getpid();
+		
+	BackupDaemon daemon;
+	const char* fake_argv[] = { "bbackupd", "testfiles/bbackupd.conf" };
+	
+	int result = daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, 2, 
+		fake_argv);
+	
+	TEST_THAT(result == 0);
+	if (result != 0)
+	{
+		printf("Daemon exited with code %d\n", result);
+	}
+	
+	// ensure that no child processes end up running tests!
+	TEST_THAT(getpid() == own_pid);
+	if (getpid() != own_pid)
+	{
+		// abort!
+		_exit(1);
+	}
+
+	TEST_THAT(TestFileExists("testfiles/bbackupd.pid"));
+	
+	printf("Waiting for daemon to start");
+	int pid = -1;
+	
+	for (int i = 0; i < 30; i++)
+	{
+		printf(".");
+		fflush(stdout);
+		sleep(1);
+
+		pid = ReadPidFile("testfiles/bbackupd.pid");
+		if (pid > 0)
+		{
+			break;
+		}		
+	}
+	
+	printf("\n");
+
+	TEST_THAT(pid > 0);
+	return pid;
+}
+
+void stop_internal_daemon(int pid)
+{
+	TEST_THAT(KillServer(pid));
+
+	/*
+	int status;
+	TEST_THAT(waitpid(pid, &status, 0) == pid);
+	TEST_THAT(WIFEXITED(status));
+	
+	if (WIFEXITED(status))
+	{
+		TEST_THAT(WEXITSTATUS(status) == 0);
+	}
+	*/
+}
 
 int test_bbackupd()
 {
@@ -517,6 +593,90 @@ int test_bbackupd()
 	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
 	TEST_THAT(::system("mkdir testfiles/TestDir1") == 0);
 	TEST_THAT(::system("gzip -d < testfiles/spacetest1.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
+	
+#ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+	printf("Skipping intercept-based KeepAlive tests on this platform.\n");
+#else
+	{
+		#ifdef WIN32
+		#error TODO: implement threads on Win32, or this test \
+			will not finish properly
+		#endif
+
+		// bbackupd daemon will try to initialise timers itself
+		Timers::Cleanup();
+		
+		// something to diff against (empty file doesn't work)
+		int fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
+		TEST_THAT(fd > 0);
+		char buffer[1024];
+		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd) == 0);
+		
+		int pid = start_internal_daemon();
+		wait_for_backup_operation();
+		stop_internal_daemon(pid);
+
+		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
+			0, 2000, SYS_read);
+		TEST_THAT(unlink("testfiles/bbackupd.log") == 0);
+
+		pid = start_internal_daemon();
+		
+		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
+		TEST_THAT(fd > 0);
+		// write again, to update the file's timestamp
+		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd) == 0);	
+
+		wait_for_backup_operation();
+		// can't test whether intercept was triggered, because
+		// it's in a different process.
+		// TEST_THAT(intercept_triggered());
+		stop_internal_daemon(pid);
+
+		// check that keepalive was written to logs, and
+		// diff was not aborted, i.e. upload was a diff
+		FileStream fs("testfiles/bbackupd.log", O_RDONLY);
+		IOStreamGetLine reader(fs);
+		bool found1 = false;
+
+		while (!reader.IsEOF())
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			if (line == "Send GetBlockIndexByName(0x3,\"f1\")")
+			{
+				found1 = true;
+				break;
+			}
+		}
+
+		TEST_THAT(found1);
+		if (found1)
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive Success(0xe)");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receiving stream, size 60");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive IsAlive()");
+			TEST_THAT(reader.GetLine(line));
+
+			std::string comp = "Send StoreFile(0x3,";
+			TEST_THAT(line.substr(0, comp.size()) == comp);
+			comp = ",0xe,\"f1\")";
+			TEST_THAT(line.substr(line.size() - comp.size())
+				== comp);
+		}
+		
+		// restore timers for rest of tests
+		Timers::Init();
+	}
+#endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
 	int pid = LaunchServer("../../bin/bbackupd/bbackupd testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
 	TEST_THAT(pid != -1 && pid != 0);
@@ -1055,4 +1215,3 @@ int test(int argc, const char *argv[])
 
 	return 0;
 }
-
