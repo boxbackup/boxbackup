@@ -401,24 +401,46 @@ for my $mod (@implicit_deps, @modules)
 		sub writetestfile
 		{
 			my ($filename,$runcmd,$module) = @_;		
-			open TESTFILE,">$filename" or die "Can't open test script file for $module for writing\n";
+
+			open TESTFILE,">$filename" or die "Can't open " .
+				"test script file for $module for writing\n";
 			print TESTFILE "#!/bin/sh\necho TEST: $module\n";
+
 			if(-d "$module/testfiles")
 			{
 				print TESTFILE <<__E;
+echo Killing any running daemons...
+test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
+test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
+
 echo Removing old test files...
 rm -rf testfiles
+
 echo Copying new test files...
 cp -p -R ../../../$module/testfiles .
+
 __E
 			}
+
 			if(-e "$module/testextra")
 			{
-				open FL,"$module/testextra" or die "Can't open $module/testextra";
+				open FL,"$module/testextra" or die 
+					"Can't open $module/testextra";
 				while(<FL>) {print TESTFILE}
 				close FL;
 			}
+
 			print TESTFILE "$runcmd\n";
+
+			if(-d "$module/testfiles")
+			{
+				print TESTFILE <<__E;
+# echo Killing any running daemons...
+test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
+test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
+__E
+			}
+
 			close TESTFILE;
 		}
 		
