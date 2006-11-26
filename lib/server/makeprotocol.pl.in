@@ -829,8 +829,8 @@ if($implement_filelog || $implement_syslog)
 	}
 	if($implement_filelog)
 	{
-		$fR .= qq~\tif(mLogToFile) { ::fprintf(mLogToFile, (Size==Protocol::ProtocolStream_SizeUncertain)?"Receiving stream, size uncertain":"Receiving stream, size %d\\n", Size); ::fflush(mLogToFile); }\n~;
-		$fS .= qq~\tif(mLogToFile) { ::fprintf(mLogToFile, (Size==Protocol::ProtocolStream_SizeUncertain)?"Sending stream, size uncertain":"Sending stream, size %d\\n", Size); ::fflush(mLogToFile); }\n~;
+		$fR .= qq~\tif(mLogToFile) { ::fprintf(mLogToFile, (Size==Protocol::ProtocolStream_SizeUncertain)?"Receiving stream, size uncertain\\n":"Receiving stream, size %d\\n", Size); ::fflush(mLogToFile); }\n~;
+		$fS .= qq~\tif(mLogToFile) { ::fprintf(mLogToFile, (Size==Protocol::ProtocolStream_SizeUncertain)?"Sending stream, size uncertain\\n":"Sending stream, size %d\\n", Size); ::fflush(mLogToFile); }\n~;
 	}
 
 	print CPP <<__E;
