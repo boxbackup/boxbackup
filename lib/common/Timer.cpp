@@ -143,7 +143,7 @@ void Timers::Reschedule()
 	ASSERT(spTimers);
 
 	box_time_t timeNow = GetCurrentBoxTime();
-	box_time_t timeToNextEvent = 0;
+	int64_t timeToNextEvent = 0;
 	
 	for (std::vector<Timer*>::iterator i = spTimers->begin();
 		i != spTimers->end(); i++)
@@ -151,7 +151,8 @@ void Timers::Reschedule()
 		Timer& rTimer = **i;
 		ASSERT(!rTimer.HasExpired());
 		
-		box_time_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
+		int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
+		if (timeToExpiry <= 0) timeToExpiry = 1;
 		
 		if (timeToNextEvent == 0 || timeToNextEvent > timeToExpiry)
 		{
@@ -203,7 +204,7 @@ void Timers::Signal()
 		Timer& rTimer = **i;
 		ASSERT(!rTimer.HasExpired());
 		
-		box_time_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
+		int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
 		
 		if (timeToExpiry <= 0)
 		{
@@ -218,7 +219,14 @@ Timer::Timer(size_t timeoutSecs)
 : mExpires(GetCurrentBoxTime() + SecondsToBoxTime(timeoutSecs)),
   mExpired(false)
 {
-	Timers::Add(*this);
+	if (timeoutSecs == 0)
+	{
+		mExpires = 0;
+	}
+	else
+	{
+		Timers::Add(*this);
+	}
 }
 
 Timer::~Timer()
@@ -230,7 +238,10 @@ Timer::Timer(const Timer& rToCopy)
 : mExpires(rToCopy.mExpires),
   mExpired(rToCopy.mExpired)
 {
-	Timers::Add(*this);
+	if (mExpires != 0)
+	{
+		Timers::Add(*this);
+	}
 }
 
 Timer& Timer::operator=(const Timer& rToCopy)
@@ -238,10 +249,11 @@ Timer& Timer::operator=(const Timer& rToCopy)
 	Timers::Remove(*this);
 	mExpires = rToCopy.mExpires;
 	mExpired = rToCopy.mExpired;
-	if (!mExpired)
+	if (!mExpired && mExpires != 0)
 	{
 		Timers::Add(*this);
 	}
+	return *this;
 }
 
 void Timer::OnExpire()
