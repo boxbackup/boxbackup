@@ -1,5 +1,9 @@
 #!@PERL@
+
 use strict;
+
+use lib "../../infrastructure";
+use BoxPlatform;
 
 # Make protocol C++ classes from a protocol description file
 
