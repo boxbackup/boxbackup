@@ -52,7 +52,8 @@ protected:
 
 	virtual void Run();
 
-	void Connection(SocketStreamTLS &rStream);
+	virtual void Connection(SocketStreamTLS &rStream);
+	void Connection2(SocketStreamTLS &rStream);
 	
 	virtual const char *DaemonName() const;
 	virtual const char *DaemonBanner() const;
