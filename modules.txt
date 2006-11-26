@@ -18,6 +18,7 @@ lib/crypto
 lib/server
 lib/win32		lib/server
 lib/compress
+lib/intercept
 test/common		lib/win32
 test/crypto		lib/crypto	lib/win32
 test/compress		lib/compress	lib/win32
@@ -25,7 +26,7 @@ test/compress		lib/compress	lib/win32
 OMIT:mingw32
 test/basicserver	lib/server	lib/win32
 OMIT:CYGWIN
-test/raidfile		lib/raidfile
+test/raidfile		lib/raidfile	lib/intercept
 END-OMIT
 
 # IF_DISTRIBUTION(boxbackup)
@@ -52,7 +53,7 @@ test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
 test/backupdiff		lib/backupclient
-test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient
+test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
 END-OMIT
 
 # END_IF_DISTRIBUTION
