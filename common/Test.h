@@ -104,6 +104,27 @@ inline int RunCommand(const char *pCommandLine)
 	return ::system(command.c_str());
 }
 
+inline int ReadPidFile(const char *pidFile)
+{
+	if(!TestFileExists(pidFile))
+	{
+		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
+		return -1;
+	}
+	
+	int pid = -1;
+
+	FILE *f = fopen(pidFile, "r");
+	if(f == NULL || fscanf(f, "%d", &pid) != 1)
+	{
+		TEST_FAIL_WITH_MESSAGE("Couldn't read PID file");	
+		return -1;
+	}
+	fclose(f);
+	
+	return pid;
+}
+
 inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 {
 	if(RunCommand(pCommandLine) != 0)
@@ -112,27 +133,19 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
-	// time for it to start up
+	
+	// give it time to start up
 	::sleep(1);
 	
 	// read pid file
-	if(!TestFileExists(pidFile))
+	int pid = ReadPidFile(pidFile);
+
+	if(pid == -1)
 	{
-		printf("Server: %s\n", pCommandLine);
-		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
-		return -1;
-	}
-	
-	FILE *f = fopen(pidFile, "r");
-	int pid = -1;
-	if(f == NULL || fscanf(f, "%d", &pid) != 1)
-	{
+		// helps with debugging:
 		printf("Server: %s (pidfile %s)\n", pCommandLine, pidFile);
-		TEST_FAIL_WITH_MESSAGE("Couldn't read PID file");	
-		return -1;
 	}
-	fclose(f);
-	
+
 	return pid;
 }
 
@@ -335,4 +348,3 @@ inline void TestRemoteProcessMemLeaks(const char *filename)
 }
 
 #endif // TEST__H
-
