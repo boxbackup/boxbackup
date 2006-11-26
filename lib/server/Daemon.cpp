@@ -48,11 +48,11 @@ Daemon *Daemon::spDaemon = 0;
 //
 // --------------------------------------------------------------------------
 Daemon::Daemon()
-	: mpConfiguration(0),
+	: mpConfiguration(NULL),
 	  mReloadConfigWanted(false),
 	  mTerminateWanted(false)
 {
-	if(spDaemon != 0)
+	if(spDaemon != NULL)
 	{
 		THROW_EXCEPTION(ServerException, AlreadyDaemonConstructed)
 	}
@@ -79,6 +79,9 @@ Daemon::~Daemon()
 		delete mpConfiguration;
 		mpConfiguration = 0;
 	}
+
+	ASSERT(spDaemon == this);
+	spDaemon = NULL;
 }
 
 // --------------------------------------------------------------------------
@@ -183,18 +186,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		// Let the derived class have a go at setting up stuff in the initial process
 		SetupInInitialProcess();
 		
-#ifndef WIN32		
-		// Set signal handler
-		struct sigaction sa;
-		sa.sa_handler = SignalHandler;
-		sa.sa_flags = 0;
-		sigemptyset(&sa.sa_mask);		// macro
-		if(::sigaction(SIGHUP, &sa, NULL) != 0 || ::sigaction(SIGTERM, &sa, NULL) != 0)
-		{
-			THROW_EXCEPTION(ServerException, DaemoniseFailed)
-		}
-#endif // !WIN32
-		
 		// Server configuration
 		const Configuration &serverConfig(
 			mpConfiguration->GetSubConfiguration("Server"));
@@ -232,7 +223,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 			default:
 				// parent
-				_exit(0);
+				// _exit(0);
 				return 0;
 				break;
 
@@ -269,7 +260,20 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				break;
 			}
 		}
-#endif // ! WIN32
+
+		// Set signal handler
+		// Don't do this in the parent, since it might be anything
+		// (e.g. test/bbackupd)
+		
+		struct sigaction sa;
+		sa.sa_handler = SignalHandler;
+		sa.sa_flags = 0;
+		sigemptyset(&sa.sa_mask);		// macro
+		if(::sigaction(SIGHUP, &sa, NULL) != 0 || ::sigaction(SIGTERM, &sa, NULL) != 0)
+		{
+			THROW_EXCEPTION(ServerException, DaemoniseFailed)
+		}
+#endif // !WIN32
 
 		// open the log
 		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
