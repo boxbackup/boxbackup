@@ -673,6 +673,58 @@ int test_bbackupd()
 				== comp);
 		}
 		
+		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
+			0, 4000, SYS_read);
+		pid = start_internal_daemon();
+		
+		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
+		TEST_THAT(fd > 0);
+		// write again, to update the file's timestamp
+		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd) == 0);	
+
+		wait_for_backup_operation();
+		// can't test whether intercept was triggered, because
+		// it's in a different process.
+		// TEST_THAT(intercept_triggered());
+		stop_internal_daemon(pid);
+
+		// check that the diff was aborted, i.e. upload was not a diff
+		found1 = false;
+
+		while (!reader.IsEOF())
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			if (line == "Send GetBlockIndexByName(0x3,\"f1\")")
+			{
+				found1 = true;
+				break;
+			}
+		}
+
+		TEST_THAT(found1);
+		if (found1)
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive Success(0xf)");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receiving stream, size 60");
+
+			// delaying for 4 seconds in one step means that
+			// the diff timer and the keepalive timer will
+			// both expire, and the diff timer is honoured first,
+			// so there will be no keepalives.
+
+			TEST_THAT(reader.GetLine(line));
+			std::string comp = "Send StoreFile(0x3,";
+			TEST_THAT(line.substr(0, comp.size()) == comp);
+			comp = ",0x0,\"f1\")";
+			TEST_THAT(line.substr(line.size() - comp.size())
+				== comp);
+		}
+	
 		// restore timers for rest of tests
 		Timers::Init();
 	}
