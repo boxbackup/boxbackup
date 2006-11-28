@@ -59,7 +59,7 @@
 
 #include "MemLeakFindOn.h"
 
-bool intercept_enabled = false;
+int intercept_count = 0;
 const char *intercept_filename = 0;
 int intercept_filedes = -1;
 off_t intercept_errorafter = 0;
@@ -72,7 +72,7 @@ int intercept_delay_ms = 0;
 
 void intercept_clear_setup()
 {
-	intercept_enabled = false;
+	intercept_count = 0;
 	intercept_filename = 0;
 	intercept_filedes = -1;
 	intercept_errorafter = 0;
@@ -83,13 +83,13 @@ void intercept_clear_setup()
 
 bool intercept_triggered()
 {
-	return !intercept_enabled;
+	return intercept_count == 0;
 }
 
 void intercept_setup_error(const char *filename, unsigned int errorafter, int errortoreturn, int syscalltoerror)
 {
 	TRACE4("Setup for error: %s, after %d, err %d, syscall %d\n", filename, errorafter, errortoreturn, syscalltoerror);
-	intercept_enabled = true;
+	intercept_count = 1;
 	intercept_filename = filename;
 	intercept_filedes = -1;
 	intercept_errorafter = errorafter;
@@ -100,11 +100,12 @@ void intercept_setup_error(const char *filename, unsigned int errorafter, int er
 }
 
 void intercept_setup_delay(const char *filename, unsigned int delay_after, 
-	int delay_ms, int syscall_to_delay)
+	int delay_ms, int syscall_to_delay, int num_delays)
 {
-	TRACE4("Setup for delay: %s, after %d, wait %d ms, syscall %d\n", 
-		filename, delay_after, delay_ms, syscall_to_delay);
-	intercept_enabled = true;
+	TRACE5("Setup for delay: %s, after %d, wait %d ms, times %d, "
+		"syscall %d\n", filename, delay_after, delay_ms, 
+		num_delays, syscall_to_delay);
+	intercept_count = num_delays;
 	intercept_filename = filename;
 	intercept_filedes = -1;
 	intercept_errorafter = delay_after;
@@ -154,7 +155,7 @@ int intercept_reterr()
 }
 
 #define CHECK_FOR_FAKE_ERROR_COND(D, S, CALL, FAILRES)	\
-	if(intercept_enabled)					\
+	if(intercept_count > 0) \
 	{										\
 		if(intercept_errornow(D, S, CALL))	\
 		{									\
@@ -166,7 +167,11 @@ int intercept_reterr()
 					* 1000000; \
 				while (nanosleep(&tm, &tm) != 0 && \
 					errno == EINTR) { } \
-				intercept_clear_setup(); \
+				intercept_count --; \
+				if (intercept_count == 0) \
+				{ \
+					intercept_clear_setup(); \
+				} \
 			} \
 			else \
 			{ \
@@ -179,7 +184,7 @@ int intercept_reterr()
 extern "C" int
 open(const char *path, int flags, mode_t mode)
 {
-	if(intercept_enabled)
+	if(intercept_count > 0)
 	{
 		if(intercept_syscall == SYS_open && strcmp(path, intercept_filename) == 0)
 		{
@@ -192,7 +197,7 @@ open(const char *path, int flags, mode_t mode)
 #else
 	int r = syscall(SYS_open, path, flags, mode);
 #endif
-	if(intercept_enabled && intercept_filedes == -1)
+	if(intercept_count > 0 && intercept_filedes == -1)
 	{
 		// Right file?
 		if(strcmp(intercept_filename, path) == 0)
