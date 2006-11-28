@@ -508,8 +508,9 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 	}
 }
 
-void intercept_setup_delay(const char *filename, unsigned int delay_after, 
-	int delay_ms, int syscall_to_delay);
+void intercept_setup_delay(const char *filename, unsigned int delay_after,
+        int delay_ms, int syscall_to_delay, int num_delays);
+
 bool intercept_triggered();
 
 int start_internal_daemon()
@@ -609,7 +610,7 @@ int test_bbackupd()
 		// something to diff against (empty file doesn't work)
 		int fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
-		char buffer[1024];
+		char buffer[10000];
 		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
 		TEST_THAT(close(fd) == 0);
 		
@@ -618,7 +619,7 @@ int test_bbackupd()
 		stop_internal_daemon(pid);
 
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
-			0, 2000, SYS_read);
+			0, 2000, SYS_read, 1);
 		TEST_THAT(unlink("testfiles/bbackupd.log") == 0);
 
 		pid = start_internal_daemon();
@@ -659,13 +660,13 @@ int test_bbackupd()
 			TEST_THAT(reader.GetLine(line));
 			TEST_THAT(line == "Receive Success(0xe)");
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Receiving stream, size 60");
+			TEST_THAT(line == "Receiving stream, size 124");
 			TEST_THAT(reader.GetLine(line));
 			TEST_THAT(line == "Send GetIsAlive()");
 			TEST_THAT(reader.GetLine(line));
 			TEST_THAT(line == "Receive IsAlive()");
-			TEST_THAT(reader.GetLine(line));
 
+			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Send StoreFile(0x3,";
 			TEST_THAT(line.substr(0, comp.size()) == comp);
 			comp = ",0xe,\"f1\")";
@@ -674,7 +675,7 @@ int test_bbackupd()
 		}
 		
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
-			0, 4000, SYS_read);
+			0, 4000, SYS_read, 1);
 		pid = start_internal_daemon();
 		
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
@@ -710,7 +711,7 @@ int test_bbackupd()
 			TEST_THAT(reader.GetLine(line));
 			TEST_THAT(line == "Receive Success(0xf)");
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Receiving stream, size 60");
+			TEST_THAT(line == "Receiving stream, size 124");
 
 			// delaying for 4 seconds in one step means that
 			// the diff timer and the keepalive timer will
@@ -724,7 +725,69 @@ int test_bbackupd()
 			TEST_THAT(line.substr(line.size() - comp.size())
 				== comp);
 		}
-	
+
+		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
+			0, 1000, SYS_read, 3);
+		pid = start_internal_daemon();
+		
+		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
+		TEST_THAT(fd > 0);
+		// write again, to update the file's timestamp
+		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd) == 0);	
+
+		wait_for_backup_operation();
+		// can't test whether intercept was triggered, because
+		// it's in a different process.
+		// TEST_THAT(intercept_triggered());
+		stop_internal_daemon(pid);
+
+		// check that the diff was aborted, i.e. upload was not a diff
+		found1 = false;
+
+		while (!reader.IsEOF())
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			if (line == "Send GetBlockIndexByName(0x3,\"f1\")")
+			{
+				found1 = true;
+				break;
+			}
+		}
+
+		TEST_THAT(found1);
+		if (found1)
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive Success(0x10)");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receiving stream, size 124");
+
+			// delaying for 3 seconds in steps of 1 second
+			// means that the keepalive timer will expire 3 times,
+			// and on the 3rd time the diff timer will expire too.
+			// The diff timer is honoured first, so there will be 
+			// only two keepalives.
+			
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive IsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive IsAlive()");
+
+			TEST_THAT(reader.GetLine(line));
+			std::string comp = "Send StoreFile(0x3,";
+			TEST_THAT(line.substr(0, comp.size()) == comp);
+			comp = ",0x0,\"f1\")";
+			TEST_THAT(line.substr(line.size() - comp.size())
+				== comp);
+		}
+
 		// restore timers for rest of tests
 		Timers::Init();
 	}
