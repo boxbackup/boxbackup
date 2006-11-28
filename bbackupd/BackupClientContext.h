@@ -193,9 +193,9 @@ public:
 	//
 	// --------------------------------------------------------------------------
 	virtual void   DoKeepAlive();
-	virtual time_t GetTimeMgmtEpoch();
 	virtual int    GetMaximumDiffingTime();
-	virtual int    GetKeepaliveTime();
+	virtual int    GetKeepAliveTime();
+	virtual bool   IsManaged() { return mbIsManaged; }
 	
 private:
 	BackupDaemon &mrDaemon;
@@ -217,9 +217,6 @@ private:
 	ExcludeList *mpExcludeDirs;
 
 	bool mbIsManaged;
-	// unix time when diff was started
-	time_t mTimeMgmtEpoch;
 };
-
 
 #endif // BACKUPCLIENTCONTEXT__H
