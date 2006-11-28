@@ -51,16 +51,16 @@ public:
 	virtual ~DiffTimer();
 public:
 	virtual void   DoKeepAlive() = 0;
-	virtual time_t GetTimeMgmtEpoch() = 0;
 	virtual int    GetMaximumDiffingTime() = 0;
-	virtual int    GetKeepaliveTime() = 0;
+	virtual int    GetKeepAliveTime() = 0;
+	virtual bool   IsManaged() = 0;
 };
 
 // --------------------------------------------------------------------------
 //
 // Class
 //		Name:    BackupStoreFile
-//		Purpose: Class to hold together utils for maniplating files.
+//		Purpose: Class to hold together utils for manipulating files.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
