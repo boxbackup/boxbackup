@@ -219,6 +219,24 @@ Timer::Timer(size_t timeoutSecs)
 : mExpires(GetCurrentBoxTime() + SecondsToBoxTime(timeoutSecs)),
   mExpired(false)
 {
+	#ifndef NDEBUG
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (timeoutSecs == 0)
+	{
+		TRACE4("%d.%d: timer %p initialised for %d secs, "
+			"will not fire\n", tv.tv_sec, tv.tv_usec, this, 
+			timeoutSecs);
+	}
+	else
+	{
+		TRACE6("%d.%d: timer %p initialised for %d secs, "
+			"to fire at %d.%d\n", tv.tv_sec, tv.tv_usec, this, 
+			timeoutSecs, (int)(mExpires / 1000000), 
+			(int)(mExpires % 1000000));
+	}
+	#endif
+
 	if (timeoutSecs == 0)
 	{
 		mExpires = 0;
@@ -231,6 +249,13 @@ Timer::Timer(size_t timeoutSecs)
 
 Timer::~Timer()
 {
+	#ifndef NDEBUG
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	TRACE3("%d.%d: timer %p destroyed, will not fire\n",
+		tv.tv_sec, tv.tv_usec, this);
+	#endif
+
 	Timers::Remove(*this);
 }
 
@@ -238,7 +263,31 @@ Timer::Timer(const Timer& rToCopy)
 : mExpires(rToCopy.mExpires),
   mExpired(rToCopy.mExpired)
 {
-	if (mExpires != 0)
+	#ifndef NDEBUG
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (mExpired)
+	{
+		TRACE4("%d.%d: timer %p initialised from timer %p, "
+			"already expired, will not fire\n", tv.tv_sec, 
+			tv.tv_usec, this, &rToCopy);
+	}
+	else if (mExpires == 0)
+	{
+		TRACE4("%d.%d: timer %p initialised from timer %p, "
+			"will not fire\n", tv.tv_sec, tv.tv_usec, this, 
+			&rToCopy);
+	}
+	else
+	{
+		TRACE6("%d.%d: timer %p initialised from timer %p, "
+			"to fire at %d.%d\n", tv.tv_sec, tv.tv_usec, this, 
+			&rToCopy, (int)(mExpires / 1000000), 
+			(int)(mExpires % 1000000));
+	}
+	#endif
+
+	if (!mExpired && mExpires != 0)
 	{
 		Timers::Add(*this);
 	}
@@ -246,6 +295,30 @@ Timer::Timer(const Timer& rToCopy)
 
 Timer& Timer::operator=(const Timer& rToCopy)
 {
+	#ifndef NDEBUG
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (rToCopy.mExpired)
+	{
+		TRACE4("%d.%d: timer %p initialised from timer %p, "
+			"already expired, will not fire\n", tv.tv_sec, 
+			tv.tv_usec, this, &rToCopy);
+	}
+	else if (rToCopy.mExpires == 0)
+	{
+		TRACE4("%d.%d: timer %p initialised from timer %p, "
+			"will not fire\n", tv.tv_sec, tv.tv_usec, this, 
+			&rToCopy);
+	}
+	else
+	{
+		TRACE6("%d.%d: timer %p initialised from timer %p, "
+			"to fire at %d.%d\n", tv.tv_sec, tv.tv_usec, this, 
+			&rToCopy, (int)(rToCopy.mExpires / 1000000), 
+			(int)(rToCopy.mExpires % 1000000));
+	}
+	#endif
+
 	Timers::Remove(*this);
 	mExpires = rToCopy.mExpires;
 	mExpired = rToCopy.mExpired;
@@ -258,6 +331,12 @@ Timer& Timer::operator=(const Timer& rToCopy)
 
 void Timer::OnExpire()
 {
+	#ifndef NDEBUG
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	TRACE3("%d.%d: timer %p fired\n", tv.tv_sec, tv.tv_usec, this);
+	#endif
+
 	mExpired = true;
 	Timers::Remove(*this);
 }
