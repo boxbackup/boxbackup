@@ -223,6 +223,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 			std::string filename;
 			while((en = ::readdir(dirHandle)) != 0)
 			{
+				rParams.mrContext.DoKeepAlive();
+				
 				// Don't need to use LinuxWorkaround_FinishDirentStruct(en, rLocalPath.c_str());
 				// on Linux, as a stat is performed to get all this info
 
@@ -574,6 +576,9 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 	for(std::vector<std::string>::const_iterator f = rFiles.begin();
 		f != rFiles.end(); ++f)
 	{
+		// Send keep-alive message if needed
+		rParams.mrContext.DoKeepAlive();
+		
 		// Filename of this file
 		std::string filename(MakeFullPath(rLocalPath, *f));
 
@@ -921,6 +926,9 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 	for(std::vector<std::string>::const_iterator d = rDirs.begin();
 		d != rDirs.end(); ++d)
 	{
+		// Send keep-alive message if needed
+		rParams.mrContext.DoKeepAlive();
+		
 		// Get the local filename
 		std::string dirname(MakeFullPath(rLocalPath, *d));
 	
