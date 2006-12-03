@@ -14,6 +14,7 @@
 #include "BackupClientDeleteList.h"
 #include "BackupStoreFile.h"
 #include "ExcludeList.h"
+#include "Timer.h"
 
 class TLSContext;
 class BackupProtocolClient;
@@ -151,7 +152,7 @@ public:
 	//		Created: 04/19/2005
 	//
 	// --------------------------------------------------------------------------
-	static void SetMaximumDiffingTime(int iSeconds);
+	void SetMaximumDiffingTime(int iSeconds);
 
 	// --------------------------------------------------------------------------
 	//
@@ -161,7 +162,7 @@ public:
 	//		Created: 04/19/2005
 	//
 	// --------------------------------------------------------------------------
-	static void SetKeepAliveTime(int iSeconds);
+	void SetKeepAliveTime(int iSeconds);
 
 	// --------------------------------------------------------------------------
 	//
@@ -183,18 +184,17 @@ public:
 	// --------------------------------------------------------------------------
 	void UnManageDiffProcess();
 
-	// --------------------------------------------------------------------------
+	// -------------------------------------------------------------------
 	//
 	// Function
 	//		Name:    BackupClientContext::DoKeepAlive()
-	//		Purpose: Does something inconsequential over the SSL link to 
-	//				 keep it up, implements DiffTimer interface
+	//		Purpose: Check whether it's time to send a KeepAlive
+	//			 message over the SSL link, and if so, send it.
 	//		Created: 04/19/2005
 	//
-	// --------------------------------------------------------------------------
+	// -------------------------------------------------------------------
 	virtual void   DoKeepAlive();
 	virtual int    GetMaximumDiffingTime();
-	virtual int    GetKeepAliveTime();
 	virtual bool   IsManaged() { return mbIsManaged; }
 	
 private:
@@ -215,8 +215,10 @@ private:
 	bool mStorageLimitExceeded;
 	ExcludeList *mpExcludeFiles;
 	ExcludeList *mpExcludeDirs;
-
+	Timer mKeepAliveTimer;
 	bool mbIsManaged;
+	int mKeepAliveTime;
+	int mMaximumDiffingTime;
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

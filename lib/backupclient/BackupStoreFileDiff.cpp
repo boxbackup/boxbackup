@@ -460,12 +460,10 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 	int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES], DiffTimer *pDiffTimer)
 {
 	Timer maximumDiffingTime(0);
-	Timer keepAliveTime(0);
 
-	if (pDiffTimer && pDiffTimer->IsManaged())
+	if(pDiffTimer && pDiffTimer->IsManaged())
 	{
 		maximumDiffingTime = Timer(pDiffTimer->GetMaximumDiffingTime());
-		keepAliveTime      = Timer(pDiffTimer->GetKeepAliveTime());
 	}
 	
 	std::map<int64_t, int32_t> goodnessOfFit;
@@ -560,16 +558,11 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					break;
 				}
 				
-				if(keepAliveTime.HasExpired())
+				if(pDiffTimer)
 				{
-					ASSERT(pDiffTimer != NULL);
-					TRACE0("KeepAliveTime reached - "
-						"initiating keep-alive\n");
 					pDiffTimer->DoKeepAlive();
-					keepAliveTime = Timer(
-						pDiffTimer->GetKeepAliveTime());
 				}
-
+				
 				// Load in another block of data, and record how big it is
 				int bytesInEndings = rFile.Read(endings, Sizes[s]);
 				int tmp;

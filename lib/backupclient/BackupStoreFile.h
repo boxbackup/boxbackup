@@ -50,10 +50,9 @@ public:
 	DiffTimer();
 	virtual ~DiffTimer();
 public:
-	virtual void   DoKeepAlive() = 0;
-	virtual int    GetMaximumDiffingTime() = 0;
-	virtual int    GetKeepAliveTime() = 0;
-	virtual bool   IsManaged() = 0;
+	virtual void DoKeepAlive() = 0;
+	virtual int  GetMaximumDiffingTime() = 0;
+	virtual bool IsManaged() = 0;
 };
 
 // --------------------------------------------------------------------------
