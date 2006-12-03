@@ -17,19 +17,7 @@
 #include "MemLeakFindOn.h"
 
 std::vector<Timer*>* Timers::spTimers = NULL;
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    static void TimerSigHandler(int)
-//		Purpose: Signal handler, notifies Timers class
-//		Created: 19/3/04
-//
-// --------------------------------------------------------------------------
-static void TimerSigHandler(int iUnused)
-{
-	Timers::Signal();	
-}
+bool Timers::sRescheduleNeeded = false;
 
 // --------------------------------------------------------------------------
 //
@@ -43,15 +31,13 @@ void Timers::Init()
 {
 	ASSERT(!spTimers);
 	
-	#ifdef PLATFORM_CYGWIN
-		ASSERT(::signal(SIGALRM, TimerSigHandler) == 0);
-	#elif defined WIN32
+	#if defined WIN32 && ! defined PLATFORM_CYGWIN
 		// no support for signals at all
 		InitTimer();
-		SetTimerHandler(TimerSigHandler);
+		SetTimerHandler(Timers::SignalHandler);
 	#else
-		ASSERT(::signal(SIGALRM, TimerSigHandler) == 0);
-	#endif // PLATFORM_CYGWIN
+		ASSERT(::signal(SIGALRM, Timers::SignalHandler) == 0);
+	#endif // WIN32 && !PLATFORM_CYGWIN
 	
 	spTimers = new std::vector<Timer*>;
 }
@@ -68,15 +54,13 @@ void Timers::Cleanup()
 {
 	ASSERT(spTimers);
 	
-	#ifdef PLATFORM_CYGWIN
-		ASSERT(::signal(SIGALRM, NULL) == TimerSigHandler);
-	#elif defined WIN32
+	#if defined WIN32 && ! defined PLATFORM_CYGWIN
 		// no support for signals at all
 		SetTimerHandler(NULL);
 		FiniTimer();
 	#else
-		ASSERT(::signal(SIGALRM, NULL) == TimerSigHandler);
-	#endif // PLATFORM_CYGWIN
+		ASSERT(::signal(SIGALRM, NULL) == Timers::SignalHandler);
+	#endif // WIN32 && !PLATFORM_CYGWIN
 
 	spTimers->clear();
 	delete spTimers;
@@ -142,17 +126,48 @@ void Timers::Reschedule()
 {
 	ASSERT(spTimers);
 
+	// Set the reschedule-needed flag to false before we start.
+	// If a timer event occurs while we are scheduling, then we
+	// may or may not need to reschedule again, but this way
+	// we will do it anyway.
+	sRescheduleNeeded = false;
+
+	// scan for and remove expired timers, which requires
+	// us to restart the scan each time we remove one.
+	bool restart = true;
+	while (restart)
+	{
+		restart = false;
+
+		for (std::vector<Timer*>::iterator i = spTimers->begin();
+			i != spTimers->end(); i++)
+		{
+			Timer& rTimer = **i;
+			if (rTimer.HasExpired())
+			{
+				spTimers->erase(i);
+				restart = true;
+				break;
+			}
+		}
+	}
+
+	// Now the only remaining timers should all be in the future.
+	// Scan to find the next one to fire (earliest deadline).
+			
 	box_time_t timeNow = GetCurrentBoxTime();
 	int64_t timeToNextEvent = 0;
-	
+
 	for (std::vector<Timer*>::iterator i = spTimers->begin();
 		i != spTimers->end(); i++)
 	{
 		Timer& rTimer = **i;
-		ASSERT(!rTimer.HasExpired());
-		
 		int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
-		if (timeToExpiry <= 0) timeToExpiry = 1;
+
+		if (timeToExpiry <= 0)
+		{
+			timeToExpiry = 1;
+		}
 		
 		if (timeToNextEvent == 0 || timeToNextEvent > timeToExpiry)
 		{
@@ -183,14 +198,17 @@ void Timers::Reschedule()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    static void Timers::Signal()
-//		Purpose: Called by signal handler. Signals any timers which
+//		Name:    static void Timers::SignalHandler(unused)
+//		Purpose: Called as signal handler. Signals any timers which
 //			 are due or overdue, removes them from the set,
-//			 and reschedules next wakeup.
+//			 and requests a reschedule event. The actual
+//			 reschedule will happen next time someone calls
+//			 Timer::HasExpired(), which may be rather late,
+//			 but we can't do it from here, in signal context.
 //		Created: 5/11/2006
 //
 // --------------------------------------------------------------------------
-void Timers::Signal()
+void Timers::SignalHandler(int iUnused)
 {
 	ASSERT(spTimers);
 
@@ -212,7 +230,7 @@ void Timers::Signal()
 		}
 	}		
 	
-	Reschedule();
+	Timers::RequestReschedule();
 }
 
 Timer::Timer(size_t timeoutSecs)
