@@ -49,6 +49,7 @@
 #include "Timer.h"
 #include "FileStream.h"
 #include "IOStreamGetLine.h"
+#include "intercept.h"
 
 #include "MemLeakFindOn.h"
 
@@ -578,6 +579,70 @@ void stop_internal_daemon(int pid)
 	*/
 }
 
+static struct dirent readdir_test_dirent;
+static int readdir_test_counter = 0;
+static int readdir_stop_time = 0;
+static char stat_hook_filename[512];
+
+// First test hook, during the directory scanning stage, returns empty.
+// This will not match the directory on the store, so a sync will start.
+// We set up the next intercept for the same directory by passing NULL.
+
+struct dirent *readdir_test_hook_2(DIR *dir);
+
+#ifdef LINUX_WEIRD_LSTAT
+int lstat_test_hook(int ver, const char *file_name, struct stat *buf);
+#else
+int lstat_test_hook(const char *file_name, struct stat *buf);
+#endif
+
+struct dirent *readdir_test_hook_1(DIR *dir)
+{
+	intercept_setup_readdir_hook(NULL, readdir_test_hook_2);
+	return NULL;
+}
+
+// Second test hook, during the directory sync stage, keeps returning 
+// new filenames until the timer expires, then disables the intercept.
+
+struct dirent *readdir_test_hook_2(DIR *dir)
+{
+	if (time(NULL) >= readdir_stop_time)
+	{
+		intercept_setup_readdir_hook(NULL, NULL);
+		intercept_setup_lstat_hook  (NULL, NULL);
+		// we will not be called again.
+	}
+
+	// fill in the struct dirent appropriately
+	memset(&readdir_test_dirent, 0, sizeof(readdir_test_dirent));
+	readdir_test_dirent.d_ino = ++readdir_test_counter;
+	snprintf(readdir_test_dirent.d_name, 
+		sizeof(readdir_test_dirent.d_name),
+		"test.%d", readdir_test_counter);
+
+	// ensure that when bbackupd stats the file, it gets the 
+	// right answer
+	snprintf(stat_hook_filename, sizeof(stat_hook_filename),
+		"testfiles/TestDir1/spacetest/d1/test.%d", 
+		readdir_test_counter);
+	intercept_setup_lstat_hook(stat_hook_filename, lstat_test_hook);
+
+	return &readdir_test_dirent;
+}
+
+#ifdef LINUX_WEIRD_LSTAT
+int lstat_test_hook(int ver, const char *file_name, struct stat *buf)
+#else
+int lstat_test_hook(const char *file_name, struct stat *buf)
+#endif
+{
+	// TRACE1("lstat hook triggered for %s", file_name);		
+	memset(buf, 0, sizeof(*buf));
+	buf->st_mode = S_IFREG;
+	return 0;
+}
+
 int test_bbackupd()
 {
 //	// First, wait for a normal period to make sure the last changes attributes are within a normal backup timeframe.
@@ -787,6 +852,80 @@ int test_bbackupd()
 			TEST_THAT(line.substr(line.size() - comp.size())
 				== comp);
 		}
+
+		intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
+			readdir_test_hook_1);
+		
+		// time for at least two keepalives
+		readdir_stop_time = time(NULL) + 12 + 2;
+
+		pid = start_internal_daemon();
+		
+		std::string touchfile = 
+			"testfiles/TestDir1/spacetest/d1/touch-me";
+
+		fd = open(touchfile.c_str(), O_CREAT | O_WRONLY);
+		TEST_THAT(fd > 0);
+		// write again, to update the file's timestamp
+		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd) == 0);	
+
+		wait_for_backup_operation();
+		// can't test whether intercept was triggered, because
+		// it's in a different process.
+		// TEST_THAT(intercept_triggered());
+		stop_internal_daemon(pid);
+
+		// check that keepalives were sent during the dir search
+		found1 = false;
+
+		// skip to next login
+		while (!reader.IsEOF())
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			if (line == "Send ListDirectory(0x3,0xffffffff,0xc,true)")
+			{
+				found1 = true;
+				break;
+			}
+		}
+
+		TEST_THAT(found1);
+		if (found1)
+		{
+			found1 = false;
+
+			while (!reader.IsEOF())
+			{
+				std::string line;
+				TEST_THAT(reader.GetLine(line));
+				if (line == "Send ListDirectory(0x3,0xffffffff,0xc,true)")
+				{
+					found1 = true;
+					break;
+				}
+			}
+		}
+
+		if (found1)
+		{
+			std::string line;
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive Success(0x3)");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receiving stream, size 425");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive IsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_THAT(reader.GetLine(line));
+			TEST_THAT(line == "Receive IsAlive()");
+		}
+
+		TEST_THAT(unlink(touchfile.c_str()) == 0);
 
 		// restore timers for rest of tests
 		Timers::Init();
