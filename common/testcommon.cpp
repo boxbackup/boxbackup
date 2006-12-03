@@ -9,7 +9,9 @@
 
 #include "Box.h"
 
+#include <errno.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "Test.h"
 #include "Configuration.h"
@@ -134,6 +136,15 @@ ConfigurationVerify verify =
 	0
 };
 
+void safe_sleep(int seconds)
+{
+	struct timespec ts;
+	ts.tv_sec  = seconds;
+	ts.tv_nsec = 0;
+	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+	{ /* sleep again */ }
+}
+
 int test(int argc, const char *argv[])
 {
 	// Test self-deleting temporary file streams
@@ -254,13 +265,13 @@ int test(int argc, const char *argv[])
 	TEST_THAT(!t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
 	
-	sleep(1);
+	safe_sleep(1);
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
 	
-	sleep(1);
+	safe_sleep(1);
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(t2.HasExpired());
@@ -272,7 +283,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(!t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
 	
-	sleep(1);
+	safe_sleep(1);
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
