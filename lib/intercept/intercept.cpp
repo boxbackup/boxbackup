@@ -9,6 +9,8 @@
 
 #include "Box.h"
 
+#include "intercept.h"
+
 #ifdef HAVE_SYS_SYSCALL_H
 	#include <sys/syscall.h>
 #endif
@@ -20,6 +22,10 @@
 #endif
 
 #include <errno.h>
+
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
 
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
@@ -315,6 +321,175 @@ lseek(int fildes, off_t offset, int whence)
 		intercept_filepos = r;
 	}
 	return r;
+}
+
+static opendir_t*  opendir_real  = NULL;
+static readdir_t*  readdir_real  = NULL;
+static readdir_t*  readdir_hook  = NULL;
+static closedir_t* closedir_real = NULL;
+static lstat_t*    lstat_real    = NULL;
+static lstat_t*    lstat_hook    = NULL;
+static const char* lstat_file    = NULL;
+
+void intercept_setup_readdir_hook(const char *dirname, readdir_t hookfn)
+{
+	if (hookfn != NULL && dirname == NULL)
+	{
+		dirname = intercept_filename;
+	}
+
+	if (hookfn != NULL)
+	{
+		TRACE2("readdir hooked to %p for %s\n", hookfn, dirname);
+	}
+	else
+	{
+		TRACE2("readdir unhooked from %p for %s\n", readdir_hook, 
+			intercept_filename);
+	}
+
+	intercept_filename = dirname;
+	readdir_hook = hookfn;
+}
+
+void intercept_setup_lstat_hook(const char *filename, lstat_t hookfn)
+{
+	/*
+	if (hookfn != NULL)
+	{
+		TRACE2("lstat hooked to %p for %s\n", hookfn, filename);
+	}
+	else
+	{
+		TRACE2("lstat unhooked from %p for %s\n", lstat_hook, 
+			lstat_file);
+	}
+	*/
+
+	lstat_file = filename;
+	lstat_hook = hookfn;
+}
+
+extern "C" 
+DIR *opendir(const char *dirname)
+{
+	if (opendir_real == NULL)
+	{
+		opendir_real = (opendir_t*)(dlsym(RTLD_NEXT, "opendir"));
+	}
+
+	if (opendir_real == NULL)
+	{
+		perror("cannot find real opendir");
+		return NULL;
+	}
+
+	DIR* r = opendir_real(dirname);
+
+	if(readdir_hook != NULL && intercept_filedes == -1 && 
+		strcmp(intercept_filename, dirname) == 0)
+	{
+		intercept_filedes = dirfd(r);
+		//printf("Found file to intercept, h = %d\n", r);
+	}
+
+	return r;
+}
+
+extern "C"
+struct dirent *readdir(DIR *dir)
+{
+	if (readdir_hook != NULL && dirfd(dir) == intercept_filedes)
+	{
+		return readdir_hook(dir);
+	}
+
+	if (readdir_real == NULL)
+	{
+		#if readdir == readdir64
+		readdir_real = (readdir_t*)(dlsym(RTLD_NEXT, "readdir64"));
+		#else
+		readdir_real = (readdir_t*)(dlsym(RTLD_NEXT, "readdir"));
+		#endif
+	}
+
+	if (readdir_real == NULL)
+	{
+		perror("cannot find real readdir");
+		return NULL;
+	}
+
+	return readdir_real(dir);
+}
+
+extern "C"
+int closedir(DIR *dir)
+{
+	if (dirfd(dir) == intercept_filedes)
+	{
+		intercept_filedes = -1;
+	}
+
+	if (closedir_real == NULL)
+	{
+		closedir_real = (closedir_t*)(dlsym(RTLD_NEXT, "closedir"));
+	}
+
+	if (closedir_real == NULL)
+	{
+		perror("cannot find real closedir");
+		errno = ENOSYS;
+		return -1;
+	}
+
+	return closedir_real(dir);
+}
+
+extern "C" int 
+#ifdef LINUX_WEIRD_LSTAT
+__lxstat(int ver, const char *file_name, STAT_STRUCT *buf)
+#else
+lstat(const char *file_name, STAT_STRUCT *buf)
+#endif
+{
+	if (lstat_real == NULL)
+	{
+	#ifdef LINUX_WEIRD_LSTAT
+		#if __lxstat == __lxstat64
+		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "__lxstat64"));
+		#else
+		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "__lxstat"));
+		#endif
+	#else
+		#if lstat == lstat64
+		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "lstat64"));
+		#else
+		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "lstat"));
+		#endif
+	#endif
+	}
+
+	if (lstat_real == NULL)
+	{
+		perror("cannot find real lstat");
+		errno = ENOSYS;
+		return -1;
+	}
+
+	if (lstat_hook == NULL || strcmp(file_name, lstat_file) != 0)
+	{
+	#ifdef LINUX_WEIRD_LSTAT
+		return lstat_real(ver, file_name, buf);
+	#else
+		return lstat_real(file_name, buf);
+	#endif
+	}
+
+	#ifdef LINUX_WEIRD_LSTAT
+	return lstat_hook(ver, file_name, buf);
+	#else
+	return lstat_hook(file_name, buf);
+	#endif
 }
 
 #endif // n PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
