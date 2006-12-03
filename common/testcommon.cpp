@@ -238,7 +238,7 @@ int test(int argc, const char *argv[])
 		CommonException, AssertFailed);
 	TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
 		CommonException, AssertFailed);
-	TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
+	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
 	TEST_CHECK_THROWS(Timers::Cleanup(), CommonException, AssertFailed);
 	
 	// Check that we can initialise the timers
