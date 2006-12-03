@@ -67,6 +67,7 @@ BackupClientContext::BackupClientContext
 	  mStorageLimitExceeded(false),
 	  mpExcludeFiles(0),
 	  mpExcludeDirs(0),
+	  mKeepAliveTimer(0),
 	  mbIsManaged(false)
 {
 }
@@ -495,21 +496,17 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 	return true;
 }
 
-// maximum time to spend diffing
-static int sMaximumDiffTime = 600;
-// maximum time of SSL inactivity (keep-alive interval)
-static int sKeepAliveTime = 0;
-
 void BackupClientContext::SetMaximumDiffingTime(int iSeconds)
 {
-	sMaximumDiffTime = iSeconds < 0 ? 0 : iSeconds;
-	TRACE1("Set maximum diffing time to %d seconds\n", sMaximumDiffTime);
+	mMaximumDiffingTime = iSeconds < 0 ? 0 : iSeconds;
+	TRACE1("Set maximum diffing time to %d seconds\n", mMaximumDiffingTime);
 }
 
 void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
-	sKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
-	TRACE1("Set keep-alive time to %d seconds\n", sKeepAliveTime);
+	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
+	TRACE1("Set keep-alive time to %d seconds\n", mKeepAliveTime);
+	mKeepAliveTimer = Timer(mKeepAliveTime);
 }
 
 // --------------------------------------------------------------------------
@@ -544,7 +541,8 @@ void BackupClientContext::UnManageDiffProcess()
 //
 // Function
 //		Name:    BackupClientContext::DoKeepAlive()
-//		Purpose: Does something inconsequential over the SSL link to keep it up
+//		Purpose: Check whether it's time to send a KeepAlive
+//			 message over the SSL link, and if so, send it.
 //		Created: 04/19/2005
 //
 // --------------------------------------------------------------------------
@@ -552,19 +550,26 @@ void BackupClientContext::DoKeepAlive()
 {
 	if (!mpConnection)
 	{
-		::syslog(LOG_ERR, "DoKeepAlive() called with no connection!");
+		return;
+	}
+	
+	if (mKeepAliveTime == 0)
+	{
 		return;
 	}
 
+	if (!mKeepAliveTimer.HasExpired())
+	{
+		return;
+	}
+	
+	TRACE0("KeepAliveTime reached, sending keep-alive message\n");
 	mpConnection->QueryGetIsAlive();
+	
+	mKeepAliveTimer = Timer(mKeepAliveTime);
 }
 
 int BackupClientContext::GetMaximumDiffingTime() 
 {
-	return sMaximumDiffTime;
-}
-
-int BackupClientContext::GetKeepAliveTime() 
-{
-	return sKeepAliveTime;
+	return mMaximumDiffingTime;
 }
