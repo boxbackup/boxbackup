@@ -18,23 +18,7 @@
 #include "MemLeakFindOn.h"
 #include "BoxTime.h"
 
-class Timer
-{
-public:
-	Timer(size_t timeoutSecs);
-	virtual ~Timer();
-	Timer(const Timer &);
-	Timer &operator=(const Timer &);
-
-public:
-	box_time_t   GetExpiryTime() { return mExpires; }
-	bool         HasExpired   () { return mExpired; }
-	virtual void OnExpire     ();
-	
-private:
-	box_time_t mExpires;
-	bool       mExpired;
-};
+class Timer;
 
 // --------------------------------------------------------------------------
 //
@@ -50,13 +34,49 @@ class Timers
 	private:
 	static std::vector<Timer*>* spTimers;
 	static void Reschedule();
+
+	static bool sRescheduleNeeded;
+	static void SignalHandler(int iUnused);
 	
 	public:
 	static void Init();
 	static void Cleanup();
 	static void Add   (Timer& rTimer);
 	static void Remove(Timer& rTimer);
-	static void Signal();
+	static void RequestReschedule()
+	{
+		sRescheduleNeeded = true;
+	}
+
+	static void RescheduleIfNeeded()
+	{
+		if (sRescheduleNeeded) 
+		{
+			Reschedule();
+		}
+	}
+};
+
+class Timer
+{
+public:
+	Timer(size_t timeoutSecs);
+	virtual ~Timer();
+	Timer(const Timer &);
+	Timer &operator=(const Timer &);
+
+public:
+	box_time_t   GetExpiryTime() { return mExpires; }
+	virtual void OnExpire();
+	bool         HasExpired()
+	{
+		Timers::RescheduleIfNeeded();
+		return mExpired; 
+	}
+	
+private:
+	box_time_t mExpires;
+	bool       mExpired;
 };
 
 #include "MemLeakFindOff.h"
