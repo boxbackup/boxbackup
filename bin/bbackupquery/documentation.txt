@@ -123,7 +123,7 @@ compare <store-dir-name> <local-dir-name>
 
 	The root cannot be restored -- restore locations individually.
 
-	-d -- restore a deleted directory.
+	-d -- restore a deleted directory or deleted files inside
 	-r -- resume an interrupted restoration
 	-i -- directory name is actually an ID
 
