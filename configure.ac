@@ -94,7 +94,7 @@ esac
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([execinfo.h process.h pwd.h signal.h])
+AC_CHECK_HEADERS([dlfcn.h execinfo.h process.h pwd.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
@@ -106,6 +106,8 @@ if test "$have_regex_h" = "yes"; then
   AC_DEFINE([HAVE_REGEX_H], [1], [Define to 1 if regex.h is available])
   AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"])
 fi
+
+AC_SEARCH_LIBS([dlsym], ["dl"])
 
 ### Checks for typedefs, structures, and compiler characteristics.
 
