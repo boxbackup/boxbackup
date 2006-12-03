@@ -1807,6 +1807,10 @@ void BackupDaemon::CommitIDMapsAfterSync()
 #endif
 		if(::rename(newmap.c_str(), target.c_str()) != 0)
 		{
+			::syslog(LOG_ERR, "failed to rename ID map: "
+				"%s to %s: %s",
+				newmap.c_str(), target.c_str(),
+				strerror(errno));
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
