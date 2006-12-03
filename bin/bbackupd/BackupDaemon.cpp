@@ -523,18 +523,20 @@ void BackupDaemon::Run2()
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
+	// Setup various timings
+	int maximumDiffingTime = 600;
+	int keepAliveTime = 60;
+
 	// max diffing time, keep-alive time
 	if(conf.KeyExists("MaximumDiffingTime"))
 	{
-		BackupClientContext::SetMaximumDiffingTime(conf.GetKeyValueInt("MaximumDiffingTime"));
+		maximumDiffingTime = conf.GetKeyValueInt("MaximumDiffingTime");
 	}
 	if(conf.KeyExists("KeepAliveTime"))
 	{
-		BackupClientContext::SetKeepAliveTime(conf.GetKeyValueInt("KeepAliveTime"));
+		keepAliveTime = conf.GetKeyValueInt("KeepAliveTime");
 	}
 
-	// Setup various timings
-	
 	// How often to connect to the store (approximate)
 	box_time_t updateStoreInterval = SecondsToBoxTime(conf.GetKeyValueInt("UpdateStoreInterval"));
 
@@ -725,6 +727,9 @@ void BackupDaemon::Run2()
 				params.mFileTrackingSizeThreshold = conf.GetKeyValueInt("FileTrackingSizeThreshold");
 				params.mDiffingUploadSizeThreshold = conf.GetKeyValueInt("DiffingUploadSizeThreshold");
 				params.mMaxFileTimeInFuture = SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
+
+				clientContext.SetMaximumDiffingTime(maximumDiffingTime);
+				clientContext.SetKeepAliveTime(keepAliveTime);
 				
 				// Set store marker
 				clientContext.SetClientStoreMarker(clientStoreMarker);
