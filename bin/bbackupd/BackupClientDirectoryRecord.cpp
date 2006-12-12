@@ -922,11 +922,15 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			// In the list, just use this pointer
 			psubDirRecord = e->second;
 		}
-		else if(!rParams.mrContext.StorageLimitExceeded())	// know we've got a connection if we get this far, as dir will have been modified.
+		else 
 		{
-			// Note: only think about adding directory records if there's space left on the server.
-			// If there isn't, this step will be repeated when there is some available.
-		
+			// Note: if we have exceeded our storage limit, then
+			// we should not upload any more data, nor create any
+			// DirectoryRecord representing data that would have
+			// been uploaded. This step will be repeated when 
+			// there is some space available.
+			bool doCreateDirectoryRecord = true;
+			
 			// Need to create the record. But do we need to create the directory on the server?
 			int64_t subDirObjectID = 0;
 			if(en != 0)
@@ -934,6 +938,12 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				// No. Exists on the server, and we know about it from the listing.
 				subDirObjectID = en->GetObjectID();
 			}
+			else if(rParams.mrContext.StorageLimitExceeded())	
+			// know we've got a connection if we get this far,
+			// as dir will have been modified.
+			{
+				doCreateDirectoryRecord = false;
+			}				
 			else
 			{
 				// Yes, creation required!
@@ -1016,20 +1026,23 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					haveJustCreatedDirOnServer = true;
 				}
 			}
-			
-			// New an object for this
-			psubDirRecord = new BackupClientDirectoryRecord(subDirObjectID, *d);
-			
-			// Store in list
-			try
-			{
-				mSubDirectories[*d] = psubDirRecord;
-			}
-			catch(...)
-			{
-				delete psubDirRecord;
-				psubDirRecord = 0;
-				throw;
+
+			if (doCreateDirectoryRecord)
+			{				
+				// New an object for this
+				psubDirRecord = new BackupClientDirectoryRecord(subDirObjectID, *d);
+				
+				// Store in list
+				try
+				{
+					mSubDirectories[*d] = psubDirRecord;
+				}
+				catch(...)
+				{
+					delete psubDirRecord;
+					psubDirRecord = 0;
+					throw;
+				}
 			}
 		}
 		
