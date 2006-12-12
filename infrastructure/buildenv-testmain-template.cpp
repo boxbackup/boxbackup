@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <string>
 
 #ifdef WIN32
 	#include "emu.h"
