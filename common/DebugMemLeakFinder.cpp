@@ -25,6 +25,8 @@
 #include <string.h>
 #include <set>
 
+#include "MemLeakFinder.h"
+
 static bool memleakfinder_initialised = false;
 bool memleakfinder_global_enable = false;
 
