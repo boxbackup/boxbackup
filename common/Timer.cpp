@@ -126,14 +126,16 @@ void Timers::Reschedule()
 {
 	ASSERT(spTimers);
 
-	// Set the reschedule-needed flag to false before we start.
+	// Clear the reschedule-needed flag to false before we start.
 	// If a timer event occurs while we are scheduling, then we
 	// may or may not need to reschedule again, but this way
 	// we will do it anyway.
 	sRescheduleNeeded = false;
 
-	// scan for and remove expired timers, which requires
-	// us to restart the scan each time we remove one.
+	box_time_t timeNow = GetCurrentBoxTime();
+
+	// scan for, trigger and remove expired timers. Removal requires
+	// us to restart the scan each time, due to std::vector semantics.
 	bool restart = true;
 	while (restart)
 	{
@@ -143,11 +145,29 @@ void Timers::Reschedule()
 			i != spTimers->end(); i++)
 		{
 			Timer& rTimer = **i;
-			if (rTimer.HasExpired())
+			int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
+		
+			if (timeToExpiry <= 0)
 			{
+				TRACE3("%d.%d: timer %p has expired, "
+					"triggering it\n",
+					(int)(timeNow / 1000000), 
+					(int)(timeNow % 1000000),
+					*i);
+				rTimer.OnExpire();
 				spTimers->erase(i);
 				restart = true;
 				break;
+			}
+			else
+			{
+				TRACE5("%d.%d: timer %p has not expired, "
+					"triggering in %d.%d seconds\n",
+					(int)(timeNow / 1000000), 
+					(int)(timeNow % 1000000),
+					*i,
+					(int)(timeToExpiry / 1000000),
+					(int)(timeToExpiry % 1000000));
 			}
 		}
 	}
@@ -155,7 +175,6 @@ void Timers::Reschedule()
 	// Now the only remaining timers should all be in the future.
 	// Scan to find the next one to fire (earliest deadline).
 			
-	box_time_t timeNow = GetCurrentBoxTime();
 	int64_t timeToNextEvent = 0;
 
 	for (std::vector<Timer*>::iterator i = spTimers->begin();
@@ -199,37 +218,17 @@ void Timers::Reschedule()
 //
 // Function
 //		Name:    static void Timers::SignalHandler(unused)
-//		Purpose: Called as signal handler. Signals any timers which
-//			 are due or overdue, removes them from the set,
-//			 and requests a reschedule event. The actual
-//			 reschedule will happen next time someone calls
-//			 Timer::HasExpired(), which may be rather late,
-//			 but we can't do it from here, in signal context.
+//		Purpose: Called as signal handler. Nothing is safe in a signal
+//			 handler, not even traversing the list of timers, so
+//			 just request a reschedule in future, which will do
+//			 that for us, and trigger any expired timers at that
+//			 time.
 //		Created: 5/11/2006
 //
 // --------------------------------------------------------------------------
 void Timers::SignalHandler(int iUnused)
 {
-	ASSERT(spTimers);
-
-	box_time_t timeNow = GetCurrentBoxTime();
-
-	std::vector<Timer*> timersCopy = *spTimers;
-	
-	for (std::vector<Timer*>::iterator i = timersCopy.begin();
-		i != timersCopy.end(); i++)
-	{
-		Timer& rTimer = **i;
-		ASSERT(!rTimer.HasExpired());
-		
-		int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
-		
-		if (timeToExpiry <= 0)
-		{
-			rTimer.OnExpire();
-		}
-	}		
-	
+	// ASSERT(spTimers);
 	Timers::RequestReschedule();
 }
 
@@ -356,5 +355,4 @@ void Timer::OnExpire()
 	#endif
 
 	mExpired = true;
-	Timers::Remove(*this);
 }
