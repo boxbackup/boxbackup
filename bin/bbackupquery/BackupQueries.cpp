@@ -923,25 +923,6 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 
 		std::string fileName(args[0]);
 
-		if(!opts['i'])
-		{
-			// does this remote filename include a path?
-			std::string::size_type index = fileName.rfind('/');
-			if(index != std::string::npos)
-			{
-				std::string dirName(fileName.substr(0, index));
-				fileName = fileName.substr(index + 1);
-
-				dirId = FindDirectoryObjectID(dirName);
-				if(dirId == 0)
-				{
-					printf("Directory '%s' not found\n", 
-						dirName.c_str());
-					return;
-				}
-			}
-		}
-
 		BackupStoreFilenameClear fn(fileName);
 
 		// Need to look it up in the current directory
