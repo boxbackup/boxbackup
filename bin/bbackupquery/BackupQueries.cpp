@@ -206,7 +206,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{ "sh",   "" },
 		{ "getobject", "" },
 		{ "get",  "i" },
-		{ "compare", "alcqE" },
+		{ "compare", "alcqAE" },
 		{ "restore", "dri" },
 		{ "help", "" },
 		{ "usage", "" },
@@ -1038,6 +1038,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 BackupQueries::CompareParams::CompareParams()
 	: mQuickCompare(false),
 	  mIgnoreExcludes(false),
+	  mIgnoreAttributes(false),
 	  mDifferences(0),
 	  mDifferencesExplainedByModTime(0),
 	  mExcludedDirs(0),
@@ -1100,6 +1101,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	BackupQueries::CompareParams params;
 	params.mQuickCompare = opts['q'];
 	params.mIgnoreExcludes = opts['E'];
+	params.mIgnoreAttributes = opts['A'];
 	
 	// Try and work out the time before which all files should be on the server
 	{
@@ -1547,8 +1549,17 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						box_time_t fileModTime = 0;
 						localAttr.ReadAttributes(localPath.c_str(), false /* don't zero mod times */, &fileModTime);					
 						modifiedAfterLastSync = (fileModTime > rParams.mLatestFileUploadTime);
-						if(!localAttr.Compare(fileOnServerStream->GetAttributes(),
-								true /* ignore attr mod time */,
+						bool ignoreAttrModTime = true;
+
+						#ifdef WIN32
+						// attr mod time is really
+						// creation time, so check it
+						ignoreAttrModTime = false;
+						#endif
+
+						if(!rParams.mIgnoreAttributes &&
+						   !localAttr.Compare(fileOnServerStream->GetAttributes(),
+								ignoreAttrModTime,
 								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
 						{
 							printf("Local file '%s' "
