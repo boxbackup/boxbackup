@@ -19,7 +19,7 @@
 	#include "Win32ServiceFunctions.h"
 	#include "Win32BackupService.h"
 
-	extern Win32BackupService gDaemonService;
+	extern Win32BackupService* gpDaemonService;
 #endif
 
 int main(int argc, const char *argv[])
@@ -28,7 +28,7 @@ int main(int argc, const char *argv[])
 
 #ifdef WIN32
 
-	::openlog("Box Backup (bbackupd)", 0, 0);
+	::openlog("Box Backup (bbackupd)", LOG_PID, LOG_LOCAL6);
 
 	if(argc == 2 &&
 		(::strcmp(argv[1], "--help") == 0 ||
@@ -57,18 +57,8 @@ int main(int argc, const char *argv[])
 	{
 		runAsWin32Service = true;
 	}
-	
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-		
-	WSADATA info;
 
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
-	{
-		// box backup will not run without sockets
-		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
+	gpDaemonService = new Win32BackupService();
 
 	EnableBackupRights();
 
@@ -95,14 +85,13 @@ int main(int argc, const char *argv[])
 	}
 	else
 	{
-		ExitCode = gDaemonService.Main(
+		ExitCode = gpDaemonService->Main(
 			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 	}
 
-	// Clean up our sockets
-	WSACleanup();
-
 	::closelog();
+
+	delete gpDaemonService;
 
 	return ExitCode;
 
