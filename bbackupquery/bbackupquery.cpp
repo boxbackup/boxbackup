@@ -171,7 +171,8 @@ int main(int argc, const char *argv[])
 		}
 
 		// enable input of Unicode characters
-		if (_setmode(_fileno(stdin), _O_TEXT) == -1)
+		if (_fileno(stdin) != -1 &&
+			_setmode(_fileno(stdin), _O_TEXT) == -1)
 		{
 			perror("Failed to set the console input to "
 				"binary mode");
@@ -245,7 +246,7 @@ int main(int argc, const char *argv[])
 		int c = 0;
 		while(c < argc && !context.Stop())
 		{
-			context.DoCommand(argv[c++]);
+			context.DoCommand(argv[c++], true);
 		}
 	}
 	
@@ -263,7 +264,7 @@ int main(int argc, const char *argv[])
 			// Ctrl-D pressed -- terminate now
 			break;
 		}
-		context.DoCommand(command);
+		context.DoCommand(command, false);
 		if(last_cmd != 0 && ::strcmp(last_cmd, command) == 0)
 		{
 			free(command);
@@ -284,13 +285,16 @@ int main(int argc, const char *argv[])
 #endif
 #else
 	// Version for platforms which don't have readline by default
-	FdGetLine getLine(fileno(stdin));
-	while(!context.Stop())
+	if(fileno(stdin) >= 0)
 	{
-		printf("query > ");
-		fflush(stdout);
-		std::string command(getLine.GetLine());
-		context.DoCommand(command.c_str());
+		FdGetLine getLine(fileno(stdin));
+		while(!context.Stop())
+		{
+			printf("query > ");
+			fflush(stdout);
+			std::string command(getLine.GetLine());
+			context.DoCommand(command.c_str(), false);
+		}
 	}
 #endif
 	
