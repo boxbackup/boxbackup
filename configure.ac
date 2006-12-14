@@ -84,9 +84,13 @@ Upgrade or read the documentation for alternatives]])
 
 ### Checks for header files.
 
-if test "$target_os" != "mingw32"; then
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
   AC_HEADER_DIRENT
-fi
+  ;;
+esac
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
