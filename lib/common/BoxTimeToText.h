@@ -13,7 +13,7 @@
 #include <string>
 #include "BoxTime.h"
 
-std::string BoxTimeToISO8601String(box_time_t Time);
+std::string BoxTimeToISO8601String(box_time_t Time, bool localTime);
 
 #endif // BOXTIMETOTEXT__H
 

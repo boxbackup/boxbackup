@@ -180,7 +180,7 @@ void BackupQueries::DoCommand(const char *Command)
 	{
 		{ "quit", "" },
 		{ "exit", "" },
-		{ "list", "rodIFtsh", },
+		{ "list", "rodIFtTsh", },
 		{ "pwd",  "" },
 		{ "cd",   "od" },
 		{ "lcd",  "" },
@@ -350,8 +350,9 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	#define LIST_OPTION_ALLOWOLD		'o'
 	#define LIST_OPTION_ALLOWDELETED	'd'
 	#define LIST_OPTION_NOOBJECTID		'I'
-	#define LIST_OPTION_NOFLAGS			'F'
-	#define LIST_OPTION_TIMES			't'
+	#define LIST_OPTION_NOFLAGS		'F'
+	#define LIST_OPTION_TIMES_LOCAL		't'
+	#define LIST_OPTION_TIMES_UTC		'T'
 	#define LIST_OPTION_SIZEINBLOCKS	's'
 	#define LIST_OPTION_DISPLAY_HASH	'h'
 
@@ -468,11 +469,19 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			}
 		}
 		
-		if(opts[LIST_OPTION_TIMES])
+		if(opts[LIST_OPTION_TIMES_UTC])
 		{
-			// Show times...
+			// Show UTC times...
 			std::string time = BoxTimeToISO8601String(
-				en->GetModificationTime());
+				en->GetModificationTime(), false);
+			printf("%s ", time.c_str());
+		}
+
+		if(opts[LIST_OPTION_TIMES_LOCAL])
+		{
+			// Show local times...
+			std::string time = BoxTimeToISO8601String(
+				en->GetModificationTime(), true);
 			printf("%s ", time.c_str());
 		}
 		
