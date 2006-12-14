@@ -307,15 +307,12 @@ void FileStream::Close()
 
 #ifdef WIN32
 	if(::CloseHandle(mOSFileHandle) == 0)
-	{
-		THROW_EXCEPTION(CommonException, OSFileCloseError)
-	}
 #else
 	if(::close(mOSFileHandle) != 0)
+#endif
 	{
 		THROW_EXCEPTION(CommonException, OSFileCloseError)
 	}
-#endif
 
 	mOSFileHandle = INVALID_FILE;
 	mIsEOF = true;
