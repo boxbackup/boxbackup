@@ -382,14 +382,14 @@ void BackupDaemon::RunHelperThread(void)
 				}
 
 				// Send a response back?
-				if (sendResponse)
+				if(sendResponse)
 				{
 					const char* response = sendOK ? "ok\n" : "error\n";
 					rSocket.Write(
 						response, strlen(response));
 				}
 
-				if (disconnect) 
+				if(disconnect) 
 				{
 					break;
 				}
@@ -992,7 +992,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 	{
 		Sleep(1);
 
-		if ( timeout == 0 )
+		if( timeout == 0 )
 		{
 			DoSyncFlagOut = false;
 			SyncIsForcedOut = false;
@@ -1237,7 +1237,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 #warning race condition: what happens if socket is closed?
 #endif
 
-	if (mpCommandSocketInfo != NULL &&
+	if(mpCommandSocketInfo != NULL &&
 #ifdef WIN32
 	    mpCommandSocketInfo->mListeningSocket.IsConnected()
 #else
@@ -1864,7 +1864,7 @@ void BackupDaemon::SetState(int State)
 
 	// what happens if the socket is closed by the other thread before
 	// we can write to it? Null pointer deref at best.
-	if (mpCommandSocketInfo && 
+	if(mpCommandSocketInfo && 
 	    mpCommandSocketInfo->mListeningSocket.IsConnected())
 	{
 		try
@@ -2082,12 +2082,12 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	//
 	//
 	mpDirectoryRecord.reset(NULL);
-	if (mpExcludeFiles)
+	if(mpExcludeFiles)
 	{
 		delete mpExcludeFiles;
 		mpExcludeFiles = NULL;
 	}
-	if (mpExcludeDirs)
+	if(mpExcludeDirs)
 	{
 		delete mpExcludeDirs;
 		mpExcludeDirs = NULL;
@@ -2106,15 +2106,17 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	int64_t aMagicMarker = 0;
 	rArchive.Read(aMagicMarker);
 
-	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	if(aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
 	{
 		// NOOP
 	}
-	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
 	{
 		BackupClientDirectoryRecord *pSubRecord = new BackupClientDirectoryRecord(0, "");
-		if (!pSubRecord)
+		if(!pSubRecord)
+		{
 			throw std::bad_alloc();
+		}
 
 		mpDirectoryRecord.reset(pSubRecord);
 		mpDirectoryRecord->Deserialize(rArchive);
@@ -2130,15 +2132,17 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	//
 	rArchive.Read(aMagicMarker);
 
-	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	if(aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
 	{
 		// NOOP
 	}
-	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
 	{
 		mpExcludeFiles = new ExcludeList;
-		if (!mpExcludeFiles)
+		if(!mpExcludeFiles)
+		{
 			throw std::bad_alloc();
+		}
 
 		mpExcludeFiles->Deserialize(rArchive);
 	}
@@ -2153,15 +2157,17 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	//
 	rArchive.Read(aMagicMarker);
 
-	if (aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	if(aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
 	{
 		// NOOP
 	}
-	else if (aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
 	{
 		mpExcludeDirs = new ExcludeList;
-		if (!mpExcludeDirs)
+		if(!mpExcludeDirs)
+		{
 			throw std::bad_alloc();
+		}
 
 		mpExcludeDirs->Deserialize(rArchive);
 	}
@@ -2193,7 +2199,7 @@ void BackupDaemon::Location::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-	if (mpDirectoryRecord.get() == NULL)
+	if(mpDirectoryRecord.get() == NULL)
 	{
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
 		rArchive.Write(aMagicMarker);
@@ -2209,7 +2215,7 @@ void BackupDaemon::Location::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-	if (!mpExcludeFiles)
+	if(!mpExcludeFiles)
 	{
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
 		rArchive.Write(aMagicMarker);
@@ -2225,7 +2231,7 @@ void BackupDaemon::Location::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-	if (!mpExcludeDirs)
+	if(!mpExcludeDirs)
 	{
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
 		rArchive.Write(aMagicMarker);
@@ -2294,7 +2300,7 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 	std::string StoreObjectInfoFile = 
 		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
 
-	if (StoreObjectInfoFile.size() <= 0)
+	if(StoreObjectInfoFile.size() <= 0)
 	{
 		return false;
 	}
@@ -2323,7 +2329,7 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 		int64_t iCount = mLocations.size();
 		anArchive.Write(iCount);
 
-		for (int v = 0; v < iCount; v++)
+		for(int v = 0; v < iCount; v++)
 		{
 			ASSERT(mLocations[v]);
 			mLocations[v]->Serialize(anArchive);
@@ -2335,7 +2341,7 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 		iCount = mIDMapMounts.size();
 		anArchive.Write(iCount);
 
-		for (int v = 0; v < iCount; v++)
+		for(int v = 0; v < iCount; v++)
 			anArchive.Write(mIDMapMounts[v]);
 
 		//
@@ -2382,7 +2388,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 	std::string StoreObjectInfoFile = 
 		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
 
-	if (StoreObjectInfoFile.size() <= 0)
+	if(StoreObjectInfoFile.size() <= 0)
 	{
 		return false;
 	}
@@ -2398,7 +2404,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		int iMagicValue = 0;
 		anArchive.Read(iMagicValue);
 
-		if (iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
+		if(iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
 		{
 			::syslog(LOG_WARNING, "Store object info file '%s' "
 				"is not a valid or compatible serialised "
@@ -2413,7 +2419,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		std::string strMagicValue;
 		anArchive.Read(strMagicValue);
 
-		if (strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
+		if(strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
 		{
 			::syslog(LOG_WARNING, "Store object info file '%s' "
 				"is not a valid or compatible serialised "
@@ -2429,7 +2435,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		int iVersion = 0;
 		anArchive.Read(iVersion);
 
-		if (iVersion != STOREOBJECTINFO_VERSION)
+		if(iVersion != STOREOBJECTINFO_VERSION)
 		{
 			::syslog(LOG_WARNING, "Store object info file '%s' "
 				"version %d unsupported. "
@@ -2446,7 +2452,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		box_time_t lastKnownConfigModTime;
 		anArchive.Read(lastKnownConfigModTime);
 
-		if (lastKnownConfigModTime != GetLoadedConfigModifiedTime())
+		if(lastKnownConfigModTime != GetLoadedConfigModifiedTime())
 		{
 			::syslog(LOG_WARNING, "Store object info file '%s' "
 				"out of date. Will re-cache from store", 
@@ -2467,11 +2473,13 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		int64_t iCount = 0;
 		anArchive.Read(iCount);
 
-		for (int v = 0; v < iCount; v++)
+		for(int v = 0; v < iCount; v++)
 		{
 			Location* pLocation = new Location;
-			if (!pLocation)
+			if(!pLocation)
+			{
 				throw std::bad_alloc();
+			}
 
 			pLocation->Deserialize(anArchive);
 			mLocations.push_back(pLocation);
@@ -2483,7 +2491,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		iCount = 0;
 		anArchive.Read(iCount);
 
-		for (int v = 0; v < iCount; v++)
+		for(int v = 0; v < iCount; v++)
 		{
 			std::string strItem;
 			anArchive.Read(strItem);
