@@ -546,21 +546,43 @@ int test(int argc, const char *argv[])
 			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$")), CommonException, RegexNotSupportedOnThisPlatform);
 			TEST_THAT(elist.SizeOfRegexList() == 0);
 		#endif
+
+		#ifdef WIN32
+		#define CASE_SENSITIVE false
+		#else
+		#define CASE_SENSITIVE true
+		#endif
+
 		// Try some matches!
 		TEST_THAT(elist.IsExcluded(std::string("Definite1")) == true);
 		TEST_THAT(elist.IsExcluded(std::string("/dir/DefNumberTwo")) == true);
 		TEST_THAT(elist.IsExcluded(std::string("ThingDefThree")) == true);
 		TEST_THAT(elist.IsExcluded(std::string("AnotherDef")) == true);
 		TEST_THAT(elist.IsExcluded(std::string("dir/DefNumberTwo")) == false);
+
+		// Try some case insensitive matches,
+		// that should pass on Win32 and fail elsewhere
+		TEST_THAT(elist.IsExcluded("DEFINITe1") 
+			== !CASE_SENSITIVE);
+		TEST_THAT(elist.IsExcluded("/Dir/DefNumberTwo") 
+			== !CASE_SENSITIVE);
+		TEST_THAT(elist.IsExcluded("thingdefthree") 
+			== !CASE_SENSITIVE);
+
 		#ifdef HAVE_REGEX_H
 			TEST_THAT(elist.IsExcluded(std::string("b.reg")) == true);
+			TEST_THAT(elist.IsExcluded(std::string("B.reg")) == !CASE_SENSITIVE);
+			TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == !CASE_SENSITIVE);
 			TEST_THAT(elist.IsExcluded(std::string("e.reg")) == false);
-			TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == false);
-			TEST_THAT(elist.IsExcluded(std::string("DEfinite1")) == false);
+			TEST_THAT(elist.IsExcluded(std::string("e.Reg")) == false);
+			TEST_THAT(elist.IsExcluded(std::string("DEfinite1")) == !CASE_SENSITIVE);
 			TEST_THAT(elist.IsExcluded(std::string("DEXCLUDEfinite1")) == true);
-			TEST_THAT(elist.IsExcluded(std::string("DEfinitexclude1")) == false);
+			TEST_THAT(elist.IsExcluded(std::string("DEfinitexclude1")) == !CASE_SENSITIVE);
 			TEST_THAT(elist.IsExcluded(std::string("exclude")) == true);
+			TEST_THAT(elist.IsExcluded(std::string("ExcludE")) == !CASE_SENSITIVE);
 		#endif
+
+		#undef CASE_SENSITIVE
 	}
 
 	test_conversions();
