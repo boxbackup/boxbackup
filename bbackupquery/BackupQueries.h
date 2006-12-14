@@ -68,6 +68,7 @@ private:
 		void DeleteExcludeLists();
 		bool mQuickCompare;
 		bool mIgnoreExcludes;
+		bool mIgnoreAttributes;
 		int mDifferences;
 		int mDifferencesExplainedByModTime;
 		int mExcludedDirs;

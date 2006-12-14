@@ -104,6 +104,7 @@ compare <store-dir-name> <local-dir-name>
 	-c -- set return code
 	-q -- quick compare. Only checks file contents against checksums,
 			doesn't do a full download
+	-A -- ignore attribute differences
 	-E -- ignore exclusion settings
 	
 	Comparing with the root directory is an error, use -a option instead.
