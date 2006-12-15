@@ -461,10 +461,14 @@ void *operator new[](size_t size, const char *file, int line)
 
 // where there is no doctor... need to override standard new() too
 // http://www.relisoft.com/book/tech/9new.html
+// disabled because it causes hangs on FC2 in futex() in test/common
+// while reading files. reason unknown.
+/*
 void *operator new(size_t size)
 {
 	return internal_new(size, "standard libraries", 0);
 }
+*/
 
 void *operator new[](size_t size)
 {
