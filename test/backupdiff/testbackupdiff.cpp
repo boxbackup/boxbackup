@@ -69,10 +69,16 @@ void make_file_of_zeros(const char *filename, size_t size)
 	#ifdef WIN32
 	HANDLE handle = openfile(filename, O_WRONLY | O_CREAT | O_EXCL, 0);
 	TEST_THAT(handle != INVALID_HANDLE_VALUE);
-	SetFilePointer(handle, size, NULL, FILE_BEGIN);
+	TEST_THAT(SetFilePointer(handle, size, NULL, FILE_BEGIN)
+		!= INVALID_SET_FILE_POINTER);
 	TEST_THAT(GetLastError() == NO_ERROR);
-	TEST_THAT(SetEndOfFile(handle) == true);
-	TEST_THAT(CloseHandle(handle)  == true);
+	BOOL result = SetEndOfFile(handle);
+	if (result != TRUE)
+	{
+		printf("Error %u\n", GetLastError());
+	}
+	TEST_THAT(result == TRUE);
+	TEST_THAT(CloseHandle(handle) == TRUE);
 	#else
 	int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
 	if (fd < 0) perror(filename);
