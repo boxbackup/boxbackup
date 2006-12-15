@@ -1,0 +1,33 @@
+#!@PERL@
+
+use strict;
+use warnings;
+
+my $control_file = 'testfiles/syncallowscript.control';
+if (! -r $control_file)
+{
+	print "now\n";
+	exit 0;
+}
+
+my $control_state;
+open CONTROL, "< $control_file" or die "$control_file: $!";
+$control_state = <CONTROL>;
+defined $control_state or die "$control_file: read failed: $!";
+close CONTROL;
+
+my $marker_file_root = 'testfiles/syncallowscript.notifyran.';
+my $n = 1;
+my $marker_file;
+
+while($marker_file = $marker_file_root.$n and -e $marker_file)
+{
+	$n ++;
+}
+
+open FL,'>'.$marker_file or die "$marker_file: $!";
+print FL localtime();
+close FL;
+
+print $control_state;
+exit 0;
