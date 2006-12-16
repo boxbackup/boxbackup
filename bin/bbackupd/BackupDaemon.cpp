@@ -1562,8 +1562,19 @@ TRACE0("new location\n");
 				// First, get the directory's attributes and modification time
 				box_time_t attrModTime = 0;
 				BackupClientFileAttributes attr;
-				attr.ReadAttributes(ploc->mPath.c_str(), true /* directories have zero mod times */,
-					0 /* not interested in mod time */, &attrModTime /* get the attribute modification time */);
+				try
+				{
+					attr.ReadAttributes(ploc->mPath.c_str(), 
+						true /* directories have zero mod times */,
+						0 /* not interested in mod time */, 
+						&attrModTime /* get the attribute modification time */);
+				}
+				catch (BoxException &e)
+				{
+					::syslog(LOG_ERR, "Failed to get attributes for path "
+						"'%s', skipping.", ploc->mPath.c_str());
+					continue;
+				}
 				
 				// Execute create directory command
 				MemBlockStream attrStream(attr);
@@ -1587,6 +1598,8 @@ TRACE0("new location\n");
 		{
 			delete ploc;
 			ploc = 0;
+			::syslog(LOG_ERR, "Failed to setup location '%s' path '%s'",
+				ploc->mName.c_str(), ploc->mPath.c_str());
 			throw;
 		}
 	}
