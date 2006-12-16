@@ -15,11 +15,17 @@
 
 #include "Logging.h"
 
-bool Loggers::sLogToSyslog  = false;
-bool Loggers::sLogToConsole = false;
-bool Loggers::sContextSet   = false;
+bool Logging::sLogToSyslog  = false;
+bool Logging::sLogToConsole = false;
+bool Logging::sContextSet   = false;
 
-void Loggers::ToSyslog(bool enabled)
+std::vector<Logger*> Logging::sLoggers;
+std::string Logging::sContext;
+Console    Logging::sConsole;
+Syslog     Logging::sSyslog;
+Log::Level  Logging::sGlobalLevel;
+
+void Logging::ToSyslog(bool enabled)
 {
 	if (!sLogToSyslog && enabled)
 	{
@@ -34,7 +40,7 @@ void Loggers::ToSyslog(bool enabled)
 	sLogToSyslog = enabled;
 }
 
-void Loggers::ToConsole(bool enabled)
+void Logging::ToConsole(bool enabled)
 {
 	if (!sLogToConsole && enabled)
 	{
@@ -49,17 +55,17 @@ void Loggers::ToConsole(bool enabled)
 	sLogToConsole = enabled;
 }
 
-void Loggers::FilterConsole(Log::Level level)
+void Logging::FilterConsole(Log::Level level)
 {
 	sConsole.Filter(level);
 }
 
-void Loggers::FilterSyslog(Log::Level level)
+void Logging::FilterSyslog(Log::Level level)
 {
 	sSyslog.Filter(level);
 }
 
-void Loggers::Add(Logger* pNewLogger)
+void Logging::Add(Logger* pNewLogger)
 {
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
@@ -73,7 +79,7 @@ void Loggers::Add(Logger* pNewLogger)
 	sLoggers.insert(sLoggers.begin(), pNewLogger);
 }
 
-void Loggers::Remove(Logger* pOldLogger)
+void Logging::Remove(Logger* pOldLogger)
 {
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
@@ -86,8 +92,8 @@ void Loggers::Remove(Logger* pOldLogger)
 	}
 }
 
-void Loggers::Log(Log::Level level, const std::string& rFile, 
-	const std::string& rLine, const std::string& rMessage)
+void Logging::Log(Log::Level level, const std::string& rFile, 
+	int line, const std::string& rMessage)
 {
 	std::string newMessage;
 	
@@ -101,7 +107,7 @@ void Loggers::Log(Log::Level level, const std::string& rFile,
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
 	{
-		bool result = (*i)->Log(level, rFile, rLine, newMessage);
+		bool result = (*i)->Log(level, rFile, line, newMessage);
 		if (!result)
 		{
 			return;
@@ -109,18 +115,18 @@ void Loggers::Log(Log::Level level, const std::string& rFile,
 	}
 }
 
-void Loggers::SetContext(std::string context)
+void Logging::SetContext(std::string context)
 {
 	sContext = context;
 	sContextSet = true;
 }
 
-void Loggers::ClearContext()
+void Logging::ClearContext()
 {
 	sContextSet = false;
 }
 
-void Loggers::SetProgramName(const std::string& rProgramName)
+void Logging::SetProgramName(const std::string& rProgramName)
 {
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
@@ -130,7 +136,7 @@ void Loggers::SetProgramName(const std::string& rProgramName)
 }
 
 bool Console::Log(Log::Level level, const std::string& rFile, 
-	const std::string& rLine, std::string& rMessage)
+	int line, std::string& rMessage)
 {
 	if (level > GetLevel())
 	{
@@ -144,13 +150,13 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 		target = stderr;
 	}
 	
-	fprintf(target, "%s", rMessage.c_str());
+	fprintf(target, "%s\n", rMessage.c_str());
 	
 	return true;
 }
 
 bool Syslog::Log(Log::Level level, const std::string& rFile, 
-	const std::string& rLine, std::string& rMessage)
+	int line, std::string& rMessage)
 {
 	if (level > GetLevel())
 	{

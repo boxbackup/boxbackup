@@ -13,6 +13,7 @@
 #include <sstream>
 #include <vector>
 
+/*
 #define BOX_LOG(level, stuff) \
 { \
     if(Log::sMaxLoggingLevelForAnyOutput >= level) \
@@ -20,6 +21,14 @@
         line << stuff; \
         Log::Write(level, __FILE__, __LINE__, line.str()); \
     } \
+}
+*/
+
+#define BOX_LOG(level, stuff) \
+{ \
+	std::ostringstream line; \
+	line << stuff; \
+	Logging::Log(level, __FILE__, __LINE__, line.str()); \
 }
 
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
@@ -41,7 +50,7 @@ namespace Log
 //
 // Class
 //		Name:    Logger
-//		Purpose: Abstract class (interface) for log targets
+//		Purpose: Abstract base class for log targets
 //		Created: 2006/12/16
 //
 // --------------------------------------------------------------------------
@@ -56,7 +65,7 @@ class Logger
 	virtual ~Logger() { }
 	
 	virtual bool Log(Log::Level level, const std::string& rFile, 
-		const std::string& rLine, std::string& rMessage) = 0;
+		int line, std::string& rMessage) = 0;
 	
 	void Filter(Log::Level level)
 	{
@@ -74,7 +83,7 @@ class Logger
 // Class
 //		Name:    Console
 //		Purpose: Console logging target
-//		Created: 2006/12/12
+//		Created: 2006/12/16
 //
 // --------------------------------------------------------------------------
 
@@ -82,7 +91,7 @@ class Console : public Logger
 {
 	public:
 	virtual bool Log(Log::Level level, const std::string& rFile, 
-		const std::string& rLine, std::string& rMessage);
+		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Console"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };
@@ -92,7 +101,7 @@ class Console : public Logger
 // Class
 //		Name:    Syslog
 //		Purpose: Syslog (or Windows Event Viewer) logging target
-//		Created: 2006/12/12
+//		Created: 2006/12/16
 //
 // --------------------------------------------------------------------------
 
@@ -103,7 +112,7 @@ class Syslog : public Logger
 	virtual ~Syslog();
 	
 	virtual bool Log(Log::Level level, const std::string& rFile, 
-		const std::string& rLine, std::string& rMessage);
+		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Syslog"; }
 	virtual void SetProgramName(const std::string& rProgramName);
 };
@@ -111,14 +120,14 @@ class Syslog : public Logger
 // --------------------------------------------------------------------------
 //
 // Class
-//		Name:    Log
+//		Name:    Logging
 //		Purpose: Static logging helper, keeps track of enabled loggers
 //			 and distributes log messages to them.
-//		Created: 2006/12/12
+//		Created: 2006/12/16
 //
 // --------------------------------------------------------------------------
 
-class Loggers
+class Logging
 {
 	private:
 	static std::vector<Logger*> sLoggers;
@@ -138,7 +147,7 @@ class Loggers
 	static void Add    (Logger* pNewLogger);
 	static void Remove (Logger* pOldLogger);
 	static void Log(Log::Level level, const std::string& rFile, 
-		const std::string& rLine, const std::string& rMessage);
+		int line, const std::string& rMessage);
 	static void SetContext(std::string context);
 	static void ClearContext();
 	static void SetGlobalLevel(Log::Level level) { sGlobalLevel = level; }
