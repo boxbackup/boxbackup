@@ -51,6 +51,8 @@
 	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif
 
+	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+
 // Disable memory testing under Darwin, it just doesn't like it very much.
 #ifdef __APPLE__
 	// TODO: We really should get some decent leak detection code.

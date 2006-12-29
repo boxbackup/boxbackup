@@ -9,6 +9,7 @@
 
 #ifndef INTERCEPT_H
 #define INTERCEPT_H
+#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
 #include <dirent.h>
 
@@ -35,8 +36,12 @@ extern "C"
 
 void intercept_setup_error(const char *filename, unsigned int errorafter, 
 	int errortoreturn, int syscalltoerror);
+void intercept_setup_delay(const char *filename, unsigned int delay_after,
+	int delay_ms, int syscall_to_delay, int num_delays);
+bool intercept_triggered();
 
 void intercept_setup_readdir_hook(const char *dirname,  readdir_t hookfn);
 void intercept_setup_lstat_hook  (const char *filename, lstat_t   hookfn);
 
+#endif // !PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif // !INTERCEPT_H
