@@ -82,7 +82,7 @@
 /* #undef HAVE_GETPEEREID */
 
 /* Define to 1 if you have the `getpid' function. */
-#define HAVE_GETPID 1
+// #define HAVE_GETPID 1
 
 /* Define to 1 if you have the `getxattr' function. */
 /* #undef HAVE_GETXATTR */
@@ -172,7 +172,7 @@
 /* #undef HAVE_READLINE_READLINE_H */
 
 /* Define to 1 if you have the <regex.h> header file. */
-// #define HAVE_REGEX_H 1
+#define HAVE_REGEX_H 1
 
 /* Define to 1 if you have the `setproctitle' function. */
 /* #undef HAVE_SETPROCTITLE */
