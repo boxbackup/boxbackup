@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <dirent.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -509,11 +510,6 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 	}
 }
 
-void intercept_setup_delay(const char *filename, unsigned int delay_after,
-        int delay_ms, int syscall_to_delay, int num_delays);
-
-bool intercept_triggered();
-
 int start_internal_daemon()
 {
 	// ensure that no child processes end up running tests!
@@ -598,7 +594,9 @@ int lstat_test_hook(const char *file_name, struct stat *buf);
 
 struct dirent *readdir_test_hook_1(DIR *dir)
 {
+#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	intercept_setup_readdir_hook(NULL, readdir_test_hook_2);
+#endif
 	return NULL;
 }
 
@@ -609,8 +607,10 @@ struct dirent *readdir_test_hook_2(DIR *dir)
 {
 	if (time(NULL) >= readdir_stop_time)
 	{
+#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 		intercept_setup_readdir_hook(NULL, NULL);
 		intercept_setup_lstat_hook  (NULL, NULL);
+#endif
 		// we will not be called again.
 	}
 
@@ -626,7 +626,9 @@ struct dirent *readdir_test_hook_2(DIR *dir)
 	snprintf(stat_hook_filename, sizeof(stat_hook_filename),
 		"testfiles/TestDir1/spacetest/d1/test.%d", 
 		readdir_test_counter);
+#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	intercept_setup_lstat_hook(stat_hook_filename, lstat_test_hook);
+#endif
 
 	return &readdir_test_dirent;
 }
