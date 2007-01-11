@@ -52,6 +52,15 @@ class ProgressNotifier
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
 		const std::string& rErrorMsg) = 0;
+	virtual void NotifyFileExcluded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyDirExcluded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyUnsupportedFileType(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
 	virtual void NotifyFileReadFailed(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,

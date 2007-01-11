@@ -199,6 +199,9 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		DIR *dirHandle = 0;
 		try
 		{
+			rParams.GetProgressNotifier().NotifyScanDirectory(
+				this, rLocalPath);
+
 			dirHandle = ::opendir(rLocalPath.c_str());
 			if(dirHandle == 0)
 			{
@@ -288,6 +291,11 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					// Exclude it?
 					if(rParams.mrContext.ExcludeFile(filename))
 					{
+ 						rParams.GetProgressNotifier()
+							.NotifyFileExcluded(
+								this, 
+								filename);
+
 						// Next item!
 						continue;
 					}
@@ -302,6 +310,11 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					// Exclude it?
 					if(rParams.mrContext.ExcludeDir(filename))
 					{
+ 						rParams.GetProgressNotifier()
+							.NotifyDirExcluded(
+								this, 
+								filename);
+
 						// Next item!
 						continue;
 					}
@@ -316,6 +329,9 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 						"%d (%s)", type, 
 						filename.c_str());
 					#endif
+ 					rParams.GetProgressNotifier()
+						.NotifyUnsupportedFileType(
+							this, filename);
 					SetErrorWhenReadingFilesystemObject(
 						rParams, filename.c_str());
 					continue;
@@ -329,6 +345,11 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				// but now we need the information.
 				if(::lstat(filename.c_str(), &st) != 0)
 				{
+ 					rParams.GetProgressNotifier()
+						.NotifyFileStatFailed(this, 
+ 							filename, 
+							strerror(errno));
+					
 					// Report the error (logs and 
 					// eventual email to administrator)
 					SetErrorWhenReadingFilesystemObject(
