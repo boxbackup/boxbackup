@@ -113,7 +113,8 @@ unsigned int WINAPI HelperThread(LPVOID lpParam)
 BackupDaemon::BackupDaemon()
 	: mState(BackupDaemon::State_Initialising),
 	  mpCommandSocketInfo(0),
-	  mDeleteUnusedRootDirEntriesAfter(0)
+	  mDeleteUnusedRootDirEntriesAfter(0),
+	  mLogAllFileAccess(false)
 {
 	// Only ever one instance of a daemon
 	SSLLib::Initialise();
@@ -697,6 +698,13 @@ void BackupDaemon::Run2()
 						"ExtendedLogFile");
 				}
 				
+				if (conf.KeyExists("LogAllFileAccess"))
+				{
+					mLogAllFileAccess = 
+						conf.GetKeyValueBool(
+							"LogAllFileAccess");
+				}
+				
 				// Then create a client context object (don't 
 				// just connect, as this may be unnecessary)
 				BackupClientContext clientContext
@@ -711,7 +719,7 @@ void BackupDaemon::Run2()
 				);
 					
 				// Set up the sync parameters
-				BackupClientDirectoryRecord::SyncParams params(*this, clientContext);
+				BackupClientDirectoryRecord::SyncParams params(*this, *this, clientContext);
 				params.mSyncPeriodStart = syncPeriodStart;
 				params.mSyncPeriodEnd = syncPeriodEndExtended; // use potentially extended end time
 				params.mMaxUploadWait = maxUploadWait;

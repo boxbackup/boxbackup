@@ -83,6 +83,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	{"StoreHostname", 0, ConfigTest_Exists, 0},
 	{"ExtendedLogging",	"no", ConfigTest_IsBool, 0}, // extended log to syslog
 	{"ExtendedLogFile",	NULL, 0, 0}, // extended log to a file
+	{"LogAllFileAccess", "no", ConfigTest_IsBool, 0},
 
 	{"CommandSocket", 0, 0, 0},				// not compulsory to have this
 	{"KeepAliveTime", 0, ConfigTest_IsInt, 0},				// optional
