@@ -16,9 +16,12 @@
 
 #include "BoxTime.h"
 #include "Daemon.h"
+#include "BackupClientDirectoryRecord.h"
 #include "Socket.h"
 #include "SocketListen.h"
 #include "SocketStream.h"
+#include "Logging.h"
+
 #ifdef WIN32
 	#include "WinNamedPipeStream.h"
 #endif
@@ -39,7 +42,7 @@ class Archive;
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-class BackupDaemon : public Daemon
+class BackupDaemon : public Daemon, ProgressNotifier
 {
 public:
 	BackupDaemon();
@@ -179,6 +182,118 @@ private:
 	// Unused entries in the root directory wait a while before being deleted
 	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
 	std::vector<std::pair<int64_t,std::string> > mUnusedRootDirEntries;
+
+public:
+ 	bool StopRun() { return this->Daemon::StopRun(); }
+ 
+private:
+	bool mLogAllFileAccess;
+
+ 	/* ProgressNotifier implementation */
+public:
+ 	virtual void NotifyScanDirectory(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) 
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Scanning directory: " << rLocalPath);
+		} 
+	}
+ 	virtual void NotifyDirStatFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath, 
+ 		const std::string& rErrorMsg)
+ 	{
+		BOX_WARNING("Failed to access directory: " << rLocalPath
+			<< ": " << rErrorMsg);
+ 	}
+ 	virtual void NotifyFileStatFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const std::string& rErrorMsg)
+ 	{
+		BOX_WARNING("Failed to access file: " << rLocalPath
+			<< ": " << rErrorMsg);
+ 	}
+ 	virtual void NotifyDirListFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const std::string& rErrorMsg)
+ 	{
+		BOX_WARNING("Failed to list directory: " << rLocalPath
+			<< ": " << rErrorMsg);
+ 	}
+ 	virtual void NotifyFileReadFailed(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const std::string& rErrorMsg)
+ 	{
+		BOX_WARNING("Error reading file: " << rLocalPath
+			<< ": " << rErrorMsg);
+ 	}
+ 	virtual void NotifyFileModifiedInFuture(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath)
+ 	{
+		BOX_WARNING("Some files have modification times excessively "
+			"in the future. Check clock synchronisation. "
+			"Example file (only one shown): " << rLocalPath);
+ 	}
+ 	virtual void NotifyFileSkippedServerFull(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) 
+	{
+		BOX_WARNING("Skipped file: server is full: " << rLocalPath);
+	}
+ 	virtual void NotifyFileUploadException(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		const BoxException& rException)
+ 	{
+		BOX_ERROR("Failed to upload file: " << rLocalPath 
+			<< ": caught exception: " << rException.what() 
+			<< " (" << rException.GetType()
+			<< "/"  << rException.GetSubType() << ")");
+ 	}
+ 	virtual void NotifyFileUploading(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) 
+	{ 
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Uploading file: " << rLocalPath);
+		} 
+	}
+ 	virtual void NotifyFileUploadingPatch(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) 
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Uploading patch to file: " << rLocalPath);
+		} 
+	}
+ 	virtual void NotifyFileUploaded(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		int64_t FileSize) 
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Uploaded file: " << rLocalPath);
+		} 
+	}
+ 	virtual void NotifyFileSynchronised(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		int64_t FileSize) 
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Synchronised file: " << rLocalPath);
+		} 
+	}
 
 #ifdef WIN32
 	public:
