@@ -224,6 +224,30 @@ public:
 		BOX_WARNING("Failed to list directory: " << rLocalPath
 			<< ": " << rErrorMsg);
  	}
+	virtual void NotifyFileExcluded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Skipping excluded file: " << rLocalPath);
+		} 
+	}
+	virtual void NotifyDirExcluded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_INFO("Skipping excluded directory: " << rLocalPath);
+		} 
+	}
+	virtual void NotifyUnsupportedFileType(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
+	{
+		BOX_WARNING("Ignoring file of unknown type: " << rLocalPath);
+	}
  	virtual void NotifyFileReadFailed(
  		const BackupClientDirectoryRecord* pDirRecord,
  		const std::string& rLocalPath,
