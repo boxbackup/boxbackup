@@ -33,6 +33,7 @@
 #include "Guards.h"
 #include "UnixUser.h"
 #include "FileModificationTime.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -147,16 +148,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			if(e.GetType() == CommonException::ExceptionType &&
 				e.GetSubType() == CommonException::OSFileOpenError)
 			{
-				fprintf(stderr, "%s: failed to start: "
-					"failed to open configuration file: "
-					"%s\n", DaemonName(), 
-					mConfigFileName.c_str());
-#ifdef WIN32
-				::syslog(LOG_ERR, "%s: failed to start: "
-					"failed to open configuration file: "
-					"%s", DaemonName(), 
-					mConfigFileName.c_str());
-#endif
+				BOX_ERROR("Failed to start: failed to open "
+					"configuration file: " 
+					<< mConfigFileName);
 				return 1;
 			}
 
@@ -167,14 +161,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		if(pconfig.get() == 0 || !errors.empty())
 		{
 			// Tell user about errors
-			fprintf(stderr, "%s: Errors in config file %s:\n%s", 
-				DaemonName(), mConfigFileName.c_str(), 
-				errors.c_str());
-#ifdef WIN32
-			::syslog(LOG_ERR, "%s: Errors in config file %s:\n%s",
-				DaemonName(), mConfigFileName.c_str(), 
-				errors.c_str());
-#endif
+			BOX_ERROR("Failed to start: errors in configuration "
+				"file: " << mConfigFileName << ": " << errors);
 			// And give up
 			return 1;
 		}
@@ -275,12 +263,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		}
 #endif // !WIN32
 
-		// open the log
-		::openlog(DaemonName(), LOG_PID, LOG_LOCAL6);
-
 		// Log the start message
-		::syslog(LOG_INFO, "Starting daemon (config: %s) (version " 
-			BOX_VERSION ")", mConfigFileName.c_str());
+		BOX_INFO("Starting daemon, version " << BOX_VERSION
+			<<", config: " << mConfigFileName);
 
 		// Write PID to file
 		char pid[32];
@@ -293,7 +278,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
-			::syslog(LOG_ERR, "can't write pid file");
+			BOX_ERROR("can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
 		
@@ -334,37 +319,24 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			// And definitely don't try and send anything to those file descriptors
 			// -- this has in the past sent text to something which isn't expecting it.
 			TRACE_TO_STDOUT(false);
+			Logging::ToConsole(false);
 		}		
 	}
 	catch(BoxException &e)
 	{
-		fprintf(stderr, "%s: failed to start: exception %s (%d/%d)\n", 
-			DaemonName(), e.what(), e.GetType(), e.GetSubType());
-#ifdef WIN32
-		::syslog(LOG_ERR, "%s: failed to start: "
-			"exception %s (%d/%d)\n", DaemonName(), 
-			e.what(), e.GetType(), e.GetSubType());
-#endif
+		BOX_ERROR("Failed to start: exception " << e.what() 
+			<< " (" << e.GetType() 
+			<< "/"  << e.GetSubType() << ")");
 		return 1;
 	}
 	catch(std::exception &e)
 	{
-		fprintf(stderr, "%s: failed to start: exception %s\n", 
-			DaemonName(), e.what());
-#ifdef WIN32
-		::syslog(LOG_ERR, "%s: failed to start: exception %s\n", 
-			DaemonName(), e.what());
-#endif
+		BOX_ERROR("Failed to start: exception " << e.what());
 		return 1;
 	}
 	catch(...)
 	{
-		fprintf(stderr, "%s: failed to start: unknown exception\n", 
-			DaemonName());
-#ifdef WIN32
-		::syslog(LOG_ERR, "%s: failed to start: unknown exception\n", 
-			DaemonName());
-#endif
+		BOX_ERROR("Failed to start: unknown error");
 		return 1;
 	}
 
@@ -377,7 +349,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
 	{
 		// will not run without sockets
-		::syslog(LOG_ERR, "Failed to initialise Windows Sockets");
+		BOX_ERROR("Failed to initialise Windows Sockets");
 		THROW_EXCEPTION(CommonException, Internal)
 	}
 #endif
@@ -394,9 +366,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			if(mReloadConfigWanted && !mTerminateWanted)
 			{
 				// Need to reload that config file...
-				::syslog(LOG_INFO, "Reloading configuration "
-					"(config: %s)", 
-					mConfigFileName.c_str());
+				BOX_INFO("Reloading configuration file: "
+					<< mConfigFileName);
 				std::string errors;
 				std::auto_ptr<Configuration> pconfig = 
 					Configuration::LoadAndVerify(
@@ -407,10 +378,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				if(pconfig.get() == 0 || !errors.empty())
 				{
 					// Tell user about errors
-					::syslog(LOG_ERR, "Errors in config "
-						"file %s:\n%s", 
-						mConfigFileName.c_str(),
-						errors.c_str());
+					BOX_ERROR("Error in configuration "
+						<< "file: " << mConfigFileName
+						<< ": " << errors);
 					// And give up
 					retcode = 1;
 					break;
@@ -434,25 +404,23 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		::unlink(pidFileName.c_str());
 		
 		// Log
-		::syslog(LOG_INFO, "Terminating daemon");
+		BOX_INFO("Terminating daemon");
 	}
 	catch(BoxException &e)
 	{
-		::syslog(LOG_ERR, "%s: terminating due to exception %s "
-			"(%d/%d)", DaemonName(), e.what(), e.GetType(), 
-			e.GetSubType());
+		BOX_ERROR("Terminating due to exception " << e.what() 
+			<< " (" << e.GetType() 
+			<< "/"  << e.GetSubType() << ")");
 		retcode = 1;
 	}
 	catch(std::exception &e)
 	{
-		::syslog(LOG_ERR, "%s: terminating due to exception %s", 
-			DaemonName(), e.what());
+		BOX_ERROR("Terminating due to exception " << e.what());
 		retcode = 1;
 	}
 	catch(...)
 	{
-		::syslog(LOG_ERR, "%s: terminating due to unknown exception",
-			DaemonName());
+		BOX_ERROR("Terminating due to unknown exception");
 		retcode = 1;
 	}
 
