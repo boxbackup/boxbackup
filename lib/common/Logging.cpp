@@ -21,8 +21,8 @@ bool Logging::sContextSet   = false;
 
 std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
-Console    Logging::sConsole;
-Syslog     Logging::sSyslog;
+Console     Logging::sConsole;
+Syslog      Logging::sSyslog;
 Log::Level  Logging::sGlobalLevel;
 
 void Logging::ToSyslog(bool enabled)
