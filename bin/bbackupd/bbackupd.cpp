@@ -29,7 +29,8 @@ int main(int argc, const char *argv[])
 
 	Logging::SetProgramName("Box Backup (bbackupd)");
 	Logging::ToConsole(true);
-	Logging::FilterSyslog (Log::EVERYTHING);
+	Logging::ToSyslog (true);
+	Logging::FilterSyslog(Log::EVERYTHING);
 
 	#ifdef NDEBUG
 		Logging::FilterConsole(Log::INFO);
@@ -65,7 +66,6 @@ int main(int argc, const char *argv[])
 	if (argc >= 2 && ::strcmp(argv[1], "--service") == 0)
 	{
 		runAsWin32Service = true;
-		Logging::ToSyslog(true);
 	}
 
 	gpDaemonService = new Win32BackupService();
@@ -98,8 +98,6 @@ int main(int argc, const char *argv[])
 		ExitCode = gpDaemonService->Main(
 			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 	}
-
-	::closelog();
 
 	delete gpDaemonService;
 
