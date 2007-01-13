@@ -254,7 +254,8 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 			break;
 	}
 	
-	// Fetch the directory listing from the server -- getting a list of files which is approparite to the restore type
+	// Fetch the directory listing from the server -- getting a list 
+	// of files which is appropriate to the restore type
 	rConnection.QueryListDirectory(
 			DirectoryID,
 			Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING),
