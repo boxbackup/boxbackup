@@ -240,6 +240,7 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbstored/bbstored-config
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
+                   infrastructure/makedistribution.pl
                    lib/common/makeexception.pl
                    lib/raidfile/raidfile-config
                    lib/server/makeprotocol.pl
