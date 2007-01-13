@@ -1,6 +1,20 @@
 %define bb_user_id 171
 %define ident %{name}-%{version}
 
+# In official distribution tarballs, distribution files are copied to
+# the base directory (where configure is), so distribution_dir should be empty.
+# This is the default, overridden by the following block in non-distribution
+# builds.
+%define distribution_dir
+
+# BOX_PRIVATE_BEGIN
+# In unofficial tarballs, made from svn, distribution files are still in 
+# distribution/boxbackup, so the following line overrides the default above:
+# (this section will be removed automatically from distribution tarballs
+# by infrastructure/makedistribution.pl)
+%define distribution_dir distribution/boxbackup
+# BOX_PRIVATE_END
+
 # Detect distribution. So far we only special-case SUSE. If you need to make
 # any distro specific changes to get the package building on your system
 # please email them to boxbackup-dev@fluffy.co.uk
@@ -72,6 +86,7 @@ This package contains the server.
 %setup -q
 
 %build
+echo -e '%{version}\n%{name}' > VERSION.txt
 test -e configure || ./bootstrap
 %configure
 
@@ -88,19 +103,28 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/box/bbstored
 mkdir -p $RPM_BUILD_ROOT%{_var}/lib/box
 
-install -m 644 BUGS.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 LINUX.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 VERSION.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 CONTACT.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 DOCUMENTATION.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 ExceptionCodes.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 THANKS.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 LICENSE.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 TODO.txt $RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 BUGS.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 VERSION.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 ExceptionCodes.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 LICENSE.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+
+install -m 644 %{distribution_dir}/CONTACT.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 %{distribution_dir}/DOCUMENTATION.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 %{distribution_dir}/LINUX.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 %{distribution_dir}/THANKS.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
 
 # Client
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd.conf
-install -m 755 contrib/%{dist}/bbackupd $RPM_BUILD_ROOT%{init_dir}
+install -m 755 %{distribution_dir}/contrib/%{dist}/bbackupd \
+	$RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbackupd $RPM_BUILD_ROOT%{_sbindir}/rcbbackupd
 %endif
@@ -113,7 +137,8 @@ install %{client_dir}/bbackupd-config $RPM_BUILD_ROOT%{_sbindir}
 # Server
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbstored.conf
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/raidfile.conf
-install -m 755 contrib/%{dist}/bbstored $RPM_BUILD_ROOT%{init_dir}
+install -m 755 %{distribution_dir}/contrib/%{dist}/bbstored \
+	$RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}/rcbbstored
 %endif
@@ -195,6 +220,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sbindir}/raidfile-config
 
 %changelog
+* Sat Jan 13 2006 Chris Wilson <chris+box@qwirx.com>
+- Support building from an unofficial tarball (from svn) by changing
+  %{distribution_dir} at the top.
+- Write our RPM version number into VERSION.txt and hence compile it in
+
 * Wed Dec 28 2005 Martin Ebourne <martin@zepler.org>
 - Box now uses autoconf so use configure macro
 
