@@ -1536,7 +1536,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	
 						// Decode it
 						std::auto_ptr<BackupStoreFile::DecodedStream> fileOnServerStream;
-						// Got additional attibutes?
+						// Got additional attributes?
 						if(i->second->HasAttributes())
 						{
 							// Use these attributes
@@ -1570,6 +1570,9 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						#endif
 
 						if(!rParams.mIgnoreAttributes &&
+						#ifdef PLATFORM_DISABLE_SYMLINK_ATTRIB_COMPARE
+						   !fileOnServerStream->IsSymLink() &&
+						#endif
 						   !localAttr.Compare(fileOnServerStream->GetAttributes(),
 								ignoreAttrModTime,
 								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
