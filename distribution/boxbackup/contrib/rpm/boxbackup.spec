@@ -5,7 +5,7 @@
 # the base directory (where configure is), so distribution_dir should be empty.
 # This is the default, overridden by the following block in non-distribution
 # builds.
-%define distribution_dir
+%define distribution_dir ''
 
 # BOX_PRIVATE_BEGIN
 # In unofficial tarballs, made from svn, distribution files are still in 
