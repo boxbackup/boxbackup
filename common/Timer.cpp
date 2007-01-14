@@ -56,9 +56,12 @@ void Timers::Cleanup()
 	
 	#if defined WIN32 && ! defined PLATFORM_CYGWIN
 		// no support for signals at all
-		SetTimerHandler(NULL);
 		FiniTimer();
+		SetTimerHandler(NULL);
 	#else
+		struct itimerval timeout;
+		memset(&timeout, 0, sizeof(timeout));
+		ASSERT(::setitimer(ITIMER_REAL, &timeout, NULL) == 0);
 		ASSERT(::signal(SIGALRM, NULL) == Timers::SignalHandler);
 	#endif // WIN32 && !PLATFORM_CYGWIN
 
@@ -203,11 +206,7 @@ void Timers::Reschedule()
 	timeout.it_value.tv_usec = (int)
 		(BoxTimeToMicroSeconds(timeToNextEvent) % MICRO_SEC_IN_SEC);
 
-#ifdef PLATFORM_CYGWIN
 	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
-#else
-	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
-#endif // PLATFORM_CYGWIN
 	{
 		TRACE0("WARNING: couldn't initialise timer\n");
 		THROW_EXCEPTION(CommonException, Internal)
