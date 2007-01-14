@@ -13,11 +13,14 @@
 #include <signal.h>
 
 #include "Timer.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
 std::vector<Timer*>* Timers::spTimers = NULL;
 bool Timers::sRescheduleNeeded = false;
+
+typedef void (*sighandler_t)(int);
 
 // --------------------------------------------------------------------------
 //
@@ -36,7 +39,9 @@ void Timers::Init()
 		InitTimer();
 		SetTimerHandler(Timers::SignalHandler);
 	#else
-		ASSERT(::signal(SIGALRM, Timers::SignalHandler) == 0);
+		sighandler_t oldHandler = ::signal(SIGALRM, 
+			Timers::SignalHandler);
+		ASSERT(oldHandler == 0);
 	#endif // WIN32 && !PLATFORM_CYGWIN
 	
 	spTimers = new std::vector<Timer*>;
@@ -61,8 +66,12 @@ void Timers::Cleanup()
 	#else
 		struct itimerval timeout;
 		memset(&timeout, 0, sizeof(timeout));
-		ASSERT(::setitimer(ITIMER_REAL, &timeout, NULL) == 0);
-		ASSERT(::signal(SIGALRM, NULL) == Timers::SignalHandler);
+
+		int result = ::setitimer(ITIMER_REAL, &timeout, NULL);
+		ASSERT(result == 0);
+
+		sighandler_t oldHandler = ::signal(SIGALRM, NULL);
+		ASSERT(oldHandler == Timers::SignalHandler);
 	#endif // WIN32 && !PLATFORM_CYGWIN
 
 	spTimers->clear();
@@ -128,6 +137,14 @@ void Timers::Remove(Timer& rTimer)
 void Timers::Reschedule()
 {
 	ASSERT(spTimers);
+	if (spTimers == NULL)
+	{
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+	if (::signal(SIGALRM, Timers::SignalHandler) != Timers::SignalHandler)
+	{
+		THROW_EXCEPTION(CommonException, Internal)
+	}
 
 	// Clear the reschedule-needed flag to false before we start.
 	// If a timer event occurs while we are scheduling, then we
