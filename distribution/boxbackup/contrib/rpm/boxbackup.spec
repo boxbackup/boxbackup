@@ -12,7 +12,7 @@
 # distribution/boxbackup, so the following line overrides the default above:
 # (this section will be removed automatically from distribution tarballs
 # by infrastructure/makedistribution.pl)
-%define distribution_dir distribution/boxbackup
+%define distribution_dir distribution/boxbackup/
 # BOX_PRIVATE_END
 
 # Detect distribution. So far we only special-case SUSE. If you need to make
@@ -112,18 +112,18 @@ install -m 644 ExceptionCodes.txt \
 install -m 644 LICENSE.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
 
-install -m 644 %{distribution_dir}/CONTACT.txt \
+install -m 644 %{distribution_dir}CONTACT.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 %{distribution_dir}/DOCUMENTATION.txt \
+install -m 644 %{distribution_dir}DOCUMENTATION.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 %{distribution_dir}/LINUX.txt \
+install -m 644 %{distribution_dir}LINUX.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
-install -m 644 %{distribution_dir}/THANKS.txt \
+install -m 644 %{distribution_dir}THANKS.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
 
 # Client
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd.conf
-install -m 755 %{distribution_dir}/contrib/%{dist}/bbackupd \
+install -m 755 %{distribution_dir}contrib/%{dist}/bbackupd \
 	$RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbackupd $RPM_BUILD_ROOT%{_sbindir}/rcbbackupd
@@ -137,7 +137,7 @@ install %{client_dir}/bbackupd-config $RPM_BUILD_ROOT%{_sbindir}
 # Server
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbstored.conf
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/raidfile.conf
-install -m 755 %{distribution_dir}/contrib/%{dist}/bbstored \
+install -m 755 %{distribution_dir}contrib/%{dist}/bbstored \
 	$RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}/rcbbstored
