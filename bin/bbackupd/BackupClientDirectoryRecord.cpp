@@ -634,7 +634,14 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			{
 				rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
 					filename, strerror(errno));
-				THROW_EXCEPTION(CommonException, OSFileError)
+
+				// Report the error (logs and 
+				// eventual email to administrator)
+				SetErrorWhenReadingFilesystemObject(rParams, 
+					filename.c_str());
+
+				// Ignore this entry for now.
+				continue;
 			}
 			
 			// Extract required data
