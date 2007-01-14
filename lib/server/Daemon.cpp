@@ -265,7 +265,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 		// Log the start message
 		BOX_INFO("Starting daemon, version " << BOX_VERSION
-			<<", config: " << mConfigFileName);
+			<< ", config: " << mConfigFileName);
 
 		// Write PID to file
 		char pid[32];
