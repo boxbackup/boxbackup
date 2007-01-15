@@ -193,6 +193,23 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	std::vector<std::string> dirs;
 	std::vector<std::string> files;
 	bool downloadDirectoryRecordBecauseOfFutureFiles = false;
+
+	struct stat dir_st;
+	if(::lstat(rLocalPath.c_str(), &dir_st) != 0)
+	{
+		// Report the error (logs and 
+		// eventual email to administrator)
+		rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
+			rLocalPath, strerror(errno));
+		
+		// FIXME move to NotifyFileStatFailed()
+		SetErrorWhenReadingFilesystemObject(rParams, 
+			rLocalPath.c_str());
+		
+		// This shouldn't happen, so we'd better not continue
+		THROW_EXCEPTION(CommonException, OSFileError)
+	}
+
 	// BLOCK
 	{		
 		// read the contents...
@@ -281,6 +298,14 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					continue;
 				}
 
+				if(st.st_dev != dir_st.st_dev)
+				{
+ 					rParams.GetProgressNotifier()
+						.NotifyMountPointSkipped(this, 
+ 							filename);
+					continue;
+				}
+
 				int type = st.st_mode & S_IFMT;
 				#endif
 
@@ -324,11 +349,6 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 				else
 				{
-					#ifdef WIN32
-					::syslog(LOG_ERR, "Unknown file type: "
-						"%d (%s)", type, 
-						filename.c_str());
-					#endif
  					rParams.GetProgressNotifier()
 						.NotifyUnsupportedFileType(
 							this, filename);
@@ -356,6 +376,14 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 						rParams, filename.c_str());
 
 					// Ignore this entry for now.
+					continue;
+				}
+
+				if(st.st_dev != dir_st.st_dev)
+				{
+ 					rParams.GetProgressNotifier()
+						.NotifyMountPointSkipped(this, 
+ 							filename);
 					continue;
 				}
 				#endif
