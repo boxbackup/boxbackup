@@ -23,7 +23,7 @@ std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
 Console     Logging::sConsole;
 Syslog      Logging::sSyslog;
-Log::Level  Logging::sGlobalLevel;
+Log::Level  Logging::sGlobalLevel = Log::EVERYTHING;
 
 void Logging::ToSyslog(bool enabled)
 {
@@ -95,6 +95,11 @@ void Logging::Remove(Logger* pOldLogger)
 void Logging::Log(Log::Level level, const std::string& rFile, 
 	int line, const std::string& rMessage)
 {
+	if (level > sGlobalLevel)
+	{
+		return;
+	}
+
 	std::string newMessage;
 	
 	if (sContextSet)
