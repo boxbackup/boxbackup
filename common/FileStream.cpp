@@ -11,6 +11,8 @@
 #include "FileStream.h"
 #include "CommonException.h"
 
+#include <errno.h>
+
 #include "MemLeakFindOn.h"
 
 // --------------------------------------------------------------------------
@@ -36,7 +38,15 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 #endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
-		THROW_EXCEPTION(CommonException, OSFileOpenError)
+
+		if(errno == EACCES)
+		{
+			THROW_EXCEPTION(CommonException, AccessDenied)
+		}
+		else
+		{
+			THROW_EXCEPTION(CommonException, OSFileOpenError)
+		}
 	}
 #ifdef WIN32
 	this->fileName = Filename;
