@@ -224,6 +224,18 @@ public:
 		BOX_WARNING("Failed to list directory: " << rLocalPath
 			<< ": " << rErrorMsg);
  	}
+	virtual void NotifyMountPointSkipped(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
+	{
+		BOX_WARNING("Ignored directory: " << rLocalPath << ": "
+		#ifdef WIN32
+			"is an NTFS junction/reparse point; "
+		#else
+			"is a mount point; "
+		#endif
+			"create a new location if you want to back it up");
+	}
 	virtual void NotifyFileExcluded(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath)

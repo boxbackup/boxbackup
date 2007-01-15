@@ -52,6 +52,9 @@ class ProgressNotifier
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
 		const std::string& rErrorMsg) = 0;
+	virtual void NotifyMountPointSkipped(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
 	virtual void NotifyFileExcluded(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath) = 0;
