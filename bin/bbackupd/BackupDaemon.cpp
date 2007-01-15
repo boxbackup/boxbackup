@@ -689,7 +689,7 @@ void BackupDaemon::Run2()
 			{
 				// Set state and log start
 				SetState(State_Connected);
-				BOX_INFO("Beginning scan of local files");
+				BOX_NOTICE("Beginning scan of local files");
 
 				std::string extendedLogFile;
 				if (conf.KeyExists("ExtendedLogFile"))
@@ -809,7 +809,7 @@ void BackupDaemon::Run2()
 				CommitIDMapsAfterSync();
 
 				// Log
-				BOX_INFO("Finished scan of local files");
+				BOX_NOTICE("Finished scan of local files");
 
 				// --------------------------------------------------------------------------------------------
 
@@ -863,7 +863,7 @@ void BackupDaemon::Run2()
 				// Handle restart?
 				if(StopRun())
 				{
-					BOX_INFO("Exception (" << errorCode
+					BOX_NOTICE("Exception (" << errorCode
 						<< "/" << errorSubCode 
 						<< ") due to signal");
 					return;
@@ -895,7 +895,7 @@ void BackupDaemon::Run2()
 			}
 
 			// Log the stats
-			BOX_INFO("File statistics: total file size uploaded "
+			BOX_NOTICE("File statistics: total file size uploaded "
 				<< BackupStoreFile::msStats.mBytesInEncodedFiles
 				<< ", bytes already on server "
 				<< BackupStoreFile::msStats.mBytesAlreadyOnServer
@@ -977,7 +977,7 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 					throw;
 				}
 
-				BOX_INFO("Delaying sync by " << waitInSeconds
+				BOX_NOTICE("Delaying sync by " << waitInSeconds
 					<< " seconds (SyncAllowScript '"
 					<< conf.GetKeyValue("SyncAllowScript")
 					<< "')");
@@ -1621,7 +1621,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	// Any entries in the root directory which need deleting?
 	if(dir.GetNumberOfEntries() > 0)
 	{
-		BOX_INFO(dir.GetNumberOfEntries() << " redundant locations "
+		BOX_NOTICE(dir.GetNumberOfEntries() << " redundant locations "
 			"in root directory found, will delete from store "
 			"after " << BACKUP_DELETE_UNUSED_ROOT_ENTRIES_AFTER 
 			<< " seconds.");
@@ -2039,7 +2039,7 @@ void BackupDaemon::NotifySysadmin(int Event)
 	std::string script(conf.GetKeyValue("NotifyScript") + ' ' + sEventNames[Event]);
 	
 	// Log what we're about to do
-	BOX_INFO("About to notify administrator about event "
+	BOX_NOTICE("About to notify administrator about event "
 		<< sEventNames[Event] << ", running script '"
 		<< script << "'");
 	
@@ -2079,14 +2079,14 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 	}
 
 	// Entries to delete, and it's the right time to do so...
-	BOX_INFO("Deleting unused locations from store root...");
+	BOX_NOTICE("Deleting unused locations from store root...");
 	BackupProtocolClient &connection(rContext.GetConnection());
 	for(std::vector<std::pair<int64_t,std::string> >::iterator i(mUnusedRootDirEntries.begin()); i != mUnusedRootDirEntries.end(); ++i)
 	{
 		connection.QueryDeleteDirectory(i->first);
 		
 		// Log this
-		BOX_INFO("Deleted " << i->second << " (ID " << i->first
+		BOX_NOTICE("Deleted " << i->second << " (ID " << i->first
 			<< ") from store root");
 	}
 
