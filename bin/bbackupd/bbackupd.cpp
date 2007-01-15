@@ -30,13 +30,6 @@ int main(int argc, const char *argv[])
 	Logging::SetProgramName("Box Backup (bbackupd)");
 	Logging::ToConsole(true);
 	Logging::ToSyslog (true);
-	Logging::FilterSyslog(Log::EVERYTHING);
-
-	#ifdef NDEBUG
-		Logging::FilterConsole(Log::INFO);
-	#else
-		Logging::FilterConsole(Log::EVERYTHING);
-	#endif
 	
 #ifdef WIN32
 
