@@ -46,24 +46,21 @@ int setitimer(int type, struct itimerval *timeout, void *arg)
 {
 	ASSERT(gTimerInitialised);
 	
-	if (ITIMER_VIRTUAL == type)
+	EnterCriticalSection(&gLock);
+	// we only need seconds for the mo!
+	if (timeout->it_value.tv_sec  == 0 && 
+	    timeout->it_value.tv_usec == 0)
 	{
-		EnterCriticalSection(&gLock);
-		// we only need seconds for the mo!
-		if (timeout->it_value.tv_sec  == 0 && 
-		    timeout->it_value.tv_usec == 0)
-		{
-			gTimerList.clear();
-		}
-		else
-		{
-			Timer_t ourTimer;
-			ourTimer.countDown = timeout->it_value.tv_sec;
-			ourTimer.interval  = timeout->it_interval.tv_sec;
-			gTimerList.push_back(ourTimer);
-		}
-		LeaveCriticalSection(&gLock);
+		gTimerList.clear();
 	}
+	else
+	{
+		Timer_t ourTimer;
+		ourTimer.countDown = timeout->it_value.tv_sec;
+		ourTimer.interval  = timeout->it_interval.tv_sec;
+		gTimerList.push_back(ourTimer);
+	}
+	LeaveCriticalSection(&gLock);
 	
 	// indicate success
 	return 0;
@@ -672,6 +669,22 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	if (!(fi.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
 	{
 		st->st_mode |= S_IWRITE;
+	}
+
+	// st_dev is nroammly zero, regardless of the drive letter,
+	// since backup locations can't normally span drives. However,
+	// a reparse point does allow all kinds of weird stuff to happen.
+	// We set st_dev to 1 for a reparse point, so that Box will detect
+	// a change of device number (from 0) and refuse to recurse down
+	// the reparse point (which could lead to havoc).
+
+	if (fi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+	{
+		st->st_dev = 1;
+	}
+	else
+	{
+		st->st_dev = 0;
 	}
 
 	return 0;
