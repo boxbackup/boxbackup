@@ -34,6 +34,7 @@
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
 #define BOX_ERROR(stuff)   BOX_LOG(Log::ERROR,   stuff)
 #define BOX_WARNING(stuff) BOX_LOG(Log::WARNING, stuff)
+#define BOX_NOTICE(stuff)  BOX_LOG(Log::NOTICE,  stuff)
 #define BOX_INFO(stuff)    BOX_LOG(Log::INFO,    stuff)
 #if defined NDEBUG && ! defined COMPILE_IN_TRACES
         #define BOX_TRACE(stuff)   
@@ -43,7 +44,8 @@
 
 namespace Log
 {
-	enum Level { NOTHING = 1, FATAL, ERROR, WARNING, INFO, TRACE, EVERYTHING };
+	enum Level { NOTHING = 1, FATAL, ERROR, WARNING, NOTICE, INFO, TRACE, 
+		EVERYTHING };
 }
 
 // --------------------------------------------------------------------------
@@ -61,7 +63,7 @@ class Logger
 	Log::Level mCurrentLevel;
 	
 	public:
-	Logger() : mCurrentLevel(Log::WARNING) { }
+	Logger() : mCurrentLevel(Log::EVERYTHING) { }
 	virtual ~Logger() { }
 	
 	virtual bool Log(Log::Level level, const std::string& rFile, 
