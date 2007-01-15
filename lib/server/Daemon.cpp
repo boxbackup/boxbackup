@@ -89,50 +89,130 @@ Daemon::~Daemon()
 //
 // Function
 //		Name:    Daemon::Main(const char *, int, const char *[])
-//		Purpose: Starts the daemon off -- equivalent of C main() function
+//		Purpose: Parses command-line options, and then calls
+//			Main(std::string& configFile, bool singleProcess)
+//			to start the daemon.
 //		Created: 2003/07/29
 //
 // --------------------------------------------------------------------------
 int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
+{
+	// Find filename of config file
+	mConfigFileName = DefaultConfigFile;
+	bool haveConfigFile = false;
+	bool singleProcess  = false;
+	Log::Level masterLevel = Log::NOTICE;
+	char c;
+
+	while((c = getopt(argc, (char * const *)argv, "c:Dqv")) != -1)
+	{
+		switch(c)
+		{
+			case 'c':
+			{
+				mConfigFileName = optarg;
+				haveConfigFile = true;
+			}
+			break;
+
+			case 'D':
+			{
+				singleProcess = true;
+			}
+			break;
+
+			case 'q':
+			{
+				if(masterLevel == Log::NOTHING)
+				{
+					BOX_FATAL("Too many '-q': "
+						"Cannot reduce logging "
+						"level any more");
+					return 2;
+				}
+				((int)masterLevel)--;
+			}
+			break;
+
+			case 'v':
+			{
+				if(masterLevel == Log::EVERYTHING)
+				{
+					BOX_FATAL("Too many '-v': "
+						"Cannot increase logging "
+						"level any more");
+					return 2;
+				}
+				((int)masterLevel)++;
+			}
+			break;
+
+			case '?':
+			{
+				BOX_FATAL("Unknown option on command line: " 
+					<< "'" << optopt << "'");
+				return 2;
+			}
+			break;
+
+			default:
+			{
+				BOX_FATAL("Unknown error in getopt: returned "
+					<< "'" << c << "'");
+				return 1;
+			}
+		}
+	}
+
+	if (argc > optind && !haveConfigFile)
+	{
+		mConfigFileName = argv[optind]; optind++;
+	}
+
+	if (argc > optind && ::strcmp(argv[optind], "SINGLEPROCESS") == 0)
+	{
+		singleProcess = true; optind++;
+	}
+
+	if (argc > optind)
+	{
+		BOX_FATAL("Unknown parameter on command line: "
+			<< "'" << std::string(argv[optind]) << "'");
+		return 2;
+	}
+
+	Logging::SetGlobalLevel(masterLevel);
+
+	return Main(mConfigFileName, singleProcess);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Daemon::Main(const std::string& rConfigFileName,
+//			 bool singleProcess)
+//		Purpose: Starts the daemon off -- equivalent of C main() function
+//		Created: 2003/07/29
+//
+// --------------------------------------------------------------------------
+int Daemon::Main(const std::string &rConfigFileName, bool singleProcess)
 {
 	// Banner (optional)
 	{
 		const char *banner = DaemonBanner();
 		if(banner != 0)
 		{
-			printf("%s", banner);
+			BOX_NOTICE(banner);
 		}
 	}
 
 	std::string pidFileName;
 
+	mConfigFileName = rConfigFileName;
+	bool asDaemon   = !singleProcess;
+
 	try
 	{
-		// Find filename of config file
-		mConfigFileName = DefaultConfigFile;
-		if(argc >= 2)
-		{
-			// First argument is config file, or it's -c and the next arg is the config file
-			if(::strcmp(argv[1], "-c") == 0 && argc >= 3)
-			{
-				mConfigFileName = argv[2];
-			}
-			else
-			{
-				mConfigFileName = argv[1];
-			}
-		}
-		
-		// Test mode with no daemonisation?
-		bool asDaemon = true;
-		if(argc >= 3)
-		{
-			if(::strcmp(argv[2], "SINGLEPROCESS") == 0)
-			{
-				asDaemon = false;
-			}
-		}
-
 		// Load the configuration file.
 		std::string errors;
 		std::auto_ptr<Configuration> pconfig;
@@ -148,7 +228,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			if(e.GetType() == CommonException::ExceptionType &&
 				e.GetSubType() == CommonException::OSFileOpenError)
 			{
-				BOX_ERROR("Failed to start: failed to open "
+				BOX_FATAL("Failed to start: failed to open "
 					"configuration file: " 
 					<< mConfigFileName);
 				return 1;
@@ -161,7 +241,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		if(pconfig.get() == 0 || !errors.empty())
 		{
 			// Tell user about errors
-			BOX_ERROR("Failed to start: errors in configuration "
+			BOX_FATAL("Failed to start: errors in configuration "
 				"file: " << mConfigFileName << ": " << errors);
 			// And give up
 			return 1;
@@ -264,7 +344,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 #endif // !WIN32
 
 		// Log the start message
-		BOX_INFO("Starting daemon, version " << BOX_VERSION
+		BOX_NOTICE("Starting daemon, version " << BOX_VERSION
 			<< ", config: " << mConfigFileName);
 
 		// Write PID to file
@@ -278,7 +358,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
-			BOX_ERROR("can't write pid file");
+			BOX_FATAL("can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
 		
@@ -324,19 +404,19 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	}
 	catch(BoxException &e)
 	{
-		BOX_ERROR("Failed to start: exception " << e.what() 
+		BOX_FATAL("Failed to start: exception " << e.what() 
 			<< " (" << e.GetType() 
 			<< "/"  << e.GetSubType() << ")");
 		return 1;
 	}
 	catch(std::exception &e)
 	{
-		BOX_ERROR("Failed to start: exception " << e.what());
+		BOX_FATAL("Failed to start: exception " << e.what());
 		return 1;
 	}
 	catch(...)
 	{
-		BOX_ERROR("Failed to start: unknown error");
+		BOX_FATAL("Failed to start: unknown error");
 		return 1;
 	}
 
@@ -349,7 +429,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
 	{
 		// will not run without sockets
-		BOX_ERROR("Failed to initialise Windows Sockets");
+		BOX_FATAL("Failed to initialise Windows Sockets");
 		THROW_EXCEPTION(CommonException, Internal)
 	}
 #endif
@@ -366,7 +446,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			if(mReloadConfigWanted && !mTerminateWanted)
 			{
 				// Need to reload that config file...
-				BOX_INFO("Reloading configuration file: "
+				BOX_NOTICE("Reloading configuration file: "
 					<< mConfigFileName);
 				std::string errors;
 				std::auto_ptr<Configuration> pconfig = 
@@ -378,7 +458,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 				if(pconfig.get() == 0 || !errors.empty())
 				{
 					// Tell user about errors
-					BOX_ERROR("Error in configuration "
+					BOX_FATAL("Error in configuration "
 						<< "file: " << mConfigFileName
 						<< ": " << errors);
 					// And give up
@@ -404,23 +484,23 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		::unlink(pidFileName.c_str());
 		
 		// Log
-		BOX_INFO("Terminating daemon");
+		BOX_NOTICE("Terminating daemon");
 	}
 	catch(BoxException &e)
 	{
-		BOX_ERROR("Terminating due to exception " << e.what() 
+		BOX_FATAL("Terminating due to exception " << e.what() 
 			<< " (" << e.GetType() 
 			<< "/"  << e.GetSubType() << ")");
 		retcode = 1;
 	}
 	catch(std::exception &e)
 	{
-		BOX_ERROR("Terminating due to exception " << e.what());
+		BOX_FATAL("Terminating due to exception " << e.what());
 		retcode = 1;
 	}
 	catch(...)
 	{
-		BOX_ERROR("Terminating due to unknown exception");
+		BOX_FATAL("Terminating due to unknown exception");
 		retcode = 1;
 	}
 
