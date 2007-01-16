@@ -21,20 +21,41 @@ bool Logging::sContextSet   = false;
 
 std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
-Console     Logging::sConsole;
-Syslog      Logging::sSyslog;
+Console*    Logging::spConsole = NULL;
+Syslog*     Logging::spSyslog  = NULL;
 Log::Level  Logging::sGlobalLevel = Log::EVERYTHING;
+Logging     Logging::sGlobalLogging; //automatic initialisation
+
+Logging::Logging()
+{
+	ASSERT(!spConsole);
+	ASSERT(!spSyslog);
+	spConsole = new Console();
+	spSyslog  = new Syslog();
+	sLogToConsole = true;
+	sLogToSyslog  = true;
+}
+
+Logging::~Logging()
+{
+	sLogToConsole = false;
+	sLogToSyslog  = false;
+	delete spConsole;
+	delete spSyslog;
+	spConsole = NULL;
+	spSyslog  = NULL;
+}
 
 void Logging::ToSyslog(bool enabled)
 {
 	if (!sLogToSyslog && enabled)
 	{
-		Add(&sSyslog);
+		Add(spSyslog);
 	}
 	
 	if (sLogToSyslog && !enabled)
 	{
-		Remove(&sSyslog);
+		Remove(spSyslog);
 	}
 	
 	sLogToSyslog = enabled;
@@ -44,12 +65,12 @@ void Logging::ToConsole(bool enabled)
 {
 	if (!sLogToConsole && enabled)
 	{
-		Add(&sConsole);
+		Add(spConsole);
 	}
 	
 	if (sLogToConsole && !enabled)
 	{
-		Remove(&sConsole);
+		Remove(spConsole);
 	}
 	
 	sLogToConsole = enabled;
@@ -57,12 +78,12 @@ void Logging::ToConsole(bool enabled)
 
 void Logging::FilterConsole(Log::Level level)
 {
-	sConsole.Filter(level);
+	spConsole->Filter(level);
 }
 
 void Logging::FilterSyslog(Log::Level level)
 {
-	sSyslog.Filter(level);
+	spSyslog->Filter(level);
 }
 
 void Logging::Add(Logger* pNewLogger)
@@ -140,6 +161,17 @@ void Logging::SetProgramName(const std::string& rProgramName)
 	}
 }
 
+Logger::Logger() 
+: mCurrentLevel(Log::EVERYTHING) 
+{
+	Logging::Add(this);
+}
+
+Logger::~Logger() 
+{
+	Logging::Remove(this);
+}
+
 bool Console::Log(Log::Level level, const std::string& rFile, 
 	int line, std::string& rMessage)
 {
@@ -176,6 +208,7 @@ bool Syslog::Log(Log::Level level, const std::string& rFile,
 		case Log::FATAL:      syslogLevel = LOG_CRIT;    break;
 		case Log::ERROR:      syslogLevel = LOG_ERR;     break;
 		case Log::WARNING:    syslogLevel = LOG_WARNING; break;
+		case Log::NOTICE:     syslogLevel = LOG_NOTICE;  break;
 		case Log::INFO:       syslogLevel = LOG_INFO;    break;
 		case Log::TRACE:      /* fall through */
 		case Log::EVERYTHING: syslogLevel = LOG_DEBUG;   break;
