@@ -63,8 +63,8 @@ class Logger
 	Log::Level mCurrentLevel;
 	
 	public:
-	Logger() : mCurrentLevel(Log::EVERYTHING) { }
-	virtual ~Logger() { }
+	Logger();
+	virtual ~Logger();
 	
 	virtual bool Log(Log::Level level, const std::string& rFile, 
 		int line, std::string& rMessage) = 0;
@@ -136,12 +136,14 @@ class Logging
 	static bool sLogToSyslog, sLogToConsole;
 	static std::string sContext;
 	static bool sContextSet;
-	static Console sConsole;
-	static Syslog  sSyslog;
+	static Console* spConsole;
+	static Syslog*  spSyslog;
 	static Log::Level sGlobalLevel;
+	static Logging    sGlobalLogging;
 	
 	public:
-	static void Init(const std::string& rProgramName);
+	Logging ();
+	~Logging();
 	static void ToSyslog  (bool enabled);
 	static void ToConsole (bool enabled);
 	static void FilterSyslog  (Log::Level level);
