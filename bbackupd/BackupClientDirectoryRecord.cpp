@@ -349,11 +349,22 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				}
 				else
 				{
- 					rParams.GetProgressNotifier()
-						.NotifyUnsupportedFileType(
-							this, filename);
-					SetErrorWhenReadingFilesystemObject(
-						rParams, filename.c_str());
+					if(rParams.mrContext.ExcludeFile(filename))
+					{
+ 						rParams.GetProgressNotifier()
+							.NotifyFileExcluded(
+								this, 
+								filename);
+					}
+					else
+					{
+ 						rParams.GetProgressNotifier()
+							.NotifyUnsupportedFileType(
+								this, filename);
+						SetErrorWhenReadingFilesystemObject(
+							rParams, filename.c_str());
+					}
+
 					continue;
 				}
 				
