@@ -22,6 +22,7 @@
 #include "Utils.h"
 #include "Configuration.h"
 #include "Archive.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -139,6 +140,14 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 			#ifdef WIN32
 			entry = ReplaceSlashesDefinite(entry);
 			#endif
+
+			if (entry.size() > 0 && entry[entry.size() - 1] == 
+				DIRECTORY_SEPARATOR_ASCHAR)
+			{
+				BOX_WARNING("Exclude entry ends in path "
+					"separator, will never match: " 
+					<< entry);
+			}
 
 			mDefinite.insert(entry);
 		}

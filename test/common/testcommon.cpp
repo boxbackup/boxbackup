@@ -30,6 +30,7 @@
 #include "CollectInBufferStream.h"
 #include "Archive.h"
 #include "Timer.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -144,6 +145,40 @@ void safe_sleep(int seconds)
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{ /* sleep again */ }
 }
+
+class TestLogger : public Logger
+{
+	private:
+	bool mTriggered;
+	Log::Level mTargetLevel;
+
+	public:
+	TestLogger(Log::Level targetLevel) 
+	: mTriggered(false), mTargetLevel(targetLevel)
+	{ 
+		Logging::Add(this);
+	}
+	~TestLogger() 
+	{
+		Logging::Remove(this);
+	}
+
+	bool IsTriggered() { return mTriggered; }
+	void Reset()       { mTriggered = false; }
+
+	virtual bool Log(Log::Level level, const std::string& rFile,
+		int line, std::string& rMessage)
+	{
+		if (level == mTargetLevel)
+		{
+			mTriggered = true;
+		}
+		return true;
+	}
+
+	virtual const char* GetType() { return "Test"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
+};
 
 int test(int argc, const char *argv[])
 {
@@ -664,6 +699,8 @@ int test(int argc, const char *argv[])
 	
 	// Test ExcludeList
 	{
+		TestLogger logger(Log::WARNING);
+
 		ExcludeList elist;
 		// Check assumption
 		TEST_THAT(Configuration::MultiValueSeparator == '\x01');
@@ -721,6 +758,24 @@ int test(int argc, const char *argv[])
 		#endif
 
 		#undef CASE_SENSITIVE
+
+		TEST_THAT(!logger.IsTriggered());
+		elist.AddDefiniteEntries(std::string("/foo"));
+		TEST_THAT(!logger.IsTriggered());
+		elist.AddDefiniteEntries(std::string("/foo/"));
+		TEST_THAT(logger.IsTriggered());
+		logger.Reset();
+		elist.AddDefiniteEntries(std::string("/foo" 
+			DIRECTORY_SEPARATOR));
+		TEST_THAT(logger.IsTriggered());
+		logger.Reset();
+		elist.AddDefiniteEntries(std::string("/foo" 
+			DIRECTORY_SEPARATOR "bar\x01/foo"));
+		TEST_THAT(!logger.IsTriggered());
+		elist.AddDefiniteEntries(std::string("/foo" 
+			DIRECTORY_SEPARATOR "bar\x01/foo" 
+			DIRECTORY_SEPARATOR));
+		TEST_THAT(logger.IsTriggered());
 	}
 
 	test_conversions();
