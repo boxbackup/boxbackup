@@ -101,7 +101,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	mConfigFileName = DefaultConfigFile;
 	bool haveConfigFile = false;
 	bool singleProcess  = false;
-	Log::Level masterLevel = Log::NOTICE;
+	int masterLevel = Log::NOTICE; // need an int to do math with
 	char c;
 
 	while((c = getopt(argc, (char * const *)argv, "c:Dqv")) != -1)
@@ -130,7 +130,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 						"level any more");
 					return 2;
 				}
-				((int)masterLevel)--;
+				masterLevel--;
 			}
 			break;
 
@@ -143,7 +143,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 						"level any more");
 					return 2;
 				}
-				((int)masterLevel)++;
+				masterLevel++;
 			}
 			break;
 
@@ -181,7 +181,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		return 2;
 	}
 
-	Logging::SetGlobalLevel(masterLevel);
+	Logging::SetGlobalLevel((Log::Level)masterLevel);
 
 	return Main(mConfigFileName, singleProcess);
 }
