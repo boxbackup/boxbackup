@@ -287,10 +287,19 @@ public:
  		const std::string& rLocalPath,
  		const BoxException& rException)
  	{
-		BOX_ERROR("Failed to upload file: " << rLocalPath 
-			<< ": caught exception: " << rException.what() 
-			<< " (" << rException.GetType()
-			<< "/"  << rException.GetSubType() << ")");
+		if (rException.GetType() == CommonException::ExceptionType &&
+			rException.GetSubType() == CommonException::AccessDenied)
+		{
+			BOX_ERROR("Failed to upload file: " << rLocalPath 
+				<< ": Access denied");
+		}
+		else
+		{
+			BOX_ERROR("Failed to upload file: " << rLocalPath 
+				<< ": caught exception: " << rException.what() 
+				<< " (" << rException.GetType()
+				<< "/"  << rException.GetSubType() << ")");
+		}
  	}
  	virtual void NotifyFileUploading(
  		const BackupClientDirectoryRecord* pDirRecord,
