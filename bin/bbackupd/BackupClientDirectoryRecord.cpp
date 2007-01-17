@@ -29,6 +29,7 @@
 #include "BackupDaemon.h"
 #include "BackupStoreException.h"
 #include "Archive.h"
+#include "PathUtils.h"
 
 #include "MemLeakFindOn.h"
 
@@ -93,33 +94,6 @@ void BackupClientDirectoryRecord::DeleteSubDirectories()
 	// Empty list
 	mSubDirectories.clear();
 }
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    MakeFullPath(const std::string& rDir, const std::string& rFile)
-//		Purpose: Combine directory and file name
-//		Created: 2006/08/10
-//
-// --------------------------------------------------------------------------
-static std::string MakeFullPath(const std::string& rDir, 
-	const std::string& rFile)
-{
-	std::string result;
-
-	if (rDir.size() > 0 && 
-		rDir[rDir.size()-1] == DIRECTORY_SEPARATOR_ASCHAR)
-	{
-		result = rDir + rFile;
-	}
-	else
-	{
-		result = rDir + DIRECTORY_SEPARATOR + rFile;
-	}
-
-	return result;
-}
-
 
 // --------------------------------------------------------------------------
 //
