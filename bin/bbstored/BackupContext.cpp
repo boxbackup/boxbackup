@@ -25,6 +25,7 @@
 #include "RaidFileController.h"
 #include "FileStream.h"
 #include "InvisibleTempFileStream.h"
+#include "BufferedStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -306,7 +307,8 @@ BackupStoreDirectory &BackupContext::GetDirectoryInternal(int64_t ObjectID)
 	std::auto_ptr<BackupStoreDirectory> dir(new BackupStoreDirectory);
 	
 	// Read it from the stream, then set it's revision ID
-	dir->ReadFromStream(*objectFile, IOStream::TimeOutInfinite);
+	BufferedStream buf(*objectFile);
+	dir->ReadFromStream(buf, IOStream::TimeOutInfinite);
 	dir->SetRevisionID(revID);
 			
 	// Make sure the size of the directory is available for writing the dir back
