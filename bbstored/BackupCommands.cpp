@@ -30,6 +30,7 @@
 #include "RaidFileController.h"
 #include "FileStream.h"
 #include "InvisibleTempFileStream.h"
+#include "BufferedStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -388,9 +389,10 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 	
 		// Open the object
 		std::auto_ptr<IOStream> object(rContext.OpenObject(mObjectID));
+		BufferedStream buf(*object);
 		
 		// Verify it
-		if(!BackupStoreFile::VerifyEncodedFileFormat(*object))
+		if(!BackupStoreFile::VerifyEncodedFileFormat(buf))
 		{
 			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
 				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_FileDoesNotVerify));			
