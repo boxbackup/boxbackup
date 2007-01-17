@@ -23,6 +23,7 @@
 #include "NamedLock.h"
 #include "autogen_BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BufferedStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -252,7 +253,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 	
 	// Read the directory in
 	BackupStoreDirectory dir;
-	dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
+	BufferedStream buf(*dirStream);
+	dir.ReadFromStream(buf, IOStream::TimeOutInfinite);
 	dirStream->Close();
 	
 	// Is it empty?
