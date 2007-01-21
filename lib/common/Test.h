@@ -109,7 +109,8 @@ inline int ReadPidFile(const char *pidFile)
 {
 	if(!TestFileExists(pidFile))
 	{
-		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
+		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file "
+			"(perhaps one was already running?)");	
 		return -1;
 	}
 	
