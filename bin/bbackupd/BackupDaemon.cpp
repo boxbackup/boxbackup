@@ -1478,7 +1478,23 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			// Read the exclude lists from the Configuration
 			ploc->mpExcludeFiles = BackupClientMakeExcludeList_Files(i->second);
 			ploc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(i->second);
-			
+			// Does this exist on the server?
+			// Remove from dir object early, so that if we fail
+			// to stat the local directory, we still don't 
+			// consider to remote one for deletion.
+			BackupStoreDirectory::Iterator iter(dir);
+			BackupStoreFilenameClear dirname(ploc->mName);	// generate the filename
+			BackupStoreDirectory::Entry *en = iter.FindMatchingClearName(dirname);
+			int64_t oid = 0;
+			if(en != 0)
+			{
+				oid = en->GetObjectID();
+				
+				// Delete the entry from the directory, so we get a list of
+				// unused root directories at the end of this.
+				dir.DeleteEntry(oid);
+			}
+		
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
 
@@ -1556,19 +1572,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			}
 		
 			// Does this exist on the server?
-			BackupStoreDirectory::Iterator iter(dir);
-			BackupStoreFilenameClear dirname(ploc->mName);	// generate the filename
-			BackupStoreDirectory::Entry *en = iter.FindMatchingClearName(dirname);
-			int64_t oid = 0;
-			if(en != 0)
-			{
-				oid = en->GetObjectID();
-				
-				// Delete the entry from the directory, so we get a list of
-				// unused root directories at the end of this.
-				dir.DeleteEntry(oid);
-			}
-			else
+			if(en == 0)
 			{
 				// Doesn't exist, so it has to be created on the server. Let's go!
 				// First, get the directory's attributes and modification time
