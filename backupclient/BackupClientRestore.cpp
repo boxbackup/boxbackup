@@ -207,7 +207,7 @@ typedef struct
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t DirectoryID, std::string &rLocalDirectoryName,
+static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t DirectoryID, std::string &rLocalDirectoryName,
 	RestoreParams &Params, RestoreResumeInfo &rLevel)
 {
 	// If we're resuming... check that we haven't got a next level to look at
@@ -478,7 +478,14 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 				RestoreResumeInfo &rnextLevel(rLevel.AddLevel(en->GetObjectID(), nm.GetClearFilename()));
 				
 				// Recurse
-				BackupClientRestoreDir(rConnection, en->GetObjectID(), localDirname, Params, rnextLevel);
+				int result = BackupClientRestoreDir(
+					rConnection, en->GetObjectID(), 
+					localDirname, Params, rnextLevel);
+
+				if (result != Restore_Complete)
+				{
+					return result;
+				}
 				
 				// Remove the level for the above call
 				rLevel.RemoveLevel();
@@ -487,7 +494,9 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 				rLevel.mRestoredObjects.insert(en->GetObjectID());
 			}
 		}
-	}	
+	}
+
+	return Restore_Complete;
 }
 
 
@@ -558,7 +567,12 @@ int BackupClientRestore(BackupProtocolClient &rConnection, int64_t DirectoryID, 
 	
 	// Restore the directory
 	std::string localName(LocalDirectoryName);
-	BackupClientRestoreDir(rConnection, DirectoryID, localName, params, params.mResumeInfo);
+	int result = BackupClientRestoreDir(rConnection, DirectoryID, 
+		localName, params, params.mResumeInfo);
+	if (result != Restore_Complete)
+	{
+		return result;
+	}
 
 	// Undelete the directory on the server?
 	if(RestoreDeleted && UndeleteAfterRestoreDeleted)
