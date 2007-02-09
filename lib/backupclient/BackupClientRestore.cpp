@@ -224,9 +224,6 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 		rLevel.RemoveLevel();		
 	}
 	
-	// Save the resumption information
-	Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
-	
 	// Create the local directory, if not already done.
 	// Path and owner set later, just use restrictive owner mode.
 
@@ -270,17 +267,105 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 				}
 				TRACE1("In restore, directory name collision with file %s", rLocalDirectoryName.c_str());
 			}
-			// follow through to... (no break)
+			break;
 		case ObjectExists_NoObject:
-			if(::mkdir(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
-			{
-				THROW_EXCEPTION(CommonException, OSFileError);
-			}
+			// we'll create it in a second, after checking
+			// whether the parent directory exists
 			break;
 		default:
 			ASSERT(false);
 			break;
 	}
+
+	std::string parentDirectoryName(rLocalDirectoryName);
+	if(parentDirectoryName[parentDirectoryName.size() - 1] == 
+		DIRECTORY_SEPARATOR_ASCHAR)
+	{
+		parentDirectoryName.resize(parentDirectoryName.size() - 1);
+	}
+
+	int lastSlash = parentDirectoryName.rfind(DIRECTORY_SEPARATOR_ASCHAR);
+
+	if(lastSlash == std::string::npos)
+	{
+		// might be a forward slash separator, 
+		// especially in the unit tests!
+		lastSlash = parentDirectoryName.rfind('/');
+	}
+
+	if(lastSlash != std::string::npos)
+	{
+		// the target directory is a deep path, remove the last
+		// directory name and check that the resulting parent
+		// exists, otherwise the restore should fail.
+		parentDirectoryName.resize(lastSlash);
+
+		int parentExists;
+
+		try
+		{
+			parentExists = ObjectExists(parentDirectoryName.c_str());
+		}
+		catch (BoxException &e)
+		{
+			::syslog(LOG_ERR, "Failed to check existence for %s: "
+				"%s", parentDirectoryName.c_str(), e.what());
+			return Restore_UnknownError;
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Failed to check existence for %s: "
+				"%s", parentDirectoryName.c_str(), e.what());
+			return Restore_UnknownError;
+		}
+		catch(...)
+		{
+			::syslog(LOG_ERR, "Failed to check existence for %s: "
+				"unknown error", parentDirectoryName.c_str());
+			return Restore_UnknownError;
+		}
+
+		switch(parentExists)
+		{
+			case ObjectExists_Dir:
+				// this is fine, do nothing
+				break;
+
+			case ObjectExists_File:
+				fprintf(stderr, "Failed to restore: '%s' "
+					"is a file, but should be a "
+					"directory.\n", 
+					parentDirectoryName.c_str());
+				return Restore_TargetPathNotFound;
+
+			case ObjectExists_NoObject:
+				fprintf(stderr, "Failed to restore: "
+					"parent '%s' of target directory "
+					"does not exist.\n",
+					parentDirectoryName.c_str());
+				return Restore_TargetPathNotFound;
+
+			default:
+				fprintf(stderr, "Failed to restore: "
+					"unknown result from "
+					"ObjectExists('%s').\n",
+					parentDirectoryName.c_str());
+				return Restore_UnknownError;
+		}
+	}
+
+	if((exists == ObjectExists_NoObject ||
+		exists == ObjectExists_File) && 
+		::mkdir(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
+	{
+		::syslog(LOG_ERR, "Failed to create directory %s: %s",
+			rLocalDirectoryName.c_str(),
+			strerror(errno));
+		return Restore_UnknownError;
+	}
+	
+	// Save the resumption information
+	Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
 	
 	// Fetch the directory listing from the server -- getting a list 
 	// of files which is appropriate to the restore type
