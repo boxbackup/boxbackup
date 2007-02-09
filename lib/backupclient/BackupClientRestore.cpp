@@ -367,12 +367,34 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 			strerror(errno));
 		return Restore_UnknownError;
 	}
-	
-	// Save the resumption information
-	Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
-	
-	// Fetch the directory listing from the server -- getting a list 
-	// of files which is appropriate to the restore type
+
+	// Save the restore info, in case it's needed later
+	try
+	{
+		Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
+	}
+	catch (BoxException &e)
+	{
+		::syslog(LOG_ERR, "Failed to save resume info file %s: %s", 
+			Params.mRestoreResumeInfoFilename.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Failed to save resume info file %s: %s", 
+			Params.mRestoreResumeInfoFilename.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "Failed to save resume info file %s: "
+			"unknown error", 
+			Params.mRestoreResumeInfoFilename.c_str());
+		return Restore_UnknownError;
+	}
+
+	// Fetch the directory listing from the server -- getting a
+	// list of files which is appropriate to the restore type
 	rConnection.QueryListDirectory(
 			DirectoryID,
 			Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING),
@@ -387,7 +409,29 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	// Apply attributes to the directory
 	const StreamableMemBlock &dirAttrBlock(dir.GetAttributes());
 	BackupClientFileAttributes dirAttr(dirAttrBlock);
-	dirAttr.WriteAttributes(rLocalDirectoryName.c_str());
+
+	try
+	{
+		dirAttr.WriteAttributes(rLocalDirectoryName.c_str());
+	}
+	catch (BoxException &e)
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes for %s: %s", 
+			rLocalDirectoryName.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes for %s: %s", 
+			rLocalDirectoryName.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes for %s: "
+			"unknown error", rLocalDirectoryName.c_str());
+		return Restore_UnknownError;
+	}
 
 	int64_t bytesWrittenSinceLastRestoreInfoSave = 0;
 	
@@ -415,17 +459,43 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		
 				// Decode the file -- need to do different things depending on whether 
 				// the directory entry has additional attributes
-				if(en->HasAttributes())
+				try
 				{
-					// Use these attributes
-					const StreamableMemBlock &storeAttr(en->GetAttributes());
-					BackupClientFileAttributes attr(storeAttr);
-					BackupStoreFile::DecodeFile(*objectStream, localFilename.c_str(), rConnection.GetTimeout(), &attr);
+					if(en->HasAttributes())
+					{
+						// Use these attributes
+						const StreamableMemBlock &storeAttr(en->GetAttributes());
+						BackupClientFileAttributes attr(storeAttr);
+						BackupStoreFile::DecodeFile(*objectStream, localFilename.c_str(), rConnection.GetTimeout(), &attr);
+					}
+					else
+					{
+						// Use attributes stored in file
+						BackupStoreFile::DecodeFile(*objectStream, localFilename.c_str(), rConnection.GetTimeout());
+					}
 				}
-				else
+				catch (BoxException &e)
 				{
-					// Use attributes stored in file
-					BackupStoreFile::DecodeFile(*objectStream, localFilename.c_str(), rConnection.GetTimeout());
+					::syslog(LOG_ERR, "Failed to restore "
+						"file %s: %s", 
+						localFilename.c_str(), 
+						e.what());
+					return Restore_UnknownError;
+				}
+				catch(std::exception &e)
+				{
+					::syslog(LOG_ERR, "Failed to restore "
+						"file %s: %s", 
+						localFilename.c_str(), 
+						e.what());
+					return Restore_UnknownError;
+				}
+				catch(...)
+				{
+					::syslog(LOG_ERR, "Failed to restore "
+						"file %s: unknown error", 
+						localFilename.c_str());
+					return Restore_UnknownError;
 				}
 				
 				// Progress display?
@@ -440,7 +510,42 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				
 				// Save restore info?
 				int64_t fileSize;
-				if(FileExists(localFilename.c_str(), &fileSize, true /* treat links as not existing */))
+				int exists;
+
+				try
+				{
+					exists = FileExists(
+						localFilename.c_str(),
+						&fileSize, 
+						true /* treat links as not 
+							existing */);
+				}
+				catch (BoxException &e)
+				{
+					::syslog(LOG_ERR, "Failed to determine "
+						"whether file exists: %s: %s", 
+						localFilename.c_str(), 
+						e.what());
+					return Restore_UnknownError;
+				}
+				catch(std::exception &e)
+				{
+					::syslog(LOG_ERR, "Failed to determine "
+						"whether file exists: %s: %s", 
+						localFilename.c_str(), 
+						e.what());
+					return Restore_UnknownError;
+				}
+				catch(...)
+				{
+					::syslog(LOG_ERR, "Failed to determine "
+						"whether file exists: %s: "
+						"unknown error", 
+						localFilename.c_str());
+					return Restore_UnknownError;
+				}
+
+				if(exists)
 				{
 					// File exists...
 					bytesWrittenSinceLastRestoreInfoSave += fileSize;
@@ -448,7 +553,30 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 					if(bytesWrittenSinceLastRestoreInfoSave > MAX_BYTES_WRITTEN_BETWEEN_RESTORE_INFO_SAVES)
 					{
 						// Save the restore info, in case it's needed later
-						Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
+						try
+						{
+							Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
+						}
+						catch (BoxException &e)
+						{
+							::syslog(LOG_ERR, "Failed to save resume info file %s: %s", 
+								Params.mRestoreResumeInfoFilename.c_str(), e.what());
+							return Restore_UnknownError;
+						}
+						catch(std::exception &e)
+						{
+							::syslog(LOG_ERR, "Failed to save resume info file %s: %s", 
+								Params.mRestoreResumeInfoFilename.c_str(), e.what());
+							return Restore_UnknownError;
+						}
+						catch(...)
+						{
+							::syslog(LOG_ERR, "Failed to save resume info file %s: "
+								"unknown error", 
+								Params.mRestoreResumeInfoFilename.c_str());
+							return Restore_UnknownError;
+						}
+
 						bytesWrittenSinceLastRestoreInfoSave = 0;
 					}
 				}
@@ -460,7 +588,35 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	if(bytesWrittenSinceLastRestoreInfoSave != 0)
 	{
 		// Save the restore info, in case it's needed later
-		Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
+		try
+		{
+			Params.mResumeInfo.Save(
+				Params.mRestoreResumeInfoFilename);
+		}
+		catch (BoxException &e)
+		{
+			::syslog(LOG_ERR, "Failed to save resume info file "
+				"%s: %s", 
+				Params.mRestoreResumeInfoFilename.c_str(),
+				e.what());
+			return Restore_UnknownError;
+		}
+		catch(std::exception &e)
+		{
+			::syslog(LOG_ERR, "Failed to save resume info file "
+				"%s: %s", 
+				Params.mRestoreResumeInfoFilename.c_str(),
+				e.what());
+			return Restore_UnknownError;
+		}
+		catch(...)
+		{
+			::syslog(LOG_ERR, "Failed to save resume info file "
+				"%s: unknown error", 
+				Params.mRestoreResumeInfoFilename.c_str());
+			return Restore_UnknownError;
+		}
+		
 		bytesWrittenSinceLastRestoreInfoSave = 0;
 	}
 
