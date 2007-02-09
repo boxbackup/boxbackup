@@ -19,6 +19,7 @@
 #include <set>
 #include <limits.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include "BackupClientRestore.h"
 #include "autogen_BackupProtocolClient.h"
@@ -225,9 +226,36 @@ static void BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Di
 	
 	// Save the resumption information
 	Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
+	
+	// Create the local directory, if not already done.
+	// Path and owner set later, just use restrictive owner mode.
 
-	// Create the local directory (if not already done) -- path and owner set later, just use restrictive owner mode
-	switch(ObjectExists(rLocalDirectoryName.c_str()))
+	int exists;
+
+	try
+	{
+		exists = ObjectExists(rLocalDirectoryName.c_str());
+	}
+	catch (BoxException &e)
+	{
+		::syslog(LOG_ERR, "Failed to check existence for %s: %s", 
+			rLocalDirectoryName.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Failed to check existence for %s: %s", 
+			rLocalDirectoryName.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "Failed to check existence for %s: "
+			"unknown error", rLocalDirectoryName.c_str());
+		return Restore_UnknownError;
+	}
+
+	switch(exists)
 	{
 		case ObjectExists_Dir:
 			// Do nothing
