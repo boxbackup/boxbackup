@@ -264,7 +264,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				if(::unlink(rLocalDirectoryName.c_str()) != 0)
 				{
 					::syslog(LOG_ERR, "Failed to delete "
-						"directory %s: %s",
+						"file %s: %s",
 						rLocalDirectoryName.c_str(),
 						strerror(errno));
 					return Restore_UnknownError;
@@ -449,7 +449,14 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				std::string localFilename(rLocalDirectoryName + DIRECTORY_SEPARATOR_ASCHAR + nm.GetClearFilename());
 				
 				// Unlink anything which already exists -- for resuming restores, we can't overwrite files already there.
-				::unlink(localFilename.c_str());
+				if(::unlink(localFilename.c_str()) == 0)
+				{
+					::syslog(LOG_ERR, "Failed to delete "
+						"file %s: %s",
+						localFilename.c_str(),
+						strerror(errno));
+					return Restore_UnknownError;
+				}
 				
 				// Request it from the store
 				rConnection.QueryGetFile(DirectoryID, en->GetObjectID());
