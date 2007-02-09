@@ -461,7 +461,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	}
 
 	
-	// Recuse to directories
+	// Recurse to directories
 	{
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
