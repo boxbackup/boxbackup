@@ -263,7 +263,11 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				::printf("WARNING: File present with name '%s', removing out of the way of restored directory. Use specific restore with ID to restore this object.", rLocalDirectoryName.c_str());
 				if(::unlink(rLocalDirectoryName.c_str()) != 0)
 				{
-					THROW_EXCEPTION(CommonException, OSFileError);
+					::syslog(LOG_ERR, "Failed to delete "
+						"directory %s: %s",
+						rLocalDirectoryName.c_str(),
+						strerror(errno));
+					return Restore_UnknownError;
 				}
 				TRACE1("In restore, directory name collision with file %s", rLocalDirectoryName.c_str());
 			}
