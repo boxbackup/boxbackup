@@ -288,7 +288,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		parentDirectoryName.resize(parentDirectoryName.size() - 1);
 	}
 
-	int lastSlash = parentDirectoryName.rfind(DIRECTORY_SEPARATOR_ASCHAR);
+	size_t lastSlash = parentDirectoryName.rfind(DIRECTORY_SEPARATOR_ASCHAR);
 
 	if(lastSlash == std::string::npos)
 	{
