@@ -65,7 +65,7 @@ int main(int argc, const char *argv[])
 
 	MAINHELPER_START
 
-	// Filename for configuraiton file?
+	// Filename for configuration file?
 	const char *configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
 	
 	// Quiet?
