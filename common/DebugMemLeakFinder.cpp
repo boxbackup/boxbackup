@@ -49,6 +49,17 @@ namespace
 {
 	static std::map<void *, MallocBlockInfo> sMallocBlocks;
 	static std::map<void *, ObjectInfo> sObjectBlocks;
+	static bool sTrackingDataDestroyed = false;
+
+	static class DestructionWatchdog
+	{
+		public:
+		~DestructionWatchdog()
+		{
+			sTrackingDataDestroyed = true;
+		}
+	}
+	sWatchdog;
 	
 	static bool sTrackMallocInSection = false;
 	static std::set<void *> sSectionMallocBlocks;
@@ -225,6 +236,8 @@ void memleakfinder_notaleak(void *ptr)
 {
 	InternalAllocGuard guard;
 
+	ASSERT(!sTrackingDataDestroyed);
+
 	memleakfinder_notaleak_insert_pre();
 	if(memleakfinder_global_enable && memleakfinder_initialised)
 	{
@@ -258,6 +271,8 @@ void memleakfinder_startsectionmonitor()
 	InternalAllocGuard guard;
 
 	ASSERT(memleakfinder_initialised);
+	ASSERT(!sTrackingDataDestroyed);
+
 	sTrackMallocInSection = true;
 	sSectionMallocBlocks.clear();
 	sTrackObjectsInSection = true;
@@ -270,6 +285,7 @@ void memleakfinder_traceblocksinsection()
 	InternalAllocGuard guard;
 
 	ASSERT(memleakfinder_initialised);
+	ASSERT(!sTrackingDataDestroyed);
 
 	std::set<void *>::iterator s(sSectionMallocBlocks.begin());
 	for(; s != sSectionMallocBlocks.end(); ++s)
@@ -295,6 +311,7 @@ int memleakfinder_numleaks()
 	InternalAllocGuard guard;
 
 	ASSERT(memleakfinder_initialised);
+	ASSERT(!sTrackingDataDestroyed);
 
 	int n = 0;
 	
@@ -315,6 +332,8 @@ int memleakfinder_numleaks()
 void memleakfinder_reportleaks_file(FILE *file)
 {
 	InternalAllocGuard guard;
+
+	ASSERT(!sTrackingDataDestroyed);
 
 	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
 	{
@@ -388,6 +407,7 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 
 	if(!memleakfinder_global_enable) return;
 	if(!memleakfinder_initialised)   return;
+	ASSERT(!sTrackingDataDestroyed);
 
 	if(block != 0)
 	{
@@ -411,6 +431,7 @@ void remove_object_block(void *block)
 
 	if(!memleakfinder_global_enable) return;
 	if(!memleakfinder_initialised)   return;
+	if(sTrackingDataDestroyed)       return;
 
 	std::map<void *, ObjectInfo>::iterator i(sObjectBlocks.find(block));
 	if(i != sObjectBlocks.end())
