@@ -2,6 +2,9 @@
 //	AUTOMATICALLY GENERATED FILE
 //		do not edit
 //
+//	Note that infrastructure/buildenv-testmain-template.cpp is NOT
+//	auto-generated, but test/*/_main.cpp are generated from it.
+//
 
 
 // --------------------------------------------------------------------------
@@ -31,6 +34,7 @@
 	#include <syslog.h>
 #endif
 
+#include "Test.h"
 #include "Timer.h"
 
 #include "MemLeakFindOn.h"
@@ -78,7 +82,8 @@ bool checkfilesleftopen()
 {
 	if(filedes_open_at_beginning == -1)
 	{
-		// Not used correctly, pretend that there were things left open so this gets invesitgated
+		// Not used correctly, pretend that there were things 
+		// left open so this gets investigated
 		return true;
 	}
 
@@ -130,7 +135,7 @@ int main(int argc, const char *argv[])
 			if(memleakfinder_numleaks() != 0)
 			{
 				failures++;
-				printf("FAILURE: Memory leaks detected\n");
+				printf("FAILURE: Memory leaks detected in test code\n");
 				printf("==== MEMORY LEAKS =================================\n");
 				memleakfinder_reportleaks();
 				printf("===================================================\n");
