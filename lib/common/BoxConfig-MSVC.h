@@ -56,6 +56,10 @@
    you don't. */
 #define HAVE_DECL_XATTR_NOFOLLOW 0
 
+/* Define to 1 if you have the declaration of `O_BINARY', and to 0 if you
+   don't. */
+#define HAVE_DECL_O_BINARY 1
+
 /* Define to 1 if #define of pragmas works */
 /* #undef HAVE_DEFINE_PRAGMA */
 
@@ -268,7 +272,7 @@
 // #define HAVE_SYS_TIME_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#define HAVE_SYS_TYPES_H 1
+// #define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <sys/wait.h> header file. */
 /* #undef HAVE_SYS_WAIT_H */
@@ -317,6 +321,12 @@
 
 /* Define to 1 if __syscall is available but needs a definition */
 /* #undef HAVE___SYSCALL_NEED_DEFN */
+
+/* max value of long long calculated by configure */
+/* #undef LLONG_MAX */
+
+/* min value of long long calculated by configure */
+/* #undef LLONG_MIN */
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
