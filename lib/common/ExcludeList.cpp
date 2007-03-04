@@ -10,11 +10,7 @@
 #include "Box.h"
 
 #ifdef HAVE_REGEX_H
-	#ifdef WIN32
-		#include <pcreposix.h>
-	#else
-		#include <regex.h>
-	#endif // WIN32
+	#include <regex.h>
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
 #endif
 
