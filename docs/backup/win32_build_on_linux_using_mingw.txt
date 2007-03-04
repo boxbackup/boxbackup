@@ -28,11 +28,27 @@ Unpack and configure:
 
 	tar xzvf openssl-0.9.8b.tar.gz
 	cd openssl-0.9.8b
-	./Configure mingw
+	./Configure --prefix=/usr/local/i386-mingw32 mingw
 	make makefile.one
 	wget http://bbdev.fluffy.co.uk/svn/box/chris/win32/support/openssl-0.9.8b-mingw-cross.patch
 	patch -p1 < openssl-0.9.8b-mingw-cross.patch
 	make -f makefile.one
+	make -f makefile.one install
+
+Download PCRE from 
+[http://prdownloads.sourceforge.net/pcre/pcre-6.3.tar.bz2?download]
+
+Unpack:
+
+	tar xjvf pcre-6.3.tar.bz2
+	cd pcre-6.3
+
+Configure and make:
+
+	./configure --host=i586-mingw32msvc --prefix=/usr/i386-mingw32/
+	make winshared wininstall
+	cp .libs/libpcreposix.a /usr/i386-pc-mingw32/lib
+	cp pcreposix.h /usr/i386-pc-mingw32/include/regex.h
 
 Configure Box with:
 
