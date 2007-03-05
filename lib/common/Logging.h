@@ -42,10 +42,21 @@
         #define BOX_TRACE(stuff)   BOX_LOG(Log::TRACE, stuff)
 #endif
 
+#undef ERROR
+
 namespace Log
 {
-	enum Level { NOTHING = 1, FATAL, ERROR, WARNING, NOTICE, INFO, TRACE, 
-		EVERYTHING };
+	enum Level 
+	{
+		NOTHING = 1,
+		FATAL,
+		ERROR,
+		WARNING,
+		NOTICE,
+		INFO,
+		TRACE, 
+		EVERYTHING
+	};
 }
 
 // --------------------------------------------------------------------------
