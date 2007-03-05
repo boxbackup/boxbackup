@@ -21,6 +21,7 @@
 #include <new>
 
 #include "CommonException.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -33,6 +34,8 @@ public:
 	{
 		if(mOSFileHandle < 0)
 		{
+			BOX_ERROR("FileHandleGuard: failed to open file '" <<
+				filename << "': " << strerror(errno));
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}
