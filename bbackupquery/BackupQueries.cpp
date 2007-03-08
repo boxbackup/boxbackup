@@ -1317,6 +1317,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				"(compared to server directory '%s')\n",
 				localDirDisplay.c_str(), 
 				storeDirDisplay.c_str());
+			rParams.mDifferences ++;
 		}
 		else
 		{
