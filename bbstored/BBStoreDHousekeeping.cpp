@@ -50,7 +50,8 @@ void BackupStoreDaemon::HousekeepingProcess()
 	{
 		RunHousekeepingIfNeeded();
 
-		// Calculate how long should wait before doing the next housekeeping run
+		// Calculate how long should wait before doing the next 
+		// housekeeping run
 		int64_t timeNow = GetCurrentBoxTime();
 		time_t secondsToGo = BoxTimeToSeconds(
 			(mLastHousekeepingRun + housekeepingInterval) - 
@@ -72,6 +73,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 
 	// Time now
 	int64_t timeNow = GetCurrentBoxTime();
+
 	// Do housekeeping if the time interval has elapsed since the last check
 	if((timeNow - mLastHousekeepingRun) < housekeepingInterval)
 	{
@@ -148,6 +150,19 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 	SetProcessTitle("housekeeping, idle");
 }
 
+void BackupStoreDaemon::OnIdle()
+{
+	#ifdef WIN32
+	if (!mHousekeepingInited)
+	{
+		HousekeepingInit();
+		mHousekeepingInited = true;
+	}
+
+	RunHousekeepingIfNeeded();
+	#endif
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -159,6 +174,11 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 // --------------------------------------------------------------------------
 bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitTime)
 {
+	if(!mInterProcessCommsSocket.IsOpened())
+	{
+		return false;
+	}
+
 	// First, check to see if it's EOF -- this means something has gone wrong, and the housekeeping should terminate.
 	if(mInterProcessComms.IsEOF())
 	{
