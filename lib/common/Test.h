@@ -23,14 +23,26 @@
 #include <string>
 
 extern int failures;
+extern int first_fail_line;
+extern std::string first_fail_file;
 
-#define TEST_FAIL_WITH_MESSAGE(msg) {failures++; printf("FAILURE: " msg " at " __FILE__ "(%d)\n", __LINE__);}
-#define TEST_ABORT_WITH_MESSAGE(msg) {failures++; printf("FAILURE: " msg " at " __FILE__ "(%d)\n", __LINE__); return 1;}
+#define TEST_FAIL_WITH_MESSAGE(msg) \
+{ \
+	if (failures == 0) \
+	{ \
+		first_fail_file = __FILE__; \
+		first_fail_line = __LINE__; \
+	} \
+	failures++; \
+	printf("FAILURE: " msg " at " __FILE__ "(%d)\n", __LINE__); \
+}
+
+#define TEST_ABORT_WITH_MESSAGE(msg) {TEST_FAIL_WITH_MESSAGE(msg); return 1;}
 
 #define TEST_THAT(condition) {if(!(condition)) TEST_FAIL_WITH_MESSAGE("Condition [" #condition "] failed")}
 #define TEST_THAT_ABORTONFAIL(condition) {if(!(condition)) TEST_ABORT_WITH_MESSAGE("Condition [" #condition "] failed")}
 
-// NOTE: The 0- bit it to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
+// NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
 #define TEST_CHECK_THROWS(statement, excepttype, subtype)									\
 	{																						\
 		bool didthrow = false;																\
