@@ -156,6 +156,7 @@ winnt*)   ;;
   AX_CHECK_MOUNT_POINT(,[
     AC_MSG_ERROR([[cannot work out how to discover mount points on your platform]])
   ])
+  AC_CHECK_MEMBERS([struct dirent.d_ino],,, [[#include <dirent.h>]])
 ;;
 esac
 
