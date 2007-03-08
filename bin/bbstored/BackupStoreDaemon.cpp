@@ -42,6 +42,7 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mExtendedLogging(false),
 	  mHaveForkedHousekeeping(false),
 	  mIsHousekeepingProcess(false),
+	  mHousekeepingInited(false),
 	  mInterProcessComms(mInterProcessCommsSocket)
 {
 }
