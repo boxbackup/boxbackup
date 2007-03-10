@@ -254,7 +254,7 @@ struct itimerval
 
 int emu_mkdir(const char* pPathName);
 
-inline int mkdir(const char *pPathName, mode_t mode)
+inline int mkdir(const char *pPathName, mode_t mode = 0)
 {
 	return emu_mkdir(pPathName);
 }
@@ -398,6 +398,12 @@ bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
 bool EnableBackupRights( void );
 
+bool ConvertEncoding (const std::string& rSource, int sourceCodePage,
+	std::string& rDest, int destCodePage);
+bool ConvertToUtf8   (const std::string& rSource, std::string& rDest, 
+	int sourceCodePage);
+bool ConvertFromUtf8 (const std::string& rSource, std::string& rDest,
+	int destCodePage);
 bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
 bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 
