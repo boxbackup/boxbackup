@@ -290,6 +290,9 @@ DIR *opendir(const char *name);
 struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
 
+// local constant to open file exclusively without shared access
+#define O_LOCK 0x10000
+
 HANDLE openfile(const char *filename, int flags, int mode);
 
 #define LOG_INFO 6
