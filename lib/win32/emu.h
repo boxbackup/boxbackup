@@ -83,12 +83,6 @@ int setitimer(int type, struct itimerval *timeout, void *arg);
 void InitTimer(void);
 void FiniTimer(void);
 
-inline int geteuid(void)
-{
-	//lets pretend to be root!
-	return 0;
-}
-
 struct passwd {
 	char *pw_name;
 	char *pw_passwd;
@@ -147,8 +141,9 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 	return 0;
 }
 
-//I do not perceive a need to change the user or group on a backup client
-//at any rate the owner of a service can be set in the service settings
+// Windows and Unix owners and groups are pretty fundamentally different.
+// Ben prefers that we kludge here rather than litter the code with #ifdefs.
+// Pretend to be root, and pretend that set...() operations succeed.
 inline int setegid(int)
 {
 	return true;
@@ -170,6 +165,10 @@ inline int getgid(void)
 	return 0;
 }
 inline int getuid(void)
+{
+	return 0;
+}
+inline int geteuid(void)
 {
 	return 0;
 }
