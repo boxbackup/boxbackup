@@ -42,7 +42,7 @@ static void (__cdecl *gTimerFunc) (int) = NULL;
 
 int setitimer(int type, struct itimerval *timeout, void *arg)
 {
-	ASSERT(gTimerInitialised);
+	assert(gTimerInitialised);
 	
 	if (ITIMER_REAL != type)
 	{
@@ -137,7 +137,8 @@ int SetTimerHandler(void (__cdecl *func ) (int))
 
 void InitTimer(void)
 {
-	ASSERT(!gTimerInitialised);
+	assert(!gTimerInitialised);
+
 	InitializeCriticalSection(&gLock);
 	
 	// create our thread
@@ -151,7 +152,7 @@ void InitTimer(void)
 
 void FiniTimer(void)
 {
-	ASSERT(gTimerInitialised);
+	assert(gTimerInitialised);
 	gFinishTimer = true;
 	EnterCriticalSection(&gLock);
 	DeleteCriticalSection(&gLock);
