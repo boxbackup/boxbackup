@@ -51,6 +51,7 @@
 #include "FileStream.h"
 #include "IOStreamGetLine.h"
 #include "intercept.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
