@@ -374,23 +374,25 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ConvertUtf8ToConsole
-//		Purpose: Converts a string from UTF-8 to the console 
-//			 code page. On success, replaces contents of rDest 
-//			 and returns true. In case of fire, logs the error 
-//			 and returns false.
-//		Created: 4th February 2006
+//		Name:    ConvertEncoding(const std::string&, int, 
+//			 std::string&, int)
+//		Purpose: Converts a string from one code page to another.
+//			 On success, replaces contents of rDest and returns 
+//			 true. In case of fire, logs the error and returns 
+//			 false.
+//		Created: 15th October 2006
 //
 // --------------------------------------------------------------------------
-bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
+bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
+	std::string& rDest, int destCodePage)
 {
-	WCHAR* pWide = ConvertUtf8ToWideString(pString);
+	WCHAR* pWide = ConvertToWideString(rSource.c_str(), sourceCodePage);
 	if (pWide == NULL)
 	{
 		return false;
 	}
 
-	char* pConsole = ConvertFromWideString(pWide, GetConsoleOutputCP());
+	char* pConsole = ConvertFromWideString(pWide, destCodePage);
 	delete [] pWide;
 
 	if (!pConsole)
@@ -404,39 +406,25 @@ bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
 	return true;
 }
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    ConvertConsoleToUtf8
-//		Purpose: Converts a string from the console code page
-//			 to UTF-8. On success, replaces contents of rDest
-//			 and returns true. In case of fire, logs the error 
-//			 and returns false.
-//		Created: 4th February 2006
-//
-// --------------------------------------------------------------------------
+bool ConvertToUtf8(const char* pString, std::string& rDest, int sourceCodePage)
+{
+	return ConvertEncoding(pString, sourceCodePage, rDest, CP_UTF8);
+}
+
+bool ConvertFromUtf8(const char* pString, std::string& rDest, int destCodePage)
+{
+	return ConvertEncoding(pString, CP_UTF8, rDest, destCodePage);
+}
+
 bool ConvertConsoleToUtf8(const char* pString, std::string& rDest)
 {
-	WCHAR* pWide = ConvertToWideString(pString, GetConsoleCP());
-	if (pWide == NULL)
-	{
-		return false;
-	}
-
-	char* pConsole = ConvertFromWideString(pWide, CP_UTF8);
-	delete [] pWide;
-
-	if (!pConsole)
-	{
-		return false;
-	}
-
-	rDest = pConsole;
-	delete [] pConsole;
-
-	return true;
+	return ConvertEncoding(pString, GetConsoleCP(), rDest, CP_UTF8);
 }
 
+bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
+{
+	return ConvertEncoding(pString, CP_UTF8, rDest, GetConsoleOutputCP());
+}
 
 // --------------------------------------------------------------------------
 //
