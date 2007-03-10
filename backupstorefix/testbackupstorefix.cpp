@@ -29,6 +29,7 @@
 #include "RaidFileException.h"
 #include "StoreStructure.h"
 #include "BackupStoreFileWire.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
@@ -67,20 +68,6 @@ std::map<int32_t, bool> objectIsDir;
 #define RUN_CHECK	\
 	::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf check 01234567"); \
 	::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf check 01234567 fix");
-
-// Wait a given number of seconds for something to complete
-void wait_for_operation(int seconds)
-{
-	printf("waiting: ");
-	fflush(stdout);
-	for(int l = 0; l < seconds; ++l)
-	{
-		sleep(1);
-		printf(".");
-		fflush(stdout);
-	}
-	printf("\n");
-}
 
 // Get ID of an object given a filename
 int32_t getID(const char *name)
