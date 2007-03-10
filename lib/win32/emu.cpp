@@ -978,7 +978,7 @@ int emu_chmod(const char * pName, mode_t mode)
 		return -1;
 	}
 
-	free(pBuffer);
+	delete [] pBuffer;
 	return 0;
 }
 
@@ -1621,7 +1621,7 @@ int console_read(char* pBuffer, size_t BufferSize)
 	}
 
 	size_t WideSize = BufferSize / 5;
-	WCHAR* pWideBuffer = new WCHAR [WideSize];
+	WCHAR* pWideBuffer = new WCHAR [WideSize + 1];
 
 	if (!pWideBuffer)
 	{
@@ -1647,6 +1647,8 @@ int console_read(char* pBuffer, size_t BufferSize)
 	pWideBuffer[numCharsRead] = 0;
 
 	char* pUtf8 = ConvertFromWideString(pWideBuffer, GetConsoleCP());
+	delete [] pWideBuffer;
+
 	strncpy(pBuffer, pUtf8, BufferSize);
 	delete [] pUtf8;
 
