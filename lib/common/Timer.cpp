@@ -90,6 +90,7 @@ void Timers::Cleanup()
 void Timers::Add(Timer& rTimer)
 {
 	ASSERT(spTimers);
+	ASSERT(&rTimer);
 	spTimers->push_back(&rTimer);
 	Reschedule();
 }
@@ -106,11 +107,13 @@ void Timers::Add(Timer& rTimer)
 void Timers::Remove(Timer& rTimer)
 {
 	ASSERT(spTimers);
+	ASSERT(&rTimer);
 
 	bool restart = true;
 	while (restart)
 	{
 		restart = false;
+
 		for (std::vector<Timer*>::iterator i = spTimers->begin();
 			i != spTimers->end(); i++)
 		{
