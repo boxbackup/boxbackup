@@ -9,12 +9,13 @@
 
 #include "Box.h"
 
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <sys/stat.h>
+#include <fcntl.h>
 #include <stdarg.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #ifdef HAVE_SYS_UIO_H
 	#include <sys/uio.h>
@@ -41,7 +42,7 @@
 #include "MemLeakFindOn.h"
 
 #define READ_NUMBER_DISCS_REQUIRED	3
-#define READV_MAX_BLOCKS			64
+#define READV_MAX_BLOCKS		64
 
 // We want to use POSIX fstat() for now, not the emulated one
 #undef fstat
