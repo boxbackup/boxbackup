@@ -199,11 +199,6 @@ struct itimerval
 	typedef int socklen_t;
 #endif
 
-// I (re-)defined here for the moment; has to be removed later !!! 
-#ifndef BOX_VERSION
-#define BOX_VERSION "0.09hWin32"
-#endif
-
 #define S_IRGRP S_IWRITE
 #define S_IWGRP S_IREAD
 #define S_IROTH S_IWRITE | S_IREAD
