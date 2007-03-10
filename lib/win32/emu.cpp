@@ -18,6 +18,7 @@
 
 #include <string>
 #include <list>
+#include <sstream>
 
 // message resource definitions for syslog()
 
@@ -502,10 +503,11 @@ std::string GetErrorMessage(DWORD errorCode)
 		return std::string("failed to get error message");
 	}
 
-	std::string out(pMsgBuf);
+	std::ostringstream line;
+	line << pMsgBuf << " (" << errorCode << ")";
 	LocalFree(pMsgBuf);
 
-	return out;
+	return line.str();
 }
 
 // --------------------------------------------------------------------------
