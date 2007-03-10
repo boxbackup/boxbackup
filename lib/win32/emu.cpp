@@ -9,13 +9,11 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <process.h>
 #include <windows.h>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
-#endif
-#ifdef HAVE_PROCESS_H
-	#include <process.h>
 #endif
 
 #include <string>
