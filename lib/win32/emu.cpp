@@ -44,7 +44,14 @@ int setitimer(int type, struct itimerval *timeout, void *arg)
 {
 	ASSERT(gTimerInitialised);
 	
+	if (ITIMER_REAL != type)
+	{
+		errno = ENOSYS;
+		return -1;
+	}
+
 	EnterCriticalSection(&gLock);
+
 	// we only need seconds for the mo!
 	if (timeout->it_value.tv_sec  == 0 && 
 	    timeout->it_value.tv_usec == 0)
@@ -58,6 +65,7 @@ int setitimer(int type, struct itimerval *timeout, void *arg)
 		ourTimer.interval  = timeout->it_interval.tv_sec;
 		gTimerList.push_back(ourTimer);
 	}
+
 	LeaveCriticalSection(&gLock);
 	
 	// indicate success
