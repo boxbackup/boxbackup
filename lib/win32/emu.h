@@ -65,7 +65,7 @@
 	( *(_result) = *gmtime( (_clock) ), \
 	(_result) )
 
-#define ITIMER_VIRTUAL 0
+#define ITIMER_REAL 0
 
 #ifdef _MSC_VER
 // Microsoft decided to deprecate the standard POSIX functions. Great!
