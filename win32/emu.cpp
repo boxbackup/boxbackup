@@ -701,7 +701,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 		st->st_mode |= S_IWRITE;
 	}
 
-	// st_dev is nroammly zero, regardless of the drive letter,
+	// st_dev is normally zero, regardless of the drive letter,
 	// since backup locations can't normally span drives. However,
 	// a reparse point does allow all kinds of weird stuff to happen.
 	// We set st_dev to 1 for a reparse point, so that Box will detect
