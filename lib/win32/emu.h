@@ -6,27 +6,24 @@
 // basic types, may be required by other headers since we
 // don't include sys/types.h
 
-#ifdef __MINGW32__
-	#include <stdint.h>
-	typedef uint32_t u_int32_t;
-#else // MSVC
-	typedef __int64 int64_t;
-	typedef __int32 int32_t;
-	typedef __int16 int16_t;
-	typedef __int8  int8_t;
-	
+#ifndef __MINGW32__
 	typedef unsigned __int64 u_int64_t;
-	typedef unsigned __int32 u_int32_t;
-	
 	typedef unsigned __int64 uint64_t;
+	typedef          __int64 int64_t;
 	typedef unsigned __int32 uint32_t;
+	typedef unsigned __int32 u_int32_t;
+	typedef          __int32 int32_t;
 	typedef unsigned __int16 uint16_t;
+	typedef          __int16 int16_t;
 	typedef unsigned __int8  uint8_t;
+	typedef          __int8  int8_t;
 #endif
 
 // emulated types, present on MinGW but not MSVC or vice versa
 
-#ifdef _MSC_VER
+#ifdef __MINGW32__
+	typedef uint32_t u_int32_t;
+#else
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
 
