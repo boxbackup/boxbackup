@@ -6,7 +6,9 @@
 // basic types, may be required by other headers since we
 // don't include sys/types.h
 
-#ifndef __MINGW32__
+#ifdef __MINGW32__
+	#include <stdint.h>
+#else // MSVC
 	typedef unsigned __int64 u_int64_t;
 	typedef unsigned __int64 uint64_t;
 	typedef          __int64 int64_t;
