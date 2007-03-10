@@ -541,30 +541,37 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	// flags could be O_WRONLY | O_CREAT | O_RDONLY
 	DWORD createDisposition = OPEN_EXISTING;
-	DWORD shareMode = FILE_SHARE_READ;
-	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA;
+	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE 
+		| FILE_SHARE_DELETE;
+	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY 
+		| FILE_READ_EA;
 
 	if (flags & O_WRONLY)
 	{
 		accessRights = FILE_WRITE_DATA;
-		shareMode = FILE_SHARE_WRITE;
 	}
 	else if (flags & O_RDWR)
 	{
 		accessRights |= FILE_WRITE_ATTRIBUTES 
 			| FILE_WRITE_DATA | FILE_WRITE_EA;
-		shareMode |= FILE_SHARE_WRITE;
 	}
 
 	if (flags & O_CREAT)
 	{
 		createDisposition = OPEN_ALWAYS;
 	}
+
 	if (flags & O_TRUNC)
 	{
 		createDisposition = CREATE_ALWAYS;
 	}
-	if (flags & O_EXCL)
+
+	if ((flags & O_CREAT) && (flags & O_EXCL))
+	{
+		createDisposition = CREATE_NEW;
+	}
+
+	if (flags & O_LOCK)
 	{
 		shareMode = 0;
 	}
@@ -573,7 +580,6 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	if (flags & O_TEMPORARY)
 	{
 		winFlags  |= FILE_FLAG_DELETE_ON_CLOSE;
-		shareMode |= FILE_SHARE_DELETE;
 	}
 
 	HANDLE hdir = CreateFileW(pBuffer, 
