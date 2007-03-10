@@ -9,16 +9,20 @@ backup-client
 	bin bbackupctl
 	script bin/bbackupd/bbackupd-config
 
-ONLY:mingw32
+ONLY:mingw32,mingw32msvc
 	script bin/bbackupd/win32/installer.iss 
 	script bin/bbackupd/win32/ReadMe.txt 
 	script bin/bbackupd/win32/bbackupd.conf
+END-ONLY
+
+ONLY:mingw32
 	script /bin/mgwz.dll
 	script /bin/mingwm10.dll
 	optional script /bin/pcreposix.dll
 END-ONLY
 
 OMIT:mingw32
+OMIT:mingw32msvc
 OMIT:CYGWIN
 
 backup-server
