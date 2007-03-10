@@ -92,7 +92,7 @@ inline int TestGetFileSize(const char *Filename)
 	return -1;
 }
 
-inline int RunCommand(const char *pCommandLine)
+inline std::string ConvertPaths(const char *pCommandLine)
 {
 #ifdef WIN32
 	// convert UNIX paths to native
@@ -114,7 +114,37 @@ inline int RunCommand(const char *pCommandLine)
 	std::string command = pCommandLine;
 #endif
 
-	return ::system(command.c_str());
+	return command;
+}
+
+inline int RunCommand(const char *pCommandLine)
+{
+	return ::system(ConvertPaths(pCommandLine).c_str());
+}
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+inline bool ServerIsAlive(int pid)
+{
+#ifdef WIN32
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
+	if (hProcess == NULL)
+	{
+		if (GetLastError() != ERROR_INVALID_PARAMETER)
+		{
+			printf("Failed to open process %d: error %d\n",
+				pid, (int)GetLastError());
+		}
+		return false;
+	}
+	CloseHandle(hProcess);
+	return true;
+#else // !WIN32
+	if(pid == 0) return false;
+	return ::kill(pid, 0) != -1;
+#endif // WIN32
 }
 
 inline int ReadPidFile(const char *pidFile)
@@ -141,192 +171,136 @@ inline int ReadPidFile(const char *pidFile)
 
 inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 {
+#ifdef WIN32
+
+	PROCESS_INFORMATION procInfo;
+
+	STARTUPINFO startInfo;
+	startInfo.cb = sizeof(startInfo);
+	startInfo.lpReserved = NULL;
+	startInfo.lpDesktop  = NULL;
+	startInfo.lpTitle    = NULL;
+	startInfo.dwFlags = 0;
+	startInfo.cbReserved2 = 0;
+	startInfo.lpReserved2 = NULL;
+
+	std::string cmd = ConvertPaths(pCommandLine);
+	CHAR* tempCmd = strdup(cmd.c_str());
+
+	DWORD result = CreateProcess
+	(
+		NULL,        // lpApplicationName, naughty!
+		tempCmd,     // lpCommandLine
+		NULL,        // lpProcessAttributes
+		NULL,        // lpThreadAttributes
+		false,       // bInheritHandles
+		0,           // dwCreationFlags
+		NULL,        // lpEnvironment
+		NULL,        // lpCurrentDirectory
+		&startInfo,  // lpStartupInfo
+		&procInfo    // lpProcessInformation
+	);
+
+	free(tempCmd);
+
+	if (result == 0)
+	{
+		DWORD err = GetLastError();
+		printf("Launch failed: %s: error %d\n", pCommandLine, (int)err);
+		return -1;
+	}
+
+	CloseHandle(procInfo.hProcess);
+	CloseHandle(procInfo.hThread);
+
+#else // !WIN32
+
 	if(RunCommand(pCommandLine) != 0)
 	{
 		printf("Server: %s\n", pCommandLine);
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
-	
-	// give it time to start up
-	::sleep(1);
-	
-	// read pid file
-	int pid = ReadPidFile(pidFile);
-
-	if(pid == -1)
-	{
-		// helps with debugging:
-		printf("Server: %s (pidfile %s)\n", pCommandLine, pidFile);
-	}
-
-	return pid;
-}
-
-#ifdef WIN32
-
-#include "WinNamedPipeStream.h"
-#include "IOStreamGetLine.h"
-#include "BoxPortsAndFiles.h"
-
-bool SendCommands(const std::string& rCmd)
-{
-	WinNamedPipeStream connection;
-
-	try
-	{
-		connection.Connect(BOX_NAMED_PIPE_NAME);
-	}
-	catch(...)
-	{
-		printf("Failed to connect to daemon control socket.\n");
-		return false;
-	}
-
-	// For receiving data
-	IOStreamGetLine getLine(connection);
-	
-	// Wait for the configuration summary
-	std::string configSummary;
-	if(!getLine.GetLine(configSummary))
-	{
-		printf("Failed to receive configuration summary from daemon\n");
-		return false;
-	}
-
-	// Was the connection rejected by the server?
-	if(getLine.IsEOF())
-	{
-		printf("Server rejected the connection.\n");
-		return false;
-	}
-
-	// Decode it
-	int autoBackup, updateStoreInterval, minimumFileAge, maxUploadWait;
-	if(::sscanf(configSummary.c_str(), "bbackupd: %d %d %d %d", 
-			&autoBackup, &updateStoreInterval, 
-			&minimumFileAge, &maxUploadWait) != 4)
-	{
-		printf("Config summary didn't decode\n");
-		return false;
-	}
-
-	std::string cmds;
-	bool expectResponse;
-
-	if (rCmd != "")
-	{
-		cmds = rCmd;
-		cmds += "\nquit\n";
-		expectResponse = true;
-	}
-	else
-	{
-		cmds = "quit\n";
-		expectResponse = false;
-	}
-	
-	connection.Write(cmds.c_str(), cmds.size());
-	
-	// Read the response
-	std::string line;
-	bool statusOk = !expectResponse;
-
-	while (expectResponse && !getLine.IsEOF() && getLine.GetLine(line))
-	{
-		// Is this an OK or error line?
-		if (line == "ok")
-		{
-			statusOk = true;
-		}
-		else if (line == "error")
-		{
-			printf("ERROR (%s)\n", rCmd.c_str());
-			break;
-		}
-		else
-		{
-			printf("WARNING: Unexpected response to command '%s': "
-				"%s", rCmd.c_str(), line.c_str());
-		}
-	}
-	
-	return statusOk;
-}
-
-inline bool ServerIsAlive(int pid)
-{
-	return SendCommands("");
-}
-
-inline bool HUPServer(int pid)
-{
-	return SendCommands("reload");
-}
-
-inline bool KillServerInternal(int pid)
-{
-	bool sent = SendCommands("terminate");
-	TEST_THAT(sent);
-	return sent;
-}
-
-#else // !WIN32
-
-inline bool ServerIsAlive(int pid)
-{
-	if(pid == 0) return false;
-	return ::kill(pid, 0) != -1;
-}
-
-inline bool HUPServer(int pid)
-{
-	if(pid == 0) return false;
-	return ::kill(pid, SIGHUP) != -1;
-}
-
-inline bool KillServerInternal(int pid)
-{
-	if(pid == 0 || pid == -1) return false;
-	bool killed = (::kill(pid, SIGTERM) == 0);
-	TEST_THAT(killed);
-	return killed;
-}
 
 #endif // WIN32
 
-inline bool KillServer(int pid)
-{
-	if (!KillServerInternal(pid))
+	#ifdef WIN32
+	// on other platforms there is no other way to get 
+	// the PID, so a NULL pidFile doesn't make sense.
+
+	if (pidFile == NULL)
 	{
-		return false;
+		return (int)procInfo.dwProcessId;
 	}
+	#endif
 
-	for (int i = 0; i < 30; i++)
+	// time for it to start up
+	::fprintf(stdout, "Starting server: %s\n", pCommandLine);
+	::fprintf(stdout, "Waiting for server to start: ");
+
+	for (int i = 0; i < 15; i++)
 	{
-		if (!ServerIsAlive(pid)) break;
-		::sleep(1);
-		if (!ServerIsAlive(pid)) break;
-
-		if (i == 0) 
+		if (TestFileExists(pidFile))	
 		{
-			printf("waiting for server to die");
+			break;
 		}
-		printf(".");
-		fflush(stdout);
+
+		#ifdef WIN32
+		if (!ServerIsAlive((int)procInfo.dwProcessId))
+		{
+			break;
+		}
+		#endif
+
+		::fprintf(stdout, ".");
+		::fflush(stdout);
+		::sleep(1);
 	}
 
-	if (!ServerIsAlive(pid))
+	#ifdef WIN32
+	// on Win32 we can check whether the process is alive
+	// without even checking the PID file
+
+	if (!ServerIsAlive((int)procInfo.dwProcessId))
 	{
-		printf("done.\n");
+		::fprintf(stdout, "server died!\n");
+		TEST_FAIL_WITH_MESSAGE("Server died!");	
+		return -1;
+	}
+	#endif
+
+	if (!TestFileExists(pidFile))
+	{
+		::fprintf(stdout, "timed out!\n");
+		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
+		return -1;
 	}
 	else
 	{
-		printf("failed!\n");
+		::fprintf(stdout, "done.\n");
 	}
-	fflush(stdout);
 
-	return !ServerIsAlive(pid);
+	// wait a second for the pid to be written to the file
+	::sleep(1);
+
+	// read pid file
+	int pid = ReadPidFile(pidFile);
+
+	#ifdef WIN32
+	// On Win32 we can check whether the PID in the pidFile matches
+	// the one returned by the system, which it always should.
+
+	if (pid != (int)procInfo.dwProcessId)
+	{
+		printf("Server wrote wrong pid to file (%s): expected %d "
+			"but found %d\n", pidFile, 
+			(int)procInfo.dwProcessId, pid);
+		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");	
+		return -1;
+	}
+	#endif
+
+	return pid;
 }
 
 inline void TestRemoteProcessMemLeaks(const char *filename)
@@ -359,6 +333,55 @@ inline void TestRemoteProcessMemLeaks(const char *filename)
 		::unlink(filename);
 	}
 #endif
+}
+
+#ifdef WIN32
+#define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
+#define BBACKUPD        "..\\..\\bin\\bbackupd\\bbackupd.exe"
+#define BBSTORED        "..\\..\\bin\\bbstored\\bbstored.exe"
+#define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
+#define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
+#else
+#define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
+#define BBACKUPD        "../../bin/bbackupd/bbackupd"
+#define BBSTORED        "../../bin/bbackupd/bbstored"
+#define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
+#define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
+#endif
+
+inline void terminate_bbackupd(int pid)
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"terminate") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+
+	for (int i = 0; i < 20; i++)
+	{
+		if (!ServerIsAlive(pid)) break;
+		fprintf(stdout, ".");
+		fflush(stdout);
+		sleep(1);
+	}
+
+	TEST_THAT(!ServerIsAlive(pid));
+	TestRemoteProcessMemLeaks("bbackupd.memleaks");
+}
+
+
+// Wait a given number of seconds for something to complete
+inline void wait_for_operation(int seconds)
+{
+	printf("waiting: ");
+	fflush(stdout);
+	for(int l = 0; l < seconds; ++l)
+	{
+		sleep(1);
+		printf(".");
+		fflush(stdout);
+	}
+	printf("\n");
 }
 
 #endif // TEST__H
