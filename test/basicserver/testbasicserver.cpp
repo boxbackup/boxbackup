@@ -28,6 +28,7 @@
 #include "TestContext.h"
 #include "autogen_TestProtocolClient.h"
 #include "autogen_TestProtocolServer.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 

@@ -35,6 +35,7 @@
 #include "MemBlockStream.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupClientCryptoKeys.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
