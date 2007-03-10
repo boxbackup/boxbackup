@@ -147,41 +147,6 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 	return 0;
 }
 
-int   emu_chdir (const char* pDirName);
-int   emu_unlink(const char* pFileName);
-char* emu_getcwd(char* pBuffer, int BufSize);
-int   emu_utimes(const char* pName, const struct timeval[]);
-int   emu_chmod (const char* pName, mode_t mode);
-
-#define utimes(buffer, times) emu_utimes(buffer, times)
-
-#ifdef _MSC_VER
-	#define chmod(file, mode)     emu_chmod(file, mode)
-	#define chdir(directory)      emu_chdir(directory)
-	#define unlink(file)          emu_unlink(file)
-	#define getcwd(buffer, size)  emu_getcwd(buffer, size)
-#else
-	inline int chmod(const char * pName, mode_t mode)
-	{
-		return emu_chmod(pName, mode);
-	}
-
-	inline int chdir(const char* pDirName)
-	{
-		return emu_chdir(pDirName);
-	}
-
-	inline char* getcwd(char* pBuffer, int BufSize)
-	{
-		return emu_getcwd(pBuffer, BufSize);
-	}
-
-	inline int unlink(const char* pFileName)
-	{
-		return emu_unlink(pFileName);
-	}
-#endif
-
 //I do not perceive a need to change the user or group on a backup client
 //at any rate the owner of a service can be set in the service settings
 inline int setegid(int)
@@ -250,13 +215,6 @@ struct itimerval
 #define S_ISLNK(x) ( false )
 
 #define vsnprintf _vsnprintf
-
-int emu_mkdir(const char* pPathName);
-
-inline int mkdir(const char *pPathName, mode_t mode = 0)
-{
-	return emu_mkdir(pPathName);
-}
 
 #ifndef __MINGW32__
 inline int strcasecmp(const char *s1, const char *s2)
@@ -370,32 +328,30 @@ struct stat {
 };
 #endif
 
-int emu_stat(const char * name, struct stat * st);
-int emu_fstat(HANDLE file, struct stat * st);
-int statfs(const char * name, struct statfs * s);
-
 // need this for conversions
 time_t ConvertFileTimeToTime_t(FILETIME *fileTime);
 bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 
-#ifdef _MSC_VER
-	#define stat(filename,  struct) emu_stat (filename, struct)
-	#define lstat(filename, struct) emu_stat (filename, struct)
-	#define fstat(handle,   struct) emu_fstat(handle,   struct)
-#else
-	inline int stat(const char* filename, struct stat* stat)
-	{
-		return emu_stat(filename, stat);
-	}
-	inline int lstat(const char* filename, struct stat* stat)
-	{
-		return emu_stat(filename, stat);
-	}
-	inline int fstat(HANDLE handle, struct stat* stat)
-	{
-		return emu_fstat(handle, stat);
-	}
-#endif
+int   emu_chdir  (const char* pDirName);
+int   emu_mkdir  (const char* pPathName);
+int   emu_unlink (const char* pFileName);
+int   emu_fstat  (HANDLE file,       struct stat* st);
+int   emu_stat   (const char* pName, struct stat* st);
+int   emu_utimes (const char* pName, const struct timeval[]);
+int   emu_chmod  (const char* pName, mode_t mode);
+char* emu_getcwd (char* pBuffer,     int BufSize);
+
+#define chdir(directory)        emu_chdir  (directory)
+#define mkdir(path,     mode)   emu_mkdir  (path)
+#define unlink(file)            emu_unlink (file)
+#define stat(filename,  struct) emu_stat   (filename, struct)
+#define lstat(filename, struct) emu_stat   (filename, struct)
+#define fstat(handle,   struct) emu_fstat  (handle,   struct)
+#define utimes(buffer,  times)  emu_utimes (buffer,   times)
+#define chmod(file,     mode)   emu_chmod  (file,     mode)
+#define getcwd(buffer,  size)   emu_getcwd (buffer,   size)
+
+int statfs(const char * name, struct statfs * s);
 
 int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
 bool EnableBackupRights( void );
