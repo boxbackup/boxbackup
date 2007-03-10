@@ -1131,14 +1131,23 @@ int test_bbackupd()
 				TEST_THAT(fd != -1);
 				::close(fd);
 			}
+
 			// Wait and test...
 			wait_for_backup_operation();
 			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3e.log \"compare -ac\" quit");
-			TEST_THAT(compareReturnValue == 2*256);	// should find differences
+
+			// Check that unreadable files were found
+			TEST_THAT(compareReturnValue == 3*256);	
+
+			// Check for memory leaks during compare
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 			// Check that it was reported correctly
 			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.1"));
+
+			// Check that the error was only reorted once
 			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
+
 			// Set permissions on file and dir to stop errors in the future
 			::chmod("testfiles/TestDir1/sub23/read-fail-test-dir", 0770);
 			::chmod("testfiles/TestDir1/read-fail-test-file", 0770);
