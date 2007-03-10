@@ -144,10 +144,13 @@ void Timers::Reschedule()
 	{
 		THROW_EXCEPTION(CommonException, Internal)
 	}
+
+	#ifndef WIN32
 	if (::signal(SIGALRM, Timers::SignalHandler) != Timers::SignalHandler)
 	{
 		THROW_EXCEPTION(CommonException, Internal)
 	}
+	#endif
 
 	// Clear the reschedule-needed flag to false before we start.
 	// If a timer event occurs while we are scheduling, then we
@@ -255,7 +258,7 @@ Timer::Timer(size_t timeoutSecs)
 : mExpires(GetCurrentBoxTime() + SecondsToBoxTime(timeoutSecs)),
   mExpired(false)
 {
-	#ifndef NDEBUG
+	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	if (timeoutSecs == 0)
@@ -285,7 +288,7 @@ Timer::Timer(size_t timeoutSecs)
 
 Timer::~Timer()
 {
-	#ifndef NDEBUG
+	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	TRACE3("%d.%d: timer %p destroyed, will not fire\n",
@@ -299,7 +302,7 @@ Timer::Timer(const Timer& rToCopy)
 : mExpires(rToCopy.mExpires),
   mExpired(rToCopy.mExpired)
 {
-	#ifndef NDEBUG
+	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	if (mExpired)
@@ -331,7 +334,7 @@ Timer::Timer(const Timer& rToCopy)
 
 Timer& Timer::operator=(const Timer& rToCopy)
 {
-	#ifndef NDEBUG
+	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	if (rToCopy.mExpired)
@@ -367,7 +370,7 @@ Timer& Timer::operator=(const Timer& rToCopy)
 
 void Timer::OnExpire()
 {
-	#ifndef NDEBUG
+	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	TRACE3("%d.%d: timer %p fired\n", tv.tv_sec, tv.tv_usec, this);
