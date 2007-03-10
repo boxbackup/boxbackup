@@ -57,7 +57,15 @@ WinNamedPipeStream::~WinNamedPipeStream()
 {
 	if (mSocketHandle != INVALID_HANDLE_VALUE)
 	{
-		Close();
+		try
+		{
+			Close();
+		}
+		catch (std::exception &e)
+		{
+			::syslog(LOG_ERR, "Caught exception while destroying "
+				"named pipe, ignored.");
+		}
 	}
 }
 
