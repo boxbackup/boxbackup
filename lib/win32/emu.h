@@ -321,7 +321,7 @@ struct stat {
 	time_t st_mtime;
 	time_t st_ctime;
 };
-#endif
+#endif // 0
 
 // need this for conversions
 time_t ConvertFileTimeToTime_t(FILETIME *fileTime);
@@ -349,6 +349,19 @@ char* emu_getcwd (char* pBuffer,     int BufSize);
 int statfs(const char * name, struct statfs * s);
 
 int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
+
+struct iovec {
+	void *iov_base;   /* Starting address */
+	size_t iov_len;   /* Number of bytes */
+};
+
+int readv (int filedes, const struct iovec *vector, size_t count);
+int writev(int filedes, const struct iovec *vector, size_t count);
+
+// The following functions are not emulations, but utilities for other 
+// parts of the code where Windows API is used or windows-specific stuff 
+// is needed, like codepage conversion.
+
 bool EnableBackupRights( void );
 
 bool ConvertEncoding (const std::string& rSource, int sourceCodePage,
@@ -360,15 +373,12 @@ bool ConvertFromUtf8 (const std::string& rSource, std::string& rDest,
 bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
 bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 
-// replacement for _cgetws which requires a relatively recent C runtime lib
+// GetErrorMessage() returns a system error message, like strerror() 
+// but for Windows error codes.
+std::string GetErrorMessage(DWORD errorCode);
+
+// console_read() is a replacement for _cgetws which requires a 
+// relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
-
-struct iovec {
-	void *iov_base;   /* Starting address */
-	size_t iov_len;   /* Number of bytes */
-};
-
-int readv (int filedes, const struct iovec *vector, size_t count);
-int writev(int filedes, const struct iovec *vector, size_t count);
 
 #endif // !EMU_INCLUDE && WIN32
