@@ -1127,7 +1127,7 @@ int test_bbackupd()
 		printf("Rename an existing file over a deleted file\n");
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", "testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 		wait_for_backup_operation();
-		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
+		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3w.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
