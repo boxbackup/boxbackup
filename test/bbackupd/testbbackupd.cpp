@@ -65,15 +65,7 @@
 
 void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
 {
-	printf("waiting: ");
-	fflush(stdout);
-	for(int l = 0; l < seconds; ++l)
-	{
-		sleep(1);
-		printf(".");
-		fflush(stdout);
-	}
-	printf("\n");
+	wait_for_operation(seconds);
 }
 
 int bbstored_pid = 0;
