@@ -1050,6 +1050,79 @@ int test_bbackupd()
 		TEST_THAT(compareReturnValue == 1*256);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+		// rename an untracked file over an 
+		// existing untracked file
+		printf("Rename over existing untracked file\n");
+		int fd1 = open("testfiles/TestDir1/untracked-1", 
+			O_CREAT | O_EXCL | O_WRONLY, 0700);
+		int fd2 = open("testfiles/TestDir1/untracked-2",
+			O_CREAT | O_EXCL | O_WRONLY, 0700);
+		TEST_THAT(fd1 > 0);
+		TEST_THAT(fd2 > 0);
+		TEST_THAT(write(fd1, "hello", 5) == 5);
+		TEST_THAT(close(fd1) == 0);
+		sleep(1);
+		TEST_THAT(write(fd2, "world", 5) == 5);
+		TEST_THAT(close(fd2) == 0);
+		TEST_THAT(TestFileExists("testfiles/TestDir1/untracked-1"));
+		TEST_THAT(TestFileExists("testfiles/TestDir1/untracked-2"));
+		wait_for_operation(5);
+		// back up both files
+		wait_for_backup_operation();
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query3t.log "
+			"\"compare -ac\" quit");
+		TEST_THAT(compareReturnValue == 1*256);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		TEST_THAT(::rename("testfiles/TestDir1/untracked-1", 
+			"testfiles/TestDir1/untracked-2") == 0);
+		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
+		TEST_THAT( TestFileExists("testfiles/TestDir1/untracked-2"));
+		wait_for_backup_operation();
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query3t.log "
+			"\"compare -ac\" quit");
+		TEST_THAT(compareReturnValue == 1*256);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		// case which went wrong: rename a tracked file over an
+		// existing tracked file
+		printf("Rename over existing tracked file\n");
+		fd1 = open("testfiles/TestDir1/tracked-1", 
+			O_CREAT | O_EXCL | O_WRONLY, 0700);
+		fd2 = open("testfiles/TestDir1/tracked-2",
+			O_CREAT | O_EXCL | O_WRONLY, 0700);
+		TEST_THAT(fd1 > 0);
+		TEST_THAT(fd2 > 0);
+		char buffer[1024];
+		TEST_THAT(write(fd1, "hello", 5) == 5);
+		TEST_THAT(write(fd1, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd1) == 0);
+		sleep(1);
+		TEST_THAT(write(fd2, "world", 5) == 5);
+		TEST_THAT(write(fd2, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_THAT(close(fd2) == 0);
+		TEST_THAT(TestFileExists("testfiles/TestDir1/tracked-1"));
+		TEST_THAT(TestFileExists("testfiles/TestDir1/tracked-2"));
+		wait_for_operation(5);
+		// back up both files
+		wait_for_backup_operation();
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query3u.log "
+			"\"compare -ac\" quit");
+		TEST_THAT(compareReturnValue == 1*256);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		TEST_THAT(::rename("testfiles/TestDir1/tracked-1", 
+			"testfiles/TestDir1/tracked-2") == 0);
+		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
+		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
+		wait_for_backup_operation();
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf -l testfiles/query3v.log "
+			"\"compare -ac\" quit");
+		TEST_THAT(compareReturnValue == 1*256);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+	
 		// case which went wrong: rename a tracked file over a deleted file
 		printf("Rename an existing file over a deleted file\n");
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", "testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
