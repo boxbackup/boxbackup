@@ -397,6 +397,7 @@ inline void wait_for_operation(int seconds)
 		fflush(stdout);
 	}
 	printf("\n");
+	fflush(stdout);
 }
 
 #endif // TEST__H
