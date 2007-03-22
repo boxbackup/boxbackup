@@ -1007,6 +1007,39 @@ int test_bbackupd()
 		TEST_THAT(compareReturnValue == 1*256);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		// Check that store errors are reported neatly
+		printf("Create store error\n");
+		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
+			"testfiles/0_0/backup/01234567/info.rf.bak") == 0);
+		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf",
+			"testfiles/0_1/backup/01234567/info.rf.bak") == 0);
+		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf",
+			"testfiles/0_2/backup/01234567/info.rf.bak") == 0);
+		// Create a file to trigger an upload
+		{
+			int fd1 = open("testfiles/TestDir1/force-upload", 
+				O_CREAT | O_EXCL | O_WRONLY, 0700);
+			TEST_THAT(fd1 > 0);
+			TEST_THAT(write(fd1, "just do it", 10) == 10);
+			TEST_THAT(close(fd1) == 0);
+			wait_for_backup_operation(4);
+		}
+		// Wait and test...
+		wait_for_backup_operation();
+		// Check that it was reported correctly
+		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
+		// Check that the error was only reorted once
+		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
+		// Fix the store
+		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf.bak",
+			"testfiles/0_0/backup/01234567/info.rf") == 0);
+		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf.bak",
+			"testfiles/0_1/backup/01234567/info.rf") == 0);
+		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf.bak",
+			"testfiles/0_2/backup/01234567/info.rf") == 0);
+		// wait until bbackupd recovers from the exception
+		wait_for_backup_operation(100);
+
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("Replace symlink with directory, add new directory\n");
 		TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir") == 0);
