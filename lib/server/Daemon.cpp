@@ -101,7 +101,13 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	mConfigFileName = DefaultConfigFile;
 	bool haveConfigFile = false;
 	bool singleProcess  = false;
+
+	#ifdef NDEBUG
 	int masterLevel = Log::NOTICE; // need an int to do math with
+	#else
+	int masterLevel = Log::TRACE; // need an int to do math with
+	#endif
+
 	char c;
 
 	while((c = getopt(argc, (char * const *)argv, "c:Dqv")) != -1)
