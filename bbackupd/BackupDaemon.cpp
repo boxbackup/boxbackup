@@ -119,8 +119,8 @@ BackupDaemon::BackupDaemon()
 	// Only ever one instance of a daemon
 	SSLLib::Initialise();
 	
-	// Initialise notifcation sent status
-	for(int l = 0; l <= NotifyEvent__MAX; ++l)
+	// Initialise notification sent status
+	for(int l = 0; l < NotifyEvent__MAX; ++l)
 	{
 		mNotificationsSent[l] = false;
 	}
@@ -878,6 +878,8 @@ void BackupDaemon::Run2()
 				else
 				{
 					// Not restart/terminate, pause and retry
+					// Notify administrator
+					NotifySysadmin(NotifyEvent_BackupError);
 					SetState(State_Error);
 					BOX_ERROR("Exception caught ("
 						<< errorString
@@ -2013,11 +2015,17 @@ void BackupDaemon::TouchFileInWorkingDir(const char *Filename)
 // --------------------------------------------------------------------------
 void BackupDaemon::NotifySysadmin(int Event)
 {
-	static const char *sEventNames[] = {"store-full", "read-error", 0};
+	static const char *sEventNames[] = 
+	{
+		"store-full",
+		"read-error", 
+		"backup-error",
+		0
+	};
 
 	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << Event);
 
-	if(Event < 0 || Event > NotifyEvent__MAX)
+	if(Event < 0 || Event >= NotifyEvent__MAX)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadNotifySysadminEventCode);
 	}
