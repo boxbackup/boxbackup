@@ -530,7 +530,7 @@ int start_internal_daemon()
 
 	TEST_THAT(TestFileExists("testfiles/bbackupd.pid"));
 	
-	printf("Waiting for daemon to start");
+	printf("Waiting for backup daemon to start: ");
 	int pid = -1;
 	
 	for (int i = 0; i < 30; i++)
@@ -546,7 +546,8 @@ int start_internal_daemon()
 		}		
 	}
 	
-	printf("\n");
+	printf(" done.\n");
+	fflush(stdout);
 
 	TEST_THAT(pid > 0);
 	return pid;
