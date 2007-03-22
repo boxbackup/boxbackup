@@ -1242,6 +1242,7 @@ int test_bbackupd()
 				::fclose(f);
 			}
 			printf("\n");
+			fflush(stdout);
 			
 			// Check there's a difference
 			compareReturnValue = ::system("testfiles/extcheck1.pl");
@@ -1262,6 +1263,7 @@ int test_bbackupd()
 				::fclose(f);
 			}
 			printf("\n");
+			fflush(stdout);
 
 			compareReturnValue = ::system("testfiles/extcheck2.pl");
 			TEST_THAT(compareReturnValue == 1*256);
