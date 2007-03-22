@@ -30,6 +30,7 @@
 #include "BackupStoreException.h"
 #include "Archive.h"
 #include "PathUtils.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -793,10 +794,14 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				if (pDirOnStore != 0 && en == 0)
 				{
 					doUpload = true;
+					BOX_TRACE(filename << ": will upload "
+						"(not on server)");
 				}
 				else if (modTime >= rParams.mSyncPeriodStart)
 				{
 					doUpload = true;
+					BOX_TRACE(filename << ": will upload "
+						"(modified since last sync)");
 				}
 			}
 
@@ -813,6 +818,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				> rParams.mMaxUploadWait)
 			{
 				doUpload = true;
+				BOX_TRACE(filename << ": will upload "
+					"(continually modified)");
 			}
 
 			// Then make sure that if files are added with a 
@@ -828,6 +835,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				en->GetModificationTime() != modTime)
 			{
 				doUpload = true;
+				BOX_TRACE(filename << ": will upload "
+					"(mod time changed)");
 			}
 
 			// And just to catch really badly off clocks in 
@@ -838,7 +847,18 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				rParams.mUploadAfterThisTimeInTheFuture)
 			{
 				doUpload = true;
+				BOX_TRACE(filename << ": will upload "
+					"(mod time in the future)");
 			}
+		}
+
+		if (!doUpload)
+		{
+			BOX_TRACE(filename << ": will not upload "
+				"(no reason to upload, mod time is "
+				<< modTime << " versus sync period "
+				<< rParams.mSyncPeriodStart << " to "
+				<< rParams.mSyncPeriodEnd << ")");
 		}
 
 		if (doUpload)
