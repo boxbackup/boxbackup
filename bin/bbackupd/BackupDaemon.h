@@ -82,8 +82,9 @@ public:
 	enum
 	{
 		NotifyEvent_StoreFull = 0,
-		NotifyEvent_ReadError = 1,
-		NotifyEvent__MAX = 1
+		NotifyEvent_ReadError,
+		NotifyEvent_BackupError,
+		NotifyEvent__MAX
 		// When adding notifications, remember to add strings to NotifySysadmin()
 	};
 	void NotifySysadmin(int Event);
@@ -177,7 +178,7 @@ private:
 	CommandSocketInfo *mpCommandSocketInfo;
 	
 	// Stop notifications being repeated.
-	bool mNotificationsSent[NotifyEvent__MAX + 1];
+	bool mNotificationsSent[NotifyEvent__MAX];
 
 	// Unused entries in the root directory wait a while before being deleted
 	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
