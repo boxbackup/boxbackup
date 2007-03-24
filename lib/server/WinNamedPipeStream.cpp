@@ -100,8 +100,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "CreateNamedPipeW failed: %d", 
-			GetLastError());
+		::syslog(LOG_ERR, "CreateNamedPipeW failed: %s", 
+			GetErrorMessage(GetLastError()).c_str());
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
@@ -109,8 +109,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (!connected)
 	{
-		::syslog(LOG_ERR, "ConnectNamedPipe failed: %d", 
-			GetLastError());
+		::syslog(LOG_ERR, "ConnectNamedPipe failed: %s", 
+			GetErrorMessage(GetLastError()).c_str());
 		Close();
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -126,8 +126,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (mReadableEvent == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "Failed to create the Readable event: "
-			"error %d", GetLastError());
+		::syslog(LOG_ERR, "Failed to create the Readable event: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		Close();
 		THROW_EXCEPTION(CommonException, Internal)
 	}
@@ -145,7 +145,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		if (err != ERROR_IO_PENDING)
 		{
 			::syslog(LOG_ERR, "Failed to start overlapped read: "
-				"error %d", err);
+				"%s", GetErrorMessage(err).c_str());
 			Close();
 			THROW_EXCEPTION(ConnectionException, 
 				Conn_SocketReadError)
@@ -189,7 +189,7 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 		else
 		{
 			::syslog(LOG_ERR, "Failed to connect to backup "
-				"daemon: error %d", err);
+				"daemon: %s", GetErrorMessage(err).c_str());
 		}
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -269,7 +269,8 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 						::syslog(LOG_ERR, 
 							"Failed to wait for "
 							"ReadFile to complete: "
-							"error %d", err);
+							"%s", 
+							GetErrorMessage(err).c_str());
 					}
 
 					Close();
@@ -332,7 +333,8 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			else
 			{
 				::syslog(LOG_ERR, "Failed to start "
-					"overlapped read: error %d", err);
+					"overlapped read: %s", 
+					GetErrorMessage(err).c_str());
 				Close();
 				THROW_EXCEPTION(ConnectionException, 
 					Conn_SocketReadError)
@@ -420,6 +422,9 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 
 		if (!Success)
 		{
+			DWORD err = GetLastError();
+			::syslog(LOG_ERR, "Failed to write to control socket: "
+				"%s", GetErrorMessage(err).c_str());
 			Close();
 			THROW_EXCEPTION(ConnectionException, 
 				Conn_SocketWriteError)
@@ -456,7 +461,8 @@ void WinNamedPipeStream::Close()
 		if (!CancelIo(mSocketHandle))
 		{
 			::syslog(LOG_ERR, "Failed to cancel outstanding "
-				"I/O: error %d", GetLastError());
+				"I/O: %s", 
+				GetErrorMessage(GetLastError()).c_str());
 		}
 
 		if (mReadableEvent == INVALID_HANDLE_VALUE)
@@ -467,21 +473,27 @@ void WinNamedPipeStream::Close()
 		else if (!CloseHandle(mReadableEvent))
 		{
 			::syslog(LOG_ERR, "Failed to destroy Readable "
-				"event: error %d", GetLastError());
+				"event: %s", 
+				GetErrorMessage(GetLastError()).c_str());
 		}
 
 		mReadableEvent = INVALID_HANDLE_VALUE;
 
 		if (!FlushFileBuffers(mSocketHandle))
 		{
-			::syslog(LOG_INFO, "FlushFileBuffers failed: %d", 
-				GetLastError());
+			::syslog(LOG_INFO, "FlushFileBuffers failed: %s", 
+				GetErrorMessage(GetLastError()).c_str());
 		}
 	
 		if (!DisconnectNamedPipe(mSocketHandle))
 		{
-			::syslog(LOG_ERR, "DisconnectNamedPipe failed: %d", 
-				GetLastError());
+			DWORD err = GetLastError();
+			if (err != ERROR_PIPE_NOT_CONNECTED)
+			{
+				::syslog(LOG_ERR, "DisconnectNamedPipe "
+					"failed: %s", 
+					GetErrorMessage(err).c_str());
+			}
 		}
 
 		mIsServer = false;
@@ -496,7 +508,8 @@ void WinNamedPipeStream::Close()
 
 	if (!result) 
 	{
-		::syslog(LOG_ERR, "CloseHandle failed: %d", GetLastError());
+		::syslog(LOG_ERR, "CloseHandle failed: %s", 
+			GetErrorMessage(GetLastError()).c_str());
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
 }
@@ -544,8 +557,8 @@ void WinNamedPipeStream::WriteAllBuffered()
 	
 	if (!FlushFileBuffers(mSocketHandle))
 	{
-		::syslog(LOG_WARNING, "FlushFileBuffers failed: %d", 
-			GetLastError());
+		::syslog(LOG_WARNING, "FlushFileBuffers failed: %s", 
+			GetErrorMessage(GetLastError()).c_str());
 	}
 }
 
