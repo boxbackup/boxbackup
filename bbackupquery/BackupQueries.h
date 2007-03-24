@@ -67,6 +67,7 @@ private:
 		~CompareParams();
 		void DeleteExcludeLists();
 		bool mQuickCompare;
+		bool mQuietCompare;
 		bool mIgnoreExcludes;
 		bool mIgnoreAttributes;
 		int mDifferences;

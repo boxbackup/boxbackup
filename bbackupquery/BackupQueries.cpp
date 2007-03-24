@@ -207,7 +207,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{ "sh",   "" },
 		{ "getobject", "" },
 		{ "get",  "i" },
-		{ "compare", "alcqAE" },
+		{ "compare", "alcqAEQ" },
 		{ "restore", "dri" },
 		{ "help", "" },
 		{ "usage", "" },
@@ -1114,6 +1114,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	// Parameters, including count of differences
 	BackupQueries::CompareParams params;
 	params.mQuickCompare = opts['q'];
+	params.mQuietCompare = opts['Q'];
 	params.mIgnoreExcludes = opts['E'];
 	params.mIgnoreAttributes = opts['A'];
 	
@@ -1177,12 +1178,17 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		printf("Incorrect usage.\ncompare -a\n or compare -l <location-name>\n or compare <store-dir-name> <local-dir-name>\n");
 		return;
 	}
-	
-	printf("\n[ %d (of %d) differences probably due to file "
-		"modifications after the last upload ]\n"
-		"Differences: %d (%d dirs excluded, %d files excluded, "
+
+	if (!params.mQuietCompare)
+	{	
+		printf("\n[ %d (of %d) differences probably due to file "
+			"modifications after the last upload ]\n",
+			params.mDifferencesExplainedByModTime, 
+			params.mDifferences);
+	}
+
+	printf("Differences: %d (%d dirs excluded, %d files excluded, "
 		"%d files not checked)\n",
-		params.mDifferencesExplainedByModTime, params.mDifferences, 
 		params.mDifferences, params.mExcludedDirs, 
 		params.mExcludedFiles, params.mUncheckedFiles);
 	
