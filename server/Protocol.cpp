@@ -22,6 +22,7 @@
 #include "ServerException.h"
 #include "PartialReadStream.h"
 #include "ProtocolUncertainStream.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -55,7 +56,8 @@ Protocol::Protocol(IOStream &rStream)
 	  mLastErrorType(NoError),
 	  mLastErrorSubType(NoError)
 {
-	TRACE1("Send block allocation size is %d\n", PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK);
+	BOX_TRACE("Send block allocation size is " << 
+		PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK);
 }
 
 // --------------------------------------------------------------------------
