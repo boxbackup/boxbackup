@@ -105,7 +105,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	#ifdef NDEBUG
 	int masterLevel = Log::NOTICE; // need an int to do math with
 	#else
-	int masterLevel = Log::TRACE; // need an int to do math with
+	int masterLevel = Log::INFO; // need an int to do math with
 	#endif
 
 	char c;
