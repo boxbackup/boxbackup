@@ -74,6 +74,7 @@
 #include "Archive.h"
 #include "Timer.h"
 #include "Logging.h"
+#include "autogen_ClientException.h"
 
 #include "MemLeakFindOn.h"
 
@@ -642,7 +643,19 @@ void BackupDaemon::Run2()
 			
 			// Calculate the sync period of files to examine
 			box_time_t syncPeriodStart = lastSyncTime;
-			box_time_t syncPeriodEnd = currentSyncStartTime - minimumFileAge;
+			box_time_t syncPeriodEnd = currentSyncStartTime - 
+				minimumFileAge;
+
+			if(syncPeriodStart >= syncPeriodEnd)
+			{
+				BOX_ERROR("Invalid (negative) sync period: "
+					"perhaps your clock is going "
+					"backwards (" << syncPeriodStart <<
+					" to " << syncPeriodEnd << ")");
+				THROW_EXCEPTION(ClientException,
+					ClockWentBackwards);
+			}
+
 			// Check logic
 			ASSERT(syncPeriodEnd > syncPeriodStart);
 			// Paranoid check on sync times
@@ -669,10 +682,8 @@ void BackupDaemon::Run2()
 				BOX_ERROR("Failed to delete the "
 					"StoreObjectInfoFile, backup cannot "
 					"continue safely.");
-				// prevent runaway process where the logs fill up -- without this
-				// the log message will be emitted in a tight loop.
-				::sleep(60); 
-				continue;
+				THROW_EXCEPTION(ClientException, 
+					FailedToDeleteStoreObjectInfoFile);
 			}
 
 			// In case the backup throws an exception,
@@ -836,6 +847,7 @@ void BackupDaemon::Run2()
 				BOX_ERROR("Internal error during "
 					"backup run: " << e.what());
 				errorOccurred = true;
+				errorString = e.what();
 			}
 			catch(...)
 			{
@@ -2215,7 +2227,7 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	else
 	{
 		// there is something going on here
-		THROW_EXCEPTION(CommonException, Internal)
+		THROW_EXCEPTION(ClientException, CorruptStoreObjectInfoFile);
 	}
 
 	//
@@ -2240,7 +2252,7 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	else
 	{
 		// there is something going on here
-		THROW_EXCEPTION(CommonException, Internal)
+		THROW_EXCEPTION(ClientException, CorruptStoreObjectInfoFile);
 	}
 
 	//
@@ -2265,7 +2277,7 @@ void BackupDaemon::Location::Deserialize(Archive &rArchive)
 	else
 	{
 		// there is something going on here
-		THROW_EXCEPTION(CommonException, Internal)
+		THROW_EXCEPTION(ClientException, CorruptStoreObjectInfoFile);
 	}
 }
 
