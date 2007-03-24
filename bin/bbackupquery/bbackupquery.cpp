@@ -45,6 +45,7 @@
 #include "FdGetLine.h"
 #include "BackupClientCryptoKeys.h"
 #include "BannerText.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -95,11 +96,19 @@ int main(int argc, const char *argv[])
 	bool quiet = false;
 	bool readWrite = false;
 
+	Logging::SetProgramName("Box Backup (bbackupquery)");
+
+	#ifdef NDEBUG
+	int masterLevel = Log::NOTICE; // need an int to do math with
+	#else
+	int masterLevel = Log::INFO; // need an int to do math with
+	#endif
+
 #ifdef WIN32
-	const char* validOpts = "qwuc:l:";
+	const char* validOpts = "qvwuc:l:";
 	bool unicodeConsole = false;
 #else
-	const char* validOpts = "qwc:l:";
+	const char* validOpts = "qvwc:l:";
 #endif
 
 	// See if there's another entry on the command line
@@ -108,11 +117,35 @@ int main(int argc, const char *argv[])
 	{
 		switch(c)
 		{
-		case 'q':
-			// Quiet mode
-			quiet = true;
+			case 'q':
+			{
+				// Quiet mode
+				quiet = true;
+
+				if(masterLevel == Log::NOTHING)
+				{
+					BOX_FATAL("Too many '-q': "
+						"Cannot reduce logging "
+						"level any more");
+					return 2;
+				}
+				masterLevel--;
+			}
 			break;
-		
+
+			case 'v':
+			{
+				if(masterLevel == Log::EVERYTHING)
+				{
+					BOX_FATAL("Too many '-v': "
+						"Cannot increase logging "
+						"level any more");
+					return 2;
+				}
+				masterLevel++;
+			}
+			break;
+
 		case 'w':
 			// Read/write mode
 			readWrite = true;
@@ -147,6 +180,8 @@ int main(int argc, const char *argv[])
 	argc -= optind;
 	argv += optind;
 	
+	Logging::SetGlobalLevel((Log::Level)masterLevel);
+
 	// Print banner?
 	if(!quiet)
 	{
