@@ -293,7 +293,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		}
 
 		memcpy(pBuffer, mReadBuffer, BytesToCopy);
-		memcpy(mReadBuffer, mReadBuffer + BytesToCopy, BytesRemaining);
+		memmove(mReadBuffer, mReadBuffer + BytesToCopy, BytesRemaining);
 
 		mBytesInBuffer = BytesRemaining;
 		NumBytesRead = BytesToCopy;
