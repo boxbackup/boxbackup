@@ -295,7 +295,7 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	std::string clientCommonName(rStream.GetPeerCommonName());
 	
 	// Log the name
-	::syslog(LOG_INFO, "Certificate CN: %s\n", clientCommonName.c_str());
+	::syslog(LOG_INFO, "Certificate CN: %s", clientCommonName.c_str());
 	
 	// Check it
 	int32_t id;
@@ -342,7 +342,7 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 {
 	// Log the amount of data transferred
 	::syslog(LOG_INFO, "Connection statistics for %s: "
-			"IN=%lld OUT=%lld TOTAL=%lld\n", commonName,
+			"IN=%lld OUT=%lld TOTAL=%lld", commonName,
 			(long long)s.GetBytesRead(), 
 			(long long)s.GetBytesWritten(),
 			(long long)s.GetBytesRead() + 
