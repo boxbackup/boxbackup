@@ -89,8 +89,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		pName,                     // pipe name 
 		PIPE_ACCESS_DUPLEX |       // read/write access 
 		FILE_FLAG_OVERLAPPED,      // enabled overlapped I/O
-		PIPE_TYPE_MESSAGE |        // message type pipe 
-		PIPE_READMODE_MESSAGE |    // message-read mode 
+		PIPE_TYPE_BYTE |           // message type pipe 
+		PIPE_READMODE_BYTE |       // message-read mode 
 		PIPE_WAIT,                 // blocking mode 
 		1,                         // max. instances  
 		4096,                      // output buffer size 
