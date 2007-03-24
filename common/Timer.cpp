@@ -175,11 +175,10 @@ void Timers::Reschedule()
 		
 			if (timeToExpiry <= 0)
 			{
-				TRACE3("%d.%d: timer %p has expired, "
-					"triggering it\n",
-					(int)(timeNow / 1000000), 
-					(int)(timeNow % 1000000),
-					*i);
+				BOX_TRACE((int)(timeNow / 1000000) << "." <<
+					(int)(timeNow % 1000000) <<
+					": timer " << *i << " has expired, "
+					"triggering it");
 				rTimer.OnExpire();
 				spTimers->erase(i);
 				restart = true;
@@ -187,13 +186,13 @@ void Timers::Reschedule()
 			}
 			else
 			{
-				TRACE5("%d.%d: timer %p has not expired, "
-					"triggering in %d.%d seconds\n",
-					(int)(timeNow / 1000000), 
-					(int)(timeNow % 1000000),
-					*i,
-					(int)(timeToExpiry / 1000000),
-					(int)(timeToExpiry % 1000000));
+				BOX_TRACE((int)(timeNow / 1000000) << "." <<
+					(int)(timeNow % 1000000) <<
+					": timer " << *i << " has not "
+					"expired, triggering in " <<
+					(int)(timeToExpiry / 1000000) << "." <<
+					(int)(timeToExpiry % 1000000) <<
+					" seconds");
 			}
 		}
 	}
@@ -231,7 +230,7 @@ void Timers::Reschedule()
 
 	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
 	{
-		TRACE0("WARNING: couldn't initialise timer\n");
+		BOX_ERROR("Failed to initialise timer\n");
 		THROW_EXCEPTION(CommonException, Internal)
 	}
 }
@@ -263,15 +262,16 @@ Timer::Timer(size_t timeoutSecs)
 	gettimeofday(&tv, NULL);
 	if (timeoutSecs == 0)
 	{
-		TRACE4("%d.%d: timer %p initialised for %d secs, "
-			"will not fire\n", tv.tv_sec, tv.tv_usec, this, 
-			timeoutSecs);
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised for " <<
+			timeoutSecs << " secs, will not fire");
 	}
 	else
 	{
-		TRACE6("%d.%d: timer %p initialised for %d secs, "
-			"to fire at %d.%d\n", tv.tv_sec, tv.tv_usec, this, 
-			timeoutSecs, (int)(mExpires / 1000000), 
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised for " <<
+			timeoutSecs << " secs, to fire at " <<
+			(int)(mExpires / 1000000) << "." <<
 			(int)(mExpires % 1000000));
 	}
 	#endif
@@ -291,8 +291,8 @@ Timer::~Timer()
 	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	TRACE3("%d.%d: timer %p destroyed, will not fire\n",
-		tv.tv_sec, tv.tv_usec, this);
+	BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+		": timer " << this << " destroyed");
 	#endif
 
 	Timers::Remove(*this);
@@ -307,21 +307,22 @@ Timer::Timer(const Timer& rToCopy)
 	gettimeofday(&tv, NULL);
 	if (mExpired)
 	{
-		TRACE4("%d.%d: timer %p initialised from timer %p, "
-			"already expired, will not fire\n", tv.tv_sec, 
-			tv.tv_usec, this, &rToCopy);
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised from timer " <<
+			&rToCopy << ", already expired, will not fire");
 	}
 	else if (mExpires == 0)
 	{
-		TRACE4("%d.%d: timer %p initialised from timer %p, "
-			"will not fire\n", tv.tv_sec, tv.tv_usec, this, 
-			&rToCopy);
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised from timer " <<
+			&rToCopy << ", no expiry, will not fire");
 	}
 	else
 	{
-		TRACE6("%d.%d: timer %p initialised from timer %p, "
-			"to fire at %d.%d\n", tv.tv_sec, tv.tv_usec, this, 
-			&rToCopy, (int)(mExpires / 1000000), 
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised from timer " <<
+			&rToCopy << " to fire at " <<
+			(int)(mExpires / 1000000) << "." <<
 			(int)(mExpires % 1000000));
 	}
 	#endif
@@ -339,21 +340,22 @@ Timer& Timer::operator=(const Timer& rToCopy)
 	gettimeofday(&tv, NULL);
 	if (rToCopy.mExpired)
 	{
-		TRACE4("%d.%d: timer %p initialised from timer %p, "
-			"already expired, will not fire\n", tv.tv_sec, 
-			tv.tv_usec, this, &rToCopy);
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised from timer " <<
+			&rToCopy << ", already expired, will not fire");
 	}
 	else if (rToCopy.mExpires == 0)
 	{
-		TRACE4("%d.%d: timer %p initialised from timer %p, "
-			"will not fire\n", tv.tv_sec, tv.tv_usec, this, 
-			&rToCopy);
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised from timer " <<
+			&rToCopy << ", no expiry, will not fire");
 	}
 	else
 	{
-		TRACE6("%d.%d: timer %p initialised from timer %p, "
-			"to fire at %d.%d\n", tv.tv_sec, tv.tv_usec, this, 
-			&rToCopy, (int)(rToCopy.mExpires / 1000000), 
+		BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+			": timer " << this << " initialised from timer " <<
+			&rToCopy << " to fire at " <<
+			(int)(rToCopy.mExpires / 1000000) << "." <<
 			(int)(rToCopy.mExpires % 1000000));
 	}
 	#endif
@@ -373,7 +375,8 @@ void Timer::OnExpire()
 	#if !defined NDEBUG && !defined WIN32
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	TRACE3("%d.%d: timer %p fired\n", tv.tv_sec, tv.tv_usec, this);
+	BOX_TRACE(tv.tv_secs << "." << tv.tv_usecs <<
+		": timer " << this << " fired");
 	#endif
 
 	mExpired = true;
