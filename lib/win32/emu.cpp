@@ -1345,13 +1345,17 @@ void openlog(const char * daemonName, int, int)
 	{
 	}
 
-	if (!AddEventSource("Box Backup", 0))
+	char* name = strdup(daemonName);
+	BOOL success = AddEventSource(name, 0);
+	free(name);
+
+	if (!success)
 	{
 		::syslog(LOG_ERR, "Failed to add our own event source");
 		return;
 	}
 
-	HANDLE newSyslogH = RegisterEventSource(NULL, "Box Backup");
+	HANDLE newSyslogH = RegisterEventSource(NULL, daemonName);
 	if (newSyslogH == NULL)
 	{
 		::syslog(LOG_ERR, "Failed to register our own event source: "
