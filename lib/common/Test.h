@@ -275,10 +275,8 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
 		return -1;
 	}
-	else
-	{
-		::fprintf(stdout, "done.\n");
-	}
+
+	::fprintf(stdout, "done.\n");
 
 	// wait a second for the pid to be written to the file
 	::sleep(1);
