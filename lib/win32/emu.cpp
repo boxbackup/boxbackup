@@ -1609,6 +1609,72 @@ int emu_unlink(const char* pFileName)
 	return 0;
 }
 
+int emu_rename(const char* pOldFileName, const char* pNewFileName)
+{
+	std::string OldPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pOldFileName);
+
+	if (OldPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pOldBuffer = ConvertUtf8ToWideString(OldPathWithUnicode.c_str());
+	if (!pOldBuffer)
+	{
+		return -1;
+	}
+
+	std::string NewPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pNewFileName);
+
+	if (NewPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		delete [] pOldBuffer;
+		return -1;
+	}
+
+	WCHAR* pNewBuffer = ConvertUtf8ToWideString(NewPathWithUnicode.c_str());
+	if (!pNewBuffer)
+	{
+		delete [] pOldBuffer;
+		return -1;
+	}
+
+	BOOL result = MoveFileW(pOldBuffer, pNewBuffer);
+	DWORD err = GetLastError();
+	delete [] pOldBuffer;
+	delete [] pNewBuffer;
+
+	if (!result)
+	{
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		{
+			errno = ENOENT;
+		}
+		else if (err == ERROR_SHARING_VIOLATION)
+		{
+			errno = EBUSY;
+		}
+		else if (err == ERROR_ACCESS_DENIED)
+		{
+			errno = EACCES;
+		}
+		else
+		{
+			::syslog(LOG_WARNING, "Failed to rename file "
+				"'%s' to '%s': %s", pOldFileName, pNewFileName,
+				GetErrorMessage(err).c_str());
+			errno = ENOSYS;
+		}
+		return -1;
+	}
+
+	return 0;
+}
+
 int console_read(char* pBuffer, size_t BufferSize)
 {
 	HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
