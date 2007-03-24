@@ -646,6 +646,18 @@ void BackupDaemon::Run2()
 			box_time_t syncPeriodEnd = currentSyncStartTime - 
 				minimumFileAge;
 
+			if(syncPeriodStart >= syncPeriodEnd &&
+				syncPeriodStart - syncPeriodEnd < minimumFileAge)
+			{
+				// This can happen if we receive a force-sync
+				// command less than minimumFileAge after
+				// the last sync. Deal with it by moving back
+				// syncPeriodStart, which should not do any
+				// damage.
+				syncPeriodStart = syncPeriodEnd -
+					SecondsToBoxTime(1);
+			}
+
 			if(syncPeriodStart >= syncPeriodEnd)
 			{
 				BOX_ERROR("Invalid (negative) sync period: "
