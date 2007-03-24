@@ -298,6 +298,13 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		mBytesInBuffer = BytesRemaining;
 		NumBytesRead = BytesToCopy;
 
+		if (needAnotherRead)
+		{
+			// reinitialise the OVERLAPPED structure
+			memset(&mReadOverlap, 0, sizeof(mReadOverlap));
+			mReadOverlap.hEvent = mReadableEvent;
+		}
+
 		// start the next overlapped read
 		if (needAnotherRead && !ReadFile(mSocketHandle, 
 			mReadBuffer + mBytesInBuffer, 
