@@ -46,6 +46,7 @@
 #include "ReadGatherStream.h"
 #include "Random.h"
 #include "BackupStoreFileEncodeStream.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -1485,9 +1486,8 @@ void BackupStoreFile::EncodingBuffer::Allocate(int Size)
 // --------------------------------------------------------------------------
 void BackupStoreFile::EncodingBuffer::Reallocate(int NewSize)
 {
-#ifndef WIN32
-	TRACE2("Reallocating EncodingBuffer from %d to %d\n", mBufferSize, NewSize);
-#endif
+	BOX_TRACE("Reallocating EncodingBuffer from " << mBufferSize <<
+		" to " << NewSize);
 	ASSERT(mpBuffer != 0);
 	uint8_t *buffer = (uint8_t*)BackupStoreFile::CodingChunkAlloc(NewSize);
 	if(buffer == 0)
