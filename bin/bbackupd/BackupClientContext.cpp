@@ -29,6 +29,7 @@
 #include "BackupDaemon.h"
 #include "autogen_BackupProtocolClient.h"
 #include "BackupStoreFile.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -499,13 +500,14 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 void BackupClientContext::SetMaximumDiffingTime(int iSeconds)
 {
 	mMaximumDiffingTime = iSeconds < 0 ? 0 : iSeconds;
-	TRACE1("Set maximum diffing time to %d seconds\n", mMaximumDiffingTime);
+	BOX_TRACE("Set maximum diffing time to " << mMaximumDiffingTime <<
+		" seconds");
 }
 
 void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
 	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
-	TRACE1("Set keep-alive time to %d seconds\n", mKeepAliveTime);
+	BOX_TRACE("Set keep-alive time to " << mKeepAliveTime << " seconds");
 	mKeepAliveTimer = Timer(mKeepAliveTime);
 }
 
@@ -563,7 +565,7 @@ void BackupClientContext::DoKeepAlive()
 		return;
 	}
 	
-	TRACE0("KeepAliveTime reached, sending keep-alive message\n");
+	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	mpConnection->QueryGetIsAlive();
 	
 	mKeepAliveTimer = Timer(mKeepAliveTime);
