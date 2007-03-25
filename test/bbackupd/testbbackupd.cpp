@@ -9,22 +9,33 @@
 
 #include "Box.h"
 
-#include <dirent.h>
+// do not include MinGW's dirent.h on Win32, 
+// as we override some of it in lib/win32.
+
+#ifndef WIN32
+	#include <dirent.h>
+#endif
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
-#ifdef HAVE_SYS_XATTR_H
-#include <cerrno>
-#include <sys/xattr.h>
+
+#ifdef HAVE_SYS_WAIT_H
+	#include <sys/wait.h>
 #endif
+
+#ifdef HAVE_SYS_XATTR_H
+	#include <cerrno>
+	#include <sys/xattr.h>
+#endif
+
 #include <map>
 
 #ifdef HAVE_SYSCALL
-#include <sys/syscall.h>
+	#include <sys/syscall.h>
 #endif
 
 #include "Test.h"
