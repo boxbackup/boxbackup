@@ -125,6 +125,7 @@ void CorruptObject(const char *name, int start, const char *rubbish)
 	w.Write(rubbish, rubbish_len);
 	// Copy rest of file
 	r->CopyStreamTo(w);
+	r->Close();
 	// Commit
 	w.Commit(true /* convert now */);
 }
@@ -448,7 +449,7 @@ int test(int argc, const char *argv[])
 		}
 		
 		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Delete directory, change container ID of another, duplicate entry in dir, supurious file size, delete file\n");
+		::printf("  === Delete directory, change container ID of another, duplicate entry in dir, spurious file size, delete file\n");
 		{
 			BackupStoreDirectory dir;
 			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
