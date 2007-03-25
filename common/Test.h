@@ -358,7 +358,7 @@ inline void TestRemoteProcessMemLeaksFunc(const char *filename,
 #else
 #define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
 #define BBACKUPD        "../../bin/bbackupd/bbackupd"
-#define BBSTORED        "../../bin/bbackupd/bbstored"
+#define BBSTORED        "../../bin/bbstored/bbstored"
 #define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
 #define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
 #define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
