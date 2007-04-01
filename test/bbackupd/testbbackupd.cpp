@@ -1353,6 +1353,13 @@ int test_bbackupd()
 			// Make sure you can't restore a restored directory
 			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-Test1", true /* print progress dots */) == Restore_TargetExists);
 			
+			// Make sure you can't restore to a nonexistant path
+			printf("Try to restore to a path that doesn't exist\n");
+			TEST_THAT(BackupClientRestore(protocol, restoredirid, 
+				"testfiles/no-such-path/subdir", 
+				true /* print progress dots */) 
+				== Restore_TargetPathNotFound);
+			
 			// Find ID of the deleted directory
 			deldirid = GetDirID(protocol, "x1", restoredirid);
 			TEST_THAT(deldirid != 0);
