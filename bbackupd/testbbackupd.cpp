@@ -266,6 +266,9 @@ bool attrmatch(const char *f1, const char *f2)
 	// if link, just make sure other file is a link too, and that the link to names match
 	if((s1.st_mode & S_IFMT) == S_IFLNK)
 	{
+#ifdef WIN32
+		TEST_FAIL_WITH_MESSAGE("No symlinks on win32!")
+#else
 		if((s2.st_mode & S_IFMT) != S_IFLNK) return false;
 		
 		char p1[PATH_MAX], p2[PATH_MAX];
@@ -276,6 +279,7 @@ bool attrmatch(const char *f1, const char *f2)
 		p1[p1l] = '\0';
 		p2[p2l] = '\0';
 		return strcmp(p1, p2) == 0;
+#endif
 	}
 
 	// modification times
@@ -294,12 +298,15 @@ int test_basics()
 	BackupClientFileAttributes t1;
 	t1.ReadAttributes("testfiles/test1");
 	TEST_THAT(!t1.IsSymLink());
+
+#ifndef WIN32
 	BackupClientFileAttributes t2;
 	t2.ReadAttributes("testfiles/test2");
 	TEST_THAT(t2.IsSymLink());
 	// Check that it's actually been encrypted (search for symlink name encoded in it)
 	void *te = ::memchr(t2.GetBuffer(), 't', t2.GetSize() - 3);
 	TEST_THAT(te == 0 || ::memcmp(te, "test", 4) != 0);
+#endif
 	
 	BackupClientFileAttributes t3;
 	TEST_CHECK_THROWS(t3.ReadAttributes("doesn't exist"), CommonException, OSFileError);
@@ -312,13 +319,20 @@ int test_basics()
 	
 	// Apply attributes to these new files
 	t1.WriteAttributes("testfiles/test1_n");
+#ifdef WIN32
+	t1.WriteAttributes("testfiles/test2_n");
+#else
 	t2.WriteAttributes("testfiles/test2_n");
+#endif
+
+#ifndef WIN32
 	TEST_CHECK_THROWS(t1.WriteAttributes("testfiles/test1_nXX"), CommonException, OSFileError);
 	TEST_CHECK_THROWS(t3.WriteAttributes("doesn't exist"), BackupStoreException, AttributesNotLoaded);
 
-	// Test that atttributes are vaguely similar
+	// Test that attributes are vaguely similar
 	TEST_THAT(attrmatch("testfiles/test1", "testfiles/test1_n"));
 	TEST_THAT(attrmatch("testfiles/test2", "testfiles/test2_n"));
+#endif
 	
 	// Check encryption, and recovery from encryption
 	// First, check that two attributes taken from the same thing have different encrypted values (think IV)
@@ -992,9 +1006,11 @@ int test_bbackupd()
 		
 		// Delete a file
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+#ifndef WIN32
 		// New symlink
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/symlink-to-dir") == 0);
-		
+#endif		
+
 		// Update a file (will be uploaded as a diff)
 		{
 			// Check that the file is over the diffing threshold in the bbstored.conf file
@@ -1053,11 +1069,16 @@ int test_bbackupd()
 
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("Replace symlink with directory, add new directory\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir") == 0);
+#endif
 		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755) == 0);
 		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
 		// NOTE: create a file within the directory to avoid deletion by the housekeeping process later
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents") == 0);
+#endif
+
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
@@ -1065,9 +1086,13 @@ int test_bbackupd()
 
 		// And the inverse, replace a directory with a file/symlink
 		printf("Replace directory with symlink\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents") == 0);
+#endif
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
+#endif
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
@@ -1075,9 +1100,13 @@ int test_bbackupd()
 		
 		// And then, put it back to how it was before.
 		printf("Replace symlink with directory (which was a symlink)\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file") == 0);
+#endif
 		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
+#endif
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
@@ -1086,9 +1115,13 @@ int test_bbackupd()
 		// And finally, put it back to how it was before it was put back to how it was before
 		// This gets lots of nasty things in the store with directories over other old directories.
 		printf("Put it all back to how it was\n");
+#ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
+#endif
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
+#ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
+#endif
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3s.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 1*256);
