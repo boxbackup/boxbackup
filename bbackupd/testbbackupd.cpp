@@ -972,7 +972,11 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Unpack some more files
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/spacetest2.tgz -C testfiles/TestDir1") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
+#endif
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/d1/f3") == 0);
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d3/d4") == 0);
@@ -993,7 +997,11 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		
 		// unpack the initial files again
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/test_base.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
+#endif
 
 		// wait for it to do it's stuff
 		wait_for_backup_operation();
@@ -1218,8 +1226,12 @@ int test_bbackupd()
 		// Add some more files
 		// Because the 'm' option is not used, these files will look very old to the daemon.
 		// Lucky it'll upload them then!
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/test2.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/test2.tgz | ( cd  testfiles && tar xf - )") == 0);
 		::chmod("testfiles/TestDir1/sub23/dhsfdss/blf.h", 0415);
+#endif
 		
 		// Wait and test
 		wait_for_backup_operation();
@@ -1255,7 +1267,12 @@ int test_bbackupd()
 
 		// Add some files and directories which are marked as excluded
 		printf("Add files and dirs for exclusion test\n");
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/testexclude.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/testexclude.tgz | ( cd testfiles && tar xf - )") == 0);
+#endif
+
 		// Wait and test
 		wait_for_backup_operation();
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query3c.log \"compare -ac\" quit");
@@ -1410,7 +1427,11 @@ int test_bbackupd()
 	
 		// Add some more files and modify others
 		// Use the m flag this time so they have a recent modification time
+#ifdef WIN32
+		TEST_THAT(::system("tar xzvmf testfiles/test3.tgz -C testfiles") == 0);
+#else
 		TEST_THAT(::system("gzip -d < testfiles/test3.tgz | ( cd testfiles && tar xmf - )") == 0);
+#endif
 		
 		// Wait and test
 		wait_for_backup_operation();
@@ -1617,7 +1638,11 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Initial files
+#ifdef WIN32
+	TEST_THAT(::system("tar xzvf testfiles/test_base.tgz -C testfiles") == 0);
+#else
 	TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
+#endif
 
 	// Do the tests
 
