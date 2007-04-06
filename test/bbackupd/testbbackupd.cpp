@@ -465,6 +465,7 @@ void terminate_on_alarm(int sigraised)
 	abort();
 }
 
+#ifndef WIN32
 void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 {
 	int pid = 0;
@@ -527,6 +528,7 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 		}
 	}
 }
+#endif // !WIN32
 
 int start_internal_daemon()
 {
@@ -1514,8 +1516,9 @@ int test_bbackupd()
 		compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query6.log \"compare -ac\" quit");
 		TEST_THAT(compareReturnValue == 2*256);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		
-		printf("Interrupted restore\n");
+
+#ifndef WIN32		
+		printf("\n==== Interrupted restore\n");
 		{
 			do_interrupted_restore(context, restoredirid);
 			int64_t resumesize = 0;
@@ -1543,6 +1546,7 @@ int test_bbackupd()
 			TEST_THAT(compareReturnValue == 1*256);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
+#endif // !WIN32
 
 		printf("Check restore deleted files\n");
 		{
