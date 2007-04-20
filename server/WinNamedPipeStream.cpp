@@ -373,9 +373,26 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			&NumBytesRead, // number of bytes read 
 			NULL))         // not overlapped 
 		{
+			DWORD err = GetLastError();
+		
 			Close();
-			THROW_EXCEPTION(ConnectionException, 
-				Conn_SocketReadError)
+
+			// ERROR_NO_DATA is a strange name for 
+			// "The pipe is being closed". No exception wanted.
+
+			if (err == ERROR_NO_DATA || 
+				err == ERROR_PIPE_NOT_CONNECTED) 
+			{
+				NumBytesRead = 0;
+			}
+			else
+			{
+				::syslog(LOG_ERR, "Failed to read from "
+					"control socket: %s", 
+					GetErrorMessage(err).c_str());
+				THROW_EXCEPTION(ConnectionException, 
+					Conn_SocketReadError)
+			}
 		}
 		
 		// Closed for reading at EOF?
@@ -426,8 +443,19 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 			::syslog(LOG_ERR, "Failed to write to control socket: "
 				"%s", GetErrorMessage(err).c_str());
 			Close();
-			THROW_EXCEPTION(ConnectionException, 
-				Conn_SocketWriteError)
+
+			// ERROR_NO_DATA is a strange name for 
+			// "The pipe is being closed". No exception wanted.
+
+			if (err == ERROR_NO_DATA) 
+			{
+				return;
+			}
+			else
+			{
+				THROW_EXCEPTION(ConnectionException, 
+					Conn_SocketWriteError)
+			}
 		}
 
 		NumBytesWrittenTotal += NumBytesWrittenThisTime;
