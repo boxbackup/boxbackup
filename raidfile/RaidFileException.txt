@@ -11,8 +11,7 @@ NotOpen							7
 OSError							8	Error when accessing an underlying file. Check file permissions allow files to be read and written in the configured raid directories.
 WriteFileOpenOnTransform		9
 WrongNumberOfDiscsInSet			10	There should be three directories in each disc set.
-RaidFileDoesntExist				11	Error when accessing a
-file on the store. Check the store with bbstoreaccounts check.
+RaidFileDoesntExist				11	Error when accessing a file on the store. Check the store with bbstoreaccounts check.
 ErrorOpeningFileForRead			12
 FileIsDamagedNotRecoverable		13
 InvalidRaidFile					14
