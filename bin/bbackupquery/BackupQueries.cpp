@@ -1229,6 +1229,19 @@ void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries:
 		return;
 	}
 	const Configuration &loc(locations.GetSubConfiguration(rLocation.c_str()));
+
+	#ifdef WIN32
+	{
+		std::string path = loc.GetKeyValue("Path");
+		if (path.size() > 0 && path[path.size()-1] == 
+			DIRECTORY_SEPARATOR_ASCHAR)
+		{
+			fprintf(stderr, "Warning: location '%s' path ends "
+				"with '%s', compare may fail!",
+				rLocation, DIRECTORY_SEPARATOR);
+		}
+	}
+	#endif
 	
 	try
 	{
