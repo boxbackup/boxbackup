@@ -1179,8 +1179,29 @@ int test_bbackupd()
 			"testfiles/0_1/backup/01234567/info.rf") == 0);
 		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf.bak",
 			"testfiles/0_2/backup/01234567/info.rf") == 0);
-		// wait until bbackupd recovers from the exception
+	
+		// Check that we DO get errors on compare
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3b.log "
+			"\"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue, 2);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		// Wait until bbackupd recovers from the exception
 		wait_for_backup_operation(100);
+
+		// Ensure that the force-upload file gets uploaded,
+		// meaning that bbackupd recovered
+		sync_and_wait();
+
+		// Check that it did get uploaded, and we have no more errors
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3b.log "
+			"\"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue, 1);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("Replace symlink with directory, add new directory\n");
