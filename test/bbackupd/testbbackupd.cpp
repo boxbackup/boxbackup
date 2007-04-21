@@ -710,7 +710,11 @@ struct dirent *readdir_test_hook_2(DIR *dir)
 
 	// fill in the struct dirent appropriately
 	memset(&readdir_test_dirent, 0, sizeof(readdir_test_dirent));
-	readdir_test_dirent.d_ino = ++readdir_test_counter;
+
+	#ifdef HAVE_STRUCT_DIRENT_D_INO
+		readdir_test_dirent.d_ino = ++readdir_test_counter;
+	#endif
+
 	snprintf(readdir_test_dirent.d_name, 
 		sizeof(readdir_test_dirent.d_name),
 		"test.%d", readdir_test_counter);
