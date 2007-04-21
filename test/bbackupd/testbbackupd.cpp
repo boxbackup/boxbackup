@@ -571,6 +571,7 @@ void sync_and_wait()
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 }
 
+#ifdef WIN32
 bool set_file_time(const char* filename, FILETIME creationTime, 
 	FILETIME lastModTime, FILETIME lastAccessTime)
 {
@@ -585,6 +586,7 @@ bool set_file_time(const char* filename, FILETIME creationTime,
 	TEST_THAT(CloseHandle(handle));
 	return success;
 }
+#endif
 
 void intercept_setup_delay(const char *filename, unsigned int delay_after, 
 	int delay_ms, int syscall_to_delay);
