@@ -759,7 +759,7 @@ int test_bbackupd()
 
 	// unpack the files for the initial test
 	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
-	TEST_THAT(::mkdir("testfiles/TestDir1", 0) == 0);
+	TEST_THAT(::mkdir("testfiles/TestDir1", 0777) == 0);
 
 	#ifdef WIN32
 		TEST_THAT(::system("tar xzvf testfiles/spacetest1.tgz "
