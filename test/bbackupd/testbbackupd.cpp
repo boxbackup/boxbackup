@@ -543,6 +543,66 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 }
 #endif // !WIN32
 
+void force_sync()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"force-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+void wait_for_sync_start()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"wait-for-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+void wait_for_sync_end()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"wait-for-end") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+void sync_and_wait()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"force-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+bool set_file_time(const char* filename, FILETIME creationTime, 
+	FILETIME lastModTime, FILETIME lastAccessTime)
+{
+	HANDLE handle = openfile(filename, O_RDWR, 0);
+	TEST_THAT(handle != INVALID_HANDLE_VALUE);
+	if (handle == INVALID_HANDLE_VALUE) return false;
+		
+	BOOL success = SetFileTime(handle, &creationTime, &lastAccessTime,
+		&lastModTime);
+	TEST_THAT(success);
+
+	TEST_THAT(CloseHandle(handle));
+	return success;
+}
+
+void intercept_setup_delay(const char *filename, unsigned int delay_after, 
+	int delay_ms, int syscall_to_delay);
+bool intercept_triggered();
+
+int64_t SearchDir(BackupStoreDirectory& rDir,
+	const std::string& rChildName)
+{
+	BackupStoreDirectory::Iterator i(rDir);
+	BackupStoreFilenameClear child(rChildName.c_str());
+	BackupStoreDirectory::Entry *en = i.FindMatchingClearName(child);
+	if (en == 0) return 0;
+	int64_t id = en->GetObjectID();
+	TEST_THAT(id > 0);
+	TEST_THAT(id != BackupProtocolClientListDirectory::RootDirectory);
+	return id;
+}
+	
 int start_internal_daemon()
 {
 	// ensure that no child processes end up running tests!
