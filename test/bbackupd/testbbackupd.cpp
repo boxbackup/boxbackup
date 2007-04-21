@@ -438,7 +438,11 @@ int test_kill_bbstored()
 	TEST_THAT(KillServer(bbstored_pid));
 	::sleep(1);
 	TEST_THAT(!ServerIsAlive(bbstored_pid));
-	TestRemoteProcessMemLeaks("bbstored.memleaks");
+
+	#ifndef WIN32
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+	#endif
+	
 	return 0;
 }
 
@@ -1204,6 +1208,10 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		#ifdef WIN32
+			TEST_THAT(::unlink("testfiles/TestDir1/untracked-2") 
+				== 0);
+		#endif
 		TEST_THAT(::rename("testfiles/TestDir1/untracked-1", 
 			"testfiles/TestDir1/untracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
@@ -1243,6 +1251,9 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		#ifdef WIN32
+			TEST_THAT(::unlink("testfiles/TestDir1/tracked-2") == 0);
+		#endif
 		TEST_THAT(::rename("testfiles/TestDir1/tracked-1", 
 			"testfiles/TestDir1/tracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
@@ -1345,6 +1356,7 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+#ifndef WIN32
 		// These tests only work as non-root users.
 		if(::getuid() != 0)
 		{
@@ -1381,6 +1393,7 @@ int test_bbackupd()
 			::chmod("testfiles/TestDir1/sub23/read-fail-test-dir", 0770);
 			::chmod("testfiles/TestDir1/read-fail-test-file", 0770);
 		}
+#endif // WIN32
 
 		printf("Continuously update file, check isn't uploaded\n");
 		
@@ -1725,11 +1738,14 @@ int test_bbackupd()
 	::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf "
 		"-l testfiles/queryLIST.log \"list -rotdh\" quit");
 	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-	
-	if(::getuid() == 0)
-	{
-		::printf("WARNING: This test was run as root. Some tests have been omitted.\n");
-	}
+
+	#ifndef WIN32	
+		if(::getuid() == 0)
+		{
+			::printf("WARNING: This test was run as root. "
+				"Some tests have been omitted.\n");
+		}
+	#endif
 	
 	return 0;
 }
