@@ -85,6 +85,7 @@ void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
 }
 
 int bbstored_pid = 0;
+int bbackupd_pid = 0;
 
 #ifdef HAVE_SYS_XATTR_H
 bool readxattr_into_map(const char *filename, std::map<std::string,std::string> &rOutput)
@@ -1041,14 +1042,15 @@ int test_bbackupd()
 	}
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
-	int pid = LaunchServer(BBACKUPD " testfiles/bbackupd.conf", 
+	bbackupd_pid = LaunchServer(BBACKUPD " testfiles/bbackupd.conf", 
 		"testfiles/bbackupd.pid");
-	TEST_THAT(pid != -1 && pid != 0);
-	if(pid > 0)
-	{
-		::sleep(1);
-		TEST_THAT(ServerIsAlive(pid));
 
+	TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+
+	::sleep(1);
+
+	if(bbackupd_pid > 0)
+	{
 		// First, check storage space handling -- wait for file to be uploaded
 		wait_for_backup_operation();
 
@@ -1797,18 +1799,16 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
 		// Kill the daemon
-		TEST_THAT(KillServer(pid));
-		::sleep(1);
-		TEST_THAT(!ServerIsAlive(pid));
-		TestRemoteProcessMemLeaks("bbackupd.memleaks");
+		terminate_bbackupd(bbackupd_pid);
 		
 		// Start it again
-		pid = LaunchServer(BBACKUPD " testfiles/bbackupd.conf", 
+		bbackupd_pid = LaunchServer(BBACKUPD 
+			" testfiles/bbackupd.conf", 
 			"testfiles/bbackupd.pid");
 
-		TEST_THAT(pid != -1 && pid != 0);
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
 
-		if(pid != -1 && pid != 0)
+		if(bbackupd_pid != -1 && bbackupd_pid != 0)
 		{
 			// Wait and compare (a little bit longer than usual)
 			wait_for_backup_operation(
@@ -1821,10 +1821,7 @@ int test_bbackupd()
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Kill it again
-			TEST_THAT(KillServer(pid));
-			::sleep(1);
-			TEST_THAT(!ServerIsAlive(pid));
-			TestRemoteProcessMemLeaks("bbackupd.memleaks");
+			terminate_bbackupd(bbackupd_pid);
 		}
 	}
 
@@ -1871,7 +1868,12 @@ int test(int argc, const char *argv[])
 	if(r != 0) return r;
 	
 	r = test_bbackupd();
-	if(r != 0) return r;
+	if(r != 0)
+	{
+		KillServer(bbackupd_pid);
+		KillServer(bbstored_pid);
+		return r;
+	}
 	
 	test_kill_bbstored();
 
