@@ -1,12 +1,13 @@
 #ifndef SERVER_CONTROL_H
 #define SERVER_CONTROL_H
 
+#include "Test.h"
+
 #ifdef WIN32
 
 #include "WinNamedPipeStream.h"
 #include "IOStreamGetLine.h"
 #include "BoxPortsAndFiles.h"
-#include "Test.h"
 
 static bool SendCommands(const std::string& rCmd)
 {
