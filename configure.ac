@@ -102,7 +102,7 @@ esac
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([dlfcn.h execinfo.h process.h pwd.h signal.h])
+AC_CHECK_HEADERS([dlfcn.h execinfo.h getopt.h process.h pwd.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
