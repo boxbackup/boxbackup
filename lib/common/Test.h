@@ -25,6 +25,7 @@
 extern int failures;
 extern int first_fail_line;
 extern std::string first_fail_file;
+extern std::string bbackupd_args, bbstored_args, bbackupquery_args;
 
 #define TEST_FAIL_WITH_MESSAGE(msg) \
 { \
@@ -92,34 +93,33 @@ inline int TestGetFileSize(const char *Filename)
 	return -1;
 }
 
-inline std::string ConvertPaths(const char *pCommandLine)
+inline std::string ConvertPaths(const std::string& rOriginal)
 {
 #ifdef WIN32
 	// convert UNIX paths to native
 
-	std::string command;
-	for (int i = 0; pCommandLine[i] != 0; i++)
+	std::string converted;
+	for (int i = 0; i < rOriginal.size(); i++)
 	{
-		if (pCommandLine[i] == '/')
+		if (rOriginal[i] == '/')
 		{
-			command += '\\';
+			converted += '\\';
 		}
 		else
 		{
-			command += pCommandLine[i];
+			converted += rOriginal[i];
 		}
 	}
+	return converted;
 
 #else // !WIN32
-	std::string command = pCommandLine;
+	return rOriginal;
 #endif
-
-	return command;
 }
 
-inline int RunCommand(const char *pCommandLine)
+inline int RunCommand(const std::string& rCommandLine)
 {
-	return ::system(ConvertPaths(pCommandLine).c_str());
+	return ::system(ConvertPaths(rCommandLine).c_str());
 }
 
 #ifdef WIN32
@@ -169,7 +169,7 @@ inline int ReadPidFile(const char *pidFile)
 	return pid;
 }
 
-inline int LaunchServer(const char *pCommandLine, const char *pidFile)
+inline int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 {
 #ifdef WIN32
 
@@ -184,7 +184,7 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 	startInfo.cbReserved2 = 0;
 	startInfo.lpReserved2 = NULL;
 
-	std::string cmd = ConvertPaths(pCommandLine);
+	std::string cmd = ConvertPaths(rCommandLine);
 	CHAR* tempCmd = strdup(cmd.c_str());
 
 	DWORD result = CreateProcess
@@ -215,9 +215,9 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 
 #else // !WIN32
 
-	if(RunCommand(pCommandLine) != 0)
+	if(RunCommand(rCommandLine) != 0)
 	{
-		printf("Server: %s\n", pCommandLine);
+		printf("Server: %s\n", rCommandLine.c_str());
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
@@ -235,7 +235,7 @@ inline int LaunchServer(const char *pCommandLine, const char *pidFile)
 	#endif
 
 	// time for it to start up
-	::fprintf(stdout, "Starting server: %s\n", pCommandLine);
+	::fprintf(stdout, "Starting server: %s\n", rCommandLine.c_str());
 	::fprintf(stdout, "Waiting for server to start: ");
 
 	for (int i = 0; i < 15; i++)
@@ -396,6 +396,15 @@ inline void wait_for_operation(int seconds)
 	}
 	printf("\n");
 	fflush(stdout);
+}
+
+inline void safe_sleep(int seconds)
+{
+	struct timespec ts;
+	ts.tv_sec  = seconds;
+	ts.tv_nsec = 0;
+	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+	{ /* sleep again */ }
 }
 
 #endif // TEST__H
