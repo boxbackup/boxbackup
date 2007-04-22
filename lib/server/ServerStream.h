@@ -170,16 +170,22 @@ public:
 						}
 						else if(c[0] == "unix")
 						{
-							// Check arguments size
-							if(c.size() != 2)
-							{
-								THROW_EXCEPTION(ServerException, ServerStreamBadListenAddrs)
-							}
+							#ifdef WIN32
+								BOX_WARNING("Ignoring request to listen on a Unix socket on Windows: " << addrlist[a]);
+								delete psocket;
+								psocket = NULL;
+							#else
+								// Check arguments size
+								if(c.size() != 2)
+								{
+									THROW_EXCEPTION(ServerException, ServerStreamBadListenAddrs)
+								}
 
-							// unlink anything there
-							::unlink(c[1].c_str());
-							
-							psocket->Listen(Socket::TypeUNIX, c[1].c_str());
+								// unlink anything there
+								::unlink(c[1].c_str());
+								
+								psocket->Listen(Socket::TypeUNIX, c[1].c_str());
+							#endif // WIN32
 						}
 						else
 						{
@@ -187,8 +193,11 @@ public:
 							THROW_EXCEPTION(ServerException, ServerStreamBadListenAddrs)
 						}
 						
-						// Add to list of sockets
-						mSockets.push_back(psocket);
+						if (psocket != NULL)
+						{
+							// Add to list of sockets
+							mSockets.push_back(psocket);
+						}
 					}
 					catch(...)
 					{
@@ -196,8 +205,11 @@ public:
 						throw;
 					}
 
-					// Add to the list of things to wait on
-					connectionWait.Add(psocket);
+					if (psocket != NULL)
+					{
+						// Add to the list of things to wait on
+						connectionWait.Add(psocket);
+					}
 				}
 			}
 	
