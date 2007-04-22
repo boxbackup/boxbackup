@@ -210,7 +210,7 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 
 	if (sShowTime)
 	{
-		struct tm time_now;
+		struct tm time_now, *tm_ptr = &time_now;
 		time_t time_t_now = time(NULL);
 
 		if (time_t_now == ((time_t)-1))
@@ -218,13 +218,17 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 			msg += strerror(errno);
 			msg += " ";
 		}
-		else if (localtime_r(&time_t_now, &time_now) != NULL)
+		#ifdef WIN32
+			else if ((tm_ptr = localtime(&time_t_now)) != NULL)
+		#else
+			else if (localtime_r(&time_t_now, &time_now) != NULL)
+		#endif
 		{
 			std::ostringstream buf;
 			buf << std::setfill('0') <<
-				std::setw(2) << time_now.tm_hour << ":" << 
-				std::setw(2) << time_now.tm_min  << ":" <<
-				std::setw(2) << time_now.tm_sec  << " ";
+				std::setw(2) << tm_ptr->tm_hour << ":" << 
+				std::setw(2) << tm_ptr->tm_min  << ":" <<
+				std::setw(2) << tm_ptr->tm_sec  << " ";
 			msg += buf.str();
 		}
 		else
