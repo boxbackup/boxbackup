@@ -1879,6 +1879,93 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		// check that the excluded files did not make it
+		// into the store, and the included files did
+		printf("\n==== Check that exclude/alwaysinclude commands "
+			"actually work\n");
+
+		{
+			std::string errs;
+			std::auto_ptr<Configuration> config(
+				Configuration::LoadAndVerify(
+					"testfiles/bbackupd.conf",
+					&BackupDaemonConfigVerify, errs));
+			Configuration& conf(*config);
+			SSLLib::Initialise();
+			TLSContext tlsContext;
+			std::string certFile(conf.GetKeyValue("CertificateFile"));
+			std::string keyFile (conf.GetKeyValue("PrivateKeyFile"));
+			std::string caFile  (conf.GetKeyValue("TrustedCAsFile"));
+			tlsContext.Initialise(false, certFile.c_str(), 
+				keyFile.c_str(), caFile.c_str());
+			BackupClientCryptoKeys_Setup(
+				conf.GetKeyValue("KeysFile").c_str());
+			SocketStreamTLS socket;
+			socket.Open(tlsContext, Socket::TypeINET, 
+				conf.GetKeyValue("StoreHostname").c_str(), 
+				BOX_PORT_BBSTORED);
+			BackupProtocolClient connection(socket);
+			connection.Handshake();
+			std::auto_ptr<BackupProtocolClientVersion> 
+				serverVersion(connection.QueryVersion(
+					BACKUP_STORE_SERVER_VERSION));
+			if(serverVersion->GetVersion() != 
+				BACKUP_STORE_SERVER_VERSION)
+			{
+				THROW_EXCEPTION(BackupStoreException, 
+					WrongServerVersion);
+			}
+			connection.QueryLogin(
+				conf.GetKeyValueInt("AccountNumber"),
+				BackupProtocolClientLogin::Flags_ReadOnly);
+			
+			int64_t rootDirId = BackupProtocolClientListDirectory
+				::RootDirectory;
+			std::auto_ptr<BackupProtocolClientSuccess> dirreply(
+				connection.QueryListDirectory(
+					rootDirId, false, 0, false));
+			std::auto_ptr<IOStream> dirstream(
+				connection.ReceiveStream());
+			BackupStoreDirectory dir;
+			dir.ReadFromStream(*dirstream, connection.GetTimeout());
+
+			int64_t testDirId = SearchDir(dir, "Test1");
+			TEST_THAT(testDirId != 0);
+			dirreply = connection.QueryListDirectory(testDirId, 					false, 0, false);
+			dirstream = connection.ReceiveStream();
+			dir.ReadFromStream(*dirstream, connection.GetTimeout());
+			
+			TEST_THAT(!SearchDir(dir, "excluded_1"));
+			TEST_THAT(!SearchDir(dir, "excluded_2"));
+			TEST_THAT(!SearchDir(dir, "exclude_dir"));
+			TEST_THAT(!SearchDir(dir, "exclude_dir_2"));
+			// xx_not_this_dir_22 should not be excluded by
+			// ExcludeDirsRegex, because it's a file
+			TEST_THAT(SearchDir (dir, "xx_not_this_dir_22"));
+			TEST_THAT(!SearchDir(dir, "zEXCLUDEu"));
+			TEST_THAT(SearchDir (dir, "dont.excludethis"));
+			TEST_THAT(SearchDir (dir, "xx_not_this_dir_ALWAYSINCLUDE"));
+
+			int64_t sub23id = SearchDir(dir, "sub23");
+			TEST_THAT(sub23id != 0);
+			dirreply = connection.QueryListDirectory(sub23id, 					false, 0, false);
+			dirstream = connection.ReceiveStream();
+			dir.ReadFromStream(*dirstream, connection.GetTimeout());
+			TEST_THAT(!SearchDir(dir, "xx_not_this_dir_22"));
+			TEST_THAT(!SearchDir(dir, "somefile.excludethis"));
+			connection.QueryFinished();
+		}
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 #ifndef WIN32
 		// These tests only work as non-root users.
 		if(::getuid() != 0)
