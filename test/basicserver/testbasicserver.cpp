@@ -436,13 +436,8 @@ int test(int argc, const char *argv[])
 
 	// Launch a basic server
 	{
-		#ifdef WIN32
-			int pid = LaunchServer("test srv1 testfiles\\srv1.conf", 
-				"testfiles\\srv1.pid");
-		#else
-			int pid = LaunchServer("./test srv1 testfiles/srv1.conf", 
-				"testfiles/srv1.pid");
-		#endif
+		int pid = LaunchServer("./test srv1 testfiles/srv1.conf", 
+			"testfiles/srv1.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);
 		if(pid > 0)
@@ -454,9 +449,10 @@ int test(int argc, const char *argv[])
 
 			// Move the config file over
 			#ifdef WIN32
-				TEST_THAT(::unlink("testfiles/srv1.conf") 
-					!= -1);
+				TEST_THAT(::unlink("testfiles"
+					DIRECTORY_SEPARATOR "srv1.conf") != -1);
 			#endif
+
 			TEST_THAT(::rename(
 				"testfiles" DIRECTORY_SEPARATOR "srv1b.conf", 
 				"testfiles" DIRECTORY_SEPARATOR "srv1.conf") 
@@ -474,6 +470,7 @@ int test(int argc, const char *argv[])
 
 			// Kill it off
 			TEST_THAT(KillServer(pid));
+
 			#ifndef WIN32
 				TestRemoteProcessMemLeaks(
 					"generic-daemon.memleaks");
@@ -483,15 +480,11 @@ int test(int argc, const char *argv[])
 	
 	// Launch a test forking server
 	{
-		#ifdef WIN32
-			int pid = LaunchServer("test srv2 testfiles\\srv2.conf", 
-				"testfiles\\srv2.pid");
-		#else
-			int pid = LaunchServer("./test srv2 testfiles/srv2.conf", 
-				"testfiles/srv2.pid");
-		#endif
+		int pid = LaunchServer("./test srv2 testfiles/srv2.conf", 
+			"testfiles/srv2.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);
+
 		if(pid > 0)
 		{
 			// Will it restart?
@@ -530,6 +523,7 @@ int test(int argc, const char *argv[])
 					conns.push_back(&conn2);
 					conns.push_back(&conn3);
 				#endif // !WIN32
+
 				Srv2TestConversations(conns);
 				// Implicit close
 			}
@@ -554,15 +548,11 @@ int test(int argc, const char *argv[])
 
 	// Launch a test SSL server
 	{
-		#ifdef WIN32
-			int pid = LaunchServer("test srv3 testfiles\\srv3.conf", 
-				"testfiles\\srv3.pid");
-		#else
-			int pid = LaunchServer("./test srv3 testfiles/srv3.conf",
-				"testfiles/srv3.pid");
-		#endif
+		int pid = LaunchServer("./test srv3 testfiles/srv3.conf",
+			"testfiles/srv3.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);
+
 		if(pid > 0)
 		{
 			// Will it restart?
@@ -598,9 +588,9 @@ int test(int argc, const char *argv[])
 				#endif
 
 				// Quick check that reconnections fail
-				TEST_CHECK_THROWS(conn1.Open(context, 
-					Socket::TypeUNIX, 
-					"testfiles/srv3.sock"),
+				TEST_CHECK_THROWS(conn1.Open(context,
+					Socket::TypeUNIX,
+					"testfiles/srv3.sock");,
 					ServerException, SocketAlreadyOpen);
 
 				// Stuff some data around
@@ -637,15 +627,11 @@ int test(int argc, const char *argv[])
 //protocolserver:
 	// Launch a test protocol handling server
 	{
-		#ifdef WIN32
-			int pid = LaunchServer("test srv4 testfiles\\srv4.conf", 
-				"testfiles\\srv4.pid");
-		#else
-			int pid = LaunchServer("./test srv4 testfiles/srv4.conf", 
-				"testfiles/srv4.pid");
-		#endif
+		int pid = LaunchServer("./test srv4 testfiles/srv4.conf", 
+			"testfiles/srv4.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);
+
 		if(pid > 0)
 		{
 			::sleep(1);
@@ -656,8 +642,7 @@ int test(int argc, const char *argv[])
 			#ifdef WIN32
 				conn.Open(Socket::TypeINET, "localhost", 2003);
 			#else
-				conn.Open(Socket::TypeUNIX, 
-					"testfiles/srv4.sock");
+				conn.Open(Socket::TypeUNIX, "testfiles/srv4.sock");
 			#endif
 			
 			// Create a protocol
