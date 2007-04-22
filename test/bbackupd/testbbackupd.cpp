@@ -419,8 +419,8 @@ int test_setupaccount()
 
 int test_run_bbstored()
 {
-	bbstored_pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
-		"testfiles/bbstored.pid");
+	std::string cmd = BBSTORED + bbstored_args + " testfiles/bbstored.conf";
+	bbstored_pid = LaunchServer(cmd, "testfiles/bbstored.pid");
 
 	TEST_THAT(bbstored_pid != -1 && bbstored_pid != 0);
 
@@ -1042,8 +1042,8 @@ int test_bbackupd()
 	}
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
-	bbackupd_pid = LaunchServer(BBACKUPD " testfiles/bbackupd.conf", 
-		"testfiles/bbackupd.pid");
+	std::string cmd = BBACKUPD + bbackupd_args + " testfiles/bbackupd.conf";
+	bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 
 	TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
 
@@ -2100,9 +2100,8 @@ int test_bbackupd()
 		terminate_bbackupd(bbackupd_pid);
 		
 		// Start it again
-		bbackupd_pid = LaunchServer(BBACKUPD 
-			" testfiles/bbackupd.conf", 
-			"testfiles/bbackupd.pid");
+		cmd = BBACKUPD + bbackupd_args + " testfiles/bbackupd.conf";
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
 
