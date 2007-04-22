@@ -99,7 +99,7 @@ inline std::string ConvertPaths(const std::string& rOriginal)
 	// convert UNIX paths to native
 
 	std::string converted;
-	for (int i = 0; i < rOriginal.size(); i++)
+	for (size_t i = 0; i < rOriginal.size(); i++)
 	{
 		if (rOriginal[i] == '/')
 		{
@@ -206,7 +206,8 @@ inline int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 	if (result == 0)
 	{
 		DWORD err = GetLastError();
-		printf("Launch failed: %s: error %d\n", pCommandLine, (int)err);
+		printf("Launch failed: %s: error %d\n", rCommandLine.c_str(),
+			(int)err);
 		return -1;
 	}
 
@@ -402,11 +403,15 @@ inline void wait_for_operation(int seconds)
 
 inline void safe_sleep(int seconds)
 {
+#ifdef WIN32
+	Sleep(seconds * 1000);
+#else
 	struct timespec ts;
 	ts.tv_sec  = seconds;
 	ts.tv_nsec = 0;
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{ /* sleep again */ }
+#endif
 }
 
 #endif // TEST__H
