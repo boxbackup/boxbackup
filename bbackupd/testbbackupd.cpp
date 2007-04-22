@@ -2115,6 +2115,15 @@ int test_bbackupd()
 			protocol.QueryFinished();
 		}
 
+		// Compare the restored files
+		compareReturnValue = ::system(BBACKUPQUERY " -q "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query10.log "
+			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
+			"quit");
+		TEST_RETURN(compareReturnValue, 1);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		
 		printf("Add files with current time\n");
 	
 		// Add some more files and modify others
