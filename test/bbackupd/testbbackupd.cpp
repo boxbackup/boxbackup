@@ -2407,6 +2407,76 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
+#ifdef WIN32
+		printf("\n==== Testing locked file behaviour:\n");
+
+		// Test that locked files cannot be backed up,
+		// and the appropriate error is reported.
+		// Wait for the sync to finish, so that we have time to work
+		wait_for_sync_start();
+		// Now we have about three seconds to work
+
+		handle = openfile("testfiles/TestDir1/lockedfile",
+			O_CREAT | O_EXCL | O_LOCK, 0);
+		TEST_THAT(handle != INVALID_HANDLE_VALUE);
+
+		if (handle != 0)
+		{
+			// first sync will ignore the file, it's too new
+			wait_for_sync_end();
+			TEST_THAT(!TestFileExists("testfiles/"
+				"notifyran.read-error.1"));
+
+			// this sync should try to back up the file, 
+			// and fail, because it's locked
+			wait_for_sync_end();
+			TEST_THAT(TestFileExists("testfiles/"
+				"notifyran.read-error.1"));
+			TEST_THAT(!TestFileExists("testfiles/"
+				"notifyran.read-error.2"));
+
+			// now close the file and check that it is
+			// backed up on the next run.
+			CloseHandle(handle);
+			wait_for_sync_end();
+			TEST_THAT(!TestFileExists("testfiles/"
+				"notifyran.read-error.2"));
+
+			// compare, and check that it works
+			// reports the correct error message (and finishes)
+			compareReturnValue = ::system(BBACKUPQUERY " -q "
+				"-c testfiles/bbackupd.conf "
+				"-l testfiles/query15a.log "
+				"\"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// open the file again, compare and check that compare
+			// reports the correct error message (and finishes)
+			handle = openfile("testfiles/TestDir1/lockedfile",
+				O_LOCK, 0);
+			TEST_THAT(handle != INVALID_HANDLE_VALUE);
+
+			compareReturnValue = ::system(BBACKUPQUERY 
+				" -q -c testfiles/bbackupd.conf "
+				"-l testfiles/query15.log "
+				"\"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue, 3);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// close the file again, check that compare
+			// works again
+			CloseHandle(handle);
+
+			compareReturnValue = ::system(BBACKUPQUERY " -q "
+				"-c testfiles/bbackupd.conf "
+				"-l testfiles/query15a.log "
+				"\"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		}
+#endif
+
 		// Kill the daemon
 		terminate_bbackupd(bbackupd_pid);
 		
