@@ -1238,7 +1238,7 @@ void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries:
 		{
 			fprintf(stderr, "Warning: location '%s' path ends "
 				"with '%s', compare may fail!",
-				rLocation, DIRECTORY_SEPARATOR);
+				rLocation.c_str(), DIRECTORY_SEPARATOR);
 		}
 	}
 	#endif
