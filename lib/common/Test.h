@@ -317,7 +317,8 @@ inline void TestRemoteProcessMemLeaksFunc(const char *filename,
 			first_fail_line = line;
 		}
 		++failures;
-		printf("FAILURE: MemLeak report not available (file %s)\n", filename);
+		printf("FAILURE: MemLeak report not available (file %s) "
+			"at %s:%d\n", filename, file, line);
 	}
 	else
 	{
@@ -331,12 +332,13 @@ inline void TestRemoteProcessMemLeaksFunc(const char *filename,
 			}
 			++failures;
 			printf("FAILURE: Memory leaks found in other process "
-				"(file %s)\n==========\n", filename);
+				"(file %s) at %s:%d\n==========\n", 
+				filename, file, line);
 			FILE *f = fopen(filename, "r");
-			char line[512];
-			while(::fgets(line, sizeof(line), f) != 0)
+			char linebuf[512];
+			while(::fgets(linebuf, sizeof(linebuf), f) != 0)
 			{
-				printf("%s", line);
+				printf("%s", linebuf);
 			}
 			fclose(f);
 			printf("==========\n");
