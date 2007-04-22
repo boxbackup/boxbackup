@@ -642,7 +642,11 @@ int start_internal_daemon()
 		fflush(stdout);
 		safe_sleep(1);
 
-		pid = ReadPidFile("testfiles/bbackupd.pid");
+		if (TestFileExists("testfiles/bbackupd.pid"))
+		{
+			pid = ReadPidFile("testfiles/bbackupd.pid");
+		}
+
 		if (pid > 0)
 		{
 			break;
