@@ -77,6 +77,7 @@ private:
 	box_time_t mLoadedConfigModifiedTime;
 	bool mReloadConfigWanted;
 	bool mTerminateWanted;
+	bool mKeepConsoleOpenAfterFork;
 	static Daemon *spDaemon;
 };
 

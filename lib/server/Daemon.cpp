@@ -51,7 +51,8 @@ Daemon *Daemon::spDaemon = 0;
 Daemon::Daemon()
 	: mpConfiguration(NULL),
 	  mReloadConfigWanted(false),
-	  mTerminateWanted(false)
+	  mTerminateWanted(false),
+	  mKeepConsoleOpenAfterFork(false)
 {
 	if(spDaemon != NULL)
 	{
@@ -109,8 +110,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	#endif
 
 	char c;
+	optind = 0; // just in case anybody used getopt before
 
-	while((c = getopt(argc, (char * const *)argv, "c:Dqv")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "c:DqvVt:Tk")) != -1)
 	{
 		switch(c)
 		{
@@ -153,10 +155,34 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			}
 			break;
 
+			case 'V':
+			{
+				masterLevel = Log::EVERYTHING;
+			}
+			break;
+
+			case 't':
+			{
+				Console::SetTag(optarg);
+			}
+			break;
+
+			case 'T':
+			{
+				Console::SetShowTime(true);
+			}
+			break;
+
+			case 'k':
+			{
+				mKeepConsoleOpenAfterFork = true;
+			}
+			break;
+
 			case '?':
 			{
 				BOX_FATAL("Unknown option on command line: " 
-					<< "'" << optopt << "'");
+					<< "'" << (char)optopt << "'");
 				return 2;
 			}
 			break;
@@ -377,7 +403,7 @@ int Daemon::Main(const std::string &rConfigFileName, bool singleProcess)
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
 	
-		if(asDaemon)
+		if(asDaemon && !mKeepConsoleOpenAfterFork)
 		{
 #ifndef WIN32
 			// Close standard streams
