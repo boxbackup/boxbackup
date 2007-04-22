@@ -9,11 +9,15 @@
 
 #include "Box.h"
 
+#include <time.h>
+
 #ifdef HAVE_SYSLOG_H
 	#include <syslog.h>
 #endif
 
 #include "Logging.h"
+
+#include <iomanip>
 
 bool Logging::sLogToSyslog  = false;
 bool Logging::sLogToConsole = false;
@@ -172,6 +176,21 @@ Logger::~Logger()
 	Logging::Remove(this);
 }
 
+bool Console::sShowTime = false;
+bool Console::sShowTag  = false;
+std::string Console::sTag;
+
+void Console::SetTag(const std::string& rTag)
+{
+	sTag = rTag;
+	sShowTag = true;
+}
+
+void Console::SetShowTime(bool enabled)
+{
+	sShowTime = enabled;
+}
+
 bool Console::Log(Log::Level level, const std::string& rFile, 
 	int line, std::string& rMessage)
 {
@@ -186,8 +205,43 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	{
 		target = stderr;
 	}
+
+	std::string msg;
+
+	if (sShowTime)
+	{
+		struct tm time_now;
+		time_t time_t_now = time(NULL);
+
+		if (time_t_now == ((time_t)-1))
+		{
+			msg += strerror(errno);
+			msg += " ";
+		}
+		else if (localtime_r(&time_t_now, &time_now) != NULL)
+		{
+			std::ostringstream buf;
+			buf << std::setfill('0') <<
+				std::setw(2) << time_now.tm_hour << ":" << 
+				std::setw(2) << time_now.tm_min  << ":" <<
+				std::setw(2) << time_now.tm_sec  << " ";
+			msg += buf.str();
+		}
+		else
+		{
+			msg += strerror(errno);
+			msg += " ";
+		}
+	}
+
+	if (sShowTag)
+	{
+		msg += "[" + sTag + "] ";
+	}
 	
-	fprintf(target, "%s\n", rMessage.c_str());
+	msg += rMessage;
+
+	fprintf(target, "%s\n", msg.c_str());
 	
 	return true;
 }
