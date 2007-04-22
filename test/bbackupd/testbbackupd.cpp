@@ -426,7 +426,7 @@ int test_run_bbstored()
 
 	if(bbstored_pid > 0)
 	{
-		::sleep(1);
+		::safe_sleep(1);
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		return 0;	// success
 	}
@@ -437,7 +437,7 @@ int test_run_bbstored()
 int test_kill_bbstored()
 {
 	TEST_THAT(KillServer(bbstored_pid));
-	::sleep(1);
+	::safe_sleep(1);
 	TEST_THAT(!ServerIsAlive(bbstored_pid));
 
 	#ifndef WIN32
@@ -640,7 +640,7 @@ int start_internal_daemon()
 	{
 		printf(".");
 		fflush(stdout);
-		sleep(1);
+		safe_sleep(1);
 
 		pid = ReadPidFile("testfiles/bbackupd.pid");
 		if (pid > 0)
@@ -1047,7 +1047,7 @@ int test_bbackupd()
 
 	TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
 
-	::sleep(1);
+	::safe_sleep(1);
 
 	if(bbackupd_pid > 0)
 	{
@@ -1588,7 +1588,7 @@ int test_bbackupd()
 		TEST_THAT(fd2 > 0);
 		TEST_THAT(write(fd1, "hello", 5) == 5);
 		TEST_THAT(close(fd1) == 0);
-		sleep(1);
+		safe_sleep(1);
 		TEST_THAT(write(fd2, "world", 5) == 5);
 		TEST_THAT(close(fd2) == 0);
 		TEST_THAT(TestFileExists("testfiles/TestDir1/untracked-1"));
@@ -1631,7 +1631,7 @@ int test_bbackupd()
 		TEST_THAT(write(fd1, "hello", 5) == 5);
 		TEST_THAT(write(fd1, buffer, sizeof(buffer)) == sizeof(buffer));
 		TEST_THAT(close(fd1) == 0);
-		sleep(1);
+		safe_sleep(1);
 		TEST_THAT(write(fd2, "world", 5) == 5);
 		TEST_THAT(write(fd2, buffer, sizeof(buffer)) == sizeof(buffer));
 		TEST_THAT(close(fd2) == 0);
@@ -1700,7 +1700,7 @@ int test_bbackupd()
 		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -q -c testfiles/bbackupd.conf wait-for-sync") == 0);
 		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 		// Then wait a second, to make sure the scan is complete
-		::sleep(1);
+		::safe_sleep(1);
 		// Then modify an existing file
 		{
 			chmod("testfiles/TestDir1/sub23/rand.h", 0777);	// in the archive, it's read only
@@ -1795,7 +1795,7 @@ int test_bbackupd()
 		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -c testfiles/bbackupd.conf wait-for-sync") == 0);
 		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 		// Then wait a second, to make sure the scan is complete
-		::sleep(1);
+		::safe_sleep(1);
 
 		{
 			// Open a file, then save something to it every second
@@ -1805,7 +1805,7 @@ int test_bbackupd()
 				TEST_THAT(f != 0);
 				fprintf(f, "Loop iteration %d\n", l);
 				fflush(f);
-				sleep(1);
+				safe_sleep(1);
 				printf(".");
 				fflush(stdout);
 				::fclose(f);
@@ -1826,7 +1826,7 @@ int test_bbackupd()
 				TEST_THAT(f != 0);
 				fprintf(f, "Loop 2 iteration %d\n", l);
 				fflush(f);
-				sleep(1);
+				safe_sleep(1);
 				printf(".");
 				fflush(stdout);
 				::fclose(f);
@@ -1956,7 +1956,7 @@ int test_bbackupd()
 		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -q -c testfiles/bbackupd.conf wait-for-sync") == 0);
 		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 		// Then wait a second, to make sure the scan is complete
-		::sleep(1);
+		::safe_sleep(1);
 		// Then modify an existing file
 		{
 			FILE *f = fopen("testfiles/TestDir1/sub23/in-the-future", "w");
