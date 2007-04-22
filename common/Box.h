@@ -27,13 +27,14 @@
 #endif
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
-  #include "Utils.h"
+	#include "Utils.h"
 	#define OPTIONAL_DO_BACKTRACE DumpStackBacktrace();
 #else
 	#define OPTIONAL_DO_BACKTRACE
 #endif
 
 #include "CommonException.h"
+#include "Logging.h"
 
 #ifndef NDEBUG
 	
@@ -108,11 +109,12 @@
 	#define MEMLEAKFINDER_STOP
 #endif
 
-#define THROW_EXCEPTION(type, subtype)														\
-	{																						\
-		OPTIONAL_DO_BACKTRACE																\
-		TRACE1("Exception thrown: " #type "(" #subtype ") at " __FILE__ "(%d)\n", __LINE__)	\
-		throw type(type::subtype);															\
+#define THROW_EXCEPTION(type, subtype) \
+	{ \
+		OPTIONAL_DO_BACKTRACE \
+		BOX_TRACE("Exception thrown: " #type "(" #subtype ") at " \
+			__FILE__ "(" << __LINE__ << ")") \
+		throw type(type::subtype); \
 	}
 
 // extra macros for converting to network byte order
