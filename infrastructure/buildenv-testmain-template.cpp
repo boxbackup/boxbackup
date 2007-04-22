@@ -28,12 +28,17 @@
 #include <errno.h>
 #include <string>
 
+#ifdef HAVE_GETOPT_H
+	#include <getopt.h>
+#endif
+
 #ifdef WIN32
 	#include "emu.h"
 #else
 	#include <syslog.h>
 #endif
 
+#include "Logging.h"
 #include "Test.h"
 #include "Timer.h"
 
@@ -50,13 +55,14 @@ int test(int argc, const char *argv[]);
 int failures = 0;
 int first_fail_line;
 std::string first_fail_file;
+std::string bbackupd_args, bbstored_args, bbackupquery_args;
 
 int filedes_open_at_beginning = -1;
 
 #ifdef WIN32
 
 // any way to check for open file descriptors on Win32?
-inline int count_filedes() { return 0; }
+inline int  count_filedes()      { return 0;     }
 inline bool checkfilesleftopen() { return false; }
 
 #else // !WIN32
@@ -96,10 +102,71 @@ bool checkfilesleftopen()
 
 #endif
 
-int main(int argc, const char *argv[])
+int main(int argc, char * const * argv)
 {
 	// Start memory leak testing
 	MEMLEAKFINDER_START
+
+#ifdef HAVE_GETOPT_H
+	struct option longopts[] = 
+	{
+		{ "bbackupd-args",	required_argument, NULL, 'c' },
+		{ "bbstored-args",	required_argument, NULL, 's' },
+		{ NULL,			0,                 NULL,  0  }
+	};
+	
+	int ch;
+	
+	while ((ch = getopt_long(argc, argv, "c:s:t:T", longopts, NULL))
+		!= -1)
+	{
+		switch(ch)
+		{
+			case 'c':
+			{
+				bbackupd_args += " ";
+				bbackupd_args += optarg;
+			}
+			break;
+
+			case 's':
+			{
+				bbstored_args += " ";
+				bbstored_args += optarg;
+			}
+			break;
+
+			case 't':
+			{
+				Console::SetTag(optarg);
+			}
+			break;
+
+			case 'T':
+			{
+				Console::SetShowTime(true);
+			}
+			break;
+
+			case '?':
+			{
+				fprintf(stderr, "Unknown option: %s\n",
+					optarg);
+				exit(2);
+			}
+
+			default:
+			{
+				fprintf(stderr, "Unknown option code '%c'\n",
+					ch);
+				exit(2);
+			}
+		}
+	}
+
+	argc -= optind - 1;
+	argv += optind - 1;
+#endif // HAVE_GETOPT_H
 
 	// If there is more than one argument, then the test is doing something advanced, so leave it alone
 	bool fulltestmode = (argc == 1);
@@ -120,6 +187,7 @@ int main(int argc, const char *argv[])
 			TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
 		#endif
 	}
+
 	try
 	{
 		#ifdef BOX_MEMORY_LEAK_TESTING
@@ -127,7 +195,7 @@ int main(int argc, const char *argv[])
 		#endif
 
 		Timers::Init();
-		int returncode = test(argc, argv);
+		int returncode = test(argc, (const char **)argv);
 		Timers::Cleanup();
 		
 		// check for memory leaks, if enabled
