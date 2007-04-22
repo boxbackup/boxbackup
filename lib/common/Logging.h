@@ -102,11 +102,19 @@ class Logger
 
 class Console : public Logger
 {
+	private:
+	static bool sShowTime;
+	static bool sShowTag;
+	static std::string sTag;
+
 	public:
 	virtual bool Log(Log::Level level, const std::string& rFile, 
 		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Console"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
+
+	static void SetTag(const std::string& rTag);
+	static void SetShowTime(bool enabled);
 };
 
 // --------------------------------------------------------------------------
