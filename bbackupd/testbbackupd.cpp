@@ -1801,13 +1801,12 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
-		// Check that modifying files with old timestamps still get added
-		printf("Modify existing file, but change timestamp to rather old\n");
-		// Time critical, so sync
-		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -q -c testfiles/bbackupd.conf wait-for-sync") == 0);
-		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-		// Then wait a second, to make sure the scan is complete
-		::safe_sleep(1);
+		// Check that modifying files with old timestamps
+		// still get added
+		printf("\n==== Modify existing file, but change timestamp "
+			"to rather old\n");
+		wait_for_sync_end();
+
 		// Then modify an existing file
 		{
 			chmod("testfiles/TestDir1/sub23/rand.h", 0777);	// in the archive, it's read only
