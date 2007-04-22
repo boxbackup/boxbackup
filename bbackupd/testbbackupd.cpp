@@ -1417,6 +1417,109 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		TEST_RETURN(compareReturnValue, 2);
 #endif // WIN32
+
+		printf("\n==== Check that SyncAllowScript is executed and can "
+			"pause backup\n");
+		fflush(stdout);
+
+		{
+			wait_for_sync_end();
+			// we now have 3 seconds before bbackupd
+			// runs the SyncAllowScript again.
+
+			char* sync_control_file = "testfiles" 
+				DIRECTORY_SEPARATOR "syncallowscript.control";
+			int fd = open(sync_control_file, 
+				O_CREAT | O_EXCL | O_WRONLY, 0700);
+			if (fd <= 0)
+			{
+				perror(sync_control_file);
+			}
+			TEST_THAT(fd > 0);
+		
+			char* control_string = "10\n";
+			TEST_THAT(write(fd, control_string, 
+				strlen(control_string)) ==
+				(int)strlen(control_string));
+			close(fd);
+
+			// this will pause backups, bbackupd will check
+			// every 10 seconds to see if they are allowed again.
+
+			char* new_test_file = "testfiles"
+				DIRECTORY_SEPARATOR "TestDir1"
+				DIRECTORY_SEPARATOR "Added_During_Pause";
+			fd = open(new_test_file,
+				O_CREAT | O_EXCL | O_WRONLY, 0700);
+			if (fd <= 0)
+			{
+				perror(new_test_file);
+			}
+			TEST_THAT(fd > 0);
+			close(fd);
+
+			struct stat st;
+
+			// next poll should happen within the next
+			// 5 seconds (normally about 3 seconds)
+
+			safe_sleep(1); // 2 seconds before
+			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
+				"syncallowscript.notifyran.1", &st) != 0);
+			safe_sleep(4); // 2 seconds after
+			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
+				"syncallowscript.notifyran.1", &st) == 0);
+			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
+				"syncallowscript.notifyran.2", &st) != 0);
+
+			// next poll should happen within the next
+			// 10 seconds (normally about 8 seconds)
+
+			safe_sleep(6); // 2 seconds before
+			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
+				"syncallowscript.notifyran.2", &st) != 0);
+			safe_sleep(4); // 2 seconds after
+			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
+				"syncallowscript.notifyran.2", &st) == 0);
+
+			// check that no backup has run (compare fails)
+			compareReturnValue = ::system(BBACKUPQUERY " -q "
+				"-c testfiles/bbackupd.conf "
+				"-l testfiles/query3.log "
+				"\"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue, 2);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			long start_time = time(NULL);
+			TEST_THAT(unlink(sync_control_file) == 0);
+			wait_for_sync_start();
+			long end_time = time(NULL);
+
+			long wait_time = end_time - start_time + 2;
+			// should be about 10 seconds
+			printf("Waited for %ld seconds, should have been %s",
+				wait_time, control_string);
+			TEST_THAT(wait_time >= 8);
+			TEST_THAT(wait_time <= 12);
+
+			wait_for_sync_end();
+			// check that backup has run (compare succeeds)
+			compareReturnValue = ::system(BBACKUPQUERY " -q "
+				"-c testfiles/bbackupd.conf "
+				"-l testfiles/query3a.log "
+				"\"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			if (failures > 0)
+			{
+				// stop early to make debugging easier
+				return 1;
+			}
+		}
+
+		printf("\n==== Delete file and update another, "
+			"create symlink.\n");
 		
 		// Delete a file
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
