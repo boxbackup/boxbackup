@@ -1141,7 +1141,7 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 		std::string line;
 		if(getLine.GetLine(line, true, 30000)) // 30 seconds should be enough
 		{
-			// Got a string, intepret
+			// Got a string, interpret
 			if(line == "now")
 			{
 				// Script says do it now. Obey.
@@ -2201,7 +2201,8 @@ void BackupDaemon::NotifySysadmin(int Event)
 		0
 	};
 
-	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << Event);
+	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << 
+		sEventNames[Event]);
 
 	if(Event < 0 || Event >= NotifyEvent__MAX)
 	{
