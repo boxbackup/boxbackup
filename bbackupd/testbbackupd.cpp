@@ -1809,11 +1809,31 @@ int test_bbackupd()
 
 		// Then modify an existing file
 		{
-			chmod("testfiles/TestDir1/sub23/rand.h", 0777);	// in the archive, it's read only
-			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h", "w+");
+			// in the archive, it's read only
+			#ifdef WIN32
+				TEST_THAT(::system("chmod 0777 testfiles"
+					"/TestDir1/sub23/rand.h") == 0);
+			#else
+				TEST_THAT(chmod("testfiles/TestDir1/sub23"
+					"/rand.h", 0777) == 0);
+			#endif
+
+			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h", 
+				"w+");
+
+			if (f == 0)
+			{
+				perror("Failed to open");
+			}
+
 			TEST_THAT(f != 0);
-			fprintf(f, "MODIFIED!\n");
-			fclose(f);
+
+			if (f != 0)
+			{
+				fprintf(f, "MODIFIED!\n");
+				fclose(f);
+			}
+
 			// and then move the time backwards!
 			struct timeval times[2];
 			BoxTimeToTimeval(SecondsToBoxTime((time_t)(365*24*60*60)), times[1]);
