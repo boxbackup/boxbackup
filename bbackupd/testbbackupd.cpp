@@ -1841,7 +1841,9 @@ int test_bbackupd()
 			TEST_THAT(::utimes("testfiles/TestDir1/sub23/rand.h", times) == 0);
 		}
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_sync_end(); // files too new
+		wait_for_sync_end(); // should (not) be backed up this time
+
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3l.log "
@@ -1858,7 +1860,8 @@ int test_bbackupd()
 #endif
 
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_sync_end();
+		wait_for_sync_end();
 		
 		// compare with exclusions, should not find differences
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
