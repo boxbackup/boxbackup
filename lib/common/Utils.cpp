@@ -20,6 +20,7 @@
 
 #include "Utils.h"
 #include "CommonException.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -71,11 +72,11 @@ void DumpStackBacktrace()
 	size = backtrace (array, 10);
 	strings = backtrace_symbols (array, size);
 
-	printf ("Obtained %zd stack frames.\n", size);
+	BOX_TRACE("Obtained " << size << " stack frames.");
 
 	for(i = 0; i < size; i++)
 	{
-		printf("%s\n", strings[i]);
+		BOX_TRACE(strings[i]);
 	}
 
 #include "MemLeakFindOff.h"
