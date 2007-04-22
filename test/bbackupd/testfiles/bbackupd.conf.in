@@ -25,7 +25,8 @@ ExtendedLogFile = testfiles/bbackupd.log
 
 CommandSocket = testfiles/bbackupd.sock
 
-NotifyScript = @PERL@ testfiles/notifyscript.pl
+NotifyScript    = @TARGET_PERL@ testfiles/notifyscript.pl
+SyncAllowScript = @TARGET_PERL@ testfiles/syncallowscript.pl
 
 Server
 {
