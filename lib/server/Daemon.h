@@ -41,7 +41,6 @@ private:
 public:
 
 	int Main(const char *DefaultConfigFile, int argc, const char *argv[]);
-	// int Main(const std::string &rConfigFile, bool singleProcess);
 	int Main(const std::string &rConfigFile);
 	
 	virtual void Run();
