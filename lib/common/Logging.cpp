@@ -289,6 +289,7 @@ Syslog::~Syslog()
 
 void Syslog::SetProgramName(const std::string& rProgramName)
 {
+	mName = rProgramName;
 	::closelog();
-	::openlog(rProgramName.c_str(), LOG_PID, LOG_LOCAL6);
+	::openlog(mName.c_str(), LOG_PID, LOG_LOCAL6);
 }
