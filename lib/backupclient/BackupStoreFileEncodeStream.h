@@ -17,6 +17,7 @@
 #include "CollectInBufferStream.h"
 #include "MD5Digest.h"
 #include "BackupStoreFile.h"
+#include "ReadLoggingStream.h"
 
 namespace BackupStoreFileCreation
 {
@@ -100,6 +101,7 @@ private:
 	Recipe *mpRecipe;
 	IOStream *mpFile;					// source file
 	CollectInBufferStream mData;		// buffer for header and index entries
+	ReadLoggingStream *mpLogging;
 	int mStatus;
 	bool mSendData;						// true if there's file data to send (ie not a symlink)
 	int64_t mTotalBlocks;				// Total number of blocks in the file
