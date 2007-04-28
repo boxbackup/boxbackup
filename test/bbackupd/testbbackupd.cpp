@@ -2128,16 +2128,18 @@ int test_bbackupd()
 				TEST_THAT(f != 0);
 				fprintf(f, "Loop iteration %d\n", l);
 				fflush(f);
-				safe_sleep(1);
+				fclose(f);
+
 				printf(".");
 				fflush(stdout);
-				::fclose(f);
+				safe_sleep(1);
 			}
 			printf("\n");
 			fflush(stdout);
 			
 			// Check there's a difference
 			compareReturnValue = ::system("testfiles/extcheck1.pl");
+
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -2146,19 +2148,22 @@ int test_bbackupd()
 
 			for(int l = 0; l < 28; ++l)
 			{
-				FILE *f = ::fopen("testfiles/TestDir1/continousupdate", "w+");
+				FILE *f = ::fopen("testfiles/TestDir1/"
+					"continousupdate", "w+");
 				TEST_THAT(f != 0);
 				fprintf(f, "Loop 2 iteration %d\n", l);
 				fflush(f);
-				safe_sleep(1);
+				fclose(f);
+
 				printf(".");
 				fflush(stdout);
-				::fclose(f);
+				safe_sleep(1);
 			}
 			printf("\n");
 			fflush(stdout);
 
 			compareReturnValue = ::system("testfiles/extcheck2.pl");
+
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
