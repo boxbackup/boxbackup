@@ -1729,10 +1729,6 @@ int test_bbackupd()
 #ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
 #endif
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
 #ifndef WIN32
