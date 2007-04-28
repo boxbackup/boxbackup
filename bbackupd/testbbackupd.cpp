@@ -1053,6 +1053,11 @@ int test_bbackupd()
 
 	::safe_sleep(1);
 
+	TEST_THAT(ServerIsAlive(bbackupd_pid));
+	TEST_THAT(ServerIsAlive(bbstored_pid));
+	if (!ServerIsAlive(bbackupd_pid)) return 1;
+	if (!ServerIsAlive(bbstored_pid)) return 1;
+
 	if(bbackupd_pid > 0)
 	{
 		// First, check storage space handling -- wait for file to be uploaded
@@ -1117,6 +1122,11 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 #ifdef WIN32
 		printf("\n==== Check that filenames in UTF-8 "
@@ -1418,6 +1428,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 2);
 #endif // WIN32
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("\n==== Check that SyncAllowScript is executed and can "
 			"pause backup\n");
 		fflush(stdout);
@@ -1518,6 +1533,11 @@ int test_bbackupd()
 			}
 		}
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("\n==== Delete file and update another, "
 			"create symlink.\n");
 		
@@ -1558,6 +1578,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// Check that store errors are reported neatly
 		printf("Create store error\n");
 		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
@@ -1597,6 +1622,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// Wait until bbackupd recovers from the exception
 		wait_for_backup_operation(100);
 
@@ -1611,6 +1641,11 @@ int test_bbackupd()
 			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("Replace symlink with directory, add new directory\n");
@@ -1632,6 +1667,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// And the inverse, replace a directory with a file/symlink
 		printf("Replace directory with symlink\n");
 #ifndef WIN32
@@ -1649,6 +1689,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// And then, put it back to how it was before.
 		printf("Replace symlink with directory (which was a symlink)\n");
 #ifndef WIN32
@@ -1672,6 +1717,11 @@ int test_bbackupd()
 #ifndef WIN32
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
 #endif
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
 #ifndef WIN32
 		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
@@ -1683,6 +1733,11 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		// rename an untracked file over an 
 		// existing untracked file
@@ -1724,6 +1779,11 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		// case which went wrong: rename a tracked file over an
 		// existing tracked file
@@ -1769,6 +1829,12 @@ int test_bbackupd()
 		// case which went wrong: rename a tracked file over a deleted file
 		printf("Rename an existing file over a deleted file\n");
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", "testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -1777,6 +1843,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("Add files with old times, update attributes of one to latest time\n");
 
 		// Move that file back
@@ -1801,6 +1872,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// Check that modifying files with old timestamps
 		// still get added
 		printf("\n==== Modify existing file, but change timestamp "
@@ -1850,6 +1926,11 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		// Add some files and directories which are marked as excluded
 		printf("Add files and dirs for exclusion test\n");
@@ -2005,6 +2086,11 @@ int test_bbackupd()
 		}
 #endif // WIN32
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("Continuously update file, check isn't uploaded\n");
 		
 		// Make sure everything happens at the same point in the sync cycle: wait until exactly the start of a sync
@@ -2055,6 +2141,11 @@ int test_bbackupd()
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("Delete directory, change attributes\n");
 	
 		// Delete a directory
@@ -2124,6 +2215,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 #ifdef WIN32
 		// make one of the files read-only, expect a compare failure
 		compareReturnValue = ::system("attrib +r "
@@ -2210,6 +2306,11 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 #endif // WIN32
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("Add files with current time\n");
 	
 		// Add some more files and modify others
@@ -2229,6 +2330,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// Rename directory
 		printf("Rename directory\n");
 		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", "testfiles/TestDir1/renamed-dir") == 0);
@@ -2261,6 +2367,11 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// Check that modifying files with madly in the future timestamps still get added
 		printf("Create a file with timestamp to way ahead in the future\n");
 		// Time critical, so sync
@@ -2288,6 +2399,11 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		printf("Change client store marker\n");
 
@@ -2324,6 +2440,11 @@ int test_bbackupd()
 			TEST_THAT(done);
 		}
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("Check change of store marker pauses daemon\n");
 		
 		// Make a change to a file, to detect whether or not 
@@ -2344,8 +2465,22 @@ int test_bbackupd()
 			"\"compare -ac\" quit");
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+	
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
-#ifndef WIN32		
+		printf("\n==== Waiting for bbackupd to recover\n");
+		// 100 seconds - (12*3/2)
+		wait_for_operation(82);
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+#ifndef WIN32
 		printf("\n==== Interrupted restore\n");
 		{
 			do_interrupted_restore(context, restoredirid);
@@ -2380,6 +2515,11 @@ int test_bbackupd()
 		}
 #endif // !WIN32
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		printf("Check restore deleted files\n");
 		{
 			SocketStreamTLS conn;
@@ -2406,6 +2546,11 @@ int test_bbackupd()
 		// Final check on notifications
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 #ifdef WIN32
 		printf("\n==== Testing locked file behaviour:\n");
@@ -2485,6 +2630,11 @@ int test_bbackupd()
 		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		if(bbackupd_pid != -1 && bbackupd_pid != 0)
 		{
