@@ -31,6 +31,8 @@
 #include "Archive.h"
 #include "Timer.h"
 #include "Logging.h"
+#include "ZeroStream.h"
+#include "PartialReadStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -173,6 +175,41 @@ class TestLogger : public Logger
 
 int test(int argc, const char *argv[])
 {
+	// Test PartialReadStream and ReadGatherStream handling of files
+	// over 2GB (refs #2)
+	{
+		char buffer[8];
+
+		ZeroStream zero(0x80000003);
+		zero.Seek(0x7ffffffe, IOStream::SeekType_Absolute);
+		TEST_THAT(zero.GetPosition() == 0x7ffffffe);
+		TEST_THAT(zero.Read(buffer, 8) == 5);
+		TEST_THAT(zero.GetPosition() == 0x80000003);
+		TEST_THAT(zero.Read(buffer, 8) == 0);
+		zero.Seek(0, IOStream::SeekType_Absolute);
+		TEST_THAT(zero.GetPosition() == 0);
+
+		char* buffer2 = new char [0x1000000];
+		TEST_THAT(buffer2 != NULL);
+
+		PartialReadStream part(zero, 0x80000002);
+		for (int i = 0; i < 0x80; i++)
+		{
+			int read = part.Read(buffer2, 0x1000000);
+			TEST_THAT(read == 0x1000000);
+		}
+		TEST_THAT(part.Read(buffer, 8) == 2);
+		TEST_THAT(part.Read(buffer, 8) == 0);
+
+		delete [] buffer2;
+
+		ReadGatherStream gather(false);
+		zero.Seek(0, IOStream::SeekType_Absolute);
+		int component = gather.AddComponent(&zero);
+		gather.AddBlock(component, 0x80000002);
+		TEST_THAT(gather.Read(buffer, 8) == 8);
+	}
+
 	// Test self-deleting temporary file streams
 	{
 		std::string tempfile("testfiles/tempfile");
