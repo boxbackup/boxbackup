@@ -101,7 +101,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	// Find filename of config file
 	mConfigFileName = DefaultConfigFile;
 	bool haveConfigFile = false;
-	bool singleProcess  = false;
 
 	#ifdef NDEBUG
 	int masterLevel = Log::NOTICE; // need an int to do math with
@@ -125,7 +124,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 			case 'D':
 			{
-				singleProcess = true;
+				mSingleProcess = true;
 			}
 			break;
 
@@ -203,7 +202,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 	if (argc > optind && ::strcmp(argv[optind], "SINGLEPROCESS") == 0)
 	{
-		singleProcess = true; optind++;
+		mSingleProcess = true; optind++;
 	}
 
 	if (argc > optind)
@@ -215,19 +214,20 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 	Logging::SetGlobalLevel((Log::Level)masterLevel);
 
-	return Main(mConfigFileName, singleProcess);
+	// return Main(mConfigFileName, mSingleProcess);
+	return Main(mConfigFileName);
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Daemon::Main(const std::string& rConfigFileName,
-//			 bool singleProcess)
+//		Name:    Daemon::Main(const std::string& rConfigFileName)
 //		Purpose: Starts the daemon off -- equivalent of C main() function
 //		Created: 2003/07/29
 //
 // --------------------------------------------------------------------------
-int Daemon::Main(const std::string &rConfigFileName, bool singleProcess)
+// int Daemon::Main(const std::string &rConfigFileName, bool singleProcess)
+int Daemon::Main(const std::string &rConfigFileName)
 {
 	// Banner (optional)
 	{
@@ -241,7 +241,8 @@ int Daemon::Main(const std::string &rConfigFileName, bool singleProcess)
 	std::string pidFileName;
 
 	mConfigFileName = rConfigFileName;
-	bool asDaemon   = !singleProcess;
+	
+	bool asDaemon   = !mSingleProcess;
 
 	try
 	{

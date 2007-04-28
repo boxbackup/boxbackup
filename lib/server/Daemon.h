@@ -41,7 +41,8 @@ private:
 public:
 
 	int Main(const char *DefaultConfigFile, int argc, const char *argv[]);
-	int Main(const std::string &rConfigFile, bool singleProcess);
+	// int Main(const std::string &rConfigFile, bool singleProcess);
+	int Main(const std::string &rConfigFile);
 	
 	virtual void Run();
 	const Configuration &GetConfiguration() const;
@@ -66,6 +67,7 @@ public:
 
 protected:
 	box_time_t GetLoadedConfigModifiedTime() const;
+	bool IsSingleProcess() { return mSingleProcess; }
 	
 private:
 	static void SignalHandler(int sigraised);
@@ -77,6 +79,7 @@ private:
 	box_time_t mLoadedConfigModifiedTime;
 	bool mReloadConfigWanted;
 	bool mTerminateWanted;
+	bool mSingleProcess;
 	bool mKeepConsoleOpenAfterFork;
 	static Daemon *spDaemon;
 };
