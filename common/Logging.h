@@ -128,6 +128,9 @@ class Console : public Logger
 
 class Syslog : public Logger
 {
+	private:
+	std::string mName;
+
 	public:
 	Syslog();
 	virtual ~Syslog();
