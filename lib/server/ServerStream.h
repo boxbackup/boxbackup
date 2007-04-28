@@ -230,7 +230,7 @@ public:
 					{
 						// Since this is a template parameter, the if() will be optimised out by the compiler
 						#ifndef WIN32 // no fork on Win32
-						if(ForkToHandleRequests)
+						if(ForkToHandleRequests && !IsSingleProcess())
 						{
 							pid_t pid = ::fork();
 							switch(pid)
@@ -285,7 +285,7 @@ public:
 
 				#ifndef WIN32
 				// Clean up child processes (if forking daemon)
-				if(ForkToHandleRequests)
+				if(ForkToHandleRequests && !IsSingleProcess())
 				{
 					int status = 0;
 					int p = 0;
@@ -326,7 +326,7 @@ protected:
 		#ifdef WIN32
 		return false;
 		#else
-		return ForkToHandleRequests;
+		return ForkToHandleRequests && !IsSingleProcess();
 		#endif // WIN32
 	}
 
