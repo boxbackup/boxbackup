@@ -186,7 +186,7 @@ int main(int argc, const char *argv[])
 	if(!quiet)
 	{
 		const char *banner = BANNER_TEXT("Backup Query Tool");
-		printf(banner);
+		BOX_NOTICE(banner);
 	}
 
 #ifdef WIN32
