@@ -1518,6 +1518,7 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 	if (result <= 0 || result >= len)
 	{
 		errno = EACCES;
+		delete [] pWide;
 		return NULL;
 	}
 
