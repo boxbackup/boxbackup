@@ -752,8 +752,9 @@ int lstat_test_hook(const char *file_name, struct stat *buf)
 
 int test_bbackupd()
 {
-//	// First, wait for a normal period to make sure the last changes attributes are within a normal backup timeframe.
-//	wait_for_backup_operation();
+	// First, wait for a normal period to make sure the last changes 
+	// attributes are within a normal backup timeframe.
+	// wait_for_backup_operation();
 
 	// Connection gubbins
 	TLSContext context;
@@ -1074,11 +1075,14 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Unpack some more files
-#ifdef WIN32
-		TEST_THAT(::system("tar xzvf testfiles/spacetest2.tgz -C testfiles/TestDir1") == 0);
-#else
-		TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz | ( cd testfiles/TestDir1 && tar xf - )") == 0);
-#endif
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvf testfiles/spacetest2.tgz "
+				"-C testfiles/TestDir1") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz "
+				"| ( cd testfiles/TestDir1 && tar xf - )") == 0);
+		#endif
+
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/d1/f3") == 0);
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d3/d4") == 0);
@@ -1104,11 +1108,13 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		
 		// unpack the initial files again
-#ifdef WIN32
-		TEST_THAT(::system("tar xzvf testfiles/test_base.tgz -C testfiles") == 0);
-#else
-		TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
-#endif
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvf testfiles/test_base.tgz "
+				"-C testfiles") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < testfiles/test_base.tgz "
+				"| ( cd testfiles && tar xf - )") == 0);
+		#endif
 
 		// wait for it to do it's stuff
 		wait_for_backup_operation();
@@ -1543,22 +1549,27 @@ int test_bbackupd()
 		
 		// Delete a file
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
-#ifndef WIN32
-		// New symlink
-		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/symlink-to-dir") == 0);
-#endif		
+
+		#ifndef WIN32
+			// New symlink
+			TEST_THAT(::symlink("does-not-exist", 
+				"testfiles/TestDir1/symlink-to-dir") == 0);
+		#endif		
 
 		// Update a file (will be uploaded as a diff)
 		{
-			// Check that the file is over the diffing threshold in the bbstored.conf file
-			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") > 1024);
+			// Check that the file is over the diffing 
+			// threshold in the bbackupd.conf file
+			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") 
+				> 1024);
 			
 			// Add a bit to the end
 			FILE *f = ::fopen("testfiles/TestDir1/f45.df", "a");
 			TEST_THAT(f != 0);
 			::fprintf(f, "EXTRA STUFF");
 			::fclose(f);
-			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") > 1024);
+			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") 
+				> 1024);
 		}
 	
 		// wait for backup daemon to do it's stuff, and compare again
@@ -1604,7 +1615,7 @@ int test_bbackupd()
 		wait_for_backup_operation();
 		// Check that it was reported correctly
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
-		// Check that the error was only reorted once
+		// Check that the error was only reported once
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
 		// Fix the store
 		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf.bak",
@@ -1650,15 +1661,25 @@ int test_bbackupd()
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("\n==== Replace symlink with directory, "
 			"add new directory\n");
-#ifndef WIN32
-		TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir") == 0);
-#endif
-		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755) == 0);
-		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
-		// NOTE: create a file within the directory to avoid deletion by the housekeeping process later
-#ifndef WIN32
-		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents") == 0);
-#endif
+
+		#ifndef WIN32
+			TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir")
+				== 0);
+		#endif
+
+		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755) 
+			== 0);
+		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) 
+			== 0);
+
+		// NOTE: create a file within the directory to 
+		// avoid deletion by the housekeeping process later
+
+		#ifndef WIN32
+			TEST_THAT(::symlink("does-not-exist", 
+				"testfiles/TestDir1/x1/dir-to-file/contents") 
+				== 0);
+		#endif
 
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
@@ -1676,13 +1697,18 @@ int test_bbackupd()
 		// And the inverse, replace a directory with a file/symlink
 		printf("\n==== Replace directory with symlink\n");
 
-#ifndef WIN32
-		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents") == 0);
-#endif
+		#ifndef WIN32
+			TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file"
+				"/contents") == 0);
+		#endif
+
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
-#ifndef WIN32
-		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
-#endif
+
+		#ifndef WIN32
+			TEST_THAT(::symlink("does-not-exist", 
+				"testfiles/TestDir1/x1/dir-to-file") == 0);
+		#endif
+
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -1700,13 +1726,20 @@ int test_bbackupd()
 		printf("\n==== Replace symlink with directory "
 			"(which was a symlink)\n");
 
-#ifndef WIN32
-		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file") == 0);
-#endif
-		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) == 0);
-#ifndef WIN32
-		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
-#endif
+		#ifndef WIN32
+			TEST_THAT(::unlink("testfiles/TestDir1/x1"
+				"/dir-to-file") == 0);
+		#endif
+
+		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 
+			0755) == 0);
+
+		#ifndef WIN32
+			TEST_THAT(::symlink("does-not-exist", 
+				"testfiles/TestDir1/x1/dir-to-file/contents2")
+				== 0);
+		#endif
+
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -1726,14 +1759,18 @@ int test_bbackupd()
 		// directories over other old directories.
 		printf("\n==== Put it all back to how it was\n");
 
-#ifndef WIN32
-		TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file/contents2") == 0);
-#endif
+		#ifndef WIN32
+			TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file"
+				"/contents2") == 0);
+		#endif
 
 		TEST_THAT(::rmdir("testfiles/TestDir1/x1/dir-to-file") == 0);
-#ifndef WIN32
-		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/x1/dir-to-file") == 0);
-#endif
+
+		#ifndef WIN32
+			TEST_THAT(::symlink("does-not-exist", 
+				"testfiles/TestDir1/x1/dir-to-file") == 0);
+		#endif
+
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -1772,10 +1809,12 @@ int test_bbackupd()
 			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 		#ifdef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/untracked-2") 
+			TEST_THAT(::unlink("testfiles/TestDir1/untracked-2")
 				== 0);
 		#endif
+
 		TEST_THAT(::rename("testfiles/TestDir1/untracked-1", 
 			"testfiles/TestDir1/untracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
@@ -1821,9 +1860,12 @@ int test_bbackupd()
 			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 		#ifdef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/tracked-2") == 0);
+			TEST_THAT(::unlink("testfiles/TestDir1/tracked-2")
+				== 0);
 		#endif
+
 		TEST_THAT(::rename("testfiles/TestDir1/tracked-1", 
 			"testfiles/TestDir1/tracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
@@ -1864,17 +1906,21 @@ int test_bbackupd()
 			"attributes of one to latest time\n");
 
 		// Move that file back
-		TEST_THAT(::rename("testfiles/TestDir1/x1/dsfdsfs98.fd", "testfiles/TestDir1/df9834.dsf") == 0);
+		TEST_THAT(::rename("testfiles/TestDir1/x1/dsfdsfs98.fd", 
+			"testfiles/TestDir1/df9834.dsf") == 0);
 		
 		// Add some more files
-		// Because the 'm' option is not used, these files will look very old to the daemon.
+		// Because the 'm' option is not used, these files will 
+		// look very old to the daemon.
 		// Lucky it'll upload them then!
-#ifdef WIN32
-		TEST_THAT(::system("tar xzvf testfiles/test2.tgz -C testfiles") == 0);
-#else
-		TEST_THAT(::system("gzip -d < testfiles/test2.tgz | ( cd  testfiles && tar xf - )") == 0);
-		::chmod("testfiles/TestDir1/sub23/dhsfdss/blf.h", 0415);
-#endif
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvf testfiles/test2.tgz "
+				"-C testfiles") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < testfiles/test2.tgz "
+				"| ( cd  testfiles && tar xf - )") == 0);
+			::chmod("testfiles/TestDir1/sub23/dhsfdss/blf.h", 0415);
+		#endif
 		
 		// Wait and test
 		wait_for_backup_operation();
@@ -1925,10 +1971,13 @@ int test_bbackupd()
 
 			// and then move the time backwards!
 			struct timeval times[2];
-			BoxTimeToTimeval(SecondsToBoxTime((time_t)(365*24*60*60)), times[1]);
+			BoxTimeToTimeval(SecondsToBoxTime(
+				(time_t)(365*24*60*60)), times[1]);
 			times[0] = times[1];
-			TEST_THAT(::utimes("testfiles/TestDir1/sub23/rand.h", times) == 0);
+			TEST_THAT(::utimes("testfiles/TestDir1/sub23/rand.h", 
+				times) == 0);
 		}
+
 		// Wait and test
 		wait_for_sync_end(); // files too new
 		wait_for_sync_end(); // should (not) be backed up this time
@@ -1947,12 +1996,14 @@ int test_bbackupd()
 
 		// Add some files and directories which are marked as excluded
 		printf("\n==== Add files and dirs for exclusion test\n");
-		
-#ifdef WIN32
-		TEST_THAT(::system("tar xzvf testfiles/testexclude.tgz -C testfiles") == 0);
-#else
-		TEST_THAT(::system("gzip -d < testfiles/testexclude.tgz | ( cd testfiles && tar xf - )") == 0);
-#endif
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvf testfiles/testexclude.tgz "
+				"-C testfiles") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < "
+				"testfiles/testexclude.tgz "
+				"| ( cd testfiles && tar xf - )") == 0);
+		#endif
 
 		// Wait and test
 		wait_for_sync_end();
@@ -2070,8 +2121,11 @@ int test_bbackupd()
 			
 			{
 				// Dir and file which can't be read
-				TEST_THAT(::mkdir("testfiles/TestDir1/sub23/read-fail-test-dir", 0000) == 0);
-				int fd = ::open("testfiles/TestDir1/read-fail-test-file", O_CREAT | O_WRONLY, 0000);
+				TEST_THAT(::mkdir("testfiles/TestDir1/sub23"
+					"/read-fail-test-dir", 0000) == 0);
+				int fd = ::open("testfiles/TestDir1"
+					"/read-fail-test-file", 
+					O_CREAT | O_WRONLY, 0000);
 				TEST_THAT(fd != -1);
 				::close(fd);
 			}
@@ -2083,23 +2137,24 @@ int test_bbackupd()
 				"-l testfiles/query3o.log "
 				"\"compare -acQ\" quit");
 
-			// Check that unreadable files were found
-			TEST_RETURN(compareReturnValue, 3);	
-
-			// Check for memory leaks during compare
+			// should find differences
+			TEST_RETURN(compareReturnValue, 3);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Check that it was reported correctly
 			TEST_THAT(TestFileExists("testfiles/notifyran.read-error.1"));
 
-			// Check that the error was only reorted once
+			// Check that the error was only reported once
 			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
 
-			// Set permissions on file and dir to stop errors in the future
-			::chmod("testfiles/TestDir1/sub23/read-fail-test-dir", 0770);
-			::chmod("testfiles/TestDir1/read-fail-test-file", 0770);
+			// Set permissions on file and dir to stop 
+			// errors in the future
+			TEST_THAT(::chmod("testfiles/TestDir1/sub23"
+				"/read-fail-test-dir", 0770) == 0);
+			TEST_THAT(::chmod("testfiles/TestDir1"
+				"/read-fail-test-file", 0770) == 0);
 		}
-#endif // WIN32
+#endif
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
@@ -2193,17 +2248,24 @@ int test_bbackupd()
 		{
 			// connect and log in
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost", 
+				BOX_PORT_BBSTORED);
 			BackupProtocolClient protocol(conn);
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-			std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, BackupProtocolClientLogin::Flags_ReadOnly));
+			std::auto_ptr<BackupProtocolClientLoginConfirmed> 
+				loginConf(protocol.QueryLogin(0x01234567, 
+				BackupProtocolClientLogin::Flags_ReadOnly));
 
 			// Find the ID of the Test1 directory
-			restoredirid = GetDirID(protocol, "Test1", BackupProtocolClientListDirectory::RootDirectory);
+			restoredirid = GetDirID(protocol, "Test1", 
+				BackupProtocolClientListDirectory::RootDirectory);
 			TEST_THAT(restoredirid != 0);
 
 			// Test the restoration
-			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-Test1", true /* print progress dots */) == Restore_Complete);
+			TEST_THAT(BackupClientRestore(protocol, restoredirid, 
+				"testfiles/restore-Test1", 
+				true /* print progress dots */) 
+				== Restore_Complete);
 
 			// Compare it
 			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query10.log \"compare -cE Test1 testfiles/restore-Test1\" quit");
@@ -2211,7 +2273,10 @@ int test_bbackupd()
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Make sure you can't restore a restored directory
-			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-Test1", true /* print progress dots */) == Restore_TargetExists);
+			TEST_THAT(BackupClientRestore(protocol, restoredirid, 
+				"testfiles/restore-Test1", 
+				true /* print progress dots */) 
+				== Restore_TargetExists);
 			
 			// Make sure you can't restore to a nonexistant path
 			printf("Try to restore to a path that doesn't exist\n");
@@ -2224,8 +2289,13 @@ int test_bbackupd()
 			deldirid = GetDirID(protocol, "x1", restoredirid);
 			TEST_THAT(deldirid != 0);
 
-			// Just check it doesn't bomb out -- will check this properly later (when bbackupd is stopped)
-			TEST_THAT(BackupClientRestore(protocol, deldirid, "testfiles/restore-Test1-x1", true /* print progress dots */, true /* deleted files */) == Restore_Complete);
+			// Just check it doesn't bomb out -- will check this 
+			// properly later (when bbackupd is stopped)
+			TEST_THAT(BackupClientRestore(protocol, deldirid, 
+				"testfiles/restore-Test1-x1", 
+				true /* print progress dots */, 
+				true /* deleted files */) 
+				== Restore_Complete);
 
 			// Log out
 			protocol.QueryFinished();
@@ -2340,11 +2410,13 @@ int test_bbackupd()
 	
 		// Add some more files and modify others
 		// Use the m flag this time so they have a recent modification time
-#ifdef WIN32
-		TEST_THAT(::system("tar xzvmf testfiles/test3.tgz -C testfiles") == 0);
-#else
-		TEST_THAT(::system("gzip -d < testfiles/test3.tgz | ( cd testfiles && tar xmf - )") == 0);
-#endif
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvmf testfiles/test3.tgz "
+				"-C testfiles") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < testfiles/test3.tgz "
+				"| ( cd testfiles && tar xmf - )") == 0);
+		#endif
 		
 		// Wait and test
 		wait_for_backup_operation();
@@ -2362,7 +2434,8 @@ int test_bbackupd()
 
 		// Rename directory
 		printf("\n==== Rename directory\n");
-		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", "testfiles/TestDir1/renamed-dir") == 0);
+		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", 
+			"testfiles/TestDir1/renamed-dir") == 0);
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -2381,9 +2454,12 @@ int test_bbackupd()
 
 		// Rename some files -- one under the threshold, others above
 		printf("\n==== Rename files\n");
-		TEST_THAT(rename("testfiles/TestDir1/continousupdate", "testfiles/TestDir1/continousupdate-ren") == 0);
-		TEST_THAT(rename("testfiles/TestDir1/df324", "testfiles/TestDir1/df324-ren") == 0);
-		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl", "testfiles/TestDir1/find2perl-ren") == 0);
+		TEST_THAT(rename("testfiles/TestDir1/continousupdate", 
+			"testfiles/TestDir1/continousupdate-ren") == 0);
+		TEST_THAT(rename("testfiles/TestDir1/df324", 
+			"testfiles/TestDir1/df324-ren") == 0);
+		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl", 
+			"testfiles/TestDir1/find2perl-ren") == 0);
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -2409,16 +2485,21 @@ int test_bbackupd()
 
 		// Then modify an existing file
 		{
-			FILE *f = fopen("testfiles/TestDir1/sub23/in-the-future", "w");
+			FILE *f = fopen("testfiles/TestDir1/sub23/"
+				"in-the-future", "w");
 			TEST_THAT(f != 0);
 			fprintf(f, "Back to the future!\n");
 			fclose(f);
 			// and then move the time forwards!
 			struct timeval times[2];
-			BoxTimeToTimeval(GetCurrentBoxTime() + SecondsToBoxTime((time_t)(365*24*60*60)), times[1]);
+			BoxTimeToTimeval(GetCurrentBoxTime() + 
+				SecondsToBoxTime((time_t)(365*24*60*60)), 
+				times[1]);
 			times[0] = times[1];
-			TEST_THAT(::utimes("testfiles/TestDir1/sub23/in-the-future", times) == 0);
+			TEST_THAT(::utimes("testfiles/TestDir1/sub23/"
+				"in-the-future", times) == 0);
 		}
+
 		// Wait and test
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
@@ -2435,7 +2516,8 @@ int test_bbackupd()
 
 		printf("\n==== Change client store marker\n");
 
-		// Then... connect to the server, and change the client store marker. See what that does!
+		// Then... connect to the server, and change the 
+		// client store marker. See what that does!
 		{
 			bool done = false;
 			int tries = 4;
@@ -2444,7 +2526,8 @@ int test_bbackupd()
 				try
 				{
 					SocketStreamTLS conn;
-					conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+					conn.Open(context, Socket::TypeINET, 
+						"localhost", BOX_PORT_BBSTORED);
 					BackupProtocolClient protocol(conn);
 					protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
 					std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));	// read-write
@@ -2513,22 +2596,38 @@ int test_bbackupd()
 		{
 			do_interrupted_restore(context, restoredirid);
 			int64_t resumesize = 0;
-			TEST_THAT(FileExists("testfiles/restore-interrupt.boxbackupresume", &resumesize));
-			TEST_THAT(resumesize > 16);	// make sure it has recorded something to resume
+			TEST_THAT(FileExists("testfiles/"
+				"restore-interrupt.boxbackupresume", 
+				&resumesize));
+			// make sure it has recorded something to resume
+			TEST_THAT(resumesize > 16);	
 
 			printf("\n==== Resume restore\n");
 
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost", 
+				BOX_PORT_BBSTORED);
 			BackupProtocolClient protocol(conn);
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-			std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));	// read-write
+			std::auto_ptr<BackupProtocolClientLoginConfirmed> 
+				loginConf(protocol.QueryLogin(0x01234567, 
+				0 /* read-write */));
 
-			// Check that the restore fn returns resume possible, rather than doing anything
-			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-interrupt", true /* print progress dots */) == Restore_ResumePossible);
+			// Check that the restore fn returns resume possible,
+			// rather than doing anything
+			TEST_THAT(BackupClientRestore(protocol, restoredirid, 
+				"testfiles/restore-interrupt", 
+				true /* print progress dots */) 
+				== Restore_ResumePossible);
 
 			// Then resume it
-			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-interrupt", true /* print progress dots */, false /* deleted files */, false /* undelete server */, true /* resume */) == Restore_Complete);
+			TEST_THAT(BackupClientRestore(protocol, restoredirid, 
+				"testfiles/restore-interrupt", 
+				true /* print progress dots */, 
+				false /* deleted files */, 
+				false /* undelete server */, 
+				true /* resume */) 
+				== Restore_Complete);
 
 			protocol.QueryFinished();
 
@@ -2551,13 +2650,21 @@ int test_bbackupd()
 		printf("\n==== Check restore deleted files\n");
 		{
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost", 
+				BOX_PORT_BBSTORED);
 			BackupProtocolClient protocol(conn);
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-			std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));	// read-write
+			std::auto_ptr<BackupProtocolClientLoginConfirmed> 
+				loginConf(protocol.QueryLogin(0x01234567, 
+				0 /* read-write */));
 
 			// Do restore and undelete
-			TEST_THAT(BackupClientRestore(protocol, deldirid, "testfiles/restore-Test1-x1-2", true /* print progress dots */, true /* deleted files */, true /* undelete on server */) == Restore_Complete);
+			TEST_THAT(BackupClientRestore(protocol, deldirid, 
+				"testfiles/restore-Test1-x1-2", 
+				true /* print progress dots */, 
+				true /* deleted files */, 
+				true /* undelete on server */) 
+				== Restore_Complete);
 
 			protocol.QueryFinished();
 
@@ -2706,11 +2813,13 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Initial files
-#ifdef WIN32
-	TEST_THAT(::system("tar xzvf testfiles/test_base.tgz -C testfiles") == 0);
-#else
-	TEST_THAT(::system("gzip -d < testfiles/test_base.tgz | ( cd testfiles && tar xf - )") == 0);
-#endif
+	#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/test_base.tgz "
+			"-C testfiles") == 0);
+	#else
+		TEST_THAT(::system("gzip -d < testfiles/test_base.tgz "
+			"| ( cd testfiles && tar xf - )") == 0);
+	#endif
 
 	// Do the tests
 
