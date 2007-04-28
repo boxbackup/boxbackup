@@ -278,7 +278,7 @@ void BackupStoreFileEncodeStream::CalculateBlockSizes(int64_t DataSize, int64_t 
 		
 		rNumBlocksOut = (DataSize + rBlockSizeOut - 1) / rBlockSizeOut;
 		
-	} while(rBlockSizeOut <= BACKUP_FILE_MAX_BLOCK_SIZE && rNumBlocksOut > BACKUP_FILE_INCREASE_BLOCK_SIZE_AFTER);
+	} while(rBlockSizeOut < BACKUP_FILE_MAX_BLOCK_SIZE && rNumBlocksOut > BACKUP_FILE_INCREASE_BLOCK_SIZE_AFTER);
 	
 	// Last block size
 	rLastBlockSizeOut = DataSize - ((rNumBlocksOut - 1) * rBlockSizeOut);
