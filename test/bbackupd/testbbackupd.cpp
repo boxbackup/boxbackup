@@ -2134,7 +2134,8 @@ int test_bbackupd()
 			fflush(stdout);
 			
 			// Check there's a difference
-			compareReturnValue = ::system("testfiles/extcheck1.pl");
+			compareReturnValue = ::system("perl testfiles/"
+				"extcheck1.pl");
 
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -2158,7 +2159,8 @@ int test_bbackupd()
 			printf("\n");
 			fflush(stdout);
 
-			compareReturnValue = ::system("testfiles/extcheck2.pl");
+			compareReturnValue = ::system("perl testfiles/"
+				"extcheck2.pl");
 
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
