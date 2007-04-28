@@ -47,6 +47,7 @@
 #include "ExcludeList.h"
 #include "BackupClientMakeExcludeList.h"
 #include "PathUtils.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -1032,10 +1033,22 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 		// Done.
 		printf("Object ID %08llx fetched sucessfully.\n", fileId);
 	}
+	catch (BoxException &e)
+	{
+		BOX_ERROR("Failed to fetch file: " << 
+			e.what());
+		::unlink(localName.c_str());
+	}
+	catch(std::exception &e)
+	{
+		BOX_ERROR("Failed to fetch file: " <<
+			e.what());
+		::unlink(localName.c_str());
+	}
 	catch(...)
 	{
+		BOX_ERROR("Failed to fetch file: unknown error");
 		::unlink(localName.c_str());
-		printf("Error occured fetching file.\n");
 	}
 }
 
