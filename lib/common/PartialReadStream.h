@@ -23,7 +23,7 @@
 class PartialReadStream : public IOStream
 {
 public:
-	PartialReadStream(IOStream &rSource, int BytesToRead);
+	PartialReadStream(IOStream &rSource, pos_type BytesToRead);
 	~PartialReadStream();
 private:
 	// no copying allowed
@@ -39,7 +39,7 @@ public:
 
 private:
 	IOStream &mrSource;
-	int mBytesLeft;
+	pos_type mBytesLeft;
 };
 
 #endif // PARTIALREADSTREAM__H
