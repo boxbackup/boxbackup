@@ -300,14 +300,14 @@ void BackupDaemon::RunHelperThread(void)
 		}
 		catch (BoxException &e)
 		{
-			BOX_ERROR("Failed to open command socket" << 
+			BOX_ERROR("Failed to open command socket: " << 
 				e.what());
 			SetTerminateWanted();
 			break; // this is fatal to listening thread
 		}
 		catch(std::exception &e)
 		{
-			BOX_ERROR("Failed to open command socket" <<
+			BOX_ERROR("Failed to open command socket: " <<
 				e.what());
 			SetTerminateWanted();
 			break; // this is fatal to listening thread
