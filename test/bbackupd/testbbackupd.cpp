@@ -2113,9 +2113,10 @@ int test_bbackupd()
 		printf("\n==== Continuously update file, "
 			"check isn't uploaded\n");
 		
-		// Make sure everything happens at the same point in the sync cycle: wait until exactly the start of a sync
-		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -c testfiles/bbackupd.conf wait-for-sync") == 0);
-		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+		// Make sure everything happens at the same point in the 
+		// sync cycle: wait until exactly the start of a sync
+		wait_for_sync_start();
+
 		// Then wait a second, to make sure the scan is complete
 		::safe_sleep(1);
 
@@ -2398,10 +2399,11 @@ int test_bbackupd()
 		printf("\n==== Create a file with timestamp way ahead "
 			"in the future\n");
 		// Time critical, so sync
-		TEST_THAT(::system("../../bin/bbackupctl/bbackupctl -q -c testfiles/bbackupd.conf wait-for-sync") == 0);
-		TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+		wait_for_sync_start();
+
 		// Then wait a second, to make sure the scan is complete
 		::safe_sleep(1);
+
 		// Then modify an existing file
 		{
 			FILE *f = fopen("testfiles/TestDir1/sub23/in-the-future", "w");
