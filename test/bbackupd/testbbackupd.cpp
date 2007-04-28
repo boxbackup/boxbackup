@@ -1088,7 +1088,7 @@ int test_bbackupd()
 		int compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query0a.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1119,7 +1119,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query1.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1566,7 +1566,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1574,7 +1574,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2q.log "
-			"\"compare -acq\" quit");
+			"\"compare -acqQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
@@ -1664,7 +1664,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3c.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
@@ -1687,7 +1687,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3d.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
@@ -1711,10 +1711,15 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3e.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
 		// And finally, put it back to how it was before 
 		// it was put back to how it was before
 		// This gets lots of nasty things in the store with 
@@ -1737,7 +1742,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3f.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1768,7 +1773,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3g.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		#ifdef WIN32
@@ -1783,7 +1788,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3g.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1815,8 +1820,9 @@ int test_bbackupd()
 		// back up both files
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
-			"-c testfiles/bbackupd.conf -l testfiles/query3u.log "
-			"\"compare -ac\" quit");
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3h.log "
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		#ifdef WIN32
@@ -1828,8 +1834,9 @@ int test_bbackupd()
 		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
-			"-c testfiles/bbackupd.conf -l testfiles/query3v.log "
-			"\"compare -ac\" quit");
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3i.log "
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
@@ -1848,7 +1855,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3j.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
@@ -1878,7 +1885,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3k.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
@@ -1933,7 +1940,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3l.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1959,7 +1966,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3m.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -1967,7 +1974,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3n.log "
-			"\"compare -acE\" quit");
+			"\"compare -acEQ\" quit");
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -2078,7 +2085,7 @@ int test_bbackupd()
 			compareReturnValue = ::system(BBACKUPQUERY " -q "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query3o.log "
-				"\"compare -ac\" quit");
+				"\"compare -acQ\" quit");
 
 			// Check that unreadable files were found
 			TEST_RETURN(compareReturnValue, 3);	
@@ -2172,7 +2179,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query4.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
@@ -2340,7 +2347,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query5.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
@@ -2356,7 +2363,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -2364,7 +2371,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6q.log "
-			"\"compare -acq\" quit");
+			"\"compare -acqQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -2377,7 +2384,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -2412,7 +2419,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3e.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 1);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
@@ -2478,7 +2485,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
-			"\"compare -ac\" quit");
+			"\"compare -acQ\" quit");
 		TEST_RETURN(compareReturnValue, 2);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
@@ -2524,7 +2531,7 @@ int test_bbackupd()
 			compareReturnValue = ::system(BBACKUPQUERY " -q "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query14.log "
-				"\"compare -cE Test1 "
+				"\"compare -cEQ Test1 "
 				"testfiles/restore-interrupt\" quit");
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -2553,7 +2560,7 @@ int test_bbackupd()
 			compareReturnValue = ::system(BBACKUPQUERY " -q "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query11.log "
-				"\"compare -cE Test1/x1 "
+				"\"compare -cEQ Test1/x1 "
 				"testfiles/restore-Test1-x1-2\" quit");
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
@@ -2660,7 +2667,7 @@ int test_bbackupd()
 			compareReturnValue = ::system(BBACKUPQUERY " -q "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query4a.log "
-				"\"compare -ac\" quit");
+				"\"compare -acQ\" quit");
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
