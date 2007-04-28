@@ -214,7 +214,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 	Logging::SetGlobalLevel((Log::Level)masterLevel);
 
-	// return Main(mConfigFileName, mSingleProcess);
 	return Main(mConfigFileName);
 }
 
@@ -226,7 +225,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 //		Created: 2003/07/29
 //
 // --------------------------------------------------------------------------
-// int Daemon::Main(const std::string &rConfigFileName, bool singleProcess)
 int Daemon::Main(const std::string &rConfigFileName)
 {
 	// Banner (optional)
