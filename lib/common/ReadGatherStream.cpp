@@ -59,8 +59,9 @@ ReadGatherStream::~ReadGatherStream()
 //
 // Function
 //		Name:    ReadGatherStream::AddComponent(IOStream *)
-//		Purpose: Add a component to this stream, returning the index of this component
-//				 in the internal list. Use this with AddBlock()
+//		Purpose: Add a component to this stream, returning the index
+//			 of this component in the internal list. Use this
+//			 with AddBlock()
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
@@ -145,10 +146,10 @@ int ReadGatherStream::Read(void *pBuffer, int NBytes, int Timeout)
 		if(mPositionInCurrentBlock < mBlocks[mCurrentBlock].mLength)
 		{
 			// Read!
-			int s = mBlocks[mCurrentBlock].mLength - mPositionInCurrentBlock;
+			pos_type s = mBlocks[mCurrentBlock].mLength - mPositionInCurrentBlock;
 			if(s > bytesToRead) s = bytesToRead;
 			
-			int r = mComponents[mBlocks[mCurrentBlock].mComponent]->Read(buffer, s, Timeout);
+			pos_type r = mComponents[mBlocks[mCurrentBlock].mComponent]->Read(buffer, s, Timeout);
 			
 			// update variables
 			mPositionInCurrentBlock += r;
