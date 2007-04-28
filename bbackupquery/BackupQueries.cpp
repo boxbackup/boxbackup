@@ -55,10 +55,10 @@
 #undef min
 #undef max
 
-#define COMPARE_RETURN_SAME			1
+#define COMPARE_RETURN_SAME		1
 #define COMPARE_RETURN_DIFFERENT	2
 #define COMPARE_RETURN_ERROR		3
-
+#define COMMAND_RETURN_ERROR		4
 
 // --------------------------------------------------------------------------
 //
@@ -786,13 +786,19 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	if(args.size() != 1 || args[0].size() == 0)
 	{
 		printf("Incorrect usage.\nlcd <local-directory>\n");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 	
 	// Try changing directory
 #ifdef WIN32
 	std::string dirName;
-	if(!ConvertConsoleToUtf8(args[0].c_str(), dirName)) return;
+	if(!ConvertConsoleToUtf8(args[0].c_str(), dirName))
+	{
+		printf("Failed to convert path from console encoding.\n");
+		SetReturnCode(COMMAND_RETURN_ERROR);
+		return;
+	}
 	int result = ::chdir(dirName.c_str());
 #else
 	int result = ::chdir(args[0].c_str());
@@ -801,6 +807,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	{
 		printf((errno == ENOENT || errno == ENOTDIR)?"Directory '%s' does not exist\n":"Error changing dir to '%s'\n",
 			args[0].c_str());
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 	
@@ -809,11 +816,17 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	if(::getcwd(wd, PATH_MAX) == 0)
 	{
 		printf("Error getting current directory\n");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 
 #ifdef WIN32
-	if(!ConvertUtf8ToConsole(wd, dirName)) return;
+	if(!ConvertUtf8ToConsole(wd, dirName))
+	{
+		printf("Failed to convert new path from console encoding.\n");
+		SetReturnCode(COMMAND_RETURN_ERROR);
+		return;
+	}
 	printf("Local current directory is now '%s'\n", dirName.c_str());
 #else
 	printf("Local current directory is now '%s'\n", wd);
@@ -1014,7 +1027,9 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	struct stat st;
 	if(::stat(localName.c_str(), &st) == 0 || errno != ENOENT)
 	{
-		printf("The local file %s already exists, will not overwrite it.\n", localName.c_str());
+		printf("The local file %s already exists, will not "
+			"overwrite it.\n", localName.c_str());
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 	
