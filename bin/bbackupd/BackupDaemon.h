@@ -308,7 +308,7 @@ public:
 	{ 
 		if (mLogAllFileAccess)
 		{
-			BOX_INFO("Uploading file: " << rLocalPath);
+			BOX_INFO("Uploading complete file: " << rLocalPath);
 		} 
 	}
  	virtual void NotifyFileUploadingPatch(
