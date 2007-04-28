@@ -292,6 +292,14 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 		}
 
 		out.Close();
+
+		// The stream might have uncertain size, in which case
+		// we need to drain it to get the 
+		// Protocol::ProtocolStreamHeader_EndOfStream byte
+		// out of our connection stream.
+		char buffer[1];
+		int drained = rEncodedFile.Read(buffer, 1);
+		ASSERT(drained == 0);
 		
 		// Write the attributes
 		stream->GetAttributes().WriteAttributes(DecodedFilename);
