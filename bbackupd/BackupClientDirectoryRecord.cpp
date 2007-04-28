@@ -31,6 +31,7 @@
 #include "Archive.h"
 #include "PathUtils.h"
 #include "Logging.h"
+#include "ReadLoggingStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -1357,9 +1358,13 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 		if(doNormalUpload)
 		{
 			// below threshold or nothing to diff from, so upload whole
+			rParams.GetProgressNotifier().NotifyFileUploading(this, 
+				rFilename);
 			
 			// Prepare to upload, getting a stream which will encode the file as we go along
-			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(rFilename.c_str(), mObjectID, rStoreFilename));
+			std::auto_ptr<IOStream> upload(
+				BackupStoreFile::EncodeFile(rFilename.c_str(),
+					mObjectID, rStoreFilename));
 		
 			// Send to store
 			std::auto_ptr<BackupProtocolClientSuccess> stored(
