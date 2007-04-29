@@ -2036,8 +2036,12 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		break;
 	#endif
 
+	case Restore_UnknownError:
+		printf("Unknown error during restore.\n");
+		break;
+
 	default:
-		printf("ERROR: Unknown restore result.\n");
+		printf("ERROR: Unknown restore result %d.\n", result);
 		break;
 	}
 }
