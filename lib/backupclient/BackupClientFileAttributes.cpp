@@ -578,7 +578,8 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
+void BackupClientFileAttributes::WriteAttributes(const char *Filename,
+	bool MakeUserWritable) const
 {
 	// Got something loaded
 	if(GetSize() <= 0)
@@ -704,7 +705,12 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
-	
+
+	if (MakeUserWritable)
+	{
+		mode |= S_IRWXU;
+	}
+
 	// Apply everything else... (allowable mode flags only)
 	if(::chmod(Filename, mode & (S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID | S_ISGID | S_ISVTX)) != 0)	// mode must be done last (think setuid)
 	{
