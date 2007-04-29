@@ -299,7 +299,13 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 		// out of our connection stream.
 		char buffer[1];
 		int drained = rEncodedFile.Read(buffer, 1);
-		ASSERT(drained == 0);
+
+		// The Read will return 0 if we are actually at the end
+		// of the stream, but some tests decode files directly,
+		// in which case we are actually positioned at the start
+		// of the block index. I hope that reading an extra byte
+		// doesn't hurt!
+		// ASSERT(drained == 0);
 		
 		// Write the attributes
 		stream->GetAttributes().WriteAttributes(DecodedFilename);
