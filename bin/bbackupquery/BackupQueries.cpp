@@ -1695,7 +1695,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 								equal = false;
 							}
 
-							// Must always read the entire decoded string, if it's not a symlink
+							// Must always read the entire decoded stream, if it's not a symlink
 							if(fileOnServerStream->StreamDataLeft())
 							{
 								// Absorb all the data remaining
@@ -1703,6 +1703,17 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 								while(fileOnServerStream->StreamDataLeft())
 								{
 									fileOnServerStream->Read(buffer, sizeof(buffer), mrConnection.GetTimeout());
+								}
+							}
+
+							// Must always read the entire encoded stream
+							if(objectStream->StreamDataLeft())
+							{
+								// Absorb all the data remaining
+								char buffer[2048];
+								while(objectStream->StreamDataLeft())
+								{
+									objectStream->Read(buffer, sizeof(buffer), mrConnection.GetTimeout());
 								}
 							}
 						}
