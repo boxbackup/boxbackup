@@ -591,7 +591,6 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		}
 	}
 
-
 	// Make sure the restore info has been saved	
 	if(bytesWrittenSinceLastRestoreInfoSave != 0)
 	{
