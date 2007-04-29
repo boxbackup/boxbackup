@@ -52,6 +52,7 @@ Daemon::Daemon()
 	: mpConfiguration(NULL),
 	  mReloadConfigWanted(false),
 	  mTerminateWanted(false),
+	  mSingleProcess(false),
 	  mKeepConsoleOpenAfterFork(false)
 {
 	if(spDaemon != NULL)
