@@ -412,7 +412,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 
 	try
 	{
-		dirAttr.WriteAttributes(rLocalDirectoryName.c_str());
+		dirAttr.WriteAttributes(rLocalDirectoryName.c_str(), true);
 	}
 	catch (BoxException &e)
 	{
@@ -591,6 +591,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		}
 	}
 
+
 	// Make sure the restore info has been saved	
 	if(bytesWrittenSinceLastRestoreInfoSave != 0)
 	{
@@ -661,6 +662,30 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				rLevel.mRestoredObjects.insert(en->GetObjectID());
 			}
 		}
+	}
+
+	// now remove the user writable flag, if we added it earlier
+	try
+	{
+		dirAttr.WriteAttributes(rLocalDirectoryName.c_str(), false);
+	}
+	catch (BoxException &e)
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes for %s: %s", 
+			rLocalDirectoryName.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(std::exception &e)
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes for %s: %s", 
+			rLocalDirectoryName.c_str(), e.what());
+		return Restore_UnknownError;
+	}
+	catch(...)
+	{
+		::syslog(LOG_ERR, "Failed to restore attributes for %s: "
+			"unknown error", rLocalDirectoryName.c_str());
+		return Restore_UnknownError;
 	}
 
 	return Restore_Complete;
