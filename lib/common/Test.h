@@ -10,16 +10,18 @@
 #ifndef TEST__H
 #define TEST__H
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdlib.h>
+#include <errno.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
 
-#include <stdio.h>
 #include <string>
 
 extern int failures;
