@@ -296,25 +296,37 @@ int test(int argc, const char *argv[])
 	Timers::Cleanup();
 	
 	// Check that using timer methods without initialisation
-	// throws an exception
-	TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL), 
-		CommonException, AssertFailed);
-	TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
-		CommonException, AssertFailed);
+	// throws an assertion failure. Can only do this in debug mode
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL), 
+			CommonException, AssertFailed);
+		TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
+			CommonException, AssertFailed);
+	#endif
+
 	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
-	TEST_CHECK_THROWS(Timers::Cleanup(), CommonException, AssertFailed);
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
+			AssertFailed);
+	#endif
 	
 	// Check that we can initialise the timers
 	Timers::Init();
 	
 	// Check that double initialisation throws an exception
-	TEST_CHECK_THROWS(Timers::Init(), CommonException, AssertFailed);
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Init(), CommonException,
+			AssertFailed);
+	#endif
 
 	// Check that we can clean up the timers
 	Timers::Cleanup();
 	
 	// Check that double cleanup throws an exception
-	TEST_CHECK_THROWS(Timers::Cleanup(), CommonException, AssertFailed);
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
+			AssertFailed);
+	#endif
 
 	Timers::Init();
 
