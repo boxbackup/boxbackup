@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <errno.h>
 #include <time.h>
 
 #ifdef HAVE_SYSLOG_H
