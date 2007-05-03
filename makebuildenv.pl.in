@@ -414,6 +414,7 @@ test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
 test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
 
 echo Removing old test files...
+chmod -R a+rwx testfiles
 rm -rf testfiles
 
 echo Copying new test files...
