@@ -1134,6 +1134,56 @@ int test_bbackupd()
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 
+
+		printf("\n==== Check that read-only directories and "
+			"their contents can be restored.\n");
+
+		{
+			#ifdef WIN32
+				TEST_THAT(::system("chmod 0555 testfiles/"
+					"TestDir1/x1") == 0);
+			#else
+				TEST_THAT(chmod("testfiles/TestDir1/x1",
+					0555) == 0);
+			#endif
+
+			wait_for_sync_end(); // too new
+			wait_for_sync_end(); // should be backed up now
+
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-c testfiles/bbackupd.conf "
+				"-q \"compare -cEQ Test1 testfiles/TestDir1\" " 
+				"quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// check that we can restore it
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-c testfiles/bbackupd.conf "
+				"-q \"restore Test1 testfiles/restore1\" "
+				"quit");
+			TEST_RETURN(compareReturnValue, 0);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// check that it restored properly
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-c testfiles/bbackupd.conf "
+				"-q \"compare -cEQ Test1 testfiles/restore1\" " 
+				"quit");
+			TEST_RETURN(compareReturnValue, 1);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// put the permissions back to sensible values
+			#ifdef WIN32
+				TEST_THAT(::system("chmod 0755 testfiles/"
+					"TestDir1/x1") == 0);
+			#else
+				TEST_THAT(chmod("testfiles/TestDir1/x1",
+					0755) == 0);
+			#endif
+
+		}
+
 #ifdef WIN32
 		printf("\n==== Check that filenames in UTF-8 "
 			"can be backed up\n");
@@ -2268,7 +2318,11 @@ int test_bbackupd()
 				== Restore_Complete);
 
 			// Compare it
-			compareReturnValue = ::system("../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query10.log \"compare -cE Test1 testfiles/restore-Test1\" quit");
+			compareReturnValue = ::system(BBACKUPQUERY " -q "
+				"-c testfiles/bbackupd.conf "
+				"-l testfiles/query10.log "
+				"\"compare -cE Test1 testfiles/restore-Test1\" "
+				"quit");
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
