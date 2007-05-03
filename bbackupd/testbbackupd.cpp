@@ -776,8 +776,11 @@ int test_bbackupd()
 	#endif
 	
 #ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-	printf("Skipping intercept-based KeepAlive tests on this platform.\n");
+	printf("\n==== Skipping intercept-based KeepAlive tests "
+		"on this platform.\n");
 #else
+	printf("\n==== Testing SSL KeepAlive messages\n");
+
 	{
 		#ifdef WIN32
 		#error TODO: implement threads on Win32, or this test \
@@ -1061,7 +1064,9 @@ int test_bbackupd()
 
 	if(bbackupd_pid > 0)
 	{
-		// First, check storage space handling -- wait for file to be uploaded
+		printf("\n==== Testing that backup pauses when store is full\n");
+
+		// wait for files to be uploaded
 		wait_for_backup_operation();
 
 		// Set limit to something very small
