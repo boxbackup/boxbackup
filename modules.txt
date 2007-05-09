@@ -9,56 +9,37 @@
 
 # Generic support code and modules
 
-OMIT:mingw32
-OMIT:mingw32msvc
-OMIT:CYGWIN
 lib/raidfile
-END-OMIT
-
 lib/crypto
 lib/server
-lib/win32		lib/server
 lib/compress
 lib/intercept
-test/common		lib/win32
-test/crypto		lib/crypto	lib/win32
-test/compress		lib/compress	lib/win32
 
-OMIT:mingw32
-OMIT:mingw32msvc
-test/basicserver	lib/server	lib/win32
-OMIT:CYGWIN
+test/common
+test/crypto		lib/crypto
+test/compress		lib/compress
 test/raidfile		lib/raidfile	lib/intercept
-END-OMIT
+test/basicserver	lib/server
 
 # IF_DISTRIBUTION(boxbackup)
 
 # Backup system
 
 lib/backupclient	lib/server	lib/crypto	lib/compress
-
-OMIT:mingw32
-OMIT:mingw32msvc
-OMIT:CYGWIN
 lib/backupstore		lib/server	lib/raidfile	lib/backupclient
-bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	lib/win32
-bin/bbstoreaccounts	lib/raidfile	lib/backupstore	lib/win32
-bin/bbackupobjdump	lib/backupclient lib/backupstore	lib/win32
-END-OMIT
 
-bin/bbackupd		lib/server	lib/backupclient	lib/win32
-bin/bbackupquery	lib/server	lib/backupclient	lib/win32
-bin/bbackupctl		lib/server	lib/backupclient	lib/win32
+bin/bbackupobjdump	lib/backupclient lib/backupstore
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
+bin/bbstoreaccounts	lib/raidfile	lib/backupstore
+bin/bbackupd		lib/server	lib/backupclient
+bin/bbackupquery	lib/server	lib/backupclient
+bin/bbackupctl		lib/server	lib/backupclient
 
-OMIT:mingw32
-OMIT:mingw32msvc
-OMIT:CYGWIN
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
-END-OMIT
 
 # END_IF_DISTRIBUTION
 
