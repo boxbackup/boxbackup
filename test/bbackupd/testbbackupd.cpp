@@ -1944,6 +1944,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/x1/dsfdsfs98.fd"));
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", 
 			"testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+		
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -q "
 			"-c testfiles/bbackupd.conf "
@@ -2536,6 +2537,7 @@ int test_bbackupd()
 		// timestamps still get added
 		printf("\n==== Create a file with timestamp way ahead "
 			"in the future\n");
+
 		// Time critical, so sync
 		wait_for_sync_start();
 
@@ -2707,6 +2709,7 @@ int test_bbackupd()
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 
 		printf("\n==== Check restore deleted files\n");
+
 		{
 			SocketStreamTLS conn;
 			conn.Open(context, Socket::TypeINET, "localhost", 
