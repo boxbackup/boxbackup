@@ -503,6 +503,10 @@ std::string GetErrorMessage(DWORD errorCode)
 		return std::string("failed to get error message");
 	}
 
+	// remove embedded newline
+	pMsgBuf[chars - 1] = 0;
+	pMsgBuf[chars - 2] = 0;
+
 	std::ostringstream line;
 	line << pMsgBuf << " (" << errorCode << ")";
 	LocalFree(pMsgBuf);
@@ -1474,6 +1478,7 @@ void syslog(int loglevel, const char *frmt, ...)
 
 int emu_chdir(const char* pDirName)
 {
+	/*
 	std::string AbsPathWithUnicode = 
 		ConvertPathToAbsoluteUnicode(pDirName);
 
@@ -1484,11 +1489,19 @@ int emu_chdir(const char* pDirName)
 	}
 
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
+	*/
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(pDirName);
 	if (!pBuffer) return -1;
+
 	int result = SetCurrentDirectoryW(pBuffer);
 	delete [] pBuffer;
+
 	if (result != 0) return 0;
+
 	errno = EACCES;
+	fprintf(stderr, "Failed to change directory to '%s': %s\n",
+		pDirName, GetErrorMessage(GetLastError()).c_str());
 	return -1;
 }
 
