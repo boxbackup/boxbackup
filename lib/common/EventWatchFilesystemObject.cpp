@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <errno.h>
 #include <fcntl.h>
 
 #ifdef HAVE_UNISTD_H
