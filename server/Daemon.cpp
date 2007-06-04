@@ -115,9 +115,9 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	// unfortunately glibc and BSD differ on this point!
 	// http://www.ussg.iu.edu/hypermail/linux/kernel/0305.3/0262.html
 	#ifdef __GLIBC__
-		optind = 1;
-	#else
 		optind = 0;
+	#else
+		optind = 1;
 		optreset = 1;
 	#endif
 
