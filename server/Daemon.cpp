@@ -110,7 +110,16 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	#endif
 
 	char c;
-	optind = 0; // just in case anybody used getopt before
+
+	// reset getopt, just in case anybody used it before.
+	// unfortunately glibc and BSD differ on this point!
+	// http://www.ussg.iu.edu/hypermail/linux/kernel/0305.3/0262.html
+	#ifdef __GLIBC__
+		optind = 1;
+	#else
+		optind = 0;
+		optreset = 1;
+	#endif
 
 	while((c = getopt(argc, (char * const *)argv, "c:DqvVt:Tk")) != -1)
 	{
