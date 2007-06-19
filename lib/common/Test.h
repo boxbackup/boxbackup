@@ -20,7 +20,8 @@
 #endif
 
 #include <stdio.h>
- 
+#include <string>
+
 extern int failures;
 
 #define TEST_FAIL_WITH_MESSAGE(msg) {failures++; printf("FAILURE: " msg " at " __FILE__ "(%d)\n", __LINE__);}
