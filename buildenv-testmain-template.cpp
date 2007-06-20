@@ -30,6 +30,8 @@
 	#include <syslog.h>
 #endif
 
+#include <string>
+
 #include "MemLeakFindOn.h"
 
 int test(int argc, const char *argv[]);
