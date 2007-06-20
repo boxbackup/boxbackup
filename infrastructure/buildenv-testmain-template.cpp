@@ -38,6 +38,8 @@
 	#include <syslog.h>
 #endif
 
+#include <string>
+
 #include "Logging.h"
 #include "Test.h"
 #include "Timer.h"
