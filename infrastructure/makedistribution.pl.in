@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 #!@PERL@
 use strict;
 use Symbol;
@@ -36,6 +37,29 @@ close VERSION;
 die "Archive name '$archive_name' is not equal to the distribution name '$distribution'"
 	unless $archive_name eq $distribution;
 
+my $svnversion = `svnversion .`;
+chomp $svnversion;
+$svnversion =~ tr/0-9A-Za-z/_/c;
+
+if($version =~ /USE_SVN_VERSION/)
+{
+	# for developers, use SVN version
+	open INFO,'svn info . |';
+	my $svnurl;
+	while(<INFO>)
+	{
+		if(m/^URL: (.+?)[\n\r]+/)
+		{
+			$svnurl = $1;
+		}
+	}
+	close INFO;
+	$svnurl =~ m'box/(.+)$';
+	my $svndir = $1;
+	$svndir =~ tr/0-9A-Za-z/_/c;
+	$version =~ s/USE_SVN_VERSION/$svndir.'_'.$svnversion/e;
+}
+
 # make initial directory
 my $base_name = "$archive_name-$version";
 system "rm -rf $base_name";
@@ -47,8 +71,6 @@ open LICENSE,"$dist_root/LICENSE.txt" or die "Can't open $dist_root/LICENSE.txt"
 my $license_f;
 read LICENSE,$license_f,100000;
 close LICENSE;
-my $svnversion = `svnversion .`;
-chomp $svnversion;
 my @license = ('distribution '.$base_name.' (svn version: '.$svnversion.')',split(/\n/,$license_f));
 
 # copy files, make a note of all the modules included
