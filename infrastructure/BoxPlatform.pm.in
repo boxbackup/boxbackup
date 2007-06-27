@@ -51,7 +51,7 @@ BEGIN
 	$product_name = <VERSION>;
 	chomp $product_name;
 	close VERSION;
-	if($product_version eq 'USE_SVN_VERSION')
+	if($product_version =~ /USE_SVN_VERSION/)
 	{
 		# for developers, use SVN version
 		my $svnversion = `svnversion .`;
@@ -70,7 +70,7 @@ BEGIN
 		$svnurl =~ m!box/(.+)$!;
 		my $svndir = $1;
 		$svndir =~ tr/0-9A-Za-z/_/c;
-		$product_version = $svndir.'_'.$svnversion;
+		$product_version =~ s/USE_SVN_VERSION/$svndir.'_'.$svnversion/e;
 	}
 
 	# where to put the files
