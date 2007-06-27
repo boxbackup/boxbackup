@@ -136,6 +136,7 @@ copy_from_list("$dist_root/DISTRIBUTION-MANIFEST.txt");
 	or die "Copy of root extra files failed";
 unlink "$base_name/DISTRIBUTION-MANIFEST.txt"
 	or die "Delete of DISTRIBUTION-MANIFEST.txt file failed";
+replace_version_in("VERSION.txt");
 
 # produce a new modules file
 my $modules = gensym;
@@ -338,6 +339,7 @@ sub replace_version_in
 	while(<IN>)
 	{
 		s/###DISTRIBUTION-VERSION-NUMBER###/$version/g;
+		s/.*USE_SVN_VERSION.*/$version/g;
 		print OUT
 	}
 	
