@@ -53,6 +53,7 @@ Daemon::Daemon()
 	  mReloadConfigWanted(false),
 	  mTerminateWanted(false),
 	  mSingleProcess(false),
+	  mRunInForeground(false),
 	  mKeepConsoleOpenAfterFork(false)
 {
 	if(spDaemon != NULL)
@@ -121,7 +122,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		optreset = 1;
 	#endif
 
-	while((c = getopt(argc, (char * const *)argv, "c:DqvVt:Tk")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "c:DFqvVt:Tk")) != -1)
 	{
 		switch(c)
 		{
@@ -135,6 +136,12 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			case 'D':
 			{
 				mSingleProcess = true;
+			}
+			break;
+
+			case 'F':
+			{
+				mRunInForeground = true;
 			}
 			break;
 
@@ -250,7 +257,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	mConfigFileName = rConfigFileName;
 	
-	bool asDaemon   = !mSingleProcess;
+	bool asDaemon   = !mSingleProcess && !mRunInForeground;
 
 	try
 	{
