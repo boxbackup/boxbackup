@@ -79,6 +79,7 @@ private:
 	bool mReloadConfigWanted;
 	bool mTerminateWanted;
 	bool mSingleProcess;
+	bool mRunInForeground;
 	bool mKeepConsoleOpenAfterFork;
 	static Daemon *spDaemon;
 };
