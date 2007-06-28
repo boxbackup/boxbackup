@@ -15,6 +15,7 @@
 
 #include <sys/types.h>
 #include <errno.h>
+#include <string.h>
 
 #ifndef WIN32
 #include <poll.h>
@@ -164,6 +165,10 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 #else
 		::close(mSocketHandle);
 #endif
+		BOX_ERROR("Failed to connect to socket (type " << Type <<
+			", name " << Name << ", port " << Port << "): " <<
+			"error " << errno << " (" << strerror(errno) << 
+			")");
 		mSocketHandle = INVALID_SOCKET_VALUE;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
 	}
