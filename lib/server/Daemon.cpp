@@ -124,6 +124,12 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 	while((c = getopt(argc, (char * const *)argv, "c:DFqvVt:Tk")) != -1)
 	{
+		BOX_TRACE("getopt: returned '" << c << "'");
+		BOX_TRACE("getopt: optind = " << optind);
+		BOX_TRACE("getopt: optopt = " << optopt);
+		BOX_TRACE("getopt: optarg = " << optarg);
+		BOX_TRACE("getopt: argv[optind] = " << argv[optind]);
+
 		switch(c)
 		{
 			case 'c':
@@ -211,6 +217,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			}
 		}
 	}
+
+	BOX_TRACE("getopt: returned " << (int)c << ", finished.");
 
 	if (argc > optind && !haveConfigFile)
 	{
