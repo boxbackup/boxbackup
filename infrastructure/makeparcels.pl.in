@@ -78,7 +78,7 @@ MAKE = $make_command
 
 __E
 
-print MAKE "all:\t",join(' ',map {parcel_target($_)} @parcels),"\n\n";
+print MAKE "all:\t",join(' ',map {"build-".$_} @parcels),"\n\n";
 
 print MAKE "clean:\n";
 for my $parcel (@parcels)
@@ -95,6 +95,7 @@ my $release_flag = BoxPlatform::make_flag('RELEASE');
 for my $parcel (@parcels)
 {
 	my $target = parcel_target($parcel);
+	print MAKE "build-$parcel:\t$target\n\n";
 	print MAKE $target,":\n";
 	
 	my $dir = parcel_dir($parcel);
