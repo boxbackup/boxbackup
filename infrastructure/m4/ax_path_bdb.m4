@@ -13,7 +13,9 @@ dnl values to add to LIBS, CPPFLAGS, and LDFLAGS, as well as setting
 dnl BDB_VERSION to the version found. HAVE_DB_H is defined also.
 dnl
 dnl The option --with-bdb-dir=DIR can be used to specify a specific
-dnl Berkeley DB installation to use.
+dnl Berkeley DB installation to use, or --with-bdb-headers=DIR and
+dnl --with-bdb-lib=DIR can be used to specify individual include and
+dnl library locations.
 dnl
 dnl An example of it's use is:
 dnl
@@ -57,6 +59,8 @@ dnl Changes:
 dnl
 dnl  1/5/05 applied patch from Rafa Rzepecki to eliminate compiler
 dnl         warning about unused variable, argv
+dnl  1/7/07 Add --with-bdb-headers and --with-bdb-lib options
+dnl         (James O'Gorman, james@netinertia.co.uk)
 dnl
 dnl @category InstalledPackages
 dnl @author Tim Toolan <toolan@ele.uri.edu>
@@ -73,16 +77,35 @@ AC_DEFUN([AX_PATH_BDB], [
     [AC_HELP_STRING([--with-bdb-dir=DIR],
                     [Berkeley DB installation directory])])
 
+  # Add --with-bdb-headers and --with-bdb-lib options
+  AC_ARG_WITH([bdb-headers],
+    [AC_HELP_STRING([--with-bdb-headers=DIR],
+                    [Berkeley DB include files location])])
+
+  AC_ARG_WITH([bdb-lib],
+    [AC_HELP_STRING([--with-bdb-lib=DIR],
+                    [Berkeley DB library location])])
+  
   # Check if --with-bdb-dir was specified.
-  if test "x$with_bdb_dir" = "x" ; then
+  if test "x$with_bdb_dir" = "x" -a \
+     "x$with_bdb_headers" = "x" -a "x$with_bdb_lib" = "x"; then
     # No option specified, so just search the system.
     AX_PATH_BDB_NO_OPTIONS([$1], [HIGHEST], [
       ax_path_bdb_ok=yes
     ])
    else
-     # Set --with-bdb-dir option.
-     ax_path_bdb_INC="$with_bdb_dir/include"
-     ax_path_bdb_LIB="$with_bdb_dir/lib"
+     # Check if the --with-bdb-headers and --with-bdb-lib flags were defined
+     # Use them if so, otherwise use --with-bdb-dir
+     if test "x$with_bdb_headers" = "x"; then
+       ax_path_bdb_INC="$with_bdb_dir/include"
+     else
+       ax_path_bdb_INC="$with_bdb_headers"
+     fi
+     if test "x$with_bdb_lib" = "x"; then
+       ax_path_bdb_LIB="$with_bdb_dir/lib"
+     else
+       ax_path_bdb_LIB="$with_bdb_lib"
+     fi
 
      dnl # Save previous environment, and modify with new stuff.
      ax_path_bdb_save_CPPFLAGS="$CPPFLAGS"
