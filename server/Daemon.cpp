@@ -122,6 +122,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		optreset = 1;
 	#endif
 
+	BOX_TRACE("'?' == " << (int)'?');
+
 	while((c = getopt(argc, (char * const *)argv, "c:DFqvVt:Tk")) != -1)
 	{
 		BOX_TRACE("getopt: returned '" << c << "' (" << (int)c << ")");
