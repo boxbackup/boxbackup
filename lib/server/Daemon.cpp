@@ -124,11 +124,20 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 	while((c = getopt(argc, (char * const *)argv, "c:DFqvVt:Tk")) != -1)
 	{
-		BOX_TRACE("getopt: returned '" << c << "'");
+		BOX_TRACE("getopt: returned '" << c << "' (" << (int)c << ")");
 		BOX_TRACE("getopt: optind = " << optind);
 		BOX_TRACE("getopt: optopt = " << optopt);
 		BOX_TRACE("getopt: optarg = " << optarg);
 		BOX_TRACE("getopt: argv[optind] = " << argv[optind]);
+
+		// Workaround for weird behaviour noted by TBP in
+		// http://lists.warhead.org.uk/pipermail/boxbackup/2007-July/003614.html
+		if (c == '?' && optopt == 0)
+		{
+			// this apparently means "end of options" in some
+			// buggy libc?
+			break;
+		}
 
 		switch(c)
 		{
