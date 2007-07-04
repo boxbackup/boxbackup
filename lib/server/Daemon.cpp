@@ -110,7 +110,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	int masterLevel = Log::INFO; // need an int to do math with
 	#endif
 
-	char c;
+	signed char c;
 
 	// reset getopt, just in case anybody used it before.
 	// unfortunately glibc and BSD differ on this point!
@@ -131,15 +131,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		BOX_TRACE("getopt: optopt = " << optopt);
 		BOX_TRACE("getopt: optarg = " << optarg);
 		BOX_TRACE("getopt: argv[optind] = " << argv[optind]);
-
-		// Workaround for weird behaviour noted by TBP in
-		// http://lists.warhead.org.uk/pipermail/boxbackup/2007-July/003614.html
-		if (c == '?' && optopt == 0)
-		{
-			// this apparently means "end of options" in some
-			// buggy libc?
-			break;
-		}
 
 		switch(c)
 		{
