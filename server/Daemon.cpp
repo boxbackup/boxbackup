@@ -110,7 +110,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	int masterLevel = Log::INFO; // need an int to do math with
 	#endif
 
-	signed char c;
+	signed int c;
 
 	// reset getopt, just in case anybody used it before.
 	// unfortunately glibc and BSD differ on this point!
@@ -122,16 +122,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		optreset = 1;
 	#endif
 
-	BOX_TRACE("'?' == " << (int)'?');
-
 	while((c = getopt(argc, (char * const *)argv, "c:DFqvVt:Tk")) != -1)
 	{
-		BOX_TRACE("getopt: returned '" << c << "' (" << (int)c << ")");
-		BOX_TRACE("getopt: optind = " << optind);
-		BOX_TRACE("getopt: optopt = " << optopt);
-		BOX_TRACE("getopt: optarg = " << optarg);
-		BOX_TRACE("getopt: argv[optind] = " << argv[optind]);
-
 		switch(c)
 		{
 			case 'c':
@@ -219,8 +211,6 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 			}
 		}
 	}
-
-	BOX_TRACE("getopt: returned " << (int)c << ", finished.");
 
 	if (argc > optind && !haveConfigFile)
 	{
