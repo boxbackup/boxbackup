@@ -2611,7 +2611,7 @@ BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
 
 static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
 static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
-static const int STOREOBJECTINFO_VERSION = 1;
+static const int STOREOBJECTINFO_VERSION = 2;
 
 bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
 {
@@ -2671,8 +2671,9 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 		//
 		//
 		aFile.Close();
-		BOX_INFO("Saved store object info file: "
-			<< StoreObjectInfoFile);
+		BOX_INFO("Saved store object info file: " <<
+			StoreObjectInfoFile << ", version " <<
+			STOREOBJECTINFO_VERSION);
 	}
 	catch(std::exception &e)
 	{
@@ -2826,6 +2827,26 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 
 			mIDMapMounts.push_back(strItem);
 		}
+
+		//
+		//
+		//
+		iCount = 0;
+		anArchive.Read(iCount);
+
+		for(int v = 0; v < iCount; v++)
+		{
+			int64_t anId;
+			anArchive.Read(anId);
+
+			std::string aName;
+			anArchive.Read(aName);
+
+			mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+		}
+
+		if (iCount > 0)
+			anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
 
 		//
 		//
