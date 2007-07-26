@@ -739,8 +739,6 @@ int test(int argc, const char *argv[])
 	
 	// Test ExcludeList
 	{
-		TestLogger logger(Log::WARNING);
-
 		ExcludeList elist;
 		// Check assumption
 		TEST_THAT(Configuration::MultiValueSeparator == '\x01');
@@ -799,6 +797,7 @@ int test(int argc, const char *argv[])
 
 		#undef CASE_SENSITIVE
 
+		TestLogger logger(Log::WARNING);
 		TEST_THAT(!logger.IsTriggered());
 		elist.AddDefiniteEntries(std::string("/foo"));
 		TEST_THAT(!logger.IsTriggered());
