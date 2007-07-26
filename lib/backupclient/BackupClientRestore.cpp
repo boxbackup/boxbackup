@@ -311,6 +311,10 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 			{
 				parentDirectoryName += '\\';
 			}
+			else if (lastSlash == 0)
+			{
+				parentDirectoryName += '\\';
+			}
 		#endif
 
 		int parentExists;
