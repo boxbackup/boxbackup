@@ -66,7 +66,8 @@ int main(int argc, const char *argv[])
 {
 	int returnCode = 0;
 
-	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupquery.memleaks", "bbackupquery")
+	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupquery.memleaks",
+		"bbackupquery")
 	MAINHELPER_START
 
 #ifdef WIN32
@@ -77,7 +78,7 @@ int main(int argc, const char *argv[])
 	
 	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
 	{
-		// throw error?    perhaps give it its own id in the furture
+		// throw error? perhaps give it its own id in the future
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
 #endif
@@ -90,7 +91,13 @@ int main(int argc, const char *argv[])
 	FILE *logFile = 0;
 
 	// Filename for configuration file?
-	const char *configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
+	std::string configFilename;
+
+	#ifdef WIN32
+		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	#else
+		configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
+	#endif
 	
 	// Flags
 	bool quiet = false;
@@ -215,9 +222,14 @@ int main(int argc, const char *argv[])
 #endif // WIN32
 
 	// Read in the configuration file
-	if(!quiet) printf("Using configuration file %s\n", configFilename);
+	if(!quiet) printf("Using configuration file %s\n", 
+		configFilename.c_str());
+
 	std::string errs;
-	std::auto_ptr<Configuration> config(Configuration::LoadAndVerify(configFilename, &BackupDaemonConfigVerify, errs));
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			(configFilename, &BackupDaemonConfigVerify, errs));
+
 	if(config.get() == 0 || !errs.empty())
 	{
 		printf("Invalid configuration file:\n%s", errs.c_str());

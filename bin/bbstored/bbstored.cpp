@@ -23,7 +23,14 @@ int main(int argc, const char *argv[])
 	Logging::ToSyslog (true);
 
 	BackupStoreDaemon daemon;
-	return daemon.Main(BOX_FILE_BBSTORED_DEFAULT_CONFIG, argc, argv);
+
+	#ifdef WIN32
+		return daemon.Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE,
+			argc, argv);
+	#else
+		return daemon.Main(BOX_FILE_BBSTORED_DEFAULT_CONFIG,
+			argc, argv);
+	#endif
 	
 	MAINHELPER_END
 }

@@ -66,7 +66,13 @@ int main(int argc, const char *argv[])
 #endif
 
 	// Filename for configuration file?
-	const char *configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
+	std::string configFilename;
+
+	#ifdef WIN32
+		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	#else
+		configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
+	#endif
 	
 	// Quiet?
 	bool quiet = false;
@@ -103,9 +109,14 @@ int main(int argc, const char *argv[])
 	}
 
 	// Read in the configuration file
-	if(!quiet) printf("Using configuration file %s\n", configFilename);
+	if(!quiet) printf("Using configuration file %s\n", 
+		configFilename.c_str());
+
 	std::string errs;
-	std::auto_ptr<Configuration> config(Configuration::LoadAndVerify(configFilename, &BackupDaemonConfigVerify, errs));
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			(configFilename, &BackupDaemonConfigVerify, errs));
+
 	if(config.get() == 0 || !errs.empty())
 	{
 		printf("Invalid configuration file:\n%s", errs.c_str());

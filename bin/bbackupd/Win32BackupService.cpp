@@ -29,31 +29,23 @@ void TerminateService(void)
 
 DWORD Win32BackupService::WinService(const char* pConfigFileName)
 {
-	char exepath[MAX_PATH];
-	GetModuleFileName(NULL, exepath, sizeof(exepath));
+	DWORD ret;
 
-	std::string configfile;
-	
+	// keep MAINHELPER_START happy
+	int argc = 0;
+	char* argv[] = {NULL};
+
+	MAINHELPER_START
+
 	if (pConfigFileName != NULL)
 	{
-		configfile = pConfigFileName;
+		ret = this->Main(pConfigFileName);
 	}
 	else
 	{
-		// make the default config file name,
-		// based on the program path
-		configfile = exepath;
-		configfile = configfile.substr(0,
-			configfile.rfind(DIRECTORY_SEPARATOR_ASCHAR));
-		configfile += DIRECTORY_SEPARATOR "bbackupd.conf";
+		ret = this->Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE);
 	}
 
-	const char *argv[] = {exepath, "-c", configfile.c_str()};
-	int argc = sizeof(argv) / sizeof(*argv);
-	DWORD ret;
-
-	MAINHELPER_START
-	ret = this->Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 	MAINHELPER_END
 
 	return ret;
