@@ -171,13 +171,22 @@
 						RelativePath="..\..\..\lib\common\IOStreamGetLine.cpp">
 					</File>
 					<File
+					        RelativePath="..\..\..\lib\common\Logging.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MemBlockStream.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\PartialReadStream.cpp">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\ReadLoggingStream.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\StreamableMemBlock.cpp">
@@ -442,6 +451,9 @@
 						RelativePath="..\..\..\lib\server\LocalProcessStream.h">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Logging.h">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MainHelper.h">
 					</File>
 					<File
@@ -463,6 +475,9 @@
 						RelativePath="..\..\..\lib\common\PartialReadStream.h">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.h">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.h">
 					</File>
 					<File
@@ -473,6 +488,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\Test.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\Timer.h">
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\UnixUser.h">
