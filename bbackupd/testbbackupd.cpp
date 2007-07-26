@@ -612,10 +612,7 @@ int start_internal_daemon()
 	int own_pid = getpid();
 		
 	BackupDaemon daemon;
-	const char* fake_argv[] = { "bbackupd", "testfiles/bbackupd.conf" };
-	
-	int result = daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, 2, 
-		fake_argv);
+	int result = daemon.Main("testfiles/bbackupd.conf");
 	
 	TEST_THAT(result == 0);
 	if (result != 0)
