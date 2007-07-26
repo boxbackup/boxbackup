@@ -132,7 +132,23 @@ void BackupStoreDaemon::SetupInInitialProcess()
 	
 	// Initialise the raid files controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
-	rcontroller.Initialise(config.GetKeyValue("RaidFileConf").c_str());
+
+	std::string raidFileConfig;
+
+	#ifdef WIN32
+		if (!config.KeyExists("RaidFileConf"))
+		{
+			raidFileConfig = BOX_GET_DEFAULT_RAIDFILE_CONFIG_FILE;
+		}
+		else
+		{
+			raidFileConfig = config.GetKeyValue("RaidFileConf");
+		}
+	#else
+		raidFileConfig = config.GetKeyValue("RaidFileConf");
+	#endif
+
+	rcontroller.Initialise(raidFileConfig);
 	
 	// Load the account database
 	std::auto_ptr<BackupStoreAccountDatabase> pdb(BackupStoreAccountDatabase::Read(config.GetKeyValue("AccountDatabase").c_str()));

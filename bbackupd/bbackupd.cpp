@@ -89,7 +89,7 @@ int main(int argc, const char *argv[])
 	else
 	{
 		ExitCode = gpDaemonService->Main(
-			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+			BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE, argc, argv);
 	}
 
 	delete gpDaemonService;
