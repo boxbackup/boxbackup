@@ -21,15 +21,9 @@ ONLY:mingw32
 	optional script /bin/pcreposix.dll
 END-ONLY
 
-OMIT:mingw32
-OMIT:mingw32msvc
-OMIT:CYGWIN
-
 backup-server
 	bin bbstored
 	bin bbstoreaccounts
 	script bin/bbstored/bbstored-certs
 	script bin/bbstored/bbstored-config
 	script lib/raidfile/raidfile-config
-
-END-OMIT
