@@ -2851,6 +2851,26 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		//
 		//
 		//
+		iCount = 0;
+		anArchive.Read(iCount);
+
+		for(int v = 0; v < iCount; v++)
+		{
+			int64_t anId;
+			anArchive.Read(anId);
+
+			std::string aName;
+			anArchive.Read(aName);
+
+			mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+		}
+
+		if (iCount > 0)
+			anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
+
+		//
+		//
+		//
 		aFile.Close();
 		BOX_INFO("Loaded store object info file version " << iVersion
 			<< "(" << StoreObjectInfoFile << ")");
