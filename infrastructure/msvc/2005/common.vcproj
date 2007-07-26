@@ -244,6 +244,10 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Logging.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MemBlockStream.cpp"
 						>
 					</File>
@@ -252,11 +256,23 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.cpp"
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\ReadLoggingStream.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\StreamableMemBlock.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\Timer.cpp"
 						>
 					</File>
 					<File
@@ -598,6 +614,10 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Logging.h"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MainHelper.h"
 						>
 					</File>
@@ -626,7 +646,15 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.h"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\ReadLoggingStream.h"
 						>
 					</File>
 					<File
@@ -639,6 +667,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\Test.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\Timer.h"
 						>
 					</File>
 					<File

@@ -130,6 +130,9 @@
 					Name="bbackupd"
 					Filter="">
 					<File
+						RelativePath="..\..\..\bin\bbackupd\autogen_ClientException.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\bin\bbackupd\BackupClientContext.cpp">
 					</File>
 					<File
@@ -169,6 +172,9 @@
 				<Filter
 					Name="bbackupd"
 					Filter="">
+					<File
+						RelativePath="..\..\..\bin\bbackupd\autogen_ClientException.h">
+					</File>
 					<File
 						RelativePath="..\..\..\bin\bbackupd\BackupClientContext.h">
 					</File>
