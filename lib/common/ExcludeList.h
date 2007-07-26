@@ -50,7 +50,7 @@ public:
 	// Mainly for tests
 	unsigned int SizeOfDefiniteList() const {return mDefinite.size();}
 	unsigned int SizeOfRegexList() const
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 		{return mRegex.size();}
 #else
 		{return 0;}
@@ -58,7 +58,7 @@ public:
 
 private:
 	std::set<std::string> mDefinite;
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	std::vector<regex_t *> mRegex;
 	std::vector<std::string> mRegexStr;	// save original regular expression string-based source for Serialize
 #endif
