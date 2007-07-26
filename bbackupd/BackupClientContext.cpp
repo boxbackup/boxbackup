@@ -197,16 +197,12 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		::syslog(LOG_INFO, "Connection made, login successful");
 
 		// Check to see if there is any space available on the server
-		int64_t softLimit = loginConf->GetBlocksSoftLimit();
-		int64_t hardLimit = loginConf->GetBlocksHardLimit();
-		// Threshold for uploading new stuff
-		int64_t stopUploadThreshold = softLimit + ((hardLimit - softLimit) / 3);
-		if(loginConf->GetBlocksUsed() > stopUploadThreshold)
+		if(loginConf->GetBlocksUsed() >= loginConf->GetBlocksHardLimit())
 		{
 			// no -- flag so only things like deletions happen
 			mStorageLimitExceeded = true;
 			// Log
-			::syslog(LOG_WARNING, "Exceeded storage limits on server -- not uploading changes to files");
+			::syslog(LOG_WARNING, "Exceeded storage hard-limit on server -- not uploading changes to files");
 		}
 	}
 	catch(...)
