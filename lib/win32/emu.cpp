@@ -218,6 +218,44 @@ bool EnableBackupRights( void )
 	}
 }
 
+// forward declaration
+char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    GetDefaultConfigFilePath(std::string name)
+//		Purpose: Calculates the default configuration file name,
+//			 by using the directory location of the currently
+//			 executing program, and appending the provided name.
+//			 In case of fire, returns an empty string.
+//		Created: 26th May 2007
+//
+// --------------------------------------------------------------------------
+std::string GetDefaultConfigFilePath(const std::string& rName)
+{
+	WCHAR exePathWide[MAX_PATH];
+	GetModuleFileNameW(NULL, exePathWide, MAX_PATH-1);
+
+	char* exePathUtf8 = ConvertFromWideString(exePathWide, CP_UTF8);
+	if (exePathUtf8 == NULL)
+	{
+		return "";
+	}
+
+	std::string configfile = exePathUtf8;
+	delete [] exePathUtf8;
+	
+	// make the default config file name,
+	// based on the program path
+	configfile = configfile.substr(0,
+		configfile.rfind('\\'));
+	configfile += "\\";
+	configfile += rName;
+
+	return configfile;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1252,15 +1290,15 @@ BOOL AddEventSource
 	// Work out the executable file name, to register ourselves
 	// as the event source
 
-	char cmd[MAX_PATH];
-	if (GetModuleFileName(NULL, cmd, sizeof(cmd)-1) == 0)
+	WCHAR cmd[MAX_PATH];
+	DWORD len = GetModuleFileNameW(NULL, cmd, MAX_PATH);
+
+	if (len == 0)
 	{
 		::syslog(LOG_ERR, "Failed to get the program file name: %s",
 			GetErrorMessage(GetLastError()).c_str());
 		return FALSE;
 	}
-	cmd[sizeof(cmd)-1] = 0;
- 	std::string exepath(cmd);
 
 	// Create the event source as a subkey of the log. 
 
@@ -1282,12 +1320,12 @@ BOOL AddEventSource
 
 	// Set the name of the message file. 
  
-	if (RegSetValueEx(hk,                // subkey handle 
-			 "EventMessageFile", // value name 
-			 0,                  // must be zero 
-			 REG_EXPAND_SZ,      // value type 
-			 (LPBYTE) exepath.c_str(),  // pointer to value data 
-			 (DWORD) (exepath.size()))) // data size
+	if (RegSetValueExW(hk,                 // subkey handle 
+			   L"EventMessageFile", // value name 
+			   0,                  // must be zero 
+			   REG_EXPAND_SZ,      // value type 
+			   (LPBYTE)cmd,        // pointer to value data 
+			   len*sizeof(WCHAR))) // data size
 	{
 		::syslog(LOG_ERR, "Failed to set the event message file: %s",
 			GetErrorMessage(GetLastError()).c_str());
@@ -1315,12 +1353,12 @@ BOOL AddEventSource
  
 	// Set the category message file and number of categories.
 
-	if (RegSetValueEx(hk,                        // subkey handle 
-			  "CategoryMessageFile",     // value name 
-			  0,                         // must be zero 
-			  REG_EXPAND_SZ,             // value type 
-			  (LPBYTE) exepath.c_str(),  // pointer to value data 
-			  (DWORD) (exepath.size()))) // data size
+	if (RegSetValueExW(hk,                    // subkey handle 
+			   L"CategoryMessageFile", // value name 
+			   0,                     // must be zero 
+			   REG_EXPAND_SZ,         // value type 
+			   (LPBYTE)cmd,           // pointer to value data 
+			   len*sizeof(WCHAR)))    // data size
 	{
 		::syslog(LOG_ERR, "Failed to set the category message file: "
 			"%s", GetErrorMessage(GetLastError()).c_str());

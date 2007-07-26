@@ -402,12 +402,19 @@ void PrintUsageAndExit()
 
 int main(int argc, const char *argv[])
 {
-	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbstoreaccounts.memleaks", "bbstoreaccounts")
+	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbstoreaccounts.memleaks",
+		"bbstoreaccounts")
 
 	MAINHELPER_START
 
-	// Filename for configuraiton file?
-	const char *configFilename = BOX_FILE_BBSTORED_DEFAULT_CONFIG;
+	// Filename for configuration file?
+	std::string configFilename;
+
+	#ifdef WIN32
+		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	#else
+		configFilename = BOX_FILE_BBSTORED_DEFAULT_CONFIG;
+	#endif
 	
 	// See if there's another entry on the command line
 	int c;
@@ -431,7 +438,10 @@ int main(int argc, const char *argv[])
 
 	// Read in the configuration file
 	std::string errs;
-	std::auto_ptr<Configuration> config(Configuration::LoadAndVerify(configFilename, &BackupConfigFileVerify, errs));
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			(configFilename, &BackupConfigFileVerify, errs));
+
 	if(config.get() == 0 || !errs.empty())
 	{
 		printf("Invalid configuration file:\n%s", errs.c_str());
