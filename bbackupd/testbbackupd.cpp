@@ -2323,14 +2323,8 @@ int test_bbackupd()
 				true /* print progress dots */) 
 				== Restore_Complete);
 
-			// Compare it
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
-				"-c testfiles/bbackupd.conf "
-				"-l testfiles/query10.log "
-				"\"compare -cE Test1 testfiles/restore-Test1\" "
-				"quit");
-			TEST_RETURN(compareReturnValue, 1);
-			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+			// On Win32 we can't open another connection
+			// to the server, so we'll compare later.
 
 			// Make sure you can't restore a restored directory
 			TEST_THAT(BackupClientRestore(protocol, restoredirid, 
