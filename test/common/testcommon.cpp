@@ -750,7 +750,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(elist.SizeOfDefiniteList() == 4);
 
 		// Add regex entries
-		#ifdef HAVE_REGEX_H
+		#ifdef HAVE_REGEX_SUPPORT
 			elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$"));
 			elist.AddRegexEntries(std::string(""));
 			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[:not_valid")), CommonException, BadRegularExpression);
@@ -782,7 +782,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(elist.IsExcluded("thingdefthree") 
 			== !CASE_SENSITIVE);
 
-		#ifdef HAVE_REGEX_H
+		#ifdef HAVE_REGEX_SUPPORT
 			TEST_THAT(elist.IsExcluded(std::string("b.reg")) == true);
 			TEST_THAT(elist.IsExcluded(std::string("B.reg")) == !CASE_SENSITIVE);
 			TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == !CASE_SENSITIVE);
