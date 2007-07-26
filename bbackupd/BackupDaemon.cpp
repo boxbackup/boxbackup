@@ -2611,7 +2611,7 @@ BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
 
 static const int STOREOBJECTINFO_MAGIC_ID_VALUE = 0x7777525F;
 static const std::string STOREOBJECTINFO_MAGIC_ID_STRING = "BBACKUPD-STATE";
-static const int STOREOBJECTINFO_VERSION = 1;
+static const int STOREOBJECTINFO_VERSION = 2;
 
 bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time_t theLastSyncTime, box_time_t theNextSyncTime) const
 {
@@ -2670,9 +2670,27 @@ bool BackupDaemon::SerializeStoreObjectInfo(int64_t aClientStoreMarker, box_time
 		//
 		//
 		//
+		iCount = mUnusedRootDirEntries.size();
+		anArchive.Write(iCount);
+
+		for(int v = 0; v < iCount; v++)
+		{
+			anArchive.Write(mUnusedRootDirEntries[v].first);
+			anArchive.Write(mUnusedRootDirEntries[v].second);
+		}
+
+		if (iCount > 0)
+		{
+			anArchive.Write(mDeleteUnusedRootDirEntriesAfter);
+		}
+
+		//
+		//
+		//
 		aFile.Close();
-		BOX_INFO("Saved store object info file: "
-			<< StoreObjectInfoFile);
+		BOX_INFO("Saved store object info file version " <<
+			STOREOBJECTINFO_VERSION << " (" <<
+			StoreObjectInfoFile << ")");
 	}
 	catch(std::exception &e)
 	{
@@ -2830,9 +2848,29 @@ bool BackupDaemon::DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, box_
 		//
 		//
 		//
+		iCount = 0;
+		anArchive.Read(iCount);
+
+		for(int v = 0; v < iCount; v++)
+		{
+			int64_t anId;
+			anArchive.Read(anId);
+
+			std::string aName;
+			anArchive.Read(aName);
+
+			mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+		}
+
+		if (iCount > 0)
+			anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
+
+		//
+		//
+		//
 		aFile.Close();
 		BOX_INFO("Loaded store object info file version " << iVersion
-			<< "(" << StoreObjectInfoFile << ")");
+			<< " (" << StoreObjectInfoFile << ")");
 		
 		return true;
 	} 
