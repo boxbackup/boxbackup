@@ -95,6 +95,7 @@
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Memory leak testing
 	#include "MemLeakFinder.h"
+	#define DEBUG_NEW new(__FILE__,__LINE__)
 	#define MEMLEAKFINDER_NOT_A_LEAK(x)	memleakfinder_notaleak(x);
 	#define MEMLEAKFINDER_NO_LEAKS		MemLeakSuppressionGuard _guard;
 	#define MEMLEAKFINDER_INIT		memleakfinder_init();
