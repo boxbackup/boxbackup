@@ -32,13 +32,13 @@ template <int flags = O_RDONLY | O_BINARY, int mode = (S_IRUSR | S_IWUSR | S_IRG
 class FileHandleGuard
 {
 public:
-	FileHandleGuard(const char *filename)
-		: mOSFileHandle(::open(filename, flags, mode))
+	FileHandleGuard(const std::string& rFilename)
+		: mOSFileHandle(::open(rFilename.c_str(), flags, mode))
 	{
 		if(mOSFileHandle < 0)
 		{
 			BOX_ERROR("FileHandleGuard: failed to open file '" <<
-				filename << "': " << strerror(errno));
+				rFilename << "': " << strerror(errno));
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}

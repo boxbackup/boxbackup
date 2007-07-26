@@ -377,6 +377,10 @@ bool ConvertFromUtf8 (const std::string& rSource, std::string& rDest,
 bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
 bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
 
+// Utility function which returns a default config file name,
+// based on the path of the current executable.
+std::string GetDefaultConfigFilePath(const std::string& rName);
+
 // GetErrorMessage() returns a system error message, like strerror() 
 // but for Windows error codes.
 std::string GetErrorMessage(DWORD errorCode);
