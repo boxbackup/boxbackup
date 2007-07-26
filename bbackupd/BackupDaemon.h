@@ -229,13 +229,15 @@ public:
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath)
 	{
-		BOX_WARNING("Ignored directory: " << rLocalPath << ": "
 		#ifdef WIN32
-			"is an NTFS junction/reparse point; "
+			BOX_WARNING("Ignored directory: " << rLocalPath << 
+				": is an NTFS junction/reparse point; create "
+				"a new location if you want to back it up");
 		#else
-			"is a mount point; "
+			BOX_WARNING("Ignored directory: " << rLocalPath << 
+				": is a mount point; create a new location "
+				"if you want to back it up");
 		#endif
-			"create a new location if you want to back it up");
 	}
 	virtual void NotifyFileExcluded(
 		const BackupClientDirectoryRecord* pDirRecord,
