@@ -385,4 +385,16 @@ std::string GetErrorMessage(DWORD errorCode);
 // relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
 
+#ifdef _MSC_VER
+	/* disable certain compiler warnings to be able to actually see the show-stopper ones */
+	#pragma warning(disable:4101)		// unreferenced local variable
+	#pragma warning(disable:4244)		// conversion, possible loss of data
+	#pragma warning(disable:4267)		// conversion, possible loss of data
+	#pragma warning(disable:4311)		// pointer truncation
+	#pragma warning(disable:4700)		// uninitialized local variable used (hmmmmm...)
+	#pragma warning(disable:4805)		// unsafe mix of type and type 'bool' in operation
+	#pragma warning(disable:4800)		// forcing value to bool 'true' or 'false' (performance warning)
+	#pragma warning(disable:4996)		// POSIX name for this item is deprecated
+#endif // _MSC_VER
+
 #endif // !EMU_INCLUDE && WIN32
