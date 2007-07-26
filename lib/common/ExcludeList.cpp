@@ -9,7 +9,10 @@
 
 #include "Box.h"
 
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_PCREPOSIX_H
+	#include <pcreposix.h>
+	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
+#elif defined HAVE_REGEX_H
 	#include <regex.h>
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
 #endif
