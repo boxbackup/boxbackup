@@ -35,20 +35,12 @@ Configure PCRE for MinGW compilation, and build and install it:
 	export CFLAGS="-mno-cygwin"
 	./configure
 	make winshared
-	cp .libs/pcreposix.dll /bin
-	cp .libs/pcreposix.dll.a /usr/i686-pc-mingw32/lib
-	cp pcreposix.h /usr/i686-pc-mingw32/include/regex.h
+	cp .libs/libpcre.a .libs/libpcreposix.a /usr/lib/mingw
+	cp pcreposix.h /usr/include/mingw
 
 Now unpack the Box Backup sources, enter the source directory,
 and configure like this:
 
-	export CXX="g++ -mno-cygwin"
-	export LD="g++ -mno-cygwin"
-	export CFLAGS="-mno-cygwin -mthreads"
-	export CXXFLAGS="-mno-cygwin -mthreads"
-	export LDFLAGS="-mno-cygwin -mthreads"
-	export LIBS="-lcrypto -lws2_32 -lgdi32"
-	(if you don't have a "configure" file, run "./bootstrap")
-	./configure --target=i686-pc-mingw32
+	./infrastructure/mingw/configure.sh
 	make
 
