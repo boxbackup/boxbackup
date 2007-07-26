@@ -112,7 +112,23 @@ AC_CHECK_HEADER([regex.h], [have_regex_h=yes])
 
 if test "$have_regex_h" = "yes"; then
   AC_DEFINE([HAVE_REGEX_H], [1], [Define to 1 if regex.h is available])
-  AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"])
+else
+  AC_CHECK_HEADER([pcreposix.h], [have_pcreposix_h=yes])
+fi
+
+if test "$have_pcreposix_h" = "yes"; then
+  AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"],,[have_pcreposix_h=no_regcomp])
+fi
+
+if test "$have_pcreposix_h" = "yes"; then
+  AC_DEFINE([HAVE_PCREPOSIX_H], [1], [Define to 1 if pcreposix.h is available])
+fi
+
+if test "$have_regex_h" = "yes" -o "$have_pcreposix_h" = "yes"; then
+  have_regex_support=yes
+  AC_DEFINE([HAVE_REGEX_SUPPORT], [1], [Define to 1 if regular expressions are supported])
+else
+  have_regex_support=no
 fi
 
 AC_SEARCH_LIBS([dlsym], ["dl"])
@@ -274,7 +290,7 @@ A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
 
-Regular expressions: $have_regex_h
+Regular expressions: $have_regex_support
 Large files:         $have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline

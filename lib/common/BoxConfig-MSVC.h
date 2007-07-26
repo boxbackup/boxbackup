@@ -178,6 +178,7 @@
 /* Define to 1 if you have the <regex.h> header file. */
 /* #undef HAVE_REGEX_H */
 #define HAVE_PCREPOSIX_H 1
+#define HAVE_REGEX_SUPPORT 1
 
 /* Define to 1 if you have the `setproctitle' function. */
 /* #undef HAVE_SETPROCTITLE */
