@@ -1696,7 +1696,11 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				if(::statfs(ploc->mPath.c_str(), &s) != 0)
 #endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
-					THROW_EXCEPTION(CommonException, OSFileError)
+					BOX_WARNING("Failed to stat location: "
+						<< ploc->mPath 
+						<< ": " << strerror(errno));
+					THROW_EXCEPTION(CommonException,
+						OSFileError)
 				}
 
 				// Where the filesystem is mounted
@@ -1781,13 +1785,24 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				}
 				
 				// Execute create directory command
-				MemBlockStream attrStream(attr);
-				std::auto_ptr<BackupProtocolClientSuccess> dirCreate(connection.QueryCreateDirectory(
-					BackupProtocolClientListDirectory::RootDirectory,
-					attrModTime, dirname, attrStream));
-					
-				// Object ID for later creation
-				oid = dirCreate->GetObjectID();
+				try
+				{
+					MemBlockStream attrStream(attr);
+					std::auto_ptr<BackupProtocolClientSuccess> dirCreate(connection.QueryCreateDirectory(
+						BackupProtocolClientListDirectory::RootDirectory,
+						attrModTime, dirname, attrStream));
+						
+					// Object ID for later creation
+					oid = dirCreate->GetObjectID();
+				}
+				catch (BoxException &e)
+				{
+					BOX_ERROR("Failed to create remote "
+						"directory '/" << dirname <<
+						"', skipping location.");
+					continue;
+				}
+
 			}
 
 			// Create and store the directory object for the root of this location
@@ -1797,6 +1812,15 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			
 			// Push it back on the vector of locations
 			mLocations.push_back(ploc);
+		}
+		catch (std::exception &e)
+		{
+			delete ploc;
+			ploc = 0;
+			BOX_ERROR("Failed to setup location '"
+				<< ploc->mName << "' path '"
+				<< ploc->mPath << "': " << e.what());
+			throw;
 		}
 		catch(...)
 		{
