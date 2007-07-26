@@ -112,7 +112,7 @@
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
 		OPTIONAL_DO_BACKTRACE \
-		BOX_TRACE("Exception thrown: " #type "(" #subtype ") at " \
+		BOX_WARN("Exception thrown: " #type "(" #subtype ") at " \
 			__FILE__ "(" << __LINE__ << ")") \
 		throw type(type::subtype); \
 	}
