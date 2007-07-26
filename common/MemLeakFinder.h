@@ -10,8 +10,6 @@
 #ifndef MEMLEAKFINDER__H
 #define MEMLEAKFINDER__H
 
-#define DEBUG_NEW new(__FILE__,__LINE__)
-
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
 	// include stdlib now, to avoid problems with having the macros defined already
 	#include <stdlib.h>
