@@ -1078,7 +1078,7 @@ int test_bbackupd()
 		// soft limit + 1/3 of (hard - soft). Set small values
 		// for limits accordingly.
 		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
-			"testfiles/bbstored.conf setlimit 01234567 10B 40B") 
+			"testfiles/bbstored.conf setlimit 01234567 9B 10B") 
 			== 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
