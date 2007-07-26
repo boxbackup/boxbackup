@@ -9,11 +9,12 @@
 
 #include "Box.h"
 
-#ifdef HAVE_PCREPOSIX_H
-	#include <pcreposix.h>
-	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
-#elif defined HAVE_REGEX_H
-	#include <regex.h>
+#ifdef HAVE_REGEX_SUPPORT
+	#ifdef HAVE_PCREPOSIX_H
+		#include <pcreposix.h>
+	#else
+		#include <regex.h>
+	#endif
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
 #endif
 
@@ -49,7 +50,7 @@ ExcludeList::ExcludeList()
 // --------------------------------------------------------------------------
 ExcludeList::~ExcludeList()
 {
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	// free regex memory
 	while(mRegex.size() > 0)
 	{
@@ -167,7 +168,7 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 // --------------------------------------------------------------------------
 void ExcludeList::AddRegexEntries(const std::string &rEntries)
 {
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 
 	// Split strings up
 	std::vector<std::string> ens;
@@ -252,7 +253,7 @@ bool ExcludeList::IsExcluded(const std::string &rTest) const
 	}
 	
 	// Check against regular expressions
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	for(std::vector<regex_t *>::const_iterator i(mRegex.begin()); i != mRegex.end(); ++i)
 	{
 		// Test against this expression
@@ -308,7 +309,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 	//
 	mDefinite.clear();
 
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	// free regex memory
 	while(mRegex.size() > 0)
 	{
@@ -349,7 +350,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 	//
 	//
 	//
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	rArchive.Read(iCount);
 
 	if (iCount > 0)
@@ -386,7 +387,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 			}
 		}
 	}
-#endif // HAVE_REGEX_H
+#endif // HAVE_REGEX_SUPPORT
 
 	//
 	//
@@ -441,7 +442,7 @@ void ExcludeList::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	// don't even try to save compiled regular expressions,
 	// use string copies instead.
 	ASSERT(mRegex.size() == mRegexStr.size()); 	
@@ -454,7 +455,7 @@ void ExcludeList::Serialize(Archive & rArchive) const
 	{
 		rArchive.Write(*i);
 	}
-#endif // HAVE_REGEX_H
+#endif // HAVE_REGEX_SUPPORT
 
 	//
 	//
