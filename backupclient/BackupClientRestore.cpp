@@ -304,6 +304,15 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		// exists, otherwise the restore should fail.
 		parentDirectoryName.resize(lastSlash);
 
+		#ifdef WIN32
+			// if the path is a drive letter, then we need to
+			// add a a backslash to query the root directory.
+			if (lastSlash == 2 && parentDirectoryName[1] == ':')
+			{
+				parentDirectoryName += '\\';
+			}
+		#endif
+
 		int parentExists;
 
 		try
