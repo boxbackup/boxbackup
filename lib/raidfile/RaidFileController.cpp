@@ -59,12 +59,12 @@ RaidFileController::RaidFileController(const RaidFileController &rController)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    RaidFileController::Initialise(const char *)
+//		Name:    RaidFileController::Initialise(const std::string&)
 //		Purpose: Initialises the system, loading the configuration file.
 //		Created: 2003/07/08
 //
 // --------------------------------------------------------------------------
-void RaidFileController::Initialise(const char *ConfigFilename)
+void RaidFileController::Initialise(const std::string& rConfigFilename)
 {
 	MEMLEAKFINDER_NO_LEAKS;
 
@@ -97,11 +97,13 @@ void RaidFileController::Initialise(const char *ConfigFilename)
 	
 	// Load the configuration
 	std::string err;
-	std::auto_ptr<Configuration> pconfig = Configuration::LoadAndVerify(ConfigFilename, &verify, err);
+	std::auto_ptr<Configuration> pconfig = Configuration::LoadAndVerify(
+		rConfigFilename, &verify, err);
 	
 	if(pconfig.get() == 0 || !err.empty())
 	{
-		fprintf(stderr, "RaidFile configuation file errors:\n%s", err.c_str());
+		fprintf(stderr, "RaidFile configuation file errors:\n%s",
+			err.c_str());
 		THROW_EXCEPTION(RaidFileException, BadConfigFile)
 	}
 	
