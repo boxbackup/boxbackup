@@ -14,7 +14,7 @@ cd ..\..\
 cd .\lib\compress & perl ./../../lib/common/makeexception.pl.in CompressException.txt
 cd ..\..\
 
-cd .\lib\common & perl ./../../lib/common/makeexception.pl.in CommonException.txt & perl ./../../lib/common/makeexception.pl.in ConversionException.txt
+cd .\lib\common & perl ./../../lib/common/makeexception.pl.in CommonException.txt & perl ./../../lib/common/makeexception.pl.in ConversionException.txt & perl ./../../lib/common/makeexception.pl.in ClientException.txt
 
 cd ..\..\
 
