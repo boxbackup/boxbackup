@@ -390,6 +390,10 @@ bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
 	WCHAR* pWide = ConvertToWideString(rSource.c_str(), sourceCodePage);
 	if (pWide == NULL)
 	{
+		::syslog(LOG_ERR, "Failed to convert string '%s' from "
+			"current code page %d to wide string: %s",
+			rSource.c_str(), sourceCodePage,
+			GetErrorMessage(GetLastError()).c_str());
 		return false;
 	}
 
@@ -398,6 +402,7 @@ bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
 
 	if (!pConsole)
 	{
+		// Error should have been logged by ConvertFromWideString
 		return false;
 	}
 
