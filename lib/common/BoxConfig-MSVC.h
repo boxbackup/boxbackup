@@ -176,7 +176,8 @@
 /* #undef HAVE_READLINE_READLINE_H */
 
 /* Define to 1 if you have the <regex.h> header file. */
-#define HAVE_REGEX_H 1
+/* #undef HAVE_REGEX_H */
+#define HAVE_PCREPOSIX_H 1
 
 /* Define to 1 if you have the `setproctitle' function. */
 /* #undef HAVE_SETPROCTITLE */
