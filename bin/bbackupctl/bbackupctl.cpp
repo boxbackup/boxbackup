@@ -162,7 +162,7 @@ int main(int argc, const char *argv[])
 		);
 
 #if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR,"Failed to connect to the command socket");
+		BOX_ERROR("Failed to connect to the command socket");
 #endif
 
 		return 1;
@@ -175,29 +175,16 @@ int main(int argc, const char *argv[])
 	std::string configSummary;
 	if(!getLine.GetLine(configSummary))
 	{
-#if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR, "Failed to receive configuration summary "
+		BOX_ERROR("Failed to receive configuration summary "
 			"from daemon");
-#else
-		printf("Failed to receive configuration summary from daemon\n");
-#endif
-
 		return 1;
 	}
 
 	// Was the connection rejected by the server?
 	if(getLine.IsEOF())
 	{
-#if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR, "Server rejected the connection. "
-			"Are you running bbackupctl as the same user "
-			"as the daemon?");
-#else
-		printf("Server rejected the connection. "
-			"Are you running bbackupctl as the same user "
-			"as the daemon?\n");
-#endif
-
+		BOX_ERROR("Server rejected the connection. Are you running "
+			"bbackupctl as the same user as the daemon?");
 		return 1;
 	}
 
@@ -224,11 +211,7 @@ int main(int argc, const char *argv[])
 	std::string stateLine;
 	if(!getLine.GetLine(stateLine) || getLine.IsEOF())
 	{
-#if defined WIN32 && ! defined NDEBUG
-		syslog(LOG_ERR, "Failed to receive state line from daemon");
-#else
-		printf("Failed to receive state line from daemon\n");
-#endif
+		BOX_ERROR("Failed to receive state line from daemon");
 		return 1;
 	}
 
@@ -236,7 +219,7 @@ int main(int argc, const char *argv[])
 	int currentState;
 	if(::sscanf(stateLine.c_str(), "state %d", &currentState) != 1)
 	{
-		printf("State line didn't decode\n");
+		BOX_ERROR("Received invalid state line from daemon");
 		return 1;
 	}
 
@@ -266,8 +249,8 @@ int main(int argc, const char *argv[])
 
 			if(!autoBackup)
 			{
-				printf("ERROR: Daemon is not in automatic mode -- "
-					"sync will never start!\n");
+				BOX_ERROR("Daemon is not in automatic mode, "
+					"sync will never start!");
 				return 1;
 			}
 

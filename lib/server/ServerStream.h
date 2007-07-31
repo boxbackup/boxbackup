@@ -14,7 +14,6 @@
 #include <errno.h>
 
 #ifndef WIN32
-	#include <syslog.h>
 	#include <sys/wait.h>
 #endif
 
@@ -73,7 +72,10 @@ public:
 		{
 			if(childExit)
 			{
-				::syslog(LOG_ERR, "in server child, exception %s (%d/%d) -- terminating child", e.what(), e.GetType(), e.GetSubType());
+				BOX_ERROR("Error in child process, "
+					"terminating connection: exception " <<
+					e.what() << "(" << e.GetType() <<
+					"/" << e.GetSubType() << ")");
 				_exit(1);
 			}
 			else throw;
@@ -82,7 +84,9 @@ public:
 		{
 			if(childExit)
 			{
-				::syslog(LOG_ERR, "in server child, exception %s -- terminating child", e.what());
+				BOX_ERROR("Error in child process, "
+					"terminating connection: exception " <<
+					e.what());
 				_exit(1);
 			}
 			else throw;
@@ -91,7 +95,9 @@ public:
 		{
 			if(childExit)
 			{
-				::syslog(LOG_ERR, "in server child, unknown exception -- terminating child");
+				BOX_ERROR("Error in child process, "
+					"terminating connection: "
+					"unknown exception");
 				_exit(1);
 			}
 			else throw;
@@ -266,7 +272,7 @@ public:
 							}
 							
 							// Log it
-							::syslog(LOG_INFO, "%s (handling in child %d)", logMessage.c_str(), pid);
+							BOX_WARNING("Error message from child process " << pid << ": " << logMessage);
 						}
 						else
 						{

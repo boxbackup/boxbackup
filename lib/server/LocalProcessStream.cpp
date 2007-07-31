@@ -120,8 +120,8 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	HANDLE writeInChild, readFromChild;
 	if(!CreatePipe(&readFromChild, &writeInChild, &secAttr, 0))
 	{
-		::syslog(LOG_ERR, "Failed to CreatePipe for child process: "
-			"error %d", GetLastError());
+		BOX_ERROR("Failed to CreatePipe for child process: "
+			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketPairFailed)
 	}
 	SetHandleInformation(readFromChild, HANDLE_FLAG_INHERIT, 0);
@@ -155,8 +155,8 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
    
 	if(!result)
 	{
-		::syslog(LOG_ERR, "Failed to CreateProcess: '%s': "
-			"error %d", CommandLine, GetLastError());
+		BOX_ERROR("Failed to CreateProcess: '" << CommandLine <<
+			"': " << GetErrorMessage(GetLastError()));
 		CloseHandle(writeInChild);
 		CloseHandle(readFromChild);
 		THROW_EXCEPTION(ServerException, ServerForkError)

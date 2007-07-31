@@ -9,10 +9,6 @@
 
 #include "Box.h"
 
-#ifdef HAVE_SYSLOG_H
-#include <syslog.h>
-#endif
-
 #include <set>
 #include <sstream>
 
@@ -88,11 +84,26 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 
 	// Check given client ID against the ID in the certificate certificate
 	// and that the client actually has an account on this machine
-	if(mClientID != rContext.GetClientID() || !rContext.GetClientHasAccount())
+	if(mClientID != rContext.GetClientID())
 	{
-		::syslog(LOG_INFO, "Failed login: Client ID presented was %08X", mClientID);
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_BadLogin));
+		BOX_WARNING("Failed login from client ID " << 
+			BOX_FORMAT_ACCOUNT(mClientID) <<
+			": wrong certificate for this account");
+		return std::auto_ptr<ProtocolObject>(
+			new BackupProtocolServerError(
+				BackupProtocolServerError::ErrorType,
+				BackupProtocolServerError::Err_BadLogin));
+	}
+
+	if(!rContext.GetClientHasAccount())
+	{
+		BOX_WARNING("Failed login from client ID " << 
+			BOX_FORMAT_ACCOUNT(mClientID) <<
+			": no such account on this server");
+		return std::auto_ptr<ProtocolObject>(
+			new BackupProtocolServerError(
+				BackupProtocolServerError::ErrorType,
+				BackupProtocolServerError::Err_BadLogin));
 	}
 
 	// If we need to write, check that nothing else has got a write lock
@@ -101,9 +112,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 		// See if the context will get the lock
 		if(!rContext.AttemptToGetWriteLock())
 		{
-			::syslog(LOG_INFO, "Failed to get write lock (for Client ID %08X)", mClientID);
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_CannotLockStoreForWriting));			
+			BOX_WARNING("Failed to get write lock for Client ID " <<
+				BOX_FORMAT_ACCOUNT(mClientID));
+			return std::auto_ptr<ProtocolObject>(
+				new BackupProtocolServerError(
+					BackupProtocolServerError::ErrorType,
+					BackupProtocolServerError::Err_CannotLockStoreForWriting));			
 		}
 		
 		// Debug: check we got the lock
@@ -120,7 +134,11 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 	rContext.SetPhase(BackupContext::Phase_Commands);
 	
 	// Log login
-	::syslog(LOG_INFO, "Login: Client ID %08X, %s", mClientID, ((mFlags & Flags_ReadOnly) != Flags_ReadOnly)?"Read/Write":"Read-only");
+	BOX_NOTICE("Login from Client ID " << 
+		BOX_FORMAT_ACCOUNT(mClientID) <<
+		" " <<
+		(((mFlags & Flags_ReadOnly) != Flags_ReadOnly)
+		?"Read/Write":"Read-only"));
 
 	// Get the usage info for reporting to the client
 	int64_t blocksUsed = 0, blocksSoftLimit = 0, blocksHardLimit = 0;
@@ -140,7 +158,8 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 // --------------------------------------------------------------------------
 std::auto_ptr<ProtocolObject> BackupProtocolServerFinished::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
 {
-	::syslog(LOG_INFO, "Session finished");
+	BOX_NOTICE("Session finished for Client ID " << 
+		BOX_FORMAT_ACCOUNT(rContext.GetClientID()));
 
 	// Let the context know about it
 	rContext.ReceivedFinishCommand();
@@ -311,13 +330,23 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			en = rdir.FindEntryByID(id);
 			if(en == 0)
 			{
-				::syslog(LOG_ERR, "Object %llx in dir %llx for account %x references object %llx which does not exist in dir",
-					mObjectID, mInDirectory, rContext.GetClientID(), id);
-				return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-					BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_PatchConsistencyError));			
+				BOX_ERROR("Object " << 
+					BOX_FORMAT_OBJECTID(mObjectID) <<
+					" in dir " << 
+					BOX_FORMAT_OBJECTID(mInDirectory) <<
+					" for account " <<
+					BOX_FORMAT_ACCOUNT(rContext.GetClientID()) <<
+					" references object " << 
+					BOX_FORMAT_OBJECTID(id) <<
+					" which does not exist in dir");
+				return std::auto_ptr<ProtocolObject>(
+					new BackupProtocolServerError(
+						BackupProtocolServerError::ErrorType,
+						BackupProtocolServerError::Err_PatchConsistencyError));			
 			}
 			id = en->GetDependsNewer();
-		} while(en != 0 && id != 0);
+		}
+		while(en != 0 && id != 0);
 		
 		// OK! The last entry in the chain is the full file, the others are patches back from it.
 		// Open the last one, which is the current from file
