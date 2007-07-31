@@ -63,8 +63,8 @@ WinNamedPipeStream::~WinNamedPipeStream()
 		}
 		catch (std::exception &e)
 		{
-			::syslog(LOG_ERR, "Caught exception while destroying "
-				"named pipe, ignored.");
+			BOX_ERROR("Caught exception while destroying "
+				"named pipe, ignored: " << e.what());
 		}
 	}
 }
@@ -100,8 +100,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "CreateNamedPipeW failed: %s", 
-			GetErrorMessage(GetLastError()).c_str());
+		BOX_ERROR("Failed to CreateNamedPipeW(" << pName << "): " <<
+			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
@@ -109,8 +109,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (!connected)
 	{
-		::syslog(LOG_ERR, "ConnectNamedPipe failed: %s", 
-			GetErrorMessage(GetLastError()).c_str());
+		BOX_ERROR("Failed to ConnectNamedPipe(" << pName << "): " <<
+			GetErrorMessage(GetLastError()));
 		Close();
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -126,8 +126,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (mReadableEvent == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "Failed to create the Readable event: %s",
-			GetErrorMessage(GetLastError()).c_str());
+		BOX_ERROR("Failed to create the Readable event: " <<
+			GetErrorMessage(GetLastError()));
 		Close();
 		THROW_EXCEPTION(CommonException, Internal)
 	}
@@ -144,8 +144,8 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 		if (err != ERROR_IO_PENDING)
 		{
-			::syslog(LOG_ERR, "Failed to start overlapped read: "
-				"%s", GetErrorMessage(err).c_str());
+			BOX_ERROR("Failed to start overlapped read: " <<
+				GetErrorMessage(err));
 			Close();
 			THROW_EXCEPTION(ConnectionException, 
 				Conn_SocketReadError)
@@ -183,13 +183,13 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 		DWORD err = GetLastError();
 		if (err == ERROR_PIPE_BUSY)
 		{
-			::syslog(LOG_ERR, "Failed to connect to backup "
-				"daemon: it is busy with another connection");
+			BOX_ERROR("Failed to connect to backup daemon: "
+				"it is busy with another connection");
 		}
 		else
 		{
-			::syslog(LOG_ERR, "Failed to connect to backup "
-				"daemon: %s", GetErrorMessage(err).c_str());
+			BOX_ERROR("Failed to connect to backup daemon: " <<
+				GetErrorMessage(err));
 		}
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -261,16 +261,14 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 				{
 					if (err == ERROR_BROKEN_PIPE)
 					{
-						::syslog(LOG_ERR, "Control "
-							"client disconnected");
+						BOX_ERROR("Control client "
+							"disconnected");
 					}
 					else
 					{
-						::syslog(LOG_ERR, 
-							"Failed to wait for "
+						BOX_ERROR("Failed to wait for "
 							"ReadFile to complete: "
-							"%s", 
-							GetErrorMessage(err).c_str());
+							<< GetErrorMessage(err));
 					}
 
 					Close();
@@ -326,15 +324,13 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			}
 			else if (err == ERROR_BROKEN_PIPE)
 			{
-				::syslog(LOG_ERR, 
-					"Control client disconnected");
+				BOX_ERROR("Control client disconnected");
 				mReadClosed = true;
 			}
 			else
 			{
-				::syslog(LOG_ERR, "Failed to start "
-					"overlapped read: %s", 
-					GetErrorMessage(err).c_str());
+				BOX_ERROR("Failed to start overlapped read: "
+					<< GetErrorMessage(err));
 				Close();
 				THROW_EXCEPTION(ConnectionException, 
 					Conn_SocketReadError)
@@ -387,9 +383,8 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			}
 			else
 			{
-				::syslog(LOG_ERR, "Failed to read from "
-					"control socket: %s", 
-					GetErrorMessage(err).c_str());
+				BOX_ERROR("Failed to read from control socket: "
+					<< GetErrorMessage(err));
 				THROW_EXCEPTION(ConnectionException, 
 					Conn_SocketReadError)
 			}
@@ -440,8 +435,8 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 		if (!Success)
 		{
 			DWORD err = GetLastError();
-			::syslog(LOG_ERR, "Failed to write to control socket: "
-				"%s", GetErrorMessage(err).c_str());
+			BOX_ERROR("Failed to write to control socket: " <<
+				GetErrorMessage(err));
 			Close();
 
 			// ERROR_NO_DATA is a strange name for 
@@ -474,8 +469,7 @@ void WinNamedPipeStream::Close()
 {
 	if (mSocketHandle == INVALID_HANDLE_VALUE && mIsConnected)
 	{
-		fprintf(stderr, "Inconsistent connected state\n");
-		::syslog(LOG_ERR, "Inconsistent connected state");
+		BOX_ERROR("Named pipe: inconsistent connected state");
 		mIsConnected = false;
 	}
 
@@ -488,29 +482,27 @@ void WinNamedPipeStream::Close()
 	{
 		if (!CancelIo(mSocketHandle))
 		{
-			::syslog(LOG_ERR, "Failed to cancel outstanding "
-				"I/O: %s", 
-				GetErrorMessage(GetLastError()).c_str());
+			BOX_ERROR("Failed to cancel outstanding I/O: " <<
+				GetErrorMessage(GetLastError()));
 		}
 
 		if (mReadableEvent == INVALID_HANDLE_VALUE)
 		{
-			::syslog(LOG_ERR, "Failed to destroy Readable "
-				"event: invalid handle");
+			BOX_ERROR("Failed to destroy Readable event: "
+				"invalid handle");
 		}
 		else if (!CloseHandle(mReadableEvent))
 		{
-			::syslog(LOG_ERR, "Failed to destroy Readable "
-				"event: %s", 
-				GetErrorMessage(GetLastError()).c_str());
+			BOX_ERROR("Failed to destroy Readable event: " <<
+				GetErrorMessage(GetLastError()));
 		}
 
 		mReadableEvent = INVALID_HANDLE_VALUE;
 
 		if (!FlushFileBuffers(mSocketHandle))
 		{
-			::syslog(LOG_INFO, "FlushFileBuffers failed: %s", 
-				GetErrorMessage(GetLastError()).c_str());
+			BOX_ERROR("Failed to FlushFileBuffers: " <<
+				GetErrorMessage(GetLastError()));
 		}
 	
 		if (!DisconnectNamedPipe(mSocketHandle))
@@ -518,9 +510,8 @@ void WinNamedPipeStream::Close()
 			DWORD err = GetLastError();
 			if (err != ERROR_PIPE_NOT_CONNECTED)
 			{
-				::syslog(LOG_ERR, "DisconnectNamedPipe "
-					"failed: %s", 
-					GetErrorMessage(err).c_str());
+				BOX_ERROR("Failed to DisconnectNamedPipe: " <<
+					GetErrorMessage(err));
 			}
 		}
 
@@ -536,8 +527,8 @@ void WinNamedPipeStream::Close()
 
 	if (!result) 
 	{
-		::syslog(LOG_ERR, "CloseHandle failed: %s", 
-			GetErrorMessage(GetLastError()).c_str());
+		BOX_ERROR("Failed to CloseHandle: " <<
+			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
 }
@@ -585,8 +576,8 @@ void WinNamedPipeStream::WriteAllBuffered()
 	
 	if (!FlushFileBuffers(mSocketHandle))
 	{
-		::syslog(LOG_WARNING, "FlushFileBuffers failed: %s", 
-			GetErrorMessage(GetLastError()).c_str());
+		BOX_ERROR("Failed to FlushFileBuffers: " <<
+			GetErrorMessage(GetLastError()));
 	}
 }
 

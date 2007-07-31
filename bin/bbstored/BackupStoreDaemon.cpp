@@ -208,7 +208,7 @@ void BackupStoreDaemon::Run()
 				// Change the log name
 				::openlog("bbstored/hk", LOG_PID, LOG_LOCAL6);
 				// Log that housekeeping started
-				::syslog(LOG_INFO, "Housekeeping process started");
+				BOX_INFO("Housekeeping process started");
 				// Ignore term and hup
 				// Parent will handle these and alert the child via the socket, don't want to randomly die
 				::signal(SIGHUP, SIG_IGN);
@@ -281,19 +281,19 @@ void BackupStoreDaemon::Connection(SocketStreamTLS &rStream)
 	}
 	catch(BoxException &e)
 	{
-		::syslog(LOG_ERR, "%s: disconnecting due to "
-			"exception %s (%d/%d)", DaemonName(), 
-			e.what(), e.GetType(), e.GetSubType());
+		BOX_ERROR("Error in child process, terminating connection: " <<
+			e.what() << " (" << e.GetType() << "/" << 
+			e.GetSubType() << ")");
 	}
 	catch(std::exception &e)
 	{
-		::syslog(LOG_ERR, "%s: disconnecting due to "
-			"exception %s", DaemonName(), e.what());
+		BOX_ERROR("Error in child process, terminating connection: " <<
+			e.what());
 	}
 	catch(...)
 	{
-		::syslog(LOG_ERR, "%s: disconnecting due to "
-			"unknown exception", DaemonName());
+		BOX_ERROR("Error in child process, terminating connection: " <<
+			"unknown exception");
 	}
 }
 	
@@ -311,7 +311,7 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	std::string clientCommonName(rStream.GetPeerCommonName());
 	
 	// Log the name
-	::syslog(LOG_INFO, "Certificate CN: %s", clientCommonName.c_str());
+	BOX_INFO("Client certificate CN: " << clientCommonName);
 	
 	// Check it
 	int32_t id;
@@ -357,10 +357,8 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 		const SocketStreamTLS &s)
 {
 	// Log the amount of data transferred
-	::syslog(LOG_INFO, "Connection statistics for %s: "
-			"IN=%lld OUT=%lld TOTAL=%lld", commonName,
-			(long long)s.GetBytesRead(), 
-			(long long)s.GetBytesWritten(),
-			(long long)s.GetBytesRead() + 
-			(long long)s.GetBytesWritten());
+	BOX_INFO("Connection statistics for " << commonName << ":"
+		" IN="  << s.GetBytesRead() <<
+		" OUT=" << s.GetBytesWritten() <<
+		" TOTAL=" << (s.GetBytesRead() + s.GetBytesWritten()));
 }

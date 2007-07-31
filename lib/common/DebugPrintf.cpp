@@ -14,12 +14,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#ifdef WIN32
-	#include "emu.h"
-#else
-	#include <syslog.h>
-#endif
-
 #include "MemLeakFindOn.h"
 
 // Use this apparently superflous printf function to avoid having to 
