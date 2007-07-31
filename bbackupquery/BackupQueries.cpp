@@ -2009,19 +2009,14 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */);
 	}
-	catch (BoxException &e)
-	{
-		::syslog(LOG_ERR, "Failed to restore: %s", e.what());
-		return;
-	}
 	catch(std::exception &e)
 	{
-		::syslog(LOG_ERR, "Failed to restore: %s", e.what());
+		BOX_ERROR("Failed to restore: " << e.what());
 		return;
 	}
 	catch(...)
 	{
-		::syslog(LOG_ERR, "Failed to restore: unknown error");
+		BOX_ERROR("Failed to restore: unknown exception");
 		return;
 	}
 

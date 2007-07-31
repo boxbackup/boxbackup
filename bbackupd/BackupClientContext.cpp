@@ -9,12 +9,10 @@
 
 #include "Box.h"
 
-#ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
-#endif
 #ifdef HAVE_SIGNAL_H
 	#include <signal.h>
 #endif
+
 #ifdef HAVE_SYS_TIME_H
 	#include <sys/time.h>
 #endif
@@ -127,7 +125,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		}
 		
 		// Log intention
-		::syslog(LOG_INFO, "Opening connection to server %s...", mHostname.c_str());
+		BOX_INFO("Opening connection to server '" <<
+			mHostname << "'...");
 
 		// Connect!
 		mpSocket->Open(mrTLSContext, Socket::TypeINET, mHostname.c_str(), BOX_PORT_BBSTORED);
@@ -147,8 +146,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 
 			if (!mpExtendedLogFileHandle)
 			{
-				::syslog(LOG_ERR, "Failed to open extended "
-					"log file: %s", strerror(errno));
+				BOX_ERROR("Failed to open extended log "
+					"file: " << strerror(errno));
 			}
 			else
 			{
@@ -194,7 +193,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		}
 		
 		// Log success
-		::syslog(LOG_INFO, "Connection made, login successful");
+		BOX_INFO("Connection made, login successful");
 
 		// Check to see if there is any space available on the server
 		if(loginConf->GetBlocksUsed() >= loginConf->GetBlocksHardLimit())
@@ -202,7 +201,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			// no -- flag so only things like deletions happen
 			mStorageLimitExceeded = true;
 			// Log
-			::syslog(LOG_WARNING, "Exceeded storage hard-limit on server -- not uploading changes to files");
+			BOX_WARNING("Exceeded storage hard-limit on server, "
+				"not uploading changes to files");
 		}
 	}
 	catch(...)
