@@ -10,6 +10,7 @@
 #ifndef LOGGING__H
 #define LOGGING__H
 
+#include <iomanip>
 #include <sstream>
 #include <vector>
 
@@ -41,6 +42,19 @@
 #else
         #define BOX_TRACE(stuff)   BOX_LOG(Log::TRACE, stuff)
 #endif
+
+#define BOX_FORMAT_ACCOUNT(accno) \
+	std::hex << \
+	std::showbase << \
+	std::internal << \
+	std::setw(8) << \
+	std::setfill('0') << \
+	(accno)
+
+#define BOX_FORMAT_OBJECTID(objectid) \
+	std::hex << \
+	std::showbase << \
+	(objectid)
 
 #undef ERROR
 

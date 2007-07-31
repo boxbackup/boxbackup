@@ -19,10 +19,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-#ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
-#endif
-
 #ifdef WIN32
 	#include <ws2tcpip.h>
 #endif
@@ -353,7 +349,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 			// Set new session
 			if(::setsid() == -1)
 			{
-				::syslog(LOG_ERR, "can't setsid");
+				BOX_ERROR("Failed to setsid(): " << 
+					strerror(errno));
 				THROW_EXCEPTION(ServerException, DaemoniseFailed)
 			}
 

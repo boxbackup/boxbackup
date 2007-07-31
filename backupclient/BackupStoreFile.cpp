@@ -17,10 +17,8 @@
 #include <string.h>
 #include <new>
 #include <string.h>
+
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
-	#ifndef WIN32
-		#include <syslog.h>
-	#endif
 	#include <stdio.h>
 #endif
 
@@ -758,8 +756,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 					// Warn and log this issue
 					if(!sWarnedAboutBackwardsCompatiblity)
 					{
-						::printf("WARNING: Decoded one or more files using backwards compatibility mode for block index.\n");
-						::syslog(LOG_ERR, "WARNING: Decoded one or more files using backwards compatibility mode for block index.\n");
+						BOX_WARNING("WARNING: Decoded one or more files using backwards compatibility mode for block index.");
 						sWarnedAboutBackwardsCompatiblity = true;
 					}
 				}

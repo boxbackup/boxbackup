@@ -14,10 +14,6 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
-#ifndef WIN32
-#include <syslog.h>
-#endif
-
 #include "SSLLib.h"
 #include "ServerException.h"
 
@@ -73,13 +69,8 @@ void SSLLib::LogError(const char *ErrorDuringAction)
 	while((errcode = ERR_get_error()) != 0)
 	{
 		::ERR_error_string_n(errcode, errname, sizeof(errname));
-		#ifndef NDEBUG
-			if(SSLLib__TraceErrors)
-			{
-				TRACE2("SSL err during %s: %s\n", ErrorDuringAction, errname);
-			}
-		#endif
-		::syslog(LOG_ERR, "SSL err during %s: %s", ErrorDuringAction, errname);
+		BOX_ERROR("SSL error during " << ErrorDuringAction << ": " <<
+			errname);
 	}
 }
 

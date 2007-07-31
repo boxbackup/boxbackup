@@ -12,12 +12,11 @@
 #ifdef HAVE_SYS_TIME_H
 	#include <sys/time.h>
 #endif
+
 #ifdef HAVE_TIME_H
 	#include <time.h>
 #endif
-#ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
-#endif
+
 #include <errno.h>
 #include <string.h>
 
@@ -40,8 +39,8 @@ box_time_t GetCurrentBoxTime()
 		struct timeval tv;
 		if (gettimeofday(&tv, NULL) != 0)
 		{
-			::syslog(LOG_ERR, "gettimeofday() failed (%s), "
-				"dropping precision", strerror(errno));
+			BOX_ERROR("Failed to gettimeofday(), dropping "
+				"precision: " << strerror(errno));
 		}
 		else
 		{
