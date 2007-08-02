@@ -109,8 +109,7 @@ int main(int argc, const char *argv[])
 	}
 
 	// Read in the configuration file
-	if(!quiet) printf("Using configuration file %s\n", 
-		configFilename.c_str());
+	if(!quiet) BOX_NOTICE("Using configuration file " << configFilename);
 
 	std::string errs;
 	std::auto_ptr<Configuration> config(
@@ -119,7 +118,7 @@ int main(int argc, const char *argv[])
 
 	if(config.get() == 0 || !errs.empty())
 	{
-		printf("Invalid configuration file:\n%s", errs.c_str());
+		BOX_ERROR("Invalid configuration file: " << errs);
 		return 1;
 	}
 	// Easier coding
@@ -128,10 +127,10 @@ int main(int argc, const char *argv[])
 	// Check there's a socket defined in the config file
 	if(!conf.KeyExists("CommandSocket"))
 	{
-		printf("Daemon isn't using a control socket, "
+		BOX_ERROR("Daemon isn't using a control socket, "
 			"could not execute command.\n"
 			"Add a CommandSocket declaration to the "
-			"bbackupd.conf file.\n");
+			"bbackupd.conf file.");
 		return 1;
 	}
 	
@@ -153,17 +152,13 @@ int main(int argc, const char *argv[])
 	}
 	catch(...)
 	{
-		printf("Failed to connect to daemon control socket.\n"
+		BOX_ERROR("Failed to connect to daemon control socket.\n"
 			"Possible causes:\n"
 			"  * Daemon not running\n"
 			"  * Daemon busy syncing with store server\n"
 			"  * Another bbackupctl process is communicating with the daemon\n"
-			"  * Daemon is waiting to recover from an error\n"
+			"  * Daemon is waiting to recover from an error"
 		);
-
-#if defined WIN32 && ! defined NDEBUG
-		BOX_ERROR("Failed to connect to the command socket");
-#endif
 
 		return 1;
 	}
@@ -193,19 +188,19 @@ int main(int argc, const char *argv[])
 	if(::sscanf(configSummary.c_str(), "bbackupd: %d %d %d %d", &autoBackup,
 			&updateStoreInterval, &minimumFileAge, &maxUploadWait) != 4)
 	{
-		printf("Config summary didn't decode\n");
+		BOX_ERROR("Config summary didn't decode.");
 		return 1;
 	}
 	// Print summary?
 	if(!quiet)
 	{
-		printf("Daemon configuration summary:\n"
-			"  AutomaticBackup = %s\n"
-			"  UpdateStoreInterval = %d seconds\n"
-			"  MinimumFileAge = %d seconds\n"
-			"  MaxUploadWait = %d seconds\n",
-			autoBackup?"true":"false", updateStoreInterval, 
-			minimumFileAge, maxUploadWait);
+		BOX_INFO("Daemon configuration summary:\n"
+			"  AutomaticBackup = " << 
+			(autoBackup?"true":"false") << "\n"
+			"  UpdateStoreInterval = " << updateStoreInterval << 
+			" seconds\n"
+			"  MinimumFileAge = " << minimumFileAge << " seconds\n"
+			"  MaxUploadWait = " << maxUploadWait << " seconds\n");
 	}
 
 	std::string stateLine;
@@ -266,8 +261,8 @@ int main(int argc, const char *argv[])
 
 			if (currentState != 0)
 			{
-				printf("Waiting for current sync/error state "
-					"to finish...\n");
+				BOX_INFO("Waiting for current sync/error state "
+					"to finish...");
 			}
 		}
 		break;
@@ -310,14 +305,14 @@ int main(int argc, const char *argv[])
 			{
 				if(line == "start-sync")
 				{
-					if (!quiet) printf("Sync started...\n");
+					if (!quiet) BOX_INFO("Sync started...");
 					syncIsRunning = true;
 				}
 				else if(line == "finish-sync")
 				{
 					if (syncIsRunning)
 					{
-						if (!quiet) printf("Sync finished.\n");
+						if (!quiet) BOX_INFO("Sync finished.\n");
 						// Send a quit command to finish nicely
 						connection.Write("quit\n", 5);
 					
@@ -326,7 +321,7 @@ int main(int argc, const char *argv[])
 					}
 					else
 					{
-						if (!quiet) printf("Previous sync finished.\n");
+						if (!quiet) BOX_INFO("Previous sync finished.");
 					}
 					// daemon must still be busy
 				}
@@ -340,13 +335,13 @@ int main(int argc, const char *argv[])
 				{
 					if(!quiet)
 					{
-						printf("Succeeded.\n");
+						BOX_INFO("Succeeded.\n");
 					}
 					finished = true;
 				}
 				else if(line == "error")
 				{
-					printf("ERROR. (Check command spelling)\n");
+					BOX_ERROR("Check command spelling");
 					returnCode = 1;
 					finished = true;
 				}

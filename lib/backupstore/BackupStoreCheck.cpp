@@ -102,7 +102,7 @@ void BackupStoreCheck::Check()
 			// Couldn't lock the account -- just stop now
 			if(!mQuiet)
 			{
-				::printf("Couldn't lock the account -- did not check.\nTry again later after the client has disconnected.\nAlternatively, forcibly kill the server.\n");
+				BOX_ERROR("Failed to lock the account -- did not check.\nTry again later after the client has disconnected.\nAlternatively, forcibly kill the server.");
 			}
 			THROW_EXCEPTION(BackupStoreException, CouldNotLockStoreAccount)
 		}
@@ -110,41 +110,43 @@ void BackupStoreCheck::Check()
 
 	if(!mQuiet && mFixErrors)
 	{
-		::printf("NOTE: Will fix errors encountered during checking.\n");
+		BOX_NOTICE("Will fix errors encountered during checking.");
 	}
 
 	// Phase 1, check objects
 	if(!mQuiet)
 	{
-		::printf("Check store account ID %08x\nPhase 1, check objects...\n", mAccountID);
+		BOX_INFO("Checking store account ID " <<
+			BOX_FORMAT_ACCOUNT(mAccountID) << "...");
+		BOX_INFO("Phase 1, check objects...");
 	}
 	CheckObjects();
 	
 	// Phase 2, check directories
 	if(!mQuiet)
 	{
-		::printf("Phase 2, check directories...\n");
+		BOX_INFO("Phase 2, check directories...");
 	}
 	CheckDirectories();
 	
 	// Phase 3, check root
 	if(!mQuiet)
 	{
-		::printf("Phase 3, check root...\n");
+		BOX_INFO("Phase 3, check root...");
 	}
 	CheckRoot();
 
 	// Phase 4, check unattached objects
 	if(!mQuiet)
 	{
-		::printf("Phase 4, fix unattached objects...\n");
+		BOX_INFO("Phase 4, fix unattached objects...");
 	}
 	CheckUnattachedObjects();
 
 	// Phase 5, fix bad info
 	if(!mQuiet)
 	{
-		::printf("Phase 5, fix unrecovered inconsistencies...\n");
+		BOX_INFO("Phase 5, fix unrecovered inconsistencies...");
 	}
 	FixDirsWithWrongContainerID();
 	FixDirsWithLostDirs();
@@ -152,7 +154,7 @@ void BackupStoreCheck::Check()
 	// Phase 6, regenerate store info
 	if(!mQuiet)
 	{
-		::printf("Phase 6, regenerate store info...\n");
+		BOX_INFO("Phase 6, regenerate store info...");
 	}
 	WriteNewStoreInfo();
 	
@@ -160,29 +162,40 @@ void BackupStoreCheck::Check()
 	
 	if(mNumberErrorsFound > 0)
 	{
-		::printf("%lld errors found\n", mNumberErrorsFound);
+		BOX_WARNING("Finished checking store account ID " <<
+			BOX_FORMAT_ACCOUNT(mAccountID) << ": " <<
+			mNumberErrorsFound << " errors found");
 		if(!mFixErrors)
 		{
-			::printf("NOTE: No changes to the store account have been made.\n");
+			BOX_WARNING("No changes to the store account "
+				"have been made.");
 		}
 		if(!mFixErrors && mNumberErrorsFound > 0)
 		{
-			::printf("Run again with fix option to fix these errors\n");
+			BOX_WARNING("Run again with fix option to "
+				"fix these errors");
 		}
-		if(mNumberErrorsFound > 0)
+		if(mFixErrors && mNumberErrorsFound > 0)
 		{
-			::printf("You should now use bbackupquery on the client machine to examine the store.\n");
+			BOX_WARNING("You should now use bbackupquery "
+				"on the client machine to examine the store.");
 			if(mLostAndFoundDirectoryID != 0)
 			{
-				::printf("A lost+found directory was created in the account root.\n"\
-					"This contains files and directories which could not be matched to existing directories.\n"\
-					"bbackupd will delete this directory in a few days time.\n");
+				BOX_WARNING("A lost+found directory was "
+					"created in the account root.\n"
+					"This contains files and directories "
+					"which could not be matched to "
+					"existing directories.\n"\
+					"bbackupd will delete this directory "
+					"in a few days time.");
 			}
 		}
 	}
 	else
 	{
-		::printf("Store account checked, no errors found.\n");
+		BOX_NOTICE("Finished checking store account ID " <<
+			BOX_FORMAT_ACCOUNT(mAccountID) << ": "
+			"no errors found");
 	}
 }
 
@@ -304,7 +317,10 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 			}
 			else
 			{
-				::printf("Spurious or invalid directory %s/%s found%s -- delete manually\n", rDirName.c_str(), (*i).c_str(), mFixErrors?", deleting":"");
+				BOX_WARNING("Spurious or invalid directory " <<
+					rDirName << DIRECTORY_SEPARATOR << 
+					(*i) << " found, " <<
+					(mFixErrors?"deleting":"delete manually"));
 				++mNumberErrorsFound;
 			}
 		}
@@ -336,7 +352,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 	// Check directory exists
 	if(!RaidFileRead::DirectoryExists(mDiscSetNumber, dirName))
 	{
-		TRACE1("RaidFile dir %s does not exist\n", dirName.c_str());
+		BOX_WARNING("RaidFile dir " << dirName << " does not exist");
 		return;
 	}
 
@@ -378,9 +394,9 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			::printf("Spurious file %s" DIRECTORY_SEPARATOR "%s "
-				"found%s\n", dirName.c_str(), (*i).c_str(), 
-				mFixErrors?", deleting":"");
+			BOX_WARNING("Spurious file " << dirName << 
+				DIRECTORY_SEPARATOR << (*i) << " found" <<
+				(mFixErrors?", deleting":""));
 			++mNumberErrorsFound;
 			if(mFixErrors)
 			{
@@ -401,7 +417,9 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			if(!CheckAndAddObject(StartID | i, dirName + leaf))
 			{
 				// File was bad, delete it
-				::printf("Corrupted file %s%s found%s\n", dirName.c_str(), leaf, mFixErrors?", deleting":"");
+				BOX_WARNING("Corrupted file " << dirName <<
+					leaf << " found" <<
+					(mFixErrors?", deleting":""));
 				++mNumberErrorsFound;
 				if(mFixErrors)
 				{
@@ -509,7 +527,7 @@ int64_t BackupStoreCheck::CheckFile(int64_t ObjectID, IOStream &rStream)
 	if(ObjectID == BACKUPSTORE_ROOT_DIRECTORY_ID)
 	{
 		// Get that dodgy thing deleted!
-		::printf("Have file as root directory. This is bad.\n");
+		BOX_ERROR("Have file as root directory. This is bad.");
 		return -1;
 	}
 
@@ -596,7 +614,9 @@ void BackupStoreCheck::CheckDirectories()
 				if(dir.CheckAndFix())
 				{
 					// Wasn't quite right, and has been modified
-					::printf("Directory ID %llx has bad structure\n", pblock->mID[e]);
+					BOX_WARNING("Directory ID " <<
+						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+						" has bad structure");
 					++mNumberErrorsFound;
 					isModified = true;
 				}
@@ -622,7 +642,11 @@ void BackupStoreCheck::CheckDirectories()
 							!= ((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == BackupStoreDirectory::Entry::Flags_Dir))
 						{
 							// Entry is of wrong type
-							::printf("Directory ID %llx references object %llx which has a different type than expected.\n", pblock->mID[e], en->GetObjectID());
+							BOX_WARNING("Directory ID " <<
+								BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+								" references object " <<
+								BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+								" which has a different type than expected.");
 							badEntry = true;
 						}
 						else
@@ -630,8 +654,12 @@ void BackupStoreCheck::CheckDirectories()
 							// Check that the entry is not already contained.
 							if(iflags & Flags_IsContained)
 							{
+								BOX_WARNING("Directory ID " <<
+									BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+									" references object " <<
+									BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+									" which is already contained.");
 								badEntry = true;
-								::printf("Directory ID %llx references object %llx which is already contained.\n", pblock->mID[e], en->GetObjectID());
 							}
 							else
 							{
@@ -645,13 +673,13 @@ void BackupStoreCheck::CheckDirectories()
 									if(iflags & Flags_IsDir)
 									{
 										// Add to will fix later list
-										::printf("Directory ID %llx has wrong container ID.\n", en->GetObjectID());
+										BOX_WARNING("Directory ID " << BOX_FORMAT_OBJECTID(en->GetObjectID()) << " has wrong container ID.");
 										mDirsWithWrongContainerID.push_back(en->GetObjectID());
 									}
 									else
 									{
 										// This is OK for files, they might move
-										::printf("File ID %llx has different container ID, probably moved\n", en->GetObjectID());
+										BOX_WARNING("File ID " << BOX_FORMAT_OBJECTID(en->GetObjectID()) << " has different container ID, probably moved");
 									}
 									
 									// Fix entry for now
@@ -670,7 +698,7 @@ void BackupStoreCheck::CheckDirectories()
 								// Mark as changed
 								isModified = true;
 								// Tell user
-								::printf("Directory ID %llx has wrong size for object %llx\n", pblock->mID[e], en->GetObjectID());
+								BOX_WARNING("Directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " has wrong size for object " << BOX_FORMAT_OBJECTID(en->GetObjectID()));
 							}
 						}
 					}
@@ -686,7 +714,7 @@ void BackupStoreCheck::CheckDirectories()
 						{
 							// Just remove the entry
 							badEntry = true;
-							::printf("Directory ID %llx references object %llx which does not exist.\n", pblock->mID[e], en->GetObjectID());
+							BOX_WARNING("Directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " references object " << BOX_FORMAT_OBJECTID(en->GetObjectID()) << " which does not exist.");
 						}
 					}
 					
@@ -729,7 +757,7 @@ void BackupStoreCheck::CheckDirectories()
 				
 				if(isModified && mFixErrors)
 				{	
-					::printf("Fixing directory ID %llx\n", pblock->mID[e]);
+					BOX_WARNING("Fixing directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]));
 
 					// Save back to disc
 					RaidFileWrite fixed(mDiscSetNumber, filename);
