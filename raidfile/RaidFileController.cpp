@@ -102,8 +102,7 @@ void RaidFileController::Initialise(const std::string& rConfigFilename)
 	
 	if(pconfig.get() == 0 || !err.empty())
 	{
-		fprintf(stderr, "RaidFile configuation file errors:\n%s",
-			err.c_str());
+		BOX_ERROR("RaidFile configuration file errors: " << err);
 		THROW_EXCEPTION(RaidFileException, BadConfigFile)
 	}
 	

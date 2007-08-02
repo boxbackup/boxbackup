@@ -34,7 +34,8 @@ void Random::Initialise()
 		THROW_EXCEPTION(CipherException, RandomInitFailed)
 	}
 #else
-	::fprintf(stderr, "No random device -- additional seeding of random number generator not performed.\n");
+	BOX_ERROR("No random device -- additional seeding of random number "
+		"generator not performed.");
 #endif
 }
 

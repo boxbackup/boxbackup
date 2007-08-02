@@ -243,6 +243,23 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	{
 		msg += "[" + sTag + "] ";
 	}
+
+	if (level <= Log::FATAL)
+	{
+		msg += "FATAL: ";
+	}
+	else if (level <= Log::ERROR)
+	{
+		msg += "ERROR: ";
+	}
+	else if (level <= Log::WARNING)
+	{
+		msg += "WARNING: ";
+	}
+	else if (level <= Log::NOTICE)
+	{
+		msg += "NOTICE: ";
+	}
 	
 	msg += rMessage;
 
@@ -272,8 +289,29 @@ bool Syslog::Log(Log::Level level, const std::string& rFile,
 		case Log::TRACE:      /* fall through */
 		case Log::EVERYTHING: syslogLevel = LOG_DEBUG;   break;
 	}
-		
-	syslog(syslogLevel, "%s", rMessage.c_str());
+
+	std::string msg;
+
+	if (level <= Log::FATAL)
+	{
+		msg = "FATAL: ";
+	}
+	else if (level <= Log::ERROR)
+	{
+		msg = "ERROR: ";
+	}
+	else if (level <= Log::WARNING)
+	{
+		msg = "WARNING: ";
+	}
+	else if (level <= Log::NOTICE)
+	{
+		msg = "NOTICE: ";
+	}
+
+	msg += rMessage;
+
+	syslog(syslogLevel, "%s", msg.c_str());
 	
 	return true;
 }

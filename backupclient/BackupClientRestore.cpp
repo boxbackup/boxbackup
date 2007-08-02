@@ -260,7 +260,11 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		case ObjectExists_File:
 			{
 				// File exists with this name, which is fun. Get rid of it.
-				::printf("WARNING: File present with name '%s', removing out of the way of restored directory. Use specific restore with ID to restore this object.", rLocalDirectoryName.c_str());
+				BOX_WARNING("File present with name '" <<
+					rLocalDirectoryName << "', removing " <<
+					"out of the way of restored directory. "
+					"Use specific restore with ID to "
+					"restore this object.");
 				if(::unlink(rLocalDirectoryName.c_str()) != 0)
 				{
 					BOX_ERROR("Failed to delete file " <<
