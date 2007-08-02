@@ -374,7 +374,8 @@ void memleakfinder_reportleaks_appendfile(const char *filename, const char *mark
 	}
 	else
 	{
-		printf("WARNING: Couldn't open memory leak results file %s for appending\n", filename);
+		BOX_WARNING("Couldn't open memory leak results file " <<
+			filename << " for appending");
 	}
 }
 

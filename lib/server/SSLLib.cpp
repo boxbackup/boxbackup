@@ -49,7 +49,8 @@ void SSLLib::Initialise()
 		THROW_EXCEPTION(ServerException, SSLRandomInitFailed)
 	}
 #else
-	::fprintf(stderr, "No random device -- additional seeding of random number generator not performed.\n");
+	BOX_WARNING("No random device -- additional seeding of "
+		"random number generator not performed.");
 #endif
 }
 

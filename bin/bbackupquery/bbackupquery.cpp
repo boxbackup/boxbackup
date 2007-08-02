@@ -12,8 +12,14 @@
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
+
+#include <errno.h>
 #include <stdio.h>
-#include <sys/types.h>
+
+#ifdef HAVE_SYS_TYPES_H
+	#include <sys/types.h>
+#endif
+
 #ifdef HAVE_LIBREADLINE
 	#ifdef HAVE_READLINE_READLINE_H
 		#include <readline/readline.h>
@@ -168,7 +174,8 @@ int main(int argc, const char *argv[])
 			logFile = ::fopen(optarg, "w");
 			if(logFile == 0)
 			{
-				printf("Can't open log file '%s'\n", optarg);
+				BOX_ERROR("Failed to open log file '" <<
+					optarg << "': " << strerror(errno));
 			}
 			break;
 
@@ -201,14 +208,14 @@ int main(int argc, const char *argv[])
 	{
 		if (!SetConsoleCP(CP_UTF8))
 		{
-			fprintf(stderr, "Failed to set input codepage: "
-				"error %d\n", GetLastError());
+			BOX_ERROR("Failed to set input codepage: " <<
+				GetErrorMessage(GetLastError()));
 		}
 
 		if (!SetConsoleOutputCP(CP_UTF8))
 		{
-			fprintf(stderr, "Failed to set output codepage: "
-				"error %d\n", GetLastError());
+			BOX_ERROR("Failed to set output codepage: " <<
+				GetErrorMessage(GetLastError()));
 		}
 
 		// enable input of Unicode characters
@@ -222,8 +229,7 @@ int main(int argc, const char *argv[])
 #endif // WIN32
 
 	// Read in the configuration file
-	if(!quiet) printf("Using configuration file %s\n", 
-		configFilename.c_str());
+	if(!quiet) BOX_INFO("Using configuration file " << configFilename);
 
 	std::string errs;
 	std::auto_ptr<Configuration> config(
@@ -232,7 +238,7 @@ int main(int argc, const char *argv[])
 
 	if(config.get() == 0 || !errs.empty())
 	{
-		printf("Invalid configuration file:\n%s", errs.c_str());
+		BOX_FATAL("Invalid configuration file: " << errs);
 		return 1;
 	}
 	// Easier coding
@@ -252,12 +258,12 @@ int main(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
 	// 2. Connect to server
-	if(!quiet) printf("Connecting to store...\n");
+	if(!quiet) BOX_INFO("Connecting to store...");
 	SocketStreamTLS socket;
 	socket.Open(tlsContext, Socket::TypeINET, conf.GetKeyValue("StoreHostname").c_str(), BOX_PORT_BBSTORED);
 	
 	// 3. Make a protocol, and handshake
-	if(!quiet) printf("Handshake with store...\n");
+	if(!quiet) BOX_INFO("Handshake with store...");
 	BackupProtocolClient connection(socket);
 	connection.Handshake();
 	
@@ -268,7 +274,7 @@ int main(int argc, const char *argv[])
 	}
 	
 	// 4. Log in to server
-	if(!quiet) printf("Login to store...\n");
+	if(!quiet) BOX_INFO("Login to store...");
 	// Check the version of the server
 	{
 		std::auto_ptr<BackupProtocolClientVersion> serverVersion(connection.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -345,9 +351,9 @@ int main(int argc, const char *argv[])
 #endif
 	
 	// Done... stop nicely
-	if(!quiet) printf("Logging off...\n");
+	if(!quiet) BOX_INFO("Logging off...");
 	connection.QueryFinished();
-	if(!quiet) printf("Session finished.\n");
+	if(!quiet) BOX_INFO("Session finished.");
 	
 	// Return code
 	returnCode = context.GetReturnCode();
