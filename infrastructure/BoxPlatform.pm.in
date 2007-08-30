@@ -27,7 +27,9 @@ BEGIN
 	$build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
 
 	$make_command = ($build_os eq 'Darwin') ? 'bsdmake' : ($build_os eq 'SunOS') ? 'gmake' : 'make';
-	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' && $build_os ne "SunOS");
+
+	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' &&
+		$build_os ne "SunOS" && $build_os ne 'GNU/kFreeBSD');
 
 	# blank extra flags by default
 	$platform_compile_line_extra = '@CPPFLAGS@ @CXXFLAGS@ @CXXFLAGS_STRICT@';
