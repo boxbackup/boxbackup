@@ -302,21 +302,24 @@ if($backup_mode eq 'lazy')
 	# lazy mode configuration
 	print CONFIG <<__E;
 
-# A scan of the local discs will be made once an hour (approximately).
-# To avoid cycles of load on the server, this time is randomly adjusted by a small
-# percentage as the daemon runs.
+# The number of seconds between backup runs under normal conditions. A scan To 
+# avoid cycles of load on the server, this time is randomly adjusted by a 
+# small percentage as the daemon runs.
 
 UpdateStoreInterval = 3600
 
 
-# A file must have been modified at least 6 hours ago before it will be uploaded.
+# The minimum age of a file, in seconds, that will be uploaded. Avoids 
+# repeated uploads of a file which is constantly being modified.
 
 MinimumFileAge = 21600
 
 
-# If a file is modified repeated, it won't be uploaded immediately in case it's modified again.
-# However, it should be uploaded eventually. This is how long we should wait after first noticing
-# a change. (1 day)
+# If a file is modified repeated, it won't be uploaded immediately in case 
+# it's modified again, due to the MinimumFileAge specified above. However, it 
+# should be uploaded eventually even if it is being modified repeatedly. This 
+# is how long we should wait, in seconds, after first noticing a change. 
+# (86400 seconds = 1 day)
 
 MaxUploadWait = 86400
 
@@ -352,13 +355,17 @@ FileTrackingSizeThreshold = 65535
 DiffingUploadSizeThreshold = 8192
 
 
-# The limit on how much time is spent diffing files. Most files shouldn't take very long,
-# but if you have really big files you can use this to limit the time spent diffing them.
+# The limit on how much time is spent diffing files, in seconds. Most files 
+# shouldn't take very long, but if you have really big files you can use this 
+# to limit the time spent diffing them.
+#
 # * Reduce if you are having problems with processor usage.
-# * Increase if you have large files, and think the upload of changes is too large and want
-#   to spend more time searching for unchanged blocks.
+#
+# * Increase if you have large files, and think the upload of changes is too 
+#   large and you want bbackupd to spend more time searching for unchanged
+#   blocks.
 
-MaximumDiffingTime = 20
+MaximumDiffingTime = 120
 
 
 # Uncomment this line to see exactly what the daemon is going when it's connected to the server.
@@ -366,14 +373,20 @@ MaximumDiffingTime = 20
 # ExtendedLogging = yes
 
 
-# Use this to temporarily stop bbackupd from syncronising or connecting to the store.
-# This specifies a program or script script which is run just before each sync, and ideally
-# the full path to the interpreter. It will be run as the same user bbackupd is running as,
-# usually root.
-# The script prints either "now" or a number to STDOUT (and a terminating newline, no quotes).
-# If the result was "now", then the sync will happen. If it's a number, then the script will
-# be asked again in that number of seconds.
-# For example, you could use this on a laptop to only backup when on a specific network.
+# This specifies a program or script script which is run just before each 
+# sync, and ideally the full path to the interpreter. It will be run as the 
+# same user bbackupd is running as, usually root.
+#
+# The script must output (print) either "now" or a number to STDOUT (and a 
+# terminating newline, no quotes).
+#
+# If the result was "now", then the sync will happen. If it's a number, then 
+# no backup will happen for that number of seconds (bbackupd will pause) and 
+# then the script will be run again.
+#
+# Use this to temporarily stop bbackupd from syncronising or connecting to the 
+# store. For example, you could use this on a laptop to only backup when on a 
+# specific network, or when it has a working Internet connection.
 
 # SyncAllowScript = /path/to/intepreter/or/exe script-name parameters etc
 
@@ -396,7 +409,7 @@ Server
 	PidFile = /var/run/bbackupd.pid
 }
 
-# 
+
 # BackupLocations specifies which locations on disc should be backed up. Each
 # directory is in the format
 # 
@@ -444,13 +457,12 @@ Server
 # AlwaysIncludeDirsRegex = /home/user/bigfiles/path/important/files/.*
 # AlwaysIncludeFilesRegex = /home/user/bigfiles/path/important/files/.*
 # 
-# If a directive ends in Regex, then it is a regular expression rather than a
+# If a directive ends in Regex, then it is a regular expression rather than a 
 # explicit full pathname. See
 # 
 # 	man 7 re_format
 # 
 # for the regex syntax on your platform.
-# 
 
 BackupLocations
 {
