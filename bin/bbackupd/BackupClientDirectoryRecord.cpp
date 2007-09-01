@@ -887,7 +887,9 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				{
 					// Connection errors should just be passed on to the main handler, retries
 					// would probably just cause more problems.
-					// Already logged by UploadFile
+					rParams.GetProgressNotifier()
+						.NotifyFileUploadException(
+							this, filename, e);
 					throw;
 				}
 				catch(BoxException &e)
