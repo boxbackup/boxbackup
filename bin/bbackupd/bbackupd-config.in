@@ -211,12 +211,24 @@ $sendmail = 'sendmail' if $sendmail !~ m/\S/;
 print NOTIFY <<__EOS;
 #!/bin/sh
 
+# This script is run whenever bbackupd changes state or encounters a
+# problem which requires the system administrator to assist:
+#
+# 1) The store is full, and no more data can be uploaded.
+# 2) Some files or directories were not readable.
+# 3) A backup run starts or finishes.
+#
+# The default script emails the system administrator, except for backups
+# starting and stopping, where it does nothing.
+
 SUBJECT="BACKUP PROBLEM on host $hostname"
 SENDTO="$current_username"
 
-if [ \$1 = store-full ]
-then
-$sendmail \$SENDTO <<EOM
+if [ "\$1" = "" ]; then
+	echo "Usage: $0 <store-full|read-error|backup-error|backup-start|backup-finish>" >&2
+	exit 2
+elif [ "\$1" = store-full ]; then
+	$sendmail \$SENDTO <<EOM
 Subject: \$SUBJECT (store full)
 To: \$SENDTO
 
@@ -230,8 +242,7 @@ FILES ARE NOT BEING BACKED UP
 Please adjust the limits on account $account_num on server $server.
 
 EOM
-elif [ \$1 = read-error ]
-then
+elif [ "\$1" = read-error ]; then
 $sendmail \$SENDTO <<EOM
 Subject: \$SUBJECT (read errors)
 To: \$SENDTO
@@ -244,11 +255,14 @@ THESE FILES ARE NOT BEING BACKED UP
 ===================================
 
 Check the logs on $hostname for the files and directories which caused
-these errors, and take appropraite action.
+these errors, and take appropriate action.
 
 Other files are being backed up.
 
 EOM
+elif [ "\$1" = backup-start -o "\$1" = backup-finish ]; then
+	# do nothing by default
+	true
 else
 $sendmail \$SENDTO <<EOM
 Subject: \$SUBJECT (unknown)
@@ -287,11 +301,15 @@ TrustedCAsFile = $ca_root_cert
 DataDirectory = $working_dir
 
 
-# This script is run whenever bbackupd encounters a problem which requires
-# the system administrator to assist:
+# This script is run whenever bbackupd changes state or encounters a
+# problem which requires the system administrator to assist:
+#
 # 1) The store is full, and no more data can be uploaded.
 # 2) Some files or directories were not readable.
-# The default script emails the system administrator.
+# 3) A backup run starts or finishes.
+#
+# The default script emails the system administrator, except for backups
+# starting and stopping, where it does nothing.
 
 NotifyScript = $notify_script
 
@@ -302,9 +320,9 @@ if($backup_mode eq 'lazy')
 	# lazy mode configuration
 	print CONFIG <<__E;
 
-# The number of seconds between backup runs under normal conditions. A scan To 
-# avoid cycles of load on the server, this time is randomly adjusted by a 
-# small percentage as the daemon runs.
+# The number of seconds between backup runs under normal conditions. To avoid 
+# cycles of load on the server, this time is randomly adjusted by a small 
+# percentage as the daemon runs.
 
 UpdateStoreInterval = 3600
 
