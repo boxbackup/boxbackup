@@ -1804,7 +1804,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				catch (BoxException &e)
 				{
 					BOX_ERROR("Failed to create remote "
-						"directory '/" << dirname <<
+						"directory '/" << ploc->mName <<
 						"', skipping location.");
 					continue;
 				}
