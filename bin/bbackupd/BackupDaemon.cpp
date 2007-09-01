@@ -903,6 +903,9 @@ void BackupDaemon::Run2()
 				// Delete any unused directories?
 				DeleteUnusedRootDirEntries(clientContext);
 								
+				// Notify administrator
+				NotifySysadmin(NotifyEvent_BackupStart);
+
 				// Go through the records, syncing them
 				for(std::vector<Location *>::const_iterator 
 					i(mLocations.begin()); 
@@ -985,6 +988,9 @@ void BackupDaemon::Run2()
 
 				// Log
 				BOX_NOTICE("Finished scan of local files");
+
+				// Notify administrator
+				NotifySysadmin(NotifyEvent_BackupFinish);
 
 				// --------------------------------------------------------------------------------------------
 
@@ -2231,7 +2237,8 @@ void BackupDaemon::TouchFileInWorkingDir(const char *Filename)
 //
 // Function
 //		Name:    BackupDaemon::NotifySysadmin(int)
-//		Purpose: Run the script to tell the sysadmin about events which need attention.
+//		Purpose: Run the script to tell the sysadmin about events
+//			 which need attention.
 //		Created: 25/2/04
 //
 // --------------------------------------------------------------------------
@@ -2242,26 +2249,40 @@ void BackupDaemon::NotifySysadmin(int Event)
 		"store-full",
 		"read-error", 
 		"backup-error",
+		"backup-start",
+		"backup-finish",
 		0
 	};
+
+	BOX_TRACE("sizeof(sEventNames)  == " << sizeof(sEventNames));
+	BOX_TRACE("sizeof(*sEventNames) == " << sizeof(*sEventNames));
+	BOX_TRACE("NotifyEvent__MAX == " << NotifyEvent__MAX);
+	ASSERT((sizeof(sEventNames)/sizeof(*sEventNames)) == NotifyEvent__MAX + 1);
 
 	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << 
 		sEventNames[Event]);
 
 	if(Event < 0 || Event >= NotifyEvent__MAX)
 	{
-		THROW_EXCEPTION(BackupStoreException, BadNotifySysadminEventCode);
+		THROW_EXCEPTION(BackupStoreException,
+			BadNotifySysadminEventCode);
 	}
 
 	// Don't send lots of repeated messages
-	if(mNotificationsSent[Event])
+	if(mNotificationsSent[Event] &&
+		Event != NotifyEvent_BackupStart &&
+		Event != NotifyEvent_BackupFinish)
 	{
+		BOX_WARNING("Suppressing duplicate notification about " <<
+			sEventNames[Event]);
 		return;
 	}
 
 	// Is there a notifation script?
 	const Configuration &conf(GetConfiguration());
-	if(!conf.KeyExists("NotifyScript"))
+	if(!conf.KeyExists("NotifyScript") &&
+		Event != NotifyEvent_BackupStart &&
+		Event != NotifyEvent_BackupFinish)
 	{
 		// Log, and then return
 		BOX_ERROR("Not notifying administrator about event "
@@ -2271,7 +2292,8 @@ void BackupDaemon::NotifySysadmin(int Event)
 	}
 
 	// Script to run
-	std::string script(conf.GetKeyValue("NotifyScript") + ' ' + sEventNames[Event]);
+	std::string script(conf.GetKeyValue("NotifyScript") + ' ' +
+		sEventNames[Event]);
 	
 	// Log what we're about to do
 	BOX_NOTICE("About to notify administrator about event "
@@ -2285,7 +2307,8 @@ void BackupDaemon::NotifySysadmin(int Event)
 			<< script << "')");
 	}
 
-	// Flag that this is done so the administrator isn't constantly bombarded with lots of errors
+	// Flag that this is done so the administrator isn't constantly
+	// bombarded with lots of errors
 	mNotificationsSent[Event] = true;
 }
 
