@@ -85,6 +85,8 @@ public:
 		NotifyEvent_StoreFull = 0,
 		NotifyEvent_ReadError,
 		NotifyEvent_BackupError,
+		NotifyEvent_BackupStart,
+		NotifyEvent_BackupFinish,
 		NotifyEvent__MAX
 		// When adding notifications, remember to add strings to NotifySysadmin()
 	};
