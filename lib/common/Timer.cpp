@@ -39,7 +39,7 @@ void Timers::Init()
 		InitTimer();
 		SetTimerHandler(Timers::SignalHandler);
 	#else
-		sighandler_t oldHandler = ::signal(SIGALRM, 
+		sighandler_t oldHandler = ::sigset(SIGALRM, 
 			Timers::SignalHandler);
 		ASSERT(oldHandler == 0);
 	#endif // WIN32 && !PLATFORM_CYGWIN
@@ -70,7 +70,7 @@ void Timers::Cleanup()
 		int result = ::setitimer(ITIMER_REAL, &timeout, NULL);
 		ASSERT(result == 0);
 
-		sighandler_t oldHandler = ::signal(SIGALRM, NULL);
+		sighandler_t oldHandler = ::sigset(SIGALRM, NULL);
 		ASSERT(oldHandler == Timers::SignalHandler);
 	#endif // WIN32 && !PLATFORM_CYGWIN
 
@@ -146,8 +146,11 @@ void Timers::Reschedule()
 	}
 
 	#ifndef WIN32
-	if (::signal(SIGALRM, Timers::SignalHandler) != Timers::SignalHandler)
+	void (*oldhandler)(int) = ::sigset(SIGALRM, Timers::SignalHandler);
+	if (oldhandler != Timers::SignalHandler)
 	{
+		printf("Signal handler was %p, expected %p\n", 
+			oldhandler, Timers::SignalHandler);
 		THROW_EXCEPTION(CommonException, Internal)
 	}
 	#endif
