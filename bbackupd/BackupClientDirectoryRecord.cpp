@@ -887,9 +887,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				{
 					// Connection errors should just be passed on to the main handler, retries
 					// would probably just cause more problems.
-					rParams.GetProgressNotifier()
-						.NotifyFileUploadException(
-							this, filename, e);
+					// Already logged by UploadFile
 					throw;
 				}
 				catch(BoxException &e)
@@ -1386,12 +1384,17 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 		{
 			// Check and see what error the protocol has -- as it might be an error...
 			int type, subtype;
-			if(connection.GetLastError(type, subtype)
-				&& type == BackupProtocolClientError::ErrorType
-				&& subtype == BackupProtocolClientError::Err_StorageLimitExceeded)
+			if(connection.GetLastError(type, subtype))
 			{
-				// The hard limit was exceeded on the server, notify!
-				rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+				if(type == BackupProtocolClientError::ErrorType
+				&& subtype == BackupProtocolClientError::Err_StorageLimitExceeded)
+				{
+					// The hard limit was exceeded on the server, notify!
+					rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+				}
+				rParams.GetProgressNotifier()
+					.NotifyFileUploadServerError(
+						this, rFilename, type, subtype);
 			}
 		}
 		

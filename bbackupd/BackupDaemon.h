@@ -21,6 +21,7 @@
 #include "SocketListen.h"
 #include "SocketStream.h"
 #include "Logging.h"
+#include "autogen_BackupProtocolClient.h"
 
 #ifdef WIN32
 	#include "WinNamedPipeStream.h"
@@ -303,6 +304,70 @@ public:
 				<< " (" << rException.GetType()
 				<< "/"  << rException.GetSubType() << ")");
 		}
+ 	}
+  	virtual void NotifyFileUploadServerError(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath,
+ 		int type, int subtype)
+ 	{
+		std::ostringstream msgs;
+		if (type != BackupProtocolClientError::ErrorType)
+		{
+			msgs << "unknown error type " << type;
+		}
+		else
+		{
+			switch(subtype)
+			{
+			case BackupProtocolClientError::Err_WrongVersion:
+				msgs << "WrongVersion";
+				break;
+			case BackupProtocolClientError::Err_NotInRightProtocolPhase:
+				msgs << "NotInRightProtocolPhase";
+				break;
+			case BackupProtocolClientError::Err_BadLogin:
+				msgs << "BadLogin";
+				break;
+			case BackupProtocolClientError::Err_CannotLockStoreForWriting:
+				msgs << "CannotLockStoreForWriting";
+				break;
+			case BackupProtocolClientError::Err_SessionReadOnly:
+				msgs << "SessionReadOnly";
+				break;
+			case BackupProtocolClientError::Err_FileDoesNotVerify:
+				msgs << "FileDoesNotVerify";
+				break;
+			case BackupProtocolClientError::Err_DoesNotExist:
+				msgs << "DoesNotExist";
+				break;
+			case BackupProtocolClientError::Err_DirectoryAlreadyExists:
+				msgs << "DirectoryAlreadyExists";
+				break;
+			case BackupProtocolClientError::Err_CannotDeleteRoot:
+				msgs << "CannotDeleteRoot";
+				break;
+			case BackupProtocolClientError::Err_TargetNameExists:
+				msgs << "TargetNameExists";
+				break;
+			case BackupProtocolClientError::Err_StorageLimitExceeded:
+				msgs << "StorageLimitExceeded";
+				break;
+			case BackupProtocolClientError::Err_DiffFromFileDoesNotExist:
+				msgs << "DiffFromFileDoesNotExist";
+				break;
+			case BackupProtocolClientError::Err_DoesNotExistInDirectory:
+				msgs << "DoesNotExistInDirectory";
+				break;
+			case BackupProtocolClientError::Err_PatchConsistencyError:
+				msgs << "PatchConsistencyError";
+				break;
+			default:
+				msgs << "unknown error subtype " << subtype;
+			}
+		}
+
+		BOX_ERROR("Failed to upload file: " << rLocalPath 
+			<< ": server error: " << msgs.str());
  	}
  	virtual void NotifyFileUploading(
  		const BackupClientDirectoryRecord* pDirRecord,
