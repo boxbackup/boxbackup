@@ -78,6 +78,10 @@ class ProgressNotifier
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
 		const BoxException& rException) = 0;
+	virtual void NotifyFileUploadServerError(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int type, int subtype) = 0;
 	virtual void NotifyFileUploading(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath) = 0;
