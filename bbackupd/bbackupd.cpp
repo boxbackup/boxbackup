@@ -25,6 +25,8 @@
 
 int main(int argc, const char *argv[])
 {
+	int ExitCode = 0;
+
 	MAINHELPER_START
 
 	Logging::SetProgramName("Box Backup (bbackupd)");
@@ -65,8 +67,6 @@ int main(int argc, const char *argv[])
 
 	EnableBackupRights();
 
-	int ExitCode = 0;
-
 	if (runAsWin32Service)
 	{
 		BOX_INFO("Box Backup service starting");
@@ -77,7 +77,7 @@ int main(int argc, const char *argv[])
 			config = strdup(argv[2]);
 		}
 
-		OurService(config);
+		ExitCode = OurService(config);
 
 		if (config)
 		{
@@ -94,14 +94,14 @@ int main(int argc, const char *argv[])
 
 	delete gpDaemonService;
 
-	return ExitCode;
-
 #else // !WIN32
 
 	BackupDaemon daemon;
-	return daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+	ExitCode = daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 
 #endif // WIN32
 
 	MAINHELPER_END
+
+	return ExitCode;
 }

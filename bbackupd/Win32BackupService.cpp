@@ -31,12 +31,6 @@ DWORD Win32BackupService::WinService(const char* pConfigFileName)
 {
 	DWORD ret;
 
-	// keep MAINHELPER_START happy
-	int argc = 0;
-	char* argv[] = {NULL};
-
-	MAINHELPER_START
-
 	if (pConfigFileName != NULL)
 	{
 		ret = this->Main(pConfigFileName);
@@ -45,8 +39,6 @@ DWORD Win32BackupService::WinService(const char* pConfigFileName)
 	{
 		ret = this->Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE);
 	}
-
-	MAINHELPER_END
 
 	return ret;
 }
