@@ -341,6 +341,25 @@ MinimumFileAge = 21600
 
 MaxUploadWait = 86400
 
+# If the connection is idle for some time (e.g. over 10 minutes or 600
+# seconds, not sure exactly how long) then the server will give up and
+# disconnect the client, resulting in Connection Protocol_Timeout errors
+# on the server and TLSReadFailed or TLSWriteFailed errors on the client.
+# Also, some firewalls and NAT gateways will kill idle connections after
+# similar lengths of time. 
+#
+# This can happen for example when most files are backed up already and
+# don't need to be sent to the store again, while scanning a large
+# directory, or while calculating diffs of a large file. To avoid this,
+# KeepAliveTime specifies that special keep-alive messages should be sent
+# when the connection is otherwise idle for a certain length of time,
+# specified here in seconds.
+#
+# The default is that these messages are never sent, equivalent to setting
+# this option to zero, but we recommend that all users enable this.
+
+KeepAliveTime = 120
+
 __E
 }
 else
