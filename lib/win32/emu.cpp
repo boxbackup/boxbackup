@@ -509,8 +509,16 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 		tmpStr = "";
 		return tmpStr;
 	}
-	
-	if (filename.length() >= 1 && filename[0] == '\\')
+
+	if (filename.length() > 2 && filename[0] == '\\' &&
+		filename[1] == '\\')
+	{
+		tmpStr += "UNC\\";
+		filename.replace(0, 2, "");
+		// \\?\UNC\<server>\<share>
+		// see http://msdn2.microsoft.com/en-us/library/aa365247.aspx
+	}
+	else if (filename.length() >= 1 && filename[0] == '\\')
 	{
 		// root directory of current drive.
 		tmpStr = wd;
@@ -1520,8 +1528,8 @@ void syslog(int loglevel, const char *frmt, ...)
 		sHaveWarnedEventLogFull = false;
 	}
 
-	printf("%s\r\n", buffer);
-	fflush(stdout);
+	// printf("%s\r\n", buffer);
+	// fflush(stdout);
 }
 
 int emu_chdir(const char* pDirName)
