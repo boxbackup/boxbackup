@@ -120,7 +120,7 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	HANDLE writeInChild, readFromChild;
 	if(!CreatePipe(&readFromChild, &writeInChild, &secAttr, 0))
 	{
-		BOX_ERROR("Failed to CreatePipe for child process: "
+		BOX_ERROR("Failed to CreatePipe for child process: " <<
 			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketPairFailed)
 	}
