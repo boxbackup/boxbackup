@@ -161,7 +161,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 	}
 }
 
-void OurService(char* pConfigFileName)
+int OurService(char* pConfigFileName)
 {
 	spConfigFileName = pConfigFileName;
 
@@ -180,7 +180,10 @@ void OurService(char* pConfigFileName)
 		ErrorHandler("Failed to start service. Did you start "
 			"Box Backup from the Service Control Manager? "
 			"(StartServiceCtrlDispatcher)", GetLastError());
+		return 1;
 	}
+
+	return 0;
 }
 
 int InstallService(const char* pConfigFileName)
