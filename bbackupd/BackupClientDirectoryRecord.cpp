@@ -1384,7 +1384,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 
 		if(e.GetType() == ConnectionException::ExceptionType && e.GetSubType() == ConnectionException::Protocol_UnexpectedReply)
 		{
-			// Check and see what error the protocol has -- as it might be an error...
+			// Check and see what error the protocol has,
+			// this is more useful to users than the exception.
 			int type, subtype;
 			if(connection.GetLastError(type, subtype))
 			{
