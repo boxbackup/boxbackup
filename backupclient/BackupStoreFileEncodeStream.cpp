@@ -38,6 +38,7 @@ using namespace BackupStoreFileCryptVar;
 BackupStoreFileEncodeStream::BackupStoreFileEncodeStream()
 	: mpRecipe(0),
 	  mpFile(0),
+	  mpLogging(0),
 	  mStatus(Status_Header),
 	  mSendData(true),
 	  mTotalBlocks(0),
@@ -77,6 +78,13 @@ BackupStoreFileEncodeStream::~BackupStoreFileEncodeStream()
 	{
 		delete mpFile;
 		mpFile = 0;
+	}
+	
+	// Clear up logging stream
+	if(mpLogging)
+	{
+		delete mpLogging;
+		mpLogging = 0;
 	}
 	
 	// Free the recipe
@@ -199,6 +207,9 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEnc
 		{
 			// Open the file
 			mpFile = new FileStream(Filename);
+
+			// Create logging stream
+			mpLogging = new ReadLoggingStream(*mpFile);
 		
 			// Work out the largest possible block required for the encoded data
 			mAllocatedBufferSize = BackupStoreFile::MaxBlockSizeForChunkSize(maxBlockClearSize);
@@ -267,7 +278,7 @@ void BackupStoreFileEncodeStream::CalculateBlockSizes(int64_t DataSize, int64_t 
 		
 		rNumBlocksOut = (DataSize + rBlockSizeOut - 1) / rBlockSizeOut;
 		
-	} while(rBlockSizeOut <= BACKUP_FILE_MAX_BLOCK_SIZE && rNumBlocksOut > BACKUP_FILE_INCREASE_BLOCK_SIZE_AFTER);
+	} while(rBlockSizeOut < BACKUP_FILE_MAX_BLOCK_SIZE && rNumBlocksOut > BACKUP_FILE_INCREASE_BLOCK_SIZE_AFTER);
 	
 	// Last block size
 	rLastBlockSizeOut = DataSize - ((rNumBlocksOut - 1) * rBlockSizeOut);
@@ -474,7 +485,7 @@ void BackupStoreFileEncodeStream::SkipPreviousBlocksInInstruction()
 	}
 	
 	// Move forward in the stream
-	mpFile->Seek(sizeToSkip, IOStream::SeekType_Relative);
+	mpLogging->Seek(sizeToSkip, IOStream::SeekType_Relative);
 }
 
 
@@ -518,14 +529,14 @@ void BackupStoreFileEncodeStream::EncodeCurrentBlock()
 	ASSERT(blockRawSize < mAllocatedBufferSize);
 
 	// Check file open
-	if(mpFile == 0)
+	if(mpFile == 0 || mpLogging == 0)
 	{
 		// File should be open, but isn't. So logical error.
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
 	
 	// Read the data in
-	if(!mpFile->ReadFullBuffer(mpRawBuffer, blockRawSize, 0 /* not interested in size if failure */))
+	if(!mpLogging->ReadFullBuffer(mpRawBuffer, blockRawSize, 0 /* not interested in size if failure */))
 	{
 		// TODO: Do something more intelligent, and abort this upload because the file
 		// has changed

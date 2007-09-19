@@ -9,17 +9,16 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <process.h>
 #include <windows.h>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
-#ifdef HAVE_PROCESS_H
-	#include <process.h>
-#endif
 
 #include <string>
 #include <list>
+#include <sstream>
 
 // message resource definitions for syslog()
 
@@ -28,6 +27,7 @@
 // our implementation for a timer, based on a 
 // simple thread which sleeps for a period of time
 
+static bool gTimerInitialised = false;
 static bool gFinishTimer;
 static CRITICAL_SECTION gLock;
 
@@ -43,24 +43,31 @@ static void (__cdecl *gTimerFunc) (int) = NULL;
 
 int setitimer(int type, struct itimerval *timeout, void *arg)
 {
-	if (ITIMER_VIRTUAL == type)
+	assert(gTimerInitialised);
+	
+	if (ITIMER_REAL != type)
 	{
-		EnterCriticalSection(&gLock);
-		// we only need seconds for the mo!
-		if (timeout->it_value.tv_sec  == 0 && 
-		    timeout->it_value.tv_usec == 0)
-		{
-			gTimerList.clear();
-		}
-		else
-		{
-			Timer_t ourTimer;
-			ourTimer.countDown = timeout->it_value.tv_sec;
-			ourTimer.interval  = timeout->it_interval.tv_sec;
-			gTimerList.push_back(ourTimer);
-		}
-		LeaveCriticalSection(&gLock);
+		errno = ENOSYS;
+		return -1;
 	}
+
+	EnterCriticalSection(&gLock);
+
+	// we only need seconds for the mo!
+	if (timeout->it_value.tv_sec  == 0 && 
+	    timeout->it_value.tv_usec == 0)
+	{
+		gTimerList.clear();
+	}
+	else
+	{
+		Timer_t ourTimer;
+		ourTimer.countDown = timeout->it_value.tv_sec;
+		ourTimer.interval  = timeout->it_interval.tv_sec;
+		gTimerList.push_back(ourTimer);
+	}
+
+	LeaveCriticalSection(&gLock);
 	
 	// indicate success
 	return 0;
@@ -131,20 +138,26 @@ int SetTimerHandler(void (__cdecl *func ) (int))
 
 void InitTimer(void)
 {
-	InitializeCriticalSection(&gLock);
+	assert(!gTimerInitialised);
 
+	InitializeCriticalSection(&gLock);
+	
 	// create our thread
 	HANDLE ourThread = (HANDLE)_beginthreadex(NULL, 0, RunTimer, 0, 
 		CREATE_SUSPENDED, NULL);
 	SetThreadPriority(ourThread, THREAD_PRIORITY_LOWEST);
 	ResumeThread(ourThread);
+
+	gTimerInitialised = true;
 }
 
 void FiniTimer(void)
 {
+	assert(gTimerInitialised);
 	gFinishTimer = true;
 	EnterCriticalSection(&gLock);
 	DeleteCriticalSection(&gLock);
+	gTimerInitialised = false;
 }
 
 //Our constants we need to keep track of
@@ -203,6 +216,44 @@ bool EnableBackupRights( void )
 	{
 		return true;
 	}
+}
+
+// forward declaration
+char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    GetDefaultConfigFilePath(std::string name)
+//		Purpose: Calculates the default configuration file name,
+//			 by using the directory location of the currently
+//			 executing program, and appending the provided name.
+//			 In case of fire, returns an empty string.
+//		Created: 26th May 2007
+//
+// --------------------------------------------------------------------------
+std::string GetDefaultConfigFilePath(const std::string& rName)
+{
+	WCHAR exePathWide[MAX_PATH];
+	GetModuleFileNameW(NULL, exePathWide, MAX_PATH-1);
+
+	char* exePathUtf8 = ConvertFromWideString(exePathWide, CP_UTF8);
+	if (exePathUtf8 == NULL)
+	{
+		return "";
+	}
+
+	std::string configfile = exePathUtf8;
+	delete [] exePathUtf8;
+	
+	// make the default config file name,
+	// based on the program path
+	configfile = configfile.substr(0,
+		configfile.rfind('\\'));
+	configfile += "\\";
+	configfile += rName;
+
+	return configfile;
 }
 
 // --------------------------------------------------------------------------
@@ -362,27 +413,34 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ConvertUtf8ToConsole
-//		Purpose: Converts a string from UTF-8 to the console 
-//			 code page. On success, replaces contents of rDest 
-//			 and returns true. In case of fire, logs the error 
-//			 and returns false.
-//		Created: 4th February 2006
+//		Name:    ConvertEncoding(const std::string&, int, 
+//			 std::string&, int)
+//		Purpose: Converts a string from one code page to another.
+//			 On success, replaces contents of rDest and returns 
+//			 true. In case of fire, logs the error and returns 
+//			 false.
+//		Created: 15th October 2006
 //
 // --------------------------------------------------------------------------
-bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
+bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
+	std::string& rDest, int destCodePage)
 {
-	WCHAR* pWide = ConvertUtf8ToWideString(pString);
+	WCHAR* pWide = ConvertToWideString(rSource.c_str(), sourceCodePage);
 	if (pWide == NULL)
 	{
+		::syslog(LOG_ERR, "Failed to convert string '%s' from "
+			"current code page %d to wide string: %s",
+			rSource.c_str(), sourceCodePage,
+			GetErrorMessage(GetLastError()).c_str());
 		return false;
 	}
 
-	char* pConsole = ConvertFromWideString(pWide, GetConsoleOutputCP());
+	char* pConsole = ConvertFromWideString(pWide, destCodePage);
 	delete [] pWide;
 
 	if (!pConsole)
 	{
+		// Error should have been logged by ConvertFromWideString
 		return false;
 	}
 
@@ -392,39 +450,25 @@ bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
 	return true;
 }
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    ConvertConsoleToUtf8
-//		Purpose: Converts a string from the console code page
-//			 to UTF-8. On success, replaces contents of rDest
-//			 and returns true. In case of fire, logs the error 
-//			 and returns false.
-//		Created: 4th February 2006
-//
-// --------------------------------------------------------------------------
+bool ConvertToUtf8(const char* pString, std::string& rDest, int sourceCodePage)
+{
+	return ConvertEncoding(pString, sourceCodePage, rDest, CP_UTF8);
+}
+
+bool ConvertFromUtf8(const char* pString, std::string& rDest, int destCodePage)
+{
+	return ConvertEncoding(pString, CP_UTF8, rDest, destCodePage);
+}
+
 bool ConvertConsoleToUtf8(const char* pString, std::string& rDest)
 {
-	WCHAR* pWide = ConvertToWideString(pString, GetConsoleCP());
-	if (pWide == NULL)
-	{
-		return false;
-	}
-
-	char* pConsole = ConvertFromWideString(pWide, CP_UTF8);
-	delete [] pWide;
-
-	if (!pConsole)
-	{
-		return false;
-	}
-
-	rDest = pConsole;
-	delete [] pConsole;
-
-	return true;
+	return ConvertEncoding(pString, GetConsoleCP(), rDest, CP_UTF8);
 }
 
+bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
+{
+	return ConvertEncoding(pString, CP_UTF8, rDest, GetConsoleOutputCP());
+}
 
 // --------------------------------------------------------------------------
 //
@@ -454,23 +498,36 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 	// Is the path relative or absolute?
 	// Absolute paths on Windows are always a drive letter
 	// followed by ':'
-	
-	if (filename.length() >= 2 && filename[1] != ':')
+		
+	char wd[PATH_MAX];
+	if (::getcwd(wd, PATH_MAX) == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to open '%s': path too long", 
+			pFileName);
+		errno = ENAMETOOLONG;
+		tmpStr = "";
+		return tmpStr;
+	}
+
+	if (filename.length() > 2 && filename[0] == '\\' &&
+		filename[1] == '\\')
+	{
+		tmpStr += "UNC\\";
+		filename.replace(0, 2, "");
+		// \\?\UNC\<server>\<share>
+		// see http://msdn2.microsoft.com/en-us/library/aa365247.aspx
+	}
+	else if (filename.length() >= 1 && filename[0] == '\\')
+	{
+		// root directory of current drive.
+		tmpStr = wd;
+		tmpStr.resize(2); // drive letter and colon
+	}
+	else if (filename.length() >= 2 && filename[1] != ':')
 	{
 		// Must be relative. We need to get the 
 		// current directory to make it absolute.
-		
-		char wd[PATH_MAX];
-		if (::getcwd(wd, PATH_MAX) == 0)
-		{
-			::syslog(LOG_WARNING, 
-				"Failed to open '%s': path too long", 
-				pFileName);
-			errno = ENAMETOOLONG;
-			tmpStr = "";
-			return tmpStr;
-		}
-		
 		tmpStr += wd;
 		if (tmpStr[tmpStr.length()] != '\\')
 		{
@@ -480,6 +537,37 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 	
 	tmpStr += filename;
 	return tmpStr;
+}
+
+std::string GetErrorMessage(DWORD errorCode)
+{
+	char* pMsgBuf = NULL;
+	
+	DWORD chars = FormatMessage
+	(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+		FORMAT_MESSAGE_FROM_SYSTEM,
+		NULL,
+		errorCode,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(char *)(&pMsgBuf),
+		0, NULL
+	);
+
+	if (chars == 0 || pMsgBuf == NULL)
+	{
+		return std::string("failed to get error message");
+	}
+
+	// remove embedded newline
+	pMsgBuf[chars - 1] = 0;
+	pMsgBuf[chars - 2] = 0;
+
+	std::ostringstream line;
+	line << pMsgBuf << " (" << errorCode << ")";
+	LocalFree(pMsgBuf);
+
+	return line.str();
 }
 
 // --------------------------------------------------------------------------
@@ -513,32 +601,45 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	// flags could be O_WRONLY | O_CREAT | O_RDONLY
 	DWORD createDisposition = OPEN_EXISTING;
-	DWORD shareMode = FILE_SHARE_READ;
-	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY | FILE_READ_EA;
+	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE 
+		| FILE_SHARE_DELETE;
+	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY 
+		| FILE_READ_EA;
 
 	if (flags & O_WRONLY)
 	{
 		accessRights = FILE_WRITE_DATA;
-		shareMode = FILE_SHARE_WRITE;
 	}
-	else if (flags & (O_RDWR | O_CREAT))
+	else if (flags & O_RDWR)
 	{
 		accessRights |= FILE_WRITE_ATTRIBUTES 
 			| FILE_WRITE_DATA | FILE_WRITE_EA;
-		shareMode |= FILE_SHARE_WRITE;
 	}
 
 	if (flags & O_CREAT)
 	{
 		createDisposition = OPEN_ALWAYS;
 	}
+
 	if (flags & O_TRUNC)
 	{
 		createDisposition = CREATE_ALWAYS;
 	}
-	if (flags & O_EXCL)
+
+	if ((flags & O_CREAT) && (flags & O_EXCL))
+	{
+		createDisposition = CREATE_NEW;
+	}
+
+	if (flags & O_LOCK)
 	{
 		shareMode = 0;
+	}
+
+	DWORD winFlags = FILE_FLAG_BACKUP_SEMANTICS;
+	if (flags & O_TEMPORARY)
+	{
+		winFlags  |= FILE_FLAG_DELETE_ON_CLOSE;
 	}
 
 	HANDLE hdir = CreateFileW(pBuffer, 
@@ -546,15 +647,16 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		shareMode, 
 		NULL, 
 		createDisposition, 
-		FILE_FLAG_BACKUP_SEMANTICS,
+		winFlags,
 		NULL);
 	
 	delete [] pBuffer;
 
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_WARNING, "Failed to open file %s: "
-			"error %i", pFileName, GetLastError());
+		::syslog(LOG_WARNING, "Failed to open file '%s': "
+			"%s", pFileName, 
+			GetErrorMessage(GetLastError()).c_str());
 		return INVALID_HANDLE_VALUE;
 	}
 
@@ -582,7 +684,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	if (!GetFileInformationByHandle(hdir, &fi))
 	{
 		::syslog(LOG_WARNING, "Failed to read file information: "
-			"error %d", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		errno = EACCES;
 		return -1;
 	}
@@ -590,7 +692,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	if (INVALID_FILE_ATTRIBUTES == fi.dwFileAttributes)
 	{
 		::syslog(LOG_WARNING, "Failed to get file attributes: "
-			"error %d", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		errno = EACCES;
 		return -1;
 	}
@@ -621,7 +723,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 		if (!GetFileSizeEx(hdir, &st_size))
 		{
 			::syslog(LOG_WARNING, "Failed to get file size: "
-				"error %d", GetLastError());
+				"%s", GetErrorMessage(GetLastError()).c_str());
 			errno = EACCES;
 			return -1;
 		}
@@ -657,6 +759,22 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	if (!(fi.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
 	{
 		st->st_mode |= S_IWRITE;
+	}
+
+	// st_dev is normally zero, regardless of the drive letter,
+	// since backup locations can't normally span drives. However,
+	// a reparse point does allow all kinds of weird stuff to happen.
+	// We set st_dev to 1 for a reparse point, so that Box will detect
+	// a change of device number (from 0) and refuse to recurse down
+	// the reparse point (which could lead to havoc).
+
+	if (fi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+	{
+		st->st_dev = 1;
+	}
+	else
+	{
+		st->st_dev = 0;
 	}
 
 	return 0;
@@ -728,8 +846,9 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 		}
 		else
 		{
-			::syslog(LOG_WARNING, 
-				"Failed to open '%s': error %d", pFileName, err);
+			::syslog(LOG_WARNING, "Failed to open '%s': "
+				"%s", pFileName, 
+				GetErrorMessage(err).c_str());
 			errno = EACCES;
 		}
 
@@ -797,7 +916,8 @@ int statfs(const char * pName, struct statfs * s)
 	if (!GetFileInformationByHandle(handle, &fi))
 	{
 		::syslog(LOG_WARNING, "Failed to get file information "
-			"for '%s': error %d", pName, GetLastError());
+			"for '%s': %s", pName,
+			GetErrorMessage(GetLastError()).c_str());
 		CloseHandle(handle);
 		errno = EACCES;
 		return -1;
@@ -807,7 +927,7 @@ int statfs(const char * pName, struct statfs * s)
 	_ui64toa(fi.dwVolumeSerialNumber, s->f_mntonname + 1, 16);
 
 	// pseudo unix mount point
-	s->f_mntonname[0] = DIRECTORY_SEPARATOR_ASCHAR;
+	s->f_mntonname[0] = '\\';
 
 	CloseHandle(handle);   // close the handle
 
@@ -850,8 +970,8 @@ int emu_utimes(const char * pName, const struct timeval times[])
 
 	if (!SetFileTime(handle, &creationTime, NULL, &modificationTime))
 	{
-		::syslog(LOG_ERR, "Failed to set times on '%s': error %d",
-			pName, GetLastError());
+		::syslog(LOG_ERR, "Failed to set times on '%s': %s", pName,
+			GetErrorMessage(GetLastError()).c_str());
 		CloseHandle(handle);
 		return 1;
 	}
@@ -893,8 +1013,8 @@ int emu_chmod(const char * pName, mode_t mode)
 	DWORD attribs = GetFileAttributesW(pBuffer);
 	if (attribs == INVALID_FILE_ATTRIBUTES)
 	{
-		::syslog(LOG_ERR, "Failed to get file attributes of '%s': "
-			"error %d", pName, GetLastError());
+		::syslog(LOG_ERR, "Failed to get file attributes of '%s': %s",
+			pName, GetErrorMessage(GetLastError()).c_str());
 		errno = EACCES;
 		free(pBuffer);
 		return -1;
@@ -911,14 +1031,14 @@ int emu_chmod(const char * pName, mode_t mode)
 
 	if (!SetFileAttributesW(pBuffer, attribs))
 	{
-		::syslog(LOG_ERR, "Failed to set file attributes of '%s': "
-			"error %d", pName, GetLastError());
+		::syslog(LOG_ERR, "Failed to set file attributes of '%s': %s",
+			pName, GetErrorMessage(GetLastError()).c_str());
 		errno = EACCES;
 		free(pBuffer);
 		return -1;
 	}
 
-	free(pBuffer);
+	delete [] pBuffer;
 	return 0;
 }
 
@@ -1178,15 +1298,15 @@ BOOL AddEventSource
 	// Work out the executable file name, to register ourselves
 	// as the event source
 
-	char cmd[MAX_PATH];
-	if (GetModuleFileName(NULL, cmd, sizeof(cmd)-1) == 0)
+	WCHAR cmd[MAX_PATH];
+	DWORD len = GetModuleFileNameW(NULL, cmd, MAX_PATH);
+
+	if (len == 0)
 	{
-		::syslog(LOG_ERR, "Failed to get the program file name: "
-			"error %d", GetLastError());
+		::syslog(LOG_ERR, "Failed to get the program file name: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		return FALSE;
 	}
-	cmd[sizeof(cmd)-1] = 0;
- 	std::string exepath(cmd);
 
 	// Create the event source as a subkey of the log. 
 
@@ -1201,22 +1321,22 @@ BOOL AddEventSource
 			 0, NULL, REG_OPTION_NON_VOLATILE,
 			 KEY_WRITE, NULL, &hk, &dwDisp)) 
 	{
-		::syslog(LOG_ERR, "Failed to create the registry key: "
-			"error %d", GetLastError()); 
+		::syslog(LOG_ERR, "Failed to create the registry key: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		return FALSE;
 	}
 
 	// Set the name of the message file. 
  
-	if (RegSetValueEx(hk,                // subkey handle 
-			 "EventMessageFile", // value name 
-			 0,                  // must be zero 
-			 REG_EXPAND_SZ,      // value type 
-			 (LPBYTE) exepath.c_str(),  // pointer to value data 
-			 (DWORD) (exepath.size()))) // data size
+	if (RegSetValueExW(hk,                 // subkey handle 
+			   L"EventMessageFile", // value name 
+			   0,                  // must be zero 
+			   REG_EXPAND_SZ,      // value type 
+			   (LPBYTE)cmd,        // pointer to value data 
+			   len*sizeof(WCHAR))) // data size
 	{
-		::syslog(LOG_ERR, "Failed to set the event message file: "
-			"error %d", GetLastError()); 
+		::syslog(LOG_ERR, "Failed to set the event message file: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1233,23 +1353,23 @@ BOOL AddEventSource
 			  (LPBYTE) &dwData, // pointer to value data 
 			  sizeof(DWORD)))   // length of value data 
 	{
-		::syslog(LOG_ERR, "Failed to set the supported types: "
-			"error %d", GetLastError()); 
+		::syslog(LOG_ERR, "Failed to set the supported types: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
  
 	// Set the category message file and number of categories.
 
-	if (RegSetValueEx(hk,                        // subkey handle 
-			  "CategoryMessageFile",     // value name 
-			  0,                         // must be zero 
-			  REG_EXPAND_SZ,             // value type 
-			  (LPBYTE) exepath.c_str(),  // pointer to value data 
-			  (DWORD) (exepath.size()))) // data size
+	if (RegSetValueExW(hk,                    // subkey handle 
+			   L"CategoryMessageFile", // value name 
+			   0,                     // must be zero 
+			   REG_EXPAND_SZ,         // value type 
+			   (LPBYTE)cmd,           // pointer to value data 
+			   len*sizeof(WCHAR)))    // data size
 	{
 		::syslog(LOG_ERR, "Failed to set the category message file: "
-			"error %d", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1261,8 +1381,8 @@ BOOL AddEventSource
 			  (LPBYTE) &dwNum, // pointer to value data 
 			  sizeof(DWORD)))  // length of value data 
 	{
-		::syslog(LOG_ERR, "Failed to set the category count: "
-			"error %d", GetLastError());
+		::syslog(LOG_ERR, "Failed to set the category count: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1285,17 +1405,21 @@ void openlog(const char * daemonName, int, int)
 	{
 	}
 
-	if (!AddEventSource("Box Backup", 0))
+	char* name = strdup(daemonName);
+	BOOL success = AddEventSource(name, 0);
+	free(name);
+
+	if (!success)
 	{
 		::syslog(LOG_ERR, "Failed to add our own event source");
 		return;
 	}
 
-	HANDLE newSyslogH = RegisterEventSource(NULL, "Box Backup");
+	HANDLE newSyslogH = RegisterEventSource(NULL, daemonName);
 	if (newSyslogH == NULL)
 	{
 		::syslog(LOG_ERR, "Failed to register our own event source: "
-			"error %d", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		return;
 	}
 
@@ -1394,8 +1518,8 @@ void syslog(int loglevel, const char *frmt, ...)
 		}
 		else
 		{
-			printf("Unable to send message to Event Log: "
-				"error %i:\r\n", (int)err);
+			printf("Unable to send message to Event Log: %s:\r\n",
+				GetErrorMessage(err).c_str());
 			fflush(stdout);
 		}
 	}
@@ -1404,12 +1528,13 @@ void syslog(int loglevel, const char *frmt, ...)
 		sHaveWarnedEventLogFull = false;
 	}
 
-	printf("%s\r\n", buffer);
-	fflush(stdout);
+	// printf("%s\r\n", buffer);
+	// fflush(stdout);
 }
 
 int emu_chdir(const char* pDirName)
 {
+	/*
 	std::string AbsPathWithUnicode = 
 		ConvertPathToAbsoluteUnicode(pDirName);
 
@@ -1420,11 +1545,19 @@ int emu_chdir(const char* pDirName)
 	}
 
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
+	*/
+
+	WCHAR* pBuffer = ConvertUtf8ToWideString(pDirName);
 	if (!pBuffer) return -1;
+
 	int result = SetCurrentDirectoryW(pBuffer);
 	delete [] pBuffer;
+
 	if (result != 0) return 0;
+
 	errno = EACCES;
+	fprintf(stderr, "Failed to change directory to '%s': %s\n",
+		pDirName, GetErrorMessage(GetLastError()).c_str());
 	return -1;
 }
 
@@ -1454,6 +1587,7 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 	if (result <= 0 || result >= len)
 	{
 		errno = EACCES;
+		delete [] pWide;
 		return NULL;
 	}
 
@@ -1539,7 +1673,74 @@ int emu_unlink(const char* pFileName)
 		else
 		{
 			::syslog(LOG_WARNING, "Failed to delete file "
-				"'%s': error %d", pFileName, (int)err);
+				"'%s': %s", pFileName, 
+				GetErrorMessage(err).c_str());
+			errno = ENOSYS;
+		}
+		return -1;
+	}
+
+	return 0;
+}
+
+int emu_rename(const char* pOldFileName, const char* pNewFileName)
+{
+	std::string OldPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pOldFileName);
+
+	if (OldPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pOldBuffer = ConvertUtf8ToWideString(OldPathWithUnicode.c_str());
+	if (!pOldBuffer)
+	{
+		return -1;
+	}
+
+	std::string NewPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pNewFileName);
+
+	if (NewPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		delete [] pOldBuffer;
+		return -1;
+	}
+
+	WCHAR* pNewBuffer = ConvertUtf8ToWideString(NewPathWithUnicode.c_str());
+	if (!pNewBuffer)
+	{
+		delete [] pOldBuffer;
+		return -1;
+	}
+
+	BOOL result = MoveFileW(pOldBuffer, pNewBuffer);
+	DWORD err = GetLastError();
+	delete [] pOldBuffer;
+	delete [] pNewBuffer;
+
+	if (!result)
+	{
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		{
+			errno = ENOENT;
+		}
+		else if (err == ERROR_SHARING_VIOLATION)
+		{
+			errno = EBUSY;
+		}
+		else if (err == ERROR_ACCESS_DENIED)
+		{
+			errno = EACCES;
+		}
+		else
+		{
+			::syslog(LOG_WARNING, "Failed to rename file "
+				"'%s' to '%s': %s", pOldFileName, pNewFileName,
+				GetErrorMessage(err).c_str());
 			errno = ENOSYS;
 		}
 		return -1;
@@ -1555,12 +1756,12 @@ int console_read(char* pBuffer, size_t BufferSize)
 	if (hConsole == INVALID_HANDLE_VALUE)
 	{
 		::fprintf(stderr, "Failed to get a handle on standard input: "
-			"error %d\n", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		return -1;
 	}
 
 	size_t WideSize = BufferSize / 5;
-	WCHAR* pWideBuffer = new WCHAR [WideSize];
+	WCHAR* pWideBuffer = new WCHAR [WideSize + 1];
 
 	if (!pWideBuffer)
 	{
@@ -1578,14 +1779,16 @@ int console_read(char* pBuffer, size_t BufferSize)
 			NULL // reserved
 		)) 
 	{
-		::fprintf(stderr, "Failed to read from console: error %d\n",
-			GetLastError());
+		::fprintf(stderr, "Failed to read from console: %s\n",
+			GetErrorMessage(GetLastError()).c_str());
 		return -1;
 	}
 
 	pWideBuffer[numCharsRead] = 0;
 
 	char* pUtf8 = ConvertFromWideString(pWideBuffer, GetConsoleCP());
+	delete [] pWideBuffer;
+
 	strncpy(pBuffer, pUtf8, BufferSize);
 	delete [] pUtf8;
 
@@ -1675,13 +1878,13 @@ bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
 	// Convert the last-write time to local time.
 	if (!SystemTimeToFileTime(&stUTC, pTo))
 	{
-		syslog(LOG_ERR, "Failed to convert between time formats: "
-			"error %d", GetLastError());
+		syslog(LOG_ERR, "Failed to convert between time formats: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		return false;
 	}
 
 	return true;
 }
 
-
 #endif // WIN32
+

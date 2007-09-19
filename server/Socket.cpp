@@ -17,7 +17,6 @@
 #ifndef WIN32
 #include <sys/socket.h>
 #include <netdb.h>
-#include <syslog.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
@@ -124,18 +123,20 @@ void Socket::LogIncomingConnection(const struct sockaddr *addr, socklen_t addrle
 	switch(addr->sa_family)
 	{
 	case AF_UNIX:
-		::syslog(LOG_INFO, "Incoming connection from local (UNIX socket)");
+		BOX_INFO("Incoming connection from local (UNIX socket)");
 		break;		
 	
 	case AF_INET:
 		{
 			sockaddr_in *a = (sockaddr_in*)addr;
-			::syslog(LOG_INFO, "Incoming connection from %s port %d", inet_ntoa(a->sin_addr), ntohs(a->sin_port));
+			BOX_INFO("Incoming connection from " <<
+				inet_ntoa(a->sin_addr) << " port " <<
+				ntohs(a->sin_port));
 		}
 		break;		
 	
 	default:
-		::syslog(LOG_INFO, "Incoming connection of unknown type");
+		BOX_WARNING("Incoming connection of unknown type");
 		break;
 	}
 }

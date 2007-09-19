@@ -15,12 +15,16 @@
 	#include <unistd.h>
 #endif
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
+
 #include <new>
 
 #include "CommonException.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -28,11 +32,13 @@ template <int flags = O_RDONLY | O_BINARY, int mode = (S_IRUSR | S_IWUSR | S_IRG
 class FileHandleGuard
 {
 public:
-	FileHandleGuard(const char *filename)
-		: mOSFileHandle(::open(filename, flags, mode))
+	FileHandleGuard(const std::string& rFilename)
+		: mOSFileHandle(::open(rFilename.c_str(), flags, mode))
 	{
 		if(mOSFileHandle < 0)
 		{
+			BOX_ERROR("FileHandleGuard: failed to open file '" <<
+				rFilename << "': " << strerror(errno));
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}

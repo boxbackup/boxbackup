@@ -69,8 +69,15 @@ public:
 		MultiValueSeparator = '\x01'
 	};
 	
-	static std::auto_ptr<Configuration> LoadAndVerify(const char *Filename, const ConfigurationVerify *pVerify, std::string &rErrorMsg);
-	static std::auto_ptr<Configuration> Load(const char *Filename, std::string &rErrorMsg) { return LoadAndVerify(Filename, 0, rErrorMsg); }
+	static std::auto_ptr<Configuration> LoadAndVerify(
+		const std::string& rFilename,
+		const ConfigurationVerify *pVerify,
+		std::string &rErrorMsg);
+
+	static std::auto_ptr<Configuration> Load(
+		const std::string& rFilename,
+		std::string &rErrorMsg)
+	{ return LoadAndVerify(rFilename, 0, rErrorMsg); }
 	
 	bool KeyExists(const char *pKeyName) const;
 	const std::string &GetKeyValue(const char *pKeyName) const;

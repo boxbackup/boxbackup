@@ -29,6 +29,7 @@
 #include "RollingChecksum.h"
 #include "MD5Digest.h"
 #include "CommonException.h"
+#include "Timer.h"
 
 #include "MemLeakFindOn.h"
 
@@ -51,31 +52,6 @@ static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int3
 static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber,
 BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks);
 static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksAvailableEntry *pIndex, int64_t NumBlocks, std::map<int64_t, int64_t> &rFoundBlocks, int64_t SizeOfInputFile);
-
-// sDiffTimerExpired flags when the diff timer has expired. When true, the 
-// diff routine should check the wall clock as soon as possible, to determine 
-// whether it's time for a keepalive to be sent, or whether the diff has been 
-// running for too long and should be terminated.
-static bool sDiffTimerExpired = false;
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreFile::DiffTimerExpired()
-//		Purpose: Notifies BackupStoreFile object that the diff operation
-//				 timer has expired, which may mean that a keepalive should
-//				 be sent, or the diff should be terminated. Called from an
-//				 external timer, so it should not do more than set a flag.
-//
-//		Created: 19/1/06
-//
-// --------------------------------------------------------------------------
-void BackupStoreFile::DiffTimerExpired()
-{
-	sDiffTimerExpired = true;
-}
-
 
 // --------------------------------------------------------------------------
 //
@@ -483,15 +459,11 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 	BlocksAvailableEntry *pIndex, int64_t NumBlocks, 
 	int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES], DiffTimer *pDiffTimer)
 {
-	time_t TimeMgmtEpoch   = 0;
-	int MaximumDiffingTime = 0;
-	int KeepAliveTime      = 0;
+	Timer maximumDiffingTime(0);
 
-	if (pDiffTimer)
+	if(pDiffTimer && pDiffTimer->IsManaged())
 	{
-		TimeMgmtEpoch      = pDiffTimer->GetTimeMgmtEpoch();
-		MaximumDiffingTime = pDiffTimer->GetMaximumDiffingTime();
-		KeepAliveTime      = pDiffTimer->GetKeepaliveTime();
+		maximumDiffingTime = Timer(pDiffTimer->GetMaximumDiffingTime());
 	}
 	
 	std::map<int64_t, int32_t> goodnessOfFit;
@@ -577,31 +549,20 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			int rollOverInitialBytes = 0;
 			while(true)
 			{
-				if(sDiffTimerExpired)
+				if(maximumDiffingTime.HasExpired())
 				{
-					ASSERT(TimeMgmtEpoch > 0);
 					ASSERT(pDiffTimer != NULL);
-					
-					time_t tTotalRunIntvl = time(NULL) - TimeMgmtEpoch;
-					
-					if(MaximumDiffingTime > 0 && 
-						tTotalRunIntvl >= MaximumDiffingTime)
-					{
-						TRACE0("MaximumDiffingTime reached - "
-							"suspending file diff\n");
-						abortSearch = true;
-						break;
-					}
-					else if(KeepAliveTime > 0)
-					{
-						TRACE0("KeepAliveTime reached - "
-							"initiating keep-alive\n");
-						pDiffTimer->DoKeepAlive();
-					}
-
-					sDiffTimerExpired = false;
+					TRACE0("MaximumDiffingTime reached - "
+						"suspending file diff\n");
+					abortSearch = true;
+					break;
 				}
-
+				
+				if(pDiffTimer)
+				{
+					pDiffTimer->DoKeepAlive();
+				}
+				
 				// Load in another block of data, and record how big it is
 				int bytesInEndings = rFile.Read(endings, Sizes[s]);
 				int tmp;

@@ -8,25 +8,24 @@
 
 #ifdef __MINGW32__
 	#include <stdint.h>
-	typedef uint32_t u_int32_t;
 #else // MSVC
-	typedef __int64 int64_t;
-	typedef __int32 int32_t;
-	typedef __int16 int16_t;
-	typedef __int8  int8_t;
-	
 	typedef unsigned __int64 u_int64_t;
-	typedef unsigned __int32 u_int32_t;
-	
 	typedef unsigned __int64 uint64_t;
+	typedef          __int64 int64_t;
 	typedef unsigned __int32 uint32_t;
+	typedef unsigned __int32 u_int32_t;
+	typedef          __int32 int32_t;
 	typedef unsigned __int16 uint16_t;
+	typedef          __int16 int16_t;
 	typedef unsigned __int8  uint8_t;
+	typedef          __int8  int8_t;
 #endif
 
 // emulated types, present on MinGW but not MSVC or vice versa
 
-#ifdef _MSC_VER
+#ifdef __MINGW32__
+	typedef uint32_t u_int32_t;
+#else
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
 
@@ -66,7 +65,7 @@
 	( *(_result) = *gmtime( (_clock) ), \
 	(_result) )
 
-#define ITIMER_VIRTUAL 0
+#define ITIMER_REAL 0
 
 #ifdef _MSC_VER
 // Microsoft decided to deprecate the standard POSIX functions. Great!
@@ -83,12 +82,6 @@ int SetTimerHandler(void (__cdecl *func ) (int));
 int setitimer(int type, struct itimerval *timeout, void *arg);
 void InitTimer(void);
 void FiniTimer(void);
-
-inline int geteuid(void)
-{
-	//lets pretend to be root!
-	return 0;
-}
 
 struct passwd {
 	char *pw_name;
@@ -148,43 +141,9 @@ inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
 	return 0;
 }
 
-int   emu_chdir (const char* pDirName);
-int   emu_unlink(const char* pFileName);
-char* emu_getcwd(char* pBuffer, int BufSize);
-int   emu_utimes(const char* pName, const struct timeval[]);
-int   emu_chmod (const char* pName, mode_t mode);
-
-#define utimes(buffer, times) emu_utimes(buffer, times)
-
-#ifdef _MSC_VER
-	#define chmod(file, mode)     emu_chmod(file, mode)
-	#define chdir(directory)      emu_chdir(directory)
-	#define unlink(file)          emu_unlink(file)
-	#define getcwd(buffer, size)  emu_getcwd(buffer, size)
-#else
-	inline int chmod(const char * pName, mode_t mode)
-	{
-		return emu_chmod(pName, mode);
-	}
-
-	inline int chdir(const char* pDirName)
-	{
-		return emu_chdir(pDirName);
-	}
-
-	inline char* getcwd(char* pBuffer, int BufSize)
-	{
-		return emu_getcwd(pBuffer, BufSize);
-	}
-
-	inline int unlink(const char* pFileName)
-	{
-		return emu_unlink(pFileName);
-	}
-#endif
-
-//I do not perceive a need to change the user or group on a backup client
-//at any rate the owner of a service can be set in the service settings
+// Windows and Unix owners and groups are pretty fundamentally different.
+// Ben prefers that we kludge here rather than litter the code with #ifdefs.
+// Pretend to be root, and pretend that set...() operations succeed.
 inline int setegid(int)
 {
 	return true;
@@ -206,6 +165,10 @@ inline int getgid(void)
 	return 0;
 }
 inline int getuid(void)
+{
+	return 0;
+}
+inline int geteuid(void)
 {
 	return 0;
 }
@@ -235,11 +198,6 @@ struct itimerval
 	typedef int socklen_t;
 #endif
 
-// I (re-)defined here for the moment; has to be removed later !!! 
-#ifndef BOX_VERSION
-#define BOX_VERSION "0.09hWin32"
-#endif
-
 #define S_IRGRP S_IWRITE
 #define S_IWGRP S_IREAD
 #define S_IROTH S_IWRITE | S_IREAD
@@ -251,13 +209,6 @@ struct itimerval
 #define S_ISLNK(x) ( false )
 
 #define vsnprintf _vsnprintf
-
-int emu_mkdir(const char* pPathName);
-
-inline int mkdir(const char *pPathName, mode_t mode)
-{
-	return emu_mkdir(pPathName);
-}
 
 #ifndef __MINGW32__
 inline int strcasecmp(const char *s1, const char *s2)
@@ -290,11 +241,17 @@ DIR *opendir(const char *name);
 struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
 
+// local constant to open file exclusively without shared access
+#define O_LOCK 0x10000
+
 HANDLE openfile(const char *filename, int flags, int mode);
 
+#define LOG_DEBUG LOG_INFO
 #define LOG_INFO 6
+#define LOG_NOTICE LOG_INFO
 #define LOG_WARNING 4
 #define LOG_ERR 3
+#define LOG_CRIT LOG_ERR
 #define LOG_PID 0
 #define LOG_LOCAL5 0
 #define LOG_LOCAL6 0
@@ -366,43 +323,36 @@ struct stat {
 	time_t st_mtime;
 	time_t st_ctime;
 };
-#endif
-
-int emu_stat(const char * name, struct stat * st);
-int emu_fstat(HANDLE file, struct stat * st);
-int statfs(const char * name, struct statfs * s);
+#endif // 0
 
 // need this for conversions
 time_t ConvertFileTimeToTime_t(FILETIME *fileTime);
 bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 
-#ifdef _MSC_VER
-	#define stat(filename,  struct) emu_stat (filename, struct)
-	#define lstat(filename, struct) emu_stat (filename, struct)
-	#define fstat(handle,   struct) emu_fstat(handle,   struct)
-#else
-	inline int stat(const char* filename, struct stat* stat)
-	{
-		return emu_stat(filename, stat);
-	}
-	inline int lstat(const char* filename, struct stat* stat)
-	{
-		return emu_stat(filename, stat);
-	}
-	inline int fstat(HANDLE handle, struct stat* stat)
-	{
-		return emu_fstat(handle, stat);
-	}
-#endif
+int   emu_chdir  (const char* pDirName);
+int   emu_mkdir  (const char* pPathName);
+int   emu_unlink (const char* pFileName);
+int   emu_fstat  (HANDLE file,       struct stat* st);
+int   emu_stat   (const char* pName, struct stat* st);
+int   emu_utimes (const char* pName, const struct timeval[]);
+int   emu_chmod  (const char* pName, mode_t mode);
+char* emu_getcwd (char* pBuffer,     int BufSize);
+int   emu_rename (const char* pOldName, const char* pNewName);
+
+#define chdir(directory)        emu_chdir  (directory)
+#define mkdir(path,     mode)   emu_mkdir  (path)
+#define unlink(file)            emu_unlink (file)
+#define stat(filename,  struct) emu_stat   (filename, struct)
+#define lstat(filename, struct) emu_stat   (filename, struct)
+#define fstat(handle,   struct) emu_fstat  (handle,   struct)
+#define utimes(buffer,  times)  emu_utimes (buffer,   times)
+#define chmod(file,     mode)   emu_chmod  (file,     mode)
+#define getcwd(buffer,  size)   emu_getcwd (buffer,   size)
+#define rename(oldname, newname) emu_rename (oldname, newname)
+
+int statfs(const char * name, struct statfs * s);
 
 int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
-bool EnableBackupRights( void );
-
-bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
-bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
-
-// replacement for _cgetws which requires a relatively recent C runtime lib
-int console_read(char* pBuffer, size_t BufferSize);
 
 struct iovec {
 	void *iov_base;   /* Starting address */
@@ -411,5 +361,44 @@ struct iovec {
 
 int readv (int filedes, const struct iovec *vector, size_t count);
 int writev(int filedes, const struct iovec *vector, size_t count);
+
+// The following functions are not emulations, but utilities for other 
+// parts of the code where Windows API is used or windows-specific stuff 
+// is needed, like codepage conversion.
+
+bool EnableBackupRights( void );
+
+bool ConvertEncoding (const std::string& rSource, int sourceCodePage,
+	std::string& rDest, int destCodePage);
+bool ConvertToUtf8   (const std::string& rSource, std::string& rDest, 
+	int sourceCodePage);
+bool ConvertFromUtf8 (const std::string& rSource, std::string& rDest,
+	int destCodePage);
+bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
+bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
+
+// Utility function which returns a default config file name,
+// based on the path of the current executable.
+std::string GetDefaultConfigFilePath(const std::string& rName);
+
+// GetErrorMessage() returns a system error message, like strerror() 
+// but for Windows error codes.
+std::string GetErrorMessage(DWORD errorCode);
+
+// console_read() is a replacement for _cgetws which requires a 
+// relatively recent C runtime lib
+int console_read(char* pBuffer, size_t BufferSize);
+
+#ifdef _MSC_VER
+	/* disable certain compiler warnings to be able to actually see the show-stopper ones */
+	#pragma warning(disable:4101)		// unreferenced local variable
+	#pragma warning(disable:4244)		// conversion, possible loss of data
+	#pragma warning(disable:4267)		// conversion, possible loss of data
+	#pragma warning(disable:4311)		// pointer truncation
+	#pragma warning(disable:4700)		// uninitialized local variable used (hmmmmm...)
+	#pragma warning(disable:4805)		// unsafe mix of type and type 'bool' in operation
+	#pragma warning(disable:4800)		// forcing value to bool 'true' or 'false' (performance warning)
+	#pragma warning(disable:4996)		// POSIX name for this item is deprecated
+#endif // _MSC_VER
 
 #endif // !EMU_INCLUDE && WIN32

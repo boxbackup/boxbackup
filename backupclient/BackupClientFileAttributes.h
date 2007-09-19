@@ -45,7 +45,8 @@ public:
 	void ReadAttributes(const char *Filename, bool ZeroModificationTimes = false,
 		box_time_t *pModTime = 0, box_time_t *pAttrModTime = 0, int64_t *pFileSize = 0,
 		InodeRefType *pInodeNumber = 0, bool *pHasMultipleLinks = 0);
-	void WriteAttributes(const char *Filename) const;
+	void WriteAttributes(const char *Filename, 
+		bool MakeUserWritable = false) const;
 
 	bool IsSymLink() const;
 

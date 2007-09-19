@@ -124,7 +124,8 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 	};
 	
 	// Generate the filename
-	ASSERT(rRootDir[rRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
+	ASSERT(rRootDir[rRootDir.size() - 1] == '/' ||
+		rRootDir[rRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 	std::string fn(rRootDir + INFO_FILENAME);
 	
 	// Open the file for writing

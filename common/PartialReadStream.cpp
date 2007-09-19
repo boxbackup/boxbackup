@@ -16,13 +16,15 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    PartialReadStream::PartialReadStream(IOStream &, int)
-//		Purpose: Constructor, taking another stream and the number of bytes
-//				 to be read from it.
+//		Name:    PartialReadStream::PartialReadStream(IOStream &,
+//			 pos_type)
+//		Purpose: Constructor, taking another stream and the number of
+//			 bytes to be read from it.
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-PartialReadStream::PartialReadStream(IOStream &rSource, int BytesToRead)
+PartialReadStream::PartialReadStream(IOStream &rSource,
+	pos_type BytesToRead)
 	: mrSource(rSource),
 	  mBytesLeft(BytesToRead)
 {

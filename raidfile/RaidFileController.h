@@ -81,7 +81,8 @@ public:
 	~RaidFileController();
 	
 public:
-	void Initialise(const char *ConfigFilename = "/etc/box/raidfile.conf");
+	void Initialise(const std::string& rConfigFilename = 
+		"/etc/box/raidfile.conf");
 	int GetNumDiscSets() {return mSetList.size();}
 
 	// --------------------------------------------------------------------------

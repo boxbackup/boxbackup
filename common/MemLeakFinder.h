@@ -10,8 +10,6 @@
 #ifndef MEMLEAKFINDER__H
 #define MEMLEAKFINDER__H
 
-#define DEBUG_NEW new(__FILE__,__LINE__)
-
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
 	// include stdlib now, to avoid problems with having the macros defined already
 	#include <stdlib.h>
@@ -20,12 +18,21 @@
 // global enable flag
 extern bool memleakfinder_global_enable;
 
+class MemLeakSuppressionGuard
+{
+	public:
+	MemLeakSuppressionGuard();
+	~MemLeakSuppressionGuard();
+};
+
 extern "C"
 {
 	void *memleakfinder_malloc(size_t size, const char *file, int line);
 	void *memleakfinder_realloc(void *ptr, size_t size);
 	void memleakfinder_free(void *ptr);
 }
+
+void memleakfinder_init();
 
 int memleakfinder_numleaks();
 
@@ -41,11 +48,8 @@ void memleakfinder_traceblocksinsection();
 
 void memleakfinder_notaleak(void *ptr);
 
-void *operator new(size_t size, const char *file, int line);
+void *operator new  (size_t size, const char *file, int line);
 void *operator new[](size_t size, const char *file, int line);
-
-void operator delete(void *ptr) throw ();
-void operator delete[](void *ptr) throw ();
 
 // define the malloc functions now, if required
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
@@ -54,7 +58,6 @@ void operator delete[](void *ptr) throw ();
 	#define free		memleakfinder_free
 	#define MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
 #endif
-
 
 #endif // MEMLEAKFINDER__H
 
