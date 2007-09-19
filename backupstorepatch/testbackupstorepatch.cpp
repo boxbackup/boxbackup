@@ -35,6 +35,7 @@
 #include "MemBlockStream.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupClientCryptoKeys.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
@@ -283,14 +284,6 @@ void test_depends_in_dirs()
 
 int test(int argc, const char *argv[])
 {
-#ifdef WIN32
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-
-	WSADATA info;
-	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
-#endif
-
 	// Allocate a buffer
 	buffer = ::malloc(BUFFER_SIZE);
 	TEST_THAT(buffer != 0);
@@ -317,9 +310,8 @@ int test(int argc, const char *argv[])
 			"testfiles/clientTrustedCAs.pem");
 
 	// Create an account
-	TEST_THAT_ABORTONFAIL(RunCommand(
-		"../../bin/bbstoreaccounts/bbstoreaccounts "
-		"-c testfiles/bbstored.conf "
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf "
 		"create 01234567 0 30000B 40000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
@@ -330,7 +322,8 @@ int test(int argc, const char *argv[])
 	test_depends_in_dirs();
 
 	// First, try logging in without an account having been created... just make sure login fails.
-	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
+		"testfiles/bbstored.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
