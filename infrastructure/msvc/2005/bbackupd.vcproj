@@ -4,6 +4,7 @@
 	Version="8.00"
 	Name="bbackupd"
 	ProjectGUID="{22D325FB-9131-4BD6-B390-968F0491D687}"
+	RootNamespace="bbackupd"
 	Keyword="Win32Proj"
 	>
 	<Platforms>
@@ -41,7 +42,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)..\..\..\lib\backupclient&quot;;&quot;$(SolutionDir)..\..\..\lib\common&quot;;&quot;$(SolutionDir)..\..\..\lib\compress&quot;;&quot;$(SolutionDir)..\..\..\lib\crypto&quot;;&quot;$(SolutionDir)..\..\..\lib\server&quot;;&quot;$(SolutionDir)..\..\..\lib\win32&quot;;&quot;$(SolutionDir)..\..\..\..\openssl\inc32&quot;;&quot;$(SolutionDir)..\..\..\..\zlib\include&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;NDEBUG"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -61,7 +62,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcre.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="2"
 				IgnoreAllDefaultLibraries="false"
@@ -122,8 +123,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				EnableFiberSafeOptimizations="true"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;BOOST_REGEX_NO_LIB"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(SolutionDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
 				UsePrecompiledHeader="0"
@@ -142,7 +143,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\lib\win32\Release\boost_regex.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcre.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames=""
@@ -194,6 +195,10 @@
 					Name="bbackupd"
 					>
 					<File
+						RelativePath="..\..\..\bin\bbackupd\autogen_ClientException.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\bin\bbackupd\BackupClientContext.cpp"
 						>
 					</File>
@@ -240,6 +245,10 @@
 					Name="bbackupd"
 					>
 					<File
+						RelativePath="..\..\..\bin\bbackupd\autogen_ClientException.h"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\bin\bbackupd\BackupClientContext.h"
 						>
 					</File>
@@ -275,6 +284,10 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
+			<File
+				RelativePath="..\..\..\lib\win32\messages.rc"
+				>
+			</File>
 		</Filter>
 		<File
 			RelativePath="..\..\..\ReadMe.txt"

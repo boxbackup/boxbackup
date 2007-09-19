@@ -149,6 +149,11 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	int count = ntohl(hdr.mNumEntries);
 	
 	// Clear existing list
+	for(std::vector<Entry*>::iterator i = mEntries.begin(); 
+		i != mEntries.end(); i++)
+	{
+		delete (*i);
+	}
 	mEntries.clear();
 	
 	// Read them in!

@@ -9,8 +9,9 @@
 
 #include "Box.h"
 
-#include <map>
 #include <stdio.h>
+
+#include <map>
 
 #include "HousekeepStoreAccount.h"
 #include "BackupStoreDaemon.h"
@@ -23,6 +24,7 @@
 #include "NamedLock.h"
 #include "autogen_BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BufferedStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -136,11 +138,18 @@ void HousekeepStoreAccount::DoHousekeeping()
 			|| (usedDeleted + mBlocksInDeletedFilesDelta) != mBlocksInDeletedFiles || usedDirectories != mBlocksInDirectories)
 		{
 			// Log this
-			::syslog(LOG_ERR, "On housekeeping, sizes in store do not match calculated sizes, correcting");
-			::syslog(LOG_ERR, "different (store,calc): acc 0x%08x, used (%lld,%lld), old (%lld,%lld), deleted (%lld,%lld), dirs (%lld,%lld)",
-				mAccountID,
-				(used + mBlocksUsedDelta), mBlocksUsed, (usedOld + mBlocksInOldFilesDelta), mBlocksInOldFiles,
-				(usedDeleted + mBlocksInDeletedFilesDelta), mBlocksInDeletedFiles, usedDirectories, mBlocksInDirectories);
+			BOX_ERROR("Housekeeping on account " << 
+				BOX_FORMAT_ACCOUNT(mAccountID) << " found "
+				"and fixed wrong block counts: "
+				"used (" <<
+				(used + mBlocksUsedDelta) << "," <<
+				mBlocksUsed << "), old (" <<
+				(usedOld + mBlocksInOldFilesDelta) << "," <<
+				mBlocksInOldFiles << "), deleted (" <<
+				(usedDeleted + mBlocksInDeletedFilesDelta) <<
+				"," << mBlocksInDeletedFiles << "), dirs (" <<
+				usedDirectories << "," << mBlocksInDirectories
+				<< ")");
 		}
 		
 		// If the current values don't match, store them
@@ -172,17 +181,33 @@ void HousekeepStoreAccount::DoHousekeeping()
 	// Log deletion if anything was deleted
 	if(mFilesDeleted > 0 || mEmptyDirectoriesDeleted > 0)
 	{
-		::syslog(LOG_INFO, "Account 0x%08x, removed %lld blocks (%lld files, %lld dirs)%s", mAccountID, 0 - (mBlocksUsedDelta + removeASAPBlocksUsedDelta),
-			mFilesDeleted, mEmptyDirectoriesDeleted,
-			deleteInterrupted?" was interrupted":"");
+		BOX_INFO("Housekeeping on account " << 
+			BOX_FORMAT_ACCOUNT(mAccountID) << " "
+			"removed " <<
+			(0 - (mBlocksUsedDelta + removeASAPBlocksUsedDelta)) <<
+			" blocks (" << mFilesDeleted << " files, " <<
+			mEmptyDirectoriesDeleted << " dirs)" <<
+			(deleteInterrupted?" and was interrupted":""));
 	}
 	
 	// Make sure the delta's won't cause problems if the counts are really wrong, and
 	// it wasn't fixed because the store was updated during the scan.
-	if(mBlocksUsedDelta 			< (0 - info->GetBlocksUsed())) 				mBlocksUsedDelta = 			(0 - info->GetBlocksUsed());
-	if(mBlocksInOldFilesDelta 		< (0 - info->GetBlocksInOldFiles())) 		mBlocksInOldFilesDelta = 	(0 - info->GetBlocksInOldFiles());
-	if(mBlocksInDeletedFilesDelta 	< (0 - info->GetBlocksInDeletedFiles())) 	mBlocksInDeletedFilesDelta =(0 - info->GetBlocksInDeletedFiles());
-	if(mBlocksInDirectoriesDelta 	< (0 - info->GetBlocksInDirectories()))		mBlocksInDirectoriesDelta = (0 - info->GetBlocksInDirectories());
+	if(mBlocksUsedDelta < (0 - info->GetBlocksUsed()))
+	{
+		mBlocksUsedDelta = (0 - info->GetBlocksUsed());
+	}
+	if(mBlocksInOldFilesDelta < (0 - info->GetBlocksInOldFiles()))
+	{
+ 		mBlocksInOldFilesDelta = (0 - info->GetBlocksInOldFiles());
+	}
+	if(mBlocksInDeletedFilesDelta < (0 - info->GetBlocksInDeletedFiles()))
+	{
+	 	mBlocksInDeletedFilesDelta = (0 - info->GetBlocksInDeletedFiles());
+	}
+	if(mBlocksInDirectoriesDelta < (0 - info->GetBlocksInDirectories()))
+	{
+		mBlocksInDirectoriesDelta = (0 - info->GetBlocksInDirectories());
+	}
 	
 	// Update the usage counts in the store
 	info->ChangeBlocksUsed(mBlocksUsedDelta);
@@ -252,7 +277,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 	
 	// Read the directory in
 	BackupStoreDirectory dir;
-	dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
+	BufferedStream buf(*dirStream);
+	dir.ReadFromStream(buf, IOStream::TimeOutInfinite);
 	dirStream->Close();
 	
 	// Is it empty?
@@ -552,7 +578,14 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID, Ba
 		BackupStoreDirectory::Entry *pentry = rDirectory.FindEntryByID(ObjectID);
 		if(pentry == 0)
 		{
-			::syslog(LOG_ERR, "acc 0x%08x, object %lld not found in dir %lld, logic error/corruption? Run bbstoreaccounts check <accid> fix", mAccountID, ObjectID, InDirectory);
+			BOX_ERROR("Housekeeping on account " <<
+				BOX_FORMAT_ACCOUNT(mAccountID) << " "
+				"found error: object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) << " "
+				"not found in dir " << 
+				BOX_FORMAT_OBJECTID(InDirectory) << ", "
+				"indicates logic error/corruption? Run "
+				"bbstoreaccounts check <accid> fix");
 			return;
 		}
 		

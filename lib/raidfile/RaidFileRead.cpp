@@ -9,19 +9,16 @@
 
 #include "Box.h"
 
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <sys/stat.h>
+#include <fcntl.h>
 #include <stdarg.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #ifdef HAVE_SYS_UIO_H
 	#include <sys/uio.h>
-#endif
-
-#ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
 #endif
 
 #ifdef HAVE_DIRENT_H
@@ -41,7 +38,10 @@
 #include "MemLeakFindOn.h"
 
 #define READ_NUMBER_DISCS_REQUIRED	3
-#define READV_MAX_BLOCKS			64
+#define READV_MAX_BLOCKS		64
+
+// We want to use POSIX fstat() for now, not the emulated one
+#undef fstat
 
 // --------------------------------------------------------------------------
 //
@@ -544,8 +544,8 @@ void RaidFileRead_Raid::MoveDamagedFileAlertDaemon(int SetNumber, const std::str
 // --------------------------------------------------------------------------
 void RaidFileRead_Raid::AttemptToRecoverFromIOError(bool Stripe1)
 {
-	TRACE3("Attempting to recover from I/O error: %d %s, on stripe %d\n", mSetNumber, mFilename.c_str(), Stripe1?1:2);
-	::syslog(LOG_ERR | LOG_LOCAL5, "Attempting to recover from I/O error: %d %s, on stripe %d\n", mSetNumber, mFilename.c_str(), Stripe1?1:2);
+	BOX_WARNING("Attempting to recover from I/O error: " << mSetNumber <<
+		" " << mFilename << ", on stripe " << (Stripe1?1:2));
 
 	// Close offending file
 	if(Stripe1)
@@ -857,8 +857,10 @@ void RaidFileRead_Raid::SetPosition(pos_type FilePosition)
 		{
 			if(errno == EIO)
 			{
-				TRACE3("I/O error when seeking in %d %s (to %d), stripe 1\n", mSetNumber, mFilename.c_str(), (int)FilePosition);
-				::syslog(LOG_ERR | LOG_LOCAL5, "I/O error when seeking in %d %s (to %d), stripe 1\n", mSetNumber, mFilename.c_str(), (int)FilePosition);
+				BOX_ERROR("I/O error when seeking in " <<
+					mSetNumber << " " << mFilename <<
+					" (to " << FilePosition << "), " <<
+					"stripe 1");
 				// Attempt to recover
 				AttemptToRecoverFromIOError(true /* is stripe 1 */);
 				ASSERT(mStripe1Handle == -1);
@@ -875,8 +877,10 @@ void RaidFileRead_Raid::SetPosition(pos_type FilePosition)
 		{
 			if(errno == EIO)
 			{
-				TRACE3("I/O error when seeking in %d %s (to %d), stripe 2\n", mSetNumber, mFilename.c_str(), (int)FilePosition);
-				::syslog(LOG_ERR | LOG_LOCAL5, "I/O error when seeking in %d %s (to %d), stripe 2\n", mSetNumber, mFilename.c_str(), (int)FilePosition);
+				BOX_ERROR("I/O error when seeking in " <<
+					mSetNumber << " " << mFilename <<
+					" (to " << FilePosition << "), " <<
+					"stripe 2");
 				// Attempt to recover
 				AttemptToRecoverFromIOError(false /* is stripe 2 */);
 				ASSERT(mStripe2Handle == -1);
@@ -1050,8 +1054,9 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 	{
 		if(existance != RaidFileUtil::AsRaid)
 		{
-			TRACE2("Opening %d %s in normal mode, but parity file doesn't exist\n", SetNumber, Filename.c_str());
-			::syslog(LOG_ERR | LOG_LOCAL5, "Opening %d %s in normal mode, but parity file doesn't exist\n", SetNumber, Filename.c_str());
+			BOX_ERROR("Opening " << SetNumber << " " <<
+				Filename << " in normal mode, but "
+				"parity file doesn't exist");
 			// TODO: Alert recovery daemon
 		}
 	
@@ -1126,8 +1131,9 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			bool oktotryagain = true;
 			if(stripe1errno == EIO)
 			{
-				TRACE2("I/O error on opening %d %s stripe 1, trying recovery mode\n", SetNumber, Filename.c_str());
-				::syslog(LOG_ERR | LOG_LOCAL5, "I/O error on opening %d %s stripe 1, trying recovery mode\n", SetNumber, Filename.c_str());
+				BOX_ERROR("I/O error on opening " <<
+					SetNumber << " " << Filename <<
+					" stripe 1, trying recovery mode");
 				RaidFileRead_Raid::MoveDamagedFileAlertDaemon(SetNumber, Filename, true /* is stripe 1 */);
 
 				existingFiles = existingFiles & ~RaidFileUtil::Stripe1Exists;
@@ -1142,8 +1148,9 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			
 			if(stripe2errno == EIO)
 			{
-				TRACE2("I/O error on opening %d %s stripe 2, trying recovery mode\n", SetNumber, Filename.c_str());
-				::syslog(LOG_ERR | LOG_LOCAL5, "I/O error on opening %d %s stripe 2, trying recovery mode\n", SetNumber, Filename.c_str());
+				BOX_ERROR("I/O error on opening " <<
+					SetNumber << " " << Filename <<
+					" stripe 2, trying recovery mode");
 				RaidFileRead_Raid::MoveDamagedFileAlertDaemon(SetNumber, Filename, false /* is stripe 2 */);
 
 				existingFiles = existingFiles & ~RaidFileUtil::Stripe2Exists;
@@ -1165,8 +1172,10 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 
 	if(existance == RaidFileUtil::AsRaidWithMissingReadable)
 	{
-		TRACE3("Attempting to open RAID file %d %s in recovery mode (stripe %d present)\n", SetNumber, Filename.c_str(), (existingFiles & RaidFileUtil::Stripe1Exists)?1:2);
-		::syslog(LOG_ERR | LOG_LOCAL5, "Attempting to open RAID file %d %s in recovery mode (stripe %d present)\n", SetNumber, Filename.c_str(), (existingFiles & RaidFileUtil::Stripe1Exists)?1:2);
+		BOX_ERROR("Attempting to open RAID file " << SetNumber <<
+			" " << Filename << " in recovery mode (stripe " <<
+			((existingFiles & RaidFileUtil::Stripe1Exists)?1:2) <<
+			" present)");
 	
 		// Generate the filenames of all the lovely files
 		std::string stripe1Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, Filename, (0 + startDisc) % READ_NUMBER_DISCS_REQUIRED));

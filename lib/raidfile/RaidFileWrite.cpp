@@ -35,6 +35,9 @@
 // Must have this number of discs in the set
 #define TRANSFORM_NUMBER_DISCS_REQUIRED	3
 
+// we want to use POSIX fstat() for now, not the emulated one
+#undef fstat
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -104,7 +107,8 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	writeFilename += 'X';
 
 	// Attempt to open
-	mOSFileHandle = ::open(writeFilename.c_str(), O_WRONLY | O_CREAT,
+	mOSFileHandle = ::open(writeFilename.c_str(), 
+		O_WRONLY | O_CREAT | O_BINARY,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(mOSFileHandle == -1)
 	{
@@ -115,7 +119,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 #ifdef HAVE_FLOCK
 	int errnoBlock = EWOULDBLOCK;
 	if(::flock(mOSFileHandle, LOCK_EX | LOCK_NB) != 0)
-#else
+#elif HAVE_DECL_F_SETLK
 	int errnoBlock = EAGAIN;
 	struct flock desc;
 	desc.l_type = F_WRLCK;
@@ -123,6 +127,9 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	desc.l_start = 0;
 	desc.l_len = 0;
 	if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
+#else
+	int errnoBlock = ENOSYS;
+	if (0)
 #endif
 	{
 		// Lock was not obtained.
@@ -242,23 +249,46 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	}
 	
 	// Rename it into place -- BEFORE it's closed so lock remains
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
-	// Get the filename for the write file
-	std::string renameTo(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
-	// And the current name
-	std::string renameFrom(renameTo + 'X');
-	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
-	{
-		THROW_EXCEPTION(RaidFileException, OSError)
-	}
-	
+
+#ifdef WIN32
+	// Except on Win32 which doesn't allow renaming open files
 	// Close file...
 	if(::close(mOSFileHandle) != 0)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 	mOSFileHandle = -1;
+#endif // WIN32
+
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
+	// Get the filename for the write file
+	std::string renameTo(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
+	// And the current name
+	std::string renameFrom(renameTo + 'X');
+
+#ifdef WIN32
+	// need to delete the target first
+	if(::unlink(renameTo.c_str()) != 0 && 
+		GetLastError() != ERROR_FILE_NOT_FOUND)
+	{
+		THROW_EXCEPTION(RaidFileException, OSError)
+	}
+#endif
+
+	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
+	{
+		THROW_EXCEPTION(RaidFileException, OSError)
+	}
+	
+#ifndef WIN32	
+	// Close file...
+	if(::close(mOSFileHandle) != 0)
+	{
+		THROW_EXCEPTION(RaidFileException, OSError)
+	}
+	mOSFileHandle = -1;
+#endif // !WIN32
 	
 	// Raid it?
 	if(ConvertToRaidNow)
@@ -292,8 +322,15 @@ void RaidFileWrite::Discard()
 	writeFilename += 'X';
 	
 	// Unlink and close it
-	if((::unlink(writeFilename.c_str()) != 0)
-		|| (::close(mOSFileHandle) != 0))
+
+#ifdef WIN32
+	// On Win32 we must close it first
+	if (::close(mOSFileHandle) != 0 ||
+		::unlink(writeFilename.c_str()) != 0)
+#else // !WIN32
+	if (::unlink(writeFilename.c_str()) != 0 ||
+		::close(mOSFileHandle) != 0)
+#endif // !WIN32
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
@@ -388,13 +425,13 @@ void RaidFileWrite::TransformToRaidStorage()
 	try
 	{
 #if HAVE_DECL_O_EXLOCK
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK)> parity(parityFilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe1(stripe1FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe2(stripe2FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> parity(parityFilenameW.c_str());
 #else
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL)> parity(parityFilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe1(stripe1FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe2(stripe2FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> parity(parityFilenameW.c_str());
 #endif
 
 		// Then... read in data...
@@ -530,6 +567,21 @@ void RaidFileWrite::TransformToRaidStorage()
 		parity.Close();
 		stripe2.Close();
 		stripe1.Close();
+
+#ifdef WIN32
+		// Must delete before renaming
+		#define CHECK_UNLINK(file) \
+		{ \
+			if (::unlink(file) != 0 && errno != ENOENT) \
+			{ \
+				THROW_EXCEPTION(RaidFileException, OSError); \
+			} \
+		}
+		CHECK_UNLINK(stripe1Filename.c_str());
+		CHECK_UNLINK(stripe2Filename.c_str());
+		CHECK_UNLINK(parityFilename.c_str());
+		#undef CHECK_UNLINK
+#endif
 		
 		// Rename them into place
 		if(::rename(stripe1FilenameW.c_str(), stripe1Filename.c_str()) != 0

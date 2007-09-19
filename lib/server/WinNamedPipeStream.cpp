@@ -35,7 +35,9 @@
 //
 // --------------------------------------------------------------------------
 WinNamedPipeStream::WinNamedPipeStream()
-	: mSocketHandle(NULL),
+	: mSocketHandle(INVALID_HANDLE_VALUE),
+	  mReadableEvent(INVALID_HANDLE_VALUE),
+	  mBytesInBuffer(0),
 	  mReadClosed(false),
 	  mWriteClosed(false),
 	  mIsServer(false),
@@ -53,9 +55,17 @@ WinNamedPipeStream::WinNamedPipeStream()
 // --------------------------------------------------------------------------
 WinNamedPipeStream::~WinNamedPipeStream()
 {
-	if (mSocketHandle != NULL)
+	if (mSocketHandle != INVALID_HANDLE_VALUE)
 	{
-		Close();
+		try
+		{
+			Close();
+		}
+		catch (std::exception &e)
+		{
+			BOX_ERROR("Caught exception while destroying "
+				"named pipe, ignored: " << e.what());
+		}
 	}
 }
 
@@ -70,16 +80,17 @@ WinNamedPipeStream::~WinNamedPipeStream()
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Accept(const wchar_t* pName)
 {
-	if (mSocketHandle != NULL || mIsConnected) 
+	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
 
 	mSocketHandle = CreateNamedPipeW( 
 		pName,                     // pipe name 
-		PIPE_ACCESS_DUPLEX,        // read/write access 
-		PIPE_TYPE_MESSAGE |        // message type pipe 
-		PIPE_READMODE_MESSAGE |    // message-read mode 
+		PIPE_ACCESS_DUPLEX |       // read/write access 
+		FILE_FLAG_OVERLAPPED,      // enabled overlapped I/O
+		PIPE_TYPE_BYTE |           // message type pipe 
+		PIPE_READMODE_BYTE |       // message-read mode 
 		PIPE_WAIT,                 // blocking mode 
 		1,                         // max. instances  
 		4096,                      // output buffer size 
@@ -87,10 +98,10 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 		NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
 		NULL);                     // default security attribute 
 
-	if (mSocketHandle == NULL)
+	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "CreateNamedPipeW failed: %d", 
-			GetLastError());
+		BOX_ERROR("Failed to CreateNamedPipeW(" << pName << "): " <<
+			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
@@ -98,16 +109,48 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (!connected)
 	{
-		::syslog(LOG_ERR, "ConnectNamedPipe failed: %d", 
-			GetLastError());
+		BOX_ERROR("Failed to ConnectNamedPipe(" << pName << "): " <<
+			GetErrorMessage(GetLastError()));
 		Close();
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 	
+	mBytesInBuffer = 0;
 	mReadClosed  = false;
 	mWriteClosed = false;
 	mIsServer    = true; // must flush and disconnect before closing
 	mIsConnected = true;
+
+	// create the Readable event
+	mReadableEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	if (mReadableEvent == INVALID_HANDLE_VALUE)
+	{
+		BOX_ERROR("Failed to create the Readable event: " <<
+			GetErrorMessage(GetLastError()));
+		Close();
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	// initialise the OVERLAPPED structure
+	memset(&mReadOverlap, 0, sizeof(mReadOverlap));
+	mReadOverlap.hEvent = mReadableEvent;
+
+	// start the first overlapped read
+	if (!ReadFile(mSocketHandle, mReadBuffer, sizeof(mReadBuffer),
+		NULL, &mReadOverlap))
+	{
+		DWORD err = GetLastError();
+
+		if (err != ERROR_IO_PENDING)
+		{
+			BOX_ERROR("Failed to start overlapped read: " <<
+				GetErrorMessage(err));
+			Close();
+			THROW_EXCEPTION(ConnectionException, 
+				Conn_SocketReadError)
+		}
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -120,7 +163,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Connect(const wchar_t* pName)
 {
-	if (mSocketHandle != NULL || mIsConnected) 
+	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
@@ -137,8 +180,17 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		::syslog(LOG_ERR, "Failed to connect to server's named pipe: "
-			"error %d", GetLastError());
+		DWORD err = GetLastError();
+		if (err == ERROR_PIPE_BUSY)
+		{
+			BOX_ERROR("Failed to connect to backup daemon: "
+				"it is busy with another connection");
+		}
+		else
+		{
+			BOX_ERROR("Failed to connect to backup daemon: " <<
+				GetErrorMessage(err));
+		}
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 
@@ -159,33 +211,192 @@ void WinNamedPipeStream::Connect(const wchar_t* pName)
 int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
 	// TODO no support for timeouts yet
-	ASSERT(Timeout == IOStream::TimeOutInfinite)
+	if (Timeout != IOStream::TimeOutInfinite)
+	{
+		THROW_EXCEPTION(CommonException, AssertFailed)
+	}
 	
-	if (mSocketHandle == NULL || !mIsConnected) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
 
+	if (mReadClosed)
+	{
+		THROW_EXCEPTION(ConnectionException, SocketShutdownError)
+	}
+
+	// ensure safe to cast NBytes to unsigned
+	if (NBytes < 0)
+	{
+		THROW_EXCEPTION(CommonException, AssertFailed)
+	}
+
 	DWORD NumBytesRead;
-	
-	bool Success = ReadFile( 
-		mSocketHandle, // pipe handle 
-		pBuffer,       // buffer to receive reply 
-		NBytes,        // size of buffer 
-		&NumBytesRead, // number of bytes read 
-		NULL);         // not overlapped 
-	
-	if (!Success)
+
+	if (mIsServer)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_SocketReadError)
+		// satisfy from buffer if possible, to avoid
+		// blocking on read.
+		bool needAnotherRead = false;
+		if (mBytesInBuffer == 0)
+		{
+			// overlapped I/O completed successfully? 
+			// (wait if needed)
+
+			if (GetOverlappedResult(mSocketHandle,
+				&mReadOverlap, &NumBytesRead, TRUE))
+			{
+				needAnotherRead = true;
+			}
+			else
+			{
+				DWORD err = GetLastError();
+
+				if (err == ERROR_HANDLE_EOF)
+				{
+					mReadClosed = true;
+				}
+				else 
+				{
+					if (err == ERROR_BROKEN_PIPE)
+					{
+						BOX_ERROR("Control client "
+							"disconnected");
+					}
+					else
+					{
+						BOX_ERROR("Failed to wait for "
+							"ReadFile to complete: "
+							<< GetErrorMessage(err));
+					}
+
+					Close();
+					THROW_EXCEPTION(ConnectionException, 
+						Conn_SocketReadError)
+				}
+			}
+		}
+		else
+		{
+			NumBytesRead = 0;
+		}
+
+		size_t BytesToCopy = NumBytesRead + mBytesInBuffer;
+		size_t BytesRemaining = 0;
+
+		if (BytesToCopy > (size_t)NBytes)
+		{
+			BytesRemaining = BytesToCopy - NBytes;
+			BytesToCopy = NBytes;
+		}
+
+		memcpy(pBuffer, mReadBuffer, BytesToCopy);
+		memmove(mReadBuffer, mReadBuffer + BytesToCopy, BytesRemaining);
+
+		mBytesInBuffer = BytesRemaining;
+		NumBytesRead = BytesToCopy;
+
+		if (needAnotherRead)
+		{
+			// reinitialise the OVERLAPPED structure
+			memset(&mReadOverlap, 0, sizeof(mReadOverlap));
+			mReadOverlap.hEvent = mReadableEvent;
+		}
+
+		// start the next overlapped read
+		if (needAnotherRead && !ReadFile(mSocketHandle, 
+			mReadBuffer + mBytesInBuffer, 
+			sizeof(mReadBuffer) - mBytesInBuffer,
+			NULL, &mReadOverlap))
+		{
+			DWORD err = GetLastError();
+			if (err == ERROR_IO_PENDING)
+			{
+				// Don't reset yet, there might be data
+				// in the buffer waiting to be read, 
+				// will check below.
+				// ResetEvent(mReadableEvent);
+			}
+			else if (err == ERROR_HANDLE_EOF)
+			{
+				mReadClosed = true;
+			}
+			else if (err == ERROR_BROKEN_PIPE)
+			{
+				BOX_ERROR("Control client disconnected");
+				mReadClosed = true;
+			}
+			else
+			{
+				BOX_ERROR("Failed to start overlapped read: "
+					<< GetErrorMessage(err));
+				Close();
+				THROW_EXCEPTION(ConnectionException, 
+					Conn_SocketReadError)
+			}
+		}
+
+		// If the read succeeded immediately, leave the event 
+		// signaled, so that we will be called again to process 
+		// the newly read data and start another overlapped read.
+		if (needAnotherRead && !mReadClosed)
+		{
+			// leave signalled
+		}
+		else if (!needAnotherRead && mBytesInBuffer > 0)
+		{
+			// leave signalled
+		}
+		else
+		{
+			// nothing left to read, reset the event
+			ResetEvent(mReadableEvent);
+			// FIXME: a pending read could have signalled
+			// the event (again) while we were busy reading.
+			// that signal would be lost, and the reading
+			// thread would block. Should be pretty obvious
+			// if this happens in practice: control client
+			// hangs.
+		}
 	}
-	
-	// Closed for reading at EOF?
-	if (NumBytesRead == 0)
+	else
 	{
-		mReadClosed = true;
+		if (!ReadFile( 
+			mSocketHandle, // pipe handle 
+			pBuffer,       // buffer to receive reply 
+			NBytes,        // size of buffer 
+			&NumBytesRead, // number of bytes read 
+			NULL))         // not overlapped 
+		{
+			DWORD err = GetLastError();
+		
+			Close();
+
+			// ERROR_NO_DATA is a strange name for 
+			// "The pipe is being closed". No exception wanted.
+
+			if (err == ERROR_NO_DATA || 
+				err == ERROR_PIPE_NOT_CONNECTED) 
+			{
+				NumBytesRead = 0;
+			}
+			else
+			{
+				BOX_ERROR("Failed to read from control socket: "
+					<< GetErrorMessage(err));
+				THROW_EXCEPTION(ConnectionException, 
+					Conn_SocketReadError)
+			}
+		}
+		
+		// Closed for reading at EOF?
+		if (NumBytesRead == 0)
+		{
+			mReadClosed = true;
+		}
 	}
-	
+		
 	return NumBytesRead;
 }
 
@@ -199,7 +410,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 {
-	if (mSocketHandle == NULL || !mIsConnected) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -223,9 +434,23 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 
 		if (!Success)
 		{
-			mWriteClosed = true;	// assume can't write again
-			THROW_EXCEPTION(ConnectionException, 
-				Conn_SocketWriteError)
+			DWORD err = GetLastError();
+			BOX_ERROR("Failed to write to control socket: " <<
+				GetErrorMessage(err));
+			Close();
+
+			// ERROR_NO_DATA is a strange name for 
+			// "The pipe is being closed". No exception wanted.
+
+			if (err == ERROR_NO_DATA) 
+			{
+				return;
+			}
+			else
+			{
+				THROW_EXCEPTION(ConnectionException, 
+					Conn_SocketWriteError)
+			}
 		}
 
 		NumBytesWrittenTotal += NumBytesWrittenThisTime;
@@ -242,30 +467,52 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void WinNamedPipeStream::Close()
 {
-	if (mSocketHandle == NULL && mIsConnected)
+	if (mSocketHandle == INVALID_HANDLE_VALUE && mIsConnected)
 	{
-		fprintf(stderr, "Inconsistent connected state\n");
-		::syslog(LOG_ERR, "Inconsistent connected state");
+		BOX_ERROR("Named pipe: inconsistent connected state");
 		mIsConnected = false;
 	}
 
-	if (mSocketHandle == NULL) 
+	if (mSocketHandle == INVALID_HANDLE_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
 
 	if (mIsServer)
-	{	
+	{
+		if (!CancelIo(mSocketHandle))
+		{
+			BOX_ERROR("Failed to cancel outstanding I/O: " <<
+				GetErrorMessage(GetLastError()));
+		}
+
+		if (mReadableEvent == INVALID_HANDLE_VALUE)
+		{
+			BOX_ERROR("Failed to destroy Readable event: "
+				"invalid handle");
+		}
+		else if (!CloseHandle(mReadableEvent))
+		{
+			BOX_ERROR("Failed to destroy Readable event: " <<
+				GetErrorMessage(GetLastError()));
+		}
+
+		mReadableEvent = INVALID_HANDLE_VALUE;
+
 		if (!FlushFileBuffers(mSocketHandle))
 		{
-			::syslog(LOG_INFO, "FlushFileBuffers failed: %d", 
-				GetLastError());
+			BOX_ERROR("Failed to FlushFileBuffers: " <<
+				GetErrorMessage(GetLastError()));
 		}
 	
 		if (!DisconnectNamedPipe(mSocketHandle))
 		{
-			::syslog(LOG_ERR, "DisconnectNamedPipe failed: %d", 
-				GetLastError());
+			DWORD err = GetLastError();
+			if (err != ERROR_PIPE_NOT_CONNECTED)
+			{
+				BOX_ERROR("Failed to DisconnectNamedPipe: " <<
+					GetErrorMessage(err));
+			}
 		}
 
 		mIsServer = false;
@@ -273,12 +520,15 @@ void WinNamedPipeStream::Close()
 
 	bool result = CloseHandle(mSocketHandle);
 
-	mSocketHandle = NULL;
+	mSocketHandle = INVALID_HANDLE_VALUE;
 	mIsConnected = false;
+	mReadClosed  = true;
+	mWriteClosed = true;
 
 	if (!result) 
 	{
-		::syslog(LOG_ERR, "CloseHandle failed: %d", GetLastError());
+		BOX_ERROR("Failed to CloseHandle: " <<
+			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
 }
@@ -308,5 +558,28 @@ bool WinNamedPipeStream::StreamClosed()
 {
 	return mWriteClosed;
 }
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    IOStream::WriteAllBuffered()
+//		Purpose: Ensures that any data which has been buffered is written to the stream
+//		Created: 2003/08/26
+//
+// --------------------------------------------------------------------------
+void WinNamedPipeStream::WriteAllBuffered()
+{
+	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
+	{
+		THROW_EXCEPTION(ServerException, BadSocketHandle)
+	}
+	
+	if (!FlushFileBuffers(mSocketHandle))
+	{
+		BOX_ERROR("Failed to FlushFileBuffers: " <<
+			GetErrorMessage(GetLastError()));
+	}
+}
+
 
 #endif // WIN32

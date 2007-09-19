@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <errno.h>
 #include <fcntl.h>
 
 #ifdef HAVE_UNISTD_H
@@ -17,6 +18,7 @@
 
 #include "EventWatchFilesystemObject.h"
 #include "autogen_CommonException.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -37,6 +39,9 @@ EventWatchFilesystemObject::EventWatchFilesystemObject(const char *Filename)
 #ifdef HAVE_KQUEUE
 	if(mDescriptor == -1)
 	{
+		BOX_ERROR("EventWatchFilesystemObject: "
+			"Failed to open file '" << Filename << "': " <<
+			strerror(errno));
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
 #else

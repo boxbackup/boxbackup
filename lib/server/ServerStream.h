@@ -14,7 +14,6 @@
 #include <errno.h>
 
 #ifndef WIN32
-	#include <syslog.h>
 	#include <sys/wait.h>
 #endif
 
@@ -73,7 +72,10 @@ public:
 		{
 			if(childExit)
 			{
-				::syslog(LOG_ERR, "in server child, exception %s (%d/%d) -- terminating child", e.what(), e.GetType(), e.GetSubType());
+				BOX_ERROR("Error in child process, "
+					"terminating connection: exception " <<
+					e.what() << "(" << e.GetType() <<
+					"/" << e.GetSubType() << ")");
 				_exit(1);
 			}
 			else throw;
@@ -82,7 +84,9 @@ public:
 		{
 			if(childExit)
 			{
-				::syslog(LOG_ERR, "in server child, exception %s -- terminating child", e.what());
+				BOX_ERROR("Error in child process, "
+					"terminating connection: exception " <<
+					e.what());
 				_exit(1);
 			}
 			else throw;
@@ -91,7 +95,9 @@ public:
 		{
 			if(childExit)
 			{
-				::syslog(LOG_ERR, "in server child, unknown exception -- terminating child");
+				BOX_ERROR("Error in child process, "
+					"terminating connection: "
+					"unknown exception");
 				_exit(1);
 			}
 			else throw;
@@ -170,16 +176,22 @@ public:
 						}
 						else if(c[0] == "unix")
 						{
-							// Check arguments size
-							if(c.size() != 2)
-							{
-								THROW_EXCEPTION(ServerException, ServerStreamBadListenAddrs)
-							}
+							#ifdef WIN32
+								BOX_WARNING("Ignoring request to listen on a Unix socket on Windows: " << addrlist[a]);
+								delete psocket;
+								psocket = NULL;
+							#else
+								// Check arguments size
+								if(c.size() != 2)
+								{
+									THROW_EXCEPTION(ServerException, ServerStreamBadListenAddrs)
+								}
 
-							// unlink anything there
-							::unlink(c[1].c_str());
-							
-							psocket->Listen(Socket::TypeUNIX, c[1].c_str());
+								// unlink anything there
+								::unlink(c[1].c_str());
+								
+								psocket->Listen(Socket::TypeUNIX, c[1].c_str());
+							#endif // WIN32
 						}
 						else
 						{
@@ -187,8 +199,11 @@ public:
 							THROW_EXCEPTION(ServerException, ServerStreamBadListenAddrs)
 						}
 						
-						// Add to list of sockets
-						mSockets.push_back(psocket);
+						if (psocket != NULL)
+						{
+							// Add to list of sockets
+							mSockets.push_back(psocket);
+						}
 					}
 					catch(...)
 					{
@@ -196,8 +211,11 @@ public:
 						throw;
 					}
 
-					// Add to the list of things to wait on
-					connectionWait.Add(psocket);
+					if (psocket != NULL)
+					{
+						// Add to the list of things to wait on
+						connectionWait.Add(psocket);
+					}
 				}
 			}
 	
@@ -217,7 +235,8 @@ public:
 					if(connection.get())
 					{
 						// Since this is a template parameter, the if() will be optimised out by the compiler
-						if(WillForkToHandleRequests())
+						#ifndef WIN32 // no fork on Win32
+						if(ForkToHandleRequests && !IsSingleProcess())
 						{
 							pid_t pid = ::fork();
 							switch(pid)
@@ -253,22 +272,26 @@ public:
 							}
 							
 							// Log it
-							::syslog(LOG_INFO, "%s (handling in child %d)", logMessage.c_str(), pid);
+							BOX_WARNING("Error message from child process " << pid << ": " << logMessage);
 						}
 						else
 						{
-							// Just handle in this connection
+						#endif // !WIN32
+							// Just handle in this process
 							SetProcessTitle("handling");
 							HandleConnection(*connection);
 							SetProcessTitle("idle");										
+						#ifndef WIN32
 						}
+						#endif // !WIN32
 					}
 				}
 
 				OnIdle();
 
+				#ifndef WIN32
 				// Clean up child processes (if forking daemon)
-				if(WillForkToHandleRequests())
+				if(ForkToHandleRequests && !IsSingleProcess())
 				{
 					int status = 0;
 					int p = 0;
@@ -281,6 +304,7 @@ public:
 						}
 					} while(p > 0);
 				}
+				#endif // !WIN32
 			}
 		}
 		catch(...)
@@ -301,14 +325,14 @@ public:
 	virtual void Connection(StreamType &rStream) = 0;
 	
 protected:
-	// For checking code in dervied classes -- use if you have an algorithm which
+	// For checking code in derived classes -- use if you have an algorithm which
 	// depends on the forking model in case someone changes it later.
 	bool WillForkToHandleRequests()
 	{
 		#ifdef WIN32
 		return false;
 		#else
-		return ForkToHandleRequests;
+		return ForkToHandleRequests && !IsSingleProcess();
 		#endif // WIN32
 	}
 

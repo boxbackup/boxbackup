@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 #!@PERL@
 use strict;
 use Symbol;
@@ -6,7 +7,7 @@ use Symbol;
 my %comment_chars = ('cpp' => '// ', 'h' => '// ', 'pl' => '# ', 'pm' => '# ', '' => '# ');
 
 # other extensions which need text copying, just to remove the private stuff
-my %text_files = ('txt' => 1);
+my %text_files = ('txt' => 1, 'spec' => 1);
 
 # files which don't get the license added
 my %no_license = (); # 'filename' => 1
@@ -36,6 +37,29 @@ close VERSION;
 die "Archive name '$archive_name' is not equal to the distribution name '$distribution'"
 	unless $archive_name eq $distribution;
 
+my $svnversion = `svnversion .`;
+chomp $svnversion;
+$svnversion =~ tr/0-9A-Za-z/_/c;
+
+if($version =~ /USE_SVN_VERSION/)
+{
+	# for developers, use SVN version
+	open INFO,'svn info . |';
+	my $svnurl;
+	while(<INFO>)
+	{
+		if(m/^URL: (.+?)[\n\r]+/)
+		{
+			$svnurl = $1;
+		}
+	}
+	close INFO;
+	$svnurl =~ m'box/(.+)$';
+	my $svndir = $1;
+	$svndir =~ tr/0-9A-Za-z/_/c;
+	$version =~ s/USE_SVN_VERSION/$svndir.'_'.$svnversion/e;
+}
+
 # make initial directory
 my $base_name = "$archive_name-$version";
 system "rm -rf $base_name";
@@ -47,8 +71,6 @@ open LICENSE,"$dist_root/LICENSE.txt" or die "Can't open $dist_root/LICENSE.txt"
 my $license_f;
 read LICENSE,$license_f,100000;
 close LICENSE;
-my $svnversion = `svnversion .`;
-chomp $svnversion;
 my @license = ('distribution '.$base_name.' (svn version: '.$svnversion.')',split(/\n/,$license_f));
 
 # copy files, make a note of all the modules included
@@ -114,6 +136,7 @@ copy_from_list("$dist_root/DISTRIBUTION-MANIFEST.txt");
 	or die "Copy of root extra files failed";
 unlink "$base_name/DISTRIBUTION-MANIFEST.txt"
 	or die "Delete of DISTRIBUTION-MANIFEST.txt file failed";
+replace_version_in("VERSION.txt");
 
 # produce a new modules file
 my $modules = gensym;
@@ -316,6 +339,7 @@ sub replace_version_in
 	while(<IN>)
 	{
 		s/###DISTRIBUTION-VERSION-NUMBER###/$version/g;
+		s/.*USE_SVN_VERSION.*/$version/g;
 		print OUT
 	}
 	

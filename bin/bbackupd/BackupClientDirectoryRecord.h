@@ -25,6 +25,82 @@ class BackupDaemon;
 // --------------------------------------------------------------------------
 //
 // Class
+//		Name:    ProgressNotifier
+//		Purpose: Provides methods for the backup library to inform the user
+//		         interface about its progress with the backup
+//		Created: 2005/11/20
+//
+// --------------------------------------------------------------------------
+class BackupClientDirectoryRecord;
+	
+class ProgressNotifier
+{
+	public:
+	virtual ~ProgressNotifier() { }
+	virtual void NotifyScanDirectory(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyDirStatFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg) = 0;
+	virtual void NotifyFileStatFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg) = 0;
+	virtual void NotifyDirListFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg) = 0;
+	virtual void NotifyMountPointSkipped(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileExcluded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyDirExcluded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyUnsupportedFileType(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileReadFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg) = 0;
+	virtual void NotifyFileModifiedInFuture(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileSkippedServerFull(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileUploadException(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const BoxException& rException) = 0;
+	virtual void NotifyFileUploadServerError(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int type, int subtype) = 0;
+	virtual void NotifyFileUploading(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileUploadingPatch(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileUploaded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int64_t FileSize) = 0;
+	virtual void NotifyFileSynchronised(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int64_t FileSize) = 0;
+};
+
+// --------------------------------------------------------------------------
+//
+// Class
 //		Name:    BackupClientDirectoryRecord
 //		Purpose: Implementation of record about directory for backup client
 //		Created: 2003/10/08
@@ -59,14 +135,18 @@ public:
 	class SyncParams
 	{
 	public:
-		SyncParams(BackupDaemon &rDaemon, BackupClientContext &rContext);
+		SyncParams(
+			BackupDaemon &rDaemon,
+			ProgressNotifier &rProgressNotifier,
+			BackupClientContext &rContext);
 		~SyncParams();
 	private:
 		// No copying
 		SyncParams(const SyncParams&);
 		SyncParams &operator=(const SyncParams&);
+		ProgressNotifier &mrProgressNotifier;
+		
 	public:
-
 		// Data members are public, as accessors are not justified here
 		box_time_t mSyncPeriodStart;
 		box_time_t mSyncPeriodEnd;
@@ -81,6 +161,11 @@ public:
 		// Member variables modified by syncing process
 		box_time_t mUploadAfterThisTimeInTheFuture;
 		bool mHaveLoggedWarningAboutFutureFileTimes;
+	
+		ProgressNotifier& GetProgressNotifier() const 
+		{ 
+			return mrProgressNotifier;
+		}
 	};
 
 	void SyncDirectory(SyncParams &rParams, int64_t ContainingDirectoryID, const std::string &rLocalPath,

@@ -1,7 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 8.00
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "boxquery", "boxquery.vcproj", "{FE9EC666-4B3A-4370-B3D4-DEBD4A21F36E}"
 	ProjectSection(ProjectDependencies) = postProject
-		{98598F62-FEA7-4134-AA29-0AD2315A214F} = {98598F62-FEA7-4134-AA29-0AD2315A214F}
 		{A089CEE6-EBF0-4232-A0C0-74850A8127A6} = {A089CEE6-EBF0-4232-A0C0-74850A8127A6}
 	EndProjectSection
 EndProject
@@ -11,7 +10,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "common", "common.vcproj", "
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupd", "bbackupd.vcproj", "{22D325FB-9131-4BD6-B390-968F0491D687}"
 	ProjectSection(ProjectDependencies) = postProject
-		{98598F62-FEA7-4134-AA29-0AD2315A214F} = {98598F62-FEA7-4134-AA29-0AD2315A214F}
 		{A089CEE6-EBF0-4232-A0C0-74850A8127A6} = {A089CEE6-EBF0-4232-A0C0-74850A8127A6}
 	EndProjectSection
 EndProject
@@ -23,10 +21,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupctl", "bbackupctl.vcproj", "{9FD51412-E945-4457-A17A-CA3C505CF431}"
 	ProjectSection(ProjectDependencies) = postProject
 		{A089CEE6-EBF0-4232-A0C0-74850A8127A6} = {A089CEE6-EBF0-4232-A0C0-74850A8127A6}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "boost_regex", "lib\win32\boost_regex.vcproj", "{98598F62-FEA7-4134-AA29-0AD2315A214F}"
-	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
 Global
@@ -55,10 +49,6 @@ Global
 		{9FD51412-E945-4457-A17A-CA3C505CF431}.Debug.Build.0 = Debug|Win32
 		{9FD51412-E945-4457-A17A-CA3C505CF431}.Release.ActiveCfg = Release|Win32
 		{9FD51412-E945-4457-A17A-CA3C505CF431}.Release.Build.0 = Release|Win32
-		{98598F62-FEA7-4134-AA29-0AD2315A214F}.Debug.ActiveCfg = Debug|Win32
-		{98598F62-FEA7-4134-AA29-0AD2315A214F}.Debug.Build.0 = Debug|Win32
-		{98598F62-FEA7-4134-AA29-0AD2315A214F}.Release.ActiveCfg = Release|Win32
-		{98598F62-FEA7-4134-AA29-0AD2315A214F}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

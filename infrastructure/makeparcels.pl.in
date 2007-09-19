@@ -101,8 +101,12 @@ for my $parcel (@parcels)
 	my $dir = parcel_dir($parcel);
 	print MAKE "\ttest -d $dir || mkdir $dir\n";
 	
-	open SCRIPT,">parcels/scripts/install-$parcel" or die "Can't open installer script for $parcel for writing";
-	print SCRIPT "#!/bin/sh\n\n";
+	unless ($target_windows)
+	{
+		open SCRIPT,">parcels/scripts/install-$parcel" or die
+			"Can't open installer script for $parcel for writing";
+		print SCRIPT "#!/bin/sh\n\n";
+	}
 	
 	for(@{$parcel_contents{$parcel}})
 	{
@@ -124,7 +128,8 @@ for my $parcel (@parcels)
 		{
 			if ($optional)
 			{
-				print MAKE "\ttest -r $name && cp $name $dir\n";
+				print MAKE "\ttest -r $name " .
+					"&& cp $name $dir || true\n";
 			}
 			else
 			{
@@ -135,21 +140,34 @@ for my $parcel (@parcels)
 			$name = $1;
 		}
 
-		print SCRIPT "install $name $install_into_dir\n";
+		unless ($target_windows)
+		{
+			print SCRIPT "install $name $install_into_dir\n";
+		}
+	}
+
+	unless ($target_windows)
+	{	
+		close SCRIPT;
+		chmod 0755,"parcels/scripts/install-$parcel";
 	}
 	
-	close SCRIPT;
-	
-	chmod 0755,"parcels/scripts/install-$parcel";
-	
 	my $root = parcel_root($parcel);
-	print MAKE "\tcp parcels/scripts/install-$parcel $dir\n";
+
+	unless ($target_windows)
+	{
+		print MAKE "\tcp parcels/scripts/install-$parcel $dir\n";
+	}
+
 	print MAKE "\t(cd parcels; tar cf - $root | gzip -9 - > $root.tgz )\n";
 	
 	print MAKE "\n";
-	
-	print MAKE "install-$parcel:\n";
-	print MAKE "\t(cd $dir; ./install-$parcel)\n\n";
+
+	unless ($target_windows)
+	{	
+		print MAKE "install-$parcel:\n";
+		print MAKE "\t(cd $dir; ./install-$parcel)\n\n";
+	}
 }
 
 print MAKE <<__E;

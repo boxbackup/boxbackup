@@ -26,13 +26,21 @@ if test "x$GXX" = "xyes"; then
   # Use -rdynamic if we have gcc. This is needed for backtrace
   AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
 fi
-AC_PATH_PROG([PERL], [perl], [no])
-if test "x$PERL" != "xno"; then
-  AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$PERL"], [Location of the perl executable])
-else
-  AC_MSG_ERROR([[perl executable was not found]])
-fi
 
+AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
+
+case $target_os in
+mingw*) 
+	TARGET_PERL=perl
+	;;
+*)
+	TARGET_PERL=$PERL
+	;;
+esac
+
+AC_SUBST([TARGET_PERL])
+AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$TARGET_PERL"], 
+	[Location of the perl executable])
 
 ### Checks for libraries.
 
@@ -94,15 +102,36 @@ esac
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([execinfo.h process.h pwd.h regex.h signal.h])
+AC_CHECK_HEADERS([dlfcn.h execinfo.h getopt.h process.h pwd.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
 AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 
-if test "$ac_cv_header_regex_h" = "yes"; then
-  AC_SEARCH_LIBS([regcomp], [pcreposix])
+AC_CHECK_HEADER([regex.h], [have_regex_h=yes])
+
+if test "$have_regex_h" = "yes"; then
+  AC_DEFINE([HAVE_REGEX_H], [1], [Define to 1 if regex.h is available])
+else
+  AC_CHECK_HEADER([pcreposix.h], [have_pcreposix_h=yes])
 fi
+
+if test "$have_pcreposix_h" = "yes"; then
+  AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"],,[have_pcreposix_h=no_regcomp])
+fi
+
+if test "$have_pcreposix_h" = "yes"; then
+  AC_DEFINE([HAVE_PCREPOSIX_H], [1], [Define to 1 if pcreposix.h is available])
+fi
+
+if test "$have_regex_h" = "yes" -o "$have_pcreposix_h" = "yes"; then
+  have_regex_support=yes
+  AC_DEFINE([HAVE_REGEX_SUPPORT], [1], [Define to 1 if regular expressions are supported])
+else
+  have_regex_support=no
+fi
+
+AC_SEARCH_LIBS([dlsym], ["dl"])
 
 ### Checks for typedefs, structures, and compiler characteristics.
 
@@ -143,6 +172,7 @@ winnt*)   ;;
   AX_CHECK_MOUNT_POINT(,[
     AC_MSG_ERROR([[cannot work out how to discover mount points on your platform]])
   ])
+  AC_CHECK_MEMBERS([struct dirent.d_ino],,, [[#include <dirent.h>]])
 ;;
 esac
 
@@ -155,7 +185,7 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid])
+AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid gettimeofday])
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
 # TODO: Remove this when NetBSD kqueue implementation is working
 netbsd_hack=`echo $target_os | sed 's/netbsd.*/netbsd/'`
@@ -235,6 +265,7 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbstored/bbstored-config
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
+                   infrastructure/makedistribution.pl
                    lib/common/makeexception.pl
                    lib/raidfile/raidfile-config
                    lib/server/makeprotocol.pl
@@ -259,7 +290,7 @@ A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
 
-Regular expressions: $ac_cv_header_regex_h
+Regular expressions: $have_regex_support
 Large files:         $have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline

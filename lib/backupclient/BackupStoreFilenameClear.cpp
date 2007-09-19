@@ -13,6 +13,7 @@
 #include "CipherContext.h"
 #include "CipherBlowfish.h"
 #include "Guards.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -203,9 +204,9 @@ static void EnsureEncDecBufferSize(int BufSize)
 	{
 		if(sEncDecBufferSize < BufSize)
 		{
-#ifndef WIN32
-			TRACE2("Reallocating filename encoding/decoding buffer from %d to %d\n", sEncDecBufferSize, BufSize);
-#endif
+			BOX_TRACE("Reallocating filename encoding/decoding "
+				"buffer from " << sEncDecBufferSize <<
+				" to " << BufSize);
 			spEncDecBuffer->Resize(BufSize);
 			sEncDecBufferSize = BufSize;
 			MEMLEAKFINDER_NOT_A_LEAK(*spEncDecBuffer);

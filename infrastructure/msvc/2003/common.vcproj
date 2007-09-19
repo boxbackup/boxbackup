@@ -20,7 +20,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0\&quot;"
-				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING"
+				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;NDEBUG "
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -171,13 +171,22 @@
 						RelativePath="..\..\..\lib\common\IOStreamGetLine.cpp">
 					</File>
 					<File
+					        RelativePath="..\..\..\lib\common\Logging.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MemBlockStream.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\PartialReadStream.cpp">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\ReadLoggingStream.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\StreamableMemBlock.cpp">
@@ -287,6 +296,9 @@
 					<File
 						RelativePath="..\..\..\lib\win32\emu.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt_long.cxx">
+					</File>
 				</Filter>
 				<Filter
 					Name="server"
@@ -327,6 +339,10 @@
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.cpp">
+					</File>
+
 				</Filter>
 			</Filter>
 		</Filter>
@@ -435,6 +451,9 @@
 						RelativePath="..\..\..\lib\server\LocalProcessStream.h">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Logging.h">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MainHelper.h">
 					</File>
 					<File
@@ -456,6 +475,9 @@
 						RelativePath="..\..\..\lib\common\PartialReadStream.h">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.h">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.h">
 					</File>
 					<File
@@ -468,6 +490,9 @@
 						RelativePath="..\..\..\lib\common\Test.h">
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Timer.h">
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\UnixUser.h">
 					</File>
 					<File
@@ -475,6 +500,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\WaitForEvent.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\BoxVersion.h">
 					</File>
 				</Filter>
 				<Filter
@@ -569,6 +597,12 @@
 					<File
 						RelativePath="..\..\..\lib\win32\emu.h">
 					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\getopt.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h">
+					</File>
 				</Filter>
 				<Filter
 					Name="server"
@@ -620,6 +654,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.h">
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.h">
 					</File>
 				</Filter>
 			</Filter>

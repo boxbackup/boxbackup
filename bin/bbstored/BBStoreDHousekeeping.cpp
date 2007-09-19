@@ -11,10 +11,6 @@
 
 #include <stdio.h>
 
-#ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
-#endif
-
 #include "BackupStoreDaemon.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
@@ -50,7 +46,8 @@ void BackupStoreDaemon::HousekeepingProcess()
 	{
 		RunHousekeepingIfNeeded();
 
-		// Calculate how long should wait before doing the next housekeeping run
+		// Calculate how long should wait before doing the next 
+		// housekeeping run
 		int64_t timeNow = GetCurrentBoxTime();
 		time_t secondsToGo = BoxTimeToSeconds(
 			(mLastHousekeepingRun + housekeepingInterval) - 
@@ -72,6 +69,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 
 	// Time now
 	int64_t timeNow = GetCurrentBoxTime();
+
 	// Do housekeeping if the time interval has elapsed since the last check
 	if((timeNow - mLastHousekeepingRun) < housekeepingInterval)
 	{
@@ -80,7 +78,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 
 	// Store the time
 	mLastHousekeepingRun = timeNow;
-	::syslog(LOG_INFO, "Starting housekeeping");
+	BOX_INFO("Starting housekeeping");
 
 	// Get the list of accounts
 	std::vector<int32_t> accounts;
@@ -110,18 +108,25 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 		}
 		catch(BoxException &e)
 		{
-			::syslog(LOG_ERR, "while housekeeping account %08X, exception %s (%d/%d) -- aborting housekeeping run for this account",
-				*i, e.what(), e.GetType(), e.GetSubType());
+			BOX_ERROR("Housekeeping on account " <<
+				BOX_FORMAT_ACCOUNT(*i) << " threw exception, "
+				"aborting run for this account: " <<
+				e.what() << " (" <<
+				e.GetType() << "/" << e.GetSubType() << ")");
 		}
 		catch(std::exception &e)
 		{
-			::syslog(LOG_ERR, "while housekeeping account %08X, exception %s -- aborting housekeeping run for this account",
-				*i, e.what());
+			BOX_ERROR("Housekeeping on account " <<
+				BOX_FORMAT_ACCOUNT(*i) << " threw exception, "
+				"aborting run for this account: " <<
+				e.what());
 		}
 		catch(...)
 		{
-			::syslog(LOG_ERR, "while housekeeping account %08X, unknown exception -- aborting housekeeping run for this account",
-				*i);
+			BOX_ERROR("Housekeeping on account " <<
+				BOX_FORMAT_ACCOUNT(*i) << " threw exception, "
+				"aborting run for this account: "
+				"unknown exception");
 		}
 	
 		int64_t timeNow = GetCurrentBoxTime();
@@ -142,10 +147,23 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 		}
 	}
 		
-	::syslog(LOG_INFO, "Finished housekeeping");
+	BOX_INFO("Finished housekeeping");
 
 	// Placed here for accuracy, if StopRun() is true, for example.
 	SetProcessTitle("housekeeping, idle");
+}
+
+void BackupStoreDaemon::OnIdle()
+{
+	#ifdef WIN32
+	if (!mHousekeepingInited)
+	{
+		HousekeepingInit();
+		mHousekeepingInited = true;
+	}
+
+	RunHousekeepingIfNeeded();
+	#endif
 }
 
 // --------------------------------------------------------------------------
@@ -159,6 +177,11 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 // --------------------------------------------------------------------------
 bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitTime)
 {
+	if(!mInterProcessCommsSocket.IsOpened())
+	{
+		return false;
+	}
+
 	// First, check to see if it's EOF -- this means something has gone wrong, and the housekeeping should terminate.
 	if(mInterProcessComms.IsEOF())
 	{
@@ -170,7 +193,7 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 	std::string line;
 	if(mInterProcessComms.GetLine(line, false /* no pre-processing */, MaximumWaitTime))
 	{
-		TRACE1("housekeeping received command '%s' over interprocess comms\n", line.c_str());
+		TRACE1("Housekeeping received command '%s' over interprocess comms\n", line.c_str());
 	
 		int account = 0;
 	
@@ -192,7 +215,9 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 			if(account == AccountNum)
 			{
 				// Yes! -- need to stop now so when it retries to get the lock, it will succeed
-				::syslog(LOG_INFO, "Housekeeping giving way to connection for account 0x%08x", AccountNum);
+				BOX_INFO("Housekeeping on account " <<
+					BOX_FORMAT_ACCOUNT(AccountNum) <<
+					"giving way to client connection");
 				return true;
 			}
 		}

@@ -9,8 +9,12 @@
 
 #include "Box.h"
 
-#ifdef HAVE_REGEX_H
-	#include <regex.h>
+#ifdef HAVE_REGEX_SUPPORT
+	#ifdef HAVE_PCREPOSIX_H
+		#include <pcreposix.h>
+	#else
+		#include <regex.h>
+	#endif
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
 #endif
 
@@ -18,6 +22,7 @@
 #include "Utils.h"
 #include "Configuration.h"
 #include "Archive.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -45,7 +50,7 @@ ExcludeList::ExcludeList()
 // --------------------------------------------------------------------------
 ExcludeList::~ExcludeList()
 {
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	// free regex memory
 	while(mRegex.size() > 0)
 	{
@@ -65,6 +70,45 @@ ExcludeList::~ExcludeList()
 	}
 }
 
+#ifdef WIN32
+std::string ExcludeList::ReplaceSlashesDefinite(const std::string& input) const
+{
+	std::string output = input;
+
+	for (std::string::size_type pos = output.find("/");
+		pos != std::string::npos; 
+		pos = output.find("/"))
+	{
+		output.replace(pos, 1, DIRECTORY_SEPARATOR);
+	}
+
+	for (std::string::iterator i = output.begin(); i != output.end(); i++)
+	{
+		*i = tolower(*i);
+	}
+
+	return output;
+}
+
+std::string ExcludeList::ReplaceSlashesRegex(const std::string& input) const
+{
+	std::string output = input;
+
+	for (std::string::size_type pos = output.find("/");
+		pos != std::string::npos; 
+		pos = output.find("/"))
+	{
+		output.replace(pos, 1, "\\" DIRECTORY_SEPARATOR);
+	}
+
+	for (std::string::iterator i = output.begin(); i != output.end(); i++)
+	{
+		*i = tolower(*i);
+	}
+
+	return output;
+}
+#endif
 
 // --------------------------------------------------------------------------
 //
@@ -88,7 +132,24 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 	{
 		if(i->size() > 0)
 		{
-			mDefinite.insert(*i);
+			std::string entry = *i;
+
+			// Convert any forward slashes in the string
+			// to backslashes
+
+			#ifdef WIN32
+			entry = ReplaceSlashesDefinite(entry);
+			#endif
+
+			if (entry.size() > 0 && entry[entry.size() - 1] == 
+				DIRECTORY_SEPARATOR_ASCHAR)
+			{
+				BOX_WARNING("Exclude entry ends in path "
+					"separator, will never match: " 
+					<< entry);
+			}
+
+			mDefinite.insert(entry);
 		}
 	}
 }
@@ -107,7 +168,7 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 // --------------------------------------------------------------------------
 void ExcludeList::AddRegexEntries(const std::string &rEntries)
 {
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 
 	// Split strings up
 	std::vector<std::string> ens;
@@ -123,8 +184,18 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 			
 			try
 			{
+				std::string entry = *i;
+
+				// Convert any forward slashes in the string
+				// to appropriately escaped backslashes
+
+				#ifdef WIN32
+				entry = ReplaceSlashesRegex(entry);
+				#endif
+
 				// Compile
-				if(::regcomp(pregex, i->c_str(), REG_EXTENDED | REG_NOSUB) != 0)
+				if(::regcomp(pregex, entry.c_str(), 
+					REG_EXTENDED | REG_NOSUB) != 0)
 				{
 					THROW_EXCEPTION(CommonException, BadRegularExpression)
 				}
@@ -132,7 +203,7 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				// Store in list of regular expressions
 				mRegex.push_back(pregex);
 				// Store in list of regular expression string for Serialize
-				mRegexStr.push_back(i->c_str());
+				mRegexStr.push_back(entry.c_str());
 			}
 			catch(...)
 			{
@@ -158,10 +229,16 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 // --------------------------------------------------------------------------
 bool ExcludeList::IsExcluded(const std::string &rTest) const
 {
+	std::string test = rTest;
+
+	#ifdef WIN32
+	test = ReplaceSlashesDefinite(test);
+	#endif
+
 	// Check against the always include list
 	if(mpAlwaysInclude != 0)
 	{
-		if(mpAlwaysInclude->IsExcluded(rTest))
+		if(mpAlwaysInclude->IsExcluded(test))
 		{
 			// Because the "always include" list says it's 'excluded'
 			// this means it should actually be included.
@@ -170,17 +247,17 @@ bool ExcludeList::IsExcluded(const std::string &rTest) const
 	}
 
 	// Is it in the set of definite entries?
-	if(mDefinite.find(rTest) != mDefinite.end())
+	if(mDefinite.find(test) != mDefinite.end())
 	{
 		return true;
 	}
 	
 	// Check against regular expressions
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	for(std::vector<regex_t *>::const_iterator i(mRegex.begin()); i != mRegex.end(); ++i)
 	{
 		// Test against this expression
-		if(regexec(*i, rTest.c_str(), 0, 0 /* no match information required */, 0 /* no flags */) == 0)
+		if(regexec(*i, test.c_str(), 0, 0 /* no match information required */, 0 /* no flags */) == 0)
 		{
 			// match happened
 			return true;
@@ -232,7 +309,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 	//
 	mDefinite.clear();
 
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	// free regex memory
 	while(mRegex.size() > 0)
 	{
@@ -273,7 +350,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 	//
 	//
 	//
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	rArchive.Read(iCount);
 
 	if (iCount > 0)
@@ -310,7 +387,7 @@ void ExcludeList::Deserialize(Archive & rArchive)
 			}
 		}
 	}
-#endif // HAVE_REGEX_H
+#endif // HAVE_REGEX_SUPPORT
 
 	//
 	//
@@ -365,7 +442,7 @@ void ExcludeList::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-#ifdef HAVE_REGEX_H
+#ifdef HAVE_REGEX_SUPPORT
 	// don't even try to save compiled regular expressions,
 	// use string copies instead.
 	ASSERT(mRegex.size() == mRegexStr.size()); 	
@@ -378,7 +455,7 @@ void ExcludeList::Serialize(Archive & rArchive) const
 	{
 		rArchive.Write(*i);
 	}
-#endif // HAVE_REGEX_H
+#endif // HAVE_REGEX_SUPPORT
 
 	//
 	//

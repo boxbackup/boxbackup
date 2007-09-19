@@ -1,12 +1,19 @@
 How to build Box Backup on Win32 using Cygwin and MinGW
-By Chris Wilson, 2005-12-07
+By Chris Wilson, 2007-05-26
 
-Install Cygwin on your Windows box [http://www.cygwin.org]
-Make sure to include the following packages:
+(To read this document online with better formatting, browse to:
+http://bbdev.fluffy.co.uk/trac/wiki/CompileWithMinGW)
+
+Start by installing Cygwin on your Windows machine [http://www.cygwin.org].
+Make sure to select the following packages during installation:
+
 * Devel/gcc-mingw
 * Devel/gcc-mingw-core
 * Devel/gcc-mingw-g++
 * Mingw/mingw-zlib
+
+If you already have Cygwin installed, please re-run the installer and
+ensure that those packages are installed.
 
 Download OpenSSL from 
 [http://www.openssl.org/source/openssl-0.9.7i.tar.gz]
@@ -35,20 +42,12 @@ Configure PCRE for MinGW compilation, and build and install it:
 	export CFLAGS="-mno-cygwin"
 	./configure
 	make winshared
-	cp .libs/pcreposix.dll /bin
-	cp .libs/pcreposix.dll.a /usr/i686-pc-mingw32/lib
-	cp pcreposix.h /usr/i686-pc-mingw32/include/regex.h
+	cp .libs/libpcre.a .libs/libpcreposix.a /usr/lib/mingw
+	cp pcreposix.h /usr/include/mingw
 
 Now unpack the Box Backup sources, enter the source directory,
 and configure like this:
 
-	export CXX="g++ -mno-cygwin"
-	export LD="g++ -mno-cygwin"
-	export CFLAGS="-mno-cygwin -mthreads"
-	export CXXFLAGS="-mno-cygwin -mthreads"
-	export LDFLAGS="-mno-cygwin -mthreads"
-	export LIBS="-lcrypto -lws2_32 -lgdi32"
-	(if you don't have a "configure" file, run "./bootstrap")
-	./configure --target=i686-pc-mingw32
+	./infrastructure/mingw/configure.sh
 	make
 

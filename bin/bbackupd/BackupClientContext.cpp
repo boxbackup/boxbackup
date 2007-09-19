@@ -9,12 +9,10 @@
 
 #include "Box.h"
 
-#ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
-#endif
 #ifdef HAVE_SIGNAL_H
 	#include <signal.h>
 #endif
+
 #ifdef HAVE_SYS_TIME_H
 	#include <sys/time.h>
 #endif
@@ -29,19 +27,28 @@
 #include "BackupDaemon.h"
 #include "autogen_BackupProtocolClient.h"
 #include "BackupStoreFile.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientContext::BackupClientContext(BackupDaemon &, TLSContext &, const std::string &, int32_t, bool)
+//		Name:    BackupClientContext::BackupClientContext(BackupDaemon &, TLSContext &, const std::string &, int32_t, bool, bool, std::string)
 //		Purpose: Constructor
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLSContext, const std::string &rHostname,
-			int32_t AccountNumber, bool ExtendedLogging)
+BackupClientContext::BackupClientContext
+(
+	BackupDaemon &rDaemon, 
+	TLSContext &rTLSContext, 
+	const std::string &rHostname,
+	int32_t AccountNumber, 
+	bool ExtendedLogging,
+	bool ExtendedLogToFile,
+	std::string ExtendedLogFile
+)
 	: mrDaemon(rDaemon),
 	  mrTLSContext(rTLSContext),
 	  mHostname(rHostname),
@@ -49,6 +56,9 @@ BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLS
 	  mpSocket(0),
 	  mpConnection(0),
 	  mExtendedLogging(ExtendedLogging),
+	  mExtendedLogToFile(ExtendedLogToFile),
+	  mExtendedLogFile(ExtendedLogFile),
+	  mpExtendedLogFileHandle(NULL),
 	  mClientStoreMarker(ClientStoreMarker_NotKnown),
 	  mpDeleteList(0),
 	  mpCurrentIDMap(0),
@@ -56,8 +66,8 @@ BackupClientContext::BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLS
 	  mStorageLimitExceeded(false),
 	  mpExcludeFiles(0),
 	  mpExcludeDirs(0),
-	  mbIsManaged(false),
-	  mTimeMgmtEpoch(0)
+	  mKeepAliveTimer(0),
+	  mbIsManaged(false)
 {
 }
 
@@ -115,7 +125,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		}
 		
 		// Log intention
-		::syslog(LOG_INFO, "Opening connection to server %s...", mHostname.c_str());
+		BOX_INFO("Opening connection to server '" <<
+			mHostname << "'...");
 
 		// Connect!
 		mpSocket->Open(mrTLSContext, Socket::TypeINET, mHostname.c_str(), BOX_PORT_BBSTORED);
@@ -125,6 +136,24 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		
 		// Set logging option
 		mpConnection->SetLogToSysLog(mExtendedLogging);
+		
+		if (mExtendedLogToFile)
+		{
+			ASSERT(mpExtendedLogFileHandle == NULL);
+			
+			mpExtendedLogFileHandle = fopen(
+				mExtendedLogFile.c_str(), "a+");
+
+			if (!mpExtendedLogFileHandle)
+			{
+				BOX_ERROR("Failed to open extended log "
+					"file: " << strerror(errno));
+			}
+			else
+			{
+				mpConnection->SetLogToFile(mpExtendedLogFileHandle);
+			}
+		}
 		
 		// Handshake
 		mpConnection->Handshake();
@@ -164,19 +193,16 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		}
 		
 		// Log success
-		::syslog(LOG_INFO, "Connection made, login successful");
+		BOX_INFO("Connection made, login successful");
 
 		// Check to see if there is any space available on the server
-		int64_t softLimit = loginConf->GetBlocksSoftLimit();
-		int64_t hardLimit = loginConf->GetBlocksHardLimit();
-		// Threshold for uploading new stuff
-		int64_t stopUploadThreshold = softLimit + ((hardLimit - softLimit) / 3);
-		if(loginConf->GetBlocksUsed() > stopUploadThreshold)
+		if(loginConf->GetBlocksUsed() >= loginConf->GetBlocksHardLimit())
 		{
 			// no -- flag so only things like deletions happen
 			mStorageLimitExceeded = true;
 			// Log
-			::syslog(LOG_WARNING, "Exceeded storage limits on server -- not uploading changes to files");
+			BOX_WARNING("Exceeded storage hard-limit on server, "
+				"not uploading changes to files");
 		}
 	}
 	catch(...)
@@ -256,6 +282,12 @@ void BackupClientContext::CloseAnyOpenConnection()
 		delete mpDeleteList;
 		mpDeleteList = 0;
 	}
+
+	if (mpExtendedLogFileHandle != NULL)
+	{
+		fclose(mpExtendedLogFileHandle);
+		mpExtendedLogFileHandle = NULL;
+	}
 }
 
 
@@ -303,8 +335,8 @@ BackupClientDeleteList &BackupClientContext::GetDeleteList()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    
-//		Purpose: 
+//		Name:    BackupClientContext::PerformDeletions()
+//		Purpose: Perform any pending file deletions.
 //		Created: 10/11/03
 //
 // --------------------------------------------------------------------------
@@ -461,35 +493,18 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 	return true;
 }
 
-
-// maximum time to spend diffing
-static int sMaximumDiffTime = 600;
-// maximum time of SSL inactivity (keep-alive interval)
-static int sKeepAliveTime = 0;
-
 void BackupClientContext::SetMaximumDiffingTime(int iSeconds)
 {
-	sMaximumDiffTime = iSeconds < 0 ? 0 : iSeconds;
-	TRACE1("Set maximum diffing time to %d seconds\n", sMaximumDiffTime);
+	mMaximumDiffingTime = iSeconds < 0 ? 0 : iSeconds;
+	BOX_TRACE("Set maximum diffing time to " << mMaximumDiffingTime <<
+		" seconds");
 }
 
 void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
-	sKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
-	TRACE1("Set keep-alive time to %d seconds\n", sKeepAliveTime);
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    static TimerSigHandler(int)
-//		Purpose: Signal handler
-//		Created: 19/3/04
-//
-// --------------------------------------------------------------------------
-static void TimerSigHandler(int iUnused)
-{
-	BackupStoreFile::DiffTimerExpired();	
+	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
+	BOX_TRACE("Set keep-alive time to " << mKeepAliveTime << " seconds");
+	mKeepAliveTimer = Timer(mKeepAliveTime);
 }
 
 // --------------------------------------------------------------------------
@@ -502,59 +517,8 @@ static void TimerSigHandler(int iUnused)
 // --------------------------------------------------------------------------
 void BackupClientContext::ManageDiffProcess()
 {
-	if (mbIsManaged || !mpConnection)
-		return;
-
-	ASSERT(mTimeMgmtEpoch == 0);
-
-#ifdef PLATFORM_CYGWIN
-	::signal(SIGALRM, TimerSigHandler);
-#elif defined WIN32
-	// no support for SIGVTALRM
-	SetTimerHandler(TimerSigHandler);
-#else
-	::signal(SIGVTALRM, TimerSigHandler);
-#endif // PLATFORM_CYGWIN
-
-	struct itimerval timeout;
-	memset(&timeout, 0, sizeof(timeout));
-
-	//
-	//
-	//
-	if (sMaximumDiffTime <= 0 && sKeepAliveTime <= 0)
-	{
-		TRACE0("Diff control not requested - letting things run wild\n");
-		return;
-	}
-	else if (sMaximumDiffTime > 0 && sKeepAliveTime > 0)
-	{
-		timeout.it_value.tv_sec = sKeepAliveTime < sMaximumDiffTime ? sKeepAliveTime : sMaximumDiffTime;
-		timeout.it_interval.tv_sec = sKeepAliveTime < sMaximumDiffTime ? sKeepAliveTime : sMaximumDiffTime;
-	}
-	else
-	{
-		timeout.it_value.tv_sec = sKeepAliveTime > 0 ? sKeepAliveTime : sMaximumDiffTime;
-		timeout.it_interval.tv_sec = sKeepAliveTime > 0 ? sKeepAliveTime : sMaximumDiffTime;
-	}
-
-	// avoid race
-	mTimeMgmtEpoch = time(NULL);
-
-#ifdef PLATFORM_CYGWIN
-	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
-#else
-	if(::setitimer(ITIMER_VIRTUAL, &timeout, NULL) != 0)
-#endif // PLATFORM_CYGWIN
-	{
-		mTimeMgmtEpoch = 0;
-
-		TRACE0("WARNING: couldn't set file diff control timeout\n");
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
-
+	ASSERT(!mbIsManaged);
 	mbIsManaged = true;
-	TRACE0("Initiated timer for file diff control\n");
 }
 
 // --------------------------------------------------------------------------
@@ -567,33 +531,16 @@ void BackupClientContext::ManageDiffProcess()
 // --------------------------------------------------------------------------
 void BackupClientContext::UnManageDiffProcess()
 {
-	if (!mbIsManaged /* don't test for active connection, just do it */)
-		return;
-
-	struct itimerval timeout;
-	memset(&timeout, 0, sizeof(timeout));
-
-#ifdef PLATFORM_CYGWIN
-	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
-#else
-	if(::setitimer(ITIMER_VIRTUAL, &timeout, NULL) != 0)
-#endif // PLATFORM_CYGWIN
-	{
-		TRACE0("WARNING: couldn't clear file diff control timeout\n");
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
-
+	// ASSERT(mbIsManaged);
 	mbIsManaged = false;
-	mTimeMgmtEpoch = 0;
-
-	TRACE0("Suspended timer for file diff control\n");
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    BackupClientContext::DoKeepAlive()
-//		Purpose: Does something inconsequential over the SSL link to keep it up
+//		Purpose: Check whether it's time to send a KeepAlive
+//			 message over the SSL link, and if so, send it.
 //		Created: 04/19/2005
 //
 // --------------------------------------------------------------------------
@@ -601,33 +548,26 @@ void BackupClientContext::DoKeepAlive()
 {
 	if (!mpConnection)
 	{
-		::syslog(LOG_ERR, "DoKeepAlive() called with no connection!");
+		return;
+	}
+	
+	if (mKeepAliveTime == 0)
+	{
 		return;
 	}
 
+	if (!mKeepAliveTimer.HasExpired())
+	{
+		return;
+	}
+	
+	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	mpConnection->QueryGetIsAlive();
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupClientContext::GetTimeMgmtEpoch()
-//		Purpose: Returns the unix time when the diff was started, or zero
-//				 if the diff process is unmanaged.
-//		Created: 04/19/2005
-//
-// --------------------------------------------------------------------------
-time_t BackupClientContext::GetTimeMgmtEpoch() 
-{
-	return mTimeMgmtEpoch;
+	
+	mKeepAliveTimer = Timer(mKeepAliveTime);
 }
 
 int BackupClientContext::GetMaximumDiffingTime() 
 {
-	return sMaximumDiffTime;
-}
-
-int BackupClientContext::GetKeepaliveTime() 
-{
-	return sKeepAliveTime;
+	return mMaximumDiffingTime;
 }

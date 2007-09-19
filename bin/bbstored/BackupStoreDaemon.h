@@ -52,7 +52,8 @@ protected:
 
 	virtual void Run();
 
-	void Connection(SocketStreamTLS &rStream);
+	virtual void Connection(SocketStreamTLS &rStream);
+	void Connection2(SocketStreamTLS &rStream);
 	
 	virtual const char *DaemonName() const;
 	virtual const char *DaemonBanner() const;
@@ -71,10 +72,12 @@ private:
 	bool mExtendedLogging;
 	bool mHaveForkedHousekeeping;
 	bool mIsHousekeepingProcess;
+	bool mHousekeepingInited;
 	
 	SocketStream mInterProcessCommsSocket;
 	IOStreamGetLine mInterProcessComms;
 
+	virtual void OnIdle();
 	void HousekeepingInit();
 	void RunHousekeepingIfNeeded();
 	int64_t mLastHousekeepingRun;

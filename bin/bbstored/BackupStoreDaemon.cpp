@@ -42,6 +42,7 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mExtendedLogging(false),
 	  mHaveForkedHousekeeping(false),
 	  mIsHousekeepingProcess(false),
+	  mHousekeepingInited(false),
 	  mInterProcessComms(mInterProcessCommsSocket)
 {
 }
@@ -131,7 +132,23 @@ void BackupStoreDaemon::SetupInInitialProcess()
 	
 	// Initialise the raid files controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
-	rcontroller.Initialise(config.GetKeyValue("RaidFileConf").c_str());
+
+	std::string raidFileConfig;
+
+	#ifdef WIN32
+		if (!config.KeyExists("RaidFileConf"))
+		{
+			raidFileConfig = BOX_GET_DEFAULT_RAIDFILE_CONFIG_FILE;
+		}
+		else
+		{
+			raidFileConfig = config.GetKeyValue("RaidFileConf");
+		}
+	#else
+		raidFileConfig = config.GetKeyValue("RaidFileConf");
+	#endif
+
+	rcontroller.Initialise(raidFileConfig);
 	
 	// Load the account database
 	std::auto_ptr<BackupStoreAccountDatabase> pdb(BackupStoreAccountDatabase::Read(config.GetKeyValue("AccountDatabase").c_str()));
@@ -159,6 +176,9 @@ void BackupStoreDaemon::Run()
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
 	
+#ifdef WIN32	
+	// Housekeeping runs synchronously on Win32
+#else
 	// Fork off housekeeping daemon -- must only do this the first time Run() is called
 	if(!mHaveForkedHousekeeping)
 	{
@@ -188,7 +208,7 @@ void BackupStoreDaemon::Run()
 				// Change the log name
 				::openlog("bbstored/hk", LOG_PID, LOG_LOCAL6);
 				// Log that housekeeping started
-				::syslog(LOG_INFO, "Housekeeping process started");
+				BOX_INFO("Housekeeping process started");
 				// Ignore term and hup
 				// Parent will handle these and alert the child via the socket, don't want to randomly die
 				::signal(SIGHUP, SIG_IGN);
@@ -214,6 +234,7 @@ void BackupStoreDaemon::Run()
 			THROW_EXCEPTION(ServerException, SocketCloseError)
 		}
 	}
+#endif // WIN32
 
 	if(mIsHousekeepingProcess)
 	{
@@ -224,12 +245,18 @@ void BackupStoreDaemon::Run()
 	{
 		// In server process -- use the base class to do the magic
 		ServerTLS<BOX_PORT_BBSTORED>::Run();
-		
+
+		if (!mInterProcessCommsSocket.IsOpened())
+		{
+			return;
+		}
+
 		// Why did it stop? Tell the housekeeping process to do the same
 		if(IsReloadConfigWanted())
 		{
 			mInterProcessCommsSocket.Write("h\n", 2);
 		}
+
 		if(IsTerminateWanted())
 		{
 			mInterProcessCommsSocket.Write("t\n", 2);
@@ -237,22 +264,54 @@ void BackupStoreDaemon::Run()
 	}
 }
 
-
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    BackupStoreDaemon::Connection(SocketStreamTLS &)
-//		Purpose: Handles a connection
+//		Purpose: Handles a connection, by catching exceptions and
+//			 delegating to Connection2
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
 void BackupStoreDaemon::Connection(SocketStreamTLS &rStream)
 {
+	try
+	{
+		Connection2(rStream);
+	}
+	catch(BoxException &e)
+	{
+		BOX_ERROR("Error in child process, terminating connection: " <<
+			e.what() << " (" << e.GetType() << "/" << 
+			e.GetSubType() << ")");
+	}
+	catch(std::exception &e)
+	{
+		BOX_ERROR("Error in child process, terminating connection: " <<
+			e.what());
+	}
+	catch(...)
+	{
+		BOX_ERROR("Error in child process, terminating connection: " <<
+			"unknown exception");
+	}
+}
+	
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDaemon::Connection2(SocketStreamTLS &)
+//		Purpose: Handles a connection from bbackupd
+//		Created: 2006/11/12
+//
+// --------------------------------------------------------------------------
+void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
+{
 	// Get the common name from the certificate
 	std::string clientCommonName(rStream.GetPeerCommonName());
 	
 	// Log the name
-	::syslog(LOG_INFO, "Certificate CN: %s\n", clientCommonName.c_str());
+	BOX_INFO("Client certificate CN: " << clientCommonName);
 	
 	// Check it
 	int32_t id;
@@ -298,10 +357,8 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 		const SocketStreamTLS &s)
 {
 	// Log the amount of data transferred
-	::syslog(LOG_INFO, "Connection statistics for %s: "
-			"IN=%lld OUT=%lld TOTAL=%lld\n", commonName,
-			(long long)s.GetBytesRead(), 
-			(long long)s.GetBytesWritten(),
-			(long long)s.GetBytesRead() + 
-			(long long)s.GetBytesWritten());
+	BOX_INFO("Connection statistics for " << commonName << ":"
+		" IN="  << s.GetBytesRead() <<
+		" OUT=" << s.GetBytesWritten() <<
+		" TOTAL=" << (s.GetBytesRead() + s.GetBytesWritten()));
 }

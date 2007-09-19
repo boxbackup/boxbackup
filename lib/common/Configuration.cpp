@@ -83,19 +83,16 @@ Configuration::~Configuration()
 //		Created: 2003/07/23
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<Configuration> Configuration::LoadAndVerify(const char *Filename, const ConfigurationVerify *pVerify, std::string &rErrorMsg)
+std::auto_ptr<Configuration> Configuration::LoadAndVerify(
+	const std::string& rFilename,
+	const ConfigurationVerify *pVerify,
+	std::string &rErrorMsg)
 {
-	// Check arguments
-	if(Filename == 0)
-	{
-		THROW_EXCEPTION(CommonException, BadArguments)
-	}
-	
 	// Just to make sure
 	rErrorMsg.erase();
 	
 	// Open the file
-	FileHandleGuard<O_RDONLY> file(Filename);
+	FileHandleGuard<O_RDONLY> file(rFilename);
 	
 	// GetLine object
 	FdGetLine getline(file);

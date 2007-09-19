@@ -12,8 +12,8 @@
 #ifndef WIN32SERVICEFUNCTIONS_H
 #define WIN32SERVICEFUNCTIONS_H
 
-int  RemoveService  (void);
-int  InstallService (const char* pConfigFilePath);
-void OurService     (char* pConfigFileName);
+int RemoveService  (void);
+int InstallService (const char* pConfigFilePath);
+int OurService     (char* pConfigFileName);
 
 #endif
