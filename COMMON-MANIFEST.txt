@@ -17,9 +17,12 @@ docs/common/lib_crypto notes/lib_crypto
 docs/common/lib_server notes/lib_server
 MKDIR infrastructure
 infrastructure/buildenv-testmain-template.cpp
-infrastructure/makebuildenv.pl
+infrastructure/makebuildenv.pl.in
+infrastructure/makedistribution.pl.in
+infrastructure/makeparcels.pl.in
 infrastructure/BoxPlatform.pm.in
-infrastructure/makeparcels.pl
+infrastructure/mingw
+infrastructure/msvc
 configure.ac
 NO-LICENSE config.sub
 config.sub
@@ -27,7 +30,7 @@ NO-LICENSE config.guess
 config.guess
 bootstrap
 parcels.txt
-runtest.pl
+runtest.pl.in
 NO-LICENSE-IN-DIR infrastructure/m4
 infrastructure/m4
 configure
