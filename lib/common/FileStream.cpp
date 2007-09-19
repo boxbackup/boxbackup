@@ -10,6 +10,9 @@
 #include "Box.h"
 #include "FileStream.h"
 #include "CommonException.h"
+#include "Logging.h"
+
+#include <errno.h>
 
 #include "MemLeakFindOn.h"
 
@@ -36,7 +39,15 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 #endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
-		THROW_EXCEPTION(CommonException, OSFileOpenError)
+
+		if(errno == EACCES)
+		{
+			THROW_EXCEPTION(CommonException, AccessDenied)
+		}
+		else
+		{
+			THROW_EXCEPTION(CommonException, OSFileOpenError)
+		}
 	}
 #ifdef WIN32
 	this->fileName = Filename;
@@ -47,7 +58,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    FileStream::FileStream(int)
+//		Name:    FileStream::FileStream(tOSFileHandle)
 //		Purpose: Constructor, using existing file descriptor
 //		Created: 2003/08/28
 //
@@ -63,8 +74,12 @@ FileStream::FileStream(tOSFileHandle FileDescriptor)
 #endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
+		BOX_ERROR("FileStream: called with invalid file handle");
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
+#ifdef WIN32
+	this->fileName = "HANDLE";
+#endif
 }
 
 #if 0
@@ -87,6 +102,7 @@ FileStream::FileStream(const FileStream &rToCopy)
 #endif
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
+		BOX_ERROR("FileStream: copying unopened file");
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
 }
@@ -138,8 +154,14 @@ int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 	{
 		r = numBytesRead;
 	}
+	else if (GetLastError() == ERROR_BROKEN_PIPE)
+	{
+		r = 0;
+	}
 	else
 	{
+		BOX_ERROR("Failed to read from file: " <<
+			GetErrorMessage(GetLastError()));
 		r = -1;
 	}
 #else
@@ -203,7 +225,7 @@ void FileStream::Write(const void *pBuffer, int NBytes)
 		NULL
 		);
 
-	if ( (res == 0) || (numBytesWritten != NBytes))
+	if ((res == 0) || (numBytesWritten != (DWORD)NBytes))
 	{
 		// DWORD err = GetLastError();
 		THROW_EXCEPTION(CommonException, OSFileWriteError)

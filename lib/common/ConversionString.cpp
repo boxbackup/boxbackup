@@ -123,7 +123,7 @@ int32_t BoxConvert::_ConvertStringToInt(const char *pString, int Size)
 void BoxConvert::_ConvertIntToString(std::string &rTo, int32_t From)
 {
 	char text[64];	// size more than enough
-	::sprintf(text, "%d", From);
+	::sprintf(text, "%d", (int)From);
 	rTo = text;
 }
 

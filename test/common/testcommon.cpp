@@ -9,13 +9,16 @@
 
 #include "Box.h"
 
+#include <errno.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "Test.h"
 #include "Configuration.h"
 #include "FdGetLine.h"
 #include "Guards.h"
 #include "FileStream.h"
+#include "InvisibleTempFileStream.h"
 #include "IOStreamGetLine.h"
 #include "NamedLock.h"
 #include "ReadGatherStream.h"
@@ -24,6 +27,12 @@
 #include "CommonException.h"
 #include "Conversion.h"
 #include "autogen_ConversionException.h"
+#include "CollectInBufferStream.h"
+#include "Archive.h"
+#include "Timer.h"
+#include "Logging.h"
+#include "ZeroStream.h"
+#include "PartialReadStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -130,11 +139,139 @@ ConfigurationVerify verify =
 	0
 };
 
+class TestLogger : public Logger
+{
+	private:
+	bool mTriggered;
+	Log::Level mTargetLevel;
+
+	public:
+	TestLogger(Log::Level targetLevel) 
+	: mTriggered(false), mTargetLevel(targetLevel)
+	{ 
+		Logging::Add(this);
+	}
+	~TestLogger() 
+	{
+		Logging::Remove(this);
+	}
+
+	bool IsTriggered() { return mTriggered; }
+	void Reset()       { mTriggered = false; }
+
+	virtual bool Log(Log::Level level, const std::string& rFile,
+		int line, std::string& rMessage)
+	{
+		if (level == mTargetLevel)
+		{
+			mTriggered = true;
+		}
+		return true;
+	}
+
+	virtual const char* GetType() { return "Test"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
+};
+
 int test(int argc, const char *argv[])
 {
-	// Test memory leak detection
+	// Test PartialReadStream and ReadGatherStream handling of files
+	// over 2GB (refs #2)
+	{
+		char buffer[8];
+
+		ZeroStream zero(0x80000003);
+		zero.Seek(0x7ffffffe, IOStream::SeekType_Absolute);
+		TEST_THAT(zero.GetPosition() == 0x7ffffffe);
+		TEST_THAT(zero.Read(buffer, 8) == 5);
+		TEST_THAT(zero.GetPosition() == 0x80000003);
+		TEST_THAT(zero.Read(buffer, 8) == 0);
+		zero.Seek(0, IOStream::SeekType_Absolute);
+		TEST_THAT(zero.GetPosition() == 0);
+
+		char* buffer2 = new char [0x1000000];
+		TEST_THAT(buffer2 != NULL);
+
+		PartialReadStream part(zero, 0x80000002);
+		for (int i = 0; i < 0x80; i++)
+		{
+			int read = part.Read(buffer2, 0x1000000);
+			TEST_THAT(read == 0x1000000);
+		}
+		TEST_THAT(part.Read(buffer, 8) == 2);
+		TEST_THAT(part.Read(buffer, 8) == 0);
+
+		delete [] buffer2;
+
+		ReadGatherStream gather(false);
+		zero.Seek(0, IOStream::SeekType_Absolute);
+		int component = gather.AddComponent(&zero);
+		gather.AddBlock(component, 0x80000002);
+		TEST_THAT(gather.Read(buffer, 8) == 8);
+	}
+
+	// Test self-deleting temporary file streams
+	{
+		std::string tempfile("testfiles/tempfile");
+		TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()), 
+			CommonException, OSFileOpenError);
+		InvisibleTempFileStream fs(tempfile.c_str(), O_CREAT);
+
+	#ifdef WIN32
+		// file is still visible under Windows
+		TEST_THAT(TestFileExists(tempfile.c_str()));
+
+		// opening it again should work
+		InvisibleTempFileStream fs2(tempfile.c_str());
+		TEST_THAT(TestFileExists(tempfile.c_str()));
+
+		// opening it to create should work
+		InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+		TEST_THAT(TestFileExists(tempfile.c_str()));
+
+		// opening it to create exclusively should fail
+		TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(), 
+			O_CREAT | O_EXCL), CommonException, OSFileOpenError);
+
+		fs2.Close();
+	#else
+		// file is not visible under Unix
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+		// opening it again should fail
+		TEST_CHECK_THROWS(InvisibleTempFileStream fs2(tempfile.c_str()),
+			CommonException, OSFileOpenError);
+
+		// opening it to create should work
+		InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+		// opening it to create exclusively should work
+		InvisibleTempFileStream fs4(tempfile.c_str(), O_CREAT | O_EXCL);
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+		fs4.Close();
+	#endif
+
+		fs.Close();
+		fs3.Close();
+
+		// now that it's closed, it should be invisible on all platforms
+		TEST_THAT(!TestFileExists(tempfile.c_str()));
+	}
+
+	// Test that memory leak detection doesn't crash
+	{
+		char *test = new char[1024];
+		delete [] test;
+		MemBlockStream *s = new MemBlockStream(test,12);
+		delete s;
+	}
+
 #ifdef BOX_MEMORY_LEAK_TESTING
 	{
+		Timers::Cleanup();
+
 		TEST_THAT(memleakfinder_numleaks() == 0);
 		void *block = ::malloc(12);
 		TEST_THAT(memleakfinder_numleaks() == 1);
@@ -150,9 +287,85 @@ int test(int argc, const char *argv[])
 		TEST_THAT(memleakfinder_numleaks() == 1);
 		delete [] test;
 		TEST_THAT(memleakfinder_numleaks() == 0);
+
+		Timers::Init();
 	}
 #endif // BOX_MEMORY_LEAK_TESTING
+
+	// test main() initialises timers for us, so uninitialise them
+	Timers::Cleanup();
 	
+	// Check that using timer methods without initialisation
+	// throws an assertion failure. Can only do this in debug mode
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL), 
+			CommonException, AssertFailed);
+		TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
+			CommonException, AssertFailed);
+	#endif
+
+	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
+			AssertFailed);
+	#endif
+	
+	// Check that we can initialise the timers
+	Timers::Init();
+	
+	// Check that double initialisation throws an exception
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Init(), CommonException,
+			AssertFailed);
+	#endif
+
+	// Check that we can clean up the timers
+	Timers::Cleanup();
+	
+	// Check that double cleanup throws an exception
+	#ifndef NDEBUG
+		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
+			AssertFailed);
+	#endif
+
+	Timers::Init();
+
+	Timer t0(0); // should never expire
+	Timer t1(1);
+	Timer t2(2);
+	Timer t3(3);
+	
+	TEST_THAT(!t0.HasExpired());
+	TEST_THAT(!t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
+	
+	safe_sleep(1);
+	TEST_THAT(!t0.HasExpired());
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
+	
+	safe_sleep(1);
+	TEST_THAT(!t0.HasExpired());
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
+	
+	t1 = Timer(1);
+	t2 = Timer(2);
+	TEST_THAT(!t0.HasExpired());
+	TEST_THAT(!t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	
+	safe_sleep(1);
+	TEST_THAT(!t0.HasExpired());
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(t3.HasExpired());
+
+	// Leave timers initialised for rest of test.
+	// Test main() will cleanup after test finishes.
 
 	static char *testfilelines[] =
 	{
@@ -537,7 +750,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(elist.SizeOfDefiniteList() == 4);
 
 		// Add regex entries
-		#ifdef HAVE_REGEX_H
+		#ifdef HAVE_REGEX_SUPPORT
 			elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$"));
 			elist.AddRegexEntries(std::string(""));
 			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[:not_valid")), CommonException, BadRegularExpression);
@@ -569,7 +782,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(elist.IsExcluded("thingdefthree") 
 			== !CASE_SENSITIVE);
 
-		#ifdef HAVE_REGEX_H
+		#ifdef HAVE_REGEX_SUPPORT
 			TEST_THAT(elist.IsExcluded(std::string("b.reg")) == true);
 			TEST_THAT(elist.IsExcluded(std::string("B.reg")) == !CASE_SENSITIVE);
 			TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == !CASE_SENSITIVE);
@@ -583,9 +796,86 @@ int test(int argc, const char *argv[])
 		#endif
 
 		#undef CASE_SENSITIVE
+
+		TestLogger logger(Log::WARNING);
+		TEST_THAT(!logger.IsTriggered());
+		elist.AddDefiniteEntries(std::string("/foo"));
+		TEST_THAT(!logger.IsTriggered());
+		elist.AddDefiniteEntries(std::string("/foo/"));
+		TEST_THAT(logger.IsTriggered());
+		logger.Reset();
+		elist.AddDefiniteEntries(std::string("/foo" 
+			DIRECTORY_SEPARATOR));
+		TEST_THAT(logger.IsTriggered());
+		logger.Reset();
+		elist.AddDefiniteEntries(std::string("/foo" 
+			DIRECTORY_SEPARATOR "bar\x01/foo"));
+		TEST_THAT(!logger.IsTriggered());
+		elist.AddDefiniteEntries(std::string("/foo" 
+			DIRECTORY_SEPARATOR "bar\x01/foo" 
+			DIRECTORY_SEPARATOR));
+		TEST_THAT(logger.IsTriggered());
 	}
 
 	test_conversions();
+
+	// test that we can use Archive and CollectInBufferStream
+	// to read and write arbitrary types to a memory buffer
+
+	{
+		CollectInBufferStream buffer;
+		ASSERT(buffer.GetPosition() == 0);
+
+		{
+			Archive archive(buffer, 0);
+			ASSERT(buffer.GetPosition() == 0);
+
+			archive.Write((bool) true);
+			archive.Write((bool) false);
+			archive.Write((int) 0x12345678);
+			archive.Write((int) 0x87654321);
+			archive.Write((int64_t)  0x0badfeedcafebabeLL);
+			archive.Write((uint64_t) 0xfeedfacedeadf00dLL);
+			archive.Write((uint8_t)  0x01);
+			archive.Write((uint8_t)  0xfe);
+			archive.Write(std::string("hello world!"));
+			archive.Write(std::string("goodbye cruel world!"));
+		}
+
+		CollectInBufferStream buf2;
+		buf2.Write(buffer.GetBuffer(), buffer.GetSize());
+		TEST_THAT(buf2.GetPosition() == buffer.GetSize());
+
+		buf2.SetForReading();
+		TEST_THAT(buf2.GetPosition() == 0);
+
+		{
+			Archive archive(buf2, 0);
+			TEST_THAT(buf2.GetPosition() == 0);
+
+			bool b;
+			archive.Read(b); TEST_THAT(b == true);
+			archive.Read(b); TEST_THAT(b == false);
+
+			int i;
+			archive.Read(i); TEST_THAT(i == 0x12345678);
+			archive.Read(i); TEST_THAT((unsigned int)i == 0x87654321);
+
+			uint64_t i64;
+			archive.Read(i64); TEST_THAT(i64 == 0x0badfeedcafebabeLL);
+			archive.Read(i64); TEST_THAT(i64 == 0xfeedfacedeadf00dLL);
+
+			uint8_t i8;
+			archive.Read(i8); TEST_THAT(i8 == 0x01);
+			archive.Read(i8); TEST_THAT(i8 == 0xfe);
+
+			std::string s;
+			archive.Read(s); TEST_THAT(s == "hello world!");
+			archive.Read(s); TEST_THAT(s == "goodbye cruel world!");
+
+			TEST_THAT(!buf2.StreamDataLeft());
+		}
+	}
 
 	return 0;
 }

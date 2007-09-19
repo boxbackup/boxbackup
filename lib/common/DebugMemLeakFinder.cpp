@@ -25,6 +25,9 @@
 #include <string.h>
 #include <set>
 
+#include "MemLeakFinder.h"
+
+static bool memleakfinder_initialised = false;
 bool memleakfinder_global_enable = false;
 
 typedef struct
@@ -46,6 +49,17 @@ namespace
 {
 	static std::map<void *, MallocBlockInfo> sMallocBlocks;
 	static std::map<void *, ObjectInfo> sObjectBlocks;
+	static bool sTrackingDataDestroyed = false;
+
+	static class DestructionWatchdog
+	{
+		public:
+		~DestructionWatchdog()
+		{
+			sTrackingDataDestroyed = true;
+		}
+	}
+	sWatchdog;
 	
 	static bool sTrackMallocInSection = false;
 	static std::set<void *> sSectionMallocBlocks;
@@ -55,11 +69,41 @@ namespace
 	static std::set<void *> sNotLeaks;
 
 	void *sNotLeaksPre[1024];
-	int sNotLeaksPreNum = 0;
+	size_t sNotLeaksPreNum = 0;
 }
+
+void memleakfinder_init()
+{
+	ASSERT(!memleakfinder_initialised);
+	memleakfinder_initialised = true;
+}
+
+MemLeakSuppressionGuard::MemLeakSuppressionGuard()
+{
+	ASSERT(memleakfinder_global_enable);
+	memleakfinder_global_enable = false;
+}
+
+MemLeakSuppressionGuard::~MemLeakSuppressionGuard()
+{
+	ASSERT(!memleakfinder_global_enable);
+	memleakfinder_global_enable = true;
+}
+
+// these functions may well allocate memory, which we don't want to track.
+static int sInternalAllocDepth = 0;
+
+class InternalAllocGuard
+{
+	public:
+	InternalAllocGuard () { sInternalAllocDepth++; }
+	~InternalAllocGuard() { sInternalAllocDepth--; }
+};
 
 void memleakfinder_malloc_add_block(void *b, size_t size, const char *file, int line)
 {
+	InternalAllocGuard guard;
+
 	if(b != 0)
 	{
 		MallocBlockInfo i;
@@ -75,11 +119,13 @@ void memleakfinder_malloc_add_block(void *b, size_t size, const char *file, int 
 	}
 }
 
-
 void *memleakfinder_malloc(size_t size, const char *file, int line)
 {
+	InternalAllocGuard guard;
+
 	void *b = ::malloc(size);
 	if(!memleakfinder_global_enable) return b;
+	if(!memleakfinder_initialised)   return b;
 
 	memleakfinder_malloc_add_block(b, size, file, line);
 
@@ -89,7 +135,9 @@ void *memleakfinder_malloc(size_t size, const char *file, int line)
 
 void *memleakfinder_realloc(void *ptr, size_t size)
 {
-	if(!memleakfinder_global_enable)
+	InternalAllocGuard guard;
+
+	if(!memleakfinder_global_enable || !memleakfinder_initialised)
 	{
 		return ::realloc(ptr, size);
 	}
@@ -133,7 +181,9 @@ void *memleakfinder_realloc(void *ptr, size_t size)
 
 void memleakfinder_free(void *ptr)
 {
-	if(memleakfinder_global_enable)
+	InternalAllocGuard guard;
+
+	if(memleakfinder_global_enable && memleakfinder_initialised)
 	{
 		// Check it's been allocated
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
@@ -143,7 +193,7 @@ void memleakfinder_free(void *ptr)
 		}
 		else
 		{
-			TRACE1("Block %x freed, but not known. Error? Or allocated in startup static allocation?\n", ptr);
+			TRACE1("Block %p freed, but not known. Error? Or allocated in startup static allocation?\n", ptr);
 		}
 
 		if(sTrackMallocInSection)
@@ -160,30 +210,44 @@ void memleakfinder_free(void *ptr)
 
 void memleakfinder_notaleak_insert_pre()
 {
+	InternalAllocGuard guard;
+
 	if(!memleakfinder_global_enable) return;
-	for(int l = 0; l < sNotLeaksPreNum; l++)
+	if(!memleakfinder_initialised)   return;
+
+	for(size_t l = 0; l < sNotLeaksPreNum; l++)
 	{
 		sNotLeaks.insert(sNotLeaksPre[l]);
 	}
+
 	sNotLeaksPreNum = 0;
 }
 
 bool is_leak(void *ptr)
 {
+	InternalAllocGuard guard;
+
+	ASSERT(memleakfinder_initialised);
 	memleakfinder_notaleak_insert_pre();
 	return sNotLeaks.find(ptr) == sNotLeaks.end();
 }
 
 void memleakfinder_notaleak(void *ptr)
 {
+	InternalAllocGuard guard;
+
+	ASSERT(!sTrackingDataDestroyed);
+
 	memleakfinder_notaleak_insert_pre();
-	if(memleakfinder_global_enable)
+	if(memleakfinder_global_enable && memleakfinder_initialised)
 	{
 		sNotLeaks.insert(ptr);
 	}
 	else
 	{
-		sNotLeaksPre[sNotLeaksPreNum++] = ptr;
+		if ( sNotLeaksPreNum < 
+			 sizeof(sNotLeaksPre)/sizeof(*sNotLeaksPre) )
+			sNotLeaksPre[sNotLeaksPreNum++] = ptr;
 	}
 /*	{
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
@@ -204,6 +268,11 @@ void memleakfinder_notaleak(void *ptr)
 // start monitoring a section of code
 void memleakfinder_startsectionmonitor()
 {
+	InternalAllocGuard guard;
+
+	ASSERT(memleakfinder_initialised);
+	ASSERT(!sTrackingDataDestroyed);
+
 	sTrackMallocInSection = true;
 	sSectionMallocBlocks.clear();
 	sTrackObjectsInSection = true;
@@ -213,6 +282,11 @@ void memleakfinder_startsectionmonitor()
 // trace all blocks allocated and still allocated since memleakfinder_startsectionmonitor() called
 void memleakfinder_traceblocksinsection()
 {
+	InternalAllocGuard guard;
+
+	ASSERT(memleakfinder_initialised);
+	ASSERT(!sTrackingDataDestroyed);
+
 	std::set<void *>::iterator s(sSectionMallocBlocks.begin());
 	for(; s != sSectionMallocBlocks.end(); ++s)
 	{
@@ -223,17 +297,22 @@ void memleakfinder_traceblocksinsection()
 		}
 		else
 		{
-			TRACE4("Block 0x%08p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
+			TRACE4("Block %p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
 		}
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sSectionObjectBlocks.begin()); i != sSectionObjectBlocks.end(); ++i)
 	{
-		TRACE5("Object%s 0x%08p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
+		TRACE5("Object%s %p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 
 int memleakfinder_numleaks()
 {
+	InternalAllocGuard guard;
+
+	ASSERT(memleakfinder_initialised);
+	ASSERT(!sTrackingDataDestroyed);
+
 	int n = 0;
 	
 	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
@@ -243,6 +322,7 @@ int memleakfinder_numleaks()
 	
 	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
+		const ObjectInfo& rInfo = i->second;
 		if(is_leak(i->first)) ++n;
 	}
 
@@ -251,24 +331,32 @@ int memleakfinder_numleaks()
 
 void memleakfinder_reportleaks_file(FILE *file)
 {
+	InternalAllocGuard guard;
+
+	ASSERT(!sTrackingDataDestroyed);
+
 	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Block 0x%08p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Block 0x%p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%08p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 
 void memleakfinder_reportleaks()
 {
+	InternalAllocGuard guard;
+
 	// report to stdout
 	memleakfinder_reportleaks_file(stdout);
 }
 
 void memleakfinder_reportleaks_appendfile(const char *filename, const char *markertext)
 {
+	InternalAllocGuard guard;
+
 	FILE *file = ::fopen(filename, "a");
 	if(file != 0)
 	{
@@ -286,7 +374,8 @@ void memleakfinder_reportleaks_appendfile(const char *filename, const char *mark
 	}
 	else
 	{
-		printf("WARNING: Couldn't open memory leak results file %s for appending\n", filename);
+		BOX_WARNING("Couldn't open memory leak results file " <<
+			filename << " for appending");
 	}
 }
 
@@ -315,7 +404,11 @@ void memleakfinder_setup_exit_report(const char *filename, const char *markertex
 
 void add_object_block(void *block, size_t size, const char *file, int line, bool array)
 {
+	InternalAllocGuard guard;
+
 	if(!memleakfinder_global_enable) return;
+	if(!memleakfinder_initialised)   return;
+	ASSERT(!sTrackingDataDestroyed);
 
 	if(block != 0)
 	{
@@ -335,7 +428,11 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 
 void remove_object_block(void *block)
 {
+	InternalAllocGuard guard;
+
 	if(!memleakfinder_global_enable) return;
+	if(!memleakfinder_initialised)   return;
+	if(sTrackingDataDestroyed)       return;
 
 	std::map<void *, ObjectInfo>::iterator i(sObjectBlocks.find(block));
 	if(i != sObjectBlocks.end())
@@ -355,34 +452,68 @@ void remove_object_block(void *block)
 	// If it's not in the list, just ignore it, as lots of stuff goes this way...
 }
 
+static void *internal_new(size_t size, const char *file, int line)
+{
+	void *r;
+
+	{
+		InternalAllocGuard guard;
+		r = ::malloc(size);
+	}
+	
+	if (sInternalAllocDepth == 0)
+	{
+		InternalAllocGuard guard;
+		add_object_block(r, size, file, line, false);
+		//TRACE4("new(), %d, %s, %d, %08x\n", size, file, line, r);
+	}
+
+	return r;
+}
+
 void *operator new(size_t size, const char *file, int line)
 {
-	void *r = ::malloc(size);
-	add_object_block(r, size, file, line, false);
-	//TRACE4("new(), %d, %s, %d, %08x\n", size, file, line, r);
-	return r;
+	return internal_new(size, file, line);
 }
 
 void *operator new[](size_t size, const char *file, int line)
 {
-	void *r = ::malloc(size);
-	add_object_block(r, size, file, line, true);
-	//TRACE4("new[](), %d, %s, %d, %08x\n", size, file, line, r);
-	return r;
+	return internal_new(size, file, line);
 }
 
-void operator delete[](void *ptr) throw ()
+// where there is no doctor... need to override standard new() too
+// http://www.relisoft.com/book/tech/9new.html
+// disabled because it causes hangs on FC2 in futex() in test/common
+// while reading files. reason unknown.
+/*
+void *operator new(size_t size)
 {
+	return internal_new(size, "standard libraries", 0);
+}
+*/
+
+void *operator new[](size_t size)
+{
+	return internal_new(size, "standard libraries", 0);
+}
+
+void internal_delete(void *ptr)
+{
+	InternalAllocGuard guard;
+
 	::free(ptr);
 	remove_object_block(ptr);
 	//TRACE1("delete[]() called, %08x\n", ptr);
 }
 
+void operator delete[](void *ptr) throw ()
+{
+	internal_delete(ptr);
+}
+
 void operator delete(void *ptr) throw ()
 {
-	::free(ptr);
-	remove_object_block(ptr);
-	//TRACE1("delete() called, %08x\n", ptr);
+	internal_delete(ptr);
 }
 
 #endif // NDEBUG

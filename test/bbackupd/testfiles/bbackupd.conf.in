@@ -17,13 +17,16 @@ MaxUploadWait = 24
 FileTrackingSizeThreshold = 1024
 DiffingUploadSizeThreshold = 1024
 
-MaximumDiffingTime = 8
+MaximumDiffingTime = 3
+KeepAliveTime = 1
 
-ExtendedLogging = yes
+ExtendedLogging = no
+ExtendedLogFile = testfiles/bbackupd.log
 
 CommandSocket = testfiles/bbackupd.sock
 
-NotifyScript = @PERL@ testfiles/notifyscript.pl
+NotifyScript    = @TARGET_PERL@ testfiles/notifyscript.pl
+SyncAllowScript = @TARGET_PERL@ testfiles/syncallowscript.pl
 
 Server
 {

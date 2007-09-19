@@ -344,8 +344,8 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		// to be true (still aborts), but it can at least hold 2^32.
 		if (winTime >= 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
-			::syslog(LOG_ERR, "Invalid Modification Time "
-				"caught for file: %s", Filename);
+			BOX_ERROR("Invalid Modification Time caught for "
+				"file: '" << Filename << "'");
 			pattr->ModificationTime = 0;
 		}
 
@@ -355,8 +355,8 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 
 		if (winTime > 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
-			::syslog(LOG_ERR, "Invalid Attribute Modification "
-				"Time caught for file: %s", Filename);
+			BOX_ERROR("Invalid Attribute Modification Time " 
+				"caught for file: '" << Filename << "'");
 			pattr->AttrModificationTime = 0;
 		}
 #endif
@@ -578,7 +578,8 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
+void BackupClientFileAttributes::WriteAttributes(const char *Filename,
+	bool MakeUserWritable) const
 {
 	// Got something loaded
 	if(GetSize() <= 0)
@@ -626,9 +627,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 		}
 	
 #ifdef WIN32
-		::syslog(LOG_WARNING, 
-			"Cannot create symbolic links on Windows: %s", 
-			Filename);
+		BOX_WARNING("Cannot create symbolic links on Windows: '" <<
+			Filename << "'");
 #else
 		// Make a symlink, first deleting anything in the way
 		::unlink(Filename);
@@ -704,7 +704,12 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename) const
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
-	
+
+	if (MakeUserWritable)
+	{
+		mode |= S_IRWXU;
+	}
+
 	// Apply everything else... (allowable mode flags only)
 	if(::chmod(Filename, mode & (S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID | S_ISGID | S_ISVTX)) != 0)	// mode must be done last (think setuid)
 	{

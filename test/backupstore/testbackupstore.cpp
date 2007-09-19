@@ -33,6 +33,7 @@
 #include "MemBlockStream.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupClientCryptoKeys.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
@@ -1683,7 +1684,10 @@ int test3(int argc, const char *argv[])
 			"testfiles/clientTrustedCAs.pem");
 
 	// First, try logging in without an account having been created... just make sure login fails.
-	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+
+	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf",
+		"testfiles/bbstored.pid");
+
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
@@ -1712,12 +1716,17 @@ int test3(int argc, const char *argv[])
 		}
 
 		// Create an account for the test client
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 10000B 20000B") == 0);
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+			" -c testfiles/bbstored.conf create 01234567 0 "
+			"10000B 20000B") == 0);
+
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
 		TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
 		TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
 		TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
-		TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);	// make sure something is written to it
+		TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);
+		// make sure something is written to it
 
 		TEST_THAT(ServerIsAlive(pid));
 
@@ -1741,13 +1750,18 @@ int test3(int argc, const char *argv[])
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
 #endif
 		
-		// Set a new limit on the account -- leave the hard limit high to make sure the target for
-		// freeing space is the soft limit.
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20000B") == 0);
+		// Set a new limit on the account -- leave the hard limit 
+		// high to make sure the target for freeing space is the 
+		// soft limit.
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+			" -c testfiles/bbstored.conf setlimit 01234567 "
+			"10B 20000B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Start things up
-		pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored.conf", "testfiles/bbstored.pid");
+		pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
+			"testfiles/bbstored.pid");
+
 		::sleep(1);
 		TEST_THAT(ServerIsAlive(pid));
 		
@@ -1763,8 +1777,9 @@ int test3(int argc, const char *argv[])
 
 		// Count the objects again
 		recursive_count_objects_results after = {0,0,0};
-		recursive_count_objects("localhost", BackupProtocolClientListDirectory::RootDirectory, after);
-printf("after.objectsNotDel=%i, deleted=%i, old=%i\n",after.objectsNotDel, after.deleted, after.old);
+		recursive_count_objects("localhost", 
+			BackupProtocolClientListDirectory::RootDirectory, 
+			after);
 
 		// If these tests fail then try increasing the timeout above
 		TEST_THAT(after.objectsNotDel == before.objectsNotDel);
@@ -1772,7 +1787,9 @@ printf("after.objectsNotDel=%i, deleted=%i, old=%i\n",after.objectsNotDel, after
 		TEST_THAT(after.old == 0);
 		
 		// Set a really small hard limit
-		TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf setlimit 01234567 10B 20B") == 0);
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+			" -c testfiles/bbstored.conf setlimit 01234567 "
+			"10B 20B") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		// Try to upload a file and create a directory, and check an error is generated
@@ -1836,11 +1853,16 @@ int multi_server()
 	printf("Starting server for connection from remote machines...\n");
 
 	// Create an account for the test client
-	TEST_THAT_ABORTONFAIL(::system("../../bin/bbstoreaccounts/bbstoreaccounts -c testfiles/bbstored.conf create 01234567 0 30000B 40000B") == 0);
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+		" -c testfiles/bbstored.conf create 01234567 0 "
+		"30000B 40000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// First, try logging in without an account having been created... just make sure login fails.
-	int pid = LaunchServer("../../bin/bbstored/bbstored testfiles/bbstored_multi.conf", "testfiles/bbstored.pid");
+
+	int pid = LaunchServer(BBSTORED " testfiles/bbstored_multi.conf", 
+		"testfiles/bbstored.pid");
+
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
 	{
@@ -1874,12 +1896,6 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
 int test(int argc, const char *argv[])
 {
 #ifdef WIN32
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-
-	WSADATA info;
-	TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
-
 	// this had better work, or bbstored will die when combining diffs
 	char* file = "foo";
 	std::string abs = ConvertPathToAbsoluteUnicode(file);
@@ -1905,6 +1921,7 @@ int test(int argc, const char *argv[])
 
 	CloseHandle(h2);
 	CloseHandle(h1);
+	delete [] wfile;
 
 	h1 = openfile("foo", O_CREAT | O_RDWR, 0);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
@@ -1932,14 +1949,19 @@ int test(int argc, const char *argv[])
 	// for seeing what's going on.
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");	
 	
-	// encode in some filenames -- can't do static initialisation because the key won't be set up when these are initialised
-	for(unsigned int l = 0; l < sizeof(ens_filenames) / sizeof(ens_filenames[0]); ++l)
+	// encode in some filenames -- can't do static initialisation 
+	// because the key won't be set up when these are initialised
 	{
-		ens[l].fn = BackupStoreFilenameClear(ens_filenames[l]);
-	}
-	for(unsigned int l = 0; l < sizeof(uploads_filenames) / sizeof(uploads_filenames[0]); ++l)
-	{
-		uploads[l].name = BackupStoreFilenameClear(uploads_filenames[l]);
+		MEMLEAKFINDER_NO_LEAKS
+
+		for(unsigned int l = 0; l < sizeof(ens_filenames) / sizeof(ens_filenames[0]); ++l)
+		{
+			ens[l].fn = BackupStoreFilenameClear(ens_filenames[l]);
+		}
+		for(unsigned int l = 0; l < sizeof(uploads_filenames) / sizeof(uploads_filenames[0]); ++l)
+		{
+			uploads[l].name = BackupStoreFilenameClear(uploads_filenames[l]);
+		}
 	}
 	
 	// Trace errors out

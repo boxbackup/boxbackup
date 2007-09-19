@@ -401,31 +401,54 @@ for my $mod (@implicit_deps, @modules)
 		sub writetestfile
 		{
 			my ($filename,$runcmd,$module) = @_;		
-			open TESTFILE,">$filename" or die "Can't open test script file for $module for writing\n";
+
+			open TESTFILE,">$filename" or die "Can't open " .
+				"test script file for $module for writing\n";
 			print TESTFILE "#!/bin/sh\necho TEST: $module\n";
+
 			if(-d "$module/testfiles")
 			{
 				print TESTFILE <<__E;
+echo Killing any running daemons...
+test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
+test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
+
 echo Removing old test files...
+chmod -R a+rwx testfiles
 rm -rf testfiles
+
 echo Copying new test files...
 cp -p -R ../../../$module/testfiles .
+
 __E
 			}
+
 			if(-e "$module/testextra")
 			{
-				open FL,"$module/testextra" or die "Can't open $module/testextra";
+				open FL,"$module/testextra" or die 
+					"Can't open $module/testextra";
 				while(<FL>) {print TESTFILE}
 				close FL;
 			}
+
 			print TESTFILE "$runcmd\n";
+
+			if(-d "$module/testfiles")
+			{
+				print TESTFILE <<__E;
+# echo Killing any running daemons...
+test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
+test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
+__E
+			}
+
 			close TESTFILE;
 		}
 		
-		writetestfile("$mod/_t", 
-			'./test' . $platform_exe_ext . ' $1 $2 $3 $4 $5', $mod);
-		writetestfile("$mod/_t-gdb", 
-			'gdb ./test' . $platform_exe_ext, $mod);
+		writetestfile("$mod/_t", "GLIBCXX_FORCE_NEW=1 ".
+			'./test' . $platform_exe_ext . ' "$@"', $mod);
+		writetestfile("$mod/_t-gdb", "GLIBCXX_FORCE_NEW=1 ".
+			'gdb ./test' . $platform_exe_ext . ' "$@"', $mod);
 		
 	}
 	
@@ -522,6 +545,40 @@ VARIENT = DEBUG
 .endif
 
 __E
+
+	if ($bsd_make)
+	{
+		print MAKE <<__E;
+.ifdef V
+HIDE     = 
+_CXX     = \$(CXX)
+_LINK    = \$(CXX)
+_WINDRES = \$(WINDRES)
+_AR      = \$(AR)
+_RANLIB  = \$(RANLIB)
+.else
+HIDE     = @
+_CXX     = @ echo "[CXX]    " \$(*F) && \$(CXX)
+_LINK    = @ echo "[LINK]   " \$(*F) && \$(CXX)
+_WINDRES = @ echo "[WINDRES]" \$(*F) && \$(WINDRES)
+_AR      = @ echo "[AR]     " \$(*F) && \$(AR)
+_RANLIB  = @ echo "[RANLIB] " \$(*F) && \$(RANLIB)
+.endif
+
+__E
+	}
+	else
+	{
+		print MAKE <<__E;
+HIDE     = \$(if \$(V),,@)
+_CXX     = \$(if \$(V),\$(CXX),     @ echo "[CXX]     \$<" && \$(CXX))
+_LINK    = \$(if \$(V),\$(CXX),     @ echo "[LINK]    \$@" && \$(CXX))
+_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "[WINDRES] \$<" && \$(WINDRES))
+_AR      = \$(if \$(V),\$(AR),      @ echo "[AR]      \$@" && \$(AR))
+_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "[RANLIB]  \$@" && \$(RANLIB))
+
+__E
+	}
 	
 	# read directory
 	opendir DIR,$mod;
@@ -623,12 +680,12 @@ __E
 
 		if ($is_cpp)
 		{
-			$make .= "\t\$(CXX) \$(CXXFLAGS) $compile_line_extra ".
+			$make .= "\t\$(_CXX) \$(CXXFLAGS) $compile_line_extra ".
 				"-c $file -o $out_name\n\n";
 		}
 		elsif ($is_rc)
 		{
-			$make .= "\t\$(WINDRES) $file $out_name\n\n";
+			$make .= "\t\$(_WINDRES) $file $out_name\n\n";
 			my $res_list = $module_resources_win32{$mod};
 			$res_list ||= [];
 			push @$res_list, $base.'.o';
@@ -667,7 +724,7 @@ __E
 		# run make for things we require
 		for my $dep (@all_deps_for_module)
 		{
-			$deps_makeinfo .= "\t\t(cd ../../$dep; \$(MAKE)$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
+			$deps_makeinfo .= "\t\t\$(HIDE) (cd ../../$dep; \$(MAKE)$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
 		}
 		$deps_makeinfo .= ".\tendif\n.endif\n\n";
 	}
@@ -711,9 +768,9 @@ __E
 	if($target_is_library)
 	{
 		# make a library archive...
-		print MAKE "\t(echo -n > $end_target; rm $end_target)\n";
-		print MAKE "\t\$(AR) -q $end_target $o_file_list\n";
-		print MAKE "\t\$(RANLIB) $end_target\n";
+		print MAKE "\t\$(HIDE) (echo -n > $end_target; rm $end_target)\n";
+		print MAKE "\t\$(_AR) -q $end_target $o_file_list\n";
+		print MAKE "\t\$(_RANLIB) $end_target\n";
 	}
 	else
 	{
@@ -737,7 +794,7 @@ __E
 		}
 	
 		# link line...
-		print MAKE "\t\$(CXX) $link_line_extra -o $end_target $o_file_list $lib_files$lo $platform_lib_files\n";
+		print MAKE "\t\$(_LINK) $link_line_extra -o $end_target $o_file_list $lib_files$lo $platform_lib_files\n";
 	}
 	# tests need to copy the test file over
 	if($type eq 'test')
@@ -758,7 +815,7 @@ __E
 	print MAKE "clean:\n\t-rm -rf \$(OUTDIR)/*\n.\tifndef SUBCLEAN\n";
 	for my $dep (@all_deps_for_module)
 	{
-		print MAKE "\t(cd ../../$dep; \$(MAKE) \$(DEPENDMAKEFLAGS) -D SUBCLEAN clean)\n";
+		print MAKE "\t\$(HIDE) (cd ../../$dep; \$(MAKE) \$(DEPENDMAKEFLAGS) -D SUBCLEAN clean)\n";
 	}
 	print MAKE ".\tendif\n";
 	

@@ -27,13 +27,14 @@
 #endif
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
-  #include "Utils.h"
+	#include "Utils.h"
 	#define OPTIONAL_DO_BACKTRACE DumpStackBacktrace();
 #else
 	#define OPTIONAL_DO_BACKTRACE
 #endif
 
 #include "CommonException.h"
+#include "Logging.h"
 
 #ifndef NDEBUG
 	
@@ -94,22 +95,27 @@
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Memory leak testing
 	#include "MemLeakFinder.h"
+	#define DEBUG_NEW new(__FILE__,__LINE__)
 	#define MEMLEAKFINDER_NOT_A_LEAK(x)	memleakfinder_notaleak(x);
+	#define MEMLEAKFINDER_NO_LEAKS		MemLeakSuppressionGuard _guard;
+	#define MEMLEAKFINDER_INIT		memleakfinder_init();
 	#define MEMLEAKFINDER_START {memleakfinder_global_enable = true;}
-	#define MEMLEAKFINDER_STOP {memleakfinder_global_enable = false;}
+	#define MEMLEAKFINDER_STOP  {memleakfinder_global_enable = false;}
 #else
 	#define DEBUG_NEW new
 	#define MEMLEAKFINDER_NOT_A_LEAK(x)
+	#define MEMLEAKFINDER_NO_LEAKS
+	#define MEMLEAKFINDER_INIT
 	#define MEMLEAKFINDER_START
 	#define MEMLEAKFINDER_STOP
 #endif
 
-
-#define THROW_EXCEPTION(type, subtype)														\
-	{																						\
-		OPTIONAL_DO_BACKTRACE																\
-		TRACE1("Exception thrown: " #type "(" #subtype ") at " __FILE__ "(%d)\n", __LINE__)	\
-		throw type(type::subtype);															\
+#define THROW_EXCEPTION(type, subtype) \
+	{ \
+		OPTIONAL_DO_BACKTRACE \
+		BOX_WARNING("Exception thrown: " #type "(" #subtype ") at " \
+			__FILE__ "(" << __LINE__ << ")") \
+		throw type(type::subtype); \
 	}
 
 // extra macros for converting to network byte order

@@ -3,6 +3,8 @@
 echo quick and dirty to get up and running by generating the required files 
 echo using Cygwin and Perl
 
+copy .\infrastructure\BoxPlatform.pm.in .\infrastructure\BoxPlatform.pm
+
 cd .\bin\bbackupquery\ & perl ./../../bin/bbackupquery/makedocumentation.pl.in
 cd ..\..\
 
@@ -16,6 +18,10 @@ cd .\lib\common & perl ./../../lib/common/makeexception.pl.in CommonException.tx
 
 cd ..\..\
 
+cd .\bin\bbackupd & perl ./../../lib/common/makeexception.pl.in ClientException.txt
+
+cd ..\..\
+
 cd .\lib\crypto & perl ./../../lib/common/makeexception.pl.in CipherException.txt
 cd ..\..\
 
@@ -23,7 +29,5 @@ echo server parts - which appears as though some of the clients rely on
 
 cd .\lib\server & perl ./../../lib/common/makeexception.pl.in ServerException.txt & perl ./../../lib/common/makeexception.pl.in ConnectionException.txt
 cd ..\..\
-
-copy lib\win32\config.h.win32 lib\common\BoxConfig.h
 
 perl -pe 's/@PERL@/perl/' ./test/bbackupd/testfiles/bbackupd.conf.in > .\test\bbackupd\testfiles\bbackupd.conf

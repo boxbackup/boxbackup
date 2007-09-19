@@ -12,8 +12,14 @@
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
+
+#include <errno.h>
 #include <stdio.h>
-#include <sys/types.h>
+
+#ifdef HAVE_SYS_TYPES_H
+	#include <sys/types.h>
+#endif
+
 #ifdef HAVE_LIBREADLINE
 	#ifdef HAVE_READLINE_READLINE_H
 		#include <readline/readline.h>
@@ -45,6 +51,7 @@
 #include "FdGetLine.h"
 #include "BackupClientCryptoKeys.h"
 #include "BannerText.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -63,7 +70,11 @@ void PrintUsageAndExit()
 
 int main(int argc, const char *argv[])
 {
-	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupquery.memleaks", "bbackupquery")
+	int returnCode = 0;
+
+	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupquery.memleaks",
+		"bbackupquery")
+	MAINHELPER_START
 
 #ifdef WIN32
 	WSADATA info;
@@ -73,7 +84,7 @@ int main(int argc, const char *argv[])
 	
 	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
 	{
-		// throw error?    perhaps give it its own id in the furture
+		// throw error? perhaps give it its own id in the future
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
 #endif
@@ -83,24 +94,34 @@ int main(int argc, const char *argv[])
 		BoxDebugTraceOn = false;
 	#endif
 	
-	int returnCode = 0;
-
-	MAINHELPER_START
-	
 	FILE *logFile = 0;
 
 	// Filename for configuration file?
-	const char *configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
+	std::string configFilename;
+
+	#ifdef WIN32
+		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	#else
+		configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
+	#endif
 	
 	// Flags
 	bool quiet = false;
 	bool readWrite = false;
 
+	Logging::SetProgramName("Box Backup (bbackupquery)");
+
+	#ifdef NDEBUG
+	int masterLevel = Log::NOTICE; // need an int to do math with
+	#else
+	int masterLevel = Log::INFO; // need an int to do math with
+	#endif
+
 #ifdef WIN32
-	const char* validOpts = "qwuc:l:";
+	const char* validOpts = "qvwuc:l:";
 	bool unicodeConsole = false;
 #else
-	const char* validOpts = "qwc:l:";
+	const char* validOpts = "qvwc:l:";
 #endif
 
 	// See if there's another entry on the command line
@@ -109,11 +130,35 @@ int main(int argc, const char *argv[])
 	{
 		switch(c)
 		{
-		case 'q':
-			// Quiet mode
-			quiet = true;
+			case 'q':
+			{
+				// Quiet mode
+				quiet = true;
+
+				if(masterLevel == Log::NOTHING)
+				{
+					BOX_FATAL("Too many '-q': "
+						"Cannot reduce logging "
+						"level any more");
+					return 2;
+				}
+				masterLevel--;
+			}
 			break;
-		
+
+			case 'v':
+			{
+				if(masterLevel == Log::EVERYTHING)
+				{
+					BOX_FATAL("Too many '-v': "
+						"Cannot increase logging "
+						"level any more");
+					return 2;
+				}
+				masterLevel++;
+			}
+			break;
+
 		case 'w':
 			// Read/write mode
 			readWrite = true;
@@ -129,7 +174,8 @@ int main(int argc, const char *argv[])
 			logFile = ::fopen(optarg, "w");
 			if(logFile == 0)
 			{
-				printf("Can't open log file '%s'\n", optarg);
+				BOX_ERROR("Failed to open log file '" <<
+					optarg << "': " << strerror(errno));
 			}
 			break;
 
@@ -148,11 +194,13 @@ int main(int argc, const char *argv[])
 	argc -= optind;
 	argv += optind;
 	
+	Logging::SetGlobalLevel((Log::Level)masterLevel);
+
 	// Print banner?
 	if(!quiet)
 	{
 		const char *banner = BANNER_TEXT("Backup Query Tool");
-		printf(banner);
+		BOX_NOTICE(banner);
 	}
 
 #ifdef WIN32
@@ -160,14 +208,14 @@ int main(int argc, const char *argv[])
 	{
 		if (!SetConsoleCP(CP_UTF8))
 		{
-			fprintf(stderr, "Failed to set input codepage: "
-				"error %d\n", GetLastError());
+			BOX_ERROR("Failed to set input codepage: " <<
+				GetErrorMessage(GetLastError()));
 		}
 
 		if (!SetConsoleOutputCP(CP_UTF8))
 		{
-			fprintf(stderr, "Failed to set output codepage: "
-				"error %d\n", GetLastError());
+			BOX_ERROR("Failed to set output codepage: " <<
+				GetErrorMessage(GetLastError()));
 		}
 
 		// enable input of Unicode characters
@@ -181,12 +229,16 @@ int main(int argc, const char *argv[])
 #endif // WIN32
 
 	// Read in the configuration file
-	if(!quiet) printf("Using configuration file %s\n", configFilename);
+	if(!quiet) BOX_INFO("Using configuration file " << configFilename);
+
 	std::string errs;
-	std::auto_ptr<Configuration> config(Configuration::LoadAndVerify(configFilename, &BackupDaemonConfigVerify, errs));
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			(configFilename, &BackupDaemonConfigVerify, errs));
+
 	if(config.get() == 0 || !errs.empty())
 	{
-		printf("Invalid configuration file:\n%s", errs.c_str());
+		BOX_FATAL("Invalid configuration file: " << errs);
 		return 1;
 	}
 	// Easier coding
@@ -206,12 +258,12 @@ int main(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
 	// 2. Connect to server
-	if(!quiet) printf("Connecting to store...\n");
+	if(!quiet) BOX_INFO("Connecting to store...");
 	SocketStreamTLS socket;
 	socket.Open(tlsContext, Socket::TypeINET, conf.GetKeyValue("StoreHostname").c_str(), BOX_PORT_BBSTORED);
 	
 	// 3. Make a protocol, and handshake
-	if(!quiet) printf("Handshake with store...\n");
+	if(!quiet) BOX_INFO("Handshake with store...");
 	BackupProtocolClient connection(socket);
 	connection.Handshake();
 	
@@ -222,7 +274,7 @@ int main(int argc, const char *argv[])
 	}
 	
 	// 4. Log in to server
-	if(!quiet) printf("Login to store...\n");
+	if(!quiet) BOX_INFO("Login to store...");
 	// Check the version of the server
 	{
 		std::auto_ptr<BackupProtocolClientVersion> serverVersion(connection.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -299,9 +351,9 @@ int main(int argc, const char *argv[])
 #endif
 	
 	// Done... stop nicely
-	if(!quiet) printf("Logging off...\n");
+	if(!quiet) BOX_INFO("Logging off...");
 	connection.QueryFinished();
-	if(!quiet) printf("Session finished.\n");
+	if(!quiet) BOX_INFO("Session finished.");
 	
 	// Return code
 	returnCode = context.GetReturnCode();
@@ -314,13 +366,13 @@ int main(int argc, const char *argv[])
 	
 	// Let everything be cleaned up on exit.
 	
-	MAINHELPER_END
-	
 #ifdef WIN32
 	// Clean up our sockets
 	WSACleanup();
 #endif
 
+	MAINHELPER_END
+	
 	return returnCode;
 }
 

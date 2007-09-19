@@ -21,7 +21,12 @@
 
 #define PLATFORM_DEV_NULL			"/dev/null"
 
+#ifdef _MSC_VER
+#include "BoxConfig-MSVC.h"
+#include "BoxVersion.h"
+#else
 #include "BoxConfig.h"
+#endif
 
 #ifdef WIN32
 	// need msvcrt version 6.1 or higher for _gmtime64()
@@ -50,6 +55,14 @@
 #ifdef __APPLE__
 	// TODO: We really should get some decent leak detection code.
 	#define PLATFORM_DISABLE_MEM_LEAK_TESTING
+#endif
+
+// Darwin also has a weird idea of permissions and dates on symlinks:
+// perms are fixed at creation time by your umask, and dates can't be
+// changed. This breaks unit tests if we try to compare these things.
+// See: http://lists.apple.com/archives/darwin-kernel/2006/Dec/msg00057.html
+#ifdef __APPLE__
+	#define PLATFORM_DISABLE_SYMLINK_ATTRIB_COMPARE
 #endif
 
 // Find out if credentials on UNIX sockets can be obtained
@@ -97,8 +110,6 @@
 	#define HAVE_U_INT16_T
 	#define HAVE_U_INT32_T
 	#define HAVE_U_INT64_T
-
-	typedef int pid_t;
 #endif // WIN32 && !__MINGW32__
 
 // Define missing types

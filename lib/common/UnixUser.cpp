@@ -69,7 +69,7 @@ UnixUser::UnixUser(uid_t UID, gid_t GID)
 //
 // Function
 //		Name:    UnixUser::~UnixUser()
-//		Purpose: Destructor -- reverts to previous user if the change wasn't permanant
+//		Purpose: Destructor -- reverts to previous user if the change wasn't perminant
 //		Created: 21/1/04
 //
 // --------------------------------------------------------------------------
@@ -78,8 +78,7 @@ UnixUser::~UnixUser()
 	if(mRevertOnDestruction)
 	{
 		// Revert to "real" user and group id of the process
-		if(::setegid(::getgid()) != 0
-			|| ::seteuid(::getuid()) != 0)
+		if(::setegid(::getgid()) != 0 || ::seteuid(::getuid()) != 0)
 		{
 			THROW_EXCEPTION(CommonException, CouldNotRestoreProcessUser)
 		}
@@ -101,8 +100,7 @@ void UnixUser::ChangeProcessUser(bool Temporary)
 	if(Temporary)
 	{
 		// Change temporarily (change effective only)
-		if(::setegid(mGID) != 0
-			|| ::seteuid(mUID) != 0)
+		if(::setegid(mGID) != 0 || ::seteuid(mUID) != 0)
 		{
 			THROW_EXCEPTION(CommonException, CouldNotChangeProcessUser)
 		}
@@ -113,8 +111,7 @@ void UnixUser::ChangeProcessUser(bool Temporary)
 	else
 	{
 		// Change permanently (change all UIDs and GIDs)
-		if(::setgid(mGID) != 0
-			|| ::setuid(mUID) != 0)
+		if(::setgid(mGID) != 0 || ::setuid(mUID) != 0)
 		{
 			THROW_EXCEPTION(CommonException, CouldNotChangeProcessUser)
 		}

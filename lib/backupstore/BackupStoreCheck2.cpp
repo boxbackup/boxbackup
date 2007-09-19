@@ -47,7 +47,7 @@ void BackupStoreCheck::CheckRoot()
 	}
 	else
 	{
-		::printf("Root directory doesn't exist\n");
+		BOX_WARNING("Root directory doesn't exist");
 		
 		++mNumberErrorsFound;
 		
@@ -118,7 +118,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 			if((flags & Flags_IsContained) == 0)
 			{
 				// Unattached object...
-				::printf("Object %llx is unattached.\n", pblock->mID[e]);
+				BOX_WARNING("Object " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " is unattached.");
 				++mNumberErrorsFound;
 
 				// What's to be done?
@@ -147,7 +147,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 						// Just delete it to be safe.
 						if(diffFromObjectID != 0)
 						{
-							::printf("Object %llx is unattached, and is a patch. Deleting, cannot reliably recover.\n", pblock->mID[e]);
+							BOX_WARNING("Object " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " is unattached, and is a patch. Deleting, cannot reliably recover.");
 						
 							// Delete this object instead
 							if(mFixErrors)
@@ -229,11 +229,15 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	// Can recreate this! Wooo!
 	if(!mFixErrors)
 	{
-		::printf("Missing directory %llx could be recreated\n", MissingDirectoryID);
+		BOX_WARNING("Missing directory " << 
+			BOX_FORMAT_OBJECTID(MissingDirectoryID) <<
+			" could be recreated.");
 		mDirsAdded.insert(MissingDirectoryID);
 		return true;
 	}
-	::printf("Recreating missing directory %llx\n", MissingDirectoryID);
+
+	BOX_WARNING("Recreating missing directory " << 
+		BOX_FORMAT_OBJECTID(MissingDirectoryID));
 	
 	// Create a blank directory
 	BackupStoreDirectory dir(MissingDirectoryID, missing->second /* containing dir ID */);
@@ -300,7 +304,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 		if(!dir.NameInUse(lostAndFound))
 		{
 			// Found a name which can be used
-			::printf("Lost and found dir has name %s\n", name);
+			BOX_WARNING("Lost and found dir has name " << name);
 			break;
 		}
 	}
@@ -524,7 +528,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 	catch(...)
 	{
-		::printf("Load of existing store info failed, regenerating.\n");
+		BOX_WARNING("Load of existing store info failed, regenerating.");
 		++mNumberErrorsFound;
 	}
 
@@ -551,7 +555,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 	else
 	{
-		::printf("NOTE: Soft limit for account changed to ensure housekeeping doesn't delete files on next run\n");
+		BOX_WARNING("Soft limit for account changed to ensure housekeeping doesn't delete files on next run.");
 	}
 	if(poldInfo.get() != 0 && poldInfo->GetBlocksHardLimit() > minHard)
 	{
@@ -559,7 +563,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 	else
 	{
-		::printf("NOTE: Hard limit for account changed to ensure housekeeping doesn't delete files on next run\n");
+		BOX_WARNING("Hard limit for account changed to ensure housekeeping doesn't delete files on next run.");
 	}
 	
 	// Object ID
@@ -586,7 +590,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	if(mFixErrors)
 	{
 		info->Save();
-		::printf("New store info file written successfully.\n");
+		BOX_NOTICE("New store info file written successfully.");
 	}
 }
 

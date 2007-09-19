@@ -17,10 +17,8 @@
 #include <string.h>
 #include <new>
 #include <string.h>
+
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
-	#ifndef WIN32
-		#include <syslog.h>
-	#endif
 	#include <stdio.h>
 #endif
 
@@ -46,6 +44,7 @@
 #include "ReadGatherStream.h"
 #include "Random.h"
 #include "BackupStoreFileEncodeStream.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -291,6 +290,20 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 		}
 
 		out.Close();
+
+		// The stream might have uncertain size, in which case
+		// we need to drain it to get the 
+		// Protocol::ProtocolStreamHeader_EndOfStream byte
+		// out of our connection stream.
+		char buffer[1];
+		int drained = rEncodedFile.Read(buffer, 1);
+
+		// The Read will return 0 if we are actually at the end
+		// of the stream, but some tests decode files directly,
+		// in which case we are actually positioned at the start
+		// of the block index. I hope that reading an extra byte
+		// doesn't hurt!
+		// ASSERT(drained == 0);
 		
 		// Write the attributes
 		stream->GetAttributes().WriteAttributes(DecodedFilename);
@@ -743,8 +756,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 					// Warn and log this issue
 					if(!sWarnedAboutBackwardsCompatiblity)
 					{
-						::printf("WARNING: Decoded one or more files using backwards compatibility mode for block index.\n");
-						::syslog(LOG_ERR, "WARNING: Decoded one or more files using backwards compatibility mode for block index.\n");
+						BOX_WARNING("WARNING: Decoded one or more files using backwards compatibility mode for block index.");
 						sWarnedAboutBackwardsCompatiblity = true;
 					}
 				}
@@ -1485,9 +1497,8 @@ void BackupStoreFile::EncodingBuffer::Allocate(int Size)
 // --------------------------------------------------------------------------
 void BackupStoreFile::EncodingBuffer::Reallocate(int NewSize)
 {
-#ifndef WIN32
-	TRACE2("Reallocating EncodingBuffer from %d to %d\n", mBufferSize, NewSize);
-#endif
+	BOX_TRACE("Reallocating EncodingBuffer from " << mBufferSize <<
+		" to " << NewSize);
 	ASSERT(mpBuffer != 0);
 	uint8_t *buffer = (uint8_t*)BackupStoreFile::CodingChunkAlloc(NewSize);
 	if(buffer == 0)

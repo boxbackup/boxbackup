@@ -44,7 +44,7 @@ void ErrorHandler(char *s, DWORD err)
 	char buf[256];
 	memset(buf, 0, sizeof(buf));
 	_snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
-	::syslog(LOG_ERR, "%s", buf);
+	BOX_ERROR(buf);
 	MessageBox(0, buf, "Error", 
 		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
 	ExitProcess(err);
@@ -161,7 +161,7 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 	}
 }
 
-void OurService(char* pConfigFileName)
+int OurService(char* pConfigFileName)
 {
 	spConfigFileName = pConfigFileName;
 
@@ -180,7 +180,10 @@ void OurService(char* pConfigFileName)
 		ErrorHandler("Failed to start service. Did you start "
 			"Box Backup from the Service Control Manager? "
 			"(StartServiceCtrlDispatcher)", GetLastError());
+		return 1;
 	}
+
+	return 0;
 }
 
 int InstallService(const char* pConfigFileName)
@@ -191,16 +194,16 @@ int InstallService(const char* pConfigFileName)
 
 		if (emu_stat(pConfigFileName, &st) != 0)
 		{
-			syslog(LOG_ERR, "Failed to open configuration file: "
-				"%s: %s", pConfigFileName, strerror(errno));
+			BOX_ERROR("Failed to open configuration file '" <<
+				pConfigFileName << "': " << strerror(errno));
 			return 1;
 		}
 
 		if (!(st.st_mode & S_IFREG))
 		{
 	
-			syslog(LOG_ERR, "Failed to open configuration file: "
-				"%s: not a file", pConfigFileName);
+			BOX_ERROR("Failed to open configuration file '" <<
+				pConfigFileName << "': not a file");
 			return 1;
 		}
 	}
@@ -209,8 +212,8 @@ int InstallService(const char* pConfigFileName)
 
 	if (!scm) 
 	{
-		syslog(LOG_ERR, "Failed to open service control manager: "
-			"error %d", GetLastError());
+		BOX_ERROR("Failed to open service control manager: " <<
+			GetErrorMessage(GetLastError()));
 		return 1;
 	}
 
@@ -248,21 +251,21 @@ int InstallService(const char* pConfigFileName)
 		{
 			case ERROR_SERVICE_EXISTS:
 			{
-				::syslog(LOG_ERR, "Failed to create Box Backup "
+				BOX_ERROR("Failed to create Box Backup "
 					"service: it already exists");
 			}
 			break;
 
 			case ERROR_SERVICE_MARKED_FOR_DELETE:
 			{
-				::syslog(LOG_ERR, "Failed to create Box Backup "
+				BOX_ERROR("Failed to create Box Backup "
 					"service: it is waiting to be deleted");
 			}
 			break;
 
 			case ERROR_DUPLICATE_SERVICE_NAME:
 			{
-				::syslog(LOG_ERR, "Failed to create Box Backup "
+				BOX_ERROR("Failed to create Box Backup "
 					"service: a service with this name "
 					"already exists");
 			}
@@ -270,15 +273,16 @@ int InstallService(const char* pConfigFileName)
 
 			default:
 			{
-				::syslog(LOG_ERR, "Failed to create Box Backup "
-					"service: error %d", err);
+				BOX_ERROR("Failed to create Box Backup "
+					"service: error " <<
+					GetErrorMessage(GetLastError()));
 			}
 		}
 
 		return 1;
 	}
 
-	::syslog(LOG_INFO, "Created Box Backup service");
+	BOX_INFO("Created Box Backup service");
 	
 	SERVICE_DESCRIPTION desc;
 	desc.lpDescription = "Backs up your data files over the Internet";
@@ -286,8 +290,8 @@ int InstallService(const char* pConfigFileName)
 	if (!ChangeServiceConfig2(newService, SERVICE_CONFIG_DESCRIPTION,
 		&desc))
 	{
-		::syslog(LOG_WARNING, "Failed to set description for "
-			"Box Backup service: error %d", GetLastError());
+		BOX_WARNING("Failed to set description for Box Backup "
+			"service: " << GetErrorMessage(GetLastError()));
 	}
 
 	CloseServiceHandle(newService);
@@ -301,8 +305,8 @@ int RemoveService(void)
 
 	if (!scm) 
 	{
-		syslog(LOG_ERR, "Failed to open service control manager: "
-			"error %d", GetLastError());
+		BOX_ERROR("Failed to open service control manager: " <<
+			GetErrorMessage(GetLastError()));
 		return 1;
 	}
 
@@ -317,13 +321,13 @@ int RemoveService(void)
 			err == ERROR_IO_PENDING) 
 			// hello microsoft? anyone home?
 		{
-			syslog(LOG_ERR, "Failed to open Box Backup service: "
+			BOX_ERROR("Failed to open Box Backup service: "
 				"not installed or not found");
 		}
 		else
 		{
-			syslog(LOG_ERR, "Failed to open Box Backup service: "
-				"error %d", err);
+			BOX_ERROR("Failed to open Box Backup service: " <<
+				GetErrorMessage(err));
 		}
 		return 1;
 	}
@@ -334,8 +338,8 @@ int RemoveService(void)
 		err = GetLastError();
 		if (err != ERROR_SERVICE_NOT_ACTIVE)
 		{
-			syslog(LOG_WARNING, "Failed to stop Box Backup "
-				"service: error %d", err);
+			BOX_WARNING("Failed to stop Box Backup service: " <<
+				GetErrorMessage(err));
 		}
 	}
 
@@ -345,18 +349,18 @@ int RemoveService(void)
 
 	if (deleted)
 	{
-		syslog(LOG_INFO, "Box Backup service deleted");
+		BOX_INFO("Box Backup service deleted");
 		return 0;
 	}
 	else if (err == ERROR_SERVICE_MARKED_FOR_DELETE)
 	{
-		syslog(LOG_ERR, "Failed to remove Box Backup service: "
+		BOX_ERROR("Failed to remove Box Backup service: "
 			"it is already being deleted");
 	}
 	else
 	{
-		syslog(LOG_ERR, "Failed to remove Box Backup service: "
-			"error %d", err);
+		BOX_ERROR("Failed to remove Box Backup service: " <<
+			GetErrorMessage(err));
 	}
 
 	return 1;

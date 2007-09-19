@@ -12,6 +12,7 @@
 #include "MainHelper.h"
 #include "BoxPortsAndFiles.h"
 #include "BackupStoreException.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -24,11 +25,15 @@
 
 int main(int argc, const char *argv[])
 {
+	int ExitCode = 0;
+
 	MAINHELPER_START
 
+	Logging::SetProgramName("Box Backup (bbackupd)");
+	Logging::ToConsole(true);
+	Logging::ToSyslog (true);
+	
 #ifdef WIN32
-
-	::openlog("Box Backup (bbackupd)", LOG_PID, LOG_LOCAL6);
 
 	if(argc == 2 &&
 		(::strcmp(argv[1], "--help") == 0 ||
@@ -62,11 +67,9 @@ int main(int argc, const char *argv[])
 
 	EnableBackupRights();
 
-	int ExitCode = 0;
-
 	if (runAsWin32Service)
 	{
-		syslog(LOG_INFO, "Box Backup service starting");
+		BOX_INFO("Box Backup service starting");
 
 		char* config = NULL;
 		if (argc >= 3)
@@ -74,33 +77,31 @@ int main(int argc, const char *argv[])
 			config = strdup(argv[2]);
 		}
 
-		OurService(config);
+		ExitCode = OurService(config);
 
 		if (config)
 		{
 			free(config);
 		}
 
-		syslog(LOG_INFO, "Box Backup service shut down");
+		BOX_INFO("Box Backup service shut down");
 	}
 	else
 	{
 		ExitCode = gpDaemonService->Main(
-			BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+			BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE, argc, argv);
 	}
 
-	::closelog();
-
 	delete gpDaemonService;
-
-	return ExitCode;
 
 #else // !WIN32
 
 	BackupDaemon daemon;
-	return daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+	ExitCode = daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
 
 #endif // WIN32
 
 	MAINHELPER_END
+
+	return ExitCode;
 }
