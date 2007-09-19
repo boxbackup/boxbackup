@@ -14,6 +14,7 @@
 #include "BackupClientDeleteList.h"
 #include "BackupStoreFile.h"
 #include "ExcludeList.h"
+#include "Timer.h"
 
 class TLSContext;
 class BackupProtocolClient;
@@ -35,8 +36,16 @@ class BackupStoreFilenameClear;
 class BackupClientContext : public DiffTimer
 {
 public:
-	BackupClientContext(BackupDaemon &rDaemon, TLSContext &rTLSContext, const std::string &rHostname,
-		int32_t AccountNumber, bool ExtendedLogging);
+	BackupClientContext
+	(
+		BackupDaemon &rDaemon, 
+		TLSContext &rTLSContext, 
+		const std::string &rHostname,
+		int32_t AccountNumber, 
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile
+	);
 	virtual ~BackupClientContext();
 private:
 	BackupClientContext(const BackupClientContext &);
@@ -143,7 +152,7 @@ public:
 	//		Created: 04/19/2005
 	//
 	// --------------------------------------------------------------------------
-	static void SetMaximumDiffingTime(int iSeconds);
+	void SetMaximumDiffingTime(int iSeconds);
 
 	// --------------------------------------------------------------------------
 	//
@@ -153,7 +162,7 @@ public:
 	//		Created: 04/19/2005
 	//
 	// --------------------------------------------------------------------------
-	static void SetKeepAliveTime(int iSeconds);
+	void SetKeepAliveTime(int iSeconds);
 
 	// --------------------------------------------------------------------------
 	//
@@ -175,19 +184,18 @@ public:
 	// --------------------------------------------------------------------------
 	void UnManageDiffProcess();
 
-	// --------------------------------------------------------------------------
+	// -------------------------------------------------------------------
 	//
 	// Function
 	//		Name:    BackupClientContext::DoKeepAlive()
-	//		Purpose: Does something inconsequential over the SSL link to 
-	//				 keep it up, implements DiffTimer interface
+	//		Purpose: Check whether it's time to send a KeepAlive
+	//			 message over the SSL link, and if so, send it.
 	//		Created: 04/19/2005
 	//
-	// --------------------------------------------------------------------------
+	// -------------------------------------------------------------------
 	virtual void   DoKeepAlive();
-	virtual time_t GetTimeMgmtEpoch();
 	virtual int    GetMaximumDiffingTime();
-	virtual int    GetKeepaliveTime();
+	virtual bool   IsManaged() { return mbIsManaged; }
 	
 private:
 	BackupDaemon &mrDaemon;
@@ -197,6 +205,9 @@ private:
 	SocketStreamTLS *mpSocket;
 	BackupProtocolClient *mpConnection;
 	bool mExtendedLogging;
+	bool mExtendedLogToFile;
+	std::string mExtendedLogFile;
+	FILE* mpExtendedLogFileHandle;
 	int64_t mClientStoreMarker;
 	BackupClientDeleteList *mpDeleteList;
 	const BackupClientInodeToIDMap *mpCurrentIDMap;
@@ -204,11 +215,10 @@ private:
 	bool mStorageLimitExceeded;
 	ExcludeList *mpExcludeFiles;
 	ExcludeList *mpExcludeDirs;
-
+	Timer mKeepAliveTimer;
 	bool mbIsManaged;
-	// unix time when diff was started
-	time_t mTimeMgmtEpoch;
+	int mKeepAliveTime;
+	int mMaximumDiffingTime;
 };
-
 
 #endif // BACKUPCLIENTCONTEXT__H

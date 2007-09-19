@@ -37,12 +37,13 @@ void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 {
 	if(SoftLimit >= HardLimit)
 	{
-		printf("ERROR: Soft limit must be less than the hard limit.\n");
+		BOX_FATAL("Soft limit must be less than the hard limit.");
 		exit(1);
 	}
 	if(SoftLimit > ((HardLimit * MAX_SOFT_LIMIT_SIZE) / 100))
 	{
-		printf("ERROR: Soft limit must be no more than %d%% of the hard limit.\n", MAX_SOFT_LIMIT_SIZE);
+		BOX_FATAL("Soft limit must be no more than " << 
+			MAX_SOFT_LIMIT_SIZE << "% of the hard limit.");
 		exit(1);
 	}
 }
@@ -53,7 +54,7 @@ int BlockSizeOfDiscSet(int DiscSet)
 	RaidFileController &controller(RaidFileController::GetController());
 	if(DiscSet < 0 || DiscSet >= controller.GetNumDiscSets())
 	{
-		printf("Disc set %d does not exist\n", DiscSet);
+		BOX_FATAL("Disc set " << DiscSet << " does not exist.");
 		exit(1);
 	}
 	
@@ -89,7 +90,7 @@ int64_t SizeStringToBlocks(const char *string, int DiscSet)
 	int64_t number = strtol(string, &endptr, 0);
 	if(endptr == string || number == LONG_MIN || number == LONG_MAX)
 	{
-		printf("%s is an invalid number\n", string);
+		BOX_FATAL("'" << string << "' is not a valid number.");
 		exit(1);
 	}
 	
@@ -116,7 +117,8 @@ int64_t SizeStringToBlocks(const char *string, int DiscSet)
 		break;
 	
 	default:
-		printf("%s has an invalid units specifier\nUse B for blocks, M for Mb, G for Gb, eg 2Gb\n", string);
+		BOX_FATAL(string << " has an invalid units specifier "
+			"(use B for blocks, M for Mb, G for Gb, eg 2Gb)");
 		exit(1);
 		break;		
 	}
@@ -143,7 +145,8 @@ bool GetWriteLockOnAccount(NamedLock &rLock, const std::string rRootDir, int Dis
 	if(!gotLock)
 	{
 		// Couldn't lock the account -- just stop now
-		printf("Couldn't lock the account -- did not change the limits\nTry again later.\n");
+		BOX_ERROR("Failed to lock the account, did not change limits. "
+			"Try again later.");
 		return 1;
 	}
 
@@ -168,7 +171,8 @@ int SetLimit(Configuration &rConfig, const std::string &rUsername, int32_t ID, c
 	// Already exists?
 	if(!db->EntryExists(ID))
 	{
-		printf("Account %x does not exist\n", ID);
+		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
+			" does not exist.");
 		return 1;
 	}
 	
@@ -198,7 +202,9 @@ int SetLimit(Configuration &rConfig, const std::string &rUsername, int32_t ID, c
 	// Save
 	info->Save();
 
-	printf("Limits on account 0x%08x changed to %lld soft, %lld hard\n", ID, softlimit, hardlimit);
+	BOX_NOTICE("Limits on account " << BOX_FORMAT_ACCOUNT(ID) <<
+		" changed to " << softlimit << " soft, " <<
+		hardlimit << " hard.");
 
 	return 0;
 }
@@ -211,7 +217,8 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 	// Exists?
 	if(!db->EntryExists(ID))
 	{
-		printf("Account %x does not exist\n", ID);
+		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
+			" does not exist.");
 		return 1;
 	}
 	
@@ -241,11 +248,12 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	// Check user really wants to do this
 	if(AskForConfirmation)
 	{
-		::printf("Really delete account %08x?\n(type 'yes' to confirm)\n", ID);
+		BOX_WARNING("Really delete account " << 
+			BOX_FORMAT_ACCOUNT(ID) << "? (type 'yes' to confirm)");
 		char response[256];
 		if(::fgets(response, sizeof(response), stdin) == 0 || ::strcmp(response, "yes\n") != 0)
 		{
-			printf("Deletion cancelled\n");
+			BOX_NOTICE("Deletion cancelled.");
 			return 0;
 		}
 	}
@@ -256,7 +264,8 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	// Exists?
 	if(!db->EntryExists(ID))
 	{
-		printf("Account %x does not exist\n", ID);
+		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
+			" does not exist.");
 		return 1;
 	}
 	
@@ -318,24 +327,27 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 			toDelete.push_back((*i) + DIRECTORY_SEPARATOR + rootDir);
 		}
 	}
-	
+
+	int retcode = 0;
+
 	// Thirdly, delete the directories...
 	for(std::vector<std::string>::const_iterator d(toDelete.begin()); d != toDelete.end(); ++d)
 	{
-		::printf("Deleting store directory %s...\n", (*d).c_str());
+		BOX_NOTICE("Deleting store directory " << (*d) << "...");
 		// Just use the rm command to delete the files
 		std::string cmd("rm -rf ");
 		cmd += *d;
 		// Run command
 		if(::system(cmd.c_str()) != 0)
 		{
-			::printf("ERROR: Deletion of %s failed.\n(when cleaning up, remember to delete all raid directories)\n", (*d).c_str());
-			return 1;
+			BOX_ERROR("Failed to delete files in " << (*d) <<
+				", delete them manually.");
+			retcode = 1;
 		}
 	}
 	
 	// Success!
-	return 0;
+	return retcode;
 }
 
 int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t ID, bool FixErrors, bool Quiet)
@@ -346,7 +358,8 @@ int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t I
 	// Exists?
 	if(!db->EntryExists(ID))
 	{
-		printf("Account %x does not exist\n", ID);
+		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
+			" does not exist.");
 		return 1;
 	}
 	
@@ -381,7 +394,8 @@ int CreateAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	// Already exists?
 	if(db->EntryExists(ID))
 	{
-		printf("Account %x already exists\n", ID);
+		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
+			" already exists.");
 		return 1;
 	}
 	
@@ -389,7 +403,7 @@ int CreateAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	BackupStoreAccounts acc(*db);
 	acc.Create(ID, DiscNumber, SoftLimit, HardLimit, rUsername);
 	
-	printf("Account %x created\n", ID);
+	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(ID) << " created.");
 
 	return 0;
 }
@@ -402,12 +416,19 @@ void PrintUsageAndExit()
 
 int main(int argc, const char *argv[])
 {
-	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbstoreaccounts.memleaks", "bbstoreaccounts")
+	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbstoreaccounts.memleaks",
+		"bbstoreaccounts")
 
 	MAINHELPER_START
 
-	// Filename for configuraiton file?
-	const char *configFilename = BOX_FILE_BBSTORED_DEFAULT_CONFIG;
+	// Filename for configuration file?
+	std::string configFilename;
+
+	#ifdef WIN32
+		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	#else
+		configFilename = BOX_FILE_BBSTORED_DEFAULT_CONFIG;
+	#endif
 	
 	// See if there's another entry on the command line
 	int c;
@@ -431,10 +452,14 @@ int main(int argc, const char *argv[])
 
 	// Read in the configuration file
 	std::string errs;
-	std::auto_ptr<Configuration> config(Configuration::LoadAndVerify(configFilename, &BackupConfigFileVerify, errs));
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			(configFilename, &BackupConfigFileVerify, errs));
+
 	if(config.get() == 0 || !errs.empty())
 	{
-		printf("Invalid configuration file:\n%s", errs.c_str());
+		BOX_ERROR("Invalid configuration file " << configFilename <<
+			":" << errs);
 	}
 	
 	// Get the user under which the daemon runs
@@ -474,7 +499,8 @@ int main(int argc, const char *argv[])
 		if(argc < 5
 			|| ::sscanf(argv[2], "%d", &discnum) != 1)
 		{
-			printf("create requires raid file disc number, soft and hard limits\n");
+			BOX_ERROR("create requires raid file disc number, "
+				"soft and hard limits.");
 			return 1;
 		}
 		
@@ -496,7 +522,7 @@ int main(int argc, const char *argv[])
 		// Change the limits on this account
 		if(argc < 4)
 		{
-			printf("setlimit requires soft and hard limits\n");
+			BOX_ERROR("setlimit requires soft and hard limits.");
 			return 1;
 		}
 		
@@ -530,7 +556,7 @@ int main(int argc, const char *argv[])
 			}
 			else
 			{
-				::printf("Unknown option %s.\n", argv[o]);
+				BOX_ERROR("Unknown option " << argv[o] << ".");
 				return 2;
 			}
 		}
@@ -540,7 +566,7 @@ int main(int argc, const char *argv[])
 	}
 	else
 	{
-		printf("Unknown command '%s'\n", argv[0]);
+		BOX_ERROR("Unknown command '" << argv[0] << "'.");
 		return 1;
 	}
 
