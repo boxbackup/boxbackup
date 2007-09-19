@@ -4,6 +4,7 @@
 	Version="8.00"
 	Name="bbackupctl"
 	ProjectGUID="{9FD51412-E945-4457-A17A-CA3C505CF431}"
+	RootNamespace="bbackupctl"
 	Keyword="Win32Proj"
 	>
 	<Platforms>
@@ -41,7 +42,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;NDEBUG"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -61,7 +62,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcre.lib"
 				OutputFile="$(OutDir)/bbackupctl.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -121,8 +122,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				EnableFiberSafeOptimizations="true"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
 				UsePrecompiledHeader="0"
@@ -141,7 +142,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib $(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib"
+				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Release\common.lib $(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcre.lib"
 				OutputFile="$(OutDir)/bbackupctl.exe"
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames=""
@@ -210,6 +211,10 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
+			<File
+				RelativePath="..\..\..\lib\win32\messages.rc"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

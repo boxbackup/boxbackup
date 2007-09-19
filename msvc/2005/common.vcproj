@@ -25,6 +25,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Determining Version Number"
+				CommandLine="perl $(InputDir)..\getversion.pl"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -41,8 +43,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;$(NOINHERIT)"
-				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;NDEBUG"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\..\pcre\pcre-6.7\&quot;;$(NOINHERIT)"
+				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -108,8 +110,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				EnableFiberSafeOptimizations="true"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\include&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;;&quot;$(SolutionDir)..\..\..\..\boost_1_31_0\&quot;"
-				PreprocessorDefinitions="BOOST_REGEX_NO_LIB;WIN32;NDEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common\&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\..\pcre\pcre-6.7\&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
 				UsePrecompiledHeader="0"
@@ -242,6 +244,10 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Logging.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MemBlockStream.cpp"
 						>
 					</File>
@@ -250,11 +256,23 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.cpp"
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\ReadLoggingStream.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\StreamableMemBlock.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\Timer.cpp"
 						>
 					</File>
 					<File
@@ -394,7 +412,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.cpp"
+						RelativePath="..\..\..\lib\win32\getopt_long.cxx"
 						>
 					</File>
 				</Filter>
@@ -447,6 +465,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.cpp"
 						>
 					</File>
 				</Filter>
@@ -504,7 +526,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\common\BoxConfig.h"
+						RelativePath="..\..\..\lib\common\BoxConfig-MSVC.h"
 						>
 					</File>
 					<File
@@ -529,6 +551,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\BoxTimeToUnix.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\BoxVersion.h"
 						>
 					</File>
 					<File
@@ -588,6 +614,10 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\Logging.h"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\MainHelper.h"
 						>
 					</File>
@@ -616,7 +646,15 @@
 						>
 					</File>
 					<File
+						RelativePath="..\..\..\lib\common\PathUtils.h"
+						>
+					</File>
+					<File
 						RelativePath="..\..\..\lib\common\ReadGatherStream.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\ReadLoggingStream.h"
 						>
 					</File>
 					<File
@@ -629,6 +667,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\common\Test.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\common\Timer.h"
 						>
 					</File>
 					<File
@@ -764,7 +806,7 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\..\lib\win32\WinNamedPipeStream.h"
+						RelativePath="..\..\..\lib\win32\getopt.h"
 						>
 					</File>
 				</Filter>
@@ -833,6 +875,10 @@
 					</File>
 					<File
 						RelativePath="..\..\..\lib\server\TLSContext.h"
+						>
+					</File>
+					<File
+						RelativePath="..\..\..\lib\server\WinNamedPipeStream.h"
 						>
 					</File>
 				</Filter>

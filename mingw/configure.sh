@@ -2,15 +2,15 @@
 
 if [ ! -r "/usr/i686-pc-mingw32/lib/libssl.a" ]; then
 	echo "Error: install OpenSSL as instructed by" \
-		"docs/backup/mingw_build.txt" >&2
+		"docs/backup/win32_build_on_cygwin_using_mingw.txt" >&2
 	exit 2
 fi
 
-if [ ! -r "/usr/i686-pc-mingw32/lib/libpcreposix.a" \
-	-o ! -r "/usr/i686-pc-mingw32/lib/libpcre.a" \
-	-o ! -r "/usr/i686-pc-mingw32/include/regex.h" ]; then
+if [ ! -r "/usr/lib/mingw/libpcreposix.a" \
+	-o ! -r "/usr/lib/mingw/libpcre.a" \
+	-o ! -r "/usr/include/mingw/pcreposix.h" ]; then
 	echo "Error: install PCRE as instructed by" \
-		"docs/backup/mingw_build.txt" >&2
+		"docs/backup/win32_build_on_cygwin_using_mingw.txt" >&2
 	exit 2
 fi
 
