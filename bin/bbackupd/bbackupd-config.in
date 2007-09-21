@@ -467,9 +467,9 @@ Server
 #
 # For example:
 # 
-# 	ExcludeDir = /home/guest-user
-# 	ExcludeFilesRegex = *.(mp3|MP3)\$
-# 	AlwaysIncludeFile = /home/username/veryimportant.mp3
+# 	ExcludeDir = ^/home/guest-user$
+# 	ExcludeFilesRegex = \.(mp3|MP3)\$
+# 	AlwaysIncludeFile = ^/home/username/veryimportant\.mp3$
 # 
 # This excludes the directory /home/guest-user from the backup along with all mp3
 # files, except one MP3 file in particular.
@@ -483,16 +483,16 @@ Server
 # To back up a directory inside an excluded directory, use a configuration
 # like this, to ensure that each directory in the path to the important
 # files is included, but none of their contents will be backed up except
-# the directories futher down that path to the important one.
+# the directories further down that path to the important one.
 #
-# ExcludeDirsRegex = /home/user/bigfiles/.*
-# ExcludeFilesRegex = /home/user/bigfiles/.*
-# AlwaysIncludeDir = /home/user/bigfiles/path
-# AlwaysIncludeDir = /home/user/bigfiles/path/to
-# AlwaysIncludeDir = /home/user/bigfiles/path/important
-# AlwaysIncludeDir = /home/user/bigfiles/path/important/files
-# AlwaysIncludeDirsRegex = /home/user/bigfiles/path/important/files/.*
-# AlwaysIncludeFilesRegex = /home/user/bigfiles/path/important/files/.*
+# ExcludeDirsRegex = ^/home/user/bigfiles/
+# ExcludeFilesRegex = ^/home/user/bigfiles/
+# AlwaysIncludeDir = ^/home/user/bigfiles/path
+# AlwaysIncludeDir = ^/home/user/bigfiles/path/to
+# AlwaysIncludeDir = ^/home/user/bigfiles/path/important
+# AlwaysIncludeDir = ^/home/user/bigfiles/path/important/files
+# AlwaysIncludeDirsRegex = ^/home/user/bigfiles/path/important/files/
+# AlwaysIncludeFilesRegex = ^/home/user/bigfiles/path/important/files/
 # 
 # If a directive ends in Regex, then it is a regular expression rather than a 
 # explicit full pathname. See
