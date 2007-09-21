@@ -467,9 +467,9 @@ Server
 #
 # For example:
 # 
-# 	ExcludeDir = ^/home/guest-user$
+# 	ExcludeDir = /home/guest-user
 # 	ExcludeFilesRegex = \.(mp3|MP3)\$
-# 	AlwaysIncludeFile = ^/home/username/veryimportant\.mp3$
+# 	AlwaysIncludeFile = /home/username/veryimportant.mp3
 # 
 # This excludes the directory /home/guest-user from the backup along with all mp3
 # files, except one MP3 file in particular.
@@ -487,10 +487,10 @@ Server
 #
 # ExcludeDirsRegex = ^/home/user/bigfiles/
 # ExcludeFilesRegex = ^/home/user/bigfiles/
-# AlwaysIncludeDir = ^/home/user/bigfiles/path
-# AlwaysIncludeDir = ^/home/user/bigfiles/path/to
-# AlwaysIncludeDir = ^/home/user/bigfiles/path/important
-# AlwaysIncludeDir = ^/home/user/bigfiles/path/important/files
+# AlwaysIncludeDir = /home/user/bigfiles/path
+# AlwaysIncludeDir = /home/user/bigfiles/path/to
+# AlwaysIncludeDir = /home/user/bigfiles/path/important
+# AlwaysIncludeDir = /home/user/bigfiles/path/important/files
 # AlwaysIncludeDirsRegex = ^/home/user/bigfiles/path/important/files/
 # AlwaysIncludeFilesRegex = ^/home/user/bigfiles/path/important/files/
 # 
