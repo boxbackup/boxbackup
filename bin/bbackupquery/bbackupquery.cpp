@@ -303,7 +303,16 @@ int main(int argc, const char *argv[])
 	}
 	
 	// Get commands from input
+
 #ifdef HAVE_LIBREADLINE
+	// Must initialise the locale before using editline's readline(),
+	// otherwise cannot enter international characters.
+	if (setlocale(LC_ALL, "") == NULL)
+	{
+		BOX_ERROR("Failed to initialise locale. International "
+			"character support may not work.");
+	}
+
 #ifdef HAVE_READLINE_HISTORY
 	using_history();
 #endif
