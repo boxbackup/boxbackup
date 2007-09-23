@@ -194,9 +194,15 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				#endif
 
 				// Compile
-				if(::regcomp(pregex, entry.c_str(), 
-					REG_EXTENDED | REG_NOSUB) != 0)
+				int errcode = ::regcomp(pregex, entry.c_str(), 
+					REG_EXTENDED | REG_NOSUB);
+
+				if (errcode != 0)
 				{
+					char buf[1024];
+					regerror(errcode, pregex, buf, sizeof(buf));
+					BOX_ERROR("Invalid regular expression: " <<
+						entry << ": " << buf);
 					THROW_EXCEPTION(CommonException, BadRegularExpression)
 				}
 				
