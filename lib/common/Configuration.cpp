@@ -319,6 +319,7 @@ const std::string &Configuration::GetKeyValue(const char *pKeyName) const
 	
 	if(i == mKeys.end())
 	{
+		BOX_ERROR("Missing configuration key: " << pKeyName);
 		THROW_EXCEPTION(CommonException, ConfigNoKey)
 	}
 	else
