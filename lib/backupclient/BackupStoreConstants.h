@@ -40,14 +40,5 @@
 // This is a multiple of the number of blocks in the diff from file.
 #define BACKUP_FILE_DIFF_MAX_BLOCK_FIND_MULTIPLE	4096
 
-// How many seconds to wait before deleting unused root directory entries?
-#ifndef NDEBUG
-	// Debug: 30 seconds (easier to test)
-	#define BACKUP_DELETE_UNUSED_ROOT_ENTRIES_AFTER		30
-#else
-	// Release: 2 days (plenty of time for sysadmins to notice, or change their mind)
-	#define BACKUP_DELETE_UNUSED_ROOT_ENTRIES_AFTER		172800
-#endif
-
 #endif // BACKUPSTORECONSTANTS__H
 
