@@ -876,6 +876,9 @@ void BackupDaemon::Run2()
 					SecondsToBoxTime(
 						conf.GetKeyValueInt(
 							"MaxFileTimeInFuture"));
+				mDeleteRedundantLocationsAfter =
+					conf.GetKeyValueInt(
+						"DeleteRedundantLocationsAfter");
 
 				clientContext.SetMaximumDiffingTime(maximumDiffingTime);
 				clientContext.SetKeepAliveTime(keepAliveTime);
@@ -1659,7 +1662,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	for(std::list<std::pair<std::string, Configuration> >::const_iterator i = rLocationsConf.mSubConfigurations.begin();
 		i != rLocationsConf.mSubConfigurations.end(); ++i)
 	{
-		BOX_TRACE("new location");
+		BOX_TRACE("new location: " << i->first);
 		// Create a record for it
 		Location *ploc = new Location;
 		try
@@ -1821,12 +1824,12 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		}
 		catch (std::exception &e)
 		{
-			delete ploc;
-			ploc = 0;
 			BOX_ERROR("Failed to configure location '"
 				<< ploc->mName << "' path '"
 				<< ploc->mPath << "': " << e.what() <<
 				": please check for previous errors");
+			delete ploc;
+			ploc = 0;
 			throw;
 		}
 		catch(...)
@@ -1857,8 +1860,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			mDeleteUnusedRootDirEntriesAfter == 0)
 		{
 			mDeleteUnusedRootDirEntriesAfter = now + 
-				SecondsToBoxTime(
-				BACKUP_DELETE_UNUSED_ROOT_ENTRIES_AFTER);
+				SecondsToBoxTime(mDeleteRedundantLocationsAfter);
 		}
 
 		int secs = BoxTimeToSeconds(mDeleteUnusedRootDirEntriesAfter
