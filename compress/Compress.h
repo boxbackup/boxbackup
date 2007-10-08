@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    CompressContext.h
+//		Name:    Compress.h
 //		Purpose: Interface to zlib compression
 //		Created: 5/12/03
 //
@@ -17,7 +17,7 @@
 // --------------------------------------------------------------------------
 //
 // Class
-//		Name:    CompressContext
+//		Name:    Compress
 //		Purpose: Interface to zlib compression, only very slight wrapper.
 //				 (Use CompressStream for a more friendly interface.)
 //		Created: 5/12/03
