@@ -18,7 +18,7 @@ class BackupStoreCheck;
 
 // --------------------------------------------------------------------------
 //
-// File
+// Class
 //		Name:    BackupStoreInfo
 //		Purpose: Main backup store information storage
 //		Created: 2003/08/28

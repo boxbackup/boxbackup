@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    PartialReadStream.h
+//		Name:    ProtocolUncertainStream.h
 //		Purpose: Read part of another stream
 //		Created: 2003/12/05
 //
@@ -15,7 +15,7 @@
 // --------------------------------------------------------------------------
 //
 // Class
-//		Name:    PartialReadStream
+//		Name:    ProtocolUncertainStream
 //		Purpose: Read part of another stream
 //		Created: 2003/12/05
 //
