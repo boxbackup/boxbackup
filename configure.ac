@@ -281,8 +281,11 @@ AC_OUTPUT
 
 # Configure the Box build system
 echo
-$PERL ./infrastructure/makebuildenv.pl &&
-  $PERL ./infrastructure/makeparcels.pl
+if ! $PERL ./infrastructure/makebuildenv.pl \
+|| ! $PERL ./infrastructure/makeparcels.pl; then
+	echo "Making infrastructure failed!"
+	exit 1
+fi
 
 # Write summary of important info
 cat <<EOC
