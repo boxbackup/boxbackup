@@ -77,6 +77,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 				// return "now" if it's allowed, or a number of seconds if it's not
 
 	{"MaximumDiffingTime", 0, ConfigTest_IsInt, 0},
+	{"DeleteRedundantLocationsAfter", "172800", ConfigTest_IsInt, 0},
 
 	{"FileTrackingSizeThreshold", 0, ConfigTest_Exists | ConfigTest_IsInt, 0},
 	{"DiffingUploadSizeThreshold", 0, ConfigTest_Exists | ConfigTest_IsInt, 0},
