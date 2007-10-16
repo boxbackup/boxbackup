@@ -1160,6 +1160,13 @@ BackupLocations
                 file, or crashing while trying to upload it. The logs will be
                 sent to the system log or Windows Event Viewer.</para>
 
+		<para>This generates a <emphasis>lot</emphasis>
+		of output, so it should only be used when instructed, or when
+		you suspect that bbackupd is skipping some files and want to
+		know why. Because it is verbose, the messages are hidden by
+		default even if the option is enabled. To see them, you must
+		run bbackupd with at least one -v option.</para>
+
                 <para>This is a boolean value, which may be set to
                 <quote>Yes</quote> or <quote>No</quote>. The default is of
                 course <quote>No</quote>.</para>
