@@ -50,7 +50,8 @@ Daemon::Daemon()
 	  mTerminateWanted(false),
 	  mSingleProcess(false),
 	  mRunInForeground(false),
-	  mKeepConsoleOpenAfterFork(false)
+	  mKeepConsoleOpenAfterFork(false),
+	  mHaveConfigFile(false);
 {
 	if(spDaemon != NULL)
 	{
@@ -87,6 +88,126 @@ Daemon::~Daemon()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    Daemon::GetOptionString()
+//		Purpose: Returns the valid Getopt command-line options.
+//			 This should be overridden by subclasses to add
+//			 their own options, which should override 
+//			 ProcessOption, handle their own, and delegate to
+//			 ProcessOption for the standard options.
+//		Created: 2007/09/18
+//
+// --------------------------------------------------------------------------
+std::string Daemon::GetOptionString()
+{
+	return "c:DFqvVt:Tk";
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Daemon::ProcessOption(int option)
+//		Purpose: Processes the supplied option (equivalent to the
+//			 return code from getopt()). Return zero if the
+//			 option was handled successfully, or nonzero to
+//			 abort the program with that return value.
+//		Created: 2007/09/18
+//
+// --------------------------------------------------------------------------
+int Daemon::ProcessOption(signed int option)
+{
+	switch(option)
+	{
+		case 'c':
+		{
+			mConfigFileName = optarg;
+			mHaveConfigFile = true;
+		}
+		break;
+
+		case 'D':
+		{
+			mSingleProcess = true;
+		}
+		break;
+
+		case 'F':
+		{
+			mRunInForeground = true;
+		}
+		break;
+
+		case 'q':
+		{
+			if(mLogLevel == Log::NOTHING)
+			{
+				BOX_FATAL("Too many '-q': "
+					"Cannot reduce logging "
+					"level any more");
+				return 2;
+			}
+			mLogLevel--;
+		}
+		break;
+
+		case 'v':
+		{
+			if(mLogLevel == Log::EVERYTHING)
+			{
+				BOX_FATAL("Too many '-v': "
+					"Cannot increase logging "
+					"level any more");
+				return 2;
+			}
+			mLogLevel++;
+		}
+		break;
+
+		case 'V':
+		{
+			mLogLevel = Log::EVERYTHING;
+		}
+		break;
+
+		case 't':
+		{
+			Console::SetTag(optarg);
+		}
+		break;
+
+		case 'T':
+		{
+			Console::SetShowTime(true);
+		}
+		break;
+
+		case 'k':
+		{
+			mKeepConsoleOpenAfterFork = true;
+		}
+		break;
+
+		case '?':
+		{
+			BOX_FATAL("Unknown option on command line: " 
+				<< "'" << (char)optopt << "'");
+			return 2;
+		}
+		break;
+
+		default:
+		{
+			BOX_FATAL("Unknown error in getopt: returned "
+				<< "'" << option << "'");
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    Daemon::Main(const char *, int, const char *[])
 //		Purpose: Parses command-line options, and then calls
 //			Main(std::string& configFile, bool singleProcess)
@@ -98,12 +219,11 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 {
 	// Find filename of config file
 	mConfigFileName = DefaultConfigFile;
-	bool haveConfigFile = false;
 
 	#ifdef NDEBUG
-	int masterLevel = Log::NOTICE; // need an int to do math with
+	mLogLevel = Log::NOTICE; // need an int to do math with
 	#else
-	int masterLevel = Log::INFO; // need an int to do math with
+	mLogLevel = Log::INFO; // need an int to do math with
 	#endif
 
 	signed int c;
@@ -118,97 +238,18 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		optreset = 1;
 	#endif
 
-	while((c = getopt(argc, (char * const *)argv, "c:DFqvVt:Tk")) != -1)
+	while((c = getopt(argc, (char * const *)argv, 
+		GetOptionString().c_str())) != -1)
 	{
-		switch(c)
+		int returnCode = ProcessOption(c);
+
+		if (returnCode != 0)
 		{
-			case 'c':
-			{
-				mConfigFileName = optarg;
-				haveConfigFile = true;
-			}
-			break;
-
-			case 'D':
-			{
-				mSingleProcess = true;
-			}
-			break;
-
-			case 'F':
-			{
-				mRunInForeground = true;
-			}
-			break;
-
-			case 'q':
-			{
-				if(masterLevel == Log::NOTHING)
-				{
-					BOX_FATAL("Too many '-q': "
-						"Cannot reduce logging "
-						"level any more");
-					return 2;
-				}
-				masterLevel--;
-			}
-			break;
-
-			case 'v':
-			{
-				if(masterLevel == Log::EVERYTHING)
-				{
-					BOX_FATAL("Too many '-v': "
-						"Cannot increase logging "
-						"level any more");
-					return 2;
-				}
-				masterLevel++;
-			}
-			break;
-
-			case 'V':
-			{
-				masterLevel = Log::EVERYTHING;
-			}
-			break;
-
-			case 't':
-			{
-				Console::SetTag(optarg);
-			}
-			break;
-
-			case 'T':
-			{
-				Console::SetShowTime(true);
-			}
-			break;
-
-			case 'k':
-			{
-				mKeepConsoleOpenAfterFork = true;
-			}
-			break;
-
-			case '?':
-			{
-				BOX_FATAL("Unknown option on command line: " 
-					<< "'" << (char)optopt << "'");
-				return 2;
-			}
-			break;
-
-			default:
-			{
-				BOX_FATAL("Unknown error in getopt: returned "
-					<< "'" << c << "'");
-				return 1;
-			}
+			return returnCode;
 		}
 	}
 
-	if (argc > optind && !haveConfigFile)
+	if (argc > optind && !mHaveConfigFile)
 	{
 		mConfigFileName = argv[optind]; optind++;
 	}
@@ -225,7 +266,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		return 2;
 	}
 
-	Logging::SetGlobalLevel((Log::Level)masterLevel);
+	Logging::SetGlobalLevel((Log::Level)mLogLevel);
 
 	return Main(mConfigFileName);
 }
