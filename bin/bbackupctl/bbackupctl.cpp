@@ -145,7 +145,8 @@ int main(int argc, const char *argv[])
 	try
 	{
 #ifdef WIN32
-		connection.Connect(BOX_NAMED_PIPE_NAME);
+		std::string socket = conf.GetKeyValue("CommandSocket");
+		connection.Connect(socket);
 #else
 		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str());
 #endif
@@ -200,7 +201,7 @@ int main(int argc, const char *argv[])
 			"  UpdateStoreInterval = " << updateStoreInterval << 
 			" seconds\n"
 			"  MinimumFileAge = " << minimumFileAge << " seconds\n"
-			"  MaxUploadWait = " << maxUploadWait << " seconds\n");
+			"  MaxUploadWait = " << maxUploadWait << " seconds");
 	}
 
 	std::string stateLine;
@@ -312,7 +313,7 @@ int main(int argc, const char *argv[])
 				{
 					if (syncIsRunning)
 					{
-						if (!quiet) BOX_INFO("Sync finished.\n");
+						if (!quiet) BOX_INFO("Sync finished.");
 						// Send a quit command to finish nicely
 						connection.Write("quit\n", 5);
 					
@@ -335,7 +336,7 @@ int main(int argc, const char *argv[])
 				{
 					if(!quiet)
 					{
-						BOX_INFO("Succeeded.\n");
+						BOX_INFO("Succeeded.");
 					}
 					finished = true;
 				}
