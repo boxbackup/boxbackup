@@ -65,8 +65,10 @@ End Function
 
 Sub SendMail(from,sendto,subject,body)
 	Set objEmail = CreateObject("CDO.Message")
+	Set WshShell = CreateObject("WScript.Shell")
 	Dim cdoschema
 	cdoschema = "http://schemas.microsoft.com/cdo/configuration/"
+	
 	With objEmail
 		.From = from
 		.To = sendto
@@ -79,5 +81,15 @@ Sub SendMail(from,sendto,subject,body)
 			.Configuration.Fields.Update
 		End If
 	End With
-	objEmail.Send
+	On Error Resume Next
+	rc = objEmail.Send
+	If rc Then
+		WshShell.Exec "eventcreate /L Application /ID 201 /T WARNING " _
+			& "/SO ""Box Backup"" /D """ & args(0) _
+			& " notification sent to " & sendto & "."""
+	Else
+		WshShell.Exec "eventcreate /L Application /ID 202 /T ERROR " _
+			& "/SO ""Box Backup"" /D ""Failed to send " & args(0) _
+			& " notification to " & sendto & "."""
+	End If
 End Sub
