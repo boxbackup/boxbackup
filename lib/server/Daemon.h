@@ -67,12 +67,13 @@ public:
 protected:
 	box_time_t GetLoadedConfigModifiedTime() const;
 	bool IsSingleProcess() { return mSingleProcess; }
+	std::string GetOptionString();
+	int ProcessOption(signed int option);
 	
 private:
 	static void SignalHandler(int sigraised);
 	box_time_t GetConfigFileModifiedTime() const;
 	
-private:
 	std::string mConfigFileName;
 	Configuration *mpConfiguration;
 	box_time_t mLoadedConfigModifiedTime;
@@ -81,6 +82,8 @@ private:
 	bool mSingleProcess;
 	bool mRunInForeground;
 	bool mKeepConsoleOpenAfterFork;
+	bool mHaveConfigFile;
+	int mLogLevel; // need an int to do math with
 	static Daemon *spDaemon;
 };
 
