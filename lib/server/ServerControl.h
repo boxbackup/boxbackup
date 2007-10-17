@@ -9,17 +9,24 @@
 #include "IOStreamGetLine.h"
 #include "BoxPortsAndFiles.h"
 
+static std::string sPipeName;
+
+static void SetNamedPipeName(const std::string& rPipeName)
+{
+	sPipeName = rPipeName;
+}
+
 static bool SendCommands(const std::string& rCmd)
 {
 	WinNamedPipeStream connection;
 
 	try
 	{
-		connection.Connect(BOX_NAMED_PIPE_NAME);
+		connection.Connect(sPipeName);
 	}
 	catch(...)
 	{
-		printf("Failed to connect to daemon control socket.\n");
+		BOX_ERROR("Failed to connect to daemon control socket");
 		return false;
 	}
 
@@ -30,14 +37,14 @@ static bool SendCommands(const std::string& rCmd)
 	std::string configSummary;
 	if(!getLine.GetLine(configSummary))
 	{
-		printf("Failed to receive configuration summary from daemon\n");
+		BOX_ERROR("Failed to receive configuration summary from daemon");
 		return false;
 	}
 
 	// Was the connection rejected by the server?
 	if(getLine.IsEOF())
 	{
-		printf("Server rejected the connection.\n");
+		BOX_ERROR("Server rejected the connection");
 		return false;
 	}
 
@@ -47,7 +54,7 @@ static bool SendCommands(const std::string& rCmd)
 			&autoBackup, &updateStoreInterval, 
 			&minimumFileAge, &maxUploadWait) != 4)
 	{
-		printf("Config summary didn't decode\n");
+		BOX_ERROR("Config summary didn't decode");
 		return false;
 	}
 
@@ -81,13 +88,13 @@ static bool SendCommands(const std::string& rCmd)
 		}
 		else if (line == "error")
 		{
-			printf("ERROR (%s)\n", rCmd.c_str());
+			BOX_ERROR(rCmd);
 			break;
 		}
 		else
 		{
-			printf("WARNING: Unexpected response to command '%s': "
-				"%s", rCmd.c_str(), line.c_str());
+			BOX_WARNING("Unexpected response to command '" <<
+				rCmd << "': " << line)
 		}
 	}
 	
@@ -104,15 +111,15 @@ inline bool KillServerInternal(int pid)
 	HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, false, pid);
 	if (hProcess == NULL)
 	{
-		printf("Failed to open process %d: error %d\n",
-			pid, (int)GetLastError());
+		BOX_ERROR("Failed to open process " << pid << ": " <<
+			GetErrorMessage(GetLastError()));
 		return false;
 	}
 
 	if (!TerminateProcess(hProcess, 1))
 	{
-		printf("Failed to terminate process %d: error %d\n",
-			pid, (int)GetLastError());
+		BOX_ERROR("Failed to terminate process " << pid << ": " <<
+			GetErrorMessage(GetLastError()));
 		CloseHandle(hProcess);
 		return false;
 	}
