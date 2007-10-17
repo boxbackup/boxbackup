@@ -26,6 +26,8 @@
 
 #include "MemLeakFindOn.h"
 
+std::string WinNamedPipeStream::sPipeNamePrefix = "\\\\.\\pipe\\";
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -72,21 +74,23 @@ WinNamedPipeStream::~WinNamedPipeStream()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    WinNamedPipeStream::Accept(const char* Name)
+//		Name:    WinNamedPipeStream::Accept(const std::string& rName)
 //		Purpose: Creates a new named pipe with the given name,
 //			and wait for a connection on it
 //		Created: 2005/12/07
 //
 // --------------------------------------------------------------------------
-void WinNamedPipeStream::Accept(const wchar_t* pName)
+void WinNamedPipeStream::Accept(const std::string& rName)
 {
 	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
 
-	mSocketHandle = CreateNamedPipeW( 
-		pName,                     // pipe name 
+	std::string socket = sPipeNamePrefix + rName;
+
+	mSocketHandle = CreateNamedPipeA( 
+		socket.c_str(),            // pipe name 
 		PIPE_ACCESS_DUPLEX |       // read/write access 
 		FILE_FLAG_OVERLAPPED,      // enabled overlapped I/O
 		PIPE_TYPE_BYTE |           // message type pipe 
@@ -100,7 +104,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		BOX_ERROR("Failed to CreateNamedPipeW(" << pName << "): " <<
+		BOX_ERROR("Failed to CreateNamedPipeA(" << socket << "): " <<
 			GetErrorMessage(GetLastError()));
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
@@ -109,7 +113,7 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 
 	if (!connected)
 	{
-		BOX_ERROR("Failed to ConnectNamedPipe(" << pName << "): " <<
+		BOX_ERROR("Failed to ConnectNamedPipe(" << socket << "): " <<
 			GetErrorMessage(GetLastError()));
 		Close();
 		THROW_EXCEPTION(ServerException, SocketOpenError)
@@ -156,20 +160,22 @@ void WinNamedPipeStream::Accept(const wchar_t* pName)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    WinNamedPipeStream::Connect(const char* Name)
+//		Name:    WinNamedPipeStream::Connect(const std::string& rName)
 //		Purpose: Opens a connection to a listening named pipe
 //		Created: 2005/12/07
 //
 // --------------------------------------------------------------------------
-void WinNamedPipeStream::Connect(const wchar_t* pName)
+void WinNamedPipeStream::Connect(const std::string& rName)
 {
 	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
+
+	std::string socket = sPipeNamePrefix + rName;
 	
-	mSocketHandle = CreateFileW( 
-		pName,          // pipe name 
+	mSocketHandle = CreateFileA( 
+		socket.c_str(), // pipe name 
 		GENERIC_READ |  // read and write access 
 		GENERIC_WRITE, 
 		0,              // no sharing 
