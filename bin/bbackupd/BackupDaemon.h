@@ -69,7 +69,8 @@ public:
 
 	void Run();
 	virtual const char *DaemonName() const;
-	virtual const char *DaemonBanner() const;
+	virtual std::string DaemonBanner() const;
+	virtual void Usage();
 	const ConfigurationVerify *GetConfigVerify() const;
 
 	bool FindLocationPathName(const std::string &rLocationName, std::string &rPathOut) const;
