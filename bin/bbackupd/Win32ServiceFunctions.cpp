@@ -199,7 +199,7 @@ int OurService(const char* pConfigFileName)
 	return 0;
 }
 
-int InstallService(const char* pConfigFileName)
+int InstallService(const char* pConfigFileName, const std::string& rServiceName)
 {
 	if (pConfigFileName != NULL)
 	{
@@ -235,7 +235,7 @@ int InstallService(const char* pConfigFileName)
 	cmd[sizeof(cmd)-1] = 0;
 
 	std::string cmdWithArgs(cmd);
-	cmdWithArgs += " -s";
+	cmdWithArgs += " -s -S \"" + rServiceName + "\"";
 
 	if (pConfigFileName != NULL)
 	{
@@ -244,10 +244,12 @@ int InstallService(const char* pConfigFileName)
 		cmdWithArgs += "\"";
 	}
 
+	std::string serviceDesc = "Box Backup (" + rServiceName + ")";
+
 	SC_HANDLE newService = CreateService(
 		scm, 
-		SERVICE_NAME, 
-		"Box Backup", 
+		rServiceName.c_str(),
+		serviceDesc.c_str(),
 		SERVICE_ALL_ACCESS, 
 		SERVICE_WIN32_OWN_PROCESS, 
 		SERVICE_AUTO_START, 
@@ -312,7 +314,7 @@ int InstallService(const char* pConfigFileName)
 	return 0;
 }
 
-int RemoveService(void)
+int RemoveService(const std::string& rServiceName)
 {
 	SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
@@ -323,7 +325,7 @@ int RemoveService(void)
 		return 1;
 	}
 
-	SC_HANDLE service = OpenService(scm, SERVICE_NAME, 
+	SC_HANDLE service = OpenService(scm, rServiceName.c_str(), 
 		SERVICE_ALL_ACCESS|DELETE);
 	DWORD err = GetLastError();
 	CloseServiceHandle(scm);
