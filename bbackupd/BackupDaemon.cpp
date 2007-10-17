@@ -126,42 +126,33 @@ BackupDaemon::BackupDaemon()
 		mNotificationsSent[l] = false;
 	}
 
-#ifdef WIN32
-	// Create the event object to signal from main thread to worker
-	// when new messages are queued to be sent to the command socket.
-	mhMessageToSendEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(mhMessageToSendEvent == INVALID_HANDLE_VALUE)
-	{
-		BOX_ERROR("Failed to create event object: error " <<
-			GetLastError());
-		exit(1);
-	}
+	#ifdef WIN32
+		// Create the event object to signal from main thread to
+		// worker when new messages are queued to be sent to the
+		// command socket.
 
-	// Create the event object to signal from worker to main thread
-	// when a command has been received on the command socket.
-	mhCommandReceivedEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(mhCommandReceivedEvent == INVALID_HANDLE_VALUE)
-	{
-		BOX_ERROR("Failed to create event object: error " <<
-			GetLastError());
-		exit(1);
-	}
+		mhMessageToSendEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		if(mhMessageToSendEvent == INVALID_HANDLE_VALUE)
+		{
+			BOX_ERROR("Failed to create event object: error " <<
+				GetLastError());
+			exit(1);
+		}
 
-	// Create the critical section to protect the message queue
-	InitializeCriticalSection(&mMessageQueueLock);
+		// Create the event object to signal from worker to main thread
+		// when a command has been received on the command socket.
 
-	// Create a thread to handle the named pipe
-	HANDLE hThread;
-	unsigned int dwThreadId;
+		mhCommandReceivedEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		if(mhCommandReceivedEvent == INVALID_HANDLE_VALUE)
+		{
+			BOX_ERROR("Failed to create event object: error " <<
+				GetLastError());
+			exit(1);
+		}
 
-	hThread = (HANDLE) _beginthreadex( 
-        	NULL,                        // default security attributes 
-        	0,                           // use default stack size  
-        	HelperThread,                // thread function 
-        	this,                        // argument to thread function 
-        	0,                           // use default creation flags 
-        	&dwThreadId);                // returns the thread identifier 
-#endif
+		// Create the critical section to protect the message queue
+		InitializeCriticalSection(&mMessageQueueLock);
+	#endif
 }
 
 // --------------------------------------------------------------------------
@@ -287,6 +278,7 @@ void BackupDaemon::DeleteAllLocations()
 #ifdef WIN32
 void BackupDaemon::RunHelperThread(void)
 {
+	const Configuration &conf(GetConfiguration());
 	mpCommandSocketInfo = new CommandSocketInfo;
 	WinNamedPipeStream& rSocket(mpCommandSocketInfo->mListeningSocket);
 
@@ -296,7 +288,8 @@ void BackupDaemon::RunHelperThread(void)
 	{
 		try
 		{
-			rSocket.Accept(BOX_NAMED_PIPE_NAME);
+			std::string socket = conf.GetKeyValue("CommandSocket");
+			rSocket.Accept(socket);
 		}
 		catch (BoxException &e)
 		{
@@ -331,7 +324,6 @@ void BackupDaemon::RunHelperThread(void)
 
 			// Send a header line summarising the configuration 
 			// and current state
-			const Configuration &conf(GetConfiguration());
 			char summary[256];
 			size_t summarySize = sprintf(summary, 
 				"bbackupd: %d %d %d %d\nstate %d\n",
@@ -512,30 +504,36 @@ void BackupDaemon::Run()
 	// initialise global timer mechanism
 	Timers::Init();
 	
-#ifdef WIN32
-	try
-	{
-		Run2();
-	}
-	catch(...)
-	{
-		Timers::Cleanup();
-		throw;
-	}
-#else // ! WIN32
-	// Ignore SIGPIPE (so that if a command connection is broken, the daemon doesn't terminate)
-	::signal(SIGPIPE, SIG_IGN);
+	#ifdef WIN32
+		// Create a thread to handle the named pipe
+		HANDLE hThread;
+		unsigned int dwThreadId;
 
-	// Create a command socket?
-	const Configuration &conf(GetConfiguration());
-	if(conf.KeyExists("CommandSocket"))
-	{
-		// Yes, create a local UNIX socket
-		mpCommandSocketInfo = new CommandSocketInfo;
-		const char *socketName = conf.GetKeyValue("CommandSocket").c_str();
-		::unlink(socketName);
-		mpCommandSocketInfo->mListeningSocket.Listen(Socket::TypeUNIX, socketName);
-	}
+		hThread = (HANDLE) _beginthreadex( 
+			NULL,         // default security attributes 
+			0,            // use default stack size  
+			HelperThread, // thread function 
+			this,         // argument to thread function 
+			0,            // use default creation flags 
+			&dwThreadId); // returns the thread identifier 
+	#else
+		// Ignore SIGPIPE so that if a command connection is broken,
+		// the daemon doesn't terminate.
+		::signal(SIGPIPE, SIG_IGN);
+
+		// Create a command socket?
+		const Configuration &conf(GetConfiguration());
+		if(conf.KeyExists("CommandSocket"))
+		{
+			// Yes, create a local UNIX socket
+			mpCommandSocketInfo = new CommandSocketInfo;
+			const char *socketName =
+				conf.GetKeyValue("CommandSocket").c_str();
+			::unlink(socketName);
+			mpCommandSocketInfo->mListeningSocket.Listen(
+				Socket::TypeUNIX, socketName);
+		}
+	#endif // !WIN32
 
 	// Handle things nicely on exceptions
 	try
@@ -544,6 +542,11 @@ void BackupDaemon::Run()
 	}
 	catch(...)
 	{
+		#ifdef WIN32
+			// Don't delete the socket, as the helper thread
+			// is probably still using it. Let Windows clean
+			// up after us.
+		#else
 		if(mpCommandSocketInfo != 0)
 		{
 			try 
@@ -563,19 +566,21 @@ void BackupDaemon::Run()
 			}
 			mpCommandSocketInfo = 0;
 		}
+		#endif // WIN32
 
 		Timers::Cleanup();
 		
 		throw;
 	}
 
-	// Clean up
-	if(mpCommandSocketInfo != 0)
-	{
-		delete mpCommandSocketInfo;
-		mpCommandSocketInfo = 0;
-	}
-#endif
+	#ifndef WIN32
+		// Clean up
+		if(mpCommandSocketInfo != 0)
+		{
+			delete mpCommandSocketInfo;
+			mpCommandSocketInfo = 0;
+		}
+	#endif
 	
 	Timers::Cleanup();
 }
