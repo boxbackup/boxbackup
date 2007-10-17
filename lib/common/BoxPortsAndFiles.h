@@ -36,8 +36,5 @@
 #define BOX_FILE_BBSTORED_DEFAULT_CONFIG 	"/etc/box/bbstored.conf"
 #endif
 
-// Default name of the named pipe
-#define BOX_NAMED_PIPE_NAME L"\\\\.\\pipe\\boxbackup"
-
 #endif // BOXPORTSANDFILES__H
 
