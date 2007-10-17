@@ -13,6 +13,7 @@ backup-client
 ONLY:mingw32,mingw32msvc
 	script bin/bbackupd/win32/installer.iss 
 	script bin/bbackupd/win32/bbackupd.conf
+	script bin/bbackupd/win32/NotifySysAdmin.vbs
 END-ONLY
 
 ONLY:mingw32
