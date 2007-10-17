@@ -50,8 +50,9 @@ public:
 	const std::string &GetConfigFileName() const {return mConfigFileName;}
 
 	virtual const char *DaemonName() const;
-	virtual const char *DaemonBanner() const;
+	virtual std::string DaemonBanner() const;
 	virtual const ConfigurationVerify *GetConfigVerify() const;
+	virtual void Usage();
 	
 	bool StopRun() {return mReloadConfigWanted | mTerminateWanted;}
 	bool IsReloadConfigWanted() {return mReloadConfigWanted;}
@@ -87,6 +88,7 @@ private:
 	bool mHaveConfigFile;
 	int mLogLevel; // need an int to do math with
 	static Daemon *spDaemon;
+	std::string mAppName;
 };
 
 #define DAEMON_VERIFY_SERVER_KEYS 	{"PidFile", 0, ConfigTest_Exists, 0}, \
