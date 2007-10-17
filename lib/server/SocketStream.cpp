@@ -168,14 +168,17 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 		::close(mSocketHandle);
 #endif
 
+#ifdef WIN32
 		BOX_ERROR("Failed to connect to socket (type " << Type <<
 			", name " << Name << ", port " << Port << "): " <<
-			#ifdef WIN32
 				GetErrorMessage(err)
-			#else
-				strerror(err) << " (" << err << ")"
-			#endif
 			);
+#else
+		BOX_ERROR("Failed to connect to socket (type " << Type <<
+			", name " << Name << ", port " << Port << "): " <<
+				strerror(err) << " (" << err << ")"
+			);
+#endif
 
 		mSocketHandle = INVALID_SOCKET_VALUE;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
