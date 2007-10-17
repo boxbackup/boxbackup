@@ -58,7 +58,14 @@ private:
 		box_time_t & theLastSyncTime, box_time_t & theNextSyncTime);
 	bool DeleteStoreObjectInfo() const;
 	BackupDaemon(const BackupDaemon &);
+
 public:
+	#ifdef WIN32
+		// add command-line options to handle Windows services
+		std::string GetOptionString();
+		int ProcessOption(signed int option);
+		int Main(const std::string &rConfigFileName);
+	#endif
 
 	void Run();
 	virtual const char *DaemonName() const;
@@ -418,6 +425,8 @@ public:
 
 	private:
 	bool mDoSyncFlagOut, mSyncIsForcedOut;
+	bool mInstallService, mRemoveService, mRunAsService;
+	std::string mServiceName;
 	HANDLE mhMessageToSendEvent, mhCommandReceivedEvent;
 	CRITICAL_SECTION mMessageQueueLock;
 	std::vector<std::string> mMessageList;

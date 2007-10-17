@@ -76,6 +76,13 @@
 #include "Logging.h"
 #include "autogen_ClientException.h"
 
+#ifdef WIN32
+	#include "Win32ServiceFunctions.h"
+	#include "Win32BackupService.h"
+
+	extern Win32BackupService* gpDaemonService;
+#endif
+
 #include "MemLeakFindOn.h"
 
 static const time_t MAX_SLEEP_TIME = 1024;
@@ -116,6 +123,11 @@ BackupDaemon::BackupDaemon()
 	  mpCommandSocketInfo(0),
 	  mDeleteUnusedRootDirEntriesAfter(0),
 	  mLogAllFileAccess(false)
+	#ifdef WIN32
+	, mInstallService(false),
+	  mRemoveService(false),
+	  mRunAsService(false)
+	#endif
 {
 	// Only ever one instance of a daemon
 	SSLLib::Initialise();
@@ -276,6 +288,83 @@ void BackupDaemon::DeleteAllLocations()
 }
 
 #ifdef WIN32
+std::string BackupDaemon::GetOptionString()
+{
+	std::string oldOpts = this->Daemon::GetOptionString();
+	ASSERT(oldOpts.find("s") == std::string::npos);
+	ASSERT(oldOpts.find("S") == std::string::npos);
+	ASSERT(oldOpts.find("i") == std::string::npos);
+	ASSERT(oldOpts.find("r") == std::string::npos);
+	return oldOpts + "sS:ir";
+}
+
+int BackupDaemon::ProcessOption(signed int option)
+{
+	switch(option)
+	{
+		case 's':
+		{
+			mRunAsService = true;
+			return 0;
+		}
+
+		case 'S':
+		{
+			mServiceName = optarg;
+			return 0;
+		}
+
+		case 'i':
+		{
+			mInstallService = true;
+			return 0;
+		}
+
+		case 'r':
+		{
+			mRemoveService = true;
+			return 0;
+		}
+
+		default:
+		{
+			return this->Daemon::ProcessOption(option);
+		}
+	}
+}
+
+int BackupDaemon::Main(const std::string &rConfigFileName)
+{
+	if (mInstallService)
+	{
+		return InstallService(rConfigFileName.c_str());
+	}
+
+	if (mRemoveService)
+	{
+		return RemoveService();
+	}
+
+	int returnCode;
+
+	if (mRunAsService)
+	{
+		// We will be called reentrantly by the Service Control
+		// Manager, and we had better not call OurService again!
+		mRunAsService = false;
+
+		BOX_INFO("Box Backup service starting");
+		returnCode = OurService(rConfigFileName.c_str());
+		BOX_INFO("Box Backup service shut down");
+	}
+	else
+	{
+		returnCode = this->Daemon::Main(rConfigFileName);
+	}
+	
+	return returnCode;
+}
+
 void BackupDaemon::RunHelperThread(void)
 {
 	const Configuration &conf(GetConfiguration());
