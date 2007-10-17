@@ -161,17 +161,26 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 	{
 		// Dispose of the socket
 #ifdef WIN32
+		DWORD err = WSAGetLastError();
 		::closesocket(mSocketHandle);
 #else
+		int err = errno;
 		::close(mSocketHandle);
 #endif
+
 		BOX_ERROR("Failed to connect to socket (type " << Type <<
 			", name " << Name << ", port " << Port << "): " <<
-			"error " << errno << " (" << strerror(errno) << 
-			")");
+			#ifdef WIN32
+				GetErrorMessage(err)
+			#else
+				strerror(err) << " (" << err << ")"
+			#endif
+			);
+
 		mSocketHandle = INVALID_SOCKET_VALUE;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
 	}
+
 	ResetCounters();
 }
 
