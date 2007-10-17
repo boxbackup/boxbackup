@@ -27,10 +27,10 @@ public:
 	~WinNamedPipeStream();
 
 	// server side - create the named pipe and listen for connections
-	void Accept(const wchar_t* Name);
+	void Accept(const std::string& rName);
 
 	// client side - connect to a waiting server
-	void Connect(const wchar_t* Name);
+	void Connect(const std::string& rName);
 
 	// both sides
 	virtual int Read(void *pBuffer, int NBytes, 
@@ -61,6 +61,8 @@ private:
 	bool mWriteClosed;
 	bool mIsServer;
 	bool mIsConnected;
+
+	static std::string sPipeNamePrefix;
 };
 
 #endif // WINNAMEDPIPESTREAM__H
