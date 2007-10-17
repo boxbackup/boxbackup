@@ -439,12 +439,12 @@ int Daemon::Main(const std::string &rConfigFileName)
 			{
 				::close(devnull);
 			}
-#endif // ! WIN32
 
 			// And definitely don't try and send anything to those file descriptors
 			// -- this has in the past sent text to something which isn't expecting it.
 			TRACE_TO_STDOUT(false);
 			Logging::ToConsole(false);
+#endif // ! WIN32
 		}		
 	}
 	catch(BoxException &e)
