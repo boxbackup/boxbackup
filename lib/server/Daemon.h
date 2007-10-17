@@ -41,7 +41,9 @@ private:
 public:
 
 	int Main(const char *DefaultConfigFile, int argc, const char *argv[]);
-	int Main(const std::string &rConfigFile);
+
+	/* override this Main() if you want custom option processing: */
+	virtual int Main(const std::string &rConfigFile);
 	
 	virtual void Run();
 	const Configuration &GetConfiguration() const;
@@ -67,8 +69,8 @@ public:
 protected:
 	box_time_t GetLoadedConfigModifiedTime() const;
 	bool IsSingleProcess() { return mSingleProcess; }
-	std::string GetOptionString();
-	int ProcessOption(signed int option);
+	virtual std::string GetOptionString();
+	virtual int ProcessOption(signed int option);
 	
 private:
 	static void SignalHandler(int sigraised);
