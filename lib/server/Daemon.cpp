@@ -23,6 +23,8 @@
 	#include <ws2tcpip.h>
 #endif
 
+#include <iostream>
+
 #include "Daemon.h"
 #include "Configuration.h"
 #include "ServerException.h"
@@ -51,7 +53,8 @@ Daemon::Daemon()
 	  mSingleProcess(false),
 	  mRunInForeground(false),
 	  mKeepConsoleOpenAfterFork(false),
-	  mHaveConfigFile(false)
+	  mHaveConfigFile(false),
+	  mAppName(DaemonName())
 {
 	if(spDaemon != NULL)
 	{
@@ -99,7 +102,33 @@ Daemon::~Daemon()
 // --------------------------------------------------------------------------
 std::string Daemon::GetOptionString()
 {
-	return "c:DFqvVt:Tk";
+	return "c:"
+	#ifndef WIN32
+		"DFk"
+	#endif
+		"hqvVt:T";
+}
+
+void Daemon::Usage()
+{
+	std::cout << 
+	DaemonBanner() << "\n"
+	"\n"
+	"Usage: " << mAppName << " [options] [config file]\n" <<
+	"\n"
+	"Options:\n"
+	"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
+	"             argument is the configuration file\n"
+#ifndef WIN32
+	"  -D         Debugging mode, do not fork, one process only, one client only\n"
+	"  -F         Do not fork into background, but fork to serve multiple clients\n"
+	"  -k         Keep console open after fork, keep writing log messages to it\n"
+#endif
+	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
+	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
+	"  -V         Run at maximum verbosity\n"
+	"  -t <tag>   Tag console output with specified marker\n"
+	"  -T         Timestamp console output\n";
 }
 
 // --------------------------------------------------------------------------
@@ -124,6 +153,7 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
+#ifndef WIN32
 		case 'D':
 		{
 			mSingleProcess = true;
@@ -133,6 +163,20 @@ int Daemon::ProcessOption(signed int option)
 		case 'F':
 		{
 			mRunInForeground = true;
+		}
+		break;
+
+		case 'k':
+		{
+			mKeepConsoleOpenAfterFork = true;
+		}
+		break;
+#endif
+
+		case 'h':
+		{
+			Usage();
+			return 2;
 		}
 		break;
 
@@ -180,12 +224,6 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
-		case 'k':
-		{
-			mKeepConsoleOpenAfterFork = true;
-		}
-		break;
-
 		case '?':
 		{
 			BOX_FATAL("Unknown option on command line: " 
@@ -219,12 +257,19 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 {
 	// Find filename of config file
 	mConfigFileName = DefaultConfigFile;
+	mAppName = argv[0];
 
 	#ifdef NDEBUG
 	mLogLevel = Log::NOTICE; // need an int to do math with
 	#else
 	mLogLevel = Log::INFO; // need an int to do math with
 	#endif
+
+	if (argc == 2 && strcmp(argv[1], "/?") == 0)
+	{
+		Usage();
+		return 2;
+	}
 
 	signed int c;
 
@@ -283,11 +328,9 @@ int Daemon::Main(const std::string &rConfigFileName)
 {
 	// Banner (optional)
 	{
-		const char *banner = DaemonBanner();
-		if(banner != 0)
-		{
-			BOX_NOTICE(banner);
-		}
+		#ifndef NDEBUG
+		BOX_NOTICE(DaemonBanner());
+		#endif
 	}
 
 	std::string pidFileName;
@@ -671,9 +714,9 @@ const char *Daemon::DaemonName() const
 //		Created: 1/1/04
 //
 // --------------------------------------------------------------------------
-const char *Daemon::DaemonBanner() const
+std::string Daemon::DaemonBanner() const
 {
-	return 0;
+	return "Generic daemon using the Box Application Framework";
 }
 
 

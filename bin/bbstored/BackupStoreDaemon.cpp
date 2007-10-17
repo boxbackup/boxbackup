@@ -93,14 +93,9 @@ const char *BackupStoreDaemon::DaemonName() const
 //		Created: 1/1/04
 //
 // --------------------------------------------------------------------------
-const char *BackupStoreDaemon::DaemonBanner() const
+std::string BackupStoreDaemon::DaemonBanner() const
 {
-#ifndef NDEBUG
-	// Don't display banner in debug builds
-	return 0;
-#else
 	return BANNER_TEXT("Backup Store Server");
-#endif
 }
 
 
