@@ -14,6 +14,6 @@
 
 int RemoveService  (void);
 int InstallService (const char* pConfigFilePath);
-int OurService     (char* pConfigFileName);
+int OurService     (const char* pConfigFileName);
 
 #endif
