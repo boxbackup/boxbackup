@@ -14,10 +14,12 @@
 
 Win32BackupService* gpDaemonService = NULL;
 extern HANDLE gStopServiceEvent;
+extern DWORD gServiceReturnCode;
 
 unsigned int WINAPI RunService(LPVOID lpParameter)
 {
 	DWORD retVal = gpDaemonService->WinService((const char*) lpParameter);
+	gServiceReturnCode = retVal;
 	SetEvent(gStopServiceEvent);
 	return retVal;
 }

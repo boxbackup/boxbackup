@@ -30,6 +30,7 @@ TCHAR* gServiceName = TEXT("Box Backup Service");
 SERVICE_STATUS gServiceStatus;
 SERVICE_STATUS_HANDLE gServiceStatusHandle = 0;
 HANDLE gStopServiceEvent = 0;
+DWORD gServiceReturnCode = 0;
 
 #define SERVICE_NAME "boxbackup"
 
@@ -43,7 +44,8 @@ void ErrorHandler(char *s, DWORD err)
 {
 	char buf[256];
 	memset(buf, 0, sizeof(buf));
-	_snprintf(buf, sizeof(buf)-1, "%s (%d)", s, err);
+	_snprintf(buf, sizeof(buf)-1, "%s: %s", s,
+		GetErrorMessage(err).c_str());
 	BOX_ERROR(buf);
 	MessageBox(0, buf, "Error", 
 		MB_OK | MB_SETFOREGROUND | MB_DEFAULT_DESKTOP_ONLY);
@@ -156,14 +158,22 @@ VOID ServiceMain(DWORD argc, LPTSTR *argv)
 		// service is now stopped
 		gServiceStatus.dwControlsAccepted &= 
 			~(SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+
 		gServiceStatus.dwCurrentState = SERVICE_STOPPED;
+
+		if (gServiceReturnCode != 0)
+		{
+			gServiceStatus.dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;
+			gServiceStatus.dwServiceSpecificExitCode = gServiceReturnCode;
+		}
+
 		SetServiceStatus(gServiceStatusHandle, &gServiceStatus);
 	}
 }
 
-int OurService(char* pConfigFileName)
+int OurService(const char* pConfigFileName)
 {
-	spConfigFileName = pConfigFileName;
+	spConfigFileName = strdup(pConfigFileName);
 
 	SERVICE_TABLE_ENTRY serviceTable[] = 
 	{ 
@@ -174,6 +184,9 @@ int OurService(char* pConfigFileName)
 
 	// Register with the SCM
 	success = StartServiceCtrlDispatcher(serviceTable);
+
+	free(spConfigFileName);
+	spConfigFileName = NULL;
 
 	if (!success)
 	{
@@ -222,7 +235,7 @@ int InstallService(const char* pConfigFileName)
 	cmd[sizeof(cmd)-1] = 0;
 
 	std::string cmdWithArgs(cmd);
-	cmdWithArgs += " --service";
+	cmdWithArgs += " -s";
 
 	if (pConfigFileName != NULL)
 	{
