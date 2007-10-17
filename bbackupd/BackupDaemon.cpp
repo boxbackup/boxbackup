@@ -128,7 +128,8 @@ BackupDaemon::BackupDaemon()
 	#ifdef WIN32
 	, mInstallService(false),
 	  mRemoveService(false),
-	  mRunAsService(false)
+	  mRunAsService(false),
+	  mServiceName("bbackupd")
 	#endif
 {
 	// Only ever one instance of a daemon
@@ -347,13 +348,15 @@ int BackupDaemon::Main(const std::string &rConfigFileName)
 {
 	if (mInstallService)
 	{
-		return InstallService(rConfigFileName.c_str());
+		return InstallService(rConfigFileName.c_str(), mServiceName);
 	}
 
 	if (mRemoveService)
 	{
-		return RemoveService();
+		return RemoveService(mServiceName);
 	}
+
+	Logging::SetProgramName("Box Backup (" + mServiceName + ")");
 
 	int returnCode;
 

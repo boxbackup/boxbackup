@@ -12,8 +12,8 @@
 #ifndef WIN32SERVICEFUNCTIONS_H
 #define WIN32SERVICEFUNCTIONS_H
 
-int RemoveService  (void);
-int InstallService (const char* pConfigFilePath);
+int RemoveService  (const std::string& rServiceName);
+int InstallService (const char* pConfigFilePath, const std::string& rServiceName);
 int OurService     (const char* pConfigFileName);
 
 #endif
