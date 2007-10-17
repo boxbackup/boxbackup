@@ -51,7 +51,7 @@ Daemon::Daemon()
 	  mSingleProcess(false),
 	  mRunInForeground(false),
 	  mKeepConsoleOpenAfterFork(false),
-	  mHaveConfigFile(false);
+	  mHaveConfigFile(false)
 {
 	if(spDaemon != NULL)
 	{
