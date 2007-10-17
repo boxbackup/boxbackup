@@ -57,14 +57,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "Box.h"
+// #include "Box.h"
 
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
-#ifdef _MSC_VER
+#include "getopt.h"
+
+#if defined _MSC_VER || defined __MINGW32__
 #define	REPLACE_GETOPT		/* use this getopt as the system getopt(3) */
 #endif
 
