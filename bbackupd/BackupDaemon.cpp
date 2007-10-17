@@ -38,6 +38,8 @@
 	#include <process.h>
 #endif
 
+#include <iostream>
+
 #include "Configuration.h"
 #include "IOStream.h"
 #include "MemBlockStream.h"
@@ -209,13 +211,21 @@ const char *BackupDaemon::DaemonName() const
 //		Created: 1/1/04
 //
 // --------------------------------------------------------------------------
-const char *BackupDaemon::DaemonBanner() const
+std::string BackupDaemon::DaemonBanner() const
 {
-#ifndef NDEBUG
-	// Don't display banner in debug builds
-	return 0;
-#else
 	return BANNER_TEXT("Backup Client");
+}
+
+void BackupDaemon::Usage()
+{
+	this->Daemon::Usage();
+
+#ifdef WIN32
+	std::cout <<
+	"  -s         Run as a Windows Service, for internal use only\n"
+	"  -i         Install Windows Service (you may want to specify a config file)\n"
+	"  -r         Remove Windows Service\n"
+	"  -S <name>  Service name for -i and -r options\n";
 #endif
 }
 

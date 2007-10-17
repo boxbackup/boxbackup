@@ -56,7 +56,7 @@ protected:
 	void Connection2(SocketStreamTLS &rStream);
 	
 	virtual const char *DaemonName() const;
-	virtual const char *DaemonBanner() const;
+	virtual std::string DaemonBanner() const;
 
 	const ConfigurationVerify *GetConfigVerify() const;
 	
