@@ -148,9 +148,6 @@ bool checkfilesleftopen()
 		return true;
 	}
 
-	// make sure syslog log file is closed, if it was opened
-	::closelog();
-
 	// Count the file descriptors open
 	return check_filedes(true);
 }
@@ -228,11 +225,11 @@ int main(int argc, char * const * argv)
 
 	if(fulltestmode)
 	{
+		// banner
+		BOX_NOTICE("Running test TEST_NAME in " MODE_TEXT " mode...");
+
 		// Count open file descriptors for a very crude "files left open" test
 		check_filedes(false);
-
-		// banner
-		printf("Running test TEST_NAME in " MODE_TEXT " mode...\n");
 
 		#ifdef WIN32
 			// Under win32 we must initialise the Winsock library
