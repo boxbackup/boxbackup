@@ -64,26 +64,78 @@ int filedes_open_at_beginning = -1;
 #ifdef WIN32
 
 // any way to check for open file descriptors on Win32?
-inline int  count_filedes()      { return 0;     }
-inline bool checkfilesleftopen() { return false; }
+inline bool check_filedes(bool x) { return 0;     }
+inline bool checkfilesleftopen()  { return false; }
 
 #else // !WIN32
 
-int count_filedes()
+#define FILEDES_MAX 256
+
+bool filedes_open[FILEDES_MAX];
+
+bool check_filedes(bool report)
 {
-	int c = 0;
+	bool allOk = true;
 
 	// See how many file descriptors there are with values < 256
-	for(int d = 0; d < 256; ++d)
+	for(int d = 0; d < FILEDES_MAX; ++d)
 	{
 		if(::fcntl(d, F_GETFD) != -1)
 		{
 			// File descriptor obviously exists
-			++c;
+			if (report && !filedes_open[d])
+			{
+				struct stat st;
+				if (fstat(d, &st) == 0)
+				{
+					int m = st.st_mode;
+					#define flag(x) ((m & x) ? #x " " : "")
+					BOX_FATAL("File descriptor " << d << 
+						" left open (type == " <<
+						flag(S_IFIFO) <<
+						flag(S_IFCHR) <<
+						flag(S_IFDIR) <<
+						flag(S_IFBLK) <<
+						flag(S_IFREG) <<
+						flag(S_IFLNK) <<
+						flag(S_IFSOCK) <<
+						flag(S_IFWHT) << " plus " <<							m << ")");
+				}
+				else
+				{
+					BOX_FATAL("File descriptor " << d << 
+						" left open (and stat failed)");
+				}
+	
+				allOk = false;
+				
+			}
+			else if (!report)
+			{
+				filedes_open[d] = true;
+			}
+		}
+		else 
+		{
+			if (report && filedes_open[d])
+			{
+				BOX_FATAL("File descriptor " << d << 
+					" was open, now closed");
+				allOk = false;
+			}
+			else
+			{
+				filedes_open[d] = false;
+			}
 		}
 	}
+
+	if (!report && allOk)
+	{
+		filedes_open_at_beginning = 0;
+	}
 	
-	return c;
+	return !allOk;
 }
 
 bool checkfilesleftopen()
@@ -92,6 +144,7 @@ bool checkfilesleftopen()
 	{
 		// Not used correctly, pretend that there were things 
 		// left open so this gets investigated
+		BOX_FATAL("File descriptor test was not initialised");
 		return true;
 	}
 
@@ -99,7 +152,7 @@ bool checkfilesleftopen()
 	::closelog();
 
 	// Count the file descriptors open
-	return filedes_open_at_beginning != count_filedes();
+	return check_filedes(true);
 }
 
 #endif
@@ -176,7 +229,7 @@ int main(int argc, char * const * argv)
 	if(fulltestmode)
 	{
 		// Count open file descriptors for a very crude "files left open" test
-		filedes_open_at_beginning = count_filedes();
+		check_filedes(false);
 
 		// banner
 		printf("Running test TEST_NAME in " MODE_TEXT " mode...\n");
