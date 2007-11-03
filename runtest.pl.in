@@ -86,13 +86,15 @@ sub runtest
 		$exit_code = 2;
 		return;
 	}
+
+	my $logfile = "test-$t.log";
 	
 	# run it
 	my $test_res = system("cd $test_mode/test/$t ; ./t 2>&1 " .
-		"| tee ../../../temp.runtest");
+		"| tee ../../../$logfile");
 
 	# open test results
-	if(open RESULTS,'temp.runtest')
+	if(open RESULTS, $logfile)
 	{
 		my $last;
 		while(<RESULTS>)
@@ -102,7 +104,7 @@ sub runtest
 		close RESULTS;
 
 		chomp $last;
-		push @results,"$t: $last";
+		push @results, "$t: $last";
 
 		if ($last ne "PASSED") 
 		{ 
@@ -111,10 +113,11 @@ sub runtest
 	}
 	else
 	{
-		push @results,"$t: output not found";
+		push @results, 
+			"$t: failed to open test log file: $logfile: $!";
 	}
 	
 	# delete test results
-	# unlink 'temp.runtest';
+	# unlink $logfile;
 }
 
