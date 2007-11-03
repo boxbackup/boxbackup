@@ -88,7 +88,8 @@ sub runtest
 	}
 	
 	# run it
-	my $test_res = system("cd $test_mode/test/$t ; ./t | tee ../../../temp.runtest");
+	my $test_res = system("cd $test_mode/test/$t ; ./t 2>&1 " .
+		"| tee ../../../temp.runtest");
 
 	# open test results
 	if(open RESULTS,'temp.runtest')
@@ -114,6 +115,6 @@ sub runtest
 	}
 	
 	# delete test results
-	unlink 'temp.runtest';
+	# unlink 'temp.runtest';
 }
 
