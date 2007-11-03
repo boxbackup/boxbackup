@@ -42,7 +42,7 @@ void Timers::Init()
 		struct sigaction newact, oldact;
 		newact.sa_handler = Timers::SignalHandler;
 		newact.sa_flags = SA_RESTART;
-		::sigemptyset(&newact.sa_mask);
+		sigemptyset(&newact.sa_mask);
 		if (::sigaction(SIGALRM, &newact, &oldact) != 0)
 		{
 			BOX_ERROR("Failed to install signal handler");
@@ -80,7 +80,7 @@ void Timers::Cleanup()
 		struct sigaction newact, oldact;
 		newact.sa_handler = SIG_DFL;
 		newact.sa_flags = SA_RESTART;
-		::sigemptyset(&newact.sa_mask);
+		sigemptyset(&(newact.sa_mask));
 		if (::sigaction(SIGALRM, &newact, &oldact) != 0)
 		{
 			BOX_ERROR("Failed to remove signal handler");
