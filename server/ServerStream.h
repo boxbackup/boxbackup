@@ -227,7 +227,8 @@ public:
 
 				if(psocket)
 				{
-					// Get the incomming connection (with zero wait time)
+					// Get the incoming connection
+					// (with zero wait time)
 					std::string logMessage;
 					std::auto_ptr<StreamType> connection(psocket->Accept(0, &logMessage));
 
@@ -272,7 +273,7 @@ public:
 							}
 							
 							// Log it
-							BOX_WARNING("Error message from child process " << pid << ": " << logMessage);
+							BOX_WARNING("Message from child process " << pid << ": " << logMessage);
 						}
 						else
 						{
