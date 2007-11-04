@@ -453,8 +453,11 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				BackupStoreFilenameClear nm(en->GetName());
 				std::string localFilename(rLocalDirectoryName + DIRECTORY_SEPARATOR_ASCHAR + nm.GetClearFilename());
 				
-				// Unlink anything which already exists -- for resuming restores, we can't overwrite files already there.
-				if(::unlink(localFilename.c_str()) != 0)
+				// Unlink anything which already exists:
+				// For resuming restores, we can't overwrite
+				// files already there.
+				if(ObjectExists(localFilename) != ObjectExists_NoObject &&
+					::unlink(localFilename.c_str()) != 0)
 				{
 					BOX_ERROR("Failed to delete file '" <<
 						localFilename << "': " <<
