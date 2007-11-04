@@ -542,37 +542,7 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 		}
 	}
 }
-#endif // !WIN32
 
-void force_sync()
-{
-	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-		"force-sync") == 0);
-	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-}
-
-void wait_for_sync_start()
-{
-	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-		"wait-for-sync") == 0);
-	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-}
-
-void wait_for_sync_end()
-{
-	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-		"wait-for-end") == 0);
-	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-}
-
-void sync_and_wait()
-{
-	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-		"force-sync") == 0);
-	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
-}
-
-#ifdef WIN32
 bool set_file_time(const char* filename, FILETIME creationTime, 
 	FILETIME lastModTime, FILETIME lastAccessTime)
 {
