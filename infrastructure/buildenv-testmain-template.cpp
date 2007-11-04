@@ -99,7 +99,7 @@ bool check_filedes(bool report)
 						flag(S_IFREG) <<
 						flag(S_IFLNK) <<
 						flag(S_IFSOCK) <<
-						flag(S_IFWHT) << " plus " <<							m << ")");
+						" or " << m << ")");
 				}
 				else
 				{
