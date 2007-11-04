@@ -59,7 +59,7 @@ NamedLock::~NamedLock()
 // Function
 //		Name:    NamedLock::TryAndGetLock(const char *, int)
 //		Purpose: Trys to get a lock on the name in the file system.
-//				 IMPORTANT NOTE: If a file exists with this name, it will be deleted.
+//			 IMPORTANT NOTE: If a file exists with this name, it will be deleted.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
@@ -93,6 +93,7 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 	int fd = ::open(Filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd == -1)
 	{
+		BOX_WARNING("Failed to open lockfile: " << Filename);
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
 
