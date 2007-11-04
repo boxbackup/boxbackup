@@ -1580,7 +1580,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			{
 				// Not found -- report
 				BOX_WARNING("Local file '" << 
-					localDirDisplay << "' does not exist, "
+					localPathDisplay << "' does not exist, "
 					"but store file '" <<
 					storePathDisplay << "' does.");
 				rParams.mDifferences ++;
