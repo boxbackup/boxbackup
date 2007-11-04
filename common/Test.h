@@ -24,6 +24,22 @@
 
 #include <string>
 
+#ifdef WIN32
+#define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
+#define BBACKUPD        "..\\..\\bin\\bbackupd\\bbackupd.exe"
+#define BBSTORED        "..\\..\\bin\\bbstored\\bbstored.exe"
+#define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
+#define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
+#else
+#define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
+#define BBACKUPD        "../../bin/bbackupd/bbackupd"
+#define BBSTORED        "../../bin/bbstored/bbstored"
+#define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
+#define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
+#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
+#endif
+
 extern int failures;
 extern int first_fail_line;
 extern std::string first_fail_file;
@@ -353,21 +369,33 @@ inline void TestRemoteProcessMemLeaksFunc(const char *filename,
 #endif
 }
 
-#ifdef WIN32
-#define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
-#define BBACKUPD        "..\\..\\bin\\bbackupd\\bbackupd.exe"
-#define BBSTORED        "..\\..\\bin\\bbstored\\bbstored.exe"
-#define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
-#define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
-#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
-#else
-#define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
-#define BBACKUPD        "../../bin/bbackupd/bbackupd"
-#define BBSTORED        "../../bin/bbstored/bbstored"
-#define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
-#define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
-#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
-#endif
+inline void force_sync()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"force-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+inline void wait_for_sync_start()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"wait-for-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+inline void wait_for_sync_end()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"wait-for-end") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
+
+inline void sync_and_wait()
+{
+	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
+		"force-sync") == 0);
+	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+}
 
 inline void terminate_bbackupd(int pid)
 {
