@@ -135,15 +135,15 @@ bool FileExists(const char *Filename, int64_t *pFileSize, bool TreatLinksAsNotEx
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ObjectExists(const char *)
+//		Name:    ObjectExists(const std::string& rFilename)
 //		Purpose: Does a object exist, and if so, is it a file or a directory?
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-int ObjectExists(const char *Filename)
+int ObjectExists(const std::string& rFilename)
 {
 	struct stat st;
-	if(::stat(Filename, &st) != 0)
+	if(::stat(rFilename.c_str(), &st) != 0)
 	{
 		if(errno == ENOENT)
 		{
