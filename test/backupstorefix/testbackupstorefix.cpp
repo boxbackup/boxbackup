@@ -310,19 +310,24 @@ int test(int argc, const char *argv[])
 		TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
 			" testfiles/testbackupstorefix.pl init") == 0);
 
-		int bbackupd_pid = LaunchServer(BBACKUPD 
-			" testfiles/bbackupd.conf", "testfiles/bbackupd.pid");
+		std::string cmd = BBACKUPD + bbackupd_args +
+			" testfiles/bbackupd.conf";
+		int bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
 
 		if(bbackupd_pid > 0)
 		{
 			::safe_sleep(1);
 			TEST_THAT(ServerIsAlive(bbackupd_pid));
+
+			// Wait 4 more seconds for the files to be old enough
+			// to upload
+			::safe_sleep(4);
 	
-			// Create a nice store directory
+			// Upload files to create a nice store directory
 			::sync_and_wait();
 
-			// That'll do nicely, stop the server	
+			// Stop bbackupd
 			#ifdef WIN32
 				terminate_bbackupd(bbackupd_pid);
 				// implicit check for memory leaks
