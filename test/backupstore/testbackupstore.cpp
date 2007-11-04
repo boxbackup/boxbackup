@@ -1211,6 +1211,7 @@ int test_server(const char *hostname)
 			StreamableMemBlock attr(attr1, sizeof(attr1));
 			TEST_THAT(dir.GetAttributes() == attr);
 		}
+
 		// Check that we don't get attributes if we don't ask for them
 		{
 			// Command
@@ -1224,6 +1225,10 @@ int test_server(const char *hostname)
 			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
 			TEST_THAT(!dir.HasAttributes());
 		}
+
+		// sleep to ensure that the timestamp on the file will change
+		::safe_sleep(1);
+
 		// Change attributes on the directory
 		{
 			MemBlockStream attrnew(attr2, sizeof(attr2));
@@ -1262,6 +1267,7 @@ int test_server(const char *hostname)
 				subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName));
 			TEST_THAT(rep->GetObjectID() == uploads[UPLOAD_FILE_TO_MOVE].allocated_objid);
 		}
+
 		// Try some dodgy renames
 		{
 			BackupStoreFilenameClear newName("moved-files");
@@ -1274,6 +1280,10 @@ int test_server(const char *hostname)
 					subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName),
 				ConnectionException, Conn_Protocol_UnexpectedReply);
 		}
+
+		// sleep to ensure that the timestamp on the file will change
+		::safe_sleep(1);
+
 		// Rename within a directory
 		{
 			BackupStoreFilenameClear newName("moved-files-x");
@@ -1281,6 +1291,7 @@ int test_server(const char *hostname)
 				subdirid,
 				subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName);
 		}
+
 		// Check it's all gone from the root directory...
 		{
 			// Command
@@ -1300,6 +1311,7 @@ int test_server(const char *hostname)
 				TEST_THAT(en->GetName() != uploads[UPLOAD_FILE_TO_MOVE].name);
 			}
 		}
+
 		// Check the old and new versions are in the other directory
 		{
 			BackupStoreFilenameClear lookFor("moved-files-x");
@@ -1329,6 +1341,7 @@ int test_server(const char *hostname)
 			TEST_THAT(foundCurrent);
 			TEST_THAT(foundOld);
 		}
+
 		// make a little bit more of a thing to look at
 		int64_t subsubdirid = 0;
 		int64_t subsubfileid = 0;
@@ -1352,6 +1365,7 @@ int test_server(const char *hostname)
 				upload));
 			subsubfileid = stored->GetObjectID();
 		}
+
 		// Query names -- test that invalid stuff returns not found OK
 		{
 			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(3248972347823478927LL, subsubdirid));
@@ -1369,6 +1383,7 @@ int test_server(const char *hostname)
 			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(BackupProtocolClientGetObjectName::ObjectID_DirectoryOnly, 2234342378424LL));
 			TEST_THAT(nameRep->GetNumNameElements() == 0);		
 		}
+
 		// Query names... first, get info for the file
 		{
 			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(subsubfileid, subsubdirid));
@@ -1386,6 +1401,7 @@ int test_server(const char *hostname)
 				TEST_THAT(fn.GetClearFilename() == testnames[l]);
 			}
 		}
+
 		// Query names... secondly, for the directory
 		{
 			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(BackupProtocolClientGetObjectName::ObjectID_DirectoryOnly, subsubdirid));
@@ -1685,8 +1701,9 @@ int test3(int argc, const char *argv[])
 
 	// First, try logging in without an account having been created... just make sure login fails.
 
-	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf",
-		"testfiles/bbstored.pid");
+	std::string cmd = BBSTORED " " + bbstored_args + 
+		" testfiles/bbstored.conf";
+	int pid = LaunchServer(cmd.c_str(), "testfiles/bbstored.pid");
 
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
