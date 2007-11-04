@@ -316,11 +316,11 @@ int test(int argc, const char *argv[])
 
 		if(bbackupd_pid > 0)
 		{
-			::sleep(1);
+			::safe_sleep(1);
 			TEST_THAT(ServerIsAlive(bbackupd_pid));
 	
 			// Create a nice store directory
-			wait_for_operation(14);
+			::sync_and_wait();
 
 			// That'll do nicely, stop the server	
 			#ifdef WIN32
