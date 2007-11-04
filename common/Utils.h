@@ -29,7 +29,7 @@ enum
 	ObjectExists_File = 1,
 	ObjectExists_Dir = 2
 };
-int ObjectExists(const char *Filename);
+int ObjectExists(const std::string& rFilename);
 
 #include "MemLeakFindOff.h"
 
