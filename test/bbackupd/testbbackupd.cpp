@@ -1622,6 +1622,10 @@ int test_bbackupd()
 			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
 				"syncallowscript.notifyran.2", &st) == 0);
 
+			// bbackupquery compare might take a while
+			// on slow machines, so start the timer now
+			long start_time = time(NULL);
+
 			// check that no backup has run (compare fails)
 			compareReturnValue = ::system(BBACKUPQUERY " -q "
 				"-c testfiles/bbackupd.conf "
@@ -1630,7 +1634,6 @@ int test_bbackupd()
 			TEST_RETURN(compareReturnValue, 2);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
-			long start_time = time(NULL);
 			TEST_THAT(unlink(sync_control_file) == 0);
 			wait_for_sync_start();
 			long end_time = time(NULL);
