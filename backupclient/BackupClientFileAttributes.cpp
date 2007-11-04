@@ -248,7 +248,9 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	
 	if(!IgnoreModTime)
 	{
-		if(a1->ModificationTime != a2->ModificationTime)
+		int t1 = a1->ModificationTime / 1000000;
+		int t2 = a2->ModificationTime / 1000000;
+		if(t1 != t2)
 		{
 			return false;
 		}
@@ -256,7 +258,9 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 
 	if(!IgnoreAttrModTime)
 	{
-		if(a1->AttrModificationTime != a2->AttrModificationTime)
+		int t1 = a1->AttrModificationTime / 1000000;
+		int t2 = a2->AttrModificationTime / 1000000;
+		if(t1 != t2)
 		{
 			return false;
 		}
