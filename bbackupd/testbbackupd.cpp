@@ -542,7 +542,9 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 		}
 	}
 }
+#endif // !WIN32
 
+#ifdef WIN32
 bool set_file_time(const char* filename, FILETIME creationTime, 
 	FILETIME lastModTime, FILETIME lastAccessTime)
 {
