@@ -393,7 +393,7 @@ inline void wait_for_sync_end()
 inline void sync_and_wait()
 {
 	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
-		"force-sync") == 0);
+		"sync-and-wait") == 0);
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
 }
 
