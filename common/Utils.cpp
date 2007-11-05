@@ -98,7 +98,7 @@ void DumpStackBacktrace()
 bool FileExists(const char *Filename, int64_t *pFileSize, bool TreatLinksAsNotExisting)
 {
 	struct stat st;
-	if(::stat(Filename, &st) != 0)
+	if(::lstat(Filename, &st) != 0)
 	{
 		if(errno == ENOENT)
 		{
