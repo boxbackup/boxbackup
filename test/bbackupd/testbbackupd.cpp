@@ -981,7 +981,7 @@ int test_bbackupd()
 			if (sub != comp)
 			{
 				printf("Expected <%s> but found <%s>\n",
-					comp.to_s, sub.to_s);
+					comp.c_str(), sub.c_str());
 			}
 		}
 
