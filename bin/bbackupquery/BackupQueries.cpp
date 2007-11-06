@@ -2028,11 +2028,13 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	catch(std::exception &e)
 	{
 		BOX_ERROR("Failed to restore: " << e.what());
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 	catch(...)
 	{
 		BOX_ERROR("Failed to restore: unknown exception");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 
@@ -2044,10 +2046,12 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	
 	case Restore_ResumePossible:
 		BOX_ERROR("Resume possible -- repeat command with -r flag to resume");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 	
 	case Restore_TargetExists:
 		BOX_ERROR("The target directory exists. You cannot restore over an existing directory.");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 		
 	#ifdef WIN32
@@ -2055,15 +2059,18 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		BOX_ERROR("The target directory path does not exist.\n"
 			"To restore to a directory whose parent "
 			"does not exist, create the parent first.");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 	#endif
 
 	case Restore_UnknownError:
 		BOX_ERROR("Unknown error during restore.");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 
 	default:
 		BOX_ERROR("Unknown restore result " << result << ".");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 	}
 }
