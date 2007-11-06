@@ -975,8 +975,14 @@ int test_bbackupd()
 			comp = "Send StoreFile(0x3,";
 			TEST_THAT(line.substr(0, comp.size()) == comp);
 			comp = ",0x0,\"f1\")";
-			TEST_THAT(line.substr(line.size() - comp.size())
-				== comp);
+			std::string sub = line.substr(line.size() - comp.size());
+
+			TEST_THAT(sub == comp);
+			if (sub != comp)
+			{
+				printf("Expected <%s> but found <%s>\n",
+					comp.to_s, sub.to_s);
+			}
 		}
 
 		intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
