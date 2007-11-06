@@ -619,8 +619,14 @@ int start_internal_daemon()
 	// ensure that no child processes end up running tests!
 	int own_pid = getpid();
 		
+	// this is a quick hack to allow passing some options to the daemon
+	const char* argv[] = {
+		"dummy",
+		bbackupd_args.c_str(),
+	};
+
 	BackupDaemon daemon;
-	int result = daemon.Main("testfiles/bbackupd.conf");
+	int result = daemon.Main("testfiles/bbackupd.conf", 2, argv);
 	
 	TEST_THAT(result == 0);
 	if (result != 0)
@@ -859,10 +865,22 @@ int test_bbackupd()
 			comp = "Send StoreFile(0x3,";
 			TEST_THAT(line.substr(0, comp.size()) == comp);
 			comp = ",\"f1\")";
-			TEST_THAT(line.substr(line.size() - comp.size())
-				== comp);
+			std::string sub = line.substr(line.size() - comp.size());
+
+			TEST_THAT(sub == comp);
+			if (sub != comp)
+			{
+				printf("Expected <%s> but found <%s> in <%s>\n",
+					comp.c_str(), sub.c_str(), line.c_str());
+			}
 		}
 		
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
+		}
+
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
 			0, 4000, SYS_read, 1);
 		pid = start_internal_daemon();
@@ -912,8 +930,20 @@ int test_bbackupd()
 			comp = "Send StoreFile(0x3,";
 			TEST_THAT(line.substr(0, comp.size()) == comp);
 			comp = ",0x0,\"f1\")";
-			TEST_THAT(line.substr(line.size() - comp.size())
-				== comp);
+			std::string sub = line.substr(line.size() - comp.size());
+
+			TEST_THAT(sub == comp);
+			if (sub != comp)
+			{
+				printf("Expected <%s> but found <%s> in <%s>\n",
+					comp.c_str(), sub.c_str(), line.c_str());
+			}
+		}
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
 		}
 
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
@@ -971,6 +1001,9 @@ int test_bbackupd()
 			TEST_THAT(reader.GetLine(line));
 			TEST_THAT(line == "Receive IsAlive()");
 
+			// should not be a diff, so previous version
+			// should be 0x0
+
 			TEST_THAT(reader.GetLine(line));
 			comp = "Send StoreFile(0x3,";
 			TEST_THAT(line.substr(0, comp.size()) == comp);
@@ -980,9 +1013,15 @@ int test_bbackupd()
 			TEST_THAT(sub == comp);
 			if (sub != comp)
 			{
-				printf("Expected <%s> but found <%s>\n",
-					comp.c_str(), sub.c_str());
+				printf("Expected <%s> but found <%s> in <%s>\n",
+					comp.c_str(), sub.c_str(), line.c_str());
 			}
+		}
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
 		}
 
 		intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
@@ -1055,6 +1094,12 @@ int test_bbackupd()
 			TEST_THAT(line == "Send GetIsAlive()");
 			TEST_THAT(reader.GetLine(line));
 			TEST_THAT(line == "Receive IsAlive()");
+		}
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
 		}
 
 		TEST_THAT(unlink(touchfile.c_str()) == 0);
