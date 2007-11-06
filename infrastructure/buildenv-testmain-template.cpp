@@ -176,7 +176,10 @@ int main(int argc, char * const * argv)
 		{
 			case 'c':
 			{
-				bbackupd_args += " ";
+				if (bbackupd_args.length() > 0)
+				{
+					bbackupd_args += " ";
+				}
 				bbackupd_args += optarg;
 			}
 			break;
