@@ -626,7 +626,16 @@ int start_internal_daemon()
 	};
 
 	BackupDaemon daemon;
-	int result = daemon.Main("testfiles/bbackupd.conf", 2, argv);
+	int result;
+
+	if (bbackupd_args.size() > 0)
+	{
+		result = daemon.Main("testfiles/bbackupd.conf", 2, argv);
+	}
+	else
+	{
+		result = daemon.Main("testfiles/bbackupd.conf", 1, argv);
+	}
 	
 	TEST_THAT(result == 0);
 	if (result != 0)
