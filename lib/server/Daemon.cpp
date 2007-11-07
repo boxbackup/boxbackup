@@ -276,11 +276,13 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	// reset getopt, just in case anybody used it before.
 	// unfortunately glibc and BSD differ on this point!
 	// http://www.ussg.iu.edu/hypermail/linux/kernel/0305.3/0262.html
-	#ifdef __GLIBC__
-		optind = 0;
-	#else
+	#if HAVE_DECL_OPTRESET == 1
 		optind = 1;
 		optreset = 1;
+	#elif defined __GLIBC__
+		optind = 0;
+	#else // Solaris, any others?
+		optind = 1;
 	#endif
 
 	while((c = getopt(argc, (char * const *)argv, 
