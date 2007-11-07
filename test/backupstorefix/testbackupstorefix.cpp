@@ -310,7 +310,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
 			" testfiles/testbackupstorefix.pl init") == 0);
 
-		std::string cmd = BBACKUPD + bbackupd_args +
+		std::string cmd = BBACKUPD + " " + bbackupd_args +
 			" testfiles/bbackupd.conf";
 		int bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);

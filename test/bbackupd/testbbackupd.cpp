@@ -1118,7 +1118,7 @@ int test_bbackupd()
 	}
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
-	std::string cmd = BBACKUPD + bbackupd_args + 
+	std::string cmd = BBACKUPD + " " + bbackupd_args + 
 		" testfiles/bbackupd-temploc.conf";
 
 	bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
@@ -1238,7 +1238,8 @@ int test_bbackupd()
 		// Kill the daemon
 		terminate_bbackupd(bbackupd_pid);
 
-		cmd = BBACKUPD + bbackupd_args + " testfiles/bbackupd.conf";
+		cmd = BBACKUPD + " " + bbackupd_args +
+			" testfiles/bbackupd.conf";
 		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
@@ -2976,7 +2977,8 @@ int test_bbackupd()
 		terminate_bbackupd(bbackupd_pid);
 		
 		// Start it again
-		cmd = BBACKUPD + bbackupd_args + " testfiles/bbackupd.conf";
+		cmd = BBACKUPD + " " + bbackupd_args +
+			" testfiles/bbackupd.conf";
 		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
