@@ -155,26 +155,26 @@ inline bool KillServer(int pid)
 
 	for (int i = 0; i < 30; i++)
 	{
-		if (!ServerIsAlive(pid)) break;
-		::sleep(1);
-		if (!ServerIsAlive(pid)) break;
-
 		if (i == 0) 
 		{
-			printf("waiting for server to die");
+			printf("Waiting for server to die: ");
 		}
 
 		printf(".");
 		fflush(stdout);
+
+		if (!ServerIsAlive(pid)) break;
+		::sleep(1);
+		if (!ServerIsAlive(pid)) break;
 	}
 
 	if (!ServerIsAlive(pid))
 	{
-		printf("done.\n");
+		printf(" done.\n");
 	}
 	else
 	{
-		printf("failed!\n");
+		printf(" failed!\n");
 	}
 
 	fflush(stdout);

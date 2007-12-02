@@ -419,7 +419,7 @@ inline void terminate_bbackupd(int pid)
 // Wait a given number of seconds for something to complete
 inline void wait_for_operation(int seconds)
 {
-	printf("waiting: ");
+	printf("Waiting: ");
 	fflush(stdout);
 	for(int l = 0; l < seconds; ++l)
 	{
@@ -427,7 +427,7 @@ inline void wait_for_operation(int seconds)
 		printf(".");
 		fflush(stdout);
 	}
-	printf("\n");
+	printf(" done.\n");
 	fflush(stdout);
 }
 
