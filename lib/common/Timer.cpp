@@ -65,6 +65,11 @@ void Timers::Init()
 void Timers::Cleanup()
 {
 	ASSERT(spTimers);
+	if (!spTimers)
+	{
+		BOX_ERROR("Tried to clean up timers when not initialised!");
+		return;
+	}
 	
 	#if defined WIN32 && ! defined PLATFORM_CYGWIN
 		// no support for signals at all
