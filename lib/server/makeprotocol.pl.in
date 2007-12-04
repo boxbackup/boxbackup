@@ -503,11 +503,11 @@ __E
 
 	if($implement_syslog)
 	{
-		my ($format,$args) = make_log_strings($cmd);
+		my ($log) = make_log_strings_framework($cmd);
 		print CPP <<__E;
 void ${class}LogSysLog(const char *Action) const
 {
-	::syslog(LOG_INFO,"%s $format",Action$args);
+	BOX_TRACE($log);
 }
 __E
 	}
@@ -1002,6 +1002,47 @@ sub make_log_strings
 		}
 	}
 	return ($cmd.'('.join(',',@str).')', join(',','',@arg));
+}
+
+sub make_log_strings_framework
+{
+	my ($cmd) = @_;
+
+	my @args;
+
+	for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
+	{
+		my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
+		
+		if(exists $log_display_types{$ty})
+		{
+			# need to translate it
+			my ($format,$arg) = @{$log_display_types{$ty}};
+			$arg =~ s/VAR/m$nm/g;
+
+			if ($format =~ m'x$')
+			{
+				$arg = "std::hex << std::showbase " .
+					"<< $arg << std::dec";
+			}
+
+			push @args, $arg;
+		}
+		else
+		{
+			# is opaque
+			push @args, '"OPAQUE"';
+		}
+	}
+
+	my $log_cmd = "Action << \" $cmd(\" ";
+	foreach my $arg (@args)
+	{
+		$arg = "<< $arg ";
+	}
+	$log_cmd .= join('<< "," ',@args);
+	$log_cmd .= '<< ")"';
+	return $log_cmd;
 }
 
 
