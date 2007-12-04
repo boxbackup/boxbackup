@@ -37,11 +37,9 @@
 #define BOX_WARNING(stuff) BOX_LOG(Log::WARNING, stuff)
 #define BOX_NOTICE(stuff)  BOX_LOG(Log::NOTICE,  stuff)
 #define BOX_INFO(stuff)    BOX_LOG(Log::INFO,    stuff)
-#if defined NDEBUG && ! defined COMPILE_IN_TRACES
-        #define BOX_TRACE(stuff)   
-#else
-        #define BOX_TRACE(stuff)   BOX_LOG(Log::TRACE, stuff)
-#endif
+#define BOX_TRACE(stuff)   \
+	if (Logging::IsEnabled(Log::TRACE)) \
+	{ BOX_LOG(Log::TRACE, stuff) }
 
 #define BOX_FORMAT_ACCOUNT(accno) \
 	std::hex << \
@@ -193,6 +191,10 @@ class Logging
 	static void SetContext(std::string context);
 	static void ClearContext();
 	static void SetGlobalLevel(Log::Level level) { sGlobalLevel = level; }
+	static bool IsEnabled(Log::Level level)
+	{
+		return (int)sGlobalLevel >= (int)level;
+	}
 	static void SetProgramName(const std::string& rProgramName);
 };
 
