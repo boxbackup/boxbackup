@@ -18,17 +18,17 @@
 	#include <sys/time.h>
 #endif
 
-#include "BackupStoreFile.h"
-#include "BackupStoreFileWire.h"
-#include "BackupStoreFileCryptVar.h"
-#include "BackupStoreObjectMagic.h"
-#include "BackupStoreException.h"
-#include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreConstants.h"
-#include "FileStream.h"
-#include "RollingChecksum.h"
-#include "MD5Digest.h"
+#include "BackupStoreException.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreFileCryptVar.h"
+#include "BackupStoreFileEncodeStream.h"
+#include "BackupStoreFileWire.h"
+#include "BackupStoreObjectMagic.h"
 #include "CommonException.h"
+#include "FileStream.h"
+#include "MD5Digest.h"
+#include "RollingChecksum.h"
 #include "Timer.h"
 
 #include "MemLeakFindOn.h"
@@ -485,10 +485,9 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
 	
-	// TODO: Use buffered file class
-	// Because we read in the file a scanned block size at a time, it is likely to be
-	// inefficient. Probably will be much better to use a buffering IOStream class which
-	// reads data in at the size of the filesystem block size.
+	// TODO: Because we read in the file a scanned block size at a time,
+	// it is likely to be inefficient. Probably will be much better to
+	// calculate checksums for all block sizes in a single pass.
 
 	// Allocate the buffers.
 	uint8_t *pbuffer0 = (uint8_t *)::malloc(bufSize);
@@ -513,7 +512,8 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		for(int s = BACKUP_FILE_DIFF_MAX_BLOCK_SIZES - 1; s >= 0; --s)
 		{
 			ASSERT(Sizes[s] <= bufSize);
-			//TRACE2("Diff pass %d, for block size %d\n", s, Sizes[s]);
+			BOX_TRACE("Diff pass " << s << ", for block size " <<
+				Sizes[s]);
 			
 			// Check we haven't finished
 			if(Sizes[s] == 0)
@@ -552,8 +552,8 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 				if(maximumDiffingTime.HasExpired())
 				{
 					ASSERT(pDiffTimer != NULL);
-					TRACE0("MaximumDiffingTime reached - "
-						"suspending file diff\n");
+					BOX_INFO("MaximumDiffingTime reached - "
+						"suspending file diff");
 					abortSearch = true;
 					break;
 				}
@@ -621,6 +621,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					{
 						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks))
 						{
+							BOX_TRACE("Found block match for " << hash << " of " << Sizes[s] << " bytes at offset " << fileOffset);
 							goodnessOfFit[fileOffset] = Sizes[s];
 
 							// Block matched, roll the checksum forward to the next block without doing
@@ -645,6 +646,10 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 							
 							// End this loop, so the final byte isn't used again
 							break;
+						}
+						else
+						{
+							BOX_TRACE("False alarm match for " << hash << " of " << Sizes[s] << " bytes at offset " << fileOffset);
 						}
 
 						int64_t NumBlocksFound = static_cast<int64_t>(
@@ -722,7 +727,9 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 	if(BackupStoreFile::TraceDetailsOfDiffProcess)
 	{
 		// Trace out the found blocks in debug mode
-		TRACE0("Diff: list of found blocks\n======== ======== ======== ========\n  Offset   BlkIdx     Size Movement\n");
+		BOX_TRACE("Diff: list of found blocks");
+		BOX_TRACE("======== ======== ======== ========");
+		BOX_TRACE("  Offset   BlkIdx     Size Movement");
 		for(std::map<int64_t, int64_t>::const_iterator i(rFoundBlocks.begin()); i != rFoundBlocks.end(); ++i)
 		{
 			int64_t orgLoc = 0;
@@ -730,10 +737,13 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			{
 				orgLoc += pIndex[b].mSize;
 			}
-			TRACE4("%8lld %8lld %8lld %8lld\n", i->first, i->second,
-				(int64_t)(pIndex[i->second].mSize), i->first - orgLoc);
+			BOX_TRACE(std::setw(8) << i->first << " " <<
+				std::setw(8) << i->second << " " <<
+				std::setw(8) << pIndex[i->second].mSize << 
+				" " << 
+				std::setw(8) << (i->first - orgLoc));
 		}
-		TRACE0("======== ======== ======== ========\n");
+		BOX_TRACE("======== ======== ======== ========");
 	}
 #endif
 }
