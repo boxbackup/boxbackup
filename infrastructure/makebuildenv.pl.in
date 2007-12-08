@@ -525,9 +525,9 @@ __E
 #    do not edit!
 #
 #
-CXX = g++
-AR = ar
-RANLIB = ranlib
+CXX = "@CXX@"
+AR = "@AR@"
+RANLIB = "@RANLIB@"
 PERL = "@PERL@"
 WINDRES = windres
 .ifdef RELEASE
