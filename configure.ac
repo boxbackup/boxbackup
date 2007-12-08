@@ -42,6 +42,11 @@ AC_SUBST([TARGET_PERL])
 AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$TARGET_PERL"], 
 	[Location of the perl executable])
 
+AC_CHECK_PROGS([AR],     [ar],    
+	[AC_MSG_ERROR([[cannot find ar executable]])])
+AC_CHECK_PROGS([RANLIB], [ranlib],
+	[AC_MSG_ERROR([[cannot find ranlib executable]])])
+
 ### Checks for libraries.
 
 case $target_os in
@@ -137,6 +142,7 @@ AC_SEARCH_LIBS([dlsym], ["dl"])
 
 AC_CHECK_TYPES([u_int8_t, u_int16_t, u_int32_t, u_int64_t])
 AC_CHECK_TYPES([uint8_t, uint16_t, uint32_t, uint64_t])
+
 AC_HEADER_STDBOOL
 AC_C_CONST
 AC_C_BIGENDIAN
@@ -146,15 +152,24 @@ AC_TYPE_MODE_T
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
+
 AC_CHECK_MEMBERS([struct stat.st_flags])
 AC_CHECK_MEMBERS([struct stat.st_mtimespec])
 AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   #include <sys/types.h>
   #include <netinet/in.h>
   ]])
+
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
 AC_CHECK_DECLS([O_BINARY],,,)
+
+AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
+AC_CHECK_DECL([dirfd],
+	[],
+	AC_DEFINE([dirfd(x)], [(x)->d_fd], [dirfd() replacement for Solaris]),
+	[#include <getopt.h>])
+
 AC_HEADER_TIME
 AC_STRUCT_TM
 AX_CHECK_DIRENT_D_TYPE
