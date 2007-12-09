@@ -147,7 +147,6 @@ bool GetWriteLockOnAccount(NamedLock &rLock, const std::string rRootDir, int Dis
 		// Couldn't lock the account -- just stop now
 		BOX_ERROR("Failed to lock the account, did not change limits. "
 			"Try again later.");
-		return false;
 	}
 
 	return gotLock;
