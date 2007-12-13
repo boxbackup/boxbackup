@@ -168,7 +168,10 @@ AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
 AC_CHECK_DECL([dirfd],
 	[],
 	AC_DEFINE([dirfd(x)], [(x)->d_fd], [dirfd() replacement for Solaris]),
-	[#include <getopt.h>])
+	[
+		#include <getopt.h>
+		#include <dirent.h>
+	])
 
 AC_HEADER_TIME
 AC_STRUCT_TM
