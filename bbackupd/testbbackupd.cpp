@@ -752,8 +752,8 @@ struct dirent *readdir_test_hook_2(DIR *dir)
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 		intercept_setup_readdir_hook(NULL, NULL);
 		intercept_setup_lstat_hook  (NULL, NULL);
-#endif
 		// we will not be called again.
+#endif
 	}
 
 	// fill in the struct dirent appropriately
@@ -772,6 +772,7 @@ struct dirent *readdir_test_hook_2(DIR *dir)
 	snprintf(stat_hook_filename, sizeof(stat_hook_filename),
 		"testfiles/TestDir1/spacetest/d1/test.%d", 
 		readdir_test_counter);
+
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	intercept_setup_lstat_hook(stat_hook_filename, lstat_test_hook);
 #endif
