@@ -74,6 +74,14 @@ int intercept_syscall = 0;
 off_t intercept_filepos = 0;
 int intercept_delay_ms = 0;
 
+static opendir_t*  opendir_real  = NULL;
+static readdir_t*  readdir_real  = NULL;
+static readdir_t*  readdir_hook  = NULL;
+static closedir_t* closedir_real = NULL;
+static lstat_t*    lstat_real    = NULL;
+static lstat_t*    lstat_hook    = NULL;
+static const char* lstat_file    = NULL;
+
 #define SIZE_ALWAYS_ERROR	-773
 
 void intercept_clear_setup()
@@ -85,6 +93,8 @@ void intercept_clear_setup()
 	intercept_syscall = 0;
 	intercept_filepos = 0;
 	intercept_delay_ms = 0;
+	readdir_hook = NULL;
+	lstat_hook = NULL;
 }
 
 bool intercept_triggered()
@@ -94,7 +104,11 @@ bool intercept_triggered()
 
 void intercept_setup_error(const char *filename, unsigned int errorafter, int errortoreturn, int syscalltoerror)
 {
-	TRACE4("Setup for error: %s, after %d, err %d, syscall %d\n", filename, errorafter, errortoreturn, syscalltoerror);
+	BOX_TRACE("Setup for error: " << filename << 
+		", after " << errorafter <<
+		", err " << errortoreturn <<
+		", syscall " << syscalltoerror);
+
 	intercept_count = 1;
 	intercept_filename = filename;
 	intercept_filedes = -1;
@@ -108,9 +122,12 @@ void intercept_setup_error(const char *filename, unsigned int errorafter, int er
 void intercept_setup_delay(const char *filename, unsigned int delay_after, 
 	int delay_ms, int syscall_to_delay, int num_delays)
 {
-	TRACE5("Setup for delay: %s, after %d, wait %d ms, times %d, "
-		"syscall %d\n", filename, delay_after, delay_ms, 
-		num_delays, syscall_to_delay);
+	BOX_TRACE("Setup for delay: " << filename <<
+		", after " << delay_after <<
+		", wait " << delay_ms << " ms" <<
+		", times " << num_delays <<
+		", syscall " << syscall_to_delay);
+
 	intercept_count = num_delays;
 	intercept_filename = filename;
 	intercept_filedes = -1;
@@ -120,37 +137,69 @@ void intercept_setup_delay(const char *filename, unsigned int delay_after,
 	intercept_filepos = 0;
 	intercept_delay_ms = delay_ms;
 }
+
 bool intercept_errornow(int d, int size, int syscallnum)
 {
-	if(intercept_filedes != -1 && d == intercept_filedes && syscallnum == intercept_syscall)
-	{
-		//printf("Checking for err, %d, %d, %d\n", d, size, syscallnum);
-		if(size == SIZE_ALWAYS_ERROR)
-		{
-			// Looks good for an error!
-			TRACE2("Returning error %d for syscall %d\n", intercept_errno, syscallnum);
-			return true;
-		}
-		// where are we in the file?
-		if(intercept_filepos >= intercept_errorafter || intercept_filepos >= ((off_t)intercept_errorafter - size))
-		{
-			if (intercept_errno != 0)
-			{
-				TRACE3("Returning error %d for syscall %d, "
-					"file pos %d\n", intercept_errno, 
-					syscallnum, (int)intercept_filepos);
-			}
-			else if (intercept_delay_ms != 0)
-			{
-				TRACE3("Delaying %d ms for syscall %d, "
-					"file pos %d\n", intercept_delay_ms, 
-					syscallnum, (int)intercept_filepos);
-			}
+	ASSERT(intercept_count > 0)
 
-			return true;
-		}
+	if (intercept_filedes == -1)
+	{
+		return false; // no error please!
 	}
-	return false;	// no error please!
+
+	if (d != intercept_filedes)
+	{
+		return false; // no error please!
+	}
+
+	if (syscallnum != intercept_syscall)
+	{
+		return false; // no error please!
+	}
+
+	bool ret = false; // no error unless one of the conditions matches
+
+	//printf("Checking for err, %d, %d, %d\n", d, size, syscallnum);
+
+	if (intercept_delay_ms != 0)
+	{
+		BOX_TRACE("Delaying " << intercept_delay_ms << " ms " <<
+			" for syscall " << syscallnum << 
+			" at " << intercept_filepos);
+
+		struct timespec tm;
+		tm.tv_sec = intercept_delay_ms / 1000;
+		tm.tv_nsec = (intercept_delay_ms % 1000) * 1000000;
+		while (nanosleep(&tm, &tm) != 0 &&
+			errno == EINTR) { }
+	}
+
+	if (size == SIZE_ALWAYS_ERROR)
+	{
+		// Looks good for an error!
+		BOX_TRACE("Returning error " << intercept_errno <<
+			" for syscall " << syscallnum);
+		ret = true;
+	}
+	else if (intercept_filepos + size < intercept_errorafter)
+	{
+		return false; // no error please
+	}
+	else if (intercept_errno != 0)
+	{
+		BOX_TRACE("Returning error " << intercept_errno << 
+			" for syscall " << syscallnum <<
+			" at " << intercept_filepos);
+		ret = true;
+	}
+
+	intercept_count--;
+	if (intercept_count == 0)
+	{
+		intercept_clear_setup();
+	}
+
+	return ret;
 }
 
 int intercept_reterr()
@@ -160,31 +209,14 @@ int intercept_reterr()
 	return err;
 }
 
-#define CHECK_FOR_FAKE_ERROR_COND(D, S, CALL, FAILRES)	\
+#define CHECK_FOR_FAKE_ERROR_COND(D, S, CALL, FAILRES) \
 	if(intercept_count > 0) \
-	{										\
-		if(intercept_errornow(D, S, CALL))	\
-		{									\
-			if(intercept_delay_ms > 0) \
-			{ \
-				struct timespec tm; \
-				tm.tv_sec = intercept_delay_ms / 1000; \
-				tm.tv_nsec = (intercept_delay_ms % 1000) \
-					* 1000000; \
-				while (nanosleep(&tm, &tm) != 0 && \
-					errno == EINTR) { } \
-				intercept_count --; \
-				if (intercept_count == 0) \
-				{ \
-					intercept_clear_setup(); \
-				} \
-			} \
-			else \
-			{ \
-				errno = intercept_reterr();		\
-				return FAILRES;					\
-			} \
-		}									\
+	{ \
+		if(intercept_errornow(D, S, CALL)) \
+		{ \
+			errno = intercept_reterr(); \
+			return FAILRES; \
+		} \
 	}
 
 extern "C" int
@@ -192,18 +224,24 @@ open(const char *path, int flags, mode_t mode)
 {
 	if(intercept_count > 0)
 	{
-		if(intercept_syscall == SYS_open && strcmp(path, intercept_filename) == 0)
+		if(intercept_filename != NULL &&
+			intercept_syscall == SYS_open &&
+			strcmp(path, intercept_filename) == 0)
 		{
 			errno = intercept_reterr();
 			return -1;
 		}
 	}
+
 #ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_open(path, flags, mode);
 #else
 	int r = syscall(SYS_open, path, flags, mode);
 #endif
-	if(intercept_count > 0 && intercept_filedes == -1)
+
+	if(intercept_filename != NULL && 
+		intercept_count > 0 && 
+		intercept_filedes == -1)
 	{
 		// Right file?
 		if(strcmp(intercept_filename, path) == 0)
@@ -212,6 +250,7 @@ open(const char *path, int flags, mode_t mode)
 			//printf("Found file to intercept, h = %d\n", r);
 		}
 	}
+
 	return r;
 }
 
@@ -323,26 +362,19 @@ lseek(int fildes, off_t offset, int whence)
 	return r;
 }
 
-static opendir_t*  opendir_real  = NULL;
-static readdir_t*  readdir_real  = NULL;
-static readdir_t*  readdir_hook  = NULL;
-static closedir_t* closedir_real = NULL;
-static lstat_t*    lstat_real    = NULL;
-static lstat_t*    lstat_hook    = NULL;
-static const char* lstat_file    = NULL;
-
 void intercept_setup_readdir_hook(const char *dirname, readdir_t hookfn)
 {
 	if (hookfn != NULL && dirname == NULL)
 	{
 		dirname = intercept_filename;
+		ASSERT(dirname != NULL);
 	}
 
 	if (hookfn != NULL)
 	{
 		TRACE2("readdir hooked to %p for %s\n", hookfn, dirname);
 	}
-	else
+	else if (intercept_filename != NULL)
 	{
 		TRACE2("readdir unhooked from %p for %s\n", readdir_hook, 
 			intercept_filename);
@@ -386,7 +418,9 @@ DIR *opendir(const char *dirname)
 
 	DIR* r = opendir_real(dirname);
 
-	if(readdir_hook != NULL && intercept_filedes == -1 && 
+	if (readdir_hook != NULL && 
+		intercept_filename != NULL && 
+		intercept_filedes == -1 && 
 		strcmp(intercept_filename, dirname) == 0)
 	{
 		intercept_filedes = dirfd(r);
