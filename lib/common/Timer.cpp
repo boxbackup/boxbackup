@@ -149,10 +149,6 @@ void Timers::Remove(Timer& rTimer)
 	Reschedule();
 }
 
-#define FORMAT_BOX_TIME(t) \
-	(BoxTimeToSeconds(t)) << "." << \
-	(BoxTimeToMicroSeconds(t) % MICRO_SEC_IN_SEC)
-
 #define FORMAT_MICROSECONDS(t) \
 	(int)(t / 1000000) << "." << \
 	(int)(t % 1000000)
@@ -185,8 +181,10 @@ void Timers::Reschedule()
 
 		if (oldact.sa_handler != Timers::SignalHandler)
 		{
-			printf("Signal handler was %p, expected %p\n", 
-				oldact.sa_handler, Timers::SignalHandler);
+			BOX_ERROR("Signal handler was " <<
+				(void *)oldact.sa_handler << 
+				", expected " <<
+				(void *)Timers::SignalHandler);
 			THROW_EXCEPTION(CommonException, Internal)
 		}
 	#endif
@@ -214,8 +212,7 @@ void Timers::Reschedule()
 		
 			if (timeToExpiry <= 0)
 			{
-				BOX_TRACE(FORMAT_MICROSECONDS(timeNow) <<
-					": timer " << *i << " has expired, "
+				BOX_TRACE("timer " << *i << " has expired, "
 					"triggering it");
 				rTimer.OnExpire();
 				spTimers->erase(i);
@@ -224,8 +221,7 @@ void Timers::Reschedule()
 			}
 			else
 			{
-				BOX_TRACE(FORMAT_MICROSECONDS(timeNow) <<
-					": timer " << *i << " has not "
+				BOX_TRACE("timer " << *i << " has not "
 					"expired, triggering in " <<
 					FORMAT_MICROSECONDS(timeToExpiry) <<
 					" seconds");
@@ -294,17 +290,14 @@ Timer::Timer(size_t timeoutSecs)
   mExpired(false)
 {
 	#ifndef NDEBUG
-	box_time_t timeNow = GetCurrentBoxTime();
 	if (timeoutSecs == 0)
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised for " <<
+		BOX_TRACE("timer " << this << " initialised for " <<
 			timeoutSecs << " secs, will not fire");
 	}
 	else
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised for " <<
+		BOX_TRACE("timer " << this << " initialised for " <<
 			timeoutSecs << " secs, to fire at " <<
 			FORMAT_MICROSECONDS(mExpires));
 	}
@@ -323,9 +316,7 @@ Timer::Timer(size_t timeoutSecs)
 Timer::~Timer()
 {
 	#ifndef NDEBUG
-	box_time_t timeNow = GetCurrentBoxTime();
-	BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-		": timer " << this << " destroyed");
+	BOX_TRACE("timer " << this << " destroyed");
 	#endif
 
 	Timers::Remove(*this);
@@ -336,23 +327,19 @@ Timer::Timer(const Timer& rToCopy)
   mExpired(rToCopy.mExpired)
 {
 	#ifndef NDEBUG
-	box_time_t timeNow = GetCurrentBoxTime();
 	if (mExpired)
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised from timer " <<
+		BOX_TRACE("timer " << this << " initialised from timer " <<
 			&rToCopy << ", already expired, will not fire");
 	}
 	else if (mExpires == 0)
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised from timer " <<
+		BOX_TRACE("timer " << this << " initialised from timer " <<
 			&rToCopy << ", no expiry, will not fire");
 	}
 	else
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised from timer " <<
+		BOX_TRACE("timer " << this << " initialised from timer " <<
 			&rToCopy << " to fire at " <<
 			(int)(mExpires / 1000000) << "." <<
 			(int)(mExpires % 1000000));
@@ -368,23 +355,19 @@ Timer::Timer(const Timer& rToCopy)
 Timer& Timer::operator=(const Timer& rToCopy)
 {
 	#ifndef NDEBUG
-	box_time_t timeNow = GetCurrentBoxTime();
 	if (rToCopy.mExpired)
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised from timer " <<
+		BOX_TRACE("timer " << this << " initialised from timer " <<
 			&rToCopy << ", already expired, will not fire");
 	}
 	else if (rToCopy.mExpires == 0)
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised from timer " <<
+		BOX_TRACE("timer " << this << " initialised from timer " <<
 			&rToCopy << ", no expiry, will not fire");
 	}
 	else
 	{
-		BOX_TRACE(FORMAT_BOX_TIME(timeNow) <<
-			": timer " << this << " initialised from timer " <<
+		BOX_TRACE("timer " << this << " initialised from timer " <<
 			&rToCopy << " to fire at " <<
 			(int)(rToCopy.mExpires / 1000000) << "." <<
 			(int)(rToCopy.mExpires % 1000000));
@@ -404,8 +387,7 @@ Timer& Timer::operator=(const Timer& rToCopy)
 void Timer::OnExpire()
 {
 	#ifndef NDEBUG
-	box_time_t timeNow = GetCurrentBoxTime();
-	BOX_TRACE(FORMAT_BOX_TIME(timeNow) << ": timer " << this << " fired");
+	BOX_TRACE("timer " << this << " fired");
 	#endif
 
 	mExpired = true;
