@@ -20,6 +20,8 @@
 
 #include <iomanip>
 
+#include "BoxTime.h"
+
 bool Logging::sLogToSyslog  = false;
 bool Logging::sLogToConsole = false;
 bool Logging::sContextSet   = false;
@@ -178,7 +180,8 @@ Logger::~Logger()
 }
 
 bool Console::sShowTime = false;
-bool Console::sShowTag  = false;
+bool Console::sShowTimeMicros = false;
+bool Console::sShowTag = false;
 std::string Console::sTag;
 
 void Console::SetTag(const std::string& rTag)
@@ -190,6 +193,11 @@ void Console::SetTag(const std::string& rTag)
 void Console::SetShowTime(bool enabled)
 {
 	sShowTime = enabled;
+}
+
+void Console::SetShowTimeMicros(bool enabled)
+{
+	sShowTimeMicros = enabled;
 }
 
 bool Console::Log(Log::Level level, const std::string& rFile, 
@@ -211,25 +219,31 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 
 	if (sShowTime)
 	{
-		struct tm time_now, *tm_ptr = &time_now;
-		time_t time_t_now = time(NULL);
+		box_time_t time_now = GetCurrentBoxTime();
+		time_t seconds = BoxTimeToSeconds(time_now);
+		int micros = BoxTimeToMicroSeconds(time_now) % MICRO_SEC_IN_SEC;
 
-		if (time_t_now == ((time_t)-1))
-		{
-			msg += strerror(errno);
-			msg += " ";
-		}
+		struct tm tm_now, *tm_ptr = &tm_now;
+
 		#ifdef WIN32
-			else if ((tm_ptr = localtime(&time_t_now)) != NULL)
+			if ((tm_ptr = localtime(&seconds)) != NULL)
 		#else
-			else if (localtime_r(&time_t_now, &time_now) != NULL)
+			if (localtime_r(&seconds, &tm_now) != NULL)
 		#endif
 		{
 			std::ostringstream buf;
+
 			buf << std::setfill('0') <<
 				std::setw(2) << tm_ptr->tm_hour << ":" << 
 				std::setw(2) << tm_ptr->tm_min  << ":" <<
-				std::setw(2) << tm_ptr->tm_sec  << " ";
+				std::setw(2) << tm_ptr->tm_sec;
+
+			if (sShowTimeMicros)
+			{
+				buf << "." << std::setw(6) << micros;
+			}
+
+			buf << " ";
 			msg += buf.str();
 		}
 		else

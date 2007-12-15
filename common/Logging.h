@@ -118,6 +118,7 @@ class Console : public Logger
 {
 	private:
 	static bool sShowTime;
+	static bool sShowTimeMicros;
 	static bool sShowTag;
 	static std::string sTag;
 
@@ -129,6 +130,7 @@ class Console : public Logger
 
 	static void SetTag(const std::string& rTag);
 	static void SetShowTime(bool enabled);
+	static void SetShowTimeMicros(bool enabled);
 };
 
 // --------------------------------------------------------------------------
