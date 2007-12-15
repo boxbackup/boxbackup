@@ -169,7 +169,7 @@ int main(int argc, char * const * argv)
 	
 	int ch;
 	
-	while ((ch = getopt_long(argc, argv, "c:s:t:T", longopts, NULL))
+	while ((ch = getopt_long(argc, argv, "c:s:t:TU", longopts, NULL))
 		!= -1)
 	{
 		switch(ch)
@@ -200,6 +200,13 @@ int main(int argc, char * const * argv)
 			case 'T':
 			{
 				Console::SetShowTime(true);
+			}
+			break;
+
+			case 'U':
+			{
+				Console::SetShowTime(true);
+				Console::SetShowTimeMicros(true);
 			}
 			break;
 
