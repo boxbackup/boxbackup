@@ -701,9 +701,11 @@ int start_internal_daemon()
 	return pid;
 }
 
-void stop_internal_daemon(int pid)
+bool stop_internal_daemon(int pid)
 {
-	TEST_THAT(KillServer(pid));
+	bool killed_server = KillServer(pid);
+	TEST_THAT(killed_server);
+	return killed_server;
 
 	/*
 	int status;
@@ -844,7 +846,7 @@ int test_bbackupd()
 		
 		int pid = start_internal_daemon();
 		wait_for_backup_operation();
-		stop_internal_daemon(pid);
+		TEST_THAT(stop_internal_daemon(pid));
 
 		// two-second delay on the first read() of f1
 		// should mean that a single keepalive is sent,
@@ -865,7 +867,7 @@ int test_bbackupd()
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
-		stop_internal_daemon(pid);
+		TEST_THAT(stop_internal_daemon(pid));
 
 		// check that keepalive was written to logs, and
 		// diff was not aborted, i.e. upload was a diff
@@ -935,7 +937,7 @@ int test_bbackupd()
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
-		stop_internal_daemon(pid);
+		TEST_THAT(stop_internal_daemon(pid));
 
 		// check that the diff was aborted, i.e. upload was not a diff
 		found1 = false;
@@ -995,7 +997,7 @@ int test_bbackupd()
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
-		stop_internal_daemon(pid);
+		TEST_THAT(stop_internal_daemon(pid));
 
 		// check that the diff was aborted, i.e. upload was not a diff
 		found1 = false;
@@ -1079,7 +1081,7 @@ int test_bbackupd()
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
-		stop_internal_daemon(pid);
+		TEST_THAT(stop_internal_daemon(pid));
 
 		// check that keepalives were sent during the dir search
 		found1 = false;
