@@ -437,10 +437,17 @@ inline void safe_sleep(int seconds)
 	Sleep(seconds * 1000);
 #else
 	struct timespec ts;
+	memset(&ts, 0, sizeof(ts));
 	ts.tv_sec  = seconds;
 	ts.tv_nsec = 0;
+	BOX_TRACE("sleeping for " << seconds << " seconds");
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
-	{ /* sleep again */ }
+	{
+		BOX_TRACE("safe_sleep interrupted with " <<
+			ts.tv_sec << "." << ts.tv_nsec <<
+			" secs remaining, sleeping again");
+		/* sleep again */
+	}
 #endif
 }
 
