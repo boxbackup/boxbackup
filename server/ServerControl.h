@@ -140,6 +140,11 @@ inline bool KillServerInternal(int pid)
 {
 	if(pid == 0 || pid == -1) return false;
 	bool killed = (::kill(pid, SIGTERM) == 0);
+	if (!killed)
+	{
+		BOX_ERROR("Failed to kill process " << pid << ": " <<
+			strerror(errno));
+	}
 	TEST_THAT(killed);
 	return killed;
 }
