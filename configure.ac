@@ -165,13 +165,11 @@ AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
 AC_CHECK_DECLS([O_BINARY],,,)
 
 AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
-AC_CHECK_DECL([dirfd],
-	[],
-	AC_DEFINE([dirfd(x)], [(x)->d_fd], [dirfd() replacement for Solaris]),
-	[
+AC_CHECK_DECLS([dirfd],,,
+	[[
 		#include <getopt.h>
 		#include <dirent.h>
-	])
+	]])
 
 AC_HEADER_TIME
 AC_STRUCT_TM
