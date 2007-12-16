@@ -531,13 +531,13 @@ RANLIB = "@RANLIB@"
 PERL = "@PERL@"
 WINDRES = windres
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG $release_flags -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -DNDEBUG $release_flags -Wall -Wundef $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS = -g -Wall $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS = -g -Wall -Wundef $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
