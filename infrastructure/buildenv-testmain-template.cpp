@@ -57,7 +57,7 @@ int test(int argc, const char *argv[]);
 int failures = 0;
 int first_fail_line;
 std::string first_fail_file;
-std::string bbackupd_args, bbstored_args, bbackupquery_args;
+std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 
 int filedes_open_at_beginning = -1;
 
@@ -194,12 +194,16 @@ int main(int argc, char * const * argv)
 			case 't':
 			{
 				Console::SetTag(optarg);
+				test_args += " -t '";
+				test_args += optarg;
+				test_args += "'";
 			}
 			break;
 
 			case 'T':
 			{
 				Console::SetShowTime(true);
+				test_args += " -T";
 			}
 			break;
 
@@ -207,13 +211,14 @@ int main(int argc, char * const * argv)
 			{
 				Console::SetShowTime(true);
 				Console::SetShowTimeMicros(true);
+				test_args += " -U";
 			}
 			break;
 
 			case '?':
 			{
-				fprintf(stderr, "Unknown option: %s\n",
-					optarg);
+				fprintf(stderr, "Unknown option: '%c'\n",
+					optopt);
 				exit(2);
 			}
 
