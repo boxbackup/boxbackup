@@ -402,12 +402,29 @@ void intercept_setup_lstat_hook(const char *filename, lstat_t hookfn)
 	lstat_hook = hookfn;
 }
 
+static void * find_function(const char *pName)
+{
+	dlerror();
+
+	void *result = dlsym(RTLD_NEXT, pName);
+	const char *errmsg = (const char *)dlerror();
+
+	if (errmsg != NULL)
+	{
+		BOX_ERROR("Failed to find real " << pName << " function: " <<
+			errmsg);
+		return NULL;
+	}
+
+	return result;
+}
+
 extern "C" 
 DIR *opendir(const char *dirname)
 {
 	if (opendir_real == NULL)
 	{
-		opendir_real = (opendir_t*)(dlsym(RTLD_NEXT, "opendir"));
+		opendir_real = (opendir_t*)find_function("opendir");
 	}
 
 	if (opendir_real == NULL)
@@ -440,10 +457,10 @@ struct dirent *readdir(DIR *dir)
 
 	if (readdir_real == NULL)
 	{
-		#if readdir == readdir64
-		readdir_real = (readdir_t*)(dlsym(RTLD_NEXT, "readdir64"));
+		#if defined readdir && readdir == readdir64
+		readdir_real = (readdir_t*)find_function("readdir64");
 		#else
-		readdir_real = (readdir_t*)(dlsym(RTLD_NEXT, "readdir"));
+		readdir_real = (readdir_t*)find_function("readdir");
 		#endif
 	}
 
@@ -466,7 +483,7 @@ int closedir(DIR *dir)
 
 	if (closedir_real == NULL)
 	{
-		closedir_real = (closedir_t*)(dlsym(RTLD_NEXT, "closedir"));
+		closedir_real = (closedir_t*)find_function("closedir");
 	}
 
 	if (closedir_real == NULL)
@@ -489,16 +506,16 @@ lstat(const char *file_name, STAT_STRUCT *buf)
 	if (lstat_real == NULL)
 	{
 	#ifdef LINUX_WEIRD_LSTAT
-		#if __lxstat == __lxstat64
-		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "__lxstat64"));
+		#if defined __lxstat && __lxstat == __lxstat64
+		lstat_real = (lstat_t*)find_function("__lxstat64");
 		#else
-		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "__lxstat"));
+		lstat_real = (lstat_t*)find_function("__lxstat");
 		#endif
 	#else
-		#if lstat == lstat64
-		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "lstat64"));
+		#if defined lstat && lstat == lstat64
+		lstat_real = (lstat_t*)find_function("lstat64");
 		#else
-		lstat_real = (lstat_t*)(dlsym(RTLD_NEXT, "lstat"));
+		lstat_real = (lstat_t*)find_function("lstat");
 		#endif
 	#endif
 	}
