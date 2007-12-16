@@ -43,7 +43,7 @@
 extern int failures;
 extern int first_fail_line;
 extern std::string first_fail_file;
-extern std::string bbackupd_args, bbstored_args, bbackupquery_args;
+extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 
 #define TEST_FAIL_WITH_MESSAGE(msg) \
 { \
