@@ -126,6 +126,25 @@ void testservers_connection(SocketStream &rStream)
 					total += r;
 				}
 				TEST_THAT(total == LARGE_DATA_SIZE);
+				if (total != LARGE_DATA_SIZE)
+				{
+					BOX_ERROR("Expected " << 
+						LARGE_DATA_SIZE << " bytes " <<
+						"but was " << total);
+					return;
+				}
+			}
+			{
+				// Send lots of data again
+				char data[LARGE_DATA_BLOCK_SIZE];
+				for(unsigned int y = 0; y < sizeof(data); y++)
+				{
+					data[y] = y & 0xff;
+				}
+				for(int s = 0; s < (LARGE_DATA_SIZE / LARGE_DATA_BLOCK_SIZE); ++s)
+				{
+					rStream.Write(data, sizeof(data));
+				}
 			}
 			
 			// next!
@@ -345,6 +364,18 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			conns[c]->Write(data, sizeof(data));
 		}
 	}
+	for(unsigned int c = 0; c < conns.size(); ++c)
+	{
+		// Receive lots of data again
+		char buf[1024];
+		int total = 0;
+		int r = 0;
+		while(total < LARGE_DATA_SIZE && (r = conns[c]->Read(buf, sizeof(buf))) != 0)
+		{
+			total += r;
+		}
+		TEST_THAT(total == LARGE_DATA_SIZE);
+	}
 
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
@@ -407,27 +438,42 @@ int test(int argc, const char *argv[])
 	// Server launching stuff
 	if(argc >= 2)
 	{
-		if(strcmp(argv[1], "srv1") == 0)
+		// this is a quick hack to allow passing some options
+		// to the daemon
+
+		const char* mode = argv[1];
+
+		if (test_args.length() > 0)
+		{
+			argv[1] = test_args.c_str();
+		}
+		else
+		{
+			argc--;
+			argv++;
+		}
+
+		if(strcmp(mode, "srv1") == 0)
 		{
 			// Run very basic daemon
 			basicdaemon daemon;
-			return daemon.Main("doesnotexist", argc - 1, argv + 1);
+			return daemon.Main("doesnotexist", argc, argv);
 		}
-		else if(strcmp(argv[1], "srv2") == 0)
+		else if(strcmp(mode, "srv2") == 0)
 		{
 			// Run daemon which accepts connections
 			testserver daemon;
-			return daemon.Main("doesnotexist", argc - 1, argv + 1);
+			return daemon.Main("doesnotexist", argc, argv);
 		}		
-		else if(strcmp(argv[1], "srv3") == 0)
+		else if(strcmp(mode, "srv3") == 0)
 		{
 			testTLSserver daemon;
-			return daemon.Main("doesnotexist", argc - 1, argv + 1);
+			return daemon.Main("doesnotexist", argc, argv);
 		}
-		else if(strcmp(argv[1], "srv4") == 0)
+		else if(strcmp(mode, "srv4") == 0)
 		{
 			testProtocolServer daemon;
-			return daemon.Main("doesnotexist", argc - 1, argv + 1);
+			return daemon.Main("doesnotexist", argc, argv);
 		}
 	}
 
@@ -436,7 +482,7 @@ int test(int argc, const char *argv[])
 
 	// Launch a basic server
 	{
-		std::string cmd = "./test";
+		std::string cmd = "./test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv1 testfiles/srv1.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv1.pid");
@@ -482,7 +528,7 @@ int test(int argc, const char *argv[])
 	
 	// Launch a test forking server
 	{
-		std::string cmd = "./test";
+		std::string cmd = "./test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv2 testfiles/srv2.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv2.pid");
@@ -552,7 +598,7 @@ int test(int argc, const char *argv[])
 
 	// Launch a test SSL server
 	{
-		std::string cmd = "./test";
+		std::string cmd = "./test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv3 testfiles/srv3.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv3.pid");
@@ -633,7 +679,7 @@ int test(int argc, const char *argv[])
 //protocolserver:
 	// Launch a test protocol handling server
 	{
-		std::string cmd = "./test";
+		std::string cmd = "./test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv4 testfiles/srv4.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv4.pid");
