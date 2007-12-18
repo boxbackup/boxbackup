@@ -164,12 +164,13 @@ int main(int argc, char * const * argv)
 	{
 		{ "bbackupd-args",	required_argument, NULL, 'c' },
 		{ "bbstored-args",	required_argument, NULL, 's' },
+		{ "test-daemon-args",	required_argument, NULL, 'd' },
 		{ NULL,			0,                 NULL,  0  }
 	};
 	
 	int ch;
 	
-	while ((ch = getopt_long(argc, argv, "c:s:t:TU", longopts, NULL))
+	while ((ch = getopt_long(argc, argv, "c:d:s:t:TUV", longopts, NULL))
 		!= -1)
 	{
 		switch(ch)
@@ -184,6 +185,16 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
+			case 'd':
+			{
+				if (test_args.length() > 0)
+				{
+					test_args += " ";
+				}
+				test_args += optarg;
+			}
+			break;
+
 			case 's':
 			{
 				bbstored_args += " ";
@@ -194,16 +205,12 @@ int main(int argc, char * const * argv)
 			case 't':
 			{
 				Console::SetTag(optarg);
-				test_args += " -t '";
-				test_args += optarg;
-				test_args += "'";
 			}
 			break;
 
 			case 'T':
 			{
 				Console::SetShowTime(true);
-				test_args += " -T";
 			}
 			break;
 
@@ -211,7 +218,12 @@ int main(int argc, char * const * argv)
 			{
 				Console::SetShowTime(true);
 				Console::SetShowTimeMicros(true);
-				test_args += " -U";
+			}
+			break;
+
+			case 'V':
+			{
+				Logging::SetGlobalLevel(Log::EVERYTHING);
 			}
 			break;
 
