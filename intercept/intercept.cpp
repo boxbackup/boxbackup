@@ -457,7 +457,7 @@ struct dirent *readdir(DIR *dir)
 
 	if (readdir_real == NULL)
 	{
-		#if defined readdir && readdir == readdir64
+		#ifdef HAVE_LARGE_FILE_SUPPORT
 		readdir_real = (readdir_t*)find_function("readdir64");
 		#else
 		readdir_real = (readdir_t*)find_function("readdir");
@@ -506,13 +506,13 @@ lstat(const char *file_name, STAT_STRUCT *buf)
 	if (lstat_real == NULL)
 	{
 	#ifdef LINUX_WEIRD_LSTAT
-		#if defined __lxstat && __lxstat == __lxstat64
+		#ifdef HAVE_LARGE_FILE_SUPPORT
 		lstat_real = (lstat_t*)find_function("__lxstat64");
 		#else
 		lstat_real = (lstat_t*)find_function("__lxstat");
 		#endif
 	#else
-		#if defined lstat && lstat == lstat64
+		#ifdef HAVE_LARGE_FILE_SUPPORT
 		lstat_real = (lstat_t*)find_function("lstat64");
 		#else
 		lstat_real = (lstat_t*)find_function("lstat");
