@@ -24,7 +24,7 @@ AC_DEFUN([AX_CHECK_DIRENT_D_TYPE], [
           DIR* dir = opendir(".");
           struct dirent* res = NULL;
           if(dir) res = readdir(dir);
-          return res ? (res->d_type==DT_UNKNOWN) : 1;
+          return res ? (res->d_type != DT_FILE && res->d_type != DT_DIR) : 1;
         ]])],
         [have_valid_dirent_d_type=yes], [have_valid_dirent_d_type=no]
       )])
