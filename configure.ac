@@ -225,6 +225,11 @@ AC_CACHE_CHECK([if we have large file support enabled], [have_large_file_support
     [have_large_file_support=yes], [have_large_file_support=no]
   )])
 
+if test "x$have_large_file_support" = "xyes"; then
+	AC_DEFINE([HAVE_LARGE_FILE_SUPPORT], [1],
+		[Define to 1 if large files are supported])
+fi
+
 ## Find out how to do file locking
 AC_CHECK_FUNCS([flock])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
