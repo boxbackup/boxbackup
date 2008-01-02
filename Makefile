@@ -10,7 +10,12 @@ HTMLPREFIX=box-html
 VPATH= adminguide
 .SUFFIXES: .html .xml
 
-all: adminguide instguide manpages 
+all: docs
+
+docs: instguide adminguide manpages
+	mkdir -p $(HTMLPREFIX)/images
+	cp html/images/*.png $(HTMLPREFIX)/images/.
+	cp html/*.css $(HTMLPREFIX)/.
 
 adminguide: $(HTMLPREFIX)/adminguide/index.html 
 
@@ -49,10 +54,7 @@ man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html bbstored-config
 	mv $@ man-pages/.
 	gzip -f -9 man-pages/$@
 
-dockit: instguide adminguide manpages
-	mkdir $(HTMLPREFIX)/images
-	cp html/images/*.png $(HTMLPREFIX)/images/.
-	cp html/*.css $(HTMLPREFIX)/.
+dockit: clean docs
 	tar zcf documentation-kit-0.10.tar.gz $(HTMLPREFIX)/
 
 clean:
