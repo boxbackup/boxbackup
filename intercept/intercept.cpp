@@ -413,7 +413,7 @@ static void * find_function(const char *pName)
 		std::string name64(pName);
 		name64 += "64";
 		result = dlsym(RTLD_NEXT, name64.c_str());
-		if (dlerror() == NULL)
+		if (dlerror() == NULL && result != NULL)
 		{
 			return result;
 		}
