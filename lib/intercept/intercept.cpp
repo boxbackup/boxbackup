@@ -405,18 +405,31 @@ void intercept_setup_lstat_hook(const char *filename, lstat_t hookfn)
 static void * find_function(const char *pName)
 {
 	dlerror();
+	void *result = NULL;
 
-	void *result = dlsym(RTLD_NEXT, pName);
+	#ifdef HAVE_LARGE_FILE_SUPPORT
+	{
+		// search for the 64-bit version first
+		std::string name64(pName);
+		name64 += "64";
+		result = dlsym(RTLD_NEXT, name64.c_str());
+		if (dlerror() == NULL)
+		{
+			return result;
+		}
+	}
+	#endif
+
+	result = dlsym(RTLD_NEXT, pName);
 	const char *errmsg = (const char *)dlerror();
 
-	if (errmsg != NULL)
+	if (errmsg == NULL)
 	{
-		BOX_ERROR("Failed to find real " << pName << " function: " <<
-			errmsg);
-		return NULL;
+		return result;
 	}
 
-	return result;
+	BOX_ERROR("Failed to find real " << pName << " function: " << errmsg);
+	return NULL;
 }
 
 extern "C" 
@@ -457,11 +470,7 @@ struct dirent *readdir(DIR *dir)
 
 	if (readdir_real == NULL)
 	{
-		#ifdef HAVE_LARGE_FILE_SUPPORT
-		readdir_real = (readdir_t*)find_function("readdir64");
-		#else
 		readdir_real = (readdir_t*)find_function("readdir");
-		#endif
 	}
 
 	if (readdir_real == NULL)
@@ -506,17 +515,9 @@ lstat(const char *file_name, STAT_STRUCT *buf)
 	if (lstat_real == NULL)
 	{
 	#ifdef LINUX_WEIRD_LSTAT
-		#ifdef HAVE_LARGE_FILE_SUPPORT
-		lstat_real = (lstat_t*)find_function("__lxstat64");
-		#else
 		lstat_real = (lstat_t*)find_function("__lxstat");
-		#endif
 	#else
-		#ifdef HAVE_LARGE_FILE_SUPPORT
-		lstat_real = (lstat_t*)find_function("lstat64");
-		#else
 		lstat_real = (lstat_t*)find_function("lstat");
-		#endif
 	#endif
 	}
 
