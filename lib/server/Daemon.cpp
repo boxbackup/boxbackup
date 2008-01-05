@@ -114,11 +114,12 @@ void Daemon::Usage()
 	std::cout << 
 	DaemonBanner() << "\n"
 	"\n"
-	"Usage: " << mAppName << " [options] [config file]\n" <<
+	"Usage: " << mAppName << " [options] [config file]\n"
 	"\n"
 	"Options:\n"
 	"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
-	"             argument is the configuration file\n"
+	"             argument is the configuration file, or else the default \n"
+	"             [" << GetConfigFileName() << "]\n"
 #ifndef WIN32
 	"  -D         Debugging mode, do not fork, one process only, one client only\n"
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
