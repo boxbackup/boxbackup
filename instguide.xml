@@ -299,9 +299,15 @@ cd boxbackup-0.00-backup-server-OpenBSD
             </row>
 
             <row>
-              <entry>--with-bdb-dir=DIR</entry>
+              <entry>--with-bdb-lib=DIR</entry>
 
-              <entry>Specify Berkeley DB location</entry>
+              <entry>Specify Berkeley DB library location</entry>
+            </row>
+
+            <row>
+              <entry>--with-bdb-headers=DIR</entry>
+
+              <entry>Specify Berkeley DB headers location</entry>
             </row>
 
             <row>
