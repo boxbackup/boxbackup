@@ -136,8 +136,7 @@ for my $parcel (@parcels)
 				print MAKE "\tcp $name $dir\n";
 			}
 			# remove path from script name
-			$name =~ m~/([^/]+)\Z~;
-			$name = $1;
+			$name =~ s{.*/}{};
 		}
 
 		unless ($target_windows)
