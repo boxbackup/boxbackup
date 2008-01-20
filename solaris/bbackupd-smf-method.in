@@ -1,0 +1,24 @@
+
+PIDFILE=/var/run/bbackupd.pid
+
+case $1 in 
+
+        # SMF arguments (start and restart [really "refresh"])
+'start')
+        @bindir_expanded@/bbackupd
+        ;;
+
+'restart')
+        if [ -f "$PIDFILE" ]; then
+                /usr/bin/kill -HUP `/usr/bin/cat $PIDFILE`
+        fi
+        ;;
+
+*)
+        echo "Usage: $0 { start | restart }"
+        exit 1
+        ;;
+esac    
+
+exit $?
+
