@@ -276,9 +276,13 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 
 				if(st.st_dev != dir_st.st_dev)
 				{
- 					rParams.GetProgressNotifier()
-						.NotifyMountPointSkipped(this, 
- 							filename);
+					if(!(rParams.mrContext.ExcludeDir(
+						filename)))
+					{
+						rParams.GetProgressNotifier()
+							.NotifyMountPointSkipped(
+								this, filename);
+					}
 					continue;
 				}
 
