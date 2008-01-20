@@ -1,0 +1,112 @@
+body {
+	font-family: Verdana, Geneva, Arial, sans-serif;
+	background-color: #edeef3;
+        font-size: .75em;
+        line-height: 180%;
+        text-align: left;
+        margin-top: 20px;
+        margin-right: 100px;
+        margin-left: 250px;
+        position: relative;
+        width: auto; }
+	
+table {
+	font-family: Verdana, Geneva, Arial, sans-serif;
+	background-color: #edeef3;
+        font-size: 10pt;
+        line-height: 100%; }
+
+
+	
+
+div.navheader {
+	font-family: Verdana, Geneva, Arial, sans-serif;
+	background-color: #edeef3; 
+        line-height: 100%; }
+       
+#header {
+	background-color: #e4e6ed;
+	text-align: left;
+	padding-top: 10px;
+        margin-right: -100px;
+        margin-left: -250px;
+	top: 20px;
+	border-top: 1px solid #c4c4d5;
+	border-bottom: 1px solid white }
+	
+#logo {
+	position: relative; 
+	margin-left: 200px }
+	
+	
+#page {
+	font-size: .75em;
+	line-height: 180%;
+	text-align: left;
+	margin-top: 50px;
+	margin-right: 100px;
+	margin-left: 250px;
+	position: relative;
+	width: auto }
+
+#disc {    }
+	
+.informaltable td,tr {font-size: 1em;
+	line-height: 140%;
+	text-align: left;
+	background-color: #e4e6ed;
+	padding: 4px }
+	
+tr,td {font-size: 1em;
+	line-height: 100%;
+	background-color: #edeef3; }
+	
+pre, tt { font-size: 1.3em; 
+	color: #088;
+	letter-spacing: 1px;
+	word-spacing: 2px}
+	
+h1 {
+	color: #c00;
+	font-size: 16pt;
+	margin-bottom: 2em;
+	margin-left: -50px }
+	
+h2 {
+	color: #324e95;
+	font-size: 12pt;
+	margin-top: 2em;
+	margin-left: -50px }
+	
+h3 {
+	color: #324e95;
+	font-size: 10pt;
+	margin-top: 2em;
+	margin-left: -50px }
+	
+dt { font-weight: bold }
+	
+ul {
+	list-style-image: url(images/arrow.png) }
+	
+ul li {
+	background-color: #e4e6ed;
+	margin: 1em 6em 1em -2em;
+	padding: 0.2em 0.5em 0.2em 1em;
+	border-style: solid;
+	border-width: 1px;
+	border-color: #c4c4d5 #fff #fff #c4c4d5 }
+	
+a:link {
+	color: #324e95;
+	text-decoration: none;
+	background-color: transparent }
+	
+a:visited {
+	color: #90c;
+	text-decoration: none }
+	
+a:hover {
+	color: #c00;
+	text-decoration: underline;
+	background-color: transparent }
