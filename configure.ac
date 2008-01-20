@@ -22,7 +22,7 @@ if test "x$ac_cv_cxx_exceptions" != "xyes" || \
 fi
 if test "x$GXX" = "xyes"; then
   # Use -Wall if we have gcc. This gives better warnings
-  AC_SUBST([CXXFLAGS_STRICT], ['-Wall'])
+  AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
   # Use -rdynamic if we have gcc. This is needed for backtrace
   AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
 fi
@@ -284,6 +284,10 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbackupquery/makedocumentation.pl
                    bin/bbstored/bbstored-certs
                    bin/bbstored/bbstored-config
+                   contrib/solaris/bbackupd-manifest.xml
+                   contrib/solaris/bbstored-manifest.xml
+                   contrib/solaris/bbackupd-smf-method
+                   contrib/solaris/bbstored-smf-method
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl
