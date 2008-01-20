@@ -7,6 +7,24 @@ use BoxPlatform;
 my @parcels;
 my %parcel_contents;
 
+sub starts_with ($$)
+{
+	my ($string,$expected) = @_;
+	return substr($string, 0, length $expected) eq $expected;
+}
+
+sub os_matches ($)
+{
+	my ($prefix_string) = @_;
+	my @prefixes = split m'\,', $prefix_string;
+	foreach my $prefix (@prefixes)
+	{
+		return 1 if starts_with($build_os,  $prefix);
+		return 1 if starts_with($target_os, $prefix);
+	}
+	return 0;
+}
+
 open PARCELS,"parcels.txt" or die "Can't open parcels file";
 {
 	my $cur_parcel = '';
@@ -19,7 +37,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 		next if m/\AEND-OMIT/;
 		if(m/\AOMIT:(.+)/)
 		{
-			if($1 eq $build_os or $1 eq $target_os)
+			if (os_matches($1))
 			{
 				while(<PARCELS>)
 				{
@@ -31,10 +49,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 
 		if (m'\AONLY:(.+)')
 		{
-			my @only_targets = split m'\,', $1;
-
-			if (not grep {$_ eq $build_os or $_ eq $target_os}
-				@only_targets)
+			if (not os_matches($1))
 			{
 				while (<PARCELS>)
 				{
@@ -110,14 +125,14 @@ for my $parcel (@parcels)
 	
 	for(@{$parcel_contents{$parcel}})
 	{
-		my ($type,$name) = split /\s+/;
+		my ($type,$name,$dest) = split /\s+/;
 		my $optional = '';
 
 		if ($type eq 'optional')
 		{
-			($optional,$type,$name) = split /\s+/;
+			($optional,$type,$name,$dest) = split /\s+/;
 		}
-		
+
 		if($type eq 'bin')
 		{
 			my $exeext = $platform_exe_ext;
@@ -141,7 +156,12 @@ for my $parcel (@parcels)
 
 		unless ($target_windows)
 		{
-			print SCRIPT "install $name $install_into_dir\n";
+			my $local_install_dir = $install_into_dir;
+			if (defined $dest)
+			{
+				$local_install_dir = "@prefix@/$dest";
+			}
+			print SCRIPT "install $name $local_install_dir\n";
 		}
 	}
 
