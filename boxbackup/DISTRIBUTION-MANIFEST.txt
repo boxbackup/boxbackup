@@ -22,18 +22,21 @@ test/backupdiff
 docs/raidfile notes
 docs/raidfile/lib_raidfile notes/lib_raidfile
 docs/backup notes
+documentation
+documentation/html
+documentation/html/images
 TODO.txt
 BUGS.txt
-distribution/boxbackup/contrib contrib
+contrib
 NO-LICENSE-IN-DIR contrib/rpm
-distribution/boxbackup/contrib/rpm contrib/rpm
+contrib/rpm
 REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
 NO-LICENSE-IN-DIR contrib/redhat
-distribution/boxbackup/contrib/redhat contrib/redhat
+contrib/redhat
 NO-LICENSE-IN-DIR contrib/suse
-distribution/boxbackup/contrib/suse contrib/suse
+contrib/suse
 NO-LICENSE-IN-DIR contrib/cygwin
-distribution/boxbackup/contrib/cygwin contrib/cygwin
+contrib/cygwin
 infrastructure/msvc
 NO-LICENSE-IN-DIR infrastructure/msvc/2003
 infrastructure/msvc/2003
