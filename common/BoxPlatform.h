@@ -169,7 +169,7 @@
 // We cannot define macros with arguments directly using AC_DEFINE,
 // so do it here instead of in configure.ac.
 
-#ifndef HAVE_DECL_DIRFD
+#if HAVE_DECL_DIRFD
 	#define dirfd(x) (x)->d_fd
 #endif
 
