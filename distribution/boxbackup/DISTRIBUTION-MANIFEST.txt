@@ -28,17 +28,12 @@ documentation/html/images
 TODO.txt
 BUGS.txt
 contrib
-NO-LICENSE-IN-DIR contrib/rpm
-contrib/rpm
-REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
+NO-LICENSE-IN-DIR contrib/debian
 NO-LICENSE-IN-DIR contrib/redhat
-contrib/redhat
+NO-LICENSE-IN-DIR contrib/rpm
+REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
+NO-LICENSE-IN-DIR contrib/solaris
 NO-LICENSE-IN-DIR contrib/suse
-contrib/suse
-NO-LICENSE-IN-DIR contrib/cygwin
-contrib/cygwin
 infrastructure/msvc
 NO-LICENSE-IN-DIR infrastructure/msvc/2003
-infrastructure/msvc/2003
 NO-LICENSE-IN-DIR infrastructure/msvc/2005
-infrastructure/msvc/2005

@@ -32,5 +32,4 @@ bootstrap
 parcels.txt
 runtest.pl.in
 NO-LICENSE-IN-DIR infrastructure/m4
-infrastructure/m4
 configure
