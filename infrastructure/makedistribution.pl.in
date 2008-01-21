@@ -82,11 +82,11 @@ sub copy_from_list
 	my $list = $_[0];
 	open LIST,$list or die "Can't open $list";
 	
-	while(<LIST>)
+	while(my $line = <LIST>)
 	{
-		next unless m/\S/;
-		chomp;
-		my ($src,$dst) = split /\s+/;
+		next unless $line =~ m/\S/;
+		chomp $line;
+		my ($src,$dst,$other) = split /\s+/, $line;
 		$dst = $src if $dst eq '';
 		if($src eq 'MKDIR')
 		{
@@ -95,8 +95,16 @@ sub copy_from_list
 		}
 		elsif($src eq 'NO-LICENSE-IN-DIR')
 		{
+			my ($junk,$spec) = split /\s+/, $line;
 			# record that this directory shouldn't have the license added
 			$no_license_dir{$dst} = 1;
+
+			# actually copy it, to remove redundancy in manifests
+			$src = $dst;
+			$dst = $other;
+			$dst = $src if $dst eq '';
+			$modules_included{$spec} = 1;
+			copy_dir($src,$dst);
 		}
 		elsif($src eq 'REPLACE-VERSION-IN')
 		{
@@ -108,16 +116,17 @@ sub copy_from_list
 		}
 		elsif($src eq 'RUN')
 		{
-			print "Running $dst...\n";
-			if(system($dst) != 0)
+			my ($junk,$cmd) = split /\s+/, $line, 2;
+			print "Running $cmd...\n";
+			if(system($cmd) != 0)
 			{
-				print "Error running $dst. Aborting.\n";
+				print "Error running $cmd. Aborting.\n";
 				exit(1);
 			}
 		}
 		elsif(-d $src)
 		{
-			$modules_included{$_} = 1;
+			$modules_included{$line} = 1;
 			copy_dir($src,$dst);
 		}
 		else
@@ -322,6 +331,8 @@ sub copy_dir
 		next if m/\A_/;
 		next if m/\AMakefile\Z/;
 		next if m/\Aautogen/;
+		next if m/-smf-method\Z/; # copy only the .in versions
+		next if m/-manifest.xml\Z/; # copy onlt the .in versions
 		next if !-f "$dir/$_";
 		
 		copy_file("$dir/$_","$dst_dir/$_");
