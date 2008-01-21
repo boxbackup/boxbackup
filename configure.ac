@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([Box Backup], 0.10, [box@fluffy.co.uk])
+AC_INIT([Box Backup], 0.11, [boxbackup@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
