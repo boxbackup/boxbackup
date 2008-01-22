@@ -159,6 +159,8 @@ AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   #include <sys/types.h>
   #include <netinet/in.h>
   ]])
+AC_CHECK_MEMBERS([DIR.d_fd],,,  [[#include <dirent.h>]])
+AC_CHECK_MEMBERS([DIR.dd_fd],,, [[#include <dirent.h>]])
 
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])

@@ -170,7 +170,13 @@
 // so do it here instead of in configure.ac.
 
 #if ! HAVE_DECL_DIRFD
-	#define dirfd(x) (x)->d_fd
+	#ifdef HAVE_DIR_D_FD
+		#define dirfd(x) (x)->d_fd
+	#elif defined HAVE_DIR_DD_FD
+		#define dirfd(x) (x)->dd_fd
+	#else
+		#error No way to get file descriptor from DIR structure
+	#endif
 #endif
 
 #endif // BOXPLATFORM__H
