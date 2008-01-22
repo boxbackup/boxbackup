@@ -40,7 +40,7 @@
 	
 	extern bool AssertFailuresToSyslog;
 	#define ASSERT_FAILS_TO_SYSLOG_ON {AssertFailuresToSyslog = true;}
-	void BoxDebugAssertFailed(char *cond, char *file, int line);
+	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
 	#define ASSERT(cond) {if(!(cond)) {BoxDebugAssertFailed(#cond, __FILE__, __LINE__); THROW_EXCEPTION(CommonException, AssertFailed)}}
 
 	// Note that syslog tracing is independent of BoxDebugTraceOn, but stdout tracing is not
