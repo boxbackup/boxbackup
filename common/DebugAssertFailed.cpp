@@ -23,7 +23,7 @@
 
 bool AssertFailuresToSyslog = false;
 
-void BoxDebugAssertFailed(char *cond, char *file, int line)
+void BoxDebugAssertFailed(const char *cond, const char *file, int line)
 {
 	printf("ASSERT FAILED: [%s] at %s(%d)\n", cond, file, line);
 	if(AssertFailuresToSyslog)
