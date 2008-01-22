@@ -1757,7 +1757,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	ASSERT(mountPoints.size() > 0);
 #ifndef NDEBUG
 	{
-		std::set<std::string, mntLenCompare>::const_reverse_iterator i(mountPoints.rbegin());
+		std::set<std::string, mntLenCompare>::reverse_iterator i(mountPoints.rbegin());
 		ASSERT(*i == "/");
 	}
 #endif // n NDEBUG
