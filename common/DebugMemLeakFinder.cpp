@@ -383,7 +383,7 @@ static char atexit_filename[512];
 static char atexit_markertext[512];
 static bool atexit_registered = false;
 
-void memleakfinder_atexit()
+extern "C" void memleakfinder_atexit()
 {
 	memleakfinder_reportleaks_appendfile(atexit_filename, atexit_markertext);
 }
