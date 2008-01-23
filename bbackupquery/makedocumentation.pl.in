@@ -40,7 +40,7 @@ print OUT <<__E;
 
 #include "MemLeakFindOn.h"
 
-char *help_commands[] =
+const char *help_commands[] =
 {
 __E
 
@@ -53,7 +53,7 @@ print OUT <<__E;
 	0
 };
 
-char *help_text[] =
+const char *help_text[] =
 {
 __E
 
