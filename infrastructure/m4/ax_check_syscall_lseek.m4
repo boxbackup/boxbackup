@@ -24,7 +24,7 @@ AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
           #ifdef HAVE___SYSCALL_NEED_DEFN
             extern "C" off_t __syscall(quad_t number, ...);
           #endif
-          #ifndef HAVE_SYSCALL
+          #ifdef HAVE___SYSCALL // always use it if we have it
             #undef syscall
             #define syscall __syscall
           #endif
@@ -33,7 +33,18 @@ AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
           int res = 0;
           if(fh>=0)
           {
-            res = syscall(SYS_lseek, fh, 0, SEEK_SET, 99);
+            // This test tries first to seek to position 0, with NO
+            // "dummy argument". If lseek does actually require a dummy
+            // argument, then it will eat SEEK_SET for the offset and
+            // try to use 99 as whence, which is invalid, so res will be
+            // -1, the program will return zero and 
+            // have_lseek_dummy_param=yes 
+            // (whew! that took 1 hour to figure out)
+            // The "dummy argument" probably means that it takes a 64-bit
+            // offset, so this was probably a bug anyway, and now that
+            // we cast the offset to off_t, it should never be needed
+            // (if my reasoning is correct).
+            res = syscall(SYS_lseek, fh, (off_t)0, SEEK_SET, 99);
             close(fh);
           }
           unlink("lseektest");
