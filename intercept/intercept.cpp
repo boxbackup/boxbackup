@@ -50,11 +50,14 @@
 	extern "C" off_t
 	TEST_lseek(int fildes, off_t offset, int whence);
 #else
+	// if we have __syscall, we should use it for everything
+	// (on FreeBSD 7 this is required for 64-bit alignment of off_t).
+	// if not, we should continue to use the old syscall().
 	#ifdef HAVE___SYSCALL_NEED_DEFN
 		// Need this, not declared in syscall.h nor unistd.h
 		extern "C" off_t __syscall(quad_t number, ...);
 	#endif
-	#ifndef HAVE_SYSCALL
+	#ifdef HAVE___SYSCALL
 		#undef syscall
 		#define syscall __syscall
 	#endif
