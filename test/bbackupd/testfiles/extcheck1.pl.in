@@ -15,7 +15,9 @@ my $seen = 0;
 while(<IN>)
 {
 	next unless m/\S/;
-	if(m/continousupdate/)
+	print "READ: $_";
+
+	if (m/continousupdate/)
 	{
 		unless (/exists/)
 		{
@@ -23,6 +25,12 @@ while(<IN>)
 			$ret = 2;
 		}
 		$seen = 1;
+	}
+	elsif (m/^No entry for terminal type/ or
+		m/^using dumb terminal settings/)
+	{
+		# skip these lines, may happen in Debian buildd
+		# with no terminal.
 	}
 	else
 	{
@@ -33,7 +41,6 @@ while(<IN>)
 			$ret = 2;
 		}
 	}
-	print "READ: $_";
 }
 
 close IN;
