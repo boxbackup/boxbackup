@@ -12,13 +12,15 @@ $|=1;
 
 # note: Mac OS X resource forks and .DS_Store files are explicity ignored
 
-print "Box build environment setup for '$build_os'.\n\n";
+print "Box build environment setup.\n";
 
 my @implicit_deps = ('lib/common');
 
 # work out platform variables
 use lib 'infrastructure';
 use BoxPlatform;
+
+print "Building on '$build_os'.\n\n";
 
 # keep copy of command line args
 my $makebuildenv_args = join(' ',@ARGV);
