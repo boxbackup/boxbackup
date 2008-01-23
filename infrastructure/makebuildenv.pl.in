@@ -12,7 +12,7 @@ $|=1;
 
 # note: Mac OS X resource forks and .DS_Store files are explicity ignored
 
-print "Box build environment setup.\n\n";
+print "Box build environment setup for '$build_os'.\n\n";
 
 my @implicit_deps = ('lib/common');
 
@@ -741,7 +741,7 @@ __E
 	additional_objects_from_make_fragment("$mod/Makefile.extra", \@objs, \@makefile_includes);
 	additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
 
-	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} @objs);
+	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} sort @objs);
 
 	if ($has_deps and not $bsd_make)
 	{
