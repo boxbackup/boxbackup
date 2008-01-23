@@ -14,13 +14,21 @@ my $ret = 1;
 while(<IN>)
 {
 	next unless m/\S/;
-	if(m/continousupdate/)
+	print "READ: $_";
+
+	if (m/continousupdate/)
 	{
 		unless (m/contents/ or m/attributes/)
 		{
 			print "FAIL: continuousupdate line does not match\n";
 			$ret = 2;
 		}
+	}
+	elsif (m/^No entry for terminal type/ or
+		m/^using dumb terminal settings/)
+	{
+		# skip these lines, may happen in Debian buildd
+		# with no terminal.
 	}
 	else
 	{
@@ -31,8 +39,6 @@ while(<IN>)
 			$ret = 2;
 		}
 	}
-
-	print "READ: $_";
 }
 
 close IN;
