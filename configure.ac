@@ -6,6 +6,9 @@ AC_INIT([Box Backup], 0.11, [boxbackup@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
+# override default sysconfdir, for backwards compatibility
+AC_SUBST([sysconfdir], ['/etc'])dnl
+
 touch install-sh
 AC_CANONICAL_SYSTEM
 test -s install-sh || rm install-sh
@@ -273,11 +276,13 @@ saved_prefix=$prefix
 saved_exec_prefix=$exec_prefix
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
-bindir_expanded=`eval "echo $bindir"`
-bindir_expanded=`eval "echo $bindir_expanded"`
+bindir_expanded=`       eval "echo $bindir"`
+bindir_expanded=`       eval "echo $bindir_expanded"`
+sysconfdir_expanded=`   eval "echo $sysconfdir"`
+localstatedir_expanded=`eval "echo $localstatedir"`
 prefix=$saved_prefix
 exec_prefix=$saved_exec_prefix
-AC_SUBST([bindir_expanded])
+AC_SUBST([bindir_expanded sysconfdir_expanded localstatedir_expanded])
 
 
 ### Output files
@@ -293,6 +298,7 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl
+                   lib/common/BoxPortsAndFiles.h
                    lib/common/makeexception.pl
                    lib/raidfile/raidfile-config
                    lib/server/makeprotocol.pl
