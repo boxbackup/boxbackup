@@ -1,5 +1,5 @@
-#!/usr/bin/perl
 #!@PERL@
+
 use strict;
 use Symbol;
 
