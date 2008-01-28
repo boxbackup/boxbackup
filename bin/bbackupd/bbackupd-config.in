@@ -15,15 +15,19 @@ Setup bbackupd config utility.
 
 Bad command line parameters.
 Usage:
-	bbackupd-config config-dir backup-mode account-num server-hostname working-dir backup-dir [more backup directories]
+    bbackupd-config config-dir backup-mode account-num server-hostname
+        working-dir [backup directories]
 
-config-dir usually /etc/box
-backup-mode is lazy or snapshot
-    lazy mode runs continously, uploading files over a specified age
-    snapshot mode uploads a snapshot of the filesystem when instructed explicitly
-account-num (hexdecimal) and server-hostname as supplied from the server administrator
-working-dir usually /var/bbackupd
-backup-dir, list of directories to back up
+Parameters:
+    config-dir          is usually @sysconfdir_expanded@/box
+    backup-mode         is lazy or snapshot:
+        lazy mode       runs continously, uploading files over a specified age
+        snapshot mode   uploads a snapshot of the filesystem when instructed
+                        explicitly, using bbackupctl sync
+    account-num (hexdecimal) and server-hostname
+                        are supplied by the server administrator
+    working-dir         is usually @localstatedir_expanded@
+    backup directories  is list of directories to back up
 
 __E
 	print "=========\nERROR:\n",$_[0],"\n\n" if $_[0] ne '';
@@ -53,7 +57,7 @@ __E
 }
 
 # default locations
-my $default_config_location = '/etc/box/bbackupd.conf';
+my $default_config_location = '@sysconfdir_expanded@/box/bbackupd.conf';
 
 # command line parameters
 my ($config_dir,$backup_mode,$account_num,$server,$working_dir,@tobackup) = @ARGV;
@@ -126,8 +130,6 @@ print <<__E;
 Note: If other file systems are mounted inside these directories, then
 they will NOT be backed up. You will have to create separate locations for
 any mounted filesystems inside your backup locations.
-
-WARNING: Directories not checked against mountpoints. Check mounted filesystems manually.
 
 __E
 
@@ -269,7 +271,7 @@ Subject: \$SUBJECT (unknown)
 To: \$SENDTO
 
 
-The backup daemon on $hostname reported an unknown error.
+The backup daemon on $hostname reported an unknown error (\$1).
 
 ==========================
 FILES MAY NOT BE BACKED UP
@@ -430,7 +432,7 @@ MaximumDiffingTime = 120
 
 # Where the command socket is created in the filesystem.
 
-CommandSocket = /var/run/bbackupd.sock
+CommandSocket = $working_dir/bbackupd.sock
 
 # Uncomment the StoreObjectInfoFile to enable the experimental archiving
 # of the daemon's state (including client store marker and configuration)
@@ -443,7 +445,7 @@ CommandSocket = /var/run/bbackupd.sock
 
 Server
 {
-	PidFile = /var/run/bbackupd.pid
+	PidFile = $working_dir/bbackupd.pid
 }
 
 
@@ -563,7 +565,7 @@ What you need to do now...
 
 4) You may wish to read the configuration file
       $config_file
-   and adjust as appropraite.
+   and adjust as appropriate.
    
    There are some notes in it on excluding files you do not
    wish to be backed up.
@@ -575,7 +577,7 @@ What you need to do now...
    more files will be backed up. You want to know about this.
 
 6) Start the backup daemon with the command
-      /usr/local/bin/bbackupd$daemon_args
+      @bindir_expanded@/bbackupd$daemon_args
    in /etc/rc.local, or your local equivalent.
    Note that bbackupd must run as root.
 __E
@@ -585,7 +587,7 @@ if($backup_mode eq 'snapshot')
 
 7) Set up a cron job to run whenever you want a snapshot of the
    file system to be taken. Run the command
-      /usr/local/bin/bbackupctl -q$ctl_daemon_args sync
+      @bindir_expanded@/bbackupctl -q$ctl_daemon_args sync
 __E
 }
 print <<__E;
