@@ -16,14 +16,17 @@ Setup raidfile config utility.
 
 Bad command line parameters.
 Usage:
-	raidfile-config config-dir block-size dir0 [dir1 dir2]
+    raidfile-config config-dir block-size dir0 [dir1 dir2]
 
-config-dir usually /etc/box
-block-size must be a power of two, and usually the block or fragment size of your filing system
-dir0, dir1, dir2 are the directories used as the root of the raid file system
+Parameters:
+    config-dir        is usually @sysconfdir_expanded@/box
+    block-size        must be a power of two, and usually the block or
+                      fragment size of your file system
+    dir0, dir1, dir2  are the directories used as the root of the raid
+                      file system
 
-If only one directory is specified, then userland RAID is disabled. Specifying three directories
-enables it.
+If only one directory is specified, then userland RAID is disabled.
+Specifying three directories enables it.
 
 __E
 	exit(1);
@@ -57,7 +60,7 @@ while(1)
 # check that it doesn't already exist
 if(-f $conf)
 {
-	die "$conf already exists. Delete and try again"
+	die "$conf already exists. Delete and try again";
 }
 
 # create directory
@@ -72,7 +75,7 @@ if($#dirs == 0)
 {
 	$dirs[1] = $dirs[0];
 	$dirs[2] = $dirs[0];
-	print "WARNING: userland RAID is disabled.\n"
+	print "WARNING: userland RAID is disabled.\n";
 }
 
 # write the file
