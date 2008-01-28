@@ -16,12 +16,15 @@ Setup bbstored config utility.
 
 Bad command line parameters.
 Usage:
-	bbstored-config config-dir server-hostname username [raidfile-config]
+    bbstored-config config-dir server-hostname username [raidfile-config]
 
-config-dir usually /etc/box
-server-hostname is the hostname used by clients to connect to this server
-username is the user to run the server under
-raidfile-config is optional. Use if you have a non-standard raidfile.conf file.
+Parameters:
+    config-dir       is usually @sysconfdir_expanded@/box
+    server-hostname  is the hostname that clients will use to connect to
+                     this server
+    username         is the user to run the server under
+    raidfile-config  is optional. Use if you have a non-standard
+                     raidfile.conf file.
 
 __E
 	exit(1);
@@ -44,7 +47,7 @@ __E
 }
 
 # default locations
-my $default_config_location = '/etc/box/bbstored.conf';
+my $default_config_location = '@sysconfdir_expanded@/box/bbstored.conf';
 
 # command line parameters
 my ($config_dir,$server,$username,$raidfile_config) = @ARGV;
@@ -193,7 +196,7 @@ TimeBetweenHousekeeping = 900
 
 Server
 {
-	PidFile = /var/run/bbstored.pid
+	PidFile = @localstatedir_expanded@/bbstored.pid
 	User = $username
 	ListenAddresses = inet:$server
 	CertificateFile = $certificate
@@ -231,7 +234,7 @@ What you need to do now...
 4) Create accounts with bbstoreaccounts
 
 5) Start the backup store daemon with the command
-      /usr/local/bin/bbstored$daemon_args
+      @bindir_expanded@/bbstored$daemon_args
    in /etc/rc.local, or your local equivalent.
 
 ===================================================================
