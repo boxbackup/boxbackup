@@ -161,7 +161,8 @@ for my $parcel (@parcels)
 			{
 				$local_install_dir = "@prefix@/$dest";
 			}
-			print SCRIPT "install $name $local_install_dir\n";
+			print SCRIPT "install $name " .
+				"\$DESTDIR$local_install_dir\n";
 		}
 	}
 
