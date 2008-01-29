@@ -1,4 +1,4 @@
-PIDFILE=/var/run/bbstored.pid
+PIDFILE=@localstatedir_expanded@/bbstored.pid
 
 case $1 in 
 

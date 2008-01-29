@@ -1,5 +1,5 @@
 
-PIDFILE=/var/run/bbackupd.pid
+PIDFILE=@localstatedir_expanded@/bbackupd.pid
 
 case $1 in 
 

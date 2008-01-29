@@ -291,6 +291,12 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbackupquery/makedocumentation.pl
                    bin/bbstored/bbstored-certs
                    bin/bbstored/bbstored-config
+                   contrib/debian/bbackupd
+                   contrib/debian/bbstored
+                   contrib/redhat/bbackupd
+                   contrib/redhat/bbstored
+                   contrib/suse/bbackupd
+                   contrib/suse/bbstored
                    contrib/solaris/bbackupd-manifest.xml
                    contrib/solaris/bbstored-manifest.xml
                    contrib/solaris/bbackupd-smf-method
