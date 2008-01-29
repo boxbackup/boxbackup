@@ -341,7 +341,7 @@
 #define PACKAGE_NAME "Box Backup"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Box Backup 0.09"
+#define PACKAGE_STRING "Box Backup 0.11"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "box-backup"
