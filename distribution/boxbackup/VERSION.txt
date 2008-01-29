@@ -1,2 +1,2 @@
-0.10_plus_USE_SVN_VERSION
+0.11rc2
 boxbackup
