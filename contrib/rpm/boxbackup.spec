@@ -123,8 +123,7 @@ install -m 644 %{distribution_dir}THANKS.txt \
 
 # Client
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd.conf
-install -m 755 %{distribution_dir}contrib/%{dist}/bbackupd \
-	$RPM_BUILD_ROOT%{init_dir}
+install -m 755 contrib/%{dist}/bbackupd $RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbackupd $RPM_BUILD_ROOT%{_sbindir}/rcbbackupd
 %endif
@@ -137,8 +136,7 @@ install %{client_dir}/bbackupd-config $RPM_BUILD_ROOT%{_sbindir}
 # Server
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbstored.conf
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/raidfile.conf
-install -m 755 %{distribution_dir}contrib/%{dist}/bbstored \
-	$RPM_BUILD_ROOT%{init_dir}
+install -m 755 contrib/%{dist}/bbstored $RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}/rcbbstored
 %endif
