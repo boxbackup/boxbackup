@@ -7,8 +7,8 @@ AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
 # override default sysconfdir, for backwards compatibility
-AC_SUBST([sysconfdir],    ['/etc'])dnl
-AC_SUBST([localstatedir], ['/var/run'])dnl
+test "$sysconfdir" = NONE && sysconfdir=/etc
+test "$localstatedir" = NONE && localstatedir=/var/run
 
 touch install-sh
 AC_CANONICAL_SYSTEM
