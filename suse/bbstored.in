@@ -1,0 +1,104 @@
+#!/bin/sh
+#
+# Copyright (c)2004, Nothing But Net Limited
+#   <chris.smith@nothingbutnet.co.nz>
+#
+######################################################################
+# RELEASED AND PROVIDED TO YOU UNDER THE SAME LICENCE AS THE BOXBACKUP
+# SUITE OF PROGRAMS. LICENCE MAY BE VIEWED HERE:
+#
+# http://www.boxbackup.org/license.html
+######################################################################
+#
+# /etc/init.d/bbstored
+#   and its symbolic link
+# /(usr/)sbin/rcbbstored
+#
+### BEGIN INIT INFO
+# Provides:          bbstored
+# Required-Start:    $named $network $local_fs $syslog
+# X-UnitedLinux-Should-Start: $time ypbind sendmail
+# Required-Stop:     $named $network $localfs $syslog
+# X-UnitedLinux-Should-Stop: $time ypbind sendmail
+# Default-Start:     3 5
+# Default-Stop:      0 1 2 6
+# Short-Description: BoxBackup server side daemon
+# Description: Server daemon for the BoxBackup software,
+#	to which bbackupd clients connect.
+### END INIT INFO
+# 
+
+# Check for missing binaries (stale symlinks should not happen)
+BBSTORED_BIN=@bindir_expanded@/bbstored
+if [ ! -x $BBSTORED_BIN ] ; then
+	echo "$BBSTORED_BIN not installed"
+	exit 5
+fi
+
+. /etc/rc.status
+
+# Reset status of this service
+rc_reset
+
+case "$1" in
+	start)
+	echo -n "Starting bbstored "
+	startproc $BBSTORED_BIN
+	rc_status -v
+	;;
+
+    stop)
+	echo -n "Shutting down bbstored "
+	killproc -TERM $BBSTORED_BIN
+	rc_status -v
+	;;
+
+    try-restart|condrestart)
+	if test "$1" = "condrestart"; then
+		echo "${attn} Use try-restart ${done}(LSB)${attn} rather than condrestart ${warn}(RH)${norm}"
+	fi
+	$0 status
+	if test $? = 0; then
+		$0 restart
+	else
+		rc_reset	# Not running is not a failure.
+	fi
+	rc_status
+	;;
+
+    restart)
+	$0 stop
+	$0 start
+	rc_status
+	;;
+
+    force-reload)
+	echo -n "Reload service bbstored "
+	killproc -HUP $BBSTORED_BIN
+	rc_status -v
+	;;
+
+    reload)
+	echo -n "Reload service bbstored  "
+	killproc -HUP $BBSTORED_BIN
+	rc_status -v
+	;;
+
+    status)
+	echo -n "Checking for service bbstored "
+	checkproc $BBSTORED_BIN
+	rc_status -v
+	;;
+
+    probe)
+	test @sysconfdir_expanded@/box/bbstored.conf \
+		-nt @localstatedir_expanded@/bbstored.pid && echo reload
+	;;
+
+    *)
+	echo "Usage: $0 {start|stop|status|try-restart|restart|force-reload|reload|probe}"
+	exit 1
+	;;
+
+esac
+rc_exit

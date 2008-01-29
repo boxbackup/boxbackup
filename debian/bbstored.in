@@ -1,0 +1,46 @@
+#! /bin/sh
+
+# Start and stop the Box Backup server daemon.
+
+BBSTORED=@bindir_expanded@/bbstored
+CONFIG=@sysconfdir_expanded@/box/bbstored.conf
+PIDFILE=@localstatedir_expanded@/bbstored.pid
+
+test -x $BBACKUPD || exit 0
+test -f $CONFIG || exit 0
+
+case $1 in
+	start)
+		echo -n "Starting Box Backup Server daemon: bbstored"
+		start-stop-daemon --start --quiet --exec $BBSTORED > /dev/null
+		echo "."
+		;;
+	
+	stop)
+		echo -n "Stopping Box Backup Server daemon: bbstored"
+		start-stop-daemon --stop --quiet \
+			--pidfile $PIDFILE --exec $BBSTORED
+		echo "."
+		;;
+	
+	reload|force-reload)
+		echo -n "Reloading Box Backup Server configuration"
+		start-stop-daemon --stop --signal 1 --quiet --oknodo \
+			--pidfile $PIDFILE --exec $BBSTORED
+		echo "."
+		;;
+	
+	restart)
+		echo -n "Restarting Box Backup Server daemon: bbstored"
+		start-stop-daemon --stop --quiet --pidfile $PIDFILE \
+			--exec $BBSTORED
+		start-stop-daemon --start --quiet \
+			--exec $BBSTORED > /dev/null
+		echo "."
+		;;
+	
+	*)
+		echo "Usage: /etc/init.d/bbstored {start|stop|reload|force-reload|restart}"
+esac
+
+exit 0

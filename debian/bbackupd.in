@@ -1,0 +1,46 @@
+#! /bin/sh
+
+# Start and stop the Box Backup client daemon.
+
+BBACKUPD=@bindir_expanded@/bbackupd
+CONFIG=@sysconfdir_expanded@/box/bbackupd.conf
+PIDFILE=@localstatedir_expanded@/bbackupd.pid
+
+test -x $BBACKUPD || exit 0
+test -f $CONFIG || exit 0
+
+case $1 in
+	start)
+		echo -n "Starting Box Backup Client daemon: bbackupd"
+		start-stop-daemon --start --quiet --exec $BBACKUPD > /dev/null
+		echo "."
+		;;
+		
+	stop)
+		echo -n "Stopping Box Backup Client daemon: bbackupd"
+		start-stop-daemon --stop --quiet \
+			--pidfile $PIDFILE --exec $BBACKUPD
+		echo "."
+		;;
+	
+	reload|force-reload)
+		echo -n "Reloading Box Backup Client configuration"
+		start-stop-daemon --stop --signal 1 --quiet --oknodo \
+			--pidfile $PIDFILE --exec $BBACKUPD
+		echo "."
+		;;
+		
+	restart)
+		echo -n "Restarting Box Backup Client daemon: bbackupd"	
+		start-stop-daemon --stop --quiet --pidfile $PIDFILE \
+			--exec $BBACKUPD
+		start-stop-daemon --start --quiet \
+			--exec $BBACKUPD > /dev/null
+		echo "."
+		;;
+	*)
+		echo "Usage: /etc/init.d/bbackupd {start|stop|reload|force-reload|restart}"
+		exit 1
+esac
+
+exit 0

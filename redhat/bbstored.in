@@ -1,13 +1,13 @@
 #! /bin/bash
 #
-# bbackupd          Start/Stop the box backup daemon.
+# bbstored          Start/Stop the box backup server daemon.
 #
 # chkconfig: 345 93 07
-# description: bbackup is the client side deamon for Box Backup, a completely \
-#              automatic on-line backup system
-# processname: bbackupd
-# config: /etc/box
-# pidfile: /var/run/bbackupd.pid
+# description: bbstored is the server side daemon for Box Backup, \
+#              a completely automatic on-line backup system.
+# processname: bbstored
+# config: @sysconfdir_expanded@/box
+# pidfile: @localstatedir_expanded@/bbstored.pid
 
 # Source function library.
 . /etc/init.d/functions
@@ -16,10 +16,10 @@ RETVAL=0
 
 # See how we were called.
 
-prog="bbackupd"
+prog="bbstored"
 
 # Check that configuration exists.
-[ -f /etc/box/$prog.conf ] || exit 0
+[ -f @sysconfdir_expanded@/box/$prog.conf ] || exit 0
 
 start() {
 	echo -n $"Starting $prog: "
@@ -49,7 +49,7 @@ restart() {
 }
 
 reload() {
-        echo -n $"Reloading $prog daemon configuration: "
+        echo -n $"Reloading $prog configuration: "
         killproc $prog -HUP
         retval=$?
         echo
