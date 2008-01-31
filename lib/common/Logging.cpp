@@ -182,6 +182,7 @@ Logger::~Logger()
 bool Console::sShowTime = false;
 bool Console::sShowTimeMicros = false;
 bool Console::sShowTag = false;
+bool Console::sShowPID = false;
 std::string Console::sTag;
 
 void Console::SetTag(const std::string& rTag)
@@ -200,6 +201,11 @@ void Console::SetShowTimeMicros(bool enabled)
 	sShowTimeMicros = enabled;
 }
 
+void Console::SetShowPID(bool enabled)
+{
+	sShowPID = enabled;
+}
+
 bool Console::Log(Log::Level level, const std::string& rFile, 
 	int line, std::string& rMessage)
 {
@@ -215,7 +221,7 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 		target = stderr;
 	}
 
-	std::string msg;
+	std::ostringstream buf;
 
 	if (sShowTime)
 	{
@@ -231,8 +237,6 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 			if (localtime_r(&seconds, &tm_now) != NULL)
 		#endif
 		{
-			std::ostringstream buf;
-
 			buf << std::setfill('0') <<
 				std::setw(2) << tm_ptr->tm_hour << ":" << 
 				std::setw(2) << tm_ptr->tm_min  << ":" <<
@@ -244,40 +248,58 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 			}
 
 			buf << " ";
-			msg += buf.str();
 		}
 		else
 		{
-			msg += strerror(errno);
-			msg += " ";
+			buf << strerror(errno);
+			buf << " ";
 		}
 	}
 
 	if (sShowTag)
 	{
-		msg += "[" + sTag + "] ";
+		if (sShowPID)
+		{
+			buf << "[" << sTag << " " << getpid() << "] ";
+		}
+		else
+		{
+			buf << "[" << sTag << "] ";
+		}
+	}
+	else if (sShowPID)
+	{
+		buf << "[" << getpid() << "] ";
 	}
 
 	if (level <= Log::FATAL)
 	{
-		msg += "FATAL: ";
+		buf << "FATAL:   ";
 	}
 	else if (level <= Log::ERROR)
 	{
-		msg += "ERROR: ";
+		buf << "ERROR:   ";
 	}
 	else if (level <= Log::WARNING)
 	{
-		msg += "WARNING: ";
+		buf << "WARNING: ";
 	}
 	else if (level <= Log::NOTICE)
 	{
-		msg += "NOTICE: ";
+		buf << "NOTICE:  ";
 	}
-	
-	msg += rMessage;
+	else if (level <= Log::INFO)
+	{
+		buf << "INFO:    ";
+	}
+	else if (level <= Log::TRACE)
+	{
+		buf << "TRACE:   ";
+	}
 
-	fprintf(target, "%s\n", msg.c_str());
+	buf << rMessage;
+
+	fprintf(target, "%s\n", buf.str().c_str());
 	
 	return true;
 }

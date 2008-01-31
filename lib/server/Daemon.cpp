@@ -106,7 +106,7 @@ std::string Daemon::GetOptionString()
 	#ifndef WIN32
 		"DFk"
 	#endif
-		"hqvVt:T";
+		"hPqvVt:TU";
 }
 
 void Daemon::Usage()
@@ -125,11 +125,13 @@ void Daemon::Usage()
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
 #endif
+	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity\n"
 	"  -t <tag>   Tag console output with specified marker\n"
-	"  -T         Timestamp console output\n";
+	"  -T         Timestamp console output\n"
+	"  -U         Timestamp console output with microseconds\n";
 }
 
 // --------------------------------------------------------------------------
@@ -181,6 +183,12 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
+		case 'P':
+		{
+			Console::SetShowPID(true);
+		}
+		break;
+
 		case 'q':
 		{
 			if(mLogLevel == Log::NOTHING)
@@ -222,6 +230,13 @@ int Daemon::ProcessOption(signed int option)
 		case 'T':
 		{
 			Console::SetShowTime(true);
+		}
+		break;
+
+		case 'U':
+		{
+			Console::SetShowTime(true);
+			Console::SetShowTimeMicros(true);
 		}
 		break;
 
