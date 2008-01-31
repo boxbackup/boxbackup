@@ -974,6 +974,9 @@ int test_server(const char *hostname)
 
 		test_server_1(protocol, protocolReadOnly);
 
+		// sleep to ensure that the timestamp on the file will change
+		::safe_sleep(1);
+
 		// Create and upload some test files
 		int64_t maxID = 0;
 		for(int t = 0; t < UPLOAD_NUM; ++t)
@@ -1048,11 +1051,16 @@ int test_server(const char *hostname)
 			StreamableMemBlock attrtest(attr3, sizeof(attr3));
 
 			// Use the read only connection to verify that the directory is as we expect
+			printf("\n\n==== Reading directory using read-only connection\n");
 			check_dir_after_uploads(protocolReadOnly, attrtest);
+			printf("done.\n\n");
 			// And on the read/write one
 			check_dir_after_uploads(protocol, attrtest);
 		}
 		
+		// sleep to ensure that the timestamp on the file will change
+		::safe_sleep(1);
+
 		// Check diffing and rsync like stuff...
 		// Build a modified file
 		{
@@ -1149,6 +1157,8 @@ int test_server(const char *hostname)
 				*upload));
 			subdirfileid = stored->GetObjectID();
 		}
+
+		printf("\n==== Checking upload using read-only connection\n");
 		// Check the directories on the read only connection
 		{
 			// Command
@@ -1181,6 +1191,7 @@ int test_server(const char *hostname)
 			TEST_THAT(en->GetObjectID() == subdirid);
 			TEST_THAT(en->GetModificationTime() == 0);	// dirs don't have modification times.
 		}
+
 		{
 			// Command
 			std::auto_ptr<BackupProtocolClientSuccess> dirreply(protocolReadOnly.QueryListDirectory(
@@ -1211,6 +1222,7 @@ int test_server(const char *hostname)
 			StreamableMemBlock attr(attr1, sizeof(attr1));
 			TEST_THAT(dir.GetAttributes() == attr);
 		}
+		printf("done.\n\n");
 
 		// Check that we don't get attributes if we don't ask for them
 		{
@@ -1258,6 +1270,9 @@ int test_server(const char *hostname)
 			TEST_THAT(dir.GetAttributes() == attrtest);
 		}
 		
+		// sleep to ensure that the timestamp on the file will change
+		::safe_sleep(1);
+
 		// Test moving a file
 		{
 			BackupStoreFilenameClear newName("moved-files");
@@ -1280,9 +1295,6 @@ int test_server(const char *hostname)
 					subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName),
 				ConnectionException, Conn_Protocol_UnexpectedReply);
 		}
-
-		// sleep to ensure that the timestamp on the file will change
-		::safe_sleep(1);
 
 		// Rename within a directory
 		{
@@ -1341,6 +1353,9 @@ int test_server(const char *hostname)
 			TEST_THAT(foundCurrent);
 			TEST_THAT(foundOld);
 		}
+
+		// sleep to ensure that the timestamp on the file will change
+		::safe_sleep(1);
 
 		// make a little bit more of a thing to look at
 		int64_t subsubdirid = 0;
