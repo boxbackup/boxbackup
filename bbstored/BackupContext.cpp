@@ -277,9 +277,17 @@ BackupStoreDirectory &BackupContext::GetDirectoryInternal(int64_t ObjectID)
 		if(revID == item->second->GetRevisionID())
 		{
 			// Looks good... return the cached object
+			BOX_TRACE("Returning object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" from cache, modtime = " << revID);
 			return *(item->second);
 		}
 		
+		BOX_TRACE("Refreshing object " <<
+			BOX_FORMAT_OBJECTID(ObjectID) <<
+			" in cache, modtime changed from " <<
+			item->second->GetRevisionID() << " to " << revID);
+
 		// Delete this cached object
 		delete item->second;
 		mDirectoryCache.erase(item);
