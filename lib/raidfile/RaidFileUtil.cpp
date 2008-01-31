@@ -22,9 +22,11 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    RaidFileUtil::RaidFileExists(RaidFileDiscSet &, const std::string &)
-//		Purpose: Check to see the state of a RaidFile on disc (doesn't look at contents,
-//				 just at existense of files)
+//		Name:    RaidFileUtil::RaidFileExists(RaidFileDiscSet &,
+//			 const std::string &, int *, int *, int64_t *)
+//		Purpose: Check to see the state of a RaidFile on disc
+//			 (doesn't look at contents, just at existence of
+//			 files)
 //		Created: 2003/07/11
 //
 // --------------------------------------------------------------------------
@@ -54,10 +56,14 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 			if(pRevisionID != 0)
 			{
 				(*pRevisionID) = FileModificationTime(st);
-#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
-				// On linux, the time resolution is very low for modification times.
-				// So add the size to it to give a bit more chance of it changing.
+#ifdef NDEBUG
+				// The resolution of timestamps may be very
+				// low, e.g. 1 second. So add the size to it
+				// to give a bit more chance of it changing.
 				// TODO: Make this better.
+				// Disabled in debug mode, to simulate
+				// filesystem with 1-second timestamp
+				// resolution, e.g. MacOS X HFS, Linux.
 				(*pRevisionID) += st.st_size;
 #endif
 			}
@@ -71,10 +77,10 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 	int64_t revisionID = 0;
 	int setSize = rDiscSet.size();
 	int rfCount = 0;
-#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
+
 	// TODO: replace this with better linux revision ID detection
 	int64_t revisionIDplus = 0;
-#endif
+
 	for(int f = 0; f < setSize; ++f)
 	{
 		std::string componentFile(RaidFileUtil::MakeRaidComponentName(rDiscSet, rFilename, (f + startDisc) % setSize));
@@ -92,16 +98,20 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 			{
 				int64_t rid = FileModificationTime(st);
 				if(rid > revisionID) revisionID = rid;
-#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 				revisionIDplus += st.st_size;
-#endif
 			}
 		}
 	}
 	if(pRevisionID != 0)
 	{
 		(*pRevisionID) = revisionID;
-#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
+#ifdef NDEBUG
+		// The resolution of timestamps may be very low, e.g.
+		// 1 second. So add the size to it to give a bit more
+		// chance of it changing.
+		// TODO: Make this better.
+		// Disabled in debug mode, to simulate filesystem with
+		// 1-second timestamp resolution, e.g. MacOS X HFS, Linux.
 		(*pRevisionID) += revisionIDplus;
 #endif
 	}
