@@ -28,11 +28,18 @@ inline box_time_t FileModificationTime(struct stat &st)
 
 inline box_time_t FileAttrModificationTime(struct stat &st)
 {
-#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
-	box_time_t statusmodified = ((int64_t)st.st_ctime) * (MICRO_SEC_IN_SEC_LL);
-#else
-	box_time_t statusmodified = (((int64_t)st.st_ctimespec.tv_nsec) / NANO_SEC_IN_USEC_LL)
-			+ (((int64_t)st.st_ctimespec.tv_sec) * (MICRO_SEC_IN_SEC_LL));
+	box_time_t statusmodified =
+#ifdef HAVE_STRUCT_STAT_ST_MTIMESPEC
+		(((int64_t)st.st_ctimespec.tv_nsec) / (NANO_SEC_IN_USEC_LL)) +
+		(((int64_t)st.st_ctimespec.tv_sec)  * (MICRO_SEC_IN_SEC_LL));
+#elif defined HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC
+		(((int64_t)st.st_ctim.tv_nsec) / (NANO_SEC_IN_USEC_LL)) +
+		(((int64_t)st.st_ctim.tv_sec)  * (MICRO_SEC_IN_SEC_LL));
+#elif defined HAVE_STRUCT_STAT_ST_ATIMENSEC
+		(((int64_t)st.st_ctimensec) / (NANO_SEC_IN_USEC_LL)) +
+		(((int64_t)st.st_ctime)     * (MICRO_SEC_IN_SEC_LL));
+#else // no nanoseconds anywhere
+		(((int64_t)st.st_ctime) * (MICRO_SEC_IN_SEC_LL));
 #endif
 	
 	return statusmodified;
