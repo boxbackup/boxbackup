@@ -620,16 +620,16 @@ protected:
 
 __E
 
-my $construtor_extra = '';
-$construtor_extra .= ', mLogToSysLog(false)' if $implement_syslog;
-$construtor_extra .= ', mLogToFile(0)' if $implement_filelog;
+my $constructor_extra = '';
+$constructor_extra .= ', mLogToSysLog(false)' if $implement_syslog;
+$constructor_extra .= ', mLogToFile(0)' if $implement_filelog;
 
 my $destructor_extra = ($type eq 'Server')?"\n\tDeleteStreamsToSend();":'';
 
 my $prefix = $classname_base.'::';
 print CPP <<__E;
 $prefix$classname_base(IOStream &rStream)
-	: Protocol(rStream)$construtor_extra
+	: Protocol(rStream)$constructor_extra
 {
 }
 $prefix~$classname_base()
@@ -661,7 +661,7 @@ print CPP <<__E;
 	}
 }
 __E
-# write receieve and send functions
+# write receive and send functions
 print CPP <<__E;
 std::auto_ptr<$derive_objects_from> ${prefix}Receive()
 {
@@ -734,51 +734,9 @@ void ${prefix}DoServer($context_class &rContext)
 		// Get an object from the conversation
 		std::auto_ptr<${derive_objects_from}> pobj(Receive());
 
-__E
-	if($implement_syslog)
-	{
-		print CPP <<__E;
-		if(mLogToSysLog)
-		{
-			pobj->LogSysLog("Receive");
-		}
-__E
-	}
-	if($implement_filelog)
-	{
-		print CPP <<__E;
-		if(mLogToFile != 0)
-		{
-			pobj->LogFile("Receive", mLogToFile);
-		}
-__E
-	}
-	print CPP <<__E;
-
 		// Run the command
 		std::auto_ptr<${derive_objects_from}> preply((${derive_objects_from}*)(pobj->DoCommand(*this, rContext).release()));
 		
-__E
-	if($implement_syslog)
-	{
-		print CPP <<__E;
-		if(mLogToSysLog)
-		{
-			preply->LogSysLog("Send");
-		}
-__E
-	}
-	if($implement_filelog)
-	{
-		print CPP <<__E;
-		if(mLogToFile != 0)
-		{
-			preply->LogFile("Send", mLogToFile);
-		}
-__E
-	}
-	print CPP <<__E;
-
 		// Send the reply
 		Send(*(preply.get()));
 
@@ -824,13 +782,57 @@ if($implement_filelog || $implement_syslog)
 
 	if($implement_syslog)
 	{
-		$fR .= qq~\tif(mLogToSysLog) { ::syslog(LOG_INFO, (Size==Protocol::ProtocolStream_SizeUncertain)?"Receiving stream, size uncertain":"Receiving stream, size %d", Size); }\n~;
-		$fS .= qq~\tif(mLogToSysLog) { ::syslog(LOG_INFO, (Size==Protocol::ProtocolStream_SizeUncertain)?"Sending stream, size uncertain":"Sending stream, size %d", Size); }\n~;
+		$fR .= <<__E;
+	if(mLogToSysLog)
+	{
+		if(Size==Protocol::ProtocolStream_SizeUncertain)
+		{
+			BOX_TRACE("Receiving stream, size uncertain");
+		}
+		else
+		{
+			BOX_TRACE("Receiving stream, size " << Size);
+		}
 	}
+__E
+		
+		$fS .= <<__E;
+	if(mLogToSysLog)
+	{
+		if(Size==Protocol::ProtocolStream_SizeUncertain)
+		{
+			BOX_TRACE("Sending stream, size uncertain");
+		}
+		else
+		{
+			BOX_TRACE("Sending stream, size " << Size);
+		}
+	}
+__E
+	}
+
 	if($implement_filelog)
 	{
-		$fR .= qq~\tif(mLogToFile) { ::fprintf(mLogToFile, (Size==Protocol::ProtocolStream_SizeUncertain)?"Receiving stream, size uncertain\\n":"Receiving stream, size %d\\n", Size); ::fflush(mLogToFile); }\n~;
-		$fS .= qq~\tif(mLogToFile) { ::fprintf(mLogToFile, (Size==Protocol::ProtocolStream_SizeUncertain)?"Sending stream, size uncertain\\n":"Sending stream, size %d\\n", Size); ::fflush(mLogToFile); }\n~;
+		$fR .= <<__E;
+	if(mLogToFile)
+	{
+		::fprintf(mLogToFile,
+			(Size==Protocol::ProtocolStream_SizeUncertain)
+			?"Receiving stream, size uncertain\\n"
+			:"Receiving stream, size %d\\n", Size);
+		::fflush(mLogToFile);
+	}
+__E
+		$fS .= <<__E;
+	if(mLogToFile)
+	{
+		::fprintf(mLogToFile,
+			(Size==Protocol::ProtocolStream_SizeUncertain)
+			?"Sending stream, size uncertain\\n"
+			:"Sending stream, size %d\\n", Size);
+		::fflush(mLogToFile);
+	}
+__E
 	}
 
 	print CPP <<__E;
@@ -888,11 +890,13 @@ std::auto_ptr<$classname_base$reply> ${classname_base}::Query(const $classname_b
 		if(preply->IsError(type, subType))
 		{
 			SetError(type, subType);
-			TRACE2("Protocol: Error received %d/%d\\n", type, subType);
+			BOX_WARNING("Protocol: Received error " << type <<
+				"/" << subType);
 		}
 		else
 		{
 			SetError(Protocol::UnknownError, Protocol::UnknownError);
+			BOX_WARNING("Protocol: Received unknown error");
 		}
 		
 		// Throw an exception
