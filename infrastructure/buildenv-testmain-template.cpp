@@ -160,6 +160,12 @@ int main(int argc, char * const * argv)
 	MEMLEAKFINDER_START
 
 #ifdef HAVE_GETOPT_H
+	#ifdef NDEBUG
+	int logLevel = Log::NOTICE; // need an int to do math with
+	#else
+	int logLevel = Log::INFO; // need an int to do math with
+	#endif
+
 	struct option longopts[] = 
 	{
 		{ "bbackupd-args",	required_argument, NULL, 'c' },
@@ -170,7 +176,7 @@ int main(int argc, char * const * argv)
 	
 	int ch;
 	
-	while ((ch = getopt_long(argc, argv, "c:d:s:t:TUV", longopts, NULL))
+	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vTUV", longopts, NULL))
 		!= -1)
 	{
 		switch(ch)
@@ -202,6 +208,38 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
+			case 'q':
+			{
+				if(logLevel == Log::NOTHING)
+				{
+					BOX_FATAL("Too many '-q': "
+						"Cannot reduce logging "
+						"level any more");
+					return 2;
+				}
+				logLevel--;
+			}
+			break;
+
+			case 'v':
+			{
+				if(logLevel == Log::EVERYTHING)
+				{
+					BOX_FATAL("Too many '-v': "
+						"Cannot increase logging "
+						"level any more");
+					return 2;
+				}
+				logLevel++;
+			}
+			break;
+
+			case 'V':
+			{
+				logLevel = Log::EVERYTHING;
+			}
+			break;
+
 			case 't':
 			{
 				Console::SetTag(optarg);
@@ -221,12 +259,6 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
-			case 'V':
-			{
-				Logging::SetGlobalLevel(Log::EVERYTHING);
-			}
-			break;
-
 			case '?':
 			{
 				fprintf(stderr, "Unknown option: '%c'\n",
@@ -242,6 +274,8 @@ int main(int argc, char * const * argv)
 			}
 		}
 	}
+
+	Logging::SetGlobalLevel((Log::Level)logLevel);
 
 	argc -= optind - 1;
 	argv += optind - 1;
