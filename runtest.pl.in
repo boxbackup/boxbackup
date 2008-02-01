@@ -71,6 +71,26 @@ else
 # report results
 print "--------\n",join("\n",@results),"\n";
 
+if ($exit_code != 0)
+{
+	print <<__E;
+
+One or more tests have failed. Please check the following common causes:
+
+* Check that no instances of bbstored or bbackupd are already running
+  on this machine.
+* Make sure there isn't a firewall blocking incoming or outgoing connections
+  on port 2201.
+* Check that there is sufficient space in the filesystem that the tests
+  are being run from (at least 1 GB free).
+* The backupdiff test fails if it takes too long, so it's sensitive to
+  the speed of the host and your connection to it.
+
+After checking all the above, if you still have problems please contact
+us on the mailing list, boxbackup@fluffy.co.uk. Thanks!
+__E
+}
+
 exit $exit_code;
 
 sub runtest
