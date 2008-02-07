@@ -63,14 +63,14 @@ void SSLLib::Initialise()
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-void SSLLib::LogError(const char *ErrorDuringAction)
+void SSLLib::LogError(const std::string& rErrorDuringAction)
 {
 	unsigned long errcode;
 	char errname[256];		// SSL docs say at least 120 bytes
 	while((errcode = ERR_get_error()) != 0)
 	{
 		::ERR_error_string_n(errcode, errname, sizeof(errname));
-		BOX_ERROR("SSL error during " << ErrorDuringAction << ": " <<
+		BOX_ERROR("SSL error while " << rErrorDuringAction << ": " <<
 			errname);
 	}
 }

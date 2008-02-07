@@ -123,7 +123,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	mpBIO = ::BIO_new(::BIO_s_socket());
 	if(mpBIO == 0)
 	{
-		SSLLib::LogError("Create socket bio");
+		SSLLib::LogError("creating socket bio");
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
@@ -134,7 +134,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	mpSSL = ::SSL_new(rContext.GetRawContext());
 	if(mpSSL == 0)
 	{
-		SSLLib::LogError("Create ssl");
+		SSLLib::LogError("creating SSL object");
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
@@ -202,12 +202,12 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			// Error occured
 			if(IsServer)
 			{
-				SSLLib::LogError("Accept");
+				SSLLib::LogError("accepting connection");
 				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
 			}
 			else
 			{
-				SSLLib::LogError("Connect");
+				SSLLib::LogError("connecting");
 				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
 			}
 		}
@@ -334,7 +334,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 			break;
 			
 		default:
-			SSLLib::LogError("Read");
+			SSLLib::LogError("reading");
 			THROW_EXCEPTION(ConnectionException, Conn_TLSReadFailed)
 			break;
 		}
@@ -399,7 +399,7 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 			break;
 		
 		default:
-			SSLLib::LogError("Write");
+			SSLLib::LogError("writing");
 			THROW_EXCEPTION(ConnectionException, Conn_TLSWriteFailed)
 			break;
 		}
@@ -441,7 +441,7 @@ void SocketStreamTLS::Shutdown(bool Read, bool Write)
 
 	if(::SSL_shutdown(mpSSL) < 0)
 	{
-		SSLLib::LogError("Shutdown");
+		SSLLib::LogError("shutting down");
 		THROW_EXCEPTION(ConnectionException, Conn_TLSShutdownFailed)
 	}
 
