@@ -29,7 +29,7 @@
 namespace SSLLib
 {
 	void Initialise();
-	void LogError(const char *ErrorDuringAction);
+	void LogError(const std::string& rErrorDuringAction);
 };
 
 #endif // SSLLIB__H
