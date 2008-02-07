@@ -75,19 +75,25 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	// Setup our identity
 	if(::SSL_CTX_use_certificate_chain_file(mpContext, CertificatesFile) != 1)
 	{
-		SSLLib::LogError("Load certificates");
+		std::string msg = "loading certificates from ";
+		msg += CertificatesFile;
+		SSLLib::LogError(msg);
 		THROW_EXCEPTION(ServerException, TLSLoadCertificatesFailed)
 	}
 	if(::SSL_CTX_use_PrivateKey_file(mpContext, PrivateKeyFile, SSL_FILETYPE_PEM) != 1)
 	{
-		SSLLib::LogError("Load private key");
+		std::string msg = "loading private key from ";
+		msg += PrivateKeyFile;
+		SSLLib::LogError(msg);
 		THROW_EXCEPTION(ServerException, TLSLoadPrivateKeyFailed)
 	}
 	
 	// Setup the identify of CAs we trust
 	if(::SSL_CTX_load_verify_locations(mpContext, TrustedCAsFile, NULL) != 1)
 	{
-		SSLLib::LogError("Load CA cert");
+		std::string msg = "loading CA cert from ";
+		msg += TrustedCAsFile;
+		SSLLib::LogError(msg);
 		THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
 	}
 	
@@ -99,7 +105,7 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	// Setup allowed ciphers
 	if(::SSL_CTX_set_cipher_list(mpContext, CIPHER_LIST) != 1)
 	{
-		SSLLib::LogError("Set cipher list");
+		SSLLib::LogError("setting cipher list to " CIPHER_LIST);
 		THROW_EXCEPTION(ServerException, TLSSetCiphersFailed)
 	}
 }
