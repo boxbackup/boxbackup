@@ -227,7 +227,7 @@ SUBJECT="BACKUP PROBLEM on host $hostname"
 SENDTO="$current_username"
 
 if [ "\$1" = "" ]; then
-	echo "Usage: $0 <store-full|read-error|backup-error|backup-start|backup-finish>" >&2
+	echo "Usage: \$0 <store-full|read-error|backup-error|backup-start|backup-finish>" >&2
 	exit 2
 elif [ "\$1" = store-full ]; then
 	$sendmail \$SENDTO <<EOM
