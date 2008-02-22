@@ -104,9 +104,9 @@ std::string Daemon::GetOptionString()
 {
 	return "c:"
 	#ifndef WIN32
-		"DFk"
+		"DFkP"
 	#endif
-		"hPqvVt:TU";
+		"hqvVt:TU";
 }
 
 void Daemon::Usage()
@@ -124,8 +124,8 @@ void Daemon::Usage()
 	"  -D         Debugging mode, do not fork, one process only, one client only\n"
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
-#endif
 	"  -P         Show process ID (PID) in console output\n"
+#endif
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity\n"
@@ -183,11 +183,13 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
+		#ifndef WIN32
 		case 'P':
 		{
 			Console::SetShowPID(true);
 		}
 		break;
+		#endif
 
 		case 'q':
 		{
