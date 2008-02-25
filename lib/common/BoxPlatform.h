@@ -165,11 +165,11 @@
 	#include "emu.h"
 #endif
 
-// Solaris has no dirfd(x) macro or function, and we need one.
-// We cannot define macros with arguments directly using AC_DEFINE,
-// so do it here instead of in configure.ac.
+// Solaris has no dirfd(x) macro or function, and we need one for
+// intercept tests. We cannot define macros with arguments directly 
+// using AC_DEFINE, so do it here instead of in configure.ac.
 
-#if ! HAVE_DECL_DIRFD
+#if ! defined PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE && ! HAVE_DECL_DIRFD
 	#ifdef HAVE_DIR_D_FD
 		#define dirfd(x) (x)->d_fd
 	#elif defined HAVE_DIR_DD_FD
