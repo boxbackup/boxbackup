@@ -5,7 +5,7 @@ case $1 in
 
         # SMF arguments (start and restart [really "refresh"])
 'start')
-        @bindir_expanded@/bbackupd
+        @sbindir_expanded@/bbackupd
         ;;
 
 'restart')

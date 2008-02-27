@@ -23,7 +23,7 @@ prog="bbstored"
 
 start() {
 	echo -n $"Starting $prog: "
-	daemon $prog
+	daemon @sbindir_expanded@/$prog
 	RETVAL=$?
 	echo
 	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
@@ -32,7 +32,7 @@ start() {
 
 stop() {
 	echo -n $"Stopping $prog: "
-	killproc $prog
+	killproc @sbindir_expanded@/$prog
 	RETVAL=$?
 	echo
 	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$prog
@@ -40,7 +40,7 @@ stop() {
 }
 
 rhstatus() {
-	status $prog
+	status @sbindir_expanded@/$prog
 }
 
 restart() {
@@ -50,7 +50,7 @@ restart() {
 
 reload() {
         echo -n $"Reloading $prog configuration: "
-        killproc $prog -HUP
+        killproc @sbindir_expanded@/$prog -HUP
         retval=$?
         echo
         return $RETVAL

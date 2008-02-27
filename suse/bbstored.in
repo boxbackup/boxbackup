@@ -29,7 +29,7 @@
 # 
 
 # Check for missing binaries (stale symlinks should not happen)
-BBSTORED_BIN=@bindir_expanded@/bbstored
+BBSTORED_BIN=@sbindir_expanded@/bbstored
 if [ ! -x $BBSTORED_BIN ] ; then
 	echo "$BBSTORED_BIN not installed"
 	exit 5

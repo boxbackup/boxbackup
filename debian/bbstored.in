@@ -2,7 +2,7 @@
 
 # Start and stop the Box Backup server daemon.
 
-BBSTORED=@bindir_expanded@/bbstored
+BBSTORED=@sbindir_expanded@/bbstored
 CONFIG=@sysconfdir_expanded@/box/bbstored.conf
 PIDFILE=@localstatedir_expanded@/bbstored.pid
 
