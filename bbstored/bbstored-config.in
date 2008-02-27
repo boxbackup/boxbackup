@@ -234,7 +234,7 @@ What you need to do now...
 4) Create accounts with bbstoreaccounts
 
 5) Start the backup store daemon with the command
-      @bindir_expanded@/bbstored$daemon_args
+      @sbindir_expanded@/bbstored$daemon_args
    in /etc/rc.local, or your local equivalent.
 
 ===================================================================
