@@ -28,7 +28,7 @@
 ### END INIT INFO
 
 # Check for missing binaries (stale symlinks should not happen)
-BBACKUPD_BIN=@bindir_expanded@/bbackupd
+BBACKUPD_BIN=@sbindir_expanded@/bbackupd
 if [ ! -x $BBACKUPD_BIN ] ; then
 	echo "$BBACKUPD_BIN not installed"
 	exit 5

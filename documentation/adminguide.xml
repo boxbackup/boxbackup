@@ -96,11 +96,11 @@ cd boxbackup-0.10-server-darwin8.5.0
         <programlisting>mkdir /tmp/boxbackupRepository                        # Create the directory
 chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the new boxbackup daemon user
 
-/usr/local/bin/raidfile-config /etc/box/  1024 /tmp/boxbackupRepository
+/usr/local/sbin/raidfile-config /etc/box/  1024 /tmp/boxbackupRepository
 
 #substitute 1024 with the desired blocksize
 #substitute /tmp/boxbackupRepository with a directory that exists where you want the backup store located
-#/usr/local/bin/raidfile-config --help shows you the options</programlisting>
+#/usr/local/sbin/raidfile-config --help shows you the options</programlisting>
 
         <para>Then create the configuration file /etc/box/bbstored.conf The
         hostname is tricky as it is used for two things: The name of the
@@ -111,7 +111,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
         <literal>ListenAddresses</literal> directive in the
         <filename>/etc/box/bbstored.conf</filename> file.</para>
 
-        <programlisting>/usr/local/bin/bbstored-config /etc/box hostname _bbstored</programlisting>
+        <programlisting>/usr/local/sbin/bbstored-config /etc/box hostname _bbstored</programlisting>
 
         <para>This last step outputs 5 instructions that you must execute to
         the letter. A lot of questions are raised on the mailing list because
@@ -164,7 +164,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
 
           <para>To setup the basic key structure, do the following:</para>
 
-          <programlisting>/usr/local/bin/bbstored-certs ca init</programlisting>
+          <programlisting>/usr/local/sbin/bbstored-certs ca init</programlisting>
 
           <para>(See <ulink url="instguide.xml">OpenSSL notes</ulink> if you
           get an OpenSSL error)</para>
@@ -181,7 +181,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
           request (CSR) for you. Transfer it to the machine with your CA, then
           do:</para>
 
-          <programlisting>/usr/local/bin/bbstored-certs ca sign-server hostname-csr.pem</programlisting>
+          <programlisting>/usr/local/sbin/bbstored-certs ca sign-server hostname-csr.pem</programlisting>
 
           <para>This signs the certificate for the server. Follow the
           instructions in the output on which files to install on the server.
@@ -199,7 +199,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
           0, for example, 1 or 75AB23C. Then on the backup store server,
           create the account with:</para>
 
-          <programlisting>/usr/local/bin/bbstoreaccounts create 75AB23C 0 4096M 4505M</programlisting>
+          <programlisting>/usr/local/sbin/bbstoreaccounts create 75AB23C 0 4096M 4505M</programlisting>
 
           <para>This looks complicated. The numbers are, in order:</para>
 
@@ -261,7 +261,7 @@ chown _bbstored /tmp/boxbackupRepository/             # Change the owner to the 
 
           <para>Sign this CSR with this command:</para>
 
-          <programlisting>/usr/local/bin/bbstored-certs ca sign 75AB23C-csr.pem</programlisting>
+          <programlisting>/usr/local/sbin/bbstored-certs ca sign 75AB23C-csr.pem</programlisting>
 
           <para>Don't forget to check that the embedded account number is
           correct! Then send the two files back to the user, as instructed by
@@ -345,7 +345,7 @@ touch /var/log/raidfile</programlisting>
           the configuration files and generate a private key and certificate
           request.</para>
 
-          <programlisting>/usr/local/bin/bbackupd-config /etc/box lazy <emphasis
+          <programlisting>/usr/local/sbin/bbackupd-config /etc/box lazy <emphasis
               role="bold">999 hostname</emphasis> /var/bbackupd <emphasis
               role="bold">/home</emphasis></programlisting>
 
@@ -407,7 +407,7 @@ touch /var/log/raidfile</programlisting>
           basic bbackupd configuration.</para>
 
           <para>You can then run the daemon (as root) by running
-          <command>/usr/local/bin/bbackupd</command>, and of course, adding it
+          <command>/usr/local/sbin/bbackupd</command>, and of course, adding it
           to your system's startup scripts. The first time it's run it will
           upload everything. Interrupting it and restarting it will only
           upload files which were not uploaded before - it's very
@@ -517,7 +517,7 @@ touch /var/log/raidfile</programlisting>
             here -- they may be different for your system.</para>
           </important>
 
-          <programlisting>/usr/local/bin/bbackupd-config /etc/box lazy 51 server.example.com /var/bbackupd /home /etc/samba
+          <programlisting>/usr/local/sbin/bbackupd-config /etc/box lazy 51 server.example.com /var/bbackupd /home /etc/samba
 
 Setup bbackupd config utility.
 
@@ -579,7 +579,7 @@ What you need to do now...
    more files will be backed up. You want to know about this.
 
 6) Start the backup daemon with the command
-      /usr/local/bin/bbackupd
+      /usr/local/sbin/bbackupd
    in /etc/rc.local, or your local equivalent.
    Note that bbackupd must run as root.
 
@@ -1304,7 +1304,7 @@ BackupLocations
 
         <para>The command line syntax is:</para>
 
-        <programlisting>/usr/local/bin/bbackupctl [-q] [-c config-file] command</programlisting>
+        <programlisting>/usr/local/sbin/bbackupctl [-q] [-c config-file] command</programlisting>
 
         <para>The -q option reduces the amount of output the program emits,
         and -c allows an alternative configuration file to be
@@ -1358,7 +1358,7 @@ BackupLocations
         <para>Use bbackupd-config to write a configuration file in snapshot
         mode, and then run the following command as a cron job.</para>
 
-        <programlisting>/usr/local/bin/bbackupctl -q sync</programlisting>
+        <programlisting>/usr/local/sbin/bbackupctl -q sync</programlisting>
 
         <para>This will cause the backup daemon to upload all changed files
         immediately. <emphasis role="bold">bbackupctl</emphasis> will exit
@@ -1376,7 +1376,7 @@ BackupLocations
           for this account. Either use the usage command in interactive mode,
           or type:</para>
 
-          <programlisting>/usr/local/bin/bbackupquery -q usage quit</programlisting>
+          <programlisting>/usr/local/sbin/bbackupquery -q usage quit</programlisting>
 
           <para>to show the space used as a single command.</para>
         </section>
@@ -1388,11 +1388,11 @@ BackupLocations
           the limits. To display the space used on the server for an account,
           use:</para>
 
-          <programlisting>/usr/local/bin/bbstoreaccounts info 75AB23C</programlisting>
+          <programlisting>/usr/local/sbin/bbstoreaccounts info 75AB23C</programlisting>
 
           <para>To adjust the soft and hard limits on an account, use:</para>
 
-          <programlisting>/usr/local/bin/bbstoreaccounts setlimit 75AB23C new-soft-limit new-hard-limit</programlisting>
+          <programlisting>/usr/local/sbin/bbstoreaccounts setlimit 75AB23C new-soft-limit new-hard-limit</programlisting>
 
           <para>You do not need to restart the server.</para>
         </section>
@@ -1538,7 +1538,7 @@ query &gt;</programlisting>
           regularly, and check its output. You can run the command manually as
           follows:</para>
 
-          <programlisting>/usr/local/bin/bbackupquery "compare -a" quit</programlisting>
+          <programlisting>/usr/local/sbin/bbackupquery "compare -a" quit</programlisting>
 
           <para>This command will report all the differences found between the
           store and the files on disc. It will download everything, so may
@@ -1561,7 +1561,7 @@ query &gt;</programlisting>
           <para>If you would like to do a "quick" check which just downloads
           file checksums and compares against that, then run:</para>
 
-          <programlisting>/usr/local/bin/bbackupquery "compare -aq" quit</programlisting>
+          <programlisting>/usr/local/sbin/bbackupquery "compare -aq" quit</programlisting>
 
           <para>However, this does not check that the file attributes are
           correct, and since the checksums are generated on the client they
@@ -1595,7 +1595,7 @@ query &gt;</programlisting>
 
           <para>Type:</para>
 
-          <programlisting>/usr/local/bin/bbackupquery</programlisting>
+          <programlisting>/usr/local/sbin/bbackupquery</programlisting>
 
           <para>to run it in interactive mode.</para>
 
@@ -1628,7 +1628,7 @@ query &gt;</programlisting>
           <para>Firstly, run bbackupquery in interactive mode. It behaves in a
           similar manner to a command line sftp client.</para>
 
-          <programlisting>/usr/local/bin/bbackupquery</programlisting>
+          <programlisting>/usr/local/sbin/bbackupquery</programlisting>
 
           <para>Then navigate to the directory containing the file you want,
           using list, cd and pwd.</para>
@@ -1744,14 +1744,14 @@ Object ID 0000437e fetched successfully.</programlisting>
         <para>First, run the check utility, and see what errors it
         reports.</para>
 
-        <programlisting>/usr/local/bin/bbstoreaccounts check 1234</programlisting>
+        <programlisting>/usr/local/sbin/bbstoreaccounts check 1234</programlisting>
 
         <para>This will take some time, and use a fair bit of memory (about 16
         bytes per file and directory). If the output looks plausible and
         reports errors which need fixing, run it again but with the fix
         flag:</para>
 
-        <programlisting>/usr/local/bin/bbstoreaccounts check 1234 fix</programlisting>
+        <programlisting>/usr/local/sbin/bbstoreaccounts check 1234 fix</programlisting>
 
         <para>This will fix any errors, and remove unrecoverable files.
         Directories will be recreated if necessary.</para>
@@ -1841,7 +1841,7 @@ Object ID 0000437e fetched successfully.</programlisting>
         configuration file locations to daemons and programs. For
         example</para>
 
-        <programlisting>/usr/local/bin/bbstored /some/other/dir/bbstored.config /usr/local/bin/bbackupquery -c /some/other/dir/bbackupd.config</programlisting>
+        <programlisting>/usr/local/sbin/bbstored /some/other/dir/bbstored.config /usr/local/sbin/bbackupquery -c /some/other/dir/bbackupd.config</programlisting>
 
         <para>(daemons specify the name as the first argument, utility
         programs with the -c option).</para>

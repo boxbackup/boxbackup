@@ -4,7 +4,7 @@ case $1 in
 
         # SMF arguments (start and restart [really "refresh"])
 'start')
-        @bindir_expanded@/bbstored
+        @sbindir_expanded@/bbstored
         ;;
 
 'restart')
