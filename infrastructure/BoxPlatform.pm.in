@@ -76,7 +76,7 @@ BEGIN
 	}
 
 	# where to put the files
-	$install_into_dir = '@bindir_expanded@';
+	$install_into_dir = '@sbindir_expanded@';
 
 	# if it's Darwin,
 	if($build_os eq 'Darwin')

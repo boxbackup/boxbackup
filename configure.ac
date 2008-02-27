@@ -279,10 +279,10 @@ saved_prefix=$prefix
 saved_exec_prefix=$exec_prefix
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
-bindir_expanded=`       eval "echo $bindir"`
-bindir_expanded=`       eval "echo $bindir_expanded"`
-sysconfdir_expanded=`   eval "echo $sysconfdir"`
-localstatedir_expanded=`eval "echo $localstatedir"`
+eval bindir_expanded=`       eval "echo $bindir"`
+eval sbindir_expanded=`      eval "echo $sbindir"`
+eval sysconfdir_expanded=`   eval "echo $sysconfdir"`
+eval localstatedir_expanded=`eval "echo $localstatedir"`
 prefix=$saved_prefix
 exec_prefix=$saved_exec_prefix
 AC_SUBST([bindir_expanded sysconfdir_expanded localstatedir_expanded])

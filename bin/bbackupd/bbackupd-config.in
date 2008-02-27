@@ -577,7 +577,7 @@ What you need to do now...
    more files will be backed up. You want to know about this.
 
 6) Start the backup daemon with the command
-      @bindir_expanded@/bbackupd$daemon_args
+      @sbindir_expanded@/bbackupd$daemon_args
    in /etc/rc.local, or your local equivalent.
    Note that bbackupd must run as root.
 __E

@@ -39,8 +39,8 @@ Version: ###DISTRIBUTION-VERSION-NUMBER###
 Release: 1
 License: BSD
 Group: Applications/Archiving
-Packager: Martin Ebourne <boxbackup-dev@fluffy.co.uk>
-URL: http://www.fluffy.co.uk/boxbackup/
+Packager: Martin Ebourne <boxbackup-dev@boxbackup.org>
+URL: http://www.boxbackup.org/
 Source0: %{ident}.tgz
 Requires: openssl >= 0.9.7a
 BuildRoot: %{_tmppath}/%{ident}-%{release}-root
@@ -143,7 +143,7 @@ ln -s ../../%{init_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}/rcbbstored
 %define server_dir parcels/%{ident}-backup-server-linux-gnu
 install %{server_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}
 install %{server_dir}/bbstoreaccounts $RPM_BUILD_ROOT%{_sbindir}
-install %{server_dir}/bbstored-certs $RPM_BUILD_ROOT%{_bindir}
+install %{server_dir}/bbstored-certs $RPM_BUILD_ROOT%{_sbindir}
 install %{server_dir}/bbstored-config $RPM_BUILD_ROOT%{_sbindir}
 install %{server_dir}/raidfile-config $RPM_BUILD_ROOT%{_sbindir}
 
