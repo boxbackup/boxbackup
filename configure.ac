@@ -285,7 +285,7 @@ eval sysconfdir_expanded=`   eval "echo $sysconfdir"`
 eval localstatedir_expanded=`eval "echo $localstatedir"`
 prefix=$saved_prefix
 exec_prefix=$saved_exec_prefix
-AC_SUBST([bindir_expanded sysconfdir_expanded localstatedir_expanded])
+AC_SUBST([bindir_expanded sbindir_expanded sysconfdir_expanded localstatedir_expanded])
 
 
 ### Output files
