@@ -603,7 +603,7 @@ int64_t SearchDir(BackupStoreDirectory& rDir,
 
 SocketStreamTLS sSocket;
 
-std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext, int flags)
+std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext)
 {
 	sSocket.Open(rContext, Socket::TypeINET, 
 		"localhost", BOX_PORT_BBSTORED);
@@ -619,10 +619,17 @@ std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext, int flags)
 		THROW_EXCEPTION(BackupStoreException, 
 			WrongServerVersion);
 	}
-	connection->QueryLogin(0x01234567, flags);
 	return connection;
 }
 
+std::auto_ptr<BackupProtocolClient> ConnectAndLogin(TLSContext& rContext,
+	int flags)
+{
+	std::auto_ptr<BackupProtocolClient> connection(Connect(rContext));
+	connection->QueryLogin(0x01234567, flags);
+	return connection;
+}
+	
 std::auto_ptr<BackupStoreDirectory> ReadDirectory
 (
 	BackupProtocolClient& rClient,
@@ -1249,23 +1256,27 @@ int test_bbackupd()
 	printf("\n==== Testing that redundant locations are deleted on time\n");
 
 	{
-		std::auto_ptr<BackupProtocolClient> client = Connect(
-			context,
-			BackupProtocolClientLogin::Flags_ReadOnly);
-		
-		std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
-			*client,
-			BackupProtocolClientListDirectory::RootDirectory);
+		{
+			std::auto_ptr<BackupProtocolClient> client =
+				ConnectAndLogin(context,
+				BackupProtocolClientLogin::Flags_ReadOnly);
+			
+			std::auto_ptr<BackupStoreDirectory> dir = 
+				ReadDirectory(*client,
+				BackupProtocolClientListDirectory::RootDirectory);
 
-		// int64_t testDirId = SearchDir(*dir, "Test2");
-		// TEST_THAT(testDirId == 0);
+			// int64_t testDirId = SearchDir(*dir, "Test2");
+			// TEST_THAT(testDirId == 0);
 
-		sync_and_wait();
+			sync_and_wait();
 
-		dir = ReadDirectory(*client,
-			BackupProtocolClientListDirectory::RootDirectory);
-		int64_t testDirId = SearchDir(*dir, "Test2");
-		TEST_THAT(testDirId != 0);
+			dir = ReadDirectory(*client,
+				BackupProtocolClientListDirectory::RootDirectory);
+			int64_t testDirId = SearchDir(*dir, "Test2");
+			TEST_THAT(testDirId != 0);
+			client->QueryFinished();
+			sSocket.Close();
+		}
 
 		// Kill the daemon
 		terminate_bbackupd(bbackupd_pid);
@@ -1288,28 +1299,43 @@ int test_bbackupd()
 		wait_for_sync_end();
 		wait_for_sync_end();
 
-		dir = ReadDirectory(*client,
-			BackupProtocolClientListDirectory::RootDirectory);
-		testDirId = SearchDir(*dir, "Test2");
-		TEST_THAT(testDirId != 0);
+		{
+			std::auto_ptr<BackupProtocolClient> client =
+				ConnectAndLogin(context,
+				BackupProtocolClientLogin::Flags_ReadOnly);
+			
+			std::auto_ptr<BackupStoreDirectory> dir = 
+				ReadDirectory(*client,
+				BackupProtocolClientListDirectory::RootDirectory);
+			int64_t testDirId = SearchDir(*dir, "Test2");
+			TEST_THAT(testDirId != 0);
+			client->QueryFinished();
+			sSocket.Close();
+		}
 
 		wait_for_sync_end();
-		
-		dir = ReadDirectory(*client,
-			BackupProtocolClientListDirectory::RootDirectory);
-		testDirId = SearchDir(*dir, "Test2");
-		TEST_THAT(testDirId != 0);
 
-		BackupStoreDirectory::Iterator i(*dir);
-		BackupStoreFilenameClear dirname("Test2");
-		BackupStoreDirectory::Entry *en = i.FindMatchingClearName(dirname);
-		TEST_THAT(en != 0);
-		int16_t en_flags = en->GetFlags();
-		TEST_THAT(en_flags && BackupStoreDirectory::Entry::Flags_Deleted);
+		{
+			std::auto_ptr<BackupProtocolClient> client =
+				ConnectAndLogin(context,
+				BackupProtocolClientLogin::Flags_ReadOnly);
+			
+			std::auto_ptr<BackupStoreDirectory> dir = 
+				ReadDirectory(*client,
+				BackupProtocolClientListDirectory::RootDirectory);
+			int64_t testDirId = SearchDir(*dir, "Test2");
+			TEST_THAT(testDirId != 0);
 
-		// Log out.
-		client->QueryFinished();
-		sSocket.Close();
+			BackupStoreDirectory::Iterator i(*dir);
+			BackupStoreFilenameClear dirname("Test2");
+			BackupStoreDirectory::Entry *en = 
+				i.FindMatchingClearName(dirname);
+			TEST_THAT(en != 0);
+			int16_t en_flags = en->GetFlags();
+			TEST_THAT(en_flags && BackupStoreDirectory::Entry::Flags_Deleted);
+			client->QueryFinished();
+			sSocket.Close();
+		}
 	}
 
 	TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -1567,7 +1593,7 @@ int test_bbackupd()
 		// Check that we can find it in directory listing
 		{
 			std::auto_ptr<BackupProtocolClient> client =
-				Connect(context, 0);
+				ConnectAndLogin(context, 0);
 
 			std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
 				*client, 
@@ -1577,11 +1603,11 @@ int test_bbackupd()
 			TEST_THAT(baseDirId != 0);
 			dir = ReadDirectory(*client, baseDirId);
 
-			int64_t testDirId = SearchDir(dir, dirname.c_str());
+			int64_t testDirId = SearchDir(*dir, dirname.c_str());
 			TEST_THAT(testDirId != 0);
 			dir = ReadDirectory(*client, testDirId);
 		
-			TEST_THAT(SearchDir(dir, filename.c_str()) != 0);
+			TEST_THAT(SearchDir(*dir, filename.c_str()) != 0);
 			// Log out
 			client->QueryFinished();
 			sSocket.Close();
@@ -2335,8 +2361,8 @@ int test_bbackupd()
 			"actually work\n");
 
 		{
-			std::auto_ptr<BackupProtocolClient> client = Connect(
-				context,
+			std::auto_ptr<BackupProtocolClient> client = 
+				ConnectAndLogin(context,
 				BackupProtocolClientLogin::Flags_ReadOnly);
 			
 			std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
@@ -2508,8 +2534,8 @@ int test_bbackupd()
 		int64_t restoredirid = 0;
 		{
 			// connect and log in
-			std::auto_ptr<BackupProtocolClient> client = Connect(
-				context,
+			std::auto_ptr<BackupProtocolClient> client = 
+				ConnectAndLogin(context,
 				BackupProtocolClientLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
@@ -2781,23 +2807,23 @@ int test_bbackupd()
 			{
 				try
 				{
-					SocketStreamTLS conn;
-					conn.Open(context, Socket::TypeINET, 
-						"localhost", BOX_PORT_BBSTORED);
-					BackupProtocolClient protocol(conn);
-					protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-					std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));	// read-write
-					// Make sure the marker isn't zero, because that's the default, and it should have changed
+					std::auto_ptr<BackupProtocolClient>
+						protocol = Connect(context);
+					// Make sure the marker isn't zero,
+					// because that's the default, and
+					// it should have changed
+					std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol->QueryLogin(0x01234567, 0));
 					TEST_THAT(loginConf->GetClientStoreMarker() != 0);
 					
 					// Change it to something else
-					protocol.QuerySetClientStoreMarker(12);
+					protocol->QuerySetClientStoreMarker(12);
 					
 					// Success!
 					done = true;
 					
 					// Log out
-					protocol.QueryFinished();
+					protocol->QueryFinished();
+					sSocket.Close();
 				}
 				catch(...)
 				{
@@ -2860,8 +2886,8 @@ int test_bbackupd()
 
 			printf("\n==== Resume restore\n");
 
-			std::auto_ptr<BackupProtocolClient> client = Connect(
-				context,
+			std::auto_ptr<BackupProtocolClient> client = 
+				ConnectAndLogin(context,
 				BackupProtocolClientLogin::Flags_ReadOnly);
 
 			// Check that the restore fn returns resume possible,
@@ -2902,8 +2928,8 @@ int test_bbackupd()
 		printf("\n==== Check restore deleted files\n");
 
 		{
-			std::auto_ptr<BackupProtocolClient> client = Connect(
-				context, 0 /* read-write */);
+			std::auto_ptr<BackupProtocolClient> client = 
+				ConnectAndLogin(context, 0 /* read-write */);
 
 			// Do restore and undelete
 			TEST_THAT(BackupClientRestore(*client, deldirid, 
