@@ -348,9 +348,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 {
 	// Banner (optional)
 	{
-		#ifndef NDEBUG
-		BOX_NOTICE(DaemonBanner());
-		#endif
+		BOX_SYSLOG(Log::NOTICE, DaemonBanner());
 	}
 
 	std::string pidFileName;
