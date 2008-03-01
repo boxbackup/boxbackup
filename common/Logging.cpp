@@ -148,6 +148,31 @@ void Logging::Log(Log::Level level, const std::string& rFile,
 	}
 }
 
+void Logging::LogToSyslog(Log::Level level, const std::string& rFile, 
+	int line, const std::string& rMessage)
+{
+	if (!sLogToSyslog)
+	{
+		return;
+	}
+
+	if (level > sGlobalLevel)
+	{
+		return;
+	}
+
+	std::string newMessage;
+	
+	if (sContextSet)
+	{
+		newMessage += "[" + sContext + "] ";
+	}
+	
+	newMessage += rMessage;
+
+	spSyslog->Log(level, rFile, line, newMessage);
+}
+
 void Logging::SetContext(std::string context)
 {
 	sContext = context;
