@@ -601,7 +601,10 @@ int test(int argc, const char *argv[])
 		// ------------------------------------------------------------------------------------------------		
 		// Stop server
 		TEST_THAT(KillServer(pid));
-		#ifndef WIN32
+
+		#ifdef WIN32
+			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+		#else
 			TestRemoteProcessMemLeaks("bbstored.memleaks");
 		#endif
 	}

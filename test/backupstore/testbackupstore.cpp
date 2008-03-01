@@ -1778,9 +1778,12 @@ int test3(int argc, const char *argv[])
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
-#ifndef WIN32
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-#endif
+
+		#ifdef WIN32
+			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+		#else
+			TestRemoteProcessMemLeaks("bbstored.memleaks");
+		#endif
 		
 		// Set a new limit on the account -- leave the hard limit 
 		// high to make sure the target for freeing space is the 
@@ -1872,9 +1875,11 @@ int test3(int argc, const char *argv[])
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
 
-#ifndef WIN32
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-#endif
+		#ifdef WIN32
+			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+		#else
+			TestRemoteProcessMemLeaks("bbstored.memleaks");
+		#endif
 	}
 
 	return 0;
@@ -1911,9 +1916,12 @@ int multi_server()
 		TEST_THAT(KillServer(pid));
 		::sleep(1);
 		TEST_THAT(!ServerIsAlive(pid));
-#ifndef WIN32
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-#endif
+
+		#ifdef WIN32
+			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+		#else
+			TestRemoteProcessMemLeaks("bbstored.memleaks");
+		#endif
 	}
 
 
