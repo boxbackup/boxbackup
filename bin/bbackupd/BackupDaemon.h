@@ -65,6 +65,14 @@ public:
 		std::string GetOptionString();
 		int ProcessOption(signed int option);
 		int Main(const std::string &rConfigFileName);
+
+		// This shouldn't be here, but apparently gcc on
+		// Windows has no idea about inherited methods...
+		virtual int Main(const char *DefaultConfigFile, int argc,
+			const char *argv[])
+		{
+			return Daemon::Main(DefaultConfigFile, argc, argv);
+		}
 	#endif
 
 	void Run();
