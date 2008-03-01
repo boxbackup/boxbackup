@@ -377,7 +377,8 @@ int main(int argc, const char *argv[])
 	
 #ifdef WIN32
 	// Clean up our sockets
-	WSACleanup();
+	// FIXME we should do this, but I get an abort() when I try
+	// WSACleanup();
 #endif
 
 	MAINHELPER_END
