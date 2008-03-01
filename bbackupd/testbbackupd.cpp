@@ -1160,6 +1160,7 @@ int test_bbackupd()
 	if (!ServerIsAlive(bbackupd_pid)) return 1;
 	if (!ServerIsAlive(bbstored_pid)) return 1;
 
+	#ifndef WIN32
 	printf("\n==== Testing that absolute symlinks are not followed "
 		"during restore\n");
 
@@ -1243,6 +1244,7 @@ int test_bbackupd()
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 	}
+	#endif // !WIN32
 
 	printf("\n==== Testing that redundant locations are deleted on time\n");
 
