@@ -32,6 +32,13 @@
 	Logging::Log(level, __FILE__, __LINE__, line.str()); \
 }
 
+#define BOX_SYSLOG(level, stuff) \
+{ \
+	std::ostringstream line; \
+	line << stuff; \
+	Logging::LogToSyslog(level, __FILE__, __LINE__, line.str()); \
+}
+
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
 #define BOX_ERROR(stuff)   BOX_LOG(Log::ERROR,   stuff)
 #define BOX_WARNING(stuff) BOX_LOG(Log::WARNING, stuff)
@@ -195,6 +202,8 @@ class Logging
 	static void Add    (Logger* pNewLogger);
 	static void Remove (Logger* pOldLogger);
 	static void Log(Log::Level level, const std::string& rFile, 
+		int line, const std::string& rMessage);
+	static void LogToSyslog(Log::Level level, const std::string& rFile, 
 		int line, const std::string& rMessage);
 	static void SetContext(std::string context);
 	static void ClearContext();
