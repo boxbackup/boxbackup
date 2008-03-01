@@ -45,12 +45,21 @@ Unpack:
 
 Configure and make:
 
-	./configure --host=i586-mingw32msvc --prefix=/usr/i386-mingw32/
-	make winshared wininstall
-	cp .libs/libpcreposix.a /usr/i386-pc-mingw32/lib
-	cp pcreposix.h /usr/i386-pc-mingw32/include/regex.h
+	export AR=i386-mingw32-ar
+	./configure --host=i386-mingw32 --prefix=/usr/local/i386-mingw32/
+	make winshared
+	cp .libs/libpcreposix.a /usr/local/i386-pc-mingw32/lib
+	cp pcreposix.h /usr/local/i386-pc-mingw32/include
 
 Configure Box with:
+
+	./configure --host=i386-mingw32 \
+		CXXFLAGS="-mthreads -I/usr/local/i386-mingw32/include" \
+		LDFLAGS=" -mthreads -L/usr/local/i386-mingw32/lib" \
+		LIBS="-lcrypto -lws2_32 -lgdi32"
+	make
+
+or, if that fails, try this:
 
 	export CXX="i386-mingw32-g++"
 	export AR=i386-mingw32-ar
