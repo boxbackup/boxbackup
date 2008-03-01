@@ -310,6 +310,9 @@ int main(int argc, char * const * argv)
 		Timers::Init();
 		int returncode = test(argc, (const char **)argv);
 		Timers::Cleanup();
+
+		fflush(stdout);
+		fflush(stderr);
 		
 		// check for memory leaks, if enabled
 		#ifdef BOX_MEMORY_LEAK_TESTING
@@ -326,6 +329,10 @@ int main(int argc, char * const * argv)
 		if(fulltestmode)
 		{
 			bool filesleftopen = checkfilesleftopen();
+
+			fflush(stdout);
+			fflush(stderr);
+		
 			if(filesleftopen)
 			{
 				failures++;
