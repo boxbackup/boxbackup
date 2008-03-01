@@ -40,7 +40,8 @@ private:
 	Daemon(const Daemon &rToCopy);
 public:
 
-	int Main(const char *DefaultConfigFile, int argc, const char *argv[]);
+	virtual int Main(const char *DefaultConfigFile, int argc,
+		const char *argv[]);
 
 	/* override this Main() if you want custom option processing: */
 	virtual int Main(const std::string &rConfigFile);
