@@ -52,7 +52,11 @@ Daemon::Daemon()
 	  mTerminateWanted(false),
 	  mSingleProcess(false),
 	  mRunInForeground(false),
+	#ifdef WIN32
+	  mKeepConsoleOpenAfterFork(true),
+	#else
 	  mKeepConsoleOpenAfterFork(false),
+	#endif
 	  mHaveConfigFile(false),
 	  mAppName(DaemonName())
 {
@@ -103,7 +107,9 @@ Daemon::~Daemon()
 std::string Daemon::GetOptionString()
 {
 	return "c:"
-	#ifndef WIN32
+	#ifdef WIN32
+		"K"
+	#else // !WIN32
 		"DFkP"
 	#endif
 		"hqvVt:TU";
@@ -120,7 +126,9 @@ void Daemon::Usage()
 	"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
 	"             argument is the configuration file, or else the default \n"
 	"             [" << GetConfigFileName() << "]\n"
-#ifndef WIN32
+#ifdef WIN32
+	"  -K         Stop writing log messages to console while daemon is running\n"
+#else // !WIN32
 	"  -D         Debugging mode, do not fork, one process only, one client only\n"
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
@@ -156,7 +164,13 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
-#ifndef WIN32
+#ifdef WIN32
+		case 'K':
+		{
+			mKeepConsoleOpenAfterFork = false;
+		}
+		break;
+#else // !WIN32
 		case 'D':
 		{
 			mSingleProcess = true;
@@ -490,10 +504,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 #endif // !WIN32
 
-		// Log the start message
-		BOX_NOTICE("Starting daemon, version " << BOX_VERSION
-			<< ", config: " << mConfigFileName);
-
 		// Write PID to file
 		char pid[32];
 
@@ -518,7 +528,11 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
 	
-		if(asDaemon && !mKeepConsoleOpenAfterFork)
+		if(
+			#ifndef WIN32
+				asDaemon && 
+			#endif
+			!mKeepConsoleOpenAfterFork)
 		{
 #ifndef WIN32
 			// Close standard streams
@@ -545,9 +559,13 @@ int Daemon::Main(const std::string &rConfigFileName)
 			// And definitely don't try and send anything to those file descriptors
 			// -- this has in the past sent text to something which isn't expecting it.
 			TRACE_TO_STDOUT(false);
-			Logging::ToConsole(false);
 #endif // ! WIN32
+			Logging::ToConsole(false);
 		}		
+
+		// Log the start message
+		BOX_NOTICE("Starting daemon, version: " << BOX_VERSION);
+		BOX_NOTICE("Using configuration file: " << mConfigFileName);
 	}
 	catch(BoxException &e)
 	{
