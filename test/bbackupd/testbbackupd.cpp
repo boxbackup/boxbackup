@@ -440,7 +440,8 @@ int test_setupaccount()
 
 int test_run_bbstored()
 {
-	std::string cmd = BBSTORED + bbstored_args + " testfiles/bbstored.conf";
+	std::string cmd = BBSTORED " " + bbstored_args + 
+		" testfiles/bbstored.conf";
 	bbstored_pid = LaunchServer(cmd, "testfiles/bbstored.pid");
 
 	TEST_THAT(bbstored_pid != -1 && bbstored_pid != 0);
