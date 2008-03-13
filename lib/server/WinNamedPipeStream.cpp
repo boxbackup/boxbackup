@@ -440,13 +440,18 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 
 		if (!Success)
 		{
-			DWORD err = GetLastError();
-			BOX_ERROR("Failed to write to control socket: " <<
-				GetErrorMessage(err));
-			Close();
-
 			// ERROR_NO_DATA is a strange name for 
 			// "The pipe is being closed". No exception wanted.
+
+			DWORD err = GetLastError();
+
+			if (err != ERROR_NO_DATA)
+			{
+				BOX_ERROR("Failed to write to control "
+					socket: " << GetErrorMessage(err));
+			}
+
+			Close();
 
 			if (err == ERROR_NO_DATA) 
 			{
