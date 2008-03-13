@@ -124,6 +124,7 @@ sub runtest
 		close RESULTS;
 
 		chomp $last;
+		$last =~ s/\r//;
 		push @results, "$t: $last";
 
 		if ($last ne "PASSED") 
