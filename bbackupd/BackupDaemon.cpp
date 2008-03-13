@@ -471,12 +471,10 @@ void BackupDaemon::RunHelperThread(void)
 						{
 							std::string message = *(mMessageList.begin());
 							mMessageList.erase(mMessageList.begin());
-							printf("Sending '%s' to waiting client... ", message.c_str());
+							BOX_TRACE("Sending '" << message << "' to waiting client");
 							message += "\n";
 							rSocket.Write(message.c_str(),
 								message.length());
-
-							printf("done.\n");
 						}
 					}
 					catch (...)
