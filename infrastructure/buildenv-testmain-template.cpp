@@ -57,7 +57,17 @@ int test(int argc, const char *argv[]);
 int failures = 0;
 int first_fail_line;
 std::string first_fail_file;
-std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
+
+#ifdef WIN32
+	#define QUIET_PROCESS "-K"
+#else
+	#define QUIET_PROCESS ""
+#endif
+
+std::string bbackupd_args = QUIET_PROCESS,
+	bbstored_args = QUIET_PROCESS,
+	bbackupquery_args,
+	test_args;
 
 int filedes_open_at_beginning = -1;
 
