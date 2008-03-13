@@ -448,7 +448,7 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 			if (err != ERROR_NO_DATA)
 			{
 				BOX_ERROR("Failed to write to control "
-					socket: " << GetErrorMessage(err));
+					"socket: " << GetErrorMessage(err));
 			}
 
 			Close();
