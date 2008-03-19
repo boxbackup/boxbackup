@@ -3,7 +3,7 @@
   <refmeta>
     <refentrytitle>bbstoreaccounts</refentrytitle>
 
-    <manvolnum>1</manvolnum>
+    <manvolnum>8</manvolnum>
   </refmeta>
 
   <refnamediv>
@@ -28,7 +28,7 @@
     accounts, as well as create, change and delete accounts on the store
     server. </para>
 
-    <para><literal>bbstoreaccounts</literal> alwas takes at least 2
+    <para><literal>bbstoreaccounts</literal> always takes at least 2
     parameters: the command name and the account ID. Some commands require
     additional parameters, and some commands have optional parameters.</para>
 
@@ -160,7 +160,7 @@ Blocks used by deleted files: 34025 (132.91Mb)
 
             <listitem>
               <para>Blocks used by deleted files: The number of blocks used by
-              files that have been deleted on the client. Thi s data is at
+              files that have been deleted on the client. This data is at
               risk for being removed during housekeeping.</para>
             </listitem>
 
@@ -267,7 +267,7 @@ Blocks used by deleted files: 34025 (132.91Mb)
       </listitem>
 
       <listitem>
-        <para>The platform you are running on (Hardware and OS), for both
+        <para>The platform you are running on (hardware and OS), for both
         client and server.</para>
       </listitem>
 
