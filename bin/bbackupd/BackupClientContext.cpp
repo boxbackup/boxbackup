@@ -146,8 +146,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 
 			if (!mpExtendedLogFileHandle)
 			{
-				BOX_ERROR("Failed to open extended log "
-					"file: " << strerror(errno));
+				BOX_LOG_SYS_ERROR("Failed to open extended "
+					"log file: " << mExtendedLogFile);
 			}
 			else
 			{

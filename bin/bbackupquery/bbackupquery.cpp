@@ -174,8 +174,8 @@ int main(int argc, const char *argv[])
 			logFile = ::fopen(optarg, "w");
 			if(logFile == 0)
 			{
-				BOX_ERROR("Failed to open log file '" <<
-					optarg << "': " << strerror(errno));
+				BOX_LOG_SYS_ERROR("Failed to open log file "
+					"'" << optarg << "'");
 			}
 			break;
 
