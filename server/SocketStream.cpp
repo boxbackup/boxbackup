@@ -150,9 +150,11 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 	Socket::NameLookupToSockAddr(addr, sockDomain, Type, Name, Port, addrLen);
 
 	// Create the socket
-	mSocketHandle = ::socket(sockDomain, SOCK_STREAM, 0 /* let OS choose protocol */);
+	mSocketHandle = ::socket(sockDomain, SOCK_STREAM,
+		0 /* let OS choose protocol */);
 	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
+		BOX_LOG_SYS_ERROR("Failed to create a network socket");
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 	
@@ -163,22 +165,16 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 #ifdef WIN32
 		DWORD err = WSAGetLastError();
 		::closesocket(mSocketHandle);
-#else
+		BOX_LOG_WIN_ERROR_NUMBER("Failed to connect to socket " 
+			"(type " << Type << ", name " << Name <<
+			", port " << Port << ")", err);
+#else // !WIN32
 		int err = errno;
 		::close(mSocketHandle);
-#endif
-
-#ifdef WIN32
-		BOX_ERROR("Failed to connect to socket (type " << Type <<
-			", name " << Name << ", port " << Port << "): " <<
-				GetErrorMessage(err)
-			);
-#else
-		BOX_ERROR("Failed to connect to socket (type " << Type <<
-			", name " << Name << ", port " << Port << "): " <<
-				strerror(err) << " (" << err << ")"
-			);
-#endif
+		BOX_LOG_SYS_ERROR("Failed to connect to socket (type " <<
+			Type << ", name " << Name << ", port " << Port <<
+			")");
+#endif // WIN32
 
 		mSocketHandle = INVALID_SOCKET_VALUE;
 		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
@@ -220,7 +216,9 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 			else
 			{
 				// Bad!
-				THROW_EXCEPTION(ServerException, SocketPollError)
+				BOX_LOG_SYS_ERROR("Failed to poll socket");
+				THROW_EXCEPTION(ServerException,
+					SocketPollError)
 			}
 			break;
 			
@@ -250,9 +248,12 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		else
 		{
 			// Other error
-			THROW_EXCEPTION(ConnectionException, Conn_SocketReadError)
+			BOX_LOG_SYS_ERROR("Failed to read from socket");
+			THROW_EXCEPTION(ConnectionException,
+				Conn_SocketReadError);
 		}
 	}
+
 	// Closed for reading?
 	if(r == 0)
 	{
@@ -297,7 +298,9 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 		{
 			// Error.
 			mWriteClosed = true;	// assume can't write again
-			THROW_EXCEPTION(ConnectionException, Conn_SocketWriteError)
+			BOX_LOG_SYS_ERROR("Failed to write to socket");
+			THROW_EXCEPTION(ConnectionException,
+				Conn_SocketWriteError);
 		}
 		
 		// Knock off bytes sent
@@ -310,7 +313,9 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 		// Need to wait until it can send again?
 		if(bytesLeft > 0)
 		{
-			TRACE3("Waiting to send data on socket %d, (%d to send of %d)\n", mSocketHandle, bytesLeft, NBytes);
+			BOX_TRACE("Waiting to send data on socket " << 
+				mSocketHandle << " (" << bytesLeft <<
+				" of " << NBytes << " bytes left)");
 			
 			// Wait for data to send.
 			struct pollfd p;
@@ -323,7 +328,10 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 				// Don't exception if it's just a signal
 				if(errno != EINTR)
 				{
-					THROW_EXCEPTION(ServerException, SocketPollError)
+					BOX_LOG_SYS_ERROR("Failed to poll "
+						"socket");
+					THROW_EXCEPTION(ServerException,
+						SocketPollError)
 				}
 			}
 		}
@@ -350,6 +358,7 @@ void SocketStream::Close()
 	if(::close(mSocketHandle) == -1)
 #endif
 	{
+		BOX_LOG_SYS_ERROR("Failed to close socket");
 		THROW_EXCEPTION(ServerException, SocketCloseError)
 	}
 	mSocketHandle = INVALID_SOCKET_VALUE;
@@ -380,6 +389,7 @@ void SocketStream::Shutdown(bool Read, bool Write)
 	// Shut it down!
 	if(::shutdown(mSocketHandle, how) == -1)
 	{
+		BOX_LOG_SYS_ERROR("Failed to shutdown socket");
 		THROW_EXCEPTION(ConnectionException, Conn_SocketShutdownError)
 	}
 }
@@ -458,12 +468,15 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 	struct ucred cred;
 	socklen_t credLen = sizeof(cred);
 
-	if(::getsockopt(mSocketHandle, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0)
+	if(::getsockopt(mSocketHandle, SOL_SOCKET, SO_PEERCRED, &cred,
+		&credLen) == 0)
 	{
 		rUidOut = cred.uid;
 		rGidOut = cred.gid;
 		return true;
 	}
+
+	BOX_LOG_SYS_ERROR("Failed to get peer credentials on socket");
 #endif
 
 	// Not available
