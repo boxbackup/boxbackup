@@ -185,7 +185,7 @@ const ConfigurationVerify *testserver::GetConfigVerify() const
 {
 	static ConfigurationVerifyKey verifyserverkeys[] = 
 	{
-		SERVERSTREAM_VERIFY_SERVER_KEYS(0)	// no default addresses
+		SERVERSTREAM_VERIFY_SERVER_KEYS(ConfigurationVerifyKey::NoDefaultValue) // no default listen addresses
 	};
 
 	static ConfigurationVerify verifyserver[] = 
@@ -258,7 +258,7 @@ const ConfigurationVerify *testTLSserver::GetConfigVerify() const
 {
 	static ConfigurationVerifyKey verifyserverkeys[] = 
 	{
-		SERVERTLS_VERIFY_SERVER_KEYS(0)	// no default listen addresses
+		SERVERTLS_VERIFY_SERVER_KEYS(ConfigurationVerifyKey::NoDefaultValue) // no default listen addresses
 	};
 
 	static ConfigurationVerify verifyserver[] = 
