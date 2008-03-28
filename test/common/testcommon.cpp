@@ -57,15 +57,15 @@ void test_conversions()
 
 ConfigurationVerifyKey verifykeys1_1_1[] =
 {
-	{"bing", 0, ConfigTest_Exists, 0},
-	{"carrots", 0, ConfigTest_Exists | ConfigTest_IsInt, 0},
-	{"terrible", 0, ConfigTest_Exists | ConfigTest_LastEntry, 0}
+	ConfigurationVerifyKey("bing", ConfigTest_Exists),
+	ConfigurationVerifyKey("carrots", ConfigTest_Exists | ConfigTest_IsInt),
+	ConfigurationVerifyKey("terrible", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 ConfigurationVerifyKey verifykeys1_1_2[] =
 {
-	{"fish", 0, ConfigTest_Exists | ConfigTest_IsInt, 0},
-	{"string", 0, ConfigTest_Exists | ConfigTest_LastEntry, 0}
+	ConfigurationVerifyKey("fish", ConfigTest_Exists | ConfigTest_IsInt),
+	ConfigurationVerifyKey("string", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 
@@ -89,15 +89,15 @@ ConfigurationVerify verifysub1_1[] =
 
 ConfigurationVerifyKey verifykeys1_1[] =
 {
-	{"value", 0, ConfigTest_Exists | ConfigTest_IsInt, 0},
-	{"string1", 0, ConfigTest_Exists, 0},
-	{"string2", 0, ConfigTest_Exists | ConfigTest_LastEntry, 0}
+	ConfigurationVerifyKey("value", ConfigTest_Exists | ConfigTest_IsInt),
+	ConfigurationVerifyKey("string1", ConfigTest_Exists),
+	ConfigurationVerifyKey("string2", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 ConfigurationVerifyKey verifykeys1_2[] = 
 {
-	{"carrots", 0, ConfigTest_Exists | ConfigTest_IsInt, 0},
-	{"string", 0, ConfigTest_Exists | ConfigTest_LastEntry, 0}
+	ConfigurationVerifyKey("carrots", ConfigTest_Exists | ConfigTest_IsInt),
+	ConfigurationVerifyKey("string", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 ConfigurationVerify verifysub1[] = 
@@ -120,14 +120,15 @@ ConfigurationVerify verifysub1[] =
 
 ConfigurationVerifyKey verifykeys1[] =
 {
-		{"notExpected", 0, 0, 0},
-		{"HasDefaultValue", "Lovely default value", 0, 0},
-		{"MultiValue", 0, ConfigTest_MultiValueAllowed, 0},
-		{"BoolTrue1", 0, ConfigTest_IsBool, 0},
-		{"BoolTrue2", 0, ConfigTest_IsBool, 0},
-		{"BoolFalse1", 0, ConfigTest_IsBool, 0},
-		{"BoolFalse2", 0, ConfigTest_IsBool, 0},
-		{"TOPlevel", 0, ConfigTest_LastEntry | ConfigTest_Exists, 0}
+		ConfigurationVerifyKey("notExpected", 0),
+		ConfigurationVerifyKey("HasDefaultValue", 0, "Lovely default value"),
+		ConfigurationVerifyKey("MultiValue", ConfigTest_MultiValueAllowed),
+		ConfigurationVerifyKey("BoolTrue1", ConfigTest_IsBool),
+		ConfigurationVerifyKey("BoolTrue2", ConfigTest_IsBool),
+		ConfigurationVerifyKey("BoolFalse1", ConfigTest_IsBool),
+		ConfigurationVerifyKey("BoolFalse2", ConfigTest_IsBool),
+		ConfigurationVerifyKey("TOPlevel", 
+			ConfigTest_LastEntry | ConfigTest_Exists)
 };
 
 ConfigurationVerify verify =

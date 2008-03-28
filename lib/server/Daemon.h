@@ -92,8 +92,9 @@ private:
 	std::string mAppName;
 };
 
-#define DAEMON_VERIFY_SERVER_KEYS 	{"PidFile", 0, ConfigTest_Exists, 0}, \
-									{"User", 0, ConfigTest_LastEntry, 0}
+#define DAEMON_VERIFY_SERVER_KEYS \
+	ConfigurationVerifyKey("PidFile", ConfigTest_Exists), \
+	ConfigurationVerifyKey("User", ConfigTest_LastEntry)
 
 #endif // DAEMON__H
 
