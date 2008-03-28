@@ -48,6 +48,20 @@
 	if (Logging::IsEnabled(Log::TRACE)) \
 	{ BOX_LOG(Log::TRACE, stuff) }
 
+#define BOX_LOG_SYS_WARNING(stuff) \
+	BOX_WARNING(stuff << ": " << strerror(errno) << " (" << errno << ")")
+#define BOX_LOG_SYS_ERROR(stuff) \
+	BOX_ERROR(stuff << ": " << strerror(errno) << " (" << errno << ")")
+#define BOX_LOG_SYS_FATAL(stuff) \
+	BOX_FATAL(stuff << ": " << strerror(errno) << " (" << errno << ")")
+
+#ifdef WIN32
+	#define BOX_LOG_WIN_ERROR(stuff) \
+		BOX_ERROR(stuff << ": " << GetErrorMessage(GetLastError()))
+	#define BOX_LOG_WIN_ERROR_NUMBER(stuff, number) \
+		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
+#endif
+
 #define BOX_FORMAT_ACCOUNT(accno) \
 	std::hex << \
 	std::showbase << \
