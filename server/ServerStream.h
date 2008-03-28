@@ -273,7 +273,7 @@ public:
 							}
 							
 							// Log it
-							BOX_WARNING("Message from child process " << pid << ": " << logMessage);
+							BOX_NOTICE("Message from child process " << pid << ": " << logMessage);
 						}
 						else
 						{
