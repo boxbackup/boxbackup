@@ -958,6 +958,7 @@ void BackupDaemon::Run2()
 					*this, 
 					tlsContext, 
 					conf.GetKeyValue("StoreHostname"),
+					conf.GetKeyValueInt("StorePort"),
 					conf.GetKeyValueInt("AccountNumber"), 
 					conf.GetKeyValueBool("ExtendedLogging"),
 					conf.KeyExists("ExtendedLogFile"),
