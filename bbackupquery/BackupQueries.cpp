@@ -810,8 +810,8 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 		}
 		else
 		{
-			BOX_ERROR("Error changing to directory '" <<
-				args[0] << ": " << strerror(errno));
+			BOX_LOG_SYS_ERROR("Failed to change to directory "
+				"'" << args[0] << "'");
 		}
 
 		SetReturnCode(COMMAND_RETURN_ERROR);
@@ -822,8 +822,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	char wd[PATH_MAX];
 	if(::getcwd(wd, PATH_MAX) == 0)
 	{
-		BOX_ERROR("Error getting current directory: " <<
-			strerror(errno));
+		BOX_LOG_SYS_ERROR("Error getting current directory");
 		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
@@ -1399,9 +1398,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		}
 		else
 		{
-			BOX_WARNING("Failed to access local directory '" <<
-				localDirDisplay << ": " << strerror(errno) <<
-				"'.");
+			BOX_LOG_SYS_WARNING("Failed to access local directory "
+				"'" << localDirDisplay << "'");
 			rParams.mUncheckedFiles ++;
 		}
 		return;
@@ -1449,8 +1447,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	DIR *dirhandle = ::opendir(rLocalDir.c_str());
 	if(dirhandle == 0)
 	{
-		BOX_WARNING("Failed to open local directory '" << 
-			localDirDisplay << "': " << strerror(errno));
+		BOX_LOG_SYS_WARNING("Failed to open local directory '" << 
+			localDirDisplay << "'");
 		rParams.mUncheckedFiles ++;
 		return;
 	}
@@ -1518,8 +1516,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		// Close directory
 		if(::closedir(dirhandle) != 0)
 		{
-			BOX_ERROR("Failed to close local directory '" <<
-				localDirDisplay << "': " << strerror(errno));
+			BOX_LOG_SYS_ERROR("Failed to close local directory "
+				"'" << localDirDisplay << "'");
 		}
 		dirhandle = 0;
 	
