@@ -70,11 +70,14 @@ void RaidFileController::Initialise(const std::string& rConfigFilename)
 
 	static const ConfigurationVerifyKey verifykeys[] =
 	{
-		{"SetNumber",	0,	ConfigTest_Exists | ConfigTest_IsInt, 0},
-		{"BlockSize",	0,	ConfigTest_Exists | ConfigTest_IsInt, 0},
-		{"Dir0", 		0,	ConfigTest_Exists, 0},
-		{"Dir1", 		0,	ConfigTest_Exists, 0},
-		{"Dir2", 		0,	ConfigTest_Exists | ConfigTest_LastEntry, 0}
+		ConfigurationVerifyKey("SetNumber",
+			ConfigTest_Exists | ConfigTest_IsInt),
+		ConfigurationVerifyKey("BlockSize",
+			ConfigTest_Exists | ConfigTest_IsInt),
+		ConfigurationVerifyKey("Dir0", ConfigTest_Exists),
+		ConfigurationVerifyKey("Dir1", ConfigTest_Exists),
+		ConfigurationVerifyKey("Dir2",
+			ConfigTest_Exists | ConfigTest_LastEntry)
 	};
 	
 	static const ConfigurationVerify subverify = 

@@ -44,6 +44,7 @@ BackupClientContext::BackupClientContext
 	BackupDaemon &rDaemon, 
 	TLSContext &rTLSContext, 
 	const std::string &rHostname,
+	int Port,
 	int32_t AccountNumber, 
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
@@ -52,6 +53,7 @@ BackupClientContext::BackupClientContext
 	: mrDaemon(rDaemon),
 	  mrTLSContext(rTLSContext),
 	  mHostname(rHostname),
+	  mPort(Port),
 	  mAccountNumber(AccountNumber),
 	  mpSocket(0),
 	  mpConnection(0),
@@ -129,7 +131,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			mHostname << "'...");
 
 		// Connect!
-		mpSocket->Open(mrTLSContext, Socket::TypeINET, mHostname.c_str(), BOX_PORT_BBSTORED);
+		mpSocket->Open(mrTLSContext, Socket::TypeINET,
+			mHostname.c_str(), mPort);
 		
 		// And create a procotol object
 		mpConnection = new BackupProtocolClient(*mpSocket);
