@@ -169,7 +169,6 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 			"(type " << Type << ", name " << Name <<
 			", port " << Port << ")", err);
 #else // !WIN32
-		int err = errno;
 		BOX_LOG_SYS_ERROR("Failed to connect to socket (type " <<
 			Type << ", name " << Name << ", port " << Port <<
 			")");
