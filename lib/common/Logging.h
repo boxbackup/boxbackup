@@ -62,14 +62,17 @@
 		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
 #endif
 
-#define BOX_FORMAT_ACCOUNT(accno) \
+#define BOX_FORMAT_HEX32(number) \
 	std::hex << \
 	std::showbase << \
 	std::internal << \
 	std::setw(10) << \
 	std::setfill('0') << \
-	(accno) << \
+	(number) << \
 	std::dec
+
+#define BOX_FORMAT_ACCOUNT(accno) \
+	BOX_FORMAT_HEX32(accno)
 
 #define BOX_FORMAT_OBJECTID(objectid) \
 	std::hex << \

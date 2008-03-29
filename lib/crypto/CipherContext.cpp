@@ -166,7 +166,8 @@ void CipherContext::Begin()
 	// Warn if in a transformation (not an error, because a context might not have been finalised if an exception occured)
 	if(mWithinTransform)
 	{
-		TRACE0("CipherContext::Begin called when context flagged as within a transform\n");
+		BOX_WARNING("CipherContext::Begin called when context "
+			"flagged as within a transform");
 	}
 
 	// Initialise the cipher context again
@@ -423,7 +424,8 @@ int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *p
 	// Warn if in a transformation
 	if(mWithinTransform)
 	{
-		TRACE0("CipherContext::TransformBlock called when context flagged as within a transform\n");
+		BOX_WARNING("CipherContext::TransformBlock called when "
+			"context flagged as within a transform");
 	}
 
 	// Check output buffer size
@@ -521,7 +523,8 @@ void CipherContext::SetIV(const void *pIV)
 	// Warn if in a transformation
 	if(mWithinTransform)
 	{
-		TRACE0("CipherContext::SetIV called when context flagged as within a transform\n");
+		BOX_WARNING("CipherContext::SetIV called when context "
+			"flagged as within a transform");
 	}
 
 	// Set IV
@@ -559,7 +562,8 @@ const void *CipherContext::SetRandomIV(int &rLengthOut)
 	// Warn if in a transformation
 	if(mWithinTransform)
 	{
-		TRACE0("CipherContext::SetRandomIV called when context flagged as within a transform\n");
+		BOX_WARNING("CipherContext::SetRandomIV called when "
+			"context flagged as within a transform");
 	}
 
 	// Get length of IV

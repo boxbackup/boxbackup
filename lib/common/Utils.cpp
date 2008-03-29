@@ -53,10 +53,10 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 		rOutput.push_back(String.substr(b));
 	}
 /*#ifndef NDEBUG
-	TRACE2("Splitting string '%s' on %c\n", String.c_str(), SplitOn);
+	BOX_TRACE("Splitting string '" << String << " on " << (char)SplitOn);
 	for(unsigned int l = 0; l < rOutput.size(); ++l)
 	{
-		TRACE2("%d = '%s'\n", l, rOutput[l].c_str());
+		BOX_TRACE(l << " = '" << rOutput[l] << "'");
 	}
 #endif*/
 }

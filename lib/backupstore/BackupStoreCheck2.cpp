@@ -594,6 +594,8 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 }
 
+#define FMT_OID(x) BOX_FORMAT_OBJECTID(x)
+#define FMT_i      BOX_FORMAT_OBJECTID((*i)->GetObjectID())
 
 // --------------------------------------------------------------------------
 //
@@ -620,7 +622,11 @@ bool BackupStoreDirectory::CheckAndFix()
 				if(newerEn == 0)
 				{
 					// Depends on something, but it isn't there.
-					TRACE2("Entry id %llx removed because depends on newer version %llx which doesn't exist\n", (*i)->GetObjectID(), dependsNewer);
+					BOX_TRACE("Entry id " << FMT_i <<
+						" removed because depends "
+						"on newer version " <<
+						FMT_OID(dependsNewer) <<
+						" which doesn't exist");
 					
 					// Remove
 					delete *i;
@@ -638,7 +644,12 @@ bool BackupStoreDirectory::CheckAndFix()
 					if(newerEn->GetDependsOlder() != (*i)->GetObjectID())
 					{
 						// Wrong entry
-						TRACE3("Entry id %llx, correcting DependsOlder to %llx, was %llx\n", dependsNewer, (*i)->GetObjectID(), newerEn->GetDependsOlder());
+						BOX_TRACE("Entry id " <<
+							FMT_OID(dependsNewer) <<
+							", correcting DependsOlder to " <<
+							FMT_i <<
+							", was " <<
+							FMT_OID(newerEn->GetDependsOlder()));
 						newerEn->SetDependsOlder((*i)->GetObjectID());
 						// Mark as changed
 						changed = true;
@@ -657,7 +668,11 @@ bool BackupStoreDirectory::CheckAndFix()
 			if(dependsOlder != 0 && FindEntryByID(dependsOlder) == 0)
 			{
 				// Has an older version marked, but this doesn't exist. Remove this mark
-				TRACE2("Entry id %llx was marked that %llx depended on it, which doesn't exist, dependency info cleared\n", (*i)->GetObjectID(), dependsOlder);
+				BOX_TRACE("Entry id " << FMT_i <<
+					" was marked as depended on by " <<
+					FMT_OID(dependsOlder) << ", "
+					"which doesn't exist, dependency "
+					"info cleared");
 
 				(*i)->SetDependsOlder(0);
 				
@@ -693,7 +708,7 @@ bool BackupStoreDirectory::CheckAndFix()
 			bool removeEntry = false;
 			if((*i) == 0)
 			{
-				TRACE0("Remove because null pointer found\n");
+				BOX_TRACE("Remove because null pointer found");
 				removeEntry = true;
 			}
 			else
@@ -704,7 +719,8 @@ bool BackupStoreDirectory::CheckAndFix()
 				if(isDir && (((*i)->GetFlags() & Entry::Flags_File) == Entry::Flags_File))
 				{
 					// Bad! Unset the file flag
-					TRACE1("Entry %llx: File flag set when dir flag set\n", (*i)->GetObjectID());
+					BOX_TRACE("Entry " << FMT_i <<
+						": File flag and dir flag both set");
 					(*i)->RemoveFlags(Entry::Flags_File);
 					changed = true;
 				}
@@ -713,7 +729,8 @@ bool BackupStoreDirectory::CheckAndFix()
 				if(idsEncountered.find((*i)->GetObjectID()) != idsEncountered.end())
 				{
 					// ID already seen, or type doesn't match
-					TRACE1("Entry %llx: Remove because ID already seen\n", (*i)->GetObjectID());
+					BOX_TRACE("Entry " << FMT_i <<
+						": Remove because ID already seen");
 					removeEntry = true;
 				}
 				else
@@ -730,7 +747,8 @@ bool BackupStoreDirectory::CheckAndFix()
 							&& ((*i)->GetFlags() & Entry::Flags_Deleted) == 0)
 						{
 							// Not set, set it
-							TRACE1("Entry %llx: Set old flag\n", (*i)->GetObjectID());
+							BOX_TRACE("Entry " << FMT_i <<
+								": Set old flag");
 							(*i)->AddFlags(Entry::Flags_OldVersion);
 							changed = true;
 						}
@@ -741,7 +759,8 @@ bool BackupStoreDirectory::CheckAndFix()
 						if(((*i)->GetFlags() & Entry::Flags_OldVersion) == Entry::Flags_OldVersion)
 						{
 							// Set, unset it
-							TRACE1("Entry %llx: Old flag unset\n", (*i)->GetObjectID());
+							BOX_TRACE("Entry " << FMT_i <<
+								": Old flag unset");
 							(*i)->RemoveFlags(Entry::Flags_OldVersion);
 							changed = true;
 						}
