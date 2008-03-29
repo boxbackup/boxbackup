@@ -170,10 +170,10 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 			", port " << Port << ")", err);
 #else // !WIN32
 		int err = errno;
-		::close(mSocketHandle);
 		BOX_LOG_SYS_ERROR("Failed to connect to socket (type " <<
 			Type << ", name " << Name << ", port " << Port <<
 			")");
+		::close(mSocketHandle);
 #endif // WIN32
 
 		mSocketHandle = INVALID_SOCKET_VALUE;
