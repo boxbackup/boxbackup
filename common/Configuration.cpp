@@ -208,8 +208,8 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 		if(!rErrorMsg.empty())
 		{
 			// An error occured, return now
-			//TRACE1("Error message from LoadInto: %s", rErrorMsg.c_str());
-			TRACE0("Error at Configuration::LoadInfo\n");
+			BOX_ERROR("Error in Configuration::LoadInfo: " << 
+				rErrorMsg);
 			delete pconfig;
 			pconfig = 0;
 			return std::auto_ptr<Configuration>(0);

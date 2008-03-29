@@ -268,7 +268,8 @@ void BackupStoreCheck::CheckObjects()
 		}
 	
 		maxDir = CheckObjectsScanDir(0, 1, mStoreRoot);
-		TRACE1("Max dir starting ID is %llx\n", maxDir);
+		BOX_TRACE("Max dir starting ID is " <<
+			BOX_FORMAT_OBJECTID(maxDir));
 	}
 	
 	// Then go through and scan all the objects within those directories
