@@ -27,16 +27,16 @@
 
 #define BOX_LOG(level, stuff) \
 { \
-	std::ostringstream line; \
-	line << stuff; \
-	Logging::Log(level, __FILE__, __LINE__, line.str()); \
+	std::ostringstream _box_log_line; \
+	_box_log_line << stuff; \
+	Logging::Log(level, __FILE__, __LINE__, _box_log_line.str()); \
 }
 
 #define BOX_SYSLOG(level, stuff) \
 { \
-	std::ostringstream line; \
-	line << stuff; \
-	Logging::LogToSyslog(level, __FILE__, __LINE__, line.str()); \
+	std::ostringstream _box_log_line; \
+	_box_log_line << stuff; \
+	Logging::LogToSyslog(level, __FILE__, __LINE__, _box_log_line.str()); \
 }
 
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
