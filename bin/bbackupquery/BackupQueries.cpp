@@ -27,6 +27,8 @@
 
 #include <set>
 #include <limits>
+#include <iostream>
+#include <ostream>
 
 #include "BackupQueries.h"
 #include "Utils.h"
@@ -2156,22 +2158,9 @@ void BackupQueries::CommandUsage()
 // --------------------------------------------------------------------------
 void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size, int64_t HardLimit, int32_t BlockSize)
 {
-	// Calculate size in Mb
-	double mb = (((double)Size) * ((double)BlockSize)) / ((double)(1024*1024));
-	int64_t percent = (Size * 100) / HardLimit;
-
-	// Bar graph
-	char bar[41];
-	unsigned int b = (int)((Size * (sizeof(bar)-1)) / HardLimit);
-	if(b > sizeof(bar)-1) {b = sizeof(bar)-1;}
-	for(unsigned int l = 0; l < b; l++)
-	{
-		bar[l] = '*';
-	}
-	bar[b] = '\0';
-
-	// Print the entryj
-	::printf("%14s %10.1fMb %3d%% %s\n", Name, mb, (int32_t)percent, bar);
+	std::cout << FormatUsageLineStart(Name) <<
+		FormatUsageBar(Size, Size * BlockSize, HardLimit * BlockSize) <<
+		std::endl;
 }
 
 
