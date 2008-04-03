@@ -30,6 +30,9 @@ enum
 	ObjectExists_Dir = 2
 };
 int ObjectExists(const std::string& rFilename);
+std::string HumanReadableSize(int64_t Bytes);
+std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max);
+std::string FormatUsageLineStart(const std::string& rName);
 
 #include "MemLeakFindOff.h"
 
