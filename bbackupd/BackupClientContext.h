@@ -41,7 +41,6 @@ public:
 		BackupDaemon &rDaemon, 
 		TLSContext &rTLSContext, 
 		const std::string &rHostname,
-		int32_t Port,
 		int32_t AccountNumber, 
 		bool ExtendedLogging,
 		bool ExtendedLogToFile,
@@ -202,7 +201,6 @@ private:
 	BackupDaemon &mrDaemon;
 	TLSContext &mrTLSContext;
 	std::string mHostname;
-	int mPort;
 	int32_t mAccountNumber;
 	SocketStreamTLS *mpSocket;
 	BackupProtocolClient *mpConnection;

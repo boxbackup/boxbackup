@@ -193,8 +193,7 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 	std::string line;
 	if(mInterProcessComms.GetLine(line, false /* no pre-processing */, MaximumWaitTime))
 	{
-		BOX_TRACE("Housekeeping received command '" << line <<
-			"' over interprocess comms");
+		TRACE1("Housekeeping received command '%s' over interprocess comms\n", line.c_str());
 	
 		int account = 0;
 	
