@@ -112,7 +112,7 @@ int64_t SizeStringToBlocks(const char *string, int DiscSet)
 	
 	default:
 		BOX_FATAL(string << " has an invalid units specifier "
-			"(use B for blocks, M for Mb, G for Gb, eg 2Gb)");
+			"(use B for blocks, M for MB, G for GB, eg 2GB)");
 		exit(1);
 		break;		
 	}
@@ -403,8 +403,32 @@ int CreateAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 
 void PrintUsageAndExit()
 {
-	printf("Usage: bbstoreaccounts [-c config_file] action account_id [args]\nAccount ID is integer specified in hex\n");
-	exit(1);
+	printf(
+"Usage: bbstoreaccounts [-c config_file] action account_id [args]\n"
+"Account ID is integer specified in hex\n"
+"\n"
+"Commands (and arguments):\n"
+"  create <account> <discnum> <softlimit> <hardlimit>\n"
+"        Creates the specified account number (in hex with no 0x) on the\n"
+"        specified raidfile disc set number (see raidfile.conf for valid\n"
+"        set numbers) with the specified soft and hard limits (in blocks\n"
+"        if suffixed with B, MB with M, GB with G)\n"
+"  info <account>\n"
+"        Prints information about the specified account including number\n"
+"        of blocks used.\n"
+"  setlimit <accounts> <softlimit> <hardlimit>\n"
+"        Changes the limits of the account as specified. Numbers are\n"
+"        interpreted as for the 'create' command (suffixed with B, M or G)\n"
+"  delete <account> [yes]\n"
+"        Deletes the specified account. Prompts for confirmation unless\n"
+"        the optional 'yes' parameter is provided.\n"
+"  check <account> [fix] [quiet]\n"
+"        Checks the specified account for errors. If the 'fix' option is\n"
+"        provided, any errors discovered that can be fixed automatically\n"
+"        will be fixed. If the 'quiet' option is provided, less output is\n"
+"        produced.\n"
+	);
+	exit(2);
 }
 
 int main(int argc, const char *argv[])
