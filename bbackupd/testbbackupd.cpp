@@ -514,8 +514,7 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 		{
 			// connect and log in
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost",
-				22011);
+			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
 			BackupProtocolClient protocol(conn);
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
 			std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, BackupProtocolClientLogin::Flags_ReadOnly));
@@ -608,7 +607,7 @@ SocketStreamTLS sSocket;
 std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext)
 {
 	sSocket.Open(rContext, Socket::TypeINET, 
-		"localhost", 22011);
+		"localhost", BOX_PORT_BBSTORED);
 	std::auto_ptr<BackupProtocolClient> connection;
 	connection.reset(new BackupProtocolClient(sSocket));
 	connection->Handshake();
@@ -2560,6 +2559,13 @@ int test_bbackupd()
 				true /* print progress dots */) 
 				== Restore_TargetExists);
 			
+			// Make sure you can't restore to a nonexistant path
+			printf("Try to restore to a path that doesn't exist\n");
+			TEST_THAT(BackupClientRestore(*client, restoredirid, 
+				"testfiles/no-such-path/subdir", 
+				true /* print progress dots */) 
+				== Restore_TargetPathNotFound);
+			
 			// Find ID of the deleted directory
 			deldirid = GetDirID(*client, "x1", restoredirid);
 			TEST_THAT(deldirid != 0);
@@ -2571,15 +2577,6 @@ int test_bbackupd()
 				true /* print progress dots */, 
 				true /* deleted files */) 
 				== Restore_Complete);
-
-			// Make sure you can't restore to a nonexistant path
-			printf("\n\n==== Try to restore to a path "
-				"that doesn't exist\n");
-			fflush(stdout);
-			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"testfiles/no-such-path/subdir", 
-				true /* print progress dots */) 
-				== Restore_TargetPathNotFound);
 
 			// Log out
 			client->QueryFinished();

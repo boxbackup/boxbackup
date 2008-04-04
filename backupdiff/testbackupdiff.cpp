@@ -110,10 +110,8 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 	TEST_THAT((uint64_t)box_ntoh64(hdr.mOtherFileID) == (uint64_t)OtherFileID);
 	// number of blocks
 	int64_t nblocks = box_ntoh64(hdr.mNumBlocks);
-	BOX_TRACE("Reading index from '" << filename << "', has " <<
-		nblocks << " blocks");
-	BOX_TRACE("======== ===== ========== ======== ========");
-	BOX_TRACE("   Index Where  EncSz/Idx     Size  WChcksm");
+	TRACE2("Reading index from '%s', has %lld blocks\n", filename, nblocks);
+	TRACE0("======== ===== ========== ======== ========\n   Index Where  EncSz/Idx     Size  WChcksm\n");
 	// Read them all in
 	int64_t nnew = 0, nold = 0;
 	for(int64_t b = 0; b < nblocks; ++b)
@@ -121,36 +119,35 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		file_BlockIndexEntry en;
 		TEST_THAT(enc.ReadFullBuffer(&en, sizeof(en), 0));
 		int64_t s = box_ntoh64(en.mEncodedSize);
-
-		// Decode the rest
-		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
-		iv += b;
-		sBlowfishDecryptBlockEntry.SetIV(&iv);
-		file_BlockIndexEntryEnc entryEnc;
-		sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc,
-			sizeof(entryEnc), en.mEnEnc, sizeof(en.mEnEnc));
-
-
 		if(s > 0)
 		{
 			nnew++;
-			BOX_TRACE(std::setw(8) << b << " this  s=" << 
-				std::setw(8) << s << " " <<
-				std::setw(8) << ntohl(entryEnc.mSize) << " " <<
-				std::setw(8) << std::setfill('0') <<
-				std::hex << ntohl(entryEnc.mWeakChecksum));
+			#ifdef WIN32
+			TRACE2("%8I64d this  s=%8I64d", b, s);
+			#else
+			TRACE2("%8lld this  s=%8lld", b, s);
+			#endif
 		}
 		else
 		{
 			nold++;
-			BOX_TRACE(std::setw(8) << b << " other i=" << 
-				std::setw(8) << (0-s) << " " <<
-				std::setw(8) << ntohl(entryEnc.mSize) << " " <<
-				std::setw(8) << std::setfill('0') <<
-				std::hex << ntohl(entryEnc.mWeakChecksum));
+			#ifdef WIN32
+			TRACE2("%8I64d other i=%8I64d", b, 0 - s);		
+			#else
+			TRACE2("%8lld other i=%8lld", b, 0 - s);		
+			#endif
 		}
+		// Decode the rest
+		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
+		iv += b;
+		sBlowfishDecryptBlockEntry.SetIV(&iv);			
+		file_BlockIndexEntryEnc entryEnc;
+		sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
+				en.mEnEnc, sizeof(en.mEnEnc));
+		TRACE2(" %8d %08x\n", ntohl(entryEnc.mSize), ntohl(entryEnc.mWeakChecksum));
+		
 	}
-	BOX_TRACE("======== ===== ========== ======== ========");
+	TRACE0("======== ===== ========== ======== ========\n");
 	TEST_THAT(new_blocks_expected == nnew);
 	TEST_THAT(old_blocks_expected == nold);
 }
