@@ -62,22 +62,16 @@ int BlockSizeOfDiscSet(int DiscSet)
 	return controller.GetDiscSet(DiscSet).GetBlockSize();
 }
 
-const char *BlockSizeToString(int64_t Blocks, int DiscSet)
+std::string BlockSizeToString(int64_t Blocks, int DiscSet)
 {
-	// Not reentrant, nor can be used in the same function call twice, etc.
-	static char string[256];
-	
 	// Work out size in Mb.
 	double mb = (Blocks * BlockSizeOfDiscSet(DiscSet)) / (1024.0*1024.0);
 	
 	// Format string
-#ifdef WIN32
-	sprintf(string, "%I64d (%.2fMb)", Blocks, mb);
-#else
-	sprintf(string, "%lld (%.2fMb)", Blocks, mb);
-#endif
-	
-	return string;
+	std::ostringstream buf;
+	buf << Blocks << " blocks " << std::fixed << std::setprecision(2) <<
+		std::showpoint << "(" << mb << " MB)";
+	return buf.str();
 }
 
 int64_t SizeStringToBlocks(const char *string, int DiscSet)
@@ -231,12 +225,12 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 	// Then print out lots of info
 	printf("                  Account ID: %08x\n", ID);
 	printf("              Last object ID: %lld\n", info->GetLastObjectIDUsed());
-	printf("                 Blocks used: %s\n", BlockSizeToString(info->GetBlocksUsed(), discSet));
-	printf("    Blocks used by old files: %s\n", BlockSizeToString(info->GetBlocksInOldFiles(), discSet));
-	printf("Blocks used by deleted files: %s\n", BlockSizeToString(info->GetBlocksInDeletedFiles(), discSet));
-	printf("  Blocks used by directories: %s\n", BlockSizeToString(info->GetBlocksInDirectories(), discSet));
-	printf("            Block soft limit: %s\n", BlockSizeToString(info->GetBlocksSoftLimit(), discSet));
-	printf("            Block hard limit: %s\n", BlockSizeToString(info->GetBlocksHardLimit(), discSet));
+	printf("                 Blocks used: %s\n", BlockSizeToString(info->GetBlocksUsed(), discSet).c_str());
+	printf("    Blocks used by old files: %s\n", BlockSizeToString(info->GetBlocksInOldFiles(), discSet).c_str());
+	printf("Blocks used by deleted files: %s\n", BlockSizeToString(info->GetBlocksInDeletedFiles(), discSet).c_str());
+	printf("  Blocks used by directories: %s\n", BlockSizeToString(info->GetBlocksInDirectories(), discSet).c_str());
+	printf("            Block soft limit: %s\n", BlockSizeToString(info->GetBlocksSoftLimit(), discSet).c_str());
+	printf("            Block hard limit: %s\n", BlockSizeToString(info->GetBlocksHardLimit(), discSet).c_str());
 	printf("         Client store marker: %lld\n", info->GetClientStoreMarker());
 	
 	return 0;
