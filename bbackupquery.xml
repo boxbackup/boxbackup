@@ -3,7 +3,7 @@
   <refmeta>
     <refentrytitle>bbackupquery</refentrytitle>
 
-    <manvolnum>1</manvolnum>
+    <manvolnum>8</manvolnum>
   </refmeta>
 
   <refnamediv>
@@ -39,7 +39,7 @@
     <programlisting>bbackupquery "list home-dirs" quit</programlisting>
 
     <para>Note that commands that contain spaces are enclosed in double
-    quotes. If the <literal>quit</literal> command is ommitted, after the
+    quotes. If the <literal>quit</literal> command is omitted, after the
     preceding commands are completed, <literal>bbackupquery</literal> will
     enter interactive mode.</para>
 
@@ -328,7 +328,7 @@
   <refsection>
     <title>See Also</title>
 
-    <para>bbackupd.conf(8)</para>
+    <para>bbackupd.conf(5)</para>
   </refsection>
 
   <refsection>
@@ -357,7 +357,7 @@
       </listitem>
 
       <listitem>
-        <para>The platform you are running on (Hardware and OS), for both
+        <para>The platform you are running on (hardware and OS), for both
         client and server.</para>
       </listitem>
 

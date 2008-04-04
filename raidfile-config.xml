@@ -3,7 +3,7 @@
   <refmeta>
     <refentrytitle>raidfile-config</refentrytitle>
 
-    <manvolnum>1</manvolnum>
+    <manvolnum>8</manvolnum>
   </refmeta>
 
   <refnamediv>
@@ -45,7 +45,7 @@
 
         <listitem>
           <para><literal>blocksize</literal>: The block size used for file
-          storage in the system, in bytes. Using a multple of the file system
+          storage in the system, in bytes. Using a multiple of the file system
           block size is a good strategy. Depending on the size of the files
           you will be backing up, this multiple varies. Of course it also
           depends on the native block size of your file system.</para>
@@ -90,7 +90,7 @@
   <refsection>
     <title>See Also</title>
 
-    <para><literal>bbstored-config(1)</literal></para>
+    <para><literal>bbstored-config(8)</literal></para>
 
     <para><literal>bbstored.conf(5)</literal></para>
 
@@ -120,7 +120,7 @@
       </listitem>
 
       <listitem>
-        <para>The platform you are running on (Hardware and OS), for both
+        <para>The platform you are running on (hardware and OS), for both
         client and server.</para>
       </listitem>
 
