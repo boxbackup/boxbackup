@@ -125,7 +125,7 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		// Decode the rest
 		uint64_t iv = box_ntoh64(hdr.mEntryIVBase);
 		iv += b;
-		sBlowfishDecryptBlockEntry.SetIV(&iv);			
+		sBlowfishDecryptBlockEntry.SetIV(&iv);
 		file_BlockIndexEntryEnc entryEnc;
 		sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc,
 			sizeof(entryEnc), en.mEnEnc, sizeof(en.mEnEnc));
@@ -144,7 +144,7 @@ void check_encoded_file(const char *filename, int64_t OtherFileID, int new_block
 		{
 			nold++;
 			BOX_TRACE(std::setw(8) << b << " other i=" << 
-				std::setw(8) << (0-s) <<
+				std::setw(8) << (0-s) << " " <<
 				std::setw(8) << ntohl(entryEnc.mSize) << " " <<
 				std::setw(8) << std::setfill('0') <<
 				std::hex << ntohl(entryEnc.mWeakChecksum));
