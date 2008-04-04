@@ -39,8 +39,8 @@ box_time_t GetCurrentBoxTime()
 		struct timeval tv;
 		if (gettimeofday(&tv, NULL) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to gettimeofday(), "
-				"dropping precision");
+			BOX_ERROR("Failed to gettimeofday(), dropping "
+				"precision: " << strerror(errno));
 		}
 		else
 		{

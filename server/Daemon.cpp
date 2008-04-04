@@ -465,7 +465,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 			// Set new session
 			if(::setsid() == -1)
 			{
-				BOX_LOG_SYS_ERROR("Failed to setsid()");
+				BOX_ERROR("Failed to setsid(): " << 
+					strerror(errno));
 				THROW_EXCEPTION(ServerException, DaemoniseFailed)
 			}
 
@@ -474,7 +475,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 			{
 			case -1:
 				// error
-				BOX_LOG_SYS_ERROR("Failed to fork() a child");
 				THROW_EXCEPTION(ServerException, DaemoniseFailed)
 				break;
 
@@ -497,11 +497,9 @@ int Daemon::Main(const std::string &rConfigFileName)
 		struct sigaction sa;
 		sa.sa_handler = SignalHandler;
 		sa.sa_flags = 0;
-		sigemptyset(&sa.sa_mask); // macro
-		if(::sigaction(SIGHUP, &sa, NULL) != 0 ||
-			::sigaction(SIGTERM, &sa, NULL) != 0)
+		sigemptyset(&sa.sa_mask);		// macro
+		if(::sigaction(SIGHUP, &sa, NULL) != 0 || ::sigaction(SIGTERM, &sa, NULL) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to set signal handlers");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
 #endif // !WIN32
@@ -517,8 +515,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
-			BOX_LOG_SYS_FATAL("Failed to write PID file: " <<
-				pidFileName);
+			BOX_FATAL("can't write pid file");
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
 		
@@ -547,7 +544,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 			int devnull = ::open(PLATFORM_DEV_NULL, O_RDWR, 0);
 			if(devnull == -1)
 			{
-				BOX_LOG_SYS_ERROR("Failed to open /dev/null");
 				THROW_EXCEPTION(CommonException, OSFileError);
 			}
 			// Then duplicate them to all three handles
@@ -894,8 +890,6 @@ box_time_t Daemon::GetConfigFileModifiedTime() const
 		{
 			return 0;
 		}
-		BOX_LOG_SYS_ERROR("Failed to stat configuration file: " <<
-			GetConfigFileName());
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
 	

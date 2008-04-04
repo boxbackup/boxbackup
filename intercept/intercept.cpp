@@ -375,12 +375,12 @@ void intercept_setup_readdir_hook(const char *dirname, readdir_t hookfn)
 
 	if (hookfn != NULL)
 	{
-		BOX_TRACE("readdir hooked to " << hookfn << " for " << dirname);
+		TRACE2("readdir hooked to %p for %s\n", hookfn, dirname);
 	}
 	else if (intercept_filename != NULL)
 	{
-		BOX_TRACE("readdir unhooked from " << readdir_hook << 
-			" for " << intercept_filename);
+		TRACE2("readdir unhooked from %p for %s\n", readdir_hook, 
+			intercept_filename);
 	}
 
 	intercept_filename = dirname;
@@ -392,11 +392,11 @@ void intercept_setup_lstat_hook(const char *filename, lstat_t hookfn)
 	/*
 	if (hookfn != NULL)
 	{
-		BOX_TRACE("lstat hooked to " << hookfn << " for " << filename);
+		TRACE2("lstat hooked to %p for %s\n", hookfn, filename);
 	}
 	else
 	{
-		BOX_TRACE("lstat unhooked from " << lstat_hook << " for " <<
+		TRACE2("lstat unhooked from %p for %s\n", lstat_hook, 
 			lstat_file);
 	}
 	*/

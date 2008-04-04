@@ -30,8 +30,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 #else
 	: mOSFileHandle(::open(Filename, flags, mode)),
 #endif
-	  mIsEOF(false),
-	  mFileName(Filename)
+	  mIsEOF(false)
 {
 #ifdef WIN32
 	if(mOSFileHandle == INVALID_HANDLE_VALUE)
@@ -50,6 +49,9 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}
+#ifdef WIN32
+	this->fileName = Filename;
+#endif
 }
 
 
@@ -63,8 +65,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 // --------------------------------------------------------------------------
 FileStream::FileStream(tOSFileHandle FileDescriptor)
 	: mOSFileHandle(FileDescriptor),
-	  mIsEOF(false),
-	  mFileName("HANDLE")
+	  mIsEOF(false)
 {
 #ifdef WIN32
 	if(mOSFileHandle == INVALID_HANDLE_VALUE)
@@ -76,6 +77,9 @@ FileStream::FileStream(tOSFileHandle FileDescriptor)
 		BOX_ERROR("FileStream: called with invalid file handle");
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
+#ifdef WIN32
+	this->fileName = "HANDLE";
+#endif
 }
 
 #if 0
@@ -146,32 +150,27 @@ int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 		NULL
 		);
 
-	if(valid)
+	if ( valid )
 	{
 		r = numBytesRead;
 	}
-	else if(GetLastError() == ERROR_BROKEN_PIPE)
+	else if (GetLastError() == ERROR_BROKEN_PIPE)
 	{
 		r = 0;
 	}
 	else
 	{
-		BOX_LOG_WIN_ERROR("Failed to read from file: " << mFileName);
+		BOX_ERROR("Failed to read from file: " <<
+			GetErrorMessage(GetLastError()));
 		r = -1;
 	}
 #else
 	int r = ::read(mOSFileHandle, pBuffer, NBytes);
-	if(r == -1)
-	{
-		BOX_LOG_SYS_ERROR("Failed to read from file: " << mFileName);
-	}
 #endif
-
 	if(r == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileReadError)
 	}
-
 	if(r == 0)
 	{
 		mIsEOF = true;

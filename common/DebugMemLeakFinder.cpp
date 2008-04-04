@@ -146,9 +146,7 @@ void *memleakfinder_realloc(void *ptr, size_t size)
 	std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
 	if(ptr && i == sMallocBlocks.end())
 	{
-		BOX_WARNING("Block " << ptr << " realloc()ated, but not "
-			"in list. Error? Or allocated in startup static "
-			"objects?");
+		TRACE1("Block %x realloc(), but not in list. Error? Or allocated in startup static objects?\n", ptr);
 	}
 
 	void *b = ::realloc(ptr, size);
@@ -195,9 +193,7 @@ void memleakfinder_free(void *ptr)
 		}
 		else
 		{
-			BOX_WARNING("Block " << ptr << " freed, but not "
-				"known. Error? Or allocated in startup "
-				"static allocation?");
+			TRACE1("Block %p freed, but not known. Error? Or allocated in startup static allocation?\n", ptr);
 		}
 
 		if(sTrackMallocInSection)
@@ -297,21 +293,16 @@ void memleakfinder_traceblocksinsection()
 		std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.find(*s));
 		if(i == sMallocBlocks.end())
 		{
-			BOX_WARNING("Logical error in section block finding");
+			TRACE0("Logical error in section block finding\n");
 		}
 		else
 		{
-			BOX_TRACE("Block " << i->first << " size " <<
-				i->second.size << " allocated at " <<
-				i->second.file << ":" << i->second.line);
+			TRACE4("Block %p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
 		}
 	}
 	for(std::map<void *, ObjectInfo>::const_iterator i(sSectionObjectBlocks.begin()); i != sSectionObjectBlocks.end(); ++i)
 	{
-		BOX_TRACE("Object" << (i->second.array?" []":"") << " " <<
-			i->first << " size " << i->second.size <<
-			" allocated at " << i->second.file << 
-			":" << i->second.line);
+		TRACE5("Object%s %p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
 	}
 }
 

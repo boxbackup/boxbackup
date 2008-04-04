@@ -189,18 +189,15 @@ void BackupStoreCheck::DumpObjectInfo()
 	{
 		IDBlock *pblock = i->second;
 		int32_t bentries = (pblock == mpInfoLastBlock)?mInfoLastBlockEntries:BACKUPSTORECHECK_BLOCK_SIZE;
-		BOX_TRACE("BLOCK @ " << BOX_FORMAT_HEX32(pblock) <<
-			", " << bentries << " entries");
+		TRACE2("BLOCK @ 0x%08x, %d entries\n", pblock, bentries);
 		
 		for(int e = 0; e < bentries; ++e)
 		{
 			uint8_t flags = GetFlags(pblock, e);
-			BOX_TRACE(std::hex << 
-				"id "  << pblock->mID[e] <<
-				", c " << pblock->mContainer[e] <<
-				", " << ((flags & Flags_IsDir)?"dir":"file") <<
-				", " << ((flags & Flags_IsContained) ? 
-					"contained":"unattached"));
+			TRACE4("id %llx, c %llx, %s, %s\n",
+				pblock->mID[e], pblock->mContainer[e],
+				(flags & Flags_IsDir)?"dir":"file",
+				(flags & Flags_IsContained)?"contained":"unattached");
 		}
 	}
 }

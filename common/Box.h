@@ -52,6 +52,15 @@
 	extern bool BoxDebugTraceOn;
 	int BoxDebug_printf(const char *format, ...);
 	int BoxDebugTrace(const char *format, ...);
+	#define	TRACE0(msg) {BoxDebugTrace("%s", msg);}
+	#define	TRACE1(msg, a0) {BoxDebugTrace(msg, a0);}
+	#define	TRACE2(msg, a0, a1) {BoxDebugTrace(msg, a0, a1);}
+	#define	TRACE3(msg, a0, a1, a2) {BoxDebugTrace(msg, a0, a1, a2);}
+	#define	TRACE4(msg, a0, a1, a2, a3) {BoxDebugTrace(msg, a0, a1, a2, a3);}
+	#define	TRACE5(msg, a0, a1, a2, a3, a4) {BoxDebugTrace(msg, a0, a1, a2, a3, a4);}
+	#define	TRACE6(msg, a0, a1, a2, a3, a4, a5) {BoxDebugTrace(msg, a0, a1, a2, a3, a4, a5);}
+	#define	TRACE7(msg, a0, a1, a2, a3, a4, a5, a6) {BoxDebugTrace(msg, a0, a1, a2, a3, a4, a5, a6);}
+	#define	TRACE8(msg, a0, a1, a2, a3, a4, a5, a6, a7) {BoxDebugTrace(msg, a0, a1, a2, a3, a4, a5, a6, a7);}
 	
 	#ifndef PLATFORM_DISABLE_MEM_LEAK_TESTING
 		#define BOX_MEMORY_LEAK_TESTING
@@ -67,6 +76,16 @@
 	#define TRACE_TO_SYSLOG(x) {}
 	#define TRACE_TO_STDOUT(x) {}
 
+	#define TRACE0(msg)
+	#define	TRACE1(msg, a0)
+	#define	TRACE2(msg, a0, a1)
+	#define	TRACE3(msg, a0, a1, a2)
+	#define	TRACE4(msg, a0, a1, a2, a3)
+	#define	TRACE5(msg, a0, a1, a2, a3, a4)
+	#define	TRACE6(msg, a0, a1, a2, a3, a4, a5)
+	#define	TRACE7(msg, a0, a1, a2, a3, a4, a5, a6)
+	#define	TRACE8(msg, a0, a1, a2, a3, a4, a5, a6, a7)
+	
 	// Box Backup builds release get extra information for exception logging
 	#define EXCEPTION_CODENAMES_EXTENDED
 	#define EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION

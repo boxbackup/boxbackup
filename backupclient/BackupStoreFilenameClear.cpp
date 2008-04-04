@@ -167,8 +167,7 @@ void BackupStoreFilenameClear::MakeClearAvailable() const
 	switch(encoding)
 	{
 	case Encoding_Clear:
-		BOX_TRACE("**** BackupStoreFilename encoded with "
-			"Clear encoding ****");
+		TRACE0("**** BackupStoreFilename encoded with Clear encoding ****\n");
 		mClearFilename.assign(c_str() + 2, size - 2);
 		break;
 		
@@ -194,8 +193,7 @@ static void EnsureEncDecBufferSize(int BufSize)
 	if(spEncDecBuffer == 0)
 	{
 #ifndef WIN32
-		BOX_TRACE("Allocating filename encoding/decoding buffer "
-			"with size " << BufSize);
+		TRACE1("Allocating filename encoding/decoding buffer with size %d\n", BufSize);
 #endif
 		spEncDecBuffer = new MemoryBlockGuard<uint8_t *>(BufSize);
 		MEMLEAKFINDER_NOT_A_LEAK(spEncDecBuffer);

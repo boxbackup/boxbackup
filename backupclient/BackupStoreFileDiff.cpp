@@ -149,7 +149,7 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 	int64_t blocksInIndex = 0;
 	bool canDiffFromThis = false;
 	LoadIndex(rDiffFromBlockIndex, DiffFromObjectID, &pindex, blocksInIndex, Timeout, canDiffFromThis);
-	// BOX_TRACE("Diff: Blocks in index: " << blocksInIndex);
+	//TRACE1("Diff: Blocks in index: %lld\n", blocksInIndex);
 	
 	if(!canDiffFromThis)
 	{
@@ -439,9 +439,7 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 	{
 		for(int t = 0; t < BACKUP_FILE_DIFF_MAX_BLOCK_SIZES; ++t)
 		{
-			BOX_TRACE("Diff block size " << t << ": " <<
-				Sizes[t] << " (count = " << 
-				sizeCounts[t] << ")");
+			TRACE3("Diff block size %d: %d (count = %lld)\n", t, Sizes[t], sizeCounts[t]);
 		}
 	}
 #endif
@@ -776,7 +774,7 @@ static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int3
 			// Already present in table?
 			if(pHashTable[hash] != 0)
 			{
-				//BOX_TRACE("Another hash entry for " << hash << " found");
+				//TRACE1("Another hash entry for %d found\n", hash);
 				// Yes -- need to set the pointer in this entry to the current entry to build the linked list
 				pIndex[b].mpNextInHashList = pHashTable[hash];
 			}
@@ -842,19 +840,17 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	
 	// Then go through the entries in the hash list, comparing with the strong digest calculated
 	scan = pFirstInHashList;
-	//BOX_TRACE("second stage match");
+	//TRACE0("second stage match\n");
 	while(scan != 0)
 	{
-		//BOX_TRACE("scan size " << scan->mSize <<
-		//	", block size " << BlockSize <<
-		//	", hash " << Hash);
+		//TRACE3("scan size %d, block size %d, hash %d\n", scan->mSize, BlockSize, Hash);
 		ASSERT(scan->mSize == BlockSize);
 		ASSERT(RollingChecksum::ExtractHashingComponent(scan->mWeakChecksum) == DEBUG_Hash);
 	
 		// Compare?
 		if(strong.DigestMatches(scan->mStrongChecksum))
 		{
-			//BOX_TRACE("Match!\n");
+			//TRACE0("Match!\n");
 			// Found! Add to list of found blocks...
 			int64_t fileOffset = (FileBlockNumber * BlockSize) + Offset;
 			int64_t blockIndex = (scan - pIndex);	// pointer arthmitic is frowned upon. But most efficient way of doing it here -- alternative is to use more memory
@@ -916,8 +912,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 		#ifndef NDEBUG
 		if(BackupStoreFile::TraceDetailsOfDiffProcess)
 		{
-			BOX_TRACE("Diff: Default recipe generated, " << 
-				SizeOfInputFile << " bytes of file");
+			TRACE1("Diff: Default recipe generated, %lld bytes of file\n", SizeOfInputFile);
 		}
 		#endif
 		
@@ -1010,14 +1005,10 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	
 	// dump out the recipe
 #ifndef NDEBUG
-	BOX_TRACE("Diff: " << 
-		debug_NewBytesFound << " new bytes found, " <<
-		debug_OldBlocksUsed << " old blocks used");
+	TRACE2("Diff: %lld new bytes found, %lld old blocks used\n", debug_NewBytesFound, debug_OldBlocksUsed);
 	if(BackupStoreFile::TraceDetailsOfDiffProcess)
 	{
-		BOX_TRACE("Diff: Recipe generated (size " << rRecipe.size());
-		BOX_TRACE("======== ========= ========");
-		BOX_TRACE("Space b4 FirstBlk  NumBlks");
+		TRACE1("Diff: Recipe generated (size %d)\n======== ========= ========\nSpace b4 FirstBlk  NumBlks\n", rRecipe.size());
 		{
 			for(unsigned int e = 0; e < rRecipe.size(); ++e)
 			{
@@ -1027,15 +1018,10 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 #else
 				sprintf(b, "%8lld", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
 #endif
-				BOX_TRACE(std::setw(8) <<
-					rRecipe[e].mSpaceBefore <<
-					" " <<
-					((rRecipe[e].mpStartBlock == 0)?"       -":b) <<
-					" " << std::setw(8) <<
-					rRecipe[e].mBlocks);
+				TRACE3("%8lld %s %8lld\n", rRecipe[e].mSpaceBefore, (rRecipe[e].mpStartBlock == 0)?"       -":b, (int64_t)rRecipe[e].mBlocks);
 			}
 		}
-		BOX_TRACE("======== ========= ========");
+		TRACE0("======== ========= ========\n");
 	}
 #endif
 }
