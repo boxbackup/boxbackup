@@ -26,7 +26,7 @@ Parameters:
                         explicitly, using bbackupctl sync
     account-num (hexdecimal) and server-hostname
                         are supplied by the server administrator
-    working-dir         is usually @localstatedir_expanded@
+    working-dir         is usually @localstatedir_expanded@/bbackupd
     backup directories  is list of directories to back up
 
 __E

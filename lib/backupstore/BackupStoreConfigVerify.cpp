@@ -16,7 +16,8 @@
 
 static const ConfigurationVerifyKey verifyserverkeys[] = 
 {
-	SERVERTLS_VERIFY_SERVER_KEYS(0)	// no default listen addresses
+	SERVERTLS_VERIFY_SERVER_KEYS(ConfigurationVerifyKey::NoDefaultValue)
+	// no default listen addresses
 };
 
 static const ConfigurationVerify verifyserver[] = 
@@ -32,16 +33,18 @@ static const ConfigurationVerify verifyserver[] =
 
 static const ConfigurationVerifyKey verifyrootkeys[] = 
 {
-	{"AccountDatabase",	0, ConfigTest_Exists, 0},
-	{"TimeBetweenHousekeeping",	0, ConfigTest_Exists | ConfigTest_IsInt, 0},
-	{"ExtendedLogging",	"no", ConfigTest_IsBool, 0},			// make value "yes" to enable in config file
+	ConfigurationVerifyKey("AccountDatabase", ConfigTest_Exists),
+	ConfigurationVerifyKey("TimeBetweenHousekeeping",
+		ConfigTest_Exists | ConfigTest_IsInt),
+	ConfigurationVerifyKey("ExtendedLogging", ConfigTest_IsBool, false),
+	// make value "yes" to enable in config file
 
 	#ifdef WIN32
-		{"RaidFileConf", "", ConfigTest_LastEntry, 0}
+		ConfigurationVerifyKey("RaidFileConf", ConfigTest_LastEntry)
 	#else
-		{"RaidFileConf", BOX_FILE_RAIDFILE_DEFAULT_CONFIG, ConfigTest_LastEntry, 0}
+		ConfigurationVerifyKey("RaidFileConf", ConfigTest_LastEntry,
+			BOX_FILE_RAIDFILE_DEFAULT_CONFIG)
 	#endif
-
 };
 
 const ConfigurationVerify BackupConfigFileVerify =

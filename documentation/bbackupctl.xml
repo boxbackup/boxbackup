@@ -3,7 +3,7 @@
   <refmeta>
     <refentrytitle>bbackupctl</refentrytitle>
 
-    <manvolnum>1</manvolnum>
+    <manvolnum>8</manvolnum>
   </refmeta>
 
   <refnamediv>
@@ -23,7 +23,7 @@
 
     <para><literal>bbackupctl</literal> lets the user control the bbackupd
     daemon on a client machine. The main use is to force a sync with the store
-    server. This is especially important if bbackupd(1) is configured to do
+    server. This is especially important if bbackupd(8) is configured to do
     snapshot backups. In that case <literal>bbackupctl</literal> is the only
     way to effect a backup.</para>
 
@@ -31,7 +31,7 @@
     socket. Some platforms (notably Windows) can't determine if the user
     connecting on this socket has the correct credentials to execute the
     commands, leaving a rather sizeable security hole open. To avoid this,
-    unset the CommandSocket parameter in <literal>bbackupd.conf</literal>(8).
+    unset the CommandSocket parameter in <literal>bbackupd.conf</literal>(5).
     That disables the command socket, so bbackupd is secure. This does,
     however, render bbackupctl unusable.</para>
 
@@ -93,9 +93,9 @@
   <refsection>
     <title>See Also</title>
 
-    <para><literal>bbackupd.conf(8)</literal></para>
+    <para><literal>bbackupd.conf(5)</literal></para>
 
-    <para>bbackupd(1)</para>
+    <para><literal>bbackupd(8)</literal></para>
   </refsection>
 
   <refsection>
