@@ -13,8 +13,11 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <limits.h>
-#include <vector>
+
 #include <algorithm>
+#include <iostream>
+#include <ostream>
+#include <vector>
 
 #include "BoxPortsAndFiles.h"
 #include "BackupStoreConfigVerify.h"
@@ -62,16 +65,10 @@ int BlockSizeOfDiscSet(int DiscSet)
 	return controller.GetDiscSet(DiscSet).GetBlockSize();
 }
 
-std::string BlockSizeToString(int64_t Blocks, int DiscSet)
+std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int DiscSet)
 {
-	// Work out size in Mb.
-	double mb = (Blocks * BlockSizeOfDiscSet(DiscSet)) / (1024.0*1024.0);
-	
-	// Format string
-	std::ostringstream buf;
-	buf << Blocks << " blocks " << std::fixed << std::setprecision(2) <<
-		std::showpoint << "(" << mb << " MB)";
-	return buf.str();
+	return FormatUsageBar(Blocks, Blocks * BlockSizeOfDiscSet(DiscSet),
+		MaxBlocks * BlockSizeOfDiscSet(DiscSet));
 }
 
 int64_t SizeStringToBlocks(const char *string, int DiscSet)
@@ -223,15 +220,30 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, rootDir, discSet, true /* ReadOnly */));
 	
 	// Then print out lots of info
-	printf("                  Account ID: %08x\n", ID);
-	printf("              Last object ID: %lld\n", info->GetLastObjectIDUsed());
-	printf("                 Blocks used: %s\n", BlockSizeToString(info->GetBlocksUsed(), discSet).c_str());
-	printf("    Blocks used by old files: %s\n", BlockSizeToString(info->GetBlocksInOldFiles(), discSet).c_str());
-	printf("Blocks used by deleted files: %s\n", BlockSizeToString(info->GetBlocksInDeletedFiles(), discSet).c_str());
-	printf("  Blocks used by directories: %s\n", BlockSizeToString(info->GetBlocksInDirectories(), discSet).c_str());
-	printf("            Block soft limit: %s\n", BlockSizeToString(info->GetBlocksSoftLimit(), discSet).c_str());
-	printf("            Block hard limit: %s\n", BlockSizeToString(info->GetBlocksHardLimit(), discSet).c_str());
-	printf("         Client store marker: %lld\n", info->GetClientStoreMarker());
+	std::cout << FormatUsageLineStart("Account ID") <<
+		BOX_FORMAT_ACCOUNT(ID) << std::endl;
+	std::cout << FormatUsageLineStart("Last object ID") <<
+		BOX_FORMAT_OBJECTID(info->GetLastObjectIDUsed()) << std::endl;
+	std::cout << FormatUsageLineStart("Used") <<
+		BlockSizeToString(info->GetBlocksUsed(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Old files") <<
+		BlockSizeToString(info->GetBlocksInOldFiles(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Deleted files") <<
+		BlockSizeToString(info->GetBlocksInDeletedFiles(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Directories") <<
+		BlockSizeToString(info->GetBlocksInDirectories(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Soft limit") <<
+		BlockSizeToString(info->GetBlocksSoftLimit(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Hard limit") <<
+		BlockSizeToString(info->GetBlocksHardLimit(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Client store marker") <<
+		info->GetLastObjectIDUsed() << std::endl;
 	
 	return 0;
 }

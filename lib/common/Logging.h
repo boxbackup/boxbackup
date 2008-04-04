@@ -27,16 +27,16 @@
 
 #define BOX_LOG(level, stuff) \
 { \
-	std::ostringstream line; \
-	line << stuff; \
-	Logging::Log(level, __FILE__, __LINE__, line.str()); \
+	std::ostringstream _box_log_line; \
+	_box_log_line << stuff; \
+	Logging::Log(level, __FILE__, __LINE__, _box_log_line.str()); \
 }
 
 #define BOX_SYSLOG(level, stuff) \
 { \
-	std::ostringstream line; \
-	line << stuff; \
-	Logging::LogToSyslog(level, __FILE__, __LINE__, line.str()); \
+	std::ostringstream _box_log_line; \
+	_box_log_line << stuff; \
+	Logging::LogToSyslog(level, __FILE__, __LINE__, _box_log_line.str()); \
 }
 
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
@@ -48,14 +48,31 @@
 	if (Logging::IsEnabled(Log::TRACE)) \
 	{ BOX_LOG(Log::TRACE, stuff) }
 
-#define BOX_FORMAT_ACCOUNT(accno) \
+#define BOX_LOG_SYS_WARNING(stuff) \
+	BOX_WARNING(stuff << ": " << strerror(errno) << " (" << errno << ")")
+#define BOX_LOG_SYS_ERROR(stuff) \
+	BOX_ERROR(stuff << ": " << strerror(errno) << " (" << errno << ")")
+#define BOX_LOG_SYS_FATAL(stuff) \
+	BOX_FATAL(stuff << ": " << strerror(errno) << " (" << errno << ")")
+
+#ifdef WIN32
+	#define BOX_LOG_WIN_ERROR(stuff) \
+		BOX_ERROR(stuff << ": " << GetErrorMessage(GetLastError()))
+	#define BOX_LOG_WIN_ERROR_NUMBER(stuff, number) \
+		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
+#endif
+
+#define BOX_FORMAT_HEX32(number) \
 	std::hex << \
 	std::showbase << \
 	std::internal << \
 	std::setw(10) << \
 	std::setfill('0') << \
-	(accno) << \
+	(number) << \
 	std::dec
+
+#define BOX_FORMAT_ACCOUNT(accno) \
+	BOX_FORMAT_HEX32(accno)
 
 #define BOX_FORMAT_OBJECTID(objectid) \
 	std::hex << \

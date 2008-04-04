@@ -3,7 +3,7 @@
   <refmeta>
     <refentrytitle>bbstored-config</refentrytitle>
 
-    <manvolnum>1</manvolnum>
+    <manvolnum>8</manvolnum>
   </refmeta>
 
   <refnamediv>
@@ -86,7 +86,7 @@
   <refsection>
     <title>See Also</title>
 
-    <para><literal>raidfile-config(1)</literal></para>
+    <para><literal>raidfile-config(8)</literal></para>
 
     <para><literal>bbstored.conf(5)</literal></para>
 
@@ -117,7 +117,7 @@
       </listitem>
 
       <listitem>
-        <para>The platform you are running on (Hardware and OS), for both
+        <para>The platform you are running on (hardware and OS), for both
         client and server.</para>
       </listitem>
 

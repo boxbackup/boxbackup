@@ -90,7 +90,8 @@ int test_stream()
 		
 		// Check sizes
 		TEST_THAT(poutput->GetSize() < source.GetSize());
-		TRACE2("compressed size = %d, source size = %d\n", poutput->GetSize(), source.GetSize());
+		BOX_TRACE("compressed size = " << poutput->GetSize() <<
+			", source size = " << source.GetSize());
 		
 		// Decompress the data
 		{
