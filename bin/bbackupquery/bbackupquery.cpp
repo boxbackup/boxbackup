@@ -174,8 +174,8 @@ int main(int argc, const char *argv[])
 			logFile = ::fopen(optarg, "w");
 			if(logFile == 0)
 			{
-				BOX_LOG_SYS_ERROR("Failed to open log file "
-					"'" << optarg << "'");
+				BOX_ERROR("Failed to open log file '" <<
+					optarg << "': " << strerror(errno));
 			}
 			break;
 
@@ -260,9 +260,7 @@ int main(int argc, const char *argv[])
 	// 2. Connect to server
 	if(!quiet) BOX_INFO("Connecting to store...");
 	SocketStreamTLS socket;
-	socket.Open(tlsContext, Socket::TypeINET,
-		conf.GetKeyValue("StoreHostname").c_str(),
-		conf.GetKeyValueInt("StorePort"));
+	socket.Open(tlsContext, Socket::TypeINET, conf.GetKeyValue("StoreHostname").c_str(), BOX_PORT_BBSTORED);
 	
 	// 3. Make a protocol, and handshake
 	if(!quiet) BOX_INFO("Handshake with store...");

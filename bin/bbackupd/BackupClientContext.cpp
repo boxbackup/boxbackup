@@ -44,7 +44,6 @@ BackupClientContext::BackupClientContext
 	BackupDaemon &rDaemon, 
 	TLSContext &rTLSContext, 
 	const std::string &rHostname,
-	int Port,
 	int32_t AccountNumber, 
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
@@ -53,7 +52,6 @@ BackupClientContext::BackupClientContext
 	: mrDaemon(rDaemon),
 	  mrTLSContext(rTLSContext),
 	  mHostname(rHostname),
-	  mPort(Port),
 	  mAccountNumber(AccountNumber),
 	  mpSocket(0),
 	  mpConnection(0),
@@ -131,8 +129,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			mHostname << "'...");
 
 		// Connect!
-		mpSocket->Open(mrTLSContext, Socket::TypeINET,
-			mHostname.c_str(), mPort);
+		mpSocket->Open(mrTLSContext, Socket::TypeINET, mHostname.c_str(), BOX_PORT_BBSTORED);
 		
 		// And create a procotol object
 		mpConnection = new BackupProtocolClient(*mpSocket);
@@ -149,8 +146,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 
 			if (!mpExtendedLogFileHandle)
 			{
-				BOX_LOG_SYS_ERROR("Failed to open extended "
-					"log file: " << mExtendedLogFile);
+				BOX_ERROR("Failed to open extended log "
+					"file: " << strerror(errno));
 			}
 			else
 			{

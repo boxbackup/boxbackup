@@ -622,8 +622,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(n2 != n3);
 		TEST_THAT(n1 != n3);
 		TEST_THAT(n1 == n4);		// ie wraps around
-		BOX_TRACE("Gen paths = '" << n1 << "', '" << n2 << 
-			"', '" << n3);
+		TRACE3("Gen paths= '%s','%s',%s'\n", n1.c_str(), n2.c_str(), n3.c_str());
 	}
 
 	// Create a RaidFile

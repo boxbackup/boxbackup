@@ -958,7 +958,6 @@ void BackupDaemon::Run2()
 					*this, 
 					tlsContext, 
 					conf.GetKeyValue("StoreHostname"),
-					conf.GetKeyValueInt("StorePort"),
 					conf.GetKeyValueInt("AccountNumber"), 
 					conf.GetKeyValueBool("ExtendedLogging"),
 					conf.KeyExists("ExtendedLogFile"),
@@ -1813,9 +1812,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				if(::statfs(apLoc->mPath.c_str(), &s) != 0)
 #endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
-					BOX_LOG_SYS_WARNING("Failed to stat location "
+					BOX_WARNING("Failed to stat location "
 						"path '" << apLoc->mPath <<
-						"', skipping location '" <<
+						"' (" << strerror(errno) <<
+						"), skipping location '" <<
 						apLoc->mName << "'");
 					continue;
 				}
@@ -2189,8 +2189,9 @@ void BackupDaemon::CommitIDMapsAfterSync()
 #endif
 		if(::rename(newmap.c_str(), target.c_str()) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to rename ID map: " <<
-				newmap << " to " << target);
+			BOX_ERROR("failed to rename ID map: " << newmap
+				<< " to " << target << ": " 
+				<< strerror(errno));
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
@@ -3054,10 +3055,9 @@ bool BackupDaemon::DeleteStoreObjectInfo() const
 	// Check to see if the file exists
 	if(!FileExists(storeObjectInfoFile.c_str()))
 	{
-		// File doesn't exist -- so can't be deleted. But something
-		// isn't quite right, so log a message
-		BOX_WARNING("StoreObjectInfoFile did not exist when it "
-			"was supposed to: " << storeObjectInfoFile);
+		// File doesn't exist -- so can't be deleted. But something isn't quite right, so log a message
+		BOX_WARNING("Store object info file did not exist when it "
+			"was supposed to. (" << storeObjectInfoFile << ")");
 
 		// Return true to stop things going around in a loop
 		return true;
@@ -3066,8 +3066,8 @@ bool BackupDaemon::DeleteStoreObjectInfo() const
 	// Actually delete it
 	if(::unlink(storeObjectInfoFile.c_str()) != 0)
 	{
-		BOX_LOG_SYS_ERROR("Failed to delete the old "
-			"StoreObjectInfoFile: " << storeObjectInfoFile);
+		BOX_ERROR("Failed to delete the old store object info file: "
+			<< storeObjectInfoFile << ": "<< strerror(errno));
 		return false;
 	}
 

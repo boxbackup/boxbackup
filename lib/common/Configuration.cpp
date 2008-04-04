@@ -12,8 +12,6 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include <sstream>
-
 #include "Configuration.h"
 #include "CommonException.h"
 #include "Guards.h"
@@ -31,105 +29,7 @@ inline bool iw(int c)
 static const char *sValueBooleanStrings[] = {"yes", "true", "no", "false", 0};
 static const bool sValueBooleanValue[] = {true, true, false, false};
 
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	std::string name,
-	int flags,
-	void *testFunction
-)
-: mName(name),
-  mHasDefaultValue(false),
-  mFlags(flags),
-  mTestFunction(testFunction)
-{ }
 
-// to allow passing NULL for default ListenAddresses
-
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	std::string name,
-	int flags,
-	NoDefaultValue_t t,
-	void *testFunction
-)
-: mName(name),
-  mHasDefaultValue(false),
-  mFlags(flags),
-  mTestFunction(testFunction)
-{ }
-
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	std::string name,
-	int flags,
-	std::string defaultValue,
-	void *testFunction
-)
-: mName(name),
-  mDefaultValue(defaultValue),
-  mHasDefaultValue(true),
-  mFlags(flags),
-  mTestFunction(testFunction)
-{ }
-
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	std::string name,
-	int flags,
-	const char *defaultValue,
-	void *testFunction
-)
-: mName(name),
-  mDefaultValue(defaultValue),
-  mHasDefaultValue(true),
-  mFlags(flags),
-  mTestFunction(testFunction)
-{ }
-
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	std::string name,
-	int flags,
-	int defaultValue,
-	void *testFunction
-)
-: mName(name),
-  mHasDefaultValue(true),
-  mFlags(flags),
-  mTestFunction(testFunction)
-{
-	ASSERT(flags & ConfigTest_IsInt);
-	std::ostringstream val;
-	val << defaultValue;
-	mDefaultValue = val.str();
-}
-
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	std::string name,
-	int flags,
-	bool defaultValue,
-	void *testFunction
-)
-: mName(name),
-  mHasDefaultValue(true),
-  mFlags(flags),
-  mTestFunction(testFunction)
-{
-	ASSERT(flags & ConfigTest_IsBool);
-	mDefaultValue = defaultValue ? "yes" : "no";
-}
-
-ConfigurationVerifyKey::ConfigurationVerifyKey
-(
-	const ConfigurationVerifyKey& rToCopy
-)
-: mName(rToCopy.mName),
-  mDefaultValue(rToCopy.mDefaultValue),
-  mHasDefaultValue(rToCopy.mHasDefaultValue),
-  mFlags(rToCopy.mFlags),
-  mTestFunction(rToCopy.mTestFunction)
-{ }
 
 // --------------------------------------------------------------------------
 //
@@ -208,8 +108,8 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 		if(!rErrorMsg.empty())
 		{
 			// An error occured, return now
-			BOX_ERROR("Error in Configuration::LoadInfo: " << 
-				rErrorMsg);
+			//TRACE1("Error message from LoadInto: %s", rErrorMsg.c_str());
+			TRACE0("Error at Configuration::LoadInfo\n");
 			delete pconfig;
 			pconfig = 0;
 			return std::auto_ptr<Configuration>(0);
@@ -220,8 +120,8 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 		{
 			if(!Verify(*pconfig, *pVerify, std::string(), rErrorMsg))
 			{
-				BOX_ERROR("Error verifying configuration: " <<
-					rErrorMsg);
+				//TRACE1("Error message from Verify: %s", rErrorMsg.c_str());
+				TRACE0("Error at Configuration::Verify\n");
 				delete pconfig;
 				pconfig = 0;
 				return std::auto_ptr<Configuration>(0);
@@ -289,8 +189,7 @@ bool Configuration::LoadInto(Configuration &rConfig, FdGetLine &rGetLine, std::s
 			}
 			else
 			{
-				rErrorMsg += "Unexpected start block in " +
-					rConfig.mName + "\n";
+				rErrorMsg += "Unexpected start block in " + rConfig.mName + "\n";
 			}
 		}
 		else
@@ -391,32 +290,36 @@ bool Configuration::LoadInto(Configuration &rConfig, FdGetLine &rGetLine, std::s
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::KeyExists(const std::string&)
+//		Name:    Configuration::KeyExists(const char *)
 //		Purpose: Checks to see if a key exists
 //		Created: 2003/07/23
 //
 // --------------------------------------------------------------------------
-bool Configuration::KeyExists(const std::string& rKeyName) const
+bool Configuration::KeyExists(const char *pKeyName) const
 {
-	return mKeys.find(rKeyName) != mKeys.end();
+	if(pKeyName == 0) {THROW_EXCEPTION(CommonException, BadArguments)}
+
+	return mKeys.find(pKeyName) != mKeys.end();
 }
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::GetKeyValue(const std::string&)
+//		Name:    Configuration::GetKeyValue(const char *)
 //		Purpose: Returns the value of a configuration variable
 //		Created: 2003/07/23
 //
 // --------------------------------------------------------------------------
-const std::string &Configuration::GetKeyValue(const std::string& rKeyName) const
+const std::string &Configuration::GetKeyValue(const char *pKeyName) const
 {
-	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
+	if(pKeyName == 0) {THROW_EXCEPTION(CommonException, BadArguments)}
+
+	std::map<std::string, std::string>::const_iterator i(mKeys.find(pKeyName));
 	
 	if(i == mKeys.end())
 	{
-		BOX_ERROR("Missing configuration key: " << rKeyName);
+		BOX_ERROR("Missing configuration key: " << pKeyName);
 		THROW_EXCEPTION(CommonException, ConfigNoKey)
 	}
 	else
@@ -429,14 +332,16 @@ const std::string &Configuration::GetKeyValue(const std::string& rKeyName) const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::GetKeyValueInt(const std::string& rKeyName)
+//		Name:    Configuration::GetKeyValueInt(const char *)
 //		Purpose: Gets a key value as an integer
 //		Created: 2003/07/23
 //
 // --------------------------------------------------------------------------
-int Configuration::GetKeyValueInt(const std::string& rKeyName) const
+int Configuration::GetKeyValueInt(const char *pKeyName) const
 {
-	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
+	if(pKeyName == 0) {THROW_EXCEPTION(CommonException, BadArguments)}
+
+	std::map<std::string, std::string>::const_iterator i(mKeys.find(pKeyName));
 	
 	if(i == mKeys.end())
 	{
@@ -457,14 +362,16 @@ int Configuration::GetKeyValueInt(const std::string& rKeyName) const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::GetKeyValueBool(const std::string&)
+//		Name:    Configuration::GetKeyValueBool(const char *) const
 //		Purpose: Gets a key value as a boolean
 //		Created: 17/2/04
 //
 // --------------------------------------------------------------------------
-bool Configuration::GetKeyValueBool(const std::string& rKeyName) const
+bool Configuration::GetKeyValueBool(const char *pKeyName) const
 {
-	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
+	if(pKeyName == 0) {THROW_EXCEPTION(CommonException, BadArguments)}
+
+	std::map<std::string, std::string>::const_iterator i(mKeys.find(pKeyName));
 	
 	if(i == mKeys.end())
 	{
@@ -521,21 +428,22 @@ std::vector<std::string> Configuration::GetKeyNames() const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::SubConfigurationExists(const
-//			 std::string&)
+//		Name:    Configuration::SubConfigurationExists(const char *)
 //		Purpose: Checks to see if a sub configuration exists
 //		Created: 2003/07/23
 //
 // --------------------------------------------------------------------------
-bool Configuration::SubConfigurationExists(const std::string& rSubName) const
+bool Configuration::SubConfigurationExists(const char *pSubName) const
 {
+	if(pSubName == 0) {THROW_EXCEPTION(CommonException, BadArguments)}
+
 	// Attempt to find it...
 	std::list<std::pair<std::string, Configuration> >::const_iterator i(mSubConfigurations.begin());
 	
 	for(; i != mSubConfigurations.end(); ++i)
 	{
 		// This the one?
-		if(i->first == rSubName)
+		if(i->first == pSubName)
 		{
 			// Yes.
 			return true;
@@ -550,22 +458,22 @@ bool Configuration::SubConfigurationExists(const std::string& rSubName) const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::GetSubConfiguration(const
-//			 std::string&)
+//		Name:    Configuration::GetSubConfiguration(const char *)
 //		Purpose: Gets a sub configuration
 //		Created: 2003/07/23
 //
 // --------------------------------------------------------------------------
-const Configuration &Configuration::GetSubConfiguration(const std::string&
-	rSubName) const
+const Configuration &Configuration::GetSubConfiguration(const char *pSubName) const
 {
+	if(pSubName == 0) {THROW_EXCEPTION(CommonException, BadArguments)}
+
 	// Attempt to find it...
 	std::list<std::pair<std::string, Configuration> >::const_iterator i(mSubConfigurations.begin());
 	
 	for(; i != mSubConfigurations.end(); ++i)
 	{
 		// This the one?
-		if(i->first == rSubName)
+		if(i->first == pSubName)
 		{
 			// Yes.
 			return i->second;
@@ -620,14 +528,15 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 		do
 		{
 			// Can the key be found?
-			if(rConfig.KeyExists(pvkey->Name()))
+			ASSERT(pvkey->mpName);
+			if(rConfig.KeyExists(pvkey->mpName))
 			{
 				// Get value
-				const std::string &rval = rConfig.GetKeyValue(pvkey->Name());
+				const std::string &rval = rConfig.GetKeyValue(pvkey->mpName);
 				const char *val = rval.c_str();
 
 				// Check it's a number?
-				if((pvkey->Flags() & ConfigTest_IsInt) == ConfigTest_IsInt)
+				if((pvkey->Tests & ConfigTest_IsInt) == ConfigTest_IsInt)
 				{					
 					// Test it...
 					char *end;
@@ -636,12 +545,12 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 					{
 						// not a good value
 						ok = false;
-						rErrorMsg += rLevel + rConfig.mName + "." + pvkey->Name() + " (key) is not a valid integer.\n";
+						rErrorMsg += rLevel + rConfig.mName +"." + pvkey->mpName + " (key) is not a valid integer.\n";
 					}
 				}
 				
 				// Check it's a bool?
-				if((pvkey->Flags() & ConfigTest_IsBool) == ConfigTest_IsBool)
+				if((pvkey->Tests & ConfigTest_IsBool) == ConfigTest_IsBool)
 				{				
 					// See if it's one of the allowed strings.
 					bool found = false;
@@ -659,38 +568,37 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 					if(!found)
 					{
 						ok = false;
-						rErrorMsg += rLevel + rConfig.mName + "." + pvkey->Name() + " (key) is not a valid boolean value.\n";
+						rErrorMsg += rLevel + rConfig.mName +"." + pvkey->mpName + " (key) is not a valid boolean value.\n";
 					}
 				}
 				
 				// Check for multi valued statments where they're not allowed
-				if((pvkey->Flags() & ConfigTest_MultiValueAllowed) == 0)
+				if((pvkey->Tests & ConfigTest_MultiValueAllowed) == 0)
 				{
 					// Check to see if this key is a multi-value -- it shouldn't be
 					if(rval.find(MultiValueSeparator) != rval.npos)
 					{
 						ok = false;
-						rErrorMsg += rLevel + rConfig.mName +"." + pvkey->Name() + " (key) multi value not allowed (duplicated key?).\n";
+						rErrorMsg += rLevel + rConfig.mName +"." + pvkey->mpName + " (key) multi value not allowed (duplicated key?).\n";
 					}
 				}				
 			}
 			else
 			{
 				// Is it required to exist?
-				if((pvkey->Flags() & ConfigTest_Exists) == ConfigTest_Exists)
+				if((pvkey->Tests & ConfigTest_Exists) == ConfigTest_Exists)
 				{
 					// Should exist, but doesn't.
 					ok = false;
-					rErrorMsg += rLevel + rConfig.mName + "." + pvkey->Name() + " (key) is missing.\n";
+					rErrorMsg += rLevel + rConfig.mName + "." + pvkey->mpName + " (key) is missing.\n";
 				}
-				else if(pvkey->HasDefaultValue())
+				else if(pvkey->mpDefaultValue)
 				{
-					rConfig.mKeys[pvkey->Name()] =
-						pvkey->DefaultValue();
+					rConfig.mKeys[std::string(pvkey->mpName)] = std::string(pvkey->mpDefaultValue);
 				}
 			}
 		
-			if((pvkey->Flags() & ConfigTest_LastEntry) == ConfigTest_LastEntry)
+			if((pvkey->Tests & ConfigTest_LastEntry) == ConfigTest_LastEntry)
 			{
 				// No more!
 				todo = false;
@@ -710,14 +618,14 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 			bool found = false;
 			while(scan)
 			{
-				if(scan->Name() == i->first)
+				if(scan->mpName == i->first)
 				{
 					found = true;
 					break;
 				}
 				
 				// Next?
-				if((scan->Flags() & ConfigTest_LastEntry) == ConfigTest_LastEntry)
+				if((scan->Tests & ConfigTest_LastEntry) == ConfigTest_LastEntry)
 				{
 					break;
 				}
@@ -742,7 +650,8 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 		const ConfigurationVerify *scan = rVerify.mpSubConfigurations;
 		while(scan)
 		{
-			if(scan->mName.length() > 0 && scan->mName[0] == '*')
+			ASSERT(scan->mpName);
+			if(scan->mpName[0] == '*')
 			{
 				wildcardverify = scan;
 			}
@@ -750,8 +659,7 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 			// Required?
 			if((scan->Tests & ConfigTest_Exists) == ConfigTest_Exists)
 			{
-				if(scan->mName.length() > 0 &&
-					scan->mName[0] == '*')
+				if(scan->mpName[0] == '*')
 				{
 					// Check something exists
 					if(rConfig.mSubConfigurations.size() < 1)
@@ -764,11 +672,11 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 				else
 				{
 					// Check real thing exists
-					if(!rConfig.SubConfigurationExists(scan->mName))
+					if(!rConfig.SubConfigurationExists(scan->mpName))
 					{
 						// Should exist, but doesn't.
 						ok = false;
-						rErrorMsg += rLevel + rConfig.mName + "." + scan->mName + " (block) is missing.\n";
+						rErrorMsg += rLevel + rConfig.mName + "." + scan->mpName + " (block) is missing.\n";
 					}
 				}
 			}
@@ -793,7 +701,7 @@ bool Configuration::Verify(Configuration &rConfig, const ConfigurationVerify &rV
 			ASSERT(name);
 			while(scan)
 			{
-				if(scan->mName == name)
+				if(strcmp(scan->mpName, name) == 0)
 				{
 					// found it!
 					subverify = scan;

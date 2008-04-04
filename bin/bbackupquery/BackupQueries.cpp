@@ -27,8 +27,6 @@
 
 #include <set>
 #include <limits>
-#include <iostream>
-#include <ostream>
 
 #include "BackupQueries.h"
 #include "Utils.h"
@@ -812,8 +810,8 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 		}
 		else
 		{
-			BOX_LOG_SYS_ERROR("Failed to change to directory "
-				"'" << args[0] << "'");
+			BOX_ERROR("Error changing to directory '" <<
+				args[0] << ": " << strerror(errno));
 		}
 
 		SetReturnCode(COMMAND_RETURN_ERROR);
@@ -824,7 +822,8 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	char wd[PATH_MAX];
 	if(::getcwd(wd, PATH_MAX) == 0)
 	{
-		BOX_LOG_SYS_ERROR("Error getting current directory");
+		BOX_ERROR("Error getting current directory: " <<
+			strerror(errno));
 		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
@@ -1400,8 +1399,9 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		}
 		else
 		{
-			BOX_LOG_SYS_WARNING("Failed to access local directory "
-				"'" << localDirDisplay << "'");
+			BOX_WARNING("Failed to access local directory '" <<
+				localDirDisplay << ": " << strerror(errno) <<
+				"'.");
 			rParams.mUncheckedFiles ++;
 		}
 		return;
@@ -1449,8 +1449,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	DIR *dirhandle = ::opendir(rLocalDir.c_str());
 	if(dirhandle == 0)
 	{
-		BOX_LOG_SYS_WARNING("Failed to open local directory '" << 
-			localDirDisplay << "'");
+		BOX_WARNING("Failed to open local directory '" << 
+			localDirDisplay << "': " << strerror(errno));
 		rParams.mUncheckedFiles ++;
 		return;
 	}
@@ -1518,8 +1518,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		// Close directory
 		if(::closedir(dirhandle) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to close local directory "
-				"'" << localDirDisplay << "'");
+			BOX_ERROR("Failed to close local directory '" <<
+				localDirDisplay << "': " << strerror(errno));
 		}
 		dirhandle = 0;
 	
@@ -2158,9 +2158,22 @@ void BackupQueries::CommandUsage()
 // --------------------------------------------------------------------------
 void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size, int64_t HardLimit, int32_t BlockSize)
 {
-	std::cout << FormatUsageLineStart(Name) <<
-		FormatUsageBar(Size, Size * BlockSize, HardLimit * BlockSize) <<
-		std::endl;
+	// Calculate size in Mb
+	double mb = (((double)Size) * ((double)BlockSize)) / ((double)(1024*1024));
+	int64_t percent = (Size * 100) / HardLimit;
+
+	// Bar graph
+	char bar[41];
+	unsigned int b = (int)((Size * (sizeof(bar)-1)) / HardLimit);
+	if(b > sizeof(bar)-1) {b = sizeof(bar)-1;}
+	for(unsigned int l = 0; l < b; l++)
+	{
+		bar[l] = '*';
+	}
+	bar[b] = '\0';
+
+	// Print the entryj
+	::printf("%14s %10.1fMb %3d%% %s\n", Name, mb, (int32_t)percent, bar);
 }
 
 

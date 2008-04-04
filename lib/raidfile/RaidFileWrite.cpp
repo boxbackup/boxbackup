@@ -96,8 +96,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 		RaidFileUtil::ExistType existance = RaidFileUtil::RaidFileExists(rdiscSet, mFilename);
 		if(existance != RaidFileUtil::NoFile)
 		{
-			BOX_ERROR("Attempted to overwrite raidfile " <<
-				mSetNumber << " " << mFilename);
+			TRACE2("Trying to overwrite raidfile %d %s\n", mSetNumber, mFilename.c_str());
 			THROW_EXCEPTION(RaidFileException, CannotOverwriteExistingFile)
 		}
 	}
@@ -179,8 +178,7 @@ void RaidFileWrite::Write(const void *pBuffer, int Length)
 	int written = ::write(mOSFileHandle, pBuffer, Length);
 	if(written != Length)
 	{
-		BOX_LOG_SYS_ERROR("RaidFileWrite failed, Length = " <<
-			Length << ", written = " << written);
+		TRACE3("RaidFileWrite::Write: Write failure, Length = %d, written = %d, errno = %d\n", Length, written, errno);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 }
@@ -781,7 +779,7 @@ int RaidFileWrite::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void RaidFileWrite::Close()
 {
-	BOX_WARNING("RaidFileWrite::Close() called, discarding file");
+	TRACE0("Warning: RaidFileWrite::Close() called, discarding file\n");
 	if(mOSFileHandle != -1)
 	{
 		Discard();

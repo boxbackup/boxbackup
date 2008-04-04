@@ -41,8 +41,7 @@ ProtocolUncertainStream::~ProtocolUncertainStream()
 {
 	if(!mFinished)
 	{
-		BOX_WARNING("ProtocolUncertainStream destroyed before "
-			"stream finished");
+		TRACE0("ProtocolUncertainStream::~ProtocolUncertainStream() destroyed when stream not complete\n");
 	}
 }
 
