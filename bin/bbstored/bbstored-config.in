@@ -196,7 +196,7 @@ TimeBetweenHousekeeping = 900
 
 Server
 {
-	PidFile = @localstatedir_expanded@/run/bbstored.pid
+	PidFile = @localstatedir_expanded@/bbstored.pid
 	User = $username
 	ListenAddresses = inet:$server
 	CertificateFile = $certificate

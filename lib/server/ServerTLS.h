@@ -70,10 +70,11 @@ private:
 };
 
 #define SERVERTLS_VERIFY_SERVER_KEYS(DEFAULT_ADDRESSES) \
-	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists), \
-	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists), \
-	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists), \
-	SERVERSTREAM_VERIFY_SERVER_KEYS(DEFAULT_ADDRESSES)
+											{"CertificateFile", 0, ConfigTest_Exists, 0}, \
+											{"PrivateKeyFile", 0, ConfigTest_Exists, 0}, \
+											{"TrustedCAsFile", 0, ConfigTest_Exists, 0}, \
+											SERVERSTREAM_VERIFY_SERVER_KEYS(DEFAULT_ADDRESSES)
+
 
 #endif // SERVERTLS__H
 

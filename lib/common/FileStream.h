@@ -57,8 +57,10 @@ private:
 	bool mIsEOF;
 	FileStream(const FileStream &rToCopy) { /* do not call */ }
 
+#ifdef WIN32
 	// for debugging..
-	std::string mFileName;
+	std::string fileName;
+#endif
 };
 
 

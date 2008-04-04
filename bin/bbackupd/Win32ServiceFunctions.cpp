@@ -207,8 +207,8 @@ int InstallService(const char* pConfigFileName, const std::string& rServiceName)
 
 		if (emu_stat(pConfigFileName, &st) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to open configuration file "
-				"'" << pConfigFileName << "'");
+			BOX_ERROR("Failed to open configuration file '" <<
+				pConfigFileName << "': " << strerror(errno));
 			return 1;
 		}
 
@@ -221,7 +221,7 @@ int InstallService(const char* pConfigFileName, const std::string& rServiceName)
 		}
 	}
 
-	SC_HANDLE scm = OpenSCManager(0, 0, SC_MANAGER_CREATE_SERVICE);
+	SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
 
 	if (!scm) 
 	{

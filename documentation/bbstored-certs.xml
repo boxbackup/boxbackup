@@ -3,7 +3,7 @@
   <refmeta>
     <refentrytitle>bbstored-certs</refentrytitle>
 
-    <manvolnum>8</manvolnum>
+    <manvolnum>1</manvolnum>
   </refmeta>
 
   <refnamediv>
@@ -51,7 +51,7 @@
         <listitem>
           <para><literal>sign &lt;clientcsrfile&gt;</literal>: Sign a client
           certificate. The <literal>clientcsrfile</literal> is generated
-          during client setup. See <literal>bbackupd-config(8)</literal>. Send
+          during client setup. See <literal>bbackupd-config(1)</literal>. Send
           the signed certificate back to the client, and install according to
           the instructions given by <literal>bbackupd-config</literal>.</para>
         </listitem>
@@ -72,11 +72,11 @@
   <refsection>
     <title>See Also</title>
 
-    <para><literal>bbstored-config(8)</literal></para>
+    <para><literal>bbstored-config(1)</literal></para>
 
     <para><literal>bbstored.conf(5)</literal></para>
 
-    <para><literal>bbstoreaccounts(8)</literal></para>
+    <para><literal>bbstoreaccounts(1)</literal></para>
   </refsection>
 
   <refsection>
@@ -102,7 +102,7 @@
       </listitem>
 
       <listitem>
-        <para>The platform you are running on (hardware and OS), for both
+        <para>The platform you are running on (Hardware and OS), for both
         client and server.</para>
       </listitem>
 

@@ -1014,8 +1014,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 	// Delete the pending entries, if the map is entry
 	if(mpPendingEntries != 0 && mpPendingEntries->size() == 0)
 	{
-		BOX_TRACE("Deleting mpPendingEntries from dir ID " <<
-			BOX_FORMAT_OBJECTID(mObjectID));
+		TRACE1("Deleting mpPendingEntries from dir ID %lld\n", mObjectID);
 		delete mpPendingEntries;
 		mpPendingEntries = 0;
 	}
@@ -1250,8 +1249,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 						rLocalPath, 
 						dirname.GetClearFilename());
 
-					BOX_TRACE("Deleted directory record "
-						"for " << name);
+					TRACE1("Deleted directory record for "
+						"%s\n", name.c_str());
 				}				
 			}
 		}

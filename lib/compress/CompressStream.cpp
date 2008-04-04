@@ -414,7 +414,7 @@ void CompressStream::CheckBuffer()
 	{
 		size *= 2;
 	}
-	BOX_TRACE("Allocating CompressStream buffer, size " << size);
+	TRACE1("Allocating CompressStream buffer, size %d\n", size);
 	mpBuffer = ::malloc(size);
 	if(mpBuffer == 0)
 	{

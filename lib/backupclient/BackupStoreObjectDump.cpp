@@ -47,7 +47,7 @@ static void OutputLine(FILE *file, bool ToTrace, const char *format, ...)
 	}
 	if(ToTrace)
 	{
-		BOX_TRACE(text);
+		TRACE1("%s", text);
 	}
 }
 
@@ -211,16 +211,14 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 		if(s > 0)
 		{
 			nnew++;
-			BOX_TRACE(std::setw(8) << b << " this  s=" <<
-				std::setw(8) << s);
+			TRACE2("%8lld this  s=%8lld\n", b, s);
 		}
 		else
 		{
 			nold++;
-			BOX_TRACE(std::setw(8) << b << " other i=" <<
-				std::setw(8) << 0 - s);
+			TRACE2("%8lld other i=%8lld\n", b, 0 - s);		
 		}
 	}
-	BOX_TRACE("======== ===== ==========");
+	TRACE0("======== ===== ==========\n");
 }
 

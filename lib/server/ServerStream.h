@@ -273,7 +273,7 @@ public:
 							}
 							
 							// Log it
-							BOX_NOTICE("Message from child process " << pid << ": " << logMessage);
+							BOX_WARNING("Message from child process " << pid << ": " << logMessage);
 						}
 						else
 						{
@@ -365,8 +365,8 @@ private:
 };
 
 #define SERVERSTREAM_VERIFY_SERVER_KEYS(DEFAULT_ADDRESSES) \
-	ConfigurationVerifyKey("ListenAddresses", 0, DEFAULT_ADDRESSES), \
-	DAEMON_VERIFY_SERVER_KEYS 
+											{"ListenAddresses", DEFAULT_ADDRESSES, 0, 0}, \
+											DAEMON_VERIFY_SERVER_KEYS 
 
 #include "MemLeakFindOff.h"
 

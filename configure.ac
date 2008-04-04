@@ -6,6 +6,10 @@ AC_INIT([Box Backup], 0.11, [boxbackup@fluffy.co.uk])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
+# override default sysconfdir, for backwards compatibility
+test "$sysconfdir" = NONE && sysconfdir=/etc
+test "$localstatedir" = NONE && localstatedir=/var/run
+
 touch install-sh
 AC_CANONICAL_SYSTEM
 test -s install-sh || rm install-sh
@@ -58,6 +62,7 @@ winnt)    ;;
 	;;
 esac
 
+AC_CHECK_HEADER([zlib.h],, [AC_MSG_ERROR([[cannot find zlib.h]])])
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
 VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 
@@ -268,10 +273,6 @@ if test "x$enable_static_bin" = "xyes"; then
   AC_CHECK_LIB([ssl],[SSL_read],,, [crypto])
   LIBS="-Wl,-Bstatic $LIBS -Wl,-Bdynamic"
 fi
-
-# override default sysconfdir, for backwards compatibility
-test "$sysconfdir" = '${prefix}/etc' && sysconfdir=/etc
-test "$localstatedir" = '${prefix}/var' && localstatedir=/var
 
 ## Kludge to allow makeparcels.pl to use bindir. This is not a good long term
 ## solution because it prevents use of "make exec_prefix=/some/dir"

@@ -108,57 +108,45 @@ public:
 			if(::close(mSocketHandle) == -1)
 #endif
 			{
-				BOX_LOG_SYS_ERROR("Failed to close network "
-					"socket");
-				THROW_EXCEPTION(ServerException,
-					SocketCloseError)
+				THROW_EXCEPTION(ServerException, SocketCloseError)
 			}
 		}
 		mSocketHandle = -1;
 	}
 
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	//
 	// Function
 	//		Name:    SocketListen::Listen(int, char*, int)
 	//		Purpose: Initialises, starts the socket listening.
 	//		Created: 2003/07/31
 	//
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	void Listen(int Type, const char *Name, int Port = 0)
 	{
-		if(mSocketHandle != -1)
-		{
-			THROW_EXCEPTION(ServerException, SocketAlreadyOpen);
-		}
+		if(mSocketHandle != -1) {THROW_EXCEPTION(ServerException, SocketAlreadyOpen)}
 		
 		// Setup parameters based on type, looking up names if required
 		int sockDomain = 0;
 		SocketAllAddr addr;
 		int addrLen = 0;
-		Socket::NameLookupToSockAddr(addr, sockDomain, Type, Name,
-			Port, addrLen);
+		Socket::NameLookupToSockAddr(addr, sockDomain, Type, Name, Port, addrLen);
 	
 		// Create the socket
-		mSocketHandle = ::socket(sockDomain, SOCK_STREAM,
-			0 /* let OS choose protocol */);
+		mSocketHandle = ::socket(sockDomain, SOCK_STREAM, 0 /* let OS choose protocol */);
 		if(mSocketHandle == -1)
 		{
-			BOX_LOG_SYS_ERROR("Failed to create a network socket");
 			THROW_EXCEPTION(ServerException, SocketOpenError)
 		}
 		
 		// Set an option to allow reuse (useful for -HUP situations!)
 #ifdef WIN32
-		if(::setsockopt(mSocketHandle, SOL_SOCKET, SO_REUSEADDR, "",
-			0) == -1)
+		if(::setsockopt(mSocketHandle, SOL_SOCKET, SO_REUSEADDR, "", 0) == -1)
 #else
 		int option = true;
-		if(::setsockopt(mSocketHandle, SOL_SOCKET, SO_REUSEADDR,
-			&option, sizeof(option)) == -1)
+		if(::setsockopt(mSocketHandle, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option)) == -1)
 #endif
 		{
-			BOX_LOG_SYS_ERROR("Failed to set socket options");
 			THROW_EXCEPTION(ServerException, SocketOpenError)
 		}
 
@@ -173,25 +161,19 @@ public:
 		}	
 	}
 	
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	//
 	// Function
 	//		Name:    SocketListen::Accept(int)
-	//		Purpose: Accepts a connection, returning a pointer to
-	//			 a class of the specified type. May return a
-	//			 null pointer if a signal happens, or there's
-	//			 a timeout. Timeout specified in
-	//			 milliseconds, defaults to infinite time.
+	//		Purpose: Accepts a connection, returning a pointer to a class of
+	//				 the specified type. May return a null pointer if a signal happens,
+	//				 or there's a timeout. Timeout specified in milliseconds, defaults to infinite time.
 	//		Created: 2003/07/31
 	//
-	// ------------------------------------------------------------------
-	std::auto_ptr<SocketType> Accept(int Timeout = INFTIM,
-		std::string *pLogMsg = 0)
+	// --------------------------------------------------------------------------
+	std::auto_ptr<SocketType> Accept(int Timeout = INFTIM, std::string *pLogMsg = 0)
 	{
-		if(mSocketHandle == -1)
-		{
-			THROW_EXCEPTION(ServerException, BadSocketHandle);
-		}
+		if(mSocketHandle == -1) {THROW_EXCEPTION(ServerException, BadSocketHandle)}
 		
 		// Do the accept, using the supplied locking type
 		int sock;
@@ -203,10 +185,8 @@ public:
 			
 			if(!socklock.HaveLock())
 			{
-				// Didn't get the lock for some reason.
-				// Wait a while, then return nothing.
-				BOX_ERROR("Failed to get a lock on incoming "
-					"connection");
+				// Didn't get the lock for some reason. Wait a while, then
+				// return nothing.
 				::sleep(1);
 				return std::auto_ptr<SocketType>();
 			}
@@ -222,18 +202,12 @@ public:
 				// signal?
 				if(errno == EINTR)
 				{
-					BOX_ERROR("Failed to accept "
-						"connection: interrupted by "
-						"signal");
 					// return nothing
 					return std::auto_ptr<SocketType>();
 				}
 				else
 				{
-					BOX_LOG_SYS_ERROR("Failed to poll "
-						"connection");
-					THROW_EXCEPTION(ServerException,
-						SocketPollError)
+					THROW_EXCEPTION(ServerException, SocketPollError)
 				}
 				break;
 			case 0:	// timed out
@@ -246,19 +220,16 @@ public:
 			
 			sock = ::accept(mSocketHandle, &addr, &addrlen);
 		}
-
-		// Got socket (or error), unlock (implicit in destruction)
+		// Got socket (or error), unlock (implcit in destruction)
 		if(sock == -1)
 		{
-			BOX_LOG_SYS_ERROR("Failed to accept connection");
 			THROW_EXCEPTION(ServerException, SocketAcceptError)
 		}
 
 		// Log it
 		if(pLogMsg)
 		{
-			*pLogMsg = Socket::IncomingConnectionLogMessage(&addr,
-				addrlen);
+			*pLogMsg = Socket::IncomingConnectionLogMessage(&addr, addrlen);
 		}
 		else
 		{
@@ -272,29 +243,27 @@ public:
 	// Functions to allow adding to WaitForEvent class, for efficient waiting
 	// on multiple sockets.
 #ifdef HAVE_KQUEUE
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	//
 	// Function
 	//		Name:    SocketListen::FillInKEevent
 	//		Purpose: Fills in a kevent structure for this socket
 	//		Created: 9/3/04
 	//
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	void FillInKEvent(struct kevent &rEvent, int Flags = 0) const
 	{
-		EV_SET(&rEvent, mSocketHandle, EVFILT_READ, 0, 0, 0,
-			(void*)this);
+		EV_SET(&rEvent, mSocketHandle, EVFILT_READ, 0, 0, 0, (void*)this);
 	}
 #else
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	//
 	// Function
 	//		Name:    SocketListen::FillInPoll
-	//		Purpose: Fills in the data necessary for a poll
-	//			 operation
+	//		Purpose: Fills in the data necessary for a poll operation
 	//		Created: 9/3/04
 	//
-	// ------------------------------------------------------------------
+	// --------------------------------------------------------------------------
 	void FillInPoll(int &fd, short &events, int Flags = 0) const
 	{
 		fd = mSocketHandle;

@@ -44,8 +44,7 @@ PartialReadStream::~PartialReadStream()
 	// Warn in debug mode
 	if(mBytesLeft != 0)
 	{
-		BOX_TRACE("PartialReadStream destroyed with " << mBytesLeft <<
-			" bytes remaining");
+		TRACE1("PartialReadStream::~PartialReadStream when mBytesLeft = %d\n", mBytesLeft);
 	}
 }
 
