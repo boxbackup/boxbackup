@@ -267,14 +267,14 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 					"restore this object.");
 				if(::unlink(rLocalDirectoryName.c_str()) != 0)
 				{
-					BOX_ERROR("Failed to delete file " <<
-						rLocalDirectoryName << ": " <<
-						strerror(errno));
+					BOX_LOG_SYS_ERROR("Failed to delete "
+						"file '" << 
+						rLocalDirectoryName << "'");
 					return Restore_UnknownError;
 				}
 				BOX_TRACE("In restore, directory name " 
-					"collision with file " <<
-					rLocalDirectoryName);
+					"collision with file '" <<
+					rLocalDirectoryName << "'");
 			}
 			break;
 		case ObjectExists_NoObject:
@@ -378,9 +378,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 		exists == ObjectExists_File) && 
 		::mkdir(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
 	{
-		BOX_ERROR("Failed to create directory '" <<
-			rLocalDirectoryName << "': " << 
-			strerror(errno));
+		BOX_LOG_SYS_ERROR("Failed to create directory '" <<
+			rLocalDirectoryName << "'");
 		return Restore_UnknownError;
 	}
 
@@ -451,7 +450,9 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 			{
 				// Local name
 				BackupStoreFilenameClear nm(en->GetName());
-				std::string localFilename(rLocalDirectoryName + DIRECTORY_SEPARATOR_ASCHAR + nm.GetClearFilename());
+				std::string localFilename(rLocalDirectoryName +
+					DIRECTORY_SEPARATOR_ASCHAR +
+					nm.GetClearFilename());
 				
 				// Unlink anything which already exists:
 				// For resuming restores, we can't overwrite
@@ -459,20 +460,23 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				if(ObjectExists(localFilename) != ObjectExists_NoObject &&
 					::unlink(localFilename.c_str()) != 0)
 				{
-					BOX_ERROR("Failed to delete file '" <<
-						localFilename << "': " <<
-						strerror(errno));
+					BOX_LOG_SYS_ERROR("Failed to delete "
+						"file '" << localFilename << 
+						"'");
 					return Restore_UnknownError;
 				}
 				
 				// Request it from the store
-				rConnection.QueryGetFile(DirectoryID, en->GetObjectID());
+				rConnection.QueryGetFile(DirectoryID,
+					en->GetObjectID());
 		
 				// Stream containing encoded file
-				std::auto_ptr<IOStream> objectStream(rConnection.ReceiveStream());
+				std::auto_ptr<IOStream> objectStream(
+					rConnection.ReceiveStream());
 		
-				// Decode the file -- need to do different things depending on whether 
-				// the directory entry has additional attributes
+				// Decode the file -- need to do different
+				// things depending on whether the directory
+				// entry has additional attributes
 				try
 				{
 					if(en->HasAttributes())

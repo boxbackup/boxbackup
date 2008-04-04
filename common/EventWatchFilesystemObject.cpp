@@ -26,9 +26,10 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    EventWatchFilesystemObject::EventWatchFilesystemObject(const char *)
-//		Purpose: Constructor -- opens the file object
-//		Created: 12/3/04
+//	Name:    EventWatchFilesystemObject::EventWatchFilesystemObject
+//		 (const char *)
+//	Purpose: Constructor -- opens the file object
+//	Created: 12/3/04
 //
 // --------------------------------------------------------------------------
 EventWatchFilesystemObject::EventWatchFilesystemObject(const char *Filename)
@@ -39,9 +40,8 @@ EventWatchFilesystemObject::EventWatchFilesystemObject(const char *Filename)
 #ifdef HAVE_KQUEUE
 	if(mDescriptor == -1)
 	{
-		BOX_ERROR("EventWatchFilesystemObject: "
-			"Failed to open file '" << Filename << "': " <<
-			strerror(errno));
+		BOX_LOG_SYS_ERROR("EventWatchFilesystemObject: "
+			"Failed to open file '" << Filename << "'");
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
 #else
@@ -53,9 +53,9 @@ EventWatchFilesystemObject::EventWatchFilesystemObject(const char *Filename)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    EventWatchFilesystemObject::~EventWatchFilesystemObject()
-//		Purpose: Destructor
-//		Created: 12/3/04
+//	Name:    EventWatchFilesystemObject::~EventWatchFilesystemObject()
+//	Purpose: Destructor
+//	Created: 12/3/04
 //
 // --------------------------------------------------------------------------
 EventWatchFilesystemObject::~EventWatchFilesystemObject()
@@ -70,12 +70,14 @@ EventWatchFilesystemObject::~EventWatchFilesystemObject()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    EventWatchFilesystemObject::EventWatchFilesystemObject(const EventWatchFilesystemObject &)
-//		Purpose: Copy constructor
-//		Created: 12/3/04
+//	Name:    EventWatchFilesystemObject::EventWatchFilesystemObject
+//		 (const EventWatchFilesystemObject &)
+//	Purpose: Copy constructor
+//	Created: 12/3/04
 //
 // --------------------------------------------------------------------------
-EventWatchFilesystemObject::EventWatchFilesystemObject(const EventWatchFilesystemObject &rToCopy)
+EventWatchFilesystemObject::EventWatchFilesystemObject(
+	const EventWatchFilesystemObject &rToCopy)
 	: mDescriptor(::dup(rToCopy.mDescriptor))
 {
 	if(mDescriptor == -1)
@@ -89,17 +91,20 @@ EventWatchFilesystemObject::EventWatchFilesystemObject(const EventWatchFilesyste
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    EventWatchFilesystemObject::FillInKEvent(struct kevent &, int)
-//		Purpose: For WaitForEvent
-//		Created: 12/3/04
+//	Name:    EventWatchFilesystemObject::FillInKEvent(struct kevent &, int)
+//	Purpose: For WaitForEvent
+//	Created: 12/3/04
 //
 // --------------------------------------------------------------------------
-void EventWatchFilesystemObject::FillInKEvent(struct kevent &rEvent, int Flags) const
+void EventWatchFilesystemObject::FillInKEvent(struct kevent &rEvent,
+	int Flags) const
 {
-	EV_SET(&rEvent, mDescriptor, EVFILT_VNODE, EV_CLEAR, NOTE_DELETE | NOTE_WRITE, 0, (void*)this);
+	EV_SET(&rEvent, mDescriptor, EVFILT_VNODE, EV_CLEAR,
+		NOTE_DELETE | NOTE_WRITE, 0, (void*)this);
 }
 #else
-void EventWatchFilesystemObject::FillInPoll(int &fd, short &events, int Flags) const
+void EventWatchFilesystemObject::FillInPoll(int &fd, short &events,
+	int Flags) const
 {
 	THROW_EXCEPTION(CommonException, KQueueNotSupportedOnThisPlatform)
 }

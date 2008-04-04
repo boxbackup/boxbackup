@@ -52,10 +52,12 @@ public:
 		if((r = ((Compressing)?(deflateEnd(&mStream))
 			:(inflateEnd(&mStream)))) != Z_OK)
 		{
-			TRACE1("zlib error code = %d\n", r);
+			BOX_WARNING("zlib error code = " << r);
 			if(r == Z_DATA_ERROR)
 			{
-				TRACE0("WARNING: End of compress/decompress without all input being consumed -- possible corruption?\n");
+				BOX_WARNING("End of compress/decompress "
+					"without all input being consumed, "
+					"possible corruption?");
 			}
 			else
 			{
@@ -148,7 +150,7 @@ public:
 		// Check errors
 		if(ret < 0)
 		{
-			TRACE1("zlib error code = %d\n", ret);			
+			BOX_WARNING("zlib error code = " << ret);			
 			THROW_EXCEPTION(CompressException, TransformFailed)
 		}
 		
