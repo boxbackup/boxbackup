@@ -382,7 +382,8 @@ int64_t BackupContext::AllocateObjectID()
 		// Mark that the store info should be saved as soon as possible
 		mSaveStoreInfoDelay = 0;
 		
-		TRACE1("When allocating object ID, found that %lld is already in use\n", id);
+		BOX_WARNING("When allocating object ID, found that " <<
+			BOX_FORMAT_OBJECTID(id) << " is already in use");
 	}
 	
 	THROW_EXCEPTION(BackupStoreException, CouldNotFindUnusedIDDuringAllocation)
