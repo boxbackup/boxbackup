@@ -2,7 +2,8 @@
 //
 // File
 //		Name:    NamedLock.cpp
-//		Purpose: A global named lock, implemented as a lock file in file system
+//		Purpose: A global named lock, implemented as a lock file in
+//			 file system
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
@@ -58,8 +59,9 @@ NamedLock::~NamedLock()
 //
 // Function
 //		Name:    NamedLock::TryAndGetLock(const char *, int)
-//		Purpose: Trys to get a lock on the name in the file system.
-//			 IMPORTANT NOTE: If a file exists with this name, it will be deleted.
+//		Purpose: Tries to get a lock on the name in the file system.
+//			 IMPORTANT NOTE: If a file exists with this name, it
+//			 will be deleted.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
