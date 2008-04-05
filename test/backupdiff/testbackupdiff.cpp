@@ -64,7 +64,7 @@ bool files_identical(const char *file1, const char *file2)
 	return true;
 }
 
-void make_file_of_zeros(const char *filename, size_t size)
+bool make_file_of_zeros(const char *filename, size_t size)
 {
 	#ifdef WIN32
 	HANDLE handle = openfile(filename, O_WRONLY | O_CREAT | O_EXCL, 0);
@@ -75,7 +75,9 @@ void make_file_of_zeros(const char *filename, size_t size)
 	BOOL result = SetEndOfFile(handle);
 	if (result != TRUE)
 	{
-		printf("Error %u\n", GetLastError());
+		BOX_ERROR("Failed to create large file " << filename <<
+			" (" << (size >> 20) << " MB): " <<
+			GetErrorMessage(GetLastError()));
 	}
 	TEST_THAT(result == TRUE);
 	TEST_THAT(CloseHandle(handle) == TRUE);
@@ -87,7 +89,16 @@ void make_file_of_zeros(const char *filename, size_t size)
 	TEST_THAT(close(fd) == 0);
 	#endif
 
-	TEST_THAT((size_t)TestGetFileSize(filename) == size);
+	bool correct_size = ((size_t)TestGetFileSize(filename) == size);
+	TEST_THAT(correct_size);
+	if (!correct_size)
+	{
+		BOX_ERROR("Failed to create large file " << filename <<
+			" (" << (size >> 20) << " MB): " <<
+			"got " << (TestGetFileSize(filename) >> 20) <<
+			" MB instead");
+	}
+	return correct_size;
 }
 
 
@@ -515,13 +526,20 @@ int test(int argc, const char *argv[])
 	// found. Check this out!
 
 	#ifdef WIN32
-	::fprintf(stdout, "Testing diffing two large streams, "
-		"may take a while!\n");
-	::fflush(stdout);
+	BOX_WARNING("Testing diffing two large streams, may take a while!");
+	::fflush(stderr);
 	#endif
 
-	make_file_of_zeros("testfiles/zero.0", 20*1024*1024);
-	make_file_of_zeros("testfiles/zero.1", 200*1024*1024);
+	if (!make_file_of_zeros("testfiles/zero.0", 20*1024*1024))
+	{
+		return 1;
+	}
+
+	if (!make_file_of_zeros("testfiles/zero.1", 200*1024*1024))
+	{
+		remove("testfiles/zero.0");
+		return 1;
+	}
 
 	// Generate a first encoded file
 	{
