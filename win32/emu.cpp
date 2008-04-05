@@ -1527,6 +1527,7 @@ void syslog(int loglevel, const char *frmt, ...)
 			0,                     // no data 
 			strings,               // pointer to string array 
 			NULL);                 // pointer to data 
+		delete [] pWide;
 	}
 		
 	if (result == 0)
