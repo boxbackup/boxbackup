@@ -269,7 +269,8 @@ std::string GetDefaultConfigFilePath(const std::string& rName)
 //		Created: 4th February 2006
 //
 // --------------------------------------------------------------------------
-WCHAR* ConvertToWideString(const char* pString, unsigned int codepage)
+WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
+	bool logErrors)
 {
 	int len = MultiByteToWideChar
 	(
@@ -284,9 +285,12 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage)
 
 	if (len == 0)
 	{
-		::syslog(LOG_WARNING, 
-			"Failed to convert string to wide string: "
-			"error %d", GetLastError());
+		if (logErrors)
+		{
+			::syslog(LOG_WARNING, 
+				"Failed to convert string to wide string: "
+				"%s", GetErrorMessage(GetLastError()).c_str());
+		}
 		errno = EINVAL;
 		return NULL;
 	}
@@ -295,9 +299,12 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage)
 
 	if (buffer == NULL)
 	{
-		::syslog(LOG_WARNING, 
-			"Failed to convert string to wide string: "
-			"out of memory");
+		if (logErrors)
+		{
+			::syslog(LOG_WARNING, 
+				"Failed to convert string to wide string: "
+				"out of memory");
+		}
 		errno = ENOMEM;
 		return NULL;
 	}
@@ -314,9 +321,12 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage)
 
 	if (len == 0)
 	{
-		::syslog(LOG_WARNING, 
-			"Failed to convert string to wide string: "
-			"error %i", GetLastError());
+		if (logErrors)
+		{
+			::syslog(LOG_WARNING, 
+				"Failed to convert string to wide string: "
+				"%s", GetErrorMessage(GetLastError()).c_str());
+		}
 		errno = EACCES;
 		delete [] buffer;
 		return NULL;
@@ -338,7 +348,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage)
 // --------------------------------------------------------------------------
 WCHAR* ConvertUtf8ToWideString(const char* pString)
 {
-	return ConvertToWideString(pString, CP_UTF8);
+	return ConvertToWideString(pString, CP_UTF8, true);
 }
 
 // --------------------------------------------------------------------------
@@ -427,7 +437,8 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
 	std::string& rDest, int destCodePage)
 {
-	WCHAR* pWide = ConvertToWideString(rSource.c_str(), sourceCodePage);
+	WCHAR* pWide = ConvertToWideString(rSource.c_str(), sourceCodePage,
+		true);
 	if (pWide == NULL)
 	{
 		::syslog(LOG_ERR, "Failed to convert string '%s' from "
@@ -1474,8 +1485,6 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	va_end(args);
 
-	LPCSTR strings[] = { buffer, NULL };
-
 	if (gSyslogH == 0)
 	{
 		printf("%s\r\n", buffer);
@@ -1483,17 +1492,44 @@ void syslog(int loglevel, const char *frmt, ...)
 		return;
 	}
 
-	if (!ReportEvent(gSyslogH, // event log handle 
-		errinfo,               // event type 
-		0,                     // category zero 
-		MSG_ERR,	       // event identifier - 
-		                       // we will call them all the same
-		NULL,                  // no user security identifier 
-		1,                     // one substitution string 
-		0,                     // no data 
-		strings,               // pointer to string array 
-		NULL))                 // pointer to data 
+	WCHAR* pWide = ConvertToWideString(buffer, CP_UTF8, false);
+	// must delete[] pWide
 
+	DWORD result;
+
+	if (pWide == NULL)
+	{
+		std::string buffer2 = buffer;
+		buffer2 += " (failed to convert string encoding)";
+		LPCSTR strings[] = { buffer2.c_str(), NULL };
+
+		result = ReportEventA(gSyslogH, // event log handle 
+			errinfo,               // event type 
+			0,                     // category zero 
+			MSG_ERR,	       // event identifier - 
+					       // we will call them all the same
+			NULL,                  // no user security identifier 
+			1,                     // one substitution string 
+			0,                     // no data 
+			strings,               // pointer to string array 
+			NULL);                 // pointer to data 
+	}
+	else
+	{
+		LPCWSTR strings[] = { pWide, NULL };
+		result = ReportEventW(gSyslogH, // event log handle 
+			errinfo,               // event type 
+			0,                     // category zero 
+			MSG_ERR,	       // event identifier - 
+					       // we will call them all the same
+			NULL,                  // no user security identifier 
+			1,                     // one substitution string 
+			0,                     // no data 
+			strings,               // pointer to string array 
+			NULL);                 // pointer to data 
+	}
+		
+	if (result == 0)
 	{
 		DWORD err = GetLastError();
 		if (err == ERROR_LOG_FILE_FULL)
@@ -1517,9 +1553,6 @@ void syslog(int loglevel, const char *frmt, ...)
 	{
 		sHaveWarnedEventLogFull = false;
 	}
-
-	// printf("%s\r\n", buffer);
-	// fflush(stdout);
 }
 
 int emu_chdir(const char* pDirName)
