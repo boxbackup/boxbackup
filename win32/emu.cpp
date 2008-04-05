@@ -164,30 +164,31 @@ void FiniTimer(void)
 //globals
 struct passwd gTempPasswd;
 
-bool EnableBackupRights( void )
+bool EnableBackupRights()
 {
 	HANDLE hToken;
 	TOKEN_PRIVILEGES token_priv;
 
 	//open current process to adjust privileges
-	if( !OpenProcessToken( GetCurrentProcess( ), 
-		TOKEN_ADJUST_PRIVILEGES, 
-		&hToken ))
+	if(!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, 
+		&hToken))
 	{
-		printf( "Cannot open process token: error %d\n", 
-			(int)GetLastError() );
+		::syslog(LOG_ERR, "Failed to open process token: %s",
+			GetErrorMessage(GetLastError()).c_str());
 		return false;
 	}
 
 	//let's build the token privilege struct - 
 	//first, look up the LUID for the backup privilege
 
-	if( !LookupPrivilegeValue( NULL, //this system
+	if (!LookupPrivilegeValue(
+		NULL, //this system
 		SE_BACKUP_NAME, //the name of the privilege
-		&( token_priv.Privileges[0].Luid )) ) //result
+		&( token_priv.Privileges[0].Luid ))) //result
 	{
-		printf( "Cannot lookup backup privilege: error %d\n", 
-			(int)GetLastError( ) );
+		::syslog(LOG_ERR, "Failed to lookup backup privilege: %s",
+			GetErrorMessage(GetLastError()).c_str());
+		CloseHandle(hToken);
 		return false;
 	}
 
@@ -198,24 +199,25 @@ bool EnableBackupRights( void )
 	// because we're going exit right after dumping the streams, there isn't 
 	// any need to save current state
 
-	if( !AdjustTokenPrivileges( hToken, //our process token
+	if (!AdjustTokenPrivileges(
+		hToken, //our process token
 		false,  //we're not disabling everything
 		&token_priv, //address of structure
-		sizeof( token_priv ), //size of structure
-		NULL, NULL )) //don't save current state
+		sizeof(token_priv), //size of structure
+		NULL, NULL)) //don't save current state
 	{
 		//this function is a little tricky - if we were adjusting
 		//more than one privilege, it could return success but not
 		//adjust them all - in the general case, you need to trap this
-		printf( "Could not enable backup privileges: error %d\n", 
-			(int)GetLastError( ) );
+		::syslog(LOG_ERR, "Failed to enable backup privilege: %s",
+			GetErrorMessage(GetLastError()).c_str());
+		CloseHandle(hToken);
 		return false;
 
 	}
-	else
-	{
-		return true;
-	}
+
+	CloseHandle(hToken);
+	return true;
 }
 
 // forward declaration
@@ -702,7 +704,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	// This is how we get our INODE (equivalent) information
 	ULARGE_INTEGER conv;
 	conv.HighPart = fi.nFileIndexHigh;
-	conv.LowPart = fi.nFileIndexLow;
+	conv.LowPart  = fi.nFileIndexLow;
 	st->st_ino = (_ino_t)conv.QuadPart;
 
 	// get the time information
@@ -716,20 +718,8 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	}
 	else
 	{
-		// size of the file
-		LARGE_INTEGER st_size;
-		memset(&st_size, 0, sizeof(st_size));
-
-		if (!GetFileSizeEx(hdir, &st_size))
-		{
-			::syslog(LOG_WARNING, "Failed to get file size: "
-				"%s", GetErrorMessage(GetLastError()).c_str());
-			errno = EACCES;
-			return -1;
-		}
-
-		conv.HighPart = st_size.HighPart;
-		conv.LowPart = st_size.LowPart;
+		conv.HighPart = fi.nFileSizeHigh;
+		conv.LowPart  = fi.nFileSizeLow;
 		st->st_size = (_off_t)conv.QuadPart;
 	}
 
@@ -1078,7 +1068,7 @@ DIR *opendir(const char *name)
 	}
 
 	pDir->name = ConvertUtf8ToWideString(dirName.c_str());
-	// We are responsible for freeing dir->name
+	// We are responsible for freeing dir->name with delete[]
 	
 	if (pDir->name == NULL)
 	{
