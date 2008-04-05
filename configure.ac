@@ -123,6 +123,7 @@ else
 fi
 
 if test "$have_pcreposix_h" = "yes"; then
+  AC_DEFINE([PCRE_STATIC], [1], [Box Backup always uses static PCRE])
   AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"],,[have_pcreposix_h=no_regcomp])
 fi
 
