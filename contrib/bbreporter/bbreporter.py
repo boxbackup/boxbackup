@@ -4,7 +4,6 @@
 #
 # Copyright: (C) 2007 Three A IT Limited
 # Author: Kenny Millington <kenny.millington@3ait.co.uk>
-# Version: $Id: bbreporter.py,v 1.15 2007-11-14 11:13:38 kenny Exp $
 #
 # Credit: This script is based on the ideas of BoxReport.pl by Matt Brown of 
 #         Three A IT Support Limited.
@@ -83,7 +82,7 @@ class BoxBackupReporter:
     def __init__(self, config_file="/etc/box/bbackupd.conf", 
                  log_file="/var/log/syslog", email_to=None, 
                  email_from="report@boxbackup", rotate=False, 
-                 verbose=False, stats=False):
+                 verbose=False, stats=False, sort=False):
         
         # Config options
         self.config_file = config_file
@@ -93,6 +92,7 @@ class BoxBackupReporter:
         self.rotate_log_file = rotate
         self.verbose_report = verbose
         self.usage_stats = stats
+        self.sort_files = sort
         
         # Regex's
         self.re_automatic_backup = re.compile(" *AutomaticBackup *= *no", re.I)
@@ -106,9 +106,9 @@ class BoxBackupReporter:
     def reset(self):
         # Reset report data to default values
         self.hostname = ""
-        self.patched_files = {}
-        self.synced_files = {}
-        self.uploaded_files = {}
+        self.patched_files = []
+        self.synced_files = []
+        self.uploaded_files = []
         self.warnings = []
         self.errors = []
         self.stats = None
@@ -198,6 +198,10 @@ class BoxBackupReporter:
     def _parse_syslog(self):
         lfh = open(self.log_file)
         
+        patched_files = {}
+        uploaded_files = {}
+        synced_files = {}
+        
         for line in lfh:
             # Only run the regex if we find a box backup entry.
             if line.find("Box Backup") > -1 or line.find("bbackupd") > -1:
@@ -233,19 +237,19 @@ class BoxBackupReporter:
                 elif self.start_datetime != "Unknown":
                     # We found a patch event, add the file to the patched_files.
                     if data[5] == "Uploading patch to file":
-                        self.patched_files[data[6]] = ""
+                        patched_files[data[6]] = ""
 
                     # We found an upload event, add to uploaded files.
                     elif data[5] == "Uploading complete file":
-                        self.uploaded_files[data[6]] = ""
+                        uploaded_files[data[6]] = ""
                     
                     # We found another upload event.
                     elif data[5] == "Uploaded file":
-                        self.uploaded_files[data[6]] = ""
+                        uploaded_files[data[6]] = ""
                     
                     # We found a sync event, add the file to the synced_files.
                     elif data[5] == "Synchronised file":
-                        self.synced_files[data[6]] = ""
+                        synced_files[data[6]] = ""
                 
                     # We found a warning, add the warning to the warnings.
                     elif data[5] == "WARNING":
@@ -254,7 +258,19 @@ class BoxBackupReporter:
                     # We found an error, add the error to the errors.
                     elif data[5] == "ERROR":
                         self.errors.append(data[6])
-
+        
+        
+        self.patched_files = patched_files.keys()
+        self.uploaded_files = uploaded_files.keys()
+        self.synced_files = synced_files.keys()
+        
+        # There's no point running the sort functions if we're not going
+        # to display the resultant lists.
+        if self.sort_files and self.verbose_report:
+            self.patched_files.sort()
+            self.uploaded_files.sort()
+            
+        
         lfh.close()
     
     def _parse_stats(self):
@@ -316,7 +332,7 @@ class BoxBackupReporter:
             if len(self.uploaded_files) > 0:
                 report.append("Uploaded Files (%d)" % len(self.uploaded_files))
                 report.append("---------------------")
-                for file in self.uploaded_files.keys():
+                for file in self.uploaded_files:
                     report.append(file)
                 report.append("")
                 report.append("")
@@ -324,7 +340,7 @@ class BoxBackupReporter:
             if len(self.patched_files) > 0:
                 report.append("Patched Files (%d)" % len(self.patched_files))
                 report.append("---------------------")
-                for file in self.patched_files.keys():
+                for file in self.patched_files:
                     report.append(file)
                 report.append("")
                 report.append("")
@@ -446,12 +462,13 @@ def main():
     rotate = False
     verbose = False 
     stats = False
+    sort = False
 
     # Parse the options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "srvhl:c:t:f:", 
+        opts, args = getopt.getopt(sys.argv[1:], "osrvhl:c:t:f:", 
                         ["help", "logfile=", "configfile=","email-to=", 
-                         "email-from=","rotate","verbose","stats"])
+                         "email-from=","rotate","verbose","stats","sort"])
     except getopt.GetoptError:
         usage()
         return
@@ -471,13 +488,15 @@ def main():
             verbose = True
         elif(opt in ("--stats", "-s")):
             stats = True
+        elif(opt in ("--sort", "-o")):
+            sort = True
         elif(opt in ("--help", "-h")):
             usage()
             return
     
     # Run the reporter
     bbr = BoxBackupReporter(configfile, logfile, email_to, email_from, 
-                            rotate, verbose, stats)
+                            rotate, verbose, stats, sort)
     try:
         bbr.run()
         bbr.deliver()
