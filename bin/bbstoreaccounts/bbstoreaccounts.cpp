@@ -30,6 +30,7 @@
 #include "NamedLock.h"
 #include "UnixUser.h"
 #include "BackupStoreCheck.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
