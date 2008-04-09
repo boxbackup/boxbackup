@@ -106,7 +106,8 @@ void CipherContext::Init(CipherContext::CipherFunction Function, const CipherDes
 #else
 		// With the old version, a copy needs to be taken first.
 		mpDescription = rDescription.Clone();
-		// Mark it as not a leak, otherwise static cipher contexts cause supriously memory leaks to be reported
+		// Mark it as not a leak, otherwise static cipher contexts
+		// cause spurious memory leaks to be reported
 		MEMLEAKFINDER_NOT_A_LEAK(mpDescription);
 		mpDescription->SetupParameters(&ctx);
 #endif
