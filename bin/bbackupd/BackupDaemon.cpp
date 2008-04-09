@@ -2360,19 +2360,21 @@ void BackupDaemon::NotifySysadmin(int Event)
 		0
 	};
 
-	BOX_TRACE("sizeof(sEventNames)  == " << sizeof(sEventNames));
-	BOX_TRACE("sizeof(*sEventNames) == " << sizeof(*sEventNames));
-	BOX_TRACE("NotifyEvent__MAX == " << NotifyEvent__MAX);
+	// BOX_TRACE("sizeof(sEventNames)  == " << sizeof(sEventNames));
+	// BOX_TRACE("sizeof(*sEventNames) == " << sizeof(*sEventNames));
+	// BOX_TRACE("NotifyEvent__MAX == " << NotifyEvent__MAX);
 	ASSERT((sizeof(sEventNames)/sizeof(*sEventNames)) == NotifyEvent__MAX + 1);
-
-	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << 
-		sEventNames[Event]);
 
 	if(Event < 0 || Event >= NotifyEvent__MAX)
 	{
+		BOX_ERROR("BackupDaemon::NotifySysadmin() called for "
+			"invalid event code " << Event);
 		THROW_EXCEPTION(BackupStoreException,
 			BadNotifySysadminEventCode);
 	}
+
+	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << 
+		sEventNames[Event]);
 
 	// Don't send lots of repeated messages
 	if(mNotificationsSent[Event] &&
