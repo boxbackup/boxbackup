@@ -856,12 +856,17 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					"(mod time in the future)");
 			}
 		}
-
-		if (!doUpload)
+	
+		if (en != 0 && en->GetModificationTime() == modTime)
 		{
 			BOX_TRACE(filename << ": will not upload "
-				"(no reason to upload, mod time is "
-				<< modTime << " versus sync period "
+				"(not modified since last upload)");
+		}
+		else if (!doUpload)
+		{
+			BOX_TRACE(filename << ": will not upload "
+				"(mod time is " << modTime << 
+				" which is outside sync window, "
 				<< rParams.mSyncPeriodStart << " to "
 				<< rParams.mSyncPeriodEnd << ")");
 		}
