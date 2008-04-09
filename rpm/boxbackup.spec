@@ -96,6 +96,7 @@ make
 rm -rf $RPM_BUILD_ROOT
 
 mkdir -p $RPM_BUILD_ROOT%{_docdir}/%{ident}
+mkdir -p $RPM_BUILD_ROOT%{_docdir}/%{ident}/bbreporter
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT%{_sbindir}
 mkdir -p $RPM_BUILD_ROOT%{init_dir}
@@ -120,6 +121,11 @@ install -m 644 %{distribution_dir}LINUX.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
 install -m 644 %{distribution_dir}THANKS.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+
+install -m 644 %{distribution_dir}contrib/bbreporter/LICENSE \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}/bbreporter
+install -m 755 %{distribution_dir}contrib/bbreporter/bbreporter.py \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}/bbreporter
 
 # Client
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd.conf
@@ -213,9 +219,10 @@ rm -rf $RPM_BUILD_ROOT
 %config %ghost %{_sysconfdir}/box/raidfile.conf
 %{_sbindir}/bbstored
 %{_sbindir}/bbstoreaccounts
-%{_bindir}/bbstored-certs
+%{_sbindir}/bbstored-certs
 %{_sbindir}/bbstored-config
 %{_sbindir}/raidfile-config
+%doc %{_docdir}/%{ident}/bbreporter
 
 %changelog
 * Sat Jan 13 2006 Chris Wilson <chris+box@qwirx.com>
