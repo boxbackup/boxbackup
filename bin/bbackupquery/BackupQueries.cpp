@@ -117,7 +117,13 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 	if(Command[0] == 's' && Command[1] == 'h' && Command[2] == ' ' && Command[3] != '\0')
 	{
 		// Yes, run shell command
-		::system(Command + 3);
+		int result = ::system(Command + 3);
+		if(result != 0)
+		{
+			BOX_WARNING("System command returned error code " <<
+				result);
+			SetReturnCode(COMMAND_RETURN_ERROR);
+		}
 		return;
 	}
 
@@ -2054,14 +2060,12 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 		
-	#ifdef WIN32
 	case Restore_TargetPathNotFound:
 		BOX_ERROR("The target directory path does not exist.\n"
 			"To restore to a directory whose parent "
 			"does not exist, create the parent first.");
 		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
-	#endif
 
 	case Restore_UnknownError:
 		BOX_ERROR("Unknown error during restore.");
