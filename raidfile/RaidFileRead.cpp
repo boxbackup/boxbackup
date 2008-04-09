@@ -1021,6 +1021,7 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 	RaidFileUtil::ExistType existance = RaidFileUtil::RaidFileExists(rdiscSet, Filename, &startDisc, &existingFiles, pRevisionID);
 	if(existance == RaidFileUtil::NoFile)
 	{
+		BOX_ERROR("Expected raidfile " << Filename << " does not exist");
 		THROW_EXCEPTION(RaidFileException, RaidFileDoesntExist)
 	}
 	else if(existance == RaidFileUtil::NonRaid)
