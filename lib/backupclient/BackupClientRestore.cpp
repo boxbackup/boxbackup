@@ -202,20 +202,26 @@ typedef struct
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientRestoreDir(BackupProtocolClient &, int64_t, const char *, bool)
+//		Name:    BackupClientRestoreDir(BackupProtocolClient &,
+//			 int64_t, const char *, bool)
 //		Purpose: Restore a directory
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t DirectoryID, std::string &rLocalDirectoryName,
+static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
+	int64_t DirectoryID, std::string &rLocalDirectoryName,
 	RestoreParams &Params, RestoreResumeInfo &rLevel)
 {
-	// If we're resuming... check that we haven't got a next level to look at
+	// If we're resuming... check that we haven't got a next level to
+	// look at
 	if(rLevel.mpNextLevel != 0)
 	{
 		// Recurse immediately
-		std::string localDirname(rLocalDirectoryName + DIRECTORY_SEPARATOR_ASCHAR + rLevel.mNextLevelLocalName);
-		BackupClientRestoreDir(rConnection, rLevel.mNextLevelID, localDirname, Params, *rLevel.mpNextLevel);
+		std::string localDirname(rLocalDirectoryName + 
+			DIRECTORY_SEPARATOR_ASCHAR + 
+			rLevel.mNextLevelLocalName);
+		BackupClientRestoreDir(rConnection, rLevel.mNextLevelID,
+			localDirname, Params, *rLevel.mpNextLevel);
 		
 		// Add it to the list of done itmes
 		rLevel.mRestoredObjects.insert(rLevel.mNextLevelID);
@@ -259,9 +265,10 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 			break;
 		case ObjectExists_File:
 			{
-				// File exists with this name, which is fun. Get rid of it.
+				// File exists with this name, which is fun.
+				// Get rid of it.
 				BOX_WARNING("File present with name '" <<
-					rLocalDirectoryName << "', removing " <<
+					rLocalDirectoryName << "', removing "
 					"out of the way of restored directory. "
 					"Use specific restore with ID to "
 					"restore this object.");
@@ -406,10 +413,10 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	// Fetch the directory listing from the server -- getting a
 	// list of files which is appropriate to the restore type
 	rConnection.QueryListDirectory(
-			DirectoryID,
-			Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING),
-			BackupProtocolClientListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolClientListDirectory::Flags_Deleted)),
-			true /* want attributes */);
+		DirectoryID,
+		Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING),
+		BackupProtocolClientListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolClientListDirectory::Flags_Deleted)),
+		true /* want attributes */);
 
 	// Retrieve the directory from the stream following
 	BackupStoreDirectory dir;
@@ -443,10 +450,12 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	{
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
-		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
+		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File))
+			!= 0)
 		{
 			// Check ID hasn't already been done
-			if(rLevel.mRestoredObjects.find(en->GetObjectID()) == rLevel.mRestoredObjects.end())
+			if(rLevel.mRestoredObjects.find(en->GetObjectID())
+				== rLevel.mRestoredObjects.end())
 			{
 				// Local name
 				BackupStoreFilenameClear nm(en->GetName());
@@ -457,7 +466,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				// Unlink anything which already exists:
 				// For resuming restores, we can't overwrite
 				// files already there.
-				if(ObjectExists(localFilename) != ObjectExists_NoObject &&
+				if(ObjectExists(localFilename)
+					!= ObjectExists_NoObject &&
 					::unlink(localFilename.c_str()) != 0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to delete "
@@ -549,11 +559,13 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 				if(exists)
 				{
 					// File exists...
-					bytesWrittenSinceLastRestoreInfoSave += fileSize;
+					bytesWrittenSinceLastRestoreInfoSave
+						+= fileSize;
 					
 					if(bytesWrittenSinceLastRestoreInfoSave > MAX_BYTES_WRITTEN_BETWEEN_RESTORE_INFO_SAVES)
 					{
-						// Save the restore info, in case it's needed later
+						// Save the restore info, in
+						// case it's needed later
 						try
 						{
 							Params.mResumeInfo.Save(Params.mRestoreResumeInfoFilename);
@@ -612,17 +624,23 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 	{
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
-		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
+		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir))
+			!= 0)
 		{
 			// Check ID hasn't already been done
-			if(rLevel.mRestoredObjects.find(en->GetObjectID()) == rLevel.mRestoredObjects.end())
+			if(rLevel.mRestoredObjects.find(en->GetObjectID())
+				== rLevel.mRestoredObjects.end())
 			{
 				// Local name
 				BackupStoreFilenameClear nm(en->GetName());
-				std::string localDirname(rLocalDirectoryName + DIRECTORY_SEPARATOR_ASCHAR + nm.GetClearFilename());
+				std::string localDirname(rLocalDirectoryName
+					+ DIRECTORY_SEPARATOR_ASCHAR
+					+ nm.GetClearFilename());
 				
 				// Add the level for the next entry
-				RestoreResumeInfo &rnextLevel(rLevel.AddLevel(en->GetObjectID(), nm.GetClearFilename()));
+				RestoreResumeInfo &rnextLevel(
+					rLevel.AddLevel(en->GetObjectID(),
+						nm.GetClearFilename()));
 				
 				// Recurse
 				int result = BackupClientRestoreDir(
@@ -668,28 +686,35 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection, int64_t Dir
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientRestore(BackupProtocolClient &, int64_t, const char *, bool, bool)
-//		Purpose: Restore a directory on the server to a local directory on the disc.
+//		Name:    BackupClientRestore(BackupProtocolClient &, int64_t,
+//			 const char *, bool, bool)
+//		Purpose: Restore a directory on the server to a local
+//			 directory on the disc. The local directory must not
+//			 already exist.
 //
-//				 The local directory must not already exist.
+//			 If a restore is aborted for any reason, then it may
+//			 be resumed if Resume == true. If Resume == false
+//			 and resumption is possible, then
+//			 Restore_ResumePossible is returned.
 //
-//				 If a restore is aborted for any reason, then it may be resumed if
-//				 Resume == true. If Resume == false and resumption is possible, then
-//				 Restore_ResumePossible is returned.
+//			 Set RestoreDeleted to restore a deleted directory.
+//			 This may not give the directory structure when it
+//			 was deleted, because files may have been deleted
+//			 within it before it was deleted.
 //
-//				 Set RestoreDeleted to restore a deleted directory. This may not give the
-//				 directory structure when it was deleted, because files may have been deleted
-//				 within it before it was deleted.
+//			 Returns Restore_TargetExists if the target
+//			 directory exists, but there is no restore possible.
+//			 (Won't attempt to overwrite things.)
 //
-//				 Returns Restore_TargetExists if the target directory exists, but
-//				 there is no restore possible. (Won't attempt to overwrite things.)
-//
-//				 Returns Restore_Complete on success. (Exceptions on error.)
+//			 Returns Restore_Complete on success. (Exceptions
+//			 on error.)
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-int BackupClientRestore(BackupProtocolClient &rConnection, int64_t DirectoryID, const char *LocalDirectoryName,
-	bool PrintDots, bool RestoreDeleted, bool UndeleteAfterRestoreDeleted, bool Resume)
+int BackupClientRestore(BackupProtocolClient &rConnection,
+	int64_t DirectoryID, const char *LocalDirectoryName,
+	bool PrintDots, bool RestoreDeleted,
+	bool UndeleteAfterRestoreDeleted, bool Resume)
 {
 	// Parameter block
 	RestoreParams params;
@@ -703,12 +728,13 @@ int BackupClientRestore(BackupProtocolClient &rConnection, int64_t DirectoryID, 
 
 	// Does any resumption information exist?
 	bool doingResume = false;
-	if(FileExists(params.mRestoreResumeInfoFilename.c_str()) && targetExistance == ObjectExists_Dir)
+	if(FileExists(params.mRestoreResumeInfoFilename.c_str()) &&
+		targetExistance == ObjectExists_Dir)
 	{
 		if(!Resume)
 		{
-			// Caller didn't specify that resume should be done, so refuse to do it
-			// but say why.
+			// Caller didn't specify that resume should be done,
+			// so refuse to do it but say why.
 			return Restore_ResumePossible;
 		}
 		
@@ -758,7 +784,4 @@ int BackupClientRestore(BackupProtocolClient &rConnection, int64_t DirectoryID, 
 
 	return Restore_Complete;
 }
-
-
-
 
