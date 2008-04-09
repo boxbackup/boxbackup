@@ -34,6 +34,7 @@ NO-LICENSE-IN-DIR contrib/rpm
 REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
 NO-LICENSE-IN-DIR contrib/solaris
 NO-LICENSE-IN-DIR contrib/suse
+NO-LICENSE-IN-DIR contrib/bbreporter
 infrastructure/msvc
 NO-LICENSE-IN-DIR infrastructure/msvc/2003
 NO-LICENSE-IN-DIR infrastructure/msvc/2005
