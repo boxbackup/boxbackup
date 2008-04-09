@@ -18,26 +18,21 @@
 
 #include "Box.h"
 
-#include "stdio.h"
-#include <exception>
-#include <sys/types.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <string>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #ifdef HAVE_GETOPT_H
 	#include <getopt.h>
 #endif
 
-#ifdef WIN32
-	#include "emu.h"
-#else
-	#include <syslog.h>
-#endif
+#include <sys/stat.h>
+#include <sys/types.h>
 
+#include <exception>
 #include <string>
 
 #include "Logging.h"
