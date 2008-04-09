@@ -82,7 +82,7 @@ class BoxBackupReporter:
     def __init__(self, config_file="/etc/box/bbackupd.conf", 
                  log_file="/var/log/syslog", email_to=None, 
                  email_from="report@boxbackup", rotate=False, 
-                 verbose=False, stats=False, sort=False):
+                 verbose=False, stats=False, sort=False, debug=False):
         
         # Config options
         self.config_file = config_file
@@ -93,7 +93,8 @@ class BoxBackupReporter:
         self.verbose_report = verbose
         self.usage_stats = stats
         self.sort_files = sort
-        
+        self.debug = debug
+
         # Regex's
         self.re_automatic_backup = re.compile(" *AutomaticBackup *= *no", re.I)
         self.re_syslog = re.compile("(\S+) +(\S+) +([\d:]+) +(\S+) +([^:]+): +"+
@@ -102,7 +103,10 @@ class BoxBackupReporter:
         # Initialise report
         self.reset()
         
-        
+    def _debug(self, msg):
+        if self.debug:
+            sys.stderr.write("[bbreporter.py Debug]: %s\n" % msg)
+
     def reset(self):
         # Reset report data to default values
         self.hostname = ""
@@ -119,6 +123,12 @@ class BoxBackupReporter:
     def run(self):
         try:
             self._determine_operating_mode()
+            
+            if self.lazy_mode:
+                self._debug("Operating in LAZY MODE.")
+            else:
+                self._debug("Operating in SNAPSHOT MODE.")
+
         except IOError:
             raise BoxBackupReporter.BoxBackupReporterError("Error: "+\
                   "Config file \"%s\" could not be read." % self.config_file)
@@ -226,12 +236,26 @@ class BoxBackupReporter:
                     # we're not in lazy mode we do want to and we want to reset
                     # so we only capture the most recent session.
                     if not self.lazy_mode or self.start_datetime == "Unknown":
+                        self._debug("Reset start dtime with old time: %s." % 
+                                    self.start_datetime)
+                        
+                        # Reset ourselves
                         self.reset()
+                        
+                        # Reset our temporary variables which we store
+                        # the files in.
+                        patched_files = {}
+                        uploaded_files = {}
+                        synced_files = {}
+
                         self.start_datetime = data[1]+" "+data[0]+ " "+data[2]
+                        self._debug("Reset start dtime with new time %s." %
+                                    self.start_datetime)
                                               
                 # If we find the backup-finish event then set the end_datetime.
                 elif data[6].find("backup-finish") > -1:
                     self.end_datetime = data[1] + " " + data[0] + " " + data[2]
+                    self._debug("Set end dtime: %s" % self.end_datetime)
                 
                 # Only log the events if we have our start time.
                 elif self.start_datetime != "Unknown":
@@ -446,6 +470,10 @@ def usage():
     stderr("  --stats\t\t\t\tIncludes the usage stats retrieved from \n"+\
            "\t\t\t\t\t'bbackupquery usage' in the report.\n")
     
+    stderr("  --sort\t\t\t\tSorts the file lists in verbose mode.\n")
+    
+    stderr("  --debug\t\t\t\tEnables debug output.\n")
+
     stderr("  --verbose\t\t\t\tList every file that was backed up to\n"+\
            "\t\t\t\t\tthe server, default is to just display\n"+\
            "\t\t\t\t\tthe summary.\n")
@@ -463,12 +491,13 @@ def main():
     verbose = False 
     stats = False
     sort = False
-
+    debug = False
     # Parse the options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "osrvhl:c:t:f:", 
+        opts, args = getopt.getopt(sys.argv[1:], "dosrvhl:c:t:f:", 
                         ["help", "logfile=", "configfile=","email-to=", 
-                         "email-from=","rotate","verbose","stats","sort"])
+                         "email-from=","rotate","verbose","stats","sort",
+                         "debug"])
     except getopt.GetoptError:
         usage()
         return
@@ -490,13 +519,15 @@ def main():
             stats = True
         elif(opt in ("--sort", "-o")):
             sort = True
+        elif(opt in ("--debug", "-d")):
+            debug = True
         elif(opt in ("--help", "-h")):
             usage()
             return
     
     # Run the reporter
     bbr = BoxBackupReporter(configfile, logfile, email_to, email_from, 
-                            rotate, verbose, stats, sort)
+                            rotate, verbose, stats, sort, debug)
     try:
         bbr.run()
         bbr.deliver()
