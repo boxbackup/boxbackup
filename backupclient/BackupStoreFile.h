@@ -10,11 +10,13 @@
 #ifndef BACKUPSTOREFILE__H
 #define BACKUPSTOREFILE__H
 
+#include <stdlib.h>
+
+#include <memory>
+
 #include "IOStream.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreFilename.h"
-
-#include <memory>
 
 typedef struct 
 {

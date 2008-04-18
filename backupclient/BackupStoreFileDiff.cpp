@@ -9,6 +9,8 @@
 
 #include "Box.h"
 
+#include <string.h>
+
 #include <new>
 #include <map>
 

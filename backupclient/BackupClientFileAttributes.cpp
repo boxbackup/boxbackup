@@ -15,11 +15,13 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <string.h>
 #include <limits.h>
+
 #include <algorithm>
+#include <cstring>
 #include <new>
 #include <vector>
+
 #ifdef HAVE_SYS_XATTR_H
 #include <cerrno>
 #include <sys/xattr.h>
