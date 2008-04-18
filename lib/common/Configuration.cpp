@@ -9,8 +9,9 @@
 
 #include "Box.h"
 
-#include <stdlib.h>
 #include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <sstream>
 

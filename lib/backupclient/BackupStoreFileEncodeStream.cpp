@@ -9,6 +9,8 @@
 
 #include "Box.h"
 
+#include <string.h>
+
 #include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreFileWire.h"
