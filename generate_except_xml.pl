@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 
-open (EXCEPT, "<../../ExceptionCodes.txt") or die "Can't open ../../ExceptionCodes.txt: $!\n";
+open (EXCEPT, "<../ExceptionCodes.txt") or die "Can't open ../ExceptionCodes.txt: $!\n";
 open (DOCBOOK, ">ExceptionCodes.xml") or die "Can't open Exceptioncodes.xml for writing: $!\n";
 
 print DOCBOOK <<EOD;
