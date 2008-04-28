@@ -59,10 +59,10 @@ man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html \
 
 # for BSD make:
 .xml.8:
-	$(DBPROC) -o $(.TARGET) $(MANXSL) $(.IMPSRC)
-	cp $(.TARGET) man-pages/
-	rm -f man-pages/$(.TARGET).gz
-	gzip -f -9 man-pages/$(.TARGET)
+	$(DBPROC) -o $@ $(MANXSL) $<
+	cp $@ man-pages/
+	rm -f man-pages/$@.gz
+	gzip -f -9 man-pages/$@
 
 # for GNU make:
 #%.8: %.xml
