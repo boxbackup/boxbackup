@@ -2,13 +2,13 @@
 
 # Process DocBook to HTML
 
-DBPROC=/usr/bin/xsltproc
+DBPROC=xsltproc
 BOOKXSL=bb-book.xsl
 NOCHUNKBOOKXSL=bb-nochunk-book.xsl
 MANXSL=bb-man.xsl
 HTMLPREFIX=box-html
 VPATH= adminguide
-.SUFFIXES: .html .xml
+.SUFFIXES: .html .xml .1 .5 .8
 
 all: docs
 
@@ -28,7 +28,7 @@ instguide: $(HTMLPREFIX)/instguide/index.html
 $(HTMLPREFIX)/instguide/index.html: instguide.xml $(BOOKXSL)
 	$(DBPROC) -o $(HTMLPREFIX)/instguide/ $(BOOKXSL) instguide.xml
 
-ExceptionCodes.xml: ../../ExceptionCodes.txt
+ExceptionCodes.xml: ../ExceptionCodes.txt
 	perl ./generate_except_xml.pl
 
 manpages: man-dirs man-nroff man-html
@@ -41,18 +41,35 @@ $(HTMLPREFIX)/man-html/.there:
 man-pages/.there:
 	if [ ! -d man-pages ]; then mkdir man-pages; touch man-pages/.there; fi
 
-man-nroff: bbackupquery.1 bbackupctl.1 bbstoreaccounts.1 bbstored-config.1 raidfile-config.1 bbstored-certs.1
+man-nroff: bbackupquery.8 bbackupctl.8 bbstoreaccounts.8 bbstored-config.8 \
+	raidfile-config.8 bbstored-certs.8
 
-man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html bbstored-config.html raidfile-config.html bbstored-certs.html
+man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html \
+	bbstored-config.html raidfile-config.html bbstored-certs.html
 
-%.html: %.xml
+# for BSD make:
+.xml.html:
 	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
-	mv $@ $(HTMLPREFIX)/man-html/.
+	cp $@ $(HTMLPREFIX)/man-html/.
 
-%.1: %.xml
-	$(DBPROC) -o $@ $(MANXSL) $<
-	mv $@ man-pages/.
-	gzip -f -9 man-pages/$@
+# for GNU make:
+#%.html: %.xml
+#	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
+#	mv $@ $(HTMLPREFIX)/man-html/.
+
+# for BSD make:
+.xml.8:
+	$(DBPROC) -o $(.TARGET) $(MANXSL) $(.IMPSRC)
+	cp $(.TARGET) man-pages/
+	rm -f man-pages/$(.TARGET).gz
+	gzip -f -9 man-pages/$(.TARGET)
+
+# for GNU make:
+#%.8: %.xml
+#	$(DBPROC) -o $@ $(MANXSL) $<
+#	cp $@ man-pages/
+#	rm -f man-pages/$@.gz
+#	gzip -f -9 man-pages/$@
 
 dockit: clean docs
 	tar zcf documentation-kit-0.10.tar.gz $(HTMLPREFIX)/
