@@ -47,29 +47,15 @@ man-nroff: bbackupquery.8 bbackupctl.8 bbstoreaccounts.8 bbstored-config.8 \
 man-html: bbackupquery.html bbackupctl.html bbstoreaccounts.html \
 	bbstored-config.html raidfile-config.html bbstored-certs.html
 
-# for BSD make:
 .xml.html:
 	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
 	cp $@ $(HTMLPREFIX)/man-html/.
 
-# for GNU make:
-#%.html: %.xml
-#	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
-#	mv $@ $(HTMLPREFIX)/man-html/.
-
-# for BSD make:
 .xml.8:
 	$(DBPROC) -o $@ $(MANXSL) $<
 	cp $@ man-pages/
 	rm -f man-pages/$@.gz
 	gzip -f -9 man-pages/$@
-
-# for GNU make:
-#%.8: %.xml
-#	$(DBPROC) -o $@ $(MANXSL) $<
-#	cp $@ man-pages/
-#	rm -f man-pages/$@.gz
-#	gzip -f -9 man-pages/$@
 
 dockit: clean docs
 	tar zcf documentation-kit-0.10.tar.gz $(HTMLPREFIX)/
