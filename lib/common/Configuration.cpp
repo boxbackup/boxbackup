@@ -209,7 +209,7 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 		if(!rErrorMsg.empty())
 		{
 			// An error occured, return now
-			BOX_ERROR("Error in Configuration::LoadInfo: " << 
+			BOX_ERROR("Error in Configuration::LoadInto: " << 
 				rErrorMsg);
 			delete pconfig;
 			pconfig = 0;
