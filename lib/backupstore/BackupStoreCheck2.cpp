@@ -399,11 +399,11 @@ void BackupStoreCheck::InsertObjectIntoDirectory(int64_t ObjectID, int64_t Direc
 		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
 	}
 	
-	// Add a new entry in an appropraite place
+	// Add a new entry in an appropriate place
 	dir.AddUnattactedObject(objectStoreFilename, modTime, ObjectID, sizeInBlocks,
 		IsDirectory?(BackupStoreDirectory::Entry::Flags_Dir):(BackupStoreDirectory::Entry::Flags_File));
 
-	// Fix any flags which have been broken, which there's a good change of going
+	// Fix any flags which have been broken, which there's a good chance of doing
 	dir.CheckAndFix();
 	
 	// Write it out
