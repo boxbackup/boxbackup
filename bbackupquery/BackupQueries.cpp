@@ -410,6 +410,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 		{
 			BOX_ERROR("Directory '" << args[0] << "' not found "
 				"on store.");
+			SetReturnCode(COMMAND_RETURN_ERROR);
 			return;
 		}
 	}
@@ -435,11 +436,28 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 	if(!opts[LIST_OPTION_ALLOWDELETED]) excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
 
 	// Do communication
-	mrConnection.QueryListDirectory(
-			DirID,
-			BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
-			excludeFlags,
-			true /* want attributes */);
+	try
+	{
+		mrConnection.QueryListDirectory(
+				DirID,
+				BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,
+				// both files and directories
+				excludeFlags,
+				true /* want attributes */);
+	}
+	catch (std::exception &e)
+	{
+		BOX_ERROR("Failed to list directory: " << e.what());
+		SetReturnCode(COMMAND_RETURN_ERROR);
+		return;
+	}
+	catch (...)
+	{
+		BOX_ERROR("Failed to list directory: unknown error");
+		SetReturnCode(COMMAND_RETURN_ERROR);
+		return;
+	}
+
 
 	// Retrieve the directory from the stream following
 	BackupStoreDirectory dir;
@@ -755,6 +773,7 @@ void BackupQueries::CommandChangeDir(const std::vector<std::string> &args, const
 	if(args.size() != 1 || args[0].size() == 0)
 	{
 		BOX_ERROR("Incorrect usage. cd [-o] [-d] <directory>");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 
@@ -772,6 +791,7 @@ void BackupQueries::CommandChangeDir(const std::vector<std::string> &args, const
 	if(id == 0)
 	{
 		BOX_ERROR("Directory '" << args[0] << "' not found.");
+		SetReturnCode(COMMAND_RETURN_ERROR);
 		return;
 	}
 	
