@@ -193,6 +193,8 @@ typedef struct
 {
 	bool PrintDots;
 	bool RestoreDeleted;
+	bool ContinueAfterErrors;
+	bool ContinuedAfterError;
 	std::string mRestoreResumeInfoFilename;
 	RestoreResumeInfo mResumeInfo;
 } RestoreParams;
@@ -387,7 +389,15 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 	{
 		BOX_LOG_SYS_ERROR("Failed to create directory '" <<
 			rLocalDirectoryName << "'");
-		return Restore_UnknownError;
+
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 
 	// Save the restore info, in case it's needed later
@@ -400,14 +410,30 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 		BOX_ERROR("Failed to save resume info file '" <<
 			Params.mRestoreResumeInfoFilename << "': " <<
 			e.what());
-		return Restore_UnknownError;
+
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 	catch(...)
 	{
 		BOX_ERROR("Failed to save resume info file '" <<
 			Params.mRestoreResumeInfoFilename <<
 			"': unknown error");
-		return Restore_UnknownError;
+
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 
 	// Fetch the directory listing from the server -- getting a
@@ -435,13 +461,29 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 	{
 		BOX_ERROR("Failed to restore attributes for '" <<
 			rLocalDirectoryName << "': " << e.what());
-		return Restore_UnknownError;
+
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 	catch(...)
 	{
 		BOX_ERROR("Failed to restore attributes for '" <<
 			rLocalDirectoryName << "': unknown error");
-		return Restore_UnknownError;
+
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 
 	int64_t bytesWrittenSinceLastRestoreInfoSave = 0;
@@ -473,7 +515,15 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 					BOX_LOG_SYS_ERROR("Failed to delete "
 						"file '" << localFilename << 
 						"'");
-					return Restore_UnknownError;
+
+					if (Params.ContinueAfterErrors)
+					{
+						Params.ContinuedAfterError = true;
+					}
+					else
+					{
+						return Restore_UnknownError;
+					}
 				}
 				
 				// Request it from the store
@@ -507,14 +557,30 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 					BOX_ERROR("Failed to restore file '" <<
 						localFilename << "': " <<
 						e.what());
-					return Restore_UnknownError;
+
+					if (Params.ContinueAfterErrors)
+					{
+						Params.ContinuedAfterError = true;
+					}
+					else
+					{
+						return Restore_UnknownError;
+					}
 				}
 				catch(...)
 				{
 					BOX_ERROR("Failed to restore file '" <<
 						localFilename <<
 						"': unknown error");
-					return Restore_UnknownError;
+
+					if (Params.ContinueAfterErrors)
+					{
+						Params.ContinuedAfterError = true;
+					}
+					else
+					{
+						return Restore_UnknownError;
+					}
 				}
 				
 				// Progress display?
@@ -545,7 +611,15 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 						"whether file exists: '" <<
 						localFilename << "': " <<
 						e.what());
-					return Restore_UnknownError;
+
+					if (Params.ContinueAfterErrors)
+					{
+						Params.ContinuedAfterError = true;
+					}
+					else
+					{
+						return Restore_UnknownError;
+					}
 				}
 				catch(...)
 				{
@@ -553,7 +627,15 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 						"whether file exists: '" <<
 						localFilename << "': "
 						"unknown error");
-					return Restore_UnknownError;
+
+					if (Params.ContinueAfterErrors)
+					{
+						Params.ContinuedAfterError = true;
+					}
+					else
+					{
+						return Restore_UnknownError;
+					}
 				}
 
 				if(exists)
@@ -606,14 +688,28 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 			BOX_ERROR("Failed to save resume info file '" <<
 				Params.mRestoreResumeInfoFilename << "': " <<
 				e.what());
-			return Restore_UnknownError;
+			if (Params.ContinueAfterErrors)
+			{
+				Params.ContinuedAfterError = true;
+			}
+			else
+			{
+				return Restore_UnknownError;
+			}
 		}
 		catch(...)
 		{
 			BOX_ERROR("Failed to save resume info file '" <<
 				Params.mRestoreResumeInfoFilename <<
 				"': unknown error");
-			return Restore_UnknownError;
+			if (Params.ContinueAfterErrors)
+			{
+				Params.ContinuedAfterError = true;
+			}
+			else
+			{
+				return Restore_UnknownError;
+			}
 		}
 		
 		bytesWrittenSinceLastRestoreInfoSave = 0;
@@ -670,13 +766,27 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 	{
 		BOX_ERROR("Failed to restore attributes for '" <<
 			rLocalDirectoryName << "': " << e.what());
-		return Restore_UnknownError;
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 	catch(...)
 	{
 		BOX_ERROR("Failed to restore attributes for '" <<
 			rLocalDirectoryName << "': unknown error");
-		return Restore_UnknownError;
+		if (Params.ContinueAfterErrors)
+		{
+			Params.ContinuedAfterError = true;
+		}
+		else
+		{
+			return Restore_UnknownError;
+		}
 	}
 
 	return Restore_Complete;
@@ -687,7 +797,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 //
 // Function
 //		Name:    BackupClientRestore(BackupProtocolClient &, int64_t,
-//			 const char *, bool, bool)
+//			 const char *, bool, bool, bool, bool, bool)
 //		Purpose: Restore a directory on the server to a local
 //			 directory on the disc. The local directory must not
 //			 already exist.
@@ -707,19 +817,24 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 //			 (Won't attempt to overwrite things.)
 //
 //			 Returns Restore_Complete on success. (Exceptions
-//			 on error.)
+//			 on error, unless ContinueAfterError is true and
+//			 the error is recoverable, in which case it returns
+//			 Restore_CompleteWithErrors)
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
 int BackupClientRestore(BackupProtocolClient &rConnection,
 	int64_t DirectoryID, const char *LocalDirectoryName,
 	bool PrintDots, bool RestoreDeleted,
-	bool UndeleteAfterRestoreDeleted, bool Resume)
+	bool UndeleteAfterRestoreDeleted, bool Resume,
+	bool ContinueAfterErrors)
 {
 	// Parameter block
 	RestoreParams params;
 	params.PrintDots = PrintDots;
 	params.RestoreDeleted = RestoreDeleted;
+	params.ContinueAfterErrors = ContinueAfterErrors;
+	params.ContinuedAfterError = false;
 	params.mRestoreResumeInfoFilename = LocalDirectoryName;
 	params.mRestoreResumeInfoFilename += ".boxbackupresume";
 
@@ -782,6 +897,7 @@ int BackupClientRestore(BackupProtocolClient &rConnection,
 	// Delete the resume information file
 	::unlink(params.mRestoreResumeInfoFilename.c_str());
 
-	return Restore_Complete;
+	return params.ContinuedAfterError ? Restore_CompleteWithErrors
+		: Restore_Complete;
 }
 
