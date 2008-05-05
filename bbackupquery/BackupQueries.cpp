@@ -217,7 +217,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{ "getobject", "" },
 		{ "get",  "i" },
 		{ "compare", "alcqAEQ" },
-		{ "restore", "dri" },
+		{ "restore", "drif" },
 		{ "help", "" },
 		{ "usage", "" },
 		{ "undelete", "" },
@@ -1966,7 +1966,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	// Check arguments
 	if(args.size() != 2)
 	{
-		BOX_ERROR("Incorrect usage. restore [-d] [-r] [-i] <remote-name> <local-name>");
+		BOX_ERROR("Incorrect usage. restore [-drif] <remote-name> <local-name>");
 		return;
 	}
 
@@ -2029,7 +2029,8 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 			localName.c_str(), 
 			true /* print progress dots */, restoreDeleted, 
 			false /* don't undelete after restore! */, 
-			opts['r'] /* resume? */);
+			opts['r'] /* resume? */,
+			opts['f'] /* force continue after errors */);
 	}
 	catch(std::exception &e)
 	{
@@ -2050,13 +2051,20 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		BOX_INFO("Restore complete.");
 		break;
 	
+	case Restore_CompleteWithErrors:
+		BOX_WARNING("Restore complete, but some files could not be "
+			"restored.");
+		break;
+	
 	case Restore_ResumePossible:
-		BOX_ERROR("Resume possible -- repeat command with -r flag to resume");
+		BOX_ERROR("Resume possible -- repeat command with -r flag "
+			"to resume.");
 		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 	
 	case Restore_TargetExists:
-		BOX_ERROR("The target directory exists. You cannot restore over an existing directory.");
+		BOX_ERROR("The target directory exists. You cannot restore "
+			"over an existing directory.");
 		SetReturnCode(COMMAND_RETURN_ERROR);
 		break;
 		
