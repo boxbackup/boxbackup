@@ -95,6 +95,21 @@ void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t Contain
 	mBlocksInDirectories += size;
 }
 
+class BackupStoreDirectoryFixer
+{
+	private:
+	BackupStoreDirectory mDirectory;
+	std::string mFilename;
+	std::string mStoreRoot;
+	int mDiscSetNumber;
+
+	public:
+	BackupStoreDirectoryFixer(std::string storeRoot, int discSetNumber,
+		int64_t ID);
+	void InsertObject(int64_t ObjectID, bool IsDirectory,
+		int32_t lostDirNameSerial);
+	~BackupStoreDirectoryFixer();
+};
 
 // --------------------------------------------------------------------------
 //
@@ -106,6 +121,10 @@ void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t Contain
 // --------------------------------------------------------------------------
 void BackupStoreCheck::CheckUnattachedObjects()
 {
+	typedef std::map<int64_t, BackupStoreDirectoryFixer*> fixers_t;
+	typedef std::pair<int64_t, BackupStoreDirectoryFixer*> fixer_pair_t;
+	fixers_t fixers;
+
 	// Scan all objects, finding ones which have no container
 	for(Info_t::const_iterator i(mInfo.begin()); i != mInfo.end(); ++i)
 	{
@@ -118,7 +137,9 @@ void BackupStoreCheck::CheckUnattachedObjects()
 			if((flags & Flags_IsContained) == 0)
 			{
 				// Unattached object...
-				BOX_WARNING("Object " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " is unattached.");
+				BOX_WARNING("Object " <<
+					BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+					" is unattached.");
 				++mNumberErrorsFound;
 
 				// What's to be done?
@@ -196,14 +217,50 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				}
 				ASSERT(putIntoDirectoryID != 0);
 
+				if (!mFixErrors)
+				{
+					continue;
+				}
+
+				BackupStoreDirectoryFixer* pFixer;
+				fixers_t::iterator fi = 
+					fixers.find(putIntoDirectoryID);
+				if (fi == fixers.end())
+				{
+					// no match, create a new one
+					pFixer = new BackupStoreDirectoryFixer(
+						mStoreRoot, mDiscSetNumber,
+						putIntoDirectoryID);
+					fixers.insert(fixer_pair_t(
+						putIntoDirectoryID, pFixer));
+				}
+				else
+				{
+					pFixer = fi->second;
+				}
+
+				int32_t lostDirNameSerial = 0;
+
+				if(flags & Flags_IsDir)
+				{
+					lostDirNameSerial = mLostDirNameSerial++;
+				}
+
 				// Add it to the directory
-				InsertObjectIntoDirectory(pblock->mID[e], putIntoDirectoryID,
-					((flags & Flags_IsDir) == Flags_IsDir));
+				pFixer->InsertObject(pblock->mID[e],
+					((flags & Flags_IsDir) == Flags_IsDir),
+					lostDirNameSerial);
 			}
 		}
 	}
-}
 
+	// clean up all the fixers. Deleting them commits them automatically.
+	for (fixers_t::iterator i = fixers.begin(); i != fixers.end(); i++)
+	{
+		BackupStoreDirectoryFixer* pFixer = i->second;
+		delete pFixer;
+	}
+}
 
 // --------------------------------------------------------------------------
 //
@@ -261,6 +318,86 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	return true;
 }
 
+BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(std::string storeRoot,
+	int discSetNumber, int64_t ID)
+: mStoreRoot(storeRoot),
+  mDiscSetNumber(discSetNumber)
+{
+	// Generate filename
+	StoreStructure::MakeObjectFilename(ID, mStoreRoot, mDiscSetNumber,
+		mFilename, false /* don't make sure the dir exists */);
+	
+	// Read it in
+	std::auto_ptr<RaidFileRead> file(
+		RaidFileRead::Open(mDiscSetNumber, mFilename));
+	mDirectory.ReadFromStream(*file, IOStream::TimeOutInfinite);
+}
+
+void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
+	int32_t lostDirNameSerial)
+{
+	// Data for the object
+	BackupStoreFilename objectStoreFilename;
+	int64_t modTime = 100;	// something which isn't zero or a special time
+	int32_t sizeInBlocks = 0; // suitable for directories
+
+	if(IsDirectory)
+	{
+		// Directory -- simply generate a name for it.
+		char name[32];
+		::sprintf(name, "dir%08x", lostDirNameSerial);
+		objectStoreFilename.SetAsClearFilename(name);
+	}
+	else
+	{
+		// Files require a little more work...
+		// Open file
+		std::string fileFilename;
+		StoreStructure::MakeObjectFilename(ObjectID, mStoreRoot,
+			mDiscSetNumber, fileFilename,
+			false /* don't make sure the dir exists */);
+		std::auto_ptr<RaidFileRead> file(
+			RaidFileRead::Open(mDiscSetNumber, fileFilename));
+
+		// Fill in size information
+		sizeInBlocks = file->GetDiscUsageInBlocks();
+
+		// Read in header
+		file_StreamFormat hdr;
+		if(file->Read(&hdr, sizeof(hdr)) != sizeof(hdr) ||
+			(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
+#ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
+			&& ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V0
+#endif		
+			))
+		{
+			// This should never happen, everything has been
+			// checked before.
+			THROW_EXCEPTION(BackupStoreException, Internal)
+		}
+		// This tells us nice things
+		modTime = box_ntoh64(hdr.mModificationTime);
+		// And the filename comes next
+		objectStoreFilename.ReadFromStream(*file, IOStream::TimeOutInfinite);
+	}
+
+	// Add a new entry in an appropriate place
+	mDirectory.AddUnattactedObject(objectStoreFilename, modTime,
+		ObjectID, sizeInBlocks,
+		IsDirectory?(BackupStoreDirectory::Entry::Flags_Dir):(BackupStoreDirectory::Entry::Flags_File));
+}
+
+BackupStoreDirectoryFixer::~BackupStoreDirectoryFixer()
+{
+	// Fix any flags which have been broken, which there's a good chance of doing
+	mDirectory.CheckAndFix();
+	
+	// Write it out
+	RaidFileWrite root(mDiscSetNumber, mFilename);
+	root.Open(true /* allow overwriting */);
+	mDirectory.WriteToStream(root);
+	root.Commit(true /* convert to raid now */);
+}
 
 // --------------------------------------------------------------------------
 //
