@@ -179,6 +179,23 @@ void Logging::SetContext(std::string context)
 	sContextSet = true;
 }
 
+Log::Level Logging::GetNamedLevel(const std::string& rName)
+{
+	if      (rName == "nothing") { return Log::NOTHING; }
+	else if (rName == "fatal")   { return Log::FATAL; }
+	else if (rName == "error")   { return Log::ERROR; }
+	else if (rName == "warning") { return Log::WARNING; }
+	else if (rName == "notice")  { return Log::NOTICE; }
+	else if (rName == "info")    { return Log::INFO; }
+	else if (rName == "trace")   { return Log::TRACE; }
+	else if (rName == "everything") { return Log::EVERYTHING; }
+	else
+	{
+		BOX_ERROR("Unknown verbosity level: " << rName);
+		return Log::INVALID;
+	}
+}
+
 void Logging::ClearContext()
 {
 	sContextSet = false;
@@ -350,6 +367,7 @@ bool Syslog::Log(Log::Level level, const std::string& rFile,
 	switch(level)
 	{
 		case Log::NOTHING:    /* fall through */
+		case Log::INVALID:    /* fall through */
 		case Log::FATAL:      syslogLevel = LOG_CRIT;    break;
 		case Log::ERROR:      syslogLevel = LOG_ERR;     break;
 		case Log::WARNING:    syslogLevel = LOG_WARNING; break;
