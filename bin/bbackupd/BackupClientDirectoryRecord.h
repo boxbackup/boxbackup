@@ -96,6 +96,12 @@ class ProgressNotifier
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
 		int64_t FileSize) = 0;
+	virtual void NotifyDirectoryDeleted(
+		int64_t ObjectID,
+		const std::string& rRemotePath) = 0;
+	virtual void NotifyFileDeleted(
+		int64_t ObjectID,
+		const std::string& rRemotePath) = 0;
 };
 
 // --------------------------------------------------------------------------
@@ -137,14 +143,12 @@ public:
 	public:
 		SyncParams(
 			BackupDaemon &rDaemon,
-			ProgressNotifier &rProgressNotifier,
 			BackupClientContext &rContext);
 		~SyncParams();
 	private:
 		// No copying
 		SyncParams(const SyncParams&);
 		SyncParams &operator=(const SyncParams&);
-		ProgressNotifier &mrProgressNotifier;
 		
 	public:
 		// Data members are public, as accessors are not justified here
@@ -161,42 +165,52 @@ public:
 		// Member variables modified by syncing process
 		box_time_t mUploadAfterThisTimeInTheFuture;
 		bool mHaveLoggedWarningAboutFutureFileTimes;
-	
-		ProgressNotifier& GetProgressNotifier() const 
-		{ 
-			return mrProgressNotifier;
-		}
 	};
 
-	void SyncDirectory(SyncParams &rParams, int64_t ContainingDirectoryID, const std::string &rLocalPath,
+	void SyncDirectory(SyncParams &rParams,
+		int64_t ContainingDirectoryID,
+		const std::string &rLocalPath,
+		const std::string &rRemotePath,
 		bool ThisDirHasJustBeenCreated = false);
 
 private:
 	void DeleteSubDirectories();
 	BackupStoreDirectory *FetchDirectoryListing(SyncParams &rParams);
-	void UpdateAttributes(SyncParams &rParams, BackupStoreDirectory *pDirOnStore, const std::string &rLocalPath);
-	bool UpdateItems(SyncParams &rParams, const std::string &rLocalPath, BackupStoreDirectory *pDirOnStore,
+	void UpdateAttributes(SyncParams &rParams,
+		BackupStoreDirectory *pDirOnStore,
+		const std::string &rLocalPath);
+	bool UpdateItems(SyncParams &rParams, const std::string &rLocalPath,
+		const std::string &rRemotePath,
+		BackupStoreDirectory *pDirOnStore,
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
-		std::vector<std::string> &rFiles, const std::vector<std::string> &rDirs);
-	int64_t UploadFile(SyncParams &rParams, const std::string &rFilename, const BackupStoreFilename &rStoreFilename,
-		int64_t FileSize, box_time_t ModificationTime, box_time_t AttributesHash, bool NoPreviousVersionOnServer);
-	void SetErrorWhenReadingFilesystemObject(SyncParams &rParams, const char *Filename);
-	void RemoveDirectoryInPlaceOfFile(SyncParams &rParams, BackupStoreDirectory *pDirOnStore, int64_t ObjectID, const std::string &rFilename);
+		std::vector<std::string> &rFiles,
+		const std::vector<std::string> &rDirs);
+	int64_t UploadFile(SyncParams &rParams,
+		const std::string &rFilename,
+		const BackupStoreFilename &rStoreFilename,
+		int64_t FileSize, box_time_t ModificationTime,
+		box_time_t AttributesHash, bool NoPreviousVersionOnServer);
+	void SetErrorWhenReadingFilesystemObject(SyncParams &rParams,
+		const char *Filename);
+	void RemoveDirectoryInPlaceOfFile(SyncParams &rParams,
+		BackupStoreDirectory* pDirOnStore,
+		BackupStoreDirectory::Entry* pEntry,
+		const std::string &rFilename);
 
 private:
-	int64_t 		mObjectID;
+	int64_t 	mObjectID;
 	std::string 	mSubDirName;
-	bool 			mInitialSyncDone;
-	bool 			mSyncDone;
+	bool 		mInitialSyncDone;
+	bool 		mSyncDone;
 
 	// Checksum of directory contents and attributes, used to detect changes
 	uint8_t mStateChecksum[MD5Digest::DigestLength];
 
-	std::map<std::string, box_time_t>						*mpPendingEntries;
-	std::map<std::string, BackupClientDirectoryRecord *>	mSubDirectories;
+	std::map<std::string, box_time_t> *mpPendingEntries;
+	std::map<std::string, BackupClientDirectoryRecord *> mSubDirectories;
 	// mpPendingEntries is a pointer rather than simple a member
-	// variables, because most of the time it'll be empty. This would waste a lot
-	// of memory because of STL allocation policies.
+	// variable, because most of the time it'll be empty. This would
+	// waste a lot of memory because of STL allocation policies.
 };
 
 #endif // BACKUPCLIENTDIRECTORYRECORD__H

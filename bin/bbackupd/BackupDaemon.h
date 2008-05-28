@@ -14,13 +14,15 @@
 #include <string>
 #include <memory>
 
+#include "BackupClientDirectoryRecord.h"
 #include "BoxTime.h"
 #include "Daemon.h"
-#include "BackupClientDirectoryRecord.h"
+#include "Logging.h"
 #include "Socket.h"
 #include "SocketListen.h"
 #include "SocketStream.h"
-#include "Logging.h"
+#include "TLSContext.h"
+
 #include "autogen_BackupProtocolClient.h"
 
 #ifdef WIN32
@@ -52,10 +54,10 @@ public:
 private:
 	// methods below do partial (specialized) serialization of 
 	// client state only
-	bool SerializeStoreObjectInfo(int64_t aClientStoreMarker, 
-		box_time_t theLastSyncTime, box_time_t theNextSyncTime) const;
-	bool DeserializeStoreObjectInfo(int64_t & aClientStoreMarker, 
-		box_time_t & theLastSyncTime, box_time_t & theNextSyncTime);
+	bool SerializeStoreObjectInfo(box_time_t theLastSyncTime,
+		box_time_t theNextSyncTime) const;
+	bool DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
+		box_time_t & theNextSyncTime);
 	bool DeleteStoreObjectInfo() const;
 	BackupDaemon(const BackupDaemon &);
 
@@ -111,6 +113,11 @@ public:
 private:
 	void Run2();
 
+public:
+	void InitCrypto();
+	void RunSyncNow();
+
+private:
 	void DeleteAllLocations();
 	void SetupLocations(BackupClientContext &rClientContext, const Configuration &rLocationsConf);
 
@@ -205,8 +212,15 @@ private:
 	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
 	std::vector<std::pair<int64_t,std::string> > mUnusedRootDirEntries;
 
+	int64_t mClientStoreMarker;
+	bool mStorageLimitExceeded;
+	bool mReadErrorsOnFilesystemObjects;
+	box_time_t mLastSyncTime;
+	TLSContext mTlsContext;
+
 public:
  	bool StopRun() { return this->Daemon::StopRun(); }
+	bool StorageLimitExceeded() { return mStorageLimitExceeded; }
  
 private:
 	bool mLogAllFileAccess;
@@ -426,6 +440,28 @@ public:
 		{
 			BOX_INFO("Synchronised file: " << rLocalPath);
 		} 
+	}
+	virtual void NotifyDirectoryDeleted(
+		int64_t ObjectID,
+		const std::string& rRemotePath)
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_NOTICE("Deleted directory: " << rRemotePath << 
+				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
+				")");
+		}
+	}
+	virtual void NotifyFileDeleted(
+		int64_t ObjectID,
+		const std::string& rRemotePath)
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_NOTICE("Deleted file: " << rRemotePath << 
+				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
+				")");
+		}
 	}
 
 #ifdef WIN32

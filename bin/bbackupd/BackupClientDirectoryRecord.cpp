@@ -2,7 +2,8 @@
 //
 // File
 //		Name:    BackupClientDirectoryRecord.cpp
-//		Purpose: Implementation of record about directory for backup client
+//		Purpose: Implementation of record about directory for
+//			 backup client
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
@@ -100,14 +101,25 @@ void BackupClientDirectoryRecord::DeleteSubDirectories()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::SyncParams &, int64_t, const std::string &, bool)
-//		Purpose: Syncronise, recusively, a local directory with the server.
+//		Name:    BackupClientDirectoryRecord::SyncDirectory(i
+//			 BackupClientDirectoryRecord::SyncParams &,
+//			 int64_t, const std::string &,
+//			 const std::string &, bool)
+//		Purpose: Recursively synchronise a local directory
+//			 with the server.
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::SyncParams &rParams, int64_t ContainingDirectoryID,
-	const std::string &rLocalPath, bool ThisDirHasJustBeenCreated)
+void BackupClientDirectoryRecord::SyncDirectory(
+	BackupClientDirectoryRecord::SyncParams &rParams,
+	int64_t ContainingDirectoryID,
+	const std::string &rLocalPath,
+	const std::string &rRemotePath,
+	bool ThisDirHasJustBeenCreated)
 {
+	BackupClientContext& rContext(rParams.mrContext);
+	ProgressNotifier& rNotifier(rContext.GetProgressNotifier());
+
 	// Signal received by daemon?
 	if(rParams.mrDaemon.StopRun())
 	{
@@ -118,49 +130,66 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	// Start by making some flag changes, marking this sync as not done,
 	// and on the immediate sub directories.
 	mSyncDone = false;
-	for(std::map<std::string, BackupClientDirectoryRecord *>::iterator i = mSubDirectories.begin();
+	for(std::map<std::string, BackupClientDirectoryRecord *>::iterator
+		i  = mSubDirectories.begin();
 		i != mSubDirectories.end(); ++i)
 	{
 		i->second->mSyncDone = false;
 	}
 
-	// Work out the time in the future after which the file should be uploaded regardless.
-	// This is a simple way to avoid having too many problems with file servers when they have
-	// clients with badly out of sync clocks.
-	rParams.mUploadAfterThisTimeInTheFuture = GetCurrentBoxTime() + rParams.mMaxFileTimeInFuture;
+	// Work out the time in the future after which the file should
+	// be uploaded regardless. This is a simple way to avoid having
+	// too many problems with file servers when they have clients
+	// with badly out of sync clocks.
+	rParams.mUploadAfterThisTimeInTheFuture = GetCurrentBoxTime() +
+		rParams.mMaxFileTimeInFuture;
 	
-	// Build the current state checksum to compare against while getting info from dirs
-	// Note checksum is used locally only, so byte order isn't considered.
+	// Build the current state checksum to compare against while
+	// getting info from dirs. Note checksum is used locally only,
+	// so byte order isn't considered.
 	MD5Digest currentStateChecksum;
 	
+	struct stat dest_st;
 	// Stat the directory, to get attribute info
+	// If it's a symbolic link, we want the link target here
+	// (as we're about to back up the contents of the directory)
 	{
-		struct stat st;
-		if(::stat(rLocalPath.c_str(), &st) != 0)
+		if(::stat(rLocalPath.c_str(), &dest_st) != 0)
 		{
-			// The directory has probably been deleted, so just ignore this error.
-			// In a future scan, this deletion will be noticed, deleted from server, and this object deleted.
-			rParams.GetProgressNotifier().NotifyDirStatFailed(
-				this, rLocalPath, strerror(errno));
+			// The directory has probably been deleted, so
+			// just ignore this error. In a future scan, this
+			// deletion will be noticed, deleted from server,
+			// and this object deleted.
+			rNotifier.NotifyDirStatFailed(this, rLocalPath,
+				strerror(errno));
 			return;
 		}
-		// Store inode number in map so directories are tracked in case they're renamed
+		// Store inode number in map so directories are tracked
+		// in case they're renamed
 		{
-			BackupClientInodeToIDMap &idMap(rParams.mrContext.GetNewIDMap());
-			idMap.AddToMap(st.st_ino, mObjectID, ContainingDirectoryID);
+			BackupClientInodeToIDMap &idMap(
+				rParams.mrContext.GetNewIDMap());
+			idMap.AddToMap(dest_st.st_ino, mObjectID,
+				ContainingDirectoryID);
 		}
 		// Add attributes to checksum
-		currentStateChecksum.Add(&st.st_mode, sizeof(st.st_mode));
-		currentStateChecksum.Add(&st.st_uid, sizeof(st.st_uid));
-		currentStateChecksum.Add(&st.st_gid, sizeof(st.st_gid));
+		currentStateChecksum.Add(&dest_st.st_mode,
+			sizeof(dest_st.st_mode));
+		currentStateChecksum.Add(&dest_st.st_uid,
+			sizeof(dest_st.st_uid));
+		currentStateChecksum.Add(&dest_st.st_gid,
+			sizeof(dest_st.st_gid));
 		// Inode to be paranoid about things moving around
-		currentStateChecksum.Add(&st.st_ino, sizeof(st.st_ino));
+		currentStateChecksum.Add(&dest_st.st_ino,
+			sizeof(dest_st.st_ino));
 #ifdef HAVE_STRUCT_STAT_ST_FLAGS
-		currentStateChecksum.Add(&st.st_flags, sizeof(st.st_flags));
+		currentStateChecksum.Add(&dest_st.st_flags,
+			sizeof(dest_st.st_flags));
 #endif
 
 		StreamableMemBlock xattr;
-		BackupClientFileAttributes::FillExtendedAttr(xattr, rLocalPath.c_str());
+		BackupClientFileAttributes::FillExtendedAttr(xattr,
+			rLocalPath.c_str());
 		currentStateChecksum.Add(xattr.GetBuffer(), xattr.GetSize());
 	}
 	
@@ -170,13 +199,13 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 	std::vector<std::string> files;
 	bool downloadDirectoryRecordBecauseOfFutureFiles = false;
 
-	struct stat dir_st;
-	if(::lstat(rLocalPath.c_str(), &dir_st) != 0)
+	struct stat link_st;
+	if(::lstat(rLocalPath.c_str(), &link_st) != 0)
 	{
 		// Report the error (logs and 
 		// eventual email to administrator)
-		rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
-			rLocalPath, strerror(errno));
+		rNotifier.NotifyFileStatFailed(this, rLocalPath,
+			strerror(errno));
 		
 		// FIXME move to NotifyFileStatFailed()
 		SetErrorWhenReadingFilesystemObject(rParams, 
@@ -192,8 +221,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		DIR *dirHandle = 0;
 		try
 		{
-			rParams.GetProgressNotifier().NotifyScanDirectory(
-				this, rLocalPath);
+			rNotifier.NotifyScanDirectory(this, rLocalPath);
 
 			dirHandle = ::opendir(rLocalPath.c_str());
 			if(dirHandle == 0)
@@ -202,17 +230,19 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				// eventual email to administrator)
 				if (errno == EACCES)
 				{
-					rParams.GetProgressNotifier().NotifyDirListFailed(
-						this, rLocalPath, "Access denied");
+					rNotifier.NotifyDirListFailed(this,
+						rLocalPath, "Access denied");
 				}
 				else
 				{
-					rParams.GetProgressNotifier().NotifyDirListFailed(this, 
+					rNotifier.NotifyDirListFailed(this, 
 						rLocalPath, strerror(errno));
 				}
 				
-				// Report the error (logs and eventual email to administrator)
-				SetErrorWhenReadingFilesystemObject(rParams, rLocalPath.c_str());
+				// Report the error (logs and eventual email
+				// to administrator)
+				SetErrorWhenReadingFilesystemObject(rParams,
+					rLocalPath.c_str());
 				// Ignore this directory for now.
 				return;
 			}
@@ -228,14 +258,17 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 			::memset(&checksum_info, 0, sizeof(checksum_info));
 	
 			struct dirent *en = 0;
-			struct stat st;
+			struct stat file_st;
 			std::string filename;
 			while((en = ::readdir(dirHandle)) != 0)
 			{
 				rParams.mrContext.DoKeepAlive();
 				
-				// Don't need to use LinuxWorkaround_FinishDirentStruct(en, rLocalPath.c_str());
-				// on Linux, as a stat is performed to get all this info
+				// Don't need to use
+				// LinuxWorkaround_FinishDirentStruct(en,
+				// rLocalPath.c_str());
+				// on Linux, as a stat is performed to
+				// get all this info
 
 				if(en->d_name[0] == '.' && 
 					(en->d_name[1] == '\0' || (en->d_name[1] == '.' && en->d_name[2] == '\0')))
@@ -259,11 +292,11 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				// prefer S_IFREG, S_IFDIR...
 				int type = en->d_type;
 				#else
-				if(::lstat(filename.c_str(), &st) != 0)
+				if(::lstat(filename.c_str(), &file_st) != 0)
 				{
 					// Report the error (logs and 
 					// eventual email to administrator)
- 					rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
+ 					rNotifier.NotifyFileStatFailed(this, 
  						filename, strerror(errno));
 					
 					// FIXME move to NotifyFileStatFailed()
@@ -274,19 +307,18 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					continue;
 				}
 
-				if(st.st_dev != dir_st.st_dev)
+				if(file_st.st_dev != dest_st.st_dev)
 				{
 					if(!(rParams.mrContext.ExcludeDir(
 						filename)))
 					{
-						rParams.GetProgressNotifier()
-							.NotifyMountPointSkipped(
-								this, filename);
+						rNotifier.NotifyMountPointSkipped(
+							this, filename);
 					}
 					continue;
 				}
 
-				int type = st.st_mode & S_IFMT;
+				int type = file_st.st_mode & S_IFMT;
 				#endif
 
 				if(type == S_IFREG || type == S_IFLNK)
@@ -296,8 +328,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					// Exclude it?
 					if(rParams.mrContext.ExcludeFile(filename))
 					{
- 						rParams.GetProgressNotifier()
-							.NotifyFileExcluded(
+ 						rNotifier.NotifyFileExcluded(
 								this, 
 								filename);
 
@@ -315,8 +346,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					// Exclude it?
 					if(rParams.mrContext.ExcludeDir(filename))
 					{
- 						rParams.GetProgressNotifier()
-							.NotifyDirExcluded(
+ 						rNotifier.NotifyDirExcluded(
 								this, 
 								filename);
 
@@ -331,15 +361,13 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				{
 					if(rParams.mrContext.ExcludeFile(filename))
 					{
- 						rParams.GetProgressNotifier()
-							.NotifyFileExcluded(
+ 						rNotifier.NotifyFileExcluded(
 								this, 
 								filename);
 					}
 					else
 					{
- 						rParams.GetProgressNotifier()
-							.NotifyUnsupportedFileType(
+ 						rNotifier.NotifyUnsupportedFileType(
 								this, filename);
 						SetErrorWhenReadingFilesystemObject(
 							rParams, filename.c_str());
@@ -354,10 +382,9 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 				#ifdef WIN32
 				// We didn't stat the file before,
 				// but now we need the information.
-				if(::lstat(filename.c_str(), &st) != 0)
+				if(::lstat(filename.c_str(), &file_st) != 0)
 				{
- 					rParams.GetProgressNotifier()
-						.NotifyFileStatFailed(this, 
+ 					rNotifier.NotifyFileStatFailed(this, 
  							filename, 
 							strerror(errno));
 					
@@ -370,18 +397,17 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					continue;
 				}
 
-				if(st.st_dev != dir_st.st_dev)
+				if(file_st.st_dev != link_st.st_dev)
 				{
- 					rParams.GetProgressNotifier()
-						.NotifyMountPointSkipped(this, 
+ 					rNotifier.NotifyMountPointSkipped(this, 
  							filename);
 					continue;
 				}
 				#endif
 
-				checksum_info.mModificationTime = FileModificationTime(st);
-				checksum_info.mAttributeModificationTime = FileAttrModificationTime(st);
-				checksum_info.mSize = st.st_size;
+				checksum_info.mModificationTime = FileModificationTime(file_st);
+				checksum_info.mAttributeModificationTime = FileAttrModificationTime(file_st);
+				checksum_info.mSize = file_st.st_size;
 				currentStateChecksum.Add(&checksum_info, sizeof(checksum_info));
 				currentStateChecksum.Add(en->d_name, strlen(en->d_name));
 				
@@ -394,7 +420,7 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 					// Log that this has happened
 					if(!rParams.mHaveLoggedWarningAboutFutureFileTimes)
 					{
-						rParams.GetProgressNotifier().NotifyFileModifiedInFuture(
+						rNotifier.NotifyFileModifiedInFuture(
 							this, filename);
 						rParams.mHaveLoggedWarningAboutFutureFileTimes = true;
 					}
@@ -468,7 +494,8 @@ void BackupClientDirectoryRecord::SyncDirectory(BackupClientDirectoryRecord::Syn
 		}
 		
 		// Do the directory reading
-		bool updateCompleteSuccess = UpdateItems(rParams, rLocalPath, pdirOnStore, entriesLeftOver, files, dirs);
+		bool updateCompleteSuccess = UpdateItems(rParams, rLocalPath,
+			rRemotePath, pdirOnStore, entriesLeftOver, files, dirs);
 		
 		// LAST THING! (think exception safety)
 		// Store the new checksum -- don't fetch things unnecessarily in the future
@@ -604,11 +631,18 @@ void BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::
 //		Created: 2003/10/09
 //
 // --------------------------------------------------------------------------
-bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncParams &rParams,
-	const std::string &rLocalPath, BackupStoreDirectory *pDirOnStore,
+bool BackupClientDirectoryRecord::UpdateItems(
+	BackupClientDirectoryRecord::SyncParams &rParams,
+	const std::string &rLocalPath,
+	const std::string &rRemotePath,
+	BackupStoreDirectory *pDirOnStore,
 	std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
-	std::vector<std::string> &rFiles, const std::vector<std::string> &rDirs)
+	std::vector<std::string> &rFiles,
+	const std::vector<std::string> &rDirs)
 {
+	BackupClientContext& rContext(rParams.mrContext);
+	ProgressNotifier& rNotifier(rContext.GetProgressNotifier());
+
 	bool allUpdatedSuccessfully = true;
 
 	// Decrypt all the directory entries.
@@ -634,7 +668,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		f != rFiles.end(); ++f)
 	{
 		// Send keep-alive message if needed
-		rParams.mrContext.DoKeepAlive();
+		rContext.DoKeepAlive();
 		
 		// Filename of this file
 		std::string filename(MakeFullPath(rLocalPath, *f));
@@ -651,7 +685,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			struct stat st;
 			if(::lstat(filename.c_str(), &st) != 0)
 			{
-				rParams.GetProgressNotifier().NotifyFileStatFailed(this, 
+				rNotifier.NotifyFileStatFailed(this, 
 					filename, strerror(errno));
 
 				// Report the error (logs and 
@@ -689,7 +723,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		if((en != 0) && ((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) == 0))
 		{
 			// Directory exists in the place of this file -- sort it out
-			RemoveDirectoryInPlaceOfFile(rParams, pDirOnStore, en->GetObjectID(), *f);
+			RemoveDirectoryInPlaceOfFile(rParams, pDirOnStore,
+				en, *f);
 			en = 0;
 		}
 		
@@ -701,7 +736,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			// 2) It's not in the store
 			
 			// Do we know about the inode number?
-			const BackupClientInodeToIDMap &idMap(rParams.mrContext.GetCurrentIDMap());
+			const BackupClientInodeToIDMap &idMap(rContext.GetCurrentIDMap());
 			int64_t renameObjectID = 0, renameInDirectory = 0;
 			if(idMap.Lookup(inodeNum, renameObjectID, renameInDirectory))
 			{
@@ -711,7 +746,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				bool isCurrentVersion = false;
 				box_time_t srvModTime = 0, srvAttributesHash = 0;
 				BackupStoreFilenameClear oldLeafname;
-				if(rParams.mrContext.FindFilename(renameObjectID, renameInDirectory, localPotentialOldName, isDir, isCurrentVersion, &srvModTime, &srvAttributesHash, &oldLeafname))
+				if(rContext.FindFilename(renameObjectID, renameInDirectory, localPotentialOldName, isDir, isCurrentVersion, &srvModTime, &srvAttributesHash, &oldLeafname))
 				{	
 					// Only interested if it's a file and the latest version
 					if(!isDir && isCurrentVersion)
@@ -724,11 +759,11 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 							// Therefore we can safely rename it to this new file.
 
 							// Get the connection to the server 
-							BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+							BackupProtocolClient &connection(rContext.GetConnection());
 
 							// Only do this step if there is room on the server.
 							// This step will be repeated later when there is space available
-							if(!rParams.mrContext.StorageLimitExceeded())
+							if(!rContext.StorageLimitExceeded())
 							{
 								// Rename the existing files (ie include old versions) on the server
 								connection.QueryMoveObject(renameObjectID, renameInDirectory, mObjectID /* move to this directory */,
@@ -736,7 +771,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 									storeFilename);
 									
 								// Stop the attempt to delete the file in the original location
-								BackupClientDeleteList &rdelList(rParams.mrContext.GetDeleteList());
+								BackupClientDeleteList &rdelList(rContext.GetDeleteList());
 								rdelList.StopFileDeletion(renameInDirectory, oldLeafname);
 								
 								// Create new entry in the directory for it
@@ -871,16 +906,22 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				<< rParams.mSyncPeriodEnd << ")");
 		}
 
+		bool fileSynced = true;
+
 		if (doUpload)
 		{
+			// Upload needed, don't mark sync success until
+			// we've actually done it
+			fileSynced = false;
+
 			// Make sure we're connected -- must connect here so we know whether
 			// the storage limit has been exceeded, and hence whether or not
 			// to actually upload the file.
-			rParams.mrContext.GetConnection();
+			rContext.GetConnection();
 
 			// Only do this step if there is room on the server.
 			// This step will be repeated later when there is space available
-			if(!rParams.mrContext.StorageLimitExceeded())
+			if(!rContext.StorageLimitExceeded())
 			{
 				// Upload the file to the server, recording the object ID it returns
 				bool noPreviousVersionOnServer = ((pDirOnStore != 0) && (en == 0));
@@ -890,15 +931,27 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				try
 				{
 					latestObjectID = UploadFile(rParams, filename, storeFilename, fileSize, modTime, attributesHash, noPreviousVersionOnServer);
-					uploadSuccess = true;
+					if (latestObjectID == 0)
+					{
+						// storage limit exceeded
+						rParams.mrContext.SetStorageLimitExceeded();
+						uploadSuccess = false;
+						allUpdatedSuccessfully = false;
+					}
+					else
+					{
+						uploadSuccess = true;
+					}
 				}
 				catch(ConnectionException &e)
 				{
 					// Connection errors should just be passed on to the main handler, retries
 					// would probably just cause more problems.
-					rParams.GetProgressNotifier()
-						.NotifyFileUploadException(
-							this, filename, e);
+					// StorageLimitExceeded never gets here.
+					
+					rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+					rNotifier.NotifyFileUploadException(
+						this, filename, e);
 					throw;
 				}
 				catch(BoxException &e)
@@ -907,14 +960,15 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					allUpdatedSuccessfully = false;
 					// Log it.
 					SetErrorWhenReadingFilesystemObject(rParams, filename.c_str());
-					rParams.GetProgressNotifier()
-						.NotifyFileUploadException(
-							this, filename, e);
+					rNotifier.NotifyFileUploadException(
+						this, filename, e);
 				}
 
 				// Update structures if the file was uploaded successfully.
 				if(uploadSuccess)
 				{
+					fileSynced = true;
+
 					// delete from pending entries
 					if(pendingFirstSeenTime != 0 && mpPendingEntries != 0)
 					{
@@ -924,28 +978,31 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			}
 			else
 			{
-				rParams.GetProgressNotifier().NotifyFileSkippedServerFull(this,
+				rNotifier.NotifyFileSkippedServerFull(this,
 					filename);
 			}
 		}
 		else if(en != 0 && en->GetAttributesHash() != attributesHash)
 		{
 			// Attributes have probably changed, upload them again.
-			// If the attributes have changed enough, the directory hash will have changed too,
-			// and so the dir will have been downloaded, and the entry will be available.
+			// If the attributes have changed enough, the directory
+			// hash will have changed too, and so the dir will have
+			// been downloaded, and the entry will be available.
 
 			// Get connection
-			BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+			BackupProtocolClient &connection(rContext.GetConnection());
 
 			// Only do this step if there is room on the server.
-			// This step will be repeated later when there is space available
-			if(!rParams.mrContext.StorageLimitExceeded())
+			// This step will be repeated later when there is
+			// space available
+			if(!rContext.StorageLimitExceeded())
 			{
 				// Update store
 				BackupClientFileAttributes attr;
 				attr.ReadAttributes(filename.c_str(), false /* put mod times in the attributes, please */);
 				MemBlockStream attrStream(attr);
 				connection.QuerySetReplacementFileAttributes(mObjectID, attributesHash, storeFilename, attrStream);
+				fileSynced = true;
 			}
 		}
 
@@ -981,7 +1038,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		if(fileSize >= rParams.mFileTrackingSizeThreshold)
 		{
 			// Get the map
-			BackupClientInodeToIDMap &idMap(rParams.mrContext.GetNewIDMap());
+			BackupClientInodeToIDMap &idMap(rContext.GetNewIDMap());
 		
 			// Need to get an ID from somewhere...
 			if(latestObjectID != 0)
@@ -993,7 +1050,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			{
 				// Don't know it -- haven't sent anything to the store, and didn't get a listing.
 				// Look it up in the current map, and if it's there, use that.
-				const BackupClientInodeToIDMap &currentIDMap(rParams.mrContext.GetCurrentIDMap());
+				const BackupClientInodeToIDMap &currentIDMap(rContext.GetCurrentIDMap());
 				int64_t objid = 0, dirid = 0;
 				if(currentIDMap.Lookup(inodeNum, objid, dirid))
 				{
@@ -1002,15 +1059,18 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					// NOTE: If the above assert fails, an inode number has been reused by the OS,
 					// or there is a problem somewhere. If this happened on a short test run, look
 					// into it. However, in a long running process this may happen occasionally and
-					// not indiciate anything wrong.
+					// not indicate anything wrong.
 					// Run the release version for real life use, where this check is not made.
 					idMap.AddToMap(inodeNum, objid, mObjectID /* containing directory */);				
 				}
 			}
 		}
 		
-		rParams.GetProgressNotifier().NotifyFileSynchronised(this, 
-			filename, fileSize);
+		if (fileSynced)
+		{
+			rNotifier.NotifyFileSynchronised(this, filename,
+				fileSize);
+		}
 	}
 
 	// Erase contents of files to save space when recursing
@@ -1030,7 +1090,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		d != rDirs.end(); ++d)
 	{
 		// Send keep-alive message if needed
-		rParams.mrContext.DoKeepAlive();
+		rContext.DoKeepAlive();
 		
 		// Get the local filename
 		std::string dirname(MakeFullPath(rLocalPath, *d));
@@ -1050,16 +1110,20 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 		// Check that the entry which might have been found is in fact a directory
 		if((en != 0) && ((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == 0))
 		{
-			// Entry exists, but is not a directory. Bad. Get rid of it.
-			BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+			// Entry exists, but is not a directory. Bad.
+			// Get rid of it.
+			BackupProtocolClient &connection(rContext.GetConnection());
 			connection.QueryDeleteFile(mObjectID /* in directory */, storeFilename);
+			rNotifier.NotifyFileDeleted(en->GetObjectID(),
+				storeFilename.GetClearFilename());
 			
 			// Nothing found
 			en = 0;
 		}
 
-		// Flag for having created directory, so can optimise the recusive call not to
-		// read it again, because we know it's empty.
+		// Flag for having created directory, so can optimise the
+		// recusive call not to read it again, because we know
+		// it's empty.
 		bool haveJustCreatedDirOnServer = false;
 
 		// Next, see if it's in the list of sub directories
@@ -1086,7 +1150,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				// No. Exists on the server, and we know about it from the listing.
 				subDirObjectID = en->GetObjectID();
 			}
-			else if(rParams.mrContext.StorageLimitExceeded())	
+			else if(rContext.StorageLimitExceeded())	
 			// know we've got a connection if we get this far,
 			// as dir will have been modified.
 			{
@@ -1112,14 +1176,15 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				// First, do we have a record in the ID map?
 				int64_t renameObjectID = 0, renameInDirectory = 0;
 				bool renameDir = false;
-				const BackupClientInodeToIDMap &idMap(rParams.mrContext.GetCurrentIDMap());
+				const BackupClientInodeToIDMap &idMap(
+					rContext.GetCurrentIDMap());
 				if(idMap.Lookup(inodeNum, renameObjectID, renameInDirectory))
 				{
 					// Look up on the server to get the name, to build the local filename
 					std::string localPotentialOldName;
 					bool isDir = false;
 					bool isCurrentVersion = false;
-					if(rParams.mrContext.FindFilename(renameObjectID, renameInDirectory, localPotentialOldName, isDir, isCurrentVersion))
+					if(rContext.FindFilename(renameObjectID, renameInDirectory, localPotentialOldName, isDir, isCurrentVersion))
 					{	
 						// Only interested if it's a directory
 						if(isDir && isCurrentVersion)
@@ -1137,7 +1202,7 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 				}
 
 				// Get connection
-				BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+				BackupProtocolClient &connection(rContext.GetConnection());
 				
 				// Don't do a check for storage limit exceeded here, because if we get to this
 				// stage, a connection will have been opened, and the status known, so the check 
@@ -1157,7 +1222,8 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 					connection.QueryChangeDirAttributes(renameObjectID, attrModTime, attrStream);
 
 					// Stop it being deleted later
-					BackupClientDeleteList &rdelList(rParams.mrContext.GetDeleteList());
+					BackupClientDeleteList &rdelList(
+						rContext.GetDeleteList());
 					rdelList.StopDirectoryDeletion(renameObjectID);
 
 					// This is the ID for the renamed directory
@@ -1194,12 +1260,14 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			}
 		}
 		
-		ASSERT(psubDirRecord != 0 || rParams.mrContext.StorageLimitExceeded());
+		ASSERT(psubDirRecord != 0 || rContext.StorageLimitExceeded());
 		
 		if(psubDirRecord)
 		{
 			// Sync this sub directory too
-			psubDirRecord->SyncDirectory(rParams, mObjectID, dirname, haveJustCreatedDirOnServer);
+			psubDirRecord->SyncDirectory(rParams, mObjectID,
+				dirname, rRemotePath + "/" + *d,
+				haveJustCreatedDirOnServer);
 		}
 
 		// Zero pointer in rEntriesLeftOver, if we have a pointer to zero
@@ -1228,20 +1296,26 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 			// to a list, which is actually deleted at the very end of the session.
 			// If there's an error during the process, it doesn't matter if things
 			// aren't actually deleted, as the whole state will be reset anyway.
-			BackupClientDeleteList &rdel(rParams.mrContext.GetDeleteList());
+			BackupClientDeleteList &rdel(rContext.GetDeleteList());
+
+			std::string localName = MakeFullPath(rLocalPath,
+				en->GetName());
 			
 			// Delete this entry -- file or directory?
 			if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) != 0)
 			{
 				// Set a pending deletion for the file
-				rdel.AddFileDelete(mObjectID, en->GetName());				
+				rdel.AddFileDelete(mObjectID, en->GetName(),
+					localName);
 			}
 			else if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
 			{
 				// Set as a pending deletion for the directory
-				rdel.AddDirectoryDelete(en->GetObjectID());
+				rdel.AddDirectoryDelete(en->GetObjectID(),
+					localName);
 				
-				// If there's a directory record for it in the sub directory map, delete it now
+				// If there's a directory record for it in 
+				// the sub directory map, delete it now
 				BackupStoreFilenameClear dirname(en->GetName());
 				std::map<std::string, BackupClientDirectoryRecord *>::iterator e(mSubDirectories.find(dirname.GetClearFilename()));
 				if(e != mSubDirectories.end())
@@ -1276,14 +1350,24 @@ bool BackupClientDirectoryRecord::UpdateItems(BackupClientDirectoryRecord::SyncP
 //		Created: 9/7/04
 //
 // --------------------------------------------------------------------------
-void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(SyncParams &rParams, BackupStoreDirectory *pDirOnStore, int64_t ObjectID, const std::string &rFilename)
+void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(
+	SyncParams &rParams,
+	BackupStoreDirectory* pDirOnStore,
+	BackupStoreDirectory::Entry* pEntry,
+	const std::string &rFilename)
 {
 	// First, delete the directory
 	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
-	connection.QueryDeleteDirectory(ObjectID);
+	connection.QueryDeleteDirectory(pEntry->GetObjectID());
+
+	BackupStoreFilenameClear clear(pEntry->GetName());
+	rParams.mrContext.GetProgressNotifier().NotifyDirectoryDeleted(
+		pEntry->GetObjectID(), clear.GetClearFilename());
 
 	// Then, delete any directory record
-	std::map<std::string, BackupClientDirectoryRecord *>::iterator e(mSubDirectories.find(rFilename));
+	std::map<std::string, BackupClientDirectoryRecord *>::iterator
+		e(mSubDirectories.find(rFilename));
+
 	if(e != mSubDirectories.end())
 	{
 		// A record exists for this, remove it
@@ -1300,16 +1384,30 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(SyncParams &rPara
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::SyncParams &, const std::string &, const BackupStoreFilename &, int64_t, box_time_t, box_time_t, bool)
-//		Purpose: Private. Upload a file to the server -- may send a patch instead of the whole thing
+//		Name:    BackupClientDirectoryRecord::UploadFile(
+//			 BackupClientDirectoryRecord::SyncParams &,
+//			 const std::string &,
+//			 const BackupStoreFilename &,
+//			 int64_t, box_time_t, box_time_t, bool)
+//		Purpose: Private. Upload a file to the server. May send
+//			 a patch instead of the whole thing
 //		Created: 20/1/04
 //
 // --------------------------------------------------------------------------
-int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::SyncParams &rParams, const std::string &rFilename, const BackupStoreFilename &rStoreFilename,
-			int64_t FileSize, box_time_t ModificationTime, box_time_t AttributesHash, bool NoPreviousVersionOnServer)
+int64_t BackupClientDirectoryRecord::UploadFile(
+	BackupClientDirectoryRecord::SyncParams &rParams,
+	const std::string &rFilename,
+	const BackupStoreFilename &rStoreFilename,
+	int64_t FileSize,
+	box_time_t ModificationTime,
+	box_time_t AttributesHash,
+	bool NoPreviousVersionOnServer)
 {
+	BackupClientContext& rContext(rParams.mrContext);
+	ProgressNotifier& rNotifier(rContext.GetProgressNotifier());
+
 	// Get the connection
-	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+	BackupProtocolClient &connection(rContext.GetConnection());
 
 	// Info
 	int64_t objID = 0;
@@ -1318,8 +1416,10 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 	// Use a try block to catch store full errors
 	try
 	{
-		// Might an old version be on the server, and is the file size over the diffing threshold?
-		if(!NoPreviousVersionOnServer && FileSize >= rParams.mDiffingUploadSizeThreshold)
+		// Might an old version be on the server, and is the file
+		// size over the diffing threshold?
+		if(!NoPreviousVersionOnServer &&
+			FileSize >= rParams.mDiffingUploadSizeThreshold)
 		{
 			// YES -- try to do diff, if possible
 			// First, query the server to see if there's an old version available
@@ -1329,7 +1429,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 			if(diffFromID != 0)
 			{
 				// Found an old version
-				rParams.GetProgressNotifier().NotifyFileUploadingPatch(this, 
+				rNotifier.NotifyFileUploadingPatch(this, 
 					rFilename);
 
 				// Get the index
@@ -1339,7 +1439,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				// Diff the file
 				//
 
-				rParams.mrContext.ManageDiffProcess();
+				rContext.ManageDiffProcess();
 
 				bool isCompletelyDifferent = false;
 				std::auto_ptr<IOStream> patchStream(
@@ -1348,11 +1448,11 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 						mObjectID,	/* containing directory */
 						rStoreFilename, diffFromID, *blockIndexStream,
 						connection.GetTimeout(), 
-						&rParams.mrContext, // DiffTimer implementation
+						&rContext, // DiffTimer implementation
 						0 /* not interested in the modification time */, 
 						&isCompletelyDifferent));
 	
-				rParams.mrContext.UnManageDiffProcess();
+				rContext.UnManageDiffProcess();
 
 				//
 				// Upload the patch to the store
@@ -1360,6 +1460,9 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
 						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *patchStream));
 				
+				// Get object ID from the result		
+				objID = stored->GetObjectID();
+
 				// Don't attempt to upload it again!
 				doNormalUpload = false;
 			} 
@@ -1368,8 +1471,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 		if(doNormalUpload)
 		{
 			// below threshold or nothing to diff from, so upload whole
-			rParams.GetProgressNotifier().NotifyFileUploading(this, 
-				rFilename);
+			rNotifier.NotifyFileUploading(this, rFilename);
 			
 			// Prepare to upload, getting a stream which will encode the file as we go along
 			std::auto_ptr<IOStream> upload(
@@ -1390,7 +1492,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 	}
 	catch(BoxException &e)
 	{
-		rParams.mrContext.UnManageDiffProcess();
+		rContext.UnManageDiffProcess();
 
 		if(e.GetType() == ConnectionException::ExceptionType && e.GetSubType() == ConnectionException::Protocol_UnexpectedReply)
 		{
@@ -1404,10 +1506,13 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 				{
 					// The hard limit was exceeded on the server, notify!
 					rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+					// return an error code instead of
+					// throwing an exception that we
+					// can't debug.
+					return 0;
 				}
-				rParams.GetProgressNotifier()
-					.NotifyFileUploadServerError(
-						this, rFilename, type, subtype);
+				rNotifier.NotifyFileUploadServerError(this,
+					rFilename, type, subtype);
 			}
 		}
 		
@@ -1415,7 +1520,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(BackupClientDirectoryRecord::Syn
 		throw;
 	}
 
-	rParams.GetProgressNotifier().NotifyFileUploaded(this, rFilename, FileSize);
+	rNotifier.NotifyFileUploaded(this, rFilename, FileSize);
 
 	// Return the new object ID of this file
 	return objID;
@@ -1457,9 +1562,8 @@ void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(BackupClie
 //
 // --------------------------------------------------------------------------
 BackupClientDirectoryRecord::SyncParams::SyncParams(BackupDaemon &rDaemon, 
-	ProgressNotifier &rProgressNotifier, BackupClientContext &rContext)
-	: mrProgressNotifier(rProgressNotifier),
-	  mSyncPeriodStart(0),
+	BackupClientContext &rContext)
+	: mSyncPeriodStart(0),
 	  mSyncPeriodEnd(0),
 	  mMaxUploadWait(0),
 	  mMaxFileTimeInFuture(99999999999999999LL),
