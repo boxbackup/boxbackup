@@ -17,13 +17,14 @@
 
 #include "BoxPlatform.h"
 
-// uncomment this line to enable full memory leak finding on all malloc-ed blocks (at least, ones used by the STL)
+// uncomment this line to enable full memory leak finding on all
+// malloc-ed blocks (at least, ones used by the STL)
 //#define MEMLEAKFINDER_FULL_MALLOC_MONITORING
 
-#ifndef NDEBUG
-	#ifdef HAVE_EXECINFO_H
-		#define SHOW_BACKTRACE_ON_EXCEPTION
-	#endif
+// Show backtraces on exceptions in release builds until further notice
+// (they are only logged at TRACE level anyway)
+#ifdef HAVE_EXECINFO_H
+	#define SHOW_BACKTRACE_ON_EXCEPTION
 #endif
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
@@ -43,7 +44,8 @@
 	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
 	#define ASSERT(cond) {if(!(cond)) {BoxDebugAssertFailed(#cond, __FILE__, __LINE__); THROW_EXCEPTION(CommonException, AssertFailed)}}
 
-	// Note that syslog tracing is independent of BoxDebugTraceOn, but stdout tracing is not
+	// Note that syslog tracing is independent of BoxDebugTraceOn,
+	// but stdout tracing is not
 	extern bool BoxDebugTraceToSyslog;
 	#define TRACE_TO_SYSLOG(x) {BoxDebugTraceToSyslog = x;}
 	extern bool BoxDebugTraceToStdout;
