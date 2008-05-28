@@ -1,7 +1,16 @@
 #!@TARGET_PERL@
 
-
 my $f = 'testfiles/notifyran.'.$ARGV[0].'.';
+
+if (-e 'testfiles/notifyscript.tag')
+{
+	open FILE, '< testfiles/notifyscript.tag' or die $!;
+	my $tag = <FILE>;
+	chomp $tag;
+	$f .= "$tag.";
+	close FILE;
+}
+
 my $n = 1;
 
 while(-e $f.$n)
