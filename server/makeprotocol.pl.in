@@ -178,6 +178,9 @@ print CPP <<__E;
 // Auto-generated file -- do not edit
 
 #include "Box.h"
+
+#include <sstream>
+
 #include "$h_filename"
 #include "IOStream.h"
 
@@ -273,7 +276,7 @@ __E
 
 if($derive_objects_from ne 'ProtocolObject')
 {	
-	# output a definition for the protocol object derviced class
+	# output a definition for the protocol object derived class
 	print H <<__E;
 class ${protocol_name}ProtocolServer;
 	
@@ -338,6 +341,7 @@ __E
 	if(obj_is_type($cmd,'IsError'))
 	{
 		print H "\tbool IsError(int &rTypeOut, int &rSubTypeOut) const;\n";
+		print H "\tstd::string GetMessage() const;\n";
 	}
 	if($type eq 'Server' && obj_is_type($cmd, 'Command'))
 	{
@@ -497,6 +501,27 @@ bool ${class}IsError(int &rTypeOut, int &rSubTypeOut) const
 	rTypeOut = m$mem_type;
 	rSubTypeOut = m$mem_subtype;
 	return true;
+}
+std::string ${class}GetMessage() const
+{
+	switch(m$mem_subtype)
+	{
+__E
+		foreach my $const (@{$cmd_constants{$cmd}})
+		{
+			next unless $const =~ /^Err_(.*)/;
+			my $shortname = $1;
+			$const =~ s/ = .*//;
+			print CPP <<__E;
+		case $const: return "$shortname";
+__E
+		}
+		print CPP <<__E;
+		default:
+			std::ostringstream out;
+			out << "Unknown subtype " << m$mem_subtype;
+			return out.str();
+	}
 }
 __E
 	}
@@ -890,13 +915,15 @@ std::auto_ptr<$classname_base$reply> ${classname_base}::Query(const $classname_b
 		if(preply->IsError(type, subType))
 		{
 			SetError(type, subType);
-			BOX_WARNING("Protocol: Received error " << type <<
-				"/" << subType);
+			BOX_WARNING("$cmd command failed: received error " <<
+				((${classname_base}Error&)*preply).GetMessage());
 		}
 		else
 		{
 			SetError(Protocol::UnknownError, Protocol::UnknownError);
-			BOX_WARNING("Protocol: Received unknown error");
+			BOX_WARNING("$cmd command failed: received "
+				"unexpected response type " <<
+				preply->GetType());
 		}
 		
 		// Throw an exception
