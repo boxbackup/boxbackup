@@ -344,13 +344,27 @@ void memleakfinder_reportleaks_file(FILE *file)
 
 	ASSERT(!sTrackingDataDestroyed);
 
-	for(std::map<void *, MallocBlockInfo>::const_iterator i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
+	for(std::map<void *, MallocBlockInfo>::const_iterator
+		i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Block 0x%p size %d allocated at %s:%d\n", i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first))
+		{
+			::fprintf(file, "Block %p size %d allocated at "
+				"%s:%d\n", i->first, i->second.size,
+				i->second.file, i->second.line);
+		}
 	}
-	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
+
+	for(std::map<void *, ObjectInfo>::const_iterator
+		i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
-		if(is_leak(i->first)) ::fprintf(file, "Object%s 0x%p size %d allocated at %s:%d\n", i->second.array?" []":"", i->first, i->second.size, i->second.file, i->second.line);
+		if(is_leak(i->first))
+		{
+			::fprintf(file, "Object%s %p size %d allocated at "
+				"%s:%d\n", i->second.array?" []":"",
+				i->first, i->second.size, i->second.file,
+				i->second.line);
+		}
 	}
 }
 
