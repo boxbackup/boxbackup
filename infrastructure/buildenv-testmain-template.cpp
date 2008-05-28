@@ -164,6 +164,8 @@ int main(int argc, char * const * argv)
 	// Start memory leak testing
 	MEMLEAKFINDER_START
 
+	Logging::SetProgramName(BOX_MODULE);
+
 #ifdef HAVE_GETOPT_H
 	#ifdef NDEBUG
 	int logLevel = Log::NOTICE; // need an int to do math with
@@ -181,7 +183,7 @@ int main(int argc, char * const * argv)
 	
 	int ch;
 	
-	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vTUV", longopts, NULL))
+	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vPTUV", longopts, NULL))
 		!= -1)
 	{
 		switch(ch)
@@ -212,6 +214,14 @@ int main(int argc, char * const * argv)
 				bbstored_args += optarg;
 			}
 			break;
+
+			#ifndef WIN32
+			case 'P':
+			{
+				Console::SetShowPID(true);
+			}
+			break;
+			#endif
 
 			case 'q':
 			{
