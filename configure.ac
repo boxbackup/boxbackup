@@ -316,6 +316,9 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    runtest.pl
                    test/backupstorefix/testfiles/testbackupstorefix.pl
                    test/bbackupd/testfiles/bbackupd.conf
+                   test/bbackupd/testfiles/bbackupd-exclude.conf
+                   test/bbackupd/testfiles/bbackupd-snapshot.conf
+                   test/bbackupd/testfiles/bbackupd-symlink.conf
                    test/bbackupd/testfiles/extcheck1.pl
                    test/bbackupd/testfiles/extcheck2.pl
                    test/bbackupd/testfiles/notifyscript.pl
