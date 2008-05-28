@@ -107,7 +107,6 @@ int main(int argc, const char *argv[])
 	#endif
 	
 	// Flags
-	bool quiet = false;
 	bool readWrite = false;
 
 	Logging::SetProgramName("Box Backup (bbackupquery)");
@@ -119,10 +118,10 @@ int main(int argc, const char *argv[])
 	#endif
 
 #ifdef WIN32
-	const char* validOpts = "qvwuc:l:";
+	const char* validOpts = "qvwuc:l:W:";
 	bool unicodeConsole = false;
 #else
-	const char* validOpts = "qvwc:l:";
+	const char* validOpts = "qvwc:l:W:";
 #endif
 
 	// See if there's another entry on the command line
@@ -133,9 +132,6 @@ int main(int argc, const char *argv[])
 		{
 			case 'q':
 			{
-				// Quiet mode
-				quiet = true;
-
 				if(masterLevel == Log::NOTHING)
 				{
 					BOX_FATAL("Too many '-q': "
@@ -157,6 +153,17 @@ int main(int argc, const char *argv[])
 					return 2;
 				}
 				masterLevel++;
+			}
+			break;
+
+		case 'W':
+			{
+				masterLevel = Logging::GetNamedLevel(optarg);
+				if (masterLevel == Log::INVALID)
+				{
+					BOX_FATAL("Invalid logging level");
+					return 2;
+				}
 			}
 			break;
 
@@ -196,6 +203,13 @@ int main(int argc, const char *argv[])
 	argv += optind;
 	
 	Logging::SetGlobalLevel((Log::Level)masterLevel);
+
+	bool quiet = false;
+	if (masterLevel < Log::NOTICE)
+	{
+		// Quiet mode
+		quiet = true;
+	}
 
 	// Print banner?
 	if(!quiet)

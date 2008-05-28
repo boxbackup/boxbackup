@@ -43,6 +43,7 @@
 #include "BackupClientRestore.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
+#include "BackupQueries.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -82,13 +83,21 @@
 // utility macro for comparing two strings in a line
 #define TEST_EQUAL(expected, found, line) \
 { \
-	std::string exp_str = expected; \
-	std::string found_str = found; \
+	std::ostringstream _oss1; \
+	_oss1 << expected; \
+	std::string exp_str = _oss1.str(); \
+	\
+	std::ostringstream _oss2; \
+	_oss2 << found; \
+	std::string found_str = _oss2.str(); \
+	\
 	TEST_THAT(exp_str == found_str); \
+	std::string _line = line; \
+	\
 	if(exp_str != found_str) \
 	{ \
 		printf("Expected <%s> but found <%s> in <%s>\n", \
-			exp_str.c_str(), found_str.c_str(), line.c_str()); \
+			exp_str.c_str(), found_str.c_str(), _line.c_str()); \
 	} \
 }
 
@@ -336,7 +345,11 @@ int test_basics()
 #endif
 	
 	BackupClientFileAttributes t3;
-	TEST_CHECK_THROWS(t3.ReadAttributes("doesn't exist"), CommonException, OSFileError);
+	{
+		Logging::Guard guard(Log::ERROR);
+		TEST_CHECK_THROWS(t3.ReadAttributes("doesn't exist"),
+			CommonException, OSFileError);
+	}
 
 	// Create some more files
 	FILE *f = fopen("testfiles/test1_n", "w");
@@ -353,8 +366,13 @@ int test_basics()
 #endif
 
 #ifndef WIN32
-	TEST_CHECK_THROWS(t1.WriteAttributes("testfiles/test1_nXX"), CommonException, OSFileError);
-	TEST_CHECK_THROWS(t3.WriteAttributes("doesn't exist"), BackupStoreException, AttributesNotLoaded);
+	{
+		Logging::Guard guard(Log::ERROR);
+		TEST_CHECK_THROWS(t1.WriteAttributes("testfiles/test1_nXX"),
+			CommonException, OSFileError);
+		TEST_CHECK_THROWS(t3.WriteAttributes("doesn't exist"),
+			BackupStoreException, AttributesNotLoaded);
+	}
 
 	// Test that attributes are vaguely similar
 	TEST_THAT(attrmatch("testfiles/test1", "testfiles/test1_n"));
@@ -650,6 +668,7 @@ int start_internal_daemon()
 {
 	// ensure that no child processes end up running tests!
 	int own_pid = getpid();
+	BOX_TRACE("Test PID is " << own_pid);
 		
 	// this is a quick hack to allow passing some options to the daemon
 	const char* argv[] = {
@@ -669,14 +688,10 @@ int start_internal_daemon()
 		result = daemon.Main("testfiles/bbackupd.conf", 1, argv);
 	}
 	
-	TEST_THAT(result == 0);
-	if (result != 0)
-	{
-		printf("Daemon exited with code %d\n", result);
-	}
+	TEST_EQUAL(0, result, "Daemon exit code");
 	
 	// ensure that no child processes end up running tests!
-	TEST_THAT(getpid() == own_pid);
+	TEST_EQUAL(own_pid, getpid(), "Forking test problem");
 	if (getpid() != own_pid)
 	{
 		// abort!
@@ -799,10 +814,38 @@ int lstat_test_hook(int ver, const char *file_name, struct stat *buf)
 int lstat_test_hook(const char *file_name, struct stat *buf)
 #endif
 {
-	// TRACE1("lstat hook triggered for %s", file_name);		
+	// TRACE1("lstat hook triggered for %s", file_name);
 	memset(buf, 0, sizeof(*buf));
 	buf->st_mode = S_IFREG;
 	return 0;
+}
+
+// Simulate a symlink that is on a different device than the file
+// that it points to.
+int lstat_test_post_hook(int old_ret, const char *file_name, struct stat *buf)
+{
+	BOX_TRACE("lstat post hook triggered for " << file_name);
+	if (old_ret == 0 &&
+		strcmp(file_name, "testfiles/symlink-to-TestDir1") == 0)
+	{
+		buf->st_dev ^= 0xFFFF;
+	}
+	return old_ret;
+}
+
+bool test_entry_deleted(BackupStoreDirectory& rDir, 
+	const std::string& rName)
+{
+	BackupStoreDirectory::Iterator i(rDir);
+
+	BackupStoreDirectory::Entry *en = i.FindMatchingClearName(
+		BackupStoreFilenameClear(rName));
+	TEST_THAT(en != 0);
+	if (en == 0) return false;
+
+	int16_t flags = en->GetFlags();
+	TEST_THAT(flags && BackupStoreDirectory::Entry::Flags_Deleted);
+	return flags && BackupStoreDirectory::Entry::Flags_Deleted;
 }
 
 int test_bbackupd()
@@ -817,6 +860,23 @@ int test_bbackupd()
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
+
+	printf("\n==== Testing that ReadDirectory on nonexistent directory "
+		"does not crash\n");
+	{
+		std::auto_ptr<BackupProtocolClient> client = ConnectAndLogin(
+			context, 0 /* read-write */);
+		
+		{
+			Logging::Guard guard(Log::ERROR);
+			TEST_CHECK_THROWS(ReadDirectory(*client, 0x12345678),
+				ConnectionException,
+				Conn_Protocol_UnexpectedReply);
+		}
+
+		client->QueryFinished();
+		sSocket.Close();
+	}
 
 	// unpack the files for the initial test
 	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
@@ -852,7 +912,8 @@ int test_bbackupd()
 		char buffer[10000];
 		memset(buffer, 0, sizeof(buffer));
 
-		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
 		TEST_THAT(close(fd) == 0);
 		
 		int pid = start_internal_daemon();
@@ -867,11 +928,13 @@ int test_bbackupd()
 		TEST_THAT(unlink("testfiles/bbackupd.log") == 0);
 
 		pid = start_internal_daemon();
+		intercept_clear_setup();
 		
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
 		wait_for_backup_operation();
@@ -937,11 +1000,13 @@ int test_bbackupd()
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
 			0, 4000, SYS_read, 1);
 		pid = start_internal_daemon();
+		intercept_clear_setup();
 		
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
 		wait_for_backup_operation();
@@ -970,9 +1035,9 @@ int test_bbackupd()
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Receive Success(0x";
-			TEST_THAT(line.substr(0, comp.size()) == comp);
+			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Receiving stream, size 124");
+			TEST_EQUAL("Receiving stream, size 124", line, line);
 
 			// delaying for 4 seconds in one step means that
 			// the diff timer and the keepalive timer will
@@ -997,11 +1062,13 @@ int test_bbackupd()
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
 			0, 1000, SYS_read, 3);
 		pid = start_internal_daemon();
+		intercept_clear_setup();
 		
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
 		wait_for_backup_operation();
@@ -1030,9 +1097,9 @@ int test_bbackupd()
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Receive Success(0x";
-			TEST_THAT(line.substr(0, comp.size()) == comp);
+			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Receiving stream, size 124");
+			TEST_EQUAL("Receiving stream, size 124", line, line);
 
 			// delaying for 3 seconds in steps of 1 second
 			// means that the keepalive timer will expire 3 times,
@@ -1041,13 +1108,13 @@ int test_bbackupd()
 			// only two keepalives.
 			
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_EQUAL("Send GetIsAlive()", line, line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Receive IsAlive()");
+			TEST_EQUAL("Receive IsAlive()", line, line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Send GetIsAlive()");
+			TEST_EQUAL("Send GetIsAlive()", line, line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_THAT(line == "Receive IsAlive()");
+			TEST_EQUAL("Receive IsAlive()", line, line);
 
 			// but two matching blocks should have been found
 			// already, so the upload should be a diff.
@@ -1078,6 +1145,7 @@ int test_bbackupd()
 		readdir_stop_time = time(NULL) + 12 + 2;
 
 		pid = start_internal_daemon();
+		intercept_clear_setup();
 		
 		std::string touchfile = 
 			"testfiles/TestDir1/spacetest/d1/touch-me";
@@ -1085,7 +1153,8 @@ int test_bbackupd()
 		fd = open(touchfile.c_str(), O_CREAT | O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_THAT(write(fd, buffer, sizeof(buffer)) == sizeof(buffer));
+		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
 		wait_for_backup_operation();
@@ -1158,7 +1227,7 @@ int test_bbackupd()
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
 	std::string cmd = BBACKUPD " " + bbackupd_args + 
-		" testfiles/bbackupd-temploc.conf";
+		" testfiles/bbackupd.conf";
 
 	bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 	TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
@@ -1168,6 +1237,368 @@ int test_bbackupd()
 	TEST_THAT(ServerIsAlive(bbstored_pid));
 	if (!ServerIsAlive(bbackupd_pid)) return 1;
 	if (!ServerIsAlive(bbstored_pid)) return 1;
+
+	if(bbackupd_pid > 0)
+	{
+		printf("\n==== Testing that backup pauses when "
+			"store is full\n");
+
+		// wait for files to be uploaded
+		BOX_TRACE("Waiting for all outstanding files to be uploaded")
+		wait_for_sync_end();
+		BOX_TRACE("done.")
+
+		// Set limit to something very small
+		// 26 blocks will be used at this point.
+		// (12 files + location * 2 for raidfile)
+		// 20 is what we'll need in a minute
+		// set soft limit to 0 to ensure that all deleted files
+		// are deleted immediately by housekeeping
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
+			"testfiles/bbstored.conf setlimit 01234567 0B 20B") 
+			== 0);
+		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+		// Unpack some more files
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvf testfiles/spacetest2.tgz "
+				"-C testfiles/TestDir1") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz "
+				"| ( cd testfiles/TestDir1 && tar xf - )") == 0);
+		#endif
+
+		// Delete a file and a directory
+		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+
+		// The following files should be on the server:
+		// 00000001 -d---- 00002 (root)
+		// 00000002 -d---- 00002 Test1
+		// 00000003 -d---- 00002 Test1/spacetest
+		// 00000004 f-X--- 00002 Test1/spacetest/f1
+		// 00000005 f----- 00002 Test1/spacetest/f2
+		// 00000006 -d---- 00002 Test1/spacetest/d1
+		// 00000007 f----- 00002 Test1/spacetest/d1/f3
+		// 00000008 f----- 00002 Test1/spacetest/d1/f4
+		// 00000009 -d---- 00002 Test1/spacetest/d2
+		// 0000000a -d---- 00002 Test1/spacetest/d3
+		// 0000000b -d---- 00002 Test1/spacetest/d3/d4
+		// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
+		// 0000000d -d---- 00002 Test1/spacetest/d6
+		// 0000000e -dX--- 00002 Test1/spacetest/d7
+		// This is 28 blocks total, of which 2 in deleted files
+		// and 18 in directories. Note that f1 and d7 may or may
+		// not be deleted yet.
+		//
+		// spacetest1 + spacetest2 = 16 files = 32 blocks with raidfile
+		// minus one file and one dir is 28 blocks
+		//
+		// d2/f6, d6/d8 and d6/d8/f7 are new
+		// even if the client marks f1 and d7 as deleted, and
+		// housekeeping deleted them, the backup cannot complete
+		// if the limit is 20 blocks.
+
+		BOX_TRACE("Waiting for bbackupd to notice that the "
+			"store is full");
+		wait_for_sync_end();
+		BOX_TRACE("done.");
+
+		BOX_TRACE("Compare to check that there are differences");
+		int compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query0a.log "
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		BOX_TRACE("done.");
+
+		// Check that the notify script was run
+		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
+		// But only once!
+		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
+		
+		// Kill the daemon
+		terminate_bbackupd(bbackupd_pid);
+
+		BOX_TRACE("Wait for housekeeping to remove the deleted files");
+		wait_for_backup_operation(5);
+		BOX_TRACE("done.");
+
+		// This removes f1 and d7, which were previously marked
+		// as deleted, so total usage drops by 4 blocks to 24.
+
+		// BLOCK
+		{
+			std::auto_ptr<BackupProtocolClient> client =
+				ConnectAndLogin(context, 0 /* read-write */);
+		
+			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+				client->QueryGetAccountUsage());
+			TEST_EQUAL(24, usage->GetBlocksUsed(), "blocks used");
+			TEST_EQUAL(0,  usage->GetBlocksInDeletedFiles(),
+				"deleted blocks");
+			TEST_EQUAL(16, usage->GetBlocksInDirectories(),
+				"directory blocks");
+
+			client->QueryFinished();
+			sSocket.Close();
+		}
+
+		BOX_TRACE("Restart bbackupd with more exclusions");
+		// Start again with a new config that excludes d3 and f2,
+		// and hence also d3/d4 and d3/d4/f5. bbackupd should mark
+		// them as deleted and housekeeping should clean up,
+		// making space to upload the new files.
+		// total required: (13-2-4+3)*2 = 20 blocks
+		/*
+		cmd = BBACKUPD " " + bbackupd_args +
+			" testfiles/bbackupd-exclude.conf";
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		::safe_sleep(1);
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+		*/
+		BackupDaemon bbackupd;
+		bbackupd.Configure("testfiles/bbackupd-exclude.conf");
+		bbackupd.InitCrypto();
+		BOX_TRACE("done.");
+
+		// Should be marked as deleted by this run
+		// wait_for_sync_end();
+		{
+			Logging::Guard guard(Log::ERROR);
+			bbackupd.RunSyncNow();
+		}
+
+		TEST_THAT(bbackupd.StorageLimitExceeded());
+
+		// Check that the notify script was run
+		// TEST_THAT(TestFileExists("testfiles/notifyran.store-full.2"));
+		// But only twice!
+		// TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.3"));
+
+		// All these should be marked as deleted but hopefully
+		// not removed by housekeeping yet:
+		// f1		deleted
+		// f2		excluded
+		// d1		excluded (why?)
+		// d1/f3	excluded (why?)
+		// d3		excluded
+		// d3/d4	excluded
+		// d3/d4/f5	excluded
+		// d7		deleted
+		// Careful with timing here, these files can already be
+		// deleted by housekeeping.
+
+		BOX_TRACE("Find out whether bbackupd marked files as deleted");
+		{
+			std::auto_ptr<BackupProtocolClient> client =
+				ConnectAndLogin(context, 0 /* read-write */);
+		
+			std::auto_ptr<BackupStoreDirectory> rootDir = 
+				ReadDirectory(*client,
+				BackupProtocolClientListDirectory::RootDirectory);
+
+			int64_t testDirId = SearchDir(*rootDir, "Test1");
+			TEST_THAT(testDirId != 0);
+
+			std::auto_ptr<BackupStoreDirectory> Test1_dir =
+				ReadDirectory(*client, testDirId);
+
+			int64_t spacetestDirId = SearchDir(*Test1_dir, 
+				"spacetest");
+			TEST_THAT(spacetestDirId != 0);
+
+			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
+				ReadDirectory(*client, spacetestDirId);
+
+			TEST_THAT(SearchDir(*spacetest_dir, "f1") == 0);
+			TEST_THAT(test_entry_deleted(*spacetest_dir, "f2"));
+			TEST_THAT(test_entry_deleted(*spacetest_dir, "d3"));
+			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
+
+			int64_t d3_id = SearchDir(*spacetest_dir, "d3");
+			TEST_THAT(d3_id != 0);
+
+			std::auto_ptr<BackupStoreDirectory> d3_dir =
+				ReadDirectory(*client, d3_id);
+			TEST_THAT(test_entry_deleted(*d3_dir, "d4"));
+
+			int64_t d4_id = SearchDir(*d3_dir, "d4");
+			TEST_THAT(d4_id != 0);
+
+			std::auto_ptr<BackupStoreDirectory> d4_dir =
+				ReadDirectory(*client, d4_id);
+			TEST_THAT(test_entry_deleted(*d4_dir, "f5"));
+
+			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+				client->QueryGetAccountUsage());
+			TEST_EQUAL(24, usage->GetBlocksUsed(), "blocks used");
+			TEST_EQUAL(4, usage->GetBlocksInDeletedFiles(),
+				"deleted blocks");
+			TEST_EQUAL(16, usage->GetBlocksInDirectories(),
+				"directory blocks");
+			// d1/f3 and d1/f4 are the only two files on the
+			// server which are not deleted, they use 2 blocks
+			// each, the rest is directories and 2 deleted files
+			// (f1 and d3/d4/f5)
+
+			// Log out.
+			client->QueryFinished();
+			sSocket.Close();
+		}
+		BOX_TRACE("done.");
+
+		// Wait for housekeeping to run
+		BOX_TRACE("Wait for housekeeping to remove the deleted files");
+		wait_for_backup_operation(5);
+		BOX_TRACE("done.");
+
+		BOX_TRACE("Check that the files were removed");
+		{
+			std::auto_ptr<BackupProtocolClient> client = 
+				ConnectAndLogin(context, 0 /* read-write */);
+			
+			std::auto_ptr<BackupStoreDirectory> rootDir = 
+				ReadDirectory(*client,
+				BackupProtocolClientListDirectory::RootDirectory);
+
+			int64_t testDirId = SearchDir(*rootDir, "Test1");
+			TEST_THAT(testDirId != 0);
+
+			std::auto_ptr<BackupStoreDirectory> Test1_dir =
+				ReadDirectory(*client, testDirId);
+
+			int64_t spacetestDirId = SearchDir(*Test1_dir, 
+				"spacetest");
+			TEST_THAT(spacetestDirId != 0);
+
+			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
+				ReadDirectory(*client, spacetestDirId);
+
+			TEST_THAT(SearchDir(*spacetest_dir, "f1") == 0);
+			TEST_THAT(SearchDir(*spacetest_dir, "f2") == 0);
+			TEST_THAT(SearchDir(*spacetest_dir, "d3") == 0);
+			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
+
+			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+				client->QueryGetAccountUsage());
+			TEST_EQUAL(16, usage->GetBlocksUsed(), "blocks used");
+			TEST_EQUAL(0, usage->GetBlocksInDeletedFiles(),
+				"deleted blocks");
+			TEST_EQUAL(12, usage->GetBlocksInDirectories(),
+				"directory blocks");
+			// d1/f3 and d1/f4 are the only two files on the
+			// server, they use 2 blocks each, the rest is
+			// directories.
+
+			// Log out.
+			client->QueryFinished();
+			sSocket.Close();
+		}
+
+		// Need 22 blocks free to upload everything
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
+			"testfiles/bbstored.conf setlimit 01234567 0B 22B") 
+			== 0);
+		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+		// Run another backup, now there should be enough space
+		// for everything we want to upload.
+		{
+			Logging::Guard guard(Log::ERROR);
+			bbackupd.RunSyncNow();
+		}
+		TEST_THAT(!bbackupd.StorageLimitExceeded());
+
+		// Check that the contents of the store are the same 
+		// as the contents of the disc 
+		// (-a = all, -c = give result in return code)
+		BOX_TRACE("Check that all files were uploaded successfully");
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd-exclude.conf "
+			"-l testfiles/query1.log "
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		BOX_TRACE("done.");
+
+		// BLOCK
+		{
+			std::auto_ptr<BackupProtocolClient> client = 
+				ConnectAndLogin(context, 0 /* read-write */);
+
+			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+				client->QueryGetAccountUsage());
+			TEST_EQUAL(22, usage->GetBlocksUsed(), "blocks used");
+			TEST_EQUAL(0, usage->GetBlocksInDeletedFiles(),
+				"deleted blocks");
+			TEST_EQUAL(14, usage->GetBlocksInDirectories(),
+				"directory blocks");
+			// d2/f6, d6/d8 and d6/d8/f7 are new
+			// i.e. 2 new files, 1 new directory
+
+			client->QueryFinished();
+			sSocket.Close();
+		}
+
+		// Put the limit back
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
+			"testfiles/bbstored.conf setlimit 01234567 "
+			"1000B 2000B") == 0);
+		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	
+		// Start again with the old config
+		BOX_TRACE("Restart bbackupd with original configuration");
+		// terminate_bbackupd();
+		cmd = BBACKUPD " " + bbackupd_args +
+			" testfiles/bbackupd.conf";
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		::safe_sleep(1);
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+		BOX_TRACE("done.");
+
+		// unpack the initial files again
+		#ifdef WIN32
+			TEST_THAT(::system("tar xzvf testfiles/test_base.tgz "
+				"-C testfiles") == 0);
+		#else
+			TEST_THAT(::system("gzip -d < testfiles/test_base.tgz "
+				"| ( cd testfiles && tar xf - )") == 0);
+		#endif
+
+		BOX_TRACE("Wait for bbackupd to upload more files");
+		wait_for_backup_operation();
+		BOX_TRACE("done.");
+		
+		// Check that the contents of the store are the same 
+		// as the contents of the disc 
+		// (-a = all, -c = give result in return code)
+		BOX_TRACE("Check that all files were uploaded successfully");
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query1.log "
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue, 
+			BackupQueries::ReturnCode::Compare_Same);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		BOX_TRACE("done.");
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+	}
 
 	#ifndef WIN32
 	printf("\n==== Testing that absolute symlinks are not followed "
@@ -1204,11 +1635,12 @@ int test_bbackupd()
 		::sync_and_wait();
 
 		// Check that the backup was successful, i.e. no differences
-		int compareReturnValue = ::system(BBACKUPQUERY " -q "
+		int compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query1.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// now stop bbackupd and update the test file,
@@ -1227,9 +1659,10 @@ int test_bbackupd()
 		// check that we can restore it
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
-			"-q \"restore Test1 testfiles/restore-symlink\" "
+			"-Wwarning \"restore Test1 testfiles/restore-symlink\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Command_OK);
 
 		// make it accessible again
 		TEST_THAT(chmod(SYM_DIR, 0755) == 0);
@@ -1240,9 +1673,51 @@ int test_bbackupd()
 		std::string line;
 		TEST_THAT(gl.GetLine(line));
 		TEST_THAT(line != "before");
-		TEST_THAT(line == "after");
+		TEST_EQUAL("after", line, line);
 
 		#undef SYM_DIR
+
+		/*
+ 		// This is not worth testing or fixing.
+ 		//
+		#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+		printf("\n==== Testing that symlinks to other filesystems "
+			"can be backed up as roots\n");
+
+		intercept_setup_lstat_post_hook(lstat_test_post_hook);
+		TEST_THAT(symlink("TestDir1", "testfiles/symlink-to-TestDir1")
+			== 0);
+
+		struct stat stat_st, lstat_st;
+		TEST_THAT(stat("testfiles/symlink-to-TestDir1", &stat_st) == 0);
+		TEST_THAT(lstat("testfiles/symlink-to-TestDir1", &lstat_st) == 0);
+		TEST_EQUAL((stat_st.st_dev ^ 0xFFFF), lstat_st.st_dev,
+			"stat vs lstat");
+
+		BackupDaemon bbackupd;
+		bbackupd.Configure("testfiles/bbackupd-symlink.conf");
+		bbackupd.InitCrypto();
+		bbackupd.RunSyncNow();
+		intercept_clear_setup();
+
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query0a.log "
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+		// and again using the symlink during compare
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd-symlink.conf "
+			"-l testfiles/query0a.log "
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		#endif
+		*/
 
 		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
@@ -1257,7 +1732,27 @@ int test_bbackupd()
 
 	printf("\n==== Testing that redundant locations are deleted on time\n");
 
+	// BLOCK
 	{
+		// Kill the daemon
+		terminate_bbackupd(bbackupd_pid);
+
+		// Start it with a config that has a temporary location
+		// that will be created on the server
+		std::string cmd = BBACKUPD " " + bbackupd_args + 
+			" testfiles/bbackupd-temploc.conf";
+
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		::safe_sleep(1);
+
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		sync_and_wait();
+
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context,
@@ -1266,16 +1761,9 @@ int test_bbackupd()
 			std::auto_ptr<BackupStoreDirectory> dir = 
 				ReadDirectory(*client,
 				BackupProtocolClientListDirectory::RootDirectory);
-
-			// int64_t testDirId = SearchDir(*dir, "Test2");
-			// TEST_THAT(testDirId == 0);
-
-			sync_and_wait();
-
-			dir = ReadDirectory(*client,
-				BackupProtocolClientListDirectory::RootDirectory);
 			int64_t testDirId = SearchDir(*dir, "Test2");
 			TEST_THAT(testDirId != 0);
+
 			client->QueryFinished();
 			sSocket.Close();
 		}
@@ -1283,6 +1771,7 @@ int test_bbackupd()
 		// Kill the daemon
 		terminate_bbackupd(bbackupd_pid);
 
+		// Start it again with the normal config (no Test2)
 		cmd = BBACKUPD " " + bbackupd_args +
 			" testfiles/bbackupd.conf";
 		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
@@ -1301,6 +1790,8 @@ int test_bbackupd()
 		wait_for_sync_end();
 		wait_for_sync_end();
 
+		// not yet! should still be there
+
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context,
@@ -1311,30 +1802,26 @@ int test_bbackupd()
 				BackupProtocolClientListDirectory::RootDirectory);
 			int64_t testDirId = SearchDir(*dir, "Test2");
 			TEST_THAT(testDirId != 0);
+
 			client->QueryFinished();
 			sSocket.Close();
 		}
 
 		wait_for_sync_end();
 
+		// NOW it should be gone
+
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context,
 				BackupProtocolClientLogin::Flags_ReadOnly);
 			
-			std::auto_ptr<BackupStoreDirectory> dir = 
+			std::auto_ptr<BackupStoreDirectory> root_dir = 
 				ReadDirectory(*client,
 				BackupProtocolClientListDirectory::RootDirectory);
-			int64_t testDirId = SearchDir(*dir, "Test2");
-			TEST_THAT(testDirId != 0);
 
-			BackupStoreDirectory::Iterator i(*dir);
-			BackupStoreFilenameClear dirname("Test2");
-			BackupStoreDirectory::Entry *en = 
-				i.FindMatchingClearName(dirname);
-			TEST_THAT(en != 0);
-			int16_t en_flags = en->GetFlags();
-			TEST_THAT(en_flags && BackupStoreDirectory::Entry::Flags_Deleted);
+			TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
+
 			client->QueryFinished();
 			sSocket.Close();
 		}
@@ -1347,82 +1834,6 @@ int test_bbackupd()
 
 	if(bbackupd_pid > 0)
 	{
-		printf("\n==== Testing that backup pauses when store is full\n");
-
-		// wait for files to be uploaded
-		wait_for_backup_operation();
-
-		// Set limit to something very small
-		// About 28 blocks will be used at this point. bbackupd 
-		// will only pause if the size used is greater than 
-		// soft limit + 1/3 of (hard - soft). Set small values
-		// for limits accordingly.
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
-			"testfiles/bbstored.conf setlimit 01234567 9B 10B") 
-			== 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		// Unpack some more files
-		#ifdef WIN32
-			TEST_THAT(::system("tar xzvf testfiles/spacetest2.tgz "
-				"-C testfiles/TestDir1") == 0);
-		#else
-			TEST_THAT(::system("gzip -d < testfiles/spacetest2.tgz "
-				"| ( cd testfiles/TestDir1 && tar xf - )") == 0);
-		#endif
-
-		// Delete a file and a directory
-		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/d1/f3") == 0);
-		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d3/d4") == 0);
-		wait_for_backup_operation();
-
-		// Make sure there are some differences
-		int compareReturnValue = ::system(BBACKUPQUERY " -q "
-			"-c testfiles/bbackupd.conf "
-			"-l testfiles/query0a.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 2);
-		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-
-		// Put the limit back
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
-			"testfiles/bbstored.conf setlimit 01234567 "
-			"1000B 2000B") == 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-		
-		// Check that the notify script was run
-		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
-		// But only once!
-		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
-		
-		// unpack the initial files again
-		#ifdef WIN32
-			TEST_THAT(::system("tar xzvf testfiles/test_base.tgz "
-				"-C testfiles") == 0);
-		#else
-			TEST_THAT(::system("gzip -d < testfiles/test_base.tgz "
-				"| ( cd testfiles && tar xf - )") == 0);
-		#endif
-
-		// wait for it to do it's stuff
-		wait_for_backup_operation();
-		
-		// Check that the contents of the store are the same 
-		// as the contents of the disc 
-		// (-a = all, -c = give result in return code)
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
-			"-c testfiles/bbackupd.conf "
-			"-l testfiles/query1.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
-		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-
-
 		printf("\n==== Check that read-only directories and "
 			"their contents can be restored.\n");
 
@@ -1438,27 +1849,33 @@ int test_bbackupd()
 			wait_for_sync_end(); // too new
 			wait_for_sync_end(); // should be backed up now
 
-			compareReturnValue = ::system(BBACKUPQUERY " "
+			int compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Wwarning "
 				"-c testfiles/bbackupd.conf "
-				"-q \"compare -cEQ Test1 testfiles/TestDir1\" " 
+				"\"compare -cEQ Test1 testfiles/TestDir1\" " 
 				"quit");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// check that we can restore it
 			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Wwarning "
 				"-c testfiles/bbackupd.conf "
-				"-q \"restore Test1 testfiles/restore1\" "
+				"\"restore Test1 testfiles/restore1\" "
 				"quit");
-			TEST_RETURN(compareReturnValue, 0);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Command_OK);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// check that it restored properly
 			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Wwarning "
 				"-c testfiles/bbackupd.conf "
-				"-q \"compare -cEQ Test1 testfiles/restore1\" " 
+				"\"compare -cEQ Test1 testfiles/restore1\" " 
 				"quit");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// put the permissions back to sensible values
@@ -1513,7 +1930,7 @@ int test_bbackupd()
 		std::string filepath(dirpath + "/" + filename);
 
 		char cwdbuf[1024];
-		TEST_THAT(getcwd(cwdbuf, sizeof(cwdbuf)) == cwdbuf);
+		TEST_EQUAL(cwdbuf, getcwd(cwdbuf, sizeof(cwdbuf)), "getcwd");
 		std::string cwd = cwdbuf;
 
 		// Test that our emulated chdir() works properly
@@ -1544,52 +1961,61 @@ int test_bbackupd()
 
 		// test that bbackupd will let us lcd into the local 
 		// directory using a relative path
-		std::string command = BBACKUPQUERY " -q "
+		std::string command = BBACKUPQUERY " "
+			"-Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"\"lcd testfiles/TestDir1/" + systemDirName + "\" "
 			"quit";
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Command_OK);
 
 		// and back out again
-		command = BBACKUPQUERY " -q "
+		command = BBACKUPQUERY " "
+			"-Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"\"lcd testfiles/TestDir1/" + systemDirName + "\" "
 			"\"lcd ..\" quit";
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Command_OK);
 
 		// and using an absolute path
-		command = BBACKUPQUERY " -q "
+		command = BBACKUPQUERY " "
+			"-Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"\"lcd " + cwd + "/testfiles/TestDir1/" + 
 			systemDirName + "\" quit";
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Command_OK);
 
 		// and back out again
-		command = BBACKUPQUERY " -q "
+		command = BBACKUPQUERY " "
+			"-Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"\"lcd " + cwd + "/testfiles/TestDir1/" + 
 			systemDirName + "\" "
 			"\"lcd ..\" quit";
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Command_OK);
 
 		{
 			FileStream fs(filepath.c_str(), O_CREAT | O_RDWR);
 
 			std::string data("hello world\n");
 			fs.Write(data.c_str(), data.size());
-			TEST_THAT(fs.GetPosition() == 12);
+			TEST_EQUAL(12, fs.GetPosition(), "FileStream position");
 			fs.Close();
 		}
 
 		wait_for_backup_operation();
 		// Compare to check that the file was uploaded
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf \"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Check that we can find it in directory listing
@@ -1615,9 +2041,8 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 
-
 		// Check that bbackupquery shows the dir in console encoding
-		command = BBACKUPQUERY " -q "
+		command = BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"-q \"list Test1\" quit";
 		pid_t bbackupquery_pid;
@@ -1647,7 +2072,7 @@ int test_bbackupd()
 		// on the command line in system encoding, and shows
 		// the file in console encoding
 		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"list Test1/" + systemDirName + "\" quit";
+			"-Wwarning \"list Test1/" + systemDirName + "\" quit";
 		queryout = LocalProcessStream(command.c_str(), 
 			bbackupquery_pid);
 		TEST_THAT(queryout.get() != NULL);
@@ -1671,31 +2096,34 @@ int test_bbackupd()
 		// Check that bbackupquery can compare the dir when given
 		// on the command line in system encoding.
 		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"compare -cEQ Test1/" + systemDirName +
+			"-Wwarning \"compare -cEQ Test1/" + systemDirName +
 			" testfiles/TestDir1/" + systemDirName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries:ReturnCode::Compare_Same);
 
 		// Check that bbackupquery can restore the dir when given
 		// on the command line in system encoding.
 		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"restore Test1/" + systemDirName +
+			"-Wwarning \"restore Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries:ReturnCode::Command_OK);
 
 		// Compare to make sure it was restored properly.
 		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"compare -cEQ Test1/" + systemDirName +
+			"-Wwarning \"compare -cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 
 		std::string fileToUnlink = "testfiles/restore-" + 
 			dirname + "/" + filename;
@@ -1704,22 +2132,25 @@ int test_bbackupd()
 		// Check that bbackupquery can get the file when given
 		// on the command line in system encoding.
 		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"get Test1/" + systemDirName + "/" + 
+			"-Wwarning \"get Test1/" + systemDirName + "/" + 
 			systemFileName + " " + "testfiles/restore-" + 
 			systemDirName + "/" + systemFileName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries:ReturnCode::Command_OK);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// And after changing directory to a relative path
-		command = BBACKUPQUERY " -c testfiles/bbackupd.conf -q "
+		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
+			"-Wwarning "
 			"\"lcd testfiles\" "
 			"\"cd Test1/" + systemDirName + "\" " + 
 			"\"get " + systemFileName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries:ReturnCode::Command_OK);
 		TestRemoteProcessMemLeaks("testfiles/bbackupquery.memleaks");
 
 		// cannot overwrite a file that exists, so delete it
@@ -1727,34 +2158,38 @@ int test_bbackupd()
 		TEST_THAT(::unlink(tmp.c_str()) == 0);
 
 		// And after changing directory to an absolute path
-		command = BBACKUPQUERY " -c testfiles/bbackupd.conf -q "
+		command = BBACKUPQUERY " -c testfiles/bbackupd.conf -Wwarning "
 			"\"lcd " + cwd + "/testfiles\" "
 			"\"cd Test1/" + systemDirName + "\" " + 
 			"\"get " + systemFileName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries:ReturnCode::Command_OK);
 		TestRemoteProcessMemLeaks("testfiles/bbackupquery.memleaks");
 
 		// Compare to make sure it was restored properly.
 		// The Get command does not restore attributes, so
 		// we must compare without them (-A) to succeed.
-		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"compare -cAEQ Test1/" + systemDirName +
+		command = BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-Wwarning \"compare -cAEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName + "\" quit";
 
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries:ReturnCode::Compare_Same);
 
 		// Compare without attributes. This should fail.
-		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
-			"-q \"compare -cEQ Test1/" + systemDirName +
+		command = BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-Werror \"compare -cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName + "\" quit";
-
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		TEST_RETURN(compareReturnValue, 2);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 #endif // WIN32
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -1831,11 +2266,13 @@ int test_bbackupd()
 			long start_time = time(NULL);
 
 			// check that no backup has run (compare fails)
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			int compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Werror "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query3.log "
 				"\"compare -acQ\" quit");
-			TEST_RETURN(compareReturnValue, 2);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Different);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			TEST_THAT(unlink(sync_control_file) == 0);
@@ -1851,11 +2288,13 @@ int test_bbackupd()
 
 			wait_for_sync_end();
 			// check that backup has run (compare succeeds)
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Wwarning "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query3a.log "
 				"\"compare -acQ\" quit");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			if (failures > 0)
@@ -1900,19 +2339,21 @@ int test_bbackupd()
 	
 		// wait for backup daemon to do it's stuff, and compare again
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		int compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2.log "
 			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Try a quick compare, just for fun
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2q.log "
-			"\"compare -acqQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acqQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -1922,12 +2363,15 @@ int test_bbackupd()
 
 		// Check that store errors are reported neatly
 		printf("\n==== Create store error\n");
+
+		// break the store
 		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
 			"testfiles/0_0/backup/01234567/info.rf.bak") == 0);
 		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf",
 			"testfiles/0_1/backup/01234567/info.rf.bak") == 0);
 		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf",
 			"testfiles/0_2/backup/01234567/info.rf.bak") == 0);
+
 		// Create a file to trigger an upload
 		{
 			int fd1 = open("testfiles/TestDir1/force-upload", 
@@ -1935,49 +2379,188 @@ int test_bbackupd()
 			TEST_THAT(fd1 > 0);
 			TEST_THAT(write(fd1, "just do it", 10) == 10);
 			TEST_THAT(close(fd1) == 0);
-			wait_for_backup_operation(4);
 		}
-		// Wait and test...
-		wait_for_backup_operation();
-		// Check that it was reported correctly
+
+		wait_for_backup_operation(4);
+		// Check that an error was reported just once
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
-		// Check that the error was only reported once
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
-		// Fix the store
+		// Now kill bbackupd and start one that's running in
+		// snapshot mode, check that it automatically syncs after
+		// an error, without waiting for another sync command.
+		terminate_bbackupd(bbackupd_pid);
+		std::string cmd = BBACKUPD " " + bbackupd_args + 
+			" testfiles/bbackupd-snapshot.conf";
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		::safe_sleep(1);
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		sync_and_wait();
+
+		// Check that the error was reported once more
+		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
+		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.2"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.3"));
+		// Fix the store (so that bbackupquery compare works)
 		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf.bak",
 			"testfiles/0_0/backup/01234567/info.rf") == 0);
 		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf.bak",
 			"testfiles/0_1/backup/01234567/info.rf") == 0);
 		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf.bak",
 			"testfiles/0_2/backup/01234567/info.rf") == 0);
-	
-		// Check that we DO get errors on compare
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+
+		// Check that we DO get errors on compare (cannot do this
+		// until after we fix the store, which creates a race)
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3b.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 2);
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
+		// Test initial state
+		TEST_THAT(!TestFileExists("testfiles/"
+			"notifyran.backup-start.wait-snapshot.1"));
+
+		// Set a tag for the notify script to distinguist from
+		// previous runs.
+		{
+			int fd1 = open("testfiles/notifyscript.tag", 
+				O_CREAT | O_EXCL | O_WRONLY, 0700);
+			TEST_THAT(fd1 > 0);
+			TEST_THAT(write(fd1, "wait-snapshot", 13) == 13);
+			TEST_THAT(close(fd1) == 0);
+		}
+
+		// bbackupd should pause for about 90 seconds
+		wait_for_backup_operation(85);
+		TEST_THAT(!TestFileExists("testfiles/"
+			"notifyran.backup-start.wait-snapshot.1"));
+
+		// Should not have backed up, should still get errors
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3b.log "
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		// wait another 10 seconds, bbackup should have run
+		wait_for_backup_operation(10);
+		TEST_THAT(TestFileExists("testfiles/"
+			"notifyran.backup-start.wait-snapshot.1"));
+	
+		// Check that it did get uploaded, and we have no more errors
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3b.log "
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		TEST_THAT(::unlink("testfiles/notifyscript.tag") == 0);
+
+		// Stop the snapshot bbackupd
+		terminate_bbackupd(bbackupd_pid);
+
+		// Break the store again
+		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
+			"testfiles/0_0/backup/01234567/info.rf.bak") == 0);
+		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf",
+			"testfiles/0_1/backup/01234567/info.rf.bak") == 0);
+		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf",
+			"testfiles/0_2/backup/01234567/info.rf.bak") == 0);
+
+		// Modify a file to trigger an upload
+		{
+			int fd1 = open("testfiles/TestDir1/force-upload", 
+				O_WRONLY, 0700);
+			TEST_THAT(fd1 > 0);
+			TEST_THAT(write(fd1, "and again", 9) == 9);
+			TEST_THAT(close(fd1) == 0);
+		}
+
+		// Restart the old bbackupd, in automatic mode
+		cmd = BBACKUPD " " + bbackupd_args + 
+			" testfiles/bbackupd.conf";
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		::safe_sleep(1);
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 
-		// Wait until bbackupd recovers from the exception
-		wait_for_backup_operation(100);
-
-		// Ensure that the force-upload file gets uploaded,
-		// meaning that bbackupd recovered
 		sync_and_wait();
 
-		// Check that it did get uploaded, and we have no more errors
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		// Fix the store again
+		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf.bak",
+			"testfiles/0_0/backup/01234567/info.rf") == 0);
+		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf.bak",
+			"testfiles/0_1/backup/01234567/info.rf") == 0);
+		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf.bak",
+			"testfiles/0_2/backup/01234567/info.rf") == 0);
+
+		// Check that we DO get errors on compare (cannot do this
+		// until after we fix the store, which creates a race)
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3b.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		// Test initial state
+		TEST_THAT(!TestFileExists("testfiles/"
+			"notifyran.backup-start.wait-automatic.1"));
+
+		// Set a tag for the notify script to distinguist from
+		// previous runs.
+		{
+			int fd1 = open("testfiles/notifyscript.tag", 
+				O_CREAT | O_EXCL | O_WRONLY, 0700);
+			TEST_THAT(fd1 > 0);
+			TEST_THAT(write(fd1, "wait-automatic", 14) == 14);
+			TEST_THAT(close(fd1) == 0);
+		}
+
+		// bbackupd should pause for at least 90 seconds
+		wait_for_backup_operation(85);
+		TEST_THAT(!TestFileExists("testfiles/"
+			"notifyran.backup-start.wait-automatic.1"));
+
+		// Should not have backed up, should still get errors
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3b.log "
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		// wait another 10 seconds, bbackup should have run
+		wait_for_backup_operation(10);
+		TEST_THAT(TestFileExists("testfiles/"
+			"notifyran.backup-start.wait-automatic.1"));
+	
+		// Check that it did get uploaded, and we have no more errors
+		compareReturnValue = ::system(BBACKUPQUERY " "
+			"-c testfiles/bbackupd.conf "
+			"-l testfiles/query3b.log "
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
+		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
+
+		TEST_THAT(::unlink("testfiles/notifyscript.tag") == 0);
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
@@ -2008,11 +2591,12 @@ int test_bbackupd()
 		#endif
 
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3c.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2036,11 +2620,12 @@ int test_bbackupd()
 		#endif
 
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3d.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2067,11 +2652,12 @@ int test_bbackupd()
 		#endif
 
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3e.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2098,11 +2684,12 @@ int test_bbackupd()
 		#endif
 
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3f.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2129,11 +2716,12 @@ int test_bbackupd()
 		wait_for_operation(5);
 		// back up both files
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3g.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		#ifdef WIN32
@@ -2146,11 +2734,12 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/untracked-2"));
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3g.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2180,11 +2769,12 @@ int test_bbackupd()
 		wait_for_operation(5);
 		// back up both files
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3h.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		#ifdef WIN32
@@ -2197,11 +2787,12 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3i.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2217,11 +2808,12 @@ int test_bbackupd()
 			"testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 		
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3j.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2251,11 +2843,12 @@ int test_bbackupd()
 		
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3k.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2309,11 +2902,12 @@ int test_bbackupd()
 		wait_for_sync_end(); // files too new
 		wait_for_sync_end(); // should (not) be backed up this time
 
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3l.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2337,19 +2931,21 @@ int test_bbackupd()
 		wait_for_sync_end();
 		
 		// compare with exclusions, should not find differences
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3m.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// compare without exclusions, should find differences
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3n.log "
-			"\"compare -acEQ\" quit");
-		TEST_RETURN(compareReturnValue, 2);
+			"-Werror \"compare -acEQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2421,13 +3017,14 @@ int test_bbackupd()
 
 			// Wait and test...
 			wait_for_backup_operation();
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query3o.log "
-				"\"compare -acQ\" quit");
+				"-Werror \"compare -acQ\" quit");
 
 			// should find differences
-			TEST_RETURN(compareReturnValue, 3);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Error);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Check that it was reported correctly
@@ -2524,11 +3121,12 @@ int test_bbackupd()
 		
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query4.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
 		printf("\n==== Restore files and directories\n");
@@ -2573,13 +3171,18 @@ int test_bbackupd()
 				== Restore_Complete);
 
 			// Make sure you can't restore to a nonexistant path
-			printf("\n\n==== Try to restore to a path "
+			printf("\n==== Try to restore to a path "
 				"that doesn't exist\n");
 			fflush(stdout);
-			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"testfiles/no-such-path/subdir", 
-				true /* print progress dots */) 
-				== Restore_TargetPathNotFound);
+
+			{
+				Logging::Guard guard(Log::FATAL);
+				TEST_THAT(BackupClientRestore(*client,
+					restoredirid, 
+					"testfiles/no-such-path/subdir", 
+					true /* print progress dots */) 
+					== Restore_TargetPathNotFound);
+			}
 
 			// Log out
 			client->QueryFinished();
@@ -2587,12 +3190,14 @@ int test_bbackupd()
 		}
 
 		// Compare the restored files
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query10.log "
+			"-Wwarning "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2606,12 +3211,14 @@ int test_bbackupd()
 			"testfiles\\restore-Test1\\f1.dat");
 		TEST_RETURN(compareReturnValue, 0);
 
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query10a.log "
+			"-Werror "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 2);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
 		// set it back, expect no failures
@@ -2619,11 +3226,13 @@ int test_bbackupd()
 			"testfiles\\restore-Test1\\f1.dat");
 		TEST_RETURN(compareReturnValue, 0);
 
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf -l testfiles/query10a.log "
+			"-Wwarning "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// change the timestamp on a file, expect a compare failure
@@ -2643,46 +3252,54 @@ int test_bbackupd()
 		// a compare failure
 		TEST_THAT(set_file_time(testfile, dummyTime, lastModTime,
 			lastAccessTime));
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query10a.log "
+			"-Werror "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 2);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// last access time is not backed up, so it cannot be compared
 		TEST_THAT(set_file_time(testfile, creationTime, lastModTime,
 			dummyTime));
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query10a.log "
+			"-Wwarning "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// last write time is backed up, so changing it should cause
 		// a compare failure
 		TEST_THAT(set_file_time(testfile, creationTime, dummyTime,
 			lastAccessTime));
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query10a.log "
+			"-Werror "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 2);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// set back to original values, check that compare succeeds
 		TEST_THAT(set_file_time(testfile, creationTime, lastModTime,
 			lastAccessTime));
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query10a.log "
+			"-Wwarning "
 			"\"compare -cEQ Test1 testfiles/restore-Test1\" "
 			"quit");
-		TEST_RETURN(compareReturnValue, 1);
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 #endif // WIN32
 
@@ -2705,11 +3322,12 @@ int test_bbackupd()
 		
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query5.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2722,19 +3340,21 @@ int test_bbackupd()
 		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", 
 			"testfiles/TestDir1/renamed-dir") == 0);
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// and again, but with quick flag
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6q.log "
-			"\"compare -acqQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acqQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// Rename some files -- one under the threshold, others above
@@ -2746,11 +3366,12 @@ int test_bbackupd()
 		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl", 
 			"testfiles/TestDir1/find2perl-ren") == 0);
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2788,11 +3409,12 @@ int test_bbackupd()
 
 		// Wait and test
 		wait_for_backup_operation();
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3e.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 1);
+			"-Wwarning \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2856,11 +3478,12 @@ int test_bbackupd()
 		// Wait and test that there *are* differences
 		wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION * 
 			3) / 2); // little bit longer than usual
-		compareReturnValue = ::system(BBACKUPQUERY " -q "
+		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
-			"\"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue, 2);
+			"-Werror \"compare -acQ\" quit");
+		TEST_RETURN(compareReturnValue,
+			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -2914,12 +3537,13 @@ int test_bbackupd()
 			sSocket.Close();
 
 			// Then check it has restored the correct stuff
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query14.log "
-				"\"compare -cEQ Test1 "
+				"-Wwarning \"compare -cEQ Test1 "
 				"testfiles/restore-interrupt\" quit");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 #endif // !WIN32
@@ -2947,12 +3571,14 @@ int test_bbackupd()
 			sSocket.Close();
 
 			// Do a compare with the now undeleted files
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query11.log "
+				"-Wwarning "
 				"\"compare -cEQ Test1/x1 "
 				"testfiles/restore-Test1-x1-2\" quit");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 		
@@ -3002,11 +3628,12 @@ int test_bbackupd()
 
 			// compare, and check that it works
 			// reports the correct error message (and finishes)
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query15a.log "
-				"\"compare -acQ\" quit");
-			TEST_RETURN(compareReturnValue, 1);
+				"-Wwarning \"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// open the file again, compare and check that compare
@@ -3015,22 +3642,24 @@ int test_bbackupd()
 				O_LOCK, 0);
 			TEST_THAT(handle != INVALID_HANDLE_VALUE);
 
-			compareReturnValue = ::system(BBACKUPQUERY 
-				" -q -c testfiles/bbackupd.conf "
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query15.log "
-				"\"compare -acQ\" quit");
-			TEST_RETURN(compareReturnValue, 3);
+				"-Werror \"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Error);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// close the file again, check that compare
 			// works again
 			CloseHandle(handle);
 
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query15a.log "
-				"\"compare -acQ\" quit");
-			TEST_RETURN(compareReturnValue, 1);
+				"-Wwarning \"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 #endif
@@ -3055,11 +3684,12 @@ int test_bbackupd()
 			// Wait and compare (a little bit longer than usual)
 			wait_for_backup_operation(
 				(TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2); 
-			compareReturnValue = ::system(BBACKUPQUERY " -q "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query4a.log "
-				"\"compare -acQ\" quit");
-			TEST_RETURN(compareReturnValue, 1);
+				"-Wwarning \"compare -acQ\" quit");
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 			// Kill it again
@@ -3067,10 +3697,12 @@ int test_bbackupd()
 		}
 	}
 
-	// List the files on the server
+	/*
+	// List the files on the server - why?
 	::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf "
 		"-l testfiles/queryLIST.log \"list -rotdh\" quit");
 	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+	*/
 
 	#ifndef WIN32	
 		if(::getuid() == 0)
