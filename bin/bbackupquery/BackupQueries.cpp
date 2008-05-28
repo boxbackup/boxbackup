@@ -122,7 +122,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{
 			BOX_WARNING("System command returned error code " <<
 				result);
-			SetReturnCode(COMMAND_RETURN_ERROR);
+			SetReturnCode(ReturnCode::Command_Error);
 		}
 		return;
 	}
@@ -295,7 +295,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 	if(cmd != COMMAND_Quit && cmd != COMMAND_Exit)
 	{
 		// If not a quit command, set the return code to zero
-		SetReturnCode(0);
+		SetReturnCode(ReturnCode::Command_OK);
 	}
 
 	// Handle command
@@ -410,7 +410,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 		{
 			BOX_ERROR("Directory '" << args[0] << "' not found "
 				"on store.");
-			SetReturnCode(COMMAND_RETURN_ERROR);
+			SetReturnCode(ReturnCode::Command_Error);
 			return;
 		}
 	}
@@ -448,13 +448,13 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 	catch (std::exception &e)
 	{
 		BOX_ERROR("Failed to list directory: " << e.what());
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	catch (...)
 	{
 		BOX_ERROR("Failed to list directory: unknown error");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 
@@ -773,7 +773,7 @@ void BackupQueries::CommandChangeDir(const std::vector<std::string> &args, const
 	if(args.size() != 1 || args[0].size() == 0)
 	{
 		BOX_ERROR("Incorrect usage. cd [-o] [-d] <directory>");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 
@@ -791,7 +791,7 @@ void BackupQueries::CommandChangeDir(const std::vector<std::string> &args, const
 	if(id == 0)
 	{
 		BOX_ERROR("Directory '" << args[0] << "' not found.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	
@@ -813,7 +813,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	if(args.size() != 1 || args[0].size() == 0)
 	{
 		BOX_ERROR("Incorrect usage. lcd <local-directory>");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	
@@ -823,7 +823,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	if(!ConvertConsoleToUtf8(args[0].c_str(), dirName))
 	{
 		BOX_ERROR("Failed to convert path from console encoding.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	int result = ::chdir(dirName.c_str());
@@ -842,7 +842,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 				"'" << args[0] << "'");
 		}
 
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	
@@ -851,7 +851,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	if(::getcwd(wd, PATH_MAX) == 0)
 	{
 		BOX_LOG_SYS_ERROR("Error getting current directory");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 
@@ -859,7 +859,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 	if(!ConvertUtf8ToConsole(wd, dirName))
 	{
 		BOX_ERROR("Failed to convert new path from console encoding.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	BOX_INFO("Local current directory is now '" << dirName << "'.");
@@ -1069,7 +1069,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	{
 		BOX_ERROR("The local file " << localName << " already exists, "
 			"will not overwrite it.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	
@@ -1268,15 +1268,15 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	{
 		if (params.mUncheckedFiles != 0)
 		{
-			SetReturnCode(COMPARE_RETURN_ERROR);
+			SetReturnCode(ReturnCode::Compare_Error);
 		} 
 		else if (params.mDifferences != 0)
 		{
-			SetReturnCode(COMPARE_RETURN_DIFFERENT);
+			SetReturnCode(ReturnCode::Compare_Different);
 		}
 		else
 		{
-			SetReturnCode(COMPARE_RETURN_SAME);
+			SetReturnCode(ReturnCode::Compare_Same);
 		}
 	}
 }
@@ -2055,13 +2055,13 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	catch(std::exception &e)
 	{
 		BOX_ERROR("Failed to restore: " << e.what());
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 	catch(...)
 	{
 		BOX_ERROR("Failed to restore: unknown exception");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
 
@@ -2079,30 +2079,30 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	case Restore_ResumePossible:
 		BOX_ERROR("Resume possible -- repeat command with -r flag "
 			"to resume.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		break;
 	
 	case Restore_TargetExists:
 		BOX_ERROR("The target directory exists. You cannot restore "
 			"over an existing directory.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		break;
 		
 	case Restore_TargetPathNotFound:
 		BOX_ERROR("The target directory path does not exist.\n"
 			"To restore to a directory whose parent "
 			"does not exist, create the parent first.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		break;
 
 	case Restore_UnknownError:
 		BOX_ERROR("Unknown error during restore.");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		break;
 
 	default:
 		BOX_ERROR("Unknown restore result " << result << ".");
-		SetReturnCode(COMMAND_RETURN_ERROR);
+		SetReturnCode(ReturnCode::Command_Error);
 		break;
 	}
 }
