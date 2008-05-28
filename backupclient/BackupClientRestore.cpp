@@ -595,7 +595,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 				
 				// Save restore info?
 				int64_t fileSize;
-				int exists;
+				bool exists = false;
 
 				try
 				{
