@@ -79,9 +79,28 @@ private:
 		const ExcludeList *mpExcludeDirs;
 		box_time_t mLatestFileUploadTime;
 	};
-	void CompareLocation(const std::string &rLocation, CompareParams &rParams);
-	void Compare(const std::string &rStoreDir, const std::string &rLocalDir, CompareParams &rParams);
-	void Compare(int64_t DirID, const std::string &rStoreDir, const std::string &rLocalDir, CompareParams &rParams);
+	void CompareLocation(const std::string &rLocation,
+		CompareParams &rParams);
+	void Compare(const std::string &rStoreDir,
+		const std::string &rLocalDir, CompareParams &rParams);
+	void Compare(int64_t DirID, const std::string &rStoreDir,
+		const std::string &rLocalDir, CompareParams &rParams);
+
+public:
+
+	class ReturnCode
+	{
+		public:
+		enum {
+			Command_OK = 0,
+			Compare_Same = 1,
+			Compare_Different,
+			Compare_Error,
+			Command_Error,
+		} Type;
+	};
+
+private:
 
 	// Utility functions
 	int64_t FindDirectoryObjectID(const std::string &rDirName, bool AllowOldVersion = false,
