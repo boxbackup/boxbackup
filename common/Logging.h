@@ -93,7 +93,8 @@ namespace Log
 		NOTICE,
 		INFO,
 		TRACE, 
-		EVERYTHING
+		EVERYTHING,
+		INVALID = -1,
 	};
 }
 
@@ -225,11 +226,30 @@ class Logging
 	static void SetContext(std::string context);
 	static void ClearContext();
 	static void SetGlobalLevel(Log::Level level) { sGlobalLevel = level; }
+	static Log::Level GetGlobalLevel() { return sGlobalLevel; }
+	static Log::Level GetNamedLevel(const std::string& rName);
 	static bool IsEnabled(Log::Level level)
 	{
 		return (int)sGlobalLevel >= (int)level;
 	}
 	static void SetProgramName(const std::string& rProgramName);
+
+	class Guard
+	{
+		private:
+		Log::Level mOldLevel;
+
+		public:
+		Guard(Log::Level newLevel)
+		{
+			mOldLevel = Logging::GetGlobalLevel();
+			Logging::SetGlobalLevel(newLevel);
+		}
+		~Guard()
+		{
+			Logging::SetGlobalLevel(mOldLevel);
+		}
+	};
 };
 
 #endif // LOGGING__H
