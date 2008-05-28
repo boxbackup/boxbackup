@@ -84,6 +84,12 @@ static closedir_t* closedir_real = NULL;
 static lstat_t*    lstat_real    = NULL;
 static lstat_t*    lstat_hook    = NULL;
 static const char* lstat_file    = NULL;
+static lstat_t*    stat_real     = NULL;
+static lstat_t*    stat_hook     = NULL;
+static const char* stat_file     = NULL;
+
+static lstat_post_hook_t* lstat_post_hook = NULL;
+static lstat_post_hook_t* stat_post_hook  = NULL;
 
 #define SIZE_ALWAYS_ERROR	-773
 
@@ -97,7 +103,10 @@ void intercept_clear_setup()
 	intercept_filepos = 0;
 	intercept_delay_ms = 0;
 	readdir_hook = NULL;
+	stat_hook = NULL;
 	lstat_hook = NULL;
+	stat_post_hook = NULL;
+	lstat_post_hook = NULL;
 }
 
 bool intercept_triggered()
@@ -405,6 +414,40 @@ void intercept_setup_lstat_hook(const char *filename, lstat_t hookfn)
 	lstat_hook = hookfn;
 }
 
+void intercept_setup_lstat_post_hook(lstat_post_hook_t hookfn)
+{
+	/*
+	if (hookfn != NULL)
+	{
+		BOX_TRACE("lstat hooked to " << hookfn << " for " << filename);
+	}
+	else
+	{
+		BOX_TRACE("lstat unhooked from " << lstat_hook << " for " <<
+			lstat_file);
+	}
+	*/
+
+	lstat_post_hook = hookfn;
+}
+
+void intercept_setup_stat_post_hook(lstat_post_hook_t hookfn)
+{
+	/*
+	if (hookfn != NULL)
+	{
+		BOX_TRACE("lstat hooked to " << hookfn << " for " << filename);
+	}
+	else
+	{
+		BOX_TRACE("lstat unhooked from " << lstat_hook << " for " <<
+			lstat_file);
+	}
+	*/
+
+	stat_post_hook = hookfn;
+}
+
 static void * find_function(const char *pName)
 {
 	dlerror();
@@ -534,16 +577,65 @@ lstat(const char *file_name, STAT_STRUCT *buf)
 	if (lstat_hook == NULL || strcmp(file_name, lstat_file) != 0)
 	{
 	#ifdef LINUX_WEIRD_LSTAT
-		return lstat_real(ver, file_name, buf);
+		int ret = lstat_real(ver, file_name, buf);
 	#else
-		return lstat_real(file_name, buf);
+		int ret = lstat_real(file_name, buf);
 	#endif
+		if (lstat_post_hook != NULL)
+		{
+			ret = lstat_post_hook(ret, file_name, buf);
+		}
+		return ret;
 	}
 
 	#ifdef LINUX_WEIRD_LSTAT
 	return lstat_hook(ver, file_name, buf);
 	#else
 	return lstat_hook(file_name, buf);
+	#endif
+}
+
+extern "C" int 
+#ifdef LINUX_WEIRD_LSTAT
+__xstat(int ver, const char *file_name, STAT_STRUCT *buf)
+#else
+stat(const char *file_name, STAT_STRUCT *buf)
+#endif
+{
+	if (stat_real == NULL)
+	{
+	#ifdef LINUX_WEIRD_LSTAT
+		stat_real = (lstat_t*)find_function("__xstat");
+	#else
+		stat_real = (lstat_t*)find_function("stat");
+	#endif
+	}
+
+	if (stat_real == NULL)
+	{
+		perror("cannot find real stat");
+		errno = ENOSYS;
+		return -1;
+	}
+
+	if (stat_hook == NULL || strcmp(file_name, stat_file) != 0)
+	{
+	#ifdef LINUX_WEIRD_LSTAT
+		int ret = stat_real(ver, file_name, buf);
+	#else
+		int ret = stat_real(file_name, buf);
+	#endif
+		if (stat_post_hook != NULL)
+		{
+			ret = stat_post_hook(ret, file_name, buf);
+		}
+		return ret;
+	}
+
+	#ifdef LINUX_WEIRD_LSTAT
+	return stat_hook(ver, file_name, buf);
+	#else
+	return stat_hook(file_name, buf);
 	#endif
 }
 
