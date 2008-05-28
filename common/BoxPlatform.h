@@ -29,6 +29,9 @@
 #endif
 
 #ifdef WIN32
+	#ifdef __MSVCRT_VERSION__
+		#error Must include Box.h before sys/types.h
+	#endif
 	// need msvcrt version 6.1 or higher for _gmtime64()
 	// must define this before importing <sys/types.h>
 	#define __MSVCRT_VERSION__ 0x0601
