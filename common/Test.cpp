@@ -7,6 +7,8 @@
 //
 // --------------------------------------------------------------------------
 
+#include "Box.h"
+
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -19,7 +21,6 @@
 	#include <unistd.h>
 #endif
 
-#include "Box.h"
 #include "Test.h"
 
 bool TestFileExists(const char *Filename)
