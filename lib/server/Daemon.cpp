@@ -112,7 +112,7 @@ std::string Daemon::GetOptionString()
 	#else // !WIN32
 		"DFkP"
 	#endif
-		"hqvVt:TU";
+		"hqt:TUvVW:";
 }
 
 void Daemon::Usage()
@@ -137,6 +137,7 @@ void Daemon::Usage()
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity\n"
+	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
 	"  -t <tag>   Tag console output with specified marker\n"
 	"  -T         Timestamp console output\n"
 	"  -U         Timestamp console output with microseconds\n";
@@ -234,6 +235,17 @@ int Daemon::ProcessOption(signed int option)
 		case 'V':
 		{
 			mLogLevel = Log::EVERYTHING;
+		}
+		break;
+
+		case 'W':
+		{
+			mLogLevel = Logging::GetNamedLevel(optarg);
+			if (mLogLevel == Log::INVALID)
+			{
+				BOX_FATAL("Invalid logging level");
+				return 2;
+			}
 		}
 		break;
 
@@ -353,6 +365,62 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    Daemon::Configure(const std::string& rConfigFileName)
+//		Purpose: Loads daemon configuration. Useful when you have
+//			 a local Daemon object and don't intend to fork()
+//			 or call Main().
+//		Created: 2008/04/19
+//
+// --------------------------------------------------------------------------
+
+bool Daemon::Configure(const std::string& rConfigFileName)
+{
+	mConfigFileName = rConfigFileName;
+
+	// Load the configuration file.
+	std::string errors;
+	std::auto_ptr<Configuration> pconfig;
+
+	try
+	{
+		pconfig = Configuration::LoadAndVerify(
+			mConfigFileName.c_str(), 
+			GetConfigVerify(), errors);
+	}
+	catch(BoxException &e)
+	{
+		if(e.GetType() == CommonException::ExceptionType &&
+			e.GetSubType() == CommonException::OSFileOpenError)
+		{
+			BOX_ERROR("Failed to open configuration file: " 
+				<< mConfigFileName);
+			return false;
+		}
+
+		throw;
+	}
+
+	// Got errors?
+	if(pconfig.get() == 0 || !errors.empty())
+	{
+		BOX_ERROR("Configuration errors: " << errors);
+		return false;
+	}
+	
+	// Store configuration
+	mpConfiguration = pconfig.release();
+	mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
+	
+	// Let the derived class have a go at setting up stuff
+	// in the initial process
+	SetupInInitialProcess();
+		
+	return true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    Daemon::Main(const std::string& rConfigFileName)
 //		Purpose: Starts the daemon off -- equivalent of C main() function
 //		Created: 2003/07/29
@@ -367,52 +435,16 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	std::string pidFileName;
 
-	mConfigFileName = rConfigFileName;
-	
-	bool asDaemon   = !mSingleProcess && !mRunInForeground;
+	bool asDaemon = !mSingleProcess && !mRunInForeground;
 
 	try
 	{
-		// Load the configuration file.
-		std::string errors;
-		std::auto_ptr<Configuration> pconfig;
-
-		try
+		if (!Configure(rConfigFileName))
 		{
-			pconfig = Configuration::LoadAndVerify(
-				mConfigFileName.c_str(), 
-				GetConfigVerify(), errors);
-		}
-		catch(BoxException &e)
-		{
-			if(e.GetType() == CommonException::ExceptionType &&
-				e.GetSubType() == CommonException::OSFileOpenError)
-			{
-				BOX_FATAL("Failed to start: failed to open "
-					"configuration file: " 
-					<< mConfigFileName);
-				return 1;
-			}
-
-			throw;
-		}
-
-		// Got errors?
-		if(pconfig.get() == 0 || !errors.empty())
-		{
-			// Tell user about errors
-			BOX_FATAL("Failed to start: errors in configuration "
-				"file: " << mConfigFileName << ": " << errors);
-			// And give up
+			BOX_FATAL("Failed to start: failed to load "
+				"configuration file: " << rConfigFileName);
 			return 1;
 		}
-		
-		// Store configuration
-		mpConfiguration = pconfig.release();
-		mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
-		
-		// Let the derived class have a go at setting up stuff in the initial process
-		SetupInInitialProcess();
 		
 		// Server configuration
 		const Configuration &serverConfig(
@@ -675,8 +707,19 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 #ifdef WIN32
 	WSACleanup();
+#else
+	// Should clean up here, but it breaks memory leak tests.
+	/*
+	if(asDaemon)
+	{
+		// we are running in the child by now, and should not return
+		delete mpConfiguration;
+		mpConfiguration = NULL;
+		exit(0);
+	}
+	*/
 #endif
-	
+
 	return retcode;
 }
 
@@ -840,8 +883,10 @@ const Configuration &Daemon::GetConfiguration() const
 //
 // Function
 //		Name:    Daemon::SetupInInitialProcess()
-//		Purpose: A chance for the daemon to do something initial setting up in the process which
-//				 initiates everything, and after the configuration file has been read and verified.
+//		Purpose: A chance for the daemon to do something initial
+//			 setting up in the process which initiates
+//			 everything, and after the configuration file has
+//			 been read and verified.
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
