@@ -42,21 +42,38 @@ BackupClientDeleteList::~BackupClientDeleteList()
 {
 }
 
+BackupClientDeleteList::FileToDelete::FileToDelete(int64_t DirectoryID,
+	const BackupStoreFilename& rFilename,
+	const std::string& rLocalPath)
+: mDirectoryID(DirectoryID),
+  mFilename(rFilename),
+  mLocalPath(rLocalPath)
+{ }
+
+BackupClientDeleteList::DirToDelete::DirToDelete(int64_t ObjectID,
+	const std::string& rLocalPath)
+: mObjectID(ObjectID),
+  mLocalPath(rLocalPath)
+{ }
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDeleteList::AddDirectoryDelete(int64_t)
+//		Name:    BackupClientDeleteList::AddDirectoryDelete(int64_t,
+//			 const BackupStoreFilename&)
 //		Purpose: Add a directory to the list of directories to be deleted.
 //		Created: 10/11/03
 //
 // --------------------------------------------------------------------------
-void BackupClientDeleteList::AddDirectoryDelete(int64_t ObjectID)
+void BackupClientDeleteList::AddDirectoryDelete(int64_t ObjectID,
+	const std::string& rLocalPath)
 {
 	// Only add the delete to the list if it's not in the "no delete" set
-	if(mDirectoryNoDeleteList.find(ObjectID) == mDirectoryNoDeleteList.end())
+	if(mDirectoryNoDeleteList.find(ObjectID) ==
+		mDirectoryNoDeleteList.end())
 	{
 		// Not in the list, so should delete it
-		mDirectoryList.push_back(ObjectID);
+		mDirectoryList.push_back(DirToDelete(ObjectID, rLocalPath));
 	}
 }
 
@@ -64,18 +81,22 @@ void BackupClientDeleteList::AddDirectoryDelete(int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDeleteList::AddFileDelete(int64_t, BackupStoreFilenameClear &)
+//		Name:    BackupClientDeleteList::AddFileDelete(int64_t,
+//			 const BackupStoreFilename &)
 //		Purpose: 
 //		Created: 10/11/03
 //
 // --------------------------------------------------------------------------
-void BackupClientDeleteList::AddFileDelete(int64_t DirectoryID, const BackupStoreFilename &rFilename)
+void BackupClientDeleteList::AddFileDelete(int64_t DirectoryID,
+	const BackupStoreFilename &rFilename, const std::string& rLocalPath)
 {
 	// Try to find it in the no delete list
-	std::vector<std::pair<int64_t, BackupStoreFilename> >::iterator delEntry(mFileNoDeleteList.begin());
+	std::vector<std::pair<int64_t, BackupStoreFilename> >::iterator
+		delEntry(mFileNoDeleteList.begin());
 	while(delEntry != mFileNoDeleteList.end())
 	{
-		if((delEntry)->first == DirectoryID && (delEntry)->second == rFilename)
+		if((delEntry)->first == DirectoryID 
+			&& (delEntry)->second == rFilename)
 		{
 			// Found!
 			break;
@@ -86,7 +107,8 @@ void BackupClientDeleteList::AddFileDelete(int64_t DirectoryID, const BackupStor
 	// Only add it to the delete list if it wasn't in the no delete list
 	if(delEntry == mFileNoDeleteList.end())
 	{
-		mFileList.push_back(std::pair<int64_t, BackupStoreFilename>(DirectoryID, rFilename));
+		mFileList.push_back(FileToDelete(DirectoryID, rFilename,
+			rLocalPath));
 	}
 }
 
@@ -113,18 +135,24 @@ void BackupClientDeleteList::PerformDeletions(BackupClientContext &rContext)
 	BackupProtocolClient &connection(rContext.GetConnection());
 	
 	// Do the deletes
-	for(std::vector<int64_t>::iterator i(mDirectoryList.begin()); i != mDirectoryList.end(); ++i)
+	for(std::vector<DirToDelete>::iterator i(mDirectoryList.begin());
+		i != mDirectoryList.end(); ++i)
 	{
-		connection.QueryDeleteDirectory(*i);
+		connection.QueryDeleteDirectory(i->mObjectID);
+		rContext.GetProgressNotifier().NotifyDirectoryDeleted(
+			i->mObjectID, i->mLocalPath);
 	}
 	
 	// Clear the directory list
 	mDirectoryList.clear();
 	
 	// Delete the files
-	for(std::vector<std::pair<int64_t, BackupStoreFilename> >::iterator i(mFileList.begin()); i != mFileList.end(); ++i)
+	for(std::vector<FileToDelete>::iterator i(mFileList.begin());
+		i != mFileList.end(); ++i)
 	{
-		connection.QueryDeleteFile(i->first, i->second);
+		connection.QueryDeleteFile(i->mDirectoryID, i->mFilename);
+		rContext.GetProgressNotifier().NotifyFileDeleted(
+			i->mDirectoryID, i->mLocalPath);
 	}
 }
 
@@ -140,7 +168,15 @@ void BackupClientDeleteList::PerformDeletions(BackupClientContext &rContext)
 void BackupClientDeleteList::StopDirectoryDeletion(int64_t ObjectID)
 {
 	// First of all, is it in the delete vector?
-	std::vector<int64_t>::iterator delEntry(std::find(mDirectoryList.begin(), mDirectoryList.end(), ObjectID));
+	std::vector<DirToDelete>::iterator delEntry(mDirectoryList.begin());
+	for(; delEntry != mDirectoryList.end(); delEntry++)
+	{
+		if(delEntry->mObjectID == ObjectID)
+		{
+			// Found!
+			break;
+		}
+	}
 	if(delEntry != mDirectoryList.end())
 	{
 		// erase this entry
@@ -148,7 +184,8 @@ void BackupClientDeleteList::StopDirectoryDeletion(int64_t ObjectID)
 	}
 	else
 	{
-		// Haven't been asked to delete it yet, put it in the no delete list
+		// Haven't been asked to delete it yet, put it in the
+		// no delete list
 		mDirectoryNoDeleteList.insert(ObjectID);
 	}
 }
@@ -162,13 +199,15 @@ void BackupClientDeleteList::StopDirectoryDeletion(int64_t ObjectID)
 //		Created: 19/11/03
 //
 // --------------------------------------------------------------------------
-void BackupClientDeleteList::StopFileDeletion(int64_t DirectoryID, const BackupStoreFilename &rFilename)
+void BackupClientDeleteList::StopFileDeletion(int64_t DirectoryID,
+	const BackupStoreFilename &rFilename)
 {
 	// Find this in the delete list
-	std::vector<std::pair<int64_t, BackupStoreFilename> >::iterator delEntry(mFileList.begin());
+	std::vector<FileToDelete>::iterator delEntry(mFileList.begin());
 	while(delEntry != mFileList.end())
 	{
-		if((delEntry)->first == DirectoryID && (delEntry)->second == rFilename)
+		if(delEntry->mDirectoryID == DirectoryID
+			&& delEntry->mFilename == rFilename)
 		{
 			// Found!
 			break;
@@ -186,10 +225,5 @@ void BackupClientDeleteList::StopFileDeletion(int64_t DirectoryID, const BackupS
 		// Haven't been asked to delete it yet, put it in the no delete list
 		mFileNoDeleteList.push_back(std::pair<int64_t, BackupStoreFilename>(DirectoryID, rFilename));
 	}
-
 }
-
-
-
-
 

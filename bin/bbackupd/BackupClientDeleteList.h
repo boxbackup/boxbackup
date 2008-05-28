@@ -28,22 +28,46 @@ class BackupClientContext;
 // --------------------------------------------------------------------------
 class BackupClientDeleteList
 {
+private:
+	class FileToDelete
+	{
+		public:
+		int64_t mDirectoryID;
+		BackupStoreFilename mFilename;
+		std::string mLocalPath;
+		FileToDelete(int64_t DirectoryID, 
+			const BackupStoreFilename& rFilename,
+			const std::string& rLocalPath);
+	};
+
+	class DirToDelete
+	{
+		public:
+		int64_t mObjectID;
+		std::string mLocalPath;
+		DirToDelete(int64_t ObjectID, const std::string& rLocalPath);
+	};
+
 public:
 	BackupClientDeleteList();
 	~BackupClientDeleteList();
 	
-	void AddDirectoryDelete(int64_t ObjectID);
-	void AddFileDelete(int64_t DirectoryID, const BackupStoreFilename &rFilename);
+	void AddDirectoryDelete(int64_t ObjectID,
+		const std::string& rLocalPath);
+	void AddFileDelete(int64_t DirectoryID,
+		const BackupStoreFilename &rFilename,
+		const std::string& rLocalPath);
 
 	void StopDirectoryDeletion(int64_t ObjectID);
-	void StopFileDeletion(int64_t DirectoryID, const BackupStoreFilename &rFilename);
+	void StopFileDeletion(int64_t DirectoryID,
+		const BackupStoreFilename &rFilename);
 	
 	void PerformDeletions(BackupClientContext &rContext);
 	
 private:
-	std::vector<int64_t> mDirectoryList;
+	std::vector<DirToDelete> mDirectoryList;
 	std::set<int64_t> mDirectoryNoDeleteList;	// note: things only get in this list if they're not present in mDirectoryList when they are 'added'
-	std::vector<std::pair<int64_t, BackupStoreFilename> > mFileList;
+	std::vector<FileToDelete> mFileList;
 	std::vector<std::pair<int64_t, BackupStoreFilename> > mFileNoDeleteList;
 };
 
