@@ -42,6 +42,8 @@ private:
 	bool ScanDirectory(int64_t ObjectID);
 	bool DeleteFiles();
 	bool DeleteEmptyDirectories();
+	void DeleteEmptyDirectory(int64_t dirId,
+		std::vector<int64_t>& rToExamine);
 	void DeleteFile(int64_t InDirectory, int64_t ObjectID, BackupStoreDirectory &rDirectory, const std::string &rDirectoryFilename, int64_t OriginalDirSizeInBlocks);
 
 private:
@@ -52,6 +54,7 @@ private:
 		int64_t mSizeInBlocks;
 		int32_t mMarkNumber;
 		int32_t mVersionAgeWithinMark;	// 0 == current, 1 latest old version, etc
+		bool    mIsFlagDeleted; // false for files flagged "Old"
 	} DelEn;
 	
 	struct DelEnCompare
