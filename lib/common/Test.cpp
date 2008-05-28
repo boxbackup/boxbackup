@@ -25,6 +25,12 @@
 bool TestFileExists(const char *Filename)
 {
 	struct stat st;
+	return ::stat(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == 0;
+}
+
+bool TestFileNotEmpty(const char *Filename)
+{
+	struct stat st;
 	return ::stat(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == 0 &&
 		st.st_size > 0;
 }
@@ -102,7 +108,7 @@ bool ServerIsAlive(int pid)
 
 int ReadPidFile(const char *pidFile)
 {
-	if(!TestFileExists(pidFile))
+	if(!TestFileNotEmpty(pidFile))
 	{
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file "
 			"(perhaps one was already running?)");	
@@ -194,7 +200,7 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 
 	for (int i = 0; i < 15; i++)
 	{
-		if (TestFileExists(pidFile))	
+		if (TestFileNotEmpty(pidFile))	
 		{
 			break;
 		}
@@ -223,7 +229,7 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 	}
 	#endif
 
-	if (!TestFileExists(pidFile))
+	if (!TestFileNotEmpty(pidFile))
 	{
 		::fprintf(stdout, " timed out!\n");
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
