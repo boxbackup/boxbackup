@@ -18,7 +18,7 @@ int main(int argc, const char *argv[])
 {
 	MAINHELPER_START
 
-	Logging::SetProgramName("Box Backup (bbstored)");
+	Logging::SetProgramName("bbstored");
 	Logging::ToConsole(true);
 	Logging::ToSyslog (true);
 
