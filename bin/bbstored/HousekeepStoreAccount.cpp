@@ -85,16 +85,19 @@ void HousekeepStoreAccount::DoHousekeeping()
 {
 	// Attempt to lock the account
 	std::string writeLockFilename;
-	StoreStructure::MakeWriteLockFilename(mStoreRoot, mStoreDiscSet, writeLockFilename);
+	StoreStructure::MakeWriteLockFilename(mStoreRoot, mStoreDiscSet,
+		writeLockFilename);
 	NamedLock writeLock;
-	if(!writeLock.TryAndGetLock(writeLockFilename.c_str(), 0600 /* restrictive file permissions */))
+	if(!writeLock.TryAndGetLock(writeLockFilename.c_str(),
+		0600 /* restrictive file permissions */))
 	{
 		// Couldn't lock the account -- just stop now
 		return;
 	}
 
 	// Load the store info to find necessary info for the housekeeping
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet, false /* Read/Write */));
+	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
+		mStoreRoot, mStoreDiscSet, false /* Read/Write */));
 
 	// Calculate how much should be deleted
 	mDeletionSizeTarget = info->GetBlocksUsed() - info->GetBlocksSoftLimit();
@@ -104,14 +107,18 @@ void HousekeepStoreAccount::DoHousekeeping()
 	}
 
 	// Scan the directory for potential things to delete
-	// This will also remove elegiable items marked with RemoveASAP
+	// This will also remove eligible items marked with RemoveASAP
 	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID);
 
-	// If scan directory stopped for some reason, probably parent instructed to teminate, stop now.
+	// If scan directory stopped for some reason, probably parent
+	// instructed to terminate, stop now.
 	if(!continueHousekeeping)
 	{
-		// If any files were marked "delete now", then update the size of the store.
-		if(mBlocksUsedDelta != 0 || mBlocksInOldFilesDelta != 0 || mBlocksInDeletedFilesDelta != 0)
+		// If any files were marked "delete now", then update
+		// the size of the store.
+		if(mBlocksUsedDelta != 0 || 
+			mBlocksInOldFilesDelta != 0 ||
+			mBlocksInDeletedFilesDelta != 0)
 		{
 			info->ChangeBlocksUsed(mBlocksUsedDelta);
 			info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
@@ -124,8 +131,8 @@ void HousekeepStoreAccount::DoHousekeeping()
 		return;
 	}
 
-	// Log any difference in opinion between the values recorded in the store info, and
-	// the values just calculated for space usage.
+	// Log any difference in opinion between the values recorded in
+	// the store info, and the values just calculated for space usage.
 	// BLOCK
 	{
 		int64_t used = info->GetBlocksUsed();
@@ -133,9 +140,12 @@ void HousekeepStoreAccount::DoHousekeeping()
 		int64_t usedDeleted = info->GetBlocksInDeletedFiles();
 		int64_t usedDirectories = info->GetBlocksInDirectories();
 
-		// If the counts were wrong, taking into account RemoveASAP items deleted, log a message
-		if((used + mBlocksUsedDelta) != mBlocksUsed || (usedOld + mBlocksInOldFilesDelta) != mBlocksInOldFiles
-			|| (usedDeleted + mBlocksInDeletedFilesDelta) != mBlocksInDeletedFiles || usedDirectories != mBlocksInDirectories)
+		// If the counts were wrong, taking into account RemoveASAP 
+		// items deleted, log a message
+		if((used + mBlocksUsedDelta) != mBlocksUsed 
+			|| (usedOld + mBlocksInOldFilesDelta) != mBlocksInOldFiles
+			|| (usedDeleted + mBlocksInDeletedFilesDelta) != mBlocksInDeletedFiles 
+			|| usedDirectories != mBlocksInDirectories)
 		{
 			// Log this
 			BOX_ERROR("Housekeeping on account " << 
@@ -153,18 +163,25 @@ void HousekeepStoreAccount::DoHousekeeping()
 		}
 		
 		// If the current values don't match, store them
-		if(used != mBlocksUsed || usedOld != mBlocksInOldFiles
-			|| usedDeleted != mBlocksInDeletedFiles || usedDirectories != (mBlocksInDirectories + mBlocksInDirectoriesDelta))
+		if(used != mBlocksUsed 
+			|| usedOld != mBlocksInOldFiles
+			|| usedDeleted != mBlocksInDeletedFiles 
+			|| usedDirectories != (mBlocksInDirectories + mBlocksInDirectoriesDelta))
 		{	
 			// Set corrected values in store info
-			info->CorrectAllUsedValues(mBlocksUsed, mBlocksInOldFiles, mBlocksInDeletedFiles, mBlocksInDirectories + mBlocksInDirectoriesDelta);
+			info->CorrectAllUsedValues(mBlocksUsed,
+				mBlocksInOldFiles, mBlocksInDeletedFiles,
+				mBlocksInDirectories + mBlocksInDirectoriesDelta);
 			info->Save();
 		}
 	}
 	
-	// Reset the delta counts for files, as they will include RemoveASAP flagged files deleted
-	// during the initial scan.
-	int64_t removeASAPBlocksUsedDelta = mBlocksUsedDelta;	// keep for reporting
+	// Reset the delta counts for files, as they will include 
+	// RemoveASAP flagged files deleted during the initial scan.
+
+	// keep for reporting
+	int64_t removeASAPBlocksUsedDelta = mBlocksUsedDelta;
+
 	mBlocksUsedDelta = 0;
 	mBlocksInOldFilesDelta = 0;
 	mBlocksInDeletedFilesDelta = 0;
@@ -172,7 +189,8 @@ void HousekeepStoreAccount::DoHousekeeping()
 	// Go and delete items from the accounts
 	bool deleteInterrupted = DeleteFiles();
 	
-	// If that wasn't interrupted, remove any empty directories which are also marked as deleted in their containing directory
+	// If that wasn't interrupted, remove any empty directories which 
+	// are also marked as deleted in their containing directory
 	if(!deleteInterrupted)
 	{
 		deleteInterrupted = DeleteEmptyDirectories();
@@ -190,8 +208,9 @@ void HousekeepStoreAccount::DoHousekeeping()
 			(deleteInterrupted?" and was interrupted":""));
 	}
 	
-	// Make sure the delta's won't cause problems if the counts are really wrong, and
-	// it wasn't fixed because the store was updated during the scan.
+	// Make sure the delta's won't cause problems if the counts are 
+	// really wrong, and it wasn't fixed because the store was 
+	// updated during the scan.
 	if(mBlocksUsedDelta < (0 - info->GetBlocksUsed()))
 	{
 		mBlocksUsedDelta = (0 - info->GetBlocksUsed());
@@ -218,7 +237,8 @@ void HousekeepStoreAccount::DoHousekeeping()
 	// Save the store info back
 	info->Save();
 	
-	// Explicity release the lock (would happen automatically on going out of scope, included for code clarity)
+	// Explicity release the lock (would happen automatically on 
+	// going out of scope, included for code clarity)
 	writeLock.ReleaseLock();
 }
 
@@ -243,8 +263,9 @@ void HousekeepStoreAccount::MakeObjectFilename(int64_t ObjectID, std::string &rF
 //
 // Function
 //		Name:    HousekeepStoreAccount::ScanDirectory(int64_t)
-//		Purpose: Private. Scan a directory for potenitally deleteable items, and
-//				 add them to the list. Returns true if the scan should continue.
+//		Purpose: Private. Scan a directory for potentially deleteable
+//			 items, and add them to the list. Returns true if the
+//			 scan should continue.
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
@@ -253,9 +274,12 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 #ifndef WIN32
 	if((--mCountUntilNextInterprocessMsgCheck) <= 0)
 	{
-		mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
+		mCountUntilNextInterprocessMsgCheck =
+			POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
+
 		// Check for having to stop
-		if(mrDaemon.CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is locked
+		// Include account ID here as the specified account is locked
+		if(mrDaemon.CheckForInterProcessMsg(mAccountID))
 		{
 			// Need to abort now
 			return false;
@@ -268,7 +292,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 	MakeObjectFilename(ObjectID, objectFilename);
 
 	// Open it.
-	std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet, objectFilename));
+	std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet,
+		objectFilename));
 	
 	// Add the size of the directory on disc to the size being calculated
 	int64_t originalDirSizeInBlocks = dirStream->GetDiscUsageInBlocks();
@@ -290,8 +315,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 	
 	// BLOCK
 	{
-		// Remove any files which are marked for removal as soon as they become old
-		// or deleted.
+		// Remove any files which are marked for removal as soon
+		// as they become old or deleted.
 		bool deletedSomething = false;
 		do
 		{
@@ -364,6 +389,9 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 				d.mSizeInBlocks = en->GetSizeInBlocks();
 				d.mMarkNumber = en->GetMarkNumber();
 				d.mVersionAgeWithinMark = enVersionAge;
+				d.mIsFlagDeleted = (enFlags &
+					BackupStoreDirectory::Entry::Flags_Deleted)
+					? true : false;
 				
 				// Add it to the list
 				mPotentialDeletions.insert(d);
@@ -541,6 +569,10 @@ bool HousekeepStoreAccount::DeleteFiles()
 		
 		// Delete the file
 		DeleteFile(i->mInDirectory, i->mObjectID, dir, dirFilename, dirSizeInBlocksOrig);
+		BOX_INFO("Housekeeping removed " <<
+			(i->mIsFlagDeleted ? "deleted" : "old") <<
+			" file " << BOX_FORMAT_OBJECTID(i->mObjectID) <<
+			" from dir " << BOX_FORMAT_OBJECTID(i->mInDirectory));
 		
 		// Stop if the deletion target has been matched or exceeded
 		// (checking here rather than at the beginning will tend to reduce the
@@ -786,87 +818,7 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories()
 				continue;
 			}
 
-			// Load up the directory to potentially delete
-			std::string dirFilename;
-			BackupStoreDirectory dir;
-			int64_t dirSizeInBlocks = 0;
-			{
-				MakeObjectFilename(*i, dirFilename);
-				// Check it actually exists (just in case it gets added twice to the list)
-				if(!RaidFileRead::FileExists(mStoreDiscSet, dirFilename))
-				{
-					// doesn't exist, next!
-					continue;
-				}
-				// load
-				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet, dirFilename));
-				dirSizeInBlocks = dirStream->GetDiscUsageInBlocks();
-				dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
-			}
-
-			// Make sure this directory is actually empty
-			if(dir.GetNumberOfEntries() != 0)
-			{
-				// Not actually empty, try next one
-				continue;
-			}
-
-			// Candiate for deletion... open containing directory
-			std::string containingDirFilename;
-			BackupStoreDirectory containingDir;
-			int64_t containingDirSizeInBlocksOrig = 0;
-			{
-				MakeObjectFilename(dir.GetContainerID(), containingDirFilename);
-				std::auto_ptr<RaidFileRead> containingDirStream(RaidFileRead::Open(mStoreDiscSet, containingDirFilename));
-				containingDirSizeInBlocksOrig = containingDirStream->GetDiscUsageInBlocks();
-				containingDir.ReadFromStream(*containingDirStream, IOStream::TimeOutInfinite);
-			}
-
-			// Find the entry
-			BackupStoreDirectory::Entry *pdirentry = containingDir.FindEntryByID(dir.GetObjectID());
-			if((pdirentry != 0) && ((pdirentry->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0))
-			{
-				// Should be deleted
-				containingDir.DeleteEntry(dir.GetObjectID());
-
-				// Is the containing dir now a candidate for deletion?
-				if(containingDir.GetNumberOfEntries() == 0)
-				{
-					toExamine.push_back(containingDir.GetObjectID());
-				}
-
-				// Write revised parent directory
-				RaidFileWrite writeDir(mStoreDiscSet, containingDirFilename);
-				writeDir.Open(true /* allow overwriting */);
-				containingDir.WriteToStream(writeDir);
-
-				// get the disc usage (must do this before commiting it)
-				int64_t dirSize = writeDir.GetDiscUsageInBlocks();
-
-				// Commit directory
-				writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-
-				// adjust usage counts for this directory
-				if(dirSize > 0)
-				{
-					int64_t adjust = dirSize - containingDirSizeInBlocksOrig;
-					mBlocksUsedDelta += adjust;
-					mBlocksInDirectoriesDelta += adjust;
-				}
-
-				// Delete the directory itself
-				{
-					RaidFileWrite del(mStoreDiscSet, dirFilename);
-					del.Delete();
-				}
-
-				// And adjust usage counts for the directory that's just been deleted
-				mBlocksUsedDelta -= dirSizeInBlocks;
-				mBlocksInDirectoriesDelta -= dirSizeInBlocks;
-
-				// Update count
-				++mEmptyDirectoriesDeleted;
-			}
+			DeleteEmptyDirectory(*i, toExamine);
 		}
 
 		// Remove contents of empty directories
@@ -879,6 +831,102 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories()
 	return false;
 }
 
+void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
+	std::vector<int64_t>& rToExamine)
+{
+	// Load up the directory to potentially delete
+	std::string dirFilename;
+	BackupStoreDirectory dir;
+	int64_t dirSizeInBlocks = 0;
 
+	// BLOCK
+	{
+		MakeObjectFilename(dirId, dirFilename);
+		// Check it actually exists (just in case it gets
+		// added twice to the list)
+		if(!RaidFileRead::FileExists(mStoreDiscSet, dirFilename))
+		{
+			// doesn't exist, next!
+			return;
+		}
+		// load
+		std::auto_ptr<RaidFileRead> dirStream(
+			RaidFileRead::Open(mStoreDiscSet, dirFilename));
+		dirSizeInBlocks = dirStream->GetDiscUsageInBlocks();
+		dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
+	}
 
+	// Make sure this directory is actually empty
+	if(dir.GetNumberOfEntries() != 0)
+	{
+		// Not actually empty, try next one
+		return;
+	}
+
+	// Candidate for deletion... open containing directory
+	std::string containingDirFilename;
+	BackupStoreDirectory containingDir;
+	int64_t containingDirSizeInBlocksOrig = 0;
+	{
+		MakeObjectFilename(dir.GetContainerID(), containingDirFilename);
+		std::auto_ptr<RaidFileRead> containingDirStream(
+			RaidFileRead::Open(mStoreDiscSet,
+				containingDirFilename));
+		containingDirSizeInBlocksOrig = 
+			containingDirStream->GetDiscUsageInBlocks();
+		containingDir.ReadFromStream(*containingDirStream,
+			IOStream::TimeOutInfinite);
+	}
+
+	// Find the entry
+	BackupStoreDirectory::Entry *pdirentry = 
+		containingDir.FindEntryByID(dir.GetObjectID());
+	if((pdirentry != 0) && ((pdirentry->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0))
+	{
+		// Should be deleted
+		containingDir.DeleteEntry(dir.GetObjectID());
+
+		// Is the containing dir now a candidate for deletion?
+		if(containingDir.GetNumberOfEntries() == 0)
+		{
+			rToExamine.push_back(containingDir.GetObjectID());
+		}
+
+		// Write revised parent directory
+		RaidFileWrite writeDir(mStoreDiscSet, containingDirFilename);
+		writeDir.Open(true /* allow overwriting */);
+		containingDir.WriteToStream(writeDir);
+
+		// get the disc usage (must do this before commiting it)
+		int64_t dirSize = writeDir.GetDiscUsageInBlocks();
+
+		// Commit directory
+		writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+
+		// adjust usage counts for this directory
+		if(dirSize > 0)
+		{
+			int64_t adjust = dirSize - containingDirSizeInBlocksOrig;
+			mBlocksUsedDelta += adjust;
+			mBlocksInDirectoriesDelta += adjust;
+		}
+
+		// Delete the directory itself
+		{
+			RaidFileWrite del(mStoreDiscSet, dirFilename);
+			del.Delete();
+		}
+
+		BOX_INFO("Housekeeping removed empty deleted dir " <<
+			BOX_FORMAT_OBJECTID(dirId));
+
+		// And adjust usage counts for the directory that's
+		// just been deleted
+		mBlocksUsedDelta -= dirSizeInBlocks;
+		mBlocksInDirectoriesDelta -= dirSizeInBlocks;
+
+		// Update count
+		++mEmptyDirectoriesDeleted;
+	}
+}
 
