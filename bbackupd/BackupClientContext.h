@@ -12,6 +12,7 @@
 
 #include "BoxTime.h"
 #include "BackupClientDeleteList.h"
+#include "BackupClientDirectoryRecord.h"
 #include "BackupStoreFile.h"
 #include "ExcludeList.h"
 #include "Timer.h"
@@ -45,7 +46,8 @@ public:
 		int32_t AccountNumber, 
 		bool ExtendedLogging,
 		bool ExtendedLogToFile,
-		std::string ExtendedLogFile
+		std::string ExtendedLogFile,
+		ProgressNotifier &rProgressNotifier
 	);
 	virtual ~BackupClientContext();
 private:
@@ -70,6 +72,7 @@ public:
 	int64_t GetClientStoreMarker() const {return mClientStoreMarker;}
 	
 	bool StorageLimitExceeded() {return mStorageLimitExceeded;}
+	void SetStorageLimitExceeded() {mStorageLimitExceeded = true;}
 
 	// --------------------------------------------------------------------------
 	//
@@ -198,6 +201,11 @@ public:
 	virtual int    GetMaximumDiffingTime();
 	virtual bool   IsManaged() { return mbIsManaged; }
 	
+	ProgressNotifier& GetProgressNotifier() const 
+	{ 
+		return mrProgressNotifier;
+	}
+
 private:
 	BackupDaemon &mrDaemon;
 	TLSContext &mrTLSContext;
@@ -221,6 +229,7 @@ private:
 	bool mbIsManaged;
 	int mKeepAliveTime;
 	int mMaximumDiffingTime;
+	ProgressNotifier &mrProgressNotifier;
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

@@ -48,7 +48,8 @@ BackupClientContext::BackupClientContext
 	int32_t AccountNumber, 
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
-	std::string ExtendedLogFile
+	std::string ExtendedLogFile,
+	ProgressNotifier& rProgressNotifier
 )
 	: mrDaemon(rDaemon),
 	  mrTLSContext(rTLSContext),
@@ -69,7 +70,8 @@ BackupClientContext::BackupClientContext
 	  mpExcludeFiles(0),
 	  mpExcludeDirs(0),
 	  mKeepAliveTimer(0),
-	  mbIsManaged(false)
+	  mbIsManaged(false),
+	  mrProgressNotifier(rProgressNotifier)
 {
 }
 
