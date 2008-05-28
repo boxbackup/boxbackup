@@ -18,6 +18,10 @@
 	#include <stdlib.h>
 #endif
 
+#ifdef HAVE_CXXABI_H
+	#include <cxxabi.h>
+#endif
+
 #include "Utils.h"
 #include "CommonException.h"
 #include "Logging.h"
@@ -76,7 +80,67 @@ void DumpStackBacktrace()
 
 	for(i = 0; i < size; i++)
 	{
-		BOX_TRACE(strings[i]);
+		// Demangling code copied from 
+		// cctbx_sources/boost_adaptbx/meta_ext.cpp, BSD license
+		
+		std::string mangled_frame = strings[i];
+		std::string output_frame  = strings[i]; // default
+
+		#ifdef HAVE_CXXABI_H
+		int start = mangled_frame.find('(');
+		int end   = mangled_frame.find('+', start);
+		std::string mangled_func = mangled_frame.substr(start + 1,
+			end - start - 1);
+
+		size_t len = 256;
+		std::auto_ptr<char> output_buf(new char [len]);
+		int status;
+		
+		if (abi::__cxa_demangle(mangled_func.c_str(), output_buf.get(),
+			&len, &status) == NULL)
+		{
+			if (status == 0)
+			{
+				BOX_WARNING("Demangle failed but no error: " <<
+					mangled_func);
+			}
+			else if (status == -1)
+			{
+				BOX_WARNING("Demangle failed with "
+					"memory allocation error: " <<
+					mangled_func);
+			}
+			else if (status == -2)
+			{
+				/*
+				BOX_WARNING("Demangle failed with "
+					"with invalid name: " <<
+					mangled_func);
+				*/
+			}
+			else if (status == -3)
+			{
+				BOX_WARNING("Demangle failed with "
+					"with invalid argument: " <<
+					mangled_func);
+			}
+			else
+			{
+				BOX_WARNING("Demangle failed with "
+					"with unknown error " << status <<
+					": " << mangled_func);
+			}
+		}
+		else
+		{
+			output_frame = mangled_frame.substr(0, start + 1) +
+				// std::string(output_buf.get()) +
+				output_buf.get() +
+				mangled_frame.substr(end);
+		}
+		#endif // HAVE_CXXABI_H
+
+		BOX_TRACE("Stack frame " << i << ": " << output_frame);
 	}
 
 #include "MemLeakFindOff.h"
