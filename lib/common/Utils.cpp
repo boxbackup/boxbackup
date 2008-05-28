@@ -78,6 +78,9 @@ void DumpStackBacktrace()
 
 	BOX_TRACE("Obtained " << size << " stack frames.");
 
+	size_t output_len = 256;
+	char*  output_buf = new char [output_len];
+
 	for(i = 0; i < size; i++)
 	{
 		// Demangling code copied from 
@@ -92,12 +95,12 @@ void DumpStackBacktrace()
 		std::string mangled_func = mangled_frame.substr(start + 1,
 			end - start - 1);
 
-		size_t len = 256;
-		std::auto_ptr<char> output_buf(new char [len]);
 		int status;
 		
-		if (abi::__cxa_demangle(mangled_func.c_str(), output_buf.get(),
-			&len, &status) == NULL)
+		char* result = abi::__cxa_demangle(mangled_func.c_str(),
+			output_buf, &output_len, &status);
+
+		if (result == NULL)
 		{
 			if (status == 0)
 			{
@@ -112,6 +115,7 @@ void DumpStackBacktrace()
 			}
 			else if (status == -2)
 			{
+				// Probably non-C++ name, don't demangle
 				/*
 				BOX_WARNING("Demangle failed with "
 					"with invalid name: " <<
@@ -133,15 +137,17 @@ void DumpStackBacktrace()
 		}
 		else
 		{
+			output_buf = result;
 			output_frame = mangled_frame.substr(0, start + 1) +
 				// std::string(output_buf.get()) +
-				output_buf.get() +
-				mangled_frame.substr(end);
+				result + mangled_frame.substr(end);
 		}
 		#endif // HAVE_CXXABI_H
 
 		BOX_TRACE("Stack frame " << i << ": " << output_frame);
 	}
+
+	delete [] output_buf;
 
 #include "MemLeakFindOff.h"
 	free (strings);
