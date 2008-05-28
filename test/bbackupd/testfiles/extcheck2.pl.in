@@ -3,7 +3,10 @@ use strict;
 
 my $flags = $ARGV[0] or "";
 
-unless(open IN,"../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf -l testfiles/query4.log \"compare -ac$flags\" quit 2>&1 |")
+unless(open IN,"../../bin/bbackupquery/bbackupquery -Wwarning " .
+	"-c testfiles/bbackupd.conf " .
+	"-l testfiles/query4.log " .
+	"\"compare -ac$flags\" quit 2>&1 |")
 {
 	print "Couldn't open compare utility\n";
 	exit 2;
