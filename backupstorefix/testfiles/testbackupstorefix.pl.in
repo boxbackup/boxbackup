@@ -93,8 +93,12 @@ elsif($ARGV[0] eq 'check')
 	}
 
 	# read in the new listing, and compare
-	open LISTING,"../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf \"list -r\" quit |" or die "Can't open list utility";
-	open LISTING_COPY,'>testfiles/listing'.$ARGV[1].'.txt' or die "can't open copy listing file";
+	open LISTING,"../../bin/bbackupquery/bbackupquery -Wwarning " .
+		"-c testfiles/bbackupd.conf " .
+		"\"list -r\" quit |"
+		or die "Can't open list utility";
+	open LISTING_COPY,'>testfiles/listing'.$ARGV[1].'.txt'
+		or die "can't open copy listing file";
 	my $err = 0;
 	while(<LISTING>)
 	{
@@ -125,8 +129,12 @@ elsif($ARGV[0] eq 'check')
 }
 elsif($ARGV[0] eq 'reroot')
 {
-	open LISTING,"../../bin/bbackupquery/bbackupquery -q -c testfiles/bbackupd.conf \"list -r\" quit |" or die "Can't open list utility";
-	open LISTING_COPY,'>testfiles/listing'.$ARGV[1].'.txt' or die "can't open copy listing file";
+	open LISTING,"../../bin/bbackupquery/bbackupquery -Wwarning " .
+		"-c testfiles/bbackupd.conf " .
+		"\"list -r\" quit |"
+		or die "Can't open list utility";
+	open LISTING_COPY,'>testfiles/listing'.$ARGV[1].'.txt'
+		or die "can't open copy listing file";
 	my $err = 0;
 	my $count = 0;
 	while(<LISTING>)
