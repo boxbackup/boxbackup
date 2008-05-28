@@ -54,7 +54,9 @@ public:
 	virtual std::string DaemonBanner() const;
 	virtual const ConfigurationVerify *GetConfigVerify() const;
 	virtual void Usage();
-	
+
+	virtual bool Configure(const std::string& rConfigFileName);
+
 	bool StopRun() {return mReloadConfigWanted | mTerminateWanted;}
 	bool IsReloadConfigWanted() {return mReloadConfigWanted;}
 	bool IsTerminateWanted() {return mTerminateWanted;}
@@ -63,12 +65,12 @@ public:
 	void SetReloadConfigWanted() {mReloadConfigWanted = true;}
 	void SetTerminateWanted() {mTerminateWanted = true;}
 	
-	virtual void SetupInInitialProcess();
 	virtual void EnterChild();
 	
 	static void SetProcessTitle(const char *format, ...);
 
 protected:
+	virtual void SetupInInitialProcess();
 	box_time_t GetLoadedConfigModifiedTime() const;
 	bool IsSingleProcess() { return mSingleProcess; }
 	virtual std::string GetOptionString();
