@@ -34,6 +34,9 @@ extern "C"
 #endif
 }
 
+typedef int (lstat_post_hook_t) (int old_ret, const char *file_name,
+	struct stat *buf);
+
 void intercept_setup_error(const char *filename, unsigned int errorafter, 
 	int errortoreturn, int syscalltoerror);
 void intercept_setup_delay(const char *filename, unsigned int delay_after,
@@ -42,6 +45,10 @@ bool intercept_triggered();
 
 void intercept_setup_readdir_hook(const char *dirname,  readdir_t hookfn);
 void intercept_setup_lstat_hook  (const char *filename, lstat_t   hookfn);
+void intercept_setup_lstat_post_hook(lstat_post_hook_t hookfn);
+void intercept_setup_stat_post_hook (lstat_post_hook_t hookfn);
+
+void intercept_clear_setup();
 
 #endif // !PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif // !INTERCEPT_H
