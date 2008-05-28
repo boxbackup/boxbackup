@@ -2102,7 +2102,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		TEST_RETURN(compareReturnValue,
-			BackupQueries:ReturnCode::Compare_Same);
+			BackupQueries::ReturnCode::Compare_Same);
 
 		// Check that bbackupquery can restore the dir when given
 		// on the command line in system encoding.
@@ -2113,7 +2113,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		TEST_RETURN(compareReturnValue,
-			BackupQueries:ReturnCode::Command_OK);
+			BackupQueries::ReturnCode::Command_OK);
 
 		// Compare to make sure it was restored properly.
 		command = BBACKUPQUERY " -c testfiles/bbackupd.conf "
@@ -2138,7 +2138,7 @@ int test_bbackupd()
 
 		compareReturnValue = ::system(command.c_str());
 		TEST_RETURN(compareReturnValue,
-			BackupQueries:ReturnCode::Command_OK);
+			BackupQueries::ReturnCode::Command_OK);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
 		// And after changing directory to a relative path
@@ -2150,7 +2150,7 @@ int test_bbackupd()
 
 		compareReturnValue = ::system(command.c_str());
 		TEST_RETURN(compareReturnValue,
-			BackupQueries:ReturnCode::Command_OK);
+			BackupQueries::ReturnCode::Command_OK);
 		TestRemoteProcessMemLeaks("testfiles/bbackupquery.memleaks");
 
 		// cannot overwrite a file that exists, so delete it
@@ -2165,7 +2165,7 @@ int test_bbackupd()
 
 		compareReturnValue = ::system(command.c_str());
 		TEST_RETURN(compareReturnValue,
-			BackupQueries:ReturnCode::Command_OK);
+			BackupQueries::ReturnCode::Command_OK);
 		TestRemoteProcessMemLeaks("testfiles/bbackupquery.memleaks");
 
 		// Compare to make sure it was restored properly.
@@ -2179,7 +2179,7 @@ int test_bbackupd()
 		compareReturnValue = ::system(command.c_str());
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		TEST_RETURN(compareReturnValue,
-			BackupQueries:ReturnCode::Compare_Same);
+			BackupQueries::ReturnCode::Compare_Same);
 
 		// Compare without attributes. This should fail.
 		command = BBACKUPQUERY " "
