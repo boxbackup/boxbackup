@@ -683,6 +683,7 @@ __E
 		if ($is_cpp)
 		{
 			$make .= "\t\$(_CXX) \$(CXXFLAGS) $compile_line_extra ".
+				"-DBOX_MODULE=\"\\\"$mod\\\"\" " .
 				"-c $file -o $out_name\n\n";
 		}
 		elsif ($is_rc)
@@ -771,7 +772,7 @@ __E
 	{
 		# make a library archive...
 		print MAKE "\t\$(HIDE) (echo -n > $end_target; rm $end_target)\n";
-		print MAKE "\t\$(_AR) -q $end_target $o_file_list\n";
+		print MAKE "\t\$(_AR) cq $end_target $o_file_list\n";
 		print MAKE "\t\$(_RANLIB) $end_target\n";
 	}
 	else
