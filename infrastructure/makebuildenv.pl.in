@@ -515,6 +515,9 @@ __E
 	open MAKE,">$mod/Makefile".$mk_name_extra or die "Can't open Makefile for $mod\n";
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
+	my $default_cxxflags = '@CXXFLAGS@';
+	my $default_cxxflags =~ s/ -O2//g;
+
 	my $release_flags = "-O2";
 	if ($target_windows)
 	{
@@ -532,14 +535,20 @@ AR = @AR@
 RANLIB = @RANLIB@
 PERL = @PERL@
 WINDRES = windres
+
+CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
+	$include_paths $extra_platform_defines \\
+	-DBOX_VERSION="\\"$product_version\\""
+LDFLAGS = @LDFLAGS@ @LDADD_RDYNAMIC@
+
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG $release_flags @CXXFLAGS_STRICT@ $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS += -DNDEBUG $release_flags
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS = -g @CXXFLAGS_STRICT@ $include_paths $extra_platform_defines -DBOX_VERSION="\\"$product_version\\""
+CXXFLAGS += -g
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
@@ -797,7 +806,9 @@ __E
 		}
 	
 		# link line...
-		print MAKE "\t\$(_LINK) $link_line_extra -o $end_target $o_file_list $lib_files$lo $platform_lib_files\n";
+		print MAKE "\t\$(_LINK) \$(LDFLAGS) $link_line_extra " .
+			"-o $end_target $o_file_list " .
+			"$lib_files$lo $platform_lib_files\n";
 	}
 	# tests need to copy the test file over
 	if($type eq 'test')
