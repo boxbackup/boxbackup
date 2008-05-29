@@ -39,7 +39,7 @@ Version: ###DISTRIBUTION-VERSION-NUMBER###
 Release: 1
 License: BSD
 Group: Applications/Archiving
-Packager: Martin Ebourne <boxbackup-dev@boxbackup.org>
+Packager: boxbackup-dev@boxbackup.org
 URL: http://www.boxbackup.org/
 Source0: %{ident}.tgz
 Requires: openssl >= 0.9.7a
@@ -122,9 +122,9 @@ install -m 644 %{distribution_dir}LINUX.txt \
 install -m 644 %{distribution_dir}THANKS.txt \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}
 
-install -m 644 %{distribution_dir}contrib/bbreporter/LICENSE \
+install -m 644 contrib/bbreporter/LICENSE \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}/bbreporter
-install -m 755 %{distribution_dir}contrib/bbreporter/bbreporter.py \
+install -m 755 contrib/bbreporter/bbreporter.py \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}/bbreporter
 
 # Client
@@ -225,6 +225,9 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_docdir}/%{ident}/bbreporter
 
 %changelog
+* Thu May 29 2008 Martin Ebourne <martin@zepler.org>
+- Fix paths to bbreporter files
+
 * Sat Jan 13 2006 Chris Wilson <chris+box@qwirx.com>
 - Support building from an unofficial tarball (from svn) by changing
   %{distribution_dir} at the top.
