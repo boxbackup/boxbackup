@@ -10,6 +10,7 @@
 #ifndef LOGGING__H
 #define LOGGING__H
 
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -49,11 +50,11 @@
 	{ BOX_LOG(Log::TRACE, stuff) }
 
 #define BOX_LOG_SYS_WARNING(stuff) \
-	BOX_WARNING(stuff << ": " << strerror(errno) << " (" << errno << ")")
+	BOX_WARNING(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
 #define BOX_LOG_SYS_ERROR(stuff) \
-	BOX_ERROR(stuff << ": " << strerror(errno) << " (" << errno << ")")
+	BOX_ERROR(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
 #define BOX_LOG_SYS_FATAL(stuff) \
-	BOX_FATAL(stuff << ": " << strerror(errno) << " (" << errno << ")")
+	BOX_FATAL(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
 
 #ifdef WIN32
 	#define BOX_LOG_WIN_ERROR(stuff) \
