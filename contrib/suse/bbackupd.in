@@ -91,7 +91,7 @@ case "$1" in
 
     probe)
 		test @sysconfdir_expanded@/box/bbackupd.conf \
-			-nt @localstatedir_expanded@/bbackupd.pid \
+			-nt @localstatedir_expanded@/bbackupd/bbackupd.pid \
 		&& echo reload
 		;;
 
