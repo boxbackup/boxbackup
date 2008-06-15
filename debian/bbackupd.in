@@ -4,7 +4,7 @@
 
 BBACKUPD=@sbindir_expanded@/bbackupd
 CONFIG=@sysconfdir_expanded@/box/bbackupd.conf
-PIDFILE=@localstatedir_expanded@/bbackupd.pid
+PIDFILE=@localstatedir_expanded@/bbackupd/bbackupd.pid
 
 test -x $BBACKUPD || exit 0
 test -f $CONFIG || exit 0
@@ -33,7 +33,7 @@ case $1 in
 	restart)
 		echo -n "Restarting Box Backup Client daemon: bbackupd"	
 		start-stop-daemon --stop --quiet --pidfile $PIDFILE \
-			--exec $BBACKUPD
+			--exec $BBACKUPD --retry 5
 		start-stop-daemon --start --quiet \
 			--exec $BBACKUPD > /dev/null
 		echo "."
