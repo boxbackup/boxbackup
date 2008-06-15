@@ -1,46 +1,59 @@
 #! /bin/sh
 
 # Start and stop the Box Backup client daemon.
+# Originally by James Stark, modified by Chris Wilson and James O'Gorman
+# For support, visit http://www.boxbackup.org/trac/wiki/MailingLists
 
-BBACKUPD=@sbindir_expanded@/bbackupd
-CONFIG=@sysconfdir_expanded@/box/bbackupd.conf
-PIDFILE=@localstatedir_expanded@/bbackupd/bbackupd.pid
+NAME=bbackupd
+LONGNAME="Box Backup Client daemon"
+BINARY=@sbindir_expanded@/$NAME
+CONFIG=@sysconfdir_expanded@/box/$NAME.conf
+PIDFILE=@localstatedir_expanded@/bbackupd/$NAME.pid
 
-test -x $BBACKUPD || exit 0
+test -x $BINARY || exit 0
 test -f $CONFIG || exit 0
+
+start_stop() {
+	start-stop-daemon --quiet --exec $BINARY --pidfile $PIDFILE "$@"
+}
+
+start_stop_verbose() {
+	if start_stop "$@"; then
+		echo "."
+	else
+		echo " failed!"
+		exit 1
+	fi
+}
 
 case $1 in
 	start)
-		echo -n "Starting Box Backup Client daemon: bbackupd"
-		start-stop-daemon --start --quiet --exec $BBACKUPD > /dev/null
-		echo "."
+		echo -n "Starting $LONGNAME: $NAME"
+		start_stop_verbose --start
 		;;
-		
+	
 	stop)
-		echo -n "Stopping Box Backup Client daemon: bbackupd"
-		start-stop-daemon --stop --quiet \
-			--pidfile $PIDFILE --exec $BBACKUPD
-		echo "."
+		echo -n "Stopping $LONGNAME: $NAME"
+		start_stop_verbose --stop
 		;;
 	
 	reload|force-reload)
-		echo -n "Reloading Box Backup Client configuration"
-		start-stop-daemon --stop --signal 1 --quiet --oknodo \
-			--pidfile $PIDFILE --exec $BBACKUPD
-		echo "."
+		echo -n "Reloading $LONGNAME configuration"
+		start_stop_verbose --stop --signal 1
 		;;
-		
+	
 	restart)
-		echo -n "Restarting Box Backup Client daemon: bbackupd"	
-		start-stop-daemon --stop --quiet --pidfile $PIDFILE \
-			--exec $BBACKUPD --retry 5
-		start-stop-daemon --start --quiet \
-			--exec $BBACKUPD > /dev/null
-		echo "."
+		echo -n "Restarting $LONGNAME: $NAME"
+		if start_stop --stop --retry 5 && start_stop --start; then
+			echo "."
+		else
+			echo " failed!"
+			exit 1
+		fi
 		;;
+	
 	*)
-		echo "Usage: /etc/init.d/bbackupd {start|stop|reload|force-reload|restart}"
-		exit 1
+		echo "Usage: $0 {start|stop|reload|force-reload|restart}"
 esac
 
 exit 0
