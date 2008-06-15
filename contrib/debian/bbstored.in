@@ -4,7 +4,7 @@
 
 BBSTORED=@sbindir_expanded@/bbstored
 CONFIG=@sysconfdir_expanded@/box/bbstored.conf
-PIDFILE=@localstatedir_expanded@/bbstored.pid
+PIDFILE=@localstatedir_expanded@/run/bbstored.pid
 
 test -x $BBACKUPD || exit 0
 test -f $CONFIG || exit 0
@@ -33,7 +33,7 @@ case $1 in
 	restart)
 		echo -n "Restarting Box Backup Server daemon: bbstored"
 		start-stop-daemon --stop --quiet --pidfile $PIDFILE \
-			--exec $BBSTORED
+			--exec $BBSTORED --retry 5
 		start-stop-daemon --start --quiet \
 			--exec $BBSTORED > /dev/null
 		echo "."
