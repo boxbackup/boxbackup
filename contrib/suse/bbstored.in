@@ -92,7 +92,7 @@ case "$1" in
 
     probe)
 	test @sysconfdir_expanded@/box/bbstored.conf \
-		-nt @localstatedir_expanded@/bbstored.pid && echo reload
+		-nt @localstatedir_expanded@/run/bbstored.pid && echo reload
 	;;
 
     *)
