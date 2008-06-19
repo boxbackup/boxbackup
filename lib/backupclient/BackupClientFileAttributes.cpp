@@ -465,7 +465,7 @@ void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBl
 void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename)
 {
 #ifdef HAVE_SYS_XATTR_H
-	int listBufferSize = 1000;
+	int listBufferSize = 10000;
 	char* list = new char[listBufferSize];
 
 	try
@@ -561,9 +561,25 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 
 			outputBlock.ResizeBlock(xattrSize);
 		}
-		else if(listSize<0 && errno!=EOPNOTSUPP && errno!=EACCES)
+		else if(listSize<0)
 		{
-			THROW_EXCEPTION(CommonException, OSFileError);
+			if(errno == EOPNOTSUPP || errno == EACCES)
+			{
+				// fail silently
+			}
+			else if(errno == ERANGE)
+			{
+				BOX_ERROR("Failed to read extended "
+					"attributes of " << Filename <<
+					": buffer too small, not backed up");
+			}
+			else
+			{
+				BOX_LOG_SYS_ERROR("Failed to read extended "
+					"attributes of " << Filename <<
+					", not backed up");
+				THROW_EXCEPTION(CommonException, OSFileError);
+			}
 		}
 	}
 	catch(...)
