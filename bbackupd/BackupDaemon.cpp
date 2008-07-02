@@ -10,6 +10,7 @@
 #include "Box.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef HAVE_UNISTD_H
@@ -888,7 +889,8 @@ void BackupDaemon::Run2()
 				}
 				else
 				{
-					// Unset the read error flag, so the						// error is reported again if it
+					// Unset the read error flag, so the
+					// error is reported again if it
 					// happens again
 					mNotificationsSent[NotifyEvent_ReadError] = false;
 				}
@@ -1013,6 +1015,13 @@ void BackupDaemon::Run2()
 							SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 					doSyncForcedByPreviousSyncError = true;
 				}
+			}
+			else
+			{
+				// Unset the read error flag, so the
+				// error is reported again if it
+				// happens again
+				mNotificationsSent[NotifyEvent_BackupError] = false;
 			}
 
 			// Log the stats
