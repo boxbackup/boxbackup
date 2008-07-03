@@ -357,6 +357,11 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Store on list
 					dirs.push_back(std::string(en->d_name));
 				}
+				else if (type == S_IFSOCK || type == S_IFIFO)
+				{
+					// removed notification for these types
+					// see Debian bug 479145, no objections
+				}
 				else
 				{
 					if(rParams.mrContext.ExcludeFile(filename))
