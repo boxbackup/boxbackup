@@ -95,7 +95,7 @@ namespace Log
 		INFO,
 		TRACE, 
 		EVERYTHING,
-		INVALID = -1,
+		INVALID = -1
 	};
 }
 
