@@ -16,12 +16,14 @@
 #ifdef HAVE_SYSLOG_H
 	#include <syslog.h>
 #endif
-
-#include "Logging.h"
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
 
 #include <iomanip>
 
 #include "BoxTime.h"
+#include "Logging.h"
 
 bool Logging::sLogToSyslog  = false;
 bool Logging::sLogToConsole = false;
