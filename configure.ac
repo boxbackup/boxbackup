@@ -20,11 +20,16 @@ if test "x$ac_cv_cxx_exceptions" != "xyes" || \
    test "x$ac_cv_cxx_namespaces" != "xyes"; then
   AC_MSG_ERROR([[basic compile checks failed, the C++ compiler is broken]])
 fi
+
 if test "x$GXX" = "xyes"; then
   # Use -Wall if we have gcc. This gives better warnings
   AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
-  # Use -rdynamic if we have gcc. This is needed for backtrace
-  AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
+
+  # Use -rdynamic if we have gcc, but not mingw. This is needed for backtrace
+  case $target_os in
+    mingw*) ;;
+    *) AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic']) ;;
+  esac
 fi
 
 AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
