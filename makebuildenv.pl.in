@@ -569,11 +569,11 @@ _AR      = \$(AR)
 _RANLIB  = \$(RANLIB)
 .else
 HIDE     = @
-_CXX     = @ echo "[CXX]    " \$(*F) && \$(CXX)
-_LINK    = @ echo "[LINK]   " \$(*F) && \$(CXX)
-_WINDRES = @ echo "[WINDRES]" \$(*F) && \$(WINDRES)
-_AR      = @ echo "[AR]     " \$(*F) && \$(AR)
-_RANLIB  = @ echo "[RANLIB] " \$(*F) && \$(RANLIB)
+_CXX     = @ echo "  [CXX]    " \$(*F) && \$(CXX)
+_LINK    = @ echo "  [LINK]   " \$(*F) && \$(CXX)
+_WINDRES = @ echo "  [WINDRES]" \$(*F) && \$(WINDRES)
+_AR      = @ echo "  [AR]     " \$(*F) && \$(AR)
+_RANLIB  = @ echo "  [RANLIB] " \$(*F) && \$(RANLIB)
 .endif
 
 __E
@@ -582,11 +582,11 @@ __E
 	{
 		print MAKE <<__E;
 HIDE     = \$(if \$(V),,@)
-_CXX     = \$(if \$(V),\$(CXX),     @ echo "[CXX]     \$<" && \$(CXX))
-_LINK    = \$(if \$(V),\$(CXX),     @ echo "[LINK]    \$@" && \$(CXX))
-_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "[WINDRES] \$<" && \$(WINDRES))
-_AR      = \$(if \$(V),\$(AR),      @ echo "[AR]      \$@" && \$(AR))
-_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "[RANLIB]  \$@" && \$(RANLIB))
+_CXX     = \$(if \$(V),\$(CXX),     @ echo "  [CXX]     \$<" && \$(CXX))
+_LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    \$@" && \$(CXX))
+_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] \$<" && \$(WINDRES))
+_AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      \$@" && \$(AR))
+_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  \$@" && \$(RANLIB))
 
 __E
 	}
