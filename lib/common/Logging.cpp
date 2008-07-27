@@ -274,35 +274,8 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 
 	if (sShowTime)
 	{
-		box_time_t time_now = GetCurrentBoxTime();
-		time_t seconds = BoxTimeToSeconds(time_now);
-		int micros = BoxTimeToMicroSeconds(time_now) % MICRO_SEC_IN_SEC;
-
-		struct tm tm_now, *tm_ptr = &tm_now;
-
-		#ifdef WIN32
-			if ((tm_ptr = localtime(&seconds)) != NULL)
-		#else
-			if (localtime_r(&seconds, &tm_now) != NULL)
-		#endif
-		{
-			buf << std::setfill('0') <<
-				std::setw(2) << tm_ptr->tm_hour << ":" << 
-				std::setw(2) << tm_ptr->tm_min  << ":" <<
-				std::setw(2) << tm_ptr->tm_sec;
-
-			if (sShowTimeMicros)
-			{
-				buf << "." << std::setw(6) << micros;
-			}
-
-			buf << " ";
-		}
-		else
-		{
-			buf << strerror(errno);
-			buf << " ";
-		}
+		buf << FormatTime(GetCurrentBoxTime(), sShowTimeMicros);
+		buf << " ";
 	}
 
 	if (sShowTag)
