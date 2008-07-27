@@ -88,23 +88,46 @@ int RunCommand(const std::string& rCommandLine)
 
 bool ServerIsAlive(int pid)
 {
-#ifdef WIN32
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
-	if (hProcess == NULL)
-	{
-		if (GetLastError() != ERROR_INVALID_PARAMETER)
+	#ifdef WIN32
+
+		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION,
+			false, pid);
+		if (hProcess == NULL)
 		{
-			printf("Failed to open process %d: error %d\n",
-				pid, (int)GetLastError());
+			if (GetLastError() != ERROR_INVALID_PARAMETER)
+			{
+				BOX_ERROR("Failed to open process " << pid <<
+					": " <<
+					GetErrorMessage(GetLastError()));
+			}
+			return false;
 		}
+
+		DWORD exitCode;
+		BOOL result = GetExitCodeProcess(hProcess, &exitCode);
+		CloseHandle(hProcess);
+
+		if (result == 0)
+		{
+			BOX_ERROR("Failed to get exit code for process " <<
+				pid << ": " <<
+				GetErrorMessage(GetLastError()))
+			return false;
+		}
+
+		if (exitCode == STILL_ACTIVE)
+		{
+			return true;
+		}
+		
 		return false;
-	}
-	CloseHandle(hProcess);
-	return true;
-#else // !WIN32
-	if(pid == 0) return false;
-	return ::kill(pid, 0) != -1;
-#endif // WIN32
+
+	#else // !WIN32
+
+		if(pid == 0) return false;
+		return ::kill(pid, 0) != -1;
+
+	#endif // WIN32
 }
 
 int ReadPidFile(const char *pidFile)
