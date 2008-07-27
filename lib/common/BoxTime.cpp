@@ -52,3 +52,37 @@ box_time_t GetCurrentBoxTime()
 	
 	return SecondsToBoxTime(time(0));
 }
+
+std::string FormatTime(box_time_t time, bool showMicros)
+{
+	std::ostringstream buf;
+
+	time_t seconds = BoxTimeToSeconds(time);
+	int micros = BoxTimeToMicroSeconds(time) % MICRO_SEC_IN_SEC;
+
+	struct tm tm_now, *tm_ptr = &tm_now;
+
+	#ifdef WIN32
+		if ((tm_ptr = localtime(&seconds)) != NULL)
+	#else
+		if (localtime_r(&seconds, &tm_now) != NULL)
+	#endif
+	{
+		buf << std::setfill('0') <<
+			std::setw(2) << tm_ptr->tm_hour << ":" << 
+			std::setw(2) << tm_ptr->tm_min  << ":" <<
+			std::setw(2) << tm_ptr->tm_sec;
+
+		if (showMicros)
+		{
+			buf << "." << std::setw(6) << micros;
+		}
+	}
+	else
+	{
+		buf << strerror(errno);
+	}
+
+	return buf.str();
+}
+
