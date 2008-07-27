@@ -40,35 +40,24 @@ class Timers
 
 	static bool sRescheduleNeeded;
 	static void SignalHandler(int iUnused);
-	
+
 	public:
 	static void Init();
 	static void Cleanup();
 	static void Add   (Timer& rTimer);
 	static void Remove(Timer& rTimer);
-	static void RequestReschedule()
-	{
-		sRescheduleNeeded = true;
-	}
-
-	static void RescheduleIfNeeded()
-	{
-		if (sRescheduleNeeded) 
-		{
-			Reschedule();
-		}
-	}
+	static void RequestReschedule();
+	static void RescheduleIfNeeded();
 };
 
 class Timer
 {
 public:
-	Timer(size_t timeoutSecs);
+	Timer(size_t timeoutSecs, const std::string& rName = "");
 	virtual ~Timer();
 	Timer(const Timer &);
 	Timer &operator=(const Timer &);
 
-public:
 	box_time_t   GetExpiryTime() { return mExpires; }
 	virtual void OnExpire();
 	bool         HasExpired()
@@ -76,10 +65,23 @@ public:
 		Timers::RescheduleIfNeeded();
 		return mExpired; 
 	}
+
+	const std::string& GetName() const { return mName; }
 	
 private:
-	box_time_t mExpires;
-	bool       mExpired;
+	box_time_t  mExpires;
+	bool        mExpired;
+	std::string mName;
+
+	void Start();
+	void Start(int64_t delayInMicros);
+	void Stop();
+
+	#ifdef WIN32
+	HANDLE mTimerHandle;
+	static VOID CALLBACK TimerRoutine(PVOID lpParam,
+		BOOLEAN TimerOrWaitFired);
+	#endif
 };
 
 #include "MemLeakFindOff.h"
