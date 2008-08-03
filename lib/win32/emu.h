@@ -205,6 +205,7 @@ struct itimerval
 
 //again need to verify these
 #define S_IFLNK 1
+#define S_IFSOCK 0
 
 #define S_ISLNK(x) ( false )
 
@@ -290,6 +291,11 @@ inline int ioctl(SOCKET sock, int flag,  int * something)
 {
 	//indicate success
 	return 0;
+}
+
+extern "C" inline int getpid()
+{
+	return (int)GetCurrentProcessId();
 }
 
 inline int waitpid(pid_t pid, int *status, int)
