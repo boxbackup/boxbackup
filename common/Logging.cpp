@@ -227,9 +227,7 @@ Logger::~Logger()
 bool Console::sShowTime = false;
 bool Console::sShowTimeMicros = false;
 bool Console::sShowTag = false;
-#ifndef WIN32
 bool Console::sShowPID = false;
-#endif
 std::string Console::sTag;
 
 void Console::SetTag(const std::string& rTag)
@@ -248,12 +246,10 @@ void Console::SetShowTimeMicros(bool enabled)
 	sShowTimeMicros = enabled;
 }
 
-#ifndef WIN32
 void Console::SetShowPID(bool enabled)
 {
 	sShowPID = enabled;
 }
-#endif
 
 bool Console::Log(Log::Level level, const std::string& rFile, 
 	int line, std::string& rMessage)
@@ -280,23 +276,19 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 
 	if (sShowTag)
 	{
-		#ifndef WIN32
 		if (sShowPID)
 		{
 			buf << "[" << sTag << " " << getpid() << "] ";
 		}
 		else
-		#endif
 		{
 			buf << "[" << sTag << "] ";
 		}
 	}
-	#ifndef WIN32
 	else if (sShowPID)
 	{
 		buf << "[" << getpid() << "] ";
 	}
-	#endif
 
 	if (level <= Log::FATAL)
 	{
