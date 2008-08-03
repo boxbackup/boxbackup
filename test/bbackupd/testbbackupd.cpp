@@ -91,13 +91,12 @@
 	_oss2 << found; \
 	std::string found_str = _oss2.str(); \
 	\
-	TEST_THAT(exp_str == found_str); \
-	std::string _line = line; \
-	\
 	if(exp_str != found_str) \
 	{ \
+		std::string _line = line; \
 		printf("Expected <%s> but found <%s> in <%s>\n", \
 			exp_str.c_str(), found_str.c_str(), _line.c_str()); \
+		TEST_FAIL_WITH_MESSAGE(#found " != " #expected " in " line); \
 	} \
 }
 
@@ -1346,6 +1345,15 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
+		}
+
+		// ensure time is different to refresh the cache
+		::safe_sleep(1);
+
 		BOX_TRACE("Restart bbackupd with more exclusions");
 		// Start again with a new config that excludes d3 and f2,
 		// and hence also d3/d4 and d3/d4/f5. bbackupd should mark
@@ -1357,12 +1365,12 @@ int test_bbackupd()
 			" testfiles/bbackupd-exclude.conf";
 		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
 		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-		::safe_sleep(1);
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 		*/
+
 		BackupDaemon bbackupd;
 		bbackupd.Configure("testfiles/bbackupd-exclude.conf");
 		bbackupd.InitCrypto();
@@ -1371,7 +1379,7 @@ int test_bbackupd()
 		// Should be marked as deleted by this run
 		// wait_for_sync_end();
 		{
-			Logging::Guard guard(Log::ERROR);
+			// Logging::Guard guard(Log::ERROR);
 			bbackupd.RunSyncNow();
 		}
 
@@ -1393,7 +1401,21 @@ int test_bbackupd()
 		// d3/d4/f5	excluded
 		// d7		deleted
 		// Careful with timing here, these files can already be
-		// deleted by housekeeping.
+		// deleted by housekeeping. On Win32, housekeeping runs
+		// immediately after disconnect, but only if enough time
+		// has elapsed since the last housekeeping. Since the
+		// backup run closely follows the last one, housekeeping
+		// should not run afterwards. By waiting before
+		// connecting to check the results, we should force
+		// housekeeping to run after that check, so the next check
+		// will see that the deleted files have been removed.
+
+		#ifdef WIN32
+			BOX_TRACE("Wait long enough that housekeeping "
+				"will run again")
+			wait_for_backup_operation(5);
+			BOX_TRACE("done.");
+		#endif
 
 		BOX_TRACE("Find out whether bbackupd marked files as deleted");
 		{
@@ -1417,10 +1439,17 @@ int test_bbackupd()
 			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
 				ReadDirectory(*client, spacetestDirId);
 
+			// these files were deleted before, they should be
+			// long gone by now
+
 			TEST_THAT(SearchDir(*spacetest_dir, "f1") == 0);
+			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
+
+			// these files have just been deleted, because
+			// they are excluded by the new configuration.
+			// but housekeeping should not have run yet
 			TEST_THAT(test_entry_deleted(*spacetest_dir, "f2"));
 			TEST_THAT(test_entry_deleted(*spacetest_dir, "d3"));
-			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
 
 			int64_t d3_id = SearchDir(*spacetest_dir, "d3");
 			TEST_THAT(d3_id != 0);
@@ -1453,6 +1482,12 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 		BOX_TRACE("done.");
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
+		}
 
 		// Wait for housekeeping to run
 		BOX_TRACE("Wait for housekeeping to remove the deleted files");
@@ -1502,6 +1537,12 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
+		}
+
 		// Need 22 blocks free to upload everything
 		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
 			"testfiles/bbstored.conf setlimit 01234567 0B 22B") 
@@ -1546,6 +1587,12 @@ int test_bbackupd()
 
 			client->QueryFinished();
 			sSocket.Close();
+		}
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
 		}
 
 		// Put the limit back
@@ -1598,6 +1645,12 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
+		}
 	}
 
 	#ifndef WIN32
@@ -1622,7 +1675,7 @@ int test_bbackupd()
 		fclose(fp);
 
 		char buf[PATH_MAX];
-		TEST_THAT(getcwd(buf, sizeof(buf)) != NULL);
+		TEST_THAT(getcwd(buf, sizeof(buf)) == buf);
 		std::string path = buf;
 		path += DIRECTORY_SEPARATOR SYM_DIR 
 			DIRECTORY_SEPARATOR "a"
@@ -1889,6 +1942,8 @@ int test_bbackupd()
 
 		}
 
+		int compareReturnValue;
+
 #ifdef WIN32
 		printf("\n==== Check that filenames in UTF-8 "
 			"can be backed up\n");
@@ -1930,7 +1985,7 @@ int test_bbackupd()
 		std::string filepath(dirpath + "/" + filename);
 
 		char cwdbuf[1024];
-		TEST_EQUAL(cwdbuf, getcwd(cwdbuf, sizeof(cwdbuf)), "getcwd");
+		TEST_THAT(getcwd(cwdbuf, sizeof(cwdbuf)) == cwdbuf);
 		std::string cwd = cwdbuf;
 
 		// Test that our emulated chdir() works properly
@@ -2266,7 +2321,7 @@ int test_bbackupd()
 			long start_time = time(NULL);
 
 			// check that no backup has run (compare fails)
-			int compareReturnValue = ::system(BBACKUPQUERY " "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-Werror "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query3.log "
@@ -2339,7 +2394,7 @@ int test_bbackupd()
 	
 		// wait for backup daemon to do it's stuff, and compare again
 		wait_for_backup_operation();
-		int compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
+		compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2.log "
 			"\"compare -acQ\" quit");
