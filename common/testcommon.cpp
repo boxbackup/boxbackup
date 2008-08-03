@@ -331,10 +331,10 @@ int test(int argc, const char *argv[])
 
 	Timers::Init();
 
-	Timer t0(0); // should never expire
-	Timer t1(1);
-	Timer t2(2);
-	Timer t3(3);
+	Timer t0(0, "t0"); // should never expire
+	Timer t1(1, "t1");
+	Timer t2(2, "t2");
+	Timer t3(3, "t3");
 	
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(!t1.HasExpired());
@@ -353,8 +353,8 @@ int test(int argc, const char *argv[])
 	TEST_THAT(t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
 	
-	t1 = Timer(1);
-	t2 = Timer(2);
+	t1 = Timer(1, "t1a");
+	t2 = Timer(2, "t2a");
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(!t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
