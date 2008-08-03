@@ -409,7 +409,7 @@ public:
 	{ 
 		if (mLogAllFileAccess)
 		{
-			BOX_INFO("Uploading complete file: " << rLocalPath);
+			BOX_NOTICE("Uploading complete file: " << rLocalPath);
 		} 
 	}
  	virtual void NotifyFileUploadingPatch(
@@ -418,7 +418,7 @@ public:
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_INFO("Uploading patch to file: " << rLocalPath);
+			BOX_NOTICE("Uploading patch to file: " << rLocalPath);
 		} 
 	}
  	virtual void NotifyFileUploaded(
@@ -428,7 +428,7 @@ public:
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_INFO("Uploaded file: " << rLocalPath);
+			BOX_NOTICE("Uploaded file: " << rLocalPath);
 		} 
 	}
  	virtual void NotifyFileSynchronised(
