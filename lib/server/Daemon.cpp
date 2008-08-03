@@ -107,12 +107,10 @@ Daemon::~Daemon()
 std::string Daemon::GetOptionString()
 {
 	return "c:"
-	#ifdef WIN32
-		"K"
-	#else // !WIN32
-		"DFkP"
+	#ifndef WIN32
+		"DFP"
 	#endif
-		"hqt:TUvVW:";
+		"hkKqt:TUvVW:";
 }
 
 void Daemon::Usage()
@@ -126,12 +124,13 @@ void Daemon::Usage()
 	"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
 	"             argument is the configuration file, or else the default \n"
 	"             [" << GetConfigFileName() << "]\n"
-#ifdef WIN32
-	"  -K         Stop writing log messages to console while daemon is running\n"
-#else // !WIN32
+#ifndef WIN32
 	"  -D         Debugging mode, do not fork, one process only, one client only\n"
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
+#endif
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
+	"  -K         Stop writing log messages to console while daemon is running\n"
+#ifndef WIN32
 	"  -P         Show process ID (PID) in console output\n"
 #endif
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -165,13 +164,7 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
-#ifdef WIN32
-		case 'K':
-		{
-			mKeepConsoleOpenAfterFork = false;
-		}
-		break;
-#else // !WIN32
+#ifndef WIN32
 		case 'D':
 		{
 			mSingleProcess = true;
@@ -183,13 +176,19 @@ int Daemon::ProcessOption(signed int option)
 			mRunInForeground = true;
 		}
 		break;
+#endif // !WIN32
 
 		case 'k':
 		{
 			mKeepConsoleOpenAfterFork = true;
 		}
 		break;
-#endif
+
+		case 'K':
+		{
+			mKeepConsoleOpenAfterFork = false;
+		}
+		break;
 
 		case 'h':
 		{
@@ -198,13 +197,11 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
-		#ifndef WIN32
 		case 'P':
 		{
 			Console::SetShowPID(true);
 		}
 		break;
-		#endif
 
 		case 'q':
 		{
@@ -435,7 +432,9 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	std::string pidFileName;
 
-	bool asDaemon = !mSingleProcess && !mRunInForeground;
+	#ifndef WIN32
+		bool asDaemon = !mSingleProcess && !mRunInForeground;
+	#endif
 
 	try
 	{
@@ -541,11 +540,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		// Write PID to file
 		char pid[32];
 
-#ifdef WIN32
-		int pidsize = sprintf(pid, "%d", (int)GetCurrentProcessId());
-#else
 		int pidsize = sprintf(pid, "%d", (int)getpid());
-#endif
 
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
