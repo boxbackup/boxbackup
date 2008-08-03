@@ -2473,10 +2473,11 @@ void BackupDaemon::NotifySysadmin(int Event)
 		<< script << "'");
 	
 	// Then do it
-	if(::system(script.c_str()) != 0)
+	int returnCode = ::system(script.c_str());
+	if (returnCode != 0)
 	{
-		BOX_ERROR("Notify script returned an error code. ('"
-			<< script << "')");
+		BOX_ERROR("Notify script returned error code: " <<
+			returnCode << " ('" << script << "')");
 	}
 
 	// Flag that this is done so the administrator isn't constantly
