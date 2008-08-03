@@ -408,13 +408,27 @@ for my $mod (@implicit_deps, @modules)
 				"test script file for $module for writing\n";
 			print TESTFILE "#!/bin/sh\necho TEST: $module\n";
 
-			if(-d "$module/testfiles")
+			if (-d "$module/testfiles")
+			{
+				if ($target_windows)
+				{
+				print TESTFILE <<__E;
+echo Killing any running daemons...
+test -r testfiles/bbackupd.pid && /bin/kill -f `cat testfiles/bbackupd.pid`
+test -r testfiles/bbstored.pid && /bin/kill -f `cat testfiles/bbstored.pid`
+__E
+			}
+			else
 			{
 				print TESTFILE <<__E;
 echo Killing any running daemons...
 test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
 test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
+__E
+			}
 
+
+			print TESTFILE <<__E;
 echo Removing old test files...
 chmod -R a+rwx testfiles
 rm -rf testfiles
