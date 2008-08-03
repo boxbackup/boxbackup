@@ -108,9 +108,9 @@ std::string Daemon::GetOptionString()
 {
 	return "c:"
 	#ifndef WIN32
-		"DFP"
+		"DF"
 	#endif
-		"hkKqt:TUvVW:";
+		"hkKPqt:TUvVW:";
 }
 
 void Daemon::Usage()
