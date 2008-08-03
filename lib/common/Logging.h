@@ -147,9 +147,7 @@ class Console : public Logger
 	static bool sShowTimeMicros;
 	static bool sShowTag;
 	static std::string sTag;
-	#ifndef WIN32
 	static bool sShowPID;
-	#endif
 
 	public:
 	virtual bool Log(Log::Level level, const std::string& rFile, 
@@ -160,9 +158,7 @@ class Console : public Logger
 	static void SetTag(const std::string& rTag);
 	static void SetShowTime(bool enabled);
 	static void SetShowTimeMicros(bool enabled);
-	#ifndef WIN32
 	static void SetShowPID(bool enabled);
-	#endif
 };
 
 // --------------------------------------------------------------------------
