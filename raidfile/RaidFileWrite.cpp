@@ -274,6 +274,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	if(::unlink(renameTo.c_str()) != 0 && 
 		GetLastError() != ERROR_FILE_NOT_FOUND)
 	{
+		BOX_LOG_WIN_ERROR("failed to delete file: " << renameTo);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 #endif
