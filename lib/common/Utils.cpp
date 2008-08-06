@@ -68,20 +68,13 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
 void DumpStackBacktrace()
 {
-	void *array[10];
-	size_t size;
-	char **strings;
-	size_t i;
-
-	size = backtrace (array, 10);
-	strings = backtrace_symbols (array, size);
+	void  *array[10];
+	size_t size = backtrace (array, 10);
+	char **strings = backtrace_symbols (array, size);
 
 	BOX_TRACE("Obtained " << size << " stack frames.");
 
-	size_t output_len = 256;
-	char*  output_buf = new char [output_len];
-
-	for(i = 0; i < size; i++)
+	for(size_t i = 0; i < size; i++)
 	{
 		// Demangling code copied from 
 		// cctbx_sources/boost_adaptbx/meta_ext.cpp, BSD license
@@ -97,8 +90,10 @@ void DumpStackBacktrace()
 
 		int status;
 		
+#include "MemLeakFindOff.h"
 		char* result = abi::__cxa_demangle(mangled_func.c_str(),
-			output_buf, &output_len, &status);
+			NULL, NULL, &status);
+#include "MemLeakFindOn.h"
 
 		if (result == NULL)
 		{
@@ -137,20 +132,19 @@ void DumpStackBacktrace()
 		}
 		else
 		{
-			output_buf = result;
 			output_frame = mangled_frame.substr(0, start + 1) +
-				// std::string(output_buf.get()) +
 				result + mangled_frame.substr(end);
+#include "MemLeakFindOff.h"
+			std::free(result);
+#include "MemLeakFindOn.h"
 		}
 		#endif // HAVE_CXXABI_H
 
 		BOX_TRACE("Stack frame " << i << ": " << output_frame);
 	}
 
-	delete [] output_buf;
-
 #include "MemLeakFindOff.h"
-	free (strings);
+	std::free (strings);
 #include "MemLeakFindOn.h"
 }
 #endif
