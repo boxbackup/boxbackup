@@ -81,31 +81,35 @@
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
 // utility macro for comparing two strings in a line
-#define TEST_EQUAL(expected, found, line) \
+#define TEST_EQUAL(_expected, _found, _line) \
 { \
 	std::ostringstream _oss1; \
-	_oss1 << expected; \
-	std::string exp_str = _oss1.str(); \
+	_oss1 << _expected; \
+	std::string _exp_str = _oss1.str(); \
 	\
 	std::ostringstream _oss2; \
-	_oss2 << found; \
-	std::string found_str = _oss2.str(); \
+	_oss2 << _found; \
+	std::string _found_str = _oss2.str(); \
 	\
-	if(exp_str != found_str) \
+	if(_exp_str != _found_str) \
 	{ \
-		std::string _line = line; \
+		std::string _line_str = _line; \
 		printf("Expected <%s> but found <%s> in <%s>\n", \
-			exp_str.c_str(), found_str.c_str(), _line.c_str()); \
-		TEST_FAIL_WITH_MESSAGE(#found " != " #expected " in " line); \
+			_exp_str.c_str(), _found_str.c_str(), _line_str.c_str()); \
+		\
+		std::ostringstream _oss3; \
+		_oss3 << #_found << " != " << #_expected << " in " << _line; \
+		\
+		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
 	} \
 }
 
 // utility macro for testing a line
-#define TEST_LINE(condition, line) \
-	TEST_THAT(condition); \
-	if (!(condition)) \
+#define TEST_LINE(_condition, _line) \
+	TEST_THAT(_condition); \
+	if (!(_condition)) \
 	{ \
-		printf("Test failed on <%s>\n", line.c_str()); \
+		printf("Test failed on <%s>\n", _line.c_str()); \
 	}
 
 void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
