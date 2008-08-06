@@ -182,7 +182,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 	// Insert info from file
 	info->mClientStoreMarker	= box_ntoh64(hdr.mClientStoreMarker);
 	info->mLastObjectIDUsed		= box_ntoh64(hdr.mLastObjectIDUsed);
-	info->mBlocksUsed 			= box_ntoh64(hdr.mBlocksUsed);
+	info->mBlocksUsed 		= box_ntoh64(hdr.mBlocksUsed);
 	info->mBlocksInOldFiles 	= box_ntoh64(hdr.mBlocksInOldFiles);
 	info->mBlocksInDeletedFiles	= box_ntoh64(hdr.mBlocksInDeletedFiles);
 	info->mBlocksInDirectories	= box_ntoh64(hdr.mBlocksInDirectories);
