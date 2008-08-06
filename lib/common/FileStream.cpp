@@ -47,6 +47,8 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 		}
 		else
 		{
+			BOX_LOG_SYS_WARNING("Failed to open file: " <<
+				Filename);
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}
