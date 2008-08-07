@@ -154,6 +154,8 @@ int ReadPidFile(const char *pidFile)
 
 int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 {
+	::fprintf(stdout, "Starting server: %s\n", rCommandLine.c_str());
+
 #ifdef WIN32
 
 	PROCESS_INFORMATION procInfo;
@@ -191,35 +193,42 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 		DWORD err = GetLastError();
 		printf("Launch failed: %s: error %d\n", rCommandLine.c_str(),
 			(int)err);
+		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
 
 	CloseHandle(procInfo.hProcess);
 	CloseHandle(procInfo.hThread);
 
+	return WaitForServerStart(pidFile, (int)procInfo.dwProcessId);
+
 #else // !WIN32
 
 	if(RunCommand(rCommandLine) != 0)
 	{
-		printf("Server: %s\n", rCommandLine.c_str());
 		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
 		return -1;
 	}
 
-#endif // WIN32
+	return WaitForServerStartup(pidFile, 0);
 
+#endif // WIN32
+}
+
+int WaitForServerStartup(const char *pidFile, int pidIfKnown)
+{
 	#ifdef WIN32
 	if (pidFile == NULL)
 	{
-		return (int)procInfo.dwProcessId;
+		return pidIfKnown;
 	}
 	#else
 	// on other platforms there is no other way to get 
 	// the PID, so a NULL pidFile doesn't make sense.
+	ASSERT(pidFile != NULL);
 	#endif
 
 	// time for it to start up
-	::fprintf(stdout, "Starting server: %s\n", rCommandLine.c_str());
 	::fprintf(stdout, "Waiting for server to start: ");
 
 	for (int i = 0; i < 15; i++)
@@ -229,29 +238,25 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 			break;
 		}
 
-		#ifdef WIN32
-		if (!ServerIsAlive((int)procInfo.dwProcessId))
+		if (pidIfKnown && !ServerIsAlive(pidIfKnown))
 		{
 			break;
 		}
-		#endif
 
 		::fprintf(stdout, ".");
 		::fflush(stdout);
 		::sleep(1);
 	}
 
-	#ifdef WIN32
 	// on Win32 we can check whether the process is alive
 	// without even checking the PID file
 
-	if (!ServerIsAlive((int)procInfo.dwProcessId))
+	if (pidIfKnown && !ServerIsAlive(pidIfKnown))
 	{
 		::fprintf(stdout, " server died!\n");
 		TEST_FAIL_WITH_MESSAGE("Server died!");	
 		return -1;
 	}
-	#endif
 
 	if (!TestFileNotEmpty(pidFile))
 	{
@@ -268,19 +273,16 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 	// read pid file
 	int pid = ReadPidFile(pidFile);
 
-	#ifdef WIN32
 	// On Win32 we can check whether the PID in the pidFile matches
 	// the one returned by the system, which it always should.
 
-	if (pid != (int)procInfo.dwProcessId)
+	if (pidIfKnown && pid != pidIfKnown)
 	{
 		printf("Server wrote wrong pid to file (%s): expected %d "
-			"but found %d\n", pidFile, 
-			(int)procInfo.dwProcessId, pid);
+			"but found %d\n", pidFile, pidIfKnown, pid);
 		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");	
 		return -1;
 	}
-	#endif
 
 	return pid;
 }
