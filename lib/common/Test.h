@@ -86,6 +86,7 @@ int RunCommand(const std::string& rCommandLine);
 bool ServerIsAlive(int pid);
 int ReadPidFile(const char *pidFile);
 int LaunchServer(const std::string& rCommandLine, const char *pidFile);
+int WaitForServerStartup(const char *pidFile, int pidIfKnown);
 
 #define TestRemoteProcessMemLeaks(filename) \
 	TestRemoteProcessMemLeaksFunc(filename, __FILE__, __LINE__)
