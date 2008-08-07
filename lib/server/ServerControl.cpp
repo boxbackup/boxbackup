@@ -6,6 +6,10 @@
 	#include <sys/types.h>
 #endif
 
+#ifdef HAVE_SYS_WAIT_H
+	#include <sys/wait.h>
+#endif
+
 #ifdef HAVE_SIGNAL_H
 	#include <signal.h>
 #endif
@@ -160,18 +164,43 @@ bool KillServerInternal(int pid)
 
 #endif // WIN32
 
-bool KillServer(int pid)
+bool KillServer(int pid, bool WaitForProcess)
 {
 	if (!KillServerInternal(pid))
 	{
 		return false;
 	}
 
+	#ifdef HAVE_WAITPID
+	if (WaitForProcess)
+	{
+		int status, result;
+
+		result = waitpid(pid, &status, 0);
+		if (result != pid)
+		{
+			BOX_WARNING("waitpid returned " << result);
+		}
+		TEST_THAT(result == pid);
+
+		TEST_THAT(WIFEXITED(status));
+		if (WIFEXITED(status))
+		{
+			if (WEXITSTATUS(status) != 0)
+			{
+				BOX_WARNING("process exited with code " <<
+					WEXITSTATUS(status));
+			}
+			TEST_THAT(WEXITSTATUS(status) == 0);
+		}
+	}
+	#endif
+
 	for (int i = 0; i < 30; i++)
 	{
 		if (i == 0) 
 		{
-			printf("Waiting for server to die: ");
+			printf("Waiting for server to die (pid %d): ", pid);
 		}
 
 		printf(".");
