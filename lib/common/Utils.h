@@ -31,8 +31,10 @@ enum
 };
 int ObjectExists(const std::string& rFilename);
 std::string HumanReadableSize(int64_t Bytes);
-std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max);
-std::string FormatUsageLineStart(const std::string& rName);
+std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
+	bool MachineReadable);
+std::string FormatUsageLineStart(const std::string& rName,
+	bool MachineReadable);
 
 #include "MemLeakFindOff.h"
 

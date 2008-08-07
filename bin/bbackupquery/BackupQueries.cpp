@@ -2190,8 +2190,8 @@ void BackupQueries::CommandUsage()
 // --------------------------------------------------------------------------
 void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size, int64_t HardLimit, int32_t BlockSize)
 {
-	std::cout << FormatUsageLineStart(Name) <<
-		FormatUsageBar(Size, Size * BlockSize, HardLimit * BlockSize) <<
+	std::cout << FormatUsageLineStart(Name, false) <<
+		FormatUsageBar(Size, Size * BlockSize, HardLimit * BlockSize, false) <<
 		std::endl;
 }
 
