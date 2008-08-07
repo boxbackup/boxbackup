@@ -39,6 +39,8 @@
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
 
+bool sMachineReadableOutput = false;
+
 void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 {
 	if(SoftLimit >= HardLimit)
@@ -71,7 +73,8 @@ int BlockSizeOfDiscSet(int DiscSet)
 std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int DiscSet)
 {
 	return FormatUsageBar(Blocks, Blocks * BlockSizeOfDiscSet(DiscSet),
-		MaxBlocks * BlockSizeOfDiscSet(DiscSet));
+		MaxBlocks * BlockSizeOfDiscSet(DiscSet),
+		sMachineReadableOutput);
 }
 
 int64_t SizeStringToBlocks(const char *string, int DiscSet)
@@ -205,7 +208,9 @@ int SetLimit(Configuration &rConfig, const std::string &rUsername, int32_t ID, c
 int AccountInfo(Configuration &rConfig, int32_t ID)
 {
 	// Load in the account database 
-	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
+	std::auto_ptr<BackupStoreAccountDatabase> db(
+		BackupStoreAccountDatabase::Read(
+			rConfig.GetKeyValue("AccountDatabase").c_str()));
 	
 	// Exists?
 	if(!db->EntryExists(ID))
@@ -220,32 +225,33 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 	std::string rootDir;
 	int discSet;
 	acc.GetAccountRoot(ID, rootDir, discSet);
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, rootDir, discSet, true /* ReadOnly */));
+	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID,
+		rootDir, discSet, true /* ReadOnly */));
 	
 	// Then print out lots of info
-	std::cout << FormatUsageLineStart("Account ID") <<
+	std::cout << FormatUsageLineStart("Account ID", sMachineReadableOutput) <<
 		BOX_FORMAT_ACCOUNT(ID) << std::endl;
-	std::cout << FormatUsageLineStart("Last object ID") <<
+	std::cout << FormatUsageLineStart("Last object ID", sMachineReadableOutput) <<
 		BOX_FORMAT_OBJECTID(info->GetLastObjectIDUsed()) << std::endl;
-	std::cout << FormatUsageLineStart("Used") <<
+	std::cout << FormatUsageLineStart("Used", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksUsed(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
-	std::cout << FormatUsageLineStart("Old files") <<
+	std::cout << FormatUsageLineStart("Old files", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInOldFiles(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
-	std::cout << FormatUsageLineStart("Deleted files") <<
+	std::cout << FormatUsageLineStart("Deleted files", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInDeletedFiles(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
-	std::cout << FormatUsageLineStart("Directories") <<
+	std::cout << FormatUsageLineStart("Directories", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInDirectories(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
-	std::cout << FormatUsageLineStart("Soft limit") <<
+	std::cout << FormatUsageLineStart("Soft limit", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksSoftLimit(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
-	std::cout << FormatUsageLineStart("Hard limit") <<
+	std::cout << FormatUsageLineStart("Hard limit", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksHardLimit(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
-	std::cout << FormatUsageLineStart("Client store marker") <<
+	std::cout << FormatUsageLineStart("Client store marker", sMachineReadableOutput) <<
 		info->GetLastObjectIDUsed() << std::endl;
 	
 	return 0;
@@ -428,9 +434,9 @@ void PrintUsageAndExit()
 "        specified raidfile disc set number (see raidfile.conf for valid\n"
 "        set numbers) with the specified soft and hard limits (in blocks\n"
 "        if suffixed with B, MB with M, GB with G)\n"
-"  info <account>\n"
+"  info [-m] <account>\n"
 "        Prints information about the specified account including number\n"
-"        of blocks used.\n"
+"        of blocks used. The -m option enable machine-readable output.\n"
 "  setlimit <accounts> <softlimit> <hardlimit>\n"
 "        Changes the limits of the account as specified. Numbers are\n"
 "        interpreted as for the 'create' command (suffixed with B, M or G)\n"
@@ -464,7 +470,7 @@ int main(int argc, const char *argv[])
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "c:")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "c:m")) != -1)
 	{
 		switch(c)
 		{
@@ -473,6 +479,11 @@ int main(int argc, const char *argv[])
 			configFilename = optarg;
 			break;
 		
+		case 'm':
+			// enable machine readable output
+			sMachineReadableOutput = true;
+			break;
+
 		case '?':
 		default:
 			PrintUsageAndExit();
