@@ -252,36 +252,56 @@ std::string HumanReadableSize(int64_t Bytes)
 	return result.str();
 }
 
-std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max)
+std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
+	bool MachineReadable)
 {
 	std::ostringstream result;
 	
-	// Bar graph
-	char bar[17];
-	unsigned int b = (int)((Bytes * (sizeof(bar)-1)) / Max);
-	if(b > sizeof(bar)-1) {b = sizeof(bar)-1;}
-	for(unsigned int l = 0; l < b; l++)
+
+	if (MachineReadable)
 	{
-		bar[l] = '*';
+		result << (Bytes >> 10) << " kB, " <<
+			std::setprecision(0) << ((Bytes*100)/Max) << "%";
 	}
-	for(unsigned int l = b; l < sizeof(bar) - 1; l++)
+	else
 	{
-		bar[l] = ' ';
+		// Bar graph
+		char bar[17];
+		unsigned int b = (int)((Bytes * (sizeof(bar)-1)) / Max);
+		if(b > sizeof(bar)-1) {b = sizeof(bar)-1;}
+		for(unsigned int l = 0; l < b; l++)
+		{
+			bar[l] = '*';
+		}
+		for(unsigned int l = b; l < sizeof(bar) - 1; l++)
+		{
+			bar[l] = ' ';
+		}
+		bar[sizeof(bar)-1] = '\0';
+		
+		result << std::fixed <<
+			std::setw(10) << Blocks << " blocks, " <<
+			std::setw(10) << HumanReadableSize(Bytes) << ", " << 
+			std::setw(3) << std::setprecision(0) <<
+			((Bytes*100)/Max) << "% |" << bar << "|";
 	}
-	bar[sizeof(bar)-1] = '\0';
-	
-	result << std::fixed <<
-		std::setw(10) << Blocks << " blocks, " <<
-		std::setw(10) << HumanReadableSize(Bytes) << ", " << 
-		std::setw(3) << std::setprecision(0) <<
-		((Bytes*100)/Max) << "% |" << bar << "|";
 	
 	return result.str();
 }
 
-std::string FormatUsageLineStart(const std::string& rName)
+std::string FormatUsageLineStart(const std::string& rName,
+	bool MachineReadable)
 {
-	std::ostringstream result;	
-	result << std::setw(20) << std::right << rName << ": ";
+	std::ostringstream result;
+
+	if (MachineReadable)
+	{
+		result << rName << ": ";
+	}
+	else
+	{
+		result << std::setw(20) << std::right << rName << ": ";
+	}
+
 	return result.str();
 }
