@@ -68,6 +68,10 @@ public:
 	virtual void EnterChild();
 	
 	static void SetProcessTitle(const char *format, ...);
+	void SetRunInForeground(bool foreground)
+	{
+		mRunInForeground = foreground;
+	}
 
 protected:
 	virtual void SetupInInitialProcess();
