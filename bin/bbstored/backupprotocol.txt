@@ -4,7 +4,7 @@
 
 Name 				Backup
 IdentString			Box-Backup:v=C
-ServerContextClass	BackupContext	BackupContext.h
+ServerContextClass	BackupStoreContext	BackupStoreContext.h
 
 ClientType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
 ServerType		Filename	BackupStoreFilename			BackupStoreFilename.h

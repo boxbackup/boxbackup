@@ -15,7 +15,7 @@
 #include "autogen_BackupProtocolServer.h"
 #include "autogen_RaidFileException.h"
 #include "BackupConstants.h"
-#include "BackupContext.h"
+#include "BackupStoreContext.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -31,7 +31,7 @@
 #include "MemLeakFindOn.h"
 
 #define CHECK_PHASE(phase)																						\
-	if(rContext.GetPhase() != BackupContext::phase)																\
+	if(rContext.GetPhase() != BackupStoreContext::phase)																\
 	{																											\
 		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(										\
 			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_NotInRightProtocolPhase));		\
@@ -47,12 +47,12 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerVersion::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerVersion::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Return the current version, or an error if the requested version isn't allowed
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerVersion::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerVersion::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Version)
 
@@ -64,7 +64,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerVersion::DoCommand(BackupProto
 	}
 
 	// Mark the next phase
-	rContext.SetPhase(BackupContext::Phase_Login);
+	rContext.SetPhase(BackupStoreContext::Phase_Login);
 
 	// Return our version
 	return std::auto_ptr<ProtocolObject>(new BackupProtocolServerVersion(BACKUP_STORE_SERVER_VERSION));
@@ -73,12 +73,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerVersion::DoCommand(BackupProto
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerLogin::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerLogin::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Return the current version, or an error if the requested version isn't allowed
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Login)
 
@@ -131,7 +131,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 	int64_t clientStoreMarker = rContext.GetClientStoreMarker();
 
 	// Mark the next phase
-	rContext.SetPhase(BackupContext::Phase_Commands);
+	rContext.SetPhase(BackupStoreContext::Phase_Commands);
 	
 	// Log login
 	BOX_NOTICE("Login from Client ID " << 
@@ -151,12 +151,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerFinished::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerFinished::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Marks end of conversation (Protocol framework handles this)
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerFinished::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerFinished::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	BOX_NOTICE("Session finished for Client ID " << 
 		BOX_FORMAT_ACCOUNT(rContext.GetClientID()));
@@ -172,12 +172,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerFinished::DoCommand(BackupProt
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerListDirectory::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerListDirectory::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Command to list a directory
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -217,20 +217,27 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(Backu
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerStoreFile::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerStoreFile::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Command to store a file on the server
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerStoreFile::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerStoreFile::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
+
+	std::auto_ptr<ProtocolObject> hookResult =
+		rContext.StartCommandHook(*this);
+	if(hookResult.get())
+	{
+		return hookResult;
+	}
 	
 	// Check that the diff from file actually exists, if it's specified
 	if(mDiffFromFileID != 0)
 	{
-		if(!rContext.ObjectExists(mDiffFromFileID, BackupContext::ObjectExists_File))
+		if(!rContext.ObjectExists(mDiffFromFileID, BackupStoreContext::ObjectExists_File))
 		{
 			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
 				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DiffFromFileDoesNotExist));	
@@ -275,12 +282,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerStoreFile::DoCommand(BackupPro
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetObject::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerGetObject::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Command to get an arbitary object from the server
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetObject::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetObject::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -303,13 +310,13 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetObject::DoCommand(BackupPro
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetFile::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerGetFile::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Command to get an file object from the server -- may have to do a bit of 
 //				 work to get the object.
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -475,12 +482,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerCreateDirectory::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerCreateDirectory::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Create directory command
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerCreateDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerCreateDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -518,12 +525,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerCreateDirectory::DoCommand(Bac
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerChangeDirAttributes::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerChangeDirAttributes::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Change attributes on directory
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerChangeDirAttributes::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerChangeDirAttributes::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -546,12 +553,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerChangeDirAttributes::DoCommand
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerSetReplacementFileAttributes::DoCommand(Protocol &, BackupContext &)
+//		Name:    BackupProtocolServerSetReplacementFileAttributes::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Change attributes on directory
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerSetReplacementFileAttributes::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerSetReplacementFileAttributes::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -581,12 +588,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerSetReplacementFileAttributes::
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerDeleteFile::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerDeleteFile::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Delete a file
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteFile::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteFile::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -603,12 +610,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteFile::DoCommand(BackupPr
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerDeleteDirectory::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerDeleteDirectory::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Delete a directory
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -631,12 +638,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteDirectory::DoCommand(Bac
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerUndeleteDirectory::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerUndeleteDirectory::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Undelete a directory
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerUndeleteDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerUndeleteDirectory::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -658,12 +665,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerUndeleteDirectory::DoCommand(B
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerSetClientStoreMarker::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerSetClientStoreMarker::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Command to set the client's store marker
 //		Created: 2003/10/29
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerSetClientStoreMarker::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerSetClientStoreMarker::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -679,12 +686,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerSetClientStoreMarker::DoComman
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerMoveObject::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerMoveObject::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Command to move an object from one directory to another
 //		Created: 2003/11/12
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerMoveObject::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerMoveObject::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -722,12 +729,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerMoveObject::DoCommand(BackupPr
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetObjectName::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerGetObjectName::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Command to find the name of an object
 //		Created: 12/11/03
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetObjectName::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetObjectName::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 	
@@ -748,7 +755,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetObjectName::DoCommand(Backu
 	do
 	{
 		// Check the directory really exists
-		if(!rContext.ObjectExists(dirID, BackupContext::ObjectExists_Directory))
+		if(!rContext.ObjectExists(dirID, BackupStoreContext::ObjectExists_Directory))
 		{
 			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerObjectName(BackupProtocolServerObjectName::NumNameElements_ObjectDoesntExist, 0, 0, 0));
 		}
@@ -813,12 +820,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetObjectName::DoCommand(Backu
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetBlockIndexByID::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerGetBlockIndexByID::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Get the block index from a file, by ID
 //		Created: 19/1/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetBlockIndexByID::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetBlockIndexByID::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -839,12 +846,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetBlockIndexByID::DoCommand(B
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetBlockIndexByName::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerGetBlockIndexByName::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Get the block index from a file, by name within a directory
 //		Created: 19/1/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetBlockIndexByName::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetBlockIndexByName::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -891,12 +898,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetBlockIndexByName::DoCommand
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetAccountUsage::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerGetAccountUsage::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Return the amount of disc space used
 //		Created: 19/4/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetAccountUsage::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetAccountUsage::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -922,12 +929,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetAccountUsage::DoCommand(Bac
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolServerGetIsAlive::DoCommand(BackupProtocolServer &, BackupContext &)
+//		Name:    BackupProtocolServerGetIsAlive::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Return the amount of disc space used
 //		Created: 19/4/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> BackupProtocolServerGetIsAlive::DoCommand(BackupProtocolServer &rProtocol, BackupContext &rContext)
+std::auto_ptr<ProtocolObject> BackupProtocolServerGetIsAlive::DoCommand(BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
 {
 	CHECK_PHASE(Phase_Commands)
 

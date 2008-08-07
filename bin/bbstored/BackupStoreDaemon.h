@@ -13,6 +13,7 @@
 #include "ServerTLS.h"
 #include "BoxPortsAndFiles.h"
 #include "BackupConstants.h"
+#include "BackupStoreContext.h"
 #include "IOStreamGetLine.h"
 
 class BackupStoreAccounts;
@@ -38,7 +39,7 @@ private:
 	BackupStoreDaemon(const BackupStoreDaemon &rToCopy);
 public:
 
-	// For BackupContext to communicate with housekeeping process
+	// For BackupStoreContext to communicate with housekeeping process
 	void SendMessageToHousekeepingProcess(const void *Msg, int MsgLen)
 	{
 #ifndef WIN32
@@ -81,6 +82,15 @@ private:
 	void HousekeepingInit();
 	void RunHousekeepingIfNeeded();
 	int64_t mLastHousekeepingRun;
+
+public:
+	void SetTestHook(BackupStoreContext::TestHook& rTestHook)
+	{
+		mpTestHook = &rTestHook;
+	}
+
+private:
+	BackupStoreContext::TestHook* mpTestHook;
 };
 
 
