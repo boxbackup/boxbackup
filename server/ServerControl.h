@@ -4,7 +4,7 @@
 #include "Test.h"
 
 bool HUPServer(int pid);
-bool KillServer(int pid);
+bool KillServer(int pid, bool WaitForProcess = false);
 
 #ifdef WIN32
 	#include "WinNamedPipeStream.h"
