@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    BackupContext.cpp
+//		Name:    BackupStoreContext.cpp
 //		Purpose: Context for backup store server
 //		Created: 2003/08/20
 //
@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 
-#include "BackupContext.h"
+#include "BackupStoreContext.h"
 #include "RaidFileWrite.h"
 #include "RaidFileRead.h"
 #include "BackupStoreDirectory.h"
@@ -48,31 +48,32 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::BackupContext()
+//		Name:    BackupStoreContext::BackupStoreContext()
 //		Purpose: Constructor
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-BackupContext::BackupContext(int32_t ClientID, BackupStoreDaemon &rDaemon)
+BackupStoreContext::BackupStoreContext(int32_t ClientID, BackupStoreDaemon &rDaemon)
 	: mClientID(ClientID),
 	  mrDaemon(rDaemon),
 	  mProtocolPhase(Phase_START),
 	  mClientHasAccount(false),
 	  mStoreDiscSet(-1),
 	  mReadOnly(true),
-	  mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY)
+	  mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+	  mpTestHook(NULL)
 {
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::~BackupContext()
+//		Name:    BackupStoreContext::~BackupStoreContext()
 //		Purpose: Destructor
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-BackupContext::~BackupContext()
+BackupStoreContext::~BackupStoreContext()
 {
 	// Delete the objects in the cache
 	for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin()); i != mDirectoryCache.end(); ++i)
@@ -85,12 +86,12 @@ BackupContext::~BackupContext()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::CleanUp()
+//		Name:    BackupStoreContext::CleanUp()
 //		Purpose: Clean up after a connection
 //		Created: 16/12/03
 //
 // --------------------------------------------------------------------------
-void BackupContext::CleanUp()
+void BackupStoreContext::CleanUp()
 {
 	// Make sure the store info is saved, if it has been loaded, isn't read only and has been modified
 	if(mpStoreInfo.get() && !(mpStoreInfo->IsReadOnly()) && mpStoreInfo->IsModified())
@@ -102,12 +103,12 @@ void BackupContext::CleanUp()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::ReceivedFinishCommand()
+//		Name:    BackupStoreContext::ReceivedFinishCommand()
 //		Purpose: Called when the finish command is received by the protocol
 //		Created: 16/12/03
 //
 // --------------------------------------------------------------------------
-void BackupContext::ReceivedFinishCommand()
+void BackupStoreContext::ReceivedFinishCommand()
 {
 	if(!mReadOnly && mpStoreInfo.get())
 	{
@@ -120,12 +121,12 @@ void BackupContext::ReceivedFinishCommand()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::AttemptToGetWriteLock()
+//		Name:    BackupStoreContext::AttemptToGetWriteLock()
 //		Purpose: Attempt to get a write lock for the store, and if so, unset the read only flags
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-bool BackupContext::AttemptToGetWriteLock()
+bool BackupStoreContext::AttemptToGetWriteLock()
 {
 	// Make the filename of the write lock file
 	std::string writeLockFile;
@@ -166,12 +167,12 @@ bool BackupContext::AttemptToGetWriteLock()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::LoadStoreInfo()
+//		Name:    BackupStoreContext::LoadStoreInfo()
 //		Purpose: Load the store info from disc
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-void BackupContext::LoadStoreInfo()
+void BackupStoreContext::LoadStoreInfo()
 {
 	if(mpStoreInfo.get() != 0)
 	{
@@ -195,12 +196,12 @@ void BackupContext::LoadStoreInfo()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::SaveStoreInfo(bool)
+//		Name:    BackupStoreContext::SaveStoreInfo(bool)
 //		Purpose: Potentially delayed saving of the store info
 //		Created: 16/12/03
 //
 // --------------------------------------------------------------------------
-void BackupContext::SaveStoreInfo(bool AllowDelay)
+void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -233,13 +234,13 @@ void BackupContext::SaveStoreInfo(bool AllowDelay)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::MakeObjectFilename(int64_t, std::string &, bool)
+//		Name:    BackupStoreContext::MakeObjectFilename(int64_t, std::string &, bool)
 //		Purpose: Create the filename of an object in the store, optionally creating the 
 //				 containing directory if it doesn't already exist.
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-void BackupContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists)
+void BackupStoreContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists)
 {
 	// Delegate to utility function
 	StoreStructure::MakeObjectFilename(ObjectID, mStoreRoot, mStoreDiscSet, rOutput, EnsureDirectoryExists);
@@ -249,7 +250,7 @@ void BackupContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutput, b
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::GetDirectoryInternal(int64_t)
+//		Name:    BackupStoreContext::GetDirectoryInternal(int64_t)
 //		Purpose: Return a reference to a directory. Valid only until the 
 //				 next time a function which affects directories is called.
 //				 Mainly this funciton, and creation of files.
@@ -257,7 +258,7 @@ void BackupContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutput, b
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-BackupStoreDirectory &BackupContext::GetDirectoryInternal(int64_t ObjectID)
+BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 {
 	// Get the filename
 	std::string filename;
@@ -343,12 +344,12 @@ BackupStoreDirectory &BackupContext::GetDirectoryInternal(int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::AllocateObjectID()
+//		Name:    BackupStoreContext::AllocateObjectID()
 //		Purpose: Allocate a new object ID, tolerant of failures to save store info
 //		Created: 16/12/03
 //
 // --------------------------------------------------------------------------
-int64_t BackupContext::AllocateObjectID()
+int64_t BackupStoreContext::AllocateObjectID()
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -393,13 +394,13 @@ int64_t BackupContext::AllocateObjectID()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::AddFile(IOStream &, int64_t, int64_t, int64_t, const BackupStoreFilename &, bool)
+//		Name:    BackupStoreContext::AddFile(IOStream &, int64_t, int64_t, int64_t, const BackupStoreFilename &, bool)
 //		Purpose: Add a file to the store, from a given stream, into a specified directory.
 //				 Returns object ID of the new file.
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime,
+int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime,
 		int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename,
 		bool MarkFileWithSameNameAsOldVersions)
 {
@@ -681,12 +682,12 @@ int64_t BackupContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t Mod
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &)
+//		Name:    BackupStoreContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &)
 //		Purpose: Deletes a file, returning true if the file existed. Object ID returned too, set to zero if not found.
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-bool BackupContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut)
+bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut)
 {
 	// Essential checks!
 	if(mpStoreInfo.get() == 0)
@@ -768,12 +769,12 @@ bool BackupContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InD
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::RemoveDirectoryFromCache(int64_t)
+//		Name:    BackupStoreContext::RemoveDirectoryFromCache(int64_t)
 //		Purpose: Remove directory from cache
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-void BackupContext::RemoveDirectoryFromCache(int64_t ObjectID)
+void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 {
 	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
 	if(item != mDirectoryCache.end())
@@ -789,12 +790,12 @@ void BackupContext::RemoveDirectoryFromCache(int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::SaveDirectory(BackupStoreDirectory &, int64_t)
+//		Name:    BackupStoreContext::SaveDirectory(BackupStoreDirectory &, int64_t)
 //		Purpose: Save directory back to disc, update time in cache
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-void BackupContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID)
+void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -851,12 +852,12 @@ void BackupContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::AddDirectory(int64_t, const BackupStoreFilename &, bool &)
+//		Name:    BackupStoreContext::AddDirectory(int64_t, const BackupStoreFilename &, bool &)
 //		Purpose: Creates a directory (or just returns the ID of an existing one). rAlreadyExists set appropraitely.
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-int64_t BackupContext::AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists)
+int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -945,12 +946,12 @@ int64_t BackupContext::AddDirectory(int64_t InDirectory, const BackupStoreFilena
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &, bool)
+//		Name:    BackupStoreContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &, bool)
 //		Purpose: Recusively deletes a directory (or undeletes if Undelete = true)
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-void BackupContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
+void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 {
 	// Essential checks!
 	if(mpStoreInfo.get() == 0)
@@ -1027,12 +1028,12 @@ void BackupContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::DeleteDirectoryRecurse(BackupStoreDirectory &, int64_t)
+//		Name:    BackupStoreContext::DeleteDirectoryRecurse(BackupStoreDirectory &, int64_t)
 //		Purpose: Private. Deletes a directory depth-first recusively.
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-void BackupContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete)
+void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete)
 {
 	try
 	{
@@ -1129,12 +1130,12 @@ void BackupContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDel
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::ChangeDirAttributes(int64_t, const StreamableMemBlock &, int64_t)
+//		Name:    BackupStoreContext::ChangeDirAttributes(int64_t, const StreamableMemBlock &, int64_t)
 //		Purpose: Change the attributes of a directory
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-void BackupContext::ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime)
+void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1166,12 +1167,12 @@ void BackupContext::ChangeDirAttributes(int64_t Directory, const StreamableMemBl
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::ChangeFileAttributes(int64_t, int64_t, const StreamableMemBlock &, int64_t)
+//		Name:    BackupStoreContext::ChangeFileAttributes(int64_t, int64_t, const StreamableMemBlock &, int64_t)
 //		Purpose: Sets the attributes on a directory entry. Returns true if the object existed, false if it didn't.
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-bool BackupContext::ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut)
+bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1231,12 +1232,12 @@ bool BackupContext::ChangeFileAttributes(const BackupStoreFilename &rFilename, i
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::ObjectExists(int64_t)
+//		Name:    BackupStoreContext::ObjectExists(int64_t)
 //		Purpose: Test to see if an object of this ID exists in the store
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-bool BackupContext::ObjectExists(int64_t ObjectID, int MustBe)
+bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1302,12 +1303,12 @@ bool BackupContext::ObjectExists(int64_t ObjectID, int MustBe)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::OpenObject(int64_t)
+//		Name:    BackupStoreContext::OpenObject(int64_t)
 //		Purpose: Opens an object
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupContext::OpenObject(int64_t ObjectID)
+std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1324,12 +1325,12 @@ std::auto_ptr<IOStream> BackupContext::OpenObject(int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::GetClientStoreMarker()
+//		Name:    BackupStoreContext::GetClientStoreMarker()
 //		Purpose: Retrieve the client store marker
 //		Created: 2003/10/29
 //
 // --------------------------------------------------------------------------
-int64_t BackupContext::GetClientStoreMarker()
+int64_t BackupStoreContext::GetClientStoreMarker()
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1343,12 +1344,12 @@ int64_t BackupContext::GetClientStoreMarker()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::GetStoreDiscUsageInfo(int64_t &, int64_t &, int64_t &)
+//		Name:    BackupStoreContext::GetStoreDiscUsageInfo(int64_t &, int64_t &, int64_t &)
 //		Purpose: Get disc usage info from store info
 //		Created: 1/1/04
 //
 // --------------------------------------------------------------------------
-void BackupContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocksSoftLimit, int64_t &rBlocksHardLimit)
+void BackupStoreContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocksSoftLimit, int64_t &rBlocksHardLimit)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1364,12 +1365,12 @@ void BackupContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocks
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::HardLimitExceeded()
+//		Name:    BackupStoreContext::HardLimitExceeded()
 //		Purpose: Returns true if the hard limit has been exceeded
 //		Created: 1/1/04
 //
 // --------------------------------------------------------------------------
-bool BackupContext::HardLimitExceeded()
+bool BackupStoreContext::HardLimitExceeded()
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1383,12 +1384,12 @@ bool BackupContext::HardLimitExceeded()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::SetClientStoreMarker(int64_t)
+//		Name:    BackupStoreContext::SetClientStoreMarker(int64_t)
 //		Purpose: Sets the client store marker, and commits it to disc
 //		Created: 2003/10/29
 //
 // --------------------------------------------------------------------------
-void BackupContext::SetClientStoreMarker(int64_t ClientStoreMarker)
+void BackupStoreContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -1407,12 +1408,12 @@ void BackupContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::MoveObject(int64_t, int64_t, int64_t, const BackupStoreFilename &, bool)
+//		Name:    BackupStoreContext::MoveObject(int64_t, int64_t, int64_t, const BackupStoreFilename &, bool)
 //		Purpose: Move an object (and all objects with the same name) from one directory to another
 //		Created: 12/11/03
 //
 // --------------------------------------------------------------------------
-void BackupContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject)
+void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject)
 {
 	if(mReadOnly)
 	{
@@ -1652,12 +1653,12 @@ void BackupContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int6
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupContext::GetBackupStoreInfo()
+//		Name:    BackupStoreContext::GetBackupStoreInfo()
 //		Purpose: Return the backup store info object, exception if it isn't loaded
 //		Created: 19/4/04
 //
 // --------------------------------------------------------------------------
-const BackupStoreInfo &BackupContext::GetBackupStoreInfo() const
+const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
 {
 	if(mpStoreInfo.get() == 0)
 	{

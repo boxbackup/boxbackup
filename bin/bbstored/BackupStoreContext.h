@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    BackupContext.h
+//		Name:    BackupStoreContext.h
 //		Purpose: Context for backup store server
 //		Created: 2003/08/20
 //
@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "NamedLock.h"
+#include "ProtocolObject.h"
 #include "Utils.h"
 
 class BackupStoreDirectory;
@@ -22,23 +23,24 @@ class BackupStoreFilename;
 class BackupStoreDaemon;
 class BackupStoreInfo;
 class IOStream;
+class BackupProtocolObject;
 class StreamableMemBlock;
 
 // --------------------------------------------------------------------------
 //
 // Class
-//		Name:    BackupContext
+//		Name:    BackupStoreContext
 //		Purpose: Context for backup store server
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-class BackupContext
+class BackupStoreContext
 {
 public:
-	BackupContext(int32_t ClientID, BackupStoreDaemon &rDaemon);
-	~BackupContext();
+	BackupStoreContext(int32_t ClientID, BackupStoreDaemon &rDaemon);
+	~BackupStoreContext();
 private:
-	BackupContext(const BackupContext &rToCopy);
+	BackupStoreContext(const BackupStoreContext &rToCopy);
 public:
 
 	void ReceivedFinishCommand();
@@ -83,7 +85,7 @@ public:
 	// --------------------------------------------------------------------------
 	//
 	// Function
-	//		Name:    BackupContext::GetDirectory(int64_t)
+	//		Name:    BackupStoreContext::GetDirectory(int64_t)
 	//		Purpose: Return a reference to a directory. Valid only until the 
 	//				 next time a function which affects directories is called.
 	//				 Mainly this funciton, and creation of files.
@@ -143,6 +145,30 @@ private:
 	
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
+
+public:
+	class TestHook
+	{
+		public:
+		virtual std::auto_ptr<ProtocolObject> StartCommand(BackupProtocolObject&
+			rCommand) = 0;
+		virtual ~TestHook() { }
+	};
+	void SetTestHook(TestHook& rTestHook)
+	{
+		mpTestHook = &rTestHook;
+	}
+	std::auto_ptr<ProtocolObject> StartCommandHook(BackupProtocolObject& rCommand)
+	{
+		if(mpTestHook)
+		{
+			return mpTestHook->StartCommand(rCommand);
+		}
+		return std::auto_ptr<ProtocolObject>();
+	}
+
+private:
+	TestHook* mpTestHook;
 };
 
 #endif // BACKUPCONTEXT__H
