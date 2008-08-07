@@ -17,7 +17,7 @@
 	#include <syslog.h>
 #endif
 
-#include "BackupContext.h"
+#include "BackupStoreContext.h"
 #include "BackupStoreDaemon.h"
 #include "BackupStoreConfigVerify.h"
 #include "autogen_BackupProtocolServer.h"
@@ -43,7 +43,8 @@ BackupStoreDaemon::BackupStoreDaemon()
 	  mHaveForkedHousekeeping(false),
 	  mIsHousekeepingProcess(false),
 	  mHousekeepingInited(false),
-	  mInterProcessComms(mInterProcessCommsSocket)
+	  mInterProcessComms(mInterProcessCommsSocket),
+	  mpTestHook(NULL)
 {
 }
 
@@ -320,7 +321,12 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	SetProcessTitle("client %08x", id);
 
 	// Create a context, using this ID
-	BackupContext context(id, *this);
+	BackupStoreContext context(id, *this);
+
+	if (mpTestHook)
+	{
+		context.SetTestHook(*mpTestHook);
+	}
 	
 	// See if the client has an account?
 	if(mpAccounts && mpAccounts->AccountExists(id))
