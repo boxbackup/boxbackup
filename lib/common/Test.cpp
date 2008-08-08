@@ -200,7 +200,7 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 	CloseHandle(procInfo.hProcess);
 	CloseHandle(procInfo.hThread);
 
-	return WaitForServerStart(pidFile, (int)procInfo.dwProcessId);
+	return WaitForServerStartup(pidFile, (int)procInfo.dwProcessId);
 
 #else // !WIN32
 
