@@ -457,9 +457,6 @@ void BackupDaemon::RunHelperThread(void)
 				handles[0] = mhMessageToSendEvent;
 				handles[1] = rSocket.GetReadableEvent();
 				
-				BOX_TRACE("Received command '" << command 
-					<< "' over command socket");
-
 				DWORD result = WaitForMultipleObjects(
 					sizeof(handles)/sizeof(*handles),
 					handles, FALSE, 1000);
@@ -495,7 +492,9 @@ void BackupDaemon::RunHelperThread(void)
 				}
 				else if(result != 1)
 				{
-					BOX_ERROR("WaitForMultipleObjects returned invalid result " << result);
+					BOX_ERROR("WaitForMultipleObjects "
+						"returned invalid result " <<
+						result);
 					continue;
 				}
 
@@ -505,8 +504,8 @@ void BackupDaemon::RunHelperThread(void)
 					continue;
 				}
 
-				BOX_INFO("Received command " << command << 
-					" from client");
+				BOX_INFO("Received command '" << command << 
+					"' over command socket");
 
 				bool sendOK = false;
 				bool sendResponse = true;
@@ -553,7 +552,7 @@ void BackupDaemon::RunHelperThread(void)
 				{
 					BOX_ERROR("Received unknown command "
 						"'" << command << "' "
-						"from client");
+						"over command socket");
 					sendResponse = true;
 					sendOK = false;
 				}
@@ -561,9 +560,10 @@ void BackupDaemon::RunHelperThread(void)
 				// Send a response back?
 				if(sendResponse)
 				{
-					const char* response = sendOK ? "ok\n" : "error\n";
-					rSocket.Write(
-						response, strlen(response));
+					const char* response =
+						sendOK ? "ok\n" : "error\n";
+					rSocket.Write(response,
+						strlen(response));
 				}
 
 				if(disconnect) 
