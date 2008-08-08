@@ -199,32 +199,30 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 	FdGetLine getline(file);
 	
 	// Object to create
-	Configuration *pconfig = new Configuration(std::string("<root>"));
+	std::auto_ptr<Configuration> apConfig(
+		new Configuration(std::string("<root>")));
 	
 	try
 	{
 		// Load
-		LoadInto(*pconfig, getline, rErrorMsg, true);
+		LoadInto(*apConfig, getline, rErrorMsg, true);
 
 		if(!rErrorMsg.empty())
 		{
 			// An error occured, return now
 			BOX_ERROR("Error in Configuration::LoadInto: " << 
 				rErrorMsg);
-			delete pconfig;
-			pconfig = 0;
 			return std::auto_ptr<Configuration>(0);
 		}
 
 		// Verify?
 		if(pVerify)
 		{
-			if(!Verify(*pconfig, *pVerify, std::string(), rErrorMsg))
+			if(!Verify(*apConfig, *pVerify, std::string(),
+				rErrorMsg))
 			{
 				BOX_ERROR("Error verifying configuration: " <<
 					rErrorMsg);
-				delete pconfig;
-				pconfig = 0;
 				return std::auto_ptr<Configuration>(0);
 			}
 		}
@@ -232,13 +230,11 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 	catch(...)
 	{
 		// Clean up
-		delete pconfig;
-		pconfig = 0;
 		throw;
 	}
 	
 	// Success. Return result.
-	return std::auto_ptr<Configuration>(pconfig);
+	return apConfig;
 }
 
 
