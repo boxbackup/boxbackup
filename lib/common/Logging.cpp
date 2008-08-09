@@ -317,7 +317,13 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 
 	buf << rMessage;
 
-	fprintf(target, "%s\n", buf.str().c_str());
+	#ifdef WIN32
+		std::string output = buf.str();
+		ConvertUtf8ToConsole(output.c_str(), output);
+		fprintf(target, "%s\n", output.c_str());
+	#else
+		fprintf(target, "%s\n", buf.str().c_str());
+	#endif
 	
 	return true;
 }
