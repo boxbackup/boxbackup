@@ -667,9 +667,20 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
+		switch(GetLastError())
+		{
+			case ERROR_SHARING_VIOLATION:
+			errno = EBUSY;
+			break;
+
+			default:
+			errno = EINVAL;
+		}
+
 		::syslog(LOG_WARNING, "Failed to open file '%s': "
 			"%s", pFileName, 
 			GetErrorMessage(GetLastError()).c_str());
+
 		return INVALID_HANDLE_VALUE;
 	}
 
