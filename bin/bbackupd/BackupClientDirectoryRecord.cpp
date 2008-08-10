@@ -950,18 +950,18 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 				catch(ConnectionException &e)
 				{
-					// Connection errors should just be passed on to the main handler, retries
-					// would probably just cause more problems.
-					// StorageLimitExceeded never gets here.
-					
-					rParams.mrDaemon.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+					// Connection errors should just be
+					// passed on to the main handler,
+					// retries would probably just cause
+					// more problems.
 					rNotifier.NotifyFileUploadException(
 						this, filename, e);
 					throw;
 				}
 				catch(BoxException &e)
 				{
-					// an error occured -- make return code false, to show error in directory
+					// an error occured -- make return
+					// code false, to show error in directory
 					allUpdatedSuccessfully = false;
 					// Log it.
 					SetErrorWhenReadingFilesystemObject(rParams, filename.c_str());
@@ -969,7 +969,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 						this, filename, e);
 				}
 
-				// Update structures if the file was uploaded successfully.
+				// Update structures if the file was uploaded
+				// successfully.
 				if(uploadSuccess)
 				{
 					fileSynced = true;
