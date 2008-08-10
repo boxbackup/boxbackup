@@ -115,6 +115,7 @@ private:
 
 public:
 	void InitCrypto();
+	void RunSyncNowWithExceptionHandling();
 	void RunSyncNow();
 
 private:
@@ -215,8 +216,11 @@ private:
 	int64_t mClientStoreMarker;
 	bool mStorageLimitExceeded;
 	bool mReadErrorsOnFilesystemObjects;
-	box_time_t mLastSyncTime;
+	box_time_t mLastSyncTime, mNextSyncTime;
+	box_time_t mCurrentSyncStartTime, mUpdateStoreInterval;
 	TLSContext mTlsContext;
+	bool mDeleteStoreObjectInfoFile;
+	bool mDoSyncForcedByPreviousSyncError;
 
 public:
  	bool StopRun() { return this->Daemon::StopRun(); }
