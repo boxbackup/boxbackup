@@ -38,6 +38,7 @@
 	#include <sys/syscall.h>
 #endif
 
+#include "autogen_BackupProtocolServer.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupClientRestore.h"
@@ -45,6 +46,8 @@
 #include "BackupDaemonConfigVerify.h"
 #include "BackupQueries.h"
 #include "BackupStoreConstants.h"
+#include "BackupStoreContext.h"
+#include "BackupStoreDaemon.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
 #include "BoxPortsAndFiles.h"
@@ -477,11 +480,15 @@ int test_run_bbstored()
 	return 1;
 }
 
-int test_kill_bbstored()
+int test_kill_bbstored(bool wait_for_process = false)
 {
-	TEST_THAT(KillServer(bbstored_pid));
+	TEST_THAT(KillServer(bbstored_pid, wait_for_process));
 	::safe_sleep(1);
 	TEST_THAT(!ServerIsAlive(bbstored_pid));
+	if (!ServerIsAlive(bbstored_pid))
+	{
+		bbstored_pid = 0;
+	}
 
 	#ifdef WIN32
 		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
@@ -732,20 +739,9 @@ int start_internal_daemon()
 
 bool stop_internal_daemon(int pid)
 {
-	bool killed_server = KillServer(pid);
+	bool killed_server = KillServer(pid, true);
 	TEST_THAT(killed_server);
 	return killed_server;
-
-	/*
-	int status;
-	TEST_THAT(waitpid(pid, &status, 0) == pid);
-	TEST_THAT(WIFEXITED(status));
-	
-	if (WIFEXITED(status))
-	{
-		TEST_THAT(WEXITSTATUS(status) == 0);
-	}
-	*/
 }
 
 static struct dirent readdir_test_dirent;
@@ -893,7 +889,8 @@ int test_bbackupd()
 			"| ( cd testfiles/TestDir1 && tar xf - )") == 0);
 	#endif
 	
-#ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+#if 1
+// #ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	printf("\n==== Skipping intercept-based KeepAlive tests "
 		"on this platform.\n");
 #else
@@ -1656,6 +1653,137 @@ int test_bbackupd()
 			return 1;
 		}
 	}
+
+	#ifndef WIN32 // requires fork
+	printf("\n==== Testing that bbackupd responds correctly to "
+		"connection failure\n");
+
+	{
+		// Kill the daemons
+		terminate_bbackupd(bbackupd_pid);
+		test_kill_bbstored();
+
+		// create a new file to force an upload
+
+		char* new_file = "testfiles/TestDir1/force-upload-2";
+		int fd = open(new_file, 
+			O_CREAT | O_EXCL | O_WRONLY, 0700);
+		if (fd <= 0)
+		{
+			perror(new_file);
+		}
+		TEST_THAT(fd > 0);
+	
+		char* control_string = "whee!\n";
+		TEST_THAT(write(fd, control_string, 
+			strlen(control_string)) ==
+			(int)strlen(control_string));
+		close(fd);
+
+		// sleep to make it old enough to upload
+		safe_sleep(4);
+
+		class MyHook : public BackupStoreContext::TestHook
+		{
+			virtual std::auto_ptr<ProtocolObject> StartCommand(
+				BackupProtocolObject& rCommand)
+			{
+				if (rCommand.GetType() ==
+					BackupProtocolServerStoreFile::TypeID)
+				{
+					// terminate badly
+					THROW_EXCEPTION(CommonException,
+						Internal);
+				}
+				return std::auto_ptr<ProtocolObject>();
+			}
+		};
+		MyHook hook;
+
+		bbstored_pid = fork();
+
+		if (bbstored_pid < 0)
+		{
+			BOX_LOG_SYS_ERROR("failed to fork()");
+			return 1;
+		}
+
+		if (bbstored_pid == 0)
+		{
+			// in fork child
+			TEST_THAT(setsid() != -1);
+
+			if (!Logging::IsEnabled(Log::TRACE))
+			{
+				Logging::SetGlobalLevel(Log::NOTHING);
+			}
+
+			// BackupStoreDaemon must be destroyed before exit(),
+			// to avoid memory leaks being reported.
+			{
+				BackupStoreDaemon bbstored;
+				bbstored.SetTestHook(hook);
+				bbstored.SetRunInForeground(true);
+				bbstored.Main("testfiles/bbstored.conf");
+			}
+
+			Timers::Cleanup(); // avoid memory leaks
+			exit(0);
+		}
+
+		// in fork parent
+		bbstored_pid = WaitForServerStartup("testfiles/bbstored.pid",
+			bbstored_pid);
+
+		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
+
+		// Ignore SIGPIPE so that when the connection is broken,
+		// the daemon doesn't terminate.
+		::signal(SIGPIPE, SIG_IGN);
+
+		{
+			Log::Level newLevel = Logging::GetGlobalLevel();
+
+			if (!Logging::IsEnabled(Log::TRACE))
+			{
+				newLevel = Log::NOTHING;
+			}
+
+			Logging::Guard guard(newLevel);
+
+			BackupDaemon bbackupd;
+			bbackupd.Configure("testfiles/bbackupd.conf");
+			bbackupd.InitCrypto();
+			bbackupd.RunSyncNowWithExceptionHandling();
+		}
+
+		::signal(SIGPIPE, SIG_DFL);
+
+		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
+
+		test_kill_bbstored(true);
+
+		if (failures > 0)
+		{
+			// stop early to make debugging easier
+			return 1;
+		}
+
+		test_run_bbstored();
+
+		cmd = BBACKUPD " " + bbackupd_args +
+			" testfiles/bbackupd.conf";
+		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		::safe_sleep(1);
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+	}
+	#endif // !WIN32
 
 	#ifndef WIN32
 	printf("\n==== Testing that absolute symlinks are not followed "
@@ -2422,6 +2550,8 @@ int test_bbackupd()
 
 		// Check that store errors are reported neatly
 		printf("\n==== Create store error\n");
+		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*")
+			== 0);
 
 		// break the store
 		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
@@ -2461,9 +2591,9 @@ int test_bbackupd()
 		sync_and_wait();
 
 		// Check that the error was reported once more
-		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.3"));
+
 		// Fix the store (so that bbackupquery compare works)
 		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf.bak",
 			"testfiles/0_0/backup/01234567/info.rf") == 0);
@@ -3805,8 +3935,14 @@ int test(int argc, const char *argv[])
 	r = test_bbackupd();
 	if(r != 0)
 	{
-		KillServer(bbackupd_pid);
-		KillServer(bbstored_pid);
+		if (bbackupd_pid)
+		{
+			KillServer(bbackupd_pid);
+		}
+		if (bbstored_pid)
+		{
+			KillServer(bbstored_pid);
+		}
 		return r;
 	}
 	
