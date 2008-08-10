@@ -1,1 +1,14 @@
-link-extra: ../../bin/bbackupd/autogen_ClientException.o ../../bin/bbackupd/BackupClientContext.o ../../bin/bbackupd/BackupClientDeleteList.o ../../bin/bbackupd/BackupClientDirectoryRecord.o ../../bin/bbackupd/Win32BackupService.o ../../bin/bbackupd/BackupClientInodeToIDMap.o ../../bin/bbackupd/Win32ServiceFunctions.o ../../bin/bbackupd/BackupDaemon.o
+link-extra: ../../bin/bbackupd/autogen_ClientException.o \
+	../../bin/bbackupd/BackupClientContext.o \
+	../../bin/bbackupd/BackupClientDeleteList.o \
+	../../bin/bbackupd/BackupClientDirectoryRecord.o \
+	../../bin/bbackupd/Win32BackupService.o \
+	../../bin/bbackupd/BackupClientInodeToIDMap.o \
+	../../bin/bbackupd/Win32ServiceFunctions.o \
+	../../bin/bbackupd/BackupDaemon.o \
+	../../bin/bbstored/BackupStoreContext.o \
+	../../bin/bbstored/BBStoreDHousekeeping.o \
+	../../bin/bbstored/HousekeepStoreAccount.o \
+	../../bin/bbstored/autogen_BackupProtocolServer.o \
+	../../bin/bbstored/BackupCommands.o \
+	../../bin/bbstored/BackupStoreDaemon.o
