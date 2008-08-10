@@ -718,22 +718,22 @@ void BackupDaemon::Run2()
 	const Configuration &conf(GetConfiguration());
 
 	// How often to connect to the store (approximate)
-	box_time_t updateStoreInterval = SecondsToBoxTime(
+	mUpdateStoreInterval = SecondsToBoxTime(
 		conf.GetKeyValueInt("UpdateStoreInterval"));
 
 	// But are we connecting automatically?
 	bool automaticBackup = conf.GetKeyValueBool("AutomaticBackup");
 	
 	// When the next sync should take place -- which is ASAP
-	box_time_t nextSyncTime = 0;
+	mNextSyncTime = 0;
 
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	mLastSyncTime = 0;
 
  	// --------------------------------------------------------------------------------------------
  
- 	bool deleteStoreObjectInfoFile = DeserializeStoreObjectInfo(
-		mLastSyncTime, nextSyncTime);
+ 	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo(
+		mLastSyncTime, mNextSyncTime);
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -741,7 +741,7 @@ void BackupDaemon::Run2()
 	// Set state
 	SetState(State_Idle);
 
-	bool doSyncForcedByPreviousSyncError = false;
+	mDoSyncForcedByPreviousSyncError = false;
 
 	// Loop around doing backups
 	do
@@ -749,7 +749,7 @@ void BackupDaemon::Run2()
 		// Flags used below
 		bool storageLimitExceeded = false;
 		bool doSync = false;
-		bool doSyncForcedByCommand = false;
+		bool mDoSyncForcedByCommand = false;
 
 		// Is a delay necessary?
 		box_time_t currentTime;
@@ -766,14 +766,14 @@ void BackupDaemon::Run2()
 			// MAX_SLEEP_TIME seconds (use the conditional
 			// because times are unsigned)
 			box_time_t requiredDelay = 
-				(nextSyncTime < currentTime)
+				(mNextSyncTime < currentTime)
 				? (0)
-				: (nextSyncTime - currentTime);
+				: (mNextSyncTime - currentTime);
 
 			// If there isn't automatic backup happening, 
 			// set a long delay. And limit delays at the 
 			// same time.
-			if(!automaticBackup && !doSyncForcedByPreviousSyncError)
+			if(!automaticBackup && !mDoSyncForcedByPreviousSyncError)
 			{
 				requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
 			}
@@ -794,7 +794,7 @@ void BackupDaemon::Run2()
 					// A command socket exists, 
 					// so sleep by waiting on it
 					WaitOnCommandSocket(requiredDelay,
-						doSync, doSyncForcedByCommand);
+						doSync, mDoSyncForcedByCommand);
 				}
 				else
 				{
@@ -808,8 +808,8 @@ void BackupDaemon::Run2()
 				}
 			}
 			
-			if ((automaticBackup || doSyncForcedByPreviousSyncError)
-				&& currentTime >= nextSyncTime)
+			if ((automaticBackup || mDoSyncForcedByPreviousSyncError)
+				&& currentTime >= mNextSyncTime)
 			{
 				doSync = true;
 			}
@@ -818,21 +818,21 @@ void BackupDaemon::Run2()
 
 		// Time of sync start, and if it's time for another sync 
 		// (and we're doing automatic syncs), set the flag
-		box_time_t currentSyncStartTime = GetCurrentBoxTime();
-		if((automaticBackup || doSyncForcedByPreviousSyncError) &&
-			currentSyncStartTime >= nextSyncTime)
+		mCurrentSyncStartTime = GetCurrentBoxTime();
+		if((automaticBackup || mDoSyncForcedByPreviousSyncError) &&
+			mCurrentSyncStartTime >= mNextSyncTime)
 		{
 			doSync = true;
 		}
 		
 		// Use a script to see if sync is allowed now?
-		if(!doSyncForcedByCommand && doSync && !StopRun())
+		if(!mDoSyncForcedByCommand && doSync && !StopRun())
 		{
 			int d = UseScriptToSeeIfSyncAllowed();
 			if(d > 0)
 			{
 				// Script has asked for a delay
-				nextSyncTime = GetCurrentBoxTime() + 
+				mNextSyncTime = GetCurrentBoxTime() + 
 					SecondsToBoxTime(d);
 				doSync = false;
 			}
@@ -842,202 +842,7 @@ void BackupDaemon::Run2()
 		// to be stopping)
 		if(doSync && !StopRun())
 		{
-			// Touch a file to record times in filesystem
-			TouchFileInWorkingDir("last_sync_start");
-		
-			// Tell anything connected to the command socket
-			SendSyncStartOrFinish(true /* start */);
-			
-			// Reset statistics on uploads
-			BackupStoreFile::ResetStats();
-			
-			// Delete the serialised store object file,
-			// so that we don't try to reload it after a
-			// partially completed backup
-			if(deleteStoreObjectInfoFile && 
-				!DeleteStoreObjectInfo())
-			{
-				BOX_ERROR("Failed to delete the "
-					"StoreObjectInfoFile, backup cannot "
-					"continue safely.");
-				THROW_EXCEPTION(ClientException, 
-					FailedToDeleteStoreObjectInfoFile);
-			}
-
-			// In case the backup throws an exception,
-			// we should not try to delete the store info
-			// object file again.
-			deleteStoreObjectInfoFile = false;
-			
-			// Do sync
-			bool errorOccurred = false;
-			int errorCode = 0, errorSubCode = 0;
-			const char* errorString = "unknown";
-
-			try
-			{
-				// Notify administrator
-				NotifySysadmin(NotifyEvent_BackupStart);
-
-				RunSyncNow();
-
-				// Errors reading any files?
-				if(mReadErrorsOnFilesystemObjects)
-				{
-					// Notify administrator
-					NotifySysadmin(NotifyEvent_ReadError);
-				}
-				else
-				{
-					// Unset the read error flag, so the
-					// error is reported again if it
-					// happens again
-					mNotificationsSent[NotifyEvent_ReadError] = false;
-				}
-				
-				// Check the storage limit
-				if(mStorageLimitExceeded)
-				{
-					// Tell the sysadmin about this
-					NotifySysadmin(NotifyEvent_StoreFull);
-				}
-				else
-				{
-					// unflag the storage full notify flag
-					// so that next time the store is full,
-					// an alert will be sent
-					mNotificationsSent[NotifyEvent_StoreFull] = false;
-				}
-				
-				// Calculate when the next sync run should be
-				nextSyncTime = currentSyncStartTime + 
-					updateStoreInterval + 
-					Random::RandomInt(updateStoreInterval >>
-					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
-			
-				// Notify administrator
-				NotifySysadmin(NotifyEvent_BackupFinish);
-
-				// --------------------------------------------------------------------------------------------
-
-				// We had a successful backup, save the store 
-				// info. If we save successfully, we must 
-				// delete the file next time we start a backup
-
-				deleteStoreObjectInfoFile = 
-					SerializeStoreObjectInfo(mLastSyncTime,
-						nextSyncTime);
-
-				// --------------------------------------------------------------------------------------------
-
-				// If we were retrying after an error,
-				// now would be a good time to stop :-)
-				doSyncForcedByPreviousSyncError = false;
-			}
-			catch(BoxException &e)
-			{
-				errorOccurred = true;
-				errorString = e.what();
-				errorCode = e.GetType();
-				errorSubCode = e.GetSubType();
-			}
-			catch(std::exception &e)
-			{
-				BOX_ERROR("Internal error during "
-					"backup run: " << e.what());
-				errorOccurred = true;
-				errorString = e.what();
-			}
-			catch(...)
-			{
-				// TODO: better handling of exceptions here...
-				// need to be very careful
-				errorOccurred = true;
-			}
-			
-			if(errorOccurred)
-			{
-				// Is it a berkely db failure?
-				bool isBerkelyDbFailure = false;
-
-				if (errorCode == BackupStoreException::ExceptionType
-					&& errorSubCode == BackupStoreException::BerkelyDBFailure)
-				{
-					isBerkelyDbFailure = true;
-				}
-
-				if(isBerkelyDbFailure)
-				{
-					// Delete corrupt files
-					DeleteCorruptBerkelyDbFiles();
-				}
-
-				// Clear state data
-				// Go back to beginning of time
-				mLastSyncTime = 0;
-				mClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;	// no store marker, so download everything
-				DeleteAllLocations();
-				DeleteAllIDMaps();
-
-				// Handle restart?
-				if(StopRun())
-				{
-					BOX_NOTICE("Exception (" << errorCode
-						<< "/" << errorSubCode 
-						<< ") due to signal");
-					return;
-				}
-
-				// If the Berkely db files get corrupted,
-				// delete them and try again immediately.
-				if(isBerkelyDbFailure)
-				{
-					BOX_ERROR("Berkely db inode map files corrupted, deleting and restarting scan. Renamed files and directories will not be tracked until after this scan.");
-					::sleep(1);
-				}
-				else
-				{
-					// Not restart/terminate, pause and retry
-					// Notify administrator
-					NotifySysadmin(NotifyEvent_BackupError);
-					SetState(State_Error);
-					BOX_ERROR("Exception caught ("
-						<< errorString
-						<< " " << errorCode
-						<< "/" << errorSubCode
-						<< "), reset state and "
-						"waiting to retry...");
-					::sleep(10);
-					nextSyncTime = currentSyncStartTime + 
-						SecondsToBoxTime(100) +
-						Random::RandomInt(
-							updateStoreInterval >> 
-							SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
-					doSyncForcedByPreviousSyncError = true;
-				}
-			}
-			else
-			{
-				// Unset the read error flag, so the
-				// error is reported again if it
-				// happens again
-				mNotificationsSent[NotifyEvent_BackupError] = false;
-			}
-
-			// Log the stats
-			BOX_NOTICE("File statistics: total file size uploaded "
-				<< BackupStoreFile::msStats.mBytesInEncodedFiles
-				<< ", bytes already on server "
-				<< BackupStoreFile::msStats.mBytesAlreadyOnServer
-				<< ", encoded size "
-				<< BackupStoreFile::msStats.mTotalFileStreamSize);
-			BackupStoreFile::ResetStats();
-
-			// Tell anything connected to the command socket
-			SendSyncStartOrFinish(false /* finish */);
-
-			// Touch a file to record times in filesystem
-			TouchFileInWorkingDir("last_sync_finish");
+			RunSyncNowWithExceptionHandling();
 		}
 		
 		// Set state
@@ -1048,6 +853,206 @@ void BackupDaemon::Run2()
 	// Make sure we have a clean start next time round (if restart)
 	DeleteAllLocations();
 	DeleteAllIDMaps();
+}
+
+void BackupDaemon::RunSyncNowWithExceptionHandling()
+{
+	// Touch a file to record times in filesystem
+	TouchFileInWorkingDir("last_sync_start");
+
+	// Tell anything connected to the command socket
+	SendSyncStartOrFinish(true /* start */);
+	
+	// Reset statistics on uploads
+	BackupStoreFile::ResetStats();
+	
+	// Delete the serialised store object file,
+	// so that we don't try to reload it after a
+	// partially completed backup
+	if(mDeleteStoreObjectInfoFile && 
+		!DeleteStoreObjectInfo())
+	{
+		BOX_ERROR("Failed to delete the "
+			"StoreObjectInfoFile, backup cannot "
+			"continue safely.");
+		THROW_EXCEPTION(ClientException, 
+			FailedToDeleteStoreObjectInfoFile);
+	}
+
+	// In case the backup throws an exception,
+	// we should not try to delete the store info
+	// object file again.
+	mDeleteStoreObjectInfoFile = false;
+	
+	// Do sync
+	bool errorOccurred = false;
+	int errorCode = 0, errorSubCode = 0;
+	const char* errorString = "unknown";
+
+	try
+	{
+		// Notify administrator
+		NotifySysadmin(NotifyEvent_BackupStart);
+
+		RunSyncNow();
+
+		// Errors reading any files?
+		if(mReadErrorsOnFilesystemObjects)
+		{
+			// Notify administrator
+			NotifySysadmin(NotifyEvent_ReadError);
+		}
+		else
+		{
+			// Unset the read error flag, so the
+			// error is reported again if it
+			// happens again
+			mNotificationsSent[NotifyEvent_ReadError] = false;
+		}
+		
+		// Check the storage limit
+		if(mStorageLimitExceeded)
+		{
+			// Tell the sysadmin about this
+			NotifySysadmin(NotifyEvent_StoreFull);
+		}
+		else
+		{
+			// unflag the storage full notify flag
+			// so that next time the store is full,
+			// an alert will be sent
+			mNotificationsSent[NotifyEvent_StoreFull] = false;
+		}
+		
+		// Calculate when the next sync run should be
+		mNextSyncTime = mCurrentSyncStartTime + 
+			mUpdateStoreInterval + 
+			Random::RandomInt(mUpdateStoreInterval >>
+			SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
+	
+		// Notify administrator
+		NotifySysadmin(NotifyEvent_BackupFinish);
+
+		// --------------------------------------------------------------------------------------------
+
+		// We had a successful backup, save the store 
+		// info. If we save successfully, we must 
+		// delete the file next time we start a backup
+
+		mDeleteStoreObjectInfoFile = 
+			SerializeStoreObjectInfo(mLastSyncTime,
+				mNextSyncTime);
+
+		// --------------------------------------------------------------------------------------------
+
+		// If we were retrying after an error,
+		// now would be a good time to stop :-)
+		mDoSyncForcedByPreviousSyncError = false;
+	}
+	catch(BoxException &e)
+	{
+		errorOccurred = true;
+		errorString = e.what();
+		errorCode = e.GetType();
+		errorSubCode = e.GetSubType();
+	}
+	catch(std::exception &e)
+	{
+		BOX_ERROR("Internal error during "
+			"backup run: " << e.what());
+		errorOccurred = true;
+		errorString = e.what();
+	}
+	catch(...)
+	{
+		// TODO: better handling of exceptions here...
+		// need to be very careful
+		errorOccurred = true;
+	}
+	
+	if(errorOccurred)
+	{
+		// Is it a berkely db failure?
+		bool isBerkelyDbFailure = false;
+
+		if (errorCode == BackupStoreException::ExceptionType
+			&& errorSubCode == BackupStoreException::BerkelyDBFailure)
+		{
+			isBerkelyDbFailure = true;
+		}
+
+		if(isBerkelyDbFailure)
+		{
+			// Delete corrupt files
+			DeleteCorruptBerkelyDbFiles();
+		}
+
+		// Clear state data
+		// Go back to beginning of time
+		mLastSyncTime = 0;
+		mClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;	// no store marker, so download everything
+		DeleteAllLocations();
+		DeleteAllIDMaps();
+
+		// Handle restart?
+		if(StopRun())
+		{
+			BOX_NOTICE("Exception (" << errorCode
+				<< "/" << errorSubCode 
+				<< ") due to signal");
+			return;
+		}
+
+		// If the Berkely db files get corrupted,
+		// delete them and try again immediately.
+		if(isBerkelyDbFailure)
+		{
+			BOX_ERROR("Berkely db inode map files corrupted, deleting and restarting scan. Renamed files and directories will not be tracked until after this scan.");
+			::sleep(1);
+		}
+		else
+		{
+			// Not restart/terminate, pause and retry
+			// Notify administrator
+			NotifySysadmin(NotifyEvent_BackupError);
+			SetState(State_Error);
+			BOX_ERROR("Exception caught ("
+				<< errorString
+				<< " " << errorCode
+				<< "/" << errorSubCode
+				<< "), reset state and "
+				"waiting to retry...");
+			::sleep(10);
+			mNextSyncTime = mCurrentSyncStartTime + 
+				SecondsToBoxTime(100) +
+				Random::RandomInt(
+					mUpdateStoreInterval >> 
+					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
+			mDoSyncForcedByPreviousSyncError = true;
+		}
+	}
+	else
+	{
+		// Unset the read error flag, so the
+		// error is reported again if it
+		// happens again
+		mNotificationsSent[NotifyEvent_BackupError] = false;
+	}
+
+	// Log the stats
+	BOX_NOTICE("File statistics: total file size uploaded "
+		<< BackupStoreFile::msStats.mBytesInEncodedFiles
+		<< ", bytes already on server "
+		<< BackupStoreFile::msStats.mBytesAlreadyOnServer
+		<< ", encoded size "
+		<< BackupStoreFile::msStats.mTotalFileStreamSize);
+	BackupStoreFile::ResetStats();
+
+	// Tell anything connected to the command socket
+	SendSyncStartOrFinish(false /* finish */);
+
+	// Touch a file to record times in filesystem
+	TouchFileInWorkingDir("last_sync_finish");
 }
 
 void BackupDaemon::RunSyncNow()
@@ -1729,14 +1734,20 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	// Just a check to make sure it's right.
 	DeleteAllLocations();
 	
-	// Going to need a copy of the root directory. Get a connection, and fetch it.
+	// Going to need a copy of the root directory. Get a connection,
+	// and fetch it.
 	BackupProtocolClient &connection(rClientContext.GetConnection());
 	
-	// Ask server for a list of everything in the root directory, which is a directory itself
-	std::auto_ptr<BackupProtocolClientSuccess> dirreply(connection.QueryListDirectory(
+	// Ask server for a list of everything in the root directory,
+	// which is a directory itself
+	std::auto_ptr<BackupProtocolClientSuccess> dirreply(
+		connection.QueryListDirectory(
 			BackupProtocolClientListDirectory::RootDirectory,
-			BackupProtocolClientListDirectory::Flags_Dir,	// only directories
-			BackupProtocolClientListDirectory::Flags_Deleted | BackupProtocolClientListDirectory::Flags_OldVersion, // exclude old/deleted stuff
+			// only directories
+			BackupProtocolClientListDirectory::Flags_Dir,
+			// exclude old/deleted stuff
+			BackupProtocolClientListDirectory::Flags_Deleted |
+			BackupProtocolClientListDirectory::Flags_OldVersion,
 			false /* no attributes */));
 
 	// Retrieve the directory from the stream following
