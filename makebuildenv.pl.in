@@ -922,11 +922,18 @@ sub additional_objects_from_make_fragment
 			chomp;
 			if(m/link-extra:\s*(.+)\Z/)
 			{
-				my @o = split /\s+/,$1;
-				for(@o)
+				my $extra = $1;
+				do
 				{
-					push @$objs_r,$1 if m/\A(.+)\.o\Z/;
+					my @o = split /\s+/, $extra;
+					for(@o)
+					{
+						push @$objs_r,$1 if m/\A(.+)\.o\Z/;
+					}
+					last unless $extra =~ m'\\$';
+					$extra = <FL>;
 				}
+				while(1);
 			}
 			elsif(m/include-makefile:\s*(\S+)/)
 			{
