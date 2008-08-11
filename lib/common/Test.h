@@ -41,7 +41,8 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 		first_fail_line = __LINE__; \
 	} \
 	failures++; \
-	printf("FAILURE: %s at " __FILE__ ":%d\n", msg, __LINE__); \
+	BOX_ERROR("**** TEST FAILURE: " << msg << " at " << __FILE__ << \
+		":" << __LINE__); \
 }
 
 #define TEST_ABORT_WITH_MESSAGE(msg) {TEST_FAIL_WITH_MESSAGE(msg); return 1;}
