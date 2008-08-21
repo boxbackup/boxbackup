@@ -28,7 +28,8 @@ class HousekeepStoreAccount;
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-class BackupStoreDaemon : public ServerTLS<BOX_PORT_BBSTORED>
+class BackupStoreDaemon : public ServerTLS<BOX_PORT_BBSTORED>,
+	HousekeepingInterface
 {
 	friend class HousekeepStoreAccount;
 

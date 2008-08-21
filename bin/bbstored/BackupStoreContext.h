@@ -26,6 +26,13 @@ class IOStream;
 class BackupProtocolObject;
 class StreamableMemBlock;
 
+class HousekeepingInterface
+{
+	public:
+	virtual ~HousekeepingInterface() { }
+	virtual void SendMessageToHousekeepingProcess(const void *Msg, int MsgLen) = 0;
+};
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -37,7 +44,7 @@ class StreamableMemBlock;
 class BackupStoreContext
 {
 public:
-	BackupStoreContext(int32_t ClientID, BackupStoreDaemon &rDaemon);
+	BackupStoreContext(int32_t ClientID, HousekeepingInterface &rDaemon);
 	~BackupStoreContext();
 private:
 	BackupStoreContext(const BackupStoreContext &rToCopy);
@@ -131,7 +138,7 @@ private:
 
 private:
 	int32_t mClientID;
-	BackupStoreDaemon &mrDaemon;
+	HousekeepingInterface &mrDaemon;
 	int mProtocolPhase;
 	bool mClientHasAccount;
 	std::string mStoreRoot;	// has final directory separator

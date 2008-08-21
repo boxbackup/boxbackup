@@ -53,7 +53,8 @@
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-BackupStoreContext::BackupStoreContext(int32_t ClientID, BackupStoreDaemon &rDaemon)
+BackupStoreContext::BackupStoreContext(int32_t ClientID,
+	HousekeepingInterface &rDaemon)
 	: mClientID(ClientID),
 	  mrDaemon(rDaemon),
 	  mProtocolPhase(Phase_START),
