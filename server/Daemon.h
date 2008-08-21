@@ -56,6 +56,7 @@ public:
 	virtual void Usage();
 
 	virtual bool Configure(const std::string& rConfigFileName);
+	virtual bool Configure(const Configuration& rConfig);
 
 	bool StopRun() {return mReloadConfigWanted | mTerminateWanted;}
 	bool IsReloadConfigWanted() {return mReloadConfigWanted;}
@@ -72,6 +73,10 @@ public:
 	{
 		mRunInForeground = foreground;
 	}
+	void SetSingleProcess(bool value)
+	{
+		mSingleProcess = value;
+	}
 
 protected:
 	virtual void SetupInInitialProcess();
@@ -85,7 +90,7 @@ private:
 	box_time_t GetConfigFileModifiedTime() const;
 	
 	std::string mConfigFileName;
-	Configuration *mpConfiguration;
+	std::auto_ptr<Configuration> mapConfiguration;
 	box_time_t mLoadedConfigModifiedTime;
 	bool mReloadConfigWanted;
 	bool mTerminateWanted;
