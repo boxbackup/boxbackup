@@ -630,7 +630,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 
 							// Block matched, roll the checksum forward to the next block without doing
 							// any more comparisons, because these are pointless (as any more matches will be ignored when
-							// the receipe is generated) and just take up valuable processor time. Edge cases are
+							// the recipe is generated) and just take up valuable processor time. Edge cases are
 							// especially nasty, using huge amounts of time and memory.
 							int skip = Sizes[s];
 							if(offset < bytesInEndings && skip > 0)
