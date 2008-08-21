@@ -30,26 +30,27 @@
 #include <iostream>
 #include <ostream>
 
-#include "BackupQueries.h"
-#include "Utils.h"
-#include "Configuration.h"
-#include "autogen_BackupProtocolClient.h"
-#include "BackupStoreFilenameClear.h"
-#include "BackupStoreDirectory.h"
-#include "IOStream.h"
-#include "BoxTimeToText.h"
-#include "FileStream.h"
-#include "BackupStoreFile.h"
-#include "TemporaryDirectory.h"
-#include "FileModificationTime.h"
 #include "BackupClientFileAttributes.h"
-#include "CommonException.h"
-#include "BackupClientRestore.h"
-#include "BackupStoreException.h"
-#include "ExcludeList.h"
 #include "BackupClientMakeExcludeList.h"
-#include "PathUtils.h"
+#include "BackupClientRestore.h"
+#include "BackupQueries.h"
+#include "BackupStoreDirectory.h"
+#include "BackupStoreException.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreFilenameClear.h"
+#include "BoxTimeToText.h"
+#include "CommonException.h"
+#include "Configuration.h"
+#include "ExcludeList.h"
+#include "FileModificationTime.h"
+#include "FileStream.h"
+#include "IOStream.h"
 #include "Logging.h"
+#include "PathUtils.h"
+#include "SelfFlushingStream.h"
+#include "TemporaryDirectory.h"
+#include "Utils.h"
+#include "autogen_BackupProtocolClient.h"
 
 #include "MemLeakFindOn.h"
 
@@ -1929,18 +1930,20 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			}
 		}
 		
-		// Report any files which exist on the locally, but not on the store
-		for(std::set<std::string>::const_iterator i = localDirs.begin(); i != localDirs.end(); ++i)
+		// Report any files which exist locally, but not on the store
+		for(std::set<std::string>::const_iterator
+			i  = localDirs.begin();
+			i != localDirs.end(); ++i)
 		{
-#ifdef WIN32
-			// File name is also in UTF-8 encoding, 
-			// need to convert to console
-			std::string fileNameDisplay;
-			if(!ConvertUtf8ToConsole(i->c_str(), fileNameDisplay))
-				return;
-#else
-			const std::string& fileNameDisplay(*i);
-#endif
+			#ifdef WIN32
+				// File name is also in UTF-8 encoding, 
+				// need to convert to console
+				std::string fileNameDisplay;
+				if(!ConvertUtf8ToConsole(i->c_str(), fileNameDisplay))
+					return;
+			#else
+				const std::string& fileNameDisplay(*i);
+			#endif
 
 			std::string localPath(MakeFullPath
 				(rLocalDir, *i));
@@ -1953,7 +1956,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 				(storeDirDisplay + "/" + fileNameDisplay);
 
 			// Should this be ignored (ie is excluded)?
-			if(rParams.mpExcludeDirs == 0 || !(rParams.mpExcludeDirs->IsExcluded(localPath)))
+			if(rParams.mpExcludeDirs == 0 ||
+				!(rParams.mpExcludeDirs->IsExcluded(localPath)))
 			{
 				BOX_WARNING("Local directory '" <<
 					localPathDisplay << "' exists, but "
