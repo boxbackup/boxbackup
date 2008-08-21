@@ -1216,11 +1216,16 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	if(!opts['l'] && opts['a'] && args.size() == 0)
 	{
 		// Compare all locations
-		const Configuration &locations(mrConfiguration.GetSubConfiguration("BackupLocations"));
-		for(std::list<std::pair<std::string, Configuration> >::const_iterator i = locations.mSubConfigurations.begin();
-				i != locations.mSubConfigurations.end(); ++i)
+		const Configuration &rLocations(
+			mrConfiguration.GetSubConfiguration("BackupLocations"));
+		std::vector<std::string> locNames =
+			rLocations.GetSubConfigurationNames();
+		for(std::vector<std::string>::iterator
+			pLocName  = locNames.begin();
+			pLocName != locNames.end();
+			pLocName++)
 		{
-			CompareLocation(i->first, params);
+			CompareLocation(*pLocName, params);
 		}
 	}
 	else if(opts['l'] && !opts['a'] && args.size() == 1)
