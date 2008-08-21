@@ -1482,7 +1482,9 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			// Prepare to upload, getting a stream which will encode the file as we go along
 			std::auto_ptr<IOStream> upload(
 				BackupStoreFile::EncodeFile(rFilename.c_str(),
-					mObjectID, rStoreFilename));
+					mObjectID, rStoreFilename, NULL,
+					&rParams,
+					&(rParams.mrRunStatusProvider)));
 		
 			// Send to store
 			std::auto_ptr<BackupProtocolClientSuccess> stored(

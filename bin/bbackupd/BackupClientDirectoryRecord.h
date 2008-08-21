@@ -13,14 +13,31 @@
 #include <string>
 #include <map>
 
-#include "BoxTime.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreDirectory.h"
+#include "BoxTime.h"
 #include "MD5Digest.h"
+#include "ReadLoggingStream.h"
+#include "RunStatusProvider.h"
 
 class Archive;
 class BackupClientContext;
 class BackupDaemon;
+
+// --------------------------------------------------------------------------
+//
+// Class
+//		Name:    SysadminNotifier
+//		Purpose: Provides a NotifySysadmin() method to send mail to the sysadmin
+//		Created: 2005/11/15
+//
+// --------------------------------------------------------------------------
+class SysadminNotifier
+{
+	public:
+	virtual ~SysadminNotifier() { }
+	virtual void NotifySysadmin(int Event) = 0;
+};
 
 // --------------------------------------------------------------------------
 //
@@ -37,6 +54,7 @@ class ProgressNotifier
 {
 	public:
 	virtual ~ProgressNotifier() { }
+	virtual void NotifyIDMapsSetup(BackupClientContext& rContext) = 0;
 	virtual void NotifyScanDirectory(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath) = 0;
@@ -102,6 +120,11 @@ class ProgressNotifier
 	virtual void NotifyFileDeleted(
 		int64_t ObjectID,
 		const std::string& rRemotePath) = 0;
+	virtual void NotifyReadProgress(int64_t readSize, int64_t offset,
+		int64_t length, box_time_t elapsed, box_time_t finish) = 0;
+	virtual void NotifyReadProgress(int64_t readSize, int64_t offset,
+		int64_t length) = 0;
+	virtual void NotifyReadProgress(int64_t readSize, int64_t offset) = 0;
 };
 
 // --------------------------------------------------------------------------
@@ -138,11 +161,13 @@ public:
 	//		Created: 8/3/04
 	//
 	// --------------------------------------------------------------------------
-	class SyncParams
+	class SyncParams : public ReadLoggingStream::Logger
 	{
 	public:
 		SyncParams(
-			BackupDaemon &rDaemon,
+			RunStatusProvider &rRunStatusProvider, 
+			SysadminNotifier &rSysadminNotifier,
+			ProgressNotifier &rProgressNotifier,
 			BackupClientContext &rContext);
 		~SyncParams();
 	private:
@@ -158,13 +183,43 @@ public:
 		box_time_t mMaxFileTimeInFuture;
 		int32_t mFileTrackingSizeThreshold;
 		int32_t mDiffingUploadSizeThreshold;
-		BackupDaemon &mrDaemon;
+		RunStatusProvider &mrRunStatusProvider;
+		SysadminNotifier &mrSysadminNotifier;
+		ProgressNotifier &mrProgressNotifier;
 		BackupClientContext &mrContext;
 		bool mReadErrorsOnFilesystemObjects;
 		
 		// Member variables modified by syncing process
 		box_time_t mUploadAfterThisTimeInTheFuture;
 		bool mHaveLoggedWarningAboutFutureFileTimes;
+	
+		bool StopRun() { return mrRunStatusProvider.StopRun(); }
+		void NotifySysadmin(int Event) 
+		{ 
+			mrSysadminNotifier.NotifySysadmin(Event); 
+		}
+		ProgressNotifier& GetProgressNotifier() const 
+		{ 
+			return mrProgressNotifier;
+		}
+		
+		/* ReadLoggingStream::Logger implementation */
+		virtual void Log(int64_t readSize, int64_t offset,
+			int64_t length, box_time_t elapsed, box_time_t finish)
+		{
+			mrProgressNotifier.NotifyReadProgress(readSize, offset,
+				length, elapsed, finish);
+		}
+		virtual void Log(int64_t readSize, int64_t offset,
+			int64_t length)
+		{
+			mrProgressNotifier.NotifyReadProgress(readSize, offset,
+				length);
+		}
+		virtual void Log(int64_t readSize, int64_t offset)
+		{
+			mrProgressNotifier.NotifyReadProgress(readSize, offset);
+		}
 	};
 
 	void SyncDirectory(SyncParams &rParams,

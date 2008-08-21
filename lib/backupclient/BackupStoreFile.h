@@ -14,9 +14,11 @@
 
 #include <memory>
 
-#include "IOStream.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreFilename.h"
+#include "IOStream.h"
+#include "ReadLoggingStream.h"
+#include "RunStatusProvider.h"
 
 typedef struct 
 {
@@ -116,7 +118,11 @@ public:
 
 
 	// Main interface
-	static std::auto_ptr<IOStream> EncodeFile(const char *Filename, int64_t ContainerID, const BackupStoreFilename &rStoreFilename, int64_t *pModificationTime = 0);
+	static std::auto_ptr<IOStream> EncodeFile(const char *Filename,
+		int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
+		int64_t *pModificationTime = 0,
+		ReadLoggingStream::Logger* pLogger = NULL,
+		RunStatusProvider* pRunStatusProvider = NULL);
 	static std::auto_ptr<IOStream> EncodeFileDiff
 	(
 		const char *Filename, int64_t ContainerID,
