@@ -120,13 +120,19 @@ public:
 		}
 	}
 	
+protected:
+	virtual void NotifyListenerIsReady() { }
+	
+public:
 	virtual void Run2(bool &rChildExit)
 	{
 		try
 		{
-			// Wait object with a timeout of 10 seconds, which is a reasonable time to wait before
-			// cleaning up finished child processes.
-			WaitForEvent connectionWait(10000);
+			// Wait object with a timeout of 1 second, which
+			// is a reasonable time to wait before cleaning up
+			// finished child processes, and allows the daemon
+			// to terminate reasonably quickly on request.
+			WaitForEvent connectionWait(1000);
 			
 			// BLOCK
 			{
@@ -218,6 +224,8 @@ public:
 					}
 				}
 			}
+			
+			NotifyListenerIsReady();
 	
 			while(!StopRun())
 			{
