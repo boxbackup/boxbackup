@@ -55,7 +55,8 @@ public:
 		mContext.Initialise(true /* as server */, certFile.c_str(), keyFile.c_str(), caFile.c_str());
 	
 		// Then do normal stream server stuff
-		ServerStream<SocketStreamTLS, Port, ListenBacklog>::Run2(rChildExit);
+		ServerStream<SocketStreamTLS, Port, ListenBacklog,
+			ForkToHandleRequests>::Run2(rChildExit);
 	}
 	
 	virtual void HandleConnection(SocketStreamTLS &rStream)
