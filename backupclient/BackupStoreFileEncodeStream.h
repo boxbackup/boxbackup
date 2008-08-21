@@ -18,6 +18,7 @@
 #include "MD5Digest.h"
 #include "BackupStoreFile.h"
 #include "ReadLoggingStream.h"
+#include "RunStatusProvider.h"
 
 namespace BackupStoreFileCreation
 {
@@ -74,7 +75,11 @@ public:
 		int64_t mOtherFileID;
 	};
 	
-	void Setup(const char *Filename, Recipe *pRecipe, int64_t ContainerID, const BackupStoreFilename &rStoreFilename, int64_t *pModificationTime);
+	void Setup(const char *Filename, Recipe *pRecipe, int64_t ContainerID,
+		const BackupStoreFilename &rStoreFilename,
+		int64_t *pModificationTime,
+		ReadLoggingStream::Logger* pLogger = NULL,
+		RunStatusProvider* pRunStatusProvider = NULL);
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout);
 	virtual void Write(const void *pBuffer, int NBytes);
@@ -101,7 +106,8 @@ private:
 	Recipe *mpRecipe;
 	IOStream *mpFile;					// source file
 	CollectInBufferStream mData;		// buffer for header and index entries
-	ReadLoggingStream *mpLogging;
+	IOStream *mpLogging;
+	RunStatusProvider* mpRunStatusProvider;
 	int mStatus;
 	bool mSendData;						// true if there's file data to send (ie not a symlink)
 	int64_t mTotalBlocks;				// Total number of blocks in the file
