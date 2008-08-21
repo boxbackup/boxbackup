@@ -99,9 +99,10 @@ SocketStreamTLS::~SocketStreamTLS()
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-void SocketStreamTLS::Open(const TLSContext &rContext, int Type, const char *Name, int Port)
+void SocketStreamTLS::Open(const TLSContext &rContext, int Type,
+	const std::string& rName, int Port)
 {
-	SocketStream::Open(Type, Name, Port);
+	SocketStream::Open(Type, rName, Port);
 	Handshake(rContext);
 	ResetCounters();
 }
