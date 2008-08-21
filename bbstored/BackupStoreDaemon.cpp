@@ -172,11 +172,12 @@ void BackupStoreDaemon::Run()
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
 	
-#ifdef WIN32	
-	// Housekeeping runs synchronously on Win32
-#else
-	// Fork off housekeeping daemon -- must only do this the first time Run() is called
-	if(!mHaveForkedHousekeeping)
+	// Fork off housekeeping daemon -- must only do this the first
+	// time Run() is called.  Housekeeping runs synchronously on Win32
+	// because IsSingleProcess() is always true
+	
+#ifndef WIN32
+	if(!IsSingleProcess() && !mHaveForkedHousekeeping)
 	{
 		// Open a socket pair for communication
 		int sv[2] = {-1,-1};
@@ -206,7 +207,9 @@ void BackupStoreDaemon::Run()
 				// Log that housekeeping started
 				BOX_INFO("Housekeeping process started");
 				// Ignore term and hup
-				// Parent will handle these and alert the child via the socket, don't want to randomly die
+				// Parent will handle these and alert the
+				// child via the socket, don't want to
+				// randomly die!
 				::signal(SIGHUP, SIG_IGN);
 				::signal(SIGTERM, SIG_IGN);
 			}
