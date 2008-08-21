@@ -28,13 +28,13 @@
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
-void BackupClientCryptoKeys_Setup(const char *KeyMaterialFilename)
+void BackupClientCryptoKeys_Setup(const std::string& rKeyMaterialFilename)
 {
 	// Read in the key material
 	unsigned char KeyMaterial[BACKUPCRYPTOKEYS_FILE_SIZE];
 	
 	// Open the file
-	FileStream file(KeyMaterialFilename);
+	FileStream file(rKeyMaterialFilename);
 	// Read in data
 	if(!file.ReadFullBuffer(KeyMaterial, BACKUPCRYPTOKEYS_FILE_SIZE, 0))
 	{
