@@ -101,6 +101,7 @@ for my $parcel (@parcels)
 	print MAKE "\trm -rf ",parcel_dir($parcel),"\n";
 	print MAKE "\trm -f ",parcel_target($parcel),"\n";
 }
+print MAKE "\tfind release debug -type f | xargs -r rm\n";
 print MAKE "\n";
 
 print MAKE "test:\trelease/common/test\n\nrelease/common/test:\n\t./runtest.pl ALL release\n\n";
@@ -110,19 +111,16 @@ my $release_flag = BoxPlatform::make_flag('RELEASE');
 for my $parcel (@parcels)
 {
 	my $target = parcel_target($parcel);
-	print MAKE "build-$parcel:\t$target\n\n";
-	print MAKE $target,":\n";
-	
 	my $dir = parcel_dir($parcel);
-	print MAKE "\ttest -d $dir || mkdir $dir\n";
-	
+	my @parcel_deps;
+
 	unless ($target_windows)
 	{
 		open SCRIPT,">parcels/scripts/install-$parcel" or die
 			"Can't open installer script for $parcel for writing";
 		print SCRIPT "#!/bin/sh\n\n";
 	}
-	
+
 	for(@{$parcel_contents{$parcel}})
 	{
 		my ($type,$name,$dest) = split /\s+/;
@@ -136,20 +134,65 @@ for my $parcel (@parcels)
 		if($type eq 'bin')
 		{
 			my $exeext = $platform_exe_ext;
-			print MAKE "\t(cd bin/$name; \$(MAKE) $release_flag)\n";
-			print MAKE "\tcp release/bin/$name/$name$exeext $dir\n";
+			print MAKE <<EOF;
+$dir/$name$exeext: release/bin/$name/$name$exeext
+	mkdir -p $dir
+	cp -p release/bin/$name/$name$exeext $dir
+
+.PHONY: release/bin/$name/$name$exeext
+release/bin/$name/$name$exeext:
+	(cd bin/$name; \$(MAKE) $release_flag)
+
+EOF
+			push @parcel_deps, "$dir/$name$exeext";
 		}
 		elsif ($type eq 'script')
 		{
+			my $fullpath = $name;
+			my $filename = $name;
+			# remove path from script name
+			$filename =~ s{.*/}{};
+
+			print MAKE <<EOF;
+$dir/$filename: $fullpath
+	mkdir -p $dir
+EOF
+
 			if ($optional)
 			{
-				print MAKE "\ttest -r $name " .
-					"&& cp $name $dir || true\n";
+				print MAKE "\ttest -r $fullpath " .
+					"&& cp -p $fullpath $dir || true\n";
 			}
 			else
 			{
-				print MAKE "\tcp $name $dir\n";
+				print MAKE "\tcp -p $fullpath $dir\n";
 			}
+
+			print MAKE "\n";
+
+			push @parcel_deps, "$dir/$filename";
+		}
+	}
+
+	print MAKE <<EOF;
+build-$parcel:	$target
+
+$target: @parcel_deps
+	test -d $dir || mkdir $dir
+EOF
+	
+	for(@{$parcel_contents{$parcel}})
+	{
+		my ($type,$name,$dest) = split /\s+/;
+		my $optional = '';
+
+		if ($type eq 'optional')
+		{
+			($optional,$type,$name,$dest) = split /\s+/;
+		}
+
+		if ($type eq 'script')
+		{
 			# remove path from script name
 			$name =~ s{.*/}{};
 		}
