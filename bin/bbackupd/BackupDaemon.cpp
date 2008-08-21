@@ -275,12 +275,12 @@ void BackupDaemon::SetupInInitialProcess()
 	if(GetConfiguration().KeyExists("CommandSocket"))
 	{
 		BOX_WARNING(
-				"==============================================================================\n"
-				"SECURITY WARNING: This platform cannot check the credentials of connections to\n"
-				"the command socket. This is a potential DoS security problem.\n"
-				"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl\n"
-				"is not used.\n"
-				"==============================================================================\n"
+			"==============================================================================\n"
+			"SECURITY WARNING: This platform cannot check the credentials of connections to\n"
+			"the command socket. This is a potential DoS security problem.\n"
+			"Remove the CommandSocket directive from the bbackupd.conf file if bbackupctl\n"
+			"is not used.\n"
+			"==============================================================================\n"
 			);
 	}
 }
@@ -866,33 +866,6 @@ void BackupDaemon::Run2()
 
 void BackupDaemon::RunSyncNowWithExceptionHandling()
 {
-	// Touch a file to record times in filesystem
-	TouchFileInWorkingDir("last_sync_start");
-
-	// Tell anything connected to the command socket
-	SendSyncStartOrFinish(true /* start */);
-	
-	// Reset statistics on uploads
-	BackupStoreFile::ResetStats();
-	
-	// Delete the serialised store object file,
-	// so that we don't try to reload it after a
-	// partially completed backup
-	if(mDeleteStoreObjectInfoFile && 
-		!DeleteStoreObjectInfo())
-	{
-		BOX_ERROR("Failed to delete the "
-			"StoreObjectInfoFile, backup cannot "
-			"continue safely.");
-		THROW_EXCEPTION(ClientException, 
-			FailedToDeleteStoreObjectInfoFile);
-	}
-
-	// In case the backup throws an exception,
-	// we should not try to delete the store info
-	// object file again.
-	mDeleteStoreObjectInfoFile = false;
-	
 	// Do sync
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
@@ -900,63 +873,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 
 	try
 	{
-		// Notify administrator
-		NotifySysadmin(NotifyEvent_BackupStart);
-
 		RunSyncNow();
-
-		// Errors reading any files?
-		if(mReadErrorsOnFilesystemObjects)
-		{
-			// Notify administrator
-			NotifySysadmin(NotifyEvent_ReadError);
-		}
-		else
-		{
-			// Unset the read error flag, so the
-			// error is reported again if it
-			// happens again
-			mNotificationsSent[NotifyEvent_ReadError] = false;
-		}
-		
-		// Check the storage limit
-		if(mStorageLimitExceeded)
-		{
-			// Tell the sysadmin about this
-			NotifySysadmin(NotifyEvent_StoreFull);
-		}
-		else
-		{
-			// unflag the storage full notify flag
-			// so that next time the store is full,
-			// an alert will be sent
-			mNotificationsSent[NotifyEvent_StoreFull] = false;
-		}
-		
-		// Calculate when the next sync run should be
-		mNextSyncTime = mCurrentSyncStartTime + 
-			mUpdateStoreInterval + 
-			Random::RandomInt(mUpdateStoreInterval >>
-			SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
-	
-		// Notify administrator
-		NotifySysadmin(NotifyEvent_BackupFinish);
-
-		// --------------------------------------------------------------------------------------------
-
-		// We had a successful backup, save the store 
-		// info. If we save successfully, we must 
-		// delete the file next time we start a backup
-
-		mDeleteStoreObjectInfoFile = 
-			SerializeStoreObjectInfo(mLastSyncTime,
-				mNextSyncTime);
-
-		// --------------------------------------------------------------------------------------------
-
-		// If we were retrying after an error,
-		// now would be a good time to stop :-)
-		mDoSyncForcedByPreviousSyncError = false;
 	}
 	catch(BoxException &e)
 	{
@@ -1034,10 +951,8 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 			::sleep(10);
 			mNextSyncTime = mCurrentSyncStartTime + 
 				SecondsToBoxTime(100) +
-				Random::RandomInt(
-					mUpdateStoreInterval >> 
+				Random::RandomInt(mUpdateStoreInterval >> 
 					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
-			mDoSyncForcedByPreviousSyncError = true;
 		}
 	}
 	else
@@ -1047,6 +962,10 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 		// happens again
 		mNotificationsSent[NotifyEvent_BackupError] = false;
 	}
+
+	// If we were retrying after an error,
+	// now would be a good time to stop :-)
+	mDoSyncForcedByPreviousSyncError = errorOccurred;
 
 	// Log the stats
 	BOX_NOTICE("File statistics: total file size uploaded "
@@ -1066,6 +985,36 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 
 void BackupDaemon::RunSyncNow()
 {
+	// Touch a file to record times in filesystem
+	TouchFileInWorkingDir("last_sync_start");
+
+	// Tell anything connected to the command socket
+	SendSyncStartOrFinish(true /* start */);
+	
+	// Reset statistics on uploads
+	BackupStoreFile::ResetStats();
+	
+	// Delete the serialised store object file,
+	// so that we don't try to reload it after a
+	// partially completed backup
+	if(mDeleteStoreObjectInfoFile && 
+		!DeleteStoreObjectInfo())
+	{
+		BOX_ERROR("Failed to delete the "
+			"StoreObjectInfoFile, backup cannot "
+			"continue safely.");
+		THROW_EXCEPTION(ClientException, 
+			FailedToDeleteStoreObjectInfoFile);
+	}
+
+	// In case the backup throws an exception,
+	// we should not try to delete the store info
+	// object file again.
+	mDeleteStoreObjectInfoFile = false;
+
+	// Notify administrator
+	NotifySysadmin(NotifyEvent_BackupStart);
+
 	// Set state and log start
 	SetState(State_Connected);
 	BOX_NOTICE("Beginning scan of local files");
@@ -1298,6 +1247,56 @@ void BackupDaemon::RunSyncNow()
 
 	// Log
 	BOX_NOTICE("Finished scan of local files");
+
+	
+	// Errors reading any files?
+	if(mReadErrorsOnFilesystemObjects)
+	{
+		// Notify administrator
+		NotifySysadmin(NotifyEvent_ReadError);
+	}
+	else
+	{
+		// Unset the read error flag, so the
+		// error is reported again if it
+		// happens again
+		mNotificationsSent[NotifyEvent_ReadError] = false;
+	}
+	
+	// Check the storage limit
+	if(mStorageLimitExceeded)
+	{
+		// Tell the sysadmin about this
+		NotifySysadmin(NotifyEvent_StoreFull);
+	}
+	else
+	{
+		// unflag the storage full notify flag
+		// so that next time the store is full,
+		// an alert will be sent
+		mNotificationsSent[NotifyEvent_StoreFull] = false;
+	}
+	
+	// Calculate when the next sync run should be
+	mNextSyncTime = mCurrentSyncStartTime + 
+		mUpdateStoreInterval + 
+		Random::RandomInt(mUpdateStoreInterval >>
+		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
+
+	// Notify administrator
+	NotifySysadmin(NotifyEvent_BackupFinish);
+
+	// --------------------------------------------------------------------------------------------
+
+	// We had a successful backup, save the store 
+	// info. If we save successfully, we must 
+	// delete the file next time we start a backup
+
+	mDeleteStoreObjectInfoFile = 
+		SerializeStoreObjectInfo(mLastSyncTime,
+			mNextSyncTime);
+
+	// --------------------------------------------------------------------------------------------
 }
 
 // --------------------------------------------------------------------------
@@ -1849,22 +1848,30 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 
 	// Then... go through each of the entries in the configuration,
 	// making sure there's a directory created for it.
-	for(std::list<std::pair<std::string, Configuration> >::const_iterator i = rLocationsConf.mSubConfigurations.begin();
-		i != rLocationsConf.mSubConfigurations.end(); ++i)
+	std::vector<std::string> locNames =
+		rLocationsConf.GetSubConfigurationNames();
+	
+	for(std::vector<std::string>::iterator
+		pLocName  = locNames.begin();
+		pLocName != locNames.end();
+		pLocName++)
 	{
-		BOX_TRACE("new location: " << i->first);
+		const Configuration& rConfig(
+			rLocationsConf.GetSubConfiguration(*pLocName));
+		BOX_TRACE("new location: " << *pLocName);
+		
 		// Create a record for it
 		std::auto_ptr<Location> apLoc(new Location);
 
 		try
 		{
 			// Setup names in the location record
-			apLoc->mName = i->first;
-			apLoc->mPath = i->second.GetKeyValue("Path");
+			apLoc->mName = *pLocName;
+			apLoc->mPath = rConfig.GetKeyValue("Path");
 			
 			// Read the exclude lists from the Configuration
-			apLoc->mpExcludeFiles = BackupClientMakeExcludeList_Files(i->second);
-			apLoc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(i->second);
+			apLoc->mpExcludeFiles = BackupClientMakeExcludeList_Files(rConfig);
+			apLoc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(rConfig);
 
 			// Does this exist on the server?
 			// Remove from dir object early, so that if we fail
@@ -2011,7 +2018,8 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 
 			// Create and store the directory object for the root of this location
 			ASSERT(oid != 0);
-			BackupClientDirectoryRecord *precord = new BackupClientDirectoryRecord(oid, i->first);
+			BackupClientDirectoryRecord *precord =
+				new BackupClientDirectoryRecord(oid, *pLocName);
 			apLoc->mpDirectoryRecord.reset(precord);
 			
 			// Push it back on the vector of locations
@@ -2089,8 +2097,8 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 // --------------------------------------------------------------------------
 void BackupDaemon::SetupIDMapsForSync()
 {
-	// Need to do different things depending on whether it's an in memory implementation,
-	// or whether it's all stored on disc.
+	// Need to do different things depending on whether it's an
+	// in memory implementation, or whether it's all stored on disc.
 	
 #ifdef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 
@@ -2098,8 +2106,8 @@ void BackupDaemon::SetupIDMapsForSync()
 	DeleteIDMapVector(mNewIDMaps);
 	FillIDMapVector(mNewIDMaps, true /* new maps */);
 
-	// Then make sure that the current maps have objects, even if they are empty
-	// (for the very first run)
+	// Then make sure that the current maps have objects,
+	// even if they are empty (for the very first run)
 	if(mCurrentIDMaps.empty())
 	{
 		FillIDMapVector(mCurrentIDMaps, false /* current maps */);
