@@ -1709,8 +1709,11 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	
 						// Compare contents, if it's a regular file not a link
 						// Remember, we MUST read the entire stream from the server.
+						SelfFlushingStream flushObject(*objectStream);
+
 						if(!fileOnServerStream->IsSymLink())
 						{
+							SelfFlushingStream flushFile(*fileOnServerStream);
 							// Open the local file
 							FileStream l(localPath.c_str());
 							
@@ -1740,28 +1743,6 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 							if(fileOnServerStream->StreamDataLeft() || fileSizeServer != fileSizeLocal)
 							{
 								equal = false;
-							}
-
-							// Must always read the entire decoded stream, if it's not a symlink
-							if(fileOnServerStream->StreamDataLeft())
-							{
-								// Absorb all the data remaining
-								char buffer[2048];
-								while(fileOnServerStream->StreamDataLeft())
-								{
-									fileOnServerStream->Read(buffer, sizeof(buffer), mrConnection.GetTimeout());
-								}
-							}
-
-							// Must always read the entire encoded stream
-							if(objectStream->StreamDataLeft())
-							{
-								// Absorb all the data remaining
-								char buffer[2048];
-								while(objectStream->StreamDataLeft())
-								{
-									objectStream->Read(buffer, sizeof(buffer), mrConnection.GetTimeout());
-								}
 							}
 						}
 					}
