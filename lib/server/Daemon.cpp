@@ -47,26 +47,21 @@ Daemon *Daemon::spDaemon = 0;
 //
 // --------------------------------------------------------------------------
 Daemon::Daemon()
-	: mpConfiguration(NULL),
-	  mReloadConfigWanted(false),
+	: mReloadConfigWanted(false),
 	  mTerminateWanted(false),
-	  mSingleProcess(false),
-	  mRunInForeground(false),
 	#ifdef WIN32
+	  mSingleProcess(true),
+	  mRunInForeground(true),
 	  mKeepConsoleOpenAfterFork(true),
 	#else
+	  mSingleProcess(false),
+	  mRunInForeground(false),
 	  mKeepConsoleOpenAfterFork(false),
 	#endif
 	  mHaveConfigFile(false),
 	  mAppName(DaemonName())
 {
-	if(spDaemon != NULL)
-	{
-		THROW_EXCEPTION(ServerException, AlreadyDaemonConstructed)
-	}
-	spDaemon = this;
-	
-	// And in debug builds, we'll switch on assert failure logging to syslog
+	// In debug builds, switch on assert failure logging to syslog
 	ASSERT_FAILS_TO_SYSLOG_ON
 	// And trace goes to syslog too
 	TRACE_TO_SYSLOG(true)
@@ -82,14 +77,6 @@ Daemon::Daemon()
 // --------------------------------------------------------------------------
 Daemon::~Daemon()
 {
-	if(mpConfiguration)
-	{
-		delete mpConfiguration;
-		mpConfiguration = 0;
-	}
-
-	ASSERT(spDaemon == this);
-	spDaemon = NULL;
 }
 
 // --------------------------------------------------------------------------
@@ -372,16 +359,13 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 
 bool Daemon::Configure(const std::string& rConfigFileName)
 {
-	mConfigFileName = rConfigFileName;
-
 	// Load the configuration file.
 	std::string errors;
-	std::auto_ptr<Configuration> pconfig;
+	std::auto_ptr<Configuration> apConfig;
 
 	try
 	{
-		pconfig = Configuration::LoadAndVerify(
-			mConfigFileName.c_str(), 
+		apConfig = Configuration::LoadAndVerify(rConfigFileName,
 			GetConfigVerify(), errors);
 	}
 	catch(BoxException &e)
@@ -389,8 +373,8 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 		if(e.GetType() == CommonException::ExceptionType &&
 			e.GetSubType() == CommonException::OSFileOpenError)
 		{
-			BOX_ERROR("Failed to open configuration file: " 
-				<< mConfigFileName);
+			BOX_ERROR("Failed to open configuration file: "  <<
+				rConfigFileName);
 			return false;
 		}
 
@@ -398,15 +382,54 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 	}
 
 	// Got errors?
-	if(pconfig.get() == 0 || !errors.empty())
+	if(apConfig.get() == 0)
+	{
+		BOX_ERROR("Failed to load or verify configuration file");
+		return false;
+	}
+	
+	if(!Configure(*apConfig))
+	{
+		BOX_ERROR("Failed to verify configuration file");
+		return false;		
+	}
+	
+	// Store configuration
+	mConfigFileName = rConfigFileName;
+	mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
+		
+	return true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Daemon::Configure(const Configuration& rConfig)
+//		Purpose: Loads daemon configuration. Useful when you have
+//			 a local Daemon object and don't intend to fork()
+//			 or call Main().
+//		Created: 2008/08/12
+//
+// --------------------------------------------------------------------------
+
+bool Daemon::Configure(const Configuration& rConfig)
+{
+	std::string errors;
+
+	// Verify() may modify the configuration, e.g. adding default values
+	// for required keys, so need to make a copy here
+	std::auto_ptr<Configuration> apConf(new Configuration(rConfig));
+	apConf->Verify(*GetConfigVerify(), errors);
+
+	// Got errors?
+	if(!errors.empty())
 	{
 		BOX_ERROR("Configuration errors: " << errors);
 		return false;
 	}
 	
 	// Store configuration
-	mpConfiguration = pconfig.release();
-	mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
+	mapConfiguration = apConf;
 	
 	// Let the derived class have a go at setting up stuff
 	// in the initial process
@@ -432,9 +455,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	std::string pidFileName;
 
-	#ifndef WIN32
-		bool asDaemon = !mSingleProcess && !mRunInForeground;
-	#endif
+	bool asDaemon = !mSingleProcess && !mRunInForeground;
 
 	try
 	{
@@ -447,13 +468,13 @@ int Daemon::Main(const std::string &rConfigFileName)
 		
 		// Server configuration
 		const Configuration &serverConfig(
-			mpConfiguration->GetSubConfiguration("Server"));
+			mapConfiguration->GetSubConfiguration("Server"));
 
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
 	
-#ifndef WIN32	
+#ifndef WIN32
 		// Handle changing to a different user
 		if(serverConfig.KeyExists("User"))
 		{
@@ -469,7 +490,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			// Change the process ID
 			daemonUser.ChangeProcessUser();
 		}
-	
+
 		if(asDaemon)
 		{
 			// Let's go... Daemonise...
@@ -520,7 +541,17 @@ int Daemon::Main(const std::string &rConfigFileName)
 				break;
 			}
 		}
-
+#endif // !WIN32
+		
+		// Must set spDaemon before installing signal handler,
+		// otherwise the handler will crash if invoked too soon.
+		if(spDaemon != NULL)
+		{
+			THROW_EXCEPTION(ServerException, AlreadyDaemonConstructed)
+		}
+		spDaemon = this;
+		
+#ifndef WIN32
 		// Set signal handler
 		// Don't do this in the parent, since it might be anything
 		// (e.g. test/bbackupd)
@@ -558,11 +589,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
 	
-		if(
-			#ifndef WIN32
-				asDaemon && 
-			#endif
-			!mKeepConsoleOpenAfterFork)
+		if(asDaemon && !mKeepConsoleOpenAfterFork)
 		{
 #ifndef WIN32
 			// Close standard streams
@@ -662,12 +689,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 					break;
 				}
 				
-				// delete old configuration
-				delete mpConfiguration;
-				mpConfiguration = 0;
-
 				// Store configuration
-				mpConfiguration = pconfig.release();
+				mapConfiguration = pconfig;
 				mLoadedConfigModifiedTime =
 					GetConfigFileModifiedTime();
 				
@@ -708,12 +731,14 @@ int Daemon::Main(const std::string &rConfigFileName)
 	if(asDaemon)
 	{
 		// we are running in the child by now, and should not return
-		delete mpConfiguration;
-		mpConfiguration = NULL;
+		mapConfiguration.reset();
 		exit(0);
 	}
 	*/
 #endif
+
+	ASSERT(spDaemon == this);
+	spDaemon = NULL;
 
 	return retcode;
 }
@@ -722,7 +747,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 //
 // Function
 //		Name:    Daemon::EnterChild()
-//		Purpose: Sets up for a child task of the main server. Call just after fork()
+//		Purpose: Sets up for a child task of the main server. Call
+//		just after fork().
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
@@ -864,13 +890,13 @@ const ConfigurationVerify *Daemon::GetConfigVerify() const
 // --------------------------------------------------------------------------
 const Configuration &Daemon::GetConfiguration() const
 {
-	if(mpConfiguration == 0)
+	if(mapConfiguration.get() == 0)
 	{
 		// Shouldn't get anywhere near this if a configuration file can't be loaded
 		THROW_EXCEPTION(ServerException, Internal)
 	}
 	
-	return *mpConfiguration;
+	return *mapConfiguration;
 }
 
 
