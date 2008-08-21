@@ -68,8 +68,17 @@ BEGIN
 			}
 		}
 		close INFO;
-		$svnurl =~ m!box/(.+)$!;
-		my $svndir = $1;
+
+		my $svndir;
+		if ($svnurl =~ m!/box/(.+)$!)
+		{
+			$svndir = $1;
+		}
+		elsif ($svnurl =~ m'/(boxi/.+)/boxi/boxbackup')
+		{
+			$svndir = $1;
+		}
+
 		$svndir =~ tr/0-9A-Za-z/_/c;
 		$product_version =~ s/USE_SVN_VERSION/$svndir.'_'.$svnversion/e;
 	}
