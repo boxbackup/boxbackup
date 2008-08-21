@@ -37,7 +37,8 @@
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type, const char *Name, int Port, int &rSockAddrLenOut)
+void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
+	int Type, const std::string& rName, int Port, int &rSockAddrLenOut)
 {
 	int sockAddrLen = 0;
 
@@ -47,7 +48,7 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 		sockDomain = AF_INET;
 		{
 			// Lookup hostname
-			struct hostent *phost = ::gethostbyname(Name);
+			struct hostent *phost = ::gethostbyname(rName.c_str());
 			if(phost != NULL)
 			{
 				if(phost->h_addr_list[0] != 0)
@@ -81,7 +82,7 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 		sockDomain = AF_UNIX;
 		{
 			// Check length of name is OK
-			unsigned int nameLen = ::strlen(Name);
+			unsigned int nameLen = rName.length();
 			if(nameLen >= (sizeof(addr.sa_unix.sun_path) - 1))
 			{
 				THROW_EXCEPTION(ServerException, SocketNameUNIXPathTooLong);
@@ -91,7 +92,7 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type
 			addr.sa_unix.sun_len = sockAddrLen;
 #endif
 			addr.sa_unix.sun_family = PF_UNIX;
-			::strcpy(addr.sa_unix.sun_path, Name);
+			::strcpy(addr.sa_unix.sun_path, rName.c_str());
 		}
 		break;
 #endif

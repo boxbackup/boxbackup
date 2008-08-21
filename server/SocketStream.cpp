@@ -136,7 +136,7 @@ void SocketStream::Attach(int socket)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void SocketStream::Open(int Type, const char *Name, int Port)
+void SocketStream::Open(int Type, const std::string& rName, int Port)
 {
 	if(mSocketHandle != INVALID_SOCKET_VALUE) 
 	{
@@ -147,7 +147,7 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 	int sockDomain = 0;
 	SocketAllAddr addr;
 	int addrLen = 0;
-	Socket::NameLookupToSockAddr(addr, sockDomain, Type, Name, Port, addrLen);
+	Socket::NameLookupToSockAddr(addr, sockDomain, Type, rName, Port, addrLen);
 
 	// Create the socket
 	mSocketHandle = ::socket(sockDomain, SOCK_STREAM,
@@ -166,11 +166,11 @@ void SocketStream::Open(int Type, const char *Name, int Port)
 		DWORD err = WSAGetLastError();
 		::closesocket(mSocketHandle);
 		BOX_LOG_WIN_ERROR_NUMBER("Failed to connect to socket " 
-			"(type " << Type << ", name " << Name <<
+			"(type " << Type << ", name " << rName <<
 			", port " << Port << ")", err);
 #else // !WIN32
 		BOX_LOG_SYS_ERROR("Failed to connect to socket (type " <<
-			Type << ", name " << Name << ", port " << Port <<
+			Type << ", name " << rName << ", port " << Port <<
 			")");
 		::close(mSocketHandle);
 #endif // WIN32

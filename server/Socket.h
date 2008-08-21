@@ -45,7 +45,9 @@ namespace Socket
 		TypeUNIX = 2
 	};
 
-	void NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain, int Type, const char *Name, int Port, int &rSockAddrLenOut);
+	void NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
+		int Type, const std::string& rName, int Port,
+		int &rSockAddrLenOut);
 	void LogIncomingConnection(const struct sockaddr *addr, socklen_t addrlen);
 	std::string IncomingConnectionLogMessage(const struct sockaddr *addr, socklen_t addrlen);
 };
