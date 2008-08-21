@@ -60,6 +60,8 @@ private:
 
 	// Implementations
 	void List(int64_t DirID, const std::string &rListRoot, const bool *opts, bool FirstLevel);
+	
+public:
 	class CompareParams
 	{
 	public:
