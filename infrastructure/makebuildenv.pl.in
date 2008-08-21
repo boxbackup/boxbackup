@@ -39,16 +39,8 @@ unless(-d 'local')
 # flags about the environment
 my %env_flags;
 
-my $windows_include_path = "";
-if ($target_windows)
-{
-	$module_dependency{"lib/common"} = ["lib/win32"];
-	push @implicit_deps, "lib/win32";
-}
-else
-{
-	# $env_flags{'IGNORE_lib/win32'} = 1;
-}
+$module_dependency{"lib/common"} = ["lib/win32"];
+push @implicit_deps, "lib/win32";
 
 # print "Flag: $_\n" for(keys %env_flags);
 
@@ -501,8 +493,7 @@ __E
 	
 
 	# make include path
-	my $include_paths = $windows_include_path .
-		join(' ',map {'-I../../'.$_} @all_deps_for_module);
+	my $include_paths = join(' ',map {'-I../../'.$_} @all_deps_for_module);
 
 	# is target a library?
 	my $target_is_library = ($type ne 'bin' && $type ne 'test');
@@ -530,7 +521,7 @@ __E
 	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
 
 	my $default_cxxflags = '@CXXFLAGS@';
-	my $default_cxxflags =~ s/ -O2//g;
+	$default_cxxflags =~ s/ -O2//g;
 
 	my $release_flags = "-O2";
 	if ($target_windows)
@@ -550,19 +541,19 @@ RANLIB = @RANLIB@
 PERL = @PERL@
 WINDRES = windres
 
-CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
+DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
 	$include_paths $extra_platform_defines \\
 	-DBOX_VERSION="\\"$product_version\\""
 LDFLAGS = @LDFLAGS@ @LDADD_RDYNAMIC@
 
 .ifdef RELEASE
-CXXFLAGS += -DNDEBUG $release_flags
+CXXFLAGS = -DNDEBUG $release_flags \$(DEFAULT_CXXFLAGS)
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS += -g
+CXXFLAGS = -g \$(DEFAULT_CXXFLAGS)
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
@@ -750,8 +741,9 @@ __E
 		# run make for things we require
 		for my $dep (@all_deps_for_module)
 		{
-			$deps_makeinfo .= "\t\t\$(HIDE) (cd ../../$dep; \$(MAKE)$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
+			$deps_makeinfo .= "\t\t\$(HIDE) (cd ../../$dep; \$(MAKE)$sub_make_options -q \$(DEPENDMAKEFLAGS) -D NODEPS || \$(MAKE)$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
 		}
+
 		$deps_makeinfo .= ".\tendif\n.endif\n\n";
 	}
 	print MAKE $deps_makeinfo if $bsd_make;
@@ -840,7 +832,11 @@ __E
 	print MAKE $make,"\n";
 	
 	# and a clean target
-	print MAKE "clean:\n\t-rm -rf \$(OUTDIR)/*\n.\tifndef SUBCLEAN\n";
+	print MAKE <<EOF;
+clean:
+	-rm -rf \$(OUTDIR)/*
+.	ifndef SUBCLEAN
+EOF
 	for my $dep (@all_deps_for_module)
 	{
 		print MAKE "\t\$(HIDE) (cd ../../$dep; \$(MAKE) \$(DEPENDMAKEFLAGS) -D SUBCLEAN clean)\n";
@@ -877,7 +873,7 @@ __E
 		{
 			s/\A\.\s*(ifdef|else|endif|ifndef)/$1/;
 			s/\A\.\s*include\s+<(.+?)>/include $1/;
-			s/-D\s+(\w+)/$1=1/;
+			s/-D\s+(\w+)/$1=1/g;
 			print MAKE;
 		}
 
