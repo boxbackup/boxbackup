@@ -24,14 +24,14 @@
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-FileStream::FileStream(const char *Filename, int flags, int mode)
+FileStream::FileStream(const std::string& rFilename, int flags, int mode)
 #ifdef WIN32
-	: mOSFileHandle(::openfile(Filename, flags, mode)),
+	: mOSFileHandle(::openfile(rFilename.c_str(), flags, mode)),
 #else
-	: mOSFileHandle(::open(Filename, flags, mode)),
+	: mOSFileHandle(::open(rFilename.c_str(), flags, mode)),
 #endif
 	  mIsEOF(false),
-	  mFileName(Filename)
+	  mFileName(rFilename)
 {
 #ifdef WIN32
 	if(mOSFileHandle == INVALID_HANDLE_VALUE)
@@ -48,7 +48,7 @@ FileStream::FileStream(const char *Filename, int flags, int mode)
 		else
 		{
 			BOX_LOG_SYS_WARNING("Failed to open file: " <<
-				Filename);
+				rFilename);
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}
