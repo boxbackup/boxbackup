@@ -1945,6 +1945,20 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 					"store directory '" <<
 					storePathDisplay << "' does not.");
 				rParams.mDifferences ++;
+
+				// Check the dir modification time
+				struct stat st;
+				if(::stat(localPath.c_str(), &st) == 0 &&
+					FileModificationTime(st) >
+					rParams.mLatestFileUploadTime)
+				{
+					rParams.mDifferencesExplainedByModTime ++;
+					BOX_INFO("Local directory '" <<
+						localPathDisplay << "' was "
+						"modified since the last sync, "
+						"might be reason for "
+						"difference");
+				}
 			}
 			else
 			{
