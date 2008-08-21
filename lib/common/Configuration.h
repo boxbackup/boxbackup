@@ -88,9 +88,8 @@ class FdGetLine;
 // --------------------------------------------------------------------------
 class Configuration
 {
-private:
-	Configuration(const std::string &rName);
 public:
+	Configuration(const std::string &rName);
 	Configuration(const Configuration &rToCopy);
 	~Configuration();
 	
@@ -118,18 +117,28 @@ public:
 	
 	bool SubConfigurationExists(const std::string& rSubName) const;
 	const Configuration &GetSubConfiguration(const std::string& rSubName) const;
+	Configuration &GetSubConfigurationEditable(const std::string& rSubName);
 	std::vector<std::string> GetSubConfigurationNames() const;
 	
+	void AddKeyValue(const std::string& rKey, const std::string& rValue);
+	void AddSubConfig(const std::string& rName, const Configuration& rSubConfig);
+	
+	bool Verify(const ConfigurationVerify &rVerify, std::string &rErrorMsg)
+	{
+		return Verify(rVerify, std::string(), rErrorMsg);
+	}
+
+private:	
 	std::string mName;
+	// Order of keys not preserved
+	std::map<std::string, std::string> mKeys;
 	// Order of sub blocks preserved
 	typedef std::list<std::pair<std::string, Configuration> > SubConfigListType;
 	SubConfigListType mSubConfigurations;
-	// Order of keys, not preserved
-	std::map<std::string, std::string> mKeys;
 	
-private:
 	static bool LoadInto(Configuration &rConfig, FdGetLine &rGetLine, std::string &rErrorMsg, bool RootLevel);
-	static bool Verify(Configuration &rConfig, const ConfigurationVerify &rVerify, const std::string &rLevel, std::string &rErrorMsg);
+	bool Verify(const ConfigurationVerify &rVerify, const std::string &rLevel,
+		std::string &rErrorMsg);
 };
 
 #endif // CONFIGURATION__H
