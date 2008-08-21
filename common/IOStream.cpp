@@ -238,4 +238,24 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 	return true;	// completed
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    IOStream::Flush(int Timeout)
+//		Purpose: Read and discard all remaining data in stream.
+//			 Useful for protocol streams which must be flushed
+//			 to avoid breaking the protocol.
+//		Created: 2008/08/20
+//
+// --------------------------------------------------------------------------
+void IOStream::Flush(int Timeout)
+{
+	char buffer[4096];
+
+	while(StreamDataLeft())
+	{
+		Read(buffer, sizeof(buffer), Timeout);
+	}
+}
+
 
