@@ -31,7 +31,7 @@
 class FileStream : public IOStream
 {
 public:
-	FileStream(const char *Filename, 
+	FileStream(const std::string& rFilename, 
 #ifdef WIN32
 		int flags = (O_RDONLY | O_BINARY),
 #else
