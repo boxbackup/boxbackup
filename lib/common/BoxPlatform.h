@@ -30,11 +30,14 @@
 
 #ifdef WIN32
 	#ifdef __MSVCRT_VERSION__
-		#error Must include Box.h before sys/types.h
+		#if __MSVCRT_VERSION__ < 0x0601
+			#error Must include Box.h before sys/types.h
+		#endif
+	#else
+		// need msvcrt version 6.1 or higher for _gmtime64()
+		// must define this before importing <sys/types.h>
+		#define __MSVCRT_VERSION__ 0x0601
 	#endif
-	// need msvcrt version 6.1 or higher for _gmtime64()
-	// must define this before importing <sys/types.h>
-	#define __MSVCRT_VERSION__ 0x0601
 #endif
 
 #ifdef HAVE_SYS_TYPES_H
@@ -153,7 +156,7 @@
 #endif
 
 // for Unix compatibility with Windows :-)
-#if !HAVE_DECL_O_BINARY
+#ifndef O_BINARY
 	#define O_BINARY 0
 #endif
 
