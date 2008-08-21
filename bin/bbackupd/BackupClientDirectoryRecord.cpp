@@ -960,6 +960,14 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 				catch(BoxException &e)
 				{
+					if (e.GetType() == BackupStoreException::ExceptionType &&
+						e.GetSubType() == BackupStoreException::SignalReceived)
+					{
+						// abort requested, pass the 
+						// exception on up.
+						throw;
+					}
+					
 					// an error occured -- make return
 					// code false, to show error in directory
 					allUpdatedSuccessfully = false;
