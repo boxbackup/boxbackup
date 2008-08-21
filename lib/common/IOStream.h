@@ -57,6 +57,7 @@ public:
 	// Utility functions
 	bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout = IOStream::TimeOutInfinite);
 	bool CopyStreamTo(IOStream &rCopyTo, int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024);
+	void Flush(int Timeout = IOStream::TimeOutInfinite);
 	
 	static int ConvertSeekTypeToOSWhence(int SeekType);
 };
