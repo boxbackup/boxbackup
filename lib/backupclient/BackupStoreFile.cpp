@@ -65,22 +65,27 @@ BackupStoreFileStats BackupStoreFile::msStats = {0,0,0};
 // Function
 //		Name:    BackupStoreFile::EncodeFile(IOStream &, IOStream &)
 //		Purpose: Encode a file into something for storing on file server.
-//				 Requires a real filename so full info can be stored.
+//			 Requires a real filename so full info can be stored.
 //
-//				 Returns a stream. Most of the work is done by the stream
-//				 when data is actually requested -- the file will be held
-//				 open until the stream is deleted or the file finished.
+//			 Returns a stream. Most of the work is done by the stream
+//			 when data is actually requested -- the file will be held
+//			 open until the stream is deleted or the file finished.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(const char *Filename, int64_t ContainerID, const BackupStoreFilename &rStoreFilename, int64_t *pModificationTime)
+std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(const char *Filename,
+	int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
+	int64_t *pModificationTime, ReadLoggingStream::Logger* pLogger,
+	RunStatusProvider* pRunStatusProvider)
 {
 	// Create the stream
 	std::auto_ptr<IOStream> stream(new BackupStoreFileEncodeStream);
 
 	// Do the initial setup
-	((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename, 0 /* no recipe, just encode */,
-		ContainerID, rStoreFilename, pModificationTime);
+	((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename,
+		0 /* no recipe, just encode */,
+		ContainerID, rStoreFilename, pModificationTime, pLogger,
+		pRunStatusProvider);
 	
 	// Return the stream for the caller
 	return stream;

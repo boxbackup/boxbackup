@@ -49,34 +49,33 @@
 
 #include "SSLLib.h"
 
+#include "autogen_BackupProtocolClient.h"
+#include "autogen_ClientException.h"
+#include "autogen_ConversionException.h"
+#include "Archive.h"
+#include "BackupClientContext.h"
+#include "BackupClientCryptoKeys.h"
+#include "BackupClientDirectoryRecord.h"
+#include "BackupClientFileAttributes.h"
+#include "BackupClientInodeToIDMap.h"
+#include "BackupClientMakeExcludeList.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
-#include "BackupClientContext.h"
-#include "BackupClientDirectoryRecord.h"
-#include "BackupStoreDirectory.h"
-#include "BackupClientFileAttributes.h"
-#include "BackupStoreFilenameClear.h"
-#include "BackupClientInodeToIDMap.h"
-#include "autogen_BackupProtocolClient.h"
-#include "autogen_ConversionException.h"
-#include "BackupClientCryptoKeys.h"
-#include "BannerText.h"
-#include "BackupStoreFile.h"
-#include "Random.h"
-#include "ExcludeList.h"
-#include "BackupClientMakeExcludeList.h"
-#include "IOStreamGetLine.h"
-#include "Utils.h"
-#include "FileStream.h"
-#include "BackupStoreException.h"
 #include "BackupStoreConstants.h"
-#include "LocalProcessStream.h"
-#include "IOStreamGetLine.h"
+#include "BackupStoreDirectory.h"
+#include "BackupStoreException.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreFilenameClear.h"
+#include "BannerText.h"
 #include "Conversion.h"
-#include "Archive.h"
-#include "Timer.h"
+#include "ExcludeList.h"
+#include "FileStream.h"
+#include "IOStreamGetLine.h"
+#include "LocalProcessStream.h"
 #include "Logging.h"
-#include "autogen_ClientException.h"
+#include "Random.h"
+#include "Timer.h"
+#include "Utils.h"
 
 #ifdef WIN32
 	#include "Win32ServiceFunctions.h"
@@ -122,13 +121,23 @@ unsigned int WINAPI HelperThread(LPVOID lpParam)
 // --------------------------------------------------------------------------
 BackupDaemon::BackupDaemon()
 	: mState(BackupDaemon::State_Initialising),
+	  mDeleteRedundantLocationsAfter(0),
 	  mpCommandSocketInfo(0),
 	  mDeleteUnusedRootDirEntriesAfter(0),
 	  mClientStoreMarker(BackupClientContext::ClientStoreMarker_NotKnown),
 	  mStorageLimitExceeded(false),
 	  mReadErrorsOnFilesystemObjects(false),
 	  mLastSyncTime(0),
-	  mLogAllFileAccess(false)
+	  mNextSyncTime(0),
+	  mCurrentSyncStartTime(0),
+	  mUpdateStoreInterval(0),
+	  mDeleteStoreObjectInfoFile(false),
+	  mDoSyncForcedByPreviousSyncError(false),
+	  mLogAllFileAccess(false),
+	  mpProgressNotifier(this),
+	  mpLocationResolver(this),
+	  mpRunStatusProvider(this),
+	  mpSysadminNotifier(this)
 	#ifdef WIN32
 	, mInstallService(false),
 	  mRemoveService(false),
@@ -1078,14 +1087,14 @@ void BackupDaemon::RunSyncNow()
 	// just connect, as this may be unnecessary)
 	BackupClientContext clientContext
 	(
-		*this, 
+		*mpLocationResolver, 
 		mTlsContext, 
 		conf.GetKeyValue("StoreHostname"),
 		conf.GetKeyValueInt("StorePort"),
 		conf.GetKeyValueInt("AccountNumber"), 
 		conf.GetKeyValueBool("ExtendedLogging"),
 		conf.KeyExists("ExtendedLogFile"),
-		extendedLogFile, *this
+		extendedLogFile, *mpProgressNotifier
 	);
 		
 	// The minimum age a file needs to be before it will be
@@ -1158,8 +1167,8 @@ void BackupDaemon::RunSyncNow()
 	}
 
 	// Set up the sync parameters
-	BackupClientDirectoryRecord::SyncParams params(
-		*this, clientContext);
+	BackupClientDirectoryRecord::SyncParams params(*mpRunStatusProvider,
+		*mpSysadminNotifier, *mpProgressNotifier, clientContext);
 	params.mSyncPeriodStart = syncPeriodStart;
 	params.mSyncPeriodEnd = syncPeriodEndExtended;
 	// use potentially extended end time
@@ -1213,6 +1222,8 @@ void BackupDaemon::RunSyncNow()
 		// are set up
 		SetupLocations(clientContext, locations);
 	}
+	
+	mpProgressNotifier->NotifyIDMapsSetup(clientContext);
 	
 	// Get some ID maps going
 	SetupIDMapsForSync();

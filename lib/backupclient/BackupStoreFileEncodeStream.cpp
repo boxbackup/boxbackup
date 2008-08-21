@@ -11,18 +11,18 @@
 
 #include <string.h>
 
-#include "BackupStoreFileEncodeStream.h"
-#include "BackupStoreFile.h"
-#include "BackupStoreFileWire.h"
-#include "BackupStoreFileCryptVar.h"
-#include "BackupStoreObjectMagic.h"
-#include "BackupStoreException.h"
-#include "BackupStoreConstants.h"
-#include "BoxTime.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupStoreConstants.h"
+#include "BackupStoreException.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreFileCryptVar.h"
+#include "BackupStoreFileEncodeStream.h"
+#include "BackupStoreFileWire.h"
+#include "BackupStoreObjectMagic.h"
+#include "BoxTime.h"
 #include "FileStream.h"
-#include "RollingChecksum.h"
 #include "Random.h"
+#include "RollingChecksum.h"
 
 #include "MemLeakFindOn.h"
 
@@ -41,6 +41,7 @@ BackupStoreFileEncodeStream::BackupStoreFileEncodeStream()
 	: mpRecipe(0),
 	  mpFile(0),
 	  mpLogging(0),
+	  mpRunStatusProvider(NULL),
 	  mStatus(Status_Header),
 	  mSendData(true),
 	  mTotalBlocks(0),
@@ -107,8 +108,11 @@ BackupStoreFileEncodeStream::~BackupStoreFileEncodeStream()
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEncodeStream::Recipe *pRecipe,
-	int64_t ContainerID, const BackupStoreFilename &rStoreFilename, int64_t *pModificationTime)
+void BackupStoreFileEncodeStream::Setup(const char *Filename,
+	BackupStoreFileEncodeStream::Recipe *pRecipe,
+	int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
+	int64_t *pModificationTime, ReadLoggingStream::Logger* pLogger,
+	RunStatusProvider* pRunStatusProvider)
 {
 	// Pointer to a blank recipe which we might create
 	BackupStoreFileEncodeStream::Recipe *pblankRecipe = 0;
@@ -128,9 +132,9 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEnc
 			pblankRecipe = new BackupStoreFileEncodeStream::Recipe(0, 0);
 			
 			BackupStoreFileEncodeStream::RecipeInstruction instruction;
-			instruction.mSpaceBefore = fileSize; 	// whole file
-			instruction.mBlocks = 0;				// no blocks
-			instruction.mpStartBlock = 0;			// no block
+			instruction.mSpaceBefore = fileSize; // whole file
+			instruction.mBlocks = 0; // no blocks
+			instruction.mpStartBlock = 0; // no block
 			pblankRecipe->push_back(instruction);		
 
 			pRecipe = pblankRecipe;
@@ -210,8 +214,18 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEnc
 			// Open the file
 			mpFile = new FileStream(Filename);
 
-			// Create logging stream
-			mpLogging = new ReadLoggingStream(*mpFile);
+			if (pLogger)
+			{
+				// Create logging stream
+				mpLogging = new ReadLoggingStream(*mpFile,
+					*pLogger);
+			}
+			else
+			{
+				// re-use FileStream instead
+				mpLogging = mpFile;
+				mpFile = NULL;
+			}
 		
 			// Work out the largest possible block required for the encoded data
 			mAllocatedBufferSize = BackupStoreFile::MaxBlockSizeForChunkSize(maxBlockClearSize);
@@ -259,6 +273,8 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename, BackupStoreFileEnc
 		}
 		throw;
 	}
+	
+	mpRunStatusProvider = pRunStatusProvider;
 }
 
 
@@ -315,6 +331,11 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 	if(mStatus == Status_Finished)
 	{
 		return 0;
+	}
+	
+	if(mpRunStatusProvider && mpRunStatusProvider->StopRun())
+	{
+		THROW_EXCEPTION(BackupStoreException, SignalReceived);
 	}
 
 	int bytesToRead = NBytes;
@@ -531,22 +552,25 @@ void BackupStoreFileEncodeStream::EncodeCurrentBlock()
 	ASSERT(blockRawSize < mAllocatedBufferSize);
 
 	// Check file open
-	if(mpFile == 0 || mpLogging == 0)
+	if(mpLogging == 0)
 	{
 		// File should be open, but isn't. So logical error.
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
 	
 	// Read the data in
-	if(!mpLogging->ReadFullBuffer(mpRawBuffer, blockRawSize, 0 /* not interested in size if failure */))
+	if(!mpLogging->ReadFullBuffer(mpRawBuffer, blockRawSize,
+		0 /* not interested in size if failure */))
 	{
-		// TODO: Do something more intelligent, and abort this upload because the file
-		// has changed
-		THROW_EXCEPTION(BackupStoreException, Temp_FileEncodeStreamDidntReadBuffer)
+		// TODO: Do something more intelligent, and abort
+		// this upload because the file has changed.
+		THROW_EXCEPTION(BackupStoreException,
+			Temp_FileEncodeStreamDidntReadBuffer)
 	}
 	
 	// Encode it
-	mCurrentBlockEncodedSize = BackupStoreFile::EncodeChunk(mpRawBuffer, blockRawSize, mEncodedBuffer);
+	mCurrentBlockEncodedSize = BackupStoreFile::EncodeChunk(mpRawBuffer,
+		blockRawSize, mEncodedBuffer);
 	
 	//TRACE2("Encode: Encoded size of block %d is %d\n", (int32_t)mCurrentBlock, (int32_t)mCurrentBlockEncodedSize);
 	
@@ -557,7 +581,8 @@ void BackupStoreFileEncodeStream::EncodeCurrentBlock()
 	strongChecksum.Finish();
 
 	// Add entry to the index
-	StoreBlockIndexEntry(mCurrentBlockEncodedSize, blockRawSize, weakChecksum.GetChecksum(), strongChecksum.DigestAsData());
+	StoreBlockIndexEntry(mCurrentBlockEncodedSize, blockRawSize,
+		weakChecksum.GetChecksum(), strongChecksum.DigestAsData());
 	
 	// Set vars to reading this block
 	mPositionInCurrentBlock = 0;

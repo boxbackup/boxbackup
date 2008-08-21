@@ -15,13 +15,27 @@
 
 class ReadLoggingStream : public IOStream
 {
+public:
+	class Logger
+	{
+	public:
+		virtual ~Logger() { }
+		virtual void Log(int64_t readSize, int64_t offset,
+			int64_t length, box_time_t elapsed,
+			box_time_t finish) = 0;
+		virtual void Log(int64_t readSize, int64_t offset,
+			int64_t length) = 0;
+		virtual void Log(int64_t readSize, int64_t offset) = 0;
+	};
+
 private:
 	IOStream& mrSource;
 	IOStream::pos_type mOffset, mLength, mTotalRead;
 	box_time_t mStartTime;
+	Logger& mrLogger;
 
 public:
-	ReadLoggingStream(IOStream& rSource);
+	ReadLoggingStream(IOStream& rSource, Logger& rLogger);
 	
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
@@ -35,7 +49,8 @@ public:
 
 private:
 	ReadLoggingStream(const ReadLoggingStream &rToCopy) 
-	: mrSource(rToCopy.mrSource) { /* do not call */ }
+	: mrSource(rToCopy.mrSource), mrLogger(rToCopy.mrLogger)
+	{ /* do not call */ }
 };
 
 #endif // READLOGGINGSTREAM__H

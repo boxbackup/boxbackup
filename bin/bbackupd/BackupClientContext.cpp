@@ -41,7 +41,7 @@
 // --------------------------------------------------------------------------
 BackupClientContext::BackupClientContext
 (
-	BackupDaemon &rDaemon, 
+	LocationResolver &rResolver, 
 	TLSContext &rTLSContext, 
 	const std::string &rHostname,
 	int Port,
@@ -51,7 +51,7 @@ BackupClientContext::BackupClientContext
 	std::string ExtendedLogFile,
 	ProgressNotifier& rProgressNotifier
 )
-	: mrDaemon(rDaemon),
+	: mrResolver(rResolver),
 	  mrTLSContext(rTLSContext),
 	  mHostname(rHostname),
 	  mPort(Port),
@@ -470,7 +470,7 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 		{
 			// Location name -- look up in daemon's records
 			std::string locPath;
-			if(!mrDaemon.FindLocationPathName(elementName.GetClearFilename(), locPath))
+			if(!mrResolver.FindLocationPathName(elementName.GetClearFilename(), locPath))
 			{
 				// Didn't find the location... so can't give the local filename
 				return false;
