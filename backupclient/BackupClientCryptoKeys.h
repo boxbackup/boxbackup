@@ -49,7 +49,7 @@
 #define BACKUPCRYPTOKEYS_FILE_AES_KEY_LENGTH			32
 
 
-void BackupClientCryptoKeys_Setup(const char *KeyMaterialFilename);
+void BackupClientCryptoKeys_Setup(const std::string& rKeyMaterialFilename);
 
 #endif // BACKUPCLIENTCRYTOKEYS__H
 
