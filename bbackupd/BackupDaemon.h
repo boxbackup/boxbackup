@@ -14,6 +14,7 @@
 #include <string>
 #include <memory>
 
+#include "BackupClientContext.h"
 #include "BackupClientDirectoryRecord.h"
 #include "BoxTime.h"
 #include "Daemon.h"
@@ -45,7 +46,8 @@ class Archive;
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-class BackupDaemon : public Daemon, ProgressNotifier
+class BackupDaemon : public Daemon, ProgressNotifier, LocationResolver,
+RunStatusProvider, SysadminNotifier
 {
 public:
 	BackupDaemon();
@@ -153,7 +155,7 @@ private:
 
 	int UseScriptToSeeIfSyncAllowed();
 
-private:
+public:
 	class Location
 	{
 	public:
@@ -173,7 +175,11 @@ private:
 		ExcludeList *mpExcludeFiles;
 		ExcludeList *mpExcludeDirs;
 	};
-
+	
+	typedef const std::vector<Location *> Locations;
+	Locations GetLocations() { return mLocations; }
+	
+private:
 	int mState;		// what the daemon is currently doing
 
 	std::vector<Location *> mLocations;
@@ -229,8 +235,26 @@ public:
 private:
 	bool mLogAllFileAccess;
 
+public:
+	ProgressNotifier*  GetProgressNotifier()  { return mpProgressNotifier; }
+	LocationResolver*  GetLocationResolver()  { return mpLocationResolver; }
+	RunStatusProvider* GetRunStatusProvider() { return mpRunStatusProvider; }
+	SysadminNotifier*  GetSysadminNotifier()  { return mpSysadminNotifier; }
+	void SetProgressNotifier (ProgressNotifier*  p) { mpProgressNotifier = p; }
+	void SetLocationResolver (LocationResolver*  p) { mpLocationResolver = p; }
+	void SetRunStatusProvider(RunStatusProvider* p) { mpRunStatusProvider = p; }
+	void SetSysadminNotifier (SysadminNotifier*  p) { mpSysadminNotifier = p; }
+		
+private:
+	ProgressNotifier* mpProgressNotifier;
+	LocationResolver* mpLocationResolver;
+	RunStatusProvider* mpRunStatusProvider;
+	SysadminNotifier* mpSysadminNotifier;
+	
  	/* ProgressNotifier implementation */
 public:
+	virtual void NotifyIDMapsSetup(BackupClientContext& rContext) { }
+
  	virtual void NotifyScanDirectory(
  		const BackupClientDirectoryRecord* pDirRecord,
  		const std::string& rLocalPath) 
@@ -466,6 +490,24 @@ public:
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}
+	}
+	virtual void NotifyReadProgress(int64_t readSize, int64_t offset,
+		int64_t length, box_time_t elapsed, box_time_t finish)
+	{
+		BOX_TRACE("Read " << readSize << " bytes at " << offset << 
+			", " << (length - offset) << " remain, eta " <<
+			BoxTimeToSeconds(finish - elapsed) << "s");
+	}
+	virtual void NotifyReadProgress(int64_t readSize, int64_t offset,
+		int64_t length)
+	{
+		BOX_TRACE("Read " << readSize << " bytes at " << offset << 
+			", " << (length - offset) << " remain");
+	}
+	virtual void NotifyReadProgress(int64_t readSize, int64_t offset)
+	{
+		BOX_TRACE("Read " << readSize << " bytes at " << offset << 
+			", unknown bytes remaining");
 	}
 
 #ifdef WIN32

@@ -29,6 +29,24 @@ class BackupStoreFilenameClear;
 // --------------------------------------------------------------------------
 //
 // Class
+//		Name:    LocationResolver
+//		Purpose: Interface for classes that can resolve locations to paths,
+//		         like BackupDaemon
+//		Created: 2003/10/08
+//
+// --------------------------------------------------------------------------
+class LocationResolver
+{
+public:
+	virtual ~LocationResolver() { }
+	virtual bool FindLocationPathName(const std::string &rLocationName, 
+		std::string &rPathOut) const = 0;
+};
+
+
+// --------------------------------------------------------------------------
+//
+// Class
 //		Name:    BackupClientContext
 //		Purpose: 
 //		Created: 2003/10/08
@@ -39,7 +57,7 @@ class BackupClientContext : public DiffTimer
 public:
 	BackupClientContext
 	(
-		BackupDaemon &rDaemon, 
+		LocationResolver &rResolver, 
 		TLSContext &rTLSContext, 
 		const std::string &rHostname,
 		int32_t Port,
@@ -207,7 +225,7 @@ public:
 	}
 
 private:
-	BackupDaemon &mrDaemon;
+	LocationResolver &mrResolver;
 	TLSContext &mrTLSContext;
 	std::string mHostname;
 	int mPort;
