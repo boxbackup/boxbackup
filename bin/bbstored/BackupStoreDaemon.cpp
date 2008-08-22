@@ -361,7 +361,7 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 		const SocketStreamTLS &s)
 {
 	// Log the amount of data transferred
-	BOX_INFO("Connection statistics for " << commonName << ":"
+	BOX_NOTICE("Connection statistics for " << commonName << ":"
 		" IN="  << s.GetBytesRead() <<
 		" OUT=" << s.GetBytesWritten() <<
 		" TOTAL=" << (s.GetBytesRead() + s.GetBytesWritten()));
