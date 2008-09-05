@@ -8,7 +8,6 @@ backup-client
 	bin bbackupquery
 	bin bbackupctl
 	script bin/bbackupd/bbackupd-config
-	script LICENSE.txt
 
 ONLY:mingw32,mingw32msvc
 	script bin/bbackupd/win32/installer.iss 
