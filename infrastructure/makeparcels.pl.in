@@ -101,7 +101,7 @@ for my $parcel (@parcels)
 	print MAKE "\trm -rf ",parcel_dir($parcel),"\n";
 	print MAKE "\trm -f ",parcel_target($parcel),"\n";
 }
-print MAKE "\tfind release debug -type f | xargs -r rm\n";
+print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
 print MAKE "\n";
 
 print MAKE "test:\trelease/common/test\n\nrelease/common/test:\n\t./runtest.pl ALL release\n\n";
