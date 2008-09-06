@@ -419,7 +419,6 @@ test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
 __E
 			}
 
-
 			print TESTFILE <<__E;
 echo Removing old test files...
 chmod -R a+rwx testfiles
@@ -444,9 +443,15 @@ __E
 			if(-d "$module/testfiles")
 			{
 				print TESTFILE <<__E;
+
 # echo Killing any running daemons...
-test -r testfiles/bbackupd.pid && kill `cat testfiles/bbackupd.pid`
-test -r testfiles/bbstored.pid && kill `cat testfiles/bbstored.pid`
+test -r testfiles/bbackupd.pid \\
+&& kill -0 `cat testfiles/bbackupd.pid` \\
+&& kill `cat testfiles/bbackupd.pid`
+
+test -r testfiles/bbstored.pid \\
+&& kill -0 `cat testfiles/bbstored.pid` \\
+&& kill `cat testfiles/bbstored.pid`
 __E
 			}
 
