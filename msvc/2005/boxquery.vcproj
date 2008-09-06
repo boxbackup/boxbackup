@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\pcre&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -62,7 +62,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcre.lib"
+				AdditionalDependencies="Ws2_32.lib Advapi32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\pcre.lib"
 				OutputFile="$(OutDir)/bbackupquery.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
