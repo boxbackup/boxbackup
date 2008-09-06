@@ -598,7 +598,7 @@ int test(int argc, const char *argv[])
 			" testfiles/testbackupstorefix.pl reroot 6") == 0);
 
 
-		// ------------------------------------------------------------------------------------------------		
+		// ---------------------------------------------------------
 		// Stop server
 		TEST_THAT(KillServer(pid));
 
