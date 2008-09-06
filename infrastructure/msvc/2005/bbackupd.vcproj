@@ -62,7 +62,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\lib_pcre.lib"
+				AdditionalDependencies="Ws2_32.lib Advapi32.lib User32.lib $(ProjectDir)..\..\..\..\zlib\lib\zdll.lib $(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib $(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib $(ProjectDir)..\..\..\Debug\common.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\pcreposix.lib $(ProjectDir)..\..\..\..\pcre\bin\debug\pcre.lib"
 				OutputFile="$(OutDir)/bbackupd.exe"
 				LinkIncremental="2"
 				IgnoreAllDefaultLibraries="false"

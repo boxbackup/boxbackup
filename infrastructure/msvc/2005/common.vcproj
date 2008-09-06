@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\..\pcre\pcre-6.7\&quot;;$(NOINHERIT)"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)..\..\..\lib\backupclient&quot;;&quot;$(ProjectDir)..\..\..\lib\common&quot;;&quot;$(ProjectDir)..\..\..\lib\compress&quot;;&quot;$(ProjectDir)..\..\..\lib\crypto&quot;;&quot;$(ProjectDir)..\..\..\lib\server&quot;;&quot;$(ProjectDir)..\..\..\lib\win32&quot;;&quot;$(ProjectDir)..\..\..\..\openssl\inc32&quot;;&quot;$(ProjectDir)..\..\..\..\zlib\include&quot;;&quot;$(ProjectDir)..\..\..\..\pcre&quot;;$(NOINHERIT)"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
