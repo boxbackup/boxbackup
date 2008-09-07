@@ -33,6 +33,32 @@ FileStream::FileStream(const std::string& rFilename, int flags, int mode)
 	  mIsEOF(false),
 	  mFileName(rFilename)
 {
+	AfterOpen();
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    FileStream::FileStream(const char *, int, int)
+//		Purpose: Alternative constructor, takes a const char *,
+//			 avoids const strings being interpreted as handles!
+//		Created: 2003/07/31
+//
+// --------------------------------------------------------------------------
+FileStream::FileStream(const char *pFilename, int flags, int mode)
+#ifdef WIN32
+	: mOSFileHandle(::openfile(pFilename, flags, mode)),
+#else
+	: mOSFileHandle(::open(pFilename, flags, mode)),
+#endif
+	  mIsEOF(false),
+	  mFileName(pFilename)
+{
+	AfterOpen();
+}
+
+void FileStream::AfterOpen()
+{
 #ifdef WIN32
 	if(mOSFileHandle == INVALID_HANDLE_VALUE)
 #else
@@ -48,7 +74,7 @@ FileStream::FileStream(const std::string& rFilename, int flags, int mode)
 		else
 		{
 			BOX_LOG_SYS_WARNING("Failed to open file: " <<
-				rFilename);
+				mFileName);
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}
