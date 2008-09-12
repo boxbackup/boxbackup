@@ -1230,6 +1230,9 @@ int test_bbackupd()
 	}
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
+	// Check that no read error has been reported yet
+	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 	std::string cmd = BBACKUPD " " + bbackupd_args + 
 		" testfiles/bbackupd.conf";
 
@@ -1658,6 +1661,9 @@ int test_bbackupd()
 		}
 	}
 
+	// Check that no read error has been reported yet
+	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 	#ifndef WIN32 // requires fork
 	printf("\n==== Testing that bbackupd responds correctly to "
 		"connection failure\n");
@@ -1820,6 +1826,9 @@ int test_bbackupd()
 			DIRECTORY_SEPARATOR "b"
 			DIRECTORY_SEPARATOR "link") == 0);
 
+		// also test symlink-to-self loop does not break restore
+		TEST_THAT(symlink("self", SYM_DIR "/self") == 0);
+
 		::wait_for_operation(4);
 		::sync_and_wait();
 
@@ -1918,6 +1927,9 @@ int test_bbackupd()
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 	}
 	#endif // !WIN32
+
+	// Check that no read error has been reported yet
+	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 	printf("\n==== Testing that redundant locations are deleted on time\n");
 
@@ -2023,6 +2035,9 @@ int test_bbackupd()
 
 	if(bbackupd_pid > 0)
 	{
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 		printf("\n==== Check that read-only directories and "
 			"their contents can be restored.\n");
 
@@ -2383,6 +2398,9 @@ int test_bbackupd()
 			BackupQueries::ReturnCode::Compare_Different);
 #endif // WIN32
 
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
@@ -2494,6 +2512,9 @@ int test_bbackupd()
 				return 1;
 			}
 		}
+
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
@@ -3009,6 +3030,9 @@ int test_bbackupd()
 			BackupQueries::ReturnCode::Compare_Same);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
@@ -3048,6 +3072,9 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 		// Check that modifying files with old timestamps
 		// still get added
@@ -3107,6 +3134,9 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 		// Add some files and directories which are marked as excluded
 		printf("\n==== Add files and dirs for exclusion test\n");
@@ -3194,6 +3224,9 @@ int test_bbackupd()
 		// These tests only work as non-root users.
 		if(::getuid() != 0)
 		{
+			// Check that the error has not been reported yet
+			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 			// Check that read errors are reported neatly
 			printf("\n==== Add unreadable files\n");
 			
@@ -3816,6 +3849,8 @@ int test_bbackupd()
 			// backed up on the next run.
 			CloseHandle(handle);
 			wait_for_sync_end();
+
+			// still no read errors?
 			TEST_THAT(!TestFileExists("testfiles/"
 				"notifyran.read-error.2"));
 
