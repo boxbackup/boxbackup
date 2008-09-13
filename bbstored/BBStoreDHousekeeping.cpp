@@ -46,6 +46,12 @@ void BackupStoreDaemon::HousekeepingProcess()
 	{
 		RunHousekeepingIfNeeded();
 
+		// Stop early?
+		if(StopRun())
+		{
+			break;
+		}
+
 		// Calculate how long should wait before doing the next 
 		// housekeeping run
 		int64_t timeNow = GetCurrentBoxTime();
