@@ -143,19 +143,19 @@ class Logger
 class Console : public Logger
 {
 	private:
+	static bool sShowTag;
 	static bool sShowTime;
 	static bool sShowTimeMicros;
-	static bool sShowTag;
-	static std::string sTag;
 	static bool sShowPID;
+	static std::string sTag;
 
 	public:
 	virtual bool Log(Log::Level level, const std::string& rFile, 
 		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Console"; }
-	virtual void SetProgramName(const std::string& rProgramName) { }
+	virtual void SetProgramName(const std::string& rProgramName);
 
-	static void SetTag(const std::string& rTag);
+	static void SetShowTag(bool enabled);
 	static void SetShowTime(bool enabled);
 	static void SetShowTimeMicros(bool enabled);
 	static void SetShowPID(bool enabled);
@@ -206,6 +206,7 @@ class Logging
 	static Syslog*  spSyslog;
 	static Log::Level sGlobalLevel;
 	static Logging    sGlobalLogging;
+	static std::string sProgramName;
 	
 	public:
 	Logging ();
@@ -230,6 +231,7 @@ class Logging
 		return (int)sGlobalLevel >= (int)level;
 	}
 	static void SetProgramName(const std::string& rProgramName);
+	static std::string GetProgramName() { return sProgramName; }
 
 	class Guard
 	{
@@ -245,6 +247,23 @@ class Logging
 		~Guard()
 		{
 			Logging::SetGlobalLevel(mOldLevel);
+		}
+	};
+
+	class Tagger
+	{
+		private:
+		std::string mOldTag;
+
+		public:
+		Tagger(const std::string& rTempTag)
+		{
+			mOldTag = Logging::GetProgramName();
+			Logging::SetProgramName(mOldTag + " " + rTempTag);
+		}
+		~Tagger()
+		{
+			Logging::SetProgramName(mOldTag);
 		}
 	};
 };

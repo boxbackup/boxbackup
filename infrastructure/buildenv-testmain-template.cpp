@@ -257,7 +257,8 @@ int main(int argc, char * const * argv)
 
 			case 't':
 			{
-				Console::SetTag(optarg);
+				Logging::SetProgramName(optarg);
+				Console::SetShowTag(true);
 			}
 			break;
 
