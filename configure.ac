@@ -47,10 +47,17 @@ AC_SUBST([TARGET_PERL])
 AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$TARGET_PERL"], 
 	[Location of the perl executable])
 
-AC_CHECK_PROGS([AR],     [ar],    
+AC_CHECK_TOOL([AR],     [ar],    
 	[AC_MSG_ERROR([[cannot find ar executable]])])
-AC_CHECK_PROGS([RANLIB], [ranlib],
+AC_CHECK_TOOL([RANLIB], [ranlib],
 	[AC_MSG_ERROR([[cannot find ranlib executable]])])
+
+case $target_os in
+mingw*) 
+	AC_CHECK_TOOL([WINDRES], [windres],
+		[AC_MSG_ERROR([[cannot find windres executable]])])
+	;;
+esac
 
 ### Checks for libraries.
 
