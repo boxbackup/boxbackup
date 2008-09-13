@@ -308,7 +308,7 @@ int main(int argc, const char *argv[])
 	if(!quiet) printf("Login complete.\n\nType \"help\" for a list of commands.\n\n");
 	
 	// Set up a context for our work
-	BackupQueries context(connection, conf);
+	BackupQueries context(connection, conf, readWrite);
 	
 	// Start running commands... first from the command line
 	{

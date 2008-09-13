@@ -71,8 +71,10 @@
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-BackupQueries::BackupQueries(BackupProtocolClient &rConnection, const Configuration &rConfiguration)
-	: mrConnection(rConnection),
+BackupQueries::BackupQueries(BackupProtocolClient &rConnection,
+	const Configuration &rConfiguration, bool readWrite)
+	: mReadWrite(readWrite),
+	  mrConnection(rConnection),
 	  mrConfiguration(rConfiguration),
 	  mQuitNow(false),
 	  mRunningAsRoot(false),
@@ -222,24 +224,32 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{ "help", "" },
 		{ "usage", "" },
 		{ "undelete", "" },
+		{ "delete", "" },
 		{ NULL, NULL } 
 	};
-	#define COMMAND_Quit		0
-	#define COMMAND_Exit		1
-	#define COMMAND_List		2
-	#define COMMAND_pwd			3
-	#define COMMAND_cd			4
-	#define COMMAND_lcd			5
-	#define COMMAND_sh			6
-	#define COMMAND_GetObject	7
-	#define COMMAND_Get			8
-	#define COMMAND_Compare		9
-	#define COMMAND_Restore		10
-	#define COMMAND_Help		11
-	#define COMMAND_Usage		12
-	#define COMMAND_Undelete	13
-	static const char *alias[] = {"ls",			0};
-	static const int aliasIs[] = {COMMAND_List, 0};
+
+	typedef enum
+	{
+		Command_Quit = 0,
+		Command_Exit,
+		Command_List,
+		Command_pwd,
+		Command_cd,
+		Command_lcd,
+		Command_sh,
+		Command_GetObject,
+		Command_Get,
+		Command_Compare,
+		Command_Restore,
+		Command_Help,
+		Command_Usage,
+		Command_Undelete,
+		Command_Delete,
+	}
+	CommandType;
+
+	static const char *alias[] = {"ls", 0};
+	static const int aliasIs[] = {Command_List, 0};
 	
 	// Work out which command it is...
 	int cmd = 0;
@@ -293,7 +303,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		}
 	}
 
-	if(cmd != COMMAND_Quit && cmd != COMMAND_Exit)
+	if(cmd != Command_Quit && cmd != Command_Exit)
 	{
 		// If not a quit command, set the return code to zero
 		SetReturnCode(ReturnCode::Command_OK);
@@ -302,16 +312,16 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 	// Handle command
 	switch(cmd)
 	{
-	case COMMAND_Quit:
-	case COMMAND_Exit:
+	case Command_Quit:
+	case Command_Exit:
 		mQuitNow = true;
 		break;
 		
-	case COMMAND_List:
+	case Command_List:
 		CommandList(args, opts);
 		break;
 		
-	case COMMAND_pwd:
+	case Command_pwd:
 		{
 			// Simple implementation, so do it here
 			BOX_INFO(GetCurrentDirectoryName() << " (" <<
@@ -319,47 +329,52 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		}
 		break;
 
-	case COMMAND_cd:
+	case Command_cd:
 		CommandChangeDir(args, opts);
 		break;
 		
-	case COMMAND_lcd:
+	case Command_lcd:
 		CommandChangeLocalDir(args);
 		break;
 		
-	case COMMAND_sh:
+	case Command_sh:
 		BOX_ERROR("The command to run must be specified as an argument.");
 		break;
 		
-	case COMMAND_GetObject:
+	case Command_GetObject:
 		CommandGetObject(args, opts);
 		break;
 		
-	case COMMAND_Get:
+	case Command_Get:
 		CommandGet(args, opts);
 		break;
 		
-	case COMMAND_Compare:
+	case Command_Compare:
 		CommandCompare(args, opts);
 		break;
 		
-	case COMMAND_Restore:
+	case Command_Restore:
 		CommandRestore(args, opts);
 		break;
 		
-	case COMMAND_Usage:
+	case Command_Usage:
 		CommandUsage();
 		break;
 		
-	case COMMAND_Help:
+	case Command_Help:
 		CommandHelp(args);
 		break;
 
-	case COMMAND_Undelete:
+	case Command_Undelete:
 		CommandUndelete(args, opts);
 		break;
 		
+	case Command_Delete:
+		CommandDelete(args, opts);
+		break;
+		
 	default:
+		BOX_ERROR("Unknown command: " << Command);
 		break;
 	}
 }
@@ -601,15 +616,18 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::FindDirectoryObjectID(const std::string &)
-//		Purpose: Find the object ID of a directory on the store, or return 0 for not found.
-//				 If pStack != 0, the object is set to the stack of directories.
-//				 Will start from the current directory stack.
+//		Name:    BackupQueries::FindDirectoryObjectID(const
+//			 std::string &)
+//		Purpose: Find the object ID of a directory on the store,
+//			 or return 0 for not found. If pStack != 0, the
+//			 object is set to the stack of directories.
+//			 Will start from the current directory stack.
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName, bool AllowOldVersion,
-			bool AllowDeletedDirs, std::vector<std::pair<std::string, int64_t> > *pStack)
+int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
+	bool AllowOldVersion, bool AllowDeletedDirs,
+	std::vector<std::pair<std::string, int64_t> > *pStack)
 {
 	// Split up string into elements
 	std::vector<std::string> dirElements;
@@ -935,6 +953,117 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 }
 
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::FindFileID(const std::string&
+//			 rNameOrIdString, const bool *options,
+//			 int64_t *pDirIdOut, std::string* pFileNameOut)
+//		Purpose: Locate a file on the store (either by name or by
+//			 object ID, depending on opts['i'], where name can
+//			 include a path) and return the file ID, placing the
+//			 directory ID in *pDirIdOut and the filename part
+//			 of the path (if not looking up by ID and not NULL)
+//			 in *pFileNameOut.
+//		Created: 2008-09-12
+//
+// --------------------------------------------------------------------------
+int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
+	const bool *opts, int64_t *pDirIdOut, std::string* pFileNameOut,
+	int16_t flagsInclude, int16_t flagsExclude, int16_t* pFlagsOut)
+{
+	// Find object ID somehow
+	int64_t fileId;
+	int64_t dirId = GetCurrentDirectoryID();
+	std::string fileName = rNameOrIdString;
+
+	if(!opts['i'])
+	{
+		// does this remote filename include a path?
+		std::string::size_type index = fileName.rfind('/');
+		if(index != std::string::npos)
+		{
+			std::string dirName(fileName.substr(0, index));
+			fileName = fileName.substr(index + 1);
+
+			dirId = FindDirectoryObjectID(dirName);
+			if(dirId == 0)
+			{
+				BOX_ERROR("Directory '" << dirName <<
+					"' not found.");
+				return 0;
+			}
+		}
+
+		if(pFileNameOut)
+		{
+			*pFileNameOut = fileName;
+		}
+	}
+
+	BackupStoreFilenameClear fn(fileName);
+
+	// Need to look it up in the current directory
+	mrConnection.QueryListDirectory(
+		dirId, flagsInclude, flagsExclude,
+		true /* do want attributes */);
+
+	// Retrieve the directory from the stream following
+	BackupStoreDirectory dir;
+	std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
+	dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
+	BackupStoreDirectory::Entry *en;
+
+	if(opts['i'])
+	{
+		// Specified as ID. 
+		fileId = ::strtoll(rNameOrIdString.c_str(), 0, 16);
+		if(fileId == std::numeric_limits<long long>::min() || 
+			fileId == std::numeric_limits<long long>::max() || 
+			fileId == 0)
+		{
+			BOX_ERROR("Not a valid object ID (specified in hex).");
+			return 0;
+		}
+		
+		// Check that the item is actually in the directory
+		en = dir.FindEntryByID(fileId);
+		if(en == 0)
+		{
+			BOX_ERROR("File ID " << 
+				BOX_FORMAT_OBJECTID(fileId) <<
+				" not found in current directory on store.\n"
+				"(You can only access files by ID from the "
+				"current directory.)");
+			return 0;
+		}
+	}
+	else
+	{				
+		// Specified by name, find the object in the directory to get the ID
+		BackupStoreDirectory::Iterator i(dir);
+		en = i.FindMatchingClearName(fn);
+		if(en == 0)
+		{
+			BOX_ERROR("Filename '" << rNameOrIdString << "' "
+				"not found in current directory on store.\n"
+				"(Subdirectories in path not searched.)");
+			return 0;
+		}
+		
+		fileId = en->GetObjectID();
+	}
+
+	*pDirIdOut = dirId;
+
+	if(pFlagsOut)
+	{
+		*pFlagsOut = en->GetFlags();
+	}
+
+	return fileId;
+}
+
 
 // --------------------------------------------------------------------------
 //
@@ -957,110 +1086,62 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	}
 
 	// Find object ID somehow
-	int64_t fileId;
-	int64_t dirId = GetCurrentDirectoryID();
+	int64_t fileId, dirId;
 	std::string localName;
 
-	// BLOCK
-	{
 #ifdef WIN32
-		for (std::vector<std::string>::iterator 
-			i = args.begin(); i != args.end(); i++)
+	for (std::vector<std::string>::iterator 
+		i = args.begin(); i != args.end(); i++)
+	{
+		std::string out;
+		if(!ConvertConsoleToUtf8(i->c_str(), out))
 		{
-			std::string out;
-			if(!ConvertConsoleToUtf8(i->c_str(), out))
-			{
-				BOX_ERROR("Failed to convert encoding.");
-				return;
-			}
-			*i = out;
+			BOX_ERROR("Failed to convert encoding.");
+			return;
 		}
+		*i = out;
+	}
 #endif
 
-		std::string fileName(args[0]);
+	int16_t flagsExclude;
 
-		if(!opts['i'])
+	if(opts['i'])
+	{
+		// can retrieve anything by ID
+		flagsExclude = BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING;
+	}
+	else
+	{
+		// only current versions by name
+		flagsExclude =
+			BackupProtocolClientListDirectory::Flags_OldVersion |
+			BackupProtocolClientListDirectory::Flags_Deleted;
+	}
+
+
+	fileId = FindFileID(args[0], opts, &dirId, &localName,
+		BackupProtocolClientListDirectory::Flags_File, // just files
+		flagsExclude, NULL /* don't care about flags found */);
+
+	if (fileId == 0)
+	{
+		// error already reported
+		return;
+	}
+
+	if(opts['i'])
+	{
+		// Specified as ID.  Must have a local name in the arguments
+		// (check at beginning of function ensures this)
+		localName = args[1];
+	}
+	else
+	{				
+		// Specified by name. Local name already set by FindFileID,
+		// but may be overridden by user supplying a second argument.
+		if(args.size() == 2)
 		{
-			// does this remote filename include a path?
-			std::string::size_type index = fileName.rfind('/');
-			if(index != std::string::npos)
-			{
-				std::string dirName(fileName.substr(0, index));
-				fileName = fileName.substr(index + 1);
-
-				dirId = FindDirectoryObjectID(dirName);
-				if(dirId == 0)
-				{
-					BOX_ERROR("Directory '" << dirName <<
-						"' not found.");
-					return;
-				}
-			}
-		}
-
-		BackupStoreFilenameClear fn(fileName);
-
-		// Need to look it up in the current directory
-		mrConnection.QueryListDirectory(
-				dirId,
-				BackupProtocolClientListDirectory::Flags_File,	// just files
-				(opts['i'])?(BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING):(BackupProtocolClientListDirectory::Flags_OldVersion | BackupProtocolClientListDirectory::Flags_Deleted), // only current versions
-				false /* don't want attributes */);
-
-		// Retrieve the directory from the stream following
-		BackupStoreDirectory dir;
-		std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
-		dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
-
-		if(opts['i'])
-		{
-			// Specified as ID. 
-			fileId = ::strtoll(args[0].c_str(), 0, 16);
-			if(fileId == std::numeric_limits<long long>::min() || 
-				fileId == std::numeric_limits<long long>::max() || 
-				fileId == 0)
-			{
-				BOX_ERROR("Not a valid object ID (specified in hex).");
-				return;
-			}
-			
-			// Check that the item is actually in the directory
-			if(dir.FindEntryByID(fileId) == 0)
-			{
-				BOX_ERROR("File ID " << 
-					BOX_FORMAT_OBJECTID(fileId) <<
-					" not found in current "
-					"directory on store.\n"
-					"(You can only download files by ID "
-					"from the current directory.)");
-				return;
-			}
-			
-			// Must have a local name in the arguments (check at beginning of function ensures this)
 			localName = args[1];
-		}
-		else
-		{				
-			// Specified by name, find the object in the directory to get the ID
-			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry *en = i.FindMatchingClearName(fn);
-			
-			if(en == 0)
-			{
-				BOX_ERROR("Filename '" << args[0] << "' "
-					"not found in current "
-					"directory on store.\n"
-					"(Subdirectories in path not "
-					"searched.)");
-				return;
-			}
-			
-			fileId = en->GetObjectID();
-			
-			// Local name is the last argument, which is either 
-			// the looked up filename, or a filename specified 
-			// by the user.
-			localName = args[args.size() - 1];
 		}
 	}
 	
@@ -2210,10 +2291,17 @@ void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size, int
 // --------------------------------------------------------------------------
 void BackupQueries::CommandUndelete(const std::vector<std::string> &args, const bool *opts)
 {
+	if (!mReadWrite)
+	{
+		BOX_ERROR("This command requires a read-write connection. "
+			"Please reconnect with the -w option.");
+		return;
+	}
+
 	// Check arguments
 	if(args.size() != 1)
 	{
-		BOX_ERROR("Incorrect usage. undelete <directory-name>");
+		BOX_ERROR("Incorrect usage. undelete <name> or undelete -i <object-id>");
 		return;
 	}
 
@@ -2223,23 +2311,133 @@ void BackupQueries::CommandUndelete(const std::vector<std::string> &args, const 
 #else
 	const std::string& storeDirEncoded(args[0]);
 #endif
-	
-	// Get directory ID
-	int64_t dirID = FindDirectoryObjectID(storeDirEncoded, 
-		false /* no old versions */, true /* find deleted dirs */);
-	
-	// Allowable?
-	if(dirID == 0)
+
+	// Find object ID somehow
+	int64_t fileId, parentId;
+	std::string fileName;
+	int16_t flagsOut;
+
+	fileId = FindFileID(storeDirEncoded, opts, &parentId, &fileName,
+		/* include files and directories */
+		BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+		/* include old and deleted files */
+		BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+		&flagsOut);
+
+	if (fileId == 0)
 	{
-		BOX_ERROR("Directory '" << args[0] << "' not found on server.");
-		return;
-	}
-	if(dirID == BackupProtocolClientListDirectory::RootDirectory)
-	{
-		BOX_ERROR("Cannot undelete the root directory.");
+		// error already reported
 		return;
 	}
 
-	// Undelete
-	mrConnection.QueryUndeleteDirectory(dirID);
+	// Undelete it on the store
+	try
+	{
+		// Undelete object
+		if(flagsOut & BackupProtocolClientListDirectory::Flags_File)
+		{
+			mrConnection.QueryUndeleteFile(parentId, fileId);
+		}
+		else
+		{
+			mrConnection.QueryUndeleteDirectory(fileId);
+		}
+	}
+	catch (BoxException &e)
+	{
+		BOX_ERROR("Failed to undelete object: " << 
+			e.what());
+	}
+	catch(std::exception &e)
+	{
+		BOX_ERROR("Failed to undelete object: " <<
+			e.what());
+	}
+	catch(...)
+	{
+		BOX_ERROR("Failed to undelete object: unknown error");
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupQueries::CommandDelete(const
+//			 std::vector<std::string> &, const bool *)
+//		Purpose: Deletes a file
+//		Created: 23/11/03
+//
+// --------------------------------------------------------------------------
+void BackupQueries::CommandDelete(const std::vector<std::string> &args,
+	const bool *opts)
+{
+	if (!mReadWrite)
+	{
+		BOX_ERROR("This command requires a read-write connection. "
+			"Please reconnect with the -w option.");
+		return;
+	}
+
+	// Check arguments
+	if(args.size() != 1)
+	{
+		BOX_ERROR("Incorrect usage. delete <name>");
+		return;
+	}
+
+#ifdef WIN32
+	std::string storeDirEncoded;
+	if(!ConvertConsoleToUtf8(args[0].c_str(), storeDirEncoded)) return;
+#else
+	const std::string& storeDirEncoded(args[0]);
+#endif
+
+	// Find object ID somehow
+	int64_t fileId, parentId;
+	std::string fileName;
+	int16_t flagsOut;
+
+	fileId = FindFileID(storeDirEncoded, opts, &parentId, &fileName,
+		/* include files and directories */
+		BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+		/* exclude old and deleted files */
+		BackupProtocolClientListDirectory::Flags_OldVersion |
+		BackupProtocolClientListDirectory::Flags_Deleted,
+		&flagsOut);
+
+	if (fileId == 0)
+	{
+		// error already reported
+		return;
+	}
+
+	BackupStoreFilenameClear fn(fileName);
+
+	// Delete it on the store
+	try
+	{
+		// Delete object
+		if(flagsOut & BackupProtocolClientListDirectory::Flags_File)
+		{
+			mrConnection.QueryDeleteFile(parentId, fn);
+		}
+		else
+		{
+			mrConnection.QueryDeleteDirectory(fileId);
+		}
+	}
+	catch (BoxException &e)
+	{
+		BOX_ERROR("Failed to delete object: " << 
+			e.what());
+	}
+	catch(std::exception &e)
+	{
+		BOX_ERROR("Failed to delete object: " <<
+			e.what());
+	}
+	catch(...)
+	{
+		BOX_ERROR("Failed to delete object: unknown error");
+	}
 }

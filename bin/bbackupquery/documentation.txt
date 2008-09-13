@@ -159,6 +159,21 @@ compare <store-dir-name> <local-dir-name>
 	files is near zero.
 <
 
+> undelete <directory-name>
+undelete -i <object-id>
+
+	Removes the deleted flag from the specified directory name (in the
+	current directory) or hex object ID. Be careful not to use this
+	command where a directory already exists with the same name which is
+	not marked as deleted.
+<
+
+> delete <file-name>
+
+	Sets the deleted flag on the specified file name (in the current
+	directory, or with a relative path).
+<
+
 > quit
 
 	End session and exit.
