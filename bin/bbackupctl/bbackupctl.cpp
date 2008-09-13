@@ -257,7 +257,8 @@ int main(int argc, const char *argv[])
 		case SyncAndWaitForEnd:
 		{
 			// send a sync command
-			std::string cmd("force-sync\n");
+			commandName = "force-sync";
+			std::string cmd = commandName + "\n";
 			connection.Write(cmd.c_str(), cmd.size());
 			connection.WriteAllBuffered();
 
@@ -337,13 +338,17 @@ int main(int argc, const char *argv[])
 				{
 					if(!quiet)
 					{
-						BOX_INFO("Succeeded.");
+						BOX_INFO("Control command "
+							"succeeded: " <<
+							commandName);
 					}
 					finished = true;
 				}
 				else if(line == "error")
 				{
-					BOX_ERROR("Check command spelling");
+					BOX_ERROR("Control command failed: " <<
+						commandName << ". Check "
+						"command spelling");
 					returnCode = 1;
 					finished = true;
 				}
