@@ -30,7 +30,9 @@ class ExcludeList;
 class BackupQueries
 {
 public:
-	BackupQueries(BackupProtocolClient &rConnection, const Configuration &rConfiguration);
+	BackupQueries(BackupProtocolClient &rConnection,
+		const Configuration &rConfiguration,
+		bool readWrite);
 	~BackupQueries();
 private:
 	BackupQueries(const BackupQueries &);
@@ -54,12 +56,16 @@ private:
 	void CommandCompare(const std::vector<std::string> &args, const bool *opts);
 	void CommandRestore(const std::vector<std::string> &args, const bool *opts);
 	void CommandUndelete(const std::vector<std::string> &args, const bool *opts);
+	void CommandDelete(const std::vector<std::string> &args,
+		const bool *opts);
 	void CommandUsage();
-	void CommandUsageDisplayEntry(const char *Name, int64_t Size, int64_t HardLimit, int32_t BlockSize);
+	void CommandUsageDisplayEntry(const char *Name, int64_t Size,
+		int64_t HardLimit, int32_t BlockSize);
 	void CommandHelp(const std::vector<std::string> &args);
 
 	// Implementations
-	void List(int64_t DirID, const std::string &rListRoot, const bool *opts, bool FirstLevel);
+	void List(int64_t DirID, const std::string &rListRoot, const bool *opts,
+		bool FirstLevel);
 	
 public:
 	class CompareParams
@@ -105,13 +111,19 @@ public:
 private:
 
 	// Utility functions
-	int64_t FindDirectoryObjectID(const std::string &rDirName, bool AllowOldVersion = false,
-		bool AllowDeletedDirs = false, std::vector<std::pair<std::string, int64_t> > *pStack = 0);
+	int64_t FindDirectoryObjectID(const std::string &rDirName,
+		bool AllowOldVersion = false, bool AllowDeletedDirs = false,
+		std::vector<std::pair<std::string, int64_t> > *pStack = 0);
+	int64_t FindFileID(const std::string& rNameOrIdString,
+		const bool *opts, int64_t *pDirIdOut,
+		std::string* pFileNameOut, int16_t flagsInclude,
+		int16_t flagsExclude, int16_t* pFlagsOut);
 	int64_t GetCurrentDirectoryID();
 	std::string GetCurrentDirectoryName();
 	void SetReturnCode(int code) {mReturnCode = code;}
 
 private:
+	bool mReadWrite;
 	BackupProtocolClient &mrConnection;
 	const Configuration &mrConfiguration;
 	bool mQuitNow;
