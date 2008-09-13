@@ -321,7 +321,10 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	}
 
 	// Make ps listings clearer
-	SetProcessTitle("client %08x", id);
+	std::ostringstream tag;
+	tag << "client=" << BOX_FORMAT_ACCOUNT(id);
+	SetProcessTitle(tag.str().c_str());
+	Logging::Tagger tagWithClientID(tag.str());
 
 	// Create a context, using this ID
 	BackupStoreContext context(id, *this);
