@@ -235,7 +235,8 @@ int Daemon::ProcessOption(signed int option)
 
 		case 't':
 		{
-			Console::SetTag(optarg);
+			Logging::SetProgramName(optarg);
+			Console::SetShowTag(true);
 		}
 		break;
 
