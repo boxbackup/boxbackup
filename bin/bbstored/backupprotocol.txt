@@ -204,6 +204,12 @@ GetBlockIndexByName	35	Command(Success)
 	# stream of the block index follows the reply if found ID != 0
 
 
+UndeleteFile	36	Command(Success)
+	int64		InDirectory
+	int64		ObjectID
+	# will return 0 if the object couldn't be found in the specified directory
+
+
 # -------------------------------------------------------------------------------------
 #  Information commands
 # -------------------------------------------------------------------------------------

@@ -695,6 +695,7 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -759,12 +760,91 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 		RemoveDirectoryFromCache(InDirectory);
 		throw;
 	}
-		
 
 	return fileExisted;
 }
 
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &)
+//		Purpose: Deletes a file, returning true if the file existed. Object ID returned too, set to zero if not found.
+//		Created: 2003/10/21
+//
+// --------------------------------------------------------------------------
+bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
+{
+	// Essential checks!
+	if(mpStoreInfo.get() == 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
+	}
+
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
+	}
+
+	// Find the directory the file is in (will exception if it fails)
+	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
+
+	// Setup flags
+	bool fileExisted = false;
+	bool madeChanges = false;
+
+	// Count of deleted blocks
+	int64_t blocksDel = 0;
+
+	try
+	{
+		// Iterate through directory, only looking at files which have been deleted
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *e = 0;
+		while((e = i.Next(BackupStoreDirectory::Entry::Flags_File |
+			BackupStoreDirectory::Entry::Flags_Deleted, 0)) != 0)
+		{
+			// Compare name
+			if(e->GetObjectID() == ObjectID)
+			{
+				// Check that it's definitely already deleted
+				ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0);
+				// Clear deleted flag
+				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				// Mark as made a change
+				madeChanges = true;
+				blocksDel -= e->GetSizeInBlocks();
+
+				// Is this the last version?
+				if((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0)
+				{
+					// Yes. It's been found.
+					fileExisted = true;
+				}
+			}
+		}
+		
+		// Save changes?
+		if(madeChanges)
+		{
+			// Save the directory back
+			SaveDirectory(dir, InDirectory);
+			
+			// Modify the store info, and write
+			mpStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
+			
+			// Maybe postponed save of store info
+			SaveStoreInfo();
+		}
+	}
+	catch(...)
+	{
+		RemoveDirectoryFromCache(InDirectory);
+		throw;
+	}
+
+	return fileExisted;
+}
 
 
 // --------------------------------------------------------------------------

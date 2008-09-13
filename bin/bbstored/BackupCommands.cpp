@@ -610,6 +610,30 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteFile::DoCommand(BackupPr
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    BackupProtocolServerUndeleteFile::DoCommand(
+//			 BackupProtocolServer &, BackupStoreContext &)
+//		Purpose: Undelete a file
+//		Created: 2008-09-12
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<ProtocolObject> BackupProtocolServerUndeleteFile::DoCommand(
+	BackupProtocolServer &rProtocol, BackupStoreContext &rContext)
+{
+	CHECK_PHASE(Phase_Commands)
+	CHECK_WRITEABLE_SESSION
+
+	// Context handles this
+	bool result = rContext.UndeleteFile(mObjectID, mInDirectory);
+
+	// return the object ID or zero for not found
+	return std::auto_ptr<ProtocolObject>(
+		new BackupProtocolServerSuccess(result ? mObjectID : 0));
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupProtocolServerDeleteDirectory::DoCommand(BackupProtocolServer &, BackupStoreContext &)
 //		Purpose: Delete a directory
 //		Created: 2003/10/21
