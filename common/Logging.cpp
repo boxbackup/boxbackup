@@ -35,6 +35,7 @@ Console*    Logging::spConsole = NULL;
 Syslog*     Logging::spSyslog  = NULL;
 Log::Level  Logging::sGlobalLevel = Log::EVERYTHING;
 Logging     Logging::sGlobalLogging; //automatic initialisation
+std::string Logging::sProgramName;
 
 Logging::Logging()
 {
@@ -206,6 +207,8 @@ void Logging::ClearContext()
 
 void Logging::SetProgramName(const std::string& rProgramName)
 {
+	sProgramName = rProgramName;
+
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
 	{
@@ -230,10 +233,14 @@ bool Console::sShowTag = false;
 bool Console::sShowPID = false;
 std::string Console::sTag;
 
-void Console::SetTag(const std::string& rTag)
+void Console::SetProgramName(const std::string& rProgramName)
 {
-	sTag = rTag;
-	sShowTag = true;
+	sTag = rProgramName;
+}
+
+void Console::SetShowTag(bool enabled)
+{
+	sShowTag = enabled;
 }
 
 void Console::SetShowTime(bool enabled)
