@@ -544,7 +544,7 @@ CXX = @CXX@
 AR = @AR@
 RANLIB = @RANLIB@
 PERL = @PERL@
-WINDRES = windres
+WINDRES = @WINDRES@
 
 DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
 	$include_paths $extra_platform_defines \\
