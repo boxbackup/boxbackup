@@ -1417,8 +1417,13 @@ void openlog(const char * daemonName, int, int)
 	{
 	}
 
-	std::string name = "Box Backup (" + daemonName + ")";
-	BOOL success = AddEventSource(name.c_str(), 0);
+	std::string nameStr = "Box Backup (";
+	nameStr += daemonName;
+	nameStr += ")";
+
+	char* name = strdup(nameStr.c_str());
+	BOOL success = AddEventSource(name, 0);
+	free(name);
 
 	if (!success)
 	{
