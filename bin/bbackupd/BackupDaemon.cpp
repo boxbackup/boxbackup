@@ -335,6 +335,7 @@ int BackupDaemon::ProcessOption(signed int option)
 		case 'S':
 		{
 			mServiceName = optarg;
+			Logging::SetProgramName(mServiceName);
 			return 0;
 		}
 
@@ -368,8 +369,6 @@ int BackupDaemon::Main(const std::string &rConfigFileName)
 	{
 		return RemoveService(mServiceName);
 	}
-
-	Logging::SetProgramName("Box Backup (" + mServiceName + ")");
 
 	int returnCode;
 

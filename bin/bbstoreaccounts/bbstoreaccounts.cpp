@@ -459,6 +459,8 @@ int main(int argc, const char *argv[])
 
 	MAINHELPER_START
 
+	Logging::SetProgramName("bbstoreaccounts");
+
 	// Filename for configuration file?
 	std::string configFilename;
 
