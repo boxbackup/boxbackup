@@ -1408,18 +1408,18 @@ static bool sHaveWarnedEventLogFull = false;
 
 void openlog(const char * daemonName, int, int)
 {
+	std::string nameStr = "Box Backup (";
+	nameStr += daemonName;
+	nameStr += ")";
+
 	// register a default event source, so that we can
 	// log errors with the process of adding or registering our own.
 	gSyslogH = RegisterEventSource(
 		NULL,        // uses local computer 
-		daemonName); // source name
+		nameStr.c_str()); // source name
 	if (gSyslogH == NULL) 
 	{
 	}
-
-	std::string nameStr = "Box Backup (";
-	nameStr += daemonName;
-	nameStr += ")";
 
 	char* name = strdup(nameStr.c_str());
 	BOOL success = AddEventSource(name, 0);
@@ -1431,7 +1431,7 @@ void openlog(const char * daemonName, int, int)
 		return;
 	}
 
-	HANDLE newSyslogH = RegisterEventSource(NULL, daemonName);
+	HANDLE newSyslogH = RegisterEventSource(NULL, nameStr.c_str());
 	if (newSyslogH == NULL)
 	{
 		::syslog(LOG_ERR, "Failed to register our own event source: "
