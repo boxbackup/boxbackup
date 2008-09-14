@@ -109,7 +109,7 @@ int main(int argc, const char *argv[])
 	// Flags
 	bool readWrite = false;
 
-	Logging::SetProgramName("Box Backup (bbackupquery)");
+	Logging::SetProgramName("bbackupquery");
 
 	#ifdef NDEBUG
 	int masterLevel = Log::NOTICE; // need an int to do math with

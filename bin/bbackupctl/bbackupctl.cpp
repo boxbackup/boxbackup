@@ -62,9 +62,7 @@ int main(int argc, const char *argv[])
 
 	MAINHELPER_START
 
-#if defined WIN32 && ! defined NDEBUG
-	::openlog("Box Backup (bbackupctl)", 0, 0);
-#endif
+	Logging::SetProgramName("bbackupctl");
 
 	// Filename for configuration file?
 	std::string configFilename;
