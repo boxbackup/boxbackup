@@ -337,7 +337,7 @@ int main(int argc, const char *argv[])
 					if(!quiet)
 					{
 						BOX_INFO("Control command "
-							"succeeded: " <<
+							"sent: " <<
 							commandName);
 					}
 					finished = true;
@@ -346,7 +346,7 @@ int main(int argc, const char *argv[])
 				{
 					BOX_ERROR("Control command failed: " <<
 						commandName << ". Check "
-						"command spelling");
+						"command spelling.");
 					returnCode = 1;
 					finished = true;
 				}
