@@ -30,7 +30,7 @@ Unpack and configure:
 	cd openssl-0.9.8b
 	./Configure --prefix=/usr/local/i386-mingw32 mingw
 	make makefile.one
-	wget http://bbdev.fluffy.co.uk/svn/box/chris/win32/support/openssl-0.9.8b-mingw-cross.patch
+	wget http://www.boxbackup.org/svn/box/chris/win32/support/openssl-0.9.8b-mingw-cross.patch
 	patch -p1 < openssl-0.9.8b-mingw-cross.patch
 	make -f makefile.one
 	make -f makefile.one install

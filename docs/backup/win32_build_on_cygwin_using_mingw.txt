@@ -2,7 +2,7 @@ How to build Box Backup on Win32 using Cygwin and MinGW
 By Chris Wilson, 2007-05-26
 
 (To read this document online with better formatting, browse to:
-http://bbdev.fluffy.co.uk/trac/wiki/CompileWithMinGW)
+http://www.boxbackup.org/trac/wiki/CompileWithMinGW)
 
 Start by installing Cygwin on your Windows machine [http://www.cygwin.org].
 Make sure to select the following packages during installation:
