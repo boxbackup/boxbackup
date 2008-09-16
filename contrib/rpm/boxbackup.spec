@@ -17,7 +17,7 @@
 
 # Detect distribution. So far we only special-case SUSE. If you need to make
 # any distro specific changes to get the package building on your system
-# please email them to boxbackup-dev@fluffy.co.uk
+# please email them to boxbackup-dev@boxbackup.org
 #%define is_fc   %(test -e %{_sysconfdir}/fedora-release && echo 1 || echo 0)
 #%define is_mdk  %(test -e %{_sysconfdir}/mandrake-release && echo 1 || echo 0)
 #%define is_rh   %(test -e %{_sysconfdir}/redhat-release && echo 1 || echo 0)

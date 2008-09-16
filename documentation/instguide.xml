@@ -579,11 +579,11 @@ nsCertType                      = 0x40</programlisting>
           <para>You will need to compile OpenSSL using Visual C++. The latest
           release at this time, OpenSSL 0.9.8a, does not compile with Visual
           C++ 2005 out of the box, so you need <ulink
-          url="http://bbdev.fluffy.co.uk/svn/box/chris/win32/support/openssl-0.9.8a-vc2005.zip">a
+          url="http://www.boxbackup.org/svn/box/chris/win32/support/openssl-0.9.8a-vc2005.zip">a
           patched version</ulink>. The <ulink
           url="http://www.openssl.org/source/openssl-0.9.8a.tar.gz">original
           source</ulink> and <ulink
-          url="http://bbdev.fluffy.co.uk/svn/box/chris/win32/support/openssl-0.9.8a-win32fix.patch">patch</ulink>
+          url="http://www.boxbackup.org/svn/box/chris/win32/support/openssl-0.9.8a-win32fix.patch">patch</ulink>
           are also available.</para>
 
           <para>To compile OpenSSL:</para>
@@ -636,12 +636,12 @@ nmake -f ms\ntdll.mak</programlisting>
 
         <para>The first version of Box Backup that's known to compile and with
         Visual C++ 2005 is available on the <ulink
-        url="http://bbdev.fluffy.co.uk/svn/box/chris/win32/vc2005-compile-fixes/">Subversion
+        url="http://www.boxbackup.org/svn/box/chris/win32/vc2005-compile-fixes/">Subversion
         server</ulink>. However, this version has not been extensively tested
         and may be out of date.</para>
 
         <para>The changes are expected to be merged into the <ulink
-        url="http://bbdev.fluffy.co.uk/svn/box/trunk">Subversion trunk</ulink>
+        url="http://www.boxbackup.org/svn/box/trunk">Subversion trunk</ulink>
         at some point, and this page should then be updated. If in doubt,
         please sign up to the <ulink
         url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
@@ -652,7 +652,7 @@ nmake -f ms\ntdll.mak</programlisting>
         client for Windows</ulink>. After installing it, open a new command
         prompt, go to the base directory, and type:</para>
 
-        <programlisting>svn co http://bbdev.fluffy.co.uk/svn/box/chris/win32/vc2005-compile-fixes/ boxbackup</programlisting>
+        <programlisting>svn co http://www.boxbackup.org/svn/box/chris/win32/vc2005-compile-fixes/ boxbackup</programlisting>
 
         <para>This should create a directory called <emphasis
         role="bold">boxbackup</emphasis> inside the base directory.</para>
