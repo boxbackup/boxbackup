@@ -97,6 +97,11 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("ExtendedLogFile", 0),
 	// extended log to a file
 	ConfigurationVerifyKey("LogAllFileAccess", ConfigTest_IsBool, false),
+	// enable logging reasons why each file is backed up or not
+	ConfigurationVerifyKey("LogFile", 0),
+	// enable logging to a file
+	ConfigurationVerifyKey("LogFileLevel", 0),
+	// set the level of verbosity of file logging
 	ConfigurationVerifyKey("CommandSocket", 0),
 	// not compulsory to have this
 	ConfigurationVerifyKey("KeepAliveTime", ConfigTest_IsInt),
@@ -106,6 +111,9 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("NotifyScript", 0),
 	// optional script to run when backup needs attention, eg store full
 	
+	ConfigurationVerifyKey("NotifyAlways", ConfigTest_IsBool, false),
+	// option to disable the suppression of duplicate notifications
+
 	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists),
