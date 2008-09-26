@@ -69,7 +69,7 @@ BackupClientContext::BackupClientContext
 	  mStorageLimitExceeded(false),
 	  mpExcludeFiles(0),
 	  mpExcludeDirs(0),
-	  mKeepAliveTimer(0),
+	  mKeepAliveTimer(0, "KeepAliveTime"),
 	  mbIsManaged(false),
 	  mrProgressNotifier(rProgressNotifier)
 {
@@ -509,7 +509,7 @@ void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
 	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
 	BOX_TRACE("Set keep-alive time to " << mKeepAliveTime << " seconds");
-	mKeepAliveTimer = Timer(mKeepAliveTime);
+	mKeepAliveTimer = Timer(mKeepAliveTime, "KeepAliveTime");
 }
 
 // --------------------------------------------------------------------------
@@ -569,7 +569,7 @@ void BackupClientContext::DoKeepAlive()
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	mpConnection->QueryGetIsAlive();
 	
-	mKeepAliveTimer = Timer(mKeepAliveTime);
+	mKeepAliveTimer = Timer(mKeepAliveTime, "KeepAliveTime");
 }
 
 int BackupClientContext::GetMaximumDiffingTime() 
