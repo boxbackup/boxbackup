@@ -22,6 +22,7 @@
 #endif
 
 #include <errno.h>
+#include <stdarg.h>
 
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
@@ -232,7 +233,11 @@ int intercept_reterr()
 	}
 
 extern "C" int
-open(const char *path, int flags, mode_t mode)
+#ifdef DEFINE_ONLY_OPEN64
+	open64(const char *path, int flags, ...)
+#else
+	open(const char *path, int flags, ...)
+#endif // DEFINE_ONLY_OPEN64
 {
 	if(intercept_count > 0)
 	{
@@ -243,6 +248,15 @@ open(const char *path, int flags, mode_t mode)
 			errno = intercept_reterr();
 			return -1;
 		}
+	}
+
+	mode_t mode = 0;
+	if (flags & O_CREAT)
+	{
+		va_list ap;
+		va_start(ap, flags);
+		mode = va_arg(ap, mode_t);
+		va_end(ap);
 	}
 
 #ifdef PLATFORM_NO_SYSCALL
@@ -266,14 +280,27 @@ open(const char *path, int flags, mode_t mode)
 	return r;
 }
 
+#ifndef DEFINE_ONLY_OPEN64
 extern "C" int
-open64(const char *path, int flags, mode_t mode)
+// open64(const char *path, int flags, mode_t mode)
+// open64(const char *path, int flags, ...)
+open64 (__const char *path, int flags, ...)
 {
+	mode_t mode = 0;
+	if (flags & O_CREAT)
+	{
+		va_list ap;
+		va_start(ap, flags);
+		mode = va_arg(ap, mode_t);
+		va_end(ap);
+	}
+
 	// With _FILE_OFFSET_BITS set to 64 this should really use (flags |
 	// O_LARGEFILE) here, but not actually necessary for the tests and not
 	// worth the trouble finding O_LARGEFILE
 	return open(path, flags, mode);
 }
+#endif // !DEFINE_ONLY_OPEN64
 
 extern "C" int
 close(int d)
