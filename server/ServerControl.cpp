@@ -179,7 +179,7 @@ bool KillServer(int pid, bool WaitForProcess)
 		result = waitpid(pid, &status, 0);
 		if (result != pid)
 		{
-			BOX_WARNING("waitpid returned " << result);
+			BOX_LOG_SYS_ERROR("waitpid failed");
 		}
 		TEST_THAT(result == pid);
 
