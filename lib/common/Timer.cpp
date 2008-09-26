@@ -569,6 +569,7 @@ Timer& Timer::operator=(const Timer& rToCopy)
 
 	mExpires = rToCopy.mExpires;
 	mExpired = rToCopy.mExpired;
+	mName    = rToCopy.mName;
 
 	if (!mExpired && mExpires != 0)
 	{
