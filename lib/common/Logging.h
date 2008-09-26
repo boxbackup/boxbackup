@@ -15,6 +15,8 @@
 #include <sstream>
 #include <vector>
 
+#include "FileStream.h"
+
 /*
 #define BOX_LOG(level, stuff) \
 { \
@@ -115,6 +117,7 @@ class Logger
 	
 	public:
 	Logger();
+	Logger(Log::Level level);
 	virtual ~Logger();
 	
 	virtual bool Log(Log::Level level, const std::string& rFile, 
@@ -266,6 +269,26 @@ class Logging
 			Logging::SetProgramName(mOldTag);
 		}
 	};
+};
+
+class FileLogger : public Logger
+{
+	private:
+	FileStream mLogFile;
+	FileLogger(const FileLogger& forbidden)
+	: mLogFile("") { /* do not call */ }
+	
+	public:
+	FileLogger(const std::string& rFileName, Log::Level Level)
+	: Logger(Level),
+	  mLogFile(rFileName, O_WRONLY | O_CREAT | O_APPEND)
+	{ }
+	
+	virtual bool Log(Log::Level Level, const std::string& rFile, 
+		int Line, std::string& rMessage);
+	
+	virtual const char* GetType() { return "FileLogger"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 
 #endif // LOGGING__H
