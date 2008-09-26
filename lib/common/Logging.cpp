@@ -222,6 +222,12 @@ Logger::Logger()
 	Logging::Add(this);
 }
 
+Logger::Logger(Log::Level Level) 
+: mCurrentLevel(Level) 
+{
+	Logging::Add(this);
+}
+
 Logger::~Logger() 
 {
 	Logging::Remove(this);
@@ -399,4 +405,57 @@ void Syslog::SetProgramName(const std::string& rProgramName)
 	mName = rProgramName;
 	::closelog();
 	::openlog(mName.c_str(), LOG_PID, LOG_LOCAL6);
+}
+
+bool FileLogger::Log(Log::Level Level, const std::string& rFile, 
+	int line, std::string& rMessage)
+{
+	if (Level > GetLevel())
+	{
+		return true;
+	}
+	
+	/* avoid infinite loop if this throws an exception */
+	Logging::Remove(this);
+
+	std::ostringstream buf;
+	buf << FormatTime(GetCurrentBoxTime(), false);
+	buf << " ";
+
+	if (Level <= Log::FATAL)
+	{
+		buf << "[FATAL]   ";
+	}
+	else if (Level <= Log::ERROR)
+	{
+		buf << "[ERROR]   ";
+	}
+	else if (Level <= Log::WARNING)
+	{
+		buf << "[WARNING] ";
+	}
+	else if (Level <= Log::NOTICE)
+	{
+		buf << "[NOTICE]  ";
+	}
+	else if (Level <= Log::INFO)
+	{
+		buf << "[INFO]    ";
+	}
+	else if (Level <= Log::TRACE)
+	{
+		buf << "[TRACE]   ";
+	}
+
+	buf << rMessage << "\n";
+	std::string output = buf.str();
+
+	#ifdef WIN32
+		ConvertUtf8ToConsole(output.c_str(), output);
+	#endif
+
+	mLogFile.Write(output.c_str(), output.length());
+
+	Logging::Add(this);
+	return true;
 }
