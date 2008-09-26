@@ -463,11 +463,12 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 	BlocksAvailableEntry *pIndex, int64_t NumBlocks, 
 	int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES], DiffTimer *pDiffTimer)
 {
-	Timer maximumDiffingTime(0);
+	Timer maximumDiffingTime(0, "MaximumDiffingTime");
 
 	if(pDiffTimer && pDiffTimer->IsManaged())
 	{
-		maximumDiffingTime = Timer(pDiffTimer->GetMaximumDiffingTime());
+		maximumDiffingTime = Timer(pDiffTimer->GetMaximumDiffingTime(),
+			"MaximumDiffingTime");
 	}
 	
 	std::map<int64_t, int32_t> goodnessOfFit;
