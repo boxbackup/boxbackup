@@ -342,7 +342,8 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		return 2;
 	}
 
-	Logging::SetGlobalLevel((Log::Level)mLogLevel);
+	Logging::FilterConsole((Log::Level)mLogLevel);
+	Logging::FilterSyslog ((Log::Level)mLogLevel);
 
 	return Main(mConfigFileName);
 }
