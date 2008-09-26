@@ -1530,7 +1530,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 	{
 		rContext.UnManageDiffProcess();
 
-		if(e.GetType() == ConnectionException::ExceptionType && e.GetSubType() == ConnectionException::Protocol_UnexpectedReply)
+		if(e.GetType() == ConnectionException::ExceptionType &&
+			e.GetSubType() == ConnectionException::Protocol_UnexpectedReply)
 		{
 			// Check and see what error the protocol has,
 			// this is more useful to users than the exception.
@@ -1541,7 +1542,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 				&& subtype == BackupProtocolClientError::Err_StorageLimitExceeded)
 				{
 					// The hard limit was exceeded on the server, notify!
-					rParams.mrSysadminNotifier.NotifySysadmin(BackupDaemon::NotifyEvent_StoreFull);
+					rParams.mrSysadminNotifier.NotifySysadmin(
+						SysadminNotifier::StoreFull);
 					// return an error code instead of
 					// throwing an exception that we
 					// can't debug.

@@ -100,17 +100,7 @@ public:
 	int GetState() {return mState;}
 
 	// Allow other classes to call this too
-	enum
-	{
-		NotifyEvent_StoreFull = 0,
-		NotifyEvent_ReadError,
-		NotifyEvent_BackupError,
-		NotifyEvent_BackupStart,
-		NotifyEvent_BackupFinish,
-		NotifyEvent__MAX
-		// When adding notifications, remember to add strings to NotifySysadmin()
-	};
-	void NotifySysadmin(int Event);
+	void NotifySysadmin(SysadminNotifier::EventCode Event);
 
 private:
 	void Run2();
@@ -119,6 +109,8 @@ public:
 	void InitCrypto();
 	void RunSyncNowWithExceptionHandling();
 	void RunSyncNow();
+	void OnBackupStart();
+	void OnBackupFinish();
 
 private:
 	void DeleteAllLocations();
@@ -213,7 +205,7 @@ private:
 	CommandSocketInfo *mpCommandSocketInfo;
 	
 	// Stop notifications being repeated.
-	bool mNotificationsSent[NotifyEvent__MAX];
+	SysadminNotifier::EventCode mLastNotifiedEvent;
 
 	// Unused entries in the root directory wait a while before being deleted
 	box_time_t mDeleteUnusedRootDirEntriesAfter;	// time to delete them
