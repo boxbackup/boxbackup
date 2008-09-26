@@ -839,13 +839,15 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				if (pDirOnStore != 0 && en == 0)
 				{
 					doUpload = true;
-					BOX_TRACE(filename << ": will upload "
+					BOX_TRACE("Upload decision: " <<
+						filename << ": will upload "
 						"(not on server)");
 				}
 				else if (modTime >= rParams.mSyncPeriodStart)
 				{
 					doUpload = true;
-					BOX_TRACE(filename << ": will upload "
+					BOX_TRACE("Upload decision: " <<
+						filename << ": will upload "
 						"(modified since last sync)");
 				}
 			}
@@ -863,7 +865,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				> rParams.mMaxUploadWait)
 			{
 				doUpload = true;
-				BOX_TRACE(filename << ": will upload "
+				BOX_TRACE("Upload decision: " <<
+					filename << ": will upload "
 					"(continually modified)");
 			}
 
@@ -880,7 +883,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				en->GetModificationTime() != modTime)
 			{
 				doUpload = true;
-				BOX_TRACE(filename << ": will upload "
+				BOX_TRACE("Upload decision: " <<
+					filename << ": will upload "
 					"(mod time changed)");
 			}
 
@@ -892,23 +896,39 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				rParams.mUploadAfterThisTimeInTheFuture)
 			{
 				doUpload = true;
-				BOX_TRACE(filename << ": will upload "
+				BOX_TRACE("Upload decision: " <<
+					filename << ": will upload "
 					"(mod time in the future)");
 			}
 		}
 	
 		if (en != 0 && en->GetModificationTime() == modTime)
 		{
-			BOX_TRACE(filename << ": will not upload "
+			BOX_TRACE("Upload decision: " <<
+				filename << ": will not upload "
 				"(not modified since last upload)");
 		}
 		else if (!doUpload)
 		{
-			BOX_TRACE(filename << ": will not upload "
-				"(mod time is " << modTime << 
-				" which is outside sync window, "
-				<< rParams.mSyncPeriodStart << " to "
-				<< rParams.mSyncPeriodEnd << ")");
+			if (modTime > rParams.mSyncPeriodEnd)
+			{
+				box_time_t now = GetCurrentBoxTime();
+				int age = BoxTimeToSeconds(now -
+					modTime);
+				BOX_TRACE("Upload decision: " <<
+					filename << ": will not upload "
+					"(modified too recently: "
+					"only " << age << "seconds ago)");
+			}
+			else
+			{
+				BOX_TRACE("Upload decision: " <<
+					filename << ": will not upload "
+					"(mod time is " << modTime << 
+					" which is outside sync window, "
+					<< rParams.mSyncPeriodStart << " to "
+					<< rParams.mSyncPeriodEnd << ")");
+			}
 		}
 
 		bool fileSynced = true;
