@@ -123,6 +123,7 @@ BackupDaemon::BackupDaemon()
 	: mState(BackupDaemon::State_Initialising),
 	  mDeleteRedundantLocationsAfter(0),
 	  mpCommandSocketInfo(0),
+	  mLastNotifiedEvent(SysadminNotifier::MAX),
 	  mDeleteUnusedRootDirEntriesAfter(0),
 	  mClientStoreMarker(BackupClientContext::ClientStoreMarker_NotKnown),
 	  mStorageLimitExceeded(false),
@@ -148,12 +149,6 @@ BackupDaemon::BackupDaemon()
 	// Only ever one instance of a daemon
 	SSLLib::Initialise();
 	
-	// Initialise notification sent status
-	for(int l = 0; l < NotifyEvent__MAX; ++l)
-	{
-		mNotificationsSent[l] = false;
-	}
-
 	#ifdef WIN32
 		// Create the event object to signal from main thread to
 		// worker when new messages are queued to be sent to the
@@ -865,6 +860,8 @@ void BackupDaemon::Run2()
 
 void BackupDaemon::RunSyncNowWithExceptionHandling()
 {
+	OnBackupStart();
+
 	// Do sync
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
@@ -894,6 +891,9 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 		// need to be very careful
 		errorOccurred = true;
 	}
+
+	// do not retry immediately without a good reason
+	mDoSyncForcedByPreviousSyncError = false;
 	
 	if(errorOccurred)
 	{
@@ -925,28 +925,30 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 			BOX_NOTICE("Exception (" << errorCode
 				<< "/" << errorSubCode 
 				<< ") due to signal");
+			OnBackupFinish();
 			return;
 		}
+
+		NotifySysadmin(SysadminNotifier::BackupError);
 
 		// If the Berkely db files get corrupted,
 		// delete them and try again immediately.
 		if(isBerkelyDbFailure)
 		{
-			BOX_ERROR("Berkely db inode map files corrupted, deleting and restarting scan. Renamed files and directories will not be tracked until after this scan.");
+			BOX_ERROR("Berkely db inode map files corrupted, "
+				"deleting and restarting scan. Renamed files "
+				"and directories will not be tracked until "
+				"after this scan.");
 			::sleep(1);
 		}
 		else
 		{
 			// Not restart/terminate, pause and retry
 			// Notify administrator
-			NotifySysadmin(NotifyEvent_BackupError);
 			SetState(State_Error);
-			BOX_ERROR("Exception caught ("
-				<< errorString
-				<< " " << errorCode
-				<< "/" << errorSubCode
-				<< "), reset state and "
-				"waiting to retry...");
+			BOX_ERROR("Exception caught (" << errorString <<
+				" " << errorCode << "/" << errorSubCode <<
+				"), reset state and waiting to retry...");
 			::sleep(10);
 			mNextSyncTime = mCurrentSyncStartTime + 
 				SecondsToBoxTime(100) +
@@ -954,45 +956,29 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 		}
 	}
+	// Notify system administrator about the final state of the backup
+	else if(mReadErrorsOnFilesystemObjects)
+	{
+		NotifySysadmin(SysadminNotifier::ReadError);
+	}
+	else if(mStorageLimitExceeded)
+	{
+		NotifySysadmin(SysadminNotifier::StoreFull);
+	}
 	else
 	{
-		// Unset the read error flag, so the
-		// error is reported again if it
-		// happens again
-		mNotificationsSent[NotifyEvent_BackupError] = false;
+		NotifySysadmin(SysadminNotifier::BackupOK);
 	}
-
-	// If we were retrying after an error,
-	// now would be a good time to stop :-)
+	
+	// If we were retrying after an error, and this backup succeeded,
+	// then now would be a good time to stop :-)
 	mDoSyncForcedByPreviousSyncError = errorOccurred;
 
-	// Log the stats
-	BOX_NOTICE("File statistics: total file size uploaded "
-		<< BackupStoreFile::msStats.mBytesInEncodedFiles
-		<< ", bytes already on server "
-		<< BackupStoreFile::msStats.mBytesAlreadyOnServer
-		<< ", encoded size "
-		<< BackupStoreFile::msStats.mTotalFileStreamSize);
-	BackupStoreFile::ResetStats();
-
-	// Tell anything connected to the command socket
-	SendSyncStartOrFinish(false /* finish */);
-
-	// Touch a file to record times in filesystem
-	TouchFileInWorkingDir("last_sync_finish");
+	OnBackupFinish();
 }
 
 void BackupDaemon::RunSyncNow()
 {
-	// Touch a file to record times in filesystem
-	TouchFileInWorkingDir("last_sync_start");
-
-	// Tell anything connected to the command socket
-	SendSyncStartOrFinish(true /* start */);
-	
-	// Reset statistics on uploads
-	BackupStoreFile::ResetStats();
-	
 	// Delete the serialised store object file,
 	// so that we don't try to reload it after a
 	// partially completed backup
@@ -1011,14 +997,21 @@ void BackupDaemon::RunSyncNow()
 	// object file again.
 	mDeleteStoreObjectInfoFile = false;
 
-	// Notify administrator
-	NotifySysadmin(NotifyEvent_BackupStart);
-
-	// Set state and log start
-	SetState(State_Connected);
-	BOX_NOTICE("Beginning scan of local files");
-
 	const Configuration &conf(GetConfiguration());
+
+	std::auto_ptr<FileLogger> fileLogger;
+
+	if (conf.KeyExists("LogFile"))
+	{
+		Log::Level level = Log::INFO;
+		if (conf.KeyExists("LogFileLevel"))
+		{
+			level = Logging::GetNamedLevel(
+				conf.GetKeyValue("LogFileLevel"));
+		}
+		fileLogger.reset(new FileLogger(conf.GetKeyValue("LogFile"),
+			level));
+	}
 
 	std::string extendedLogFile;
 	if (conf.KeyExists("ExtendedLogFile"))
@@ -1122,18 +1115,13 @@ void BackupDaemon::RunSyncNow()
 	// use potentially extended end time
 	params.mMaxUploadWait = maxUploadWait;
 	params.mFileTrackingSizeThreshold = 
-		conf.GetKeyValueInt(
-		"FileTrackingSizeThreshold");
+		conf.GetKeyValueInt("FileTrackingSizeThreshold");
 	params.mDiffingUploadSizeThreshold = 
-		conf.GetKeyValueInt(
-		"DiffingUploadSizeThreshold");
+		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
 	params.mMaxFileTimeInFuture = 
-		SecondsToBoxTime(
-			conf.GetKeyValueInt(
-				"MaxFileTimeInFuture"));
+		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
 	mDeleteRedundantLocationsAfter =
-		conf.GetKeyValueInt(
-			"DeleteRedundantLocationsAfter");
+		conf.GetKeyValueInt("DeleteRedundantLocationsAfter");
 	mStorageLimitExceeded = false;
 	mReadErrorsOnFilesystemObjects = false;
 
@@ -1205,19 +1193,6 @@ void BackupDaemon::RunSyncNow()
 		clientContext.SetExcludeLists(0, 0);
 	}
 	
-	// Errors reading any files?
-	if(params.mReadErrorsOnFilesystemObjects)
-	{
-		// Notify administrator
-		NotifySysadmin(NotifyEvent_ReadError);
-	}
-	else
-	{
-		// Unset the read error flag, so the						// error is reported again if it
-		// happens again
-		mNotificationsSent[NotifyEvent_ReadError] = false;
-	}
-	
 	// Perform any deletions required -- these are
 	// delayed until the end to allow renaming to 
 	// happen neatly.
@@ -1244,46 +1219,11 @@ void BackupDaemon::RunSyncNow()
 	// Commit the ID Maps
 	CommitIDMapsAfterSync();
 
-	// Log
-	BOX_NOTICE("Finished scan of local files");
-
-	
-	// Errors reading any files?
-	if(mReadErrorsOnFilesystemObjects)
-	{
-		// Notify administrator
-		NotifySysadmin(NotifyEvent_ReadError);
-	}
-	else
-	{
-		// Unset the read error flag, so the
-		// error is reported again if it
-		// happens again
-		mNotificationsSent[NotifyEvent_ReadError] = false;
-	}
-	
-	// Check the storage limit
-	if(mStorageLimitExceeded)
-	{
-		// Tell the sysadmin about this
-		NotifySysadmin(NotifyEvent_StoreFull);
-	}
-	else
-	{
-		// unflag the storage full notify flag
-		// so that next time the store is full,
-		// an alert will be sent
-		mNotificationsSent[NotifyEvent_StoreFull] = false;
-	}
-	
 	// Calculate when the next sync run should be
 	mNextSyncTime = mCurrentSyncStartTime + 
 		mUpdateStoreInterval + 
 		Random::RandomInt(mUpdateStoreInterval >>
 		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
-
-	// Notify administrator
-	NotifySysadmin(NotifyEvent_BackupFinish);
 
 	// --------------------------------------------------------------------------------------------
 
@@ -1296,6 +1236,51 @@ void BackupDaemon::RunSyncNow()
 			mNextSyncTime);
 
 	// --------------------------------------------------------------------------------------------
+}
+
+void BackupDaemon::OnBackupStart()
+{
+	// Touch a file to record times in filesystem
+	TouchFileInWorkingDir("last_sync_start");
+
+	// Reset statistics on uploads
+	BackupStoreFile::ResetStats();
+	
+	// Tell anything connected to the command socket
+	SendSyncStartOrFinish(true /* start */);
+	
+	// Notify administrator
+	NotifySysadmin(SysadminNotifier::BackupStart);
+
+	// Set state and log start
+	SetState(State_Connected);
+	BOX_NOTICE("Beginning scan of local files");
+}
+
+void BackupDaemon::OnBackupFinish()
+{
+	// Log
+	BOX_NOTICE("Finished scan of local files");
+
+	// Notify administrator
+	NotifySysadmin(SysadminNotifier::BackupFinish);
+
+	// Tell anything connected to the command socket
+	SendSyncStartOrFinish(false /* finish */);
+
+	// Log the stats
+	BOX_NOTICE("File statistics: total file size uploaded "
+		<< BackupStoreFile::msStats.mBytesInEncodedFiles
+		<< ", bytes already on server "
+		<< BackupStoreFile::msStats.mBytesAlreadyOnServer
+		<< ", encoded size "
+		<< BackupStoreFile::msStats.mTotalFileStreamSize);
+
+	// Reset statistics again
+	BackupStoreFile::ResetStats();
+
+	// Touch a file to record times in filesystem
+	TouchFileInWorkingDir("last_sync_finish");
 }
 
 // --------------------------------------------------------------------------
@@ -2439,7 +2424,7 @@ void BackupDaemon::TouchFileInWorkingDir(const char *Filename)
 //		Created: 25/2/04
 //
 // --------------------------------------------------------------------------
-void BackupDaemon::NotifySysadmin(int Event)
+void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 {
 	static const char *sEventNames[] = 
 	{
@@ -2448,15 +2433,16 @@ void BackupDaemon::NotifySysadmin(int Event)
 		"backup-error",
 		"backup-start",
 		"backup-finish",
+		"backup-ok",
 		0
 	};
 
 	// BOX_TRACE("sizeof(sEventNames)  == " << sizeof(sEventNames));
 	// BOX_TRACE("sizeof(*sEventNames) == " << sizeof(*sEventNames));
 	// BOX_TRACE("NotifyEvent__MAX == " << NotifyEvent__MAX);
-	ASSERT((sizeof(sEventNames)/sizeof(*sEventNames)) == NotifyEvent__MAX + 1);
+	ASSERT((sizeof(sEventNames)/sizeof(*sEventNames)) == SysadminNotifier::MAX + 1);
 
-	if(Event < 0 || Event >= NotifyEvent__MAX)
+	if(Event < 0 || Event >= SysadminNotifier::MAX)
 	{
 		BOX_ERROR("BackupDaemon::NotifySysadmin() called for "
 			"invalid event code " << Event);
@@ -2467,14 +2453,16 @@ void BackupDaemon::NotifySysadmin(int Event)
 	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << 
 		sEventNames[Event]);
 
-	// Don't send lots of repeated messages
-	if(mNotificationsSent[Event] &&
-		Event != NotifyEvent_BackupStart &&
-		Event != NotifyEvent_BackupFinish)
+	if(!GetConfiguration().KeyExists("NotifyAlways") ||
+		!GetConfiguration().GetKeyValueBool("NotifyAlways"))
 	{
-		BOX_WARNING("Suppressing duplicate notification about " <<
-			sEventNames[Event]);
-		return;
+		// Don't send lots of repeated messages
+		if(mLastNotifiedEvent == Event)
+		{
+			BOX_WARNING("Suppressing duplicate notification about " <<
+				sEventNames[Event]);
+			return;
+		}
 	}
 
 	// Is there a notification script?
@@ -2482,8 +2470,8 @@ void BackupDaemon::NotifySysadmin(int Event)
 	if(!conf.KeyExists("NotifyScript"))
 	{
 		// Log, and then return
-		if(Event != NotifyEvent_BackupStart &&
-			Event != NotifyEvent_BackupFinish)
+		if(Event != SysadminNotifier::BackupStart &&
+			Event != SysadminNotifier::BackupFinish)
 		{
 			BOX_ERROR("Not notifying administrator about event "
 				<< sEventNames[Event] << " -- set NotifyScript "
@@ -2503,15 +2491,16 @@ void BackupDaemon::NotifySysadmin(int Event)
 	
 	// Then do it
 	int returnCode = ::system(script.c_str());
-	if (returnCode != 0)
+	if(returnCode != 0)
 	{
 		BOX_ERROR("Notify script returned error code: " <<
 			returnCode << " ('" << script << "')");
 	}
-
-	// Flag that this is done so the administrator isn't constantly
-	// bombarded with lots of errors
-	mNotificationsSent[Event] = true;
+	else if(Event != SysadminNotifier::BackupStart &&
+		Event != SysadminNotifier::BackupFinish)
+	{
+		mLastNotifiedEvent = Event;
+	}
 }
 
 

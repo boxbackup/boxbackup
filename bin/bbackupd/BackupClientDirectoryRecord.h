@@ -36,7 +36,22 @@ class SysadminNotifier
 {
 	public:
 	virtual ~SysadminNotifier() { }
-	virtual void NotifySysadmin(int Event) = 0;
+
+	typedef enum
+	{
+		StoreFull = 0,
+		ReadError,
+		BackupError,
+		BackupStart,
+		BackupFinish,
+		BackupOK,
+		MAX
+		// When adding notifications, remember to add
+		// strings to NotifySysadmin()
+	}
+	EventCode;
+
+	virtual void NotifySysadmin(EventCode Event) = 0;
 };
 
 // --------------------------------------------------------------------------
@@ -194,7 +209,7 @@ public:
 		bool mHaveLoggedWarningAboutFutureFileTimes;
 	
 		bool StopRun() { return mrRunStatusProvider.StopRun(); }
-		void NotifySysadmin(int Event) 
+		void NotifySysadmin(SysadminNotifier::EventCode Event) 
 		{ 
 			mrSysadminNotifier.NotifySysadmin(Event); 
 		}
