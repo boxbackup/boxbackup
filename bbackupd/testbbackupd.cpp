@@ -705,11 +705,11 @@ int start_internal_daemon()
 	TEST_EQUAL(0, result, "Daemon exit code");
 	
 	// ensure that no child processes end up running tests!
-	TEST_EQUAL(own_pid, getpid(), "Forking test problem");
 	if (getpid() != own_pid)
 	{
 		// abort!
-		_exit(1);
+		BOX_INFO("Daemon child finished, exiting now.");
+		_exit(0);
 	}
 
 	TEST_THAT(TestFileExists("testfiles/bbackupd.pid"));
@@ -743,7 +743,7 @@ int start_internal_daemon()
 
 bool stop_internal_daemon(int pid)
 {
-	bool killed_server = KillServer(pid, true);
+	bool killed_server = KillServer(pid, false);
 	TEST_THAT(killed_server);
 	return killed_server;
 }
@@ -892,9 +892,8 @@ int test_bbackupd()
 		TEST_THAT(::system("gzip -d < testfiles/spacetest1.tgz "
 			"| ( cd testfiles/TestDir1 && tar xf - )") == 0);
 	#endif
-	
-#if 1
-// #ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+
+#ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	printf("\n==== Skipping intercept-based KeepAlive tests "
 		"on this platform.\n");
 #else
@@ -2548,7 +2547,7 @@ int test_bbackupd()
 			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") 
 				> 1024);
 		}
-	
+
 		// wait for backup daemon to do it's stuff, and compare again
 		wait_for_backup_operation();
 		compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
