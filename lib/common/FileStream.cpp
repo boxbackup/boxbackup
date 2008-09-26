@@ -262,6 +262,7 @@ void FileStream::Write(const void *pBuffer, int NBytes)
 #else
 	if(::write(mOSFileHandle, pBuffer, NBytes) != NBytes)
 	{
+		BOX_LOG_SYS_ERROR("Failed to write to file: " << mFileName);
 		THROW_EXCEPTION(CommonException, OSFileWriteError)
 	}
 #endif
