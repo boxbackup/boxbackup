@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<refentry>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
   <refmeta>
     <refentrytitle>bbackupctl</refentrytitle>
 
@@ -9,139 +15,169 @@
   <refnamediv>
     <refname>bbackupctl</refname>
 
-    <refpurpose>Control the bbackupd daemon </refpurpose>
+    <refpurpose>Contol the Box Backup client daemon</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>bbackupctl [-q] [-c config-file] command</command>
+      <command>bbackupctl</command>
+
+      <arg>-q</arg>
+
+      <arg>-c config-file</arg>
+
+      <arg choice="plain">command</arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
   <refsection>
     <title>Description</title>
 
-    <para><literal>bbackupctl</literal> lets the user control the bbackupd
-    daemon on a client machine. The main use is to force a sync with the store
-    server. This is especially important if bbackupd(8) is configured to do
-    snapshot backups. In that case <literal>bbackupctl</literal> is the only
-    way to effect a backup.</para>
+    <para><command>bbackupctl</command> sends commands to a running
+    <command>bbackupd</command> daemon on a client machine. It can be used to
+    force an immediate backup, tell the daemon to reload its configuration
+    files or stop the daemon. If <command>bbackupd</command> is configured in
+    snapshot mode, it will not back up automatically, and the
+    <command>bbackupctl</command> must be used to tell it when to start a
+    backup.</para>
 
     <para>Communication with the bbackupd daemon takes place over a local
-    socket. Some platforms (notably Windows) can't determine if the user
-    connecting on this socket has the correct credentials to execute the
-    commands, leaving a rather sizeable security hole open. To avoid this,
-    unset the CommandSocket parameter in <literal>bbackupd.conf</literal>(5).
-    That disables the command socket, so bbackupd is secure. This does,
-    however, render bbackupctl unusable.</para>
+    socket (not over the network). Some platforms (notably Windows) can't
+    determine if the user connecting on this socket has the correct
+    credentials to execute the commands. On these platforms, ANY local user
+    can interfere with bbackupd. To avoid this, remove the CommandSocket
+    option from bbackupd.conf, which will also disable bbackupctl. See the
+    Client Configuration page for more information.</para>
 
-    <refsection>
-      <title>Options</title>
+    <para><command>bbackupctl</command> needs to read the
+    <command>bbackupd</command> configuration file to find out the name of the
+    CommandSocket. If you have to tell <command>bbackupd</command> where to
+    find the configuration file, you will have to tell
+    <command>bbackupctl</command> as well. The default on Unix systems is
+    usually <filename>/etc/box/bbackupd.conf</filename>. On Windows systems,
+    it is <filename>bbackupd.conf</filename> in the same directory where
+    <command>bbackupd.exe</command> is located. If
+    <command>bbackupctl</command> cannot find or read the configuration file,
+    it will log an error message and exit.</para>
 
-      <itemizedlist>
+    <para><command>bbackupctl</command> usually writes error messages to the
+    console and the system logs. If it is not doing what you expect, please
+    check these outputs first of all.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><option>-q</option></term>
+
         <listitem>
-          <para>-q -- quiet. Do not output status messages.</para>
+          <para>Run in quiet mode.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-c</option> config-file</term>
 
         <listitem>
-          <para>-c config_file -- Use a different config file from the default
-          one. Can be a full or a relative path.</para>
+          <para>Specify configuration file.</para>
         </listitem>
-      </itemizedlist>
-    </refsection>
+      </varlistentry>
+    </variablelist>
 
     <refsection>
       <title>Commands</title>
 
       <para>The following commands are available in bbackupctl:</para>
 
-      <itemizedlist>
-        <listitem>
-          <para><literal>terminate</literal></para>
+      <variablelist>
+        <varlistentry>
+          <term><command>terminate</command></term>
 
-          <para>This command stops the bbackupd server. This is the equivalent
-          of killing (kill -KILL) the bbackupd process.</para>
-        </listitem>
+          <listitem>
+            <para>This command cleanly shuts down <command>bbackupd</command>.
+            This is better than killing or terminating it any other
+            way.</para>
+          </listitem>
+        </varlistentry>
 
-        <listitem>
-          <para><literal>reload</literal></para>
+        <varlistentry>
+          <term><command>reload</command></term>
 
-          <para>Causes the bbackupd daemon to re-read all its configuration
-          files. Equivalent to kill -HUP.</para>
-        </listitem>
+          <listitem>
+            <para>Causes the <command>bbackupd</command> daemon to re-read all
+            its configuration files. Equivalent to <command>kill
+            -HUP</command>.</para>
+          </listitem>
+        </varlistentry>
 
-        <listitem>
-          <para><literal>sync</literal></para>
+        <varlistentry>
+          <term><command>sync</command></term>
 
-          <para>Initiates a backup to the store of whatever needs to be backed
-          up.</para>
-        </listitem>
-      </itemizedlist>
+          <listitem>
+            <para>Initiates a backup. If no files need to be backed up, no
+            connection will be made to the server.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>force-sync</command></term>
+
+          <listitem>
+            <para>Initiates a backup, even if the
+            <varname>SyncAllowScript</varname> says that no backup should run
+            now.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>wait-for-sync</command></term>
+
+          <listitem>
+            <para>Passively waits until the next backup starts of its own
+            accord, and then terminates.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>wait-for-end</command></term>
+
+          <listitem>
+            <para>Passively waits until the next backup starts of its own
+            accord and finishes, and then terminates.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>sync-and-wait</command></term>
+
+          <listitem>
+            <para>Initiates a backup, waits for it to finish, and then
+            terminates.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
     </refsection>
-  </refsection>
-
-  <refsection>
-    <title>Author</title>
-
-    <para>Ben Summers and contributors. For help, please go to the <ulink
-    url="http://www.boxbackup.org/trac/">Wiki</ulink>, or subscribe to the Box
-    Backup <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list.</ulink></para>
-  </refsection>
-
-  <refsection>
-    <title>See Also</title>
-
-    <para><literal>bbackupd.conf(5)</literal></para>
-
-    <para><literal>bbackupd(8)</literal></para>
   </refsection>
 
   <refsection>
     <title>Files</title>
 
-    <para><literal>bbackupctl</literal> uses the Box Backup client
-    configuration file, usually located in
-    <filename>/etc/box/bbackupd.conf</filename>. On Windows this file is
-    usually located in the installation directory, and is named
-    <filename>bbackupd.conf</filename> as well.</para>
+    <para><filename>/etc/box/bbackupd.conf</filename></para>
   </refsection>
 
   <refsection>
-    <title>Bugs</title>
+    <title>See Also</title>
 
-    <para>If you find a bug in Box Backup, and you want to let us know about
-    it, join the <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list</ulink>, and send a description of the problem there.</para>
+    <para><citerefentry>
+        <refentrytitle>bbackupd.conf</refentrytitle>
 
-    <para>To report a bug, give us at least the following information:</para>
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupd-config</refentrytitle>
 
-    <itemizedlist>
-      <listitem>
-        <para>The version of Box Backup you are running</para>
-      </listitem>
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupctl</refentrytitle>
 
-      <listitem>
-        <para>The platform you are running on (Hardware and OS), for both
-        client and server.</para>
-      </listitem>
-
-      <listitem>
-        <para>If possible attach your config files (bbstored.conf,
-        bbackupd.conf) to the bug report.</para>
-      </listitem>
-
-      <listitem>
-        <para>Also attach any log file output that helps shed light on the
-        problem you are seeing.</para>
-      </listitem>
-
-      <listitem>
-        <para>And last but certainly not least, a description of what you are
-        seeing, in as much detail as possible.</para>
-      </listitem>
-    </itemizedlist>
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
   </refsection>
 </refentry>

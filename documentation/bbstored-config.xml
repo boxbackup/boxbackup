@@ -1,68 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<refentry>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
   <refmeta>
     <refentrytitle>bbstored-config</refentrytitle>
 
     <manvolnum>8</manvolnum>
+
+    <refmiscinfo>Box Backup 0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>
     <refname>bbstored-config</refname>
 
-    <refpurpose>Create config files for bbstored</refpurpose>
+    <refpurpose>Box Backup store daemon configuration file
+    generator</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>bbstored-config &lt;configdir&gt; &lt;servername&gt;
-      &lt;username&gt;</command>
+      <command>bbstored-config</command>
+
+      <arg choice="plain">configdir</arg>
+
+      <arg choice="plain">servername</arg>
+
+      <arg choice="plain">username</arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
   <refsection>
     <title>Description</title>
 
-    <para>The <literal>bbstored-config</literal> script creates config files
-    and server certificates for a bbstored instance. It takes three
-    parameters:</para>
+    <para>The bbstored-config script creates configuration files and server
+    certificates for a bbstored instance. It takes three parameters</para>
+
+    <variablelist>
+      <varlistentry>
+        <term>configdir</term>
+
+        <listitem>
+          <para>The directory where config files will reside. A
+          <filename>bbstored</filename> subdirectory will be created where
+          several config files will reside. The
+          <filename>bbstored.conf</filename> file will be created in
+          <varname>configdir</varname>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>servername</term>
+
+        <listitem>
+          <para>The name of the server that is being configured. Usually the
+          fully qualified domain name of the machine in question.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>username</term>
+
+        <listitem>
+          <para>The name of the user that should be running the
+          <command>bbstored</command> process. Recommended name:
+          _bbstored.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>A valid <citerefentry>
+        <refentrytitle>raidfile.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry> must be found in configdir. Several steps are taken
+    during the run of <command>bbstored-config</command>:</para>
 
     <itemizedlist>
-      <listitem>
-        <para><literal>configdir</literal>: The directory where config files
-        will reside. A subdirectory bbstored will be created, where several
-        config files will reside. the <literal>bbstored.conf</literal> file
-        will be created in <literal>configdir</literal>.</para>
-      </listitem>
-
-      <listitem>
-        <para><literal>servername</literal>: The name of the server that is
-        being configured. Usually the fully qualified domain name of the
-        machine in question.</para>
-      </listitem>
-
-      <listitem>
-        <para><literal>username</literal>: The name of the user that should be
-        running the bbstored processes. Recommended name:
-        _<literal>bbstored.</literal></para>
-      </listitem>
-    </itemizedlist>
-
-    <para>A valid raidfile.conf(5) must be found in configdir. Several steps
-    are taken during the run of bbstored-config:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para>Configuration files are created.</para>
-      </listitem>
-
       <listitem>
         <para>Server certificates are created. This requires interaction from
         the operator.</para>
       </listitem>
 
       <listitem>
-        <para>The raid volumes are checked, to ensure that the configuration
-        is consistent, and will work.</para>
+        <para>The RAID volumes are checked to ensure that the configuration is
+        consistent and will work.</para>
       </listitem>
 
       <listitem>
@@ -74,67 +99,46 @@
   </refsection>
 
   <refsection>
-    <title>Author</title>
+    <title>Files</title>
 
-    <para>Ben Summers and contributors. For help, please go to the <ulink
-    url="http://www.boxbackup.org/trac/">Wiki</ulink>, or subscribe to the Box
-    Backup <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list.</ulink></para>
+    <para><filename>/etc/box/bbstored.conf</filename></para>
   </refsection>
 
   <refsection>
     <title>See Also</title>
 
-    <para><literal>raidfile-config(8)</literal></para>
+    <para><citerefentry>
+        <refentrytitle>bbstored.conf</refentrytitle>
 
-    <para><literal>bbstored.conf(5)</literal></para>
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored</refentrytitle>
 
-    <para><literal>raidfile.conf(5)</literal></para>
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored-certs</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>raidfile-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
   </refsection>
 
   <refsection>
-    <title>Files</title>
+    <title>Authors</title>
 
-    <para><literal>bbstoreaccounts</literal> uses the Box Backup server
-    configuration file, usually located in
-    <filename>/etc/box/bbstored.conf</filename>.</para>
-  </refsection>
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
 
-  <refsection>
-    <title>Bugs</title>
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
 
-    <para>If you find a bug in Box Backup, and you want to let us know about
-    it, join the <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list</ulink>, and send a description of the problem there.</para>
-
-    <para>To report a bug, give us at least the following information:</para>
-
-    <itemizedlist>
-      <listitem>
-        <para>The version of Box Backup you are running</para>
-      </listitem>
-
-      <listitem>
-        <para>The platform you are running on (hardware and OS), for both
-        client and server.</para>
-      </listitem>
-
-      <listitem>
-        <para>If possible attach your config files (bbstored.conf,
-        bbackupd.conf) to the bug report.</para>
-      </listitem>
-
-      <listitem>
-        <para>Also attach any log file output that helps shed light on the
-        problem you are seeing.</para>
-      </listitem>
-
-      <listitem>
-        <para>And last but certainly not least, a description of what you are
-        seeing, in as much detail as possible.</para>
-      </listitem>
-    </itemizedlist>
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
   </refsection>
 </refentry>

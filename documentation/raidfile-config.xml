@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<refentry>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
   <refmeta>
     <refentrytitle>raidfile-config</refentrytitle>
 
     <manvolnum>8</manvolnum>
+
+    <refmiscinfo>Box Backup 0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>
@@ -14,8 +22,13 @@
 
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>raidfile-config &lt;configdir&gt; &lt;blocksize&gt;
-      &lt;dir1&gt; [&lt;dir2&gt; &lt;dir3&gt;]</command>
+      <command>raidfile-config</command>
+
+      <arg choice="plain">config-dir</arg>
+
+      <arg choice="plain">blocksize</arg>
+
+      <arg choice="plain">dir1 <arg>dir2 <arg>dir3</arg></arg></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
@@ -27,81 +40,75 @@
     Backup supports userland RAID, in a restricted RAID5 configuration, where
     3 and only 3 'drives' are supported. You can read more about RAID5 (and
     other RAID-levels) <ulink
-    url="http://en.wikipedia.org/wiki/Redundant_array_of_independent_disks#RAID_5">here</ulink>.
-    </para>
+    url="http://en.wikipedia.org/wiki/Redundant_array_of_independent_disks#RAID_5">here</ulink>.</para>
 
     <refsection>
       <title>Parameters</title>
 
       <para>The parameters are as follows:</para>
 
-      <itemizedlist>
-        <listitem>
-          <para><literal>configdir</literal>: The directory path where
-          configuration files are located. Usually this is
-          <literal>/etc/box</literal>. <literal>raidfile.conf</literal> will
-          be written in this directory.</para>
-        </listitem>
+      <variablelist>
+        <varlistentry>
+          <term><varname>config-dir</varname></term>
 
-        <listitem>
-          <para><literal>blocksize</literal>: The block size used for file
-          storage in the system, in bytes. Using a multiple of the file system
-          block size is a good strategy. Depending on the size of the files
-          you will be backing up, this multiple varies. Of course it also
-          depends on the native block size of your file system.</para>
-        </listitem>
+          <listitem>
+            <para>The directory path where configuration files are located.
+            Usually this is <filename>/etc/box</filename>.
+            <filename>raidfile.conf</filename> will be written in this
+            directory.</para>
+          </listitem>
+        </varlistentry>
 
-        <listitem>
-          <para><literal>dir1</literal>: The first directory in the built-in
-          RAID array.</para>
-        </listitem>
+        <varlistentry>
+          <term><varname>blocksize</varname></term>
 
-        <listitem>
-          <para><literal>dir2</literal>: The second directory in the built-in
-          RAID array. If you are not using the built-in RAID functionality,
-          this field should be ignored. You should not use the built-in RAID,
-          when you have a hardware RAID solution, or if you're using another
-          type of software RAID (like md on Linux).</para>
-        </listitem>
+          <listitem>
+            <para>The block size used for file storage in the system, in
+            bytes. Using a multiple of the file system block size is a good
+            strategy. Depending on the size of the files you will be backing
+            up, this multiple varies. Of course it also depends on the native
+            block size of your file system.</para>
+          </listitem>
+        </varlistentry>
 
-        <listitem>
-          <para><literal>dir3</literal>: The third directory in the built-in
-          RAID array. The same notes that apply to <literal>dir2</literal>
-          also apply to <literal>dir3</literal>.</para>
-        </listitem>
-      </itemizedlist>
+        <varlistentry>
+          <term><varname>dir1</varname></term>
+
+          <listitem>
+            <para>The first directory in the built-in RAID array.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><varname>dir2</varname></term>
+
+          <listitem>
+            <para>The second directory in the built-in RAID array. If you are
+            not using the built-in RAID functionality, this field should be
+            ignored. You should not use the built-in RAID if you have a
+            hardware RAID solution or if you're using another type of software
+            RAID (like md on Linux).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><varname>dir3</varname></term>
+
+          <listitem>
+            <para>The third directory in the built-in RAID array. The same
+            notes that apply to <varname>dir2</varname> also apply to
+            <varname>dir3</varname>.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
 
       <para>Note that there are currently no way to add multiple disk sets to
-      the raidfile.conf file using command line tools, etc. See
-      raidfile.conf(5) for details on adding more disks</para>
+      the raidfile.conf file using command line tools, etc. See <citerefentry>
+          <refentrytitle>raidfile.conf</refentrytitle>
+
+          <manvolnum>5</manvolnum>
+        </citerefentry> for details on adding more disks.</para>
     </refsection>
-  </refsection>
-
-  <refsection>
-    <title>Author</title>
-
-    <para>Ben Summers and contributors. For help, please go to the <ulink
-    url="http://www.boxbackup.org/trac/">Wiki</ulink>, or subscribe to the Box
-    Backup <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list.</ulink></para>
-  </refsection>
-
-  <refsection>
-    <title>See Also</title>
-
-    <para><literal>bbstored-config(8)</literal></para>
-
-    <para><literal>bbstored.conf(5)</literal></para>
-
-    <para><literal>raidfile.conf(5)</literal></para>
-  </refsection>
-
-  <refsection>
-    <title>Files</title>
-
-    <para><literal>raidfile-config</literal> generates the raidfile.conf(5)
-    file.</para>
   </refsection>
 
   <refsection>
@@ -139,5 +146,49 @@
         seeing, in as much detail as possible.</para>
       </listitem>
     </itemizedlist>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><command>raidfile-config</command> generates the <citerefentry>
+        <refentrytitle>raidfile.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry> file.</para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbstored-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>raidfile.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
   </refsection>
 </refentry>
