@@ -77,11 +77,15 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 				toRead = mBytesLeftInCurrentBlock;
 			}
 			
+			BOX_TRACE("Reading " << toRead << " bytes from stream");
+	
 			// Read it
 			int r = mrSource.Read(((uint8_t*)pBuffer) + read, toRead, Timeout);
 			// Give up now if it didn't return anything
 			if(r == 0)
 			{
+				BOX_TRACE("Read " << r << " bytes from "
+					"stream, returning");
 				return read;
 			}
 			
@@ -92,6 +96,8 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// stop now if the stream returned less than we asked for -- avoid blocking
 			if(r != toRead)
 			{
+				BOX_TRACE("Read " << r << " bytes from "
+					"stream, returning");
 				return read;
 			}
 		}
@@ -102,6 +108,9 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 			if(mrSource.Read(&header, 1, Timeout) == 0)
 			{
 				// Didn't get the byte, return now
+				BOX_TRACE("Read 0 bytes of block header, "
+					"returning with " << read << " bytes "
+					"read this time");
 				return read;
 			}
 			
@@ -110,6 +119,8 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 			{
 				// All done.
 				mFinished = true;
+				BOX_TRACE("Stream finished, returning with " <<
+					read << " bytes read this time");
 				return read;
 			}
 			else if(header <= Protocol::ProtocolStreamHeader_MaxEncodedSizeValue)
@@ -127,6 +138,9 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 				// Bad. It used the reserved values.
 				THROW_EXCEPTION(ServerException, ProtocolUncertainStreamBadBlockHeader)	
 			}
+
+			BOX_TRACE("Next block has " <<
+				mBytesLeftInCurrentBlock << "bytes");
 		}
 	}
 
