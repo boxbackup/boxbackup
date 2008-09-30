@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbackupd.conf</refentrytitle>
+
+    <manvolnum>5</manvolnum>
+
+    <refmiscinfo>Box Backup 0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbackupd.conf</refname>
+
+    <refpurpose>Box Backup client daemon configuration file</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>/etc/box/bbackupd.conf</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <variablelist>
+      <varlistentry>
+        <term><varname>AccountNumber</varname></term>
+
+        <listitem>
+          <para>The account number of this client. This is set by the admin of
+          the store server.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>UpdateStoreInterval</varname></term>
+
+        <listitem>
+          <para>Specifies the interval between scanning of the local discs. To
+          avoid cycles of load on the server, this time is randomly adjusted
+          by a small percentage as the daemon runs. Defaults to 1 hour.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>MinimumFileAge</varname></term>
+
+        <listitem>
+          <para>Specifies how long since a file was last modified before it
+          will be uploaded. Defaults to 6 hours.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>MaxUploadWait</varname></term>
+
+        <listitem>
+          <para>If a file is repeatedly modified it won't be uploaded
+          immediately in case it's modified again. However it should be
+          uploaded eventually. This is how long we should wait after first
+          noticing a change. Defaults to 1 day.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>MaxFileTimeInFuture</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>AutomaticBackup</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>SyncAllowScript</varname></term>
+
+        <listitem>
+          <para>Use this to temporarily stop bbackupd from syncronising or
+          connecting to the store. This specifies a program or script script
+          which is run just before each sync, and ideally the full path to the
+          interpreter. It will be run as the same user bbackupd is running as,
+          usually root.</para>
+
+          <para>The script prints either "now" or a number to STDOUT (and a
+          terminating newline, no quotes). If the result was "now", then the
+          sync will happen. If it's a number, then the script will be asked
+          again in that number of seconds.</para>
+
+          <para>For example, you could use this on a laptop to only backup
+          when on a specific network. </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>MaximumDiffingTime</varname></term>
+
+        <listitem>
+          <para>How much time should be spent on diffing files.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>DeleteRedundantLocationsAfter</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>FileTrackingSizeThreshold</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>DiffingUploadSizeThreshold</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>StoreHostname</varname></term>
+
+        <listitem>
+          <para>The hostname or IP address of the <citerefentry>
+              <refentrytitle>bbstored</refentrytitle>
+
+              <manvolnum>8</manvolnum>
+            </citerefentry> server.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>StorePort</varname></term>
+
+        <listitem>
+          <para>The port used by the server. Defaults to 2201.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>ExtendedLogging</varname></term>
+
+        <listitem>
+          <para>Logs everything that happens between the client and server.
+          The <citerefentry>
+              <refentrytitle>bbackupd</refentrytitle>
+
+              <manvolnum>8</manvolnum>
+            </citerefentry> client must also be started with
+          <option>-V</option>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>ExtendedLogFile</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>LogAllFileAccess</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>LogFile</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>LogFileLevel</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>CommandSocket</varname></term>
+
+        <listitem>
+          <para>Where the command socket is created in the filesystem.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>KeepAliveTime</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>StoreObjectInfoFile</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>NotifyScript</varname></term>
+
+        <listitem>
+          <para>The location of the script which runs at certain events. This
+          script is generated by <citerefentry>
+              <refentrytitle>bbackupd-config</refentrytitle>
+
+              <manvolnum>8</manvolnum>
+            </citerefentry>. Defaults to
+          <filename>/etc/box/bbackupd/NotifySysAdmin.sh</filename>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>NotifyAlways</varname></term>
+
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>CertificateFile</varname></term>
+
+        <listitem>
+          <para>The path to the client's public certificate.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>PrivateKeyFile</varname></term>
+
+        <listitem>
+          <para>The path to the client's private key. This should only be
+          readable by root.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>TrustedCAsFile</varname></term>
+
+        <listitem>
+          <para>The Certificate Authority created by <citerefentry>
+              <refentrytitle>bbstored-certs</refentrytitle>
+
+              <manvolnum>8</manvolnum>
+            </citerefentry>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>KeysFile</varname></term>
+
+        <listitem>
+          <para>The data encryption key. This <emphasis
+          role="bold">must</emphasis> be kept safe at all costs, your data is
+          useless without it!</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>DataDirectory</varname></term>
+
+        <listitem>
+          <para>A directory to keep temporary state files. This is usually
+          something like <filename>/var/bbackupd</filename>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>Server</varname></term>
+
+        <listitem>
+          <para>This section relates to the running daemon.</para>
+
+          <para><variablelist>
+              <varlistentry>
+                <term><varname>PidFile</varname></term>
+
+                <listitem>
+                  <para>The location of the process ID file. Defaults to
+                  <filename>/var/run/bbackupd.pid</filename>.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>BackupLocations</varname></term>
+
+        <listitem>
+          <para>This section defines each directory to be backed up. Each
+          entry must have at least a Path entry and, optionally, include and
+          exclude directives.</para>
+
+          <para>Multiple include and exclude directives may appear.</para>
+
+          <para><variablelist>
+              <varlistentry>
+                <term><varname>Path</varname></term>
+
+                <listitem>
+                  <para>The path to back up.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>ExcludeFile</varname></term>
+
+                <listitem>
+                  <para>Exclude a single file.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>ExcludeFilesRegex</varname></term>
+
+                <listitem>
+                  <para>Exclude multiple files based on a regular expression.
+                  See <citerefentry>
+                      <refentrytitle>re_format</refentrytitle>
+
+                      <manvolnum>7</manvolnum>
+                    </citerefentry>.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>ExcludeDir</varname></term>
+
+                <listitem>
+                  <para>Exclude a single directory.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>ExcludeDirsRegex</varname></term>
+
+                <listitem>
+                  <para>Exclude multiple directories based on a regular
+                  expression. See <citerefentry>
+                      <refentrytitle>re_format</refentrytitle>
+
+                      <manvolnum>7</manvolnum>
+                    </citerefentry>.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>AlwaysIncludeFile</varname></term>
+
+                <listitem>
+                  <para>Include a single file from a directory which has been
+                  excluded.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>AlwaysIncludeFilesRegex</varname></term>
+
+                <listitem>
+                  <para>Include multiple files from an excluded directory,
+                  based on a regular expression.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>AlwaysIncludeDir</varname></term>
+
+                <listitem>
+                  <para>Include a single directory from a directory which has
+                  been excluded.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>AlwaysIncludeDirsRegex</varname></term>
+
+                <listitem>
+                  <para>Include multiple directories from an excluded
+                  directory, based on a regular expression.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist></para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <para>The following is an example of a backup location:</para>
+
+    <programlisting>home
+{
+   Path = /home
+   ExcludeDir = /home/guest
+   ExcludeDir = /home/[^/]+/tmp
+   ExcludeFilesRegex = .*\.(mp3|MP3)$
+   AlwaysIncludeFile = /home/someuser/importantspeech.mp3
+}</programlisting>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbackupd.conf</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbackupd</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupd-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupctl</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>

@@ -1,27 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<refentry>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
   <refmeta>
     <refentrytitle>bbackupquery</refentrytitle>
 
     <manvolnum>8</manvolnum>
+
+    <refmiscinfo class="manual">Box Backup 0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>
     <refname>bbackupquery</refname>
 
-    <refpurpose>Box Backup store query and retrieval</refpurpose>
+    <refpurpose>Box Backup store query and file retrieval</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>bbackupquery [-q] [-c configfile] [commands ...]</command>
+      <command>bbackupquery</command>
+
+      <arg>-q</arg>
+
+      <arg>-c configfile</arg>
+
+      <arg>command ...</arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
   <refsection>
     <title>Description</title>
 
-    <para><literal>bbackupquery</literal> is the main way of interacting with
+    <para><command>bbackupquery</command> is the main way of interacting with
     the backup store from a Box Backup client machine. It supports both
     interactive and batch modes of operation.</para>
 
@@ -29,152 +43,233 @@
     store, getting status from the store server. The main use is to retrieve
     files and directories when needed.</para>
 
-    <para><literal>bbackupquery</literal> supports interactive and batch modes
+    <para><command>bbackupquery</command> supports interactive and batch modes
     of operation. Interactive mode allows for interaction with the server much
     like an interactive FTP client.</para>
 
     <para>Batch mode is invoked by putting commands into the invocation of
-    bbackupquery. Example:</para>
+    <command>bbackupquery</command>. Example:</para>
 
-    <programlisting>bbackupquery "list home-dirs" quit</programlisting>
+    <para><programlisting>bbackupquery "list home-dirs" quit</programlisting></para>
 
     <para>Note that commands that contain spaces are enclosed in double
-    quotes. If the <literal>quit</literal> command is omitted, after the
-    preceding commands are completed, <literal>bbackupquery</literal> will
+    quotes. If the <command>quit</command> command is omitted, after the
+    preceding commands are completed, <command>bbackupquery</command> will
     enter interactive mode.</para>
+  </refsection>
 
-    <para><emphasis role="bold">Options</emphasis></para>
+  <refsection>
+    <title>Options</title>
 
-    <para><emphasis>-q: Quiet. Suppresses status output while
-    running.</emphasis></para>
+    <para><variablelist>
+        <varlistentry>
+          <term><option>-q</option></term>
 
-    <para><emphasis>-c configfile: Use config file, instead of the default
-    bbackupd.conf file. Can be a relative or full path.</emphasis></para>
+          <listitem>
+            <para>Quiet. Suppresses status output while running.</para>
+          </listitem>
+        </varlistentry>
 
-    <refsection>
-      <title>Commands</title>
+        <varlistentry>
+          <term><option>-c</option> <option>configfile</option></term>
 
-      <para>The commands that can be used in <literal>bbackupquery</literal>
-      are listed below.</para>
+          <listitem>
+            <para>Use configfile instead of the default bbackupd.conf file.
+            Can be a relative or full path.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist></para>
+  </refsection>
 
-      <itemizedlist>
+  <refsection>
+    <title>Commands</title>
+
+    <para>The commands that can be used in bbackupquery are listed
+    below.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><command>help</command></term>
+
         <listitem>
-          <para><literal>help</literal></para>
-
           <para>Displays the basic help message, which gives information about
-          the commands available in bbackupquery. Use the form <literal>help
-          command</literal>, to get help on a specific command.</para>
+          the commands available in <command>bbackupquery</command>. Use the
+          form <command>help command</command> to get help on a specific
+          command.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>quit</command></term>
 
         <listitem>
-          <para><literal>quit</literal></para>
-
           <para>End the session with the store server, and quit
-          <literal>bbackupquery</literal>.</para>
+          bbackupquery.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>cd</command> <optional>options</optional>
+        <varname>directory-name</varname></term>
 
         <listitem>
-          <para><literal>cd [options] &lt;directory-name&gt;</literal></para>
+          <para>Change directory. Options: <variablelist>
+              <varlistentry>
+                <term><option>-d</option></term>
 
-          <para>Change directory. Options:</para>
+                <listitem>
+                  <para>consider deleted directories for traversal</para>
+                </listitem>
+              </varlistentry>
 
-          <itemizedlist>
-            <listitem>
-              <para><literal>-d</literal> -- consider deleted directories for
-              traversal</para>
-            </listitem>
+              <varlistentry>
+                <term><option>-o</option></term>
 
-            <listitem>
-              <para><literal>-o</literal> -- consider old versions of
-              directories for traversal. This option should never be useful in
-              a correctly formed store.</para>
-            </listitem>
-          </itemizedlist>
+                <listitem>
+                  <para>consider old versions of directories for traversal.
+                  This option should never be useful in a correctly formed
+                  store.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist></para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>lcd</command>
+        <varname>local-directory-name</varname></term>
 
         <listitem>
-          <para><literal>lcd &lt;local-directory-name&gt;</literal></para>
-
           <para>Change directory on the client machine. To list the contents
-          of the local directory, type <literal>sh ls</literal> (on unix-like
-          machines). TODO: Does <literal>sh dir</literal> work on
-          Windows?</para>
+          of the local directory, type <command>sh ls</command> (on Unix-like
+          machines).</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>list</command> <optional>options</optional>
+        <optional>directory-name</optional></term>
 
         <listitem>
-          <para><literal>list [options] [directory-name]</literal></para>
+          <para>The list (or its synonym <command>ls</command>) command lists
+          the content of the current, or specified, directory. The options are
+          as follows:</para>
 
-          <para>The <literal>list</literal> (or its synonym
-          <literal>ls</literal>) command lists the content of the current, or
-          specified, directory. The options are as follows:</para>
+          <para><variablelist>
+              <varlistentry>
+                <term><option>-r</option></term>
 
-          <itemizedlist>
-            <listitem>
-              <para><literal>-r</literal> -- recursively list all files</para>
-            </listitem>
+                <listitem>
+                  <para>recursively list all files</para>
+                </listitem>
+              </varlistentry>
 
-            <listitem>
-              <para><literal>-d</literal> -- list deleted files and
-              directories</para>
-            </listitem>
+              <varlistentry>
+                <term><option>-d</option></term>
 
-            <listitem>
-              <para><literal>-o</literal> -- list old versions of files and
-              directories</para>
-            </listitem>
+                <listitem>
+                  <para>list deleted files and directories</para>
+                </listitem>
+              </varlistentry>
 
-            <listitem>
-              <para><literal>-I</literal> -- don't display object IDs</para>
-            </listitem>
+              <varlistentry>
+                <term><option>-o</option></term>
 
-            <listitem>
-              <para><literal>-F</literal> -- don't display flags</para>
-            </listitem>
+                <listitem>
+                  <para>list old versions of files and directories</para>
+                </listitem>
+              </varlistentry>
 
-            <listitem>
-              <para><literal>-t</literal> -- show file modification time (and
-              attr mod time, if the object has attributes.</para>
-            </listitem>
+              <varlistentry>
+                <term><option>-I</option></term>
 
-            <listitem>
-              <para><literal>-s</literal> -- show file size in blocks used on
-              server. Note that this is only a very approximate indication of
-              local file size.</para>
-            </listitem>
-          </itemizedlist>
+                <listitem>
+                  <para>don't display object IDs</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><option>-F</option></term>
+
+                <listitem>
+                  <para>don't display flags</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><option>-t</option></term>
+
+                <listitem>
+                  <para>show file modification time (and attr mod time, if the
+                  object has attributes).</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><option>-s</option></term>
+
+                <listitem>
+                  <para>show file size in blocks used on server. Note that
+                  this is only a very approximate indication of local file
+                  size.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist></para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>ls</command> <optional>options</optional>
+        <optional>directory-name</optional></term>
 
         <listitem>
-          <para><literal>ls [options] [directory-name]</literal></para>
-
-          <para>Synonym for <literal>list</literal>.</para>
+          <para>Synonym for <command>list</command>.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>pwd</command></term>
 
         <listitem>
-          <para><literal><literal>pwd</literal></literal></para>
-
           <para>Print current directory, always relative to the backup store
           root.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>sh</command> <varname>shell-command</varname></term>
 
         <listitem>
-          <para><literal>sh &lt;shell command&gt;</literal></para>
-
           <para>Everything after the sh is passed to a shell and run. All
           output from the command is displayed in the client.</para>
 
           <para>Example: to list the contents of the current directory on the
-          client machine type <literal>sh ls</literal>.</para>
+          client machine type <command>sh ls</command>.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>compare -a</command></term>
 
         <listitem>
-          <para><literal>compare -a</literal></para>
+          <para></para>
+        </listitem>
+      </varlistentry>
 
-          <para><literal>compare -l &lt;location-name&gt;</literal></para>
+      <varlistentry>
+        <term><command>compare -l</command>
+        <varname>location-name</varname></term>
 
-          <para><literal>compare &lt;store-dir-name&gt;
-          &lt;local-dir-name&gt;</literal></para>
+        <listitem>
+          <para></para>
+        </listitem>
+      </varlistentry>
 
+      <varlistentry>
+        <term><command>compare</command> <varname>store-dir-name</varname>
+        <varname>local-dir-name</varname></term>
+
+        <listitem>
           <para>Compare the current data in the store with the data on the
           disc. Please note that all the data will be downloaded from the
           store, so this can be a very lengthy process depending on the size
@@ -182,172 +277,180 @@
 
           <para>Options:</para>
 
-          <itemizedlist>
-            <listitem>
-              <para><literal>-a</literal> -- compare all locations. </para>
-            </listitem>
-
-            <listitem>
-              <para><literal>-l</literal> -- compare one backup location as
-              specified in the configuration file. This compares one of the
-              top level store directories.</para>
-            </listitem>
-
-            <listitem>
-              <para><literal>-c</literal> -- set return code. The return code
-              is set to the following values, if <literal>quit</literal> is
-              the next command. So, if another command is run after the
-              <literal>compare</literal>, the return code will not refer to
-              the <literal>compare</literal>. This option is very useful for
-              automating compares. Return code values:</para>
-
-              <itemizedlist>
-                <listitem>
-                  <para>1 -- no differences were found</para>
-                </listitem>
+          <para><variablelist>
+              <varlistentry>
+                <term><option>-a</option></term>
 
                 <listitem>
-                  <para>2 -- differences were found</para>
+                  <para>compare all locations.</para>
                 </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><option>-l</option></term>
 
                 <listitem>
-                  <para>3 -- an error occured</para>
+                  <para>compare one backup location as specified in the
+                  configuration file. This compares one of the top level store
+                  directories.</para>
                 </listitem>
-              </itemizedlist>
-            </listitem>
-          </itemizedlist>
+              </varlistentry>
+
+              <varlistentry>
+                <term><option>-c</option></term>
+
+                <listitem>
+                  <para>set return code. The return code is set to the
+                  following values, if quit is the next command. So, if
+                  another command is run after the compare, the return code
+                  will not refer to the compare. This option is very useful
+                  for automating compares. Return code values:<itemizedlist>
+                      <listitem>
+                        <para><option>1</option> -- no differences were
+                        found</para>
+                      </listitem>
+
+                      <listitem>
+                        <para><option>2</option> -- differences were
+                        found</para>
+                      </listitem>
+
+                      <listitem>
+                        <para><option>3</option> -- an error occured</para>
+                      </listitem>
+                    </itemizedlist></para>
+                </listitem>
+              </varlistentry>
+            </variablelist></para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>get</command> <varname>object-filename</varname>
+        <optional>local-filename</optional></term>
 
         <listitem>
-          <para><literal>get &lt;object-filename&gt;
-          [&lt;local-filename&gt;]</literal></para>
+          <para></para>
+        </listitem>
+      </varlistentry>
 
-          <para><literal>get -i &lt;object-id&gt;
-          &lt;local-filename&gt;</literal></para>
+      <varlistentry>
+        <term><command>get -i</command> <varname>object-id</varname>
+        <varname>local-filename</varname></term>
 
+        <listitem>
           <para>Gets a file from the store. Object is specified as the
           filename within the current directory. Local filename is optional.
           Ignores old and deleted files when searching the directory for the
           file to retrieve.</para>
 
-          <para>To get an old or deleted file, use the <literal>-i</literal>
+          <para>To get an old or deleted file, use the <option>-i</option>
           option and select the object as a hex object ID (first column in
           listing). The local filename must be specified.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>getobject</command> <varname>object-id</varname>
+        <varname>local-filename</varname></term>
 
         <listitem>
-          <para><literal>getobject &lt;object-id&gt;
-          &lt;local-filename&gt;</literal></para>
-
           <para>Gets the object specified by the object id (in hex) and stores
-          the raw contents in the local file specified. <emphasis
-          role="bold">Note</emphasis>: This is only useful for debugging as it
-          does not decode files from the stored format, which is encrypted and
-          compressed.</para>
+          the raw contents in the local file specified. Note: This is only
+          useful for debugging as it does not decode files from the stored
+          format, which is encrypted and compressed.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>restore</command> <optional>-d</optional>
+        <varname>directory-name</varname>
+        <varname>local-directory-name</varname></term>
 
         <listitem>
-          <para><literal>restore [-d] &lt;directory-name&gt;
-          &lt;local-directory-name&gt;</literal></para>
+          <para></para>
+        </listitem>
+      </varlistentry>
 
-          <para><literal>restore -r</literal></para>
+      <varlistentry>
+        <term><command>restore -r</command></term>
 
+        <listitem>
           <para>Restores a directory to the local disc. The local directory
           specified must not exist (unless a previous restore is being
           restarted). The root cannot be restored -- restore locations
-          individually. </para>
+          individually.</para>
 
           <para>Options:</para>
 
-          <itemizedlist>
-            <listitem>
-              <para><literal>-d</literal> -- restore a deleted
-              directory</para>
-            </listitem>
+          <para><variablelist>
+              <varlistentry>
+                <term><option>-d</option></term>
 
-            <listitem>
-              <para><literal>-r</literal> -- resume an interrupted
-              restore</para>
-            </listitem>
-          </itemizedlist>
+                <listitem>
+                  <para>restore a deleted directory</para>
+                </listitem>
+              </varlistentry>
 
-          <para> If a restore operation is interrupted for any reason, it can
-          be restarted using the <literal>-r</literal> switch. Restore
-          progress information is saved in a file at regular intervals during
-          the restore operation to allow restarts.</para>
+              <varlistentry>
+                <term><option>-r</option></term>
+
+                <listitem>
+                  <para>resume an interrupted restore</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>If a restore operation is interrupted for any
+          reason, it can be restarted using the <option>-r</option> switch.
+          Restore progress information is saved in a file at regular intervals
+          during the restore operation to allow restarts.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><command>usage</command></term>
 
         <listitem>
-          <para>usage</para>
-
           <para>Show space used on the server for this account. Display
-          fields:</para>
+          fields:<itemizedlist>
+              <listitem>
+                <para><property>Used</property>: Total amount of space used on
+                the server</para>
+              </listitem>
 
-          <itemizedlist>
-            <listitem>
-              <para><literal>Used</literal>: Total amount of space used on the
-              server</para>
-            </listitem>
+              <listitem>
+                <para><property>Old files</property>: Space used by old
+                files</para>
+              </listitem>
 
-            <listitem>
-              <para><literal>Old files</literal>: Space used by old
-              files</para>
-            </listitem>
+              <listitem>
+                <para><property>Deleted files</property>: Space used by
+                deleted files</para>
+              </listitem>
 
-            <listitem>
-              <para><literal>Deleted files</literal>: Space used by deleted
-              files</para>
-            </listitem>
+              <listitem>
+                <para><property>Directories</property>: Space used by the
+                directory structure</para>
+              </listitem>
+            </itemizedlist></para>
 
-            <listitem>
-              <para><literal>Directories</literal>: Space used by the
-              directory structure</para>
-            </listitem>
-          </itemizedlist>
-
-          <para>When Used exceeds the soft limit, the server will start to
-          remove old and deleted files until the usage drops below the soft
-          limit. After a while, you should expect to see the usage stay at
-          just below the soft limit. You only need more space if the space
-          used by old and deleted files is near zero.</para>
+          <para>When <property>Used</property> exceeds the soft limit, the
+          server will start to remove old and deleted files until the usage
+          drops below the soft limit. After a while, you should expect to see
+          the usage stay at just below the soft limit. You only need more
+          space if the space used by old and deleted files is near
+          zero.</para>
         </listitem>
-      </itemizedlist>
-    </refsection>
-  </refsection>
-
-  <refsection>
-    <title>Author</title>
-
-    <para>Ben Summers and contributors. For help, please go to the <ulink
-    url="http://www.boxbackup.org/trac/">Wiki</ulink>, or subscribe to the Box
-    Backup <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list.</ulink></para>
-  </refsection>
-
-  <refsection>
-    <title>See Also</title>
-
-    <para>bbackupd.conf(5)</para>
-  </refsection>
-
-  <refsection>
-    <title>Files</title>
-
-    <para><literal>bbackupquery</literal> uses the Box Backup client
-    configuration file, usually located in
-    <filename>/etc/box/bbackupd.conf</filename>. On Windows this file is
-    usually located in the installation directory, and is named
-    <filename>bbackupd.conf</filename> as well.</para>
+      </varlistentry>
+    </variablelist>
   </refsection>
 
   <refsection>
     <title>Bugs</title>
 
-    <para>If you find a bug in Box Backup, and you want to let us know about
-    it, join the <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list</ulink>, and send a description of the problem there.</para>
+    <para>If you find a bug in Box Backup and you want to let us know about
+    it, join the <link
+    xlink:href="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
+    list</link> and send us a description of the problem there.</para>
 
     <para>To report a bug, give us at least the following information:</para>
 
@@ -376,5 +479,21 @@
         seeing, in as much detail as possible.</para>
       </listitem>
     </itemizedlist>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
   </refsection>
 </refentry>
