@@ -749,8 +749,10 @@ void Protocol::SendStream(IOStream &rStream)
 			}
 			
 			// Send final byte to finish the stream
+			BOX_TRACE("Sending end of stream byte");
 			uint8_t endOfStream = ProtocolStreamHeader_EndOfStream;
 			mrStream.Write(&endOfStream, 1);
+			BOX_TRACE("Sent end of stream byte");
 		}
 		catch(...)
 		{
@@ -788,6 +790,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	// Quick sanity check
 	if(BytesInBlock == 0)
 	{
+		BOX_TRACE("Zero size block, not sending anything");
 		return 0;
 	}
 	
@@ -813,6 +816,8 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 		}
 	}
 	ASSERT(header > 0);
+	BOX_TRACE("Sending header byte " << header << " plus " << writeSize <<
+		" bytes to stream");
 	
 	// Store the header
 	Block[-1] = header;
@@ -820,6 +825,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	// Write everything out
 	mrStream.Write(Block - 1, writeSize + 1);
 	
+	BOX_TRACE("Sent " << (writeSize+1) << " bytes to stream");
 	// move the remainer to the beginning of the block for the next time round
 	if(writeSize != BytesInBlock)
 	{
