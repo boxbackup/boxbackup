@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbackupd</refentrytitle>
+
+    <manvolnum>8</manvolnum>
+
+    <refmiscinfo>Box Backup 0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbackupd</refname>
+
+    <refpurpose>Box Backup client daemon</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>bbackupd</command>
+
+      <arg>-DFkqvVT</arg>
+
+      <arg>-c config-file</arg>
+
+      <arg>-t tag</arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para><command>bbackupd</command> runs on client computers in the
+    background, finding new files to back up. When it is time for a backup,
+    <command>bbackupd</command> will connect to the server
+    (<command>bbstored</command>) to upload the files.</para>
+
+    <para>A running <command>bbackupd</command> daemon can be controlled with
+    the <command>bbackupctl</command> command, to make it shut down, reload
+    its configuration, or start an immediate backup.</para>
+
+    <para><command>bbackupd</command> needs to be configured to tell it which
+    files to back up, how often, and to which server (running
+    <command>bbstored</command>). See the Client Configuration page for more
+    information. For this, you must write a configuration file. You must
+    either place it in the default location, or tell
+    <command>bbackupd</command> where to find it.</para>
+
+    <para>You can check the default location with the <option>-h</option>
+    option. The default on Unix systems is usually
+    <filename>/etc/box/bbackupd.conf</filename>. On Windows systems, it is
+    <filename>bbackupd.conf</filename> in the same directory where
+    <command>bbackupd.exe</command> is located. If bbackupd cannot find or
+    read the configuration file, it will log an error message and exit.</para>
+
+    <para><command>bbackupd</command> usually writes log messages to the
+    system logs, using the facility <function>local5</function>, which you can
+    use to filter them to send them to a separate file. It can also write them
+    to the console, see options below. If <command>bbackupd</command> is not
+    doing what you expect, please check the logs first of all.</para>
+
+    <refsection>
+      <title>Options</title>
+
+      <variablelist>
+        <varlistentry>
+          <term><option>-c</option> config-file</term>
+
+          <listitem>
+            <para>Use the specified configuration file. If <option>-c</option>
+            is omitted, the last argument is the configuration file. If none
+            is specified, the default is used (see above).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-D</option></term>
+
+          <listitem>
+            <para>Debugging mode. Do not fork into the background (do not run
+            as a daemon). Not available on Windows.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-F</option></term>
+
+          <listitem>
+            <para>No-fork mode. Same as <option>-D</option> for bbackupd. Not
+            available on Windows.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-k</option></term>
+
+          <listitem>
+            <para>Keep console open after fork, keep writing log messages to
+            it. Not available on Windows.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-q</option></term>
+
+          <listitem>
+            <para>Run more quietly. Reduce verbosity level by one. Available
+            levels are <varname>NOTHING</varname>, <varname>FATAL</varname>,
+            <varname>ERROR</varname>, <varname>WARNING</varname>,
+            <varname>NOTICE</varname>, <varname>INFO</varname>,
+            <varname>TRACE</varname>, <varname>EVERYTHING</varname>. Default
+            level is <varname>NOTICE</varname> in non-debugging builds. Use
+            once to drop to <varname>WARNING</varname> level, twice for
+            <varname>ERROR</varname> level, four times for no logging at
+            all.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>-v</term>
+
+          <listitem>
+            <para>Run more verbosely. Increase verbosity level by one. Use
+            once to raise to <varname>INFO</varname> level, twice for
+            <varname>TRACE</varname> level, three times for
+            <varname>EVERYTHING</varname> (currently the same as
+            <varname>TRACE</varname>).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-V</option></term>
+
+          <listitem>
+            <para>Run at maximum verbosity (<varname>EVERYTHING</varname>
+            level).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-t</option> tag</term>
+
+          <listitem>
+            <para>Tag each console message with specified marker. Mainly
+            useful in testing when running multiple daemons on the same
+            console.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>-T</option></term>
+
+          <listitem>
+            <para>Timestamp each line of console output.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+    </refsection>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbackupd.conf</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbackupd.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupd-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupctl</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Author</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>

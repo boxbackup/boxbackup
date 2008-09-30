@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbackupd-config</refentrytitle>
+
+    <manvolnum>8</manvolnum>
+
+    <refmiscinfo>Box Backup 0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbackupd-config</refname>
+
+    <refpurpose>Box Backup client daemon configuration file
+    generator</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>bbackupd-config</command>
+
+      <arg choice="plain">config-dir</arg>
+
+      <arg choice="plain">backup-mode</arg>
+
+      <arg choice="plain">account-num</arg>
+
+      <arg choice="plain">server-hostname</arg>
+
+      <arg choice="plain">working-dir</arg>
+
+      <arg choice="plain">backup-dir</arg>
+
+      <arg choice="opt">backup-dir ...</arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>The bbackupd-config script creates configuration files and client
+    certificates. It takes at least six parameters:</para>
+
+    <variablelist>
+      <varlistentry>
+        <term>config-dir</term>
+
+        <listitem>
+          <para>Configuration directory. Usually
+          <filename>/etc/box</filename>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>backup-mode</term>
+
+        <listitem>
+          <para>Either lazy or snapshot.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>account-num</term>
+
+        <listitem>
+          <para>The client account number. This is set by the bbstored
+          administrator.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>server-hostname</term>
+
+        <listitem>
+          <para>The hostname or IP address of the bbstored server.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>working-dir</term>
+
+        <listitem>
+          <para>A directory to keep temporary state files. This is usually
+          something like <filename>/var/bbackupd</filename>. This can be
+          changed in <filename>bbackupd.conf</filename> later on if
+          required.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>backup-dir</term>
+
+        <listitem>
+          <para>A space-separated list of directories to be backed up. Note
+          that this <emphasis>does not</emphasis> traverse mount
+          points.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbackupd.conf</filename></para>
+
+    <para><filename>/etc/box/bbackupd/NotifySysAdmin.sh</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbackupd.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupd</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupctl</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>

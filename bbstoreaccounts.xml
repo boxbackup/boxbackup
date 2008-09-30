@@ -1,44 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<refentry>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
   <refmeta>
     <refentrytitle>bbstoreaccounts</refentrytitle>
 
     <manvolnum>8</manvolnum>
+
+    <refmiscinfo>Box Backup 0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>
     <refname>bbstoreaccounts</refname>
 
-    <refpurpose>View and change account information on the store
-    server</refpurpose>
+    <refpurpose>Box Backup store accounts manager</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>bbstoreaccounts [-c configfile] command account_id
-      [command-specific arguments]</command>
+      <command>bbstoreaccounts</command>
+
+      <arg>-c config-file</arg>
+
+      <arg choice="plain">command</arg>
+
+      <arg choice="plain">account-id</arg>
+
+      <arg>command-specific arguments</arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
   <refsection>
     <title>Description</title>
 
-    <para><literal>bbstoreaccounts</literal> is the tool for managing accounts
+    <para><command>bbstoreaccounts</command> is the tool for managing accounts
     on the store server. It can be used to view information related to
     accounts, as well as create, change and delete accounts on the store
-    server. </para>
+    server.</para>
 
-    <para><literal>bbstoreaccounts</literal> always takes at least 2
+    <para><command>bbstoreaccounts</command> always takes at least 2
     parameters: the command name and the account ID. Some commands require
     additional parameters, and some commands have optional parameters.</para>
 
     <refsection>
       <title>Options</title>
 
-      <para><literal>-c &lt;configfile&gt;</literal></para>
+      <para><variablelist>
+          <varlistentry>
+            <term><option>-c config-file</option></term>
 
-      <para>The configfile to use for connecting to the store. Default is
-      <literal>/etc/box/bbstored.conf</literal>.</para>
+            <listitem>
+              <para>The configfile to use for connecting to the store. Default
+              is <filename>/etc/box/bbstored.conf</filename>.</para>
+            </listitem>
+          </varlistentry>
+        </variablelist></para>
     </refsection>
 
     <refsection>
@@ -46,73 +66,102 @@
 
       <para>The commands tells bbstoreaccounts what action to perform.</para>
 
-      <itemizedlist>
-        <listitem>
-          <para><literal>check &lt;account-id&gt; [fix]</literal></para>
-
-          <para>The <literal>check</literal> command verifies the integrity of
-          the store account given, and optionally fixes any corruptions.
-          <emphasis role="bold">Note</emphasis>: It is recommended to run the
-          'simple' check command (without <literal>fix</literal>) before using
-          the <literal>fix</literal> option, This gives an overview of the
-          extent of any problems, before attempting to fix them.</para>
-        </listitem>
-
-        <listitem>
-          <para><literal>create &lt;account-id&gt; &lt;discset&gt;
-          &lt;softlimit&gt; &lt;hardlimit&gt;</literal></para>
-
-          <para>Creates a new store account with the parameters given. The
-          parameters are as follows:</para>
-
-          <itemizedlist>
-            <listitem>
-              <para><literal>account-id</literal>: the ID of the new account
-              to be created. A 32-bit hexadecimal number. Cannot already exist
-              on the server.</para>
-            </listitem>
+      <para><variablelist>
+          <varlistentry>
+            <term><command>check</command> <varname>account-id</varname>
+            <optional>fix</optional></term>
 
             <listitem>
-              <para><literal>discset</literal>: the disc set from
-              raidfile.conf(5) where the backups for this client will be
-              stored.. A number. Each RAID-file set has a number in
-              raidfile.conf. This number is what's used.</para>
+              <para>The <command>check</command> command verifies the
+              integrity of the store account given, and optionally fixes any
+              corruptions. <emphasis role="bold">Note</emphasis>: It is
+              recommended to run the 'simple' check command (without
+              <command>fix</command>) before using the <command>fix</command>
+              option. This gives an overview of the extent of any problems,
+              before attempting to fix them.</para>
             </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><command>create</command> <varname>account-id</varname>
+            <varname>disc-set</varname> <varname>soft-limit</varname>
+            <varname>hard-limit</varname></term>
 
             <listitem>
-              <para><literal>softlimit</literal>: The soft limit is the amount
-              of storage that the server will guarantee to be available for
-              storage.</para>
+              <para>Creates a new store account with the parameters given. The
+              parameters are as follows:</para>
+
+              <para><variablelist>
+                  <varlistentry>
+                    <term><option>account-id</option></term>
+
+                    <listitem>
+                      <para>The ID of the new account to be created. A 32-bit
+                      hexadecimal number. Cannot already exist on the
+                      server.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><option>disc-set</option></term>
+
+                    <listitem>
+                      <para>The disc set from <citerefentry>
+                          <refentrytitle>raidfile.conf</refentrytitle>
+
+                          <manvolnum>5</manvolnum>
+                        </citerefentry> where the backups for this client will
+                      be stored. A number. Each RAID-file set has a number in
+                      raidfile.conf. This number is what's used.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><option>soft-limit</option></term>
+
+                    <listitem>
+                      <para>The soft limit is the amount of storage that the
+                      server will guarantee to be available for
+                      storage.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><option>hard-limit</option></term>
+
+                    <listitem>
+                      <para>The amount of storage that the the server will
+                      allow, before rejecting uploads, and starting to
+                      eliminate old and deleted files to get back down to
+                      soft-limit.</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist></para>
             </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><command>delete</command> <varname>account-id</varname>
+            <optional>yes</optional></term>
 
             <listitem>
-              <para><literal>hardlimit</literal>: The amount of storage that
-              the the server will allow, before rejecting uploads, and
-              starting to eliminate old and deleted files to get back down to
-              <literal>softlimit</literal>. </para>
+              <para>Deletes the account from the store server completely.
+              Removes all backups and deletes all references to the account in
+              the config files.</para>
+
+              <para><command>delete</command> will ask for confirmation from
+              the user, when called. Using the <option>yes</option> flag,
+              eliminates that need. This is useful when deleting accounts from
+              within a script or some other automated means. 0</para>
             </listitem>
-          </itemizedlist>
-        </listitem>
+          </varlistentry>
 
-        <listitem>
-          <para><literal>delete &lt;account-id&gt; [yes]</literal></para>
+          <varlistentry>
+            <term><command>info</command> <varname>account-id</varname></term>
 
-          <para>Deletes the account from the store server completely. Removes
-          all backups and deletes all references to the account in the config
-          files.</para>
-
-          <para><literal>delete</literal> will ask for confirmation from the
-          user, when called. Using the <literal>yes</literal> flag, eliminates
-          that need. This is useful when deleting accounts from within a
-          script or some other automated means.</para>
-        </listitem>
-
-        <listitem>
-          <para><literal>info &lt;account-id&gt;</literal></para>
-
-          <para>Display information about the given account. Example:</para>
-
-          <programlisting>[root]# bbstoreaccounts info 1
+            <listitem>
+              <para>Display information about the given account.
+              Example:<programlisting>[root]# bbstoreaccounts info 1
                   Account ID: 00000001
               Last object ID: 58757
                  Blocks used: 9864063 (38531.50Mb)
@@ -121,170 +170,213 @@ Blocks used by deleted files: 34025 (132.91Mb)
   Blocks used by directories: 6679 (26.09Mb)
             Block soft limit: 11796480 (46080.00Mb)
             Block hard limit: 13107200 (51200.00Mb)
-         Client store marker: 1139559852000000 </programlisting>
+         Client store marker: 1139559852000000</programlisting></para>
 
-          <para>Explanation:</para>
+              <para>Explanation:</para>
 
-          <itemizedlist>
-            <listitem>
-              <para>Account ID: The account ID being displayed.</para>
+              <para><variablelist>
+                  <varlistentry>
+                    <term>Account ID</term>
+
+                    <listitem>
+                      <para>The account ID being displayed.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Last Object ID</term>
+
+                    <listitem>
+                      <para>A counter that keeps track of the objects that
+                      have been backed up. This number refers to the last file
+                      that was written to the store. The ID is displayed as a
+                      decimal number, and the object ID can be converted to a
+                      path name to a file as follows: convert the number to
+                      hex (e.g.: 58757 =&gt; 0xE585); The last backed up file
+                      will be (relative from the client's store root):
+                      <filename>e5/o85.rfw</filename>. Longer numbers infer
+                      more directories in the structure, so as an example
+                      3952697264 as the last object ID gives 0xEB995FB0, which
+                      translates to a backup pathname of
+                      <filename>eb/99/5f/ob0.rfw</filename>.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Blocks used</term>
+
+                    <listitem>
+                      <para>The number of blocks used by the store. The size
+                      in Mb depends on the number of blocks, as well as the
+                      block size for the disc set given in <citerefentry>
+                          <refentrytitle>raidfile.conf</refentrytitle>
+
+                          <manvolnum>5</manvolnum>
+                        </citerefentry>. In this case the block size is
+                      4096.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Blocks used by old files</term>
+
+                    <listitem>
+                      <para>The number of blocks occupied by files that have
+                      newer versions in the store. This data is at risk for
+                      being removed during housekeeping.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Blocks used by deleted files</term>
+
+                    <listitem>
+                      <para>The number of blocks used by files that have been
+                      deleted on the client. This data is at risk for being
+                      removed during housekeeping.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Blocks used by directories</term>
+
+                    <listitem>
+                      <para>The number of blocks used by directories in the
+                      store.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Block soft limit</term>
+
+                    <listitem>
+                      <para>The soft limit in blocks. The soft limit is the
+                      maximum guaranteed storage space available to the
+                      account. When housekeeping starts, and the old and
+                      deleted files are removed, they are removed in
+                      chronological order (oldest first), until the data used
+                      is less than the soft limit.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Block hard limit</term>
+
+                    <listitem>
+                      <para>The hard limit in blocks. The hard limit is the
+                      most amount of storage the server will allow in an
+                      account. Any data above this amount will be rejected.
+                      Housekeeping will reduce the storage use, so more data
+                      can be uploaded.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Client store marker</term>
+
+                    <listitem>
+                      <para><citerefentry>
+                          <refentrytitle>bbstored</refentrytitle>
+
+                          <manvolnum>8</manvolnum>
+                        </citerefentry> uses this number to determine if it
+                      needs to rescan the entire store. If this number is
+                      different from the last time it checked, a rescan will
+                      take place.</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist></para>
             </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><command>setlimit</command> <varname>account-id</varname>
+            <varname>soft-limit</varname> <varname>hard-limit</varname></term>
 
             <listitem>
-              <para>Last Object ID: A counter that keeps track of the objects
-              that have been backed up. This number refers to the last file
-              that was written to the store. The ID is displayed as a decimal
-              number, and the object ID can be converted to a path name to a
-              file as follows: convert the number to hex (e.g.: 58757 =&gt;
-              0xE585); The last backed up file will be (relative from the
-              client's store root): <literal>e5/o85.rfw</literal>. Longer
-              numbers infer more directories in the structure, so as an
-              example 3952697264 as the last object ID gives 0xEB995FB0, which
-              translates to a backup pathname of
-              <literal>eb/99/5f/ob0.rfw.</literal></para>
+              <para>Changes the storage space allocation for the given
+              account. No server restart is needed.</para>
+
+              <para>Parameters:</para>
+
+              <para><variablelist>
+                  <varlistentry>
+                    <term><option>account-id</option></term>
+
+                    <listitem>
+                      <para>The ID of the account to be modified.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><option>soft-limit</option></term>
+
+                    <listitem>
+                      <para>The soft limit is the amount of storage that the
+                      server will guarantee to be available for
+                      storage.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><option>hard-limit</option></term>
+
+                    <listitem>
+                      <para>The amount of storage that the the server will
+                      allow before rejecting uploads and starting to eliminate
+                      old and deleted files to get back down to
+                      <option>soft-limit</option>.</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist></para>
             </listitem>
-
-            <listitem>
-              <para>Blocks used: The number of blocks used by the store. The
-              size in Mb depends on the number of blocks, as well as the block
-              size for the disc set given in
-              <literal>raidfile.conf(5)</literal>. In this case the block size
-              is 4096.</para>
-            </listitem>
-
-            <listitem>
-              <para>Blocks used by old files: The number of blocks occupied by
-              files that have newer versions in the store. This data is at
-              risk for being removed during housekeeping.</para>
-            </listitem>
-
-            <listitem>
-              <para>Blocks used by deleted files: The number of blocks used by
-              files that have been deleted on the client. This data is at
-              risk for being removed during housekeeping.</para>
-            </listitem>
-
-            <listitem>
-              <para>Blocks used by directories: The number of blocks used by
-              directories in the store.</para>
-            </listitem>
-
-            <listitem>
-              <para>Block soft limit: The soft limit in blocks. The soft limit
-              is the maximum guaranteed storage space available to the
-              account. When housekeeping starts, and the old and deleted files
-              are removed, they are removed in chronological order (oldest
-              first), until the data used is less than the soft limit.</para>
-            </listitem>
-
-            <listitem>
-              <para>Block hard limit: The hard limit in blocks. The hard limit
-              is the most amount of storage the server will allow in an
-              account. Any data above this amount will be rejected.
-              Housekeeping will reduce the storage use, so more data can be
-              uploaded.</para>
-            </listitem>
-
-            <listitem>
-              <para>Client store marker: TODO What exactly is this? </para>
-            </listitem>
-          </itemizedlist>
-        </listitem>
-
-        <listitem>
-          <para><literal>setlimit &lt;account-id&gt; &lt;softlimit&gt;
-          &lt;hardlimit&gt;</literal></para>
-
-          <para>Changes the storage space allocation for the given account. No
-          server restart is needed.</para>
-
-          <para>Parameters:</para>
-
-          <itemizedlist>
-            <listitem>
-              <para><literal>account-id</literal>: the ID of the new account
-              to be created. A 32-bit hexadecimal number. Cannot already exist
-              on the server.</para>
-            </listitem>
-
-            <listitem>
-              <para><literal>softlimit</literal>: The soft limit is the amount
-              of storage that the server will guarantee to be available for
-              storage.</para>
-            </listitem>
-
-            <listitem>
-              <para><literal>hardlimit</literal>: The amount of storage that
-              the the server will allow, before rejecting uploads, and
-              starting to eliminate old and deleted files to get back down to
-              <literal>softlimit</literal>.</para>
-            </listitem>
-          </itemizedlist>
-        </listitem>
-      </itemizedlist>
+          </varlistentry>
+        </variablelist></para>
     </refsection>
   </refsection>
 
   <refsection>
-    <title>Author</title>
+    <title>Examples</title>
 
-    <para>Ben Summers and contributors. For help, please go to the <ulink
-    url="http://www.boxbackup.org/trac/">Wiki</ulink>, or subscribe to the Box
-    Backup <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list.</ulink></para>
-  </refsection>
-
-  <refsection>
-    <title>See Also</title>
-
-    <para><literal>bbstored.conf(5)</literal></para>
-
-    <para><literal>raidfile.conf(5)</literal></para>
+    <para>Create an account with ID 3af on disc set 0, with a 20GB soft-limit
+    and a 22GB hard-limit:<programlisting>bbstoreaccounts create 3af 0 20G 22G</programlisting>Alter
+    existing account ID 20 to have a 50GB soft-limit and a 55GB
+    hard-limit:<programlisting>bbstoreaccounts setlimit 20 50G 55G</programlisting></para>
   </refsection>
 
   <refsection>
     <title>Files</title>
 
-    <para><literal>bbstoreaccounts</literal> uses the Box Backup server
-    configuration file, usually located in
-    <filename>/etc/box/bbstored.conf</filename>. </para>
+    <para><filename>/etc/box/bbstored/accounts.txt</filename></para>
   </refsection>
 
   <refsection>
-    <title>Bugs</title>
+    <title>See Also</title>
 
-    <para>If you find a bug in Box Backup, and you want to let us know about
-    it, join the <ulink
-    url="http://lists.warhead.org.uk/mailman/listinfo/boxbackup">mailing
-    list</ulink>, and send a description of the problem there.</para>
+    <para><citerefentry>
+        <refentrytitle>bbstored</refentrytitle>
 
-    <para>To report a bug, give us at least the following information:</para>
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored-config</refentrytitle>
 
-    <itemizedlist>
-      <listitem>
-        <para>The version of Box Backup you are running</para>
-      </listitem>
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
 
-      <listitem>
-        <para>The platform you are running on (hardware and OS), for both
-        client and server.</para>
-      </listitem>
+  <refsection>
+    <title>Authors</title>
 
-      <listitem>
-        <para>If possible attach your config files (bbstored.conf,
-        bbackupd.conf) to the bug report.</para>
-      </listitem>
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
 
-      <listitem>
-        <para>Also attach any log file output that helps shed light on the
-        problem you are seeing.</para>
-      </listitem>
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
 
-      <listitem>
-        <para>And last but certainly not least, a description of what you are
-        seeing, in as much detail as possible.</para>
-      </listitem>
-    </itemizedlist>
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
   </refsection>
 </refentry>
