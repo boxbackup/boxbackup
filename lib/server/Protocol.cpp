@@ -670,9 +670,18 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 	InformStreamReceiving(streamSize);
 
 	// Return a stream object
-	return std::auto_ptr<IOStream>((streamSize == ProtocolStream_SizeUncertain)?
-		((IOStream*)(new ProtocolUncertainStream(mrStream)))
-		:((IOStream*)(new PartialReadStream(mrStream, streamSize))));
+	if(streamSize == ProtocolStream_SizeUncertain)
+	{
+		BOX_TRACE("Receiving stream, size uncertain");
+		return std::auto_ptr<IOStream>(
+			new ProtocolUncertainStream(mrStream));
+	}
+	else
+	{
+		BOX_TRACE("Receiving stream, size " << streamSize << " bytes");
+		return std::auto_ptr<IOStream>(
+			new PartialReadStream(mrStream, streamSize));
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -816,8 +825,8 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 		}
 	}
 	ASSERT(header > 0);
-	BOX_TRACE("Sending header byte " << header << " plus " << writeSize <<
-		" bytes to stream");
+	BOX_TRACE("Sending header byte " << (int)header << " plus " <<
+		writeSize << " bytes to stream");
 	
 	// Store the header
 	Block[-1] = header;
