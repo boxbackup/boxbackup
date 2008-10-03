@@ -1417,12 +1417,11 @@ int test_bbackupd()
 		// housekeeping to run after that check, so the next check
 		// will see that the deleted files have been removed.
 
-		#ifdef WIN32
-			BOX_TRACE("Wait long enough that housekeeping "
-				"will run again")
-			wait_for_backup_operation(5);
-			BOX_TRACE("done.");
-		#endif
+#ifndef WIN32
+		BOX_TRACE("Wait long enough that housekeeping "
+			"will run again")
+		wait_for_backup_operation(5);
+		BOX_TRACE("done.");
 
 		BOX_TRACE("Find out whether bbackupd marked files as deleted");
 		{
@@ -1495,6 +1494,7 @@ int test_bbackupd()
 			// stop early to make debugging easier
 			return 1;
 		}
+#endif
 
 		// Wait for housekeeping to run
 		BOX_TRACE("Wait for housekeeping to remove the deleted files");
@@ -1931,6 +1931,18 @@ int test_bbackupd()
 	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 	printf("\n==== Testing that redundant locations are deleted on time\n");
+
+	// unpack the files for the redundant location test
+	TEST_THAT(::system("rm -rf testfiles/TestDir2") == 0);
+	TEST_THAT(::mkdir("testfiles/TestDir2", 0777) == 0);
+
+	#ifdef WIN32
+		TEST_THAT(::system("tar xzvf testfiles/spacetest1.tgz "
+			"-C testfiles/TestDir2") == 0);
+	#else
+		TEST_THAT(::system("gzip -d < testfiles/spacetest1.tgz "
+			"| ( cd testfiles/TestDir2 && tar xf - )") == 0);
+	#endif
 
 	// BLOCK
 	{
@@ -3822,7 +3834,7 @@ int test_bbackupd()
 		// Test that locked files cannot be backed up,
 		// and the appropriate error is reported.
 		// Wait for the sync to finish, so that we have time to work
-		wait_for_sync_start();
+		wait_for_sync_end();
 		// Now we have about three seconds to work
 
 		handle = openfile("testfiles/TestDir1/lockedfile",
@@ -3835,7 +3847,15 @@ int test_bbackupd()
 			wait_for_sync_end();
 			TEST_THAT(!TestFileExists("testfiles/"
 				"notifyran.read-error.1"));
+		}
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		if (handle != 0)
+		{
 			// this sync should try to back up the file, 
 			// and fail, because it's locked
 			wait_for_sync_end();
@@ -3843,7 +3863,15 @@ int test_bbackupd()
 				"notifyran.read-error.1"));
 			TEST_THAT(!TestFileExists("testfiles/"
 				"notifyran.read-error.2"));
+		}
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		if (handle != 0)
+		{
 			// now close the file and check that it is
 			// backed up on the next run.
 			CloseHandle(handle);
@@ -3852,7 +3880,15 @@ int test_bbackupd()
 			// still no read errors?
 			TEST_THAT(!TestFileExists("testfiles/"
 				"notifyran.read-error.2"));
+		}
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		if (handle != 0)
+		{
 			// compare, and check that it works
 			// reports the correct error message (and finishes)
 			compareReturnValue = ::system(BBACKUPQUERY " "
@@ -3862,7 +3898,15 @@ int test_bbackupd()
 			TEST_RETURN(compareReturnValue,
 				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+		}
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		if (handle != 0)
+		{
 			// open the file again, compare and check that compare
 			// reports the correct error message (and finishes)
 			handle = openfile("testfiles/TestDir1/lockedfile",
@@ -3880,7 +3924,15 @@ int test_bbackupd()
 			// close the file again, check that compare
 			// works again
 			CloseHandle(handle);
+		}
 
+		TEST_THAT(ServerIsAlive(bbackupd_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
+		if (!ServerIsAlive(bbackupd_pid)) return 1;
+		if (!ServerIsAlive(bbstored_pid)) return 1;
+
+		if (handle != 0)
+		{
 			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query15a.log "
