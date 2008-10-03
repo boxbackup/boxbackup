@@ -103,7 +103,8 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 		}
 		else
 		{
-			// Read the header byte to find out how much there is in the next block
+			// Read the header byte to find out how much there is
+			// in the next block
 			uint8_t header;
 			if(mrSource.Read(&header, 1, Timeout) == 0)
 			{
@@ -139,8 +140,9 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 				THROW_EXCEPTION(ServerException, ProtocolUncertainStreamBadBlockHeader)	
 			}
 
-			BOX_TRACE("Next block has " <<
-				mBytesLeftInCurrentBlock << "bytes");
+			BOX_TRACE("Read header byte " << (int)header << ", "
+				"next block has " << 
+				mBytesLeftInCurrentBlock << " bytes");
 		}
 	}
 
