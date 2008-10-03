@@ -24,10 +24,11 @@ class WinNamedPipeStream : public IOStream
 {
 public:
 	WinNamedPipeStream();
+	WinNamedPipeStream(HANDLE hNamedPipe);
 	~WinNamedPipeStream();
 
 	// server side - create the named pipe and listen for connections
-	void Accept(const std::string& rName);
+	// use WinNamedPipeListener to do this instead.
 
 	// client side - connect to a waiting server
 	void Connect(const std::string& rName);
@@ -40,9 +41,6 @@ public:
 	virtual void Close();
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
-	bool IsConnected() { return mIsConnected; }
-	HANDLE GetSocketHandle() { return mSocketHandle; }
-	HANDLE GetReadableEvent() { return mReadableEvent; }
 
 protected:
 	void MarkAsReadClosed()  {mReadClosed  = true;}
@@ -62,6 +60,7 @@ private:
 	bool mIsServer;
 	bool mIsConnected;
 
+public:
 	static std::string sPipeNamePrefix;
 };
 
