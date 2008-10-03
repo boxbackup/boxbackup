@@ -217,13 +217,16 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientInodeToIDMap::Lookup(InodeRefType, int64_t &, int64_t &) const
-//		Purpose: Looks up an inode in the map, returning true if it exists, and the object
-//				 ids of it and the directory it's in the reference arguments.
+//		Name:    BackupClientInodeToIDMap::Lookup(InodeRefType,
+//			 int64_t &, int64_t &) const
+//		Purpose: Looks up an inode in the map, returning true if it
+//			 exists, and the object ids of it and the directory
+//			 it's in the reference arguments. 
 //		Created: 11/11/03
 //
 // --------------------------------------------------------------------------
-bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDOut, int64_t &rInDirectoryOut) const
+bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef,
+	int64_t &rObjectIDOut, int64_t &rInDirectoryOut) const
 {
 #ifdef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
 	std::map<InodeRefType, std::pair<int64_t, int64_t> >::const_iterator i(mMap.find(InodeRef));
