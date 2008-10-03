@@ -95,9 +95,9 @@ std::string Daemon::GetOptionString()
 {
 	return "c:"
 	#ifndef WIN32
-		"DF"
+		"DFK"
 	#endif
-		"hkKPqt:TUvVW:";
+		"hkPqQt:TUvVW:";
 }
 
 void Daemon::Usage()
@@ -116,13 +116,14 @@ void Daemon::Usage()
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
 #endif
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
-	"  -K         Stop writing log messages to console while daemon is running\n"
 #ifndef WIN32
+	"  -K         Stop writing log messages to console while daemon is running\n"
 	"  -P         Show process ID (PID) in console output\n"
 #endif
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
+	"  -Q         Run at minimum verbosity, log nothing\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
-	"  -V         Run at maximum verbosity\n"
+	"  -V         Run at maximum verbosity, log everything\n"
 	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
 	"  -t <tag>   Tag console output with specified marker\n"
 	"  -T         Timestamp console output\n"
@@ -202,6 +203,13 @@ int Daemon::ProcessOption(signed int option)
 			mLogLevel--;
 		}
 		break;
+
+		case 'Q':
+		{
+			mLogLevel = Log::NOTHING;
+		}
+		break;
+
 
 		case 'v':
 		{
@@ -621,7 +629,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			TRACE_TO_STDOUT(false);
 #endif // ! WIN32
 			Logging::ToConsole(false);
-		}		
+		}
 
 		// Log the start message
 		BOX_NOTICE("Starting daemon, version: " << BOX_VERSION);
