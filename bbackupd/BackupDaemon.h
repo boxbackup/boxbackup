@@ -27,6 +27,7 @@
 #include "autogen_BackupProtocolClient.h"
 
 #ifdef WIN32
+	#include "WinNamedPipeListener.h"
 	#include "WinNamedPipeStream.h"
 #endif
 
@@ -193,7 +194,8 @@ private:
 		CommandSocketInfo &operator=(const CommandSocketInfo &);
 	public:
 #ifdef WIN32
-		WinNamedPipeStream mListeningSocket;
+		WinNamedPipeListener<1 /* listen backlog */> mListeningSocket;
+		std::auto_ptr<WinNamedPipeStream> mpConnectedSocket;
 #else
 		SocketListen<SocketStream, 1 /* listen backlog */> mListeningSocket;
 		std::auto_ptr<SocketStream> mpConnectedSocket;
@@ -202,7 +204,7 @@ private:
 	};
 	
 	// Using a socket?
-	CommandSocketInfo *mpCommandSocketInfo;
+	std::auto_ptr<CommandSocketInfo> mapCommandSocketInfo;
 	
 	// Stop notifications being repeated.
 	SysadminNotifier::EventCode mLastNotifiedEvent;
@@ -503,16 +505,9 @@ public:
 	}
 
 #ifdef WIN32
-	public:
-	void RunHelperThread(void);
-
 	private:
-	bool mDoSyncFlagOut, mSyncIsForcedOut;
 	bool mInstallService, mRemoveService, mRunAsService;
 	std::string mServiceName;
-	HANDLE mhMessageToSendEvent, mhCommandReceivedEvent;
-	CRITICAL_SECTION mMessageQueueLock;
-	std::vector<std::string> mMessageList;
 #endif
 };
 
