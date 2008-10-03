@@ -54,7 +54,7 @@ int first_fail_line;
 std::string first_fail_file;
 
 #ifdef WIN32
-	#define QUIET_PROCESS "-K"
+	#define QUIET_PROCESS "-Q"
 #else
 	#define QUIET_PROCESS ""
 #endif
