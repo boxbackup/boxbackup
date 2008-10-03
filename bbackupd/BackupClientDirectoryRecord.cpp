@@ -948,14 +948,22 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// This step will be repeated later when there is space available
 			if(!rContext.StorageLimitExceeded())
 			{
-				// Upload the file to the server, recording the object ID it returns
-				bool noPreviousVersionOnServer = ((pDirOnStore != 0) && (en == 0));
+				// Upload the file to the server, recording the
+				// object ID it returns
+				bool noPreviousVersionOnServer = 
+					((pDirOnStore != 0) && (en == 0));
 				
-				// Surround this in a try/catch block, to catch errrors, but still continue
+				// Surround this in a try/catch block, to
+				// catch errors, but still continue
 				bool uploadSuccess = false;
 				try
 				{
-					latestObjectID = UploadFile(rParams, filename, storeFilename, fileSize, modTime, attributesHash, noPreviousVersionOnServer);
+					latestObjectID = UploadFile(rParams,
+						filename, storeFilename,
+						fileSize, modTime,
+						attributesHash,
+						noPreviousVersionOnServer);
+
 					if (latestObjectID == 0)
 					{
 						// storage limit exceeded
