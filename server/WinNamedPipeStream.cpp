@@ -44,7 +44,55 @@ WinNamedPipeStream::WinNamedPipeStream()
 	  mWriteClosed(false),
 	  mIsServer(false),
 	  mIsConnected(false)
-{
+{ }
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    WinNamedPipeStream::WinNamedPipeStream(HANDLE)
+//		Purpose: Constructor (with already-connected pipe handle)
+//		Created: 2008/10/01
+//
+// --------------------------------------------------------------------------
+WinNamedPipeStream::WinNamedPipeStream(HANDLE hNamedPipe)
+	: mSocketHandle(hNamedPipe),
+	  mReadableEvent(INVALID_HANDLE_VALUE),
+	  mBytesInBuffer(0),
+	  mReadClosed(false),
+	  mWriteClosed(false),
+	  mIsServer(true),
+	  mIsConnected(true)
+{ 
+	// create the Readable event
+	mReadableEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	if (mReadableEvent == INVALID_HANDLE_VALUE)
+	{
+		BOX_ERROR("Failed to create the Readable event: " <<
+			GetErrorMessage(GetLastError()));
+		Close();
+		THROW_EXCEPTION(CommonException, Internal)
+	}
+
+	// initialise the OVERLAPPED structure
+	memset(&mReadOverlap, 0, sizeof(mReadOverlap));
+	mReadOverlap.hEvent = mReadableEvent;
+
+	// start the first overlapped read
+	if (!ReadFile(mSocketHandle, mReadBuffer, sizeof(mReadBuffer),
+		NULL, &mReadOverlap))
+	{
+		DWORD err = GetLastError();
+
+		if (err != ERROR_IO_PENDING)
+		{
+			BOX_ERROR("Failed to start overlapped read: " <<
+				GetErrorMessage(err));
+			Close();
+			THROW_EXCEPTION(ConnectionException, 
+				Conn_SocketReadError)
+		}
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -80,33 +128,17 @@ WinNamedPipeStream::~WinNamedPipeStream()
 //		Created: 2005/12/07
 //
 // --------------------------------------------------------------------------
-void WinNamedPipeStream::Accept(const std::string& rName)
+/*
+void WinNamedPipeStream::Accept()
 {
-	if (mSocketHandle != INVALID_HANDLE_VALUE || mIsConnected) 
-	{
-		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
-	}
-
-	std::string socket = sPipeNamePrefix + rName;
-
-	mSocketHandle = CreateNamedPipeA( 
-		socket.c_str(),            // pipe name 
-		PIPE_ACCESS_DUPLEX |       // read/write access 
-		FILE_FLAG_OVERLAPPED,      // enabled overlapped I/O
-		PIPE_TYPE_BYTE |           // message type pipe 
-		PIPE_READMODE_BYTE |       // message-read mode 
-		PIPE_WAIT,                 // blocking mode 
-		1,                         // max. instances  
-		4096,                      // output buffer size 
-		4096,                      // input buffer size 
-		NMPWAIT_USE_DEFAULT_WAIT,  // client time-out 
-		NULL);                     // default security attribute 
-
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
 	{
-		BOX_ERROR("Failed to CreateNamedPipeA(" << socket << "): " <<
-			GetErrorMessage(GetLastError()));
-		THROW_EXCEPTION(ServerException, SocketOpenError)
+		THROW_EXCEPTION(ServerException, BadSocketHandle);
+	}
+
+	if (mIsConnected) 
+	{
+		THROW_EXCEPTION(ServerException, SocketAlreadyOpen);
 	}
 
 	bool connected = ConnectNamedPipe(mSocketHandle, (LPOVERLAPPED) NULL);
@@ -156,6 +188,7 @@ void WinNamedPipeStream::Accept(const std::string& rName)
 		}
 	}
 }
+*/
 
 // --------------------------------------------------------------------------
 //
@@ -217,7 +250,7 @@ void WinNamedPipeStream::Connect(const std::string& rName)
 int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
 	// TODO no support for timeouts yet
-	if (Timeout != IOStream::TimeOutInfinite)
+	if (!mIsServer && Timeout != IOStream::TimeOutInfinite)
 	{
 		THROW_EXCEPTION(CommonException, AssertFailed)
 	}
@@ -249,8 +282,29 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		{
 			// overlapped I/O completed successfully? 
 			// (wait if needed)
+			DWORD waitResult = WaitForSingleObject(
+				mReadOverlap.hEvent, Timeout);
 
-			if (GetOverlappedResult(mSocketHandle,
+			if (waitResult == WAIT_ABANDONED)
+			{
+				BOX_ERROR("Wait for command socket read "
+					"abandoned by system");
+				THROW_EXCEPTION(ServerException,
+					BadSocketHandle);
+			}
+			else if (waitResult == WAIT_TIMEOUT)
+			{
+				// wait timed out, nothing to read
+				NumBytesRead = 0;
+			}
+			else if (waitResult != WAIT_OBJECT_0)
+			{
+				BOX_ERROR("Failed to wait for command "
+					"socket read: unknown result " <<
+					waitResult);
+			}
+			// object is ready to read from
+			else if (GetOverlappedResult(mSocketHandle,
 				&mReadOverlap, &NumBytesRead, TRUE))
 			{
 				needAnotherRead = true;
@@ -267,7 +321,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 				{
 					if (err == ERROR_BROKEN_PIPE)
 					{
-						BOX_ERROR("Control client "
+						BOX_NOTICE("Control client "
 							"disconnected");
 					}
 					else
@@ -341,29 +395,6 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 				THROW_EXCEPTION(ConnectionException, 
 					Conn_SocketReadError)
 			}
-		}
-
-		// If the read succeeded immediately, leave the event 
-		// signaled, so that we will be called again to process 
-		// the newly read data and start another overlapped read.
-		if (needAnotherRead && !mReadClosed)
-		{
-			// leave signalled
-		}
-		else if (!needAnotherRead && mBytesInBuffer > 0)
-		{
-			// leave signalled
-		}
-		else
-		{
-			// nothing left to read, reset the event
-			ResetEvent(mReadableEvent);
-			// FIXME: a pending read could have signalled
-			// the event (again) while we were busy reading.
-			// that signal would be lost, and the reading
-			// thread would block. Should be pretty obvious
-			// if this happens in practice: control client
-			// hangs.
 		}
 	}
 	else
@@ -441,7 +472,7 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 		if (!Success)
 		{
 			// ERROR_NO_DATA is a strange name for 
-			// "The pipe is being closed". No exception wanted.
+			// "The pipe is being closed".
 
 			DWORD err = GetLastError();
 
@@ -453,15 +484,8 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 
 			Close();
 
-			if (err == ERROR_NO_DATA) 
-			{
-				return;
-			}
-			else
-			{
-				THROW_EXCEPTION(ConnectionException, 
-					Conn_SocketWriteError)
-			}
+			THROW_EXCEPTION(ConnectionException, 
+				Conn_SocketWriteError)
 		}
 
 		NumBytesWrittenTotal += NumBytesWrittenThisTime;
