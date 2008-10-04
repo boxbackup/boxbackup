@@ -10,12 +10,18 @@
     <refentrytitle>bbackupctl</refentrytitle>
 
     <manvolnum>8</manvolnum>
+
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>
     <refname>bbackupctl</refname>
 
-    <refpurpose>Control the Box Backup client daemon</refpurpose>
+    <refpurpose>Contol the Box Backup client daemon</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
@@ -179,5 +185,21 @@
 
         <manvolnum>8</manvolnum>
       </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
   </refsection>
 </refentry>
