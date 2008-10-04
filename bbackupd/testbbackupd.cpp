@@ -1407,21 +1407,14 @@ int test_bbackupd()
 		// d3/d4	excluded
 		// d3/d4/f5	excluded
 		// d7		deleted
-		// Careful with timing here, these files can already be
-		// deleted by housekeeping. On Win32, housekeeping runs
-		// immediately after disconnect, but only if enough time
+		// Careful with timing here, these files will be removed by
+		// housekeeping the next time it runs. On Win32, housekeeping
+		// runs immediately after disconnect, but only if enough time
 		// has elapsed since the last housekeeping. Since the
 		// backup run closely follows the last one, housekeeping
-		// should not run afterwards. By waiting before
-		// connecting to check the results, we should force
-		// housekeeping to run after that check, so the next check
-		// will see that the deleted files have been removed.
-
-#ifndef WIN32
-		BOX_TRACE("Wait long enough that housekeeping "
-			"will run again")
-		wait_for_backup_operation(5);
-		BOX_TRACE("done.");
+		// should not run afterwards. On other platforms, we want to
+		// get in immediately after the backup and hope that
+		// housekeeping doesn't beat us to it.
 
 		BOX_TRACE("Find out whether bbackupd marked files as deleted");
 		{
@@ -1454,6 +1447,7 @@ int test_bbackupd()
 			// these files have just been deleted, because
 			// they are excluded by the new configuration.
 			// but housekeeping should not have run yet
+
 			TEST_THAT(test_entry_deleted(*spacetest_dir, "f2"));
 			TEST_THAT(test_entry_deleted(*spacetest_dir, "d3"));
 
@@ -1494,9 +1488,7 @@ int test_bbackupd()
 			// stop early to make debugging easier
 			return 1;
 		}
-#endif
 
-		// Wait for housekeeping to run
 		BOX_TRACE("Wait for housekeeping to remove the deleted files");
 		wait_for_backup_operation(5);
 		BOX_TRACE("done.");
