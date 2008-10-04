@@ -11,7 +11,11 @@
 
     <manvolnum>8</manvolnum>
 
-    <refmiscinfo class="manual">Box Backup 0.11</refmiscinfo>
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>

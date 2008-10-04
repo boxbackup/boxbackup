@@ -11,7 +11,11 @@
 
     <manvolnum>8</manvolnum>
 
-    <refmiscinfo>Box Backup 0.11</refmiscinfo>
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
   </refmeta>
 
   <refnamediv>
@@ -37,7 +41,7 @@
     <title>Description</title>
 
     <para>The bbstored-config script creates configuration files and server
-    certificates for a bbstored instance. It takes three parameters</para>
+    certificates for a bbstored instance. It takes three parameters:</para>
 
     <variablelist>
       <varlistentry>
