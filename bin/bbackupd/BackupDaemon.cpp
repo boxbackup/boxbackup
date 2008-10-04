@@ -974,12 +974,6 @@ void BackupDaemon::OnBackupFinish()
 	// Log
 	BOX_NOTICE("Finished scan of local files");
 
-	// Notify administrator
-	NotifySysadmin(SysadminNotifier::BackupFinish);
-
-	// Tell anything connected to the command socket
-	SendSyncStartOrFinish(false /* finish */);
-
 	// Log the stats
 	BOX_NOTICE("File statistics: total file size uploaded "
 		<< BackupStoreFile::msStats.mBytesInEncodedFiles
@@ -990,6 +984,12 @@ void BackupDaemon::OnBackupFinish()
 
 	// Reset statistics again
 	BackupStoreFile::ResetStats();
+
+	// Notify administrator
+	NotifySysadmin(SysadminNotifier::BackupFinish);
+
+	// Tell anything connected to the command socket
+	SendSyncStartOrFinish(false /* finish */);
 
 	// Touch a file to record times in filesystem
 	TouchFileInWorkingDir("last_sync_finish");
