@@ -21,7 +21,7 @@
   <refnamediv>
     <refname>bbackupctl</refname>
 
-    <refpurpose>Contol the Box Backup client daemon</refpurpose>
+    <refpurpose>Control the Box Backup client daemon</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
