@@ -5,7 +5,6 @@ use Exporter;
 
 BEGIN
 {
-
 	# which OS are we building under?
 	$target_os = '@target_os@';
 	$target_windows = 0;
@@ -38,20 +37,17 @@ BEGIN
 	$platform_exe_ext = '@EXEEXT@';
 
 	# get version
-	if (! -r "VERSION.txt" and -r "../../VERSION.txt")
-	{
-		open VERSION,"../../VERSION.txt" or die "../../VERSION.txt: $!";
-	}
-	else
-	{
-		open VERSION,"VERSION.txt" or die "VERSION.txt: $!";
-	}
+	my $version_file = "VERSION.txt";
+	if (not -r $version_file) { $version_file = "../../$version_file" }
+	die "missing version file: $version_file" unless $version_file;
 
+	open VERSION, $version_file or die "$version_file: $!";
 	$product_version = <VERSION>;
 	chomp $product_version;
 	$product_name = <VERSION>;
 	chomp $product_name;
 	close VERSION;
+
 	if($product_version =~ /USE_SVN_VERSION/)
 	{
 		# for developers, use SVN version
@@ -114,6 +110,22 @@ sub make_flag
 		return "-D $_[0]"
 	}
 	return $_[0].'=1';
+}
+
+sub parcel_root
+{
+	my $tos = $_[1] || $target_os;
+	return $product_name.'-'.$product_version.'-'.$_[0].'-'.$tos;
+}
+
+sub parcel_dir
+{
+	'parcels/'.parcel_root($_[0], $_[1])
+}
+
+sub parcel_target
+{
+	parcel_dir($_[0]).'.tgz'
 }
 
 1;
