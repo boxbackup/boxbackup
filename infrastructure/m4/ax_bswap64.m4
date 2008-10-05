@@ -13,7 +13,7 @@ AC_DEFUN([AX_BSWAP64], [
   bswap64_function=""
   AC_CHECK_HEADERS([sys/endian.h asm/byteorder.h])
   if test "x$ac_cv_header_sys_endian_h" = "xyes"; then
-    AC_CACHE_CHECK([for htobe64], [have_htobe64],
+    AC_CACHE_CHECK([for htobe64], [box_cv_have_htobe64],
       [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
           $ac_includes_default
           #include <sys/endian.h>
@@ -21,15 +21,15 @@ AC_DEFUN([AX_BSWAP64], [
           htobe64(0);
           return 1;
         ]])],
-        [have_htobe64=yes], [have_htobe64=no]
+        [box_cv_have_htobe64=yes], [box_cv_have_htobe64=no]
       )])
-    if test "x$have_htobe64" = "xyes"; then
+    if test "x$box_cv_have_htobe64" = "xyes"; then
       bswap64_function=htobe64
     fi
   fi
   if test "x$bswap64_function" = "x" && \
      test "x$ac_cv_header_asm_byteorder_h" = "xyes"; then
-    AC_CACHE_CHECK([for __cpu_to_be64], [have___cpu_to_be64],
+    AC_CACHE_CHECK([for __cpu_to_be64], [box_cv_have___cpu_to_be64],
       [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
           $ac_includes_default
           #include <asm/byteorder.h>
@@ -37,9 +37,9 @@ AC_DEFUN([AX_BSWAP64], [
           __cpu_to_be64(0);
           return 1;
         ]])],
-        [have___cpu_to_be64=yes], [have___cpu_to_be64=no]
+        [box_cv_have___cpu_to_be64=yes], [box_cv_have___cpu_to_be64=no]
       )])
-    if test "x$have___cpu_to_be64" = "xyes"; then
+    if test "x$box_cv_have___cpu_to_be64" = "xyes"; then
       bswap64_function=__cpu_to_be64
     fi
   fi

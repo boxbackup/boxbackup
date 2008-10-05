@@ -238,14 +238,14 @@ AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
 
 ## Check for large file support active. AC_SYS_LARGEFILE has already worked
 ## out how to enable it if necessary, we just use this to report to the user
-AC_CACHE_CHECK([if we have large file support enabled], [have_large_file_support],
+AC_CACHE_CHECK([if we have large file support enabled], [box_cv_have_large_file_support],
   [AC_RUN_IFELSE([AC_LANG_PROGRAM([[$ac_includes_default]], [[
       return sizeof(off_t)==4;
     ]])],
-    [have_large_file_support=yes], [have_large_file_support=no]
+    [box_cv_have_large_file_support=yes], [box_cv_have_large_file_support=no]
   )])
 
-if test "x$have_large_file_support" = "xyes"; then
+if test "x$box_cv_have_large_file_support" = "xyes"; then
 	AC_DEFINE([HAVE_LARGE_FILE_SUPPORT], [1],
 		[Define to 1 if large files are supported])
 fi
@@ -301,7 +301,10 @@ eval sysconfdir_expanded=`   eval "echo $sysconfdir"`
 eval localstatedir_expanded=`eval "echo $localstatedir"`
 prefix=$saved_prefix
 exec_prefix=$saved_exec_prefix
-AC_SUBST([bindir_expanded sbindir_expanded sysconfdir_expanded localstatedir_expanded])
+AC_SUBST([bindir_expanded])
+AC_SUBST([sbindir_expanded])
+AC_SUBST([sysconfdir_expanded])
+AC_SUBST([localstatedir_expanded])
 
 
 ### Output files
@@ -355,7 +358,7 @@ without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
 
 Regular expressions: $have_regex_support
-Large files:         $have_large_file_support
+Large files:         $box_cv_have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
 Extended attributes: $ac_cv_header_sys_xattr_h
@@ -364,7 +367,7 @@ EOC
 
 ### Warnings at end for visibility
 
-if test "x$gcc_3_plus" != "xyes" && test "x$malloc_workaround" != "xyes"; then
+if test "x$box_cv_gcc_3_plus" != "xyes" && test "x$box_cv_malloc_workaround" != "xyes"; then
   echo
   AC_MSG_WARN([[the implementation of the C++ STL on this platform may
 have a flaw which causes it to apparently leak memory, and this flaw cannot be

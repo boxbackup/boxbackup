@@ -15,7 +15,7 @@ dnl @license AllPermissive
 AC_DEFUN([AX_CHECK_DIRENT_D_TYPE], [
   AC_CHECK_MEMBERS([struct dirent.d_type],,, [[#include <dirent.h>]])
   if test "x$ac_cv_member_struct_dirent_d_type" = "xyes"; then
-    AC_CACHE_CHECK([[whether struct dirent.d_type is valid]], [have_valid_dirent_d_type],
+    AC_CACHE_CHECK([[whether struct dirent.d_type is valid]], [box_cv_have_valid_dirent_d_type],
       [AC_RUN_IFELSE(
         [AC_LANG_PROGRAM([[
           $ac_includes_default
@@ -26,14 +26,14 @@ AC_DEFUN([AX_CHECK_DIRENT_D_TYPE], [
           if(dir) res = readdir(dir);
           return res ? (res->d_type != DT_FILE && res->d_type != DT_DIR) : 1;
         ]])],
-        [have_valid_dirent_d_type=yes], [have_valid_dirent_d_type=no]
+        [box_cv_have_valid_dirent_d_type=yes], [box_cv_have_valid_dirent_d_type=no]
       )])
-    if test "x$have_valid_dirent_d_type" = "xyes"; then
+    if test "x$box_cv_have_valid_dirent_d_type" = "xyes"; then
       AC_DEFINE([HAVE_VALID_DIRENT_D_TYPE], 1, [Define to 1 if struct dirent.d_type is valid])
     fi
   fi
   if test "x$ac_cv_member_struct_dirent_d_type" = "xyes" || \
-     test "x$have_valid_dirent_d_type" = "xyes"
+     test "x$box_cv_have_valid_dirent_d_type" = "xyes"
   then
     m4_ifvaln([$1],[$1],[:])dnl
     m4_ifvaln([$2],[else $2])dnl
