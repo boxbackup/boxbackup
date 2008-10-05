@@ -15,7 +15,7 @@ dnl @license AllPermissive
 AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
   AC_REQUIRE([AX_FUNC_SYSCALL])dnl
   if test "x$ac_cv_header_sys_syscall_h" = "xyes"; then
-    AC_CACHE_CHECK([[whether syscall lseek requires dummy parameter]], [have_lseek_dummy_param],
+    AC_CACHE_CHECK([[whether syscall lseek requires dummy parameter]], [box_cv_have_lseek_dummy_param],
       [AC_RUN_IFELSE(
         [AC_LANG_PROGRAM([[
           $ac_includes_default
@@ -50,14 +50,14 @@ AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
           unlink("lseektest");
           return res!=-1;
         ]])],
-        [have_lseek_dummy_param=yes], [have_lseek_dummy_param=no]
+        [box_cv_have_lseek_dummy_param=yes], [box_cv_have_lseek_dummy_param=no]
       )])
-    if test "x$have_lseek_dummy_param" = "xyes"; then
+    if test "x$box_cv_have_lseek_dummy_param" = "xyes"; then
       AC_DEFINE([HAVE_LSEEK_DUMMY_PARAM], 1,
                 [Define to 1 if syscall lseek requires a dummy middle parameter])
     fi
   fi
-  if test "x$have_lseek_dummy_param" = "xno"
+  if test "x$box_cv_have_lseek_dummy_param" = "xno"
   then
     m4_ifvaln([$1],[$1],[:])dnl
     m4_ifvaln([$2],[else $2])dnl
