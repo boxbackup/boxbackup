@@ -306,6 +306,17 @@ AC_SUBST([sbindir_expanded])
 AC_SUBST([sysconfdir_expanded])
 AC_SUBST([localstatedir_expanded])
 
+## Figure out the client parcel directory and substitute it
+client_parcel_dir=`perl infrastructure/parcelpath.pl client $target_os`
+os_name=`uname -o`
+if test "$os_name" = "Cygwin"; then
+	client_parcel_dir=`cygpath -wa $client_parcel_dir`
+fi
+AC_SUBST([client_parcel_dir])
+
+## Figure out version and substitute it in
+box_version=`perl infrastructure/printversion.pl`
+AC_SUBST([box_version])
 
 ### Output files
 AC_CONFIG_FILES([infrastructure/BoxPlatform.pm])
@@ -323,6 +334,7 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    contrib/solaris/bbstored-manifest.xml
                    contrib/solaris/bbackupd-smf-method
                    contrib/solaris/bbstored-smf-method
+                   contrib/windows/installer/boxbackup.mpi
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl

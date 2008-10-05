@@ -21,7 +21,7 @@ AutoRefreshFiles
 Yes
 
 BBVersionNo
-1857
+@box_version@
 
 BrandName
 GigaLock
@@ -273,7 +273,7 @@ test
 
 }
 FileGroup ::481451CC-F49C-D389-8645076F595B -setup Install -active Yes -platforms {Windows MacOS-X} -name {Program Files} -parent FileGroups
-File ::B9F58CFC-EE7A-BEE4-62CB-2C10665095A2 -filemethod {Update files with more recent dates} -type dir -directory <%InstallDir%> -name /home/petjal/doc/teb/cli/bu/installer/win/2.2 -location C:/cygwin/home/Chris/general/parcels/boxbackup-chris_general_1988M-backup-client-mingw32 -parent 481451CC-F49C-D389-8645076F595B
+File ::B9F58CFC-EE7A-BEE4-62CB-2C10665095A2 -filemethod {Update files with more recent dates} -type dir -directory <%InstallDir%> -name /home/petjal/doc/teb/cli/bu/installer/win/2.2 -location @client_parcel_dir@ -parent 481451CC-F49C-D389-8645076F595B
 File ::CDDED10B-2747-DD07-5F9D-42A7FD7BB7E6 -name LICENSE.txt -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::D6E262BC-8A84-B6DB-794B-8FDC8AECB079 -name mgwz.dll -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::E56A0360-7D7F-D99E-E9A4-3C20BC4C2B99 -name mingwm10.dll -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
