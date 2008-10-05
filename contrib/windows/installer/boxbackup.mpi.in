@@ -93,7 +93,7 @@ InstallPassword
 {}
 
 InstallVersion
-0.10.18.57
+@box_version@
 
 Language,de
 No
@@ -213,7 +213,7 @@ UserInfoPhone
 {}
 
 Version
-0.10.1857
+@box_version@
 
 ViewReadme
 No
@@ -2880,7 +2880,7 @@ Windows,IncludeTWAPI
 No
 
 Windows,InstallDir
-{D:\Program Files\<%BrandName%> Backup Service}
+{C:\Program Files\<%BrandName%> Backup Service}
 
 Windows,InstallMode
 Standard
