@@ -98,8 +98,8 @@ print MAKE "all:\t",join(' ',map {"build-".$_} @parcels),"\n\n";
 print MAKE "clean:\n";
 for my $parcel (@parcels)
 {
-	print MAKE "\trm -rf ",parcel_dir($parcel),"\n";
-	print MAKE "\trm -f ",parcel_target($parcel),"\n";
+	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
+	print MAKE "\trm -f ",  BoxPlatform::parcel_target($parcel), "\n";
 }
 print MAKE "\tif [ `uname -o` = 'Cygwin' ]; then find release debug -type f | xargs -r rm -f; else find release debug -type f -exec rm -f {} \\;; fi\n";
 print MAKE "\n";
@@ -110,8 +110,8 @@ my $release_flag = BoxPlatform::make_flag('RELEASE');
 
 for my $parcel (@parcels)
 {
-	my $target = parcel_target($parcel);
-	my $dir = parcel_dir($parcel);
+	my $target = BoxPlatform::parcel_target($parcel);
+	my $dir    = BoxPlatform::parcel_dir($parcel);
 	my @parcel_deps;
 
 	unless ($target_windows)
@@ -215,7 +215,7 @@ EOF
 		chmod 0755,"parcels/scripts/install-$parcel";
 	}
 	
-	my $root = parcel_root($parcel);
+	my $root = BoxPlatform::parcel_root($parcel);
 
 	unless ($target_windows)
 	{
@@ -256,17 +256,3 @@ print INSTALLMSG "\n";
 
 close INSTALLMSG;
 
-sub parcel_root
-{
-	$product_name.'-'.$product_version.'-'.$_[0].'-'.$target_os
-}
-
-sub parcel_dir
-{
-	'parcels/'.parcel_root($_[0])
-}
-
-sub parcel_target
-{
-	parcel_dir($_[0]).'.tgz'
-}
