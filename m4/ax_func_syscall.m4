@@ -18,7 +18,7 @@ AC_DEFUN([AX_FUNC_SYSCALL], [
   AC_CHECK_FUNCS([syscall __syscall])
   if test "x$ac_cv_func_syscall" != "xyes" &&
      test "x$ac_cv_func___syscall" != "xyes"; then
-    AC_CACHE_CHECK([for __syscall needing definition], [have___syscall_need_defn],
+    AC_CACHE_CHECK([for __syscall needing definition], [box_cv_have___syscall_need_defn],
       [AC_RUN_IFELSE([AC_LANG_PROGRAM([[
           $ac_includes_default
           #ifdef HAVE_SYS_SYSCALL_H
@@ -29,9 +29,9 @@ AC_DEFUN([AX_FUNC_SYSCALL], [
           __syscall(SYS_exit, 0);
           return 1;
         ]])],
-        [have___syscall_need_defn=yes], [have___syscall_need_defn=no]
+        [box_cv_have___syscall_need_defn=yes], [box_cv_have___syscall_need_defn=no]
       )])
-    if test "x$have___syscall_need_defn" = "xyes"; then
+    if test "x$box_cv_have___syscall_need_defn" = "xyes"; then
       AC_DEFINE([HAVE___SYSCALL_NEED_DEFN], 1,
                 [Define to 1 if __syscall is available but needs a definition])
     fi

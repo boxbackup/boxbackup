@@ -10,14 +10,14 @@ dnl @version 2005/07/03
 dnl @license AllPermissive
 
 AC_DEFUN([AX_CHECK_DEFINE_PRAGMA], [
-  AC_CACHE_CHECK([for pre-processor pragma defines], [have_define_pragma],
+  AC_CACHE_CHECK([for pre-processor pragma defines], [box_cv_have_define_pragma],
     [AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
         #define TEST_DEFINE #pragma pack(1)
         TEST_DEFINE
       ]])],
-      [have_define_pragma=yes], [have_define_pragma=no]
+      [box_cv_have_define_pragma=yes], [box_cv_have_define_pragma=no]
     )])
-  if test "x$have_define_pragma" = "xyes"; then
+  if test "x$box_cv_have_define_pragma" = "xyes"; then
     AC_DEFINE([HAVE_DEFINE_PRAGMA], 1, [Define to 1 if #define of pragmas works])
     m4_ifvaln([$1],[$1],[:])dnl
     m4_ifvaln([$2],[else $2])dnl
