@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbstored.conf</refentrytitle>
+
+    <manvolnum>5</manvolnum>
+
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbstored.conf</refname>
+
+    <refpurpose>Box Backup store daemon configuration file</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>/etc/box/bbstored.conf</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>The following configuration options are valid:</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><varname>RaidFileConf</varname></term>
+
+        <listitem>
+          <para>Specifies the path to the <citerefentry>
+              <refentrytitle>raidfile.conf</refentrytitle>
+
+              <manvolnum>5</manvolnum>
+            </citerefentry>. This is normally
+          <filename>/etc/box/raidfile.conf</filename>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>AccountDatabase</varname></term>
+
+        <listitem>
+          <para>Specifies the path to the account database created by
+          <citerefentry>
+              <refentrytitle>bbstoreaccounts</refentrytitle>
+
+              <manvolnum>8</manvolnum>
+            </citerefentry>. This is usually
+          <filename>/etc/box/bbstored/accounts.txt</filename>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>ExtendedLogging</varname></term>
+
+        <listitem>
+          <para>Specifies whether extended logging should be enabled to show
+          what commands are being received from clients.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>TimeBetweenHousekeeping</varname></term>
+
+        <listitem>
+          <para>How long between scanning for files which need
+          deleting.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><varname>Server</varname></term>
+
+        <listitem>
+          <para>These options relate to the actual daemon.<variablelist>
+              <varlistentry>
+                <term><varname>PidFile</varname></term>
+
+                <listitem>
+                  <para>The location of the pidfile, where the daemon's
+                  process ID is kept.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>User</varname></term>
+
+                <listitem>
+                  <para>The user to run as.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>ListenAddresses</varname></term>
+
+                <listitem>
+                  <para>The interface addresses to listen on. Hostnames may be
+                  used instead of IP addresses. The format is:
+                  <option>inet:hostname</option> or
+                  <option>inet:10.0.0.1</option>.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>CertificateFile</varname></term>
+
+                <listitem>
+                  <para>The path to the server's public certificate.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>PrivateKeyFile</varname></term>
+
+                <listitem>
+                  <para>The path to the server's private key. This should only
+                  be readable by root and/or the <option>User</option>.</para>
+                </listitem>
+              </varlistentry>
+
+              <varlistentry>
+                <term><varname>TrustedCAsFile</varname></term>
+
+                <listitem>
+                  <para>The Certificate Authority created by <citerefentry>
+                      <refentrytitle>bbstored-certs</refentrytitle>
+
+                      <manvolnum>8</manvolnum>
+                    </citerefentry>.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist></para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <para>The following is an example bbstored.conf:</para>
+
+    <para><programlisting>RaidFileConf = /etc/box/raidfile.conf
+AccountDatabase = /etc/box/bbstored/accounts.txt
+
+TimeBetweenHousekeeping = 900
+
+Server
+{
+  PidFile = /var/run/bbstored.pid
+  User = _bbstored
+  ListenAddresses = inet:server.example.com
+  CertificateFile = /etc/box/bbstored/server.example.com-cert.pem
+  PrivateKeyFile = /etc/box/bbstored/server.example.com-key.pem
+  TrustedCAsFile = /etc/box/bbstored/clientCA.pem
+}</programlisting></para>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbstored.conf</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbstored</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>raidfile-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>

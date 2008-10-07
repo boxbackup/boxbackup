@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbstored-config</refentrytitle>
+
+    <manvolnum>8</manvolnum>
+
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbstored-config</refname>
+
+    <refpurpose>Box Backup store daemon configuration file
+    generator</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>bbstored-config</command>
+
+      <arg choice="plain">configdir</arg>
+
+      <arg choice="plain">servername</arg>
+
+      <arg choice="plain">username</arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>The bbstored-config script creates configuration files and server
+    certificates for a bbstored instance. It takes three parameters:</para>
+
+    <variablelist>
+      <varlistentry>
+        <term>configdir</term>
+
+        <listitem>
+          <para>The directory where config files will reside. A
+          <filename>bbstored</filename> subdirectory will be created where
+          several config files will reside. The
+          <filename>bbstored.conf</filename> file will be created in
+          <varname>configdir</varname>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>servername</term>
+
+        <listitem>
+          <para>The name of the server that is being configured. Usually the
+          fully qualified domain name of the machine in question.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>username</term>
+
+        <listitem>
+          <para>The name of the user that should be running the
+          <command>bbstored</command> process. Recommended name:
+          _bbstored.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>A valid <citerefentry>
+        <refentrytitle>raidfile.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry> must be found in configdir. Several steps are taken
+    during the run of <command>bbstored-config</command>:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>Server certificates are created. This requires interaction from
+        the operator.</para>
+      </listitem>
+
+      <listitem>
+        <para>The RAID volumes are checked to ensure that the configuration is
+        consistent and will work.</para>
+      </listitem>
+
+      <listitem>
+        <para>Instructions for next steps to take are shown. These steps may
+        be different for different OS platforms, so pay close attention to
+        these instructions.</para>
+      </listitem>
+    </itemizedlist>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbstored.conf</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbstored.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored-certs</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>raidfile-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>
