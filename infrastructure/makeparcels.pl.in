@@ -101,7 +101,16 @@ for my $parcel (@parcels)
 	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
 	print MAKE "\trm -f ",  BoxPlatform::parcel_target($parcel), "\n";
 }
-print MAKE "\tif [ `uname -o` = 'Cygwin' ]; then find release debug -type f | xargs -r rm -f; else find release debug -type f -exec rm -f {} \\;; fi\n";
+
+if ($build_os eq 'CYGWIN')
+{
+	print MAKE "\tfind release debug -type f | xargs -r rm -f\n";
+}
+else
+{
+	print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
+}
+
 print MAKE "\n";
 
 print MAKE "test:\trelease/common/test\n\nrelease/common/test:\n\t./runtest.pl ALL release\n\n";
