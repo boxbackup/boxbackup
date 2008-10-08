@@ -78,10 +78,10 @@ ExtractSolidArchivesOnStartup
 No
 
 Icon
-@build_dir@/documentation/favicon.ico
+{}
 
 Image
-@build_dir@/documentation/html/images/bblogo.png
+@build_dir@/docs/html/images/bblogo.png
 
 IncludeDebugging
 Yes
@@ -332,6 +332,7 @@ File ::98C376E2-A6C3-4B6C-BBD4-F70CAC2E6A7B -name bbackupd.exe -parent B9F58CFC-
 File ::5C3EAB34-7CD4-4DF3-9DEB-0FC23A6F5812 -name bbackupquery.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::7633DBC3-EACA-4F9B-9A87-AD3AF0EC298E -name installer.iss -active 0 -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::D3CF86E1-CAFF-4342-8730-463F96EACC39 -targetfilename templates/NotifySysAdmin.original.vbs -name NotifySysAdmin.vbs -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::A702625F-29C7-4CA0-A8F8-E50DBF5C541B -name uninstall.exe -active 0 -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 Component ::4A9C852B-647E-EED5-5482FFBCC2AF -setup Install -active Yes -platforms {Windows MacOS-X} -name {Default Component} -parent Components
 SetupType ::8202CECC-54A0-9B6C-D24D111BA52E -setup Install -active Yes -platforms {Windows MacOS-X} -name Typical -parent SetupTypes
 
@@ -1145,7 +1146,7 @@ Yes
 <%InstallDir%>
 
 481451CC-F49C-D389-8645076F595B,FileSize
-15224460
+15288767
 
 481451CC-F49C-D389-8645076F595B,Name
 {Program Files}
@@ -2298,7 +2299,7 @@ D9F88AC1-3D2D-F6DB-871E-3A0E016770B1,Destination
 <%ConfigFileTemplate%>
 
 D9F88AC1-3D2D-F6DB-871E-3A0E016770B1,Source
-<%InstallDir%>/templates/template.conf
+<%InstallDir%>/templates/original.conf
 
 DA33B826-E633-A845-4646-76DFA78B907B,Active
 Yes
@@ -2907,7 +2908,7 @@ Windows,ProgramReadme
 {}
 
 Windows,WindowsIcon
-/home/petjal/doc/teb/cli/bu/installer/win/favicon.ico
+{}
 
 ZipArchive,Active
 No
