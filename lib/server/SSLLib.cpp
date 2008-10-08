@@ -14,6 +14,10 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
+#ifdef WIN32
+	#include <wincrypt.h>
+#endif
+
 #include "SSLLib.h"
 #include "ServerException.h"
 
@@ -43,7 +47,37 @@ void SSLLib::Initialise()
 	::SSL_load_error_strings();
 
 	// Extra seeding over and above what's already done by the library
-#ifdef HAVE_RANDOM_DEVICE
+#ifdef WIN32
+	HCRYPTPROV provider;
+	if(!CryptAcquireContext(&provider, NULL, NULL, PROV_RSA_FULL,
+		CRYPT_VERIFYCONTEXT))
+	{
+		BOX_LOG_WIN_ERROR("Failed to acquire crypto context");
+		BOX_WARNING("No random device -- additional seeding of "
+			"random number generator not performed.");
+	}
+	else
+	{
+		// must free provider
+		BYTE buf[1024];
+
+		if(!CryptGenRandom(provider, sizeof(buf), buf))
+		{
+			BOX_LOG_WIN_ERROR("Failed to get random data");
+			BOX_WARNING("No random device -- additional seeding of "
+				"random number generator not performed.");
+		}
+		else
+		{
+			RAND_seed(buf, sizeof(buf));
+		}
+		
+		if(!CryptReleaseContext(provider, 0))
+		{
+			BOX_LOG_WIN_ERROR("Failed to release crypto context");
+		}
+	}
+#elif HAVE_RANDOM_DEVICE
 	if(::RAND_load_file(RANDOM_DEVICE, 1024) != 1024)
 	{
 		THROW_EXCEPTION(ServerException, SSLRandomInitFailed)
