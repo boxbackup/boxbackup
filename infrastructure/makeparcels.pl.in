@@ -195,7 +195,9 @@ EOF
 	
 	for(@{$parcel_contents{$parcel}})
 	{
-		my ($type,$name,$dest) = split /\s+/;
+		my @args = split /\s+/;
+
+		my ($type,$name,$dest) = @args;
 
 		my $optional = 0;
 		my $install  = 1;
