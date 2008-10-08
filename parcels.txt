@@ -8,6 +8,7 @@ backup-client
 	bin bbackupquery
 	bin bbackupctl
 	script bin/bbackupd/bbackupd-config
+	noinstall script LICENSE.txt
 
 ONLY:mingw32,mingw32msvc
 	script bin/bbackupd/win32/installer.iss 
@@ -31,6 +32,7 @@ backup-server
 	script bin/bbstored/bbstored-certs
 	script bin/bbstored/bbstored-config
 	script lib/raidfile/raidfile-config
+	noinstall script LICENSE.txt
 
 ONLY:SunOS
 	script contrib/solaris/bbstored-manifest.xml lib/svc/manifest
