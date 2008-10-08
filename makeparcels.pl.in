@@ -123,12 +123,24 @@ for my $parcel (@parcels)
 
 	for(@{$parcel_contents{$parcel}})
 	{
-		my ($type,$name,$dest) = split /\s+/;
-		my $optional = '';
+		my @args = split /\s+/;
+
+		my ($type,$name,$dest) = @args;
+		my $optional = 0;
+		my $install  = 1;
 
 		if ($type eq 'optional')
 		{
-			($optional,$type,$name,$dest) = split /\s+/;
+			$optional = 1;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'noinstall')
+		{
+			$install = 0;
+			shift @args;
+			($type,$name,$dest) = @args;
 		}
 
 		if($type eq 'bin')
@@ -184,12 +196,24 @@ EOF
 	for(@{$parcel_contents{$parcel}})
 	{
 		my ($type,$name,$dest) = split /\s+/;
-		my $optional = '';
+
+		my $optional = 0;
+		my $install  = 1;
 
 		if ($type eq 'optional')
 		{
-			($optional,$type,$name,$dest) = split /\s+/;
+			$optional = 1;
+			shift @args;
+			($type,$name,$dest) = @args;
 		}
+
+		if ($type eq 'noinstall')
+		{
+			$install = 0;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
 
 		if ($type eq 'script')
 		{
@@ -197,7 +221,7 @@ EOF
 			$name =~ s{.*/}{};
 		}
 
-		unless ($target_windows)
+		if ($install and not $target_windows)
 		{
 			my $local_install_dir = $install_into_dir;
 			if (defined $dest)
