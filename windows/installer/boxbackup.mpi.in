@@ -6,13 +6,13 @@ AllowLanguageSelection
 No
 
 AppName
-{GigaLock Backup Service}
+<%BrandName%>
 
 ApplicationID
 E10C6FD9-E524-28BD-B0AB3588F16C
 
 ApplicationURL
-http://<%BrandName%>.com/
+http://www.boxbackup.org/
 
 AutoFileGroups
 No
@@ -24,7 +24,7 @@ BBVersionNo
 @box_version@
 
 BrandName
-GigaLock
+{Box Backup}
 
 BuildFailureAction
 {Fail (recommended)}
@@ -39,7 +39,7 @@ CommandLineFailureAction
 {Fail (recommended)}
 
 Company
-{Tebuco, Inc.}
+{Tebuco, Inc. and Ben Summers and Contributors}
 
 CompressionLevel
 6
@@ -51,10 +51,10 @@ ConfigFileName
 {<%InstallDir%>\bbackupd.conf}
 
 ConfigFileTemplate
-{<%InstallDir%>\template.conf}
+{<%InstallDir%>\templates\template.conf}
 
 Copyright
-{2007-2008 Tebuco, Inc., & Ben Summers and Contributors}
+{2003-2008 Tebuco, Inc. and Ben Summers and Contributors}
 
 CreateDesktopShortcut
 No
@@ -78,10 +78,10 @@ ExtractSolidArchivesOnStartup
 No
 
 Icon
-/home/petjal/doc/teb/cli/bu/installer/win/icon.png
+@build_dir@/documentation/favicon.ico
 
 Image
-/home/petjal/doc/teb/cli/bu/installer/win/image.png
+@build_dir@/documentation/html/images/bblogo.png
 
 IncludeDebugging
 Yes
@@ -135,13 +135,13 @@ PackageLicense
 {}
 
 PackageMaintainer
-{Tebuco, Inc.}
+{Tebuco, Inc. and Ben Summers and Contributors}
 
 PackageName
 <%ShortAppName%>
 
 PackagePackager
-{Tebuco, Inc.}
+{Tebuco, Inc. and Ben Summers and Contributors}
 
 PackageRelease
 <%PatchVersion%>
@@ -171,7 +171,7 @@ ScriptExt
 .bat
 
 ServiceExeName
-bu_service.exe
+bbackupd.exe
 
 ServiceName
 <%BrandName%>
@@ -277,63 +277,66 @@ File ::B9F58CFC-EE7A-BEE4-62CB-2C10665095A2 -filemethod {Update files with more 
 File ::CDDED10B-2747-DD07-5F9D-42A7FD7BB7E6 -name LICENSE.txt -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::D6E262BC-8A84-B6DB-794B-8FDC8AECB079 -name mgwz.dll -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::E56A0360-7D7F-D99E-E9A4-3C20BC4C2B99 -name mingwm10.dll -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::A7F6806E-A2E9-7259-23E1-2045261004AC -type dir -name service -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::3A3BF87F-8FA9-2849-A300-669BC209112C -type dir -name templates -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::B485E910-8884-1CF0-2A98-13E9E34223C9 -name NotifySysAdmin.template.vbs -parent 3A3BF87F-8FA9-2849-A300-669BC209112C
-File ::E412715D-AA11-7A0D-15EF-78DC817579E6 -name SyncAllowScript.template.bat -parent 3A3BF87F-8FA9-2849-A300-669BC209112C
-File ::01B412CF-48EB-05DF-A350-46BA0944B4D8 -name template.conf -parent 3A3BF87F-8FA9-2849-A300-669BC209112C
-File ::E2EF2B48-8708-DE29-451C-AC1BCDB472EB -name original.conf -parent 3A3BF87F-8FA9-2849-A300-669BC209112C
-File ::47602DF7-8463-AB89-E13F-11983610CAA2 -type dir -name tools -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::92EA29C5-2DE9-7366-B966-E5F25388080E -name copying.txt -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::1E499466-5B3A-A1BC-B8FE-5F52F3D9BBB4 -name EditConfig.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
+File ::47602DF7-8463-AB89-E13F-11983610CAA2 -type dir -name tools -location @build_dir@/contrib/windows/installer/tools -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 File ::F7F61231-C340-5CD5-686B-01F521994B0C -name InstallService.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::68DAE474-165D-81FE-1396-FDD2E6081B41 -name KillBackupProcess.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::9FD80105-AF11-2C52-A212-620945F797B5 -name readme.txt -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::2436C940-3332-13AA-7613-8EE67C35CE9B -name ReloadConfig.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::336DDAC3-F3BA-1117-73D4-11DFEF9E98AB -name RemoveService.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::0C15AE46-0FF3-3B7F-FC55-D91EF279DBD3 -name RestartService.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::58D97EDE-58F2-15D7-7113-BEE3047F0782 -name StartService.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::BE7CDB16-D3FE-30FA-2153-7C0509CD5E78 -name StopService.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::73BD5859-FB38-71F8-24BD-BDCF871F9FD3 -name Sync.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::B9A4E416-DBBC-082A-DA03-351CE8B00548 -name VariableMapping.txt -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::67B3838F-4EF7-2C1C-2E86-78DB8ADD6682 -name ShowUsage.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::2646A97C-C0D9-A29C-E145-C5C371F44938 -name QueryOutputAll.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::2F41E3D2-DA4D-2FCB-B3D5-F04032D17A63 -name QueryOutputCurrent.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
 File ::C6430BDD-8A07-B80E-FC0C-426C16EB4187 -name RemoteControl.exe -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::8E96CC1E-CF8F-81FB-78F2-95DA83B4ED22 -name QueryUpload.bat -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::0DE45C2C-EB7F-6574-9D55-72A22B5296C9 -type dir -name templates -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::40CFA47A-45A1-8C30-FFCF-08DEB67EF185 -name backup.template.conf -parent 0DE45C2C-EB7F-6574-9D55-72A22B5296C9
-File ::14A3E208-A250-1D52-1E73-E3C84DCCCD9A -name NotifySysAdmin.template.vbs~ -parent 0DE45C2C-EB7F-6574-9D55-72A22B5296C9
-File ::2BC3D48B-59D1-132D-F6A9-25FEDAE89BD6 -name NotifySysAdmin.template.vbs -parent 0DE45C2C-EB7F-6574-9D55-72A22B5296C9
-File ::D7D9A52B-3CAC-4090-72EC-768DD7D94400 -name SyncAllowScript.template.bat -parent 0DE45C2C-EB7F-6574-9D55-72A22B5296C9
-File ::61917543-36C2-A1CB-BA81-6265F4F4C3AA -name backup.original.conf -parent 0DE45C2C-EB7F-6574-9D55-72A22B5296C9
 File ::5EADAB59-F559-44CB-A3EE-9A56D4EF17C8 -type dir -name .svn -active 0 -parent 47602DF7-8463-AB89-E13F-11983610CAA2
-File ::31429CC4-525E-4E30-9328-4774AFA9F619 -name entries -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
-File ::A27BEFB6-1421-4030-8F11-F04316BCE57C -name format -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
-File ::C99700CE-1035-498C-9A96-B60835652077 -type dir -name prop-base -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
-File ::2A77AF5B-4761-45B5-A543-6328A7F0F39B -type dir -name props -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
-File ::BF74F2C1-3CE7-4875-9B52-CD0F527E01C7 -type dir -name text-base -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
-File ::90695C82-0000-4F6A-8FE7-0ABDEAA17CAE -type dir -name tmp -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
-File ::7DFF0EE4-7298-4C8C-A5BC-56BBDD81CFC8 -type dir -name prop-base -parent 90695C82-0000-4F6A-8FE7-0ABDEAA17CAE
-File ::4C60E473-119E-4B0B-9B01-56240F24D9D5 -type dir -name props -parent 90695C82-0000-4F6A-8FE7-0ABDEAA17CAE
-File ::E1E25ACC-487B-4191-B8CF-9E7C8C88EA09 -type dir -name text-base -parent 90695C82-0000-4F6A-8FE7-0ABDEAA17CAE
-File ::EC7489EC-9BC7-CF1C-8D3F-40C4203F422D -name query.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::7EA24716-8F12-19BF-8825-6E1CB828EC2B -name ServiceControl.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::FFDEA5C6-74A8-EB75-7E4B-CEC1E3A36DCD -name bu_service.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::E54B0E4B-4825-7F47-F7A5-FD6003230BE8 -name serverCA.pem -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::2448E6EE-D5C6-DC53-3A49-30D013107F37 -targetfilename <%AccountNo%>-key.pem -name key.pem -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::68FC4607-EF29-EAA7-155F-09AD23FD6BC3 -targetfilename <%AccountNo%>-cert.pem -name cert.pem -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::9D8A4908-8D06-D6DF-9016-2C29EB15EEC4 -targetfilename <%AccountNo%>-FileEncKeys.raw -name FileEncKeys.raw -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::9E11F400-C675-74F6-1233-89B3E0638A3B -type dir -name keys -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::1F544B9C-1F8D-6C7A-189B-BB12796BB011 -name service.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::DF0BE0B1-6360-2B38-8CF7-C2FEE5B2E450 -name control.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::BB9FF6C0-C34E-4D2E-8FC4-54E64D710ACC -type dir -name .svn -active 0 -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
-File ::AB8EBBB3-6D82-4AFF-AE41-97738D9B1A1A -name boxbackup.mpi -active 0 -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::31429CC4-525E-4E30-9328-4774AFA9F619 -name entries -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::A27BEFB6-1421-4030-8F11-F04316BCE57C -name format -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::C99700CE-1035-498C-9A96-B60835652077 -type dir -name prop-base -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::6FF9DFDE-4BB7-4319-AC85-BF1E88731C1C -name InstallService.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::6AAE8600-5CFC-4240-A47F-5CFCF4E571C6 -name KillBackupProcess.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::834C33D3-4B53-4B2D-9380-A05420AEE75F -name QueryOutputAll.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::854AD23A-5DDE-44C4-900C-34F5845E6747 -name QueryOutputCurrent.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::9A587DE7-B17C-4CDF-B92C-0D267E30E361 -name ReloadConfig.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::197AAEFA-C62E-4E79-890F-C2E4C8440239 -name RemoteControl.exe.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::912E0F50-53DD-4483-A4F4-CA69944A5959 -name RemoveService.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::BDD695BF-9C7E-4F06-BBCE-EC89536DCF27 -name RestartService.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::61615EE4-BF66-40E7-B89A-E6A50B92AF93 -name ShowUsage.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::A6F7C6B7-9759-4B86-9388-4A42E6F7C5C3 -name StartService.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::45D3E7F5-277B-4E52-81BA-ED6D2BB441D7 -name StopService.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::58966972-8387-4D14-A06E-15AA176633A3 -name Sync.bat.svn-base -active 0 -parent C99700CE-1035-498C-9A96-B60835652077
+File ::2A77AF5B-4761-45B5-A543-6328A7F0F39B -type dir -name props -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::BF74F2C1-3CE7-4875-9B52-CD0F527E01C7 -type dir -name text-base -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::D972D6B2-40E5-40B3-BC06-66B8B7F51B04 -name InstallService.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::2F14E4F3-5331-4AC5-93F7-C4748970C7F4 -name KillBackupProcess.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::9F3663B2-8BAA-4EAE-B606-53D5C922E703 -name QueryOutputAll.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::BE9BD4FB-DF44-4F4B-BB55-15285A8566BA -name QueryOutputCurrent.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::3B4E0BF4-7FDD-4903-8D43-76C43F38C6C4 -name ReloadConfig.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::038CEEA0-3F21-48F6-B109-BBE1EF7D3E96 -name RemoteControl.exe.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::0C177E04-DF2D-43AB-8A42-9E7A389AB1D1 -name RemoveService.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::9BE16F40-9D1D-4C84-843D-955A44069040 -name RestartService.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::4E503A3C-EB42-4870-9849-D508A3D9BAB7 -name ShowUsage.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::131B7D8B-1BEB-456C-8F05-386C2EAFBEAE -name StartService.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::D3D0AFC1-CB6C-42D4-8C05-21898505DA40 -name StopService.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::C89F78B2-25A7-432B-9D92-DC2AB636CFB5 -name Sync.bat.svn-base -active 0 -parent BF74F2C1-3CE7-4875-9B52-CD0F527E01C7
+File ::90695C82-0000-4F6A-8FE7-0ABDEAA17CAE -type dir -name tmp -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::7DFF0EE4-7298-4C8C-A5BC-56BBDD81CFC8 -type dir -name prop-base -active 0 -parent 90695C82-0000-4F6A-8FE7-0ABDEAA17CAE
+File ::4C60E473-119E-4B0B-9B01-56240F24D9D5 -type dir -name props -active 0 -parent 90695C82-0000-4F6A-8FE7-0ABDEAA17CAE
+File ::E1E25ACC-487B-4191-B8CF-9E7C8C88EA09 -type dir -name text-base -active 0 -parent 90695C82-0000-4F6A-8FE7-0ABDEAA17CAE
+File ::E7258732-3D21-4E89-AA41-24AA8B8EBF29 -name all-wcprops -active 0 -parent 5EADAB59-F559-44CB-A3EE-9A56D4EF17C8
+File ::9CEBA2A0-C68B-48BA-944E-2E8EE9A35D97 -name bbackupctl.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::497483A6-7264-4361-86F2-F2703F719908 -name bbackupd-config -active 0 -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::204358FC-610F-47DF-8928-1D0E39921700 -targetfilename templates/original.conf -name bbackupd.conf -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::98C376E2-A6C3-4B6C-BBD4-F70CAC2E6A7B -name bbackupd.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::5C3EAB34-7CD4-4DF3-9DEB-0FC23A6F5812 -name bbackupquery.exe -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::7633DBC3-EACA-4F9B-9A87-AD3AF0EC298E -name installer.iss -active 0 -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
+File ::D3CF86E1-CAFF-4342-8730-463F96EACC39 -targetfilename templates/NotifySysAdmin.original.vbs -name NotifySysAdmin.vbs -parent B9F58CFC-EE7A-BEE4-62CB-2C10665095A2
 Component ::4A9C852B-647E-EED5-5482FFBCC2AF -setup Install -active Yes -platforms {Windows MacOS-X} -name {Default Component} -parent Components
 SetupType ::8202CECC-54A0-9B6C-D24D111BA52E -setup Install -active Yes -platforms {Windows MacOS-X} -name Typical -parent SetupTypes
 
 InstallComponent AE3BD5B4-35DE-4240-B79914D43E56 -setup Install -type pane -title {Welcome Screen} -component Welcome -active No -parent StandardInstall
-InstallComponent 2AC89879-6E9D-3D4E-F28E-5985EEBFAAA8 -setup Install -type pane -conditions 4EE35849-FAD7-170B-0E45-FA30636467B1 -title {Install Password} -component InstallPassword -command insert -active Yes -parent StandardInstall
+InstallComponent 2AC89879-6E9D-3D4E-F28E-5985EEBFAAA8 -setup Install -type pane -conditions 4EE35849-FAD7-170B-0E45-FA30636467B1 -title {Install Password} -component InstallPassword -command insert -active No -parent StandardInstall
 Condition 4EE35849-FAD7-170B-0E45-FA30636467B1 -active Yes -parent 2AC89879-6E9D-3D4E-F28E-5985EEBFAAA8 -title {Password Test Condition} -component PasswordTestCondition -TreeObject::id 4EE35849-FAD7-170B-0E45-FA30636467B1
 InstallComponent B3B99E2D-C368-A921-B7BC-A71EBDE3AD4D -setup Install -type action -title {Set Install Password} -component SetInstallPassword -active Yes -parent 2AC89879-6E9D-3D4E-F28E-5985EEBFAAA8
 InstallComponent 1BEFB82C-C073-73D4-CFCE-F5DE7A674D9E -setup Install -type pane -title {User Information} -component UserInformation -active Yes -parent StandardInstall
@@ -363,8 +366,8 @@ InstallComponent 2EC82FBD-8294-A3E4-7F39-1CBA0582FA64 -setup Install -type actio
 InstallComponent 28E76C8B-2605-4739-9FFE-9C2880C17E59 -setup Install -type action -title {Edit config file} -component ExecuteExternalProgram -active No -parent 37E627F2-E04B-AEF2-D566C017A4D6
 InstallComponent 52F0A238-57E1-A578-2CE4DA177B32 -setup Install -type action -title {Move Forward} -component MoveForward -active Yes -parent 37E627F2-E04B-AEF2-D566C017A4D6
 InstallComponent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7 -setup Install -type pane -title SetBackupLocations -component CustomBlankPane2 -command reorder -active Yes -parent StandardInstall
-InstallComponent A5B32DA1-B2FE-C1FA-6057-FBC3059EF076 -setup Install -type action -title {Execute Script} -component ExecuteScript -active Yes -parent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7
 InstallComponent 614C45B2-7515-780C-E444-7F165CF02DD7 -setup Install -type action -title {Execute Script} -component ExecuteScript -active No -parent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7
+InstallComponent A5B32DA1-B2FE-C1FA-6057-FBC3059EF076 -setup Install -type action -title {Execute Script} -component ExecuteScript -active Yes -parent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7
 InstallComponent F9E38720-6ABA-8B99-2471-496902E4CBC2 -setup Install -type action -title {Execute Script} -component ExecuteScript -active No -parent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7
 InstallComponent 362B6D6A-11BC-83CE-AFF6-410D8FBCF54D -setup Install -type action -title {Execute Script} -component ExecuteScript -active No -parent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7
 InstallComponent 2E2963BD-DDBD-738D-A910-B7F3F04946F9 -setup Install -type action -title ShowAddAnotherValue -component AddWidget -active Yes -parent 3FD9BFF3-2F6E-E4FC-2FAE-98F2017916A7
@@ -778,9 +781,6 @@ No
 28E76C8B-2605-4739-9FFE-9C2880C17E59,WorkingDirectory
 <%InstallDir%>
 
-2AC89879-6E9D-3D4E-F28E-5985EEBFAAA8,Active
-Yes
-
 2AC89879-6E9D-3D4E-F28E-5985EEBFAAA8,BackButton,subst
 1
 
@@ -1145,7 +1145,7 @@ Yes
 <%InstallDir%>
 
 481451CC-F49C-D389-8645076F595B,FileSize
-19437406
+15224460
 
 481451CC-F49C-D389-8645076F595B,Name
 {Program Files}
@@ -2436,7 +2436,7 @@ E56ADFF4-C15E-AEDB-A599-C468AF72C4BB,Conditions
 {0 conditions}
 
 E56ADFF4-C15E-AEDB-A599-C468AF72C4BB,Destination
-{<%InstallDir%>\NotifySysAdmin.vbs}
+{<%InstallDir%>\templates\NotifySysAdmin.original.vbs}
 
 E56ADFF4-C15E-AEDB-A599-C468AF72C4BB,Source
 {<%InstallDir%>\templates\NotifySysAdmin.template.vbs}
@@ -2874,13 +2874,13 @@ Windows,BuildType
 {}
 
 Windows,Executable
-<%BrandName%>BackupService-Setup-3.3-<%AccountNo%><%Ext%>
+installer.exe
 
 Windows,IncludeTWAPI
 No
 
 Windows,InstallDir
-{C:\Program Files\<%BrandName%> Backup Service}
+{C:\Program Files\<%BrandName%>}
 
 Windows,InstallMode
 Standard
@@ -2895,7 +2895,7 @@ Windows,ProgramFolderAllUsers
 No
 
 Windows,ProgramFolderName
-{<%BrandName%> Backup Service}
+<%BrandName%>
 
 Windows,ProgramLicense
 {<%InstallDir%>\LICENSE.txt}
