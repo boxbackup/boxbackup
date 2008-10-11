@@ -75,6 +75,13 @@ namespace
 void memleakfinder_init()
 {
 	ASSERT(!memleakfinder_initialised);
+
+	{
+		// allocates a permanent buffer on Solaris.
+		// not a leak?
+		std::ostringstream oss;
+	}
+
 	memleakfinder_initialised = true;
 }
 
