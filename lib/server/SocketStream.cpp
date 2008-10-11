@@ -482,7 +482,7 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 	BOX_LOG_SYS_ERROR("Failed to get peer credentials on socket");
 #endif
 
-#if HAVE_UCRED_H && HAVE_GETPEERUCRED
+#if defined HAVE_UCRED_H && HAVE_GETPEERUCRED
 	ucred_t *pucred = NULL;
 	if(::getpeerucred(mSocketHandle, &pucred) == 0)
 	{
