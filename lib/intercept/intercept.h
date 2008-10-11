@@ -22,9 +22,6 @@ extern "C"
 	typedef struct dirent *(readdir_t) (DIR *dir);
 	typedef struct dirent *(readdir_t) (DIR *dir);
 	typedef int            (closedir_t)(DIR *dir);
-#if _FILE_OFFSET_BITS == 64
-	#define DEFINE_ONLY_OPEN64
-#endif
 #if defined __GNUC__ && __GNUC__ >= 2
 	#define LINUX_WEIRD_LSTAT
 	#define STAT_STRUCT struct stat /* should be stat64 */
