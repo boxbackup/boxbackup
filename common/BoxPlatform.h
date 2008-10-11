@@ -72,10 +72,14 @@
 #endif
 
 // Find out if credentials on UNIX sockets can be obtained
-#ifndef HAVE_GETPEEREID
-	#if !HAVE_DECL_SO_PEERCRED
-		#define PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
-	#endif
+#ifdef HAVE_GETPEEREID
+	//
+#elif HAVE_DECL_SO_PEERCRED
+	//
+#elif HAVE_UCRED_H && HAVE_GETPEERUCRED
+	//
+#else
+	#define PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 #endif
 
 #ifdef HAVE_DEFINE_PRAGMA
