@@ -182,6 +182,10 @@ AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
 AC_CHECK_DECLS([O_BINARY],,,)
 
+# Solaris provides getpeerucred() instead of getpeereid() or SO_PEERCRED
+AC_CHECK_HEADERS([ucred.h])
+AC_CHECK_FUNCS([getpeerucred])
+
 AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
 AC_CHECK_DECLS([dirfd],,,
 	[[
@@ -311,10 +315,9 @@ build_dir=`dirname $0`
 build_dir=`cd $build_dir && pwd`
 client_parcel_dir=`perl infrastructure/parcelpath.pl backup-client $target_os`
 
-os_name=`uname -o`
-if test "$os_name" = "Cygwin"; then
+if test "$build_os" = "cygwin"; then
 	client_parcel_dir=`cygpath -wa $client_parcel_dir | sed -e 's|\\\|/|g'`
-	build_dir=`cygpath -wa $build_dir | sed -e 's|\\\|/|g'`
+	build_dir=`        cygpath -wa $build_dir         | sed -e 's|\\\|/|g'`
 fi
 
 AC_SUBST([client_parcel_dir])

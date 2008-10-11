@@ -18,7 +18,11 @@
 #include <string.h>
 
 #ifndef WIN32
-#include <poll.h>
+	#include <poll.h>
+#endif
+
+#ifdef HAVE_UCRED_H
+	#include <ucred.h>
 #endif
 
 #include "SocketStream.h"
@@ -478,10 +482,26 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 	BOX_LOG_SYS_ERROR("Failed to get peer credentials on socket");
 #endif
 
+#if HAVE_UCRED_H && HAVE_GETPEERUCRED
+	ucred_t *pucred = NULL;
+	if(::getpeerucred(mSocketHandle, &pucred) == 0)
+	{
+		rUidOut = ucred_geteuid(pucred);
+		rGidOut = ucred_getegid(pucred);
+		ucred_free(pucred);
+		if (rUidOut == -1 || rGidOut == -1)
+		{
+			BOX_ERROR("Failed to get peer credentials on "
+				"socket: insufficient information");
+			return false;
+		}
+		return true;
+	}
+
+	BOX_LOG_SYS_ERROR("Failed to get peer credentials on socket");
+#endif
+
 	// Not available
 	return false;
 }
-
-
-
 
