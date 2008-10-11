@@ -757,15 +757,15 @@ static char stat_hook_filename[512];
 // This will not match the directory on the store, so a sync will start.
 // We set up the next intercept for the same directory by passing NULL.
 
-struct dirent *readdir_test_hook_2(DIR *dir);
+extern "C" struct dirent *readdir_test_hook_2(DIR *dir);
 
 #ifdef LINUX_WEIRD_LSTAT
-int lstat_test_hook(int ver, const char *file_name, struct stat *buf);
+extern "C" int lstat_test_hook(int ver, const char *file_name, struct stat *buf);
 #else
-int lstat_test_hook(const char *file_name, struct stat *buf);
+extern "C" int lstat_test_hook(const char *file_name, struct stat *buf);
 #endif
 
-struct dirent *readdir_test_hook_1(DIR *dir)
+extern "C" struct dirent *readdir_test_hook_1(DIR *dir)
 {
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	intercept_setup_readdir_hook(NULL, readdir_test_hook_2);
@@ -776,7 +776,7 @@ struct dirent *readdir_test_hook_1(DIR *dir)
 // Second test hook, during the directory sync stage, keeps returning 
 // new filenames until the timer expires, then disables the intercept.
 
-struct dirent *readdir_test_hook_2(DIR *dir)
+extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 {
 	if (time(NULL) >= readdir_stop_time)
 	{
@@ -812,9 +812,9 @@ struct dirent *readdir_test_hook_2(DIR *dir)
 }
 
 #ifdef LINUX_WEIRD_LSTAT
-int lstat_test_hook(int ver, const char *file_name, struct stat *buf)
+extern "C" int lstat_test_hook(int ver, const char *file_name, struct stat *buf)
 #else
-int lstat_test_hook(const char *file_name, struct stat *buf)
+extern "C" int lstat_test_hook(const char *file_name, struct stat *buf)
 #endif
 {
 	// TRACE1("lstat hook triggered for %s", file_name);
@@ -1666,7 +1666,7 @@ int test_bbackupd()
 
 		// create a new file to force an upload
 
-		char* new_file = "testfiles/TestDir1/force-upload-2";
+		const char* new_file = "testfiles/TestDir1/force-upload-2";
 		int fd = open(new_file, 
 			O_CREAT | O_EXCL | O_WRONLY, 0700);
 		if (fd <= 0)
@@ -1675,7 +1675,7 @@ int test_bbackupd()
 		}
 		TEST_THAT(fd > 0);
 	
-		char* control_string = "whee!\n";
+		const char* control_string = "whee!\n";
 		TEST_THAT(write(fd, control_string, 
 			strlen(control_string)) ==
 			(int)strlen(control_string));
@@ -2418,7 +2418,7 @@ int test_bbackupd()
 			// we now have 3 seconds before bbackupd
 			// runs the SyncAllowScript again.
 
-			char* sync_control_file = "testfiles" 
+			const char* sync_control_file = "testfiles" 
 				DIRECTORY_SEPARATOR "syncallowscript.control";
 			int fd = open(sync_control_file, 
 				O_CREAT | O_EXCL | O_WRONLY, 0700);
@@ -2428,7 +2428,7 @@ int test_bbackupd()
 			}
 			TEST_THAT(fd > 0);
 		
-			char* control_string = "10\n";
+			const char* control_string = "10\n";
 			TEST_THAT(write(fd, control_string, 
 				strlen(control_string)) ==
 				(int)strlen(control_string));
@@ -2437,7 +2437,7 @@ int test_bbackupd()
 			// this will pause backups, bbackupd will check
 			// every 10 seconds to see if they are allowed again.
 
-			char* new_test_file = "testfiles"
+			const char* new_test_file = "testfiles"
 				DIRECTORY_SEPARATOR "TestDir1"
 				DIRECTORY_SEPARATOR "Added_During_Pause";
 			fd = open(new_test_file,
