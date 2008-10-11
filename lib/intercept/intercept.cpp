@@ -232,6 +232,10 @@ int intercept_reterr()
 		} \
 	}
 
+#if defined _FILE_OFFSET_BITS && _FILE_OFFSET_BITS == 64
+	#define DEFINE_ONLY_OPEN64
+#endif
+
 extern "C" int
 #ifdef DEFINE_ONLY_OPEN64
 	open64(const char *path, int flags, ...)
