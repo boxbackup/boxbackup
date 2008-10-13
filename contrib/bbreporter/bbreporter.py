@@ -98,7 +98,7 @@ class BoxBackupReporter:
         # Regex's
         self.re_automatic_backup = re.compile(" *AutomaticBackup *= *no", re.I)
         self.re_syslog = re.compile("(\S+) +(\S+) +([\d:]+) +(\S+) +([^:]+): +"+
-                                    "([^:]+): *(.*)") 
+                                    "(?:[A-Z]+:)? *([^:]+): *(.*)") 
         
         # Initialise report
         self.reset()
