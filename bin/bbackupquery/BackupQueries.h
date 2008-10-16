@@ -58,9 +58,9 @@ private:
 	void CommandUndelete(const std::vector<std::string> &args, const bool *opts);
 	void CommandDelete(const std::vector<std::string> &args,
 		const bool *opts);
-	void CommandUsage();
+	void CommandUsage(const bool *opts);
 	void CommandUsageDisplayEntry(const char *Name, int64_t Size,
-		int64_t HardLimit, int32_t BlockSize);
+		int64_t HardLimit, int32_t BlockSize, bool MachineReadable);
 	void CommandHelp(const std::vector<std::string> &args);
 
 	// Implementations
