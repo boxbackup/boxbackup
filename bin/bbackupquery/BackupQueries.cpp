@@ -222,7 +222,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{ "compare", "alcqAEQ" },
 		{ "restore", "drif" },
 		{ "help", "" },
-		{ "usage", "" },
+		{ "usage", "m" },
 		{ "undelete", "" },
 		{ "delete", "" },
 		{ NULL, NULL } 
@@ -358,7 +358,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		break;
 		
 	case Command_Usage:
-		CommandUsage();
+		CommandUsage(opts);
 		break;
 		
 	case Command_Help:
@@ -2248,36 +2248,46 @@ void BackupQueries::CommandHelp(const std::vector<std::string> &args)
 //		Created: 19/4/04
 //
 // --------------------------------------------------------------------------
-void BackupQueries::CommandUsage()
+void BackupQueries::CommandUsage(const bool *opts)
 {
+	bool MachineReadable = opts['m'];
+
 	// Request full details from the server
 	std::auto_ptr<BackupProtocolClientAccountUsage> usage(mrConnection.QueryGetAccountUsage());
 
 	// Display each entry in turn
 	int64_t hardLimit = usage->GetBlocksHardLimit();
 	int32_t blockSize = usage->GetBlockSize();
-	CommandUsageDisplayEntry("Used", usage->GetBlocksUsed(), hardLimit, blockSize);
-	CommandUsageDisplayEntry("Old files", usage->GetBlocksInOldFiles(), hardLimit, blockSize);
-	CommandUsageDisplayEntry("Deleted files", usage->GetBlocksInDeletedFiles(), hardLimit, blockSize);
-	CommandUsageDisplayEntry("Directories", usage->GetBlocksInDirectories(), hardLimit, blockSize);
-	CommandUsageDisplayEntry("Soft limit", usage->GetBlocksSoftLimit(), hardLimit, blockSize);
-	CommandUsageDisplayEntry("Hard limit", hardLimit, hardLimit, blockSize);
+	CommandUsageDisplayEntry("Used", usage->GetBlocksUsed(), hardLimit,
+		blockSize, MachineReadable);
+	CommandUsageDisplayEntry("Old files", usage->GetBlocksInOldFiles(),
+		hardLimit, blockSize, MachineReadable);
+	CommandUsageDisplayEntry("Deleted files", usage->GetBlocksInDeletedFiles(),
+		hardLimit, blockSize, MachineReadable);
+	CommandUsageDisplayEntry("Directories", usage->GetBlocksInDirectories(),
+		hardLimit, blockSize, MachineReadable);
+	CommandUsageDisplayEntry("Soft limit", usage->GetBlocksSoftLimit(),
+		hardLimit, blockSize, MachineReadable);
+	CommandUsageDisplayEntry("Hard limit", hardLimit, hardLimit, blockSize,
+		MachineReadable);
 }
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::CommandUsageDisplayEntry(const char *, int64_t, int64_t, int32_t)
+//		Name:    BackupQueries::CommandUsageDisplayEntry(const char *,
+//			 int64_t, int64_t, int32_t, bool)
 //		Purpose: Display an entry in the usage table
 //		Created: 19/4/04
 //
 // --------------------------------------------------------------------------
-void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size, int64_t HardLimit, int32_t BlockSize)
+void BackupQueries::CommandUsageDisplayEntry(const char *Name, int64_t Size,
+int64_t HardLimit, int32_t BlockSize, bool MachineReadable)
 {
-	std::cout << FormatUsageLineStart(Name, false) <<
-		FormatUsageBar(Size, Size * BlockSize, HardLimit * BlockSize, false) <<
-		std::endl;
+	std::cout << FormatUsageLineStart(Name, MachineReadable) <<
+		FormatUsageBar(Size, Size * BlockSize, HardLimit * BlockSize,
+			MachineReadable) << std::endl;
 }
 
 

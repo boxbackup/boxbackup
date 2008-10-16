@@ -142,9 +142,11 @@ compare <store-dir-name> <local-dir-name>
 	stored format, which is encrypted and compressed.
 <
 
-> usage
+> usage [-m]
 
 	Show space used on the server for this account.
+
+	-m -- display the output in machine-readable form
 
 	Used: Total amount of space used on the server.
 	Old files: Space used by old files
