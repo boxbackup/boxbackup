@@ -13,6 +13,8 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#include <cstdlib>
+
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
 	#include <execinfo.h>
 	#include <stdlib.h>
