@@ -411,7 +411,7 @@
       </varlistentry>
 
       <varlistentry>
-        <term><command>usage</command></term>
+        <term><command>usage</command> <optional>-m</optional></term>
 
         <listitem>
           <para>Show space used on the server for this account. Display
@@ -443,6 +443,9 @@
           the usage stay at just below the soft limit. You only need more
           space if the space used by old and deleted files is near
           zero.</para>
+
+          <para>The <option>-m</option> option displays output in
+          machine-readable form.</para>
         </listitem>
       </varlistentry>
     </variablelist>
