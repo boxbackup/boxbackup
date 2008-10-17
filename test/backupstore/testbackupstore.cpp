@@ -72,7 +72,7 @@ static const char *ens_filenames[] = {"obj1ertewt", "obj2", "obj3", "obj4dfedfg4
 
 typedef struct
 {
-	char *fnextra;
+	const char *fnextra;
 	BackupStoreFilenameClear name;
 	int seed;
 	int size;
