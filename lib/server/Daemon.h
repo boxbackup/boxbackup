@@ -19,8 +19,8 @@
 #include <string>
 
 #include "BoxTime.h"
+#include "Configuration.h"
 
-class Configuration;
 class ConfigurationVerify;
 
 // --------------------------------------------------------------------------
