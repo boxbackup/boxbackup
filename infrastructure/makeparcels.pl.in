@@ -239,8 +239,10 @@ EOF
 			{
 				$local_install_dir = "@prefix@/$dest";
 			}
+			print SCRIPT "mkdir -p " .
+				"\${DESTDIR}$local_install_dir/\n";
 			print SCRIPT "install $name " .
-				"\$DESTDIR$local_install_dir\n";
+				"\${DESTDIR}$local_install_dir\n";
 		}
 	}
 
