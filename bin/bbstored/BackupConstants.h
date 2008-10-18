@@ -10,8 +10,6 @@
 #ifndef BACKUPCONSTANTS__H
 #define BACKUPCONSTANTS__H
 
-#define BACKUP_STORE_DEFAULT_ACCOUNT_DATABASE_FILE	"/etc/box/backupstoreaccounts"
-
 // 15 minutes to timeout (milliseconds)
 #define	BACKUP_STORE_TIMEOUT			(15*60*1000)
 
