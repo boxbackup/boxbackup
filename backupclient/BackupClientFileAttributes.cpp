@@ -304,6 +304,8 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 		struct stat st;
 		if(::lstat(Filename, &st) != 0)
 		{
+			BOX_LOG_SYS_ERROR("Failed to stat file: '" <<
+				Filename << "'");
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 		
@@ -441,6 +443,7 @@ void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBl
 	int linkedToSize = ::readlink(Filename, linkedTo, PATH_MAX);
 	if(linkedToSize == -1)
 	{
+		BOX_LOG_SYS_ERROR("Failed to readlink '" << Filename << "'");
 		THROW_EXCEPTION(CommonException, OSFileError);
 	}
 
@@ -531,6 +534,9 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), 0, 0);
 				if(valueSize<0)
 				{
+					BOX_LOG_SYS_ERROR("Failed to get "
+						"extended attributes size "
+						"for '" << Filename << "'");
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
 
@@ -546,6 +552,9 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
 				if(valueSize<0)
 				{
+					BOX_LOG_SYS_ERROR("Failed to get "
+						"extended attributes for " 
+						"'" << Filename << "'");
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
 				xattrSize += valueSize;
@@ -569,15 +578,15 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 			}
 			else if(errno == ERANGE)
 			{
-				BOX_ERROR("Failed to read extended "
-					"attributes of " << Filename <<
-					": buffer too small, not backed up");
+				BOX_ERROR("Failed to list extended "
+					"attributes of '" << Filename << "': "
+					"buffer too small, not backed up");
 			}
 			else
 			{
-				BOX_LOG_SYS_ERROR("Failed to read extended "
-					"attributes of " << Filename <<
-					", not backed up");
+				BOX_LOG_SYS_ERROR("Failed to list extended "
+					"attributes of '" << Filename << "', "
+					"not backed up");
 				THROW_EXCEPTION(CommonException, OSFileError);
 			}
 		}
@@ -656,6 +665,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		::unlink(Filename);
 		if(::symlink((char*)(pattr + 1), Filename) != 0)
 		{
+			BOX_LOG_SYS_ERROR("Failed to symlink '" << Filename <<
+				"' to '" << (char*)(pattr + 1) << "'");
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 #endif
@@ -673,12 +684,18 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 				// Not a link, use normal chown
 				if(::chown(Filename, ntohl(pattr->UID), ntohl(pattr->GID)) != 0)
 				{
+					BOX_LOG_SYS_ERROR("Failed to change "
+						"owner of file "
+						"'" << Filename << "'");
 					THROW_EXCEPTION(CommonException, OSFileError)
 				}
 			}
 		#else
-			if(::lchown(Filename, ntohl(pattr->UID), ntohl(pattr->GID)) != 0)	// use the version which sets things on symlinks
+			// use the version which sets things on symlinks
+			if(::lchown(Filename, ntohl(pattr->UID), ntohl(pattr->GID)) != 0)
 			{
+				BOX_LOG_SYS_ERROR("Failed to change owner of "
+					"symbolic link '" << Filename << "'");
 				THROW_EXCEPTION(CommonException, OSFileError)
 			}
 		#endif
@@ -723,6 +740,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		// Try to apply
 		if(::utimes(Filename, times) != 0)
 		{
+			BOX_LOG_SYS_ERROR("Failed to change times of "
+				"file '" << Filename << "'");
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
@@ -733,8 +752,12 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 	}
 
 	// Apply everything else... (allowable mode flags only)
-	if(::chmod(Filename, mode & (S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID | S_ISGID | S_ISVTX)) != 0)	// mode must be done last (think setuid)
+	// Mode must be done last (think setuid)
+	if(::chmod(Filename, mode & (S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID
+		| S_ISGID | S_ISVTX)) != 0)
 	{
+		BOX_LOG_SYS_ERROR("Failed to change permissions of file "
+			"'" << Filename << "'");
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
 }
@@ -849,6 +872,8 @@ void BackupClientFileAttributes::WriteExtendedAttr(const char *Filename, int xat
 		// FIXME: Warn on EOPNOTSUPP
 		if(::lsetxattr(Filename, key, buffer+xattrOffset, valueSize, 0)!=0 && errno!=EOPNOTSUPP)
 		{
+			BOX_LOG_SYS_ERROR("Failed to set extended attributes "
+				"on file '" << Filename << "'");
 			THROW_EXCEPTION(CommonException, OSFileError);
 		}
 
