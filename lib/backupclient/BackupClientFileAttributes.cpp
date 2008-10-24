@@ -15,6 +15,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include <limits.h>
 
 #include <algorithm>
