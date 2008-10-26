@@ -420,8 +420,10 @@ extern "C" void memleakfinder_atexit()
 
 void memleakfinder_setup_exit_report(const char *filename, const char *markertext)
 {
-	::strcpy(atexit_filename, filename);
-	::strcpy(atexit_markertext, markertext);
+	::strncpy(atexit_filename, filename, sizeof(atexit_filename)-1);
+	::strncpy(atexit_markertext, markertext, sizeof(atexit_markertext)-1);
+	atexit_filename[sizeof(atexit_filename)-1] = 0;
+	atexit_markertext[sizeof(atexit_markertext)-1] = 0;
 	if(!atexit_registered)
 	{
 		atexit(memleakfinder_atexit);
