@@ -10,7 +10,7 @@ my $cleaned = 1;
 my $dist_archives_exist = 0;
 my @bad_h;
 
-open EVERYTHING,'find . |' or die "Can't open find for file listing";
+open EVERYTHING,'find . -type d \( -name docs \) -prune -o -type f |' or die "Can't open find for file listing";
 
 my %exclude_from_memtest_checks = ('PollEmulator.cpp'=>1,'DebugMemLeakFinder.cpp'=>1,'MemLeakFinder.h'=>1,'MemLeakFindOn.h'=>1,'MemLeakFindOff.h'=>1,'Box.h'=>1);
 
@@ -178,7 +178,7 @@ sub ask_about_delete
 	{
 		print $_,"\n";
 	}
-	print "Delete these ",$#$del_r + 1, " $name?";
+	print "Delete these ",$#$del_r + 1, " $name? ";
 	my $in = <STDIN>;
 	chomp $in;
 	if($in eq 'yes')
