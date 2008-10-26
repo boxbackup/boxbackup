@@ -92,7 +92,9 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
 			addr.sa_unix.sun_len = sockAddrLen;
 #endif
 			addr.sa_unix.sun_family = PF_UNIX;
-			::strcpy(addr.sa_unix.sun_path, rName.c_str());
+			::strncpy(addr.sa_unix.sun_path, rName.c_str(),
+				sizeof(addr.sa_unix.sun_path) - 1);
+			addr.sa_unix.sun_path[sizeof(addr.sa_unix.sun_path)-1] = 0;
 		}
 		break;
 #endif
