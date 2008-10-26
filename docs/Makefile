@@ -44,13 +44,13 @@ manpages: $(MANXSL) man-dirs man-nroff man-html
 $(MANXSL): $(MANXSL).tmpl
 	@sed -e 's,%%DOCBOOK%%,$(DOCBOOK),' $(MANXSL).tmpl > $(MANXSL)
 
-man-dirs: man-pages/.there $(HTMLPREFIX)/man-html/.there
+man-dirs: man/.there $(HTMLPREFIX)/man-html/.there
 
 $(HTMLPREFIX)/man-html/.there:
-	if [ ! -d man-html ]; then mkdir -p $(HTMLPREFIX)/man-html; touch $(HTMLPREFIX)/man-html/.there; fi
+	if [ ! -d $(HTMLPREFIX)/man-html ]; then mkdir -p $(HTMLPREFIX)/man-html; touch $(HTMLPREFIX)/man-html/.there; fi
 
-man-pages/.there:
-	if [ ! -d man-pages ]; then mkdir man-pages; touch man-pages/.there; fi
+man/.there:
+	if [ ! -d man ]; then mkdir man; touch man/.there; fi
 
 man-nroff: bbackupd.8 bbackupd-config.8 bbackupctl.8 bbackupquery.8 \
 	bbstored.8 bbstored-config.8 bbstoreaccounts.8 bbstored-certs.8 \
@@ -63,21 +63,21 @@ man-html: bbackupd.html bbackupd-config.html bbackupctl.html bbackupquery.html \
 	bbackupd.conf.html bbstored.conf.html raidfile.conf.html
 
 .xml.html:
-	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
-	cp $@ $(HTMLPREFIX)/man-html/.
+	@$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
+	@cp $@ $(HTMLPREFIX)/man-html/.
 
 .xml.8 .xml.5:
-	$(DBPROC) -o $@ $(MANXSL) $<
-	cp $@ man-pages/
-	rm -f man-pages/$@.gz
-	gzip -f -9 man-pages/$@
+	@$(DBPROC) -o $@ $(MANXSL) $<
+	@cp $@ man/
+	@rm -f man/$@.gz
+	@gzip -f -9 man/$@
 
 dockit: clean docs
 	tar zcf documentation-kit-0.10.tar.gz $(HTMLPREFIX)/
 
 clean:
 	if [ -d ./$(HTMLPREFIX) ]; then rm -rf $(HTMLPREFIX) ; fi
-	if [ -d ./man-pages ]; then  rm -rf ./man-pages/; fi
+	if [ -d ./man ]; then  rm -rf ./man/; fi
 	if [ -f ExceptionCodes.xml ]; then rm ExceptionCodes.xml; fi
 	if [ -f documentation-kit-0.10.tar.gz ]; then rm documentation-kit-0.10.tar.gz; fi
 
