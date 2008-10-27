@@ -1,6 +1,6 @@
 
-http://www.fluffy.co.uk/boxbackup/
+http://www.boxbackup.org/
 
-Ben Summers
-ben@fluffy.co.uk
+Ben Summers & contributors
+boxbackup@boxbackup.org
 
