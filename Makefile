@@ -21,9 +21,9 @@ DOCBOOK=http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
 all: docs
 
 docs: instguide adminguide manpages
-	mkdir -p $(HTMLPREFIX)/images
-	cp html/images/*.png $(HTMLPREFIX)/images/.
-	cp html/*.css $(HTMLPREFIX)/.
+	@mkdir -p $(HTMLPREFIX)/images
+	@cp html/images/*.png $(HTMLPREFIX)/images/.
+	@cp html/*.css $(HTMLPREFIX)/.
 
 adminguide: $(HTMLPREFIX)/adminguide/index.html 
 
