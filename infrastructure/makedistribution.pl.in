@@ -332,7 +332,11 @@ sub copy_dir
 		next if m/\AMakefile\Z/;
 		next if m/\Aautogen/;
 		next if m/-smf-method\Z/; # copy only the .in versions
-		next if m/-manifest.xml\Z/; # copy onlt the .in versions
+		next if m/-manifest.xml\Z/; # copy only the .in versions
+		if($dir eq 'docs') {
+			next if m/.(x[sm]l|tmpl)\Z/; # don't include doc sources
+			next if m/generate_except_xml.pl/;
+		}
 		next if !-f "$dir/$_";
 		
 		copy_file("$dir/$_","$dst_dir/$_");

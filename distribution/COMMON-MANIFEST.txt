@@ -1,4 +1,5 @@
 RUN ./bootstrap
+RUN cd docs; make
 lib/common
 lib/crypto
 lib/server
@@ -11,15 +12,17 @@ test/basicserver/testfiles
 test/crypto
 test/compress
 test/win32
-docs/common notes
-docs/common/lib_common notes/lib_common
-docs/common/lib_crypto notes/lib_crypto
-docs/common/lib_server notes/lib_server
+docs/api-docs/common docs/api-notes
+docs/api-docs/common/lib_common docs/api-notes/lib_common
+docs/api-docs/common/lib_crypto docs/api-notes/lib_crypto
+docs/api-docs/common/lib_server docs/api-notes/lib_server
 MKDIR infrastructure
 infrastructure/buildenv-testmain-template.cpp
 infrastructure/makebuildenv.pl.in
 infrastructure/makedistribution.pl.in
 infrastructure/makeparcels.pl.in
+infrastructure/parcelpath.pl
+infrastructure/printversion.pl
 infrastructure/BoxPlatform.pm.in
 infrastructure/mingw
 infrastructure/msvc
