@@ -19,12 +19,15 @@ test/backupstorepatch
 test/bbackupd
 test/bbackupd/testfiles
 test/backupdiff
-docs/raidfile notes
-docs/raidfile/lib_raidfile notes/lib_raidfile
-docs/backup notes
-documentation
-documentation/html
-documentation/html/images
+docs/api-docs/raidfile docs/api-notes
+docs/api-docs/raidfile/lib_raidfile docs/api-notes/lib_raidfile
+docs/api-docs/backup docs/api-notes
+docs/box-html docs/htmlguide
+docs/box-html/adminguide docs/htmlguide/adminguide
+docs/box-html/images docs/htmlguide/images
+docs/box-html/instguide docs/htmlguide/instguide
+docs/box-html/man-html docs/htmlguide/manpages
+docs/man
 TODO.txt
 BUGS.txt
 contrib
@@ -35,6 +38,9 @@ REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
 NO-LICENSE-IN-DIR contrib/solaris
 NO-LICENSE-IN-DIR contrib/suse
 NO-LICENSE-IN-DIR contrib/bbreporter
+NO-LICENSE-IN-DIR contrib/windows
+NO-LICENSE-IN-DIR contrib/windows/installer
+NO-LICENSE-IN-DIR contrib/windows/installer/tools
 infrastructure/msvc
 NO-LICENSE-IN-DIR infrastructure/msvc/2003
 NO-LICENSE-IN-DIR infrastructure/msvc/2005
