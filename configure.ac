@@ -313,7 +313,7 @@ AC_SUBST([localstatedir_expanded])
 ## Figure out the client parcel directory and substitute it
 build_dir=`dirname $0`
 build_dir=`cd $build_dir && pwd`
-client_parcel_dir=`perl infrastructure/parcelpath.pl backup-client $target_os`
+client_parcel_dir=`$PERL infrastructure/parcelpath.pl backup-client $target_os`
 
 if test "$build_os" = "cygwin"; then
 	client_parcel_dir=`cygpath -wa $client_parcel_dir | sed -e 's|\\\|/|g'`
@@ -324,7 +324,7 @@ AC_SUBST([client_parcel_dir])
 AC_SUBST([build_dir])
 
 ## Figure out version and substitute it in
-box_version=`perl infrastructure/printversion.pl`
+box_version=`$PERL infrastructure/printversion.pl`
 AC_SUBST([box_version])
 
 ### Output files
