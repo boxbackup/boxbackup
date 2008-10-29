@@ -1174,7 +1174,7 @@ int test_bbackupd()
 		{
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
-			if (line == "Send ListDirectory(0x3,0xffffffff,0xc,true)")
+			if (line == "Send ListDirectory(0x3,0xffff,0xc,true)")
 			{
 				found1 = true;
 				break;
