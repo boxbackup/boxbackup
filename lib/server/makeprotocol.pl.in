@@ -538,11 +538,13 @@ __E
 	}
 	if($implement_filelog)
 	{
-		my ($format,$args) = make_log_strings($cmd);
+		my ($log) = make_log_strings_framework($cmd);
 		print CPP <<__E;
 void ${class}LogFile(const char *Action, FILE *File) const
 {
-	::fprintf(File,"%s $format\\n",Action$args);
+	std::ostringstream oss;
+	oss << $log;
+	::fprintf(File, "%s\\n", oss.str().c_str());
 	::fflush(File);
 }
 __E
@@ -1051,10 +1053,22 @@ sub make_log_strings_framework
 			my ($format,$arg) = @{$log_display_types{$ty}};
 			$arg =~ s/VAR/m$nm/g;
 
-			if ($format =~ m'x$')
+			if ($format eq '\\"%s\\"')
 			{
-				$arg = "std::hex << std::showbase " .
-					"<< $arg << std::dec";
+				$arg = "\"\\\"\" << $arg << \"\\\"\"";
+			}
+			elsif ($format =~ m'x$')
+			{
+				# my $width = 0;
+				# $ty =~ /^int(\d+)$/ and $width = $1 / 4;
+				$arg = 	"($arg == 0 ? \"0x\" : \"\") " .
+					"<< std::hex " .
+					"<< std::showbase " .
+					# "<< std::setw($width) " .
+					# "<< std::setfill('0') " .
+					# "<< std::internal " .
+					"<< $arg " .
+					"<< std::dec";
 			}
 
 			push @args, $arg;
