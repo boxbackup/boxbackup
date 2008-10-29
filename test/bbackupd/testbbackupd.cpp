@@ -1002,21 +1002,26 @@ int test_bbackupd()
 		// before any matching blocks could be found.
 		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
 			0, 4000, SYS_read, 1);
-		pid = start_internal_daemon();
-		intercept_clear_setup();
+		{
+			Timers::Init();
+			BackupDaemon bbackupd;
+			bbackupd.Configure("testfiles/bbackupd.conf");
+			bbackupd.InitCrypto();
 		
-		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
-		TEST_THAT(fd > 0);
-		// write again, to update the file's timestamp
-		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
-			"Buffer write");
-		TEST_THAT(close(fd) == 0);	
+			fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
+			TEST_THAT(fd > 0);
+			// write again, to update the file's timestamp
+			TEST_EQUAL(1, write(fd, "z", 1), "Buffer write");
+			TEST_THAT(close(fd) == 0);
 
-		wait_for_backup_operation();
-		// can't test whether intercept was triggered, because
-		// it's in a different process.
-		// TEST_THAT(intercept_triggered());
-		TEST_THAT(stop_internal_daemon(pid));
+			// wait long enough to put file into sync window
+			wait_for_operation(5);
+
+			bbackupd.RunSyncNow();
+			TEST_THAT(intercept_triggered());
+			intercept_clear_setup();
+			Timers::Cleanup();
+		}
 
 		// check that the diff was aborted, i.e. upload was not a diff
 		found1 = false;
@@ -1174,7 +1179,7 @@ int test_bbackupd()
 		{
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
-			if (line == "Send ListDirectory(0x3,0xffffffff,0xc,true)")
+			if (line == "Send ListDirectory(0x3,0xffff,0xc,true)")
 			{
 				found1 = true;
 				break;
