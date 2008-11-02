@@ -28,6 +28,29 @@ docs/box-html/images docs/htmlguide/images
 docs/box-html/instguide docs/htmlguide/instguide
 docs/box-html/man-html docs/htmlguide/manpages
 docs/man
+MKDIR docs/docbook
+RUN cd docs; sed -i "" -e '/^ExceptionCodes/,/^$/s/\(.*\)/# &/' Makefile
+docs/Makefile docs/docbook/Makefile
+docs/ExceptionCodes.xml docs/docbook/ExceptionCodes.xml
+docs/adminguide.xml docs/docbook/adminguide.xml
+docs/bb-book.xsl docs/docbook/bb-book.xsl
+docs/bb-man.xsl.tmpl docs/docbook/bb-man.xsl.tmpl
+docs/bb-nochunk-book.xsl docs/docbook/bb-nochunk-book.xsl
+docs/bbackupctl.xml docs/docbook/bbackupctl.xml
+docs/bbackupd-config.xml docs/docbook/bbackupd-config.xml
+docs/bbackupd.conf.xml docs/docbook/bbackupd.conf.xml
+docs/bbackupd.xml docs/docbook/bbackupd.xml
+docs/bbackupquery.xml docs/docbook/bbackupquery.xml
+docs/bbstoreaccounts.xml docs/docbook/bbstoreaccounts.xml
+docs/bbstored-certs.xml docs/docbook/bbstored-certs.xml
+docs/bbstored-config.xml docs/docbook/bbstored-config.xml
+docs/bbstored.conf.xml docs/docbook/bbstored.conf.xml
+docs/bbstored.xml docs/docbook/bbstored.xml
+docs/instguide.xml docs/docbook/instguide.xml
+docs/raidfile-config.xml docs/docbook/raidfile-config.xml
+docs/raidfile.conf.xml docs/docbook/raidfile.conf.xml
+docs/html docs/docbook/html
+docs/html/images docs/docbook/html/images
 TODO.txt
 BUGS.txt
 contrib
