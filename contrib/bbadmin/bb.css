@@ -1,0 +1,70 @@
+body
+{
+	background: #edeef3;
+}
+
+table
+{
+	border-spacing: 0px;
+}
+
+h1, th
+{
+	background: #e4e6ed;
+}
+
+h1
+{
+	border-top: 1px solid #c4c4d5;
+	border-bottom: 1px solid #fff;
+}
+
+td, th
+{
+	border-top: 1px solid #fff;
+	border-bottom: 1px solid #c4c4d5;
+	margin: 0px;
+	padding: 0.2em 0.5em;
+}
+
+th
+{
+	text-align: left;
+}
+
+table.numbers td
+{
+	text-align: right;
+}
+
+div.error, div.success
+{
+	margin: 1em;
+}
+
+div.error>*, div.success>*
+{
+	margin: 0.5em;
+}
+
+div.error
+{
+	background: #fdd;
+	border: 2px solid #c00;
+}
+
+div.success
+{
+	background: #dfd;
+	border: 2px solid #0c0;
+}
+
+h2, table, p
+{
+	margin: 0.5em;
+}
+
+form
+{
+	margin: 0.5em 0;
+}
