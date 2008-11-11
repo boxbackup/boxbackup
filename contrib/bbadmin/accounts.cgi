@@ -345,7 +345,8 @@ print $cgi->Tr(
 sub human_format($)
 {
 	my ($kb) = @_;
-	die unless $kb =~ /^(\d+) (kB)$/;
+	die "bad format in value: expected number followed by kB, " .
+		"found '$kb'" unless $kb =~ /^(\d+) (kB)$/;
 
 	my $value = $1;
 	my $units = $2;
