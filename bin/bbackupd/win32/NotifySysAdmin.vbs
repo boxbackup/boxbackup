@@ -32,7 +32,7 @@ If args(0) = "store-full" Then
 ElseIf args(0) = "read-error" Then
 	subject = subjtmpl & " (read errors)"
 	body =	"Errors occurred reading some files or directories " & _
-		"for backup on " & hostname & "." _ & vbCrLf & _
+		"for backup on " & hostname & "." & vbCrLf & _
 		vbCrLf & _
 		"===================================" & vbCrLf & _
 		"THESE FILES ARE NOT BEING BACKED UP" & vbCrLf & _
@@ -55,7 +55,8 @@ ElseIf args(0) = "backup-error" Then
 		"information about the error, " & vbCrLf & _
 		"and take appropriate action." & vbCrLf
 	SendMail from,sendto,subject,body
-ElseIf args(0) = "backup-start" Or args(0) = "backup-finish" Then
+ElseIf args(0) = "backup-start" Or args(0) = "backup-finish" _
+	Or args(0) = "backup-ok" Then
 	' do nothing for these messages by default
 Else
 	subject = subjtmpl & " (unknown)"
