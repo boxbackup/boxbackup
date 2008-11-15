@@ -30,11 +30,13 @@
 //		Created: 2003/07/11
 //
 // --------------------------------------------------------------------------
-RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, const std::string &rFilename, int *pStartDisc, int *pExisitingFiles, int64_t *pRevisionID)
+RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
+	const std::string &rFilename, int *pStartDisc, int *pExistingFiles,
+	int64_t *pRevisionID)
 {
-	if(pExisitingFiles)
+	if(pExistingFiles)
 	{
-		*pExisitingFiles = 0;
+		*pExistingFiles = 0;
 	}
 	
 	// For stat call, although the results are not examined
@@ -89,9 +91,9 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet, 
 			// Component file exists, add to count
 			rfCount++;
 			// Set flags for existance?
-			if(pExisitingFiles)
+			if(pExistingFiles)
 			{
-				(*pExisitingFiles) |= (1 << f);
+				(*pExistingFiles) |= (1 << f);
 			}
 			// Revision ID
 			if(pRevisionID != 0)
