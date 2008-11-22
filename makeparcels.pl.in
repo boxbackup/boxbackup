@@ -237,7 +237,15 @@ EOF
 			my $local_install_dir = $install_into_dir;
 			if (defined $dest)
 			{
-				$local_install_dir = "@prefix@/$dest";
+				if ($dest =~ m,^/,)
+				{
+					# Don't add $prefix if $dest is a literal path
+					$local_install_dir = $dest;
+				}
+				else
+				{
+					$local_install_dir = "@prefix@/$dest";
+				}
 			}
 			print SCRIPT "mkdir -p " .
 				"\${DESTDIR}$local_install_dir/\n";
