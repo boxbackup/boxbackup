@@ -26,6 +26,10 @@ ONLY:SunOS
 	script contrib/solaris/bbackupd-smf-method   lib/svc/method
 END-ONLY
 
+ONLY:Darwin
+	script contrib/mac_osx/org.boxbackup.bbackupd.plist /Library/LaunchDaemons
+END-ONLY
+
 backup-server
 	bin bbstored
 	bin bbstoreaccounts
@@ -37,4 +41,8 @@ backup-server
 ONLY:SunOS
 	script contrib/solaris/bbstored-manifest.xml lib/svc/manifest
 	script contrib/solaris/bbstored-smf-method   lib/svc/method
+END-ONLY
+
+ONLY:Darwin
+	script contrib/mac_osx/org.boxbackup.bbstored.plist /Library/LaunchDaemons
 END-ONLY
