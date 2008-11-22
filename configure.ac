@@ -335,6 +335,8 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbstored/bbstored-config
                    contrib/debian/bbackupd
                    contrib/debian/bbstored
+		   contrib/mac_osx/org.boxbackup.bbackupd.plist
+		   contrib/mac_osx/org.boxbackup.bbstored.plist
                    contrib/redhat/bbackupd
                    contrib/redhat/bbstored
                    contrib/suse/bbackupd
