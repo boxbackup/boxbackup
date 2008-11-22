@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>org.boxbackup.bbstored</string>
+	<string>org.boxbackup.bbackupd</string>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/usr/local/bin/bbstored</string>
+		<string>@prefix@/sbin/bbackupd</string>
 	</array>
 </dict>
 </plist>
