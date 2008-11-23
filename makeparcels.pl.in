@@ -110,10 +110,18 @@ else
 {
 	print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
 }
+print MAKE "\trm -rf docs/*.[58] docs/bb-man.xsl docs/man\n" if $product_version =~ /trunk_[0-9]+/;
 
 print MAKE "\n";
 
 print MAKE "test:\trelease/common/test\n\nrelease/common/test:\n\t./runtest.pl ALL release\n\n";
+
+print MAKE <<EOF if $product_version =~ /trunk_[0-9]+/;
+.PHONY: docs/bb-man.xsl
+docs/bb-man.xsl:
+	(cd docs; \$(MAKE) bb-man.xsl; if [ ! -d man ]; then mkdir man; fi)
+
+EOF
 
 my $release_flag = BoxPlatform::make_flag('RELEASE');
 
@@ -193,6 +201,24 @@ EOF
 
 			push @parcel_deps, "$dir/$filename";
 		}
+		elsif($type eq 'man')
+		{
+			print MAKE <<EOF;
+$dir/${name}.gz: docs/man/${name}.gz
+	mkdir -p $dir
+	cp -p docs/man/${name}.gz $dir
+
+EOF
+			# Only build the docs if we're building from trunk.
+			# Releases have the docs pre-made.
+			print MAKE <<EOF if $product_version =~ /trunk_[0-9]+/;
+.PHONY: docs/man/${name}.gz
+docs/man/${name}.gz: docs/bb-man.xsl
+	(cd docs; \$(MAKE) $name)
+
+EOF
+			push @parcel_deps, "$dir/${name}.gz";
+		}
 	}
 
 	print MAKE <<EOF;
@@ -230,6 +256,13 @@ EOF
 		{
 			# remove path from script name
 			$name =~ s{.*/}{};
+		}
+
+		if ($type eq 'man')
+		{
+			$name =~ /([0-9])$/;
+			$dest = "man/man$1";
+			$name =~ s/$/\.gz/;
 		}
 
 		if ($install and not $target_windows)
