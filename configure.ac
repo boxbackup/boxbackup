@@ -328,37 +328,38 @@ box_version=`$PERL infrastructure/printversion.pl`
 AC_SUBST([box_version])
 
 ### Output files
-AC_CONFIG_FILES([infrastructure/BoxPlatform.pm])
+AC_CONFIG_FILES([infrastructure/BoxPlatform.pm
+                 contrib/mac_osx/org.boxbackup.bbackupd.plist
+                 contrib/mac_osx/org.boxbackup.bbstored.plist
+                 contrib/solaris/bbackupd-manifest.xml
+                 contrib/solaris/bbstored-manifest.xml
+                 lib/common/BoxPortsAndFiles.h
+                 test/bbackupd/testfiles/bbackupd.conf
+                 test/bbackupd/testfiles/bbackupd-exclude.conf
+                 test/bbackupd/testfiles/bbackupd-snapshot.conf
+                 test/bbackupd/testfiles/bbackupd-symlink.conf
+  		 ])
 AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbackupquery/makedocumentation.pl
                    bin/bbstored/bbstored-certs
                    bin/bbstored/bbstored-config
                    contrib/debian/bbackupd
                    contrib/debian/bbstored
-		   contrib/mac_osx/org.boxbackup.bbackupd.plist
-		   contrib/mac_osx/org.boxbackup.bbstored.plist
                    contrib/redhat/bbackupd
                    contrib/redhat/bbstored
                    contrib/suse/bbackupd
                    contrib/suse/bbstored
-                   contrib/solaris/bbackupd-manifest.xml
-                   contrib/solaris/bbstored-manifest.xml
                    contrib/solaris/bbackupd-smf-method
                    contrib/solaris/bbstored-smf-method
                    contrib/windows/installer/boxbackup.mpi
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl
-                   lib/common/BoxPortsAndFiles.h
                    lib/common/makeexception.pl
                    lib/raidfile/raidfile-config
                    lib/server/makeprotocol.pl
                    runtest.pl
                    test/backupstorefix/testfiles/testbackupstorefix.pl
-                   test/bbackupd/testfiles/bbackupd.conf
-                   test/bbackupd/testfiles/bbackupd-exclude.conf
-                   test/bbackupd/testfiles/bbackupd-snapshot.conf
-                   test/bbackupd/testfiles/bbackupd-symlink.conf
                    test/bbackupd/testfiles/extcheck1.pl
                    test/bbackupd/testfiles/extcheck2.pl
                    test/bbackupd/testfiles/notifyscript.pl
