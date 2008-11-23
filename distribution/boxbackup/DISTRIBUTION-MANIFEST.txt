@@ -51,10 +51,12 @@ docs/raidfile-config.xml docs/docbook/raidfile-config.xml
 docs/raidfile.conf.xml docs/docbook/raidfile.conf.xml
 docs/html docs/docbook/html
 docs/html/images docs/docbook/html/images
+RUN svn revert docs/Makefile
 TODO.txt
 BUGS.txt
 contrib
 NO-LICENSE-IN-DIR contrib/debian
+NO-LICENSE-IN-DIR contrib/mac_osx
 NO-LICENSE-IN-DIR contrib/redhat
 NO-LICENSE-IN-DIR contrib/rpm
 REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
