@@ -2089,8 +2089,12 @@ int test_bbackupd()
 			#ifdef WIN32
 				TEST_THAT(::system("chmod 0755 testfiles/"
 					"TestDir1/x1") == 0);
+				TEST_THAT(::system("chmod 0755 testfiles/"
+					"restore1/x1") == 0);
 			#else
 				TEST_THAT(chmod("testfiles/TestDir1/x1",
+					0755) == 0);
+				TEST_THAT(chmod("testfiles/restore1/x1",
 					0755) == 0);
 			#endif
 
