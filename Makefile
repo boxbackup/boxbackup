@@ -8,14 +8,6 @@ NOCHUNKBOOKXSL=bb-nochunk-book.xsl
 MANXSL=bb-man.xsl
 HTMLPREFIX=box-html
 VPATH= adminguide
-# If your OS declares a system make variable, add a .elif statement here
-# with the path to the locally-installed DocBook stylesheet
-.if .FreeBSD
-# Requires textproc/docbook-xsl port installed
-DOCBOOK=file:///usr/local/share/xsl/docbook/manpages/docbook.xsl
-.else
-DOCBOOK=http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
-.endif
 .SUFFIXES: .html .xml .1 .5 .8
 
 all: docs
@@ -42,7 +34,12 @@ ExceptionCodes.xml: ../ExceptionCodes.txt
 manpages: $(MANXSL) man-dirs man-nroff man-html
 
 $(MANXSL): $(MANXSL).tmpl
-	@sed -e 's,%%DOCBOOK%%,$(DOCBOOK),' $(MANXSL).tmpl > $(MANXSL)
+	@if [ -f /usr/local/share/xsl/docbook/manpages/docbook.xsl ]; then \
+	   DOCBOOK=file:///usr/local/share/xsl/docbook/manpages/docbook.xsl; \
+	 else \
+	   DOCBOOK=http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl; \
+	 fi; \
+	 sed -e "s,%%DOCBOOK%%,$${DOCBOOK}," $(MANXSL).tmpl > $(MANXSL)
 
 man-dirs: man/.there $(HTMLPREFIX)/man-html/.there
 
