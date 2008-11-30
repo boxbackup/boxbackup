@@ -31,6 +31,8 @@ static bool gTimerInitialised = false;
 static bool gFinishTimer;
 static CRITICAL_SECTION gLock;
 
+DWORD winerrno;
+
 typedef struct 
 {
 	int countDown;
@@ -285,11 +287,12 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		if (logErrors)
 		{
 			::syslog(LOG_WARNING, 
 				"Failed to convert string to wide string: "
-				"%s", GetErrorMessage(GetLastError()).c_str());
+				"%s", GetErrorMessage(winerrno).c_str());
 		}
 		errno = EINVAL;
 		return NULL;
@@ -305,6 +308,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 				"Failed to convert string to wide string: "
 				"out of memory");
 		}
+		winerrno = ERROR_OUTOFMEMORY;
 		errno = ENOMEM;
 		return NULL;
 	}
@@ -321,11 +325,12 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		if (logErrors)
 		{
 			::syslog(LOG_WARNING, 
 				"Failed to convert string to wide string: "
-				"%s", GetErrorMessage(GetLastError()).c_str());
+				"%s", GetErrorMessage(winerrno).c_str());
 		}
 		errno = EACCES;
 		delete [] buffer;
@@ -519,6 +524,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 			"Failed to open '%s': path too long", 
 			pFileName);
 		errno = ENAMETOOLONG;
+		winerrno = ERROR_INVALID_NAME;
 		tmpStr = "";
 		return tmpStr;
 	}
@@ -594,6 +600,8 @@ std::string GetErrorMessage(DWORD errorCode)
 // --------------------------------------------------------------------------
 HANDLE openfile(const char *pFileName, int flags, int mode)
 {
+	winerrno = ERROR_INVALID_FUNCTION;
+
 	std::string AbsPathWithUnicode = 
 		ConvertPathToAbsoluteUnicode(pFileName);
 	
@@ -667,7 +675,8 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
-		switch(GetLastError())
+		winerrno = GetLastError();
+		switch(winerrno)
 		{
 			case ERROR_SHARING_VIOLATION:
 			errno = EBUSY;
@@ -684,6 +693,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		return INVALID_HANDLE_VALUE;
 	}
 
+	winerrno = NO_ERROR;
 	return hdir;
 }
 
