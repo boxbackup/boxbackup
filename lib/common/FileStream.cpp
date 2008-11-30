@@ -74,8 +74,8 @@ void FileStream::AfterOpen()
 		else
 		{
 			#ifdef WIN32
-			BOX_LOG_WIN_WARNING("Failed to open file: " <<
-				mFileName);
+			BOX_LOG_WIN_WARNING_NUMBER("Failed to open file: " <<
+				mFileName, winerrno);
 			#else
 			BOX_LOG_SYS_WARNING("Failed to open file: " <<
 				mFileName);

@@ -61,8 +61,12 @@
 #ifdef WIN32
 	#define BOX_LOG_WIN_ERROR(stuff) \
 		BOX_ERROR(stuff << ": " << GetErrorMessage(GetLastError()))
+	#define BOX_LOG_WIN_WARNING(stuff) \
+		BOX_WARNING(stuff << ": " << GetErrorMessage(GetLastError()))
 	#define BOX_LOG_WIN_ERROR_NUMBER(stuff, number) \
 		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
+	#define BOX_LOG_WIN_WARNING_NUMBER(stuff, number) \
+		BOX_WARNING(stuff << ": " << GetErrorMessage(number))
 #endif
 
 #define BOX_FORMAT_HEX32(number) \
