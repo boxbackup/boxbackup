@@ -693,6 +693,18 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		return INVALID_HANDLE_VALUE;
 	}
 
+	if (flags & O_APPEND)
+	{
+		if (SetFilePointer(hdir, 0, NULL, FILE_END) ==
+			INVALID_SET_FILE_POINTER)
+		{
+			winerrno = GetLastError();
+			errno = EINVAL;
+			CloseHandle(hdir);
+			return INVALID_HANDLE_VALUE;
+		}
+	}
+
 	winerrno = NO_ERROR;
 	return hdir;
 }
