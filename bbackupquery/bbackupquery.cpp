@@ -62,10 +62,13 @@ void PrintUsageAndExit()
 #ifdef WIN32
 	"[-u] "
 #endif
-	"\n\t[-c config_file] [-l log_file] [commands]\n"
+	"\n"
+	"\t[-c config_file] [-o log_file] [-O log_file_level]\n"
+	"\t[-l protocol_log_file] [commands]\n"
+	"\n"
 	"As many commands as you require.\n"
 	"If commands are multiple words, remember to enclose the command in quotes.\n"
-	"Remember to use quit command if you don't want to drop into interactive mode.\n");
+	"Remember to use the quit command unless you want to end up in interactive mode.\n");
 	exit(1);
 }
 
@@ -118,11 +121,14 @@ int main(int argc, const char *argv[])
 	#endif
 
 #ifdef WIN32
-	const char* validOpts = "qvwuc:l:W:";
+	const char* validOpts = "qvwuc:l:o:O:W:";
 	bool unicodeConsole = false;
 #else
-	const char* validOpts = "qvwc:l:W:";
+	const char* validOpts = "qvwc:l:o:O:W:";
 #endif
+
+	std::string fileLogFile;
+	Log::Level fileLogLevel = Log::INVALID;
 
 	// See if there's another entry on the command line
 	int c;
@@ -187,6 +193,22 @@ int main(int argc, const char *argv[])
 			}
 			break;
 
+		case 'o':
+			fileLogFile = optarg;
+			fileLogLevel = Log::EVERYTHING;
+			break;
+
+		case 'O':
+			{
+				fileLogLevel = Logging::GetNamedLevel(optarg);
+				if (fileLogLevel == Log::INVALID)
+				{
+					BOX_FATAL("Invalid logging level");
+					return 2;
+				}
+			}
+			break;
+
 #ifdef WIN32
 		case 'u':
 			unicodeConsole = true;
@@ -203,6 +225,12 @@ int main(int argc, const char *argv[])
 	argv += optind;
 	
 	Logging::SetGlobalLevel((Log::Level)masterLevel);
+
+	std::auto_ptr<FileLogger> fileLogger;
+	if (fileLogLevel != Log::INVALID)
+	{
+		fileLogger.reset(new FileLogger(fileLogFile, fileLogLevel));
+	}
 
 	bool quiet = false;
 	if (masterLevel < Log::NOTICE)
