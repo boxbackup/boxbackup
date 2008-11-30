@@ -73,8 +73,13 @@ void FileStream::AfterOpen()
 		}
 		else
 		{
+			#ifdef WIN32
+			BOX_LOG_WIN_WARNING("Failed to open file: " <<
+				mFileName);
+			#else
 			BOX_LOG_SYS_WARNING("Failed to open file: " <<
 				mFileName);
+			#endif
 			THROW_EXCEPTION(CommonException, OSFileOpenError)
 		}
 	}
