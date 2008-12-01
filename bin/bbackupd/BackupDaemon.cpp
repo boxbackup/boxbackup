@@ -2158,10 +2158,21 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 		!GetConfiguration().GetKeyValueBool("NotifyAlways"))
 	{
 		// Don't send lots of repeated messages
+		// Note: backup-start and backup-finish will always be
+		// logged, because mLastNotifiedEvent is never set to
+		// these values and therefore they are never "duplicates".
 		if(mLastNotifiedEvent == Event)
 		{
-			BOX_WARNING("Suppressing duplicate notification about " <<
-				sEventNames[Event]);
+			if(Event == SysadminNotifier::BackupOK)
+			{
+				BOX_INFO("Suppressing duplicate notification "
+					"about " << sEventNames[Event]);
+			}
+			else
+			{
+				BOX_WARNING("Suppressing duplicate notification "
+					"about " << sEventNames[Event]);
+			}
 			return;
 		}
 	}
@@ -2174,7 +2185,7 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 		if(Event != SysadminNotifier::BackupStart &&
 			Event != SysadminNotifier::BackupFinish)
 		{
-			BOX_ERROR("Not notifying administrator about event "
+			BOX_INFO("Not notifying administrator about event "
 				<< sEventNames[Event] << " -- set NotifyScript "
 				"to do this in future");
 		}
@@ -2186,7 +2197,7 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 		sEventNames[Event]);
 	
 	// Log what we're about to do
-	BOX_NOTICE("About to notify administrator about event "
+	BOX_INFO("About to notify administrator about event "
 		<< sEventNames[Event] << ", running script '"
 		<< script << "'");
 	
@@ -2194,7 +2205,7 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 	int returnCode = ::system(script.c_str());
 	if(returnCode != 0)
 	{
-		BOX_ERROR("Notify script returned error code: " <<
+		BOX_WARNING("Notify script returned error code: " <<
 			returnCode << " ('" << script << "')");
 	}
 	else if(Event != SysadminNotifier::BackupStart &&
