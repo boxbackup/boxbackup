@@ -1086,7 +1086,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			if(latestObjectID != 0)
 			{
 				// Use this one
-				BOX_TRACE("Storing uploaded file ID " << inodeNum << " (" << filename << " in ID map as object " << latestObjectID << " with parent " << mObjectID << " (" << rLocalPath << ")");
+				BOX_TRACE("Storing uploaded file ID " << inodeNum << " (" << filename << ") in ID map as object " << latestObjectID << " with parent " << mObjectID << " (" << rLocalPath << ")");
 				idMap.AddToMap(inodeNum, latestObjectID, mObjectID /* containing directory */);
 			}
 			else
@@ -1110,7 +1110,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// into it. However, in a long running process this may happen occasionally and
 					// not indicate anything wrong.
 					// Run the release version for real life use, where this check is not made.
-					BOX_TRACE("Storing found file ID " << inodeNum << " (" << filename << " in ID map as object " << latestObjectID << " with parent " << mObjectID << " (" << rLocalPath << ")");
+					BOX_TRACE("Storing found file ID " << inodeNum << " (" << filename << ") in ID map as object " << latestObjectID << " with parent " << mObjectID << " (" << rLocalPath << ")");
 					idMap.AddToMap(inodeNum, objid, mObjectID /* containing directory */);				
 				}
 			}
