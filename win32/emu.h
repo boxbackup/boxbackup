@@ -25,6 +25,9 @@
 
 #ifdef __MINGW32__
 	typedef uint32_t u_int32_t;
+	typedef uint64_t _ino_t;
+	typedef _ino_t ino_t;
+	#define _INO_T_
 #else
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
