@@ -441,7 +441,6 @@ echo Copying new test files...
 cp -p -R ../../../$module/testfiles .
 
 __E
-			}
 
 			if (-e "$module/testextra")
 			{
