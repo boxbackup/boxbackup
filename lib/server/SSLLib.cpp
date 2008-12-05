@@ -39,7 +39,7 @@ void SSLLib::Initialise()
 {
 	if(!::SSL_library_init())
 	{
-		LogError("Initialisation");
+		LogError("initialising OpenSSL");
 		THROW_EXCEPTION(ServerException, SSLLibraryInitialisationError)
 	}
 	
