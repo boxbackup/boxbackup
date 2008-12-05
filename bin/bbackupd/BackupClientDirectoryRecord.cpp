@@ -1039,12 +1039,22 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// space available
 			if(!rContext.StorageLimitExceeded())
 			{
-				// Update store
-				BackupClientFileAttributes attr;
-				attr.ReadAttributes(filename.c_str(), false /* put mod times in the attributes, please */);
-				MemBlockStream attrStream(attr);
-				connection.QuerySetReplacementFileAttributes(mObjectID, attributesHash, storeFilename, attrStream);
-				fileSynced = true;
+				try
+				{
+					// Update store
+					BackupClientFileAttributes attr;
+					attr.ReadAttributes(filename.c_str(), false /* put mod times in the attributes, please */);
+					MemBlockStream attrStream(attr);
+					connection.QuerySetReplacementFileAttributes(mObjectID, attributesHash, storeFilename, attrStream);
+					fileSynced = true;
+				}
+				catch (BoxException &e)
+				{
+					BOX_ERROR("Failed to read or store "
+						"file attributes for '" <<
+						filename << "', will try "
+						"again later");
+				}
 			}
 		}
 
@@ -1086,7 +1096,11 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			if(latestObjectID != 0)
 			{
 				// Use this one
-				BOX_TRACE("Storing uploaded file ID " << inodeNum << " (" << filename << ") in ID map as object " << latestObjectID << " with parent " << mObjectID << " (" << rLocalPath << ")");
+				BOX_TRACE("Storing uploaded file ID " <<
+					inodeNum << " (" << filename << ") "
+					"in ID map as object " <<
+					latestObjectID << " with parent " <<
+					mObjectID);
 				idMap.AddToMap(inodeNum, latestObjectID, mObjectID /* containing directory */);
 			}
 			else
@@ -1100,7 +1114,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// Found
 					if (dirid != mObjectID)
 					{
-						BOX_WARNING("Found conflicting parent ID for file ID " << inodeNum << " (" << filename << "): expected " << mObjectID << " (" << rLocalPath << ") but found " << dirid << " (same directory used in two different locations?)");
+						BOX_WARNING("Found conflicting parent ID for file ID " << inodeNum << " (" << filename << "): expected " << mObjectID << " but found " << dirid << " (same directory used in two different locations?)");
 					}
 
 					ASSERT(dirid == mObjectID);
@@ -1110,8 +1124,13 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// into it. However, in a long running process this may happen occasionally and
 					// not indicate anything wrong.
 					// Run the release version for real life use, where this check is not made.
-					BOX_TRACE("Storing found file ID " << inodeNum << " (" << filename << ") in ID map as object " << latestObjectID << " with parent " << mObjectID << " (" << rLocalPath << ")");
-					idMap.AddToMap(inodeNum, objid, mObjectID /* containing directory */);				
+					BOX_TRACE("Storing found file ID " <<
+						inodeNum << " (" << filename <<
+						") in ID map as object " <<
+						objid << " with parent " <<
+						mObjectID);
+					idMap.AddToMap(inodeNum, objid,
+						mObjectID /* containing directory */);
 				}
 			}
 		}
@@ -1172,13 +1191,15 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		}
 
 		// Flag for having created directory, so can optimise the
-		// recusive call not to read it again, because we know
+		// recursive call not to read it again, because we know
 		// it's empty.
 		bool haveJustCreatedDirOnServer = false;
 
 		// Next, see if it's in the list of sub directories
 		BackupClientDirectoryRecord *psubDirRecord = 0;
-		std::map<std::string, BackupClientDirectoryRecord *>::iterator e(mSubDirectories.find(*d));
+		std::map<std::string, BackupClientDirectoryRecord *>::iterator
+			e(mSubDirectories.find(*d));
+
 		if(e != mSubDirectories.end())
 		{
 			// In the list, just use this pointer
@@ -1218,9 +1239,24 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				box_time_t attrModTime = 0;
 				InodeRefType inodeNum = 0;
 				BackupClientFileAttributes attr;
-				attr.ReadAttributes(dirname.c_str(), true /* directories have zero mod times */,
-					0 /* not interested in mod time */, &attrModTime, 0 /* not file size */,
-					&inodeNum);
+				bool failedToReadAttributes = false;
+
+				try
+				{
+					attr.ReadAttributes(dirname.c_str(),
+						true /* directories have zero mod times */,
+						0 /* not interested in mod time */,
+						&attrModTime, 0 /* not file size */,
+						&inodeNum);
+				}
+				catch (BoxException &e)
+				{
+					BOX_WARNING("Failed to read attributes "
+						"of directory, cannot check "
+						"for rename, assuming new: '"
+						<< dirname << "'");
+					failedToReadAttributes = true;
+				}
 
 				// Check to see if the directory been renamed
 				// First, do we have a record in the ID map?
@@ -1228,7 +1264,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				bool renameDir = false;
 				const BackupClientInodeToIDMap &idMap(
 					rContext.GetCurrentIDMap());
-				if(idMap.Lookup(inodeNum, renameObjectID, renameInDirectory))
+
+				if(!failedToReadAttributes && idMap.Lookup(inodeNum,
+					renameObjectID, renameInDirectory))
 				{
 					// Look up on the server to get the name, to build the local filename
 					std::string localPotentialOldName;
