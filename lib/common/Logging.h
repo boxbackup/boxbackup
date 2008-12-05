@@ -67,7 +67,16 @@
 		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
 	#define BOX_LOG_WIN_WARNING_NUMBER(stuff, number) \
 		BOX_WARNING(stuff << ": " << GetErrorMessage(number))
+	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_WIN_ERROR(stuff)
+	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_WIN_WARNING(stuff)
+#else
+	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_SYS_ERROR(stuff)
+	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_SYS_WARNING(stuff)
 #endif
+
+#define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \
+	BOX_LOG_NATIVE_ERROR(stuff << " (type " << _type << ", name " << \
+		_name << ", port " << _port << ")")
 
 #define BOX_FORMAT_HEX32(number) \
 	std::hex << \
