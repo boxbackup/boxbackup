@@ -71,13 +71,14 @@ print H <<__E;
 class ${class}Exception : public BoxException
 {
 public:
-	${class}Exception(unsigned int SubType)
-		: mSubType(SubType)
+	${class}Exception(unsigned int SubType,
+		const std::string& rMessage = "")
+	: mSubType(SubType), mMessage(rMessage)
 	{
 	}
 	
 	${class}Exception(const ${class}Exception &rToCopy)
-		: mSubType(rToCopy.mSubType)
+	: mSubType(rToCopy.mSubType), mMessage(rToCopy.mMessage)
 	{
 	}
 	
@@ -108,9 +109,14 @@ print H <<__E;
 	virtual unsigned int GetType() const throw();
 	virtual unsigned int GetSubType() const throw();
 	virtual const char *what() const throw();
+	virtual const std::string& GetMessage() const
+	{
+		return mMessage;
+	}
 
 private:
 	unsigned int mSubType;
+	std::string mMessage;
 };
 
 #endif // $guardname
