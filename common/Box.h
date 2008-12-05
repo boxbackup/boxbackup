@@ -42,7 +42,15 @@
 	extern bool AssertFailuresToSyslog;
 	#define ASSERT_FAILS_TO_SYSLOG_ON {AssertFailuresToSyslog = true;}
 	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
-	#define ASSERT(cond) {if(!(cond)) {BoxDebugAssertFailed(#cond, __FILE__, __LINE__); THROW_EXCEPTION(CommonException, AssertFailed)}}
+	#define ASSERT(cond) \
+	{ \
+		if(!(cond)) \
+		{ \
+			BoxDebugAssertFailed(#cond, __FILE__, __LINE__); \
+			THROW_EXCEPTION_MESSAGE(CommonException, \
+				AssertFailed, #cond); \
+		} \
+	}
 
 	// Note that syslog tracing is independent of BoxDebugTraceOn,
 	// but stdout tracing is not
@@ -96,13 +104,21 @@
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
 		OPTIONAL_DO_BACKTRACE \
-		BOX_WARNING("Exception thrown: " #type "(" #subtype ") at " \
-			__FILE__ "(" << __LINE__ << ")") \
+		BOX_WARNING("Exception thrown: " #type "(" #subtype ") " \
+			"at " __FILE__ "(" << __LINE__ << ")") \
 		throw type(type::subtype); \
 	}
 
-// extra macros for converting to network byte order
+#define THROW_EXCEPTION_MESSAGE(type, subtype, message) \
+	{ \
+		OPTIONAL_DO_BACKTRACE \
+		BOX_WARNING("Exception thrown: " #type "(" #subtype ") " \
+			" (" message ") at " \
+			__FILE__ "(" << __LINE__ << ")") \
+		throw type(type::subtype, message); \
+	}
 
+// extra macros for converting to network byte order
 #ifdef HAVE_NETINET_IN_H
 	#include <netinet/in.h>
 #endif
