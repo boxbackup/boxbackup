@@ -405,8 +405,8 @@ for my $mod (@implicit_deps, @modules)
 				print TESTFILE <<__E;
 kill_process()
 {
-	test -r testfiles/$1.pid \
-	&& /bin/kill -0 -f `cat testfiles/$1.pid` \
+	test -r testfiles/$1.pid \\
+	&& /bin/kill -0 -f `cat testfiles/$1.pid` \\
 	&& /bin/kill    -f `cat testfiles/$1.pid`
 }
 __E
@@ -416,8 +416,8 @@ __E
 				print TESTFILE <<__E;
 kill_process()
 {
-	test -r testfiles/$1.pid \
-	&& kill -0 `cat testfiles/$1.pid` \
+	test -r testfiles/$1.pid \\
+	&& kill -0 `cat testfiles/$1.pid` \\
 	&& kill    `cat testfiles/$1.pid`
 }
 __E
