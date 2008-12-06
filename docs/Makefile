@@ -36,6 +36,8 @@ manpages: $(MANXSL) man-dirs man-nroff man-html
 $(MANXSL): $(MANXSL).tmpl
 	@if [ -f /usr/local/share/xsl/docbook/manpages/docbook.xsl ]; then \
 	   DOCBOOK=file:///usr/local/share/xsl/docbook/manpages/docbook.xsl; \
+	 elif [ -f /opt/local/share/xsl/docbook-xsl/manpages/docbook.xsl ]; then \
+	   DOCBOOK=file:///opt/local/share/xsl/docbook-xsl/manpages/docbook.xsl; \
 	 else \
 	   DOCBOOK=http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl; \
 	 fi; \
@@ -63,7 +65,7 @@ man-html: bbackupd.html bbackupd-config.html bbackupctl.html bbackupquery.html \
 	@$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
 	@cp $@ $(HTMLPREFIX)/man-html/.
 
-.xml.8 .xml.5:
+.xml.8 .xml.5: $(MANXSL)
 	@$(DBPROC) -o $@ $(MANXSL) $<
 	@cp $@ man/
 	@rm -f man/$@.gz
