@@ -69,7 +69,6 @@
 
 #if defined _MSC_VER || defined __MINGW32__
 #define	REPLACE_GETOPT		/* use this getopt as the system getopt(3) */
-#endif
 
 #ifdef REPLACE_GETOPT
 int	opterr = 1;		/* if error message should be printed */
@@ -548,3 +547,4 @@ getopt_long_only(int nargc, char * const *nargv, const char *options,
 	    FLAG_PERMUTE|FLAG_LONGONLY));
 }
 
+#endif // defined _MSC_VER || defined __MINGW32__
