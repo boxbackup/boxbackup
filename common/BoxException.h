@@ -11,6 +11,7 @@
 #define BOXEXCEPTION__H
 
 #include <exception>
+#include <string>
 
 // --------------------------------------------------------------------------
 //
