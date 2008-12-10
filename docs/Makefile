@@ -38,6 +38,8 @@ $(MANXSL): $(MANXSL).tmpl
 	   DOCBOOK=file:///usr/local/share/xsl/docbook/manpages/docbook.xsl; \
 	 elif [ -f /opt/local/share/xsl/docbook-xsl/manpages/docbook.xsl ]; then \
 	   DOCBOOK=file:///opt/local/share/xsl/docbook-xsl/manpages/docbook.xsl; \
+	 elif [ -f /usr/share/sgml/docbook/xsl-stylesheets/manpages/docbook.xsl ]; then \
+	   DOCBOOK=file:///usr/share/sgml/docbook/xsl-stylesheets/manpages/docbook.xsl; \
 	 else \
 	   DOCBOOK=http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl; \
 	 fi; \
