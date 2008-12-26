@@ -108,6 +108,10 @@ void RaidFileController::Initialise(const std::string& rConfigFilename)
 		BOX_ERROR("RaidFile configuration file errors: " << err);
 		THROW_EXCEPTION(RaidFileException, BadConfigFile)
 	}
+
+	// Allow reinitializing the controller by remove any existing
+	// disc sets. Used by Boxi unit tests.
+	mSetList.clear();
 	
 	// Use the values
 	int expectedSetNum = 0;
