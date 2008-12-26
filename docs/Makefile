@@ -53,15 +53,19 @@ $(HTMLPREFIX)/man-html/.there:
 man/.there:
 	if [ ! -d man ]; then mkdir man; touch man/.there; fi
 
-man-nroff: bbackupd.8 bbackupd-config.8 bbackupctl.8 bbackupquery.8 \
+NROFF_PAGES = bbackupd.8 bbackupd-config.8 bbackupctl.8 bbackupquery.8 \
 	bbstored.8 bbstored-config.8 bbstoreaccounts.8 bbstored-certs.8 \
 	raidfile-config.8 \
 	bbackupd.conf.5 bbstored.conf.5 raidfile.conf.5
 
-man-html: bbackupd.html bbackupd-config.html bbackupctl.html bbackupquery.html \
-	bbstored.html bbstored-config.html bbstoreaccounts.html bbstored-certs.html \
-	raidfile-config.html \
+man-nroff: $(NROFF_PAGES)
+
+HTML_PAGES = bbackupd.html bbackupd-config.html bbackupctl.html \
+	bbackupquery.html bbstored.html bbstored-config.html \
+	bbstoreaccounts.html bbstored-certs.html raidfile-config.html \
 	bbackupd.conf.html bbstored.conf.html raidfile.conf.html
+
+man-html: $(HTML_PAGES)
 
 .xml.html:
 	@$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
@@ -80,6 +84,7 @@ clean:
 	if [ -d ./$(HTMLPREFIX) ]; then rm -rf $(HTMLPREFIX) ; fi
 	if [ -d ./man ]; then  rm -rf ./man/; fi
 	if [ -f ExceptionCodes.xml ]; then rm ExceptionCodes.xml; fi
+	rm -f $(NROFF_PAGES) $(HTML_PAGES)
 	if [ -f documentation-kit-0.10.tar.gz ]; then rm documentation-kit-0.10.tar.gz; fi
 
 
