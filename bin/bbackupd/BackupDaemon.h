@@ -112,6 +112,9 @@ public:
 	void RunSyncNow();
 	void OnBackupStart();
 	void OnBackupFinish();
+	// TouchFileInWorkingDir is only here for use by Boxi.
+	// This does NOT constitute an API!
+	void TouchFileInWorkingDir(const char *Filename);
 
 private:
 	void DeleteAllLocations();
@@ -137,8 +140,6 @@ private:
 	void CloseCommandConnection();
 	void SendSyncStartOrFinish(bool SendStart);
 	
-	void TouchFileInWorkingDir(const char *Filename);
-
 	void DeleteUnusedRootDirEntries(BackupClientContext &rContext);
 
 #ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
