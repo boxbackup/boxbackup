@@ -777,10 +777,9 @@ void BackupDaemon::RunSyncNow()
 	if(syncPeriodStart >= syncPeriodEnd &&
 		syncPeriodStart - syncPeriodEnd < minimumFileAge)
 	{
-		// This can happen if we receive a force-sync
-		// command less than minimumFileAge after
-		// the last sync. Deal with it by moving back
-		// syncPeriodStart, which should not do any
+		// This can happen if we receive a force-sync command less
+		// than minimumFileAge after the last sync. Deal with it by
+		// moving back syncPeriodStart, which should not do any
 		// damage.
 		syncPeriodStart = syncPeriodEnd -
 			SecondsToBoxTime(1);
