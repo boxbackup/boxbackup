@@ -37,7 +37,7 @@
 #include "CommonException.h"
 #include "Logging.h"
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	
 	extern bool AssertFailuresToSyslog;
 	#define ASSERT_FAILS_TO_SYSLOG_ON {AssertFailuresToSyslog = true;}

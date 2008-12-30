@@ -7,7 +7,7 @@
 //
 // --------------------------------------------------------------------------
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 
 #include "Box.h"
 
@@ -80,4 +80,4 @@ int BoxDebugTrace(const char *format, ...)
 }
 
 
-#endif // NDEBUG
+#endif // BOX_RELEASE_BUILD

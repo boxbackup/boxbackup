@@ -390,7 +390,7 @@ void RaidFileWrite::TransformToRaidStorage()
 //	// DEBUG MODE -- check file system size block size is same as block size for files
 //	// doesn't really apply, as space benefits of using fragment size are worth efficiency,
 //	// and anyway, it'll be buffered eventually so it won't matter.
-//	#ifndef NDEBUG
+//	#ifndef BOX_RELEASE_BUILD
 //	{
 //		if(writeFileStat.st_blksize != blockSize)
 //		{

@@ -7,7 +7,7 @@
 //
 // --------------------------------------------------------------------------
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 
 #include "Box.h"
 
@@ -33,5 +33,5 @@ void BoxDebugAssertFailed(const char *cond, const char *file, int line)
 }
 
 
-#endif // NDEBUG
+#endif // BOX_RELEASE_BUILD
 

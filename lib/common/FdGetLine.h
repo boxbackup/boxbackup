@@ -12,7 +12,7 @@
 
 #include <string>
 
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define FDGETLINE_BUFFER_SIZE		1024
 #elif defined WIN32
 	// need enough space for at least one unicode character 

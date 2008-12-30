@@ -40,7 +40,7 @@ using namespace BackupStoreFileCreation;
 
 // By default, don't trace out details of the diff as we go along -- would fill up logs significantly.
 // But it's useful for the test.
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	bool BackupStoreFile::TraceDetailsOfDiffProcess = false;
 #endif
 
@@ -436,7 +436,7 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 	}
 	
 	// trace the size table in debug builds
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	if(BackupStoreFile::TraceDetailsOfDiffProcess)
 	{
 		for(int t = 0; t < BACKUP_FILE_DIFF_MAX_BLOCK_SIZES; ++t)
@@ -728,7 +728,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		throw;
 	}
 	
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	if(BackupStoreFile::TraceDetailsOfDiffProcess)
 	{
 		// Trace out the found blocks in debug mode
@@ -810,7 +810,7 @@ static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChec
 	ASSERT(pFirstInHashList != 0);
 	ASSERT(pIndex != 0);
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	uint16_t DEBUG_Hash = fastSum.GetComponentForHashing();
 #endif
 	uint32_t Checksum = fastSum.GetChecksum();
@@ -916,7 +916,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 		instruction.mSpaceBefore = SizeOfInputFile;
 		rRecipe.push_back(instruction);	
 	
-		#ifndef NDEBUG
+		#ifndef BOX_RELEASE_BUILD
 		if(BackupStoreFile::TraceDetailsOfDiffProcess)
 		{
 			BOX_TRACE("Diff: Default recipe generated, " << 
@@ -936,7 +936,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	ASSERT(i != rFoundBlocks.end());	// check logic
 
 	// Counting for debug tracing
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	int64_t debug_NewBytesFound = 0;
 	int64_t debug_OldBlocksUsed = 0;
 #endif
@@ -963,7 +963,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			instruction.mSpaceBefore = i->first - loc;
 			// Move location forward to match
 			loc += instruction.mSpaceBefore;
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 			debug_NewBytesFound += instruction.mSpaceBefore;
 #endif
 		}
@@ -989,7 +989,7 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			instruction.mBlocks += 1;
 		}
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 		debug_OldBlocksUsed++;
 #endif
 
@@ -1005,14 +1005,14 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 	{
 		RESET_INSTRUCTION
 		instruction.mSpaceBefore = SizeOfInputFile - loc;
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 		debug_NewBytesFound += instruction.mSpaceBefore;
 #endif
 		rRecipe.push_back(instruction);		
 	}
 	
 	// dump out the recipe
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	BOX_TRACE("Diff: " << 
 		debug_NewBytesFound << " new bytes found, " <<
 		debug_OldBlocksUsed << " old blocks used");

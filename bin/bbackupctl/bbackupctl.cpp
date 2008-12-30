@@ -356,7 +356,7 @@ int main(int argc, const char *argv[])
 
 	MAINHELPER_END
 
-#if defined WIN32 && ! defined NDEBUG
+#if defined WIN32 && ! defined BOX_RELEASE_BUILD
 	closelog();
 #endif
 	

@@ -8,7 +8,7 @@
 // --------------------------------------------------------------------------
 
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 
 #include "Box.h"
 
@@ -548,4 +548,4 @@ void operator delete(void *ptr) throw ()
 	internal_delete(ptr);
 }
 
-#endif // NDEBUG
+#endif // BOX_RELEASE_BUILD

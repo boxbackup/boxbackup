@@ -296,7 +296,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	mConfigFileName = DefaultConfigFile;
 	mAppName = argv[0];
 
-	#ifdef NDEBUG
+	#ifdef BOX_RELEASE_BUILD
 	mLogLevel = Log::NOTICE; // need an int to do math with
 	#else
 	mLogLevel = Log::INFO; // need an int to do math with

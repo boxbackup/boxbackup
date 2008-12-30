@@ -43,7 +43,7 @@
 
 int test(int argc, const char *argv[]);
 
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define MODE_TEXT	"release"
 #else
 	#define MODE_TEXT	"debug"
@@ -167,7 +167,7 @@ int main(int argc, char * const * argv)
 	Logging::SetProgramName(BOX_MODULE);
 
 #ifdef HAVE_GETOPT_H
-	#ifdef NDEBUG
+	#ifdef BOX_RELEASE_BUILD
 	int logLevel = Log::NOTICE; // need an int to do math with
 	#else
 	int logLevel = Log::INFO; // need an int to do math with
