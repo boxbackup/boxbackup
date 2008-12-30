@@ -468,24 +468,26 @@ bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
 	return true;
 }
 
-bool ConvertToUtf8(const char* pString, std::string& rDest, int sourceCodePage)
+bool ConvertToUtf8(const std::string& rSource, std::string& rDest,
+	int sourceCodePage)
 {
-	return ConvertEncoding(pString, sourceCodePage, rDest, CP_UTF8);
+	return ConvertEncoding(rSource, sourceCodePage, rDest, CP_UTF8);
 }
 
-bool ConvertFromUtf8(const char* pString, std::string& rDest, int destCodePage)
+bool ConvertFromUtf8(const std::string& rSource, std::string& rDest,
+	int destCodePage)
 {
-	return ConvertEncoding(pString, CP_UTF8, rDest, destCodePage);
+	return ConvertEncoding(rSource, CP_UTF8, rDest, destCodePage);
 }
 
-bool ConvertConsoleToUtf8(const char* pString, std::string& rDest)
+bool ConvertConsoleToUtf8(const std::string& rSource, std::string& rDest)
 {
-	return ConvertEncoding(pString, GetConsoleCP(), rDest, CP_UTF8);
+	return ConvertToUtf8(rSource, rDest, GetConsoleCP());
 }
 
-bool ConvertUtf8ToConsole(const char* pString, std::string& rDest)
+bool ConvertUtf8ToConsole(const std::string& rSource, std::string& rDest)
 {
-	return ConvertEncoding(pString, CP_UTF8, rDest, GetConsoleOutputCP());
+	return ConvertFromUtf8(rSource, rDest, GetConsoleOutputCP());
 }
 
 // --------------------------------------------------------------------------
