@@ -384,8 +384,8 @@ bool ConvertToUtf8   (const std::string& rSource, std::string& rDest,
 	int sourceCodePage);
 bool ConvertFromUtf8 (const std::string& rSource, std::string& rDest,
 	int destCodePage);
-bool ConvertUtf8ToConsole(const char* pString, std::string& rDest);
-bool ConvertConsoleToUtf8(const char* pString, std::string& rDest);
+bool ConvertUtf8ToConsole(const std::string& rSource, std::string& rDest);
+bool ConvertConsoleToUtf8(const std::string& rSource, std::string& rDest);
 
 // Utility function which returns a default config file name,
 // based on the path of the current executable.
