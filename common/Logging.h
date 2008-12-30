@@ -10,6 +10,7 @@
 #ifndef LOGGING__H
 #define LOGGING__H
 
+#include <cerrno>
 #include <cstring>
 #include <iomanip>
 #include <sstream>
@@ -57,6 +58,17 @@
 	BOX_ERROR(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
 #define BOX_LOG_SYS_FATAL(stuff) \
 	BOX_FATAL(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
+
+inline std::string GetNativeErrorMessage()
+{
+#ifdef WIN32
+	return GetErrorMessage(GetLastError());
+#else
+	std::ostringstream _box_log_line;
+	_box_log_line << std::strerror(errno) << " (" << errno << ")";
+	return _box_log_line.str();
+#endif
+}
 
 #ifdef WIN32
 	#define BOX_LOG_WIN_ERROR(stuff) \
