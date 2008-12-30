@@ -388,7 +388,7 @@ void test_combined_diffs()
 int test(int argc, const char *argv[])
 {
 	// Want to trace out all the details
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 	#ifndef WIN32
 	BackupStoreFile::TraceDetailsOfDiffProcess = true;
 	#endif

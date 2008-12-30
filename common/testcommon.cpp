@@ -298,7 +298,7 @@ int test(int argc, const char *argv[])
 	
 	// Check that using timer methods without initialisation
 	// throws an assertion failure. Can only do this in debug mode
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 		TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL), 
 			CommonException, AssertFailed);
 		TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
@@ -306,7 +306,7 @@ int test(int argc, const char *argv[])
 	#endif
 
 	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
 			AssertFailed);
 	#endif
@@ -315,7 +315,7 @@ int test(int argc, const char *argv[])
 	Timers::Init();
 	
 	// Check that double initialisation throws an exception
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 		TEST_CHECK_THROWS(Timers::Init(), CommonException,
 			AssertFailed);
 	#endif
@@ -324,7 +324,7 @@ int test(int argc, const char *argv[])
 	Timers::Cleanup();
 	
 	// Check that double cleanup throws an exception
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
 			AssertFailed);
 	#endif
