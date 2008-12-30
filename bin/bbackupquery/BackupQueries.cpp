@@ -1190,7 +1190,6 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	}
 }
 
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1199,58 +1198,17 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 //		Created: 29/1/04
 //
 // --------------------------------------------------------------------------
-BackupQueries::CompareParams::CompareParams()
-	: mQuickCompare(false),
-	  mIgnoreExcludes(false),
-	  mIgnoreAttributes(false),
-	  mDifferences(0),
-	  mDifferencesExplainedByModTime(0),
-	  mUncheckedFiles(0),
-	  mExcludedDirs(0),
-	  mExcludedFiles(0),
-	  mpExcludeFiles(0),
-	  mpExcludeDirs(0),
-	  mLatestFileUploadTime(0)
-{
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupQueries::CompareParams::~CompareParams()
-//		Purpose: Destructor
-//		Created: 29/1/04
-//
-// --------------------------------------------------------------------------
-BackupQueries::CompareParams::~CompareParams()
-{
-	DeleteExcludeLists();
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupQueries::CompareParams::DeleteExcludeLists()
-//		Purpose: Delete the include lists contained
-//		Created: 29/1/04
-//
-// --------------------------------------------------------------------------
-void BackupQueries::CompareParams::DeleteExcludeLists()
-{
-	if(mpExcludeFiles != 0)
-	{
-		delete mpExcludeFiles;
-		mpExcludeFiles = 0;
-	}
-	if(mpExcludeDirs != 0)
-	{
-		delete mpExcludeDirs;
-		mpExcludeDirs = 0;
-	}
-}
-
+BackupQueries::CompareParams::CompareParams(bool QuickCompare,
+	bool IgnoreExcludes, bool IgnoreAttributes,
+	box_time_t LatestFileUploadTime)
+: BoxBackupCompareParams(QuickCompare, IgnoreExcludes, IgnoreAttributes,
+	LatestFileUploadTime),
+  mDifferences(0),
+  mDifferencesExplainedByModTime(0),
+  mUncheckedFiles(0),
+  mExcludedDirs(0),
+  mExcludedFiles(0)
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -1262,12 +1220,7 @@ void BackupQueries::CompareParams::DeleteExcludeLists()
 // --------------------------------------------------------------------------
 void BackupQueries::CommandCompare(const std::vector<std::string> &args, const bool *opts)
 {
-	// Parameters, including count of differences
-	BackupQueries::CompareParams params;
-	params.mQuickCompare = opts['q'];
-	params.mQuietCompare = opts['Q'];
-	params.mIgnoreExcludes = opts['E'];
-	params.mIgnoreAttributes = opts['A'];
+	box_time_t LatestFileUploadTime = GetCurrentBoxTime();
 	
 	// Try and work out the time before which all files should be on the server
 	{
@@ -1278,8 +1231,8 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		if(::stat(syncTimeFilename.c_str(), &st) == 0)
 		{
 			// Files modified after this time shouldn't be on the server, so report errors slightly differently
-			params.mLatestFileUploadTime = FileModificationTime(st)
-					- SecondsToBoxTime(mrConfiguration.GetKeyValueInt("MinimumFileAge"));
+			LatestFileUploadTime = FileModificationTime(st) -
+				SecondsToBoxTime(mrConfiguration.GetKeyValueInt("MinimumFileAge"));
 		}
 		else
 		{
@@ -1288,8 +1241,16 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		}
 	}
 
+	// Parameters, including count of differences
+	BackupQueries::CompareParams params(opts['q'], // quick compare?
+		opts['E'], // ignore excludes
+		opts['A'], // ignore attributes
+		LatestFileUploadTime);
+	
+	params.mQuietCompare = opts['Q'];
+	
 	// Quick compare?
-	if(params.mQuickCompare)
+	if(params.QuickCompare())
 	{
 		BOX_WARNING("Quick compare used -- file attributes are not "
 			"checked.");
@@ -1320,7 +1281,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		// Compare directory to directory
 		
 		// Can't be bothered to do all the hard work to work out which location it's on, and hence which exclude list
-		if(!params.mIgnoreExcludes)
+		if(!params.IgnoreExcludes())
 		{
 			BOX_ERROR("Cannot use excludes on directory to directory comparison -- use -E flag to specify ignored excludes.");
 			return;
@@ -1377,7 +1338,8 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 //		Created: 2003/10/13
 //
 // --------------------------------------------------------------------------
-void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries::CompareParams &rParams)
+void BackupQueries::CompareLocation(const std::string &rLocation,
+	BoxBackupCompareParams &rParams)
 {
 	// Find the location's sub configuration
 	const Configuration &locations(mrConfiguration.GetSubConfiguration("BackupLocations"));
@@ -1401,45 +1363,36 @@ void BackupQueries::CompareLocation(const std::string &rLocation, BackupQueries:
 	}
 	#endif
 	
-	try
+	// Generate the exclude lists
+	if(!rParams.IgnoreExcludes())
 	{
-		// Generate the exclude lists
-		if(!rParams.mIgnoreExcludes)
-		{
-			rParams.mpExcludeFiles = BackupClientMakeExcludeList_Files(loc);
-			rParams.mpExcludeDirs = BackupClientMakeExcludeList_Dirs(loc);
-		}
-				
-		// Then get it compared
-		Compare(std::string("/") + rLocation, 
-			loc.GetKeyValue("Path"), rParams);
+		rParams.LoadExcludeLists(loc);
 	}
-	catch(...)
-	{
-		// Clean up
-		rParams.DeleteExcludeLists();
-		throw;
-	}
-	
-	// Delete exclude lists
-	rParams.DeleteExcludeLists();
+			
+	// Then get it compared
+	Compare(std::string("/") + rLocation, loc.GetKeyValue("Path"), rParams);
 }
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupQueries::Compare(const std::string &, const std::string &, BackupQueries::CompareParams &)
+//		Name:    BackupQueries::Compare(const std::string &,
+//			 const std::string &, BackupQueries::CompareParams &)
 //		Purpose: Compare a store directory against a local directory
 //		Created: 2003/10/13
 //
 // --------------------------------------------------------------------------
-void BackupQueries::Compare(const std::string &rStoreDir, const std::string &rLocalDir, BackupQueries::CompareParams &rParams)
+void BackupQueries::Compare(const std::string &rStoreDir,
+	const std::string &rLocalDir, BoxBackupCompareParams &rParams)
 {
 #ifdef WIN32
+	std::string localDirEncoded;
 	std::string storeDirEncoded;
+	if(!ConvertConsoleToUtf8(rLocalDir.c_str(), localDirEncoded)) return;
 	if(!ConvertConsoleToUtf8(rStoreDir.c_str(), storeDirEncoded)) return;
 #else
+	const std::string& localDirEncoded(rLocalDir);
 	const std::string& storeDirEncoded(rStoreDir);
 #endif
 	
@@ -1449,19 +1402,22 @@ void BackupQueries::Compare(const std::string &rStoreDir, const std::string &rLo
 	// Found?
 	if(dirID == 0)
 	{
-		BOX_WARNING("Local directory '" << rLocalDir << "' exists, "
-			"but server directory '" << rStoreDir << "' does not "
-			"exist.");
-		rParams.mDifferences ++;
+		bool modifiedAfterLastSync = false;
+		
+		struct stat st;
+		if(::stat(rLocalDir.c_str(), &st) == 0)
+		{
+			if(FileAttrModificationTime(st) >
+				rParams.LatestFileUploadTime())
+			{
+				modifiedAfterLastSync = true;
+			}
+		}
+		
+		rParams.NotifyRemoteFileMissing(localDirEncoded,
+			storeDirEncoded, modifiedAfterLastSync);
 		return;
 	}
-
-#ifdef WIN32
-	std::string localDirEncoded;
-	if(!ConvertConsoleToUtf8(rLocalDir.c_str(), localDirEncoded)) return;
-#else
-	std::string localDirEncoded(rLocalDir);
-#endif
 	
 	// Go!
 	Compare(dirID, storeDirEncoded, localDirEncoded, rParams);
@@ -1477,55 +1433,34 @@ void BackupQueries::Compare(const std::string &rStoreDir, const std::string &rLo
 //		Created: 2003/10/13
 //
 // --------------------------------------------------------------------------
-void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const std::string &rLocalDir, BackupQueries::CompareParams &rParams)
+void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
+	const std::string &rLocalDir, BoxBackupCompareParams &rParams)
 {
-#ifdef WIN32
-	// By this point, rStoreDir and rLocalDir should be in UTF-8 encoding
-
-	std::string localDirDisplay;
-	std::string storeDirDisplay;
-
-	if(!ConvertUtf8ToConsole(rLocalDir.c_str(), localDirDisplay)) return;
-	if(!ConvertUtf8ToConsole(rStoreDir.c_str(), storeDirDisplay)) return;
-#else
-	const std::string& localDirDisplay(rLocalDir);
-	const std::string& storeDirDisplay(rStoreDir);
-#endif
-
 	// Get info on the local directory
 	struct stat st;
 	if(::lstat(rLocalDir.c_str(), &st) != 0)
 	{
 		// What kind of error?
-		if(errno == ENOTDIR)
+		if(errno == ENOTDIR || errno == ENOENT)
 		{
-			BOX_WARNING("Local object '" << localDirDisplay << "' "
-				"is a file, server object '" << 
-				storeDirDisplay << "' is a directory.");
-			rParams.mDifferences ++;
-		}
-		else if(errno == ENOENT)
-		{
-			BOX_WARNING("Local directory '" << localDirDisplay <<
-				"' does not exist (compared to server "
-				"directory '" << storeDirDisplay << "').");
-			rParams.mDifferences ++;
+			rParams.NotifyLocalDirMissing(rLocalDir, rStoreDir);
 		}
 		else
 		{
-			BOX_LOG_SYS_WARNING("Failed to access local directory "
-				"'" << localDirDisplay << "'");
-			rParams.mUncheckedFiles ++;
+			rParams.NotifyLocalDirAccessFailed(rLocalDir, rStoreDir);
 		}
 		return;
 	}
 
 	// Get the directory listing from the store
 	mrConnection.QueryListDirectory(
-			DirID,
-			BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	// get everything
-			BackupProtocolClientListDirectory::Flags_OldVersion | BackupProtocolClientListDirectory::Flags_Deleted,	// except for old versions and deleted files
-			true /* want attributes */);
+		DirID,
+		BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,
+		// get everything
+		BackupProtocolClientListDirectory::Flags_OldVersion |
+		BackupProtocolClientListDirectory::Flags_Deleted,
+		// except for old versions and deleted files
+		true /* want attributes */);
 
 	// Retrieve the directory from the stream following
 	BackupStoreDirectory dir;
@@ -1535,8 +1470,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	// Test out the attributes
 	if(!dir.HasAttributes())
 	{
-		BOX_WARNING("Store directory '" << storeDirDisplay << "' "
-			"doesn't have attributes.");
+		rParams.NotifyStoreDirMissingAttributes(rLocalDir, rStoreDir);
 	}
 	else
 	{
@@ -1551,10 +1485,20 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 
 		if(!(attr.Compare(localAttr, true, true /* ignore modification times */)))
 		{
-			BOX_WARNING("Local directory '" << localDirDisplay <<
-				"' has different attributes to store "
-				"directory '" << storeDirDisplay << "'.");
-			rParams.mDifferences ++;
+			bool modifiedAfterLastSync = false;
+			
+			struct stat st;
+			if(::stat(rLocalDir.c_str(), &st) == 0)
+			{
+				if(FileAttrModificationTime(st) >
+					rParams.LatestFileUploadTime())
+				{
+					modifiedAfterLastSync = true;
+				}
+			}
+			
+			rParams.NotifyDifferentAttributes(rLocalDir, rStoreDir,
+				modifiedAfterLastSync, false);
 		}
 	}
 
@@ -1562,11 +1506,10 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 	DIR *dirhandle = ::opendir(rLocalDir.c_str());
 	if(dirhandle == 0)
 	{
-		BOX_LOG_SYS_WARNING("Failed to open local directory '" << 
-			localDirDisplay << "'");
-		rParams.mUncheckedFiles ++;
+		rParams.NotifyLocalDirAccessFailed(rLocalDir, rStoreDir);
 		return;
 	}
+	
 	try
 	{
 		// Read the files and directories into sets
@@ -1632,7 +1575,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		if(::closedir(dirhandle) != 0)
 		{
 			BOX_LOG_SYS_ERROR("Failed to close local directory "
-				"'" << localDirDisplay << "'");
+				"'" << rLocalDir << "'");
 		}
 		dirhandle = 0;
 	
@@ -1670,33 +1613,17 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeFiles.begin(); i != storeFiles.end(); ++i)
 		{
 			const std::string& fileName(i->first);
-#ifdef WIN32
-			// File name is also in UTF-8 encoding, 
-			// need to convert to console
-			std::string fileNameDisplay;
-			if(!ConvertUtf8ToConsole(i->first.c_str(), 
-				fileNameDisplay)) return;
-#else
-			const std::string& fileNameDisplay(i->first);
-#endif
 
-			std::string localPath(MakeFullPath
-				(rLocalDir, fileName));
-			std::string localPathDisplay(MakeFullPath
-				(localDirDisplay, fileNameDisplay));
-			std::string storePathDisplay
-				(storeDirDisplay + "/" + fileNameDisplay);
+			std::string localPath(MakeFullPath(rLocalDir, fileName));
+			std::string storePath(rStoreDir + "/" + fileName);
 
 			// Does the file exist locally?
 			string_set_iter_t local(localFiles.find(fileName));
 			if(local == localFiles.end())
 			{
 				// Not found -- report
-				BOX_WARNING("Local file '" << 
-					localPathDisplay << "' does not exist, "
-					"but store file '" <<
-					storePathDisplay << "' does.");
-				rParams.mDifferences ++;
+				rParams.NotifyLocalFileMissing(localPath,
+					storePath);
 			}
 			else
 			{
@@ -1707,8 +1634,10 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 					
 					// File modified after last sync flag
 					bool modifiedAfterLastSync = false;
+					
+					bool hasDifferentAttribsOrContents = false;
 						
-					if(rParams.mQuickCompare)
+					if(rParams.QuickCompare())
 					{
 						// Compare file -- fetch it
 						mrConnection.QueryGetBlockIndexByID(i->second->GetObjectID());
@@ -1753,7 +1682,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						BackupClientFileAttributes localAttr;
 						box_time_t fileModTime = 0;
 						localAttr.ReadAttributes(localPath.c_str(), false /* don't zero mod times */, &fileModTime);					
-						modifiedAfterLastSync = (fileModTime > rParams.mLatestFileUploadTime);
+						modifiedAfterLastSync = (fileModTime > rParams.LatestFileUploadTime());
 						bool ignoreAttrModTime = true;
 
 						#ifdef WIN32
@@ -1762,7 +1691,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 						ignoreAttrModTime = false;
 						#endif
 
-						if(!rParams.mIgnoreAttributes &&
+						if(!rParams.IgnoreAttributes() &&
 						#ifdef PLATFORM_DISABLE_SYMLINK_ATTRIB_COMPARE
 						   !fileOnServerStream->IsSymLink() &&
 						#endif
@@ -1770,22 +1699,12 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 								ignoreAttrModTime,
 								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
 						{
-							BOX_WARNING("Local file '" <<
-								localPathDisplay <<
-								"' has different attributes "
-								"to store file '" <<
-								storePathDisplay <<
-								"'.");
-							rParams.mDifferences ++;
-							if(modifiedAfterLastSync)
-							{
-								rParams.mDifferencesExplainedByModTime ++;
-								BOX_INFO("(the file above was modified after the last sync time -- might be reason for difference)");
-							}
-							else if(i->second->HasAttributes())
-							{
-								BOX_INFO("(the file above has had new attributes applied)\n");
-							}
+							rParams.NotifyDifferentAttributes(
+								localPath,
+								storePath,
+								modifiedAfterLastSync,
+								i->second->HasAttributes());
+							hasDifferentAttribsOrContents = true;
 						}
 	
 						// Compare contents, if it's a regular file not a link
@@ -1831,48 +1750,32 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 					// Report if not equal.
 					if(!equal)
 					{
-						BOX_WARNING("Local file '" <<
-							localPathDisplay << "' "
-							"has different contents "
-							"to store file '" <<
-							storePathDisplay <<
-							"'.");
-						rParams.mDifferences ++;
-						if(modifiedAfterLastSync)
-						{
-							rParams.mDifferencesExplainedByModTime ++;
-							BOX_INFO("(the file above was modified after the last sync time -- might be reason for difference)");
-						}
-						else if(i->second->HasAttributes())
-						{
-							BOX_INFO("(the file above has had new attributes applied)\n");
-						}
+						rParams.NotifyDifferentContents(
+							localPath, storePath,
+							modifiedAfterLastSync);
+						hasDifferentAttribsOrContents = true;
+					}
+					
+					if (!hasDifferentAttribsOrContents)
+					{
+						rParams.NotifyFileCompareOK(
+							localPath, storePath);
 					}
 				}
 				catch(BoxException &e)
 				{
-					BOX_ERROR("Failed to fetch and compare "
-						"'" << 
-						storePathDisplay.c_str() <<
-						"': error " << e.what() <<
-						" (" << e.GetType() <<
-						"/"  << e.GetSubType() << ")");
-					rParams.mUncheckedFiles ++;
+					rParams.NotifyDownloadFailed(localPath,
+						storePath, e);
 				}
 				catch(std::exception &e)
 				{
-					BOX_ERROR("Failed to fetch and compare "
-						"'" << 
-						storePathDisplay.c_str() <<
-						"': " << e.what());
+					rParams.NotifyDownloadFailed(localPath,
+						storePath, e);
 				}
 				catch(...)
 				{	
-					BOX_ERROR("Failed to fetch and compare "
-						"'" << 
-						storePathDisplay.c_str() <<
-						"': unknown error");
-					rParams.mUncheckedFiles ++;
+					rParams.NotifyDownloadFailed(localPath,
+						storePath);
 				}
 
 				// Remove from set so that we know it's been compared
@@ -1880,53 +1783,34 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 			}
 		}
 		
-		// Report any files which exist on the locally, but not on the store
+		// Report any files which exist locally, but not on the store
 		for(string_set_iter_t i = localFiles.begin(); i != localFiles.end(); ++i)
 		{
-#ifdef WIN32
-			// File name is also in UTF-8 encoding, 
-			// need to convert to console
-			std::string fileNameDisplay;
-			if(!ConvertUtf8ToConsole(i->c_str(), fileNameDisplay)) 
-				return;
-#else
-			const std::string& fileNameDisplay(*i);
-#endif
-
-			std::string localPath(MakeFullPath
-				(rLocalDir, *i));
-			std::string localPathDisplay(MakeFullPath
-				(localDirDisplay, fileNameDisplay));
-			std::string storePathDisplay
-				(storeDirDisplay + "/" + fileNameDisplay);
+			std::string localPath(MakeFullPath(rLocalDir, *i));
+			std::string storePath(rStoreDir + "/" + *i);
 
 			// Should this be ignored (ie is excluded)?
-			if(rParams.mpExcludeFiles == 0 || 
-				!(rParams.mpExcludeFiles->IsExcluded(localPath)))
+			if(!rParams.IsExcludedFile(localPath))
 			{
-				BOX_WARNING("Local file '" << 
-					localPathDisplay <<
-					"' exists, but store file '" <<
-					storePathDisplay <<
-					"' does not.");
-				rParams.mDifferences ++;
+				bool modifiedAfterLastSync = false;
 				
-				// Check the file modification time
+				struct stat st;
+				if(::stat(localPath.c_str(), &st) == 0)
 				{
-					struct stat st;
-					if(::stat(localPath.c_str(), &st) == 0)
+					if(FileModificationTime(st) >
+						rParams.LatestFileUploadTime())
 					{
-						if(FileModificationTime(st) > rParams.mLatestFileUploadTime)
-						{
-							rParams.mDifferencesExplainedByModTime ++;
-							BOX_INFO("(the file above was modified after the last sync time -- might be reason for difference)");
-						}
+						modifiedAfterLastSync = true;
 					}
 				}
+				
+				rParams.NotifyRemoteFileMissing(localPath,
+					storePath, modifiedAfterLastSync);
 			}
 			else
 			{
-				rParams.mExcludedFiles ++;
+				rParams.NotifyExcludedFile(localPath,
+					storePath);
 			}
 		}		
 		
@@ -1937,116 +1821,69 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		// Now do the directories, recursively to check subdirectories
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeDirs.begin(); i != storeDirs.end(); ++i)
 		{
-#ifdef WIN32
-			// Directory name is also in UTF-8 encoding, 
-			// need to convert to console
-			std::string subdirNameDisplay;
-			if(!ConvertUtf8ToConsole(i->first.c_str(), 
-				subdirNameDisplay))
-				return;
-#else
-			const std::string& subdirNameDisplay(i->first);
-#endif
-
-			std::string localPath(MakeFullPath
-				(rLocalDir, i->first));
-			std::string localPathDisplay(MakeFullPath
-				(localDirDisplay, subdirNameDisplay));
-			std::string storePathDisplay
-				(storeDirDisplay + "/" + subdirNameDisplay);
+			std::string localPath(MakeFullPath(rLocalDir, i->first));
+			std::string storePath(rLocalDir + "/" + i->first);
 
 			// Does the directory exist locally?
 			string_set_iter_t local(localDirs.find(i->first));
 			if(local == localDirs.end() &&
-				rParams.mpExcludeDirs != NULL && 
-				rParams.mpExcludeDirs->IsExcluded(localPath))
+				rParams.IsExcludedDir(localPath))
 			{
-				// Not found -- report
-				BOX_WARNING("Local directory '" <<
-					localPathDisplay << "' is excluded, "
-					"but store directory '" <<
-					storePathDisplay << "' still exists.");
-				rParams.mDifferences ++;
+				rParams.NotifyExcludedFileNotDeleted(localPath,
+					storePath);
 			}
 			else if(local == localDirs.end())
 			{
 				// Not found -- report
-				BOX_WARNING("Local directory '" <<
-					localPathDisplay << "' does not exist, "
-					"but store directory '" <<
-					storePathDisplay << "' does.");
-				rParams.mDifferences ++;
+				rParams.NotifyRemoteFileMissing(localPath,
+					storePath, false);
 			}
-			else if(rParams.mpExcludeDirs != NULL && 
-				rParams.mpExcludeDirs->IsExcluded(localPath))
+			else if(rParams.IsExcludedDir(localPath))
 			{
 				// don't recurse into excluded directories
 			}
 			else
 			{
 				// Compare directory
-				Compare(i->second->GetObjectID(), rStoreDir + "/" + i->first, localPath, rParams);
+				Compare(i->second->GetObjectID(),
+					rStoreDir + "/" + i->first,
+					localPath, rParams);
 				
 				// Remove from set so that we know it's been compared
 				localDirs.erase(local);
 			}
 		}
 		
-		// Report any files which exist locally, but not on the store
+		// Report any directories which exist locally, but not on the store
 		for(std::set<std::string>::const_iterator
 			i  = localDirs.begin();
 			i != localDirs.end(); ++i)
 		{
-			#ifdef WIN32
-				// File name is also in UTF-8 encoding, 
-				// need to convert to console
-				std::string fileNameDisplay;
-				if(!ConvertUtf8ToConsole(i->c_str(), fileNameDisplay))
-					return;
-			#else
-				const std::string& fileNameDisplay(*i);
-			#endif
-
-			std::string localPath(MakeFullPath
-				(rLocalDir, *i));
-			std::string localPathDisplay(MakeFullPath
-				(localDirDisplay, fileNameDisplay));
-
-			std::string storePath
-				(rStoreDir + "/" + *i);
-			std::string storePathDisplay
-				(storeDirDisplay + "/" + fileNameDisplay);
+			std::string localPath(MakeFullPath(rLocalDir, *i));
+			std::string storePath(rStoreDir + "/" + *i);
 
 			// Should this be ignored (ie is excluded)?
-			if(rParams.mpExcludeDirs == 0 ||
-				!(rParams.mpExcludeDirs->IsExcluded(localPath)))
+			if(!rParams.IsExcludedDir(localPath))
 			{
-				BOX_WARNING("Local directory '" <<
-					localPathDisplay << "' exists, but "
-					"store directory '" <<
-					storePathDisplay << "' does not.");
-				rParams.mDifferences ++;
-
+				bool modifiedAfterLastSync = false;
+				
 				// Check the dir modification time
 				struct stat st;
 				if(::stat(localPath.c_str(), &st) == 0 &&
 					FileModificationTime(st) >
-					rParams.mLatestFileUploadTime)
+					rParams.LatestFileUploadTime())
 				{
-					rParams.mDifferencesExplainedByModTime ++;
-					BOX_INFO("Local directory '" <<
-						localPathDisplay << "' was "
-						"modified since the last sync, "
-						"might be reason for "
-						"difference");
+					modifiedAfterLastSync = true;
 				}
+
+				rParams.NotifyRemoteFileMissing(localPath,
+					storePath, modifiedAfterLastSync);
 			}
 			else
 			{
-				rParams.mExcludedDirs ++;
+				rParams.NotifyExcludedDir(localPath, storePath);
 			}
 		}		
-		
 	}
 	catch(...)
 	{
@@ -2054,6 +1891,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir, const s
 		{
 			::closedir(dirhandle);
 		}
+		throw;
 	}
 }
 

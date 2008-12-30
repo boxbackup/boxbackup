@@ -14,6 +14,7 @@
 #include <string>
 
 #include "BoxTime.h"
+#include "BoxBackupCompareParams.h"
 
 class BackupProtocolClient;
 class Configuration;
@@ -68,31 +69,207 @@ private:
 		bool FirstLevel);
 	
 public:
-	class CompareParams
+	class CompareParams : public BoxBackupCompareParams
 	{
 	public:
-		CompareParams();
-		~CompareParams();
-		void DeleteExcludeLists();
-		bool mQuickCompare;
+		CompareParams(bool QuickCompare, bool IgnoreExcludes,
+			bool IgnoreAttributes, box_time_t LatestFileUploadTime);
+		
 		bool mQuietCompare;
-		bool mIgnoreExcludes;
-		bool mIgnoreAttributes;
 		int mDifferences;
 		int mDifferencesExplainedByModTime;
 		int mUncheckedFiles;
 		int mExcludedDirs;
 		int mExcludedFiles;
-		const ExcludeList *mpExcludeFiles;
-		const ExcludeList *mpExcludeDirs;
-		box_time_t mLatestFileUploadTime;
+
+		std::string ConvertForConsole(const std::string& rUtf8String)
+		{
+		#ifdef WIN32
+			std::string output;
+			
+			if(!ConvertUtf8ToConsole(rUtf8String.c_str(), output))
+			{
+				BOX_WARNING("Character set conversion failed "
+					"on string: " << rUtf8String);
+				return rUtf8String;
+			}
+			
+			return output;
+		#else
+			return rUtf8String;
+		#endif
+		}
+
+		virtual void NotifyLocalDirMissing(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			BOX_WARNING("Local directory '" <<
+				ConvertForConsole(rLocalPath) << "' "
+				"does not exist, but remote directory does.");
+			mDifferences ++;
+		}
+		
+		virtual void NotifyLocalDirAccessFailed(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			BOX_LOG_SYS_WARNING("Failed to access local directory "
+				"'" << ConvertForConsole(rLocalPath) << "'");
+			mUncheckedFiles ++;
+		}
+
+		virtual void NotifyStoreDirMissingAttributes(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			BOX_WARNING("Store directory '" <<
+				ConvertForConsole(rRemotePath) << "' "
+				"doesn't have attributes.");
+		}
+
+		virtual void NotifyDifferentAttributes(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath,
+			bool modifiedAfterLastSync,
+			bool newAttributesApplied)
+		{
+			BOX_WARNING("Local file '" <<
+				ConvertForConsole(rLocalPath) <<
+				"' has different attributes to store file '" <<
+				ConvertForConsole(rRemotePath) << "'.");
+			mDifferences ++;
+			
+			if(modifiedAfterLastSync)
+			{
+				mDifferencesExplainedByModTime ++;
+				BOX_INFO("(the file above was modified after "
+					"the last sync time -- might be "
+					"reason for difference)");
+			}
+			else if(newAttributesApplied)
+			{
+				BOX_INFO("(the file above has had new "
+					"attributes applied)\n");
+			}
+		}
+
+		virtual void NotifyRemoteFileMissing(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath,
+			bool modifiedAfterLastSync)
+		{
+			BOX_WARNING("Local file '" <<
+				ConvertForConsole(rLocalPath) << "' " 
+				"exists, but remote file '" <<
+				ConvertForConsole(rRemotePath) << "' "
+				"does not.");
+			mDifferences ++;
+			
+			if(modifiedAfterLastSync)
+			{
+				mDifferencesExplainedByModTime ++;
+				BOX_INFO("(the file above was modified after "
+					"the last sync time -- might be "
+					"reason for difference)");
+			}
+		}
+
+		virtual void NotifyLocalFileMissing(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			BOX_WARNING("Remote file '" <<
+				ConvertForConsole(rRemotePath) << "' " 
+				"exists, but local file '" <<
+				ConvertForConsole(rLocalPath) << "' does not.");
+			mDifferences ++;
+		}
+
+		virtual void NotifyExcludedFileNotDeleted(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			BOX_WARNING("Local file '" <<
+				ConvertForConsole(rLocalPath) << "' " 
+				"is excluded, but remote file '" <<
+				ConvertForConsole(rRemotePath) << "' "
+				"still exists.");
+			mDifferences ++;
+		}
+		
+		virtual void NotifyDifferentContents(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath,
+			bool modifiedAfterLastSync)
+		{
+			BOX_WARNING("Local file '" <<
+				ConvertForConsole(rLocalPath) <<
+				"' has different contents to store file '" <<
+				ConvertForConsole(rRemotePath) << "'.");
+			mDifferences ++;
+			
+			if(modifiedAfterLastSync)
+			{
+				mDifferencesExplainedByModTime ++;
+				BOX_INFO("(the file above was modified after "
+					"the last sync time -- might be "
+					"reason for difference)");
+			}
+		}
+
+		virtual void NotifyDownloadFailed(const std::string& rLocalPath,
+			const std::string& rRemotePath,
+			BoxException& rException)
+		{
+			BOX_ERROR("Failed to download remote file '" <<
+				ConvertForConsole(rRemotePath) << "': " <<
+				rException.what() << " (" <<
+				rException.GetType() << "/" <<
+				rException.GetSubType() << ")");
+			mUncheckedFiles ++;
+		}
+
+		virtual void NotifyDownloadFailed(const std::string& rLocalPath,
+			const std::string& rRemotePath,
+			std::exception& rException)
+		{
+			BOX_ERROR("Failed to download remote file '" <<
+				ConvertForConsole(rRemotePath) << "': " <<
+				rException.what());
+			mUncheckedFiles ++;
+		}
+
+		virtual void NotifyDownloadFailed(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			BOX_ERROR("Failed to download remote file '" <<
+				ConvertForConsole(rRemotePath));
+			mUncheckedFiles ++;
+		}
+
+		virtual void NotifyExcludedFile(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			mExcludedFiles ++;
+		}
+
+		virtual void NotifyExcludedDir(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+			mExcludedDirs ++;
+		}
+
+		virtual void NotifyFileCompareOK(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+		}
 	};
 	void CompareLocation(const std::string &rLocation,
-		CompareParams &rParams);
+		BoxBackupCompareParams &rParams);
 	void Compare(const std::string &rStoreDir,
-		const std::string &rLocalDir, CompareParams &rParams);
+		const std::string &rLocalDir, BoxBackupCompareParams &rParams);
 	void Compare(int64_t DirID, const std::string &rStoreDir,
-		const std::string &rLocalDir, CompareParams &rParams);
+		const std::string &rLocalDir, BoxBackupCompareParams &rParams);
 
 public:
 
