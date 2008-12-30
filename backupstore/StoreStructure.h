@@ -12,7 +12,7 @@
 
 #include <string>
 
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define STORE_ID_SEGMENT_LENGTH		8
 	#define STORE_ID_SEGMENT_MASK		0xff
 #else

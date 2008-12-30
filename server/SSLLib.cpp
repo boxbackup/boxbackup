@@ -23,7 +23,7 @@
 
 #include "MemLeakFindOn.h"
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	bool SSLLib__TraceErrors = false;
 #endif
 

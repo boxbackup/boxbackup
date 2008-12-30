@@ -19,7 +19,7 @@
 #include "MemLeakFindOn.h"
 
 // How big a buffer to use
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	// debug!
 	#define BUFFER_SIZE	256
 #else

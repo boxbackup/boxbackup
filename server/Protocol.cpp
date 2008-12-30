@@ -26,7 +26,7 @@
 
 #include "MemLeakFindOn.h"
 
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK	1024
 #else
 //	#define PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK	1024

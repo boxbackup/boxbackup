@@ -55,7 +55,7 @@ typedef struct
 END_STRUCTURE_PACKING_FOR_WIRE
 #endif
 
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define 	NUM_DELETED_DIRS_BLOCK	256
 #else
 	#define 	NUM_DELETED_DIRS_BLOCK	2

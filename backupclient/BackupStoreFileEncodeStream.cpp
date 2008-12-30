@@ -236,7 +236,7 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename,
 			{
 				throw std::bad_alloc();
 			}
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 			// In debug builds, make sure that the reallocation code is exercised.
 			mEncodedBuffer.Allocate(mAllocatedBufferSize / 4);
 #else

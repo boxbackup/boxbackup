@@ -174,7 +174,7 @@ BackupStoreCheck::IDBlock *BackupStoreCheck::LookupID(BackupStoreCheck_ID_t ID, 
 }
 
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 // --------------------------------------------------------------------------
 //
 // Function

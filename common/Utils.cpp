@@ -58,7 +58,7 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 	{
 		rOutput.push_back(String.substr(b));
 	}
-/*#ifndef NDEBUG
+/*#ifndef BOX_RELEASE_BUILD
 	BOX_TRACE("Splitting string '" << String << " on " << (char)SplitOn);
 	for(unsigned int l = 0; l < rOutput.size(); ++l)
 	{
