@@ -13,6 +13,7 @@
 #include "BoxTime.h"
 #include "BackupClientDeleteList.h"
 #include "BackupClientDirectoryRecord.h"
+#include "BackupDaemonInterface.h"
 #include "BackupStoreFile.h"
 #include "ExcludeList.h"
 #include "Timer.h"
@@ -25,23 +26,6 @@ class BackupDaemon;
 class BackupStoreFilenameClear;
 
 #include <string>
-
-// --------------------------------------------------------------------------
-//
-// Class
-//		Name:    LocationResolver
-//		Purpose: Interface for classes that can resolve locations to paths,
-//		         like BackupDaemon
-//		Created: 2003/10/08
-//
-// --------------------------------------------------------------------------
-class LocationResolver
-{
-public:
-	virtual ~LocationResolver() { }
-	virtual bool FindLocationPathName(const std::string &rLocationName, 
-		std::string &rPathOut) const = 0;
-};
 
 
 // --------------------------------------------------------------------------
