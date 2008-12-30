@@ -391,7 +391,7 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 		case SSL_ERROR_WANT_WRITE:
 			// wait for the requried data
 			{
-			#ifndef NDEBUG
+			#ifndef BOX_RELEASE_BUILD
 				bool conditionmet = 
 			#endif
 				WaitWhenRetryRequired(se, IOStream::TimeOutInfinite);

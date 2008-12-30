@@ -215,7 +215,7 @@ public:
 	static BackupStoreFileStats msStats;
 	
 	// For debug
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	static bool TraceDetailsOfDiffProcess;
 #endif
 

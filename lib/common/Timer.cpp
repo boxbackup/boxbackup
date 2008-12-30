@@ -347,7 +347,7 @@ Timer::Timer(size_t timeoutSecs, const std::string& rName)
 , mTimerHandle(INVALID_HANDLE_VALUE)
 #endif
 {
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 	if (timeoutSecs == 0)
 	{
 		BOX_TRACE(TIMER_ID "initialised for " << timeoutSecs << 
@@ -476,7 +476,7 @@ void Timer::Stop()
 
 Timer::~Timer()
 {
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 	BOX_TRACE(TIMER_ID "destroyed");
 	#endif
 
@@ -503,7 +503,7 @@ Timer::Timer(const Timer& rToCopy)
 , mTimerHandle(INVALID_HANDLE_VALUE)
 #endif
 {
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 	if (mExpired)
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
@@ -544,7 +544,7 @@ Timer::Timer(const Timer& rToCopy)
 
 Timer& Timer::operator=(const Timer& rToCopy)
 {
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 	if (rToCopy.mExpired)
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
@@ -595,7 +595,7 @@ Timer& Timer::operator=(const Timer& rToCopy)
 
 void Timer::OnExpire()
 {
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 	BOX_TRACE(TIMER_ID "fired");
 	#endif
 

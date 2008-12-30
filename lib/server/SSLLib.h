@@ -10,7 +10,7 @@
 #ifndef SSLLIB__H
 #define SSLLIB__H
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	extern bool SSLLib__TraceErrors;
 	#define SET_DEBUG_SSLLIB_TRACE_ERRORS {SSLLib__TraceErrors = true;}
 #else

@@ -33,7 +33,7 @@
 // Maximum number of directories to keep in the cache
 // When the cache is bigger than this, everything gets
 // deleted.
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define	MAX_CACHE_SIZE	32
 #else
 	#define	MAX_CACHE_SIZE	2

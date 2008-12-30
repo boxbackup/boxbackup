@@ -14,7 +14,7 @@
 
 #include "IOStream.h"
 
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define IOSTREAMGETLINE_BUFFER_SIZE		1024
 #else
 	#define IOSTREAMGETLINE_BUFFER_SIZE		4

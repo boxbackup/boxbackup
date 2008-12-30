@@ -457,7 +457,6 @@ __E
 			if (-d "$module/testfiles")
 			{
 				print TESTFILE <<__E;
-echo Killing any running daemons...
 kill_process bbackupd
 kill_process bbstored
 __E
@@ -560,7 +559,7 @@ DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
 LDFLAGS = @LDFLAGS@ @LDADD_RDYNAMIC@
 
 .ifdef RELEASE
-CXXFLAGS = -DNDEBUG $release_flags \$(DEFAULT_CXXFLAGS)
+CXXFLAGS = -DBOX_RELEASE_BUILD $release_flags \$(DEFAULT_CXXFLAGS)
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE

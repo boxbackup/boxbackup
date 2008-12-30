@@ -58,7 +58,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 			if(pRevisionID != 0)
 			{
 				(*pRevisionID) = FileModificationTime(st);
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 				// The resolution of timestamps may be very
 				// low, e.g. 1 second. So add the size to it
 				// to give a bit more chance of it changing.
@@ -107,7 +107,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 	if(pRevisionID != 0)
 	{
 		(*pRevisionID) = revisionID;
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 		// The resolution of timestamps may be very low, e.g.
 		// 1 second. So add the size to it to give a bit more
 		// chance of it changing.

@@ -48,7 +48,7 @@ The following problems can be fixed:
 
 
 // Size of blocks in the list of IDs
-#ifdef NDEBUG
+#ifdef BOX_RELEASE_BUILD
 	#define BACKUPSTORECHECK_BLOCK_SIZE		(64*1024)
 #else
 	#define BACKUPSTORECHECK_BLOCK_SIZE		8
@@ -150,7 +150,7 @@ private:
 		return (pBlock->mFlags[Index / Flags__NumItemsPerEntry] >> ((Index % Flags__NumItemsPerEntry) * Flags__NumFlags)) & Flags__MASK;
 	}
 	
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	void DumpObjectInfo();
 	#define DUMP_OBJECT_INFO DumpObjectInfo();
 #else

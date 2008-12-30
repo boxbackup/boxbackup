@@ -94,7 +94,7 @@ int main(int argc, const char *argv[])
 #endif
 
 	// Really don't want trace statements happening, even in debug mode
-	#ifndef NDEBUG
+	#ifndef BOX_RELEASE_BUILD
 		BoxDebugTraceOn = false;
 	#endif
 	
@@ -114,7 +114,7 @@ int main(int argc, const char *argv[])
 
 	Logging::SetProgramName("bbackupquery");
 
-	#ifdef NDEBUG
+	#ifdef BOX_RELEASE_BUILD
 	int masterLevel = Log::NOTICE; // need an int to do math with
 	#else
 	int masterLevel = Log::INFO; // need an int to do math with

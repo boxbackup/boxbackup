@@ -1522,12 +1522,12 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 #endif // HAVE_STRUCT_MNTENT_MNT_DIR
 	// Check sorting and that things are as we expect
 	ASSERT(mountPoints.size() > 0);
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	{
 		std::set<std::string, mntLenCompare>::reverse_iterator i(mountPoints.rbegin());
 		ASSERT(*i == "/");
 	}
-#endif // n NDEBUG
+#endif // n BOX_RELEASE_BUILD
 #endif // n HAVE_STRUCT_STATFS_F_MNTONNAME || n HAVE_STRUCT_STATVFS_F_MNTONNAME
 #endif // HAVE_MOUNTS
 
