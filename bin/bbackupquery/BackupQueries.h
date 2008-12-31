@@ -127,32 +127,6 @@ public:
 				"doesn't have attributes.");
 		}
 
-		virtual void NotifyDifferentAttributes(
-			const std::string& rLocalPath,
-			const std::string& rRemotePath,
-			bool modifiedAfterLastSync,
-			bool newAttributesApplied)
-		{
-			BOX_WARNING("Local file '" <<
-				ConvertForConsole(rLocalPath) <<
-				"' has different attributes to store file '" <<
-				ConvertForConsole(rRemotePath) << "'.");
-			mDifferences ++;
-			
-			if(modifiedAfterLastSync)
-			{
-				mDifferencesExplainedByModTime ++;
-				BOX_INFO("(the file above was modified after "
-					"the last sync time -- might be "
-					"reason for difference)");
-			}
-			else if(newAttributesApplied)
-			{
-				BOX_INFO("(the file above has had new "
-					"attributes applied)\n");
-			}
-		}
-
 		virtual void NotifyRemoteFileMissing(
 			const std::string& rLocalPath,
 			const std::string& rRemotePath,
@@ -197,28 +171,8 @@ public:
 			mDifferences ++;
 		}
 		
-		virtual void NotifyDifferentContents(
-			const std::string& rLocalPath,
-			const std::string& rRemotePath,
-			bool modifiedAfterLastSync)
-		{
-			BOX_WARNING("Local file '" <<
-				ConvertForConsole(rLocalPath) <<
-				"' has different contents to store file '" <<
-				ConvertForConsole(rRemotePath) << "'.");
-			mDifferences ++;
-			
-			if(modifiedAfterLastSync)
-			{
-				mDifferencesExplainedByModTime ++;
-				BOX_INFO("(the file above was modified after "
-					"the last sync time -- might be "
-					"reason for difference)");
-			}
-		}
-
 		virtual void NotifyDownloadFailed(const std::string& rLocalPath,
-			const std::string& rRemotePath,
+			const std::string& rRemotePath, int64_t NumBytes,
 			BoxException& rException)
 		{
 			BOX_ERROR("Failed to download remote file '" <<
@@ -230,7 +184,7 @@ public:
 		}
 
 		virtual void NotifyDownloadFailed(const std::string& rLocalPath,
-			const std::string& rRemotePath,
+			const std::string& rRemotePath, int64_t NumBytes,
 			std::exception& rException)
 		{
 			BOX_ERROR("Failed to download remote file '" <<
@@ -240,7 +194,7 @@ public:
 		}
 
 		virtual void NotifyDownloadFailed(const std::string& rLocalPath,
-			const std::string& rRemotePath)
+			const std::string& rRemotePath, int64_t NumBytes)
 		{
 			BOX_ERROR("Failed to download remote file '" <<
 				ConvertForConsole(rRemotePath));
@@ -259,9 +213,77 @@ public:
 			mExcludedDirs ++;
 		}
 
-		virtual void NotifyFileCompareOK(const std::string& rLocalPath,
-			const std::string& rRemotePath)
+		virtual void NotifyDirCompared(
+			const std::string& rLocalPath,
+			const std::string& rRemotePath,
+			bool HasDifferentAttributes,
+			bool modifiedAfterLastSync)
 		{
+			if(HasDifferentAttributes)
+			{
+				BOX_WARNING("Local directory '" <<
+					ConvertForConsole(rLocalPath) << "' "
+					"has different attributes to "
+					"store directory '" <<
+					ConvertForConsole(rRemotePath) << "'.");
+				mDifferences ++;
+				
+				if(modifiedAfterLastSync)
+				{
+					mDifferencesExplainedByModTime ++;
+					BOX_INFO("(the directory above was "
+						"modified after the last sync "
+						"time -- might be reason for "
+						"difference)");
+				}
+			}
+		}
+			
+		virtual void NotifyFileCompared(const std::string& rLocalPath,
+			const std::string& rRemotePath, int64_t NumBytes,
+			bool HasDifferentAttributes, bool HasDifferentContents,
+			bool ModifiedAfterLastSync, bool NewAttributesApplied)
+		{
+			int NewDifferences = 0;
+			
+			if(HasDifferentAttributes)
+			{
+				BOX_WARNING("Local file '" <<
+					ConvertForConsole(rLocalPath) << "' "
+					"has different attributes to "
+					"store file '" <<
+					ConvertForConsole(rRemotePath) << "'.");
+				NewDifferences ++;
+			}
+
+			if(HasDifferentContents)
+			{
+				BOX_WARNING("Local file '" <<
+					ConvertForConsole(rLocalPath) << "' "
+					"has different contents to "
+					"store file '" <<
+					ConvertForConsole(rRemotePath) << "'.");
+				NewDifferences ++;
+			}
+			
+			if(HasDifferentAttributes || HasDifferentContents)
+			{
+				if(ModifiedAfterLastSync)
+				{
+					mDifferencesExplainedByModTime +=
+						NewDifferences;
+					BOX_INFO("(the file above was modified "
+						"after the last sync time -- "
+						"might be reason for difference)");
+				}
+				else if(NewAttributesApplied)
+				{
+					BOX_INFO("(the file above has had new "
+						"attributes applied)\n");
+				}
+			}
+			
+			mDifferences += NewDifferences;
 		}
 	};
 	void CompareLocation(const std::string &rLocation,
