@@ -1483,7 +1483,12 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 		localAttr.ReadAttributes(rLocalDir.c_str(), 
 			true /* directories have zero mod times */);
 
-		if(!(attr.Compare(localAttr, true, true /* ignore modification times */)))
+		if(attr.Compare(localAttr, true, true /* ignore modification times */))
+		{
+			rParams.NotifyDirCompared(rLocalDir, rStoreDir,
+				false, false /* actually we didn't check :) */);
+		}
+		else
 		{
 			bool modifiedAfterLastSync = false;
 			
@@ -1497,8 +1502,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				}
 			}
 			
-			rParams.NotifyDifferentAttributes(rLocalDir, rStoreDir,
-				modifiedAfterLastSync, false);
+			rParams.NotifyDirCompared(rLocalDir, rStoreDir,
+				true, modifiedAfterLastSync);
 		}
 	}
 
@@ -1627,6 +1632,14 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			}
 			else
 			{
+				int64_t fileSize = 0;
+
+				struct stat st;
+				if(::stat(localPath.c_str(), &st) == 0)
+				{
+					fileSize = st.st_size;
+				}
+
 				try
 				{
 					// Files the same flag?
@@ -1635,7 +1648,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 					// File modified after last sync flag
 					bool modifiedAfterLastSync = false;
 					
-					bool hasDifferentAttribsOrContents = false;
+					bool hasDifferentAttribs = false;
 						
 					if(rParams.QuickCompare())
 					{
@@ -1699,12 +1712,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 								ignoreAttrModTime,
 								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
 						{
-							rParams.NotifyDifferentAttributes(
-								localPath,
-								storePath,
-								modifiedAfterLastSync,
-								i->second->HasAttributes());
-							hasDifferentAttribsOrContents = true;
+							hasDifferentAttribs = true;
 						}
 	
 						// Compare contents, if it's a regular file not a link
@@ -1747,35 +1755,26 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 						}
 					}
 
-					// Report if not equal.
-					if(!equal)
-					{
-						rParams.NotifyDifferentContents(
-							localPath, storePath,
-							modifiedAfterLastSync);
-						hasDifferentAttribsOrContents = true;
-					}
-					
-					if (!hasDifferentAttribsOrContents)
-					{
-						rParams.NotifyFileCompareOK(
-							localPath, storePath);
-					}
+					rParams.NotifyFileCompared(localPath,
+						storePath, fileSize,
+						hasDifferentAttribs, !equal,
+						modifiedAfterLastSync,
+						i->second->HasAttributes());
 				}
 				catch(BoxException &e)
 				{
 					rParams.NotifyDownloadFailed(localPath,
-						storePath, e);
+						storePath, fileSize, e);
 				}
 				catch(std::exception &e)
 				{
 					rParams.NotifyDownloadFailed(localPath,
-						storePath, e);
+						storePath, fileSize, e);
 				}
 				catch(...)
 				{	
 					rParams.NotifyDownloadFailed(localPath,
-						storePath);
+						storePath, fileSize);
 				}
 
 				// Remove from set so that we know it's been compared

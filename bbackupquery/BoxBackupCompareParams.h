@@ -71,10 +71,6 @@ public:
 		const std::string& rRemotePath) = 0;
 	virtual void NotifyStoreDirMissingAttributes(const std::string& rLocalPath,
 		const std::string& rRemotePath) = 0;
-	virtual void NotifyDifferentAttributes(const std::string& rLocalPath,
-		const std::string& rRemotePath,
-		bool modifiedAfterLastSync,
-		bool newAttributesApplied) = 0;
 	virtual void NotifyRemoteFileMissing(const std::string& rLocalPath,
 		const std::string& rRemotePath,
 		bool modifiedAfterLastSync) = 0;
@@ -82,23 +78,25 @@ public:
 		const std::string& rRemotePath) = 0;
 	virtual void NotifyExcludedFileNotDeleted(const std::string& rLocalPath,
 		const std::string& rRemotePath) = 0;
-	virtual void NotifyDifferentContents(const std::string& rLocalPath,
-		const std::string& rRemotePath,
-		bool modifiedAfterLastSync) = 0;
 	virtual void NotifyDownloadFailed(const std::string& rLocalPath,
-		const std::string& rRemotePath,
+		const std::string& rRemotePath, int64_t NumBytes,
 		BoxException& rException) = 0;
 	virtual void NotifyDownloadFailed(const std::string& rLocalPath,
-		const std::string& rRemotePath,
+		const std::string& rRemotePath, int64_t NumBytes,
 		std::exception& rException) = 0;
 	virtual void NotifyDownloadFailed(const std::string& rLocalPath,
-		const std::string& rRemotePath) = 0;
+		const std::string& rRemotePath, int64_t NumBytes) = 0;
 	virtual void NotifyExcludedFile(const std::string& rLocalPath,
 		const std::string& rRemotePath) = 0;
 	virtual void NotifyExcludedDir(const std::string& rLocalPath,
 		const std::string& rRemotePath) = 0;
-	virtual void NotifyFileCompareOK(const std::string& rLocalPath,
-		const std::string& rRemotePath) = 0;
+	virtual void NotifyDirCompared(const std::string& rLocalPath,
+		const std::string& rRemotePath,	bool HasDifferentAttributes,
+		bool modifiedAfterLastSync) = 0;
+	virtual void NotifyFileCompared(const std::string& rLocalPath,
+		const std::string& rRemotePath, int64_t NumBytes,
+		bool HasDifferentAttributes, bool HasDifferentContents,
+		bool modifiedAfterLastSync, bool newAttributesApplied) = 0;
 };
 
 #endif // BOXBACKUPCOMPAREPARAMS__H
