@@ -1436,6 +1436,8 @@ void BackupQueries::Compare(const std::string &rStoreDir,
 void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 	const std::string &rLocalDir, BoxBackupCompareParams &rParams)
 {
+	rParams.NotifyDirComparing(rLocalDir, rStoreDir);
+
 	// Get info on the local directory
 	struct stat st;
 	if(::lstat(rLocalDir.c_str(), &st) != 0)
@@ -1622,6 +1624,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			std::string localPath(MakeFullPath(rLocalDir, fileName));
 			std::string storePath(rStoreDir + "/" + fileName);
 
+			rParams.NotifyFileComparing(localPath, storePath);
+			
 			// Does the file exist locally?
 			string_set_iter_t local(localFiles.find(fileName));
 			if(local == localFiles.end())
@@ -1631,7 +1635,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 					storePath);
 			}
 			else
-			{
+			{				
 				int64_t fileSize = 0;
 
 				struct stat st;
