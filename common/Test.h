@@ -77,6 +77,62 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 		}																					\
 	}
 
+// utility macro for comparing two strings in a line
+#define TEST_EQUAL(_expected, _found) \
+{ \
+	std::ostringstream _oss1; \
+	_oss1 << _expected; \
+	std::string _exp_str = _oss1.str(); \
+	\
+	std::ostringstream _oss2; \
+	_oss2 << _found; \
+	std::string _found_str = _oss2.str(); \
+	\
+	if(_exp_str != _found_str) \
+	{ \
+		printf("Expected <%s> but found <%s>\n", \
+			_exp_str.c_str(), _found_str.c_str()); \
+		\
+		std::ostringstream _oss3; \
+		_oss3 << #_found << " != " << #_expected; \
+		\
+		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
+	} \
+}
+
+// utility macro for comparing two strings in a line
+#define TEST_EQUAL_LINE(_expected, _found, _line) \
+{ \
+	std::ostringstream _oss1; \
+	_oss1 << _expected; \
+	std::string _exp_str = _oss1.str(); \
+	\
+	std::ostringstream _oss2; \
+	_oss2 << _found; \
+	std::string _found_str = _oss2.str(); \
+	\
+	if(_exp_str != _found_str) \
+	{ \
+		std::string _line_str = _line; \
+		printf("Expected <%s> but found <%s> in <%s>\n", \
+			_exp_str.c_str(), _found_str.c_str(), _line_str.c_str()); \
+		\
+		std::ostringstream _oss3; \
+		_oss3 << #_found << " != " << #_expected << " in " << _line; \
+		\
+		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
+	} \
+}
+
+
+// utility macro for testing a line
+#define TEST_LINE(_condition, _line) \
+	TEST_THAT(_condition); \
+	if (!(_condition)) \
+	{ \
+		printf("Test failed on <%s>\n", _line.c_str()); \
+	}
+
 bool TestFileExists(const char *Filename);
 bool TestDirExists(const char *Filename);
 
