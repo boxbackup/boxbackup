@@ -65,7 +65,8 @@ private:
 
 // Root level
 #define HTTPSERVER_VERIFY_ROOT_KEYS \
-	{"AddressPrefix", 0, ConfigTest_Exists | ConfigTest_LastEntry, 0}
+	ConfigurationVerifyKey("AddressPrefix", \
+		ConfigTest_Exists | ConfigTest_LastEntry)
 
 // AddressPrefix is, for example, http://localhost:1080 -- ie the beginning of the URI
 // This is used for handling redirections.

@@ -73,7 +73,7 @@ const ConfigurationVerify *HTTPServer::GetConfigVerify() const
 {
 	static ConfigurationVerifyKey verifyserverkeys[] = 
 	{
-		HTTPSERVER_VERIFY_SERVER_KEYS(0)	// no default addresses
+		HTTPSERVER_VERIFY_SERVER_KEYS(ConfigurationVerifyKey::NoDefaultValue) // no default addresses
 	};
 
 	static ConfigurationVerify verifyserver[] = 
