@@ -19,9 +19,10 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPQueryDecoder::HTTPQueryDecoder(HTTPRequest::Query_t &)
-//		Purpose: Constructor. Pass in the query contents you want to decode
-//				 the query string into.
+//		Name:    HTTPQueryDecoder::HTTPQueryDecoder(
+//			 HTTPRequest::Query_t &)
+//		Purpose: Constructor. Pass in the query contents you want
+//			 to decode the query string into.
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
