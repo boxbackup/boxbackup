@@ -38,7 +38,7 @@ private:
 	SocketStreamTLS(const SocketStreamTLS &rToCopy);
 public:
 
-	void Open(const TLSContext &rContext, int Type,
+	void Open(const TLSContext &rContext, Socket::Type Type,
 		const std::string& rName, int Port = 0);
 	void Handshake(const TLSContext &rContext, bool IsServer = false);
 	
