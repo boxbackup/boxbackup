@@ -127,20 +127,23 @@ void SocketStream::Attach(int socket)
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
 
-	mSocketHandle = socket;
 	ResetCounters();
+
+	mSocketHandle = socket;
+	mReadClosed = false;
+	mWriteClosed = false;
 }
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    SocketStream::Open(int, char *, int)
+//		Name:    SocketStream::Open(Socket::Type, char *, int)
 //		Purpose: Opens a connection to a listening socket (INET or UNIX)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void SocketStream::Open(int Type, const std::string& rName, int Port)
+void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 {
 	if(mSocketHandle != INVALID_SOCKET_VALUE) 
 	{
@@ -184,6 +187,9 @@ void SocketStream::Open(int Type, const std::string& rName, int Port)
 	}
 
 	ResetCounters();
+
+	mReadClosed = false;
+	mWriteClosed = false;
 }
 
 // --------------------------------------------------------------------------
