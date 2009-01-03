@@ -213,6 +213,11 @@ public:
 			mExcludedDirs ++;
 		}
 
+		virtual void NotifyDirComparing(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+		}
+
 		virtual void NotifyDirCompared(
 			const std::string& rLocalPath,
 			const std::string& rRemotePath,
@@ -238,7 +243,12 @@ public:
 				}
 			}
 		}
-			
+
+		virtual void NotifyFileComparing(const std::string& rLocalPath,
+			const std::string& rRemotePath)
+		{
+		}
+		
 		virtual void NotifyFileCompared(const std::string& rLocalPath,
 			const std::string& rRemotePath, int64_t NumBytes,
 			bool HasDifferentAttributes, bool HasDifferentContents,
