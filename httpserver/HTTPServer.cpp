@@ -1,0 +1,249 @@
+// --------------------------------------------------------------------------
+//
+// File
+//		Name:    HTTPServer.cpp
+//		Purpose: HTTP server class
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+
+#include "Box.h"
+
+#include <stdio.h>
+
+#include "HTTPServer.h"
+#include "HTTPRequest.h"
+#include "HTTPResponse.h"
+#include "IOStreamGetLine.h"
+
+#include "MemLeakFindOn.h"
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::HTTPServer()
+//		Purpose: Constructor
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+HTTPServer::HTTPServer()
+	: mTimeout(20000)	// default timeout leaves a little while for clients to get the second request in.
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::~HTTPServer()
+//		Purpose: Destructor
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+HTTPServer::~HTTPServer()
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::DaemonName()
+//		Purpose: As interface, generic name for daemon
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+const char *HTTPServer::DaemonName() const
+{
+	return "generic-httpserver";
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::GetConfigVerify()
+//		Purpose: As interface -- return most basic config so it's only necessary to
+//				 provide this if you want to add extra directives.
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+const ConfigurationVerify *HTTPServer::GetConfigVerify() const
+{
+	static ConfigurationVerifyKey verifyserverkeys[] = 
+	{
+		HTTPSERVER_VERIFY_SERVER_KEYS(0)	// no default addresses
+	};
+
+	static ConfigurationVerify verifyserver[] = 
+	{
+		{
+			"Server",
+			0,
+			verifyserverkeys,
+			ConfigTest_Exists | ConfigTest_LastEntry,
+			0
+		}
+	};
+	
+	static ConfigurationVerifyKey verifyrootkeys[] = 
+	{
+		HTTPSERVER_VERIFY_ROOT_KEYS
+	};
+
+	static ConfigurationVerify verify =
+	{
+		"root",
+		verifyserver,
+		verifyrootkeys,
+		ConfigTest_Exists | ConfigTest_LastEntry,
+		0
+	};
+
+	return &verify;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::Run()
+//		Purpose: As interface.
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+void HTTPServer::Run()
+{
+	// Do some configuration stuff
+	const Configuration &conf(GetConfiguration());
+	HTTPResponse::SetDefaultURIPrefix(conf.GetKeyValue("AddressPrefix"));
+
+	// Let the base class do the work
+	ServerStream<SocketStream, 80>::Run();
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::Connection(SocketStream &) 
+//		Purpose: As interface, handle connection
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+void HTTPServer::Connection(SocketStream &rStream)
+{
+	// Create a get line object to use
+	IOStreamGetLine getLine(rStream);
+
+	// Notify dervived claases
+	HTTPConnectionOpening();
+
+	bool handleRequests = true;
+	while(handleRequests)
+	{
+		// Parse the request
+		HTTPRequest request;
+		if(!request.Read(getLine, mTimeout))
+		{
+			// Didn't get request, connection probably closed.
+			break;
+		}
+	
+		// Generate a response
+		HTTPResponse response;
+		try
+		{
+			Handle(request, response);
+		}
+		catch(BoxException &e)
+		{
+			char exceptionCode[64];
+			::sprintf(exceptionCode, "(%d/%d)", e.GetType(), e.GetSubType());
+			SendInternalErrorResponse(exceptionCode, rStream);
+			return;
+		}
+		catch(...)
+		{
+			SendInternalErrorResponse("unknown", rStream);
+			return;
+		}
+		
+		// Keep alive?
+		if(request.GetClientKeepAliveRequested())
+		{
+			// Mark the response to the client as supporting keepalive
+			response.SetKeepAlive(true);
+		}
+		else
+		{
+			// Stop now
+			handleRequests = false;
+		}
+	
+		// Send the response (omit any content if this is a HEAD method request)
+		response.Send(rStream, request.GetMethod() == HTTPRequest::Method_HEAD);
+	}
+
+	// Notify dervived claases
+	HTTPConnectionClosing();
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::SendInternalErrorResponse(const char *, SocketStream &)
+//		Purpose: Sends an error response to the remote side
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+void HTTPServer::SendInternalErrorResponse(const char *Error, SocketStream &rStream)
+{
+	#define ERROR_HTML_1 "<html><head><title>Internal Server Error</title></head>\n" \
+			"<h1>Internal Server Error</h1>\n" \
+			"<p>An error, type "
+	#define ERROR_HTML_2 " occured when processing the request.</p>" \
+			"<p>Please try again later.</p>" \
+			"</body>\n</html>\n"
+
+	// Generate the error page
+	HTTPResponse response;
+	response.SetResponseCode(HTTPResponse::Code_InternalServerError);
+	response.SetContentType("text/html");
+	response.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
+	response.Write(Error, ::strlen(Error));
+	response.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
+
+	// Send the error response
+	response.Send(rStream);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::HTTPConnectionOpening()
+//		Purpose: Override to get notifications of connections opening
+//		Created: 22/12/04
+//
+// --------------------------------------------------------------------------
+void HTTPServer::HTTPConnectionOpening()
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPServer::HTTPConnectionClosing()
+//		Purpose: Override to get notifications of connections closing
+//		Created: 22/12/04
+//
+// --------------------------------------------------------------------------
+void HTTPServer::HTTPConnectionClosing()
+{
+}
+
+
