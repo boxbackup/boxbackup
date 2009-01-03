@@ -19,6 +19,7 @@
 #include "autogen_HTTPException.h"
 #include "IOStream.h"
 #include "IOStreamGetLine.h"
+#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 
@@ -219,7 +220,8 @@ bool HTTPRequest::Read(IOStreamGetLine &rGetLine, int Timeout)
 		}
 	}
 	
-	TRACE3("HTTPRequest: method=%d, uri=%s, version=%d\n", mMethod, mRequestURI.c_str(), mHTTPVersion);
+	BOX_TRACE("HTTPRequest: method=" << mMethod << ", uri=" <<
+		mRequestURI << ", version=" << mHTTPVersion);
 	
 	// If HTTP 1.1 or greater, assume keep-alive
 	if(mHTTPVersion >= HTTPVersion_1_1)
@@ -254,7 +256,8 @@ bool HTTPRequest::Read(IOStreamGetLine &rGetLine, int Timeout)
 		if(fromBuffer > mContentLength) fromBuffer = mContentLength;
 		if(fromBuffer > 0)
 		{
-			TRACE1("Decoding %d bytes of data from getline buffer\n", fromBuffer);
+			BOX_TRACE("Decoding " << fromBuffer << " bytes of "
+				"data from getline buffer");
 			decoder.DecodeChunk((const char *)rGetLine.GetBufferedData(), fromBuffer);
 			// And tell the getline object to ignore the data we just used
 			rGetLine.IgnoreBufferedData(fromBuffer);
@@ -368,7 +371,9 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 					// Truncate the string to just the hostname
 					mHostName = mHostName.substr(0, colon);
 					
-					TRACE2("Host: header, hostname = '%s', host port = %d\n", mHostName.c_str(), mHostPort);
+					BOX_TRACE("Host: header, hostname = " <<
+						"'" << mHostName << "', host "
+						"port = " << mHostPort);
 				}
 			}
 			else if(p == sizeof("Cookie")-1
