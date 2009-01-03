@@ -87,38 +87,6 @@
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
-// utility macro for comparing two strings in a line
-#define TEST_EQUAL(_expected, _found, _line) \
-{ \
-	std::ostringstream _oss1; \
-	_oss1 << _expected; \
-	std::string _exp_str = _oss1.str(); \
-	\
-	std::ostringstream _oss2; \
-	_oss2 << _found; \
-	std::string _found_str = _oss2.str(); \
-	\
-	if(_exp_str != _found_str) \
-	{ \
-		std::string _line_str = _line; \
-		printf("Expected <%s> but found <%s> in <%s>\n", \
-			_exp_str.c_str(), _found_str.c_str(), _line_str.c_str()); \
-		\
-		std::ostringstream _oss3; \
-		_oss3 << #_found << " != " << #_expected << " in " << _line; \
-		\
-		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
-	} \
-}
-
-// utility macro for testing a line
-#define TEST_LINE(_condition, _line) \
-	TEST_THAT(_condition); \
-	if (!(_condition)) \
-	{ \
-		printf("Test failed on <%s>\n", _line.c_str()); \
-	}
-
 void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
 {
 	wait_for_operation(seconds);
@@ -702,7 +670,7 @@ int start_internal_daemon()
 		result = daemon.Main("testfiles/bbackupd.conf", 1, argv);
 	}
 	
-	TEST_EQUAL(0, result, "Daemon exit code");
+	TEST_EQUAL_LINE(0, result, "Daemon exit code");
 	
 	// ensure that no child processes end up running tests!
 	if (getpid() != own_pid)
@@ -915,7 +883,8 @@ int test_bbackupd()
 		char buffer[10000];
 		memset(buffer, 0, sizeof(buffer));
 
-		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);
 		
@@ -936,7 +905,8 @@ int test_bbackupd()
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
@@ -969,20 +939,22 @@ int test_bbackupd()
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Receive Success(0x";
-			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
+				line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 124", line, line);
+			TEST_EQUAL("Receiving stream, size 124", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line, line);
+			TEST_EQUAL("Send GetIsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line, line);
+			TEST_EQUAL("Receive IsAlive()", line);
 
 			TEST_THAT(reader.GetLine(line));
 			comp = "Send StoreFile(0x3,";
-			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
+				line);
 			comp = ",\"f1\")";
 			std::string sub = line.substr(line.size() - comp.size());
-			TEST_EQUAL(comp, sub, line);
+			TEST_EQUAL_LINE(comp, sub, line);
 			std::string comp2 = ",0x0,";
 			sub = line.substr(line.size() - comp.size() -
 				comp2.size() + 1, comp2.size());
@@ -1008,7 +980,8 @@ int test_bbackupd()
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
@@ -1038,9 +1011,10 @@ int test_bbackupd()
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Receive Success(0x";
-			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
+				line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 124", line, line);
+			TEST_EQUAL("Receiving stream, size 124", line);
 
 			// delaying for 4 seconds in one step means that
 			// the diff timer and the keepalive timer will
@@ -1049,10 +1023,11 @@ int test_bbackupd()
 
 			TEST_THAT(reader.GetLine(line));
 			comp = "Send StoreFile(0x3,";
-			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
+				line);
 			comp = ",0x0,\"f1\")";
 			std::string sub = line.substr(line.size() - comp.size());
-			TEST_EQUAL(comp, sub, line);
+			TEST_EQUAL_LINE(comp, sub, line);
 		}
 
 		if (failures > 0)
@@ -1070,7 +1045,8 @@ int test_bbackupd()
 		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
@@ -1100,9 +1076,10 @@ int test_bbackupd()
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Receive Success(0x";
-			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
+				line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 124", line, line);
+			TEST_EQUAL("Receiving stream, size 124", line);
 
 			// delaying for 3 seconds in steps of 1 second
 			// means that the keepalive timer will expire 3 times,
@@ -1111,23 +1088,24 @@ int test_bbackupd()
 			// only two keepalives.
 			
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line, line);
+			TEST_EQUAL("Send GetIsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line, line);
+			TEST_EQUAL("Receive IsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line, line);
+			TEST_EQUAL("Send GetIsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line, line);
+			TEST_EQUAL("Receive IsAlive()", line);
 
 			// but two matching blocks should have been found
 			// already, so the upload should be a diff.
 
 			TEST_THAT(reader.GetLine(line));
 			comp = "Send StoreFile(0x3,";
-			TEST_EQUAL(comp, line.substr(0, comp.size()), line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
+				line);
 			comp = ",\"f1\")";
 			std::string sub = line.substr(line.size() - comp.size());
-			TEST_EQUAL(comp, sub, line);
+			TEST_EQUAL_LINE(comp, sub, line);
 			std::string comp2 = ",0x0,";
 			sub = line.substr(line.size() - comp.size() -
 				comp2.size() + 1, comp2.size());
@@ -1156,7 +1134,8 @@ int test_bbackupd()
 		fd = open(touchfile.c_str(), O_CREAT | O_WRONLY);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
-		TEST_EQUAL(sizeof(buffer), write(fd, buffer, sizeof(buffer)),
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
@@ -1202,17 +1181,17 @@ int test_bbackupd()
 		{
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive Success(0x3)", line, line);
+			TEST_EQUAL("Receive Success(0x3)", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 425", line, line);
+			TEST_EQUAL("Receiving stream, size 425", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line, line);
+			TEST_EQUAL("Send GetIsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line, line);
+			TEST_EQUAL("Receive IsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line, line);
+			TEST_EQUAL("Send GetIsAlive()", line);
 			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line, line);
+			TEST_EQUAL("Receive IsAlive()", line);
 		}
 
 		if (failures > 0)
@@ -1342,10 +1321,11 @@ int test_bbackupd()
 		
 			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
 				client->QueryGetAccountUsage());
-			TEST_EQUAL(24, usage->GetBlocksUsed(), "blocks used");
-			TEST_EQUAL(0,  usage->GetBlocksInDeletedFiles(),
+			TEST_EQUAL_LINE(24, usage->GetBlocksUsed(),
+				"blocks used");
+			TEST_EQUAL_LINE(0,  usage->GetBlocksInDeletedFiles(),
 				"deleted blocks");
-			TEST_EQUAL(16, usage->GetBlocksInDirectories(),
+			TEST_EQUAL_LINE(16, usage->GetBlocksInDirectories(),
 				"directory blocks");
 
 			client->QueryFinished();
@@ -1467,10 +1447,11 @@ int test_bbackupd()
 
 			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
 				client->QueryGetAccountUsage());
-			TEST_EQUAL(24, usage->GetBlocksUsed(), "blocks used");
-			TEST_EQUAL(4, usage->GetBlocksInDeletedFiles(),
+			TEST_EQUAL_LINE(24, usage->GetBlocksUsed(),
+				"blocks used");
+			TEST_EQUAL_LINE(4, usage->GetBlocksInDeletedFiles(),
 				"deleted blocks");
-			TEST_EQUAL(16, usage->GetBlocksInDirectories(),
+			TEST_EQUAL_LINE(16, usage->GetBlocksInDirectories(),
 				"directory blocks");
 			// d1/f3 and d1/f4 are the only two files on the
 			// server which are not deleted, they use 2 blocks
@@ -1522,10 +1503,11 @@ int test_bbackupd()
 
 			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
 				client->QueryGetAccountUsage());
-			TEST_EQUAL(16, usage->GetBlocksUsed(), "blocks used");
-			TEST_EQUAL(0, usage->GetBlocksInDeletedFiles(),
+			TEST_EQUAL_LINE(16, usage->GetBlocksUsed(),
+				"blocks used");
+			TEST_EQUAL_LINE(0, usage->GetBlocksInDeletedFiles(),
 				"deleted blocks");
-			TEST_EQUAL(12, usage->GetBlocksInDirectories(),
+			TEST_EQUAL_LINE(12, usage->GetBlocksInDirectories(),
 				"directory blocks");
 			// d1/f3 and d1/f4 are the only two files on the
 			// server, they use 2 blocks each, the rest is
@@ -1576,10 +1558,11 @@ int test_bbackupd()
 
 			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
 				client->QueryGetAccountUsage());
-			TEST_EQUAL(22, usage->GetBlocksUsed(), "blocks used");
-			TEST_EQUAL(0, usage->GetBlocksInDeletedFiles(),
+			TEST_EQUAL_LINE(22, usage->GetBlocksUsed(),
+				"blocks used");
+			TEST_EQUAL_LINE(0, usage->GetBlocksInDeletedFiles(),
 				"deleted blocks");
-			TEST_EQUAL(14, usage->GetBlocksInDirectories(),
+			TEST_EQUAL_LINE(14, usage->GetBlocksInDirectories(),
 				"directory blocks");
 			// d2/f6, d6/d8 and d6/d8/f7 are new
 			// i.e. 2 new files, 1 new directory
@@ -1862,7 +1845,7 @@ int test_bbackupd()
 		std::string line;
 		TEST_THAT(gl.GetLine(line));
 		TEST_THAT(line != "before");
-		TEST_EQUAL("after", line, line);
+		TEST_EQUAL("after", line);
 
 		#undef SYM_DIR
 
@@ -1880,7 +1863,7 @@ int test_bbackupd()
 		struct stat stat_st, lstat_st;
 		TEST_THAT(stat("testfiles/symlink-to-TestDir1", &stat_st) == 0);
 		TEST_THAT(lstat("testfiles/symlink-to-TestDir1", &lstat_st) == 0);
-		TEST_EQUAL((stat_st.st_dev ^ 0xFFFF), lstat_st.st_dev,
+		TEST_EQUAL_LINE((stat_st.st_dev ^ 0xFFFF), lstat_st.st_dev,
 			"stat vs lstat");
 
 		BackupDaemon bbackupd;
@@ -2219,7 +2202,8 @@ int test_bbackupd()
 
 			std::string data("hello world\n");
 			fs.Write(data.c_str(), data.size());
-			TEST_EQUAL(12, fs.GetPosition(), "FileStream position");
+			TEST_EQUAL_LINE(12, fs.GetPosition(),
+				"FileStream position");
 			fs.Close();
 		}
 
