@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "HTTPResponse.h"
+#include "IOStreamGetLine.h"
 #include "autogen_HTTPException.h"
 
 #include "MemLeakFindOn.h"
@@ -32,7 +33,8 @@ std::string HTTPResponse::msDefaultURIPrefix;
 HTTPResponse::HTTPResponse()
 	: mResponseCode(HTTPResponse::Code_NoContent),
 	  mResponseIsDynamicContent(true),
-	  mKeepAlive(false)
+	  mKeepAlive(false),
+	  mContentLength(-1)
 {
 }
 
@@ -54,7 +56,8 @@ HTTPResponse::~HTTPResponse()
 //
 // Function
 //		Name:    HTTPResponse::ResponseCodeToString(int)
-//		Purpose: Return string equivalent of the response code, suitable for Status: headers
+//		Purpose: Return string equivalent of the response code,
+//			 suitable for Status: headers
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
@@ -114,8 +117,8 @@ void HTTPResponse::SetContentType(const char *ContentType)
 //
 // Function
 //		Name:    HTTPResponse::Send(IOStream &, bool)
-//		Purpose: Build the response, and send via the stream. Optionally omitting
-//				 the content.
+//		Purpose: Build the response, and send via the stream.
+//			 Optionally omitting the content.
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
@@ -139,10 +142,10 @@ void HTTPResponse::Send(IOStream &rStream, bool OmitContent)
 			header += len;
 		}
 		// Extra headers...
-		for(std::vector<std::string>::const_iterator i(mExtraHeaders.begin()); i != mExtraHeaders.end(); ++i)
+		for(std::vector<std::pair<std::string, std::string> >::const_iterator i(mExtraHeaders.begin()); i != mExtraHeaders.end(); ++i)
 		{
 			header += "\r\n";
-			header += *i;
+			header += i->first + ": " + i->second;
 		}
 		// NOTE: a line ending must be included here in all cases
 		// Control whether the response is cached
@@ -181,16 +184,214 @@ void HTTPResponse::Send(IOStream &rStream, bool OmitContent)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    HTTPResponse::ParseHeaders(IOStreamGetLine &, int)
+//		Purpose: Private. Parse the headers of the response
+//		Created: 26/3/04
+//
+// --------------------------------------------------------------------------
+void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
+{
+	std::string header;
+	bool haveHeader = false;
+	while(true)
+	{
+		if(rGetLine.IsEOF())
+		{
+			// Header terminates unexpectedly
+			THROW_EXCEPTION(HTTPException, BadRequest)		
+		}
+
+		std::string currentLine;	
+		if(!rGetLine.GetLine(currentLine, false /* no preprocess */, Timeout))
+		{
+			// Timeout
+			THROW_EXCEPTION(HTTPException, RequestReadFailed)
+		}
+		
+		// Is this a continuation of the previous line?
+		bool processHeader = haveHeader;
+		if(!currentLine.empty() && (currentLine[0] == ' ' || currentLine[0] == '\t'))
+		{
+			// A continuation, don't process anything yet
+			processHeader = false;
+		}
+		//TRACE3("%d:%d:%s\n", processHeader, haveHeader, currentLine.c_str());
+		
+		// Parse the header -- this will actually process the header
+		// from the previous run around the loop.
+		if(processHeader)
+		{
+			// Find where the : is in the line
+			const char *h = header.c_str();
+			int p = 0;
+			while(h[p] != '\0' && h[p] != ':')
+			{
+				++p;
+			}
+			// Skip white space
+			int dataStart = p + 1;
+			while(h[dataStart] == ' ' || h[dataStart] == '\t')
+			{
+				++dataStart;
+			}
+		
+			if(p == sizeof("Content-Length")-1
+				&& ::strncasecmp(h, "Content-Length", sizeof("Content-Length")-1) == 0)
+			{
+				// Decode number
+				long len = ::strtol(h + dataStart, NULL, 10);	// returns zero in error case, this is OK
+				if(len < 0) len = 0;
+				// Store
+				mContentLength = len;
+			}
+			else if(p == sizeof("Content-Type")-1
+				&& ::strncasecmp(h, "Content-Type", sizeof("Content-Type")-1) == 0)
+			{
+				// Store rest of string as content type
+				mContentType = h + dataStart;
+			}
+			else if(p == sizeof("Cookie")-1
+				&& ::strncasecmp(h, "Cookie", sizeof("Cookie")-1) == 0)
+			{
+				THROW_EXCEPTION(HTTPException, NotImplemented);
+				/*
+				// Parse cookies
+				ParseCookies(header, dataStart);
+				*/
+			}
+			else if(p == sizeof("Connection")-1
+				&& ::strncasecmp(h, "Connection", sizeof("Connection")-1) == 0)
+			{
+				// Connection header, what is required?
+				const char *v = h + dataStart;
+				if(::strcasecmp(v, "close") == 0)
+				{
+					mKeepAlive = false;
+				}
+				else if(::strcasecmp(v, "keep-alive") == 0)
+				{
+					mKeepAlive = true;
+				}
+				// else don't understand, just assume default for protocol version
+			}
+			else
+			{
+				std::string headerName = header.substr(0, p);
+				AddHeader(headerName, h + dataStart);
+			}
+			
+			// Unset have header flag, as it's now been processed
+			haveHeader = false;
+		}
+
+		// Store the chunk of header the for next time round
+		if(haveHeader)
+		{
+			header += currentLine;
+		}
+		else
+		{
+			header = currentLine;
+			haveHeader = true;
+		}
+
+		// End of headers?
+		if(currentLine.empty())
+		{
+			// All done!
+			break;
+		}		
+	}
+}
+
+void HTTPResponse::Receive(IOStream& rStream, int Timeout)
+{
+	IOStreamGetLine rGetLine(rStream);
+
+	if(rGetLine.IsEOF())
+	{
+		// Connection terminated unexpectedly
+		THROW_EXCEPTION(HTTPException, BadResponse)		
+	}
+
+	std::string statusLine;	
+	if(!rGetLine.GetLine(statusLine, false /* no preprocess */, Timeout))
+	{
+		// Timeout
+		THROW_EXCEPTION(HTTPException, ResponseReadFailed)
+	}
+
+	if (statusLine.substr(0, 7) != "HTTP/1." ||
+		statusLine[8] != ' ')
+	{
+		// Status line terminated unexpectedly
+		BOX_ERROR("Bad response status line: " << statusLine);
+		THROW_EXCEPTION(HTTPException, BadResponse)		
+	}
+
+	if (statusLine[5] == '1' && statusLine[7] == '1')
+	{
+		// HTTP/1.1 default is to keep alive
+		mKeepAlive = true;
+	}
+		
+	// Decode the status code
+	long status = ::strtol(statusLine.substr(9, 3).c_str(), NULL, 10);
+	// returns zero in error case, this is OK
+	if(status < 0) status = 0;
+	// Store
+	mResponseCode = status;
+
+	ParseHeaders(rGetLine, Timeout);
+
+	// push back whatever bytes we have left
+	// rGetLine.DetachFile();
+	if (mContentLength > 0)
+	{
+		if (mContentLength < rGetLine.GetSizeOfBufferedData())
+		{
+			// very small response, not good!
+			THROW_EXCEPTION(HTTPException, NotImplemented);
+		}
+
+		Write(rGetLine.GetBufferedData(),
+			rGetLine.GetSizeOfBufferedData());
+	}
+
+	while (mContentLength != 0) // could be -1 as well
+	{
+		char buffer[4096];
+		int readSize = sizeof(buffer);
+		if (mContentLength > 0 && mContentLength < readSize)
+		{
+			readSize = mContentLength;
+		}
+		readSize = rStream.Read(buffer, readSize, Timeout);
+		if (readSize == 0)
+		{
+			break;
+		}
+		mContentLength -= readSize;
+		Write(buffer, readSize);
+	}
+
+	SetForReading();
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    HTTPResponse::AddHeader(const char *)
 //		Purpose: Add header, given entire line
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
+/*
 void HTTPResponse::AddHeader(const char *EntireHeaderLine)
 {
 	mExtraHeaders.push_back(std::string(EntireHeaderLine));
 }
-
+*/
 
 // --------------------------------------------------------------------------
 //
@@ -200,11 +401,12 @@ void HTTPResponse::AddHeader(const char *EntireHeaderLine)
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
+/*
 void HTTPResponse::AddHeader(const std::string &rEntireHeaderLine)
 {
 	mExtraHeaders.push_back(rEntireHeaderLine);
 }
-
+*/
 
 // --------------------------------------------------------------------------
 //
@@ -214,12 +416,9 @@ void HTTPResponse::AddHeader(const std::string &rEntireHeaderLine)
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-void HTTPResponse::AddHeader(const char *Header, const char *Value)
+void HTTPResponse::AddHeader(const char *pHeader, const char *pValue)
 {
-	std::string h(Header);
-	h += ": ";
-	h += Value;
-	mExtraHeaders.push_back(h);
+	mExtraHeaders.push_back(Header(pHeader, pValue));
 }
 
 
@@ -231,12 +430,9 @@ void HTTPResponse::AddHeader(const char *Header, const char *Value)
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-void HTTPResponse::AddHeader(const char *Header, const std::string &rValue)
+void HTTPResponse::AddHeader(const char *pHeader, const std::string &rValue)
 {
-	std::string h(Header);
-	h += ": ";
-	h += rValue;
-	mExtraHeaders.push_back(h);
+	mExtraHeaders.push_back(Header(pHeader, rValue));
 }
 
 
@@ -250,7 +446,7 @@ void HTTPResponse::AddHeader(const char *Header, const std::string &rValue)
 // --------------------------------------------------------------------------
 void HTTPResponse::AddHeader(const std::string &rHeader, const std::string &rValue)
 {
-	mExtraHeaders.push_back(rHeader + ": " + rValue);
+	mExtraHeaders.push_back(Header(rHeader, rValue));
 }
 
 
@@ -279,14 +475,14 @@ void HTTPResponse::SetCookie(const char *Name, const char *Value, const char *Pa
 	h += Path;
 	h += "\"";
 */
-	std::string h("Set-Cookie: ");
+	std::string h;
 	h += Name;
 	h += "=";
 	h += Value;
 	h += "; Version=1; Path=";
 	h += Path;
 
-	mExtraHeaders.push_back(h);
+	mExtraHeaders.push_back(Header("Set-Cookie", h));
 }
 
 
@@ -312,10 +508,10 @@ void HTTPResponse::SetAsRedirect(const char *RedirectTo, bool IsLocalURI)
 	mResponseCode = Code_Found;
 
 	// Set location to redirect to
-	std::string header("Location: ");
+	std::string header;
 	if(IsLocalURI) header += msDefaultURIPrefix;
 	header += RedirectTo;
-	mExtraHeaders.push_back(header);
+	mExtraHeaders.push_back(Header("Location", header));
 	
 	// Set up some default content
 	mContentType = "text/html";

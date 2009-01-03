@@ -27,7 +27,17 @@ class IOStreamGetLine;
 class HTTPRequest
 {
 public:
+	enum Method
+	{
+		Method_UNINITIALISED = -1,
+		Method_UNKNOWN = 0,
+		Method_GET = 1,
+		Method_HEAD = 2,
+		Method_POST = 3
+	};
+	
 	HTTPRequest();
+	HTTPRequest(enum Method method, const std::string& rURI);
 	~HTTPRequest();
 private:
 	// no copying
@@ -40,15 +50,6 @@ public:
 
 	enum
 	{
-		Method_UNINITIALISED = -1,
-		Method_UNKNOWN = 0,
-		Method_GET = 1,
-		Method_HEAD = 2,
-		Method_POST = 3
-	};
-	
-	enum
-	{
 		HTTPVersion__MajorMultiplier = 1000,
 		HTTPVersion_0_9 = 9,
 		HTTPVersion_1_0 = 1000,
@@ -56,6 +57,7 @@ public:
 	};
 
 	bool Read(IOStreamGetLine &rGetLine, int Timeout);
+	bool Write(IOStream &rStream, int Timeout);
 
 	typedef std::map<std::string, std::string> CookieJar_t;
 	
@@ -67,7 +69,7 @@ public:
 	//		Created: 26/3/04
 	//
 	// --------------------------------------------------------------------------
-	int GetMethod() const {return mMethod;}
+	enum Method GetMethod() const {return mMethod;}
 	const std::string &GetRequestURI() const {return mRequestURI;}
 	const std::string &GetHostName() const {return mHostName;}	// note: request does splitting of Host: header
 	const int GetHostPort() const {return mHostPort;}  // into host name and port number
@@ -91,13 +93,17 @@ public:
 	//
 	// --------------------------------------------------------------------------
 	bool GetClientKeepAliveRequested() const {return mClientKeepAliveRequested;}
+	void SetClientKeepAliveRequested(bool keepAlive)
+	{
+		mClientKeepAliveRequested = keepAlive;
+	}
 
 private:
 	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
 	void ParseCookies(const std::string &rHeader, int DataStarts);
 
 private:
-	int mMethod;
+	enum Method mMethod;
 	std::string mRequestURI;
 	std::string mHostName;
 	int mHostPort;

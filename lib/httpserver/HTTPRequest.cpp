@@ -52,6 +52,28 @@ HTTPRequest::HTTPRequest()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    HTTPRequest::HTTPRequest(enum Method,
+//			 const std::string&)
+//		Purpose: Alternate constructor for hand-crafted requests
+//		Created: 03/01/09
+//
+// --------------------------------------------------------------------------
+HTTPRequest::HTTPRequest(enum Method method, const std::string& rURI)
+	: mMethod(method),
+	  mRequestURI(rURI),
+	  mHostPort(80),	// default if not specified
+	  mHTTPVersion(HTTPVersion_1_1),
+	  mContentLength(-1),
+	  mpCookies(0),
+	  mClientKeepAliveRequested(false)
+{
+}
+
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    HTTPRequest::~HTTPRequest()
 //		Purpose: Destructor
 //		Created: 26/3/04
@@ -72,9 +94,10 @@ HTTPRequest::~HTTPRequest()
 //
 // Function
 //		Name:    HTTPRequest::Read(IOStreamGetLine &, int)
-//		Purpose: Read the request from an IOStreamGetLine (and attached stream)
-//				 Returns false if there was no valid request, probably due to 
-//				 a kept-alive connection closing.
+//		Purpose: Read the request from an IOStreamGetLine (and
+//			 attached stream).
+//			 Returns false if there was no valid request,
+//			 probably due to a kept-alive connection closing.
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
@@ -283,6 +306,89 @@ bool HTTPRequest::Read(IOStreamGetLine &rGetLine, int Timeout)
 		decoder.Finish();
 	}
 	
+	return true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPRequest::Write(IOStream &, int)
+//		Purpose: Write the request to an IOStream using HTTP.
+//		Created: 03/01/09
+//
+// --------------------------------------------------------------------------
+bool HTTPRequest::Write(IOStream &rStream, int Timeout)
+{
+	switch (mMethod)
+	{
+	case Method_UNINITIALISED:
+		THROW_EXCEPTION(HTTPException, RequestNotInitialised); break;
+	case Method_UNKNOWN:
+		THROW_EXCEPTION(HTTPException, BadRequest); break;
+	case Method_GET:
+		rStream.Write("GET"); break;
+	case Method_HEAD:
+		rStream.Write("HEAD"); break;
+	case Method_POST:
+		rStream.Write("POST"); break;
+	}
+
+	rStream.Write(" ");
+	rStream.Write(mRequestURI.c_str());
+	rStream.Write(" ");
+
+	switch (mHTTPVersion)
+	{
+	case HTTPVersion_0_9: rStream.Write("HTTP/0.9"); break;
+	case HTTPVersion_1_0: rStream.Write("HTTP/1.0"); break;
+	case HTTPVersion_1_1: rStream.Write("HTTP/1.1"); break;
+	default:
+		THROW_EXCEPTION(HTTPException, NotImplemented);
+	}
+
+	rStream.Write("\n");
+	std::ostringstream oss;
+
+	if (mContentLength != -1)
+	{
+		oss << "Content-Length: " << mContentLength << "\n";
+	}
+
+	if (mContentType != "")
+	{
+		oss << "Content-Type: " << mContentType << "\n";
+	}
+
+	if (mHostName != "")
+	{
+		if (mHostPort != 80)
+		{
+			oss << "Host: " << mHostName << ":" << mHostPort <<
+				"\n";
+		}
+		else
+		{
+			oss << "Host: " << mHostName << "\n";
+		}
+	}
+
+	if (mpCookies)
+	{
+		THROW_EXCEPTION(HTTPException, NotImplemented);
+	}
+
+	if (mClientKeepAliveRequested)
+	{
+		oss << "Connection: keep-alive\n";
+	}
+	else
+	{
+		oss << "Connection: close\n";
+	}
+
+	rStream.Write(oss.str().c_str());
+	rStream.Write("\n");
+
 	return true;
 }
 
