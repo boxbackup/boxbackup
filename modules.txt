@@ -41,5 +41,9 @@ test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidf
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
 
+# HTTP server system
+lib/httpserver          lib/server 
+test/httpserver         lib/httpserver 
+
 # END_IF_DISTRIBUTION
 
