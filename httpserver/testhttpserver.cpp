@@ -16,6 +16,7 @@
 #include "HTTPServer.h"
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
+#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
