@@ -90,9 +90,13 @@ public:
 		const std::string& rRemotePath) = 0;
 	virtual void NotifyExcludedDir(const std::string& rLocalPath,
 		const std::string& rRemotePath) = 0;
+	virtual void NotifyDirComparing(const std::string& rLocalPath,
+		const std::string& rRemotePath) = 0;
 	virtual void NotifyDirCompared(const std::string& rLocalPath,
 		const std::string& rRemotePath,	bool HasDifferentAttributes,
 		bool modifiedAfterLastSync) = 0;
+	virtual void NotifyFileComparing(const std::string& rLocalPath,
+		const std::string& rRemotePath) = 0;
 	virtual void NotifyFileCompared(const std::string& rLocalPath,
 		const std::string& rRemotePath, int64_t NumBytes,
 		bool HasDifferentAttributes, bool HasDifferentContents,
