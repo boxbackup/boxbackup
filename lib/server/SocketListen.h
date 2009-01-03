@@ -125,7 +125,7 @@ public:
 	//		Created: 2003/07/31
 	//
 	// ------------------------------------------------------------------
-	void Listen(int Type, const char *Name, int Port = 0)
+	void Listen(Socket::Type Type, const char *Name, int Port = 0)
 	{
 		if(mSocketHandle != -1)
 		{

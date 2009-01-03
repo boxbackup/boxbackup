@@ -32,13 +32,15 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Socket::NameLookupToSockAddr(SocketAllAddr &, int, char *, int)
+//		Name:    Socket::NameLookupToSockAddr(SocketAllAddr &, int,
+//			 char *, int)
 //		Purpose: Sets up a sockaddr structure given a name and type
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
 void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
-	int Type, const std::string& rName, int Port, int &rSockAddrLenOut)
+	enum Type Type, const std::string& rName, int Port,
+	int &rSockAddrLenOut)
 {
 	int sockAddrLen = 0;
 

@@ -11,6 +11,7 @@
 #define SOCKETSTREAM__H
 
 #include "IOStream.h"
+#include "Socket.h"
 
 #ifdef WIN32
 	typedef SOCKET tOSSocketHandle;
@@ -36,7 +37,7 @@ public:
 	SocketStream(const SocketStream &rToCopy);
 	~SocketStream();
 	
-	void Open(int Type, const std::string& rName, int Port = 0);
+	void Open(Socket::Type Type, const std::string& rName, int Port = 0);
 	void Attach(int socket);
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
