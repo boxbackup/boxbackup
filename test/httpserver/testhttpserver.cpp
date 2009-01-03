@@ -16,6 +16,7 @@
 #include "HTTPServer.h"
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
+#include "IOStreamGetLine.h"
 #include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
@@ -71,6 +72,7 @@ void TestWebServer::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
 		case HTTPRequest::Method_GET: m = "GET "; break;
 		case HTTPRequest::Method_HEAD: m = "HEAD"; break;
 		case HTTPRequest::Method_POST: m = "POST"; break;
+		default: m = "UNKNOWN";
 		}
 		rResponse.Write(m, 4);
 	}
@@ -125,15 +127,92 @@ int test(int argc, const char *argv[])
 	// Start the server
 	int pid = LaunchServer("./test server testfiles/httpserver.conf", "testfiles/httpserver.pid");
 	TEST_THAT(pid != -1 && pid != 0);
-	if(pid > 0)
+	if(pid <= 0)
 	{
-		// Run the request script
-		TEST_THAT(::system("perl testfiles/testrequests.pl") == 0);
-	
-		// Kill it
-		TEST_THAT(KillServer(pid));
-		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+		return 0;
 	}
+
+	// Run the request script
+	TEST_THAT(::system("perl testfiles/testrequests.pl") == 0);
+
+	signal(SIGPIPE, SIG_IGN);
+
+	SocketStream sock;
+	sock.Open(Socket::TypeINET, "localhost", 1080);
+
+	for (int i = 0; i < 4; i++)
+	{
+		HTTPRequest request(HTTPRequest::Method_GET,
+			"/test-one/34/341s/234?p1=vOne&p2=vTwo");
+
+		if (i >= 2)
+		{
+			// first set of passes has keepalive off by default,
+			// so when i == 1 the socket has already been closed
+			// by the server, and we'll get -EPIPE when we try
+			// to send the request.
+			request.SetClientKeepAliveRequested(true);
+		}
+
+		if (i == 1)
+		{
+			TEST_CHECK_THROWS(request.Write(sock,
+				IOStream::TimeOutInfinite),
+				ConnectionException, SocketWriteError);
+			sock.Close();
+			sock.Open(Socket::TypeINET, "localhost", 1080);
+			continue;
+		}
+		else
+		{
+			request.Write(sock, IOStream::TimeOutInfinite);
+		}
+
+		HTTPResponse response;
+		response.Receive(sock);
+		
+		TEST_THAT(response.GetResponseCode() == HTTPResponse::Code_OK);
+		TEST_THAT(response.GetContentType() == "text/html");
+
+		IOStreamGetLine getline(response);
+		std::string line;
+
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<html>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<head><title>TEST SERVER RESPONSE</title></head>",
+			line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<body><h1>Test response</h1>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>URI:</b> /test-one/34/341s/234</p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>Query string:</b> p1=vOne&p2=vTwo</p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>Method:</b> GET </p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>Decoded query:</b><br>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("PARAM:p1=vOne<br>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("PARAM:p2=vTwo<br></p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>Content type:</b> </p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>Content length:</b> -1</p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("<p><b>Cookies:</b><br>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("</p>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("</body>", line);
+		TEST_THAT(getline.GetLine(line));
+		TEST_EQUAL("</html>", line);
+	}
+	
+	// Kill it
+	TEST_THAT(KillServer(pid));
+	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
 
 	return 0;
 }

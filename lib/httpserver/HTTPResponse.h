@@ -15,6 +15,8 @@
 
 #include "CollectInBufferStream.h"
 
+class IOStreamGetLine;
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -35,15 +37,18 @@ private:
 public:
 
 	void SetResponseCode(int Code);
+	int GetResponseCode() { return mResponseCode; }
 	void SetContentType(const char *ContentType);
+	const std::string& GetContentType() { return mContentType; }
 
 	void SetAsRedirect(const char *RedirectTo, bool IsLocalURI = true);
 	void SetAsNotFound(const char *URI);
 
 	void Send(IOStream &rStream, bool OmitContent = false);
+	void Receive(IOStream& rStream, int Timeout = IOStream::TimeOutInfinite);
 
-	void AddHeader(const char *EntireHeaderLine);
-	void AddHeader(const std::string &rEntireHeaderLine);
+	// void AddHeader(const char *EntireHeaderLine);
+	// void AddHeader(const std::string &rEntireHeaderLine);
 	void AddHeader(const char *Header, const char *Value);
 	void AddHeader(const char *Header, const std::string &rValue);
 	void AddHeader(const std::string &rHeader, const std::string &rValue);
@@ -106,9 +111,13 @@ private:
 	bool mResponseIsDynamicContent;
 	bool mKeepAlive;
 	std::string mContentType;
-	std::vector<std::string> mExtraHeaders;
+	typedef std::pair<std::string, std::string> Header;
+	std::vector<Header> mExtraHeaders;
+	int mContentLength; // only used when reading response from stream
 	
 	static std::string msDefaultURIPrefix;
+
+	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
 };
 
 #endif // HTTPRESPONSE__H

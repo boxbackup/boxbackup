@@ -1,12 +1,15 @@
 EXCEPTION HTTP 10
 
 Internal							0
-RequestReadFailed					1
-RequestAlreadyBeenRead				2
+RequestReadFailed						1
+RequestAlreadyBeenRead						2
 BadRequest							3
-UnknownResponseCodeUsed				4
-NoContentTypeSet					5
-POSTContentTooLong					6
-CannotSetRedirectIfReponseHasData	7
-CannotSetNotFoundIfReponseHasData	8
-NotImplemented						9
+UnknownResponseCodeUsed						4
+NoContentTypeSet						5
+POSTContentTooLong						6
+CannotSetRedirectIfReponseHasData				7
+CannotSetNotFoundIfReponseHasData				8
+NotImplemented							9
+RequestNotInitialised						10
+BadResponse							11
+ResponseReadFailed						12
