@@ -39,14 +39,14 @@ typedef union {
 // --------------------------------------------------------------------------
 namespace Socket
 {
-	enum
+	enum Type
 	{
 		TypeINET = 1,
 		TypeUNIX = 2
 	};
 
 	void NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
-		int Type, const std::string& rName, int Port,
+		enum Type type, const std::string& rName, int Port,
 		int &rSockAddrLenOut);
 	void LogIncomingConnection(const struct sockaddr *addr, socklen_t addrlen);
 	std::string IncomingConnectionLogMessage(const struct sockaddr *addr, socklen_t addrlen);
