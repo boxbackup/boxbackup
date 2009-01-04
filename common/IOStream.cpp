@@ -258,4 +258,7 @@ void IOStream::Flush(int Timeout)
 	}
 }
 
-
+void IOStream::Write(const char *pBuffer)
+{
+	Write(pBuffer, strlen(pBuffer));
+}
