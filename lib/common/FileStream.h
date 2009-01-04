@@ -56,6 +56,8 @@ public:
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
+	bool CompareWith(IOStream& rOther, int Timeout = IOStream::TimeOutInfinite);
+
 private:
 	tOSFileHandle mOSFileHandle;
 	bool mIsEOF;

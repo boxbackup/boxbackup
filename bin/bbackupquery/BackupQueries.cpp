@@ -1728,34 +1728,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 							SelfFlushingStream flushFile(*fileOnServerStream);
 							// Open the local file
 							FileStream l(localPath.c_str());
-							
-							// Size
-							IOStream::pos_type fileSizeLocal = l.BytesLeftToRead();
-							IOStream::pos_type fileSizeServer = 0;
-							
-							// Test the contents
-							char buf1[2048];
-							char buf2[2048];
-							while(fileOnServerStream->StreamDataLeft() && l.StreamDataLeft())
-							{
-								int size = fileOnServerStream->Read(buf1, sizeof(buf1), mrConnection.GetTimeout());
-								fileSizeServer += size;
-								
-								if(l.Read(buf2, size) != size
-										|| ::memcmp(buf1, buf2, size) != 0)
-								{
-									equal = false;
-									break;
-								}
-							}
-	
-							// Check read all the data from the server and file -- can't be equal if local and remote aren't the same length
-							// Can't use StreamDataLeft() test on file, because if it's the same size, it won't know
-							// it's EOF yet.
-							if(fileOnServerStream->StreamDataLeft() || fileSizeServer != fileSizeLocal)
-							{
-								equal = false;
-							}
+							equal = l.CompareWith(fileOnServerStream,  mrConnection.GetTimeout());
 						}
 					}
 
