@@ -44,10 +44,7 @@ public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite) = 0;
 	virtual pos_type BytesLeftToRead();	// may return IOStream::SizeOfStreamUnknown (and will for most stream types)
 	virtual void Write(const void *pBuffer, int NBytes) = 0;
-	virtual void Write(const char *pBuffer)
-	{
-		Write(pBuffer, strlen(pBuffer));
-	}
+	virtual void Write(const char *pBuffer);
 	virtual void WriteAllBuffered();
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
