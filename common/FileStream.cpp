@@ -403,3 +403,44 @@ bool FileStream::StreamClosed()
 	return mIsEOF;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    FileStream::CompareWith(IOStream&, int)
+//		Purpose: Compare bytes in this file with other stream's data
+//		Created: 2009/01/03
+//
+// --------------------------------------------------------------------------
+bool FileStream::CompareWith(IOStream& rOther, int Timeout)
+{
+	// Size
+	IOStream::pos_type mySize = BytesLeftToRead();
+	IOStream::pos_type otherSize = 0;
+	
+	// Test the contents
+	char buf1[2048];
+	char buf2[2048];
+	while(StreamDataLeft() && rOther.StreamDataLeft())
+	{
+		int readSize = rOther.Read(buf1, sizeof(buf1), Timeout);
+		otherSize += readSize;
+		
+		if(Read(buf2, readSize) != readSize ||
+			::memcmp(buf1, buf2, readSize) != 0)
+		{
+			return false;
+		}
+	}
+
+	// Check read all the data from the server and file -- can't be
+	// equal if local and remote aren't the same length. Can't use
+	// StreamDataLeft() test on local file, because if it's the same
+	// size, it won't know it's EOF yet.
+	
+	if(rOther.StreamDataLeft() || otherSize != mySize)
+	{
+		return false;
+	}
+
+	return true;
+}
