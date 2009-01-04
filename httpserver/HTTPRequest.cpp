@@ -93,7 +93,7 @@ HTTPRequest::~HTTPRequest()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPRequest::Read(IOStreamGetLine &, int)
+//		Name:    HTTPRequest::Receive(IOStreamGetLine &, int)
 //		Purpose: Read the request from an IOStreamGetLine (and
 //			 attached stream).
 //			 Returns false if there was no valid request,
@@ -101,7 +101,7 @@ HTTPRequest::~HTTPRequest()
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-bool HTTPRequest::Read(IOStreamGetLine &rGetLine, int Timeout)
+bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 {
 	// Check caller's logic
 	if(mMethod != Method_UNINITIALISED)
@@ -312,12 +312,12 @@ bool HTTPRequest::Read(IOStreamGetLine &rGetLine, int Timeout)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPRequest::Write(IOStream &, int)
+//		Name:    HTTPRequest::Send(IOStream &, int)
 //		Purpose: Write the request to an IOStream using HTTP.
 //		Created: 03/01/09
 //
 // --------------------------------------------------------------------------
-bool HTTPRequest::Write(IOStream &rStream, int Timeout)
+bool HTTPRequest::Send(IOStream &rStream, int Timeout)
 {
 	switch (mMethod)
 	{
@@ -384,6 +384,12 @@ bool HTTPRequest::Write(IOStream &rStream, int Timeout)
 	else
 	{
 		oss << "Connection: close\n";
+	}
+
+	for (std::vector<Header>::iterator i = mExtraHeaders.begin();
+		i != mExtraHeaders.end(); i++)
+	{
+		oss << i->first << ": " << i->second << "\n";
 	}
 
 	rStream.Write(oss.str().c_str());

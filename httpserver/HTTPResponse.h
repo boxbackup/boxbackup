@@ -30,12 +30,14 @@ class HTTPResponse : public CollectInBufferStream
 public:
 	HTTPResponse();
 	~HTTPResponse();
+
 private:
 	// no copying
 	HTTPResponse(const HTTPResponse &);
 	HTTPResponse &operator=(const HTTPResponse &);
-public:
+	typedef std::pair<std::string, std::string> Header;
 
+public:
 	void SetResponseCode(int Code);
 	int GetResponseCode() { return mResponseCode; }
 	void SetContentType(const char *ContentType);
@@ -52,6 +54,29 @@ public:
 	void AddHeader(const char *Header, const char *Value);
 	void AddHeader(const char *Header, const std::string &rValue);
 	void AddHeader(const std::string &rHeader, const std::string &rValue);
+	bool GetHeader(const std::string& rName, std::string* pValueOut) const
+	{
+		for (std::vector<Header>::const_iterator
+			i  = mExtraHeaders.begin();
+			i != mExtraHeaders.end(); i++)
+		{
+			if (i->first == rName)
+			{
+				*pValueOut = i->second;
+				return true;
+			}
+		}
+		return false;
+	}
+	std::string GetHeaderValue(const std::string& rName)
+	{
+		std::string value;
+		if (!GetHeader(rName, &value))
+		{
+			THROW_EXCEPTION(CommonException, ConfigNoKey);
+		}
+		return value;
+	}
 
 	// Set dynamic content flag, default is content is dynamic
 	void SetResponseIsDynamicContent(bool IsDynamic) {mResponseIsDynamicContent = IsDynamic;}
@@ -68,6 +93,7 @@ public:
 		Code_Found = 302,	// redirection
 		Code_NotModified = 304,
 		Code_TemporaryRedirect = 307,
+		Code_MethodNotAllowed = 400,
 		Code_Unauthorized = 401,
 		Code_Forbidden = 403,
 		Code_NotFound = 404,
@@ -111,7 +137,6 @@ private:
 	bool mResponseIsDynamicContent;
 	bool mKeepAlive;
 	std::string mContentType;
-	typedef std::pair<std::string, std::string> Header;
 	std::vector<Header> mExtraHeaders;
 	int mContentLength; // only used when reading response from stream
 	

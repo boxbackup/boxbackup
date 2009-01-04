@@ -145,7 +145,7 @@ void HTTPServer::Connection(SocketStream &rStream)
 	{
 		// Parse the request
 		HTTPRequest request;
-		if(!request.Read(getLine, mTimeout))
+		if(!request.Receive(getLine, mTimeout))
 		{
 			// Didn't get request, connection probably closed.
 			break;
@@ -186,7 +186,7 @@ void HTTPServer::Connection(SocketStream &rStream)
 		response.Send(rStream, request.GetMethod() == HTTPRequest::Method_HEAD);
 	}
 
-	// Notify dervived claases
+	// Notify derived claases
 	HTTPConnectionClosing();
 }
 
