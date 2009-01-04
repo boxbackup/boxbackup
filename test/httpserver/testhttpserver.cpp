@@ -110,10 +110,78 @@ void TestWebServer::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.Write(DEFAULT_RESPONSE_2, sizeof(DEFAULT_RESPONSE_2) - 1);
 }
 
-
-
 TestWebServer::TestWebServer() {}
 TestWebServer::~TestWebServer() {}
+
+class S3Simulator : public HTTPServer
+{
+public:
+	S3Simulator() { }
+	~S3Simulator() { }
+
+	virtual void Handle(const HTTPRequest &rRequest,
+		HTTPResponse &rResponse);
+};
+
+void S3Simulator::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
+{
+	// if anything goes wrong, return a 500 error
+	rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
+	rResponse.SetContentType("text/plain");
+
+	if (rRequest.GetMethod() != HTTPRequest::Method_GET)
+	{
+		rResponse.SetResponseCode(HTTPResponse::Code_MethodNotAllowed);
+		return;
+	}
+
+	std::string path = "testfiles";
+	path += rRequest.GetRequestURI();
+	std::auto_ptr<FileStream> apFile;
+
+	try
+	{
+		apFile.reset(new FileStream(path));
+	}
+	catch (CommonException &ce)
+	{
+		if (ce.GetSubType() == CommonException::OSFileOpenError)
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
+		}
+		else if (ce.GetSubType() == CommonException::AccessDenied)
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
+		}
+		else
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
+		}
+		rResponse.IOStream::Write(ce.what());
+		return;
+	}
+	catch (std::exception &e)
+	{
+		rResponse.IOStream::Write(e.what());
+		return;
+	}
+	catch (...)
+	{
+		rResponse.IOStream::Write("Unknown error");
+		return;
+	}
+
+	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
+	apFile->CopyStreamTo(rResponse);
+	rResponse.AddHeader("x-amz-id-2", "qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY");
+	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
+	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
+	rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
+	rResponse.SetContentType("text/plain");
+	rResponse.AddHeader("Server", "AmazonS3");
+	rResponse.SetResponseCode(HTTPResponse::Code_OK);
+}
 
 int test(int argc, const char *argv[])
 {
@@ -121,6 +189,13 @@ int test(int argc, const char *argv[])
 	{
 		// Run a server
 		TestWebServer server;
+		return server.Main("doesnotexist", argc - 1, argv + 1);
+	}
+	
+	if(argc >= 2 && ::strcmp(argv[1], "s3server") == 0)
+	{
+		// Run a server
+		S3Simulator server;
 		return server.Main("doesnotexist", argc - 1, argv + 1);
 	}
 	
@@ -145,18 +220,24 @@ int test(int argc, const char *argv[])
 		HTTPRequest request(HTTPRequest::Method_GET,
 			"/test-one/34/341s/234?p1=vOne&p2=vTwo");
 
-		if (i >= 2)
+		if (i < 2)
 		{
 			// first set of passes has keepalive off by default,
 			// so when i == 1 the socket has already been closed
 			// by the server, and we'll get -EPIPE when we try
 			// to send the request.
+			request.SetClientKeepAliveRequested(false);
+		}
+		else
+		{
 			request.SetClientKeepAliveRequested(true);
 		}
 
 		if (i == 1)
 		{
-			TEST_CHECK_THROWS(request.Write(sock,
+			sleep(1); // need time for our process to realise
+			// that the peer has died, otherwise no SIGPIPE :(
+			TEST_CHECK_THROWS(request.Send(sock,
 				IOStream::TimeOutInfinite),
 				ConnectionException, SocketWriteError);
 			sock.Close();
@@ -165,7 +246,7 @@ int test(int argc, const char *argv[])
 		}
 		else
 		{
-			request.Write(sock, IOStream::TimeOutInfinite);
+			request.Send(sock, IOStream::TimeOutInfinite);
 		}
 
 		HTTPResponse response;
@@ -210,6 +291,78 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("</html>", line);
 	}
 	
+	// Kill it
+	TEST_THAT(KillServer(pid));
+	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+
+	// Start the S3Simulator server
+	pid = LaunchServer("./test s3server testfiles/httpserver.conf",
+		"testfiles/httpserver.pid");
+	TEST_THAT(pid != -1 && pid != 0);
+	if(pid <= 0)
+	{
+		return 0;
+	}
+
+	sock.Close();
+	sock.Open(Socket::TypeINET, "localhost", 1080);
+
+	{
+		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.SetClientKeepAliveRequested(true);
+		request.Send(sock, IOStream::TimeOutInfinite);
+
+		HTTPResponse response;
+		response.Receive(sock);
+		std::string value;
+		TEST_EQUAL(404, response.GetResponseCode());
+	}
+
+	{
+		TEST_THAT(chmod("testfiles/testrequests.pl", 0) == 0);
+		HTTPRequest request(HTTPRequest::Method_GET,
+			"/testrequests.pl");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.SetClientKeepAliveRequested(true);
+		request.Send(sock, IOStream::TimeOutInfinite);
+
+		HTTPResponse response;
+		response.Receive(sock);
+		std::string value;
+		TEST_EQUAL(403, response.GetResponseCode());
+		TEST_THAT(chmod("testfiles/testrequests.pl", 0755) == 0);
+	}
+
+	{
+		HTTPRequest request(HTTPRequest::Method_GET,
+			"/testrequests.pl");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.SetClientKeepAliveRequested(true);
+		request.Send(sock, IOStream::TimeOutInfinite);
+
+		HTTPResponse response;
+		response.Receive(sock);
+		std::string value;
+		TEST_EQUAL(200, response.GetResponseCode());
+		TEST_EQUAL("qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY", response.GetHeaderValue("x-amz-id-2"));
+		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
+		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
+		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
+		TEST_EQUAL("\"828ef3fdfa96f00ad9f27c383fc9ac7f\"", response.GetHeaderValue("ETag"));
+		TEST_EQUAL("text/plain", response.GetContentType());
+		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
+
+		FileStream file("testfiles/testrequests.pl");
+		TEST_THAT(file.CompareWith(response));
+	}
+
 	// Kill it
 	TEST_THAT(KillServer(pid));
 	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
