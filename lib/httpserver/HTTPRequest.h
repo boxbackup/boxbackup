@@ -44,9 +44,8 @@ private:
 	HTTPRequest(const HTTPRequest &);
 	HTTPRequest &operator=(const HTTPRequest &);
 public:
-
 	typedef std::multimap<std::string, std::string> Query_t;
-	typedef std::pair<std::string, std::string> QueryEn_t;
+	typedef std::pair<std::string, std::string> QueryEn_t, Header;
 
 	enum
 	{
@@ -56,8 +55,8 @@ public:
 		HTTPVersion_1_1 = 1001
 	};
 
-	bool Read(IOStreamGetLine &rGetLine, int Timeout);
-	bool Write(IOStream &rStream, int Timeout);
+	bool Receive(IOStreamGetLine &rGetLine, int Timeout);
+	bool Send(IOStream &rStream, int Timeout);
 
 	typedef std::map<std::string, std::string> CookieJar_t;
 	
@@ -71,7 +70,15 @@ public:
 	// --------------------------------------------------------------------------
 	enum Method GetMethod() const {return mMethod;}
 	const std::string &GetRequestURI() const {return mRequestURI;}
-	const std::string &GetHostName() const {return mHostName;}	// note: request does splitting of Host: header
+
+	// Note: the HTTPRequest generates and parses the Host: header
+	// Do not attempt to set one yourself with AddHeader().
+	const std::string &GetHostName() const {return mHostName;}
+	void SetHostName(const std::string& rHostName)
+	{
+		mHostName = rHostName;
+	}
+
 	const int GetHostPort() const {return mHostPort;}  // into host name and port number
 	const std::string &GetQueryString() const {return mQueryString;}
 	int GetHTTPVersion() const {return mHTTPVersion;}
@@ -98,6 +105,11 @@ public:
 		mClientKeepAliveRequested = keepAlive;
 	}
 
+	void AddHeader(const std::string& rName, const std::string& rValue)
+	{
+		mExtraHeaders.push_back(Header(rName, rValue));
+	}
+
 private:
 	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
 	void ParseCookies(const std::string &rHeader, int DataStarts);
@@ -114,6 +126,7 @@ private:
 	std::string mContentType;
 	CookieJar_t *mpCookies;
 	bool mClientKeepAliveRequested;
+	std::vector<Header> mExtraHeaders;
 };
 
 #endif // HTTPREQUEST__H
