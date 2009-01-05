@@ -29,19 +29,6 @@ IOStream::IOStream()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    IOStream::IOStream(const IOStream &)
-//		Purpose: Copy constructor (exceptions)
-//		Created: 2003/07/31
-//
-// --------------------------------------------------------------------------
-IOStream::IOStream(const IOStream &rToCopy)
-{
-	THROW_EXCEPTION(CommonException, NotSupported)
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    IOStream::~IOStream()
 //		Purpose: Destructor
 //		Created: 2003/07/31
