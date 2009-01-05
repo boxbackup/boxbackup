@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 #include "HTTPRequest.h"
+#include "HTTPResponse.h"
 #include "HTTPQueryDecoder.h"
 #include "autogen_HTTPException.h"
 #include "IOStream.h"
@@ -44,7 +45,9 @@ HTTPRequest::HTTPRequest()
 	  mHTTPVersion(0),
 	  mContentLength(-1),
 	  mpCookies(0),
-	  mClientKeepAliveRequested(false)
+	  mClientKeepAliveRequested(false),
+	  mExpectContinue(false),
+	  mpStreamToReadFrom(NULL)
 {
 }
 
@@ -61,11 +64,13 @@ HTTPRequest::HTTPRequest()
 HTTPRequest::HTTPRequest(enum Method method, const std::string& rURI)
 	: mMethod(method),
 	  mRequestURI(rURI),
-	  mHostPort(80),	// default if not specified
+	  mHostPort(80), // default if not specified
 	  mHTTPVersion(HTTPVersion_1_1),
 	  mContentLength(-1),
 	  mpCookies(0),
-	  mClientKeepAliveRequested(false)
+	  mClientKeepAliveRequested(false),
+	  mExpectContinue(false),
+	  mpStreamToReadFrom(NULL)
 {
 }
 
@@ -120,30 +125,36 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 
 	// Check the method
 	unsigned int p = 0;	// current position in string
-	if(::strncmp(requestLine.c_str(), "GET ", 4) == 0)
+	p = requestLine.find(' '); // end of first word
+	
+	if (p == std::string::npos)
 	{
-		p = 3;
-		mMethod = Method_GET;
-	}
-	else if(::strncmp(requestLine.c_str(), "HEAD ", 5) == 0)
-	{
-		p = 4;
-		mMethod = Method_HEAD;
-	}
-	else if(::strncmp(requestLine.c_str(), "POST ", 5) == 0)
-	{
-		p = 4;
-		mMethod = Method_POST;
+		// No terminating space, looks bad
+		p = requestLine.size();
 	}
 	else
 	{
-		p = requestLine.find(' ');
-		if(p == std::string::npos)
+		std::string method = requestLine.substr(0, p);
+		if (method == "GET")
 		{
-			// No terminating space, looks bad
-			p = requestLine.size();
+			mMethod = Method_GET;
 		}
-		mMethod = Method_UNKNOWN;
+		else if (method == "HEAD")
+		{
+			mMethod = Method_HEAD;
+		}
+		else if (method == "POST")
+		{
+			mMethod = Method_POST;
+		}
+		else if (method == "PUT")
+		{
+			mMethod = Method_PUT;
+		}
+		else
+		{
+			mMethod = Method_UNKNOWN;
+		}
 	}
 
 	// Skip spaces to find URI
@@ -263,6 +274,15 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	// Now parse the headers
 	ParseHeaders(rGetLine, Timeout);
 	
+	std::string expected;
+	if (GetHeader("Expect", &expected))
+	{
+		if (expected == "100-continue")
+		{
+			mExpectContinue = true;
+		}
+	}
+	
 	// Parse form data?
 	if(mMethod == Method_POST && mContentLength >= 0)
 	{
@@ -305,8 +325,40 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		// Finish off
 		decoder.Finish();
 	}
+	else if (mContentLength > 0)
+	{
+		IOStream::pos_type bytesToCopy = rGetLine.GetSizeOfBufferedData();
+		if (bytesToCopy > mContentLength)
+		{
+			bytesToCopy = mContentLength;
+		}
+		Write(rGetLine.GetBufferedData(), bytesToCopy);
+		SetForReading();
+		mpStreamToReadFrom = &(rGetLine.GetUnderlyingStream());
+	}
 	
 	return true;
+}
+
+void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
+{
+	Seek(0, SeekType_Absolute);
+	
+	CopyStreamTo(rStreamToWriteTo);
+	IOStream::pos_type bytesCopied = GetSize();
+	
+	while (bytesCopied < mContentLength)
+	{
+		char buffer[1024];
+		IOStream::pos_type bytesToCopy = sizeof(buffer);
+		if (bytesToCopy > mContentLength - bytesCopied)
+		{
+			bytesToCopy = mContentLength - bytesCopied;
+		}
+		bytesToCopy = mpStreamToReadFrom->Read(buffer, bytesToCopy);
+		rStreamToWriteTo.Write(buffer, bytesToCopy);
+		bytesCopied += bytesToCopy;
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -317,7 +369,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 //		Created: 03/01/09
 //
 // --------------------------------------------------------------------------
-bool HTTPRequest::Send(IOStream &rStream, int Timeout)
+bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 {
 	switch (mMethod)
 	{
@@ -331,6 +383,8 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout)
 		rStream.Write("HEAD"); break;
 	case Method_POST:
 		rStream.Write("POST"); break;
+	case Method_PUT:
+		rStream.Write("PUT"); break;
 	}
 
 	rStream.Write(" ");
@@ -391,11 +445,41 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout)
 	{
 		oss << i->first << ": " << i->second << "\n";
 	}
+	
+	if (ExpectContinue)
+	{
+		oss << "Expect: 100-continue\n";
+	}
 
 	rStream.Write(oss.str().c_str());
 	rStream.Write("\n");
 
 	return true;
+}
+
+void HTTPRequest::SendWithStream(IOStream &rStreamToSendTo, int Timeout,
+	IOStream* pStreamToSend, HTTPResponse& rResponse)
+{
+	IOStream::pos_type size = pStreamToSend->BytesLeftToRead();
+	
+	if (size != IOStream::SizeOfStreamUnknown)
+	{
+		mContentLength = size;
+	}
+	
+	Send(rStreamToSendTo, Timeout, true);
+	
+	rResponse.Receive(rStreamToSendTo, Timeout);
+	if (rResponse.GetResponseCode() != 100)
+	{
+		// bad response, abort now
+		return;
+	}
+	
+	pStreamToSend->CopyStreamTo(rStreamToSendTo, Timeout);
+	
+	// receive the final response
+	rResponse.Receive(rStreamToSendTo, Timeout);
 }
 
 // --------------------------------------------------------------------------
@@ -509,7 +593,12 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 				}
 				// else don't understand, just assume default for protocol version
 			}
-			// else ignore it
+			else
+			{
+				std::string name = header.substr(0, p);
+				mExtraHeaders.push_back(Header(name,
+					h + dataStart));
+			}
 			
 			// Unset have header flag, as it's now been processed
 			haveHeader = false;

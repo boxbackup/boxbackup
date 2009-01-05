@@ -13,6 +13,9 @@
 #include <string>
 #include <map>
 
+#include "CollectInBufferStream.h"
+
+class HTTPResponse;
 class IOStream;
 class IOStreamGetLine;
 
@@ -24,7 +27,7 @@ class IOStreamGetLine;
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-class HTTPRequest
+class HTTPRequest : public CollectInBufferStream
 {
 public:
 	enum Method
@@ -33,7 +36,8 @@ public:
 		Method_UNKNOWN = 0,
 		Method_GET = 1,
 		Method_HEAD = 2,
-		Method_POST = 3
+		Method_POST = 3,
+		Method_PUT = 4
 	};
 	
 	HTTPRequest();
@@ -56,7 +60,10 @@ public:
 	};
 
 	bool Receive(IOStreamGetLine &rGetLine, int Timeout);
-	bool Send(IOStream &rStream, int Timeout);
+	bool Send(IOStream &rStream, int Timeout, bool ExpectContinue = false);
+	void SendWithStream(IOStream &rStreamToSendTo, int Timeout,
+		IOStream* pStreamToSend, HTTPResponse& rResponse);
+	void ReadContent(IOStream& rStreamToWriteTo);
 
 	typedef std::map<std::string, std::string> CookieJar_t;
 	
@@ -88,7 +95,20 @@ public:
 	const CookieJar_t *GetCookies() const {return mpCookies;} // WARNING: May return NULL
 	bool GetCookie(const char *CookieName, std::string &rValueOut) const;
 	const std::string &GetCookie(const char *CookieName) const;
-
+	bool GetHeader(const std::string& rName, std::string* pValueOut) const
+	{
+		for (std::vector<Header>::const_iterator
+			i  = mExtraHeaders.begin();
+			i != mExtraHeaders.end(); i++)
+		{
+			if (i->first == rName)
+			{
+				*pValueOut = i->second;
+				return true;
+			}
+		}
+		return false;
+	}
 
 	// --------------------------------------------------------------------------
 	//
@@ -109,12 +129,12 @@ public:
 	{
 		mExtraHeaders.push_back(Header(rName, rValue));
 	}
-
+	bool IsExpectingContinue() const { return mExpectContinue; }
+	
 private:
 	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
 	void ParseCookies(const std::string &rHeader, int DataStarts);
 
-private:
 	enum Method mMethod;
 	std::string mRequestURI;
 	std::string mHostName;
@@ -127,6 +147,8 @@ private:
 	CookieJar_t *mpCookies;
 	bool mClientKeepAliveRequested;
 	std::vector<Header> mExtraHeaders;
+	bool mExpectContinue;
+	IOStream* mpStreamToReadFrom;
 };
 
 #endif // HTTPREQUEST__H
