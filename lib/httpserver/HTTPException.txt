@@ -13,3 +13,4 @@ NotImplemented							9
 RequestNotInitialised						10
 BadResponse							11
 ResponseReadFailed						12
+NoStreamConfigured						13
