@@ -25,6 +25,24 @@ std::string HTTPResponse::msDefaultURIPrefix;
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    HTTPResponse::HTTPResponse(IOStream*)
+//		Purpose: Constructor for response to be sent to a stream
+//		Created: 04/01/09
+//
+// --------------------------------------------------------------------------
+HTTPResponse::HTTPResponse(IOStream* pStreamToSendTo)
+	: mResponseCode(HTTPResponse::Code_NoContent),
+	  mResponseIsDynamicContent(true),
+	  mKeepAlive(false),
+	  mContentLength(-1),
+	  mpStreamToSendTo(pStreamToSendTo)
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    HTTPResponse::HTTPResponse()
 //		Purpose: Constructor
 //		Created: 26/3/04
@@ -34,7 +52,8 @@ HTTPResponse::HTTPResponse()
 	: mResponseCode(HTTPResponse::Code_NoContent),
 	  mResponseIsDynamicContent(true),
 	  mKeepAlive(false),
-	  mContentLength(-1)
+	  mContentLength(-1),
+	  mpStreamToSendTo(NULL)
 {
 }
 
@@ -123,11 +142,16 @@ void HTTPResponse::SetContentType(const char *ContentType)
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-void HTTPResponse::Send(IOStream &rStream, bool OmitContent)
+void HTTPResponse::Send(bool OmitContent)
 {
-	if(mContentType.empty())
+	if (!mpStreamToSendTo)
 	{
-		THROW_EXCEPTION(HTTPException, NoContentTypeSet)
+		THROW_EXCEPTION(HTTPException, NoStreamConfigured);
+	}
+	
+	if (GetSize() != 0 && mContentType.empty())
+	{
+		THROW_EXCEPTION(HTTPException, NoContentTypeSet);
 	}
 
 	// Build and send header
@@ -171,16 +195,20 @@ void HTTPResponse::Send(IOStream &rStream, bool OmitContent)
 		// NOTE: header ends with blank line in all cases
 		
 		// Write to stream
-		rStream.Write(header.c_str(), header.size());
+		mpStreamToSendTo->Write(header.c_str(), header.size());
 	}
 	
 	// Send content
 	if(!OmitContent)
 	{
-		rStream.Write(GetBuffer(), GetSize());
+		mpStreamToSendTo->Write(GetBuffer(), GetSize());
 	}
 }
 
+void HTTPResponse::SendContinue()
+{
+	mpStreamToSendTo->Write("HTTP/1.1 100 Continue\r\n");
+}
 
 // --------------------------------------------------------------------------
 //
@@ -339,10 +367,16 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	// Decode the status code
 	long status = ::strtol(statusLine.substr(9, 3).c_str(), NULL, 10);
 	// returns zero in error case, this is OK
-	if(status < 0) status = 0;
+	if (status < 0) status = 0;
 	// Store
 	mResponseCode = status;
 
+	// 100 Continue responses have no headers, terminating newline, or body
+	if (status == 100)
+	{
+		return;
+	}
+	
 	ParseHeaders(rGetLine, Timeout);
 
 	// push back whatever bytes we have left
