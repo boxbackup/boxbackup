@@ -28,6 +28,7 @@ class IOStreamGetLine;
 class HTTPResponse : public CollectInBufferStream
 {
 public:
+	HTTPResponse(IOStream* pStreamToSendTo);
 	HTTPResponse();
 	~HTTPResponse();
 
@@ -46,7 +47,8 @@ public:
 	void SetAsRedirect(const char *RedirectTo, bool IsLocalURI = true);
 	void SetAsNotFound(const char *URI);
 
-	void Send(IOStream &rStream, bool OmitContent = false);
+	void Send(bool OmitContent = false);
+	void SendContinue();
 	void Receive(IOStream& rStream, int Timeout = IOStream::TimeOutInfinite);
 
 	// void AddHeader(const char *EntireHeaderLine);
@@ -139,6 +141,7 @@ private:
 	std::string mContentType;
 	std::vector<Header> mExtraHeaders;
 	int mContentLength; // only used when reading response from stream
+	IOStream* mpStreamToSendTo; // nonzero only when constructed with a stream
 	
 	static std::string msDefaultURIPrefix;
 
