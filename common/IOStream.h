@@ -22,9 +22,13 @@ class IOStream
 {
 public:
 	IOStream();
-	IOStream(const IOStream &rToCopy);
 	virtual ~IOStream();
-	
+
+private:
+	IOStream(const IOStream &rToCopy); /* forbidden */
+	IOStream& operator=(const IOStream &rToCopy); /* forbidden */
+		
+public:
 	enum
 	{
 		TimeOutInfinite = -1,
