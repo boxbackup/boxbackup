@@ -46,7 +46,7 @@ public:
 	//		Created: 26/3/04
 	//
 	// --------------------------------------------------------------------------
-	virtual void Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse) = 0;
+	virtual void Handle(HTTPRequest &rRequest, HTTPResponse &rResponse) = 0;
 	
 	// For notifications to derived classes
 	virtual void HTTPConnectionOpening();
