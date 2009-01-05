@@ -152,7 +152,7 @@ void HTTPServer::Connection(SocketStream &rStream)
 		}
 	
 		// Generate a response
-		HTTPResponse response;
+		HTTPResponse response(&rStream);
 		try
 		{
 			Handle(request, response);
@@ -183,7 +183,7 @@ void HTTPServer::Connection(SocketStream &rStream)
 		}
 	
 		// Send the response (omit any content if this is a HEAD method request)
-		response.Send(rStream, request.GetMethod() == HTTPRequest::Method_HEAD);
+		response.Send(request.GetMethod() == HTTPRequest::Method_HEAD);
 	}
 
 	// Notify derived claases
@@ -209,7 +209,7 @@ void HTTPServer::SendInternalErrorResponse(const char *Error, SocketStream &rStr
 			"</body>\n</html>\n"
 
 	// Generate the error page
-	HTTPResponse response;
+	HTTPResponse response(&rStream);
 	response.SetResponseCode(HTTPResponse::Code_InternalServerError);
 	response.SetContentType("text/html");
 	response.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
@@ -217,7 +217,7 @@ void HTTPServer::SendInternalErrorResponse(const char *Error, SocketStream &rStr
 	response.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
 
 	// Send the error response
-	response.Send(rStream);
+	response.Send();
 }
 
 
