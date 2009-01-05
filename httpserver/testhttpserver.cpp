@@ -27,12 +27,12 @@ public:
 	TestWebServer();
 	~TestWebServer();
 
-	virtual void Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void Handle(HTTPRequest &rRequest, HTTPResponse &rResponse);
 
 };
 
 // Build a nice HTML response, so this can also be tested neatly in a browser
-void TestWebServer::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
+void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 {
 	// Test redirection mechanism
 	if(rRequest.GetRequestURI() == "/redirect")
@@ -119,22 +119,50 @@ public:
 	S3Simulator() { }
 	~S3Simulator() { }
 
-	virtual void Handle(const HTTPRequest &rRequest,
-		HTTPResponse &rResponse);
+	virtual void Handle(HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse);
 };
 
-void S3Simulator::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
+void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 {
 	// if anything goes wrong, return a 500 error
 	rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
 	rResponse.SetContentType("text/plain");
 
-	if (rRequest.GetMethod() != HTTPRequest::Method_GET)
-	{
-		rResponse.SetResponseCode(HTTPResponse::Code_MethodNotAllowed);
-		return;
+	try
+	{		
+		if (rRequest.GetMethod() == HTTPRequest::Method_GET)
+		{
+			HandleGet(rRequest, rResponse);
+		}
+		else if (rRequest.GetMethod() == HTTPRequest::Method_PUT)
+		{
+			HandlePut(rRequest, rResponse);
+		}
+		else
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_MethodNotAllowed);
+		}
 	}
+	catch (CommonException &ce)
+	{
+		rResponse.IOStream::Write(ce.what());
+	}
+	catch (std::exception &e)
+	{
+		rResponse.IOStream::Write(e.what());
+	}
+	catch (...)
+	{
+		rResponse.IOStream::Write("Unknown error");
+	}
+	
+	return;
+}
 
+void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
+{
 	std::string path = "testfiles";
 	path += rRequest.GetRequestURI();
 	std::auto_ptr<FileStream> apFile;
@@ -153,22 +181,7 @@ void S3Simulator::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
 		{
 			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
 		}
-		else
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
-		}
-		rResponse.IOStream::Write(ce.what());
-		return;
-	}
-	catch (std::exception &e)
-	{
-		rResponse.IOStream::Write(e.what());
-		return;
-	}
-	catch (...)
-	{
-		rResponse.IOStream::Write("Unknown error");
-		return;
+		throw;
 	}
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
@@ -178,7 +191,47 @@ void S3Simulator::Handle(const HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
 	rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
-	rResponse.SetContentType("text/plain");
+	rResponse.AddHeader("Server", "AmazonS3");
+	rResponse.SetResponseCode(HTTPResponse::Code_OK);
+}
+
+void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
+{
+	std::string path = "testfiles";
+	path += rRequest.GetRequestURI();
+	std::auto_ptr<FileStream> apFile;
+
+	try
+	{
+		apFile.reset(new FileStream(path, O_CREAT | O_WRONLY));
+	}
+	catch (CommonException &ce)
+	{
+		if (ce.GetSubType() == CommonException::OSFileOpenError)
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
+		}
+		else if (ce.GetSubType() == CommonException::AccessDenied)
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
+		}
+		throw;
+	}
+
+	if (rRequest.IsExpectingContinue())
+	{
+		rResponse.SendContinue();
+	}
+
+	rRequest.ReadContent(*apFile);
+
+	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTObjectPUT.html
+	rResponse.AddHeader("x-amz-id-2", "LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7");
+	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
+	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
+	rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
+	rResponse.SetContentType("");
 	rResponse.AddHeader("Server", "AmazonS3");
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 }
@@ -361,6 +414,34 @@ int test(int argc, const char *argv[])
 
 		FileStream file("testfiles/testrequests.pl");
 		TEST_THAT(file.CompareWith(response));
+	}
+
+	{
+		HTTPRequest request(HTTPRequest::Method_PUT,
+			"/newfile");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.AddHeader("Content-Type", "text/plain");
+		FileStream fs("testfiles/testrequests.pl");
+		HTTPResponse response;
+		request.SendWithStream(sock,
+			IOStream::TimeOutInfinite /* or 10000 milliseconds */,
+			&fs, response);
+		std::string value;
+		TEST_EQUAL(200, response.GetResponseCode());
+		TEST_EQUAL("LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7", response.GetHeaderValue("x-amz-id-2"));
+		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
+		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
+		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
+		TEST_EQUAL("\"828ef3fdfa96f00ad9f27c383fc9ac7f\"", response.GetHeaderValue("ETag"));
+		TEST_EQUAL("", response.GetContentType());
+		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
+		TEST_EQUAL(0, response.GetSize());
+
+		FileStream f1("testfiles/testrequests.pl");
+		FileStream f2("testfiles/newfile");
+		TEST_THAT(f1.CompareWith(f2));
 	}
 
 	// Kill it
