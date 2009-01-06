@@ -12,12 +12,16 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "Test.h"
-#include "HTTPServer.h"
+#include <openssl/hmac.h>
+
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
+#include "HTTPServer.h"
 #include "IOStreamGetLine.h"
 #include "ServerControl.h"
+#include "Test.h"
+#include "decode.h"
+#include "encode.h"
 
 #include "MemLeakFindOn.h"
 
@@ -131,8 +135,92 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.SetContentType("text/plain");
 
 	try
-	{		
-		if (rRequest.GetMethod() == HTTPRequest::Method_GET)
+	{
+		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
+		std::string access_key = "0PN5J17HBGZHT7JJ3X82";
+		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
+		
+		std::string md5, date, bucket;
+		rRequest.GetHeader("Content-MD5", &md5);
+		rRequest.GetHeader("Date", &date);
+		
+		std::string host = rRequest.GetHostName();
+		std::string s3suffix = ".s3.amazonaws.com";
+		if (host.size() > s3suffix.size())
+		{
+			std::string suffix = host.substr(host.size() -
+				s3suffix.size(), s3suffix.size());
+			if (suffix == s3suffix)
+			{
+				bucket = host.substr(0, host.size() -
+					s3suffix.size());
+			}
+		}
+		
+		std::ostringstream data;
+		data << rRequest.GetVerb() << "\n";
+		data << md5 << "\n";
+		data << rRequest.GetContentType() << "\n";
+		data << date << "\n";
+		
+		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
+		
+		for (std::vector<HTTPRequest::Header>::iterator
+			i = headers.begin(); i != headers.end(); i++)
+		{
+			std::string& rHeaderName = i->first;
+			
+			for (std::string::iterator c = rHeaderName.begin();
+				c != rHeaderName.end() && *c != ':'; c++)
+			{
+				*c = tolower(*c);
+			}
+		}
+		
+		sort(headers.begin(), headers.end());
+		
+		for (std::vector<HTTPRequest::Header>::iterator
+			i = headers.begin(); i != headers.end(); i++)
+		{
+			if (i->first.substr(0, 5) == "x-amz")
+			{
+				data << i->first << ":" << i->second << "\n";
+			}
+		}		
+		
+		if (! bucket.empty())
+		{
+			data << "/" << bucket;
+		}
+		
+		data << rRequest.GetRequestURI();
+		std::string data_string = data.str();
+
+		unsigned char digest_buffer[EVP_MAX_MD_SIZE];
+		unsigned int digest_size = sizeof(digest_buffer);
+		unsigned char* mac = HMAC(EVP_sha1(),
+			secret_key.c_str(), secret_key.size(),
+			(const unsigned char*)data_string.c_str(),
+			data_string.size(), digest_buffer, &digest_size);
+		std::string digest((const char *)digest_buffer, digest_size);
+		
+		base64::encoder encoder;
+		std::string expectedAuth = "AWS " + access_key + ":" +
+			encoder.encode(digest);
+		
+		if (expectedAuth[expectedAuth.size() - 1] == '\n')
+		{
+			expectedAuth = expectedAuth.substr(0,
+				expectedAuth.size() - 1);
+		}
+		
+		std::string actualAuth;
+		if (!rRequest.GetHeader("Authorization", &actualAuth) ||
+			actualAuth != expectedAuth)
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_Unauthorized);
+		}	
+		else if (rRequest.GetMethod() == HTTPRequest::Method_GET)
 		{
 			HandleGet(rRequest, rResponse);
 		}
@@ -348,6 +436,97 @@ int test(int argc, const char *argv[])
 	TEST_THAT(KillServer(pid));
 	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
 
+	{
+		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
+		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
+		request.SetHostName("johnsmith.s3.amazonaws.com");
+		request.AddHeader("Date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		request.AddHeader("Authorization",
+			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
+		
+		S3Simulator simulator;
+		
+		CollectInBufferStream response_buffer;
+		HTTPResponse response(&response_buffer);
+		
+		simulator.Handle(request, response);
+		TEST_EQUAL(200, response.GetResponseCode());
+		
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
+		TEST_EQUAL("omgpuppies!\n", response_data);
+	}
+
+	{
+		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
+		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
+		request.SetHostName("johnsmith.s3.amazonaws.com");
+		request.AddHeader("Date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		request.AddHeader("Authorization",
+			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=");
+		
+		S3Simulator simulator;
+		
+		CollectInBufferStream response_buffer;
+		HTTPResponse response(&response_buffer);
+		
+		simulator.Handle(request, response);
+		TEST_EQUAL(401, response.GetResponseCode());
+		
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
+		TEST_EQUAL("", response_data);
+	}
+
+	{
+		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:0cSX/YPdtXua1aFFpYmH1tc0ajA=");
+
+		S3Simulator simulator;
+		
+		CollectInBufferStream response_buffer;
+		HTTPResponse response(&response_buffer);
+		
+		simulator.Handle(request, response);
+		TEST_EQUAL(404, response.GetResponseCode());
+	}
+
+	{
+		HTTPRequest request(HTTPRequest::Method_PUT,
+			"/newfile");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+		request.AddHeader("Content-Type", "text/plain");
+		
+		FileStream fs("testfiles/testrequests.pl");
+		fs.CopyStreamTo(request);
+		request.SetForReading();
+
+		CollectInBufferStream response_buffer;
+		HTTPResponse response(&response_buffer);
+		
+		S3Simulator simulator;
+		simulator.Handle(request, response);
+		
+		TEST_EQUAL(200, response.GetResponseCode());
+		TEST_EQUAL("LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7", response.GetHeaderValue("x-amz-id-2"));
+		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
+		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
+		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
+		TEST_EQUAL("\"828ef3fdfa96f00ad9f27c383fc9ac7f\"", response.GetHeaderValue("ETag"));
+		TEST_EQUAL("", response.GetContentType());
+		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
+		TEST_EQUAL(0, response.GetSize());
+
+		FileStream f1("testfiles/testrequests.pl");
+		FileStream f2("testfiles/newfile");
+		TEST_THAT(f1.CompareWith(f2));
+		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
+	}
+
 	// Start the S3Simulator server
 	pid = LaunchServer("./test s3server testfiles/httpserver.conf",
 		"testfiles/httpserver.pid");
@@ -364,7 +543,7 @@ int test(int argc, const char *argv[])
 		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:0cSX/YPdtXua1aFFpYmH1tc0ajA=");
 		request.SetClientKeepAliveRequested(true);
 		request.Send(sock, IOStream::TimeOutInfinite);
 
@@ -380,7 +559,7 @@ int test(int argc, const char *argv[])
 			"/testrequests.pl");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
 		request.SetClientKeepAliveRequested(true);
 		request.Send(sock, IOStream::TimeOutInfinite);
 
@@ -396,7 +575,7 @@ int test(int argc, const char *argv[])
 			"/testrequests.pl");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
 		request.SetClientKeepAliveRequested(true);
 		request.Send(sock, IOStream::TimeOutInfinite);
 
@@ -421,7 +600,7 @@ int test(int argc, const char *argv[])
 			"/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 15B4D3461F177624206A:xQE0diMbLRepdf3YB+FIEXAMPLE=");
+		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:kfY1m6V3zTufRy2kj92FpQGKz4M=");
 		request.AddHeader("Content-Type", "text/plain");
 		FileStream fs("testfiles/testrequests.pl");
 		HTTPResponse response;

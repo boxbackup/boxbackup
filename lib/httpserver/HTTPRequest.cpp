@@ -134,20 +134,20 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	}
 	else
 	{
-		std::string method = requestLine.substr(0, p);
-		if (method == "GET")
+		mHttpVerb = requestLine.substr(0, p);
+		if (mHttpVerb == "GET")
 		{
 			mMethod = Method_GET;
 		}
-		else if (method == "HEAD")
+		else if (mHttpVerb == "HEAD")
 		{
 			mMethod = Method_HEAD;
 		}
-		else if (method == "POST")
+		else if (mHttpVerb == "POST")
 		{
 			mMethod = Method_POST;
 		}
-		else if (method == "PUT")
+		else if (mHttpVerb == "PUT")
 		{
 			mMethod = Method_PUT;
 		}
