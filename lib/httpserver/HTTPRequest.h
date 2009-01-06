@@ -86,7 +86,7 @@ public:
 		mHostName = rHostName;
 	}
 
-	const int GetHostPort() const {return mHostPort;}  // into host name and port number
+	const int GetHostPort() const {return mHostPort;}
 	const std::string &GetQueryString() const {return mQueryString;}
 	int GetHTTPVersion() const {return mHTTPVersion;}
 	const Query_t &GetQuery() const {return mQuery;}
@@ -109,6 +109,7 @@ public:
 		}
 		return false;
 	}
+	std::vector<Header> GetHeaders() { return mExtraHeaders; }
 
 	// --------------------------------------------------------------------------
 	//
@@ -130,6 +131,23 @@ public:
 		mExtraHeaders.push_back(Header(rName, rValue));
 	}
 	bool IsExpectingContinue() const { return mExpectContinue; }
+	const char* GetVerb() const
+	{
+		if (!mHttpVerb.empty())
+		{
+			return mHttpVerb.c_str();
+		}
+		switch (mMethod)
+		{
+			case Method_UNINITIALISED: return "Uninitialized";
+			case Method_UNKNOWN: return "Unknown";
+			case Method_GET: return "GET";
+			case Method_HEAD: return "HEAD";
+			case Method_POST: return "POST";
+			case Method_PUT: return "PUT";
+		}
+		return "Bad";
+	}
 	
 private:
 	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
@@ -149,6 +167,7 @@ private:
 	std::vector<Header> mExtraHeaders;
 	bool mExpectContinue;
 	IOStream* mpStreamToReadFrom;
+	std::string mHttpVerb;
 };
 
 #endif // HTTPREQUEST__H
