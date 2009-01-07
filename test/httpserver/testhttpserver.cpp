@@ -9,11 +9,13 @@
 
 #include "Box.h"
 
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
+#include <ctime>
 
 #include <openssl/hmac.h>
 
+#include "autogen_HTTPException.h"
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
 #include "HTTPServer.h"
@@ -198,7 +200,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 		unsigned char digest_buffer[EVP_MAX_MD_SIZE];
 		unsigned int digest_size = sizeof(digest_buffer);
-		unsigned char* mac = HMAC(EVP_sha1(),
+		/* unsigned char* mac = */ HMAC(EVP_sha1(),
 			secret_key.c_str(), secret_key.size(),
 			(const unsigned char*)data_string.c_str(),
 			data_string.size(), digest_buffer, &digest_size);
@@ -324,6 +326,194 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 }
 
+class S3Client
+{
+	public:
+	S3Client(S3Simulator* pSimulator, const std::string& rHostName,
+		const std::string& rAccessKey, const std::string& rSecretKey)
+	: mpSimulator(pSimulator),
+	  mHostName(rHostName),
+	  mAccessKey(rAccessKey),
+	  mSecretKey(rSecretKey)
+	{ }
+	
+	S3Client(std::string HostName, int Port, const std::string& rAccessKey,
+		const std::string& rSecretKey)
+	: mpSimulator(NULL),
+	  mHostName(HostName),
+	  mPort(Port),
+	  mAccessKey(rAccessKey),
+	  mSecretKey(rSecretKey)
+	{ }
+		
+	HTTPResponse GetObject(const std::string& rObjectURI);
+
+	private:
+	S3Simulator* mpSimulator;
+	std::string mHostName;
+	int mPort;
+	std::auto_ptr<SocketStream> mapClientSocket;
+	std::string mAccessKey, mSecretKey;
+
+	HTTPResponse FinishAndSendRequest(HTTPRequest::Method Method,
+		const std::string& rRequestURI,
+		IOStream* pStreamToSend = NULL,
+		const char* pStreamContentType = NULL);
+	HTTPResponse SendRequest(HTTPRequest& rRequest,
+		IOStream* pStreamToSend = NULL,
+		const char* pStreamContentType = NULL);
+};
+
+HTTPResponse S3Client::GetObject(const std::string& rObjectURI)
+{
+	return FinishAndSendRequest(HTTPRequest::Method_GET, rObjectURI);
+}
+
+HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
+	const std::string& rRequestURI, IOStream* pStreamToSend,
+	const char* pStreamContentType)
+{
+	HTTPRequest request(Method, rRequestURI);
+	request.SetHostName(mHostName);
+	
+	std::ostringstream date;
+	time_t tt = time(NULL);
+	struct tm *tp = gmtime(&tt);
+	if (!tp)
+	{
+		BOX_ERROR("Failed to get current time");
+		THROW_EXCEPTION(HTTPException, Internal);
+	}
+	const char *dow[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+	date << dow[tp->tm_wday] << ", ";
+	const char *month[] = {"Jan","Feb","Mar","Apr","May","Jun",
+		"Jul","Aug","Sep","Oct","Nov","Dec"};
+	date << std::internal << std::setfill('0') <<
+		std::setw(2) << tp->tm_mday << " " <<
+		month[tp->tm_mon] << " " <<
+		(tp->tm_year + 1900) << " ";
+	date << std::setw(2) << tp->tm_hour << ":" <<
+		std::setw(2) << tp->tm_min  << ":" <<
+		std::setw(2) << tp->tm_sec  << " GMT";
+	request.AddHeader("Date", date.str());
+
+	if (pStreamContentType)
+	{
+		request.AddHeader("Content-Type", pStreamContentType);
+	}
+	
+	std::string s3suffix = ".s3.amazonaws.com";
+	std::string bucket;
+	if (mHostName.size() > s3suffix.size())
+	{
+		std::string suffix = mHostName.substr(mHostName.size() -
+			s3suffix.size(), s3suffix.size());
+		if (suffix == s3suffix)
+		{
+			bucket = mHostName.substr(0, mHostName.size() -
+				s3suffix.size());
+		}
+	}
+	
+	std::ostringstream data;
+	data << request.GetVerb() << "\n";
+	data << "\n"; /* Content-MD5 */
+	data << request.GetContentType() << "\n";
+	data << date.str() << "\n";
+		
+	if (! bucket.empty())
+	{
+		data << "/" << bucket;
+	}
+	
+	data << request.GetRequestURI();
+	std::string data_string = data.str();
+
+	unsigned char digest_buffer[EVP_MAX_MD_SIZE];
+	unsigned int digest_size = sizeof(digest_buffer);
+	/* unsigned char* mac = */ HMAC(EVP_sha1(),
+		mSecretKey.c_str(), mSecretKey.size(),
+		(const unsigned char*)data_string.c_str(),
+		data_string.size(), digest_buffer, &digest_size);
+	std::string digest((const char *)digest_buffer, digest_size);
+	
+	base64::encoder encoder;
+	std::string auth_code = "AWS " + mAccessKey + ":" +
+		encoder.encode(digest);
+
+	if (auth_code[auth_code.size() - 1] == '\n')
+	{
+		auth_code = auth_code.substr(0, auth_code.size() - 1);
+	}
+
+	request.AddHeader("Authorization", auth_code);
+	
+	if (mpSimulator)
+	{
+		if (pStreamToSend)
+		{
+			pStreamToSend->CopyStreamTo(request);
+		}
+
+		request.SetForReading();
+		CollectInBufferStream response_buffer;
+		HTTPResponse response(&response_buffer);
+	
+		mpSimulator->Handle(request, response);
+		return response;
+	}
+	else
+	{
+		try
+		{
+			if (!mapClientSocket.get())
+			{
+				mapClientSocket.reset(new SocketStream());
+				mapClientSocket->Open(Socket::TypeINET,
+					mHostName, mPort);
+			}
+			return SendRequest(request, pStreamToSend,
+				pStreamContentType);
+		}
+		catch (ConnectionException &ce)
+		{
+			if (ce.GetType() == ConnectionException::SocketWriteError)
+			{
+				// server may have disconnected us,
+				// try to reconnect, just once
+				mapClientSocket->Open(Socket::TypeINET,
+					mHostName, mPort);
+				return SendRequest(request, pStreamToSend,
+					pStreamContentType);
+			}
+			else
+			{
+				throw;
+			}
+		}
+	}
+}
+
+HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
+	IOStream* pStreamToSend, const char* pStreamContentType)
+{		
+	HTTPResponse response;
+	
+	if (pStreamToSend)
+	{
+		rRequest.SendWithStream(*mapClientSocket,
+			30000 /* milliseconds */,
+			pStreamToSend, response);
+	}
+	else
+	{
+		rRequest.Send(*mapClientSocket, 30000 /* milliseconds */);
+		response.Receive(*mapClientSocket, 30000 /* milliseconds */);
+	}
+		
+	return response;
+}	
+
 int test(int argc, const char *argv[])
 {
 	if(argc >= 2 && ::strcmp(argv[1], "server") == 0)
@@ -436,6 +626,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(KillServer(pid));
 	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
 
+	// correct, official signature should succeed
 	{
 		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
@@ -457,6 +648,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("omgpuppies!\n", response_data);
 	}
 
+	// modified signature should fail
 	{
 		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
@@ -478,18 +670,20 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("", response_data);
 	}
 
+	// S3Client tests
 	{
-		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
-		request.SetHostName("quotes.s3.amazonaws.com");
-		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:0cSX/YPdtXua1aFFpYmH1tc0ajA=");
-
 		S3Simulator simulator;
+		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
+			"0PN5J17HBGZHT7JJ3X82",
+			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
 		
-		CollectInBufferStream response_buffer;
-		HTTPResponse response(&response_buffer);
-		
-		simulator.Handle(request, response);
+		HTTPResponse response = client.GetObject("/photos/puppy.jpg");
+		TEST_EQUAL(200, response.GetResponseCode());
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
+		TEST_EQUAL("omgpuppies!\n", response_data);
+
+		response = client.GetObject("/nonexist");
 		TEST_EQUAL(404, response.GetResponseCode());
 	}
 
