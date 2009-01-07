@@ -32,13 +32,35 @@ public:
 	HTTPResponse();
 	~HTTPResponse();
 
-private:
-	// no copying
-	HTTPResponse(const HTTPResponse &);
-	HTTPResponse &operator=(const HTTPResponse &);
+	// allow copying, but be very careful with the response stream,
+	// you can only read it once! (this class doesn't police it).
+	HTTPResponse(const HTTPResponse& rOther)
+	: mResponseCode(rOther.mResponseCode),
+	  mResponseIsDynamicContent(rOther.mResponseIsDynamicContent),
+	  mKeepAlive(rOther.mKeepAlive),
+	  mContentType(rOther.mContentType),
+	  mExtraHeaders(rOther.mExtraHeaders),
+	  mContentLength(rOther.mContentLength),
+	  mpStreamToSendTo(rOther.mpStreamToSendTo)
+	{
+		Write(rOther.GetBuffer(), rOther.GetSize());
+	}
+		
+	HTTPResponse &operator=(const HTTPResponse &rOther)
+	{
+		Write(rOther.GetBuffer(), rOther.GetSize());
+		mResponseCode = rOther.mResponseCode;
+		mResponseIsDynamicContent = rOther.mResponseIsDynamicContent;
+		mKeepAlive = rOther.mKeepAlive;
+		mContentType = rOther.mContentType;
+		mExtraHeaders = rOther.mExtraHeaders;
+		mContentLength = rOther.mContentLength;
+		mpStreamToSendTo = rOther.mpStreamToSendTo;
+		return *this;
+	}
+	
 	typedef std::pair<std::string, std::string> Header;
 
-public:
 	void SetResponseCode(int Code);
 	int GetResponseCode() { return mResponseCode; }
 	void SetContentType(const char *ContentType);
