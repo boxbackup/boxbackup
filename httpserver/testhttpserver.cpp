@@ -347,6 +347,8 @@ class S3Client
 	{ }
 		
 	HTTPResponse GetObject(const std::string& rObjectURI);
+	HTTPResponse PutObject(const std::string& rObjectURI,
+		IOStream& rStreamToSend, const char* pContentType = NULL);
 
 	private:
 	S3Simulator* mpSimulator;
@@ -367,6 +369,13 @@ class S3Client
 HTTPResponse S3Client::GetObject(const std::string& rObjectURI)
 {
 	return FinishAndSendRequest(HTTPRequest::Method_GET, rObjectURI);
+}
+
+HTTPResponse S3Client::PutObject(const std::string& rObjectURI,
+	IOStream& rStreamToSend, const char* pContentType)
+{
+	return FinishAndSendRequest(HTTPRequest::Method_PUT, rObjectURI,
+		&rStreamToSend, pContentType);
 }
 
 HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
@@ -683,8 +692,24 @@ int test(int argc, const char *argv[])
 			response.GetSize());
 		TEST_EQUAL("omgpuppies!\n", response_data);
 
+		// make sure that assigning to HTTPResponse does clear stream
+		response = client.GetObject("/photos/puppy.jpg");
+		TEST_EQUAL(200, response.GetResponseCode());
+		response_data = std::string((const char *)response.GetBuffer(),
+			response.GetSize());
+		TEST_EQUAL("omgpuppies!\n", response_data);
+
 		response = client.GetObject("/nonexist");
 		TEST_EQUAL(404, response.GetResponseCode());
+		
+		FileStream fs("testfiles/testrequests.pl");
+		response = client.PutObject("/newfile", fs);
+		TEST_EQUAL(200, response.GetResponseCode());
+
+		response = client.GetObject("/newfile");
+		TEST_EQUAL(200, response.GetResponseCode());
+		TEST_THAT(fs.CompareWith(response));
+		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
 	}
 
 	{
