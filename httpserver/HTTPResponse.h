@@ -48,6 +48,7 @@ public:
 		
 	HTTPResponse &operator=(const HTTPResponse &rOther)
 	{
+		Reset();
 		Write(rOther.GetBuffer(), rOther.GetSize());
 		mResponseCode = rOther.mResponseCode;
 		mResponseIsDynamicContent = rOther.mResponseIsDynamicContent;
