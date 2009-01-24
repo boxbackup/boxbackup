@@ -1728,7 +1728,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 							SelfFlushingStream flushFile(*fileOnServerStream);
 							// Open the local file
 							FileStream l(localPath.c_str());
-							equal = l.CompareWith(fileOnServerStream,  mrConnection.GetTimeout());
+							equal = l.CompareWith(*fileOnServerStream,
+								mrConnection.GetTimeout());
 						}
 					}
 
