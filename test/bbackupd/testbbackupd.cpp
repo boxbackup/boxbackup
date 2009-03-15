@@ -2618,6 +2618,8 @@ int test_bbackupd()
 		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf.bak",
 			"testfiles/0_2/backup/01234567/info.rf") == 0);
 
+		int store_fixed_time = time(NULL);
+
 		// Check that we DO get errors on compare (cannot do this
 		// until after we fix the store, which creates a race)
 		compareReturnValue = ::system(BBACKUPQUERY " "
@@ -2632,7 +2634,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 
-		// Set a tag for the notify script to distinguist from
+		// Set a tag for the notify script to distinguish from
 		// previous runs.
 		{
 			int fd1 = open("testfiles/notifyscript.tag", 
@@ -2642,8 +2644,9 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		// bbackupd should pause for about 90 seconds
-		wait_for_backup_operation(85);
+		// bbackupd should pause for about 90 seconds from store_fixed_time,
+		// so check that it hasn't run after 85 seconds from store_fixed_time
+		wait_for_backup_operation(85 - time(NULL) + store_fixed_time);
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 
@@ -2713,6 +2716,8 @@ int test_bbackupd()
 		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf.bak",
 			"testfiles/0_2/backup/01234567/info.rf") == 0);
 
+		store_fixed_time = time(NULL);
+
 		// Check that we DO get errors on compare (cannot do this
 		// until after we fix the store, which creates a race)
 		compareReturnValue = ::system(BBACKUPQUERY " "
@@ -2737,8 +2742,9 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		// bbackupd should pause for at least 90 seconds
-		wait_for_backup_operation(85);
+		// bbackupd should pause for about 90 seconds from store_fixed_time,
+		// so check that it hasn't run after 85 seconds from store_fixed_time
+		wait_for_backup_operation(85 - time(NULL) + store_fixed_time);
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
 
