@@ -13,6 +13,10 @@
 #include <cstring>
 #include <ctime>
 
+#ifdef HAVE_SIGNAL_H
+	#include <signal.h>
+#endif
+
 #include <openssl/hmac.h>
 
 #include "autogen_HTTPException.h"
