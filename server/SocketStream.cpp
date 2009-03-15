@@ -368,7 +368,8 @@ void SocketStream::Close()
 #endif
 	{
 		BOX_LOG_SYS_ERROR("Failed to close socket");
-		THROW_EXCEPTION(ServerException, SocketCloseError)
+		// don't throw an exception here, assume that the socket was
+		// already closed or closing.
 	}
 	mSocketHandle = INVALID_SOCKET_VALUE;
 }
