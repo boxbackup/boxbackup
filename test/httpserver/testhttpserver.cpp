@@ -580,6 +580,8 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(404, response.GetResponseCode());
 	}
 
+	// Make file inaccessible, should cause server to return a 403 error,
+	// unless of course the test is run as root :)
 	{
 		TEST_THAT(chmod("testfiles/testrequests.pl", 0) == 0);
 		HTTPRequest request(HTTPRequest::Method_GET,
