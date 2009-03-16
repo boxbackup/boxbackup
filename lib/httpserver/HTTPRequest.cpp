@@ -121,10 +121,10 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		// Didn't get the request line, probably end of connection which had been kept alive
 		return false;
 	}
-//	TRACE1("Request line: %s\n", requestLine.c_str());
+	BOX_TRACE("Request line: " << requestLine);
 
 	// Check the method
-	unsigned int p = 0;	// current position in string
+	size_t p = 0;	// current position in string
 	p = requestLine.find(' '); // end of first word
 	
 	if (p == std::string::npos)
