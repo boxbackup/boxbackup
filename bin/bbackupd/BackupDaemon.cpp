@@ -697,9 +697,8 @@ void BackupDaemon::RunSyncNow()
 	if(mDeleteStoreObjectInfoFile && 
 		!DeleteStoreObjectInfo())
 	{
-		BOX_ERROR("Failed to delete the "
-			"StoreObjectInfoFile, backup cannot "
-			"continue safely.");
+		BOX_ERROR("Failed to delete the StoreObjectInfoFile, "
+			"backup cannot continue safely.");
 		THROW_EXCEPTION(ClientException, 
 			FailedToDeleteStoreObjectInfoFile);
 	}
@@ -998,8 +997,9 @@ void BackupDaemon::OnBackupFinish()
 //
 // Function
 //		Name:    BackupDaemon::UseScriptToSeeIfSyncAllowed()
-//		Purpose: Private. Use a script to see if the sync should be allowed (if configured)
-//				 Returns -1 if it's allowed, time in seconds to wait otherwise.
+//		Purpose: Private. Use a script to see if the sync should be
+//			 allowed now (if configured). Returns -1 if it's
+//			 allowed, time in seconds to wait otherwise.
 //		Created: 21/6/04
 //
 // --------------------------------------------------------------------------
@@ -1021,7 +1021,8 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	pid_t pid = 0;
 	try
 	{
-		std::auto_ptr<IOStream> pscript(LocalProcessStream(conf.GetKeyValue("SyncAllowScript").c_str(), pid));
+		std::auto_ptr<IOStream> pscript(LocalProcessStream(
+			conf.GetKeyValue("SyncAllowScript").c_str(), pid));
 
 		// Read in the result
 		IOStreamGetLine getLine(*pscript);
