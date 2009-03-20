@@ -22,7 +22,6 @@ ONLY:mingw32,mingw32msvc
 END-ONLY
 
 ONLY:mingw32
-	script /bin/mgwz.dll
 	script /bin/mingwm10.dll
 END-ONLY
 
