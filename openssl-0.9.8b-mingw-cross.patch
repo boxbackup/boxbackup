@@ -322,3 +322,15 @@ diff -ru openssl-0.9.8b/makefile.one openssl-0.9.8b-mingw/makefile.one
 +rm cert.tmp
 +
 +echo passed all tests
+diff -ru openssl-0.9.8b/include/openssl/e_os2.h openssl-0.9.8b-mingw/include/openssl/e_os2.h
+--- openssl-0.9.8b/include/openssl/e_os2.h	2009-03-20 00:02:19.000000000 +0000
++++ openssl-0.9.8b-mingw/include/openssl/e_os2.h	2009-03-20 00:02:34.000000000 +0000
+@@ -264,7 +264,7 @@
+ # define OPENSSL_IMPLEMENT_GLOBAL(type,name)			     \
+ 	extern type _hide_##name;				     \
+ 	type *_shadow_##name(void) { return &_hide_##name; }	     \
+-	static type _hide_##name
++	type _hide_##name
+ # define OPENSSL_DECLARE_GLOBAL(type,name) type *_shadow_##name(void)
+ # define OPENSSL_GLOBAL_REF(name) (*(_shadow_##name()))
+ #else
