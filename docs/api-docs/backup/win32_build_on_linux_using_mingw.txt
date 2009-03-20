@@ -3,7 +3,7 @@ By Chris Wilson, 2005-12-07
 
 Install the MinGW cross-compiler for Windows:
 
-- Debian users can "apt-get install mingw32"
+- Debian and Ubuntu users can "apt-get install mingw32"
 - Fedora and SuSE users can download RPM packages from 
   [http://mirzam.it.vu.nl/mingw/]
 
@@ -12,7 +12,16 @@ It will usually be something like "ix86-mingw32*-". All the binaries in the
 cross-compiler package will start with this prefix. The documentation below
 assumes that it is "i386-mingw32-". Adjust to taste.
 
-Download Zlib from [http://www.zlib.net/], unpack and enter source directory:
+You will also need to install Wine and the Linux kernel "binary formats"
+(binfmt) support, so that you can run Windows executables on Linux,
+otherwise the configure scripts will not work properly with a cross-compiler.
+On Ubuntu, run:
+
+	apt-get install wine binfmt-support
+	/etc/init.d/binfmt-support start
+
+Start by downloading Zlib from [http://www.zlib.net/], unpack and enter
+source directory:
 
 	export CC=i386-mingw32-gcc 
 	export AR="i386-mingw32-ar rc" 
@@ -48,10 +57,35 @@ Configure and make:
 	export AR=i386-mingw32-ar
 	./configure --host=i386-mingw32 --prefix=/usr/local/i386-mingw32/
 	make winshared
+
+If you get this error:
+
+	./dftables.exe pcre_chartables.c
+	/bin/bash: ./dftables.exe: cannot execute binary file
+	make: *** [pcre_chartables.c] Error 126
+
+then run:
+
+	wine ./dftables.exe pcre_chartables.c
+	make winshared
+
+to complete the build. Finally:
+
 	cp .libs/libpcreposix.a /usr/local/i386-pc-mingw32/lib
 	cp pcreposix.h /usr/local/i386-pc-mingw32/include
 
-Configure Box with:
+You will need to find a copy of mingwm10.dll that matches your cross-compiler.
+Most MinGW distributions should come with it. On Debian and Ubuntu, for some
+bizarre reason, you'll find it compressed as
+/usr/share/doc/mingw32-runtime/mingwm10.dll.gz, in which case you'll
+have to un-gzip it with "gzip -d". Copy it to a known location, e.g.
+/usr/local/i386-mingw32/bin.
+
+Download and extract Box Backup, and change into the base directory,
+e.g. boxbackup-0.11rc2. Change the path to mingwm10.dll in parcels.txt to
+match where you found or installed it.
+
+Now configure Box with:
 
 	./configure --host=i386-mingw32 \
 		CXXFLAGS="-mthreads -I/usr/local/i386-mingw32/include" \
