@@ -57,7 +57,12 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 			// Get unique ID
 			if(pRevisionID != 0)
 			{
-				(*pRevisionID) = FileModificationTime(st);
+				#ifdef WIN32
+					*pRevisionID = st.st_mtime;
+				#else
+					*pRevisionID = FileModificationTime(st);
+				#endif
+
 #ifdef BOX_RELEASE_BUILD
 				// The resolution of timestamps may be very
 				// low, e.g. 1 second. So add the size to it
@@ -98,7 +103,12 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 			// Revision ID
 			if(pRevisionID != 0)
 			{
-				int64_t rid = FileModificationTime(st);
+				#ifdef WIN32
+					int64_t rid = st.st_mtime;
+				#else
+					int64_t rid = FileModificationTime(st);
+				#endif
+
 				if(rid > revisionID) revisionID = rid;
 				revisionIDplus += st.st_size;
 			}

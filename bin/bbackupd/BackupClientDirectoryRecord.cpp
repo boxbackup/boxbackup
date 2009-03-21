@@ -149,12 +149,12 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	// so byte order isn't considered.
 	MD5Digest currentStateChecksum;
 	
-	struct stat dest_st;
+	EMU_STRUCT_STAT dest_st;
 	// Stat the directory, to get attribute info
 	// If it's a symbolic link, we want the link target here
 	// (as we're about to back up the contents of the directory)
 	{
-		if(::stat(rLocalPath.c_str(), &dest_st) != 0)
+		if(EMU_STAT(rLocalPath.c_str(), &dest_st) != 0)
 		{
 			// The directory has probably been deleted, so
 			// just ignore this error. In a future scan, this
@@ -199,8 +199,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	std::vector<std::string> files;
 	bool downloadDirectoryRecordBecauseOfFutureFiles = false;
 
-	struct stat link_st;
-	if(::lstat(rLocalPath.c_str(), &link_st) != 0)
+	EMU_STRUCT_STAT link_st;
+	if(EMU_LSTAT(rLocalPath.c_str(), &link_st) != 0)
 	{
 		// Report the error (logs and 
 		// eventual email to administrator)
@@ -258,7 +258,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 			::memset(&checksum_info, 0, sizeof(checksum_info));
 	
 			struct dirent *en = 0;
-			struct stat file_st;
+			EMU_STRUCT_STAT file_st;
 			std::string filename;
 			while((en = ::readdir(dirHandle)) != 0)
 			{
@@ -292,7 +292,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				// prefer S_IFREG, S_IFDIR...
 				int type = en->d_type;
 				#else
-				if(::lstat(filename.c_str(), &file_st) != 0)
+				if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
 				{
 					// Report the error (logs and 
 					// eventual email to administrator)
@@ -387,7 +387,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				#ifdef WIN32
 				// We didn't stat the file before,
 				// but now we need the information.
-				if(::lstat(filename.c_str(), &file_st) != 0)
+				if(emu_stat(filename.c_str(), &file_st) != 0)
 				{
  					rNotifier.NotifyFileStatFailed(this, 
  							filename, 
@@ -687,8 +687,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		// BLOCK
 		{
 			// Stat the file
-			struct stat st;
-			if(::lstat(filename.c_str(), &st) != 0)
+			EMU_STRUCT_STAT st;
+			if(EMU_LSTAT(filename.c_str(), &st) != 0)
 			{
 				rNotifier.NotifyFileStatFailed(this, 
 					filename, strerror(errno));
@@ -757,8 +757,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					if(!isDir && isCurrentVersion)
 					{
 						// Check that the object we found in the ID map doesn't exist on disc
-						struct stat st;
-						if(::stat(localPotentialOldName.c_str(), &st) != 0 && errno == ENOENT)
+						EMU_STRUCT_STAT st;
+						if(EMU_STAT(localPotentialOldName.c_str(), &st) != 0 && errno == ENOENT)
 						{
 							// Doesn't exist locally, but does exist on the server.
 							// Therefore we can safely rename it to this new file.
@@ -1278,8 +1278,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 						if(isDir && isCurrentVersion)
 						{
 							// Check that the object doesn't exist already
-							struct stat st;
-							if(::stat(localPotentialOldName.c_str(), &st) != 0 && errno == ENOENT)
+							EMU_STRUCT_STAT st;
+							if(EMU_STAT(localPotentialOldName.c_str(), &st) != 0 && errno == ENOENT)
 							{
 								// Doesn't exist locally, but does exist on the server.
 								// Therefore we can safely rename it.

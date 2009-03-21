@@ -25,28 +25,28 @@
 
 bool TestFileExists(const char *Filename)
 {
-	struct stat st;
-	return ::stat(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == 0;
+	EMU_STRUCT_STAT st;
+	return EMU_STAT(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == 0;
 }
 
 bool TestFileNotEmpty(const char *Filename)
 {
-	struct stat st;
-	return ::stat(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == 0 &&
+	EMU_STRUCT_STAT st;
+	return EMU_STAT(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == 0 &&
 		st.st_size > 0;
 }
 
 bool TestDirExists(const char *Filename)
 {
-	struct stat st;
-	return ::stat(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == S_IFDIR;
+	EMU_STRUCT_STAT st;
+	return EMU_STAT(Filename, &st) == 0 && (st.st_mode & S_IFDIR) == S_IFDIR;
 }
 
 // -1 if doesn't exist
 int TestGetFileSize(const char *Filename)
 {
-	struct stat st;
-	if(::stat(Filename, &st) == 0)
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(Filename, &st) == 0)
 	{
 		return st.st_size;
 	}

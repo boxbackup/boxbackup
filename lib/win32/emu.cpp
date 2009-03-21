@@ -21,149 +21,9 @@
 #include <sstream>
 
 // message resource definitions for syslog()
-
 #include "messages.h"
 
-// our implementation for a timer, based on a 
-// simple thread which sleeps for a period of time
-
-static bool gTimerInitialised = false;
-static bool gFinishTimer;
-static CRITICAL_SECTION gLock;
-
 DWORD winerrno;
-
-typedef struct 
-{
-	int countDown;
-	int interval;
-}
-Timer_t;
-
-std::list<Timer_t> gTimerList;
-static void (__cdecl *gTimerFunc) (int) = NULL;
-
-int setitimer(int type, struct itimerval *timeout, void *arg)
-{
-	assert(gTimerInitialised);
-	
-	if (ITIMER_REAL != type)
-	{
-		errno = ENOSYS;
-		return -1;
-	}
-
-	EnterCriticalSection(&gLock);
-
-	// we only need seconds for the mo!
-	if (timeout->it_value.tv_sec  == 0 && 
-	    timeout->it_value.tv_usec == 0)
-	{
-		gTimerList.clear();
-	}
-	else
-	{
-		Timer_t ourTimer;
-		ourTimer.countDown = timeout->it_value.tv_sec;
-		ourTimer.interval  = timeout->it_interval.tv_sec;
-		gTimerList.push_back(ourTimer);
-	}
-
-	LeaveCriticalSection(&gLock);
-	
-	// indicate success
-	return 0;
-}
-
-static unsigned int WINAPI RunTimer(LPVOID lpParameter)
-{
-	gFinishTimer = false;
-
-	while (!gFinishTimer)
-	{
-		std::list<Timer_t>::iterator it;
-		EnterCriticalSection(&gLock);
-
-		for (it = gTimerList.begin(); it != gTimerList.end(); it++)
-		{
-			Timer_t& rTimer(*it);
-
-			rTimer.countDown --;
-			if (rTimer.countDown == 0)
-			{
-				if (gTimerFunc != NULL)
-				{
-					gTimerFunc(0);
-				}
-				if (rTimer.interval)
-				{
-					rTimer.countDown = rTimer.interval;
-				}
-				else
-				{
-					// mark for deletion
-					rTimer.countDown = -1;
-				}
-			}
-		}
-
-		for (it = gTimerList.begin(); it != gTimerList.end(); it++)
-		{
-			Timer_t& rTimer(*it);
-
-			if (rTimer.countDown == -1)
-			{
-				gTimerList.erase(it);
-				
-				// the iterator is now invalid, so restart search
-				it = gTimerList.begin();
-
-				// if the list is now empty, don't try to increment 
-				// the iterator again
-				if (it == gTimerList.end()) break;
-			}
-		}
-
-		LeaveCriticalSection(&gLock);
-		// we only need to have a 1 second resolution
-		Sleep(1000);
-	}
-
-	return 0;
-}
-
-int SetTimerHandler(void (__cdecl *func ) (int))
-{
-	gTimerFunc = func;
-	return 0;
-}
-
-void InitTimer(void)
-{
-	assert(!gTimerInitialised);
-
-	InitializeCriticalSection(&gLock);
-	
-	// create our thread
-	HANDLE ourThread = (HANDLE)_beginthreadex(NULL, 0, RunTimer, 0, 
-		CREATE_SUSPENDED, NULL);
-	SetThreadPriority(ourThread, THREAD_PRIORITY_LOWEST);
-	ResumeThread(ourThread);
-
-	gTimerInitialised = true;
-}
-
-void FiniTimer(void)
-{
-	assert(gTimerInitialised);
-	gFinishTimer = true;
-	EnterCriticalSection(&gLock);
-	DeleteCriticalSection(&gLock);
-	gTimerInitialised = false;
-}
-
-//Our constants we need to keep track of
-//globals
 struct passwd gTempPasswd;
 
 bool EnableBackupRights()
@@ -715,11 +575,13 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 //
 // Function
 //		Name:    emu_fstat
-//		Purpose: replacement for fstat supply a windows handle
+//		Purpose: replacement for fstat. Supply a windows handle.
+//			 Returns a struct emu_stat to have room for 64-bit
+//			 file identifier in st_ino (mingw allows only 16!)
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int emu_fstat(HANDLE hdir, struct stat * st)
+int emu_fstat(HANDLE hdir, struct emu_stat * st)
 {
 	if (hdir == INVALID_HANDLE_VALUE)
 	{
@@ -751,7 +613,7 @@ int emu_fstat(HANDLE hdir, struct stat * st)
 	ULARGE_INTEGER conv;
 	conv.HighPart = fi.nFileIndexHigh;
 	conv.LowPart  = fi.nFileIndexLow;
-	st->st_ino = (_ino_t)conv.QuadPart;
+	st->st_ino = conv.QuadPart;
 
 	// get the time information
 	st->st_ctime = ConvertFileTimeToTime_t(&fi.ftCreationTime);
@@ -898,12 +760,14 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 //
 // Function
 //		Name:    emu_stat 
-//		Purpose: replacement for the lstat and stat functions, 
-//			works with unicode filenames supplied in utf8 format
+//		Purpose: replacement for the lstat and stat functions. 
+//			 Works with unicode filenames supplied in utf8.
+//			 Returns a struct emu_stat to have room for 64-bit
+//			 file identifier in st_ino (mingw allows only 16!)
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int emu_stat(const char * pName, struct stat * st)
+int emu_stat(const char * pName, struct emu_stat * st)
 {
 	HANDLE handle = OpenFileByNameUtf8(pName, 
 		FILE_READ_ATTRIBUTES | FILE_READ_EA);

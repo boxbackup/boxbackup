@@ -38,10 +38,6 @@
 		// must define this before importing <sys/types.h>
 		#define __MSVCRT_VERSION__ 0x0601
 	#endif
-
-	// stop sys/types.h from defining its own ino_t as short,
-	// because we want a bigger one :)
-	#define _INO_T_
 #endif
 
 #ifdef HAVE_SYS_TYPES_H

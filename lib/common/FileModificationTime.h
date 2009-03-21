@@ -14,7 +14,7 @@
 
 #include "BoxTime.h"
 
-inline box_time_t FileModificationTime(struct stat &st)
+inline box_time_t FileModificationTime(EMU_STRUCT_STAT &st)
 {
 #ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
@@ -26,7 +26,7 @@ inline box_time_t FileModificationTime(struct stat &st)
 	return datamodified;
 }
 
-inline box_time_t FileAttrModificationTime(struct stat &st)
+inline box_time_t FileAttrModificationTime(EMU_STRUCT_STAT &st)
 {
 	box_time_t statusmodified =
 #ifdef HAVE_STRUCT_STAT_ST_MTIMESPEC
@@ -45,7 +45,7 @@ inline box_time_t FileAttrModificationTime(struct stat &st)
 	return statusmodified;
 }
 
-inline box_time_t FileModificationTimeMaxModAndAttr(struct stat &st)
+inline box_time_t FileModificationTimeMaxModAndAttr(EMU_STRUCT_STAT &st)
 {
 #ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);

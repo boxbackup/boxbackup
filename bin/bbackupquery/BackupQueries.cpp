@@ -914,8 +914,8 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	}
 	
 	// Does file exist?
-	struct stat st;
-	if(::stat(args[1].c_str(), &st) == 0 || errno != ENOENT)
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(args[1].c_str(), &st) == 0 || errno != ENOENT)
 	{
 		BOX_ERROR("The local file '" << args[1] << " already exists.");
 		return;
@@ -1146,8 +1146,8 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	}
 	
 	// Does local file already exist? (don't want to overwrite)
-	struct stat st;
-	if(::stat(localName.c_str(), &st) == 0 || errno != ENOENT)
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(localName.c_str(), &st) == 0 || errno != ENOENT)
 	{
 		BOX_ERROR("The local file " << localName << " already exists, "
 			"will not overwrite it.");
@@ -1227,8 +1227,8 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		std::string syncTimeFilename(mrConfiguration.GetKeyValue("DataDirectory") + DIRECTORY_SEPARATOR_ASCHAR);
 		syncTimeFilename += "last_sync_start";
 		// Stat it to get file time
-		struct stat st;
-		if(::stat(syncTimeFilename.c_str(), &st) == 0)
+		EMU_STRUCT_STAT st;
+		if(EMU_STAT(syncTimeFilename.c_str(), &st) == 0)
 		{
 			// Files modified after this time shouldn't be on the server, so report errors slightly differently
 			LatestFileUploadTime = FileModificationTime(st) -
@@ -1404,8 +1404,8 @@ void BackupQueries::Compare(const std::string &rStoreDir,
 	{
 		bool modifiedAfterLastSync = false;
 		
-		struct stat st;
-		if(::stat(rLocalDir.c_str(), &st) == 0)
+		EMU_STRUCT_STAT st;
+		if(EMU_STAT(rLocalDir.c_str(), &st) == 0)
 		{
 			if(FileAttrModificationTime(st) >
 				rParams.LatestFileUploadTime())
@@ -1439,8 +1439,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 	rParams.NotifyDirComparing(rLocalDir, rStoreDir);
 
 	// Get info on the local directory
-	struct stat st;
-	if(::lstat(rLocalDir.c_str(), &st) != 0)
+	EMU_STRUCT_STAT st;
+	if(EMU_LSTAT(rLocalDir.c_str(), &st) != 0)
 	{
 		// What kind of error?
 		if(errno == ENOTDIR || errno == ENOENT)
@@ -1494,8 +1494,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 		{
 			bool modifiedAfterLastSync = false;
 			
-			struct stat st;
-			if(::stat(rLocalDir.c_str(), &st) == 0)
+			EMU_STRUCT_STAT st;
+			if(EMU_STAT(rLocalDir.c_str(), &st) == 0)
 			{
 				if(FileAttrModificationTime(st) >
 					rParams.LatestFileUploadTime())
@@ -1547,8 +1547,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 #ifndef HAVE_VALID_DIRENT_D_TYPE
 			std::string fn(MakeFullPath
 				(rLocalDir, localDirEn->d_name));
-			struct stat st;
-			if(::lstat(fn.c_str(), &st) != 0)
+			EMU_STRUCT_STAT st;
+			if(EMU_LSTAT(fn.c_str(), &st) != 0)
 			{
 			    THROW_EXCEPTION(CommonException, OSFileError)
 			}
@@ -1638,8 +1638,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			{				
 				int64_t fileSize = 0;
 
-				struct stat st;
-				if(::stat(localPath.c_str(), &st) == 0)
+				EMU_STRUCT_STAT st;
+				if(EMU_STAT(localPath.c_str(), &st) == 0)
 				{
 					fileSize = st.st_size;
 				}
@@ -1771,8 +1771,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			{
 				bool modifiedAfterLastSync = false;
 				
-				struct stat st;
-				if(::stat(localPath.c_str(), &st) == 0)
+				EMU_STRUCT_STAT st;
+				if(EMU_STAT(localPath.c_str(), &st) == 0)
 				{
 					if(FileModificationTime(st) >
 						rParams.LatestFileUploadTime())
@@ -1845,8 +1845,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				bool modifiedAfterLastSync = false;
 				
 				// Check the dir modification time
-				struct stat st;
-				if(::stat(localPath.c_str(), &st) == 0 &&
+				EMU_STRUCT_STAT st;
+				if(EMU_STAT(localPath.c_str(), &st) == 0 &&
 					FileModificationTime(st) >
 					rParams.LatestFileUploadTime())
 				{
