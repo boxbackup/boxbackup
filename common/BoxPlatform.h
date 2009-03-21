@@ -172,8 +172,9 @@
 
 #ifdef WIN32
 	#define WIN32_LEAN_AND_MEAN
-	#include "emu.h"
 #endif
+
+#include "emu.h"
 
 // Solaris has no dirfd(x) macro or function, and we need one for
 // intercept tests. We cannot define macros with arguments directly 
