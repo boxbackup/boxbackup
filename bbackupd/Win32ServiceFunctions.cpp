@@ -203,7 +203,7 @@ int InstallService(const char* pConfigFileName, const std::string& rServiceName)
 {
 	if (pConfigFileName != NULL)
 	{
-		struct stat st;
+		EMU_STRUCT_STAT st;
 
 		if (emu_stat(pConfigFileName, &st) != 0)
 		{
