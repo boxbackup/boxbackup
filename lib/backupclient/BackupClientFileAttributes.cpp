@@ -302,8 +302,8 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 	StreamableMemBlock *pnewAttr = 0;
 	try
 	{
-		struct stat st;
-		if(::lstat(Filename, &st) != 0)
+		EMU_STRUCT_STAT st;
+		if(EMU_LSTAT(Filename, &st) != 0)
 		{
 			BOX_LOG_SYS_ERROR("Failed to stat file: '" <<
 				Filename << "'");
@@ -395,7 +395,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroM
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st, bool ZeroModificationTimes)
+void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, EMU_STRUCT_STAT &st, bool ZeroModificationTimes)
 {
 	outputBlock.ResizeBlock(sizeof(attr_StreamFormat));
 	attr_StreamFormat *pattr = (attr_StreamFormat*)outputBlock.GetBuffer();
@@ -1037,7 +1037,7 @@ void BackupClientFileAttributes::SetAttributeHashSecret(const void *pSecret, int
 //		Created: 25/4/04
 //
 // --------------------------------------------------------------------------
-uint64_t BackupClientFileAttributes::GenerateAttributeHash(struct stat &st, const std::string &filename, const std::string &leafname)
+uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, const std::string &filename, const std::string &leafname)
 {
 	if(sAttributeHashSecretLength == 0)
 	{

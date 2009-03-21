@@ -258,9 +258,9 @@ void finish_with_write_xattr_test()
 
 bool attrmatch(const char *f1, const char *f2)
 {
-	struct stat s1, s2;
-	TEST_THAT(::lstat(f1, &s1) == 0);
-	TEST_THAT(::lstat(f2, &s2) == 0);
+	EMU_STRUCT_STAT s1, s2;
+	TEST_THAT(EMU_LSTAT(f1, &s1) == 0);
+	TEST_THAT(EMU_LSTAT(f2, &s2) == 0);
 
 #ifdef HAVE_SYS_XATTR_H
 	{
@@ -2027,6 +2027,8 @@ int test_bbackupd()
 		printf("\n==== Check that read-only directories and "
 			"their contents can be restored.\n");
 
+		int compareReturnValue;
+
 		{
 			#ifdef WIN32
 				TEST_THAT(::system("chmod 0555 testfiles/"
@@ -2039,7 +2041,7 @@ int test_bbackupd()
 			wait_for_sync_end(); // too new
 			wait_for_sync_end(); // should be backed up now
 
-			int compareReturnValue = ::system(BBACKUPQUERY " "
+			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-Wwarning "
 				"-c testfiles/bbackupd.conf "
 				"\"compare -cEQ Test1 testfiles/TestDir1\" " 
@@ -2082,8 +2084,6 @@ int test_bbackupd()
 			#endif
 
 		}
-
-		int compareReturnValue;
 
 #ifdef WIN32
 		printf("\n==== Check that filenames in UTF-8 "

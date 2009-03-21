@@ -130,8 +130,8 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 {
 	// Is it a symlink?
 	{
-		struct stat st;
-		if(::lstat(Filename, &st) != 0)
+		EMU_STRUCT_STAT st;
+		if(EMU_LSTAT(Filename, &st) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}

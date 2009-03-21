@@ -163,8 +163,8 @@ void DumpStackBacktrace()
 // --------------------------------------------------------------------------
 bool FileExists(const char *Filename, int64_t *pFileSize, bool TreatLinksAsNotExisting)
 {
-	struct stat st;
-	if(::lstat(Filename, &st) != 0)
+	EMU_STRUCT_STAT st;
+	if(EMU_LSTAT(Filename, &st) != 0)
 	{
 		if(errno == ENOENT)
 		{
@@ -208,8 +208,8 @@ bool FileExists(const char *Filename, int64_t *pFileSize, bool TreatLinksAsNotEx
 // --------------------------------------------------------------------------
 int ObjectExists(const std::string& rFilename)
 {
-	struct stat st;
-	if(::stat(rFilename.c_str(), &st) != 0)
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(rFilename.c_str(), &st) != 0)
 	{
 		if(errno == ENOENT)
 		{

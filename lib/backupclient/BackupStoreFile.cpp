@@ -272,8 +272,8 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFilename, int Timeout, const BackupClientFileAttributes *pAlterativeAttr)
 {
 	// Does file exist?
-	struct stat st;
-	if(::stat(DecodedFilename, &st) == 0)
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(DecodedFilename, &st) == 0)
 	{
 		THROW_EXCEPTION(BackupStoreException, OutputFileAlreadyExists)
 	}
@@ -1260,8 +1260,8 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 	// is it a symlink?
 	bool sourceIsSymlink = false;
 	{
-		struct stat st;
-		if(::lstat(Filename, &st) == -1)
+		EMU_STRUCT_STAT st;
+		if(EMU_LSTAT(Filename, &st) == -1)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}

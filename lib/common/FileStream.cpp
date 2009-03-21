@@ -224,8 +224,8 @@ int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 IOStream::pos_type FileStream::BytesLeftToRead()
 {
-	struct stat st;
-	if(::fstat(mOSFileHandle, &st) != 0)
+	EMU_STRUCT_STAT st;
+	if(EMU_FSTAT(mOSFileHandle, &st) != 0)
 	{
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}

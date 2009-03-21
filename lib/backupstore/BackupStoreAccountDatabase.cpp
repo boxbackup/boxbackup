@@ -208,8 +208,8 @@ void BackupStoreAccountDatabase::CheckUpToDate() const
 // --------------------------------------------------------------------------
 box_time_t BackupStoreAccountDatabase::GetDBFileModificationTime() const
 {
-	struct stat st;
-	if(::stat(pImpl->mFilename.c_str(), &st) == -1)
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(pImpl->mFilename.c_str(), &st) == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}

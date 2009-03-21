@@ -15,7 +15,7 @@
 #include "StreamableMemBlock.h"
 #include "BoxTime.h"
 
-struct stat;
+EMU_STRUCT_STAT; // declaration
 
 // --------------------------------------------------------------------------
 //
@@ -53,11 +53,13 @@ public:
 	static void SetBlowfishKey(const void *pKey, int KeyLength);
 	static void SetAttributeHashSecret(const void *pSecret, int SecretLength);
 	
-	static uint64_t GenerateAttributeHash(struct stat &st, const std::string &filename, const std::string &leafname);
+	static uint64_t GenerateAttributeHash(EMU_STRUCT_STAT &st, const std::string &filename, const std::string &leafname);
 	static void FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename);
 
 private:
-	static void FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st, bool ZeroModificationTimes);
+	static void FillAttributes(StreamableMemBlock &outputBlock,
+		const char *Filename, EMU_STRUCT_STAT &st,
+		bool ZeroModificationTimes);
 	static void FillAttributesLink(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st);
 	void WriteExtendedAttr(const char *Filename, int xattrOffset) const;
 
