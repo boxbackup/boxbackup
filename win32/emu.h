@@ -1,5 +1,17 @@
 // emulates unix syscalls to win32 functions
 
+#ifdef WIN32
+	#define EMU_STRUCT_STAT struct emu_stat
+	#define EMU_STAT  emu_stat
+	#define EMU_FSTAT emu_fstat
+	#define EMU_LSTAT emu_stat
+#else
+	#define EMU_STRUCT_STAT struct stat
+	#define EMU_STAT  ::stat
+	#define EMU_FSTAT ::fstat
+	#define EMU_LSTAT ::lstat
+#endif
+
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
@@ -25,17 +37,9 @@
 
 #ifdef __MINGW32__
 	typedef uint32_t u_int32_t;
-	typedef uint64_t _ino_t;
-	typedef _ino_t ino_t;
-	#define _INO_T_
 #else
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
-
-	// must define _INO_T_DEFINED before including <sys/types.h>
-	// to replace it with our own.
-	typedef u_int64_t _ino_t;
-	#define _INO_T_DEFINED
 #endif
 
 // set up to include the necessary parts of Windows headers
@@ -80,11 +84,6 @@
 #define lseek(fd,off,whence)  _lseek(fd,off,whence)
 #define fileno(struct_file)   _fileno(struct_file)
 #endif
-
-int SetTimerHandler(void (__cdecl *func ) (int));
-int setitimer(int type, struct itimerval *timeout, void *arg);
-void InitTimer(void);
-void FiniTimer(void);
 
 struct passwd {
 	char *pw_name;
@@ -186,13 +185,6 @@ inline int geteuid(void)
 #endif // !__MINGW32__
 
 #define timespec timeval
-
-//not available in win32
-struct itimerval
-{
-	timeval 	it_interval;
-	timeval 	it_value;
-};
 
 //win32 deals in usec not nsec - so need to ensure this follows through
 #define tv_nsec tv_usec 
@@ -313,27 +305,19 @@ struct statfs
 	TCHAR f_mntonname[MAX_PATH];
 };
 
-#if 0
-// I think this should get us going
-// Although there is a warning about 
-// mount points in win32 can now exists - which means inode number can be 
-// duplicated, so potential of a problem - perhaps this needs to be 
-// implemented with a little more thought... TODO
-
-struct stat {
-	//_dev_t st_dev;
-	u_int64_t st_ino;
+struct emu_stat {
+	int st_dev;
+	uint64_t st_ino;
 	DWORD st_mode;
 	short st_nlink;
 	short st_uid;
 	short st_gid;
 	//_dev_t st_rdev;
-	u_int64_t st_size;
+	uint64_t st_size;
 	time_t st_atime;
 	time_t st_mtime;
 	time_t st_ctime;
 };
-#endif // 0
 
 // need this for conversions
 time_t ConvertFileTimeToTime_t(FILETIME *fileTime);
@@ -342,8 +326,8 @@ bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 int   emu_chdir  (const char* pDirName);
 int   emu_mkdir  (const char* pPathName);
 int   emu_unlink (const char* pFileName);
-int   emu_fstat  (HANDLE file,       struct stat* st);
-int   emu_stat   (const char* pName, struct stat* st);
+int   emu_fstat  (HANDLE file,       struct emu_stat* st);
+int   emu_stat   (const char* pName, struct emu_stat* st);
 int   emu_utimes (const char* pName, const struct timeval[]);
 int   emu_chmod  (const char* pName, mode_t mode);
 char* emu_getcwd (char* pBuffer,     int BufSize);
@@ -352,13 +336,21 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 #define chdir(directory)        emu_chdir  (directory)
 #define mkdir(path,     mode)   emu_mkdir  (path)
 #define unlink(file)            emu_unlink (file)
-#define stat(filename,  struct) emu_stat   (filename, struct)
-#define lstat(filename, struct) emu_stat   (filename, struct)
-#define fstat(handle,   struct) emu_fstat  (handle,   struct)
 #define utimes(buffer,  times)  emu_utimes (buffer,   times)
 #define chmod(file,     mode)   emu_chmod  (file,     mode)
 #define getcwd(buffer,  size)   emu_getcwd (buffer,   size)
 #define rename(oldname, newname) emu_rename (oldname, newname)
+
+// Not safe to replace stat/fstat/lstat on mingw at least, as struct stat
+// has a 16-bit st_ino and we need a 64-bit one.
+//
+// #define stat(filename,  struct) emu_stat   (filename, struct)
+// #define lstat(filename, struct) emu_stat   (filename, struct)
+// #define fstat(handle,   struct) emu_fstat  (handle,   struct)
+//
+// But lstat doesn't exist on Windows, so we have to provide something:
+
+#define lstat(filename, struct) stat(filename, struct)
 
 int statfs(const char * name, struct statfs * s);
 

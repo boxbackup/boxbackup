@@ -962,9 +962,9 @@ void Daemon::SetProcessTitle(const char *format, ...)
 
 box_time_t Daemon::GetConfigFileModifiedTime() const
 {
-	struct stat st;
+	EMU_STRUCT_STAT st;
 
-	if(::stat(GetConfigFileName().c_str(), &st) != 0)
+	if(EMU_STAT(GetConfigFileName().c_str(), &st) != 0)
 	{
 		if (errno == ENOENT)
 		{
