@@ -71,6 +71,7 @@ then run:
 
 to complete the build. Finally:
 
+	cp .libs/libpcre.a /usr/local/i386-pc-mingw32/lib
 	cp .libs/libpcreposix.a /usr/local/i386-pc-mingw32/lib
 	cp pcreposix.h /usr/local/i386-pc-mingw32/include
 
