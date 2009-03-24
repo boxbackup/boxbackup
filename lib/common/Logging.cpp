@@ -216,6 +216,11 @@ void Logging::SetProgramName(const std::string& rProgramName)
 	}
 }
 
+void Logging::SetFacility(int facility)
+{
+	spSyslog->SetFacility(facility);
+}
+
 Logger::Logger() 
 : mCurrentLevel(Log::EVERYTHING) 
 {
@@ -390,9 +395,9 @@ bool Syslog::Log(Log::Level level, const std::string& rFile,
 	return true;
 }
 
-Syslog::Syslog()
+Syslog::Syslog() : mFacility(LOG_LOCAL6)
 {
-	::openlog("Box Backup", LOG_PID, LOG_LOCAL6);
+	::openlog("Box Backup", LOG_PID, mFacility);
 }
 
 Syslog::~Syslog()
@@ -404,7 +409,32 @@ void Syslog::SetProgramName(const std::string& rProgramName)
 {
 	mName = rProgramName;
 	::closelog();
-	::openlog(mName.c_str(), LOG_PID, LOG_LOCAL6);
+	::openlog(mName.c_str(), LOG_PID, mFacility);
+}
+
+void Syslog::SetFacility(int facility)
+{
+	mFacility = facility;
+	::closelog();
+	::openlog(mName.c_str(), LOG_PID, mFacility);
+}
+
+int Syslog::GetNamedFacility(const std::string& rFacility)
+{
+	#define CASE_RETURN(x) if (rFacility == #x) { return LOG_ ## x; }
+	CASE_RETURN(LOCAL0)
+	CASE_RETURN(LOCAL1)
+	CASE_RETURN(LOCAL2)
+	CASE_RETURN(LOCAL3)
+	CASE_RETURN(LOCAL4)
+	CASE_RETURN(LOCAL5)
+	CASE_RETURN(LOCAL6)
+	CASE_RETURN(DAEMON)
+	#undef CASE_RETURN
+
+	BOX_ERROR("Unknown log facility '" << rFacility << "', "
+		"using default LOCAL6");
+	return LOG_LOCAL6;
 }
 
 bool FileLogger::Log(Log::Level Level, const std::string& rFile, 

@@ -105,6 +105,7 @@ private:
 
 #define DAEMON_VERIFY_SERVER_KEYS \
 	ConfigurationVerifyKey("PidFile", ConfigTest_Exists), \
+	ConfigurationVerifyKey("LogFacility", 0), \
 	ConfigurationVerifyKey("User", ConfigTest_LastEntry)
 
 #endif // DAEMON__H
