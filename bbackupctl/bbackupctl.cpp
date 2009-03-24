@@ -10,11 +10,12 @@
 #include "Box.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
+
+#include <cstdlib>
 
 #include "MainHelper.h"
 #include "BoxPortsAndFiles.h"
