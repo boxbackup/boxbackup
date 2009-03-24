@@ -12,7 +12,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include <sys/stat.h>
@@ -26,10 +25,11 @@
 	#include <dirent.h>
 #endif
 
-#include <stdio.h>
-#include <string.h>
-#include <memory>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <map>
+#include <memory>
 
 #include "RaidFileRead.h"
 #include "RaidFileException.h"

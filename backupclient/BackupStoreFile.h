@@ -10,8 +10,7 @@
 #ifndef BACKUPSTOREFILE__H
 #define BACKUPSTOREFILE__H
 
-#include <stdlib.h>
-
+#include <cstdlib>
 #include <memory>
 
 #include "BackupClientFileAttributes.h"
