@@ -10,7 +10,6 @@
 #include "Box.h"
 
 #include <errno.h>
-#include <string.h>
 #include <time.h>
 
 #ifdef HAVE_SYSLOG_H
@@ -20,6 +19,7 @@
 	#include <unistd.h>
 #endif
 
+#include <cstring>
 #include <iomanip>
 
 #include "BoxTime.h"

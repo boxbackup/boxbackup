@@ -15,6 +15,7 @@
 #include "Box.h"
 
 #include <signal.h>
+#include <cstring>
 
 #include "Timer.h"
 #include "Logging.h"

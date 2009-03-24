@@ -10,7 +10,7 @@
 #ifndef WAITFOREVENT__H
 #define WAITFOREVENT__H
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #ifdef HAVE_KQUEUE
 	#include <sys/event.h>

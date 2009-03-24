@@ -15,7 +15,6 @@
 
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #ifdef HAVE_SYS_TYPES_H
 	#include <sys/types.h>
@@ -37,6 +36,8 @@
 		#include <history.h>
 	#endif
 #endif
+
+#include <cstdlib>
 
 #include "MainHelper.h"
 #include "BoxPortsAndFiles.h"
