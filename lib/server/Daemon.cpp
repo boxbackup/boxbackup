@@ -480,6 +480,13 @@ int Daemon::Main(const std::string &rConfigFileName)
 		const Configuration &serverConfig(
 			mapConfiguration->GetSubConfiguration("Server"));
 
+		if(serverConfig.KeyExists("LogFacility"))
+		{
+			std::string facility =
+				serverConfig.GetKeyValue("LogFacility");
+			Logging::SetFacility(Syslog::GetNamedFacility(facility));
+		}
+
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
