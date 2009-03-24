@@ -202,6 +202,7 @@ class Syslog : public Logger
 {
 	private:
 	std::string mName;
+	int mFacility;
 
 	public:
 	Syslog();
@@ -211,6 +212,8 @@ class Syslog : public Logger
 		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Syslog"; }
 	virtual void SetProgramName(const std::string& rProgramName);
+	virtual void SetFacility(int facility);
+	static int GetNamedFacility(const std::string& rFacility);
 };
 
 // --------------------------------------------------------------------------
@@ -260,6 +263,7 @@ class Logging
 	}
 	static void SetProgramName(const std::string& rProgramName);
 	static std::string GetProgramName() { return sProgramName; }
+	static void SetFacility(int facility);
 
 	class Guard
 	{
