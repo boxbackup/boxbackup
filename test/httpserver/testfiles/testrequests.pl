@@ -9,7 +9,7 @@ my $ua = LWP::UserAgent->new(env_proxy => 0, keep_alive => 1, timeout => 30);
 print "GET request...\n";
 
 my $response1 = $ua->get("$url_base/test-one/34/341s/234?p1=vOne&p2=vTwo");
-exit 1 unless $response1->is_success();
+die $response1->content unless $response1->is_success();
 
 my $content = $response1->content();
 
