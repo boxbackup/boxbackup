@@ -13,7 +13,6 @@
 	#include <unistd.h>
 #endif
 
-#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -25,10 +24,11 @@
 	#include <dirent.h>
 #endif
 
-#include <set>
+#include <cstring>
 #include <limits>
 #include <iostream>
 #include <ostream>
+#include <set>
 
 #include "BackupClientFileAttributes.h"
 #include "BackupClientMakeExcludeList.h"
