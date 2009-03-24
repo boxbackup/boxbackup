@@ -10,6 +10,7 @@
 #ifndef BOXBACKUPCOMPAREPARAMS__H
 #define BOXBACKUPCOMPAREPARAMS__H
 
+#include <memory>
 #include <string>
 
 #include "BoxTime.h"
