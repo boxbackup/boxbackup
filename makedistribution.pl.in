@@ -7,7 +7,9 @@ use Symbol;
 my %comment_chars = ('cpp' => '// ', 'h' => '// ', 'pl' => '# ', 'pm' => '# ', '' => '# ');
 
 # other extensions which need text copying, just to remove the private stuff
-my %text_files = ('txt' => 1, 'spec' => 1);
+# .in is included here, as these could be any kind of source, but clearly
+# they have text substitutions run on them by autoconf, so we can too :)
+my %text_files = ('txt' => 1, 'spec' => 1, 'in' => 1);
 
 # files which don't get the license added
 my %no_license = (); # 'filename' => 1
@@ -189,9 +191,9 @@ sub copy_file
 	# licensed or not?
 	if(exists $comment_chars{$ext} && !exists $no_license{$fn} && $license_in_dir)
 	{
-		my $b = $comment_chars{$ext};
-
 		# copy as text, inserting license
+		# print "source copy $fn to $base_name/$dst_fn\n";
+
 		my $in = gensym;
 		open $in,$fn;
 		open OUT,">$base_name/$dst_fn";
@@ -204,6 +206,7 @@ sub copy_file
 		}
 		
 		# write license
+		my $b = $comment_chars{$ext};
 		for(@license)
 		{
 			print OUT $b,$_,"\n"
@@ -225,31 +228,31 @@ sub copy_file
 		close OUT;
 		close $in;
 	}
+	elsif(exists $text_files{$ext})
+	{
+		# copy this as text, to remove private stuff
+		# print "text copy $fn to $base_name/$dst_fn\n";
+
+		my $in = gensym;
+		open $in,$fn;
+		open OUT,">$base_name/$dst_fn";
+
+		while(<$in>)
+		{
+			unless(skip_non_applicable_section($_, $in, $fn))
+			{
+				print OUT
+			}
+		}	
+
+		close OUT;
+		close $in;
+	}
 	else
 	{
-		if(exists $text_files{$ext})
-		{
-			# copy this as text, to remove private stuff
-			my $in = gensym;
-			open $in,$fn;
-			open OUT,">$base_name/$dst_fn";
-
-			while(<$in>)
-			{
-				unless(skip_non_applicable_section($_, $in, $fn))
-				{
-					print OUT
-				}
-			}	
-
-			close OUT;
-			close $in;
-		}
-		else
-		{
-			# copy as binary
-			system 'cp',$fn,"$base_name/$dst_fn"
-		}
+		# copy as binary
+		# print "binary copy $fn to $base_name/$dst_fn\n";
+		system 'cp',$fn,"$base_name/$dst_fn"
 	}
 	
 	# copy executable bit from src
