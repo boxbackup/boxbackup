@@ -29,7 +29,7 @@ docs/box-html/instguide docs/htmlguide/instguide
 docs/box-html/man-html docs/htmlguide/manpages
 docs/man
 MKDIR docs/docbook
-RUN cd docs; sed -i "" -e '/^ExceptionCodes/,/^$/s/\(.*\)/# &/' Makefile
+RUN cd docs; sed -i -e '/^ExceptionCodes/,/^$/s/\(.*\)/# &/' Makefile
 docs/Makefile docs/docbook/Makefile
 docs/ExceptionCodes.xml docs/docbook/ExceptionCodes.xml
 docs/adminguide.xml docs/docbook/adminguide.xml
