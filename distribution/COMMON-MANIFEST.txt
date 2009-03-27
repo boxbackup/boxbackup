@@ -19,6 +19,7 @@ docs/api-docs/common/lib_server docs/api-notes/lib_server
 MKDIR infrastructure
 infrastructure/buildenv-testmain-template.cpp
 infrastructure/makebuildenv.pl.in
+infrastructure/makedistribution.pl.in
 infrastructure/makeparcels.pl.in
 infrastructure/parcelpath.pl
 infrastructure/printversion.pl
