@@ -211,7 +211,7 @@ $dir/${name}.gz: docs/man/${name}.gz
 EOF
 			# Only build the docs if we're building from trunk.
 			# Releases have the docs pre-made.
-			print MAKE <<EOF if $product_version =~ /trunk_[0-9]+/;
+			print MAKE <<EOF;
 .PHONY: docs/man/${name}.gz
 docs/man/${name}.gz: docs/bb-man.xsl
 	(cd docs; \$(MAKE) $name)
