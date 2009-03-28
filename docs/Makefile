@@ -3,33 +3,39 @@
 # Process DocBook to HTML
 
 DBPROC=xsltproc
-BOOKXSL=bb-book.xsl
-NOCHUNKBOOKXSL=bb-nochunk-book.xsl
-MANXSL=bb-man.xsl
-HTMLPREFIX=box-html
-VPATH= adminguide
-.SUFFIXES: .html .xml .1 .5 .8
+
+DOCBOOK_DIR = docbook
+HTML_DIR = htmlguide
+MAN_DIR = man
+
+BOOKXSL = $(DOCBOOK_DIR)/bb-book.xsl
+NOCHUNKBOOKXSL = $(DOCBOOK_DIR)/bb-nochunk-book.xsl
+MANXSL = $(DOCBOOK_DIR)/bb-man.xsl
+
+# VPATH= adminguide
+# .SUFFIXES: .html .xml .1 .5 .8
 
 all: docs
 
 docs: instguide adminguide manpages
-	@mkdir -p $(HTMLPREFIX)/images
-	@cp html/images/*.png $(HTMLPREFIX)/images/.
-	@cp html/*.css $(HTMLPREFIX)/.
+	@mkdir -p $(HTML_DIR)/images
+	@cp $(DOCBOOK_DIR)/html/images/*.png $(HTML_DIR)/images/.
+	@cp $(DOCBOOK_DIR)/html/*.css $(HTML_DIR)/.
+	@cp $(DOCBOOK_DIR)/html/*.ico $(HTML_DIR)/.
 
-adminguide: $(HTMLPREFIX)/adminguide/index.html 
+adminguide: $(HTML_DIR)/adminguide/index.html 
 
-$(HTMLPREFIX)/adminguide/index.html: adminguide.xml ExceptionCodes.xml $(BOOKXSL)
+$(HTML_DIR)/adminguide/index.html: $(DOCBOOK_DIR)/adminguide.xml $(DOCBOOK_DIR)/ExceptionCodes.xml $(BOOKXSL)
 	# docname=`echo $@ | sed -e 's/\/index.html//'`
-	$(DBPROC) -o $(HTMLPREFIX)/adminguide/ $(BOOKXSL) adminguide.xml
+	$(DBPROC) -o $(HTML_DIR)/adminguide/ $(BOOKXSL) $<
 
-instguide: $(HTMLPREFIX)/instguide/index.html 
+instguide: $(HTML_DIR)/instguide/index.html 
 
-$(HTMLPREFIX)/instguide/index.html: instguide.xml $(BOOKXSL)
-	$(DBPROC) -o $(HTMLPREFIX)/instguide/ $(BOOKXSL) instguide.xml
+$(HTML_DIR)/instguide/index.html: $(DOCBOOK_DIR)/instguide.xml $(BOOKXSL)
+	$(DBPROC) -o $(HTML_DIR)/instguide/ $(BOOKXSL) $<
 
-ExceptionCodes.xml: ../ExceptionCodes.txt
-	perl ./generate_except_xml.pl
+$(DOCBOOK_DIR)/ExceptionCodes.xml: ../ExceptionCodes.txt
+	perl tools/generate_except_xml.pl $< $@
 
 manpages: $(MANXSL) man-dirs man-nroff man-html
 
@@ -45,46 +51,49 @@ $(MANXSL): $(MANXSL).tmpl
 	 fi; \
 	 sed -e "s,%%DOCBOOK%%,$${DOCBOOK}," $(MANXSL).tmpl > $(MANXSL)
 
-man-dirs: man/.there $(HTMLPREFIX)/man-html/.there
+man-dirs: man/.there $(HTML_DIR)/man-html/.there
 
-$(HTMLPREFIX)/man-html/.there:
-	if [ ! -d $(HTMLPREFIX)/man-html ]; then mkdir -p $(HTMLPREFIX)/man-html; touch $(HTMLPREFIX)/man-html/.there; fi
+$(HTML_DIR)/man-html/.there:
+	mkdir -p $(HTML_DIR)/man-html
+	touch $(HTML_DIR)/man-html/.there
 
 man/.there:
-	if [ ! -d man ]; then mkdir man; touch man/.there; fi
+	then mkdir -p man
+	touch man/.there
 
 NROFF_PAGES = bbackupd.8 bbackupd-config.8 bbackupctl.8 bbackupquery.8 \
 	bbstored.8 bbstored-config.8 bbstoreaccounts.8 bbstored-certs.8 \
 	raidfile-config.8 \
 	bbackupd.conf.5 bbstored.conf.5 raidfile.conf.5
 
-man-nroff: $(NROFF_PAGES)
+NROFF_FILES = $(NROFF_PAGES:%=$(MAN_DIR)/%.gz)
 
-HTML_PAGES = bbackupd.html bbackupd-config.html bbackupctl.html \
-	bbackupquery.html bbstored.html bbstored-config.html \
-	bbstoreaccounts.html bbstored-certs.html raidfile-config.html \
-	bbackupd.conf.html bbstored.conf.html raidfile.conf.html
+man-nroff: $(NROFF_FILES)
 
-man-html: $(HTML_PAGES)
+HTML_FILES_1 = $(NROFF_PAGES:%.5=%.html)
+HTML_FILES_2 = $(HTML_FILES_1:%.8=%.html)
+HTML_FILES   = $(HTML_FILES_2:%=$(HTML_DIR)/man-html/%)
 
-.xml.html:
-	@$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
-	@cp $@ $(HTMLPREFIX)/man-html/.
+man-html: $(HTML_FILES)
 
-.xml.8 .xml.5: $(MANXSL)
-	@$(DBPROC) -o $@ $(MANXSL) $<
-	@cp $@ man/
-	@rm -f man/$@.gz
-	@gzip -f -9 man/$@
+$(HTML_DIR)/man-html/%.html: $(DOCBOOK_DIR)/%.xml $(NOCHUNKBOOKXSL)
+	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
+
+$(MAN_DIR)/%.8.gz: $(DOCBOOK_DIR)/%.xml $(MANXSL)
+	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
+	gzip $(@:.gz=)
+
+$(MAN_DIR)/%.5.gz: $(DOCBOOK_DIR)/%.xml $(MANXSL)
+	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
+	gzip $(@:.gz=)
 
 dockit: clean docs
-	tar zcf documentation-kit-0.10.tar.gz $(HTMLPREFIX)/
+	tar zcf documentation-kit-0.10.tar.gz $(HTML_DIR)/
 
 clean:
-	if [ -d ./$(HTMLPREFIX) ]; then rm -rf $(HTMLPREFIX) ; fi
-	if [ -d ./man ]; then  rm -rf ./man/; fi
-	if [ -f ExceptionCodes.xml ]; then rm ExceptionCodes.xml; fi
-	rm -f $(NROFF_PAGES) $(HTML_PAGES)
-	if [ -f documentation-kit-0.10.tar.gz ]; then rm documentation-kit-0.10.tar.gz; fi
+	rm -f $(HTML_FILES)
+	rm -f $(NROFF_FILES)
+	rm -f $(DOCBOOK_DIR)/ExceptionCodes.xml
+	rm -f documentation-kit-0.10.tar.gz
 
 
