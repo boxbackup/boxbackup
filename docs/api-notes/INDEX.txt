@@ -19,12 +19,12 @@ In this directory, the files correspond to modules or areas of interest. Sub dir
 
 SUBTITLE Suggested reading order
 
-* lib_common
-* lib_server
-* bin_bbackupd
+* common/lib_common.txt
+* common/lib_server.txt
+* bin_bbackupd.txt
 * backup_encryption.txt
-* bin_bstored
-* lib_raidfile
+* bin_bbstored.txt
+* raidfile/lib_raidfile.txt
 
 and refer to other sections as required.
 
