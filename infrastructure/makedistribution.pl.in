@@ -115,6 +115,13 @@ sub copy_from_list
 		elsif($src eq 'NO-LICENSE')
 		{
 			$no_license{$dst} = 1;
+
+			# actually copy it, to remove redundancy in manifests
+			$src = $dst;
+			$dst = $other;
+			$dst = $src if $dst eq '';
+
+			copy_file($src,$dst);
 		}
 		elsif($src eq 'RUN')
 		{
@@ -252,7 +259,8 @@ sub copy_file
 	{
 		# copy as binary
 		# print "binary copy $fn to $base_name/$dst_fn\n";
-		system 'cp',$fn,"$base_name/$dst_fn"
+		my $cmd = "cp -p $fn $base_name/$dst_fn";
+		system($cmd) == 0 or die "copy failed: $cmd";
 	}
 	
 	# copy executable bit from src

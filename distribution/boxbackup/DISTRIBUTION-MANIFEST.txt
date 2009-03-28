@@ -22,15 +22,14 @@ test/backupdiff
 docs/Makefile
 docs/tools
 docs/api-notes
-docs/api-notes/lib_raidfile
+docs/api-notes/raidfile/lib_raidfile
 docs/htmlguide
 docs/htmlguide/adminguide
 docs/htmlguide/images
 docs/htmlguide/instguide
 docs/htmlguide/manpages
 docs/man
-# RUN cd docs; sed -i"" -e '/^ExceptionCodes/,/^$/s/\(.*\)/# &/' Makefile
-docs/docbook/Makefile
+MKDIR docs/docbook
 docs/docbook/ExceptionCodes.xml
 docs/docbook/adminguide.xml
 docs/docbook/bb-book.xsl
@@ -51,7 +50,6 @@ docs/docbook/raidfile-config.xml
 docs/docbook/raidfile.conf.xml
 docs/docbook/html
 docs/docbook/html/images
-# RUN svn revert docs/Makefile
 TODO.txt
 BUGS.txt
 contrib
