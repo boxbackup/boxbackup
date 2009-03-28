@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 use strict;
 
-open (EXCEPT, "<../ExceptionCodes.txt") or die "Can't open ../ExceptionCodes.txt: $!\n";
-open (DOCBOOK, ">ExceptionCodes.xml") or die "Can't open Exceptioncodes.xml for writing: $!\n";
+open (EXCEPT,  "< $ARGV[0]") or die "Can't open $ARGV[0]: $!\n";
+open (DOCBOOK, "> $ARGV[1]") or die "Can't open $ARGV[1] for writing: $!\n";
 
 print DOCBOOK <<EOD;
 <?xml version="1.0" encoding="UTF-8"?>
