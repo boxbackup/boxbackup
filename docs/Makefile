@@ -12,8 +12,8 @@ BOOKXSL = $(DOCBOOK_DIR)/bb-book.xsl
 NOCHUNKBOOKXSL = $(DOCBOOK_DIR)/bb-nochunk-book.xsl
 MANXSL = $(DOCBOOK_DIR)/bb-man.xsl
 
-# VPATH= adminguide
-# .SUFFIXES: .html .xml .1 .5 .8
+VPATH = $(DOCBOOK_DIR)
+.SUFFIXES: .html .xml .gz .1 .5 .8
 
 all: docs
 
@@ -23,19 +23,21 @@ docs: instguide adminguide manpages
 	@cp $(DOCBOOK_DIR)/html/*.css $(HTML_DIR)/.
 	@cp $(DOCBOOK_DIR)/html/*.ico $(HTML_DIR)/.
 
-adminguide: $(HTML_DIR)/adminguide/index.html 
+adminguide: $(DOCBOOK_DIR)/ExceptionCodes.xml $(HTML_DIR)/adminguide/index.html 
 
-$(HTML_DIR)/adminguide/index.html: $(DOCBOOK_DIR)/adminguide.xml $(DOCBOOK_DIR)/ExceptionCodes.xml $(BOOKXSL)
-	# docname=`echo $@ | sed -e 's/\/index.html//'`
-	$(DBPROC) -o $(HTML_DIR)/adminguide/ $(BOOKXSL) $<
+# all sources ($>) is exactly the right args for xsltproc
+$(HTML_DIR)/adminguide/index.html: $(BOOKXSL) $(DOCBOOK_DIR)/adminguide.xml
+	$(DBPROC) -o $(HTML_DIR)/adminguide/ $>
 
 instguide: $(HTML_DIR)/instguide/index.html 
 
-$(HTML_DIR)/instguide/index.html: $(DOCBOOK_DIR)/instguide.xml $(BOOKXSL)
-	$(DBPROC) -o $(HTML_DIR)/instguide/ $(BOOKXSL) $<
+$(HTML_DIR)/instguide/index.html: $(BOOKXSL) $(DOCBOOK_DIR)/instguide.xml
+	$(DBPROC) -o $(HTML_DIR)/instguide/ $>
 
+# $< is empty on BSD make when making this rule, $> has all sources
+# $< has the target on GNU make, $> is empty
 $(DOCBOOK_DIR)/ExceptionCodes.xml: ../ExceptionCodes.txt
-	perl tools/generate_except_xml.pl $< $@
+	perl tools/generate_except_xml.pl $< $> $@
 
 manpages: $(MANXSL) man-dirs man-nroff man-html
 
@@ -58,7 +60,7 @@ $(HTML_DIR)/man-html/.there:
 	touch $(HTML_DIR)/man-html/.there
 
 man/.there:
-	then mkdir -p man
+	mkdir -p man
 	touch man/.there
 
 NROFF_PAGES = bbackupd.8 bbackupd-config.8 bbackupctl.8 bbackupquery.8 \
@@ -76,16 +78,31 @@ HTML_FILES   = $(HTML_FILES_2:%=$(HTML_DIR)/man-html/%)
 
 man-html: $(HTML_FILES)
 
+# GNU make
 $(HTML_DIR)/man-html/%.html: $(DOCBOOK_DIR)/%.xml $(NOCHUNKBOOKXSL)
 	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
 
+# GNU make
 $(MAN_DIR)/%.8.gz: $(DOCBOOK_DIR)/%.xml $(MANXSL)
 	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
 	gzip $(@:.gz=)
 
+# GNU make
 $(MAN_DIR)/%.5.gz: $(DOCBOOK_DIR)/%.xml $(MANXSL)
 	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
 	gzip $(@:.gz=)
+
+# BSD make: the final colon (:) is required to make this line valid syntax
+# for a dummy rule in GNU make. It creates a dummy rule in BSD make too.
+# Both dummy rules are harmless.
+.for MAN_PAGE in $(NROFF_PAGES) :
+$(MAN_DIR)/$(MAN_PAGE).gz: $(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
+	$(DBPROC) -o $(.TARGET:.gz=) $(MANXSL) $>
+	gzip $(@:.gz=)
+
+$(HTML_DIR)/man-html/$(MAN_PAGE:R).html: $(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
+	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $>
+.endfor :
 
 dockit: clean docs
 	tar zcf documentation-kit-0.10.tar.gz $(HTML_DIR)/
