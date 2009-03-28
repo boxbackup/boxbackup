@@ -110,18 +110,20 @@ else
 {
 	print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
 }
-print MAKE "\trm -rf docs/*.[58] docs/bb-man.xsl docs/man\n" if $product_version =~ /trunk_[0-9]+/;
 
-print MAKE "\n";
+print MAKE <<__END_OF_FRAGMENT;
+	\$(MAKE) -C docs clean
 
-print MAKE "test:\trelease/common/test\n\nrelease/common/test:\n\t./runtest.pl ALL release\n\n";
+test:	release/common/test
 
-print MAKE <<EOF if $product_version =~ /trunk_[0-9]+/;
-.PHONY: docs/bb-man.xsl
-docs/bb-man.xsl:
-	(cd docs; \$(MAKE) bb-man.xsl; if [ ! -d man ]; then mkdir man; fi)
+release/common/test:
+	./runtest.pl ALL release
 
-EOF
+.PHONY: docs
+docs:
+	\$(MAKE) -C docs
+
+__END_OF_FRAGMENT
 
 my $release_flag = BoxPlatform::make_flag('RELEASE');
 
@@ -209,12 +211,12 @@ $dir/${name}.gz: docs/man/${name}.gz
 	cp -p docs/man/${name}.gz $dir
 
 EOF
-			# Only build the docs if we're building from trunk.
-			# Releases have the docs pre-made.
+			# Releases have the docs pre-made, but users
+			# may want to rebuild them for some reason.
 			print MAKE <<EOF;
 .PHONY: docs/man/${name}.gz
-docs/man/${name}.gz: docs/bb-man.xsl
-	(cd docs; \$(MAKE) $name)
+docs/man/${name}.gz:
+	\$(MAKE) -C docs man/${name}.gz
 
 EOF
 			push @parcel_deps, "$dir/${name}.gz";
