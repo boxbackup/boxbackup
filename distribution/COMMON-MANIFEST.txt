@@ -12,10 +12,10 @@ test/basicserver/testfiles
 test/crypto
 test/compress
 test/win32
-docs/api-docs/common docs/api-notes
-docs/api-docs/common/lib_common docs/api-notes/lib_common
-docs/api-docs/common/lib_crypto docs/api-notes/lib_crypto
-docs/api-docs/common/lib_server docs/api-notes/lib_server
+docs/api-notes
+docs/api-notes/common/lib_common
+docs/api-notes/common/lib_crypto
+docs/api-notes/common/lib_server
 MKDIR infrastructure
 infrastructure/buildenv-testmain-template.cpp
 infrastructure/makebuildenv.pl.in
@@ -26,13 +26,11 @@ infrastructure/printversion.pl
 infrastructure/BoxPlatform.pm.in
 infrastructure/mingw
 infrastructure/msvc
-configure.ac
 NO-LICENSE config.sub
-config.sub
 NO-LICENSE config.guess
-config.guess
 bootstrap
+configure.ac
+configure
 parcels.txt
 runtest.pl.in
 NO-LICENSE-IN-DIR infrastructure/m4
-configure
