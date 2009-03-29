@@ -40,6 +40,7 @@ inline uint64_t BoxTimeToMicroSeconds(box_time_t Time)
 	return Time;
 }
 
-std::string FormatTime(box_time_t time, bool showMicros = false);
+std::string FormatTime(box_time_t time, bool includeDate,
+	bool showMicros = false);
 
 #endif // BOXTIME__H

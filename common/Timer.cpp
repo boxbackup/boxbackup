@@ -357,7 +357,7 @@ Timer::Timer(size_t timeoutSecs, const std::string& rName)
 	else
 	{
 		BOX_TRACE(TIMER_ID "initialised for " << timeoutSecs <<
-			" secs, to fire at " << FormatTime(mExpires, true));
+			" secs, to fire at " << FormatTime(mExpires, false, true));
 	}
 	#endif
 
