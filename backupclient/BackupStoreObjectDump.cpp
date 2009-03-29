@@ -70,7 +70,7 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 		mAttributesModTime, mAttributes.GetSize());
 
 	// So repeated filenames can be illustrated, even though they can't be decoded
-	std::map<BackupStoreFilename, int> nameNum;
+	std::map<std::string, int> nameNum;
 	int nameNumI = 0;
 
 	// Dump items
@@ -78,7 +78,7 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 	for(std::vector<Entry*>::const_iterator i(mEntries.begin()); i != mEntries.end(); ++i)
 	{
 		// Choose file name index number for this file
-		std::map<BackupStoreFilename, int>::iterator nn(nameNum.find((*i)->GetName()));
+		std::map<std::string, int>::iterator nn(nameNum.find((*i)->GetName().GetEncodedFilename()));
 		int ni = nameNumI;
 		if(nn != nameNum.end())
 		{
@@ -86,7 +86,7 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 		}
 		else
 		{
-			nameNum[(*i)->GetName()] = nameNumI;
+			nameNum[(*i)->GetName().GetEncodedFilename()] = nameNumI;
 			++nameNumI;
 		}
 		
@@ -124,7 +124,7 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 			(*i)->GetSizeInBlocks(),
 			(*i)->GetAttributesHash(),
 			(*i)->GetAttributes().GetSize(),
-			(*i)->GetName().size(),
+			(*i)->GetName().GetEncodedFilename().size(),
 			ni,
 			((f & BackupStoreDirectory::Entry::Flags_File)?" file":""),
 			((f & BackupStoreDirectory::Entry::Flags_Dir)?" dir":""),
@@ -173,7 +173,8 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 	// Read the next two objects
 	BackupStoreFilename fn;
 	fn.ReadFromStream(rFile, IOStream::TimeOutInfinite);
-	OutputLine(file, ToTrace, "Filename size: %d\n", fn.size());
+	OutputLine(file, ToTrace, "Filename size: %d\n",
+		fn.GetEncodedFilename().size());
 	
 	BackupClientFileAttributes attr;
 	attr.ReadFromStream(rFile, IOStream::TimeOutInfinite);
