@@ -53,7 +53,7 @@ box_time_t GetCurrentBoxTime()
 	return SecondsToBoxTime(time(0));
 }
 
-std::string FormatTime(box_time_t time, bool showMicros)
+std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
 {
 	std::ostringstream buf;
 
@@ -68,8 +68,16 @@ std::string FormatTime(box_time_t time, bool showMicros)
 		if (localtime_r(&seconds, &tm_now) != NULL)
 	#endif
 	{
-		buf << std::setfill('0') <<
-			std::setw(2) << tm_ptr->tm_hour << ":" << 
+		buf << std::setfill('0');
+
+		if (includeDate)
+		{
+			buf << 	std::setw(4) << (tm_ptr->tm_year + 1900) << "-" <<
+				std::setw(2) << (tm_ptr->tm_mon  + 1) << "-" <<
+				std::setw(2) << (tm_ptr->tm_mday) << " ";
+		}
+
+		buf <<	std::setw(2) << tm_ptr->tm_hour << ":" << 
 			std::setw(2) << tm_ptr->tm_min  << ":" <<
 			std::setw(2) << tm_ptr->tm_sec;
 

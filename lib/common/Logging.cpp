@@ -288,7 +288,7 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 
 	if (sShowTime)
 	{
-		buf << FormatTime(GetCurrentBoxTime(), sShowTimeMicros);
+		buf << FormatTime(GetCurrentBoxTime(), false, sShowTimeMicros);
 		buf << " ";
 	}
 
@@ -449,7 +449,7 @@ bool FileLogger::Log(Log::Level Level, const std::string& rFile,
 	Logging::Remove(this);
 
 	std::ostringstream buf;
-	buf << FormatTime(GetCurrentBoxTime(), false);
+	buf << FormatTime(GetCurrentBoxTime(), true, false);
 	buf << " ";
 
 	if (Level <= Log::FATAL)
