@@ -689,10 +689,10 @@ int Daemon::Main(const std::string &rConfigFileName)
 				BOX_NOTICE("Reloading configuration file: "
 					<< mConfigFileName);
 				std::string errors;
-				std::auto_ptr<Configuration> pconfig = 
+				std::auto_ptr<Configuration> pconfig(
 					Configuration::LoadAndVerify(
 						mConfigFileName.c_str(),
-						GetConfigVerify(), errors);
+						GetConfigVerify(), errors));
 
 				// Got errors?
 				if(pconfig.get() == 0 || !errors.empty())
