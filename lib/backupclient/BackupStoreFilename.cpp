@@ -37,7 +37,7 @@ BackupStoreFilename::BackupStoreFilename()
 //
 // --------------------------------------------------------------------------
 BackupStoreFilename::BackupStoreFilename(const BackupStoreFilename &rToCopy)
-	: BackupStoreFilename_base(rToCopy)
+	: mEncryptedName(rToCopy.mEncryptedName)
 {
 }
 
@@ -65,7 +65,7 @@ bool BackupStoreFilename::CheckValid(bool ExceptionIfInvalid) const
 {
 	bool ok = true;
 	
-	if(size() < 2)
+	if(mEncryptedName.size() < 2)
 	{
 		// Isn't long enough to have a header
 		ok = false;
@@ -73,14 +73,14 @@ bool BackupStoreFilename::CheckValid(bool ExceptionIfInvalid) const
 	else
 	{
 		// Check size is consistent
-		unsigned int dsize = BACKUPSTOREFILENAME_GET_SIZE(*this);
-		if(dsize != size())
+		unsigned int dsize = BACKUPSTOREFILENAME_GET_SIZE(this->mEncryptedName);
+		if(dsize != mEncryptedName.size())
 		{
 			ok = false;
 		}
 		
 		// And encoding is an accepted value
-		unsigned int encoding = BACKUPSTOREFILENAME_GET_ENCODING(*this);
+		unsigned int encoding = BACKUPSTOREFILENAME_GET_ENCODING(this->mEncryptedName);
 		if(encoding < Encoding_Min || encoding > Encoding_Max)
 		{
 			ok = false;
@@ -119,8 +119,8 @@ void BackupStoreFilename::ReadFromProtocol(Protocol &rProtocol)
 	rProtocol.Read(data, dsize - 2);
 	
 	// assign to this string, storing the header and the extra data
-	assign(hdr, 2);
-	append(data.c_str(), data.size());
+	mEncryptedName.assign(hdr, 2);
+	mEncryptedName.append(data.c_str(), data.size());
 	
 	// Check it
 	CheckValid();
@@ -141,7 +141,7 @@ void BackupStoreFilename::WriteToProtocol(Protocol &rProtocol) const
 {
 	CheckValid();
 	
-	rProtocol.Write(c_str(), size());
+	rProtocol.Write(mEncryptedName.c_str(), mEncryptedName.size());
 }
 
 // --------------------------------------------------------------------------
@@ -177,7 +177,7 @@ void BackupStoreFilename::ReadFromStream(IOStream &rStream, int Timeout)
 		buf[0] = hdr[0]; buf[1] = hdr[1];
 
 		// assign to this string, storing the header and the extra data
-		assign(buf, dsize);
+		mEncryptedName.assign(buf, dsize);
 	}
 	else
 	{
@@ -194,7 +194,7 @@ void BackupStoreFilename::ReadFromStream(IOStream &rStream, int Timeout)
 		data[0] = hdr[0]; data[1] = hdr[1];
 
 		// assign to this string, storing the header and the extra data
-		assign(data, dsize);
+		mEncryptedName.assign(data, dsize);
 	}
 	
 	// Check it
@@ -216,7 +216,7 @@ void BackupStoreFilename::WriteToStream(IOStream &rStream) const
 {
 	CheckValid();
 	
-	rStream.Write(c_str(), size());
+	rStream.Write(mEncryptedName.c_str(), mEncryptedName.size());
 }
 
 // --------------------------------------------------------------------------
@@ -242,7 +242,8 @@ void BackupStoreFilename::EncodedFilenameChanged()
 // --------------------------------------------------------------------------
 bool BackupStoreFilename::IsEncrypted() const
 {
-	return BACKUPSTOREFILENAME_GET_ENCODING(*this) != Encoding_Clear;
+	return BACKUPSTOREFILENAME_GET_ENCODING(this->mEncryptedName) !=
+		Encoding_Clear;
 }
 
 
@@ -250,8 +251,9 @@ bool BackupStoreFilename::IsEncrypted() const
 //
 // Function
 //		Name:    BackupStoreFilename::SetAsClearFilename(const char *)
-//		Purpose: Sets this object to be a valid filename, but with a filename in the clear.
-//				 Used on the server to create filenames when there's no way of encrypting it.
+//		Purpose: Sets this object to be a valid filename, but with a
+//			 filename in the clear. Used on the server to create
+//			 filenames when there's no way of encrypting it.
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
@@ -268,7 +270,7 @@ void BackupStoreFilename::SetAsClearFilename(const char *Clear)
 	ASSERT(encoded.size() == toEncode.size() + 2);
 	
 	// Store the encoded string
-	assign(encoded);
+	mEncryptedName.assign(encoded);
 	
 	// Stuff which must be done
 	EncodedFilenameChanged();

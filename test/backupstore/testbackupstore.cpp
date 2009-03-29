@@ -232,7 +232,8 @@ int test1(int argc, const char *argv[])
 		TEST_THAT(fn1 == fn3);
 		
 		// Check that it's been encrypted
-		TEST_THAT(fn2.find("name") == fn2.npos);
+		std::string name(fn2.GetEncodedFilename());
+		TEST_THAT(name.find("name") == name.npos);
 			
 		// Bung it in a stream, get it out in a Clear filename
 		{

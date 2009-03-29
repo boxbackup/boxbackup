@@ -349,7 +349,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 		// Add files to the list of potential deletions
 
 		// map to count the distance from the mark
-		std::map<std::pair<BackupStoreFilename, int32_t>, int32_t> markVersionAges;
+		typedef std::pair<std::string, int32_t> version_t;
+		std::map<version_t, int32_t> markVersionAges;
 			// map of pair (filename, mark number) -> version age
 
 		// NOTE: use a reverse iterator to allow the distance from mark stuff to work
@@ -367,7 +368,10 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 					
 			// Work out ages of this version from the last mark
 			int32_t enVersionAge = 0;
-			std::map<std::pair<BackupStoreFilename, int32_t>, int32_t>::iterator enVersionAgeI(markVersionAges.find(std::pair<BackupStoreFilename, int32_t>(en->GetName(), en->GetMarkNumber())));
+			std::map<version_t, int32_t>::iterator enVersionAgeI(
+				markVersionAges.find(
+					version_t(en->GetName().GetEncodedFilename(),
+						en->GetMarkNumber())));
 			if(enVersionAgeI != markVersionAges.end())
 			{
 				enVersionAge = enVersionAgeI->second + 1;
@@ -375,7 +379,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 			}
 			else
 			{
-				markVersionAges[std::pair<BackupStoreFilename, int32_t>(en->GetName(), en->GetMarkNumber())] = enVersionAge;
+				markVersionAges[version_t(en->GetName().GetEncodedFilename(), en->GetMarkNumber())] = enVersionAge;
 			}
 			// enVersionAge is now the age of this version.
 			
