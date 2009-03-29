@@ -160,8 +160,8 @@ void BackupStoreFilenameClear::MakeClearAvailable() const
 	CheckValid();
 		
 	// Decode the header
-	int size = BACKUPSTOREFILENAME_GET_SIZE(*this);
-	int encoding = BACKUPSTOREFILENAME_GET_ENCODING(*this);
+	int size = BACKUPSTOREFILENAME_GET_SIZE(GetEncodedFilename());
+	int encoding = BACKUPSTOREFILENAME_GET_ENCODING(GetEncodedFilename());
 	
 	// Decode based on encoding given in the header
 	switch(encoding)
@@ -169,7 +169,8 @@ void BackupStoreFilenameClear::MakeClearAvailable() const
 	case Encoding_Clear:
 		BOX_TRACE("**** BackupStoreFilename encoded with "
 			"Clear encoding ****");
-		mClearFilename.assign(c_str() + 2, size - 2);
+		mClearFilename.assign(GetEncodedFilename().c_str() + 2,
+			size - 2);
 		break;
 		
 	case Encoding_Blowfish:
@@ -244,7 +245,7 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 	BACKUPSTOREFILENAME_MAKE_HDR(buffer, encSize, StoreAsEncoding);
 	
 	// Store the encoded string
-	assign((char*)buffer, encSize);
+	SetEncodedFilename(std::string((char*)buffer, encSize));
 }
 
 
@@ -258,8 +259,10 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 // --------------------------------------------------------------------------
 void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) const
 {
+	const std::string& rEncoded = GetEncodedFilename();
+
 	// Work out max size
-	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(size()) + 4;
+	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rEncoded.size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
 	EnsureEncDecBufferSize(maxOutSize);
@@ -268,8 +271,8 @@ void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) con
 	uint8_t *buffer = *spEncDecBuffer;
 	
 	// Decrypt
-	const char *str = c_str() + 2;
-	int sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, size() - 2);
+	const char *str = rEncoded.c_str() + 2;
+	int sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, rEncoded.size() - 2);
 	
 	// Assign to this
 	mClearFilename.assign((char*)buffer, sizeOut);

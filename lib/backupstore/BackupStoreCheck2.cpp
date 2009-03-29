@@ -750,7 +750,7 @@ bool BackupStoreDirectory::CheckAndFix()
 
 		// Records of things seen
 		std::set<int64_t> idsEncountered;
-		std::set<BackupStoreFilename> filenamesEncountered;
+		std::set<std::string> filenamesEncountered;
 
 		do
 		{
@@ -792,7 +792,7 @@ bool BackupStoreDirectory::CheckAndFix()
 					
 					// Check to see if the name has already been encountered -- if not, then it
 					// needs to have the old version flag set
-					if(filenamesEncountered.find((*i)->GetName()) != filenamesEncountered.end())
+					if(filenamesEncountered.find((*i)->GetName().GetEncodedFilename()) != filenamesEncountered.end())
 					{
 						// Seen before -- check old version flag set
 						if(((*i)->GetFlags() & Entry::Flags_OldVersion) != Entry::Flags_OldVersion
@@ -818,7 +818,7 @@ bool BackupStoreDirectory::CheckAndFix()
 						}
 						
 						// Remember filename
-						filenamesEncountered.insert((*i)->GetName());
+						filenamesEncountered.insert((*i)->GetName().GetEncodedFilename());
 					}
 				}
 			}

@@ -1386,8 +1386,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// aren't actually deleted, as the whole state will be reset anyway.
 			BackupClientDeleteList &rdel(rContext.GetDeleteList());
 
+			BackupStoreFilenameClear clear(en->GetName());
 			std::string localName = MakeFullPath(rLocalPath,
-				en->GetName());
+				clear.GetClearFilename());
 			
 			// Delete this entry -- file or directory?
 			if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) != 0)

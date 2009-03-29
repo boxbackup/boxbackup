@@ -40,8 +40,11 @@ class IOStream;
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-class BackupStoreFilename : public BackupStoreFilename_base
+class BackupStoreFilename /* : public BackupStoreFilename_base */
 {
+private:
+	std::string mEncryptedName;
+
 public:
 	BackupStoreFilename();
 	BackupStoreFilename(const BackupStoreFilename &rToCopy);
@@ -71,8 +74,27 @@ public:
 		Encoding_Max = 2
 	};
 
+	const std::string& GetEncodedFilename() const
+	{
+		return mEncryptedName;
+	}
+
+	bool operator==(const BackupStoreFilename& rOther) const
+	{
+		return mEncryptedName == rOther.mEncryptedName;
+	}
+
+	bool operator!=(const BackupStoreFilename& rOther) const
+	{
+		return mEncryptedName != rOther.mEncryptedName;
+	}
+
 protected:
 	virtual void EncodedFilenameChanged();
+	void SetEncodedFilename(const std::string &rEncoded)
+	{
+		mEncryptedName = rEncoded;
+	}
 };
 
 // On the wire utilities for class and derived class
