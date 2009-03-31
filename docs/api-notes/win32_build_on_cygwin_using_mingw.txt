@@ -4,28 +4,40 @@ By Chris Wilson, 2009-03-31
 (To read this document online with better formatting, browse to:
 [http://www.boxbackup.org/trac/wiki/CompileWithMinGW])
 
+== MinGW C++ ==
+
 Start by installing Cygwin on your Windows machine from [http://www.cygwin.org/cygwin/].
 
 Make sure to select the following packages during installation:
 
-* Devel/automake
-* Devel/autoconf
-* Devel/gcc-mingw
-* Devel/gcc-mingw-core
-* Devel/gcc-mingw-g++
-* Devel/make
-* Devel/mingw-runtime
-* Lib/libxml2
-* Lib/libxslt
-* Mingw/mingw-zlib
-* Perl/Perl
+ * Devel/automake
+ * Devel/autoconf
+ * Devel/gcc-mingw
+ * Devel/gcc-mingw-core
+ * Devel/gcc-mingw-g++
+ * Devel/make
+ * Devel/mingw-runtime
+ * Lib/libxml2
+ * Lib/libxslt
+ * Mingw/mingw-zlib
+ * Perl/Perl
 
 If you already have Cygwin installed, please re-run the installer and
 ensure that those packages are installed.
 
+== Base Directory ==
+
+Choose a directory where you will unpack and compile OpenSSL, Zlib and Box Backup. We will call this the ''base directory''. An example might be:
+
+  C:\Cygwin\Home\Your Username
+
+Make sure you know the full path to this directory.
+
+== OpenSSL ==
+
 Download OpenSSL from [http://www.openssl.org/source/openssl-0.9.7i.tar.gz]
 
-Open a Cygwin shell, and unpack OpenSSL:
+Open a Cygwin shell, go to the base directory, and unpack OpenSSL:
 
 	tar xzvf openssl-0.9.7i.tar.gz
 
@@ -36,10 +48,14 @@ Configure OpenSSL for MinGW compilation, and build and install it:
 	make
 	make install
 
+== PCRE ==
+
+This step is only required to support regular expressions in including/excluding files from backups. However, this is a very useful feature.
+
 Download PCRE from 
 [http://prdownloads.sourceforge.net/pcre/pcre-6.3.tar.bz2?download]
 
-Open a Cygwin shell, and unpack PCRE:
+Open a Cygwin shell, go to the base directory, and unpack PCRE:
 
 	tar xjvf pcre-6.3.tar.bz2
 
@@ -52,9 +68,17 @@ Configure PCRE for MinGW compilation, and build and install it:
 	cp .libs/libpcre.a .libs/libpcreposix.a /lib/mingw
 	cp pcreposix.h /usr/include/mingw
 
-Now get the latest Box Backup sources
+== Download Box Backup ==
+
+Go back to the base directory, and download the latest Box Backup sources:
 
 	svn co https://www.boxbackup.org/svn/box/trunk/ trunk
+
+Note: If you have problems during the configure or make stage, please try to eliminate one potential source of problems by running the following command to convert all line endings to Unix format:
+
+	find -type f -not \( -wholename .*svn*. \) -exec dos2unix {} \;
+
+== Compile Box Backup ==
 
 Enter the source directory and configure like this:
 
@@ -62,4 +86,22 @@ Enter the source directory and configure like this:
 	./infrastructure/mingw/configure.sh
 	make
 
-Note: In case you have any problems during the configure or make stage, please try to eliminate one potential source of problems by running "find -type f -not \( -wholename .*svn*. \) -exec dos2unix {} \;" in the trunk directory to fix potential line break problems.
+== Installation ==
+
+Create the destination directory, ''C:\Program Files\Box Backup\bbackupd''.
+
+Write a configuration file, keys and certificate on a Unix machine, and copy them into the ''Box Backup'' directory, together with the following files from the ''base directory'':
+
+ * boxbackup\release\bin\bbackupd\bbackupd.exe
+ * boxbackup\release\bin\bbackupquery\bbackupquery.exe
+ * boxbackup\release\bin\bbackupctl\bbackupctl.exe
+ * openssl\out32dll\libeay32.dll
+ * openssl\out32dll\ssleay32.dll
+ * zlib\zlib1.dll
+
+Ensure that the user running Box Backup can read from the ''Box Backup'' directory, and write to the ''bbackupd'' directory inside it.
+
+Run Box Backup by double-clicking on it, and check that it connects to the server. If the window opens and closes immediately, it's probably due to a problem with the configuration file - check the Windows Event Viewer for details.
+
+See also the service installation and upgrade instructions at 
+[https://www.boxbackup.org/trac/wiki/CompilationOnWindows].
