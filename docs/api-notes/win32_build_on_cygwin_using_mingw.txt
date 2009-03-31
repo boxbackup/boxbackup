@@ -1,22 +1,29 @@
 How to build Box Backup on Win32 using Cygwin and MinGW
-By Chris Wilson, 2007-05-26
+By Chris Wilson, 2009-03-31
 
 (To read this document online with better formatting, browse to:
-http://www.boxbackup.org/trac/wiki/CompileWithMinGW)
+[http://www.boxbackup.org/trac/wiki/CompileWithMinGW])
 
-Start by installing Cygwin on your Windows machine [http://www.cygwin.org].
+Start by installing Cygwin on your Windows machine from [http://www.cygwin.org/cygwin/].
+
 Make sure to select the following packages during installation:
 
+* Devel/automake
+* Devel/autoconf
 * Devel/gcc-mingw
 * Devel/gcc-mingw-core
 * Devel/gcc-mingw-g++
+* Devel/make
+* Devel/mingw-runtime
+* Lib/libxml2
+* Lib/libxslt
 * Mingw/mingw-zlib
+* Perl/Perl
 
 If you already have Cygwin installed, please re-run the installer and
 ensure that those packages are installed.
 
-Download OpenSSL from 
-[http://www.openssl.org/source/openssl-0.9.7i.tar.gz]
+Download OpenSSL from [http://www.openssl.org/source/openssl-0.9.7i.tar.gz]
 
 Open a Cygwin shell, and unpack OpenSSL:
 
@@ -42,12 +49,17 @@ Configure PCRE for MinGW compilation, and build and install it:
 	export CFLAGS="-mno-cygwin"
 	./configure
 	make winshared
-	cp .libs/libpcre.a .libs/libpcreposix.a /usr/lib/mingw
+	cp .libs/libpcre.a .libs/libpcreposix.a /lib/mingw
 	cp pcreposix.h /usr/include/mingw
 
-Now unpack the Box Backup sources, enter the source directory,
-and configure like this:
+Now get the latest Box Backup sources
 
+	svn co https://www.boxbackup.org/svn/box/trunk/ trunk
+
+Enter the source directory and configure like this:
+
+	cd trunk
 	./infrastructure/mingw/configure.sh
 	make
 
+Note: In case you have any problems during the configure or make stage, please try to eliminate one potential source of problems by running "find -type f -not \( -wholename .*svn*. \) -exec dos2unix {} \;" in the trunk directory to fix potential line break problems.
