@@ -9,6 +9,12 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>@prefix@/sbin/bbackupd</string>
+		<string>-F</string>
+		<string>@prefix@/etc/boxbackup/bbackupd.conf</string>
 	</array>
+        <key>LowPriorityIO</key>
+        <true/>
+        <key>Nice</key>
+        <integer>1</integer>
 </dict>
 </plist>
