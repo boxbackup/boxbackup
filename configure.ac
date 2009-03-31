@@ -160,7 +160,6 @@ AC_CHECK_TYPES([uint8_t, uint16_t, uint32_t, uint64_t])
 AC_HEADER_STDBOOL
 AC_C_CONST
 AC_C_BIGENDIAN
-AX_CHECK_NONALIGNED_ACCESS
 AC_TYPE_UID_T
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
@@ -243,10 +242,12 @@ AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
 ## Check for large file support active. AC_SYS_LARGEFILE has already worked
 ## out how to enable it if necessary, we just use this to report to the user
 AC_CACHE_CHECK([if we have large file support enabled], [box_cv_have_large_file_support],
-  [AC_RUN_IFELSE([AC_LANG_PROGRAM([[$ac_includes_default]], [[
+  [AC_TRY_RUN([AC_LANG_PROGRAM([[$ac_includes_default]], [[
       return sizeof(off_t)==4;
     ]])],
-    [box_cv_have_large_file_support=yes], [box_cv_have_large_file_support=no]
+    [box_cv_have_large_file_support=yes],
+    [box_cv_have_large_file_support=no],
+    [box_cv_have_large_file_support=no # safe for cross-compile]
   )])
 
 if test "x$box_cv_have_large_file_support" = "xyes"; then
