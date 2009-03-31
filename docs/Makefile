@@ -112,5 +112,5 @@ clean:
 	rm -f $(NROFF_FILES)
 	rm -f $(DOCBOOK_DIR)/ExceptionCodes.xml
 	rm -f documentation-kit-0.10.tar.gz
-
+	rm -f $(MANXSL)
 
