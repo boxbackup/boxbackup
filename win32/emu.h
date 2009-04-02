@@ -257,6 +257,15 @@ void openlog (const char * daemonName, int, int);
 void closelog(void);
 void syslog  (int loglevel, const char *fmt, ...);
 
+#define LOG_LOCAL0 0
+#define LOG_LOCAL1 0
+#define LOG_LOCAL2 0
+#define LOG_LOCAL3 0
+#define LOG_LOCAL4 0
+#define LOG_LOCAL5 0
+#define LOG_LOCAL6 0
+#define LOG_DAEMON 0
+
 #ifndef __MINGW32__
 #define strtoll _strtoi64
 #endif
