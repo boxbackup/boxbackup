@@ -12,7 +12,7 @@
 
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
 	// include stdlib now, to avoid problems with having the macros defined already
-	#include <stdlib.h>
+	#include <cstdlib>
 #endif
 
 // global enable flag

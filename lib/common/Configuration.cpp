@@ -22,6 +22,8 @@
 
 #include "MemLeakFindOn.h"
 
+#include <cstring>
+
 // utility whitespace function
 inline bool iw(int c)
 {

@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <set>
+#include <cstdlib> // for std::atexit
 
 #include "MemLeakFinder.h"
 
@@ -130,7 +131,7 @@ void *memleakfinder_malloc(size_t size, const char *file, int line)
 {
 	InternalAllocGuard guard;
 
-	void *b = ::malloc(size);
+	void *b = std::malloc(size);
 	if(!memleakfinder_global_enable) return b;
 	if(!memleakfinder_initialised)   return b;
 
@@ -146,7 +147,7 @@ void *memleakfinder_realloc(void *ptr, size_t size)
 
 	if(!memleakfinder_global_enable || !memleakfinder_initialised)
 	{
-		return ::realloc(ptr, size);
+		return std::realloc(ptr, size);
 	}
 
 	// Check it's been allocated
@@ -158,7 +159,7 @@ void *memleakfinder_realloc(void *ptr, size_t size)
 			"objects?");
 	}
 
-	void *b = ::realloc(ptr, size);
+	void *b = std::realloc(ptr, size);
 
 	if(ptr && i!=sMallocBlocks.end())
 	{
@@ -215,7 +216,7 @@ void memleakfinder_free(void *ptr)
 	}
 
 	//TRACE1("free(), %08x\n", ptr);
-	::free(ptr);
+	std::free(ptr);
 }
 
 
@@ -426,7 +427,7 @@ void memleakfinder_setup_exit_report(const char *filename, const char *markertex
 	atexit_markertext[sizeof(atexit_markertext)-1] = 0;
 	if(!atexit_registered)
 	{
-		atexit(memleakfinder_atexit);
+		std::atexit(memleakfinder_atexit);
 		atexit_registered = true;
 	}
 }
@@ -490,7 +491,7 @@ static void *internal_new(size_t size, const char *file, int line)
 
 	{
 		InternalAllocGuard guard;
-		r = ::malloc(size);
+		r = std::malloc(size);
 	}
 	
 	if (sInternalAllocDepth == 0)
@@ -533,7 +534,7 @@ void internal_delete(void *ptr)
 {
 	InternalAllocGuard guard;
 
-	::free(ptr);
+	std::free(ptr);
 	remove_object_block(ptr);
 	//TRACE1("delete[]() called, %08x\n", ptr);
 }

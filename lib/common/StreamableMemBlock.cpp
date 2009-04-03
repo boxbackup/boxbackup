@@ -10,7 +10,7 @@
 #include "Box.h"
 
 #include <new>
-#include <stdlib.h>
+#include <cstdlib>
 #include <string.h>
 
 #include "StreamableMemBlock.h"

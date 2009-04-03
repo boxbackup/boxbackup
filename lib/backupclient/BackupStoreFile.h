@@ -12,6 +12,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <cstdlib>
 
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreFilename.h"

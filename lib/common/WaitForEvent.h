@@ -22,6 +22,8 @@
 	#endif
 #endif
 
+#include <cstdlib>
+
 #include "CommonException.h"
 
 #include "MemLeakFindOn.h"

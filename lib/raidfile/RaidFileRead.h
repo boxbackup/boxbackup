@@ -10,7 +10,8 @@
 #ifndef RAIDFILEREAD__H
 #define RAIDFILEREAD__H
 
-#include <string>
+#include <cstring>
+#include <cstdlib>
 #include <memory>
 #include <vector>
 
