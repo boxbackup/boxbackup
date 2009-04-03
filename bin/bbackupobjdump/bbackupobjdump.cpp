@@ -9,7 +9,8 @@
 
 #include "Box.h"
 
-#include <stdio.h>
+#include <cstdio>
+#include <cstring>
 
 #include "MainHelper.h"
 #include "FileStream.h"

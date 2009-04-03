@@ -28,6 +28,8 @@
 #include <sys/xattr.h>
 #endif
 
+#include <cstring>
+
 #include "BackupClientFileAttributes.h"
 #include "CommonException.h"
 #include "FileModificationTime.h"

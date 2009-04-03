@@ -11,6 +11,10 @@
 
 #include <errno.h>
 #include <time.h>
+#include <string.h> // for stderror
+
+// c.f. http://bugs.debian.org/512510
+#include <cstdio>
 
 #ifdef HAVE_SYSLOG_H
 	#include <syslog.h>

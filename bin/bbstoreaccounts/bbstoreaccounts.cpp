@@ -36,6 +36,8 @@
 
 #include "MemLeakFindOn.h"
 
+#include <cstring>
+
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
 
