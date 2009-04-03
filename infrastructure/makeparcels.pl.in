@@ -25,6 +25,13 @@ sub os_matches ($)
 	return 0;
 }
 
+my $copy_command = "cp -p";
+
+if ($build_os eq 'CYGWIN')
+{
+	$copy_command = "cp -pu"; # faster
+}
+
 open PARCELS,"parcels.txt" or die "Can't open parcels file";
 {
 	my $cur_parcel = '';
@@ -168,7 +175,7 @@ for my $parcel (@parcels)
 			print MAKE <<EOF;
 $dir/$name$exeext: release/bin/$name/$name$exeext
 	mkdir -p $dir
-	cp -p release/bin/$name/$name$exeext $dir
+	$copy_command release/bin/$name/$name$exeext $dir
 
 .PHONY: release/bin/$name/$name$exeext
 release/bin/$name/$name$exeext:
@@ -192,11 +199,11 @@ EOF
 			if ($optional)
 			{
 				print MAKE "\ttest -r $fullpath " .
-					"&& cp -p $fullpath $dir || true\n";
+					"&& $copy_command $fullpath $dir || true\n";
 			}
 			else
 			{
-				print MAKE "\tcp -p $fullpath $dir\n";
+				print MAKE "\t$copy_command $fullpath $dir\n";
 			}
 
 			print MAKE "\n";
@@ -208,7 +215,7 @@ EOF
 			print MAKE <<EOF;
 $dir/${name}.gz: docs/man/${name}.gz
 	mkdir -p $dir
-	cp -p docs/man/${name}.gz $dir
+	$copy_command docs/man/${name}.gz $dir
 
 EOF
 			# Releases have the docs pre-made, but users
