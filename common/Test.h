@@ -10,7 +10,7 @@
 #ifndef TEST__H
 #define TEST__H
 
-#include <string>
+#include <cstring>
 
 #ifdef WIN32
 #define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"

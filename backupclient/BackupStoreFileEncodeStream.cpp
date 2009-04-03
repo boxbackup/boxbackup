@@ -26,6 +26,8 @@
 
 #include "MemLeakFindOn.h"
 
+#include <cstring>
+
 using namespace BackupStoreFileCryptVar;
 
 
