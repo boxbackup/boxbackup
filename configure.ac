@@ -241,14 +241,20 @@ AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
 
 ## Check for large file support active. AC_SYS_LARGEFILE has already worked
 ## out how to enable it if necessary, we just use this to report to the user
-AC_CACHE_CHECK([if we have large file support enabled], [box_cv_have_large_file_support],
-  [AC_TRY_RUN([AC_LANG_PROGRAM([[$ac_includes_default]], [[
+AC_CACHE_CHECK([if we have large file support enabled],
+  [box_cv_have_large_file_support],
+  [AC_TRY_RUN([
+    $ac_includes_default
+    int main()
+    {
       return sizeof(off_t)==4;
-    ]])],
+    }
+    ],
     [box_cv_have_large_file_support=yes],
     [box_cv_have_large_file_support=no],
     [box_cv_have_large_file_support=no # safe for cross-compile]
-  )])
+    )
+  ])
 
 if test "x$box_cv_have_large_file_support" = "xyes"; then
 	AC_DEFINE([HAVE_LARGE_FILE_SUPPORT], [1],
