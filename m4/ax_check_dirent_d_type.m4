@@ -17,15 +17,17 @@ AC_DEFUN([AX_CHECK_DIRENT_D_TYPE], [
   if test "x$ac_cv_member_struct_dirent_d_type" = "xyes"; then
     AC_CACHE_CHECK([[whether struct dirent.d_type is valid]], [box_cv_have_valid_dirent_d_type],
       [AC_TRY_RUN(
-        [AC_LANG_PROGRAM([[
+        [
           $ac_includes_default
           #include <dirent.h>
-          ]], [[
+          int main()
+          {
           DIR* dir = opendir(".");
           struct dirent* res = NULL;
           if(dir) res = readdir(dir);
           return res ? (res->d_type != DT_FILE && res->d_type != DT_DIR) : 1;
-        ]])],
+          }
+        ],
         [box_cv_have_valid_dirent_d_type=yes],
 	[box_cv_have_valid_dirent_d_type=no],
 	[box_cv_have_valid_dirent_d_type=cross]

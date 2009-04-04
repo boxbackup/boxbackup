@@ -17,7 +17,7 @@ AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
   if test "x$ac_cv_header_sys_syscall_h" = "xyes"; then
     AC_CACHE_CHECK([[whether syscall lseek requires dummy parameter]], [box_cv_have_lseek_dummy_param],
       [AC_TRY_RUN(
-        [AC_LANG_PROGRAM([[
+        [
           $ac_includes_default
           #include <fcntl.h>
           #include <sys/syscall.h>
@@ -28,7 +28,8 @@ AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
             #undef syscall
             #define syscall __syscall
           #endif
-          ]], [[
+          int main()
+          {
           int fh = creat("lseektest", 0600);
           int res = 0;
           if(fh>=0)
@@ -49,7 +50,8 @@ AC_DEFUN([AX_CHECK_SYSCALL_LSEEK], [
           }
           unlink("lseektest");
           return res!=-1;
-        ]])],
+          }
+        ],
         [box_cv_have_lseek_dummy_param=yes],
 	[box_cv_have_lseek_dummy_param=no],
 	[box_cv_have_lseek_dummy_param=no # assume not for cross-compiling]
