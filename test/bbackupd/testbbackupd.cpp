@@ -1755,7 +1755,7 @@ int test_bbackupd()
 			return 1;
 		}
 
-		test_run_bbstored();
+		TEST_THAT(test_run_bbstored() == 0);
 
 		cmd = BBACKUPD " " + bbackupd_args +
 			" testfiles/bbackupd.conf";
@@ -2541,9 +2541,13 @@ int test_bbackupd()
 				> 1024);
 		}
 
-		// wait for backup daemon to do it's stuff, and compare again
-		wait_for_backup_operation("bbackupd to sync the changes");
+		// wait long enough for new files to be old enough to backup
+		wait_for_operation(5, "new files to be old enough");
 
+		// wait for backup daemon to do it's stuff
+		sync_and_wait();
+
+		// compare to make sure that it worked
 		compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2.log "
@@ -2994,10 +2998,13 @@ int test_bbackupd()
 		TEST_THAT(TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT(TestFileExists("testfiles/TestDir1/tracked-2"));
 
-		// back up both files
+		// wait for them to be old enough to back up
 		wait_for_operation(5, "tracked files to be old enough");
-		wait_for_backup_operation("bbackupd to sync the tracked files");
+		
+		// back up both files
+		sync_and_wait();
 
+		// compare to make sure that it worked
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3h.log "
@@ -4039,6 +4046,7 @@ int test(int argc, const char *argv[])
 	if(r != 0) return r;
 
 	r = test_run_bbstored();
+	TEST_THAT(r == 0);
 	if(r != 0) return r;
 	
 	r = test_bbackupd();
