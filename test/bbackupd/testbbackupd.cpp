@@ -1142,7 +1142,7 @@ int test_bbackupd()
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
-		wait_for_backup_operation("internal dameon to scan "
+		wait_for_backup_operation("internal daemon to scan "
 			"spacetest/d1");
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
