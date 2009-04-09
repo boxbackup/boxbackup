@@ -336,6 +336,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 	if (argc > optind && !mHaveConfigFile)
 	{
 		mConfigFileName = argv[optind]; optind++;
+		mHaveConfigFile = true;
 	}
 
 	if (argc > optind && ::strcmp(argv[optind], "SINGLEPROCESS") == 0)
@@ -375,6 +376,20 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 
 	try
 	{
+		if (!FileExists(rConfigFileName.c_str()))
+		{
+			BOX_FATAL("The main configuration file for " <<
+				DaemonName() << " was not found: " <<
+				rConfigFileName);
+			if (!mHaveConfigFile)
+			{
+				BOX_WARNING("The default configuration "
+					"directory has changed from /etc/box "
+					"to /etc/boxbackup");
+			}
+			return false;
+		}
+			
 		apConfig = Configuration::LoadAndVerify(rConfigFileName,
 			GetConfigVerify(), errors);
 	}
