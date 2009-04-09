@@ -578,7 +578,7 @@ int test(int argc, const char *argv[])
 #ifdef WIN32
 			// Cannot signal bbstored to do housekeeping now,
 			// so just wait until we're sure it's done
-			wait_for_operation(12);
+			wait_for_operation(12, "housekeeping to run");
 #else
 			// Send the server a restart signal, so it does 
 			// housekeeping immediately, and wait for it to happen
