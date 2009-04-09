@@ -87,9 +87,9 @@
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
-void wait_for_backup_operation(int seconds = TIME_TO_WAIT_FOR_BACKUP_OPERATION)
+void wait_for_backup_operation(char* message)
 {
-	wait_for_operation(seconds);
+	wait_for_operation(TIME_TO_WAIT_FOR_BACKUP_OPERATION, message);
 }
 
 int bbstored_pid = 0;
@@ -889,7 +889,7 @@ int test_bbackupd()
 		TEST_THAT(close(fd) == 0);
 		
 		int pid = start_internal_daemon();
-		wait_for_backup_operation();
+		wait_for_backup_operation("internal daemon to run a sync");
 		TEST_THAT(stop_internal_daemon(pid));
 
 		// two-second delay on the first read() of f1
@@ -910,7 +910,8 @@ int test_bbackupd()
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("internal daemon to sync "
+			"spacetest/f1");
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
@@ -985,7 +986,8 @@ int test_bbackupd()
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("internal daemon to sync "
+			"spacetest/f1 again");
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
@@ -1050,7 +1052,8 @@ int test_bbackupd()
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("internal daemon to sync "
+			"spacetest/f1 again");
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
@@ -1139,7 +1142,8 @@ int test_bbackupd()
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);	
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("internal dameon to scan "
+			"spacetest/d1");
 		// can't test whether intercept was triggered, because
 		// it's in a different process.
 		// TEST_THAT(intercept_triggered());
@@ -1284,10 +1288,10 @@ int test_bbackupd()
 		// housekeeping deleted them, the backup cannot complete
 		// if the limit is 20 blocks.
 
-		BOX_TRACE("Waiting for bbackupd to notice that the "
+		BOX_TRACE("Waiting for sync for bbackupd to notice that the "
 			"store is full");
 		wait_for_sync_end();
-		BOX_TRACE("done.");
+		BOX_TRACE("Sync finished.");
 
 		BOX_TRACE("Compare to check that there are differences");
 		int compareReturnValue = ::system(BBACKUPQUERY " "
@@ -1297,7 +1301,7 @@ int test_bbackupd()
 		TEST_RETURN(compareReturnValue,
 			BackupQueries::ReturnCode::Compare_Different);
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		BOX_TRACE("done.");
+		BOX_TRACE("Compare finished.");
 
 		// Check that the notify script was run
 		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
@@ -1307,9 +1311,8 @@ int test_bbackupd()
 		// Kill the daemon
 		terminate_bbackupd(bbackupd_pid);
 
-		BOX_TRACE("Wait for housekeeping to remove the deleted files");
-		wait_for_backup_operation(5);
-		BOX_TRACE("done.");
+		wait_for_operation(5, "housekeeping to remove the "
+			"deleted files");
 
 		// This removes f1 and d7, which were previously marked
 		// as deleted, so total usage drops by 4 blocks to 24.
@@ -1470,9 +1473,8 @@ int test_bbackupd()
 			return 1;
 		}
 
-		BOX_TRACE("Wait for housekeeping to remove the deleted files");
-		wait_for_backup_operation(5);
-		BOX_TRACE("done.");
+		wait_for_operation(5, "housekeeping to remove the "
+			"deleted files");
 
 		BOX_TRACE("Check that the files were removed");
 		{
@@ -1606,9 +1608,7 @@ int test_bbackupd()
 				"| ( cd testfiles && tar xf - )") == 0);
 		#endif
 
-		BOX_TRACE("Wait for bbackupd to upload more files");
-		wait_for_backup_operation();
-		BOX_TRACE("done.");
+		wait_for_backup_operation("bbackupd to upload more files");
 		
 		// Check that the contents of the store are the same 
 		// as the contents of the disc 
@@ -1803,8 +1803,8 @@ int test_bbackupd()
 		// also test symlink-to-self loop does not break restore
 		TEST_THAT(symlink("self", SYM_DIR "/self") == 0);
 
-		::wait_for_operation(4);
-		::sync_and_wait();
+		wait_for_operation(4, "symlinks to be old enough");
+		sync_and_wait();
 
 		// Check that the backup was successful, i.e. no differences
 		int compareReturnValue = ::system(BBACKUPQUERY " "
@@ -2207,7 +2207,8 @@ int test_bbackupd()
 			fs.Close();
 		}
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("upload of file with unicode name");
+
 		// Compare to check that the file was uploaded
 		compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf \"compare -acQ\" quit");
@@ -2541,7 +2542,8 @@ int test_bbackupd()
 		}
 
 		// wait for backup daemon to do it's stuff, and compare again
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync the changes");
+
 		compareReturnValue = ::system(BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query2.log "
@@ -2586,7 +2588,8 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		wait_for_backup_operation(4);
+		wait_for_operation(4, "bbackupd to try to access the store");
+
 		// Check that an error was reported just once
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
@@ -2644,9 +2647,11 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		// bbackupd should pause for about 90 seconds from store_fixed_time,
-		// so check that it hasn't run after 85 seconds from store_fixed_time
-		wait_for_backup_operation(85 - time(NULL) + store_fixed_time);
+		// bbackupd should pause for about 90 seconds from
+		// store_fixed_time, so check that it hasn't run after
+		// 85 seconds after store_fixed_time
+		wait_for_operation(85 - time(NULL) + store_fixed_time,
+			"just before bbackupd recovers");
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 
@@ -2660,7 +2665,7 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
 		// wait another 10 seconds, bbackup should have run
-		wait_for_backup_operation(10);
+		wait_for_operation(10, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 	
@@ -2742,9 +2747,11 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		// bbackupd should pause for about 90 seconds from store_fixed_time,
-		// so check that it hasn't run after 85 seconds from store_fixed_time
-		wait_for_backup_operation(85 - time(NULL) + store_fixed_time);
+		// bbackupd should pause for about 90 seconds from
+		// store_fixed_time, so check that it hasn't run after
+		// 85 seconds from store_fixed_time
+		wait_for_operation(85 - time(NULL) + store_fixed_time,
+			"just before bbackupd recovers");
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
 
@@ -2758,7 +2765,7 @@ int test_bbackupd()
 		TestRemoteProcessMemLeaks("bbackupquery.memleaks");		
 
 		// wait another 10 seconds, bbackup should have run
-		wait_for_backup_operation(10);
+		wait_for_operation(10, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
 	
@@ -2801,7 +2808,7 @@ int test_bbackupd()
 				== 0);
 		#endif
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync the changes");
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3c.log "
@@ -2830,7 +2837,8 @@ int test_bbackupd()
 				"testfiles/TestDir1/x1/dir-to-file") == 0);
 		#endif
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync the changes");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3d.log "
@@ -2862,7 +2870,8 @@ int test_bbackupd()
 				== 0);
 		#endif
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync the changes");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3e.log "
@@ -2894,7 +2903,8 @@ int test_bbackupd()
 				"testfiles/TestDir1/x1/dir-to-file") == 0);
 		#endif
 
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync the changes");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3f.log "
@@ -2924,9 +2934,12 @@ int test_bbackupd()
 		TEST_THAT(close(fd2) == 0);
 		TEST_THAT(TestFileExists("testfiles/TestDir1/untracked-1"));
 		TEST_THAT(TestFileExists("testfiles/TestDir1/untracked-2"));
-		wait_for_operation(5);
+
 		// back up both files
-		wait_for_backup_operation();
+		wait_for_operation(5, "untracked files to be old enough");
+		wait_for_backup_operation("bbackupd to sync the "
+			"untracked files");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3g.log "
@@ -2944,7 +2957,10 @@ int test_bbackupd()
 			"testfiles/TestDir1/untracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/untracked-2"));
-		wait_for_backup_operation();
+
+		wait_for_backup_operation("bbackupd to sync the untracked "
+			"files again");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3g.log "
@@ -2977,9 +2993,11 @@ int test_bbackupd()
 		TEST_THAT(close(fd2) == 0);
 		TEST_THAT(TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT(TestFileExists("testfiles/TestDir1/tracked-2"));
-		wait_for_operation(5);
+
 		// back up both files
-		wait_for_backup_operation();
+		wait_for_operation(5, "tracked files to be old enough");
+		wait_for_backup_operation("bbackupd to sync the tracked files");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3h.log "
@@ -2997,7 +3015,10 @@ int test_bbackupd()
 			"testfiles/TestDir1/tracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
-		wait_for_backup_operation();
+
+		wait_for_backup_operation("bbackupd to sync the tracked "
+			"files again");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3i.log "
@@ -3018,7 +3039,8 @@ int test_bbackupd()
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", 
 			"testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 		
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3j.log "
@@ -3056,7 +3078,8 @@ int test_bbackupd()
 		#endif
 		
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync old files");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3k.log "
@@ -3239,7 +3262,8 @@ int test_bbackupd()
 			}
 
 			// Wait and test...
-			wait_for_backup_operation();
+			wait_for_backup_operation("bbackupd to try to sync "
+				"unreadable file");
 			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query3o.log "
@@ -3343,7 +3367,9 @@ int test_bbackupd()
 		::chmod("testfiles/TestDir1/df9834.dsf", 0423);
 		
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync deletion "
+			"of directory");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query4.log "
@@ -3544,7 +3570,8 @@ int test_bbackupd()
 		#endif
 		
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackupd to sync new files");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query5.log "
@@ -3562,7 +3589,9 @@ int test_bbackupd()
 		printf("\n==== Rename directory\n");
 		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", 
 			"testfiles/TestDir1/renamed-dir") == 0);
-		wait_for_backup_operation();
+
+		wait_for_backup_operation("bbackupd to sync renamed directory");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
@@ -3588,7 +3617,9 @@ int test_bbackupd()
 			"testfiles/TestDir1/df324-ren") == 0);
 		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl", 
 			"testfiles/TestDir1/find2perl-ren") == 0);
-		wait_for_backup_operation();
+
+		wait_for_backup_operation("bbackupd to sync renamed files");
+
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
@@ -3631,7 +3662,7 @@ int test_bbackupd()
 		}
 
 		// Wait and test
-		wait_for_backup_operation();
+		wait_for_backup_operation("bbackup to sync future file");
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query3e.log "
@@ -3698,9 +3729,11 @@ int test_bbackupd()
 			::fclose(f);
 		}
 
-		// Wait and test that there *are* differences
-		wait_for_backup_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION * 
-			3) / 2); // little bit longer than usual
+		// Wait a little bit longer than usual
+		wait_for_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION * 
+			3) / 2, "bbackupd to detect changed store marker");
+
+		// Test that there *are* differences
 		compareReturnValue = ::system(BBACKUPQUERY " "
 			"-c testfiles/bbackupd.conf "
 			"-l testfiles/query6.log "
@@ -3714,9 +3747,8 @@ int test_bbackupd()
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 
-		printf("\n==== Waiting for bbackupd to recover\n");
 		// 100 seconds - (12*3/2)
-		wait_for_operation(82);
+		wait_for_operation(82, "bbackupd to recover");
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
@@ -3947,8 +3979,9 @@ int test_bbackupd()
 		if(bbackupd_pid != -1 && bbackupd_pid != 0)
 		{
 			// Wait and compare (a little bit longer than usual)
-			wait_for_backup_operation(
-				(TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2); 
+			wait_for_operation(
+				(TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2,
+				"bbackupd to sync everything"); 
 			compareReturnValue = ::system(BBACKUPQUERY " "
 				"-c testfiles/bbackupd.conf "
 				"-l testfiles/query4a.log "

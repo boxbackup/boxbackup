@@ -158,7 +158,7 @@ void sync_and_wait();
 void terminate_bbackupd(int pid);
 
 // Wait a given number of seconds for something to complete
-void wait_for_operation(int seconds);
+void wait_for_operation(int seconds, char* message);
 void safe_sleep(int seconds);
 
 #endif // TEST__H

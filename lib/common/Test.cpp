@@ -229,7 +229,14 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 	#endif
 
 	// time for it to start up
-	::fprintf(stdout, "Waiting for server to start: ");
+	if (Logging::GetGlobalLevel() >= Log::TRACE)
+	{
+		BOX_TRACE("Waiting for server to start");
+	}
+	else
+	{
+		::fprintf(stdout, "Waiting for server to start: ");
+	}
 
 	for (int i = 0; i < 15; i++)
 	{
@@ -243,8 +250,12 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 			break;
 		}
 
-		::fprintf(stdout, ".");
-		::fflush(stdout);
+		if (Logging::GetGlobalLevel() < Log::TRACE)
+		{
+			::fprintf(stdout, ".");
+			::fflush(stdout);
+		}
+
 		::sleep(1);
 	}
 
@@ -253,19 +264,42 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 
 	if (pidIfKnown && !ServerIsAlive(pidIfKnown))
 	{
-		::fprintf(stdout, " server died!\n");
+		if (Logging::GetGlobalLevel() >= Log::TRACE)
+		{
+			BOX_ERROR("server died!");
+		}
+		else
+		{
+			::fprintf(stdout, " server died!\n");
+		}
+
 		TEST_FAIL_WITH_MESSAGE("Server died!");	
 		return -1;
 	}
 
 	if (!TestFileNotEmpty(pidFile))
 	{
-		::fprintf(stdout, " timed out!\n");
+		if (Logging::GetGlobalLevel() >= Log::TRACE)
+		{
+			BOX_ERROR("timed out!");
+		}
+		else
+		{
+			::fprintf(stdout, " timed out!\n");
+		}
+
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
 		return -1;
 	}
 
-	::fprintf(stdout, " done.\n");
+	if (Logging::GetGlobalLevel() >= Log::TRACE)
+	{
+		BOX_TRACE("Server started");
+	}
+	else
+	{
+		::fprintf(stdout, " done.\n");
+	}
 
 	// wait a second for the pid to be written to the file
 	::sleep(1);
@@ -278,8 +312,9 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 
 	if (pidIfKnown && pid != pidIfKnown)
 	{
-		printf("Server wrote wrong pid to file (%s): expected %d "
-			"but found %d\n", pidFile, pidIfKnown, pid);
+		BOX_ERROR("Server wrote wrong pid to file (" << pidFile <<
+			"): expected " << pidIfKnown << " but found " <<
+			pid);
 		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");	
 		return -1;
 	}
@@ -381,22 +416,43 @@ void terminate_bbackupd(int pid)
 
 
 // Wait a given number of seconds for something to complete
-void wait_for_operation(int seconds)
+void wait_for_operation(int seconds, char* message)
 {
-	printf("Waiting: ");
-	fflush(stdout);
+	if (Logging::GetGlobalLevel() >= Log::TRACE)
+	{
+		BOX_TRACE("Waiting " << seconds << " seconds for " << message);
+	}
+	else
+	{
+		printf("Waiting for %s: ", message);
+		fflush(stdout);
+	}
+
 	for(int l = 0; l < seconds; ++l)
 	{
 		sleep(1);
-		printf(".");
+		if (Logging::GetGlobalLevel() < Log::TRACE)
+		{
+			printf(".");
+			fflush(stdout);
+		}
+	}
+
+	if (Logging::GetGlobalLevel() >= Log::TRACE)
+	{
+		BOX_TRACE("Finished waiting for " << message);
+	}
+	else
+	{
+		printf(" done.\n");
 		fflush(stdout);
 	}
-	printf(" done.\n");
-	fflush(stdout);
 }
 
 void safe_sleep(int seconds)
 {
+	BOX_TRACE("sleeping for " << seconds << " seconds");
+
 #ifdef WIN32
 	Sleep(seconds * 1000);
 #else
@@ -404,7 +460,6 @@ void safe_sleep(int seconds)
 	memset(&ts, 0, sizeof(ts));
 	ts.tv_sec  = seconds;
 	ts.tv_nsec = 0;
-	BOX_TRACE("sleeping for " << seconds << " seconds");
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{
 		BOX_TRACE("safe_sleep interrupted with " <<
@@ -414,5 +469,4 @@ void safe_sleep(int seconds)
 	}
 #endif
 }
-
 
