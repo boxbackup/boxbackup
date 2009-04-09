@@ -19,7 +19,7 @@ Usage:
         working-dir [backup directories]
 
 Parameters:
-    config-dir          is usually @sysconfdir_expanded@/box
+    config-dir          is usually @sysconfdir_expanded@/boxbackup
     backup-mode         is lazy or snapshot:
         lazy mode       runs continously, uploading files over a specified age
         snapshot mode   uploads a snapshot of the filesystem when instructed
@@ -57,7 +57,7 @@ __E
 }
 
 # default locations
-my $default_config_location = '@sysconfdir_expanded@/box/bbackupd.conf';
+my $default_config_location = '@sysconfdir_expanded@/boxbackup/bbackupd.conf';
 
 # command line parameters
 my ($config_dir,$backup_mode,$account_num,$server,$working_dir,@tobackup) = @ARGV;
