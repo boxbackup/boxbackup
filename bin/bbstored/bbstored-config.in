@@ -19,7 +19,7 @@ Usage:
     bbstored-config config-dir server-hostname username [raidfile-config]
 
 Parameters:
-    config-dir       is usually @sysconfdir_expanded@/box
+    config-dir       is usually @sysconfdir_expanded@/boxbackup
     server-hostname  is the hostname that clients will use to connect to
                      this server
     username         is the user to run the server under
@@ -47,7 +47,7 @@ __E
 }
 
 # default locations
-my $default_config_location = '@sysconfdir_expanded@/box/bbstored.conf';
+my $default_config_location = '@sysconfdir_expanded@/boxbackup/bbstored.conf';
 
 # command line parameters
 my ($config_dir,$server,$username,$raidfile_config) = @ARGV;

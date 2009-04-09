@@ -7,7 +7,7 @@
 NAME=bbstored
 LONGNAME="Box Backup Server daemon"
 BINARY=@sbindir_expanded@/$NAME
-CONFIG=@sysconfdir_expanded@/box/$NAME.conf
+CONFIG=@sysconfdir_expanded@/boxbackup/$NAME.conf
 PIDFILE=@localstatedir_expanded@/run/$NAME.pid
 
 test -x $BINARY || exit 0
