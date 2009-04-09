@@ -32,6 +32,7 @@
 #include "UnixUser.h"
 #include "FileModificationTime.h"
 #include "Logging.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
