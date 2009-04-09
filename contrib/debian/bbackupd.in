@@ -7,7 +7,7 @@
 NAME=bbackupd
 LONGNAME="Box Backup Client daemon"
 BINARY=@sbindir_expanded@/$NAME
-CONFIG=@sysconfdir_expanded@/box/$NAME.conf
+CONFIG=@sysconfdir_expanded@/boxbackup/$NAME.conf
 PIDFILE=@localstatedir_expanded@/bbackupd/$NAME.pid
 
 test -x $BINARY || exit 0

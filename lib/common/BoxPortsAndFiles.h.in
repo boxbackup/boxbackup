@@ -31,9 +31,12 @@
 	#define BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE \
 		GetDefaultConfigFilePath("bbstored.conf").c_str()
 #else
-#define BOX_FILE_BBACKUPD_DEFAULT_CONFIG "@sysconfdir_expanded@/box/bbackupd.conf"
-#define BOX_FILE_RAIDFILE_DEFAULT_CONFIG "@sysconfdir_expanded@/box/raidfile.conf"
-#define BOX_FILE_BBSTORED_DEFAULT_CONFIG "@sysconfdir_expanded@/box/bbstored.conf"
+#define BOX_FILE_BBACKUPD_DEFAULT_CONFIG "@sysconfdir_expanded@/boxbackup/bbackupd.conf"
+#define BOX_FILE_RAIDFILE_DEFAULT_CONFIG "@sysconfdir_expanded@/boxbackup/raidfile.conf"
+#define BOX_FILE_BBSTORED_DEFAULT_CONFIG "@sysconfdir_expanded@/boxbackup/bbstored.conf"
+#define BOX_FILE_BBACKUPD_OLD_CONFIG "@sysconfdir_expanded@/box/bbackupd.conf"
+#define BOX_FILE_RAIDFILE_OLD_CONFIG "@sysconfdir_expanded@/box/raidfile.conf"
+#define BOX_FILE_BBSTORED_OLD_CONFIG "@sysconfdir_expanded@/box/bbstored.conf"
 #endif
 
 #endif // BOXPORTSANDFILES__H

@@ -82,7 +82,7 @@ public:
 	
 public:
 	void Initialise(const std::string& rConfigFilename = 
-		"/etc/box/raidfile.conf");
+		"/etc/boxbackup/raidfile.conf");
 	int GetNumDiscSets() {return mSetList.size();}
 
 	// --------------------------------------------------------------------------
