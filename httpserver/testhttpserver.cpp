@@ -358,7 +358,9 @@ int test(int argc, const char *argv[])
 	// Run the request script
 	TEST_THAT(::system("perl testfiles/testrequests.pl") == 0);
 
+	#ifndef WIN32
 	signal(SIGPIPE, SIG_IGN);
+	#endif
 
 	SocketStream sock;
 	sock.Open(Socket::TypeINET, "localhost", 1080);
