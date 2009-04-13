@@ -26,6 +26,7 @@
 #include "HTTPServer.h"
 #include "IOStreamGetLine.h"
 #include "S3Client.h"
+#include "S3Simulator.h"
 #include "ServerControl.h"
 #include "Test.h"
 #include "decode.h"
@@ -124,213 +125,6 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 TestWebServer::TestWebServer() {}
 TestWebServer::~TestWebServer() {}
-
-class S3Simulator : public HTTPServer
-{
-public:
-	S3Simulator() { }
-	~S3Simulator() { }
-
-	virtual void Handle(HTTPRequest &rRequest, HTTPResponse &rResponse);
-	virtual void HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse);
-	virtual void HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse);
-};
-
-void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
-{
-	// if anything goes wrong, return a 500 error
-	rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
-	rResponse.SetContentType("text/plain");
-
-	try
-	{
-		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
-		std::string access_key = "0PN5J17HBGZHT7JJ3X82";
-		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
-		
-		std::string md5, date, bucket;
-		rRequest.GetHeader("Content-MD5", &md5);
-		rRequest.GetHeader("Date", &date);
-		
-		std::string host = rRequest.GetHostName();
-		std::string s3suffix = ".s3.amazonaws.com";
-		if (host.size() > s3suffix.size())
-		{
-			std::string suffix = host.substr(host.size() -
-				s3suffix.size(), s3suffix.size());
-			if (suffix == s3suffix)
-			{
-				bucket = host.substr(0, host.size() -
-					s3suffix.size());
-			}
-		}
-		
-		std::ostringstream data;
-		data << rRequest.GetVerb() << "\n";
-		data << md5 << "\n";
-		data << rRequest.GetContentType() << "\n";
-		data << date << "\n";
-		
-		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
-		
-		for (std::vector<HTTPRequest::Header>::iterator
-			i = headers.begin(); i != headers.end(); i++)
-		{
-			std::string& rHeaderName = i->first;
-			
-			for (std::string::iterator c = rHeaderName.begin();
-				c != rHeaderName.end() && *c != ':'; c++)
-			{
-				*c = tolower(*c);
-			}
-		}
-		
-		sort(headers.begin(), headers.end());
-		
-		for (std::vector<HTTPRequest::Header>::iterator
-			i = headers.begin(); i != headers.end(); i++)
-		{
-			if (i->first.substr(0, 5) == "x-amz")
-			{
-				data << i->first << ":" << i->second << "\n";
-			}
-		}		
-		
-		if (! bucket.empty())
-		{
-			data << "/" << bucket;
-		}
-		
-		data << rRequest.GetRequestURI();
-		std::string data_string = data.str();
-
-		unsigned char digest_buffer[EVP_MAX_MD_SIZE];
-		unsigned int digest_size = sizeof(digest_buffer);
-		/* unsigned char* mac = */ HMAC(EVP_sha1(),
-			secret_key.c_str(), secret_key.size(),
-			(const unsigned char*)data_string.c_str(),
-			data_string.size(), digest_buffer, &digest_size);
-		std::string digest((const char *)digest_buffer, digest_size);
-		
-		base64::encoder encoder;
-		std::string expectedAuth = "AWS " + access_key + ":" +
-			encoder.encode(digest);
-		
-		if (expectedAuth[expectedAuth.size() - 1] == '\n')
-		{
-			expectedAuth = expectedAuth.substr(0,
-				expectedAuth.size() - 1);
-		}
-		
-		std::string actualAuth;
-		if (!rRequest.GetHeader("Authorization", &actualAuth) ||
-			actualAuth != expectedAuth)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_Unauthorized);
-		}	
-		else if (rRequest.GetMethod() == HTTPRequest::Method_GET)
-		{
-			HandleGet(rRequest, rResponse);
-		}
-		else if (rRequest.GetMethod() == HTTPRequest::Method_PUT)
-		{
-			HandlePut(rRequest, rResponse);
-		}
-		else
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_MethodNotAllowed);
-		}
-	}
-	catch (CommonException &ce)
-	{
-		rResponse.IOStream::Write(ce.what());
-	}
-	catch (std::exception &e)
-	{
-		rResponse.IOStream::Write(e.what());
-	}
-	catch (...)
-	{
-		rResponse.IOStream::Write("Unknown error");
-	}
-	
-	return;
-}
-
-void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
-{
-	std::string path = "testfiles";
-	path += rRequest.GetRequestURI();
-	std::auto_ptr<FileStream> apFile;
-
-	try
-	{
-		apFile.reset(new FileStream(path));
-	}
-	catch (CommonException &ce)
-	{
-		if (ce.GetSubType() == CommonException::OSFileOpenError)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
-		}
-		else if (ce.GetSubType() == CommonException::AccessDenied)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
-		}
-		throw;
-	}
-
-	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
-	apFile->CopyStreamTo(rResponse);
-	rResponse.AddHeader("x-amz-id-2", "qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY");
-	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
-	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
-	rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
-	rResponse.AddHeader("Server", "AmazonS3");
-	rResponse.SetResponseCode(HTTPResponse::Code_OK);
-}
-
-void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
-{
-	std::string path = "testfiles";
-	path += rRequest.GetRequestURI();
-	std::auto_ptr<FileStream> apFile;
-
-	try
-	{
-		apFile.reset(new FileStream(path, O_CREAT | O_WRONLY));
-	}
-	catch (CommonException &ce)
-	{
-		if (ce.GetSubType() == CommonException::OSFileOpenError)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
-		}
-		else if (ce.GetSubType() == CommonException::AccessDenied)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
-		}
-		throw;
-	}
-
-	if (rRequest.IsExpectingContinue())
-	{
-		rResponse.SendContinue();
-	}
-
-	rRequest.ReadContent(*apFile);
-
-	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTObjectPUT.html
-	rResponse.AddHeader("x-amz-id-2", "LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7");
-	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
-	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
-	rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
-	rResponse.SetContentType("");
-	rResponse.AddHeader("Server", "AmazonS3");
-	rResponse.SetResponseCode(HTTPResponse::Code_OK);
-}
 
 int test(int argc, const char *argv[])
 {
@@ -446,16 +240,17 @@ int test(int argc, const char *argv[])
 	TEST_THAT(KillServer(pid));
 	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
 
-	// correct, official signature should succeed
+	// correct, official signature should succeed, with lower-case header
 	{
 		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
 		request.SetHostName("johnsmith.s3.amazonaws.com");
-		request.AddHeader("Date", "Tue, 27 Mar 2007 19:36:42 +0000");
-		request.AddHeader("Authorization",
+		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		request.AddHeader("authorization",
 			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
 		
 		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
 		
 		CollectInBufferStream response_buffer;
 		HTTPResponse response(&response_buffer);
@@ -473,11 +268,12 @@ int test(int argc, const char *argv[])
 		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
 		request.SetHostName("johnsmith.s3.amazonaws.com");
-		request.AddHeader("Date", "Tue, 27 Mar 2007 19:36:42 +0000");
-		request.AddHeader("Authorization",
+		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		request.AddHeader("authorization",
 			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=");
 		
 		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
 		
 		CollectInBufferStream response_buffer;
 		HTTPResponse response(&response_buffer);
@@ -487,12 +283,19 @@ int test(int argc, const char *argv[])
 		
 		std::string response_data((const char *)response.GetBuffer(),
 			response.GetSize());
-		TEST_EQUAL("", response_data);
+		TEST_EQUAL("<html><head>"
+			"<title>Internal Server Error</title></head>\n"
+			"<h1>Internal Server Error</h1>\n"
+			"<p>An error, type Authentication Failed occured "
+			"when processing the request.</p>"
+			"<p>Please try again later.</p></body>\n"
+			"</html>\n", response_data);
 	}
 
 	// S3Client tests
 	{
 		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
 		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
 			"0PN5J17HBGZHT7JJ3X82",
 			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
@@ -527,8 +330,8 @@ int test(int argc, const char *argv[])
 		HTTPRequest request(HTTPRequest::Method_PUT,
 			"/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
-		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+		request.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("authorization", "AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
 		request.AddHeader("Content-Type", "text/plain");
 		
 		FileStream fs("testfiles/testrequests.pl");
@@ -539,6 +342,7 @@ int test(int argc, const char *argv[])
 		HTTPResponse response(&response_buffer);
 		
 		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
 		simulator.Handle(request, response);
 		
 		TEST_EQUAL(200, response.GetResponseCode());
@@ -558,8 +362,8 @@ int test(int argc, const char *argv[])
 	}
 
 	// Start the S3Simulator server
-	pid = LaunchServer("./test s3server testfiles/httpserver.conf",
-		"testfiles/httpserver.pid");
+	pid = LaunchServer("./test s3server testfiles/s3simulator.conf",
+		"testfiles/s3simulator.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid <= 0)
 	{
