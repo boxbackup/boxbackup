@@ -431,6 +431,8 @@ __E
 echo Killing any running daemons...
 kill_process bbackupd
 kill_process bbstored
+kill_process httpserver
+kill_process s3simulator
 __E
 			}
 
