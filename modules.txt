@@ -44,6 +44,7 @@ test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bi
 # HTTP server system
 lib/httpserver          lib/server 
 test/httpserver         lib/httpserver 
+bin/s3simulator		lib/httpserver
 
 # END_IF_DISTRIBUTION
 

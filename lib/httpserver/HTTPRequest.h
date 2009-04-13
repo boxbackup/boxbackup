@@ -97,16 +97,19 @@ public:
 	const std::string &GetCookie(const char *CookieName) const;
 	bool GetHeader(const std::string& rName, std::string* pValueOut) const
 	{
+		std::string header = ToLowerCase(rName);
+
 		for (std::vector<Header>::const_iterator
 			i  = mExtraHeaders.begin();
 			i != mExtraHeaders.end(); i++)
 		{
-			if (i->first == rName)
+			if (i->first == header)
 			{
 				*pValueOut = i->second;
 				return true;
 			}
 		}
+
 		return false;
 	}
 	std::vector<Header> GetHeaders() { return mExtraHeaders; }
@@ -128,7 +131,7 @@ public:
 
 	void AddHeader(const std::string& rName, const std::string& rValue)
 	{
-		mExtraHeaders.push_back(Header(rName, rValue));
+		mExtraHeaders.push_back(Header(ToLowerCase(rName), rValue));
 	}
 	bool IsExpectingContinue() const { return mExpectContinue; }
 	const char* GetVerb() const
@@ -168,6 +171,17 @@ private:
 	bool mExpectContinue;
 	IOStream* mpStreamToReadFrom;
 	std::string mHttpVerb;
+
+	std::string ToLowerCase(const std::string& rInput) const
+	{
+		std::string output = rInput;
+		for (std::string::iterator c = output.begin();
+			c != output.end(); c++)
+		{
+			*c = tolower(*c);
+		}
+		return output;
+	}
 };
 
 #endif // HTTPREQUEST__H
