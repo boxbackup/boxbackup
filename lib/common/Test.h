@@ -90,8 +90,8 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 	\
 	if(_exp_str != _found_str) \
 	{ \
-		printf("Expected <%s> but found <%s>\n", \
-			_exp_str.c_str(), _found_str.c_str()); \
+		BOX_WARNING("Expected <" << _exp_str << "> but found <" << \
+			_found_str << ">"); \
 		\
 		std::ostringstream _oss3; \
 		_oss3 << #_found << " != " << #_expected; \
