@@ -153,21 +153,21 @@ void HTTPServer::Connection(SocketStream &rStream)
 	
 		// Generate a response
 		HTTPResponse response(&rStream);
+		
 		try
 		{
 			Handle(request, response);
 		}
 		catch(BoxException &e)
 		{
-			char exceptionCode[64];
-			::sprintf(exceptionCode, "(%d/%d)", e.GetType(), e.GetSubType());
-			SendInternalErrorResponse(exceptionCode, rStream);
-			return;
+			char exceptionCode[256];
+			::sprintf(exceptionCode, "%s (%d/%d)", e.what(),
+				e.GetType(), e.GetSubType());
+			SendInternalErrorResponse(exceptionCode, response);
 		}
 		catch(...)
 		{
-			SendInternalErrorResponse("unknown", rStream);
-			return;
+			SendInternalErrorResponse("unknown", response);
 		}
 		
 		// Keep alive?
@@ -186,7 +186,7 @@ void HTTPServer::Connection(SocketStream &rStream)
 		response.Send(request.GetMethod() == HTTPRequest::Method_HEAD);
 	}
 
-	// Notify derived claases
+	// Notify derived classes
 	HTTPConnectionClosing();
 }
 
@@ -194,12 +194,14 @@ void HTTPServer::Connection(SocketStream &rStream)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPServer::SendInternalErrorResponse(const char *, SocketStream &)
-//		Purpose: Sends an error response to the remote side
+//		Name:    HTTPServer::SendInternalErrorResponse(const char*,
+//			 HTTPResponse&)
+//		Purpose: Generates an error message in the provided response
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-void HTTPServer::SendInternalErrorResponse(const char *Error, SocketStream &rStream)
+void HTTPServer::SendInternalErrorResponse(const std::string& rErrorMsg,
+	HTTPResponse& rResponse)
 {
 	#define ERROR_HTML_1 "<html><head><title>Internal Server Error</title></head>\n" \
 			"<h1>Internal Server Error</h1>\n" \
@@ -209,15 +211,11 @@ void HTTPServer::SendInternalErrorResponse(const char *Error, SocketStream &rStr
 			"</body>\n</html>\n"
 
 	// Generate the error page
-	HTTPResponse response(&rStream);
-	response.SetResponseCode(HTTPResponse::Code_InternalServerError);
-	response.SetContentType("text/html");
-	response.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
-	response.Write(Error, ::strlen(Error));
-	response.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
-
-	// Send the error response
-	response.Send();
+	// rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
+	rResponse.SetContentType("text/html");
+	rResponse.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
+	rResponse.IOStream::Write(rErrorMsg.c_str());
+	rResponse.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
 }
 
 

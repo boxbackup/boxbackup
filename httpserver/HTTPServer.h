@@ -52,15 +52,17 @@ public:
 	virtual void HTTPConnectionOpening();
 	virtual void HTTPConnectionClosing();
 
+protected:
+	void SendInternalErrorResponse(const std::string& rErrorMsg,
+		HTTPResponse& rResponse);
+	int GetTimeout() { return mTimeout; }
+
 private:
+	int mTimeout;	// Timeout for read operations
 	const char *DaemonName() const;
 	const ConfigurationVerify *GetConfigVerify() const;
 	void Run();
 	void Connection(SocketStream &rStream);
-	void SendInternalErrorResponse(const char *Error, SocketStream &rStream);
-
-private:
-	int mTimeout;	// Timeout for read operations
 };
 
 // Root level
