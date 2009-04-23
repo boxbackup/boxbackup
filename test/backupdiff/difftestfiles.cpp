@@ -10,6 +10,7 @@
 #include "Box.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #include "FileStream.h"
 #include "PartialReadStream.h"

@@ -37,7 +37,7 @@ public:
 		AsRaidWithMissingNotRecoverable = 4
 	} ExistType;
 	
-	typedef enum
+	enum
 	{
 		Stripe1Exists = 1,
 		Stripe2Exists = 2,
