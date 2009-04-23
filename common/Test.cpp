@@ -416,7 +416,7 @@ void terminate_bbackupd(int pid)
 
 
 // Wait a given number of seconds for something to complete
-void wait_for_operation(int seconds, char* message)
+void wait_for_operation(int seconds, const char* message)
 {
 	if (Logging::GetGlobalLevel() >= Log::TRACE)
 	{
