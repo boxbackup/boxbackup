@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <algorithm>
 #include <cstring>
 
 // #include <cstdio>
@@ -125,7 +126,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		// header names are already in lower case, i.e. canonical form
 
 		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
-		sort(headers.begin(), headers.end());
+                std::sort(headers.begin(), headers.end());
 		
 		for (std::vector<HTTPRequest::Header>::iterator
 			i = headers.begin(); i != headers.end(); i++)
