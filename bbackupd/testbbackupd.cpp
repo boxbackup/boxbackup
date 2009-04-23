@@ -87,7 +87,7 @@
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 
-void wait_for_backup_operation(char* message)
+void wait_for_backup_operation(const char* message)
 {
 	wait_for_operation(TIME_TO_WAIT_FOR_BACKUP_OPERATION, message);
 }

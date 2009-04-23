@@ -368,7 +368,7 @@ int test(int argc, const char *argv[])
 	// Leave timers initialised for rest of test.
 	// Test main() will cleanup after test finishes.
 
-	static char *testfilelines[] =
+	static const char *testfilelines[] =
 	{
 		"First line",
 		"Second line",
