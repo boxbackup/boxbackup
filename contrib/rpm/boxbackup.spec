@@ -25,18 +25,18 @@
 
 %if %{is_suse}
 %define init_dir %{_sysconfdir}/init.d
-%define dist suse
+%define distribution suse
 %define rc_start rc
 %else
 %define init_dir %{_sysconfdir}/rc.d/init.d
-%define dist redhat
+%define distribution redhat
 %define rc_start "service "
 %endif
 
 Summary: An automatic on-line backup system for UNIX.
 Name: boxbackup
 Version: ###DISTRIBUTION-VERSION-NUMBER###
-Release: 1
+Release: 1%{?dist}
 License: BSD
 Group: Applications/Archiving
 Packager: boxbackup-dev@boxbackup.org
@@ -129,7 +129,7 @@ install -m 755 contrib/bbreporter/bbreporter.py \
 
 # Client
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd.conf
-install -m 755 contrib/%{dist}/bbackupd $RPM_BUILD_ROOT%{init_dir}
+install -m 755 contrib/%{distribution}/bbackupd $RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbackupd $RPM_BUILD_ROOT%{_sbindir}/rcbbackupd
 %endif
@@ -142,7 +142,7 @@ install %{client_dir}/bbackupd-config $RPM_BUILD_ROOT%{_sbindir}
 # Server
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/bbstored.conf
 touch $RPM_BUILD_ROOT%{_sysconfdir}/box/raidfile.conf
-install -m 755 contrib/%{dist}/bbstored $RPM_BUILD_ROOT%{init_dir}
+install -m 755 contrib/%{distribution}/bbstored $RPM_BUILD_ROOT%{init_dir}
 %if %{is_suse}
 ln -s ../../%{init_dir}/bbstored $RPM_BUILD_ROOT%{_sbindir}/rcbbstored
 %endif
@@ -225,6 +225,9 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_docdir}/%{ident}/bbreporter
 
 %changelog
+* Thu Apr 23 2009 Martin Ebourne <martin@zepler.org>
+- Use dist tag in version
+
 * Thu May 29 2008 Martin Ebourne <martin@zepler.org>
 - Fix paths to bbreporter files
 
