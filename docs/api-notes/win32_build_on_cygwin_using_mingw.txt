@@ -18,7 +18,7 @@ Make sure to select the following packages during installation:
  * Devel/make
  * Devel/mingw-runtime
  * Lib/libxml2
- * Lib/libxslt
+ * Lib/libxslt (for xsltproc)
  * Mingw/mingw-zlib
  * Perl/Perl
 
