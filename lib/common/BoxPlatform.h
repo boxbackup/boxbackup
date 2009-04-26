@@ -176,6 +176,14 @@
 
 #include "emu.h"
 
+#ifdef WIN32
+	#define INVALID_FILE INVALID_HANDLE_VALUE
+	typedef HANDLE tOSFileHandle;
+#else
+	#define INVALID_FILE -1
+	typedef int tOSFileHandle;
+#endif
+
 // Solaris has no dirfd(x) macro or function, and we need one for
 // intercept tests. We cannot define macros with arguments directly 
 // using AC_DEFINE, so do it here instead of in configure.ac.
