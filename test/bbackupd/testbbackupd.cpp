@@ -2443,10 +2443,10 @@ int test_bbackupd()
 			// next poll should happen within the next
 			// 5 seconds (normally about 3 seconds)
 
-			safe_sleep(1); // 2 seconds before
+			wait_for_operation(1, "2 seconds before next run");
 			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
 				"syncallowscript.notifyran.1", &st) != 0);
-			safe_sleep(4); // 2 seconds after
+			wait_for_operation(4, "2 seconds after run");
 			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
 				"syncallowscript.notifyran.1", &st) == 0);
 			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
@@ -2455,10 +2455,10 @@ int test_bbackupd()
 			// next poll should happen within the next
 			// 10 seconds (normally about 8 seconds)
 
-			safe_sleep(6); // 2 seconds before
+			wait_for_operation(6, "2 seconds before next run");
 			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
 				"syncallowscript.notifyran.2", &st) != 0);
-			safe_sleep(4); // 2 seconds after
+			wait_for_operation(4, "2 seconds after run");
 			TEST_THAT(stat("testfiles" DIRECTORY_SEPARATOR 
 				"syncallowscript.notifyran.2", &st) == 0);
 
@@ -2481,9 +2481,14 @@ int test_bbackupd()
 			long end_time = time(NULL);
 
 			long wait_time = end_time - start_time + 2;
+
 			// should be about 10 seconds
-			printf("Waited for %ld seconds, should have been %s",
-				wait_time, control_string);
+			if (wait_time < 8 || wait_time > 12)
+			{
+				printf("Waited for %ld seconds, should have "
+					"been %s", wait_time, control_string);
+			}
+
 			TEST_THAT(wait_time >= 8);
 			TEST_THAT(wait_time <= 12);
 
