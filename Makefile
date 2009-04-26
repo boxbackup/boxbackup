@@ -41,20 +41,6 @@ $(DOCBOOK_DIR)/ExceptionCodes.xml: ../ExceptionCodes.txt
 
 manpages: man-dirs man-nroff man-html
 
-xslt: $(MANXSL)
-
-$(MANXSL): $(MANXSL).tmpl
-	@if [ -f /usr/local/share/xsl/docbook/manpages/docbook.xsl ]; then \
-	   DOCBOOK=file:///usr/local/share/xsl/docbook/manpages/docbook.xsl; \
-	 elif [ -f /opt/local/share/xsl/docbook-xsl/manpages/docbook.xsl ]; then \
-	   DOCBOOK=file:///opt/local/share/xsl/docbook-xsl/manpages/docbook.xsl; \
-	 elif [ -f /usr/share/sgml/docbook/xsl-stylesheets/manpages/docbook.xsl ]; then \
-	   DOCBOOK=file:///usr/share/sgml/docbook/xsl-stylesheets/manpages/docbook.xsl; \
-	 else \
-	   DOCBOOK=http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl; \
-	 fi; \
-	 sed -e "s,%%DOCBOOK%%,$${DOCBOOK}," $(MANXSL).tmpl > $(MANXSL)
-
 man-dirs: man/.there $(HTML_DIR)/man-html/.there
 
 $(HTML_DIR)/man-html/.there:
@@ -84,22 +70,13 @@ man-html: $(HTML_FILES)
 $(HTML_DIR)/man-html/%.html: $(DOCBOOK_DIR)/%.xml $(NOCHUNKBOOKXSL)
 	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
 
-# Before running xsltproc to generate manual pages, we need to check
-# that $(MANXSL) has been built. We don't want to add it to dependencies,
-# because that would cause # the man pages to try to be rebuilt even if
-# they already exist if the date of the xslt file changes, and that
-# requires xsltproc, which negates the point of precompiling them for
-# distribution users.
-
 # GNU make
 $(MAN_DIR)/%.8.gz: $(DOCBOOK_DIR)/%.xml
-	$(MAKE) xslt
 	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
 	gzip $(@:.gz=)
 
 # GNU make
 $(MAN_DIR)/%.5.gz: $(DOCBOOK_DIR)/%.xml
-	$(MAKE) xslt
 	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
 	gzip $(@:.gz=)
 
@@ -109,7 +86,6 @@ $(MAN_DIR)/%.5.gz: $(DOCBOOK_DIR)/%.xml
 
 .for MAN_PAGE in $(NROFF_PAGES) :
 $(MAN_DIR)/$(MAN_PAGE).gz: $(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
-	$(MAKE) xslt
 	$(DBPROC) -o $(.TARGET:.gz=) $(MANXSL) $>
 	gzip $(@:.gz=)
 
@@ -125,5 +101,4 @@ clean:
 	rm -f $(NROFF_FILES)
 	rm -f $(DOCBOOK_DIR)/ExceptionCodes.xml
 	rm -f documentation-kit-0.10.tar.gz
-	rm -f $(MANXSL)
 
