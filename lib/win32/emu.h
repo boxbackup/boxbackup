@@ -117,7 +117,7 @@ inline struct passwd * getpwnam(const char * name)
 #ifndef __MINGW32__
 	//not sure if these are correct
 	//S_IWRITE -   writing permitted
-	//_S_IREAD -    reading permitted
+	//_S_IREAD -   reading permitted
 	//_S_IREAD | _S_IWRITE - 
 	#define S_IRUSR S_IWRITE
 	#define S_IWUSR S_IREAD
@@ -242,6 +242,15 @@ int closedir(DIR *dp);
 
 extern DWORD winerrno; /* used to report errors from openfile() */
 HANDLE openfile(const char *filename, int flags, int mode);
+inline int closefile(HANDLE handle)
+{
+	if (CloseHandle(handle) != TRUE)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	return 0;
+}
 
 #define LOG_DEBUG LOG_INFO
 #define LOG_INFO 6
