@@ -428,11 +428,16 @@ __E
 			if (-d "$module/testfiles")
 			{
 				print TESTFILE <<__E;
+kill_daemons()
+{
+	kill_process bbackupd
+	kill_process bbstored
+	kill_process httpserver
+	kill_process s3simulator
+}
+
 echo Killing any running daemons...
-kill_process bbackupd
-kill_process bbstored
-kill_process httpserver
-kill_process s3simulator
+kill_daemons
 __E
 			}
 
@@ -459,8 +464,7 @@ __E
 			if (-d "$module/testfiles")
 			{
 				print TESTFILE <<__E;
-kill_process bbackupd
-kill_process bbstored
+kill_daemons
 __E
 			}
 
