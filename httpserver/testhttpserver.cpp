@@ -238,7 +238,12 @@ int test(int argc, const char *argv[])
 	
 	// Kill it
 	TEST_THAT(KillServer(pid));
-	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+
+	#ifdef WIN32
+		TEST_THAT(unlink("testfiles/httpserver.pid") == 0);
+	#else
+		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+	#endif
 
 	// correct, official signature should succeed, with lower-case header
 	{
@@ -387,6 +392,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(404, response.GetResponseCode());
 	}
 
+	#ifndef WIN32 // much harder to make files inaccessible on WIN32
 	// Make file inaccessible, should cause server to return a 403 error,
 	// unless of course the test is run as root :)
 	{
@@ -405,6 +411,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(403, response.GetResponseCode());
 		TEST_THAT(chmod("testfiles/testrequests.pl", 0755) == 0);
 	}
+	#endif
 
 	{
 		HTTPRequest request(HTTPRequest::Method_GET,
@@ -461,7 +468,12 @@ int test(int argc, const char *argv[])
 
 	// Kill it
 	TEST_THAT(KillServer(pid));
-	TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+
+	#ifdef WIN32
+		TEST_THAT(unlink("testfiles/s3simulator.pid") == 0);
+	#else
+		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+	#endif
 
 	return 0;
 }
