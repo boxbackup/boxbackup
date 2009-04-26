@@ -8,7 +8,7 @@ unless(open IN,"../../bin/bbackupquery/bbackupquery -Wwarning " .
 	"-l testfiles/query4.log " .
 	"\"compare -ac$flags\" quit 2>&1 |")
 {
-	print "Couldn't open compare utility\n";
+	print "FAIL: opening compare utility\n";
 	exit 2;
 }
 
@@ -48,7 +48,11 @@ while(<IN>)
 
 close IN;
 
-$ret = 2 unless $seen;
+unless ($seen)
+{
+	print "FAIL: missing line matching continousupdate\n";
+	$ret = 2;
+}
 
 exit $ret;
 
