@@ -18,14 +18,14 @@
 #define BBSTORED        "..\\..\\bin\\bbstored\\bbstored.exe"
 #define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
 #define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
-#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected);
+#define TEST_RETURN(actual, expected) TEST_EQUAL(expected, actual);
 #else
 #define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
 #define BBACKUPD        "../../bin/bbackupd/bbackupd"
 #define BBSTORED        "../../bin/bbstored/bbstored"
 #define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
 #define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
-#define TEST_RETURN(actual, expected) TEST_THAT(actual == expected*256);
+#define TEST_RETURN(actual, expected) TEST_EQUAL(expected << 8, actual);
 #endif
 
 extern int failures;
