@@ -66,6 +66,19 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 			next;
 		}
 		next if (m'\AEND-ONLY');
+
+		if (m'\AEXCEPT:(.+)')
+		{
+			if (os_matches($1))
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-EXCEPT';
+				}
+			}
+			next;
+		}
+		next if (m'\AEND-EXCEPT');
 		
 		# new parcel, or a new parcel definition?
 		if(m/\A\s+(.+)\Z/)
@@ -227,6 +240,24 @@ docs/man/${name}.gz:
 
 EOF
 			push @parcel_deps, "$dir/${name}.gz";
+		}
+		elsif($type eq 'html')
+		{
+			print MAKE <<EOF;
+$dir/docs/${name}.html: docs/htmlguide/man-html/${name}.html
+	mkdir -p $dir/docs
+	$copy_command docs/htmlguide/man-html/${name}.html $dir/docs
+
+EOF
+			# Releases have the docs pre-made, but users
+			# may want to rebuild them for some reason.
+			print MAKE <<EOF;
+.PHONY: docs/htmlguide/man-html/${name}.html
+docs/htmlguide/man-html/${name}.html:
+	\$(MAKE) -C docs htmlguide/man-html/${name}.html
+
+EOF
+			push @parcel_deps, "$dir/docs/${name}.html";
 		}
 	}
 
