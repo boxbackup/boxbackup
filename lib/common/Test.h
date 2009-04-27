@@ -25,7 +25,7 @@
 #define BBSTORED        "../../bin/bbstored/bbstored"
 #define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
 #define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
-#define TEST_RETURN(actual, expected) TEST_EQUAL(expected << 8, actual);
+#define TEST_RETURN(actual, expected) TEST_EQUAL((expected << 8), actual);
 #endif
 
 extern int failures;
