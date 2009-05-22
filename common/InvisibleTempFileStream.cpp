@@ -24,9 +24,9 @@
 // --------------------------------------------------------------------------
 InvisibleTempFileStream::InvisibleTempFileStream(const char *Filename, int flags, int mode)
 #ifdef WIN32
-	: FileStream(::openfile(Filename, flags | O_TEMPORARY, mode))
+	: FileStream(Filename, flags | O_TEMPORARY, mode)
 #else
-	: FileStream(::open(Filename, flags, mode))
+	: FileStream(Filename, flags, mode)
 #endif
 {
 	#ifndef WIN32
