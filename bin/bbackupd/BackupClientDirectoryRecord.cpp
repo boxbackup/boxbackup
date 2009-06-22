@@ -294,14 +294,21 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				#else
 				if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
 				{
-					// Report the error (logs and 
-					// eventual email to administrator)
- 					rNotifier.NotifyFileStatFailed(this, 
- 						filename, strerror(errno));
+					if(!(rParams.mrContext.ExcludeDir(
+						filename)))
+					{
+						// Report the error (logs and 
+						// eventual email to
+						// administrator)
+ 						rNotifier.NotifyFileStatFailed(
+							this, filename,
+							strerror(errno));
 					
-					// FIXME move to NotifyFileStatFailed()
-					SetErrorWhenReadingFilesystemObject(
-						rParams, filename.c_str());
+						// FIXME move to
+						// NotifyFileStatFailed()
+						SetErrorWhenReadingFilesystemObject(
+							rParams, filename.c_str());
+					}
 
 					// Ignore this entry for now.
 					continue;
