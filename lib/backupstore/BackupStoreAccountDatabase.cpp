@@ -289,7 +289,8 @@ bool BackupStoreAccountDatabase::EntryExists(int32_t ID) const
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-const BackupStoreAccountDatabase::Entry &BackupStoreAccountDatabase::GetEntry(int32_t ID) const
+BackupStoreAccountDatabase::Entry BackupStoreAccountDatabase::GetEntry(
+	int32_t ID) const
 {
 	// Check that we're using the latest version of the database
 	CheckUpToDate();
@@ -311,12 +312,14 @@ const BackupStoreAccountDatabase::Entry &BackupStoreAccountDatabase::GetEntry(in
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-void BackupStoreAccountDatabase::AddEntry(int32_t ID, int DiscSet)
+BackupStoreAccountDatabase::Entry BackupStoreAccountDatabase::AddEntry(
+	int32_t ID, int DiscSet)
 {
 	// Check that we're using the latest version of the database
 	CheckUpToDate();
 
 	pImpl->mDatabase[ID] = Entry(ID, DiscSet);
+	return pImpl->mDatabase[ID];
 }
 
 

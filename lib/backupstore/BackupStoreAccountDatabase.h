@@ -55,8 +55,8 @@ public:
 	};
 
 	bool EntryExists(int32_t ID) const;
-	const Entry &GetEntry(int32_t ID) const;
-	void AddEntry(int32_t ID, int DiscSet);
+	Entry GetEntry(int32_t ID) const;
+	Entry AddEntry(int32_t ID, int DiscSet);
 	void DeleteEntry(int32_t ID);
 
 	// This interface should change in the future. But for now it'll do.
