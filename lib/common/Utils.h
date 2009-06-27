@@ -21,7 +21,8 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 	void DumpStackBacktrace();
 #endif
 
-bool FileExists(const char *Filename, int64_t *pFileSize = 0, bool TreatLinksAsNotExisting = false);
+bool FileExists(const std::string& rFilename, int64_t *pFileSize = 0,
+	bool TreatLinksAsNotExisting = false);
 
 enum
 {
