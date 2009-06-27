@@ -156,15 +156,16 @@ void DumpStackBacktrace()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    FileExists(const char *)
+//		Name:    FileExists(const std::string& rFilename)
 //		Purpose: Does a file exist?
 //		Created: 20/11/03
 //
 // --------------------------------------------------------------------------
-bool FileExists(const char *Filename, int64_t *pFileSize, bool TreatLinksAsNotExisting)
+bool FileExists(const std::string& rFilename, int64_t *pFileSize,
+	bool TreatLinksAsNotExisting)
 {
 	EMU_STRUCT_STAT st;
-	if(EMU_LSTAT(Filename, &st) != 0)
+	if(EMU_LSTAT(rFilename.c_str(), &st) != 0)
 	{
 		if(errno == ENOENT)
 		{
