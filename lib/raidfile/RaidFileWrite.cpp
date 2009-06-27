@@ -113,6 +113,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(mOSFileHandle == -1)
 	{
+		BOX_LOG_SYS_ERROR("Failed to open file: " << writeFilename);
 		THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFile)
 	}
 	
@@ -274,13 +275,15 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	if(::unlink(renameTo.c_str()) != 0 && 
 		GetLastError() != ERROR_FILE_NOT_FOUND)
 	{
-		BOX_LOG_WIN_ERROR("failed to delete file: " << renameTo);
+		BOX_LOG_WIN_ERROR("Failed to delete file: " << renameTo);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 #endif
 
 	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
 	{
+		BOX_LOG_SYS_ERROR("Failed to rename file: " << renameFrom <<
+			" to " << renameTo);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 	
@@ -335,6 +338,7 @@ void RaidFileWrite::Discard()
 		::close(mOSFileHandle) != 0)
 #endif // !WIN32
 	{
+		BOX_LOG_SYS_ERROR("Failed to delete file: " << writeFilename);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
 	
@@ -562,6 +566,8 @@ void RaidFileWrite::TransformToRaidStorage()
 			ASSERT((::lseek(parity, 0, SEEK_CUR) % blockSize) == 0);
 			if(::write(parity, &sw, sizeof(sw)) != sizeof(sw))
 			{
+				BOX_LOG_SYS_ERROR("Failed to write to file: " <<
+					writeFilename);
 				THROW_EXCEPTION(RaidFileException, OSError)
 			}
 		}
@@ -600,6 +606,8 @@ void RaidFileWrite::TransformToRaidStorage()
 		// Finally delete the write file
 		if(::unlink(writeFilename.c_str()) != 0)
 		{
+			BOX_LOG_SYS_ERROR("Failed to delete file: " <<
+				writeFilename);
 			THROW_EXCEPTION(RaidFileException, OSError)
 		}
 	}
