@@ -12,7 +12,7 @@
 
 #include <string>
 
-class BackupStoreAccountDatabase;
+#include "BackupStoreAccountDatabase.h"
 
 // --------------------------------------------------------------------------
 //
@@ -35,9 +35,14 @@ public:
 
 	bool AccountExists(int32_t ID);
 	void GetAccountRoot(int32_t ID, std::string &rRootDirOut, int &rDiscSetOut) const;
+	static std::string GetAccountRoot(const
+		BackupStoreAccountDatabase::Entry &rEntry)
+	{
+		return MakeAccountRootDir(rEntry.GetID(), rEntry.GetDiscSet());
+	}
 
 private:
-	std::string MakeAccountRootDir(int32_t ID, int DiscSet) const;
+	static std::string MakeAccountRootDir(int32_t ID, int DiscSet);
 
 private:
 	BackupStoreAccountDatabase &mrDatabase;

@@ -14,6 +14,7 @@
 #include "BoxPortsAndFiles.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "RaidFileWrite.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreDirectory.h"
@@ -61,6 +62,10 @@ BackupStoreAccounts::~BackupStoreAccounts()
 // --------------------------------------------------------------------------
 void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit, int64_t SizeHardLimit, const std::string &rAsUsername)
 {
+	// Create the entry in the database
+	BackupStoreAccountDatabase::Entry Entry(mrDatabase.AddEntry(ID,
+		DiscSet));
+	
 	{
 		// Become the user specified in the config file?
 		std::auto_ptr<UnixUser> user;
@@ -100,15 +105,17 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		
 		// Save it back
 		info->Save();
+
+		// Create the refcount database
+		BackupStoreRefCountDatabase::CreateNew(Entry);
+		std::auto_ptr<BackupStoreRefCountDatabase> refcount(
+			BackupStoreRefCountDatabase::Load(Entry, false));
+		refcount->AddReference(BACKUPSTORE_ROOT_DIRECTORY_ID);
 	}
 
 	// As the original user...
-
-	// Create the entry in the database
-	mrDatabase.AddEntry(ID, DiscSet);
-	
 	// Write the database back
-	mrDatabase.Write();	
+	mrDatabase.Write();
 }
 
 
@@ -138,7 +145,7 @@ void BackupStoreAccounts::GetAccountRoot(int32_t ID, std::string &rRootDirOut, i
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-std::string BackupStoreAccounts::MakeAccountRootDir(int32_t ID, int DiscSet) const
+std::string BackupStoreAccounts::MakeAccountRootDir(int32_t ID, int DiscSet)
 {
 	char accid[64];	// big enough!
 	::sprintf(accid, "%08x" DIRECTORY_SEPARATOR, ID);
