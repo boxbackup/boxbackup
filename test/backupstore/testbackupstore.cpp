@@ -34,6 +34,8 @@
 #include "BackupClientFileAttributes.h"
 #include "BackupClientCryptoKeys.h"
 #include "ServerControl.h"
+#include "BackupStoreAccountDatabase.h"
+#include "BackupStoreRefCountDatabase.h"
 
 #include "MemLeakFindOn.h"
 
@@ -470,7 +472,27 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 	TEST_THAT(dirs == 0 || dirs == 2);
 }
 
-int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir, const char *name, int depth)
+void create_file_in_dir(std::string name, std::string source, int64_t parentId,
+	BackupProtocolClient &protocol, BackupStoreRefCountDatabase& rRefCount)
+{
+	BackupStoreFilenameClear name_encoded("file_One");
+	std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(
+		source.c_str(), parentId, name_encoded));
+	std::auto_ptr<BackupProtocolClientSuccess> stored(
+		protocol.QueryStoreFile(
+			parentId,
+			0x123456789abcdefLL,		/* modification time */
+			0x7362383249872dfLL,		/* attr hash */
+			0,				/* diff from ID */
+			name_encoded,
+			*upload));
+	int64_t objectId = stored->GetObjectID();
+	TEST_EQUAL(objectId, rRefCount.GetLastObjectIDUsed());
+	TEST_EQUAL(1, rRefCount.GetRefCount(objectId))
+}
+
+int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
+	const char *name, int depth, BackupStoreRefCountDatabase& rRefCount)
 {
 	// Create a directory
 	int64_t subdirid = 0;
@@ -486,49 +508,31 @@ int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir, 
 	}
 	
 	printf("Create subdirs, depth = %d, dirid = %llx\n", depth, subdirid);
+
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+		BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567), true));
+	TEST_EQUAL(subdirid, rRefCount.GetLastObjectIDUsed());
+	TEST_EQUAL(1, rRefCount.GetRefCount(subdirid))
 	
 	// Put more directories in it, if we haven't gone down too far
 	if(depth > 0)
 	{
-		create_test_data_subdirs(protocol, subdirid, "dir_One", depth - 1);
-		create_test_data_subdirs(protocol, subdirid, "dir_Two", depth - 1);
+		create_test_data_subdirs(protocol, subdirid, "dir_One",
+			depth - 1, rRefCount);
+		create_test_data_subdirs(protocol, subdirid, "dir_Two",
+			depth - 1, rRefCount);
 	}
 	
 	// Stick some files in it
-	{
-		BackupStoreFilenameClear name("file_One");
-		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/file1", subdirid, name));
-		std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
-			subdirid,
-			0x123456789abcdefLL,		/* modification time */
-			0x7362383249872dfLL,		/* attr hash */
-			0,							/* diff from ID */
-			name,
-			*upload));
-	}
-	{
-		BackupStoreFilenameClear name("file_Two");
-		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/file1", subdirid, name));
-		std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
-			subdirid,
-			0x123456789abcdefLL,		/* modification time */
-			0x7362383249872dfLL,		/* attr hash */
-			0,							/* diff from ID */
-			name,
-			*upload));
-	}
-	{
-		BackupStoreFilenameClear name("file_Three");
-		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/file1", subdirid, name));
-		std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
-			subdirid,
-			0x123456789abcdefLL,		/* modification time */
-			0x7362383249872dfLL,		/* attr hash */
-			0,							/* diff from ID */
-			name,
-			*upload));
-	}
-
+	create_file_in_dir("file_One", "testfiles/file1", subdirid, protocol,
+		rRefCount);
+	create_file_in_dir("file_Two", "testfiles/file1", subdirid, protocol,
+		rRefCount);
+	create_file_in_dir("file_Three", "testfiles/file1", subdirid, protocol,
+		rRefCount);
 	return subdirid;
 }
 
@@ -885,15 +889,48 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 	}
 }
 
-
-int test_server(const char *hostname)
+void init_context(TLSContext& rContext)
 {
-	// Context
-	TLSContext context;
-	context.Initialise(false /* client */,
+	rContext.Initialise(false /* client */,
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
+}
+
+std::auto_ptr<SocketStreamTLS> open_conn(const char *hostname,
+	TLSContext& rContext)
+{
+	init_context(rContext);
+	std::auto_ptr<SocketStreamTLS> conn(new SocketStreamTLS);
+	conn->Open(rContext, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
+	return conn;
+}
+
+std::auto_ptr<BackupProtocolClient> test_server_login(SocketStreamTLS& rConn)
+{
+	// Make a protocol
+	std::auto_ptr<BackupProtocolClient> protocol(new
+		BackupProtocolClient(rConn));
+	
+	// Check the version
+	std::auto_ptr<BackupProtocolClientVersion> serverVersion(
+		protocol->QueryVersion(BACKUP_STORE_SERVER_VERSION));
+	TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+
+	// Login
+	std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(
+		protocol->QueryLogin(0x01234567, 0));
+
+	return protocol;
+}
+
+int test_server(const char *hostname)
+{
+	TLSContext context;
+	std::auto_ptr<SocketStreamTLS> conn = open_conn(hostname, context);
+	std::auto_ptr<BackupProtocolClient> apProtocol(
+		test_server_login(*conn));
+	BackupProtocolClient& protocol(*apProtocol);
 
 	// Make some test attributes
 	#define ATTR1_SIZE 	245
@@ -911,27 +948,10 @@ int test_server(const char *hostname)
 
 	// BLOCK
 	{
-		// Open a connection to the server
-		SocketStreamTLS conn;
-		conn.Open(context, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
-
-		// Make a protocol
-		BackupProtocolClient protocol(conn);
-		
 		// Get it logging
 		FILE *protocolLog = ::fopen("testfiles/protocol.log", "w");
 		TEST_THAT(protocolLog != 0);
 		protocol.SetLogToFile(protocolLog);
-
-		// Check the version
-		std::auto_ptr<BackupProtocolClientVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-
-		// Login
-		std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));
-		
-		// Check marker is 0
-		TEST_THAT(loginConf->GetClientStoreMarker() == 0);
 
 #ifndef WIN32
 		// Check that we can't open a new connection which requests write permissions
@@ -1435,10 +1455,18 @@ int test_server(const char *hostname)
 		}
 		
 //}	skip:
+
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read(
+				"testfiles/accounts.txt"));
+		std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
+			BackupStoreRefCountDatabase::Load(
+				apAccounts->GetEntry(0x1234567), true));
 	
 		// Create some nice recursive directories
 		int64_t dirtodelete = create_test_data_subdirs(protocol,
-			BackupProtocolClientListDirectory::RootDirectory, "test_delete", 6 /* depth */);
+			BackupProtocolClientListDirectory::RootDirectory,
+			"test_delete", 6 /* depth */, *apRefCount);
 		
 		// And delete them
 		{
@@ -1760,6 +1788,32 @@ int test3(int argc, const char *argv[])
 		TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
 		TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);
 		// make sure something is written to it
+		
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+
+		std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+			BackupStoreRefCountDatabase::Load(
+				apAccounts->GetEntry(0x1234567), true));
+		TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			apReferences->GetLastObjectIDUsed());
+		TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+		apReferences.reset();
+
+		// Delete the refcount database and log in again,
+		// check that it is recreated automatically but with
+		// no objects in it, to ensure seamless upgrade.
+		TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
+
+		// Context
+		TLSContext context;
+		std::auto_ptr<SocketStreamTLS> conn = open_conn("localhost",
+			context);
+		test_server_login(*conn)->QueryFinished();
+
+		apReferences = BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567), true);
+		TEST_EQUAL(0, apReferences->GetLastObjectIDUsed());
 
 		TEST_THAT(ServerIsAlive(pid));
 
