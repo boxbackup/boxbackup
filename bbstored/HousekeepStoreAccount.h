@@ -17,6 +17,12 @@
 class BackupStoreDaemon;
 class BackupStoreDirectory;
 
+class HousekeepingCallback
+{
+	public:
+	virtual ~HousekeepingCallback() {}
+	virtual bool CheckForInterProcessMsg(int AccountNum = 0, int MaximumWaitTime = 0) = 0;
+};
 
 // --------------------------------------------------------------------------
 //
@@ -29,10 +35,11 @@ class BackupStoreDirectory;
 class HousekeepStoreAccount
 {
 public:
-	HousekeepStoreAccount(int AccountID, const std::string &rStoreRoot, int StoreDiscSet, BackupStoreDaemon &rDaemon);
+	HousekeepStoreAccount(int AccountID, const std::string &rStoreRoot,
+		int StoreDiscSet, HousekeepingCallback* pHousekeepingCallback);
 	~HousekeepStoreAccount();
 	
-	void DoHousekeeping();
+	void DoHousekeeping(bool KeepTryingForever = false);
 	
 	
 private:
@@ -65,7 +72,7 @@ private:
 	int mAccountID;
 	std::string mStoreRoot;
 	int mStoreDiscSet;
-	BackupStoreDaemon &mrDaemon;
+	HousekeepingCallback* mpHousekeepingCallback;
 	
 	int64_t mDeletionSizeTarget;
 	
@@ -91,6 +98,10 @@ private:
 	// Deletion count
 	int64_t mFilesDeleted;
 	int64_t mEmptyDirectoriesDeleted;
+
+	// New reference count list
+	std::vector<uint32_t> mNewRefCounts;
+	bool mSuppressRefCountChangeWarnings;
 	
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;
