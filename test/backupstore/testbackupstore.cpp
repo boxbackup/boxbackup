@@ -36,6 +36,8 @@
 #include "ServerControl.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreRefCountDatabase.h"
+#include "BackupStoreAccounts.h"
+#include "HousekeepStoreAccount.h"
 
 #include "MemLeakFindOn.h"
 
@@ -472,6 +474,17 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 	TEST_THAT(dirs == 0 || dirs == 2);
 }
 
+std::vector<uint32_t> ExpectedRefCounts;
+
+void set_refcount(int64_t ObjectID, uint32_t RefCount = 1)
+{
+	if (ExpectedRefCounts.size() <= ObjectID);
+	{
+		ExpectedRefCounts.resize(ObjectID + 1, 0);
+	}
+	ExpectedRefCounts[ObjectID] = RefCount;
+}
+
 void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	BackupProtocolClient &protocol, BackupStoreRefCountDatabase& rRefCount)
 {
@@ -489,6 +502,7 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	int64_t objectId = stored->GetObjectID();
 	TEST_EQUAL(objectId, rRefCount.GetLastObjectIDUsed());
 	TEST_EQUAL(1, rRefCount.GetRefCount(objectId))
+	set_refcount(objectId, 1);
 }
 
 int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
@@ -509,13 +523,9 @@ int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
 	
 	printf("Create subdirs, depth = %d, dirid = %llx\n", depth, subdirid);
 
-	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
-		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true));
 	TEST_EQUAL(subdirid, rRefCount.GetLastObjectIDUsed());
 	TEST_EQUAL(1, rRefCount.GetRefCount(subdirid))
+	set_refcount(subdirid, 1);
 	
 	// Put more directories in it, if we haven't gone down too far
 	if(depth > 0)
@@ -634,7 +644,8 @@ void recursive_count_objects(const char *hostname, int64_t id, recursive_count_o
 
 	// Get a connection
 	SocketStreamTLS connReadOnly;
-	connReadOnly.Open(context, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
+	connReadOnly.Open(context, Socket::TypeINET, hostname,
+		BOX_PORT_BBSTORED_TEST);
 	BackupProtocolClient protocolReadOnly(connReadOnly);
 
 	{
@@ -796,6 +807,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		store1objid = stored->GetObjectID();
 		TEST_THAT(store1objid == 2);
 	}
+	set_refcount(store1objid, 1);
 	// And retrieve it
 	{
 		// Retrieve as object
@@ -902,7 +914,8 @@ std::auto_ptr<SocketStreamTLS> open_conn(const char *hostname,
 {
 	init_context(rContext);
 	std::auto_ptr<SocketStreamTLS> conn(new SocketStreamTLS);
-	conn->Open(rContext, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
+	conn->Open(rContext, Socket::TypeINET, hostname,
+		BOX_PORT_BBSTORED_TEST);
 	return conn;
 }
 
@@ -922,6 +935,17 @@ std::auto_ptr<BackupProtocolClient> test_server_login(SocketStreamTLS& rConn)
 		protocol->QueryLogin(0x01234567, 0));
 
 	return protocol;
+}
+
+void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
+{
+	std::string rootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
+	int discSet = rAccount.GetDiscSet();
+
+	// Do housekeeping on this account
+	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
+		discSet, NULL);
+	housekeeping.DoHousekeeping(true /* keep trying forever */);
 }
 
 int test_server(const char *hostname)
@@ -957,7 +981,8 @@ int test_server(const char *hostname)
 		// Check that we can't open a new connection which requests write permissions
 		{
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, hostname,
+				BOX_PORT_BBSTORED_TEST);
 			BackupProtocolClient protocol(conn);
 			std::auto_ptr<BackupProtocolClientVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 			TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
@@ -973,7 +998,8 @@ int test_server(const char *hostname)
 #ifndef WIN32
 		// Open a new connection which is read only
 		SocketStreamTLS connReadOnly;
-		connReadOnly.Open(context, Socket::TypeINET, hostname, BOX_PORT_BBSTORED);
+		connReadOnly.Open(context, Socket::TypeINET, hostname,
+			BOX_PORT_BBSTORED_TEST);
 		BackupProtocolClient protocolReadOnly(connReadOnly);
 
 		// Get it logging
@@ -1021,6 +1047,10 @@ int test_server(const char *hostname)
 			uploads[t].allocated_objid = stored->GetObjectID();
 			uploads[t].mod_time = modtime;
 			if(maxID < stored->GetObjectID()) maxID = stored->GetObjectID();
+			set_refcount(stored->GetObjectID(), 1);
+			BOX_TRACE("wrote file " << filename << " to server "
+				"as object " <<
+				BOX_FORMAT_OBJECTID(stored->GetObjectID()));
 		}
 
 		// Add some attributes onto one of them
@@ -1141,6 +1171,9 @@ int test_server(const char *hostname)
 				if(maxID < stored->GetObjectID()) maxID = stored->GetObjectID();
 				patchedID = stored->GetObjectID();
 			}
+
+			set_refcount(patchedID, 1);
+
 			// Then download it to check it's OK
 			std::auto_ptr<BackupProtocolClientSuccess> getFile(protocol.QueryGetFile(BackupProtocolClientListDirectory::RootDirectory, patchedID));
 			TEST_THAT(getFile->GetObjectID() == patchedID);
@@ -1162,6 +1195,9 @@ int test_server(const char *hostname)
 			subdirid = dirCreate->GetObjectID(); 
 			TEST_THAT(subdirid == maxID + 1);
 		}
+
+		set_refcount(subdirid, 1);
+
 		// Stick a file in it
 		int64_t subdirfileid = 0;
 		{
@@ -1178,6 +1214,8 @@ int test_server(const char *hostname)
 				*upload));
 			subdirfileid = stored->GetObjectID();
 		}
+
+		set_refcount(subdirfileid, 1);
 
 		printf("\n==== Checking upload using read-only connection\n");
 		// Check the directories on the read only connection
@@ -1401,6 +1439,9 @@ int test_server(const char *hostname)
 				upload));
 			subsubfileid = stored->GetObjectID();
 		}
+
+		set_refcount(subsubdirid, 1);
+		set_refcount(subsubfileid, 1);
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
@@ -1759,7 +1800,8 @@ int test3(int argc, const char *argv[])
 		{
 			// Open a connection to the server
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost",
+				BOX_PORT_BBSTORED_TEST);
 
 			// Make a protocol
 			BackupProtocolClient protocol(conn);
@@ -1805,19 +1847,61 @@ int test3(int argc, const char *argv[])
 		// no objects in it, to ensure seamless upgrade.
 		TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
 
-		// Context
 		TLSContext context;
 		std::auto_ptr<SocketStreamTLS> conn = open_conn("localhost",
 			context);
 		test_server_login(*conn)->QueryFinished();
 
-		apReferences = BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true);
+		BackupStoreAccountDatabase::Entry account =
+			apAccounts->GetEntry(0x1234567);
+		apReferences = BackupStoreRefCountDatabase::Load(account, true);
 		TEST_EQUAL(0, apReferences->GetLastObjectIDUsed());
 
 		TEST_THAT(ServerIsAlive(pid));
 
+		run_housekeeping(account);
+
+		// Check that housekeeping fixed the ref counts
+		TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			apReferences->GetLastObjectIDUsed());
+		TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+
+		TEST_THAT(ServerIsAlive(pid));
+
+		set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
 		TEST_THAT(test_server("localhost") == 0);
+
+		// test that all object reference counts have the
+		// expected values
+		TEST_EQUAL(ExpectedRefCounts.size() - 1,
+			apReferences->GetLastObjectIDUsed());
+		for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
+			i < ExpectedRefCounts.size(); i++)
+		{
+			TEST_EQUAL_LINE(ExpectedRefCounts[i],
+				apReferences->GetRefCount(i),
+				"object " << BOX_FORMAT_OBJECTID(i));
+		}
+
+		// Delete the refcount database again, and let
+		// housekeeping recreate it and fix the ref counts.
+		// This could also happen after upgrade, if a housekeeping
+		// runs before the user logs in.
+		apReferences.reset();
+		TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
+		run_housekeeping(account);
+		apReferences = BackupStoreRefCountDatabase::Load(account, true);
+
+		TEST_EQUAL(ExpectedRefCounts.size() - 1,
+			apReferences->GetLastObjectIDUsed());
+		for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
+			i < ExpectedRefCounts.size(); i++)
+		{
+			TEST_EQUAL_LINE(ExpectedRefCounts[i],
+				apReferences->GetRefCount(i),
+				"object " << BOX_FORMAT_OBJECTID(i));
+		}
 		
 		// Test the deletion of objects by the housekeeping system
 		// First, things as they are now.
@@ -1886,7 +1970,8 @@ int test3(int argc, const char *argv[])
 		{
 			// Open a connection to the server
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost",
+				BOX_PORT_BBSTORED_TEST);
 
 			// Make a protocol
 			BackupProtocolClient protocol(conn);
