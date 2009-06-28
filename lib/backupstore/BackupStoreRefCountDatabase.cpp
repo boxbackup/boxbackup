@@ -247,7 +247,8 @@ void BackupStoreRefCountDatabase::Save()
 //		Created: 2009/06/01
 //
 // --------------------------------------------------------------------------
-int32_t BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
+BackupStoreRefCountDatabase::refcount_t
+BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
 {
 	IOStream::pos_type offset = GetOffset(ObjectID);
 

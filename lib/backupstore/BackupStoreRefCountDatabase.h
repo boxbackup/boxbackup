@@ -52,6 +52,8 @@ class BackupStoreRefCountDatabase
 {
 	friend class BackupStoreCheck;
 	friend class BackupStoreContext;
+	friend class HousekeepStoreAccount;
+
 public:
 	~BackupStoreRefCountDatabase();
 private:
@@ -73,8 +75,10 @@ public:
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(const
 		BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
 	
+	typedef uint32_t refcount_t;
+
 	// Data access functions
-	int32_t GetRefCount(int64_t ObjectID) const;
+	refcount_t GetRefCount(int64_t ObjectID) const;
 	int64_t GetLastObjectIDUsed() const;
 	
 	// Data modification functions
@@ -93,8 +97,6 @@ private:
 
 	static void Create(const BackupStoreAccountDatabase::Entry& rAccount,
 		bool AllowOverwrite);
-
-	typedef int32_t refcount_t;
 
 	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&
 		rAccount);
