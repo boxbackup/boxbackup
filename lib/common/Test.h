@@ -113,7 +113,9 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 	\
 	if(_exp_str != _found_str) \
 	{ \
-		std::string _line_str = _line; \
+		std::ostringstream _ossl; \
+		_ossl << _line; \
+		std::string _line_str = _ossl.str(); \
 		printf("Expected <%s> but found <%s> in <%s>\n", \
 			_exp_str.c_str(), _found_str.c_str(), _line_str.c_str()); \
 		\
