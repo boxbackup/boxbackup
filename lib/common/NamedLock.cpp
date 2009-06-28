@@ -65,7 +65,7 @@ NamedLock::~NamedLock()
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-bool NamedLock::TryAndGetLock(const char *Filename, int mode)
+bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 {
 	// Check
 	if(mFileDescriptor != -1)
@@ -75,7 +75,8 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 
 	// See if the lock can be got
 #if HAVE_DECL_O_EXLOCK
-	int fd = ::open(Filename, O_WRONLY | O_NONBLOCK | O_CREAT | O_TRUNC | O_EXLOCK, mode);
+	int fd = ::open(rFilename.c_str(),
+		O_WRONLY | O_NONBLOCK | O_CREAT | O_TRUNC | O_EXLOCK, mode);
 	if(fd != -1)
 	{
 		// Got a lock, lovely
@@ -92,10 +93,10 @@ bool NamedLock::TryAndGetLock(const char *Filename, int mode)
 
 	return false;
 #else
-	int fd = ::open(Filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	int fd = ::open(rFilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd == -1)
 	{
-		BOX_WARNING("Failed to open lockfile: " << Filename);
+		BOX_WARNING("Failed to open lockfile: " << rFilename);
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
 
