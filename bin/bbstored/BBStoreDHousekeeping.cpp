@@ -108,7 +108,8 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 				mpAccounts->GetAccountRoot(*i, rootDir, discSet);
 				
 				// Do housekeeping on this account
-				HousekeepStoreAccount housekeeping(*i, rootDir, discSet, *this);
+				HousekeepStoreAccount housekeeping(*i, rootDir,
+					discSet, this);
 				housekeeping.DoHousekeeping();
 			}
 		}
