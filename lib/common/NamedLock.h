@@ -28,7 +28,7 @@ private:
 	NamedLock(const NamedLock &);
 
 public:
-	bool TryAndGetLock(const char *Filename, int mode = 0755);
+	bool TryAndGetLock(const std::string& rFilename, int mode = 0755);
 	bool GotLock() {return mFileDescriptor != -1;}
 	void ReleaseLock();
 	
