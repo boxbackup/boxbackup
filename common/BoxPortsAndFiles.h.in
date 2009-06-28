@@ -15,6 +15,7 @@
 
 // Backup store daemon
 #define BOX_PORT_BBSTORED			(BOX_PORT_BASE+1)
+#define BOX_PORT_BBSTORED_TEST			22011
 
 // directory within the RAIDFILE root for the backup store daemon
 #define BOX_RAIDFILE_ROOT_BBSTORED		"backup"
