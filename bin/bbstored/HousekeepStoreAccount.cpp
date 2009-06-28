@@ -39,11 +39,13 @@
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-HousekeepStoreAccount::HousekeepStoreAccount(int AccountID, const std::string &rStoreRoot, int StoreDiscSet, BackupStoreDaemon &rDaemon)
+HousekeepStoreAccount::HousekeepStoreAccount(int AccountID,
+	const std::string &rStoreRoot, int StoreDiscSet,
+	HousekeepingCallback* pHousekeepingCallback)
 	: mAccountID(AccountID),
 	  mStoreRoot(rStoreRoot),
 	  mStoreDiscSet(StoreDiscSet),
-	  mrDaemon(rDaemon),
+	  mpHousekeepingCallback(pHousekeepingCallback),
 	  mDeletionSizeTarget(0),
   	  mPotentialDeletionsTotalSize(0),
 	  mMaxSizeInPotentialDeletions(0),
@@ -57,6 +59,7 @@ HousekeepStoreAccount::HousekeepStoreAccount(int AccountID, const std::string &r
 	  mBlocksInDirectoriesDelta(0),
 	  mFilesDeleted(0),
 	  mEmptyDirectoriesDeleted(0),
+	  mSuppressRefCountChangeWarnings(false),
 	  mCountUntilNextInterprocessMsgCheck(POLL_INTERPROCESS_MSG_CHECK_FREQUENCY)
 {
 }
@@ -81,7 +84,7 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-void HousekeepStoreAccount::DoHousekeeping()
+void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 {
 	// Attempt to lock the account
 	std::string writeLockFilename;
@@ -91,8 +94,21 @@ void HousekeepStoreAccount::DoHousekeeping()
 	if(!writeLock.TryAndGetLock(writeLockFilename.c_str(),
 		0600 /* restrictive file permissions */))
 	{
-		// Couldn't lock the account -- just stop now
-		return;
+		if(KeepTryingForever)
+		{
+			BOX_WARNING("Failed to lock account for housekeeping, "
+				"still trying...");
+			while(!writeLock.TryAndGetLock(writeLockFilename,
+				0600 /* restrictive file permissions */))
+			{
+				sleep(1);
+			}
+		}
+		else
+		{
+			// Couldn't lock the account -- just stop now
+			return;
+		}
 	}
 
 	// Load the store info to find necessary info for the housekeeping
@@ -105,6 +121,14 @@ void HousekeepStoreAccount::DoHousekeeping()
 	{
 		mDeletionSizeTarget = 0;
 	}
+
+	// initialise the refcount database
+	mNewRefCounts.clear();
+	// try to pre-allocate as much memory as we need
+	mNewRefCounts.reserve(info->GetLastObjectIDUsed());
+	// initialise the refcount of the root entry
+	mNewRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1, 0);
+	mNewRefCounts[BACKUPSTORE_ROOT_DIRECTORY_ID] = 1;
 
 	// Scan the directory for potential things to delete
 	// This will also remove eligible items marked with RemoveASAP
@@ -207,6 +231,86 @@ void HousekeepStoreAccount::DoHousekeeping()
 			mEmptyDirectoriesDeleted << " dirs)" <<
 			(deleteInterrupted?" and was interrupted":""));
 	}
+
+	// We can only update the refcount database if we successfully
+	// finished our scan of all directories, otherwise we don't actually
+	// know which of the new counts are valid and which aren't
+	// (we might not have seen second references to some objects, etc.)
+
+	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences;
+
+	// try to load the reference count database
+	try
+	{
+		apReferences = BackupStoreRefCountDatabase::Load(account,
+			false);
+	}
+	catch(BoxException &e)
+	{
+		BOX_WARNING("Reference count database is missing or corrupted "
+			"during housekeeping, creating a new one.");
+		mSuppressRefCountChangeWarnings = true;
+		BackupStoreRefCountDatabase::CreateForRegeneration(account);
+		apReferences = BackupStoreRefCountDatabase::Load(account,
+			false);
+	}
+
+	int64_t LastUsedObjectIdOnDisk = apReferences->GetLastObjectIDUsed();
+
+	for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
+		ObjectID < mNewRefCounts.size(); ObjectID++)
+	{
+		if (ObjectID > LastUsedObjectIdOnDisk)
+		{
+			if (!mSuppressRefCountChangeWarnings)
+			{
+				BOX_WARNING("Reference count of object " <<
+					BOX_FORMAT_OBJECTID(ObjectID) <<
+					" not found in database, added"
+					" with " << mNewRefCounts[ObjectID] <<
+					" references");
+			}
+			apReferences->SetRefCount(ObjectID,
+				mNewRefCounts[ObjectID]);
+			LastUsedObjectIdOnDisk = ObjectID;
+			continue;
+		}
+
+		BackupStoreRefCountDatabase::refcount_t OldRefCount =
+			apReferences->GetRefCount(ObjectID);
+
+		if (OldRefCount != mNewRefCounts[ObjectID])
+		{
+			BOX_WARNING("Reference count of object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" changed from " << OldRefCount <<
+				" to " << mNewRefCounts[ObjectID]);
+			apReferences->SetRefCount(ObjectID,
+				mNewRefCounts[ObjectID]);
+		}
+	}
+
+	// zero excess references in the database
+	for (int64_t ObjectID = mNewRefCounts.size(); 
+		ObjectID <= LastUsedObjectIdOnDisk; ObjectID++)
+	{
+		BackupStoreRefCountDatabase::refcount_t OldRefCount =
+			apReferences->GetRefCount(ObjectID);
+		BackupStoreRefCountDatabase::refcount_t NewRefCount = 0;
+
+		if (OldRefCount != NewRefCount)
+		{
+			BOX_WARNING("Reference count of object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" changed from " << OldRefCount <<
+				" to " << NewRefCount << " (not found)");
+			apReferences->SetRefCount(ObjectID, NewRefCount);
+		}
+	}
+
+	// force file to be saved and closed before releasing the lock below
+	apReferences.reset();
 	
 	// Make sure the delta's won't cause problems if the counts are 
 	// really wrong, and it wasn't fixed because the store was 
@@ -279,7 +383,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 
 		// Check for having to stop
 		// Include account ID here as the specified account is locked
-		if(mrDaemon.CheckForInterProcessMsg(mAccountID))
+		if(mpHousekeepingCallback && mpHousekeepingCallback->CheckForInterProcessMsg(mAccountID))
 		{
 			// Need to abort now
 			return false;
@@ -359,6 +463,13 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
 		{
+			// This directory references this object
+			if (mNewRefCounts.size() <= en->GetObjectID())
+			{
+				mNewRefCounts.resize(en->GetObjectID() + 1, 0);
+			}
+			mNewRefCounts[en->GetObjectID()]++;
+
 			// Update recalculated usage sizes
 			int16_t enFlags = en->GetFlags();
 			int64_t enSizeInBlocks = en->GetSizeInBlocks();
@@ -467,6 +578,13 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
+			// This parent directory references this child
+			if (mNewRefCounts.size() <= en->GetObjectID())
+			{
+				mNewRefCounts.resize(en->GetObjectID() + 1, 0);
+			}
+			mNewRefCounts[en->GetObjectID()]++;
+
 			// Next level
 			ASSERT((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == BackupStoreDirectory::Entry::Flags_Dir);
 			
@@ -551,7 +669,7 @@ bool HousekeepStoreAccount::DeleteFiles()
 		{
 			mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
 			// Check for having to stop
-			if(mrDaemon.CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is now locked
+			if(mpHousekeepingCallback && mpHousekeepingCallback->CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is now locked
 			{
 				// Need to abort now
 				return true;
@@ -808,7 +926,7 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories()
 			{
 				mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
 				// Check for having to stop
-				if(mrDaemon.CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is now locked
+				if(mpHousekeepingCallback && mpHousekeepingCallback->CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is now locked
 				{
 					// Need to abort now
 					return true;

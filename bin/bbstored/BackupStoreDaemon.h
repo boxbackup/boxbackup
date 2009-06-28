@@ -14,11 +14,11 @@
 #include "BoxPortsAndFiles.h"
 #include "BackupConstants.h"
 #include "BackupStoreContext.h"
+#include "HousekeepStoreAccount.h"
 #include "IOStreamGetLine.h"
 
 class BackupStoreAccounts;
 class BackupStoreAccountDatabase;
-class HousekeepStoreAccount;
 
 // --------------------------------------------------------------------------
 //
@@ -29,10 +29,8 @@ class HousekeepStoreAccount;
 //
 // --------------------------------------------------------------------------
 class BackupStoreDaemon : public ServerTLS<BOX_PORT_BBSTORED>,
-	HousekeepingInterface
+	HousekeepingInterface, HousekeepingCallback
 {
-	friend class HousekeepStoreAccount;
-
 public:
 	BackupStoreDaemon();
 	~BackupStoreDaemon();
@@ -64,9 +62,12 @@ protected:
 	
 	// Housekeeping functions
 	void HousekeepingProcess();
-	bool CheckForInterProcessMsg(int AccountNum = 0, int MaximumWaitTime = 0);
 
 	void LogConnectionStats(const char *commonName, const SocketStreamTLS &s);
+
+public:
+	// HousekeepingInterface implementation
+	virtual bool CheckForInterProcessMsg(int AccountNum = 0, int MaximumWaitTime = 0);
 
 private:
 	BackupStoreAccountDatabase *mpAccountDatabase;
