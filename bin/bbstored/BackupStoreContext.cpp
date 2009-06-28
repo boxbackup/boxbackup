@@ -191,6 +191,23 @@ void BackupStoreContext::LoadStoreInfo()
 	
 	// Keep the pointer to it
 	mpStoreInfo = i;
+
+	BackupStoreAccountDatabase::Entry account(mClientID, mStoreDiscSet);
+
+	// try to load the reference count database
+	try
+	{
+		mapRefCount = BackupStoreRefCountDatabase::Load(account, false);
+	}
+	catch(BoxException &e)
+	{
+		BOX_WARNING("Reference count database is missing or corrupted, "
+			"creating a new one, expect housekeeping to find and "
+			"fix problems with reference counts later.");
+		
+		BackupStoreRefCountDatabase::CreateForRegeneration(account);
+		mapRefCount = BackupStoreRefCountDatabase::Load(account, false);
+	}
 }
 
 
@@ -395,15 +412,18 @@ int64_t BackupStoreContext::AllocateObjectID()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::AddFile(IOStream &, int64_t, int64_t, int64_t, const BackupStoreFilename &, bool)
-//		Purpose: Add a file to the store, from a given stream, into a specified directory.
-//				 Returns object ID of the new file.
+//		Name:    BackupStoreContext::AddFile(IOStream &, int64_t,
+//			 int64_t, int64_t, const BackupStoreFilename &, bool)
+//		Purpose: Add a file to the store, from a given stream, into
+//			 a specified directory. Returns object ID of the new
+//			 file.
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
-int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime,
-		int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename,
-		bool MarkFileWithSameNameAsOldVersions)
+int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
+	int64_t ModificationTime, int64_t AttributesHash,
+	int64_t DiffFromFileID, const BackupStoreFilename &rFilename,
+	bool MarkFileWithSameNameAsOldVersions)
 {
 	if(mpStoreInfo.get() == 0)
 	{
@@ -670,6 +690,9 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory, int64_
 	mpStoreInfo->ChangeBlocksUsed(blocksUsed);
 	mpStoreInfo->ChangeBlocksInOldFiles(blocksInOldFiles);
 	
+	// Increment reference count on the new directory to one
+	mapRefCount->AddReference(id);
+	
 	// Save the store info -- can cope if this exceptions because infomation
 	// will be rebuilt by housekeeping, and ID allocation can recover.
 	SaveStoreInfo();
@@ -768,8 +791,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &)
-//		Purpose: Deletes a file, returning true if the file existed. Object ID returned too, set to zero if not found.
+//		Name:    BackupStoreContext::UndeleteFile(int64_t, int64_t)
+//		Purpose: Undeletes a file, if it exists, returning true if
+//			 the file existed.
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
@@ -933,8 +957,10 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t Objec
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::AddDirectory(int64_t, const BackupStoreFilename &, bool &)
-//		Purpose: Creates a directory (or just returns the ID of an existing one). rAlreadyExists set appropraitely.
+//		Name:    BackupStoreContext::AddDirectory(int64_t,
+//			 const BackupStoreFilename &, bool &)
+//		Purpose: Creates a directory (or just returns the ID of an
+//			 existing one). rAlreadyExists set appropraitely.
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
@@ -974,7 +1000,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 	// Allocate the next ID
 	int64_t id = AllocateObjectID();
 
-	// Create a blank directory with the given attributes on disc
+	// Create an empty directory with the given attributes on disc
 	std::string fn;
 	MakeObjectFilename(id, fn, true /* make sure the directory it's in exists */);
 	{
@@ -998,11 +1024,14 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 		// Not added to cache, so don't set the size in the directory
 	}
 	
-	// Then add it into the directory
+	// Then add it into the parent directory
 	try
 	{
 		dir.AddEntry(rFilename, 0 /* modification time */, id, 0 /* blocks used */, BackupStoreDirectory::Entry::Flags_Dir, 0 /* attributes mod time */);
 		SaveDirectory(dir, InDirectory);
+
+		// Increment reference count on the new directory to one
+		mapRefCount->AddReference(id);
 	}
 	catch(...)
 	{
@@ -1016,7 +1045,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 		// Don't worry about the incremented number in the store info
 		throw;	
 	}
-	
+
 	// Save the store info (may be postponed)
 	SaveStoreInfo();
 
