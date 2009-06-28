@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 
+#include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
 #include "ProtocolObject.h"
 #include "Utils.h"
@@ -137,7 +138,6 @@ private:
 	void DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete);
 	int64_t AllocateObjectID();
 
-private:
 	int32_t mClientID;
 	HousekeepingInterface &mrDaemon;
 	int mProtocolPhase;
@@ -150,6 +150,9 @@ private:
 	
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mpStoreInfo;
+
+	// Refcount database
+	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
 	
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
