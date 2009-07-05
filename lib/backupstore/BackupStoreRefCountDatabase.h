@@ -83,6 +83,7 @@ public:
 	
 	// Data modification functions
 	void AddReference(int64_t ObjectID);
+	// RemoveReference returns false if refcount drops to zero
 	bool RemoveReference(int64_t ObjectID);
 
 private:
