@@ -103,18 +103,25 @@
 
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
-		OPTIONAL_DO_BACKTRACE \
-		BOX_WARNING("Exception thrown: " #type "(" #subtype ") " \
-			"at " __FILE__ "(" << __LINE__ << ")") \
+		if(!HideExceptionMessageGuard::ExceptionsHidden()) \
+		{ \
+			OPTIONAL_DO_BACKTRACE \
+			BOX_WARNING("Exception thrown: " \
+				#type "(" #subtype ") " \
+				"at " __FILE__ "(" << __LINE__ << ")") \
+		} \
 		throw type(type::subtype); \
 	}
 
 #define THROW_EXCEPTION_MESSAGE(type, subtype, message) \
 	{ \
-		OPTIONAL_DO_BACKTRACE \
-		BOX_WARNING("Exception thrown: " #type "(" #subtype ") " \
-			" (" message ") at " \
-			__FILE__ "(" << __LINE__ << ")") \
+		if(!HideExceptionMessageGuard::ExceptionsHidden()) \
+		{ \
+			OPTIONAL_DO_BACKTRACE \
+			BOX_WARNING("Exception thrown: " \
+				#type "(" #subtype ") (" message ") at " \
+				__FILE__ "(" << __LINE__ << ")") \
+		} \
 		throw type(type::subtype, message); \
 	}
 
