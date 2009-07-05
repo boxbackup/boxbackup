@@ -627,6 +627,30 @@ int test(int argc, const char *argv[])
 			"', '" << n3);
 	}
 
+	// Test that creating and deleting a RaidFile with the wrong
+	// reference counts throws the expected errors.
+	{
+		RaidFileWrite write1(0, "write1", 1);
+		write1.Open();
+		write1.Commit();
+		TEST_CHECK_THROWS(write1.Delete(), RaidFileException,
+			RequestedDeleteReferencedFile);
+	}
+
+	{
+		RaidFileWrite write1(0, "write1", 0);
+		write1.Open(true);
+		TEST_CHECK_THROWS(write1.Commit(), RaidFileException,
+			RequestedModifyUnreferencedFile);
+		write1.Delete();
+	}
+
+	{
+		TEST_CHECK_THROWS(RaidFileWrite write1(0, "write1", 2),
+			RaidFileException,
+			RequestedModifyMultiplyReferencedFile);
+	}
+
 	// Create a RaidFile
 	RaidFileWrite write1(0, "test1");
 	IOStream &write1stream = write1;	// use the stream interface where possible
