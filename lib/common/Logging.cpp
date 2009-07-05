@@ -33,6 +33,8 @@ bool Logging::sLogToSyslog  = false;
 bool Logging::sLogToConsole = false;
 bool Logging::sContextSet   = false;
 
+bool HideExceptionMessageGuard::sHiddenState = false;
+
 std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
 Console*    Logging::spConsole = NULL;
