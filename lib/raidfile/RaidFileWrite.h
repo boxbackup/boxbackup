@@ -28,6 +28,7 @@ class RaidFileWrite : public IOStream
 {
 public:
 	RaidFileWrite(int SetNumber, const std::string &Filename);
+	RaidFileWrite(int SetNumber, const std::string &Filename, int refcount);
 	~RaidFileWrite();
 private:
 	RaidFileWrite(const RaidFileWrite &rToCopy);
@@ -60,6 +61,7 @@ private:
 	int mSetNumber;
 	std::string mFilename;
 	int mOSFileHandle;
+	int mRefCount;
 };
 
 #endif // RAIDFILEWRITE__H
