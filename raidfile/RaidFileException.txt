@@ -23,3 +23,6 @@ CanOnlyGetUsageBeforeCommit		19
 CanOnlyGetFileSizeBeforeCommit	20
 ErrorOpeningWriteFileOnTruncate	21
 FileIsCurrentlyOpenForWriting	22
+RequestedModifyUnreferencedFile	23	Internal error: the server attempted to modify a file which has no references.
+RequestedModifyMultiplyReferencedFile	24	Internal error: the server attempted to modify a file which has multiple references.
+RequestedDeleteReferencedFile	25	Internal error: the server attempted to delete a file which is still referenced.

@@ -42,15 +42,45 @@
 //
 // Function
 //		Name:    RaidFileWrite::RaidFileWrite(int, const std::string &)
-//		Purpose: Construtor, just stores requried details
+//		Purpose: Simple constructor, just stores required details
 //		Created: 2003/07/10
 //
 // --------------------------------------------------------------------------
 RaidFileWrite::RaidFileWrite(int SetNumber, const std::string &Filename)
 	: mSetNumber(SetNumber),
 	  mFilename(Filename),
-	  mOSFileHandle(-1)		// not valid file handle
+	  mOSFileHandle(-1), // not valid file handle
+	  mRefCount(-1) // unknown refcount
 {
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    RaidFileWrite::RaidFileWrite(int,
+//			 const std::string &, int refcount)
+//		Purpose: Constructor with check for overwriting file
+//			 with multiple references
+//		Created: 2009/07/05
+//
+// --------------------------------------------------------------------------
+RaidFileWrite::RaidFileWrite(int SetNumber, const std::string &Filename,
+	int refcount)
+	: mSetNumber(SetNumber),
+	  mFilename(Filename),
+	  mOSFileHandle(-1),		// not valid file handle
+	  mRefCount(refcount)
+{
+	// Can't check for zero refcount here, because it's legal
+	// to create a RaidFileWrite to delete an object with zero refcount.
+	// Check in Commit() and Delete() instead.
+	if (refcount > 1)
+	{
+		BOX_ERROR("Attempted to modify object " << mFilename <<
+			", which has " << refcount << " references");
+		THROW_EXCEPTION(RaidFileException,
+			RequestedModifyMultiplyReferencedFile);
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -250,7 +280,15 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	{
 		THROW_EXCEPTION(RaidFileException, NotOpen)
 	}
-	
+
+	if (mRefCount == 0)
+	{
+		BOX_ERROR("Attempted to modify object " << mFilename << 
+			", which has no references");
+		THROW_EXCEPTION(RaidFileException,
+			RequestedModifyUnreferencedFile);
+	}
+
 	// Rename it into place -- BEFORE it's closed so lock remains
 
 #ifdef WIN32
@@ -638,6 +676,14 @@ void RaidFileWrite::TransformToRaidStorage()
 // --------------------------------------------------------------------------
 void RaidFileWrite::Delete()
 {
+	if (mRefCount != 0 && mRefCount != -1)
+	{
+		BOX_ERROR("Attempted to delete object " << mFilename <<
+			" which has " << mRefCount << " references");
+		THROW_EXCEPTION(RaidFileException,
+			RequestedDeleteReferencedFile);
+	}
+
 	// Get disc set
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
