@@ -54,6 +54,7 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 #define TEST_CHECK_THROWS(statement, excepttype, subtype)									\
 	{																						\
 		bool didthrow = false;																\
+		HideExceptionMessageGuard hide; \
 		try																					\
 		{																					\
 			statement;																		\

@@ -320,4 +320,23 @@ class FileLogger : public Logger
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 
+class HideExceptionMessageGuard
+{
+	public:
+	HideExceptionMessageGuard()
+	{
+		mOldHiddenState = sHiddenState;
+		sHiddenState = true;
+	}
+	~HideExceptionMessageGuard()
+	{
+		sHiddenState = mOldHiddenState;
+	}
+	static bool ExceptionsHidden() { return sHiddenState; }
+
+	private:
+	static bool sHiddenState;
+	bool mOldHiddenState;
+};
+
 #endif // LOGGING__H
