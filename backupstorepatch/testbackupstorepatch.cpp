@@ -332,7 +332,8 @@ int test(int argc, const char *argv[])
 		{
 			// Open a connection to the server
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost",
+				BOX_PORT_BBSTORED_TEST);
 	
 			// Make a protocol
 			BackupProtocolClient protocol(conn);
@@ -500,7 +501,8 @@ int test(int argc, const char *argv[])
 			
 			// Open a connection to the server (need to do this each time, otherwise housekeeping won't delete files)
 			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost", BOX_PORT_BBSTORED);
+			conn.Open(context, Socket::TypeINET, "localhost",
+				BOX_PORT_BBSTORED_TEST);
 			BackupProtocolClient protocol(conn);
 			{
 				std::auto_ptr<BackupProtocolClientVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
