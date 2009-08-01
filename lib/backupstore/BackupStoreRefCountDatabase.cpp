@@ -18,6 +18,7 @@
 #include "RaidFileController.h"
 #include "RaidFileUtil.h"
 #include "RaidFileException.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
