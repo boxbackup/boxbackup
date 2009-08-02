@@ -417,6 +417,32 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 	}
 	
 	tmpStr += filename;
+
+	// We are using direct filename access, which does not support ..,
+	// so we need to implement it ourselves.
+
+	for (std::string::size_type i = 1; i < tmpStr.size() - 3; i++)
+	{
+		if (tmpStr.substr(i, 3) == "\\..")
+		{
+			std::string::size_type lastSlash =
+				tmpStr.rfind('\\', i - 1);
+
+			if (lastSlash == std::string::npos)
+			{
+				// no previous directory, ignore it, 
+				// CreateFile will fail with error 123
+			}
+			else
+			{
+				tmpStr.replace(lastSlash, i + 3 - lastSlash,
+					"");
+			}
+
+			i = lastSlash;
+		}
+	}
+
 	return tmpStr;
 }
 
