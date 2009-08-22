@@ -1,8 +1,71 @@
-
-
 # Process DocBook to HTML
 
-DBPROC=xsltproc
+# This makefile is a bit obfuscated so that it works correctly on both
+# BSD and GNU make. Some parts apply to one version of make and not the
+# other; these are marked by comments.
+
+# The "all" target shouldn't be up here, but the trickery below defines
+# what looks like a rule to GNU make, and so we need to define the actual
+# default target before it.
+
+all: docs
+
+DBPROC_COMMAND = xsltproc
+MKDIR_COMMAND  = mkdir
+CP_COMMAND     = cp
+PERL_COMMAND   = perl
+RM_COMMAND     = rm -f
+TAR_COMMAND    = tar
+GZIP_COMMAND   = gzip -f
+GENERATE_SCRIPT = tools/generate_except_xml.pl
+
+DBPROC   = $(DBPROC_COMMAND)
+MKDIR    = $(MKDIR_COMMAND)
+CP       = $(CP_COMMAND)
+GENERATE = $(PERL_COMMAND) $(GENERATE_SCRIPT)
+RM_QUIET = $(RM_COMMAND)
+TAR      = $(TAR_COMMAND)
+GZIP     = $(GZIP_COMMAND)
+PROGRESS = @ true
+
+# use a GNU make "define" command, that looks like a harmless dummy rule
+# to BSD make, to hide parts of the Makefile from GNU make.
+define IGNORED_BY_GNU_MAKE:
+.if 0
+endef
+
+  # seen by GNU make, not by BSD make
+  ifeq ($(V),)
+    DBPROC   = @ echo "  [XLSTPROC]" $^ && $(DBPROC_COMMAND) 2>/dev/null
+    GENERATE = @ echo "  [GENERATE]" $@ && $(PERL_COMMAND) $(GENERATE_SCRIPT)
+    TAR      = @ echo "  [TAR]     " $@ && $(TAR_COMMAND)
+    GZIP     = @ echo "  [GZIP]    " $< && $(GZIP_COMMAND)
+    RM_QUIET = @ $(RM_COMMAND)
+    PROGRESS = @ echo
+  endif  
+
+define IGNORED_BY_GNU_MAKE:
+.endif
+
+.ifndef V
+  # seen by BSD make, not by GNU make
+  DBPROC   = @ echo "  [XSLTPROC]" $(.ALLSRC) && $(DBPROC_COMMAND) 2>/dev/null
+  GENERATE = @ echo "  [GENERATE]" $(.TARGET) && $(PERL_COMMAND) $(GENERATE_SCRIPT)
+  TAR      = @ echo "  [TAR]     " $(.TARGET) && $(TAR_COMMAND)
+  GZIP     = @ echo "  [GZIP]    " $(.TARGET:.gz=) && $(GZIP_COMMAND)
+  RM_QUIET = @ $(RM_COMMAND)
+  PROGRESS = @ echo
+.endif
+
+# neither .endif nor endef can be followed by a colon; each creates
+# warnings or errors in one or other version of make. we need some
+# magic to make them both work. Luckily, .endfor ignores the colon.
+
+.for DUMMY in $(NO_SUCH_VARIABLE)
+endef
+.endfor :
+
+PROGRESS_RM = $(PROGRESS) "  [RM]      "
 
 DOCBOOK_DIR = docbook
 HTML_DIR = htmlguide
@@ -15,8 +78,6 @@ MANXSL = $(DOCBOOK_DIR)/bb-man.xsl
 VPATH = $(DOCBOOK_DIR)
 .SUFFIXES: .html .xml .gz .1 .5 .8
 
-all: docs
-
 docs: instguide adminguide manpages
 	@mkdir -p $(HTML_DIR)/images
 	@cp $(DOCBOOK_DIR)/html/images/*.png $(HTML_DIR)/images/.
@@ -25,19 +86,20 @@ docs: instguide adminguide manpages
 
 adminguide: $(DOCBOOK_DIR)/ExceptionCodes.xml $(HTML_DIR)/adminguide/index.html 
 
-# all sources ($>) is exactly the right args for xsltproc
+# $^ gives all sources on GNU make, and nothing on BSD make
+# $> gives all sources on BSD make, and nothing on GNU make
 $(HTML_DIR)/adminguide/index.html: $(BOOKXSL) $(DOCBOOK_DIR)/adminguide.xml
-	$(DBPROC) -o $(HTML_DIR)/adminguide/ $>
+	$(DBPROC) -o $(HTML_DIR)/adminguide/ $^ $>
 
 instguide: $(HTML_DIR)/instguide/index.html 
 
 $(HTML_DIR)/instguide/index.html: $(BOOKXSL) $(DOCBOOK_DIR)/instguide.xml
-	$(DBPROC) -o $(HTML_DIR)/instguide/ $>
+	$(DBPROC) -o $(HTML_DIR)/instguide/ $^ $>
 
-# $< is empty on BSD make when making this rule, $> has all sources
-# $< has the target on GNU make, $> is empty
+# On BSD make, $> contains all sources and $^ is empty 
+# On GNU make, $^ contains all sources and $> is empty
 $(DOCBOOK_DIR)/ExceptionCodes.xml: ../ExceptionCodes.txt
-	perl tools/generate_except_xml.pl $< $> $@
+	$(GENERATE) $> $^ $@
 
 manpages: man-dirs man-nroff man-html
 
@@ -66,39 +128,56 @@ HTML_FILES   = $(HTML_FILES_2:%=$(HTML_DIR)/man-html/%)
 
 man-html: $(HTML_FILES)
 
-# GNU make
-$(HTML_DIR)/man-html/%.html: $(DOCBOOK_DIR)/%.xml $(NOCHUNKBOOKXSL)
-	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $<
+# $^ gives all sources on GNU make, and nothing on BSD make
 
 # GNU make
-$(MAN_DIR)/%.8.gz: $(DOCBOOK_DIR)/%.xml
-	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
-	gzip $(@:.gz=)
+$(HTML_DIR)/man-html/%.html: $(NOCHUNKBOOKXSL) $(DOCBOOK_DIR)/%.xml
+	$(DBPROC) -o $@ $^
 
 # GNU make
-$(MAN_DIR)/%.5.gz: $(DOCBOOK_DIR)/%.xml
-	$(DBPROC) -o $(@:.gz=) $(MANXSL) $<
-	gzip $(@:.gz=)
+$(MAN_DIR)/%.8: $(MANXSL) $(DOCBOOK_DIR)/%.xml
+	$(DBPROC) -o $@ $^
+
+# GNU make
+$(MAN_DIR)/%.8.gz: $(MAN_DIR)/%.8
+	$(GZIP) $<
+
+# GNU make
+$(MAN_DIR)/%.5: $(MANXSL) $(DOCBOOK_DIR)/%.xml $(MANXSL)
+	$(DBPROC) -o $@ $^
+
+# GNU make
+$(MAN_DIR)/%.5.gz: $(MAN_DIR)/%.5
+	$(GZIP) $<
 
 # BSD make: the final colon (:) is required to make the .for and .endfor
 # lines valid in GNU make. It creates (different) dummy rules in GNU and
 # BSD make. Both dummy rules are harmless.
 
 .for MAN_PAGE in $(NROFF_PAGES) :
-$(MAN_DIR)/$(MAN_PAGE).gz: $(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
-	$(DBPROC) -o $(.TARGET:.gz=) $(MANXSL) $>
-	gzip $(@:.gz=)
+$(MAN_DIR)/$(MAN_PAGE).gz: $(MANXSL) $(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
+	$(DBPROC) -o $(.TARGET:.gz=) $(.ALLSRC)
+	$(GZIP) $(.TARGET:.gz=)
 
-$(HTML_DIR)/man-html/$(MAN_PAGE:R).html: $(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
-	$(DBPROC) -o $@ $(NOCHUNKBOOKXSL) $>
+$(HTML_DIR)/man-html/$(MAN_PAGE:R).html: $(NOCHUNKBOOKXSL) \
+$(DOCBOOK_DIR)/$(MAN_PAGE:R).xml
+	$(DBPROC) -o $(.TARGET) $(.ALLSRC)
 .endfor :
 
-dockit: clean docs
-	tar zcf documentation-kit-0.10.tar.gz $(HTML_DIR)/
+dockit: clean docs documentation-kit-0.10.tar.gz
+
+documentation-kit-0.10.tar.gz:
+	$(TAR) zcf documentation-kit-0.10.tar.gz $(HTML_DIR)/
 
 clean:
-	rm -f $(HTML_FILES)
-	rm -f $(NROFF_FILES)
-	rm -f $(DOCBOOK_DIR)/ExceptionCodes.xml
-	rm -f documentation-kit-0.10.tar.gz
+	$(PROGRESS_RM) "$(HTML_DIR)/man-html/*.html"
+	$(RM_QUIET) $(HTML_FILES)
 
+	$(PROGRESS_RM) "$(MAN_DIR)/*.[58].gz"
+	$(RM_QUIET) $(NROFF_FILES)
+
+	$(PROGRESS_RM) "$(DOCBOOK_DIR)/ExceptionCodes.xml"
+	$(RM_QUIET) $(DOCBOOK_DIR)/ExceptionCodes.xml
+	
+	$(PROGRESS_RM) "documentation-kit-0.10.tar.gz"
+	$(RM_QUIET) documentation-kit-0.10.tar.gz
