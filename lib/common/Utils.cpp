@@ -30,6 +30,11 @@
 
 #include "MemLeakFindOn.h"
 
+std::string GetBoxBackupVersion()
+{
+	return BOX_VERSION;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
