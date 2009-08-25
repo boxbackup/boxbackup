@@ -15,6 +15,8 @@
 
 #include "MemLeakFindOn.h"
 
+std::string GetBoxBackupVersion();
+
 void SplitString(const std::string &String, char SplitOn, std::vector<std::string> &rOutput);
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
