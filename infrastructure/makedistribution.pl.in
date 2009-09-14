@@ -28,7 +28,7 @@ my $dist_root = "distribution/$distribution";
 die "Distribution '$distribution' does not exist" unless -d $dist_root;
 
 # get version
-open VERSION,"$dist_root/VERSION.txt" or die "Can't open $dist_root/VERSION.txt";
+open VERSION,"VERSION.txt" or die "Can't open VERSION.txt";
 my $version = <VERSION>;
 chomp $version;
 my $archive_name = <VERSION>;
