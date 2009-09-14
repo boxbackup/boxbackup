@@ -21,8 +21,8 @@ test/bbackupd/testfiles
 test/backupdiff
 docs/Makefile
 docs/tools
-docs/api-notes
-docs/api-notes/raidfile/lib_raidfile
+docs/api-notes/raidfile
+docs/api-notes/raidfile/lib_raidfile.txt
 docs/htmlguide
 docs/htmlguide/adminguide
 docs/htmlguide/images
@@ -33,7 +33,7 @@ MKDIR docs/docbook
 docs/docbook/ExceptionCodes.xml
 docs/docbook/adminguide.xml
 docs/docbook/bb-book.xsl
-docs/docbook/bb-man.xsl.tmpl
+docs/docbook/bb-man.xsl
 docs/docbook/bb-nochunk-book.xsl
 docs/docbook/bbackupctl.xml
 docs/docbook/bbackupd-config.xml
