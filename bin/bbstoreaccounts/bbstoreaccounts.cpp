@@ -45,16 +45,17 @@ bool sMachineReadableOutput = false;
 
 void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 {
-	if(SoftLimit >= HardLimit)
+	if(SoftLimit > HardLimit)
 	{
 		BOX_FATAL("Soft limit must be less than the hard limit.");
 		exit(1);
 	}
 	if(SoftLimit > ((HardLimit * MAX_SOFT_LIMIT_SIZE) / 100))
 	{
-		BOX_FATAL("Soft limit must be no more than " << 
-			MAX_SOFT_LIMIT_SIZE << "% of the hard limit.");
-		exit(1);
+		BOX_WARNING("We recommend setting the soft limit below " <<
+			MAX_SOFT_LIMIT_SIZE << "% of the hard limit, or " <<
+			HumanReadableSize((HardLimit * MAX_SOFT_LIMIT_SIZE)
+				/ 100) << " in this case.");
 	}
 }
 
