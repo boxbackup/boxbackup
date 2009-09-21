@@ -202,8 +202,8 @@ sub copy_file
 		# print "source copy $fn to $base_name/$dst_fn\n";
 
 		my $in = gensym;
-		open $in,$fn;
-		open OUT,">$base_name/$dst_fn";
+		open $in,$fn or die "$fn: $!";
+		open OUT,">$base_name/$dst_fn" or die "$base_name/$dst_fn: $!";
 		
 		my $first = <$in>;
 		if($first =~ m/\A#!/)
@@ -241,8 +241,8 @@ sub copy_file
 		# print "text copy $fn to $base_name/$dst_fn\n";
 
 		my $in = gensym;
-		open $in,$fn;
-		open OUT,">$base_name/$dst_fn";
+		open $in,$fn or die "$fn: $!";
+		open OUT,">$base_name/$dst_fn" or die "$base_name/$dst_fn: $!";
 
 		while(<$in>)
 		{
