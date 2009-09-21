@@ -51,6 +51,11 @@ docs/docbook/raidfile.conf.xml
 docs/docbook/html
 docs/docbook/html/images
 docs/xsl-generic
+docs/xsl-generic/manpages
+docs/xsl-generic/lib
+docs/xsl-generic/common
+docs/xsl-generic/html
+docs/xsl-generic/highlighting
 TODO.txt
 BUGS.txt
 contrib
