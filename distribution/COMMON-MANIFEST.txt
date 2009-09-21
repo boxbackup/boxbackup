@@ -13,6 +13,7 @@ test/crypto
 test/compress
 test/win32
 docs/api-notes
+docs/api-notes/common
 docs/api-notes/common/lib_common.txt
 docs/api-notes/common/lib_crypto
 docs/api-notes/common/lib_server
