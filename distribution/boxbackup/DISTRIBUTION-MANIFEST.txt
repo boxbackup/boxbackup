@@ -33,7 +33,7 @@ docs/htmlguide
 docs/htmlguide/adminguide
 docs/htmlguide/images
 docs/htmlguide/instguide
-docs/htmlguide/manpages
+docs/htmlguide/man-html
 docs/man
 MKDIR docs/docbook
 docs/docbook/ExceptionCodes.xml
