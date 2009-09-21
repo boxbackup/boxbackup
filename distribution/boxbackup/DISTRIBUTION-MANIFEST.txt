@@ -50,6 +50,7 @@ docs/docbook/raidfile-config.xml
 docs/docbook/raidfile.conf.xml
 docs/docbook/html
 docs/docbook/html/images
+docs/xsl-generic
 TODO.txt
 BUGS.txt
 contrib
