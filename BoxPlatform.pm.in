@@ -89,14 +89,14 @@ BEGIN
 		my $cpus = `sysctl hw.ncpu`;
 		if($cpus =~ m/hw.ncpu:\s(\d+)/ && $1 > 1)
 		{
-			print "$1 processors detected, will set make to perform concurrent jobs\n";
+			print STDERR "$1 processors detected, will set make to perform concurrent jobs\n";
 			$sub_make_options = ' -j '.($1 + 1);
 		}
 		
 		# test for fink installation
 		if(-d '/sw/include' && -d '/sw/lib')
 		{
-			print "Fink installation detected, will use headers and libraries\n";
+			print STDERR "Fink installation detected, will use headers and libraries\n";
 			$platform_compile_line_extra = '-I/sw/include ';
 			$platform_link_line_extra = '-L/sw/lib ';
 		}
