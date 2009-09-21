@@ -4,6 +4,7 @@ test/raidfile
 test/raidfile/testfiles
 lib/backupclient
 lib/backupstore
+lib/httpserver
 bin/bbstored
 bin/bbstoreaccounts
 bin/bbackupd
@@ -19,8 +20,11 @@ test/backupstorepatch
 test/bbackupd
 test/bbackupd/testfiles
 test/backupdiff
+test/httpserver
 docs/Makefile
 docs/tools
+docs/api-notes
+docs/api-notes/backup
 docs/api-notes/raidfile
 docs/api-notes/raidfile/lib_raidfile.txt
 docs/html
