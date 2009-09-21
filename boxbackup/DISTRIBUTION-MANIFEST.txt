@@ -23,6 +23,8 @@ docs/Makefile
 docs/tools
 docs/api-notes/raidfile
 docs/api-notes/raidfile/lib_raidfile.txt
+docs/html
+docs/html/images
 docs/htmlguide
 docs/htmlguide/adminguide
 docs/htmlguide/images
