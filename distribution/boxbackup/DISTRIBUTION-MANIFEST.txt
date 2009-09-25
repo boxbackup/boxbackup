@@ -21,6 +21,8 @@ test/bbackupd
 test/bbackupd/testfiles
 test/backupdiff
 test/httpserver
+test/httpserver/testfiles
+test/httpserver/testfiles/photos
 docs/Makefile
 docs/tools
 docs/api-notes
