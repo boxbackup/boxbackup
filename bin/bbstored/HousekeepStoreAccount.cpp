@@ -60,6 +60,7 @@ HousekeepStoreAccount::HousekeepStoreAccount(int AccountID,
 	  mFilesDeleted(0),
 	  mEmptyDirectoriesDeleted(0),
 	  mSuppressRefCountChangeWarnings(false),
+	  mRefCountsAdjusted(0),
 	  mCountUntilNextInterprocessMsgCheck(POLL_INTERPROCESS_MSG_CHECK_FREQUENCY)
 {
 }
@@ -273,6 +274,7 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			}
 			apReferences->SetRefCount(ObjectID,
 				mNewRefCounts[ObjectID]);
+			mRefCountsAdjusted++;
 			LastUsedObjectIdOnDisk = ObjectID;
 			continue;
 		}
@@ -288,6 +290,7 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 				" to " << mNewRefCounts[ObjectID]);
 			apReferences->SetRefCount(ObjectID,
 				mNewRefCounts[ObjectID]);
+			mRefCountsAdjusted++;
 		}
 	}
 
@@ -306,6 +309,7 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 				" changed from " << OldRefCount <<
 				" to " << NewRefCount << " (not found)");
 			apReferences->SetRefCount(ObjectID, NewRefCount);
+			mRefCountsAdjusted++;
 		}
 	}
 
@@ -646,7 +650,8 @@ bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount
 //
 // Function
 //		Name:    HousekeepStoreAccount::DeleteFiles()
-//		Purpose: Delete the files targetted for deletion, returning true if the operation was interrupted
+//		Purpose: Delete the files targeted for deletion, returning
+//			 true if the operation was interrupted
 //		Created: 15/12/03
 //
 // --------------------------------------------------------------------------
@@ -713,9 +718,11 @@ bool HousekeepStoreAccount::DeleteFiles()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HousekeepStoreAccount::DeleteFile(int64_t, int64_t, BackupStoreDirectory &, const std::string &, int64_t)
-//		Purpose: Delete a file. Takes the directory already loaded in and the filename,
-//				 for efficiency in both the usage senarios.
+//		Name:    HousekeepStoreAccount::DeleteFile(int64_t, int64_t,
+//			 BackupStoreDirectory &, const std::string &, int64_t)
+//		Purpose: Delete a file. Takes the directory already loaded
+//			 in and the filename, for efficiency in both the
+//			 usage scenarios.
 //		Created: 15/7/04
 //
 // --------------------------------------------------------------------------
@@ -725,7 +732,7 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID, Ba
 	bool wasDeleted = false;
 	bool wasOldVersion = false;
 	int64_t deletedFileSizeInBlocks = 0;
-	// A pointer to an object which requires commiting if the directory save goes OK
+	// A pointer to an object which requires committing if the directory save goes OK
 	std::auto_ptr<RaidFileWrite> padjustedEntry;
 	// BLOCK
 	{
@@ -813,7 +820,8 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID, Ba
 			MakeObjectFilename(ObjectID, objFilename);
 			std::auto_ptr<RaidFileRead> pobjectBeingDeleted(RaidFileRead::Open(mStoreDiscSet, objFilename));
 			// And open a write file to overwrite the other directory entry
-			padjustedEntry.reset(new RaidFileWrite(mStoreDiscSet, objFilenameOlder));
+			padjustedEntry.reset(new RaidFileWrite(mStoreDiscSet,
+				objFilenameOlder, mNewRefCounts[ObjectID]));
 			padjustedEntry->Open(true /* allow overwriting */);
 
 			if(pentry->GetDependsNewer() == 0)
@@ -853,7 +861,8 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID, Ba
 	// BLOCK
 	int64_t dirRevisedSize = 0;
 	{
-		RaidFileWrite writeDir(mStoreDiscSet, rDirectoryFilename);
+		RaidFileWrite writeDir(mStoreDiscSet, rDirectoryFilename,
+			mNewRefCounts[InDirectory]);
 		writeDir.Open(true /* allow overwriting */);
 		rDirectory.WriteToStream(writeDir);
 
@@ -879,11 +888,14 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID, Ba
 		padjustedEntry.reset();	// delete it now
 	}
 
-	// Delete from disc
+	// Drop reference count by one. If it reaches zero, delete the file.
+	if (--mNewRefCounts[ObjectID] == 0)
 	{
+		// Delete from disc
 		std::string objFilename;
 		MakeObjectFilename(ObjectID, objFilename);
-		RaidFileWrite del(mStoreDiscSet, objFilename);
+		RaidFileWrite del(mStoreDiscSet, objFilename,
+			mNewRefCounts[ObjectID]);
 		del.Delete();
 	}
 
@@ -1015,7 +1027,8 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 		}
 
 		// Write revised parent directory
-		RaidFileWrite writeDir(mStoreDiscSet, containingDirFilename);
+		RaidFileWrite writeDir(mStoreDiscSet, containingDirFilename,
+			mNewRefCounts[containingDir.GetObjectID()]);
 		writeDir.Open(true /* allow overwriting */);
 		containingDir.WriteToStream(writeDir);
 
@@ -1033,9 +1046,12 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 			mBlocksInDirectoriesDelta += adjust;
 		}
 
-		// Delete the directory itself
+		
+		if (--mNewRefCounts[dir.GetObjectID()] == 0)
 		{
-			RaidFileWrite del(mStoreDiscSet, dirFilename);
+			// Delete the directory itself
+			RaidFileWrite del(mStoreDiscSet, dirFilename,
+				mNewRefCounts[dir.GetObjectID()]);
 			del.Delete();
 		}
 
