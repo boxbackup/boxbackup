@@ -45,6 +45,7 @@ public:
 	{
 		Write((int) Item);
 	}
+	void WriteExact(uint32_t Item) { Write((int)Item); }
 	void Write(int Item)
 	{
 		int32_t privItem = htonl(Item);
@@ -55,6 +56,7 @@ public:
 		int64_t privItem = box_hton64(Item);
 		mrStream.Write(&privItem, sizeof(privItem));
 	}
+	void WriteExact(uint64_t Item) { Write(Item); }
 	void Write(uint64_t Item)
 	{
 		uint64_t privItem = box_hton64(Item);
@@ -88,6 +90,7 @@ public:
 			rItemOut = false;
 		}
 	}
+	void ReadExact(uint32_t &rItemOut) { Read((int&)rItemOut); }
 	void Read(int &rItemOut)
 	{
 		int32_t privItem;
@@ -106,6 +109,7 @@ public:
 		}
 		rItemOut = box_ntoh64(privItem);
 	}
+	void ReadExact(uint64_t &rItemOut) { Read(rItemOut); }
 	void Read(uint64_t &rItemOut)
 	{
 		uint64_t privItem;
