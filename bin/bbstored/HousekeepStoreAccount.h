@@ -40,7 +40,7 @@ public:
 	~HousekeepStoreAccount();
 	
 	void DoHousekeeping(bool KeepTryingForever = false);
-	
+	int GetRefCountsAdjusted() { return mRefCountsAdjusted; }
 	
 private:
 	// utility functions
@@ -102,6 +102,7 @@ private:
 	// New reference count list
 	std::vector<uint32_t> mNewRefCounts;
 	bool mSuppressRefCountChangeWarnings;
+	int mRefCountsAdjusted;
 	
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;
