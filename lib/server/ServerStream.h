@@ -302,16 +302,7 @@ public:
 				// Clean up child processes (if forking daemon)
 				if(ForkToHandleRequests && !IsSingleProcess())
 				{
-					int status = 0;
-					int p = 0;
-					do
-					{
-						if((p = ::waitpid(0 /* any child in process group */, &status, WNOHANG)) == -1
-							&& errno != ECHILD && errno != EINTR)
-						{
-							THROW_EXCEPTION(ServerException, ServerWaitOnChildError)
-						}
-					} while(p > 0);
+					WaitForChildren();
 				}
 				#endif // !WIN32
 			}
@@ -325,6 +316,49 @@ public:
 		// Delete the sockets
 		DeleteSockets();
 	}
+
+	#ifndef WIN32 // no waitpid() on Windows
+	void WaitForChildren()
+	{
+		int p = 0;
+		do
+		{
+			int status = 0;
+			p = ::waitpid(0 /* any child in process group */,
+				&status, WNOHANG);
+
+			if(p == -1 && errno != ECHILD && errno != EINTR)
+			{
+				THROW_EXCEPTION(ServerException,
+					ServerWaitOnChildError)
+			}
+			else if(p == 0)
+			{
+				// no children exited, will return from
+				// function
+			}
+			else if(WIFEXITED(status))
+			{
+				BOX_INFO("child process " << p << " "
+					"terminated normally");
+			}
+			else if(WIFSIGNALED(status))
+			{
+				int sig = WTERMSIG(status);
+				BOX_ERROR("child process " << p << " "
+					"terminated abnormally with "
+					"signal " << sig);
+			}
+			else
+			{
+				BOX_WARNING("something unknown happened "
+					"to child process " << p << ": "
+					"status = " << status);
+			}
+		}
+		while(p > 0);
+	}
+	#endif
 
 	virtual void HandleConnection(StreamType &rStream)
 	{
