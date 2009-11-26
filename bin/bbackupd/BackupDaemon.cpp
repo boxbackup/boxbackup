@@ -1021,8 +1021,11 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	pid_t pid = 0;
 	try
 	{
+		std::string script("\"" + conf.GetKeyValue("SyncAllowScript") + 
+			"\" \"" + GetConfigFileName() + "\"");
+
 		std::auto_ptr<IOStream> pscript(LocalProcessStream(
-			conf.GetKeyValue("SyncAllowScript").c_str(), pid));
+			script.c_str(), pid));
 
 		// Read in the result
 		IOStreamGetLine getLine(*pscript);
@@ -1044,17 +1047,16 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 				}
 				catch(ConversionException &e)
 				{
-					BOX_ERROR("Invalid output "
-						"from SyncAllowScript '"
-						<< conf.GetKeyValue("SyncAllowScript")
-						<< "': '" << line << "'");
+					BOX_ERROR("Invalid output from "
+						"SyncAllowScript " <<
+						script << ": '" << line << "'");
 					throw;
 				}
 
 				BOX_NOTICE("Delaying sync by " << waitInSeconds
-					<< " seconds (SyncAllowScript '"
+					<< " seconds (SyncAllowScript "
 					<< conf.GetKeyValue("SyncAllowScript")
-					<< "')");
+					<< ")");
 			}
 		}
 		
@@ -2193,20 +2195,19 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 	}
 
 	// Script to run
-	std::string script(conf.GetKeyValue("NotifyScript") + ' ' +
-		sEventNames[Event]);
+	std::string script("\"" + conf.GetKeyValue("NotifyScript") + "\" " +
+		sEventNames[Event] + " \"" + GetConfigFileName() + "\"");
 	
 	// Log what we're about to do
 	BOX_INFO("About to notify administrator about event "
-		<< sEventNames[Event] << ", running script '"
-		<< script << "'");
+		<< sEventNames[Event] << ", running script " << script);
 	
 	// Then do it
 	int returnCode = ::system(script.c_str());
 	if(returnCode != 0)
 	{
 		BOX_WARNING("Notify script returned error code: " <<
-			returnCode << " ('" << script << "')");
+			returnCode << " (" << script << ")");
 	}
 	else if(Event != SysadminNotifier::BackupStart &&
 		Event != SysadminNotifier::BackupFinish)
