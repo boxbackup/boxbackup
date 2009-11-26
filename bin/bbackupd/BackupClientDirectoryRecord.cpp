@@ -925,7 +925,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				BOX_TRACE("Upload decision: " <<
 					filename << ": will not upload "
 					"(modified too recently: "
-					"only " << age << "seconds ago)");
+					"only " << age << " seconds ago)");
 			}
 			else
 			{
