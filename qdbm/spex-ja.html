@@ -1,0 +1,4348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta name="author" content="Mikio Hirabayashi" />
+<meta name="keywords" content="QDBM, DBM, database, hash, B+ tree" />
+<meta name="description" content="fundamental specifications of QDBM" />
+<link rel="contents" href="./" />
+<link rel="alternate" href="spex.html" hreflang="en" title="the English version" />
+<link rev="made" href="mailto:mikio@users.sourceforge.net" />
+<title>Specifications of QDBM Version 1 (Japanese)</title>
+<style type="text/css">html { margin: 0em 0em; padding: 0em 0em; background: #eeeeee none; }
+body { margin: 2em 2em; padding: 0em 0em;
+  background: #eeeeee none; color: #111111;
+  font-style: normal; font-weight: normal; }
+h1 { margin-top: 1.8em; margin-bottom: 1.3em; font-weight: bold; }
+h2 { margin-top: 1.8em; margin-bottom: 1.1em; font-weight: bold;
+  border-left: solid 0.6em #445555; border-bottom: solid 1pt #bbbbbb;
+  padding: 0.5em 0.5em; width: 60%; }
+h3 { margin-top: 1.8em; margin-bottom: 0.8em; font-weight: bold; }
+hr { margin-top: 2.5em; margin-bottom: 1.5em; height: 1pt;
+  color: #999999; background-color: #999999; border: none; }
+div.note,div.navi { text-align: right; }
+div.logo { text-align: center; margin: 3em 0em; }
+div.logo img { border: inset 2pt #ccccdd; }
+p { margin: 0.8em 0em; line-height: 140%; }
+p,dd { text-indent: 0.8em; }
+div,pre { margin-left: 1.7em; margin-right: 1.7em; }
+pre { background-color: #ddddee; padding: 0.2em; border: 1pt solid #bbbbcc; font-size: smaller; }
+kbd { color: #111111; font-style: normal; font-weight: bold; }
+a { color: #0022aa; text-decoration: none; }
+a:hover,a:focus { color: #0033ee; text-decoration: underline; }
+a.head { color: #111111; text-decoration: none; }
+table { padding: 1pt 2pt 1pt 2pt; border: none; margin-left: 1.7em; border-collapse: collapse; }
+th { padding: 1pt 4pt 1pt 4pt; border-style: none;
+  text-align: left; vertical-align: bottom; }
+td { padding: 1pt 4pt 1pt 4pt; border: 1pt solid #333333;
+  text-align: left; vertical-align: top; }
+ul,ol,dl { line-height: 140%; }
+dt { margin-left: 1.2em; }
+dd { margin-left: 2.0em; }
+ul.lines { list-style-type: none; }
+@media print {
+  html,body { margin: 0em 0em; background-color: #ffffff; color: #000000; }
+  h1 { padding: 8em 0em 0.5em 0em; text-align: center; }
+  h2 { page-break-before: always; }
+  div.note { text-align: center; }
+  div.navi,div.logo { display: none }
+  hr { display: none; }
+  pre { margin: 0.8em 0.8em; background-color: #ffffff;
+    border: 1pt solid #aaaaaa; font-size: smaller; }
+  a,kbd { color: #000000; text-decoration: none; }
+  h1,h2,h3 { font-family: sans-serif; }
+  p,div,li,dt,dd { font-family: serif; }
+  pre,kbd { font-family: monospace; }
+  dd { font-size: smaller; }
+}
+</style>
+</head>
+
+<body>
+
+<h1>QDBMバージョン１基本仕様書</h1>
+
+<div class="note">Copyright (C) 2000-2007 Mikio Hirabayashi</div>
+<div class="note">Last Update: Thu, 26 Oct 2006 15:00:20 +0900</div>
+<div class="navi">[<a href="spex.html" hreflang="en">English</a>] [<a href="http://qdbm.sourceforge.net/">Home</a>]</div>
+
+<hr />
+
+<h2>目次</h2>
+
+<ol>
+<li><a href="#overview">概要</a></li>
+<li><a href="#features">特徴</a></li>
+<li><a href="#installation">インストール</a></li>
+<li><a href="#depotapi">Depot: 基本API</a></li>
+<li><a href="#depotcli">Depot用コマンド</a></li>
+<li><a href="#curiaapi">Curia: 拡張API</a></li>
+<li><a href="#curiacli">Curia用コマンド</a></li>
+<li><a href="#relicapi">Relic: NDBM互換API</a></li>
+<li><a href="#reliccli">Relic用コマンド</a></li>
+<li><a href="#hovelapi">Hovel: GDBM互換API</a></li>
+<li><a href="#hovelcli">Hovel用コマンド</a></li>
+<li><a href="#cabinapi">Cabin: ユーティリティAPI</a></li>
+<li><a href="#cabincli">Cabin用コマンド</a></li>
+<li><a href="#villaapi">Villa: 上級API</a></li>
+<li><a href="#villacli">Villa用コマンド</a></li>
+<li><a href="#odeumapi">Odeum: 転置API</a></li>
+<li><a href="#odeumcli">Odeum用コマンド</a></li>
+<li><a href="#fileformat">ファイルフォーマット</a></li>
+<li><a href="#porting">移植方法</a></li>
+<li><a href="#bugs">バグ</a></li>
+<li><a href="#faq">よく聞かれる質問</a></li>
+<li><a href="#copying">ライセンス</a></li>
+</ol>
+
+<hr />
+
+<h2><a name="overview" id="overview" class="head">概要</a></h2>
+
+<p>QDBMはデータベースを扱うルーチン群のライブラリである。データベースといっても単純なものであり、キーと値のペアからなるレコード群を格納したデータファイルである。キーと値は任意の長さを持つ一連のバイト列であり、文字列でもバイナリでも扱うことができる。テーブルやデータ型の概念はない。レコードはハッシュ表またはB+木で編成される。</p>
+
+<p>ハッシュ表のデータベースでは、キーはデータベース内で一意であり、キーが重複する複数のレコードを格納することはできない。このデータベースに対しては、キーと値を指定してレコードを格納したり、キーを指定して対応するレコードを削除したり、キーを指定して対応するレコードを検索したりすることができる。また、データベースに格納してある全てのキーを順不同に一つずつ取り出すこともできる。このような操作は、UNIX標準で定義されているDBMライブラリおよびその追従であるNDBMやGDBMに類するものである。QDBMはDBMのより良い代替として利用することができる。</p>
+
+<p>B+木のデータベースでは、キーが重複する複数のレコードを格納することができる。このデータベースに対しては、ハッシュ表のデータベースと同様に、キーを指定してレコードを格納したり取り出したり削除したりすることができる。レコードはユーザが指示した比較関数に基づいて整列されて格納される。カーソルを用いて各レコードを昇順または降順で参照することができる。この機構によって、文字列の前方一致検索や数値の範囲検索が可能になる。また、B+木のデータベースではトランザクションが利用できる。</p>
+
+<p>QDBMはCで記述され、C、C++、Java、PerlおよびRubyのAPIとして提供される。QDBMはPOSIX準拠のAPIを備えるプラットフォームで利用できる。QDBMはGNU Lesser General Public Licenseに基づくフリーソフトウェアである。</p>
+
+<hr />
+
+<h2><a name="features" id="features" class="head">特徴</a></h2>
+
+<h3>効率的なハッシュデータベースの実装</h3>
+
+<p>QDBMはGDBMを参考に次の三点を目標として開発された。処理がより高速であること、データベースファイルがより小さいこと、APIがより単純であること。これらの目標は達成されている。また、GDBMと同様に、伝統的なDBMが抱える三つの制限事項を回避している。すなわち、プロセス内で複数のデータベースを扱うことができ、キーと値のサイズに制限がなく、データベースファイルがスパースではない。</p>
+
+<p>QDBMはレコードの探索にハッシュアルゴリズムを用いる。バケット配列に十分な要素数があれば、レコードの探索にかかる時間計算量は O(1) である。すなわち、レコードの探索に必要な時間はデータベースの規模に関わらず一定である。追加や削除に関しても同様である。ハッシュ値の衝突はセパレートチェーン法で管理する。チェーンのデータ構造は二分探索木である。バケット配列の要素数が著しく少ない場合でも、探索等の時間計算量は O(log n) に抑えられる。</p>
+
+<p>QDBMはバケット配列を全てRAM上に保持することによって、処理の高速化を図る。バケット配列がRAM上にあれば、ほぼ1パスのファイル操作でレコードに該当するファイル上の領域を参照することができる。ファイルに記録されたバケット配列は `read' コールでRAM上に読み込むのではなく、`mmap' コールでRAMに直接マッピングされる。したがって、データベースに接続する際の準備時間が極めて短く、また、複数のプロセスでメモリマップを共有することができる。</p>
+
+<p>バケット配列の要素数が格納するレコード数の半分ほどであれば、データの性質によって多少前後するが、ハッシュ値の衝突率は56.7%ほどである（等倍だと36.8%、2倍だと21.3%、4倍だと11.5%、8倍だと6.0%ほど）。そのような場合、平均2パス以下のファイル操作でレコードを探索することができる。これを性能指標とするならば、例えば100万個のレコードを格納するためには50万要素のバケット配列が求められる。バケット配列の各要素は4バイトである。すなわち、2MバイトのRAMが利用できれば100万レコードのデータベースが構築できる。</p>
+
+<p>QDBMにはデータベースに接続するモードとして、「リーダ」と「ライタ」の二種類がある。リーダは読み込み専用であり、ライタは読み書き両用である。データベースにはファイルロックによってプロセス間での排他制御が行われる。ライタが接続している間は、他のプロセスはリーダとしてもライタとしても接続できない。リーダが接続している間は、他のプロセスのリーダは接続できるが、ライタは接続できない。この機構によって、マルチタスク環境での同時接続に伴うデータの整合性が保証される。</p>
+
+<p>伝統的なDBMにはレコードの追加操作に関して「挿入」モードと「置換」モードがある。前者では、キーが既存のレコードと重複する際に既存の値を残す。後者では、キーが既存のレコードと重複した際に新しい値に置き換える。QDBMはその２つに加えて「連結」モードがある。既存の値の末尾に指定された値を連結して格納する操作である。レコードの値を配列として扱う場合、要素を追加するには連結モードが役に立つ。また、DBMではレコードの値を取り出す際にはその全ての領域を処理対象にするしか方法がないが、QDBMでは値の領域の一部のみを選択して取り出すことができる。レコードの値を配列として扱う場合にはこの機能も役に立つ。</p>
+
+<p>一般的に、データベースの更新処理を続けるとファイル内の利用可能領域の断片化が起き、ファイルのサイズが肥大化してしまう。QDBMは隣接する不要領域を連結して再利用し、またデータベースの最適化機能を備えることによってこの問題に対処する。既存のレコードの値をより大きなサイズの値に上書きする場合、そのレコードの領域をファイル中の別の位置に移動させる必要がある。この処理の時間計算量はレコードのサイズに依存するので、値を拡張していく場合には効率が悪い。しかし、QDBMはアラインメントによってこの問題に対処する。増分がパディングに収まれば領域を移動させる必要はない。</p>
+
+<p>多くのファイルシステムでは、2GBを越えるサイズのファイルを扱うことができない。この問題に対処するために、QDBMは複数のデータベースファイルを含むディレクトリからなるデータベースを扱う機能を提供する。レコードをどのファイルに格納するかはキーに別のハッシュ関数を適用することによって決められる。この機能によって、理論的にはレコードの合計サイズが1TBまでのデータベースを構築することができる。また、データベースファイルを複数のディスクに振り分けることができるため、RAID-0（ストライピング）に見られるような更新操作の高速化が期待できる。NFS等を利用すれば複数のファイルサーバにデータベースを分散させることもできる。</p>
+
+<h3>便利なB+木データベースの実装</h3>
+
+<p>B+木データベースはハッシュデータベースより遅いが、ユーザが定義した順序に基づいて各レコードを参照できることが特長である。B+木は複数のレコードを整列させた状態で論理的なページにまとめて管理する。各ページに対してはB木すなわち多進平衡木によって階層化された疎インデックスが維持される。したがって、各レコードの探索等にかかる時間計算量は O(log n) である。各レコードを順番に参照するためにカーソルが提供される。カーソルの場所はキーを指定して飛ばすことができ、また現在の場所から次のレコードに進めたり前のレコードに戻したりすることができる。各ページは双方向リンクリストで編成されるので、カーソルを前後に移動させる時間計算量は O(1) である。</p>
+
+<p>B+木データベースは上述のハッシュデータベースを基盤として実装される。B+木の各ページはハッシュデータベースのレコードとして記録されるので、ハッシュデータベースの記憶管理の効率性を継承している。B+木では各レコードのヘッダが小さく、各ページのアラインメントはページサイズに応じて調整されるので、ほとんどの場合、ハッシュデータベースに較べてデータベースファイルのサイズが半減する。B+木を更新する際には多くのページを操作する必要があるが、QDBMはページをキャッシュすることによってファイル操作を減らして処理を効率化する。ほとんどの場合、疎インデックス全体がメモリ上にキャッシュされるので、各レコードを参照するのに必要なファイル操作は平均1パス以下である。</p>
+
+<p>B+木データベースはトランザクション機構を提供する。トランザクションを開始してから終了するまでの一連の操作を一括してデータベースにコミットしたり、一連の更新操作を破棄してデータベースの状態をトランザクションの開始前の状態にロールバックしたりすることができる。トランザクションの間にアプリケーションのプロセスがクラッシュしてもデータベースファイルは破壊されない。</p>
+
+<p>可逆データ圧縮ライブラリであるZLIBかLZOかBZIP2を有効化してQDBMをビルドすると、B+木の各ページの内容は圧縮されてファイルに書き込まれる。同一ページ内の各レコードは似たようなパターンを持つため、Lempel-Zivなどのアルゴリズムを適用すると高い圧縮効率が期待できる。テキストデータを扱う場合、データベースのサイズが元の25%程度になる。データベースの規模が大きくディスクI/Oがボトルネックとなる場合は、圧縮機能を有効化すると処理速度が大幅に改善される。</p>
+
+<h3>単純だが多様なインタフェース群</h3>
+
+<p>QDBMのAPIは非常に単純である。ANSI Cで定義された `FILE' ポインタを用いた通常のファイル入出力と同じようにデータベースファイルに対する入出力を行うことができる。QDBMの基本APIでは、データベースの実体は単一のファイルに記録される。拡張APIでは、データベースの実体は単一のディレクトリに含まれる複数のファイルに記録される。二つのAPIは互いに酷似しているので、アプリケーションを一方から他方に移植することはたやすい。</p>
+
+<p>NDBMおよびGDBMに互換するAPIも提供される。NDBMやGDBMのアプリケーションは市場に数多く存在するが、それらをQDBMに移植するのはたやすい。ほとんどの場合、ヘッダファイルの取り込み（#include）を書き換えてコンパイルしなおせばよい。ただし、オリジナルのNDBMやGDBMで作成したデータベースファイルをQDBMで扱うことはできない。</p>
+
+<p>メモリ上でレコードを簡単に扱うために、ユーティリティAPIが提供される。メモリ確保関数とソート関数と拡張可能なデータと配列リストとハッシュマップ等の実装である。それらを用いると、C言語でもPerlやRuby等のスクリプト言語のような手軽さでレコードを扱うことができる。</p>
+
+<p>B+木データベースは上級APIを介して利用する。上級APIは基本APIとユーティリティAPIを利用して実装される。上級APIも基本APIや拡張APIに類似した書式を持つので、使い方を覚えるのは容易である。</p>
+
+<p>全文検索システムで利用される転置インデックスを扱うために、転置APIが提供される。文書群の転置インデックスを容易に扱うことができれば、アプリケーションはテキスト処理や自然言語処理に注力できる。このAPIは文字コードや言語に依存しないので、ユーザの多様な要求に応える全文検索システムを実装することが可能となる。</p>
+
+<p>QDBMはC言語の他にも、C++、Java、PerlおよびRubyのAPIを提供する。C言語のAPIには、基本API、拡張API、NDBM互換API、GDBM互換API、ユーティリティAPI、上級APIおよび転置APIの七種類がある。各APIに対応したコマンドラインインタフェースも用意されている。それらはプロトタイピングやテストやデバッグなどで活躍する。C++用APIは基本APIと拡張APIと上級APIのデータベース操作関数群をC++のクラス機構でカプセル化したものである。Java用APIはJava Native Interfaceを用いて基本APIと拡張APIと上級APIを呼び出すものである。Perl用APIはXS言語を用いて基本APIと拡張APIと上級APIを呼び出すものである。Ruby用APIはRubyのモジュールとして基本APIと拡張APIと上級APIを呼び出すものである。データベースの管理とファイルアップロードと全文検索のためのCGIスクリプトも提供される。</p>
+
+<h3>幅広い移植性</h3>
+
+<p>QDBMはANSI C（C89）の記法に従い、ANSI CまたはPOSIXで定義されたAPIのみを用いて実装される。したがって、ほとんどのUNIXおよびその互換をうたうOSで動作させることができる。C言語のAPIに関しては、少なくとも以下のプラットフォームで動作確認されている。</p>
+
+<ul>
+<li>Linux (2.2, 2.4, 2.6) (IA32, IA64, AMD64, PA-RISC, Alpha, PowerPC, M68000, ARM)</li>
+<li>FreeBSD (4.9, 5.0, 5.1, 5.2, 5.3) (IA32, IA64, SPARC, Alpha)</li>
+<li>NetBSD (1.6) (IA32)</li>
+<li>OpenBSD (3.4) (IA32)</li>
+<li>SunOS (5.6, 5.7, 5.8, 5.9, 5.10) (IA32, SPARC)</li>
+<li>HP-UX (11.11, 11.23) (IA64, PA-RISC)</li>
+<li>AIX (5.2) (POWER)</li>
+<li>Windows (2000, XP) (IA32, IA64, AMD64) (Cygwin, MinGW, Visual C++)</li>
+<li>Mac OS X (10.2, 10.3, 10.4) (IA32, PowerPC)</li>
+<li>Tru64 (5.1) (Alpha)</li>
+<li>RISC OS (5.03) (ARM)</li>
+</ul>
+
+<p>QDBMが作成したデータベースファイルは処理系のバイトオーダに依存するが、その対策として、バイトオーダに依存しない形式のデータをダンプするユーティリティが提供される。</p>
+
+<hr />
+
+<h2><a name="installation" id="installation" class="head">インストール</a></h2>
+
+<h3>準備</h3>
+
+<p>ソースパッケージを用いてQDBMをインストールするには、GCCのバージョン2.8以降と `make' が必要である。</p>
+
+<p>QDBMの配布用アーカイブファイルを展開したら、生成されたディレクトリに入ってインストール作業を行う。</p>
+
+<h3>普通の手順</h3>
+
+<p>LinuxとBSDとSunOSでは以下の手順に従う。</p>
+
+<p>ビルド環境を設定する。</p>
+
+<pre>./configure
+</pre>
+
+<p>プログラムをビルドする。</p>
+
+<pre>make
+</pre>
+
+<p>プログラムの自己診断テストを行う。</p>
+
+<pre>make check
+</pre>
+
+<p>プログラムをインストールする。作業は `root' ユーザで行う。</p>
+
+<pre>make install
+</pre>
+
+<h3>GNU Libtoolを使う場合</h3>
+
+<p>上記の方法でうまくいかない場合、以下の手順に従う。この手順には、GNU Libtoolのバージョン1.5以降が必要である。</p>
+
+<p>ビルド環境を設定する。</p>
+
+<pre>./configure
+</pre>
+
+<p>プログラムをビルドする。</p>
+
+<pre>make -f LTmakefile
+</pre>
+
+<p>プログラムの自己診断テストを行う。</p>
+
+<pre>make -f LTmakefile check
+</pre>
+
+<p>プログラムをインストールする。作業は `root' ユーザで行う。</p>
+
+<pre>make -f LTmakefile install
+</pre>
+
+<h3>結果</h3>
+
+<p>一連の作業が終ると、以下のファイルがインストールされる。その他にも、マニュアルが `/usr/local/man/man1' と `/usr/local/man/man3' に、それ以外の文書が `/usr/local/share/qdbm' に、`pkg-config' 用の設定ファイルが `/usr/local/lib/pkgconfig' にインストールされる。</p>
+
+<pre>/usr/local/include/depot.h
+/usr/local/include/curia.h
+/usr/local/include/relic.h
+/usr/local/include/hovel.h
+/usr/local/include/cabin.h
+/usr/local/include/villa.h
+/usr/local/include/vista.h
+/usr/local/include/odeum.h
+/usr/local/lib/libqdbm.a
+/usr/local/lib/libqdbm.so.14.13.0
+/usr/local/lib/libqdbm.so.14
+/usr/local/lib/libqdbm.so
+/usr/local/bin/dpmgr
+/usr/local/bin/dptest
+/usr/local/bin/dptsv
+/usr/local/bin/crmgr
+/usr/local/bin/crtest
+/usr/local/bin/crtsv
+/usr/local/bin/rlmgr
+/usr/local/bin/rltest
+/usr/local/bin/hvmgr
+/usr/local/bin/hvtest
+/usr/local/bin/cbtest
+/usr/local/bin/cbcodec
+/usr/local/bin/vlmgr
+/usr/local/bin/vltest
+/usr/local/bin/vltsv
+/usr/local/bin/odmgr
+/usr/local/bin/odtest
+/usr/local/bin/odidx
+/usr/local/bin/qmttest
+</pre>
+
+<p>`libqdbm.so' と動的にリンクしたプログラムを実行する際には、ライブラリの検索パスに `/usr/local/lib' を含めるべきである。環境変数 `LD_LIBRARY_PATH' でライブラリの検索パスを設定することができる。</p>
+
+<p>QDBMをアンインストールするには、`./configure' をした後の状態で以下のコマンドを実行する。作業は `root' ユーザで行う。</p>
+
+<pre>make uninstall
+</pre>
+
+<p>QDBMの古いバージョンがインストールされている場合、それをアンインストールしてからインストール作業を行うべきである。</p>
+
+<p>C言語以外のAPIとCGIスクリプトはデフォルトではインストールされない。C++用APIのインストール方法については、サブディレクトリ `plus' にある `xspex-ja.html' を参照すること。JAVA用APIのインストール方法については、サブディレクトリ `java' にある `jspex-ja.html' を参照すること。Perl用APIのインストール方法については、サブディレクトリ `perl' にある `plspex-ja.html' を参照すること。Ruby用APIのインストール方法については、サブディレクトリ `ruby' にある `rbspex-ja.html' を参照すること。CGIスクリプトのインストール方法については、サブディレクトリ `cgi' にある `cgispex.html' を参照すること。</p>
+
+<p>RPM等のバイナリパッケージを用いてインストールを行う場合は、それぞれのパッケージマネージャのマニュアルを参照すること。例えば、RPMを用いる場合、以下のようなコマンドを `root' ユーザで実行する。</p>
+
+<pre>rpm -ivh qdbm-1.x.x-x.i386.rpm
+</pre>
+
+<h3>Windowsの場合</h3>
+
+<p>Windows（Cygwin）にインストールする場合、以下の手順に従う。</p>
+
+<p>ビルド環境を設定する。</p>
+
+<pre>./configure
+</pre>
+
+<p>プログラムをビルドする。</p>
+
+<pre>make win
+</pre>
+
+<p>プログラムの自己診断テストを行う。</p>
+
+<pre>make check-win
+</pre>
+
+<p>プログラムをインストールする。なお、アンインストールする場合は `make uninstall-win' とする。</p>
+
+<pre>make install-win
+</pre>
+
+<p>Windowsでは、静的ライブラリ `libqdbm.a' に加えてインポートライブラリ `libqdbm.dll.a' が生成され、動的ライブラリ `libqdbm.so' 等の代わりにダイナミックリンクライブラリ `qdbm.dll' が生成される。`qdbm.dll' は `/usr/local/bin' にインストールされる。</p>
+
+<p>Cygwin環境でMinGWを用いてビルドするには、`make win' の代わりに `make mingw' を用いる。CygwinのUNIXエミュレーション層を用いる場合、生成されるプログラムは `cygwin1.dll' に依存したものになる（GNU GPLの影響を受ける）。MinGWによってWin32のネイティブDLLとリンクさせればこの問題を回避できる。</p>
+
+<p>Visual C++を用いてビルドするには、`VCmakefile' を編集してヘッダとライブラリの検索パスを設定した上で、`nmake /f VCMakefile' とすればよい。生成された `qdbm.dll' とリンクするアプリケーションは、コンパイラの `/MD' または `/MDd' オプションを用いて `msvcrt.dll' とリンクさせる必要がある。詳細設定に関しては `VCmakefile' を参照のこと。</p>
+
+<h3>Mac OS Xの場合</h3>
+
+<p>Mac OS X（Darwin）にインストールする場合、以下の手順に従う。</p>
+
+<p>ビルド環境を設定する。</p>
+
+<pre>./configure
+</pre>
+
+<p>プログラムをビルドする。</p>
+
+<pre>make mac
+</pre>
+
+<p>プログラムの自己診断テストを行う。</p>
+
+<pre>make check-mac
+</pre>
+
+<p>プログラムをインストールする。なお、アンインストールする場合は `make uninstall-mac' とする。</p>
+
+<pre>make install-mac
+</pre>
+
+<p>Mac OS Xでは、`libqdbm.so' 等の代わりに `libqdbm.dylib' 等が生成される。ライブラリの検索パスの指定は環境変数 `DYLD_LIBRARY_PATH' で行うことができる。</p>
+
+<h3>HP-UXの場合</h3>
+
+<p>HP-UXにインストールする場合、以下の手順に従う。</p>
+
+<p>ビルド環境を設定する。</p>
+
+<pre>./configure
+</pre>
+
+<p>プログラムをビルドする。</p>
+
+<pre>make hpux
+</pre>
+
+<p>プログラムの自己診断テストを行う。</p>
+
+<pre>make check-hpux
+</pre>
+
+<p>プログラムをインストールする。なお、アンインストールする場合は `make uninstall-hpux' とする。</p>
+
+<pre>make install-hpux
+</pre>
+
+<p>HP-UXでは、`libqdbm.so' 等の代わりに `libqdbm.sl' が生成される。ライブラリの検索パスの指定は環境変数 `SHLIB_PATH' で行うことができる。</p>
+
+<h3>RISC OSの場合</h3>
+
+<p>RISC OSにインストールする場合、以下の手順に従う。</p>
+
+<p>プログラムをビルドする。デフォルトではコンパイラに `cc' を用いるようになっているが、`gcc' を用いたければ `CC=gcc' という引数を加えればよい。</p>
+
+<pre>make -f RISCmakefile
+</pre>
+
+<p>一連の作業が終ると、`libqdbm' というライブラリファイルと `dpmgr' 等のコマンドが生成される。それらのインストール方法は定義されていないので、手動で任意の場所にコピーしてインストールすること。`depot.h' 等のヘッダファイルも同様に手動でインストールすること。</p>
+
+<h3>詳細設定</h3>
+
+<p>`./configure' を実行する際に以下のオプション引数を指定することで、ビルド方法の詳細な設定を行うことができる。</p>
+
+<ul class="lines">
+<li><kbd>--enable-debug</kbd> : デバッグ用にビルドする。デバッグシンボルを有効化し、最適化を行わず、静的にリンクする。</li>
+<li><kbd>--enable-devel</kbd> : 開発用にビルドする。デバッグシンボルを有効化し、最適化を行い、動的にリンクする。</li>
+<li><kbd>--enable-stable</kbd> : 安定版のリリース用にビルドする。保守的な最適化を行い、動的にリンクする。</li>
+<li><kbd>--enable-pthread</kbd> : POSIXスレッドを用い、グローバル変数をスレッド固有データとして扱う。</li>
+<li><kbd>--disable-lock</kbd> : ファイルロッキングが実装されていない環境用にビルドする。</li>
+<li><kbd>--disable-mmap</kbd> : メモリマッピングが実装されていない環境用にビルドする。</li>
+<li><kbd>--enable-zlib</kbd> : ZLIBによるB+木と転置インデックスのレコード圧縮を機能させる。</li>
+<li><kbd>--enable-lzo</kbd> : LZOによるB+木と転置インデックスのレコード圧縮を機能させる。</li>
+<li><kbd>--enable-bzip</kbd> : BZIP2によるB+木と転置インデックスのレコード圧縮を機能させる。</li>
+<li><kbd>--enable-iconv</kbd> : ICONVによる文字コード変換ユーティリティを機能させる。</li>
+</ul>
+
+<p>通常、QDBMとそのアプリケーションは `libqdbm.*' 以外の非標準のライブラリには依存しないでビルドすることができる。ただし、POSIXスレッドを有効にした場合は `libpthread.*' に依存し、ZLIBを有効にした場合は `libz.*' に依存し、LZOを有効にした場合は `liblzo2.*' に依存し、BZIP2を有効にした場合は `libbz2.*' に依存し、ICONVを有効にした場合は `libiconv.*' に依存するようになる。</p>
+
+<p>LZOのライセンスはGNU GPLなので、`liblzo2.*' とリンクしたアプリケーションはGNU GPLの制約を受けることに注意すること。</p>
+
+<hr />
+
+<h2><a name="depotapi" id="depotapi" class="head">Depot: 基本API</a></h2>
+
+<h3>概要</h3>
+
+<p>DepotはQDBMの基本APIである。QDBMが提供するデータベース管理機能のほぼ全てがDepotによって実装される。その他のAPIはDepotのラッパーにすぎない。したがって、QDBMのAPIの中でDepotが最も高速に動作する。</p>
+
+<p>Depotを使うためには、`depot.h' と `stdlib.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;depot.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+</dl>
+
+<p>Depotでデータベースを扱う際には、`DEPOT' 型へのポインタをハンドルとして用いる。これは、`stdio.h' の各種ルーチンがファイル入出力に `FILE' 型へのポインタを用いるのに似ている。ハンドルは、関数 `dpopen' で開き、関数 `dpclose' で閉じる。ハンドルのメンバを直接参照することは推奨されない。データベースに致命的なエラーが起きた場合は、以後そのハンドルに対する `dpclose' を除く全ての操作は何もせずにエラーを返す。ひとつのプロセスで複数のデータベースファイルを同時に利用することは可能であるが、同じデータベースファイルの複数のハンドルを利用してはならない。</p>
+
+<h3>API</h3>
+
+<p>外部変数 `dpversion' はバージョン情報の文字列である。</p>
+
+<dl>
+<dt><kbd>extern const char *dpversion;</kbd></dt>
+<dd>この変数の指す領域は書き込み禁止である。</dd>
+</dl>
+
+<p>外部変数 `dpecode' には直前のエラーコードが記録される。エラーコードの詳細については `depot.h' を参照すること。</p>
+
+<dl>
+<dt><kbd>extern int dpecode;</kbd></dt>
+<dd>この変数の初期値は `DP_ENOERR' である。その他の値として、`DP_EFATAL'、`DP_EMODE'、`DP_EBROKEN'、`DP_EKEEP'、`DP_ENOITEM'、`DP_EALLOC'、`DP_EMAP'、`DP_EOPEN'、`DP_ECLOSE'、`DP_ETRUNC'、`DP_ESYNC'、`DP_ESTAT'、`DP_ESEEK'、`DP_EREAD'、`DP_EWRITE'、`DP_ELOCK'、`DP_EUNLINK'、`DP_EMKDIR'、`DP_ERMDIR' および `DP_EMISC' がある。</dd>
+</dl>
+
+<p>エラーコードに対応するメッセージ文字列を得るには、関数 `dperrmsg' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *dperrmsg(int <var>ecode</var>);</kbd></dt>
+<dd>`ecode' はエラーコードを指定する。戻り値はエラーメッセージの文字列であり、その領域は書き込み禁止である。</dd>
+</dl>
+
+<p>データベースのハンドルを作成するには、関数 `dpopen' を用いる。</p>
+
+<dl>
+<dt><kbd>DEPOT *dpopen(const char *<var>name</var>, int <var>omode</var>, int <var>bnum</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。`omode' は接続モードを指定し、`DP_OREADER' ならリーダ、`DP_OWRITER' ならライタとなる。`DP_OWRITER' の場合、`DP_OCREAT' または `DP_OTRUNC' とのビット論理和にすることができる。`DP_OCREAT' はファイルが無い場合に新規作成することを指示し、`DP_OTRUNC' はファイルが存在しても作り直すことを指示する。`DP_OREADER' と `DP_OWRITER' の両方で `DP_ONOLCK' または `DP_OLCKNB' とのビット論理和にすることができるが、前者はファイルロックをかけずにデータベースを開くことを指示し、後者はブロックせずにロックをかけることを指示する。`DP_OCREAT' は `DP_OSPARSE' とのビット論理和にすることができるが、それは生成されるファイルをスパースにすることを指示する。`bnum' はバケット配列の要素数の目安を指定するが、0 以下ならデフォルト値が使われる。バケット配列の要素数はデータベースを作成する時に決められ、最適化以外の手段で変更することはできない。バケット配列の要素数は、格納するレコード数の半分から4倍程度にするのがよい。戻り値はデータベースハンドルであるか、エラーなら `NULL' である。ライタ（読み書き両用モード）でデータベースファイルを開く際にはそのファイルに対して排他ロックがかけられ、リーダ（読み込み専用モード）で開く際には共有ロックがかけられる。その際には該当のロックがかけられるまで制御がブロックする。`DP_ONOLCK' を使う場合、アプリケーションが排他制御の責任を負う。</dd>
+</dl>
+
+<p>データベースとの接続を閉じてハンドルを破棄するには、関数 `dpclose' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpclose(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。データベースの更新内容は、接続を閉じた時点で初めてファイルと同期される。ライタでデータベースを開いた場合、適切に接続を閉じないとデータベースが破壊される。閉じたハンドルの領域は解放されるので、以後は利用できなくなる。</dd>
+</dl>
+
+<p>レコードを追加するには、関数 `dpput' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpput(DEPOT *<var>depot</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const char *<var>vbuf</var>, int <var>vsiz</var>, int <var>dmode</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。`dmode' はキーが既存レコードと重複した際の制御を指定する。`DP_DOVER' は既存のレコードの値を上書きし、`DP_DKEEP' は既存のレコードを残してエラーを返し、`DP_DCAT' は指定された値を既存の値の末尾に加える。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>レコードを削除するには、関数 `dpout' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpout(DEPOT *<var>depot</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。</dd>
+</dl>
+
+<p>レコードを取得するには、関数 `dpget' を用いる。</p>
+
+<dl>
+<dt><kbd>char *dpget(DEPOT *<var>depot</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>start</var>, int <var>max</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定するか、負数なら無制限となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>レコードを取得してバッファに書き込むには、関数 `dpgetwb' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpgetwb(DEPOT *<var>depot</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>start</var>, int <var>max</var>, char *<var>vbuf</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定する。それは書き込み用のバッファのサイズ以下である必要がある。`vbuf' は抽出したデータを書き込むバッファへのポインタを指定する。戻り値は正常ならバッファに書き込まれたデータのサイズであり、エラーなら -1 である。該当のレコードがない場合も -1 を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。書き込み用バッファの末尾に終端文字が追加されないことに注意すべきである。</dd>
+</dl>
+
+<p>レコードの値のサイズを取得するには、関数 `dpvsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpvsiz(DEPOT *<var>depot</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は該当レコードの値のサイズであるが、該当がない場合やエラーの場合は -1 である。この関数はレコードの有無を調べるのにも便利である。`dpget' と違って実データを読み込まないので効率がよい。</dd>
+</dl>
+
+<p>データベースのイテレータを初期化するには、関数 `dpiterinit' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpiterinit(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。イテレータは、データベースに格納された全てのレコードを参照するために用いられる。</dd>
+</dl>
+
+<p>データベースのイテレータから次のレコードのキーを取り出すには、関数 `dpiternext' を用いる。</p>
+
+<dl>
+<dt><kbd>char *dpiternext(DEPOT *<var>depot</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常ならキーを格納した領域へのポインタであり、エラーなら `NULL' である。イテレータが最後まできて該当のレコードがない場合も `NULL' を返す。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数を繰り返して呼ぶことによって全てのレコードを一度ずつ参照することができる。ただし、繰り返しの間にデータベースの更新があった場合はその限りではない。なお、取り出すレコードの順序は制御できず、格納した順番でレコードを取り出せるとは限らない。</dd>
+</dl>
+
+<p>データベースのアラインメントを設定するには、関数 `dpsetalign' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpsetalign(DEPOT *<var>depot</var>, int <var>align</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。`align' はアラインメントのサイズを指定する。戻り値は正常なら真であり、エラーなら偽である。アラインメントを設定しておくと、レコードの上書きを頻繁にする場合の処理効率が良くなる。アラインメントには、一連の更新操作をした後の状態での標準的な値のサイズを指定するのがよい。アラインメントが正数の場合、レコードの領域のサイズがアラインメントの倍数になるようにパディングがとられる。アラインメントが負数の場合、`vsiz' を値のサイズとして、パディングのサイズは `(vsiz / pow(2, abs(align) - 1))' として算出される。アラインメントの設定はデータベースに保存されないので、データベースを開く度に指定する必要がある。</dd>
+</dl>
+
+<p>データベースのフリーブロックプールのサイズ設定するには、関数 `dpsetfbpsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpsetfbpsiz(DEPOT *<var>depot</var>, int <var>size</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。`size' はフリーブロックプールのサイズを指定する。戻り値は正常なら真であり、エラーなら偽である。フリーブロックプールのデフォルトのサイズは16である。サイズをより大きくすると、レコードの上書きを繰り返す際の空間効率は上がるが、時間効率が下がる。</dd>
+</dl>
+
+<p>データベースを更新した内容をファイルとデバイスに同期させるには、関数 `dpsync' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpsync(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。この関数はデータベースを閉じないうちに別プロセスにデータベースファイルを利用させる場合に役立つ。</dd>
+</dl>
+
+<p>データベースを最適化するには、関数 `dpoptimize' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpoptimize(DEPOT *<var>depot</var>, int <var>bnum</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。`bnum' は新たなバケット配列の要素数を指定するが、0 以下なら現在のレコード数に最適な値が指定される。戻り値は正常なら真であり、エラーなら偽である。レコードを削除したり、置換モードや連結モードで書き込みを繰り返したりする場合は、データベース内に不要な領域が蓄積するが、この関数はそれを解消するのに役立つ。</dd>
+</dl>
+
+<p>データベースの名前を得るには、関数 `dpname' を用いる。</p>
+
+<dl>
+<dt><kbd>char *dpname(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常なら名前を格納した領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>データベースファイルのサイズを得るには、関数 `dpfsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpfsiz(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常ならデータベースファイルのサイズであり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースのバケット配列の要素数を得るには、関数 `dpbnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpbnum(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常ならデータベースのバケット配列の要素数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースのバケット配列の利用済みの要素数を得るには、関数 `dpbusenum' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpbusenum(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常ならバケット配列の利用済みの要素数であり、エラーなら -1 である。この関数はバケット配列の全ての要素を参照するので、効率が悪い。</dd>
+</dl>
+
+<p>データベースのレコード数を得るには、関数 `dprnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int dprnum(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は正常ならデータベースのレコード数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースハンドルがライタかどうかを調べるには、関数 `dpwritable' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpwritable(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値はライタなら真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースに致命的エラーが起きたかどうかを調べるには、関数 `dpfatalerror' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpfatalerror(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値は致命的エラーがあれば真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースファイルのinode番号を得るには、関数 `dpinode' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpinode(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値はデータベースファイルのinode番号である。</dd>
+</dl>
+
+<p>データベースの最終更新時刻を得るには、関数 `dpmtime' を用いる。</p>
+
+<dl>
+<dt><kbd>time_t dpmtime(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値はデータベースの最終更新時刻である。</dd>
+</dl>
+
+<p>データベースファイルのファイルディスクリプタを得るには、関数 `dpfdesc' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpfdesc(DEPOT *<var>depot</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。戻り値はデータベースファイルのファイルディスクリプタである。データベースのファイルディスクリプタを直接操ることは推奨されない。</dd>
+</dl>
+
+<p>データベースファイルを削除するには、関数 `dpremove' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpremove(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>壊れたデータベースファイルを修復するには、関数 `dprepair' を用いる。</p>
+
+<dl>
+<dt><kbd>int dprepair(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。修復されたデータベースの全レコードが元来もしくは期待される状態に戻る保証はない。</dd>
+</dl>
+
+<p>全てのレコードをエンディアン非依存のデータとしてダンプするには、関数 `dpexportdb' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpexportdb(DEPOT *<var>depot</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`depot' はデータベースハンドルを指定する。`name' は出力ファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>エンディアン非依存データから全てのレコードをロードするには、関数 `dpimportdb' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpimportdb(DEPOT *<var>depot</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`depot' はライタで接続したデータベースハンドルを指定する。データベースは空でなければならない。`name' は入力ファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>データベースファイルからレコードを直接取得するには、関数 `dpsnaffle' を用いる。</p>
+
+<dl>
+<dt><kbd>char *dpsnaffle(const char *<var>name</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定するか、負数なら無制限となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はデータベースファイルが別のプロセスにロックされていても利用できるが、最新の更新が反映されている保証はない。</dd>
+</dl>
+
+<p>データベースの内部で用いるハッシュ関数として、関数 `dpinnerhash' がある。</p>
+
+<dl>
+<dt><kbd>int dpinnerhash(const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値はキーから31ビット長のハッシュ値を算出した値である。この関数はアプリケーションがバケット配列の状態を予測する際に役立つ。</dd>
+</dl>
+
+<p>データベースの内部で用いるハッシュ関数と独立したハッシュ関数として、関数 `dpouterhash' がある。</p>
+
+<dl>
+<dt><kbd>int dpouterhash(const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値はキーから31ビット長のハッシュ値を算出した値である。この関数はアプリケーションがデータベースの更に上でハッシュアルゴリズムを利用する際に役立つ。</dd>
+</dl>
+
+<p>ある数以上の自然数の素数を得るには、関数 `dpprimenum' を用いる。</p>
+
+<dl>
+<dt><kbd>int dpprimenum(int <var>num</var>);</kbd></dt>
+<dd>`num' は適当な自然数を指定する。戻り値は、指定した数と同じかより大きくかつなるべく小さい自然数の素数である。この関数はアプリケーションが利用するバケット配列のサイズを決める場合に役立つ。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>名前と対応させて電話番号を格納し、それを検索するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#define NAME     "mikio"
+#define NUMBER   "000-1234-5678"
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  DEPOT *depot;
+  char *val;
+
+  /* データベースを開く */
+  if(!(depot = dpopen(DBNAME, DP_OWRITER | DP_OCREAT, -1))){
+    fprintf(stderr, "dpopen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* レコードを格納する */
+  if(!dpput(depot, NAME, -1, NUMBER, -1, DP_DOVER)){
+    fprintf(stderr, "dpput: %s\n", dperrmsg(dpecode));
+  }
+
+  /* レコードを取得する */
+  if(!(val = dpget(depot, NAME, -1, 0, -1, NULL))){
+    fprintf(stderr, "dpget: %s\n", dperrmsg(dpecode));
+  } else {
+    printf("Name: %s\n", NAME);
+    printf("Number: %s\n", val);
+    free(val);
+  }
+
+  /* データベースを閉じる */
+  if(!dpclose(depot)){
+    fprintf(stderr, "dpclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<p>データベースの全てのレコードを表示するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  DEPOT *depot;
+  char *key, *val;
+
+  /* データベースを開く */
+  if(!(depot = dpopen(DBNAME, DP_OREADER, -1))){
+    fprintf(stderr, "dpopen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* イテレータを初期化する */
+  if(!dpiterinit(depot)){
+    fprintf(stderr, "dpiterinit: %s\n", dperrmsg(dpecode));
+  }
+
+  /* イテレータを走査する */
+  while((key = dpiternext(depot, NULL)) != NULL){
+    if(!(val = dpget(depot, key, -1, 0, -1, NULL))){
+      fprintf(stderr, "dpget: %s\n", dperrmsg(dpecode));
+      free(key);
+      break;
+    }
+    printf("%s: %s\n", key, val);
+    free(val);
+    free(key);
+  }
+
+  /* データベースを閉じる */
+  if(!dpclose(depot)){
+    fprintf(stderr, "dpclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Depotを利用したプログラムをビルドするには、ライブラリ `libqdbm.a' または `libqdbm.so' をリンク対象に加える必要がある。例えば、`sample.c' から `sample' を作るには、以下のようにビルドを行う。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>POSIXスレッドを有効にしてQDBMをビルドした場合、外部変数 `dpecode' はスレッド固有データへの参照として扱われ、Depotの各関数はリエントラントになる。その場合、スレッド間で同時に同じハンドルにアクセスしない限りは、各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<hr />
+
+<h2><a name="depotcli" id="depotcli" class="head">Depot用コマンド</a></h2>
+
+<p>Depotに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `dpmgr' はDepotやそのアプリケーションのデバッグに役立つツールである。データベースを更新したり、データベースの状態を調べたりする機能を持つ。シェルスクリプトでデータベースアプリケーションを作るのにも利用できる。以下の書式で用いる。`name' はデータベース名、`key' はレコードのキー、`val' はレコードの値を指定する。</p>
+
+<dl>
+<dt><kbd>dpmgr create [-s] [-bnum <var>num</var>] <var>name</var></kbd></dt>
+<dd>データベースファイルを作成する。</dd>
+<dt><kbd>dpmgr put [-kx|-ki] [-vx|-vi|-vf] [-keep|-cat] [-na] <var>name</var> <var>key</var> <var>val</var></kbd></dt>
+<dd>キーと値に対応するレコードを追加する。</dd>
+<dt><kbd>dpmgr out [-kx|-ki] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードを削除する。</dd>
+<dt><kbd>dpmgr get [-nl] [-kx|-ki] [-start <var>num</var>] [-max <var>num</var>] [-ox] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>dpmgr list [-nl] [-k|-v] [-ox] <var>name</var></kbd></dt>
+<dd>データベース内の全てのレコードのキーと値をタブと改行で区切って標準出力する。</dd>
+<dt><kbd>dpmgr optimize [-bnum <var>num</var>] [-na] <var>name</var></kbd></dt>
+<dd>データベースを最適化する。</dd>
+<dt><kbd>dpmgr inform [-nl] <var>name</var></kbd></dt>
+<dd>データベースの雑多な情報を出力する。</dd>
+<dt><kbd>dpmgr remove <var>name</var></kbd></dt>
+<dd>データベースファイルを削除する。</dd>
+<dt><kbd>dpmgr repair <var>name</var></kbd></dt>
+<dd>壊れたデータベースファイルを修復する。</dd>
+<dt><kbd>dpmgr exportdb <var>name</var> <var>file</var></kbd></dt>
+<dd>全てのレコードをエンディアン非依存のデータとしてダンプする。</dd>
+<dt><kbd>dpmgr importdb [-bnum <var>num</var>] <var>name</var> <var>file</var></kbd></dt>
+<dd>エンディアン非依存データから全てのレコードをロードする。</dd>
+<dt><kbd>dpmgr snaffle [-kx|-ki] [-ox] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>ロックされたデータベースからキーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>dpmgr version</kbd></dt>
+<dd>QDBMのバージョン情報を標準出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-s</kbd> : ファイルをスパースにする。</li>
+<li><kbd>-bnum <var>num</var></kbd> : バケット配列の要素数を `num' に指定する。</li>
+<li><kbd>-kx</kbd> : 2桁単位の16進数によるバイナリ表現として `key' を扱う。</li>
+<li><kbd>-ki</kbd> : 10進数による数値表現として `key' を扱う。</li>
+<li><kbd>-vx</kbd> : 2桁単位の16進数によるバイナリ表現として `val' を扱う。</li>
+<li><kbd>-vi</kbd> : 10進数による数値表現として `val' を扱う。</li>
+<li><kbd>-vf</kbd> : 名前が `val' のファイルのデータを値として読み込む。</li>
+<li><kbd>-keep</kbd> : 既存のレコードとキーが重複時に上書きせずにエラーにする。</li>
+<li><kbd>-cat</kbd> : 既存のレコードとキーが重複時に値を末尾に追加する。</li>
+<li><kbd>-na</kbd> : アラインメントを設定しない。</li>
+<li><kbd>-nl</kbd> : ファイルロックをかけずにデータベースを開く。</li>
+<li><kbd>-start</kbd> : 値から取り出すデータの開始オフセットを指定する。</li>
+<li><kbd>-max</kbd> : 値から取り出すデータの最大の長さを指定する。</li>
+<li><kbd>-ox</kbd> : 2桁単位の16進数によるバイナリ表現として標準出力を行う。</li>
+<li><kbd>-n</kbd> : 標準出力の末尾に付加される改行文字の出力を抑制する。</li>
+<li><kbd>-k</kbd> : キーのみを出力する。</li>
+<li><kbd>-v</kbd> : 値のみを出力する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `dptest' はDepotの機能テストや性能テストに用いるツールである。このコマンドによって生成されたデータベースファイルを `dpmgr' によって解析したり、`time' コマンドによってこのコマンドの実行時間を計ったりするとよい。以下の書式で用いる。`name' はデータベース名、`rnum' はレコード数、`bnum' はバケット配列の要素数、`pnum' はキーのパターン数、`align' はアラインメントの基本サイズ、`fbpsiz' はフリーブロックプールのサイズを指定する。</p>
+
+<dl>
+<dt><kbd>dptest write [-s] <var>name</var> <var>rnum</var> <var>bnum</var></kbd></dt>
+<dd>`00000001'、`00000002' のように変化する8バイトのキーと適当な8バイトの値を連続してデータベースに追加する。</dd>
+<dt><kbd>dptest read [-wb] <var>name</var></kbd></dt>
+<dd>上記で生成したデータベースの全レコードを検索する。</dd>
+<dt><kbd>dptest rcat [-c] <var>name</var> <var>rnum</var> <var>bnum</var> <var>pnum</var> <var>align</var> <var>fbpsiz</var></kbd></dt>
+<dd>キーがある程度重複するようにレコードの追加を行い、連結モードで処理する。</dd>
+<dt><kbd>dptest combo <var>name</var></kbd></dt>
+<dd>各種操作の組み合わせテストを行う。</dd>
+<dt><kbd>dptest wicked [-c] <var>name</var> <var>rnum</var></kbd></dt>
+<dd>各種更新操作を無作為に選択して実行する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-s</kbd> : ファイルをスパースにする。</li>
+<li><kbd>-wb</kbd> : 関数 `dpget' の代わりに関数 `dpgetwb' を用いる。</li>
+<li><kbd>-c</kbd> : Cabinのマップを使って比較テストを行う。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `dptsv' はタブ区切りでキーと値を表現した行からなるTSVファイルとDepotのデータベースを相互変換する。このコマンドは、QDBMの他のバージョンや他のDBMとの間でデータの交換を行う際に役立つ。また、バイトオーダの違うシステムの間でデータを交換する際にも役立つ。以下の書式で用いる。`name' はデータベース名を指定する。`export' サブコマンドではTSVのデータは標準入力から読み込む。キーが重複するレコードは後者を優先する。`-bnum' オプションの引数 `num' はバケット配列の要素数を指定する。`import' サブコマンドではTSVのデータが標準出力に書き出される。</p>
+
+<dl>
+<dt><kbd>dptsv import [-bnum <var>num</var>] [-bin] <var>name</var></kbd></dt>
+<dd>TSVファイルを読み込んでデータベースを作成する。</dd>
+<dt><kbd>dptsv export [-bin] <var>name</var></kbd></dt>
+<dd>データベースの全てのレコードをTSVファイルとして出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-bnum <var>num</var></kbd> : バケット配列の要素数を `num' に指定する。</li>
+<li><kbd>-bin</kbd> : Base64形式でレコードを扱う。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>Depotのコマンド群を駆使すると、簡単なデータベースシステムが構築できる。例えば `/etc/password' をユーザ名で検索するためのデータベースを作成するには、以下のようにする。</p>
+
+<pre>cat /etc/passwd | tr ':' '\t' | dptsv import casket
+</pre>
+
+<p>そして、`mikio' というユーザの情報を取り出すには、以下のようにする。</p>
+
+<pre>dpmgr get casket mikio
+</pre>
+
+<p>これらのコマンドと同等の機能をDepotのAPIを用いて実装することも容易である。</p>
+
+<hr />
+
+<h2><a name="curiaapi" id="curiaapi" class="head">Curia: 拡張API</a></h2>
+
+<h3>概要</h3>
+
+<p>CuriaはQDBMの拡張APIであり、複数のデータベースファイルをディレクトリで一括して扱う機能を提供する。データベースを複数のファイルに分割することで、ファイルシステムによるファイルサイズの制限を回避することができる。複数のデバイスにファイルを分散させれば、スケーラビリティを向上させることができる。</p>
+
+<p>Depotではファイル名を指定してデータベースを構築するが、Curiaではディレクトリ名を指定してデータベースを構築する。指定したディレクトリの直下には、`depot' という名前のデータベースファイルが生成される。これはディレクトリの属性を保持するものであり、レコードの実データは格納されない。それとは別に、データベースを分割した個数だけ、4桁の10進数値の名前を持つサブディレクトリが生成され、各々のサブディレクトリの中には `depot' という名前でデータベースファイルが生成される。レコードの実データはそれらに格納される。例えば、`casket' という名前のデータベースを作成し、分割数を3にする場合、`casket/depot'、`casket/0001/depot'、`casket/0002/depot'、`casket/0003/depot' が生成される。データベースを作成する際にすでにディレクトリが存在していてもエラーとはならない。したがって、予めサブディレクトリを生成しておいて、各々に異なるデバイスのファイルシステムをマウントしておけば、データベースファイルを複数のデバイスに分散させることができる。</p>
+
+<p>Curiaにはラージオブジェクトを扱う機能がある。通常のレコードのデータはデータベースファイルに格納されるが、ラージオブジェクトのレコードのデータは個別のファイルに格納される。ラージオブジェクトのファイルはハッシュ値を元にディレクトリに分けて格納されるので、通常のレコードには劣るが、それなりの速度で参照できる。サイズが大きく参照頻度が低いデータは、ラージオブジェクトとしてデータベースファイルから分離すべきである。そうすれば、通常のレコードに対する処理速度が向上する。ラージオブジェクトのディレクトリ階層はデータベースファイルが格納されるサブディレクトリの中の `lob' という名前のディレクトリの中に作られる。通常のデータベースとラージオブジェクトのデータベースはキー空間が異なり、互いに干渉することはない。</p>
+
+<p>Curiaを使うためには、`depot.h' と `curia.h' と `stdlib.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;depot.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;curia.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+</dl>
+
+<p>Curiaでデータベースを扱う際には、`CURIA' 型へのポインタをハンドルとして用いる。これは、`stdio.h' の各種ルーチンがファイル入出力に `FILE' 型へのポインタを用いるのに似ている。ハンドルは、関数 `cropen' で開き、関数 `crclose' で閉じる。ハンドルのメンバを直接参照することは推奨されない。データベースに致命的なエラーが起きた場合は、以後そのハンドルに対する `crclose' を除く全ての操作は何もせずにエラーを返す。ひとつのプロセスで複数のデータベースディレクトリを同時に利用することは可能であるが、同じデータベースディレクトリの複数のハンドルを利用してはならない。</p>
+
+<p>CuriaでもDepotと同じく外部変数 `dpecode' に直前のエラーコードが記録される。エラーコードに対応するメッセージ文字列を得るには、関数 `dperrmsg' を用いる。</p>
+
+<h3>API</h3>
+
+<p>データベースのハンドルを作成するには、関数 `cropen' を用いる。</p>
+
+<dl>
+<dt><kbd>CURIA *cropen(const char *<var>name</var>, int <var>omode</var>, int <var>bnum</var>, int <var>dnum</var>);</kbd></dt>
+<dd>`name' はデータベースディレクトリの名前を指定する。`omode' は接続モードを指定し、`CR_OREADER' ならリーダ、`CR_OWRITER' ならライタとなる。`CR_OWRITER' の場合、`CR_OCREAT' または `CR_OTRUNC' とのビット論理和にすることができる。`CR_OCREAT' はファイルが無い場合に新規作成することを指示し、`CR_OTRUNC' はファイルが存在しても作り直すことを指示する。`CR_OREADER' と `CR_OWRITER' の両方で `CR_ONOLCK' または `CR_OLCKNB' とのビット論理和にすることができるが、前者はファイルロックをかけずにデータベースを開くことを指示し、後者はブロックせずにロックをかけることを指示する。`CR_OCREAT' は `CR_OSPARSE' とのビット論理和にすることができるが、それは生成されるファイルをスパースにすることを指示する。`bnum' はバケット配列の要素数の目安を指定するが、0 以下ならデフォルト値が使われる。バケット配列の要素数はデータベースを作成する時に決められ、最適化以外の手段で変更することはできない。バケット配列の要素数は、格納するレコード数の半分から4倍程度にするのがよい。`dnum' は要素データベースの数を指定するが、0 以下ならデフォルト値が使われる。データベースファイルの分割数はデータベースを作成する時に指定したものから変更することはできない。データベースファイルの分割数の最大値は 512 個である。戻り値はデータベースハンドルであるか、エラーなら `NULL' である。ライタ（読み書き両用モード）でデータベースファイルを開く際にはそのファイルに対して排他ロックがかけられ、リーダ（読み込み専用モード）で開く際には共有ロックがかけられる。その際には該当のロックがかけられるまで制御がブロックする。`CR_ONOLCK' を使う場合、アプリケーションが排他制御の責任を負う。</dd>
+</dl>
+
+<p>データベースとの接続を閉じてハンドルを破棄するには、関数 `crclose' を用いる。</p>
+
+<dl>
+<dt><kbd>int crclose(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。データベースの更新内容は、接続を閉じた時点で初めてファイルと同期される。ライタでデータベースを開いた場合、適切に接続を閉じないとデータベースが破壊される。閉じたハンドルの領域は解放されるので、以後は利用できなくなる。</dd>
+</dl>
+
+<p>レコードを追加するには、関数 `crput' を用いる。</p>
+
+<dl>
+<dt><kbd>int crput(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const char *<var>vbuf</var>, int <var>vsiz</var>, int <var>dmode</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。`dmode' はキーが既存レコードと重複した際の制御を指定する。`CR_DOVER' は既存のレコードの値を上書きし、`CR_DKEEP' は既存のレコードを残してエラーを返し、`DP_DCAT' は指定された値を既存の値の末尾に加える。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>レコードを削除するには、関数 `crout' を用いる。</p>
+
+<dl>
+<dt><kbd>int crout(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。</dd>
+</dl>
+
+<p>レコードを取得するには、関数 `crget' を用いる。</p>
+
+<dl>
+<dt><kbd>char *crget(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>start</var>, int <var>max</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定するか、負数なら無制限となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>レコードを取得してバッファに書き込むには、関数 `crgetwb' を用いる。</p>
+
+<dl>
+<dt><kbd>int crgetwb(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>start</var>, int <var>max</var>, char *<var>vbuf</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定する。それは書き込み用のバッファのサイズ以下である必要がある。`vbuf' は抽出したデータを書き込むバッファへのポインタを指定する。戻り値は正常ならバッファに書き込まれたデータのサイズであり、エラーなら -1 である。該当のレコードがない場合も -1 を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。書き込み用バッファの末尾に終端文字が追加されないことに注意すべきである。</dd>
+</dl>
+
+<p>レコードの値のサイズを取得するには、関数 `crvsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int crvsiz(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は該当レコードの値のサイズであるが、該当がない場合やエラーの場合は -1 である。この関数はレコードの有無を調べるのにも便利である。`crget' と違って実データを読み込まないので効率がよい。</dd>
+</dl>
+
+<p>データベースのイテレータを初期化するには、関数 `criterinit' を用いる。</p>
+
+<dl>
+<dt><kbd>int criterinit(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。イテレータは、データベースに格納された全てのレコードを参照するために用いられる。</dd>
+</dl>
+
+<p>データベースのイテレータから次のレコードのキーを取り出すには、関数 `criternext' を用いる。</p>
+
+<dl>
+<dt><kbd>char *criternext(CURIA *<var>curia</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常ならキーを格納した領域へのポインタであり、エラーなら `NULL' である。イテレータが最後まできて該当のレコードがない場合も `NULL' を返す。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数を繰り返して呼ぶことによって全てのレコードを一度ずつ参照することができる。ただし、繰り返しの間にデータベースの更新があった場合はその限りではない。なお、取り出すレコードの順序は制御できず、格納した順番でレコードを取り出せるとは限らない。</dd>
+</dl>
+
+<p>データベースのアラインメントを設定するには、関数 `crsetalign' を用いる。</p>
+
+<dl>
+<dt><kbd>int crsetalign(CURIA *<var>curia</var>, int <var>align</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`align' はアラインメントのサイズを指定する。戻り値は正常なら真であり、エラーなら偽である。アラインメントを設定しておくと、レコードの上書きを頻繁にする場合の処理効率が良くなる。アラインメントには、一連の更新操作をした後の状態での標準的な値のサイズを指定するのがよい。アラインメントが正数の場合、レコードの領域のサイズがアラインメントの倍数になるようにパディングがとられる。アラインメントが負数の場合、`vsiz' を値のサイズとして、パディングのサイズは `(vsiz / pow(2, abs(align) - 1))' として算出される。アラインメントの設定はデータベースに保存されないので、データベースを開く度に指定する必要がある。</dd>
+</dl>
+
+<p>データベースのフリーブロックプールのサイズ設定するには、関数 `crsetfbpsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int crsetfbpsiz(CURIA *<var>curia</var>, int <var>size</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`size' はフリーブロックプールのサイズを指定する。戻り値は正常なら真であり、エラーなら偽である。フリーブロックプールのデフォルトのサイズは16である。サイズをより大きくすると、レコードの上書きを繰り返す際の空間効率は上がるが、時間効率が下がる。</dd>
+</dl>
+
+<p>データベースを更新した内容をファイルとデバイスに同期させるには、関数 `crsync' を用いる。</p>
+
+<dl>
+<dt><kbd>int crsync(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。この関数はデータベースを閉じないうちに別プロセスにデータベースファイルを利用させる場合に役立つ。</dd>
+</dl>
+
+<p>データベースを最適化するには、関数 `croptimize' を用いる。</p>
+
+<dl>
+<dt><kbd>int croptimize(CURIA *<var>curia</var>, int <var>bnum</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`bnum' は新たなバケット配列の要素数を指定するが、0 以下なら現在のレコード数に最適な値が指定される。戻り値は正常なら真であり、エラーなら偽である。レコードを削除したり、置換モードや連結モードで書き込みを繰り返したりする場合は、データベース内に不要な領域が蓄積するが、この関数はそれを解消するのに役立つ。</dd>
+</dl>
+
+<p>データベースの名前を得るには、関数 `crname' を用いる。</p>
+
+<dl>
+<dt><kbd>char *crname(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常なら名前を格納した領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>データベースファイルのサイズの合計を得るには、関数 `crfsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int crfsiz(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常ならデータベースファイルのサイズの合計であり、エラーなら -1 である。戻り値が2GBを越えた場合は桁溢れが起こる。</dd>
+</dl>
+
+<p>データベースファイルのサイズの合計を倍精度浮動小数として得るには、関数 `crfsizd' を用いる。</p>
+
+<dl>
+<dt><kbd>double crfsizd(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常ならデータベースファイルのサイズの合計の倍精度値であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースのバケット配列の要素数の合計を得るには、関数 `crbnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int crbnum(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常ならデータベースのバケット配列の要素数の合計であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースのバケット配列の利用済みの要素数の合計を得るには、関数 `crbusenum' を用いる。</p>
+
+<dl>
+<dt><kbd>int crbusenum(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常ならバケット配列の利用済みの要素数の合計であり、エラーなら -1 である。この関数はバケット配列の全ての要素を参照するので、効率が悪い。</dd>
+</dl>
+
+<p>データベースのレコード数を得るには、関数 `crrnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int crrnum(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常ならデータベースのレコード数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースハンドルがライタかどうかを調べるには、関数 `crwritable' を用いる。</p>
+
+<dl>
+<dt><kbd>int crwritable(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値はライタなら真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースに致命的エラーが起きたかどうかを調べるには、関数 `crfatalerror' を用いる。</p>
+
+<dl>
+<dt><kbd>int crfatalerror(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は致命的エラーがあれば真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースディレクトリのinode番号を得るには、関数 `crinode' を用いる。</p>
+
+<dl>
+<dt><kbd>int crinode(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値はデータベースディレクトリのinode番号である。</dd>
+</dl>
+
+<p>データベースの最終更新時刻を得るには、関数 `crmtime' を用いる。</p>
+
+<dl>
+<dt><kbd>time_t crmtime(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値はデータベースの最終更新時刻である。</dd>
+</dl>
+
+<p>データベースディレクトリを削除するには、関数 `crremove' を用いる。</p>
+
+<dl>
+<dt><kbd>int crremove(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はデータベースディレクトリの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>壊れたデータベースディレクトリを修復するには、関数 `crrepair' を用いる。</p>
+
+<dl>
+<dt><kbd>int crrepair(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。修復されたデータベースの全レコードが元来もしくは期待される状態に戻る保証はない。</dd>
+</dl>
+
+<p>全てのレコードをエンディアン非依存のデータとしてダンプするには、関数 `crexportdb' を用いる。</p>
+
+<dl>
+<dt><kbd>int crexportdb(CURIA *<var>curia</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`name' は出力ディレクトリの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>エンディアン非依存データから全てのレコードをロードするには、関数 `crimportdb' を用いる。</p>
+
+<dl>
+<dt><kbd>int crimportdb(CURIA *<var>curia</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。データベースは空でなければならない。`name' は入力ディレクトリの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>データベースディレクトリからレコードを直接取得するには、関数 `crsnaffle' を用いる。</p>
+
+<dl>
+<dt><kbd>char *crsnaffle(const char *<var>name</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`name' はデータベースディレクトリの名前を指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定するか、負数なら無制限となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はデータベースディレクトリが別のプロセスにロックされていても利用できるが、最新の更新が反映されている保証はない。</dd>
+</dl>
+
+<p>ラージオブジェクト用データベースにレコードを追加するには、関数 `crputlob' を用いる。</p>
+
+<dl>
+<dt><kbd>int crputlob(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const char *<var>vbuf</var>, int <var>vsiz</var>, int <var>dmode</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。`dmode' はキーが既存レコードと重複した際の制御を指定する。`CR_DOVER' は既存のレコードの値を上書きし、`CR_DKEEP' は既存のレコードを残してエラーを返し、`DP_DCAT' は指定された値を既存の値の末尾に加える。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>ラージオブジェクト用データベースからレコードを削除するには、関数 `croutlob' を用いる。</p>
+
+<dl>
+<dt><kbd>int croutlob(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`curia' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。</dd>
+</dl>
+
+<p>ラージオブジェクト用データベースからレコードの値を取得するには、関数 `crgetlob' を用いる。</p>
+
+<dl>
+<dt><kbd>char *crgetlob(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>start</var>, int <var>max</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`start' は値の領域から抽出する最初のバイトのオフセットを指定する。`max' は値の領域から抽出するサイズを指定するか、負数なら無制限となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。取り出そうとした値のサイズが `start' より小さかった場合には該当とみなさない。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>ラージオブジェクト用データベースにあるレコードのファイルディスクリプタを取得するには、関数 `crgetlobfd' を用いる。</p>
+
+<dl>
+<dt><kbd>int crgetlobfd(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら該当のファイルディスクリプタであり、エラーなら -1 である。該当のレコードがない場合も -1 を返す。戻り値のファイルディスクリプタは `open' コールで開かれる。データベースがライタで接続された場合はそのディスクリプタは書き込み可能（O_RDWR）であり、そうでなければ書き込み不可能（O_RDONLY）である。ディスクリプタが不要になったら `close' で閉じるべきである。</dd>
+</dl>
+
+<p>ラージオブジェクト用データベースにあるレコードの値のサイズを取得するには、関数 `crvsizlob' を用いる。</p>
+
+<dl>
+<dt><kbd>int crvsizlob(CURIA *<var>curia</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は該当レコードの値のサイズであり、該当がない場合やエラーの場合は -1 である。この関数はレコードの有無を調べるのにも便利である。`crgetlob' と違って実データを読み込まないので効率がよい。</dd>
+</dl>
+
+<p>ラージオブジェクト用データベースのレコード数の合計を得るには、関数 `crrnumlob' を用いる。</p>
+
+<dl>
+<dt><kbd>int crrnumlob(CURIA *<var>curia</var>);</kbd></dt>
+<dd>`curia' はデータベースハンドルを指定する。戻り値は正常ならデータベースのレコード数の合計であり、エラーなら -1 である。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>名前と対応させて電話番号を格納し、それを検索するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;curia.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#define NAME     "mikio"
+#define NUMBER   "000-1234-5678"
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  CURIA *curia;
+  char *val;
+
+  /* データベースを開く */
+  if(!(curia = cropen(DBNAME, CR_OWRITER | CR_OCREAT, -1, -1))){
+    fprintf(stderr, "cropen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* レコードを格納する */
+  if(!crput(curia, NAME, -1, NUMBER, -1, CR_DOVER)){
+    fprintf(stderr, "crput: %s\n", dperrmsg(dpecode));
+  }
+
+  /* レコードを取得する */
+  if(!(val = crget(curia, NAME, -1, 0, -1, NULL))){
+    fprintf(stderr, "crget: %s\n", dperrmsg(dpecode));
+  } else {
+    printf("Name: %s\n", NAME);
+    printf("Number: %s\n", val);
+    free(val);
+  }
+
+  /* データベースを閉じる */
+  if(!crclose(curia)){
+    fprintf(stderr, "crclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<p>データベースの全てのレコードを表示するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;curia.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  CURIA *curia;
+  char *key, *val;
+
+  /* データベースを開く */
+  if(!(curia = cropen(DBNAME, CR_OREADER, -1, -1))){
+    fprintf(stderr, "cropen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* イテレータを初期化する */
+  if(!criterinit(curia)){
+    fprintf(stderr, "criterinit: %s\n", dperrmsg(dpecode));
+  }
+
+  /* イテレータを走査する */
+  while((key = criternext(curia, NULL)) != NULL){
+    if(!(val = crget(curia, key, -1, 0, -1, NULL))){
+      fprintf(stderr, "crget: %s\n", dperrmsg(dpecode));
+      free(key);
+      break;
+    }
+    printf("%s: %s\n", key, val);
+    free(val);
+    free(key);
+  }
+
+  /* データベースを閉じる */
+  if(!crclose(curia)){
+    fprintf(stderr, "crclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Curiaを利用したプログラムをビルドする方法は、Depotの場合と全く同じである。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>POSIXスレッドを有効にしてQDBMをビルドした場合、外部変数 `dpecode' はスレッド固有データへの参照として扱われ、Curiaの各関数はリエントラントになる。その場合、スレッド間で同時に同じハンドルにアクセスしない限りは、各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<hr />
+
+<h2><a name="curiacli" id="curiacli" class="head">Curia用コマンド</a></h2>
+
+<p>Curiaに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `crmgr' はCuriaやそのアプリケーションのデバッグに役立つツールである。データベースを更新したり、データベースの状態を調べたりする機能を持つ。シェルスクリプトでデータベースアプリケーションを作るのにも利用できる。以下の書式で用いる。`name' はデータベース名、`key' はレコードのキー、`val' はレコードの値を指定する。</p>
+
+<dl>
+<dt><kbd>crmgr create [-s] [-bnum <var>num</var>] [-dnum <var>num</var>] <var>name</var></kbd></dt>
+<dd>データベースディレクトリを作成する。</dd>
+<dt><kbd>crmgr put [-kx|-ki] [-vx|-vi|-vf] [-keep|-cat] [-lob] [-na] <var>name</var> <var>key</var> <var>val</var></kbd></dt>
+<dd>キーと値に対応するレコードを追加する。</dd>
+<dt><kbd>crmgr out [-kx|-ki] [-lob] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードを削除する。</dd>
+<dt><kbd>crmgr get [-nl] [-kx|-ki] [-start <var>num</var>] [-max <var>num</var>] [-ox] [-lob] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>crmgr list [-nl] [-k|-v] [-ox] <var>name</var></kbd></dt>
+<dd>データベース内の全てのレコードのキーと値をタブと改行で区切って標準出力する。</dd>
+<dt><kbd>crmgr optimize [-bnum <var>num</var>] [-na] <var>name</var></kbd></dt>
+<dd>データベースを最適化する。</dd>
+<dt><kbd>crmgr inform [-nl] <var>name</var></kbd></dt>
+<dd>データベースの雑多な情報を出力する。</dd>
+<dt><kbd>crmgr remove <var>name</var></kbd></dt>
+<dd>データベースディレクトリを削除する。</dd>
+<dt><kbd>crmgr repair <var>name</var></kbd></dt>
+<dd>壊れたデータベースディレクトリを修復する。</dd>
+<dt><kbd>crmgr exportdb <var>name</var> <var>dir</var></kbd></dt>
+<dd>全てのレコードをエンディアン非依存のデータとしてダンプする。</dd>
+<dt><kbd>crmgr importdb [-bnum <var>num</var>] [-dnum <var>num</var>] <var>name</var> <var>dir</var></kbd></dt>
+<dd>エンディアン非依存データから全てのレコードをロードする。</dd>
+<dt><kbd>crmgr snaffle [-kx|-ki] [-ox] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>ロックされたデータベースからキーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>crmgr version</kbd></dt>
+<dd>QDBMのバージョン情報を標準出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-s</kbd> : ファイルをスパースにする。</li>
+<li><kbd>-bnum <var>num</var></kbd> : バケット配列の要素数を `num' に指定する。</li>
+<li><kbd>-dnum <var>num</var></kbd> : データベースファイルの分割数を `num' に指定する。</li>
+<li><kbd>-kx</kbd> : 2桁単位の16進数によるバイナリ表現として `key' を扱う。</li>
+<li><kbd>-ki</kbd> : 10進数による数値表現として `key' を扱う。</li>
+<li><kbd>-vx</kbd> : 2桁単位の16進数によるバイナリ表現として `val' を扱う。</li>
+<li><kbd>-vi</kbd> : 10進数による数値表現として `val' を扱う。</li>
+<li><kbd>-vf</kbd> : 名前が `val' のファイルのデータを値として読み込む。</li>
+<li><kbd>-keep</kbd> : 既存のレコードとキーが重複時に上書きせずにエラーにする。</li>
+<li><kbd>-cat</kbd> : 既存のレコードとキーが重複時に値を末尾に追加する。</li>
+<li><kbd>-na</kbd> : アラインメントを設定しない。</li>
+<li><kbd>-nl</kbd> : ファイルロックをかけずにデータベースを開く。</li>
+<li><kbd>-start</kbd> : 値から取り出すデータの開始オフセットを指定する。</li>
+<li><kbd>-max</kbd> : 値から取り出すデータの最大の長さを指定する。</li>
+<li><kbd>-ox</kbd> : 2桁単位の16進数によるバイナリ表現として標準出力を行う。</li>
+<li><kbd>-lob</kbd> : ラージオブジェクトを扱う。</li>
+<li><kbd>-n</kbd> : 標準出力の末尾に付加される改行文字の出力を抑制する。</li>
+<li><kbd>-k</kbd> : キーのみを出力する。</li>
+<li><kbd>-v</kbd> : 値のみを出力する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `crtest' はCuriaの機能テストや性能テストに用いるツールである。`crtest' によって生成されたデータベースディレクトリを `crmgr' によって解析したり、`time' コマンドによってこのコマンドの実行時間を計ったりするとよい。以下の書式で用いる。`name' はデータベース名、`rnum' はレコード数、`bnum' はバケット配列の要素数、`dnum' はデータベースファイルの分割数、`pnum' はキーのパターン数、`align' はアラインメントの基本サイズ、`fbpsiz' はフリーブロックプールのサイズを指定する。</p>
+
+<dl>
+<dt><kbd>crtest write [-s] [-lob] <var>name</var> <var>rnum</var> <var>bnum</var> <var>dnum</var></kbd></dt>
+<dd>`00000001'、`00000002' のように変化する8バイトのキーと適当な8バイトの値を連続してデータベースに追加する。</dd>
+<dt><kbd>crtest read [-wb] [-lob] <var>name</var></kbd></dt>
+<dd>上記で生成したデータベースの全レコードを検索する。</dd>
+<dt><kbd>crtest rcat [-c] <var>name</var> <var>rnum</var> <var>bnum</var> <var>dnum</var> <var>pnum</var> <var>align</var> <var>fbpsiz</var></kbd></dt>
+<dd>キーがある程度重複するようにレコードの追加を行い、連結モードで処理する。</dd>
+<dt><kbd>crtest combo <var>name</var></kbd></dt>
+<dd>各種操作の組み合わせテストを行う。</dd>
+<dt><kbd>crtest wicked [-c] <var>name</var> <var>rnum</var></kbd></dt>
+<dd>各種更新操作を無作為に選択して実行する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-s</kbd> : ファイルをスパースにする。</li>
+<li><kbd>-lob</kbd> : ラージオブジェクトを扱う。</li>
+<li><kbd>-wb</kbd> : 関数 `crget' の代わりに関数 `crgetwb' を用いる。</li>
+<li><kbd>-c</kbd> : Cabinのマップを使って比較テストを行う。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `crtsv' はタブ区切りでキーと値を表現した行からなるTSVファイルとCuriaのデータベースを相互変換する。このコマンドは、QDBMの他のバージョンや他のDBMとの間でデータの交換を行う際に役立つ。また、バイトオーダの違うシステムの間でデータを交換する際にも役立つ。以下の書式で用いる。`name' はデータベース名を指定する。`export' サブコマンドではTSVのデータは標準入力から読み込む。キーが重複するレコードは後者を優先する。`-bnum' オプションの引数 `num' はバケット配列の要素数を指定する。`-dnum' オプションの引数 `num' は要素データベースの数を指定する。`import' サブコマンドではTSVのデータが標準出力に書き出される。</p>
+
+<dl>
+<dt><kbd>crtsv import [-bnum <var>num</var>] [-dnum <var>num</var>] [-bin] <var>name</var></kbd></dt>
+<dd>TSVファイルを読み込んでデータベースを作成する。</dd>
+<dt><kbd>crtsv export [-bin] <var>name</var></kbd></dt>
+<dd>データベースの全てのレコードをTSVファイルとして出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-bnum <var>num</var></kbd> : バケット配列の要素数を `num' に指定する。</li>
+<li><kbd>-dnum <var>num</var></kbd> : データベースファイルの分割数を `num' に指定する。</li>
+<li><kbd>-bin</kbd> : Base64形式でレコードを扱う。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>Curiaのコマンド群を駆使すると、簡単なデータベースシステムが構築できる。例えば `/etc/password' をユーザ名で検索するためのデータベースを作成するには、以下のようにする。</p>
+
+<pre>cat /etc/passwd | tr ':' '\t' | crtsv import casket
+</pre>
+
+<p>そして、`mikio' というユーザの情報を取り出すには、以下のようにする。</p>
+
+<pre>crmgr get casket mikio
+</pre>
+
+<p>これらのコマンドと同等の機能をCuriaのAPIを用いて実装することも容易である。</p>
+
+<hr />
+
+<h2><a name="relicapi" id="relicapi" class="head">Relic: NDBM互換API</a></h2>
+
+<h3>概要</h3>
+
+<p>Relicは、NDBMと互換するAPIである。すなわち、Depotの関数群をNDBMのAPIで包んだものである。Relicを使ってNDBMのアプリケーションをQDBMに移植するのはたやすい。ほとんどの場合、インクルードするヘッダファイルを `ndbm.h' から `relic.h' に換え、ビルドの際のリンカオプションを `-lndbm' から `-lqdbm' に換えるだけでよい。</p>
+
+<p>オリジナルのNDBMでは、データベースは二つのファイルの対からなる。ひとつは接尾辞に `.dir' がつく名前で、キーのビットマップを格納する「ディレクトリファイル」である。もうひとつは接尾辞に `.pag' がつく名前で、データの実体を格納する「データファイル」である。Relicではディレクトリファイルは単なるダミーとして作成し、データファイルをデータベースとする。RelicではオリジナルのNDBMと違い、格納するデータのサイズに制限はない。なお、オリジナルのNDBMで生成したデータベースファイルをRelicで扱うことはできない。</p>
+
+<p>Relicを使うためには、`relic.h' と `stdlib.h' と `sys/types.h' と `sys/stat.h' と `fcntl.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;relic.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;sys/types.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;sys/stat.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;fcntl.h&gt;</kbd></dt>
+</dl>
+
+<p>Relicでデータベースを扱う際には、`DBM' 型へのポインタをハンドルとして用いる。ハンドルは、関数 `dbm_open' で開き、関数 `dbm_close' で閉じる。ハンドルのメンバを直接参照することは推奨されない。</p>
+
+<h3>API</h3>
+
+<p>データの格納、削除、検索に用いる関数とのデータの授受には、キーと値を表現するのに `datum' 型の構造体を用いる。</p>
+
+<dl>
+<dt><kbd>typedef struct { void *dptr; size_t dsize; } datum;</kbd></dt>
+<dd>`dptr' はデータ領域へのポインタである。`dsize' はデータ領域のサイズである。</dd>
+</dl>
+
+<p>データベースのハンドルを作成するには、関数 `dbm_open' を用いる。</p>
+
+<dl>
+<dt><kbd>DBM *dbm_open(char *<var>name</var>, int <var>flags</var>, int <var>mode</var>);</kbd></dt>
+<dd>`name' はデータベースの名前を指定するが、ファイル名はそれに接尾辞をつけたものになる。`flags' は `open' コールに渡すものと同じだが、`O_WRONLY' は `O_RDWR' と同じになり、追加フラグでは `O_CREAT' と `O_TRUNC' のみが有効である。`mode' は `open' コールに渡すものと同じでファイルのモードを指定する。戻り値は正常ならデータベースハンドルであり、エラーなら `NULL' である。</dd>
+</dl>
+
+<p>データベースとの接続を閉じてハンドルを破棄するには、関数 `dbm_close' を用いる。</p>
+
+<dl>
+<dt><kbd>void dbm_close(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用することができなくなる。</dd>
+</dl>
+
+<p>レコードを追加するには、関数 `dbm_store' を用いる。</p>
+
+<dl>
+<dt><kbd>int dbm_store(DBM *<var>db</var>, datum <var>key</var>, datum <var>content</var>, int <var>flags</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。`key' はキーの構造体を指定する。`content' は値の構造体を指定する。`frags' が `DBM_INSERT' ならキーの重複時に書き込みを断念し、`DBM_REPLACE' なら上書きを行う。戻り値は正常なら 0 であり、重複での断念なら 1 であり、その他のエラーなら -1 である。</dd>
+</dl>
+
+<p>レコードを削除するには、関数 `dbm_delete' を用いる。</p>
+
+<dl>
+<dt><kbd>int dbm_delete(DBM *<var>db</var>, datum <var>key</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。`key' はキーの構造体を指定する。戻り値は正常なら 0 であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>レコードを取得するには、関数 `dbm_fetch' を用いる。</p>
+
+<dl>
+<dt><kbd>datum dbm_fetch(DBM *<var>db</var>, datum <var>key</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。`key' はキーの構造体を指定する。戻り値は値の構造体である。該当があればメンバ `dptr' がその領域を指し、メンバ `dsize' がそのサイズを示す。該当がなければ `dptr' の値は `NULL' となる。`dptr' の指す領域はハンドルに関連づけられて確保され、同じハンドルに対して次にこの関数を呼び出すか、ハンドルを閉じるまで、有効なデータを保持する。</dd>
+</dl>
+
+<p>最初のレコードのキーを得るには、関数 `dbm_firstkey' を用いる。</p>
+
+<dl>
+<dt><kbd>datum dbm_firstkey(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値はキーの構造体である。該当があればメンバ `dptr' がその領域を指し、`dsize' がそのサイズを示す。該当がなければ `dptr' の値は `NULL' となる。`dptr' の指す領域はハンドルに関連づけられて確保され、同じハンドルに対して次にこの関数もしくは関数 `dbm_nextkey' を呼び出すか、ハンドルを閉じるまで、有効なデータを保持する。</dd>
+</dl>
+
+<p>次レコードのキーを得るには、関数 `dbm_nextkey' を用いる。</p>
+
+<dl>
+<dt><kbd>datum dbm_nextkey(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値はキーの構造体である。該当があればメンバ `dptr' がその領域を指し、`dsize' がそのサイズを示す。該当がなければ `dptr' の値は `NULL' となる。`dptr' の指す領域はハンドルに関連づけられて確保され、同じハンドルに対して次にこの関数もしくは関数 `dbm_firstkey' を呼び出すか、ハンドルを閉じるまで、有効なデータを保持する。</dd>
+</dl>
+
+<p>データベースに致命的エラーが起きたかどうかを調べるには、関数 `dbm_error' を用いる。</p>
+
+<dl>
+<dt><kbd>int dbm_error(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値は致命的エラーがあれば真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>関数 `dbm_clearerr' は何もしない。</p>
+
+<dl>
+<dt><kbd>int dbm_clearerr(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値は 0 である。この関数は互換性のためにのみ存在する。</dd>
+</dl>
+
+<p>データベースが読み込み専用かどうかを調べるには、関数 `dbm_rdonly' を用いる。</p>
+
+<dl>
+<dt><kbd>int dbm_rdonly(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値は読み込み専用なら真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>ディレクトリファイルのファイルディスクリプタを得るには、関数 `dbm_dirfno' を用いる。</p>
+
+<dl>
+<dt><kbd>int dbm_dirfno(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値はディレクトリファイルのファイルディスクリプタである。</dd>
+</dl>
+
+<p>データファイルのファイルディスクリプタを得るには、関数 `dbm_pagfno' を用いる。</p>
+
+<dl>
+<dt><kbd>int dbm_pagfno(DBM *<var>db</var>);</kbd></dt>
+<dd>`db' はデータベースハンドルを指定する。戻り値はデータファイルのファイルディスクリプタである。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>名前と対応させて電話番号を格納し、それを検索するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;relic.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define NAME     "mikio"
+#define NUMBER   "000-1234-5678"
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  DBM *db;
+  datum key, val;
+  int i;
+
+  /* データベースを開く */
+  if(!(db = dbm_open(DBNAME, O_RDWR | O_CREAT, 00644))){
+    perror("dbm_open");
+    return 1;
+  }
+
+  /* レコードを準備する */
+  key.dptr = NAME;
+  key.dsize = strlen(NAME);
+  val.dptr = NUMBER;
+  val.dsize = strlen(NUMBER);
+
+  /* レコードを格納する */
+  if(dbm_store(db, key, val, DBM_REPLACE) != 0){
+    perror("dbm_store");
+  }
+
+  /* レコードを検索する */
+  val = dbm_fetch(db, key);
+  if(val.dptr){
+    printf("Name: %s\n", NAME);
+    printf("Number: ");
+    for(i = 0; i &lt; val.dsize; i++){
+      putchar(((char *)val.dptr)[i]);
+    }
+    putchar('\n');
+  } else {
+    perror("dbm_fetch");
+  }
+
+  /* データベースを閉じる */
+  dbm_close(db);
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Relicを利用したプログラムをビルドする方法は、Depotの場合と全く同じである。リンカに渡すオプションは `-lndbm' ではなく `-lqdbm' である。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>スレッド間で同時に同じハンドルにアクセスしない限りは、Relicの各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<hr />
+
+<h2><a name="reliccli" id="reliccli" class="head">Relic用コマンド</a></h2>
+
+<p>Relicに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `rlmgr' はRelicやそのアプリケーションのデバッグに役立つツールである。データベースを更新したり、データベースの状態を調べたりする機能を持つ。シェルスクリプトでデータベースアプリケーションを作るのにも利用できる。以下の書式で用いる。`name' はデータベース名、`key' はレコードのキー、`val' はレコードの値を指定する。</p>
+
+<dl>
+<dt><kbd>rlmgr create <var>name</var></kbd></dt>
+<dd>データベースファイルを作成する。</dd>
+<dt><kbd>rlmgr store [-kx] [-vx|-vf] [-insert] <var>name</var> <var>key</var> <var>val</var></kbd></dt>
+<dd>キーと値に対応するレコードを追加する。</dd>
+<dt><kbd>rlmgr delete [-kx] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードを削除する。</dd>
+<dt><kbd>rlmgr fetch [-kx] [-ox] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>rlmgr list [-ox] <var>name</var></kbd></dt>
+<dd>データベース内の全てのレコードのキーと値をタブと改行で区切って標準出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-kx</kbd> : 2桁単位の16進数によるバイナリ表現として `key' を扱う。</li>
+<li><kbd>-vx</kbd> : 2桁単位の16進数によるバイナリ表現として `val' を扱う。</li>
+<li><kbd>-vf</kbd> : 名前が `val' のファイルのデータを値として読み込む。</li>
+<li><kbd>-insert</kbd> : 既存のレコードとキーが重複時に上書きせずにエラーにする。</li>
+<li><kbd>-ox</kbd> : 2桁単位の16進数によるバイナリ表現として標準出力を行う。</li>
+<li><kbd>-n</kbd> : 標準出力の末尾に付加される改行文字の出力を抑制する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>コマンド `rltest' はRelicの機能テストや性能テストに用いるツールである。このコマンドによって生成されたデータベースファイルを `rlmgr' によって解析したり、`time' コマンドによってこのコマンドの実行時間を計ったりするとよい。以下の書式で用いる。`name' はデータベース名、`rnum' はレコード数を指定する。</p>
+
+<dl>
+<dt><kbd>rltest write <var>name</var> <var>rnum</var></kbd></dt>
+<dd>`00000001'、`00000002' のように変化する8バイトのキーと適当な8バイトの値を連続してデータベースに追加する。</dd>
+<dt><kbd>rltest read <var>name</var> <var>rnum</var></kbd></dt>
+<dd>上記で生成したデータベースを検索する。</dd>
+</dl>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<hr />
+
+<h2><a name="hovelapi" id="hovelapi" class="head">Hovel: GDBM互換API</a></h2>
+
+<h3>概要</h3>
+
+<p>Hovelは、GDBMと互換するAPIである。すなわち、DepotおよびCuriaの関数群をGDBMのAPIで包んだものである。Hovelを使ってGDBMのアプリケーションをQDBMに移植するのはたやすい。ほとんどの場合、インクルードするヘッダファイルを `gdbm.h' から `hovel.h' に換え、ビルドの際のリンカオプションを `-lgdbm' から `-lqdbm' に換えるだけでよい。なお、オリジナルのGDBMで生成したデータベースファイルをHovelで扱うことはできない。</p>
+
+<p>Hovelを使うためには、`hovel.h' と `stdlib.h' と `sys/types.h' と `sys/stat.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;hovel.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;sys/types.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;sys/stat.h&gt;</kbd></dt>
+</dl>
+
+<p>Hovelでデータベースを扱う際には、`GDBM_FILE' 型のオブジェクト（それ自体がポインタ型）をハンドルとして用いる。ハンドルは、関数 `gdbm_open' で開き、関数 `gdbm_close' で閉じる。ハンドルのメンバを直接参照することは推奨されない。Hovelは通常はDepotのラッパーとして動作してデータベースファイルを扱うが、ハンドルを開く際に関数 `gdbm_open2' を用いることによってCuriaのラッパーとしてデータベースディレクトリを扱うようにすることができる。</p>
+
+<h3>API</h3>
+
+<p>データの格納、削除、検索に用いる関数とのデータの授受には、キーと値を表現するのに `datum' 型の構造体を用いる。</p>
+
+<dl>
+<dt><kbd>typedef struct { char *dptr; size_t dsize; } datum;</kbd></dt>
+<dd>`dptr' はデータ領域へのポインタである。`dsize' はデータ領域のサイズである。</dd>
+</dl>
+
+<p>外部変数 `gdbm_version' はバージョン情報の文字列である。</p>
+
+<dl>
+<dt><kbd>extern char *gdbm_version;</kbd></dt>
+<dd>この変数の指す領域は書き込み禁止である。</dd>
+</dl>
+
+<p>外部変数 `gdbm_errno' には直前のエラーコードが記録される。エラーコードの詳細については `hovel.h' を参照すること。</p>
+
+<dl>
+<dt><kbd>extern gdbm_error gdbm_errno;</kbd></dt>
+<dd>この変数の初期値は `GDBM_NO_ERROR' である。その他の値として、`GDBM_MALLOC_ERROR'、`GDBM_BLOCK_SIZE_ERROR'、`GDBM_FILE_OPEN_ERROR'、`GDBM_FILE_WRITE_ERROR'、`GDBM_FILE_SEEK_ERROR'、`GDBM_FILE_READ_ERROR'、`GDBM_BAD_MAGIC_NUMBER'、`GDBM_EMPTY_DATABASE'、`GDBM_CANT_BE_READER'、`GDBM_CANT_BE_WRITER'、`GDBM_READER_CANT_DELETE'、`GDBM_READER_CANT_STORE'、`GDBM_READER_CANT_REORGANIZE'、`GDBM_UNKNOWN_UPDATE'、`GDBM_ITEM_NOT_FOUND'、`GDBM_REORGANIZE_FAILED'、`GDBM_CANNOT_REPLACE'、`GDBM_ILLEGAL_DATA'、`GDBM_OPT_ALREADY_SET' および `GDBM_OPT_ILLEGAL' がある。</dd>
+</dl>
+
+<p>エラーコードに対応するメッセージ文字列を得るには、関数 `gdbm_strerror' を用いる。</p>
+
+<dl>
+<dt><kbd>char *gdbm_strerror(gdbm_error <var>gdbmerrno</var>);</kbd></dt>
+<dd>`gdbmerrno' はエラーコードを指定する。戻り値はエラーメッセージの文字列であり、その領域は書き込み禁止領域である。</dd>
+</dl>
+
+<p>GDBM流にデータベースのハンドルを作成するには、関数 `gdbm_open' を用いる。</p>
+
+<dl>
+<dt><kbd>GDBM_FILE gdbm_open(char *<var>name</var>, int <var>block_size</var>, int <var>read_write</var>, int <var>mode</var>, void (*<var>fatal_func</var>)(void));</kbd></dt>
+<dd>`name' はデータベースの名前を指定する。`block_size' は無視される。`read_write' は接続モードを指定し、`GDBM_READER' ならリーダ、`GDBM_WRITER' と `GDBM_WRCREAT' と `GDBM_NEWDB' ならライタとなる。`GDBM_WRCREAT' の場合はデータベースが存在しなければ作成し、`GDBM_NEWDB' の場合は既に存在していても新しいデータベースを作成する。ライタに対しては、`GDBM_SYNC' か `GDBM_NOLOCK' か `GDBM_LOCKNB' か `GDBM_FAST' か `GDBM_SPARSE' とのビット論理和にすることができる。`GDBM_SYNC' は全てのデータベース操作をディスクと同期させ、`GDBM_NOLOCK' はファイルロックを伴わずにデータベースを開き、`GDBM_LOCKNB' はブロックなしのロックを行い、`GDBM_FAST' は無視される。`GDBM_SPARSE' はQDBM独自のものであり、作成するファイルをスパースにする。`mode' は `open' コールに渡すものと同じでファイルのモードを指定する。`fatal_func' は無視される。戻り値は正常ならデータベースハンドルであり、エラーなら `NULL' である。</dd>
+</dl>
+
+<p>QDBM流にデータベースのハンドルを作成するには、関数 `gdbm_open2' を用いる。</p>
+
+<dl>
+<dt><kbd>GDBM_FILE gdbm_open2(char *<var>name</var>, int <var>read_write</var>, int <var>mode</var>, int <var>bnum</var>, int <var>dnum</var>, int <var>align</var>);</kbd></dt>
+<dd>`name' はデータベースの名前を指定する。`read_write' は接続モードを指定し、`GDBM_READER' ならリーダ、`GDBM_WRITER' と `GDBM_WRCREAT' と `GDBM_NEWDB' ならライタとなる。`GDBM_WRCREAT' の場合はデータベースが存在しなければ作成し、`GDBM_NEWDB' の場合は既に存在していても新しいデータベースを作成する。ライタに対しては、`GDBM_SYNC' か `GDBM_NOLOCK' か `GDBM_LOCKNB' か `GDBM_FAST' か `GDBM_SPARSE' とのビット論理和にすることができる。`GDBM_SYNC' は全てのデータベース操作をディスクと同期させ、`GDBM_NOLOCK' はファイルロックを伴わずにデータベースを開き、`GDBM_LOCKNB' はブロックなしのロックを行い、`GDBM_FAST' は無視される。`GDBM_SPARSE' はQDBM独自のものであり、作成するファイルをスパースにする。`mode' は `open' コールもしくは `mkdir' コールに渡すものと同じでファイルやディレクトリのモードを指定する。`bnum' はバケット配列の要素数の目安を指定するが、0 以下ならデフォルト値が使われる。`dnum' は要素データベースの数を指定するが、0 以下なら返されるハンドルはDepotのラッパーとして生成され、そうでなければCuriaのラッパーになる。`align' はアラインメントの基本サイズを指定する。戻り値は正常ならデータベースハンドルであり、エラーなら `NULL' である。既にデータベースが存在する場合、それがDepotのものかCuriaのものかが自動的に判断される。</dd>
+</dl>
+
+<p>データベースとの接続を閉じてハンドルを破棄するには、関数 `gdbm_close' を用いる。</p>
+
+<dl>
+<dt><kbd>void gdbm_close(GDBM_FILE <var>dbf</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用することができなくなる。</dd>
+</dl>
+
+<p>レコードを追加するには、関数 `gdbm_store' を用いる。</p>
+
+<dl>
+<dt><kbd>int gdbm_store(GDBM_FILE <var>dbf</var>, datum <var>key</var>, datum <var>content</var>, int <var>flag</var>);</kbd></dt>
+<dd>`dbf' はライタで接続したデータベースハンドルを指定する。`key' はキーの構造体を指定する。`content' は値の構造体を指定する。`frags' が `GDBM_INSERT' ならキーの重複時に書き込みを断念し、`GDBM_REPLACE' なら上書きを行う。戻り値は正常なら 0 、重複での断念なら 1 、その他のエラーなら -1 である。</dd>
+</dl>
+
+<p>レコードを削除するには、関数 `gdbm_delete' を用いる。</p>
+
+<dl>
+<dt><kbd>int gdbm_delete(GDBM_FILE <var>dbf</var>, datum <var>key</var>);</kbd></dt>
+<dd>`dbf' はライタで接続したデータベースハンドルを指定する。`key' はキーの構造体を指定する。戻り値は正常なら 0 、エラーなら -1 である。</dd>
+</dl>
+
+<p>レコードを取得するには、関数 `gdbm_fetch' を用いる。</p>
+
+<dl>
+<dt><kbd>datum gdbm_fetch(GDBM_FILE <var>dbf</var>, datum <var>key</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。`key' はキーの構造体を指定する。戻り値は値の構造体である。該当があればメンバ `dptr' がその領域を指し、`dsize' がそのサイズを示す。該当がなければ `dptr' の値は `NULL' となる。戻り値のメンバ `dptr' の指す領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>レコードが存在するか調べるには、関数 `gdbm_exists' を用いる。</p>
+
+<dl>
+<dt><kbd>int gdbm_exists(GDBM_FILE <var>dbf</var>, datum <var>key</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。`key' はキーの構造体を指定する。戻り値は該当があれば真であり、該当がない場合やエラーの場合は偽である。</dd>
+</dl>
+
+<p>最初のレコードのキーを得るには、関数 `gdbm_firstkey' を用いる。</p>
+
+<dl>
+<dt><kbd>datum gdbm_firstkey(GDBM_FILE <var>dbf</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。戻り値はキーの構造体である。該当があればメンバ `dptr' がその領域を指し、`dsize' がそのサイズを示す。該当がなければ `dptr' の値は `NULL' となる。戻り値のメンバ `dptr' の指す領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>次のレコードのキーを得るには、関数 gdbm_nextkey を用いる。</p>
+
+<dl>
+<dt><kbd>datum gdbm_nextkey(GDBM_FILE <var>dbf</var>, datum <var>key</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。`key' は無視される。戻り値はキーの構造体である。該当があればメンバ `dptr' がその領域を指し、`dsize' がそのサイズを示す。該当がなければ `dptr' の値は `NULL' となる。戻り値のメンバ `dptr' の指す領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>データベースを更新した内容をファイルとデバイスに同期させるには、関数 `gdbm_sync' を用いる。</p>
+
+<dl>
+<dt><kbd>void gdbm_sync(GDBM_FILE <var>dbf</var>);</kbd></dt>
+<dd>`dbf' はライタで接続したデータベースハンドルを指定する。</dd>
+</dl>
+
+<p>データベースを最適化するには、関数 `gdbm_reorganize' を用いる。</p>
+
+<dl>
+<dt><kbd>int gdbm_reorganize(GDBM_FILE <var>dbf</var>);</kbd></dt>
+<dd>`dbf' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら 0 であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースファイルのファイルディスクリプタを得るには、関数 `gdbm_fdesc' を用いる。</p>
+
+<dl>
+<dt><kbd>int gdbm_fdesc(GDBM_FILE <var>dbf</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。戻り値はデータベースファイルのファイルディスクリプタである。データベースがディレクトリなら、戻り値は -1 である。</dd>
+</dl>
+
+<p>関数 `gdbm_setopt' は何もしない。</p>
+
+<dl>
+<dt><kbd>int gdbm_setopt(GDBM_FILE <var>dbf</var>, int <var>option</var>, int *<var>value</var>, int <var>size</var>);</kbd></dt>
+<dd>`dbf' はデータベースハンドルを指定する。`option' は無視される。`value' は無視される。`size' は無視される。戻り値は 0 である。この関数は互換性のためにのみ存在する。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>名前と対応させて電話番号を格納し、それを検索するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;hovel.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define NAME     "mikio"
+#define NUMBER   "000-1234-5678"
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  GDBM_FILE dbf;
+  datum key, val;
+  int i;
+
+  /* データベースを開く */
+  if(!(dbf = gdbm_open(DBNAME, 0, GDBM_WRCREAT, 00644, NULL))){
+    fprintf(stderr, "gdbm_open: %s\n", gdbm_strerror(gdbm_errno));
+    return 1;
+  }
+
+  /* レコードを準備する */
+  key.dptr = NAME;
+  key.dsize = strlen(NAME);
+  val.dptr = NUMBER;
+  val.dsize = strlen(NUMBER);
+
+  /* レコードを格納する */
+  if(gdbm_store(dbf, key, val, GDBM_REPLACE) != 0){
+    fprintf(stderr, "gdbm_store: %s\n", gdbm_strerror(gdbm_errno));
+  }
+
+  /* レコードを検索する */
+  val = gdbm_fetch(dbf, key);
+  if(val.dptr){
+    printf("Name: %s\n", NAME);
+    printf("Number: ");
+    for(i = 0; i &lt; val.dsize; i++){
+      putchar(val.dptr[i]);
+    }
+    putchar('\n');
+    free(val.dptr);
+  } else {
+    fprintf(stderr, "gdbm_fetch: %s\n", gdbm_strerror(gdbm_errno));
+  }
+
+  /* データベースを閉じる */
+  gdbm_close(dbf);
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Hovelを利用したプログラムをビルドする方法は、Depotの場合と全く同じである。リンカに渡すオプションは `-lgdbm' ではなく `-lqdbm' である。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>POSIXスレッドを有効にしてQDBMをビルドした場合、外部変数 `gdbm_errno' はスレッド固有データへの参照として扱われ、Hovelの各関数はリエントラントになる。その場合、スレッド間で同時に同じハンドルにアクセスしない限りは、各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<hr />
+
+<h2><a name="hovelcli" id="hovelcli" class="head">Hovel用コマンド</a></h2>
+
+<p>Hovelに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `hvmgr' はHovelやそのアプリケーションのデバッグに役立つツールである。データベースを更新したり、データベースの状態を調べたりす機能を持つ。シェルスクリプトでデータベースアプリケーションを作るのにも利用できる。以下の書式で用いる。`name' はデータベース名、`key' はレコードのキー、`val' はレコードの値を指定する。</p>
+
+<dl>
+<dt><kbd>hvmgr [-qdbm bnum dnum] [-s] create <var>name</var></kbd></dt>
+<dd>データベースファイルを作成する。</dd>
+<dt><kbd>hvmgr store [-qdbm] [-kx] [-vx|-vf] [-insert] <var>name</var> <var>key</var> <var>val</var></kbd></dt>
+<dd>キーと値に対応するレコードを追加する。</dd>
+<dt><kbd>hvmgr delete [-qdbm] [-kx] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードを削除する。</dd>
+<dt><kbd>hvmgr fetch [-qdbm] [-kx] [-ox] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>hvmgr list [-qdbm] [-ox] <var>name</var></kbd></dt>
+<dd>データベース内の全てのレコードのキーと値をタブと改行で区切って標準出力する。</dd>
+<dt><kbd>hvmgr optimize [-qdbm] <var>name</var></kbd></dt>
+<dd>データベースを最適化する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-qdbm [<var>bnum</var> <var>dnum</var>]</kbd> : `gdbm_open2' でデータベースを開く。`bnum' と `dnum' はバケット配列の要素数とデータベースの分割数を指定する。</li>
+<li><kbd>-s</kbd> : ファイルをスパースにする。</li>
+<li><kbd>-kx</kbd> : 2桁単位の16進数によるバイナリ表現として `key' を扱う。</li>
+<li><kbd>-vx</kbd> : 2桁単位の16進数によるバイナリ表現として `val' を扱う。</li>
+<li><kbd>-vf</kbd> : 名前が `val' のファイルのデータを値として読み込む。</li>
+<li><kbd>-insert</kbd> : 既存のレコードとキーが重複時に上書きせずにエラーにする。</li>
+<li><kbd>-ox</kbd> : 2桁単位の16進数によるバイナリ表現として標準出力を行う。</li>
+<li><kbd>-n</kbd> : 標準出力の末尾に付加される改行文字の出力を抑制する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>コマンド `hvtest' はHovelの機能テストや性能テストに用いるツールである。このコマンドによって生成されたデータベースファイルを `hvmgr' によって解析したり、`time' コマンドによってこのコマンドの実行時間を計ったりするとよい。以下の書式で用いる。`name' はデータベース名、`rnum' はレコード数を指定する。</p>
+
+<dl>
+<dt><kbd>hvtest write [-qdbm] [-s] <var>name</var> <var>rnum</var></kbd></dt>
+<dd>`00000001'、`00000002' のように変化する8バイトのキーと適当な8バイトの値を連続してデータベースに追加する。</dd>
+<dt><kbd>hvtest read [-qdbm] <var>name</var> <var>rnum</var></kbd></dt>
+<dd>上記で生成したデータベースを検索する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-qdbm</kbd> : `gdbm_open2' を用いてCuriaのハンドルを開く。</li>
+<li><kbd>-s</kbd> : ファイルをスパースにする。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<hr />
+
+<h2><a name="cabinapi" id="cabinapi" class="head">Cabin: ユーティリティAPI</a></h2>
+
+<h3>概要</h3>
+
+<p>Cabinはメモリ上で簡単にレコードを扱うためのメモリ確保関数や整列関数や拡張可能なデータや配列リストやハッシュマップやヒープ配列など提供するユーティリティのAPIである。MIMEやCSVやXMLを解析する機能や、各種の符号化と復号を行う機能も備える。</p>
+
+<p>Cabinを使うためには、`cabin.h' と `stdlib.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;cabin.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+</dl>
+
+<p>拡張可能なデータを扱う際には、`CBDATUM' 型へのポインタをハンドルとして用いる。データハンドルは、関数 `cbdatumopen' で開き、関数 `cbdatumclose' で閉じる。リストを扱う際には、`CBLIST' 型へのポインタをハンドルとして用いる。リストハンドルは、関数 `cblistopen' で開き、関数 `cblistclose' で閉じる。マップを扱う際には、`CBMAP' 型へのポインタをハンドルとして用いる。マップハンドルは、関数 `cbmapopen' で開き、関数 `cbmapclose' で閉じる。ヒープ配列を扱う際には `CBHEAP' 型へのポインタをハンドルとして用いる。ヒープハンドルは関数 `cbheapopen' で開き、関数 `cbheapclose' で閉じる。各ハンドルのメンバを直接参照することは推奨されない。
+
+</p>
+
+<h3>API</h3>
+
+<p>外部変数 `cbfatalfunc' は致命的エラーをハンドリングするコールバック関数である。</p>
+
+<dl>
+<dt><kbd>extern void (*cbfatalfunc)(const char *<var>message</var>);</kbd></dt>
+<dd>引数はエラーメッセージを指定する。この変数の初期値は `NULL' であり、`NULL' ならば致命的エラーの発生時にはデフォルトの関数が呼ばれる。致命的エラーはメモリの割り当てに失敗した際に起こる。</dd>
+</dl>
+
+<p>メモリ上に領域を確保するには、関数 `cbmalloc' を用いる。</p>
+
+<dl>
+<dt><kbd>void *cbmalloc(size_t <var>size</var>);</kbd></dt>
+<dd>`size' は領域のサイズを指定する。戻り値は確保した領域へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>メモリ上の領域を再確保するには、関数 `cbrealloc' を用いる。</p>
+
+<dl>
+<dt><kbd>void *cbrealloc(void *<var>ptr</var>, size_t <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' は領域のサイズを指定する。戻り値は再確保した領域へのポインタである。戻り値の領域は `remalloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>メモリ上の領域を複製するには、関数 `cbmemdup' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbmemdup(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' は領域のサイズを指定する。戻り値は再確保した領域へのポインタである。戻り値は複製の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>メモリ上の開放を解放するには、関数 `cbfree' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbfree(void *<var>ptr</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定するが、`NULL' の場合は何もしない。この関数は `free' のラッパーに過ぎないが、`malloc' シリーズの別のパッケージを使うアプリケーションにおいてQDBMが確保した領域を解放するのに便利である。</dd>
+</dl>
+
+<p>オブジェクトのポインタかハンドルをグローバルガベージコレクタに登録するには、関数 `cbglobalgc' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbglobalgc(void *<var>ptr</var>, void (*<var>func</var>)(void *));</kbd></dt>
+<dd>`ptr' はオブジェクトのポインタかハンドルを指定する。`func' はオブジェクトのリソースを解放する関数を指定する。その引数は解放するオブジェクトのポインタかハンドルである。この関数は、`main' 関数がリターンするか `exit' 関数が呼ばれてプロセスが正常終了する際に、オブジェクトのリソースが解放されることを保証する。</dd>
+</dl>
+
+<p>グローバルガベージコレクタを明示的に発動させるには、関数 `cbggcsweep' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbggcsweep(void);</kbd></dt>
+<dd>この関数を呼んだ後はグローバルガベージコレクタに登録してあったオブジェクトは利用することができなくなることに注意すること。グローバルガベージコレクタは初期化されるので、新しいオブジェクトを入れることができるようになる。</dd>
+</dl>
+
+<p>仮想メモリの割り当て可能性を調べるには、関数 `cbvmemavail' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbvmemavail(size_t <var>size</var>);</kbd></dt>
+<dd>`size' は新たに割り当て可能であるべき領域のサイズを指定する。戻り値は割り当てが可能であれば真、そうでなければ偽である。</dd>
+</dl>
+
+<p>配列の各要素を挿入ソートで整列させるには、関数 `cbisort' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbisort(void *<var>base</var>, int <var>nmemb</var>, int <var>size</var>, int(*<var>compar</var>)(const void *, const void *));</kbd></dt>
+<dd>`base' は配列のポインタを指定する。`nmemb' は配列の要素数を指定する。`size' は各要素のサイズを指定する。`compar' は比較関数を指定する。二つの引数は要素へのポインタである。比較関数は前者が大きければ正数を、後者が大きければ負数を、両者が等しければ 0 を返すべきである。挿入ソートは、ほとんどの要素が既に整列済みの場合にのみ有用である。</dd>
+</dl>
+
+<p>配列の各要素をシェルソートで整列させるには、関数 `cbssort' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbssort(void *<var>base</var>, int <var>nmemb</var>, int <var>size</var>, int(*<var>compar</var>)(const void *, const void *));</kbd></dt>
+<dd>`base' は配列のポインタを指定する。`nmemb' は配列の要素数を指定する。`size' は各要素のサイズを指定する。`compar' は比較関数を指定する。二つの引数は要素へのポインタである。比較関数は前者が大きければ正数を、後者が大きければ負数を、両者が等しければ 0 を返すべきである。ほとんどの要素が整列済みの場合、シェルソートの方がヒープソートやクイックソートより速いかもしれない。</dd>
+</dl>
+
+<p>配列の各要素をヒープソートで整列させるには、関数 `cbhsort' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbhsort(void *<var>base</var>, int <var>nmemb</var>, int <var>size</var>, int(*<var>compar</var>)(const void *, const void *));</kbd></dt>
+<dd>`base' は配列のポインタを指定する。`nmemb' は配列の要素数を指定する。`size' は各要素のサイズを指定する。`compar' は比較関数を指定する。二つの引数は要素へのポインタである。比較関数は前者が大きければ正数を、後者が大きければ負数を、両者が等しければ 0 を返すべきである。ヒープソートは入力の偏りに対して頑丈であるが、ほとんどの場合でクイックソートの方が速い。</dd>
+</dl>
+
+<p>配列の各要素をクイックソートで整列させるには、関数 `cbqsort' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbqsort(void *<var>base</var>, int <var>nmemb</var>, int <var>size</var>, int(*<var>compar</var>)(const void *, const void *));</kbd></dt>
+<dd>`base' は配列のポインタを指定する。`nmemb' は配列の要素数を指定する。`size' は各要素のサイズを指定する。`compar' は比較関数を指定する。二つの引数は要素へのポインタである。比較関数は前者が大きければ正数を、後者が大きければ負数を、両者が等しければ 0 を返すべきである。入力の偏りに敏感ではあるが、クイックソートは最速の整列アルゴリズムである。</dd>
+</dl>
+
+<p>大文字と小文字の違いを無視して二つの文字列を比較するには、関数 `cbstricmp' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbstricmp(const char *<var>astr</var>, const char *<var>bstr</var>);</kbd></dt>
+<dd>`astr' は一方の文字列へのポインタを指定する。`bstr' は他方の文字列へのポインタを指定する。戻り値は前者が大きければ正、後者が大きければ負、両者が等価なら 0 である。ASCIIコード中のアルファベットの大文字と小文字は区別されない。</dd>
+</dl>
+
+<p>文字列があるキーで始まっているか調べるには、関数 `cbstrfwmatch' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbstrfwmatch(const char *<var>str</var>, const char *<var>key</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。`key' は前方一致のキーの文字列へのポインタを指定する。戻り値は対象の文字列がキーで始まっていれば真、そうでなければ偽である。</dd>
+</dl>
+
+<p>大文字と小文字の違いを無視しつつ、文字列があるキーで始まっているか調べるには、関数 `cbstrfwimatch' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbstrfwimatch(const char *<var>str</var>, const char *<var>key</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。`key' は前方一致のキーの文字列へのポインタを指定する。戻り値は対象の文字列がキーで始まっていれば真、そうでなければ偽である。ASCIIコード中のアルファベットの大文字と小文字は区別されない。</dd>
+</dl>
+
+<p>文字列があるキーで終っているか調べるには、関数 `cbstrbwmatch' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbstrbwmatch(const char *<var>str</var>, const char *<var>key</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。`key' は後方一致のキーの文字列へのポインタを指定する。戻り値は対象の文字列がキーで終っていれば真、そうでなければ偽である。</dd>
+</dl>
+
+<p>大文字と小文字の違いを無視しつつ、文字列があるキーで終っているか調べるには、関数 `cbstrbwimatch' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbstrbwimatch(const char *<var>str</var>, const char *<var>key</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。`key' は後方一致のキーの文字列へのポインタを指定する。戻り値は対象の文字列がキーで終っていれば真、そうでなければ偽である。ASCIIコード中のアルファベットの大文字と小文字は区別されない。</dd>
+</dl>
+
+<p>KMP法を用いて文字列の部分文字列の位置を得るには、関数 `cbstrstrkmp' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrstrkmp(const char *<var>haystack</var>, const char *<var>needle</var>);</kbd></dt>
+<dd>`haystack' は文字列へのポインタを指定する。`needle' は探すべき部分文字列へのポインタを指定する。戻り値は部分文字列の開始を指すポインタか、見つからなければ `NULL' である。大抵の場合、この関数よりコンパイラのビルドインである `strstr' の方が高速である。</dd>
+</dl>
+
+<p>BM法を用いて文字列の部分文字列の位置を得るには、関数 `cbstrstrbm' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrstrbm(const char *<var>haystack</var>, const char *<var>needle</var>);</kbd></dt>
+<dd>`haystack' は文字列へのポインタを指定する。`needle' は探すべき部分文字列へのポインタを指定する。戻り値は部分文字列の開始を指すポインタか、見つからなければ `NULL' である。大抵の場合、この関数よりコンパイラのビルドインである `strstr' の方が高速である。</dd>
+</dl>
+
+<p>文字列の全ての文字を大文字に変換するには、関数 `cbstrtoupper' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrtoupper(char *<var>str</var>);</kbd></dt>
+<dd>`str' は変換対象の文字列へのポインタを指定する。戻り値はその文字列へのポインタである。</dd>
+</dl>
+
+<p>文字列の全ての文字を小文字に変換するには、関数 `cbstrtolower' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrtolower(char *<var>str</var>);</kbd></dt>
+<dd>`str' は変換対象の文字列へのポインタを指定する。戻り値はその文字列へのポインタである。</dd>
+</dl>
+
+<p>文字列の先頭と末尾にある空白文字を削除するには、関数 `cbstrtrim' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrtrim(char *<var>str</var>);</kbd></dt>
+<dd>`str' は変換対象の文字列へのポインタを指定する。戻り値はその文字列へのポインタである。</dd>
+</dl>
+
+<p>文字列内の連続する空白を絞って整形するには、関数 `cbstrsqzcpc' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrsqzspc(char *<var>str</var>);</kbd></dt>
+<dd>`str' は変換対象の文字列へのポインタを指定する。戻り値はその文字列へのポインタである。</dd>
+</dl>
+
+<p>UTF-8の文字列に含まれる文字数を数えるには、関数 `cbstrcountutf' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbstrcountutf(const char *<var>str</var>);</kbd></dt>
+<dd>`str' はUTF-8の文字列へのポインタを指定する。戻り値はその文字列に含まれる文字数である。</dd>
+</dl>
+
+<p>UTF-8の文字列を指定した文字数で切るには、関数 `cbstrcututf' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbstrcututf(char *<var>str</var>, int <var>num</var>);</kbd></dt>
+<dd>`str' はUTF-8の文字列へのポインタを指定する。`num' は保持する文字数を指定する。戻り値はその文字列へのポインタである。</dd>
+</dl>
+
+<p>データハンドルを作成するには、関数 `cbdatumopen' を用いる。</p>
+
+<dl>
+<dt><kbd>CBDATUM *cbdatumopen(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は初期内容の領域へのポインタを指定するか、`NULL' なら空のデータを作成する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。戻り値はデータハンドルである。</dd>
+</dl>
+
+<p>データを複製するには、関数 `cbdatumdup' を用いる。</p>
+
+<dl>
+<dt><kbd>CBDATUM *cbdatumdup(const CBDATUM *<var>datum</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。戻り値は新しいデータハンドルである。</dd>
+</dl>
+
+<p>データハンドルを破棄するには、関数 `cbdatumclose' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbdatumclose(CBDATUM *<var>datum</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用することができなくなる。</dd>
+</dl>
+
+<p>データに別の領域を連結するには、関数 `cbdatumcat' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbdatumcat(CBDATUM *<var>datum</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。`ptr' は連結する領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。</dd>
+</dl>
+
+<p>データの領域へのポインタを得るには、関数 `cbdatumptr' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *cbdatumptr(const CBDATUM *<var>datum</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。戻り値はデータの領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。</dd>
+</dl>
+
+<p>データの領域のサイズを得るには、関数 `cbdatumsize' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbdatumsize(const CBDATUM *<var>datum</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。戻り値はデータの領域のサイズである。</dd>
+</dl>
+
+<p>データの領域のサイズを変更するには、関数 `cbdatumsetsize' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbdatumsetsize(CBDATUM *<var>datum</var>, int <var>size</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。`size' は領域の新しいサイズを指定する。新しいサイズが既存のサイズより大きい場合、余った領域は終端文字で埋められる。</dd>
+</dl>
+
+<p>データに書式出力を行なうには、関数 `cbdatumprintf' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbdatumprintf(CBDATUM *<var>datum</var>, const char *<var>format</var>, ...);</kbd></dt>
+<dd>`format' はprintf風の書式文字列を指定する。変換文字 `%' を `s'、`d'、`o'、`u'、`x'、`X'、`c'、`e'、`E'、`f'、`g'、`G'、`@'、`?'、`:'、`%' と併せて利用することができる。`@' は `s' と同様に機能するが、XMLのメタ文字をエスケープする。`?' は `s' と同様に機能するが、URLのメタ文字をエスケープする。`:' は `s' と同様に機能するが、UTF-8としてのMIMEエンコーディングを施す。それ以外の変換文字は元来のものと同様に機能する。</dd>
+</dl>
+
+<p>データを確保された領域に変換するには、関数 `cbdatumtomalloc' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbdatumtomalloc(CBDATUM *<var>datum</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`datum' はデータハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値はデータの領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。元のデータの領域は解放されるので、それを再び解放してはならない。</dd>
+</dl>
+
+<p>リストハンドルを作成するには、関数 `cblistopen' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cblistopen(void);</kbd></dt>
+<dd>戻り値はリストハンドルである。</dd>
+</dl>
+
+<p>リストを複製するには、関数 `cblistdup' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cblistdup(const CBLIST *<var>list</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。戻り値は新しいリストハンドルである。</dd>
+</dl>
+
+<p>リストハンドルを破棄するには、関数 `cblistclose' を用いる。</p>
+
+<dl>
+<dt><kbd>void cblistclose(CBLIST *<var>list</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用することができなくなる。</dd>
+</dl>
+
+<p>リストに格納された要素数を得るには、関数 `cblistnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int cblistnum(const CBLIST *<var>list</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。戻り値はリストに格納された要素数である。</dd>
+</dl>
+
+<p>リスト内のある要素の領域へのポインタを得るには、関数 `cblistval' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *cblistval(const CBLIST *<var>list</var>, int <var>index</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`index' は取り出す要素のインデックスを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は該当要素の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。`index' が要素数以上ならば、戻り値は `NULL' である。</dd>
+</dl>
+
+<p>要素をリストの末尾に加えるには、関数 `cblistpush' を用いる。</p>
+
+<dl>
+<dt><kbd>void cblistpush(CBLIST *<var>list</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`ptr' は追加する要素の領域へのポインタを指定する。`size' はその領域のサイズを指定するが、負数なら `strlen(ptr)' の値となる。</dd>
+</dl>
+
+<p>リストの末尾の要素を削除するには、関数 `cblistpop' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cblistpop(CBLIST *<var>list</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は該当要素の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。リストが空ならば、戻り値は `NULL' である。</dd>
+</dl>
+
+<p>要素をリストの先頭に加えるには、関数 `cblistunshift' を用いる。</p>
+
+<dl>
+<dt><kbd>void cblistunshift(CBLIST *<var>list</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`ptr' は追加する要素の領域へのポインタを指定する。`size' はその領域のサイズを指定するが、負数なら `strlen(ptr)' の値となる。</dd>
+</dl>
+
+<p>リストの先頭の要素を削除するには、関数 `cblistshift' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cblistshift(CBLIST *<var>list</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は該当要素の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。リストが空ならば、戻り値は `NULL' である。</dd>
+</dl>
+
+<p>リスト内の指定した位置に要素を加えるには、関数 `cblistinsert' を用いる。</p>
+
+<dl>
+<dt><kbd>void cblistinsert(CBLIST *<var>list</var>, int <var>index</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`index' は追加する要素のインデックスを指定する。`ptr' は追加する要素の領域へのポインタを指定する。`size' はその領域のサイズを指定するが、負数なら `strlen(ptr)' の値となる。</dd>
+</dl>
+
+<p>リスト内の指定した位置の要素を削除するには、関数 `cblistremove' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cblistremove(CBLIST *<var>list</var>, int <var>index</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`index' は削除する要素のインデックスを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は該当要素の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。`index' が要素数以上ならば、要素は削除されず、戻り値は `NULL' である。</dd>
+</dl>
+
+<p>リスト内の指定した位置の要素を上書きするには、関数 `cblistover' を用いる。</p>
+
+<dl>
+<dt><kbd>void cblistover(CBLIST *<var>list</var>, int <var>index</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`index' は削除する要素のインデックスを指定する。`ptr' は新しい内容の領域へのポインタを指定する。`size' はその領域のサイズを指定するが、負数なら `strlen(ptr)' の値となる。`index' が要素数以上ならば、この関数は何もしない。</dd>
+</dl>
+
+<p>リストの要素を辞書順で整列させるには、関数 `cblistsort' を用いる。</p>
+
+<dl>
+<dt><kbd>void cblistsort(CBLIST *<var>list</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。整列にはクイックソートが用いられる。</dd>
+</dl>
+
+<p>リストの要素を線形探索を使って検索するには、関数 `cblistlsearch' を用いる。</p>
+
+<dl>
+<dt><kbd>int cblistlsearch(const CBLIST *<var>list</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`ptr' は検索キーの領域へのポインタを指定する。`size' はその領域のサイズを指定するが、負数なら `strlen(ptr)' の値となる。戻り値は該当の要素のインデックスであるが、該当がなければ -1 である。複数の要素が該当した場合、前者が返される。</dd>
+</dl>
+
+<p>リストの要素を二分探索を使って検索するには、関数 `cblistbsearch' を用いる。</p>
+
+<dl>
+<dt><kbd>int cblistbsearch(const CBLIST *<var>list</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。リストは辞書順にソートされている必要がある。`ptr' は検索キーの領域へのポインタを指定する。`size' はその領域のサイズを指定するが、負数なら `strlen(ptr)' の値となる。戻り値は該当の要素のインデックスであるが、該当がなければ -1 である。複数の要素が該当した場合にどちらが返るかは未定義である。</dd>
+</dl>
+
+<p>リストを直列化してバイト配列にするには、関数 `cblistdump' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cblistdump(const CBLIST *<var>list</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`list' はリストハンドルを指定する。`sp' は抽出した領域のサイズを格納する領域へのポインタを指定する。戻り値は直列化された領域へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>直列化されたリストを復元するには、関数 `cblistload' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cblistload(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' はバイト配列へのポインタを指定する。`size' はその領域のサイズを指定する。戻り値は新しいリストハンドルである。</dd>
+</dl>
+
+<p>マップハンドルを作成するには、関数 `cbmapopen' を用いる。</p>
+
+<dl>
+<dt><kbd>CBMAP *cbmapopen(void);</kbd></dt>
+<dd>戻り値はマップハンドルである。</dd>
+</dl>
+
+<p>マップを複製するには、関数 `cbmapdup' を用いる。</p>
+
+<dl>
+<dt><kbd>CBMAP *cbmapdup(CBMAP *<var>map</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。戻り値は新しいマップハンドルである。コピー元のマップのイテレータは初期化される。</dd>
+</dl>
+
+<p>マップハンドルを破棄するには、関数 `cbmapclose' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbmapclose(CBMAP *<var>map</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用できなくなる。</dd>
+</dl>
+
+<p>マップにレコードを追加するには、関数 `cbmapput' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbmapput(CBMAP *<var>map</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const char *<var>vbuf</var>, int <var>vsiz</var>, int <var>over</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。`over' は重複したレコードを上書きするか否かを指定する。`over' が偽でキーが重複した場合は戻り値は偽であるが、そうでない場合は真である。</dd>
+</dl>
+
+<p>既存のレコードの値の末尾に値を連結するには、関数 `cbmapputcat' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbmapputcat(CBMAP *<var>map</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const char *<var>vbuf</var>, int <var>vsiz</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。該当のレコードが存在しない場合は新しいレコードが作られる。</dd>
+</dl>
+
+<p>マップのレコードを削除するには、関数 `cbmapout' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbmapout(CBMAP *<var>map</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら真であり、該当のレコードがない場合は偽である。</dd>
+</dl>
+
+<p>マップのレコードを取得するには、関数 `cbmapget' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *cbmapget(const CBMAP *<var>map</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、該当のレコードがない場合は `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。</dd>
+</dl>
+
+<p>レコードをマップの端に移動させるには、関数 `cbmapmove' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbmapmove(CBMAP *<var>map</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>head</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`head' は移動先を指定し、真なら先頭、偽なら末尾となる。戻り値は正常なら真であり、該当のレコードがない場合は偽である。</dd>
+</dl>
+
+<p>マップのイテレータを初期化するには、関数 `cbmapiterinit' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbmapiterinit(CBMAP *<var>map</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。イテレータは、マップに格納された全てのレコードを参照するために用いられる。</dd>
+</dl>
+
+<p>マップのイテレータから次のレコードのキーを取り出すには、関数 `cbmapiternext' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *cbmapiternext(CBMAP *<var>map</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常ならキーを格納した領域へのポインタであり、エラーなら `NULL' である。イテレータが最後まできて該当のレコードがない場合も `NULL' を返す。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。取り出す順番は格納した際の順番に一致することが保証されている。</dd>
+</dl>
+
+<p>マップのイテレータから取り出したキーに対応する値を取り出すには、関数　`cbmapiterval' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *cbmapiterval(const char *<var>kbuf</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`kbuf' はイテレータから取り出したキーの領域へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は値を格納した領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。</dd>
+</dl>
+
+<p>マップのレコード数を得るには、関数 `cbmaprnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbmaprnum(const CBMAP *<var>map</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。戻り値はデータベースのレコード数である。</dd>
+</dl>
+
+<p>マップに含まれる全てのキーを含むリストを得るには、関数 `cbmapkeys' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbmapkeys(CBMAP *<var>map</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。戻り値はマップに含まれる全てのキーを含むリストハンドルである。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>マップに含まれる全ての値を含むリストを得るには、関数 `cbmapvals' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbmapvals(CBMAP *<var>map</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。戻り値はマップに含まれる全ての値を含むリストハンドルである。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>マップを直列化してバイト配列にするには、関数 `cbmapdump' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbmapdump(const CBMAP *<var>map</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`map' はマップハンドルを指定する。`sp' は抽出した領域のサイズを格納する領域へのポインタを指定する。戻り値は直列化された領域へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>直列化されたマップを復元するには、関数 `cbmapload' を用いる。</p>
+
+<dl>
+<dt><kbd>CBMAP *cbmapload(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' はバイト配列へのポインタを指定する。`size' はその領域のサイズを指定する。戻り値は新しいマップハンドルである。</dd>
+</dl>
+
+<p>直列化したマップからひとつのレコードを抽出するには、関数 `cbmaploadone' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbmaploadone(const char *<var>ptr</var>, int <var>size</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' はバイト配列へのポインタを指定する。`size' はその領域のサイズを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、該当のレコードがない場合は `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。</dd>
+</dl>
+
+<p>ヒープハンドルを作成するには、関数 `cbheapopen' を用いる。</p>
+
+<dl>
+<dt><kbd>CBHEAP *cbheapopen(int <var>size</var>, int <var>max</var>, int(*<var>compar</var>)(const void *, const void *));</kbd></dt>
+<dd>`size' は各レコードの領域のサイズを指定する。`max' はヒープに格納するレコードの最大数を指定する。`compar' は比較関数を指定する。二つの引数はレコードへのポインタである。比較関数は前者が大きければ正数を、後者が大きければ負数を、両者が等しければ 0 を返すべきである。戻り値はヒープハンドル。</dd>
+</dl>
+
+<p>ヒープハンドルを複製するには、関数 `cbheapdup' を用いる。</p>
+
+<dl>
+<dt><kbd>CBHEAP *cbheapdup(CBHEAP *<var>heap</var>);</kbd></dt>
+<dd>`heap' はヒープハンドルを指定する。戻り値は新しいヒープハンドルである。</dd>
+</dl>
+
+<p>ヒープハンドルを破棄するには、関数 `cbheapclose' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbheapclose(CBHEAP *<var>heap</var>);</kbd></dt>
+<dd>`heap' はヒープハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用することができなくなる。</dd>
+</dl>
+
+<p>ヒープに格納されたレコード数を得るには、関数 `cbheapnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbheapnum(CBHEAP *<var>heap</var>);</kbd></dt>
+<dd>`heap' はヒープハンドルを指定する。戻り値はリストに格納されたレコード数である。</dd>
+</dl>
+
+<p>ヒープにレコードを挿入するには、関数 `cbheapinsert' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbheapinsert(CBHEAP *<var>heap</var>, const void *<var>ptr</var>);</kbd></dt>
+<dd>`heap' はヒープハンドルを指定する。`ptr' は追加するレコードの領域へのポインタを指定する。戻り値はレコードが追加されれば真であり、そうでなければ偽である。新しいレコードの値が既存のレコードの最大値より大きければ、新しいレコードは追加されない。新しいレコードが追加されてレコード数が最大数を越えた場合、既存のレコードの最大値のものが削除される。</dd>
+</dl>
+
+<p>ヒープ内のあるレコードの領域へのポインタを取得するには、関数 `cbheapget' を用いる。</p>
+
+<dl>
+<dt><kbd>void *cbheapval(CBHEAP *<var>heap</var>, int <var>index</var>);</kbd></dt>
+<dd>`heap' はヒープハンドルを指定する。`index' は取り出すレコードのインデックスを指定する。戻り値は該当レコードの領域へのポインタである。`index' が要素数以上ならば、戻り値は `NULL' である。レコードは内部的には比較関数の負値に基づいて組織化されていることに注意すべきである。</dd>
+</dl>
+
+<p>ヒープを確保された領域に変換するには、関数 `cbheaptomalloc' を用いる。</p>
+
+<dl>
+<dt><kbd>void *cbheaptomalloc(CBHEAP *<var>heap</var>, int *<var>np</var>);</kbd></dt>
+<dd>`heap' はヒープハンドルを指定する。`np' が `NULL' でなければ、その参照先に抽出した領域のレコード数を格納する。戻り値はヒープの領域へのポインタである。レコードはソート済みになる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。元のデータの領域は解放されるので、それを再び解放してはならない。</dd>
+</dl>
+
+<p>書式に基づいた文字列をメモリ上で確保するには、関数 `cbsprintf' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbsprintf(const char *<var>format</var>, ...);</kbd></dt>
+<dd>`format' はprintf風の書式文字列を指定する。変換文字 `%' をフラグ文字 `d'、`o'、`u'、`x'、`X'、`e'、`E'、`f'、`g'、`G'、`c'、`s' および `%' を伴わせて使用することができる。フィールドの幅と精度の指示子を変換文字とフラグ文字の間に置くことができる。その指示子は10進数字、`.'、`+'、`-' およびスペース文字からなる。その他の引数は書式文字列によって利用される。戻り値は結果の文字列の領域へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>文字列中のパターンを置換するには、関数 `cbreplace' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbreplace(const char *<var>str</var>, CBMAP *<var>pairs</var>);</kbd></dt>
+<dd>`str' は置換前の文字列を指定する。`pairs' は置換のペアからなるマップのハンドルを指定する。各ペアのキーは置換前のパターンを指定し、値は置換後のパターンを指定する。戻り値は結果の文字列の領域へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>一連のデータを分割してリストを作成するには、関数 `cbsplit' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbsplit(const char *<var>ptr</var>, int <var>size</var>, const char *<var>delim</var>);</kbd></dt>
+<dd>`ptr' は内容の領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`delim' は区切り文字を含む文字列を指定するか、`NULL' なら終端文字を区切り文字とする。戻り値はリストハンドルである。区切り文字が連続している場合でも、その間に空の要素があるとみなす。戻り値のハンドルは、関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>ファイルの全データを読み込むには、関数 `cbreadfile' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbreadfile(const char *<var>name</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`name' はファイルの名前を指定するが、`NULL' なら標準入力を読み込む。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら読み込んだデータを格納した領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>一連のデータをファイルに書き込むには、関数 `cbwritefile' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbwritefile(const char *<var>name</var>, const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`name' はファイル名を指定するが、`NULL' なら標準出力に書き出される。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。戻り値は正常なら真であり、該当のエラーなら偽である。ファイルが存在する場合には上書きされ、そうでない場合は新しいファイルが生成される。</dd>
+</dl>
+
+<p>ファイルの各行を読み込むには、関数 `cbreadlines' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbreadlines(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はファイルの名前を指定するが、`NULL' なら標準入力を読み込む。成功すれば戻り値は各行のデータを保持するリストのハンドルであり、失敗なら `NULL' である。改行文字は削除される。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>ディレクトリに含まれるファイルの名前のリストを得るには、関数 `cbdirlist' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbdirlist(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はディレクトリの名前を指定する。成功すれば戻り値は各ファイルの名前を保持するリストのハンドルであり、失敗なら `NULL' である。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>ファイルやディレクトリの状態を得るには、関数 `cbfilestat' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbfilestat(const char *<var>name</var>, int *<var>isdirp</var>, int *<var>sizep</var>, int *<var>mtimep</var>);</kbd></dt>
+<dd>`name' はファイルやディレクトリの名前を指定する。`dirp' が `NULL' でなければ、その参照先にファイルがディレクトリか否かを格納する。`sizep' が `NULL' でなければ、その参照先にファイルのサイズを格納する。`mtimep' が `NULL' でなければ、その参照先にファイルの最終更新時刻を格納する。戻り値は正常なら真であり、エラーなら偽である。ファイルが存在しない場合やパーミッションがない場合も偽を返す。</dd>
+</dl>
+
+<p>ファイルかディレクトリとその内容を削除するには、関数 `cbremove' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbremove(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はファイルやディレクトリの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。ファイルが存在しない場合やパーミッションがない場合も偽を返す。</dd>
+</dl>
+
+<p>URLを構成要素に分解するには、関数 `cburlbreak' を用いる。</p>
+
+<dl>
+<dt><kbd>CBMAP *cburlbreak(const char *<var>str</var>);</kbd></dt>
+<dd>`str' はURLの文字列へのポインタを指定する。戻り値はマップハンドルである。マップの各キーは要素名である。キー "self" はURLそれ自体を指示する。キー "scheme" はURLのスキームを指示する。キー "host" はサーバのホスト名を指示する。キー "port" はサーバのポート番号を指示する。キー "authority" は認証情報を指示する。キー "path" はリソースのパスを指示する。キー "file" はディレクトリ部分を除いたファイル名を指示する。キー "query" はクエリ文字列を指示する。キー "fragment" はフラグメント文字列を指示する。サポートされるスキームはHTTPとHTTPSとFTPとFILEである。絶対URLにも相対URLにも対応する。戻り値のハンドルは関数 `cbmapopen' で開かれるので、不要になったら `cbmapclose' で閉じるべきである。</dd>
+</dl>
+
+<p>相対URLを絶対URLを用いて解決するには、関数 `cburlresolve' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cburlresolve(const char *<var>base</var>, const char *<var>target</var>);</kbd></dt>
+<dd>`base' はベースロケーションの絶対URLを指定する。`target' は解決すべきURLを指定する。戻り値は解決されたURLである。ターゲットURLが相対URLの場合、ベースロケーションからの相対位置のURLを返す。ターゲットURLが絶対URLの場合、ターゲットURLのコピーを返す。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>一連のオブジェクトをURLエンコーディングで符号化するには、関数 `cburlencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cburlencode(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。戻り値は結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>URLエンコーディングで符号化された文字列を復元するには、関数 `cburldecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cburldecode(const char *<var>str</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`str' は符号化された文字列へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は結果の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>一連のオブジェクトをBase64エンコーディングで符号化するには、関数 `cbbaseencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbbaseencode(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。戻り値は結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>Base64エンコーディングで符号化された文字列を復元するには、関数 `cbbasedecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbbasedecode(const char *<var>str</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`str' は符号化された文字列へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は結果の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>一連のオブジェクトをquoted-printableエンコーディングで符号化するには、関数 `cbquoteencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbquoteencode(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。戻り値は結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>quoted-printableエンコーディングで符号化された文字列を復元するには、関数 `cbquotedecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbquotedecode(const char *<var>str</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`str' は符号化された文字列へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は結果の領域へのポインタである。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>MIMEの文字列をヘッダとボディに分割するには、関数 `cbmimebreak' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbmimebreak(const char *<var>ptr</var>, int <var>size</var>, CBMAP *<var>attrs</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' はMIMEのデータの領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`attrs' は属性を保存するためのマップハンドルを指定するが、`NULL' の場合には利用されない。マップの各キーは小文字に正規化された属性名である。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値はボディの文字列である。コンテントタイプが指定されている場合、マップのキー "TYPE" はそのタイプを指示する。文字コードが指定されている場合、キー "CHARSET" はそのコード名を指示する。マルチパートの区切り文字列が指定されている場合、キー "BOUNDARY" はその文字列を指示する。コンテントディスポジションが指定されている場合、キー "DISPOSITION" はその方針を指示する。ファイル名が指定されている場合、キー "FILENAME" はその名前を指示する。属性名が指定されている場合、キー "NAME" はその名前を指示する。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>MIMEのマルチパートデータの文字列を各パートに分割するには、関数 `cbmimeparts' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbmimeparts(const char *<var>ptr</var>, int <var>size</var>, const char *<var>boundary</var>);</kbd></dt>
+<dd>`ptr' はMIMEのデータの領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`boundary' は区切り文字列へのポインタを指定する。戻り値はリストハンドルである。リストの各要素はパートの文字列である。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>文字列をMIMEエンコーディングで符号化するには、関数 `cbmimeencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbmimeencode(const char *<var>str</var>, const char *<var>encname</var>, int <var>base</var>);</kbd></dt>
+<dd>`str' は文字列へのポインタを指定する。`encname' は文字コード名の文字列を指定する。`base' はBase64エンコードを使うか否かを指定する。偽の場合はquoted-printableが用いられる。戻り値は結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>MIMEエンコーディングで符号化された文字列を復元するには、関数 `cbmimedecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbmimedecode(const char *<var>str</var>, char *<var>enp</var>);</kbd></dt>
+<dd>`str' は符号化された文字列へのポインタを指定する。`enp' は文字コード名を書き込むための領域へのポインタを指定するが、`NULL' の場合は利用されない。バッファのサイズは32バイト以上でなければならない。戻り値は結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>CSVの文字列を行に分割するには、関数 `cbcsvrows' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbcsvrows(const char *<var>str</var>);</kbd></dt>
+<dd>`str' はCSVの文字列へのポインタを指定する。戻り値はリストハンドルである。リストの各要素は行の文字列である。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。入力文字列の文字コードはUS-ASCII、UTF-8、ISO-8859-*、EUC-*、Shift_JISのどれかである必要がある。MS-Excelと互換して、これらCSV用関数群は、ダブルクォートで囲んでコンマなどのメタ文字を含めたセルを扱うことができる。</dd>
+</dl>
+
+<p>CSVの行の文字列をセルに分割するには、関数 `cbcsvcells' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbcsvcells(const char *<var>str</var>);</kbd></dt>
+<dd>`str' はCSVの行の文字列へのポインタを指定する。戻り値はリストハンドルである。リストの各要素はセル内容をアンエスケープした文字列である。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>CSVのメタ文字をエスケープした文字列を得るには、関数 `cbcsvescape' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbcsvescape(const char *<var>str</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。戻り値はメタ文字を無効化した結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>XMLの実体参照をアンエスケープした文字列を得るには、関数 `cbcsvunescape' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbcsvunescape(const char *<var>str</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。戻り値はメタ文字を伴った結果の文字列へのポインタである。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>XMLの文字列をタグとテキストセクションに分割するには、関数 `cbxmlbreak' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *cbxmlbreak(const char *<var>str</var>, int <var>cr</var>);</kbd></dt>
+<dd>`str' はXMLの文字列へのポインタを指定する。`cr' はコメントを削除するか否かを指定する。戻り値はリストハンドルである。リストの各要素はタグかテキストセクションの文字列である。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。入力文字列の文字コードはUS-ASCII、UTF-8、ISO-8859-*、EUC-*、Shift_JISのどれかである必要がある。これらXML用関数群は妥当性検証を行うXMLパーザではないので、HTMLやSGMLも扱うことができる。</dd>
+</dl>
+
+<p>XMLのタグの属性のマップを得るには、関数 `cbxmlattrs' を用いる。</p>
+
+<dl>
+<dt><kbd>CBMAP *cbxmlattrs(const char *<var>str</var>);</kbd></dt>
+<dd>`str' はタグの文字列へのポインタを指定する。戻り値はマップハンドルである。マップの各キーは属性の名前である。各値はアンエスケープされる。空文字列をキーにするとタグの名前を取り出すことができる。戻り値のハンドルは関数 `cbmapopen' で開かれるので、不要になったら `cbmapclose' で閉じるべきである。</dd>
+</dl>
+
+<p>XMLのメタ文字をエスケープした文字列を得るには、関数 `cbxmlescape' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbxmlescape(const char *<var>str</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。戻り値はメタ文字を無効化した結果の文字列へのポインタである。この関数は `&amp;'、 `&lt;'、`&gt;'、`&quot;' のみを変換する。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>XMLの実体参照をアンエスケープした文字列を得るには、関数 `cbxmlunescape' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbxmlunescape(const char *<var>str</var>);</kbd></dt>
+<dd>`str' は対象の文字列へのポインタを指定する。戻り値はメタ文字を伴った結果の文字列へのポインタである。この関数は `&amp;amp;'、`&amp;lt;'、`&amp;gt;'、`&amp;quot;' のみを復元する。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>ZLIBを用いて一連のオブジェクトを圧縮するには、関数 `cbdeflate' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbdeflate(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`sp' の参照先には抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがZLIBを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>ZLIBを用いて圧縮されたオブジェクトを伸長するには、関数 `cbinflate' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbinflate(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがZLIBを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>GZIPを用いて一連のオブジェクトを圧縮するには、関数 `cbgzencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbgzencode(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`sp' の参照先には抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがZLIBを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>GZIPを用いて圧縮されたオブジェクトを伸長するには、関数 `cbgzdecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbgzdecode(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがZLIBを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>一連のオブジェクトのCRC32チェックサムを得るには、関数 `cbgetcrc' を用いる。</p>
+
+<dl>
+<dt><kbd>unsigned int cbgetcrc(const char *<var>ptr</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。戻り値はオブジェクトのCRC32チェックサムである。この関数はQDBMがZLIBを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>LZOを用いて一連のオブジェクトを圧縮するには、関数 `cblzoencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cblzoencode(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`sp' の参照先には抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがLZOを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>LZOを用いて圧縮されたオブジェクトを伸長するには、関数 `cblzodecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cblzodecode(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがLZOを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>BZIP2を用いて一連のオブジェクトを圧縮するには、関数 `cbbzencode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbbzencode(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`sp' の参照先には抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがBZIP2を有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>BZIP2を用いて圧縮されたオブジェクトを伸長するには、関数 `cbbzdecode' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbbzdecode(const char *<var>ptr</var>, int <var>size</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがBZIP2を有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>文字列の文字コードを変換するには、関数 `cbiconv' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbiconv(const char *<var>ptr</var>, int <var>size</var>, const char *<var>icode</var>, const char *<var>ocode</var>, int *<var>sp</var>, int *<var>mp</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`icode' は入力文字列の文字コードの名前を指定する。`outcode' は出力文字列の文字コードの名前を指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。`mp' が `NULL' でなければ、その参照先に変換に失敗した文字数を格納する。戻り値は正常なら結果の領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。この関数はQDBMがICONVを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>文字列の文字コードを自動判定するには、関数 `cbencname' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *cbencname(const char *<var>str</var>, int <var>size</var>);</kbd></dt>
+<dd>`ptr' は領域へのポインタを指定する。`size' はその領域のサイズを指定するか、負数なら `strlen(ptr)' の値となる。`icode' は入力文字列の文字コードの名前を指定する。戻り値はエンコードの名前の文字列である。現状では、US-ASCII、ISO-2022-JP、Shift_JIS、CP932、EUC-JP、UTF-8、UTF-16、UTF-16BEおよびUTF-16LEに対応している。そのいずれでもない場合は、ISO-8859-1と判定する。この関数はQDBMがICONVを有効にしてビルドされた場合のみ利用できる。</dd>
+</dl>
+
+<p>ローカル時間の秒単位の時差を得るには、関数 `cbjetlag' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbjetlag(void);</kbd></dt>
+<dd>戻り値はローカル時間の秒単位の時差である。</dd>
+</dl>
+
+<p>ある時間のグレゴリオ暦を得るには、関数 `cbcalendar' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbcalendar(time_t <var>t</var>, int <var>jl</var>, int *<var>yearp</var>, int *<var>monp</var>, int *<var>dayp</var>, int *<var>hourp</var>, int *<var>minp</var>, int *<var>secp</var>);</kbd></dt>
+<dd>`t' は対象の時間を指定するが、負数なら現在時間が使われる。`jl' はある場所の時差を秒単位で指定する。`yearp' が `NULL' でなければ、その参照先に年を格納する。`monp' が `NULL' でなければ、その参照先に月を格納する。1は1月を意味し、12は12月を意味する。`dayp' が `NULL' でなければ、その参照先に日を格納する。`hourp' が `NULL' でなければ、その参照先に時を格納する。`minp' が `NULL' でなければ、その参照先に分を格納する。`secp' が `NULL' でなければ、その参照先に秒を格納する。</dd>
+</dl>
+
+<p>ある日付の曜日を得るには、関数 `cbdayofweek' を用いる。</p>
+
+<dl>
+<dt><kbd>int cbdayofweek(int <var>year</var>, int <var>mon</var>, int <var>day</var>);</kbd></dt>
+<dd>`year' は日付の年を指定する。`mon' は日付の月を指定する。`day' は日付の日を指定する。戻り値は曜日の値である。0は日曜を意味し、6は土曜を意味する。</dd>
+</dl>
+
+<p>ある日付をW3CDTFの書式で表した文字列を得るには、関数 `cbdatestrwww' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbdatestrwww(time_t <var>t</var>, int <var>jl</var>);</kbd></dt>
+<dd>`t' は対象の時間を指定するが、負数なら現在時間が使われる。`jl' はある場所の時差を秒単位で指定する。戻り値はW3CDTFの書式（YYYY-MM-DDThh:mm:ddTZD）の文字列である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>ある日付をRFC 1123の書式で表した文字列を得るには、関数 `cbdatestrhttp' を用いる。</p>
+
+<dl>
+<dt><kbd>char *cbdatestrhttp(time_t <var>t</var>, int <var>jl</var>);</kbd></dt>
+<dd>`t' は対象の時間を指定するが、負数なら現在時間が使われる。`jl' はある場所の時差を秒単位で指定する。戻り値はRFC 1123の書式（Wdy, DD-Mon-YYYY hh:mm:dd TZD）の文字列である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>10進数か16進数かW3CDTFかRFC 822（1123）の書式で表した文字列から時間の値を得るには、関数 `cbstrmktime' を用いる。</p>
+
+<dl>
+<dt><kbd>time_t cbstrmktime(const char *<var>str</var>);</kbd></dt>
+<dd>`str' は10進数か16進数かW3CDTFかRFC 822（1123）の書式で表した文字列を指定する。戻り値はその時間の値か、書式が不正な場合は -1 である。10進数に "s" を後置すると秒単位を意味し、"m" を後置すると分単位を意味し、"h" を後置すると時単位を意味し、"d" を後置すると日単位を意味する。</dd>
+</dl>
+
+<p>ユーザとシステムのプロセス時間を得るには、関数 `cbproctime' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbproctime(double *<var>usrp</var>, double *<var>sysp</var>);</kbd></dt>
+<dd>`usrp' が `NULL' でなければ、その参照先にユーザ時間を格納する。時間の単位は秒である。`sysp' が `NULL' でなければ、その参照先にシステム時間を格納する。時間の単位は秒である。</dd>
+</dl>
+
+<p>標準入出力がバイナリモードであることを保証するには、関数 `cbstdiobin' を用いる。</p>
+
+<dl>
+<dt><kbd>void cbstdiobin(void);</kbd></dt>
+<dd>この関数はDOS的なファイルシステムの上のアプリケーションで有用である。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>以下のサンプルコードは典型的な利用例である。</p>
+
+<pre>#include &lt;cabin.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+int main(int argc, char **argv){
+  CBDATUM *datum;
+  CBLIST *list;
+  CBMAP *map;
+  char *buf1, *buf2;
+  int i;
+
+  /* データハンドルを開く */
+  datum = cbdatumopen("123", -1);
+  /* データを連結する */
+  cbdatumcat(datum, "abc", -1);
+  /* データを表示する */
+  printf("%s\n", cbdatumptr(datum));
+  /* データハンドルを閉じる */
+  cbdatumclose(datum);
+
+  /* リストハンドルを開く */
+  list = cblistopen();
+  /* リストに要素を追加する */
+  cblistpush(list, "apple", -1);
+  cblistpush(list, "orange", -1);
+  /* 全ての要素を表示する */
+  for(i = 0; i &lt; cblistnum(list); i++){
+    printf("%s\n", cblistval(list, i, NULL));
+  }
+  /* リストハンドルを閉じる */
+  cblistclose(list);
+
+  /* マップハンドルを開く */
+  map = cbmapopen();
+  /* マップにレコードを追加する */
+  cbmapput(map, "dog", -1, "bowwow", -1, 1);
+  cbmapput(map, "cat", -1, "meow", -1, 1);
+  /* 値を取得して表示する */
+  printf("%s\n", cbmapget(map, "dog", -1, NULL));
+  printf("%s\n", cbmapget(map, "cat", -1, NULL));
+  /* マップハンドルを閉じる */
+  cbmapclose(map);
+
+  /* Base64の符号化を行う */
+  buf1 = cbbaseencode("I miss you.", -1);
+  printf("%s\n", buf1);
+  /* Base64の復元を行う */
+  buf2 = cbbasedecode(buf1, NULL);
+  printf("%s\n", buf2);
+  /* リソースを解放する */
+  free(buf2);
+  free(buf1);
+
+  /* 単純なポインタをグローバルガベージコレクタに登録する */
+  buf1 = cbmemdup("Take it easy.", -1);
+  cbglobalgc(buf1, free);
+  /* ポインタは利用できるが解放する必要はない */
+  printf("%s\n", buf1);
+
+  /* リストをグローバルガベージコレクタに登録する */
+  list = cblistopen();
+  cbglobalgc(list, (void (*)(void *))cblistclose);
+  /* ハンドルは利用できるが閉じる必要はない */
+  cblistpush(list, "Don't hesitate.", -1);
+  for(i = 0; i &lt; cblistnum(list); i++){
+    printf("%s\n", cblistval(list, i, NULL));
+  }
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Cabinを利用したプログラムをビルドする方法は、Depotの場合と全く同じである。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>スレッド間で同時に同じハンドルにアクセスしない限りは、`cbglobalgc' を除いたCabinの各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<hr />
+
+<h2><a name="cabincli" id="cabincli" class="head">Cabin用コマンド</a></h2>
+
+<p>Cabinに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `cbtest' はCabinの機能テストや性能テストに用いるツールである。`time' コマンドによってこのコマンドの実行時間を計るとよい。以下の書式で用いる。`rnum' はレコード数を指定する。</p>
+
+<dl>
+<dt><kbd>cbtest sort [-d] <var>rnum</var></kbd></dt>
+<dd>ソートアルゴリズムのテストを行う。</dd>
+<dt><kbd>cbtest strstr [-d] <var>rnum</var></kbd></dt>
+<dd>文字列探索アルゴリズムのテストを行う。</dd>
+<dt><kbd>cbtest list [-d] <var>rnum</var></kbd></dt>
+<dd>リストの書き込みテストを行う。</dd>
+<dt><kbd>cbtest map [-d] <var>rnum</var></kbd></dt>
+<dd>マップの書き込みテストを行う。</dd>
+<dt><kbd>cbtest wicked <var>rnum</var></kbd></dt>
+<dd>リストとマップの各種更新操作を無作為に選択して実行する。</dd>
+<dt><kbd>cbtest misc</kbd></dt>
+<dd>雑多なルーチンのテストを実行する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-d</kbd> : 結果のデータを読み込んで表示する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>コマンド `cbcodec' はCabinが提供するエンコードおよびデコードの機能を利用するツールである。以下の書式で用いる。`file' は入力ファイルを指定するが、省略されれば標準入力を読み込む。</p>
+
+<dl>
+<dt><kbd>cbcodec url [-d] [-br] [-rs <var>base</var> <var>target</var>] [-l] [-e <var>expr</var>] [<var>file</var>]</kbd></dt>
+<dd>URLエンコードとそのデコードを行う。</dd>
+<dt><kbd>cbcodec base [-d] [-l] [-c <var>num</var>] [-e <var>expr</var>] [<var>file</var>]</kbd></dt>
+<dd>Base64エンコードとそのデコードを行う。</dd>
+<dt><kbd>cbcodec quote [-d] [-l] [-c <var>num</var>] [-e <var>expr</var>] [<var>file</var>]</kbd></dt>
+<dd>quoted-printableエンコードとそのデコードを行う。</dd>
+<dt><kbd>cbcodec mime [-d] [-hd] [-bd] [-part <var>num</var>] [-l] [-ec <var>code</var>] [-qp] [-dc] [-e <var>expr</var>] [<var>file</var>]</kbd></dt>
+<dd>MIMEエンコードとそのデコードを行う。</dd>
+<dt><kbd>cbcodec csv [-d] [-t] [-l] [-e <var>expr</var>] [-html] [<var>file</var>]</kbd></dt>
+<dd>CSVの処理を行う。デフォルトではメタ文字のエスケープを行う。</dd>
+<dt><kbd>cbcodec xml [-d] [-p] [-l] [-e <var>expr</var>] [-tsv] [<var>file</var>]</kbd></dt>
+<dd>XMLの処理を行う。デフォルトではメタ文字のエスケープを行う。</dd>
+<dt><kbd>cbcodec zlib [-d] [-gz] [-crc] [<var>file</var>]</kbd></dt>
+<dd>ZLIBの圧縮とその伸長を行う。ZLIBを有効化してQDBMをビルドした場合にのみ利用可能である。</dd>
+<dt><kbd>cbcodec lzo [-d] [<var>file</var>]</kbd></dt>
+<dd>LZOの圧縮とその伸長を行う。LZOを有効化してQDBMをビルドした場合にのみ利用可能である。</dd>
+<dt><kbd>cbcodec bzip [-d] [<var>file</var>]</kbd></dt>
+<dd>BZIP2の圧縮とその伸長を行う。BZIP2を有効化してQDBMをビルドした場合にのみ利用可能である。</dd>
+<dt><kbd>cbcodec iconv [-ic <var>code</var>] [-oc <var>code</var>] [-ol <var>ltype</var>] [-cn] [-um] [-wc] [<var>file</var>]</kbd></dt>
+<dd>ICONVによる文字コードの変換を行う。ICONVを有効化してQDBMをビルドした場合にのみ利用可能である。</dd>
+<dt><kbd>cbcodec date [-wf] [-rf] [-utc] [<var>str</var>]</kbd></dt>
+<dd>`str' で指定した日付の文字列の書式を変換する。デフォルトでは、UNIX時間を出力する。`str' が省略されると、現在日時を扱う。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-d</kbd> : エンコード（エスケープ）ではなく、デコード（アンエスケープ）を行う。</li>
+<li><kbd>-br</kbd> : URLを構成要素に分解する。</li>
+<li><kbd>-rs</kbd> : 相対URLを解決する。</li>
+<li><kbd>-l</kbd> : 出力の末尾に改行文字を加える。</li>
+<li><kbd>-e <var>expr</var></kbd> : 入力データを直接指定する。</li>
+<li><kbd>-c <var>num</var></kbd> : エンコードの際の桁数制限を指定する。</li>
+<li><kbd>-hd</kbd> : MIMEの構文解析を行い、ヘッダをTSV形式で抽出する。</li>
+<li><kbd>-bd</kbd> : MIMEの構文解析を行い、ボディを抽出する。</li>
+<li><kbd>-part <var>num</var></kbd> : MIMEの構文解析を行い、特定のパートを抽出する。</li>
+<li><kbd>-ec <var>code</var></kbd> : 入力の文字コードを指定する。デフォルトはUTF-8である。</li>
+<li><kbd>-qp</kbd> : quoted-printableエンコードを用いる。デフォルトはBase64である。</li>
+<li><kbd>-dc</kbd> : デコード結果の文字列でなく、文字コード名を出力する。</li>
+<li><kbd>-t</kbd> : CSVの構造を解析する。TSVに変換して表示する。セル内のタブと改行は削除される。</li>
+<li><kbd>-html</kbd> : CSVの構造を解析する。HTMLに変換して出力する。</li>
+<li><kbd>-p</kbd> : XMLの構文解析を行う。タグとテキストセクションをヘッダで分けて表示する。</li>
+<li><kbd>-tsv</kbd> : XMLの構文解析を行う。結果をTSV形式で出力する。テキストセクションのタブと改行はURLエンコードされる。</li>
+<li><kbd>-gz</kbd> : GZIP形式を用いる。</li>
+<li><kbd>-crc</kbd> : CRC32のチェックサムをビッグエンディアンの16進数で出力する。</li>
+<li><kbd>-ic <var>code</var></kbd> : 入力の文字コードを指定する。デフォルトだと自動判定する。</li>
+<li><kbd>-oc <var>code</var></kbd> : 出力の文字コードを指定する。デフォルトだとUTF-8になる。</li>
+<li><kbd>-ol <var>ltype</var></kbd> : 改行文字を変換する。`unix'(LF)、`dos'(CRLF)、`mac'(CR) のどれかを指定する。</li>
+<li><kbd>-cn</kbd> : 入力の文字コードを自動判定し、その名前を表示する。</li>
+<li><kbd>-wc</kbd> : 入力の文字コードをUTF-8と仮定し、その文字数を表示する。</li>
+<li><kbd>-um</kbd> : UCS-2の文字と、C言語の文字列表現でのUTF-16BEとUTF-8の対応表を出力する。</li>
+<li><kbd>-wf</kbd> : W3CDTFの書式で出力する。</li>
+<li><kbd>-rf</kbd> : RFC 1123の書式で出力する。</li>
+<li><kbd>-utc</kbd> : 協定世界時を出力する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<hr />
+
+<h2><a name="villaapi" id="villaapi" class="head">Villa: 上級API</a></h2>
+
+<h3>概要</h3>
+
+<p>VillaはQDBMの上級APIであり、B+木のデータベースを管理するルーチンを提供する。各レコードはユーザが指定した順序で整列されて格納される。ハッシュデータベースではレコードの検索はキーの完全一致によるしかなかった。しかし、Villaを用いると範囲を指定してレコードを検索することができる。各レコードを順番に参照するにはカーソルを用いる。データベースにはキーが重複する複数のレコードを格納することができる。また、トランザクション機構によってデータベースの操作を一括して反映させたり破棄したりすることができる。</p>
+
+<p>VillaはDepotおよびCabinを基盤として実装される。VillaのデータベースファイルはDepotのデータベースファイルそのものである。レコードの検索や格納の処理速度はDepotより遅いが、データベースファイルのサイズはより小さい。</p>
+
+<p>Villaを使うためには、`depot.h' と `cabin.h' と `villa.h' と `stdlib.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;depot.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;cabin.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;villa.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+</dl>
+
+<p>Villaでデータベースを扱う際には、`VILLA' 型へのポインタをハンドルとして用いる。これは、`stdio.h' の各種ルーチンがファイル入出力に `FILE' 型へのポインタを用いるのに似ている。ハンドルは、関数 `vlopen' で開き、関数 `vlclose' で閉じる。ハンドルのメンバを直接参照することは推奨されない。データベースに致命的なエラーが起きた場合は、以後そのハンドルに対する `vlclose' を除く全ての操作は何もせずにエラーを返す。ひとつのプロセスで複数のデータベースファイルを同時に利用することは可能であるが、同じデータベースファイルの複数のハンドルを利用してはならない。カーソルを使う前には `vlcurfirst' か `vlcurlast' か `vlcurjump' のどれかで初期化する必要がある。`vlcurput' と `vlcurout' 以外の関数でレコードの更新や削除をした後にもカーソルを初期化する必要がある。</p>
+
+<p>VillaでもDepotと同じく外部変数 `dpecode' に直前のエラーコードが記録される。エラーコードに対応するメッセージ文字列を得るには、関数 `dperrmsg' を用いる。</p>
+
+<h3>API</h3>
+
+<p>レコードの順番を指定するためには、比較関数を定義する。比較関数には以下の型を用いる。</p>
+
+<dl>
+<dt><kbd>typedef int(*VLCFUNC)(const char *<var>aptr</var>, int <var>asiz</var>, const char *<var>bptr</var>, int <var>bsiz</var>);</kbd></dt>
+<dd>`aptr' は一方のキーのデータ領域へのポインタを指定する。`asiz' はそのキーのデータ領域のサイズを指定する。`bptr' は他方のキーのデータ領域へのポインタを指定する。`bsiz' はそのキーのデータ領域のサイズを指定する。戻り値は前者が大きければ正、後者が大きければ負、両者が等価なら 0 である。</dd>
+</dl>
+
+<p>データベースのハンドルを作成するには、関数 `vlopen' を用いる。</p>
+
+<dl>
+<dt><kbd>VILLA *vlopen(const char *<var>name</var>, int <var>omode</var>, VLCFUNC <var>cmp</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。`omode' は接続モードを指定し、`VL_OREADER' ならリーダ、`VL_OWRITER' ならライタとなる。`VL_OWRITER' の場合、`VL_OCREAT' または `VL_OTRUNC' とのビット論理和にすることができる。`VL_OCREAT' はファイルが無い場合に新規作成することを指示し、`VL_OTRUNC' はファイルが存在しても作り直すことを指示し、`VL_OZCOMP' はデータベース内のリーフをZLIBで圧縮することを指示し、`VL_OYCOMP' はデータベース内のリーフをLZOで圧縮することを指示し、`VL_OXCOMP' はデータベース内のリーフをBZIP2で圧縮することを指示する。`VL_OREADER' と `VL_OWRITER' の両方で `VL_ONOLCK' または `VL_OLCKNB' とのビット論理和にすることができるが、前者はファイルロックをかけずにデータベースを開くことを指示し、後者はブロックせずにロックをかけることを指示する。`cmp' は比較関数を指定する。`VL_CMPLEX' はキーを辞書順で比較する。`VL_CMPINT' はキーを `int' 型のオブジェクトとみなして比較する。`VL_CMPNUM' はキーをビッグエンディアンの数値とみなして比較する。`VL_CMPDEC' はキーを10進数の数値を表す文字列とみなして比較する。`VLCFUNC' 型の宣言に基づく関数であれば比較関数として用いることができる。同じデータベースには常に同じ比較関数を用いる必要がある。戻り値はデータベースハンドルであるか、エラーなら `NULL' である。ライタ（読み書き両用モード）でデータベースファイルを開く際にはそのファイルに対して排他ロックがかけられ、リーダ（読み込み専用モード）で開く際には共有ロックがかけられる。その際には該当のロックがかけられるまで制御がブロックする。`VL_OZCOMP' と `VL_OYCOMP' と `VL_OXCOMP' はQDBMがそれぞれZLIBとLZOとBZIP2を有効にしてビルドされた場合にのみ利用できる。`VL_ONOLCK' を使う場合、アプリケーションが排他制御の責任を負う。</dd>
+</dl>
+
+<p>データベースとの接続を閉じてハンドルを破棄するには、関数 `vlclose' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlclose(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。データベースの更新内容は、接続を閉じた時点で初めてファイルと同期される。ライタでデータベースを開いた場合、適切に接続を閉じないとデータベースが破壊される。閉じたハンドルの領域は解放されるので、以後は利用できなくなる。トランザクションが有効でコミットされていない場合、それは破棄される。</dd>
+</dl>
+
+<p>レコードを追加するには、関数 `vlput' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlput(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const char *<var>vbuf</var>, int <var>vsiz</var>, int <var>dmode</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。`dmode' はキーが既存レコードと重複した際の制御を指定する。`VL_DOVER' は既存のレコードの値を上書きし、`VL_DKEEP' は既存のレコードを残してエラーを返し、`VL_DCAT' は指定された値を既存の値の末尾に加え、`VL_DDUP' はキーの重複を許して指定された値を最後の値として加え、`VL_DDUPR' はキーの重複を許して指定された値を最初の値として加える。戻り値は正常なら真であり、エラーなら偽である。データベースの更新によってカーソルは使用不能になる。</dd>
+</dl>
+
+<p>レコードを削除するには、関数 `vlout' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlout(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。重複するレコード群のキーが指定された場合、その最初のものが削除される。データベースの更新によってカーソルは使用不能になる。</dd>
+</dl>
+
+<p>レコードを取得するには、関数 `vlget' を用いる。</p>
+
+<dl>
+<dt><kbd>char *vlget(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。重複するレコード群のキーが指定された場合、その最初のものが選択される。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>レコードの値のサイズを取得するには、関数 `vlvsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlvsiz(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は該当レコードの値のサイズであるが、該当がない場合やエラーの場合は -1 である。複数のレコードが該当する場合は、最初のレコードの値のサイズを返す。</dd>
+</dl>
+
+<p>キーに一致するレコードの数を取得するには、関数 `vlvnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlvnum(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は該当レコードの値の数であり、該当がない場合やエラーの場合は 0 である。</dd>
+</dl>
+
+<p>キーに一致する複数のレコードを追加するには、関数 `vlputlist' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlputlist(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, const CBLIST *<var>vals</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`vals' は値のリストのハンドルを指定する。リストは空であってはならない。戻り値は正常なら真であり、エラーなら偽である。データベースの更新によってカーソルは使用不能になる。</dd>
+</dl>
+
+<p>キーに一致する全てのレコードを削除するには、関数 `vloutlist' を用いる。</p>
+
+<dl>
+<dt><kbd>int vloutlist(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。データベースの更新によってカーソルは使用不能になる。</dd>
+</dl>
+
+<p>キーに一致する全てのレコードを取得するには、関数 `vlgetlist' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *vlgetlist(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。戻り値は一致するレコードの値のリストのハンドルであるか、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>キーに一致する全てのレコードの連結した値を取得するには、関数 `vlgetcat' を用いる。</p>
+
+<dl>
+<dt><kbd>char *vlgetcat(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら連結した値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>カーソルを最初のレコードに移動させるには、関数 `vlcurfirst' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurfirst(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。データベースが空の場合も偽を返す。</dd>
+</dl>
+
+<p>カーソルを最後のレコードに移動させるには、関数 `vlcurlast' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurlast(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。データベースが空の場合も偽を返す。</dd>
+</dl>
+
+<p>カーソルを前のレコードに移動させるには、関数 `vlcurprev' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurprev(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。前のレコードがない場合も偽を返す。</dd>
+</dl>
+
+<p>カーソルを次のレコードに移動させるには、関数 `vlcurnext' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurnext(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。次のレコードがない場合も偽を返す。</dd>
+</dl>
+
+<p>カーソルを特定のレコードの前後に移動させるには、関数 `vlcurjump' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurjump(VILLA *<var>villa</var>, const char *<var>kbuf</var>, int <var>ksiz</var>, int <var>jmode</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`kbuf' はキーのデータ領域へのポインタを指定する。`ksiz' はキーのデータ領域のサイズを指定するか、負数なら `strlen(kbuf)' の値となる。`jmode' は詳細な調整を指定する。`VL_JFORWARD' はキーが同じレコード群の最初のレコードにカーソルが設定され、また完全に一致するレコードがない場合は次の候補にカーソルが設定されることを意味する。`VL_JBACKWORD' はキーが同じレコード群の最後のレコードにカーソルが設定され、また完全に一致するレコードがない場合は前の候補にカーソルが設定されることを意味する。戻り値は正常なら真であり、エラーなら偽である。条件に一致するレコードがない場合も偽を返す。</dd>
+</dl>
+
+<p>カーソルのあるレコードのキーを取得するには、関数 `vlcurkey' を用いる。</p>
+
+<dl>
+<dt><kbd>char *vlcurkey(VILLA *<var>villa</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>カーソルのあるレコードの値を取得するには、関数 `vlcurkey' を用いる。</p>
+
+<dl>
+<dt><kbd>char *vlcurval(VILLA *<var>villa</var>, int *<var>sp</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`sp' が `NULL' でなければ、その参照先に抽出した領域のサイズを格納する。戻り値は正常なら値を格納した領域へのポインタであり、エラーなら `NULL' である。該当のレコードがない場合も `NULL' を返す。戻り値の領域は、実際には1バイト多く確保して終端文字が置かれるので、文字列として利用できる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>カーソルのあるレコードの周辺にレコードを挿入するには、関数 `vlcurput' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurput(VILLA *<var>villa</var>, const char *<var>vbuf</var>, int <var>vsiz</var>, int <var>cpmode</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。`vbuf' は値のデータ領域へのポインタを指定する。`vsiz' は値のデータ領域のサイズを指定するか、負数なら `strlen(vbuf)' の値となる。`cpmode' は詳細な調整を指定する。`VL_CPCURRENT' は現在のレコードの値を上書きすることを指示し、`VL_CPBEFORE' はカーソルの直前にレコードを挿入することを指示し、`VL_CPAFTER' はカーソルの直後にレコードを挿入することを指示する。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。挿入操作の後には、カーソルは挿入されたレコードの位置に移動する。</dd>
+</dl>
+
+<p>カーソルのあるレコードを削除するには、関数 `vlcurout' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlcurout(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。該当のレコードがない場合も偽を返す。削除操作の後には、可能であればカーソルは次のレコードに移動する。</dd>
+</dl>
+
+<p>性能を調整するパラメータを指定するには、関数 `vlsettuning' を用いる。</p>
+
+<dl>
+<dt><kbd>void vlsettuning(VILLA *<var>villa</var>, int <var>lrecmax</var>, int <var>nidxmax</var>, int <var>lcnum</var>, int <var>ncnum</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`lrecmax' はB+木のひとつのリーフに入れるレコードの最大数を指定するが、0 以下ならデフォルト値が使われる。`nidxmax' はB+木の非リーフノードに入れるインデックスの最大数を指定するが、0 以下ならデフォルト値が使われる。`lcnum' はキャッシュに入れるリーフの最大数を指定するが、0 以下ならデフォルト値が使われる。`ncnum' はキャッシュに入れる非リーフノードの最大数を指定するが、0 以下ならデフォルト値が使われる。デフォルトの設定は `vlsettuning(49, 192, 1024, 512)' に相当する。性能調整のパラメータはデータベースに保存されないので、データベースを開く度に指定する必要がある。</dd>
+</dl>
+
+<p>データベースのフリーブロックプールのサイズ設定するには、関数 `vlsetfbpsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlsetfbpsiz(VILLA *<var>villa</var>, int <var>size</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。`size' はフリーブロックプールのサイズを指定する。戻り値は正常なら真であり、エラーなら偽である。フリーブロックプールのデフォルトのサイズは256である。サイズをより大きくすると、レコードの上書きを繰り返す際の空間効率は上がるが、時間効率が下がる。</dd>
+</dl>
+
+<p>データベースを更新した内容をファイルとデバイスに同期させるには、関数 `vlsync' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlsync(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。この関数はデータベースを閉じないうちに別プロセスにデータベースファイルを利用させる場合に役立つ。トランザクションが有効な間はこの関数を使用すべきではない。</dd>
+</dl>
+
+<p>データベースを最適化するには、関数 `vloptimize' を用いる。</p>
+
+<dl>
+<dt><kbd>int vloptimize(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。レコードを削除したり、置換モードや連結モードで書き込みを繰り返したりする場合は、データベース内に不要な領域が蓄積するが、この関数はそれを解消するのに役立つ。トランザクションが有効な間はこの関数を使用すべきではない。</dd>
+</dl>
+
+<p>データベースの名前を得るには、関数 `vlname' を用いる。</p>
+
+<dl>
+<dt><kbd>char *vlname(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら名前を格納した領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>データベースファイルのサイズを得るには、関数 `vlfsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlfsiz(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常ならデータベースファイルのサイズであり、エラーなら -1 である。I/Oバッファにより、戻り値は実際のサイズより小さくなる場合がある。</dd>
+</dl>
+
+<p>B+木のリーフノードの数を得るには、関数 `vllnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int vllnum(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常ならリーフノードの数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>B+木の非リーフノードの数を得るには、関数 `vlnnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlnnum(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常なら非リーフノードの数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースのレコード数を得るには、関数 `vlrnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlrnum(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は正常ならデータベースのレコード数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースハンドルがライタかどうかを調べるには、関数 `vlwritable' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlwritable(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値はライタなら真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースに致命的エラーが起きたかどうかを調べるには、関数 `vlfatalerror' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlfatalerror(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値は致命的エラーがあれば真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースファイルのinode番号を得るには、関数 `vlinode' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlinode(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値はデータベースファイルのinode番号である。</dd>
+</dl>
+
+<p>データベースの最終更新時刻を得るには、関数 `vlmtime' を用いる。</p>
+
+<dl>
+<dt><kbd>time_t vlmtime(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。戻り値はデータベースの最終更新時刻である。</dd>
+</dl>
+
+<p>トランザクションを開始するには、関数 `vltranbegin' を用いる。</p>
+
+<dl>
+<dt><kbd>int vltranbegin(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。この関数はマルチスレッドでの相互排他制御を行わないので、アプリケーションがその責任を負う。一つのデータベースハンドルで同時に有効にできるトランザクションは一つだけである。</dd>
+</dl>
+
+<p>トランザクションをコミットするには、関数 `vltrancommit' を用いる。</p>
+
+<dl>
+<dt><kbd>int vltrancommit(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。トランザクションの中でのデータベースの更新はコミットが成功した時に確定する。</dd>
+</dl>
+
+<p>トランザクションを破棄するには、関数 `vltranabort' を用いる。</p>
+
+<dl>
+<dt><kbd>int vltranabort(VILLA *<var>villa</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。トランザクションの中でのデータベースの更新はアボートした時には破棄される。データベースの状態はトランザクションの前の状態にロールバックされる。</dd>
+</dl>
+
+<p>データベースファイルを削除するには、関数 `vlremove' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlremove(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>壊れたデータベースファイルを修復するには、関数 `vlrepair' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlrepair(const char *<var>name</var>, VLCFUNC <var>cmp</var>);</kbd></dt>
+<dd>`name' はデータベースファイルの名前を指定する。`cmp' はデータベースファイルの比較関数を指定する。戻り値は正常なら真であり、エラーなら偽である。修復されたデータベースの全レコードが元来もしくは期待される状態に戻る保証はない。</dd>
+</dl>
+
+<p>全てのレコードをエンディアン非依存のデータとしてダンプするには、関数 `vlexportdb' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlexportdb(VILLA *<var>villa</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`villa' はデータベースハンドルを指定する。`name' は出力ファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>エンディアン非依存データから全てのレコードをロードするには、関数 `vlimportdb' を用いる。</p>
+
+<dl>
+<dt><kbd>int vlimportdb(VILLA *<var>villa</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`villa' はライタで接続したデータベースハンドルを指定する。データベースは空でなければならない。`name' は入力ファイルの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>名前と対応させて電話番号を格納し、それを検索するアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;cabin.h&gt;
+#include &lt;villa.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#define NAME     "mikio"
+#define NUMBER   "000-1234-5678"
+#define DBNAME   "book"
+
+int main(int argc, char **argv){
+  VILLA *villa;
+  char *val;
+
+  /* データベースを開く */
+  if(!(villa = vlopen(DBNAME, VL_OWRITER | VL_OCREAT, VL_CMPLEX))){
+    fprintf(stderr, "vlopen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* レコードを格納する */
+  if(!vlput(villa, NAME, -1, NUMBER, -1, VL_DOVER)){
+    fprintf(stderr, "vlput: %s\n", dperrmsg(dpecode));
+  }
+
+  /* レコードを取得する */
+  if(!(val = vlget(villa, NAME, -1, NULL))){
+    fprintf(stderr, "vlget: %s\n", dperrmsg(dpecode));
+  } else {
+    printf("Name: %s\n", NAME);
+    printf("Number: %s\n", val);
+    free(val);
+  }
+
+  /* データベースを閉じる */
+  if(!vlclose(villa)){
+    fprintf(stderr, "vlclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<p>文字列の前方一致検索を行うアプリケーションのサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;cabin.h&gt;
+#include &lt;villa.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define DBNAME   "words"
+#define PREFIX   "apple"
+
+int main(int argc, char **argv){
+  VILLA *villa;
+  char *key, *val;
+
+  /* データベースを開く */
+  if(!(villa = vlopen(DBNAME, VL_OWRITER | VL_OCREAT, VL_CMPLEX))){
+    fprintf(stderr, "vlopen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* レコードを格納する */
+  if(!vlput(villa, "applet", -1, "little application", -1, VL_DDUP) ||
+     !vlput(villa, "aurora", -1, "polar wonderwork", -1, VL_DDUP) ||
+     !vlput(villa, "apple", -1, "delicious fruit", -1, VL_DDUP) ||
+     !vlput(villa, "amigo", -1, "good friend", -1, VL_DDUP) ||
+     !vlput(villa, "apple", -1, "big city", -1, VL_DDUP)){
+    fprintf(stderr, "vlput: %s\n", dperrmsg(dpecode));
+  }
+
+  /* カーソルを候補の先頭に置く */
+  vlcurjump(villa, PREFIX, -1, VL_JFORWARD);
+
+  /* カーソルを走査する */
+  while((key = vlcurkey(villa, NULL)) != NULL){
+    if(strstr(key, PREFIX) != key){
+      free(key);
+      break;
+    }
+    if(!(val = vlcurval(villa, NULL))){
+      fprintf(stderr, "vlcurval: %s\n", dperrmsg(dpecode));
+      free(key);
+      break;
+    }
+    printf("%s: %s\n", key, val);
+    free(val);
+    free(key);
+    vlcurnext(villa);
+  }
+
+  /* データベースを閉じる */
+  if(!vlclose(villa)){
+    fprintf(stderr, "vlclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Villaを利用したプログラムをビルドする方法は、Depotの場合と全く同じである。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>POSIXスレッドを有効にしてQDBMをビルドした場合、外部変数 `dpecode' はスレッド固有データへの参照として扱われ、Villaの各関数はリエントラントになる。その場合、スレッド間で同時に同じハンドルにアクセスしない限りは、各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<h3>Vista: 拡張上級API</h3>
+
+<p>VistaはVillaを拡張したAPIである。Villaが2GB以上のファイルを扱うことができないという欠点を補うために、VistaではDepotではなくCuriaを用いて内部データベースを管理する。VistaはVillaと同じくB+木のデータ構造とその操作を提供するが、そのデータベースはディレクトリで実現される。</p>
+
+<p>Vistaを使うには、`villa.h' の代わりに `vista.h' をインクルードすればよい。VistaはVillaのシンボルをマクロでオーバーライドして実装されているため、Villaと全く同様のAPIで利用することができる。すなわち、双方のシグネチャは全く同じである。ただし、その副作用として、Vistaを使うモジュール（コンパイルユニット）はVillaを利用することができない（`villa.h' をインクルードしてはならない）。</p>
+
+<hr />
+
+<h2><a name="villacli" id="villacli" class="head">Villa用コマンド</a></h2>
+
+<p>Villaに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `vlmgr' はVillaやそのアプリケーションのデバッグに役立つツールである。データベースを更新したり、データベースの状態を調べたりする機能を持つ。シェルスクリプトでデータベースアプリケーションを作るのにも利用できる。以下の書式で用いる。`name' はデータベース名、`key' はレコードのキー、`val' はレコードの値を指定する。</p>
+
+<dl>
+<dt><kbd>vlmgr create [-cz|-cy|-cx] <var>name</var></kbd></dt>
+<dd>データベースファイルを作成する。</dd>
+<dt><kbd>vlmgr put [-kx|-ki] [-vx|-vi|-vf] [-keep|-cat|-dup] <var>name</var> <var>key</var> <var>val</var></kbd></dt>
+<dd>キーと値に対応するレコードを追加する。</dd>
+<dt><kbd>vlmgr out [-l] [-kx|-ki] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードを削除する。</dd>
+<dt><kbd>vlmgr get [-nl] [-l] [-kx|-ki] [-ox] [-n] <var>name</var> <var>key</var></kbd></dt>
+<dd>キーに対応するレコードの値を取得して標準出力する。</dd>
+<dt><kbd>vlmgr list [-nl] [-k|-v] [-kx|-ki] [-ox] [-top <var>key</var>] [-bot <var>key</var>] [-gt] [-lt] [-max <var>num</var>] [-desc] <var>name</var></kbd></dt>
+<dd>データベース内の全てのレコードのキーと値をタブと改行で区切って標準出力する。</dd>
+<dt><kbd>vlmgr optimize <var>name</var></kbd></dt>
+<dd>データベースを最適化する。</dd>
+<dt><kbd>vlmgr inform [-nl] <var>name</var></kbd></dt>
+<dd>データベースの雑多な情報を出力する。</dd>
+<dt><kbd>vlmgr remove <var>name</var></kbd></dt>
+<dd>データベースファイルを削除する。</dd>
+<dt><kbd>vlmgr repair [-ki] <var>name</var></kbd></dt>
+<dd>壊れたデータベースファイルを修復する。</dd>
+<dt><kbd>vlmgr exportdb [-ki] <var>name</var> <var>file</var></kbd></dt>
+<dd>全てのレコードをエンディアン非依存のデータとしてダンプする。</dd>
+<dt><kbd>vlmgr importdb [-ki] <var>name</var> <var>file</var></kbd></dt>
+<dd>エンディアン非依存データから全てのレコードをロードする。</dd>
+<dt><kbd>vlmgr version</kbd></dt>
+<dd>QDBMのバージョン情報を標準出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-cz</kbd> : データベースのリーフをZLIBで圧縮する。</li>
+<li><kbd>-cy</kbd> : データベースのリーフをLZOで圧縮する。</li>
+<li><kbd>-cx</kbd> : データベースのリーフをBZIP2で圧縮する。</li>
+<li><kbd>-l</kbd> : キーに一致する全てのレコードを処理対象とする。</li>
+<li><kbd>-kx</kbd> : 2桁単位の16進数によるバイナリ表現として `key' を扱う。</li>
+<li><kbd>-ki</kbd> : 10進数による数値表現として `key' を扱う。</li>
+<li><kbd>-vx</kbd> : 2桁単位の16進数によるバイナリ表現として `val' を扱う。</li>
+<li><kbd>-vi</kbd> : 10進数による数値表現として `val' を扱う。</li>
+<li><kbd>-vf</kbd> : 名前が `val' のファイルのデータを値として読み込む。</li>
+<li><kbd>-keep</kbd> : 既存のレコードとキーが重複時に上書きせずにエラーにする。</li>
+<li><kbd>-cat</kbd> : 既存のレコードとキーが重複時に値を末尾に追加する。</li>
+<li><kbd>-dup</kbd> : レコードのキーが重複するのを許す。</li>
+<li><kbd>-nl</kbd> : ファイルロックをかけずにデータベースを開く。</li>
+<li><kbd>-top <var>key</var></kbd> : リストの最小のキーを指定する。</li>
+<li><kbd>-bot <var>key</var></kbd> : リストの最大のキーを指定する。</li>
+<li><kbd>-gt</kbd> : 最小のキーをリストに含めない。</li>
+<li><kbd>-lt</kbd> : 最大のキーをリストに含めない。</li>
+<li><kbd>-max <var>num</var></kbd> : リストする最大数を指定する。</li>
+<li><kbd>-desc</kbd> : リストを降順で行う。</li>
+<li><kbd>-ox</kbd> : 2桁単位の16進数によるバイナリ表現として標準出力を行う。</li>
+<li><kbd>-n</kbd> : 標準出力の末尾に付加される改行文字の出力を抑制する。</li>
+<li><kbd>-k</kbd> : キーのみを出力する。</li>
+<li><kbd>-v</kbd> : 値のみを出力する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `vltest' はVillaの機能テストや性能テストに用いるツールである。このコマンドによって生成されたデータベースファイルを `vlmgr' によって解析したり、`time' コマンドによってこのコマンドの実行時間を計ったりするとよい。以下の書式で用いる。`name' はデータベース名、`rnum' はレコード数、`pnum' はキーのパターン数を指定する。</p>
+
+<dl>
+<dt><kbd>vltest write [-int] [-cz|-cy|-cx] [-tune <var>lrecmax</var> <var>nidxmax</var> <var>lcnum</var> <var>ncnum</var>] [-fbp <var>num</var>] <var>name</var> <var>rnum</var></kbd></dt>
+<dd>`00000001'、`00000002' のように変化する8バイトのキーと適当な8バイトの値を連続してデータベースに追加する。</dd>
+<dt><kbd>vltest read [-int] [-vc] <var>name</var></kbd></dt>
+<dd>上記で生成したデータベースの全レコードを検索する。</dd>
+<dt><kbd>vltest rdup [-int] [-cz|-cy|-cx] [-cc] [-tune <var>lrecmax</var> <var>nidxmax</var> <var>lcnum</var> <var>ncnum</var>] [-fbp <var>num</var>] <var>name</var> <var>rnum</var> <var>pnum</var></kbd></dt>
+<dd>キーがある程度重複するようにレコードの追加を行い、重複モードで処理する。</dd>
+<dt><kbd>vltest combo [-cz|-cy|-cx] <var>name</var></kbd></dt>
+<dd>各種操作の組み合わせテストを行う。</dd>
+<dt><kbd>vltest wicked [-cz|-cy|-cx] <var>name</var> <var>rnum</var></kbd></dt>
+<dd>各種更新操作を無作為に選択して実行する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-int</kbd> : `int' 型のオブジェクトをキーと値に用い、比較関数もそれに合わせる。</li>
+<li><kbd>-cz</kbd> : データベースのリーフをZLIBで圧縮する。</li>
+<li><kbd>-cy</kbd> : データベースのリーフをLZOで圧縮する。</li>
+<li><kbd>-cx</kbd> : データベースのリーフをBZIP2で圧縮する。</li>
+<li><kbd>-vc</kbd> : 揮発性キャッシュを参照する。</li>
+<li><kbd>-cc</kbd> : 連結モードと重複モードを無作為に選択する。</li>
+<li><kbd>-tune <var>lrecmax</var> <var>nidxmax</var> <var>lcnum</var> <var>ncnum</var></kbd> : 性能パラメータを指定する。</li>
+<li><kbd>-fbp <var>num</var></kbd> : フリーブロックプールのサイズを指定する。</li>
+<li><kbd>-c</kbd> : Cabinのマップを使って比較テストを行う。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `vltsv' はタブ区切りでキーと値を表現した行からなるTSVファイルとVillaのデータベースを相互変換する。このコマンドは、QDBMの他のバージョンや他のDBMとの間でデータの交換を行う際に役立つ。また、バイトオーダの違うシステムの間でデータを交換する際にも役立つ。以下の書式で用いる。`name' はデータベース名を指定する。`export' サブコマンドではTSVのデータは標準入力から読み込む。`import' サブコマンドではTSVのデータが標準出力に書き出される。</p>
+
+<dl>
+<dt><kbd>vltsv import [-bin] <var>name</var></kbd></dt>
+<dd>TSVファイルを読み込んでデータベースを作成する。</dd>
+<dt><kbd>vltsv export [-bin] <var>name</var></kbd></dt>
+<dd>データベースの全てのレコードをTSVファイルとして出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-bin</kbd> : Base64形式でレコードを扱う。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>Villaのコマンド群を駆使すると、簡単なデータベースシステムが構築できる。例えば `/etc/password' をユーザ名で検索するためのデータベースを作成するには、以下のようにする。</p>
+
+<pre>cat /etc/passwd | tr ':' '\t' | vltsv import casket
+</pre>
+
+<p>そして、`mikio' というユーザの情報を取り出すには、以下のようにする。</p>
+
+<pre>vlmgr get casket mikio
+</pre>
+
+<p>これらのコマンドと同等の機能をVillaのAPIを用いて実装することも容易である。</p>
+
+<p>コマンド `qmttest' はDepotとCuriaとVillaのマルチスレッドにおける安全性を調査する。このコマンドはPOSIXスレッドを有効にしてQDBMをビルドした場合にのみマルチスレッドで動作する。以下の書式で用いる。`name' はデータベース名の接頭辞を指定する。`rnum' は各データベースに書き込むレコード数を指定する。`tnum' はスレッド数を指定する。</p>
+
+<dl>
+<dt><kbd>qmttest <var>name</var> <var>rnum</var> <var>tnum</var></kbd></dt>
+<dd>マルチスレッドにおける安全性を調査する。</dd>
+</dl>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<hr />
+
+<h2><a name="odeumapi" id="odeumapi" class="head">Odeum: 転置API</a></h2>
+
+<h3>概要</h3>
+
+<p>Odeumは転置インデックスを扱うAPIである。転置インデックスとは、母集団の文書群に含まれる語を抽出して、各語をキーとし、その語を含む文書のリストを検索するためのデータ構造である。転置インデックスを用いると、全文検索システムを容易に実現することができる。Odeumは文書を語や属性の集合として扱うための抽象データ型を提供する。それは、各アプリケーションがOdeumのデータベースに文書を格納する際や、データベースから文書を検索する際に用いられる。</p>
+
+<p>Odeumは元来の文書データからテキストを抽出する方法は提供しない。それはアプリケーションが実装する必要がある。Odeumはテキストを分解して語群を抽出するユーティリティを提供するが、それは空白で語が分割される英語などの言語を指向している。形態素解析やN-gram解析が必要な日本語などの言語を扱う際や、ステミングなどのより高度な自然言語処理を行う際には、アプリケーションは独自の解析方法を適用することができる。検索結果は文書のID番号とそのスコアをメンバに持つ構造体を要素とする配列として得られる。複数の語を用いて検索を行うために、Odeumは結果の配列の集合演算を行うユーティリティを提供する。</p>
+
+<p>OdeumはCuriaとCabinとVillaを基盤として実装される。Odeumではディレクトリ名を指定してデータベースを構築する。特定のディレクトリの直下にCuriaやVillaのデータベースを構築する。例えば、`casket' という名前のデータベースを作成する場合、`casket/docs'、`casket/index' および `casket/rdocs' が生成される。`docs' はCuriaのデータベースディレクトリである。キーは文書のID番号であり、値はURI等の文書属性である。`index' はCuriaのデータベースディレクトリである。キーは語の正規形であり、値はその語を含む文書のID番号とそのスコアを要素とする配列である。`rdocs' はVillaのデータベースファイルである。キーは文書のURIであり、値は文書のID番号である。</p>
+
+<p>Odeumを使うためには、`depot.h' と `cabin.h' と `odeum.h' と `stdlib.h' をインクルードすべきである。通常、ソースファイルの冒頭付近で以下の記述を行う。</p>
+
+<dl>
+<dt><kbd>#include &lt;depot.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;cabin.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;odeum.h&gt;</kbd></dt>
+<dt><kbd>#include &lt;stdlib.h&gt;</kbd></dt>
+</dl>
+
+<p>Odeumでデータベースを扱う際には、`ODEUM' 型へのポインタをハンドルとして用いる。ハンドルは、関数 `odopen' で開き、関数 `odclose' で閉じる。ハンドルのメンバを直接参照することは推奨されない。データベースに致命的なエラーが起きた場合は、以後そのハンドルに対する `odclose' を除く全ての操作は何もせずにエラーを返す。ひとつのプロセスで複数のデータベースファイルを同時に利用することは可能であるが、同じデータベースファイルの複数のハンドルを利用してはならない。</p>
+
+<p>各文書を扱う際には、`ODDOC' 型へのポインタをハンドルとして用いる。ハンドルは、関数 `oddocopen' で開き、関数 `oddocclose' で閉じる。ハンドルのメンバを直接参照することは推奨されない。文書は属性と語の集合からなる。語は正規形と出現形のペアとして表現される。</p>
+
+<p>OdeumでもDepotと同じく外部変数 `dpecode' に直前のエラーコードが記録される。エラーコードに対応するメッセージ文字列を得るには、関数 `dperrmsg' を用いる。</p>
+
+<h3>API</h3>
+
+<p>検索結果を扱うためには、`ODPAIR' 型の構造体を用いる。</p>
+
+<dl>
+<dt><kbd>typedef struct { int id; int score; } ODPAIR;</kbd></dt>
+<dd>`id' は文書のID番号である。`score' は文書に含まれる検索語の数を元に算出されるスコアである。</dd>
+</dl>
+
+<p>データベースのハンドルを作成するには、関数 `odopen' を用いる。</p>
+
+<dl>
+<dt><kbd>ODEUM *odopen(const char *<var>name</var>, int <var>omode</var>);</kbd></dt>
+<dd>`name' はデータベースディレクトリの名前を指定する。`omode' は接続モードを指定し、`OD_OREADER' ならリーダ、`OD_OWRITER' ならライタとなる。`OD_OWRITER' の場合、`OD_OCREAT' または `OD_OTRUNC' とのビット論理和にすることができる。`OD_OCREAT' はファイルが無い場合に新規作成することを指示し、`OD_OTRUNC' はファイルが存在しても作り直すことを指示する。`OD_OREADER' と `OD_OWRITER' の両方で `OD_ONOLCK' か `OD_OLCKNB' とのビット論理和にすることができるが、前者はファイルロックをかけずにデータベースを開くことを指示し、後者はブロックせずにロックをかけることを指示する。戻り値はデータベースハンドルであるか、エラーなら `NULL' である。ライタ（読み書き両用モード）でデータベースファイルを開く際にはそのファイルに対して排他ロックがかけられ、リーダ（読み込み専用モード）で開く際には共有ロックがかけられる。その際には該当のロックがかけられるまで制御がブロックする。`OD_ONOLCK' を使う場合、アプリケーションが排他制御の責任を負う。</dd>
+</dl>
+
+<p>データベースとの接続を閉じてハンドルを破棄するには、関数 `odclose' を用いる。</p>
+
+<dl>
+<dt><kbd>int odclose(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。データベースの更新内容は、接続を閉じた時点で初めてファイルと同期される。ライタでデータベースを開いた場合、適切に接続を閉じないとデータベースが破壊される。閉じたハンドルの領域は解放されるので、以後は利用できなくなる。</dd>
+</dl>
+
+<p>文書を追加するには、関数 `odput' を用いる。</p>
+
+<dl>
+<dt><kbd>int odput(ODEUM *<var>odeum</var>, const ODDOC *<var>doc</var>, int <var>wmax</var>, int <var>over</var>);</kbd></dt>
+<dd>`odeum' はライタで接続したデータベースハンドルを指定する。`doc' は文書ハンドルを指定する。`wmax' は文書データベースに格納する語の最大数を指定するが、負数なら無制限となる。`over' は重複した文書の上書きを行うか否かを指定する。それが偽で文書のURIが重複した場合はエラーとなる。戻り値は正常なら真であり、エラーなら偽である。</dd>
+</dl>
+
+<p>URIで指定した文書を削除するには、関数 `odout' を用いる。</p>
+
+<dl>
+<dt><kbd>int odout(ODEUM *<var>odeum</var>, const char *<var>uri</var>);</kbd></dt>
+<dd>`odeum' はライタで接続したデータベースハンドルを指定する。`uri' は文書のURIの文字列を指定する。戻り値は正常なら真であり、エラーなら偽である。該当する文書がない場合も偽を返す。</dd>
+</dl>
+
+<p>ID番号で指定した文書を削除するには、関数 `odoutbyid' を用いる。</p>
+
+<dl>
+<dt><kbd>int odoutbyid(ODEUM *<var>odeum</var>, int <var>id</var>);</kbd></dt>
+<dd>`odeum' はライタで接続したデータベースハンドルを指定する。`id' は文書のID番号を指定する。戻り値は正常なら真であり、エラーなら偽である。該当する文書がない場合も偽を返す。</dd>
+</dl>
+
+<p>URIで指定した文書を取得するには、関数 `odget' を用いる。</p>
+
+<dl>
+<dt><kbd>ODDOC *odget(ODEUM *<var>odeum</var>, const char *<var>uri</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`uri' は文書のURIの文字列を指定する。戻り値は正常なら該当の文書のハンドルであり、エラーなら `NULL' である。該当の文書がない場合も `NULL' を返す。戻り値のハンドルは、関数 `oddocopen' で開かれるので、不要になったら `oddocclose' で閉じるべきである。</dd>
+</dl>
+
+<p>ID番号で指定した文書を取得するには、関数 `odgetbyid' を用いる。</p>
+
+<dl>
+<dt><kbd>ODDOC *odgetbyid(ODEUM *<var>odeum</var>, int <var>id</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`id' は文書のID番号を指定する。戻り値は正常なら該当の文書のハンドルであり、エラーなら `NULL' である。該当の文書がない場合も `NULL' を返す。戻り値のハンドルは、関数 `oddocopen' で開かれるので、不要になったら `oddocclose' で閉じるべきである。</dd>
+</dl>
+
+<p>URIで指定した文書のIDを取得するには、関数 `odgetidbyuri' を用いる。</p>
+
+<dl>
+<dt><kbd>int odgetidbyuri(ODEUM *<var>odeum</var>, const char *<var>uri</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`uri' は文書のURIの文字列を指定する。戻り値は正常なら該当の文書のIDであり、エラーなら -1 である。該当の文書がない場合も -1 を返す。</dd>
+</dl>
+
+<p>ID番号で指定した文書が存在しているか調べるには、関数 `odcheck' を用いる。</p>
+
+<dl>
+<dt><kbd>int odcheck(ODEUM *<var>odeum</var>, int <var>id</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`id' は文書のID番号を指定する。戻り値は文書が存在すれば真、そうでなければ偽である。</dd>
+</dl>
+
+<p>転置インデックスを検索して特定の語を含む文書群を知るには、関数 `odsearch' を用いる。</p>
+
+<dl>
+<dt><kbd>ODPAIR *odsearch(ODEUM *<var>odeum</var>, const char *<var>word</var>, int <var>max</var>, int *<var>np</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`word' は検索語を指定する。`max' は取り出す文書の最大数を指定する。`np' の参照先には、戻り値の配列の要素数が格納される。戻り値は正常なら配列へのポインタであり、エラーなら `NULL' である。その配列の各要素は文書のID番号とスコアのペアであり、スコアの降順で並べられる。検索語に該当する文書が一つもなかったとしてもエラーにはならずに、空の配列を返す。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。配列の各要素には既に削除された文書のデータも含まれることに注意すべきである。</dd>
+</dl>
+
+<p>特定の語を含む文書の数を知るには、関数 `odsearchdnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int odsearchdnum(ODEUM *<var>odeum</var>, const char *<var>word</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`word' は検索語を指定する。戻り値は正常なら検索語を含む文書の数であり、該当がない場合やエラーの場合は -1 である。この関数は転置インデックスの実データを読み込まないので効率がよい。</dd>
+</dl>
+
+<p>データベースのイテレータを初期化するには、関数 `oditerinit' を用いる。</p>
+
+<dl>
+<dt><kbd>int oditerinit(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。イテレータは、データベースに格納された全ての文書を参照するために用いられる。</dd>
+</dl>
+
+<p>データベースのイテレータから次の文書を取り出すには、関数 `oditernext' を用いる。</p>
+
+<dl>
+<dt><kbd>ODDOC *oditernext(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常なら文書ハンドルであり、エラーなら `NULL' である。イテレータが最後まできて該当の文書がない場合も `NULL' を返す。この関数を繰り返して呼ぶことによって全ての文書を一度ずつ参照することができる。ただし、繰り返しの間にデータベースの更新があった場合はその限りではない。なお、取り出すレコードの順序は制御できず、格納した順番でレコードを取り出せるとは限らない。戻り値のハンドルは、関数 `oddocopen' で開かれるので、不要になったら `oddocclose' で閉じるべきである。</dd>
+</dl>
+
+<p>データベースを更新した内容をファイルとデバイスに同期させるには、関数 `odsync' を用いる。</p>
+
+<dl>
+<dt><kbd>int odsync(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。この関数はデータベースを閉じないうちに別プロセスにデータベースディレクトリを利用させる場合に役立つ。</dd>
+</dl>
+
+<p>データベースを最適化するには、関数 `odoptimize' を用いる。</p>
+
+<dl>
+<dt><kbd>int odoptimize(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はライタで接続したデータベースハンドルを指定する。戻り値は正常なら真であり、エラーなら偽である。転置インデックスにおける削除された文書の要素は削除される。</dd>
+</dl>
+
+<p>データベースの名前を得るには、関数 `odname' を用いる。</p>
+
+<dl>
+<dt><kbd>char *odname(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常なら名前を格納した領域へのポインタであり、エラーなら `NULL' である。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>データベースファイルのサイズの合計を得るには、関数 `odfsiz' を用いる。</p>
+
+<dl>
+<dt><kbd>double odfsiz(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常ならデータベースファイルのサイズの合計であり、エラーなら -1.0 である。</dd>
+</dl>
+
+<p>転置インデックス内のバケット配列の要素数の合計を得るには、関数 `odbnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int odbnum(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常ならバケット配列の要素数の合計であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>転置インデックス内のバケット配列の利用済みの要素数の合計を得るには、関数 `odbusenum' を用いる。</p>
+
+<dl>
+<dt><kbd>int odbusenum(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常ならバケット配列の利用済みの要素数の合計であり、エラーなら -1 である。</dd>
+</dl>
+
+
+<p>データベースに格納された文書数を得るには、関数 `oddnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int oddnum(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常ならデータベースに格納された文書の数であり、エラーなら -1 である。</dd>
+</dl>
+
+<p>データベースに格納された単語数を得るには、関数 `odwnum' を用いる。</p>
+
+<dl>
+<dt><kbd>int odwnum(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は正常ならデータベースに格納された語の数であり、エラーなら -1 である。I/Oバッファにより、戻り値は実際のサイズより小さくなる場合がある。</dd>
+</dl>
+
+<p>データベースハンドルがライタかどうかを調べるには、関数 `odwritable' を用いる。</p>
+
+<dl>
+<dt><kbd>int odwritable(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値はライタなら真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースに致命的エラーが起きたかどうかを調べるには、関数 `odfatalerror' を用いる。</p>
+
+<dl>
+<dt><kbd>int odfatalerror(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値は致命的エラーがあれば真であり、そうでなければ偽である。</dd>
+</dl>
+
+<p>データベースディレクトリのinode番号を得るには、関数 `odinode' を用いる。</p>
+
+<dl>
+<dt><kbd>int odinode(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値はデータベースディレクトリのinode番号である。</dd>
+</dl>
+
+<p>データベースの最終更新時刻を得るには、関数 `odmtime' を用いる。</p>
+
+<dl>
+<dt><kbd>time_t odmtime(ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。戻り値はデータベースの最終更新時刻である。</dd>
+</dl>
+
+<p>複数のデータベースをマージするには、関数 `odmerge' を用いる。</p>
+
+<dl>
+<dt><kbd>int odmerge(const char *<var>name</var>, const CBLIST *<var>elemnames</var>);</kbd></dt>
+<dd>`name' は作成するデータベースディレクトリの名前を指定する。`elemnames' は要素データベースの名前のリストを指定する。戻り値は正常なら真であり、エラーなら偽である。同じURLを持つ複数の文書が現れた場合、最初に現れたものが採用され、残りは無視される。</dd>
+</dl>
+
+<p>データベースディレクトリを削除するには、関数 `odremove' を用いる。</p>
+
+<dl>
+<dt><kbd>int odremove(const char *<var>name</var>);</kbd></dt>
+<dd>`name' はデータベースディレクトリの名前を指定する。戻り値は正常なら真であり、エラーなら偽である。データベースディレクトリの中にはQDBMの他のAPIによるデータベースを置くことができるが、それらもこの関数によって削除される。</dd>
+</dl>
+
+<p>文書ハンドルを作成するには、関数 `oddocopen' を用いる。</p>
+
+<dl>
+<dt><kbd>ODDOC *oddocopen(const char *<var>uri</var>);</kbd></dt>
+<dd>`uri' は文書のURIを指定する。戻り値は文書ハンドルである。新しい文書のID番号は定義されない。それはデータベースに格納した際に定義される。</dd>
+</dl>
+
+<p>文書ハンドルを破棄するには、関数 `oddocclose' を用いる。</p>
+
+<dl>
+<dt><kbd>void oddocclose(ODDOC *<var>doc</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。閉じたハンドルの領域は解放されるので、以後は利用できなくなる。</dd>
+</dl>
+
+<p>文書に属性を追加するには、関数 `oddocaddattr' を用いる。</p>
+
+<dl>
+<dt><kbd>void oddocaddattr(ODDOC *<var>doc</var>, const char *<var>name</var>, const char *<var>value</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。`name' は属性名の文字列を指定する。`value' は属性値の文字列を指定する。</dd>
+</dl>
+
+<p>文書に語を追加するには、関数 `oddocaddword' を用いる。</p>
+
+<dl>
+<dt><kbd>void oddocaddword(ODDOC *<var>doc</var>, const char *<var>normal</var>, const char *<var>asis</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。`normal' は語の正規形の文字列を指定する。正規形は転置インデックスのキーとして扱われる。正規形が空文字列の場合、その語は転置インデックスに反映されない。`asis' は語の出現形の文字列を指定する。出現形はアプリケーションが文書を取得した際に利用される。</dd>
+</dl>
+
+<p>文書のIDを得るには、関数 `oddocid' を用いる。</p>
+
+<dl>
+<dt><kbd>int oddocid(const ODDOC *<var>doc</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。戻り値は文書のID番号である。</dd>
+</dl>
+
+<p>文書のURIを得るには、関数 `oddocuri' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *oddocuri(const ODDOC *<var>doc</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。戻り値は文書のURIの文字列である。</dd>
+</dl>
+
+<p>文書の属性値を得るには、関数 `oddocgetattr' を用いる。</p>
+
+<dl>
+<dt><kbd>const char *oddocgetattr(const ODDOC *<var>doc</var>, const char *<var>name</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。`name' は属性名の文字列を指定する。戻り値は属性値の文字列であるか、該当がなければ `NULL' である。</dd>
+</dl>
+
+<p>文書内の語群の正規形のリストを得るには、関数 `oddocnwords' を用いる。</p>
+
+<dl>
+<dt><kbd>const CBLIST *oddocnwords(const ODDOC *<var>doc</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。戻り値は正規形の語群を格納したリストハンドルである。</dd>
+</dl>
+
+<p>文書内の語群の出現形のリストを得るには、関数 `oddocawords' を用いる。</p>
+
+<dl>
+<dt><kbd>const CBLIST *oddocawords(const ODDOC *<var>doc</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。戻り値は出現形の語群を格納したリストハンドルである。</dd>
+</dl>
+
+<p>文書のキーワードの正規形とそのスコアのマップを得るには、関数 `oddocscores' を用いる。</p>
+
+<dl>
+<dt><kbd>CBMAP *oddocscores(const ODDOC *<var>doc</var>, int <var>max</var>, ODEUM *<var>odeum</var>);</kbd></dt>
+<dd>`doc' は文書ハンドルを指定する。`max' は取得するキーワードの最大数を指定する。`odeum' が `NULL' でなければ、それを用いて重みづけのためのIDFが算出される。戻り値はキーワードとそのスコアを格納したマップハンドルである。スコアは10進数の文字列で表現される。戻り値のハンドルは関数 `cbmapopen' で開かれるので、不要になったら `cbmapclose' で閉じるべきである。</dd>
+</dl>
+
+<p>テキストを分解して語群の出現形のリストを得るには、関数 `odbreaktext' を用いる。</p>
+
+<dl>
+<dt><kbd>CBLIST *odbreaktext(const char *<var>text</var>);</kbd></dt>
+<dd>`text' はテキストの文字列を指定する。戻り値は語群の出現形のリストハンドルである。語群は空白文字とピリオドやコンマ等の区切り文字で分割される。戻り値のハンドルは関数 `cblistopen' で開かれるので、不要になったら `cblistclose' で閉じるべきである。</dd>
+</dl>
+
+<p>語の正規形を取得するには、関数 `odnormalizeword' を用いる。</p>
+
+<dl>
+<dt><kbd>char *odnormalizeword(const char *<var>asis</var>);</kbd></dt>
+<dd>`asis' は語の出現形の文字列を指定する。戻り値は語の正規形の文字列である。ASCIIコードのアルファベットは小文字に統一される。区切り文字のみからなる文字は空文字列として扱われる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>二つの文書集合からその共通集合を得るには、関数 `odpairsand' を用いる。</p>
+
+<dl>
+<dt><kbd>ODPAIR *odpairsand(ODPAIR *<var>apairs</var>, int <var>anum</var>, ODPAIR *<var>bpairs</var>, int <var>bnum</var>, int *<var>np</var>);</kbd></dt>
+<dd>`apairs' は前者の文書集合の配列を指定する。`anum' は前者の配列の要素数を指定する。`apairs' は後者の文書集合の配列を指定する。`anum' は後者の配列の要素数を指定する。`np' の参照先には、戻り値の配列の要素数が格納される。戻り値は新しい文書集合の配列へのポインタであり、各要素は二つの集合に共通して属するものである。各要素はスコアの降順で並べられる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>二つの文書集合からその和集合を得るには、関数 `odpairsor' を用いる。</p>
+
+<dl>
+<dt><kbd>ODPAIR *odpairsor(ODPAIR *<var>apairs</var>, int <var>anum</var>, ODPAIR *<var>bpairs</var>, int <var>bnum</var>, int *<var>np</var>);</kbd></dt>
+<dd>`apairs' は前者の文書集合の配列を指定する。`anum' は前者の配列の要素数を指定する。`apairs' は後者の文書集合の配列を指定する。`anum' は後者の配列の要素数を指定する。`np' の参照先には、戻り値の配列の要素数が格納される。戻り値は新しい文書集合の配列へのポインタであり、各要素は二つの集合の両方あるいはどちらか一方に属するものである。各要素はスコアの降順で並べられる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>二つの文書集合からその差集合を得るには、関数 `odpairsnotand' を用いる。</p>
+
+<dl>
+<dt><kbd>ODPAIR *odpairsnotand(ODPAIR *<var>apairs</var>, int <var>anum</var>, ODPAIR *<var>bpairs</var>, int <var>bnum</var>, int *<var>np</var>);</kbd></dt>
+<dd>`apairs' は前者の文書集合の配列を指定する。`anum' は前者の配列の要素数を指定する。`apairs' は後者の文書集合の配列を指定する。`anum' は後者の配列の要素数を指定する。`np' の参照先には、戻り値の配列の要素数が格納される。戻り値は新しい文書集合の配列へのポインタであり、各要素は前者の集合には属するが後者の集合には属さないものである。各要素はスコアの降順で並べられる。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。</dd>
+</dl>
+
+<p>文書集合をスコアの降順で並べるには、関数 `odpairssort' を用いる。</p>
+
+<dl>
+<dt><kbd>void odpairssort(ODPAIR *<var>pairs</var>, int <var>pnum</var>);</kbd></dt>
+<dd>`pairs' は文書集合の配列を指定する。`pnum' はその配列の要素数を指定する。</dd>
+</dl>
+
+<p>ある数の自然対数を得るには、関数 `odlogarithm' を用いる。</p>
+
+<dl>
+<dt><kbd>double odlogarithm(double <var>x</var>);</kbd></dt>
+<dd>`x' はある数を指定する。戻り値はその数の自然対数である。もしその数が 1.0 以下であれば、戻り値は 0.0 となる。この関数はアプリケーションが検索結果のIDFを算出する際に便利である。</dd>
+</dl>
+
+<p>二つのベクトルのなす角の余弦を得るには、関数 `odvectorcosine' を用いる。</p>
+
+<dl>
+<dt><kbd>double odvectorcosine(const int *<var>avec</var>, const int *<var>bvec</var>, int <var>vnum</var>);</kbd></dt>
+<dd>`avec' は前者の数値配列を指定する。`bvec' は後者の数値配列を指定する。`vnum' は各々の配列の要素数を指定する。戻り値は二つのベクトルのなす角の余弦である。この関数はアプリケーションが文書の類似度を算出する際に便利である。</dd>
+</dl>
+
+<p>性能を調整する大域的なパラメータを指定するには、関数 `odsettuning' を用いる。</p>
+
+<dl>
+<dt><kbd>void odsettuning(int <var>ibnum</var>, int <var>idnum</var>, int <var>cbnum</var>, int <var>csiz</var>);</kbd></dt>
+<dd>`ibnum' は転置インデックスのバケット数を指定する。`idnum' は転置インデックスの分割数を指定する。`cbnum' はダーティバッファのバケット数を指定する。`csiz' はダーティバッファに使うメモリの最大バイト数を指定する。デフォルトの設定は `odsettuning(32749, 7, 262139, 8388608)' に相当する。この関数はハンドルを開く前に呼び出すべきである。</dd>
+</dl>
+
+<p>テキストを分解して出現形と正規形を別々のリストに格納するには、関数 `odanalyzetext' を用いる。</p>
+
+<dl>
+<dt><kbd>void odanalyzetext(ODEUM *<var>odeum</var>, const char *<var>text</var>, CBLIST *<var>awords</var>, CBLIST *<var>nwords</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`text' はテキストの文字列を指定する。`awords' は出現型を格納するリストハンドルを指定する。`nwords' は正規型を格納するリストハンドルを指定するが、`NULL' なら無視される。語群は空白文字とピリオドやコンマ等の区切り文字で分割される。</dd>
+</dl>
+
+<p>関数 `odanalyzetext' で使われる文字の分類を設定するには、関数 `odsetcharclass' を用いる。</p>
+
+<dl>
+<dt><kbd>void odsetcharclass(ODEUM *<var>odeum</var>, const char *<var>spacechars</var>, const char *<var>delimchars</var>, const char *<var>gluechars</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`spachechars' は空白文字を含む文字列を指定する。`delimchars' は区切り文字を含む文字列を指定する。`gluechars' は接着文字を含む文字列を指定する。</dd>
+</dl>
+
+<p>小さな問い合わせ言語を使って検索を行うには、関数 `odquery' を用いる。</p>
+
+<dl>
+<dt><kbd>ODPAIR *odquery(ODEUM *<var>odeum</var>, const char *<var>query</var>, int *<var>np</var>, CBLIST *<var>errors</var>);</kbd></dt>
+<dd>`odeum' はデータベースハンドルを指定する。`query' は問い合わせ言語の文字列を指定する。`np' の参照先には、戻り値の配列の要素数が格納される。`error' はエラーメッセージを格納するリストハンドルを指定する。戻り値は正常なら配列へのポインタであり、エラーなら `NULL' である。その配列の各要素は文書のID番号とスコアのペアであり、スコアの降順で並べられる。検索語に該当する文書が一つもなかったとしてもエラーにはならずに、空の配列を返す。戻り値の領域は `malloc' で確保されるので、不要になったら `free' で解放するべきである。配列の各要素には既に削除された文書のデータも含まれることに注意すべきである。</dd>
+</dl>
+
+<h3>サンプルコード</h3>
+
+<p>文書をデータベースに格納するサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;cabin.h&gt;
+#include &lt;odeum.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define DBNAME   "index"
+
+int main(int argc, char **argv){
+  ODEUM *odeum;
+  ODDOC *doc;
+  CBLIST *awords;
+  const char *asis;
+  char *normal;
+  int i;
+
+  /* データベースを開く */
+  if(!(odeum = odopen(DBNAME, OD_OWRITER | OD_OCREAT))){
+    fprintf(stderr, "odopen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* 文書ハンドルを取得する */
+  doc = oddocopen("http://www.foo.bar/baz.txt");
+
+  /* 文書の属性を設定する */
+  oddocaddattr(doc, "title", "Balcony Scene");
+  oddocaddattr(doc, "author", "Shakespeare");
+
+  /* テキストを分解して語のリストを得る */
+  awords = odbreaktext("Parting is such sweet sorrow.");
+
+  /* 各語を文書ハンドルに設定する */
+  for(i = 0; i &lt; cblistnum(awords); i++){
+    /* 語のリストから一語を取り出す */
+    asis = cblistval(awords, i, NULL);
+    /* 出現形から正規形を生成する */
+    normal = odnormalizeword(asis);
+    /* 語を文書ハンドルに設定する */
+    oddocaddword(doc, normal, asis);
+    /* 正規形の領域を解放する */
+    free(normal);
+  }
+
+  /* 文書をデータベースに登録する */
+  if(!odput(odeum, doc, -1, 1)){
+    fprintf(stderr, "odput: %s\n", dperrmsg(dpecode));
+  }
+
+  /* 語のリストを解放する */
+  cblistclose(awords);
+
+  /* 文書ハンドルを解放する */
+  oddocclose(doc);
+
+  /* データベースを閉じる */
+  if(!odclose(odeum)){
+    fprintf(stderr, "odclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<p>データベース内の文書を検索するサンプルコードを以下に示す。</p>
+
+<pre>#include &lt;depot.h&gt;
+#include &lt;cabin.h&gt;
+#include &lt;odeum.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define DBNAME   "index"
+
+int main(int argc, char **argv){
+  ODEUM *odeum;
+  ODPAIR *pairs;
+  ODDOC *doc;
+  const CBLIST *words;
+  const char *title, *author, *asis;
+  int i, j, pnum;
+
+  /* データベースを取得する */
+  if(!(odeum = odopen(DBNAME, OD_OREADER))){
+    fprintf(stderr, "odopen: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  /* 文書の検索を行う */
+  if((pairs = odsearch(odeum, "sorrow", -1, &amp;pnum)) != NULL){
+
+    /* 文書の配列を走査する */
+    for(i = 0; i &lt; pnum; i++){
+      /* 文書ハンドルを取得する */
+      if(!(doc = odgetbyid(odeum, pairs[i].id))) continue;
+      /* 文書の属性を表示する */
+      printf("URI: %s\n", oddocuri(doc));
+      title = oddocgetattr(doc, "title");
+      if(title) printf("TITLE: %s\n", title);
+      author = oddocgetattr(doc, "author");
+      if(author) printf("AUTHOR: %s\n", author);
+      /* 文書内の語を出現形で表示する */
+      printf("WORDS:");
+      words = oddocawords(doc);
+      for(j = 0; j &lt; cblistnum(words); j++){
+        asis = cblistval(words, j, NULL);
+        printf(" %s", asis);
+      }
+      putchar('\n');
+      /* 文書ハンドルを解放する */
+      oddocclose(doc);
+    }
+
+    /* 文書の配列を解放する */
+    free(pairs);
+
+  } else {
+    fprintf(stderr, "odsearch: %s\n", dperrmsg(dpecode));
+  }
+
+  /* データベースを閉じる */
+  if(!odclose(odeum)){
+    fprintf(stderr, "odclose: %s\n", dperrmsg(dpecode));
+    return 1;
+  }
+
+  return 0;
+}
+</pre>
+
+<h3>注記</h3>
+
+<p>Odeumを利用したプログラムをビルドする方法は、Depotの場合と全く同じである。</p>
+
+<pre>gcc -I/usr/local/include -o sample sample.c -L/usr/local/lib -lqdbm
+</pre>
+
+<p>POSIXスレッドを有効にしてQDBMをビルドした場合、外部変数 `dpecode' はスレッド固有データへの参照として扱われ、Odeumの各関数はリエントラントになる。その場合、スレッド間で同時に同じハンドルにアクセスしない限りは、各関数はスレッドセーフである。ただし、`errno' や `malloc' 等がスレッドセーフな処理系であることが前提となる。</p>
+
+<p>ZLIBを有効にしてQDBMをビルドした場合、文書属性用データベース内のレコードは圧縮されて保存される。その場合、サイズが30%以下になる。したがって、Odeumを利用する場合はZLIBを有効にした方がよい。ZLIBを有効にして作成したOdeumのデータベースを、ZLIBを有効にしていない環境で利用することはできず、またその逆も同様である。ZLIBが有効でなくLZOが有効な場合は、ZLIBの変わりにLZOが用いられる。</p>
+
+<h3>問い合わせ言語</h3>
+
+<p>関数 `odquery' の問い合わせ言語は以下の文法に基づく。</p>
+
+<pre>expr ::= subexpr ( op subexpr )*
+subexpr ::= WORD
+subexpr ::= LPAREN expr RPAREN
+</pre>
+
+<p>演算子としては "&amp;"（AND）と "|"（OR）と "!"（NOTAND）が利用できる。また、括弧 "()" を使うことで演算子の評価順序を制御することができる。問い合わせの文字列は関数 `odanalyzetext' を用いて分解されるので、"&amp;"、"|"、"!"、"("、")" は区切り文字として設定されている必要がある。また、空白で単語を区切っても "&amp;" で区切ったのと同じことになる。つまり "joe blow" は "joe &amp; blow" と同じである。</p>
+
+<p>問い合わせ文字列の文字コードは対象文書の文字コードと一致している必要がある。また、空白文字と区切り文字と接着文字に指定できるのは1バイト文字だけである。</p>
+
+<hr />
+
+<h2><a name="odeumcli" id="odeumcli" class="head">Odeum用コマンド</a></h2>
+
+<p>Odeumに対応するコマンドラインインタフェースは以下のものである。</p>
+
+<p>コマンド `odmgr' はOdeumやそのアプリケーションのデバッグに役立つツールである。データベースを更新したり、データベースの状態を調べたりする機能を持つ。シェルスクリプトで全文検索システムを作るのにも利用できる。以下の書式で用いる。`name' はデータベース名、`file' はファイル名、`expr' は文書のURIかID番号、`words' は検索語、`elems' は要素データベースを指定する。</p>
+
+<dl>
+<dt><kbd>odmgr create <var>name</var></kbd></dt>
+<dd>データベースファイルを作成する。</dd>
+<dt><kbd>odmgr put [-uri <var>str</var>] [-title <var>str</var>] [-author <var>str</var>] [-date <var>str</var>] [-wmax <var>num</var>] [-keep] <var>name</var> [<var>file</var>]</kbd></dt>
+<dd>ファイルを読み込んで文書を追加する。`file' を省略すると標準入力を読み込むが、その場合はURIの指定が必須となる。</dd>
+<dt><kbd>odmgr out [-id] <var>name</var> <var>expr</var></kbd></dt>
+<dd>URIに対応する文書を削除する。</dd>
+<dt><kbd>odmgr get [-id] [-t|-h] <var>name</var> <var>expr</var></kbd></dt>
+<dd>URIに対応する文書を表示する。出力は文書のID番号とURIとスコアをタブで区切ったものである。</dd>
+<dt><kbd>odmgr search [-max <var>num</var>] [-or] [-idf] [-t|-h|-n] <var>name</var> <var>words</var>...</kbd></dt>
+<dd>指定した語を含む文書を検索する。出力の第1行は、検索語全体の該当数と各検索語およびその該当数をタブで区切ったものである。第2行以降は、該当の各文書のID番号とURIとスコアをタブで区切ったものである。</dd>
+<dt><kbd>odmgr list [-t|-h] <var>name</var></kbd></dt>
+<dd>データベース内の全ての文書を表示する。出力の各行は文書のID番号とURIとスコアをタブで区切ったものである。</dd>
+<dt><kbd>odmgr optimize <var>name</var></kbd></dt>
+<dd>データベースを最適化する。</dd>
+<dt><kbd>odmgr inform <var>name</var></kbd></dt>
+<dd>データベースの雑多な情報を出力する。</dd>
+<dt><kbd>odmgr merge <var>name</var> <var>elems</var>...</kbd></dt>
+<dd>複数のデータベースをマージする。</dd>
+<dt><kbd>odmgr remove <var>name</var></kbd></dt>
+<dd>データベースディレクトリを削除する。</dd>
+<dt><kbd>odmgr break [-h|-k|-s] [<var>file</var>]</kbd></dt>
+<dd>ファイルを読み込んで、テキストを語に分解して出力する。出力の各行は各語の正規形と出現形をタブで区切ったものである。</dd>
+<dt><kbd>odmgr version</kbd></dt>
+<dd>QDBMのバージョン情報を出力する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-uri <var>str</var></kbd> : 文書のURIを明示的に指定する。</li>
+<li><kbd>-title <var>str</var></kbd> : 文書のタイトルを指定する。</li>
+<li><kbd>-author <var>str</var></kbd> : 文書の著者名を指定する。</li>
+<li><kbd>-date <var>str</var></kbd> : 文書の更新日時を指定する。</li>
+<li><kbd>-wmax <var>num</var></kbd> : 格納する語の最大数を指定する。</li>
+<li><kbd>-keep</kbd> : 同じURIの文書が既存であれば上書きを行わない。</li>
+<li><kbd>-id</kbd> : URIでなくID番号で文書を指定する。</li>
+<li><kbd>-t</kbd> : 文書の詳細情報をタブ区切りで出力する。</li>
+<li><kbd>-h</kbd> : 文書の詳細情報を人間が読みやすい形式で出力する。</li>
+<li><kbd>-k</kbd> : 文書のキーワードのみを出力する。</li>
+<li><kbd>-s</kbd> : 文書の要約のみを出力する。</li>
+<li><kbd>-max <var>num</var></kbd> : 出力する文書の最大数を指定する。</li>
+<li><kbd>-or</kbd> : AND検索でなくOR検索を行う。</li>
+<li><kbd>-idf</kbd> : IDFでスコアを重みづけする。</li>
+<li><kbd>-n</kbd> : 文書のIDとスコアのみを表示する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `odtest' はOdeumの機能テストや性能テストに用いるツールである。このコマンドによって生成されたデータベースディレクトリを `odmgr' によって解析したり、`time' コマンドによってこのコマンドの実行時間を計ったりするとよい。以下の書式で用いる。`name' はデータベース名、`dnum' は文書数、`wnum' は文書毎の語数、`pnum' は語のパターン数を指定する。</p>
+
+<dl>
+<dt><kbd>odtest write [-tune <var>ibnum</var> <var>idnum</var> <var>cbnum</var> <var>csiz</var>] <var>name</var> <var>dnum</var> <var>wnum</var> <var>pnum</var></kbd></dt>
+<dd>無作為な属性と語を持つ文書を連続してデータベースに追加する。</dd>
+<dt><kbd>odtest read <var>name</var></kbd></dt>
+<dd>上記で生成したデータベースの全文書を検索する。</dd>
+<dt><kbd>odtest combo <var>name</var></kbd></dt>
+<dd>各種操作の組み合わせテストを行う。</dd>
+<dt><kbd>odtest wicked <var>name</var> <var>dnum</var></kbd></dt>
+<dd>各種更新操作を無作為に選択して実行する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-tune <var>ibnum</var> <var>idnum</var> <var>cbnum</var> <var>csiz</var></kbd> : 性能パラメータを指定する。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。環境変数 `QDBMDBGFD' の値として、変数 `dpecode' の変更履歴を出力するファイルディスクリプタを指定ことができる。</p>
+
+<p>コマンド `odidx' はローカルファイルシステム上のファイルを読み込んでOdeumのデータベースに登録するユーティリティである。このコマンドはWebサイトの全文検索システムを構築する際に役立つ。サポートされるファイルフォーマットはプレーンテキストとHTMLである。サポートされる文字コードはUS-ASCIIとISO-8859-1である。各文書のURIにはファイルのパスが指定される。各文書には、`title' と `date' という属性が付与される。既にデータベース登録してあるファイルを登録しようとした場合、更新時刻が新しければ登録され、そうでなければ無視される。更新時刻はデータベースディレクトリの中の '_mtime' というサブデータベースに記録される。スコア情報はデータベースディレクトリの中の `_score' というサブデータベースに記録される。以下の書式で用いる。`name' はデータベース名、`dir' はディレクトリ名を指定する。</p>
+
+<dl>
+<dt><kbd>odidx register [-l <var>file</var>] [-wmax <var>num</var>] [-tsuf <var>sufs</var>] [-hsuf <var>sufs</var>] <var>name</var> [<var>dir</var>]</kbd></dt>
+<dd>特定のディレクトリ以下のファイル群をデータベース登録する。`dir' が省略された場合、カレントディレクトリが指定される。</dd>
+<dt><kbd>odidx relate <var>name</var></kbd></dt>
+<dd>データベースの各文書に関連文書検索のためのスコア情報を付加する。</dd>
+<dt><kbd>odidx purge <var>name</var></kbd></dt>
+<dd>ファイルシステムに存在しない文書をデータベースから削除する。</dd>
+</dl>
+
+<p>各オプションは以下の機能を持つ。</p>
+
+<ul class="lines">
+<li><kbd>-l <var>file</var></kbd> : 登録すべきファイルのパスのリストをファイルから読み込む。`-' を指定した場合、標準入力が読み込まれる。</li>
+<li><kbd>-wmax <var>num</var></kbd> : データベースに格納する語の最大数を指定する。</li>
+<li><kbd>-tsuf <var>sufs</var></kbd> : プレーンテキストファイルの拡張子をカンマ区切りで指定する。デフォルトは `-tsuf .txt,.text' と同意である。</li>
+<li><kbd>-hsuf <var>sufs</var></kbd> : HTMLファイルの拡張子をカンマ区切りで指定する。デフォルトは `-hsuf .html,.htm' と同意である。</li>
+</ul>
+
+<p>このコマンドは処理が正常に終了すれば 0 を返し、エラーがあればそれ以外の値を返して終了する。</p>
+
+<p>Odeumのコマンド群を駆使すると、全文検索システムを簡単に実現することができる。例えば `/home/mikio' 以下にあり、かつ `.txt' か `.c' か `.h' という接尾辞を持つファイル群を `casket' という名前のインデックスに登録するなら、以下のようにする。</p>
+
+<pre>odidx register -tsuf ".txt,.c,.h" -hsuf "" casket /home/mikio
+</pre>
+
+<p>そして、`unix' および `posix' という語を含む文書を検索し、上位8件を表示するには、以下のようにする。</p>
+
+<pre>odmgr search -max 8 -h casket "unix posix"
+</pre>
+
+<p>`odidx' で生成したデータベースは、QDBMに付録される全文検索のためのCGIスクリプト `qfts.cgi' でそのまま利用することができる。</p>
+
+<hr />
+
+<h2><a name="fileformat" id="fileformat" class="head">ファイルフォーマット</a></h2>
+
+<h3>Depotのファイルフォーマット</h3>
+
+<p>Depotが管理するデータベースファイルの内容は、ヘッダ部、バケット部、レコード部の三つに大別される。</p>
+
+<p>ヘッダ部はファイルの先頭から 48 バイトの固定長でとられ、以下の情報が記録される。</p>
+
+<ol>
+<li>マジックナンバ : オフセット 0 から始まる。ビッグエンディアン用なら文字列 "[DEPOT]\n\f" を内容とし、リトルエンディアン用なら文字列 "[depot]\n\f" を内容とする。</li>
+<li>バージョン番号 : オフセット 12 から始まる。ライブラリのバージョン番号を10進数で表現した文字列を内容とする。</li>
+<li>ラッパー用フラグ : オフセット 16 から始まる。`int' 型の整数である。</li>
+<li>ファイルサイズ : オフセット 24 から始まる。`int' 型の整数である。</li>
+<li>バケット配列の要素数 : オフセット 32 から始まる。`int' 型の整数である。</li>
+<li>レコード数 : オフセット 40 から始まる。`int' 型の整数である。</li>
+</ol>
+
+<p>バケット部はヘッダ部の直後にバケット配列の要素数に応じた大きさでとられ、チェーンの先頭要素のオフセットが各要素に記録される。</p>
+
+<p>レコード部はバケット部の直後からファイルの末尾までを占め、各レコードの以下の情報を持つ要素が記録される。</p>
+
+<ol>
+<li>フラグ : `int' 型の整数である。</li>
+<li>キーの第二ハッシュ値 : `int' 型の整数である。</li>
+<li>キーのサイズ : `int' 型の整数である。</li>
+<li>値のサイズ : `int' 型の整数である。</li>
+<li>パディングのサイズ : `int' 型の整数である。</li>
+<li>左の子の位置 : `int' 型の整数である。</li>
+<li>右の子の位置 : `int' 型の整数である。</li>
+<li>キーの実データ : キーのサイズで定義される長さを持つ一連のバイトである。</li>
+<li>値の実データ : 値のサイズで定義される長さを持つ一連のバイトである。</li>
+<li>パディング : 値のサイズとアラインメントにより算出される長さを持つ一連のバイトである。</li>
+</ol>
+
+<h3>Villaのファイルフォーマット</h3>
+
+<p>Villaの扱う全てのデータはDepotのデータベースに記録される。記録されるデータは、メタデータと論理ページに分類される。論理ページはリーフノードと非リーフノードに分類される。メタデータはレコード数等の管理情報を記録するもので、キーと値ともに `int' 型である。リーフノードはレコードを保持する。非リーフノードはページを参照する疎インデックスを保持する。</p>
+
+<p>Villaは、小さい自然数を直列化して扱う際に記憶領域を節約するために、可変長整数フォーマット（BER圧縮）を用いる。可変長整数のオブジェクトは、領域の先頭から解析し、値が正のバイトを読んだらそこで終端とする。各バイトは絶対値で評価され、リトルエンディアンの128進数として算出される。</p>
+
+<p>レコードはユーザデータの論理的な単位である。キーが重複する論理レコードは物理的には単一のレコードにまとめられる。物理レコードは以下の形式で直列化される。</p>
+
+<ol>
+<li>キーのサイズ : 可変長整数型である。</li>
+<li>キーの実データ : キーのサイズで定義される長さを持つ一連のバイトである。</li>
+<li>値の数 : 可変長整数型である。</li>
+<li>値のリスト : 以下の表現を値の数だけ繰り返した一連のバイトである。<ol>
+<li>サイズ : 可変長整数型である。</li>
+<li>実データ : サイズで定義される長さを持つ一連のバイトである。</li>
+</ol></li>
+</ol>
+
+<p>リーフノードはレコードの集合を格納するための物理的な単位である。リーフノードは `int' 型のIDをキーとし、以下の値を持つレコードとしてDepotのデータベースに格納される。レコードは常にキーの昇順に整列した状態で保持される。</p>
+
+<ol>
+<li>前のリーフのID : 可変長整数型である。</li>
+<li>次のリーフのID : 可変長整数型である。</li>
+<li>レコードのリスト : 直列化したレコードを連結したもの。</li>
+</ol>
+
+<p>インデックスはページを探索するためのポインタの論理的な単位である。インデックスは以下の形式で直列化される。</p>
+
+<ol>
+<li>参照先のページのID : 可変長整数型である。</li>
+<li>キーのサイズ : 可変長整数型である。</li>
+<li>キーの実データ : キーのサイズで定義される長さを持つ一連のバイトである。</li>
+</ol>
+
+<p>非リーフノードはインデックスの集合を格納するための物理的な単位である。非リーフノードは `int' 型のIDをキーとし、以下の値を持つレコードとしてDepotのデータベースに格納される。インデックスは常にキーの昇順に整列した状態で保持される。</p>
+
+<ol>
+<li>最初の子ノードのID : 可変長整数型である。</li>
+<li>インデックスのリスト : 直列化したインデックスを連結したもの。</li>
+</ol>
+
+<h3>注記</h3>
+
+<p>データベースファイルはスパースではないので、通常のファイルと同様に複製等の操作を行うことができる。Depotはバイトオーダの調整をしないでファイルの読み書きを行っているので、バイトオーダの異なる環境にデータベースファイルを移設してもそのままでは利用できない。</p>
+
+<p>DepotやVillaのデータベースファイルをネットワークで配布する際には、MIMEタイプを `application/x-qdbm' にしてほしい。ファイル名の接尾辞は `.qdb' にしてほしい。Curiaのデータベースディレクトリをネットワークで配布する際には、TAR形式等を用いたアーカイブに変換して行うことができる。</p>
+
+<p>データベースファイルのマジックナンバを `file' コマンドに識別させたい場合は、`magic' ファイルに以下の行を追記するとよい。</p>
+
+<pre>0       string          [DEPOT]\n\f     QDBM, big endian
+&gt;12     string          x               \b, version=%s
+&gt;19     byte            ^1              \b, Hash
+&gt;19     byte            &amp;1              \b, B+ tree
+&gt;19     byte            &amp;2              \b (deflated:ZLIB)
+&gt;19     byte            &amp;4              \b (deflated:LZO)
+&gt;19     byte            &amp;8              \b (deflated:BZIP2)
+&gt;24     belong          x               \b, filesize=%d
+&gt;32     belong          x               \b, buckets=%d
+&gt;40     belong          x               \b, records=%d
+0       string          [depot]\n\f     QDBM, little endian
+&gt;12     string          x               \b, version=%s
+&gt;16     byte            ^1              \b, Hash
+&gt;16     byte            &amp;1              \b, B+ tree
+&gt;16     byte            &amp;2              \b (deflated:ZLIB)
+&gt;16     byte            &amp;4              \b (deflated:LZO)
+&gt;16     byte            &amp;8              \b (deflated:BZIP2)
+&gt;24     lelong          x               \b, filesize=%d
+&gt;32     lelong          x               \b, buckets=%d
+&gt;40     lelong          x               \b, records=%d
+</pre>
+
+<hr />
+
+<h2><a name="porting" id="porting" class="head">移植方法</a></h2>
+
+<p>QDBMはPOSIX互換の全てのプラットフォームで動作することを目標としている。ただし、いくつかのAPIが実装されていないプラットフォームでも動作することが望ましい。また、GCC以外のコンパイラを利用してもビルドができることが望ましい。様々なプラットフォームへの移植作業は、新しい `Makefile' を追加したりソースファイルの一部を修正したりすることによってなされる。C言語のAPIであれば、おそらく以下のファイルのいくつかを修正することになる。もしくはそれらを基に新しいファイルを作ってもよい。</p>
+
+<ul class="lines">
+<li><kbd>Makefile.in</kbd> : `./configure' に利用され、`Makefile' のベースとなる。</li>
+<li><kbd>myconf.h</kbd> : システム依存の設定ファイル。</li>
+<li><kbd>depot.h</kbd> : 基本APIのヘッダ。</li>
+<li><kbd>curia.h</kbd> : 拡張APIのヘッダ。</li>
+<li><kbd>relic.h</kbd> : NDBM互換APIのヘッダ。</li>
+<li><kbd>hovel.h</kbd> : GDBM互換APIのヘッダ。</li>
+<li><kbd>cabin.h</kbd> : ユーティリティAPIのヘッダ。</li>
+<li><kbd>villa.h</kbd> : 上級APIのヘッダ。</li>
+<li><kbd>vista.h</kbd> : 拡張上級APIのヘッダ。</li>
+<li><kbd>odeum.h</kbd> : 転置APIのヘッダ。</li>
+<li><kbd>myconf.c</kbd> : システム依存の実装。</li>
+<li><kbd>depot.c</kbd> : 基本APIの実装。</li>
+<li><kbd>curia.c</kbd> : 拡張APIの実装。</li>
+<li><kbd>relic.c</kbd> : NDBM互換APIの実装。</li>
+<li><kbd>hovel.c</kbd> : GDBM互換APIの実装。</li>
+<li><kbd>cabin.c</kbd> : ユーティリティAPIの実装。</li>
+<li><kbd>villa.c</kbd> : 上級APIの実装。</li>
+<li><kbd>vista.c</kbd> : 拡張上級APIの実装。</li>
+<li><kbd>odeum.c</kbd> : 転置APIの実装。</li>
+</ul>
+
+<p>`fcntl' コールによるファイルロックがサポートされていないプラットフォームでは、`Makefile' で定義される `CFLAGS' マクロに `-DMYNOLOCK' を追加するとよい。その際にはプロセス間の排他制御を行う別の方法を考える必要がある。同様に、`mmap' コールがないプラットフォームでは、`CFLAGS' に `-DMYNOMMAP' を追加するとよい。`mmap' に関しては `malloc' 等を用いたエミュレーションが用意されている。その他のシステムコールが実装されていない場合は、`myconf.h' と `myconf.c' を修正して該当のシステムコールのエミュレーションを行えばよい。</p>
+
+<p>C++用のAPIではPOSIXスレッドを使っているので、そのパッケージが実装されていない環境にはC++用APIは移植できない。Java用のAPIではJNIを使っているので、そのヘッダやライブラリの場所に注意すべきである。また、`long long' や `int64' といった型定義にも注意すべきである。PerlやRuby用のAPIでは各々の言語処理系で用意されたビルドコマンドを用いているので、その仕様に精通すべきである。</p>
+
+<hr />
+
+<h2><a name="bugs" id="bugs" class="head">バグ</a></h2>
+
+<p>QDBMの各文書は英語を母国語とする人達によって校正されるべきである。</p>
+
+<p>segmentation faultによるクラッシュ、予期せぬデータの消失等の不整合、メモリリーク、その他諸々のバグに関して、既知のもので未修正のものはない。</p>
+
+<p>バグを発見したら、是非とも作者にフィードバックしてほしい。その際、QDBMのバージョンと、利用環境のOSとコンパイラのバージョンも教えてほしい。</p>
+
+<p>1.7.13より前のバージョンのQDBMで作成したデータベースは、それ以後のバージョンと互換性がない。</p>
+
+<hr />
+
+<h2><a name="faq" id="faq" class="head">よく聞かれる質問</a></h2>
+
+<dl>
+<dt>Q. : QDBMはSQLをサポートするか。</dt>
+<dd>A. : QDBMはSQLをサポートしない。QDBMはRDBMS（関係データベース管理システム）ではない。組み込みのRDBMSを求めるなら、SQLiteなどを利用するとよい。</dd>
+<dt>Q. : 結局のところ、GDBM（NDBM、SDBM、Berkeley DB）とどう違うのか。</dt>
+<dd>A. : 処理が速い。データベースファイルが小さい。APIが簡潔である。特筆すべきは、レコードの上書きを繰り返す場合の時間的および空間的効率がとてもよく、実用上のスケーラビリティが高いことである。また、レコード数が100万を越えるような大規模なデータベースを構築する際にも、処理が極端に遅くなったり、ファイルのサイズが極端に大きくなったりしない。とはいえ、用途によっては他のDBMやDBMSを使う方が適切かもしれないので、各自で性能や機能の比較をしてみてほしい。</dd>
+<dt>Q. : 参考文献は何か。</dt>
+<dd>A. : QDBMの各種アルゴリズムは、主にAho他の `Data Structures and Algorithms'（邦題は「データ構造とアルゴリズム」）およびSedgewickの `Algorithms in C'（邦題は「アルゴリズムC」）の記述に基礎を置いている。</dd>
+<dt>Q. : どのAPIを使えばよいのか。</dt>
+<dd>A. : レコードの検索が完全一致だけで済むのなら、Depotを試すとよい。その規模が大きいなら、Curiaを試すとよい。レコードを順序に基づいて参照したいなら、Villaを試すとよい。その規模が大きいなら、Vistaを試すとよい。最大のレコード数を追求するなら、ZLIBかLZOを有効にしてQDBMをビルドし、その上でVistaを用いるのがよい。</dd>
+<dt>Q. : アプリケーションの良いサンプルコードはあるか。</dt>
+<dd>A. : 各APIのコマンドのソースコードを参考にしてほしい。`dptsv.c' と `crtsv.c' と `vltsv.c' が最も簡潔である。</dd>
+<dt>Q. : データベースが壊れたのだが、どうしてか。</dt>
+<dd>A. : 大抵の場合、あなたのアプリケーションがきちんとデータベースを閉じていないのが原因である。デーモンプロセスであろうが、CGIスクリプトであろうが、アプリケーションが終了する際には必ずデータベースを閉じなければならない。なお、CGIのプロセスはSIGPIPEやSIGTERMによって殺されることがあることにも留意すべきである。</dd>
+<dt>Q. : QDBMのデータベースはどのくらい堅牢なのか。</dt>
+<dd>A. : QDBMは絶対的な堅牢性は保証しない。オペレーティングシステムが暴走した際にはデータベースが壊れる可能性がある。Villaのトランザクションはアプリケーションの暴走からデータベースを保護することができるが、オペレーティングシステムの暴走には対処できない。したがって、ミッションクリティカルな用途にQDBMを利用する場合は、データベースの多重化を考慮すべきである。</dd>
+<dt>Q. : DepotとCuriaのアラインメントの使い方がよくわからないが。</dt>
+<dd>A. : 上書きモードや連結モードでの書き込みを繰り返す場合に、アラインメントはデータベースファイルのサイズが急激に大きくなるのを防ぐ。アラインメントの適切なサイズはアプリケーションによって異なるので、各自で実験してみてほしい。さしあたりは32くらいにしておくとよい。</dd>
+<dt>Q. : Villaの性能パラメータの調整がよくわからないが。</dt>
+<dd>A. : レコードを順番に参照することが多いならば、`lrecmax' と `nidxmax' をより大きくした方がよい。レコードを無作為に参照することが多いならば、それらは小さくした方がよい。RAMに余裕があるならば、`lcnum' と `ncnum' を増やすと性能がかなり向上する。ZLIBやLZOやBZIP2を有効化した場合、`lrecmax' を大きくした方が圧縮効率がよくなる。</dd>
+<dt>Q. : Villaの圧縮方式としてはZLIBとLZOとBZIP2のどれがよいのか。</dt>
+<dd>A. : 圧縮率が最も良いのはBZIP2で、処理速度が最も高いのはLZOで、ZLIBはその中間的な特性を持つ。特に理由がない限りはZLIBを使うとよい。ただし、更新が頻繁なデータベースにはLZOが適切で、更新がほとんどないならばBZIP2が適切である。圧縮しないという選択肢よりはLZOを使う方がよい。LZOのライセンスはGNU GPLであることに注意すること。</dd>
+<dt>Q. : スパースファイルとは何か。</dt>
+<dd>A. : ホール（一度もデータが書き込まれていないブロック）があるファイルのことである。ファイルシステムがスパースファイルをサポートしている場合、ホールは物理的な記憶装置に割り当てられない。QDBMでは、DP_OSPARSEなどのフラグを用いると、ハッシュのバケット配列は初期化されずにホールとなる。このことを利用して、非常に巨大なハッシュ表を実現することができる。ただし、その性能はファイルシステムの設定に強く依存する。</dd>
+<dt>Q. : なぜDepotとCuriaにはトランザクション機能がないのか。</dt>
+<dd>A. : アプリケーションが独自のトランザクション機能を実装している場合には、データベース内部のトランザクションは邪魔になるからである。トランザクションはCabinのマップを使えば簡単に実装できる。</dd>
+<dt>Q. : 性能を引き出すシステムの設定はどうであるか。</dt>
+<dd>A. : データベースのサイズと同等以上のRAMをマシンに搭載することが望ましい。そして、I/Oバッファのサイズを大きくし、ダーティバッファをフラッシュする頻度が少なくするように設定するとよい。ファイルシステムの選択も重要である。Linux上では、通常はEXT2が最高速であるが、EXT3の `writeback' モードの方が速いこともある。ReiserFSはそれなりである。EXT3のその他のモードはかなり遅い。他のファイルシステムに関しては各自で実験してみてほしい。</dd>
+<dt>Q. : `gcc' の代わりに `cc' を使ってビルドできるか。</dt>
+<dd>A. : `LTmakefile' を使えばできる。</dd>
+<dt>Q. : Visual C++を使ってビルドできるか。</dt>
+<dd>A. : できる。`Makefile' の代わりに `VCmakefile' を使うこと。</dd>
+<dt>Q. : 他にQDBMを利用できる言語はあるか。</dt>
+<dd>A. : PHP、Scheme（Gauche）、OCaml用のインタフェースが既に公開されているようである。それ以外の言語については、必要なら自分で作ってほしい。</dd>
+<dt>Q. : 「QDBM」とはどういう意味なのか。</dt>
+<dd>A. : 「QDBM」は「Quick Database Manager」の略である。高速に動作するという意味と、アプリケーションの開発が迅速にできるという意味が込められている。</dd>
+<dt>Q. : 各APIの名前はどういう意味なのか。どう発音するのか。</dt>
+<dd>A. : 5文字の英単語から適当に選択しただけで、深い意味はない。なお、「depot」は、空港、倉庫、補給所など、物質が集まる場所を意味するらしい。発音を片仮名で表現するなら「ディーポゥ」が妥当だろう。「curia」は、宮廷、法廷など、権威が集まる場所を意味するらしい。発音を片仮名で表現するなら「キュリア」が妥当だろう。「relic」は、遺物、遺跡など、過去の残骸を意味するらしい。発音を片仮名で表現するなら「レリック」が妥当だろう。「hovel」は、小屋、物置、離れ家など、粗末な建物を意味するらしい。発音を片仮名で表現するなら「ハヴル」が妥当だろう。「cabin」は、機室、客室、小屋など、簡易的な居住空間を意味するらしい。発音を片仮名で表現するなら「キャビン」が妥当だろう。「villa」は、別荘、郊外住宅など、都会風でない住居を意味するらしい。発音を片仮名で表現するなら「ヴィラ」が妥当だろう。「vista」は、予想、展望など、遠くを見渡すことを意味するらしい。発音を片仮名で表現するなら「ヴィスタ」が妥当だろう。「odeum」は、音楽堂、劇場など、音楽や詩吟を行う建物を意味するらしい。発音を片仮名で表現するなら「オディアム」が妥当だろう。</dd>
+</dl>
+
+<hr />
+
+<h2><a name="copying" id="copying" class="head">ライセンス</a></h2>
+
+<p>QDBMはフリーソフトウェアである。あなたは、Free Software Foundationが公表したGNU Lesser General Public Licenseのバージョン2.1あるいはそれ以降の各バージョンの中からいずれかを選択し、そのバージョンが定める条項に従ってQDBMを再頒布または変更することができる。</p>
+
+<p>QDBMは有用であると思われるが、頒布にあたっては、市場性及び特定目的適合性についての暗黙の保証を含めて、いかなる保証も行なわない。詳細についてはGNU Lesser General Public Licenseを読んでほしい。</p>
+
+<p>あなたは、QDBMと一緒にGNU Lesser General Public Licenseの写しを受け取っているはずである（`COPYING' ファイルを参照）。そうでない場合は、Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA へ連絡してほしい。</p>
+
+<p>QDBMは平林幹雄が作成した。作者と連絡をとるには、`mikio@users.sourceforge.net' 宛に電子メールを送ってほしい。ただし、質問やバグレポートなど、他のユーザと共有できる話題はメーリングリストに送ってほしい。メーリングリストの参加方法については、`http://lists.sourceforge.net/lists/listinfo/qdbm-users' を参照すること。</p>
+
+<hr />
+
+</body>
+
+</html>
+
+<!-- END OF FILE -->

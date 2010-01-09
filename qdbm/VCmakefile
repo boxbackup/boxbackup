@@ -1,0 +1,248 @@
+# Makefile to build QDBM using Microsoft Visual C++
+
+
+
+#================================================================
+# Setting variables
+#================================================================
+
+
+# VC++ directory
+VCPATH = C:\Program Files\Microsoft Visual Studio .NET 2003\Vc7
+
+# User options
+YOUR_CLFLAGS =
+YOUR_LIBFLAGS =
+YOUR_LINKFLAGS=
+
+# Configurations
+!IF "$(CFG)" == "ld"
+!MESSAGE Build using static debug configuration
+BASE_FLAGS = /MLd /W3 /ZI /Od /FD /GZ /Fo"$(OUTDIR)\\" /Fd"$(OUTDIR)\\"
+BASE_DEFS = /D_DEBUG /D__DEBUG__
+OUTDIR = .\tmp_ld
+LIB_APPEND = _ld
+EXE_APPEND = _ld
+!ELSEIF "$(CFG)" == "l"
+!MESSAGE Build using static release configuration
+BASE_DEFS = /DNDEBUG
+BASE_FLAGS = /ML /W3 /O2 /FD /Fo"$(OUTDIR)\\" /Fd"$(OUTDIR)\\"
+OUTDIR = .\tmp_l
+LIB_APPEND = _l
+EXE_APPEND = _l
+!ELSEIF "$(CFG)" == "td"
+!MESSAGE Build using static threaded debug configuration
+BASE_FLAGS = /MTd /W3 /ZI /Od /FD /GZ /Fo"$(OUTDIR)\\" /Fd"$(OUTDIR)\\"
+BASE_DEFS = /D_DEBUG /D__DEBUG__
+OUTDIR = .\tmp_td
+LIB_APPEND = _td
+EXE_APPEND = _td
+!ELSEIF "$(CFG)" == "t"
+!MESSAGE Build using static threaded release configuration
+BASE_DEFS = /DNDEBUG
+BASE_FLAGS = /MT /W3 /O2 /FD /Fo"$(OUTDIR)\\" /Fd"$(OUTDIR)\\"
+OUTDIR = .\tmp_t
+LIB_APPEND = _t
+EXE_APPEND = _t
+!ELSEIF "$(CFG)" == "dd"
+!MESSAGE Build using dynamic threaded debug configuration
+BASE_FLAGS = /MDd /W3 /ZI /Od /FD /GZ /Fo"$(OUTDIR)\\" /Fd"$(OUTDIR)\\"
+BASE_DEFS = /D_DEBUG /D__DEBUG__
+OUTDIR = .\tmp_dd
+LIB_APPEND = _dd
+EXE_APPEND = _dd
+!ELSE
+!MESSAGE Build using dynamic threaded release configuration
+BASE_DEFS = /DNDEBUG
+BASE_FLAGS = /MD /W3 /O2 /FD /Fo"$(OUTDIR)\\" /Fd"$(OUTDIR)\\"
+OUTDIR = .\tmp
+LIB_APPEND =
+EXE_APPEND =
+!ENDIF
+
+# Building binaries
+CLFLAGS = /I "$(VCPATH)\Include" /I "$(VCPATH)\PlatformSDK\Include" /I "." \
+  /nologo $(YOUR_CLFLAGS) $(BASE_FLAGS) $(BASE_DEFS) /D_CRT_SECURE_NO_DEPRECATE=1
+LIBFLAGS = /libpath:"$(VCPATH)\lib" /libpath:"$(VCPATH)\PlatformSDK\Lib" /libpath:"." \
+  /nologo $(YOUR_LIBFLAGS)
+LINKFLAGS = /libpath:"$(VCPATH)\lib" /libpath:"$(VCPATH)\PlatformSDK\Lib" /libpath:"." \
+  /nologo $(YOUR_LINKFLAGS)
+
+# Targets
+MYLIBS = qdbm$(LIB_APPEND).dll qdbm$(LIB_APPEND).lib qdbm$(LIB_APPEND)_static.lib
+LIBOBJS = $(OUTDIR)\depot.obj $(OUTDIR)\curia.obj $(OUTDIR)\relic.obj \
+  $(OUTDIR)\hovel.obj $(OUTDIR)\cabin.obj $(OUTDIR)\villa.obj \
+  $(OUTDIR)\vista.obj $(OUTDIR)\odeum.obj $(OUTDIR)\myconf.obj
+MYBINS = dpmgr$(EXE_APPEND).exe dptest$(EXE_APPEND).exe dptsv$(EXE_APPEND).exe \
+  crmgr$(EXE_APPEND).exe crtest$(EXE_APPEND).exe crtsv$(EXE_APPEND).exe \
+  rlmgr$(EXE_APPEND).exe rltest$(EXE_APPEND).exe hvmgr$(EXE_APPEND).exe \
+  hvtest$(EXE_APPEND).exe cbtest$(EXE_APPEND).exe cbcodec$(EXE_APPEND).exe \
+  vlmgr$(EXE_APPEND).exe vltest$(EXE_APPEND).exe vltsv$(EXE_APPEND).exe \
+  odmgr$(EXE_APPEND).exe odtest$(EXE_APPEND).exe odidx$(EXE_APPEND).exe
+
+
+
+#================================================================
+# Suffix rules
+#================================================================
+
+
+.SUFFIXES :
+.SUFFIXES : .c .obj
+
+.c{$(OUTDIR)}.obj :
+	cl /c $(CLFLAGS) $<
+
+.c.obj:
+	cl /c $(CLFLAGS) $<
+
+
+
+#================================================================
+# Actions
+#================================================================
+
+
+all : $(OUTDIR) $(MYLIBS) $(MYBINS)
+
+
+allcfg:
+	nmake /NOLOGO /f VCmakefile CFG=ld
+	nmake /NOLOGO /f VCmakefile CFG=l
+	nmake /NOLOGO /f VCmakefile CFG=td
+	nmake /NOLOGO /f VCmakefile CFG=t
+	nmake /NOLOGO /f VCmakefile CFG=dd
+	nmake /NOLOGO /f VCmakefile
+
+
+clean :
+	-rd tmp_ld /S /Q > NUL: 2>&1
+	-rd tmp_l /S /Q > NUL: 2>&1
+	-rd tmp_td /S /Q > NUL: 2>&1
+	-rd tmp_t /S /Q > NUL: 2>&1
+	-rd tmp_dd /S /Q > NUL: 2>&1
+	-rd tmp /S /Q > NUL: 2>&1
+	-del *.obj *.lib *.dll *.exp *.exe casket /F /Q > NUL: 2>&1
+
+
+"$(OUTDIR)" :
+	if not exist "$(OUTDIR)/" mkdir "$(OUTDIR)"
+
+
+
+#================================================================
+# Building binaries
+#================================================================
+
+
+qdbm$(LIB_APPEND).dll : $(LIBOBJS) qdbm.def
+	link /DLL /DEF:qdbm.def $(LINKFLAGS) /OUT:$@ /IMPLIB:qdbm$(LIB_APPEND).lib $(LIBOBJS)
+
+
+qdbm$(LIB_APPEND).lib : qdbm$(LIB_APPEND).dll
+
+
+qdbm$(LIB_APPEND)_static.lib : $(LIBOBJS)
+	lib $(LIBFLAGS) /OUT:$@ $(LIBOBJS)
+
+
+dpmgr$(EXE_APPEND).exe : $(OUTDIR)\dpmgr.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\dpmgr.obj qdbm$(LIB_APPEND).lib
+
+
+dptest$(EXE_APPEND).exe : $(OUTDIR)\dptest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\dptest.obj qdbm$(LIB_APPEND).lib
+
+
+dptsv$(EXE_APPEND).exe : $(OUTDIR)\dptsv.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\dptsv.obj qdbm$(LIB_APPEND).lib
+
+
+crmgr$(EXE_APPEND).exe : $(OUTDIR)\crmgr.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\crmgr.obj qdbm$(LIB_APPEND).lib
+
+
+crtest$(EXE_APPEND).exe : $(OUTDIR)\crtest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\crtest.obj qdbm$(LIB_APPEND).lib
+
+
+crtsv$(EXE_APPEND).exe : $(OUTDIR)\crtsv.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\crtsv.obj qdbm$(LIB_APPEND).lib
+
+
+rlmgr$(EXE_APPEND).exe : $(OUTDIR)\rlmgr.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\rlmgr.obj qdbm$(LIB_APPEND).lib
+
+
+rltest$(EXE_APPEND).exe : $(OUTDIR)\rltest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\rltest.obj qdbm$(LIB_APPEND).lib
+
+
+hvmgr$(EXE_APPEND).exe : $(OUTDIR)\hvmgr.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\hvmgr.obj qdbm$(LIB_APPEND).lib
+
+
+hvtest$(EXE_APPEND).exe : $(OUTDIR)\hvtest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\hvtest.obj qdbm$(LIB_APPEND).lib
+
+
+cbtest$(EXE_APPEND).exe : $(OUTDIR)\cbtest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\cbtest.obj qdbm$(LIB_APPEND).lib
+
+
+cbcodec$(EXE_APPEND).exe : $(OUTDIR)\cbcodec.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\cbcodec.obj qdbm$(LIB_APPEND).lib
+
+
+vlmgr$(EXE_APPEND).exe : $(OUTDIR)\vlmgr.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\vlmgr.obj qdbm$(LIB_APPEND).lib
+
+
+vltest$(EXE_APPEND).exe : $(OUTDIR)\vltest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\vltest.obj qdbm$(LIB_APPEND).lib
+
+
+vltsv$(EXE_APPEND).exe : $(OUTDIR)\vltsv.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\vltsv.obj qdbm$(LIB_APPEND).lib
+
+
+odmgr$(EXE_APPEND).exe : $(OUTDIR)\odmgr.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\odmgr.obj qdbm$(LIB_APPEND).lib
+
+
+odtest$(EXE_APPEND).exe : $(OUTDIR)\odtest.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\odtest.obj qdbm$(LIB_APPEND).lib
+
+
+odidx$(EXE_APPEND).exe : $(OUTDIR)\odidx.obj qdbm$(LIB_APPEND).lib
+	link $(LINKFLAGS) /OUT:$@ $(OUTDIR)\odidx.obj qdbm$(LIB_APPEND).lib
+
+
+$(OUTDIR)\depot.obj $(OUTDIR)\dpmgr.obj $(OUTDIR)\dptest.obj $(OUTDIR)\dptsv.obj : \
+  depot.h myconf.h
+
+$(OUTDIR)\curia.obj $(OUTDIR)\crmgr.obj $(OUTDIR)\crtest.obj $(OUTDIR)\crtsv.obj : \
+  curia.h depot.h myconf.h
+
+$(OUTDIR)\relic.obj $(OUTDIR)\rlmgr.obj $(OUTDIR)\rltest.obj : \
+  relic.h depot.h myconf.h
+
+$(OUTDIR)\hovel.obj $(OUTDIR)\hvmgr.obj $(OUTDIR)\hvtest.obj : \
+  hovel.h depot.h curia.h myconf.h
+
+$(OUTDIR)\cabin.obj $(OUTDIR)\cbtest.obj $(OUTDIR)\cbcodec.obj : \
+  cabin.h myconf.h
+
+$(OUTDIR)\villa.obj $(OUTDIR)\vlmgr.obj $(OUTDIR)\vltest.obj $(OUTDIR)\vltsv.obj : \
+  villa.h depot.h cabin.h myconf.h
+
+$(OUTDIR)\vista.obj : vista.h villa.h depot.h curia.h cabin.h myconf.h
+
+$(OUTDIR)\odeum.obj $(OUTDIR)\odmgr.obj $(OUTDIR)\odtest.obj $(OUTDIR)\odidx.obj : \
+  odeum.h depot.h curia.h cabin.h villa.h myconf.h
+
+$(OUTDIR)\myconf.obj : myconf.h
+
+
+
+# END OF FILE

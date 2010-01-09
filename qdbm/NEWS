@@ -1,0 +1,43 @@
+== Thu, 08 Sep 2005 13:13:58 +0900 ==
+
+Compressing options of ZLIB was changed.  If you use villa with the option
+`VL_OZCOMP', databases of the earlier versions are not compatible with the
+current version of QDBM.  To convert the old database to new format,
+export endian independent data by "vlmgr exportdb" with the old version,
+and then import it by "vlmgr importdb" with the latest version.
+
+
+
+== Wed, 10 Mar 2004 23:24:24 +0900 ==
+
+API of B+ tree was changed a bit.  Even if you build QDBM with ZLIB
+enabled, records are not compressed.  Instead of it, the function `vlopen'
+has the option `VL_OZCOMP'.  If it is specified, records are compressed.
+So, you can switch whether to compress records or not, on runtime.
+
+Users who have used ZLIB feature should modify their source codes to
+specify that option.
+
+
+
+== Wed, 10 Dec 2003 09:24:12 +0900 ==
+
+The database format was changed with QDBM 1.7.13.  Newer versions do not
+have backward compatibility to old format.  You can convert old databases
+with the command `fmtcnv031127' in the sub directory `lab'.  To build it,
+perform the following steps.
+
+  cd lab
+  make fmtcnv031127
+
+About usage of it, see the file `README' in `lab'.  Typically, to convert
+a Depot database named as `old' and create a database named as `new',
+perform the following step.
+
+  ./fmtcnv031127 < old > new
+
+I'm sorry for bothering you.
+
+
+
+== END OF FILE ==

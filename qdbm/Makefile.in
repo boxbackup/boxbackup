@@ -1,0 +1,646 @@
+# Makefile for QDBM
+
+
+
+#================================================================
+# Setting variables
+#================================================================
+
+
+# Generic settings
+SHELL = @SHELL@
+srcdir = @srcdir@
+VPATH = @srcdir@
+SUBDIRS = 
+
+# Packaging
+PACKAGE = @PACKAGE_NAME@
+VERSION = @PACKAGE_VERSION@
+PACKAGEDIR = $(PACKAGE)-$(VERSION)
+PACKAGETGZ = $(PACKAGE)-$(VERSION).tar.gz
+LIBVER = @LIBVER@
+LIBREV = @LIBREV@
+
+# Targets
+MYHEADS = depot.h curia.h relic.h hovel.h cabin.h villa.h vista.h odeum.h
+MYLIBOBJS = depot.o curia.o relic.o hovel.o cabin.o villa.o vista.o odeum.o myconf.o
+MYLIBS = libqdbm.a libqdbm.so.$(LIBVER).$(LIBREV).0 libqdbm.so.$(LIBVER) libqdbm.so
+MYBINS = dpmgr dptest dptsv crmgr crtest crtsv rlmgr rltest hvmgr hvtest \
+  cbtest cbcodec vlmgr vltest vltsv odmgr odtest odidx qmttest
+MYMAN1S = dpmgr.1 dptest.1 dptsv.1 crmgr.1 crtest.1 crtsv.1 rlmgr.1 rltest.1 hvmgr.1 hvtest.1 \
+  cbtest.1 cbcodec.1 vlmgr.1 vltest.1 vltsv.1 odmgr.1 odtest.1 odidx.1 qmttest.1
+MYMAN3S = qdbm.3 depot.3 dpopen.3 curia.3 cropen.3 relic.3 hovel.3 \
+  cabin.3 villa.3 vlopen.3 vista.3 odeum.3 odopen.3
+MYDOCS = spex.html spex-ja.html COPYING ChangeLog NEWS THANKS
+MYPCS = qdbm.pc
+MYWINLIBS = libqdbm.a libqdbm.dll.a
+MYMACLIBS = libqdbm.a libqdbm.$(LIBVER).$(LIBREV).0.dylib libqdbm.$(LIBVER).dylib libqdbm.dylib
+MYHPUXLIBS = libqdbm.a libqdbm.sl
+
+# Install destinations
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+MYHEADDIR = @includedir@
+MYLIBDIR = @libdir@
+MYBINDIR = @bindir@
+MYMAN1DIR = @mandir@/man1
+MYMAN3DIR = @mandir@/man3
+MYDATADIR = @datadir@/$(PACKAGE)
+MYPCDIR = @libdir@/pkgconfig
+DESTDIR =
+
+# Building binaries
+CC = @CC@
+CPPFLAGS = @CPPFLAGS@ -I$(srcdir) -I$(MYHEADDIR) \
+  -I$(HOME)/include -I/usr/local/include @MYDEFS@ \
+  -D_XOPEN_SOURCE_EXTENDED=1 -D_GNU_SOURCE=1 -D__EXTENSIONS__=1 -D_HPUX_SOURCE=1 \
+  -D_POSIX_MAPPED_FILES=1 -D_POSIX_SYNCHRONIZED_IO=1 \
+  -DPIC=1 -D_THREAD_SAFE=1 -D_REENTRANT=1 -DNDEBUG
+CFLAGS = -Wall -pedantic -fPIC -fsigned-char -O3 -fomit-frame-pointer -fforce-addr @MYOPTS@
+LD = @LD@
+LIBS = -lqdbm @LIBS@
+LIBLDFLAGS = @LDFLAGS@ -L. -L$(MYLIBDIR) -L$(HOME)/lib -L/usr/local/lib @LIBS@
+LDFLAGS = @LDFLAGS@ -L. -L$(MYLIBDIR) -L$(HOME)/lib -L/usr/local/lib $(LIBS)
+LDENV = LD_RUN_PATH=/lib:/usr/lib:$(MYLIBDIR):$(HOME)/lib:/usr/local/lib
+AR = @AR@
+ARFLAGS = rcsv
+RUNENV = LD_LIBRARY_PATH=.:/lib:/usr/lib:$(MYLIBDIR):$(HOME)/lib:/usr/local/lib
+
+
+
+#================================================================
+# Suffix rules
+#================================================================
+
+
+.SUFFIXES :
+.SUFFIXES : .c .o
+
+.c.o :
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $<
+
+
+
+#================================================================
+# Actions
+#================================================================
+
+
+targets : @TARGETS@
+
+
+all : $(MYLIBS) $(MYBINS)
+	@printf '\n'
+	@printf '#================================================================\n'
+	@printf '# Ready to install.\n'
+	@printf '#================================================================\n'
+
+
+static :
+	make MYLIBS="$(MYLIBS)" LDFLAGS="-static $(LDFLAGS)" all
+
+
+debug :
+	make MYLIBS="$(MYLIBS)" CPPFLAGS="$(CPPFLAGS) -UNDEBUG" \
+	  CFLAGS="-Wall -ansi -pedantic -fPIC -fsigned-char -O2 -g" \
+	  LDFLAGS="-static $(LDFLAGS)" all
+
+
+devel :
+	make MYLIBS="$(MYLIBS)" CPPFLAGS="$(CPPFLAGS) -UNDEBUG" \
+	  CFLAGS="-Wall -ansi -pedantic -fPIC -fsigned-char -O2 -g -pipe" all
+	sync ; sync
+
+
+stable :
+	make MYLIBS="$(MYLIBS)" CFLAGS="-Wall -ansi -pedantic -fPIC -fsigned-char -O2" all
+
+
+profile :
+	make MYLIBS="$(MYLIBS)" \
+	  CFLAGS="-Wall -pedantic -fPIC -fsigned-char -O3 -pg -g -Werror" \
+	  LDFLAGS="-static $(LDFLAGS)" all
+
+
+unsigned :
+	make MYLIBS="$(MYLIBS)" CPPFLAGS="$(CPPFLAGS) -UNDEBUG" \
+	  CFLAGS="-Wall -ansi -pedantic -fPIC -funsigned-char -g -O2" all
+
+
+m64 :
+	make MYLIBS="$(MYLIBS)" CPPFLAGS="$(CPPFLAGS) -UNDEBUG" \
+	  CFLAGS="-Wall -ansi -pedantic -fPIC -fsigned-char -O2 -m64 -g" all
+
+
+pen4 :
+	stdopt="-O3 -fomit-frame-pointer -minline-all-stringops" ; \
+	exopt="-march=pentium4 -minline-all-stringops -fprefetch-loop-arrays" ; \
+	  make MYLIBS="$(MYLIBS)" \
+	    CFLAGS="-Wall -pedantic -fPIC -fsigned-char $$stdopt $$exopt" all
+
+
+k8 :
+	stdopt="-O3 -fomit-frame-pointer -minline-all-stringops" ; \
+	exopt="-march=k8 -minline-all-stringops -fprefetch-loop-arrays" ; \
+	  make MYLIBS="$(MYLIBS)" \
+	    CFLAGS="-Wall -pedantic -fPIC -fsigned-char $$stdopt $$exopt" all
+
+
+clean :
+	rm -rf $(MYLIBS) $(MYBINS) *.o *.a *.so *.lo *.la a.out .libs \
+	  *.exe *.dll.a *.dll *.dylib *.sl TAGS srcdoc gmon.out leak.log \
+	  casket casket.* casket-* *~
+
+
+version :
+	vernum=`expr $(LIBVER)00 + $(LIBREV)` ; \
+	  sed -e 's/_QDBM_VERSION.*/_QDBM_VERSION  "$(VERSION)"/' \
+	    -e "s/_QDBM_LIBVER.*/_QDBM_LIBVER   $$vernum/" depot.h > depot.h~
+	[ -f depot.h~ ] && mv -f depot.h~ depot.h
+
+
+install :
+	mkdir -p $(DESTDIR)$(MYHEADDIR)
+	cd $(srcdir) && cp -Rf $(MYHEADS) $(DESTDIR)$(MYHEADDIR)
+	mkdir -p $(DESTDIR)$(MYLIBDIR)
+	cp -Rf $(MYLIBS) $(DESTDIR)$(MYLIBDIR)
+	mkdir -p $(DESTDIR)$(MYBINDIR)
+	cp -Rf $(MYBINS) $(DESTDIR)$(MYBINDIR)
+	mkdir -p $(DESTDIR)$(MYMAN1DIR)
+	cd $(srcdir)/man && cp -Rf $(MYMAN1S) $(DESTDIR)$(MYMAN1DIR)
+	mkdir -p $(DESTDIR)$(MYMAN3DIR)
+	cd $(srcdir)/man && cp -Rf $(MYMAN3S) $(DESTDIR)$(MYMAN3DIR)
+	mkdir -p $(DESTDIR)$(MYDATADIR)
+	cd $(srcdir) && cp -Rf $(MYDOCS) $(DESTDIR)$(MYDATADIR)
+	mkdir -p $(DESTDIR)$(MYPCDIR)
+	cd $(srcdir) && cp -Rf $(MYPCS) $(DESTDIR)$(MYPCDIR)
+	@printf '\n'
+	@printf '#================================================================\n'
+	@printf '# Thanks for using QDBM.\n'
+	@printf '#================================================================\n'
+
+
+install-strip :
+	make DESTDIR=$(DESTDIR) install
+	cd $(DESTDIR)$(MYBINDIR) && strip $(MYBINS)
+
+
+uninstall :
+	cd $(DESTDIR)$(MYHEADDIR) && rm -f $(MYHEADS)
+	cd $(DESTDIR)$(MYLIBDIR) && rm -f $(MYLIBS)
+	cd $(DESTDIR)$(MYBINDIR) && rm -f $(MYBINS)
+	cd $(DESTDIR)$(MYMAN1DIR) && rm -f $(MYMAN1S)
+	cd $(DESTDIR)$(MYMAN3DIR) && rm -f $(MYMAN3S)
+	rm -rf $(DESTDIR)$(MYDATADIR)
+	cd $(DESTDIR)$(MYPCDIR) && rm -f $(MYPCS)
+
+
+dist :
+	sync ; sync
+	for dir in $(SUBDIRS) ; \
+	  do \
+	    if [ -d $$dir ] ; \
+	    then \
+	      echo Making $@ in $$dir ; \
+	      ( cd $$dir && if [ -f configure.in ] ; then autoconf ; ./configure ; \
+	        make dist ; fi ) ; \
+	    fi ; \
+	  done
+	make version
+	make distclean
+	cd .. && tar cvf - $(PACKAGEDIR) | gzip -c > $(PACKAGETGZ)
+	sync ; sync
+
+
+distclean : clean
+	for dir in $(SUBDIRS) ; \
+	  do \
+	    if [ -d $$dir ] ; \
+	    then \
+	      echo Making $@ in $$dir ; \
+	      ( cd $$dir && if [ -f Makefile ] ; then make distclean ; fi ) ; \
+	    fi ; \
+	  done
+	rm -rf Makefile LTmakefile qdbm.spec qdbm.pc config.cache config.log config.status \
+	  autom4te.cache rpm-tmp *-win32
+
+
+TAGS :
+	etags -o $@ *.c *.h
+
+
+sdoc :
+	rm -rf srcdoc
+	./lab/ccdoc -d srcdoc -t "Source Documents of QDBM" *.h *.c
+
+
+check :
+	sync ; sync
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./dptest write -s casket 500 500000
+	$(RUNENV) $(RUNCMD) ./dptest write casket 50000 5000
+	$(RUNENV) $(RUNCMD) ./dptest read casket
+	$(RUNENV) $(RUNCMD) ./dptest read -wb casket
+	$(RUNENV) $(RUNCMD) ./dptest rcat -c casket 50000 50 500 32 8
+	$(RUNENV) $(RUNCMD) ./dptest combo casket
+	$(RUNENV) $(RUNCMD) ./dptest wicked -c casket 5000
+	$(RUNENV) $(RUNCMD) ./dptest wicked casket 500
+	$(RUNENV) $(RUNCMD) ./dpmgr repair casket
+	$(RUNENV) $(RUNCMD) ./dpmgr optimize casket
+	$(RUNENV) $(RUNCMD) ./dpmgr list casket
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./crtest write -s casket 500 100000 5
+	$(RUNENV) $(RUNCMD) ./crtest write casket 50000 500 10
+	$(RUNENV) $(RUNCMD) ./crtest read casket
+	$(RUNENV) $(RUNCMD) ./crtest read -wb casket
+	$(RUNENV) $(RUNCMD) ./crtest rcat -c casket 50000 5 10 500 32 8
+	$(RUNENV) $(RUNCMD) ./crtest combo casket
+	$(RUNENV) $(RUNCMD) ./crtest wicked -c casket 5000
+	$(RUNENV) $(RUNCMD) ./crtest wicked casket 500
+	$(RUNENV) $(RUNCMD) ./crmgr repair casket
+	$(RUNENV) $(RUNCMD) ./crmgr optimize casket
+	$(RUNENV) $(RUNCMD) ./crmgr list casket
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./crtest write -lob casket 1000 50 10
+	$(RUNENV) $(RUNCMD) ./crtest read -lob casket
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./rltest write casket 5000
+	$(RUNENV) $(RUNCMD) ./rltest read casket 5000
+	$(RUNENV) $(RUNCMD) ./rlmgr list casket
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./hvtest write casket 5000
+	$(RUNENV) $(RUNCMD) ./hvtest read casket 5000
+	$(RUNENV) $(RUNCMD) ./hvmgr optimize casket
+	$(RUNENV) $(RUNCMD) ./hvmgr list casket
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./hvtest write -qdbm -s casket 500
+	$(RUNENV) $(RUNCMD) ./hvtest write -qdbm casket 5000
+	$(RUNENV) $(RUNCMD) ./hvtest read -qdbm casket 5000
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./cbtest sort 5000
+	$(RUNENV) $(RUNCMD) ./cbtest strstr 500
+	$(RUNENV) $(RUNCMD) ./cbtest list 50000
+	$(RUNENV) $(RUNCMD) ./cbtest list -d 500
+	$(RUNENV) $(RUNCMD) ./cbtest map 50000 500
+	$(RUNENV) $(RUNCMD) ./cbtest map -d 500 5
+	$(RUNENV) $(RUNCMD) ./cbtest heap 50000 500
+	$(RUNENV) $(RUNCMD) ./cbtest heap -d 500 50
+	$(RUNENV) $(RUNCMD) ./cbtest wicked 5000
+	$(RUNENV) $(RUNCMD) ./cbtest misc
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./vltest write -tune 32 31 32 32 casket 50000
+	$(RUNENV) $(RUNCMD) ./vltest read casket
+	$(RUNENV) $(RUNCMD) ./vltest rdup -tune 32 31 512 256 casket 50000 50000
+	$(RUNENV) $(RUNCMD) ./vltest combo casket
+	$(RUNENV) $(RUNCMD) ./vltest wicked -c casket 5000
+	$(RUNENV) $(RUNCMD) ./vltest wicked casket 500
+	$(RUNENV) $(RUNCMD) ./vlmgr repair casket
+	$(RUNENV) $(RUNCMD) ./vlmgr optimize casket
+	$(RUNENV) $(RUNCMD) ./vlmgr list casket
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./vltest write -int -cz -tune 32 31 32 32 casket 50000
+	$(RUNENV) $(RUNCMD) ./vltest read -int -vc casket
+	$(RUNENV) $(RUNCMD) ./vltest rdup -int -cz -cc -tune 32 31 512 256 casket 50000 50000
+	$(RUNENV) $(RUNCMD) ./vltest combo -cz casket
+	$(RUNENV) $(RUNCMD) ./vltest wicked -cz -c casket 5000
+	$(RUNENV) $(RUNCMD) ./vltest combo -cy casket
+	$(RUNENV) $(RUNCMD) ./vltest wicked -cy -c casket 5000
+	$(RUNENV) $(RUNCMD) ./vltest combo -cx casket
+	$(RUNENV) $(RUNCMD) ./vltest wicked -cx -c casket 5000
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./odtest write casket 500 50 5000
+	$(RUNENV) $(RUNCMD) ./odtest read casket
+	$(RUNENV) $(RUNCMD) ./odtest combo casket
+	$(RUNENV) $(RUNCMD) ./odtest wicked casket 500
+	rm -rf casket*
+	$(RUNENV) $(RUNCMD) ./qmttest casket 50000 10
+	rm -rf casket*
+	@printf '\n'
+	@printf '#================================================================\n'
+	@printf '# Checking completed.\n'
+	@printf '#================================================================\n'
+
+
+check-valgrind :
+	make RUNCMD="valgrind --tool=memcheck --log-fd=1" check | tee leak.log
+	grep ERROR leak.log
+	grep 'at exit' leak.log
+
+
+world :
+	make clean ; make
+	cd plus ; [ -f Makefile ] || ./configure ; make clean ; make
+	cd java ; [ -f Makefile ] || ./configure ; make clean ; make
+	cd perl ; [ -f Makefile ] || ./configure ; make clean ; make
+	cd ruby ; [ -f Makefile ] || ./configure ; make clean ; make
+	cd cgi ; [ -f Makefile ] || ./configure ; make clean ; make
+
+
+install-world :
+	make install
+	cd plus ; [ -f Makefile ] || ./configure ; make install
+	cd java ; [ -f Makefile ] || ./configure ; make install
+	cd perl ; [ -f Makefile ] || ./configure ; make install
+	cd ruby ; [ -f Makefile ] || ./configure ; make install
+	cd cgi ; [ -f Makefile ] || ./configure ; make install
+
+
+uninstall-world :
+	make uninstall
+	cd plus ; [ -f Makefile ] || ./configure ; make uninstall
+	cd java ; [ -f Makefile ] || ./configure ; make uninstall
+	cd perl ; [ -f Makefile ] || ./configure ; make uninstall
+	cd ruby ; [ -f Makefile ] || ./configure ; make uninstall
+	cd cgi ; [ -f Makefile ] || ./configure ; make uninstall
+
+
+check-world :
+	make check
+	cd plus ; [ -f Makefile ] || ./configure ; make check
+	cd java ; [ -f Makefile ] || ./configure ; make check
+	cd perl ; [ -f Makefile ] || ./configure ; make check
+	cd ruby ; [ -f Makefile ] || ./configure ; make check
+
+
+rpm : ../$(PACKAGETGZ) qdbm.spec
+	mkdir -p rpm-tmp/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+	mkdir -p rpm-tmp/RPMS/i386
+	cp ../$(PACKAGETGZ) rpm-tmp/SOURCES
+	rpmbuild -bb --target i386 --define "_topdir `pwd`/rpm-tmp" qdbm.spec
+	mv -f rpm-tmp/RPMS/i386/$(PACKAGE)-*$(VERSION)*.rpm ..
+	rm -rf rpm-tmp
+
+
+win32pkg :
+	test -f /bin/mgwz.dll
+	test -f /bin/libiconv-2.dll
+	make uninstall && make uninstall-win && make clean
+	make mingw && strip *.exe && make install-win
+	cd java && ./configure
+	cd java && make uninstall && make uninstall-win && make clean
+	cd java && make mingw
+	cd cgi && ./configure
+	cd cgi && make clean
+	cd cgi && make mingw && strip *.cgi
+	mkdir -p $(PACKAGE)-$(VERSION)-win32
+	cp -Rf $(MYHEADS) libqdbm.dll.a qdbm.dll *.exe *.html \
+	  misc/README-win32.txt misc/COPYING.txt misc/win32check.bat \
+	  /bin/mgwz.dll /bin/libiconv-2.dll \
+	  $(PACKAGE)-$(VERSION)-win32
+	cp -Rf java/jqdbm.dll java/qdbm.jar java/*.html java/japidoc $(PACKAGE)-$(VERSION)-win32
+	mkdir -p $(PACKAGE)-$(VERSION)-win32/cgi
+	cp -Rf cgi/*.cgi cgi/*.conf cgi/*.html $(PACKAGE)-$(VERSION)-win32/cgi
+	zip -r $(PACKAGE)-$(VERSION)-win32.zip $(PACKAGE)-$(VERSION)-win32
+	mv -f $(PACKAGE)-$(VERSION)-win32.zip ..
+	rm -rf $(PACKAGE)-$(VERSION)-win32
+	make uninstall && make uninstall-win && make clean
+	cd java ; make uninstall && make uninstall-win && make clean
+
+
+win :
+	make MYLIBS="$(MYWINLIBS)" CFLAGS="-Wall -ansi -pedantic -fsigned-char -O2"
+
+
+mingw :
+	make CC="gcc -mno-cygwin" MYLIBS="$(MYWINLIBS)" \
+	  CFLAGS="-Wall -fsigned-char -O2" LIBLDFLAGS="@MGWLIBS@" LDFLAGS="-L. -lqdbm @MGWLIBS@"
+
+
+check-win :
+	make check
+
+
+install-win :
+	make MYBINS="`for file in $(MYBINS) ; do echo $$file.exe ; done | tr '\n' ' '`" \
+	  MYLIBS="$(MYWINLIBS)" install
+	cp -Rf qdbm.dll $(DESTDIR)$(MYBINDIR)
+
+
+uninstall-win :
+	make MYBINS="`for file in $(MYBINS) ; do echo $$file.exe ; done | tr '\n' ' '`" \
+	  MYLIBS="$(MYWINLIBS)" uninstall
+	rm -f $(DESTDIR)$(MYBINDIR)/qdbm.dll
+
+
+def : libqdbm.a
+	./misc/makevcdef libqdbm.a > qdbm.def
+
+
+mac :
+	make MYLIBS="$(MYMACLIBS)" CFLAGS="-Wall -fsigned-char -fno-common -O2"
+
+
+check-mac :
+	make RUNENV="DYLD_LIBRARY_PATH=." check
+
+
+install-mac :
+	make MYLIBS="$(MYMACLIBS)" install
+
+
+uninstall-mac :
+	make MYLIBS="$(MYMACLIBS)" uninstall
+
+
+hpux :
+	make MYLIBS="$(MYHPUXLIBS)"
+
+
+check-hpux :
+	make RUNENV="SHLIB_PATH=." check
+
+
+install-hpux :
+	make MYLIBS="$(MYHPUXLIBS)" install
+
+
+uninstall-hpux :
+	make MYLIBS="$(MYHPUXLIBS)" uninstall
+
+
+no-so :
+	make MYLIBS="libqdbm.a" all
+
+
+install-no-so :
+	make MYLIBS="libqdbm.a" install
+
+
+uninstall-no-so :
+	make MYLIBS="libqdbm.a" uninstall
+
+
+.PHONY : all clean install check
+
+
+
+#================================================================
+# Building binaries
+#================================================================
+
+
+libqdbm.a : $(MYLIBOBJS)
+	$(AR) $(ARFLAGS) $@ $(MYLIBOBJS)
+
+
+libqdbm.so.$(LIBVER).$(LIBREV).0 : $(MYLIBOBJS)
+	if uname -a | egrep -i 'SunOS' > /dev/null ; \
+	  then \
+	    $(CC) -shared -Wl,-G,-h,libqdbm.so.$(LIBVER) -o $@ $(MYLIBOBJS) $(LIBLDFLAGS) ; \
+	  else \
+	    $(CC) -shared -Wl,-soname,libqdbm.so.$(LIBVER) -o $@ $(MYLIBOBJS) $(LIBLDFLAGS) ; \
+	  fi
+
+
+libqdbm.so.$(LIBVER) : libqdbm.so.$(LIBVER).$(LIBREV).0
+	ln -f -s libqdbm.so.$(LIBVER).$(LIBREV).0 $@
+
+
+libqdbm.so : libqdbm.so.$(LIBVER).$(LIBREV).0
+	ln -f -s libqdbm.so.$(LIBVER).$(LIBREV).0 $@
+
+
+libqdbm.dll.a : qdbm.dll
+
+
+qdbm.dll : $(MYLIBOBJS)
+	$(CC) -shared -o $@ \
+	  -Wl,--out-implib=lib$@.a \
+	  -Wl,--export-all-symbols \
+	  -Wl,--enable-auto-import \
+	  -Wl,--add-stdcall-alias \
+	  -Wl,--whole-archive \
+	  -Wl,--no-whole-archive $(MYLIBOBJS) $(LIBLDFLAGS)
+
+
+libqdbm.$(LIBVER).$(LIBREV).0.dylib : $(MYLIBOBJS)
+	$(CC) -dynamiclib -o $@ \
+	  -install_name $(MYLIBDIR)/libqdbm.$(LIBVER).dylib \
+	  -current_version $(LIBVER).$(LIBREV).0 \
+	  -compatibility_version $(LIBVER) \
+	  $(MYLIBOBJS) $(LIBLDFLAGS)
+
+
+libqdbm.$(LIBVER).dylib : libqdbm.$(LIBVER).$(LIBREV).0.dylib
+	ln -f -s libqdbm.$(LIBVER).$(LIBREV).0.dylib $@
+
+
+libqdbm.dylib : libqdbm.$(LIBVER).$(LIBREV).0.dylib
+	ln -f -s libqdbm.$(LIBVER).$(LIBREV).0.dylib $@
+
+
+libqdbm.sl : $(MYLIBOBJS)
+	$(CC) -shared -Wl,-b -o $@ $(MYLIBOBJS) $(LIBLDFLAGS)
+
+
+dpmgr : dpmgr.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ dpmgr.o $(LDFLAGS)
+
+
+dptest : dptest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ dptest.o $(LDFLAGS)
+
+
+dptsv : dptsv.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ dptsv.o $(LDFLAGS)
+
+
+crmgr : crmgr.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ crmgr.o $(LDFLAGS)
+
+
+crtest : crtest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ crtest.o $(LDFLAGS)
+
+
+crtsv : crtsv.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ crtsv.o $(LDFLAGS)
+
+
+rlmgr : rlmgr.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ rlmgr.o $(LDFLAGS)
+
+
+rltest : rltest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ rltest.o $(LDFLAGS)
+
+
+hvmgr : hvmgr.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ hvmgr.o $(LDFLAGS)
+
+
+hvtest : hvtest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ hvtest.o $(LDFLAGS)
+
+
+cbtest : cbtest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ cbtest.o $(LDFLAGS)
+
+
+cbcodec : cbcodec.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ cbcodec.o $(LDFLAGS)
+
+
+vlmgr : vlmgr.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ vlmgr.o $(LDFLAGS)
+
+
+vltest : vltest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ vltest.o $(LDFLAGS)
+
+
+vltsv : vltsv.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ vltsv.o $(LDFLAGS)
+
+
+odmgr : odmgr.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ odmgr.o $(LDFLAGS)
+
+
+odtest : odtest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ odtest.o $(LDFLAGS)
+
+
+odidx : odidx.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ odidx.o $(LDFLAGS)
+
+
+qmttest : qmttest.o $(MYLIBS)
+	$(LDENV) $(CC) $(CFLAGS) -o $@ qmttest.o $(LDFLAGS)
+
+
+depot.o : depot.h myconf.h
+
+curia.o : depot.h curia.h myconf.h
+
+relic.o : depot.h relic.h myconf.h
+
+hovel.o : depot.h curia.h hovel.h myconf.h
+
+cabin.o : cabin.h myconf.h
+
+villa.o : depot.h cabin.h villa.h myconf.h
+
+vista.o : depot.h curia.h cabin.h villa.h vista.h myconf.h villa.c
+
+odeum.o : depot.h curia.h cabin.h villa.h myconf.h
+
+myconf.o : myconf.h
+
+dpmgr.o dptest.o dptsv.o : depot.h cabin.h
+
+crmgr.o crtest.o crtsv.o : depot.h curia.h cabin.h
+
+rlmgr.o rltest.o : depot.h relic.h cabin.h
+
+hvmgr.o hvtest.o : depot.h curia.h hovel.h cabin.h
+
+cbtest.o cbcodec.o : cabin.h
+
+vlmgr.o vltest.o vltsv.o : depot.h cabin.h villa.h
+
+odmgr.o odtest.o odidx.o : depot.h curia.h cabin.h villa.h odeum.h
+
+
+
+# END OF FILE
