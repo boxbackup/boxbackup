@@ -1,0 +1,140 @@
+# Makefile for the RISC OS version of QDBM
+
+
+# Define which compiler to use:
+
+CC = cc
+#CC = gcc
+
+
+#########################################
+# DO NOT EDIT ANYTHING BELOW THIS LINE! #
+#########################################
+
+ifeq (${CC},cc)
+CC = cc
+LD = link
+AR = libfile
+DEPEND = -depend !Depend
+CC_FLAGS = -Wdp -throwback -Otime -I@,Unix: -JUnix
+UNIXLIB = Unix:o.UnixLib
+else
+ifeq (${CC},gcc)
+CC = gcc
+LD = gcc
+AR = ar
+CC_FLAGS = -mthrowback -O3 -I.
+else
+# No other compiler supported!
+endif
+endif
+
+QDBM_OBJS = o.depot o.curia o.relic o.hovel o.cabin o.villa o.vista o.odeum o.myconf
+
+.INIT :
+	@cdir o
+
+## Rule Patterns ##
+
+.SUFFIXES : .c .o
+
+.c.o :
+	$(CC) $(CC_FLAGS) $(DEPEND) -c -o $@ $<
+
+# Static dependencies:
+
+all : libqdbm testcases managers converters
+
+libqdbm : $(QDBM_OBJS)
+	$(AR) $(AR_FLAGS) -c -o libqdbm $(QDBM_OBJS)
+
+testcases : dptest crtest rltest hvtest cbtest vltest odtest
+	create testcases
+
+managers : dpmgr crmgr rlmgr hvmgr vlmgr odmgr
+	create managers
+
+converters : dptsv crtsv cbcodec vltsv odidx
+	create converters
+
+dptest : o.dptest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+crtest : o.crtest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+rltest : o.rltest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+hvtest : o.hvtest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+cbtest : o.cbtest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+vltest : o.vltest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+odtest : o.odtest libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+dpmgr : o.dpmgr libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+crmgr : o.crmgr libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+rlmgr : o.rlmgr libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+hvmgr : o.hvmgr libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+vlmgr : o.vlmgr libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+odmgr : o.odmgr libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+dptsv : o.dptsv libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+crtsv : o.crtsv libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+cbcodec : o.cbcodec libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+vltsv : o.vltsv libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+odidx : o.odidx libqdbm
+	$(LD) $(LD_FLAGS) -o $@ o.$* libqdbm $(UNIXLIB)
+
+clean:
+	-ifthere libqdbm then wipe libqdbm ~CFR~V
+	-ifthere dptest then wipe dptest ~CFR~V
+	-ifthere crtest then wipe crtest ~CFR~V
+	-ifthere rltest then wipe rltest ~CFR~V
+	-ifthere hvtest then wipe hvtest ~CFR~V
+	-ifthere cbtest then wipe cbtest ~CFR~V
+	-ifthere vltest then wipe vltest ~CFR~V
+	-ifthere odtest then wipe odtest ~CFR~V
+	-ifthere dpmgr then wipe dpmgr ~CFR~V
+	-ifthere crmgr then wipe crmgr ~CFR~V
+	-ifthere rlmgr then wipe rlmgr ~CFR~V
+	-ifthere hvmgr then wipe hvmgr ~CFR~V
+	-ifthere cbmgr then wipe cbmgr ~CFR~V
+	-ifthere vlmgr then wipe vlmgr ~CFR~V
+	-ifthere odmgr then wipe odmgr ~CFR~V
+	-ifthere dptsv then wipe dptsv ~CFR~V
+	-ifthere crtsv then wipe crtsv ~CFR~V
+	-ifthere cbcodec then wipe cbcodec ~CFR~V
+	-ifthere vltsv then wipe vltsv ~CFR~V
+	-ifthere odidx then wipe odidx ~CFR~V
+	-ifthere testcases then wipe testcases ~CFR~V
+	-ifthere managers then wipe managers ~CFR~V
+	-ifthere converters then wipe converters ~CFR~V
+	-ifthere o.* then wipe o.* ~CFR~V
+
+# Dynamic dependencies:
