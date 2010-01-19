@@ -1,2 +1,2 @@
-0.11rc5
+0.11rc6
 boxbackup
