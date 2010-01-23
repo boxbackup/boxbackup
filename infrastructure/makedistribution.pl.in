@@ -12,12 +12,15 @@ my %comment_chars = ('cpp' => '// ', 'h' => '// ', 'pl' => '# ', 'pm' => '# ', '
 my %text_files = ('txt' => 1, 'spec' => 1, 'in' => 1);
 
 # files which don't get the license added
-my %no_license = (); # 'filename' => 1
+# my %file_license = (); # 'filename' => 'GPL', 'DUAL' or 'none'
 
 # ----------------------------------------------
 
 # filled in from the manifest file
-my %no_license_dir = ();
+# my %dir_license = (); # 'dir' => 'GPL', 'DUAL' or 'none'
+#
+# most recently specified LICENSE become default until overridden
+my $current_license; # 'GPL', 'DUAL' or 'none'
 
 # distribution name
 my $distribution = $ARGV[0];
@@ -68,12 +71,17 @@ system "rm -rf $base_name";
 system "rm $base_name.tgz";
 mkdir $base_name,0755;
 
-# get license file
-open LICENSE,"$dist_root/LICENSE.txt" or die "Can't open $dist_root/LICENSE.txt";
-my $license_f;
-read LICENSE,$license_f,100000;
-close LICENSE;
-my @license = ('distribution '.$base_name.' (svn version: '.$svnversion.')',split(/\n/,$license_f));
+# get license files
+my %license_text; # name of license => array of lines of license text
+foreach my $license ("GPL", "DUAL")
+{
+	my $file = "./LICENSE-$license.txt";
+	open LICENSE, $file or die "Can't open $file: $!";
+	my @lines = <LICENSE>;
+	close LICENSE;
+	unshift @lines, "distribution $base_name (svn version: $svnversion)\n";
+	$license_text{$license} = \@lines;
+}
 
 # copy files, make a note of all the modules included
 my %modules_included;
@@ -88,40 +96,21 @@ sub copy_from_list
 	{
 		next unless $line =~ m/\S/;
 		chomp $line;
-		my ($src,$dst,$other) = split /\s+/, $line;
+		my @words = split /\s+/, $line;
+		my ($src,$dst,$other) = @words;
 		$dst = $src if $dst eq '';
 		if($src eq 'MKDIR')
 		{
 			# actually we just need to make a directory here
 			mkdir "$base_name/$dst",0755;
 		}
-		elsif($src eq 'NO-LICENSE-IN-DIR')
+		elsif($src eq 'LICENSE')
 		{
-			my ($junk,$spec) = split /\s+/, $line;
-			# record that this directory shouldn't have the license added
-			$no_license_dir{$dst} = 1;
-
-			# actually copy it, to remove redundancy in manifests
-			$src = $dst;
-			$dst = $other;
-			$dst = $src if $dst eq '';
-			$modules_included{$spec} = 1;
-			copy_dir($src,$dst);
+			$current_license = $dst;
 		}
 		elsif($src eq 'REPLACE-VERSION-IN')
 		{
 			replace_version_in($dst);
-		}
-		elsif($src eq 'NO-LICENSE')
-		{
-			$no_license{$dst} = 1;
-
-			# actually copy it, to remove redundancy in manifests
-			$src = $dst;
-			$dst = $other;
-			$dst = $src if $dst eq '';
-
-			copy_file($src,$dst);
 		}
 		elsif($src eq 'RUN')
 		{
@@ -189,14 +178,10 @@ sub copy_file
 	
 	my $ext;
 	$ext = $1 if $fn =~ m/\.(\w+)\Z/;
-	
-	# licenses not used in this directory?
-	my $license_in_dir = 1;
 	$dst_fn =~ m~\A(.+)/[^/]+?\Z~;
-	$license_in_dir = 0 if exists $no_license_dir{$1};
 	
 	# licensed or not?
-	if(exists $comment_chars{$ext} && !exists $no_license{$fn} && $license_in_dir)
+	if(exists $comment_chars{$ext} && $current_license ne "none")
 	{
 		# copy as text, inserting license
 		# print "source copy $fn to $base_name/$dst_fn\n";
@@ -214,9 +199,10 @@ sub copy_file
 		
 		# write license
 		my $b = $comment_chars{$ext};
-		for(@license)
+		my $this_license = $license_text{$current_license};
+		for (@$this_license)
 		{
-			print OUT $b,$_,"\n"
+			print OUT $b, $_;
 		}
 		
 		if($first ne '')
