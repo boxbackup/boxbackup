@@ -55,7 +55,7 @@ while(<FINDAUTOGEN>)
 	my $dir = $1;
 	open FL,$file or die "Can't open $_ for reading";
 	my %vars;
-	$vars{PERL} = "@PERL@";
+	$vars{_PERL} = "@PERL@";
 	my $do_cmds = 0;
 	while(<FL>)
 	{
@@ -590,6 +590,7 @@ _LINK    = \$(CXX)
 _WINDRES = \$(WINDRES)
 _AR      = \$(AR)
 _RANLIB  = \$(RANLIB)
+_PERL    = \$(PERL)
 .else
 HIDE     = @
 _CXX     = @ echo "  [CXX]    " \$(*F) && \$(CXX)
@@ -597,6 +598,7 @@ _LINK    = @ echo "  [LINK]   " \$(*F) && \$(CXX)
 _WINDRES = @ echo "  [WINDRES]" \$(*F) && \$(WINDRES)
 _AR      = @ echo "  [AR]     " \$(*F) && \$(AR)
 _RANLIB  = @ echo "  [RANLIB] " \$(*F) && \$(RANLIB)
+_PERL    = @ echo "  [PERL]   " \$(*F) && \$(PERL)
 .endif
 
 __E
@@ -610,6 +612,7 @@ _LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    \$@" && \$(CXX))
 _WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] \$<" && \$(WINDRES))
 _AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      \$@" && \$(AR))
 _RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  \$@" && \$(RANLIB))
+_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    \$@" && \$(PERL))
 
 __E
 	}

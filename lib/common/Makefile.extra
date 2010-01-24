@@ -3,9 +3,9 @@ MAKEEXCEPTION = ../../lib/common/makeexception.pl
 
 # AUTOGEN SEEDING
 autogen_CommonException.h autogen_CommonException.cpp:	$(MAKEEXCEPTION) CommonException.txt
-	$(PERL) $(MAKEEXCEPTION) CommonException.txt
+	$(_PERL) $(MAKEEXCEPTION) CommonException.txt
 
 # AUTOGEN SEEDING
 autogen_ConversionException.h autogen_ConversionException.cpp:	$(MAKEEXCEPTION) ConversionException.txt
-	$(PERL) $(MAKEEXCEPTION) ConversionException.txt
+	$(_PERL) $(MAKEEXCEPTION) ConversionException.txt
 
