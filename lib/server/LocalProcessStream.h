@@ -13,7 +13,8 @@
 #include <memory>
 #include "IOStream.h"
 
-std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidOut);
+std::auto_ptr<IOStream> LocalProcessStream(const std::string& rCommandLine,
+	pid_t &rPidOut);
 
 #endif // LOCALPROCESSSTREAM__H
 
