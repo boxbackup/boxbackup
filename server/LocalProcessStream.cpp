@@ -43,13 +43,14 @@
 //		Created: 12/3/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidOut)
+std::auto_ptr<IOStream> LocalProcessStream(const std::string& rCommandLine,
+	pid_t &rPidOut)
 {
 #ifndef WIN32
 
 	// Split up command
 	std::vector<std::string> command;
-	SplitString(std::string(CommandLine), ' ', command);
+	SplitString(rCommandLine, ' ', command);
 
 	// Build arguments
 	char *args[MAX_ARGUMENTS + 4];
@@ -137,8 +138,8 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
 	startupInfo.hStdInput  = INVALID_HANDLE_VALUE;
 	startupInfo.dwFlags   |= STARTF_USESTDHANDLES;
 
-	CHAR* commandLineCopy = (CHAR*)malloc(strlen(CommandLine) + 1);
-	strcpy(commandLineCopy, CommandLine);
+	CHAR* commandLineCopy = (CHAR*)malloc(rCommandLine.size() + 1);
+	strcpy(commandLineCopy, rCommandLine.c_str());
 
 	BOOL result = CreateProcess(NULL, 
 		commandLineCopy, // command line 
@@ -155,7 +156,7 @@ std::auto_ptr<IOStream> LocalProcessStream(const char *CommandLine, pid_t &rPidO
    
 	if(!result)
 	{
-		BOX_ERROR("Failed to CreateProcess: '" << CommandLine <<
+		BOX_ERROR("Failed to CreateProcess: '" << rCommandLine <<
 			"': " << GetErrorMessage(GetLastError()));
 		CloseHandle(writeInChild);
 		CloseHandle(readFromChild);
