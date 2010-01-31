@@ -1549,6 +1549,11 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			std::string storeDirPath(rStoreDir + "/" +
 				localDirEn->d_name);
 
+			// Check whether dir is excluded before trying to
+			// stat it, to fix problems with .gvfs directories
+			// that are not readable by root causing compare
+			// to crash:
+			// http://lists.boxbackup.org/pipermail/boxbackup/2010-January/000013.html
 			if(rParams.IsExcludedDir(localDirPath))
 			{
 				rParams.NotifyExcludedDir(localDirPath,
