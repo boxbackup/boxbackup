@@ -13,11 +13,10 @@ http://lists.boxbackup.org/pipermail/boxbackup/2010-January/000005.html
 
 Note that this project uses mixed licensing. Different parts of the project
 may be used and distributed under different licenses, as described below.
-The two licenses used are GPL and BSD.
+The two licenses used are "Box Backup GPL" and a BSD-style license.
 
 Unless stated otherwise in the file, all files in the following directories
-fall under the GPL license (the GNU General Public License v2, or later
-at your choice):
+fall under the "Box Backup GPL" license, described below:
 
 bin/bbackupctl
 bin/bbackupd
@@ -45,8 +44,57 @@ contrib/suse
 contrib/windows
 distribution/boxbackup
 
-The GPL license follows:
+The "Box Backup GPL" license follows:
 ---------------------------------------------------------------------
+The Box Backup GPL is based on the GPLv2 (GNU General Public License
+version 2 or later) as published by the Free Software Foundation.
+However, it includes optional exceptions which allow linking with
+OpenSSL and Microsoft VSS, listed below. This means that Box Backup
+is not under pure GPLv2 as published by the Free Software Foundation.
+These are the only differences between the Box Backup GPL license and
+the original GPL from the Free Software Foundation.
+
+Please note that while the Box Backup GPL is similar in spirit to the
+original GPL, it is not fully compatible. Because of these optional
+exceptions, you may not include or combine fully GPL source code 
+(such as the GNU readline library) with Box Backup, or distribute the
+resulting binaries, under the Box Backup GPL license, without
+specific permission from the authors of such code. You may do so
+under the pure GPL license, by omitting the optional exclusion clauses
+below, however you may not legally link such code with OpenSSL or
+Microsoft VSS, which may limit the usefulness or functionality of the
+resulting code.
+
+The license exemption section below was based on the license of the
+Bacula project
+[http://bacula.git.sourceforge.net/git/gitweb.cgi?p=bacula/bacula;a=blob_plain;f=bacula/LICENSE;hb=HEAD].
+
+For the most part, Box Backup is licensed under the GPL version 2
+[http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt].
+The sections that follow are optional exemptions to the GPL version 2
+license, that apply to code that is copyrighted by Ben Summers and
+Contributors.
+
+Linking: 
+As a special exception to the GPLv2, the Box Backup Project gives
+permission to link any code falling under this license (the Box Backup
+GPL) with any software that can be downloaded from
+the OpenSSL website [http://www.openssl.org] under either the
+"OpenSSL License" or the "Original SSLeay License", and to distribute
+the linked executables under the terms of the "Box Backup GPL" license.
+
+As a special exception to the GPLv2, the Box Backup Project gives
+permission to link any code falling under this license (the Box Backup
+GPL) with any version of Microsoft's Volume Shadow Copy Service 7.2 SDK
+or Microsoft Windows Software Development Kit (SDK), including
+vssapi.lib, that can be downloaded from the Microsoft website
+[*.microsoft.com], and to distribute the linked executables under the
+terms of the "Box Backup GPL" license.
+
+The sections above are optional, and you may distribute the code that
+falls under this license under the original GPLv2 license by omitting
+them. The original GPLv2 license follows.
+
 		    GNU GENERAL PUBLIC LICENSE
 		       Version 2, June 1991
 
@@ -387,7 +435,6 @@ consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
 ---------------------------------------------------------------------
-[http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt]
 
 Unless stated otherwise in the file or in the list of directories above,
 all files in the following directories are dual licensed under the BSD and
