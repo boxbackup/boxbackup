@@ -5,8 +5,10 @@ All rights reserved.
 
 Note that this project uses mixed licensing. Any file with this license
 attached, or where the code LICENSE-GPL appears on the first line, falls
-under this license. See the file COPYING.txt for more information.
+under the "Box Backup GPL" license. See the file COPYING.txt for more
+information about this license.
 
+---------------------------------------------------------------------
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
@@ -23,5 +25,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 [http://www.gnu.org/licenses/old-licenses/gpl-2.0.html#SEC4]
 
-You may find a full copy of the GPLv2 license at:
-[http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt]
+As a special exception to the GPLv2, the Box Backup Project gives
+permission to link any code falling under this license (the Box Backup
+GPL) with any software that can be downloaded from
+the OpenSSL website [http://www.openssl.org] under either the
+"OpenSSL License" or the "Original SSLeay License", and to distribute
+the linked executables under the terms of the "Box Backup GPL" license.
+
+As a special exception to the GPLv2, the Box Backup Project gives
+permission to link any code falling under this license (the Box Backup
+GPL) with any version of Microsoft's Volume Shadow Copy Service 7.2 SDK
+or Microsoft Windows Software Development Kit (SDK), including
+vssapi.lib, that can be downloaded from the Microsoft website
+[*.microsoft.com], and to distribute the linked executables under the
+terms of the "Box Backup GPL" license.
