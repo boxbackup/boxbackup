@@ -1544,13 +1544,24 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				continue;
 			}
 
-#ifndef HAVE_VALID_DIRENT_D_TYPE
-			std::string fn(MakeFullPath
-				(rLocalDir, localDirEn->d_name));
-			EMU_STRUCT_STAT st;
-			if(EMU_LSTAT(fn.c_str(), &st) != 0)
+			std::string localDirPath(MakeFullPath(rLocalDir,
+				localDirEn->d_name));
+			std::string storeDirPath(rStoreDir + "/" +
+				localDirEn->d_name);
+
+			if(rParams.IsExcludedDir(localDirPath))
 			{
-			    THROW_EXCEPTION(CommonException, OSFileError)
+				rParams.NotifyExcludedDir(localDirPath,
+					storeDirPath);
+				continue;
+			}
+
+#ifndef HAVE_VALID_DIRENT_D_TYPE
+			EMU_STRUCT_STAT st;
+			if(EMU_LSTAT(localDirPath.c_str(), &st) != 0)
+			{
+			    THROW_EXCEPTION_MESSAGE(CommonException,
+				OSFileError, localDirPath);
 			}
 			
 			// Entry -- file or dir?
