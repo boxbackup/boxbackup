@@ -119,8 +119,8 @@
 		{ \
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
-				#type "(" #subtype ") (" message ") at " \
-				__FILE__ "(" << __LINE__ << ")") \
+				#type "(" #subtype ") (" << message << \
+				") at " __FILE__ "(" << __LINE__ << ")") \
 		} \
 		throw type(type::subtype, message); \
 	}
