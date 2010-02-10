@@ -234,6 +234,10 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	// Check sizes are the same, as a first check
 	if(mpClearAttributes->GetSize() != rAttr.mpClearAttributes->GetSize())
 	{
+		BOX_TRACE("Attribute Compare: Attributes objects are "
+			"different sizes, cannot compare them: local " <<
+			mpClearAttributes->GetSize() << " bytes, remote " <<
+			rAttr.mpClearAttributes->GetSize() << " bytes");
 		return false;
 	}
 	
@@ -241,15 +245,20 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	// Bytes are checked in network order, but this doesn't matter as we're only checking for equality.
 	attr_StreamFormat *a1 = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
 	attr_StreamFormat *a2 = (attr_StreamFormat*)rAttr.mpClearAttributes->GetBuffer();
-	
-	if(a1->AttributeType != a2->AttributeType
-		|| a1->UID != a2->UID
-		|| a1->GID != a2->GID
-		|| a1->UserDefinedFlags != a2->UserDefinedFlags
-		|| a1->Mode != a2->Mode)
-	{
-		return false;
+
+	#define COMPARE(attribute, message) \
+	if (a1->attribute != a2->attribute) \
+	{ \
+		BOX_TRACE("Attribute Compare: " << message << " differ: " \
+			"local " << a1->attribute << ", " \
+			"remote " << a2->attribute); \
+		return false; \
 	}
+	COMPARE(AttributeType, "Attribute types");
+	COMPARE(UID, "UIDs");
+	COMPARE(GID, "GIDs");
+	COMPARE(UserDefinedFlags, "User-defined flags");
+	COMPARE(Mode, "Modes");
 	
 	if(!IgnoreModTime)
 	{
@@ -257,6 +266,9 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 		int t2 = a2->ModificationTime / 1000000;
 		if(t1 != t2)
 		{
+			BOX_TRACE("Attribute Compare: File modification "
+				"times differ: local " << t1 << ", "
+				"remote " << t2);
 			return false;
 		}
 	}
@@ -267,6 +279,9 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 		int t2 = a2->AttrModificationTime / 1000000;
 		if(t1 != t2)
 		{
+			BOX_TRACE("Attribute Compare: Attribute modification "
+				"times differ: local " << t1 << ", "
+				"remote " << t2);
 			return false;
 		}
 	}
@@ -276,8 +291,16 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	if(size > sizeof(attr_StreamFormat))
 	{
 		// Symlink strings don't match. This also compares xattrs
-		if(::memcmp(a1 + 1, a2 + 1, size - sizeof(attr_StreamFormat)) != 0)
+		int datalen = size - sizeof(attr_StreamFormat);
+
+		if(::memcmp(a1 + 1, a2 + 1, datalen) != 0)
 		{
+			std::string s1((char *)(a1 + 1), datalen);
+			std::string s2((char *)(a2 + 1), datalen);
+			BOX_TRACE("Attribute Compare: Symbolic link target "
+				"or extended attributes differ: "
+				"local " << PrintEscapedBinaryData(s1) << ", "
+				"remote " << PrintEscapedBinaryData(s2));
 			return false;
 		}
 	}
