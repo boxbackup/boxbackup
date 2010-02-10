@@ -18,17 +18,6 @@
 
 #include "FileStream.h"
 
-/*
-#define BOX_LOG(level, stuff) \
-{ \
-    if(Log::sMaxLoggingLevelForAnyOutput >= level) \
-        std::ostringstream line; \
-        line << stuff; \
-        Log::Write(level, __FILE__, __LINE__, line.str()); \
-    } \
-}
-*/
-
 #define BOX_LOG(level, stuff) \
 { \
 	std::ostringstream _box_log_line; \
@@ -52,12 +41,20 @@
 	if (Logging::IsEnabled(Log::TRACE)) \
 	{ BOX_LOG(Log::TRACE, stuff) }
 
+#define BOX_SYS_ERROR(stuff) \
+	stuff << ": " << std::strerror(errno) << " (" << errno << ")"
+
 #define BOX_LOG_SYS_WARNING(stuff) \
-	BOX_WARNING(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
+	BOX_WARNING(BOX_SYS_ERROR(stuff))
 #define BOX_LOG_SYS_ERROR(stuff) \
-	BOX_ERROR(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
+	BOX_ERROR(BOX_SYS_ERROR(stuff))
 #define BOX_LOG_SYS_FATAL(stuff) \
-	BOX_FATAL(stuff << ": " << std::strerror(errno) << " (" << errno << ")")
+	BOX_FATAL(BOX_SYS_ERROR(stuff))
+
+#define LOG_AND_THROW_ERROR(message, filename, exception, subtype) \
+	BOX_LOG_SYS_ERROR(message << ": " << filename); \
+	THROW_EXCEPTION_MESSAGE(exception, subtype, \
+		BOX_SYS_ERROR(message << ": " << filename));
 
 inline std::string GetNativeErrorMessage()
 {
@@ -338,5 +335,7 @@ class HideExceptionMessageGuard
 	static bool sHiddenState;
 	bool mOldHiddenState;
 };
+
+std::string PrintEscapedBinaryData(const std::string& rInput);
 
 #endif // LOGGING__H

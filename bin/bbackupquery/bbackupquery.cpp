@@ -60,7 +60,7 @@
 
 void PrintUsageAndExit()
 {
-	printf("Usage: bbackupquery [-q] [-w] "
+	printf("Usage: bbackupquery [-q*|v*|V|W<level>] [-w] "
 #ifdef WIN32
 	"[-u] "
 #endif
@@ -123,10 +123,10 @@ int main(int argc, const char *argv[])
 	#endif
 
 #ifdef WIN32
-	const char* validOpts = "qvwuc:l:o:O:W:";
+	const char* validOpts = "qvVwuc:l:o:O:W:";
 	bool unicodeConsole = false;
 #else
-	const char* validOpts = "qvwc:l:o:O:W:";
+	const char* validOpts = "qvVwc:l:o:O:W:";
 #endif
 
 	std::string fileLogFile;
@@ -138,7 +138,7 @@ int main(int argc, const char *argv[])
 	{
 		switch(c)
 		{
-			case 'q':
+		case 'q':
 			{
 				if(masterLevel == Log::NOTHING)
 				{
@@ -151,7 +151,7 @@ int main(int argc, const char *argv[])
 			}
 			break;
 
-			case 'v':
+		case 'v':
 			{
 				if(masterLevel == Log::EVERYTHING)
 				{
@@ -161,6 +161,12 @@ int main(int argc, const char *argv[])
 					return 2;
 				}
 				masterLevel++;
+			}
+			break;
+
+		case 'V':
+			{
+				masterLevel = Log::EVERYTHING;
 			}
 			break;
 
