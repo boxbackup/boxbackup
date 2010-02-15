@@ -115,25 +115,7 @@ __E
 
 print MAKE "all:\t",join(' ',map {"build-".$_} @parcels),"\n\n";
 
-print MAKE "clean:\n";
-for my $parcel (@parcels)
-{
-	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
-	print MAKE "\trm -f ",  BoxPlatform::parcel_target($parcel), "\n";
-}
-
-if ($build_os eq 'CYGWIN')
-{
-	print MAKE "\tfind release debug -type f | xargs -r rm -f\n";
-}
-else
-{
-	print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
-}
-
 print MAKE <<__END_OF_FRAGMENT;
-	\$(MAKE) -C docs clean
-
 test:	release/common/test
 
 release/common/test:
@@ -146,6 +128,7 @@ docs:
 __END_OF_FRAGMENT
 
 my $release_flag = BoxPlatform::make_flag('RELEASE');
+my @clean_deps;
 
 for my $parcel (@parcels)
 {
@@ -259,6 +242,20 @@ docs/htmlguide/man-html/${name}.html:
 EOF
 			push @parcel_deps, "$dir/docs/${name}.html";
 		}
+		elsif ($type eq 'subdir')
+		{
+			print MAKE <<EOF;
+.PHONY: $name-build $name-clean
+
+$name-build:
+	\$(MAKE) -C $name
+
+$name-clean:
+	\$(MAKE) -C $name clean
+EOF
+			push @parcel_deps, "$name-build";
+			push @clean_deps,  "$name-clean";
+		}
 	}
 
 	print MAKE <<EOF;
@@ -351,11 +348,28 @@ EOF
 	}
 }
 
-print MAKE <<__E;
+print MAKE <<EOF;
 install:
 	cat local/install.msg
 
-__E
+clean: @clean_deps
+	\$(MAKE) -C docs clean
+EOF
+
+if ($build_os eq 'CYGWIN')
+{
+	print MAKE "\tfind release debug -type f | xargs -r rm -f\n";
+}
+else
+{
+	print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
+}
+
+for my $parcel (@parcels)
+{
+	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
+	print MAKE "\trm -f ",  BoxPlatform::parcel_target($parcel), "\n";
+}
 
 close MAKE;
 
