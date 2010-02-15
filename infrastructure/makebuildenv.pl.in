@@ -257,7 +257,7 @@ for(@modules_files)
 	push @modules,$mod;
 	my @md;	# module dependencies
 	my @lo; # link line options
-	for(@deps)
+	for (@deps)
 	{
 		if(/\A-l/)
 		{
@@ -273,7 +273,7 @@ for(@modules_files)
 	
 	# make directories, but not if we're using an external library and this a library module
 	my ($s,$d) = split /\//,$mod;
-	if($s ne 'lib' || $external_lib eq '')
+	if ($s ne 'lib' or $external_lib eq '')
 	{
 		mkdir "release/$s",0755;
 		mkdir "release/$s/$d",0755;
@@ -371,11 +371,11 @@ for my $mod (@modules, @implicit_deps)
 	closedir DIR;
 }
 
+# Then write a makefile for each module
 print "done\n\nGenerating Makefiles...\n";
 
 my %module_resources_win32;
 
-# Then write a makefile for each module
 for my $mod (@implicit_deps, @modules)
 {
 	print $mod,"\n";
@@ -775,8 +775,20 @@ __E
 	}
 	print MAKE $deps_makeinfo if $bsd_make;
 	
-	# get the list of library things to add -- in order of dependency so things link properly
-	my $lib_files = join(' ',map {($_ =~ m/lib\/(.+)\Z/)?('$(OUTBASE)/'.$_.'/'.$1.'.a'):undef} (reverse(@all_deps_for_module)));
+	# get the list of library things to add -- in order of dependency 
+	# so things link properly
+	my @lib_files;
+	foreach my $dep (reverse @all_deps_for_module)
+	{
+		if ($dep =~ m|^lib\/(.+)$|)
+		{
+			push @lib_files, "\$(OUTBASE)/$dep/$1.a";
+		}
+		elsif ($dep =~ m|^([^/]+)$|)
+		{
+			push @lib_files, "../../$dep/lib$1.a";
+		}
+	}
 
 	# need to see if the extra makefile fragments require extra object files
 	# or include any more makefiles
@@ -795,7 +807,7 @@ __E
 	}
 
 	print MAKE $end_target,': ',$o_file_list;
-	print MAKE " ",$lib_files unless $target_is_library;
+	print MAKE " @lib_files" unless $target_is_library;
 	print MAKE "\n";
 	
 	if ($target_windows)
@@ -822,13 +834,26 @@ __E
 		# work out library options
 		# need to be... least used first, in absolute order they appear in the modules.txt file
 		my @libops;
+		
 		sub libops_fill
 		{
-			my ($m,$r) = @_;
-			push @$r,$_ for(@{$module_library_link_opts{$m}});
-			libops_fill($_,$r) for(@{$module_dependency{$m}});
+			my ($module, $libops_ref) = @_;
+			
+			my $library_link_opts = $module_library_link_opts{$module};
+			if ($library_link_opts)
+			{
+				push @$libops_ref, @$library_link_opts;
+			}
+			
+			my $deps = $module_dependency{$module};
+			foreach my $dep (@$deps)
+			{
+				libops_fill($dep, $libops_ref);
+			}
 		}
+		
 		libops_fill($mod,\@libops);
+		
 		my $lo = '';
 		my %ldone;
 		for(@libops)
@@ -841,7 +866,7 @@ __E
 		# link line...
 		print MAKE "\t\$(_LINK) \$(LDFLAGS) $link_line_extra " .
 			"-o $end_target $o_file_list " .
-			"$lib_files$lo $platform_lib_files\n";
+			"@lib_files $lo $platform_lib_files\n";
 	}
 	# tests need to copy the test file over
 	if($type eq 'test')
