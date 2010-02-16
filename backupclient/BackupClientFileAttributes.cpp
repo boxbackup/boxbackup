@@ -250,8 +250,8 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	if (a1->attribute != a2->attribute) \
 	{ \
 		BOX_TRACE("Attribute Compare: " << message << " differ: " \
-			"local " << a1->attribute << ", " \
-			"remote " << a2->attribute); \
+			"local "  << ntoh(a1->attribute) << ", " \
+			"remote " << ntoh(a2->attribute)); \
 		return false; \
 	}
 	COMPARE(AttributeType, "Attribute types");
@@ -262,8 +262,8 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	
 	if(!IgnoreModTime)
 	{
-		int t1 = a1->ModificationTime / 1000000;
-		int t2 = a2->ModificationTime / 1000000;
+		uint64_t t1 = box_ntoh64(a1->ModificationTime) / 1000000;
+		uint64_t t2 = box_ntoh64(a2->ModificationTime) / 1000000;
 		if(t1 != t2)
 		{
 			BOX_TRACE("Attribute Compare: File modification "
@@ -275,8 +275,8 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 
 	if(!IgnoreAttrModTime)
 	{
-		int t1 = a1->AttrModificationTime / 1000000;
-		int t2 = a2->AttrModificationTime / 1000000;
+		uint64_t t1 = box_ntoh64(a1->AttrModificationTime) / 1000000;
+		uint64_t t2 = box_ntoh64(a2->AttrModificationTime) / 1000000;
 		if(t1 != t2)
 		{
 			BOX_TRACE("Attribute Compare: Attribute modification "
@@ -299,7 +299,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 			std::string s2((char *)(a2 + 1), datalen);
 			BOX_TRACE("Attribute Compare: Symbolic link target "
 				"or extended attributes differ: "
-				"local " << PrintEscapedBinaryData(s1) << ", "
+				"local "  << PrintEscapedBinaryData(s1) << ", "
 				"remote " << PrintEscapedBinaryData(s2));
 			return false;
 		}
