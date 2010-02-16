@@ -163,5 +163,23 @@ inline uint64_t box_swap64(uint64_t x)
 	#define box_ntoh64(x) box_swap64(x)
 #endif
 
+// overloaded auto-conversion functions
+inline uint64_t hton(uint64_t in) { return box_hton64(in); }
+inline uint32_t hton(uint32_t in) { return htonl(in); }
+inline uint16_t hton(uint16_t in) { return htons(in); }
+inline uint8_t  hton(uint8_t in)  { return in; }
+inline int64_t  hton(int64_t in)  { return box_hton64(in); }
+inline int32_t  hton(int32_t in)  { return htonl(in); }
+inline int16_t  hton(int16_t in)  { return htons(in); }
+inline int8_t   hton(int8_t in)   { return in; }
+inline uint64_t ntoh(uint64_t in) { return box_ntoh64(in); }
+inline uint32_t ntoh(uint32_t in) { return ntohl(in); }
+inline uint16_t ntoh(uint16_t in) { return ntohs(in); }
+inline uint8_t  ntoh(uint8_t in)  { return in; }
+inline int64_t  ntoh(int64_t in)  { return box_ntoh64(in); }
+inline int32_t  ntoh(int32_t in)  { return ntohl(in); }
+inline int16_t  ntoh(int16_t in)  { return ntohs(in); }
+inline int8_t   ntoh(int8_t in)   { return in; }
+
 #endif // BOX__H
 
