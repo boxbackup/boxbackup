@@ -13,6 +13,7 @@ test -s install-sh || rm install-sh
 ### Checks for programs.
 
 AC_LANG([C++])
+AC_PROG_CC
 AC_PROG_CXX
 AC_CXX_EXCEPTIONS
 AC_CXX_NAMESPACES
@@ -381,6 +382,19 @@ if ! $PERL ./infrastructure/makebuildenv.pl \
 	echo "Making infrastructure failed!"
 	exit 1
 fi
+
+cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
+	if test "$cmd" = "subdir"; then
+		echo
+		echo "Configuring $subdir..."
+		cd $subdir
+		export CC CXX CXXFLAGS LDFLAGS LIBS
+		if ! ./configure $configure_args; then
+			echo "Configuring $subdir failed!" >&2
+			exit 1
+		fi
+	fi
+done || exit $?
 
 # Write summary of important info
 cat <<EOC
