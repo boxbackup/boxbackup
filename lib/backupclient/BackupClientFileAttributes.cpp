@@ -259,29 +259,37 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	COMPARE(GID, "GIDs");
 	COMPARE(UserDefinedFlags, "User-defined flags");
 	COMPARE(Mode, "Modes");
-	
+
 	if(!IgnoreModTime)
 	{
-		uint64_t t1 = box_ntoh64(a1->ModificationTime) / 1000000;
-		uint64_t t2 = box_ntoh64(a2->ModificationTime) / 1000000;
-		if(t1 != t2)
+		uint64_t t1 = box_ntoh64(a1->ModificationTime);
+		uint64_t t2 = box_ntoh64(a2->ModificationTime);
+		time_t s1 = BoxTimeToSeconds(t1);
+		time_t s2 = BoxTimeToSeconds(t2);
+		if(s1 != s2)
 		{
 			BOX_TRACE("Attribute Compare: File modification "
-				"times differ: local " << t1 << ", "
-				"remote " << t2);
+				"times differ: local " <<
+				FormatTime(t1, true) << " (" << s1 << "), "
+				"remote " <<
+				FormatTime(t2, true) << " (" << s2 << ")");
 			return false;
 		}
 	}
-
+	
 	if(!IgnoreAttrModTime)
 	{
-		uint64_t t1 = box_ntoh64(a1->AttrModificationTime) / 1000000;
-		uint64_t t2 = box_ntoh64(a2->AttrModificationTime) / 1000000;
-		if(t1 != t2)
+		uint64_t t1 = box_ntoh64(a1->AttrModificationTime);
+		uint64_t t2 = box_ntoh64(a2->AttrModificationTime);
+		time_t s1 = BoxTimeToSeconds(t1);
+		time_t s2 = BoxTimeToSeconds(t2);
+		if(s1 != s2)
 		{
 			BOX_TRACE("Attribute Compare: Attribute modification "
-				"times differ: local " << t1 << ", "
-				"remote " << t2);
+				"times differ: local " <<
+				FormatTime(t1, true) << " (" << s1 << "), "
+				"remote " <<
+				FormatTime(t2, true) << " (" << s2 << ")");
 			return false;
 		}
 	}
