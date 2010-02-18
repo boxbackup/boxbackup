@@ -18,6 +18,8 @@ backup-client
 	html bbackupd-config
 	html bbackupd.conf
 
+	subdir qdbm
+
 EXCEPT:mingw32,mingw32msvc
 	man bbackupd.8
 	man bbackupquery.8
