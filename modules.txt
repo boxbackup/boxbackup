@@ -31,7 +31,7 @@ lib/backupstore		lib/server	lib/raidfile	lib/backupclient
 bin/bbackupobjdump	lib/backupclient lib/backupstore
 bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
 bin/bbstoreaccounts	lib/raidfile	lib/backupstore
-bin/bbackupd		lib/server	lib/backupclient	qdbm
+bin/bbackupd		lib/server	lib/backupclient
 bin/bbackupquery	lib/server	lib/backupclient
 bin/bbackupctl		lib/server	lib/backupclient
 
