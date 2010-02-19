@@ -479,6 +479,7 @@ __E
 	}
 	
 	my @all_deps_for_module;
+
 	{
 		# work out what dependencies need to be run
 		my @deps_raw;
@@ -768,7 +769,27 @@ __E
 		# run make for things we require
 		for my $dep (@all_deps_for_module)
 		{
-			$deps_makeinfo .= "\t\t\$(HIDE) (cd ../../$dep; \$(MAKE)$sub_make_options -q \$(DEPENDMAKEFLAGS) -D NODEPS || \$(MAKE)$sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS)\n";
+			my $dep_target = "";
+			if ($dep =~ m|^lib/(.*)|)
+			{
+				$dep_target = "\$(OUTBASE)/$dep/$1.a";
+			}
+			elsif ($dep =~ m|^.*/(.*)|)
+			{
+				$dep_target = "\$(OUTBASE)/$dep/$1$platform_exe_ext";
+			}
+			else
+			{
+				$dep_target = "lib$dep.a";
+			}
+
+			$deps_makeinfo .= <<EOF;
+	\$(HIDE) ( \\
+		cd ../../$dep; \\
+		\$(MAKE) $sub_make_options -q \$(DEPENDMAKEFLAGS) -D NODEPS $dep_target \\
+		|| \$(MAKE) $sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS $dep_target \\
+	)
+EOF
 		}
 
 		$deps_makeinfo .= ".\tendif\n.endif\n\n";
