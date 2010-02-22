@@ -1784,31 +1784,11 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 // --------------------------------------------------------------------------
 void BackupDaemon::SetupIDMapsForSync()
 {
-	// Need to do different things depending on whether it's an
-	// in memory implementation, or whether it's all stored on disc.
-	
-#ifdef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
-
-	// Make sure we have some blank, empty ID maps
-	DeleteIDMapVector(mNewIDMaps);
-	FillIDMapVector(mNewIDMaps, true /* new maps */);
-
-	// Then make sure that the current maps have objects,
-	// even if they are empty (for the very first run)
-	if(mCurrentIDMaps.empty())
-	{
-		FillIDMapVector(mCurrentIDMaps, false /* current maps */);
-	}
-
-#else
-
 	// Make sure we have some blank, empty ID maps
 	DeleteIDMapVector(mNewIDMaps);
 	FillIDMapVector(mNewIDMaps, true /* new maps */);
 	DeleteIDMapVector(mCurrentIDMaps);
 	FillIDMapVector(mCurrentIDMaps, false /* new maps */);
-
-#endif
 }
 
 
@@ -1935,21 +1915,6 @@ void BackupDaemon::MakeMapBaseName(unsigned int MountNumber, std::string &rNameO
 // --------------------------------------------------------------------------
 void BackupDaemon::CommitIDMapsAfterSync()
 {
-	// Need to do different things depending on whether it's an in memory implementation,
-	// or whether it's all stored on disc.
-	
-#ifdef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
-	// Remove the current ID maps
-	DeleteIDMapVector(mCurrentIDMaps);
-
-	// Copy the (pointers to) "new" maps over to be the new "current" maps
-	mCurrentIDMaps = mNewIDMaps;
-	
-	// Clear the new ID maps vector (not delete them!)
-	mNewIDMaps.clear();
-
-#else
-
 	// Get rid of the maps in memory (leaving them on disc of course)
 	DeleteIDMapVector(mCurrentIDMaps);
 	DeleteIDMapVector(mNewIDMaps);
@@ -1973,8 +1938,6 @@ void BackupDaemon::CommitIDMapsAfterSync()
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
 	}
-
-#endif
 }
 
 
@@ -1996,8 +1959,7 @@ void BackupDaemon::DeleteIDMapVector(std::vector<BackupClientInodeToIDMap *> &rV
 		rVector.pop_back();
 		
 		// Close and delete
-		toDel->Close();
-		delete toDel;
+win32 rename		delete toDel;
 	}
 	ASSERT(rVector.size() == 0);
 }
