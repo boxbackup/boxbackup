@@ -14,6 +14,7 @@ if [ ! -r "/usr/lib/mingw/libpcreposix.a" \
 	exit 2
 fi
 
+export CC="gcc -mno-cygwin"
 export CXX="g++ -mno-cygwin"
 export LD="g++ -mno-cygwin"
 export CFLAGS="-mno-cygwin -mthreads"
