@@ -386,11 +386,11 @@ fi
 cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
 	if test "$cmd" = "subdir"; then
 		echo
-		echo "Configuring $subdir..."
-		cd $subdir
 		export CC CXX CXXFLAGS LDFLAGS LIBS
 		args="$configure_args --target=$target_alias"
 		echo "Configuring $subdir with: $args"
+
+		cd $subdir
 		if ! ./configure $args; then
 			echo "Configuring $subdir with $args failed!" >&2
 			exit 1
