@@ -8,25 +8,16 @@
 // --------------------------------------------------------------------------
 
 #ifndef BACKUPCLIENTINODETOIDMAP_H
-#define BACKUPCLIENTINODETOIDMAP__H
+#define BACKUPCLIENTINODETOIDMAP_H
 
 #include <sys/types.h>
 
 #include <map>
 #include <utility>
 
-// Use in memory implementation if there isn't access to the Berkely DB on this platform
-#ifndef HAVE_DB
-	#define BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
-#endif
-
 // avoid having to include the DB files when not necessary
 #ifndef BACKIPCLIENTINODETOIDMAP_IMPLEMENTATION
-#ifdef BERKELY_V4
-	class Db;
-#else
-	class DB;
-#endif
+	class DEPOT;
 #endif
 
 // --------------------------------------------------------------------------
@@ -55,19 +46,12 @@ public:
 	void Close();
 
 private:
-#ifdef BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
-	std::map<InodeRefType, std::pair<int64_t, int64_t> > mMap;
-#else
 	bool mReadOnly;
 	bool mEmpty;
-#ifdef BERKELY_V4
-	Db *dbp;	// c++ style implimentation
-#else
-	DB *dbp;	// C style interface, use notation from documentation
-#endif // BERKELY_V4
-#endif // BACKIPCLIENTINODETOIDMAP_IN_MEMORY_IMPLEMENTATION
+	std::string mFilename;
+	DEPOT *mpDepot;
 };
 
-#endif // BACKUPCLIENTINODETOIDMAP__H
+#endif // BACKUPCLIENTINODETOIDMAP_H
 
 
