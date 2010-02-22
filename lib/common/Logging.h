@@ -51,10 +51,13 @@
 #define BOX_LOG_SYS_FATAL(stuff) \
 	BOX_FATAL(BOX_SYS_ERROR(stuff))
 
-#define LOG_AND_THROW_ERROR(message, filename, exception, subtype) \
-	BOX_LOG_SYS_ERROR(message << ": " << filename); \
+#define THROW_SYS_ERROR(message, exception, subtype) \
+	BOX_LOG_SYS_ERROR(message); \
 	THROW_EXCEPTION_MESSAGE(exception, subtype, \
-		BOX_SYS_ERROR(message << ": " << filename));
+		BOX_SYS_ERROR(message))
+
+#define THROW_SYS_FILE_ERROR(message, filename, exception, subtype) \
+	THROW_SYS_ERROR(message << ": " << filename, exception, subtype)
 
 inline std::string GetNativeErrorMessage()
 {
