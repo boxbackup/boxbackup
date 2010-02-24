@@ -1050,6 +1050,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				try
 				{
+					rNotifier.NotifyFileUploadingAttributes(
+						this, filename);
+					
 					// Update store
 					BackupClientFileAttributes attr;
 					attr.ReadAttributes(filename.c_str(), false /* put mod times in the attributes, please */);
