@@ -435,6 +435,22 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	List(rootDir, listRoot, opts, true /* first level to list */);
 }
 
+static std::string GetTimeString(BackupStoreDirectory::Entry& en,
+	bool useLocalTime)
+{
+	std::ostringstream out;
+	out << BoxTimeToISO8601String(en.GetModificationTime(), useLocalTime);
+
+	if(en.HasAttributes())
+	{
+		const StreamableMemBlock &storeAttr(en.GetAttributes());
+		BackupClientFileAttributes attr(storeAttr);
+		out << "~" << BoxTimeToISO8601String(attr.GetModificationTime(),
+			useLocalTime);
+	}
+	
+	return out.str();
+}
 
 // --------------------------------------------------------------------------
 //
@@ -534,17 +550,13 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		if(opts[LIST_OPTION_TIMES_UTC])
 		{
 			// Show UTC times...
-			std::string time = BoxTimeToISO8601String(
-				en->GetModificationTime(), false);
-			printf("%s ", time.c_str());
+			printf("%s ", GetTimeString(*en, false).c_str());
 		}
 
 		if(opts[LIST_OPTION_TIMES_LOCAL])
 		{
 			// Show local times...
-			std::string time = BoxTimeToISO8601String(
-				en->GetModificationTime(), true);
-			printf("%s ", time.c_str());
+			printf("%s ", GetTimeString(*en, true).c_str());
 		}
 		
 		if(opts[LIST_OPTION_DISPLAY_HASH])
