@@ -650,13 +650,15 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::GetModificationTime()
+//		Name:    BackupClientFileAttributes::GetModificationTimes()
 //		Purpose: Returns the modification time embedded in the
 //			 attributes.
 //		Created: 2010/02/24
 //
 // --------------------------------------------------------------------------
-box_time_t BackupClientFileAttributes::GetModificationTime() const
+void BackupClientFileAttributes::GetModificationTimes(
+	box_time_t *pModificationTime,
+	box_time_t *pAttrModificationTime) const
 {
 	// Got something loaded
 	if(GetSize() <= 0)
@@ -691,7 +693,15 @@ box_time_t BackupClientFileAttributes::GetModificationTime() const
 	// Get pointer to structure
 	attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
 
-	return box_ntoh64(pattr->ModificationTime);
+	if(pModificationTime)
+	{
+		*pModificationTime = box_ntoh64(pattr->ModificationTime);
+	}
+	
+	if(pAttrModificationTime)
+	{
+		*pAttrModificationTime = box_ntoh64(pattr->AttrModificationTime);
+	}
 }
 
 // --------------------------------------------------------------------------
