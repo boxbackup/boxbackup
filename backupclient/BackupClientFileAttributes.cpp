@@ -647,6 +647,52 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 #endif
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::GetModificationTime()
+//		Purpose: Returns the modification time embedded in the
+//			 attributes.
+//		Created: 2010/02/24
+//
+// --------------------------------------------------------------------------
+box_time_t BackupClientFileAttributes::GetModificationTime() const
+{
+	// Got something loaded
+	if(GetSize() <= 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+	
+	// Make sure there are clear attributes to use
+	EnsureClearAvailable();
+	ASSERT(mpClearAttributes != 0);
+
+	// Check if the decrypted attributes are small enough, and the type of attributes stored
+	if(mpClearAttributes->GetSize() < (int)sizeof(int32_t))
+	{
+		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
+	}
+	int32_t *type = (int32_t*)mpClearAttributes->GetBuffer();
+	ASSERT(type != 0);
+	if(ntohl(*type) != ATTRIBUTETYPE_GENERIC_UNIX)
+	{
+		// Don't know what to do with these
+		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
+	}
+	
+	// Check there is enough space for an attributes block
+	if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat))
+	{
+		// Too small
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	// Get pointer to structure
+	attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
+
+	return box_ntoh64(pattr->ModificationTime);
+}
 
 // --------------------------------------------------------------------------
 //
