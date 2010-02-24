@@ -444,6 +444,16 @@ public:
 			BOX_NOTICE("Uploading patch to file: " << rLocalPath);
 		} 
 	}
+ 	virtual void NotifyFileUploadingAttributes(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) 
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_NOTICE("Uploading new file attributes: " << 
+				rLocalPath);
+		} 
+	}
  	virtual void NotifyFileUploaded(
  		const BackupClientDirectoryRecord* pDirRecord,
  		const std::string& rLocalPath,

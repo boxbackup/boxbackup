@@ -78,6 +78,9 @@ typedef struct
 typedef struct
 {
 	int32_t uid, gid, mode;
+	#ifdef WIN32
+	int64_t fileCreationTime;
+	#endif
 } attributeHashData;
 
 // Use default packing
@@ -221,12 +224,15 @@ bool BackupClientFileAttributes::operator==(const BackupClientFileAttributes &rA
 //
 // Function
 //		Name:    BackupClientFileAttributes::Compare(const BackupClientFileAttributes &, bool)
-//		Purpose: Compare, optionally ignoring the attribute modification time and/or modification time, and some data which is
-//				 irrelevant in practise (eg file generation number)
+//		Purpose: Compare, optionally ignoring the attribute
+//			 modification time and/or modification time, and some
+//			 data which is irrelevant in practise (eg file
+//			 generation number)
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr, bool IgnoreAttrModTime, bool IgnoreModTime) const
+bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr,
+	bool IgnoreAttrModTime, bool IgnoreModTime) const
 {
 	EnsureClearAvailable();
 	rAttr.EnsureClearAvailable();
@@ -1070,14 +1076,18 @@ void BackupClientFileAttributes::SetAttributeHashSecret(const void *pSecret, int
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::GenerateAttributeHash(struct stat &, const std::string &, const std::string &)
-//		Purpose: Generate a 64 bit hash from the attributes, used to detect changes.
-//				 Include filename in the hash, so that it changes from one file to another,
-//				 so don't reveal identical attributes.
+//		Name:    BackupClientFileAttributes::GenerateAttributeHash(
+//			 struct stat &, const std::string &,
+//			 const std::string &)
+//		Purpose: Generate a 64 bit hash from the attributes, used to
+//			 detect changes. Include filename in the hash, so
+//			 that it changes from one file to another, so don't
+//			 reveal identical attributes.
 //		Created: 25/4/04
 //
 // --------------------------------------------------------------------------
-uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, const std::string &filename, const std::string &leafname)
+uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st,
+	const std::string &filename, const std::string &leafname)
 {
 	if(sAttributeHashSecretLength == 0)
 	{
@@ -1092,6 +1102,16 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, 
 	hashData.gid = htonl(st.st_gid);
 	hashData.mode = htonl(st.st_mode);
 
+	#ifdef WIN32
+	// On Windows, the "file attribute modification time" is the
+	// file creation time, and we want to back this up, restore
+	// it and compare it.
+	//
+	// On other platforms, it's not very important and can't
+	// reliably be set to anything other than the current time.
+	hashData.fileCreationTime = box_hton64(st.st_ctime);
+	#endif
+
 	StreamableMemBlock xattr;
 	FillExtendedAttr(xattr, filename.c_str());
 
@@ -1100,7 +1120,7 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, 
 	digest.Add(&hashData, sizeof(hashData));
 	digest.Add(xattr.GetBuffer(), xattr.GetSize());
 	digest.Add(leafname.c_str(), leafname.size());
-	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);
+	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);	
 	digest.Finish();
 	
 	// Return the first 64 bits of the hash
