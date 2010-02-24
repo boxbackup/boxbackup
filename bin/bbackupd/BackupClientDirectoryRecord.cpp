@@ -613,8 +613,10 @@ void BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::
 		const StreamableMemBlock &storeAttrEnc(pDirOnStore->GetAttributes());
 		// Explict decryption
 		BackupClientFileAttributes storeAttr(storeAttrEnc);
+		
 		// Compare the attributes
-		if(attr.Compare(storeAttr, true, true /* ignore both modification times */))
+		if(attr.Compare(storeAttr, true,
+			true /* ignore both modification times */))
 		{
 			// No update necessary
 			updateAttr = false;
