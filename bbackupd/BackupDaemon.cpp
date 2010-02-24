@@ -1959,7 +1959,7 @@ void BackupDaemon::DeleteIDMapVector(std::vector<BackupClientInodeToIDMap *> &rV
 		rVector.pop_back();
 		
 		// Close and delete
-win32 rename		delete toDel;
+		delete toDel;
 	}
 	ASSERT(rVector.size() == 0);
 }
