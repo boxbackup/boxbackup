@@ -74,6 +74,72 @@ void PrintUsageAndExit()
 	exit(1);
 }
 
+#ifdef HAVE_LIBREADLINE
+// copied from: http://tiswww.case.edu/php/chet/readline/readline.html#SEC44
+
+char * command_generator(const char *text, int state)
+{
+	static int list_index, len;
+	const char *name;
+
+	/* 
+	 * If this is a new word to complete, initialize now.  This includes
+	 * saving the length of TEXT for efficiency, and initializing the index
+	 * variable to 0.
+	 */
+	if(!state)
+	{
+		list_index = 0;
+		len = strlen(text);
+	}
+
+	/* Return the next name which partially matches from the command list. */
+	while((name = commands[list_index].name))
+	{
+		list_index++;
+
+		if(::strncmp(name, text, len) == 0 && !(state--))
+		{
+			return ::strdup(name);
+		}
+	}
+
+	list_index = 0;
+
+	while((name = alias[list_index]))
+	{
+		list_index++;
+
+		if(::strncmp(name, text, len) == 0 && !(state--))
+		{
+			return ::strdup(name);
+		}
+	}
+
+	/* If no names matched, then return NULL. */
+	return (char *) NULL;
+}
+
+char ** bbackupquery_completion(const char *text, int start, int end)
+{
+	char **matches;
+
+	matches = (char **)NULL;
+
+	/* If this word is at the start of the line, then it is a command
+	 * to complete.  Otherwise it is the name of a file in the current
+	 * directory.
+	 */
+	if (start == 0)
+	{
+		matches = rl_completion_matches(text, command_generator);
+	}
+
+	return matches;
+}
+
+#endif // HAVE_LIBREADLINE
+
 int main(int argc, const char *argv[])
 {
 	int returnCode = 0;
@@ -369,6 +435,12 @@ int main(int argc, const char *argv[])
 #ifdef HAVE_READLINE_HISTORY
 	using_history();
 #endif
+	/* Allow conditional parsing of the ~/.inputrc file. */
+	rl_readline_name = "bbackupquery";
+
+	/* Tell the completer that we want a crack first. */
+	rl_attempted_completion_function = bbackupquery_completion;
+
 	char *last_cmd = 0;
 	while(!context.Stop())
 	{

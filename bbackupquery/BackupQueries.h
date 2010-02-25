@@ -20,6 +20,39 @@ class BackupProtocolClient;
 class Configuration;
 class ExcludeList;
 
+typedef struct
+{
+	const char* name;
+	const char* opts;
+}
+QueryCommandSpecification;
+
+// Data about commands
+extern QueryCommandSpecification commands[];
+
+typedef enum
+{
+	Command_Quit = 0,
+	Command_Exit,
+	Command_List,
+	Command_pwd,
+	Command_cd,
+	Command_lcd,
+	Command_sh,
+	Command_GetObject,
+	Command_Get,
+	Command_Compare,
+	Command_Restore,
+	Command_Help,
+	Command_Usage,
+	Command_Undelete,
+	Command_Delete,
+}
+CommandType;
+
+extern const char *alias[];
+extern const int aliasIs[];
+
 // --------------------------------------------------------------------------
 //
 // Class

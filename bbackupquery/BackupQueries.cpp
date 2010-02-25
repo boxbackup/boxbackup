@@ -63,6 +63,30 @@
 #define COMPARE_RETURN_ERROR		3
 #define COMMAND_RETURN_ERROR		4
 
+// Data about commands
+QueryCommandSpecification commands[] = 
+{
+	{ "quit", "" },
+	{ "exit", "" },
+	{ "list", "rodIFtTash", },
+	{ "pwd",  "" },
+	{ "cd",   "od" },
+	{ "lcd",  "" },
+	{ "sh",   "" },
+	{ "getobject", "" },
+	{ "get",  "i" },
+	{ "compare", "alcqAEQ" },
+	{ "restore", "drif" },
+	{ "help", "" },
+	{ "usage", "m" },
+	{ "undelete", "" },
+	{ "delete", "" },
+	{ NULL, NULL } 
+};
+
+const char *alias[] = {"ls", 0};
+const int aliasIs[] = {Command_List, 0};
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -99,12 +123,6 @@ BackupQueries::BackupQueries(BackupProtocolClient &rConnection,
 BackupQueries::~BackupQueries()
 {
 }
-
-typedef struct
-{
-	const char* name;
-	const char* opts;
-} QueryCommandSpecification;
 
 // --------------------------------------------------------------------------
 //
@@ -206,51 +224,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		// blank command
 		return;
 	}
-	
-	// Data about commands
-	static QueryCommandSpecification commands[] = 
-	{
-		{ "quit", "" },
-		{ "exit", "" },
-		{ "list", "rodIFtTash", },
-		{ "pwd",  "" },
-		{ "cd",   "od" },
-		{ "lcd",  "" },
-		{ "sh",   "" },
-		{ "getobject", "" },
-		{ "get",  "i" },
-		{ "compare", "alcqAEQ" },
-		{ "restore", "drif" },
-		{ "help", "" },
-		{ "usage", "m" },
-		{ "undelete", "" },
-		{ "delete", "" },
-		{ NULL, NULL } 
-	};
 
-	typedef enum
-	{
-		Command_Quit = 0,
-		Command_Exit,
-		Command_List,
-		Command_pwd,
-		Command_cd,
-		Command_lcd,
-		Command_sh,
-		Command_GetObject,
-		Command_Get,
-		Command_Compare,
-		Command_Restore,
-		Command_Help,
-		Command_Usage,
-		Command_Undelete,
-		Command_Delete,
-	}
-	CommandType;
-
-	static const char *alias[] = {"ls", 0};
-	static const int aliasIs[] = {Command_List, 0};
-	
 	// Work out which command it is...
 	int cmd = 0;
 	while(commands[cmd].name != 0 && ::strcmp(cmdElements[0].c_str(), commands[cmd].name) != 0)
