@@ -244,11 +244,12 @@ EOF
 		}
 		elsif ($type eq 'subdir')
 		{
+			shift @args;
 			print MAKE <<EOF;
 .PHONY: $name-build $name-clean
 
 $name-build:
-	\$(MAKE) -C $name
+	\$(MAKE) -C @args
 
 $name-clean:
 	\$(MAKE) -C $name clean
