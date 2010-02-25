@@ -599,7 +599,7 @@ _LINK    = @ echo "  [LINK]   " \$(*F) && \$(CXX)
 _WINDRES = @ echo "  [WINDRES]" \$(*F) && \$(WINDRES)
 _AR      = @ echo "  [AR]     " \$(*F) && \$(AR)
 _RANLIB  = @ echo "  [RANLIB] " \$(*F) && \$(RANLIB)
-_PERL    = @ echo "  [PERL]   " \$(*F) && \$(PERL)
+_PERL    = @ echo "  [PERL]   " \$(*F) && \$(PERL) >/dev/null
 .endif
 
 __E
@@ -613,7 +613,7 @@ _LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    \$@" && \$(CXX))
 _WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] \$<" && \$(WINDRES))
 _AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      \$@" && \$(AR))
 _RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  \$@" && \$(RANLIB))
-_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    \$@" && \$(PERL))
+_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    \$@" && \$(PERL) >/dev/null)
 
 __E
 	}
