@@ -29,7 +29,7 @@ if [ ! -x "configure" ]; then
 	fi
 fi
 
-if ! ./configure --target=i686-pc-mingw32; then
+if ! ./configure --target=i686-pc-mingw32 "$@"; then
 	echo "Error: configure failed, aborting." >&2
 	exit 1
 fi
