@@ -18,7 +18,7 @@ backup-client
 	html bbackupd-config
 	html bbackupd.conf
 
-	subdir qdbm static
+	subdir qdbm libqdbm.a
 
 EXCEPT:mingw32,mingw32msvc
 	man bbackupd.8
