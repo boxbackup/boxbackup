@@ -68,6 +68,19 @@ Configure PCRE for MinGW compilation, and build and install it:
 	cp .libs/libpcre.a .libs/libpcreposix.a /lib/mingw
 	cp pcreposix.h /usr/include/mingw
 
+== Readline (Optional) ==
+
+If you want Readline support, download Readline version 6.1, unpack
+and install thus:
+
+	tar xzvf readline-6.1.tar.gz
+	./configure --prefix=/usr/i686-pc-mingw32 \
+		CFLAGS="-mno-cygwin" \
+		CPPFLAGS="-mno-cygwin" \
+		LDFLAGS="-mno-cygwin"
+	make
+	make install
+
 == Download Box Backup ==
 
 Go back to the base directory, and download the latest Box Backup sources:
@@ -83,7 +96,7 @@ Note: If you have problems during the configure or make stage, please try to eli
 Enter the source directory and configure like this:
 
 	cd trunk
-	./infrastructure/mingw/configure.sh
+	./infrastructure/mingw/configure.sh [--enable-gnu-readline]
 	make
 
 == Installation ==
