@@ -79,6 +79,16 @@ AC_DEFUN([VL_LIB_READLINE], [
   fi
 ])
 
+dnl BOX_CHECK_VAR(name, where, headers)
+AC_DEFUN([BOX_CHECK_VAR], [
+  AC_CACHE_CHECK([for $1 $2], [vl_cv_var_$1], 
+    [AC_TRY_LINK([$3], [(void) $1], [vl_cv_var_$1=yes], [vl_cv_var_$1=no])
+    ])
+  if test "${vl_cv_var_$1}" = "yes"; then
+    AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_$1), 1, [Define if you have $1 $2])
+  fi
+  ])
+
 dnl VL_LIB_READLINE_CHECK(name, libraries, headers, history headers)
 AC_DEFUN([VL_LIB_READLINE_CHECK], [
   AC_CACHE_CHECK([for $1 library],
@@ -108,12 +118,23 @@ AC_DEFUN([VL_LIB_READLINE_CHECK], [
     fi
   ])
 
+  vl_cv_lib_includes=""
+
   vl_cv_lib_readline_compat_found=no
   if test "x$vl_cv_lib_$1" != "xno"; then
-    AC_CHECK_HEADERS([$3], [vl_cv_lib_readline_compat_found=yes])
+    AC_CHECK_HEADERS([$3], [
+      vl_cv_lib_readline_compat_found=yes
+      vl_cv_lib_includes="$vl_cv_lib_headers #include <$ac_header>"
+    ])
   fi
 
   if test "x$vl_cv_lib_readline_compat_found" = "xyes"; then
+    BOX_CHECK_VAR([rl_completion_matches], [in readline headers],
+      [$vl_cv_lib_includes])
+
+    BOX_CHECK_VAR([completion_matches], [in readline headers],
+      [$vl_cv_lib_includes])
+
     AC_DEFINE([HAVE_LIBREADLINE], 1,
               [Define if you have a readline compatible library])
 
