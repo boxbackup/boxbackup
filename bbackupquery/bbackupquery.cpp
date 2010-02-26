@@ -132,7 +132,12 @@ char ** bbackupquery_completion(const char *text, int start, int end)
 	 */
 	if (start == 0)
 	{
-		matches = rl_completion_matches(text, command_generator);
+		#ifdef HAVE_RL_COMPLETION_MATCHES
+			matches = rl_completion_matches(text,
+				command_generator);
+		#elif defined HAVE_COMPLETION_MATCHES
+			matches = completion_matches(text, command_generator);
+		#endif
 	}
 
 	return matches;
