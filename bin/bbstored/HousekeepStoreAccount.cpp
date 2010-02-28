@@ -420,7 +420,25 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 		// Add it to the list of directories to potentially delete
 		mEmptyDirectories.push_back(dir.GetObjectID());
 	}
-	
+
+	// Calculate reference counts first, before we start requesting
+	// files to be deleted.
+	// BLOCK
+	{
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *en = 0;
+
+		while((en = i.Next()) != 0)
+		{
+			// This directory references this object
+			if (mNewRefCounts.size() <= en->GetObjectID())
+			{
+				mNewRefCounts.resize(en->GetObjectID() + 1, 0);
+			}
+			mNewRefCounts[en->GetObjectID()]++;
+		}
+	}
+
 	// BLOCK
 	{
 		// Remove any files which are marked for removal as soon
@@ -467,13 +485,6 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
 		{
-			// This directory references this object
-			if (mNewRefCounts.size() <= en->GetObjectID())
-			{
-				mNewRefCounts.resize(en->GetObjectID() + 1, 0);
-			}
-			mNewRefCounts[en->GetObjectID()]++;
-
 			// Update recalculated usage sizes
 			int16_t enFlags = en->GetFlags();
 			int64_t enSizeInBlocks = en->GetSizeInBlocks();
@@ -582,13 +593,6 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
-			// This parent directory references this child
-			if (mNewRefCounts.size() <= en->GetObjectID())
-			{
-				mNewRefCounts.resize(en->GetObjectID() + 1, 0);
-			}
-			mNewRefCounts[en->GetObjectID()]++;
-
 			// Next level
 			ASSERT((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == BackupStoreDirectory::Entry::Flags_Dir);
 			
