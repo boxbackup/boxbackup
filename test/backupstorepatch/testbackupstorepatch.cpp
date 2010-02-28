@@ -13,29 +13,33 @@
 #include <string.h>
 #include <signal.h>
 
-#include "Test.h"
 #include "autogen_BackupProtocolClient.h"
-#include "SSLLib.h"
-#include "TLSContext.h"
-#include "SocketStreamTLS.h"
-#include "BoxPortsAndFiles.h"
-#include "BackupStoreConstants.h"
-#include "Socket.h"
-#include "BackupStoreFilenameClear.h"
-#include "CollectInBufferStream.h"
-#include "BackupStoreDirectory.h"
-#include "BackupStoreFile.h"
-#include "FileStream.h"
-#include "RaidFileController.h"
-#include "RaidFileRead.h"
-#include "RaidFileWrite.h"
-#include "BackupStoreInfo.h"
-#include "BackupStoreException.h"
-#include "RaidFileException.h"
-#include "MemBlockStream.h"
-#include "BackupClientFileAttributes.h"
 #include "BackupClientCryptoKeys.h"
+#include "BackupClientFileAttributes.h"
+#include "BackupStoreAccountDatabase.h"
+#include "BackupStoreAccounts.h"
+#include "BackupStoreConstants.h"
+#include "BackupStoreDirectory.h"
+#include "BackupStoreException.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreFilenameClear.h"
+#include "BackupStoreInfo.h"
+#include "BoxPortsAndFiles.h"
+#include "CollectInBufferStream.h"
+#include "FileStream.h"
+#include "MemBlockStream.h"
+#include "RaidFileController.h"
+#include "RaidFileException.h"
+#include "RaidFileRead.h"
+#include "RaidFileUtil.h"
+#include "RaidFileWrite.h"
+#include "SSLLib.h"
 #include "ServerControl.h"
+#include "Socket.h"
+#include "SocketStreamTLS.h"
+#include "StoreStructure.h"
+#include "TLSContext.h"
+#include "Test.h"
 
 #include "MemLeakFindOn.h"
 
@@ -320,8 +324,17 @@ int test(int argc, const char *argv[])
 	
 	// Check the basic directory stuff works
 	test_depends_in_dirs();
+	
+	std::string storeRootDir;
+	int discSet = 0;
+	{
+		std::auto_ptr<BackupStoreAccountDatabase> apDatabase(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		BackupStoreAccounts accounts(*apDatabase);
+		accounts.GetAccountRoot(0x1234567, storeRootDir, discSet);
+	}
+	RaidFileDiscSet rfd(rcontroller.GetDiscSet(discSet));
 
-	// First, try logging in without an account having been created... just make sure login fails.
 	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
 		"testfiles/bbstored.pid");
 	TEST_THAT(pid != -1 && pid != 0);
@@ -478,6 +491,19 @@ int test(int argc, const char *argv[])
 					if(en == 0)
 					{
 						TEST_THAT(test_files[f].HasBeenDeleted);
+						// check that unreferenced
+						// object was removed by
+						// housekeeping
+						std::string filenameOut;
+						int startDisc = 0;
+						StoreStructure::MakeObjectFilename(
+							test_files[f].IDOnServer,
+							storeRootDir, discSet,
+							filenameOut,
+							false /* don't bother ensuring the directory exists */);
+						TEST_EQUAL(RaidFileUtil::NoFile,
+							RaidFileUtil::RaidFileExists(
+								rfd, filenameOut));
 					}
 					else
 					{
