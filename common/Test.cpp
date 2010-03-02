@@ -462,7 +462,7 @@ void safe_sleep(int seconds)
 	ts.tv_nsec = 0;
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{
-		// FIME evil hack for OSX, where ts.tv_sec contains
+		// FIXME evil hack for OSX, where ts.tv_sec contains
 		// a negative number interpreted as unsigned 32-bit
 		// when nanosleep() returns later than expected.
 
