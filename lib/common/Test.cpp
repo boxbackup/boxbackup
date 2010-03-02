@@ -43,10 +43,10 @@ bool TestDirExists(const char *Filename)
 }
 
 // -1 if doesn't exist
-int TestGetFileSize(const char *Filename)
+int TestGetFileSize(const std::string& rFilename)
 {
 	EMU_STRUCT_STAT st;
-	if(EMU_STAT(Filename, &st) == 0)
+	if(EMU_STAT(rFilename.c_str(), &st) == 0)
 	{
 		return st.st_size;
 	}
@@ -462,7 +462,7 @@ void safe_sleep(int seconds)
 	ts.tv_nsec = 0;
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{
-		// FIME evil hack for OSX, where ts.tv_sec contains
+		// FIXME evil hack for OSX, where ts.tv_sec contains
 		// a negative number interpreted as unsigned 32-bit
 		// when nanosleep() returns later than expected.
 
