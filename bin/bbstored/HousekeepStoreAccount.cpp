@@ -879,12 +879,21 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID, Ba
 		padjustedEntry.reset();	// delete it now
 	}
 
-	// Delete from disc
+	// Drop reference count by one. If it reaches zero, delete the file.
+	if(--mNewRefCounts[ObjectID] == 0)
 	{
+		BOX_TRACE("Removing unreferenced object " <<
+			BOX_FORMAT_OBJECTID(ObjectID));
 		std::string objFilename;
 		MakeObjectFilename(ObjectID, objFilename);
 		RaidFileWrite del(mStoreDiscSet, objFilename);
 		del.Delete();
+	}
+	else
+	{
+		BOX_TRACE("Preserving object " <<
+			BOX_FORMAT_OBJECTID(ObjectID) << " with " <<
+			mNewRefCounts[ObjectID] << " references");
 	}
 
 	// Adjust counts for the file
