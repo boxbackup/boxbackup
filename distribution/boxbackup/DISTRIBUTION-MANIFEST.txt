@@ -1,10 +1,16 @@
+LICENSE-GPL.txt
+
+LICENSE DUAL
 lib/intercept
 lib/raidfile
+lib/httpserver
 test/raidfile
 test/raidfile/testfiles
+test/httpserver
+
+LICENSE GPL
 lib/backupclient
 lib/backupstore
-lib/httpserver
 bin/bbstored
 bin/bbstoreaccounts
 bin/bbackupd
@@ -20,17 +26,20 @@ test/backupstorepatch
 test/bbackupd
 test/bbackupd/testfiles
 test/backupdiff
-test/httpserver
 test/httpserver/testfiles
 test/httpserver/testfiles/photos
 docs/Makefile
 docs/tools
+
+LICENSE DUAL
 docs/api-notes
-docs/api-notes/backup
 docs/api-notes/raidfile
 docs/api-notes/raidfile/lib_raidfile.txt
-docs/html
-docs/html/images
+
+LICENSE GPL
+docs/api-notes/backup
+
+docs/images
 docs/htmlguide
 docs/htmlguide/adminguide
 docs/htmlguide/images
@@ -66,17 +75,18 @@ docs/xsl-generic/html
 docs/xsl-generic/highlighting
 BUGS.txt
 contrib
-NO-LICENSE-IN-DIR contrib/debian
-NO-LICENSE-IN-DIR contrib/mac_osx
-NO-LICENSE-IN-DIR contrib/redhat
-NO-LICENSE-IN-DIR contrib/rpm
+
+contrib/debian
+contrib/mac_osx
+contrib/redhat
+contrib/rpm
 REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
-NO-LICENSE-IN-DIR contrib/solaris
-NO-LICENSE-IN-DIR contrib/suse
-NO-LICENSE-IN-DIR contrib/bbreporter
-NO-LICENSE-IN-DIR contrib/windows
-NO-LICENSE-IN-DIR contrib/windows/installer
-NO-LICENSE-IN-DIR contrib/windows/installer/tools
+contrib/solaris
+contrib/suse
+contrib/bbreporter
+contrib/windows
+contrib/windows/installer
+contrib/windows/installer/tools
 infrastructure/msvc
-NO-LICENSE-IN-DIR infrastructure/msvc/2003
-NO-LICENSE-IN-DIR infrastructure/msvc/2005
+infrastructure/msvc/2003
+infrastructure/msvc/2005

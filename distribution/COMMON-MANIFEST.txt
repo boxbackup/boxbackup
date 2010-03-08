@@ -1,5 +1,10 @@
+LICENSE-DUAL.txt
+
+LICENSE DUAL
+
 RUN ./bootstrap
 RUN cd docs; make
+
 lib/common
 lib/crypto
 lib/server
@@ -27,11 +32,14 @@ infrastructure/printversion.pl
 infrastructure/BoxPlatform.pm.in
 infrastructure/mingw
 infrastructure/msvc
-NO-LICENSE config.sub
-NO-LICENSE config.guess
 bootstrap
 configure.ac
 configure
 parcels.txt
 runtest.pl.in
-NO-LICENSE-IN-DIR infrastructure/m4
+COPYING.txt
+
+LICENSE none
+config.sub
+config.guess
+infrastructure/m4
