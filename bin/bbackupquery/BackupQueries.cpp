@@ -212,7 +212,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 	{
 		{ "quit", "" },
 		{ "exit", "" },
-		{ "list", "rodIFtTsh", },
+		{ "list", "rodIFtTash", },
 		{ "pwd",  "" },
 		{ "cd",   "od" },
 		{ "lcd",  "" },
@@ -397,6 +397,7 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	#define LIST_OPTION_NOFLAGS		'F'
 	#define LIST_OPTION_TIMES_LOCAL		't'
 	#define LIST_OPTION_TIMES_UTC		'T'
+	#define LIST_OPTION_TIMES_ATTRIBS	'a'
 	#define LIST_OPTION_SIZEINBLOCKS	's'
 	#define LIST_OPTION_DISPLAY_HASH	'h'
 
@@ -435,6 +436,52 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	List(rootDir, listRoot, opts, true /* first level to list */);
 }
 
+static std::string GetTimeString(BackupStoreDirectory::Entry& en,
+	bool useLocalTime, bool showAttrModificationTimes)
+{
+	std::ostringstream out;
+	box_time_t originalTime, newAttributesTime;
+
+	// there is no attribute modification time in the directory
+	// entry, unfortunately, so we can't display it.
+	originalTime = en.GetModificationTime();
+	out << BoxTimeToISO8601String(originalTime, useLocalTime);
+
+	if(en.HasAttributes())
+	{
+		const StreamableMemBlock &storeAttr(en.GetAttributes());
+		BackupClientFileAttributes attr(storeAttr);
+		
+		box_time_t NewModificationTime, NewAttrModificationTime;
+		attr.GetModificationTimes(&NewModificationTime,
+			&NewAttrModificationTime);
+		
+		if (showAttrModificationTimes)
+		{
+			newAttributesTime = NewAttrModificationTime;
+		}
+		else
+		{
+			newAttributesTime = NewModificationTime;
+		}
+		
+		if (newAttributesTime == originalTime)
+		{
+			out << "*";
+		}
+		else
+		{
+			out << "~" << BoxTimeToISO8601String(newAttributesTime,
+				useLocalTime);
+		}
+	}
+	else
+	{
+		out << " ";
+	}
+	
+	return out.str();
+}
 
 // --------------------------------------------------------------------------
 //
@@ -534,17 +581,15 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		if(opts[LIST_OPTION_TIMES_UTC])
 		{
 			// Show UTC times...
-			std::string time = BoxTimeToISO8601String(
-				en->GetModificationTime(), false);
-			printf("%s ", time.c_str());
+			printf("%s ", GetTimeString(*en, false,
+				opts[LIST_OPTION_TIMES_ATTRIBS]).c_str());
 		}
 
 		if(opts[LIST_OPTION_TIMES_LOCAL])
 		{
 			// Show local times...
-			std::string time = BoxTimeToISO8601String(
-				en->GetModificationTime(), true);
-			printf("%s ", time.c_str());
+			printf("%s ", GetTimeString(*en, true,
+				opts[LIST_OPTION_TIMES_ATTRIBS]).c_str());
 		}
 		
 		if(opts[LIST_OPTION_DISPLAY_HASH])

@@ -78,6 +78,9 @@ typedef struct
 typedef struct
 {
 	int32_t uid, gid, mode;
+	#ifdef WIN32
+	int64_t fileCreationTime;
+	#endif
 } attributeHashData;
 
 // Use default packing
@@ -221,12 +224,15 @@ bool BackupClientFileAttributes::operator==(const BackupClientFileAttributes &rA
 //
 // Function
 //		Name:    BackupClientFileAttributes::Compare(const BackupClientFileAttributes &, bool)
-//		Purpose: Compare, optionally ignoring the attribute modification time and/or modification time, and some data which is
-//				 irrelevant in practise (eg file generation number)
+//		Purpose: Compare, optionally ignoring the attribute
+//			 modification time and/or modification time, and some
+//			 data which is irrelevant in practise (eg file
+//			 generation number)
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr, bool IgnoreAttrModTime, bool IgnoreModTime) const
+bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr,
+	bool IgnoreAttrModTime, bool IgnoreModTime) const
 {
 	EnsureClearAvailable();
 	rAttr.EnsureClearAvailable();
@@ -234,6 +240,10 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	// Check sizes are the same, as a first check
 	if(mpClearAttributes->GetSize() != rAttr.mpClearAttributes->GetSize())
 	{
+		BOX_TRACE("Attribute Compare: Attributes objects are "
+			"different sizes, cannot compare them: local " <<
+			mpClearAttributes->GetSize() << " bytes, remote " <<
+			rAttr.mpClearAttributes->GetSize() << " bytes");
 		return false;
 	}
 	
@@ -241,32 +251,51 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	// Bytes are checked in network order, but this doesn't matter as we're only checking for equality.
 	attr_StreamFormat *a1 = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
 	attr_StreamFormat *a2 = (attr_StreamFormat*)rAttr.mpClearAttributes->GetBuffer();
-	
-	if(a1->AttributeType != a2->AttributeType
-		|| a1->UID != a2->UID
-		|| a1->GID != a2->GID
-		|| a1->UserDefinedFlags != a2->UserDefinedFlags
-		|| a1->Mode != a2->Mode)
-	{
-		return false;
+
+	#define COMPARE(attribute, message) \
+	if (a1->attribute != a2->attribute) \
+	{ \
+		BOX_TRACE("Attribute Compare: " << message << " differ: " \
+			"local "  << ntoh(a1->attribute) << ", " \
+			"remote " << ntoh(a2->attribute)); \
+		return false; \
 	}
-	
+	COMPARE(AttributeType, "Attribute types");
+	COMPARE(UID, "UIDs");
+	COMPARE(GID, "GIDs");
+	COMPARE(UserDefinedFlags, "User-defined flags");
+	COMPARE(Mode, "Modes");
+
 	if(!IgnoreModTime)
 	{
-		int t1 = a1->ModificationTime / 1000000;
-		int t2 = a2->ModificationTime / 1000000;
-		if(t1 != t2)
+		uint64_t t1 = box_ntoh64(a1->ModificationTime);
+		uint64_t t2 = box_ntoh64(a2->ModificationTime);
+		time_t s1 = BoxTimeToSeconds(t1);
+		time_t s2 = BoxTimeToSeconds(t2);
+		if(s1 != s2)
 		{
+			BOX_TRACE("Attribute Compare: File modification "
+				"times differ: local " <<
+				FormatTime(t1, true) << " (" << s1 << "), "
+				"remote " <<
+				FormatTime(t2, true) << " (" << s2 << ")");
 			return false;
 		}
 	}
-
+	
 	if(!IgnoreAttrModTime)
 	{
-		int t1 = a1->AttrModificationTime / 1000000;
-		int t2 = a2->AttrModificationTime / 1000000;
-		if(t1 != t2)
+		uint64_t t1 = box_ntoh64(a1->AttrModificationTime);
+		uint64_t t2 = box_ntoh64(a2->AttrModificationTime);
+		time_t s1 = BoxTimeToSeconds(t1);
+		time_t s2 = BoxTimeToSeconds(t2);
+		if(s1 != s2)
 		{
+			BOX_TRACE("Attribute Compare: Attribute modification "
+				"times differ: local " <<
+				FormatTime(t1, true) << " (" << s1 << "), "
+				"remote " <<
+				FormatTime(t2, true) << " (" << s2 << ")");
 			return false;
 		}
 	}
@@ -276,8 +305,16 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	if(size > sizeof(attr_StreamFormat))
 	{
 		// Symlink strings don't match. This also compares xattrs
-		if(::memcmp(a1 + 1, a2 + 1, size - sizeof(attr_StreamFormat)) != 0)
+		int datalen = size - sizeof(attr_StreamFormat);
+
+		if(::memcmp(a1 + 1, a2 + 1, datalen) != 0)
 		{
+			std::string s1((char *)(a1 + 1), datalen);
+			std::string s2((char *)(a2 + 1), datalen);
+			BOX_TRACE("Attribute Compare: Symbolic link target "
+				"or extended attributes differ: "
+				"local "  << PrintEscapedBinaryData(s1) << ", "
+				"remote " << PrintEscapedBinaryData(s2));
 			return false;
 		}
 	}
@@ -603,6 +640,62 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 #endif
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientFileAttributes::GetModificationTimes()
+//		Purpose: Returns the modification time embedded in the
+//			 attributes.
+//		Created: 2010/02/24
+//
+// --------------------------------------------------------------------------
+void BackupClientFileAttributes::GetModificationTimes(
+	box_time_t *pModificationTime,
+	box_time_t *pAttrModificationTime) const
+{
+	// Got something loaded
+	if(GetSize() <= 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+	
+	// Make sure there are clear attributes to use
+	EnsureClearAvailable();
+	ASSERT(mpClearAttributes != 0);
+
+	// Check if the decrypted attributes are small enough, and the type of attributes stored
+	if(mpClearAttributes->GetSize() < (int)sizeof(int32_t))
+	{
+		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
+	}
+	int32_t *type = (int32_t*)mpClearAttributes->GetBuffer();
+	ASSERT(type != 0);
+	if(ntohl(*type) != ATTRIBUTETYPE_GENERIC_UNIX)
+	{
+		// Don't know what to do with these
+		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
+	}
+	
+	// Check there is enough space for an attributes block
+	if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat))
+	{
+		// Too small
+		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
+	}
+
+	// Get pointer to structure
+	attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
+
+	if(pModificationTime)
+	{
+		*pModificationTime = box_ntoh64(pattr->ModificationTime);
+	}
+	
+	if(pAttrModificationTime)
+	{
+		*pAttrModificationTime = box_ntoh64(pattr->AttrModificationTime);
+	}
+}
 
 // --------------------------------------------------------------------------
 //
@@ -1032,14 +1125,18 @@ void BackupClientFileAttributes::SetAttributeHashSecret(const void *pSecret, int
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::GenerateAttributeHash(struct stat &, const std::string &, const std::string &)
-//		Purpose: Generate a 64 bit hash from the attributes, used to detect changes.
-//				 Include filename in the hash, so that it changes from one file to another,
-//				 so don't reveal identical attributes.
+//		Name:    BackupClientFileAttributes::GenerateAttributeHash(
+//			 struct stat &, const std::string &,
+//			 const std::string &)
+//		Purpose: Generate a 64 bit hash from the attributes, used to
+//			 detect changes. Include filename in the hash, so
+//			 that it changes from one file to another, so don't
+//			 reveal identical attributes.
 //		Created: 25/4/04
 //
 // --------------------------------------------------------------------------
-uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, const std::string &filename, const std::string &leafname)
+uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st,
+	const std::string &filename, const std::string &leafname)
 {
 	if(sAttributeHashSecretLength == 0)
 	{
@@ -1054,6 +1151,16 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, 
 	hashData.gid = htonl(st.st_gid);
 	hashData.mode = htonl(st.st_mode);
 
+	#ifdef WIN32
+	// On Windows, the "file attribute modification time" is the
+	// file creation time, and we want to back this up, restore
+	// it and compare it.
+	//
+	// On other platforms, it's not very important and can't
+	// reliably be set to anything other than the current time.
+	hashData.fileCreationTime = box_hton64(st.st_ctime);
+	#endif
+
 	StreamableMemBlock xattr;
 	FillExtendedAttr(xattr, filename.c_str());
 
@@ -1062,7 +1169,7 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st, 
 	digest.Add(&hashData, sizeof(hashData));
 	digest.Add(xattr.GetBuffer(), xattr.GetSize());
 	digest.Add(leafname.c_str(), leafname.size());
-	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);
+	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);	
 	digest.Finish();
 	
 	// Return the first 64 bits of the hash

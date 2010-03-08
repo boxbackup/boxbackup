@@ -495,3 +495,24 @@ bool FileLogger::Log(Log::Level Level, const std::string& rFile,
 	Logging::Add(this);
 	return true;
 }
+
+std::string PrintEscapedBinaryData(const std::string& rInput)
+{
+	std::ostringstream output;
+
+	for (size_t i = 0; i < rInput.length(); i++)
+	{
+		if (isprint(rInput[i]))
+		{
+			output << rInput[i];
+		}
+		else
+		{
+			output << "\\x" << std::hex << std::setw(2) <<
+				std::setfill('0') << (int) rInput[i] <<
+				std::dec;
+		}
+	}
+
+	return output.str();
+}

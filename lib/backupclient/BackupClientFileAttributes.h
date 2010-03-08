@@ -47,7 +47,9 @@ public:
 		InodeRefType *pInodeNumber = 0, bool *pHasMultipleLinks = 0);
 	void WriteAttributes(const char *Filename, 
 		bool MakeUserWritable = false) const;
-
+	void GetModificationTimes(box_time_t *pModificationTime,
+		box_time_t *pAttrModificationTime) const;
+	
 	bool IsSymLink() const;
 
 	static void SetBlowfishKey(const void *pKey, int KeyLength);

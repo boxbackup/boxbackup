@@ -123,6 +123,9 @@ class ProgressNotifier
 	virtual void NotifyFileUploadingPatch(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath) = 0;
+	virtual void NotifyFileUploadingAttributes(
+ 		const BackupClientDirectoryRecord* pDirRecord,
+ 		const std::string& rLocalPath) = 0;
 	virtual void NotifyFileUploaded(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
