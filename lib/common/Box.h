@@ -115,6 +115,8 @@
 
 #define THROW_EXCEPTION_MESSAGE(type, subtype, message) \
 	{ \
+		std::ostringstream _box_throw_line; \
+		_box_throw_line << message; \
 		if(!HideExceptionMessageGuard::ExceptionsHidden()) \
 		{ \
 			OPTIONAL_DO_BACKTRACE \
@@ -122,7 +124,7 @@
 				#type "(" #subtype ") (" << message << \
 				") at " __FILE__ "(" << __LINE__ << ")") \
 		} \
-		throw type(type::subtype, message); \
+		throw type(type::subtype, _box_throw_line.str()); \
 	}
 
 // extra macros for converting to network byte order
