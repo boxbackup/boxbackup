@@ -1017,15 +1017,15 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	// If there's no result, try again in five minutes
 	int waitInSeconds = (60*5);
 
+	std::string script(conf.GetKeyValue("SyncAllowScript") + 
+		" \"" + GetConfigFileName() + "\"");
+
 	// Run it?
 	pid_t pid = 0;
 	try
 	{
-		std::string script("\"" + conf.GetKeyValue("SyncAllowScript") + 
-			"\" \"" + GetConfigFileName() + "\"");
-
-		std::auto_ptr<IOStream> pscript(LocalProcessStream(
-			script.c_str(), pid));
+		std::auto_ptr<IOStream> pscript(LocalProcessStream(script,
+			pid));
 
 		// Read in the result
 		IOStreamGetLine getLine(*pscript);
@@ -1048,15 +1048,14 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 				catch(ConversionException &e)
 				{
 					BOX_ERROR("Invalid output from "
-						"SyncAllowScript " <<
-						script << ": '" << line << "'");
+						"SyncAllowScript: '" <<
+						line << "' (" << script << ")");
 					throw;
 				}
 
 				BOX_NOTICE("Delaying sync by " << waitInSeconds
-					<< " seconds (SyncAllowScript "
-					<< conf.GetKeyValue("SyncAllowScript")
-					<< ")");
+					<< " seconds due to SyncAllowScript "
+					<< "(" << script << ")");
 			}
 		}
 		
@@ -1064,14 +1063,14 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	catch(std::exception &e)
 	{
 		BOX_ERROR("Internal error running SyncAllowScript: "
-			<< e.what());
+			<< e.what() << " (" << script << ")");
 	}
 	catch(...)
 	{
 		// Ignore any exceptions
 		// Log that something bad happened
-		BOX_ERROR("Error running SyncAllowScript '"
-			<< conf.GetKeyValue("SyncAllowScript") << "'");
+		BOX_ERROR("Unknown error running SyncAllowScript (" <<
+			script << ")");
 	}
 
 	// Wait and then cleanup child process, if any
@@ -2188,19 +2187,19 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 			Event != SysadminNotifier::BackupFinish)
 		{
 			BOX_INFO("Not notifying administrator about event "
-				<< sEventNames[Event] << " -- set NotifyScript "
+				<< sEventNames[Event] << ", set NotifyScript "
 				"to do this in future");
 		}
 		return;
 	}
 
 	// Script to run
-	std::string script("\"" + conf.GetKeyValue("NotifyScript") + "\" " +
+	std::string script(conf.GetKeyValue("NotifyScript") + " " +
 		sEventNames[Event] + " \"" + GetConfigFileName() + "\"");
 	
 	// Log what we're about to do
 	BOX_INFO("About to notify administrator about event "
-		<< sEventNames[Event] << ", running script " << script);
+		<< sEventNames[Event] << ", running script '" << script << "'");
 	
 	// Then do it
 	int returnCode = ::system(script.c_str());
