@@ -3,5 +3,5 @@ MAKEEXCEPTION = ../../lib/common/makeexception.pl
 
 # AUTOGEN SEEDING
 autogen_ClientException.h autogen_ClientException.cpp:	$(MAKEEXCEPTION) ClientException.txt
-	$(PERL) $(MAKEEXCEPTION) ClientException.txt
+	$(_PERL) $(MAKEEXCEPTION) ClientException.txt
 
