@@ -462,10 +462,24 @@ void safe_sleep(int seconds)
 	ts.tv_nsec = 0;
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{
-		BOX_TRACE("safe_sleep interrupted with " <<
-			ts.tv_sec << "." << ts.tv_nsec <<
-			" secs remaining, sleeping again");
-		/* sleep again */
+		// FIXME evil hack for OSX, where ts.tv_sec contains
+		// a negative number interpreted as unsigned 32-bit
+		// when nanosleep() returns later than expected.
+
+		int32_t secs = (int32_t) ts.tv_sec;
+		int64_t remain_ns = (secs * 1000000000) + ts.tv_nsec;
+
+		if (remain_ns < 0)
+		{
+			BOX_WARNING("nanosleep interrupted " <<
+				((float)(0 - remain_ns) / 1000000000) <<
+				" secs late");
+			return;
+		}
+
+		BOX_TRACE("nanosleep interrupted with " <<
+			(remain_ns / 1000000000) << " secs remaining, "
+			"sleeping again");
 	}
 #endif
 }
