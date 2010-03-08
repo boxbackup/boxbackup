@@ -329,14 +329,21 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::ReadAttributes(const char *)
-//		Purpose: Read the attributes of the file, and store them ready for streaming.
-//				 Optionally retrieve the modification time and attribute modification time.
+//		Name:    BackupClientFileAttributes::ReadAttributes(
+//			 const char *Filename, bool ZeroModificationTimes,
+//			 box_time_t *pModTime, box_time_t *pAttrModTime,
+//			 int64_t *pFileSize, InodeRefType *pInodeNumber,
+//			 bool *pHasMultipleLinks)
+//		Purpose: Read the attributes of the file, and store them
+//			 ready for streaming. Optionally retrieve the
+//			 modification time and attribute modification time.
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::ReadAttributes(const char *Filename, bool ZeroModificationTimes, box_time_t *pModTime,
-	box_time_t *pAttrModTime, int64_t *pFileSize, InodeRefType *pInodeNumber, bool *pHasMultipleLinks)
+void BackupClientFileAttributes::ReadAttributes(const char *Filename,
+	bool ZeroModificationTimes, box_time_t *pModTime,
+	box_time_t *pAttrModTime, int64_t *pFileSize,
+	InodeRefType *pInodeNumber, bool *pHasMultipleLinks)
 {
 	StreamableMemBlock *pnewAttr = 0;
 	try
