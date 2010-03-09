@@ -18,6 +18,7 @@ bin/bbackupd/win32
 bin/bbackupquery
 bin/bbackupctl
 bin/bbackupobjdump
+bin/s3simulator
 test/backupstore
 test/backupstore/testfiles
 test/backupstorefix
@@ -74,6 +75,8 @@ docs/xsl-generic/highlighting
 BUGS.txt
 contrib
 
+contrib/bbadmin
+contrib/bbreporter
 contrib/debian
 contrib/mac_osx
 contrib/redhat
@@ -81,10 +84,10 @@ contrib/rpm
 REPLACE-VERSION-IN contrib/rpm/boxbackup.spec
 contrib/solaris
 contrib/suse
-contrib/bbreporter
 contrib/windows
 contrib/windows/installer
 contrib/windows/installer/tools
+
 infrastructure/msvc
 infrastructure/msvc/2003
 infrastructure/msvc/2005
