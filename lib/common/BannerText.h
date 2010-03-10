@@ -12,7 +12,7 @@
 
 #define BANNER_TEXT(UtilityName) \
 	"Box " UtilityName " v" BOX_VERSION ", (c) Ben Summers and " \
-	"contributors 2003-2008"
+	"contributors 2003-2010"
 
 #endif // BANNERTEXT__H
 
