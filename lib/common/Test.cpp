@@ -43,10 +43,10 @@ bool TestDirExists(const char *Filename)
 }
 
 // -1 if doesn't exist
-int TestGetFileSize(const char *Filename)
+int TestGetFileSize(const std::string& Filename)
 {
 	EMU_STRUCT_STAT st;
-	if(EMU_STAT(Filename, &st) == 0)
+	if(EMU_STAT(Filename.c_str(), &st) == 0)
 	{
 		return st.st_size;
 	}
