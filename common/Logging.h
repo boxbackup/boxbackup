@@ -59,6 +59,10 @@
 #define THROW_SYS_FILE_ERROR(message, filename, exception, subtype) \
 	THROW_SYS_ERROR(message << ": " << filename, exception, subtype)
 
+#define THROW_FILE_ERROR(message, filename, exception, subtype) \
+	BOX_ERROR(message << ": " << filename); \
+	THROW_EXCEPTION_MESSAGE(exception, subtype, message << ": " << filename);
+
 inline std::string GetNativeErrorMessage()
 {
 #ifdef WIN32
