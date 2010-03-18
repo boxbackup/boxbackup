@@ -140,7 +140,7 @@ bool TestFileExists(const char *Filename);
 bool TestDirExists(const char *Filename);
 
 // -1 if doesn't exist
-int TestGetFileSize(const char *Filename);
+int TestGetFileSize(const std::string& Filename);
 std::string ConvertPaths(const std::string& rOriginal);
 int RunCommand(const std::string& rCommandLine);
 bool ServerIsAlive(int pid);
