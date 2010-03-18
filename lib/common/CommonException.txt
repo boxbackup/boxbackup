@@ -52,3 +52,6 @@ DatabaseDeleteFailed			44	Failed to delete a record from the database file
 DatabaseCloseFailed			45	Failed to close the database file
 DatabaseRecordNotFound			46	The database does not contain the expected record
 DatabaseRecordAlreadyExists		47	The database already contains a record with this key, which was not expected
+DatabaseRecordBadSize			48	The database contains a record with an invalid size
+DatabaseIterateFailed			49	Failed to iterate over the database keys
+ReferenceNotFound			50	The database does not contain an expected reference
