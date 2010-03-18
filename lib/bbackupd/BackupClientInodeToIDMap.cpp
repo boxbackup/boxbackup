@@ -19,6 +19,7 @@
 #include "Archive.h"
 #include "BackupStoreException.h"
 #include "CollectInBufferStream.h"
+#include "Database.h"
 #include "MemBlockStream.h"
 #include "autogen_CommonException.h"
 
@@ -26,22 +27,6 @@
 
 #define BOX_DBM_INODE_DB_VERSION_KEY "BackupClientInodeToIDMap.Version"
 #define BOX_DBM_INODE_DB_VERSION_CURRENT 2
-
-#define BOX_DBM_MESSAGE(stuff) stuff << " (qdbm): " << dperrmsg(dpecode)
-
-#define BOX_LOG_DBM_ERROR(stuff) \
-	BOX_ERROR(BOX_DBM_MESSAGE(stuff))
-
-#define THROW_DBM_ERROR(message, filename, exception, subtype) \
-	BOX_LOG_DBM_ERROR(message << ": " << filename); \
-	THROW_EXCEPTION_MESSAGE(exception, subtype, \
-		BOX_DBM_MESSAGE(message << ": " << filename));
-
-#define ASSERT_DBM_OK(operation, message, filename, exception, subtype) \
-	if(!(operation)) \
-	{ \
-		THROW_DBM_ERROR(message, filename, exception, subtype); \
-	}
 
 #define ASSERT_DBM_OPEN() \
 	if(mpDepot == 0) \
