@@ -123,7 +123,7 @@ release/common/test:
 
 .PHONY: docs
 docs:
-	\$(MAKE) -C docs
+	cd docs; \$(MAKE)
 
 __END_OF_FRAGMENT
 
@@ -219,7 +219,7 @@ EOF
 			print MAKE <<EOF;
 .PHONY: docs/man/${name}.gz
 docs/man/${name}.gz:
-	\$(MAKE) -C docs man/${name}.gz
+	cd docs; \$(MAKE) man/${name}.gz
 
 EOF
 			push @parcel_deps, "$dir/${name}.gz";
@@ -237,7 +237,7 @@ EOF
 			print MAKE <<EOF;
 .PHONY: docs/htmlguide/man-html/${name}.html
 docs/htmlguide/man-html/${name}.html:
-	\$(MAKE) -C docs htmlguide/man-html/${name}.html
+	cd docs; \$(MAKE) htmlguide/man-html/${name}.html
 
 EOF
 			push @parcel_deps, "$dir/docs/${name}.html";
@@ -245,14 +245,15 @@ EOF
 		elsif ($type eq 'subdir')
 		{
 			shift @args;
+			my $subdir = shift @args;
 			print MAKE <<EOF;
 .PHONY: $name-build $name-clean
 
 $name-build:
-	\$(MAKE) -C @args
+	cd $subdir; \$(MAKE) @args
 
 $name-clean:
-	\$(MAKE) -C $name clean
+	cd $name; \$(MAKE) clean
 EOF
 			push @parcel_deps, "$name-build";
 			push @clean_deps,  "$name-clean";
@@ -354,7 +355,7 @@ install:
 	cat local/install.msg
 
 clean: @clean_deps
-	\$(MAKE) -C docs clean
+	cd docs; \$(MAKE) clean
 EOF
 
 if ($build_os eq 'CYGWIN')
