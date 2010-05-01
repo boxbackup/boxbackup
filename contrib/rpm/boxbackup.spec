@@ -104,16 +104,23 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/box/bbackupd
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/box/bbstored
 mkdir -p $RPM_BUILD_ROOT%{_var}/lib/box
 
-install -m 644 -t $RPM_BUILD_ROOT%{_docdir}/%{ident} \
-	BUGS.txt \
-	VERSION.txt \
-	ExceptionCodes.txt \
-	LICENSE-GPL.txt \
-	LICENSE-DUAL.txt \
-	%{distribution_dir}CONTACT.txt \
-	%{distribution_dir}DOCUMENTATION.txt \
-	%{distribution_dir}LINUX.txt \
-	%{distribution_dir}THANKS.txt
+install -m 644 BUGS.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 VERSION.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 ExceptionCodes.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 LICENSE.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+
+install -m 644 %{distribution_dir}CONTACT.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 %{distribution_dir}DOCUMENTATION.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 %{distribution_dir}LINUX.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
+install -m 644 %{distribution_dir}THANKS.txt \
+	$RPM_BUILD_ROOT%{_docdir}/%{ident}
 
 install -m 644 contrib/bbreporter/LICENSE \
 	$RPM_BUILD_ROOT%{_docdir}/%{ident}/bbreporter
