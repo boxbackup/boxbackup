@@ -109,7 +109,7 @@ install -m 644 -t $RPM_BUILD_ROOT%{_docdir}/%{ident} \
 	VERSION.txt \
 	ExceptionCodes.txt \
 	LICENSE-GPL.txt \
-	LICENSE-BSD.txt \
+	LICENSE-DUAL.txt \
 	%{distribution_dir}CONTACT.txt \
 	%{distribution_dir}DOCUMENTATION.txt \
 	%{distribution_dir}LINUX.txt \
