@@ -45,7 +45,7 @@ public:
 		TLSContext &rTLSContext, 
 		const std::string &rHostname,
 		int32_t Port,
-		int32_t AccountNumber, 
+		uint32_t AccountNumber, 
 		bool ExtendedLogging,
 		bool ExtendedLogToFile,
 		std::string ExtendedLogFile,
@@ -213,7 +213,7 @@ private:
 	TLSContext &mrTLSContext;
 	std::string mHostname;
 	int mPort;
-	int32_t mAccountNumber;
+	uint32_t mAccountNumber;
 	SocketStreamTLS *mpSocket;
 	BackupProtocolClient *mpConnection;
 	bool mExtendedLogging;
