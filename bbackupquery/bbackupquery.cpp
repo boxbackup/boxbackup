@@ -213,6 +213,8 @@ int main(int argc, const char *argv[])
 #elif defined HAVE_LIBREADLINE // && !WIN32
 	const char* validOpts = "qvVwEc:l:o:O:W:";
 	bool useReadline = true;
+#else
+	const char* validOpts = "qvVwc:l:o:O:W:";
 #endif
 
 	std::string fileLogFile;
@@ -458,6 +460,7 @@ int main(int argc, const char *argv[])
 	if (false)
 	{
 #endif
+		#ifdef HAVE_LIBREADLINE
 		// Must initialise the locale before using editline's
 		// readline(), otherwise cannot enter international characters.
 		if (setlocale(LC_ALL, "") == NULL)
@@ -509,6 +512,7 @@ int main(int argc, const char *argv[])
 			free(last_cmd);
 			last_cmd = 0;
 		#endif
+		#endif // HAVE_READLINE
 	}
 	else // !HAVE_LIBREADLINE || !useReadline
 	{
