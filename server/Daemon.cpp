@@ -291,10 +291,11 @@ int Daemon::ProcessOption(signed int option)
 //		Created: 2003/07/29
 //
 // --------------------------------------------------------------------------
-int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
+int Daemon::Main(const std::string& rDefaultConfigFile, int argc,
+	const char *argv[])
 {
 	// Find filename of config file
-	mConfigFileName = DefaultConfigFile;
+	mConfigFileName = rDefaultConfigFile;
 	mAppName = argv[0];
 
 	#ifdef BOX_RELEASE_BUILD
