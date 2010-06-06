@@ -20,20 +20,10 @@ class BackupProtocolClient;
 class Configuration;
 class ExcludeList;
 
-typedef struct
-{
-	const char* name;
-	const char* opts;
-}
-QueryCommandSpecification;
-
-// Data about commands
-extern QueryCommandSpecification commands[];
-
 typedef enum
 {
-	Command_Quit = 0,
-	Command_Exit,
+	Command_Unknown = 0,
+	Command_Quit,
 	Command_List,
 	Command_pwd,
 	Command_cd,
@@ -49,6 +39,29 @@ typedef enum
 	Command_Delete,
 }
 CommandType;
+
+typedef enum
+{
+	Complete_End = 0,
+	Complete_RemoteDir,
+	Complete_RemoteFile,
+	Complete_LocalDir,
+	Complete_LocalFile,
+	Complete_LocationName,
+	Complete_RemoteIdInCurrentDir,
+}
+CompletionType;
+
+typedef struct
+{
+	const char* name;
+	const char* opts;
+	CommandType type;
+}
+QueryCommandSpecification;
+
+// Data about commands
+extern QueryCommandSpecification commands[];
 
 extern const char *alias[];
 extern const int aliasIs[];
@@ -71,8 +84,17 @@ public:
 private:
 	BackupQueries(const BackupQueries &);
 public:
+	struct ParsedCommand
+	{
+		std::vector<std::string> cmdElements;
+		std::string options;
+		std::string completeCommand;
+	};
 
-	void DoCommand(const char *Command, bool isFromCommandLine);
+	ParsedCommand ParseCommand(const std::string& Command,
+		bool isFromCommandLine);
+	void DoCommand(ParsedCommand& rCommand);
+	CompletionType* GetCompletionTypes(ParsedCommand& rCommand);
 
 	// Ready to stop?
 	bool Stop() {return mQuitNow;}

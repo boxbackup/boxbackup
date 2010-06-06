@@ -60,17 +60,34 @@
 
 void PrintUsageAndExit()
 {
-	printf("Usage: bbackupquery [-q*|v*|V|W<level>] [-w] "
+	std::ostringstream out;
+	out << 
+		"Usage: bbackupquery [options] [command]...\n"
+		"\n"
+		"Options:\n"
+		"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
+		"  -Q         Run at minimum verbosity, log nothing\n"
+		"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
+		"  -V         Run at maximum verbosity, log everything\n"
+		"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
+		"  -w         Read/write mode, allow changes to store\n"
 #ifdef WIN32
-	"[-u] "
+		"  -u         Enable Unicode console, requires font change to Lucida Console\n"
+#else // !WIN32
+		"  -E         Disable interactive command editing, may fix entering intl chars\n"
 #endif
-	"\n"
-	"\t[-c config_file] [-o log_file] [-O log_file_level]\n"
-	"\t[-l protocol_log_file] [commands]\n"
-	"\n"
-	"As many commands as you require.\n"
-	"If commands are multiple words, remember to enclose the command in quotes.\n"
-	"Remember to use the quit command unless you want to end up in interactive mode.\n");
+		"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
+		"             argument is the configuration file, or else the default \n"
+		"             [" << BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE << 
+		"]\n"
+		"  -o <file>  Write logging output to specified file as well as console\n"
+		"  -O <level> Set file verbosity to error/warning/notice/info/trace/everything\n"
+		"  -l <file>  Write protocol debugging logs to specified file\n"
+		"\n"
+		"Parameters: as many commands as you like. If commands are multiple words,\n"
+		"remember to enclose the command in quotes. Remember to use the quit command\n"
+		"unless you want to end up in interactive mode.\n";
+	printf("%s", out.str().c_str());
 	exit(1);
 }
 
@@ -120,6 +137,12 @@ char * command_generator(const char *text, int state)
 	return (char *) NULL;
 }
 
+#ifdef HAVE_RL_COMPLETION_MATCHES
+	#define RL_COMPLETION_MATCHES rl_completion_matches
+#elif defined HAVE_COMPLETION_MATCHES
+	#define RL_COMPLETION_MATCHES completion_matches
+#endif
+
 char ** bbackupquery_completion(const char *text, int start, int end)
 {
 	char **matches;
@@ -130,15 +153,12 @@ char ** bbackupquery_completion(const char *text, int start, int end)
 	 * to complete.  Otherwise it is the name of a file in the current
 	 * directory.
 	 */
+	#ifdef RL_COMPLETION_MATCHES
 	if (start == 0)
 	{
-		#ifdef HAVE_RL_COMPLETION_MATCHES
-			matches = rl_completion_matches(text,
-				command_generator);
-		#elif defined HAVE_COMPLETION_MATCHES
-			matches = completion_matches(text, command_generator);
-		#endif
+		matches = RL_COMPLETION_MATCHES(text, command_generator);
 	}
+	#endif
 
 	return matches;
 }
@@ -190,8 +210,9 @@ int main(int argc, const char *argv[])
 #ifdef WIN32
 	const char* validOpts = "qvVwuc:l:o:O:W:";
 	bool unicodeConsole = false;
-#else
-	const char* validOpts = "qvVwc:l:o:O:W:";
+#elif defined HAVE_LIBREADLINE // && !WIN32
+	const char* validOpts = "qvVwEc:l:o:O:W:";
+	bool useReadline = true;
 #endif
 
 	std::string fileLogFile;
@@ -285,6 +306,10 @@ int main(int argc, const char *argv[])
 #ifdef WIN32
 		case 'u':
 			unicodeConsole = true;
+			break;
+#elif defined HAVE_LIBREADLINE // && !WIN32
+		case 'E':
+			useReadline = false;
 			break;
 #endif
 		
@@ -382,7 +407,9 @@ int main(int argc, const char *argv[])
 	
 	// 3. Make a protocol, and handshake
 	if(!quiet) BOX_INFO("Handshake with store...");
-	BackupProtocolClient connection(socket);
+	std::auto_ptr<BackupProtocolClient>
+		apConnection(new BackupProtocolClient(socket));
+	BackupProtocolClient& connection(*(apConnection.get()));
 	connection.Handshake();
 	
 	// logging?
@@ -402,7 +429,7 @@ int main(int argc, const char *argv[])
 		}
 	}
 	// Login -- if this fails, the Protocol will exception
-	connection.QueryLogin(conf.GetKeyValueInt("AccountNumber"),
+	connection.QueryLogin(conf.GetKeyValueUint32("AccountNumber"),
 		(readWrite)?0:(BackupProtocolClientLogin::Flags_ReadOnly));
 
 	// 5. Tell user.
@@ -416,72 +443,90 @@ int main(int argc, const char *argv[])
 		int c = 0;
 		while(c < argc && !context.Stop())
 		{
-			context.DoCommand(argv[c++], true);
+			BackupQueries::ParsedCommand cmd(
+				context.ParseCommand(argv[c++], true));
+			context.DoCommand(cmd);
 		}
 	}
 	
 	// Get commands from input
 
 #ifdef HAVE_LIBREADLINE
-	// Must initialise the locale before using editline's readline(),
-	// otherwise cannot enter international characters.
-	if (setlocale(LC_ALL, "") == NULL)
+	if (useReadline)
 	{
-		BOX_ERROR("Failed to initialise locale. International "
-			"character support may not work.");
-	}
-
-#ifdef HAVE_READLINE_HISTORY
-	using_history();
-#endif
-	/* Allow conditional parsing of the ~/.inputrc file. */
-	rl_readline_name = "bbackupquery";
-
-	/* Tell the completer that we want a crack first. */
-	rl_attempted_completion_function = bbackupquery_completion;
-
-	char *last_cmd = 0;
-	while(!context.Stop())
-	{
-		char *command = readline("query > ");
-		if(command == NULL)
-		{
-			// Ctrl-D pressed -- terminate now
-			break;
-		}
-		context.DoCommand(command, false);
-		if(last_cmd != 0 && ::strcmp(last_cmd, command) == 0)
-		{
-			free(command);
-		}
-		else
-		{
-#ifdef HAVE_READLINE_HISTORY
-			add_history(command);
 #else
-			free(last_cmd);
-#endif
-			last_cmd = command;
-		}
-	}
-#ifndef HAVE_READLINE_HISTORY
-	free(last_cmd);
-	last_cmd = 0;
-#endif
-#else
-	// Version for platforms which don't have readline by default
-	if(fileno(stdin) >= 0)
+	if (false)
 	{
-		FdGetLine getLine(fileno(stdin));
+#endif
+		// Must initialise the locale before using editline's
+		// readline(), otherwise cannot enter international characters.
+		if (setlocale(LC_ALL, "") == NULL)
+		{
+			BOX_ERROR("Failed to initialise locale. International "
+				"character support may not work.");
+		}
+
+		#ifdef HAVE_READLINE_HISTORY
+			using_history();
+		#endif
+
+		/* Allow conditional parsing of the ~/.inputrc file. */
+		rl_readline_name = strdup("bbackupquery");
+
+		/* Tell the completer that we want a crack first. */
+		rl_attempted_completion_function = bbackupquery_completion;
+		
+		char *last_cmd = 0;
 		while(!context.Stop())
 		{
-			printf("query > ");
-			fflush(stdout);
-			std::string command(getLine.GetLine());
-			context.DoCommand(command.c_str(), false);
+			char *command = readline("query > ");
+			
+			if(command == NULL)
+			{
+				// Ctrl-D pressed -- terminate now
+				break;
+			}
+			
+			BackupQueries::ParsedCommand cmd(
+				context.ParseCommand(command, false));
+			context.DoCommand(cmd);
+			
+			if(last_cmd != 0 && ::strcmp(last_cmd, command) == 0)
+			{
+				free(command);
+			}
+			else
+			{
+				#ifdef HAVE_READLINE_HISTORY
+					add_history(command);
+				#else
+					free(last_cmd);
+				#endif
+				last_cmd = command;
+			}
+		}
+		#ifndef HAVE_READLINE_HISTORY
+			free(last_cmd);
+			last_cmd = 0;
+		#endif
+	}
+	else // !HAVE_LIBREADLINE || !useReadline
+	{
+		// Version for platforms which don't have readline by default
+		if(fileno(stdin) >= 0)
+		{
+			FdGetLine getLine(fileno(stdin));
+			while(!context.Stop())
+			{
+				printf("query > ");
+				fflush(stdout);
+				std::string command(getLine.GetLine());
+				BackupQueries::ParsedCommand cmd(
+					context.ParseCommand(command, false));
+				context.DoCommand(cmd);
+			}
 		}
 	}
-#endif
 	
 	// Done... stop nicely
 	if(!quiet) BOX_INFO("Logging off...");
