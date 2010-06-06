@@ -174,13 +174,7 @@ int main(int argc, const char *argv[])
 	FILE *logFile = 0;
 
 	// Filename for configuration file?
-	std::string configFilename;
-
-	#ifdef WIN32
-		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
-	#else
-		configFilename = BOX_FILE_BBACKUPD_DEFAULT_CONFIG;
-	#endif
+	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
 	
 	// Flags
 	bool readWrite = false;

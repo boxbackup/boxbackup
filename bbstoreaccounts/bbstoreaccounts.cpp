@@ -465,13 +465,7 @@ int main(int argc, const char *argv[])
 	Logging::SetProgramName("bbstoreaccounts");
 
 	// Filename for configuration file?
-	std::string configFilename;
-
-	#ifdef WIN32
-		configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
-	#else
-		configFilename = BOX_FILE_BBSTORED_DEFAULT_CONFIG;
-	#endif
+	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
 	
 	// See if there's another entry on the command line
 	int c;
