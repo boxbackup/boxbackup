@@ -45,7 +45,7 @@ BackupClientContext::BackupClientContext
 	TLSContext &rTLSContext, 
 	const std::string &rHostname,
 	int Port,
-	int32_t AccountNumber, 
+	uint32_t AccountNumber, 
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
 	std::string ExtendedLogFile,

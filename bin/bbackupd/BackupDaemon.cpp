@@ -743,7 +743,7 @@ void BackupDaemon::RunSyncNow()
 		mTlsContext, 
 		conf.GetKeyValue("StoreHostname"),
 		conf.GetKeyValueInt("StorePort"),
-		conf.GetKeyValueInt("AccountNumber"), 
+		conf.GetKeyValueUint32("AccountNumber"), 
 		conf.GetKeyValueBool("ExtendedLogging"),
 		conf.KeyExists("ExtendedLogFile"),
 		extendedLogFile, *mpProgressNotifier
