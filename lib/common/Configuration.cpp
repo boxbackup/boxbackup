@@ -453,8 +453,39 @@ int Configuration::GetKeyValueInt(const std::string& rKeyName) const
 	}
 	else
 	{
-		long value = ::strtol((i->second).c_str(), NULL, 0 /* C style handling */);
+		long value = ::strtol((i->second).c_str(), NULL,
+			0 /* C style handling */);
 		if(value == LONG_MAX || value == LONG_MIN)
+		{
+			THROW_EXCEPTION(CommonException, ConfigBadIntValue)
+		}
+		return (int)value;
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Configuration::GetKeyValueUint32(const std::string& rKeyName)
+//		Purpose: Gets a key value as a 32-bit unsigned integer
+//		Created: 2003/07/23
+//
+// --------------------------------------------------------------------------
+uint32_t Configuration::GetKeyValueUint32(const std::string& rKeyName) const
+{
+	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
+	
+	if(i == mKeys.end())
+	{
+		THROW_EXCEPTION(CommonException, ConfigNoKey)
+	}
+	else
+	{
+		errno = 0;
+		long value = ::strtoul((i->second).c_str(), NULL,
+			0 /* C style handling */);
+		if(errno != 0)
 		{
 			THROW_EXCEPTION(CommonException, ConfigBadIntValue)
 		}
@@ -678,6 +709,21 @@ bool Configuration::Verify(const ConfigurationVerify &rVerify,
 						// not a good value
 						ok = false;
 						rErrorMsg += rLevel + mName + "." + pvkey->Name() + " (key) is not a valid integer.\n";
+					}
+				}
+
+				// Check it's a number?
+				if(pvkey->Flags() & ConfigTest_IsUint32)
+				{					
+					// Test it...
+					char *end;
+					errno = 0;
+					uint32_t r = ::strtoul(val, &end, 0);
+					if(errno != 0 || end != (val + rval.size()))
+					{
+						// not a good value
+						ok = false;
+						rErrorMsg += rLevel + mName + "." + pvkey->Name() + " (key) is not a valid unsigned 32-bit integer.\n";
 					}
 				}
 				

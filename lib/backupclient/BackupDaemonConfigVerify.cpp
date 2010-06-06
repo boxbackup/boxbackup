@@ -65,7 +65,7 @@ static const ConfigurationVerify verifyserver[] =
 static const ConfigurationVerifyKey verifyrootkeys[] = 
 {
 	ConfigurationVerifyKey("AccountNumber",
-		ConfigTest_Exists | ConfigTest_IsInt),
+		ConfigTest_Exists | ConfigTest_IsUint32),
 	ConfigurationVerifyKey("UpdateStoreInterval",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("MinimumFileAge",
