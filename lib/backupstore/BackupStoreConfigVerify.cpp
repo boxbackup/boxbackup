@@ -38,13 +38,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("ExtendedLogging", ConfigTest_IsBool, false),
 	// make value "yes" to enable in config file
-
-	#ifdef WIN32
-		ConfigurationVerifyKey("RaidFileConf", ConfigTest_LastEntry)
-	#else
-		ConfigurationVerifyKey("RaidFileConf", ConfigTest_LastEntry,
-			BOX_FILE_RAIDFILE_DEFAULT_CONFIG)
-	#endif
+	ConfigurationVerifyKey("RaidFileConf", ConfigTest_LastEntry)
 };
 
 const ConfigurationVerify BackupConfigFileVerify =

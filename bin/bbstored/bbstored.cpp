@@ -24,13 +24,7 @@ int main(int argc, const char *argv[])
 
 	BackupStoreDaemon daemon;
 
-	#ifdef WIN32
-		return daemon.Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE,
-			argc, argv);
-	#else
-		return daemon.Main(BOX_FILE_BBSTORED_DEFAULT_CONFIG,
-			argc, argv);
-	#endif
+	return daemon.Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE, argc, argv);
 	
 	MAINHELPER_END
 }
