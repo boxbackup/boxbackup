@@ -46,7 +46,8 @@ int main(int argc, const char *argv[])
 #else // !WIN32
 
 	BackupDaemon daemon;
-	ExitCode = daemon.Main(BOX_FILE_BBACKUPD_DEFAULT_CONFIG, argc, argv);
+	ExitCode = daemon.Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE,
+		argc, argv);
 
 #endif // WIN32
 
