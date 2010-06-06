@@ -66,22 +66,22 @@
 // Data about commands
 QueryCommandSpecification commands[] = 
 {
-	{ "quit", "" },
-	{ "exit", "" },
-	{ "list", "rodIFtTash", },
-	{ "pwd",  "" },
-	{ "cd",   "od" },
-	{ "lcd",  "" },
-	{ "sh",   "" },
-	{ "getobject", "" },
-	{ "get",  "i" },
-	{ "compare", "alcqAEQ" },
-	{ "restore", "drif" },
-	{ "help", "" },
-	{ "usage", "m" },
-	{ "undelete", "" },
-	{ "delete", "" },
-	{ NULL, NULL } 
+	{ "quit", "", Command_Quit },
+	{ "exit", "", Command_Quit },
+	{ "list", "rodIFtTash", Command_List },
+	{ "pwd",  "", Command_pwd },
+	{ "cd",   "od", Command_cd },
+	{ "lcd",  "", Command_lcd },
+	{ "sh",   "", Command_sh },
+	{ "getobject", "", Command_GetObject },
+	{ "get",  "i", Command_Get },
+	{ "compare", "alcqAEQ", Command_Compare },
+	{ "restore", "drif", Command_Restore },
+	{ "help", "", Command_Help },
+	{ "usage", "m", Command_Usage },
+	{ "undelete", "", Command_Undelete },
+	{ "delete", "", Command_Delete },
+	{ NULL, NULL, Command_Unknown } 
 };
 
 const char *alias[] = {"ls", 0};
@@ -124,6 +124,105 @@ BackupQueries::~BackupQueries()
 {
 }
 
+BackupQueries::ParsedCommand
+BackupQueries::ParseCommand(const std::string& Command, bool isFromCommandLine)
+{
+	ParsedCommand parsed;
+	parsed.completeCommand = Command;
+	
+	// is the command a shell command?
+	if(Command[0] == 's' && Command[1] == 'h' && Command[2] == ' ' && Command[3] != '\0')
+	{
+		// Yes, run shell command
+		parsed.cmdElements[0] = "sh";
+		parsed.cmdElements[1] = Command.c_str() + 3;
+		return parsed;
+	}
+
+	// split command into components
+	const char *c = Command.c_str();
+	bool inQuoted = false;
+	bool inOptions = false;
+	
+	std::string s;
+	while(*c != 0)
+	{
+		// Terminating char?
+		if(*c == ((inQuoted)?'"':' '))
+		{
+			if(!s.empty()) parsed.cmdElements.push_back(s);
+			s.resize(0);
+			inQuoted = false;
+			inOptions = false;
+		}
+		else
+		{
+			// No. Start of quoted parameter?
+			if(s.empty() && *c == '"')
+			{
+				inQuoted = true;
+			}
+			// Start of options?
+			else if(s.empty() && *c == '-')
+			{
+				inOptions = true;
+			}
+			else
+			{
+				if(inOptions)
+				{
+					// Option char
+					parsed.options += *c;
+				}
+				else
+				{
+					// Normal string char
+					s += *c;
+				}
+			}
+		}
+	
+		++c;
+	}
+	
+	if(!s.empty())
+	{
+		parsed.cmdElements.push_back(s);
+	}
+	
+	#ifdef WIN32
+	if(isFromCommandLine)
+	{
+		std::string converted;
+		
+		if(!ConvertEncoding(parsed.completeCommand, CP_ACP, converted, 
+			GetConsoleCP()))
+		{
+			BOX_ERROR("Failed to convert encoding");
+			return;
+		}
+		
+		parsed.completeCommand = converted;
+		
+		for(std::vector<std::string>::iterator 
+			i  = parsed.cmdElements.begin();
+			i != parsed.cmdElements.end(); i++)
+		{
+			if(!ConvertEncoding(*i, CP_ACP, converted, 
+				GetConsoleCP()))
+			{
+				BOX_ERROR("Failed to convert encoding");
+				return;
+			}
+			
+			*i = converted;
+		}
+	}
+	#endif
+	
+	return parsed;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -132,13 +231,19 @@ BackupQueries::~BackupQueries()
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
-{
-	// is the command a shell command?
-	if(Command[0] == 's' && Command[1] == 'h' && Command[2] == ' ' && Command[3] != '\0')
+void BackupQueries::DoCommand(ParsedCommand& rCommand)
+{	
+	// Check...
+	if(rCommand.cmdElements.size() < 1)
+	{
+		// blank command
+		return;
+	}
+
+	if(rCommand.cmdElements[0] == "sh" && rCommand.cmdElements.size() == 2)
 	{
 		// Yes, run shell command
-		int result = ::system(Command + 3);
+		int result = ::system(rCommand.cmdElements[1].c_str());
 		if(result != 0)
 		{
 			BOX_WARNING("System command returned error code " <<
@@ -147,114 +252,40 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		}
 		return;
 	}
-
-	// split command into components
-	std::vector<std::string> cmdElements;
-	std::string options;
-	{
-		const char *c = Command;
-		bool inQuoted = false;
-		bool inOptions = false;
 		
-		std::string s;
-		while(*c != 0)
-		{
-			// Terminating char?
-			if(*c == ((inQuoted)?'"':' '))
-			{
-				if(!s.empty()) cmdElements.push_back(s);
-				s.resize(0);
-				inQuoted = false;
-				inOptions = false;
-			}
-			else
-			{
-				// No. Start of quoted parameter?
-				if(s.empty() && *c == '"')
-				{
-					inQuoted = true;
-				}
-				// Start of options?
-				else if(s.empty() && *c == '-')
-				{
-					inOptions = true;
-				}
-				else
-				{
-					if(inOptions)
-					{
-						// Option char
-						options += *c;
-					}
-					else
-					{
-						// Normal string char
-						s += *c;
-					}
-				}
-			}
-		
-			++c;
-		}
-		if(!s.empty()) cmdElements.push_back(s);
-	}
-	
-	#ifdef WIN32
-	if (isFromCommandLine)
-	{
-		for (std::vector<std::string>::iterator 
-			i  = cmdElements.begin();
-			i != cmdElements.end(); i++)
-		{
-			std::string converted;
-			if (!ConvertEncoding(*i, CP_ACP, converted, 
-				GetConsoleCP()))
-			{
-				BOX_ERROR("Failed to convert encoding");
-				return;
-			}
-			*i = converted;
-		}
-	}
-	#endif
-		
-	// Check...
-	if(cmdElements.size() < 1)
-	{
-		// blank command
-		return;
-	}
-
 	// Work out which command it is...
 	int cmd = 0;
-	while(commands[cmd].name != 0 && ::strcmp(cmdElements[0].c_str(), commands[cmd].name) != 0)
+	while(commands[cmd].name != 0 && 
+		rCommand.cmdElements[0] != commands[cmd].name)
 	{
 		cmd++;
 	}
+	
 	if(commands[cmd].name == 0)
 	{
 		// Check for aliases
 		int a;
 		for(a = 0; alias[a] != 0; ++a)
 		{
-			if(::strcmp(cmdElements[0].c_str(), alias[a]) == 0)
+			if(rCommand.cmdElements[0] == alias[a])
 			{
 				// Found an alias
 				cmd = aliasIs[a];
 				break;
 			}
 		}
-	
+	}
+		
+	if(commands[cmd].name == 0 || commands[cmd].type == Command_Unknown)
+	{
 		// No such command
-		if(alias[a] == 0)
-		{
-			BOX_ERROR("Unrecognised command: " << Command);
-			return;
-		}
+		BOX_ERROR("Unrecognised command: " << rCommand.cmdElements[0]);
+		return;
 	}
 
 	// Arguments
-	std::vector<std::string> args(cmdElements.begin() + 1, cmdElements.end());
+	std::vector<std::string> args(rCommand.cmdElements.begin() + 1,
+		rCommand.cmdElements.end());
 
 	// Set up options
 	bool opts[256];
@@ -262,7 +293,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 	// BLOCK
 	{
 		// options
-		const char *c = options.c_str();
+		const char *c = rCommand.options.c_str();
 		while(*c != 0)
 		{
 			// Valid option?
@@ -277,17 +308,16 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		}
 	}
 
-	if(cmd != Command_Quit && cmd != Command_Exit)
+	if(commands[cmd].type != Command_Quit)
 	{
 		// If not a quit command, set the return code to zero
 		SetReturnCode(ReturnCode::Command_OK);
 	}
 
 	// Handle command
-	switch(cmd)
+	switch(commands[cmd].type)
 	{
 	case Command_Quit:
-	case Command_Exit:
 		mQuitNow = true;
 		break;
 		
@@ -348,7 +378,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		break;
 		
 	default:
-		BOX_ERROR("Unknown command: " << Command);
+		BOX_ERROR("Unknown command: " << rCommand.cmdElements[0]);
 		break;
 	}
 }
