@@ -447,7 +447,15 @@ int main(int argc, const char *argv[])
 		{
 			BackupQueries::ParsedCommand cmd(
 				context.ParseCommand(argv[c++], true));
-			context.DoCommand(cmd);
+
+			if(cmd.failed)
+			{
+				BOX_ERROR("Parse failed");
+			}
+			else
+			{
+				context.DoCommand(cmd);
+			}
 		}
 	}
 	
@@ -492,8 +500,16 @@ int main(int argc, const char *argv[])
 			
 			BackupQueries::ParsedCommand cmd(
 				context.ParseCommand(command, false));
-			context.DoCommand(cmd);
 			
+			if(cmd.failed)
+			{
+				BOX_ERROR("Parse failed");
+			}
+			else
+			{
+				context.DoCommand(cmd);
+			}
+
 			if(last_cmd != 0 && ::strcmp(last_cmd, command) == 0)
 			{
 				free(command);
