@@ -89,6 +89,8 @@ public:
 		std::vector<std::string> cmdElements;
 		std::string options;
 		std::string completeCommand;
+		bool failed;
+		ParsedCommand() : failed(false) { }
 	};
 
 	ParsedCommand ParseCommand(const std::string& Command,
