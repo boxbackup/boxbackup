@@ -16,6 +16,8 @@
 #include <set>
 
 #include "NamedLock.h"
+#include "BackupStoreDirectory.h"
+
 class IOStream;
 class BackupStoreFilename;
 
@@ -120,6 +122,9 @@ private:
 	int64_t CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName);
 	void CheckObjectsDir(int64_t StartID);
 	bool CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
+	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
+		int64_t DirectoryID, int32_t indexInDirBlock,
+		bool& rIsModified);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
 	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);	
 
@@ -161,6 +166,7 @@ private:
 	std::string mStoreRoot;
 	int mDiscSetNumber;
 	int32_t mAccountID;
+	std::string mAccountName;
 	bool mFixErrors;
 	bool mQuiet;
 	
@@ -179,7 +185,8 @@ private:
 	// List of stuff to fix
 	std::vector<BackupStoreCheck_ID_t> mDirsWithWrongContainerID;
 	// This is a map of lost dir ID -> existing dir ID
-	std::map<BackupStoreCheck_ID_t, BackupStoreCheck_ID_t> mDirsWhichContainLostDirs;
+	std::map<BackupStoreCheck_ID_t, BackupStoreCheck_ID_t>
+		mDirsWhichContainLostDirs;
 	
 	// Set of extra directories added
 	std::set<BackupStoreCheck_ID_t> mDirsAdded;
@@ -190,9 +197,14 @@ private:
 	
 	// Usage
 	int64_t mBlocksUsed;
+	int64_t mBlocksInCurrentFiles;
 	int64_t mBlocksInOldFiles;
 	int64_t mBlocksInDeletedFiles;
 	int64_t mBlocksInDirectories;
+	int64_t mNumFiles;
+	int64_t mNumOldFiles;
+	int64_t mNumDeletedFiles;
+	int64_t mNumDirectories;
 };
 
 #endif // BACKUPSTORECHECK__H
