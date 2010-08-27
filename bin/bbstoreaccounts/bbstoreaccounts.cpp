@@ -208,6 +208,60 @@ int SetLimit(Configuration &rConfig, const std::string &rUsername, int32_t ID, c
 	return 0;
 }
 
+int SetAccountName(Configuration &rConfig, const std::string &rUsername,
+	int32_t ID, const std::string& rNewAccountName)
+{
+	// Become the user specified in the config file?
+	std::auto_ptr<UnixUser> user;
+	if(!rUsername.empty())
+	{
+		// Username specified, change...
+		user.reset(new UnixUser(rUsername.c_str()));
+		user->ChangeProcessUser(true /* temporary */);
+		// Change will be undone at the end of this function
+	}
+
+	// Load in the account database 
+	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
+	
+	// Already exists?
+	if(!db->EntryExists(ID))
+	{
+		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
+			" does not exist.");
+		return 1;
+	}
+	
+	// Load it in
+	BackupStoreAccounts acc(*db);
+	std::string rootDir;
+	int discSet;
+	acc.GetAccountRoot(ID, rootDir, discSet);
+	
+	// Attempt to lock
+	NamedLock writeLock;
+	if(!GetWriteLockOnAccount(writeLock, rootDir, discSet))
+	{
+		// Failed to get lock
+		return 1;
+	}
+
+	// Load the info
+	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID,
+		rootDir, discSet, false /* Read/Write */));
+
+	info->SetAccountName(rNewAccountName);
+	
+	// Save
+	info->Save();
+
+	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(ID) <<
+		" name changed to " << rNewAccountName);
+
+	return 0;
+}
+
+
 int AccountInfo(Configuration &rConfig, int32_t ID)
 {
 	// Load in the account database 
@@ -234,10 +288,16 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 	// Then print out lots of info
 	std::cout << FormatUsageLineStart("Account ID", sMachineReadableOutput) <<
 		BOX_FORMAT_ACCOUNT(ID) << std::endl;
+	std::cout << FormatUsageLineStart("Account Name", sMachineReadableOutput) <<
+		info->GetAccountName() << std::endl;
 	std::cout << FormatUsageLineStart("Last object ID", sMachineReadableOutput) <<
 		BOX_FORMAT_OBJECTID(info->GetLastObjectIDUsed()) << std::endl;
 	std::cout << FormatUsageLineStart("Used", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksUsed(),
+			info->GetBlocksHardLimit(), discSet) << std::endl;
+	std::cout << FormatUsageLineStart("Current files",
+			sMachineReadableOutput) <<
+		BlockSizeToString(info->GetBlocksInCurrentFiles(),
 			info->GetBlocksHardLimit(), discSet) << std::endl;
 	std::cout << FormatUsageLineStart("Old files", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInOldFiles(),
@@ -256,6 +316,14 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 			info->GetBlocksHardLimit(), discSet) << std::endl;
 	std::cout << FormatUsageLineStart("Client store marker", sMachineReadableOutput) <<
 		info->GetLastObjectIDUsed() << std::endl;
+	std::cout << FormatUsageLineStart("Live Files", sMachineReadableOutput) <<
+		info->GetNumFiles() << std::endl;
+	std::cout << FormatUsageLineStart("Old Files", sMachineReadableOutput) <<
+		info->GetNumOldFiles() << std::endl;
+	std::cout << FormatUsageLineStart("Deleted Files", sMachineReadableOutput) <<
+		info->GetNumDeletedFiles() << std::endl;
+	std::cout << FormatUsageLineStart("Directories", sMachineReadableOutput) <<
+		info->GetNumDirectories() << std::endl;
 	
 	return 0;
 }
@@ -451,6 +519,10 @@ void PrintUsageAndExit()
 "        provided, any errors discovered that can be fixed automatically\n"
 "        will be fixed. If the 'quiet' option is provided, less output is\n"
 "        produced.\n"
+"  name <account> <new name>\n"
+"        Changes the \"name\" of the account to the specified string.\n"
+"        The name is purely cosmetic and intended to make it easier to\n"
+"        identify your accounts.\n"
 	);
 	exit(2);
 }
@@ -569,6 +641,17 @@ int main(int argc, const char *argv[])
 		}
 		
 		return SetLimit(*config, username, id, argv[2], argv[3]);
+	}
+	else if(::strcmp(argv[0], "name") == 0)
+	{
+		// Change the limits on this account
+		if(argc != 3)
+		{
+			BOX_ERROR("name command requires a new name.");
+			return 1;
+		}
+		
+		return SetAccountName(*config, username, id, argv[2]);
 	}
 	else if(::strcmp(argv[0], "delete") == 0)
 	{
