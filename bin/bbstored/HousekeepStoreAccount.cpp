@@ -115,6 +115,9 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Load the store info to find necessary info for the housekeeping
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
 		mStoreRoot, mStoreDiscSet, false /* Read/Write */));
+	std::auto_ptr<BackupStoreInfo> pOldInfo(
+		BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet,
+			true /* Read Only */));
 
 	// Calculate how much should be deleted
 	mDeletionSizeTarget = info->GetBlocksUsed() - info->GetBlocksSoftLimit();
@@ -148,8 +151,9 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			info->ChangeBlocksUsed(mBlocksUsedDelta);
 			info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
 			info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
-			
+
 			// Save the store info back
+			info->ReportChangesTo(*pOldInfo);
 			info->Save();
 		}
 	
@@ -197,6 +201,8 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			info->CorrectAllUsedValues(mBlocksUsed,
 				mBlocksInOldFiles, mBlocksInDeletedFiles,
 				mBlocksInDirectories + mBlocksInDirectoriesDelta);
+
+			info->ReportChangesTo(*pOldInfo);
 			info->Save();
 		}
 	}
@@ -343,6 +349,7 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	info->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
 	
 	// Save the store info back
+	info->ReportChangesTo(*pOldInfo);
 	info->Save();
 	
 	// Explicity release the lock (would happen automatically on 
