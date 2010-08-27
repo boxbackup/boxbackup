@@ -919,11 +919,14 @@ std::auto_ptr<SocketStreamTLS> open_conn(const char *hostname,
 	return conn;
 }
 
-std::auto_ptr<BackupProtocolClient> test_server_login(SocketStreamTLS& rConn)
+std::auto_ptr<BackupProtocolClient> test_server_login(const char *hostname,
+	TLSContext& rContext, std::auto_ptr<SocketStreamTLS>& rapConn)
 {
+	rapConn = open_conn(hostname, rContext);
+
 	// Make a protocol
 	std::auto_ptr<BackupProtocolClient> protocol(new
-		BackupProtocolClient(rConn));
+		BackupProtocolClient(*rapConn));
 	
 	// Check the version
 	std::auto_ptr<BackupProtocolClientVersion> serverVersion(
@@ -948,13 +951,35 @@ void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 	housekeeping.DoHousekeeping(true /* keep trying forever */);
 }
 
+// Run housekeeping (for which we need to disconnect ourselves) and check
+// that it doesn't change the numbers of files.
+//
+// Also check that bbstoreaccounts doesn't change anything
+
+void run_housekeeping_and_check_account(const char *hostname,
+	TLSContext& rContext, std::auto_ptr<SocketStreamTLS>& rapConn,
+	std::auto_ptr<BackupProtocolClient>& rapProtocol)
+{
+	rapProtocol->QueryFinished();
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	BackupStoreAccountDatabase::Entry account =
+		apAccounts->GetEntry(0x1234567);
+	run_housekeeping(account);
+
+	TEST_THAT(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf check 01234567 fix") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	rapProtocol = test_server_login(hostname, rContext, rapConn);
+}
+
 int test_server(const char *hostname)
 {
 	TLSContext context;
-	std::auto_ptr<SocketStreamTLS> conn = open_conn(hostname, context);
-	std::auto_ptr<BackupProtocolClient> apProtocol(
-		test_server_login(*conn));
-	BackupProtocolClient& protocol(*apProtocol);
+	std::auto_ptr<SocketStreamTLS> conn;
+	std::auto_ptr<BackupProtocolClient> apProtocol =
+		test_server_login(hostname, context, conn);
 
 	// Make some test attributes
 	#define ATTR1_SIZE 	245
@@ -975,7 +1000,7 @@ int test_server(const char *hostname)
 		// Get it logging
 		FILE *protocolLog = ::fopen("testfiles/protocol.log", "w");
 		TEST_THAT(protocolLog != 0);
-		protocol.SetLogToFile(protocolLog);
+		apProtocol->SetLogToFile(protocolLog);
 
 #ifndef WIN32
 		// Check that we can't open a new connection which requests write permissions
@@ -993,7 +1018,7 @@ int test_server(const char *hostname)
 #endif
 		
 		// Set the client store marker
-		protocol.QuerySetClientStoreMarker(0x8732523ab23aLL);
+		apProtocol->QuerySetClientStoreMarker(0x8732523ab23aLL);
 
 #ifndef WIN32
 		// Open a new connection which is read only
@@ -1019,7 +1044,27 @@ int test_server(const char *hostname)
 		BackupProtocolClient& protocolReadOnly(protocol);
 #endif
 
-		test_server_1(protocol, protocolReadOnly);
+		test_server_1(*apProtocol, protocolReadOnly);
+
+		#define TEST_NUM_FILES(files, old, deleted, dirs) \
+		{ \
+			std::auto_ptr<BackupStoreInfo> apInfo = \
+				BackupStoreInfo::Load(0x1234567, \
+				"backup/01234567/", 0, true); \
+			TEST_EQUAL_LINE(files, apInfo->GetNumFiles(), \
+				"num files"); \
+			TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(), \
+				"old files"); \
+			TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(), \
+				"deleted files"); \
+			TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(), \
+				"directories"); \
+		}
+
+		TEST_NUM_FILES(1, 0, 0, 1);
+		run_housekeeping_and_check_account(hostname, context,
+			conn, apProtocol);
+		TEST_NUM_FILES(1, 0, 0, 1);
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
@@ -1033,15 +1078,15 @@ int test_server(const char *hostname)
 			std::string filename("testfiles/test");
 			filename += uploads[t].fnextra;
 			int64_t modtime = 0;
-			
+
 			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(filename.c_str(), BackupProtocolClientListDirectory::RootDirectory, uploads[t].name, &modtime));
 			TEST_THAT(modtime != 0);
 			
-			std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
+			std::auto_ptr<BackupProtocolClientSuccess> stored(apProtocol->QueryStoreFile(
 				BackupProtocolClientListDirectory::RootDirectory,
 				modtime,
 				modtime, /* use it for attr hash too */
-				0,							/* diff from ID */
+				0, /* diff from ID */
 				uploads[t].name,
 				*upload));
 			uploads[t].allocated_objid = stored->GetObjectID();
@@ -1051,40 +1096,49 @@ int test_server(const char *hostname)
 			BOX_TRACE("wrote file " << filename << " to server "
 				"as object " <<
 				BOX_FORMAT_OBJECTID(stored->GetObjectID()));
+			TEST_NUM_FILES(t + 2, 0, 0, 1);
+
+			run_housekeeping_and_check_account(hostname, context,
+				conn, apProtocol);
+			TEST_NUM_FILES(t + 2, 0, 0, 1);
 		}
 
 		// Add some attributes onto one of them
 		{
+			TEST_NUM_FILES(UPLOAD_NUM + 1, 0, 0, 1);
 			MemBlockStream attrnew(attr3, sizeof(attr3));
-			std::auto_ptr<BackupProtocolClientSuccess> set(protocol.QuerySetReplacementFileAttributes(
+			std::auto_ptr<BackupProtocolClientSuccess> set(apProtocol->QuerySetReplacementFileAttributes(
 				BackupProtocolClientListDirectory::RootDirectory,
 				32498749832475LL,
 				uploads[UPLOAD_ATTRS_EN].name,
 				attrnew));
 			TEST_THAT(set->GetObjectID() == uploads[UPLOAD_ATTRS_EN].allocated_objid);
+			TEST_NUM_FILES(UPLOAD_NUM + 1, 0, 0, 1);
 		}
 		
 		// Delete one of them (will implicitly delete an old version)
 		{
-			std::auto_ptr<BackupProtocolClientSuccess> del(protocol.QueryDeleteFile(
+			std::auto_ptr<BackupProtocolClientSuccess> del(apProtocol->QueryDeleteFile(
 				BackupProtocolClientListDirectory::RootDirectory,
 				uploads[UPLOAD_DELETE_EN].name));
 			TEST_THAT(del->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
+			TEST_NUM_FILES(UPLOAD_NUM, 0, 1, 1);
 		}
+
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
 			// Fetch the raw object
 			{
 				FileStream out("testfiles/downloaddelobj", O_WRONLY | O_CREAT);
-				std::auto_ptr<BackupProtocolClientSuccess> getobj(protocol.QueryGetObject(uploads[UPLOAD_DELETE_EN].allocated_objid));
-				std::auto_ptr<IOStream> objstream(protocol.ReceiveStream());
+				std::auto_ptr<BackupProtocolClientSuccess> getobj(apProtocol->QueryGetObject(uploads[UPLOAD_DELETE_EN].allocated_objid));
+				std::auto_ptr<IOStream> objstream(apProtocol->ReceiveStream());
 				objstream->CopyStreamTo(out);
 			}
 			// query index and test
-			std::auto_ptr<BackupProtocolClientSuccess> getblockindex(protocol.QueryGetBlockIndexByName(
+			std::auto_ptr<BackupProtocolClientSuccess> getblockindex(apProtocol->QueryGetBlockIndexByName(
 				BackupProtocolClientListDirectory::RootDirectory, uploads[UPLOAD_DELETE_EN].name));
 			TEST_THAT(getblockindex->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
-			std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
 			TEST_THAT(check_block_index("testfiles/downloaddelobj", *blockIndexStream));
 		}
 
@@ -1092,9 +1146,9 @@ int test_server(const char *hostname)
 		for(int t = 0; t < UPLOAD_NUM; ++t)
 		{
 			printf("%d\n", t);
-			std::auto_ptr<BackupProtocolClientSuccess> getFile(protocol.QueryGetFile(BackupProtocolClientListDirectory::RootDirectory, uploads[t].allocated_objid));
+			std::auto_ptr<BackupProtocolClientSuccess> getFile(apProtocol->QueryGetFile(BackupProtocolClientListDirectory::RootDirectory, uploads[t].allocated_objid));
 			TEST_THAT(getFile->GetObjectID() == uploads[t].allocated_objid);
-			std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			test_test_file(t, *filestream);
 		}
 
@@ -1106,7 +1160,7 @@ int test_server(const char *hostname)
 			check_dir_after_uploads(protocolReadOnly, attrtest);
 			printf("done.\n\n");
 			// And on the read/write one
-			check_dir_after_uploads(protocol, attrtest);
+			check_dir_after_uploads(*apProtocol, attrtest);
 		}
 		
 		// sleep to ensure that the timestamp on the file will change
@@ -1128,12 +1182,34 @@ int test_server(const char *hostname)
 			out.Write(buf, TEST_FILE_FOR_PATCHING_SIZE - TEST_FILE_FOR_PATCHING_PATCH_AT);
 			::free(buf);
 		}
+
+		TEST_NUM_FILES(UPLOAD_NUM, 0, 1, 1);
+
+		// Run housekeeping (for which we need to disconnect
+		// ourselves) and check that it doesn't change the numbers
+		// of files
+		apProtocol->QueryFinished();
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		BackupStoreAccountDatabase::Entry account =
+			apAccounts->GetEntry(0x1234567);
+		run_housekeeping(account);
+
+		// Also check that bbstoreaccounts doesn't change anything
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
+		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+		apProtocol = test_server_login(hostname, context, conn);
+
+		TEST_NUM_FILES(UPLOAD_NUM, 0, 1, 1);
+
 		{
 			// Fetch the block index for this one
-			std::auto_ptr<BackupProtocolClientSuccess> getblockindex(protocol.QueryGetBlockIndexByName(
+			std::auto_ptr<BackupProtocolClientSuccess> getblockindex(apProtocol->QueryGetBlockIndexByName(
 				BackupProtocolClientListDirectory::RootDirectory, uploads[UPLOAD_PATCH_EN].name));
 			TEST_THAT(getblockindex->GetObjectID() == uploads[UPLOAD_PATCH_EN].allocated_objid);
-			std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
 			
 			// Do the patching
 			bool isCompletelyDifferent = false;
@@ -1160,7 +1236,7 @@ int test_server(const char *hostname)
 			int64_t patchedID = 0;
 			{
 				FileStream uploadpatch(TEST_FILE_FOR_PATCHING ".patch");
-				std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
+				std::auto_ptr<BackupProtocolClientSuccess> stored(apProtocol->QueryStoreFile(
 					BackupProtocolClientListDirectory::RootDirectory,
 					modtime,
 					modtime, /* use it for attr hash too */
@@ -1175,12 +1251,14 @@ int test_server(const char *hostname)
 			set_refcount(patchedID, 1);
 
 			// Then download it to check it's OK
-			std::auto_ptr<BackupProtocolClientSuccess> getFile(protocol.QueryGetFile(BackupProtocolClientListDirectory::RootDirectory, patchedID));
+			std::auto_ptr<BackupProtocolClientSuccess> getFile(apProtocol->QueryGetFile(BackupProtocolClientListDirectory::RootDirectory, patchedID));
 			TEST_THAT(getFile->GetObjectID() == patchedID);
-			std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			BackupStoreFile::DecodeFile(*filestream, TEST_FILE_FOR_PATCHING ".downloaded", IOStream::TimeOutInfinite);
 			// Check it's the same
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
+
+			TEST_NUM_FILES(UPLOAD_NUM, 1, 1, 1);
 		}
 
 		// Create a directory
@@ -1189,11 +1267,13 @@ int test_server(const char *hostname)
 		{
 			// Attributes
 			MemBlockStream attr(attr1, sizeof(attr1));
-			std::auto_ptr<BackupProtocolClientSuccess> dirCreate(protocol.QueryCreateDirectory(
+			std::auto_ptr<BackupProtocolClientSuccess> dirCreate(apProtocol->QueryCreateDirectory(
 				BackupProtocolClientListDirectory::RootDirectory,
 				9837429842987984LL, dirname, attr));
 			subdirid = dirCreate->GetObjectID(); 
 			TEST_THAT(subdirid == maxID + 1);
+
+			TEST_NUM_FILES(UPLOAD_NUM, 1, 1, 2);
 		}
 
 		set_refcount(subdirid, 1);
@@ -1205,7 +1285,7 @@ int test_server(const char *hostname)
 			int64_t modtime;
 			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(filename.c_str(), subdirid, uploads[0].name, &modtime));
 
-			std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
+			std::auto_ptr<BackupProtocolClientSuccess> stored(apProtocol->QueryStoreFile(
 				subdirid,
 				modtime,
 				modtime, /* use for attr hash too */
@@ -1213,6 +1293,8 @@ int test_server(const char *hostname)
 				uploads[0].name,
 				*upload));
 			subdirfileid = stored->GetObjectID();
+
+			TEST_NUM_FILES(UPLOAD_NUM + 1, 1, 1, 2);
 		}
 
 		set_refcount(subdirfileid, 1);
@@ -1303,7 +1385,7 @@ int test_server(const char *hostname)
 		// Change attributes on the directory
 		{
 			MemBlockStream attrnew(attr2, sizeof(attr2));
-			std::auto_ptr<BackupProtocolClientSuccess> changereply(protocol.QueryChangeDirAttributes(
+			std::auto_ptr<BackupProtocolClientSuccess> changereply(apProtocol->QueryChangeDirAttributes(
 					subdirid,
 					329483209443598LL,
 					attrnew));
@@ -1336,7 +1418,7 @@ int test_server(const char *hostname)
 		{
 			BackupStoreFilenameClear newName("moved-files");
 		
-			std::auto_ptr<BackupProtocolClientSuccess> rep(protocol.QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+			std::auto_ptr<BackupProtocolClientSuccess> rep(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 				BackupProtocolClientListDirectory::RootDirectory,
 				subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName));
 			TEST_THAT(rep->GetObjectID() == uploads[UPLOAD_FILE_TO_MOVE].allocated_objid);
@@ -1345,11 +1427,11 @@ int test_server(const char *hostname)
 		// Try some dodgy renames
 		{
 			BackupStoreFilenameClear newName("moved-files");
-			TEST_CHECK_THROWS(protocol.QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					BackupProtocolClientListDirectory::RootDirectory,
 					subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName),
 				ConnectionException, Conn_Protocol_UnexpectedReply);
-			TEST_CHECK_THROWS(protocol.QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					subdirid,
 					subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName),
 				ConnectionException, Conn_Protocol_UnexpectedReply);
@@ -1358,7 +1440,7 @@ int test_server(const char *hostname)
 		// Rename within a directory
 		{
 			BackupStoreFilenameClear newName("moved-files-x");
-			protocol.QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+			apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 				subdirid,
 				subdirid, BackupProtocolClientMoveObject::Flags_MoveAllWithSameName, newName);
 		}
@@ -1423,14 +1505,14 @@ int test_server(const char *hostname)
 			BackupStoreFilenameClear nd("sub2");
 			// Attributes
 			MemBlockStream attr(attr1, sizeof(attr1));
-			std::auto_ptr<BackupProtocolClientSuccess> dirCreate(protocol.QueryCreateDirectory(
+			std::auto_ptr<BackupProtocolClientSuccess> dirCreate(apProtocol->QueryCreateDirectory(
 				subdirid,
 				9837429842987984LL, nd, attr));
 			subsubdirid = dirCreate->GetObjectID(); 
 
 			FileStream upload("testfiles/file1_upload1");
 			BackupStoreFilenameClear nf("file2");
-			std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
+			std::auto_ptr<BackupProtocolClientSuccess> stored(apProtocol->QueryStoreFile(
 				subsubdirid,
 				0x123456789abcdefLL,		/* modification time */
 				0x7362383249872dfLL,		/* attr hash */
@@ -1445,26 +1527,26 @@ int test_server(const char *hostname)
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
-			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(3248972347823478927LL, subsubdirid));
+			std::auto_ptr<BackupProtocolClientObjectName> nameRep(apProtocol->QueryGetObjectName(3248972347823478927LL, subsubdirid));
 			TEST_THAT(nameRep->GetNumNameElements() == 0);		
 		}
 		{
-			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(subsubfileid, 2342378424LL));
+			std::auto_ptr<BackupProtocolClientObjectName> nameRep(apProtocol->QueryGetObjectName(subsubfileid, 2342378424LL));
 			TEST_THAT(nameRep->GetNumNameElements() == 0);		
 		}
 		{
-			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(38947234789LL, 2342378424LL));
+			std::auto_ptr<BackupProtocolClientObjectName> nameRep(apProtocol->QueryGetObjectName(38947234789LL, 2342378424LL));
 			TEST_THAT(nameRep->GetNumNameElements() == 0);		
 		}
 		{
-			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(BackupProtocolClientGetObjectName::ObjectID_DirectoryOnly, 2234342378424LL));
+			std::auto_ptr<BackupProtocolClientObjectName> nameRep(apProtocol->QueryGetObjectName(BackupProtocolClientGetObjectName::ObjectID_DirectoryOnly, 2234342378424LL));
 			TEST_THAT(nameRep->GetNumNameElements() == 0);		
 		}
 
 		// Query names... first, get info for the file
 		{
-			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(subsubfileid, subsubdirid));
-			std::auto_ptr<IOStream> namestream(protocol.ReceiveStream());
+			std::auto_ptr<BackupProtocolClientObjectName> nameRep(apProtocol->QueryGetObjectName(subsubfileid, subsubdirid));
+			std::auto_ptr<IOStream> namestream(apProtocol->ReceiveStream());
 		
 			TEST_THAT(nameRep->GetNumNameElements() == 3);
 			TEST_THAT(nameRep->GetFlags() == BackupProtocolClientListDirectory::Flags_File);
@@ -1481,8 +1563,8 @@ int test_server(const char *hostname)
 
 		// Query names... secondly, for the directory
 		{
-			std::auto_ptr<BackupProtocolClientObjectName> nameRep(protocol.QueryGetObjectName(BackupProtocolClientGetObjectName::ObjectID_DirectoryOnly, subsubdirid));
-			std::auto_ptr<IOStream> namestream(protocol.ReceiveStream());
+			std::auto_ptr<BackupProtocolClientObjectName> nameRep(apProtocol->QueryGetObjectName(BackupProtocolClientGetObjectName::ObjectID_DirectoryOnly, subsubdirid));
+			std::auto_ptr<IOStream> namestream(apProtocol->ReceiveStream());
 		
 			TEST_THAT(nameRep->GetNumNameElements() == 2);
 			TEST_THAT(nameRep->GetFlags() == BackupProtocolClientListDirectory::Flags_Dir);
@@ -1497,21 +1579,18 @@ int test_server(const char *hostname)
 		
 //}	skip:
 
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read(
-				"testfiles/accounts.txt"));
 		std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 			BackupStoreRefCountDatabase::Load(
 				apAccounts->GetEntry(0x1234567), true));
 	
 		// Create some nice recursive directories
-		int64_t dirtodelete = create_test_data_subdirs(protocol,
+		int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 			BackupProtocolClientListDirectory::RootDirectory,
 			"test_delete", 6 /* depth */, *apRefCount);
 		
 		// And delete them
 		{
-			std::auto_ptr<BackupProtocolClientSuccess> dirdel(protocol.QueryDeleteDirectory(
+			std::auto_ptr<BackupProtocolClientSuccess> dirdel(apProtocol->QueryDeleteDirectory(
 					dirtodelete));
 			TEST_THAT(dirdel->GetObjectID() == dirtodelete);
 		}
@@ -1549,7 +1628,7 @@ int test_server(const char *hostname)
 #ifndef WIN32
 		protocolReadOnly.QueryFinished();
 #endif
-		protocol.QueryFinished();
+		apProtocol->QueryFinished();
 		
 		// Close logs
 #ifndef WIN32
@@ -1742,6 +1821,7 @@ int test3(int argc, const char *argv[])
 		TEST_CHECK_THROWS(info->ChangeBlocksInDeletedFiles(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->RemovedDeletedDirectory(2), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->AddDeletedDirectory(2), BackupStoreException, StoreInfoIsReadOnly);
+		TEST_CHECK_THROWS(info->SetAccountName("hello"), BackupStoreException, StoreInfoIsReadOnly);
 	}
 	{
 		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, false));
@@ -1758,6 +1838,7 @@ int test3(int argc, const char *argv[])
 		info->AddDeletedDirectory(3);
 		info->AddDeletedDirectory(4);
 		info->RemovedDeletedDirectory(3);
+		info->SetAccountName("whee");
 		TEST_CHECK_THROWS(info->RemovedDeletedDirectory(9), BackupStoreException, StoreInfoDirNotInList);
 		info->Save();
 	}
@@ -1768,6 +1849,7 @@ int test3(int argc, const char *argv[])
 		TEST_THAT(info->GetBlocksInDeletedFiles() == 1);
 		TEST_THAT(info->GetBlocksSoftLimit() == 3461231233455433LL);
 		TEST_THAT(info->GetBlocksHardLimit() == 2934852487LL);
+		TEST_THAT(info->GetAccountName() == "whee");
 		const std::vector<int64_t> &delfiles(info->GetDeletedDirectories());
 		TEST_THAT(delfiles.size() == 2);
 		TEST_THAT(delfiles[0] == 2);
@@ -1848,9 +1930,8 @@ int test3(int argc, const char *argv[])
 		TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
 
 		TLSContext context;
-		std::auto_ptr<SocketStreamTLS> conn = open_conn("localhost",
-			context);
-		test_server_login(*conn)->QueryFinished();
+		std::auto_ptr<SocketStreamTLS> conn;
+		test_server_login("localhost", context, conn)->QueryFinished();
 
 		BackupStoreAccountDatabase::Entry account =
 			apAccounts->GetEntry(0x1234567);
