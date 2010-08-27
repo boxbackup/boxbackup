@@ -222,7 +222,7 @@ public:
 				// signal?
 				if(errno == EINTR)
 				{
-					BOX_ERROR("Failed to accept "
+					BOX_INFO("Failed to accept "
 						"connection: interrupted by "
 						"signal");
 					// return nothing
