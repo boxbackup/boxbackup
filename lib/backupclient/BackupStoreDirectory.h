@@ -90,7 +90,24 @@ public:
 		};
 		// characters for textual listing of files -- see bbackupquery/BackupQueries
 		#define BACKUPSTOREDIRECTORY_ENTRY_FLAGS_DISPLAY_NAMES "fdXoR"
-		
+
+		// convenience methods
+		bool inline IsDir()
+		{
+			return GetFlags() & Flags_Dir;
+		}
+		bool inline IsFile()
+		{
+			return GetFlags() & Flags_File;
+		}
+		bool inline IsOld()
+		{
+			return GetFlags() & Flags_OldVersion;
+		}
+		bool inline IsDeleted()
+		{
+			return GetFlags() & Flags_Deleted;
+		}
 		bool inline MatchesFlags(int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 		{
 			return ((FlagsMustBeSet == Flags_INCLUDE_EVERYTHING) || ((mFlags & FlagsMustBeSet) == FlagsMustBeSet))
