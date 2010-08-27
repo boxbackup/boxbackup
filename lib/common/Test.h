@@ -51,31 +51,31 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 #define TEST_THAT_ABORTONFAIL(condition) {if(!(condition)) TEST_ABORT_WITH_MESSAGE("Condition [" #condition "] failed")}
 
 // NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
-#define TEST_CHECK_THROWS(statement, excepttype, subtype)									\
-	{																						\
-		bool didthrow = false;																\
+#define TEST_CHECK_THROWS(statement, excepttype, subtype) \
+	{ \
+		bool didthrow = false; \
 		HideExceptionMessageGuard hide; \
-		try																					\
-		{																					\
-			statement;																		\
-		}																					\
-		catch(excepttype &e)																\
-		{																					\
-			if(e.GetSubType() != ((unsigned int)excepttype::subtype)						\
-					&& e.GetSubType() != (unsigned int)(0-excepttype::subtype)) 			\
-			{																				\
-				throw;																		\
-			}																				\
-			didthrow = true;																\
-		}																					\
-		catch(...)																			\
-		{																					\
-			throw;																			\
-		}																					\
-		if(!didthrow)																		\
-		{																					\
-			TEST_FAIL_WITH_MESSAGE("Didn't throw exception " #excepttype "(" #subtype ")")	\
-		}																					\
+		try \
+		{ \
+			statement; \
+		} \
+		catch(excepttype &e) \
+		{ \
+			if(e.GetSubType() != ((unsigned int)excepttype::subtype) \
+					&& e.GetSubType() != (unsigned int)(0-excepttype::subtype)) \
+			{ \
+				throw; \
+			} \
+			didthrow = true; \
+		} \
+		catch(...) \
+		{ \
+			throw; \
+		} \
+		if(!didthrow) \
+		{ \
+			TEST_FAIL_WITH_MESSAGE("Didn't throw exception " #excepttype "(" #subtype ")") \
+		} \
 	}
 
 // utility macro for comparing two strings in a line
@@ -91,8 +91,8 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 	\
 	if(_exp_str != _found_str) \
 	{ \
-		BOX_WARNING("Expected <" << _exp_str << "> but found <" << \
-			_found_str << ">"); \
+		printf("Expected <%s> but found <%s>\n", \
+			_exp_str.c_str(), _found_str.c_str()); \
 		\
 		std::ostringstream _oss3; \
 		_oss3 << #_found << " != " << #_expected; \
@@ -126,7 +126,6 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
 	} \
 }
-
 
 // utility macro for testing a line
 #define TEST_LINE(_condition, _line) \
