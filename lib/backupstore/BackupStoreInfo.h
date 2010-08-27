@@ -46,23 +46,31 @@ public:
 	bool IsModified() const {return mIsModified;}
 	
 	// Save modified infomation back to store
-	void Save();
+	void Save(bool allowOverwrite = true);
 	
 	// Data access functions
 	int32_t GetAccountID() const {return mAccountID;}
 	int64_t GetLastObjectIDUsed() const {return mLastObjectIDUsed;}
 	int64_t GetBlocksUsed() const {return mBlocksUsed;}
+	int64_t GetBlocksInCurrentFiles() const {return mBlocksInCurrentFiles;}
 	int64_t GetBlocksInOldFiles() const {return mBlocksInOldFiles;}
 	int64_t GetBlocksInDeletedFiles() const {return mBlocksInDeletedFiles;}
 	int64_t GetBlocksInDirectories() const {return mBlocksInDirectories;}
 	const std::vector<int64_t> &GetDeletedDirectories() const {return mDeletedDirectories;}
 	int64_t GetBlocksSoftLimit() const {return mBlocksSoftLimit;}
 	int64_t GetBlocksHardLimit() const {return mBlocksHardLimit;}
+	int64_t GetNumFiles() const {return mNumFiles;}
+	int64_t GetNumOldFiles() const {return mNumOldFiles;}
+	int64_t GetNumDeletedFiles() const {return mNumDeletedFiles;}
+	int64_t GetNumDirectories() const {return mNumDirectories;}
 	bool IsReadOnly() const {return mReadOnly;}
 	int GetDiscSetNumber() const {return mDiscSet;}
+
+	int ReportChangesTo(BackupStoreInfo& rOldInfo);
 	
 	// Data modification functions
 	void ChangeBlocksUsed(int64_t Delta);
+	void ChangeBlocksInCurrentFiles(int64_t Delta);
 	void ChangeBlocksInOldFiles(int64_t Delta);
 	void ChangeBlocksInDeletedFiles(int64_t Delta);
 	void ChangeBlocksInDirectories(int64_t Delta);
@@ -70,6 +78,10 @@ public:
 	void AddDeletedDirectory(int64_t DirID);
 	void RemovedDeletedDirectory(int64_t DirID);
 	void ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimit);
+	void AdjustNumFiles(int64_t increase);
+	void AdjustNumOldFiles(int64_t increase);
+	void AdjustNumDeletedFiles(int64_t increase);
+	void AdjustNumDirectories(int64_t increase);
 	
 	// Object IDs
 	int64_t AllocateObjectID();
@@ -78,14 +90,23 @@ public:
 	int64_t GetClientStoreMarker() {return mClientStoreMarker;}
 	void SetClientStoreMarker(int64_t ClientStoreMarker);
 
-private:
-	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(int32_t AccountID, const std::string &rRootDir,
-		int DiscSet, int64_t LastObjectID, int64_t BlocksUsed, int64_t BlocksInOldFiles,
-		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories, int64_t BlockSoftLimit, int64_t BlockHardLimit);
+	const std::string& GetAccountName() { return mAccountName; }
+	void SetAccountName(const std::string& rName);
 
 private:
+	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(
+		int32_t AccountID, const std::string &rAccountName,
+		const std::string &rRootDir, int DiscSet,
+		int64_t LastObjectID, int64_t BlocksUsed,
+		int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
+		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
+		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+
 	// Location information
+	// Be VERY careful about changing types of these values, as
+	// they now define the sizes of fields on disk (via Archive).
 	int32_t mAccountID;
+	std::string mAccountName;
 	int mDiscSet;
 	std::string mFilename;
 	bool mReadOnly;
@@ -97,14 +118,18 @@ private:
 	// Account information
 	int64_t mLastObjectIDUsed;
 	int64_t mBlocksUsed;
+	int64_t mBlocksInCurrentFiles;
 	int64_t mBlocksInOldFiles;
 	int64_t mBlocksInDeletedFiles;
 	int64_t mBlocksInDirectories;
 	int64_t mBlocksSoftLimit;
 	int64_t mBlocksHardLimit;
+	int64_t mNumFiles;
+	int64_t mNumOldFiles;
+	int64_t mNumDeletedFiles;
+	int64_t mNumDirectories;
 	std::vector<int64_t> mDeletedDirectories;
 };
-
 
 #endif // BACKUPSTOREINFO__H
 

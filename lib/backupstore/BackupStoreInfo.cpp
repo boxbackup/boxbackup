@@ -11,6 +11,7 @@
 
 #include <algorithm>
 
+#include "Archive.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreException.h"
 #include "RaidFileWrite.h"
@@ -28,6 +29,7 @@ BEGIN_STRUCTURE_PACKING_FOR_WIRE
 // ******************
 // make sure the defaults in CreateNew are modified!
 // ******************
+// Old version, grandfathered, do not change!
 typedef struct
 {
 	int32_t mMagicValue;	// also the version number
@@ -44,9 +46,10 @@ typedef struct
 	uint32_t mOptionsPresent;		// bit mask of optional elements present
 	int64_t mNumberDeletedDirectories;
 	// Then loads of int64_t IDs for the deleted directories
-} info_StreamFormat;
+} info_StreamFormat_1;
 
-#define INFO_MAGIC_VALUE	0x34832476
+#define INFO_MAGIC_VALUE_1	0x34832476
+#define INFO_MAGIC_VALUE_2	0x494e4632 /* INF2 */
 
 // Use default packing
 #ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
@@ -79,8 +82,14 @@ BackupStoreInfo::BackupStoreInfo()
 	  mClientStoreMarker(0),
 	  mLastObjectIDUsed(-1),
 	  mBlocksUsed(0),
+	  mBlocksInCurrentFiles(0),
 	  mBlocksInOldFiles(0),
-	  mBlocksInDeletedFiles(0)
+	  mBlocksInDeletedFiles(0),
+	  mBlocksInDirectories(0),
+	  mNumFiles(0),
+	  mNumOldFiles(0),
+	  mNumDeletedFiles(0),
+	  mNumDirectories(0)
 {
 }
 
@@ -106,46 +115,29 @@ BackupStoreInfo::~BackupStoreInfo()
 // --------------------------------------------------------------------------
 void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet, int64_t BlockSoftLimit, int64_t BlockHardLimit)
 {
-	// Initial header (is entire file)
-	info_StreamFormat hdr = {
-		htonl(INFO_MAGIC_VALUE), // mMagicValue
-		htonl(AccountID), // mAccountID
-		0, // mClientStoreMarker
-		box_hton64(1), // mLastObjectIDUsed (which is the root directory)
-		0, // mBlocksUsed
-		0, // mBlocksInOldFiles
-		0, // mBlocksInDeletedFiles
-		0, // mBlocksInDirectories
-		box_hton64(BlockSoftLimit), // mBlocksSoftLimit
-		box_hton64(BlockHardLimit), // mBlocksHardLimit
-		0, // mCurrentMarkNumber
-		0, // mOptionsPresent
-		0 // mNumberDeletedDirectories
-	};
-	
+	BackupStoreInfo info;
+	info.mAccountID = AccountID;
+	info.mDiscSet = DiscSet;
+	info.mReadOnly = false;
+	info.mLastObjectIDUsed = 1;
+	info.mBlocksSoftLimit = BlockSoftLimit;
+	info.mBlocksHardLimit = BlockHardLimit;
+
 	// Generate the filename
 	ASSERT(rRootDir[rRootDir.size() - 1] == '/' ||
 		rRootDir[rRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
-	std::string fn(rRootDir + INFO_FILENAME);
-	
-	// Open the file for writing
-	RaidFileWrite rf(DiscSet, fn);
-	rf.Open(false);		// no overwriting, as this is a new file
-	
-	// Write header
-	rf.Write(&hdr, sizeof(hdr));
-	
-	// Commit it to disc, converting it to RAID now
-	rf.Commit(true);
-	
-	// Done.
+	info.mFilename = rRootDir + INFO_FILENAME;
+
+	info.Save(false);
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreInfo::Load(int32_t, const std::string &, int, bool)
-//		Purpose: Loads the info from disc, given the root information. Can be marked as read only.
+//		Name:    BackupStoreInfo::Load(int32_t, const std::string &,
+//			 int, bool)
+//		Purpose: Loads the info from disc, given the root
+//			 information. Can be marked as read only.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
@@ -156,20 +148,29 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 	
 	// Open the file for reading (passing on optional request for revision ID)
 	std::auto_ptr<RaidFileRead> rf(RaidFileRead::Open(DiscSet, fn, pRevisionID));
-	
-	// Read in a header
-	info_StreamFormat hdr;
-	if(!rf->ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */))
+
+	// Read in format and version
+	int32_t magic;
+	if(!rf->ReadFullBuffer(&magic, sizeof(magic), 0))
 	{
-		THROW_EXCEPTION(BackupStoreException, CouldNotLoadStoreInfo)
+		THROW_EXCEPTION(BackupStoreException, CouldNotLoadStoreInfo);
 	}
-	
-	// Check it
-	if(ntohl(hdr.mMagicValue) != INFO_MAGIC_VALUE || (int32_t)ntohl(hdr.mAccountID) != AccountID)
+
+	bool v1 = false, v2 = false;
+
+	if(ntohl(magic) == INFO_MAGIC_VALUE_1)
+	{
+		v1 = true;
+	}
+	else if(ntohl(magic) == INFO_MAGIC_VALUE_2)
+	{
+		v2 = true;
+	}
+	else
 	{
 		THROW_EXCEPTION(BackupStoreException, BadStoreInfoOnLoad)
 	}
-	
+
 	// Make new object
 	std::auto_ptr<BackupStoreInfo> info(new BackupStoreInfo);
 	
@@ -179,19 +180,70 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 	info->mFilename = fn;
 	info->mReadOnly = ReadOnly;
 	
-	// Insert info from file
-	info->mClientStoreMarker	= box_ntoh64(hdr.mClientStoreMarker);
-	info->mLastObjectIDUsed		= box_ntoh64(hdr.mLastObjectIDUsed);
-	info->mBlocksUsed 		= box_ntoh64(hdr.mBlocksUsed);
-	info->mBlocksInOldFiles 	= box_ntoh64(hdr.mBlocksInOldFiles);
-	info->mBlocksInDeletedFiles	= box_ntoh64(hdr.mBlocksInDeletedFiles);
-	info->mBlocksInDirectories	= box_ntoh64(hdr.mBlocksInDirectories);
-	info->mBlocksSoftLimit		= box_ntoh64(hdr.mBlocksSoftLimit);
-	info->mBlocksHardLimit		= box_ntoh64(hdr.mBlocksHardLimit);
-	
-	// Load up array of deleted objects
-	int64_t numDelObj = box_ntoh64(hdr.mNumberDeletedDirectories);
-	
+	int64_t numDelObj;
+
+	if (v1)
+	{
+		// Read in a header
+		info_StreamFormat_1 hdr;
+
+		if(!rf->ReadFullBuffer(&hdr, sizeof(hdr),
+			0 /* not interested in bytes read if this fails */))
+		{
+			THROW_EXCEPTION(BackupStoreException,
+				CouldNotLoadStoreInfo)
+		}
+		
+		// Check it
+		if((int32_t)ntohl(hdr.mAccountID) != AccountID)
+		{
+			THROW_EXCEPTION(BackupStoreException,
+				BadStoreInfoOnLoad)
+		}
+		
+		// Insert info from file
+		info->mClientStoreMarker	= box_ntoh64(hdr.mClientStoreMarker);
+		info->mLastObjectIDUsed		= box_ntoh64(hdr.mLastObjectIDUsed);
+		info->mBlocksUsed 		= box_ntoh64(hdr.mBlocksUsed);
+		info->mBlocksInOldFiles 	= box_ntoh64(hdr.mBlocksInOldFiles);
+		info->mBlocksInDeletedFiles	= box_ntoh64(hdr.mBlocksInDeletedFiles);
+		info->mBlocksInDirectories	= box_ntoh64(hdr.mBlocksInDirectories);
+		info->mBlocksSoftLimit		= box_ntoh64(hdr.mBlocksSoftLimit);
+		info->mBlocksHardLimit		= box_ntoh64(hdr.mBlocksHardLimit);
+		
+		// Load up array of deleted objects
+		numDelObj = box_ntoh64(hdr.mNumberDeletedDirectories);
+	}
+	else if(v2)
+	{
+		Archive archive(*rf, IOStream::TimeOutInfinite);
+
+		// Check it
+		int32_t FileAccountID;
+		archive.Read(FileAccountID);
+		if (FileAccountID != AccountID)
+		{
+			THROW_EXCEPTION(BackupStoreException,
+				BadStoreInfoOnLoad)
+		}
+
+		archive.Read(info->mAccountName);
+		archive.Read(info->mClientStoreMarker);
+		archive.Read(info->mLastObjectIDUsed);
+		archive.Read(info->mBlocksUsed);
+		archive.Read(info->mBlocksInCurrentFiles);
+		archive.Read(info->mBlocksInOldFiles);
+		archive.Read(info->mBlocksInDeletedFiles);
+		archive.Read(info->mBlocksInDirectories);
+		archive.Read(info->mBlocksSoftLimit);
+		archive.Read(info->mBlocksHardLimit);
+	  	archive.Read(info->mNumFiles);
+	  	archive.Read(info->mNumOldFiles);
+	  	archive.Read(info->mNumDeletedFiles);
+	  	archive.Read(info->mNumDirectories);
+	  	archive.Read(numDelObj);
+	}
+
 	// Then load them in
 	if(numDelObj > 0)
 	{
@@ -238,9 +290,13 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 //		Created: 23/4/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(int32_t AccountID, const std::string &rRootDir,
-	int DiscSet, int64_t LastObjectID, int64_t BlocksUsed, int64_t BlocksInOldFiles,
-	int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories, int64_t BlockSoftLimit, int64_t BlockHardLimit)
+std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
+	int32_t AccountID, const std::string& rAccountName,
+	const std::string &rRootDir, int DiscSet,
+	int64_t LastObjectID, int64_t BlocksUsed,
+	int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
+	int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
+	int64_t BlockSoftLimit, int64_t BlockHardLimit)
 {
 	// Generate the filename
 	std::string fn(rRootDir + DIRECTORY_SEPARATOR INFO_FILENAME);
@@ -250,6 +306,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(int32_t Ac
 	
 	// Put in basic info
 	info->mAccountID = AccountID;
+	info->mAccountName = rAccountName;
 	info->mDiscSet = DiscSet;
 	info->mFilename = fn;
 	info->mReadOnly = false;
@@ -257,7 +314,8 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(int32_t Ac
 	// Insert info starting info
 	info->mClientStoreMarker	= 0;
 	info->mLastObjectIDUsed		= LastObjectID;
-	info->mBlocksUsed 			= BlocksUsed;
+	info->mBlocksUsed 		= BlocksUsed;
+	info->mBlocksInCurrentFiles	= BlocksInCurrentFiles;
 	info->mBlocksInOldFiles 	= BlocksInOldFiles;
 	info->mBlocksInDeletedFiles	= BlocksInDeletedFiles;
 	info->mBlocksInDirectories	= BlocksInDirectories;
@@ -272,12 +330,12 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(int32_t Ac
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreInfo::Save()
+//		Name:    BackupStoreInfo::Save(bool allowOverwrite)
 //		Purpose: Save modified info back to disc
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-void BackupStoreInfo::Save()
+void BackupStoreInfo::Save(bool allowOverwrite)
 {
 	// Make sure we're initialised (although should never come to this)
 	if(mFilename.empty() || mAccountID == -1 || mDiscSet == -1)
@@ -293,27 +351,32 @@ void BackupStoreInfo::Save()
 	
 	// Then... open a write file
 	RaidFileWrite rf(mDiscSet, mFilename);
-	rf.Open(true);		// allow overwriting
+	rf.Open(allowOverwrite);
 	
 	// Make header
-	info_StreamFormat hdr;
-	hdr.mMagicValue 				= htonl(INFO_MAGIC_VALUE);
-	hdr.mAccountID 					= htonl(mAccountID);
-	hdr.mClientStoreMarker			= box_hton64(mClientStoreMarker);
-	hdr.mLastObjectIDUsed			= box_hton64(mLastObjectIDUsed);
-	hdr.mBlocksUsed 				= box_hton64(mBlocksUsed);
-	hdr.mBlocksInOldFiles 			= box_hton64(mBlocksInOldFiles);
-	hdr.mBlocksInDeletedFiles 		= box_hton64(mBlocksInDeletedFiles);
-	hdr.mBlocksInDirectories		= box_hton64(mBlocksInDirectories);
-	hdr.mBlocksSoftLimit			= box_hton64(mBlocksSoftLimit);
-	hdr.mBlocksHardLimit			= box_hton64(mBlocksHardLimit);
-	hdr.mCurrentMarkNumber			= 0;
-	hdr.mOptionsPresent				= 0;
-	hdr.mNumberDeletedDirectories	= box_hton64(mDeletedDirectories.size());
-	
-	// Write header
-	rf.Write(&hdr, sizeof(hdr));
-	
+	int32_t magic = htonl(INFO_MAGIC_VALUE_2);
+	rf.Write(&magic, sizeof(magic));
+	Archive archive(rf, IOStream::TimeOutInfinite);
+
+	archive.Write(mAccountID);
+	archive.Write(mAccountName);
+	archive.Write(mClientStoreMarker);
+	archive.Write(mLastObjectIDUsed);
+	archive.Write(mBlocksUsed);
+	archive.Write(mBlocksInCurrentFiles);
+	archive.Write(mBlocksInOldFiles);
+	archive.Write(mBlocksInDeletedFiles);
+	archive.Write(mBlocksInDirectories);
+	archive.Write(mBlocksSoftLimit);
+	archive.Write(mBlocksHardLimit);
+	archive.Write(mNumFiles);
+	archive.Write(mNumOldFiles);
+	archive.Write(mNumDeletedFiles);
+	archive.Write(mNumDirectories);
+
+	int64_t numDelObj = mDeletedDirectories.size();
+	archive.Write(numDelObj);
+
 	// Write the deleted object list
 	if(mDeletedDirectories.size() > 0)
 	{
@@ -349,7 +412,38 @@ void BackupStoreInfo::Save()
 	mIsModified = false;
 }
 
+int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
+{
+	int numChanges = 0;
 
+	#define COMPARE(attribute) \
+	if (rOldInfo.Get ## attribute () != Get ## attribute ()) \
+	{ \
+		BOX_WARNING(#attribute " changed from " << \
+			rOldInfo.Get ## attribute () << " to " << \
+			Get ## attribute ()); \
+		numChanges++; \
+	}
+
+	COMPARE(AccountID);
+	COMPARE(AccountName);
+	COMPARE(LastObjectIDUsed);
+	COMPARE(BlocksUsed);
+	COMPARE(BlocksInCurrentFiles);
+	COMPARE(BlocksInOldFiles);
+	COMPARE(BlocksInDeletedFiles);
+	COMPARE(BlocksInDirectories);
+	COMPARE(BlocksSoftLimit);
+	COMPARE(BlocksHardLimit);
+	COMPARE(NumFiles);
+	COMPARE(NumOldFiles);
+	COMPARE(NumDeletedFiles);
+	COMPARE(NumDirectories);
+
+	#undef COMPARE
+
+	return numChanges;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -372,6 +466,32 @@ void BackupStoreInfo::ChangeBlocksUsed(int64_t Delta)
 	
 	mBlocksUsed += Delta;
 	
+	mIsModified = true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreInfo::ChangeBlocksInCurrentFiles(int32_t)
+//		Purpose: Change number of blocks in current files, by a delta
+//			 amount
+//		Created: 2010/08/26
+//
+// --------------------------------------------------------------------------
+void BackupStoreInfo::ChangeBlocksInCurrentFiles(int64_t Delta)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
+	}
+
+	if((mBlocksInCurrentFiles + Delta) < 0)
+	{
+		THROW_EXCEPTION(BackupStoreException,
+			StoreInfoBlockDeltaMakesValueNegative)
+	}
+	
+	mBlocksInCurrentFiles += Delta;
 	mIsModified = true;
 }
 
@@ -447,6 +567,70 @@ void BackupStoreInfo::ChangeBlocksInDirectories(int64_t Delta)
 	mIsModified = true;
 }
 
+void BackupStoreInfo::AdjustNumFiles(int64_t increase)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
+	}
+
+	if((mNumFiles + increase) < 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
+	}
+	
+	mNumFiles += increase;
+	mIsModified = true;
+
+}
+
+void BackupStoreInfo::AdjustNumOldFiles(int64_t increase)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
+	}
+
+	if((mNumOldFiles + increase) < 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
+	}
+	
+	mNumOldFiles += increase;
+	mIsModified = true;
+}
+
+void BackupStoreInfo::AdjustNumDeletedFiles(int64_t increase)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
+	}
+
+	if((mNumDeletedFiles + increase) < 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
+	}
+	
+	mNumDeletedFiles += increase;
+	mIsModified = true;
+}
+
+void BackupStoreInfo::AdjustNumDirectories(int64_t increase)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
+	}
+
+	if((mNumDirectories + increase) < 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
+	}
+	
+	mNumDirectories += increase;
+	mIsModified = true;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -589,5 +773,25 @@ void BackupStoreInfo::SetClientStoreMarker(int64_t ClientStoreMarker)
 	mIsModified = true;
 }
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreInfo::SetAccountName(const std::string&)
+//		Purpose: Sets the account name
+//		Created: 2008/08/22
+//
+// --------------------------------------------------------------------------
+void BackupStoreInfo::SetAccountName(const std::string& rName)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
+	}
+	
+	mAccountName = rName;
+	
+	mIsModified = true;
+}
 
 
