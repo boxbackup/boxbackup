@@ -95,10 +95,11 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(const char *Filename,
 //
 // Function
 //		Name:    BackupStoreFile::VerifyEncodedFileFormat(IOStream &)
-//		Purpose: Verify that an encoded file meets the format requirements.
-//				 Doesn't verify that the data is intact and can be decoded.
-//				 Optionally returns the ID of the file which it is diffed from,
-//				 and the (original) container ID.
+//		Purpose: Verify that an encoded file meets the format
+//			 requirements. Doesn't verify that the data is intact
+//			 and can be decoded. Optionally returns the ID of the
+//			 file which it is diffed from, and the (original)
+//			 container ID.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
