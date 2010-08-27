@@ -573,10 +573,11 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 void BackupStoreCheck::WriteNewStoreInfo()
 {
 	// Attempt to load the existing store info file
-	std::auto_ptr<BackupStoreInfo> poldInfo;
+	std::auto_ptr<BackupStoreInfo> pOldInfo;
 	try
 	{
-		poldInfo.reset(BackupStoreInfo::Load(mAccountID, mStoreRoot, mDiscSetNumber, true /* read only */).release());
+		pOldInfo.reset(BackupStoreInfo::Load(mAccountID, mStoreRoot, mDiscSetNumber, true /* read only */).release());
+		mAccountName = pOldInfo->GetAccountName();
 	}
 	catch(...)
 	{
@@ -584,12 +585,19 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		++mNumberErrorsFound;
 	}
 
+	BOX_NOTICE("Total files: " << mNumFiles << " (of which "
+		"old files: " << mNumOldFiles << ", "
+		"deleted files: " << mNumDeletedFiles << "), "
+		"directories: " << mNumDirectories);
+
 	// Minimum soft and hard limits
 	int64_t minSoft = ((mBlocksUsed * 11) / 10) + 1024;
 	int64_t minHard = ((minSoft * 11) / 10) + 1024;
 
 	// Need to do anything?
-	if(poldInfo.get() != 0 && mNumberErrorsFound == 0 && poldInfo->GetAccountID() == mAccountID)
+	if(pOldInfo.get() != 0 &&
+		mNumberErrorsFound == 0 &&
+		pOldInfo->GetAccountID() == mAccountID)
 	{
 		// Leave the store info as it is, no need to alter it because nothing really changed,
 		// and the only essential thing was that the account ID was correct, which is was.
@@ -601,21 +609,23 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	// Work out the new limits
 	int64_t softLimit = minSoft;
 	int64_t hardLimit = minHard;
-	if(poldInfo.get() != 0 && poldInfo->GetBlocksSoftLimit() > minSoft)
+	if(pOldInfo.get() != 0 && pOldInfo->GetBlocksSoftLimit() > minSoft)
 	{
-		softLimit = poldInfo->GetBlocksSoftLimit();
+		softLimit = pOldInfo->GetBlocksSoftLimit();
 	}
 	else
 	{
-		BOX_WARNING("Soft limit for account changed to ensure housekeeping doesn't delete files on next run.");
+		BOX_WARNING("Soft limit for account changed to ensure "
+			"housekeeping doesn't delete files on next run.");
 	}
-	if(poldInfo.get() != 0 && poldInfo->GetBlocksHardLimit() > minHard)
+	if(pOldInfo.get() != 0 && pOldInfo->GetBlocksHardLimit() > minHard)
 	{
-		hardLimit = poldInfo->GetBlocksHardLimit();
+		hardLimit = pOldInfo->GetBlocksHardLimit();
 	}
 	else
 	{
-		BOX_WARNING("Hard limit for account changed to ensure housekeeping doesn't delete files on next run.");
+		BOX_WARNING("Hard limit for account changed to ensure "
+			"housekeeping doesn't delete files on next run.");
 	}
 	
 	// Object ID
@@ -628,15 +638,26 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	// Build a new store info
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::CreateForRegeneration(
 		mAccountID,
+		mAccountName,
 		mStoreRoot,
 		mDiscSetNumber,
 		lastObjID,
 		mBlocksUsed,
+		mBlocksInCurrentFiles,
 		mBlocksInOldFiles,
 		mBlocksInDeletedFiles,
 		mBlocksInDirectories,
 		softLimit,
 		hardLimit));
+	info->AdjustNumFiles(mNumFiles);
+	info->AdjustNumOldFiles(mNumOldFiles);
+	info->AdjustNumDeletedFiles(mNumDeletedFiles);
+	info->AdjustNumDirectories(mNumDirectories);
+
+	if(pOldInfo.get())
+	{
+		mNumberErrorsFound += info->ReportChangesTo(*pOldInfo);
+	}
 
 	// Save to disc?
 	if(mFixErrors)
