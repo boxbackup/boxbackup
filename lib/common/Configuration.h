@@ -22,8 +22,9 @@ enum
 	ConfigTest_LastEntry = 1,
 	ConfigTest_Exists = 2,
 	ConfigTest_IsInt = 4,
-	ConfigTest_MultiValueAllowed = 8,
-	ConfigTest_IsBool = 16
+	ConfigTest_IsUint32 = 8, 
+	ConfigTest_MultiValueAllowed = 16,
+	ConfigTest_IsBool = 32
 };
 
 class ConfigurationVerifyKey
@@ -112,6 +113,7 @@ public:
 	bool KeyExists(const std::string& rKeyName) const;
 	const std::string &GetKeyValue(const std::string& rKeyName) const;
 	int GetKeyValueInt(const std::string& rKeyName) const;
+	uint32_t GetKeyValueUint32(const std::string& rKeyName) const;
 	bool GetKeyValueBool(const std::string& rKeyName) const;
 	std::vector<std::string> GetKeyNames() const;
 	
