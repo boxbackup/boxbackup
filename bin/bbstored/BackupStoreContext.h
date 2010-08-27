@@ -149,7 +149,7 @@ private:
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
 	
 	// Store info
-	std::auto_ptr<BackupStoreInfo> mpStoreInfo;
+	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
 
 	// Refcount database
 	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
