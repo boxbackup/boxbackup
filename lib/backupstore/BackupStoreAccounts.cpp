@@ -55,8 +55,8 @@ BackupStoreAccounts::~BackupStoreAccounts()
 // Function
 //		Name:    BackupStoreAccounts::Create(int32_t, int, int64_t, int64_t, const std::string &)
 //		Purpose: Create a new account on the specified disc set.
-//				 If rAsUsername is not empty, then the account information will be written under the
-//				 username specified.
+//			 If rAsUsername is not empty, then the account information will be written under the
+//			 username specified.
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
@@ -102,6 +102,7 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, dirName, DiscSet, false /* ReadWrite */));
 		info->ChangeBlocksUsed(rootDirSize);
 		info->ChangeBlocksInDirectories(rootDirSize);
+		info->AdjustNumDirectories(1);
 		
 		// Save it back
 		info->Save();
