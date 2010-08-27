@@ -47,9 +47,14 @@ BackupStoreCheck::BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNum
 	  mLostDirNameSerial(0),
 	  mLostAndFoundDirectoryID(0),
 	  mBlocksUsed(0),
+	  mBlocksInCurrentFiles(0),
 	  mBlocksInOldFiles(0),
 	  mBlocksInDeletedFiles(0),
-	  mBlocksInDirectories(0)
+	  mBlocksInDirectories(0),
+	  mNumFiles(0),
+	  mNumOldFiles(0),
+	  mNumDeletedFiles(0),
+	  mNumDirectories(0)
 {
 }
 
@@ -335,7 +340,8 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 //
 // Function
 //		Name:    BackupStoreCheck::CheckObjectsDir(int64_t)
-//		Purpose: Check all the files within this directory which has the given starting ID.
+//		Purpose: Check all the files within this directory which has
+//			 the given starting ID.
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
@@ -383,13 +389,19 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			// Filename is valid, mark as existing
 			idsPresent[n] = true;
 		}
+		// No other files should be present in subdirectories
+		else if(StartID != 0)
+		{
+			fileOK = false;
+		}
+		// info and refcount databases are OK in the root directory
+		else if(*i == "info" || *i == "refcount.db")
+		{
+			fileOK = true;
+		}
 		else
 		{
-			// info file in root dir is OK!
-			if(StartID != 0 || ::strcmp("info", (*i).c_str()) != 0)
-			{
-				fileOK = false;
-			}
+			fileOK = false;
 		}
 		
 		if(!fileOK)
@@ -436,13 +448,16 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreCheck::CheckAndAddObject(int64_t, const std::string &)
-//		Purpose: Check a specific object and add it to the list if it's OK -- if
-//				 there are any errors with the reading, return false and it'll be deleted.
+//		Name:    BackupStoreCheck::CheckAndAddObject(int64_t,
+//			 const std::string &)
+//		Purpose: Check a specific object and add it to the list
+//			 if it's OK. If there are any errors with the
+//			 reading, return false and it'll be deleted.
 //		Created: 21/4/04
 //
 // --------------------------------------------------------------------------
-bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID, const std::string &rFilename)
+bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
+	const std::string &rFilename)
 {
 	// Info on object...
 	bool isFile = true;
@@ -452,10 +467,12 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID, const std::string &rF
 	try
 	{
 		// Open file
-		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, rFilename));
+		std::auto_ptr<RaidFileRead> file(
+			RaidFileRead::Open(mDiscSetNumber, rFilename));
 		size = file->GetDiscUsageInBlocks();
 		
-		// Read in first four bytes -- don't have to worry about retrying if not all bytes read as is RaidFile
+		// Read in first four bytes -- don't have to worry about
+		// retrying if not all bytes read as is RaidFile
 		uint32_t signature;
 		if(file->Read(&signature, sizeof(signature)) != sizeof(signature))
 		{
@@ -518,13 +535,15 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID, const std::string &rF
 //
 // Function
 //		Name:    BackupStoreCheck::CheckFile(int64_t, IOStream &)
-//		Purpose: Do check on file, return original container ID if OK, or -1 on error
+//		Purpose: Do check on file, return original container ID
+//			 if OK, or -1 on error
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
 int64_t BackupStoreCheck::CheckFile(int64_t ObjectID, IOStream &rStream)
 {
-	// Check that it's not the root directory ID. Having a file as the root directory would be bad.
+	// Check that it's not the root directory ID. Having a file as
+	// the root directory would be bad.
 	if(ObjectID == BACKUPSTORE_ROOT_DIRECTORY_ID)
 	{
 		// Get that dodgy thing deleted!
@@ -534,7 +553,8 @@ int64_t BackupStoreCheck::CheckFile(int64_t ObjectID, IOStream &rStream)
 
 	// Check the format of the file, and obtain the container ID
 	int64_t originalContainerID = -1;
-	if(!BackupStoreFile::VerifyEncodedFileFormat(rStream, 0 /* don't want diffing from ID */,
+	if(!BackupStoreFile::VerifyEncodedFileFormat(rStream,
+		0 /* don't want diffing from ID */,
 		&originalContainerID))
 	{
 		// Didn't verify
@@ -549,7 +569,8 @@ int64_t BackupStoreCheck::CheckFile(int64_t ObjectID, IOStream &rStream)
 //
 // Function
 //		Name:    BackupStoreCheck::CheckDirInitial(int64_t, IOStream &)
-//		Purpose: Do initial check on directory, return container ID if OK, or -1 on error
+//		Purpose: Do initial check on directory, return container ID
+//			 if OK, or -1 on error
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
@@ -588,7 +609,12 @@ void BackupStoreCheck::CheckDirectories()
 	// This phase will check all the files in the directories, make
 	// a note of all directories which are missing, and do initial fixing.
 
-	// Scan all objects	
+	// The root directory is not contained inside another directory, so
+	// it has no directory entry to scan, but we have to count it
+	// somewhere, so we'll count it here.
+	mNumDirectories++;
+
+	// Scan all objects.
 	for(Info_t::const_iterator i(mInfo.begin()); i != mInfo.end(); ++i)
 	{
 		IDBlock *pblock = i->second;
@@ -635,78 +661,14 @@ void BackupStoreCheck::CheckDirectories()
 					bool badEntry = false;
 					if(piBlock != 0)
 					{
-						// Found. Get flags
-						uint8_t iflags = GetFlags(piBlock, iIndex);
-						
-						// Is the type the same?
-						if(((iflags & Flags_IsDir) == Flags_IsDir)
-							!= ((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == BackupStoreDirectory::Entry::Flags_Dir))
-						{
-							// Entry is of wrong type
-							BOX_WARNING("Directory ID " <<
-								BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-								" references object " <<
-								BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-								" which has a different type than expected.");
-							badEntry = true;
-						}
-						else
-						{
-							// Check that the entry is not already contained.
-							if(iflags & Flags_IsContained)
-							{
-								BOX_WARNING("Directory ID " <<
-									BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-									" references object " <<
-									BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-									" which is already contained.");
-								badEntry = true;
-							}
-							else
-							{
-								// Not already contained -- mark as contained
-								SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
-								
-								// Check that the container ID of the object is correct
-								if(piBlock->mContainer[iIndex] != pblock->mID[e])
-								{
-									// Needs fixing...
-									if(iflags & Flags_IsDir)
-									{
-										// Add to will fix later list
-										BOX_WARNING("Directory ID " << BOX_FORMAT_OBJECTID(en->GetObjectID()) << " has wrong container ID.");
-										mDirsWithWrongContainerID.push_back(en->GetObjectID());
-									}
-									else
-									{
-										// This is OK for files, they might move
-										BOX_WARNING("File ID " << BOX_FORMAT_OBJECTID(en->GetObjectID()) << " has different container ID, probably moved");
-									}
-									
-									// Fix entry for now
-									piBlock->mContainer[iIndex] = pblock->mID[e];
-								}
-							}
-						}
-						
-						// Check the object size, if it's OK and a file
-						if(!badEntry && !((iflags & Flags_IsDir) == Flags_IsDir))
-						{
-							if(en->GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[iIndex])
-							{
-								// Correct
-								en->SetSizeInBlocks(piBlock->mObjectSizeInBlocks[iIndex]);
-								// Mark as changed
-								isModified = true;
-								// Tell user
-								BOX_WARNING("Directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " has wrong size for object " << BOX_FORMAT_OBJECTID(en->GetObjectID()));
-							}
-						}
+						badEntry = !CheckDirectoryEntry(
+							*en, pblock->mID[e],
+							iIndex, isModified);
 					}
 					else
 					{
 						// Item can't be found. Is it a directory?
-						if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir)
+						if(en->IsDir())
 						{
 							// Store the directory for later attention
 							mDirsWhichContainLostDirs[en->GetObjectID()] = pblock->mID[e];
@@ -724,16 +686,21 @@ void BackupStoreCheck::CheckDirectories()
 					{
 						toDelete.push_back(en->GetObjectID());
 					}
-					else
+					else if (en->IsFile())
 					{
 						// Add to sizes?
-						if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion)
+						if(en->IsOld())
 						{
 							mBlocksInOldFiles += en->GetSizeInBlocks();
 						}
-						if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted)
+						if(en->IsDeleted())
 						{
 							mBlocksInDeletedFiles += en->GetSizeInBlocks();
+						}
+						if(!en->IsOld() &&
+							!en->IsDeleted())
+						{
+							mBlocksInCurrentFiles += en->GetSizeInBlocks();
 						}
 					}
 				}
@@ -773,4 +740,108 @@ void BackupStoreCheck::CheckDirectories()
 
 }
 
+bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
+	int64_t DirectoryID, int32_t IndexInDirBlock, bool& rIsModified)
+{
+	IDBlock *piBlock = LookupID(rEntry.GetObjectID(), IndexInDirBlock);
+	ASSERT(piBlock != 0);
+
+	uint8_t iflags = GetFlags(piBlock, IndexInDirBlock);
+	bool badEntry = false;
+	
+	// Is the type the same?
+	if(((iflags & Flags_IsDir) == Flags_IsDir) != rEntry.IsDir())
+	{
+		// Entry is of wrong type
+		BOX_WARNING("Directory ID " <<
+			BOX_FORMAT_OBJECTID(DirectoryID) <<
+			" references object " <<
+			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+			" which has a different type than expected.");
+		badEntry = true;
+	}
+	// Check that the entry is not already contained.
+	else if(iflags & Flags_IsContained)
+	{
+		BOX_WARNING("Directory ID " <<
+			BOX_FORMAT_OBJECTID(DirectoryID) <<
+			" references object " <<
+			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+			" which is already contained.");
+		badEntry = true;
+	}
+	else
+	{
+		// Not already contained -- mark as contained
+		SetFlags(piBlock, IndexInDirBlock, iflags | Flags_IsContained);
+		
+		// Check that the container ID of the object is correct
+		if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
+		{
+			// Needs fixing...
+			if(iflags & Flags_IsDir)
+			{
+				// Add to will fix later list
+				BOX_WARNING("Directory ID " <<
+					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
+					<< " has wrong container ID.");
+				mDirsWithWrongContainerID.push_back(rEntry.GetObjectID());
+			}
+			else
+			{
+				// This is OK for files, they might move
+				BOX_WARNING("File ID " <<
+					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
+					<< " has different container ID, "
+					"probably moved");
+			}
+			
+			// Fix entry for now
+			piBlock->mContainer[IndexInDirBlock] = DirectoryID;
+		}
+	}
+	
+	// Check the object size, if it's OK and a file
+	if(!badEntry && !rEntry.IsDir())
+	{
+		if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
+		{
+			// Wrong size, correct it.
+			rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+			// Mark as changed
+			rIsModified = true;
+
+			// Tell user
+			BOX_WARNING("Directory ID " <<
+				BOX_FORMAT_OBJECTID(DirectoryID) <<
+				" has wrong size for object " <<
+				BOX_FORMAT_OBJECTID(rEntry.GetObjectID()));
+		}
+	}
+
+	if (!badEntry)
+	{
+		if(rEntry.IsDir())
+		{
+			mNumDirectories++;
+		}
+		else
+		{
+			mNumFiles++;
+
+			if(rEntry.IsDeleted())
+			{
+				mNumDeletedFiles++;
+			}
+
+			if(rEntry.IsOld())
+			{
+				mNumOldFiles++;
+			}
+		}
+	}
+
+	return !badEntry;
+}
 
