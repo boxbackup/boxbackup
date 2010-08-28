@@ -49,7 +49,8 @@ private:
 	HTTPRequest &operator=(const HTTPRequest &);
 public:
 	typedef std::multimap<std::string, std::string> Query_t;
-	typedef std::pair<std::string, std::string> QueryEn_t, Header;
+	typedef Query_t::value_type QueryEn_t;
+	typedef std::pair<std::string, std::string> Header;
 
 	enum
 	{
