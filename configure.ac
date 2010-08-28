@@ -393,7 +393,7 @@ Large files:         $box_cv_have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
 Extended attributes: $ac_cv_header_sys_xattr_h
-EOC
+EOC | tee config.log.features
 
 
 ### Warnings at end for visibility
