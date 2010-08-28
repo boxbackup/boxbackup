@@ -242,7 +242,7 @@ docs/htmlguide/man-html/${name}.html:
 EOF
 			push @parcel_deps, "$dir/docs/${name}.html";
 		}
-		elsif ($type eq 'subdir')
+		elsif ($type eq 'configure')
 		{
 			shift @args;
 			my $subdir = shift @args;
@@ -254,6 +254,7 @@ $name-build:
 
 $name-clean:
 	cd $name; \$(MAKE) clean
+
 EOF
 			push @parcel_deps, "$name-build";
 			push @clean_deps,  "$name-clean";
