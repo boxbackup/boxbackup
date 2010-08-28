@@ -384,7 +384,7 @@ if ! $PERL ./infrastructure/makebuildenv.pl \
 fi
 
 cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
-	if test "$cmd" = "subdir"; then
+	if test "$cmd" = "configure"; then
 		echo
 		export CC CXX CXXFLAGS LDFLAGS LIBS
 		args="$configure_args --target=$target_alias"

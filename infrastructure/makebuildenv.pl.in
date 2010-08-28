@@ -252,6 +252,9 @@ for(@modules_files)
 	
 	# check directory exists
 	die "Module $mod can't be found\n" unless -d $mod;
+
+	# skip bundled libraries with their own Makefile process	
+	next if ($mod =~ m|^bundled/|);
 	
 	# and put in lists
 	push @modules,$mod;
@@ -510,9 +513,20 @@ __E
 		}
 	}	
 	
-
 	# make include path
-	my $include_paths = join(' ',map {'-I../../'.$_} @all_deps_for_module);
+	my $include_paths = "";
+
+	foreach my $mod (@all_deps_for_module)
+	{
+		if ($mod =~ m|^bundled/| and -d "$mod/include")
+		{
+			$include_paths .= "-I../../$mod/include ";
+		}
+		else
+		{
+			$include_paths .= "-I../../$mod ";
+		}
+	}
 
 	# is target a library?
 	my $target_is_library = ($type ne 'bin' && $type ne 'test');
@@ -774,13 +788,18 @@ __E
 			{
 				$dep_target = "\$(OUTBASE)/$dep/$1.a";
 			}
-			elsif ($dep =~ m|^.*/(.*)|)
+			elsif ($dep =~ m|^bundled/(.*)|)
+			{
+				$dep_target = "lib$1.a";
+			}
+			elsif ($dep =~ m|^bin/(.*)|)
 			{
 				$dep_target = "\$(OUTBASE)/$dep/$1$platform_exe_ext";
 			}
 			else
 			{
-				$dep_target = "lib$dep.a";
+				die "Don't know how to add compile-time " .
+					"dependency on $dep";
 			}
 
 			$deps_makeinfo .= <<EOF;
@@ -801,11 +820,11 @@ EOF
 	my @lib_files;
 	foreach my $dep (reverse @all_deps_for_module)
 	{
-		if ($dep =~ m|^lib\/(.+)$|)
+		if ($dep =~ m|^lib/(.+)$|)
 		{
 			push @lib_files, "\$(OUTBASE)/$dep/$1.a";
 		}
-		elsif ($dep =~ m|^([^/]+)$|)
+		elsif ($dep =~ m|^bundled/(.+)$|)
 		{
 			push @lib_files, "../../$dep/lib$1.a";
 		}
