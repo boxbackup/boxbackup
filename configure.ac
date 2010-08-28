@@ -383,7 +383,7 @@ if ! $PERL ./infrastructure/makebuildenv.pl \
 fi
 
 # Write summary of important info
-cat <<EOC
+cat | tee config.log.features <<EOC
 A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
@@ -393,7 +393,7 @@ Large files:         $box_cv_have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
 Extended attributes: $ac_cv_header_sys_xattr_h
-EOC | tee config.log.features
+EOC
 
 
 ### Warnings at end for visibility
