@@ -236,7 +236,7 @@ int Daemon::ProcessOption(signed int option)
 			mLogLevel = Logging::GetNamedLevel(optarg);
 			if (mLogLevel == Log::INVALID)
 			{
-				BOX_FATAL("Invalid logging level");
+				BOX_FATAL("Invalid logging level: " << optarg);
 				return 2;
 			}
 		}
