@@ -24,6 +24,10 @@
 	#include <cxxabi.h>
 #endif
 
+#ifdef HAVE_DLFCN_H
+	#include <dlfcn.h>
+#endif
+
 #include "Utils.h"
 #include "CommonException.h"
 #include "Logging.h"
@@ -73,88 +77,106 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 }
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
+static std::string demangle(const std::string& mangled_name)
+{
+	#ifdef HAVE_CXXABI_H
+	int status;
+	
+#include "MemLeakFindOff.h"
+	char* result = abi::__cxa_demangle(mangled_name.c_str(),
+		NULL, NULL, &status);
+#include "MemLeakFindOn.h"
+
+	if (result == NULL)
+	{
+		if (status == 0)
+		{
+			BOX_WARNING("Demangle failed but no error: " <<
+				mangled_name);
+		}
+		else if (status == -1)
+		{
+			BOX_WARNING("Demangle failed with "
+				"memory allocation error: " <<
+				mangled_name);
+		}
+		else if (status == -2)
+		{
+			// Probably non-C++ name, don't demangle
+			/*
+			BOX_WARNING("Demangle failed with "
+				"with invalid name: " <<
+				mangled_name);
+			*/
+		}
+		else if (status == -3)
+		{
+			BOX_WARNING("Demangle failed with "
+				"with invalid argument: " <<
+				mangled_name);
+		}
+		else
+		{
+			BOX_WARNING("Demangle failed with "
+				"with unknown error " << status <<
+				": " << mangled_name);
+		}
+
+		return std::string(mangled_name);
+	}
+	else
+	{
+		std::string output = result;
+#include "MemLeakFindOff.h"
+		std::free(result);
+#include "MemLeakFindOn.h"
+		return output;
+	}
+	#else // !HAVE_CXXABI_H
+	return mangled_name;
+	#endif // HAVE_CXXABI_H
+}
+
 void DumpStackBacktrace()
 {
 	void  *array[10];
-	size_t size = backtrace (array, 10);
-	char **strings = backtrace_symbols (array, size);
-
+	size_t size = backtrace(array, 10);
 	BOX_TRACE("Obtained " << size << " stack frames.");
 
 	for(size_t i = 0; i < size; i++)
 	{
-		// Demangling code copied from 
-		// cctbx_sources/boost_adaptbx/meta_ext.cpp, BSD license
-		
-		std::string mangled_frame = strings[i];
-		std::string output_frame  = strings[i]; // default
+		std::ostringstream output;
+		output << "Stack frame " << i << ": ";
 
-		#ifdef HAVE_CXXABI_H
-		int start = mangled_frame.find('(');
-		int end   = mangled_frame.find('+', start);
-		std::string mangled_func = mangled_frame.substr(start + 1,
-			end - start - 1);
+		#ifdef HAVE_DLADDR
+			Dl_info info;
+			int result = dladdr(array[i], &info);
 
-		int status;
-		
-#include "MemLeakFindOff.h"
-		char* result = abi::__cxa_demangle(mangled_func.c_str(),
-			NULL, NULL, &status);
-#include "MemLeakFindOn.h"
-
-		if (result == NULL)
-		{
-			if (status == 0)
+			if(result == 0)
 			{
-				BOX_WARNING("Demangle failed but no error: " <<
-					mangled_func);
+				BOX_LOG_SYS_WARNING("Failed to resolve "
+					"backtrace address " << array[i]);
+				output << "unresolved address " << array[i];
 			}
-			else if (status == -1)
+			else if(info.dli_sname == NULL)
 			{
-				BOX_WARNING("Demangle failed with "
-					"memory allocation error: " <<
-					mangled_func);
-			}
-			else if (status == -2)
-			{
-				// Probably non-C++ name, don't demangle
-				/*
-				BOX_WARNING("Demangle failed with "
-					"with invalid name: " <<
-					mangled_func);
-				*/
-			}
-			else if (status == -3)
-			{
-				BOX_WARNING("Demangle failed with "
-					"with invalid argument: " <<
-					mangled_func);
+				output << "unknown address " << array[i];
 			}
 			else
 			{
-				BOX_WARNING("Demangle failed with "
-					"with unknown error " << status <<
-					": " << mangled_func);
+				uint64_t diff = (uint64_t) array[i];
+				diff -= (uint64_t) info.dli_saddr;
+				output << demangle(info.dli_sname) << "+" <<
+					(void *)diff;
 			}
-		}
-		else
-		{
-			output_frame = mangled_frame.substr(0, start + 1) +
-				result + mangled_frame.substr(end);
-#include "MemLeakFindOff.h"
-			std::free(result);
-#include "MemLeakFindOn.h"
-		}
-		#endif // HAVE_CXXABI_H
+		#else
+			output << "address " << array[i];
+		#endif // HAVE_DLADDR
 
-		BOX_TRACE("Stack frame " << i << ": " << output_frame);
+		BOX_TRACE(output.str());
 	}
-
-#include "MemLeakFindOff.h"
-	std::free (strings);
-#include "MemLeakFindOn.h"
 }
-#endif
+#endif // SHOW_BACKTRACE_ON_EXCEPTION
 
 
 
