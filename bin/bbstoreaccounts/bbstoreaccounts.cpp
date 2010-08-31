@@ -538,10 +538,11 @@ int main(int argc, const char *argv[])
 
 	// Filename for configuration file?
 	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	int logLevel = Log::EVERYTHING;
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "c:m")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "c:W:m")) != -1)
 	{
 		switch(c)
 		{
@@ -550,6 +551,15 @@ int main(int argc, const char *argv[])
 			configFilename = optarg;
 			break;
 		
+		case 'W':
+			logLevel = Logging::GetNamedLevel(optarg);
+			if(logLevel == Log::INVALID)
+			{
+				BOX_FATAL("Invalid logging level: " << optarg);
+				return 2;
+			}
+			break;
+
 		case 'm':
 			// enable machine readable output
 			sMachineReadableOutput = true;
@@ -560,6 +570,10 @@ int main(int argc, const char *argv[])
 			PrintUsageAndExit();
 		}
 	}
+
+	Logging::FilterConsole((Log::Level) logLevel);
+	Logging::FilterSyslog (Log::NOTHING);
+
 	// Adjust arguments
 	argc -= optind;
 	argv += optind;
