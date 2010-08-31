@@ -152,6 +152,7 @@ else
 fi
 
 AC_SEARCH_LIBS([dlsym], ["dl"])
+AC_CHECK_FUNCS([dlsym dladdr])
 
 ### Checks for typedefs, structures, and compiler characteristics.
 
@@ -263,7 +264,7 @@ if test "x$box_cv_have_large_file_support" = "xyes"; then
 fi
 
 ## Find out how to do file locking
-AC_CHECK_FUNCS([flock])
+AC_CHECK_FUNCS([flock fcntl])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
 
@@ -399,7 +400,7 @@ cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
 done || exit $?
 
 # Write summary of important info
-cat <<EOC
+cat | tee config.log.features <<EOC
 A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
@@ -409,7 +410,7 @@ Large files:         $box_cv_have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
 Extended attributes: $ac_cv_header_sys_xattr_h
-EOC | tee config.log.features
+EOC
 
 
 ### Warnings at end for visibility
