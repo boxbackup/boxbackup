@@ -19,6 +19,10 @@
 #include <string.h>
 #include <stdarg.h>
 
+#ifdef HAVE_BSD_UNISTD_H
+	#include <bsd/unistd.h>
+#endif
+
 #ifdef WIN32
 	#include <ws2tcpip.h>
 #endif
