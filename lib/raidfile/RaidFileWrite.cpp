@@ -836,9 +836,9 @@ int RaidFileWrite::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void RaidFileWrite::Close()
 {
-	BOX_WARNING("RaidFileWrite::Close() called, discarding file");
 	if(mOSFileHandle != -1)
 	{
+		BOX_WARNING("RaidFileWrite::Close() called, discarding file");
 		Discard();
 	}
 }
