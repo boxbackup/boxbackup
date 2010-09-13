@@ -71,8 +71,8 @@ void BufferedWriteStream::Write(const void *pBuffer, int NBytes)
 	do
 	{
 		int maxWritable = sizeof(mBuffer) - mBufferPosition;
-		int numBytesToWrite = (NBytes < maxWritable) ? NBytes :
-			maxWritable;
+		int numBytesToWrite = (numBytesRemain < maxWritable) ?
+			numBytesRemain : maxWritable;
 
 		if(numBytesToWrite > 0)
 		{
