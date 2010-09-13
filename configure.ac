@@ -125,6 +125,7 @@ AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
 AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
+AC_CHECK_HEADERS([bsd/unistd.h])
 
 AC_CHECK_HEADER([regex.h], [have_regex_h=yes])
 
@@ -223,6 +224,7 @@ AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid gettimeofday waitpid])
+AC_SEARCH_LIBS([setproctitle], ["bsd"])
 
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
 # TODO: Remove this when NetBSD kqueue implementation is working
