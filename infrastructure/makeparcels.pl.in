@@ -132,8 +132,9 @@ my @clean_deps;
 
 for my $parcel (@parcels)
 {
-	my $target = BoxPlatform::parcel_target($parcel);
-	my $dir    = BoxPlatform::parcel_dir($parcel);
+	my $version = BoxPlatform::parcel_root($parcel);
+	my $target  = BoxPlatform::parcel_target($parcel);
+	my $dir     = BoxPlatform::parcel_dir($parcel);
 	my @parcel_deps;
 
 	unless ($target_windows)
@@ -291,11 +292,16 @@ EOF
 			($type,$name,$dest) = @args;
 		}
 
-
 		if ($type eq 'script')
 		{
 			# remove path from script name
 			$name =~ s{.*/}{};
+		}
+
+		if ($type eq 'html')
+		{
+			$dest = "share/doc/$version";
+			$name = "docs/$name.html";
 		}
 
 		if ($type eq 'man')
