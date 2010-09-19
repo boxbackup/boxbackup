@@ -1365,7 +1365,7 @@ void closelog(void)
 void syslog(int loglevel, const char *frmt, ...)
 {
 	WORD errinfo;
-	char buffer[1024];
+	char buffer[4096];
 	std::string sixfour(frmt);
 
 	switch (loglevel)
