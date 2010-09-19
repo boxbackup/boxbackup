@@ -1862,7 +1862,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeDirs.begin(); i != storeDirs.end(); ++i)
 		{
 			std::string localPath(MakeFullPath(rLocalDir, i->first));
-			std::string storePath(rLocalDir + "/" + i->first);
+			std::string storePath(rStoreDir + "/" + i->first);
 
 			// Does the directory exist locally?
 			string_set_iter_t local(localDirs.find(i->first));
@@ -1875,8 +1875,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			else if(local == localDirs.end())
 			{
 				// Not found -- report
-				rParams.NotifyRemoteFileMissing(localPath,
-					storePath, false);
+				rParams.NotifyLocalFileMissing(localPath,
+					storePath);
 			}
 			else if(rParams.IsExcludedDir(localPath))
 			{
@@ -1886,8 +1886,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			{
 				// Compare directory
 				Compare(i->second->GetObjectID(),
-					rStoreDir + "/" + i->first,
-					localPath, rParams);
+					storePath, localPath, rParams);
 				
 				// Remove from set so that we know it's been compared
 				localDirs.erase(local);
