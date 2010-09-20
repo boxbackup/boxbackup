@@ -311,7 +311,15 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 		// ASSERT(drained == 0);
 		
 		// Write the attributes
-		stream->GetAttributes().WriteAttributes(DecodedFilename);
+		try
+		{
+			stream->GetAttributes().WriteAttributes(DecodedFilename);
+		}
+		catch (std::exception& e)
+		{
+			BOX_WARNING("Failed to restore attributes on " <<
+				DecodedFilename << ": " << e.what());
+		}
 	}
 	catch(...)
 	{

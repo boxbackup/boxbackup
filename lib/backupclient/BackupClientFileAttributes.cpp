@@ -843,9 +843,10 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		// Try to apply
 		if(::utimes(Filename, times) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to change times of "
-				"file '" << Filename << "'");
-			THROW_EXCEPTION(CommonException, OSFileError)
+			BOX_LOG_SYS_WARNING("Failed to change times of "
+				"file '" << Filename << "' to ctime=" <<
+				BOX_FORMAT_TIMESPEC(times[0]) << ", mtime=" << 
+				BOX_FORMAT_TIMESPEC(times[1]));
 		}
 	}
 

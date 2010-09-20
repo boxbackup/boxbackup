@@ -24,6 +24,7 @@ enum
 
 int BackupClientRestore(BackupProtocolClient &rConnection,
 	int64_t DirectoryID,
+	const char *RemoteDirectoryName,
 	const char *LocalDirectoryName,
 	bool PrintDots = false,
 	bool RestoreDeleted = false,
