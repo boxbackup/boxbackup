@@ -25,25 +25,31 @@ Make sure to select the following packages during installation:
 If you already have Cygwin installed, please re-run the installer and
 ensure that those packages are installed.
 
+You may also want to install the debugger, Devel/gdb.
+
 == Base Directory ==
 
 Choose a directory where you will unpack and compile OpenSSL, Zlib and Box Backup. We will call this the ''base directory''. An example might be:
 
-  C:\Cygwin\Home\Your Username
+  C:\Cygwin\Home\YourUsername
 
 Make sure you know the full path to this directory.
 
+If your user name has spaces in it, which is quite common on Windows,
+please rename your home directory to one without any spaces, and change
+your user's home directory in /etc/passwd to match.
+
 == OpenSSL ==
 
-Download OpenSSL from [http://www.openssl.org/source/openssl-0.9.7i.tar.gz]
+Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0a.tar.gz]
 
 Open a Cygwin shell, go to the base directory, and unpack OpenSSL:
 
-	tar xzvf openssl-0.9.7i.tar.gz
+	tar xzvf openssl-1.0.0a.tar.gz
 
 Configure OpenSSL for MinGW compilation, and build and install it:
 
-	cd openssl-0.9.7i
+	cd openssl-1.0.0a
 	./Configure --prefix=/usr/i686-pc-mingw32/ mingw
 	make
 	make install
@@ -53,20 +59,20 @@ Configure OpenSSL for MinGW compilation, and build and install it:
 This step is only required to support regular expressions in including/excluding files from backups. However, this is a very useful feature.
 
 Download PCRE from 
-[http://prdownloads.sourceforge.net/pcre/pcre-6.3.tar.bz2?download]
+[http://prdownloads.sourceforge.net/pcre/pcre-8.10.tar.bz2?download]
 
 Open a Cygwin shell, go to the base directory, and unpack PCRE:
 
-	tar xjvf pcre-6.3.tar.bz2
+	tar xjvf pcre-8.10.tar.bz2
 
 Configure PCRE for MinGW compilation, and build and install it:
 	
-	cd pcre-6.3
+	cd pcre-8.10
 	export CFLAGS="-mno-cygwin"
-	./configure
-	make winshared
-	cp .libs/libpcre.a .libs/libpcreposix.a /lib/mingw
-	cp pcreposix.h /usr/include/mingw
+	export CXXFLAGS="-mno-cygwin"
+	./configure --prefix=/usr/i686-pc-mingw32
+	make 
+	make install
 
 == Download Box Backup ==
 

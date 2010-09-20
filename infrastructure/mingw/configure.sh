@@ -1,14 +1,16 @@
 #!/bin/sh
 
-if [ ! -r "/usr/i686-pc-mingw32/lib/libssl.a" ]; then
+DEP_PATH=/usr/i686-pc-mingw32
+
+if [ ! -r "$DEP_PATH/lib/libssl.a" ]; then
 	echo "Error: install OpenSSL as instructed by" \
 		"docs/backup/win32_build_on_cygwin_using_mingw.txt" >&2
 	exit 2
 fi
 
-if [ ! -r "/usr/lib/mingw/libpcreposix.a" \
-	-o ! -r "/usr/lib/mingw/libpcre.a" \
-	-o ! -r "/usr/include/mingw/pcreposix.h" ]; then
+if [ ! -r "$DEP_PATH/lib/libpcreposix.a" \
+	-o ! -r "$DEP_PATH/lib/libpcre.a" \
+	-o ! -r "$DEP_PATH/include/pcreposix.h" ]; then
 	echo "Error: install PCRE as instructed by" \
 		"docs/backup/win32_build_on_cygwin_using_mingw.txt" >&2
 	exit 2
