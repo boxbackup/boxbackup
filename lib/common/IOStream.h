@@ -27,21 +27,21 @@ public:
 private:
 	IOStream(const IOStream &rToCopy); /* forbidden */
 	IOStream& operator=(const IOStream &rToCopy); /* forbidden */
-		
+
 public:
 	enum
 	{
 		TimeOutInfinite = -1,
 		SizeOfStreamUnknown = -1
 	};
-	
+
 	enum
 	{
 		SeekType_Absolute = 0,
 		SeekType_Relative = 1,
 		SeekType_End = 2
 	};
-	
+
 	// Timeout in milliseconds
 	// Read may return 0 -- does not mean end of stream.
 	typedef int64_t pos_type;
@@ -53,17 +53,17 @@ public:
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual void Close();
-	
+
 	// Has all data that can be read been read?
 	virtual bool StreamDataLeft() = 0;
 	// Has the stream been closed (writing not possible)
 	virtual bool StreamClosed() = 0;
-	
+
 	// Utility functions
 	bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout = IOStream::TimeOutInfinite);
-	bool CopyStreamTo(IOStream &rCopyTo, int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024);
+	bool CopyStreamTo(IOStream &rCopyTo, int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024*1024);
 	void Flush(int Timeout = IOStream::TimeOutInfinite);
-	
+
 	static int ConvertSeekTypeToOSWhence(int SeekType);
 };
 

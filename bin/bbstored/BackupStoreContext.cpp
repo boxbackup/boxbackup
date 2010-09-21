@@ -11,21 +11,22 @@
 
 #include <stdio.h>
 
+#include "BackupConstants.h"
 #include "BackupStoreContext.h"
-#include "RaidFileWrite.h"
-#include "RaidFileRead.h"
+#include "BackupStoreDaemon.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
-#include "BackupStoreInfo.h"
-#include "BackupConstants.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreInfo.h"
 #include "BackupStoreObjectMagic.h"
-#include "StoreStructure.h"
-#include "BackupStoreDaemon.h"
-#include "RaidFileController.h"
+#include "BufferedStream.h"
+#include "BufferedWriteStream.h"
 #include "FileStream.h"
 #include "InvisibleTempFileStream.h"
-#include "BufferedStream.h"
+#include "RaidFileController.h"
+#include "RaidFileRead.h"
+#include "RaidFileWrite.h"
+#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
@@ -919,7 +920,10 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t Objec
 		{
 			RaidFileWrite writeDir(mStoreDiscSet, dirfn);
 			writeDir.Open(true /* allow overwriting */);
-			rDir.WriteToStream(writeDir);
+
+			BufferedWriteStream buffer(writeDir);
+			rDir.WriteToStream(buffer);
+			buffer.Flush();
 
 			// get the disc usage (must do this before commiting it)
 			int64_t dirSize = writeDir.GetDiscUsageInBlocks();

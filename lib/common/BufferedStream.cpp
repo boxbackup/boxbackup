@@ -2,7 +2,7 @@
 //
 // File
 //		Name:    BufferedStream.cpp
-//		Purpose: Buffering wrapper around IOStreams
+//		Purpose: Buffering read-only wrapper around IOStreams
 //		Created: 2007/01/16
 //
 // --------------------------------------------------------------------------

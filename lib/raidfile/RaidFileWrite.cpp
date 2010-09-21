@@ -114,7 +114,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	{
 		THROW_EXCEPTION(RaidFileException, AlreadyOpen)
 	}
-	
+
 	// Get disc set
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
@@ -138,7 +138,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	writeFilename += 'X';
 
 	// Attempt to open
-	mOSFileHandle = ::open(writeFilename.c_str(), 
+	mOSFileHandle = ::open(writeFilename.c_str(),
 		O_WRONLY | O_CREAT | O_BINARY,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(mOSFileHandle == -1)
@@ -146,7 +146,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 		BOX_LOG_SYS_ERROR("Failed to open file: " << writeFilename);
 		THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFile)
 	}
-	
+
 	// Get a lock on the write file
 #ifdef HAVE_FLOCK
 	int errnoBlock = EWOULDBLOCK;
@@ -180,13 +180,13 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 			THROW_EXCEPTION(RaidFileException, OSError)
 		}
 	}
-	
+
 	// Truncate it to size zero
 	if(::ftruncate(mOSFileHandle, 0) != 0)
 	{
 		THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFileOnTruncate)
 	}
-	
+
 	// Done!
 }
 
@@ -205,8 +205,9 @@ void RaidFileWrite::Write(const void *pBuffer, int Length)
 	{
 		THROW_EXCEPTION(RaidFileException, NotOpen)
 	}
-	
+
 	// Write data
+	BOX_TRACE("RaidFileWrite::Write " << Length << " bytes to " << mFilename);
 	int written = ::write(mOSFileHandle, pBuffer, Length);
 	if(written != Length)
 	{
@@ -231,7 +232,7 @@ IOStream::pos_type RaidFileWrite::GetPosition() const
 	{
 		THROW_EXCEPTION(RaidFileException, NotOpen)
 	}
-	
+
 	// Use lseek to find the current file position
 	off_t p = ::lseek(mOSFileHandle, 0, SEEK_CUR);
 	if(p == -1)
@@ -257,7 +258,7 @@ void RaidFileWrite::Seek(IOStream::pos_type SeekTo, int SeekType)
 	{
 		THROW_EXCEPTION(RaidFileException, NotOpen)
 	}
-	
+
 	// Seek...
 	if(::lseek(mOSFileHandle, SeekTo, ConvertSeekTypeToOSWhence(SeekType)) == -1)
 	{
@@ -283,7 +284,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 
 	if (mRefCount == 0)
 	{
-		BOX_ERROR("Attempted to modify object " << mFilename << 
+		BOX_ERROR("Attempted to modify object " << mFilename <<
 			", which has no references");
 		THROW_EXCEPTION(RaidFileException,
 			RequestedModifyUnreferencedFile);
@@ -310,7 +311,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 
 #ifdef WIN32
 	// need to delete the target first
-	if(::unlink(renameTo.c_str()) != 0 && 
+	if(::unlink(renameTo.c_str()) != 0 &&
 		GetLastError() != ERROR_FILE_NOT_FOUND)
 	{
 		BOX_LOG_WIN_ERROR("Failed to delete file: " << renameTo);
@@ -324,8 +325,8 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 			" to " << renameTo);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-	
-#ifndef WIN32	
+
+#ifndef WIN32
 	// Close file...
 	if(::close(mOSFileHandle) != 0)
 	{
@@ -333,7 +334,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	}
 	mOSFileHandle = -1;
 #endif // !WIN32
-	
+
 	// Raid it?
 	if(ConvertToRaidNow)
 	{
@@ -364,7 +365,7 @@ void RaidFileWrite::Discard()
 	// Get the filename for the write file (temporary)
 	std::string writeFilename(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
 	writeFilename += 'X';
-	
+
 	// Unlink and close it
 
 #ifdef WIN32
@@ -379,7 +380,7 @@ void RaidFileWrite::Discard()
 		BOX_LOG_SYS_ERROR("Failed to delete file: " << writeFilename);
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-	
+
 	// reset file handle
 	mOSFileHandle = -1;
 }
@@ -419,11 +420,11 @@ void RaidFileWrite::TransformToRaidStorage()
 	// Get the filename for the write file (and get the disc set name for the start disc)
 	int startDisc = 0;
 	std::string writeFilename(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename, &startDisc));
-	
+
 	// Open it
 	FileHandleGuard<> writeFile(writeFilename.c_str());
 
-	// Get file information for write file	
+	// Get file information for write file
 	struct stat writeFileStat;
 	if(::fstat(writeFile, &writeFileStat) != 0)
 	{
@@ -441,7 +442,7 @@ void RaidFileWrite::TransformToRaidStorage()
 //		}
 //	}
 //	#endif
-	
+
 	// How many blocks is the file? (rounding up)
 	int writeFileSizeInBlocks = (writeFileStat.st_size + (blockSize - 1)) / blockSize;
 	// And how big should the buffer be? (round up to multiple of 2, and no bigger than the preset limit)
@@ -449,13 +450,13 @@ void RaidFileWrite::TransformToRaidStorage()
 	if(bufferSizeBlocks > TRANSFORM_BLOCKS_TO_LOAD) bufferSizeBlocks = TRANSFORM_BLOCKS_TO_LOAD;
 	// How big should the buffer be?
 	int bufferSize = (TRANSFORM_BLOCKS_TO_LOAD * blockSize);
-	
+
 	// Allocate buffer...
 	MemoryBlockGuard<char*> buffer(bufferSize);
-	
+
 	// Allocate buffer for parity file
 	MemoryBlockGuard<char*> parityBuffer(blockSize);
-	
+
 	// Get filenames of eventual files
 	std::string stripe1Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, (startDisc + 0) % TRANSFORM_NUMBER_DISCS_REQUIRED));
 	std::string stripe2Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, (startDisc + 1) % TRANSFORM_NUMBER_DISCS_REQUIRED));
@@ -464,8 +465,8 @@ void RaidFileWrite::TransformToRaidStorage()
 	std::string stripe1FilenameW(stripe1Filename + 'P');
 	std::string stripe2FilenameW(stripe2Filename + 'P');
 	std::string parityFilenameW(parityFilename + 'P');
-	
-	
+
+
 	// Then open them all for writing (in strict order)
 	try
 	{
@@ -513,16 +514,16 @@ void RaidFileWrite::TransformToRaidStorage()
 				{
 					pparity[n] = pstripe1[n] ^ pstripe2[n];
 				}
-				
+
 				// Size of parity to write...
 				int parityWriteSize = blockSize;
-				
+
 				// Adjust if it's the last block
 				if((blocksDone + (b + 2)) >= writeFileSizeInBlocks)
 				{
 					// Yes...
 					unsigned int bytesInLastTwoBlocks = bytesRead - (b * blockSize);
-					
+
 					// Some special cases...
 					// Zero will never happen... but in the (imaginary) case it does, the file size will be appended
 					// by the test at the end.
@@ -574,12 +575,12 @@ void RaidFileWrite::TransformToRaidStorage()
 				if(::write(((l&1)==0)?stripe1:stripe2, writeFrom, toWrite) != toWrite)
 				{
 					THROW_EXCEPTION(RaidFileException, OSError)
-				}			
+				}
 
 				// Next block
 				writeFrom += blockSize;
 			}
-			
+
 			// Count of blocks done
 			blocksDone += blocksToDo;
 		}
@@ -588,7 +589,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		{
 			THROW_EXCEPTION(RaidFileException, OSError)
 		}
-		
+
 		// Special case for zero length files
 		if(writeFileStat.st_size == 0)
 		{
@@ -629,7 +630,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		CHECK_UNLINK(parityFilename.c_str());
 		#undef CHECK_UNLINK
 #endif
-		
+
 		// Rename them into place
 		if(::rename(stripe1FilenameW.c_str(), stripe1Filename.c_str()) != 0
 			|| ::rename(stripe2FilenameW.c_str(), stripe2Filename.c_str()) != 0
@@ -658,7 +659,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		::unlink(stripe1FilenameW.c_str());
 		::unlink(stripe2FilenameW.c_str());
 		::unlink(parityFilenameW.c_str());
-		
+
 		// and send the error on its way
 		throw;
 	}
@@ -704,13 +705,13 @@ void RaidFileWrite::Delete()
 	{
 		deletedSomething = true;
 	}
-	
+
 	// If we're not running in RAID mode, stop now
 	if(rdiscSet.size() == 1)
 	{
 		return;
 	}
-	
+
 	// Now the other files
 	std::string stripe1Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 0 % TRANSFORM_NUMBER_DISCS_REQUIRED));
 	std::string stripe2Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 1 % TRANSFORM_NUMBER_DISCS_REQUIRED));
@@ -727,7 +728,7 @@ void RaidFileWrite::Delete()
 	{
 		deletedSomething = true;
 	}
-	
+
 	// Check something happened
 	if(!deletedSomething)
 	{
@@ -768,7 +769,7 @@ void RaidFileWrite::CreateDirectory(const RaidFileDiscSet &rSet, const std::stri
 		// split up string
 		std::vector<std::string> elements;
 		SplitString(rDirName, DIRECTORY_SEPARATOR_ASCHAR, elements);
-		
+
 		// Do each element in turn
 		std::string pn;
 		for(unsigned int e = 0; e < elements.size(); ++e)
@@ -786,16 +787,16 @@ void RaidFileWrite::CreateDirectory(const RaidFileDiscSet &rSet, const std::stri
 				pn += DIRECTORY_SEPARATOR_ASCHAR;
 			}
 		}
-	
+
 		return;
 	}
-	
+
 	// Create a directory in every disc of the set
 	for(unsigned int l = 0; l < rSet.size(); ++l)
 	{
 		// build name
 		std::string dn(rSet[l] + DIRECTORY_SEPARATOR + rDirName);
-	
+
 		// attempt to create
 		if(::mkdir(dn.c_str(), mode) != 0)
 		{
@@ -836,9 +837,9 @@ int RaidFileWrite::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void RaidFileWrite::Close()
 {
-	BOX_WARNING("RaidFileWrite::Close() called, discarding file");
 	if(mOSFileHandle != -1)
 	{
+		BOX_WARNING("RaidFileWrite::Close() called, discarding file");
 		Discard();
 	}
 }
@@ -884,14 +885,14 @@ IOStream::pos_type RaidFileWrite::GetFileSize()
 	{
 		THROW_EXCEPTION(RaidFileException, CanOnlyGetFileSizeBeforeCommit)
 	}
-	
+
 	// Stat to get size
 	struct stat st;
 	if(fstat(mOSFileHandle, &st) != 0)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-	
+
 	return st.st_size;
 }
 
@@ -913,14 +914,14 @@ IOStream::pos_type RaidFileWrite::GetDiscUsageInBlocks()
 	{
 		THROW_EXCEPTION(RaidFileException, CanOnlyGetUsageBeforeCommit)
 	}
-	
+
 	// Stat to get size
 	struct stat st;
 	if(fstat(mOSFileHandle, &st) != 0)
 	{
 		THROW_EXCEPTION(RaidFileException, OSError)
 	}
-	
+
 	// Then return calculation
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
