@@ -10,6 +10,7 @@
 #include "Box.h"
 
 #define TLS_CLASS_IMPLEMENTATION_CPP
+#include <openssl/engine.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
