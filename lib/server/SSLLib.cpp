@@ -42,9 +42,14 @@ void SSLLib::Initialise()
 		LogError("initialising OpenSSL");
 		THROW_EXCEPTION(ServerException, SSLLibraryInitialisationError)
 	}
-	
+
 	// More helpful error messages
 	::SSL_load_error_strings();
+
+	/* Load all bundled ENGINEs into memory and make them visible */
+	ENGINE_load_builtin_engines();
+	/* Register all of them for every algorithm they collectively implement */
+	ENGINE_register_all_complete();
 
 	// Extra seeding over and above what's already done by the library
 #ifdef WIN32
@@ -71,7 +76,7 @@ void SSLLib::Initialise()
 		{
 			RAND_seed(buf, sizeof(buf));
 		}
-		
+
 		if(!CryptReleaseContext(provider, 0))
 		{
 			BOX_LOG_WIN_ERROR("Failed to release crypto context");
