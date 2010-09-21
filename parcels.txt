@@ -35,6 +35,8 @@ END-ONLY
 ONLY:mingw32
 	script /bin/mgwz.dll
 	script /bin/mingwm10.dll
+	script /usr/i686-pc-mingw32/bin/cygpcreposix-0.dll
+	script /usr/i686-pc-mingw32/bin/cygpcre-0.dll
 END-ONLY
 
 ONLY:SunOS
