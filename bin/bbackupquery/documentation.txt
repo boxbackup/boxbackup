@@ -119,10 +119,13 @@ compare <store-dir-name> <local-dir-name>
 	This can be used for automated tests.
 <
 
-> restore [-drif] <directory-name> <local-directory-name>
+> restore [-drif] <directory-name> [<local-directory-name>]
 
 	Restores a directory to the local disc. The local directory specified
-	must not exist (unless a previous restore is being restarted).
+	must not exist (unless a previous restore is being restarted). If the
+	local directory is omitted, the default is to restore to the same
+	directory name and path, relative to the current local directory,
+	as set with the "lcd" command.
 
 	The root cannot be restored -- restore locations individually.
 

@@ -2070,6 +2070,31 @@ int test_bbackupd()
 				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+			// Try a restore with just the remote directory name,
+			// check that it uses the same name in the local
+			// directory.
+			TEST_THAT(::mkdir("testfiles/restore-test", 0700) == 0);
+
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Wwarning "
+				"-c testfiles/bbackupd.conf "
+				"\"lcd testfiles/restore-test\" "
+				"\"restore Test1\" "
+				"quit");
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Command_OK);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
+			// check that it restored properly
+			compareReturnValue = ::system(BBACKUPQUERY " "
+				"-Wwarning "
+				"-c testfiles/bbackupd.conf "
+				"\"compare -cEQ Test1 testfiles/restore-test/Test1\" " 
+				"quit");
+			TEST_RETURN(compareReturnValue,
+				BackupQueries::ReturnCode::Compare_Same);
+			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+
 			// put the permissions back to sensible values
 			#ifdef WIN32
 				TEST_THAT(::system("chmod 0755 testfiles/"
@@ -2082,7 +2107,6 @@ int test_bbackupd()
 				TEST_THAT(chmod("testfiles/restore1/x1",
 					0755) == 0);
 			#endif
-
 		}
 
 #ifdef WIN32

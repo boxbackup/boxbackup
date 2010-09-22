@@ -1951,9 +1951,10 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 void BackupQueries::CommandRestore(const std::vector<std::string> &args, const bool *opts)
 {
 	// Check arguments
-	if(args.size() != 2)
+	if(args.size() < 1 || args.size() > 2)
 	{
-		BOX_ERROR("Incorrect usage. restore [-drif] <remote-name> <local-name>");
+		BOX_ERROR("Incorrect usage. restore [-drif] <remote-name> "
+			"[<local-name>]");
 		return;
 	}
 
@@ -1994,18 +1995,30 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		BOX_ERROR("Directory '" << args[0] << "' not found on server");
 		return;
 	}
+
 	if(dirID == BackupProtocolClientListDirectory::RootDirectory)
 	{
 		BOX_ERROR("Cannot restore the root directory -- restore locations individually.");
 		return;
 	}
-	
-#ifdef WIN32
+
 	std::string localName;
-	if(!ConvertConsoleToUtf8(args[1].c_str(), localName)) return;
-#else
-	std::string localName(args[1]);
-#endif
+
+	if(args.size() == 2)
+	{
+		#ifdef WIN32
+			if(!ConvertConsoleToUtf8(args[1].c_str(), localName))
+			{
+				return;
+			}
+		#else
+			localName = args[1];
+		#endif
+	}
+	else
+	{
+		localName = args[0];
+	}
 
 	// Go and restore...
 	int result;
