@@ -16,25 +16,25 @@ class BufferedStream : public IOStream
 {
 private:
 	IOStream& mrSource;
-	char mBuffer[4096];
+	char mBuffer[1024*1024];
 	int  mBufferSize;
 	int  mBufferPosition;
 
 public:
 	BufferedStream(IOStream& rSource);
-	
+
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(IOStream::pos_type Offset, int SeekType);
 	virtual void Close();
-	
+
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
 private:
-	BufferedStream(const BufferedStream &rToCopy) 
+	BufferedStream(const BufferedStream &rToCopy)
 	: mrSource(rToCopy.mrSource) { /* do not call */ }
 };
 
