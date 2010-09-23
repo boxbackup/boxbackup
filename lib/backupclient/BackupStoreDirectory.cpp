@@ -38,7 +38,8 @@ typedef struct
 
 typedef enum
 {
-	Option_DependencyInfoPresent = 1
+	Option_DependencyInfoPresent = 1,
+	Option_DependencyInfoPresentInline = 2
 } dir_StreamFormatOptions;
 
 typedef struct
@@ -133,29 +134,29 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadDirectoryFormat)
 	}
-	
+
 	// Get data
 	mObjectID = box_ntoh64(hdr.mObjectID);
 	mContainerID = box_ntoh64(hdr.mContainerID);
 	mAttributesModTime = box_ntoh64(hdr.mAttributesModTime);
-	
+
 	// Options
-	int32_t options = ntohl(hdr.mOptionsPresent);
-	
+	mOptions = ntohl(hdr.mOptionsPresent);
+
 	// Get attributes
 	mAttributes.ReadFromStream(rStream, Timeout);
-	
+
 	// Decode count
 	int count = ntohl(hdr.mNumEntries);
-	
+
 	// Clear existing list
-	for(std::vector<Entry*>::iterator i = mEntries.begin(); 
+	for(std::vector<Entry*>::iterator i = mEntries.begin();
 		i != mEntries.end(); i++)
 	{
 		delete (*i);
 	}
 	mEntries.clear();
-	
+
 	// Read them in!
 	for(int c = 0; c < count; ++c)
 	{
@@ -164,7 +165,12 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 		{
 			// Read from stream
 			pen->ReadFromStream(rStream, Timeout);
-			
+
+			if(mOptions & Option_DependencyInfoPresentInline)
+			{
+				pen->ReadFromStreamDependencyInfo(rStream, Timeout);
+			}
+
 			// Add to list
 			mEntries.push_back(pen);
 		}
@@ -174,10 +180,12 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 			throw;
 		}
 	}
-	
+
 	// Read in dependency info?
-	if(options & Option_DependencyInfoPresent)
+	if(mOptions & Option_DependencyInfoPresent)
 	{
+		BOX_TRACE("Reading tail dependency info");
+
 		// Read in extra dependency data
 		for(int c = 0; c < count; ++c)
 		{
@@ -208,11 +216,11 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 			count++;
 		}
 	}
-	
+
 	// Check that sensible IDs have been set
 	ASSERT(mObjectID != 0);
 	ASSERT(mContainerID != 0);
-	
+
 	// Need dependency info?
 	bool dependencyInfoRequired = false;
 	if(StreamDependencyInfo)
@@ -225,25 +233,15 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 			{
 				dependencyInfoRequired = true;
 			}
-		}	
+		}
 	}
-	
+
 	// Options
 	int32_t options = 0;
-	if(dependencyInfoRequired) options |= Option_DependencyInfoPresent;
+	if(dependencyInfoRequired) options |= Option_DependencyInfoPresentInline;
 
-	// Build header
-	dir_StreamFormat hdr;
-	hdr.mMagicValue = htonl(OBJECTMAGIC_DIR_MAGIC_VALUE);
-	hdr.mNumEntries = htonl(count);
-	hdr.mObjectID = box_hton64(mObjectID);
-	hdr.mContainerID = box_hton64(mContainerID);
-	hdr.mAttributesModTime = box_hton64(mAttributesModTime);
-	hdr.mOptionsPresent = htonl(options);
-	
-	// Write header
-	rStream.Write(&hdr, sizeof(hdr));
-	
+	WriteHeaderToStream(rStream, count, options);
+
 	// Write the attributes?
 	if(StreamAttributes)
 	{
@@ -261,18 +259,62 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	while((pen = i.Next(FlagsMustBeSet, FlagsNotToBeSet)) != 0)
 	{
 		pen->WriteToStream(rStream);
-	}
-	
-	// Write dependency info?
-	if(dependencyInfoRequired)
-	{
-		Iterator i(*this);
-		Entry *pen = 0;
-		while((pen = i.Next(FlagsMustBeSet, FlagsNotToBeSet)) != 0)
+
+		if(dependencyInfoRequired)
 		{
 			pen->WriteToStreamDependencyInfo(rStream);
-		}	
+		}
 	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDirectory::WriteHeaderToStream(IOStream &)
+//		Purpose: Writes the header to a stream
+//		Created: 2010/09/21
+//
+// --------------------------------------------------------------------------
+void BackupStoreDirectory::WriteHeaderToStream(IOStream &rStream, int32_t Count, int32_t Options) const
+{
+	// Build header
+	dir_StreamFormat hdr;
+	hdr.mMagicValue = htonl(OBJECTMAGIC_DIR_MAGIC_VALUE);
+	hdr.mNumEntries = htonl(Count);
+	hdr.mObjectID = box_hton64(mObjectID);
+	hdr.mContainerID = box_hton64(mContainerID);
+	hdr.mAttributesModTime = box_hton64(mAttributesModTime);
+	hdr.mOptionsPresent = htonl(Options);
+
+	// Write header
+	rStream.Write(&hdr, sizeof(hdr));
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDirectory::HasDependencyInfo()
+//		Purpose: Do we have dependency info at the end of the dir?
+//		Created: 2010/09/21
+//
+// --------------------------------------------------------------------------
+bool BackupStoreDirectory::HasDependencyInfo() const
+{
+	return (0 != mOptions & Option_DependencyInfoPresent);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDirectory::HasDependencyInfoInline()
+//		Purpose: Do we have dependency info inline?
+//		Created: 2010/09/21
+//
+// --------------------------------------------------------------------------
+bool BackupStoreDirectory::HasDependencyInfoInline() const
+{
+	return (0 != mOptions & Option_DependencyInfoPresentInline);
 }
 
 // --------------------------------------------------------------------------
@@ -295,7 +337,7 @@ BackupStoreDirectory::Entry *BackupStoreDirectory::AddEntry(const Entry &rEntryT
 		delete pnew;
 		throw;
 	}
-	
+
 	return pnew;
 }
 
@@ -319,7 +361,7 @@ BackupStoreDirectory::Entry *BackupStoreDirectory::AddEntry(const BackupStoreFil
 		delete pnew;
 		throw;
 	}
-	
+
 	return pnew;
 }
 
@@ -346,7 +388,7 @@ void BackupStoreDirectory::DeleteEntry(int64_t ObjectID)
 			return;
 		}
 	}
-	
+
 	// Not found
 	THROW_EXCEPTION(BackupStoreException, CouldNotFindEntryInDirectory)
 }
@@ -476,11 +518,11 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 	}
 
 	// Do reading first before modifying the variables, to be more exception safe
-	
+
 	// Get the filename
 	BackupStoreFilename name;
 	name.ReadFromStream(rStream, Timeout);
-	
+
 	// Get the attributes
 	mAttributes.ReadFromStream(rStream, Timeout);
 
@@ -511,13 +553,13 @@ void BackupStoreDirectory::Entry::WriteToStream(IOStream &rStream) const
 	entry.mSizeInBlocks = 		box_hton64(mSizeInBlocks);
 	entry.mAttributesHash =		box_hton64(mAttributesHash);
 	entry.mFlags = 				htons(mFlags);
-	
+
 	// Write it
 	rStream.Write(&entry, sizeof(entry));
-	
+
 	// Write the filename
 	mName.WriteToStream(rStream);
-	
+
 	// Write any attributes
 	mAttributes.WriteToStream(rStream);
 }
@@ -557,7 +599,7 @@ void BackupStoreDirectory::Entry::ReadFromStreamDependencyInfo(IOStream &rStream
 void BackupStoreDirectory::Entry::WriteToStreamDependencyInfo(IOStream &rStream) const
 {
 	// Build structure
-	en_StreamFormatDepends depends;	
+	en_StreamFormatDepends depends;
 	depends.mDependsNewer = box_hton64(mDependsNewer);
 	depends.mDependsOlder = box_hton64(mDependsOlder);
 	// Write

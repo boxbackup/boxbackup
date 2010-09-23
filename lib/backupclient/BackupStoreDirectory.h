@@ -47,10 +47,10 @@ public:
 		~Entry();
 		Entry(const Entry &rToCopy);
 		Entry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, uint64_t AttributesHash);
-		
+
 		void ReadFromStream(IOStream &rStream, int Timeout);
 		void WriteToStream(IOStream &rStream) const;
-		
+
 		const BackupStoreFilename &GetName() const {return mName;}
 		box_time_t GetModificationTime() const {return mModificationTime;}
 		int64_t GetObjectID() const {return mObjectID;}
@@ -68,7 +68,7 @@ public:
 		void SetAttributes(const StreamableMemBlock &rAttr, uint64_t AttributesHash) {mAttributes.Set(rAttr); mAttributesHash = AttributesHash;}
 		const StreamableMemBlock &GetAttributes() const {return mAttributes;}
 		uint64_t GetAttributesHash() const {return mAttributesHash;}
-		
+
 		// Marks
 		// The lowest mark number a version of a file of this name has ever had
 		uint32_t GetMinMarkNumber() const {return mMinMarkNumber;}
@@ -90,7 +90,7 @@ public:
 		};
 		// characters for textual listing of files -- see bbackupquery/BackupQueries
 		#define BACKUPSTOREDIRECTORY_ENTRY_FLAGS_DISPLAY_NAMES "fdXoR"
-		
+
 		bool inline MatchesFlags(int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 		{
 			return ((FlagsMustBeSet == Flags_INCLUDE_EVERYTHING) || ((mFlags & FlagsMustBeSet) == FlagsMustBeSet))
@@ -120,32 +120,33 @@ public:
 		StreamableMemBlock mAttributes;
 		uint32_t mMinMarkNumber;
 		uint32_t mMarkNumber;
-		
+
 		uint64_t mDependsNewer;	// new version this depends on
 		uint64_t mDependsOlder;	// older version which depends on this
 	};
-	
+
 	void ReadFromStream(IOStream &rStream, int Timeout);
 	void WriteToStream(IOStream &rStream,
 			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
 			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
 			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
-			
+	void WriteHeaderToStream(IOStream &rStream, int32_t Count, int32_t Options) const;
+
 	Entry *AddEntry(const Entry &rEntryToCopy);
 	Entry *AddEntry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, box_time_t AttributesModTime);
 	void DeleteEntry(int64_t ObjectID);
 	Entry *FindEntryByID(int64_t ObjectID) const;
-	
+
 	int64_t GetObjectID() const {return mObjectID;}
 	int64_t GetContainerID() const {return mContainerID;}
-	
+
 	// Need to be able to update the container ID when moving objects
 	void SetContainerID(int64_t ContainerID) {mContainerID = ContainerID;}
 
-	// Purely for use of server -- not serialised into streams	
+	// Purely for use of server -- not serialised into streams
 	int64_t GetRevisionID() const {return mRevisionID;}
 	void SetRevisionID(int64_t RevisionID) {mRevisionID = RevisionID;}
-	
+
 	unsigned int GetNumberOfEntries() const {return mEntries.size();}
 
 	// User info -- not serialised into streams
@@ -158,6 +159,10 @@ public:
 	const StreamableMemBlock &GetAttributes() const {return mAttributes;}
 	box_time_t GetAttributesModTime() const {return mAttributesModTime;}
 
+	// Options
+	bool HasDependencyInfo() const;
+	bool HasDependencyInfoInline() const;
+
 	class Iterator
 	{
 	public:
@@ -165,7 +170,7 @@ public:
 			: mrDir(rDir), i(rDir.mEntries.begin())
 		{
 		}
-		
+
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
 			// Skip over things which don't match the required flags
@@ -207,7 +212,7 @@ public:
 		const BackupStoreDirectory &mrDir;
 		std::vector<Entry*>::const_iterator i;
 	};
-		
+
 	friend class Iterator;
 
 	class ReverseIterator
@@ -217,7 +222,7 @@ public:
 			: mrDir(rDir), i(rDir.mEntries.rbegin())
 		{
 		}
-		
+
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
 			// Skip over things which don't match the required flags
@@ -233,12 +238,12 @@ public:
 			// Return entry, and increment
 			return (*(i++));
 		}
-	
+
 	private:
 		const BackupStoreDirectory &mrDir;
 		std::vector<Entry*>::const_reverse_iterator i;
 	};
-		
+
 	friend class ReverseIterator;
 
 	// For recovery of the store
@@ -260,6 +265,7 @@ private:
 	int64_t mContainerID;
 	std::vector<Entry*> mEntries;
 	box_time_t mAttributesModTime;
+	int32_t mOptions;
 	StreamableMemBlock mAttributes;
 	int64_t mUserInfo1;
 };
