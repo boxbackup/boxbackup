@@ -108,8 +108,10 @@ RaidFileWrite::~RaidFileWrite()
 //		Created: 2003/07/10
 //
 // --------------------------------------------------------------------------
-void RaidFileWrite::Open(bool AllowOverwrite)
+void RaidFileWrite::Open(bool AllowOverwrite, bool UpdateOnly)
 {
+	ASSERT( !(AllowOverwrite && UpdateOnly) );
+
 	if(mOSFileHandle != -1)
 	{
 		THROW_EXCEPTION(RaidFileException, AlreadyOpen)
@@ -134,8 +136,11 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 
 	// Get the filename for the write file
 	std::string writeFilename(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
-	// Add on a temporary extension
-	writeFilename += 'X';
+	if(!UpdateOnly)
+	{
+		// Add on a temporary extension
+		writeFilename += 'X';
+	}
 
 	// Attempt to open
 	mOSFileHandle = ::open(writeFilename.c_str(),
@@ -181,12 +186,16 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 		}
 	}
 
-	// Truncate it to size zero
-	if(::ftruncate(mOSFileHandle, 0) != 0)
+	if(!UpdateOnly)
 	{
-		THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFileOnTruncate)
+		// Truncate it to size zero
+		if(::ftruncate(mOSFileHandle, 0) != 0)
+		{
+			THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFileOnTruncate)
+		}
 	}
 
+	mUpdateOnly = UpdateOnly;
 	// Done!
 }
 
@@ -290,40 +299,43 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 			RequestedModifyUnreferencedFile);
 	}
 
-	// Rename it into place -- BEFORE it's closed so lock remains
+	if(!mUpdateOnly)
+	{
+		// Rename it into place -- BEFORE it's closed so lock remains
 
 #ifdef WIN32
-	// Except on Win32 which doesn't allow renaming open files
-	// Close file...
-	if(::close(mOSFileHandle) != 0)
-	{
-		THROW_EXCEPTION(RaidFileException, OSError)
-	}
-	mOSFileHandle = -1;
+		// Except on Win32 which doesn't allow renaming open files
+		// Close file...
+		if(::close(mOSFileHandle) != 0)
+		{
+			THROW_EXCEPTION(RaidFileException, OSError)
+		}
+		mOSFileHandle = -1;
 #endif // WIN32
 
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
-	// Get the filename for the write file
-	std::string renameTo(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
-	// And the current name
-	std::string renameFrom(renameTo + 'X');
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
+		// Get the filename for the write file
+		std::string renameTo(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
+		// And the current name
+		std::string renameFrom(renameTo + 'X');
 
 #ifdef WIN32
-	// need to delete the target first
-	if(::unlink(renameTo.c_str()) != 0 &&
-		GetLastError() != ERROR_FILE_NOT_FOUND)
-	{
-		BOX_LOG_WIN_ERROR("Failed to delete file: " << renameTo);
-		THROW_EXCEPTION(RaidFileException, OSError)
-	}
+		// need to delete the target first
+		if(::unlink(renameTo.c_str()) != 0 &&
+			GetLastError() != ERROR_FILE_NOT_FOUND)
+		{
+			BOX_LOG_WIN_ERROR("Failed to delete file: " << renameTo);
+			THROW_EXCEPTION(RaidFileException, OSError)
+		}
 #endif
 
-	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
-	{
-		BOX_LOG_SYS_ERROR("Failed to rename file: " << renameFrom <<
-			" to " << renameTo);
-		THROW_EXCEPTION(RaidFileException, OSError)
+		if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
+		{
+			BOX_LOG_SYS_ERROR("Failed to rename file: " << renameFrom <<
+				" to " << renameTo);
+			THROW_EXCEPTION(RaidFileException, OSError)
+		}
 	}
 
 #ifndef WIN32

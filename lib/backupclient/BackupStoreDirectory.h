@@ -130,6 +130,10 @@ public:
 			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
 			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
 			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
+	void UpdateToStream(IOStream &rStream,
+			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
+			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
+			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
 	void WriteHeaderToStream(IOStream &rStream, int32_t Count, int32_t Options) const;
 
 	Entry *AddEntry(const Entry &rEntryToCopy);

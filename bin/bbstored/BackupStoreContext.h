@@ -63,10 +63,10 @@ public:
 		Phase_Login		= 1,
 		Phase_Commands	= 2
 	};
-	
+
 	int GetPhase() const {return mProtocolPhase;}
 	void SetPhase(int NewPhase) {mProtocolPhase = NewPhase;}
-	
+
 	// Read only locking
 	bool SessionIsReadOnly() {return mReadOnly;}
 	bool AttemptToGetWriteLock();
@@ -84,7 +84,7 @@ public:
 	// Client marker
 	int64_t GetClientStoreMarker();
 	void SetClientStoreMarker(int64_t ClientStoreMarker);
-	
+
 	// Usage information
 	void GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocksSoftLimit, int64_t &rBlocksHardLimit);
 	bool HardLimitExceeded();
@@ -94,7 +94,7 @@ public:
 	//
 	// Function
 	//		Name:    BackupStoreContext::GetDirectory(int64_t)
-	//		Purpose: Return a reference to a directory. Valid only until the 
+	//		Purpose: Return a reference to a directory. Valid only until the
 	//				 next time a function which affects directories is called.
 	//				 Mainly this funciton, and creation of files.
 	//		Created: 2003/09/02
@@ -106,7 +106,7 @@ public:
 		// merely turns the the returned directory const.
 		return GetDirectoryInternal(ObjectID);
 	}
-	
+
 	// Manipulating files/directories
 	int64_t AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime, int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename, bool MarkFileWithSameNameAsOldVersions);
 	int64_t AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists);
@@ -126,14 +126,14 @@ public:
 	};
 	bool ObjectExists(int64_t ObjectID, int MustBe = ObjectExists_Anything);
 	std::auto_ptr<IOStream> OpenObject(int64_t ObjectID);
-	
+
 	// Info
 	int32_t GetClientID() const {return mClientID;}
 
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID);
-	void SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID);
+	void SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID, bool AppendLastEntryOnly = false);
 	void RemoveDirectoryFromCache(int64_t ObjectID);
 	void DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete);
 	int64_t AllocateObjectID();
@@ -147,13 +147,13 @@ private:
 	bool mReadOnly;
 	NamedLock mWriteLock;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
-	
+
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mpStoreInfo;
 
 	// Refcount database
 	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
-	
+
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
 

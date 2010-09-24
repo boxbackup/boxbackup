@@ -267,6 +267,54 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDirectory::UpdateToStream(IOStream &, int16_t, int16_t, bool, bool)
+//		Purpose: Writes the header to a stream
+//		Created: 2010/09/23
+//
+// --------------------------------------------------------------------------
+void BackupStoreDirectory::UpdateToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo) const
+{
+	// Check that sensible IDs have been set
+	ASSERT(mObjectID != 0);
+	ASSERT(mContainerID != 0);
+
+	Entry *pen = mEntries.back();
+
+	if( FlagsMustBeSet == Entry::Flags_INCLUDE_EVERYTHING
+		&& FlagsNotToBeSet == Entry::Flags_EXCLUDE_NOTHING
+		&& !HasDependencyInfo()
+		&& ( (!StreamDependencyInfo && !HasDependencyInfoInline()) || (StreamDependencyInfo && HasDependencyInfoInline() == pen->HasDependencies()) ) )
+	{
+		BOX_TRACE("Appending to directory");
+
+		WriteHeaderToStream(rStream, mEntries.size(), mOptions);
+
+		// Write the attributes?
+		if(StreamAttributes)
+		{
+			mAttributes.WriteToStream(rStream);
+		}
+		else
+		{
+			// Write a blank header instead
+			StreamableMemBlock::WriteEmptyBlockToStream(rStream);
+		}
+
+		rStream.Seek(0, IOStream::SeekType_End);
+		pen->WriteToStream(rStream);
+		if(HasDependencyInfoInline())
+		{
+			pen->WriteToStreamDependencyInfo(rStream);
+		}
+	}
+	else
+	{
+		WriteToStream(rStream, FlagsMustBeSet, FlagsNotToBeSet, StreamAttributes, StreamDependencyInfo);
+	}
+}
 
 // --------------------------------------------------------------------------
 //
