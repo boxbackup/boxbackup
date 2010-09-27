@@ -110,8 +110,6 @@ RaidFileWrite::~RaidFileWrite()
 // --------------------------------------------------------------------------
 void RaidFileWrite::Open(bool AllowOverwrite, bool UpdateOnly)
 {
-	ASSERT( !(AllowOverwrite && UpdateOnly) );
-
 	if(mOSFileHandle != -1)
 	{
 		THROW_EXCEPTION(RaidFileException, AlreadyOpen)

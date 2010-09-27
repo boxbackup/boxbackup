@@ -600,6 +600,8 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	int64_t blocksInOldFiles = 0;
 	try
 	{
+		bool MarkedAsOld = false;
+
 		if(MarkFileWithSameNameAsOldVersions)
 		{
 			BackupStoreDirectory::Iterator i(dir);
@@ -620,6 +622,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 						// Can safely do this, because we know we won't be here if it's already
 						// an old version
 						blocksInOldFiles += e->GetSizeInBlocks();
+						MarkedAsOld = true;
 					}
 				}
 			}
@@ -653,7 +656,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		}
 
 		// Write the directory back to disc
-		SaveDirectory(dir, InDirectory, (0 == DiffFromFileID) /* Append last (new) entry only */ );
+		SaveDirectory(dir, InDirectory, (0 == DiffFromFileID && !MarkedAsOld) /* Append last (new) entry only */ );
 
 		// Commit the old version's new patched version, now that the directory safely reflects
 		// the state of the files on disc.

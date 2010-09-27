@@ -281,12 +281,15 @@ void BackupStoreDirectory::UpdateToStream(IOStream &rStream, int16_t FlagsMustBe
 	ASSERT(mObjectID != 0);
 	ASSERT(mContainerID != 0);
 
+	ASSERT(mEntries.size() > 0);
+
 	Entry *pen = mEntries.back();
+	ASSERT(pen != 0);
 
 	if( FlagsMustBeSet == Entry::Flags_INCLUDE_EVERYTHING
 		&& FlagsNotToBeSet == Entry::Flags_EXCLUDE_NOTHING
 		&& !HasDependencyInfo()
-		&& ( (!StreamDependencyInfo && !HasDependencyInfoInline()) || (StreamDependencyInfo && HasDependencyInfoInline() == pen->HasDependencies()) ) )
+		&& ( StreamDependencyInfo == HasDependencyInfoInline() || ( StreamDependencyInfo && !pen->HasDependencies() ) ) )
 	{
 		BOX_TRACE("Appending to directory");
 
@@ -303,7 +306,10 @@ void BackupStoreDirectory::UpdateToStream(IOStream &rStream, int16_t FlagsMustBe
 			StreamableMemBlock::WriteEmptyBlockToStream(rStream);
 		}
 
-		rStream.Seek(0, IOStream::SeekType_End);
+		if(mEntries.size() > 1)
+		{
+			rStream.Seek(0, IOStream::SeekType_End);
+		}
 		pen->WriteToStream(rStream);
 		if(HasDependencyInfoInline())
 		{
