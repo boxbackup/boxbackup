@@ -30,6 +30,7 @@
 		#include <readline.h>
 	#endif
 #endif
+
 #ifdef HAVE_READLINE_HISTORY
 	#ifdef HAVE_READLINE_HISTORY_H
 		#include <readline/history.h>
@@ -92,49 +93,70 @@ void PrintUsageAndExit()
 }
 
 #ifdef HAVE_LIBREADLINE
-// copied from: http://tiswww.case.edu/php/chet/readline/readline.html#SEC44
+static BackupProtocolClient* pProtocol;
+static const Configuration* pConfig;
+static BackupQueries* pQueries;
+static std::vector<std::string> completions;
+static std::auto_ptr<BackupQueries::ParsedCommand> sapCmd;
 
-char * command_generator(const char *text, int state)
+char * completion_generator(const char *text, int state)
 {
-	static int list_index, len;
-	const char *name;
-
-	/* 
-	 * If this is a new word to complete, initialize now.  This includes
-	 * saving the length of TEXT for efficiency, and initializing the index
-	 * variable to 0.
-	 */
-	if(!state)
+	if(state == 0)
 	{
-		list_index = 0;
-		len = strlen(text);
-	}
+		completions.clear();
 
-	/* Return the next name which partially matches from the command list. */
-	while((name = commands[list_index].name))
-	{
-		list_index++;
+		std::string partialCommand(rl_line_buffer, rl_point);
+		sapCmd.reset(new BackupQueries::ParsedCommand(partialCommand,
+			false));
 
-		if(::strncmp(name, text, len) == 0 && !(state--))
+		if(sapCmd->mArgCount == 0) // incomplete command
 		{
-			return ::strdup(name);
+			completions = CompleteCommand(*sapCmd, text, *pProtocol,
+				*pConfig, *pQueries);
+		}
+		else if(sapCmd->mInOptions)
+		{
+			completions = CompleteOptions(*sapCmd, text, *pProtocol,
+				*pConfig, *pQueries);
+		}
+		else if(sapCmd->mArgCount - 1 < MAX_COMPLETION_HANDLERS)
+		// sapCmd->mArgCount must be at least 1 if we're here
+		{
+			CompletionHandler handler =
+				sapCmd->pSpec->complete[sapCmd->mArgCount - 1];
+			if(handler != NULL)
+			{
+				completions = handler(*sapCmd, text, *pProtocol,
+					*pConfig, *pQueries);
+			}
+
+			if(std::string(text) == "")
+			{
+				// additional options are also allowed here
+				std::vector<std::string> addOpts =
+					CompleteOptions(*sapCmd, text,
+						*pProtocol, *pConfig,
+						*pQueries);
+
+				for(std::vector<std::string>::iterator
+					i =  addOpts.begin();
+					i != addOpts.end(); i++)
+				{
+					completions.push_back(*i);
+				}
+			}
 		}
 	}
 
-	list_index = 0;
-
-	while((name = alias[list_index]))
+	if(state < 0 || state >= (int) completions.size())
 	{
-		list_index++;
-
-		if(::strncmp(name, text, len) == 0 && !(state--))
-		{
-			return ::strdup(name);
-		}
+		rl_attempted_completion_over = 1;
+		return NULL;
 	}
 
-	/* If no names matched, then return NULL. */
-	return (char *) NULL;
+	return strdup(completions[state].c_str());
+	// string must be allocated with malloc() and will be freed
+	// by rl_completion_matches().
 }
 
 #ifdef HAVE_RL_COMPLETION_MATCHES
@@ -145,22 +167,7 @@ char * command_generator(const char *text, int state)
 
 char ** bbackupquery_completion(const char *text, int start, int end)
 {
-	char **matches;
-
-	matches = (char **)NULL;
-
-	/* If this word is at the start of the line, then it is a command
-	 * to complete.  Otherwise it is the name of a file in the current
-	 * directory.
-	 */
-	#ifdef RL_COMPLETION_MATCHES
-	if (start == 0)
-	{
-		matches = RL_COMPLETION_MATCHES(text, command_generator);
-	}
-	#endif
-
-	return matches;
+	return RL_COMPLETION_MATCHES(text, completion_generator);
 }
 
 #endif // HAVE_LIBREADLINE
@@ -445,10 +452,9 @@ int main(int argc, const char *argv[])
 		int c = 0;
 		while(c < argc && !context.Stop())
 		{
-			BackupQueries::ParsedCommand cmd(
-				context.ParseCommand(argv[c++], true));
+			BackupQueries::ParsedCommand cmd(argv[c++], true);
 
-			if(cmd.failed)
+			if(cmd.mFailed)
 			{
 				BOX_ERROR("Parse failed");
 			}
@@ -487,6 +493,10 @@ int main(int argc, const char *argv[])
 		/* Tell the completer that we want a crack first. */
 		rl_attempted_completion_function = bbackupquery_completion;
 		
+		pProtocol = &connection;
+		pConfig = &conf;
+		pQueries = &context;
+
 		char *last_cmd = 0;
 		while(!context.Stop())
 		{
@@ -498,10 +508,9 @@ int main(int argc, const char *argv[])
 				break;
 			}
 			
-			BackupQueries::ParsedCommand cmd(
-				context.ParseCommand(command, false));
+			BackupQueries::ParsedCommand cmd(command, false);
 			
-			if(cmd.failed)
+			if(cmd.mFailed)
 			{
 				BOX_ERROR("Parse failed");
 			}
@@ -541,8 +550,8 @@ int main(int argc, const char *argv[])
 				printf("query > ");
 				fflush(stdout);
 				std::string command(getLine.GetLine());
-				BackupQueries::ParsedCommand cmd(
-					context.ParseCommand(command, false));
+				BackupQueries::ParsedCommand cmd(command,
+					false);
 				context.DoCommand(cmd);
 			}
 		}

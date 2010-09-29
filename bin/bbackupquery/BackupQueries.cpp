@@ -24,6 +24,24 @@
 	#include <dirent.h>
 #endif
 
+#ifdef HAVE_LIBREADLINE
+	#ifdef HAVE_READLINE_READLINE_H
+		#include <readline/readline.h>
+	#elif defined(HAVE_EDITLINE_READLINE_H)
+		#include <editline/readline.h>
+	#elif defined(HAVE_READLINE_H)
+		#include <readline.h>
+	#endif
+#endif
+
+#ifdef HAVE_READLINE_HISTORY
+	#ifdef HAVE_READLINE_HISTORY_H
+		#include <readline/history.h>
+	#elif defined(HAVE_HISTORY_H)
+		#include <history.h>
+	#endif
+#endif
+
 #include <cstring>
 #include <limits>
 #include <iostream>
@@ -63,25 +81,380 @@
 #define COMPARE_RETURN_ERROR		3
 #define COMMAND_RETURN_ERROR		4
 
+#define COMPLETION_FUNCTION(name, code) \
+std::vector<std::string> Complete ## name( \
+	BackupQueries::ParsedCommand& rCommand, \
+	const std::string& prefix, \
+	BackupProtocolClient& rProtocol, const Configuration& rConfig, \
+	BackupQueries& rQueries) \
+{ \
+	std::vector<std::string> completions; \
+	\
+	try \
+	{ \
+		code \
+	} \
+	catch(std::exception &e) \
+	{ \
+		BOX_TRACE("Failed to complete " << prefix << ": " << e.what()); \
+	} \
+	catch(...) \
+	{ \
+		BOX_TRACE("Failed to complete " << prefix << ": " \
+			"unknown error"); \
+	} \
+	\
+	return completions; \
+}
+
+#define DELEGATE_COMPLETION(name) \
+	completions = Complete ## name(rCommand, prefix, rProtocol, rConfig, \
+	rQueries);
+
+COMPLETION_FUNCTION(None,)
+
+#ifdef HAVE_RL_FILENAME_COMPLETION_FUNCTION
+	#define RL_FILENAME_COMPLETION_FUNCTION rl_filename_completion_function
+#else
+	#define RL_FILENAME_COMPLETION_FUNCTION filename_completion_function
+#endif
+
+COMPLETION_FUNCTION(Default,
+	while (const char *match = RL_FILENAME_COMPLETION_FUNCTION(prefix.c_str(), 0))
+	{
+		completions.push_back(match);
+	}
+)
+
+COMPLETION_FUNCTION(Command,
+	int len = prefix.length();
+
+	for(int i = 0; commands[i].name != NULL; i++)
+	{
+		if(::strncmp(commands[i].name, prefix.c_str(), len) == 0)
+		{
+			completions.push_back(commands[i].name);
+		}
+	}
+)
+
+void CompleteOptionsInternal(const std::string& prefix,
+	BackupQueries::ParsedCommand& rCommand,
+	std::vector<std::string>& completions)
+{
+	std::string availableOptions = rCommand.pSpec->opts;
+
+	for(std::string::iterator
+		opt =  availableOptions.begin();
+		opt != availableOptions.end(); opt++)
+	{
+		if(rCommand.mOptions.find(*opt) == std::string::npos)
+		{
+			if(prefix == "")
+			{
+				// complete with possible option strings
+				completions.push_back(std::string("-") + *opt);
+			}
+			else
+			{
+				// complete with possible additional options
+				completions.push_back(prefix + *opt);
+			}
+		}
+	}
+}
+
+COMPLETION_FUNCTION(Options,
+	CompleteOptionsInternal(prefix, rCommand, completions);
+)
+
+std::string EncodeFileName(const std::string &rUnEncodedName)
+{
+#ifdef WIN32
+	std::string encodedName;
+	if(!ConvertConsoleToUtf8(rUnEncodedName, encodedName))
+	{
+		return std::string();
+	}
+	return encodedName;
+#else
+	return rUnEncodedName;
+#endif
+}
+
+#define LIST_OPTION_ALLOWOLD		'o'
+#define LIST_OPTION_ALLOWDELETED	'd'
+
+int16_t GetExcludeFlags(BackupQueries::ParsedCommand& rCommand)
+{
+	int16_t excludeFlags = 0;
+
+	if (rCommand.mOptions.find(LIST_OPTION_ALLOWOLD) == std::string::npos)
+	{
+		excludeFlags |= BackupProtocolClientListDirectory::Flags_OldVersion;
+	}
+
+	if (rCommand.mOptions.find(LIST_OPTION_ALLOWDELETED) == std::string::npos)
+	{
+		excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
+	}
+
+	return excludeFlags;
+}
+
+std::vector<std::string> CompleteRemoteFileOrDirectory(
+	BackupQueries::ParsedCommand& rCommand,
+	const std::string& prefix, BackupProtocolClient& rProtocol,
+	BackupQueries& rQueries, int16_t includeFlags)
+{
+	std::vector<std::string> completions;
+	
+	// default to using the current directory
+	int64_t listDirId = rQueries.GetCurrentDirectoryID();
+	std::string searchPrefix;
+	std::string listDir = prefix;
+
+	if(rCommand.mArgCount == rCommand.mCmdElements.size())
+	{
+		// completing an empty name, from the current directory
+		// nothing to change
+	}
+	else
+	{
+		// completing a partially-completed subdirectory name
+		searchPrefix = prefix;
+		listDir = "";
+
+		// do we need to list a subdirectory to complete?
+		size_t lastSlash = searchPrefix.rfind('/');
+		if(lastSlash == std::string::npos)
+		{
+			// no slashes, so the whole name is the prefix
+			// nothing to change
+		}
+		else
+		{
+			// listing a partially-completed subdirectory name
+			listDir = searchPrefix.substr(0, lastSlash);
+
+			listDirId = rQueries.FindDirectoryObjectID(listDir,
+				rCommand.mOptions.find(LIST_OPTION_ALLOWOLD)
+					!= std::string::npos,
+				rCommand.mOptions.find(LIST_OPTION_ALLOWDELETED)
+					!= std::string::npos);
+
+			if(listDirId == 0)
+			{
+				// no matches for subdir to list,
+				// return empty-handed.
+				return completions;
+			}
+
+			// matched, and updated listDir and listDirId already
+			searchPrefix = searchPrefix.substr(lastSlash + 1);
+		}
+	}
+
+	// Always include directories, because they contain files.
+	// We will append a slash later for each directory if we're
+	// actually looking for files.
+	//
+	// If we're looking for directories, then only list directories.
+
+	bool completeFiles = includeFlags &
+		BackupProtocolClientListDirectory::Flags_File;
+	bool completeDirs = includeFlags &
+		BackupProtocolClientListDirectory::Flags_Dir;
+	int16_t listFlags = 0;
+
+	if(completeFiles)
+	{
+		listFlags = BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING;
+	}
+	else if(completeDirs)
+	{
+		listFlags = BackupProtocolClientListDirectory::Flags_Dir;
+	}
+
+	rProtocol.QueryListDirectory(listDirId,
+		listFlags, GetExcludeFlags(rCommand),
+		false /* no attributes */);
+
+	// Retrieve the directory from the stream following
+	BackupStoreDirectory dir;
+	std::auto_ptr<IOStream> dirstream(rProtocol.ReceiveStream());
+	dir.ReadFromStream(*dirstream, rProtocol.GetTimeout());
+
+	// Then... display everything
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *en = 0;
+	while((en = i.Next()) != 0)
+	{
+		BackupStoreFilenameClear clear(en->GetName());
+		std::string name = clear.GetClearFilename().c_str();
+		if(name.compare(0, searchPrefix.length(), searchPrefix) == 0)
+		{
+			if(en->IsDir() &&
+				(includeFlags & BackupProtocolClientListDirectory::Flags_Dir) == 0)
+			{
+				// Was looking for a file, but this is a 
+				// directory, so append a slash to the name
+				name += "/";
+			}
+
+			if(listDir == "")
+			{
+				completions.push_back(name);
+			}
+			else
+			{
+				completions.push_back(listDir + "/" + name);
+			}
+		}
+	}
+
+	return completions;
+}
+
+COMPLETION_FUNCTION(RemoteDir,
+	completions = CompleteRemoteFileOrDirectory(rCommand, prefix,
+		rProtocol, rQueries,
+		BackupProtocolClientListDirectory::Flags_Dir);
+)
+
+COMPLETION_FUNCTION(RemoteFile,
+	completions = CompleteRemoteFileOrDirectory(rCommand, prefix,
+		rProtocol, rQueries,
+		BackupProtocolClientListDirectory::Flags_File);
+)
+
+COMPLETION_FUNCTION(LocalDir,
+	DELEGATE_COMPLETION(Default);
+)
+
+COMPLETION_FUNCTION(LocalFile,
+	DELEGATE_COMPLETION(Default);
+)
+
+COMPLETION_FUNCTION(LocationName,
+	const Configuration &locations(rConfig.GetSubConfiguration(
+		"BackupLocations"));
+
+	std::vector<std::string> locNames =
+		locations.GetSubConfigurationNames();
+
+	for(std::vector<std::string>::iterator
+		pLocName  = locNames.begin();
+		pLocName != locNames.end();
+		pLocName++)
+	{
+		if(pLocName->compare(0, pLocName->length(), prefix) == 0)
+		{
+			completions.push_back(*pLocName);
+		}
+	}
+)
+
+COMPLETION_FUNCTION(RemoteFileIdInCurrentDir,
+	int64_t listDirId = rQueries.GetCurrentDirectoryID();
+	int16_t excludeFlags = GetExcludeFlags(rCommand);
+
+	rProtocol.QueryListDirectory(
+		listDirId,
+		BackupProtocolClientListDirectory::Flags_File,
+		excludeFlags, false /* no attributes */);
+
+	// Retrieve the directory from the stream following
+	BackupStoreDirectory dir;
+	std::auto_ptr<IOStream> dirstream(rProtocol.ReceiveStream());
+	dir.ReadFromStream(*dirstream, rProtocol.GetTimeout());
+
+	// Then... compare each item
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *en = 0;
+	while((en = i.Next()) != 0)
+	{
+		std::ostringstream hexId;
+		hexId << std::hex << en->GetObjectID();
+		if(hexId.str().compare(0, prefix.length(), prefix) == 0)
+		{
+			completions.push_back(hexId.str());
+		}
+	}
+)
+
+// TODO implement completion of hex IDs up to the maximum according to Usage
+COMPLETION_FUNCTION(RemoteId,)
+
+COMPLETION_FUNCTION(GetFileOrId,
+	if(rCommand.mOptions.find('i') != std::string::npos)
+	{
+		DELEGATE_COMPLETION(RemoteFileIdInCurrentDir);
+	}
+	else
+	{
+		DELEGATE_COMPLETION(RemoteFile);
+	}
+)
+
+COMPLETION_FUNCTION(CompareLocationOrRemoteDir,
+	if(rCommand.mOptions.find('l') != std::string::npos)
+	{
+		DELEGATE_COMPLETION(LocationName);
+	}
+	else
+	{
+		DELEGATE_COMPLETION(RemoteDir);
+	}
+)
+
+COMPLETION_FUNCTION(CompareNoneOrLocalDir,
+	if(rCommand.mOptions.find('l') != std::string::npos)
+	{
+		// no completions
+		DELEGATE_COMPLETION(None);
+	}
+	else
+	{
+		DELEGATE_COMPLETION(LocalDir);
+	}
+)
+
+COMPLETION_FUNCTION(RestoreRemoteDirOrId,
+	if(rCommand.mOptions.find('i') != std::string::npos)
+	{
+		DELEGATE_COMPLETION(RemoteId);
+	}
+	else
+	{
+		DELEGATE_COMPLETION(RemoteDir);
+	}
+)
+
 // Data about commands
 QueryCommandSpecification commands[] = 
 {
-	{ "quit", "", Command_Quit },
-	{ "exit", "", Command_Quit },
-	{ "list", "rodIFtTash", Command_List },
-	{ "pwd",  "", Command_pwd },
-	{ "cd",   "od", Command_cd },
-	{ "lcd",  "", Command_lcd },
-	{ "sh",   "", Command_sh },
-	{ "getobject", "", Command_GetObject },
-	{ "get",  "i", Command_Get },
-	{ "compare", "alcqAEQ", Command_Compare },
-	{ "restore", "drif", Command_Restore },
-	{ "help", "", Command_Help },
-	{ "usage", "m", Command_Usage },
-	{ "undelete", "", Command_Undelete },
-	{ "delete", "", Command_Delete },
-	{ NULL, NULL, Command_Unknown } 
+	{ "quit",	"",		Command_Quit, 	{} },
+	{ "exit",	"",		Command_Quit,	{} },
+	{ "list",	"rodIFtTash",	Command_List,	{CompleteRemoteDir} },
+	{ "pwd",	"",		Command_pwd,	{} },
+	{ "cd",		"od",		Command_cd,	{CompleteRemoteDir} },
+	{ "lcd",	"",		Command_lcd,	{CompleteLocalDir} },
+	{ "sh", 	"",		Command_sh,	{CompleteDefault} },
+	{ "getobject",	"",		Command_GetObject,
+		{CompleteRemoteId, CompleteLocalDir} },
+	{ "get",	"i",		Command_Get,
+		{CompleteGetFileOrId, CompleteLocalDir} },
+	{ "compare",	"alcqAEQ",	Command_Compare,
+		{CompleteCompareLocationOrRemoteDir, CompleteCompareNoneOrLocalDir} },
+	{ "restore",	"drif",		Command_Restore,
+		{CompleteRestoreRemoteDirOrId, CompleteLocalDir} },
+	{ "help",	"",		Command_Help,	{} },
+	{ "usage",	"m",		Command_Usage,	{} },
+	{ "undelete",	"",		Command_Undelete,
+		{CompleteGetFileOrId} },
+	{ "delete",	"",		Command_Delete,	{CompleteGetFileOrId} },
+	{ NULL, 	NULL,		Command_Unknown, {} } 
 };
 
 const char *alias[] = {"ls", 0};
@@ -124,25 +497,37 @@ BackupQueries::~BackupQueries()
 {
 }
 
-BackupQueries::ParsedCommand
-BackupQueries::ParseCommand(const std::string& Command, bool isFromCommandLine)
+BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
+	bool isFromCommandLine)
+: mInOptions(false),
+  mFailed(false),
+  pSpec(NULL),
+  mArgCount(0)
 {
-	ParsedCommand parsed;
-	parsed.completeCommand = Command;
+	mCompleteCommand = Command;
 	
 	// is the command a shell command?
 	if(Command[0] == 's' && Command[1] == 'h' && Command[2] == ' ' && Command[3] != '\0')
 	{
 		// Yes, run shell command
-		parsed.cmdElements[0] = "sh";
-		parsed.cmdElements[1] = Command.c_str() + 3;
-		return parsed;
+		for(int i = 0; commands[i].type != Command_Unknown; i++)
+		{
+			if(commands[i].type == Command_sh)
+			{
+				pSpec = &(commands[i]);
+				break;
+			}
+		}
+
+		mCmdElements[0] = "sh";
+		mCmdElements[1] = Command.c_str() + 3;
+		return;
 	}
 
 	// split command into components
 	const char *c = Command.c_str();
 	bool inQuoted = false;
-	bool inOptions = false;
+	mInOptions = false;
 	
 	std::string s;
 	while(*c != 0)
@@ -150,10 +535,22 @@ BackupQueries::ParseCommand(const std::string& Command, bool isFromCommandLine)
 		// Terminating char?
 		if(*c == ((inQuoted)?'"':' '))
 		{
-			if(!s.empty()) parsed.cmdElements.push_back(s);
+			if(!s.empty())
+			{
+				mCmdElements.push_back(s);
+
+				// Because we just parsed a space, if this
+				// wasn't an option word, then we're now 
+				// completing the next (or first) arg
+				if(!mInOptions)
+				{
+					mArgCount++;
+				}
+			}
+
 			s.resize(0);
 			inQuoted = false;
-			inOptions = false;
+			mInOptions = false;
 		}
 		else
 		{
@@ -165,14 +562,14 @@ BackupQueries::ParseCommand(const std::string& Command, bool isFromCommandLine)
 			// Start of options?
 			else if(s.empty() && *c == '-')
 			{
-				inOptions = true;
+				mInOptions = true;
 			}
 			else
 			{
-				if(inOptions)
+				if(mInOptions)
 				{
 					// Option char
-					parsed.options += *c;
+					mOptions += *c;
 				}
 				else
 				{
@@ -187,40 +584,69 @@ BackupQueries::ParseCommand(const std::string& Command, bool isFromCommandLine)
 	
 	if(!s.empty())
 	{
-		parsed.cmdElements.push_back(s);
+		mCmdElements.push_back(s);
 	}
+
+	// Work out which command it is...
+	int cmd = 0;
+	while(mCmdElements.size() > 0 && commands[cmd].name != 0 && 
+		mCmdElements[0] != commands[cmd].name)
+	{
+		cmd++;
+	}
+	
+	if(mCmdElements.size() > 0 && commands[cmd].name == 0)
+	{
+		// Check for aliases
+		int a;
+		for(a = 0; alias[a] != 0; ++a)
+		{
+			if(mCmdElements[0] == alias[a])
+			{
+				// Found an alias
+				cmd = aliasIs[a];
+				break;
+			}
+		}
+	}
+
+	if(mCmdElements.size() == 0 || commands[cmd].name == 0)
+	{
+		mFailed = true;
+		return;
+	}
+
+	pSpec = &(commands[cmd]);
 	
 	#ifdef WIN32
 	if(isFromCommandLine)
 	{
 		std::string converted;
 		
-		if(!ConvertEncoding(parsed.completeCommand, CP_ACP, converted, 
+		if(!ConvertEncoding(mCompleteCommand, CP_ACP, converted, 
 			GetConsoleCP()))
 		{
 			BOX_ERROR("Failed to convert encoding");
-			parsed.failed = true;
+			failed = true;
 		}
 		
-		parsed.completeCommand = converted;
+		mCompleteCommand = converted;
 		
 		for(std::vector<std::string>::iterator 
-			i  = parsed.cmdElements.begin();
-			i != parsed.cmdElements.end(); i++)
+			i  = mCmdElements.begin();
+			i != mCmdElements.end(); i++)
 		{
 			if(!ConvertEncoding(*i, CP_ACP, converted, 
 				GetConsoleCP()))
 			{
 				BOX_ERROR("Failed to convert encoding");
-				parsed.failed = true;
+				mFailed = true;
 			}
 			
 			*i = converted;
 		}
 	}
 	#endif
-	
-	return parsed;
 }
 
 // --------------------------------------------------------------------------
@@ -234,16 +660,17 @@ BackupQueries::ParseCommand(const std::string& Command, bool isFromCommandLine)
 void BackupQueries::DoCommand(ParsedCommand& rCommand)
 {	
 	// Check...
-	if(rCommand.cmdElements.size() < 1)
+	if(rCommand.mCmdElements.size() < 1)
 	{
 		// blank command
 		return;
 	}
 
-	if(rCommand.cmdElements[0] == "sh" && rCommand.cmdElements.size() == 2)
+	if(rCommand.pSpec->type == Command_sh &&
+		rCommand.mCmdElements.size() == 2)
 	{
 		// Yes, run shell command
-		int result = ::system(rCommand.cmdElements[1].c_str());
+		int result = ::system(rCommand.mCmdElements[1].c_str());
 		if(result != 0)
 		{
 			BOX_WARNING("System command returned error code " <<
@@ -253,39 +680,16 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 		return;
 	}
 		
-	// Work out which command it is...
-	int cmd = 0;
-	while(commands[cmd].name != 0 && 
-		rCommand.cmdElements[0] != commands[cmd].name)
-	{
-		cmd++;
-	}
-	
-	if(commands[cmd].name == 0)
-	{
-		// Check for aliases
-		int a;
-		for(a = 0; alias[a] != 0; ++a)
-		{
-			if(rCommand.cmdElements[0] == alias[a])
-			{
-				// Found an alias
-				cmd = aliasIs[a];
-				break;
-			}
-		}
-	}
-		
-	if(commands[cmd].name == 0 || commands[cmd].type == Command_Unknown)
+	if(rCommand.pSpec->type == Command_Unknown)
 	{
 		// No such command
-		BOX_ERROR("Unrecognised command: " << rCommand.cmdElements[0]);
+		BOX_ERROR("Unrecognised command: " << rCommand.mCmdElements[0]);
 		return;
 	}
 
 	// Arguments
-	std::vector<std::string> args(rCommand.cmdElements.begin() + 1,
-		rCommand.cmdElements.end());
+	std::vector<std::string> args(rCommand.mCmdElements.begin() + 1,
+		rCommand.mCmdElements.end());
 
 	// Set up options
 	bool opts[256];
@@ -293,14 +697,14 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 	// BLOCK
 	{
 		// options
-		const char *c = rCommand.options.c_str();
+		const char *c = rCommand.mOptions.c_str();
 		while(*c != 0)
 		{
 			// Valid option?
-			if(::strchr(commands[cmd].opts, *c) == NULL)
+			if(::strchr(rCommand.pSpec->opts, *c) == NULL)
 			{
 				BOX_ERROR("Invalid option '" << *c << "' for "
-					"command " << commands[cmd].name);
+					"command " << rCommand.pSpec->name);
 				return;
 			}
 			opts[(int)*c] = true;
@@ -308,14 +712,14 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 		}
 	}
 
-	if(commands[cmd].type != Command_Quit)
+	if(rCommand.pSpec->type != Command_Quit)
 	{
 		// If not a quit command, set the return code to zero
 		SetReturnCode(ReturnCode::Command_OK);
 	}
 
 	// Handle command
-	switch(commands[cmd].type)
+	switch(rCommand.pSpec->type)
 	{
 	case Command_Quit:
 		mQuitNow = true;
@@ -378,7 +782,7 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 		break;
 		
 	default:
-		BOX_ERROR("Unknown command: " << rCommand.cmdElements[0]);
+		BOX_ERROR("Unknown command: " << rCommand.mCmdElements[0]);
 		break;
 	}
 }
@@ -395,8 +799,6 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 void BackupQueries::CommandList(const std::vector<std::string> &args, const bool *opts)
 {
 	#define LIST_OPTION_RECURSIVE		'r'
-	#define LIST_OPTION_ALLOWOLD		'o'
-	#define LIST_OPTION_ALLOWDELETED	'd'
 	#define LIST_OPTION_NOOBJECTID		'I'
 	#define LIST_OPTION_NOFLAGS		'F'
 	#define LIST_OPTION_TIMES_LOCAL		't'
