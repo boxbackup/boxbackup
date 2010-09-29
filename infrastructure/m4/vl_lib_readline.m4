@@ -128,6 +128,18 @@ AC_DEFUN([VL_LIB_READLINE_CHECK], [
     ])
   fi
 
+  AC_TRY_LINK([$vl_cv_lib_includes], [(void) readline;],
+    [vl_compiles=yes], [vl_compiles=no])
+  if test "x$vl_compiles" = "xno"; then
+    AC_TRY_LINK([#include <stdio.h>
+      $vl_cv_lib_includes], [(void) readline;],
+      [vl_compiles_with_stdio=yes], [vl_compiles_with_stdio=no])
+    if test "x$vl_compiles_with_stdio" = "xyes"; then
+      vl_cv_lib_includes="#include <stdio.h>
+$vl_cv_lib_includes"
+    fi
+  fi
+
   if test "x$vl_cv_lib_readline_compat_found" = "xyes"; then
     BOX_CHECK_VAR([rl_completion_matches], [in readline headers],
       [$vl_cv_lib_includes])
