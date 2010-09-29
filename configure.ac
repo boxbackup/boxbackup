@@ -74,6 +74,7 @@ esac
 AC_CHECK_HEADER([zlib.h],, [AC_MSG_ERROR([[cannot find zlib.h]])])
 AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
 VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
+AC_CHECK_FUNCS([rl_filename_completion_function])
 
 ## Check for Berkely DB. Restrict to certain versions
 AX_PATH_BDB([1.x or 4.1], [
