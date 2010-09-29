@@ -86,7 +86,7 @@ Daemon::~Daemon()
 //		Name:    Daemon::GetOptionString()
 //		Purpose: Returns the valid Getopt command-line options.
 //			 This should be overridden by subclasses to add
-//			 their own options, which should override 
+//			 their own options, which should override
 //			 ProcessOption, handle their own, and delegate to
 //			 ProcessOption for the standard options.
 //		Created: 2007/09/18
@@ -98,12 +98,12 @@ std::string Daemon::GetOptionString()
 	#ifndef WIN32
 		"DFK"
 	#endif
-		"hkPqQt:TUvVW:";
+		"hkPqQst:TUvVW:";
 }
 
 void Daemon::Usage()
 {
-	std::cout << 
+	std::cout <<
 	DaemonBanner() << "\n"
 	"\n"
 	"Usage: " << mAppName << " [options] [config file]\n"
@@ -123,6 +123,7 @@ void Daemon::Usage()
 #endif
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
 	"  -Q         Run at minimum verbosity, log nothing\n"
+	"  -s         No syslog, e.g. when using multilog\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity, log everything\n"
 	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
@@ -212,6 +213,12 @@ int Daemon::ProcessOption(signed int option)
 		break;
 
 
+		case 's':
+		{
+			Logging::ToSyslog(false);
+			::setvbuf(stdout, NULL, _IOLBF, 0);
+		}
+
 		case 'v':
 		{
 			if(mLogLevel == Log::EVERYTHING)
@@ -264,7 +271,7 @@ int Daemon::ProcessOption(signed int option)
 
 		case '?':
 		{
-			BOX_FATAL("Unknown option on command line: " 
+			BOX_FATAL("Unknown option on command line: "
 				<< "'" << (char)optopt << "'");
 			return 2;
 		}
@@ -323,7 +330,7 @@ int Daemon::Main(const char *DefaultConfigFile, int argc, const char *argv[])
 		optind = 1;
 	#endif
 
-	while((c = getopt(argc, (char * const *)argv, 
+	while((c = getopt(argc, (char * const *)argv,
 		GetOptionString().c_str())) != -1)
 	{
 		int returnCode = ProcessOption(c);
@@ -390,7 +397,7 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 			}
 			return false;
 		}
-			
+
 		apConfig = Configuration::LoadAndVerify(rConfigFileName,
 			GetConfigVerify(), errors);
 	}
@@ -413,17 +420,17 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 		BOX_ERROR("Failed to load or verify configuration file");
 		return false;
 	}
-	
+
 	if(!Configure(*apConfig))
 	{
 		BOX_ERROR("Failed to verify configuration file");
-		return false;		
+		return false;
 	}
-	
+
 	// Store configuration
 	mConfigFileName = rConfigFileName;
 	mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
-		
+
 	return true;
 }
 
@@ -453,14 +460,14 @@ bool Daemon::Configure(const Configuration& rConfig)
 		BOX_ERROR("Configuration errors: " << errors);
 		return false;
 	}
-	
+
 	// Store configuration
 	mapConfiguration = apConf;
-	
+
 	// Let the derived class have a go at setting up stuff
 	// in the initial process
 	SetupInInitialProcess();
-		
+
 	return true;
 }
 
@@ -491,7 +498,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 				"configuration file: " << rConfigFileName);
 			return 1;
 		}
-		
+
 		// Server configuration
 		const Configuration &serverConfig(
 			mapConfiguration->GetSubConfiguration("Server"));
@@ -506,20 +513,20 @@ int Daemon::Main(const std::string &rConfigFileName)
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
-	
+
 #ifndef WIN32
 		// Handle changing to a different user
 		if(serverConfig.KeyExists("User"))
 		{
 			// Config file specifies an user -- look up
 			UnixUser daemonUser(serverConfig.GetKeyValue("User").c_str());
-			
+
 			// Change the owner on the PID file, so it can be deleted properly on termination
 			if(::fchown(pidFile, daemonUser.GetUID(), daemonUser.GetGID()) != 0)
 			{
 				THROW_EXCEPTION(ServerException, CouldNotChangePIDFileOwner)
 			}
-			
+
 			// Change the process ID
 			daemonUser.ChangeProcessUser();
 		}
@@ -575,7 +582,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			}
 		}
 #endif // !WIN32
-		
+
 		// Must set spDaemon before installing signal handler,
 		// otherwise the handler will crash if invoked too soon.
 		if(spDaemon != NULL)
@@ -583,12 +590,12 @@ int Daemon::Main(const std::string &rConfigFileName)
 			THROW_EXCEPTION(ServerException, AlreadyDaemonConstructed)
 		}
 		spDaemon = this;
-		
+
 #ifndef WIN32
 		// Set signal handler
 		// Don't do this in the parent, since it might be anything
 		// (e.g. test/bbackupd)
-		
+
 		struct sigaction sa;
 		sa.sa_handler = SignalHandler;
 		sa.sa_flags = 0;
@@ -612,7 +619,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 				pidFileName);
 			THROW_EXCEPTION(ServerException, DaemoniseFailed)
 		}
-		
+
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING
 		{
@@ -621,7 +628,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			memleakfinder_setup_exit_report(filename, DaemonName());
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
-	
+
 		if(asDaemon && !mKeepConsoleOpenAfterFork)
 		{
 #ifndef WIN32
@@ -629,7 +636,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			::close(0);
 			::close(1);
 			::close(2);
-			
+
 			// Open and redirect them into /dev/null
 			int devnull = ::open(PLATFORM_DEV_NULL, O_RDWR, 0);
 			if(devnull == -1)
@@ -660,8 +667,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 	}
 	catch(BoxException &e)
 	{
-		BOX_FATAL("Failed to start: exception " << e.what() 
-			<< " (" << e.GetType() 
+		BOX_FATAL("Failed to start: exception " << e.what()
+			<< " (" << e.GetType()
 			<< "/"  << e.GetSubType() << ")");
 		return 1;
 	}
@@ -691,14 +698,14 @@ int Daemon::Main(const std::string &rConfigFileName)
 #endif
 
 	int retcode = 0;
-	
+
 	// Main Daemon running
 	try
 	{
 		while(!mTerminateWanted)
 		{
 			Run();
-			
+
 			if(mReloadConfigWanted && !mTerminateWanted)
 			{
 				// Need to reload that config file...
@@ -721,27 +728,27 @@ int Daemon::Main(const std::string &rConfigFileName)
 					retcode = 1;
 					break;
 				}
-				
+
 				// Store configuration
 				mapConfiguration = pconfig;
 				mLoadedConfigModifiedTime =
 					GetConfigFileModifiedTime();
-				
+
 				// Stop being marked for loading config again
 				mReloadConfigWanted = false;
 			}
 		}
-		
+
 		// Delete the PID file
 		::unlink(pidFileName.c_str());
-		
+
 		// Log
 		BOX_NOTICE("Terminating daemon");
 	}
 	catch(BoxException &e)
 	{
-		BOX_FATAL("Terminating due to exception " << e.what() 
-			<< " (" << e.GetType() 
+		BOX_FATAL("Terminating due to exception " << e.what()
+			<< " (" << e.GetType()
 			<< "/"  << e.GetSubType() << ")");
 		retcode = 1;
 	}
@@ -817,11 +824,11 @@ void Daemon::SignalHandler(int sigraised)
 		case SIGHUP:
 			spDaemon->mReloadConfigWanted = true;
 			break;
-			
+
 		case SIGTERM:
 			spDaemon->mTerminateWanted = true;
 			break;
-		
+
 		default:
 			break;
 		}
@@ -832,7 +839,7 @@ void Daemon::SignalHandler(int sigraised)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Daemon::DaemonName() 
+//		Name:    Daemon::DaemonName()
 //		Purpose: Returns name of the daemon
 //		Created: 2003/07/29
 //
@@ -884,12 +891,12 @@ void Daemon::Run()
 // --------------------------------------------------------------------------
 const ConfigurationVerify *Daemon::GetConfigVerify() const
 {
-	static ConfigurationVerifyKey verifyserverkeys[] = 
+	static ConfigurationVerifyKey verifyserverkeys[] =
 	{
 		DAEMON_VERIFY_SERVER_KEYS
 	};
 
-	static ConfigurationVerify verifyserver[] = 
+	static ConfigurationVerify verifyserver[] =
 	{
 		{
 			"Server",
@@ -928,7 +935,7 @@ const Configuration &Daemon::GetConfiguration() const
 		// Shouldn't get anywhere near this if a configuration file can't be loaded
 		THROW_EXCEPTION(ServerException, Internal)
 	}
-	
+
 	return *mapConfiguration;
 }
 
@@ -964,10 +971,10 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	// Make the string
 	char title[256];
 	::vsnprintf(title, sizeof(title), format, args);
-	
+
 	// Set process title
 	::setproctitle("%s", title);
-	
+
 #endif // HAVE_SETPROCTITLE
 }
 
@@ -997,7 +1004,7 @@ box_time_t Daemon::GetConfigFileModifiedTime() const
 			GetConfigFileName());
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
-	
+
 	return FileModificationTime(st);
 }
 
@@ -1006,7 +1013,7 @@ box_time_t Daemon::GetConfigFileModifiedTime() const
 // Function
 //		Name:    Daemon::GetLoadedConfigModifiedTime()
 //		Purpose: Returns the timestamp when the configuration file
-//			 had been last modified, at the time when it was 
+//			 had been last modified, at the time when it was
 //			 loaded
 //
 //		Created: 2006/01/29
