@@ -115,15 +115,19 @@ COMPLETION_FUNCTION(None,)
 
 #ifdef HAVE_RL_FILENAME_COMPLETION_FUNCTION
 	#define RL_FILENAME_COMPLETION_FUNCTION rl_filename_completion_function
-#else
+	#define HAVE_A_FILENAME_COMPLETION_FUNCTION 1
+#elif defined HAVE_FILENAME_COMPLETION_FUNCTION
 	#define RL_FILENAME_COMPLETION_FUNCTION filename_completion_function
+	#define HAVE_A_FILENAME_COMPLETION_FUNCTION 1
 #endif
 
 COMPLETION_FUNCTION(Default,
+#ifdef HAVE_A_FILENAME_COMPLETION_FUNCTION
 	while (const char *match = RL_FILENAME_COMPLETION_FUNCTION(prefix.c_str(), 0))
 	{
 		completions.push_back(match);
 	}
+#endif // HAVE_A_FILENAME_COMPLETION_FUNCTION
 )
 
 COMPLETION_FUNCTION(Command,
