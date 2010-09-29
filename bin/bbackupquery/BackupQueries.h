@@ -40,31 +40,7 @@ typedef enum
 }
 CommandType;
 
-typedef enum
-{
-	Complete_End = 0,
-	Complete_RemoteDir,
-	Complete_RemoteFile,
-	Complete_LocalDir,
-	Complete_LocalFile,
-	Complete_LocationName,
-	Complete_RemoteIdInCurrentDir,
-}
-CompletionType;
-
-typedef struct
-{
-	const char* name;
-	const char* opts;
-	CommandType type;
-}
-QueryCommandSpecification;
-
-// Data about commands
-extern QueryCommandSpecification commands[];
-
-extern const char *alias[];
-extern const int aliasIs[];
+struct QueryCommandSpecification;
 
 // --------------------------------------------------------------------------
 //
@@ -86,17 +62,21 @@ private:
 public:
 	struct ParsedCommand
 	{
-		std::vector<std::string> cmdElements;
-		std::string options;
-		std::string completeCommand;
-		bool failed;
-		ParsedCommand() : failed(false) { }
+		std::vector<std::string> mCmdElements;
+		std::string mOptions;
+		std::string mCompleteCommand;
+		bool mInOptions, mFailed;
+		QueryCommandSpecification* pSpec;
+		// mArgCount is the same as mCmdElements.size() for a complete
+		// command, but if the command line ends in a space,
+		// e.g. during readline parsing, it can be one greater,
+		// to indicate that we should complete the next item instead.
+		size_t mArgCount;
+		ParsedCommand(const std::string& Command,
+			bool isFromCommandLine);
 	};
 
-	ParsedCommand ParseCommand(const std::string& Command,
-		bool isFromCommandLine);
 	void DoCommand(ParsedCommand& rCommand);
-	CompletionType* GetCompletionTypes(ParsedCommand& rCommand);
 
 	// Ready to stop?
 	bool Stop() {return mQuitNow;}
@@ -374,17 +354,19 @@ public:
 		} Type;
 	};
 
-private:
-
-	// Utility functions
+	// Were private, but needed by completion functions:
+	int64_t GetCurrentDirectoryID();
 	int64_t FindDirectoryObjectID(const std::string &rDirName,
 		bool AllowOldVersion = false, bool AllowDeletedDirs = false,
 		std::vector<std::pair<std::string, int64_t> > *pStack = 0);
+
+private:
+
+	// Utility functions
 	int64_t FindFileID(const std::string& rNameOrIdString,
 		const bool *opts, int64_t *pDirIdOut,
 		std::string* pFileNameOut, int16_t flagsInclude,
 		int16_t flagsExclude, int16_t* pFlagsOut);
-	int64_t GetCurrentDirectoryID();
 	std::string GetCurrentDirectoryName();
 	void SetReturnCode(int code) {mReturnCode = code;}
 
@@ -398,6 +380,34 @@ private:
 	bool mWarnedAboutOwnerAttributes;
 	int mReturnCode;
 };
+
+typedef std::vector<std::string> (*CompletionHandler)
+	(BackupQueries::ParsedCommand& rCommand, const std::string& prefix,
+	BackupProtocolClient& rProtocol, const Configuration& rConfig,
+	BackupQueries& rQueries);
+
+std::vector<std::string> CompleteCommand(BackupQueries::ParsedCommand& rCommand,
+	const std::string& prefix, BackupProtocolClient& rProtocol,
+	const Configuration& rConfig, BackupQueries& rQueries);
+std::vector<std::string> CompleteOptions(BackupQueries::ParsedCommand& rCommand,
+	const std::string& prefix, BackupProtocolClient& rProtocol,
+	const Configuration& rConfig, BackupQueries& rQueries);
+
+#define MAX_COMPLETION_HANDLERS 4
+
+struct QueryCommandSpecification
+{
+	const char* name;
+	const char* opts;
+	CommandType type;
+	CompletionHandler complete[MAX_COMPLETION_HANDLERS];
+};
+
+// Data about commands
+extern QueryCommandSpecification commands[];
+
+extern const char *alias[];
+extern const int aliasIs[];
 
 #endif // BACKUPQUERIES__H
 
