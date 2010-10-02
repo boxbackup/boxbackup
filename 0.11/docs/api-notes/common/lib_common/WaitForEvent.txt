@@ -1,0 +1,16 @@
+CLASS WaitForEvent
+
+This class implements a way to efficiently wait on one or more system objects, for example sockets and file descriptors. Where kqueue() is available, this is used, otherwise poll(). The poll() implementation is less comprehensive and rather more limited.
+
+To add a compatible object, call Add(). To remove it, call Remove(). To wait for an object to become ready, call Wait(), which returns a pointer to the first ready object, or 0 for a timeout.
+
+The timeout is set either in the constructor, or using the SetTimout() method. It is specified in milliseconds.
+
+The kqueue based implementation will automatically remove objects when they are closed (actually, the OS does this), but the poll implementation requires that Remove() be called.
+
+The flags passed to Add() or Remove() are passed to the object, and are ignored by this class.
+
+For an object to be able to be added to the list, it should implement FillInKEvent() and FillInPoll() for kqueue and poll implementations respectively. Use the PLATFORM_KQUEUE_NOT_SUPPORTED define to test which is necessary for the platform.
+
+It does not have to be derived off any particular class, as it uses templates to be compatible with any class.
+

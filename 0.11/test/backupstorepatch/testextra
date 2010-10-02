@@ -1,0 +1,6 @@
+rm -rf testfiles
+mkdir testfiles
+mkdir testfiles/0_0
+mkdir testfiles/0_1
+mkdir testfiles/0_2
+cp ../../../test/backupstore/testfiles/*.* testfiles/

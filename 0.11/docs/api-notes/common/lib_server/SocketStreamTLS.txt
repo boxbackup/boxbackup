@@ -1,0 +1,11 @@
+CLASS SocketStreamTLS
+
+An implementation of IOStream which wraps a TLS (SSL) connection over a socket.
+
+The Open function takes a TLSContext reference which specifies the parameters for the connection.
+
+
+FUNCTION GetPeerCommonName()
+
+Returns the common name of the certificate presented by the remote end.
+

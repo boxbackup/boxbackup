@@ -1,0 +1,29 @@
+CLASS IOStreamGetLine
+
+This class provides a convenient way to read text from a file, line by line. It also can preprocess the line to remove leading and trailing whitespace and comments. Comments are started by the character # and run to the end of the line.
+
+Create an instance by passing a reference to a stream into the constructor.
+
+Note the class does internal buffering, so you can only detach it later if the stream supports seeking backwards.
+
+
+FUNCTION IOStreamGetLine::GetLine()
+
+Returns true if a line could be retreieved without a read timing out.
+
+
+FUNCTION IOStreamGetLine::IsEOF()
+
+Whether the end of the stream has been reached. Do not call GetLine if this is true.
+
+
+FUNCTION IOStreamGetLine::GetLineNumber()
+
+Returns the line number.
+
+
+FUNCTION IOStreamGetLine::DetachFile()
+
+Detaches the stream from the GetLine class. Will seek backwards to "replace" data it's buffered back in the stream.
+
+

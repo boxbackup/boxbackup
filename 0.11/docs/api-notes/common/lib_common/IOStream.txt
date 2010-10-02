@@ -1,0 +1,89 @@
+CLASS IOStream
+
+The base class for streams of data. See IOStream.h for specific details on functions, but the interface is described here.
+
+Most streams only implement one direction, but some both.
+
+
+SUBTITLE Reading
+
+
+FUNCTION IOStream::Read()
+
+Reads data from the stream. Returns 0 if there is no data available within the timeout requested.
+
+Unlike the UNIX API, a return of 0 does not mean that there is no more data to read. Use IOStream::StreamDataLeft() to find this out.
+
+
+FUNCTION IOStream::ReadFullBuffer()
+
+If you want to read a specific sized block of data from a stream, it is annoying ot use the Read function, because it might return less, so you have to loop.
+
+This implements that loop. Note that the timeout is the timeout for each individual read -- it might take a lot longer to complete.
+
+You must check the return value, which is whether or not it managed to get all that data.
+
+
+FUNCTION IOStream::BytesLeftToRead()
+
+How many bytes are left to read in the stream treated as a whole. May return IOStream::SizeOfStreamUnknown if it is something like a socket which doesn't know how much data is in the stream.
+
+
+FUNCTION IOStream::StreamDataLeft()
+
+Returns true if more data can be read. Or more specifically, if more data might be able to be read some time in the future.
+
+
+SUBTITLE Writing
+
+
+FUNCTION IOStream::Write()
+
+Write data to a stream. Writes the entire block, or exceptions.
+
+
+FUNCTION IOStream::WriteAllBuffered()
+
+Writes any buffered data to the underlying object.
+
+Call at the end of a series of writes to make sure the data is actually written. (Buffering is not yet implemented anywhere, but it should be soon.)
+
+
+FUNCTION IOStream::StreamClosed()
+
+Is the stream closed, and writing no longer possible?
+
+
+FUNCTION IOStream::CopyStreamTo()
+
+A utility function to copy the contents of one stream to another, until the reading stream has no data left.
+
+
+SUBTITLE Other interfaces
+
+These are slightly nasty interfaces, because they have to match the UNIX API to some extent.
+
+
+FUNCTION IOStream::Close()
+
+Close the stream -- intended to indicate that nothing more will be written.
+
+However, also closes reading in most cases. Stream dependent. Probably best just to delete the object and let it sort itself out.
+
+
+FUNCTION IOStream::Seek()
+
+Seeks within the stream -- mainly for using files within a stream interface, although some of the utility stream classes support it too.
+
+This is actually a bad interface, because it does not specify whether it applies to reading or writing. This matches the interface provided by files with a single file pointer, but does not map well onto other stream types.
+
+Should it be changed? Perhaps. But then it means that files would either have to have an inconsitent interface, or the class keep track of two separate file pointers. Which isn't nice.
+
+So use carefully, and remember whether you're using a file stream, a reading stream, or a writing stream.
+
+
+FUNCTION IOStream::GetPosition()
+
+Get the current file pointer. Subject to same problems as Seek with regard to semantics.
+
+

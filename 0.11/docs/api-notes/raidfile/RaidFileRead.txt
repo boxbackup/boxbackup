@@ -1,0 +1,14 @@
+CLASS RaidFileRead
+
+Read a raid file.
+
+IOStream interface, plus a few extras, including reading directories and checking that files exist.
+
+
+FUNCTION RaidFileRead::Open
+
+Open a given raid file -- returns a pointer to a new RaidFileRead object.
+
+Note that one of two types could be returned, depending on the representation of the file.
+
+
