@@ -462,7 +462,7 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 	{
 		DWORD NumBytesWrittenThisTime = 0;
 
-		bool Success = WriteFile( 
+		BOOL Success = WriteFile( 
 			mSocketHandle,    // pipe handle 
 			pByteBuffer + NumBytesWrittenTotal, // message 
 			NBytes      - NumBytesWrittenTotal, // message length 
@@ -553,7 +553,7 @@ void WinNamedPipeStream::Close()
 		mIsServer = false;
 	}
 
-	bool result = CloseHandle(mSocketHandle);
+	BOOL result = CloseHandle(mSocketHandle);
 
 	mSocketHandle = INVALID_HANDLE_VALUE;
 	mIsConnected = false;
