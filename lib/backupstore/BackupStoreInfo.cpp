@@ -560,11 +560,11 @@ int64_t BackupStoreInfo::AllocateObjectID()
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotInitialised)
 	}
+
+	mIsModified = true;
 	
 	// Return the next object ID
 	return ++mLastObjectIDUsed;
-	
-	mIsModified = true;
 }
 
 
