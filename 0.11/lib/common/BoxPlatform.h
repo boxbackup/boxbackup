@@ -159,11 +159,6 @@
 	#define INFTIM -1
 #endif
 
-// for Unix compatibility with Windows :-)
-#ifndef O_BINARY
-	#define O_BINARY 0
-#endif
-
 #ifdef WIN32
 	typedef u_int64_t InodeRefType;
 #else
