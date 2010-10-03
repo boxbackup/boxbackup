@@ -165,6 +165,7 @@ public:
 			: mrDir(rDir), i(rDir.mEntries.begin())
 		{
 		}
+		Iterator& operator =(const Iterator&);
 		
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
@@ -217,6 +218,7 @@ public:
 			: mrDir(rDir), i(rDir.mEntries.rbegin())
 		{
 		}
+		ReverseIterator &operator=(const ReverseIterator &rToCopy);
 		
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{

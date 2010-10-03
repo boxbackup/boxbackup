@@ -39,6 +39,7 @@ public:
 	
 private:
 	Protocol(const Protocol &rToCopy);
+	Protocol& operator=(const Protocol &rToCopy);
 
 public:
 	void Handshake();
