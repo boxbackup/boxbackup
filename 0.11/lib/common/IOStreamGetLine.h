@@ -39,6 +39,7 @@ public:
 	~IOStreamGetLine();
 private:
 	IOStreamGetLine(const IOStreamGetLine &rToCopy);
+	IOStreamGetLine& operator=(const IOStreamGetLine &rToCopy);
 
 public:
 	bool GetLine(std::string &rOutput, bool Preprocess = false, int Timeout = IOStream::TimeOutInfinite);

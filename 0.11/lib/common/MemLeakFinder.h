@@ -51,6 +51,9 @@ void memleakfinder_notaleak(void *ptr);
 void *operator new  (size_t size, const char *file, int line);
 void *operator new[](size_t size, const char *file, int line);
 
+void operator delete  (void *pMem, const char *file, int line) throw();
+void operator delete[](void *pMem, const char *file, int line) throw();
+
 // define the malloc functions now, if required
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
 	#define malloc(X)	memleakfinder_malloc(X, __FILE__, __LINE__)
