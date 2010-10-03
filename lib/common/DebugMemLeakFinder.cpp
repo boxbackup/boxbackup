@@ -518,12 +518,12 @@ void *operator new[](size_t size, const char *file, int line)
 // http://www.relisoft.com/book/tech/9new.html
 // disabled because it causes hangs on FC2 in futex() in test/common
 // while reading files. reason unknown.
-/*
+#ifdef _MSC_VER
 void *operator new(size_t size)
 {
 	return internal_new(size, "standard libraries", 0);
 }
-*/
+#endif
 
 void *operator new[](size_t size)
 {
@@ -547,6 +547,16 @@ void operator delete[](void *ptr) throw ()
 void operator delete(void *ptr) throw ()
 {
 	internal_delete(ptr);
+}
+
+void operator delete  (void *pMem, const char *file, int line) throw()
+{
+	internal_delete(pMem);
+}
+
+void operator delete[](void *pMem, const char *file, int line) throw()
+{
+	internal_delete(pMem);
 }
 
 #endif // BOX_RELEASE_BUILD
