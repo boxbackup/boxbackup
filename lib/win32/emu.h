@@ -74,17 +74,6 @@
 
 #define ITIMER_REAL 0
 
-#ifdef _MSC_VER
-// Microsoft decided to deprecate the standard POSIX functions. Great!
-#define open(file,flags,mode) _open(file,flags,mode)
-#define close(fd)             _close(fd)
-#define dup(fd)               _dup(fd)
-#define read(fd,buf,count)    _read(fd,buf,count)
-#define write(fd,buf,count)   _write(fd,buf,count)
-#define lseek(fd,off,whence)  _lseek(fd,off,whence)
-#define fileno(struct_file)   _fileno(struct_file)
-#endif
-
 struct passwd {
 	char *pw_name;
 	char *pw_passwd;
@@ -286,20 +275,24 @@ inline unsigned int sleep(unsigned int secs)
 }
 
 #define INFTIM -1
+#if(_WIN32_WINNT < 0x0600)
 #define POLLIN 0x1
 #define POLLERR 0x8
 #define POLLOUT 0x4
+#endif
 
 #define SHUT_RDWR SD_BOTH
 #define SHUT_RD SD_RECEIVE
 #define SHUT_WR SD_SEND
 
+#if(_WIN32_WINNT < 0x0600)
 struct pollfd
 {
 	SOCKET fd;
 	short int events;
 	short int revents;
 };
+#endif
 
 inline int ioctl(SOCKET sock, int flag,  int * something)
 {
@@ -408,17 +401,5 @@ std::string GetErrorMessage(DWORD errorCode);
 // console_read() is a replacement for _cgetws which requires a 
 // relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
-
-#ifdef _MSC_VER
-	/* disable certain compiler warnings to be able to actually see the show-stopper ones */
-	#pragma warning(disable:4101)		// unreferenced local variable
-	#pragma warning(disable:4244)		// conversion, possible loss of data
-	#pragma warning(disable:4267)		// conversion, possible loss of data
-	#pragma warning(disable:4311)		// pointer truncation
-	#pragma warning(disable:4700)		// uninitialized local variable used (hmmmmm...)
-	#pragma warning(disable:4805)		// unsafe mix of type and type 'bool' in operation
-	#pragma warning(disable:4800)		// forcing value to bool 'true' or 'false' (performance warning)
-	#pragma warning(disable:4996)		// POSIX name for this item is deprecated
-#endif // _MSC_VER
 
 #endif // !EMU_INCLUDE && WIN32
