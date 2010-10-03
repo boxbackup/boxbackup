@@ -1,8 +1,9 @@
 // Win32 service functions for Box Backup, by Nick Knight
 
+#include "Box.h"
+
 #ifdef WIN32
 
-#include "Box.h"
 #include "BackupDaemon.h"
 #include "MainHelper.h"
 #include "BoxPortsAndFiles.h"

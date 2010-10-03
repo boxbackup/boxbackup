@@ -10,9 +10,9 @@
 // Adapted for Box Backup by Nick Knight.
 //***************************************************************
 
-#ifdef WIN32
-
 #include "Box.h"
+
+#ifdef WIN32
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
