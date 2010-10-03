@@ -37,6 +37,7 @@ public:
 	~BackupQueries();
 private:
 	BackupQueries(const BackupQueries &);
+	BackupQueries& operator=(const BackupQueries& rToCopy);
 public:
 
 	void DoCommand(const char *Command, bool isFromCommandLine);
