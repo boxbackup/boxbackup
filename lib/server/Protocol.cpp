@@ -814,7 +814,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	else
 	{
 		// Scan the table to find the most that can be written
-		for(int s = ProtocolStreamHeader_MaxEncodedSizeValue; s > 0; --s)
+		for(uint8_t s = ProtocolStreamHeader_MaxEncodedSizeValue; s > 0; --s)
 		{
 			if(sProtocolStreamHeaderLengths[s] <= BytesInBlock)
 			{
