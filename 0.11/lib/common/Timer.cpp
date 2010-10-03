@@ -8,10 +8,6 @@
 //
 // --------------------------------------------------------------------------
 
-#ifdef WIN32
-	#define _WIN32_WINNT 0x0500
-#endif
-
 #include "Box.h"
 
 #include <signal.h>
