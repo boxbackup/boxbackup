@@ -54,6 +54,7 @@ public:
 	virtual ~BackupClientContext();
 private:
 	BackupClientContext(const BackupClientContext &);
+	BackupClientContext &operator=(const BackupClientContext &rToCopy);
 public:
 
 	BackupProtocolClient &GetConnection();
