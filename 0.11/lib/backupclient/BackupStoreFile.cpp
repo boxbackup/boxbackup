@@ -548,7 +548,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		for(int64_t e = 0; e < mNumBlocks; e++)
 		{
 			// Get the clear and encoded size
-			int32_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
+			int64_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
 			ASSERT(encodedSize > 0);
 			
 			// Larger?

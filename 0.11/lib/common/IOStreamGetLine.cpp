@@ -80,7 +80,7 @@ bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout
 		// Use any bytes left in the buffer
 		while(mBufferBegin < mBytesInBuffer)
 		{
-			int c = mBuffer[mBufferBegin++];
+			char c = mBuffer[mBufferBegin++];
 			if(c == '\r')
 			{
 				// Ignore nasty Windows line ending extra chars

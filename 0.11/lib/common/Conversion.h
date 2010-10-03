@@ -39,12 +39,12 @@ namespace BoxConvert
 	template<>
 	inline int16_t Convert<int16_t, const std::string &>(const std::string &rFrom)
 	{
-		return BoxConvert::_ConvertStringToInt(rFrom.c_str(), 16);
+		return (int16_t)BoxConvert::_ConvertStringToInt(rFrom.c_str(), 16);
 	}
 	template<>
 	inline int8_t Convert<int8_t, const std::string &>(const std::string &rFrom)
 	{
-		return BoxConvert::_ConvertStringToInt(rFrom.c_str(), 8);
+		return (int8_t)BoxConvert::_ConvertStringToInt(rFrom.c_str(), 8);
 	}
 	template<>
 	inline int32_t Convert<int32_t, const char *>(const char *pFrom)
@@ -54,12 +54,12 @@ namespace BoxConvert
 	template<>
 	inline int16_t Convert<int16_t, const char *>(const char *pFrom)
 	{
-		return BoxConvert::_ConvertStringToInt(pFrom, 16);
+		return (int16_t)BoxConvert::_ConvertStringToInt(pFrom, 16);
 	}
 	template<>
 	inline int8_t Convert<int8_t, const char *>(const char *pFrom)
 	{
-		return BoxConvert::_ConvertStringToInt(pFrom, 8);
+		return (int8_t)BoxConvert::_ConvertStringToInt(pFrom, 8);
 	}
 	
 	// Specialise for integer -> string

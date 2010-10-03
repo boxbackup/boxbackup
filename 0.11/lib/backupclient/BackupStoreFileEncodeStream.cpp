@@ -151,7 +151,7 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename,
 		// Go through each instruction in the recipe and work out how many blocks
 		// it will add, and the max clear size of these blocks
 		int maxBlockClearSize = 0;
-		for(uint64_t inst = 0; inst < pRecipe->size(); ++inst)
+		for(Recipe::size_type inst = 0; inst < pRecipe->size(); ++inst)
 		{
 			if((*pRecipe)[inst].mSpaceBefore > 0)
 			{
