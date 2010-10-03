@@ -7,9 +7,9 @@
 //
 // --------------------------------------------------------------------------
 
-#ifndef BOX_RELEASE_BUILD
-
 #include "Box.h"
+
+#ifndef BOX_RELEASE_BUILD
 
 #include <stdio.h>
 
