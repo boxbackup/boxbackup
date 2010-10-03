@@ -190,6 +190,7 @@ inline int geteuid(void)
 //again need to verify these
 #define S_IFLNK 1
 #define S_IFSOCK 0
+#define S_IFIFO 0
 
 #define S_ISLNK(x) ( false )
 
