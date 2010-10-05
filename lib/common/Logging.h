@@ -37,6 +37,7 @@
 #define BOX_WARNING(stuff) BOX_LOG(Log::WARNING, stuff)
 #define BOX_NOTICE(stuff)  BOX_LOG(Log::NOTICE,  stuff)
 #define BOX_INFO(stuff)    BOX_LOG(Log::INFO,    stuff)
+#define BOX_STATS(stuff)   BOX_LOG(Log::STATS,   stuff)
 #define BOX_TRACE(stuff)   \
 	if (Logging::IsEnabled(Log::TRACE)) \
 	{ BOX_LOG(Log::TRACE, stuff) }
@@ -109,7 +110,7 @@ inline std::string GetNativeErrorMessage()
 
 namespace Log
 {
-	enum Level 
+	enum Level
 	{
 		NOTHING = 1,
 		FATAL,
@@ -117,7 +118,8 @@ namespace Log
 		WARNING,
 		NOTICE,
 		INFO,
-		TRACE, 
+		STATS,
+		TRACE,
 		EVERYTHING,
 		INVALID = -1
 	};
@@ -136,15 +138,15 @@ class Logger
 {
 	private:
 	Log::Level mCurrentLevel;
-	
+
 	public:
 	Logger();
 	Logger(Log::Level level);
 	virtual ~Logger();
-	
-	virtual bool Log(Log::Level level, const std::string& rFile, 
+
+	virtual bool Log(Log::Level level, const std::string& rFile,
 		int line, std::string& rMessage) = 0;
-	
+
 	void Filter(Log::Level level)
 	{
 		mCurrentLevel = level;
@@ -152,7 +154,7 @@ class Logger
 
 	virtual const char* GetType() = 0;
 	Log::Level GetLevel() { return mCurrentLevel; }
-	
+
 	virtual void SetProgramName(const std::string& rProgramName) = 0;
 };
 
@@ -175,7 +177,7 @@ class Console : public Logger
 	static std::string sTag;
 
 	public:
-	virtual bool Log(Log::Level level, const std::string& rFile, 
+	virtual bool Log(Log::Level level, const std::string& rFile,
 		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Console"; }
 	virtual void SetProgramName(const std::string& rProgramName);
@@ -204,8 +206,8 @@ class Syslog : public Logger
 	public:
 	Syslog();
 	virtual ~Syslog();
-	
-	virtual bool Log(Log::Level level, const std::string& rFile, 
+
+	virtual bool Log(Log::Level level, const std::string& rFile,
 		int line, std::string& rMessage);
 	virtual const char* GetType() { return "Syslog"; }
 	virtual void SetProgramName(const std::string& rProgramName);
@@ -235,7 +237,7 @@ class Logging
 	static Log::Level sGlobalLevel;
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
-	
+
 	public:
 	Logging ();
 	~Logging();
@@ -245,9 +247,9 @@ class Logging
 	static void FilterConsole (Log::Level level);
 	static void Add    (Logger* pNewLogger);
 	static void Remove (Logger* pOldLogger);
-	static void Log(Log::Level level, const std::string& rFile, 
+	static void Log(Log::Level level, const std::string& rFile,
 		int line, const std::string& rMessage);
-	static void LogToSyslog(Log::Level level, const std::string& rFile, 
+	static void LogToSyslog(Log::Level level, const std::string& rFile,
 		int line, const std::string& rMessage);
 	static void SetContext(std::string context);
 	static void ClearContext();
@@ -303,16 +305,16 @@ class FileLogger : public Logger
 	FileStream mLogFile;
 	FileLogger(const FileLogger& forbidden)
 	: mLogFile("") { /* do not call */ }
-	
+
 	public:
 	FileLogger(const std::string& rFileName, Log::Level Level)
 	: Logger(Level),
 	  mLogFile(rFileName, O_WRONLY | O_CREAT | O_APPEND)
 	{ }
-	
-	virtual bool Log(Log::Level Level, const std::string& rFile, 
+
+	virtual bool Log(Log::Level Level, const std::string& rFile,
 		int Line, std::string& rMessage);
-	
+
 	virtual const char* GetType() { return "FileLogger"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };

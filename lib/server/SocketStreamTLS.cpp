@@ -72,7 +72,7 @@ SocketStreamTLS::~SocketStreamTLS()
 	{
 		// Attempt to close to avoid problems
 		Close();
-		
+
 		// And if that didn't work...
 		if(mpSSL)
 		{
@@ -81,7 +81,7 @@ SocketStreamTLS::~SocketStreamTLS()
 			mpBIO = 0;	// implicity freed by the SSL_free call
 		}
 	}
-	
+
 	// If we only got to creating that BIO.
 	if(mpBIO)
 	{
@@ -130,7 +130,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 
 	tOSSocketHandle socket = GetSocketHandle();
 	BIO_set_fd(mpBIO, socket, BIO_NOCLOSE);
-	
+
 	// Then the SSL object
 	mpSSL = ::SSL_new(rContext.GetRawContext());
 	if(mpSSL == 0)
@@ -153,7 +153,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
 	}
 #endif
-	
+
 	// FIXME: This is less portable than the above. However, it MAY be needed
 	// for cygwin, which has/had bugs with fcntl
 	//
@@ -198,7 +198,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeTimedOut)
 			}
 			break;
-			
+
 		default: // (and SSL_ERROR_ZERO_RETURN)
 			// Error occured
 			if(IsServer)
@@ -213,7 +213,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			}
 		}
 	}
-	
+
 	// And that's it
 }
 
@@ -235,7 +235,7 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 	case SSL_ERROR_WANT_READ:
 		p.events = POLLIN;
 		break;
-		
+
 	case SSL_ERROR_WANT_WRITE:
 		p.events = POLLOUT;
 		break;
@@ -303,7 +303,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 	{
 		return 0;
 	}
-	
+
 	while(true)
 	{
 		int r = ::SSL_read(mpSSL, pBuffer, NBytes);
@@ -314,6 +314,12 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 		case SSL_ERROR_NONE:
 			// No error, return number of bytes read
 			mBytesRead += r;
+			mBytesRead128k += r;
+			if(mBytesRead128k > 128*1024)
+			{
+				BOX_STATS("IN+" << mBytesRead128k);
+				mBytesRead128k = 0;
+			}
 			return r;
 			break;
 
@@ -333,7 +339,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 				return 0;
 			}
 			break;
-			
+
 		default:
 			SSLLib::LogError("reading");
 			THROW_EXCEPTION(ConnectionException, Conn_TLSReadFailed)
@@ -353,31 +359,37 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 {
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
-	
+
 	// Make sure zero byte writes work as expected
 	if(NBytes == 0)
 	{
 		return;
 	}
-	
+
 	// from man SSL_write
 	//
 	// SSL_write() will only return with success, when the
 	// complete contents of buf of length num has been written.
 	//
 	// So no worries about partial writes and moving the buffer around
-	
+
 	while(true)
 	{
 		// try the write
 		int r = ::SSL_write(mpSSL, pBuffer, NBytes);
-		
+
 		int se;
 		switch((se = ::SSL_get_error(mpSSL, r)))
 		{
 		case SSL_ERROR_NONE:
 			// No error, data sent, return success
 			mBytesWritten += r;
+			mBytesWritten128k += r;
+			if(mBytesWritten128k > 128*1024)
+			{
+				BOX_STATS("OUT+" << mBytesWritten128k);
+				mBytesWritten128k = 0;
+			}
 			return;
 			break;
 
@@ -392,13 +404,13 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 			// wait for the requried data
 			{
 			#ifndef BOX_RELEASE_BUILD
-				bool conditionmet = 
+				bool conditionmet =
 			#endif
 				WaitWhenRetryRequired(se, IOStream::TimeOutInfinite);
 				ASSERT(conditionmet);
 			}
 			break;
-		
+
 		default:
 			SSLLib::LogError("writing");
 			THROW_EXCEPTION(ConnectionException, Conn_TLSWriteFailed)
@@ -469,14 +481,14 @@ std::string SocketStreamTLS::GetPeerCommonName()
 		THROW_EXCEPTION(ConnectionException, Conn_TLSNoPeerCertificate)
 	}
 
-	// Subject details	
-	X509_NAME *subject = ::X509_get_subject_name(cert); 
+	// Subject details
+	X509_NAME *subject = ::X509_get_subject_name(cert);
 	if(subject == 0)
 	{
 		::X509_free(cert);
 		THROW_EXCEPTION(ConnectionException, Conn_TLSPeerCertificateInvalid)
 	}
-	
+
 	// Common name
 	char commonName[256];
 	if(::X509_NAME_get_text_by_NID(subject, NID_commonName, commonName, sizeof(commonName)) <= 0)
@@ -486,7 +498,7 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	}
 	// Terminate just in case
 	commonName[sizeof(commonName)-1] = '\0';
-	
+
 	// Done.
 	return std::string(commonName);
 }

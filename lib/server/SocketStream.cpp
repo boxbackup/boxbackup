@@ -45,7 +45,9 @@ SocketStream::SocketStream()
 	  mReadClosed(false),
 	  mWriteClosed(false),
 	  mBytesRead(0),
-	  mBytesWritten(0)
+	  mBytesRead128k(0),
+	  mBytesWritten(0),
+	  mBytesWritten128k(0)
 {
 }
 
@@ -62,7 +64,9 @@ SocketStream::SocketStream(int socket)
 	  mReadClosed(false),
 	  mWriteClosed(false),
 	  mBytesRead(0),
-	  mBytesWritten(0)
+	  mBytesRead128k(0),
+	  mBytesWritten(0),
+	  mBytesWritten128k(0)
 {
 	if(socket < 0)
 	{
@@ -83,7 +87,9 @@ SocketStream::SocketStream(const SocketStream &rToCopy)
 	  mReadClosed(rToCopy.mReadClosed),
 	  mWriteClosed(rToCopy.mWriteClosed),
 	  mBytesRead(rToCopy.mBytesRead),
-	  mBytesWritten(rToCopy.mBytesWritten)
+	  mBytesRead128k(rToCopy.mBytesRead128k),
+	  mBytesWritten(rToCopy.mBytesWritten),
+	  mBytesWritten128k(rToCopy.mBytesWritten128k)
 
 {
 	if(rToCopy.mSocketHandle < 0)
@@ -122,7 +128,7 @@ SocketStream::~SocketStream()
 // --------------------------------------------------------------------------
 void SocketStream::Attach(int socket)
 {
-	if(mSocketHandle != INVALID_SOCKET_VALUE) 
+	if(mSocketHandle != INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
@@ -145,11 +151,11 @@ void SocketStream::Attach(int socket)
 // --------------------------------------------------------------------------
 void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 {
-	if(mSocketHandle != INVALID_SOCKET_VALUE) 
+	if(mSocketHandle != INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
-	
+
 	// Setup parameters based on type, looking up names if required
 	int sockDomain = 0;
 	SocketAllAddr addr;
@@ -164,7 +170,7 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 		BOX_LOG_SYS_ERROR("Failed to create a network socket");
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
-	
+
 	// Connect it
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
@@ -172,7 +178,7 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 #ifdef WIN32
 		DWORD err = WSAGetLastError();
 		::closesocket(mSocketHandle);
-		BOX_LOG_WIN_ERROR_NUMBER("Failed to connect to socket " 
+		BOX_LOG_WIN_ERROR_NUMBER("Failed to connect to socket "
 			"(type " << Type << ", name " << rName <<
 			", port " << Port << ")", err);
 #else // !WIN32
@@ -202,7 +208,7 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 // --------------------------------------------------------------------------
 int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -230,12 +236,12 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 					SocketPollError)
 			}
 			break;
-			
+
 		case 0:
 			// no data
 			return 0;
 			break;
-			
+
 		default:
 			// good to go!
 			break;
@@ -268,8 +274,14 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 	{
 		mReadClosed = true;
 	}
-	
+
 	mBytesRead += r;
+	mBytesRead128k += r;
+	if(mBytesRead128k > 128*1024)
+	{
+		BOX_STATS("IN+" << mBytesRead128k);
+		mBytesRead128k = 0;
+	}
 	return r;
 }
 
@@ -283,18 +295,18 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStream::Write(const void *pBuffer, int NBytes)
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
-	
+
 	// Buffer in byte sized type.
 	ASSERT(sizeof(char) == 1);
 	const char *buffer = (char *)pBuffer;
-	
+
 	// Bytes left to send
 	int bytesLeft = NBytes;
-	
+
 	while(bytesLeft > 0)
 	{
 		// Try to send.
@@ -311,27 +323,33 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 			THROW_EXCEPTION(ConnectionException,
 				Conn_SocketWriteError);
 		}
-		
+
 		// Knock off bytes sent
 		bytesLeft -= sent;
 		// Move buffer pointer
 		buffer += sent;
 
 		mBytesWritten += sent;
-		
+		mBytesWritten128k += sent;
+		if(mBytesWritten128k > 128*1024)
+		{
+			BOX_STATS("OUT+" << mBytesWritten128k);
+			mBytesWritten128k = 0;
+		}
+
 		// Need to wait until it can send again?
 		if(bytesLeft > 0)
 		{
-			BOX_TRACE("Waiting to send data on socket " << 
+			BOX_TRACE("Waiting to send data on socket " <<
 				mSocketHandle << " (" << bytesLeft <<
 				" of " << NBytes << " bytes left)");
-			
+
 			// Wait for data to send.
 			struct pollfd p;
 			p.fd = mSocketHandle;
 			p.events = POLLOUT;
 			p.revents = 0;
-			
+
 			if(::poll(&p, 1, 16000 /* 16 seconds */) == -1)
 			{
 				// Don't exception if it's just a signal
@@ -357,7 +375,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 // --------------------------------------------------------------------------
 void SocketStream::Close()
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -372,6 +390,8 @@ void SocketStream::Close()
 		// already closed or closing.
 	}
 	mSocketHandle = INVALID_SOCKET_VALUE;
+
+	BOX_STATS("IN+" << mBytesRead128k << " OUT+" << mBytesWritten128k);
 }
 
 // --------------------------------------------------------------------------
@@ -384,18 +404,18 @@ void SocketStream::Close()
 // --------------------------------------------------------------------------
 void SocketStream::Shutdown(bool Read, bool Write)
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
-	
+
 	// Do anything?
 	if(!Read && !Write) return;
-	
+
 	int how = SHUT_RDWR;
 	if(Read && !Write) how = SHUT_RD;
 	if(!Read && Write) how = SHUT_WR;
-	
+
 	// Shut it down!
 	if(::shutdown(mSocketHandle, how) == -1)
 	{
@@ -443,7 +463,7 @@ bool SocketStream::StreamClosed()
 // --------------------------------------------------------------------------
 tOSSocketHandle SocketStream::GetSocketHandle()
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}

@@ -36,7 +36,7 @@ public:
 	SocketStream(int socket);
 	SocketStream(const SocketStream &rToCopy);
 	~SocketStream();
-	
+
 	void Open(Socket::Type Type, const std::string& rName, int Port = 0);
 	void Attach(int socket);
 
@@ -62,12 +62,14 @@ private:
 
 protected:
 	off_t mBytesRead;
+	off_t mBytesRead128k;
 	off_t mBytesWritten;
+	off_t mBytesWritten128k;
 
 public:
 	off_t GetBytesRead() const {return mBytesRead;}
 	off_t GetBytesWritten() const {return mBytesWritten;}
-	void ResetCounters() {mBytesRead = mBytesWritten = 0;}
+	void ResetCounters() {mBytesRead = mBytesRead128k = mBytesWritten = mBytesWritten128k = 0;}
 	bool IsOpened() { return mSocketHandle != INVALID_SOCKET_VALUE; }
 };
 

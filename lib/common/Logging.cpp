@@ -69,12 +69,12 @@ void Logging::ToSyslog(bool enabled)
 	{
 		Add(spSyslog);
 	}
-	
+
 	if (sLogToSyslog && !enabled)
 	{
 		Remove(spSyslog);
 	}
-	
+
 	sLogToSyslog = enabled;
 }
 
@@ -84,12 +84,12 @@ void Logging::ToConsole(bool enabled)
 	{
 		Add(spConsole);
 	}
-	
+
 	if (sLogToConsole && !enabled)
 	{
 		Remove(spConsole);
 	}
-	
+
 	sLogToConsole = enabled;
 }
 
@@ -113,7 +113,7 @@ void Logging::Add(Logger* pNewLogger)
 			return;
 		}
 	}
-	
+
 	sLoggers.insert(sLoggers.begin(), pNewLogger);
 }
 
@@ -130,7 +130,7 @@ void Logging::Remove(Logger* pOldLogger)
 	}
 }
 
-void Logging::Log(Log::Level level, const std::string& rFile, 
+void Logging::Log(Log::Level level, const std::string& rFile,
 	int line, const std::string& rMessage)
 {
 	if (level > sGlobalLevel)
@@ -139,14 +139,14 @@ void Logging::Log(Log::Level level, const std::string& rFile,
 	}
 
 	std::string newMessage;
-	
+
 	if (sContextSet)
 	{
 		newMessage += "[" + sContext + "] ";
 	}
-	
+
 	newMessage += rMessage;
-	
+
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
 	{
@@ -158,7 +158,7 @@ void Logging::Log(Log::Level level, const std::string& rFile,
 	}
 }
 
-void Logging::LogToSyslog(Log::Level level, const std::string& rFile, 
+void Logging::LogToSyslog(Log::Level level, const std::string& rFile,
 	int line, const std::string& rMessage)
 {
 	if (!sLogToSyslog)
@@ -172,12 +172,12 @@ void Logging::LogToSyslog(Log::Level level, const std::string& rFile,
 	}
 
 	std::string newMessage;
-	
+
 	if (sContextSet)
 	{
 		newMessage += "[" + sContext + "] ";
 	}
-	
+
 	newMessage += rMessage;
 
 	spSyslog->Log(level, rFile, line, newMessage);
@@ -227,19 +227,19 @@ void Logging::SetFacility(int facility)
 	spSyslog->SetFacility(facility);
 }
 
-Logger::Logger() 
-: mCurrentLevel(Log::EVERYTHING) 
+Logger::Logger()
+: mCurrentLevel(Log::EVERYTHING)
 {
 	Logging::Add(this);
 }
 
-Logger::Logger(Log::Level Level) 
-: mCurrentLevel(Level) 
+Logger::Logger(Log::Level Level)
+: mCurrentLevel(Level)
 {
 	Logging::Add(this);
 }
 
-Logger::~Logger() 
+Logger::~Logger()
 {
 	Logging::Remove(this);
 }
@@ -275,16 +275,16 @@ void Console::SetShowPID(bool enabled)
 	sShowPID = enabled;
 }
 
-bool Console::Log(Log::Level level, const std::string& rFile, 
+bool Console::Log(Log::Level level, const std::string& rFile,
 	int line, std::string& rMessage)
 {
 	if (level > GetLevel())
 	{
 		return true;
 	}
-	
+
 	FILE* target = stdout;
-	
+
 	if (level <= Log::WARNING)
 	{
 		target = stderr;
@@ -334,6 +334,10 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	{
 		buf << "INFO:    ";
 	}
+	else if (level <= Log::STATS)
+	{
+		buf << "STATS:   ";
+	}
 	else if (level <= Log::TRACE)
 	{
 		buf << "TRACE:   ";
@@ -348,20 +352,20 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	#else
 		fprintf(target, "%s\n", buf.str().c_str());
 	#endif
-	
+
 	return true;
 }
 
-bool Syslog::Log(Log::Level level, const std::string& rFile, 
+bool Syslog::Log(Log::Level level, const std::string& rFile,
 	int line, std::string& rMessage)
 {
 	if (level > GetLevel())
 	{
 		return true;
 	}
-	
+
 	int syslogLevel = LOG_ERR;
-	
+
 	switch(level)
 	{
 		case Log::NOTHING:    /* fall through */
@@ -397,7 +401,7 @@ bool Syslog::Log(Log::Level level, const std::string& rFile,
 	msg += rMessage;
 
 	syslog(syslogLevel, "%s", msg.c_str());
-	
+
 	return true;
 }
 
@@ -443,14 +447,14 @@ int Syslog::GetNamedFacility(const std::string& rFacility)
 	return LOG_LOCAL6;
 }
 
-bool FileLogger::Log(Log::Level Level, const std::string& rFile, 
+bool FileLogger::Log(Log::Level Level, const std::string& rFile,
 	int line, std::string& rMessage)
 {
 	if (Level > GetLevel())
 	{
 		return true;
 	}
-	
+
 	/* avoid infinite loop if this throws an exception */
 	Logging::Remove(this);
 
