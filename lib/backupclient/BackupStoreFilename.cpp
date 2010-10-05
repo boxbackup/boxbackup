@@ -63,12 +63,14 @@ BackupStoreFilename::~BackupStoreFilename()
 // --------------------------------------------------------------------------
 bool BackupStoreFilename::CheckValid(bool ExceptionIfInvalid) const
 {
-	bool ok = true;
-	
 	if(mEncryptedName.size() < 2)
 	{
 		// Isn't long enough to have a header
-		ok = false;
+		if(ExceptionIfInvalid)
+		{
+			THROW_EXCEPTION(BackupStoreException, InvalidBackupStoreFilename)
+		}
+		return false;
 	}
 	else
 	{
@@ -76,24 +78,26 @@ bool BackupStoreFilename::CheckValid(bool ExceptionIfInvalid) const
 		unsigned int dsize = BACKUPSTOREFILENAME_GET_SIZE(this->mEncryptedName);
 		if(dsize != mEncryptedName.size())
 		{
-			ok = false;
+			if(ExceptionIfInvalid)
+			{
+				THROW_EXCEPTION(BackupStoreException, InvalidBackupStoreFilename)
+			}
+			return false;
 		}
-		
+
 		// And encoding is an accepted value
 		unsigned int encoding = BACKUPSTOREFILENAME_GET_ENCODING(this->mEncryptedName);
 		if(encoding < Encoding_Min || encoding > Encoding_Max)
 		{
-			ok = false;
+			if(ExceptionIfInvalid)
+			{
+				THROW_EXCEPTION(BackupStoreException, InvalidBackupStoreFilename)
+			}
+			return false;
 		}
 	}
-	
-	// Exception?
-	if(!ok && ExceptionIfInvalid)
-	{
-		THROW_EXCEPTION(BackupStoreException, InvalidBackupStoreFilename)
-	}
 
-	return ok;
+	return true;
 }
 
 
@@ -110,21 +114,21 @@ void BackupStoreFilename::ReadFromProtocol(Protocol &rProtocol)
 	// Read the header
 	char hdr[2];
 	rProtocol.Read(hdr, 2);
-	
+
 	// How big is it?
 	int dsize = BACKUPSTOREFILENAME_GET_SIZE(hdr);
-	
+
 	// Fetch rest of data, relying on the Protocol to error on stupidly large sizes for us
 	std::string data;
 	rProtocol.Read(data, dsize - 2);
-	
+
 	// assign to this string, storing the header and the extra data
 	mEncryptedName.assign(hdr, 2);
 	mEncryptedName.append(data.c_str(), data.size());
-	
+
 	// Check it
 	CheckValid();
-	
+
 	// Alert derived classes
 	EncodedFilenameChanged();
 }
@@ -140,7 +144,7 @@ void BackupStoreFilename::ReadFromProtocol(Protocol &rProtocol)
 void BackupStoreFilename::WriteToProtocol(Protocol &rProtocol) const
 {
 	CheckValid();
-	
+
 	rProtocol.Write(mEncryptedName.c_str(), mEncryptedName.size());
 }
 
@@ -160,10 +164,10 @@ void BackupStoreFilename::ReadFromStream(IOStream &rStream, int Timeout)
 	{
 		THROW_EXCEPTION(BackupStoreException, CouldntReadEntireStructureFromStream)
 	}
-	
+
 	// How big is it?
 	unsigned int dsize = BACKUPSTOREFILENAME_GET_SIZE(hdr);
-	
+
 	// Assume most filenames are small
 	char buf[256];
 	if(dsize < sizeof(buf))
@@ -196,10 +200,10 @@ void BackupStoreFilename::ReadFromStream(IOStream &rStream, int Timeout)
 		// assign to this string, storing the header and the extra data
 		mEncryptedName.assign(data, dsize);
 	}
-	
+
 	// Check it
 	CheckValid();
-	
+
 	// Alert derived classes
 	EncodedFilenameChanged();
 }
@@ -215,7 +219,7 @@ void BackupStoreFilename::ReadFromStream(IOStream &rStream, int Timeout)
 void BackupStoreFilename::WriteToStream(IOStream &rStream) const
 {
 	CheckValid();
-	
+
 	rStream.Write(mEncryptedName.c_str(), mEncryptedName.size());
 }
 
@@ -268,10 +272,10 @@ void BackupStoreFilename::SetAsClearFilename(const char *Clear)
 	std::string encoded(hdr, 2);
 	encoded += toEncode;
 	ASSERT(encoded.size() == toEncode.size() + 2);
-	
+
 	// Store the encoded string
 	mEncryptedName.assign(encoded);
-	
+
 	// Stuff which must be done
 	EncodedFilenameChanged();
 	CheckValid(false);
