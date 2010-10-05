@@ -129,7 +129,7 @@ public:
 	void WriteToStream(IOStream &rStream,
 			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
 			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
-			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
+			bool StreamAttributes = true, bool StreamDependencyInfo = true, bool AppendLastEntryOnly = false) const;
 	void UpdateToStream(IOStream &rStream,
 			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
 			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,

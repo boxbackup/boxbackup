@@ -202,12 +202,14 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo) const
+void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo, bool AppendLastEntryOnly) const
 {
 	// Get count of entries
 	int32_t count = mEntries.size();
 	if(FlagsMustBeSet != Entry::Flags_INCLUDE_EVERYTHING || FlagsNotToBeSet != Entry::Flags_EXCLUDE_NOTHING)
 	{
+		AppendLastEntryOnly = false;
+
 		// Need to count the entries
 		count = 0;
 		Iterator i(*this);
@@ -221,6 +223,9 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	ASSERT(mObjectID != 0);
 	ASSERT(mContainerID != 0);
 
+	// Can't append to old-style directory
+	AppendLastEntryOnly &= !HasDependencyInfo();
+
 	// Need dependency info?
 	bool dependencyInfoRequired = false;
 	if(StreamDependencyInfo)
@@ -232,9 +237,13 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 			if(pen->HasDependencies())
 			{
 				dependencyInfoRequired = true;
+				break;
 			}
 		}
 	}
+
+	// Can only append if dependencies aren't changing
+	AppendLastEntryOnly &= ( StreamDependencyInfo && HasDependencyInfoInline() == dependencyInfoRequired ) || ( !StreamDependencyInfo && !HasDependencyInfoInline() );
 
 	// Options
 	int32_t options = 0;
@@ -253,16 +262,33 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 		StreamableMemBlock::WriteEmptyBlockToStream(rStream);
 	}
 
-	// Then write all the entries
-	Iterator i(*this);
-	Entry *pen = 0;
-	while((pen = i.Next(FlagsMustBeSet, FlagsNotToBeSet)) != 0)
+	if(AppendLastEntryOnly)
 	{
+		Entry *pen = mEntries.back();
+		// Avoid flushing the stream if we don't need to
+		if(count > 1)
+		{
+			rStream.Seek(0, IOStream::SeekType_End);
+		}
 		pen->WriteToStream(rStream);
-
 		if(dependencyInfoRequired)
 		{
 			pen->WriteToStreamDependencyInfo(rStream);
+		}
+	}
+	else
+	{
+		// Then write all the entries
+		Iterator i(*this);
+		Entry *pen = 0;
+		while((pen = i.Next(FlagsMustBeSet, FlagsNotToBeSet)) != 0)
+		{
+			pen->WriteToStream(rStream);
+
+			if(dependencyInfoRequired)
+			{
+				pen->WriteToStreamDependencyInfo(rStream);
+			}
 		}
 	}
 }
@@ -277,49 +303,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::UpdateToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo) const
 {
-	// Check that sensible IDs have been set
-	ASSERT(mObjectID != 0);
-	ASSERT(mContainerID != 0);
-
-	ASSERT(mEntries.size() > 0);
-
-	Entry *pen = mEntries.back();
-	ASSERT(pen != 0);
-
-	if( FlagsMustBeSet == Entry::Flags_INCLUDE_EVERYTHING
-		&& FlagsNotToBeSet == Entry::Flags_EXCLUDE_NOTHING
-		&& !HasDependencyInfo()
-		&& ( StreamDependencyInfo == HasDependencyInfoInline() || ( StreamDependencyInfo && !pen->HasDependencies() ) ) )
-	{
-		BOX_TRACE("Appending to directory");
-
-		WriteHeaderToStream(rStream, mEntries.size(), mOptions);
-
-		// Write the attributes?
-		if(StreamAttributes)
-		{
-			mAttributes.WriteToStream(rStream);
-		}
-		else
-		{
-			// Write a blank header instead
-			StreamableMemBlock::WriteEmptyBlockToStream(rStream);
-		}
-
-		if(mEntries.size() > 1)
-		{
-			rStream.Seek(0, IOStream::SeekType_End);
-		}
-		pen->WriteToStream(rStream);
-		if(HasDependencyInfoInline())
-		{
-			pen->WriteToStreamDependencyInfo(rStream);
-		}
-	}
-	else
-	{
-		WriteToStream(rStream, FlagsMustBeSet, FlagsNotToBeSet, StreamAttributes, StreamDependencyInfo);
-	}
+	WriteToStream(rStream, FlagsMustBeSet, FlagsNotToBeSet, StreamAttributes, StreamDependencyInfo, true);
 }
 
 // --------------------------------------------------------------------------
