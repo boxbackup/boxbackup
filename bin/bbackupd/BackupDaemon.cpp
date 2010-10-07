@@ -1731,7 +1731,14 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	}
 	
 	// Any entries in the root directory which need deleting?
-	if(dir.GetNumberOfEntries() > 0)
+	if(dir.GetNumberOfEntries() > 0 &&
+		mDeleteRedundantLocationsAfter == 0)
+	{
+		BOX_NOTICE(dir.GetNumberOfEntries() << " redundant locations "
+			"in root directory found, but will not delete because "
+			"DeleteRedundantLocationsAfter = 0");
+	}
+	else if(dir.GetNumberOfEntries() > 0)
 	{
 		box_time_t now = GetCurrentBoxTime();
 
