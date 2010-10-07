@@ -455,9 +455,9 @@ QueryCommandSpecification commands[] =
 		{CompleteRestoreRemoteDirOrId, CompleteLocalDir} },
 	{ "help",	"",		Command_Help,	{} },
 	{ "usage",	"m",		Command_Usage,	{} },
-	{ "undelete",	"",		Command_Undelete,
+	{ "undelete",	"i",		Command_Undelete,
 		{CompleteGetFileOrId} },
-	{ "delete",	"",		Command_Delete,	{CompleteGetFileOrId} },
+	{ "delete",	"i",		Command_Delete,	{CompleteGetFileOrId} },
 	{ NULL, 	NULL,		Command_Unknown, {} } 
 };
 
@@ -1418,8 +1418,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 //			 object ID, depending on opts['i'], where name can
 //			 include a path) and return the file ID, placing the
 //			 directory ID in *pDirIdOut and the filename part
-//			 of the path (if not looking up by ID and not NULL)
-//			 in *pFileNameOut.
+//			 of the path in *pFileNameOut (if not NULL).
 //		Created: 2008-09-12
 //
 // --------------------------------------------------------------------------
@@ -1448,11 +1447,6 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 					"' not found.");
 				return 0;
 			}
-		}
-
-		if(pFileNameOut)
-		{
-			*pFileNameOut = fileName;
 		}
 	}
 
@@ -1514,6 +1508,12 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 	if(pFlagsOut)
 	{
 		*pFlagsOut = en->GetFlags();
+	}
+
+	if(pFileNameOut)
+	{
+		BackupStoreFilenameClear entryName(en->GetName());
+		*pFileNameOut = entryName.GetClearFilename();
 	}
 
 	return fileId;
