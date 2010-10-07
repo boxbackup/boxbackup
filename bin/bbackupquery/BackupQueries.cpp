@@ -223,8 +223,8 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{ "restore", "drif" },
 		{ "help", "" },
 		{ "usage", "m" },
-		{ "undelete", "" },
-		{ "delete", "" },
+		{ "undelete", "i" },
+		{ "delete", "i" },
 		{ NULL, NULL } 
 	};
 
@@ -1008,8 +1008,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 //			 object ID, depending on opts['i'], where name can
 //			 include a path) and return the file ID, placing the
 //			 directory ID in *pDirIdOut and the filename part
-//			 of the path (if not looking up by ID and not NULL)
-//			 in *pFileNameOut.
+//			 of the path in *pFileNameOut (if not NULL).
 //		Created: 2008-09-12
 //
 // --------------------------------------------------------------------------
@@ -1038,11 +1037,6 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 					"' not found.");
 				return 0;
 			}
-		}
-
-		if(pFileNameOut)
-		{
-			*pFileNameOut = fileName;
 		}
 	}
 
@@ -1104,6 +1098,12 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 	if(pFlagsOut)
 	{
 		*pFlagsOut = en->GetFlags();
+	}
+
+	if(pFileNameOut)
+	{
+		BackupStoreFilenameClear entryName(en->GetName());
+		*pFileNameOut = entryName.GetClearFilename();
 	}
 
 	return fileId;
