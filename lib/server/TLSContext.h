@@ -12,6 +12,8 @@
 
 #ifndef TLS_CLASS_IMPLEMENTATION_CPP
 	class SSL_CTX;
+	class EVP_PKEY;
+	class X509;
 #endif
 
 // --------------------------------------------------------------------------
@@ -35,6 +37,13 @@ public:
 
 private:
 	SSL_CTX *mpContext;
+
+#ifdef WIN32
+private:
+	EVP_PKEY *GetPrivateKey();
+	X509 *GetCertificate();
+	X509 *GetTrustedCertificate();
+#endif
 };
 
 #endif // TLSCONTEXT__H
