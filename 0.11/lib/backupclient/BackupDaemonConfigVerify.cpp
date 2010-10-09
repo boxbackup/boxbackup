@@ -107,19 +107,20 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("KeepAliveTime", ConfigTest_IsInt),
  	ConfigurationVerifyKey("StoreObjectInfoFile", 0),
 	// optional
-
-	ConfigurationVerifyKey("NotifyScript", 0),
-	// optional script to run when backup needs attention, eg store full
 	
 	ConfigurationVerifyKey("NotifyAlways", ConfigTest_IsBool, false),
 	// option to disable the suppression of duplicate notifications
 
+#ifndef WIN32
 	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("KeysFile", ConfigTest_Exists),
-	ConfigurationVerifyKey("DataDirectory", 
-		ConfigTest_Exists | ConfigTest_LastEntry),
+	ConfigurationVerifyKey("DataDirectory", ConfigTest_Exists),
+#endif
+
+	ConfigurationVerifyKey("NotifyScript", ConfigTest_LastEntry),
+	// optional script to run when backup needs attention, eg store full
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =

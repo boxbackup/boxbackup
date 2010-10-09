@@ -80,6 +80,8 @@
 #ifdef WIN32
 	#include "Win32ServiceFunctions.h"
 	#include "Win32BackupService.h"
+	#include "Shlobj.h"
+	#include "Shlwapi.h"
 
 	extern Win32BackupService* gpDaemonService;
 #endif
@@ -1904,9 +1906,31 @@ void BackupDaemon::DeleteCorruptBerkelyDbFiles()
 // --------------------------------------------------------------------------
 void BackupDaemon::MakeMapBaseName(unsigned int MountNumber, std::string &rNameOut) const
 {
+	std::string dir;
+
 	// Get the directory for the maps
+#ifdef WIN32
+	// we just ask the system where to put the files...
+	char path[MAX_PATH];
+
+	if (SUCCEEDED(SHGetFolderPath(NULL,CSIDL_LOCAL_APPDATA,NULL,0,path)))
+	{
+		PathAppend(path,"Box Backup");
+		if(FALSE == CreateDirectory(path, NULL)
+			&& ERROR_ALREADY_EXISTS != GetLastError())
+		{
+			THROW_EXCEPTION(CommonException, OSFileError);
+		}
+		dir.assign(path);
+	}
+	else
+	{
+		THROW_EXCEPTION(CommonException, Internal);
+	}
+#else
 	const Configuration &config(GetConfiguration());
-	std::string dir(config.GetKeyValue("DataDirectory"));
+	dir.assign(config.GetKeyValue("DataDirectory"));
+#endif
 
 	// Make a leafname
 	std::string leaf(mIDMapMounts[MountNumber]);
