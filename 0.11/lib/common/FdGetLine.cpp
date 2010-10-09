@@ -165,11 +165,25 @@ std::string FdGetLine::GetLine(bool Preprocess)
 	{
 		return r;
 	}
+	// Skip Windows INI style headers
+	// r might be empty so can't use r[0]
+	else if(r.c_str()[0] == '[')
+	{
+		r.clear();
+		return r;
+	}
 	else
 	{
-		// Check for comment char, but char before must be whitespace
-		int end = 0;
+		// Remove whitespace
 		int size = r.size();
+		int begin = 0;
+		while(begin < size && iw(r[begin]))
+		{
+			begin++;
+		}
+		
+		// Check for comment char, but char before must be whitespace
+		int end = begin;
 		while(end < size)
 		{
 			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
@@ -179,17 +193,7 @@ std::string FdGetLine::GetLine(bool Preprocess)
 			end++;
 		}
 		
-		// Remove whitespace
-		int begin = 0;
-		while(begin < size && iw(r[begin]))
-		{
-			begin++;
-		}
-		if(!iw(r[end])) end--;
-		while(end > begin && iw(r[end]))
-		{
-			end--;
-		}
+		for(end--; end > begin && iw(r[end]); end--);
 		
 		// Return a sub string
 		return r.substr(begin, end - begin + 1);
