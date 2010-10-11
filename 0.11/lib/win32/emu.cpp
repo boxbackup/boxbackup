@@ -11,6 +11,8 @@
 #include <fcntl.h>
 #include <process.h>
 #include <windows.h>
+#include "Shlobj.h"
+#include "Shlwapi.h"
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
@@ -32,7 +34,7 @@ bool EnableBackupRights()
 	TOKEN_PRIVILEGES token_priv;
 
 	//open current process to adjust privileges
-	if(!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, 
+	if(!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES,
 		&hToken))
 	{
 		::syslog(LOG_ERR, "Failed to open process token: %s",
@@ -40,7 +42,7 @@ bool EnableBackupRights()
 		return false;
 	}
 
-	//let's build the token privilege struct - 
+	//let's build the token privilege struct -
 	//first, look up the LUID for the backup privilege
 
 	if (!LookupPrivilegeValue(
@@ -58,7 +60,7 @@ bool EnableBackupRights()
 	token_priv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
 	// now set the privilege
-	// because we're going exit right after dumping the streams, there isn't 
+	// because we're going exit right after dumping the streams, there isn't
 	// any need to save current state
 
 	if (!AdjustTokenPrivileges(
@@ -98,34 +100,25 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
 // --------------------------------------------------------------------------
 std::string GetDefaultConfigFilePath(const std::string& rName)
 {
-	WCHAR exePathWide[MAX_PATH];
-	GetModuleFileNameW(NULL, exePathWide, MAX_PATH-1);
+	// we just ask the system where to get the file...
+	char path[MAX_PATH];
 
-	char* exePathUtf8 = ConvertFromWideString(exePathWide, CP_UTF8);
-	if (exePathUtf8 == NULL)
+	if(FAILED(SHGetFolderPath(NULL,CSIDL_COMMON_APPDATA,NULL,0,path))
+		|| FALSE == PathAppend(path,"Box Backup")
+		|| FALSE == PathAppend(path,rName.c_str()))
 	{
 		return "";
 	}
 
-	std::string configfile = exePathUtf8;
-	delete [] exePathUtf8;
-	
-	// make the default config file name,
-	// based on the program path
-	configfile = configfile.substr(0,
-		configfile.rfind('\\'));
-	configfile += "\\";
-	configfile += rName;
-
-	return configfile;
+	return std::string(path);
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    ConvertToWideString
-//		Purpose: Converts a string from specified codepage to 
-//			 a wide string (WCHAR*). Returns a buffer which 
+//		Purpose: Converts a string from specified codepage to
+//			 a wide string (WCHAR*). Returns a buffer which
 //			 MUST be freed by the caller with delete[].
 //			 In case of fire, logs the error and returns NULL.
 //		Created: 4th February 2006
@@ -141,7 +134,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 		pString,  // string to map
 		-1,       // number of bytes in string - auto detect
 		NULL,     // wide-character buffer
-		0         // size of buffer - work out 
+		0         // size of buffer - work out
 		          //   how much space we need
 	);
 
@@ -150,7 +143,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 		winerrno = GetLastError();
 		if (logErrors)
 		{
-			::syslog(LOG_WARNING, 
+			::syslog(LOG_WARNING,
 				"Failed to convert string to wide string: "
 				"%s", GetErrorMessage(winerrno).c_str());
 		}
@@ -164,7 +157,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 	{
 		if (logErrors)
 		{
-			::syslog(LOG_WARNING, 
+			::syslog(LOG_WARNING,
 				"Failed to convert string to wide string: "
 				"out of memory");
 		}
@@ -188,7 +181,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 		winerrno = GetLastError();
 		if (logErrors)
 		{
-			::syslog(LOG_WARNING, 
+			::syslog(LOG_WARNING,
 				"Failed to convert string to wide string: "
 				"%s", GetErrorMessage(winerrno).c_str());
 		}
@@ -205,7 +198,7 @@ WCHAR* ConvertToWideString(const char* pString, unsigned int codepage,
 // Function
 //		Name:    ConvertUtf8ToWideString
 //		Purpose: Converts a string from UTF-8 to a wide string.
-//			 Returns a buffer which MUST be freed by the caller 
+//			 Returns a buffer which MUST be freed by the caller
 //			 with delete[].
 //			 In case of fire, logs the error and returns NULL.
 //		Created: 4th February 2006
@@ -221,7 +214,7 @@ WCHAR* ConvertUtf8ToWideString(const char* pString)
 // Function
 //		Name:    ConvertFromWideString
 //		Purpose: Converts a wide string to a narrow string in the
-//			 specified code page. Returns a buffer which MUST 
+//			 specified code page. Returns a buffer which MUST
 //			 be freed by the caller with delete[].
 //			 In case of fire, logs the error and returns NULL.
 //		Created: 4th February 2006
@@ -236,7 +229,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 		pString,  // string to map
 		-1,       // number of bytes in string - auto detect
 		NULL,     // output buffer
-		0,        // size of buffer - work out 
+		0,        // size of buffer - work out
 		          //   how much space we need
 		NULL,     // replace unknown chars with system default
 		NULL      // don't tell us when that happened
@@ -244,7 +237,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 
 	if (len == 0)
 	{
-		::syslog(LOG_WARNING, 
+		::syslog(LOG_WARNING,
 			"Failed to convert wide string to narrow: "
 			"error %d", GetLastError());
 		errno = EINVAL;
@@ -255,7 +248,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 
 	if (buffer == NULL)
 	{
-		::syslog(LOG_WARNING, 
+		::syslog(LOG_WARNING,
 			"Failed to convert wide string to narrow: "
 			"out of memory");
 		errno = ENOMEM;
@@ -276,7 +269,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 
 	if (len == 0)
 	{
-		::syslog(LOG_WARNING, 
+		::syslog(LOG_WARNING,
 			"Failed to convert wide string to narrow: "
 			"error %i", GetLastError());
 		errno = EACCES;
@@ -290,11 +283,11 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ConvertEncoding(const std::string&, int, 
+//		Name:    ConvertEncoding(const std::string&, int,
 //			 std::string&, int)
 //		Purpose: Converts a string from one code page to another.
-//			 On success, replaces contents of rDest and returns 
-//			 true. In case of fire, logs the error and returns 
+//			 On success, replaces contents of rDest and returns
+//			 true. In case of fire, logs the error and returns
 //			 false.
 //		Created: 15th October 2006
 //
@@ -374,16 +367,16 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 	}
 
 	std::string tmpStr("\\\\?\\");
-	
+
 	// Is the path relative or absolute?
 	// Absolute paths on Windows are always a drive letter
 	// followed by ':'
-		
+
 	char wd[PATH_MAX];
 	if (::getcwd(wd, PATH_MAX) == 0)
 	{
-		::syslog(LOG_WARNING, 
-			"Failed to open '%s': path too long", 
+		::syslog(LOG_WARNING,
+			"Failed to open '%s': path too long",
 			pFileName);
 		errno = ENAMETOOLONG;
 		winerrno = ERROR_INVALID_NAME;
@@ -407,7 +400,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 	}
 	else if (filename.length() >= 2 && filename[1] != ':')
 	{
-		// Must be relative. We need to get the 
+		// Must be relative. We need to get the
 		// current directory to make it absolute.
 		tmpStr += wd;
 		if (tmpStr[tmpStr.length()] != '\\')
@@ -415,7 +408,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 			tmpStr += '\\';
 		}
 	}
-	
+
 	tmpStr += filename;
 
 	// We are using direct filename access, which does not support ..,
@@ -430,7 +423,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 
 			if (lastSlash == std::string::npos)
 			{
-				// no previous directory, ignore it, 
+				// no previous directory, ignore it,
 				// CreateFile will fail with error 123
 			}
 			else
@@ -449,10 +442,10 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 std::string GetErrorMessage(DWORD errorCode)
 {
 	char* pMsgBuf = NULL;
-	
+
 	DWORD chars = FormatMessage
 	(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+		FORMAT_MESSAGE_ALLOCATE_BUFFER |
 		FORMAT_MESSAGE_FROM_SYSTEM,
 		NULL,
 		errorCode,
@@ -481,7 +474,7 @@ std::string GetErrorMessage(DWORD errorCode)
 //
 // Function
 //		Name:    openfile
-//		Purpose: replacement for any open calls - handles unicode 
+//		Purpose: replacement for any open calls - handles unicode
 //			filenames - supplied in utf8
 //		Created: 25th October 2004
 //
@@ -490,18 +483,18 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 {
 	winerrno = ERROR_INVALID_FUNCTION;
 
-	std::string AbsPathWithUnicode = 
+	std::string AbsPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pFileName);
-	
+
 	if (AbsPathWithUnicode.size() == 0)
 	{
 		// error already logged by ConvertPathToAbsoluteUnicode()
 		return INVALID_HANDLE_VALUE;
 	}
-	
+
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	// We are responsible for freeing pBuffer
-	
+
 	if (pBuffer == NULL)
 	{
 		// error already logged by ConvertUtf8ToWideString()
@@ -510,9 +503,9 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 	// flags could be O_WRONLY | O_CREAT | O_RDONLY
 	DWORD createDisposition = OPEN_EXISTING;
-	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE 
+	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE
 		| FILE_SHARE_DELETE;
-	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY 
+	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY
 		| FILE_READ_EA;
 
 	if (flags & O_WRONLY)
@@ -521,7 +514,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	}
 	else if (flags & O_RDWR)
 	{
-		accessRights |= FILE_WRITE_ATTRIBUTES 
+		accessRights |= FILE_WRITE_ATTRIBUTES
 			| FILE_WRITE_DATA | FILE_WRITE_EA;
 	}
 
@@ -551,14 +544,14 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		winFlags  |= FILE_FLAG_DELETE_ON_CLOSE;
 	}
 
-	HANDLE hdir = CreateFileW(pBuffer, 
-		accessRights, 
-		shareMode, 
-		NULL, 
-		createDisposition, 
+	HANDLE hdir = CreateFileW(pBuffer,
+		accessRights,
+		shareMode,
+		NULL,
+		createDisposition,
 		winFlags,
 		NULL);
-	
+
 	delete [] pBuffer;
 
 	if (hdir == INVALID_HANDLE_VALUE)
@@ -575,7 +568,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		}
 
 		::syslog(LOG_WARNING, "Failed to open file '%s': "
-			"%s", pFileName, 
+			"%s", pFileName,
 			GetErrorMessage(GetLastError()).c_str());
 
 		return INVALID_HANDLE_VALUE;
@@ -708,7 +701,7 @@ int emu_fstat(HANDLE hdir, struct emu_stat * st)
 //
 // Function
 //		Name:    OpenFileByNameUtf8
-//		Purpose: Converts filename to Unicode and returns 
+//		Purpose: Converts filename to Unicode and returns
 //			a handle to it. In case of error, sets errno,
 //			logs the error and returns NULL.
 //		Created: 10th December 2004
@@ -716,43 +709,43 @@ int emu_fstat(HANDLE hdir, struct emu_stat * st)
 // --------------------------------------------------------------------------
 HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 {
-	std::string AbsPathWithUnicode = 
+	std::string AbsPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pFileName);
-	
+
 	if (AbsPathWithUnicode.size() == 0)
 	{
 		// error already logged by ConvertPathToAbsoluteUnicode()
 		return NULL;
 	}
-	
+
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	// We are responsible for freeing pBuffer
-	
+
 	if (pBuffer == NULL)
 	{
 		// error already logged by ConvertUtf8ToWideString()
 		return NULL;
 	}
 
-	HANDLE handle = CreateFileW(pBuffer, 
+	HANDLE handle = CreateFileW(pBuffer,
 		flags,
-		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, 
-		NULL, 
-		OPEN_EXISTING, 
+		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
 		FILE_FLAG_BACKUP_SEMANTICS,
 		NULL);
 
 	if (handle == INVALID_HANDLE_VALUE)
 	{
-		// if our open fails we should always be able to 
+		// if our open fails we should always be able to
 		// open in this mode - to get the inode information
-		// at least one process must have the file open - 
+		// at least one process must have the file open -
 		// in this case someone else does.
-		handle = CreateFileW(pBuffer, 
+		handle = CreateFileW(pBuffer,
 			READ_CONTROL,
-			FILE_SHARE_READ, 
-			NULL, 
-			OPEN_EXISTING, 
+			FILE_SHARE_READ,
+			NULL,
+			OPEN_EXISTING,
 			FILE_FLAG_BACKUP_SEMANTICS,
 			NULL);
 	}
@@ -771,7 +764,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 		else
 		{
 			::syslog(LOG_WARNING, "Failed to open '%s': "
-				"%s", pFileName, 
+				"%s", pFileName,
 				GetErrorMessage(err).c_str());
 			errno = EACCES;
 		}
@@ -785,8 +778,8 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    emu_stat 
-//		Purpose: replacement for the lstat and stat functions. 
+//		Name:    emu_stat
+//		Purpose: replacement for the lstat and stat functions.
 //			 Works with unicode filenames supplied in utf8.
 //			 Returns a struct emu_stat to have room for 64-bit
 //			 file identifier in st_ino (mingw allows only 16!)
@@ -795,7 +788,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 // --------------------------------------------------------------------------
 int emu_stat(const char * pName, struct emu_stat * st)
 {
-	HANDLE handle = OpenFileByNameUtf8(pName, 
+	HANDLE handle = OpenFileByNameUtf8(pName,
 		FILE_READ_ATTRIBUTES | FILE_READ_EA);
 
 	if (handle == NULL)
@@ -822,7 +815,7 @@ int emu_stat(const char * pName, struct emu_stat * st)
 //
 // Function
 //		Name:    statfs
-//		Purpose: returns the mount point of where a file is located - 
+//		Purpose: returns the mount point of where a file is located -
 //			in this case the volume serial number
 //		Created: 25th October 2004
 //
@@ -917,18 +910,18 @@ int emu_utimes(const char * pName, const struct timeval times[])
 // --------------------------------------------------------------------------
 int emu_chmod(const char * pName, mode_t mode)
 {
-	std::string AbsPathWithUnicode = 
+	std::string AbsPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pName);
-	
+
 	if (AbsPathWithUnicode.size() == 0)
 	{
 		// error already logged by ConvertPathToAbsoluteUnicode()
 		return -1;
 	}
-	
+
 	WCHAR* pBuffer = ConvertUtf8ToWideString(AbsPathWithUnicode.c_str());
 	// We are responsible for freeing pBuffer
-	
+
 	if (pBuffer == NULL)
 	{
 		// error already logged by ConvertUtf8ToWideString()
@@ -984,7 +977,7 @@ DIR *opendir(const char *name)
 		errno = EINVAL;
 		return NULL;
 	}
-	
+
 	std::string dirName(name);
 
 	//append a '\' win32 findfirst is sensitive to this
@@ -1005,7 +998,7 @@ DIR *opendir(const char *name)
 
 	pDir->name = ConvertUtf8ToWideString(dirName.c_str());
 	// We are responsible for freeing dir->name with delete[]
-	
+
 	if (pDir->name == NULL)
 	{
 		delete pDir;
@@ -1020,7 +1013,7 @@ DIR *opendir(const char *name)
 		delete pDir;
 		return NULL;
 	}
-		
+
 	pDir->result.d_name = 0;
 	return pDir;
 }
@@ -1045,14 +1038,14 @@ struct dirent *readdir(DIR *dp)
 
 		if (dp && dp->fd != -1)
 		{
-			if (!dp->result.d_name || 
+			if (!dp->result.d_name ||
 				_wfindnext(dp->fd, &dp->info) != -1)
 			{
 				den = &dp->result;
 				std::wstring input(dp->info.name);
 				memset(tempbuff, 0, sizeof(tempbuff));
-				WideCharToMultiByte(CP_UTF8, 0, dp->info.name, 
-					-1, &tempbuff[0], sizeof (tempbuff), 
+				WideCharToMultiByte(CP_UTF8, 0, dp->info.name,
+					-1, &tempbuff[0], sizeof (tempbuff),
 					NULL, NULL);
 				//den->d_name = (char *)dp->info.name;
 				den->d_name = &tempbuff[0];
@@ -1103,7 +1096,7 @@ int closedir(DIR *dp)
 			delete dp;
 		}
 
-		if (finres == -1) // errors go to EBADF 
+		if (finres == -1) // errors go to EBADF
 		{
 			errno = EBADF;
 		}
@@ -1121,7 +1114,7 @@ int closedir(DIR *dp)
 //
 // Function
 //		Name:    poll
-//		Purpose: a weak implimentation (just enough for box) 
+//		Purpose: a weak implimentation (just enough for box)
 //			of the unix poll for winsock2
 //		Created: 25th October 2004
 //
@@ -1139,7 +1132,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		// struct pollfd *ufdsTmp = ufds;
 
 		timeval timOut;
-		timeval *tmpptr; 
+		timeval *tmpptr;
 
 		if (timeout == INFTIM)
 			tmpptr = NULL;
@@ -1169,7 +1162,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 					ufd->events);
 				return -1;
 			}
-		}	
+		}
 
 		int nready = select(0, &readfd, &writefd, 0, tmpptr);
 
@@ -1234,86 +1227,86 @@ BOOL AddEventSource
 		return FALSE;
 	}
 
-	// Create the event source as a subkey of the log. 
+	// Create the event source as a subkey of the log.
 
 	std::string regkey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\"
 		"Application\\");
-	regkey += pszSrcName; 
- 
+	regkey += pszSrcName;
+
 	HKEY hk;
 	DWORD dwDisp;
 
-	if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(), 
+	if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(),
 			 0, NULL, REG_OPTION_NON_VOLATILE,
-			 KEY_WRITE, NULL, &hk, &dwDisp)) 
+			 KEY_WRITE, NULL, &hk, &dwDisp))
 	{
 		::syslog(LOG_ERR, "Failed to create the registry key: %s",
 			GetErrorMessage(GetLastError()).c_str());
 		return FALSE;
 	}
 
-	// Set the name of the message file. 
- 
-	if (RegSetValueExW(hk,                 // subkey handle 
-			   L"EventMessageFile", // value name 
-			   0,                  // must be zero 
-			   REG_EXPAND_SZ,      // value type 
-			   (LPBYTE)cmd,        // pointer to value data 
+	// Set the name of the message file.
+
+	if (RegSetValueExW(hk,                 // subkey handle
+			   L"EventMessageFile", // value name
+			   0,                  // must be zero
+			   REG_EXPAND_SZ,      // value type
+			   (LPBYTE)cmd,        // pointer to value data
 			   len*sizeof(WCHAR))) // data size
 	{
 		::syslog(LOG_ERR, "Failed to set the event message file: %s",
 			GetErrorMessage(GetLastError()).c_str());
-		RegCloseKey(hk); 
+		RegCloseKey(hk);
 		return FALSE;
 	}
- 
-	// Set the supported event types. 
- 
-	DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | 
-		  EVENTLOG_INFORMATION_TYPE; 
- 
-	if (RegSetValueEx(hk,               // subkey handle 
-			  "TypesSupported", // value name 
-			  0,                // must be zero 
-			  REG_DWORD,        // value type 
-			  (LPBYTE) &dwData, // pointer to value data 
-			  sizeof(DWORD)))   // length of value data 
+
+	// Set the supported event types.
+
+	DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE |
+		  EVENTLOG_INFORMATION_TYPE;
+
+	if (RegSetValueEx(hk,               // subkey handle
+			  "TypesSupported", // value name
+			  0,                // must be zero
+			  REG_DWORD,        // value type
+			  (LPBYTE) &dwData, // pointer to value data
+			  sizeof(DWORD)))   // length of value data
 	{
 		::syslog(LOG_ERR, "Failed to set the supported types: %s",
 			GetErrorMessage(GetLastError()).c_str());
-		RegCloseKey(hk); 
+		RegCloseKey(hk);
 		return FALSE;
 	}
- 
+
 	// Set the category message file and number of categories.
 
-	if (RegSetValueExW(hk,                    // subkey handle 
-			   L"CategoryMessageFile", // value name 
-			   0,                     // must be zero 
-			   REG_EXPAND_SZ,         // value type 
-			   (LPBYTE)cmd,           // pointer to value data 
+	if (RegSetValueExW(hk,                    // subkey handle
+			   L"CategoryMessageFile", // value name
+			   0,                     // must be zero
+			   REG_EXPAND_SZ,         // value type
+			   (LPBYTE)cmd,           // pointer to value data
 			   len*sizeof(WCHAR)))    // data size
 	{
 		::syslog(LOG_ERR, "Failed to set the category message file: "
 			"%s", GetErrorMessage(GetLastError()).c_str());
-		RegCloseKey(hk); 
-		return FALSE;
-	}
- 
-	if (RegSetValueEx(hk,              // subkey handle 
-			  "CategoryCount", // value name 
-			  0,               // must be zero 
-			  REG_DWORD,       // value type 
-			  (LPBYTE) &dwNum, // pointer to value data 
-			  sizeof(DWORD)))  // length of value data 
-	{
-		::syslog(LOG_ERR, "Failed to set the category count: %s",
-			GetErrorMessage(GetLastError()).c_str());
-		RegCloseKey(hk); 
+		RegCloseKey(hk);
 		return FALSE;
 	}
 
-	RegCloseKey(hk); 
+	if (RegSetValueEx(hk,              // subkey handle
+			  "CategoryCount", // value name
+			  0,               // must be zero
+			  REG_DWORD,       // value type
+			  (LPBYTE) &dwNum, // pointer to value data
+			  sizeof(DWORD)))  // length of value data
+	{
+		::syslog(LOG_ERR, "Failed to set the category count: %s",
+			GetErrorMessage(GetLastError()).c_str());
+		RegCloseKey(hk);
+		return FALSE;
+	}
+
+	RegCloseKey(hk);
 	return TRUE;
 }
 
@@ -1329,9 +1322,9 @@ void openlog(const char * daemonName, int, int)
 	// register a default event source, so that we can
 	// log errors with the process of adding or registering our own.
 	gSyslogH = RegisterEventSource(
-		NULL,        // uses local computer 
+		NULL,        // uses local computer
 		nameStr.c_str()); // source name
-	if (gSyslogH == NULL) 
+	if (gSyslogH == NULL)
 	{
 	}
 
@@ -1359,7 +1352,7 @@ void openlog(const char * daemonName, int, int)
 
 void closelog(void)
 {
-	DeregisterEventSource(gSyslogH); 
+	DeregisterEventSource(gSyslogH);
 }
 
 void syslog(int loglevel, const char *frmt, ...)
@@ -1402,13 +1395,13 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	int len = vsnprintf(buffer, sizeof(buffer)-1, sixfour.c_str(), args);
 	assert(len >= 0);
-	if (len < 0) 
+	if (len < 0)
 	{
 		printf("%s\r\n", buffer);
 		fflush(stdout);
 		return;
 	}
-	
+
 	assert((size_t)len < sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
 
@@ -1432,33 +1425,33 @@ void syslog(int loglevel, const char *frmt, ...)
 		buffer2 += " (failed to convert string encoding)";
 		LPCSTR strings[] = { buffer2.c_str(), NULL };
 
-		result = ReportEventA(gSyslogH, // event log handle 
-			errinfo,               // event type 
-			0,                     // category zero 
-			MSG_ERR,	       // event identifier - 
+		result = ReportEventA(gSyslogH, // event log handle
+			errinfo,               // event type
+			0,                     // category zero
+			MSG_ERR,	       // event identifier -
 					       // we will call them all the same
-			NULL,                  // no user security identifier 
-			1,                     // one substitution string 
-			0,                     // no data 
-			strings,               // pointer to string array 
-			NULL);                 // pointer to data 
+			NULL,                  // no user security identifier
+			1,                     // one substitution string
+			0,                     // no data
+			strings,               // pointer to string array
+			NULL);                 // pointer to data
 	}
 	else
 	{
 		LPCWSTR strings[] = { pWide, NULL };
-		result = ReportEventW(gSyslogH, // event log handle 
-			errinfo,               // event type 
-			0,                     // category zero 
-			MSG_ERR,	       // event identifier - 
+		result = ReportEventW(gSyslogH, // event log handle
+			errinfo,               // event type
+			0,                     // category zero
+			MSG_ERR,	       // event identifier -
 					       // we will call them all the same
-			NULL,                  // no user security identifier 
-			1,                     // one substitution string 
-			0,                     // no data 
-			strings,               // pointer to string array 
-			NULL);                 // pointer to data 
+			NULL,                  // no user security identifier
+			1,                     // one substitution string
+			0,                     // no data
+			strings,               // pointer to string array
+			NULL);                 // pointer to data
 		delete [] pWide;
 	}
-		
+
 	if (result == 0)
 	{
 		DWORD err = GetLastError();
@@ -1488,7 +1481,7 @@ void syslog(int loglevel, const char *frmt, ...)
 int emu_chdir(const char* pDirName)
 {
 	/*
-	std::string AbsPathWithUnicode = 
+	std::string AbsPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pDirName);
 
 	if (AbsPathWithUnicode.size() == 0)
@@ -1561,7 +1554,7 @@ char* emu_getcwd(char* pBuffer, int BufSize)
 
 int emu_mkdir(const char* pPathName)
 {
-	std::string AbsPathWithUnicode = 
+	std::string AbsPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pPathName);
 
 	if (AbsPathWithUnicode.size() == 0)
@@ -1590,7 +1583,7 @@ int emu_mkdir(const char* pPathName)
 
 int emu_unlink(const char* pFileName)
 {
-	std::string AbsPathWithUnicode = 
+	std::string AbsPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pFileName);
 
 	if (AbsPathWithUnicode.size() == 0)
@@ -1626,7 +1619,7 @@ int emu_unlink(const char* pFileName)
 		else
 		{
 			::syslog(LOG_WARNING, "Failed to delete file "
-				"'%s': %s", pFileName, 
+				"'%s': %s", pFileName,
 				GetErrorMessage(err).c_str());
 			errno = ENOSYS;
 		}
@@ -1638,7 +1631,7 @@ int emu_unlink(const char* pFileName)
 
 int emu_rename(const char* pOldFileName, const char* pNewFileName)
 {
-	std::string OldPathWithUnicode = 
+	std::string OldPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pOldFileName);
 
 	if (OldPathWithUnicode.size() == 0)
@@ -1653,7 +1646,7 @@ int emu_rename(const char* pOldFileName, const char* pNewFileName)
 		return -1;
 	}
 
-	std::string NewPathWithUnicode = 
+	std::string NewPathWithUnicode =
 		ConvertPathToAbsoluteUnicode(pNewFileName);
 
 	if (NewPathWithUnicode.size() == 0)
@@ -1730,7 +1723,7 @@ int console_read(char* pBuffer, size_t BufferSize)
 			WideSize, // will not be null terminated by ReadConsole
 			&numCharsRead,
 			NULL // reserved
-		)) 
+		))
 	{
 		::fprintf(stderr, "Failed to read from console: %s\n",
 			GetErrorMessage(GetLastError()).c_str());
@@ -1751,10 +1744,10 @@ int console_read(char* pBuffer, size_t BufferSize)
 int readv (int filedes, const struct iovec *vector, size_t count)
 {
 	int bytes = 0;
-	
+
 	for (size_t i = 0; i < count; i++)
 	{
-		int result = read(filedes, vector[i].iov_base, 
+		int result = read(filedes, vector[i].iov_base,
 			vector[i].iov_len);
 		if (result < 0)
 		{
@@ -1769,10 +1762,10 @@ int readv (int filedes, const struct iovec *vector, size_t count)
 int writev(int filedes, const struct iovec *vector, size_t count)
 {
 	int bytes = 0;
-	
+
 	for (size_t i = 0; i < count; i++)
 	{
-		int result = write(filedes, vector[i].iov_base, 
+		int result = write(filedes, vector[i].iov_base,
 			vector[i].iov_len);
 		if (result < 0)
 		{
@@ -1793,7 +1786,7 @@ time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 	// Convert the last-write time to local time.
 	FileTimeToSystemTime(fileTime, &stUTC);
 
-	memset(&timeinfo, 0, sizeof(timeinfo));	
+	memset(&timeinfo, 0, sizeof(timeinfo));
 	timeinfo.tm_sec = stUTC.wSecond;
 	timeinfo.tm_min = stUTC.wMinute;
 	timeinfo.tm_hour = stUTC.wHour;

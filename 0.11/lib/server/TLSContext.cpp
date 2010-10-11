@@ -81,36 +81,42 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	
 	// Setup our identity
 #ifdef WIN32
-	X509 *x509 = GetCertificate();
-	if(::SSL_CTX_use_certificate(mpContext, x509) != 1)
 	{
-		SSLLib::LogError("SSL_CTX_use_certificate");
-		THROW_EXCEPTION(ServerException, TLSLoadCertificatesFailed)
+		X509 *x509 = GetTrustedCertificate();
+		X509_LOOKUP *lookup = ::X509_STORE_add_lookup(mpContext->cert_store, X509_LOOKUP_file());
+		if(lookup == NULL)
+		{
+			SSLLib::LogError("X509_STORE_add_lookup");
+			THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
+		}
+		if(::X509_STORE_add_cert(lookup->store_ctx, x509) != 1)
+		{
+			SSLLib::LogError("X509_STORE_add_cert");
+			THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
+		}
+		// don't free lookup
+		X509_free(x509);
 	}
-	X509_free(x509);
 
-	EVP_PKEY *evpPK = GetPrivateKey();
-	if(::SSL_CTX_use_PrivateKey(mpContext, evpPK) != 1)
 	{
-		SSLLib::LogError("SSL_CTX_use_PrivateKey");
-		THROW_EXCEPTION(ServerException, TLSLoadPrivateKeyFailed)
+		X509 *x509 = GetCertificate();
+		if(::SSL_CTX_use_certificate(mpContext, x509) != 1)
+		{
+			SSLLib::LogError("SSL_CTX_use_certificate");
+			THROW_EXCEPTION(ServerException, TLSLoadCertificatesFailed)
+		}
+		X509_free(x509);
 	}
-	EVP_PKEY_free(evpPK);
 
-	x509 = GetTrustedCertificate();
-	X509_LOOKUP *lookup = ::X509_STORE_add_lookup(mpContext->cert_store, X509_LOOKUP_file());
-	if(lookup == NULL)
 	{
-		SSLLib::LogError("X509_STORE_add_lookup");
-		THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
+		EVP_PKEY *evpPK = GetPrivateKey();
+		if(::SSL_CTX_use_PrivateKey(mpContext, evpPK) != 1)
+		{
+			SSLLib::LogError("SSL_CTX_use_PrivateKey");
+			THROW_EXCEPTION(ServerException, TLSLoadPrivateKeyFailed)
+		}
+		EVP_PKEY_free(evpPK);
 	}
-	if(::X509_STORE_add_cert(lookup->store_ctx, x509) != 1)
-	{
-		SSLLib::LogError("X509_STORE_add_cert");
-		THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
-	}
-	// don't free lookup
-	X509_free(x509);
 #else
 	if(::SSL_CTX_use_certificate_chain_file(mpContext, CertificatesFile) != 1)
 	{

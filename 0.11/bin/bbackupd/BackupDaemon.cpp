@@ -411,14 +411,23 @@ void BackupDaemon::InitCrypto()
 {
 	// Read in the certificates creating a TLS context
 	const Configuration &conf(GetConfiguration());
+
+#ifdef WIN32
+	std::string certFile;
+	std::string keyFile;
+	std::string caFile;
+	std::string keysFile;
+#else
 	std::string certFile(conf.GetKeyValue("CertificateFile"));
 	std::string keyFile(conf.GetKeyValue("PrivateKeyFile"));
 	std::string caFile(conf.GetKeyValue("TrustedCAsFile"));
+	std::string keysFile(conf.GetKeyValue("KeysFile"));
+#endif
 	mTlsContext.Initialise(false /* as client */, certFile.c_str(),
 		keyFile.c_str(), caFile.c_str());
 	
 	// Set up the keys for various things
-	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
+	BackupClientCryptoKeys_Setup(keysFile.c_str());
 }
 
 // --------------------------------------------------------------------------
@@ -1913,9 +1922,12 @@ void BackupDaemon::MakeMapBaseName(unsigned int MountNumber, std::string &rNameO
 	// we just ask the system where to put the files...
 	char path[MAX_PATH];
 
-	if (SUCCEEDED(SHGetFolderPath(NULL,CSIDL_LOCAL_APPDATA,NULL,0,path)))
+	if(SUCCEEDED(SHGetFolderPath(NULL,CSIDL_COMMON_APPDATA,NULL,0,path)))
 	{
-		PathAppend(path,"Box Backup");
+		if(FALSE == PathAppend(path,"Box Backup"))
+		{
+			THROW_EXCEPTION(CommonException, Internal);
+		}
 		if(FALSE == CreateDirectory(path, NULL)
 			&& ERROR_ALREADY_EXISTS != GetLastError())
 		{
@@ -2131,9 +2143,32 @@ void BackupDaemon::SetState(int State)
 // --------------------------------------------------------------------------
 void BackupDaemon::TouchFileInWorkingDir(const char *Filename)
 {
+	std::string fn;
+
+#ifdef WIN32
+	// we just ask the system where to put the files...
+	char path[MAX_PATH];
+
+	if (SUCCEEDED(SHGetFolderPath(NULL,CSIDL_COMMON_APPDATA,NULL,0,path)))
+	{
+		PathAppend(path,"Box Backup");
+		if(FALSE == CreateDirectory(path, NULL)
+			&& ERROR_ALREADY_EXISTS != GetLastError())
+		{
+			// TODO: throw something sensible; this really shouldn't be possible
+		}
+		fn.assign(path);
+	}
+	else
+	{
+		// TODO: need to throw something helpful
+	}
+#else
 	// Filename
 	const Configuration &config(GetConfiguration());
-	std::string fn(config.GetKeyValue("DataDirectory") + DIRECTORY_SEPARATOR_ASCHAR);
+	fn.assign(config.GetKeyValue("DataDirectory"));
+#endif
+	fn += DIRECTORY_SEPARATOR_ASCHAR;
 	fn += Filename;
 	
 	// Open and close it to update the timestamp
