@@ -33,6 +33,30 @@ void BackupClientCryptoKeys_Setup(const std::string& rKeyMaterialFilename)
 	// Read in the key material
 	unsigned char KeyMaterial[BACKUPCRYPTOKEYS_FILE_SIZE];
 	
+#ifdef WIN32
+	DWORD gle;
+	HKEY hKey;
+
+	(void)rKeyMaterialFilename;
+
+	if(ERROR_SUCCESS != (gle = RegOpenKeyEx(HKEY_LOCAL_MACHINE,"Software\\Box Backup",0,KEY_QUERY_VALUE,&hKey)))
+	{
+		THROW_EXCEPTION(BackupStoreException, CouldntLoadClientKeyMaterial)
+	}
+	else
+	{
+		DWORD lenKeyMaterial = BACKUPCRYPTOKEYS_FILE_SIZE;
+
+		gle = RegQueryValueEx(hKey,"FileEncKeys",NULL,NULL,KeyMaterial,&lenKeyMaterial);
+		printf("gle: %d\n",gle);
+		RegCloseKey(hKey);
+
+		if(ERROR_SUCCESS != gle)
+		{
+			THROW_EXCEPTION(BackupStoreException, CouldntLoadClientKeyMaterial)
+		}
+	}
+#else
 	// Open the file
 	FileStream file(rKeyMaterialFilename);
 
@@ -41,7 +65,8 @@ void BackupClientCryptoKeys_Setup(const std::string& rKeyMaterialFilename)
 	{
 		THROW_EXCEPTION(BackupStoreException, CouldntLoadClientKeyMaterial)
 	}
-	
+#endif
+
 	// Setup keys and encoding method for filename encryption
 	BackupStoreFilenameClear::SetBlowfishKey(
 		KeyMaterial + BACKUPCRYPTOKEYS_FILENAME_KEY_START,

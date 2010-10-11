@@ -14,6 +14,7 @@
 	class SSL_CTX;
 	class EVP_PKEY;
 	class X509;
+	class X509_LOOKUP;
 #endif
 
 // --------------------------------------------------------------------------
