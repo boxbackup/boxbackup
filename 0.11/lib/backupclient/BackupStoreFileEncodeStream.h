@@ -113,7 +113,7 @@ private:
 	int64_t mTotalBlocks;				// Total number of blocks in the file
 	int64_t mAbsoluteBlockNumber;		// The absolute block number currently being output
 	// Instruction number
-	Recipe::size_type mInstructionNumber;
+	int64_t mInstructionNumber;
 	// All the below are within the current instruction
 	int64_t mNumBlocks;					// number of blocks. Last one will be a different size to the rest in most cases
 	int64_t mCurrentBlock;
