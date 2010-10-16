@@ -213,7 +213,7 @@ X509* TLSContext::GetCertificate()
 			{
 				HCERTSTORE  hSystemStore;
 
-				if (NULL == (hSystemStore = CertOpenStore(CERT_STORE_PROV_SYSTEM, 0, NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE | CERT_STORE_READONLY_FLAG, L"MY")))
+				if (NULL == (hSystemStore = CertOpenStore(CERT_STORE_PROV_SYSTEM, 0, NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"MY")))
 				{
 					BOX_ERROR("Failed to open store");
 				}
@@ -230,6 +230,25 @@ X509* TLSContext::GetCertificate()
 						const unsigned char *pbCertEncoded = pDesiredCert->pbCertEncoded;
 
 						x509 = d2i_X509(NULL, &pbCertEncoded, pDesiredCert->cbCertEncoded);
+
+						DWORD pcbData = 0;
+						if (CertGetCertificateContextProperty(pDesiredCert,CERT_KEY_PROV_INFO_PROP_ID,NULL,&pcbData))
+						{
+							BOX_TRACE("Certificate has associated Private Key");
+						}
+						else
+						{
+							CRYPT_KEY_PROV_INFO cryptKeyProvInfo = { L"BoxBackup",MS_DEF_PROV_W,PROV_RSA_FULL,CRYPT_MACHINE_KEYSET,0,NULL,AT_SIGNATURE };
+
+							if (!CertSetCertificateContextProperty(pDesiredCert,CERT_KEY_PROV_INFO_PROP_ID,0,&cryptKeyProvInfo))
+							{
+								BOX_ERROR("SetCertProp failed");
+							}
+							else
+							{
+								BOX_INFO("Associated Private Key with certificate");
+							}
+						}
 
 						CertFreeCertificateContext(pDesiredCert);
 					}
