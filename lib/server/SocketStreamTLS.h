@@ -42,8 +42,8 @@ public:
 		const std::string& rName, int Port = 0);
 	void Handshake(const TLSContext &rContext, bool IsServer = false);
 	
-	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual void Write(const void *pBuffer, size_t NBytes);
 	virtual void Close();
 	virtual void Shutdown(bool Read = true, bool Write = true);
 

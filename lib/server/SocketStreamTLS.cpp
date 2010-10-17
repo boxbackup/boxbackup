@@ -294,9 +294,12 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
+size_t SocketStreamTLS::Read(void *pBuffer, size_t NBytes_, int Timeout)
 {
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+
+	ASSERT(NBytes_ < INT_MAX);
+	int NBytes = static_cast<int>(NBytes_);
 
 	// Make sure zero byte reads work as expected
 	if(NBytes == 0)
@@ -350,9 +353,12 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
+void SocketStreamTLS::Write(const void *pBuffer, size_t NBytes_)
 {
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+
+	ASSERT(NBytes_ < INT_MAX);
+	int NBytes = static_cast<int>(NBytes_);
 	
 	// Make sure zero byte writes work as expected
 	if(NBytes == 0)

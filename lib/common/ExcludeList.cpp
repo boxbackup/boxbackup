@@ -84,7 +84,7 @@ std::string ExcludeList::ReplaceSlashesDefinite(const std::string& input) const
 
 	for (std::string::iterator i = output.begin(); i != output.end(); i++)
 	{
-		*i = tolower(*i);
+		*i = static_cast<std::string::iterator::value_type>(tolower(*i));
 	}
 
 	return output;
@@ -103,7 +103,7 @@ std::string ExcludeList::ReplaceSlashesRegex(const std::string& input) const
 
 	for (std::string::iterator i = output.begin(); i != output.end(); i++)
 	{
-		*i = tolower(*i);
+		*i = static_cast<std::string::iterator::value_type>(tolower(*i));
 	}
 
 	return output;

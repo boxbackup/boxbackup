@@ -24,7 +24,7 @@
 class RollingChecksum
 {
 public:
-	RollingChecksum(const void * const data, const unsigned int Length);
+	RollingChecksum(const void * const data, const size_t Length);
 
 	// --------------------------------------------------------------------------
 	//
@@ -35,12 +35,12 @@ public:
 	//		Created: 6/12/03
 	//
 	// --------------------------------------------------------------------------
-	inline void RollForward(const uint8_t StartOfThisBlock, const uint8_t LastOfNextBlock, const unsigned int Length)
+	inline void RollForward(const uint8_t StartOfThisBlock, const uint8_t LastOfNextBlock, const size_t Length)
 	{
 		// IMPLEMENTATION NOTE: Everything is implicitly mod 2^16 -- uint16_t's will overflow nicely.
 		a -= StartOfThisBlock;
 		a += LastOfNextBlock;
-		b -= Length * StartOfThisBlock;
+		b -= static_cast<uint16_t>(Length * StartOfThisBlock);
 		b += a;
 	}
 
@@ -53,7 +53,7 @@ public:
 	//		Created: 7/14/05
 	//
 	// --------------------------------------------------------------------------
-	void RollForwardSeveral(const uint8_t * const StartOfThisBlock, const uint8_t * const LastOfNextBlock, const unsigned int Length, const unsigned int Skip);
+	void RollForwardSeveral(const uint8_t * const StartOfThisBlock, const uint8_t * const LastOfNextBlock, const size_t Length, const size_t Skip);
 
 	// --------------------------------------------------------------------------
 	//

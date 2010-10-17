@@ -17,15 +17,15 @@ class BufferedStream : public IOStream
 private:
 	IOStream& mrSource;
 	char mBuffer[4096];
-	int  mBufferSize;
-	int  mBufferPosition;
+	size_t  mBufferSize;
+	size_t  mBufferPosition;
 
 public:
 	BufferedStream(IOStream& rSource);
 	
-	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, size_t NBytes);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(IOStream::pos_type Offset, int SeekType);
 	virtual void Close();

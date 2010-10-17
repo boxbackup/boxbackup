@@ -81,8 +81,8 @@ public:
 		~DecodedStream();
 
 		// Stream functions		
-		virtual int Read(void *pBuffer, int NBytes, int Timeout);
-		virtual void Write(const void *pBuffer, int NBytes);
+		virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout);
+		virtual void Write(const void *pBuffer, size_t NBytes);
 		virtual bool StreamDataLeft();
 		virtual bool StreamClosed();
 		
@@ -106,10 +106,10 @@ public:
 		void *mpBlockIndex;
 		uint8_t *mpEncodedData;
 		uint8_t *mpClearData;
-		int mClearDataSize;
-		int mCurrentBlock;
-		int mCurrentBlockClearSize;
-		int mPositionInCurrentBlock;
+		size_t mClearDataSize;
+		int64_t mCurrentBlock;
+		size_t mCurrentBlockClearSize;
+		size_t mPositionInCurrentBlock;
 		uint64_t mEntryIVBase;
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
 		bool mIsOldVersion;
@@ -153,14 +153,14 @@ public:
 #endif
 
 	// Allocation of properly aligning chunks for decoding and encoding chunks
-	inline static void *CodingChunkAlloc(int Size)
+	inline static void *CodingChunkAlloc(size_t Size)
 	{
 		uint8_t *a = (uint8_t*)malloc((Size) + (BACKUPSTOREFILE_CODING_BLOCKSIZE * 3));
 		if(a == 0) return 0;
 		// Align to main block size
-		ASSERT(sizeof(unsigned long) >= sizeof(void*));	// make sure casting the right pointer size
+		ASSERT(sizeof(size_t) >= sizeof(void*));	// make sure casting the right pointer size
 		uint8_t adjustment = BACKUPSTOREFILE_CODING_BLOCKSIZE
-							  - (uint8_t)(((unsigned long)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
+							  - (uint8_t)(((size_t)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
 		uint8_t *b = (a + adjustment);
 		// Store adjustment
 		*b = adjustment;
@@ -170,8 +170,8 @@ public:
 	inline static void CodingChunkFree(void *Block)
 	{
 		// Check alignment is as expected
-		ASSERT(sizeof(unsigned long) >= sizeof(void*));	// make sure casting the right pointer size
-		ASSERT((uint8_t)(((unsigned long)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+		ASSERT(sizeof(size_t) >= sizeof(void*));	// make sure casting the right pointer size
+		ASSERT((uint8_t)(((size_t)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 		uint8_t *a = (uint8_t*)Block;
 		a -= BACKUPSTOREFILE_CODING_OFFSET;
 		// Adjust downwards...
@@ -192,23 +192,23 @@ public:
 		EncodingBuffer(const EncodingBuffer &);
 		EncodingBuffer &operator=(const EncodingBuffer &);
 	public:
-		void Allocate(int Size);
-		void Reallocate(int NewSize);
+		void Allocate(size_t Size);
+		void Reallocate(size_t NewSize);
 		
 		uint8_t *mpBuffer;
-		int mBufferSize;
+		size_t mBufferSize;
 	};
-	static int MaxBlockSizeForChunkSize(int ChunkSize);
-	static int EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFile::EncodingBuffer &rOutput);
+	static size_t MaxBlockSizeForChunkSize(size_t ChunkSize);
+	static size_t EncodeChunk(const void *Chunk, size_t ChunkSize, BackupStoreFile::EncodingBuffer &rOutput);
 
 	// Caller should know how big the output size is, but also allocate a bit more memory to cover various
 	// overheads allowed for in checks
-	static inline int OutputBufferSizeForKnownOutputSize(int KnownChunkSize)
+	static inline size_t OutputBufferSizeForKnownOutputSize(size_t KnownChunkSize)
 	{
 		// Plenty big enough
 		return KnownChunkSize + 256;
 	}
-	static int DecodeChunk(const void *Encoded, int EncodedSize, void *Output, int OutputSize);
+	static size_t DecodeChunk(const void *Encoded, size_t EncodedSize, void *Output, size_t OutputSize);
 
 	// Statisitics, not designed to be completely reliable	
 	static void ResetStats();

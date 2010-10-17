@@ -81,8 +81,8 @@ public:
 		ReadLoggingStream::Logger* pLogger = NULL,
 		RunStatusProvider* pRunStatusProvider = NULL);
 
-	virtual int Read(void *pBuffer, int NBytes, int Timeout);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout);
+	virtual void Write(const void *pBuffer, size_t NBytes);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
@@ -113,19 +113,19 @@ private:
 	int64_t mTotalBlocks;				// Total number of blocks in the file
 	int64_t mAbsoluteBlockNumber;		// The absolute block number currently being output
 	// Instruction number
-	int64_t mInstructionNumber;
+	size_t mInstructionNumber;
 	// All the below are within the current instruction
 	int64_t mNumBlocks;					// number of blocks. Last one will be a different size to the rest in most cases
 	int64_t mCurrentBlock;
-	int32_t mCurrentBlockEncodedSize;
-	int32_t mPositionInCurrentBlock;	// for reading out
+	size_t mCurrentBlockEncodedSize;
+	size_t mPositionInCurrentBlock;	// for reading out
 	int32_t mBlockSize;					// Basic block size of most of the blocks in the file
 	int32_t mLastBlockSize;				// the size (unencoded) of the last block in the file
 	// Buffers
 	uint8_t *mpRawBuffer;				// buffer for raw data
 	BackupStoreFile::EncodingBuffer mEncodedBuffer;
 										// buffer for encoded data
-	int32_t mAllocatedBufferSize;		// size of above two allocated blocks
+	size_t mAllocatedBufferSize;		// size of above two allocated blocks
 	uint64_t mEntryIVBase;				// base for block entry IV
 };
 

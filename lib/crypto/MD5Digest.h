@@ -28,12 +28,12 @@ public:
 	virtual ~MD5Digest();
 
 	void Add(const std::string &rString);
-	void Add(const void *pData, int Length);
+	void Add(const void *pData, size_t Length);
 
 	void Finish();
 
 	std::string DigestAsString();
-	uint8_t *DigestAsData(int *pLength = 0)
+	uint8_t *DigestAsData(size_t *pLength = 0)
 	{
 		if(pLength) *pLength = sizeof(mDigest);
 		return mDigest;
@@ -44,7 +44,7 @@ public:
 		DigestLength = MD5_DIGEST_LENGTH
 	};
 
-	int CopyDigestTo(uint8_t *to);
+	size_t CopyDigestTo(uint8_t *to);
 
 	bool DigestMatches(uint8_t *pCompareWith) const;
 

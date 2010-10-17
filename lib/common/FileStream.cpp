@@ -162,7 +162,7 @@ FileStream::~FileStream()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t FileStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	if(mOSFileHandle == INVALID_FILE) 
 	{
@@ -170,12 +170,13 @@ int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 
 #ifdef WIN32
+	ASSERT(NBytes <= std::numeric_limits<DWORD>::max());
 	int r;
 	DWORD numBytesRead = 0;
 	BOOL valid = ReadFile(
 		this->mOSFileHandle,
 		pBuffer,
-		NBytes,
+		static_cast<DWORD>(NBytes),
 		&numBytesRead,
 		NULL
 		);
@@ -243,7 +244,7 @@ IOStream::pos_type FileStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void FileStream::Write(const void *pBuffer, int NBytes)
+void FileStream::Write(const void *pBuffer, size_t NBytes)
 {
 	if(mOSFileHandle == INVALID_FILE) 
 	{
@@ -251,11 +252,12 @@ void FileStream::Write(const void *pBuffer, int NBytes)
 	}
 
 #ifdef WIN32
+	ASSERT(NBytes <= std::numeric_limits<DWORD>::max());
 	DWORD numBytesWritten = 0;
 	BOOL res = WriteFile(
 		this->mOSFileHandle,
 		pBuffer,
-		NBytes,
+		static_cast<DWORD>(NBytes),
 		&numBytesWritten,
 		NULL
 		);
@@ -423,7 +425,7 @@ bool FileStream::CompareWith(IOStream& rOther, int Timeout)
 	char buf2[2048];
 	while(StreamDataLeft() && rOther.StreamDataLeft())
 	{
-		int readSize = rOther.Read(buf1, sizeof(buf1), Timeout);
+		size_t readSize = rOther.Read(buf1, sizeof(buf1), Timeout);
 		otherSize += readSize;
 		
 		if(Read(buf2, readSize) != readSize ||

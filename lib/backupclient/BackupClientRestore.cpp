@@ -105,7 +105,7 @@ public:
 			// ID
 			rWrite.Write(&mNextLevelID, sizeof(mNextLevelID));
 			// Name string
-			int32_t nsize = mNextLevelLocalName.size();
+			size_t nsize = mNextLevelLocalName.size();
 			rWrite.Write(&nsize, sizeof(nsize));
 			rWrite.Write(mNextLevelLocalName.c_str(), nsize);
 			// And then the level itself
@@ -440,8 +440,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 	// list of files which is appropriate to the restore type
 	rConnection.QueryListDirectory(
 		DirectoryID,
-		Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING),
-		BackupProtocolClientListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolClientListDirectory::Flags_Deleted)),
+		static_cast<int16_t>(Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING)),
+		static_cast<int16_t>(BackupProtocolClientListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolClientListDirectory::Flags_Deleted))),
 		true /* want attributes */);
 
 	// Retrieve the directory from the stream following

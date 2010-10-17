@@ -146,7 +146,7 @@ public:
 	int64_t GetRevisionID() const {return mRevisionID;}
 	void SetRevisionID(int64_t RevisionID) {mRevisionID = RevisionID;}
 	
-	unsigned int GetNumberOfEntries() const {return mEntries.size();}
+	size_t GetNumberOfEntries() const {return mEntries.size();}
 
 	// User info -- not serialised into streams
 	int64_t GetUserInfo1_SizeInBlocks() const {return mUserInfo1;}

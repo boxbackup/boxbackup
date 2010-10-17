@@ -175,15 +175,15 @@ std::string FdGetLine::GetLine(bool Preprocess)
 	else
 	{
 		// Remove whitespace
-		int size = r.size();
-		int begin = 0;
+		size_t size = r.size();
+		size_t begin = 0;
 		while(begin < size && iw(r[begin]))
 		{
 			begin++;
 		}
 		
 		// Check for comment char, but char before must be whitespace
-		int end = begin;
+		size_t end = begin;
 		while(end < size)
 		{
 			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))

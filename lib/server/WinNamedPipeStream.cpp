@@ -247,7 +247,7 @@ void WinNamedPipeStream::Connect(const std::string& rName)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t WinNamedPipeStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// TODO no support for timeouts yet
 	if (!mIsServer && Timeout != IOStream::TimeOutInfinite)
@@ -445,7 +445,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
+void WinNamedPipeStream::Write(const void *pBuffer, size_t NBytes)
 {
 	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{

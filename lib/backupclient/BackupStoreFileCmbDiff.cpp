@@ -79,7 +79,12 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 	}
 	int64_t diff1NumBlocks = box_ntoh64(diff1IdxHdr.mNumBlocks);
 	// Allocate some memory
-	int64_t *diff1BlockStartPositions = (int64_t*)::malloc((diff1NumBlocks + 1) * sizeof(int64_t));
+	uint64_t bytesToMalloc = (diff1NumBlocks + 1) * sizeof(int64_t);
+	if(bytesToMalloc >= SIZE_MAX)
+	{
+		throw std::bad_alloc();
+	}
+	int64_t *diff1BlockStartPositions = (int64_t*)::malloc(static_cast<size_t>(bytesToMalloc));
 	if(diff1BlockStartPositions == 0)
 	{
 		throw std::bad_alloc();
@@ -87,7 +92,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 
 	// Buffer data
 	void *buffer = 0;
-	int bufferSize = 0;	
+	size_t bufferSize = 0;
 	
 	try
 	{
@@ -172,7 +177,7 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 
 			// What do to next about copying data
 			bool copyBlock = false;
-			int copySize = 0;
+			size_t copySize = 0;
 			int64_t copyFrom = 0;
 			bool fromFileDiff1 = false;
 	
@@ -191,24 +196,29 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 			else
 			{
 				// Block isn't present here -- is it present in the old one?
-				int64_t blockIndex = 0 - blockEn;
-				if(blockIndex < 0 || blockIndex > diff1NumBlocks)
+				int64_t blockIndex_ = 0 - blockEn;
+				if(blockIndex_ < 0 || blockIndex_ > diff1NumBlocks)
 				{
 					THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 				}
+				if(blockIndex_ >= SIZE_MAX)
+				{
+					THROW_EXCEPTION(CommonException, Internal)
+				}
+				size_t blockIndex = static_cast<size_t>(blockIndex_);
 				if(diff1BlockStartPositions[blockIndex] > 0)
 				{
 					// Block is in the old diff file, copy it across
 					copyBlock = true;
 					copyFrom = diff1BlockStartPositions[blockIndex];
-					int nb = blockIndex + 1;
+					size_t nb = blockIndex + 1;
 					while(diff1BlockStartPositions[nb] <= 0)
 					{
 						// This is safe, because the last entry will terminate it properly!
 						++nb;
-						ASSERT(nb <= diff1NumBlocks);
+						ASSERT((int64_t)nb <= diff1NumBlocks);
 					}
-					copySize = diff1BlockStartPositions[nb] - copyFrom;
+					copySize = static_cast<size_t>(diff1BlockStartPositions[nb] - copyFrom);
 					fromFileDiff1 = true;
 				}
 			}
@@ -280,16 +290,17 @@ void BackupStoreFile::CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream 
 			if(blockEn <= 0)
 			{
 				int64_t blockIndex = 0 - blockEn;
+				ASSERT(blockIndex < SIZE_MAX);
 				// In another file. Need to translate this against the other diff
 				if(diff1BlockStartPositions[blockIndex] > 0)
 				{
 					// Block is in the first diff file, stick in size
-					int nb = blockIndex + 1;
+					size_t nb = static_cast<size_t>(blockIndex + 1);
 					while(diff1BlockStartPositions[nb] <= 0)
 					{
 						// This is safe, because the last entry will terminate it properly!
 						++nb;
-						ASSERT(nb <= diff1NumBlocks);
+						ASSERT((int64_t)nb <= diff1NumBlocks);
 					}
 					int64_t size = diff1BlockStartPositions[nb] - diff1BlockStartPositions[blockIndex];
 					e.mEncodedSize = box_hton64(size);

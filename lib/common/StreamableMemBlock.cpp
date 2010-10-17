@@ -40,7 +40,7 @@ StreamableMemBlock::StreamableMemBlock()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-StreamableMemBlock::StreamableMemBlock(void *pBuffer, int Size)
+StreamableMemBlock::StreamableMemBlock(void *pBuffer, size_t Size)
 	: mpBuffer(0),
 	  mSize(0)
 {
@@ -56,7 +56,7 @@ StreamableMemBlock::StreamableMemBlock(void *pBuffer, int Size)
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-StreamableMemBlock::StreamableMemBlock(int Size)
+StreamableMemBlock::StreamableMemBlock(size_t Size)
 	: mpBuffer(0),
 	  mSize(0)
 {
@@ -89,7 +89,7 @@ StreamableMemBlock::StreamableMemBlock(const StreamableMemBlock &rToCopy)
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void StreamableMemBlock::Set(void *pBuffer, int Size)
+void StreamableMemBlock::Set(void *pBuffer, size_t Size)
 {
 	FreeBlock();
 	AllocateBlock(Size);
@@ -115,7 +115,11 @@ void StreamableMemBlock::Set(IOStream &rStream, int Timeout)
 	}
 	
 	// Allocate a new block (this way to be exception safe)
-	char *pblock = (char*)malloc(size);
+	if(size >= SIZE_MAX)
+	{
+		throw std::bad_alloc();
+	}
+	char *pblock = (char*)malloc(static_cast<size_t>(size));
 	if(pblock == 0)
 	{
 		throw std::bad_alloc();
@@ -141,7 +145,7 @@ void StreamableMemBlock::Set(IOStream &rStream, int Timeout)
 	// store...
 	ASSERT(mpBuffer == 0);
 	mpBuffer = pblock;
-	mSize = size;
+	mSize = static_cast<size_t>(size);
 }
 
 
@@ -200,7 +204,7 @@ void StreamableMemBlock::FreeBlock()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void StreamableMemBlock::AllocateBlock(int Size)
+void StreamableMemBlock::AllocateBlock(size_t Size)
 {
 	ASSERT(mpBuffer == 0);
 	if(Size > 0)
@@ -223,7 +227,7 @@ void StreamableMemBlock::AllocateBlock(int Size)
 //		Created: 3/12/03
 //
 // --------------------------------------------------------------------------
-void StreamableMemBlock::ResizeBlock(int Size)
+void StreamableMemBlock::ResizeBlock(size_t Size)
 {
 	ASSERT(Size > 0);
 	if(Size > 0)
@@ -299,7 +303,8 @@ void StreamableMemBlock::ReadFromStream(IOStream &rStream, int Timeout)
 // --------------------------------------------------------------------------
 void StreamableMemBlock::WriteToStream(IOStream &rStream) const
 {
-	int32_t sizenbo = htonl(mSize);
+	ASSERT(mSize <= (size_t)std::numeric_limits<int32_t>::max());
+	int32_t sizenbo = htonl(static_cast<int32_t>(mSize));
 	// Size
 	rStream.Write(&sizenbo, sizeof(sizenbo));
 	// Buffer

@@ -53,7 +53,7 @@ static void SearchForMatchingBlocks(IOStream &rFile,
 	int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES],
 	DiffTimer *pDiffTimer);
 static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t BlockSize, BlocksAvailableEntry **pHashTable);
-static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber,
+static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, size_t Offset, int32_t BlockSize, int64_t FileBlockNumber,
 BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks);
 static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksAvailableEntry *pIndex, int64_t NumBlocks, std::map<int64_t, int64_t> &rFoundBlocks, int64_t SizeOfInputFile);
 
@@ -302,7 +302,12 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 	//TODO: Verify that these sizes look reasonable
 	
 	// Allocate space for the index
-	BlocksAvailableEntry *pindex = (BlocksAvailableEntry*)::malloc(sizeof(BlocksAvailableEntry) * numBlocks);
+	uint64_t bytesToMalloc = sizeof(BlocksAvailableEntry) * numBlocks;
+	if(bytesToMalloc >= SIZE_MAX)
+	{
+		throw std::bad_alloc();
+	}
+	BlocksAvailableEntry *pindex = (BlocksAvailableEntry*)::malloc(static_cast<size_t>(bytesToMalloc));
 	if(pindex == 0)
 	{
 		throw std::bad_alloc();
@@ -329,7 +334,7 @@ static void LoadIndex(IOStream &rBlockIndex, int64_t ThisID, BlocksAvailableEntr
 			
 			// Decrypt the encrypted section
 			file_BlockIndexEntryEnc entryEnc;
-			int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
+			size_t sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
 					entry.mEnEnc, sizeof(entry.mEnEnc));
 			if(sectionSize != sizeof(entryEnc))
 			{
@@ -545,7 +550,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			// Setup block pointers
 			uint8_t *beginnings = pbuffer0;
 			uint8_t *endings = pbuffer1;
-			int offset = 0;
+			int32_t offset = 0;
 			
 			// Calculate the first checksum, ready for rolling
 			RollingChecksum rolling(beginnings, Sizes[s]);
@@ -553,7 +558,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			// Then roll, until the file is exhausted
 			int64_t fileBlockNumber = 0;
 			int64_t fileOffset = 0;
-			int rollOverInitialBytes = 0;
+			int32_t rollOverInitialBytes = 0;
 			while(true)
 			{
 				if(maximumDiffingTime.HasExpired())
@@ -571,14 +576,14 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 				}
 				
 				// Load in another block of data, and record how big it is
-				int bytesInEndings = rFile.Read(endings, Sizes[s]);
+				int32_t bytesInEndings = rFile.Read(endings, Sizes[s]);
 				int tmp;
 
 				// Skip any bytes from a previous matched block
 				if(rollOverInitialBytes > 0 && offset < bytesInEndings)
 				{
-					int spaceLeft = bytesInEndings - offset;
-					int thisRoll = (rollOverInitialBytes > spaceLeft) ? spaceLeft : rollOverInitialBytes;
+					int32_t spaceLeft = bytesInEndings - offset;
+					int32_t thisRoll = (rollOverInitialBytes > spaceLeft) ? spaceLeft : rollOverInitialBytes;
 
 					rolling.RollForwardSeveral(beginnings+offset, endings+offset, Sizes[s], thisRoll);
 
@@ -605,8 +610,8 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 				{
 					// Skip over bigger ready-matched blocks completely
 					rollOverInitialBytes = tmp;
-					int spaceLeft = bytesInEndings - offset;
-					int thisRoll = (rollOverInitialBytes > spaceLeft) ? spaceLeft : rollOverInitialBytes;
+					int32_t spaceLeft = bytesInEndings - offset;
+					int32_t thisRoll = (rollOverInitialBytes > spaceLeft) ? spaceLeft : rollOverInitialBytes;
 
 					rolling.RollForwardSeveral(beginnings+offset, endings+offset, Sizes[s], thisRoll);
 
@@ -635,11 +640,11 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 							// any more comparisons, because these are pointless (as any more matches will be ignored when
 							// the recipe is generated) and just take up valuable processor time. Edge cases are
 							// especially nasty, using huge amounts of time and memory.
-							int skip = Sizes[s];
+							int32_t skip = Sizes[s];
 							if(offset < bytesInEndings && skip > 0)
 							{
-								int spaceLeft = bytesInEndings - offset;
-								int thisRoll = (skip > spaceLeft) ? spaceLeft : skip;
+								int32_t spaceLeft = bytesInEndings - offset;
+								int32_t thisRoll = (skip > spaceLeft) ? spaceLeft : skip;
 
 								rolling.RollForwardSeveral(beginnings+offset, endings+offset, Sizes[s], thisRoll);
 
@@ -802,7 +807,7 @@ static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int3
 //
 // --------------------------------------------------------------------------
 static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings,
-	int Offset, int32_t BlockSize, int64_t FileBlockNumber, BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks)
+	size_t Offset, int32_t BlockSize, int64_t FileBlockNumber, BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks)
 {
 	// Check parameters
 	ASSERT(pBeginnings != 0);

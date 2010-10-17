@@ -31,8 +31,8 @@ public:
 	BSFCombinedIndexStream(IOStream *pDiff);
 	~BSFCombinedIndexStream();
 	
-	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual void Write(const void *pBuffer, size_t NBytes);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	virtual void Initialise(IOStream &rFrom);
@@ -174,7 +174,12 @@ void BSFCombinedIndexStream::Initialise(IOStream &rFrom)
 	
 	// Then... allocate memory for the list of sizes
 	mNumEntriesInFromFile = box_ntoh64(fromHdr.mNumBlocks);
-	mFromBlockSizes = (int64_t*)::malloc(mNumEntriesInFromFile * sizeof(int64_t));
+	uint64_t bytesToMalloc = mNumEntriesInFromFile * sizeof(int64_t);
+	if(bytesToMalloc >= SIZE_MAX)
+	{
+		throw std::bad_alloc();
+	}
+	mFromBlockSizes = (int64_t*)::malloc(static_cast<size_t>(bytesToMalloc));
 	if(mFromBlockSizes == 0)
 	{
 		throw std::bad_alloc();
@@ -212,7 +217,7 @@ void BSFCombinedIndexStream::Initialise(IOStream &rFrom)
 //		Created: 8/7/04
 //
 // --------------------------------------------------------------------------
-int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t BSFCombinedIndexStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// Paranoia is good.
 	if(!mIsInitialised || mFromBlockSizes == 0 || mpDiff == 0)
@@ -220,13 +225,13 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
 	
-	int written = 0;
+	size_t written = 0;
 	
 	// Header output yet?
 	if(!mHeaderWritten)
 	{
 		// Enough space?
-		if(NBytes < (int)sizeof(mHeader)) return 0;
+		if(NBytes < sizeof(mHeader)) return 0;
 		
 		// Copy in
 		::memcpy(pBuffer, &mHeader, sizeof(mHeader));
@@ -238,17 +243,17 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 
 	// How many entries can be written?
-	int entriesToWrite = NBytes / sizeof(file_BlockIndexEntry);
-	if(entriesToWrite > mNumEntriesToGo)
+	size_t entriesToWrite = NBytes / sizeof(file_BlockIndexEntry);
+	if(entriesToWrite > static_cast<size_t>(mNumEntriesToGo))
 	{
-		entriesToWrite = mNumEntriesToGo;
+		entriesToWrite = static_cast<size_t>(mNumEntriesToGo);
 	}
 	
 	// Setup ready to go
 	file_BlockIndexEntry *poutput = (file_BlockIndexEntry*)(((uint8_t*)pBuffer) + written);
 
 	// Write entries
-	for(int b = 0; b < entriesToWrite; ++b)
+	for(size_t b = 0; b < entriesToWrite; ++b)
 	{
 		if(!mpDiff->ReadFullBuffer(&(poutput[b]), sizeof(file_BlockIndexEntry), 0))
 		{
@@ -256,11 +261,11 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 		}
 		
 		// Does this need adjusting?
-		int s = box_ntoh64(poutput[b].mEncodedSize);
+		int64_t s = box_ntoh64(poutput[b].mEncodedSize);
 		if(s <= 0)
 		{
 			// A reference to a block in the from file
-			int block = 0 - s;
+			int64_t block = 0 - s;
 			ASSERT(block >= 0);
 			if(block >= mNumEntriesInFromFile)
 			{
@@ -289,7 +294,7 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 8/7/04
 //
 // --------------------------------------------------------------------------
-void BSFCombinedIndexStream::Write(const void *pBuffer, int NBytes)
+void BSFCombinedIndexStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(BackupStoreException, StreamDoesntHaveRequiredFeatures)
 }

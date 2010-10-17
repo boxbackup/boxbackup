@@ -34,9 +34,9 @@ public:
 	void Connect(const std::string& rName);
 
 	// both sides
-	virtual int Read(void *pBuffer, int NBytes, 
+	virtual size_t Read(void *pBuffer, size_t NBytes, 
 		int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, size_t NBytes);
 	virtual void WriteAllBuffered();
 	virtual void Close();
 	virtual bool StreamDataLeft();

@@ -57,7 +57,7 @@ PartialReadStream::~PartialReadStream()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-int PartialReadStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t PartialReadStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// Finished?
 	if(mBytesLeft <= 0)
@@ -66,15 +66,15 @@ int PartialReadStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 
 	// Asking for more than is allowed?
-	if(NBytes > mBytesLeft)
+	if(static_cast<IOStream::pos_type>(NBytes) > mBytesLeft)
 	{
 		// Adjust downwards
-		NBytes = mBytesLeft;
+		NBytes = static_cast<size_t>(mBytesLeft);
 	}
 	
 	// Route the request to the source
-	int read = mrSource.Read(pBuffer, NBytes, Timeout);
-	ASSERT(read <= mBytesLeft);
+	size_t read = mrSource.Read(pBuffer, NBytes, Timeout);
+	ASSERT(static_cast<IOStream::pos_type>(read) <= mBytesLeft);
 	
 	// Adjust the count
 	mBytesLeft -= read;
@@ -104,7 +104,7 @@ IOStream::pos_type PartialReadStream::BytesLeftToRead()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void PartialReadStream::Write(const void *pBuffer, int NBytes)
+void PartialReadStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(CommonException, CantWriteToPartialReadStream)
 }

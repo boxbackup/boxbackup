@@ -187,10 +187,10 @@ void BackupStoreFilenameClear::MakeClearAvailable() const
 // Buffer for encoding and decoding -- do this all in one single buffer to
 // avoid lots of string allocation, which stuffs up memory usage.
 // These static memory vars are, of course, not thread safe, but we don't use threads.
-static int sEncDecBufferSize = 0;
+static size_t sEncDecBufferSize = 0;
 static MemoryBlockGuard<uint8_t *> *spEncDecBuffer = 0;
 
-static void EnsureEncDecBufferSize(int BufSize)
+static void EnsureEncDecBufferSize(size_t BufSize)
 {
 	if(spEncDecBuffer == 0)
 	{
@@ -228,7 +228,7 @@ static void EnsureEncDecBufferSize(int BufSize)
 void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, CipherContext &rCipherContext, int StoreAsEncoding)
 {
 	// Work out max size
-	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rToEncode.size()) + 4;
+	size_t maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rToEncode.size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
 	EnsureEncDecBufferSize(maxOutSize);
@@ -237,7 +237,7 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 	uint8_t *buffer = *spEncDecBuffer;
 	
 	// Encode -- do entire block in one go
-	int encSize = rCipherContext.TransformBlock(buffer + 2, sEncDecBufferSize - 2, rToEncode.c_str(), rToEncode.size());
+	size_t encSize = rCipherContext.TransformBlock(buffer + 2, sEncDecBufferSize - 2, rToEncode.c_str(), rToEncode.size());
 	// and add in header size
 	encSize += 2;
 	
@@ -262,7 +262,7 @@ void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) con
 	const std::string& rEncoded = GetEncodedFilename();
 
 	// Work out max size
-	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rEncoded.size()) + 4;
+	size_t maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rEncoded.size()) + 4;
 	
 	// Make sure encode/decode buffer has enough space
 	EnsureEncDecBufferSize(maxOutSize);
@@ -272,7 +272,7 @@ void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) con
 	
 	// Decrypt
 	const char *str = rEncoded.c_str() + 2;
-	int sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, rEncoded.size() - 2);
+	size_t sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, rEncoded.size() - 2);
 	
 	// Assign to this
 	mClearFilename.assign((char*)buffer, sizeOut);
@@ -304,7 +304,7 @@ void BackupStoreFilenameClear::EncodedFilenameChanged()
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFilenameClear::SetBlowfishKey(const void *pKey, int KeyLength, const void *pIV, int IVLength)
+void BackupStoreFilenameClear::SetBlowfishKey(const void *pKey, int8_t KeyLength, const void *pIV, int8_t IVLength)
 {
 	// Initialisation vector not used. Can't use a different vector for each filename as
 	// that would stop comparisions on the server working.

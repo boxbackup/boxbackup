@@ -77,7 +77,7 @@ template<typename type>
 class MemoryBlockGuard
 {
 public:
-	MemoryBlockGuard(int BlockSize)
+	MemoryBlockGuard(size_t BlockSize)
 		: mpBlock(::malloc(BlockSize))
 	{
 		if(mpBlock == 0)
@@ -101,7 +101,7 @@ public:
 		return (type)mpBlock;
 	}
 	
-	void Resize(int NewSize)
+	void Resize(size_t NewSize)
 	{
 		void *ptrn = ::realloc(mpBlock, NewSize);
 		if(ptrn == 0)

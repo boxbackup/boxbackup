@@ -48,7 +48,7 @@ BackupStoreFileEncodeStream::BackupStoreFileEncodeStream()
 	  mSendData(true),
 	  mTotalBlocks(0),
 	  mAbsoluteBlockNumber(-1),
-	  mInstructionNumber(-1),
+	  mInstructionNumber(SIZE_MAX),
 	  mNumBlocks(0),
 	  mCurrentBlock(-1),
 	  mCurrentBlockEncodedSize(0),
@@ -150,7 +150,7 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename,
 		
 		// Go through each instruction in the recipe and work out how many blocks
 		// it will add, and the max clear size of these blocks
-		int maxBlockClearSize = 0;
+		int32_t maxBlockClearSize = 0;
 		for(Recipe::size_type inst = 0; inst < pRecipe->size(); ++inst)
 		{
 			if((*pRecipe)[inst].mSpaceBefore > 0)
@@ -301,7 +301,7 @@ void BackupStoreFileEncodeStream::CalculateBlockSizes(int64_t DataSize, int64_t 
 	} while(rBlockSizeOut < BACKUP_FILE_MAX_BLOCK_SIZE && rNumBlocksOut > BACKUP_FILE_INCREASE_BLOCK_SIZE_AFTER);
 	
 	// Last block size
-	rLastBlockSizeOut = DataSize - ((rNumBlocksOut - 1) * rBlockSizeOut);
+	rLastBlockSizeOut = static_cast<int32_t>(DataSize - ((rNumBlocksOut - 1) * rBlockSizeOut));
 	
 	// Avoid small blocks?
 	if(rLastBlockSizeOut < BACKUP_FILE_AVOID_BLOCKS_LESS_THAN
@@ -313,7 +313,7 @@ void BackupStoreFileEncodeStream::CalculateBlockSizes(int64_t DataSize, int64_t 
 	}
 	
 	// checks!
-	ASSERT((((rNumBlocksOut-1) * rBlockSizeOut) + rLastBlockSizeOut) == DataSize);
+	ASSERT(static_cast<int64_t>(((rNumBlocksOut-1) * rBlockSizeOut) + rLastBlockSizeOut) == DataSize);
 	//TRACE4("CalcBlockSize, sz %lld, num %lld, blocksize %d, last %d\n", DataSize, rNumBlocksOut, (int32_t)rBlockSizeOut, (int32_t)rLastBlockSizeOut);
 }
 
@@ -327,7 +327,7 @@ void BackupStoreFileEncodeStream::CalculateBlockSizes(int64_t DataSize, int64_t 
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t BackupStoreFileEncodeStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// Check there's something to do.
 	if(mStatus == Status_Finished)
@@ -340,7 +340,7 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		THROW_EXCEPTION(BackupStoreException, SignalReceived);
 	}
 
-	int bytesToRead = NBytes;
+	size_t bytesToRead = NBytes;
 	uint8_t *buffer = (uint8_t*)pBuffer;
 	
 	while(bytesToRead > 0 && mStatus != Status_Finished)
@@ -350,7 +350,7 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// Header or block listing phase -- send from the buffered stream
 		
 			// Send bytes from the data buffer
-			int b = mData.Read(buffer, bytesToRead, Timeout);
+			size_t b = mData.Read(buffer, bytesToRead, Timeout);
 			bytesToRead -= b;
 			buffer += b;
 			
@@ -400,7 +400,7 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 				if(mCurrentBlock >= mNumBlocks)
 				{
 					// Output extra blocks for this instruction and move forward in file
-					if(mInstructionNumber >= 0)
+					if(mInstructionNumber < SIZE_MAX)
 					{
 						SkipPreviousBlocksInInstruction();
 					}
@@ -409,14 +409,14 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 					++mInstructionNumber;
 					
 					// Skip instructions which don't contain any data
-					while(mInstructionNumber < static_cast<int64_t>(mpRecipe->size())
+					while(mInstructionNumber < mpRecipe->size()
 						&& (*mpRecipe)[mInstructionNumber].mSpaceBefore == 0)
 					{
 						SkipPreviousBlocksInInstruction();
 						++mInstructionNumber;
 					}
 					
-					if(mInstructionNumber >= static_cast<int64_t>(mpRecipe->size()))
+					if(mInstructionNumber >= mpRecipe->size())
 					{
 						// End of blocks, go to next phase
 						++mStatus;
@@ -442,7 +442,7 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 			if(mPositionInCurrentBlock < mCurrentBlockEncodedSize)
 			{
 				// How much data to put in the buffer?
-				int s = mCurrentBlockEncodedSize - mPositionInCurrentBlock;
+				size_t s = mCurrentBlockEncodedSize - mPositionInCurrentBlock;
 				if(s > bytesToRead) s = bytesToRead;
 				
 				// Copy it in
@@ -487,7 +487,7 @@ void BackupStoreFileEncodeStream::SkipPreviousBlocksInInstruction()
 	}
 
 	// Index of the first block in old file (being diffed from)
-	int firstIndex = mpRecipe->BlockPtrToIndex((*mpRecipe)[mInstructionNumber].mpStartBlock);
+	int64_t firstIndex = mpRecipe->BlockPtrToIndex((*mpRecipe)[mInstructionNumber].mpStartBlock);
 	
 	int64_t sizeToSkip = 0;
 
@@ -546,12 +546,12 @@ void BackupStoreFileEncodeStream::SetForInstruction()
 void BackupStoreFileEncodeStream::EncodeCurrentBlock()
 {
 	// How big is the block, raw?
-	int blockRawSize = mBlockSize;
+	int32_t blockRawSize = mBlockSize;
 	if(mCurrentBlock == (mNumBlocks - 1))
 	{
 		blockRawSize = mLastBlockSize;
 	}
-	ASSERT(blockRawSize < mAllocatedBufferSize);
+	ASSERT((size_t)blockRawSize < mAllocatedBufferSize);
 
 	// Check file open
 	if(mpLogging == 0)
@@ -624,7 +624,7 @@ void BackupStoreFileEncodeStream::StoreBlockIndexEntry(int64_t EncSizeOrBlkIndex
 	sBlowfishEncryptBlockEntry.SetIV(&iv);
 
 	// Encode the data
-	int encodedSize = sBlowfishEncryptBlockEntry.TransformBlock(entry.mEnEnc, sizeof(entry.mEnEnc), &entryEnc, sizeof(entryEnc));
+	size_t encodedSize = sBlowfishEncryptBlockEntry.TransformBlock(entry.mEnEnc, sizeof(entry.mEnEnc), &entryEnc, sizeof(entryEnc));
 	if(encodedSize != sizeof(entry.mEnEnc))
 	{
 		THROW_EXCEPTION(BackupStoreException, BlockEntryEncodingDidntGiveExpectedLength)
@@ -643,7 +643,7 @@ void BackupStoreFileEncodeStream::StoreBlockIndexEntry(int64_t EncSizeOrBlkIndex
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFileEncodeStream::Write(const void *pBuffer, int NBytes)
+void BackupStoreFileEncodeStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(BackupStoreException, CantWriteToEncodedFileStream)
 }

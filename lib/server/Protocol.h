@@ -89,8 +89,8 @@ public:
 	void SetMaxObjectSize(unsigned int NewMaxObjSize) {mMaxObjectSize = NewMaxObjSize;}
 
 	// For ProtocolObject derived classes
-	void Read(void *Buffer, int Size);
-	void Read(std::string &rOut, int Size);
+	void Read(void *Buffer, size_t Size);
+	void Read(std::string &rOut, size_t Size);
 	void Read(int64_t &rOut);
 	void Read(int32_t &rOut);
 	void Read(int16_t &rOut);
@@ -124,7 +124,7 @@ public:
 		}
 	}
 	
-	void Write(const void *Buffer, int Size);
+	void Write(const void *Buffer, size_t Size);
 	void Write(int64_t Value);
 	void Write(int32_t Value);
 	void Write(int16_t Value);
@@ -177,12 +177,12 @@ protected:
 	void CheckAndReadHdr(void *hdr);	// don't use type here to avoid dependency
 	
 	// Will be used for logging
-	virtual void InformStreamReceiving(u_int32_t Size);
-	virtual void InformStreamSending(u_int32_t Size);
+	virtual void InformStreamReceiving(IOStream::pos_type Size);
+	virtual void InformStreamSending(IOStream::pos_type Size);
 	
 private:
-	void EnsureBufferAllocated(int Size);
-	int SendStreamSendBlock(uint8_t *Block, int BytesInBlock);
+	void EnsureBufferAllocated(size_t Size);
+	size_t SendStreamSendBlock(uint8_t *Block, size_t BytesInBlock);
 
 private:
 	IOStream &mrStream;
@@ -190,10 +190,10 @@ private:
 	unsigned int mMaxObjectSize;
 	int mTimeout;
 	char *mpBuffer;
-	int mBufferSize;
-	int mReadOffset;
-	int mWriteOffset;
-	int mValidDataSize;
+	size_t mBufferSize;
+	size_t mReadOffset;
+	size_t mWriteOffset;
+	size_t mValidDataSize;
 	int mLastErrorType;
 	int mLastErrorSubType;
 };

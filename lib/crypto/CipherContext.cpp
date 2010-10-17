@@ -193,7 +193,7 @@ void CipherContext::Begin()
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
-int CipherContext::Transform(void *pOutBuffer, int OutLength, const void *pInBuffer, int InLength)
+size_t CipherContext::Transform(void *pOutBuffer, size_t OutLength, const void *pInBuffer, size_t InLength)
 {
 	if(!mInitialised)
 	{
@@ -206,7 +206,8 @@ int CipherContext::Transform(void *pOutBuffer, int OutLength, const void *pInBuf
 	}
 
 	// Check parameters
-	if(pOutBuffer == 0 || OutLength < 0 || (pInBuffer != 0 && InLength <= 0) || (pInBuffer == 0 && InLength != 0))
+	if(pOutBuffer == NULL || (pInBuffer != NULL && InLength == 0) || (pInBuffer == NULL && InLength != 0)
+		|| OutLength > INT_MAX || InLength > INT_MAX)
 	{
 		THROW_EXCEPTION(CipherException, BadArguments)
 	}
@@ -224,8 +225,8 @@ int CipherContext::Transform(void *pOutBuffer, int OutLength, const void *pInBuf
 	}
 	
 	// Do the transform
-	int outLength = OutLength;
-	if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
+	int outLength = static_cast<int>(OutLength);
+	if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, static_cast<int>(InLength)) != 1)
 	{
 		THROW_EXCEPTION(CipherException, EVPUpdateFailure)
 	}
@@ -246,7 +247,7 @@ int CipherContext::Transform(void *pOutBuffer, int OutLength, const void *pInBuf
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
-int CipherContext::Final(void *pOutBuffer, int OutLength)
+size_t CipherContext::Final(void *pOutBuffer, size_t OutLength)
 {
 	if(!mInitialised)
 	{
@@ -259,19 +260,19 @@ int CipherContext::Final(void *pOutBuffer, int OutLength)
 	}
 
 	// Check parameters
-	if(pOutBuffer == 0 || OutLength < 0)
+	if(pOutBuffer == NULL || OutLength > INT_MAX)
 	{
 		THROW_EXCEPTION(CipherException, BadArguments)
 	}
 
 	// Check output buffer size
-	if(OutLength < (2 * EVP_CIPHER_CTX_block_size(&ctx)))
+	int outLength = static_cast<int>(OutLength);
+	if(outLength < (2 * EVP_CIPHER_CTX_block_size(&ctx)))
 	{
 		THROW_EXCEPTION(CipherException, OutputBufferTooSmall);
 	}
 	
 	// Do the transform
-	int outLength = OutLength;
 #ifndef HAVE_OLD_SSL
 	if(EVP_CipherFinal_ex(&ctx, (unsigned char*)pOutBuffer, &outLength) != 1)
 	{
@@ -373,7 +374,7 @@ void CipherContext::OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut)
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
-int CipherContext::InSizeForOutBufferSize(int OutLength)
+size_t CipherContext::InSizeForOutBufferSize(size_t OutLength)
 {
 	if(!mInitialised)
 	{
@@ -394,7 +395,7 @@ int CipherContext::InSizeForOutBufferSize(int OutLength)
 //		Created: 3/12/03
 //
 // --------------------------------------------------------------------------
-int CipherContext::MaxOutSizeForInBufferSize(int InLength)
+size_t CipherContext::MaxOutSizeForInBufferSize(size_t InLength)
 {
 	if(!mInitialised)
 	{
@@ -415,13 +416,18 @@ int CipherContext::MaxOutSizeForInBufferSize(int InLength)
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
-int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *pInBuffer, int InLength)
+size_t CipherContext::TransformBlock(void *pOutBuffer, size_t OutLength, const void *pInBuffer, size_t InLength)
 {
 	if(!mInitialised)
 	{
 		THROW_EXCEPTION(CipherException, NotInitialised)
 	}
-	
+
+	if(OutLength > INT_MAX || InLength > INT_MAX)
+	{
+		THROW_EXCEPTION(CipherException, BadArguments)
+	}
+
 	// Warn if in a transformation
 	if(mWithinTransform)
 	{
@@ -454,13 +460,13 @@ int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *p
 	try
 	{
 		// Update
-		outLength = OutLength;
-		if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
+		outLength = static_cast<int>(OutLength);
+		if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, static_cast<int>(InLength)) != 1)
 		{
 			THROW_EXCEPTION(CipherException, EVPUpdateFailure)
 		}
 		// Finalise
-		int outLength2 = OutLength - outLength;
+		int outLength2 = static_cast<int>(OutLength - outLength);
 #ifndef HAVE_OLD_SSL
 		if(EVP_CipherFinal_ex(&ctx, ((unsigned char*)pOutBuffer) + outLength, &outLength2) != 1)
 		{
@@ -474,7 +480,7 @@ int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *p
 	catch(...)
 	{
 		// Finalise the context, so definately ready for the next caller
-		int outs = OutLength;
+		int outs = static_cast<int>(OutLength);
 #ifndef HAVE_OLD_SSL
 		EVP_CipherFinal_ex(&ctx, (unsigned char*)pOutBuffer, &outs);
 #else

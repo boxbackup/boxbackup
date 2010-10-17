@@ -146,7 +146,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	mAttributes.ReadFromStream(rStream, Timeout);
 	
 	// Decode count
-	int count = ntohl(hdr.mNumEntries);
+	int32_t count = ntohl(hdr.mNumEntries);
 	
 	// Clear existing list
 	for(std::vector<Entry*>::iterator i = mEntries.begin(); 
@@ -157,7 +157,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	mEntries.clear();
 	
 	// Read them in!
-	for(int c = 0; c < count; ++c)
+	for(int32_t c = 0; c < count; ++c)
 	{
 		Entry *pen = new Entry;
 		try
@@ -179,7 +179,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	if(options & Option_DependencyInfoPresent)
 	{
 		// Read in extra dependency data
-		for(int c = 0; c < count; ++c)
+		for(int32_t c = 0; c < count; ++c)
 		{
 			mEntries[c]->ReadFromStreamDependencyInfo(rStream, Timeout);
 		}
@@ -197,7 +197,8 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo) const
 {
 	// Get count of entries
-	int32_t count = mEntries.size();
+	size_t count = mEntries.size();
+	ASSERT(count < (size_t)std::numeric_limits<int32_t>::max());
 	if(FlagsMustBeSet != Entry::Flags_INCLUDE_EVERYTHING || FlagsNotToBeSet != Entry::Flags_EXCLUDE_NOTHING)
 	{
 		// Need to count the entries
@@ -235,7 +236,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	// Build header
 	dir_StreamFormat hdr;
 	hdr.mMagicValue = htonl(OBJECTMAGIC_DIR_MAGIC_VALUE);
-	hdr.mNumEntries = htonl(count);
+	hdr.mNumEntries = htonl(static_cast<int32_t>(count));
 	hdr.mObjectID = box_hton64(mObjectID);
 	hdr.mContainerID = box_hton64(mContainerID);
 	hdr.mAttributesModTime = box_hton64(mAttributesModTime);

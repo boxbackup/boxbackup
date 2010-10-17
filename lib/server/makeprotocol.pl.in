@@ -625,8 +625,8 @@ if($type eq 'Server')
 if($implement_filelog || $implement_syslog)
 {
 	print H <<__E;
-	virtual void InformStreamReceiving(u_int32_t Size);
-	virtual void InformStreamSending(u_int32_t Size);
+	virtual void InformStreamReceiving(IOStream::pos_type Size);
+	virtual void InformStreamSending(IOStream::pos_type Size);
 __E
 }
 
@@ -864,11 +864,11 @@ __E
 
 	print CPP <<__E;
 
-void ${prefix}InformStreamReceiving(u_int32_t Size)
+void ${prefix}InformStreamReceiving(IOStream::pos_type Size)
 {
 $fR}
 
-void ${prefix}InformStreamSending(u_int32_t Size)
+void ${prefix}InformStreamSending(IOStream::pos_type Size)
 {
 $fS}
 

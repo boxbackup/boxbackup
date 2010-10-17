@@ -43,9 +43,9 @@ ReadLoggingStream::ReadLoggingStream(IOStream& rSource, Logger& rLogger)
 //		Created: 2007/01/16
 //
 // --------------------------------------------------------------------------
-int ReadLoggingStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t ReadLoggingStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
-	int numBytesRead = mrSource.Read(pBuffer, NBytes, Timeout);
+	size_t numBytesRead = mrSource.Read(pBuffer, NBytes, Timeout);
 
 	if (numBytesRead > 0)
 	{
@@ -96,7 +96,7 @@ IOStream::pos_type ReadLoggingStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void ReadLoggingStream::Write(const void *pBuffer, int NBytes)
+void ReadLoggingStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }

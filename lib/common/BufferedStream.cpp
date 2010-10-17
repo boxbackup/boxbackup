@@ -36,13 +36,13 @@ BufferedStream::BufferedStream(IOStream& rSource)
 //		Created: 2007/01/16
 //
 // --------------------------------------------------------------------------
-int BufferedStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t BufferedStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	if (mBufferSize == mBufferPosition)
 	{
 		// buffer is empty, fill it.
 
-		int numBytesRead = mrSource.Read(mBuffer, sizeof(mBuffer), 
+		size_t numBytesRead = mrSource.Read(mBuffer, sizeof(mBuffer), 
 			Timeout);
 
 		if (numBytesRead < 0)
@@ -53,7 +53,7 @@ int BufferedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		mBufferSize = numBytesRead;
 	}
 
-	int sizeToReturn = mBufferSize - mBufferPosition;
+	size_t sizeToReturn = mBufferSize - mBufferPosition;
 
 	if (sizeToReturn > NBytes)
 	{
@@ -96,7 +96,7 @@ IOStream::pos_type BufferedStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void BufferedStream::Write(const void *pBuffer, int NBytes)
+void BufferedStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }
