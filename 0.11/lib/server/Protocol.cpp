@@ -50,9 +50,9 @@ Protocol::Protocol(IOStream &rStream)
 	  mTimeout(PROTOCOL_DEFAULT_TIMEOUT),
 	  mpBuffer(0),
 	  mBufferSize(0),
-	  mReadOffset(-1),
-	  mWriteOffset(-1),
-	  mValidDataSize(-1),
+	  mReadOffset(SIZE_MAX),
+	  mWriteOffset(SIZE_MAX),
+	  mValidDataSize(SIZE_MAX),
 	  mLastErrorType(NoError),
 	  mLastErrorSubType(NoError)
 {
@@ -137,11 +137,11 @@ void Protocol::Handshake()
 	PW_Handshake hsReceive;
 	::memset(&hsReceive, 0, sizeof(hsReceive));
 	char *readInto = (char*)&hsReceive;
-	int bytesToRead = sizeof(hsReceive);
+	size_t bytesToRead = sizeof(hsReceive);
 	while(bytesToRead > 0)
 	{
 		// Get some data from the stream
-		int bytesRead = mrStream.Read(readInto, bytesToRead, mTimeout);
+		size_t bytesRead = mrStream.Read(readInto, bytesToRead, mTimeout);
 		if(bytesRead == 0)
 		{
 			THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
@@ -173,7 +173,7 @@ void Protocol::Handshake()
 void Protocol::CheckAndReadHdr(void *hdr)
 {
 	// Check usage
-	if(mValidDataSize != -1 || mWriteOffset != -1 || mReadOffset != -1)
+	if(mValidDataSize != SIZE_MAX || mWriteOffset != SIZE_MAX || mReadOffset != SIZE_MAX)
 	{
 		THROW_EXCEPTION(ServerException, Protocol_BadUsage)
 	}
@@ -243,8 +243,8 @@ std::auto_ptr<ProtocolObject> Protocol::Receive()
 	catch(...)
 	{
 		// Make sure state is reset!
-		mValidDataSize = -1;
-		mReadOffset = -1;
+		mValidDataSize = SIZE_MAX;
+		mReadOffset = SIZE_MAX;
 		throw;
 	}
 	
@@ -252,8 +252,8 @@ std::auto_ptr<ProtocolObject> Protocol::Receive()
 	bool dataLeftOver = (mValidDataSize != mReadOffset);
 	
 	// Unset read state, so future read calls don't fail
-	mValidDataSize = -1;
-	mReadOffset = -1;
+	mValidDataSize = SIZE_MAX;
+	mReadOffset = SIZE_MAX;
 	
 	// Exception if not all the data was consumed
 	if(dataLeftOver)
@@ -275,7 +275,7 @@ std::auto_ptr<ProtocolObject> Protocol::Receive()
 void Protocol::Send(const ProtocolObject &rObject)
 {
 	// Check usage
-	if(mValidDataSize != -1 || mWriteOffset != -1 || mReadOffset != -1)
+	if(mValidDataSize != SIZE_MAX || mWriteOffset != SIZE_MAX || mReadOffset != SIZE_MAX)
 	{
 		THROW_EXCEPTION(ServerException, Protocol_BadUsage)
 	}
@@ -288,7 +288,7 @@ void Protocol::Send(const ProtocolObject &rObject)
 
 	// Make sure there's a little bit of space allocated
 	EnsureBufferAllocated(((sizeof(PW_ObjectHeader) + PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK - 1) / PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK) * PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK);
-	ASSERT(mBufferSize >= (int)sizeof(PW_ObjectHeader));
+	ASSERT(mBufferSize >= sizeof(PW_ObjectHeader));
 	
 	// Setup for write operation
 	mValidDataSize = 0;		// Not used, but must not be -1
@@ -301,17 +301,18 @@ void Protocol::Send(const ProtocolObject &rObject)
 	catch(...)
 	{
 		// Make sure state is reset!
-		mValidDataSize = -1;
-		mWriteOffset = -1;
+		mValidDataSize = SIZE_MAX;
+		mWriteOffset = SIZE_MAX;
 		throw;
 	}
 
 	// How big?
-	int writtenSize = mWriteOffset;
+	ASSERT(mWriteOffset <= UINT_MAX);
+	u_int32_t writtenSize = static_cast<u_int32_t>(mWriteOffset);
 
 	// Reset write state
-	mValidDataSize = -1;
-	mWriteOffset = -1;	
+	mValidDataSize = SIZE_MAX;
+	mWriteOffset = SIZE_MAX;
 	
 	// Make header in the existing block
 	PW_ObjectHeader *pobjHeader = (PW_ObjectHeader*)(mpBuffer);
@@ -331,7 +332,7 @@ void Protocol::Send(const ProtocolObject &rObject)
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-void Protocol::EnsureBufferAllocated(int Size)
+void Protocol::EnsureBufferAllocated(size_t Size)
 {
 	if(mpBuffer != 0 && mBufferSize >= Size)
 	{
@@ -365,13 +366,13 @@ void Protocol::EnsureBufferAllocated(int Size)
 
 
 #define READ_START_CHECK														\
-	if(mValidDataSize == -1 || mWriteOffset != -1 || mReadOffset == -1)			\
+	if(mValidDataSize == SIZE_MAX || mWriteOffset != SIZE_MAX || mReadOffset == SIZE_MAX)			\
 	{																			\
 		THROW_EXCEPTION(ServerException, Protocol_BadUsage)						\
 	}
 
 #define READ_CHECK_BYTES_AVAILABLE(bytesRequired)								\
-	if((mReadOffset + (int)(bytesRequired)) > mValidDataSize)					\
+	if(mReadOffset + bytesRequired > mValidDataSize)					\
 	{																			\
 		THROW_EXCEPTION(ConnectionException, Conn_Protocol_BadCommandRecieved)	\
 	}
@@ -384,7 +385,7 @@ void Protocol::EnsureBufferAllocated(int Size)
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-void Protocol::Read(void *Buffer, int Size)
+void Protocol::Read(void *Buffer, size_t Size)
 {
 	READ_START_CHECK
 	READ_CHECK_BYTES_AVAILABLE(Size)
@@ -402,7 +403,7 @@ void Protocol::Read(void *Buffer, int Size)
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void Protocol::Read(std::string &rOut, int Size)
+void Protocol::Read(std::string &rOut, size_t Size)
 {
 	READ_START_CHECK
 	READ_CHECK_BYTES_AVAILABLE(Size)
@@ -518,7 +519,7 @@ void Protocol::Read(std::string &rOut)
 
 
 #define WRITE_START_CHECK														\
-	if(mValidDataSize == -1 || mWriteOffset == -1 || mReadOffset != -1)			\
+	if(mValidDataSize == SIZE_MAX || mWriteOffset == SIZE_MAX || mReadOffset != SIZE_MAX)			\
 	{																			\
 		THROW_EXCEPTION(ServerException, Protocol_BadUsage)						\
 	}
@@ -538,7 +539,7 @@ void Protocol::Read(std::string &rOut)
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-void Protocol::Write(const void *Buffer, int Size)
+void Protocol::Write(const void *Buffer, size_t Size)
 {
 	WRITE_START_CHECK
 	WRITE_ENSURE_BYTES_AVAILABLE(Size)
@@ -695,7 +696,7 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 void Protocol::SendStream(IOStream &rStream)
 {
 	// Check usage
-	if(mValidDataSize != -1 || mWriteOffset != -1 || mReadOffset != -1)
+	if(mValidDataSize != SIZE_MAX || mWriteOffset != SIZE_MAX || mReadOffset != SIZE_MAX)
 	{
 		THROW_EXCEPTION(ServerException, Protocol_BadUsage)
 	}
@@ -721,7 +722,7 @@ void Protocol::SendStream(IOStream &rStream)
 	
 	// Make header
 	PW_ObjectHeader objHeader;
-	objHeader.mObjSize = htonl(uncertainSize?(ProtocolStream_SizeUncertain):streamSize);
+	objHeader.mObjSize = htonl(static_cast<uint32_t>(uncertainSize?(ProtocolStream_SizeUncertain):streamSize));
 	objHeader.mObjType = htonl(SPECIAL_STREAM_OBJECT_TYPE);
 
 	// Write header
@@ -741,7 +742,7 @@ void Protocol::SendStream(IOStream &rStream)
 		
 		try
 		{
-			int bytesInBlock = 0;
+			size_t bytesInBlock = 0;
 			while(rStream.StreamDataLeft())
 			{
 				// Read some of it
@@ -794,7 +795,7 @@ void Protocol::SendStream(IOStream &rStream)
 //		Created: 5/12/03
 //
 // --------------------------------------------------------------------------
-int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
+size_t Protocol::SendStreamSendBlock(uint8_t *Block, size_t BytesInBlock)
 {
 	// Quick sanity check
 	if(BytesInBlock == 0)
@@ -805,7 +806,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	
 	// Work out the header byte
 	uint8_t header = 0;
-	int writeSize = 0;
+	size_t writeSize = 0;
 	if(BytesInBlock >= (64*1024))
 	{
 		header = ProtocolStreamHeader_SizeIs64k;
@@ -852,7 +853,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 //		Created: 2003/10/27
 //
 // --------------------------------------------------------------------------
-void Protocol::InformStreamReceiving(u_int32_t Size)
+void Protocol::InformStreamReceiving(IOStream::pos_type Size)
 {
 	// Do nothing
 }
@@ -865,7 +866,7 @@ void Protocol::InformStreamReceiving(u_int32_t Size)
 //		Created: 2003/10/27
 //
 // --------------------------------------------------------------------------
-void Protocol::InformStreamSending(u_int32_t Size)
+void Protocol::InformStreamSending(IOStream::pos_type Size)
 {
 	// Do nothing
 }

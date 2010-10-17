@@ -36,15 +36,15 @@ ZeroStream::ZeroStream(IOStream::pos_type size)
 //		Created: 2007/01/16
 //
 // --------------------------------------------------------------------------
-int ZeroStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t ZeroStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	ASSERT(NBytes > 0);
 
-	int bytesToRead = NBytes;
+	size_t bytesToRead = NBytes;
 	
-	if (bytesToRead > mSize - mPosition)
+	if (static_cast<IOStream::pos_type>(bytesToRead) > mSize - mPosition)
 	{
-		bytesToRead = mSize - mPosition;
+		bytesToRead = static_cast<size_t>(mSize - mPosition);
 	}
 
 	memset(pBuffer, 0, bytesToRead);
@@ -76,7 +76,7 @@ IOStream::pos_type ZeroStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void ZeroStream::Write(const void *pBuffer, int NBytes)
+void ZeroStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }

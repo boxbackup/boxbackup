@@ -132,15 +132,15 @@ int IOStream::ConvertSeekTypeToOSWhence(int SeekType)
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-bool IOStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout)
+bool IOStream::mReadFullBuffer(void *pBuffer, size_t NBytes, size_t *pNBytesRead, int Timeout)
 {
-	int bytesToGo = NBytes;
+	size_t bytesToGo = NBytes;
 	char *buffer = (char*)pBuffer;
 	if(pNBytesRead) (*pNBytesRead) = 0;
 	
 	while(bytesToGo > 0)
 	{
-		int bytesRead = Read(buffer, bytesToGo, Timeout);
+		size_t bytesRead = Read(buffer, bytesToGo, Timeout);
 		if(bytesRead == 0)
 		{
 			// Timeout or something
@@ -194,7 +194,7 @@ IOStream::pos_type IOStream::BytesLeftToRead()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
+bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, size_t BufferSize)
 {
 	// Make sure there's something to do before allocating that buffer
 	if(!StreamDataLeft())
@@ -209,7 +209,7 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 	while(StreamDataLeft())
 	{
 		// Read some data
-		int bytes = Read(buffer, BufferSize, Timeout);
+		size_t bytes = Read(buffer, BufferSize, Timeout);
 		if(bytes == 0 && StreamDataLeft())
 		{
 			return false;	// incomplete, timed out

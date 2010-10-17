@@ -24,13 +24,13 @@ class StreamableMemBlock
 {
 public:
 	StreamableMemBlock();
-	StreamableMemBlock(int Size);
-	StreamableMemBlock(void *pBuffer, int Size);
+	StreamableMemBlock(size_t Size);
+	StreamableMemBlock(void *pBuffer, size_t Size);
 	StreamableMemBlock(const StreamableMemBlock &rToCopy);
 	~StreamableMemBlock();
 	
 	void Set(const StreamableMemBlock &rBlock);
-	void Set(void *pBuffer, int Size);
+	void Set(void *pBuffer, size_t Size);
 	void Set(IOStream &rStream, int Timeout);
 	StreamableMemBlock &operator=(const StreamableMemBlock &rBlock)
 	{
@@ -46,7 +46,7 @@ public:
 	void *GetBuffer() const;
 	
 	// Size of block
-	int GetSize() const {return mSize;}
+	size_t GetSize() const {return mSize;}
 
 	// Buffer empty?
 	bool IsEmpty() const {return mSize == 0;}
@@ -56,15 +56,15 @@ public:
 	
 	bool operator==(const StreamableMemBlock &rCompare) const;
 
-	void ResizeBlock(int Size);
+	void ResizeBlock(size_t Size);
 
 protected:	// be careful with these!
-	void AllocateBlock(int Size);
+	void AllocateBlock(size_t Size);
 	void FreeBlock();
 
 private:
 	void *mpBuffer;
-	int mSize;
+	size_t mSize;
 };
 
 #endif // STREAMABLEMEMBLOCK__H

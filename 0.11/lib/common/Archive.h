@@ -67,7 +67,7 @@ public:
 	}
 	void Write(const std::string &Item)
 	{
-		int size = Item.size();
+		int size = static_cast<int>(Item.size());
 		Write(size);
 		mrStream.Write(Item.c_str(), size);
 	}
@@ -119,7 +119,7 @@ public:
 	{
 		int privItem;
 		Read(privItem);
-		rItemOut = privItem;
+		rItemOut = static_cast<uint8_t>(privItem);
 	}
 	void Read(std::string &rItemOut)
 	{

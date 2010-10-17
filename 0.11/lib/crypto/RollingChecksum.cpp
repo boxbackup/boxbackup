@@ -20,15 +20,15 @@
 //		Created: 6/12/03
 //
 // --------------------------------------------------------------------------
-RollingChecksum::RollingChecksum(const void * const data, const unsigned int Length)
+RollingChecksum::RollingChecksum(const void * const data, const size_t Length)
 	: a(0),
 	  b(0)
 {
 	const uint8_t *block = (const uint8_t *)data;
-	for(unsigned int x = Length; x >= 1; --x)
+	for(size_t x = Length; x >= 1; --x)
 	{
 		a += (*block);
-		b += x * (*block);
+		b = static_cast<uint16_t>(b + x * (*block));
 		
 		++block;
 	}
@@ -43,7 +43,7 @@ RollingChecksum::RollingChecksum(const void * const data, const unsigned int Len
 //		Created: 7/14/05
 //
 // --------------------------------------------------------------------------
-void RollingChecksum::RollForwardSeveral(const uint8_t * const StartOfThisBlock, const uint8_t * const LastOfNextBlock, const unsigned int Length, const unsigned int Skip)
+void RollingChecksum::RollForwardSeveral(const uint8_t * const StartOfThisBlock, const uint8_t * const LastOfNextBlock, const size_t Length, const size_t Skip)
 {
 	// IMPLEMENTATION NOTE: Everything is implicitly mod 2^16 -- uint16_t's will overflow nicely.
 	unsigned int i;
@@ -58,5 +58,5 @@ void RollingChecksum::RollForwardSeveral(const uint8_t * const StartOfThisBlock,
 		b += a;
 	}
 
-	b -= Length * sumBegin;
+	b = static_cast<uint16_t>(b - Length * sumBegin);
 }

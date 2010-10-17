@@ -33,7 +33,7 @@ void MD5Digest::Add(const std::string &rString)
 	MD5_Update(&md5, rString.c_str(), rString.size());
 }
 
-void MD5Digest::Add(const void *pData, int Length)
+void MD5Digest::Add(const void *pData, size_t Length)
 {
 	MD5_Update(&md5, pData, Length);
 }
@@ -58,7 +58,7 @@ std::string MD5Digest::DigestAsString()
 	return r;
 }
 
-int MD5Digest::CopyDigestTo(uint8_t *to)
+size_t MD5Digest::CopyDigestTo(uint8_t *to)
 {
 	for(int l = 0; l < MD5_DIGEST_LENGTH; ++l)
 	{

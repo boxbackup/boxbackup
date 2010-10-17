@@ -26,7 +26,7 @@
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-MemBlockStream::MemBlockStream(const void *pBuffer, int Size)
+MemBlockStream::MemBlockStream(const void *pBuffer, size_t Size)
 	: mpBuffer((char*)pBuffer),
 	  mBytesInBuffer(Size),
 	  mReadPosition(0)
@@ -108,12 +108,12 @@ MemBlockStream::~MemBlockStream()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-int MemBlockStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t MemBlockStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// Adjust to number of bytes left
 	if(NBytes > (mBytesInBuffer - mReadPosition))
 	{
-		NBytes = (mBytesInBuffer - mReadPosition);
+		NBytes = static_cast<size_t>(mBytesInBuffer - mReadPosition);
 	}
 	ASSERT(NBytes >= 0);
 	if(NBytes <= 0) return 0;	// careful now
@@ -146,7 +146,7 @@ IOStream::pos_type MemBlockStream::BytesLeftToRead()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void MemBlockStream::Write(const void *pBuffer, int NBytes)
+void MemBlockStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(CommonException, MemBlockStreamNotSupported)
 }
@@ -175,7 +175,7 @@ IOStream::pos_type MemBlockStream::GetPosition() const
 // --------------------------------------------------------------------------
 void MemBlockStream::Seek(pos_type Offset, int SeekType)
 {
-	int newPos = 0;
+	pos_type newPos = 0;
 	switch(SeekType)
 	{
 	case IOStream::SeekType_Absolute:
@@ -193,7 +193,7 @@ void MemBlockStream::Seek(pos_type Offset, int SeekType)
 	}
 	
 	// Make sure it doesn't go over
-	if(newPos > mBytesInBuffer)
+	if(newPos > static_cast<pos_type>(mBytesInBuffer))
 	{
 		newPos = mBytesInBuffer;
 	}
@@ -217,7 +217,7 @@ void MemBlockStream::Seek(pos_type Offset, int SeekType)
 // --------------------------------------------------------------------------
 bool MemBlockStream::StreamDataLeft()
 {
-	return mReadPosition < mBytesInBuffer;
+	return mReadPosition < static_cast<pos_type>(mBytesInBuffer);
 }
 
 // --------------------------------------------------------------------------

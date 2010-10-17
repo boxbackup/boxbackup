@@ -54,7 +54,7 @@ ProtocolUncertainStream::~ProtocolUncertainStream()
 //		Created: 2003/12/05
 //
 // --------------------------------------------------------------------------
-int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t ProtocolUncertainStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// Finished?
 	if(mFinished)
@@ -62,7 +62,7 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 		return 0;
 	}
 	
-	int read = 0;
+	size_t read = 0;
 	while(read < NBytes)
 	{
 		// Anything we can get from the current block?
@@ -70,7 +70,7 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 		if(mBytesLeftInCurrentBlock > 0)
 		{
 			// Yes, let's use some of these up
-			int toRead = (NBytes - read);
+			size_t toRead = (NBytes - read);
 			if(toRead > mBytesLeftInCurrentBlock)
 			{
 				// Adjust downwards to only read stuff out of the current block
@@ -80,7 +80,7 @@ int ProtocolUncertainStream::Read(void *pBuffer, int NBytes, int Timeout)
 			BOX_TRACE("Reading " << toRead << " bytes from stream");
 	
 			// Read it
-			int r = mrSource.Read(((uint8_t*)pBuffer) + read, toRead, Timeout);
+			size_t r = mrSource.Read(((uint8_t*)pBuffer) + read, toRead, Timeout);
 			// Give up now if it didn't return anything
 			if(r == 0)
 			{
@@ -172,7 +172,7 @@ IOStream::pos_type ProtocolUncertainStream::BytesLeftToRead()
 //		Created: 2003/12/05
 //
 // --------------------------------------------------------------------------
-void ProtocolUncertainStream::Write(const void *pBuffer, int NBytes)
+void ProtocolUncertainStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(ServerException, CantWriteToProtocolUncertainStream)
 }

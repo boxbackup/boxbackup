@@ -65,12 +65,12 @@ ReadGatherStream::~ReadGatherStream()
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-int ReadGatherStream::AddComponent(IOStream *pStream)
+size_t ReadGatherStream::AddComponent(IOStream *pStream)
 {
 	ASSERT(pStream != 0);
 
 	// Just add the component to the list, returning it's index.
-	int index = mComponents.size();
+	size_t index = mComponents.size();
 	mComponents.push_back(pStream);
 	return index;
 }
@@ -87,10 +87,10 @@ int ReadGatherStream::AddComponent(IOStream *pStream)
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-void ReadGatherStream::AddBlock(int Component, pos_type Length, bool Seek, pos_type SeekTo)
+void ReadGatherStream::AddBlock(size_t Component, pos_type Length, bool Seek, pos_type SeekTo)
 {
 	// Check block
-	if(Component < 0 || Component >= (int)mComponents.size() || Length < 0 || SeekTo < 0)
+	if(Component < 0 || Component >= mComponents.size() || Length < 0 || SeekTo < 0)
 	{
 		THROW_EXCEPTION(CommonException, ReadGatherStreamAddingBadBlock);
 	}
@@ -117,9 +117,9 @@ void ReadGatherStream::AddBlock(int Component, pos_type Length, bool Seek, pos_t
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-int ReadGatherStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t ReadGatherStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
-	int bytesToRead = NBytes;
+	size_t bytesToRead = NBytes;
 	uint8_t *buffer = (uint8_t*)pBuffer;
 	
 	while(bytesToRead > 0)
@@ -147,14 +147,14 @@ int ReadGatherStream::Read(void *pBuffer, int NBytes, int Timeout)
 		{
 			// Read!
 			pos_type s = mBlocks[mCurrentBlock].mLength - mPositionInCurrentBlock;
-			if(s > bytesToRead) s = bytesToRead;
+			if(s > static_cast<pos_type>(bytesToRead)) s = bytesToRead;
 			
 			pos_type r = mComponents[mBlocks[mCurrentBlock].mComponent]->Read(buffer, s, Timeout);
 			
 			// update variables
 			mPositionInCurrentBlock += r;
 			buffer += r;
-			bytesToRead -= r;
+			bytesToRead -= static_cast<size_t>(r);
 			mCurrentPosition += r;
 			
 			if(r != s)
@@ -213,7 +213,7 @@ IOStream::pos_type ReadGatherStream::BytesLeftToRead()
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-void ReadGatherStream::Write(const void *pBuffer, int NBytes)
+void ReadGatherStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(CommonException, CannotWriteToReadGatherStream);
 }

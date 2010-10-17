@@ -47,12 +47,12 @@ public:
 	void Reset();
 	
 	void Begin();
-	int Transform(void *pOutBuffer, int OutLength, const void *pInBuffer, int InLength);
-	int Final(void *pOutBuffer, int OutLength);
-	int InSizeForOutBufferSize(int OutLength);
-	int MaxOutSizeForInBufferSize(int InLength);
+	size_t Transform(void *pOutBuffer, size_t OutLength, const void *pInBuffer, size_t InLength);
+	size_t Final(void *pOutBuffer, size_t OutLength);
+	size_t InSizeForOutBufferSize(size_t OutLength);
+	size_t MaxOutSizeForInBufferSize(size_t InLength);
 	
-	int TransformBlock(void *pOutBuffer, int OutLength, const void *pInBuffer, int InLength);
+	size_t TransformBlock(void *pOutBuffer, size_t OutLength, const void *pInBuffer, size_t InLength);
 
 	bool IsInitialised() {return mInitialised;}
 	

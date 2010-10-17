@@ -37,9 +37,9 @@ private:
 public:
 	ReadLoggingStream(IOStream& rSource, Logger& rLogger);
 	
-	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual size_t Read(void *pBuffer, size_t NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, size_t NBytes);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(IOStream::pos_type Offset, int SeekType);
 	virtual void Close();

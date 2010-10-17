@@ -542,7 +542,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 	if(mNumBlocks > 0)
 	{
 		// Find the maximum encoded data size
-		int32_t maxEncodedDataSize = 0;
+		int64_t maxEncodedDataSize = 0;
 		const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
 		ASSERT(entry != 0);
 		for(int64_t e = 0; e < mNumBlocks; e++)
@@ -554,9 +554,10 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 			// Larger?
 			if(encodedSize > maxEncodedDataSize) maxEncodedDataSize = encodedSize;
 		}
-		
+
 		// Allocate those blocks!
-		mpEncodedData = (uint8_t*)BackupStoreFile::CodingChunkAlloc(maxEncodedDataSize + 32);
+		ASSERT(maxEncodedDataSize+32 < SIZE_MAX);
+		mpEncodedData = (uint8_t*)BackupStoreFile::CodingChunkAlloc(static_cast<size_t>(maxEncodedDataSize + 32));
 
 		// Allocate the block for the clear data, using the hint from the header.
 		// If this is wrong, things will exception neatly later on, so it can't be used
@@ -624,7 +625,11 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 		int64_t indexSize = sizeof(file_BlockIndexEntry) * mNumBlocks;
 		
 		// Allocate some memory
-		mpBlockIndex = ::malloc(indexSize);
+		if(indexSize >= SIZE_MAX)
+		{
+			throw std::bad_alloc();
+		}
+		mpBlockIndex = ::malloc(static_cast<size_t>(indexSize));
 		if(mpBlockIndex == 0)
 		{
 			throw std::bad_alloc();
@@ -648,7 +653,7 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 //		Created: 9/12/03
 //
 // --------------------------------------------------------------------------
-int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t BackupStoreFile::DecodedStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	// Symlinks don't have data. So can't read it. Not even zero bytes.
 	if(IsSymLink())
@@ -664,7 +669,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		return 0;
 	}
 
-	int bytesToRead = NBytes;
+	size_t bytesToRead = NBytes;
 	uint8_t *output = (uint8_t*)pBuffer;
 	
 	while(bytesToRead > 0 && mCurrentBlock < mNumBlocks)
@@ -673,7 +678,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		if(mPositionInCurrentBlock < mCurrentBlockClearSize)
 		{
 			// Copy data out of this buffer
-			int s = mCurrentBlockClearSize - mPositionInCurrentBlock;
+			size_t s = mCurrentBlockClearSize - mPositionInCurrentBlock;
 			if(s > bytesToRead) s = bytesToRead;	// limit to requested data
 			
 			// Copy
@@ -698,13 +703,18 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 		
 			// Get the size from the block index
 			const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
-			int32_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
+			int64_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
 			if(encodedSize <= 0)
 			{
 				// The caller is attempting to decode a file which is the direct result of a diff
 				// operation, and so does not contain all the data.
 				// It needs to be combined with the previous version first.
 				THROW_EXCEPTION(BackupStoreException, CannotDecodeDiffedFilesWithoutCombining)
+			}
+			if(encodedSize >= SIZE_MAX)
+			{
+				// We're on a 32bit machine and this block is too big for us to deal with
+				THROW_EXCEPTION(BackupStoreException, Internal)
 			}
 			
 			// Load in next block
@@ -715,7 +725,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			}
 			
 			// Decode the data
-			mCurrentBlockClearSize = BackupStoreFile::DecodeChunk(mpEncodedData, encodedSize, mpClearData, mClearDataSize);
+			mCurrentBlockClearSize = BackupStoreFile::DecodeChunk(mpEncodedData, static_cast<size_t>(encodedSize), mpClearData, mClearDataSize);
 
 			// Calculate IV for this entry
 			uint64_t iv = mEntryIVBase;
@@ -727,7 +737,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			
 			// Decrypt the encrypted section
 			file_BlockIndexEntryEnc entryEnc;
-			int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
+			size_t sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
 					entry[mCurrentBlock].mEnEnc, sizeof(entry[mCurrentBlock].mEnEnc));
 			if(sectionSize != sizeof(entryEnc))
 			{
@@ -746,7 +756,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 				// IV for the encrypted section. Try again, with the thing the other way round
 				iv = box_swap64(iv);
 				sBlowfishDecryptBlockEntry.SetIV(&iv);
-				int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
+				size_t sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
 						entry[mCurrentBlock].mEnEnc, sizeof(entry[mCurrentBlock].mEnEnc));
 				if(sectionSize != sizeof(entryEnc))
 				{
@@ -826,7 +836,7 @@ bool BackupStoreFile::DecodedStream::IsSymLink()
 //		Created: 9/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::DecodedStream::Write(const void *pBuffer, int NBytes)
+void BackupStoreFile::DecodedStream::Write(const void *pBuffer, size_t NBytes)
 {
 	THROW_EXCEPTION(BackupStoreException, CantWriteToDecodedFileStream)
 }
@@ -922,7 +932,7 @@ void BackupStoreFile::SetAESKey(const void *pKey, int KeyLength)
 //		Created: 7/12/03
 //
 // --------------------------------------------------------------------------
-int BackupStoreFile::MaxBlockSizeForChunkSize(int ChunkSize)
+size_t BackupStoreFile::MaxBlockSizeForChunkSize(size_t ChunkSize)
 {
 	// Calculate... the maximum size of output by first the largest it could be after compression,
 	// which is encrypted, and has a 1 bytes header and the IV added, plus 1 byte for luck
@@ -942,7 +952,7 @@ int BackupStoreFile::MaxBlockSizeForChunkSize(int ChunkSize)
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFile::EncodingBuffer &rOutput)
+size_t BackupStoreFile::EncodeChunk(const void *Chunk, size_t ChunkSize, BackupStoreFile::EncodingBuffer &rOutput)
 {
 	ASSERT(spEncrypt != 0);
 
@@ -964,7 +974,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 
 	// Store header
 	rOutput.mpBuffer[0] = header;
-	int outOffset = 1;
+	size_t outOffset = 1;
 
 	// Setup cipher, and store the IV
 	int ivLen = 0;
@@ -977,6 +987,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 	
 	#define ENCODECHUNK_CHECK_SPACE(ToEncryptSize)									\
 		{																			\
+			ASSERT(rOutput.mBufferSize >= outOffset);	\
 			if((rOutput.mBufferSize - outOffset) < ((ToEncryptSize) + 128))			\
 			{																		\
 				rOutput.Reallocate(rOutput.mBufferSize + (ToEncryptSize) + 128);	\
@@ -997,7 +1008,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 		// Get and encrypt output
 		while(!compress.OutputHasFinished())
 		{
-			int s = compress.Output(buffer, sizeof(buffer));
+			size_t s = compress.Output(buffer, sizeof(buffer));
 			if(s > 0)
 			{
 				ENCODECHUNK_CHECK_SPACE(s)
@@ -1038,7 +1049,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Output, int OutputSize)
+size_t BackupStoreFile::DecodeChunk(const void *Encoded, size_t EncodedSize, void *Output, size_t OutputSize)
 {
 	// Check alignment of the encoded block
 	ASSERT((((uint32_t)(long)Encoded) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
@@ -1073,8 +1084,8 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 #endif
 	
 	// Check enough space for header, an IV and one byte of input
-	int ivLen = cipher.GetIVLength();
-	if(EncodedSize < (1 + ivLen + 1))
+	size_t ivLen = cipher.GetIVLength();
+	if(EncodedSize < 1 + ivLen + 1)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadEncodedChunk)
 	}
@@ -1084,16 +1095,16 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 	cipher.Begin();
 	
 	// Setup vars for code
-	int inOffset = 1 + ivLen;
+	size_t inOffset = 1 + ivLen;
 	uint8_t *output = (uint8_t*)Output;
-	int outOffset = 0;
+	size_t outOffset = 0;
 
 	// Do action
 	if(chunkCompressed)
 	{
 		// Do things in chunks
 		uint8_t buffer[2048];
-		int inputBlockLen = cipher.InSizeForOutBufferSize(sizeof(buffer));
+		size_t inputBlockLen = cipher.InSizeForOutBufferSize(sizeof(buffer));
 		
 		// Decompressor
 		Compress<false> decompress;
@@ -1101,16 +1112,16 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 		while(inOffset < EncodedSize)
 		{
 			// Decrypt a block
-			int bl = inputBlockLen;
+			size_t bl = inputBlockLen;
 			if(bl > (EncodedSize - inOffset)) bl = EncodedSize - inOffset;	// not too long
-			int s = cipher.Transform(buffer, sizeof(buffer), input + inOffset, bl);
+			size_t s = cipher.Transform(buffer, sizeof(buffer), input + inOffset, bl);
 			inOffset += bl;
 			
 			// Decompress the decrypted data
 			if(s > 0)
 			{
 				decompress.Input(buffer, s);
-				int os = 0;
+				size_t os = 0;
 				do
 				{
 					os = decompress.Output(output + outOffset, OutputSize - outOffset);
@@ -1126,12 +1137,12 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 		}
 		
 		// Get any compressed data remaining in the cipher context and compression
-		int s = cipher.Final(buffer, sizeof(buffer));
+		size_t s = cipher.Final(buffer, sizeof(buffer));
 		decompress.Input(buffer, s);
 		decompress.FinishInput();
 		while(!decompress.OutputHasFinished())
 		{
-			int os = decompress.Output(output + outOffset, OutputSize - outOffset);
+			size_t os = decompress.Output(output + outOffset, OutputSize - outOffset);
 			outOffset += os;
 
 			// Check that there's space left in the output buffer -- there always should be
@@ -1143,6 +1154,9 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 	}
 	else
 	{
+		ASSERT(OutputSize >= outOffset);
+		ASSERT(EncodedSize >= inOffset);
+
 		// Easy decryption
 		outOffset += cipher.Transform(output + outOffset, OutputSize - outOffset, input + inOffset, EncodedSize - inOffset);
 		outOffset += cipher.Final(output + outOffset, OutputSize - outOffset);
@@ -1176,7 +1190,7 @@ std::auto_ptr<IOStream> BackupStoreFile::ReorderFileToStreamOrder(IOStream *pStr
 	}
 
 	// Read the header
-	int bytesRead = 0;
+	size_t bytesRead = 0;
 	file_StreamFormat hdr;
 	bool readBlock = pStream->ReadFullBuffer(&hdr, sizeof(hdr), &bytesRead);
 
@@ -1217,7 +1231,7 @@ std::auto_ptr<IOStream> BackupStoreFile::ReorderFileToStreamOrder(IOStream *pStr
 	
 	// Set it up...
 	ReadGatherStream &rreordered(*((ReadGatherStream*)reordered.get()));
-	int component = rreordered.AddComponent(pStream);
+	size_t component = rreordered.AddComponent(pStream);
 	// Send out the block index
 	rreordered.AddBlock(component, blockIndexSize, true, blockIndexLoc);
 	// And then the rest of the file
@@ -1339,7 +1353,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 			
 			// Decrypt the encrypted section
 			file_BlockIndexEntryEnc entryEnc;
-			int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
+			size_t sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
 					entry.mEnEnc, sizeof(entry.mEnEnc));
 			if(sectionSize != sizeof(entryEnc))
 			{
@@ -1478,7 +1492,7 @@ BackupStoreFile::EncodingBuffer::~EncodingBuffer()
 //		Created: 25/11/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::EncodingBuffer::Allocate(int Size)
+void BackupStoreFile::EncodingBuffer::Allocate(size_t Size)
 {
 	ASSERT(mpBuffer == 0);
 	uint8_t *buffer = (uint8_t*)BackupStoreFile::CodingChunkAlloc(Size);
@@ -1500,7 +1514,7 @@ void BackupStoreFile::EncodingBuffer::Allocate(int Size)
 //		Created: 25/11/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::EncodingBuffer::Reallocate(int NewSize)
+void BackupStoreFile::EncodingBuffer::Reallocate(size_t NewSize)
 {
 	BOX_TRACE("Reallocating EncodingBuffer from " << mBufferSize <<
 		" to " << NewSize);

@@ -87,8 +87,10 @@ public:
 	//		Created: 5/12/03
 	//
 	// --------------------------------------------------------------------------
-	void Input(const void *pInBuffer, int InLength)
+	void Input(const void *pInBuffer, size_t InLength)
 	{
+		ASSERT(InLength <= std::numeric_limits<uInt>::max());
+
 		// Check usage
 		if(mStream.avail_in != 0)
 		{
@@ -97,7 +99,7 @@ public:
 		
 		// Store info
 		mStream.next_in = (unsigned char *)pInBuffer;
-		mStream.avail_in = InLength;
+		mStream.avail_in = static_cast<uInt>(InLength);
 	}
 	
 	// --------------------------------------------------------------------------
@@ -121,17 +123,19 @@ public:
 	//		Created: 5/12/03
 	//
 	// --------------------------------------------------------------------------
-	int Output(void *pOutBuffer, int OutLength, bool SyncFlush = false)
+	size_t Output(void *pOutBuffer, size_t OutLength, bool SyncFlush = false)
 	{
 		// need more input?
 		if(mStream.avail_in == 0 && mFlush != Z_FINISH && !SyncFlush)
 		{
 			return 0;
 		}
+
+		ASSERT(OutLength <= std::numeric_limits<uInt>::max());
 	
 		// Buffers
 		mStream.next_out = (unsigned char *)pOutBuffer;
-		mStream.avail_out = OutLength;
+		mStream.avail_out = static_cast<uInt>(OutLength);
 		
 		// Call one of the functions
 		int flush = mFlush;
@@ -188,7 +192,7 @@ template<typename Integer>
 Integer Compress_MaxSizeForCompressedData(Integer InLen)
 {
 	// Conservative rendition of the info found here: http://www.gzip.org/zlib/zlib_tech.html
-	int blocks = (InLen + 32*1024 - 1) / (32*1024);
+	Integer blocks = (InLen + 32*1024 - 1) / (32*1024);
 	return InLen + (blocks * 6) + 8;
 }
 

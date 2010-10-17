@@ -56,14 +56,14 @@ CollectInBufferStream::~CollectInBufferStream()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-int CollectInBufferStream::Read(void *pBuffer, int NBytes, int Timeout)
+size_t CollectInBufferStream::Read(void *pBuffer, size_t NBytes, int Timeout)
 {
 	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
 	// Adjust to number of bytes left
 	if(NBytes > (mBytesInBuffer - mReadPosition))
 	{
-		NBytes = (mBytesInBuffer - mReadPosition);
+		NBytes = static_cast<size_t>(mBytesInBuffer - mReadPosition);
 	}
 	ASSERT(NBytes >= 0);
 	if(NBytes <= 0) return 0;	// careful now
@@ -98,7 +98,7 @@ IOStream::pos_type CollectInBufferStream::BytesLeftToRead()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void CollectInBufferStream::Write(const void *pBuffer, int NBytes)
+void CollectInBufferStream::Write(const void *pBuffer, size_t NBytes)
 {
 	if(mInWritePhase != true) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
@@ -106,14 +106,14 @@ void CollectInBufferStream::Write(const void *pBuffer, int NBytes)
 	if((mBytesInBuffer + NBytes) > mBufferSize)
 	{
 		// Need to reallocate... what's the block size we'll use?
-		int allocateBlockSize = mBufferSize;
+		size_t allocateBlockSize = mBufferSize;
 		if(allocateBlockSize > MAX_BUFFER_ADDITION)
 		{
 			allocateBlockSize = MAX_BUFFER_ADDITION;
 		}
 		
 		// Write it the easy way. Although it's not the most efficient...
-		int newSize = mBufferSize;
+		size_t newSize = mBufferSize;
 		while(newSize < (mBytesInBuffer + NBytes))
 		{
 			newSize += allocateBlockSize;
@@ -157,7 +157,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 {
 	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
-	int newPos = 0;
+	pos_type newPos = 0;
 	switch(SeekType)
 	{
 	case IOStream::SeekType_Absolute:
@@ -175,7 +175,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 	}
 	
 	// Make sure it doesn't go over
-	if(newPos > mBytesInBuffer)
+	if(newPos > static_cast<pos_type>(mBytesInBuffer))
 	{
 		newPos = mBytesInBuffer;
 	}
@@ -199,7 +199,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 // --------------------------------------------------------------------------
 bool CollectInBufferStream::StreamDataLeft()
 {
-	return mInWritePhase?(false):(mReadPosition < mBytesInBuffer);
+	return mInWritePhase?(false):(mReadPosition < static_cast<pos_type>(mBytesInBuffer));
 }
 
 // --------------------------------------------------------------------------
@@ -252,7 +252,7 @@ void *CollectInBufferStream::GetBuffer() const
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-int CollectInBufferStream::GetSize() const
+size_t CollectInBufferStream::GetSize() const
 {
 	return mBytesInBuffer;
 }

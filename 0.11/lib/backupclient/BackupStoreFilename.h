@@ -101,7 +101,7 @@ protected:
 #define BACKUPSTOREFILENAME_GET_SIZE(hdr)		(( ((uint8_t)((hdr)[0])) | ( ((uint8_t)((hdr)[1])) << 8)) >> 2)
 #define BACKUPSTOREFILENAME_GET_ENCODING(hdr)	(((hdr)[0]) & 0x3)
 
-#define BACKUPSTOREFILENAME_MAKE_HDR(hdr, size, encoding)		{uint16_t h = (((uint16_t)size) << 2) | (encoding); ((hdr)[0]) = h & 0xff; ((hdr)[1]) = h >> 8;}
+#define BACKUPSTOREFILENAME_MAKE_HDR(hdr, size, encoding)		{uint16_t h = (((uint16_t)size) << 2) | (uint16_t)(encoding); ((hdr)[0]) = h & 0xff; ((hdr)[1]) = h >> 8;}
 
 #endif // BACKUPSTOREFILENAME__H
 

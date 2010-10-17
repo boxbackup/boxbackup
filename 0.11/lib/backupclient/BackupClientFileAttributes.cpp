@@ -301,11 +301,11 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 	}
 	
 	// Check symlink string?
-	unsigned int size = mpClearAttributes->GetSize();
+	size_t size = mpClearAttributes->GetSize();
 	if(size > sizeof(attr_StreamFormat))
 	{
 		// Symlink strings don't match. This also compares xattrs
-		int datalen = size - sizeof(attr_StreamFormat);
+		size_t datalen = size - sizeof(attr_StreamFormat);
 
 		if(::memcmp(a1 + 1, a2 + 1, datalen) != 0)
 		{
@@ -726,7 +726,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 	ASSERT(mpClearAttributes != 0);
 
 	// Check if the decrypted attributes are small enough, and the type of attributes stored
-	if(mpClearAttributes->GetSize() < (int)sizeof(int32_t))
+	if(mpClearAttributes->GetSize() < sizeof(int32_t))
 	{
 		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
 	}
@@ -739,7 +739,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 	}
 	
 	// Check there is enough space for an attributes block
-	if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat))
+	if(mpClearAttributes->GetSize() < sizeof(attr_StreamFormat))
 	{
 		// Too small
 		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
@@ -747,14 +747,14 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 
 	// Get pointer to structure
 	attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
-	int xattrOffset = sizeof(attr_StreamFormat);
+	size_t xattrOffset = sizeof(attr_StreamFormat);
 
 	// is it a symlink?
 	int16_t mode = ntohs(pattr->Mode);
 	if((mode & S_IFMT) == S_IFLNK)
 	{
 		// Check things are sensible
-		if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat) + 1)
+		if(mpClearAttributes->GetSize() < sizeof(attr_StreamFormat) + 1)
 		{
 			// Too small
 			THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
@@ -804,10 +804,12 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		#endif
 	}
 
-	if(static_cast<int>(xattrOffset+sizeof(u_int32_t))<=mpClearAttributes->GetSize())
-	{
-		WriteExtendedAttr(Filename, xattrOffset);
-	}
+	#ifdef HAVE_SYS_XATTR_H
+		if(static_cast<int>(xattrOffset+sizeof(u_int32_t))<=mpClearAttributes->GetSize())
+		{
+			WriteExtendedAttr(Filename, xattrOffset);
+		}
+	#endif
 
 	// Stop now if symlink, because otherwise it'll just be applied to the target
 	if((mode & S_IFMT) == S_IFLNK)
@@ -1004,14 +1006,14 @@ StreamableMemBlock *BackupClientFileAttributes::MakeClear(const StreamableMemBlo
 	try
 	{
 		// Check the block is big enough for IV and header
-		int ivSize = sBlowfishEncrypt.GetIVLength();
+		size_t ivSize = sBlowfishEncrypt.GetIVLength();
 		if(rEncrypted.GetSize() <= (ivSize + 1))
 		{
 			THROW_EXCEPTION(BackupStoreException, BadEncryptedAttributes);
 		}
 		
 		// How much space is needed for the output?
-		int maxDecryptedSize = sBlowfishDecrypt.MaxOutSizeForInBufferSize(rEncrypted.GetSize() - ivSize);
+		size_t maxDecryptedSize = sBlowfishDecrypt.MaxOutSizeForInBufferSize(rEncrypted.GetSize() - ivSize);
 		
 		// Allocate it
 		pdecrypted = new StreamableMemBlock(maxDecryptedSize);
@@ -1029,7 +1031,7 @@ StreamableMemBlock *BackupClientFileAttributes::MakeClear(const StreamableMemBlo
 		sBlowfishDecrypt.SetIV(encBlock + 1);
 		
 		// Decrypt
-		int decryptedSize = sBlowfishDecrypt.TransformBlock(pdecrypted->GetBuffer(), maxDecryptedSize, encBlock + 1 + ivSize, rEncrypted.GetSize() - (ivSize + 1));
+		size_t decryptedSize = sBlowfishDecrypt.TransformBlock(pdecrypted->GetBuffer(), maxDecryptedSize, encBlock + 1 + ivSize, rEncrypted.GetSize() - (ivSize + 1));
 
 		// Resize block to fit
 		pdecrypted->ResizeBlock(decryptedSize);
@@ -1077,7 +1079,7 @@ void BackupClientFileAttributes::EncryptAttr(const StreamableMemBlock &rToEncryp
 	FreeBlock();
 	
 	// Work out the maximum amount of space we need
-	int maxEncryptedSize = sBlowfishEncrypt.MaxOutSizeForInBufferSize(rToEncrypt.GetSize());
+	size_t maxEncryptedSize = sBlowfishEncrypt.MaxOutSizeForInBufferSize(rToEncrypt.GetSize());
 	// And the size of the IV
 	int ivSize = sBlowfishEncrypt.GetIVLength();
 	
@@ -1097,7 +1099,7 @@ void BackupClientFileAttributes::EncryptAttr(const StreamableMemBlock &rToEncryp
 	::memcpy(block + 1, iv, ivSize);
 	
 	// Do the transform
-	int encrytedSize = sBlowfishEncrypt.TransformBlock(block + 1 + ivSize, maxEncryptedSize, rToEncrypt.GetBuffer(), rToEncrypt.GetSize());
+	size_t encrytedSize = sBlowfishEncrypt.TransformBlock(block + 1 + ivSize, maxEncryptedSize, rToEncrypt.GetBuffer(), rToEncrypt.GetSize());
 
 	// Resize this block
 	ResizeBlock(encrytedSize + ivSize + 1);
