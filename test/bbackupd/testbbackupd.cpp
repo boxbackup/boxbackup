@@ -2083,7 +2083,8 @@ int test_bbackupd()
 				"quit");
 			TEST_RETURN(compareReturnValue,
 				BackupQueries::ReturnCode::Command_OK);
-			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+			TestRemoteProcessMemLeaks("testfiles/restore-test/"
+				"bbackupquery.memleaks");
 
 			// check that it restored properly
 			compareReturnValue = ::system(BBACKUPQUERY " "
