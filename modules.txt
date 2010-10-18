@@ -26,12 +26,12 @@ test/basicserver	lib/server
 # Backup system
 
 lib/backupclient	lib/server	lib/crypto	lib/compress
-lib/backupstore		lib/server	lib/raidfile	lib/backupclient		bundled/tdb
+lib/backupstore		lib/server	lib/raidfile	lib/backupclient
 
 bin/bbackupobjdump	lib/backupclient lib/backupstore
-bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	bundled/tdb
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
 bin/bbstoreaccounts	lib/raidfile	lib/backupstore
-bin/bbackupd		lib/server	lib/backupclient	bundled/tdb
+bin/bbackupd		lib/server	lib/backupclient	qdbm
 bin/bbackupquery	lib/server	lib/backupclient
 bin/bbackupctl		lib/server	lib/backupclient
 

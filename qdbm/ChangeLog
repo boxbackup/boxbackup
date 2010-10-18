@@ -1,0 +1,990 @@
+2007-10-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A potential defect related to leaf division of B+ tree was cleared.
+	- Release: 1.8.77
+
+2007-03-07  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The hash function of on-memory map was optimized.
+	- A bug related to large object was fixed.
+	- Release: 1.8.76
+
+2006-11-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- A bug related to B+ tree API for Ruby was fixed.
+	- Release: 1.8.75
+
+2006-11-02  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug related to optimization on Intel Mac series was escaped.
+	- Release: 1.8.74
+
+2006-10-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug related to BZIP2 encoding was fixed.
+	- Release: 1.8.73
+
+2006-10-06  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.8.72
+
+2006-08-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefile was modified to assure portability.
+	- Silent flag was added to the C++ API, the Java API, and the Ruby API.
+	- Release: 1.8.71
+
+2006-08-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of segmentation fault on BSD was fixed.
+	- A test command for checking multi thread safety was added.
+	- Release: 1.8.70
+
+2006-08-15  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Mutex controll in C++ API became refined.
+	- Release: 1.8.69
+
+2006-08-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug about memory alignment was fixed.
+	- A bug of handling meta data on big endian platforms was fixed.
+	- Release: 1.8.68
+
+2006-08-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug about memory alignment was fixed.
+	- A bug about parsing MIME was fixed.
+	- Release: 1.8.67
+
+2006-08-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.8.66
+
+2006-08-03  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The extended API was enhanced.
+	- The extended advanced API was enhanced.
+	- Release: 1.8.65
+
+2006-07-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of Makefile ralated to optimization was fixed.
+	- Release: 1.8.64
+
+2006-07-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A lot of functions were replaced by macros.
+	- The utility API was enhanced.
+	- Release: 1.8.63
+
+2006-07-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A lot of functions were replaced by macros.
+	- The URL resolver was to allow unescaped meta characters.
+	- The advanced API was enhanced.
+	- Release: 1.8.62
+
+2006-07-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of the size checking function of the extended API was fixed.
+	- The advanced API was enhanced.
+	- Release: 1.8.61
+
+2006-06-03  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The basic API was enhanced.
+	- The extended API was enhanced.
+	- The advanced API was enhanced.
+	- Multiple cursor class is now supported on the java API.
+	- Release: 1.8.60
+
+2006-05-30  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The basic API was enhanced.
+	- The extended API was enhanced.
+	- The advanced API was enhanced.
+	- A bug of Makefile for Mac OS X support was fixed.
+	- Release: 1.8.59
+
+2006-05-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The basic API was enhanced.
+	- The advanced API was enhanced.
+	- Release: 1.8.58
+
+2006-05-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The basic API was enhanced.
+	- The utility API was enhanced.
+	- Release: 1.8.57
+
+2006-05-17  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of URL decoder was fixed.
+	- Release: 1.8.56
+
+2006-05-15  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The extended API was enhanced.
+	- The utility API was enhanced.
+	- Release: 1.8.55
+
+2006-05-15  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The basic API was enhanced.
+	- Release: 1.8.54
+
+2006-05-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- AIX is now supported.
+	- The utility API was enhanced.
+	- Release: 1.8.53
+
+2006-05-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug about evaluating RFC822 date format was fixed.
+	- Release: 1.8.52
+
+2006-05-02  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug about evaluating RFC822 date format was fixed.
+	- Warings from GCC 4.1.x were dealt with.
+	- Missing functions in qdbm.def were supplied.
+	- Release: 1.8.51
+
+2006-04-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.8.50
+
+2006-04-19  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A parameter of dynamic linking library on Mac OS X was modified.
+	- The utility API was enhanced.
+	- Release: 1.8.49
+
+2006-03-27  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.8.48
+
+2006-03-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- LTmakefile was modified.
+	- The utility API was enhanced.
+	- Release: 1.8.47
+
+2006-02-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.8.46
+
+2006-01-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Alignment algorithm was improved.
+	- A bug of mmap emulation on Windows was fixed.
+	- Release: 1.8.45
+
+2006-01-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of handling meta data on big endian platforms was fixed.
+	- The advanced API was enhanced.
+	- Release: 1.8.44
+
+2006-01-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of mmap emulation on Windows was fixed.
+	- Release: 1.8.43
+
+2006-01-22  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- mmap emulation on Windows was enhanced.
+	- Release: 1.8.42
+
+2006-01-13  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Compression of pages of B+ tree with LZO and BZIP was added.
+	- Release: 1.8.41
+
+2006-01-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Configuration for VC++ was to build DLL.
+	- Release: 1.8.40
+
+2006-01-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The advanced API was enhanced.
+	- Release: 1.8.39
+
+2006-01-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The advanced API was enhanced.
+	- Release: 1.8.38
+
+2005-12-26  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Functions to set the size of the free block pool were added.
+	- Commands line tools were enhanced.
+	- Release: 1.8.37
+
+2005-12-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Free block pool was enhanced.
+	- Commands line tools were enhanced.
+	- Release: 1.8.36
+
+2005-11-30  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The extended advanced API was enhanced.
+	- All stat calls were replaced with lstat calls.
+	- Release: 1.8.35
+
+2005-11-22  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of i-node duplication on MinGW was fixed.
+	- Release: 1.8.34
+
+2005-09-09  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Compressing options of ZLIB was changed.
+	- The utility API was enhanced.
+	- Release: 1.8.33
+
+2005-08-30  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of backward string matching was fixed.
+	- The utility API was enhanced.
+	- Release: 1.8.32
+
+2005-06-19  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug of the MIME parser was fixed.
+	- A bug about database repair on Win32 was fixed.
+	- A bug of Makefile for Mac OS X support was fixed.
+	- The type of error codes of GDBM-compatibility API was changed.
+	- Release: 1.8.31
+
+2005-06-09  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A Bug of APIs for C++ related to namespace was fixed.
+	- The library of shared objects of C++ APIs was added.
+	- The utility API was enhanced.
+	- Release: 1.8.30
+
+2005-06-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug about file locking on Win32 was fixed.
+	- Manuals of command line tools were added.
+	- The utility API was enhanced.
+	- Release: 1.8.29
+
+2005-05-27  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A compilation problem on hppa-linux was fixed.
+	- A configuration file for pkg-config was added.
+	- Release: 1.8.28
+
+2005-05-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Non-blocking lock was featured.
+	- Release: 1.8.27
+
+2005-05-12  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- The utility API was enhanced.
+	- Release: 1.8.26
+
+2005-05-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- The utility API was enhanced.
+	- Release: 1.8.25
+
+2005-04-25  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- A bug about database repair on Win32 was fixed.
+	- Release: 1.8.24
+
+2005-04-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The extended advanced API was enhanced.
+	- Release: 1.8.23
+
+2005-03-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The extended advanced API was enhanced.
+	- The utility API was enhanced.
+	- The inverted API was enhanced.
+	- Test commands were enhanced.
+	- Release: 1.8.22
+
+2005-01-22  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Functions to dump endian independent data was added.
+	- Release: 1.8.21
+
+2005-01-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Sparse file support was added.
+	- Release: 1.8.20
+
+2005-01-02  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Building configurations were enhanced.
+	- Release: 1.8.19
+
+2004-11-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The extended advanced API was enhanced.
+	- The inverted API was enhanced.
+	- Release: 1.8.18
+
+2004-09-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The CGI script for file upload was enhanced.
+	- The spec file for RPM packages was enhanced.
+	- Release: 1.8.17
+
+2004-08-17  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug in the extended API was fixed.
+	- A bug about seek on Windows 9x was fixed.
+	- The CGI script for file upload was enhanced.
+	- Release: 1.8.16
+
+2004-08-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- A bug about mmap on Mac OS X was fixed.
+	- A CGI script for file upload was added.
+	- Building configurations were enhanced.
+	- Release: 1.8.15
+	
+2004-07-19  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The basic API was enhanced.
+	- The extended API was enhanced.
+	- The advanced API was enhanced.
+	- The inverted API was enhanced.
+	- Building configurations were enhanced.
+	- Release: 1.8.14
+
+2004-07-07  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The inverted API was enhanced.
+	- Release: 1.8.13
+
+2004-05-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The inverted API was enhanced.
+	- Building configurations were enhanced.
+	- Release: 1.8.12
+
+2004-05-12  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Source codes were cleaned up for Visual C++.
+	- Test commands were enhanced.
+	- Building configurations were enhanced.
+	- Release: 1.8.11
+
+2004-04-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Utility for performance test was enhanced.
+	- It was escaped from a bug about mmap on FreeBSD and NetBSD.
+	- Release: 1.8.10
+
+2004-04-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Logger for debugging is now featured.
+	- It was escaped from a bug about mmap on OpenBSD.
+	- Release: 1.8.9
+
+2004-04-11  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Processing speed was improved.
+	- The basic API was enhanced.
+	- The extended API was enhanced.
+	- The configuration for VC++ was enhanced.
+	- Release: 1.8.8
+
+2004-03-25  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The configuration of C++ API escaped from a bug of pthread.
+	- Release: 1.8.7
+
+2004-03-21  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The extended API was enhanced.
+	- Bugs in the utility API about memory management were fixed.
+	- Release: 1.8.6
+
+2004-03-12  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug in the utility API for 64-bit platforms was fixed.
+	- The utility API was enhanced.
+	- Release: 1.8.5
+
+2004-03-09  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Runtime switching of whether to use ZLIB was featured.
+	- The binary package for Win32 now features ZLIB and ICONV.
+	- The utility API was enhanced.
+	- Release: 1.8.4
+
+2004-03-06  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- A utility class of Java API was enhanced.
+	- Test commands were enhanced.
+	- Release: 1.8.3
+
+2004-03-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.8.2
+
+2004-02-22  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Processing speed of multi-thread support was improved.
+	- Release: 1.8.1
+
+2004-02-21  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Switch to make API for C thread-safe was added.
+	- Release: 1.8.0
+
+2004-02-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Potential bugs in APIs for C++ were fixed.
+	- Release: 1.7.34
+
+2004-01-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The extended API was enhanced.
+	- The inverted API was enhanced.
+	- Release: 1.7.33
+
+2004-01-17  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- Release: 1.7.32
+
+2004-01-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- Release: 1.7.31
+
+2004-01-12  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- Release: 1.7.30
+
+2004-01-11  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.7.29
+
+2004-01-09  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug in the utility API was fixed.
+	- Release: 1.7.28
+
+2004-01-06  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug in the advanced API was fixed.
+	- The utility API was enhanced.
+	- Release: 1.7.27
+
+2004-01-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- Release: 1.7.26
+
+2004-01-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- The utility API was enhanced.
+	- Release: 1.7.25
+
+2003-12-26  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- C++ export was supported in header files.
+	- The utility API was enhanced.
+	- Release: 1.7.24
+
+2003-12-21  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Repairing utility was added to the advanced API.
+	- The basic API was enhanced.
+	- The utility API was enhanced.
+	- Release: 1.7.23
+
+2003-12-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Repairing utility was added to the extended API.
+	- The utility API was enhanced.
+	- Release: 1.7.22
+
+2003-12-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A utility to repair a broken database file was added.
+	- A ulitity command for full-text search was enhanced.
+	- Release: 1.7.21
+
+2003-12-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Character encoding converter was added.
+	- Release: 1.7.20
+
+2003-12-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Format converter for older versions than 1.7.13 was added.
+	- Tuning paramters of the inverted API were modified.
+	- A CGI script for full-text search was enhanced.
+	- Release: 1.7.19
+
+2003-12-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The GDBM-compatible API was enhanced.
+	- Release: 1.7.18
+
+2003-12-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- A CGI script for full-text search was enhanced.
+	- Release: 1.7.17
+
+2003-12-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A CGI script for full-text search was enhanced.
+	- A ulitity command for full-text search was enhanced.
+	- Building configuration files were modified.
+	- Release: 1.7.16
+
+2003-11-30  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A CGI script for full-text search was enhanced.
+	- A ulitity command for full-text search was enhanced.
+	- Release: 1.7.15
+
+2003-11-29  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- A ulitity command for full-text search was enhanced.
+	- A CGI script for full-text search was enhanced.
+	- Release: 1.7.14
+
+2003-11-27  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Format of headers of database was modified.
+	- Supporting endian conversion was abolished.
+	- Import/export features were added to utility commands.
+	- A ulitity command for full-text search was enhanced.
+	- A CGI script for full-text search was enhanced.
+	- Release: 1.7.13
+
+2003-11-25  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- The inverted API was enhanced.
+	- A ulitity command for full-text search was enhanced.
+	- A CGI script for full-text search was enhanced.
+	- Release: 1.7.12
+
+2003-11-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API was enhanced.
+	- A ulitity command for full-text search was enhanced.
+	- A CGI script for full-text search was enhanced.
+	- A utility class of Java API was enhanced.
+	- Release: 1.7.11
+
+2003-11-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A utility class of Java API was enhanced.
+	- Building configuration for CGI scripts was modified.
+	- Release: 1.7.10
+
+2003-11-20  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Tuning paramters of the inverted API were modified.
+	- A ulitity command for full-text search was enhanced.
+	- Release: 1.7.9
+
+2003-11-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Optional features of compressing with ZLIB were added.
+	- Release: 1.7.8
+
+2003-11-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The extended advanced API, Vista was added.
+	- Release: 1.7.7
+
+2003-11-03  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- C API compilation using Visual C++ was supported.
+	- Odeum and its commands were enhanced.
+	- Release: 1.7.6
+
+2003-10-25  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A ulitity command for full-text search was enhanced.
+	- A CGI script for full-text search was enhanced.
+	- Release: 1.7.5
+
+2003-10-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A CGI script for full-text search was added.
+	- A bug of BSD support in Makefile was fixed.
+	- Release: 1.7.4
+
+2003-10-19  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Processing speed of the inverted API was improved.
+	- A ulitity command for full-text search was enhanced.
+	- Release: 1.7.3
+
+2003-10-17  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The license was changed to LGPL.
+	- An indexing command for the inverted API was added.
+	- Release: 1.7.2
+
+2003-10-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A test command for the inverted API was added.
+	- A bug about optimization in the inverted API was fixed.
+	- Tuning paramters of the inverted API were modified.
+	- Release: 1.7.1
+
+2003-10-13  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The inverted API, Odeum was added.
+	- Comments in source codes increased.
+	- Release: 1.7.0
+
+2003-10-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Executable commands were modified for RISC OS.
+	- Release: 1.6.22
+
+2003-10-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Executable commands were modified for RISC OS.
+	- Release: 1.6.21
+
+2003-09-30  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Naming file in RISC OS style was supported.
+	- Hash functions were enhanced.
+	- Release: 1.6.20
+
+2003-09-26  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Test commands were added.
+	- Release: 1.6.19
+
+2003-09-22  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefile for RISC OS was added.
+	- C++ API was enhanced.
+	- Release: 1.6.18
+
+2003-09-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Test commands were enhanced.
+	- Source codes and Makefile were modified for RISC OS.
+	- The CGI script was enhanced.
+	- Release: 1.6.17
+
+2003-09-13  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The CGI script for administration was added.
+	- C++ API was enhanced.
+	- Release: 1.6.16
+
+2003-08-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.6.15
+
+2003-08-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.6.14
+
+2003-08-11  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.6.13
+
+2003-08-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- A bug in the utility API was fixed.
+	- Test commands were enhanced.
+	- Release: 1.6.12
+
+2003-07-31  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- C and Java APIs support compilation using MinGW.
+	- Release: 1.6.11
+
+2003-07-27  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Perl and Ruby APIs support transaction.
+	- Release: 1.6.10
+
+2003-07-26  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Speed of transaction was improved.
+	- Release: 1.6.9
+
+2003-07-24  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- C++ and Java APIs of B+ tree support transaction.
+	- Release: 1.6.8
+
+2003-07-21  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- C API of B+ tree supports transaction.
+	- Bugs about Mutex in C++ and Java APIs were fixed.
+	- Release: 1.6.7
+
+2003-07-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- C++ and Java APIs of database abstraction were simplified.
+	- Ruby API of B+ tree was simplified.
+	- Release: 1.6.6
+
+2003-07-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Ruby API of B+ tree was added.
+	- C, C++, Java and Perl APIs of B+ tree were enhanced.
+	- Release: 1.6.5
+
+2003-07-13  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Perl API of B+ tree was added.
+	- C, C++ and Java APIs of B+ tree were enhanced.
+	- Release: 1.6.4
+
+2003-07-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Java API of B++ tree was added.
+	- C API of B+ tree was enhanced.
+	- C++ API of B+ tree was enhanced.
+	- Release: 1.6.3
+
+2003-07-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Debug routines were removed and speed was improved.
+	- No locking mode was added.
+	- Endian converter of Villa was added.
+	- C++ API of B++ tree was added.
+	- Release: 1.6.2
+
+2003-07-03  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The advanced API was enhanced to improve its speed.
+	- Makefiles were enhanced for HP-UX.
+	- Release: 1.6.1
+
+2003-06-28  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The advanced API for B+ tree database is added.
+	- Release: 1.6.0
+
+2003-06-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefiles were enhanced for Mac OS X.
+	- Release: 1.5.13
+
+2003-06-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefile was enhanced for Solaris and Mac OS X.
+	- Release: 1.5.12
+
+2003-06-06  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.5.11
+
+2003-05-31  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was enhanced.
+	- Release: 1.5.10
+
+2003-05-29  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was changed.
+	- Release: 1.5.9
+
+2003-05-25  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Alignment mechanism was simplified.
+	- Release: 1.5.8
+
+2003-05-17  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefile was updated
+	- Release: 1.5.7
+
+2003-05-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Test tools were enhanced.
+	- Release: 1.5.6
+
+2003-05-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefile using libtool was added.
+	- Release: 1.5.5
+
+2003-05-12  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- API for Ruby was enhanced.
+	- Release: 1.5.4
+
+2003-05-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- API for Ruby was added.
+	- Release: 1.5.3
+
+2003-05-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- API for Perl was enhanced.
+	- Release: 1.5.2
+
+2003-04-30  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- API for Perl was enhanced.
+	- Release: 1.5.1
+
+2003-04-29  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- API for Perl was added.
+	- Release: 1.5.0
+
+2003-04-25  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The package was reorganized to be a GNU package.
+	- Release: 1.4.11
+
+2003-04-21  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The utility API was added.
+	- Release: 1.4.10
+
+2003-04-15  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Endian converters were added.
+	- Release: 1.4.9
+
+2003-04-12  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The GDBM-compatible API was enhanced.
+	- Release: 1.4.8
+
+2003-04-10  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Some bugs were fixed and C++ API was enhanced.
+	- Release: 1.4.7
+
+2003-04-09  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Coalescence of dead regions and reuse of them were featured.
+	- Release: 1.4.6
+
+2003-04-06  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The GDBM-compatible API and the C++ API were enhanced.
+	- Release: 1.4.5
+
+2003-04-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The API for C++ and the API for Java were enhanced.
+	- Release: 1.4.4
+
+2003-04-02  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Documents for C++ was enhanced.
+	- Release: 1.4.3
+
+2003-04-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The API for Java was enhanced.
+	- Release: 1.4.2
+
+2003-03-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Makefiles were modified.
+	- Release: 1.4.1
+
+2003-03-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- APIs for C++ and Java was enhanced.
+	- Release: 1.4.0
+
+2003-03-15  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The API for C++ was added.
+	- Release: 1.3.2
+
+2003-03-11  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The API for Java was supported on Solaris and Windows.
+	- Release: 1.3.1
+
+2003-03-04  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The API for Java was added.
+	- Release: 1.3.0
+
+2003-02-23  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The GDBM-compatible API was added.
+	- Release: 1.2.0
+
+2003-02-21  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Compatibility with NDBM was improved.
+	- Release: 1.1.3
+
+2003-02-18  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Optimizing suppoted on Windows.  DLL is supported.
+	- Release: 1.1.2
+
+2003-02-15  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- Windows is now supported.
+	- The compatible API was enhanced.
+	- Release: 1.1.1
+
+2003-02-11  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The NDBM-compatible API was added.
+	- Release: 1.1.0
+
+2003-02-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	- The initial version.
+	- Release: 1.0.0
+

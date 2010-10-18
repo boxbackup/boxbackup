@@ -1,0 +1,318 @@
+# Makefile to build QDBM using libtool
+
+
+
+#================================================================
+# Setting variables
+#================================================================
+
+
+# Generic settings
+SHELL = @SHELL@
+
+# Packaging
+PACKAGE = @PACKAGE_NAME@
+VERSION = @PACKAGE_VERSION@
+LIBVER = @LIBVER@
+LIBREV = @LIBREV@
+
+# Targets
+MYHEADS = depot.h curia.h relic.h hovel.h cabin.h villa.h vista.h odeum.h
+MYLIBOBJS = depot.lo curia.lo relic.lo hovel.lo cabin.lo villa.lo vista.lo odeum.lo myconf.lo
+MYLIBS = libqdbm.la
+MYBINS = dpmgr dptest dptsv crmgr crtest crtsv rlmgr rltest hvmgr hvtest \
+  cbtest cbcodec vlmgr vltest vltsv odmgr odtest odidx qmttest
+MYMAN1S = dpmgr.1 dptest.1 dptsv.1 crmgr.1 crtest.1 crtsv.1 rlmgr.1 rltest.1 hvmgr.1 hvtest.1 \
+  cbtest.1 cbcodec.1 vlmgr.1 vltest.1 vltsv.1 odmgr.1 odtest.1 odidx.1 qmttest.1
+MYMAN3S = qdbm.3 depot.3 dpopen.3 curia.3 cropen.3 relic.3 hovel.3 \
+  cabin.3 villa.3 vlopen.3 vista.3 odeum.3 odopen.3
+MYDOCS = spex.html spex-ja.html COPYING ChangeLog NEWS THANKS
+MYPCS = qdbm.pc
+
+# Install destinations
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+MYHEADDIR = @includedir@
+MYLIBDIR = @libdir@
+MYBINDIR = @bindir@
+MYMAN1DIR = @mandir@/man1
+MYMAN3DIR = @mandir@/man3
+MYSHAREDIR = $(prefix)/share/$(PACKAGE)
+MYPCDIR = @libdir@/pkgconfig
+
+# Building binaries
+LIBTOOL = libtool
+CC = gcc
+CFLAGS = -I. -I$(MYHEADDIR) -I$(HOME)/include -I/usr/local/include @MYDEFS@ \
+  -D_XOPEN_SOURCE_EXTENDED=1 -D_GNU_SOURCE=1 -D__EXTENSIONS__=1 -D_HPUX_SOURCE=1 \
+  -D_POSIX_MAPPED_FILES=1 -D_POSIX_SYNCHRONIZED_IO=1 \
+  -DPIC=1 -D_THREAD_SAFE=1 -D_REENTRANT=1 -DNDEBUG -O3
+LD = gcc
+LIBLDFLAGS = -rpath $(MYLIBDIR) -R $(MYLIBDIR) \
+  -version-info $$(($(LIBVER)+$(LIBREV))):0:$(LIBREV) @LIBS@
+LDFLAGS = -rpath $(MYLIBDIR) -R $(MYLIBDIR) -L. -lqdbm @LIBS@
+INSTALL = install
+MKDIR = mkdir -p
+CP = cp -rf
+RM = rm -rf
+
+
+
+#================================================================
+# Suffix rules
+#================================================================
+
+
+.SUFFIXES :
+.SUFFIXES : .c .lo
+
+.c.lo :
+	$(LIBTOOL) --mode=compile --tag=CC $(CC) -c $(CFLAGS) $<
+
+
+
+#================================================================
+# Actions
+#================================================================
+
+
+all : $(MYLIBS) $(MYBINS)
+	@printf '\n'
+	@printf '#================================================================\n'
+	@printf '# Ready to install.\n'
+	@printf '#================================================================\n'
+
+
+clean :
+	$(RM) $(MYLIBS) $(MYBINS) *.o *.a *.so *.lo *.la a.out .libs \
+	  *.exe *.dll.a *.dll TAGS srcdoc gmon.out leak.log casket casket.* *~
+
+
+install :
+	$(LIBTOOL) --mode=install $(INSTALL) $(MYHEADS) $(MYHEADDIR)
+	$(LIBTOOL) --mode=install $(INSTALL) $(MYLIBS) $(MYLIBDIR)
+	$(LIBTOOL) --mode=install $(INSTALL) $(MYBINS) $(MYBINDIR)
+	$(MKDIR) $(MYMAN1DIR)
+	cd man && $(CP) $(MYMAN1S) $(MYMAN1DIR)
+	$(MKDIR) $(MYMAN3DIR)
+	cd man && $(CP) $(MYMAN3S) $(MYMAN3DIR)
+	$(MKDIR) $(MYSHAREDIR)
+	$(CP) $(MYDOCS) $(MYSHAREDIR)
+	$(MKDIR) $(MYPCDIR)
+	$(CP) $(MYPCS) $(MYPCDIR)
+	@printf '\n'
+	@printf '#================================================================\n'
+	@printf '# Thanks for using QDBM.\n'
+	@printf '#================================================================\n'
+
+
+uninstall :
+	cd $(MYHEADDIR) && $(LIBTOOL) --mode=uninstall $(RM) $(MYHEADS)
+	cd $(MYLIBDIR) && $(LIBTOOL) --mode=uninstall $(RM) $(MYLIBS)
+	cd $(MYBINDIR) && $(LIBTOOL) --mode=uninstall $(RM) $(MYBINS)
+	cd $(MYMAN1DIR) && $(RM) $(MYMAN1S)
+	cd $(MYMAN3DIR) && $(RM) $(MYMAN3S)
+	$(RM) $(MYSHAREDIR)
+	cd $(MYPCDIR) && $(RM) $(MYPCS)
+
+
+distclean : clean
+	$(RM) Makefile LTmakefile rpmspec config.cache config.log config.status autom4te.cache
+
+
+check :
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./dptest write -s casket 500 500000
+	$(LIBTOOL) --mode=execute ./dptest write casket 50000 5000
+	$(LIBTOOL) --mode=execute ./dptest read casket
+	$(LIBTOOL) --mode=execute ./dptest read -wb casket
+	$(LIBTOOL) --mode=execute ./dptest rcat -c casket 50000 50 500 32 8
+	$(LIBTOOL) --mode=execute ./dptest combo casket
+	$(LIBTOOL) --mode=execute ./dptest wicked -c casket 5000
+	$(LIBTOOL) --mode=execute ./dptest wicked casket 500
+	$(LIBTOOL) --mode=execute ./dpmgr repair casket
+	$(LIBTOOL) --mode=execute ./dpmgr optimize casket
+	$(LIBTOOL) --mode=execute ./dpmgr list casket
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./crtest write -s casket 500 100000 5
+	$(LIBTOOL) --mode=execute ./crtest write casket 50000 500 10
+	$(LIBTOOL) --mode=execute ./crtest read casket
+	$(LIBTOOL) --mode=execute ./crtest read -wb casket
+	$(LIBTOOL) --mode=execute ./crtest rcat -c casket 50000 5 10 500 32 8
+	$(LIBTOOL) --mode=execute ./crtest combo casket
+	$(LIBTOOL) --mode=execute ./crtest wicked -c casket 5000
+	$(LIBTOOL) --mode=execute ./crtest wicked casket 500
+	$(LIBTOOL) --mode=execute ./crmgr repair casket
+	$(LIBTOOL) --mode=execute ./crmgr optimize casket
+	$(LIBTOOL) --mode=execute ./crmgr list casket
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./crtest write -lob casket 1000 50 10
+	$(LIBTOOL) --mode=execute ./crtest read -lob casket
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./rltest write casket 5000
+	$(LIBTOOL) --mode=execute ./rltest read casket 5000
+	$(LIBTOOL) --mode=execute ./rlmgr list casket
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./hvtest write casket 5000
+	$(LIBTOOL) --mode=execute ./hvtest read casket 5000
+	$(LIBTOOL) --mode=execute ./hvmgr optimize casket
+	$(LIBTOOL) --mode=execute ./hvmgr list casket
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./hvtest write -qdbm -s casket 500
+	$(LIBTOOL) --mode=execute ./hvtest write -qdbm casket 5000
+	$(LIBTOOL) --mode=execute ./hvtest read -qdbm casket 5000
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./cbtest sort 5000
+	$(LIBTOOL) --mode=execute ./cbtest strstr 500
+	$(LIBTOOL) --mode=execute ./cbtest list 50000
+	$(LIBTOOL) --mode=execute ./cbtest list -d 500
+	$(LIBTOOL) --mode=execute ./cbtest map 50000 500
+	$(LIBTOOL) --mode=execute ./cbtest map -d 500 5
+	$(LIBTOOL) --mode=execute ./cbtest heap 50000 500
+	$(LIBTOOL) --mode=execute ./cbtest heap -d 500 50
+	$(LIBTOOL) --mode=execute ./cbtest wicked 5000
+	$(LIBTOOL) --mode=execute ./cbtest misc
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./vltest write -tune 32 31 32 32 casket 50000
+	$(LIBTOOL) --mode=execute ./vltest read casket
+	$(LIBTOOL) --mode=execute ./vltest rdup -tune 32 31 512 256 casket 50000 50000
+	$(LIBTOOL) --mode=execute ./vltest combo casket
+	$(LIBTOOL) --mode=execute ./vltest wicked -c casket 5000
+	$(LIBTOOL) --mode=execute ./vltest wicked casket 500
+	$(LIBTOOL) --mode=execute ./vlmgr repair casket
+	$(LIBTOOL) --mode=execute ./vlmgr optimize casket
+	$(LIBTOOL) --mode=execute ./vlmgr list casket
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./vltest write -int -cz -tune 32 31 32 32 casket 50000
+	$(LIBTOOL) --mode=execute ./vltest read -int -vc casket
+	$(LIBTOOL) --mode=execute ./vltest rdup -int -cz -cc -tune 32 31 512 256 casket 50000 50000
+	$(LIBTOOL) --mode=execute ./vltest combo -cz casket
+	$(LIBTOOL) --mode=execute ./vltest wicked -cz -c casket 5000
+	$(LIBTOOL) --mode=execute ./vltest combo -cy casket
+	$(LIBTOOL) --mode=execute ./vltest wicked -cy -c casket 5000
+	$(LIBTOOL) --mode=execute ./vltest combo -cx casket
+	$(LIBTOOL) --mode=execute ./vltest wicked -cx -c casket 5000
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./odtest write casket 500 50 5000
+	$(LIBTOOL) --mode=execute ./odtest read casket
+	$(LIBTOOL) --mode=execute ./odtest combo casket
+	$(LIBTOOL) --mode=execute ./odtest wicked casket 500
+	$(RM) casket*
+	$(LIBTOOL) --mode=execute ./qmttest casket 50000 10
+	$(RM) casket*
+	@printf '\n'
+	@printf '#================================================================\n'
+	@printf '# Checking completed.\n'
+	@printf '#================================================================\n'
+
+
+.PHONY : all clean install check
+
+
+
+#================================================================
+# Building binaries
+#================================================================
+
+
+libqdbm.la : $(MYLIBOBJS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) $(MYLIBOBJS) -o $@ $(LIBLDFLAGS)
+
+
+dpmgr : dpmgr.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ dpmgr.lo $(LDFLAGS)
+
+
+dptest : dptest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ dptest.lo $(LDFLAGS)
+
+
+dptsv : dptsv.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ dptsv.lo $(LDFLAGS)
+
+
+crmgr : crmgr.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ crmgr.lo $(LDFLAGS)
+
+
+crtest : crtest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ crtest.lo $(LDFLAGS)
+
+
+crtsv : crtsv.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ crtsv.lo $(LDFLAGS)
+
+
+rlmgr : rlmgr.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ rlmgr.lo $(LDFLAGS)
+
+
+rltest : rltest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ rltest.lo $(LDFLAGS)
+
+
+hvmgr : hvmgr.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ hvmgr.lo $(LDFLAGS)
+
+
+hvtest : hvtest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ hvtest.lo $(LDFLAGS)
+
+
+cbtest : cbtest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ cbtest.lo $(LDFLAGS)
+
+
+cbcodec : cbcodec.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ cbcodec.lo $(LDFLAGS)
+
+
+vlmgr : vlmgr.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ vlmgr.lo $(LDFLAGS)
+
+
+vltest : vltest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ vltest.lo $(LDFLAGS)
+
+
+vltsv : vltsv.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ vltsv.lo $(LDFLAGS)
+
+
+odmgr : odmgr.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ odmgr.lo $(LDFLAGS)
+
+
+odtest : odtest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ odtest.lo $(LDFLAGS)
+
+
+odidx : odidx.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ odidx.lo $(LDFLAGS)
+
+
+qmttest : qmttest.lo $(MYLIBS)
+	$(LIBTOOL) --mode=link --tag=CC $(LD) -o $@ qmttest.lo $(LDFLAGS)
+
+
+depot.lo dpmgr.lo dptest.lo dptsv.lo : depot.h myconf.h
+
+curia.lo crmgr.lo crtest.lo crtsv.lo : curia.h depot.h myconf.h
+
+relic.lo rlmgr.lo rltest.lo : relic.h depot.h myconf.h
+
+hovel.lo hvmgr.lo hvtest.lo : hovel.h depot.h curia.h myconf.h
+
+cabin.lo cbtest.lo : cabin.h myconf.h
+
+villa.lo vlmgr.lo vltest.lo vltsv.lo : villa.h depot.h cabin.h myconf.h
+
+vista.lo : vista.h villa.h depot.h curia.h cabin.h myconf.h villa.c
+
+odeum.lo odmgr.lo odtest.lo odidx.lo : odeum.h depot.h curia.h cabin.h villa.h myconf.h
+
+myconf.lo : myconf.h
+
+
+
+# END OF FILE
