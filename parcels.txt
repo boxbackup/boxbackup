@@ -18,6 +18,7 @@ backup-client
 	html bbackupd-config
 	html bbackupd.conf
 
+	subdir qdbm libqdbm.a
 
 EXCEPT:mingw32,mingw32msvc
 	man bbackupd.8
@@ -64,8 +65,6 @@ backup-server
 	html raidfile-config
 	html bbstored.conf
 	html raidfile.conf
-
-	configure bundled/tdb
 
 EXCEPT:mingw32,mingw32msvc
 	man bbstored.8

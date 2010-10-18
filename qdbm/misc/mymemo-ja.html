@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="author" content="Mikio Hirabayashi" />
+<link rel="contents" href="./" />
+<title>My Private Memo for QDBM</title>
+</head>
+
+<body>
+
+<h1>QDBMのための私的メモ</h1>
+
+<hr />
+
+<h2>cygwin+mingwでのビルド環境の設定方法</h2>
+
+<ul>
+<li>Cygwinのセットアップ時に、mingwのgccとmingwのzlibも選択する。</li>
+<li>mingwのlibiconvはmingwのサイトから手に入れる。そして、*.h は /usr/include/mingw の下に、*.dll.a は /lib/mingw の下に、*.dll は /binの下に移動させる。</li>
+<li>QDBMのビルド環境の設定は ./configure --enable-zlib --enable-iconv で行い、パッケージの作成は make win32pkg で行う。</li>
+</ul>
+
+<hr />
+
+</body>
+
+</html>
+
+<!-- END OF FILE -->

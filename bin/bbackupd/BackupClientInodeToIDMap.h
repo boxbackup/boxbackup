@@ -17,8 +17,7 @@
 
 // avoid having to include the DB files when not necessary
 #ifndef BACKIPCLIENTINODETOIDMAP_IMPLEMENTATION
-	struct TDB_CONTEXT;
-	struct TDB_DATUM;
+	class DEPOT;
 #endif
 
 // --------------------------------------------------------------------------
@@ -50,7 +49,7 @@ private:
 	bool mReadOnly;
 	bool mEmpty;
 	std::string mFilename;
-	TDB_CONTEXT *mpContext;
+	DEPOT *mpDepot;
 };
 
 #endif // BACKUPCLIENTINODETOIDMAP_H
