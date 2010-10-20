@@ -325,7 +325,8 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 		{
 			// Simple implementation, so do it here
 			BOX_INFO(GetCurrentDirectoryName() << " (" <<
-				BOX_FORMAT_OBJECTID(GetCurrentDirectoryID()));
+				BOX_FORMAT_OBJECTID(GetCurrentDirectoryID()) <<
+				")");
 		}
 		break;
 
