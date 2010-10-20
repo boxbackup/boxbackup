@@ -324,7 +324,7 @@ void BackupQueries::DoCommand(const char *Command, bool isFromCommandLine)
 	case Command_pwd:
 		{
 			// Simple implementation, so do it here
-			BOX_INFO(GetCurrentDirectoryName() << " (" <<
+			BOX_NOTICE(GetCurrentDirectoryName() << " (" <<
 				BOX_FORMAT_OBJECTID(GetCurrentDirectoryID()) <<
 				")");
 		}
