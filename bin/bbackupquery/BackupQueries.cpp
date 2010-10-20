@@ -737,7 +737,8 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 		{
 			// Simple implementation, so do it here
 			BOX_INFO(GetCurrentDirectoryName() << " (" <<
-				BOX_FORMAT_OBJECTID(GetCurrentDirectoryID()));
+				BOX_FORMAT_OBJECTID(GetCurrentDirectoryID()) <<
+				")");
 		}
 		break;
 
