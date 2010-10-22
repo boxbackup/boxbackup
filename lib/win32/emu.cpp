@@ -654,7 +654,7 @@ int emu_fstat(HANDLE hdir, struct emu_stat * st)
 	{
 		conv.HighPart = fi.nFileSizeHigh;
 		conv.LowPart  = fi.nFileSizeLow;
-		st->st_size = (_off_t)conv.QuadPart;
+		st->st_size = conv.QuadPart;
 	}
 
 	// at the mo
