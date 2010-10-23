@@ -114,7 +114,7 @@ print H <<__E;
 		return mMessage;
 	}
 
-private:
+protected:
 	unsigned int mSubType;
 	std::string mMessage;
 };
