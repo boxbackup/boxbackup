@@ -43,6 +43,8 @@ die "Exception class and number not specified" unless $class ne '' && $class_num
 
 close EXCEPTION_DESC;
 
+$class_decl = ("DLL" eq $ARGV[1]) ? "BOX_CLASS" : "class";
+
 # write the code
 print "Generating $class exception...\n";
 
@@ -68,7 +70,7 @@ print H <<__E;
 //		Created: autogen
 //
 // --------------------------------------------------------------------------
-class ${class}Exception : public BoxException
+$class_decl ${class}Exception : public BoxException
 {
 public:
 	${class}Exception(unsigned int SubType,

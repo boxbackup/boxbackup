@@ -25,7 +25,7 @@ EMU_STRUCT_STAT; // declaration
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-class BackupClientFileAttributes : public StreamableMemBlock
+BOX_CLASS BackupClientFileAttributes : public StreamableMemBlock
 {
 public:
 	BackupClientFileAttributes();

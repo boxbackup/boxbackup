@@ -12,7 +12,7 @@
 
 #include "Configuration.h"
 
-extern const ConfigurationVerify BackupDaemonConfigVerify;
+extern BOX_EXPORT const ConfigurationVerify BackupDaemonConfigVerify;
 
 #endif // BACKUPDAEMONCONFIGVERIFY__H
 

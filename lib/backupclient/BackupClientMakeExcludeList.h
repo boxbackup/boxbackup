@@ -13,7 +13,7 @@
 class ExcludeList;
 class Configuration;
 
-ExcludeList *BackupClientMakeExcludeList(const Configuration &rConfig, const char *DefiniteName, const char *RegexName,
+extern BOX_FUNC(ExcludeList *) BackupClientMakeExcludeList(const Configuration &rConfig, const char *DefiniteName, const char *RegexName,
 	const char *AlwaysIncludeDefiniteName = 0, const char *AlwaysIncludeRegexName = 0);
 
 // --------------------------------------------------------------------------

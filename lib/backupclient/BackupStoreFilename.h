@@ -40,7 +40,7 @@ class IOStream;
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-class BackupStoreFilename /* : public BackupStoreFilename_base */
+BOX_CLASS BackupStoreFilename /* : public BackupStoreFilename_base */
 {
 private:
 	std::string mEncryptedName;

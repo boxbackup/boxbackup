@@ -42,7 +42,7 @@ namespace BackupStoreFileCreation
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-class BackupStoreFileEncodeStream : public IOStream
+BOX_CLASS BackupStoreFileEncodeStream : public IOStream
 {
 public:
 	BackupStoreFileEncodeStream();
@@ -55,7 +55,7 @@ public:
 		BackupStoreFileCreation::BlocksAvailableEntry *mpStartBlock;	// may be null
 	} RecipeInstruction;
 	
-	class Recipe : public std::vector<RecipeInstruction>
+	BOX_CLASS Recipe : public std::vector<RecipeInstruction>
 	{
 		// NOTE: This class is rather tied in with the implementation of diffing.
 	public:
