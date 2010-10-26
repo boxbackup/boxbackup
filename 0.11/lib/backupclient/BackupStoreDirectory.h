@@ -27,7 +27,7 @@ class IOStream;
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-class BackupStoreDirectory
+BOX_CLASS BackupStoreDirectory
 {
 public:
 	BackupStoreDirectory();
@@ -38,7 +38,7 @@ private:
 public:
 	~BackupStoreDirectory();
 
-	class Entry
+	BOX_CLASS Entry
 	{
 	public:
 		friend class BackupStoreDirectory;
@@ -158,7 +158,7 @@ public:
 	const StreamableMemBlock &GetAttributes() const {return mAttributes;}
 	box_time_t GetAttributesModTime() const {return mAttributesModTime;}
 
-	class Iterator
+	BOX_CLASS Iterator
 	{
 	public:
 		Iterator(const BackupStoreDirectory &rDir)

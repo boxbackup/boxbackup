@@ -19,7 +19,7 @@
 //		Created: 2005/11/15
 //
 // --------------------------------------------------------------------------
-class RunStatusProvider
+BOX_CLASS RunStatusProvider
 {
 	public:
 	virtual ~RunStatusProvider() { }

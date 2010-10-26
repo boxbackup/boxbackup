@@ -22,7 +22,7 @@ enum
 	Restore_CompleteWithErrors,
 };
 
-int BackupClientRestore(BackupProtocolClient &rConnection,
+extern BOX_FUNC(int) BackupClientRestore(BackupProtocolClient &rConnection,
 	int64_t DirectoryID,
 	const char *LocalDirectoryName,
 	bool PrintDots = false,

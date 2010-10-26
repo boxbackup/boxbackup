@@ -48,7 +48,7 @@ typedef struct
 //		Created: 2006/01/19
 //
 // --------------------------------------------------------------------------
-class DiffTimer
+BOX_CLASS DiffTimer
 {
 public:
 	DiffTimer();
@@ -67,10 +67,10 @@ public:
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-class BackupStoreFile
+BOX_CLASS BackupStoreFile
 {
 public:
-	class DecodedStream : public IOStream
+	BOX_CLASS DecodedStream : public IOStream
 	{
 		friend class BackupStoreFile;
 	private:
@@ -182,7 +182,7 @@ public:
 	static void DiffTimerExpired();
 
 	// Building blocks
-	class EncodingBuffer
+	BOX_CLASS EncodingBuffer
 	{
 	public:
 		EncodingBuffer();

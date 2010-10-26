@@ -22,7 +22,7 @@ class CipherContext;
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-class BackupStoreFilenameClear : public BackupStoreFilename
+BOX_CLASS BackupStoreFilenameClear : public BackupStoreFilename
 {
 public:
 	BackupStoreFilenameClear();

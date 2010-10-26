@@ -32,12 +32,14 @@ my %log_display_types =
 
 
 
-my ($type, $file) = @ARGV;
+my ($type, $file, $decl) = @ARGV;
 
 if($type ne 'Server' && $type ne 'Client')
 {
 	die "Neither Server or Client is specified on command line\n";
 }
+
+my $class_decl = ("DLL" eq $decl) ? "BOX_CLASS" : "class";
 
 open IN, $file or die "Can't open input file $file\n";
 
@@ -314,7 +316,7 @@ my $classname_base = $protocol_name.'Protocol'.$type;
 for my $cmd (@cmd_list)
 {
 	print H <<__E;
-class $classname_base$cmd : public $derive_objects_from
+$class_decl $classname_base$cmd : public $derive_objects_from
 {
 public:
 	$classname_base$cmd();
@@ -553,7 +555,7 @@ __E
 
 # finally, the protocol object itself
 print H <<__E;
-class $classname_base : public Protocol
+$class_decl $classname_base : public Protocol
 {
 public:
 	$classname_base(IOStream &rStream);

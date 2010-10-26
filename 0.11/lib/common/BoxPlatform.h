@@ -40,6 +40,21 @@
 	#endif
 #endif
 
+#ifdef BOXBACKUP_EXPORTS
+	#define BOX_CLASS class __declspec(dllexport)
+	#define BOX_EXPORT __declspec(dllexport)
+	#define BOX_FUNC(ret) __declspec(dllexport) ret
+#elif defined BOXBACKUP_IMPORTS
+	#define BOX_CLASS class __declspec(dllimport)
+	#define BOX_EXPORT __declspec(dllimport)
+	#define BOX_FUNC(ret) __declspec(dllexport) ret
+#else
+	#define BOX_CLASS class
+	#define BOX_EXPORT
+	#define BOX_FUNC(ret) ret
+#endif
+
+
 #ifdef HAVE_SYS_TYPES_H
 	#include <sys/types.h>
 #endif
@@ -180,7 +195,7 @@
 #endif
 
 // Solaris has no dirfd(x) macro or function, and we need one for
-// intercept tests. We cannot define macros with arguments directly 
+// intercept tests. We cannot define macros with arguments directly
 // using AC_DEFINE, so do it here instead of in configure.ac.
 
 #if ! defined PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE && ! HAVE_DECL_DIRFD
