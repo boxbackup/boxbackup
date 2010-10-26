@@ -176,6 +176,9 @@ std::string FdGetLine::GetLine(bool Preprocess)
 	{
 		// Remove whitespace
 		size_t size = r.size();
+		if(0 == size)
+			return "";
+
 		size_t begin = 0;
 		while(begin < size && iw(r[begin]))
 		{
@@ -183,17 +186,17 @@ std::string FdGetLine::GetLine(bool Preprocess)
 		}
 		
 		// Check for comment char, but char before must be whitespace
+		if(r[begin] == '#')
+			return "";
+
 		size_t end = begin;
-		while(end < size)
+		while(++end < size)
 		{
-			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
-			{
+			if(r[end] == '#' && iw(r[end-1]))
 				break;
-			}
-			end++;
 		}
 		
-		for(end--; end > begin && iw(r[end]); end--);
+		while(--end > begin && iw(r[end])) end--;
 		
 		// Return a sub string
 		return r.substr(begin, end - begin + 1);
