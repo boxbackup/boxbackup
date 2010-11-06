@@ -48,8 +48,10 @@
 #define BACKUPCRYPTOKEYS_FILE_AES_KEY_START				(BACKUPCRYPTOKEYS_ATTRIBUTE_HASH_SECRET_START+128)
 #define BACKUPCRYPTOKEYS_FILE_AES_KEY_LENGTH			32
 
-
+#ifdef BOX__H
+// So we can use only the constants
 BOX_FUNC(void) BackupClientCryptoKeys_Setup(const std::string& rKeyMaterialFilename);
+#endif
 
 #endif // BACKUPCLIENTCRYTOKEYS__H
 
