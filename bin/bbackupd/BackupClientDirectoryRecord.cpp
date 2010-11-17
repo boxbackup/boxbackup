@@ -165,6 +165,11 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				strerror(errno));
 			return;
 		}
+
+		BOX_TRACE("Stat dir '" << rLocalPath << "' "
+			"found device/inode " <<
+			dest_st.st_dev << "/" << dest_st.st_ino);
+
 		// Store inode number in map so directories are tracked
 		// in case they're renamed
 		{
@@ -314,6 +319,11 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Ignore this entry for now.
 					continue;
 				}
+
+				BOX_TRACE("Stat entry '" << filename << "' "
+					"found device/inode " <<
+					file_st.st_dev << "/" <<
+					file_st.st_ino);
 
 				if(file_st.st_dev != dest_st.st_dev)
 				{
