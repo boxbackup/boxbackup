@@ -99,6 +99,9 @@ private:
 	bool mKeepConsoleOpenAfterFork;
 	bool mHaveConfigFile;
 	int mLogLevel; // need an int to do math with
+	std::string mLogFile;
+	Log::Level mLogFileLevel;
+	std::auto_ptr<FileLogger> mapLogFileLogger;
 	static Daemon *spDaemon;
 	std::string mAppName;
 };
