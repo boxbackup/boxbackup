@@ -55,6 +55,7 @@ BackupStoreFileEncodeStream::BackupStoreFileEncodeStream()
 	  mPositionInCurrentBlock(0),
 	  mBlockSize(BACKUP_FILE_MIN_BLOCK_SIZE),
 	  mLastBlockSize(0),
+	  mTotalBytesSent(0),
 	  mpRawBuffer(0),
 	  mAllocatedBufferSize(0),
 	  mEntryIVBase(0)
@@ -463,6 +464,7 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 	
 	// Add encoded size to stats
 	BackupStoreFile::msStats.mTotalFileStreamSize += (NBytes - bytesToRead);
+	mTotalBytesSent += (NBytes - bytesToRead);
 	
 	// Return size of data to caller
 	return NBytes - bytesToRead;

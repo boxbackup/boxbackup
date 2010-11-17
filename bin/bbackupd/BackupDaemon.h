@@ -457,11 +457,13 @@ public:
  	virtual void NotifyFileUploaded(
  		const BackupClientDirectoryRecord* pDirRecord,
  		const std::string& rLocalPath,
- 		int64_t FileSize) 
+ 		int64_t FileSize, int64_t UploadedSize) 
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_NOTICE("Uploaded file: " << rLocalPath);
+			BOX_NOTICE("Uploaded file: " << rLocalPath << ", "
+				"total size = " << FileSize << ", "
+				"uploaded size = " << UploadedSize);
 		} 
 	}
  	virtual void NotifyFileSynchronised(

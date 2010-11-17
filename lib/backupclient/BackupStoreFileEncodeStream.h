@@ -85,6 +85,7 @@ public:
 	virtual void Write(const void *pBuffer, int NBytes);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
+	int64_t GetTotalBytesSent() { return mTotalBytesSent; }
 
 private:
 	enum
@@ -121,6 +122,7 @@ private:
 	int32_t mPositionInCurrentBlock;	// for reading out
 	int32_t mBlockSize;					// Basic block size of most of the blocks in the file
 	int32_t mLastBlockSize;				// the size (unencoded) of the last block in the file
+	int64_t mTotalBytesSent;
 	// Buffers
 	uint8_t *mpRawBuffer;				// buffer for raw data
 	BackupStoreFile::EncodingBuffer mEncodedBuffer;

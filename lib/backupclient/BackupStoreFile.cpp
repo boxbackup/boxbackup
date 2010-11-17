@@ -73,9 +73,11 @@ BackupStoreFileStats BackupStoreFile::msStats = {0,0,0};
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(const char *Filename,
-	int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
-	int64_t *pModificationTime, ReadLoggingStream::Logger* pLogger,
+std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(
+	const char *Filename, int64_t ContainerID,
+	const BackupStoreFilename &rStoreFilename,
+	int64_t *pModificationTime,
+	ReadLoggingStream::Logger* pLogger,
 	RunStatusProvider* pRunStatusProvider)
 {
 	// Create the stream
