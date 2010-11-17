@@ -401,7 +401,7 @@ bool FileStream::StreamDataLeft()
 // --------------------------------------------------------------------------
 bool FileStream::StreamClosed()
 {
-	return mIsEOF;
+	return (mOSFileHandle == INVALID_FILE);
 }
 
 // --------------------------------------------------------------------------
