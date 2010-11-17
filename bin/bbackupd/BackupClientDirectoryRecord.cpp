@@ -17,9 +17,10 @@
 #include <errno.h>
 #include <string.h>
 
-#include "BackupClientDirectoryRecord.h"
 #include "autogen_BackupProtocolClient.h"
+#include "BackupClientDirectoryRecord.h"
 #include "BackupClientContext.h"
+#include "BackupStoreFileEncodeStream.h"
 #include "IOStream.h"
 #include "MemBlockStream.h"
 #include "CommonException.h"
@@ -1513,6 +1514,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 	// Info
 	int64_t objID = 0;
 	bool doNormalUpload = true;
+	int64_t uploadedSize = -1;
 	
 	// Use a try block to catch store full errors
 	try
@@ -1543,6 +1545,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 				rContext.ManageDiffProcess();
 
 				bool isCompletelyDifferent = false;
+
 				std::auto_ptr<IOStream> patchStream(
 					BackupStoreFile::EncodeFileDiff(
 						rFilename.c_str(),
@@ -1566,6 +1569,10 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 
 				// Don't attempt to upload it again!
 				doNormalUpload = false;
+
+				// Capture number of bytes sent
+				uploadedSize = ((BackupStoreFileEncodeStream &)
+					*patchStream).GetTotalBytesSent();
 			} 
 		}
 	
@@ -1591,6 +1598,9 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 	
 			// Get object ID from the result		
 			objID = stored->GetObjectID();
+
+			uploadedSize = ((BackupStoreFileEncodeStream &)
+				*upload).GetTotalBytesSent();
 		}
 	}
 	catch(BoxException &e)
@@ -1625,7 +1635,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 		throw;
 	}
 
-	rNotifier.NotifyFileUploaded(this, rFilename, FileSize);
+	rNotifier.NotifyFileUploaded(this, rFilename, FileSize, uploadedSize);
 
 	// Return the new object ID of this file
 	return objID;
