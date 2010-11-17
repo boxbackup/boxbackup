@@ -121,18 +121,19 @@ void Daemon::Usage()
 	"  -F         Do not fork into background, but fork to serve multiple clients\n"
 #endif
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
-#ifndef WIN32
 	"  -K         Stop writing log messages to console while daemon is running\n"
+	"  -o <file>  Log to a file, defaults to maximum verbosity\n"
+	"  -O <level> Set file log verbosity to error/warning/notice/info/trace/everything\n"
 	"  -P         Show process ID (PID) in console output\n"
-#endif
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
-	"  -Q         Run at minimum verbosity, log nothing\n"
-	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
-	"  -V         Run at maximum verbosity, log everything\n"
-	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
+	"  -Q         Run at minimum verbosity, log nothing to console and system\n"
 	"  -t <tag>   Tag console output with specified marker\n"
 	"  -T         Timestamp console output\n"
-	"  -U         Timestamp console output with microseconds\n";
+	"  -U         Timestamp console output with microseconds\n"
+	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
+	"  -V         Run at maximum verbosity, log everything to console and sysystem\n"
+	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
+	;
 }
 
 // --------------------------------------------------------------------------
@@ -171,6 +172,13 @@ int Daemon::ProcessOption(signed int option)
 		break;
 #endif // !WIN32
 
+		case 'h':
+		{
+			Usage();
+			return 2;
+		}
+		break;
+
 		case 'k':
 		{
 			mKeepConsoleOpenAfterFork = true;
@@ -183,10 +191,21 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
-		case 'h':
+		case 'o':
 		{
-			Usage();
-			return 2;
+			mLogFile = optarg;
+			mLogFileLevel = Log::EVERYTHING;
+		}
+		break;
+
+		case 'O':
+		{
+			mLogFileLevel = Logging::GetNamedLevel(optarg);
+			if (mLogFileLevel == Log::INVALID)
+			{
+				BOX_FATAL("Invalid logging level: " << optarg);
+				return 2;
+			}
 		}
 		break;
 
@@ -215,6 +234,25 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
+		case 't':
+		{
+			Logging::SetProgramName(optarg);
+			Console::SetShowTag(true);
+		}
+		break;
+
+		case 'T':
+		{
+			Console::SetShowTime(true);
+		}
+		break;
+
+		case 'U':
+		{
+			Console::SetShowTime(true);
+			Console::SetShowTimeMicros(true);
+		}
+		break;
 
 		case 'v':
 		{
@@ -243,26 +281,6 @@ int Daemon::ProcessOption(signed int option)
 				BOX_FATAL("Invalid logging level: " << optarg);
 				return 2;
 			}
-		}
-		break;
-
-		case 't':
-		{
-			Logging::SetProgramName(optarg);
-			Console::SetShowTag(true);
-		}
-		break;
-
-		case 'T':
-		{
-			Console::SetShowTime(true);
-		}
-		break;
-
-		case 'U':
-		{
-			Console::SetShowTime(true);
-			Console::SetShowTimeMicros(true);
 		}
 		break;
 
@@ -359,6 +377,12 @@ int Daemon::Main(const std::string& rDefaultConfigFile, int argc,
 
 	Logging::FilterConsole((Log::Level)mLogLevel);
 	Logging::FilterSyslog ((Log::Level)mLogLevel);
+
+	if (mLogFileLevel != Log::INVALID)
+	{
+		mapLogFileLogger.reset(
+			new FileLogger(mLogFile, mLogFileLevel));
+	}
 
 	return Main(mConfigFileName);
 }
