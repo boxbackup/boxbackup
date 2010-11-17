@@ -64,6 +64,7 @@ Daemon::Daemon()
 	  mKeepConsoleOpenAfterFork(false),
 	#endif
 	  mHaveConfigFile(false),
+	  mLogFileLevel(Log::INVALID),
 	  mAppName(DaemonName())
 {
 	// In debug builds, switch on assert failure logging to syslog
@@ -100,9 +101,9 @@ std::string Daemon::GetOptionString()
 {
 	return "c:"
 	#ifndef WIN32
-		"DFK"
+		"DF"
 	#endif
-		"hkPqQt:TUvVW:";
+		"hkKo:O:PqQt:TUvVW:";
 }
 
 void Daemon::Usage()
