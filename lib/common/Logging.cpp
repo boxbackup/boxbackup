@@ -446,6 +446,13 @@ int Syslog::GetNamedFacility(const std::string& rFacility)
 bool FileLogger::Log(Log::Level Level, const std::string& rFile, 
 	int line, std::string& rMessage)
 {
+	if (mLogFile.StreamClosed())
+	{
+		/* skip this logger to allow logging failure to open
+		the log file, without causing an infinite loop */
+		return true;
+	}
+
 	if (Level > GetLevel())
 	{
 		return true;
