@@ -14,6 +14,7 @@ require "$basedir\\infrastructure\\BoxPlatform.pm.in";
 open VERSIONFILE, "> $basedir/lib/common/BoxVersion.h" 
 	or die "BoxVersion.h: $!";
 print VERSIONFILE "#define BOX_VERSION \"$BoxPlatform::product_version\"\n";
+print VERSIONFILE "#define BOX_VERSION_RC $BoxPlatform::svnversion\n";
 close VERSIONFILE;
 
 exit 0;

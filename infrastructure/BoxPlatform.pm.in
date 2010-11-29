@@ -1,7 +1,7 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
+@EXPORT = qw/$build_os $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows $svnversion/;
 
 BEGIN
 {
@@ -51,7 +51,7 @@ BEGIN
 	if($product_version =~ /USE_SVN_VERSION/)
 	{
 		# for developers, use SVN version
-		my $svnversion = `svnversion .`;
+		$svnversion = `svnversion .`;
 		chomp $svnversion;
 		$svnversion =~ tr/0-9A-Za-z/_/c;
 		open INFO,'svn info . |';
