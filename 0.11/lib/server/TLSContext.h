@@ -38,12 +38,9 @@ public:
 
 private:
 	SSL_CTX *mpContext;
-
 #ifdef WIN32
 private:
-	EVP_PKEY *GetPrivateKey();
-	X509 *GetCertificate();
-	X509 *GetTrustedCertificate();
+	void ImportCertificatesAndPrivateKeyFromStore(const char *CertificatesFile);
 #endif
 };
 
