@@ -52,7 +52,7 @@ BEGIN_STRUCTURE_PACKING_FOR_WIRE
 
 #define ATTRIBUTE_ENCODING_BLOWFISH	2
 
-typedef struct 
+typedef struct
 {
 	int32_t		AttributeType;
 	u_int32_t	UID;
@@ -206,10 +206,10 @@ bool BackupClientFileAttributes::operator==(const BackupClientFileAttributes &rA
 
 		// Compare using clear version
 		bool compared = mpClearAttributes->operator==(rAttr);
-		
+
 		// Delete temporary
 		delete pDecoded;
-	
+
 		return compared;
 	}
 	catch(...)
@@ -246,7 +246,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 			rAttr.mpClearAttributes->GetSize() << " bytes");
 		return false;
 	}
-	
+
 	// Then check the elements of the two things
 	// Bytes are checked in network order, but this doesn't matter as we're only checking for equality.
 	attr_StreamFormat *a1 = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
@@ -282,7 +282,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 			return false;
 		}
 	}
-	
+
 	if(!IgnoreAttrModTime)
 	{
 		uint64_t t1 = box_ntoh64(a1->AttrModificationTime);
@@ -299,7 +299,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 			return false;
 		}
 	}
-	
+
 	// Check symlink string?
 	size_t size = mpClearAttributes->GetSize();
 	if(size > sizeof(attr_StreamFormat))
@@ -318,7 +318,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 			return false;
 		}
 	}
-	
+
 	// Passes all test, must be OK
 	return true;
 }
@@ -355,7 +355,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 				Filename << "'");
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
-		
+
 		// Modification times etc
 		if(pModTime) {*pModTime = FileModificationTime(st);}
 		if(pAttrModTime) {*pAttrModTime = FileAttrModificationTime(st);}
@@ -381,10 +381,10 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 		//this is to catch those problems with invalid time stamps stored...
 		//need to find out the reason why - but also a catch as well.
 
-		attr_StreamFormat *pattr = 
+		attr_StreamFormat *pattr =
 			(attr_StreamFormat*)pnewAttr->GetBuffer();
 		ASSERT(pattr != 0);
-		
+
 		// __time64_t winTime = BoxTimeToSeconds(
 		// pnewAttr->ModificationTime);
 
@@ -410,7 +410,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 
 		if (winTime > 0x100000000LL || _gmtime64(&winTime) == 0)
 		{
-			BOX_ERROR("Invalid Attribute Modification Time " 
+			BOX_ERROR("Invalid Attribute Modification Time "
 				"caught for file: '" << Filename << "'");
 			pattr->AttrModificationTime = 0;
 		}
@@ -418,7 +418,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 
 		// Attributes ready. Encrypt into this block
 		EncryptAttr(*pnewAttr);
-		
+
 		// Store the new attributes
 		RemoveClear();
 		mpClearAttributes = pnewAttr;
@@ -600,7 +600,7 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				if(valueSize<0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to get "
-						"extended attributes for " 
+						"extended attributes for "
 						"'" << Filename << "'");
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
@@ -665,7 +665,7 @@ void BackupClientFileAttributes::GetModificationTimes(
 	{
 		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
 	}
-	
+
 	// Make sure there are clear attributes to use
 	EnsureClearAvailable();
 	ASSERT(mpClearAttributes != 0);
@@ -682,7 +682,7 @@ void BackupClientFileAttributes::GetModificationTimes(
 		// Don't know what to do with these
 		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
 	}
-	
+
 	// Check there is enough space for an attributes block
 	if(mpClearAttributes->GetSize() < (int)sizeof(attr_StreamFormat))
 	{
@@ -697,7 +697,7 @@ void BackupClientFileAttributes::GetModificationTimes(
 	{
 		*pModificationTime = box_ntoh64(pattr->ModificationTime);
 	}
-	
+
 	if(pAttrModificationTime)
 	{
 		*pAttrModificationTime = box_ntoh64(pattr->AttrModificationTime);
@@ -720,7 +720,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 	{
 		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
 	}
-	
+
 	// Make sure there are clear attributes to use
 	EnsureClearAvailable();
 	ASSERT(mpClearAttributes != 0);
@@ -737,7 +737,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		// Don't know what to do with these
 		THROW_EXCEPTION(BackupStoreException, AttributesNotUnderstood);
 	}
-	
+
 	// Check there is enough space for an attributes block
 	if(mpClearAttributes->GetSize() < sizeof(attr_StreamFormat))
 	{
@@ -759,7 +759,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 			// Too small
 			THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
 		}
-	
+
 #ifdef WIN32
 		BOX_WARNING("Cannot create symbolic links on Windows: '" <<
 			Filename << "'");
@@ -776,7 +776,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 
 		xattrOffset += std::strlen(reinterpret_cast<char*>(pattr+1))+1;
 	}
-	
+
 	// If working as root, set user IDs
 	if(::geteuid() == 0)
 	{
@@ -825,12 +825,12 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		struct timeval times[2];
 
 		#ifdef WIN32
-		BoxTimeToTimeval(box_ntoh64(pattr->ModificationTime), 
+		BoxTimeToTimeval(box_ntoh64(pattr->ModificationTime),
 			times[1]);
-		BoxTimeToTimeval(box_ntoh64(pattr->AttrModificationTime), 
+		BoxTimeToTimeval(box_ntoh64(pattr->AttrModificationTime),
 			times[0]);
 		// Because stat() returns the creation time in the ctime
-		// field under Windows, and this gets saved in the 
+		// field under Windows, and this gets saved in the
 		// AttrModificationTime field of the serialised attributes,
 		// we subvert the first parameter of emu_utimes() to allow
 		// it to be reset to the right value on the restored file.
@@ -838,10 +838,10 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		BoxTimeToTimeval(modtime, times[1]);
 		// Copy access time as well, why not, got to set it to something
 		times[0] = times[1];
-		// Attr modification time will be changed anyway, 
+		// Attr modification time will be changed anyway,
 		// nothing that can be done about it
 		#endif
-		
+
 		// Try to apply
 		if(::utimes(Filename, times) != 0)
 		{
@@ -881,21 +881,21 @@ bool BackupClientFileAttributes::IsSymLink() const
 	EnsureClearAvailable();
 
 	// Got the right kind of thing?
-	if(mpClearAttributes->GetSize() < (int)sizeof(int32_t))
+	if(mpClearAttributes->GetSize() < sizeof(int32_t))
 	{
 		THROW_EXCEPTION(BackupStoreException, AttributesNotLoaded);
 	}
-	
+
 	// Get the type of attributes stored
 	int32_t *type = (int32_t*)mpClearAttributes->GetBuffer();
 	ASSERT(type != 0);
-	if(ntohl(*type) == ATTRIBUTETYPE_GENERIC_UNIX && mpClearAttributes->GetSize() > (int)sizeof(attr_StreamFormat))
+	if(ntohl(*type) == ATTRIBUTETYPE_GENERIC_UNIX && mpClearAttributes->GetSize() > sizeof(attr_StreamFormat))
 	{
 		// Check link
 		attr_StreamFormat *pattr = (attr_StreamFormat*)mpClearAttributes->GetBuffer();
 		return ((ntohs(pattr->Mode)) & S_IFMT) == S_IFLNK;
 	}
-	
+
 	return false;
 }
 
@@ -1011,14 +1011,14 @@ StreamableMemBlock *BackupClientFileAttributes::MakeClear(const StreamableMemBlo
 		{
 			THROW_EXCEPTION(BackupStoreException, BadEncryptedAttributes);
 		}
-		
+
 		// How much space is needed for the output?
 		size_t maxDecryptedSize = sBlowfishDecrypt.MaxOutSizeForInBufferSize(rEncrypted.GetSize() - ivSize);
-		
+
 		// Allocate it
 		pdecrypted = new StreamableMemBlock(maxDecryptedSize);
-	
-		// ptr to block	
+
+		// ptr to block
 		uint8_t *encBlock = (uint8_t*)rEncrypted.GetBuffer();
 
 		// Check that the header has right type
@@ -1029,7 +1029,7 @@ StreamableMemBlock *BackupClientFileAttributes::MakeClear(const StreamableMemBlo
 
 		// Set IV
 		sBlowfishDecrypt.SetIV(encBlock + 1);
-		
+
 		// Decrypt
 		size_t decryptedSize = sBlowfishDecrypt.TransformBlock(pdecrypted->GetBuffer(), maxDecryptedSize, encBlock + 1 + ivSize, rEncrypted.GetSize() - (ivSize + 1));
 
@@ -1069,7 +1069,7 @@ void BackupClientFileAttributes::SetBlowfishKey(const void *pKey, int KeyLength)
 //
 // Function
 //		Name:    BackupClientFileAttributes::EncryptAttr(const StreamableMemBlock &)
-//		Purpose: Private. Encrypt the given attributes into this block. 
+//		Purpose: Private. Encrypt the given attributes into this block.
 //		Created: 3/12/03
 //
 // --------------------------------------------------------------------------
@@ -1077,27 +1077,27 @@ void BackupClientFileAttributes::EncryptAttr(const StreamableMemBlock &rToEncryp
 {
 	// Free any existing block
 	FreeBlock();
-	
+
 	// Work out the maximum amount of space we need
 	size_t maxEncryptedSize = sBlowfishEncrypt.MaxOutSizeForInBufferSize(rToEncrypt.GetSize());
 	// And the size of the IV
 	int ivSize = sBlowfishEncrypt.GetIVLength();
-	
+
 	// Allocate this space
 	AllocateBlock(maxEncryptedSize + ivSize + 1);
-	
+
 	// Store the encoding byte
 	uint8_t *block = (uint8_t*)GetBuffer();
 	block[0] = ATTRIBUTE_ENCODING_BLOWFISH;
-	
+
 	// Generate and store an IV for this attribute block
 	int ivSize2 = 0;
 	const void *iv = sBlowfishEncrypt.SetRandomIV(ivSize2);
 	ASSERT(ivSize == ivSize2);
-	
+
 	// Copy into the encrypted block
 	::memcpy(block + 1, iv, ivSize);
-	
+
 	// Do the transform
 	size_t encrytedSize = sBlowfishEncrypt.TransformBlock(block + 1 + ivSize, maxEncryptedSize, rToEncrypt.GetBuffer(), rToEncrypt.GetSize());
 
@@ -1124,7 +1124,7 @@ void BackupClientFileAttributes::SetAttributeHashSecret(const void *pSecret, int
 	{
 		THROW_EXCEPTION(BackupStoreException, Internal)
 	}
-	
+
 	// Copy
 	::memcpy(sAttributeHashSecret, pSecret, SecretLength);
 	sAttributeHashSecretLength = SecretLength;
@@ -1151,7 +1151,7 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st,
 	{
 		THROW_EXCEPTION(BackupStoreException, AttributeHashSecretNotSet)
 	}
-	
+
 	// Assemble stuff we're interested in
 	attributeHashData hashData;
 	memset(&hashData, 0, sizeof(hashData));
@@ -1178,9 +1178,9 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st,
 	digest.Add(&hashData, sizeof(hashData));
 	digest.Add(xattr.GetBuffer(), xattr.GetSize());
 	digest.Add(leafname.c_str(), leafname.size());
-	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);	
+	digest.Add(sAttributeHashSecret, sAttributeHashSecretLength);
 	digest.Finish();
-	
+
 	// Return the first 64 bits of the hash
 	uint64_t result = *((uint64_t *)(digest.DigestAsData()));
 	return result;
