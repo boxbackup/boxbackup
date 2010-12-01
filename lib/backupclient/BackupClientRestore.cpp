@@ -823,7 +823,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-int BackupClientRestore(BackupProtocolClient &rConnection,
+BOX_FUNC(int) BackupClientRestore(BackupProtocolClient &rConnection,
 	int64_t DirectoryID, const char *LocalDirectoryName,
 	bool PrintDots, bool RestoreDeleted,
 	bool UndeleteAfterRestoreDeleted, bool Resume,
