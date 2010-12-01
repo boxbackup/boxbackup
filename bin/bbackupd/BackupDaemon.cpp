@@ -413,7 +413,7 @@ void BackupDaemon::InitCrypto()
 	const Configuration &conf(GetConfiguration());
 
 #ifdef WIN32
-	std::string certFile;
+	std::string certFile(conf.GetKeyValue("AccountNumber")); // abuse certFile so we know which one to look for
 	std::string keyFile;
 	std::string caFile;
 	std::string keysFile;

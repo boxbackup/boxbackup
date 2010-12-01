@@ -50,7 +50,7 @@ public:
 		const Configuration &conf(this->GetConfiguration());
 		const Configuration &serverconf(conf.GetSubConfiguration("Server"));
 #ifdef WIN32
-		std::string certFile;
+		std::string certFile(serverconf.GetKeyValue("AccountNumber"));
 		std::string keyFile;
 		std::string caFile;
 #else
