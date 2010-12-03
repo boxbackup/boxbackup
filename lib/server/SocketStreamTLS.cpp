@@ -139,6 +139,11 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
+	// Naggle just gets in the way
+	int bOptVal = 1;
+	int bOptLen = sizeof(int);
+	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char*)&bOptVal, bOptLen);
+
 	// Make the socket non-blocking so timeouts on Read work
 
 #ifdef WIN32
