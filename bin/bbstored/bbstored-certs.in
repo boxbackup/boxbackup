@@ -1,8 +1,8 @@
 #!@PERL@
 use strict;
 
-# validity period for root certificates -- default is a very long time
-my $root_sign_period = '10000';
+# validity period for root certificates -- default is 2038, the best we can do for now
+my $root_sign_period = int(((1<<31) - time()) / 86400);
 
 # but less so for client certificates
 my $sign_period = '5000';
