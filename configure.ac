@@ -385,7 +385,7 @@ if ! $PERL ./infrastructure/makebuildenv.pl \
 fi
 
 # Write summary of important info
-cat | tee config.log.features <<EOC
+tee config.log.features <<EOC
 A summary of the build configuration is below. Box Backup will function
 without these features, but will work better where they are present. Refer
 to the documentation for more information on each feature.
