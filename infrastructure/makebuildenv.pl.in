@@ -98,7 +98,11 @@ while(<FINDAUTOGEN>)
 				}
 				
 				# run command
-				die "Couldn't run command $c" unless (0 == system("(cd $dir; $c)"))
+				unless (0 == system("(cd $dir; $c)"))
+				{
+					die "Couldn't run command $c " .
+						"(in $dir) for $file";
+				}
 			}
 		}
 	}
