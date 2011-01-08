@@ -112,6 +112,11 @@ inline std::string GetNativeErrorMessage()
 	(objectid) << \
 	std::dec
 
+#define BOX_FORMAT_TIMESPEC(timespec) \
+	timespec.tv_sec << \
+	std::setw(6) << \
+	timespec.tv_usec
+
 #undef ERROR
 
 namespace Log
