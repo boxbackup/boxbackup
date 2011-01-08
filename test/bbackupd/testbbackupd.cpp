@@ -521,7 +521,10 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 			std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, BackupProtocolClientLogin::Flags_ReadOnly));
 			
 			// Test the restoration
-			TEST_THAT(BackupClientRestore(protocol, restoredirid, "testfiles/restore-interrupt", true /* print progress dots */) == Restore_Complete);
+			TEST_THAT(BackupClientRestore(protocol, restoredirid,
+				"Test1", "testfiles/restore-interrupt",
+				true /* print progress dots */)
+				== Restore_Complete);
 
 			// Log out
 			protocol.QueryFinished();
@@ -3406,7 +3409,7 @@ int test_bbackupd()
 
 			// Test the restoration
 			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"testfiles/restore-Test1", 
+				"Test1", "testfiles/restore-Test1", 
 				true /* print progress dots */) 
 				== Restore_Complete);
 
@@ -3415,7 +3418,7 @@ int test_bbackupd()
 
 			// Make sure you can't restore a restored directory
 			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"testfiles/restore-Test1", 
+				"Test1", "testfiles/restore-Test1", 
 				true /* print progress dots */) 
 				== Restore_TargetExists);
 			
@@ -3426,7 +3429,7 @@ int test_bbackupd()
 			// Just check it doesn't bomb out -- will check this 
 			// properly later (when bbackupd is stopped)
 			TEST_THAT(BackupClientRestore(*client, deldirid, 
-				"testfiles/restore-Test1-x1", 
+				"Test1", "testfiles/restore-Test1-x1", 
 				true /* print progress dots */, 
 				true /* deleted files */) 
 				== Restore_Complete);
@@ -3439,7 +3442,7 @@ int test_bbackupd()
 			{
 				Logging::Guard guard(Log::FATAL);
 				TEST_THAT(BackupClientRestore(*client,
-					restoredirid, 
+					restoredirid, "Test1",
 					"testfiles/no-such-path/subdir", 
 					true /* print progress dots */) 
 					== Restore_TargetPathNotFound);
@@ -3787,13 +3790,13 @@ int test_bbackupd()
 			// Check that the restore fn returns resume possible,
 			// rather than doing anything
 			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"testfiles/restore-interrupt", 
+				"Test1", "testfiles/restore-interrupt", 
 				true /* print progress dots */) 
 				== Restore_ResumePossible);
 
 			// Then resume it
 			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"testfiles/restore-interrupt", 
+				"Test1", "testfiles/restore-interrupt", 
 				true /* print progress dots */, 
 				false /* deleted files */, 
 				false /* undelete server */, 
@@ -3828,7 +3831,7 @@ int test_bbackupd()
 
 			// Do restore and undelete
 			TEST_THAT(BackupClientRestore(*client, deldirid, 
-				"testfiles/restore-Test1-x1-2", 
+				"Test1", "testfiles/restore-Test1-x1-2", 
 				true /* print progress dots */, 
 				true /* deleted files */, 
 				true /* undelete on server */) 
