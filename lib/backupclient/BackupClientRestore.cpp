@@ -211,7 +211,8 @@ typedef struct
 //
 // --------------------------------------------------------------------------
 static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
-	int64_t DirectoryID, std::string &rLocalDirectoryName,
+	int64_t DirectoryID, const std::string &rRemoteDirectoryName,
+	const std::string &rLocalDirectoryName,
 	RestoreParams &Params, RestoreResumeInfo &rLevel)
 {
 	// If we're resuming... check that we haven't got a next level to
@@ -223,7 +224,9 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 			DIRECTORY_SEPARATOR_ASCHAR + 
 			rLevel.mNextLevelLocalName);
 		BackupClientRestoreDir(rConnection, rLevel.mNextLevelID,
-			localDirname, Params, *rLevel.mpNextLevel);
+			rRemoteDirectoryName + '/' + 
+			rLevel.mNextLevelLocalName, localDirname,
+			Params, *rLevel.mpNextLevel);
 		
 		// Add it to the list of done itmes
 		rLevel.mRestoredObjects.insert(rLevel.mNextLevelID);
@@ -526,6 +529,11 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 					}
 				}
 				
+				BOX_TRACE("Restoring file: " <<
+					rRemoteDirectoryName + '/' + 
+					nm.GetClearFilename() << " (" <<
+					en->GetSizeInBlocks() << " blocks)");
+
 				// Request it from the store
 				rConnection.QueryGetFile(DirectoryID,
 					en->GetObjectID());
@@ -739,9 +747,16 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 						nm.GetClearFilename()));
 				
 				// Recurse
+
+				BOX_TRACE("Entering directory: " <<
+					rRemoteDirectoryName + '/' + 
+					nm.GetClearFilename());
+
 				int result = BackupClientRestoreDir(
 					rConnection, en->GetObjectID(), 
-					localDirname, Params, rnextLevel);
+					rRemoteDirectoryName + '/' + 
+					nm.GetClearFilename(), localDirname,
+					Params, rnextLevel);
 
 				if (result != Restore_Complete)
 				{
@@ -824,8 +839,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 //
 // --------------------------------------------------------------------------
 int BackupClientRestore(BackupProtocolClient &rConnection,
-	int64_t DirectoryID, const char *LocalDirectoryName,
-	bool PrintDots, bool RestoreDeleted,
+	int64_t DirectoryID, const char *RemoteDirectoryName,
+	const char *LocalDirectoryName, bool PrintDots, bool RestoreDeleted,
 	bool UndeleteAfterRestoreDeleted, bool Resume,
 	bool ContinueAfterErrors)
 {
@@ -872,9 +887,9 @@ int BackupClientRestore(BackupProtocolClient &rConnection,
 	}
 	
 	// Restore the directory
-	std::string localName(LocalDirectoryName);
 	int result = BackupClientRestoreDir(rConnection, DirectoryID, 
-		localName, params, params.mResumeInfo);
+		RemoteDirectoryName, LocalDirectoryName, params,
+		params.mResumeInfo);
 	if (result != Restore_Complete)
 	{
 		return result;

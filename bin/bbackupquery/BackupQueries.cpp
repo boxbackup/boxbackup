@@ -2368,6 +2368,8 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	// Restoring deleted things?
 	bool restoreDeleted = opts['d'];
 
+	std::string storeDirEncoded;
+
 	// Get directory ID
 	int64_t dirID = 0;
 	if(opts['i'])
@@ -2379,15 +2381,17 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 			BOX_ERROR("Not a valid object ID (specified in hex)");
 			return;
 		}
+		std::ostringstream oss;
+		oss << BOX_FORMAT_OBJECTID(args[0]);
+		storeDirEncoded = oss.str();
 	}
 	else
 	{
 #ifdef WIN32
-		std::string storeDirEncoded;
 		if(!ConvertConsoleToUtf8(args[0].c_str(), storeDirEncoded))
 			return;
 #else
-		const std::string& storeDirEncoded(args[0]);
+		storeDirEncoded = args[0];
 #endif
 	
 		// Look up directory ID
@@ -2432,9 +2436,14 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 
 	try
 	{
+		// At TRACE level, we print a line for each file and
+		// directory, so we don't need dots.
+
+		bool printDots = ! Logging::IsEnabled(Log::TRACE);
+
 		result = BackupClientRestore(mrConnection, dirID, 
-			localName.c_str(), 
-			true /* print progress dots */, restoreDeleted, 
+			storeDirEncoded.c_str(), localName.c_str(), 
+			printDots /* print progress dots */, restoreDeleted, 
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */,
 			opts['f'] /* force continue after errors */);
