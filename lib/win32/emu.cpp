@@ -1814,7 +1814,7 @@ bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
 	if (time_breakdown == NULL)
 	{
 		::syslog(LOG_ERR, "Error: failed to convert time format: "
-			"%d is not a valid time\n", from);
+			"%d is not a valid time\n", adjusted);
 		return false;
 	}
 
