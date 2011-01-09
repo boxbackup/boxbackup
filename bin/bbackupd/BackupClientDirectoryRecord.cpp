@@ -325,7 +325,14 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					file_st.st_dev << "/" <<
 					file_st.st_ino);
 
-				if(file_st.st_dev != dest_st.st_dev)
+				int type = file_st.st_mode & S_IFMT;
+
+				/* Workaround for apparent btrfs bug, where
+				symlinks appear to be on a different filesystem
+				than their containing directory, thanks to
+				Toke Hoiland-Jorgensen */
+				if(type == S_IFDIR &&
+					file_st.st_dev != dest_st.st_dev)
 				{
 					if(!(rParams.mrContext.ExcludeDir(
 						filename)))
@@ -335,8 +342,6 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					}
 					continue;
 				}
-
-				int type = file_st.st_mode & S_IFMT;
 				#endif
 
 				if(type == S_IFREG || type == S_IFLNK)
