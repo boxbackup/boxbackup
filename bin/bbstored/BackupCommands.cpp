@@ -388,11 +388,12 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 			std::auto_ptr<IOStream> diff2(rContext.OpenObject(patchID));
 			
 			// Choose a temporary filename for the result of the combination
-			std::ostringstream fs(rContext.GetStoreRoot());
-			fs << ".recombinetemp.";
-			fs << p;
-			std::string tempFn(fs.str());
-			tempFn = RaidFileController::DiscSetPathToFileSystemPath(rContext.GetStoreDiscSet(), tempFn, p + 16);
+			std::ostringstream fs;
+			fs << rContext.GetStoreRoot() << ".recombinetemp." << p;
+			std::string tempFn = 
+				RaidFileController::DiscSetPathToFileSystemPath(
+					rContext.GetStoreDiscSet(), fs.str(),
+					p + 16);
 			
 			// Open the temporary file
 			std::auto_ptr<IOStream> combined;
