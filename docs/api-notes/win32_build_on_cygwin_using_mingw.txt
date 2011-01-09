@@ -40,7 +40,7 @@ your user's home directory in /etc/passwd to match.
 
 == OpenSSL ==
 
-Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0a.tar.gz]
+Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0c.tar.gz]
 
 Open a Cygwin shell, go to the base directory, and unpack OpenSSL:
 
