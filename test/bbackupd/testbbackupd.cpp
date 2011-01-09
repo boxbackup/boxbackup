@@ -749,13 +749,23 @@ extern "C" struct dirent *readdir_test_hook_1(DIR *dir)
 
 extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 {
-	if (time(NULL) >= readdir_stop_time)
+	time_t time_now = time(NULL);
+
+	if (time_now >= readdir_stop_time)
 	{
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+		BOX_NOTICE("Cancelling readdir hook at " << time_now);
 		intercept_setup_readdir_hook(NULL, NULL);
 		intercept_setup_lstat_hook  (NULL, NULL);
 		// we will not be called again.
+#else
+		BOX_NOTICE("Failed to cancel readdir hook at " << time_now);
 #endif
+	}
+	else
+	{
+		BOX_INFO("readdir hook still active at " << time_now << ", "
+			"waiting for " << readdir_stop_time);
 	}
 
 	// fill in the struct dirent appropriately
@@ -768,6 +778,7 @@ extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 	snprintf(readdir_test_dirent.d_name, 
 		sizeof(readdir_test_dirent.d_name),
 		"test.%d", readdir_test_counter);
+	BOX_INFO("readdir hook returning " << readdir_test_dirent.d_name);
 
 	// ensure that when bbackupd stats the file, it gets the 
 	// right answer
