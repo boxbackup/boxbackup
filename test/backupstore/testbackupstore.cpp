@@ -1041,7 +1041,7 @@ int test_server(const char *hostname)
 			TEST_THAT(loginConf->GetClientStoreMarker() == 0x8732523ab23aLL);
 		}
 #else // WIN32
-		BackupProtocolClient& protocolReadOnly(protocol);
+		BackupProtocolClient& protocolReadOnly(*apProtocol);
 #endif
 
 		test_server_1(*apProtocol, protocolReadOnly);
