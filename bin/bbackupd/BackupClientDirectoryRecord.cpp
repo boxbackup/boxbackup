@@ -18,21 +18,22 @@
 #include <string.h>
 
 #include "autogen_BackupProtocolClient.h"
-#include "BackupClientDirectoryRecord.h"
+#include "Archive.h"
 #include "BackupClientContext.h"
-#include "BackupStoreFileEncodeStream.h"
-#include "IOStream.h"
-#include "MemBlockStream.h"
-#include "CommonException.h"
-#include "CollectInBufferStream.h"
-#include "BackupStoreFile.h"
+#include "BackupClientDirectoryRecord.h"
 #include "BackupClientInodeToIDMap.h"
-#include "FileModificationTime.h"
 #include "BackupDaemon.h"
 #include "BackupStoreException.h"
-#include "Archive.h"
-#include "PathUtils.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreFileEncodeStream.h"
+#include "CommonException.h"
+#include "CollectInBufferStream.h"
+#include "FileModificationTime.h"
+#include "IOStream.h"
 #include "Logging.h"
+#include "MemBlockStream.h"
+#include "PathUtils.h"
+#include "RateLimitingStream.h"
 #include "ReadLoggingStream.h"
 
 #include "MemLeakFindOn.h"
@@ -1573,11 +1574,24 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 	
 				rContext.UnManageDiffProcess();
 
+				RateLimitingStream rateLimit(*patchStream,
+					rParams.mMaxUploadRate);
+				IOStream* pStreamToUpload;
+
+				if(rParams.mMaxUploadRate > 0)
+				{
+					pStreamToUpload = &rateLimit;
+				}
+				else
+				{
+					pStreamToUpload = patchStream.get();
+				}
+
 				//
 				// Upload the patch to the store
 				//
 				std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
-						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *patchStream));
+						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *pStreamToUpload));
 				
 				// Get object ID from the result		
 				objID = stored->GetObjectID();
@@ -1602,14 +1616,27 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					mObjectID, rStoreFilename, NULL,
 					&rParams,
 					&(rParams.mrRunStatusProvider)));
-		
+
+			RateLimitingStream rateLimit(*upload,
+				rParams.mMaxUploadRate);
+			IOStream* pStreamToUpload;
+
+			if(rParams.mMaxUploadRate > 0)
+			{
+				pStreamToUpload = &rateLimit;
+			}
+			else
+			{
+				pStreamToUpload = upload.get();
+			}
+	
 			// Send to store
 			std::auto_ptr<BackupProtocolClientSuccess> stored(
 				connection.QueryStoreFile(
 					mObjectID, ModificationTime,
 					AttributesHash, 
 					0 /* no diff from file ID */, 
-					rStoreFilename, *upload));
+					rStoreFilename, *pStreamToUpload));
 	
 			// Get object ID from the result		
 			objID = stored->GetObjectID();
@@ -1696,19 +1723,20 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(
 	SysadminNotifier &rSysadminNotifier,
 	ProgressNotifier &rProgressNotifier,
 	BackupClientContext &rContext)
-	: mSyncPeriodStart(0),
-	  mSyncPeriodEnd(0),
-	  mMaxUploadWait(0),
-	  mMaxFileTimeInFuture(99999999999999999LL),
-	  mFileTrackingSizeThreshold(16*1024),
-	  mDiffingUploadSizeThreshold(16*1024),
-	  mrRunStatusProvider(rRunStatusProvider),
-	  mrSysadminNotifier(rSysadminNotifier),
-	  mrProgressNotifier(rProgressNotifier),
-	  mrContext(rContext),
-	  mReadErrorsOnFilesystemObjects(false),
-	  mUploadAfterThisTimeInTheFuture(99999999999999999LL),
-	  mHaveLoggedWarningAboutFutureFileTimes(false)
+: mSyncPeriodStart(0),
+  mSyncPeriodEnd(0),
+  mMaxUploadWait(0),
+  mMaxFileTimeInFuture(99999999999999999LL),
+  mFileTrackingSizeThreshold(16*1024),
+  mDiffingUploadSizeThreshold(16*1024),
+  mrRunStatusProvider(rRunStatusProvider),
+  mrSysadminNotifier(rSysadminNotifier),
+  mrProgressNotifier(rProgressNotifier),
+  mrContext(rContext),
+  mReadErrorsOnFilesystemObjects(false),
+  mMaxUploadRate(0),
+  mUploadAfterThisTimeInTheFuture(99999999999999999LL),
+  mHaveLoggedWarningAboutFutureFileTimes(false)
 {
 }
 
