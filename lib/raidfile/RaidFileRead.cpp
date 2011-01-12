@@ -1086,9 +1086,19 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			{
 				stripe2errno = errno;
 			}
-			if(stripe1errno != 0 || stripe2errno != 0)
+
+			if(stripe1errno != 0)
 			{
-				THROW_EXCEPTION(RaidFileException, ErrorOpeningFileForRead)
+				THROW_SYS_FILE_ERRNO("Failed to open RaidFile",
+					stripe1Filename, stripe1errno,
+					RaidFileException, ErrorOpeningFileForRead);
+			}
+
+			if(stripe2errno != 0)
+			{
+				THROW_SYS_FILE_ERRNO("Failed to open RaidFile",
+					stripe2Filename, stripe2errno,
+					RaidFileException, ErrorOpeningFileForRead);
 			}
 			
 			// stat stripe 1 to find ('half' of) length...
@@ -1107,11 +1117,20 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			length += st.st_size;
 			
 			// Handle errors
-			if(stripe1errno != 0 || stripe2errno != 0)
+			if(stripe1errno != 0)
 			{
-				THROW_EXCEPTION(RaidFileException, OSError)
+				THROW_SYS_FILE_ERRNO("Failed to stat RaidFile",
+					stripe1Filename, stripe1errno,
+					RaidFileException, OSError);
 			}
-			
+
+			if(stripe2errno != 0)
+			{
+				THROW_SYS_FILE_ERRNO("Failed to stat RaidFile",
+					stripe2Filename, stripe2errno,
+					RaidFileException, OSError);
+			}
+	
 			// Make a nice object to represent this file
 			return std::auto_ptr<RaidFileRead>(new RaidFileRead_Raid(SetNumber, Filename, stripe1, stripe2, -1, length, rdiscSet.GetBlockSize(), false /* actually we don't know */));
 		}
@@ -1238,17 +1257,27 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 				ASSERT(sizeof(FileSizeType) == 8); // compiler bug (I think) prevents from using 0 - sizeof(FileSizeType)...
 				if(::lseek(parity, -8 /*(0 - sizeof(FileSizeType))*/, SEEK_END) == -1)
 				{
-					THROW_EXCEPTION(RaidFileException, OSError)
+					THROW_SYS_FILE_ERROR("Failed to seek "
+						"in parity RaidFile",
+						parityFilename, 
+						RaidFileException, OSError);
 				}
 				// Read it in
 				if(::read(parity, &parityLastData, sizeof(parityLastData)) != sizeof(parityLastData))
 				{
-					THROW_EXCEPTION(RaidFileException, OSError)
+					THROW_SYS_FILE_ERROR("Failed to read "
+						"parity RaidFile",
+						parityFilename, 
+						RaidFileException, OSError);
 				}
+
 				// Set back to beginning of file
 				if(::lseek(parity, 0, SEEK_SET) == -1)
 				{
-					THROW_EXCEPTION(RaidFileException, OSError)
+					THROW_SYS_FILE_ERROR("Failed to seek "
+						"in parity RaidFile",
+						parityFilename, 
+						RaidFileException, OSError);
 				}
 			}
 			
@@ -1271,7 +1300,10 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 					//  to get the size from the FileSizeType value at end of the file.
 					if(::fstat(stripe1, &st) != 0)
 					{
-						THROW_EXCEPTION(RaidFileException, OSError)
+						THROW_SYS_FILE_ERROR("Failed to "
+							"stat RaidFile stripe 1",
+							stripe1Filename,
+							RaidFileException, OSError);
 					}
 					pos_type stripe1Size = st.st_size;
 					// Is size integral?
@@ -1305,17 +1337,26 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 							ASSERT(btr <= (int)sizeof(FileSizeType));
 							if(::lseek(stripe1, 0 - btr, SEEK_END) == -1)
 							{
-								THROW_EXCEPTION(RaidFileException, OSError)
+								THROW_SYS_FILE_ERROR("Failed to "
+									"seek in RaidFile stripe 1",
+									stripe1Filename,
+									RaidFileException, OSError);
 							}
 							// Read it in
 							if(::read(stripe1, &stripe1LastData, btr) != btr)
 							{
-								THROW_EXCEPTION(RaidFileException, OSError)
+								THROW_SYS_FILE_ERROR("Failed to "
+									"read RaidFile stripe 1",
+									stripe1Filename,
+									RaidFileException, OSError);
 							}
 							// Set back to beginning of file
 							if(::lseek(stripe1, 0, SEEK_SET) == -1)
 							{
-								THROW_EXCEPTION(RaidFileException, OSError)
+								THROW_SYS_FILE_ERROR("Failed to "
+									"seek in RaidFile stripe 1",
+									stripe1Filename,
+									RaidFileException, OSError);
 							}
 						}
 						// Lovely!
@@ -1337,7 +1378,10 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 					// Get size of stripe2 file
 					if(::fstat(stripe2, &st) != 0)
 					{
-						THROW_EXCEPTION(RaidFileException, OSError)
+						THROW_SYS_FILE_ERROR("Failed to "
+							"stat RaidFile stripe 2",
+							stripe2Filename,
+							RaidFileException, OSError);
 					}
 					pos_type stripe2Size = st.st_size;
 					
@@ -1406,7 +1450,8 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 		}
 	}
 	
-	THROW_EXCEPTION(RaidFileException, FileIsDamagedNotRecoverable)
+	THROW_FILE_ERROR("Failed to recover RaidFile", Filename,
+		RaidFileException, FileIsDamagedNotRecoverable);
 	
 	// Avoid compiler warning -- it'll never get here...
 	return std::auto_ptr<RaidFileRead>();
