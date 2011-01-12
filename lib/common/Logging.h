@@ -41,27 +41,45 @@
 	if (Logging::IsEnabled(Log::TRACE)) \
 	{ BOX_LOG(Log::TRACE, stuff) }
 
-#define BOX_SYS_ERROR(stuff) \
-	stuff << ": " << std::strerror(errno) << " (" << errno << ")"
+#define BOX_SYS_ERRNO_MESSAGE(error_number, stuff) \
+	stuff << ": " << std::strerror(error_number) << " (" << errno << ")"
+
+#define BOX_FILE_MESSAGE(filename, message) \
+	message << ": " << filename
+
+#define BOX_SYS_FILE_ERRNO_MESSAGE(filename, error_number, message) \
+	BOX_SYS_ERRNO_MESSAGE(error_number, BOX_FILE_MESSAGE(filename, message))
+
+#define BOX_SYS_ERROR_MESSAGE(stuff) \
+	BOX_SYS_ERRNO_MESSAGE(errno, stuff)
 
 #define BOX_LOG_SYS_WARNING(stuff) \
-	BOX_WARNING(BOX_SYS_ERROR(stuff))
+	BOX_WARNING(BOX_SYS_ERROR_MESSAGE(stuff))
 #define BOX_LOG_SYS_ERROR(stuff) \
-	BOX_ERROR(BOX_SYS_ERROR(stuff))
+	BOX_ERROR(BOX_SYS_ERROR_MESSAGE(stuff))
+#define BOX_LOG_SYS_ERRNO(error_number, stuff) \
+	BOX_ERROR(BOX_SYS_ERRNO_MESSAGE(error_number, stuff))
 #define BOX_LOG_SYS_FATAL(stuff) \
-	BOX_FATAL(BOX_SYS_ERROR(stuff))
+	BOX_FATAL(BOX_SYS_ERROR_MESSAGE(stuff))
+
+#define THROW_SYS_ERROR_NUMBER(message, error_number, exception, subtype) \
+	THROW_EXCEPTION_MESSAGE(exception, subtype, \
+		BOX_SYS_ERRNO_MESSAGE(error_number, message))
 
 #define THROW_SYS_ERROR(message, exception, subtype) \
-	BOX_LOG_SYS_ERROR(message); \
-	THROW_EXCEPTION_MESSAGE(exception, subtype, \
-		BOX_SYS_ERROR(message))
+	THROW_SYS_ERROR_NUMBER(message, errno, exception, subtype)
 
 #define THROW_SYS_FILE_ERROR(message, filename, exception, subtype) \
-	THROW_SYS_ERROR(message << ": " << filename, exception, subtype)
+	THROW_SYS_ERROR_NUMBER(BOX_FILE_MESSAGE(filename, message), \
+		errno, exception, subtype)
+
+#define THROW_SYS_FILE_ERRNO(message, filename, error_number, exception, subtype) \
+	THROW_SYS_ERROR_NUMBER(BOX_FILE_MESSAGE(filename, message), \
+		error_number, exception, subtype)
 
 #define THROW_FILE_ERROR(message, filename, exception, subtype) \
-	BOX_ERROR(message << ": " << filename); \
-	THROW_EXCEPTION_MESSAGE(exception, subtype, message << ": " << filename);
+	THROW_EXCEPTION_MESSAGE(exception, subtype, \
+		BOX_FILE_MESSAGE(filename, message))
 
 inline std::string GetNativeErrorMessage()
 {
