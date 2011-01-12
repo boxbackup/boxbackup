@@ -21,6 +21,7 @@
 	#include <unistd.h>
 #endif
 
+#include "BoxTime.h"
 #include "Test.h"
 
 bool TestFileExists(const char *Filename)
@@ -451,36 +452,6 @@ void wait_for_operation(int seconds, const char* message)
 
 void safe_sleep(int seconds)
 {
-	BOX_TRACE("sleeping for " << seconds << " seconds");
-
-#ifdef WIN32
-	Sleep(seconds * 1000);
-#else
-	struct timespec ts;
-	memset(&ts, 0, sizeof(ts));
-	ts.tv_sec  = seconds;
-	ts.tv_nsec = 0;
-	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
-	{
-		// FIXME evil hack for OSX, where ts.tv_sec contains
-		// a negative number interpreted as unsigned 32-bit
-		// when nanosleep() returns later than expected.
-
-		int32_t secs = (int32_t) ts.tv_sec;
-		int64_t remain_ns = (secs * 1000000000) + ts.tv_nsec;
-
-		if (remain_ns < 0)
-		{
-			BOX_WARNING("nanosleep interrupted " <<
-				((float)(0 - remain_ns) / 1000000000) <<
-				" secs late");
-			return;
-		}
-
-		BOX_TRACE("nanosleep interrupted with " <<
-			(remain_ns / 1000000000) << " secs remaining, "
-			"sleeping again");
-	}
-#endif
+	ShortSleep(SecondsToBoxTime(seconds), true);
 }
 

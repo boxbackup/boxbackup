@@ -94,3 +94,53 @@ std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
 	return buf.str();
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    ShortSleep(box_time_t duration)
+//		Purpose: Sleeps for the specified duration as accurately
+//			 and efficiently as possible.
+//		Created: 2011/01/11
+//
+// --------------------------------------------------------------------------
+
+void ShortSleep(box_time_t duration, bool logDuration)
+{
+	if(logDuration)
+	{
+		BOX_TRACE("Sleeping for " << BoxTimeToMicroSeconds(duration) <<
+			" microseconds");
+	}
+
+#ifdef WIN32
+	Sleep(BoxTimeToMilliSeconds(duration));
+#else
+	struct timespec ts;
+	memset(&ts, 0, sizeof(ts));
+	ts.tv_sec  = duration / MICRO_SEC_IN_SEC;
+	ts.tv_nsec = duration % MICRO_SEC_IN_SEC;
+
+	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+	{
+		// FIXME evil hack for OSX, where ts.tv_sec contains
+		// a negative number interpreted as unsigned 32-bit
+		// when nanosleep() returns later than expected.
+
+		int32_t secs = (int32_t) ts.tv_sec;
+		int64_t remain_ns = (secs * 1000000000) + ts.tv_nsec;
+
+		if (remain_ns < 0)
+		{
+			BOX_WARNING("nanosleep interrupted " <<
+				((float)(0 - remain_ns) / 1000000000) <<
+				" secs late");
+			return;
+		}
+
+		BOX_TRACE("nanosleep interrupted with " <<
+			(remain_ns / 1000000000) << " secs remaining, "
+			"sleeping again");
+	}
+#endif
+}
+
