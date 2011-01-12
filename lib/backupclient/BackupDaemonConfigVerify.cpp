@@ -114,12 +114,16 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("NotifyAlways", ConfigTest_IsBool, false),
 	// option to disable the suppression of duplicate notifications
 
+	ConfigurationVerifyKey("MaxUploadRate", ConfigTest_IsInt),
+	// optional maximum speed of uploads in kbytes per second
+
 	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("KeysFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("DataDirectory", 
 		ConfigTest_Exists | ConfigTest_LastEntry),
+
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =
