@@ -86,6 +86,7 @@ public:
 		ProgressNotifier &mrProgressNotifier;
 		BackupClientContext &mrContext;
 		bool mReadErrorsOnFilesystemObjects;
+		int64_t mMaxUploadRate;
 		
 		// Member variables modified by syncing process
 		box_time_t mUploadAfterThisTimeInTheFuture;

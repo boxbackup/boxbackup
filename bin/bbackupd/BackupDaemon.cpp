@@ -830,6 +830,12 @@ void BackupDaemon::RunSyncNow()
 		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
 	params.mMaxFileTimeInFuture = 
 		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
+
+	if(conf.KeyExists("MaxUploadRate"))
+	{
+		params.mMaxUploadRate = conf.GetKeyValueInt("MaxUploadRate");
+	}
+
 	mDeleteRedundantLocationsAfter =
 		conf.GetKeyValueInt("DeleteRedundantLocationsAfter");
 	mStorageLimitExceeded = false;
