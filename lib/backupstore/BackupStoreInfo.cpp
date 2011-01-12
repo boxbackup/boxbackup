@@ -190,15 +190,15 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 		if(!rf->ReadFullBuffer(&hdr, sizeof(hdr),
 			0 /* not interested in bytes read if this fails */))
 		{
-			THROW_EXCEPTION(BackupStoreException,
-				CouldNotLoadStoreInfo)
+			THROW_FILE_ERROR("Failed to read store info header",
+				fn, BackupStoreException, CouldNotLoadStoreInfo);
 		}
 		
 		// Check it
 		if((int32_t)ntohl(hdr.mAccountID) != AccountID)
 		{
-			THROW_EXCEPTION(BackupStoreException,
-				BadStoreInfoOnLoad)
+			THROW_FILE_ERROR("Found wrong account ID in store info",
+				fn, BackupStoreException, BadStoreInfoOnLoad);
 		}
 		
 		// Insert info from file
@@ -223,8 +223,8 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 		archive.Read(FileAccountID);
 		if (FileAccountID != AccountID)
 		{
-			THROW_EXCEPTION(BackupStoreException,
-				BadStoreInfoOnLoad)
+			THROW_FILE_ERROR("Found wrong account ID in store info",
+				fn, BackupStoreException, BadStoreInfoOnLoad);
 		}
 
 		archive.Read(info->mAccountName);
