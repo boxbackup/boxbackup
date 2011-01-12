@@ -18,8 +18,8 @@ typedef uint64_t	box_time_t;
 #define NANO_SEC_IN_USEC_LL (1000LL)
 #define MICRO_SEC_IN_SEC 	(1000000)
 #define MICRO_SEC_IN_SEC_LL	(1000000LL)
-#define MILLI_SEC_IN_NANO_SEC		(1000)
-#define MILLI_SEC_IN_NANO_SEC_LL	(1000LL)
+#define MILLI_SEC_IN_SEC		(1000)
+#define MILLI_SEC_IN_SEC_LL	(1000LL)
 
 box_time_t GetCurrentBoxTime();
 
@@ -33,7 +33,7 @@ inline time_t BoxTimeToSeconds(box_time_t Time)
 }
 inline uint64_t BoxTimeToMilliSeconds(box_time_t Time)
 {
-	return Time / MILLI_SEC_IN_NANO_SEC_LL;
+	return Time / MILLI_SEC_IN_SEC_LL;
 }
 inline uint64_t BoxTimeToMicroSeconds(box_time_t Time)
 {
@@ -42,5 +42,7 @@ inline uint64_t BoxTimeToMicroSeconds(box_time_t Time)
 
 std::string FormatTime(box_time_t time, bool includeDate,
 	bool showMicros = false);
+
+void ShortSleep(box_time_t duration, bool logDuration);
 
 #endif // BOXTIME__H
