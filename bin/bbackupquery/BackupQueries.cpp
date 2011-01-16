@@ -1879,6 +1879,159 @@ void BackupQueries::Compare(const std::string &rStoreDir,
 	Compare(dirID, storeDirEncoded, localDirEncoded, rParams);
 }
 
+void BackupQueries::CompareOneFile(int64_t DirID,
+	BackupStoreDirectory::Entry *pEntry,
+	const std::string& rLocalPath,
+	const std::string& rStorePath,
+	BoxBackupCompareParams &rParams)
+{
+	int64_t fileId = pEntry->GetObjectID();
+	int64_t fileSize = 0;
+
+	EMU_STRUCT_STAT st;
+	if(EMU_STAT(rLocalPath.c_str(), &st) == 0)
+	{
+		fileSize = st.st_size;
+	}
+
+	try
+	{
+		// Files the same flag?
+		bool equal = true;
+		
+		// File modified after last sync flag
+		bool modifiedAfterLastSync = false;
+		
+		bool hasDifferentAttribs = false;
+
+		bool alreadyReported = false;
+			
+		if(rParams.QuickCompare())
+		{
+			// Compare file -- fetch it
+			mrConnection.QueryGetBlockIndexByID(fileId);
+
+			// Stream containing block index
+			std::auto_ptr<IOStream> blockIndexStream(mrConnection.ReceiveStream());
+			
+			// Compare
+			equal = BackupStoreFile::CompareFileContentsAgainstBlockIndex(
+				rLocalPath.c_str(), *blockIndexStream,
+				mrConnection.GetTimeout());
+		}
+		else
+		{
+			// Compare file -- fetch it
+			mrConnection.QueryGetFile(DirID, pEntry->GetObjectID());
+
+			// Stream containing encoded file
+			std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+
+			// Decode it
+			std::auto_ptr<BackupStoreFile::DecodedStream> fileOnServerStream;
+
+			// Got additional attributes?
+			if(pEntry->HasAttributes())
+			{
+				// Use these attributes
+				const StreamableMemBlock &storeAttr(pEntry->GetAttributes());
+				BackupClientFileAttributes attr(storeAttr);
+				fileOnServerStream.reset(
+					BackupStoreFile::DecodeFileStream(
+						*objectStream,
+						mrConnection.GetTimeout(),
+						&attr).release());
+			}
+			else
+			{
+				// Use attributes stored in file
+				fileOnServerStream.reset(BackupStoreFile::DecodeFileStream(*objectStream, mrConnection.GetTimeout()).release());
+			}
+			
+			// Should always be something in the auto_ptr, it's how the interface is defined. But be paranoid.
+			if(!fileOnServerStream.get())
+			{
+				THROW_EXCEPTION(BackupStoreException, Internal)
+			}
+			
+			// Compare attributes
+			BackupClientFileAttributes localAttr;
+			box_time_t fileModTime = 0;
+			localAttr.ReadAttributes(rLocalPath.c_str(), false /* don't zero mod times */, &fileModTime);					
+			modifiedAfterLastSync = (fileModTime > rParams.LatestFileUploadTime());
+			bool ignoreAttrModTime = true;
+
+			#ifdef WIN32
+			// attr mod time is really
+			// creation time, so check it
+			ignoreAttrModTime = false;
+			#endif
+
+			if(!rParams.IgnoreAttributes() &&
+			#ifdef PLATFORM_DISABLE_SYMLINK_ATTRIB_COMPARE
+			   !fileOnServerStream->IsSymLink() &&
+			#endif
+			   !localAttr.Compare(fileOnServerStream->GetAttributes(),
+					ignoreAttrModTime,
+					fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
+			{
+				hasDifferentAttribs = true;
+			}
+
+			// Compare contents, if it's a regular file not a link
+			// Remember, we MUST read the entire stream from the server.
+			SelfFlushingStream flushObject(*objectStream);
+
+			if(!fileOnServerStream->IsSymLink())
+			{
+				SelfFlushingStream flushFile(*fileOnServerStream);
+				// Open the local file
+				std::auto_ptr<FileStream> apLocalFile;
+
+				try
+				{
+					apLocalFile.reset(new FileStream(rLocalPath.c_str()));
+				}
+				catch(std::exception &e)
+				{
+					rParams.NotifyLocalFileReadFailed(rLocalPath,
+						rStorePath, fileSize, e);
+					alreadyReported = true;
+				}
+				catch(...)
+				{	
+					rParams.NotifyLocalFileReadFailed(rLocalPath,
+						rStorePath, fileSize);
+					alreadyReported = true;
+				}
+
+				if(apLocalFile.get())
+				{
+					equal = apLocalFile->CompareWith(*fileOnServerStream,
+						mrConnection.GetTimeout());
+				}
+			}
+		}
+
+		rParams.NotifyFileCompared(rLocalPath, rStorePath, fileSize,
+			hasDifferentAttribs, !equal, modifiedAfterLastSync,
+			pEntry->HasAttributes());
+	}
+	catch(BoxException &e)
+	{
+		rParams.NotifyDownloadFailed(rLocalPath, rStorePath, fileSize,
+			e);
+	}
+	catch(std::exception &e)
+	{
+		rParams.NotifyDownloadFailed(rLocalPath, rStorePath, fileSize,
+			e);
+	}
+	catch(...)
+	{	
+		rParams.NotifyDownloadFailed(rLocalPath, rStorePath, fileSize);
+	}
+}
 
 // --------------------------------------------------------------------------
 //
@@ -2110,124 +2263,8 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			}
 			else
 			{				
-				int64_t fileSize = 0;
-
-				EMU_STRUCT_STAT st;
-				if(EMU_STAT(localPath.c_str(), &st) == 0)
-				{
-					fileSize = st.st_size;
-				}
-
-				try
-				{
-					// Files the same flag?
-					bool equal = true;
-					
-					// File modified after last sync flag
-					bool modifiedAfterLastSync = false;
-					
-					bool hasDifferentAttribs = false;
-						
-					if(rParams.QuickCompare())
-					{
-						// Compare file -- fetch it
-						mrConnection.QueryGetBlockIndexByID(i->second->GetObjectID());
-
-						// Stream containing block index
-						std::auto_ptr<IOStream> blockIndexStream(mrConnection.ReceiveStream());
-						
-						// Compare
-						equal = BackupStoreFile::CompareFileContentsAgainstBlockIndex(localPath.c_str(), *blockIndexStream, mrConnection.GetTimeout());
-					}
-					else
-					{
-						// Compare file -- fetch it
-						mrConnection.QueryGetFile(DirID, i->second->GetObjectID());
-	
-						// Stream containing encoded file
-						std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-	
-						// Decode it
-						std::auto_ptr<BackupStoreFile::DecodedStream> fileOnServerStream;
-						// Got additional attributes?
-						if(i->second->HasAttributes())
-						{
-							// Use these attributes
-							const StreamableMemBlock &storeAttr(i->second->GetAttributes());
-							BackupClientFileAttributes attr(storeAttr);
-							fileOnServerStream.reset(BackupStoreFile::DecodeFileStream(*objectStream, mrConnection.GetTimeout(), &attr).release());
-						}
-						else
-						{
-							// Use attributes stored in file
-							fileOnServerStream.reset(BackupStoreFile::DecodeFileStream(*objectStream, mrConnection.GetTimeout()).release());
-						}
-						
-						// Should always be something in the auto_ptr, it's how the interface is defined. But be paranoid.
-						if(!fileOnServerStream.get())
-						{
-							THROW_EXCEPTION(BackupStoreException, Internal)
-						}
-						
-						// Compare attributes
-						BackupClientFileAttributes localAttr;
-						box_time_t fileModTime = 0;
-						localAttr.ReadAttributes(localPath.c_str(), false /* don't zero mod times */, &fileModTime);					
-						modifiedAfterLastSync = (fileModTime > rParams.LatestFileUploadTime());
-						bool ignoreAttrModTime = true;
-
-						#ifdef WIN32
-						// attr mod time is really
-						// creation time, so check it
-						ignoreAttrModTime = false;
-						#endif
-
-						if(!rParams.IgnoreAttributes() &&
-						#ifdef PLATFORM_DISABLE_SYMLINK_ATTRIB_COMPARE
-						   !fileOnServerStream->IsSymLink() &&
-						#endif
-						   !localAttr.Compare(fileOnServerStream->GetAttributes(),
-								ignoreAttrModTime,
-								fileOnServerStream->IsSymLink() /* ignore modification time if it's a symlink */))
-						{
-							hasDifferentAttribs = true;
-						}
-	
-						// Compare contents, if it's a regular file not a link
-						// Remember, we MUST read the entire stream from the server.
-						SelfFlushingStream flushObject(*objectStream);
-
-						if(!fileOnServerStream->IsSymLink())
-						{
-							SelfFlushingStream flushFile(*fileOnServerStream);
-							// Open the local file
-							FileStream l(localPath.c_str());
-							equal = l.CompareWith(*fileOnServerStream,
-								mrConnection.GetTimeout());
-						}
-					}
-
-					rParams.NotifyFileCompared(localPath,
-						storePath, fileSize,
-						hasDifferentAttribs, !equal,
-						modifiedAfterLastSync,
-						i->second->HasAttributes());
-				}
-				catch(BoxException &e)
-				{
-					rParams.NotifyDownloadFailed(localPath,
-						storePath, fileSize, e);
-				}
-				catch(std::exception &e)
-				{
-					rParams.NotifyDownloadFailed(localPath,
-						storePath, fileSize, e);
-				}
-				catch(...)
-				{	
-					rParams.NotifyDownloadFailed(localPath,
-						storePath, fileSize);
-				}
+				CompareOneFile(DirID, i->second, localPath,
+					storePath, rParams);
 
 				// Remove from set so that we know it's been compared
 				localFiles.erase(local);

@@ -15,6 +15,7 @@
 
 #include "BoxTime.h"
 #include "BoxBackupCompareParams.h"
+#include "BackupStoreDirectory.h"
 
 class BackupProtocolClient;
 class Configuration;
@@ -238,6 +239,24 @@ public:
 			mUncheckedFiles ++;
 		}
 
+		virtual void NotifyLocalFileReadFailed(const std::string& rLocalPath,
+			const std::string& rRemotePath, int64_t NumBytes,
+			std::exception& rException)
+		{
+			BOX_ERROR("Failed to read local file '" <<
+				ConvertForConsole(rLocalPath) << "': " <<
+				rException.what());
+			mUncheckedFiles ++;
+		}
+
+		virtual void NotifyLocalFileReadFailed(const std::string& rLocalPath,
+			const std::string& rRemotePath, int64_t NumBytes)
+		{
+			BOX_ERROR("Failed to read local file '" <<
+				ConvertForConsole(rLocalPath));
+			mUncheckedFiles ++;
+		}
+
 		virtual void NotifyExcludedFile(const std::string& rLocalPath,
 			const std::string& rRemotePath)
 		{
@@ -339,6 +358,9 @@ public:
 		const std::string &rLocalDir, BoxBackupCompareParams &rParams);
 	void Compare(int64_t DirID, const std::string &rStoreDir,
 		const std::string &rLocalDir, BoxBackupCompareParams &rParams);
+	void CompareOneFile(int64_t DirID, BackupStoreDirectory::Entry *pEntry,
+		const std::string& rLocalPath, const std::string& rStorePath,
+		BoxBackupCompareParams &rParams);
 
 public:
 
