@@ -82,6 +82,11 @@ public:
 	virtual void NotifyDownloadFailed(const std::string& rLocalPath,
 		const std::string& rRemotePath, int64_t NumBytes,
 		BoxException& rException) = 0;
+	virtual void NotifyLocalFileReadFailed(const std::string& rLocalPath,
+		const std::string& rRemotePath, int64_t NumBytes,
+		std::exception& rException) = 0;
+	virtual void NotifyLocalFileReadFailed(const std::string& rLocalPath,
+		const std::string& rRemotePath, int64_t NumBytes) = 0;
 	virtual void NotifyDownloadFailed(const std::string& rLocalPath,
 		const std::string& rRemotePath, int64_t NumBytes,
 		std::exception& rException) = 0;
