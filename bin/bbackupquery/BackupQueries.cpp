@@ -631,7 +631,7 @@ BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
 			GetConsoleCP()))
 		{
 			BOX_ERROR("Failed to convert encoding");
-			failed = true;
+			mFailed = true;
 		}
 		
 		mCompleteCommand = converted;
