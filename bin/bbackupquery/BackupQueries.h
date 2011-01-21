@@ -431,5 +431,8 @@ extern QueryCommandSpecification commands[];
 extern const char *alias[];
 extern const int aliasIs[];
 
+#define LIST_OPTION_ALLOWOLD		'o'
+#define LIST_OPTION_ALLOWDELETED	'd'
+
 #endif // BACKUPQUERIES__H
 
