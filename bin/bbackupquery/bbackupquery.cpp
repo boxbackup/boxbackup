@@ -163,6 +163,14 @@ char * completion_generator(const char *text, int state)
 	#define RL_COMPLETION_MATCHES rl_completion_matches
 #elif defined HAVE_COMPLETION_MATCHES
 	#define RL_COMPLETION_MATCHES completion_matches
+#else
+	char* no_matches[] = {NULL};
+	char** bbackupquery_completion_dummy(const char *text, 
+		char * (completion_generator)(const char *text, int state))
+	{
+		return no_matches;
+	}
+	#define RL_COMPLETION_MATCHES bbackupquery_completion_dummy
 #endif
 
 char ** bbackupquery_completion(const char *text, int start, int end)
@@ -215,14 +223,16 @@ int main(int argc, const char *argv[])
 	#endif
 
 #ifdef WIN32
-	const char* validOpts = "qvVwuc:l:o:O:W:";
+	#define WIN32_OPTIONS "u"
 	bool unicodeConsole = false;
-#elif defined HAVE_LIBREADLINE // && !WIN32
-	const char* validOpts = "qvVwEc:l:o:O:W:";
-	bool useReadline = true;
-#else
-	const char* validOpts = "qvVwc:l:o:O:W:";
 #endif
+
+#ifdef HAVE_LIBREADLINE
+	#define READLINE_OPTIONS "E"
+	bool useReadline = true;
+#endif
+
+	const char* validOpts = "qvVwc:l:o:O:W:" WIN32_OPTIONS READLINE_OPTIONS;
 
 	std::string fileLogFile;
 	Log::Level fileLogLevel = Log::INVALID;
@@ -316,7 +326,9 @@ int main(int argc, const char *argv[])
 		case 'u':
 			unicodeConsole = true;
 			break;
-#elif defined HAVE_LIBREADLINE // && !WIN32
+#endif
+
+#ifdef HAVE_LIBREADLINE
 		case 'E':
 			useReadline = false;
 			break;
