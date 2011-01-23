@@ -225,11 +225,15 @@ int main(int argc, const char *argv[])
 #ifdef WIN32
 	#define WIN32_OPTIONS "u"
 	bool unicodeConsole = false;
+#else
+	#define WIN32_OPTIONS
 #endif
 
 #ifdef HAVE_LIBREADLINE
 	#define READLINE_OPTIONS "E"
 	bool useReadline = true;
+#else
+	#define READLINE_OPTIONS
 #endif
 
 	const char* validOpts = "qvVwc:l:o:O:W:" WIN32_OPTIONS READLINE_OPTIONS;
