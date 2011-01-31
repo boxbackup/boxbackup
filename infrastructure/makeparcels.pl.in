@@ -310,7 +310,7 @@ EOF
 			$name =~ s/$/\.gz/;
 		}
 
-		if ($install and not $target_windows)
+		if ($install and not $target_windows and not $type eq "subdir")
 		{
 			my $local_install_dir = $install_into_dir;
 			if (defined $dest)
