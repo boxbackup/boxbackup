@@ -63,6 +63,14 @@ int RateLimitingStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 	// How are we doing so far? (for logging only)
 	box_time_t currentDuration = currentTime - mStartTime;
+
+	// in case our timer is not very accurate, don't divide by zero on first pass
+	if(currentDuration == 0)
+	{
+		BOX_TRACE("Current rate not yet known, sending immediately");
+		return bytesReadThisTime;
+	}
+		
 	uint64_t effectiveRateSoFar = (mTotalBytesRead * MICRO_SEC_IN_SEC_LL)
 		/ currentDuration;
 
