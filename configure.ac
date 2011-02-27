@@ -26,11 +26,18 @@ if test "x$GXX" = "xyes"; then
   # Use -Wall if we have gcc. This gives better warnings
   AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
 
-  # Use -rdynamic if we have gcc, but not mingw. This is needed for backtrace
-  case $target_os in
-    mingw*) ;;
-    *) AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic']) ;;
-  esac
+  # Check whether gcc supports -rdynamic, thanks to Steve Ellcey
+  # [http://readlist.com/lists/gcc.gnu.org/gcc/6/31502.html]
+  # This is needed to get symbols in backtraces.
+  # Note that this apparently fails on HP-UX
+  LDFLAGS="$LDFLAGS -rdynamic"
+  AC_MSG_CHECKING([whether gcc accepts -rdynamic])
+  AC_TRY_LINK([], [return 0;],
+    [AC_MSG_RESULT([yes]); have_rdynamic=yes],
+    [AC_MSG_RESULT([no])])
+  if test x"$have_rdynamic" = x"yes" ; then
+    AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
+  fi
 fi
 
 AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
