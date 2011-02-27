@@ -41,15 +41,15 @@ your user's home directory in /etc/passwd to match.
 
 == OpenSSL ==
 
-Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0c.tar.gz]
+Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0d.tar.gz]
 
 Open a Cygwin shell, go to the base directory, and unpack OpenSSL:
 
-	tar xzvf openssl-1.0.0c.tar.gz
+	tar xzvf openssl-1.0.0d.tar.gz
 
 Configure OpenSSL for MinGW compilation, and build and install it:
 
-	cd openssl-1.0.0c
+	cd openssl-1.0.0d
 	./Configure --prefix=/usr/i686-pc-mingw32/ mingw
 	make
 	make install
@@ -59,15 +59,13 @@ Configure OpenSSL for MinGW compilation, and build and install it:
 This step is only required to support regular expressions in including/excluding files from backups. However, this is a very useful feature.
 
 Download PCRE from 
-[http://prdownloads.sourceforge.net/pcre/pcre-8.11.tar.bz2?download].
+[http://prdownloads.sourceforge.net/pcre/pcre-8.12.tar.bz2?download].
 
-Open a Cygwin shell, go to the base directory, and unpack PCRE:
+Open a Cygwin shell, go to the base directory, and unpack, build and
+install PCRE:
 
-	tar xjvf pcre-8.11.tar.bz2
-
-Configure PCRE for MinGW compilation, and build and install it:
-	
-	cd pcre-8.11
+	tar xjvf pcre-8.12.tar.bz2
+	cd pcre-8.12
 	export CFLAGS="-mno-cygwin"
 	export CXXFLAGS="-mno-cygwin"
 	./configure --prefix=/usr/i686-pc-mingw32
