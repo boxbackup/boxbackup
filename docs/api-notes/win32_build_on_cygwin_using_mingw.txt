@@ -17,7 +17,7 @@ Make sure to select the following packages during installation:
  * Devel/make
  * Libs/libxml2
  * Libs/libxslt (for xsltproc)
- * Mingw/mingw-zlib0
+ * Mingw/mingw-zlib-devel
  * Perl/Perl
 
 If you already have Cygwin installed, please re-run the installer and
@@ -28,7 +28,8 @@ Subversion client, Devel/subversion.
 
 == Base Directory ==
 
-Choose a directory where you will unpack and compile OpenSSL, Zlib and Box Backup. We will call this the ''base directory''. An example might be:
+Choose a directory where you will unpack and compile OpenSSL, Zlib and
+Box Backup. We will call this the ''base directory''. An example might be:
 
   C:\Cygwin\Home\YourUsername
 
@@ -58,7 +59,7 @@ Configure OpenSSL for MinGW compilation, and build and install it:
 This step is only required to support regular expressions in including/excluding files from backups. However, this is a very useful feature.
 
 Download PCRE from 
-[http://prdownloads.sourceforge.net/pcre/pcre-8.11.tar.bz2?download]
+[http://prdownloads.sourceforge.net/pcre/pcre-8.11.tar.bz2?download].
 
 Open a Cygwin shell, go to the base directory, and unpack PCRE:
 
@@ -81,7 +82,16 @@ do not enable readline if you intend to distribute the resulting Box
 Backup binaries, as this would be a violation of the GPL license of
 readline.
 
-If you want Readline support, download Readline version 6.1 from
+If you want Readline support, download PDCurses from
+[http://sourceforge.net/projects/pdcurses/files/pdcurses/3.4/PDCurses-3.4.tar.gz/download]. Save it in your base directory, then open a Cygwin shell there,
+unpack it, compile and install it:
+
+	tar xzvf PDCurses-3.4.tar.gz
+	cd PDCurses-3.4/win32
+	make -f gccwin32.mak CC="gcc -mno-cygwin" LINK="gcc -mno-cygwin"
+	cp pdcurses.a /usr/i686-pc-mingw32/lib/libpdcurses.a
+
+Download Readline version 6.1 from
 [ftp://ftp.cwru.edu/pub/bash/readline-6.1.tar.gz], and unpack
 and install it thus:
 
@@ -89,7 +99,9 @@ and install it thus:
 	./configure --prefix=/usr/i686-pc-mingw32 \
 		CFLAGS="-mno-cygwin" \
 		CPPFLAGS="-mno-cygwin" \
-		LDFLAGS="-mno-cygwin"
+		LDFLAGS="-mno-cygwin" \
+		LIBS="-lpdcurses" \
+		--with-curses --disable-shared
 	make
 	make install
 
