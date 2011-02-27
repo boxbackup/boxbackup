@@ -96,7 +96,7 @@ AC_DEFUN([VL_LIB_READLINE_CHECK], [
     ORIG_LIBS="$LIBS"
     vl_cv_lib_$1=""
     for readline_lib in $2; do
-      for termcap_lib in "" termcap curses ncurses; do
+      for termcap_lib in "" termcap curses ncurses pdcurses; do
         if test -z "$termcap_lib"; then
           TRY_LIB="-l$readline_lib"
         else
@@ -135,8 +135,7 @@ AC_DEFUN([VL_LIB_READLINE_CHECK], [
       $vl_cv_lib_includes], [(void) readline;],
       [vl_compiles_with_stdio=yes], [vl_compiles_with_stdio=no])
     if test "x$vl_compiles_with_stdio" = "xyes"; then
-      vl_cv_lib_includes="#include <stdio.h>
-$vl_cv_lib_includes"
+      vl_cv_lib_includes="#include <stdio.h> $vl_cv_lib_includes"
     fi
   fi
 
