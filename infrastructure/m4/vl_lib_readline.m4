@@ -135,7 +135,8 @@ AC_DEFUN([VL_LIB_READLINE_CHECK], [
       $vl_cv_lib_includes], [(void) readline;],
       [vl_compiles_with_stdio=yes], [vl_compiles_with_stdio=no])
     if test "x$vl_compiles_with_stdio" = "xyes"; then
-      vl_cv_lib_includes="#include <stdio.h> $vl_cv_lib_includes"
+      vl_cv_lib_includes="#include <stdio.h>
+$vl_cv_lib_includes"
     fi
   fi
 
