@@ -108,8 +108,15 @@ BackupQueries::~BackupQueries()
 //
 // --------------------------------------------------------------------------
 void BackupQueries::DoCommand(ParsedCommand& rCommand)
-{	
+{
 	// Check...
+
+	if(rCommand.mFailed)
+	{
+		BOX_ERROR("Parse failed");
+		return;
+	}
+
 	if(rCommand.mCmdElements.size() < 1)
 	{
 		// blank command
