@@ -68,9 +68,15 @@ install PCRE:
 	cd pcre-8.12
 	export CFLAGS="-mno-cygwin"
 	export CXXFLAGS="-mno-cygwin"
-	./configure --prefix=/usr/i686-pc-mingw32
+	./configure --prefix=/usr/i686-pc-mingw32 --disable-shared
 	make 
 	make install
+
+Note: we must disable shared libraries on Windows because otherwise
+libpcreposix.a is built to depend on libpcre.dll, even if you define
+PCRE_STATIC, and since /usr/i686-pc-mingw32/bin (the location of the DLL)
+is not normally on the PATH, the DLL can't be found, which stops you
+from running any executables.
 
 == Readline (Optional) ==
 
