@@ -383,7 +383,11 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				}
 				else
 				{
-					if (type == S_IFSOCK || type == S_IFIFO)
+					if (type == S_IFSOCK
+#						ifndef WIN32
+						|| type == S_IFIFO
+#						endif
+						)
 					{
 						// removed notification for these types
 						// see Debian bug 479145, no objections
