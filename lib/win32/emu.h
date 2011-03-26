@@ -50,6 +50,23 @@
 #define __MSVCRT_VERSION__ 0x0601
 #endif
 
+// WIN32_WINNT versions 0x0600 (Vista) and higher enable WSAPoll() in
+// winsock2.h, whose struct pollfd conflicts with ours below, so for
+// now we just set it lower than that, to Windows 2000.
+#ifdef WINVER
+	#if WINVER != 0x0500
+		#error Must include emu.h before setting WINVER
+	#endif
+#endif
+#define WINVER 0x0500
+
+#ifdef _WIN32_WINNT
+	#if _WIN32_WINNT != 0x0500
+		#error Must include emu.h before setting _WIN32_WINNT
+	#endif
+#endif
+#define _WIN32_WINNT 0x0500
+
 // Windows headers
 
 #include <winsock2.h>
@@ -286,9 +303,18 @@ inline unsigned int sleep(unsigned int secs)
 }
 
 #define INFTIM -1
-#define POLLIN 0x1
-#define POLLERR 0x8
-#define POLLOUT 0x4
+
+#ifndef POLLIN
+#	define POLLIN 0x1
+#endif
+
+#ifndef POLLERR
+#	define POLLERR 0x8
+#endif
+
+#ifndef POLLOUT
+#	define POLLOUT 0x4
+#endif
 
 #define SHUT_RDWR SD_BOTH
 #define SHUT_RD SD_RECEIVE
