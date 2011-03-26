@@ -410,7 +410,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 		// Must be relative. We need to get the 
 		// current directory to make it absolute.
 		tmpStr += wd;
-		if (tmpStr[tmpStr.length()] != '\\')
+		if (tmpStr[tmpStr.length()-1] != '\\')
 		{
 			tmpStr += '\\';
 		}
