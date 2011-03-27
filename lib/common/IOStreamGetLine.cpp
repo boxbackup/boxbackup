@@ -168,8 +168,13 @@ bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout
 		{
 			begin++;
 		}
-		if(!iw(r[end])) end--;
-		while(end > begin && iw(r[end]))
+
+		if(end < size && !iw(r[end]))
+		{
+			end--;
+		}
+
+		while(end > begin && end < size && iw(r[end]))
 		{
 			end--;
 		}

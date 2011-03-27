@@ -185,8 +185,13 @@ std::string FdGetLine::GetLine(bool Preprocess)
 		{
 			begin++;
 		}
-		if(!iw(r[end])) end--;
-		while(end > begin && iw(r[end]))
+
+		if(end < size && !iw(r[end]))
+		{
+			end--;
+		}
+
+		while(end > begin && end < size && iw(r[end]))
 		{
 			end--;
 		}
