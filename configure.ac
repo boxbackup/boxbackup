@@ -132,7 +132,7 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS([dlfcn.h getopt.h process.h pwd.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
 AC_CHECK_HEADERS([netinet/in.h])
-AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
+AC_CHECK_HEADERS([sys/file.h sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
 AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 AC_CHECK_HEADERS([bsd/unistd.h])
 
