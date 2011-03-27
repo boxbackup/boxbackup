@@ -41,7 +41,7 @@ int main(int argc, const char *argv[])
 	ExitCode = gpDaemonService->Daemon::Main(
 		BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE,
 		argc, argv);
-	delete gpDaemonService;
+ 	delete gpDaemonService;
 
 #else // !WIN32
 
