@@ -435,6 +435,16 @@ std::string GetErrorMessage(DWORD errorCode);
 // relatively recent C runtime lib
 int console_read(char* pBuffer, size_t BufferSize);
 
+// Defined thus by MinGW, but missing from MSVC
+// [http://curl.haxx.se/mail/lib-2004-11/0260.html]
+#ifndef HAVE_FTRUNCATE
+	int ftruncate(int, off_t); 
+	inline int ftruncate(int __fd, off_t __length) 
+	{ 
+		return _chsize(__fd, __length); 
+	} 
+#endif
+
 #ifdef _MSC_VER
 	/* disable certain compiler warnings to be able to actually see the show-stopper ones */
 	#pragma warning(disable:4101)		// unreferenced local variable
