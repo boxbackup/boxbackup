@@ -439,7 +439,7 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 					"");
 			}
 
-			i = lastSlash;
+			i = lastSlash - 1;
 		}
 	}
 
