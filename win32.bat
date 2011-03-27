@@ -16,11 +16,15 @@ cd .\lib\compress & perl ./../../lib/common/makeexception.pl.in CompressExceptio
 cd ..\..\
 
 cd .\lib\common & perl ./../../lib/common/makeexception.pl.in CommonException.txt & perl ./../../lib/common/makeexception.pl.in ConversionException.txt
+cd ..\..\
 
+cd .\lib\raidfile & perl ./../../lib/common/makeexception.pl.in RaidFileException.txt
 cd ..\..\
 
 cd .\bin\bbackupd & perl ./../../lib/common/makeexception.pl.in ClientException.txt
+cd ..\..\
 
+cd .\bin\bbstored & perl ./../../lib/server/makeprotocol.pl.in Server backupprotocol.txt
 cd ..\..\
 
 cd .\lib\crypto & perl ./../../lib/common/makeexception.pl.in CipherException.txt
