@@ -52,7 +52,7 @@
     </PreBuildEvent>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\openssl\include;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\..\pcre</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\raidfile;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\openssl\include;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\..\pcre</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -84,7 +84,11 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\lib\common\BufferedStream.cpp" />
+    <ClCompile Include="..\..\..\lib\common\BufferedWriteStream.cpp" />
     <ClCompile Include="..\..\..\lib\common\FileModificationTime.cpp" />
+    <ClCompile Include="..\..\..\lib\common\InvisibleTempFileStream.cpp" />
+    <ClCompile Include="..\..\..\lib\common\NamedLock.cpp" />
     <ClCompile Include="..\..\..\lib\common\RateLimitingStream.cpp" />
     <ClCompile Include="..\..\..\lib\compress\autogen_CompressException.cpp" />
     <ClCompile Include="..\..\..\lib\compress\CompressStream.cpp" />
@@ -160,6 +164,9 @@
     <ClCompile Include="..\..\..\lib\server\WinNamedPipeStream.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\lib\common\BufferedStream.h" />
+    <ClInclude Include="..\..\..\lib\common\BufferedWriteStream.h" />
+    <ClInclude Include="..\..\..\lib\common\InvisibleTempFileStream.h" />
     <ClInclude Include="..\..\..\lib\common\RateLimitingStream.h" />
     <ClInclude Include="..\..\..\lib\compress\autogen_CompressException.h" />
     <ClInclude Include="..\..\..\lib\compress\Compress.h" />

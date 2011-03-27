@@ -15,6 +15,20 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupctl", "bbackupctl.vc
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "qdbm", "qdbm.vcxproj", "{72AF22A7-B339-4FDF-B6AE-CA6522D4BB8D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbstored", "bbstored.vcxproj", "{D8404314-73DD-4270-8205-BE677F8FDAC7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A089CEE6-EBF0-4232-A0C0-74850A8127A6} = {A089CEE6-EBF0-4232-A0C0-74850A8127A6}
+		{97D89AEF-2BE4-4E34-8703-03BA67BF4494} = {97D89AEF-2BE4-4E34-8703-03BA67BF4494}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libbackupstore", "libbackupstore.vcxproj", "{97D89AEF-2BE4-4E34-8703-03BA67BF4494}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbstoreaccounts", "bbstoreaccounts.vcxproj", "{C8A1509C-F91B-4140-BD51-B87FF24FB95F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A089CEE6-EBF0-4232-A0C0-74850A8127A6} = {A089CEE6-EBF0-4232-A0C0-74850A8127A6}
+		{97D89AEF-2BE4-4E34-8703-03BA67BF4494} = {97D89AEF-2BE4-4E34-8703-03BA67BF4494}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -45,6 +59,18 @@ Global
 		{72AF22A7-B339-4FDF-B6AE-CA6522D4BB8D}.Debug|Win32.Build.0 = Debug|Win32
 		{72AF22A7-B339-4FDF-B6AE-CA6522D4BB8D}.Release|Win32.ActiveCfg = Release|Win32
 		{72AF22A7-B339-4FDF-B6AE-CA6522D4BB8D}.Release|Win32.Build.0 = Release|Win32
+		{D8404314-73DD-4270-8205-BE677F8FDAC7}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D8404314-73DD-4270-8205-BE677F8FDAC7}.Debug|Win32.Build.0 = Debug|Win32
+		{D8404314-73DD-4270-8205-BE677F8FDAC7}.Release|Win32.ActiveCfg = Release|Win32
+		{D8404314-73DD-4270-8205-BE677F8FDAC7}.Release|Win32.Build.0 = Release|Win32
+		{97D89AEF-2BE4-4E34-8703-03BA67BF4494}.Debug|Win32.ActiveCfg = Debug|Win32
+		{97D89AEF-2BE4-4E34-8703-03BA67BF4494}.Debug|Win32.Build.0 = Debug|Win32
+		{97D89AEF-2BE4-4E34-8703-03BA67BF4494}.Release|Win32.ActiveCfg = Release|Win32
+		{97D89AEF-2BE4-4E34-8703-03BA67BF4494}.Release|Win32.Build.0 = Release|Win32
+		{C8A1509C-F91B-4140-BD51-B87FF24FB95F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C8A1509C-F91B-4140-BD51-B87FF24FB95F}.Debug|Win32.Build.0 = Debug|Win32
+		{C8A1509C-F91B-4140-BD51-B87FF24FB95F}.Release|Win32.ActiveCfg = Release|Win32
+		{C8A1509C-F91B-4140-BD51-B87FF24FB95F}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
