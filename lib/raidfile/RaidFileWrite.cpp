@@ -133,9 +133,9 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 		RaidFileUtil::ExistType existance = RaidFileUtil::RaidFileExists(rdiscSet, mFilename);
 		if(existance != RaidFileUtil::NoFile)
 		{
-			BOX_ERROR("Attempted to overwrite raidfile " <<
-				mSetNumber << " " << mFilename);
-			THROW_EXCEPTION(RaidFileException, CannotOverwriteExistingFile)
+			THROW_FILE_ERROR("Attempted to overwrite raidfile " <<
+				mSetNumber, mFilename, RaidFileException,
+				CannotOverwriteExistingFile);
 		}
 	}
 
@@ -150,8 +150,8 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(mOSFileHandle == -1)
 	{
-		BOX_LOG_SYS_ERROR("Failed to open file: " << writeFilename);
-		THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFile)
+		THROW_SYS_FILE_ERROR("Failed to open RaidFile", writeFilename,
+			RaidFileException, ErrorOpeningWriteFile);
 	}
 	
 	// Get a lock on the write file
@@ -317,19 +317,21 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 
 #ifdef WIN32
 	// need to delete the target first
-	if(::unlink(renameTo.c_str()) != 0 && 
-		GetLastError() != ERROR_FILE_NOT_FOUND)
+	if(::unlink(renameTo.c_str()) != 0)
 	{
-		BOX_LOG_WIN_ERROR("Failed to delete file: " << renameTo);
-		THROW_EXCEPTION(RaidFileException, OSError)
+		DWORD errorNumber = GetLastError();
+		if (errorNumber != ERROR_FILE_NOT_FOUND)
+		{
+			THROW_WIN_FILE_ERRNO("Failed to delete file", renameTo,
+				errorNumber, RaidFileException, OSError);
+		}
 	}
 #endif
 
 	if(::rename(renameFrom.c_str(), renameTo.c_str()) != 0)
 	{
-		BOX_LOG_SYS_ERROR("Failed to rename file: " << renameFrom <<
-			" to " << renameTo);
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_ERROR("Failed to rename file: " << renameFrom <<
+			" to " << renameTo, RaidFileException, OSError);
 	}
 	
 #ifndef WIN32	
@@ -809,11 +811,13 @@ void RaidFileWrite::CreateDirectory(const RaidFileDiscSet &rSet, const std::stri
 			if(errno == EEXIST)
 			{
 				// No. Bad things.
-				THROW_EXCEPTION(RaidFileException, FileExistsInDirectoryCreation)
+				THROW_FILE_ERROR("Failed to create RaidFile directory",
+					dn, RaidFileException, FileExistsInDirectoryCreation);
 			}
 			else
 			{
-				THROW_EXCEPTION(RaidFileException, OSError)
+				THROW_FILE_ERROR("Failed to create RaidFile directory",
+					dn, RaidFileException, OSError);
 			}
 		}
 	}
