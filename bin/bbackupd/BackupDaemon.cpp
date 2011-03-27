@@ -573,15 +573,14 @@ void BackupDaemon::Run2()
 
 void BackupDaemon::RunSyncNowWithExceptionHandling()
 {
-	OnBackupStart();
-
-	// Do sync
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
 	const char* errorString = "unknown";
 
 	try
 	{
+		OnBackupStart();
+		// Do sync
 		RunSyncNow();
 	}
 	catch(BoxException &e)
@@ -975,28 +974,35 @@ void BackupDaemon::OnBackupStart()
 
 void BackupDaemon::OnBackupFinish()
 {
-	// Log
-	BOX_NOTICE("Finished scan of local files");
+	try
+	{
+		// Log
+		BOX_NOTICE("Finished scan of local files");
 
-	// Log the stats
-	BOX_NOTICE("File statistics: total file size uploaded "
-		<< BackupStoreFile::msStats.mBytesInEncodedFiles
-		<< ", bytes already on server "
-		<< BackupStoreFile::msStats.mBytesAlreadyOnServer
-		<< ", encoded size "
-		<< BackupStoreFile::msStats.mTotalFileStreamSize);
+		// Log the stats
+		BOX_NOTICE("File statistics: total file size uploaded "
+			<< BackupStoreFile::msStats.mBytesInEncodedFiles
+			<< ", bytes already on server "
+			<< BackupStoreFile::msStats.mBytesAlreadyOnServer
+			<< ", encoded size "
+			<< BackupStoreFile::msStats.mTotalFileStreamSize);
 
-	// Reset statistics again
-	BackupStoreFile::ResetStats();
+		// Reset statistics again
+		BackupStoreFile::ResetStats();
 
-	// Notify administrator
-	NotifySysadmin(SysadminNotifier::BackupFinish);
+		// Notify administrator
+		NotifySysadmin(SysadminNotifier::BackupFinish);
 
-	// Tell anything connected to the command socket
-	SendSyncStartOrFinish(false /* finish */);
+		// Tell anything connected to the command socket
+		SendSyncStartOrFinish(false /* finish */);
 
-	// Touch a file to record times in filesystem
-	TouchFileInWorkingDir("last_sync_finish");
+		// Touch a file to record times in filesystem
+		TouchFileInWorkingDir("last_sync_finish");
+	}
+	catch (std::exception &e)
+	{
+		BOX_ERROR("Failed to perform backup finish actions: " << e.what());
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -2088,7 +2094,16 @@ void BackupDaemon::TouchFileInWorkingDir(const char *Filename)
 	fn += Filename;
 	
 	// Open and close it to update the timestamp
-	FileStream touch(fn.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	try
+	{
+		FileStream touch(fn, O_WRONLY | O_CREAT | O_TRUNC,
+			S_IRUSR | S_IWUSR);
+	}
+	catch (std::exception &e)
+	{
+		BOX_ERROR("Failed to write to timestamp file: " << fn << ": " <<
+			e.what());
+	}
 }
 
 
