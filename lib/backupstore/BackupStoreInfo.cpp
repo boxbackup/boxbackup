@@ -144,7 +144,7 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID)
 {
 	// Generate the filename
-	std::string fn(rRootDir + DIRECTORY_SEPARATOR INFO_FILENAME);
+	std::string fn(rRootDir + INFO_FILENAME);
 	
 	// Open the file for reading (passing on optional request for revision ID)
 	std::auto_ptr<RaidFileRead> rf(RaidFileRead::Open(DiscSet, fn, pRevisionID));
