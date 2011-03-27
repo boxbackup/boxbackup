@@ -407,7 +407,7 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 
 	try
 	{
-		if (!FileExists(rConfigFileName.c_str()))
+		if (!FileExists(rConfigFileName))
 		{
 			BOX_FATAL("The main configuration file for " <<
 				DaemonName() << " was not found: " <<
