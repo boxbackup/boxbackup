@@ -42,7 +42,8 @@
 	{ BOX_LOG(Log::TRACE, stuff) }
 
 #define BOX_SYS_ERRNO_MESSAGE(error_number, stuff) \
-	stuff << ": " << std::strerror(error_number) << " (" << errno << ")"
+	stuff << ": " << std::strerror(error_number) << \
+	" (" << error_number << ")"
 
 #define BOX_FILE_MESSAGE(filename, message) \
 	message << ": " << filename
@@ -103,6 +104,14 @@ inline std::string GetNativeErrorMessage()
 		BOX_WARNING(stuff << ": " << GetErrorMessage(number))
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_WIN_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_WIN_WARNING(stuff)
+	#define BOX_WIN_ERRNO_MESSAGE(error_number, stuff) \
+		stuff << ": " << GetErrorMessage(error_number) << " (" << error_number << ")"
+	#define THROW_WIN_ERROR_NUMBER(message, error_number, exception, subtype) \
+		THROW_EXCEPTION_MESSAGE(exception, subtype, \
+			BOX_WIN_ERRNO_MESSAGE(error_number, message))
+	#define THROW_WIN_FILE_ERRNO(message, filename, error_number, exception, subtype) \
+		THROW_WIN_ERROR_NUMBER(BOX_FILE_MESSAGE(filename, message), \
+			error_number, exception, subtype)
 #else
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_SYS_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_SYS_WARNING(stuff)
