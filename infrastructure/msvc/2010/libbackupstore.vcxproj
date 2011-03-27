@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{97D89AEF-2BE4-4E34-8703-03BA67BF4494}</ProjectGuid>
+    <RootNamespace>libbackupstore</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(ProjectDir)..\..\..\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <TargetExt>.lib</TargetExt>
+    <IntDir>$(ProjectDir)..\..\..\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Ws2_32.lib;Advapi32.lib;User32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\$(Configuration)\common.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreAccountDatabase.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreAccounts.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheck.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheck2.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheckData.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreConfigVerify.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreInfo.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\StoreStructure.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\autogen_RaidFileException.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileController.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileRead.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileUtil.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileWrite.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreAccountDatabase.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreAccounts.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreCheck.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreConfigVerify.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreInfo.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\StoreStructure.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\autogen_RaidFileException.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileController.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileException.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileRead.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileUtil.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileWrite.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
