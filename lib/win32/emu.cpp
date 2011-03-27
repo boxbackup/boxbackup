@@ -988,7 +988,7 @@ DIR *opendir(const char *name)
 	std::string dirName(name);
 
 	//append a '\' win32 findfirst is sensitive to this
-	if ( dirName[dirName.size()] != '\\' || dirName[dirName.size()] != '/' )
+	if (dirName[dirName.size()-1] != '\\' || dirName[dirName.size()-1] != '/')
 	{
 		dirName += '\\';
 	}
@@ -1020,7 +1020,7 @@ DIR *opendir(const char *name)
 		delete pDir;
 		return NULL;
 	}
-		
+	
 	pDir->result.d_name = 0;
 	return pDir;
 }
