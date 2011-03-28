@@ -31,6 +31,10 @@
 	#include "WinNamedPipeStream.h"
 #endif
 
+#ifdef ENABLE_VSS
+	class IVssBackupComponents;
+#endif
+
 class BackupClientDirectoryRecord;
 class BackupClientContext;
 class Configuration;
@@ -521,6 +525,11 @@ public:
 	private:
 	bool mInstallService, mRemoveService, mRunAsService;
 	std::string mServiceName;
+#endif
+
+#ifdef ENABLE_VSS
+	IVssBackupComponents* mpVssBackupComponents;
+	void CreateVssBackupComponents();
 #endif
 };
 

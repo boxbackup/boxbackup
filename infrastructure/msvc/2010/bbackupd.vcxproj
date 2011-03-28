@@ -51,7 +51,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;ENABLE_VSS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -61,7 +61,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Ws2_32.lib;Advapi32.lib;User32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\$(Configuration)\common.lib;$(ProjectDir)..\..\..\$(Configuration)\qdbm.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2008\debug\pcreposix78.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2008\debug\pcre78.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>VssApi.lib;Ws2_32.lib;Advapi32.lib;User32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\$(Configuration)\common.lib;$(ProjectDir)..\..\..\$(Configuration)\qdbm.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2008\debug\pcreposix78.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2008\debug\pcre78.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)bbackupd.exe</OutputFile>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
