@@ -82,9 +82,6 @@ bool EnableBackupRights()
 	return true;
 }
 
-// forward declaration
-char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
-
 // --------------------------------------------------------------------------
 //
 // Function

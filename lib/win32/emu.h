@@ -422,6 +422,7 @@ bool ConvertFromUtf8 (const std::string& rSource, std::string& rDest,
 	int destCodePage);
 bool ConvertUtf8ToConsole(const std::string& rSource, std::string& rDest);
 bool ConvertConsoleToUtf8(const std::string& rSource, std::string& rDest);
+char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
 
 // Utility function which returns a default config file name,
 // based on the path of the current executable.
