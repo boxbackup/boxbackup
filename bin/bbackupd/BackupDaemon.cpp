@@ -82,6 +82,54 @@
 	#include "Win32BackupService.h"
 
 	extern Win32BackupService* gpDaemonService;
+
+#	ifdef ENABLE_VSS
+#		include <comdef.h>
+#		include <Vss.h>
+#		include <VsWriter.h>
+#		include <VsBackup.h>
+		
+		// http://www.flounder.com/cstring.htm
+		std::string GetMsgForHresult(HRESULT hr)
+		{
+			std::ostringstream buf;
+
+			if(hr == VSS_S_ASYNC_CANCELLED)
+			{
+				buf << "VSS async operation cancelled";
+			}
+			else if(hr == VSS_S_ASYNC_FINISHED)
+			{
+				buf << "VSS async operation finished";
+			}
+			else if(hr == VSS_S_ASYNC_PENDING)
+			{
+				buf << "VSS async operation pending";
+			}
+			else
+			{
+				buf << _com_error(hr).ErrorMessage();
+			}
+			
+			buf << " (" << BOX_FORMAT_HEX32(hr) << ")";
+			return buf.str();
+		}
+
+		std::string WideStringToString(WCHAR *buf)
+		{
+			char* pStr = ConvertFromWideString(buf, CP_UTF8);
+			std::string result(pStr);
+			free(pStr);
+			return result;
+		}
+
+		std::string GuidToString(GUID guid)
+		{
+			wchar_t buf[64];
+			StringFromGUID2(guid, buf, sizeof(buf));
+			return WideStringToString(buf);
+		}
+#	endif
 #endif
 
 #include "MemLeakFindOn.h"
@@ -125,6 +173,9 @@ BackupDaemon::BackupDaemon()
 	  mRunAsService(false),
 	  mServiceName("bbackupd")
 	#endif
+#ifdef ENABLE_VSS
+	, mpVssBackupComponents(NULL)
+#endif
 {
 	// Only ever one instance of a daemon
 	SSLLib::Initialise();
@@ -881,6 +932,10 @@ void BackupDaemon::RunSyncNow()
 
 	// Delete any unused directories?
 	DeleteUnusedRootDirEntries(clientContext);
+
+#ifdef ENABLE_VSS
+	CreateVssBackupComponents();
+#endif
 					
 	// Go through the records, syncing them
 	for(std::vector<Location *>::const_iterator 
@@ -952,6 +1007,286 @@ void BackupDaemon::RunSyncNow()
 
 	// --------------------------------------------------------------------------------------------
 }
+
+#ifdef ENABLE_VSS
+void BackupDaemon::CreateVssBackupComponents()
+{
+	HRESULT result = CoInitialize(NULL);
+	if(result != S_OK)
+	{
+		BOX_ERROR("Failed to initialize COM for VSS: " << 
+			GetMsgForHresult(result));
+		return;
+	}
+
+	result = ::CreateVssBackupComponents(&mpVssBackupComponents);
+	if(result != S_OK)
+	{
+		BOX_ERROR("Failed to create VSS backup components: " << 
+			GetMsgForHresult(result));
+		return;
+	}
+
+	result = mpVssBackupComponents->InitializeForBackup(NULL);
+	if(result != S_OK)
+	{
+		std::string message = GetMsgForHresult(result);
+
+		if (result == VSS_E_UNEXPECTED)
+		{
+			message = "Check the Application Log for details, and ensure "
+				"that the Volume Shadow Copy, COM+ System Application, "
+				"and Distributed Transaction Coordinator services "
+				"are running";
+		}
+
+		BOX_ERROR("Failed to initialize VSS for backup: " << message);
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	result = mpVssBackupComponents->SetContext(VSS_CTX_BACKUP);
+	if(result == E_NOTIMPL)
+	{
+		BOX_INFO("Failed to set VSS context to VSS_CTX_BACKUP: "
+			"not implemented, probably Windows XP, ignored.");
+	}
+	else if(result != S_OK)
+	{
+		BOX_ERROR("Failed to set VSS context to VSS_CTX_BACKUP: " <<
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	result = mpVssBackupComponents->SetBackupState(
+		false, /* no components for now */
+		true, /* might as well ask for a bootable backup */
+		VSS_BT_FULL,
+		false /* what is Partial File Support? */);
+	if(result != S_OK)
+	{
+		BOX_ERROR("Failed to set VSS backup state: " <<
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	IVssAsync *pAsync;
+	result = mpVssBackupComponents->GatherWriterMetadata(&pAsync);
+	if(result != S_OK)
+	{
+		BOX_ERROR("Failed to set VSS backup state: " <<
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	BOX_INFO("VSS: waiting for GatherWriterMetadata() to complete");
+
+	do
+	{
+		result = pAsync->Wait(1000);
+		if(result != S_OK)
+		{
+			BOX_ERROR("VSS: Failed to wait for GatherWriterMetadata() "
+				"to complete: " << GetMsgForHresult(result));
+			goto CreateVssBackupComponents_cleanup_pAsync;
+		}
+
+		HRESULT result2;
+		result = pAsync->QueryStatus(&result2, NULL);
+		if(result != S_OK)
+		{
+			BOX_ERROR("VSS: Failed to query GatherWriterMetadata() "
+				"status: " << GetMsgForHresult(result));
+			goto CreateVssBackupComponents_cleanup_pAsync;
+		}
+
+		result = result2;
+		BOX_INFO("VSS: GatherWriterMetadata() status: " <<
+			GetMsgForHresult(result));
+	}
+	while(result == VSS_S_ASYNC_PENDING);
+
+	pAsync->Release();
+	pAsync = NULL;
+
+	if(result != VSS_S_ASYNC_FINISHED)
+	{
+		BOX_ERROR("VSS: GatherWriterMetadata() failed: " <<
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	UINT writerCount;
+	result = mpVssBackupComponents->GetWriterMetadataCount(&writerCount);
+	if(result != S_OK)
+	{
+		BOX_ERROR("Failed to get VSS writer count: " <<
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	for(UINT iWriter = 0; iWriter < writerCount; iWriter++)
+	{
+		BOX_INFO("VSS: Getting metadata from writer " << iWriter);
+		VSS_ID writerInstance;
+		IVssExamineWriterMetadata* pMetadata;
+		result = mpVssBackupComponents->GetWriterMetadata(iWriter,
+			&writerInstance, &pMetadata);
+		if(result != S_OK)
+		{
+			BOX_ERROR("Failed to get VSS metadata from writer " << iWriter <<
+				": " << GetMsgForHresult(result));
+			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		}
+
+		UINT includeFiles, excludeFiles, numComponents;
+		result = pMetadata->GetFileCounts(&includeFiles, &excludeFiles,
+			&numComponents);
+		if(result != S_OK)
+		{
+			BOX_ERROR("Failed to get VSS metadata file counts from "
+				"writer " << iWriter <<	": " << 
+				GetMsgForHresult(result));
+			pMetadata->Release();
+			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		}
+
+		for(UINT iComponent = 0; iComponent < numComponents; iComponent++)
+		{
+			IVssWMComponent* pComponent;
+			result = pMetadata->GetComponent(iComponent, &pComponent);
+			if(result != S_OK)
+			{
+				BOX_ERROR("Failed to get VSS metadata component " <<
+					iComponent << " from writer " << iWriter << ": " << 
+					GetMsgForHresult(result));
+				continue;
+			}
+
+			PVSSCOMPONENTINFO pComponentInfo;
+			result = pComponent->GetComponentInfo(&pComponentInfo);
+			if(result != S_OK)
+			{
+				BOX_ERROR("Failed to get VSS metadata component " <<
+					iComponent << " info from writer " << iWriter << ": " << 
+					GetMsgForHresult(result));
+				pComponent->Release();
+				continue;
+			}
+
+			pComponent->FreeComponentInfo(pComponentInfo);
+			pComponent->Release();
+		}
+
+		pMetadata->Release();
+	}
+
+	IVssEnumObject *pEnum;
+	result = mpVssBackupComponents->Query(GUID_NULL, VSS_OBJECT_NONE,
+		VSS_OBJECT_SNAPSHOT, &pEnum);
+	if(result != S_OK)
+	{
+		BOX_ERROR("Failed to query VSS snapshot list: " << 
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	while(result == S_OK)
+	{
+		VSS_OBJECT_PROP rgelt;
+		ULONG count;
+		result = pEnum->Next(1, &rgelt, &count);
+
+		if(result != S_OK && result != S_FALSE)
+		{
+			BOX_ERROR("Failed to enumerate VSS snapshot: " << 
+				GetMsgForHresult(result));
+		}
+		else if(count != 1)
+		{
+			BOX_ERROR("Failed to enumerate VSS snapshot: " <<
+				"Next() returned " << count << " objects instead of 1");
+		}
+		else if(rgelt.Type != VSS_OBJECT_SNAPSHOT)
+		{
+			BOX_ERROR("Failed to enumerate VSS snapshot: " <<
+				"Next() returned a type " << rgelt.Type << " object "
+				"instead of VSS_OBJECT_SNAPSHOT");
+		}
+		else
+		{
+			VSS_SNAPSHOT_PROP *pSnap = &rgelt.Obj.Snap;
+			BOX_TRACE("VSS: Snapshot ID: " << 
+				GuidToString(pSnap->m_SnapshotId));
+			BOX_TRACE("VSS: Snapshot set ID: " << 
+				GuidToString(pSnap->m_SnapshotSetId));
+			BOX_TRACE("VSS: Number of volumes: " << 
+				pSnap->m_lSnapshotsCount);
+			BOX_TRACE("VSS: Snapshot device object: " << 
+				WideStringToString(pSnap->m_pwszSnapshotDeviceObject));
+			BOX_TRACE("VSS: Original volume name: " << 
+				WideStringToString(pSnap->m_pwszOriginalVolumeName));
+			BOX_TRACE("VSS: Originating machine: " << 
+				WideStringToString(pSnap->m_pwszOriginatingMachine));
+			BOX_TRACE("VSS: Service machine: " << 
+				WideStringToString(pSnap->m_pwszServiceMachine));
+			BOX_TRACE("VSS: Exposed name: " << 
+				WideStringToString(pSnap->m_pwszExposedName));
+			BOX_TRACE("VSS: Exposed path: " << 
+				WideStringToString(pSnap->m_pwszExposedPath));
+			BOX_TRACE("VSS: Provider ID: " << 
+				GuidToString(pSnap->m_ProviderId));
+			BOX_TRACE("VSS: Snapshot attributes: " << 
+				BOX_FORMAT_HEX32(pSnap->m_lSnapshotAttributes));
+			BOX_TRACE("VSS: Snapshot creation time: " << 
+				BOX_FORMAT_HEX32(pSnap->m_tsCreationTimestamp));
+
+			std::string status;
+			switch(pSnap->m_eStatus)
+			{
+			case VSS_SS_UNKNOWN:                     status = "Unknown (error)"; break;
+			case VSS_SS_PREPARING:                   status = "Preparing"; break;
+			case VSS_SS_PROCESSING_PREPARE:          status = "Preparing (processing)"; break;
+			case VSS_SS_PREPARED:                    status = "Prepared"; break;
+			case VSS_SS_PROCESSING_PRECOMMIT:        status = "Precommitting"; break;
+			case VSS_SS_PRECOMMITTED:                status = "Precommitted"; break;
+			case VSS_SS_PROCESSING_COMMIT:           status = "Commiting"; break;
+			case VSS_SS_COMMITTED:                   status = "Committed"; break;
+			case VSS_SS_PROCESSING_POSTCOMMIT:       status = "Postcommitting"; break;
+			case VSS_SS_PROCESSING_PREFINALCOMMIT:   status = "Pre final committing"; break;
+			case VSS_SS_PREFINALCOMMITTED:           status = "Pre final committed"; break;
+			case VSS_SS_PROCESSING_POSTFINALCOMMIT:  status = "Post final committing"; break;
+			case VSS_SS_CREATED:                     status = "Created"; break;
+			case VSS_SS_ABORTED:                     status = "Aborted"; break;
+			case VSS_SS_DELETED:                     status = "Deleted"; break;
+			case VSS_SS_POSTCOMMITTED:               status = "Postcommitted"; break;
+			default:
+				std::ostringstream buf;
+				buf << "Unknown code: " << pSnap->m_eStatus;
+				status = buf.str();
+			}
+
+			BOX_TRACE("VSS: Snapshot status: " << status);
+
+			CoTaskMemFree(pSnap->m_pwszSnapshotDeviceObject);
+			CoTaskMemFree(pSnap->m_pwszOriginalVolumeName);
+			CoTaskMemFree(pSnap->m_pwszOriginatingMachine);
+			CoTaskMemFree(pSnap->m_pwszServiceMachine);
+			CoTaskMemFree(pSnap->m_pwszExposedName);
+			CoTaskMemFree(pSnap->m_pwszExposedPath);
+		}
+	}
+
+	pEnum->Release();
+
+CreateVssBackupComponents_cleanup_pAsync:
+	pAsync->Release();
+
+CreateVssBackupComponents_cleanup_mpVssBackupComponents:
+	mpVssBackupComponents->Release();
+	mpVssBackupComponents = NULL;
+	return;
+}
+#endif
 
 void BackupDaemon::OnBackupStart()
 {
