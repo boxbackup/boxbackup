@@ -40,6 +40,7 @@
 #endif
 
 #include <iostream>
+#include <set>
 
 #include "Configuration.h"
 #include "IOStream.h"
@@ -128,6 +129,28 @@
 			wchar_t buf[64];
 			StringFromGUID2(guid, buf, sizeof(buf));
 			return WideStringToString(buf);
+		}
+
+		std::ostream& operator<< (std::ostream& o, const BSTR arg)
+		{
+			if(arg == NULL)
+			{
+				o << "(null)";
+			}
+			else
+			{
+				// Extract the *long* before where the arg points to
+				long len = ((long *)arg)[-1];
+				std::wstring wstr((WCHAR *)arg, len);
+				std::string str;
+				if(!ConvertFromWideString(wstr, &str, CP_UTF8))
+				{
+					throw std::exception("string conversion failed");
+				}
+				o << str;
+			}
+
+			return o;
 		}
 #	endif
 #endif
@@ -1009,12 +1032,50 @@ void BackupDaemon::RunSyncNow()
 }
 
 #ifdef ENABLE_VSS
+bool BackupDaemon::WaitForAsync(IVssAsync *pAsync,
+	const std::string& description)
+{
+	BOX_INFO("VSS: waiting for " << description << " to complete");
+	HRESULT result;
+
+	do
+	{
+		result = pAsync->Wait(1000);
+		if(result != S_OK)
+		{
+			BOX_ERROR("VSS: Failed to wait for " << description <<
+				" to complete: " << GetMsgForHresult(result));
+			break;
+		}
+
+		HRESULT result2;
+		result = pAsync->QueryStatus(&result2, NULL);
+		if(result != S_OK)
+		{
+			BOX_ERROR("VSS: Failed to query " << description <<
+				" status: " << GetMsgForHresult(result));
+			break;
+		}
+
+		result = result2;
+		BOX_INFO("VSS: " << description << " status: " <<
+			GetMsgForHresult(result));
+	}
+	while(result == VSS_S_ASYNC_PENDING);
+
+	pAsync->Release();
+
+	return (result == VSS_S_ASYNC_FINISHED);
+}
+
 void BackupDaemon::CreateVssBackupComponents()
 {
+	std::set<char> volumesIncluded;
+
 	HRESULT result = CoInitialize(NULL);
 	if(result != S_OK)
 	{
-		BOX_ERROR("Failed to initialize COM for VSS: " << 
+		BOX_ERROR("VSS: Failed to initialize COM: " << 
 			GetMsgForHresult(result));
 		return;
 	}
@@ -1022,7 +1083,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	result = ::CreateVssBackupComponents(&mpVssBackupComponents);
 	if(result != S_OK)
 	{
-		BOX_ERROR("Failed to create VSS backup components: " << 
+		BOX_ERROR("VSS: Failed to create backup components: " << 
 			GetMsgForHresult(result));
 		return;
 	}
@@ -1040,19 +1101,19 @@ void BackupDaemon::CreateVssBackupComponents()
 				"are running";
 		}
 
-		BOX_ERROR("Failed to initialize VSS for backup: " << message);
+		BOX_ERROR("VSS: Failed to initialize for backup: " << message);
 		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 	}
 
 	result = mpVssBackupComponents->SetContext(VSS_CTX_BACKUP);
 	if(result == E_NOTIMPL)
 	{
-		BOX_INFO("Failed to set VSS context to VSS_CTX_BACKUP: "
+		BOX_INFO("VSS: Failed to set context to VSS_CTX_BACKUP: "
 			"not implemented, probably Windows XP, ignored.");
 	}
 	else if(result != S_OK)
 	{
-		BOX_ERROR("Failed to set VSS context to VSS_CTX_BACKUP: " <<
+		BOX_ERROR("VSS: Failed to set context to VSS_CTX_BACKUP: " <<
 			GetMsgForHresult(result));
 		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 	}
@@ -1064,62 +1125,32 @@ void BackupDaemon::CreateVssBackupComponents()
 		false /* what is Partial File Support? */);
 	if(result != S_OK)
 	{
-		BOX_ERROR("Failed to set VSS backup state: " <<
+		BOX_ERROR("VSS: Failed to set backup state: " <<
 			GetMsgForHresult(result));
 		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 	}
 
-	IVssAsync *pAsync;
-	result = mpVssBackupComponents->GatherWriterMetadata(&pAsync);
-	if(result != S_OK)
 	{
-		BOX_ERROR("Failed to set VSS backup state: " <<
-			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
-	}
-
-	BOX_INFO("VSS: waiting for GatherWriterMetadata() to complete");
-
-	do
-	{
-		result = pAsync->Wait(1000);
+		IVssAsync *pAsync;
+		result = mpVssBackupComponents->GatherWriterMetadata(&pAsync);
 		if(result != S_OK)
 		{
-			BOX_ERROR("VSS: Failed to wait for GatherWriterMetadata() "
-				"to complete: " << GetMsgForHresult(result));
-			goto CreateVssBackupComponents_cleanup_pAsync;
+			BOX_ERROR("VSS: Failed to set backup state: " <<
+				GetMsgForHresult(result));
+			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 		}
 
-		HRESULT result2;
-		result = pAsync->QueryStatus(&result2, NULL);
-		if(result != S_OK)
+		if(!WaitForAsync(pAsync, "GatherWriterMetadata()"))
 		{
-			BOX_ERROR("VSS: Failed to query GatherWriterMetadata() "
-				"status: " << GetMsgForHresult(result));
-			goto CreateVssBackupComponents_cleanup_pAsync;
+			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 		}
-
-		result = result2;
-		BOX_INFO("VSS: GatherWriterMetadata() status: " <<
-			GetMsgForHresult(result));
-	}
-	while(result == VSS_S_ASYNC_PENDING);
-
-	pAsync->Release();
-	pAsync = NULL;
-
-	if(result != VSS_S_ASYNC_FINISHED)
-	{
-		BOX_ERROR("VSS: GatherWriterMetadata() failed: " <<
-			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 	}
 
 	UINT writerCount;
 	result = mpVssBackupComponents->GetWriterMetadataCount(&writerCount);
 	if(result != S_OK)
 	{
-		BOX_ERROR("Failed to get VSS writer count: " <<
+		BOX_ERROR("VSS: Failed to get writer count: " <<
 			GetMsgForHresult(result));
 		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 	}
@@ -1173,11 +1204,124 @@ void BackupDaemon::CreateVssBackupComponents()
 				continue;
 			}
 
+			BOX_INFO("VSS: writer " << iWriter << " component " << 
+				iComponent << " info:");
+			switch(pComponentInfo->type)
+			{
+			case VSS_CT_UNDEFINED: BOX_INFO("VSS: type: undefined"); break;
+			case VSS_CT_DATABASE:  BOX_INFO("VSS: type: database"); break;
+			case VSS_CT_FILEGROUP: BOX_INFO("VSS: type: filegroup"); break;
+			default:
+				BOX_WARNING("VSS: type: unknown (" << pComponentInfo->type << ")");
+			}
+
+			BOX_INFO("VSS: logical path: " << 
+				pComponentInfo->bstrLogicalPath);
+			BOX_INFO("VSS: component name: " << 
+				pComponentInfo->bstrComponentName);
+			BOX_INFO("VSS: caption: " << 
+				pComponentInfo->bstrCaption);
+			BOX_INFO("VSS: restore metadata: " << 
+				pComponentInfo->bRestoreMetadata);
+			BOX_INFO("VSS: notify on complete: " << 
+				pComponentInfo->bRestoreMetadata);
+			BOX_INFO("VSS: selectable: " << 
+				pComponentInfo->bSelectable);
+			BOX_INFO("VSS: selectable for restore: " << 
+				pComponentInfo->bSelectableForRestore);
+			BOX_INFO("VSS: component flags: " << 
+				BOX_FORMAT_HEX32(pComponentInfo->dwComponentFlags));
+			BOX_INFO("VSS: file count: " << 
+				pComponentInfo->cFileCount);
+			BOX_INFO("VSS: databases: " << 
+				pComponentInfo->cDatabases);
+			BOX_INFO("VSS: log files: " << 
+				pComponentInfo->cLogFiles);
+			BOX_INFO("VSS: dependencies: " << 
+				pComponentInfo->cDependencies);
+
 			pComponent->FreeComponentInfo(pComponentInfo);
 			pComponent->Release();
 		}
 
 		pMetadata->Release();
+	}
+
+	VSS_ID snapshotSetId;
+	result = mpVssBackupComponents->StartSnapshotSet(&snapshotSetId);
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: Failed to start snapshot set: " <<
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+	}
+
+	// Add all volumes included as backup locations to the snapshot set
+	for(std::vector<Location *>::iterator
+		iLocation  = mLocations.begin();
+		iLocation != mLocations.end();
+		iLocation++)
+	{
+		Location& rLocation(**iLocation);
+		std::string path = rLocation.mPath;
+		// convert to absolute and remove leading \\?\ 
+		path = ConvertPathToAbsoluteUnicode(path.c_str()).substr(4);
+
+		if(path.length() >= 3 && path[1] == ':' && path[2] == '\\')
+		{
+			std::string volumeRoot = path.substr(0, 3);
+
+			if(volumesIncluded.find(path[0]) == volumesIncluded.end())
+			{
+				std::wstring volumeRootWide;
+				volumeRootWide[0] = (WCHAR) path[0];
+				volumeRootWide[1] = (WCHAR) ':';
+				volumeRootWide[2] = (WCHAR) '\\';
+				VSS_ID newVolumeId;
+				result = mpVssBackupComponents->AddToSnapshotSet(
+					(VSS_PWSZ)(volumeRootWide.c_str()), GUID_NULL,
+					&newVolumeId);
+				if(result == S_OK)
+				{
+					BOX_TRACE("VSS: Added volume " << volumeRoot <<
+						" for backup location " << path <<
+						" to snapshot set");
+				}
+				else
+				{
+					BOX_ERROR("VSS: Failed to add volume " <<
+						volumeRoot << " to snapshot set: " <<
+						GetMsgForHresult(result));
+					goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+				}
+			}
+			else
+			{
+				BOX_TRACE("VSS: Skipping already included volume " <<
+					volumeRoot << " for backup location " << path);
+			}
+		}
+		else
+		{
+			BOX_WARNING("VSS: Skipping backup location " << path <<
+				" which does not start with a volume specification");
+		}
+	}
+
+	{
+		IVssAsync *pAsync;
+		result = mpVssBackupComponents->PrepareForBackup(&pAsync);
+		if(result != S_OK)
+		{
+			BOX_ERROR("VSS: Failed to prepare for backup: " <<
+				GetMsgForHresult(result));
+			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		}
+
+		if(!WaitForAsync(pAsync, "PrepareForBackup()"))
+		{
+			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		}
 	}
 
 	IVssEnumObject *pEnum;
@@ -1277,9 +1421,6 @@ void BackupDaemon::CreateVssBackupComponents()
 	}
 
 	pEnum->Release();
-
-CreateVssBackupComponents_cleanup_pAsync:
-	pAsync->Release();
 
 CreateVssBackupComponents_cleanup_mpVssBackupComponents:
 	mpVssBackupComponents->Release();
