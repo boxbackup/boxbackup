@@ -1274,9 +1274,9 @@ void BackupDaemon::CreateVssBackupComponents()
 			if(volumesIncluded.find(path[0]) == volumesIncluded.end())
 			{
 				std::wstring volumeRootWide;
-				volumeRootWide[0] = (WCHAR) path[0];
-				volumeRootWide[1] = (WCHAR) ':';
-				volumeRootWide[2] = (WCHAR) '\\';
+				volumeRootWide.push_back((WCHAR) path[0]);
+				volumeRootWide.push_back((WCHAR) ':');
+				volumeRootWide.push_back((WCHAR) '\\');
 				VSS_ID newVolumeId;
 				result = mpVssBackupComponents->AddToSnapshotSet(
 					(VSS_PWSZ)(volumeRootWide.c_str()), GUID_NULL,
