@@ -284,6 +284,69 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 	return buffer;
 }
 
+bool ConvertFromWideString(const std::wstring& rInput, 
+	std::string* pOutput, unsigned int codepage)
+{
+	int len = WideCharToMultiByte
+	(
+		codepage, // destination code page
+		0,        // character-type options
+		rInput.c_str(),  // string to map
+		rInput.size(),       // number of bytes in string - auto detect
+		NULL,     // output buffer
+		0,        // size of buffer - work out 
+		          //   how much space we need
+		NULL,     // replace unknown chars with system default
+		NULL      // don't tell us when that happened
+	);
+
+	if (len == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert wide string to narrow: "
+			"error %d", GetLastError());
+		errno = EINVAL;
+		return false;
+	}
+
+	char* buffer = new char[len];
+
+	if (buffer == NULL)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert wide string to narrow: "
+			"out of memory");
+		errno = ENOMEM;
+		return false;
+	}
+
+	len = WideCharToMultiByte
+	(
+		codepage, // source code page
+		0,        // character-type options
+		rInput.c_str(),  // string to map
+		rInput.size(),       // number of bytes in string - auto detect
+		buffer,   // output buffer
+		len,      // size of buffer
+		NULL,     // replace unknown chars with system default
+		NULL      // don't tell us when that happened
+	);
+
+	if (len == 0)
+	{
+		::syslog(LOG_WARNING, 
+			"Failed to convert wide string to narrow: "
+			"error %i", GetLastError());
+		errno = EACCES;
+		delete [] buffer;
+		return false;
+	}
+
+	*pOutput = std::string(buffer, len);
+	delete [] buffer;
+	return true;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function

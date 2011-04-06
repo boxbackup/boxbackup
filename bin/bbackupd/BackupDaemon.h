@@ -33,6 +33,7 @@
 
 #ifdef ENABLE_VSS
 	class IVssBackupComponents;
+	struct IVssAsync;
 #endif
 
 class BackupClientDirectoryRecord;
@@ -530,6 +531,7 @@ public:
 #ifdef ENABLE_VSS
 	IVssBackupComponents* mpVssBackupComponents;
 	void CreateVssBackupComponents();
+	bool WaitForAsync(IVssAsync *pAsync, const std::string& description);
 #endif
 };
 
