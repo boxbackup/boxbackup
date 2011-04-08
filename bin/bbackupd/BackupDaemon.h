@@ -532,6 +532,9 @@ public:
 	IVssBackupComponents* mpVssBackupComponents;
 	void CreateVssBackupComponents();
 	bool WaitForAsync(IVssAsync *pAsync, const std::string& description);
+	typedef HRESULT (__stdcall IVssBackupComponents::*AsyncMethod)(IVssAsync**);
+	bool CallAndWaitForAsync(AsyncMethod method,
+		const std::string& description);
 #endif
 };
 

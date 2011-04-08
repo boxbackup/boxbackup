@@ -119,6 +119,12 @@
 		std::string WideStringToString(WCHAR *buf)
 		{
 			char* pStr = ConvertFromWideString(buf, CP_UTF8);
+			
+			if(pStr == NULL)
+			{
+				return "conversion failed";
+			}
+			
 			std::string result(pStr);
 			free(pStr);
 			return result;
@@ -131,26 +137,24 @@
 			return WideStringToString(buf);
 		}
 
-		std::ostream& operator<< (std::ostream& o, const BSTR arg)
+		std::string BstrToString(const BSTR arg)
 		{
 			if(arg == NULL)
 			{
-				o << "(null)";
+				return std::string("(null)");
 			}
 			else
 			{
 				// Extract the *long* before where the arg points to
-				long len = ((long *)arg)[-1];
+				long len = ((long *)arg)[-1] / 2;
 				std::wstring wstr((WCHAR *)arg, len);
 				std::string str;
 				if(!ConvertFromWideString(wstr, &str, CP_UTF8))
 				{
 					throw std::exception("string conversion failed");
 				}
-				o << str;
+				return str;
 			}
-
-			return o;
 		}
 #	endif
 #endif
@@ -1068,6 +1072,23 @@ bool BackupDaemon::WaitForAsync(IVssAsync *pAsync,
 	return (result == VSS_S_ASYNC_FINISHED);
 }
 
+#define CALL_MEMBER_FN(object, method) ((object).*(method))
+
+bool BackupDaemon::CallAndWaitForAsync(AsyncMethod method,
+	const std::string& description)
+{
+	IVssAsync *pAsync;
+	HRESULT result = CALL_MEMBER_FN(*mpVssBackupComponents, method)(&pAsync);
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: " << description << " failed: " <<
+			GetMsgForHresult(result));
+		return false;
+	}
+
+	return WaitForAsync(pAsync, description);
+}
+
 void BackupDaemon::CreateVssBackupComponents()
 {
 	std::set<char> volumesIncluded;
@@ -1130,20 +1151,10 @@ void BackupDaemon::CreateVssBackupComponents()
 		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
 	}
 
+	if(!CallAndWaitForAsync(&IVssBackupComponents::GatherWriterMetadata,
+		"GatherWriterMetadata()"))
 	{
-		IVssAsync *pAsync;
-		result = mpVssBackupComponents->GatherWriterMetadata(&pAsync);
-		if(result != S_OK)
-		{
-			BOX_ERROR("VSS: Failed to set backup state: " <<
-				GetMsgForHresult(result));
-			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
-		}
-
-		if(!WaitForAsync(pAsync, "GatherWriterMetadata()"))
-		{
-			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
-		}
+		goto CreateVssBackupComponents_cleanup_WriterMetadata;
 	}
 
 	UINT writerCount;
@@ -1152,7 +1163,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	{
 		BOX_ERROR("VSS: Failed to get writer count: " <<
 			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		goto CreateVssBackupComponents_cleanup_WriterMetadata;
 	}
 
 	for(UINT iWriter = 0; iWriter < writerCount; iWriter++)
@@ -1166,7 +1177,7 @@ void BackupDaemon::CreateVssBackupComponents()
 		{
 			BOX_ERROR("Failed to get VSS metadata from writer " << iWriter <<
 				": " << GetMsgForHresult(result));
-			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+			goto CreateVssBackupComponents_cleanup_WriterMetadata;
 		}
 
 		UINT includeFiles, excludeFiles, numComponents;
@@ -1174,7 +1185,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			&numComponents);
 		if(result != S_OK)
 		{
-			BOX_ERROR("Failed to get VSS metadata file counts from "
+			BOX_ERROR("VSS: Failed to get metadata file counts from "
 				"writer " << iWriter <<	": " << 
 				GetMsgForHresult(result));
 			pMetadata->Release();
@@ -1187,7 +1198,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			result = pMetadata->GetComponent(iComponent, &pComponent);
 			if(result != S_OK)
 			{
-				BOX_ERROR("Failed to get VSS metadata component " <<
+				BOX_ERROR("VSS: Failed to get metadata component " <<
 					iComponent << " from writer " << iWriter << ": " << 
 					GetMsgForHresult(result));
 				continue;
@@ -1197,7 +1208,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			result = pComponent->GetComponentInfo(&pComponentInfo);
 			if(result != S_OK)
 			{
-				BOX_ERROR("Failed to get VSS metadata component " <<
+				BOX_ERROR("VSS: Failed to get metadata component " <<
 					iComponent << " info from writer " << iWriter << ": " << 
 					GetMsgForHresult(result));
 				pComponent->Release();
@@ -1216,11 +1227,11 @@ void BackupDaemon::CreateVssBackupComponents()
 			}
 
 			BOX_INFO("VSS: logical path: " << 
-				pComponentInfo->bstrLogicalPath);
+				BstrToString(pComponentInfo->bstrLogicalPath));
 			BOX_INFO("VSS: component name: " << 
-				pComponentInfo->bstrComponentName);
+				BstrToString(pComponentInfo->bstrComponentName));
 			BOX_INFO("VSS: caption: " << 
-				pComponentInfo->bstrCaption);
+				BstrToString(pComponentInfo->bstrCaption));
 			BOX_INFO("VSS: restore metadata: " << 
 				pComponentInfo->bRestoreMetadata);
 			BOX_INFO("VSS: notify on complete: " << 
@@ -1253,7 +1264,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	{
 		BOX_ERROR("VSS: Failed to start snapshot set: " <<
 			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		goto CreateVssBackupComponents_cleanup_WriterMetadata;
 	}
 
 	// Add all volumes included as backup locations to the snapshot set
@@ -1292,7 +1303,7 @@ void BackupDaemon::CreateVssBackupComponents()
 					BOX_ERROR("VSS: Failed to add volume " <<
 						volumeRoot << " to snapshot set: " <<
 						GetMsgForHresult(result));
-					goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+					goto CreateVssBackupComponents_cleanup_WriterMetadata;
 				}
 			}
 			else
@@ -1308,20 +1319,91 @@ void BackupDaemon::CreateVssBackupComponents()
 		}
 	}
 
+	if(!CallAndWaitForAsync(&IVssBackupComponents::PrepareForBackup,
+		"PrepareForBackup()"))
 	{
-		IVssAsync *pAsync;
-		result = mpVssBackupComponents->PrepareForBackup(&pAsync);
+		goto CreateVssBackupComponents_cleanup_WriterMetadata;
+	}
+
+	if(!CallAndWaitForAsync(&IVssBackupComponents::DoSnapshotSet,
+		"DoSnapshotSet()"))
+	{
+		goto CreateVssBackupComponents_cleanup_WriterMetadata;
+	}
+
+	if(!CallAndWaitForAsync(&IVssBackupComponents::GatherWriterStatus,
+		"GatherWriterStatus()"))
+	{
+		goto CreateVssBackupComponents_cleanup_WriterStatus;
+	}
+
+	result = mpVssBackupComponents->GetWriterStatusCount(&writerCount);
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: Failed to get writer status count: " << 
+			GetMsgForHresult(result));
+		goto CreateVssBackupComponents_cleanup_WriterStatus;
+	}
+
+	for(UINT iWriter = 0; iWriter < writerCount; iWriter++)
+	{
+		VSS_ID instance, writer;
+		BSTR writerNameBstr;
+		VSS_WRITER_STATE writerState;
+		HRESULT writerResult;
+
+		result = mpVssBackupComponents->GetWriterStatus(iWriter,
+			&instance, &writer, &writerNameBstr, &writerState,
+			&writerResult);
 		if(result != S_OK)
 		{
-			BOX_ERROR("VSS: Failed to prepare for backup: " <<
-				GetMsgForHresult(result));
-			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+			BOX_ERROR("VSS: Failed to query writer " << iWriter <<
+				" status: " << GetMsgForHresult(result));
+			goto CreateVssBackupComponents_cleanup_WriterStatus;
 		}
 
-		if(!WaitForAsync(pAsync, "PrepareForBackup()"))
+		std::string writerName = BstrToString(writerNameBstr);
+		::SysFreeString(writerNameBstr);
+
+		if(writerResult != S_OK)
 		{
-			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+			BOX_ERROR("VSS: Writer " << iWriter << " (" <<
+				writerName << ") failed: " <<
+				GetMsgForHresult(writerResult));
+			continue;
 		}
+
+		std::string stateName;
+
+		switch(writerState)
+		{
+#define WRITER_STATE(code) \
+		case code: stateName = #code; break;
+		WRITER_STATE(VSS_WS_UNKNOWN);
+		WRITER_STATE(VSS_WS_STABLE);
+		WRITER_STATE(VSS_WS_WAITING_FOR_FREEZE);
+		WRITER_STATE(VSS_WS_WAITING_FOR_THAW);
+		WRITER_STATE(VSS_WS_WAITING_FOR_POST_SNAPSHOT);
+		WRITER_STATE(VSS_WS_WAITING_FOR_BACKUP_COMPLETE);
+		WRITER_STATE(VSS_WS_FAILED_AT_IDENTIFY);
+		WRITER_STATE(VSS_WS_FAILED_AT_PREPARE_BACKUP);
+		WRITER_STATE(VSS_WS_FAILED_AT_PREPARE_SNAPSHOT);
+		WRITER_STATE(VSS_WS_FAILED_AT_FREEZE);
+		WRITER_STATE(VSS_WS_FAILED_AT_THAW);
+		WRITER_STATE(VSS_WS_FAILED_AT_POST_SNAPSHOT);
+		WRITER_STATE(VSS_WS_FAILED_AT_BACKUP_COMPLETE);
+		WRITER_STATE(VSS_WS_FAILED_AT_PRE_RESTORE);
+		WRITER_STATE(VSS_WS_FAILED_AT_POST_RESTORE);
+		WRITER_STATE(VSS_WS_FAILED_AT_BACKUPSHUTDOWN);
+#undef WRITER_STATE
+		default:
+			std::ostringstream o;
+			o << "unknown (" << writerState << ")";
+			stateName = o.str();
+		}
+
+		BOX_INFO("VSS: Writer " << iWriter << " (" <<
+			writerName << ") is in state " << stateName);
 	}
 
 	IVssEnumObject *pEnum;
@@ -1329,9 +1411,9 @@ void BackupDaemon::CreateVssBackupComponents()
 		VSS_OBJECT_SNAPSHOT, &pEnum);
 	if(result != S_OK)
 	{
-		BOX_ERROR("Failed to query VSS snapshot list: " << 
+		BOX_ERROR("VSS: Failed to query snapshot list: " << 
 			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		goto CreateVssBackupComponents_cleanup_WriterStatus;
 	}
 
 	while(result == S_OK)
@@ -1342,17 +1424,17 @@ void BackupDaemon::CreateVssBackupComponents()
 
 		if(result != S_OK && result != S_FALSE)
 		{
-			BOX_ERROR("Failed to enumerate VSS snapshot: " << 
+			BOX_ERROR("VSS: Failed to enumerate snapshot: " << 
 				GetMsgForHresult(result));
 		}
 		else if(count != 1)
 		{
-			BOX_ERROR("Failed to enumerate VSS snapshot: " <<
+			BOX_ERROR("VSS: Failed to enumerate snapshot: " <<
 				"Next() returned " << count << " objects instead of 1");
 		}
 		else if(rgelt.Type != VSS_OBJECT_SNAPSHOT)
 		{
-			BOX_ERROR("Failed to enumerate VSS snapshot: " <<
+			BOX_ERROR("VSS: Failed to enumerate snapshot: " <<
 				"Next() returned a type " << rgelt.Type << " object "
 				"instead of VSS_OBJECT_SNAPSHOT");
 		}
@@ -1421,6 +1503,22 @@ void BackupDaemon::CreateVssBackupComponents()
 	}
 
 	pEnum->Release();
+
+CreateVssBackupComponents_cleanup_WriterStatus:
+	result = mpVssBackupComponents->FreeWriterStatus();
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: Failed to free writer status: " <<
+			GetMsgForHresult(result));
+	}
+
+CreateVssBackupComponents_cleanup_WriterMetadata:
+	result = mpVssBackupComponents->FreeWriterMetadata();
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: Failed to free writer metadata: " <<
+			GetMsgForHresult(result));
+	}
 
 CreateVssBackupComponents_cleanup_mpVssBackupComponents:
 	mpVssBackupComponents->Release();
