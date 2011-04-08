@@ -11,9 +11,19 @@ chdir $basedir or die "$basedir: $!";
 
 require "$basedir\\infrastructure\\BoxPlatform.pm.in";
 
-open VERSIONFILE, "> $basedir/lib/common/BoxVersion.h" 
+my $newver = "#define BOX_VERSION \"$BoxPlatform::product_version\"\n";
+
+open VERSIONFILE, "< $basedir/lib/common/BoxVersion.h" 
 	or die "BoxVersion.h: $!";
-print VERSIONFILE "#define BOX_VERSION \"$BoxPlatform::product_version\"\n";
+my $oldver = <VERSIONFILE>;
 close VERSIONFILE;
+
+if ($newver ne $oldver)
+{
+	open VERSIONFILE, "> $basedir/lib/common/BoxVersion.h" 
+		or die "BoxVersion.h: $!";
+	print VERSIONFILE "#define BOX_VERSION \"$BoxPlatform::product_version\"\n";
+	close VERSIONFILE;
+}
 
 exit 0;
