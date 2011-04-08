@@ -1089,9 +1089,19 @@ bool BackupDaemon::CallAndWaitForAsync(AsyncMethod method,
 	return WaitForAsync(pAsync, description);
 }
 
+void FreeSnapshotProp(VSS_SNAPSHOT_PROP *pSnap)
+{
+	CoTaskMemFree(pSnap->m_pwszSnapshotDeviceObject);
+	CoTaskMemFree(pSnap->m_pwszOriginalVolumeName);
+	CoTaskMemFree(pSnap->m_pwszOriginatingMachine);
+	CoTaskMemFree(pSnap->m_pwszServiceMachine);
+	CoTaskMemFree(pSnap->m_pwszExposedName);
+	CoTaskMemFree(pSnap->m_pwszExposedPath);
+}
+
 void BackupDaemon::CreateVssBackupComponents()
 {
-	std::set<char> volumesIncluded;
+	std::map<char, VSS_ID> volumesIncluded;
 
 	HRESULT result = CoInitialize(NULL);
 	if(result != S_OK)
@@ -1282,7 +1292,10 @@ void BackupDaemon::CreateVssBackupComponents()
 		{
 			std::string volumeRoot = path.substr(0, 3);
 
-			if(volumesIncluded.find(path[0]) == volumesIncluded.end())
+			std::map<char, VSS_ID>::iterator i = 
+				volumesIncluded.find(path[0]);
+
+			if(i == volumesIncluded.end())
 			{
 				std::wstring volumeRootWide;
 				volumeRootWide.push_back((WCHAR) path[0]);
@@ -1297,6 +1310,9 @@ void BackupDaemon::CreateVssBackupComponents()
 					BOX_TRACE("VSS: Added volume " << volumeRoot <<
 						" for backup location " << path <<
 						" to snapshot set");
+					volumesIncluded[path[0]] = newVolumeId;
+					rLocation.mSnapshotVolumeId = newVolumeId;
+					rLocation.mIsSnapshotCreated = true;
 				}
 				else
 				{
@@ -1310,6 +1326,8 @@ void BackupDaemon::CreateVssBackupComponents()
 			{
 				BOX_TRACE("VSS: Skipping already included volume " <<
 					volumeRoot << " for backup location " << path);
+				rLocation.mSnapshotVolumeId = i->second;
+				rLocation.mIsSnapshotCreated = true;
 			}
 		}
 		else
@@ -1406,6 +1424,57 @@ void BackupDaemon::CreateVssBackupComponents()
 			writerName << ") is in state " << stateName);
 	}
 
+	// lookup new snapshot volume for each location that has a snapshot
+	for(std::vector<Location *>::iterator
+		iLocation  = mLocations.begin();
+		iLocation != mLocations.end();
+		iLocation++)
+	{
+		Location& rLocation(**iLocation);
+		if(rLocation.mIsSnapshotCreated)
+		{
+			std::string path = rLocation.mPath;
+			// convert to absolute and remove leading \\?\ 
+			path = ConvertPathToAbsoluteUnicode(path.c_str());
+			std::string volume = path.substr(4, 3);
+			path = path.substr(7);
+			char driveLetter = volume[0];
+
+			std::map<char, VSS_ID>::iterator iVssId =
+				volumesIncluded.find(driveLetter);
+
+			if(iVssId == volumesIncluded.end())
+			{
+				BOX_ERROR("VSS: Failed to find snapshot ID for "
+					"volume " << volume << " for location " <<
+					rLocation.mPath);
+				rLocation.mIsSnapshotCreated = false;
+				continue;
+			}
+
+			VSS_SNAPSHOT_PROP prop;
+			result = mpVssBackupComponents->GetSnapshotProperties(iVssId->second,
+				&prop);
+			if(result != S_OK)
+			{
+				BOX_ERROR("VSS: Failed to get snapshot properties "
+					"for volume " << GuidToString(iVssId->second) <<
+					" for location " << rLocation.mPath << ": " <<
+					GetMsgForHresult(result));
+				rLocation.mIsSnapshotCreated = false;
+				continue;
+			}
+
+			rLocation.mSnapshotPath =
+				WideStringToString(prop.m_pwszSnapshotDeviceObject) +
+				DIRECTORY_SEPARATOR + path;
+			FreeSnapshotProp(&prop);
+
+			BOX_INFO("VSS: Location " << rLocation.mPath << " using "
+				"snapshot path " << rLocation.mSnapshotPath);
+		}
+	}
+
 	IVssEnumObject *pEnum;
 	result = mpVssBackupComponents->Query(GUID_NULL, VSS_OBJECT_NONE,
 		VSS_OBJECT_SNAPSHOT, &pEnum);
@@ -1492,13 +1561,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			}
 
 			BOX_TRACE("VSS: Snapshot status: " << status);
-
-			CoTaskMemFree(pSnap->m_pwszSnapshotDeviceObject);
-			CoTaskMemFree(pSnap->m_pwszOriginalVolumeName);
-			CoTaskMemFree(pSnap->m_pwszOriginatingMachine);
-			CoTaskMemFree(pSnap->m_pwszServiceMachine);
-			CoTaskMemFree(pSnap->m_pwszExposedName);
-			CoTaskMemFree(pSnap->m_pwszExposedPath);
+			FreeSnapshotProp(pSnap);
 		}
 	}
 
