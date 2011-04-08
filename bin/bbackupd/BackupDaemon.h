@@ -32,8 +32,10 @@
 #endif
 
 #ifdef ENABLE_VSS
-	class IVssBackupComponents;
-	struct IVssAsync;
+#	include <comdef.h>
+#	include <Vss.h>
+#	include <VsWriter.h>
+#	include <VsBackup.h>
 #endif
 
 class BackupClientDirectoryRecord;
@@ -173,6 +175,12 @@ public:
 		int mIDMapIndex;
 		ExcludeList *mpExcludeFiles;
 		ExcludeList *mpExcludeDirs;
+
+#ifdef ENABLE_VSS
+		bool mIsSnapshotCreated;
+		VSS_ID mSnapshotVolumeId;
+		std::string mSnapshotPath;
+#endif
 	};
 	
 	typedef const std::vector<Location *> Locations;
