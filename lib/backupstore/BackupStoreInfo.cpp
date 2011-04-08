@@ -299,7 +299,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	int64_t BlockSoftLimit, int64_t BlockHardLimit)
 {
 	// Generate the filename
-	std::string fn(rRootDir + DIRECTORY_SEPARATOR INFO_FILENAME);
+	std::string fn(rRootDir + INFO_FILENAME);
 	
 	// Make new object
 	std::auto_ptr<BackupStoreInfo> info(new BackupStoreInfo);
