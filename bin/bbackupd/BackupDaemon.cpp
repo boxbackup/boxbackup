@@ -981,10 +981,18 @@ void BackupDaemon::RunSyncNow()
 			(*i)->mpExcludeDirs);
 
 		// Sync the directory
+		std::string locationPath = (*i)->mPath;
+#ifdef ENABLE_VSS
+		if((*i)->mIsSnapshotCreated)
+		{
+			locationPath = (*i)->mSnapshotPath;
+		}
+#endif
+
 		(*i)->mpDirectoryRecord->SyncDirectory(
 			params,
 			BackupProtocolClientListDirectory::RootDirectory,
-			(*i)->mPath, std::string("/") + (*i)->mName);
+			locationPath, std::string("/") + (*i)->mName);
 
 		// Unset exclude lists (just in case)
 		clientContext.SetExcludeLists(0, 0);
@@ -997,7 +1005,11 @@ void BackupDaemon::RunSyncNow()
 
 	// Close any open connection
 	clientContext.CloseAnyOpenConnection();
-	
+
+#ifdef ENABLE_VSS
+	CleanupVssBackupComponents();
+#endif
+
 	// Get the new store marker
 	mClientStoreMarker = clientContext.GetClientStoreMarker();
 	mStorageLimitExceeded = clientContext.StorageLimitExceeded();
@@ -1133,7 +1145,7 @@ void BackupDaemon::CreateVssBackupComponents()
 		}
 
 		BOX_ERROR("VSS: Failed to initialize for backup: " << message);
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		return;
 	}
 
 	result = mpVssBackupComponents->SetContext(VSS_CTX_BACKUP);
@@ -1146,7 +1158,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	{
 		BOX_ERROR("VSS: Failed to set context to VSS_CTX_BACKUP: " <<
 			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		return;
 	}
 
 	result = mpVssBackupComponents->SetBackupState(
@@ -1158,7 +1170,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	{
 		BOX_ERROR("VSS: Failed to set backup state: " <<
 			GetMsgForHresult(result));
-		goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+		return;
 	}
 
 	if(!CallAndWaitForAsync(&IVssBackupComponents::GatherWriterMetadata,
@@ -1187,7 +1199,7 @@ void BackupDaemon::CreateVssBackupComponents()
 		{
 			BOX_ERROR("Failed to get VSS metadata from writer " << iWriter <<
 				": " << GetMsgForHresult(result));
-			goto CreateVssBackupComponents_cleanup_WriterMetadata;
+			continue;
 		}
 
 		UINT includeFiles, excludeFiles, numComponents;
@@ -1199,7 +1211,7 @@ void BackupDaemon::CreateVssBackupComponents()
 				"writer " << iWriter <<	": " << 
 				GetMsgForHresult(result));
 			pMetadata->Release();
-			goto CreateVssBackupComponents_cleanup_mpVssBackupComponents;
+			continue;
 		}
 
 		for(UINT iComponent = 0; iComponent < numComponents; iComponent++)
@@ -1582,11 +1594,20 @@ CreateVssBackupComponents_cleanup_WriterMetadata:
 		BOX_ERROR("VSS: Failed to free writer metadata: " <<
 			GetMsgForHresult(result));
 	}
+}
 
-CreateVssBackupComponents_cleanup_mpVssBackupComponents:
+void BackupDaemon::CleanupVssBackupComponents()
+{
+	if(mpVssBackupComponents == NULL)
+	{
+		return;
+	}
+
+	CallAndWaitForAsync(&IVssBackupComponents::BackupComplete,
+		"BackupComplete()");
+
 	mpVssBackupComponents->Release();
 	mpVssBackupComponents = NULL;
-	return;
 }
 #endif
 
