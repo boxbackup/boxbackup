@@ -543,6 +543,7 @@ public:
 	typedef HRESULT (__stdcall IVssBackupComponents::*AsyncMethod)(IVssAsync**);
 	bool CallAndWaitForAsync(AsyncMethod method,
 		const std::string& description);
+	void CleanupVssBackupComponents();
 #endif
 };
 
