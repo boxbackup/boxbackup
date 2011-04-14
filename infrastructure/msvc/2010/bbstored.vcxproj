@@ -37,10 +37,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>..\..\..\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)..\..\..\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IntDir>..\..\..\$(Configuration)\</IntDir>
+    <IntDir>$(ProjectDir)..\..\..\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -83,6 +83,14 @@
     <ClInclude Include="..\..\..\bin\bbstored\BackupStoreContext.h" />
     <ClInclude Include="..\..\..\bin\bbstored\BackupStoreDaemon.h" />
     <ClInclude Include="..\..\..\bin\bbstored\HousekeepStoreAccount.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="common.vcxproj">
+      <Project>{a089cee6-ebf0-4232-a0c0-74850a8127a6}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libbackupstore.vcxproj">
+      <Project>{97d89aef-2be4-4e34-8703-03ba67bf4494}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
