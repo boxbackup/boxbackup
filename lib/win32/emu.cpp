@@ -451,7 +451,15 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 		return tmpStr;
 	}
 
-	if (filename.length() > 2 && filename[0] == '\\' &&
+	if (filename.length() > 4 && filename[0] == '\\' &&
+		filename[1] == '\\' && filename[2] == '?' &&
+		filename[3] == '\\')
+	{
+		// File is already in absolute utf-8 format, e.g.
+		// \\?\GLOBALROOT\...
+		tmpStr = "";
+	}
+	else if (filename.length() > 2 && filename[0] == '\\' &&
 		filename[1] == '\\')
 	{
 		tmpStr += "UNC\\";
@@ -461,13 +469,13 @@ std::string ConvertPathToAbsoluteUnicode(const char *pFileName)
 	}
 	else if (filename.length() >= 1 && filename[0] == '\\')
 	{
-		// root directory of current drive.
+		// starts with \, i.e. root directory of current drive.
 		tmpStr = wd;
 		tmpStr.resize(2); // drive letter and colon
 	}
 	else if (filename.length() >= 2 && filename[1] != ':')
 	{
-		// Must be relative. We need to get the 
+		// Must be a relative path. We need to get the 
 		// current directory to make it absolute.
 		tmpStr += wd;
 		if (tmpStr[tmpStr.length()-1] != '\\')
