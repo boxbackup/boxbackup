@@ -389,6 +389,16 @@ int BackupDaemon::Main(const std::string &rConfigFileName)
 		return RemoveService(mServiceName);
 	}
 
+#ifdef ENABLE_VSS
+	HRESULT result = CoInitialize(NULL);
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: Failed to initialize COM: " << 
+			GetMsgForHresult(result));
+		return 1;
+	}
+#endif
+
 	int returnCode;
 
 	if (mRunAsService)
@@ -989,8 +999,7 @@ void BackupDaemon::RunSyncNow()
 		}
 #endif
 
-		(*i)->mpDirectoryRecord->SyncDirectory(
-			params,
+		(*i)->mpDirectoryRecord->SyncDirectory(params,
 			BackupProtocolClientListDirectory::RootDirectory,
 			locationPath, std::string("/") + (*i)->mName);
 
@@ -1115,15 +1124,7 @@ void BackupDaemon::CreateVssBackupComponents()
 {
 	std::map<char, VSS_ID> volumesIncluded;
 
-	HRESULT result = CoInitialize(NULL);
-	if(result != S_OK)
-	{
-		BOX_ERROR("VSS: Failed to initialize COM: " << 
-			GetMsgForHresult(result));
-		return;
-	}
-
-	result = ::CreateVssBackupComponents(&mpVssBackupComponents);
+	HRESULT result = ::CreateVssBackupComponents(&mpVssBackupComponents);
 	if(result != S_OK)
 	{
 		BOX_ERROR("VSS: Failed to create backup components: " << 
@@ -1237,7 +1238,7 @@ void BackupDaemon::CreateVssBackupComponents()
 				continue;
 			}
 
-			BOX_INFO("VSS: writer " << iWriter << " component " << 
+			BOX_TRACE("VSS: writer " << iWriter << " component " << 
 				iComponent << " info:");
 			switch(pComponentInfo->type)
 			{
@@ -1248,29 +1249,29 @@ void BackupDaemon::CreateVssBackupComponents()
 				BOX_WARNING("VSS: type: unknown (" << pComponentInfo->type << ")");
 			}
 
-			BOX_INFO("VSS: logical path: " << 
+			BOX_TRACE("VSS: logical path: " << 
 				BstrToString(pComponentInfo->bstrLogicalPath));
-			BOX_INFO("VSS: component name: " << 
+			BOX_TRACE("VSS: component name: " << 
 				BstrToString(pComponentInfo->bstrComponentName));
-			BOX_INFO("VSS: caption: " << 
+			BOX_TRACE("VSS: caption: " << 
 				BstrToString(pComponentInfo->bstrCaption));
-			BOX_INFO("VSS: restore metadata: " << 
+			BOX_TRACE("VSS: restore metadata: " << 
 				pComponentInfo->bRestoreMetadata);
-			BOX_INFO("VSS: notify on complete: " << 
+			BOX_TRACE("VSS: notify on complete: " << 
 				pComponentInfo->bRestoreMetadata);
-			BOX_INFO("VSS: selectable: " << 
+			BOX_TRACE("VSS: selectable: " << 
 				pComponentInfo->bSelectable);
-			BOX_INFO("VSS: selectable for restore: " << 
+			BOX_TRACE("VSS: selectable for restore: " << 
 				pComponentInfo->bSelectableForRestore);
-			BOX_INFO("VSS: component flags: " << 
+			BOX_TRACE("VSS: component flags: " << 
 				BOX_FORMAT_HEX32(pComponentInfo->dwComponentFlags));
-			BOX_INFO("VSS: file count: " << 
+			BOX_TRACE("VSS: file count: " << 
 				pComponentInfo->cFileCount);
-			BOX_INFO("VSS: databases: " << 
+			BOX_TRACE("VSS: databases: " << 
 				pComponentInfo->cDatabases);
-			BOX_INFO("VSS: log files: " << 
+			BOX_TRACE("VSS: log files: " << 
 				pComponentInfo->cLogFiles);
-			BOX_INFO("VSS: dependencies: " << 
+			BOX_TRACE("VSS: dependencies: " << 
 				pComponentInfo->cDependencies);
 
 			pComponent->FreeComponentInfo(pComponentInfo);
@@ -1432,7 +1433,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			stateName = o.str();
 		}
 
-		BOX_INFO("VSS: Writer " << iWriter << " (" <<
+		BOX_TRACE("VSS: Writer " << iWriter << " (" <<
 			writerName << ") is in state " << stateName);
 	}
 
@@ -1503,7 +1504,12 @@ void BackupDaemon::CreateVssBackupComponents()
 		ULONG count;
 		result = pEnum->Next(1, &rgelt, &count);
 
-		if(result != S_OK && result != S_FALSE)
+		if(result == S_FALSE)
+		{
+			// end of list, break out of the loop
+			break;
+		}
+		else if(result != S_OK)
 		{
 			BOX_ERROR("VSS: Failed to enumerate snapshot: " << 
 				GetMsgForHresult(result));
