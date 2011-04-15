@@ -49,10 +49,10 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>.\;..\..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;PCREPOSIX78_EXPORTS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;PCREPOSIX78_EXPORTS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
@@ -101,10 +101,6 @@
     <ClInclude Include="pcre.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\vcres\pcreposix-dll-res.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\pcreposix78.dll.def" />
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
