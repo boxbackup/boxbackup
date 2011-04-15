@@ -61,9 +61,7 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
-    <Lib>
-      <OutputFile>$(OutDir)common.lib</OutputFile>
-    </Lib>
+    <Lib />
     <CustomBuildStep>
       <Command>perl $(ProjectDir)..\getversion.pl</Command>
     </CustomBuildStep>
@@ -73,6 +71,9 @@
     <CustomBuildStep>
       <Outputs>$(ProjectDir)..\..\..\lib\common\BoxVersion.h;%(Outputs)</Outputs>
     </CustomBuildStep>
+    <Lib>
+      <AdditionalDependencies>Ws2_32.lib;Advapi32.lib;User32.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcre.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcreposix.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
