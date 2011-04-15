@@ -1,27 +1,15 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcre78", "pcre.vcproj", "{20C9253B-00E4-414B-BE53-650D5FFCA91E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{D636B633-DBA4-4DEC-BA49-1CD9B511393F} = {D636B633-DBA4-4DEC-BA49-1CD9B511393F}
-	EndProjectSection
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual C++ Express 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcre78", "pcre.vcxproj", "{20C9253B-00E4-414B-BE53-650D5FFCA91E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dftables", "dftables.vcproj", "{D636B633-DBA4-4DEC-BA49-1CD9B511393F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dftables", "dftables.vcxproj", "{D636B633-DBA4-4DEC-BA49-1CD9B511393F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcreposix78", "pcreposix.vcproj", "{75D06D88-65BF-4ECF-8D96-22B8E35AFAC4}"
-	ProjectSection(ProjectDependencies) = postProject
-		{20C9253B-00E4-414B-BE53-650D5FFCA91E} = {20C9253B-00E4-414B-BE53-650D5FFCA91E}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcreposix78", "pcreposix.vcxproj", "{75D06D88-65BF-4ECF-8D96-22B8E35AFAC4}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcregrep", "pcregrep.vcproj", "{1F944A78-2216-42B6-B344-2FD9B02BC546}"
-	ProjectSection(ProjectDependencies) = postProject
-		{20C9253B-00E4-414B-BE53-650D5FFCA91E} = {20C9253B-00E4-414B-BE53-650D5FFCA91E}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcregrep", "pcregrep.vcxproj", "{1F944A78-2216-42B6-B344-2FD9B02BC546}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcretest", "pcretest.vcproj", "{BD550048-61C1-4B46-9BE7-6A9F71D919EB}"
-	ProjectSection(ProjectDependencies) = postProject
-		{20C9253B-00E4-414B-BE53-650D5FFCA91E} = {20C9253B-00E4-414B-BE53-650D5FFCA91E}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcretest", "pcretest.vcxproj", "{BD550048-61C1-4B46-9BE7-6A9F71D919EB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
