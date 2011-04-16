@@ -22,8 +22,9 @@ if ($newver ne $oldver)
 {
 	open VERSIONFILE, "> $basedir/lib/common/BoxVersion.h" 
 		or die "BoxVersion.h: $!";
-	print VERSIONFILE "#define BOX_VERSION \"$BoxPlatform::product_version\"\n";
+	print VERSIONFILE $newver;
 	close VERSIONFILE;
 }
 
+print $BoxPlatform::product_version;
 exit 0;
