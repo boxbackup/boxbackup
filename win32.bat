@@ -36,3 +36,6 @@ cd .\lib\server & perl ./../../lib/common/makeexception.pl.in ServerException.tx
 cd ..\..\
 
 perl -pe 's/@PERL@/perl/' ./test/bbackupd/testfiles/bbackupd.conf.in > .\test\bbackupd\testfiles\bbackupd.conf
+
+echo Generating InstallJammer configuration file
+perl infrastructure/msvc/fake-config.sub.pl ./contrib/windows/installer/boxbackup.mpi.in > ./contrib/windows/installer/boxbackup.mpi
