@@ -25,6 +25,7 @@
 
 #ifdef WIN32
 	#include <ws2tcpip.h>
+	#include <process.h>
 #endif
 
 #include <iostream>
