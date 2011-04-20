@@ -61,7 +61,7 @@ std::string BackupStoreRefCountDatabase::GetFilename(const
 	ASSERT(RootDir[RootDir.size() - 1] == '/' ||
 		RootDir[RootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 
-	std::string fn(RootDir + "refcount.db");
+	std::string fn(RootDir + REFCOUNT_FILENAME ".db");
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(rAccount.GetDiscSet()));
 	return RaidFileUtil::MakeWriteFileName(rdiscSet, fn);
