@@ -333,11 +333,6 @@ inline int ioctl(SOCKET sock, int flag,  int * something)
 	return 0;
 }
 
-extern "C" inline int getpid()
-{
-	return (int)GetCurrentProcessId();
-}
-
 inline int waitpid(pid_t pid, int *status, int)
 {
 	return 0;
@@ -377,12 +372,12 @@ int   emu_chmod  (const char* pName, mode_t mode);
 char* emu_getcwd (char* pBuffer,     int BufSize);
 int   emu_rename (const char* pOldName, const char* pNewName);
 
-#define chdir(directory)        emu_chdir  (directory)
-#define mkdir(path,     mode)   emu_mkdir  (path)
-#define unlink(file)            emu_unlink (file)
-#define utimes(buffer,  times)  emu_utimes (buffer,   times)
-#define chmod(file,     mode)   emu_chmod  (file,     mode)
-#define getcwd(buffer,  size)   emu_getcwd (buffer,   size)
+#define chdir(directory)         emu_chdir  (directory)
+#define mkdir(path,     mode)    emu_mkdir  (path)
+#define unlink(file)             emu_unlink (file)
+#define utimes(buffer,  times)   emu_utimes (buffer,   times)
+#define chmod(file,     mode)    emu_chmod  (file,     mode)
+#define getcwd(buffer,  size)    emu_getcwd (buffer,   size)
 #define rename(oldname, newname) emu_rename (oldname, newname)
 
 // Not safe to replace stat/fstat/lstat on mingw at least, as struct stat
@@ -441,6 +436,8 @@ int console_read(char* pBuffer, size_t BufferSize);
 
 // Defined thus by MinGW, but missing from MSVC
 // [http://curl.haxx.se/mail/lib-2004-11/0260.html]
+// note: chsize() doesn't work over 2GB:
+// [https://stat.ethz.ch/pipermail/r-devel/2005-May/033339.html]
 #ifndef HAVE_FTRUNCATE
 	int ftruncate(int, off_t); 
 	inline int ftruncate(int __fd, off_t __length) 
