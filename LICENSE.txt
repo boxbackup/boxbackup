@@ -1,0 +1,79 @@
+Box Backup, http://www.boxbackup.org/
+
+Copyright (c) 2003-2010, Ben Summers and contributors.
+All rights reserved.
+
+The license of the code was changed on 23-Jan-2010 in order to meet the
+Fedora Project's definition of Free Software, and therefore allow inclusion
+in Fedora, Red Hat Linux and CentOS. This also solves a long-standing
+incompatibility with the GNU Readline library that prevented us from
+distributing Box Backup binaries compiled against that library. You can
+review our discussions of the change in the mailing list archives at:
+http://lists.boxbackup.org/pipermail/boxbackup/2010-January/000005.html
+
+Note that this project uses mixed licensing. Different parts of the project
+may be used and distributed under different licenses, as described below.
+The two licenses used are "Box Backup GPL" and a BSD-style license.
+
+For full details of the license, please read the included COPYING.txt file.
+
+Unless stated otherwise in the file, all files in the following directories
+fall under the "Box Backup GPL" license, described below:
+
+bin/bbackupctl
+bin/bbackupd
+bin/bbackupobjdump
+bin/bbackupquery
+bin/bbstoreaccounts
+bin/bbstored
+bin/s3simulator
+lib/backupclient
+lib/backupstore
+test/backupdiff
+test/backupstore
+test/backupstorefix
+test/backupstorepatch
+test/bbackupd
+contrib/bbadmin
+contrib/bbreporter
+contrib/cygwin
+contrib/debian
+contrib/mac_osx
+contrib/redhat
+contrib/rpm
+contrib/solaris
+contrib/suse
+contrib/windows
+distribution/boxbackup
+
+The "Box Backup GPL" license text may be found in the file
+LICENSE-GPL.txt, or online at:
+[https://www.boxbackup.org/svn/box/trunk/LICENSE-GPL.txt]
+
+Unless stated otherwise in the file, all files in the following directories
+are dual licensed under the BSD and GPL licenses. You may use and distribute
+them providing that you comply EITHER with the terms of the BSD license,
+OR the GPL license. It is not necessary to comply with both licenses,
+only one.
+
+lib/common
+lib/compress
+lib/crypto
+lib/httpserver
+lib/intercept
+lib/raidfile
+lib/server
+lib/win32
+test/basicserver
+test/common
+test/compress
+test/crypto
+test/httpserver
+test/raidfile
+test/win32
+infrastructure
+distribution
+
+The dual license text may be found in the file
+LICENSE-DUAL.txt, or online at:
+[https://www.boxbackup.org/svn/box/trunk/LICENSE-DUAL.txt]
