@@ -22,6 +22,9 @@
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
+#ifdef WIN32
+	#include <process.h>
+#endif
 
 #include <cstring>
 #include <iomanip>
