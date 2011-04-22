@@ -107,6 +107,8 @@ int FdGetLine::ReadMore(int Timeout)
 	{
 		mPendingEOF = true;
 	}
+
+	return bytes;
 }
 
 
