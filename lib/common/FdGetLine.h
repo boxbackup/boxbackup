@@ -12,19 +12,7 @@
 
 #include <string>
 
-#ifdef BOX_RELEASE_BUILD
-	#define FDGETLINE_BUFFER_SIZE		1024
-#elif defined WIN32
-	// need enough space for at least one unicode character 
-	// in UTF-8 when calling console_read() from bbackupquery
-	#define FDGETLINE_BUFFER_SIZE		5
-#else
-	#define FDGETLINE_BUFFER_SIZE		4
-#endif
-
-// Just a very large upper bound for line size to avoid
-// people sending lots of data over sockets and causing memory problems.
-#define FDGETLINE_MAX_LINE_SIZE			(1024*256)
+#include "GetLine.h"
 
 // --------------------------------------------------------------------------
 //
@@ -34,7 +22,7 @@
 //		Created: 2003/07/24
 //
 // --------------------------------------------------------------------------
-class FdGetLine
+class FdGetLine : public GetLine
 {
 public:
 	FdGetLine(int fd);
@@ -43,22 +31,19 @@ private:
 	FdGetLine(const FdGetLine &rToCopy);
 
 public:
-	std::string GetLine(bool Preprocess = false);
-	bool IsEOF() {return mEOF;}
-	int GetLineNumber() {return mLineNumber;}
-	
+	virtual std::string GetLine(bool Preprocess = false);
 	// Call to detach, setting file pointer correctly to last bit read.
 	// Only works for lseek-able file descriptors.
 	void DetachFile();
-	
+	// if we read 0 bytes from an fd, it must be end of stream,
+	// because we don't support timeouts
+	virtual bool IsStreamDataLeft() { return false; }
+
+protected:
+	int ReadMore(int Timeout = IOStream::TimeOutInfinite);
+
 private:
-	char mBuffer[FDGETLINE_BUFFER_SIZE];
 	int mFileHandle;
-	int mLineNumber;
-	int mBufferBegin;
-	int mBytesInBuffer;
-	bool mPendingEOF;
-	bool mEOF;
 };
 
 #endif // FDGETLINE__H

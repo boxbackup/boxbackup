@@ -13,13 +13,6 @@
 
 #include "MemLeakFindOn.h"
 
-// utility whitespace function
-inline bool iw(int c)
-{
-	return (c == ' ' || c == '\t' || c == '\v' || c == '\f'); // \r, \n are already excluded
-}
-
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -29,12 +22,7 @@ inline bool iw(int c)
 //
 // --------------------------------------------------------------------------
 IOStreamGetLine::IOStreamGetLine(IOStream &Stream)
-	: mrStream(Stream),
-	  mLineNumber(0),
-	  mBufferBegin(0),
-	  mBytesInBuffer(0),
-	  mPendingEOF(false),
-	  mEOF(false)
+: mrStream(Stream)
 {
 }
 
@@ -66,123 +54,30 @@ IOStreamGetLine::~IOStreamGetLine()
 // --------------------------------------------------------------------------
 bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout)
 {
-	// EOF?
-	if(mEOF) {THROW_EXCEPTION(CommonException, GetLineEOF)}
+	return GetLineInternal(rOutput, Preprocess, Timeout);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    IOStreamGetLine::ReadMore()
+//		Purpose: Read more bytes from the handle, possible the
+//			 console, into mBuffer and return the number of
+//			 bytes read, 0 on EOF or -1 on error.
+//		Created: 2011/04/22
+//
+// --------------------------------------------------------------------------
+int IOStreamGetLine::ReadMore(int Timeout)
+{
+	int bytes = mrStream.Read(mBuffer, sizeof(mBuffer), Timeout);
 	
-	// Initialise string to stored into
-	std::string r(mPendingString);
-	mPendingString.erase();
-
-	bool foundLineEnd = false;
-
-	while(!foundLineEnd && !mEOF)
+	if(!mrStream.StreamDataLeft())
 	{
-		// Use any bytes left in the buffer
-		while(mBufferBegin < mBytesInBuffer)
-		{
-			int c = mBuffer[mBufferBegin++];
-			if(c == '\r')
-			{
-				// Ignore nasty Windows line ending extra chars
-			}
-			else if(c == '\n')
-			{
-				// Line end!
-				foundLineEnd = true;
-				break;
-			}
-			else
-			{
-				// Add to string
-				r += c;
-			}
-			
-			// Implicit line ending at EOF
-			if(mBufferBegin >= mBytesInBuffer && mPendingEOF)
-			{
-				foundLineEnd = true;
-			}
-		}
-		
-		// Check size
-		if(r.size() > IOSTREAMGETLINE_MAX_LINE_SIZE)
-		{
-			THROW_EXCEPTION(CommonException, GetLineTooLarge)
-		}
-		
-		// Read more in?
-		if(!foundLineEnd && mBufferBegin >= mBytesInBuffer && !mPendingEOF)
-		{
-			int bytes = mrStream.Read(mBuffer, sizeof(mBuffer), Timeout);
-			
-			// Adjust buffer info
-			mBytesInBuffer = bytes;
-			mBufferBegin = 0;
-			
-			// EOF / closed?
-			if(!mrStream.StreamDataLeft())
-			{
-				mPendingEOF = true;
-			}
-			
-			// No data returned?
-			if(bytes == 0 && mrStream.StreamDataLeft())
-			{
-				// store string away
-				mPendingString = r;
-				// Return false;
-				return false;
-			}
-		}
-		
-		// EOF?
-		if(mPendingEOF && mBufferBegin >= mBytesInBuffer)
-		{
-			// File is EOF, and now we've depleted the buffer completely, so tell caller as well.
-			mEOF = true;
-		}
+		mPendingEOF = true;
 	}
 
-	if(!Preprocess)
-	{
-		rOutput = r;
-		return true;
-	}
-	else
-	{
-		// Check for comment char, but char before must be whitespace
-		int end = 0;
-		int size = r.size();
-		while(end < size)
-		{
-			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
-			{
-				break;
-			}
-			end++;
-		}
-		
-		// Remove whitespace
-		int begin = 0;
-		while(begin < size && iw(r[begin]))
-		{
-			begin++;
-		}
-
-		if(end < size && !iw(r[end]))
-		{
-			end--;
-		}
-
-		while(end > begin && end < size && iw(r[end]))
-		{
-			end--;
-		}
-		
-		// Return a sub string
-		rOutput = r.substr(begin, end - begin + 1);
-		return true;
-	}
+	return bytes;	
 }
 
 

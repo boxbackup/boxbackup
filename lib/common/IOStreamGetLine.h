@@ -12,17 +12,8 @@
 
 #include <string>
 
+#include "GetLine.h"
 #include "IOStream.h"
-
-#ifdef BOX_RELEASE_BUILD
-	#define IOSTREAMGETLINE_BUFFER_SIZE		1024
-#else
-	#define IOSTREAMGETLINE_BUFFER_SIZE		4
-#endif
-
-// Just a very large upper bound for line size to avoid
-// people sending lots of data over sockets and causing memory problems.
-#define IOSTREAMGETLINE_MAX_LINE_SIZE			(1024*256)
 
 // --------------------------------------------------------------------------
 //
@@ -32,7 +23,7 @@
 //		Created: 2003/07/24
 //
 // --------------------------------------------------------------------------
-class IOStreamGetLine
+class IOStreamGetLine : public GetLine
 {
 public:
 	IOStreamGetLine(IOStream &Stream);
@@ -42,12 +33,15 @@ private:
 
 public:
 	bool GetLine(std::string &rOutput, bool Preprocess = false, int Timeout = IOStream::TimeOutInfinite);
-	bool IsEOF() {return mEOF;}
-	int GetLineNumber() {return mLineNumber;}
 	
 	// Call to detach, setting file pointer correctly to last bit read.
 	// Only works for lseek-able file descriptors.
 	void DetachFile();
+	
+	virtual bool IsStreamDataLeft()
+	{
+		return mrStream.StreamDataLeft();
+	}
 	
 	// For doing interesting stuff with the remaining data...
 	// Be careful with this!
@@ -55,16 +49,12 @@ public:
 	int GetSizeOfBufferedData() const {return mBytesInBuffer - mBufferBegin;}
 	void IgnoreBufferedData(int BytesToIgnore);
 	IOStream &GetUnderlyingStream() {return mrStream;}
+
+protected:
+	int ReadMore(int Timeout = IOStream::TimeOutInfinite);
 	
 private:
-	char mBuffer[IOSTREAMGETLINE_BUFFER_SIZE];
 	IOStream &mrStream;
-	int mLineNumber;
-	int mBufferBegin;
-	int mBytesInBuffer;
-	bool mPendingEOF;
-	bool mEOF;
-	std::string mPendingString;
 };
 
 #endif // IOSTREAMGETLINE__H
