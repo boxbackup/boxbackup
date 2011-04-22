@@ -1298,7 +1298,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	{
 		Location& rLocation(**iLocation);
 		std::string path = rLocation.mPath;
-		// convert to absolute and remove leading \\?\ 
+		// convert to absolute and remove Unicode prefix
 		path = ConvertPathToAbsoluteUnicode(path.c_str()).substr(4);
 
 		if(path.length() >= 3 && path[1] == ':' && path[2] == '\\')
