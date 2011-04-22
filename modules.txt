@@ -11,7 +11,7 @@
 
 lib/raidfile
 lib/crypto
-lib/server
+lib/server		qdbm
 lib/compress
 lib/intercept
 
