@@ -69,3 +69,4 @@ IncompatibleFromAndDiffFiles	65	Attempt to use a diff and a from file together, 
 DiffFromIDNotFoundInDirectory	66	When uploading via a diff, the diff from file must be in the same directory
 PatchChainInfoBadInDirectory	67	A directory contains inconsistent information. Run bbstoreaccounts check to fix it.
 UnknownObjectRefCountRequested	68	A reference count was requested for an object whose reference count is not known.
+MultiplyReferencedObject	69	Attempted to modify an object with multiple references, should be uncloned first
