@@ -30,18 +30,21 @@
 
 #include "MemLeakFindOn.h"
 
-#define CHECK_PHASE(phase)																						\
-	if(rContext.GetPhase() != BackupStoreContext::phase)																\
-	{																											\
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(										\
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_NotInRightProtocolPhase));		\
+#define PROTOCOL_ERROR(code) \
+	std::auto_ptr<ProtocolObject>(new BackupProtocolServerError( \
+		BackupProtocolServerError::ErrorType, \
+		BackupProtocolServerError::code));
+
+#define CHECK_PHASE(phase) \
+	if(rContext.GetPhase() != BackupStoreContext::phase) \
+	{ \
+		return PROTOCOL_ERROR(Err_NotInRightProtocolPhase); \
 	}
 
-#define CHECK_WRITEABLE_SESSION																					\
-	if(rContext.SessionIsReadOnly())																			\
-	{																											\
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(										\
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_SessionReadOnly));				\
+#define CHECK_WRITEABLE_SESSION \
+	if(rContext.SessionIsReadOnly()) \
+	{ \
+		return PROTOCOL_ERROR(Err_SessionReadOnly); \
 	}
 
 // --------------------------------------------------------------------------
@@ -59,8 +62,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerVersion::DoCommand(BackupProto
 	// Correct version?
 	if(mVersion != BACKUP_STORE_SERVER_VERSION)
 	{
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_WrongVersion));
+		return PROTOCOL_ERROR(Err_WrongVersion);
 	}
 
 	// Mark the next phase
@@ -89,10 +91,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 		BOX_WARNING("Failed login from client ID " << 
 			BOX_FORMAT_ACCOUNT(mClientID) <<
 			": wrong certificate for this account");
-		return std::auto_ptr<ProtocolObject>(
-			new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType,
-				BackupProtocolServerError::Err_BadLogin));
+		return PROTOCOL_ERROR(Err_BadLogin);
 	}
 
 	if(!rContext.GetClientHasAccount())
@@ -100,10 +99,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 		BOX_WARNING("Failed login from client ID " << 
 			BOX_FORMAT_ACCOUNT(mClientID) <<
 			": no such account on this server");
-		return std::auto_ptr<ProtocolObject>(
-			new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType,
-				BackupProtocolServerError::Err_BadLogin));
+		return PROTOCOL_ERROR(Err_BadLogin);
 	}
 
 	// If we need to write, check that nothing else has got a write lock
@@ -114,10 +110,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerLogin::DoCommand(BackupProtoco
 		{
 			BOX_WARNING("Failed to get write lock for Client ID " <<
 				BOX_FORMAT_ACCOUNT(mClientID));
-			return std::auto_ptr<ProtocolObject>(
-				new BackupProtocolServerError(
-					BackupProtocolServerError::ErrorType,
-					BackupProtocolServerError::Err_CannotLockStoreForWriting));			
+			return PROTOCOL_ERROR(Err_CannotLockStoreForWriting);
 		}
 		
 		// Debug: check we got the lock
@@ -197,10 +190,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerListDirectory::DoCommand(Backu
 	{
 		if (e.GetSubType() == RaidFileException::RaidFileDoesntExist)
 		{
-			return std::auto_ptr<ProtocolObject>(
-				new BackupProtocolServerError(
-					BackupProtocolServerError::ErrorType,
-					BackupProtocolServerError::Err_DoesNotExist));
+			return PROTOCOL_ERROR(Err_DoesNotExist);
 		}
 		throw;
 	}
@@ -237,10 +227,10 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerStoreFile::DoCommand(BackupPro
 	// Check that the diff from file actually exists, if it's specified
 	if(mDiffFromFileID != 0)
 	{
-		if(!rContext.ObjectExists(mDiffFromFileID, BackupStoreContext::ObjectExists_File))
+		if(!rContext.ObjectExists(mDiffFromFileID,
+			BackupStoreContext::ObjectExists_File))
 		{
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DiffFromFileDoesNotExist));	
+			return PROTOCOL_ERROR(Err_DiffFromFileDoesNotExist);
 		}
 	}
 	
@@ -251,20 +241,20 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerStoreFile::DoCommand(BackupPro
 	int64_t id = 0;
 	try
 	{
-		id = rContext.AddFile(*dirstream, mDirectoryObjectID, mModificationTime, mAttributesHash, mDiffFromFileID,
-			 mFilename, true /* mark files with same name as old versions */);
+		id = rContext.AddFile(*dirstream, mDirectoryObjectID,
+			mModificationTime, mAttributesHash, mDiffFromFileID,
+			mFilename,
+			true /* mark files with same name as old versions */);
 	}
 	catch(BackupStoreException &e)
 	{
 		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
 		{
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_FileDoesNotVerify));			
+			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
 		}
 		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
 		{
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_StorageLimitExceeded));			
+			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
 		}
 		else
 		{
@@ -324,8 +314,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 	if(!rContext.ObjectExists(mObjectID)
 		|| !rContext.ObjectExists(mInDirectory))
 	{
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DoesNotExist));			
+		return PROTOCOL_ERROR(Err_DoesNotExist);
 	}
 
 	// Get the directory it's in
@@ -335,8 +324,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 	BackupStoreDirectory::Entry *pfileEntry = rdir.FindEntryByID(mObjectID);
 	if(pfileEntry == 0)
 	{
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DoesNotExistInDirectory));			
+		return PROTOCOL_ERROR(Err_DoesNotExistInDirectory);
 	}
 
 	// The result
@@ -364,10 +352,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 					" references object " << 
 					BOX_FORMAT_OBJECTID(id) <<
 					" which does not exist in dir");
-				return std::auto_ptr<ProtocolObject>(
-					new BackupProtocolServerError(
-						BackupProtocolServerError::ErrorType,
-						BackupProtocolServerError::Err_PatchConsistencyError));			
+				return PROTOCOL_ERROR(Err_PatchConsistencyError);
 			}
 			id = en->GetDependsNewer();
 		}
@@ -449,8 +434,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerGetFile::DoCommand(BackupProto
 		// Verify it
 		if(!BackupStoreFile::VerifyEncodedFileFormat(buf))
 		{
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_FileDoesNotVerify));			
+			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
 		}
 		
 		// Reset stream -- seek to beginning
@@ -504,8 +488,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerCreateDirectory::DoCommand(Bac
 	if(rContext.HardLimitExceeded())
 	{
 		// Won't allow creation if the limit has been exceeded
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_StorageLimitExceeded));			
+		return PROTOCOL_ERROR(Err_StorageLimitExceeded);
 	}
 
 	bool alreadyExists = false;
@@ -513,8 +496,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerCreateDirectory::DoCommand(Bac
 	
 	if(alreadyExists)
 	{
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DirectoryAlreadyExists));			
+		return PROTOCOL_ERROR(Err_DirectoryAlreadyExists);
 	}
 
 	// Tell the caller what the file was
@@ -576,8 +558,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerSetReplacementFileAttributes::
 	if(!rContext.ChangeFileAttributes(mFilename, mInDirectory, attr, mAttributesHash, objectID))
 	{
 		// Didn't exist
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DoesNotExist));			
+		return PROTOCOL_ERROR(Err_DoesNotExist);
 	}
 
 	// Tell the caller what the file was
@@ -648,12 +629,23 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerDeleteDirectory::DoCommand(Bac
 	// Check it's not asking for the root directory to be deleted
 	if(mObjectID == BACKUPSTORE_ROOT_DIRECTORY_ID)
 	{
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_CannotDeleteRoot));			
+		return PROTOCOL_ERROR(Err_CannotDeleteRoot);
 	}
 
 	// Context handles this
-	rContext.DeleteDirectory(mObjectID);
+	try
+	{
+		rContext.DeleteDirectory(mObjectID);
+	}
+	catch (BackupStoreException &e)
+	{
+		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
+		{
+			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
+		}
+		
+		throw;
+	}
 
 	// return the object ID
 	return std::auto_ptr<ProtocolObject>(new BackupProtocolServerSuccess(mObjectID));
@@ -676,8 +668,7 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerUndeleteDirectory::DoCommand(B
 	// Check it's not asking for the root directory to be deleted
 	if(mObjectID == BACKUPSTORE_ROOT_DIRECTORY_ID)
 	{
-		return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-			BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_CannotDeleteRoot));			
+		return PROTOCOL_ERROR(Err_CannotDeleteRoot);
 	}
 
 	// Context handles this
@@ -732,13 +723,11 @@ std::auto_ptr<ProtocolObject> BackupProtocolServerMoveObject::DoCommand(BackupPr
 	{
 		if(e.GetSubType() == BackupStoreException::CouldNotFindEntryInDirectory)
 		{
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_DoesNotExist));			
+			return PROTOCOL_ERROR(Err_DoesNotExist);
 		}
 		else if(e.GetSubType() == BackupStoreException::NameAlreadyExistsInDirectory)
 		{
-			return std::auto_ptr<ProtocolObject>(new BackupProtocolServerError(
-				BackupProtocolServerError::ErrorType, BackupProtocolServerError::Err_TargetNameExists));			
+			return PROTOCOL_ERROR(Err_TargetNameExists);
 		}
 		else
 		{
