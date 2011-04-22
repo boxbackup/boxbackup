@@ -28,6 +28,8 @@
 	#include <process.h>
 #endif
 
+#include "depot.h"
+
 #include <iostream>
 
 #include "Daemon.h"
@@ -111,6 +113,7 @@ void Daemon::Usage()
 {
 	std::cout << 
 	DaemonBanner() << "\n"
+	"(built with QDBM " << dpversion << ")\n"
 	"\n"
 	"Usage: " << mAppName << " [options] [config file]\n"
 	"\n"
