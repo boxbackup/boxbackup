@@ -20,13 +20,6 @@
 
 #include "MemLeakFindOn.h"
 
-// utility whitespace function
-inline bool iw(int c)
-{
-	return (c == ' ' || c == '\t' || c == '\v' || c == '\f'); // \r, \n are already excluded
-}
-
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -36,12 +29,7 @@ inline bool iw(int c)
 //
 // --------------------------------------------------------------------------
 FdGetLine::FdGetLine(int fd)
-	: mFileHandle(fd),
-	  mLineNumber(0),
-	  mBufferBegin(0),
-	  mBytesInBuffer(0),
-	  mPendingEOF(false),
-	  mEOF(false)
+: mFileHandle(fd)
 {
 	if(mFileHandle < 0) {THROW_EXCEPTION(CommonException, BadArguments)}
 	//printf("FdGetLine buffer size = %d\n", sizeof(mBuffer));
@@ -74,130 +62,50 @@ FdGetLine::~FdGetLine()
 std::string FdGetLine::GetLine(bool Preprocess)
 {
 	if(mFileHandle == -1) {THROW_EXCEPTION(CommonException, GetLineNoHandle)}
-
-	// EOF?
-	if(mEOF) {THROW_EXCEPTION(CommonException, GetLineEOF)}
 	
 	std::string r;
+	bool result = GetLineInternal(r, Preprocess);
 
-	bool foundLineEnd = false;
-
-	while(!foundLineEnd && !mEOF)
+	if(!result)
 	{
-		// Use any bytes left in the buffer
-		while(mBufferBegin < mBytesInBuffer)
-		{
-			int c = mBuffer[mBufferBegin++];
-			if(c == '\r')
-			{
-				// Ignore nasty Windows line ending extra chars
-			}
-			else if(c == '\n')
-			{
-				// Line end!
-				foundLineEnd = true;
-				break;
-			}
-			else
-			{
-				// Add to string
-				r += c;
-			}
-			
-			// Implicit line ending at EOF
-			if(mBufferBegin >= mBytesInBuffer && mPendingEOF)
-			{
-				foundLineEnd = true;
-			}
-		}
-		
-		// Check size
-		if(r.size() > FDGETLINE_MAX_LINE_SIZE)
-		{
-			THROW_EXCEPTION(CommonException, GetLineTooLarge)
-		}
-		
-		// Read more in?
-		if(!foundLineEnd && mBufferBegin >= mBytesInBuffer && !mPendingEOF)
-		{
-#ifdef WIN32
-			int bytes;
-
-			if (mFileHandle == _fileno(stdin))
-			{
-				bytes = console_read(mBuffer, sizeof(mBuffer));
-			}
-			else
-			{
-				bytes = ::read(mFileHandle, mBuffer, 
-					sizeof(mBuffer));
-			}
-#else // !WIN32
-			int bytes = ::read(mFileHandle, mBuffer, sizeof(mBuffer));
-#endif // WIN32
-			
-			// Error?
-			if(bytes == -1)
-			{
-				THROW_EXCEPTION(CommonException, OSFileError)
-			}
-			
-			// Adjust buffer info
-			mBytesInBuffer = bytes;
-			mBufferBegin = 0;
-			
-			// EOF / closed?
-			if(bytes == 0)
-			{
-				mPendingEOF = true;
-			}
-		}
-		
-		// EOF?
-		if(mPendingEOF && mBufferBegin >= mBytesInBuffer)
-		{
-			// File is EOF, and now we've depleted the buffer completely, so tell caller as well.
-			mEOF = true;
-		}
+		// should never fail for FdGetLine
+		THROW_EXCEPTION(CommonException, Internal);
 	}
+	
+	return r;
+}
 
-	if(!Preprocess)
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    FdGetLine::ReadMore()
+//		Purpose: Read more bytes from the handle, possible the
+//			 console, into mBuffer and return the number of
+//			 bytes read, 0 on EOF or -1 on error.
+//		Created: 2011/04/22
+//
+// --------------------------------------------------------------------------
+int FdGetLine::ReadMore(int Timeout)
+{
+	int bytes;
+	
+#ifdef WIN32
+	if (mFileHandle == _fileno(stdin))
 	{
-		return r;
+		bytes = console_read(mBuffer, sizeof(mBuffer));
 	}
 	else
 	{
-		// Check for comment char, but char before must be whitespace
-		int end = 0;
-		int size = r.size();
-		while(end < size)
-		{
-			if(r[end] == '#' && (end == 0 || (iw(r[end-1]))))
-			{
-				break;
-			}
-			end++;
-		}
-		
-		// Remove whitespace
-		int begin = 0;
-		while(begin < size && iw(r[begin]))
-		{
-			begin++;
-		}
+		bytes = ::read(mFileHandle, mBuffer, sizeof(mBuffer));
+	}
+#else // !WIN32
+	bytes = ::read(mFileHandle, mBuffer, sizeof(mBuffer));
+#endif // WIN32
 
-		if(end < size && !iw(r[end]))
-		{
-			end--;
-		}
-
-		while(end > begin && end < size && iw(r[end]))
-		{
-			end--;
-		}
-		
-		// Return a sub string
-		return r.substr(begin, end - begin + 1);
+	if(bytes == 0)
+	{
+		mPendingEOF = true;
 	}
 }
 
@@ -207,7 +115,7 @@ std::string FdGetLine::GetLine(bool Preprocess)
 // Function
 //		Name:    FdGetLine::DetachFile()
 //		Purpose: Detaches the file handle, setting the file pointer correctly.
-//				 Probably not good for sockets...
+//			 Probably not good for sockets...
 //		Created: 2003/07/24
 //
 // --------------------------------------------------------------------------
@@ -229,5 +137,4 @@ void FdGetLine::DetachFile()
 	// Unset file pointer
 	mFileHandle = -1;
 }
-
 
