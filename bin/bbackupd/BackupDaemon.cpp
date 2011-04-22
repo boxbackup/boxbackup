@@ -1326,6 +1326,7 @@ void BackupDaemon::CreateVssBackupComponents()
 					volumesIncluded[path[0]] = newVolumeId;
 					rLocation.mSnapshotVolumeId = newVolumeId;
 					rLocation.mIsSnapshotCreated = true;
+					rLocation.mSnapshotPath = path;
 				}
 				else
 				{
@@ -1446,32 +1447,13 @@ void BackupDaemon::CreateVssBackupComponents()
 		Location& rLocation(**iLocation);
 		if(rLocation.mIsSnapshotCreated)
 		{
-			std::string path = rLocation.mPath;
-			// convert to absolute and remove leading \\?\ 
-			path = ConvertPathToAbsoluteUnicode(path.c_str());
-			std::string volume = path.substr(4, 3);
-			path = path.substr(7);
-			char driveLetter = volume[0];
-
-			std::map<char, VSS_ID>::iterator iVssId =
-				volumesIncluded.find(driveLetter);
-
-			if(iVssId == volumesIncluded.end())
-			{
-				BOX_ERROR("VSS: Failed to find snapshot ID for "
-					"volume " << volume << " for location " <<
-					rLocation.mPath);
-				rLocation.mIsSnapshotCreated = false;
-				continue;
-			}
-
 			VSS_SNAPSHOT_PROP prop;
-			result = mpVssBackupComponents->GetSnapshotProperties(iVssId->second,
-				&prop);
+			result = mpVssBackupComponents->GetSnapshotProperties(
+				rLocation.mSnapshotVolumeId, &prop);
 			if(result != S_OK)
 			{
 				BOX_ERROR("VSS: Failed to get snapshot properties "
-					"for volume " << GuidToString(iVssId->second) <<
+					"for volume " << GuidToString(rLocation.mSnapshotVolumeId) <<
 					" for location " << rLocation.mPath << ": " <<
 					GetMsgForHresult(result));
 				rLocation.mIsSnapshotCreated = false;
@@ -1480,7 +1462,7 @@ void BackupDaemon::CreateVssBackupComponents()
 
 			rLocation.mSnapshotPath =
 				WideStringToString(prop.m_pwszSnapshotDeviceObject) +
-				DIRECTORY_SEPARATOR + path;
+				DIRECTORY_SEPARATOR + rLocation.mSnapshotPath;
 			FreeSnapshotProp(&prop);
 
 			BOX_INFO("VSS: Location " << rLocation.mPath << " using "
