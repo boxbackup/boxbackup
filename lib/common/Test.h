@@ -132,7 +132,10 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 	TEST_THAT(_condition); \
 	if (!(_condition)) \
 	{ \
-		printf("Test failed on <%s>\n", _line.c_str()); \
+		std::ostringstream _ossl; \
+		_ossl << _line; \
+		std::string _line_str = _ossl.str(); \
+		printf("Test failed on <%s>\n", _line_str.c_str()); \
 	}
 
 bool TestFileExists(const char *Filename);
