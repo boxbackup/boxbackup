@@ -404,8 +404,10 @@ int test(int argc, const char *argv[])
   		{
 	  		TEST_THAT(!getline.IsEOF());
 	  		std::string line = getline.GetLine(true);
-	  		//printf("expected |%s| got |%s|\n", lines[l], line.c_str());
-	  		TEST_THAT(strcmp(testfilelines[l], line.c_str()) == 0);
+	  		printf("expected |%s| got |%s|\n", testfilelines[l],
+				line.c_str());
+	  		TEST_LINE(strcmp(testfilelines[l], line.c_str()) == 0,
+				line);
 	  		l++;
   		}
   		TEST_THAT(getline.IsEOF());
@@ -455,8 +457,10 @@ int test(int argc, const char *argv[])
 	  		std::string line;
 	  		while(!getline.GetLine(line, true))
 	  			;
-	  		//printf("expected |%s| got |%s|\n", lines[l], line.c_str());
-	  		TEST_THAT(strcmp(testfilelines[l], line.c_str()) == 0);
+	  		printf("expected |%s| got |%s|\n", testfilelines[l],
+				line.c_str());
+	  		TEST_LINE(strcmp(testfilelines[l], line.c_str()) == 0,
+				line);
 	  		l++;
   		}
   		TEST_THAT(getline.IsEOF());
