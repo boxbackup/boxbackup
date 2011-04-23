@@ -331,8 +331,8 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			bool hadTimeout = false;
 			while(!getline[c]->GetLine(rep, false, COMMS_READ_TIMEOUT))
 				hadTimeout = true;
-			TEST_THAT(rep == recieve[q]);
-			TEST_THAT(hadTimeout)
+			TEST_EQUAL_LINE(rep, recieve[q], "Line " << q);
+			TEST_LINE(hadTimeout, "Line " << q)
 		}
 	}
 	for(unsigned int c = 0; c < conns.size(); ++c)
