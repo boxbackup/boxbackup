@@ -518,7 +518,9 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 				22011);
 			BackupProtocolClient protocol(conn);
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-			std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, BackupProtocolClientLogin::Flags_ReadOnly));
+			std::auto_ptr<BackupProtocolClientLoginConfirmed>
+				loginConf(protocol.QueryLogin(0x01234567,
+					BackupProtocolClientLogin::Flags_ReadOnly));
 			
 			// Test the restoration
 			TEST_THAT(BackupClientRestore(protocol, restoredirid,
