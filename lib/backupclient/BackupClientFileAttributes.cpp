@@ -582,8 +582,9 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				if(valueSize<0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to get "
-						"extended attributes size "
-						"for '" << Filename << "'");
+						"extended attribute size of "
+						"'" << Filename << "': " <<
+						attrKey);
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
 
@@ -600,8 +601,9 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				if(valueSize<0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to get "
-						"extended attributes for " 
-						"'" << Filename << "'");
+						"extended attribute of " 
+						"'" << Filename << "': " <<
+						attrKey);
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
 				xattrSize += valueSize;
