@@ -9,6 +9,6 @@ link-extra: ../../bin/bbackupd/autogen_ClientException.o \
 	../../bin/bbstored/BackupStoreContext.o \
 	../../bin/bbstored/BBStoreDHousekeeping.o \
 	../../bin/bbstored/HousekeepStoreAccount.o \
-	../../bin/bbstored/autogen_BackupProtocolServer.o \
+	../../lib/backupstore/autogen_BackupProtocolServer.o \
 	../../bin/bbstored/BackupCommands.o \
 	../../bin/bbstored/BackupStoreDaemon.o

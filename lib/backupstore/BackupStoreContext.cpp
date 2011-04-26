@@ -13,7 +13,6 @@
 
 #include "BackupConstants.h"
 #include "BackupStoreContext.h"
-#include "BackupStoreDaemon.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
@@ -28,8 +27,9 @@
 #include "RaidFileWrite.h"
 #include "StoreStructure.h"
 
-#include "MemLeakFindOn.h"
+class BackupStoreDaemon;
 
+#include "MemLeakFindOn.h"
 
 // Maximum number of directories to keep in the cache
 // When the cache is bigger than this, everything gets

@@ -25,8 +25,8 @@ test/basicserver	lib/server
 
 # Backup system
 
-lib/backupclient	lib/server	lib/crypto	lib/compress
-lib/backupstore		lib/server	lib/raidfile	lib/backupclient
+lib/backupstore		lib/server	lib/raidfile	lib/crypto	lib/compress
+lib/backupclient	lib/backupstore
 
 bin/bbackupobjdump	lib/backupclient lib/backupstore
 bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient
