@@ -346,7 +346,8 @@ for my $mod (@modules, @implicit_deps)
 	for(grep /\.h\Z/i, @items)
 	{
 		next if /\A\._/;	# Temp Mac OS Resource hack
-		die "Header file $_ already used in module ".$hfiles{$_}."\n" if exists $hfiles{$_};
+		die "Header file $_ already used in module ".$hfiles{$_}.
+			", cannot add to $mod\n" if exists $hfiles{$_};
 		$hfiles{$_} = $mod
 	}
 }
