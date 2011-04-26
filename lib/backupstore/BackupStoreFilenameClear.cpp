@@ -59,8 +59,8 @@ BackupStoreFilenameClear::BackupStoreFilenameClear(const std::string &rToEncode)
 //
 // --------------------------------------------------------------------------
 BackupStoreFilenameClear::BackupStoreFilenameClear(const BackupStoreFilenameClear &rToCopy)
-	: BackupStoreFilename(rToCopy),
-	  mClearFilename(rToCopy.mClearFilename)
+: BackupStoreFilename(rToCopy),
+  mClearFilename(rToCopy.mClearFilename)
 {
 }
 
@@ -73,7 +73,7 @@ BackupStoreFilenameClear::BackupStoreFilenameClear(const BackupStoreFilenameClea
 //
 // --------------------------------------------------------------------------
 BackupStoreFilenameClear::BackupStoreFilenameClear(const BackupStoreFilename &rToCopy)
-	: BackupStoreFilename(rToCopy)
+: BackupStoreFilename(rToCopy)
 {
 	// Will get a clear filename when it's required
 }
@@ -111,6 +111,18 @@ const std::string &BackupStoreFilenameClear::GetClearFilename() const
 {
 	MakeClearAvailable();
 	return mClearFilename;
+}
+const std::string &BackupStoreFilenameClear::GetClearFilenameIfPossible(const std::string& alternative) const
+{
+	if(mClearFilename.empty() && !(sBlowfishDecrypt.IsInitialised()))
+	{
+		// encrypted and cannot decrypt
+		return alternative;
+	}
+	else
+	{
+		return GetClearFilename();
+	}
 }
 #endif
 
@@ -167,7 +179,7 @@ void BackupStoreFilenameClear::MakeClearAvailable() const
 	switch(encoding)
 	{
 	case Encoding_Clear:
-		BOX_TRACE("**** BackupStoreFilename encoded with "
+		BOX_WARNING("**** BackupStoreFilename encoded with "
 			"Clear encoding ****");
 		mClearFilename.assign(GetEncodedFilename().c_str() + 2,
 			size - 2);
