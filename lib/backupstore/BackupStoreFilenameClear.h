@@ -38,6 +38,7 @@ public:
 	const std::string GetClearFilename() const;
 #else
 	const std::string &GetClearFilename() const;
+	const std::string &GetClearFilenameIfPossible(const std::string& alternative) const;
 #endif
 	void SetClearFilename(const std::string &rToEncode);
 
