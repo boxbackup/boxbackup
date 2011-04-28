@@ -99,7 +99,7 @@ sub runtest
 
 	# attempt to make this test
 	my $flag = ($test_mode eq 'release')?(BoxPlatform::make_flag('RELEASE')):'';
-	my $make_res = system("cd test/$t ; $make_command $flag");
+	my $make_res = system("cd test/$t && $make_command $flag");
 	if($make_res != 0)
 	{
 		push @results,"$t: make failed";
