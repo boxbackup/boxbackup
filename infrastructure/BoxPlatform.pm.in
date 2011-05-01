@@ -82,17 +82,30 @@ BEGIN
 	# where to put the files
 	$install_into_dir = '@sbindir_expanded@';
 
+	# see how many processors there are, and set make flags accordingly
+	if($build_os eq 'Darwin' || $build_os =~ /(Free|Net|Open)BSD/)
+	{
+		$cpus = `sysctl -n hw.ncpu`;
+	}
+	elsif($build_os eq 'Linux')
+	{
+		$cpus = `grep -c ^processor /proc/cpuinfo`;
+	}
+	elsif($build_os eq 'SunOS')
+	{
+		$cpus = `psrinfo -p`;
+	}
+
+	chomp $cpus;
+	if($cpus > 1)
+	{
+		print STDERR "$cpus processors detected, will set make to perform concurrent jobs\n";
+		$sub_make_options = ' -j '.($cpus + 1);
+	}
+		
 	# if it's Darwin,
 	if($build_os eq 'Darwin')
 	{
-		# see how many processors there are, and set make flags accordingly
-		my $cpus = `sysctl hw.ncpu`;
-		if($cpus =~ m/hw.ncpu:\s(\d+)/ && $1 > 1)
-		{
-			print STDERR "$1 processors detected, will set make to perform concurrent jobs\n";
-			$sub_make_options = ' -j '.($1 + 1);
-		}
-		
 		# test for fink installation
 		if(-d '/sw/include' && -d '/sw/lib')
 		{
