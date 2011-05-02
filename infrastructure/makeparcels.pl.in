@@ -137,6 +137,9 @@ for my $parcel (@parcels)
 	my $dir     = BoxPlatform::parcel_dir($parcel);
 	my @parcel_deps;
 
+	# Need to use BSD install on Solaris
+	my $install_bin = $build_os eq 'SunOS' ? '/usr/ucb/install' : 'install';
+
 	unless ($target_windows)
 	{
 		open SCRIPT,">parcels/scripts/install-$parcel" or die
@@ -327,7 +330,7 @@ EOF
 			}
 			print SCRIPT "mkdir -p " .
 				"\${DESTDIR}$local_install_dir/\n";
-			print SCRIPT "install $name " .
+			print SCRIPT "$install_bin $name " .
 				"\${DESTDIR}$local_install_dir\n";
 		}
 	}
