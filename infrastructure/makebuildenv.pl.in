@@ -568,16 +568,16 @@ WINDRES = @WINDRES@
 DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
 	$include_paths $extra_platform_defines \\
 	-DBOX_VERSION="\\"$product_version\\""
-LDFLAGS = @LDFLAGS@ @LDADD_RDYNAMIC@
+LDFLAGS += @LDFLAGS@ @LDADD_RDYNAMIC@
 
 .ifdef RELEASE
-CXXFLAGS = -DBOX_RELEASE_BUILD $release_flags \$(DEFAULT_CXXFLAGS)
+CXXFLAGS += -DBOX_RELEASE_BUILD $release_flags \$(DEFAULT_CXXFLAGS)
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS = -g \$(DEFAULT_CXXFLAGS)
+CXXFLAGS += -g \$(DEFAULT_CXXFLAGS)
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =

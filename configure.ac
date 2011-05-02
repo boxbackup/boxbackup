@@ -22,6 +22,16 @@ if test "x$ac_cv_cxx_exceptions" != "xyes" || \
   AC_MSG_ERROR([[basic compile checks failed, the C++ compiler is broken]])
 fi
 
+case $build_os in
+solaris*)
+  isa_bits=`isainfo -b`
+  AC_MSG_NOTICE([setting compiler to use -m$isa_bits on Solaris])
+  CFLAGS="$CFLAGS -m$isa_bits"
+  CXXFLAGS="$CXXFLAGS -m$isa_bits"
+  LDFLAGS="$LDFLAGS -m$isa_bits"
+  ;;
+esac
+
 if test "x$GXX" = "xyes"; then
   # Use -Wall if we have gcc. This gives better warnings
   AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
@@ -411,7 +421,7 @@ fi
 cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
 	if test "$cmd" = "subdir"; then
 		echo
-		export CC CXX CXXFLAGS LDFLAGS LIBS
+		export CC CXX CFLAGS CXXFLAGS LDFLAGS LIBS
 		args="$configure_args --target=$target_alias"
 		echo "Configuring $subdir with: $args"
 
