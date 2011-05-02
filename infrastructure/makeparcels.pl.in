@@ -302,7 +302,7 @@ EOF
 
 		if ($type eq 'html')
 		{
-			$dest = "share/doc/$version";
+			$dest = "share/doc/@PACKAGE_TARNAME@";
 			$name = "docs/$name.html";
 		}
 
