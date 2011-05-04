@@ -27,7 +27,7 @@ class IOStreamGetLine : public GetLine
 {
 public:
 	IOStreamGetLine(IOStream &Stream);
-	~IOStreamGetLine();
+	virtual ~IOStreamGetLine();
 private:
 	IOStreamGetLine(const IOStreamGetLine &rToCopy);
 
