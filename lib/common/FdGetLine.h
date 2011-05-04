@@ -26,7 +26,7 @@ class FdGetLine : public GetLine
 {
 public:
 	FdGetLine(int fd);
-	~FdGetLine();
+	virtual ~FdGetLine();
 private:
 	FdGetLine(const FdGetLine &rToCopy);
 
