@@ -45,6 +45,7 @@ private:
 public:
 	virtual bool IsEOF() {return mEOF;}
 	int GetLineNumber() {return mLineNumber;}
+	virtual ~GetLine() { }
 	
 protected:
 	bool GetLineInternal(std::string &rOutput,
