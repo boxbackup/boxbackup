@@ -49,7 +49,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -71,12 +71,29 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupProtocolClient.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupProtocolServer.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupStoreException.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupClientFileAttributes.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupCommands.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreAccountDatabase.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreAccounts.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheck.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheck2.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheckData.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreConfigVerify.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreContext.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreDirectory.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFile.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCmbDiff.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCmbIdx.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCombine.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCryptVar.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileDiff.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileEncodeStream.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFilename.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFilenameClear.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileRevDiff.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreInfo.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\StoreStructure.cpp" />
@@ -87,12 +104,29 @@
     <ClCompile Include="..\..\..\lib\raidfile\RaidFileWrite.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupProtocolClient.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupProtocolServer.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupStoreException.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupClientFileAttributes.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupConstants.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreAccountDatabase.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreAccounts.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreCheck.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreConfigVerify.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreConstants.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreContext.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreDirectory.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreException.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFile.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFileCryptVar.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFileEncodeStream.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFilename.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFilenameClear.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFileWire.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreInfo.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreObjectMagic.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\RunStatusProvider.h" />
     <ClInclude Include="..\..\..\lib\backupstore\StoreStructure.h" />
     <ClInclude Include="..\..\..\lib\raidfile\autogen_RaidFileException.h" />
     <ClInclude Include="..\..\..\lib\raidfile\RaidFileController.h" />
@@ -100,6 +134,11 @@
     <ClInclude Include="..\..\..\lib\raidfile\RaidFileRead.h" />
     <ClInclude Include="..\..\..\lib\raidfile\RaidFileUtil.h" />
     <ClInclude Include="..\..\..\lib\raidfile\RaidFileWrite.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\lib\backupstore\backupprotocol.txt" />
+    <None Include="..\..\..\lib\backupstore\BackupStoreException.txt" />
+    <None Include="..\..\..\lib\backupstore\Makefile.extra" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
