@@ -243,7 +243,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 	{
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"error %d", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		errno = EINVAL;
 		return NULL;
 	}
@@ -275,7 +275,7 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 	{
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"error %i", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		errno = EACCES;
 		delete [] buffer;
 		return NULL;
@@ -304,7 +304,7 @@ bool ConvertFromWideString(const std::wstring& rInput,
 	{
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"error %d", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		errno = EINVAL;
 		return false;
 	}
@@ -336,7 +336,7 @@ bool ConvertFromWideString(const std::wstring& rInput,
 	{
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"error %i", GetLastError());
+			"%s", GetErrorMessage(GetLastError()).c_str());
 		errno = EACCES;
 		delete [] buffer;
 		return false;
