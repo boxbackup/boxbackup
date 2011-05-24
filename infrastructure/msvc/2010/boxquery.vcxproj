@@ -49,8 +49,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\pcre;$(ProjectDir)..\..\..\..\openssl\include;$(ProjectDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupstore;$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\pcre;$(ProjectDir)..\..\..\..\openssl\include;$(ProjectDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -109,6 +109,12 @@
     <ProjectReference Include="common.vcxproj">
       <Project>{a089cee6-ebf0-4232-a0c0-74850a8127a6}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="libbackupclient.vcxproj">
+      <Project>{32604097-c934-4711-b1ad-206336640e70}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libbackupstore.vcxproj">
+      <Project>{97d89aef-2be4-4e34-8703-03ba67bf4494}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

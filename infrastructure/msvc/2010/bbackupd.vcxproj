@@ -50,8 +50,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;ENABLE_VSS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ENABLE_VSS;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -61,7 +61,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>VssApi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>VssApi.lib;$(OutDir)\libbackupclient.lib;$(OutDir)\libbackupstore.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>$(OutDir)bbackupd.pdb</ProgramDatabaseFile>
       <SubSystem>Console</SubSystem>
