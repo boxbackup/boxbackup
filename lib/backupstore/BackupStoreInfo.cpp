@@ -141,7 +141,9 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID)
+std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
+	const std::string &rRootDir, int DiscSet, bool ReadOnly,
+	int64_t *pRevisionID)
 {
 	// Generate the filename
 	std::string fn(rRootDir + INFO_FILENAME);
@@ -153,7 +155,9 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 	int32_t magic;
 	if(!rf->ReadFullBuffer(&magic, sizeof(magic), 0))
 	{
-		THROW_EXCEPTION(BackupStoreException, CouldNotLoadStoreInfo);
+		THROW_FILE_ERROR("Failed to read store info file: "
+			"short read of magic number", fn,
+			BackupStoreException, CouldNotLoadStoreInfo);
 	}
 
 	bool v1 = false, v2 = false;
@@ -168,7 +172,9 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 	}
 	else
 	{
-		THROW_EXCEPTION(BackupStoreException, BadStoreInfoOnLoad)
+		THROW_FILE_ERROR("Failed to read store info file: "
+			"unknown magic " << BOX_FORMAT_HEX32(ntohl(magic)),
+			fn, BackupStoreException, BadStoreInfoOnLoad);
 	}
 
 	// Make new object
@@ -223,7 +229,8 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID, const st
 		archive.Read(FileAccountID);
 		if (FileAccountID != AccountID)
 		{
-			THROW_FILE_ERROR("Found wrong account ID in store info",
+			THROW_FILE_ERROR("Found wrong account ID in store "
+				"info: " << BOX_FORMAT_HEX32(FileAccountID),
 				fn, BackupStoreException, BadStoreInfoOnLoad);
 		}
 
