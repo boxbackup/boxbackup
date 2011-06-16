@@ -91,9 +91,9 @@ void BackupStoreRefCountDatabase::Create(const
 	// Open the file for writing
 	if (FileExists(Filename) && !AllowOverwrite)
 	{
-		BOX_ERROR("Attempted to overwrite refcount database file: " <<
-			Filename);
-		THROW_EXCEPTION(RaidFileException, CannotOverwriteExistingFile);
+		THROW_FILE_ERROR("Failed to overwrite refcount database: "
+			"not allowed here", Filename, RaidFileException,
+			CannotOverwriteExistingFile);
 	}
 
 	int flags = O_CREAT | O_BINARY | O_RDWR;
@@ -134,14 +134,18 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 	refcount_StreamFormat hdr;
 	if(!dbfile->ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */))
 	{
-		THROW_EXCEPTION(BackupStoreException, CouldNotLoadStoreInfo)
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"short read", filename, BackupStoreException,
+			CouldNotLoadStoreInfo);
 	}
 	
 	// Check it
 	if(ntohl(hdr.mMagicValue) != REFCOUNT_MAGIC_VALUE ||
 		(int32_t)ntohl(hdr.mAccountID) != rAccount.GetID())
 	{
-		THROW_EXCEPTION(BackupStoreException, BadStoreInfoOnLoad)
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"bad magic number", filename, BackupStoreException,
+			BadStoreInfoOnLoad);
 	}
 	
 	// Make new object
@@ -255,10 +259,10 @@ BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
 
 	if (GetSize() < offset + GetEntrySize())
 	{
-		BOX_ERROR("attempted read of unknown refcount for object " <<
-			BOX_FORMAT_OBJECTID(ObjectID));
-		THROW_EXCEPTION(BackupStoreException,
-			UnknownObjectRefCountRequested);
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"attempted read of unknown refcount for object " <<
+			BOX_FORMAT_OBJECTID(ObjectID), mFilename,
+			BackupStoreException, UnknownObjectRefCountRequested);
 	}
 
 	mapDatabaseFile->Seek(offset, SEEK_SET);
@@ -267,9 +271,9 @@ BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
 	if (mapDatabaseFile->Read(&refcount, sizeof(refcount)) !=
 		sizeof(refcount))
 	{
-		BOX_LOG_SYS_ERROR("short read on refcount database: " <<
-			mFilename);
-		THROW_EXCEPTION(BackupStoreException, CouldNotLoadStoreInfo);
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"short read at offset " << offset, mFilename,
+			BackupStoreException, CouldNotLoadStoreInfo);
 	}
 
 	return ntohl(refcount);
