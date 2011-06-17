@@ -37,7 +37,7 @@ bin/bbackupctl		lib/server	lib/backupclient
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
-test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
+test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
 
