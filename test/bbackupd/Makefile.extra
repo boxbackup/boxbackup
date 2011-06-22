@@ -6,9 +6,9 @@ link-extra: ../../bin/bbackupd/autogen_ClientException.o \
 	../../bin/bbackupd/BackupClientInodeToIDMap.o \
 	../../bin/bbackupd/Win32ServiceFunctions.o \
 	../../bin/bbackupd/BackupDaemon.o \
-	../../bin/bbstored/BackupStoreContext.o \
 	../../bin/bbstored/BBStoreDHousekeeping.o \
 	../../bin/bbstored/HousekeepStoreAccount.o \
 	../../lib/backupstore/autogen_BackupProtocolServer.o \
-	../../bin/bbstored/BackupCommands.o \
+	../../lib/backupstore/BackupStoreContext.o \
+	../../lib/backupstore/BackupCommands.o \
 	../../bin/bbstored/BackupStoreDaemon.o
