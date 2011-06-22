@@ -1183,6 +1183,7 @@ uint64_t BackupClientFileAttributes::GenerateAttributeHash(EMU_STRUCT_STAT &st,
 	digest.Finish();
 	
 	// Return the first 64 bits of the hash
-	uint64_t result = *((uint64_t *)(digest.DigestAsData()));
+	uint64_t result;
+	memcpy(&result, digest.DigestAsData(), sizeof(result));
 	return result;
 }
