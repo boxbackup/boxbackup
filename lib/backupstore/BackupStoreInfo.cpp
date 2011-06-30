@@ -192,6 +192,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 	{
 		// Read in a header
 		info_StreamFormat_1 hdr;
+		rf->Seek(0, IOStream::SeekType_Absolute);
 
 		if(!rf->ReadFullBuffer(&hdr, sizeof(hdr),
 			0 /* not interested in bytes read if this fails */))
