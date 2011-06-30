@@ -380,8 +380,9 @@ else
 
 for my $parcel (@parcels)
 {
-	print MAKE "\trm -r ", BoxPlatform::parcel_dir($parcel),    "\n";
-	print MAKE "\trm    ", BoxPlatform::parcel_target($parcel), "\n";
+	# need to use -f to avoid error if they don't exist (already cleaned)
+	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
+	print MAKE "\trm -f  ", BoxPlatform::parcel_target($parcel), "\n";
 }
 
 close MAKE;
