@@ -369,17 +369,19 @@ EOF
 
 if ($build_os eq 'CYGWIN')
 {
-	print MAKE "\tfind release debug -type f | xargs -r rm -f\n";
+	print MAKE "\tfind release debug       -type f | xargs -r rm\n";
+	print MAKE "\tfind . -name 'autogen_*' -type f | xargs -r rm\n";
 }
 else
 {
-	print MAKE "\tfind release debug -type f -exec rm -f {} \\;\n";
+	print MAKE "\tfind release debug       -type f -exec rm {} \\;\n";
+	print MAKE "\tfind . -name 'autogen_*' -type f -exec rm {} \\;\n";
 }
 
 for my $parcel (@parcels)
 {
-	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
-	print MAKE "\trm -f ",  BoxPlatform::parcel_target($parcel), "\n";
+	print MAKE "\trm -r ", BoxPlatform::parcel_dir($parcel),    "\n";
+	print MAKE "\trm    ", BoxPlatform::parcel_target($parcel), "\n";
 }
 
 close MAKE;
