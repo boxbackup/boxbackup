@@ -9,7 +9,7 @@ copy .\lib\common\BoxPortsAndFiles.h.in .\lib\common\BoxPortsAndFiles.h
 cd .\bin\bbackupquery\ & perl ./../../bin/bbackupquery/makedocumentation.pl.in
 cd ..\..\
 
-cd .\lib\backupclient & perl ./../../lib/common/makeexception.pl.in BackupStoreException.txt & perl ./../../lib/server/makeprotocol.pl.in Client ./../../bin/bbstored/backupprotocol.txt
+cd .\lib\backupstore & perl ./../../lib/common/makeexception.pl.in BackupStoreException.txt & perl ./../../lib/server/makeprotocol.pl.in Client backupprotocol.txt & perl ./../../lib/server/makeprotocol.pl.in Server backupprotocol.txt
 cd ..\..\
 
 cd .\lib\compress & perl ./../../lib/common/makeexception.pl.in CompressException.txt
@@ -22,9 +22,6 @@ cd .\lib\raidfile & perl ./../../lib/common/makeexception.pl.in RaidFileExceptio
 cd ..\..\
 
 cd .\bin\bbackupd & perl ./../../lib/common/makeexception.pl.in ClientException.txt
-cd ..\..\
-
-cd .\bin\bbstored & perl ./../../lib/server/makeprotocol.pl.in Server backupprotocol.txt
 cd ..\..\
 
 cd .\lib\crypto & perl ./../../lib/common/makeexception.pl.in CipherException.txt
