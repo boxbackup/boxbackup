@@ -1,4 +1,5 @@
 LICENSE-GPL.txt
+qdbm
 
 LICENSE DUAL
 lib/intercept
