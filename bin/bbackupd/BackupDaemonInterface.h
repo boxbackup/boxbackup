@@ -134,6 +134,10 @@ class ProgressNotifier
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
 		int64_t FileSize) = 0;
+	virtual void NotifyDirectoryCreated(
+		int64_t ObjectID,
+		const std::string& rLocalPath,
+		const std::string& rRemotePath) = 0;
 	virtual void NotifyDirectoryDeleted(
 		int64_t ObjectID,
 		const std::string& rRemotePath) = 0;

@@ -189,6 +189,8 @@ BackupDaemon::BackupDaemon()
 	  mUpdateStoreInterval(0),
 	  mDeleteStoreObjectInfoFile(false),
 	  mDoSyncForcedByPreviousSyncError(false),
+	  mNumFilesUploaded(-1),
+	  mNumDirsCreated(-1),
 	  mLogAllFileAccess(false),
 	  mpProgressNotifier(this),
 	  mpLocationResolver(this),
@@ -917,6 +919,8 @@ void BackupDaemon::RunSyncNow()
 		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
 	params.mMaxFileTimeInFuture = 
 		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
+	mNumFilesUploaded = 0;
+	mNumDirsCreated = 0;
 
 	if(conf.KeyExists("MaxUploadRate"))
 	{
@@ -1631,7 +1635,9 @@ void BackupDaemon::OnBackupFinish()
 			<< ", bytes already on server "
 			<< BackupStoreFile::msStats.mBytesAlreadyOnServer
 			<< ", encoded size "
-			<< BackupStoreFile::msStats.mTotalFileStreamSize);
+			<< BackupStoreFile::msStats.mTotalFileStreamSize
+			<< ", " << mNumFilesUploaded << " files uploaded, "
+			<< mNumDirsCreated << " dirs created");
 
 		// Reset statistics again
 		BackupStoreFile::ResetStats();

@@ -235,6 +235,7 @@ private:
 	TLSContext mTlsContext;
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
+	int64_t mNumFilesUploaded, mNumDirsCreated;
 
 public:
  	bool StopRun() { return this->Daemon::StopRun(); }
@@ -477,7 +478,8 @@ public:
 			BOX_NOTICE("Uploaded file: " << rLocalPath << ", "
 				"total size = " << FileSize << ", "
 				"uploaded size = " << UploadedSize);
-		} 
+		}
+		mNumFilesUploaded++;
 	}
  	virtual void NotifyFileSynchronised(
  		const BackupClientDirectoryRecord* pDirRecord,
@@ -488,6 +490,19 @@ public:
 		{
 			BOX_INFO("Synchronised file: " << rLocalPath);
 		} 
+	}
+	virtual void NotifyDirectoryCreated(
+		int64_t ObjectID,
+		const std::string& rLocalPath,
+		const std::string& rRemotePath)
+	{
+		if (mLogAllFileAccess)
+		{
+			BOX_NOTICE("Created directory: " << rRemotePath << 
+				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
+				")");
+		}
+		mNumDirsCreated++;
 	}
 	virtual void NotifyDirectoryDeleted(
 		int64_t ObjectID,
