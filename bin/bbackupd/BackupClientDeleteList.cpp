@@ -13,7 +13,7 @@
 
 #include "BackupClientDeleteList.h"
 #include "BackupClientContext.h"
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 
 #include "MemLeakFindOn.h"
 

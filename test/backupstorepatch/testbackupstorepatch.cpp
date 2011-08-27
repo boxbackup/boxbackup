@@ -13,7 +13,7 @@
 #include <string.h>
 #include <signal.h>
 
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreAccountDatabase.h"
@@ -354,7 +354,7 @@ int test(int argc, const char *argv[])
 			// Login
 			{
 				// Check the version
-				std::auto_ptr<BackupProtocolClientVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+				std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 				TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 	
 				// Login
@@ -367,9 +367,9 @@ int test(int argc, const char *argv[])
 			// Upload the first file
 			{
 				std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/0.test",
-						BackupProtocolClientListDirectory::RootDirectory, storeFilename));
-				std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
-						BackupProtocolClientListDirectory::RootDirectory, ModificationTime,
+						BackupProtocolListDirectory::RootDirectory, storeFilename));
+				std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
+						BackupProtocolListDirectory::RootDirectory, ModificationTime,
 						ModificationTime, 0 /* no diff from file ID */, storeFilename, *upload));
 				test_files[0].IDOnServer = stored->GetObjectID();
 				test_files[0].IsCompletelyDifferent = true;
@@ -380,8 +380,8 @@ int test(int argc, const char *argv[])
 			for(unsigned int f = 1; f < NUMBER_FILES; ++f)
 			{
 				// Get an index for the previous version
-				std::auto_ptr<BackupProtocolClientSuccess> getBlockIndex(protocol.QueryGetBlockIndexByName(
-						BackupProtocolClientListDirectory::RootDirectory, storeFilename));
+				std::auto_ptr<BackupProtocolSuccess> getBlockIndex(protocol.QueryGetBlockIndexByName(
+						BackupProtocolListDirectory::RootDirectory, storeFilename));
 				int64_t diffFromID = getBlockIndex->GetObjectID();
 				TEST_THAT(diffFromID != 0);
 				
@@ -397,7 +397,7 @@ int test(int argc, const char *argv[])
 					std::auto_ptr<IOStream> patchStream(
 						BackupStoreFile::EncodeFileDiff(
 							filename,
-							BackupProtocolClientListDirectory::RootDirectory,	/* containing directory */
+							BackupProtocolListDirectory::RootDirectory,	/* containing directory */
 							storeFilename, 
 							diffFromID, 
 							*blockIndexStream,
@@ -407,8 +407,8 @@ int test(int argc, const char *argv[])
 							&isCompletelyDifferent));
 		
 					// Upload the patch to the store
-					std::auto_ptr<BackupProtocolClientSuccess> stored(protocol.QueryStoreFile(
-							BackupProtocolClientListDirectory::RootDirectory, ModificationTime,
+					std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
+							BackupProtocolListDirectory::RootDirectory, ModificationTime,
 							ModificationTime, isCompletelyDifferent?(0):(diffFromID), storeFilename, *patchStream));
 					ModificationTime += MODIFICATION_TIME_INC;
 					
@@ -432,10 +432,10 @@ int test(int argc, const char *argv[])
 			
 			// List the directory from the server, and check that no dependency info is sent -- waste of bytes
 			{
-				std::auto_ptr<BackupProtocolClientSuccess> dirreply(protocol.QueryListDirectory(
-						BackupProtocolClientListDirectory::RootDirectory,
-						BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,
-						BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+				std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
+						BackupProtocolListDirectory::RootDirectory,
+						BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+						BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 				// Stream
 				BackupStoreDirectory dir;
 				std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
@@ -531,7 +531,7 @@ int test(int argc, const char *argv[])
 				BOX_PORT_BBSTORED_TEST);
 			BackupProtocolClient protocol(conn);
 			{
-				std::auto_ptr<BackupProtocolClientVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+				std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 				TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 				protocol.QueryLogin(0x01234567, 0);
 			}
@@ -555,8 +555,8 @@ int test(int argc, const char *argv[])
 	
 				// Fetch the file
 				{
-					std::auto_ptr<BackupProtocolClientSuccess> getobj(protocol.QueryGetFile(
-						BackupProtocolClientListDirectory::RootDirectory,
+					std::auto_ptr<BackupProtocolSuccess> getobj(protocol.QueryGetFile(
+						BackupProtocolListDirectory::RootDirectory,
 						test_files[f].IDOnServer));
 					TEST_THAT(getobj->GetObjectID() == test_files[f].IDOnServer);
 					// BLOCK
@@ -572,7 +572,7 @@ int test(int argc, const char *argv[])
 				
 				// Download the index, and check it looks OK
 				{
-					std::auto_ptr<BackupProtocolClientSuccess> getblockindex(protocol.QueryGetBlockIndexByID(test_files[f].IDOnServer));
+					std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByID(test_files[f].IDOnServer));
 					TEST_THAT(getblockindex->GetObjectID() == test_files[f].IDOnServer);
 					std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
 					TEST_THAT(BackupStoreFile::CompareFileContentsAgainstBlockIndex(filename, *blockIndexStream, IOStream::TimeOutInfinite));

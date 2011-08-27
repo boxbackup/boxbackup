@@ -1,16 +1,11 @@
-
 MAKEPROTOCOL = ../../lib/server/makeprotocol.pl
 
-GEN_CMD_CLI = $(MAKEPROTOCOL) Client backupprotocol.txt
-GEN_CMD_SRV = $(MAKEPROTOCOL) Server backupprotocol.txt
+GEN_CMD = $(MAKEPROTOCOL) backupprotocol.txt
 
 # AUTOGEN SEEDING
-autogen_BackupProtocolClient.cpp autogen_BackupProtocolClient.h:	$(MAKEPROTOCOL) backupprotocol.txt
-	$(_PERL) $(GEN_CMD_CLI)
+autogen_BackupProtocol.cpp autogen_BackupProtocol.h:	$(MAKEPROTOCOL) backupprotocol.txt
+	$(_PERL) $(GEN_CMD)
 
-# AUTOGEN SEEDING
-autogen_BackupProtocolServer.cpp autogen_BackupProtocolServer.h:	$(MAKEPROTOCOL) backupprotocol.txt
-	$(_PERL) $(GEN_CMD_SRV)
 
 MAKEEXCEPTION = ../../lib/common/makeexception.pl
 

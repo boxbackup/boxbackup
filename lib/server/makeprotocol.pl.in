@@ -30,23 +30,18 @@ my %log_display_types =
 	'string' => ['%s', 'VAR.c_str()']
 );
 
-
-
-my ($type, $file) = @ARGV;
-
-if($type ne 'Server' && $type ne 'Client')
+if (@ARGV != 1)
 {
-	die "Neither Server or Client is specified on command line\n";
+	die "Usage: $0 <protocol-txt-file>\n";
 }
+
+my ($file) = @ARGV;
 
 open IN, $file or die "Can't open input file $file\n";
 
-print "Making $type protocol classes from $file...\n";
+print "Making protocol classes from $file...\n";
 
 my @extra_header_files;
-
-my $implement_syslog = 0;
-my $implement_filelog = 0;
 
 # read attributes
 my %attr;
@@ -59,41 +54,18 @@ while(<IN>)
 	
 	my ($k,$v) = split /\s+/,$l,2;
 	
-	if($k eq 'ClientType')
+	if($k eq 'AddType')
 	{
-		add_type($v) if $type eq 'Client';
-	}
-	elsif($k eq 'ServerType')
-	{
-		add_type($v) if $type eq 'Server';
+		add_type($v);
 	}
 	elsif($k eq 'ImplementLog')
 	{
-		my ($log_if_type,$log_type) = split /\s+/,$v;
-		if($type eq $log_if_type)
-		{
-			if($log_type eq 'syslog')
-			{
-				$implement_syslog = 1;
-			}
-			elsif($log_type eq 'file')
-			{
-				$implement_filelog = 1;
-			}
-			else
-			{
-				printf("ERROR: Unknown log type for implementation: $log_type\n");
-				exit(1);
-			}
-		}
+		# Always implement logging
 	}
 	elsif($k eq 'LogTypeToText')
 	{
-		my ($log_if_type,$type_name,$printf_format,$arg_template) = split /\s+/,$v;
-		if($type eq $log_if_type)
-		{
-			$log_display_types{$type_name} = [$printf_format,$arg_template]
-		}
+		my ($type_name,$printf_format,$arg_template) = split /\s+/,$v;
+		$log_display_types{$type_name} = [$printf_format,$arg_template]
 	}
 	else
 	{
@@ -169,9 +141,11 @@ close IN;
 
 
 # open files
-my $h_filename = 'autogen_'.$protocol_name.'Protocol'.$type.'.h';
-open CPP,'>autogen_'.$protocol_name.'Protocol'.$type.'.cpp';
+my $h_filename = 'autogen_'.$protocol_name.'Protocol.h';
+open CPP,'>autogen_'.$protocol_name.'Protocol.cpp';
 open H,">$h_filename";
+
+my $guardname = uc 'AUTOGEN_'.$protocol_name.'Protocol_H';
 
 print CPP <<__E;
 
@@ -183,149 +157,125 @@ print CPP <<__E;
 
 #include "$h_filename"
 #include "IOStream.h"
-
 __E
 
-if($implement_syslog)
-{
-	print H <<EOF;
-#ifndef WIN32
-#include <syslog.h>
-#endif
-EOF
-}
-
-
-my $guardname = uc 'AUTOGEN_'.$protocol_name.'Protocol'.$type.'_H';
 print H <<__E;
-
 // Auto-generated file -- do not edit
 
 #ifndef $guardname
 #define $guardname
 
+#include <cstdio>
+#include <list>
+
+#ifndef WIN32
+#include <syslog.h>
+#endif
+
 #include "Protocol.h"
-#include "ProtocolObject.h"
+#include "Message.h"
 #include "ServerException.h"
 
 class IOStream;
 
-__E
 
-if($implement_filelog)
-{
-	print H qq~#include <stdio.h>\n~;
-}
+__E
 
 # extra headers
 for(@extra_header_files)
 {
-	print H qq~#include "$_"\n~
-}
-print H "\n";
-
-if($type eq 'Server')
-{
-	# need utils file for the server
-	print H '#include "Utils.h"',"\n\n"
+	print H qq@#include "$_"\n@;
 }
 
+print H <<__E;
 
-my $derive_objects_from = 'ProtocolObject';
+// need utils file for the server
+#include "Utils.h"
+
+__E
+
+my $message_base_class = "${protocol_name}ProtocolMessage";
 my $objects_extra_h = '';
 my $objects_extra_cpp = '';
-if($type eq 'Server')
-{
-	# define the context
-	print H "class $context_class;\n\n";
-	print CPP "#include \"$context_class_inc\"\n\n";
-	
-	# change class we derive the objects from
-	$derive_objects_from = $protocol_name.'ProtocolObject';
-	
-	$objects_extra_h = <<__E;
-	virtual std::auto_ptr<ProtocolObject> DoCommand(${protocol_name}ProtocolServer &rProtocol, $context_class &rContext);
+
+# define the context
+print H "class $context_class;\n\n";
+print CPP <<__E;
+#include "$context_class_inc"
+#include "MemLeakFindOn.h"
 __E
-	$objects_extra_cpp = <<__E;
-std::auto_ptr<ProtocolObject> ${derive_objects_from}::DoCommand(${protocol_name}ProtocolServer &rProtocol, $context_class &rContext)
+
+my $request_base_class = "${protocol_name}ProtocolRequest";
+my $reply_base_class   = "${protocol_name}ProtocolReply";
+# the abstract protocol interface
+my $protocol_base_class = $protocol_name."ProtocolBase";
+my $replyable_base_class = $protocol_name."ProtocolReplyable";
+
+print H <<__E;
+class $protocol_base_class;
+class $replyable_base_class;
+class $reply_base_class;
+
+class $message_base_class : public Message
+{
+public:
+	virtual std::auto_ptr<$message_base_class> DoCommand($replyable_base_class &rProtocol,
+		$context_class &rContext) const;
+};
+
+class $reply_base_class
+{
+};
+
+class $request_base_class
+{
+};
+
+__E
+
+print CPP <<__E;
+std::auto_ptr<$message_base_class> $message_base_class\::DoCommand($replyable_base_class &rProtocol,
+	$context_class &rContext) const
 {
 	THROW_EXCEPTION(ConnectionException, Conn_Protocol_TriedToExecuteReplyCommand)
 }
 __E
-}
 
-print CPP qq~#include "MemLeakFindOn.h"\n~;
-
-if($type eq 'Client' && ($implement_syslog || $implement_filelog))
-{
-	# change class we derive the objects from
-	$derive_objects_from = $protocol_name.'ProtocolObjectCl';
-}
-if($implement_syslog)
-{
-	$objects_extra_h .= <<__E;
-	virtual void LogSysLog(const char *Action) const = 0;
-__E
-}
-if($implement_filelog)
-{
-	$objects_extra_h .= <<__E;
-	virtual void LogFile(const char *Action, FILE *file) const = 0;
-__E
-}
-
-if($derive_objects_from ne 'ProtocolObject')
-{	
-	# output a definition for the protocol object derived class
-	print H <<__E;
-class ${protocol_name}ProtocolServer;
-	
-class $derive_objects_from : public ProtocolObject
-{
-public:
-	$derive_objects_from();
-	virtual ~$derive_objects_from();
-	$derive_objects_from(const $derive_objects_from &rToCopy);
-	
-$objects_extra_h
-};
-__E
-
-	# and some cpp definitions
-	print CPP <<__E;
-${derive_objects_from}::${derive_objects_from}()
-{
-}
-${derive_objects_from}::~${derive_objects_from}()
-{
-}
-${derive_objects_from}::${derive_objects_from}(const $derive_objects_from &rToCopy)
-{
-}
-$objects_extra_cpp
-__E
-}
-
-
-
-my $classname_base = $protocol_name.'Protocol'.$type;
+my %cmd_class;
 
 # output the classes
-for my $cmd (@cmd_list)
+foreach my $cmd (@cmd_list)
 {
+	my @cmd_base_classes = ($message_base_class);
+	
+	if(obj_is_type($cmd, 'Command'))
+	{
+		push @cmd_base_classes, $request_base_class;
+	}
+	
+	if(obj_is_type($cmd, 'Reply'))
+	{
+		push @cmd_base_classes, $reply_base_class;
+	}
+	
+	my $cmd_base_class = join(", ", map {"public $_"} @cmd_base_classes);
+	my $cmd_class = $protocol_name."ProtocolClient".$cmd;
+	$cmd_class{$cmd} = $cmd_class;
+	
 	print H <<__E;
-class $classname_base$cmd : public $derive_objects_from
+class $cmd_class : $cmd_base_class
 {
 public:
-	$classname_base$cmd();
-	$classname_base$cmd(const $classname_base$cmd &rToCopy);
-	~$classname_base$cmd();
+	$cmd_class();
+	$cmd_class(const $cmd_class &rToCopy);
+	~$cmd_class();
 	int GetType() const;
 	enum
 	{
 		TypeID = $cmd_id{$cmd}
 	};
 __E
+
 	# constants
 	if(exists $cmd_constants{$cmd})
 	{
@@ -333,72 +283,63 @@ __E
 		print H join(",\n\t\t",@{$cmd_constants{$cmd}});
 		print H "\n\t};\n";
 	}
+	
 	# flags
 	if(obj_is_type($cmd,'EndsConversation'))
 	{
 		print H "\tbool IsConversationEnd() const;\n";
 	}
+	
 	if(obj_is_type($cmd,'IsError'))
 	{
 		print H "\tbool IsError(int &rTypeOut, int &rSubTypeOut) const;\n";
 		print H "\tstd::string GetMessage() const;\n";
 	}
-	if($type eq 'Server' && obj_is_type($cmd, 'Command'))
+	
+	if(obj_is_type($cmd, 'Command'))
 	{
-		print H "\tstd::auto_ptr<ProtocolObject> DoCommand(${protocol_name}ProtocolServer &rProtocol, $context_class &rContext); // IMPLEMENT THIS\n"
+		print H <<__E;
+	std::auto_ptr<$message_base_class> DoCommand($replyable_base_class &rProtocol, 
+		$context_class &rContext) const; // IMPLEMENT THIS\n
+__E
 	}
 
 	# want to be able to read from streams?
-	my $read_from_streams = (obj_is_type($cmd,'Command') && $type eq 'Server') || (obj_is_type($cmd,'Reply') && $type eq 'Client');
-	my $write_to_streams = (obj_is_type($cmd,'Command') && $type eq 'Client') || (obj_is_type($cmd,'Reply') && $type eq 'Server');
+	print H "\tvoid SetPropertiesFromStreamData(Protocol &rProtocol);\n";
 	
-	if($read_from_streams)
+	# write Get functions
+	for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
 	{
-		print H "\tvoid SetPropertiesFromStreamData(Protocol &rProtocol);\n";
+		my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
 		
-		# write Get functions
-		for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
-		{
-			my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
-			
-			print H "\t".translate_type_to_arg_type($ty)." Get$nm() {return m$nm;}\n";
-		}
+		print H "\t".translate_type_to_arg_type($ty)." Get$nm() {return m$nm;}\n";
 	}
-	my $param_con_args = '';
-	if($write_to_streams)
-	{
-		# extra constructor?
-		if($#{$cmd_contents{$cmd}} >= 0)
-		{
-			my @a;
-			for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
-			{
-				my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
 
-				push @a,translate_type_to_arg_type($ty)." $nm";
-			}		
-			$param_con_args = join(', ',@a);
-			print H "\t$classname_base$cmd(".$param_con_args.");\n";
-		}
-		print H "\tvoid WritePropertiesToStreamData(Protocol &rProtocol) const;\n";
-		# set functions
+	my $param_con_args = '';
+	# extra constructor?
+	if($#{$cmd_contents{$cmd}} >= 0)
+	{
+		my @a;
 		for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
 		{
 			my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
-			
-			print H "\tvoid Set$nm(".translate_type_to_arg_type($ty)." $nm) {m$nm = $nm;}\n";
-		}
+
+			push @a,translate_type_to_arg_type($ty)." $nm";
+		}		
+		$param_con_args = join(', ',@a);
+		print H "\t$cmd_class(".$param_con_args.");\n";
+	}
+	print H "\tvoid WritePropertiesToStreamData(Protocol &rProtocol) const;\n";
+	# set functions
+	for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
+	{
+		my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
+		
+		print H "\tvoid Set$nm(".translate_type_to_arg_type($ty)." $nm) {m$nm = $nm;}\n";
 	}
 	
-	if($implement_syslog)
-	{
-		print H "\tvirtual void LogSysLog(const char *Action) const;\n";
-	}
-	if($implement_filelog)
-	{
-		print H "\tvirtual void LogFile(const char *Action, FILE *file) const;\n";
-	}
-
+	print H "\tvirtual void LogSysLog(const char *Action) const;\n";
+	print H "\tvirtual void LogFile(const char *Action, FILE *file) const;\n";
 	
 	# write member variables and setup for cpp file
 	my @def_constructor_list;
@@ -432,77 +373,73 @@ __E
 	my $param_con_vars = join(",\n\t  ",@param_constructor_list);
 	$param_con_vars = "\n\t: ".$param_con_vars if $param_con_vars ne '';
 
-	my $class = "$classname_base$cmd".'::';
 	print CPP <<__E;
-$class$classname_base$cmd()$def_con_vars
+$cmd_class\::$cmd_class()$def_con_vars
 {
 }
-$class$classname_base$cmd(const $classname_base$cmd &rToCopy)$copy_con_vars
+$cmd_class\::$cmd_class(const $cmd_class &rToCopy)$copy_con_vars
 {
 }
-$class~$classname_base$cmd()
+$cmd_class\::~$cmd_class()
 {
 }
-int ${class}GetType() const
+int $cmd_class\::GetType() const
 {
 	return $cmd_id{$cmd};
 }
 __E
-	if($read_from_streams)
+	print CPP "void $cmd_class\::SetPropertiesFromStreamData(Protocol &rProtocol)\n{\n";
+	for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
 	{
-		print CPP "void ${class}SetPropertiesFromStreamData(Protocol &rProtocol)\n{\n";
-		for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
+		my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
+		if($ty =~ m/\Avector/)
 		{
-			my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
-			if($ty =~ m/\Avector/)
-			{
-				print CPP "\trProtocol.ReadVector(m$nm);\n";
-			}
-			else
-			{
-				print CPP "\trProtocol.Read(m$nm);\n";
-			}
+			print CPP "\trProtocol.ReadVector(m$nm);\n";
 		}
-		print CPP "}\n";
+		else
+		{
+			print CPP "\trProtocol.Read(m$nm);\n";
+		}
 	}
-	if($write_to_streams)
+	print CPP "}\n";
+
+	# implement extra constructor?
+	if($param_con_vars ne '')
 	{
-		# implement extra constructor?
-		if($param_con_vars ne '')
-		{
-			print CPP "$class$classname_base$cmd($param_con_args)$param_con_vars\n{\n}\n";
-		}
-		print CPP "void ${class}WritePropertiesToStreamData(Protocol &rProtocol) const\n{\n";
-		for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
-		{
-			my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
-			if($ty =~ m/\Avector/)
-			{
-				print CPP "\trProtocol.WriteVector(m$nm);\n";
-			}
-			else
-			{
-				print CPP "\trProtocol.Write(m$nm);\n";
-			}
-		}
-		print CPP "}\n";
+		print CPP "$cmd_class\::$cmd_class($param_con_args)$param_con_vars\n{\n}\n";
 	}
+	print CPP "void $cmd_class\::WritePropertiesToStreamData(Protocol &rProtocol) const\n{\n";
+	for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
+	{
+		my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
+		if($ty =~ m/\Avector/)
+		{
+			print CPP "\trProtocol.WriteVector(m$nm);\n";
+		}
+		else
+		{
+			print CPP "\trProtocol.Write(m$nm);\n";
+		}
+	}
+	print CPP "}\n";
+
 	if(obj_is_type($cmd,'EndsConversation'))
 	{
-		print CPP "bool ${class}IsConversationEnd() const\n{\n\treturn true;\n}\n";
+		print CPP "bool $cmd_class\::IsConversationEnd() const\n{\n\treturn true;\n}\n";
 	}
+	
 	if(obj_is_type($cmd,'IsError'))
 	{
 		# get parameters
 		my ($mem_type,$mem_subtype) = split /,/,obj_get_type_params($cmd,'IsError');
 		print CPP <<__E;
-bool ${class}IsError(int &rTypeOut, int &rSubTypeOut) const
+bool $cmd_class\::IsError(int &rTypeOut, int &rSubTypeOut) const
 {
 	rTypeOut = m$mem_type;
 	rSubTypeOut = m$mem_subtype;
 	return true;
 }
-std::string ${class}GetMessage() const
+std::string $cmd_class\::GetMessage() const
 {
 	switch(m$mem_subtype)
 	{
@@ -526,21 +463,13 @@ __E
 __E
 	}
 
-	if($implement_syslog)
-	{
-		my ($log) = make_log_strings_framework($cmd);
-		print CPP <<__E;
-void ${class}LogSysLog(const char *Action) const
+	my ($log) = make_log_strings_framework($cmd);
+	print CPP <<__E;
+void $cmd_class\::LogSysLog(const char *Action) const
 {
 	BOX_TRACE($log);
 }
-__E
-	}
-	if($implement_filelog)
-	{
-		my ($log) = make_log_strings_framework($cmd);
-		print CPP <<__E;
-void ${class}LogFile(const char *Action, FILE *File) const
+void $cmd_class\::LogFile(const char *Action, FILE *File) const
 {
 	std::ostringstream oss;
 	oss << $log;
@@ -548,208 +477,476 @@ void ${class}LogFile(const char *Action, FILE *File) const
 	::fflush(File);
 }
 __E
-	}
 }
 
-# finally, the protocol object itself
+my $error_class = $protocol_name."ProtocolError";
+
+# the abstract protocol interface
 print H <<__E;
-class $classname_base : public Protocol
+class $protocol_base_class
 {
 public:
-	$classname_base(IOStream &rStream);
-	virtual ~$classname_base();
-
-	std::auto_ptr<$derive_objects_from> Receive();
-	void Send(const ${derive_objects_from} &rObject);
-__E
-if($implement_syslog)
-{
-	print H "\tvoid SetLogToSysLog(bool Log = false) {mLogToSysLog = Log;}\n";
-}
-if($implement_filelog)
-{
-	print H "\tvoid SetLogToFile(FILE *File = 0) {mLogToFile = File;}\n";
-}
-if($type eq 'Server')
-{
-	# need to put in the conversation function
-	print H "\tvoid DoServer($context_class &rContext);\n\n";
-	# and the send vector thing
-	print H "\tvoid SendStreamAfterCommand(IOStream *pStream);\n\n";
-}
-if($type eq 'Client')
-{
-	# add plain object taking query functions
-	my $with_params;
-	for my $cmd (@cmd_list)
-	{
-		if(obj_is_type($cmd,'Command'))
-		{
-			my $has_stream = obj_is_type($cmd,'StreamWithCommand');
-			my $argextra = $has_stream?', IOStream &rStream':'';
-			my $queryextra = $has_stream?', rStream':'';
-			my $reply = obj_get_type_params($cmd,'Command');
-			print H "\tstd::auto_ptr<$classname_base$reply> Query(const $classname_base$cmd &rQuery$argextra);\n";
-			my @a;
-			my @na;
-			for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
-			{
-				my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
-				push @a,translate_type_to_arg_type($ty)." $nm";
-				push @na,"$nm";
-			}
-			my $ar = join(', ',@a);
-			my $nar = join(', ',@na);
-			$nar = "($nar)" if $nar ne '';
-
-			$with_params .= "\tinline std::auto_ptr<$classname_base$reply> Query$cmd($ar$argextra)\n\t{\n";
-			$with_params .= "\t\t$classname_base$cmd send$nar;\n";
-			$with_params .= "\t\treturn Query(send$queryextra);\n";
-			$with_params .= "\t}\n";
-		}
-	}
-	# quick hack to correct bad argument lists for commands with zero paramters but with streams
-	$with_params =~ s/\(, /(/g;
-	print H "\n",$with_params,"\n";
-}
-print H <<__E;
-private:
-	$classname_base(const $classname_base &rToCopy);
-__E
-if($type eq 'Server')
-{
-	# need to put the streams to send vector
-	print H "\tstd::vector<IOStream*> mStreamsToSend;\n\tvoid DeleteStreamsToSend();\n";
-}
-
-if($implement_filelog || $implement_syslog)
-{
-	print H <<__E;
-	virtual void InformStreamReceiving(u_int32_t Size);
-	virtual void InformStreamSending(u_int32_t Size);
-__E
-}
-
-if($implement_syslog)
-{
-	print H "private:\n\tbool mLogToSysLog;\n";
-}
-if($implement_filelog)
-{
-	print H "private:\n\tFILE *mLogToFile;\n";
-}
-print H <<__E;
-
-protected:	
-	virtual std::auto_ptr<ProtocolObject> MakeProtocolObject(int ObjType);
+	$protocol_base_class();
+	virtual ~$protocol_base_class();
 	virtual const char *GetIdentString();
+	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
+
+protected:
+	void CheckReply(const std::string& requestCommand,
+		const $message_base_class &rReply, int expectedType);
+	void SetLastError(int Type, int SubType)
+	{
+		mLastErrorType = Type;
+		mLastErrorSubType = SubType;
+	}
+
+private:
+	$protocol_base_class(const $protocol_base_class &rToCopy); /* do not call */
+	int mLastErrorType;
+	int mLastErrorSubType;
+};
+
+class $replyable_base_class : public virtual $protocol_base_class
+{
+public:
+	$replyable_base_class();
+	virtual ~$replyable_base_class();
+
+	/*
+	virtual std::auto_ptr<$message_base_class> Receive() = 0;
+	virtual void Send(const ${message_base_class} &rObject) = 0;
+	*/
+
+	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
+	virtual int GetTimeout() = 0;
+	void SendStreamAfterCommand(IOStream *pStream);
+	
+protected:
+	std::list<IOStream*> mStreamsToSend;
+	void DeleteStreamsToSend();
+
+private:
+	$replyable_base_class(const $replyable_base_class &rToCopy); /* do not call */
 };
 
 __E
 
-my $constructor_extra = '';
-$constructor_extra .= ', mLogToSysLog(false)' if $implement_syslog;
-$constructor_extra .= ', mLogToFile(0)' if $implement_filelog;
-
-my $destructor_extra = ($type eq 'Server')?"\n\tDeleteStreamsToSend();":'';
-
-my $prefix = $classname_base.'::';
 print CPP <<__E;
-$prefix$classname_base(IOStream &rStream)
-	: Protocol(rStream)$constructor_extra
-{
-}
-$prefix~$classname_base()
-{$destructor_extra
-}
-const char *${prefix}GetIdentString()
+$protocol_base_class\::$protocol_base_class()
+: mLastErrorType(Protocol::NoError),
+  mLastErrorSubType(Protocol::NoError)
+{ }
+
+$protocol_base_class\::~$protocol_base_class()
+{ }
+
+const char *$protocol_base_class\::GetIdentString()
 {
 	return "$ident_string";
 }
-std::auto_ptr<ProtocolObject> ${prefix}MakeProtocolObject(int ObjType)
+
+$replyable_base_class\::$replyable_base_class()
+{ }
+
+$replyable_base_class\::~$replyable_base_class()
+{ }
+
+void $replyable_base_class\::SendStreamAfterCommand(IOStream *pStream)
+{
+	ASSERT(pStream != NULL);
+	mStreamsToSend.push_back(pStream);
+}
+
+void $replyable_base_class\::DeleteStreamsToSend()
+{
+	for(std::list<IOStream*>::iterator i(mStreamsToSend.begin()); i != mStreamsToSend.end(); ++i)
+	{
+		delete (*i);
+	}
+	mStreamsToSend.clear();
+}
+
+void $protocol_base_class\::CheckReply(const std::string& requestCommand,
+	const $message_base_class &rReply, int expectedType)
+{
+	if(rReply.GetType() == expectedType)
+	{
+		// Correct response, do nothing
+	}
+	else
+	{
+		// Set protocol error
+		int type, subType;
+		
+		if(rReply.IsError(type, subType))
+		{
+			SetLastError(type, subType);
+			BOX_WARNING(requestCommand << " command failed: "
+				"received error " <<
+				(($error_class&)rReply).GetMessage());
+		}
+		else
+		{
+			SetLastError(Protocol::UnknownError, Protocol::UnknownError);
+			BOX_WARNING(requestCommand << " command failed: "
+				"received unexpected response type " <<
+				rReply.GetType());
+		}
+		
+		// Throw an exception
+		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnexpectedReply)
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Protocol::GetLastError(int &, int &)
+//		Purpose: Returns true if there was an error, and type and subtype if there was.
+//		Created: 2003/08/19
+//
+// --------------------------------------------------------------------------
+bool $protocol_base_class\::GetLastError(int &rTypeOut, int &rSubTypeOut)
+{
+	if(mLastErrorType == Protocol::NoError)
+	{
+		// no error.
+		return false;
+	}
+	
+	// Return type and subtype in args
+	rTypeOut = mLastErrorType;
+	rSubTypeOut = mLastErrorSubType;
+	
+	// and unset them
+	mLastErrorType = Protocol::NoError;
+	mLastErrorSubType = Protocol::NoError;
+	
+	return true;
+}
+
+__E
+
+# the callable protocol interface (implemented by Client and Local classes)
+# with Query methods that don't take a context parameter
+my $callable_base_class = $protocol_name."ProtocolCallable";
+print H <<__E;
+class $callable_base_class : public virtual $protocol_base_class
+{
+public:
+	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
+	virtual int GetTimeout() = 0;
+__E
+
+# add plain object taking query functions
+my $with_params;
+for my $cmd (@cmd_list)
+{
+	if(obj_is_type($cmd,'Command'))
+	{
+		my $has_stream = obj_is_type($cmd,'StreamWithCommand');
+		my $argextra = $has_stream?', IOStream &rStream':'';
+		my $queryextra = $has_stream?', rStream':'';
+		my $request_class = $cmd_class{$cmd};
+		my $reply_class = $cmd_class{obj_get_type_params($cmd,'Command')};
+		
+		print H "\tvirtual std::auto_ptr<$reply_class> Query(const $request_class &rQuery$argextra) = 0;\n";
+		my @a;
+		my @na;
+		for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
+		{
+			my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
+			push @a,translate_type_to_arg_type($ty)." $nm";
+			push @na,"$nm";
+		}
+		my $ar = join(', ',@a);
+		my $nar = join(', ',@na);
+		$nar = "($nar)" if $nar ne '';
+
+		$with_params .= <<__E;
+	inline std::auto_ptr<$reply_class> Query$cmd($ar$argextra)
+	{
+		$request_class send$nar;
+		return Query(send$queryextra);
+	}
+__E
+	}
+}
+
+# quick hack to correct bad argument lists for commands with zero parameters but with streams
+$with_params =~ s/\(, /(/g;
+
+print H <<__E;
+
+$with_params
+};
+__E
+
+# standard remote protocol objects
+foreach my $type ('Client', 'Server', 'Local')
+{
+	my $writing_client = ($type eq 'Client');
+	my $writing_server = ($type eq 'Server');
+	my $writing_local  = ($type eq 'Local');
+			
+	my $server_or_client_class = $protocol_name."Protocol".$type;
+	my @base_classes;
+
+	if (not $writing_client)
+	{
+		push @base_classes, $replyable_base_class;
+	}
+	if (not $writing_server)
+	{
+		push @base_classes, $callable_base_class;
+	}
+	if (not $writing_local)
+	{
+		push @base_classes, "Protocol";
+	}
+
+	my $base_classes_str = join(", ", map {"public $_"} @base_classes);
+
+	print H <<__E;
+class $server_or_client_class : $base_classes_str
+{
+public:
+__E
+
+	if($writing_local)
+	{
+		print H <<__E;
+	$server_or_client_class($context_class &rContext);
+__E
+	}
+	else
+	{
+		print H <<__E;
+	$server_or_client_class(IOStream &rStream);
+	std::auto_ptr<$message_base_class> Receive();
+	void Send(const $message_base_class &rObject);
+__E
+	}
+	
+	print H <<__E;
+	virtual ~$server_or_client_class();
+__E
+
+	if($writing_server)
+	{
+		# need to put in the conversation function
+		print H <<__E;	
+	void DoServer($context_class &rContext);
+
+__E
+	}
+
+	if($writing_client or $writing_local)
+	{
+		# add plain object taking query functions
+		for my $cmd (@cmd_list)
+		{
+			if(obj_is_type($cmd,'Command'))
+			{
+				my $has_stream = obj_is_type($cmd,'StreamWithCommand');
+				my $argextra = $has_stream?', IOStream &rStream':'';
+				my $queryextra = $has_stream?', rStream':'';
+				my $request_class = $cmd_class{$cmd};
+				my $reply_class = $cmd_class{obj_get_type_params($cmd,'Command')};
+				print H "\tstd::auto_ptr<$reply_class> Query(const $request_class &rQuery$argextra);\n";
+			}
+		}
+	}
+	
+	if($writing_local)
+	{
+		print H <<__E;
+private:
+	$context_class &mrContext;
+__E
+	}
+	
+	print H <<__E;
+
+protected:
+	virtual std::auto_ptr<Message> MakeMessage(int ObjType);
+
+__E
+
+	if($writing_local)
+	{
+		print H <<__E;
+	virtual void InformStreamReceiving(u_int32_t Size) { }
+	virtual void InformStreamSending(u_int32_t Size) { }
+
+public:
+	virtual std::auto_ptr<IOStream> ReceiveStream()
+	{
+		std::auto_ptr<IOStream> apStream(mStreamsToSend.front());
+		mStreamsToSend.pop_front();
+		return apStream;
+	}
+__E
+	}
+	else
+	{
+		print H <<__E;
+	virtual void InformStreamReceiving(u_int32_t Size)
+	{
+		this->Protocol::InformStreamReceiving(Size);
+	}
+	virtual void InformStreamSending(u_int32_t Size)
+	{
+		this->Protocol::InformStreamSending(Size);
+	}
+
+public:
+	virtual std::auto_ptr<IOStream> ReceiveStream()
+	{
+		return this->Protocol::ReceiveStream();
+	}
+__E
+	}
+
+	print H <<__E;
+	virtual const char *GetProtocolIdentString()
+	{
+		return GetIdentString();
+	}
+__E
+
+	if($writing_local)
+	{
+		print H <<__E;
+	virtual int GetTimeout()
+	{
+		return IOStream::TimeOutInfinite;
+	}
+__E
+	}
+	else
+	{
+		print H <<__E;
+	virtual int GetTimeout()
+	{
+		return this->Protocol::GetTimeout();
+	}
+__E
+	}	
+	
+	print H <<__E;
+	/*
+	virtual void Handshake()
+	{
+		this->Protocol::Handshake();
+	}
+	virtual bool GetLastError(int &rTypeOut, int &rSubTypeOut)
+	{
+		return this->Protocol::GetLastError(rTypeOut, rSubTypeOut);
+	}
+	*/
+	
+private:
+	$server_or_client_class(const $server_or_client_class &rToCopy); /* no copies */
+};
+
+__E
+
+	my $destructor_extra = ($writing_server) ? "\n\tDeleteStreamsToSend();"
+		: '';
+
+	if($writing_local)
+	{
+		print CPP <<__E;
+$server_or_client_class\::$server_or_client_class($context_class &rContext)
+: mrContext(rContext)
+{ }
+__E
+	}
+	else
+	{
+		print CPP <<__E;
+$server_or_client_class\::$server_or_client_class(IOStream &rStream)
+: Protocol(rStream)
+{ }
+__E
+	}
+	
+	print CPP <<__E;
+$server_or_client_class\::~$server_or_client_class()
+{$destructor_extra
+}
+__E
+
+	# write receive and send functions
+	print CPP <<__E;
+std::auto_ptr<Message> $server_or_client_class\::MakeMessage(int ObjType)
 {
 	switch(ObjType)
 	{
 __E
 
-# do objects within this
-for my $cmd (@cmd_list)
-{
-	print CPP <<__E;
+	# do objects within this
+	for my $cmd (@cmd_list)
+	{
+		print CPP <<__E;
 	case $cmd_id{$cmd}:
-		return std::auto_ptr<ProtocolObject>(new $classname_base$cmd);
+		return std::auto_ptr<Message>(new $cmd_class{$cmd}());
 		break;
 __E
-}
+	}
 
-print CPP <<__E;
+	print CPP <<__E;
 	default:
 		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnknownCommandRecieved)
 	}
 }
 __E
-# write receive and send functions
-print CPP <<__E;
-std::auto_ptr<$derive_objects_from> ${prefix}Receive()
-{
-	std::auto_ptr<${derive_objects_from}> preply((${derive_objects_from}*)(Protocol::Receive().release()));
 
-__E
-	if($implement_syslog)
+	if(not $writing_local)
 	{
 		print CPP <<__E;
-	if(mLogToSysLog)
+std::auto_ptr<$message_base_class> $server_or_client_class\::Receive()
+{
+	std::auto_ptr<$message_base_class> preply(($message_base_class *)
+		Protocol::ReceiveInternal().release());
+
+	if(GetLogToSysLog())
 	{
 		preply->LogSysLog("Receive");
 	}
-__E
-	}
-	if($implement_filelog)
+
+	if(GetLogToFile() != 0)
 	{
-		print CPP <<__E;
-	if(mLogToFile != 0)
-	{
-		preply->LogFile("Receive", mLogToFile);
+		preply->LogFile("Receive", GetLogToFile());
 	}
-__E
-	}
-print CPP <<__E;
 
 	return preply;
 }
 
-void ${prefix}Send(const ${derive_objects_from} &rObject)
+void $server_or_client_class\::Send(const $message_base_class &rObject)
 {
-__E
-	if($implement_syslog)
-	{
-		print CPP <<__E;
-	if(mLogToSysLog)
+	if(GetLogToSysLog())
 	{
 		rObject.LogSysLog("Send");
 	}
-__E
-	}
-	if($implement_filelog)
+
+	if(GetLogToFile() != 0)
 	{
-		print CPP <<__E;
-	if(mLogToFile != 0)
-	{
-		rObject.LogFile("Send", mLogToFile);
-	}
-__E
+		rObject.LogFile("Send", GetLogToFile());
 	}
 
-print CPP <<__E;
-	Protocol::Send(rObject);
+	Protocol::SendInternal(rObject);
 }
 
 __E
-# write server function?
-if($type eq 'Server')
-{
-	print CPP <<__E;
-void ${prefix}DoServer($context_class &rContext)
+	}
+	
+	# write server function?
+	if($writing_server)
+	{
+		print CPP <<__E;
+void $server_or_client_class\::DoServer($context_class &rContext)
 {
 	// Handshake with client
 	Handshake();
@@ -759,20 +956,22 @@ void ${prefix}DoServer($context_class &rContext)
 	while(inProgress)
 	{
 		// Get an object from the conversation
-		std::auto_ptr<${derive_objects_from}> pobj(Receive());
+		std::auto_ptr<$message_base_class> pobj = Receive();
 
 		// Run the command
-		std::auto_ptr<${derive_objects_from}> preply((${derive_objects_from}*)(pobj->DoCommand(*this, rContext).release()));
+		std::auto_ptr<$message_base_class> preply = pobj->DoCommand(*this, rContext);
 		
 		// Send the reply
-		Send(*(preply.get()));
+		Send(*preply);
 
 		// Send any streams
-		for(unsigned int s = 0; s < mStreamsToSend.size(); s++)
+		for(std::list<IOStream*>::iterator
+			i =  mStreamsToSend.begin();
+			i != mStreamsToSend.end(); ++i)
 		{
-			// Send the streams
-			SendStream(*mStreamsToSend[s]);
+			SendStream(**i);
 		}
+		
 		// Delete these streams
 		DeleteStreamsToSend();
 
@@ -784,160 +983,81 @@ void ${prefix}DoServer($context_class &rContext)
 	}	
 }
 
-void ${prefix}SendStreamAfterCommand(IOStream *pStream)
-{
-	ASSERT(pStream != NULL);
-	mStreamsToSend.push_back(pStream);
-}
-
-void ${prefix}DeleteStreamsToSend()
-{
-	for(std::vector<IOStream*>::iterator i(mStreamsToSend.begin()); i != mStreamsToSend.end(); ++i)
-	{
-		delete (*i);
-	}
-	mStreamsToSend.clear();
-}
-
 __E
-}
+	}
 
-# write logging functions?
-if($implement_filelog || $implement_syslog)
-{
-	my ($fR,$fS);
-
-	if($implement_syslog)
+	# write client Query functions?
+	if($writing_client or $writing_local)
 	{
-		$fR .= <<__E;
-	if(mLogToSysLog)
-	{
-		if(Size==Protocol::ProtocolStream_SizeUncertain)
+		for my $cmd (@cmd_list)
 		{
-			BOX_TRACE("Receiving stream, size uncertain");
-		}
-		else
-		{
-			BOX_TRACE("Receiving stream, size " << Size);
-		}
-	}
-__E
-		
-		$fS .= <<__E;
-	if(mLogToSysLog)
-	{
-		if(Size==Protocol::ProtocolStream_SizeUncertain)
-		{
-			BOX_TRACE("Sending stream, size uncertain");
-		}
-		else
-		{
-			BOX_TRACE("Sending stream, size " << Size);
-		}
-	}
-__E
-	}
-
-	if($implement_filelog)
-	{
-		$fR .= <<__E;
-	if(mLogToFile)
-	{
-		::fprintf(mLogToFile,
-			(Size==Protocol::ProtocolStream_SizeUncertain)
-			?"Receiving stream, size uncertain\\n"
-			:"Receiving stream, size %d\\n", Size);
-		::fflush(mLogToFile);
-	}
-__E
-		$fS .= <<__E;
-	if(mLogToFile)
-	{
-		::fprintf(mLogToFile,
-			(Size==Protocol::ProtocolStream_SizeUncertain)
-			?"Sending stream, size uncertain\\n"
-			:"Sending stream, size %d\\n", Size);
-		::fflush(mLogToFile);
-	}
-__E
-	}
-
-	print CPP <<__E;
-
-void ${prefix}InformStreamReceiving(u_int32_t Size)
-{
-$fR}
-
-void ${prefix}InformStreamSending(u_int32_t Size)
-{
-$fS}
-
-__E
-}
-
-
-# write client Query functions?
-if($type eq 'Client')
-{
-	for my $cmd (@cmd_list)
-	{
-		if(obj_is_type($cmd,'Command'))
-		{
-			my $reply = obj_get_type_params($cmd,'Command');
-			my $reply_id = $cmd_id{$reply};
-			my $has_stream = obj_is_type($cmd,'StreamWithCommand');
-			my $argextra = $has_stream?', IOStream &rStream':'';
-			my $send_stream_extra = '';
-			if($has_stream)
+			if(obj_is_type($cmd,'Command'))
 			{
-				$send_stream_extra = <<__E;
-	
+				my $request_class = $cmd_class{$cmd};
+				my $reply_msg = obj_get_type_params($cmd,'Command');
+				my $reply_class = $cmd_class{$reply_msg};
+				my $reply_id = $cmd_id{$reply_msg};
+				my $has_stream = obj_is_type($cmd,'StreamWithCommand');
+				my $argextra = $has_stream?', IOStream &rStream':'';
+				my $send_stream_extra = '';
+				my $send_stream_method = $writing_client ? "SendStream"
+					: "SendStreamAfterCommand";
+				
+				if($writing_client)
+				{
+					if($has_stream)
+					{
+						$send_stream_extra = <<__E;
 	// Send stream after the command
 	SendStream(rStream);
 __E
-			}
-			print CPP <<__E;
-std::auto_ptr<$classname_base$reply> ${classname_base}::Query(const $classname_base$cmd &rQuery$argextra)
+					}
+					
+					print CPP <<__E;
+std::auto_ptr<$reply_class> $server_or_client_class\::Query(const $request_class &rQuery$argextra)
 {
 	// Send query
 	Send(rQuery);
 	$send_stream_extra
+	
 	// Wait for the reply
-	std::auto_ptr<${derive_objects_from}> preply(Receive().release());
+	std::auto_ptr<$message_base_class> preply = Receive();
+	
+	CheckReply("$cmd", *preply, $reply_id);
 
-	if(preply->GetType() == $reply_id)
-	{
-		// Correct response
-		return std::auto_ptr<$classname_base$reply>(($classname_base$reply*)preply.release());
-	}
-	else
-	{
-		// Set protocol error
-		int type, subType;
-		if(preply->IsError(type, subType))
-		{
-			SetError(type, subType);
-			BOX_WARNING("$cmd command failed: received error " <<
-				((${classname_base}Error&)*preply).GetMessage());
-		}
-		else
-		{
-			SetError(Protocol::UnknownError, Protocol::UnknownError);
-			BOX_WARNING("$cmd command failed: received "
-				"unexpected response type " <<
-				preply->GetType());
-		}
-		
-		// Throw an exception
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnexpectedReply)
-	}
+	// Correct response, if no exception thrown by CheckReply
+	return std::auto_ptr<$reply_class>(($reply_class *)preply.release());
 }
 __E
+				}
+				elsif($writing_local)
+				{
+					if($has_stream)
+					{
+						$send_stream_extra = <<__E;
+	// Send stream after the command
+	SendStreamAfterCommand(&rStream);
+__E
+					}
+
+					print CPP <<__E;
+std::auto_ptr<$reply_class> $server_or_client_class\::Query(const $request_class &rQuery$argextra)
+{
+	// Send query
+	$send_stream_extra
+	std::auto_ptr<$message_base_class> preply = rQuery.DoCommand(*this, mrContext);
+	
+	CheckReply("$cmd", *preply, $reply_id);
+
+	// Correct response, if no exception thrown by CheckReply
+	return std::auto_ptr<$reply_class>(($reply_class *)preply.release());
+}
+__E
+				}
+			}
 		}
 	}
 }
-
-
 
 print H <<__E;
 #endif // $guardname
@@ -948,8 +1068,7 @@ __E
 close H;
 close CPP;
 
-
-sub obj_is_type
+sub obj_is_type ($$)
 {
 	my ($c,$ty) = @_;
 	for(@{$cmd_attributes{$c}})
@@ -1003,40 +1122,6 @@ sub translate_type_to_member_type
 	return $typename
 }
 
-sub make_log_strings
-{
-	my ($cmd) = @_;
-
-	my @str;
-	my @arg;
-	for(my $x = 0; $x < $#{$cmd_contents{$cmd}}; $x+=2)
-	{
-		my ($ty,$nm) = (${$cmd_contents{$cmd}}[$x], ${$cmd_contents{$cmd}}[$x+1]);
-		
-		if(exists $log_display_types{$ty})
-		{
-			# need to translate it
-			my ($format,$arg) = @{$log_display_types{$ty}};
-			$arg =~ s/VAR/m$nm/g;
-
-			if ($format eq "0x%llx" and $target_windows)
-			{
-				$format = "0x%I64x";
-				$arg = "(uint64_t)$arg";
-			}
-
-			push @str,$format;
-			push @arg,$arg;
-		}
-		else
-		{
-			# is opaque
-			push @str,'OPAQUE';
-		}
-	}
-	return ($cmd.'('.join(',',@str).')', join(',','',@arg));
-}
-
 sub make_log_strings_framework
 {
 	my ($cmd) = @_;
@@ -1053,7 +1138,7 @@ sub make_log_strings_framework
 			my ($format,$arg) = @{$log_display_types{$ty}};
 			$arg =~ s/VAR/m$nm/g;
 
-			if ($format eq '\\"%s\\"')
+			if ($format eq '"%s"')
 			{
 				$arg = "\"\\\"\" << $arg << \"\\\"\"";
 			}
@@ -1089,5 +1174,4 @@ sub make_log_strings_framework
 	$log_cmd .= '<< ")"';
 	return $log_cmd;
 }
-
 

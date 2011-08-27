@@ -18,7 +18,6 @@
 #include "BackupStoreFilename.h"
 #include "IOStream.h"
 #include "ReadLoggingStream.h"
-#include "RunStatusProvider.h"
 
 typedef struct 
 {
@@ -26,6 +25,8 @@ typedef struct
 	int64_t mBytesAlreadyOnServer;
 	int64_t mTotalFileStreamSize;
 } BackupStoreFileStats;
+
+class RunStatusProvider;
 
 // Uncomment to disable backwards compatibility
 //#define BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE

@@ -12,11 +12,13 @@
 
 #include <sys/types.h>
 
-class IOStream;
-#include "ProtocolObject.h"
 #include <memory>
 #include <vector>
 #include <string>
+
+#include "Message.h"
+
+class IOStream;
 
 // default timeout is 15 minutes
 #define PROTOCOL_DEFAULT_TIMEOUT	(15*60*1000)
@@ -40,11 +42,14 @@ public:
 private:
 	Protocol(const Protocol &rToCopy);
 
+protected:
+	// Unsafe to make public, as they may allow sending objects
+	// from a different protocol. The derived class prevents this.
+	std::auto_ptr<Message> ReceiveInternal();
+	void SendInternal(const Message &rObject);
+
 public:
 	void Handshake();
-	std::auto_ptr<ProtocolObject> Receive();
-	void Send(const ProtocolObject &rObject);
-	
 	std::auto_ptr<IOStream> ReceiveStream();
 	void SendStream(IOStream &rStream);
 	
@@ -53,8 +58,6 @@ public:
 		NoError = -1,
 		UnknownError = 0
 	};
-
-	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
 
 	// --------------------------------------------------------------------------
 	//
@@ -87,7 +90,7 @@ public:
 	// --------------------------------------------------------------------------	
 	void SetMaxObjectSize(unsigned int NewMaxObjSize) {mMaxObjectSize = NewMaxObjSize;}
 
-	// For ProtocolObject derived classes
+	// For Message derived classes
 	void Read(void *Buffer, int Size);
 	void Read(std::string &rOut, int Size);
 	void Read(int64_t &rOut);
@@ -168,11 +171,15 @@ public:
 	{
 		ProtocolStream_SizeUncertain = 0xffffffff
 	};
+	bool GetLogToSysLog() { return mLogToSysLog; }
+	FILE *GetLogToFile() { return mLogToFile; }
+	void SetLogToSysLog(bool Log = false) {mLogToSysLog = Log;}
+	void SetLogToFile(FILE *File = 0) {mLogToFile = File;}
 
-protected:	
-	virtual std::auto_ptr<ProtocolObject> MakeProtocolObject(int ObjType) = 0;
-	virtual const char *GetIdentString() = 0;
-	void SetError(int Type, int SubType) {mLastErrorType = Type; mLastErrorSubType = SubType;}
+protected:
+	virtual std::auto_ptr<Message> MakeMessage(int ObjType) = 0;
+	virtual const char *GetProtocolIdentString() = 0;
+	
 	void CheckAndReadHdr(void *hdr);	// don't use type here to avoid dependency
 	
 	// Will be used for logging
@@ -183,7 +190,6 @@ private:
 	void EnsureBufferAllocated(int Size);
 	int SendStreamSendBlock(uint8_t *Block, int BytesInBlock);
 
-private:
 	IOStream &mrStream;
 	bool mHandshakeDone;
 	unsigned int mMaxObjectSize;
@@ -193,8 +199,12 @@ private:
 	int mReadOffset;
 	int mWriteOffset;
 	int mValidDataSize;
-	int mLastErrorType;
-	int mLastErrorSubType;
+	bool mLogToSysLog;
+	FILE *mLogToFile;
+};
+
+class ProtocolContext
+{
 };
 
 #endif // PROTOCOL__H

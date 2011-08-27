@@ -50,7 +50,7 @@
 
 #include "SSLLib.h"
 
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 #include "autogen_ClientException.h"
 #include "autogen_ConversionException.h"
 #include "Archive.h"
@@ -696,6 +696,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 	// do not retry immediately without a good reason
 	mDoSyncForcedByPreviousSyncError = false;
 	
+	// Notify system administrator about the final state of the backup
 	if(errorOccurred)
 	{
 		// Is it a berkely db failure?
@@ -757,16 +758,19 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 		}
 	}
-	// Notify system administrator about the final state of the backup
-	else if(mReadErrorsOnFilesystemObjects)
+
+	if(mReadErrorsOnFilesystemObjects)
 	{
 		NotifySysadmin(SysadminNotifier::ReadError);
 	}
-	else if(mStorageLimitExceeded)
+
+	if(mStorageLimitExceeded)
 	{
 		NotifySysadmin(SysadminNotifier::StoreFull);
 	}
-	else
+
+	if (!errorOccurred && !mReadErrorsOnFilesystemObjects &&
+		!mStorageLimitExceeded)
 	{
 		NotifySysadmin(SysadminNotifier::BackupOK);
 	}
@@ -1004,7 +1008,7 @@ void BackupDaemon::RunSyncNow()
 #endif
 
 		(*i)->mpDirectoryRecord->SyncDirectory(params,
-			BackupProtocolClientListDirectory::RootDirectory,
+			BackupProtocolListDirectory::RootDirectory,
 			locationPath, std::string("/") + (*i)->mName);
 
 		// Unset exclude lists (just in case)
@@ -2097,18 +2101,18 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	
 	// Going to need a copy of the root directory. Get a connection,
 	// and fetch it.
-	BackupProtocolClient &connection(rClientContext.GetConnection());
+	BackupProtocolCallable& connection(rClientContext.GetConnection());
 	
 	// Ask server for a list of everything in the root directory,
 	// which is a directory itself
-	std::auto_ptr<BackupProtocolClientSuccess> dirreply(
+	std::auto_ptr<BackupProtocolSuccess> dirreply(
 		connection.QueryListDirectory(
-			BackupProtocolClientListDirectory::RootDirectory,
+			BackupProtocolListDirectory::RootDirectory,
 			// only directories
-			BackupProtocolClientListDirectory::Flags_Dir,
+			BackupProtocolListDirectory::Flags_Dir,
 			// exclude old/deleted stuff
-			BackupProtocolClientListDirectory::Flags_Deleted |
-			BackupProtocolClientListDirectory::Flags_OldVersion,
+			BackupProtocolListDirectory::Flags_Deleted |
+			BackupProtocolListDirectory::Flags_OldVersion,
 			false /* no attributes */));
 
 	// Retrieve the directory from the stream following
@@ -2348,9 +2352,9 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				try
 				{
 					MemBlockStream attrStream(attr);
-					std::auto_ptr<BackupProtocolClientSuccess>
+					std::auto_ptr<BackupProtocolSuccess>
 						dirCreate(connection.QueryCreateDirectory(
-						BackupProtocolClientListDirectory::RootDirectory,
+						BackupProtocolListDirectory::RootDirectory,
 						attrModTime, dirname, attrStream));
 						
 					// Object ID for later creation
@@ -2894,7 +2898,7 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 
 	// Entries to delete, and it's the right time to do so...
 	BOX_NOTICE("Deleting unused locations from store root...");
-	BackupProtocolClient &connection(rContext.GetConnection());
+	BackupProtocolCallable &connection(rContext.GetConnection());
 	for(std::vector<std::pair<int64_t,std::string> >::iterator
 		i(mUnusedRootDirEntries.begin());
 		i != mUnusedRootDirEntries.end(); ++i)
