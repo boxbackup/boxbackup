@@ -344,7 +344,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 							"move files incorrectly in your "
 							"backup! " << filename << 
 							", nlink=" << file_st.st_nlink <<
-							" (suppressing further warnings");
+							" (suppressing further warnings)");
 						mSuppressMultipleLinksWarning = true;
 					}
 					SetErrorWhenReadingFilesystemObject(
