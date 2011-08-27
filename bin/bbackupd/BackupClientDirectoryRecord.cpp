@@ -1387,6 +1387,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					
 					// Flag as having done this for optimisation later
 					haveJustCreatedDirOnServer = true;
+					rNotifier.NotifyDirectoryCreated(subDirObjectID,
+						storeFilename.GetClearFilename(),
+						dirname);
 				}
 			}
 
