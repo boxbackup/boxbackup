@@ -367,5 +367,6 @@ void BackupStoreDaemon::LogConnectionStats(const char *commonName,
 	BOX_NOTICE("Connection statistics for " << commonName << ":"
 		" IN="  << s.GetBytesRead() <<
 		" OUT=" << s.GetBytesWritten() <<
+		" NET_IN=" << (s.GetBytesRead() - s.GetBytesWritten()) <<
 		" TOTAL=" << (s.GetBytesRead() + s.GetBytesWritten()));
 }
