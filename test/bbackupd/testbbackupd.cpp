@@ -42,7 +42,7 @@
 	#include <sys/syscall.h>
 #endif
 
-#include "autogen_BackupProtocolServer.h"
+#include "autogen_BackupProtocol.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupClientRestore.h"
@@ -73,7 +73,6 @@
 #include "Timer.h"
 #include "Utils.h"
 
-#include "autogen_BackupProtocolClient.h"
 #include "intercept.h"
 #include "ServerControl.h"
 
@@ -475,8 +474,8 @@ int64_t GetDirID(BackupProtocolClient &protocol, const char *name, int64_t InDir
 {
 	protocol.QueryListDirectory(
 			InDirectory,
-			BackupProtocolClientListDirectory::Flags_Dir,
-			BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+			BackupProtocolListDirectory::Flags_Dir,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 			true /* want attributes */);
 	
 	// Retrieve the directory from the stream following
@@ -518,9 +517,9 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 				22011);
 			BackupProtocolClient protocol(conn);
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-			std::auto_ptr<BackupProtocolClientLoginConfirmed>
+			std::auto_ptr<BackupProtocolLoginConfirmed>
 				loginConf(protocol.QueryLogin(0x01234567,
-					BackupProtocolClientLogin::Flags_ReadOnly));
+					BackupProtocolLogin::Flags_ReadOnly));
 			
 			// Test the restoration
 			TEST_THAT(BackupClientRestore(protocol, restoredirid,
@@ -604,7 +603,7 @@ int64_t SearchDir(BackupStoreDirectory& rDir,
 	if (en == 0) return 0;
 	int64_t id = en->GetObjectID();
 	TEST_THAT(id > 0);
-	TEST_THAT(id != BackupProtocolClientListDirectory::RootDirectory);
+	TEST_THAT(id != BackupProtocolListDirectory::RootDirectory);
 	return id;
 }
 
@@ -617,7 +616,7 @@ std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext)
 	std::auto_ptr<BackupProtocolClient> connection;
 	connection.reset(new BackupProtocolClient(sSocket));
 	connection->Handshake();
-	std::auto_ptr<BackupProtocolClientVersion> 
+	std::auto_ptr<BackupProtocolVersion> 
 		serverVersion(connection->QueryVersion(
 			BACKUP_STORE_SERVER_VERSION));
 	if(serverVersion->GetVersion() != 
@@ -640,10 +639,10 @@ std::auto_ptr<BackupProtocolClient> ConnectAndLogin(TLSContext& rContext,
 std::auto_ptr<BackupStoreDirectory> ReadDirectory
 (
 	BackupProtocolClient& rClient,
-	int64_t id
+	int64_t id = BackupProtocolListDirectory::RootDirectory
 )
 {
-	std::auto_ptr<BackupProtocolClientSuccess> dirreply(
+	std::auto_ptr<BackupProtocolSuccess> dirreply(
 		rClient.QueryListDirectory(id, false, 0, false));
 	std::auto_ptr<IOStream> dirstream(rClient.ReceiveStream());
 	std::auto_ptr<BackupStoreDirectory> apDir(new BackupStoreDirectory());
@@ -766,7 +765,7 @@ extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 	}
 	else
 	{
-		BOX_INFO("readdir hook still active at " << time_now << ", "
+		BOX_TRACE("readdir hook still active at " << time_now << ", "
 			"waiting for " << readdir_stop_time);
 	}
 
@@ -780,7 +779,7 @@ extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 	snprintf(readdir_test_dirent.d_name, 
 		sizeof(readdir_test_dirent.d_name),
 		"test.%d", readdir_test_counter);
-	BOX_INFO("readdir hook returning " << readdir_test_dirent.d_name);
+	BOX_TRACE("readdir hook returning " << readdir_test_dirent.d_name);
 
 	// ensure that when bbackupd stats the file, it gets the 
 	// right answer
@@ -791,6 +790,9 @@ extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	intercept_setup_lstat_hook(stat_hook_filename, lstat_test_hook);
 #endif
+
+	// sleep a bit to reduce the number of dirents returned
+	::safe_sleep(1);
 
 	return &readdir_test_dirent;
 }
@@ -1131,6 +1133,9 @@ int test_bbackupd()
 			TEST_LINE(comp2 != sub, line);
 		}
 
+		// Check that no read error has been reported yet
+		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+
 		if (failures > 0)
 		{
 			// stop early to make debugging easier
@@ -1338,7 +1343,7 @@ int test_bbackupd()
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context, 0 /* read-write */);
 		
-			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+			std::auto_ptr<BackupProtocolAccountUsage> usage(
 				client->QueryGetAccountUsage());
 			TEST_EQUAL_LINE(24, usage->GetBlocksUsed(),
 				"blocks used");
@@ -1421,8 +1426,7 @@ int test_bbackupd()
 				ConnectAndLogin(context, 0 /* read-write */);
 		
 			std::auto_ptr<BackupStoreDirectory> rootDir = 
-				ReadDirectory(*client,
-				BackupProtocolClientListDirectory::RootDirectory);
+				ReadDirectory(*client);
 
 			int64_t testDirId = SearchDir(*rootDir, "Test1");
 			TEST_THAT(testDirId != 0);
@@ -1464,7 +1468,7 @@ int test_bbackupd()
 				ReadDirectory(*client, d4_id);
 			TEST_THAT(test_entry_deleted(*d4_dir, "f5"));
 
-			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+			std::auto_ptr<BackupProtocolAccountUsage> usage(
 				client->QueryGetAccountUsage());
 			TEST_EQUAL_LINE(24, usage->GetBlocksUsed(),
 				"blocks used");
@@ -1498,8 +1502,7 @@ int test_bbackupd()
 				ConnectAndLogin(context, 0 /* read-write */);
 			
 			std::auto_ptr<BackupStoreDirectory> rootDir = 
-				ReadDirectory(*client,
-				BackupProtocolClientListDirectory::RootDirectory);
+				ReadDirectory(*client);
 
 			int64_t testDirId = SearchDir(*rootDir, "Test1");
 			TEST_THAT(testDirId != 0);
@@ -1519,7 +1522,7 @@ int test_bbackupd()
 			TEST_THAT(SearchDir(*spacetest_dir, "d3") == 0);
 			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
 
-			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+			std::auto_ptr<BackupProtocolAccountUsage> usage(
 				client->QueryGetAccountUsage());
 			TEST_EQUAL_LINE(16, usage->GetBlocksUsed(),
 				"blocks used");
@@ -1574,7 +1577,7 @@ int test_bbackupd()
 			std::auto_ptr<BackupProtocolClient> client = 
 				ConnectAndLogin(context, 0 /* read-write */);
 
-			std::auto_ptr<BackupProtocolClientAccountUsage> usage(
+			std::auto_ptr<BackupProtocolAccountUsage> usage(
 				client->QueryGetAccountUsage());
 			TEST_EQUAL_LINE(22, usage->GetBlocksUsed(),
 				"blocks used");
@@ -1685,17 +1688,17 @@ int test_bbackupd()
 
 		class MyHook : public BackupStoreContext::TestHook
 		{
-			virtual std::auto_ptr<ProtocolObject> StartCommand(
-				BackupProtocolObject& rCommand)
+			virtual std::auto_ptr<BackupProtocolMessage> StartCommand(
+				const BackupProtocolMessage& rCommand)
 			{
 				if (rCommand.GetType() ==
-					BackupProtocolServerStoreFile::TypeID)
+					BackupProtocolStoreFile::TypeID)
 				{
 					// terminate badly
 					THROW_EXCEPTION(CommonException,
 						Internal);
 				}
-				return std::auto_ptr<ProtocolObject>();
+				return std::auto_ptr<BackupProtocolMessage>();
 			}
 		};
 		MyHook hook;
@@ -1959,11 +1962,10 @@ int test_bbackupd()
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context,
-				BackupProtocolClientLogin::Flags_ReadOnly);
+				BackupProtocolLogin::Flags_ReadOnly);
 			
 			std::auto_ptr<BackupStoreDirectory> dir = 
-				ReadDirectory(*client,
-				BackupProtocolClientListDirectory::RootDirectory);
+				ReadDirectory(*client);
 			int64_t testDirId = SearchDir(*dir, "Test2");
 			TEST_THAT(testDirId != 0);
 
@@ -1998,11 +2000,10 @@ int test_bbackupd()
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context,
-				BackupProtocolClientLogin::Flags_ReadOnly);
+				BackupProtocolLogin::Flags_ReadOnly);
 			
 			std::auto_ptr<BackupStoreDirectory> dir = 
-				ReadDirectory(*client,
-				BackupProtocolClientListDirectory::RootDirectory);
+				ReadDirectory(*client);
 			int64_t testDirId = SearchDir(*dir, "Test2");
 			TEST_THAT(testDirId != 0);
 
@@ -2017,11 +2018,10 @@ int test_bbackupd()
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context,
-				BackupProtocolClientLogin::Flags_ReadOnly);
+				BackupProtocolLogin::Flags_ReadOnly);
 			
 			std::auto_ptr<BackupStoreDirectory> root_dir = 
-				ReadDirectory(*client,
-				BackupProtocolClientListDirectory::RootDirectory);
+				ReadDirectory(*client);
 
 			TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
 
@@ -2263,8 +2263,7 @@ int test_bbackupd()
 				ConnectAndLogin(context, 0);
 
 			std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
-				*client, 
-				BackupProtocolClientListDirectory::RootDirectory);
+				*client);
 
 			int64_t baseDirId = SearchDir(*dir, "Test1");
 			TEST_THAT(baseDirId != 0);
@@ -3257,11 +3256,10 @@ int test_bbackupd()
 		{
 			std::auto_ptr<BackupProtocolClient> client = 
 				ConnectAndLogin(context,
-				BackupProtocolClientLogin::Flags_ReadOnly);
+				BackupProtocolLogin::Flags_ReadOnly);
 			
 			std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
-				*client,
-				BackupProtocolClientListDirectory::RootDirectory);
+				*client);
 
 			int64_t testDirId = SearchDir(*dir, "Test1");
 			TEST_THAT(testDirId != 0);
@@ -3438,11 +3436,11 @@ int test_bbackupd()
 			// connect and log in
 			std::auto_ptr<BackupProtocolClient> client = 
 				ConnectAndLogin(context,
-				BackupProtocolClientLogin::Flags_ReadOnly);
+				BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
 			restoredirid = GetDirID(*client, "Test1", 
-				BackupProtocolClientListDirectory::RootDirectory);
+				BackupProtocolListDirectory::RootDirectory);
 			TEST_THAT(restoredirid != 0);
 
 			// Test the restoration
@@ -3745,7 +3743,7 @@ int test_bbackupd()
 					// Make sure the marker isn't zero,
 					// because that's the default, and
 					// it should have changed
-					std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(protocol->QueryLogin(0x01234567, 0));
+					std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol->QueryLogin(0x01234567, 0));
 					TEST_THAT(loginConf->GetClientStoreMarker() != 0);
 					
 					// Change it to something else
@@ -3823,7 +3821,7 @@ int test_bbackupd()
 
 			std::auto_ptr<BackupProtocolClient> client = 
 				ConnectAndLogin(context,
-				BackupProtocolClientLogin::Flags_ReadOnly);
+				BackupProtocolLogin::Flags_ReadOnly);
 
 			// Check that the restore fn returns resume possible,
 			// rather than doing anything

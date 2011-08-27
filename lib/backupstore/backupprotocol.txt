@@ -6,14 +6,13 @@ Name 				Backup
 IdentString			Box-Backup:v=C
 ServerContextClass	BackupStoreContext	BackupStoreContext.h
 
-ClientType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
-ServerType		Filename	BackupStoreFilename			BackupStoreFilename.h
+AddType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
 
 ImplementLog	Server	syslog
 ImplementLog	Client	syslog
 ImplementLog	Client	file
 
-LogTypeToText	Client	Filename	\"%s\"	VAR.GetClearFilename().c_str()
+LogTypeToText	Filename	"%s"	VAR.GetClearFilenameIfPossible("OPAQUE").c_str()
 
 BEGIN_OBJECTS
 

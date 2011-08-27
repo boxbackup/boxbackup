@@ -50,7 +50,7 @@
 #include "SSLLib.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreException.h"
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 #include "BackupQueries.h"
 #include "FdGetLine.h"
 #include "BackupClientCryptoKeys.h"
@@ -447,7 +447,7 @@ int main(int argc, const char *argv[])
 	if(!quiet) BOX_INFO("Login to store...");
 	// Check the version of the server
 	{
-		std::auto_ptr<BackupProtocolClientVersion> serverVersion(connection.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+		std::auto_ptr<BackupProtocolVersion> serverVersion(connection.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 		if(serverVersion->GetVersion() != BACKUP_STORE_SERVER_VERSION)
 		{
 			THROW_EXCEPTION(BackupStoreException, WrongServerVersion)
@@ -455,7 +455,7 @@ int main(int argc, const char *argv[])
 	}
 	// Login -- if this fails, the Protocol will exception
 	connection.QueryLogin(conf.GetKeyValueUint32("AccountNumber"),
-		(readWrite)?0:(BackupProtocolClientLogin::Flags_ReadOnly));
+		(readWrite)?0:(BackupProtocolLogin::Flags_ReadOnly));
 
 	// 5. Tell user.
 	if(!quiet) printf("Login complete.\n\nType \"help\" for a list of commands.\n\n");

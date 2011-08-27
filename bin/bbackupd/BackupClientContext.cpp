@@ -25,7 +25,7 @@
 #include "BackupStoreConstants.h"
 #include "BackupStoreException.h"
 #include "BackupDaemon.h"
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 #include "BackupStoreFile.h"
 #include "Logging.h"
 
@@ -165,7 +165,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		
 		// Check the version of the server
 		{
-			std::auto_ptr<BackupProtocolClientVersion> serverVersion(mpConnection->QueryVersion(BACKUP_STORE_SERVER_VERSION));
+			std::auto_ptr<BackupProtocolVersion> serverVersion(mpConnection->QueryVersion(BACKUP_STORE_SERVER_VERSION));
 			if(serverVersion->GetVersion() != BACKUP_STORE_SERVER_VERSION)
 			{
 				THROW_EXCEPTION(BackupStoreException, WrongServerVersion)
@@ -173,7 +173,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		}
 
 		// Login -- if this fails, the Protocol will exception
-		std::auto_ptr<BackupProtocolClientLoginConfirmed> loginConf(mpConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
+		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(mpConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
 		
 		// Check that the client store marker is the one we expect
 		if(mClientStoreMarker != ClientStoreMarker_NotKnown)
@@ -419,20 +419,20 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 
 	// Request filenames from the server, in a "safe" manner to ignore errors properly
 	{
-		BackupProtocolClientGetObjectName send(ObjectID, ContainingDirectory);
+		BackupProtocolGetObjectName send(ObjectID, ContainingDirectory);
 		connection.Send(send);
 	}
-	std::auto_ptr<BackupProtocolObjectCl> preply(connection.Receive());
+	std::auto_ptr<BackupProtocolMessage> preply(connection.Receive());
 
 	// Is it of the right type?
-	if(preply->GetType() != BackupProtocolClientObjectName::TypeID)
+	if(preply->GetType() != BackupProtocolObjectName::TypeID)
 	{
 		// Was an error or something
 		return false;
 	}
 
 	// Cast to expected type.
-	BackupProtocolClientObjectName *names = (BackupProtocolClientObjectName *)(preply.get());
+	BackupProtocolObjectName *names = (BackupProtocolObjectName *)(preply.get());
 
 	// Anything found?
 	int32_t numElements = names->GetNumNameElements();
@@ -482,10 +482,10 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 	}
 
 	// Is it a directory?
-	rIsDirectoryOut = ((names->GetFlags() & BackupProtocolClientListDirectory::Flags_Dir) == BackupProtocolClientListDirectory::Flags_Dir);
+	rIsDirectoryOut = ((names->GetFlags() & BackupProtocolListDirectory::Flags_Dir) == BackupProtocolListDirectory::Flags_Dir);
 	
 	// Is it the current version?
-	rIsCurrentVersionOut = ((names->GetFlags() & (BackupProtocolClientListDirectory::Flags_OldVersion | BackupProtocolClientListDirectory::Flags_Deleted)) == 0);
+	rIsCurrentVersionOut = ((names->GetFlags() & (BackupProtocolListDirectory::Flags_OldVersion | BackupProtocolListDirectory::Flags_Deleted)) == 0);
 
 	// And other information which may be required
 	if(pModTimeOnServer) *pModTimeOnServer = names->GetModificationTime();

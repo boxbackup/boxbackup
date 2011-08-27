@@ -24,7 +24,7 @@
 #include "SocketStream.h"
 #include "TLSContext.h"
 
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 
 #ifdef WIN32
 	#include "WinNamedPipeListener.h"
@@ -382,7 +382,7 @@ public:
  		int type, int subtype)
  	{
 		std::ostringstream msgs;
-		if (type != BackupProtocolClientError::ErrorType)
+		if (type != BackupProtocolError::ErrorType)
 		{
 			msgs << "unknown error type " << type;
 		}
@@ -390,46 +390,46 @@ public:
 		{
 			switch(subtype)
 			{
-			case BackupProtocolClientError::Err_WrongVersion:
+			case BackupProtocolError::Err_WrongVersion:
 				msgs << "WrongVersion";
 				break;
-			case BackupProtocolClientError::Err_NotInRightProtocolPhase:
+			case BackupProtocolError::Err_NotInRightProtocolPhase:
 				msgs << "NotInRightProtocolPhase";
 				break;
-			case BackupProtocolClientError::Err_BadLogin:
+			case BackupProtocolError::Err_BadLogin:
 				msgs << "BadLogin";
 				break;
-			case BackupProtocolClientError::Err_CannotLockStoreForWriting:
+			case BackupProtocolError::Err_CannotLockStoreForWriting:
 				msgs << "CannotLockStoreForWriting";
 				break;
-			case BackupProtocolClientError::Err_SessionReadOnly:
+			case BackupProtocolError::Err_SessionReadOnly:
 				msgs << "SessionReadOnly";
 				break;
-			case BackupProtocolClientError::Err_FileDoesNotVerify:
+			case BackupProtocolError::Err_FileDoesNotVerify:
 				msgs << "FileDoesNotVerify";
 				break;
-			case BackupProtocolClientError::Err_DoesNotExist:
+			case BackupProtocolError::Err_DoesNotExist:
 				msgs << "DoesNotExist";
 				break;
-			case BackupProtocolClientError::Err_DirectoryAlreadyExists:
+			case BackupProtocolError::Err_DirectoryAlreadyExists:
 				msgs << "DirectoryAlreadyExists";
 				break;
-			case BackupProtocolClientError::Err_CannotDeleteRoot:
+			case BackupProtocolError::Err_CannotDeleteRoot:
 				msgs << "CannotDeleteRoot";
 				break;
-			case BackupProtocolClientError::Err_TargetNameExists:
+			case BackupProtocolError::Err_TargetNameExists:
 				msgs << "TargetNameExists";
 				break;
-			case BackupProtocolClientError::Err_StorageLimitExceeded:
+			case BackupProtocolError::Err_StorageLimitExceeded:
 				msgs << "StorageLimitExceeded";
 				break;
-			case BackupProtocolClientError::Err_DiffFromFileDoesNotExist:
+			case BackupProtocolError::Err_DiffFromFileDoesNotExist:
 				msgs << "DiffFromFileDoesNotExist";
 				break;
-			case BackupProtocolClientError::Err_DoesNotExistInDirectory:
+			case BackupProtocolError::Err_DoesNotExistInDirectory:
 				msgs << "DoesNotExistInDirectory";
 				break;
-			case BackupProtocolClientError::Err_PatchConsistencyError:
+			case BackupProtocolError::Err_PatchConsistencyError:
 				msgs << "PatchConsistencyError";
 				break;
 			default:

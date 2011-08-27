@@ -16,15 +16,14 @@
 
 #include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
-#include "ProtocolObject.h"
+#include "Message.h"
 #include "Utils.h"
 
 class BackupStoreDirectory;
 class BackupStoreFilename;
-class BackupStoreDaemon;
 class BackupStoreInfo;
 class IOStream;
-class BackupProtocolObject;
+class BackupProtocolMessage;
 class StreamableMemBlock;
 
 class HousekeepingInterface
@@ -161,21 +160,22 @@ public:
 	class TestHook
 	{
 		public:
-		virtual std::auto_ptr<ProtocolObject> StartCommand(BackupProtocolObject&
-			rCommand) = 0;
+		virtual std::auto_ptr<BackupProtocolMessage>
+			StartCommand(const BackupProtocolMessage& rCommand) = 0;
 		virtual ~TestHook() { }
 	};
 	void SetTestHook(TestHook& rTestHook)
 	{
 		mpTestHook = &rTestHook;
 	}
-	std::auto_ptr<ProtocolObject> StartCommandHook(BackupProtocolObject& rCommand)
+	std::auto_ptr<BackupProtocolMessage>
+		StartCommandHook(const BackupProtocolMessage& rCommand)
 	{
 		if(mpTestHook)
 		{
 			return mpTestHook->StartCommand(rCommand);
 		}
-		return std::auto_ptr<ProtocolObject>();
+		return std::auto_ptr<BackupProtocolMessage>();
 	}
 
 private:

@@ -1,14 +1,14 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    ProtocolObject.h
+//		Name:    Message.h
 //		Purpose: Protocol object base class
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
 
 #include "Box.h"
-#include "ProtocolObject.h"
+#include "Message.h"
 #include "CommonException.h"
 
 #include "MemLeakFindOn.h"
@@ -16,48 +16,48 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::ProtocolObject()
+//		Name:    Message::Message()
 //		Purpose: Default constructor
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-ProtocolObject::ProtocolObject()
+Message::Message()
 {
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::ProtocolObject()
+//		Name:    Message::Message()
 //		Purpose: Destructor
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-ProtocolObject::~ProtocolObject()
+Message::~Message()
 {
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::ProtocolObject()
+//		Name:    Message::Message()
 //		Purpose: Copy constructor
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-ProtocolObject::ProtocolObject(const ProtocolObject &rToCopy)
+Message::Message(const Message &rToCopy)
 {
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::IsError(int &, int &)
+//		Name:    Message::IsError(int &, int &)
 //		Purpose: Does this represent an error, and if so, what is the type and subtype?
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-bool ProtocolObject::IsError(int &rTypeOut, int &rSubTypeOut) const
+bool Message::IsError(int &rTypeOut, int &rSubTypeOut) const
 {
 	return false;
 }
@@ -65,12 +65,12 @@ bool ProtocolObject::IsError(int &rTypeOut, int &rSubTypeOut) const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::IsConversationEnd()
+//		Name:    Message::IsConversationEnd()
 //		Purpose: Does this command end the conversation?
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-bool ProtocolObject::IsConversationEnd() const
+bool Message::IsConversationEnd() const
 {
 	return false;
 }
@@ -79,12 +79,12 @@ bool ProtocolObject::IsConversationEnd() const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::GetType()
+//		Name:    Message::GetType()
 //		Purpose: Return type of the object
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-int ProtocolObject::GetType() const
+int Message::GetType() const
 {
 	// This isn't implemented in the base class!
 	THROW_EXCEPTION(CommonException, Internal)
@@ -94,12 +94,12 @@ int ProtocolObject::GetType() const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::SetPropertiesFromStreamData(Protocol &)
+//		Name:    Message::SetPropertiesFromStreamData(Protocol &)
 //		Purpose: Set the properties of the object from the stream data ready in the Protocol object
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-void ProtocolObject::SetPropertiesFromStreamData(Protocol &rProtocol)
+void Message::SetPropertiesFromStreamData(Protocol &rProtocol)
 {
 	// This isn't implemented in the base class!
 	THROW_EXCEPTION(CommonException, Internal)
@@ -110,12 +110,12 @@ void ProtocolObject::SetPropertiesFromStreamData(Protocol &rProtocol)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ProtocolObject::WritePropertiesToStreamData(Protocol &)
+//		Name:    Message::WritePropertiesToStreamData(Protocol &)
 //		Purpose: Write the properties of the object into the stream data in the Protocol object
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-void ProtocolObject::WritePropertiesToStreamData(Protocol &rProtocol) const
+void Message::WritePropertiesToStreamData(Protocol &rProtocol) const
 {
 	// This isn't implemented in the base class!
 	THROW_EXCEPTION(CommonException, Internal)

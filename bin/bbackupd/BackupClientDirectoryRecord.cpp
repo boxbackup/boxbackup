@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 #include "Archive.h"
 #include "BackupClientContext.h"
 #include "BackupClientDirectoryRecord.h"
@@ -335,7 +335,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 						filename << ", nlink=" <<
 						file_st.st_nlink);
 				}
-				else if(file_st.st_nlink != 1)
+				else if(file_st.st_nlink > 1)
 				{
 					if(!mSuppressMultipleLinksWarning)
 					{
@@ -613,10 +613,11 @@ BackupStoreDirectory *BackupClientDirectoryRecord::FetchDirectoryListing(BackupC
 		BackupProtocolClient &connection(rParams.mrContext.GetConnection());
 
 		// Query the directory
-		std::auto_ptr<BackupProtocolClientSuccess> dirreply(connection.QueryListDirectory(
+		std::auto_ptr<BackupProtocolSuccess> dirreply(connection.QueryListDirectory(
 				mObjectID,
-				BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
-				BackupProtocolClientListDirectory::Flags_Deleted | BackupProtocolClientListDirectory::Flags_OldVersion, // exclude old/deleted stuff
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
+				BackupProtocolListDirectory::Flags_Deleted | 
+				BackupProtocolListDirectory::Flags_OldVersion, // exclude old/deleted stuff
 				true /* want attributes */));
 
 		// Retrieve the directory from the stream following
@@ -830,7 +831,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 							{
 								// Rename the existing files (ie include old versions) on the server
 								connection.QueryMoveObject(renameObjectID, renameInDirectory, mObjectID /* move to this directory */,
-									BackupProtocolClientMoveObject::Flags_MoveAllWithSameName | BackupProtocolClientMoveObject::Flags_AllowMoveOverDeletedObject,
+									BackupProtocolMoveObject::Flags_MoveAllWithSameName | 
+									BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
 									storeFilename);
 									
 								// Stop the attempt to delete the file in the original location
@@ -1364,7 +1366,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				{
 					// Rename the existing directory on the server
 					connection.QueryMoveObject(renameObjectID, renameInDirectory, mObjectID /* move to this directory */,
-						BackupProtocolClientMoveObject::Flags_MoveAllWithSameName | BackupProtocolClientMoveObject::Flags_AllowMoveOverDeletedObject,
+						BackupProtocolMoveObject::Flags_MoveAllWithSameName | 
+						BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
 						storeFilename);
 						
 					// Put the latest attributes on it
@@ -1381,7 +1384,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				else
 				{
 					// Create a new directory
-					std::auto_ptr<BackupProtocolClientSuccess> dirCreate(connection.QueryCreateDirectory(
+					std::auto_ptr<BackupProtocolSuccess> dirCreate(connection.QueryCreateDirectory(
 						mObjectID, attrModTime, storeFilename, attrStream));
 					subDirObjectID = dirCreate->GetObjectID(); 
 					
@@ -1577,7 +1580,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 		{
 			// YES -- try to do diff, if possible
 			// First, query the server to see if there's an old version available
-			std::auto_ptr<BackupProtocolClientSuccess> getBlockIndex(connection.QueryGetBlockIndexByName(mObjectID, rStoreFilename));
+			std::auto_ptr<BackupProtocolSuccess> getBlockIndex(connection.QueryGetBlockIndexByName(mObjectID, rStoreFilename));
 			int64_t diffFromID = getBlockIndex->GetObjectID();
 			
 			if(diffFromID != 0)
@@ -1625,7 +1628,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 				//
 				// Upload the patch to the store
 				//
-				std::auto_ptr<BackupProtocolClientSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
+				std::auto_ptr<BackupProtocolSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
 						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *pStreamToUpload));
 				
 				// Get object ID from the result		
@@ -1666,7 +1669,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			}
 	
 			// Send to store
-			std::auto_ptr<BackupProtocolClientSuccess> stored(
+			std::auto_ptr<BackupProtocolSuccess> stored(
 				connection.QueryStoreFile(
 					mObjectID, ModificationTime,
 					AttributesHash, 
@@ -1692,8 +1695,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			int type, subtype;
 			if(connection.GetLastError(type, subtype))
 			{
-				if(type == BackupProtocolClientError::ErrorType
-				&& subtype == BackupProtocolClientError::Err_StorageLimitExceeded)
+				if(type == BackupProtocolError::ErrorType
+				&& subtype == BackupProtocolError::Err_StorageLimitExceeded)
 				{
 					// The hard limit was exceeded on the server, notify!
 					rParams.mrSysadminNotifier.NotifySysadmin(

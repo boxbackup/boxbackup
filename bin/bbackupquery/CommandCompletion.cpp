@@ -32,7 +32,7 @@
 #include "BackupQueries.h"
 #include "Configuration.h"
 
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 
 #include "MemLeakFindOn.h"
 
@@ -154,12 +154,12 @@ int16_t GetExcludeFlags(BackupQueries::ParsedCommand& rCommand)
 
 	if (rCommand.mOptions.find(LIST_OPTION_ALLOWOLD) == std::string::npos)
 	{
-		excludeFlags |= BackupProtocolClientListDirectory::Flags_OldVersion;
+		excludeFlags |= BackupProtocolListDirectory::Flags_OldVersion;
 	}
 
 	if (rCommand.mOptions.find(LIST_OPTION_ALLOWDELETED) == std::string::npos)
 	{
-		excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
+		excludeFlags |= BackupProtocolListDirectory::Flags_Deleted;
 	}
 
 	return excludeFlags;
@@ -225,18 +225,18 @@ std::vector<std::string> CompleteRemoteFileOrDirectory(
 	// If we're looking for directories, then only list directories.
 
 	bool completeFiles = includeFlags &
-		BackupProtocolClientListDirectory::Flags_File;
+		BackupProtocolListDirectory::Flags_File;
 	bool completeDirs = includeFlags &
-		BackupProtocolClientListDirectory::Flags_Dir;
+		BackupProtocolListDirectory::Flags_Dir;
 	int16_t listFlags = 0;
 
 	if(completeFiles)
 	{
-		listFlags = BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING;
+		listFlags = BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING;
 	}
 	else if(completeDirs)
 	{
-		listFlags = BackupProtocolClientListDirectory::Flags_Dir;
+		listFlags = BackupProtocolListDirectory::Flags_Dir;
 	}
 
 	rProtocol.QueryListDirectory(listDirId,
@@ -258,7 +258,7 @@ std::vector<std::string> CompleteRemoteFileOrDirectory(
 		if(name.compare(0, searchPrefix.length(), searchPrefix) == 0)
 		{
 			if(en->IsDir() &&
-				(includeFlags & BackupProtocolClientListDirectory::Flags_Dir) == 0)
+				(includeFlags & BackupProtocolListDirectory::Flags_Dir) == 0)
 			{
 				// Was looking for a file, but this is a 
 				// directory, so append a slash to the name
@@ -282,13 +282,13 @@ std::vector<std::string> CompleteRemoteFileOrDirectory(
 COMPLETION_FUNCTION(RemoteDir,
 	completions = CompleteRemoteFileOrDirectory(rCommand, prefix,
 		rProtocol, rQueries,
-		BackupProtocolClientListDirectory::Flags_Dir);
+		BackupProtocolListDirectory::Flags_Dir);
 )
 
 COMPLETION_FUNCTION(RemoteFile,
 	completions = CompleteRemoteFileOrDirectory(rCommand, prefix,
 		rProtocol, rQueries,
-		BackupProtocolClientListDirectory::Flags_File);
+		BackupProtocolListDirectory::Flags_File);
 )
 
 COMPLETION_FUNCTION(LocalDir,
@@ -324,7 +324,7 @@ COMPLETION_FUNCTION(RemoteFileIdInCurrentDir,
 
 	rProtocol.QueryListDirectory(
 		listDirId,
-		BackupProtocolClientListDirectory::Flags_File,
+		BackupProtocolListDirectory::Flags_File,
 		excludeFlags, false /* no attributes */);
 
 	// Retrieve the directory from the stream following

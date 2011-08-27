@@ -26,8 +26,7 @@
 #include "CollectInBufferStream.h"
 
 #include "TestContext.h"
-#include "autogen_TestProtocolClient.h"
-#include "autogen_TestProtocolServer.h"
+#include "autogen_TestProtocol.h"
 #include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
@@ -393,7 +392,7 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 
 void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainstream)
 {
-	std::auto_ptr<TestProtocolClientGetStream> reply(protocol.QueryGetStream(value, uncertainstream));
+	std::auto_ptr<TestProtocolGetStream> reply(protocol.QueryGetStream(value, uncertainstream));
 	TEST_THAT(reply->GetStartingValue() == value);
 	
 	// Get a stream
@@ -704,11 +703,11 @@ int test(int argc, const char *argv[])
 
 			// Simple query
 			{
-				std::auto_ptr<TestProtocolClientSimpleReply> reply(protocol.QuerySimple(41));
+				std::auto_ptr<TestProtocolSimpleReply> reply(protocol.QuerySimple(41));
 				TEST_THAT(reply->GetValuePlusOne() == 42);
 			}
 			{
-				std::auto_ptr<TestProtocolClientSimpleReply> reply(protocol.QuerySimple(809));
+				std::auto_ptr<TestProtocolSimpleReply> reply(protocol.QuerySimple(809));
 				TEST_THAT(reply->GetValuePlusOne() == 810);
 			}
 			
@@ -724,14 +723,14 @@ int test(int argc, const char *argv[])
 				char buf[1663];
 				s.Write(buf, sizeof(buf));
 				s.SetForReading();
-				std::auto_ptr<TestProtocolClientGetStream> reply(protocol.QuerySendStream(0x73654353298ffLL, s));
+				std::auto_ptr<TestProtocolGetStream> reply(protocol.QuerySendStream(0x73654353298ffLL, s));
 				TEST_THAT(reply->GetStartingValue() == sizeof(buf));
 			}
 
 			// Lots of simple queries
 			for(int q = 0; q < 514; q++)
 			{
-				std::auto_ptr<TestProtocolClientSimpleReply> reply(protocol.QuerySimple(q));
+				std::auto_ptr<TestProtocolSimpleReply> reply(protocol.QuerySimple(q));
 				TEST_THAT(reply->GetValuePlusOne() == (q+1));
 			}
 			// Send a list of strings to it
@@ -740,13 +739,13 @@ int test(int argc, const char *argv[])
 				strings.push_back(std::string("test1"));
 				strings.push_back(std::string("test2"));
 				strings.push_back(std::string("test3"));
-				std::auto_ptr<TestProtocolClientListsReply> reply(protocol.QueryLists(strings));
+				std::auto_ptr<TestProtocolListsReply> reply(protocol.QueryLists(strings));
 				TEST_THAT(reply->GetNumberOfStrings() == 3);
 			}
 			
 			// And another
 			{
-				std::auto_ptr<TestProtocolClientHello> reply(protocol.QueryHello(41,87,11,std::string("pingu")));
+				std::auto_ptr<TestProtocolHello> reply(protocol.QueryHello(41,87,11,std::string("pingu")));
 				TEST_THAT(reply->GetNumber32() == 12);
 				TEST_THAT(reply->GetNumber16() == 89);
 				TEST_THAT(reply->GetNumber8() == 22);

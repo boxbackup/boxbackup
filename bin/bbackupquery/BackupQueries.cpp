@@ -49,7 +49,7 @@
 #include "PathUtils.h"
 #include "SelfFlushingStream.h"
 #include "Utils.h"
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 
 #include "MemLeakFindOn.h"
 
@@ -358,16 +358,16 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool *opts, bool FirstLevel)
 {
 	// Generate exclude flags
-	int16_t excludeFlags = BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING;
-	if(!opts[LIST_OPTION_ALLOWOLD]) excludeFlags |= BackupProtocolClientListDirectory::Flags_OldVersion;
-	if(!opts[LIST_OPTION_ALLOWDELETED]) excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
+	int16_t excludeFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
+	if(!opts[LIST_OPTION_ALLOWOLD]) excludeFlags |= BackupProtocolListDirectory::Flags_OldVersion;
+	if(!opts[LIST_OPTION_ALLOWDELETED]) excludeFlags |= BackupProtocolListDirectory::Flags_Deleted;
 
 	// Do communication
 	try
 	{
 		mrConnection.QueryListDirectory(
 				DirID,
-				BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 				// both files and directories
 				excludeFlags,
 				true /* want attributes */);
@@ -434,7 +434,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			// terminate
 			*(f++) = ' ';
 			*(f++) = '\0';
-			printf(displayflags);
+			printf("%s", displayflags);
 			
 			if(en_flags != 0)
 			{
@@ -544,7 +544,7 @@ int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
 
 	// Start from current stack, or root, whichever is required
 	std::vector<std::pair<std::string, int64_t> > stack;
-	int64_t dirID = BackupProtocolClientListDirectory::RootDirectory;
+	int64_t dirID = BackupProtocolListDirectory::RootDirectory;
 	if(rDirName.size() > 0 && rDirName[0] == '/')
 	{
 		// Root, do nothing
@@ -560,9 +560,9 @@ int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
 	}
 
 	// Generate exclude flags
-	int16_t excludeFlags = BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING;
-	if(!AllowOldVersion) excludeFlags |= BackupProtocolClientListDirectory::Flags_OldVersion;
-	if(!AllowDeletedDirs) excludeFlags |= BackupProtocolClientListDirectory::Flags_Deleted;
+	int16_t excludeFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
+	if(!AllowOldVersion) excludeFlags |= BackupProtocolListDirectory::Flags_OldVersion;
+	if(!AllowDeletedDirs) excludeFlags |= BackupProtocolListDirectory::Flags_Deleted;
 
 	// Read directories
 	for(unsigned int e = 0; e < dirElements.size(); ++e)
@@ -582,20 +582,20 @@ int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
 					stack.pop_back();
 					
 					// New dir ID
-					dirID = (stack.size() > 0)?(stack[stack.size() - 1].second):BackupProtocolClientListDirectory::RootDirectory;
+					dirID = (stack.size() > 0)?(stack[stack.size() - 1].second):BackupProtocolListDirectory::RootDirectory;
 				}
 				else
 				{	
 					// At root anyway
-					dirID = BackupProtocolClientListDirectory::RootDirectory;
+					dirID = BackupProtocolListDirectory::RootDirectory;
 				}
 			}
 			else
 			{
 				// Not blank element. Read current directory.
-				std::auto_ptr<BackupProtocolClientSuccess> dirreply(mrConnection.QueryListDirectory(
+				std::auto_ptr<BackupProtocolSuccess> dirreply(mrConnection.QueryListDirectory(
 						dirID,
-						BackupProtocolClientListDirectory::Flags_Dir,	// just directories
+						BackupProtocolListDirectory::Flags_Dir,	// just directories
 						excludeFlags,
 						true /* want attributes */));
 
@@ -646,7 +646,7 @@ int64_t BackupQueries::GetCurrentDirectoryID()
 	// Special case for root
 	if(mDirStack.size() == 0)
 	{
-		return BackupProtocolClientListDirectory::RootDirectory;
+		return BackupProtocolListDirectory::RootDirectory;
 	}
 	
 	// Otherwise, get from the last entry on the stack
@@ -837,8 +837,8 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	try
 	{
 		// Request object
-		std::auto_ptr<BackupProtocolClientSuccess> getobj(mrConnection.QueryGetObject(id));
-		if(getobj->GetObjectID() != BackupProtocolClientGetObject::NoObject)
+		std::auto_ptr<BackupProtocolSuccess> getobj(mrConnection.QueryGetObject(id));
+		if(getobj->GetObjectID() != BackupProtocolGetObject::NoObject)
 		{
 			// Stream that object out to the file
 			std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
@@ -1017,19 +1017,19 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	if(opts['i'])
 	{
 		// can retrieve anything by ID
-		flagsExclude = BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING;
+		flagsExclude = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
 	}
 	else
 	{
 		// only current versions by name
 		flagsExclude =
-			BackupProtocolClientListDirectory::Flags_OldVersion |
-			BackupProtocolClientListDirectory::Flags_Deleted;
+			BackupProtocolListDirectory::Flags_OldVersion |
+			BackupProtocolListDirectory::Flags_Deleted;
 	}
 
 
 	fileId = FindFileID(args[0], opts, &dirId, &localName,
-		BackupProtocolClientListDirectory::Flags_File, // just files
+		BackupProtocolListDirectory::Flags_File, // just files
 		flagsExclude, NULL /* don't care about flags found */);
 
 	if (fileId == 0)
@@ -1519,10 +1519,10 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 	// Get the directory listing from the store
 	mrConnection.QueryListDirectory(
 		DirID,
-		BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING,
+		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 		// get everything
-		BackupProtocolClientListDirectory::Flags_OldVersion |
-		BackupProtocolClientListDirectory::Flags_Deleted,
+		BackupProtocolListDirectory::Flags_OldVersion |
+		BackupProtocolListDirectory::Flags_Deleted,
 		// except for old versions and deleted files
 		true /* want attributes */);
 
@@ -1896,7 +1896,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		return;
 	}
 
-	if(dirID == BackupProtocolClientListDirectory::RootDirectory)
+	if(dirID == BackupProtocolListDirectory::RootDirectory)
 	{
 		BOX_ERROR("Cannot restore the root directory -- restore locations individually.");
 		return;
@@ -2053,7 +2053,7 @@ void BackupQueries::CommandUsage(const bool *opts)
 	bool MachineReadable = opts['m'];
 
 	// Request full details from the server
-	std::auto_ptr<BackupProtocolClientAccountUsage> usage(mrConnection.QueryGetAccountUsage());
+	std::auto_ptr<BackupProtocolAccountUsage> usage(mrConnection.QueryGetAccountUsage());
 
 	// Display each entry in turn
 	int64_t hardLimit = usage->GetBlocksHardLimit();
@@ -2129,9 +2129,9 @@ void BackupQueries::CommandUndelete(const std::vector<std::string> &args, const 
 
 	fileId = FindFileID(storeDirEncoded, opts, &parentId, &fileName,
 		/* include files and directories */
-		BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		/* include old and deleted files */
-		BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		&flagsOut);
 
 	if (fileId == 0)
@@ -2144,7 +2144,7 @@ void BackupQueries::CommandUndelete(const std::vector<std::string> &args, const 
 	try
 	{
 		// Undelete object
-		if(flagsOut & BackupProtocolClientListDirectory::Flags_File)
+		if(flagsOut & BackupProtocolListDirectory::Flags_File)
 		{
 			mrConnection.QueryUndeleteFile(parentId, fileId);
 		}
@@ -2209,10 +2209,10 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 
 	fileId = FindFileID(storeDirEncoded, opts, &parentId, &fileName,
 		/* include files and directories */
-		BackupProtocolClientListDirectory::Flags_EXCLUDE_NOTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		/* exclude old and deleted files */
-		BackupProtocolClientListDirectory::Flags_OldVersion |
-		BackupProtocolClientListDirectory::Flags_Deleted,
+		BackupProtocolListDirectory::Flags_OldVersion |
+		BackupProtocolListDirectory::Flags_Deleted,
 		&flagsOut);
 
 	if (fileId == 0)
@@ -2227,7 +2227,7 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	try
 	{
 		// Delete object
-		if(flagsOut & BackupProtocolClientListDirectory::Flags_File)
+		if(flagsOut & BackupProtocolListDirectory::Flags_File)
 		{
 			mrConnection.QueryDeleteFile(parentId, fn);
 		}

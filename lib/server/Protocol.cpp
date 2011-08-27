@@ -11,8 +11,9 @@
 
 #include <sys/types.h>
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
 
 #include <new>
 
@@ -44,17 +45,17 @@
 //
 // --------------------------------------------------------------------------
 Protocol::Protocol(IOStream &rStream)
-	: mrStream(rStream),
-	  mHandshakeDone(false),
-	  mMaxObjectSize(PROTOCOL_DEFAULT_MAXOBJSIZE),
-	  mTimeout(PROTOCOL_DEFAULT_TIMEOUT),
-	  mpBuffer(0),
-	  mBufferSize(0),
-	  mReadOffset(-1),
-	  mWriteOffset(-1),
-	  mValidDataSize(-1),
-	  mLastErrorType(NoError),
-	  mLastErrorSubType(NoError)
+: mrStream(rStream),
+  mHandshakeDone(false),
+  mMaxObjectSize(PROTOCOL_DEFAULT_MAXOBJSIZE),
+  mTimeout(PROTOCOL_DEFAULT_TIMEOUT),
+  mpBuffer(0),
+  mBufferSize(0),
+  mReadOffset(-1),
+  mWriteOffset(-1),
+  mValidDataSize(-1),
+  mLogToSysLog(false),
+  mLogToFile(NULL)  
 {
 	BOX_TRACE("Send block allocation size is " << 
 		PROTOCOL_ALLOCATE_SEND_BLOCK_CHUNK);
@@ -82,34 +83,6 @@ Protocol::~Protocol()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::GetLastError(int &, int &)
-//		Purpose: Returns true if there was an error, and type and subtype if there was.
-//		Created: 2003/08/19
-//
-// --------------------------------------------------------------------------
-bool Protocol::GetLastError(int &rTypeOut, int &rSubTypeOut)
-{
-	if(mLastErrorType == NoError)
-	{
-		// no error.
-		return false;
-	}
-	
-	// Return type and subtype in args
-	rTypeOut = mLastErrorType;
-	rSubTypeOut = mLastErrorSubType;
-	
-	// and unset them
-	mLastErrorType = NoError;
-	mLastErrorSubType = NoError;
-	
-	return true;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    Protocol::Handshake()
 //		Purpose: Handshake with peer (exchange ident strings)
 //		Created: 2003/08/20
@@ -127,7 +100,7 @@ void Protocol::Handshake()
 	PW_Handshake hsSend;
 	::memset(&hsSend, 0, sizeof(hsSend));
 	// Copy in ident string
-	::strncpy(hsSend.mIdent, GetIdentString(), sizeof(hsSend.mIdent));
+	::strncpy(hsSend.mIdent, GetProtocolIdentString(), sizeof(hsSend.mIdent));
 	
 	// Send it
 	mrStream.Write(&hsSend, sizeof(hsSend));
@@ -200,7 +173,7 @@ void Protocol::CheckAndReadHdr(void *hdr)
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<ProtocolObject> Protocol::Receive()
+std::auto_ptr<Message> Protocol::ReceiveInternal()
 {
 	// Get object header
 	PW_ObjectHeader objHeader;
@@ -220,7 +193,7 @@ std::auto_ptr<ProtocolObject> Protocol::Receive()
 	}
 
 	// Create a blank object
-	std::auto_ptr<ProtocolObject> obj(MakeProtocolObject(ntohl(objHeader.mObjType)));
+	std::auto_ptr<Message> obj(MakeMessage(ntohl(objHeader.mObjType)));
 
 	// Make sure memory is allocated to read it into
 	EnsureBufferAllocated(objSize);
@@ -272,7 +245,7 @@ std::auto_ptr<ProtocolObject> Protocol::Receive()
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-void Protocol::Send(const ProtocolObject &rObject)
+void Protocol::SendInternal(const Message &rObject)
 {
 	// Check usage
 	if(mValidDataSize != -1 || mWriteOffset != -1 || mReadOffset != -1)
@@ -854,7 +827,26 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 // --------------------------------------------------------------------------
 void Protocol::InformStreamReceiving(u_int32_t Size)
 {
-	// Do nothing
+	if(GetLogToSysLog())
+	{
+		if(Size == Protocol::ProtocolStream_SizeUncertain)
+		{
+			BOX_TRACE("Receiving stream, size uncertain");
+		}
+		else
+		{
+			BOX_TRACE("Receiving stream, size " << Size);
+		}
+	}
+
+	if(GetLogToFile())
+	{
+		::fprintf(GetLogToFile(),
+			(Size == Protocol::ProtocolStream_SizeUncertain)
+			? "Receiving stream, size uncertain\n"
+			: "Receiving stream, size %d\n", Size);
+		::fflush(GetLogToFile());
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -867,7 +859,26 @@ void Protocol::InformStreamReceiving(u_int32_t Size)
 // --------------------------------------------------------------------------
 void Protocol::InformStreamSending(u_int32_t Size)
 {
-	// Do nothing
+	if(GetLogToSysLog())
+	{
+		if(Size == Protocol::ProtocolStream_SizeUncertain)
+		{
+			BOX_TRACE("Sending stream, size uncertain");
+		}
+		else
+		{
+			BOX_TRACE("Sending stream, size " << Size);
+		}
+	}
+	
+	if(GetLogToFile())
+	{
+		::fprintf(GetLogToFile(),
+			(Size == Protocol::ProtocolStream_SizeUncertain)
+			? "Sending stream, size uncertain\n"
+			: "Sending stream, size %d\n", Size);
+		::fflush(GetLogToFile());
+	}
 }
 
 

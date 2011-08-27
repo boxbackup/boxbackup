@@ -22,7 +22,7 @@
 #include <errno.h>
 
 #include "BackupClientRestore.h"
-#include "autogen_BackupProtocolClient.h"
+#include "autogen_BackupProtocol.h"
 #include "CommonException.h"
 #include "BackupClientFileAttributes.h"
 #include "IOStream.h"
@@ -443,8 +443,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 	// list of files which is appropriate to the restore type
 	rConnection.QueryListDirectory(
 		DirectoryID,
-		Params.RestoreDeleted?(BackupProtocolClientListDirectory::Flags_Deleted):(BackupProtocolClientListDirectory::Flags_INCLUDE_EVERYTHING),
-		BackupProtocolClientListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolClientListDirectory::Flags_Deleted)),
+		Params.RestoreDeleted?(BackupProtocolListDirectory::Flags_Deleted):(BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING),
+		BackupProtocolListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolListDirectory::Flags_Deleted)),
 		true /* want attributes */);
 
 	// Retrieve the directory from the stream following

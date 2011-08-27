@@ -27,9 +27,8 @@
 #include "RaidFileWrite.h"
 #include "StoreStructure.h"
 
-class BackupStoreDaemon;
-
 #include "MemLeakFindOn.h"
+
 
 // Maximum number of directories to keep in the cache
 // When the cache is bigger than this, everything gets

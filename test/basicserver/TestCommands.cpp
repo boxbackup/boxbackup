@@ -5,34 +5,34 @@
 #include <syslog.h>
 #endif
 
-#include "autogen_TestProtocolServer.h"
+#include "autogen_TestProtocol.h"
 #include "CollectInBufferStream.h"
 
 #include "MemLeakFindOn.h"
 
 
-std::auto_ptr<ProtocolObject> TestProtocolServerHello::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolHello::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
 	if(mNumber32 != 41 || mNumber16 != 87 || mNumber8 != 11 || mText != "pingu")
 	{
-		return std::auto_ptr<ProtocolObject>(new TestProtocolServerError(0, 0));
+		return std::auto_ptr<TestProtocolMessage>(new TestProtocolError(0, 0));
 	}
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerHello(12,89,22,std::string("Hello world!")));
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolHello(12,89,22,std::string("Hello world!")));
 }
 
-std::auto_ptr<ProtocolObject> TestProtocolServerLists::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolLists::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerListsReply(mLotsOfText.size()));
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolListsReply(mLotsOfText.size()));
 }
 
-std::auto_ptr<ProtocolObject> TestProtocolServerQuit::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolQuit::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerQuit);
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolQuit);
 }
 
-std::auto_ptr<ProtocolObject> TestProtocolServerSimple::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolSimple::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerSimpleReply(mValue+1));
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolSimpleReply(mValue+1));
 }
 
 class UncertainBufferStream : public CollectInBufferStream
@@ -45,7 +45,7 @@ public:
 	}
 };
 
-std::auto_ptr<ProtocolObject> TestProtocolServerGetStream::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolGetStream::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
 	// make a new stream object
 	CollectInBufferStream *pstream = mUncertainSize?(new UncertainBufferStream):(new CollectInBufferStream);
@@ -68,14 +68,14 @@ std::auto_ptr<ProtocolObject> TestProtocolServerGetStream::DoCommand(TestProtoco
 	// Get it to be sent
 	rProtocol.SendStreamAfterCommand(pstream);
 
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerGetStream(mStartingValue, mUncertainSize));
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolGetStream(mStartingValue, mUncertainSize));
 }
 
-std::auto_ptr<ProtocolObject> TestProtocolServerSendStream::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
 	if(mValue != 0x73654353298ffLL)
 	{
-		return std::auto_ptr<ProtocolObject>(new TestProtocolServerError(0, 0));
+		return std::auto_ptr<TestProtocolMessage>(new TestProtocolError(0, 0));
 	}
 	
 	// Get a stream
@@ -91,11 +91,11 @@ std::auto_ptr<ProtocolObject> TestProtocolServerSendStream::DoCommand(TestProtoc
 	}
 
 	// tell the caller how many bytes there were
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerGetStream(bytes, uncertain));
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolGetStream(bytes, uncertain));
 }
 
-std::auto_ptr<ProtocolObject> TestProtocolServerString::DoCommand(TestProtocolServer &rProtocol, TestContext &rContext)
+std::auto_ptr<TestProtocolMessage> TestProtocolString::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
-	return std::auto_ptr<ProtocolObject>(new TestProtocolServerString(mTest));
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolString(mTest));
 }
 

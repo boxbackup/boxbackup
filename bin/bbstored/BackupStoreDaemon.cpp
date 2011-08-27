@@ -20,7 +20,7 @@
 #include "BackupStoreContext.h"
 #include "BackupStoreDaemon.h"
 #include "BackupStoreConfigVerify.h"
-#include "autogen_BackupProtocolServer.h"
+#include "autogen_BackupProtocol.h"
 #include "RaidFileController.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
