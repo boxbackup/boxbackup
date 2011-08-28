@@ -118,11 +118,16 @@
 
 		std::string WideStringToString(WCHAR *buf)
 		{
+			if (buf == NULL)
+			{
+				return "(null)";
+			}
+
 			char* pStr = ConvertFromWideString(buf, CP_UTF8);
 			
 			if(pStr == NULL)
 			{
-				return "conversion failed";
+				return "(conversion failed)";
 			}
 			
 			std::string result(pStr);
@@ -1250,9 +1255,9 @@ void BackupDaemon::CreateVssBackupComponents()
 				iComponent << " info:");
 			switch(pComponentInfo->type)
 			{
-			case VSS_CT_UNDEFINED: BOX_INFO("VSS: type: undefined"); break;
-			case VSS_CT_DATABASE:  BOX_INFO("VSS: type: database"); break;
-			case VSS_CT_FILEGROUP: BOX_INFO("VSS: type: filegroup"); break;
+			case VSS_CT_UNDEFINED: BOX_TRACE("VSS: type: undefined"); break;
+			case VSS_CT_DATABASE:  BOX_TRACE("VSS: type: database"); break;
+			case VSS_CT_FILEGROUP: BOX_TRACE("VSS: type: filegroup"); break;
 			default:
 				BOX_WARNING("VSS: type: unknown (" << pComponentInfo->type << ")");
 			}
@@ -1334,6 +1339,19 @@ void BackupDaemon::CreateVssBackupComponents()
 					volumesIncluded[path[0]] = newVolumeId;
 					rLocation.mSnapshotVolumeId = newVolumeId;
 					rLocation.mIsSnapshotCreated = true;
+
+					// If the snapshot path starts with the volume root
+					// (drive letter), because the path is absolute (as
+					// it should be), then remove it so that the
+					// resulting snapshot path can be appended to the
+					// snapshot device object to make a real path,
+					// without a spurious drive letter in it.
+
+					if (path.substr(0, volumeRoot.length()) == volumeRoot)
+					{
+						path = path.substr(volumeRoot.length());
+					}
+
 					rLocation.mSnapshotPath = path;
 				}
 				else
