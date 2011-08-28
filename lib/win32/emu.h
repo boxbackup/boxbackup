@@ -50,22 +50,30 @@
 #define __MSVCRT_VERSION__ 0x0601
 #endif
 
+// We need WINVER at least 0x0500 to use GetFileSizeEx on Cygwin/MinGW,
+// and 0x0501 for FindFirstFile(W) for opendir/readdir.
+//
 // WIN32_WINNT versions 0x0600 (Vista) and higher enable WSAPoll() in
 // winsock2.h, whose struct pollfd conflicts with ours below, so for
-// now we just set it lower than that, to Windows 2000.
+// now we just set it lower than that, to Windows XP (0x0501).
+
 #ifdef WINVER
-	#if WINVER != 0x0500
-		#error Must include emu.h before setting WINVER
-	#endif
+#	if WINVER != 0x0501
+// provoke a redefinition warning to track down the offender
+#		define WINVER 0x0501
+#		error Must include emu.h before setting WINVER
+#	endif
 #endif
-#define WINVER 0x0500
+#define WINVER 0x0501
 
 #ifdef _WIN32_WINNT
-	#if _WIN32_WINNT != 0x0500
-		#error Must include emu.h before setting _WIN32_WINNT
-	#endif
+#	if _WIN32_WINNT != 0x0501
+// provoke a redefinition warning to track down the offender
+#		define _WIN32_WINNT 0x0501
+#		error Must include emu.h before setting _WIN32_WINNT
+#	endif
 #endif
-#define _WIN32_WINNT 0x0500
+#define _WIN32_WINNT 0x0501
 
 // Windows headers
 
@@ -237,17 +245,15 @@ inline int strcasecmp(const char *s1, const char *s2)
 struct dirent
 {
 	char *d_name;
-	unsigned long d_type;
+	DWORD d_type; // file attributes
 };
 
 struct DIR
 {
-	intptr_t		fd;	// filedescriptor
-	// struct _finddata_t	info;
-	struct _wfinddata_t	info;
-	// struct _finddata_t 	info;
-	struct dirent		result;	// d_name (first time null)
-	wchar_t			*name;	// null-terminated byte string
+	HANDLE           fd;     // the HANDLE returned by FindFirstFile
+	WIN32_FIND_DATAW info;
+	struct dirent    result; // d_name (first time null)
+	wchar_t*         name;	 // null-terminated byte string
 };
 
 DIR *opendir(const char *name);

@@ -1,8 +1,5 @@
 // Box Backup Win32 native port by Nick Knight
 
-// Need at least 0x0500 to use GetFileSizeEx on Cygwin/MinGW
-#define WINVER 0x0500
-
 #include "emu.h"
 
 #ifdef WIN32
@@ -1080,9 +1077,10 @@ DIR *opendir(const char *name)
 		return NULL;
 	}
 
-	pDir->fd = _wfindfirst((const wchar_t*)pDir->name, &(pDir->info));
+	pDir->fd = FindFirstFileW(pDir->name, &pDir->info);
+	DWORD tmp = GetLastError();
 
-	if (pDir->fd == -1)
+	if (pDir->fd == INVALID_HANDLE_VALUE)
 	{
 		delete [] pDir->name;
 		delete pDir;
@@ -1111,26 +1109,37 @@ struct dirent *readdir(DIR *dp)
 	{
 		struct dirent *den = NULL;
 
-		if (dp && dp->fd != -1)
+		if (dp && dp->fd != INVALID_HANDLE_VALUE)
 		{
-			if (!dp->result.d_name || 
-				_wfindnext(dp->fd, &dp->info) != -1)
+			// first time around, when dp->result.d_name == NULL, use
+			// the values returned by FindFirstFile. After that, call
+			// FindNextFileW to return new ones.
+			if (!dp->result.d_name ||
+				FindNextFileW(dp->fd, &dp->info) != 0)
 			{
 				den = &dp->result;
-				std::wstring input(dp->info.name);
+				std::wstring input(dp->info.cFileName);
 				memset(tempbuff, 0, sizeof(tempbuff));
-				WideCharToMultiByte(CP_UTF8, 0, dp->info.name, 
+				WideCharToMultiByte(CP_UTF8, 0, dp->info.cFileName, 
 					-1, &tempbuff[0], sizeof (tempbuff), 
 					NULL, NULL);
 				//den->d_name = (char *)dp->info.name;
 				den->d_name = &tempbuff[0];
-				if (dp->info.attrib & FILE_ATTRIBUTE_DIRECTORY)
+				den->d_type = dp->info.dwFileAttributes;
+			}
+			else // FindNextFileW failed
+			{
+				// Why did it fail? No more files?
+				winerrno = GetLastError();
+				den = NULL;
+
+				if (winerrno == ERROR_NO_MORE_FILES)
 				{
-					den->d_type = S_IFDIR;
+					errno = 0; // no more files
 				}
 				else
 				{
-					den->d_type = S_IFREG;
+					errno = ENOSYS;
 				}
 			}
 		}
@@ -1138,6 +1147,7 @@ struct dirent *readdir(DIR *dp)
 		{
 			errno = EBADF;
 		}
+
 		return den;
 	}
 	catch (...)
@@ -1159,24 +1169,26 @@ int closedir(DIR *dp)
 {
 	try
 	{
-		int finres = -1;
+		BOOL finres = false;
+
 		if (dp)
 		{
-			if(dp->fd != -1)
+			if(dp->fd != INVALID_HANDLE_VALUE)
 			{
-				finres = _findclose(dp->fd);
+				finres = FindClose(dp->fd);
 			}
 
 			delete [] dp->name;
 			delete dp;
 		}
 
-		if (finres == -1) // errors go to EBADF 
+		if (finres == FALSE) // errors go to EBADF 
 		{
+			winerrno = GetLastError();
 			errno = EBADF;
 		}
 
-		return finres;
+		return (finres == TRUE) ? 0 : -1;
 	}
 	catch (...)
 	{

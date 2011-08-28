@@ -157,32 +157,6 @@ private:
 	int UseScriptToSeeIfSyncAllowed();
 
 public:
-	class Location
-	{
-	public:
-		Location();
-		~Location();
-
-		void Deserialize(Archive & rArchive);
-		void Serialize(Archive & rArchive) const;
-	private:
-		Location(const Location &);	// copy not allowed
-		Location &operator=(const Location &);
-	public:
-		std::string mName;
-		std::string mPath;
-		std::auto_ptr<BackupClientDirectoryRecord> mpDirectoryRecord;
-		int mIDMapIndex;
-		ExcludeList *mpExcludeFiles;
-		ExcludeList *mpExcludeDirs;
-
-#ifdef ENABLE_VSS
-		bool mIsSnapshotCreated;
-		VSS_ID mSnapshotVolumeId;
-		std::string mSnapshotPath;
-#endif
-	};
-	
 	typedef const std::vector<Location *> Locations;
 	Locations GetLocations() { return mLocations; }
 	

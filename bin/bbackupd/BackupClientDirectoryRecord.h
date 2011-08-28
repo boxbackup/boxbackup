@@ -21,9 +21,18 @@
 #include "ReadLoggingStream.h"
 #include "RunStatusProvider.h"
 
+#ifdef ENABLE_VSS
+#	include <comdef.h>
+#	include <Vss.h>
+#	include <VsWriter.h>
+#	include <VsBackup.h>
+#endif
+
 class Archive;
 class BackupClientContext;
 class BackupDaemon;
+class ExcludeList;
+class Location;
 
 // --------------------------------------------------------------------------
 //
@@ -125,7 +134,11 @@ public:
 		int64_t ContainingDirectoryID,
 		const std::string &rLocalPath,
 		const std::string &rRemotePath,
+		const Location& rBackupLocation,
 		bool ThisDirHasJustBeenCreated = false);
+
+	std::string ConvertVssPathToRealPath(const std::string &rVssPath,
+		const Location& rBackupLocation);
 
 private:
 	void DeleteSubDirectories();
@@ -135,6 +148,7 @@ private:
 		const std::string &rLocalPath);
 	bool UpdateItems(SyncParams &rParams, const std::string &rLocalPath,
 		const std::string &rRemotePath,
+		const Location& rBackupLocation,
 		BackupStoreDirectory *pDirOnStore,
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 		std::vector<std::string> &rFiles,
@@ -145,7 +159,7 @@ private:
 		int64_t FileSize, box_time_t ModificationTime,
 		box_time_t AttributesHash, bool NoPreviousVersionOnServer);
 	void SetErrorWhenReadingFilesystemObject(SyncParams &rParams,
-		const char *Filename);
+		const std::string& rFilename);
 	void RemoveDirectoryInPlaceOfFile(SyncParams &rParams,
 		BackupStoreDirectory* pDirOnStore,
 		BackupStoreDirectory::Entry* pEntry,
@@ -166,6 +180,32 @@ private:
 	// mpPendingEntries is a pointer rather than simple a member
 	// variable, because most of the time it'll be empty. This would
 	// waste a lot of memory because of STL allocation policies.
+};
+
+class Location
+{
+public:
+	Location();
+	~Location();
+
+	void Deserialize(Archive & rArchive);
+	void Serialize(Archive & rArchive) const;
+private:
+	Location(const Location &);	// copy not allowed
+	Location &operator=(const Location &);
+public:
+	std::string mName;
+	std::string mPath;
+	std::auto_ptr<BackupClientDirectoryRecord> mpDirectoryRecord;
+	int mIDMapIndex;
+	ExcludeList *mpExcludeFiles;
+	ExcludeList *mpExcludeDirs;
+
+#ifdef ENABLE_VSS
+	bool mIsSnapshotCreated;
+	VSS_ID mSnapshotVolumeId;
+	std::string mSnapshotPath;
+#endif
 };
 
 #endif // BACKUPCLIENTDIRECTORYRECORD__H

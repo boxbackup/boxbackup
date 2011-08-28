@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_ClientException.h"
 #include "Archive.h"
 #include "BackupClientContext.h"
 #include "BackupClientDirectoryRecord.h"
@@ -101,6 +102,23 @@ void BackupClientDirectoryRecord::DeleteSubDirectories()
 	mSubDirectories.clear();
 }
 
+std::string BackupClientDirectoryRecord::ConvertVssPathToRealPath(
+	const std::string &rVssPath,
+	const Location& rBackupLocation)
+{
+#ifdef ENABLE_VSS
+	if (rBackupLocation.mIsSnapshotCreated &&
+		rVssPath.substr(0, rBackupLocation.mSnapshotPath.length()) ==
+		rBackupLocation.mSnapshotPath)
+	{
+		return rBackupLocation.mPath +
+			rVssPath.substr(rBackupLocation.mSnapshotPath.length());
+	}
+#endif
+
+	return rVssPath;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -118,6 +136,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	int64_t ContainingDirectoryID,
 	const std::string &rLocalPath,
 	const std::string &rRemotePath,
+	const Location& rBackupLocation,
 	bool ThisDirHasJustBeenCreated)
 {
 	BackupClientContext& rContext(rParams.mrContext);
@@ -163,7 +182,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 			// just ignore this error. In a future scan, this
 			// deletion will be noticed, deleted from server,
 			// and this object deleted.
-			rNotifier.NotifyDirStatFailed(this, rLocalPath,
+			rNotifier.NotifyDirStatFailed(this,
+				ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
 				strerror(errno));
 			return;
 		}
@@ -212,12 +232,12 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	{
 		// Report the error (logs and 
 		// eventual email to administrator)
-		rNotifier.NotifyFileStatFailed(this, rLocalPath,
+		rNotifier.NotifyFileStatFailed(this, 
+			ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
 			strerror(errno));
 		
 		// FIXME move to NotifyFileStatFailed()
-		SetErrorWhenReadingFilesystemObject(rParams, 
-			rLocalPath.c_str());
+		SetErrorWhenReadingFilesystemObject(rParams, rLocalPath);
 		
 		// This shouldn't happen, so we'd better not continue
 		THROW_EXCEPTION(CommonException, OSFileError)
@@ -229,7 +249,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		DIR *dirHandle = 0;
 		try
 		{
-			rNotifier.NotifyScanDirectory(this, rLocalPath);
+			rNotifier.NotifyScanDirectory(this,
+				ConvertVssPathToRealPath(rLocalPath, rBackupLocation));
 
 			dirHandle = ::opendir(rLocalPath.c_str());
 			if(dirHandle == 0)
@@ -239,18 +260,19 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				if (errno == EACCES)
 				{
 					rNotifier.NotifyDirListFailed(this,
-						rLocalPath, "Access denied");
+						ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
+						"Access denied");
 				}
 				else
 				{
 					rNotifier.NotifyDirListFailed(this, 
-						rLocalPath, strerror(errno));
+						ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
+						strerror(errno));
 				}
 				
 				// Report the error (logs and eventual email
 				// to administrator)
-				SetErrorWhenReadingFilesystemObject(rParams,
-					rLocalPath.c_str());
+				SetErrorWhenReadingFilesystemObject(rParams, rLocalPath);
 				// Ignore this directory for now.
 				return;
 			}
@@ -297,9 +319,19 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				// Our emulated readdir() abuses en->d_type, 
 				// which would normally contain DT_REG, 
 				// DT_DIR, etc, but we only use it here and 
-				// prefer S_IFREG, S_IFDIR...
-				int type = en->d_type;
-				#else
+				// prefer to have the full file attributes.
+				int type;
+				if (en->d_type & FILE_ATTRIBUTE_DIRECTORY)
+				{
+					type = S_IFDIR;
+				}
+				else
+				{
+					type = S_IFREG;
+				}
+
+				#else // !WIN32
+
 				if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
 				{
 					if(!(rParams.mrContext.ExcludeDir(
@@ -314,8 +346,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					
 						// FIXME move to
 						// NotifyFileStatFailed()
-						SetErrorWhenReadingFilesystemObject(
-							rParams, filename.c_str());
+						SetErrorWhenReadingFilesystemObject(rParams, filename);
 					}
 
 					// Ignore this entry for now.
@@ -347,8 +378,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 							" (suppressing further warnings)");
 						mSuppressMultipleLinksWarning = true;
 					}
-					SetErrorWhenReadingFilesystemObject(
-						rParams, filename.c_str());
+					SetErrorWhenReadingFilesystemObject(rParams, filename);
 				}
 
 				BOX_TRACE("Stat entry '" << filename << "' "
@@ -380,9 +410,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Exclude it?
 					if(rParams.mrContext.ExcludeFile(filename))
 					{
- 						rNotifier.NotifyFileExcluded(
-								this, 
-								filename);
+ 						rNotifier.NotifyFileExcluded(this,
+							ConvertVssPathToRealPath(filename, rBackupLocation));
 
 						// Next item!
 						continue;
@@ -398,13 +427,25 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Exclude it?
 					if(rParams.mrContext.ExcludeDir(filename))
 					{
- 						rNotifier.NotifyDirExcluded(
-								this, 
-								filename);
+ 						rNotifier.NotifyDirExcluded(this,
+							ConvertVssPathToRealPath(filename, rBackupLocation));
 
 						// Next item!
 						continue;
 					}
+
+					#ifdef WIN32
+					// exclude reparse points, as Application Data points to the
+					// parent directory under Vista and later, and causes an
+					// infinite loop: 
+					// http://social.msdn.microsoft.com/forums/en-US/windowscompatibility/thread/05d14368-25dd-41c8-bdba-5590bf762a68/
+					if (en->d_type & FILE_ATTRIBUTE_REPARSE_POINT)
+					{
+ 						rNotifier.NotifyMountPointSkipped(this,
+							ConvertVssPathToRealPath(filename, rBackupLocation));
+						continue;
+					}
+					#endif
 
 					// Store on list
 					dirs.push_back(std::string(en->d_name));
@@ -422,16 +463,15 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					}
 					else if(rParams.mrContext.ExcludeFile(filename))
 					{
- 						rNotifier.NotifyFileExcluded(
-								this, 
-								filename);
+ 						rNotifier.NotifyFileExcluded(this, 
+							ConvertVssPathToRealPath(filename, rBackupLocation));
 					}
 					else
 					{
- 						rNotifier.NotifyUnsupportedFileType(
-								this, filename);
-						SetErrorWhenReadingFilesystemObject(
-							rParams, filename.c_str());
+ 						rNotifier.NotifyUnsupportedFileType(this, 
+							ConvertVssPathToRealPath(filename, rBackupLocation));
+						SetErrorWhenReadingFilesystemObject(rParams,
+							ConvertVssPathToRealPath(filename, rBackupLocation));
 					}
 
 					continue;
@@ -446,13 +486,12 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				if(emu_stat(filename.c_str(), &file_st) != 0)
 				{
  					rNotifier.NotifyFileStatFailed(this, 
- 							filename, 
+							ConvertVssPathToRealPath(filename, rBackupLocation),
 							strerror(errno));
 					
 					// Report the error (logs and 
 					// eventual email to administrator)
-					SetErrorWhenReadingFilesystemObject(
-						rParams, filename.c_str());
+					SetErrorWhenReadingFilesystemObject(rParams, filename);
 
 					// Ignore this entry for now.
 					continue;
@@ -461,7 +500,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				if(file_st.st_dev != link_st.st_dev)
 				{
  					rNotifier.NotifyMountPointSkipped(this, 
- 							filename);
+						ConvertVssPathToRealPath(filename, rBackupLocation));
 					continue;
 				}
 				#endif
@@ -481,8 +520,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Log that this has happened
 					if(!rParams.mHaveLoggedWarningAboutFutureFileTimes)
 					{
-						rNotifier.NotifyFileModifiedInFuture(
-							this, filename);
+						rNotifier.NotifyFileModifiedInFuture(this,
+							ConvertVssPathToRealPath(filename, rBackupLocation));
 						rParams.mHaveLoggedWarningAboutFutureFileTimes = true;
 					}
 				}
@@ -556,7 +595,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		
 		// Do the directory reading
 		bool updateCompleteSuccess = UpdateItems(rParams, rLocalPath,
-			rRemotePath, pdirOnStore, entriesLeftOver, files, dirs);
+			rRemotePath, rBackupLocation, pdirOnStore, entriesLeftOver, files, dirs);
 		
 		// LAST THING! (think exception safety)
 		// Store the new checksum -- don't fetch things unnecessarily in the future
@@ -699,6 +738,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 	BackupClientDirectoryRecord::SyncParams &rParams,
 	const std::string &rLocalPath,
 	const std::string &rRemotePath,
+	const Location& rBackupLocation,
 	BackupStoreDirectory *pDirOnStore,
 	std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 	std::vector<std::string> &rFiles,
@@ -754,8 +794,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 
 				// Report the error (logs and 
 				// eventual email to administrator)
-				SetErrorWhenReadingFilesystemObject(rParams, 
-					filename.c_str());
+				SetErrorWhenReadingFilesystemObject(rParams, filename);
 
 				// Ignore this entry for now.
 				continue;
@@ -1060,9 +1099,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// code false, to show error in directory
 					allUpdatedSuccessfully = false;
 					// Log it.
-					SetErrorWhenReadingFilesystemObject(rParams, filename.c_str());
-					rNotifier.NotifyFileUploadException(
-						this, filename, e);
+					SetErrorWhenReadingFilesystemObject(rParams, filename);
+					rNotifier.NotifyFileUploadException(this, filename, e);
 				}
 
 				// Update structures if the file was uploaded
@@ -1081,7 +1119,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			else
 			{
 				rNotifier.NotifyFileSkippedServerFull(this,
-					filename);
+					ConvertVssPathToRealPath(filename, rBackupLocation));
 			}
 		}
 		else if(en != 0 && en->GetAttributesHash() != attributesHash)
@@ -1420,8 +1458,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		if(psubDirRecord)
 		{
 			// Sync this sub directory too
-			psubDirRecord->SyncDirectory(rParams, mObjectID,
-				dirname, rRemotePath + "/" + *d,
+			psubDirRecord->SyncDirectory(rParams, mObjectID, dirname,
+				rRemotePath + "/" + *d, rBackupLocation,
 				haveJustCreatedDirOnServer);
 		}
 
@@ -1731,7 +1769,9 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 //		Created: 29/3/04
 //
 // --------------------------------------------------------------------------
-void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(BackupClientDirectoryRecord::SyncParams &rParams, const char *Filename)
+void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(
+	BackupClientDirectoryRecord::SyncParams &rParams,
+	const std::string& rFilename)
 {
 	// Zero hash, so it gets synced properly next time round.
 	::memset(mStateChecksum, 0, sizeof(mStateChecksum));
@@ -1963,5 +2003,222 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 
 		rArchive.Write(i->first);
 		pSubItem->Serialize(rArchive);
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Location::Location()
+//		Purpose: Constructor
+//		Created: 11/11/03
+//
+// --------------------------------------------------------------------------
+Location::Location()
+	: mIDMapIndex(0),
+	  mpExcludeFiles(0),
+	  mpExcludeDirs(0)
+{
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Location::~Location()
+//		Purpose: Destructor
+//		Created: 11/11/03
+//
+// --------------------------------------------------------------------------
+Location::~Location()
+{
+	// Clean up exclude locations
+	if(mpExcludeDirs != 0)
+	{
+		delete mpExcludeDirs;
+		mpExcludeDirs = 0;
+	}
+	if(mpExcludeFiles != 0)
+	{
+		delete mpExcludeFiles;
+		mpExcludeFiles = 0;
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Location::Serialize(Archive & rArchive)
+//		Purpose: Serializes this object instance into a stream of bytes,
+//               using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void Location::Serialize(Archive & rArchive) const
+{
+	//
+	//
+	//
+	rArchive.Write(mName);
+	rArchive.Write(mPath);
+	rArchive.Write(mIDMapIndex);
+
+	//
+	//
+	//
+	if(mpDirectoryRecord.get() == NULL)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpDirectoryRecord->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if(!mpExcludeFiles)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpExcludeFiles->Serialize(rArchive);
+	}
+
+	//
+	//
+	//
+	if(!mpExcludeDirs)
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
+		rArchive.Write(aMagicMarker);
+	}
+	else
+	{
+		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
+		rArchive.Write(aMagicMarker);
+
+		mpExcludeDirs->Serialize(rArchive);
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Location::Deserialize(Archive & rArchive)
+//		Purpose: Deserializes this object instance from a stream of bytes, using an Archive abstraction.
+//
+//		Created: 2005/04/11
+//
+// --------------------------------------------------------------------------
+void Location::Deserialize(Archive &rArchive)
+{
+	//
+	//
+	//
+	mpDirectoryRecord.reset(NULL);
+	if(mpExcludeFiles)
+	{
+		delete mpExcludeFiles;
+		mpExcludeFiles = NULL;
+	}
+	if(mpExcludeDirs)
+	{
+		delete mpExcludeDirs;
+		mpExcludeDirs = NULL;
+	}
+
+	//
+	//
+	//
+	rArchive.Read(mName);
+	rArchive.Read(mPath);
+	rArchive.Read(mIDMapIndex);
+
+	//
+	//
+	//
+	int64_t aMagicMarker = 0;
+	rArchive.Read(aMagicMarker);
+
+	if(aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		BackupClientDirectoryRecord *pSubRecord = new BackupClientDirectoryRecord(0, "");
+		if(!pSubRecord)
+		{
+			throw std::bad_alloc();
+		}
+
+		mpDirectoryRecord.reset(pSubRecord);
+		mpDirectoryRecord->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(ClientException, CorruptStoreObjectInfoFile);
+	}
+
+	//
+	//
+	//
+	rArchive.Read(aMagicMarker);
+
+	if(aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeFiles = new ExcludeList;
+		if(!mpExcludeFiles)
+		{
+			throw std::bad_alloc();
+		}
+
+		mpExcludeFiles->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(ClientException, CorruptStoreObjectInfoFile);
+	}
+
+	//
+	//
+	//
+	rArchive.Read(aMagicMarker);
+
+	if(aMagicMarker == ARCHIVE_MAGIC_VALUE_NOOP)
+	{
+		// NOOP
+	}
+	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
+	{
+		mpExcludeDirs = new ExcludeList;
+		if(!mpExcludeDirs)
+		{
+			throw std::bad_alloc();
+		}
+
+		mpExcludeDirs->Deserialize(rArchive);
+	}
+	else
+	{
+		// there is something going on here
+		THROW_EXCEPTION(ClientException, CorruptStoreObjectInfoFile);
 	}
 }
