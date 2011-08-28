@@ -71,8 +71,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupProtocolClient.cpp" />
-    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupProtocolServer.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupProtocol.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupStoreException.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupClientFileAttributes.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupCommands.cpp" />
@@ -104,8 +103,7 @@
     <ClCompile Include="..\..\..\lib\raidfile\RaidFileWrite.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupProtocolClient.h" />
-    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupProtocolServer.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupProtocol.h" />
     <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupStoreException.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupClientFileAttributes.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupConstants.h" />
