@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 
+#include "autogen_BackupProtocol.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
 #include "Message.h"
