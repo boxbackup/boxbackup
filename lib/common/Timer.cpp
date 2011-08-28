@@ -8,11 +8,15 @@
 //
 // --------------------------------------------------------------------------
 
-#ifdef WIN32
-	#define _WIN32_WINNT 0x0500
-#endif
-
 #include "Box.h"
+
+#ifdef WIN32
+#	ifndef _WIN32_WINNT
+#		define _WIN32_WINNT 0x0500
+#	elif _WIN32_WINNT < 0x0500
+#		error Timers require at least Windows 2000 headers
+#	endif
+#endif
 
 #include <signal.h>
 #include <cstring>
