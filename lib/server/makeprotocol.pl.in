@@ -141,9 +141,11 @@ close IN;
 
 
 # open files
-my $h_filename = 'autogen_'.$protocol_name.'Protocol.h';
-open CPP,'>autogen_'.$protocol_name.'Protocol.cpp';
-open H,">$h_filename";
+my $filename_base = 'autogen_'.$protocol_name.'Protocol';
+print "Writing $filename_base.cpp\n";
+print "Writing $filename_base.h\n";
+open CPP, "> $filename_base.cpp";
+open H,   "> $filename_base.h";
 
 my $guardname = uc 'AUTOGEN_'.$protocol_name.'Protocol_H';
 
@@ -155,7 +157,7 @@ print CPP <<__E;
 
 #include <sstream>
 
-#include "$h_filename"
+#include "$filename_base.h"
 #include "IOStream.h"
 __E
 
