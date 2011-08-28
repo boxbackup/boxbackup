@@ -137,6 +137,7 @@
     <ClCompile Include="..\..\..\lib\crypto\MD5Digest.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\Random.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\RollingChecksum.cpp" />
+    <ClCompile Include="..\..\..\lib\server\Message.cpp" />
     <ClCompile Include="..\..\..\lib\win32\emu.cpp" />
     <ClCompile Include="..\..\..\lib\win32\getopt_long.cpp" />
     <ClCompile Include="..\..\..\lib\server\autogen_ConnectionException.cpp" />
@@ -144,7 +145,6 @@
     <ClCompile Include="..\..\..\lib\server\Daemon.cpp" />
     <ClCompile Include="..\..\..\lib\server\LocalProcessStream.cpp" />
     <ClCompile Include="..\..\..\lib\server\Protocol.cpp" />
-    <ClCompile Include="..\..\..\lib\server\ProtocolObject.cpp" />
     <ClCompile Include="..\..\..\lib\server\ProtocolUncertainStream.cpp" />
     <ClCompile Include="..\..\..\lib\server\Socket.cpp" />
     <ClCompile Include="..\..\..\lib\server\SocketStream.cpp" />
@@ -217,13 +217,13 @@
     <ClInclude Include="..\..\..\lib\crypto\MD5Digest.h" />
     <ClInclude Include="..\..\..\lib\crypto\Random.h" />
     <ClInclude Include="..\..\..\lib\crypto\RollingChecksum.h" />
+    <ClInclude Include="..\..\..\lib\server\Message.h" />
     <ClInclude Include="..\..\..\lib\win32\emu.h" />
     <ClInclude Include="..\..\..\lib\win32\getopt.h" />
     <ClInclude Include="..\..\..\lib\server\autogen_ConnectionException.h" />
     <ClInclude Include="..\..\..\lib\server\autogen_ServerException.h" />
     <ClInclude Include="..\..\..\lib\server\Daemon.h" />
     <ClInclude Include="..\..\..\lib\server\Protocol.h" />
-    <ClInclude Include="..\..\..\lib\server\ProtocolObject.h" />
     <ClInclude Include="..\..\..\lib\server\ProtocolUncertainStream.h" />
     <ClInclude Include="..\..\..\lib\server\ProtocolWire.h" />
     <ClInclude Include="..\..\..\lib\server\ServerException.h" />
