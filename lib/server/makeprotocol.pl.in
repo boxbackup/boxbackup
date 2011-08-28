@@ -259,7 +259,7 @@ foreach my $cmd (@cmd_list)
 	}
 	
 	my $cmd_base_class = join(", ", map {"public $_"} @cmd_base_classes);
-	my $cmd_class = $protocol_name."ProtocolClient".$cmd;
+	my $cmd_class = $protocol_name."Protocol".$cmd;
 	$cmd_class{$cmd} = $cmd_class;
 	
 	print H <<__E;
