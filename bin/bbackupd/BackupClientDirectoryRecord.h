@@ -12,6 +12,7 @@
 
 #include <string>
 #include <map>
+#include <memory>
 
 #include "BackupClientFileAttributes.h"
 #include "BackupDaemonInterface.h"
