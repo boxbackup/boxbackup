@@ -220,9 +220,10 @@ $dir/${name}.gz: docs/man/${name}.gz
 EOF
 			# Releases have the docs pre-made, but users
 			# may want to rebuild them for some reason.
+			my $docbook_source = "docs/docbook/${name}";
+			$docbook_source =~ s/\.[58]$/.xml/;
 			print MAKE <<EOF;
-.PHONY: docs/man/${name}.gz
-docs/man/${name}.gz:
+docs/man/${name}.gz: $docbook_source docs/docbook/bb-man.xsl
 	cd docs; \$(MAKE) man/${name}.gz
 
 EOF
@@ -238,9 +239,9 @@ $dir/docs/${name}.html: docs/htmlguide/man-html/${name}.html
 EOF
 			# Releases have the docs pre-made, but users
 			# may want to rebuild them for some reason.
+			my $docbook_source = "docs/docbook/${name}.xml";
 			print MAKE <<EOF;
-.PHONY: docs/htmlguide/man-html/${name}.html
-docs/htmlguide/man-html/${name}.html:
+docs/htmlguide/man-html/${name}.html: $docbook_source docs/docbook/bb-nochunk-book.xsl
 	cd docs; \$(MAKE) htmlguide/man-html/${name}.html
 
 EOF
