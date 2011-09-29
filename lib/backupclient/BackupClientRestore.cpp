@@ -569,6 +569,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 					if (Params.ContinueAfterErrors)
 					{
 						Params.ContinuedAfterError = true;
+						// ensure that protocol remains usable
+						objectStream->Flush();
 					}
 					else
 					{
