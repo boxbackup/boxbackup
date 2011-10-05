@@ -35,8 +35,8 @@ ONLY:mingw32,mingw32msvc
 END-ONLY
 
 ONLY:mingw32
-	script /bin/mgwz.dll
-	script /bin/mingwm10.dll
+	script /usr/i686-pc-mingw32/sys-root/mingw/bin/libz-1.dll
+	script /usr/i686-pc-mingw32/sys-root/mingw/bin/mingwm10.dll
 END-ONLY
 
 ONLY:SunOS
