@@ -10,6 +10,7 @@ Start by installing Cygwin on your Windows machine from [http://www.cygwin.org/c
 
 Make sure to select the following packages during installation:
 
+ * Archive/unzip
  * Devel/automake
  * Devel/autoconf
  * Devel/gcc-mingw
@@ -23,8 +24,11 @@ Make sure to select the following packages during installation:
 If you already have Cygwin installed, please re-run the installer and
 ensure that those packages are installed.
 
-You may also want to install the debugger, Devel/gdb, and the command-line
-Subversion client, Devel/subversion.
+You may also want to install:
+
+ * Devel/gdb (the debugger)
+ * Devel/subversion (the command-line Subversion client)
+ * Editors/vim (the Vim text editor)
 
 == Base Directory ==
 
@@ -41,18 +45,18 @@ your user's home directory in /etc/passwd to match.
 
 == OpenSSL ==
 
-Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0d.tar.gz]
+Download OpenSSL from [http://www.openssl.org/source/openssl-1.0.0e.tar.gz]
 
 Open a Cygwin shell, go to the base directory, and unpack OpenSSL:
 
-	tar xzvf openssl-1.0.0d.tar.gz
+	tar xzvf openssl-1.0.0e.tar.gz
 
 Configure OpenSSL for MinGW compilation, and build and install it:
 
-	cd openssl-1.0.0d
+	cd openssl-1.0.0e
 	./Configure --prefix=/usr/i686-pc-mingw32/ mingw
 	make
-	make install
+	make install_sw
 
 == PCRE ==
 
@@ -95,11 +99,12 @@ unpack it, compile and install it:
 	make -f gccwin32.mak CC="gcc -mno-cygwin" LINK="gcc -mno-cygwin"
 	cp pdcurses.a /usr/i686-pc-mingw32/lib/libpdcurses.a
 
-Download Readline version 6.1 from
-[ftp://ftp.cwru.edu/pub/bash/readline-6.1.tar.gz], and unpack
+Download Readline version 6.2 from
+[ftp://ftp.cwru.edu/pub/bash/readline-6.2.tar.gz], and unpack
 and install it thus:
 
-	tar xzvf readline-6.1.tar.gz
+	tar xzvf readline-6.2.tar.gz
+	cd readline-6.2
 	./configure --prefix=/usr/i686-pc-mingw32 \
 		CFLAGS="-mno-cygwin" \
 		CPPFLAGS="-mno-cygwin" \
