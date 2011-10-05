@@ -15,9 +15,10 @@ if test "x$GXX" = "xyes"; then
   AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
 
   # Don't check for gcc -rdynamic on Solaris as it's broken, but returns 0.
+  # On Cygwin it does nothing except cause gcc to emit a warning message.
   case $build_os in
-  solaris*)
-    AC_MSG_NOTICE([skipping check for -rdynamic check on Solaris])
+  solaris*|cygwin)
+    AC_MSG_NOTICE([skipping check for -rdynamic check on $build_os])
     ;;
   *)
     # Check whether gcc supports -rdynamic, thanks to Steve Ellcey
