@@ -18,7 +18,7 @@ if test "x$GXX" = "xyes"; then
   # On Cygwin it does nothing except cause gcc to emit a warning message.
   case $build_os in
   solaris*|cygwin)
-    AC_MSG_NOTICE([skipping check for -rdynamic check on $build_os])
+    AC_MSG_NOTICE([skipping check for -rdynamic on $build_os])
     ;;
   *)
     # Check whether gcc supports -rdynamic, thanks to Steve Ellcey
