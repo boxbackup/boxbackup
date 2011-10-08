@@ -160,9 +160,11 @@
 #endif
 
 // Define O_BINARY for Unix compatibility with Windows :-)
-// MSVC 2010 defines in in fcntl.h, which is probably not included by this
-// point, so include it now so that we can detect if we need O_BINARY
-#ifdef _MSC_VER
+// MSVC 2010 and newer MinGW define this in fcntl.h, which is probably
+// not included by this point, so include it now so that we can detect
+// if we need O_BINARY
+
+#ifdef HAVE_FCNTL_H
 #	include <fcntl.h>
 #endif
 
