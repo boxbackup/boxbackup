@@ -91,9 +91,9 @@ AC_DEFUN([BOX_CHECK_VAR], [
 
 dnl VL_LIB_READLINE_CHECK(name, libraries, headers, history headers)
 AC_DEFUN([VL_LIB_READLINE_CHECK], [
+  ORIG_LIBS="$LIBS"
   AC_CACHE_CHECK([for $1 library],
                  [vl_cv_lib_$1], [
-    ORIG_LIBS="$LIBS"
     vl_cv_lib_$1=""
     for readline_lib in $2; do
       for termcap_lib in "" termcap curses ncurses pdcurses; do

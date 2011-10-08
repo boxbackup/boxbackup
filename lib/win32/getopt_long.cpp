@@ -58,6 +58,7 @@
  */
 
 // #include "Box.h"
+#include "emu.h"
 
 #include <errno.h>
 #include <stdarg.h>
