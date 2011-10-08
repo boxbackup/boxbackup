@@ -15,6 +15,11 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
+// Shut up stupid new warnings. Thanks MinGW! Ever heard of "compatibility"?
+#ifdef __MINGW32__
+#	define __MINGW_FEATURES__ 0
+#endif
+
 // basic types, may be required by other headers since we
 // don't include sys/types.h
 
