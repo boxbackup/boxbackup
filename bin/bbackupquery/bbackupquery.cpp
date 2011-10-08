@@ -74,7 +74,8 @@ void PrintUsageAndExit()
 		"  -w         Read/write mode, allow changes to store\n"
 #ifdef WIN32
 		"  -u         Enable Unicode console, requires font change to Lucida Console\n"
-#else // !WIN32
+#endif
+#ifdef HAVE_LIBREADLINE
 		"  -E         Disable interactive command editing, may fix entering intl chars\n"
 #endif
 		"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
