@@ -76,6 +76,9 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 /* #undef HAVE_EXECINFO_H */
 
+/* Define to 1 if you have the <fcntl.h> header file. */
+#define HAVE_FCNTL_H 1
+
 /* Define to 1 if you have the `flock' function. */
 /* #undef HAVE_FLOCK */
 

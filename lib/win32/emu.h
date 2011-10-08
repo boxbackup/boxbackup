@@ -15,6 +15,9 @@
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
+// Need feature detection macros below
+#include "../common/BoxConfig.h"
+
 // Shut up stupid new warnings. Thanks MinGW! Ever heard of "compatibility"?
 #ifdef __MINGW32__
 #	define __MINGW_FEATURES__ 0
@@ -450,7 +453,7 @@ int console_read(char* pBuffer, size_t BufferSize);
 // note: chsize() doesn't work over 2GB:
 // [https://stat.ethz.ch/pipermail/r-devel/2005-May/033339.html]
 #ifndef HAVE_FTRUNCATE
-	int ftruncate(int, off_t); 
+	extern "C" int ftruncate(int, off_t); 
 	inline int ftruncate(int __fd, off_t __length) 
 	{ 
 		return _chsize(__fd, __length); 
