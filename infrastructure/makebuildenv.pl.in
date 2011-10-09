@@ -894,12 +894,14 @@ EOF
 			"-o $end_target $o_file_list " .
 			"@lib_files $lo $platform_lib_files\n";
 	}
+
 	# tests need to copy the test file over
 	if($type eq 'test')
 	{
 		print MAKE "\tcp _t \$(OUTDIR)/t\n\tchmod u+x \$(OUTDIR)/t\n";
 		print MAKE "\tcp _t-gdb \$(OUTDIR)/t-gdb\n\tchmod u+x \$(OUTDIR)/t-gdb\n";
 	}
+
 	# dependency line?
 	print MAKE "\n";
 
