@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 #include "BoxException.h"
+#include "Logging.h"
 
 #define MAINHELPER_START									\
 	if(argc == 2 && ::strcmp(argv[1], "--version") == 0)	\
@@ -21,15 +22,13 @@
 	MEMLEAKFINDER_START										\
 	try {
 #define MAINHELPER_END																\
-	} catch(BoxException &e) {														\
-	printf("Exception: %s (%d/%d)\n", e.what(), e.GetType(), e.GetSubType());		\
-	return 1;																		\
 	} catch(std::exception &e) {													\
-	printf("Exception: %s\n", e.what());											\
-	return 1;																		\
+		BOX_FATAL(e.what()); \
+		return 1;																		\
 	} catch(...) {																	\
-	printf("Exception: <UNKNOWN>\n");												\
-	return 1; }
+		BOX_FATAL("UNKNOWN"); \
+		return 1; \
+	}
 
 #ifdef BOX_MEMORY_LEAK_TESTING
 	#define MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT(file, marker)				\
