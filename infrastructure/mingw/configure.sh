@@ -16,6 +16,11 @@ if [ ! -r "$DEP_PATH/lib/libpcreposix.a" \
 	exit 2
 fi
 
+if [ ! -r "$DEP_PATH/sys-root/mingw/lib/libz.dll.a" ]; then
+	echo "Error: upgrade your Cygwin mingw-zlib-devel package" >&2
+	exit 2
+fi
+
 if [ ! -x "configure" ]; then
 	if ! ./bootstrap; then
 		echo "Error: bootstrap failed, aborting." >&2
