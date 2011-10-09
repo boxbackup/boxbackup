@@ -16,7 +16,9 @@ if [ ! -r "$DEP_PATH/lib/libpcreposix.a" \
 	exit 2
 fi
 
-if [ ! -r "$DEP_PATH/sys-root/mingw/lib/libz.dll.a" ]; then
+LIBZ_PATH="${DEP_PATH}/sys-root/mingw/lib"
+
+if [ ! -r "$LIBZ_PATH/libz.dll.a" ]; then
 	echo "Error: upgrade your Cygwin mingw-zlib-devel package" >&2
 	exit 2
 fi
@@ -32,7 +34,7 @@ if ! ./configure "$@" --target=i686-pc-mingw32 \
 	CFLAGS="-mno-cygwin -mthreads" \
 	CPPFLAGS="-mno-cygwin" \
 	CXXFLAGS="-mno-cygwin -mthreads" \
-	LDFLAGS="-mno-cygwin -mthreads -L${DEP_PATH}/lib" \
+	LDFLAGS="-mno-cygwin -mthreads -L${DEP_PATH}/lib -L${LIBZ_PATH}" \
 	LIBS="-lcrypto -lws2_32 -lgdi32"
 then
 	echo "Error: configure failed, aborting." >&2
