@@ -16,14 +16,6 @@ if [ ! -r "$DEP_PATH/lib/libpcreposix.a" \
 	exit 2
 fi
 
-export CC="gcc -mno-cygwin"
-export CXX="g++ -mno-cygwin"
-export LD="g++ -mno-cygwin"
-export CFLAGS="-mno-cygwin -mthreads"
-export CXXFLAGS="-mno-cygwin -mthreads"
-export LDFLAGS="-mno-cygwin -mthreads"
-export LIBS="-lcrypto -lws2_32 -lgdi32"
-
 if [ ! -x "configure" ]; then
 	if ! ./bootstrap; then
 		echo "Error: bootstrap failed, aborting." >&2
@@ -31,7 +23,13 @@ if [ ! -x "configure" ]; then
 	fi
 fi
 
-if ! ./configure --target=i686-pc-mingw32 "$@"; then
+if ! ./configure "$@" --target=i686-pc-mingw32 \
+	CFLAGS="-mno-cygwin -mthreads" \
+	CPPFLAGS="-mno-cygwin" \
+	CXXFLAGS="-mno-cygwin -mthreads" \
+	LDFLAGS="-mno-cygwin -mthreads -L${DEP_PATH}/lib" \
+	LIBS="-lcrypto -lws2_32 -lgdi32"
+then
 	echo "Error: configure failed, aborting." >&2
 	exit 1
 fi
