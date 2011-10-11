@@ -44,7 +44,6 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\Release\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\Release\</IntDir>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IncludePath)</IncludePath>
-    <CustomBuildBeforeTargets Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compile</CustomBuildBeforeTargets>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <PreBuildEvent />
@@ -62,18 +61,18 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Lib />
-    <CustomBuildStep>
-      <Command>perl $(ProjectDir)..\getversion.pl</Command>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Message>Determining Version Number</Message>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Outputs>$(ProjectDir)..\..\..\lib\common\BoxVersion.h;%(Outputs)</Outputs>
-    </CustomBuildStep>
+    <CustomBuildStep />
+    <CustomBuildStep />
+    <CustomBuildStep />
     <Lib>
       <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcre.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcreposix.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
+    <PreBuildEvent>
+      <Command>perl $(ProjectDir)..\getversion.pl</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Determining Version Number</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
