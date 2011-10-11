@@ -772,6 +772,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		
 		// Filename of this file
 		std::string filename(MakeFullPath(rLocalPath, *f));
+		std::string nonVssFilePath = ConvertVssPathToRealPath(filename,
+			rBackupLocation);
 
 		// Get relevant info about file
 		box_time_t modTime = 0;
@@ -785,12 +787,12 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			EMU_STRUCT_STAT st;
 			if(EMU_LSTAT(filename.c_str(), &st) != 0)
 			{
-				rNotifier.NotifyFileStatFailed(this, 
-					filename, strerror(errno));
+				rNotifier.NotifyFileStatFailed(this, nonVssFilePath,
+					strerror(errno));
 
 				// Report the error (logs and 
 				// eventual email to administrator)
-				SetErrorWhenReadingFilesystemObject(rParams, filename);
+				SetErrorWhenReadingFilesystemObject(rParams, nonVssFilePath);
 
 				// Ignore this entry for now.
 				continue;
@@ -845,7 +847,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				bool isCurrentVersion = false;
 				box_time_t srvModTime = 0, srvAttributesHash = 0;
 				BackupStoreFilenameClear oldLeafname;
-				if(rContext.FindFilename(renameObjectID, renameInDirectory, localPotentialOldName, isDir, isCurrentVersion, &srvModTime, &srvAttributesHash, &oldLeafname))
+				if(rContext.FindFilename(renameObjectID, renameInDirectory,
+					localPotentialOldName, isDir, isCurrentVersion,
+					&srvModTime, &srvAttributesHash, &oldLeafname))
 				{	
 					// Only interested if it's a file and the latest version
 					if(!isDir && isCurrentVersion)
@@ -865,7 +869,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 							if(!rContext.StorageLimitExceeded())
 							{
 								// Rename the existing files (ie include old versions) on the server
-								connection.QueryMoveObject(renameObjectID, renameInDirectory, mObjectID /* move to this directory */,
+								connection.QueryMoveObject(renameObjectID,
+									renameInDirectory,
+									mObjectID /* move to this directory */,
 									BackupProtocolMoveObject::Flags_MoveAllWithSameName | 
 									BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
 									storeFilename);
@@ -876,8 +882,11 @@ bool BackupClientDirectoryRecord::UpdateItems(
 								
 								// Create new entry in the directory for it
 								// -- will be near enough what's actually on the server for the rest to work.
-								en = pDirOnStore->AddEntry(storeFilename, srvModTime, renameObjectID, 0 /* size in blocks unknown, but not needed */,
-									BackupStoreDirectory::Entry::Flags_File, srvAttributesHash);
+								en = pDirOnStore->AddEntry(storeFilename,
+									srvModTime, renameObjectID,
+									0 /* size in blocks unknown, but not needed */,
+									BackupStoreDirectory::Entry::Flags_File,
+									srvAttributesHash);
 							
 								// Store the object ID for the inode lookup map later
 								latestObjectID = renameObjectID;
@@ -919,6 +928,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		//	  and if we know about it from a directory listing, that it hasn't got the same upload time as on the store
 
 		bool doUpload = false;
+		std::string decisionReason = "unknown";
 
 		// Only upload a file if the mod time locally is 
 		// different to that on the server.
@@ -934,16 +944,12 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				if (pDirOnStore != 0 && en == 0)
 				{
 					doUpload = true;
-					BOX_TRACE("Upload decision: " <<
-						filename << ": will upload "
-						"(not on server)");
+					decisionReason = "not on server";
 				}
 				else if (modTime >= rParams.mSyncPeriodStart)
 				{
 					doUpload = true;
-					BOX_TRACE("Upload decision: " <<
-						filename << ": will upload "
-						"(modified since last sync)");
+					decisionReason = "modified since last sync";
 				}
 			}
 
@@ -960,9 +966,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				> rParams.mMaxUploadWait)
 			{
 				doUpload = true;
-				BOX_TRACE("Upload decision: " <<
-					filename << ": will upload "
-					"(continually modified)");
+				decisionReason = "continually modified";
 			}
 
 			// Then make sure that if files are added with a 
@@ -978,9 +982,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				en->GetModificationTime() != modTime)
 			{
 				doUpload = true;
-				BOX_TRACE("Upload decision: " <<
-					filename << ": will upload "
-					"(mod time changed)");
+				decisionReason = "mod time changed";
 			}
 
 			// And just to catch really badly off clocks in 
@@ -991,17 +993,14 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				rParams.mUploadAfterThisTimeInTheFuture)
 			{
 				doUpload = true;
-				BOX_TRACE("Upload decision: " <<
-					filename << ": will upload "
-					"(mod time in the future)");
+				decisionReason = "mod time in the future";
 			}
 		}
 	
 		if (en != 0 && en->GetModificationTime() == modTime)
 		{
-			BOX_TRACE("Upload decision: " <<
-				filename << ": will not upload "
-				"(not modified since last upload)");
+			doUpload = false;
+			decisionReason = "not modified since last upload";
 		}
 		else if (!doUpload)
 		{
@@ -1010,21 +1009,25 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				box_time_t now = GetCurrentBoxTime();
 				int age = BoxTimeToSeconds(now -
 					modTime);
-				BOX_TRACE("Upload decision: " <<
-					filename << ": will not upload "
-					"(modified too recently: "
-					"only " << age << " seconds ago)");
+				std::ostringstream s;
+				s << "modified too recently: "
+					"only " << age << " seconds ago";
+				decisionReason = s.str();
 			}
 			else
 			{
-				BOX_TRACE("Upload decision: " <<
-					filename << ": will not upload "
-					"(mod time is " << modTime << 
+				std::ostringstream s;
+				s << "mod time is " << modTime << 
 					" which is outside sync window, "
 					<< rParams.mSyncPeriodStart << " to "
-					<< rParams.mSyncPeriodEnd << ")");
+					<< rParams.mSyncPeriodEnd;
+				decisionReason = s.str();
 			}
 		}
+
+		BOX_TRACE("Upload decision: " << nonVssFilePath << ": " <<
+			(doUpload ? "will upload" : "will not upload") <<
+			"(" << decisionReason << ")");
 
 		bool fileSynced = true;
 
@@ -1078,7 +1081,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// retries would probably just cause
 					// more problems.
 					rNotifier.NotifyFileUploadException(
-						this, filename, e);
+						this, nonVssFilePath, e);
 					throw;
 				}
 				catch(BoxException &e)
@@ -1095,8 +1098,10 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// code false, to show error in directory
 					allUpdatedSuccessfully = false;
 					// Log it.
-					SetErrorWhenReadingFilesystemObject(rParams, filename);
-					rNotifier.NotifyFileUploadException(this, filename, e);
+					SetErrorWhenReadingFilesystemObject(rParams,
+						nonVssFilePath);
+					rNotifier.NotifyFileUploadException(this,
+						nonVssFilePath, e);
 				}
 
 				// Update structures if the file was uploaded
@@ -1114,8 +1119,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			}
 			else
 			{
-				rNotifier.NotifyFileSkippedServerFull(this,
-					ConvertVssPathToRealPath(filename, rBackupLocation));
+				rNotifier.NotifyFileSkippedServerFull(this, nonVssFilePath);
 			}
 		}
 		else if(en != 0 && en->GetAttributesHash() != attributesHash)
@@ -1135,8 +1139,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				try
 				{
-					rNotifier.NotifyFileUploadingAttributes(
-						this, filename);
+					rNotifier.NotifyFileUploadingAttributes(this,
+						nonVssFilePath);
 					
 					// Update store
 					BackupClientFileAttributes attr;
@@ -1147,10 +1151,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 				catch (BoxException &e)
 				{
-					BOX_ERROR("Failed to read or store "
-						"file attributes for '" <<
-						filename << "', will try "
-						"again later");
+					BOX_ERROR("Failed to read or store file attributes " 
+						"for '" << nonVssFilePath << "', will try again "
+						"later");
 				}
 			}
 		}
@@ -1194,7 +1197,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				// Use this one
 				BOX_TRACE("Storing uploaded file ID " <<
-					inodeNum << " (" << filename << ") "
+					inodeNum << " (" << nonVssFilePath << ") "
 					"in ID map as object " <<
 					latestObjectID << " with parent " <<
 					mObjectID);
@@ -1211,7 +1214,12 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// Found
 					if (dirid != mObjectID)
 					{
-						BOX_WARNING("Found conflicting parent ID for file ID " << inodeNum << " (" << filename << "): expected " << mObjectID << " but found " << dirid << " (same directory used in two different locations?)");
+						BOX_WARNING("Found conflicting parent ID for "
+							"file ID " << inodeNum << " (" <<
+							nonVssFilePath << "): expected " <<
+							mObjectID << " but found " << dirid <<
+							" (same directory used in two different "
+							"locations?)");
 					}
 
 					ASSERT(dirid == mObjectID);
@@ -1221,11 +1229,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// into it. However, in a long running process this may happen occasionally and
 					// not indicate anything wrong.
 					// Run the release version for real life use, where this check is not made.
-					BOX_TRACE("Storing found file ID " <<
-						inodeNum << " (" << filename <<
-						") in ID map as object " <<
-						objid << " with parent " <<
-						mObjectID);
+					BOX_TRACE("Storing found file ID " << inodeNum <<
+						" (" << nonVssFilePath << ") in ID map as "
+						"object " << objid << " with parent " << mObjectID);
 					idMap.AddToMap(inodeNum, objid,
 						mObjectID /* containing directory */);
 				}
@@ -1234,7 +1240,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		
 		if (fileSynced)
 		{
-			rNotifier.NotifyFileSynchronised(this, filename,
+			rNotifier.NotifyFileSynchronised(this, nonVssFilePath,
 				fileSize);
 		}
 	}
@@ -1260,6 +1266,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		
 		// Get the local filename
 		std::string dirname(MakeFullPath(rLocalPath, *d));
+		std::string nonVssDirPath = ConvertVssPathToRealPath(dirname,
+			rBackupLocation);
 	
 		// See if it's in the listing (if we have one)
 		BackupStoreFilenameClear storeFilename(*d);
@@ -1351,7 +1359,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					BOX_WARNING("Failed to read attributes "
 						"of directory, cannot check "
 						"for rename, assuming new: '"
-						<< dirname << "'");
+						<< nonVssDirPath << "'");
 					failedToReadAttributes = true;
 				}
 
@@ -1369,7 +1377,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					std::string localPotentialOldName;
 					bool isDir = false;
 					bool isCurrentVersion = false;
-					if(rContext.FindFilename(renameObjectID, renameInDirectory, localPotentialOldName, isDir, isCurrentVersion))
+					if(rContext.FindFilename(renameObjectID,
+						renameInDirectory, localPotentialOldName,
+						isDir, isCurrentVersion))
 					{	
 						// Only interested if it's a directory
 						if(isDir && isCurrentVersion)
@@ -1399,7 +1409,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				if(renameDir)
 				{
 					// Rename the existing directory on the server
-					connection.QueryMoveObject(renameObjectID, renameInDirectory, mObjectID /* move to this directory */,
+					connection.QueryMoveObject(renameObjectID,
+						renameInDirectory,
+						mObjectID /* move to this directory */,
 						BackupProtocolMoveObject::Flags_MoveAllWithSameName | 
 						BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
 						storeFilename);
@@ -1418,15 +1430,17 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				else
 				{
 					// Create a new directory
-					std::auto_ptr<BackupProtocolSuccess> dirCreate(connection.QueryCreateDirectory(
-						mObjectID, attrModTime, storeFilename, attrStream));
+					std::auto_ptr<BackupProtocolSuccess> dirCreate(
+						connection.QueryCreateDirectory(
+							mObjectID, attrModTime, storeFilename, 
+							attrStream));
 					subDirObjectID = dirCreate->GetObjectID(); 
 					
 					// Flag as having done this for optimisation later
 					haveJustCreatedDirOnServer = true;
 					rNotifier.NotifyDirectoryCreated(subDirObjectID,
 						storeFilename.GetClearFilename(),
-						dirname);
+						nonVssDirPath);
 				}
 			}
 
@@ -1490,6 +1504,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			BackupStoreFilenameClear clear(en->GetName());
 			std::string localName = MakeFullPath(rLocalPath,
 				clear.GetClearFilename());
+			std::string nonVssLocalName = ConvertVssPathToRealPath(localName,
+				rBackupLocation);
 			
 			// Delete this entry -- file or directory?
 			if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) != 0)
@@ -1515,12 +1531,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					mSubDirectories.erase(e);
 					delete rec;
 
-					std::string name = MakeFullPath(
-						rLocalPath, 
-						dirname.GetClearFilename());
-
-					BOX_TRACE("Deleted directory record "
-						"for " << name);
+					BOX_TRACE("Deleted directory record for " << 
+						nonVssLocalName);
 				}				
 			}
 		}
