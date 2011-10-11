@@ -469,7 +469,8 @@ bool FileLogger::Log(Log::Level Level, const std::string& rFile,
 	}
 	
 	/* avoid infinite loop if this throws an exception */
-	Logging::Remove(this);
+	Log::Level oldLevel = GetLevel();
+	Filter(Log::NOTHING);
 
 	std::ostringstream buf;
 	buf << FormatTime(GetCurrentBoxTime(), true, false);
@@ -509,7 +510,8 @@ bool FileLogger::Log(Log::Level Level, const std::string& rFile,
 
 	mLogFile.Write(output.c_str(), output.length());
 
-	Logging::Add(this);
+	// no infinite loop, reset to saved logging level
+	Filter(oldLevel);
 	return true;
 }
 
