@@ -138,6 +138,11 @@
     <None Include="..\..\..\lib\backupstore\BackupStoreException.txt" />
     <None Include="..\..\..\lib\backupstore\Makefile.extra" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="common.vcxproj">
+      <Project>{a089cee6-ebf0-4232-a0c0-74850a8127a6}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
