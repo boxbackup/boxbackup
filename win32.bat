@@ -5,6 +5,7 @@ echo using Cygwin and Perl
 
 copy .\infrastructure\BoxPlatform.pm.in .\infrastructure\BoxPlatform.pm
 copy .\lib\common\BoxPortsAndFiles.h.in .\lib\common\BoxPortsAndFiles.h
+copy .\lib\common\BoxConfig-MSVC.h .\lib\common\BoxConfig.h
 
 cd .\bin\bbackupquery\ & perl ./../../bin/bbackupquery/makedocumentation.pl.in
 cd ..\..\
