@@ -309,6 +309,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 
 				// Stat file to get info
 				filename = MakeFullPath(rLocalPath, en->d_name);
+				std::string realFileName = ConvertVssPathToRealPath(filename,
+					rBackupLocation);
 
 				#ifdef WIN32
 				// Don't stat the file just yet, to ensure
@@ -331,7 +333,6 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				}
 
 				#else // !WIN32
-
 				if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
 				{
 					if(!(rParams.mrContext.ExcludeDir(
@@ -408,11 +409,9 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// File or symbolic link
 
 					// Exclude it?
-					if(rParams.mrContext.ExcludeFile(filename))
+					if(rParams.mrContext.ExcludeFile(realFileName))
 					{
- 						rNotifier.NotifyFileExcluded(this,
-							ConvertVssPathToRealPath(filename, rBackupLocation));
-
+ 						rNotifier.NotifyFileExcluded(this, realFileName);
 						// Next item!
 						continue;
 					}
@@ -425,10 +424,9 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Directory
 
 					// Exclude it?
-					if(rParams.mrContext.ExcludeDir(filename))
+					if(rParams.mrContext.ExcludeDir(realFileName))
 					{
- 						rNotifier.NotifyDirExcluded(this,
-							ConvertVssPathToRealPath(filename, rBackupLocation));
+ 						rNotifier.NotifyDirExcluded(this, realFileName);
 
 						// Next item!
 						continue;
@@ -441,8 +439,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// http://social.msdn.microsoft.com/forums/en-US/windowscompatibility/thread/05d14368-25dd-41c8-bdba-5590bf762a68/
 					if (en->d_type & FILE_ATTRIBUTE_REPARSE_POINT)
 					{
- 						rNotifier.NotifyMountPointSkipped(this,
-							ConvertVssPathToRealPath(filename, rBackupLocation));
+ 						rNotifier.NotifyMountPointSkipped(this, realFileName);
 						continue;
 					}
 					#endif
@@ -450,7 +447,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 					// Store on list
 					dirs.push_back(std::string(en->d_name));
 				}
-				else
+				else // not a file or directory, what is it?
 				{
 					if (type == S_IFSOCK
 #						ifndef WIN32
@@ -461,17 +458,16 @@ void BackupClientDirectoryRecord::SyncDirectory(
 						// removed notification for these types
 						// see Debian bug 479145, no objections
 					}
-					else if(rParams.mrContext.ExcludeFile(filename))
+					else if(rParams.mrContext.ExcludeFile(realFileName))
 					{
- 						rNotifier.NotifyFileExcluded(this, 
-							ConvertVssPathToRealPath(filename, rBackupLocation));
+ 						rNotifier.NotifyFileExcluded(this, realFileName);
 					}
 					else
 					{
- 						rNotifier.NotifyUnsupportedFileType(this, 
-							ConvertVssPathToRealPath(filename, rBackupLocation));
+ 						rNotifier.NotifyUnsupportedFileType(this,
+							realFileName);
 						SetErrorWhenReadingFilesystemObject(rParams,
-							ConvertVssPathToRealPath(filename, rBackupLocation));
+							realFileName);
 					}
 
 					continue;
