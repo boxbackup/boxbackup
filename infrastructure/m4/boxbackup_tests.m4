@@ -67,11 +67,14 @@ esac
 ### Checks for libraries.
 
 case $target_os in
-mingw32*) ;;
-winnt)    ;;
+mingw32*)
+	AC_CHECK_LIB([crypto -lws2_32 -lgdi32], [CRYPTO_lock])
+	;;
+winnt)
+	;;
 *)
-  AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes],
-                 [AC_MSG_ERROR([[cannot find a short sleep function (nanosleep)]])])
+	AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes],
+		[AC_MSG_ERROR([[cannot find a short sleep function (nanosleep)]])])
 	;;
 esac
 
