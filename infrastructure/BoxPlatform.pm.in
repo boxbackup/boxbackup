@@ -24,11 +24,13 @@ BEGIN
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
 	$build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
+	$build_os = 'MINGW32' if $build_os =~ m/MINGW32/;
 
 	$make_command = ($build_os eq 'Darwin') ? 'bsdmake' : ($build_os eq 'SunOS') ? 'gmake' : 'make';
 
 	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' &&
-		$build_os ne "SunOS" && $build_os ne 'GNU/kFreeBSD');
+		$build_os ne "MINGW32" && $build_os ne "SunOS"
+		&& $build_os ne 'GNU/kFreeBSD');
 
 	# blank extra flags by default
 	$platform_compile_line_extra = '';
