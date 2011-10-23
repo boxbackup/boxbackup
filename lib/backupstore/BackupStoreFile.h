@@ -162,9 +162,9 @@ public:
 		uint8_t *a = (uint8_t*)malloc((Size) + (BACKUPSTOREFILE_CODING_BLOCKSIZE * 3));
 		if(a == 0) return 0;
 		// Align to main block size
-		ASSERT(sizeof(unsigned long) >= sizeof(void*));	// make sure casting the right pointer size
+		ASSERT(sizeof(uint64_t) >= sizeof(void*));	// make sure casting the right pointer size
 		uint8_t adjustment = BACKUPSTOREFILE_CODING_BLOCKSIZE
-							  - (uint8_t)(((unsigned long)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
+			  - (uint8_t)(((uint64_t)a) % BACKUPSTOREFILE_CODING_BLOCKSIZE);
 		uint8_t *b = (a + adjustment);
 		// Store adjustment
 		*b = adjustment;
@@ -174,8 +174,8 @@ public:
 	inline static void CodingChunkFree(void *Block)
 	{
 		// Check alignment is as expected
-		ASSERT(sizeof(unsigned long) >= sizeof(void*));	// make sure casting the right pointer size
-		ASSERT((uint8_t)(((unsigned long)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
+		ASSERT(sizeof(uint64_t) >= sizeof(void*));	// make sure casting the right pointer size
+		ASSERT((uint8_t)(((uint64_t)Block) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 		uint8_t *a = (uint8_t*)Block;
 		a -= BACKUPSTOREFILE_CODING_OFFSET;
 		// Adjust downwards...
