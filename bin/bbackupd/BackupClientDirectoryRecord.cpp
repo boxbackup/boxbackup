@@ -107,12 +107,21 @@ std::string BackupClientDirectoryRecord::ConvertVssPathToRealPath(
 	const Location& rBackupLocation)
 {
 #ifdef ENABLE_VSS
+	BOX_TRACE("VSS: ConvertVssPathToRealPath: mIsSnapshotCreated = " <<
+		rBackupLocation.mIsSnapshotCreated);
+	BOX_TRACE("VSS: ConvertVssPathToRealPath: File/Directory Path = " <<
+		rVssPath.substr(0, rBackupLocation.mSnapshotPath.length()));
+	BOX_TRACE("VSS: ConvertVssPathToRealPath: Snapshot Path = " <<
+		rBackupLocation.mSnapshotPath);
 	if (rBackupLocation.mIsSnapshotCreated &&
 		rVssPath.substr(0, rBackupLocation.mSnapshotPath.length()) ==
 		rBackupLocation.mSnapshotPath)
 	{
-		return rBackupLocation.mPath +
+		std::string convertedPath = rBackupLocation.mPath +
 			rVssPath.substr(rBackupLocation.mSnapshotPath.length());
+		BOX_TRACE("VSS: ConvertVssPathToRealPath: Converted Path = " <<
+			convertedPath);
+		return convertedPath;
 	}
 #endif
 
