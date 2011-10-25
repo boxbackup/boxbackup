@@ -156,6 +156,7 @@ private:
 		const std::vector<std::string> &rDirs);
 	int64_t UploadFile(SyncParams &rParams,
 		const std::string &rFilename,
+		const std::string &rNonVssFilePath,
 		const BackupStoreFilename &rStoreFilename,
 		int64_t FileSize, box_time_t ModificationTime,
 		box_time_t AttributesHash, bool NoPreviousVersionOnServer);
