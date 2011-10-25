@@ -28,9 +28,13 @@
 	#include <dlfcn.h>
 #endif
 
-#include "Utils.h"
+#ifdef NEED_BOX_VERSION_H
+#	include "BoxVersion.h"
+#endif
+
 #include "CommonException.h"
 #include "Logging.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 

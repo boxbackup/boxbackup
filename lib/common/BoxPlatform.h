@@ -23,7 +23,7 @@
 
 #ifdef _MSC_VER
 #include "BoxConfig-MSVC.h"
-#include "BoxVersion.h"
+#define NEED_BOX_VERSION_H
 #else
 #include "BoxConfig.h"
 #endif

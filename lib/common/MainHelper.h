@@ -12,6 +12,10 @@
 
 #include <stdio.h>
 
+#ifdef NEED_BOX_VERSION_H
+#	include "BoxVersion.h"
+#endif
+
 #include "BoxException.h"
 #include "Logging.h"
 
@@ -21,6 +25,7 @@
 	MEMLEAKFINDER_INIT \
 	MEMLEAKFINDER_START										\
 	try {
+
 #define MAINHELPER_END																\
 	} catch(std::exception &e) {													\
 		BOX_FATAL(e.what()); \

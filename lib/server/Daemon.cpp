@@ -32,13 +32,17 @@
 
 #include <iostream>
 
-#include "Daemon.h"
+#ifdef NEED_BOX_VERSION_H
+#	include "BoxVersion.h"
+#endif
+
 #include "Configuration.h"
-#include "ServerException.h"
-#include "Guards.h"
-#include "UnixUser.h"
+#include "Daemon.h"
 #include "FileModificationTime.h"
+#include "Guards.h"
 #include "Logging.h"
+#include "ServerException.h"
+#include "UnixUser.h"
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
