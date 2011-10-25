@@ -2514,6 +2514,24 @@ void BackupDaemon::FillIDMapVector(std::vector<BackupClientInodeToIDMap *> &rVec
 				filename += ".n";
 			}
 
+			// The new map file should not exist yet. If there's
+			// one left over from a previous failed run, it's not
+			// useful to us because we never read from it and will
+			// overwrite the entries of all files that still
+			// exist, so we should just delete it and start afresh.
+			if(NewMaps && FileExists(filename.c_str()))
+			{
+				BOX_NOTICE("Found an incomplete ID map "
+					"database, deleting it to start "
+					"afresh: " << filename);
+				if(unlink(filename.c_str()) != 0)
+				{
+					BOX_LOG_NATIVE_ERROR(BOX_FILE_MESSAGE(
+						filename, "Failed to delete "
+						"incomplete ID map database"));
+				}
+			}
+
 			// If it's not a new map, it may not exist in which case an empty map should be created
 			if(!NewMaps && !FileExists(filename.c_str()))
 			{
