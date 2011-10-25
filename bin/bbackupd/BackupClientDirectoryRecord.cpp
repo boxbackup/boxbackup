@@ -258,8 +258,9 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		DIR *dirHandle = 0;
 		try
 		{
-			rNotifier.NotifyScanDirectory(this,
-				ConvertVssPathToRealPath(rLocalPath, rBackupLocation));
+			std::string nonVssDirPath = ConvertVssPathToRealPath(rLocalPath,
+					rBackupLocation);
+			rNotifier.NotifyScanDirectory(this, nonVssDirPath);
 
 			dirHandle = ::opendir(rLocalPath.c_str());
 			if(dirHandle == 0)
@@ -269,19 +270,20 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				if (errno == EACCES)
 				{
 					rNotifier.NotifyDirListFailed(this,
-						ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
+						nonVssDirPath,
 						"Access denied");
 				}
 				else
 				{
 					rNotifier.NotifyDirListFailed(this, 
-						ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
+						nonVssDirPath,
 						strerror(errno));
 				}
 				
 				// Report the error (logs and eventual email
 				// to administrator)
-				SetErrorWhenReadingFilesystemObject(rParams, rLocalPath);
+				SetErrorWhenReadingFilesystemObject(rParams,
+					nonVssDirPath);
 				// Ignore this directory for now.
 				return;
 			}
@@ -1066,7 +1068,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				try
 				{
 					latestObjectID = UploadFile(rParams,
-						filename, storeFilename,
+						filename,
+						nonVssFilePath,
+						storeFilename,
 						fileSize, modTime,
 						attributesHash,
 						noPreviousVersionOnServer);
@@ -1608,6 +1612,7 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(
 int64_t BackupClientDirectoryRecord::UploadFile(
 	BackupClientDirectoryRecord::SyncParams &rParams,
 	const std::string &rFilename,
+	const std::string &rNonVssFilePath,
 	const BackupStoreFilename &rStoreFilename,
 	int64_t FileSize,
 	box_time_t ModificationTime,
@@ -1641,8 +1646,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			if(diffFromID != 0)
 			{
 				// Found an old version
-				rNotifier.NotifyFileUploadingPatch(this, 
-					rFilename);
+				rNotifier.NotifyFileUploadingPatch(this,
+					rNonVssFilePath);
 
 				// Get the index
 				std::auto_ptr<IOStream> blockIndexStream(connection.ReceiveStream());
@@ -1701,7 +1706,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 		if(doNormalUpload)
 		{
 			// below threshold or nothing to diff from, so upload whole
-			rNotifier.NotifyFileUploading(this, rFilename);
+			rNotifier.NotifyFileUploading(this, rNonVssFilePath);
 			
 			// Prepare to upload, getting a stream which will encode the file as we go along
 			std::auto_ptr<IOStream> upload(
@@ -1762,7 +1767,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					return 0;
 				}
 				rNotifier.NotifyFileUploadServerError(this,
-					rFilename, type, subtype);
+					rNonVssFilePath, type, subtype);
 			}
 		}
 		
@@ -1770,7 +1775,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 		throw;
 	}
 
-	rNotifier.NotifyFileUploaded(this, rFilename, FileSize, uploadedSize);
+	rNotifier.NotifyFileUploaded(this, rNonVssFilePath, FileSize,
+		uploadedSize);
 
 	// Return the new object ID of this file
 	return objID;
