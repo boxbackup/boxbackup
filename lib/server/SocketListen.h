@@ -166,10 +166,13 @@ public:
 		if(::bind(mSocketHandle, &addr.sa_generic, addrLen) == -1
 			|| ::listen(mSocketHandle, ListenBacklog) == -1)
 		{
+			int err_number = errno;
 			// Dispose of the socket
 			::close(mSocketHandle);
 			mSocketHandle = -1;
-			THROW_EXCEPTION(ServerException, SocketBindError)
+			THROW_SYS_FILE_ERRNO("Failed to bind or listen "
+				"on socket", Name, err_number,
+				ServerException, SocketBindError);
 		}	
 	}
 	
