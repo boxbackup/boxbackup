@@ -13,7 +13,7 @@ SocketOpenError					10
 SocketPollError					11
 SocketCloseError				13
 SocketNameUNIXPathTooLong		14
-SocketBindError					16	Check the ListenAddresses directive in your config file -- must refer to local IP addresses only
+SocketBindError					16	Check the ListenAddresses directive (bbstored) or CommandSocket (bbackupd) in your config file -- must refer to local IP addresses (or existing writable path) only
 SocketAcceptError				17
 ServerStreamBadListenAddrs		18
 ServerForkError					19
