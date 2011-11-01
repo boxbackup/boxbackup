@@ -392,7 +392,7 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 	}
 
 	// Add a new entry in an appropriate place
-	mDirectory.AddUnattactedObject(objectStoreFilename, modTime,
+	mDirectory.AddUnattachedObject(objectStoreFilename, modTime,
 		ObjectID, sizeInBlocks,
 		IsDirectory?(BackupStoreDirectory::Entry::Flags_Dir):(BackupStoreDirectory::Entry::Flags_File));
 }
@@ -883,12 +883,12 @@ bool BackupStoreDirectory::CheckAndFix()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreDirectory::AddUnattactedObject(...)
+//		Name:    BackupStoreDirectory::AddUnattachedObject(...)
 //		Purpose: Adds an object which is currently unattached. Assume that CheckAndFix() will be called afterwards.
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreDirectory::AddUnattactedObject(const BackupStoreFilename &rName,
+void BackupStoreDirectory::AddUnattachedObject(const BackupStoreFilename &rName,
 	box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags)
 {
 	Entry *pnew = new Entry(rName, ModificationTime, ObjectID, SizeInBlocks, Flags,
