@@ -467,14 +467,6 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 	int64_t containerID = -1;
 	int64_t size = -1;
 
-	// Debugging for Sune Molgaard's issue with non-existent files being
-	// detected as unattached and crashing later in CheckUnattachedObjects()
-	if (ObjectID == 0x90c1a)
-	{
-		BOX_INFO("Trying to open " << BOX_FORMAT_OBJECTID(ObjectID) <<
-			" from " << rFilename << " on disc " << mDiscSetNumber);
-	}
-
 	try
 	{
 		// Open file
