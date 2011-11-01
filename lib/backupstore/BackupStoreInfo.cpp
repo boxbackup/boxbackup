@@ -453,6 +453,23 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	return numChanges;
 }
 
+#define APPLY_DELTA(field, delta) \
+	if(mReadOnly) \
+	{ \
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly) \
+	} \
+	\
+	if((field + delta) < 0) \
+	{ \
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, \
+			StoreInfoBlockDeltaMakesValueNegative, \
+			"Failed to reduce " << #field << " from " << \
+			field << " by " << delta); \
+	} \
+	\
+	field += delta; \
+	mIsModified = true;
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -463,18 +480,7 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 // --------------------------------------------------------------------------
 void BackupStoreInfo::ChangeBlocksUsed(int64_t Delta)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-	if((mBlocksUsed + Delta) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mBlocksUsed += Delta;
-	
-	mIsModified = true;
+	APPLY_DELTA(mBlocksUsed, Delta);
 }
 
 // --------------------------------------------------------------------------
@@ -488,19 +494,7 @@ void BackupStoreInfo::ChangeBlocksUsed(int64_t Delta)
 // --------------------------------------------------------------------------
 void BackupStoreInfo::ChangeBlocksInCurrentFiles(int64_t Delta)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-
-	if((mBlocksInCurrentFiles + Delta) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException,
-			StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mBlocksInCurrentFiles += Delta;
-	mIsModified = true;
+	APPLY_DELTA(mBlocksInCurrentFiles, Delta);
 }
 
 // --------------------------------------------------------------------------
@@ -513,18 +507,7 @@ void BackupStoreInfo::ChangeBlocksInCurrentFiles(int64_t Delta)
 // --------------------------------------------------------------------------
 void BackupStoreInfo::ChangeBlocksInOldFiles(int64_t Delta)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-	if((mBlocksInOldFiles + Delta) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mBlocksInOldFiles += Delta;
-	
-	mIsModified = true;
+	APPLY_DELTA(mBlocksInOldFiles, Delta);
 }
 
 // --------------------------------------------------------------------------
@@ -537,18 +520,7 @@ void BackupStoreInfo::ChangeBlocksInOldFiles(int64_t Delta)
 // --------------------------------------------------------------------------
 void BackupStoreInfo::ChangeBlocksInDeletedFiles(int64_t Delta)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-	if((mBlocksInDeletedFiles + Delta) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mBlocksInDeletedFiles += Delta;
-	
-	mIsModified = true;
+	APPLY_DELTA(mBlocksInDeletedFiles, Delta);
 }
 
 // --------------------------------------------------------------------------
@@ -561,83 +533,27 @@ void BackupStoreInfo::ChangeBlocksInDeletedFiles(int64_t Delta)
 // --------------------------------------------------------------------------
 void BackupStoreInfo::ChangeBlocksInDirectories(int64_t Delta)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-	if((mBlocksInDirectories + Delta) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mBlocksInDirectories += Delta;
-	
-	mIsModified = true;
+	APPLY_DELTA(mBlocksInDirectories, Delta);
 }
 
 void BackupStoreInfo::AdjustNumFiles(int64_t increase)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-
-	if((mNumFiles + increase) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mNumFiles += increase;
-	mIsModified = true;
-
+	APPLY_DELTA(mNumFiles, increase);
 }
 
 void BackupStoreInfo::AdjustNumOldFiles(int64_t increase)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-
-	if((mNumOldFiles + increase) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mNumOldFiles += increase;
-	mIsModified = true;
+	APPLY_DELTA(mNumOldFiles, increase);
 }
 
 void BackupStoreInfo::AdjustNumDeletedFiles(int64_t increase)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-
-	if((mNumDeletedFiles + increase) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mNumDeletedFiles += increase;
-	mIsModified = true;
+	APPLY_DELTA(mNumDeletedFiles, increase);
 }
 
 void BackupStoreInfo::AdjustNumDirectories(int64_t increase)
 {
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-
-	if((mNumDirectories + increase) < 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoBlockDeltaMakesValueNegative)
-	}
-	
-	mNumDirectories += increase;
-	mIsModified = true;
+	APPLY_DELTA(mNumDirectories, increase);
 }
 
 // --------------------------------------------------------------------------
