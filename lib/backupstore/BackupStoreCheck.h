@@ -84,6 +84,10 @@ public:
 	void Check();
 	
 	bool ErrorsFound() {return mNumberErrorsFound > 0;}
+	inline int64_t GetNumErrorsFound()
+	{
+		return mNumberErrorsFound;
+	}
 
 private:
 	enum
@@ -161,7 +165,7 @@ private:
 #else
 	#define DUMP_OBJECT_INFO
 #endif
-	
+
 private:
 	std::string mStoreRoot;
 	int mDiscSetNumber;
