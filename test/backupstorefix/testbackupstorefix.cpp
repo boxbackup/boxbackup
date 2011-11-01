@@ -17,6 +17,7 @@
 #include <map>
 
 #include "Test.h"
+#include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreFile.h"
@@ -215,6 +216,7 @@ void test_dir_fixing()
 		TEST_THAT(dir.CheckAndFix() == false);
 		check_dir(dir, ck);
 	}
+
 	{
 		BackupStoreDirectory dir;
 		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
@@ -297,317 +299,349 @@ int test(int argc, const char *argv[])
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Start the bbstored server
-	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
+	int bbstored_pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
 		"testfiles/bbstored.pid");
-	TEST_THAT(pid != -1 && pid != 0);
-
-	if(pid > 0)
-	{
-		::sleep(1);
-		TEST_THAT(ServerIsAlive(pid));
-
-		// Run the perl script to create the initial directories
-		TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl init") == 0);
-
-		std::string cmd = BBACKUPD " " + bbackupd_args +
-			" testfiles/bbackupd.conf";
-		int bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-
-		if(bbackupd_pid > 0)
-		{
-			::safe_sleep(1);
-			TEST_THAT(ServerIsAlive(bbackupd_pid));
-
-			// Wait 4 more seconds for the files to be old enough
-			// to upload
-			::safe_sleep(4);
+	TEST_THAT(bbstored_pid > 0);
+	if (bbstored_pid <= 0) return 1;
 	
-			// Upload files to create a nice store directory
-			::sync_and_wait();
+	::sleep(1);
+	TEST_THAT(ServerIsAlive(bbstored_pid));
 
-			// Stop bbackupd
-			#ifdef WIN32
-				terminate_bbackupd(bbackupd_pid);
-				// implicit check for memory leaks
-			#else
-				TEST_THAT(KillServer(bbackupd_pid));
-				TestRemoteProcessMemLeaks("bbackupd.memleaks");
-			#endif
+	// Run the perl script to create the initial directories
+	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl init") == 0);
+
+	std::string cmd = BBACKUPD " " + bbackupd_args +
+		" testfiles/bbackupd.conf";
+	int bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+	TEST_THAT(bbackupd_pid > 0);
+	if (bbackupd_pid <= 0) return 1;
+
+	::safe_sleep(1);
+	TEST_THAT(ServerIsAlive(bbackupd_pid));
+
+	// Wait 4 more seconds for the files to be old enough
+	// to upload
+	::safe_sleep(4);
+
+	// Upload files to create a nice store directory
+	::sync_and_wait();
+
+	// Stop bbackupd
+	#ifdef WIN32
+		terminate_bbackupd(bbackupd_pid);
+		// implicit check for memory leaks
+	#else
+		TEST_THAT(KillServer(bbackupd_pid));
+		TestRemoteProcessMemLeaks("bbackupd.memleaks");
+	#endif
+
+	// Add a reference to a file that doesn't exist, check that it's removed
+	{
+		std::string fn;
+		StoreStructure::MakeObjectFilename(1 /* root */, storeRoot,
+			discSetNum, fn, true /* EnsureDirectoryExists */);
+
+		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
+			fn));
+		BackupStoreDirectory dir;
+		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+		
+		dir.AddEntry(fnames[0], 12, 0x1234567890123456LL /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File, 2);
+		
+		RaidFileWrite d(discSetNum, fn);
+		d.Open(true /* allow overwrite */);
+		dir.WriteToStream(d);
+		d.Commit(true /* write now! */);
+
+		file = RaidFileRead::Open(discSetNum, fn);
+		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) != 0);
+
+		// Check it
+		BackupStoreCheck checker(storeRoot, discSetNum,
+			0x01234567, true /* FixErrors */, false /* Quiet */);
+		checker.Check();
+		TEST_EQUAL(1, checker.GetNumErrorsFound());
+
+		file = RaidFileRead::Open(discSetNum, fn);
+		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) == 0);
+	}
+
+	if (failures > 0) return 1;
+	
+	// Generate a list of all the object IDs
+	TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
+		"-c testfiles/bbackupd.conf \"list -r\" quit "
+		"> testfiles/initial-listing.txt") == 0);
+
+	// And load it in
+	{
+		FILE *f = ::fopen("testfiles/initial-listing.txt", "r");
+		TEST_THAT_ABORTONFAIL(f != 0);
+		char line[512];
+		int32_t id;
+		char flags[32];
+		char name[256];
+		while(::fgets(line, sizeof(line), f) != 0)
+		{
+			TEST_THAT(::sscanf(line, "%x %s %s", &id, 
+				flags, name) == 3);
+			bool isDir = (::strcmp(flags, "-d---") == 0);
+			//TRACE3("%x,%d,%s\n", id, isDir, name);
+			MEMLEAKFINDER_NO_LEAKS;
+			nameToID[std::string(name)] = id;
+			objectIsDir[id] = isDir;
+		}
+		::fclose(f);
+	}
+
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Delete store info, add random file\n");
+	{
+		// Delete store info
+		RaidFileWrite del(discSetNum, storeRoot + "info");
+		del.Delete();
+	}
+	{
+		// Add a spurious file
+		RaidFileWrite random(discSetNum, 
+			storeRoot + "randomfile");
+		random.Open();
+		random.Write("test", 4);
+		random.Commit(true);
+	}
+
+	// Fix it
+	RUN_CHECK
+
+	// Check everything is as it was
+	TEST_THAT(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl check 0") == 0);
+	// Check the random file doesn't exist
+	{
+		TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
+			storeRoot + "01/randomfile"));
+	}
+
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Delete an entry for an object from dir, change that object to be a patch, check it's deleted\n");
+	{
+		// Open dir and find entry
+		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
+		{
+			BackupStoreDirectory dir;
+			LoadDirectory("Test1/cannes/ict/metegoguered", dir);
+			TEST_THAT(dir.FindEntryByID(delID) != 0);
+			dir.DeleteEntry(delID);
+			SaveDirectory("Test1/cannes/ict/metegoguered", dir);
 		}
 		
-		// Generate a list of all the object IDs
-		TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
-			"-c testfiles/bbackupd.conf \"list -r\" quit "
-			"> testfiles/initial-listing.txt") == 0);
-
-		// And load it in
+		// Adjust that entry
+		//
+		// IMPORTANT NOTE: There's a special hack in testbackupstorefix.pl to make sure that
+		// the file we're modifiying has at least two blocks so we can modify it and produce a valid file
+		// which will pass the verify checks.
+		//
+		std::string fn(getObjectName(delID));
 		{
-			FILE *f = ::fopen("testfiles/initial-listing.txt", "r");
-			TEST_THAT_ABORTONFAIL(f != 0);
-			char line[512];
-			int32_t id;
-			char flags[32];
-			char name[256];
-			while(::fgets(line, sizeof(line), f) != 0)
+			std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum, fn));
+			RaidFileWrite f(discSetNum, fn);
+			f.Open(true /* allow overwrite */);
+			// Make a copy of the original
+			file->CopyStreamTo(f);
+			// Move to header in both
+			file->Seek(0, IOStream::SeekType_Absolute);
+			BackupStoreFile::MoveStreamPositionToBlockIndex(*file);
+			f.Seek(file->GetPosition(), IOStream::SeekType_Absolute);
+			// Read header
+			struct
 			{
-				TEST_THAT(::sscanf(line, "%x %s %s", &id, 
-					flags, name) == 3);
-				bool isDir = (::strcmp(flags, "-d---") == 0);
-				//TRACE3("%x,%d,%s\n", id, isDir, name);
-				MEMLEAKFINDER_NO_LEAKS;
-				nameToID[std::string(name)] = id;
-				objectIsDir[id] = isDir;
-			}
-			::fclose(f);
-		}
+				file_BlockIndexHeader hdr;
+				file_BlockIndexEntry e[2];
+			} h;
+			TEST_THAT(file->Read(&h, sizeof(h)) == sizeof(h));
+			file->Close();
 
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Delete store info, add random file\n");
-		{
-			// Delete store info
-			RaidFileWrite del(discSetNum, storeRoot + "info");
-			del.Delete();
-		}
-		{
-			// Add a spurious file
-			RaidFileWrite random(discSetNum, 
-				storeRoot + "randomfile");
-			random.Open();
-			random.Write("test", 4);
-			random.Commit(true);
+			// Modify
+			TEST_THAT(box_ntoh64(h.hdr.mOtherFileID) == 0);
+			TEST_THAT(box_ntoh64(h.hdr.mNumBlocks) >= 2);
+			h.hdr.mOtherFileID = box_hton64(2345); // don't worry about endianness
+			h.e[0].mEncodedSize = box_hton64((box_ntoh64(h.e[0].mEncodedSize)) + (box_ntoh64(h.e[1].mEncodedSize)));
+			h.e[1].mOtherBlockIndex = box_hton64(static_cast<uint64_t>(-2));
+			// Write to modified file
+			f.Write(&h, sizeof(h));
+			// Commit new version
+			f.Commit(true /* write now! */);
 		}
 
 		// Fix it
 		RUN_CHECK
-
-		// Check everything is as it was
+		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl check 0") == 0);
-		// Check the random file doesn't exist
-		{
-			TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
-				storeRoot + "01/randomfile"));
-		}
+			" testfiles/testbackupstorefix.pl check 1") 
+			== 0);
 
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Delete an entry for an object from dir, change that object to be a patch, check it's deleted\n");
+		// Check the modified file doesn't exist
+		TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
+	}
+	
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Delete directory, change container ID of another, duplicate entry in dir, spurious file size, delete file\n");
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+		dir.SetContainerID(73773);
+		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+	}
+	int64_t duplicatedID = 0;
+	int64_t notSpuriousFileSize = 0;
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/cannes/ict/peep", dir);
+		// Duplicate the second entry
 		{
-			// Open dir and find entry
-			int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
-			{
-				BackupStoreDirectory dir;
-				LoadDirectory("Test1/cannes/ict/metegoguered", dir);
-				TEST_THAT(dir.FindEntryByID(delID) != 0);
-				dir.DeleteEntry(delID);
-				SaveDirectory("Test1/cannes/ict/metegoguered", dir);
-			}
-			
-			// Adjust that entry
-			//
-			// IMPORTANT NOTE: There's a special hack in testbackupstorefix.pl to make sure that
-			// the file we're modifiying has at least two blocks so we can modify it and produce a valid file
-			// which will pass the verify checks.
-			//
-			std::string fn(getObjectName(delID));
-			{
-				std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum, fn));
-				RaidFileWrite f(discSetNum, fn);
-				f.Open(true /* allow overwrite */);
-				// Make a copy of the original
-				file->CopyStreamTo(f);
-				// Move to header in both
-				file->Seek(0, IOStream::SeekType_Absolute);
-				BackupStoreFile::MoveStreamPositionToBlockIndex(*file);
-				f.Seek(file->GetPosition(), IOStream::SeekType_Absolute);
-				// Read header
-				struct
-				{
-					file_BlockIndexHeader hdr;
-					file_BlockIndexEntry e[2];
-				} h;
-				TEST_THAT(file->Read(&h, sizeof(h)) == sizeof(h));
-				file->Close();
-
-				// Modify
-				TEST_THAT(box_ntoh64(h.hdr.mOtherFileID) == 0);
-				TEST_THAT(box_ntoh64(h.hdr.mNumBlocks) >= 2);
-				h.hdr.mOtherFileID = box_hton64(2345); // don't worry about endianness
-				h.e[0].mEncodedSize = box_hton64((box_ntoh64(h.e[0].mEncodedSize)) + (box_ntoh64(h.e[1].mEncodedSize)));
-				h.e[1].mOtherBlockIndex = box_hton64(static_cast<uint64_t>(-2));
-				// Write to modified file
-				f.Write(&h, sizeof(h));
-				// Commit new version
-				f.Commit(true /* write now! */);
-			}
-
-			// Fix it
-			RUN_CHECK
-			// Check
-			TEST_THAT(::system(PERL_EXECUTABLE 
-				" testfiles/testbackupstorefix.pl check 1") 
-				== 0);
-
-			// Check the modified file doesn't exist
-			TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
-		}
-		
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Delete directory, change container ID of another, duplicate entry in dir, spurious file size, delete file\n");
-		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-			dir.SetContainerID(73773);
-			SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-		}
-		int64_t duplicatedID = 0;
-		int64_t notSpuriousFileSize = 0;
-		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/cannes/ict/peep", dir);
-			// Duplicate the second entry
-			{
-				BackupStoreDirectory::Iterator i(dir);
-				i.Next();
-				BackupStoreDirectory::Entry *en = i.Next();
-				TEST_THAT(en != 0);
-				duplicatedID = en->GetObjectID();
-				dir.AddEntry(*en);
-			}
-			// Adjust file size of first file
-			{
-				BackupStoreDirectory::Iterator i(dir);
-				BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
-				TEST_THAT(en != 0);
-				notSpuriousFileSize = en->GetSizeInBlocks();
-				en->SetSizeInBlocks(3473874);
-				TEST_THAT(en->GetSizeInBlocks() == 3473874);
-			}
-			SaveDirectory("Test1/cannes/ict/peep", dir);
-		}
-		// Delete a directory
-		DeleteObject("Test1/pass/cacted/ming");
-		// Delete a file
-		DeleteObject("Test1/cannes/ict/scely");
-		// Fix it
-		RUN_CHECK
-		// Check everything is as it should be
-		TEST_THAT(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl check 2") == 0);
-		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-			TEST_THAT(dir.GetContainerID() == getID("Test1/foreomizes/stemptinevidate"));
-		}
-		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/cannes/ict/peep", dir);
 			BackupStoreDirectory::Iterator i(dir);
-			// Count the number of entries with the ID which was duplicated
-			int count = 0;
-			BackupStoreDirectory::Entry *en = 0;
-			while((en = i.Next()) != 0)
-			{
-				if(en->GetObjectID() == duplicatedID)
-				{
-					++count;
-				}
-			}
-			TEST_THAT(count == 1);
-			// Check file size has changed
-			{
-				BackupStoreDirectory::Iterator i(dir);
-				BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
-				TEST_THAT(en != 0);
-				TEST_THAT(en->GetSizeInBlocks() == notSpuriousFileSize);
-			}
+			i.Next();
+			BackupStoreDirectory::Entry *en = i.Next();
+			TEST_THAT(en != 0);
+			duplicatedID = en->GetObjectID();
+			dir.AddEntry(*en);
 		}
-
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Modify the obj ID of dir, delete dir with no members, add extra reference to a file\n");
-		// Set bad object ID
+		// Adjust file size of first file
 		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-			dir.TESTONLY_SetObjectID(73773);
-			SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-		}
-		// Delete dir with no members
-		DeleteObject("Test1/dir-no-members");
-		// Add extra reference
-		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/divel", dir);
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
 			TEST_THAT(en != 0);
-			BackupStoreDirectory dir2;
-			LoadDirectory("Test1/divel/torsines/cruishery", dir2);
-			dir2.AddEntry(*en);
-			SaveDirectory("Test1/divel/torsines/cruishery", dir2);
+			notSpuriousFileSize = en->GetSizeInBlocks();
+			en->SetSizeInBlocks(3473874);
+			TEST_THAT(en->GetSizeInBlocks() == 3473874);
 		}
-		// Fix it
-		RUN_CHECK
-		// Check everything is as it should be
-		TEST_THAT(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl check 3") == 0);
-		{
-			BackupStoreDirectory dir;
-			LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-			TEST_THAT(dir.GetObjectID() == getID("Test1/foreomizes/stemptinevidate/ict"));
-		}
-		
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Orphan files and dirs without being recoverable\n");
-		DeleteObject("Test1/dir1");		
-		DeleteObject("Test1/dir1/dir2");		
-		// Fix it
-		RUN_CHECK
-		// Check everything is where it is predicted to be
-		TEST_THAT(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl check 4") == 0);
-
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Corrupt file and dir\n");
-		// File
-		CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
-			33, "34i729834298349283479233472983sdfhasgs");
-		// Dir
-		CorruptObject("Test1/cannes/imulatrougge/foreomizes",23, 
-			"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
-		// Fix it
-		RUN_CHECK
-		// Check everything is where it should be
-		TEST_THAT(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl check 5") == 0);
-
-		// ------------------------------------------------------------------------------------------------		
-		::printf("  === Overwrite root with a file\n");
-		{
-			std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
-			RaidFileWrite w(discSetNum, getObjectName(1 /* root */));
-			w.Open(true /* allow overwrite */);
-			r->CopyStreamTo(w);
-			w.Commit(true /* convert now */);
-		}
-		// Fix it
-		RUN_CHECK
-		// Check everything is where it should be
-		TEST_THAT(::system(PERL_EXECUTABLE 
-			" testfiles/testbackupstorefix.pl reroot 6") == 0);
-
-
-		// ---------------------------------------------------------
-		// Stop server
-		TEST_THAT(KillServer(pid));
-
-		#ifdef WIN32
-			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
-		#else
-			TestRemoteProcessMemLeaks("bbstored.memleaks");
-		#endif
+		SaveDirectory("Test1/cannes/ict/peep", dir);
 	}
+	// Delete a directory
+	DeleteObject("Test1/pass/cacted/ming");
+	// Delete a file
+	DeleteObject("Test1/cannes/ict/scely");
+	// Fix it
+	RUN_CHECK
+	// Check everything is as it should be
+	TEST_THAT(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl check 2") == 0);
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+		TEST_THAT(dir.GetContainerID() == getID("Test1/foreomizes/stemptinevidate"));
+	}
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/cannes/ict/peep", dir);
+		BackupStoreDirectory::Iterator i(dir);
+		// Count the number of entries with the ID which was duplicated
+		int count = 0;
+		BackupStoreDirectory::Entry *en = 0;
+		while((en = i.Next()) != 0)
+		{
+			if(en->GetObjectID() == duplicatedID)
+			{
+				++count;
+			}
+		}
+		TEST_THAT(count == 1);
+		// Check file size has changed
+		{
+			BackupStoreDirectory::Iterator i(dir);
+			BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
+			TEST_THAT(en != 0);
+			TEST_THAT(en->GetSizeInBlocks() == notSpuriousFileSize);
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Modify the obj ID of dir, delete dir with no members, add extra reference to a file\n");
+	// Set bad object ID
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+		dir.TESTONLY_SetObjectID(73773);
+		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+	}
+	// Delete dir with no members
+	DeleteObject("Test1/dir-no-members");
+	// Add extra reference
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/divel", dir);
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
+		TEST_THAT(en != 0);
+		BackupStoreDirectory dir2;
+		LoadDirectory("Test1/divel/torsines/cruishery", dir2);
+		dir2.AddEntry(*en);
+		SaveDirectory("Test1/divel/torsines/cruishery", dir2);
+	}
+	// Fix it
+	RUN_CHECK
+	// Check everything is as it should be
+	TEST_THAT(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl check 3") == 0);
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+		TEST_THAT(dir.GetObjectID() == getID("Test1/foreomizes/stemptinevidate/ict"));
+	}
+	
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Orphan files and dirs without being recoverable\n");
+	DeleteObject("Test1/dir1");		
+	DeleteObject("Test1/dir1/dir2");		
+	// Fix it
+	RUN_CHECK
+	// Check everything is where it is predicted to be
+	TEST_THAT(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl check 4") == 0);
+
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Corrupt file and dir\n");
+	// File
+	CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
+		33, "34i729834298349283479233472983sdfhasgs");
+	// Dir
+	CorruptObject("Test1/cannes/imulatrougge/foreomizes",23, 
+		"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+	// Fix it
+	RUN_CHECK
+	// Check everything is where it should be
+	TEST_THAT(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl check 5") == 0);
+
+	// ------------------------------------------------------------------------------------------------		
+	::printf("  === Overwrite root with a file\n");
+	{
+		std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
+		RaidFileWrite w(discSetNum, getObjectName(1 /* root */));
+		w.Open(true /* allow overwrite */);
+		r->CopyStreamTo(w);
+		w.Commit(true /* convert now */);
+	}
+	// Fix it
+	RUN_CHECK
+	// Check everything is where it should be
+	TEST_THAT(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl reroot 6") == 0);
+
+
+	// ---------------------------------------------------------
+	// Stop server
+	TEST_THAT(KillServer(bbstored_pid));
+
+	#ifdef WIN32
+		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+	#else
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+	#endif
 
 	return 0;
 }
