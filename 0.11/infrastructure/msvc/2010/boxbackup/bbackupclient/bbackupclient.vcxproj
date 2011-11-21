@@ -1,0 +1,297 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{DCEF045D-507C-4137-B11A-C76C4B94DFBA}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>boxbackup</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\boxbackup\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\boxbackup\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\boxbackup\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\boxbackup\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>PCRE_STATIC;WIN32;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;_USRDLL;BOXBACKUP_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\openssl\inc;$(SolutionDir)..\..\..\pcre;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>Box.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4100;4127;4251;4275;4290</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>crypt32.lib;shlwapi.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>PCRE_STATIC;WIN32;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;_USRDLL;BOXBACKUP_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\openssl\inc;$(SolutionDir)..\..\..\pcre;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>Box.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4100;4127;4251;4275;4290</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>crypt32.lib;shlwapi.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>BOX_RELEASE_BUILD;PCRE_STATIC;WIN32;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;_USRDLL;BOXBACKUP_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\openssl\inc;$(SolutionDir)..\..\..\pcre;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>Box.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4100;4127;4251;4275;4290</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>crypt32.lib;shlwapi.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>BOX_RELEASE_BUILD;PCRE_STATIC;WIN32;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;_USRDLL;BOXBACKUP_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\openssl\inc;$(SolutionDir)..\..\..\pcre;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>Box.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4100;4127;4251;4275;4290</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>crypt32.lib;shlwapi.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\autogen_BackupProtocolClient.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\autogen_BackupStoreException.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupClientCryptoKeys.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupClientFileAttributes.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupClientMakeExcludeList.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupClientRestore.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupDaemonConfigVerify.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreConstants.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreDirectory.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreException.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreFile.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreFileCryptVar.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreFileEncodeStream.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreFilename.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreFilenameClear.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreFileWire.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\BackupStoreObjectMagic.h" />
+    <ClInclude Include="..\..\..\..\..\lib\backupclient\RunStatusProvider.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\..\..\lib\win32\messages.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\..\bin\bbstored\backupprotocol.txt">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">cd $(SolutionDir)..\..\..\lib\backupclient &amp; perl ../server/makeprotocol.pl.in Client %(RootDir)%(Directory)%(Filename)%(Extension) DLL</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">cd $(SolutionDir)..\..\..\lib\backupclient &amp; perl ../server/makeprotocol.pl.in Client %(RootDir)%(Directory)%(Filename)%(Extension) DLL</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd $(SolutionDir)..\..\..\lib\backupclient &amp; perl ../server/makeprotocol.pl.in Client %(RootDir)%(Directory)%(Filename)%(Extension) DLL</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd $(SolutionDir)..\..\..\lib\backupclient &amp; perl ../server/makeprotocol.pl.in Client %(RootDir)%(Directory)%(Filename)%(Extension) DLL</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.h;$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.cpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.h;$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.cpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.h;$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.cpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.h;$(SolutionDir)..\..\..\lib\backupclient\autogen_BackupProtocolClient.cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\..\..\infrastructure\BoxPlatform.pm;$(SolutionDir)..\..\..\lib\server\makeprotocol.pl.in</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\..\..\infrastructure\BoxPlatform.pm;$(SolutionDir)..\..\..\lib\server\makeprotocol.pl.in</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\..\..\infrastructure\BoxPlatform.pm;$(SolutionDir)..\..\..\lib\server\makeprotocol.pl.in</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\..\..\infrastructure\BoxPlatform.pm;$(SolutionDir)..\..\..\lib\server\makeprotocol.pl.in</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\..\lib\backupclient\BackupStoreException.txt">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">cd %(RootDir)%(Directory) &amp; perl $(SolutionDir)../../../lib/common/makeexception.pl.in %(Filename)%(Extension) DLL</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">cd %(RootDir)%(Directory) &amp; perl $(SolutionDir)../../../lib/common/makeexception.pl.in %(Filename)%(Extension) DLL</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd %(RootDir)%(Directory) &amp; perl $(SolutionDir)../../../lib/common/makeexception.pl.in %(Filename)%(Extension) DLL</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd %(RootDir)%(Directory) &amp; perl $(SolutionDir)../../../lib/common/makeexception.pl.in %(Filename)%(Extension) DLL</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RootDir)%(Directory)autogen_%(Filename).h;%(RootDir)%(Directory)autogen_%(Filename).cpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RootDir)%(Directory)autogen_%(Filename).h;%(RootDir)%(Directory)autogen_%(Filename).cpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RootDir)%(Directory)autogen_%(Filename).h;%(RootDir)%(Directory)autogen_%(Filename).cpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RootDir)%(Directory)autogen_%(Filename).h;%(RootDir)%(Directory)autogen_%(Filename).cpp</Outputs>
+    </CustomBuild>
+    <None Include="..\..\..\..\..\lib\win32\messages.mc">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\autogen_BackupProtocolClient.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\autogen_BackupStoreException.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupClientCryptoKeys.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupClientFileAttributes.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupClientMakeExcludeList.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupClientRestore.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupDaemonConfigVerify.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreDirectory.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFile.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileCmbDiff.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileCmbIdx.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileCombine.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileCryptVar.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileDiff.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileEncodeStream.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFilename.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFilenameClear.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreFileRevDiff.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\backupclient\BackupStoreObjectDump.cpp" />
+    <ClCompile Include="..\..\..\..\..\lib\common\Win32PreCompiledHeader.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\build\build.vcxproj">
+      <Project>{dcdd2786-23d3-44db-9509-864dc01db661}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <ProjectReference Include="..\..\openssl\libeay\libeay.vcxproj">
+      <Project>{faedaf88-9894-4f02-b936-b30674de9192}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <ProjectReference Include="..\..\openssl\libssl\libssl.vcxproj">
+      <Project>{469acda3-2237-414c-babf-d30ffff2fe6a}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <ProjectReference Include="..\..\pcre\libpcre\libpcre.vcxproj">
+      <Project>{2615f432-7c7a-4b34-bc9a-d0e58ed8e90f}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <ProjectReference Include="..\..\zlib\libzlib\libzlib.vcxproj">
+      <Project>{80e019ff-948a-44c1-b422-2d9e540f9ff1}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <ProjectReference Include="..\libboxbackup\libboxbackup.vcxproj">
+      <Project>{12881b55-f898-4c2c-9507-658ffb9af053}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
