@@ -101,11 +101,6 @@ std::string ExcludeList::ReplaceSlashesRegex(const std::string& input) const
 		output.replace(pos, 1, "\\" DIRECTORY_SEPARATOR);
 	}
 
-	for (std::string::iterator i = output.begin(); i != output.end(); i++)
-	{
-		*i = tolower(*i);
-	}
-
 	return output;
 }
 #endif
@@ -185,17 +180,19 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 			try
 			{
 				std::string entry = *i;
+				int flags = REG_EXTENDED | REG_NOSUB;
 
 				// Convert any forward slashes in the string
 				// to appropriately escaped backslashes
 
 				#ifdef WIN32
 				entry = ReplaceSlashesRegex(entry);
+				flags |= REG_ICASE; // Windows convention
 				#endif
 
 				// Compile
-				int errcode = ::regcomp(pregex, entry.c_str(), 
-					REG_EXTENDED | REG_NOSUB);
+				int errcode = ::regcomp(pregex, entry.c_str(),
+					flags);
 
 				if (errcode != 0)
 				{
@@ -238,6 +235,7 @@ bool ExcludeList::IsExcluded(const std::string &rTest) const
 	std::string test = rTest;
 
 	#ifdef WIN32
+	// converts to lower case as well
 	test = ReplaceSlashesDefinite(test);
 	#endif
 
