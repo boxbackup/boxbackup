@@ -89,16 +89,16 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 	if(mClientID != rContext.GetClientID())
 	{
 		BOX_WARNING("Failed login from client ID " << 
-			BOX_FORMAT_ACCOUNT(mClientID) <<
-			": wrong certificate for this account");
+			BOX_FORMAT_ACCOUNT(mClientID) << ": "
+			"wrong certificate for this account");
 		return PROTOCOL_ERROR(Err_BadLogin);
 	}
 
 	if(!rContext.GetClientHasAccount())
 	{
 		BOX_WARNING("Failed login from client ID " << 
-			BOX_FORMAT_ACCOUNT(mClientID) <<
-			": no such account on this server");
+			BOX_FORMAT_ACCOUNT(mClientID) << ": "
+			"no such account on this server");
 		return PROTOCOL_ERROR(Err_BadLogin);
 	}
 
@@ -128,8 +128,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 	
 	// Log login
 	BOX_NOTICE("Login from Client ID " << 
-		BOX_FORMAT_ACCOUNT(mClientID) <<
-		" " <<
+		BOX_FORMAT_ACCOUNT(mClientID) << " "
+		"(name=" << rContext.GetAccountName() << "): " <<
 		(((mFlags & Flags_ReadOnly) != Flags_ReadOnly)
 		?"Read/Write":"Read-only"));
 
@@ -152,7 +152,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
 	BOX_NOTICE("Session finished for Client ID " << 
-		BOX_FORMAT_ACCOUNT(rContext.GetClientID()));
+		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
+		"(name=" << rContext.GetAccountName() << ")");
 
 	// Let the context know about it
 	rContext.ReceivedFinishCommand();
