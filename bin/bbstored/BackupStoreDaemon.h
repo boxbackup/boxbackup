@@ -63,7 +63,8 @@ protected:
 	// Housekeeping functions
 	void HousekeepingProcess();
 
-	void LogConnectionStats(const char *commonName, const SocketStreamTLS &s);
+	void LogConnectionStats(uint32_t accountId,
+		const std::string& accountName, const SocketStreamTLS &s);
 
 public:
 	// HousekeepingInterface implementation

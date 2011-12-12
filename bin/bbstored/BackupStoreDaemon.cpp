@@ -317,6 +317,8 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	if(::sscanf(clientCommonName.c_str(), "BACKUP-%x", &id) != 1)
 	{
 		// Bad! Disconnect immediately
+		BOX_WARNING("Failed login: invalid client common name: " <<
+			clientCommonName);
 		return;
 	}
 
@@ -353,18 +355,20 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	}
 	catch(...)
 	{
-		LogConnectionStats(clientCommonName.c_str(), rStream);
+		LogConnectionStats(id, context.GetAccountName(), rStream);
 		throw;
 	}
-	LogConnectionStats(clientCommonName.c_str(), rStream);
+	LogConnectionStats(id, context.GetAccountName(), rStream);
 	context.CleanUp();
 }
 
-void BackupStoreDaemon::LogConnectionStats(const char *commonName,
-		const SocketStreamTLS &s)
+void BackupStoreDaemon::LogConnectionStats(uint32_t accountId,
+	const std::string& accountName, const SocketStreamTLS &s)
 {
 	// Log the amount of data transferred
-	BOX_NOTICE("Connection statistics for " << commonName << ":"
+	BOX_NOTICE("Connection statistics for " << 
+		BOX_FORMAT_ACCOUNT(accountId) << " "
+		"(name=" << accountName << "):"
 		" IN="  << s.GetBytesRead() <<
 		" OUT=" << s.GetBytesWritten() <<
 		" NET_IN=" << (s.GetBytesRead() - s.GetBytesWritten()) <<

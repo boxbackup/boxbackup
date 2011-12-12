@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "autogen_BackupProtocol.h"
+#include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
 #include "Message.h"
@@ -22,7 +23,6 @@
 
 class BackupStoreDirectory;
 class BackupStoreFilename;
-class BackupStoreInfo;
 class IOStream;
 class BackupProtocolMessage;
 class StreamableMemBlock;
@@ -80,6 +80,14 @@ public:
 	void LoadStoreInfo();
 	void SaveStoreInfo(bool AllowDelay = true);
 	const BackupStoreInfo &GetBackupStoreInfo() const;
+	const std::string GetAccountName()
+	{
+		if(!mapStoreInfo.get())
+		{
+			return "Unknown";
+		}
+		return mapStoreInfo->GetAccountName();
+	}
 
 	// Client marker
 	int64_t GetClientStoreMarker();
