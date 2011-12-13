@@ -45,7 +45,8 @@ class HousekeepingInterface
 class BackupStoreContext
 {
 public:
-	BackupStoreContext(int32_t ClientID, HousekeepingInterface &rDaemon);
+	BackupStoreContext(int32_t ClientID, HousekeepingInterface &rDaemon,
+		const std::string& rConnectionDetails);
 	~BackupStoreContext();
 private:
 	BackupStoreContext(const BackupStoreContext &rToCopy);
@@ -137,6 +138,7 @@ public:
 	
 	// Info
 	int32_t GetClientID() const {return mClientID;}
+	const std::string& GetConnectionDetails() { return mConnectionDetails; }
 
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
@@ -146,6 +148,7 @@ private:
 	void DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete);
 	int64_t AllocateObjectID();
 
+	std::string mConnectionDetails;
 	int32_t mClientID;
 	HousekeepingInterface &mrDaemon;
 	int mProtocolPhase;

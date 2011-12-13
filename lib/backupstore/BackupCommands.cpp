@@ -131,7 +131,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 		BOX_FORMAT_ACCOUNT(mClientID) << " "
 		"(name=" << rContext.GetAccountName() << "): " <<
 		(((mFlags & Flags_ReadOnly) != Flags_ReadOnly)
-		?"Read/Write":"Read-only"));
+			?"Read/Write":"Read-only") << " from " <<
+		rContext.GetConnectionDetails());
 
 	// Get the usage info for reporting to the client
 	int64_t blocksUsed = 0, blocksSoftLimit = 0, blocksHardLimit = 0;

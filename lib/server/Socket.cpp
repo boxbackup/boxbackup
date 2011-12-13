@@ -123,27 +123,8 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
 // --------------------------------------------------------------------------
 void Socket::LogIncomingConnection(const struct sockaddr *addr, socklen_t addrlen)
 {
-	if(addr == NULL) {THROW_EXCEPTION(CommonException, BadArguments)}
-
-	switch(addr->sa_family)
-	{
-	case AF_UNIX:
-		BOX_INFO("Incoming connection from local (UNIX socket)");
-		break;		
-	
-	case AF_INET:
-		{
-			sockaddr_in *a = (sockaddr_in*)addr;
-			BOX_INFO("Incoming connection from " <<
-				inet_ntoa(a->sin_addr) << " port " <<
-				ntohs(a->sin_port));
-		}
-		break;		
-	
-	default:
-		BOX_WARNING("Incoming connection of unknown type");
-		break;
-	}
+	BOX_INFO("Incoming connection from " <<
+		IncomingConnectionLogMessage(addr, addrlen));
 }
 
 // --------------------------------------------------------------------------
@@ -161,20 +142,25 @@ std::string Socket::IncomingConnectionLogMessage(const struct sockaddr *addr, so
 	switch(addr->sa_family)
 	{
 	case AF_UNIX:
-		return std::string("Incoming connection from local (UNIX socket)");
+		return std::string("local (UNIX socket)");
 		break;		
 	
 	case AF_INET:
 		{
-			char msg[256];	// more than enough
 			sockaddr_in *a = (sockaddr_in*)addr;
-			sprintf(msg, "Incoming connection from %s port %d", inet_ntoa(a->sin_addr), ntohs(a->sin_port));
-			return std::string(msg);
+			std::ostringstream oss;
+			oss << inet_ntoa(a->sin_addr) << " port " <<
+				ntohs(a->sin_port);
+			return oss.str();
 		}
 		break;		
 	
 	default:
-		return std::string("Incoming connection of unknown type");
+		{
+			std::ostringstream oss;
+			oss << "unknown socket type " << addr->sa_family;
+			return oss.str();
+		}
 		break;
 	}
 	
