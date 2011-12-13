@@ -54,8 +54,9 @@
 //
 // --------------------------------------------------------------------------
 BackupStoreContext::BackupStoreContext(int32_t ClientID,
-	HousekeepingInterface &rDaemon)
-	: mClientID(ClientID),
+	HousekeepingInterface &rDaemon, const std::string& rConnectionDetails)
+	: mConnectionDetails(rConnectionDetails),
+	  mClientID(ClientID),
 	  mrDaemon(rDaemon),
 	  mProtocolPhase(Phase_START),
 	  mClientHasAccount(false),

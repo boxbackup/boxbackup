@@ -48,6 +48,15 @@ private:
 	ServerStream(const ServerStream &rToCopy)
 	{
 	}
+
+	std::string mConnectionDetails;
+
+protected:
+	const std::string& GetConnectionDetails()
+	{
+		return mConnectionDetails;
+	}
+
 public:
 
 	virtual const char *DaemonName() const
@@ -122,6 +131,10 @@ public:
 	
 protected:
 	virtual void NotifyListenerIsReady() { }
+	virtual void LogConnectionDetails(std::string details)
+	{
+		BOX_NOTICE("Handling incoming connection from " << details);
+	}
 	
 public:
 	virtual void Run2(bool &rChildExit)
@@ -237,8 +250,9 @@ public:
 				{
 					// Get the incoming connection
 					// (with zero wait time)
-					std::string logMessage;
-					std::auto_ptr<StreamType> connection(psocket->Accept(0, &logMessage));
+					std::auto_ptr<StreamType> connection(
+						psocket->Accept(0,
+							&mConnectionDetails));
 
 					// Was there one (there should be...)
 					if(connection.get())
@@ -264,6 +278,7 @@ public:
 								// Set up daemon
 								EnterChild();
 								SetProcessTitle("transaction");
+								LogConnectionDetails(mConnectionDetails);
 								
 								// Memory leak test the forked process
 								#ifdef BOX_MEMORY_LEAK_TESTING
@@ -281,7 +296,9 @@ public:
 							}
 							
 							// Log it
-							BOX_NOTICE("Message from child process " << pid << ": " << logMessage);
+							BOX_TRACE("Forked child process " << pid << 
+								"to handle connection from " <<
+								mConnectionDetails);
 						}
 						else
 						{

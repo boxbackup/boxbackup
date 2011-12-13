@@ -329,7 +329,7 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	Logging::Tagger tagWithClientID(tag.str());
 
 	// Create a context, using this ID
-	BackupStoreContext context(id, *this);
+	BackupStoreContext context(id, *this, GetConnectionDetails());
 
 	if (mpTestHook)
 	{
