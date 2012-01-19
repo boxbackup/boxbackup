@@ -428,8 +428,7 @@ void Timer::Start(int64_t delayInMicros)
 		(PVOID)this, delayInMillis, 0, WT_EXECUTEINTIMERTHREAD)
 		== FALSE)
 	{
-		BOX_ERROR(TIMER_ID "failed to create timer: " <<
-			GetErrorMessage(GetLastError()));
+		BOX_LOG_WIN_ERROR(TIMER_ID "failed to create timer");
 		mTimerHandle = INVALID_HANDLE_VALUE;
 	}
 #endif
@@ -454,8 +453,7 @@ void Timer::Stop()
 		if (DeleteTimerQueueTimer(NULL, mTimerHandle,
 			INVALID_HANDLE_VALUE) == FALSE)
 		{
-			BOX_ERROR(TIMER_ID "failed to delete timer: " <<
-				GetErrorMessage(GetLastError()));
+			BOX_LOG_WIN_ERROR(TIMER_ID "failed to delete timer");
 		}
 		mTimerHandle = INVALID_HANDLE_VALUE;
 	}

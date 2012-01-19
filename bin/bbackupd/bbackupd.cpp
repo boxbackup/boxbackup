@@ -35,7 +35,7 @@ int main(int argc, const char *argv[])
 	
 #ifdef WIN32
 
-	EnableBackupRights();
+	Win32::EnableBackupRights();
 
 	gpDaemonService = new Win32BackupService();
 	ExitCode = gpDaemonService->Daemon::Main(

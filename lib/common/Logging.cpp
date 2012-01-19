@@ -16,6 +16,9 @@
 // c.f. http://bugs.debian.org/512510
 #include <cstdio>
 
+#ifdef HAVE_PROCESS_H
+	#include <process.h>
+#endif
 #ifdef HAVE_SYSLOG_H
 	#include <syslog.h>
 #endif

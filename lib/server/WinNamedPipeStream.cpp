@@ -26,6 +26,8 @@
 
 #include "MemLeakFindOn.h"
 
+using namespace Win32;
+
 std::string WinNamedPipeStream::sPipeNamePrefix = "\\\\.\\pipe\\";
 
 // --------------------------------------------------------------------------

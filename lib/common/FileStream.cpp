@@ -67,10 +67,7 @@ void FileStream::AfterOpen()
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 
-		#ifdef WIN32
-		BOX_LOG_WIN_WARNING_NUMBER("Failed to open file: " <<
-			mFileName, winerrno);
-		#else
+		#ifndef WIN32
 		BOX_LOG_SYS_WARNING("Failed to open file: " <<
 			mFileName);
 		#endif

@@ -121,8 +121,7 @@ std::auto_ptr<IOStream> LocalProcessStream(const std::string& rCommandLine,
 	HANDLE writeInChild, readFromChild;
 	if(!CreatePipe(&readFromChild, &writeInChild, &secAttr, 0))
 	{
-		BOX_ERROR("Failed to CreatePipe for child process: " <<
-			GetErrorMessage(GetLastError()));
+		BOX_LOG_WIN_ERROR("Failed to CreatePipe for child process");
 		THROW_EXCEPTION(ServerException, SocketPairFailed)
 	}
 	SetHandleInformation(readFromChild, HANDLE_FLAG_INHERIT, 0);
@@ -156,8 +155,7 @@ std::auto_ptr<IOStream> LocalProcessStream(const std::string& rCommandLine,
    
 	if(!result)
 	{
-		BOX_ERROR("Failed to CreateProcess: '" << rCommandLine <<
-			"': " << GetErrorMessage(GetLastError()));
+		BOX_LOG_WIN_ERROR("Failed to CreateProcess: '" << rCommandLine);
 		CloseHandle(writeInChild);
 		CloseHandle(readFromChild);
 		THROW_EXCEPTION(ServerException, ServerForkError)

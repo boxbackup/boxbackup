@@ -843,7 +843,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		#endif
 
 		// Try to apply
-		if(::utimes(Filename, times) != 0)
+		if(EMU_UTIMES(Filename, times) != 0)
 		{
 			BOX_LOG_SYS_ERROR("Failed to change times of "
 				"file '" << Filename << "'");

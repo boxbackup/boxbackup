@@ -385,7 +385,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 
 	if((exists == ObjectExists_NoObject ||
 		exists == ObjectExists_File) && 
-		::mkdir(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
+		EMU_MKDIR(rLocalDirectoryName.c_str(), S_IRWXU) != 0)
 	{
 		BOX_LOG_SYS_ERROR("Failed to create directory '" <<
 			rLocalDirectoryName << "'");

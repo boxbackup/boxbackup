@@ -58,6 +58,10 @@
 
 #include "MemLeakFindOn.h"
 
+#ifdef WIN32
+using namespace Win32;
+#endif
+
 void PrintUsageAndExit()
 {
 	printf("Usage: bbackupquery [-q*|v*|V|W<level>] [-w] "
@@ -292,6 +296,17 @@ int main(int argc, const char *argv[])
 		BOX_FATAL("Invalid configuration file: " << errs);
 		return 1;
 	}
+#ifdef WIN32
+	char path[MAX_PATH];
+
+	if(FAILED(SHGetFolderPath(NULL,CSIDL_COMMON_APPDATA,NULL,0,path)) || !PathAppend(path,"Box Backup"))
+	{
+		BOX_FATAL("Can't build DataDirectory");
+		return 1;
+	}
+
+	config->AddKeyValue("DataDirectory",path);
+#endif
 	// Easier coding
 	const Configuration &conf(*config);
 	
@@ -300,13 +315,21 @@ int main(int argc, const char *argv[])
 	SSLLib::Initialise();
 	// Read in the certificates creating a TLS context
 	TLSContext tlsContext;
+#ifdef WIN32
+	std::string certFile(conf.GetKeyValue("AccountNumber"));
+	std::string keyFile;
+	std::string caFile;
+	std::string keysFile;
+#else
 	std::string certFile(conf.GetKeyValue("CertificateFile"));
 	std::string keyFile(conf.GetKeyValue("PrivateKeyFile"));
 	std::string caFile(conf.GetKeyValue("TrustedCAsFile"));
+	std::string keysFile(conf.GetKeyValue("KeysFile"));
+#endif
 	tlsContext.Initialise(false /* as client */, certFile.c_str(), keyFile.c_str(), caFile.c_str());
 	
 	// Initialise keys
-	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
+	BackupClientCryptoKeys_Setup(keysFile.c_str());
 
 	// 2. Connect to server
 	if(!quiet) BOX_INFO("Connecting to store...");
