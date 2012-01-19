@@ -27,9 +27,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{682F676C-50F5-45AF-85FA-C23E344583FC}</ProjectGuid>
+    <ProjectGuid>{D84AC0C6-6E7D-44AA-A37A-BBC1A599BAB3}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>bbackupctl</RootNamespace>
+    <RootNamespace>bbutil</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -120,17 +120,16 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOXBACKUP_IMPORTS;PCRE_STATIC;WIN32;_CONSOLE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0600;_DEBUG;</PreprocessorDefinitions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4100;4251;4275;4290</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_WIN32_WINNT=0x0600;_DEBUG;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4290</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -138,17 +137,16 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOXBACKUP_IMPORTS;PCRE_STATIC;WIN32;_CONSOLE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0501;_DEBUG;</PreprocessorDefinitions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4100;4251;4275;4290</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_WIN32_WINNT=0x0501;_DEBUG;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4290</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -156,17 +154,16 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOXBACKUP_IMPORTS;PCRE_STATIC;WIN32;_CONSOLE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0600;_DEBUG;_WIN64</PreprocessorDefinitions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4100;4251;4275;4290</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_WIN32_WINNT=0x0600;_DEBUG;_WIN64;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4290</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -174,17 +171,16 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOXBACKUP_IMPORTS;PCRE_STATIC;WIN32;_CONSOLE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0501;_DEBUG;_WIN64</PreprocessorDefinitions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4100;4251;4275;4290</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_WIN32_WINNT=0x0501;_DEBUG;_WIN64;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4290</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -196,17 +192,17 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>BOXBACKUP_IMPORTS;PCRE_STATIC;WIN32;_CONSOLE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0600;NDEBUG;BOX_RELEASE_BUILD;</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4100;4251;4275;4290</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_WIN32_WINNT=0x0600;NDEBUG;BOX_RELEASE_BUILD;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4290</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalDependencies>Shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -214,29 +210,36 @@
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <Optimization>Full</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>BOXBACKUP_IMPORTS;PCRE_STATIC;WIN32;_CONSOLE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0600;NDEBUG;BOX_RELEASE_BUILD;_WIN64</PreprocessorDefinitions>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4100;4251;4275;4290</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_WIN32_WINNT=0x0600;NDEBUG;BOX_RELEASE_BUILD;_WIN64;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\zlib</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4290</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>crypt32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalDependencies>Shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\bin\bbackupctl\bbackupctl.cpp" />
+    <ClCompile Include="..\..\..\..\..\bin\bbutil\bbutil.cpp" />
+    <ClCompile Include="..\..\..\..\..\bin\bbutil\est.cpp" />
+    <ClCompile Include="..\..\..\..\..\bin\bbutil\u2w.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\bbackupclient\bbackupclient.vcxproj">
-      <Project>{dcef045d-507c-4137-b11a-c76c4b94dfba}</Project>
+    <ClInclude Include="..\..\..\..\..\bin\bbutil\bbutil.h" />
+    <ClInclude Include="..\..\..\..\..\bin\bbutil\est.h" />
+    <ClInclude Include="..\..\..\..\..\bin\bbutil\u2w.h" />
+    <ClInclude Include="..\..\..\..\..\bin\bbutil\win32\resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\zlib\libzlib\libzlib.vcxproj">
+      <Project>{80e019ff-948a-44c1-b422-2d9e540f9ff1}</Project>
       <Private>true</Private>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
@@ -245,34 +248,26 @@
     </ProjectReference>
     <ProjectReference Include="..\libboxbackup\libboxbackup.vcxproj">
       <Project>{12881b55-f898-4c2c-9507-658ffb9af053}</Project>
-      <Private>true</Private>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
-      <LinkLibraryDependencies>true</LinkLibraryDependencies>
-      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\..\..\..\..\bin\bbackupctl\win32\bbackupctl.rc">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug XP|Win32'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug XP|x64'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
+    <None Include="..\..\..\..\..\bin\bbutil\win32\bbutil.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\..\..\bin\bbutil\win32\bbutil.rc">
       <Culture Condition="'$(Configuration)|$(Platform)'=='Debug XP|Win32'">0x0809</Culture>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug XP|Win32'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
       <Culture Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">0x0809</Culture>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
       <Culture Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">0x0809</Culture>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
       <Culture Condition="'$(Configuration)|$(Platform)'=='Debug XP|x64'">0x0809</Culture>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug XP|x64'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
       <Culture Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">0x0809</Culture>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
       <Culture Condition="'$(Configuration)|$(Platform)'=='Release|x64'">0x0809</Culture>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\..\..\lib\common</AdditionalIncludeDirectories>
     </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\..\..\bin\bbackupctl\win32\bbackupctl.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\..\..\bin\bbackupctl\win32\resource.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
