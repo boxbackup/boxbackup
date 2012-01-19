@@ -2,6 +2,7 @@
 
 # global exception list file
 my $global_list = '../../ExceptionCodes.txt';
+my $event_messages = '../win32/messages.mc';
 
 
 my @exception;
@@ -50,6 +51,7 @@ print "Generating $class exception...\n";
 
 open CPP,">autogen_${class}Exception.cpp" or die "Can't open cpp file for writing";
 open H,">autogen_${class}Exception.h" or die "Can't open h file for writing";
+open MC,">autogen_${class}Exception.mc" or die "Can't open mc file for writing";
 
 # write header file
 my $guardname = uc 'AUTOGEN_'.$class.'EXCEPTION_H';
@@ -205,8 +207,24 @@ const char *${class}Exception::what() const throw()
 
 __E
 
+for(my $e = 0; $e <= $#exception; $e++)
+{
+	if($exception[$e] ne '')
+	{
+		printf MC "MessageId=0x%02X%02X\n",$class_number,$e;
+		print MC "Severity=Warning\n";
+		print MC "SymbolicName=MSG_${exception[$e]}\n";
+		if($exception_desc[$e] ne '')
+		{
+			print MC $exception_desc[$e]."\n";
+		}
+		print MC "%1\n.\n";
+	}
+}
+
 close H;
 close CPP;
+close MC;
 
 # update the global exception list
 my $list_before;
@@ -281,5 +299,3 @@ print GLOBAL "END TYPE\n";
 print GLOBAL $list_after;
 
 close GLOBAL;
-
-
