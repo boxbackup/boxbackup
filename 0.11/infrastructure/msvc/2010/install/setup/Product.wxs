@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+	<Product Id="*"
+           Name="Box Backup ($(var.bbackupd.Platform))"
+           Language="1033"
+           Version="0.11.2.0"
+           Manufacturer="boxbackup.org"
+           UpgradeCode="7d02398d-88d7-4cbb-8026-03963102baf4">
+
+    <?if $(var.Platform) = x64 ?>
+      <?define Win64 = "yes" ?>
+      <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+    <?else ?>
+      <?define Win64 = "no" ?>
+      <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+    <?endif ?>
+
+    <Package Id="*"
+             InstallerVersion="300"
+             Compressed="yes"
+             InstallPrivileges="elevated"
+             InstallScope="perMachine"
+             Manufacturer="Invisible Software Ltd"
+             />
+
+		<Media Id="1" Cabinet="boxbackup.cab" EmbedCab="yes" />
+
+    <Property Id="HOSTNAME">BoxBackup server name</Property>
+    <Property Id="ACCOUNTNUMBER">0</Property>
+    <Property Id="EMAILADDRESS">test@example.com</Property>
+
+    <MajorUpgrade DowngradeErrorMessage="Can't downgrade."
+                  AllowSameVersionUpgrades="yes"
+                  Schedule="afterInstallFinalize"
+                  MigrateFeatures="no"/>
+
+    <util:Group Id="BoxBackupGroup"
+                Name="Backup Operators"/>
+
+		<Directory Id="TARGETDIR" Name="SourceDir">
+      <?if $(var.Platform) = x64 ?>
+        <?if $(var.Configuration) = Release ?>
+          <Merge Id="VCRedist" SourceFile="redist\Microsoft_VC100_CRT_x64.msm" DiskId="1" Language="0"/>
+        <?else ?>
+          <Merge Id="VCRedist" SourceFile="redist\Microsoft_VC100_DebugCRT_x64.msm" DiskId="1" Language="0"/>
+        <?endif ?>
+      <?else ?>
+        <?if $(var.Configuration) = Release ?>
+          <Merge Id="VCRedist" SourceFile="redist\Microsoft_VC100_CRT_x86.msm" DiskId="1" Language="0"/>
+        <?else ?>
+          <Merge Id="VCRedist" SourceFile="redist\Microsoft_VC100_DebugCRT_x86.msm" DiskId="1" Language="0"/>
+        <?endif ?>
+      <?endif ?>
+
+      <Directory Id="$(var.PlatformProgramFilesFolder)">
+				<Directory Id="INSTALLLOCATION" Name="Box Backup">
+          <Component Id="bbackupclient" Guid="{16695929-A140-486C-BD96-088953A3ED03}">
+            <File Id="bbackupclient_dll" Name="bbackupclient.dll" DiskId="1" Source="$(var.bbackupclient.TargetPath)" KeyPath="yes" />
+            <File Id="bbackupclient_lib" Name="bbackupclient.lib" DiskId="1" Source="$(var.bbackupclient.TargetDir)$(var.bbackupclient.TargetName).lib" />
+          </Component>
+					<Component Id="bbackupctl" Guid="1153F166-93C9-44B7-A1A1-C3CE46CD8A50">
+            <File Id="bbackupctl" Name="bbackupctl.exe" DiskId="1" Source="$(var.bbackupctl.TargetPath)" KeyPath="yes" />
+					</Component>
+          <Component Id="bbackupd" Guid="9C592CD2-ED55-4AA6-876E-AC843954FE0F">
+            <File Id="bbackupd" Name="bbackupd.exe" DiskId="1" Source="$(var.bbackupd.TargetPath)" KeyPath="yes" />
+            <RegistryKey Root="HKLM" Key="Software\Box Backup" ForceCreateOnInstall="yes">
+              <Permission User="SYSTEM" GenericAll="yes"/>
+              <Permission User="Administrators" GenericAll="yes"/>
+            </RegistryKey>
+            <ServiceInstall Id="bbackupd_service"
+                            Name="Box Backup"
+                            Description="Securely backs up files over the Internet"
+                            Type="ownProcess"
+                            Start="demand"
+                            ErrorControl="normal"
+                            Interactive="no" />
+            <ServiceControl Id="bbackupd_service"
+                            Name="Box Backup"
+                            Stop="both"
+                            Remove="uninstall"/>
+          </Component>
+          <Component Id="bbackupquery" Guid="87BFE48E-2EF7-4157-9851-D708F279FD49">
+            <File Id="bbackupquery" Name="bbackupquery.exe" DiskId="1" Source="$(var.bbackupquery.TargetPath)" KeyPath="yes" />
+          </Component>
+          <Component Id="bbutil" Guid="{BBFB0802-1C8E-4C35-9A93-4D42EC81A5FC}">
+            <File Id="bbutil" Name="bbutil.exe" DiskId="1" Source="$(var.bbutil.TargetPath)" KeyPath="yes" />
+          </Component>
+				</Directory>
+			</Directory>
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="AppData_BoxBackup" Name="Box Backup">
+          <Component Id="BoxBackupDir" Guid="5B66F39C-C4A7-48E2-A21C-AA947A8FC013">
+            <CreateFolder>
+              <Permission User="SYSTEM" GenericAll="yes" />
+              <Permission User="Administrators" GenericAll="yes"/>
+            </CreateFolder>
+          </Component>
+          <Component Id="bbackupd_conf" Guid="29AB58DE-5F70-475B-AE34-C8EADB8D1DFC" NeverOverwrite="yes">
+            <File Id="bbackupd_conf" Name="bbackupd.conf" DiskId="1" Source="$(var.SolutionDir)..\..\..\bin\bbackupd\win32\bbackupd.conf" KeyPath="yes">
+              <Permission User="SYSTEM" GenericAll="yes"/>
+              <Permission User="Administrators" GenericAll="yes"/>
+            </File>
+            <IniFile Id="bbackupd_conf_Hostname"
+                     Action="addLine"
+                     Directory="AppData_BoxBackup"
+                     Name="bbackupd.conf"
+                     Section="BoxBackup"
+                     Key="StoreHostname"
+                     Value="[HOSTNAME]"/>
+            <IniFile Id="bbackupd_conf_AccountNumber"
+                     Action="addLine"
+                     Directory="AppData_BoxBackup"
+                     Name="bbackupd.conf"
+                     Section="BoxBackup"
+                     Key="AccountNumber"
+                     Value="0x[ACCOUNTNUMBER]" />
+            <IniFile Id="bbackupd_conf_StoreObjectInfoFile"
+                     Action="addLine"
+                     Directory="AppData_BoxBackup"
+                     Name="bbackupd.conf"
+                     Section="BoxBackup"
+                     Key="StoreObjectInfoFile"
+                     Value="[CommonAppDataFolder]Box Backup\bbackupd.state" />
+            <IniFile Id="bbackupd_conf_PidFile"
+                     Action="addLine"
+                     Directory="AppData_BoxBackup"
+                     Name="bbackupd.conf"
+                     Section="BoxBackup"
+                     Key="PidFile"
+                     Value="[CommonAppDataFolder]Box Backup\bbackupd.pid" />
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="AdminToolsFolder">
+        <Component Id="bbquery_shortcut_component" Guid="83E20ED2-19FB-4DEC-8950-92B2CC24607D">
+          <Shortcut Id="bbquery_shortcut"
+                    Name="Box Backup Query"
+                    Description="Box Backup shell"
+                    Target="[INSTALLLOCATION]bbackupquery.exe"
+                    WorkingDirectory="INSTALLLOCATION" />
+          <RegistryValue Root="HKCU" Key="Software\Microsoft\Box Backup" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
+        </Component>
+      </Directory>
+    </Directory>
+
+    <Feature Id="VCRedist" Title="Visual C++ 10.0 Runtime" AllowAdvertise="no" Display="hidden" Level="1">
+      <MergeRef Id="VCRedist"/>
+    </Feature>
+
+    <Feature Id="BoxBackup" Title="Box Backup" Level="1">
+      <ComponentRef Id="bbackupd" />
+      <ComponentRef Id="BoxBackupDir" />
+      <ComponentRef Id="bbackupquery" />
+      <ComponentRef Id="bbackupclient" />
+      <ComponentRef Id="bbquery_shortcut_component" />
+
+      <Feature Id="bbackupd_conf" Title="Configuration File" AllowAdvertise="no" Display="hidden" Level="1">
+        <ComponentRef Id="bbackupd_conf" />
+        <Condition Level="0">Installed OR WIX_UPGRADE_DETECTED</Condition>
+      </Feature>
+
+      <Feature Id="BoxBackupTools" Title="Tools" Level="1">
+        <ComponentRef Id="bbackupctl" />
+        <ComponentRef Id="bbutil" />
+      </Feature>
+
+      <!-- Note: The following ComponentGroupRef is required to pull in generated authoring from project references. -->
+      <!--ComponentGroupRef Id="Product.Generated" /-->
+		</Feature>
+
+    <UI Id="BoxBackupUI">
+      <UIRef Id="WixUI_FeatureTree" />
+      <UIRef Id="WixUI_ErrorProgressText" />
+
+      <DialogRef Id="AccountDetailsDlg" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="FeaturesDlg" Order="1">LicenseAccepted = "1"</Publish>
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="AccountDetailsDlg" Order="2">LicenseAccepted = "1" AND WIX_UPGRADE_DETECTED = ""</Publish>
+      <Publish Dialog="AccountDetailsDlg" Control="Next" Event="NewDialog" Value="FeaturesDlg">1</Publish>
+      <Publish Dialog="AccountDetailsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg">1</Publish>
+      <Publish Dialog="FeaturesDlg" Control="Back" Event="NewDialog" Value="AccountDetailsDlg" Order="1">WIX_UPGRADE_DETECTED = ""</Publish>
+      <Publish Dialog="FeaturesDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" Order="2">1</Publish>
+    </UI>
+
+    <CustomAction Id="GenerateCSR" BinaryKey="custom_dll" DllEntry="GenerateCSR" Impersonate="no" Execute="deferred" />
+    <CustomAction Id="GenerateCSR.SetProperty" Return="check" Property="GenerateCSR" Value="[CommonAppDataFolder]\Box Backup\&#x000A;[ACCOUNTNUMBER]&#x000A;[EMAILADDRESS]" />
+    <CustomAction Id="GenerateKeyFile" BinaryKey="custom_dll" DllEntry="GenerateKeyFile" Impersonate="no" Execute="deferred" />
+
+    <InstallExecuteSequence>
+      <Custom Action="GenerateKeyFile" After="WriteRegistryValues" />
+      <Custom Action="GenerateCSR.SetProperty" Before="GenerateCSR" />
+      <Custom Action="GenerateCSR" Before="InstallFinalize" />
+    </InstallExecuteSequence>
+
+    <Binary Id="custom_dll" SourceFile="$(var.custom.TargetPath)" />
+	</Product>
+
+  <Fragment>
+    <WixVariable Id="WixUIBannerBmp" Value="bblogo.bmp"/>
+    <WixVariable Id="WixUIDialogBmp" Value="bbsplash.bmp"/>
+    <WixVariable Id="WixUILicenseRtf" Value="..\..\..\LICENSE-DUAL.rtf" />
+
+    <UI>
+      <Dialog Id="AccountDetailsDlg" Width="370" Height="270" Title="[ProductName]">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Account Details" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="blah blah blah" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="HostnameLabel" Type="Text" X="45" Y="73" Width="100" Height="15" TabSkip="no" Text="&amp;Hostname:" />
+        <Control Id="HostnameEdit" Type="Edit" X="45" Y="85" Width="220" Height="18" Property="HOSTNAME" Text="{128}" />
+        <Control Id="AccountNumberLabel" Type="Text" X="45" Y="110" Width="100" Height="15" TabSkip="no" Text="&amp;Account Number:" />
+        <Control Id="AccountNumberEdit" Type="Edit" X="45" Y="122" Width="220" Height="18" Property="ACCOUNTNUMBER" Text="{8}" />
+        <Control Id="EmailAddressLabel" Type="Text" X="45" Y="147" Width="100" Height="15" TabSkip="no" Text="&amp;Email Address:" />
+        <Control Id="EmailAddressEdit" Type="Edit" X="45" Y="159" Width="220" Height="18" Property="EMAILADDRESS" Text="{180}" />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
+  
+</Wix>

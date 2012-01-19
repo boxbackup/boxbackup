@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>3.5</ProductVersion>
+    <ProjectGuid>{a5d16dce-9eda-4da8-b388-7dc203b6b074}</ProjectGuid>
+    <SchemaVersion>2.0</SchemaVersion>
+    <OutputName>BoxBackup</OutputName>
+    <OutputType>Package</OutputType>
+    <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+    <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <OutputPath>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\</OutputPath>
+    <IntermediateOutputPath>$(SolutionDir)..\..\..\$(Configuration)\x86\install\$(ProjectName)\</IntermediateOutputPath>
+    <DefineConstants>Debug</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <OutputPath>$(SolutionDir)..\..\..\$(Configuration)\$(PlatformShortName)\</OutputPath>
+    <IntermediateOutputPath>$(SolutionDir)..\..\..\$(Configuration)\x86\install\$(ProjectName)\</IntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <DefineConstants>Debug</DefineConstants>
+    <OutputPath>$(SolutionDir)..\..\..\$(Configuration)\amd64\</OutputPath>
+    <IntermediateOutputPath>$(SolutionDir)..\..\..\$(Configuration)\amd64\install\$(ProjectName)\</IntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <OutputPath>$(SolutionDir)..\..\..\$(Configuration)\amd64\</OutputPath>
+    <IntermediateOutputPath>$(SolutionDir)..\..\..\$(Configuration)\amd64\install\$(ProjectName)\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\boxbackup\bbackupclient\bbackupclient.vcxproj">
+      <Name>bbackupclient</Name>
+      <Project>{dcef045d-507c-4137-b11a-c76c4b94dfba}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLLOCATION</RefTargetDir>
+    </ProjectReference>
+    <ProjectReference Include="..\..\boxbackup\bbackupctl\bbackupctl.vcxproj">
+      <Name>bbackupctl</Name>
+      <Project>{682f676c-50f5-45af-85fa-c23e344583fc}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLLOCATION</RefTargetDir>
+    </ProjectReference>
+    <ProjectReference Include="..\..\boxbackup\bbackupd\bbackupd.vcxproj">
+      <Name>bbackupd</Name>
+      <Project>{1e2bcee2-be5b-4366-bad5-4dd50d494fd7}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLLOCATION</RefTargetDir>
+    </ProjectReference>
+    <ProjectReference Include="..\..\boxbackup\bbackupquery\bbackupquery.vcxproj">
+      <Name>bbackupquery</Name>
+      <Project>{719d334e-6432-4005-9aeb-5763c23be75b}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLLOCATION</RefTargetDir>
+    </ProjectReference>
+    <ProjectReference Include="..\..\boxbackup\bbutil\bbutil.vcxproj">
+      <Name>bbutil</Name>
+      <Project>{d84ac0c6-6e7d-44aa-a37a-bbc1a599bab3}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLLOCATION</RefTargetDir>
+    </ProjectReference>
+    <ProjectReference Include="..\custom\custom.vcxproj">
+      <Name>custom</Name>
+      <Project>{b43efcbe-06e0-46c4-9502-1d06b713eb57}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLLOCATION</RefTargetDir>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <WixExtension Include="WixUtilExtension">
+      <HintPath>$(WixExtDir)\WixUtilExtension.dll</HintPath>
+      <Name>WixUtilExtension</Name>
+    </WixExtension>
+    <WixExtension Include="WixUIExtension">
+      <HintPath>$(WixExtDir)\WixUIExtension.dll</HintPath>
+      <Name>WixUIExtension</Name>
+    </WixExtension>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="redist" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="redist\Microsoft_VC100_CRT_x64.msm" />
+    <Content Include="redist\Microsoft_VC100_CRT_x86.msm" />
+    <Content Include="redist\Microsoft_VC100_DebugCRT_x64.msm" />
+    <Content Include="redist\Microsoft_VC100_DebugCRT_x86.msm" />
+  </ItemGroup>
+  <Import Project="$(WixTargetsPath)" />
+  <!--
+	To modify your build process, add your task inside one of the targets below and uncomment it.
+	Other similar extension points exist, see Wix.targets.
+	<Target Name="BeforeBuild">
+	</Target>
+	<Target Name="AfterBuild">
+	</Target>
+	-->
+</Project>
