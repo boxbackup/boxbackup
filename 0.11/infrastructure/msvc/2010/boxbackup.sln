@@ -21,10 +21,16 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "crypt", "crypt", "{F6273D56-81D4-4D75-BD47-0EAFDE030BCD}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libpcre", "pcre\libpcre\libpcre.vcxproj", "{2615F432-7C7A-4B34-BC9A-D0E58ED8E90F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcretest", "pcre\pcretest\pcretest.vcxproj", "{03734708-A8DD-4F61-A1CE-FDCB32079E9A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libzlib", "zlib\libzlib\libzlib.vcxproj", "{80E019FF-948A-44C1-B422-2D9E540F9FF1}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "example", "zlib\example\example.vcxproj", "{B3B4FE6B-5065-46C4-8664-847F51CC7B7C}"
 EndProject
@@ -35,14 +41,26 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libboxbackup", "boxbackup\l
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupd", "boxbackup\bbackupd\bbackupd.vcxproj", "{1E2BCEE2-BE5B-4366-BAD5-4DD50D494FD7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "build", "build\build.vcxproj", "{DCDD2786-23D3-44DB-9509-864DC01DB661}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupquery", "boxbackup\bbackupquery\bbackupquery.vcxproj", "{719D334E-6432-4005-9AEB-5763C23BE75B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupctl", "boxbackup\bbackupctl\bbackupctl.vcxproj", "{682F676C-50F5-45AF-85FA-C23E344583FC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "setup", "install\setup\setup.wixproj", "{A5D16DCE-9EDA-4DA8-B388-7DC203B6B074}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "custom", "install\custom\custom.vcxproj", "{B43EFCBE-06E0-46C4-9502-1D06B713EB57}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -53,8 +71,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "custom", "install\custom\cu
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libeay", "openssl\libeay\libeay.vcxproj", "{FAEDAF88-9894-4F02-B936-B30674DE9192}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libssl", "openssl\libssl\libssl.vcxproj", "{469ACDA3-2237-414C-BABF-D30FFFF2FE6A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rsa_test", "openssl\rsa_test\rsa_test.vcxproj", "{A67946D1-E644-45E1-931B-DA46177F5263}"
 EndProject
@@ -117,10 +141,16 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "run openssl tests", "openssl\run\run.vcxproj", "{995B6A5A-9A87-4CD1-A785-FE62E63251EE}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbstored", "boxbackup\bbstored\bbstored.vcxproj", "{2F13350C-C902-47B8-8584-8FA2F6C05917}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbackupclient", "boxbackup\bbackupclient\bbackupclient.vcxproj", "{DCEF045D-507C-4137-B11A-C76C4B94DFBA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bbutil", "boxbackup\bbutil\bbutil.vcxproj", "{D84AC0C6-6E7D-44AA-A37A-BBC1A599BAB3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DCDD2786-23D3-44DB-9509-864DC01DB661} = {DCDD2786-23D3-44DB-9509-864DC01DB661}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
