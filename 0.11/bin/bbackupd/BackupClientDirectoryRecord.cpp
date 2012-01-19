@@ -290,7 +290,9 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				// which would normally contain DT_REG, 
 				// DT_DIR, etc, but we only use it here and 
 				// prefer S_IFREG, S_IFDIR...
-				int type = en->d_type;
+				int type = 0;
+				type = (DT_DIR == en->d_type) ? S_IFDIR : type;
+				type = (DT_REG == en->d_type) ? S_IFREG : type;
 				#else
 				if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
 				{

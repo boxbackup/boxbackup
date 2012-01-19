@@ -120,23 +120,6 @@
 	#endif
 #endif
 
-#if defined WIN32 && !defined __MINGW32__
-	typedef __int8  int8_t;
-	typedef __int16 int16_t;
-	typedef __int32 int32_t;
-	typedef __int64 int64_t;
-
-	typedef unsigned __int8  u_int8_t;
-	typedef unsigned __int16 u_int16_t;
-	typedef unsigned __int32 u_int32_t;
-	typedef unsigned __int64 u_int64_t;
-
-	#define HAVE_U_INT8_T
-	#define HAVE_U_INT16_T
-	#define HAVE_U_INT32_T
-	#define HAVE_U_INT64_T
-#endif // WIN32 && !__MINGW32__
-
 // Define missing types
 #ifndef HAVE_UINT8_T
 	typedef u_int8_t uint8_t;
@@ -178,10 +161,6 @@
 	typedef u_int64_t InodeRefType;
 #else
 	typedef ino_t InodeRefType;
-#endif
-
-#ifdef WIN32
-	#define WIN32_LEAN_AND_MEAN
 #endif
 
 #include "emu.h"

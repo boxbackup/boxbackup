@@ -213,7 +213,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		p.fd = mSocketHandle;
 		p.events = POLLIN;
 		p.revents = 0;
-		switch(::poll(&p, 1, (Timeout == IOStream::TimeOutInfinite)?INFTIM:Timeout))
+		switch(EMU_POLL(&p, 1, (Timeout == IOStream::TimeOutInfinite)?INFTIM:Timeout))
 		{
 		case -1:
 			// error
@@ -332,7 +332,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 			p.events = POLLOUT;
 			p.revents = 0;
 			
-			if(::poll(&p, 1, 16000 /* 16 seconds */) == -1)
+			if(EMU_POLL(&p, 1, 16000 /* 16 seconds */) == -1)
 			{
 				// Don't exception if it's just a signal
 				if(errno != EINTR)

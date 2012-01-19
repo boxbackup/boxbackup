@@ -21,6 +21,8 @@
 	#include <process.h>
 #endif
 
+using namespace Win32;
+
 extern void TerminateService(void);
 extern unsigned int WINAPI RunService(LPVOID lpParameter);
 
@@ -100,7 +102,7 @@ static char* spConfigFileName;
 VOID ServiceMain(DWORD argc, LPTSTR *argv) 
 {
 	// initialise service status
-	gServiceStatus.dwServiceType = SERVICE_WIN32;
+	gServiceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	gServiceStatus.dwCurrentState = SERVICE_STOPPED;
 	gServiceStatus.dwControlsAccepted = 0;
 	gServiceStatus.dwWin32ExitCode = NO_ERROR;
@@ -190,9 +192,9 @@ int OurService(const char* pConfigFileName)
 
 	if (!success)
 	{
-		ErrorHandler("Failed to start service. Did you start "
-			"Box Backup from the Service Control Manager? "
-			"(StartServiceCtrlDispatcher)", GetLastError());
+//		ErrorHandler("Failed to start service. Did you start "
+//			"Box Backup from the Service Control Manager? "
+//			"(StartServiceCtrlDispatcher)", GetLastError());
 		return 1;
 	}
 

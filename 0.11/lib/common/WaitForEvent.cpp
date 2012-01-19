@@ -163,7 +163,7 @@ void *WaitForEvent::Wait()
 	}
 	
 	// Poll!
-	switch(::poll(mpPollInfo, mItems.size(), mTimeout))
+	switch(EMU_POLL(mpPollInfo, mItems.size(), mTimeout))
 	{
 	case -1:
 		// Interrupted system calls aren't an error, just equivalent to a timeout

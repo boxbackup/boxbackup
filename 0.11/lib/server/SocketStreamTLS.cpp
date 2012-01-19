@@ -261,7 +261,7 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 		{
 			poll_timeout = INFTIM;
 		}
-		result = ::poll(&p, 1, poll_timeout);
+		result = EMU_POLL(&p, 1, poll_timeout);
 	}
 	while(result == -1 && errno == EINTR);
 

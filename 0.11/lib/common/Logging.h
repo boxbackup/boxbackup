@@ -59,7 +59,7 @@
 inline std::string GetNativeErrorMessage()
 {
 #ifdef WIN32
-	return GetErrorMessage(GetLastError());
+	return BoxBackup::Win32::GetErrorMessage(GetLastError());
 #else
 	std::ostringstream _box_log_line;
 	_box_log_line << std::strerror(errno) << " (" << errno << ")";
@@ -69,13 +69,13 @@ inline std::string GetNativeErrorMessage()
 
 #ifdef WIN32
 	#define BOX_LOG_WIN_ERROR(stuff) \
-		BOX_ERROR(stuff << ": " << GetErrorMessage(GetLastError()))
+		BOX_ERROR(stuff << ": " << Win32::GetErrorMessage(GetLastError()))
 	#define BOX_LOG_WIN_WARNING(stuff) \
-		BOX_WARNING(stuff << ": " << GetErrorMessage(GetLastError()))
+		BOX_WARNING(stuff << ": " << Win32::GetErrorMessage(GetLastError()))
 	#define BOX_LOG_WIN_ERROR_NUMBER(stuff, number) \
-		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
+		BOX_ERROR(stuff << ": " << Win32::GetErrorMessage(number))
 	#define BOX_LOG_WIN_WARNING_NUMBER(stuff, number) \
-		BOX_WARNING(stuff << ": " << GetErrorMessage(number))
+		BOX_WARNING(stuff << ": " << Win32::GetErrorMessage(number))
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_WIN_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_WIN_WARNING(stuff)
 #else

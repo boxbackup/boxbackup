@@ -181,5 +181,7 @@ inline int32_t  ntoh(int32_t in)  { return ntohl(in); }
 inline int16_t  ntoh(int16_t in)  { return ntohs(in); }
 inline int8_t   ntoh(int8_t in)   { return in; }
 
+using namespace BoxBackup;
+
 #endif // BOX__H
 

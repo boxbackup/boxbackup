@@ -37,6 +37,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef WIN32
+#	pragma once
+#	ifdef __MINGW32__
+#		define _GETOPT_H_
+#	else
+
+#	endif
+#endif
+
 #ifndef _GETOPT_H_
 #define _GETOPT_H_
 
