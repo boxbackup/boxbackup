@@ -1,0 +1,87 @@
+
+# this file describes which binaries and scripts go to make
+# up a parcel -- a group of files and scripts needed to perform
+# a particular task
+
+backup-client
+	bin bbackupd
+	bin bbackupquery
+	bin bbackupctl
+	script bin/bbackupd/bbackupd-config
+	noinstall script COPYING.txt
+	noinstall script LICENSE-GPL.txt
+	noinstall script LICENSE-DUAL.txt
+
+	html bbackupd
+	html bbackupquery
+	html bbackupctl
+	html bbackupd-config
+	html bbackupd.conf
+
+	subdir qdbm libqdbm.a
+
+EXCEPT:mingw32,mingw32msvc
+	man bbackupd.8
+	man bbackupquery.8
+	man bbackupctl.8
+	man bbackupd-config.8
+	man bbackupd.conf.5
+END-EXCEPT
+
+ONLY:mingw32,mingw32msvc
+	script bin/bbackupd/win32/installer.iss 
+	script bin/bbackupd/win32/bbackupd.conf
+	script bin/bbackupd/win32/NotifySysAdmin.vbs
+END-ONLY
+
+ONLY:mingw32
+	script /usr/i686-pc-mingw32/sys-root/mingw/bin/libz-1.dll
+	script /usr/i686-pc-mingw32/sys-root/mingw/bin/mingwm10.dll
+	script /usr/i686-pc-mingw32/sys-root/mingw/bin/libgcc_s_dw2-1.dll
+END-ONLY
+
+ONLY:SunOS
+	script contrib/solaris/bbackupd-manifest.xml lib/svc/manifest
+	script contrib/solaris/bbackupd-smf-method   lib/svc/method
+END-ONLY
+
+ONLY:Darwin
+	script contrib/mac_osx/org.boxbackup.bbackupd.plist /Library/LaunchDaemons
+END-ONLY
+
+backup-server
+	bin bbstored
+	bin bbstoreaccounts
+	script bin/bbstored/bbstored-certs
+	script bin/bbstored/bbstored-config
+	script lib/raidfile/raidfile-config
+	noinstall script COPYING.txt
+	noinstall script LICENSE-GPL.txt
+	noinstall script LICENSE-DUAL.txt
+
+	html bbstored
+	html bbstoreaccounts
+	html bbstored-certs
+	html bbstored-config
+	html raidfile-config
+	html bbstored.conf
+	html raidfile.conf
+
+EXCEPT:mingw32,mingw32msvc
+	man bbstored.8
+	man bbstoreaccounts.8
+	man bbstored-certs.8
+	man bbstored-config.8
+	man raidfile-config.8
+	man bbstored.conf.5
+	man raidfile.conf.5
+END-EXCEPT
+
+ONLY:SunOS
+	script contrib/solaris/bbstored-manifest.xml lib/svc/manifest
+	script contrib/solaris/bbstored-smf-method   lib/svc/method
+END-ONLY
+
+ONLY:Darwin
+	script contrib/mac_osx/org.boxbackup.bbstored.plist /Library/LaunchDaemons
+END-ONLY

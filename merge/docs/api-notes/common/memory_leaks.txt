@@ -1,0 +1,44 @@
+TITLE Memory leak detection
+
+The build system contains a primative memory leak detection system in debug builds.
+
+It works by using #defines to replace calls to malloc, free, realloc, new and delete with debug versions which record their use. When a process ends, it dumps a list of all the blocks or objects which were allocated by not freed, and the file and line of the source where they are originally allocated.
+
+It's not perfect, but should catch most things and work on most platforms.
+
+If it doesn't work on your platform, define PLATFORM_DISABLE_MEM_LEAK_TESTING in BoxPlatform.h within the relevant section.
+
+
+SUBTITLE Requirements in source
+
+It does require some extra lines in the source file. The last included file in each .cpp file must be
+
+	#include "MemLeakFindOn.h"
+
+and if a .h file uses any of these functions, the contents of the .h file should be bounded with
+
+	#include "MemLeakFindOn.h"
+	
+	// ... some code, but absolutely no #includes
+	
+	#include "MemLeakFindOff.h"
+
+The cleanupforcvs.pl script checks for correct usage.
+
+
+SUBTITLE Use in tests
+
+Tests will automatically dump memory leaks and regard them as a failure for anything executing in the main test process.
+
+To test for memory leaks in programs run from the test, or daemons, use something like
+
+	TestRemoteProcessMemLeaks("bbackupd.memleaks");
+
+If memory leak detection is being used, it will check the specified file for memory leak reports (deleting it afterwards). Any leak is an error.
+
+The Daemon class automactically arranges for the memory leak reports to be written. Other exes should set this up themselves, preferably using the define in MainHelper.h, as the first thing in their main() function.
+
+	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT(file, name)
+
+File is the filename to write the report to, conventionally called "<programname>.memleaks", and name is the name of the exe.
+

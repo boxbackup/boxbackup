@@ -1,0 +1,36 @@
+CLASS RaidFileWrite
+
+Interface to writing raidfiles.
+
+See IOStream interface.
+
+Some other useful functions are available, see h and cpp files.
+
+
+FUNCTION RaidFileWrite::RaidFileWrite()
+
+The constructor takes the disc set number and filename of the file you're interested.
+
+
+FUNCTION RaidFileWrite::Open()
+
+Open() opens the file for writing, and takes an "allow overwrite" flag.
+
+
+FUNCTION RaidFileWrite::Commit()
+
+Commmit the file, and make it visible to RaidFileRead. If ConvertToRaidNow == true, it will be converted to raid file representation immediately.
+
+Setting it to false is not a good idea. Later on, it will tell a daemon to convert it in the background, but for now it simply won't be converted.
+
+
+FUNCTION RaidFileWrite::Discard()
+
+Abort the creation/update. Equivalent to just deleting the object without calling Commit().
+
+
+FUNCTION RaidFileWrite::Delete()
+
+Delete a file -- don't need to Open() it first.
+
+

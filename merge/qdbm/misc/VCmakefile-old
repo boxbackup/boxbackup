@@ -1,0 +1,169 @@
+# Makefile to build QDBM using Microsoft Visual C++
+
+
+
+#================================================================
+# Setting Variables
+#================================================================
+
+
+# Targets
+MYLIBS = qdbm.lib
+LIBOBJS = depot.obj curia.obj relic.obj hovel.obj \
+  cabin.obj villa.obj vista.obj odeum.obj myconf.obj
+MYBINS = dpmgr.exe dptest.exe dptsv.exe crmgr.exe crtest.exe crtsv.exe \
+  rlmgr.exe rltest.exe hvmgr.exe hvtest.exe cbtest.exe cbcodec.exe \
+  vlmgr.exe vltest.exe vltsv.exe odmgr.exe odtest.exe odidx.exe
+
+# VC++ directory
+VCPATH = C:\Program Files\Microsoft Visual Studio .NET 2003\Vc7
+
+# Building binaries
+CLFLAGS = /I "$(VCPATH)\Include" /I "$(VCPATH)\PlatformSDK\Include" /I "." /O2 /nologo
+LIBFLAGS = /libpath:"$(VCPATH)\lib" /libpath:"$(VCPATH)\PlatformSDK\Lib" /libpath:"." /nologo
+LINKFLAGS = /libpath:"$(VCPATH)\lib" /libpath:"$(VCPATH)\PlatformSDK\Lib" /libpath:"." /nologo
+
+
+
+#================================================================
+# Suffix rules
+#================================================================
+
+
+.SUFFIXES :
+.SUFFIXES : .c .obj
+
+.c.obj :
+	cl /c $(CLFLAGS) $<
+
+
+
+#================================================================
+# Actions
+#================================================================
+
+
+all : $(MYLIBS) $(MYBINS)
+
+
+clean :
+	del *.obj *.lib *.dll *.exp *.exe
+
+
+
+#================================================================
+# Building binaries
+#================================================================
+
+
+qdbm.lib : $(LIBOBJS)
+	lib $(LIBFLAGS) /OUT:$@ $(LIBOBJS)
+
+
+dpmgr.exe : dpmgr.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ dpmgr.obj qdbm.lib
+
+
+dptest.exe : dptest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ dptest.obj qdbm.lib
+
+
+dptsv.exe : dptsv.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ dptsv.obj qdbm.lib
+
+
+crmgr.exe : crmgr.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ crmgr.obj qdbm.lib
+
+
+crtest.exe : crtest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ crtest.obj qdbm.lib
+
+
+crtsv.exe : crtsv.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ crtsv.obj qdbm.lib
+
+
+rlmgr.exe : rlmgr.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ rlmgr.obj qdbm.lib
+
+
+rltest.exe : rltest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ rltest.obj qdbm.lib
+
+
+hvmgr.exe : hvmgr.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ hvmgr.obj qdbm.lib
+
+
+hvtest.exe : hvtest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ hvtest.obj qdbm.lib
+
+
+cbtest.exe : cbtest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ cbtest.obj qdbm.lib
+
+
+cbcodec.exe : cbcodec.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ cbcodec.obj qdbm.lib
+
+
+vlmgr.exe : vlmgr.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ vlmgr.obj qdbm.lib
+
+
+vltest.exe : vltest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ vltest.obj qdbm.lib
+
+
+vltsv.exe : vltsv.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ vltsv.obj qdbm.lib
+
+
+odmgr.exe : odmgr.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ odmgr.obj qdbm.lib
+
+
+odtest.exe : odtest.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ odtest.obj qdbm.lib
+
+
+odidx.exe : odidx.obj qdbm.lib
+	link $(LINKFLAGS) /OUT:$@ odidx.obj qdbm.lib
+
+
+depot.obj : depot.h myconf.h
+
+curia.obj : depot.h curia.h myconf.h
+
+relic.obj : depot.h relic.h myconf.h
+
+hovel.obj : depot.h curia.h hovel.h myconf.h
+
+cabin.obj : cabin.h myconf.h
+
+villa.obj : depot.h cabin.h villa.h myconf.h
+
+vista.obj : depot.h curia.h cabin.h villa.h vista.h myconf.h
+
+odeum.obj : depot.h curia.h cabin.h villa.h myconf.h
+
+myconf.obj : myconf.h
+
+dpmgr.obj dptest.obj dptsv.obj : depot.h cabin.h
+
+crmgr.obj crtest.obj crtsv.obj : depot.h curia.h cabin.h
+
+rlmgr.obj rltest.obj : depot.h relic.h cabin.h
+
+hvmgr.obj hvtest.obj : depot.h curia.h hovel.h cabin.h
+
+cbtest.obj cbcodec.obj : cabin.h
+
+vlmgr.obj vltest.obj vltsv.obj : depot.h cabin.h villa.h
+
+odmgr.obj odtest.obj odidx.obj : depot.h curia.h cabin.h villa.h odeum.h
+
+
+
+# END OF FILE

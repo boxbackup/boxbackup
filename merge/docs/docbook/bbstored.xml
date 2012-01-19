@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbstored</refentrytitle>
+
+    <manvolnum>8</manvolnum>
+
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbstored</refname>
+
+    <refpurpose>Box Backup store daemon</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>bbstored</command>
+
+      <arg>config-file</arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para><command>bbstored</command> runs on a central server. Clients
+    running <command>bbackupd</command> connect to the server and upload
+    files.</para>
+
+    <para>The only argument is optional and specifies a non-default
+    configuration file. By default it will look for the configuration file as
+    <filename>/etc/box/bbstored.conf</filename>.</para>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbstored.conf</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbstored.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbstored-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>raidfile-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>raidfile.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>

@@ -1,0 +1,40 @@
+TITLE Various stream types
+
+Some useful streams are implemented in lib/common.
+
+
+SUBTITLE CollectInBufferStream
+
+Described in it's own page.
+
+
+SUBTITLE FileStream
+
+Implements a stream from a file, allowing both reading and writing.
+
+
+SUBTITLE MemBlockStream
+
+Turns a memory block into a readable stream.
+
+Can also be constructed using StreamableMemBlock, CollectInBufferStream and MemBlockStream as sources of the buffer.
+
+
+SUBTITLE PartialReadStream
+
+Create a readable stream which will read a set number of bytes from another stream, and then declare itself as closed.
+
+Useful for extracting a small chunk of another stream to present to a function which expects to consume all of a stream.
+
+
+SUBTITLE ReadGatherStream
+
+Create a readable stream out of blocks from many streams -- so various sections of any number of streams are composed into a single stream.
+
+To use, register each stream with AddComponent, then use the returned 'handle' with AddBlock to add blocks to the composed stream.
+
+Optionally, the object will take ownership of the streams added, and delete them when itself is deleted.
+
+See the comments in the function blocks in the cpp file for more info.
+
+

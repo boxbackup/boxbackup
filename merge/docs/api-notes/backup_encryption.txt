@@ -1,0 +1,109 @@
+TITLE Encryption in the backup system
+
+This document explains how everything is encrypted in the backup system, and points to the various functions which need reviewing to ensure they do actually follow this scheme.
+
+
+SUBTITLE Security objectives
+
+The crpyto system is designed to keep the following things secret from an attacker who has full access to the server.
+
+* The names of the files and directories
+* The contents of files and directories
+* The exact size of files
+
+Things which are not secret are
+
+* Directory heirarchy and number of files in each directory
+* How the files change over time
+* Approximate size of files
+
+
+SUBTITLE Keys
+
+There are four separate keys used:
+
+* Filename
+* File attributes
+* File block index
+* File data
+
+and an additional secret for file attribute hashes.
+
+The Cipher is Blowfish in CBC mode in most cases, except for the file data. All keys are maximum length 448 bit keys, since the key size only affects the setup time and this is done very infrequently.
+
+The file data is encrypted with AES in CBC mode, with a 256 bit key (max length). Blowfish is used elsewhere because the larger block size of AES, while more secure, would be terribly space inefficient. Note that Blowfish may also be used when older versions of OpenSSL are in use, and for backwards compatibility with older versions.
+
+The keys are generated using "openssl rand", and a 1k file of key material is stored in /etc/box/bbackupd. The configuration scripts make this readable only by root.
+
+Code for review: BackupClientCryptoKeys_Setup()
+in lib/backupclient/BackupClientCryptoKeys.cpp
+
+
+SUBTITLE Filenames
+
+Filenames need to be secret from the attacker, but they need to be compared on the server so it can determine whether or not is it a new version of an old file.
+
+So, the same Initialisation Vector is used for every single filename, so the same filename encrypted twice will have the same binary representation.
+
+Filenames use standard PKCS padding implemented by OpenSSL. They are proceeded by two bytes of header which describe the length, and the encoding.
+
+Code for review: BackupStoreFilenameClear::EncryptClear()
+in lib/backupclient/BackupStoreFilenameClear.cpp
+
+
+SUBTITLE File attributes
+
+These are kept secret as well, since they reveal information. Especially as they contain the target name of symbolic links.
+
+To encrypt, a random Initialisation Vector is choosen. This is stored first, followed by the attribute data encrypted with PKCS padding.
+
+Code for review: BackupClientFileAttributes::EncryptAttr()
+in lib/backupclient/BackupClientFileAttributes.cpp
+
+
+SUBTITLE File attribute hashes
+
+To detect and update file attributes efficiently, the file status change time is not used, as this would give suprious results and result in unnecessary updates to the server. Instead, a hash of user id, group id, and mode is used.
+
+To avoid revealing details about attributes
+
+1) The filename is added to the hash, so that an attacker cannot determine whether or not two files have identical attributes
+
+2) A secret is added to the hash, so that an attacker cannot compare attributes between accounts.
+
+The hash used is the first 64 bits of an MD5 hash.
+
+
+SUBTITLE File block index
+
+Files are encoded in blocks, so that the rsync algorithm can be used on them. The data is compressed first before encryption. These small blocks don't give the best possible compression, but there is no alternative because the server can't see their contents.
+
+The file contains a number of blocks, which contain among other things
+
+* Size of the block when it's not compressed
+* MD5 checksum of the block
+* RollingChecksum of the block
+
+We don't want the attacker to know the size, so the first is bad. (Because of compression and padding, there's uncertainty on the size.)
+
+When the block is only a few bytes long, the latter two reveal it's contents with only a moderate amount of work. So these need to be encrypted.
+
+In the header of the index, a 64 bit number is chosen. The sensitive parts of the block are then encrypted, without padding, with an Initialisation Vector of this 64 bit number + the block index.
+
+If a block from an previous file is included in a new version of a file, the same checksum data will be encrypted again, but with a different IV. An eavesdropper will be able to easily find out which data has been re-encrypted, but the plaintext is not revealed.
+
+Code for review: BackupStoreFileEncodeStream::Read() (IV base choosen about half-way through)
+BackupStoreFileEncodeStream::EncodeCurrentBlock() (encrypt index entry)
+in lib/backupclient/BackupStoreFileEncodeStream.cpp
+
+
+SUBTITLE File data
+
+As above, the first is split into chunks and compressed.
+
+Then, a random initialisation vector is chosen, stored first, followed by the compressed file data encrypted using PKCS padding.
+
+Code for review: BackupStoreFileEncodeStream::EncodeCurrentBlock()
+in lib/backupclient/BackupStoreFileEncodeStream.cpp
+
+

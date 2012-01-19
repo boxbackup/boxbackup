@@ -1,0 +1,37 @@
+test1
+{
+	value=12
+	string1 = carrots in may  
+	string2 =on the string
+	subconfig
+	{
+		bing= nothing really
+		carrots =0x2356
+		terrible=lovely
+	}
+	subconfig2
+		bing= something
+		carrots=-243895
+		terrible=pgin!
+	}
+	subconfig3
+	{
+		bing= 435
+		carrots =050
+		terrible=absolutely
+	}
+	otherthing
+	{
+		string= ping
+		fish =0
+	}
+}
+
+TOPlevel= value
+
+ping
+{
+	carrots=324
+	string = casrts
+}
+

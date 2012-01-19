@@ -1,0 +1,6 @@
+CLASS ServerTLS
+
+Implements a server which uses TLS (SSL) to encrypt and authenticate connections.
+
+Very similar to ServerStream, except it reads the certificate files for the TLSContext out of the Server sub-configuration to set up a TLSContext ("CertificateFile", "PrivateKeyFile" and "TrustedCAsFile"). Otherwise works exactly the same.
+

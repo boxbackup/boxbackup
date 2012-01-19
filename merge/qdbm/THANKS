@@ -1,0 +1,45 @@
+================================================================
+ Thanks to all of the following for their valuable suggestions
+ or contributions.
+================================================================
+
+
+Kang-Jin Lee
+  - suggestions about the GDBM-compatible API
+  - contributions about Makefile
+
+Pat Podenski
+  - suggestions about porting to Mac OS X, Solaris, and HP-UX 
+
+BERO
+  - contributions about supporting MinGW
+
+Stefan Bellon
+  - contributions about porting to RISC OS
+
+Donald Gobin
+  - contributions about supporting Visual C++
+
+Emanuel Dejanu
+  - contributions about supporting Visual C++
+
+Keith Bostic
+  - suggestions about the performance test suite
+
+William Lachance
+  - contributions about RPM spec file
+
+Zed A. Shaw
+  - contributions about a text analyzer in Odeum
+  - contributions about a query language in Odeum
+
+Chris Bilderback
+  - contributions about cursor functions in Villa.
+
+Fumitoshi Ukai
+  - contributions of troff manuals
+  - making Debian packages
+
+
+
+== END OF FILE ==

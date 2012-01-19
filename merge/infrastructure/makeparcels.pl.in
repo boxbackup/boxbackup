@@ -1,0 +1,405 @@
+#!@PERL@
+
+use strict;
+use lib 'infrastructure';
+use BoxPlatform;
+
+my @parcels;
+my %parcel_contents;
+
+sub starts_with ($$)
+{
+	my ($string,$expected) = @_;
+	return substr($string, 0, length $expected) eq $expected;
+}
+
+sub os_matches ($)
+{
+	my ($prefix_string) = @_;
+	my @prefixes = split m'\,', $prefix_string;
+	foreach my $prefix (@prefixes)
+	{
+		return 1 if starts_with($build_os,  $prefix);
+		return 1 if starts_with($target_os, $prefix);
+	}
+	return 0;
+}
+
+my $copy_command = "cp -p";
+
+if ($build_os eq 'CYGWIN')
+{
+	$copy_command = "cp -pu"; # faster
+}
+
+open PARCELS,"parcels.txt" or die "Can't open parcels file";
+{
+	my $cur_parcel = '';
+	while(<PARCELS>)
+	{
+		chomp; s/#.+\Z//; s/\s+\Z//; s/\s+/ /g;
+		next unless m/\S/;
+		
+		# omit bits on some platforms?
+		next if m/\AEND-OMIT/;
+		if(m/\AOMIT:(.+)/)
+		{
+			if (os_matches($1))
+			{
+				while(<PARCELS>)
+				{
+					last if m/\AEND-OMIT/;	
+				}
+			}
+			next;
+		}
+
+		if (m'\AONLY:(.+)')
+		{
+			if (not os_matches($1))
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-ONLY';
+				}
+			}
+			next;
+		}
+		next if (m'\AEND-ONLY');
+
+		if (m'\AEXCEPT:(.+)')
+		{
+			if (os_matches($1))
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-EXCEPT';
+				}
+			}
+			next;
+		}
+		next if (m'\AEND-EXCEPT');
+		
+		# new parcel, or a new parcel definition?
+		if(m/\A\s+(.+)\Z/)
+		{
+			push @{$parcel_contents{$cur_parcel}},$1
+		}
+		else
+		{
+			$cur_parcel = $_;
+			push @parcels,$_;
+		}
+	}
+}
+close PARCELS;
+
+# create parcels directory
+mkdir "parcels",0755;
+mkdir "parcels/scripts",0755;
+
+# write master makefile
+
+open MAKE,">Makefile" or die "Can't open master Makefile for writing";
+
+print MAKE <<__E;
+#
+# AUTOMATICALLY GENERATED FILE
+#    do not edit!
+#
+#
+
+MAKE = $make_command
+
+__E
+
+print MAKE "all:\t",join(' ',map {"build-".$_} @parcels),"\n\n";
+
+print MAKE <<__END_OF_FRAGMENT;
+test:	release/common/test
+
+release/common/test:
+	./runtest.pl ALL release
+
+.PHONY: docs
+docs:
+	cd docs; \$(MAKE)
+
+__END_OF_FRAGMENT
+
+my $release_flag = BoxPlatform::make_flag('RELEASE');
+my @clean_deps;
+
+for my $parcel (@parcels)
+{
+	my $version = BoxPlatform::parcel_root($parcel);
+	my $target  = BoxPlatform::parcel_target($parcel);
+	my $dir     = BoxPlatform::parcel_dir($parcel);
+	my @parcel_deps;
+
+	# Need to use BSD install on Solaris
+	my $install_bin = $build_os eq 'SunOS' ? '/usr/ucb/install' : 'install';
+
+	unless ($target_windows)
+	{
+		open SCRIPT,">parcels/scripts/install-$parcel" or die
+			"Can't open installer script for $parcel for writing";
+		print SCRIPT "#!/bin/sh\n\n";
+	}
+
+	for(@{$parcel_contents{$parcel}})
+	{
+		my @args = split /\s+/;
+
+		my ($type,$name,$dest) = @args;
+		my $optional = 0;
+		my $install  = 1;
+
+		if ($type eq 'optional')
+		{
+			$optional = 1;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'noinstall')
+		{
+			$install = 0;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if($type eq 'bin')
+		{
+			my $exeext = $platform_exe_ext;
+			print MAKE <<EOF;
+$dir/$name$exeext: release/bin/$name/$name$exeext
+	mkdir -p $dir
+	$copy_command release/bin/$name/$name$exeext $dir
+
+.PHONY: release/bin/$name/$name$exeext
+release/bin/$name/$name$exeext:
+	(cd bin/$name; \$(MAKE) $release_flag)
+
+EOF
+			push @parcel_deps, "$dir/$name$exeext";
+		}
+		elsif ($type eq 'script')
+		{
+			my $fullpath = $name;
+			my $filename = $name;
+			# remove path from script name
+			$filename =~ s{.*/}{};
+
+			print MAKE <<EOF;
+$dir/$filename: $fullpath
+	mkdir -p $dir
+EOF
+
+			if ($optional)
+			{
+				print MAKE "\ttest -r $fullpath " .
+					"&& $copy_command $fullpath $dir || true\n";
+			}
+			else
+			{
+				print MAKE "\t$copy_command $fullpath $dir\n";
+			}
+
+			print MAKE "\n";
+
+			push @parcel_deps, "$dir/$filename";
+		}
+		elsif($type eq 'man')
+		{
+			print MAKE <<EOF;
+$dir/${name}.gz: docs/man/${name}.gz
+	mkdir -p $dir
+	$copy_command docs/man/${name}.gz $dir
+
+EOF
+			# Releases have the docs pre-made, but users
+			# may want to rebuild them for some reason.
+			my $docbook_source = "docs/docbook/${name}";
+			$docbook_source =~ s/\.[58]$/.xml/;
+			print MAKE <<EOF;
+docs/man/${name}.gz: $docbook_source docs/docbook/bb-man.xsl
+	cd docs; \$(MAKE) man/${name}.gz
+
+EOF
+			push @parcel_deps, "$dir/${name}.gz";
+		}
+		elsif($type eq 'html')
+		{
+			print MAKE <<EOF;
+$dir/docs/${name}.html: docs/htmlguide/man-html/${name}.html
+	mkdir -p $dir/docs
+	$copy_command docs/htmlguide/man-html/${name}.html $dir/docs
+
+EOF
+			# Releases have the docs pre-made, but users
+			# may want to rebuild them for some reason.
+			my $docbook_source = "docs/docbook/${name}.xml";
+			print MAKE <<EOF;
+docs/htmlguide/man-html/${name}.html: $docbook_source docs/docbook/bb-nochunk-book.xsl
+	cd docs; \$(MAKE) htmlguide/man-html/${name}.html
+
+EOF
+			push @parcel_deps, "$dir/docs/${name}.html";
+		}
+		elsif ($type eq 'subdir')
+		{
+			shift @args;
+			my $subdir = shift @args;
+			print MAKE <<EOF;
+.PHONY: $name-build $name-clean
+
+$name-build:
+	cd $subdir; \$(MAKE) @args
+
+$name-clean:
+	cd $name; \$(MAKE) clean
+EOF
+			push @parcel_deps, "$name-build";
+			push @clean_deps,  "$name-clean";
+		}
+	}
+
+	print MAKE <<EOF;
+build-$parcel:	$target
+
+$target: @parcel_deps
+	test -d $dir || mkdir $dir
+EOF
+	
+	for(@{$parcel_contents{$parcel}})
+	{
+		my @args = split /\s+/;
+
+		my ($type,$name,$dest) = @args;
+
+		my $optional = 0;
+		my $install  = 1;
+
+		if ($type eq 'optional')
+		{
+			$optional = 1;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'noinstall')
+		{
+			$install = 0;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'script')
+		{
+			# remove path from script name
+			$name =~ s{.*/}{};
+		}
+
+		if ($type eq 'html')
+		{
+			$dest = "share/doc/@PACKAGE_TARNAME@";
+			$name = "docs/$name.html";
+		}
+
+		if ($type eq 'man')
+		{
+			$name =~ /([0-9])$/;
+			$dest = "man/man$1";
+			$name =~ s/$/\.gz/;
+		}
+
+		if ($install and not $target_windows and not $type eq "subdir")
+		{
+			my $local_install_dir = $install_into_dir;
+			if (defined $dest)
+			{
+				if ($dest =~ m,^/,)
+				{
+					# Don't add $prefix if $dest is a literal path
+					$local_install_dir = $dest;
+				}
+				else
+				{
+					$local_install_dir = "@prefix@/$dest";
+				}
+			}
+			print SCRIPT "mkdir -p " .
+				"\${DESTDIR}$local_install_dir/\n";
+			print SCRIPT "$install_bin $name " .
+				"\${DESTDIR}$local_install_dir\n";
+		}
+	}
+
+	unless ($target_windows)
+	{	
+		close SCRIPT;
+		chmod 0755,"parcels/scripts/install-$parcel";
+	}
+	
+	my $root = BoxPlatform::parcel_root($parcel);
+
+	unless ($target_windows)
+	{
+		print MAKE "\tcp parcels/scripts/install-$parcel $dir\n";
+	}
+
+	print MAKE "\t(cd parcels; tar cf - $root | gzip -9 - > $root.tgz )\n";
+	
+	print MAKE "\n";
+
+	unless ($target_windows)
+	{	
+		print MAKE "install-$parcel:\n";
+		print MAKE "\t(cd $dir; ./install-$parcel)\n\n";
+	}
+}
+
+print MAKE <<EOF;
+install:
+	cat local/install.msg
+
+clean: @clean_deps
+	cd docs; \$(MAKE) clean
+EOF
+
+if ($build_os eq 'CYGWIN')
+{
+	print MAKE "\tfind release debug       -type f | xargs -r rm\n";
+	print MAKE "\tfind . -name 'autogen_*' -type f | xargs -r rm\n";
+}
+else
+{
+	print MAKE "\tfind release debug       -type f -exec rm {} \\;\n";
+	print MAKE "\tfind . -name 'autogen_*' -type f -exec rm {} \\;\n";
+}
+
+for my $parcel (@parcels)
+{
+	# need to use -f to avoid error if they don't exist (already cleaned)
+	print MAKE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
+	print MAKE "\trm -f  ", BoxPlatform::parcel_target($parcel), "\n";
+}
+
+close MAKE;
+
+open INSTALLMSG,">local/install.msg" or die "Can't open install message file for writing";
+print INSTALLMSG <<__E;
+
+Parcels need to be installed separately, and as root. Type one of the following:
+
+__E
+
+for(@parcels)
+{
+	print INSTALLMSG "    $make_command install-".$_."\n";
+}
+print INSTALLMSG "\n";
+
+close INSTALLMSG;
+

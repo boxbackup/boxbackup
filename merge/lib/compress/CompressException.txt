@@ -1,0 +1,12 @@
+EXCEPTION Compress 6
+
+Internal					0
+InitFailed					1
+EndFailed					2
+BadUsageInputNotRequired	3
+TransformFailed				4
+CopyCompressStreamNotAllowed				5
+NullPointerPassedToCompressStream			6
+CompressStreamReadSupportNotRequested		7	Specify read in the constructor
+CompressStreamWriteSupportNotRequested		8	Specify write in the constructor
+CannotWriteToClosedCompressStream			9

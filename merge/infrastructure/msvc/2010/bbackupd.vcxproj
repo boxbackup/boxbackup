@@ -1,0 +1,139 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{22D325FB-9131-4BD6-B390-968F0491D687}</ProjectGuid>
+    <RootNamespace>bbackupd</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <UseOfMfc>false</UseOfMfc>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.CPP.UpgradeFromVC71.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.CPP.UpgradeFromVC71.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)..\..\..\$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)..\..\..\$(Configuration)\$(ProjectName)\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\Release\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ENABLE_VSS;WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>VssApi.lib;$(OutDir)\libbackupclient.lib;$(OutDir)\libbackupstore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(OutDir)bbackupd.pdb</ProgramDatabaseFile>
+      <SubSystem>Console</SubSystem>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\..\openssl\inc32;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\lib\common\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;BOX_RELEASE_BUILD;_CONSOLE;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl\out32dll\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\out32dll\ssleay32.lib;$(ProjectDir)..\..\..\Release\common.lib;$(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcreposix.lib;$(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcre.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(OutDir)bbackupd.exe</OutputFile>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\bin\bbackupd\autogen_ClientException.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\BackupClientContext.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\BackupClientDeleteList.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\BackupClientDirectoryRecord.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\BackupClientInodeToIDMap.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\BackupDaemon.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\bbackupd.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\Win32BackupService.cpp" />
+    <ClCompile Include="..\..\..\bin\bbackupd\Win32ServiceFunctions.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\bin\bbackupd\autogen_ClientException.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\BackupClientContext.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\BackupClientDeleteList.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\BackupClientDirectoryRecord.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\BackupClientInodeToIDMap.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\BackupDaemon.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\Win32BackupService.h" />
+    <ClInclude Include="..\..\..\bin\bbackupd\Win32ServiceFunctions.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\lib\win32\messages.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="common.vcxproj">
+      <Project>{a089cee6-ebf0-4232-a0c0-74850a8127a6}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>true</Private>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <ProjectReference Include="qdbm.vcxproj">
+      <Project>{72af22a7-b339-4fdf-b6ae-ca6522d4bb8d}</Project>
+      <Private>true</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
