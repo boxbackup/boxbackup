@@ -190,21 +190,22 @@ int FileStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 	else
 	{
-		BOX_LOG_WIN_ERROR("Failed to read from file: " << mFileName);
-		r = -1;
+		THROW_WIN_FILE_ERROR("Failed to read from file", mFileName,
+			CommonException, OSFileReadError);
 	}
-#else
-	int r = ::read(mOSFileHandle, pBuffer, NBytes);
-	if(r == -1)
-	{
-		BOX_LOG_SYS_ERROR("Failed to read from file: " << mFileName);
-	}
-#endif
 
 	if(r == -1)
 	{
 		THROW_EXCEPTION(CommonException, OSFileReadError)
 	}
+#else
+	int r = ::read(mOSFileHandle, pBuffer, NBytes);
+	if(r == -1)
+	{
+		THROW_SYS_FILE_ERROR("Failed to read from file", mFileName,
+			CommonException, OSFileReadError);
+	}
+#endif
 
 	if(r == 0)
 	{
@@ -228,7 +229,7 @@ IOStream::pos_type FileStream::BytesLeftToRead()
 	EMU_STRUCT_STAT st;
 	if(EMU_FSTAT(mOSFileHandle, &st) != 0)
 	{
-		THROW_EXCEPTION(CommonException, OSFileError)
+		BOX_LOG_SYS_ERROR(BOX_FILE_MESSAGE("Failed to stat file", mFileName));
 	}
 	
 	return st.st_size - GetPosition();
@@ -262,14 +263,14 @@ void FileStream::Write(const void *pBuffer, int NBytes)
 
 	if ((res == 0) || (numBytesWritten != (DWORD)NBytes))
 	{
-		// DWORD err = GetLastError();
-		THROW_EXCEPTION(CommonException, OSFileWriteError)
+		THROW_WIN_FILE_ERROR("Failed to write to file", mFileName,
+			CommonException, OSFileWriteError);
 	}
 #else
 	if(::write(mOSFileHandle, pBuffer, NBytes) != NBytes)
 	{
-		BOX_LOG_SYS_ERROR("Failed to write to file: " << mFileName);
-		THROW_EXCEPTION(CommonException, OSFileWriteError)
+		THROW_SYS_FILE_ERROR("Failed to write to file", mFileName,
+			CommonException, OSFileWriteError);
 	}
 #endif
 }
@@ -292,18 +293,22 @@ IOStream::pos_type FileStream::GetPosition() const
 
 #ifdef WIN32
 	LARGE_INTEGER conv;
-
 	conv.HighPart = 0;
-	conv.LowPart = 0;
-
 	conv.LowPart = SetFilePointer(this->mOSFileHandle, 0, &conv.HighPart, FILE_CURRENT);
+
+	if(conv.LowPart == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR)
+	{
+		THROW_WIN_FILE_ERROR("Failed to seek in file", mFileName,
+			CommonException, OSFileError);
+	}
 
 	return (IOStream::pos_type)conv.QuadPart;
 #else // ! WIN32
 	off_t p = ::lseek(mOSFileHandle, 0, SEEK_CUR);
 	if(p == -1)
 	{
-		THROW_EXCEPTION(CommonException, OSFileError)
+		THROW_SYS_FILE_ERROR("Failed to seek in file", mFileName,
+			CommonException, OSFileError);
 	}
 	
 	return (IOStream::pos_type)p;
@@ -328,18 +333,19 @@ void FileStream::Seek(IOStream::pos_type Offset, int SeekType)
 
 #ifdef WIN32
 	LARGE_INTEGER conv;
-
 	conv.QuadPart = Offset;
 	DWORD retVal = SetFilePointer(this->mOSFileHandle, conv.LowPart, &conv.HighPart, ConvertSeekTypeToOSWhence(SeekType));
 
 	if(retVal == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR)
 	{
-		THROW_EXCEPTION(CommonException, OSFileError)
+		THROW_WIN_FILE_ERROR("Failed to seek in file", mFileName,
+			CommonException, OSFileError);
 	}
 #else // ! WIN32
 	if(::lseek(mOSFileHandle, Offset, ConvertSeekTypeToOSWhence(SeekType)) == -1)
 	{
-		THROW_EXCEPTION(CommonException, OSFileError)
+		THROW_SYS_FILE_ERROR("Failed to seek in file", mFileName,
+			CommonException, OSFileError);
 	}
 #endif // WIN32
 
@@ -365,12 +371,17 @@ void FileStream::Close()
 
 #ifdef WIN32
 	if(::CloseHandle(mOSFileHandle) == 0)
-#else
-	if(::close(mOSFileHandle) != 0)
-#endif
 	{
-		THROW_EXCEPTION(CommonException, OSFileCloseError)
+		THROW_WIN_FILE_ERROR("Failed to close file", mFileName,
+			CommonException, OSFileCloseError);
 	}
+#else // ! WIN32
+	if(::close(mOSFileHandle) != 0)
+	{
+		THROW_SYS_FILE_ERROR("Failed to close file", mFileName,
+			CommonException, OSFileCloseError);
+	}
+#endif // WIN32
 
 	mOSFileHandle = INVALID_FILE;
 	mIsEOF = true;
