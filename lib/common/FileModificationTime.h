@@ -14,9 +14,9 @@
 
 #include "BoxTime.h"
 
-box_time_t FileModificationTime(EMU_STRUCT_STAT &st);
-box_time_t FileAttrModificationTime(EMU_STRUCT_STAT &st);
-box_time_t FileModificationTimeMaxModAndAttr(EMU_STRUCT_STAT &st);
+box_time_t FileModificationTime(const EMU_STRUCT_STAT &st);
+box_time_t FileAttrModificationTime(const EMU_STRUCT_STAT &st);
+box_time_t FileModificationTimeMaxModAndAttr(const EMU_STRUCT_STAT &st);
 
 #endif // FILEMODIFICATIONTIME__H
 

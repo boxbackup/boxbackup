@@ -16,7 +16,7 @@
 
 #include "MemLeakFindOn.h"
 
-box_time_t FileModificationTime(EMU_STRUCT_STAT &st)
+box_time_t FileModificationTime(const EMU_STRUCT_STAT &st)
 {
 #ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
@@ -28,7 +28,7 @@ box_time_t FileModificationTime(EMU_STRUCT_STAT &st)
 	return datamodified;
 }
 
-box_time_t FileAttrModificationTime(EMU_STRUCT_STAT &st)
+box_time_t FileAttrModificationTime(const EMU_STRUCT_STAT &st)
 {
 	box_time_t statusmodified =
 #ifdef HAVE_STRUCT_STAT_ST_MTIMESPEC
@@ -47,7 +47,7 @@ box_time_t FileAttrModificationTime(EMU_STRUCT_STAT &st)
 	return statusmodified;
 }
 
-box_time_t FileModificationTimeMaxModAndAttr(EMU_STRUCT_STAT &st)
+box_time_t FileModificationTimeMaxModAndAttr(const EMU_STRUCT_STAT &st)
 {
 #ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
 	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
