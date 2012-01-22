@@ -82,17 +82,6 @@
 	THROW_EXCEPTION_MESSAGE(exception, subtype, \
 		BOX_FILE_MESSAGE(filename, message))
 
-inline std::string GetNativeErrorMessage()
-{
-#ifdef WIN32
-	return GetErrorMessage(GetLastError());
-#else
-	std::ostringstream _box_log_line;
-	_box_log_line << std::strerror(errno) << " (" << errno << ")";
-	return _box_log_line.str();
-#endif
-}
-
 #ifdef WIN32
 	#define BOX_LOG_WIN_ERROR(stuff) \
 		BOX_ERROR(stuff << ": " << GetErrorMessage(GetLastError()))
@@ -105,21 +94,30 @@ inline std::string GetNativeErrorMessage()
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_WIN_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_WIN_WARNING(stuff)
 	#define BOX_WIN_ERRNO_MESSAGE(error_number, stuff) \
-		stuff << ": " << GetErrorMessage(error_number) << " (" << error_number << ")"
+		stuff << ": " << GetErrorMessage(error_number)
 	#define THROW_WIN_ERROR_NUMBER(message, error_number, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
 			BOX_WIN_ERRNO_MESSAGE(error_number, message))
 	#define THROW_WIN_FILE_ERRNO(message, filename, error_number, exception, subtype) \
 		THROW_WIN_ERROR_NUMBER(BOX_FILE_MESSAGE(filename, message), \
 			error_number, exception, subtype)
+	#define THROW_WIN_FILE_ERROR(message, filename, exception, subtype) \
+		THROW_WIN_FILE_ERRNO(message, filename, GetLastError(), \
+			exception, subtype)
 #else
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_SYS_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_SYS_WARNING(stuff)
 #endif
 
-#define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \
+#ifdef WIN32
+#	define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \
+	BOX_LOG_WIN_ERROR_NUMBER(stuff << " (type " << _type << ", name " << \
+		_name << ", port " << _port << ")", WSAGetLastError())
+#else
+#	define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \
 	BOX_LOG_NATIVE_ERROR(stuff << " (type " << _type << ", name " << \
 		_name << ", port " << _port << ")")
+#endif
 
 #define BOX_FORMAT_HEX32(number) \
 	std::hex << \
