@@ -123,6 +123,30 @@ BackupClientFileAttributes::BackupClientFileAttributes()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    BackupClientFileAttributes::BackupClientFileAttributes()
+//		Purpose: Artifical constructor
+//		Created: 2011/12/06
+//
+// --------------------------------------------------------------------------
+BackupClientFileAttributes::BackupClientFileAttributes(const EMU_STRUCT_STAT &st)
+: mpClearAttributes(0)
+{
+	ASSERT(sizeof(u_int64_t) == sizeof(box_time_t));
+	StreamableMemBlock *pnewAttr = new StreamableMemBlock;
+	FillAttributes(*pnewAttr, (const char *)NULL, st, true);
+
+	// Attributes ready. Encrypt into this block
+	EncryptAttr(*pnewAttr);
+	
+	// Store the new attributes
+	RemoveClear();
+	mpClearAttributes = pnewAttr;
+	pnewAttr = 0;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupClientFileAttributes::BackupClientFileAttributes(const BackupClientFileAttributes &)
 //		Purpose: Copy constructor
 //		Created: 2003/10/07
@@ -436,12 +460,15 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::ReadAttributesLink()
+//		Name:    BackupClientFileAttributes::FillAttributes()
 //		Purpose: Private function, handles standard attributes for all objects
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock, const char *Filename, EMU_STRUCT_STAT &st, bool ZeroModificationTimes)
+void BackupClientFileAttributes::FillAttributes(
+	StreamableMemBlock &outputBlock, const char *Filename,
+	const EMU_STRUCT_STAT &st, bool ZeroModificationTimes
+)
 {
 	outputBlock.ResizeBlock(sizeof(attr_StreamFormat));
 	attr_StreamFormat *pattr = (attr_StreamFormat*)outputBlock.GetBuffer();
@@ -475,7 +502,9 @@ void BackupClientFileAttributes::FillAttributes(StreamableMemBlock &outputBlock,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::ReadAttributesLink()
+//		Name:    BackupClientFileAttributes::FillAttributesLink(
+//			 StreamableMemBlock &outputBlock,
+//			 const char *Filename, struct stat &st)
 //		Purpose: Private function, handles the case where a symbolic link is needed
 //		Created: 2003/10/07
 //
@@ -507,7 +536,7 @@ void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBl
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientFileAttributes::ReadExtendedAttr(const char *, unsigned char**)
+//		Name:    BackupClientFileAttributes::FillExtendedAttr(const char *, unsigned char**)
 //		Purpose: Private function, read the extended attributes of the file into the block
 //		Created: 2005/06/12
 //
