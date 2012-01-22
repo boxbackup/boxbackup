@@ -29,6 +29,7 @@ class BackupClientFileAttributes : public StreamableMemBlock
 {
 public:
 	BackupClientFileAttributes();
+	BackupClientFileAttributes(const EMU_STRUCT_STAT &st);
 	BackupClientFileAttributes(const BackupClientFileAttributes &rToCopy);
 	BackupClientFileAttributes(const StreamableMemBlock &rToCopy);
 	~BackupClientFileAttributes();
@@ -60,7 +61,7 @@ public:
 
 private:
 	static void FillAttributes(StreamableMemBlock &outputBlock,
-		const char *Filename, EMU_STRUCT_STAT &st,
+		const char *Filename, const EMU_STRUCT_STAT &st,
 		bool ZeroModificationTimes);
 	static void FillAttributesLink(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st);
 	void WriteExtendedAttr(const char *Filename, int xattrOffset) const;
