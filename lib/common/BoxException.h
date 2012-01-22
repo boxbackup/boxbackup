@@ -29,6 +29,7 @@ public:
 	
 	virtual unsigned int GetType() const throw() = 0;
 	virtual unsigned int GetSubType() const throw() = 0;
+	virtual const std::string& GetMessage() const = 0;
 
 private:
 };
