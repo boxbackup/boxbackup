@@ -149,7 +149,10 @@ public:
 			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
 			
 	Entry *AddEntry(const Entry &rEntryToCopy);
-	Entry *AddEntry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, box_time_t AttributesModTime);
+	Entry *AddEntry(const BackupStoreFilename &rName,
+		box_time_t ModificationTime, int64_t ObjectID,
+		int64_t SizeInBlocks, int16_t Flags,
+		uint64_t AttributesHash);
 	void DeleteEntry(int64_t ObjectID);
 	Entry *FindEntryByID(int64_t ObjectID) const;
 	
