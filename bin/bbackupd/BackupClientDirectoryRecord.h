@@ -141,6 +141,8 @@ public:
 	std::string ConvertVssPathToRealPath(const std::string &rVssPath,
 		const Location& rBackupLocation);
 
+	int64_t GetObjectID() const { return mObjectID; }
+
 private:
 	void DeleteSubDirectories();
 	BackupStoreDirectory *FetchDirectoryListing(SyncParams &rParams);
@@ -167,7 +169,6 @@ private:
 		BackupStoreDirectory::Entry* pEntry,
 		const std::string &rFilename);
 
-private:
 	int64_t 	mObjectID;
 	std::string 	mSubDirName;
 	bool 		mInitialSyncDone;
