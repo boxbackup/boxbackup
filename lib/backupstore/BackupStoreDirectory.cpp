@@ -115,7 +115,8 @@ BackupStoreDirectory::~BackupStoreDirectory()
 //
 // Function
 //		Name:    BackupStoreDirectory::ReadFromStream(IOStream &, int)
-//		Purpose: Reads the directory contents from a stream. Exceptions will yeild incomplete reads.
+//		Purpose: Reads the directory contents from a stream.
+//			 Exceptions will result in incomplete reads.
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
@@ -131,7 +132,12 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	// Check magic value...
 	if(OBJECTMAGIC_DIR_MAGIC_VALUE != ntohl(hdr.mMagicValue))
 	{
-		THROW_EXCEPTION(BackupStoreException, BadDirectoryFormat)
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadDirectoryFormat,
+			"Wrong magic number in directory object " << 
+			BOX_FORMAT_OBJECTID(mObjectID) << ": expected " <<
+			BOX_FORMAT_HEX32(OBJECTMAGIC_DIR_MAGIC_VALUE) <<
+			" but found " <<
+			BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)));
 	}
 	
 	// Get data
@@ -307,9 +313,13 @@ BackupStoreDirectory::Entry *BackupStoreDirectory::AddEntry(const Entry &rEntryT
 //		Created: 2003/08/27
 //
 // --------------------------------------------------------------------------
-BackupStoreDirectory::Entry *BackupStoreDirectory::AddEntry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, box_time_t AttributesModTime)
+BackupStoreDirectory::Entry *
+BackupStoreDirectory::AddEntry(const BackupStoreFilename &rName,
+	box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks,
+	int16_t Flags, uint64_t AttributesHash)
 {
-	Entry *pnew = new Entry(rName, ModificationTime, ObjectID, SizeInBlocks, Flags, AttributesModTime);
+	Entry *pnew = new Entry(rName, ModificationTime, ObjectID,
+		SizeInBlocks, Flags, AttributesHash);
 	try
 	{
 		mEntries.push_back(pnew);
