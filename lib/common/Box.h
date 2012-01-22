@@ -103,7 +103,8 @@
 
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
-		if(!HideExceptionMessageGuard::ExceptionsHidden()) \
+		if(!HideExceptionMessageGuard::ExceptionsHidden() \
+			|| Logging::IsEnabled(Log::EVERYTHING)) \
 		{ \
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
