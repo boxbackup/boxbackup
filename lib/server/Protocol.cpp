@@ -688,6 +688,17 @@ void Protocol::SendStream(IOStream &rStream)
 		// Can't send this using the fixed size header
 		uncertainSize = true;
 	}
+
+	if(streamSize == 0)
+	{
+		// Server protocol will throw an assertion failure if we
+		// try to send a stream whose size is definitely zero:
+		// ASSERT FAILED: [BytesToRead > 0] at PartialReadStream.cpp:31
+		// so catch this on the client side to help debugging
+		THROW_EXCEPTION_MESSAGE(ServerException, Protocol_BadUsage,
+			"Sending a stream with a definite size of zero "
+			"is not allowed in the protocol");
+	}
 	
 	// Inform sub class
 	InformStreamSending(streamSize);
