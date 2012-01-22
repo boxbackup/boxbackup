@@ -154,14 +154,16 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 	int sockDomain = 0;
 	SocketAllAddr addr;
 	int addrLen = 0;
-	Socket::NameLookupToSockAddr(addr, sockDomain, Type, rName, Port, addrLen);
+	Socket::NameLookupToSockAddr(addr, sockDomain, Type, rName, Port,
+		addrLen);
 
 	// Create the socket
 	mSocketHandle = ::socket(sockDomain, SOCK_STREAM,
 		0 /* let OS choose protocol */);
 	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
-		BOX_LOG_SYS_ERROR("Failed to create a network socket");
+		BOX_LOG_SOCKET_ERROR(Type, rName, Port,
+			"Failed to create a network socket");
 		THROW_EXCEPTION(ServerException, SocketOpenError)
 	}
 	
@@ -169,16 +171,11 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
 		// Dispose of the socket
+		BOX_LOG_SOCKET_ERROR(Type, rName, Port,
+			"Failed to connect to socket");
 #ifdef WIN32
-		DWORD err = WSAGetLastError();
 		::closesocket(mSocketHandle);
-		BOX_LOG_WIN_ERROR_NUMBER("Failed to connect to socket " 
-			"(type " << Type << ", name " << rName <<
-			", port " << Port << ")", err);
 #else // !WIN32
-		BOX_LOG_SYS_ERROR("Failed to connect to socket (type " <<
-			Type << ", name " << rName << ", port " << Port <<
-			")");
 		::close(mSocketHandle);
 #endif // WIN32
 

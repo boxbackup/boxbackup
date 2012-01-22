@@ -87,12 +87,16 @@ public:
 	{
 		Close();
 	}
+
 private:
 	SocketListen(const SocketListen &rToCopy)
 	{
 	}
-public:
 
+	int mType, mPort;
+	std::string mName;
+
+public:
 	enum
 	{
 		MaxMultipleListenSockets = MaxMultiListenSockets
@@ -108,8 +112,8 @@ public:
 			if(::close(mSocketHandle) == -1)
 #endif
 			{
-				BOX_LOG_SYS_ERROR("Failed to close network "
-					"socket");
+				BOX_LOG_SOCKET_ERROR(mType, mName, mPort,
+					"Failed to close network socket");
 				THROW_EXCEPTION(ServerException,
 					SocketCloseError)
 			}
@@ -127,6 +131,10 @@ public:
 	// ------------------------------------------------------------------
 	void Listen(Socket::Type Type, const char *Name, int Port = 0)
 	{
+		mType = Type;
+		mName = Name;
+		mPort = Port;
+
 		if(mSocketHandle != -1)
 		{
 			THROW_EXCEPTION(ServerException, SocketAlreadyOpen);
@@ -144,7 +152,8 @@ public:
 			0 /* let OS choose protocol */);
 		if(mSocketHandle == -1)
 		{
-			BOX_LOG_SYS_ERROR("Failed to create a network socket");
+			BOX_LOG_SOCKET_ERROR(Type, Name, Port,
+				"Failed to create a network socket");
 			THROW_EXCEPTION(ServerException, SocketOpenError)
 		}
 		
@@ -158,7 +167,8 @@ public:
 			&option, sizeof(option)) == -1)
 #endif
 		{
-			BOX_LOG_SYS_ERROR("Failed to set socket options");
+			BOX_LOG_SOCKET_ERROR(Type, Name, Port,
+				"Failed to set socket options");
 			THROW_EXCEPTION(ServerException, SocketOpenError)
 		}
 
@@ -167,9 +177,14 @@ public:
 			|| ::listen(mSocketHandle, ListenBacklog) == -1)
 		{
 			int err_number = errno;
+
+			BOX_LOG_SOCKET_ERROR(Type, Name, Port,
+				"Failed to bind socket");
+
 			// Dispose of the socket
 			::close(mSocketHandle);
 			mSocketHandle = -1;
+
 			THROW_SYS_FILE_ERRNO("Failed to bind or listen "
 				"on socket", Name, err_number,
 				ServerException, SocketBindError);
@@ -233,8 +248,8 @@ public:
 				}
 				else
 				{
-					BOX_LOG_SYS_ERROR("Failed to poll "
-						"connection");
+					BOX_LOG_SOCKET_ERROR(mType, mName, mPort,
+						"Failed to poll connection");
 					THROW_EXCEPTION(ServerException,
 						SocketPollError)
 				}
@@ -253,7 +268,8 @@ public:
 		// Got socket (or error), unlock (implicit in destruction)
 		if(sock == -1)
 		{
-			BOX_LOG_SYS_ERROR("Failed to accept connection");
+			BOX_LOG_SOCKET_ERROR(mType, mName, mPort,
+				"Failed to accept connection");
 			THROW_EXCEPTION(ServerException, SocketAcceptError)
 		}
 
