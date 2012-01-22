@@ -42,6 +42,7 @@ public:
 
 	virtual int Main(const std::string& rDefaultConfigFile, int argc,
 		const char *argv[]);
+	virtual int ProcessOptions(int argc, const char *argv[]);
 
 	/* override this Main() if you want custom option processing: */
 	virtual int Main(const std::string &rConfigFile);
