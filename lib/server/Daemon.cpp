@@ -329,10 +329,32 @@ int Daemon::Main(const std::string& rDefaultConfigFile, int argc,
 	mConfigFileName = rDefaultConfigFile;
 	mAppName = argv[0];
 
+	int ret = ProcessOptions(argc, argv);
+	if (ret != 0)
+	{
+		return ret;
+	}
+
+	return Main(mConfigFileName);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Daemon::ProcessOptions(int argc, const char *argv[])
+//		Purpose: Parses command-line options. Useful when you have
+//			 a local Daemon object and don't intend to fork()
+//			 or call Main().
+//		Created: 2008/11/04
+//
+// --------------------------------------------------------------------------
+
+int Daemon::ProcessOptions(int argc, const char *argv[])
+{
 	#ifdef BOX_RELEASE_BUILD
-	mLogLevel = Log::NOTICE; // need an int to do math with
+	mLogLevel = Log::NOTICE;
 	#else
-	mLogLevel = Log::INFO; // need an int to do math with
+	mLogLevel = Log::INFO;
 	#endif
 
 	if (argc == 2 && strcmp(argv[1], "/?") == 0)
@@ -393,7 +415,7 @@ int Daemon::Main(const std::string& rDefaultConfigFile, int argc,
 			new FileLogger(mLogFile, mLogFileLevel));
 	}
 
-	return Main(mConfigFileName);
+	return 0;
 }
 
 // --------------------------------------------------------------------------
