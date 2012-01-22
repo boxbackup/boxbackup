@@ -367,7 +367,7 @@ public:
 	class ReturnCode
 	{
 		public:
-		enum {
+		typedef enum {
 			Command_OK = 0,
 			Compare_Same = 1,
 			Compare_Different,
