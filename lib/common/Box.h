@@ -118,7 +118,8 @@
 	{ \
 		std::ostringstream _box_throw_line; \
 		_box_throw_line << message; \
-		if(!HideExceptionMessageGuard::ExceptionsHidden()) \
+		if(!HideExceptionMessageGuard::ExceptionsHidden() \
+			|| Logging::IsEnabled(Log::EVERYTHING)) \
 		{ \
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
