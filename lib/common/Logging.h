@@ -303,16 +303,32 @@ class Logging
 	{
 		private:
 		Log::Level mOldLevel;
+		static int sGuardCount;
+		static Log::Level sOriginalLevel;
 
 		public:
 		Guard(Log::Level newLevel)
 		{
 			mOldLevel = Logging::GetGlobalLevel();
+			if(sGuardCount == 0)
+			{
+				sOriginalLevel = mOldLevel;
+			}
+			sGuardCount++;
 			Logging::SetGlobalLevel(newLevel);
 		}
 		~Guard()
 		{
+			sGuardCount--;
 			Logging::SetGlobalLevel(mOldLevel);
+		}
+
+		static bool IsActive() { return (sGuardCount > 0); }
+		static Log::Level GetOriginalLevel() { return sOriginalLevel; }
+		static bool IsGuardingFrom(Log::Level originalLevel)
+		{
+			return IsActive() &&
+				(int)sOriginalLevel >= (int)originalLevel;
 		}
 	};
 

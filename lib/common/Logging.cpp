@@ -46,6 +46,9 @@ Log::Level  Logging::sGlobalLevel = Log::EVERYTHING;
 Logging     Logging::sGlobalLogging; //automatic initialisation
 std::string Logging::sProgramName;
 
+int Logging::Guard::sGuardCount = 0;
+Log::Level Logging::Guard::sOriginalLevel = Log::INVALID;
+
 Logging::Logging()
 {
 	ASSERT(!spConsole);

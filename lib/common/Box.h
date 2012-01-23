@@ -17,6 +17,8 @@
 
 #include "BoxPlatform.h"
 
+#include <memory>
+
 // uncomment this line to enable full memory leak finding on all
 // malloc-ed blocks (at least, ones used by the STL)
 //#define MEMLEAKFINDER_FULL_MALLOC_MONITORING
@@ -104,8 +106,15 @@
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
 		if(!HideExceptionMessageGuard::ExceptionsHidden() \
-			|| Logging::IsEnabled(Log::EVERYTHING)) \
+			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
 		{ \
+			std::auto_ptr<Logging::Guard> guard; \
+			\
+			if(Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
+			{ \
+				guard.reset(new Logging::Guard(Log::EVERYTHING)); \
+			} \
+			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
 				#type "(" #subtype ") " \
@@ -119,8 +128,15 @@
 		std::ostringstream _box_throw_line; \
 		_box_throw_line << message; \
 		if(!HideExceptionMessageGuard::ExceptionsHidden() \
-			|| Logging::IsEnabled(Log::EVERYTHING)) \
+			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
 		{ \
+			std::auto_ptr<Logging::Guard> guard; \
+			\
+			if(Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
+			{ \
+				guard.reset(new Logging::Guard(Log::EVERYTHING)); \
+			} \
+			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
 				#type "(" #subtype ") (" << message << \
