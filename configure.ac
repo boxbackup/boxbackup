@@ -90,6 +90,7 @@ AC_CONFIG_FILES([infrastructure/BoxPlatform.pm
                  test/bbackupd/testfiles/bbackupd-exclude.conf
                  test/bbackupd/testfiles/bbackupd-snapshot.conf
                  test/bbackupd/testfiles/bbackupd-symlink.conf
+                 test/bbackupd/testfiles/bbackupd-temploc.conf
   		 ])
 AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    bin/bbackupquery/makedocumentation.pl

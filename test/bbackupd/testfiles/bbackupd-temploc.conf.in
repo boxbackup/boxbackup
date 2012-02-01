@@ -11,6 +11,7 @@ StoreHostname = localhost
 StorePort = 22011
 AccountNumber = 0x01234567
 
+AutomaticBackup = no
 UpdateStoreInterval = 3
 MinimumFileAge = 4
 MaxUploadWait = 24
@@ -25,6 +26,8 @@ ExtendedLogging = no
 ExtendedLogFile = testfiles/bbackupd.log
 
 CommandSocket = testfiles/bbackupd.sock
+
+NotifyScript  = @TARGET_PERL@ testfiles/notifyscript.pl
 
 Server
 {
