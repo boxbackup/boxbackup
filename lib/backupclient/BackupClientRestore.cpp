@@ -841,8 +841,8 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 //
 // --------------------------------------------------------------------------
 int BackupClientRestore(BackupProtocolClient &rConnection,
-	int64_t DirectoryID, const char *RemoteDirectoryName,
-	const char *LocalDirectoryName, bool PrintDots, bool RestoreDeleted,
+	int64_t DirectoryID, const std::string& RemoteDirectoryName,
+	const std::string& LocalDirectoryName, bool PrintDots, bool RestoreDeleted,
 	bool UndeleteAfterRestoreDeleted, bool Resume,
 	bool ContinueAfterErrors)
 {
