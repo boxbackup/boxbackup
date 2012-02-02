@@ -1038,7 +1038,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 
 		BOX_TRACE("Upload decision: " << nonVssFilePath << ": " <<
 			(doUpload ? "will upload" : "will not upload") <<
-			"(" << decisionReason << ")");
+			" (" << decisionReason << ")");
 
 		bool fileSynced = true;
 
