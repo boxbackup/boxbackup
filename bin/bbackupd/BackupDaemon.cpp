@@ -2296,10 +2296,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				if(::statfs(pLoc->mPath.c_str(), &s) != 0)
 #endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
-					BOX_THROW_SYS_ERROR("Failed to stat "
-						"path '" << pLoc->mPath <<
-						"' for location '" <<
-						pLoc->mName << "'");
+					THROW_SYS_ERROR("Failed to stat path "
+						"'" << pLoc->mPath << "' "
+						"for location "
+						"'" << pLoc->mName << "'");
 				}
 
 				// Where the filesystem is mounted
