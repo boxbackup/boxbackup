@@ -157,13 +157,13 @@ private:
 	int UseScriptToSeeIfSyncAllowed();
 
 public:
-	typedef const std::vector<Location *> Locations;
+	typedef std::list<Location *> Locations;
 	Locations GetLocations() { return mLocations; }
 	
 private:
 	int mState;		// what the daemon is currently doing
 
-	std::vector<Location *> mLocations;
+	Locations mLocations;
 	
 	std::vector<std::string> mIDMapMounts;
 	std::vector<BackupClientInodeToIDMap *> mCurrentIDMaps;

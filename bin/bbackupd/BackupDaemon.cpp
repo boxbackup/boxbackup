@@ -324,7 +324,7 @@ void BackupDaemon::SetupInInitialProcess()
 void BackupDaemon::DeleteAllLocations()
 {
 	// Run through, and delete everything
-	for(std::vector<Location *>::iterator i = mLocations.begin();
+	for(Locations::iterator i = mLocations.begin();
 		i != mLocations.end(); ++i)
 	{
 		delete *i;
@@ -964,7 +964,6 @@ void BackupDaemon::RunSyncNow()
 	// Set up the locations, if necessary -- 
 	// need to do it here so we have a 
 	// (potential) connection to use
-	if(mLocations.empty())
 	{
 		const Configuration &locations(
 			conf.GetSubConfiguration(
@@ -988,7 +987,7 @@ void BackupDaemon::RunSyncNow()
 #endif
 					
 	// Go through the records, syncing them
-	for(std::vector<Location *>::const_iterator 
+	for(Locations::const_iterator 
 		i(mLocations.begin()); 
 		i != mLocations.end(); ++i)
 	{
@@ -1035,7 +1034,7 @@ void BackupDaemon::RunSyncNow()
 	// Get the new store marker
 	mClientStoreMarker = clientContext.GetClientStoreMarker();
 	mStorageLimitExceeded = clientContext.StorageLimitExceeded();
-	mReadErrorsOnFilesystemObjects =
+	mReadErrorsOnFilesystemObjects |=
 		params.mReadErrorsOnFilesystemObjects;
 
 	if(!mStorageLimitExceeded)
@@ -2104,19 +2103,6 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 // --------------------------------------------------------------------------
 void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Configuration &rLocationsConf)
 {
-	if(!mLocations.empty())
-	{
-		// Looks correctly set up
-		return;
-	}
-
-	// Make sure that if a directory is reinstated, then it doesn't get deleted	
-	mDeleteUnusedRootDirEntriesAfter = 0;
-	mUnusedRootDirEntries.clear();
-
-	// Just a check to make sure it's right.
-	DeleteAllLocations();
-	
 	// Going to need a copy of the root directory. Get a connection,
 	// and fetch it.
 	BackupProtocolCallable& connection(rClientContext.GetConnection());
@@ -2223,35 +2209,68 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	// making sure there's a directory created for it.
 	std::vector<std::string> locNames =
 		rLocationsConf.GetSubConfigurationNames();
-	
+
+	// We only want completely configured locations to be in the list
+	// when this function exits, so move them all to a temporary list.
+	// Entries matching a properly configured location will be moved
+	// back to mLocations. Anything left in this list after the loop
+	// finishes will be deleted.
+	Locations tmpLocations = mLocations;
+	mLocations.clear();
+
+	// The ID map list will be repopulated automatically by this loop
+	mIDMapMounts.clear();
+
 	for(std::vector<std::string>::iterator
 		pLocName  = locNames.begin();
 		pLocName != locNames.end();
 		pLocName++)
 	{
+		Location* pLoc = NULL;
+
+		// Try to find and reuse an existing Location object
+		for(Locations::const_iterator
+			i  = tmpLocations.begin();
+			i != tmpLocations.end(); i++)
+		{
+			if ((*i)->mName == *pLocName)
+			{
+				BOX_TRACE("Location already configured: " << *pLocName);
+				pLoc = *i;
+				break;
+			}
+		}
+			
 		const Configuration& rConfig(
 			rLocationsConf.GetSubConfiguration(*pLocName));
-		BOX_TRACE("new location: " << *pLocName);
-		
-		// Create a record for it
-		std::auto_ptr<Location> apLoc(new Location);
+		std::auto_ptr<Location> apLoc;
 
 		try
 		{
-			// Setup names in the location record
-			apLoc->mName = *pLocName;
-			apLoc->mPath = rConfig.GetKeyValue("Path");
-			
-			// Read the exclude lists from the Configuration
-			apLoc->mpExcludeFiles = BackupClientMakeExcludeList_Files(rConfig);
-			apLoc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(rConfig);
+			if(pLoc == NULL)
+			{
+				// Create a record for it
+				BOX_TRACE("New location: " << *pLocName);
+				pLoc = new Location;
+
+				// ensure deletion if setup fails
+				apLoc.reset(pLoc);
+
+				// Setup names in the location record
+				pLoc->mName = *pLocName;
+				pLoc->mPath = rConfig.GetKeyValue("Path");
+				
+				// Read the exclude lists from the Configuration
+				pLoc->mpExcludeFiles = BackupClientMakeExcludeList_Files(rConfig);
+				pLoc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(rConfig);
+			}
 
 			// Does this exist on the server?
 			// Remove from dir object early, so that if we fail
 			// to stat the local directory, we still don't 
 			// consider to remote one for deletion.
 			BackupStoreDirectory::Iterator iter(dir);
-			BackupStoreFilenameClear dirname(apLoc->mName);	// generate the filename
+			BackupStoreFilenameClear dirname(pLoc->mName);	// generate the filename
 			BackupStoreDirectory::Entry *en = iter.FindMatchingClearName(dirname);
 			int64_t oid = 0;
 			if(en != 0)
@@ -2271,17 +2290,16 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				// BSD style statfs -- includes mount point, which is nice.
 #ifdef HAVE_STRUCT_STATVFS_F_MNTONNAME
 				struct statvfs s;
-				if(::statvfs(apLoc->mPath.c_str(), &s) != 0)
+				if(::statvfs(pLoc->mPath.c_str(), &s) != 0)
 #else // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				struct statfs s;
-				if(::statfs(apLoc->mPath.c_str(), &s) != 0)
+				if(::statfs(pLoc->mPath.c_str(), &s) != 0)
 #endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
-					BOX_LOG_SYS_WARNING("Failed to stat location "
-						"path '" << apLoc->mPath <<
-						"', skipping location '" <<
-						apLoc->mName << "'");
-					continue;
+					BOX_THROW_SYS_ERROR("Failed to stat "
+						"path '" << pLoc->mPath <<
+						"' for location '" <<
+						pLoc->mName << "'");
 				}
 
 				// Where the filesystem is mounted
@@ -2290,10 +2308,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 #else // !HAVE_STRUCT_STATFS_F_MNTONNAME && !WIN32
 
 				// Warn in logs if the directory isn't absolute
-				if(apLoc->mPath[0] != '/')
+				if(pLoc->mPath[0] != '/')
 				{
 					BOX_WARNING("Location path '"
-						<< apLoc->mPath 
+						<< pLoc->mPath 
 						<< "' is not absolute");
 				}
 				// Go through the mount points found, and find a suitable one
@@ -2308,7 +2326,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 						// If it matches, the file belongs in that mount point
 						// (sorting order ensures this)
 						BOX_TRACE("checking against mount point " << *i);
-						if(::strncmp(i->c_str(), apLoc->mPath.c_str(), i->size()) == 0)
+						if(::strncmp(i->c_str(), pLoc->mPath.c_str(), i->size()) == 0)
 						{
 							// Match
 							mountName = *i;
@@ -2316,7 +2334,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 						}
 					}
 					BOX_TRACE("mount point chosen for "
-						<< apLoc->mPath << " is "
+						<< pLoc->mPath << " is "
 						<< mountName);
 				}
 
@@ -2327,12 +2345,12 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				if(f != mounts.end())
 				{
 					// Yes -- store the index
-					apLoc->mIDMapIndex = f->second;
+					pLoc->mIDMapIndex = f->second;
 				}
 				else
 				{
 					// No -- new index
-					apLoc->mIDMapIndex = numIDMaps;
+					pLoc->mIDMapIndex = numIDMaps;
 					mounts[mountName] = numIDMaps;
 					
 					// Store the mount name
@@ -2352,7 +2370,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				BackupClientFileAttributes attr;
 				try
 				{
-					attr.ReadAttributes(apLoc->mPath.c_str(), 
+					attr.ReadAttributes(pLoc->mPath.c_str(), 
 						true /* directories have zero mod times */,
 						0 /* not interested in mod time */, 
 						&attrModTime /* get the attribute modification time */);
@@ -2360,10 +2378,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				catch (BoxException &e)
 				{
 					BOX_ERROR("Failed to get attributes "
-						"for path '" << apLoc->mPath
+						"for path '" << pLoc->mPath
 						<< "', skipping location '" <<
-						apLoc->mName << "'");
-					continue;
+						pLoc->mName << "'");
+					throw;
 				}
 				
 				// Execute create directory command
@@ -2381,40 +2399,64 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				catch (BoxException &e)
 				{
 					BOX_ERROR("Failed to create remote "
-						"directory '/" << apLoc->mName <<
+						"directory '/" << pLoc->mName <<
 						"', skipping location '" <<
-						apLoc->mName << "'");
-					continue;
+						pLoc->mName << "'");
+					throw;
 				}
 
 			}
 
 			// Create and store the directory object for the root of this location
 			ASSERT(oid != 0);
-			BackupClientDirectoryRecord *precord =
-				new BackupClientDirectoryRecord(oid, *pLocName);
-			apLoc->mpDirectoryRecord.reset(precord);
+			if(pLoc->mpDirectoryRecord.get() == NULL)
+			{
+				BackupClientDirectoryRecord *precord =
+					new BackupClientDirectoryRecord(oid, *pLocName);
+				pLoc->mpDirectoryRecord.reset(precord);
+			}
 			
+			// Remove it from the temporary list to avoid deletion
+			tmpLocations.remove(pLoc);
+
 			// Push it back on the vector of locations
-			mLocations.push_back(apLoc.release());
+			mLocations.push_back(pLoc);
+
+			if(apLoc.get() != NULL)
+			{
+				// Don't delete it now!
+				apLoc.release();
+			}
 		}
 		catch (std::exception &e)
 		{
 			BOX_ERROR("Failed to configure location '"
-				<< apLoc->mName << "' path '"
-				<< apLoc->mPath << "': " << e.what() <<
+				<< pLoc->mName << "' path '"
+				<< pLoc->mPath << "': " << e.what() <<
 				": please check for previous errors");
-			throw;
+			mReadErrorsOnFilesystemObjects = true;
 		}
 		catch(...)
 		{
 			BOX_ERROR("Failed to configure location '"
-				<< apLoc->mName << "' path '"
-				<< apLoc->mPath << "': please check for "
+				<< pLoc->mName << "' path '"
+				<< pLoc->mPath << "': please check for "
 				"previous errors");
-			throw;
+			mReadErrorsOnFilesystemObjects = true;
 		}
 	}
+
+	// Now remove any leftovers
+	for(BackupDaemon::Locations::iterator
+		i  = tmpLocations.begin();
+		i != tmpLocations.end(); i++)
+	{
+		BOX_INFO("Removing obsolete location from memory: " <<
+			(*i)->mName);
+		delete *i;
+	}
+
+	tmpLocations.clear();
 	
 	// Any entries in the root directory which need deleting?
 	if(dir.GetNumberOfEntries() > 0 &&
@@ -2688,7 +2730,7 @@ void BackupDaemon::DeleteIDMapVector(std::vector<BackupClientInodeToIDMap *> &rV
 bool BackupDaemon::FindLocationPathName(const std::string &rLocationName, std::string &rPathOut) const
 {
 	// Search for the location
-	for(std::vector<Location *>::const_iterator i(mLocations.begin()); i != mLocations.end(); ++i)
+	for(Locations::const_iterator i(mLocations.begin()); i != mLocations.end(); ++i)
 	{
 		if((*i)->mName == rLocationName)
 		{
@@ -3050,10 +3092,11 @@ bool BackupDaemon::SerializeStoreObjectInfo(box_time_t theLastSyncTime,
 		int64_t iCount = mLocations.size();
 		anArchive.Write(iCount);
 
-		for(int v = 0; v < iCount; v++)
+		for(Locations::const_iterator i = mLocations.begin();
+			i != mLocations.end(); i++)
 		{
-			ASSERT(mLocations[v]);
-			mLocations[v]->Serialize(anArchive);
+			ASSERT(*i);
+			(*i)->Serialize(anArchive);
 		}
 
 		//
