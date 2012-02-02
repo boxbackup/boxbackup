@@ -292,6 +292,7 @@ int main(int argc, char * const * argv)
 	}
 
 	Logging::SetGlobalLevel((Log::Level)logLevel);
+	Logging::FilterConsole((Log::Level)logLevel);
 
 	argc -= optind - 1;
 	argv += optind - 1;
