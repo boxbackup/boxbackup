@@ -87,6 +87,9 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 // --------------------------------------------------------------------------
 void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 {
+	BOX_TRACE("Starting housekeeping on account " <<
+		BOX_FORMAT_OBJECTID(mAccountID));
+
 	// Attempt to lock the account
 	std::string writeLockFilename;
 	StoreStructure::MakeWriteLockFilename(mStoreRoot, mStoreDiscSet,
@@ -355,6 +358,9 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Explicity release the lock (would happen automatically on 
 	// going out of scope, included for code clarity)
 	writeLock.ReleaseLock();
+
+	BOX_TRACE("Finished housekeeping on account " <<
+		BOX_FORMAT_OBJECTID(mAccountID));
 }
 
 
