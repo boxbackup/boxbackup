@@ -24,13 +24,13 @@ enum
 
 int BackupClientRestore(BackupProtocolClient &rConnection,
 	int64_t DirectoryID,
-	const char *RemoteDirectoryName,
-	const char *LocalDirectoryName,
-	bool PrintDots = false,
-	bool RestoreDeleted = false,
-	bool UndeleteAfterRestoreDeleted = false,
-	bool Resume = false,
-	bool ContinueAfterErrors = false);
+	const std::string& RemoteDirectoryName,
+	const std::string& LocalDirectoryName,
+	bool PrintDots,
+	bool RestoreDeleted,
+	bool UndeleteAfterRestoreDeleted,
+	bool Resume,
+	bool ContinueAfterErrors);
 
 #endif // BACKUPSCLIENTRESTORE__H
 
