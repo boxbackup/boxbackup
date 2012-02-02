@@ -583,20 +583,21 @@ void $protocol_base_class\::CheckReply(const std::string& requestCommand,
 		if(rReply.IsError(type, subType))
 		{
 			SetLastError(type, subType);
-			BOX_WARNING(requestCommand << " command failed: "
+			THROW_EXCEPTION_MESSAGE(ConnectionException,
+				Conn_Protocol_UnexpectedReply,
+				requestCommand << " command failed: "
 				"received error " <<
 				(($error_class&)rReply).GetMessage());
 		}
 		else
 		{
 			SetLastError(Protocol::UnknownError, Protocol::UnknownError);
-			BOX_WARNING(requestCommand << " command failed: "
+			THROW_EXCEPTION_MESSAGE(ConnectionException,
+				Conn_Protocol_UnexpectedReply,
+				requestCommand << " command failed: "
 				"received unexpected response type " <<
 				rReply.GetType());
 		}
-		
-		// Throw an exception
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnexpectedReply)
 	}
 }
 
