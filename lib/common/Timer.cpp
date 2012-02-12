@@ -335,7 +335,7 @@ void Timers::SignalHandler(int unused)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Timer::Timer(size_t timeoutSecs,
+//		Name:    Timer::Timer(size_t timeoutMillis,
 //			 const std::string& rName)
 //		Purpose: Standard timer constructor, takes a timeout in
 //			 seconds from now, and an optional name for
@@ -344,8 +344,8 @@ void Timers::SignalHandler(int unused)
 //
 // --------------------------------------------------------------------------
 
-Timer::Timer(size_t timeoutSecs, const std::string& rName)
-: mExpires(GetCurrentBoxTime() + SecondsToBoxTime(timeoutSecs)),
+Timer::Timer(size_t timeoutMillis, const std::string& rName)
+: mExpires(GetCurrentBoxTime() + MilliSecondsToBoxTime(timeoutMillis)),
   mExpired(false),
   mName(rName)
 #ifdef WIN32
@@ -353,26 +353,26 @@ Timer::Timer(size_t timeoutSecs, const std::string& rName)
 #endif
 {
 	#ifndef BOX_RELEASE_BUILD
-	if (timeoutSecs == 0)
+	if (timeoutMillis == 0)
 	{
-		BOX_TRACE(TIMER_ID "initialised for " << timeoutSecs << 
-			" secs, will not fire");
+		BOX_TRACE(TIMER_ID "initialised for " << timeoutMillis << 
+			" ms, will not fire");
 	}
 	else
 	{
-		BOX_TRACE(TIMER_ID "initialised for " << timeoutSecs <<
-			" secs, to fire at " << FormatTime(mExpires, false, true));
+		BOX_TRACE(TIMER_ID "initialised for " << timeoutMillis <<
+			" ms, to fire at " << FormatTime(mExpires, false, true));
 	}
 	#endif
 
-	if (timeoutSecs == 0)
+	if (timeoutMillis == 0)
 	{
 		mExpires = 0;
 	}
 	else
 	{
 		Timers::Add(*this);
-		Start(timeoutSecs * MICRO_SEC_IN_SEC_LL);
+		Start(timeoutMillis * 1000);
 	}
 }
 
@@ -408,7 +408,7 @@ void Timer::Start()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Timer::Start(int64_t delayInMicros)
+//		Name:    Timer::Start(int64_t timeoutMillis)
 //		Purpose: This internal function initialises an OS TimerQueue
 //			 timer on Windows, with a specified delay already
 //			 calculated to save us doing it again. Like
@@ -417,23 +417,21 @@ void Timer::Start()
 //
 // --------------------------------------------------------------------------
 
-void Timer::Start(int64_t delayInMicros)
+void Timer::Start(int64_t timeoutMillis)
 {
 #ifdef WIN32
 	// only call me once!
 	ASSERT(mTimerHandle == INVALID_HANDLE_VALUE);
 
-	int64_t delayInMillis = delayInMicros / 1000;
-
 	// Windows XP always seems to fire timers up to 20 ms late,
 	// at least on my test laptop. Not critical in practice, but our
 	// tests are precise enough that they will fail if we don't
 	// correct for it.
-	delayInMillis -= 20;
+	timeoutMillis -= 20;
 	
 	// Set a system timer to call our timer routine
 	if (CreateTimerQueueTimer(&mTimerHandle, NULL, TimerRoutine,
-		(PVOID)this, delayInMillis, 0, WT_EXECUTEINTIMERTHREAD)
+		(PVOID)this, timeoutMillis, 0, WT_EXECUTEINTIMERTHREAD)
 		== FALSE)
 	{
 		BOX_ERROR(TIMER_ID "failed to create timer: " <<
@@ -523,8 +521,8 @@ Timer::Timer(const Timer& rToCopy)
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
 			"to fire at " <<
-			(int)(mExpires / 1000000) << "." <<
-			(int)(mExpires % 1000000));
+			(int)(mExpires / MICRO_SEC_IN_SEC_LL) << "." <<
+			(int)(mExpires % MICRO_SEC_IN_SEC_LL));
 	}
 	#endif
 
@@ -564,8 +562,8 @@ Timer& Timer::operator=(const Timer& rToCopy)
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
 			"to fire at " <<
-			(int)(rToCopy.mExpires / 1000000) << "." <<
-			(int)(rToCopy.mExpires % 1000000));
+			(int)(rToCopy.mExpires / MICRO_SEC_IN_SEC_LL) << "." <<
+			(int)(rToCopy.mExpires % MICRO_SEC_IN_SEC_LL));
 	}
 	#endif
 

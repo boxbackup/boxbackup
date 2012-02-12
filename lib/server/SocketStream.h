@@ -51,7 +51,6 @@ public:
 	virtual bool GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut);
 
 protected:
-	tOSSocketHandle GetSocketHandle();
 	void MarkAsReadClosed() {mReadClosed = true;}
 	void MarkAsWriteClosed() {mWriteClosed = true;}
 
@@ -69,6 +68,11 @@ public:
 	off_t GetBytesWritten() const {return mBytesWritten;}
 	void ResetCounters() {mBytesRead = mBytesWritten = 0;}
 	bool IsOpened() { return mSocketHandle != INVALID_SOCKET_VALUE; }
+	
+	/**
+	 * Only for use by NiceSocketStream!
+	 */
+	tOSSocketHandle GetSocketHandle();
 };
 
 #endif // SOCKETSTREAM__H

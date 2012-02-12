@@ -28,6 +28,7 @@
 #include "autogen_BackupProtocol.h"
 #include "BackupStoreFile.h"
 #include "Logging.h"
+#include "TcpNice.h"
 
 #include "MemLeakFindOn.h"
 
@@ -49,15 +50,14 @@ BackupClientContext::BackupClientContext
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
 	std::string ExtendedLogFile,
-	ProgressNotifier& rProgressNotifier
+	ProgressNotifier& rProgressNotifier,
+	bool TcpNiceMode
 )
 	: mrResolver(rResolver),
 	  mrTLSContext(rTLSContext),
 	  mHostname(rHostname),
 	  mPort(Port),
 	  mAccountNumber(AccountNumber),
-	  mpSocket(0),
-	  mpConnection(0),
 	  mExtendedLogging(ExtendedLogging),
 	  mExtendedLogToFile(ExtendedLogToFile),
 	  mExtendedLogFile(ExtendedLogFile),
@@ -71,7 +71,8 @@ BackupClientContext::BackupClientContext
 	  mpExcludeDirs(0),
 	  mKeepAliveTimer(0, "KeepAliveTime"),
 	  mbIsManaged(false),
-	  mrProgressNotifier(rProgressNotifier)
+	  mrProgressNotifier(rProgressNotifier),
+	  mTcpNiceMode(TcpNiceMode)
 {
 }
 
@@ -107,40 +108,42 @@ BackupClientContext::~BackupClientContext()
 BackupProtocolClient &BackupClientContext::GetConnection()
 {
 	// Already got it? Just return it.
-	if(mpConnection != 0)
+	if(mapConnection.get())
 	{
-		return *mpConnection;
+		return *mapConnection;
 	}
 	
-	// Get a socket connection
-	if(mpSocket == 0)
-	{
-		mpSocket = new SocketStreamTLS;
-		ASSERT(mpSocket != 0);	// will have exceptioned if this was a problem
-	}
+	// there shouldn't be a connection open
+	ASSERT(mapSocket.get() == 0);
+	
+	SocketStreamTLS *pSocket = new SocketStreamTLS;
 	
 	try
 	{
 		// Defensive.
-		if(mpConnection != 0)
-		{
-			delete mpConnection;
-			mpConnection = 0;
-		}
+		mapConnection.reset();
 		
 		// Log intention
 		BOX_INFO("Opening connection to server '" <<
 			mHostname << "'...");
 
 		// Connect!
-		mpSocket->Open(mrTLSContext, Socket::TypeINET,
-			mHostname.c_str(), mPort);
+		pSocket->Open(mrTLSContext, Socket::TypeINET, mHostname.c_str(), mPort);
 		
-		// And create a procotol object
-		mpConnection = new BackupProtocolClient(*mpSocket);
+		if(mTcpNiceMode)
+		{
+			mapNice.reset(new NiceSocketStream(std::auto_ptr<SocketStream>(pSocket)));
+			mapConnection.reset(new BackupProtocolClient(*mapNice));
+		}
+		else
+		{
+			mapConnection.reset(new BackupProtocolClient(*pSocket));
+		}
+		
+		pSocket = NULL;
 		
 		// Set logging option
-		mpConnection->SetLogToSysLog(mExtendedLogging);
+		mapConnection->SetLogToSysLog(mExtendedLogging);
 		
 		if (mExtendedLogToFile)
 		{
@@ -156,16 +159,17 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			}
 			else
 			{
-				mpConnection->SetLogToFile(mpExtendedLogFileHandle);
+				mapConnection->SetLogToFile(mpExtendedLogFileHandle);
 			}
 		}
 		
 		// Handshake
-		mpConnection->Handshake();
+		mapConnection->Handshake();
 		
 		// Check the version of the server
 		{
-			std::auto_ptr<BackupProtocolVersion> serverVersion(mpConnection->QueryVersion(BACKUP_STORE_SERVER_VERSION));
+			std::auto_ptr<BackupProtocolVersion> serverVersion(
+				mapConnection->QueryVersion(BACKUP_STORE_SERVER_VERSION));
 			if(serverVersion->GetVersion() != BACKUP_STORE_SERVER_VERSION)
 			{
 				THROW_EXCEPTION(BackupStoreException, WrongServerVersion)
@@ -173,7 +177,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		}
 
 		// Login -- if this fails, the Protocol will exception
-		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(mpConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
+		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(
+			mapConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
 		
 		// Check that the client store marker is the one we expect
 		if(mClientStoreMarker != ClientStoreMarker_NotKnown)
@@ -183,9 +188,9 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				// Not good... finish the connection, abort, etc, ignoring errors
 				try
 				{
-					mpConnection->QueryFinished();
-					mpSocket->Shutdown();
-					mpSocket->Close();
+					mapConnection->QueryFinished();
+					mapSocket.reset();
+					mapNice.reset();
 				}
 				catch(...)
 				{
@@ -213,14 +218,13 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	catch(...)
 	{
 		// Clean up.
-		delete mpConnection;
-		mpConnection = 0;
-		delete mpSocket;
-		mpSocket = 0;
+		mapConnection.reset();
+		mapSocket.reset();
+		mapNice.reset();
 		throw;
 	}
 	
-	return *mpConnection;
+	return *mapConnection;
 }
 
 // --------------------------------------------------------------------------
@@ -233,7 +237,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 // --------------------------------------------------------------------------
 void BackupClientContext::CloseAnyOpenConnection()
 {
-	if(mpConnection)
+	if(mapConnection.get())
 	{
 		try
 		{
@@ -244,14 +248,14 @@ void BackupClientContext::CloseAnyOpenConnection()
 				box_time_t marker = GetCurrentBoxTime();
 				
 				// Set it on the store
-				mpConnection->QuerySetClientStoreMarker(marker);
+				mapConnection->QuerySetClientStoreMarker(marker);
 				
 				// Record it so that it can be picked up later.
 				mClientStoreMarker = marker;
 			}
 		
 			// Quit nicely
-			mpConnection->QueryFinished();
+			mapConnection->QueryFinished();
 		}
 		catch(...)
 		{
@@ -259,26 +263,18 @@ void BackupClientContext::CloseAnyOpenConnection()
 		}
 		
 		// Delete it anyway.
-		delete mpConnection;
-		mpConnection = 0;
+		mapConnection.reset();
 	}
-	
-	if(mpSocket)
+
+	try
 	{
-		try
-		{
-			// Be nice about closing the socket
-			mpSocket->Shutdown();
-			mpSocket->Close();
-		}
-		catch(...)
-		{
-			// Ignore errors
-		}
-		
-		// Delete object
-		delete mpSocket;
-		mpSocket = 0;
+		// Be nice about closing the socket
+		mapSocket.reset();
+		mapNice.reset();
+	}
+	catch(...)
+	{
+		// Ignore errors
 	}
 
 	// Delete any pending list
@@ -307,9 +303,9 @@ void BackupClientContext::CloseAnyOpenConnection()
 // --------------------------------------------------------------------------
 int BackupClientContext::GetTimeout() const
 {
-	if(mpConnection)
+	if(mapConnection.get())
 	{
-		return mpConnection->GetTimeout();
+		return mapConnection->GetTimeout();
 	}
 	
 	return (15*60*1000);
@@ -509,7 +505,7 @@ void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
 	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
 	BOX_TRACE("Set keep-alive time to " << mKeepAliveTime << " seconds");
-	mKeepAliveTimer = Timer(mKeepAliveTime, "KeepAliveTime");
+	mKeepAliveTimer = Timer(mKeepAliveTime * 1000, "KeepAliveTime");
 }
 
 // --------------------------------------------------------------------------
@@ -551,7 +547,7 @@ void BackupClientContext::UnManageDiffProcess()
 // --------------------------------------------------------------------------
 void BackupClientContext::DoKeepAlive()
 {
-	if (!mpConnection)
+	if (!mapConnection.get())
 	{
 		return;
 	}
@@ -567,9 +563,9 @@ void BackupClientContext::DoKeepAlive()
 	}
 	
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
-	mpConnection->QueryGetIsAlive();
+	mapConnection->QueryGetIsAlive();
 	
-	mKeepAliveTimer = Timer(mKeepAliveTime, "KeepAliveTime");
+	mKeepAliveTimer = Timer(mKeepAliveTime * 1000, "KeepAliveTime");
 }
 
 int BackupClientContext::GetMaximumDiffingTime() 
