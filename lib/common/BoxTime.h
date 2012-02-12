@@ -27,6 +27,10 @@ inline box_time_t SecondsToBoxTime(time_t Seconds)
 {
 	return ((box_time_t)Seconds * MICRO_SEC_IN_SEC_LL);
 }
+inline uint64_t MilliSecondsToBoxTime(int64_t milliseconds)
+{
+	return ((box_time_t)milliseconds * 1000);
+}
 inline time_t BoxTimeToSeconds(box_time_t Time)
 {
 	return Time / MICRO_SEC_IN_SEC_LL;

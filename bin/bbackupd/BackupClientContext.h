@@ -16,6 +16,7 @@
 #include "BackupDaemonInterface.h"
 #include "BackupStoreFile.h"
 #include "ExcludeList.h"
+#include "TcpNice.h"
 #include "Timer.h"
 
 class TLSContext;
@@ -49,7 +50,8 @@ public:
 		bool ExtendedLogging,
 		bool ExtendedLogToFile,
 		std::string ExtendedLogFile,
-		ProgressNotifier &rProgressNotifier
+		ProgressNotifier &rProgressNotifier,
+		bool TcpNiceMode
 	);
 	virtual ~BackupClientContext();
 private:
@@ -207,6 +209,14 @@ public:
 	{ 
 		return mrProgressNotifier;
 	}
+	
+	void SetNiceMode(bool enabled)
+	{
+		if(mTcpNiceMode)
+		{
+			mapNice->SetEnabled(enabled);
+		}
+	}
 
 private:
 	LocationResolver &mrResolver;
@@ -214,8 +224,9 @@ private:
 	std::string mHostname;
 	int mPort;
 	uint32_t mAccountNumber;
-	SocketStreamTLS *mpSocket;
-	BackupProtocolClient *mpConnection;
+	std::auto_ptr<IOStream> mapSocket;
+	std::auto_ptr<NiceSocketStream> mapNice;
+	std::auto_ptr<BackupProtocolClient> mapConnection;
 	bool mExtendedLogging;
 	bool mExtendedLogToFile;
 	std::string mExtendedLogFile;
@@ -232,6 +243,7 @@ private:
 	int mKeepAliveTime;
 	int mMaximumDiffingTime;
 	ProgressNotifier &mrProgressNotifier;
+	bool mTcpNiceMode;
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

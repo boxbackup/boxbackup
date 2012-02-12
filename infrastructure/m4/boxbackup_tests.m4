@@ -131,7 +131,7 @@ AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h process.h pwd.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
-AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
 AC_CHECK_HEADERS([sys/file.h sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
 AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 AC_CHECK_HEADERS([bsd/unistd.h])
@@ -193,10 +193,14 @@ AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   ]])
 AC_CHECK_MEMBERS([DIR.d_fd],,,  [[#include <dirent.h>]])
 AC_CHECK_MEMBERS([DIR.dd_fd],,, [[#include <dirent.h>]])
+AC_CHECK_MEMBERS([struct tcp_info.tcpi_rtt],,, [[#include <netinet/tcp.h>]])
 
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
+AC_CHECK_DECLS([SO_SNDBUF],,, [[#include <asm/socket.h>]])
 AC_CHECK_DECLS([O_BINARY],,,)
+AC_CHECK_DECLS([SOL_TCP],,, [[#include <netinet/tcp.h>]])
+AC_CHECK_DECLS([TCP_INFO],,, [[#include <netinet/tcp.h>]])
 
 # Solaris provides getpeerucred() instead of getpeereid() or SO_PEERCRED
 AC_CHECK_HEADERS([ucred.h])

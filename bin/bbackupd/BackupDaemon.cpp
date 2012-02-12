@@ -844,7 +844,9 @@ void BackupDaemon::RunSyncNow()
 		conf.GetKeyValueUint32("AccountNumber"), 
 		conf.GetKeyValueBool("ExtendedLogging"),
 		conf.KeyExists("ExtendedLogFile"),
-		extendedLogFile, *mpProgressNotifier
+		extendedLogFile,
+		*mpProgressNotifier,
+		conf.GetKeyValueBool("TcpNice")
 	);
 		
 	// The minimum age a file needs to be before it will be

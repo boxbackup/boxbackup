@@ -469,7 +469,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 
 	if(pDiffTimer && pDiffTimer->IsManaged())
 	{
-		maximumDiffingTime = Timer(pDiffTimer->GetMaximumDiffingTime(),
+		maximumDiffingTime = Timer(pDiffTimer->GetMaximumDiffingTime() * 1000,
 			"MaximumDiffingTime");
 	}
 	

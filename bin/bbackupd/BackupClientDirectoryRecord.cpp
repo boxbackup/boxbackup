@@ -1671,6 +1671,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 						&isCompletelyDifferent));
 	
 				rContext.UnManageDiffProcess();
+				rContext.SetNiceMode(true);
 
 				RateLimitingStream rateLimit(*patchStream,
 					rParams.mMaxUploadRate);
@@ -1690,6 +1691,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 				//
 				std::auto_ptr<BackupProtocolSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
 						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *pStreamToUpload));
+
+				rContext.SetNiceMode(false);
 				
 				// Get object ID from the result		
 				objID = stored->GetObjectID();
@@ -1715,6 +1718,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					&rParams,
 					&(rParams.mrRunStatusProvider)));
 
+			rContext.SetNiceMode(true);
+
 			RateLimitingStream rateLimit(*upload,
 				rParams.mMaxUploadRate);
 			IOStream* pStreamToUpload;
@@ -1735,6 +1740,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					AttributesHash, 
 					0 /* no diff from file ID */, 
 					rStoreFilename, *pStreamToUpload));
+
+			rContext.SetNiceMode(false);
 	
 			// Get object ID from the result		
 			objID = stored->GetObjectID();

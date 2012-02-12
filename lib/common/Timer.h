@@ -53,7 +53,7 @@ class Timers
 class Timer
 {
 public:
-	Timer(size_t timeoutSecs, const std::string& rName = "");
+	Timer(size_t timeoutMillis, const std::string& rName = "");
 	virtual ~Timer();
 	Timer(const Timer &);
 	Timer &operator=(const Timer &);
@@ -74,7 +74,7 @@ private:
 	std::string mName;
 
 	void Start();
-	void Start(int64_t delayInMicros);
+	void Start(int64_t timeoutMillis);
 	void Stop();
 
 	#ifdef WIN32

@@ -117,6 +117,9 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("MaxUploadRate", ConfigTest_IsInt),
 	// optional maximum speed of uploads in kbytes per second
 
+	ConfigurationVerifyKey("TcpNice", ConfigTest_IsBool, false),
+	// optional enable of tcp nice/background mode
+
 	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists),
