@@ -35,7 +35,10 @@ TcpNice::TcpNice()
   mGammaPercent(100),
   mAlphaStar(100),
   mDeltaPercent(10)
-{ }
+{
+	mRateEstimateMovingAverage[0] = 0;
+	mRateEstimateMovingAverage[1] = 0;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -67,6 +70,18 @@ int TcpNice::GetNextWindowSize(int bytesChange, box_time_t timeElapsed,
 		(((100 - mDeltaPercent) * mRateEstimateMovingAverage[1]) / 100) +
 		((mDeltaPercent * rateLastPeriod) / 100);
 	
+	/*
+	 * b is the number of bytes sent during the previous control period
+	 * T is the length (in us) of the previous control period
+	 * rtt is the round trip time (in us) reported by the kernel on the socket 
+	 * e is epsilon, a parameter of the formula, calculated as alpha/rtt
+	 * rb is the actual rate (goodput) over the previous period
+	 * rbhat is the previous (last-but-one) EWMA rate estimate
+	 * raw is the unscaled adjustment to the window size
+	 * gamma is the scaled adjustment to the window size
+	 * wb is the final window size
+	 */
+
 	BOX_TRACE("TcpNice: "
 		"b=" << bytesChange << ", "
 		"T=" << timeElapsed << ", "
