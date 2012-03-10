@@ -3915,6 +3915,19 @@ int test_bbackupd()
 
 int test(int argc, const char *argv[])
 {
+	{
+		BackupDaemon daemon;
+
+		TEST_EQUAL(1234, daemon.ParseSyncAllowScriptOutput("test", "1234"));
+		TEST_EQUAL(0, daemon.GetMaxBandwidthFromSyncAllowScript());
+
+		TEST_EQUAL(1234, daemon.ParseSyncAllowScriptOutput("test", "1234 5"));
+		TEST_EQUAL(5, daemon.GetMaxBandwidthFromSyncAllowScript());
+
+		TEST_EQUAL(-1, daemon.ParseSyncAllowScriptOutput("test", "now"));
+		TEST_EQUAL(0, daemon.GetMaxBandwidthFromSyncAllowScript());
+	}
+
 	// SSL library
 	SSLLib::Initialise();
 

@@ -157,6 +157,8 @@ private:
 	int UseScriptToSeeIfSyncAllowed();
 
 public:
+	int ParseSyncAllowScriptOutput(const std::string& script,
+		const std::string& output);
 	typedef std::list<Location *> Locations;
 	Locations GetLocations() { return mLocations; }
 	
@@ -210,8 +212,10 @@ private:
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
 	int64_t mNumFilesUploaded, mNumDirsCreated;
+	int mMaxBandwidthFromSyncAllowScript;
 
 public:
+	int GetMaxBandwidthFromSyncAllowScript() { return mMaxBandwidthFromSyncAllowScript; }
  	bool StopRun() { return this->Daemon::StopRun(); }
 	bool StorageLimitExceeded() { return mStorageLimitExceeded; }
  
