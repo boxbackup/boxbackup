@@ -41,6 +41,7 @@
 
 #include <iostream>
 #include <set>
+#include <sstream>
 
 #include "Configuration.h"
 #include "IOStream.h"
@@ -196,6 +197,7 @@ BackupDaemon::BackupDaemon()
 	  mDoSyncForcedByPreviousSyncError(false),
 	  mNumFilesUploaded(-1),
 	  mNumDirsCreated(-1),
+	  mMaxBandwidthFromSyncAllowScript(0),
 	  mLogAllFileAccess(false),
 	  mpProgressNotifier(this),
 	  mpLocationResolver(this),
@@ -936,6 +938,11 @@ void BackupDaemon::RunSyncNow()
 	if(conf.KeyExists("MaxUploadRate"))
 	{
 		params.mMaxUploadRate = conf.GetKeyValueInt("MaxUploadRate");
+	}
+
+	if(mMaxBandwidthFromSyncAllowScript != 0)
+	{
+		params.mMaxUploadRate = mMaxBandwidthFromSyncAllowScript;
 	}
 
 	mDeleteRedundantLocationsAfter =
@@ -1719,33 +1726,14 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 		std::string line;
 		if(getLine.GetLine(line, true, 30000)) // 30 seconds should be enough
 		{
-			// Got a string, interpret
-			if(line == "now")
-			{
-				// Script says do it now. Obey.
-				waitInSeconds = -1;
-			}
-			else
-			{
-				try
-				{
-					// How many seconds to wait?
-					waitInSeconds = BoxConvert::Convert<int32_t, const std::string&>(line);
-				}
-				catch(ConversionException &e)
-				{
-					BOX_ERROR("Invalid output from "
-						"SyncAllowScript: '" <<
-						line << "' (" << script << ")");
-					throw;
-				}
-
-				BOX_NOTICE("Delaying sync by " << waitInSeconds
-					<< " seconds due to SyncAllowScript "
-					<< "(" << script << ")");
-			}
+			waitInSeconds = BackupDaemon::ParseSyncAllowScriptOutput(script, line);
 		}
-		
+		else
+		{
+			BOX_ERROR("SyncAllowScript output nothing within "
+				"30 seconds, waiting 5 minutes to try again"
+				" (" << script << ")");
+		}
 	}
 	catch(std::exception &e)
 	{
@@ -1770,6 +1758,83 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	return waitInSeconds;
 }
 
+int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
+	const std::string& output)
+{
+	int waitInSeconds = (60*5);
+	std::istringstream iss(output);
+
+	std::string delay;
+	iss >> delay;
+
+	if(delay == "")
+	{
+		BOX_ERROR("SyncAllowScript output an empty line");
+		return waitInSeconds;
+	}
+
+	// Got a string, interpret
+	if(delay == "now")
+	{
+		// Script says do it now. Obey.
+		waitInSeconds = -1;
+
+		BOX_NOTICE("SyncAllowScript requested a backup now "
+			<< "(" << script << ")");
+	}
+	else
+	{
+		try
+		{
+			// How many seconds to wait?
+			waitInSeconds = BoxConvert::Convert<int32_t, const std::string&>(delay);
+		}
+		catch(ConversionException &e)
+		{
+			BOX_ERROR("SyncAllowScript output an invalid "
+				"number: '" << output << "' (" <<
+				script << ")");
+			throw;
+		}
+
+		BOX_NOTICE("SyncAllowScript requested a delay of " << 
+			waitInSeconds << " seconds due to SyncAllowScript "
+			<< "(" << script << ")");
+	}
+
+	if(iss.eof())
+	{
+		// No bandwidth limit requested
+		mMaxBandwidthFromSyncAllowScript = 0;
+		BOX_NOTICE("SyncAllowScript did not set a maximum bandwidth "
+			"(" << script << ")");
+	}
+	else
+	{
+		std::string maxBandwidth;
+		iss >> maxBandwidth;
+
+		try
+		{
+			// How many seconds to wait?
+			mMaxBandwidthFromSyncAllowScript =
+				BoxConvert::Convert<int32_t, const std::string&>(maxBandwidth);
+		}
+		catch(ConversionException &e)
+		{
+			BOX_ERROR("Invalid maximum bandwidth from "
+				"SyncAllowScript: '" <<
+				output << "' (" << script << ")");
+			throw;
+		}
+
+		BOX_NOTICE("SyncAllowScript set maximum bandwidth to " <<
+			mMaxBandwidthFromSyncAllowScript << " kB/s (" <<
+			script << ")");
+	}
+
+	return waitInSeconds;
+}
 
 
 // --------------------------------------------------------------------------
