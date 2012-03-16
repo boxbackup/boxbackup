@@ -135,7 +135,8 @@ AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
 AC_CHECK_HEADERS([sys/file.h sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
 AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
 AC_CHECK_HEADERS([bsd/unistd.h])
-
+AC_CHECK_HEADERS([sys/socket.h], [have_sys_socket_h=yes])
+AC_CHECK_HEADERS([winsock2.h], [have_winsock2_h=yes])
 AC_CHECK_HEADERS([execinfo.h], [have_execinfo_h=yes])
 
 if test "$have_execinfo_h" = "yes"; then
@@ -197,10 +198,19 @@ AC_CHECK_MEMBERS([struct tcp_info.tcpi_rtt],,, [[#include <netinet/tcp.h>]])
 
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
-AC_CHECK_DECLS([SO_SNDBUF],,, [[#include <asm/socket.h>]])
 AC_CHECK_DECLS([O_BINARY],,,)
 AC_CHECK_DECLS([SOL_TCP],,, [[#include <netinet/tcp.h>]])
 AC_CHECK_DECLS([TCP_INFO],,, [[#include <netinet/tcp.h>]])
+
+if test -n "$have_sys_socket_h"; then
+  AC_CHECK_DECLS([SO_SNDBUF],,, [[#include <sys/socket.h>]])
+elif test -n "$have_winsock2_h"; then
+  AC_CHECK_DECLS([SO_SNDBUF],,, [[#include <winsock2.h>]])
+else
+  # unlikely to succeed, but defined HAVE_DECL_SO_SNDBUF to 0 instead
+  # of leaving it undefined, which makes cpp #ifdefs simpler.
+  AC_CHECK_DECLS([SO_SNDBUF])
+fi
 
 # Solaris provides getpeerucred() instead of getpeereid() or SO_PEERCRED
 AC_CHECK_HEADERS([ucred.h])
