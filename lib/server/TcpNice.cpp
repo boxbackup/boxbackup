@@ -20,6 +20,14 @@
 #	include <netinet/tcp.h>
 #endif
 
+#ifdef HAVE_WINSOCK2_H
+#	include <winsock2.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+#	include <sys/socket.h>
+#endif
+
 #include "MemLeakFindOn.h"
 
 // --------------------------------------------------------------------------
@@ -130,16 +138,16 @@ NiceSocketStream::NiceSocketStream(std::auto_ptr<SocketStream> apSocket)
 // --------------------------------------------------------------------------
 void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 {
-#ifdef HAVE_DECL_SO_SNDBUF
+#if HAVE_DECL_SO_SNDBUF && HAVE_DECL_TCP_INFO
 	if(mEnabled && mapTimer.get() && mapTimer->HasExpired())
 	{
 		box_time_t newPeriodStart = GetCurrentBoxTime();
 		box_time_t elapsed = newPeriodStart - mPeriodStartTime;
-		struct tcp_info info;
 		int socket = mapSocket->GetSocketHandle();
 		int rtt = 50; // WAG
 
-#	if defined HAVE_DECL_SOL_TCP && defined HAVE_DECL_TCP_INFO && defined HAVE_STRUCT_TCP_INFO_TCPI_RTT
+#	if HAVE_DECL_SOL_TCP && HAVE_DECL_TCP_INFO && HAVE_STRUCT_TCP_INFO_TCPI_RTT
+		struct tcp_info info;
 		socklen_t optlen = sizeof(info);
 		if(getsockopt(socket, SOL_TCP, TCP_INFO, &info, &optlen) == -1)
 		{
@@ -205,10 +213,18 @@ void NiceSocketStream::SetEnabled(bool enabled)
 	if(!enabled)
 	{
 		StopTimer();
-#ifdef HAVE_DECL_SO_SNDBUF
+#if HAVE_DECL_SO_SNDBUF
 		int socket = mapSocket->GetSocketHandle();
 		int newWindow = 1<<17;
-		if(setsockopt(socket, SOL_SOCKET, SO_SNDBUF, &newWindow,
+		if(setsockopt(socket, SOL_SOCKET, SO_SNDBUF, 
+#	ifdef WIN32
+			// optval is a const char * on Windows, even
+			// though the argument is a boolean or integer,
+			// for reasons best known to Microsoft!
+			(const char *)&newWindow,
+#	else
+			&newWindow,
+#	endif
 			sizeof(newWindow)) == -1)
 		{
 			BOX_LOG_SYS_WARNING("getsockopt(" << socket << ", SOL_SOCKET, "
