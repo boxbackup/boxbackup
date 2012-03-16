@@ -2366,7 +2366,8 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 					THROW_SYS_ERROR("Failed to stat path "
 						"'" << pLoc->mPath << "' "
 						"for location "
-						"'" << pLoc->mName << "'");
+						"'" << pLoc->mName << "'",
+						CommonException, OSFileError);
 				}
 
 				// Where the filesystem is mounted
