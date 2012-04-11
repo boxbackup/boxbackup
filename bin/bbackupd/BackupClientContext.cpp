@@ -115,8 +115,9 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	
 	// there shouldn't be a connection open
 	ASSERT(mapSocket.get() == 0);
-	
-	SocketStreamTLS *pSocket = new SocketStreamTLS;
+	// Defensive. Must close connection before releasing any old socket.
+	mapConnection.reset();
+	mapSocket.reset(new SocketStreamTLS);
 	
 	try
 	{
@@ -128,19 +129,20 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			mHostname << "'...");
 
 		// Connect!
-		pSocket->Open(mrTLSContext, Socket::TypeINET, mHostname.c_str(), mPort);
+		((SocketStreamTLS *)(mapSocket.get()))->Open(mrTLSContext,
+			Socket::TypeINET, mHostname, mPort);
 		
 		if(mTcpNiceMode)
 		{
-			mapNice.reset(new NiceSocketStream(std::auto_ptr<SocketStream>(pSocket)));
+			// Pass control of mapSocket to NiceSocketStream,
+			// which will take care of destroying it for us.
+			mapNice.reset(new NiceSocketStream(mapSocket));
 			mapConnection.reset(new BackupProtocolClient(*mapNice));
 		}
 		else
 		{
-			mapConnection.reset(new BackupProtocolClient(*pSocket));
+			mapConnection.reset(new BackupProtocolClient(*mapSocket));
 		}
-		
-		pSocket = NULL;
 		
 		// Set logging option
 		mapConnection->SetLogToSysLog(mExtendedLogging);
@@ -189,8 +191,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				try
 				{
 					mapConnection->QueryFinished();
-					mapSocket.reset();
 					mapNice.reset();
+					mapSocket.reset();
 				}
 				catch(...)
 				{
@@ -219,8 +221,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	{
 		// Clean up.
 		mapConnection.reset();
-		mapSocket.reset();
 		mapNice.reset();
+		mapSocket.reset();
 		throw;
 	}
 	
@@ -269,8 +271,8 @@ void BackupClientContext::CloseAnyOpenConnection()
 	try
 	{
 		// Be nice about closing the socket
-		mapSocket.reset();
 		mapNice.reset();
+		mapSocket.reset();
 	}
 	catch(...)
 	{
