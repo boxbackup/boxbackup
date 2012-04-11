@@ -168,6 +168,11 @@ private:
 		BackupStoreDirectory* pDirOnStore,
 		BackupStoreDirectory::Entry* pEntry,
 		const std::string &rFilename);
+	std::string DecryptFilename(BackupStoreDirectory::Entry *en,
+		const std::string& rRemoteDirectoryPath);
+	std::string DecryptFilename(BackupStoreFilenameClear fn,
+		int64_t filenameObjectID,
+		const std::string& rRemoteDirectoryPath);
 
 	int64_t 	mObjectID;
 	std::string 	mSubDirName;

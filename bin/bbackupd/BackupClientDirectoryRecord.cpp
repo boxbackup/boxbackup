@@ -731,6 +731,33 @@ void BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::
 	}
 }
 
+std::string BackupClientDirectoryRecord::DecryptFilename(
+	BackupStoreDirectory::Entry *en,
+	const std::string& rRemoteDirectoryPath)
+{
+	BackupStoreFilenameClear fn(en->GetName());
+	return DecryptFilename(fn, en->GetObjectID(), rRemoteDirectoryPath);
+}
+
+std::string BackupClientDirectoryRecord::DecryptFilename(
+	BackupStoreFilenameClear fn, int64_t filenameObjectID,
+	const std::string& rRemoteDirectoryPath)
+{
+	std::string filenameClear;
+	try
+	{
+		filenameClear = fn.GetClearFilename();
+	}
+	catch(BoxException &e)
+	{
+		BOX_ERROR("Failed to decrypt filename for object " << 
+			BOX_FORMAT_OBJECTID(filenameObjectID) << " in "
+			"directory " << BOX_FORMAT_OBJECTID(mObjectID) <<
+			" (" << rRemoteDirectoryPath << ")");
+		throw;
+	}
+	return filenameClear;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -770,7 +797,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next()) != 0)
 		{
-			decryptedEntries[BackupStoreFilenameClear(en->GetName()).GetClearFilename()] = en;
+			std::string filenameClear = DecryptFilename(en,
+				rRemotePath);
+			decryptedEntries[filenameClear] = en;
 		}
 	}
 
@@ -1301,8 +1330,11 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// Get rid of it.
 			BackupProtocolClient &connection(rContext.GetConnection());
 			connection.QueryDeleteFile(mObjectID /* in directory */, storeFilename);
+
+			std::string filenameClear = DecryptFilename(en,
+				rRemotePath);
 			rNotifier.NotifyFileDeleted(en->GetObjectID(),
-				storeFilename.GetClearFilename());
+				filenameClear);
 			
 			// Nothing found
 			en = 0;
@@ -1445,14 +1477,19 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// Create a new directory
 					std::auto_ptr<BackupProtocolSuccess> dirCreate(
 						connection.QueryCreateDirectory(
-							mObjectID, attrModTime, storeFilename, 
-							attrStream));
+							mObjectID, attrModTime,
+							storeFilename, attrStream));
 					subDirObjectID = dirCreate->GetObjectID(); 
 					
 					// Flag as having done this for optimisation later
 					haveJustCreatedDirOnServer = true;
-					rNotifier.NotifyDirectoryCreated(subDirObjectID,
-						storeFilename.GetClearFilename(),
+
+					std::string filenameClear = 
+						DecryptFilename(storeFilename,
+							subDirObjectID, 
+							rRemotePath);
+					rNotifier.NotifyDirectoryCreated(
+						subDirObjectID, filenameClear,
 						nonVssDirPath);
 				}
 			}
@@ -1514,9 +1551,11 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// aren't actually deleted, as the whole state will be reset anyway.
 			BackupClientDeleteList &rdel(rContext.GetDeleteList());
 
-			BackupStoreFilenameClear clear(en->GetName());
+			std::string filenameClear = DecryptFilename(en,
+				rRemotePath);
+
 			std::string localName = MakeFullPath(rLocalPath,
-				clear.GetClearFilename());
+				filenameClear);
 			std::string nonVssLocalName = ConvertVssPathToRealPath(localName,
 				rBackupLocation);
 			
@@ -1536,7 +1575,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				// If there's a directory record for it in 
 				// the sub directory map, delete it now
 				BackupStoreFilenameClear dirname(en->GetName());
-				std::map<std::string, BackupClientDirectoryRecord *>::iterator e(mSubDirectories.find(dirname.GetClearFilename()));
+				std::map<std::string, BackupClientDirectoryRecord *>::iterator
+					e(mSubDirectories.find(filenameClear));
 				if(e != mSubDirectories.end())
 				{
 					// Carefully delete the entry from the map
