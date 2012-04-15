@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_CipherException.h"
 #include "autogen_ClientException.h"
 #include "Archive.h"
 #include "BackupClientContext.h"
@@ -797,9 +798,19 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next()) != 0)
 		{
-			std::string filenameClear = DecryptFilename(en,
-				rRemotePath);
-			decryptedEntries[filenameClear] = en;
+			std::string filenameClear;
+			try
+			{
+ 				filenameClear = DecryptFilename(en,
+					rRemotePath);
+				decryptedEntries[filenameClear] = en;
+			}
+			catch (CipherException &e)
+			{
+				BOX_ERROR("Failed to decrypt a filename, "
+					"pretending that the file doesn't "
+					"exist");
+			}
 		}
 	}
 
@@ -820,7 +831,6 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		uint64_t attributesHash = 0;
 		int64_t fileSize = 0;
 		InodeRefType inodeNum = 0;
-		bool hasMultipleHardLinks = true;
 		// BLOCK
 		{
 			// Stat the file
@@ -842,7 +852,6 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			modTime = FileModificationTime(st);
 			fileSize = st.st_size;
 			inodeNum = st.st_ino;
-			hasMultipleHardLinks = (st.st_nlink > 1);
 			attributesHash = BackupClientFileAttributes::GenerateAttributeHash(st, filename, *f);
 		}
 
@@ -861,7 +870,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		}
 
 		// Check that the entry which might have been found is in fact a file
-		if((en != 0) && ((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) == 0))
+		if((en != 0) && !(en->IsFile()))
 		{
 			// Directory exists in the place of this file -- sort it out
 			RemoveDirectoryInPlaceOfFile(rParams, pDirOnStore,
@@ -1324,7 +1333,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		}
 		
 		// Check that the entry which might have been found is in fact a directory
-		if((en != 0) && ((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == 0))
+		if((en != 0) && !(en->IsDir()))
 		{
 			// Entry exists, but is not a directory. Bad.
 			// Get rid of it.
@@ -1550,9 +1559,21 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// If there's an error during the process, it doesn't matter if things
 			// aren't actually deleted, as the whole state will be reset anyway.
 			BackupClientDeleteList &rdel(rContext.GetDeleteList());
+			std::string filenameClear;
+			bool isCorruptFilename = false;
 
-			std::string filenameClear = DecryptFilename(en,
-				rRemotePath);
+			try
+			{
+				filenameClear = DecryptFilename(en,
+					rRemotePath);
+			}
+			catch (CipherException &e)
+			{
+				BOX_ERROR("Failed to decrypt a filename, "
+					"scheduling that file for deletion");
+				filenameClear = "<corrupt filename>";
+				isCorruptFilename = true;
+			}
 
 			std::string localName = MakeFullPath(rLocalPath,
 				filenameClear);
@@ -1577,7 +1598,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				BackupStoreFilenameClear dirname(en->GetName());
 				std::map<std::string, BackupClientDirectoryRecord *>::iterator
 					e(mSubDirectories.find(filenameClear));
-				if(e != mSubDirectories.end())
+				if(e != mSubDirectories.end() && !isCorruptFilename)
 				{
 					// Carefully delete the entry from the map
 					BackupClientDirectoryRecord *rec = e->second;
