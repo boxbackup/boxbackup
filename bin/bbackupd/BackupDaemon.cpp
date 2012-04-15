@@ -513,7 +513,7 @@ void BackupDaemon::InitCrypto()
 		keyFile.c_str(), caFile.c_str());
 	
 	// Set up the keys for various things
-	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
+	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile"));
 }
 
 // --------------------------------------------------------------------------
