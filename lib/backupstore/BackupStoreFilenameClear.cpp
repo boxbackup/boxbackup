@@ -17,13 +17,9 @@
 
 #include "MemLeakFindOn.h"
 
-// Hide private variables from the rest of the world
-namespace
-{
-	int sEncodeMethod = BackupStoreFilename::Encoding_Clear;
-	CipherContext sBlowfishEncrypt;
-	CipherContext sBlowfishDecrypt;
-}
+int BackupStoreFilenameClear::sEncodeMethod = BackupStoreFilename::Encoding_Clear;
+CipherContext BackupStoreFilenameClear::sBlowfishEncrypt;
+CipherContext BackupStoreFilenameClear::sBlowfishDecrypt;
 
 // --------------------------------------------------------------------------
 //
