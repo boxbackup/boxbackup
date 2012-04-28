@@ -721,12 +721,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 			DeleteCorruptBerkelyDbFiles();
 		}
 
-		// Clear state data
-		// Go back to beginning of time
-		mLastSyncTime = 0;
-		mClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;	// no store marker, so download everything
-		DeleteAllLocations();
-		DeleteAllIDMaps();
+		ResetCachedState();
 
 		// Handle restart?
 		if(StopRun())
@@ -787,6 +782,16 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 	mDoSyncForcedByPreviousSyncError = errorOccurred;
 
 	OnBackupFinish();
+}
+
+void BackupDaemon::ResetCachedState()
+{
+	// Clear state data
+	// Go back to beginning of time
+	mLastSyncTime = 0;
+	mClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;	// no store marker, so download everything
+	DeleteAllLocations();
+	DeleteAllIDMaps();
 }
 
 void BackupDaemon::RunSyncNow()
