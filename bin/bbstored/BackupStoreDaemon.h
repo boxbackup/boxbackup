@@ -69,6 +69,7 @@ protected:
 public:
 	// HousekeepingInterface implementation
 	virtual bool CheckForInterProcessMsg(int AccountNum = 0, int MaximumWaitTime = 0);
+	void RunHousekeepingIfNeeded();
 
 private:
 	BackupStoreAccountDatabase *mpAccountDatabase;
@@ -83,7 +84,6 @@ private:
 
 	virtual void OnIdle();
 	void HousekeepingInit();
-	void RunHousekeepingIfNeeded();
 	int64_t mLastHousekeepingRun;
 
 public:
