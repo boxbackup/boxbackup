@@ -469,12 +469,28 @@ __E
 	print CPP <<__E;
 void $cmd_class\::LogSysLog(const char *Action) const
 {
-	BOX_TRACE($log);
+	try
+	{
+		BOX_TRACE($log);
+	}
+	catch(std::exception &e)
+	{
+		BOX_WARNING("Failed to log command: " << Action << ": " <<
+			e.what());
+	}
 }
 void $cmd_class\::LogFile(const char *Action, FILE *File) const
 {
 	std::ostringstream oss;
-	oss << $log;
+	try
+	{
+		oss << $log;
+	}
+	catch(std::exception &e)
+	{
+		oss << "Failed to log command: " << Action << ": " <<
+			e.what();
+	}
 	::fprintf(File, "%s\\n", oss.str().c_str());
 	::fflush(File);
 }
