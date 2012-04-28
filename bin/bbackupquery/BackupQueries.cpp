@@ -50,6 +50,7 @@
 #include "SelfFlushingStream.h"
 #include "Utils.h"
 #include "autogen_BackupProtocol.h"
+#include "autogen_CipherException.h"
 
 #include "MemLeakFindOn.h"
 
@@ -355,7 +356,8 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool *opts, bool FirstLevel)
+void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
+	const bool *opts, bool FirstLevel, std::ostream &out)
 {
 	// Generate exclude flags
 	int16_t excludeFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
@@ -366,11 +368,11 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 	try
 	{
 		mrConnection.QueryListDirectory(
-				DirID,
-				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-				// both files and directories
-				excludeFlags,
-				true /* want attributes */);
+			DirID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			// both files and directories
+			excludeFlags,
+			true /* want attributes */);
 	}
 	catch (std::exception &e)
 	{
@@ -384,7 +386,6 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
-
 
 	// Retrieve the directory from the stream following
 	BackupStoreDirectory dir;
@@ -403,11 +404,9 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 		if(!opts[LIST_OPTION_NOOBJECTID])
 		{
 			// add object ID to line
-#ifdef _MSC_VER
-			printf("%08I64x ", (int64_t)en->GetObjectID());
-#else
-			printf("%08llx ", (long long)en->GetObjectID());
-#endif
+			out << std::hex << std::internal << std::setw(8) <<
+				std::setfill('0') << en->GetObjectID() <<
+				std::dec << " ";
 		}
 		
 		// Flags?
@@ -434,44 +433,40 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			// terminate
 			*(f++) = ' ';
 			*(f++) = '\0';
-			printf("%s", displayflags);
+			out << displayflags;
 			
 			if(en_flags != 0)
 			{
-				printf("[ERROR: Entry has additional flags set] ");
+				out << "[ERROR: Entry has additional flags set] ";
 			}
 		}
 		
 		if(opts[LIST_OPTION_TIMES_UTC])
 		{
 			// Show UTC times...
-			printf("%s ", GetTimeString(*en, false,
-				opts[LIST_OPTION_TIMES_ATTRIBS]).c_str());
+			out << GetTimeString(*en, false,
+				opts[LIST_OPTION_TIMES_ATTRIBS]) << " ";
 		}
 
 		if(opts[LIST_OPTION_TIMES_LOCAL])
 		{
 			// Show local times...
-			printf("%s ", GetTimeString(*en, true,
-				opts[LIST_OPTION_TIMES_ATTRIBS]).c_str());
+			out << GetTimeString(*en, true,
+				opts[LIST_OPTION_TIMES_ATTRIBS]) << " ";
 		}
 		
 		if(opts[LIST_OPTION_DISPLAY_HASH])
 		{
-#ifdef _MSC_VER
-			printf("%016I64x ", (int64_t)en->GetAttributesHash());
-#else
-			printf("%016llx ", (long long)en->GetAttributesHash());
-#endif
+			out << std::hex << std::internal << std::setw(16) <<
+				std::setfill('0') << en->GetAttributesHash() <<
+				std::dec;
 		}
 		
 		if(opts[LIST_OPTION_SIZEINBLOCKS])
 		{
-#ifdef _MSC_VER
-			printf("%05I64d ", (int64_t)en->GetSizeInBlocks());
-#else
-			printf("%05lld ", (long long)en->GetSizeInBlocks());
-#endif
+			out << std::internal << std::setw(5) <<
+				std::setfill('0') << en->GetSizeInBlocks() <<
+				" ";
 		}
 		
 		// add name
@@ -481,30 +476,38 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 			std::string listRootDecoded;
 			if(!ConvertUtf8ToConsole(rListRoot.c_str(), 
 				listRootDecoded)) return;
-			printf("%s/", listRootDecoded.c_str());
+			out << listRootDecoded << "/";
 #else
-			printf("%s/", rListRoot.c_str());
+			out << rListRoot << "/";
 #endif
 		}
 		
-#ifdef WIN32
+		std::string fileName;
+		try
 		{
-			std::string fileName;
-			if(!ConvertUtf8ToConsole(
-				clear.GetClearFilename().c_str(), fileName))
-				return;
-			printf("%s", fileName.c_str());
+			fileName = clear.GetClearFilename();
 		}
-#else
-		printf("%s", clear.GetClearFilename().c_str());
+		catch(CipherException &e)
+		{
+			fileName = "<decrypt failed>";
+		}
+
+#ifdef WIN32
+		std::string fileNameUtf8 = fileName;
+		if(!ConvertUtf8ToConsole(fileNameUtf8, fileName))
+		{
+			fileName = fileNameUtf8 + " [convert encoding failed]";
+		}
 #endif
+
+		out << fileName;
 		
 		if(!en->GetName().IsEncrypted())
 		{
-			printf("[FILENAME NOT ENCRYPTED]");
+			out << " [FILENAME NOT ENCRYPTED]";
 		}
 
-		printf("\n");
+		out << std::endl;
 		
 		// Directory?
 		if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
@@ -515,7 +518,9 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot, const bool
 				std::string subroot(rListRoot);
 				if(!FirstLevel) subroot += '/';
 				subroot += clear.GetClearFilename();
-				List(en->GetObjectID(), subroot, opts, false /* not the first level to list */);
+				List(en->GetObjectID(), subroot, opts,
+					false /* not the first level to list */,
+					out);
 			}
 		}
 	}
