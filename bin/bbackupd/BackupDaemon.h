@@ -117,6 +117,7 @@ public:
 	void InitCrypto();
 	void RunSyncNowWithExceptionHandling();
 	void RunSyncNow();
+	void ResetCachedState();
 	void OnBackupStart();
 	void OnBackupFinish();
 	// TouchFileInWorkingDir is only here for use by Boxi.
