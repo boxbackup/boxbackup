@@ -105,7 +105,9 @@
 
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
-		if(!HideExceptionMessageGuard::ExceptionsHidden() \
+		if((!HideExceptionMessageGuard::ExceptionsHidden() \
+			&& !HideSpecificExceptionGuard::IsHidden( \
+				type::ExceptionType, type::subtype)) \
 			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
 		{ \
 			std::auto_ptr<Logging::Guard> guard; \
@@ -127,7 +129,9 @@
 	{ \
 		std::ostringstream _box_throw_line; \
 		_box_throw_line << message; \
-		if(!HideExceptionMessageGuard::ExceptionsHidden() \
+		if((!HideExceptionMessageGuard::ExceptionsHidden() \
+			&& !HideSpecificExceptionGuard::IsHidden( \
+				type::ExceptionType, type::subtype)) \
 			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
 		{ \
 			std::auto_ptr<Logging::Guard> guard; \
@@ -139,8 +143,9 @@
 			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
-				#type "(" #subtype ") (" << message << \
-				") at " __FILE__ "(" << __LINE__ << ")") \
+				#type "(" #subtype ") (" << \
+				_box_throw_line.str() << \
+				") at " __FILE__ ":" << __LINE__) \
 		} \
 		throw type(type::subtype, _box_throw_line.str()); \
 	}
