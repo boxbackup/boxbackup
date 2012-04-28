@@ -13,6 +13,7 @@
 #include "CipherContext.h"
 #include "CipherDescription.h"
 #include "CipherException.h"
+#include "CryptoUtils.h"
 #include "Random.h"
 
 #include "MemLeakFindOn.h"
@@ -26,12 +27,12 @@
 //
 // --------------------------------------------------------------------------
 CipherContext::CipherContext()
-	: mInitialised(false),
-	  mWithinTransform(false),
-	  mPaddingOn(true)
+: mInitialised(false),
+  mWithinTransform(false),
+  mPaddingOn(true),
+  mFunction(None)
 #ifdef HAVE_OLD_SSL
-	, mFunction(Decrypt),
-	  mpDescription(0)
+, mpDescription(0)
 #endif
 {
 }
@@ -64,6 +65,28 @@ CipherContext::~CipherContext()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    CipherContext::LogError(const std::string& operation)
+//		Purpose: Logs and clears any OpenSSL errors, returning the
+//			 most recent error message for use in exception
+//			 messages. 
+//
+//			 It's essential to clear the OpenSSL error queue after
+//			 ANY failed OpenSSL operation, because OpenSSL may
+//			 decide that a later non-blocking read (returning -1
+//			 with errno == EAGAIN) is actually an error if there's
+//			 any errors left in the queue. See SSL_get_error
+//			 (called from SocketStreamTLS::Read) for the details.
+//		Created: 26/04/12
+//
+// --------------------------------------------------------------------------
+std::string CipherContext::LogError(const std::string& operation)
+{
+	return CryptoUtils::LogError(operation);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    CipherContext::Init(CipherContext::CipherFunction, const CipherDescription &)
 //		Purpose: Initialises the context, specifying the direction for the encryption, and a
 //				 description of the cipher to use, it's keys, etc
@@ -82,24 +105,29 @@ void CipherContext::Init(CipherContext::CipherFunction Function, const CipherDes
 		THROW_EXCEPTION(CipherException, BadArguments)
 	}
 	
+	// Store function for later
+	mFunction = Function;
+
 	// Initialise the cipher
 #ifndef HAVE_OLD_SSL
 	EVP_CIPHER_CTX_init(&ctx); // no error return code, even though the docs says it does
 
-	if(EVP_CipherInit_ex(&ctx, rDescription.GetCipher(), NULL, NULL, NULL, Function) != 1)
+	if(EVP_CipherInit_ex(&ctx, rDescription.GetCipher(), NULL, NULL, NULL,
+		(mFunction == Encrypt) ? 1 : 0) != 1)
 #else
-	// Store function for later
-	mFunction = Function;
-
 	// Use old version of init call
-	if(EVP_CipherInit(&ctx, rDescription.GetCipher(), NULL, NULL, Function) != 1)
+	if(EVP_CipherInit(&ctx, rDescription.GetCipher(), NULL, NULL,
+		(mFunction == Encrypt) ? 1 : 0) != 1)
 #endif
 	{
-		THROW_EXCEPTION(CipherException, EVPInitFailure)
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
+			"Failed to initialise " << rDescription.GetFullName()
+			<< "cipher: " << LogError("initialising cipher"));
 	}
 	
 	try
 	{
+		mCipherName = rDescription.GetFullName();
 #ifndef HAVE_OLD_SSL
 		// Let the description set up everything else
 		rDescription.SetupParameters(&ctx);
@@ -114,6 +142,9 @@ void CipherContext::Init(CipherContext::CipherFunction Function, const CipherDes
 	}
 	catch(...)
 	{
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
+			"Failed to configure " << mCipherName << " cipher: " <<
+			LogError("configuring cipher"));
 		EVP_CIPHER_CTX_cleanup(&ctx);
 		throw;
 	}
@@ -174,7 +205,9 @@ void CipherContext::Begin()
 	// Initialise the cipher context again
 	if(EVP_CipherInit(&ctx, NULL, NULL, NULL, -1) != 1)
 	{
-		THROW_EXCEPTION(CipherException, EVPInitFailure)
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
+			"Failed to reset " << mCipherName << " cipher: " <<
+			LogError("resetting cipher"));
 	}
 	
 	// Mark as being within a transform
@@ -227,7 +260,9 @@ int CipherContext::Transform(void *pOutBuffer, int OutLength, const void *pInBuf
 	int outLength = OutLength;
 	if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
 	{
-		THROW_EXCEPTION(CipherException, EVPUpdateFailure)
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPUpdateFailure,
+			"Failed to " << GetFunction() << " (update) " <<
+			mCipherName << " cipher: " << LogError(GetFunction()));
 	}
 
 	return outLength;
@@ -273,9 +308,12 @@ int CipherContext::Final(void *pOutBuffer, int OutLength)
 	// Do the transform
 	int outLength = OutLength;
 #ifndef HAVE_OLD_SSL
-	if(EVP_CipherFinal_ex(&ctx, (unsigned char*)pOutBuffer, &outLength) != 1)
+	if(EVP_CipherFinal(&ctx, (unsigned char*)pOutBuffer, &outLength) != 1)
 	{
-		THROW_EXCEPTION(CipherException, EVPFinalFailure)
+		mWithinTransform = false;
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPFinalFailure,
+			"Failed to " << GetFunction() << " (final) " <<
+			mCipherName << " cipher: " << LogError(GetFunction()));
 	}
 #else
 	OldOpenSSLFinal((unsigned char*)pOutBuffer, outLength);
@@ -353,7 +391,8 @@ void CipherContext::OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut)
 		}
 	}
 	// Reinitialise the cipher for the next time around
-	if(EVP_CipherInit(&ctx, mpDescription->GetCipher(), NULL, NULL, mFunction) != 1)
+	if(EVP_CipherInit(&ctx, mpDescription->GetCipher(), NULL, NULL,
+		(mFunction == Encrypt) ? 1 : 0) != 1)
 	{
 		THROW_EXCEPTION(CipherException, EVPInitFailure)
 	}
@@ -451,37 +490,29 @@ int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *p
 	
 	// Do the entire block
 	int outLength = 0;
-	try
+
+	// Update
+	outLength = OutLength;
+	if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
 	{
-		// Update
-		outLength = OutLength;
-		if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
-		{
-			THROW_EXCEPTION(CipherException, EVPUpdateFailure)
-		}
-		// Finalise
-		int outLength2 = OutLength - outLength;
-#ifndef HAVE_OLD_SSL
-		if(EVP_CipherFinal_ex(&ctx, ((unsigned char*)pOutBuffer) + outLength, &outLength2) != 1)
-		{
-			THROW_EXCEPTION(CipherException, EVPFinalFailure)
-		}
-#else
-		OldOpenSSLFinal(((unsigned char*)pOutBuffer) + outLength, outLength2);
-#endif
-		outLength += outLength2;
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPUpdateFailure,
+			"Failed to " << GetFunction() << " (update) " <<
+			mCipherName << " cipher: " << LogError(GetFunction()));
 	}
-	catch(...)
+
+	// Finalise
+	int outLength2 = OutLength - outLength;
+#ifndef HAVE_OLD_SSL
+	if(EVP_CipherFinal(&ctx, ((unsigned char*)pOutBuffer) + outLength, &outLength2) != 1)
 	{
-		// Finalise the context, so definately ready for the next caller
-		int outs = OutLength;
-#ifndef HAVE_OLD_SSL
-		EVP_CipherFinal_ex(&ctx, (unsigned char*)pOutBuffer, &outs);
-#else
-		OldOpenSSLFinal((unsigned char*)pOutBuffer, outs);
-#endif
-		throw;
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPFinalFailure,
+			"Failed to " << GetFunction() << " (final) " <<
+			mCipherName << " cipher: " << LogError(GetFunction()));
 	}
+#else
+	OldOpenSSLFinal(((unsigned char*)pOutBuffer) + outLength, outLength2);
+#endif
+	outLength += outLength2;
 
 	return outLength;
 }
@@ -531,7 +562,9 @@ void CipherContext::SetIV(const void *pIV)
 	// Set IV
 	if(EVP_CipherInit(&ctx, NULL, NULL, (unsigned char *)pIV, -1) != 1)
 	{
-		THROW_EXCEPTION(CipherException, EVPInitFailure)
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
+			"Failed to " << GetFunction() << " (set IV) " <<
+			mCipherName << " cipher: " << LogError(GetFunction()));
 	}
 
 #ifdef HAVE_OLD_SSL
@@ -576,20 +609,7 @@ const void *CipherContext::SetRandomIV(int &rLengthOut)
 	
 	// Generate some random data
 	Random::Generate(mGeneratedIV, ivLen);
-
-	// Set IV
-	if(EVP_CipherInit(&ctx, NULL, NULL, mGeneratedIV, -1) != 1)
-	{
-		THROW_EXCEPTION(CipherException, EVPInitFailure)
-	}	
-
-#ifdef HAVE_OLD_SSL
-	// Update description
-	if(mpDescription != 0)
-	{
-		mpDescription->SetIV(mGeneratedIV);
-	}
-#endif
+	SetIV(mGeneratedIV);
 
 	// Return the IV and it's length
 	rLengthOut = ivLen;
