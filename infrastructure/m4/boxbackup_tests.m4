@@ -97,6 +97,10 @@ AX_PATH_BDB([1.x or 4.1], [
   AX_SPLIT_VERSION([BDB_VERSION], [$BDB_VERSION])
 ])
 
+# need to find libdl before trying to link openssl, apparently
+AC_SEARCH_LIBS([dlsym], ["dl"])
+AC_CHECK_FUNCS([dlsym dladdr])
+
 ## Check for Open SSL, use old versions only if explicitly requested
 AC_SEARCH_LIBS([gethostbyname], [nsl socket resolv])
 AC_SEARCH_LIBS([shutdown], [nsl socket resolv])
@@ -166,9 +170,6 @@ if test "$have_regex_h" = "yes" -o "$have_pcreposix_h" = "yes"; then
 else
   have_regex_support=no
 fi
-
-AC_SEARCH_LIBS([dlsym], ["dl"])
-AC_CHECK_FUNCS([dlsym dladdr])
 
 ### Checks for typedefs, structures, and compiler characteristics.
 
