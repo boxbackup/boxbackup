@@ -268,12 +268,11 @@ public:
 		box_time_t ModificationTime, int64_t ObjectID,
 		int64_t SizeInBlocks, int16_t Flags);
 	bool NameInUse(const BackupStoreFilename &rName);
-	// Don't use these functions in normal code!
 
 	// For testing
+	// Don't use these functions in normal code!
 	void TESTONLY_SetObjectID(int64_t ObjectID) {mObjectID = ObjectID;}
-
-	// Debug and diagonistics
+	// Debug and diagnostics
 	void Dump(void *clibFileHandle, bool ToTrace); // first arg is FILE *, but avoid including stdio.h everywhere
 
 private:
