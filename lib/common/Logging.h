@@ -10,6 +10,8 @@
 #ifndef LOGGING__H
 #define LOGGING__H
 
+#include <assert.h>
+
 #include <cerrno>
 #include <cstring>
 #include <iomanip>
@@ -387,6 +389,30 @@ class HideExceptionMessageGuard
 	private:
 	static bool sHiddenState;
 	bool mOldHiddenState;
+};
+
+class HideSpecificExceptionGuard
+{
+	private:
+	std::pair<int, int> mExceptionCode;
+
+	public:
+	typedef std::vector<std::pair<int, int> > SuppressedExceptions_t;
+	static SuppressedExceptions_t sSuppressedExceptions;
+
+	HideSpecificExceptionGuard(int type, int subtype)
+	: mExceptionCode(std::pair<int, int>(type, subtype))
+	{
+		sSuppressedExceptions.push_back(mExceptionCode);
+	}
+	~HideSpecificExceptionGuard()
+	{
+		SuppressedExceptions_t::reverse_iterator i =
+			sSuppressedExceptions.rbegin();
+		assert(*i == mExceptionCode);
+		sSuppressedExceptions.pop_back();
+	}
+	static bool IsHidden(int type, int subtype);
 };
 
 std::string PrintEscapedBinaryData(const std::string& rInput);

@@ -46,6 +46,9 @@ Log::Level  Logging::sGlobalLevel = Log::EVERYTHING;
 Logging     Logging::sGlobalLogging; //automatic initialisation
 std::string Logging::sProgramName;
 
+HideSpecificExceptionGuard::SuppressedExceptions_t
+	HideSpecificExceptionGuard::sSuppressedExceptions;
+
 int Logging::Guard::sGuardCount = 0;
 Log::Level Logging::Guard::sOriginalLevel = Log::INVALID;
 
@@ -538,3 +541,18 @@ std::string PrintEscapedBinaryData(const std::string& rInput)
 
 	return output.str();
 }
+
+bool HideSpecificExceptionGuard::IsHidden(int type, int subtype)
+{
+	for (SuppressedExceptions_t::iterator
+		i  = sSuppressedExceptions.begin();
+		i != sSuppressedExceptions.end(); i++)
+	{
+		if(i->first == type && i->second == subtype)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
