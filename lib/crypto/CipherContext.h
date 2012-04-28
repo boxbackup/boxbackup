@@ -35,12 +35,15 @@ public:
 private:
 	CipherContext(const CipherContext &);	// no copying
 	CipherContext &operator=(const CipherContext &);	// no assignment
+protected:
+	std::string LogError(const std::string& operation);
 public:
 
 	typedef enum
 	{
-		Decrypt = 0,
-		Encrypt = 1
+		None = 0,
+		Decrypt,
+		Encrypt
 	} CipherFunction;
 
 	void Init(CipherContext::CipherFunction Function, const CipherDescription &rDescription);
@@ -61,6 +64,10 @@ public:
 	const void *SetRandomIV(int &rLengthOut);
 	
 	void UsePadding(bool Padding = true);
+	const char* GetFunction() const
+	{
+		return (mFunction == Encrypt) ? "encrypt" : "decrypt";
+	}
 
 #ifdef HAVE_OLD_SSL
 	void OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut);
@@ -72,8 +79,9 @@ private:
 	bool mWithinTransform;
 	bool mPaddingOn;
 	uint8_t mGeneratedIV[CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH];
-#ifdef HAVE_OLD_SSL
 	CipherFunction mFunction;
+	std::string mCipherName;
+#ifdef HAVE_OLD_SSL
 	CipherDescription *mpDescription;
 #endif
 };

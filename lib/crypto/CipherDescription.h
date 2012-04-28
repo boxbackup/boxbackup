@@ -34,7 +34,7 @@ public:
 	
 	// Return OpenSSL cipher object
 	virtual const EVP_CIPHER *GetCipher() const = 0;
-	
+
 	// Setup any other parameters
 	virtual void SetupParameters(EVP_CIPHER_CTX *pCipherContext) const = 0;
 	
@@ -47,6 +47,23 @@ public:
 		Mode_OFB = 3
 	} CipherMode;
 
+	virtual std::string GetCipherName() const = 0;
+	virtual CipherMode GetCipherMode() const = 0;
+	virtual std::string GetFullName() const
+	{
+		std::ostringstream out;
+		out << GetCipherName() << "-";
+		switch (GetCipherMode())
+		{
+		case Mode_ECB: out << "ECB"; break;
+		case Mode_CBC: out << "CBC"; break;
+		case Mode_CFB: out << "CFB"; break;
+		case Mode_OFB: out << "OFB"; break;
+		default: out << "unknown";
+		}
+		return out.str();
+	}
+	
 #ifdef HAVE_OLD_SSL
 	// For the old version of OpenSSL, we need to be able to store cipher descriptions.
 	virtual CipherDescription *Clone() const = 0;

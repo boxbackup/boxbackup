@@ -37,6 +37,15 @@ public:
 	// Setup any other parameters
 	virtual void SetupParameters(EVP_CIPHER_CTX *pCipherContext) const;
 
+	virtual std::string GetCipherName() const
+	{
+		std::ostringstream out;
+		out << "AES";
+		out << mKeyLength;
+		return out.str();
+	}
+	virtual CipherMode GetCipherMode() const { return mMode; }
+
 private:
 	CipherDescription::CipherMode mMode;
 	const void *mpKey;
