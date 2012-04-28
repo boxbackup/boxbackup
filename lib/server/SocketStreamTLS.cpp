@@ -19,11 +19,12 @@
 #include <poll.h>
 #endif
 
+#include "BoxTime.h"
+#include "CryptoUtils.h"
+#include "ServerException.h"
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
-#include "ServerException.h"
 #include "TLSContext.h"
-#include "BoxTime.h"
 
 #include "MemLeakFindOn.h"
 
@@ -124,7 +125,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	mpBIO = ::BIO_new(::BIO_s_socket());
 	if(mpBIO == 0)
 	{
-		SSLLib::LogError("creating socket bio");
+		CryptoUtils::LogError("creating socket bio");
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
@@ -135,7 +136,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	mpSSL = ::SSL_new(rContext.GetRawContext());
 	if(mpSSL == 0)
 	{
-		SSLLib::LogError("creating SSL object");
+		CryptoUtils::LogError("creating SSL object");
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 
@@ -203,12 +204,12 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			// Error occured
 			if(IsServer)
 			{
-				SSLLib::LogError("accepting connection");
+				CryptoUtils::LogError("accepting connection");
 				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
 			}
 			else
 			{
-				SSLLib::LogError("connecting");
+				CryptoUtils::LogError("connecting");
 				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
 			}
 		}
@@ -335,7 +336,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 			break;
 			
 		default:
-			SSLLib::LogError("reading");
+			CryptoUtils::LogError("reading");
 			THROW_EXCEPTION(ConnectionException, Conn_TLSReadFailed)
 			break;
 		}
@@ -400,7 +401,7 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 			break;
 		
 		default:
-			SSLLib::LogError("writing");
+			CryptoUtils::LogError("writing");
 			THROW_EXCEPTION(ConnectionException, Conn_TLSWriteFailed)
 			break;
 		}
@@ -442,7 +443,7 @@ void SocketStreamTLS::Shutdown(bool Read, bool Write)
 
 	if(::SSL_shutdown(mpSSL) < 0)
 	{
-		SSLLib::LogError("shutting down");
+		CryptoUtils::LogError("shutting down");
 		THROW_EXCEPTION(ConnectionException, Conn_TLSShutdownFailed)
 	}
 
