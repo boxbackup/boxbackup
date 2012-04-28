@@ -18,6 +18,7 @@
 	#include <wincrypt.h>
 #endif
 
+#include "CryptoUtils.h"
 #include "SSLLib.h"
 #include "ServerException.h"
 
@@ -39,8 +40,9 @@ void SSLLib::Initialise()
 {
 	if(!::SSL_library_init())
 	{
-		LogError("initialising OpenSSL");
-		THROW_EXCEPTION(ServerException, SSLLibraryInitialisationError)
+		THROW_EXCEPTION_MESSAGE(ServerException,
+			SSLLibraryInitialisationError,
+			CryptoUtils::LogError("initialising OpenSSL"));
 	}
 	
 	// More helpful error messages
@@ -88,24 +90,4 @@ void SSLLib::Initialise()
 #endif
 }
 
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    SSLLib::LogError(const char *)
-//		Purpose: Logs an error
-//		Created: 2003/08/06
-//
-// --------------------------------------------------------------------------
-void SSLLib::LogError(const std::string& rErrorDuringAction)
-{
-	unsigned long errcode;
-	char errname[256];		// SSL docs say at least 120 bytes
-	while((errcode = ERR_get_error()) != 0)
-	{
-		::ERR_error_string_n(errcode, errname, sizeof(errname));
-		BOX_ERROR("SSL error while " << rErrorDuringAction << ": " <<
-			errname);
-	}
-}
 

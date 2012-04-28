@@ -12,7 +12,7 @@
 #define TLS_CLASS_IMPLEMENTATION_CPP
 #include <openssl/ssl.h>
 
-#include "TLSContext.h"
+#include "CryptoUtils.h"
 #include "ServerException.h"
 #include "SSLLib.h"
 #include "TLSContext.h"
@@ -77,14 +77,14 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	{
 		std::string msg = "loading certificates from ";
 		msg += CertificatesFile;
-		SSLLib::LogError(msg);
+		CryptoUtils::LogError(msg);
 		THROW_EXCEPTION(ServerException, TLSLoadCertificatesFailed)
 	}
 	if(::SSL_CTX_use_PrivateKey_file(mpContext, PrivateKeyFile, SSL_FILETYPE_PEM) != 1)
 	{
 		std::string msg = "loading private key from ";
 		msg += PrivateKeyFile;
-		SSLLib::LogError(msg);
+		CryptoUtils::LogError(msg);
 		THROW_EXCEPTION(ServerException, TLSLoadPrivateKeyFailed)
 	}
 	
@@ -93,7 +93,7 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	{
 		std::string msg = "loading CA cert from ";
 		msg += TrustedCAsFile;
-		SSLLib::LogError(msg);
+		CryptoUtils::LogError(msg);
 		THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
 	}
 	
@@ -105,7 +105,7 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	// Setup allowed ciphers
 	if(::SSL_CTX_set_cipher_list(mpContext, CIPHER_LIST) != 1)
 	{
-		SSLLib::LogError("setting cipher list to " CIPHER_LIST);
+		CryptoUtils::LogError("setting cipher list to " CIPHER_LIST);
 		THROW_EXCEPTION(ServerException, TLSSetCiphersFailed)
 	}
 }
