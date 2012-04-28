@@ -10,8 +10,9 @@
 #ifndef BACKUPQUERIES__H
 #define BACKUPQUERIES__H
 
-#include <vector>
+#include <iostream>
 #include <string>
+#include <vector>
 
 #include "BoxTime.h"
 #include "BoxBackupCompareParams.h"
@@ -85,9 +86,12 @@ public:
 	// Return code?
 	int GetReturnCode() {return mReturnCode;}
 
+	void List(int64_t DirID, const std::string &rListRoot, const bool *opts,
+		bool FirstLevel, std::ostream &out = std::cout);
+	void CommandList(const std::vector<std::string> &args, const bool *opts);
+
 private:
 	// Commands
-	void CommandList(const std::vector<std::string> &args, const bool *opts);
 	void CommandChangeDir(const std::vector<std::string> &args, const bool *opts);
 	void CommandChangeLocalDir(const std::vector<std::string> &args);
 	void CommandGetObject(const std::vector<std::string> &args, const bool *opts);
@@ -102,10 +106,6 @@ private:
 		int64_t HardLimit, int32_t BlockSize, bool MachineReadable);
 	void CommandHelp(const std::vector<std::string> &args);
 
-	// Implementations
-	void List(int64_t DirID, const std::string &rListRoot, const bool *opts,
-		bool FirstLevel);
-	
 public:
 	class CompareParams : public BoxBackupCompareParams
 	{
