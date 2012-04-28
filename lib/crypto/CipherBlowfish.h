@@ -38,6 +38,15 @@ public:
 	// Setup any other parameters
 	virtual void SetupParameters(EVP_CIPHER_CTX *pCipherContext) const;
 
+	virtual std::string GetCipherName() const
+	{
+		std::ostringstream out;
+		out << "AES";
+		out << mKeyLength;
+		return out.str();
+	}
+	virtual CipherMode GetCipherMode() const { return mMode; }
+
 #ifdef HAVE_OLD_SSL
 	CipherDescription *Clone() const;
 	void SetIV(const void *pIV);
