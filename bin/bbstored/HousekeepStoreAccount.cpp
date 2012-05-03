@@ -122,6 +122,12 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet,
 			true /* Read Only */));
 
+	// Tag log output to identify account
+	std::ostringstream tag;
+	tag << "hk/" << BOX_FORMAT_ACCOUNT(mAccountID) << "/" <<
+		info->GetAccountName();
+	Logging::Tagger tagWithClientID(tag.str());
+
 	// Calculate how much should be deleted
 	mDeletionSizeTarget = info->GetBlocksUsed() - info->GetBlocksSoftLimit();
 	if(mDeletionSizeTarget < 0)

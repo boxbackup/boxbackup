@@ -100,18 +100,20 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 	{
 		try
 		{
-			if(mpAccounts)
-			{
-				// Get the account root
-				std::string rootDir;
-				int discSet = 0;
-				mpAccounts->GetAccountRoot(*i, rootDir, discSet);
-				
-				// Do housekeeping on this account
-				HousekeepStoreAccount housekeeping(*i, rootDir,
-					discSet, this);
-				housekeeping.DoHousekeeping();
-			}
+			// Tag log output to identify account
+			std::ostringstream tag;
+			tag << "hk/" << BOX_FORMAT_ACCOUNT(*i);
+			Logging::Tagger tagWithClientID(tag.str());
+
+			// Get the account root
+			std::string rootDir;
+			int discSet = 0;
+			mpAccounts->GetAccountRoot(*i, rootDir, discSet);
+			
+			// Do housekeeping on this account
+			HousekeepStoreAccount housekeeping(*i, rootDir,
+				discSet, this);
+			housekeeping.DoHousekeeping();
 		}
 		catch(BoxException &e)
 		{
