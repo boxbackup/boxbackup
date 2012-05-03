@@ -24,7 +24,7 @@ int main(int argc, const char *argv[])
 
 	BackupStoreDaemon daemon;
 
-	return daemon.Main(BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE, argc, argv);
+	return daemon.Main(BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE, argc, argv);
 	
 	MAINHELPER_END
 }
