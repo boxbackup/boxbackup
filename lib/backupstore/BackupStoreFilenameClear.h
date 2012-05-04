@@ -11,7 +11,8 @@
 #define BACKUPSTOREFILENAMECLEAR__H
 
 #include "BackupStoreFilename.h"
-#include "CipherContext.h"
+
+class CipherContext;
 
 // --------------------------------------------------------------------------
 //
@@ -53,9 +54,6 @@ protected:
 
 private:
 	mutable BackupStoreFilename_base mClearFilename;
-	static CipherContext sBlowfishEncrypt;
-	static CipherContext sBlowfishDecrypt;
-	static int sEncodeMethod;
 };
 
 #endif // BACKUPSTOREFILENAMECLEAR__H
