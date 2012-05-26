@@ -109,8 +109,9 @@ char * completion_generator(const char *text, int state)
 		std::string partialCommand(rl_line_buffer, rl_point);
 		sapCmd.reset(new BackupQueries::ParsedCommand(partialCommand,
 			false));
+		int currentArg = sapCmd->mCompleteArgCount;
 
-		if(sapCmd->mArgCount == 0) // incomplete command
+		if(currentArg == 0) // incomplete command
 		{
 			completions = CompleteCommand(*sapCmd, text, *pProtocol,
 				*pConfig, *pQueries);
@@ -120,11 +121,12 @@ char * completion_generator(const char *text, int state)
 			completions = CompleteOptions(*sapCmd, text, *pProtocol,
 				*pConfig, *pQueries);
 		}
-		else if(sapCmd->mArgCount - 1 < MAX_COMPLETION_HANDLERS)
-		// sapCmd->mArgCount must be at least 1 if we're here
+		else if(currentArg - 1 < MAX_COMPLETION_HANDLERS)
+		// currentArg must be at least 1 if we're here
 		{
 			CompletionHandler handler =
-				sapCmd->pSpec->complete[sapCmd->mArgCount - 1];
+				sapCmd->pSpec->complete[currentArg - 1];
+
 			if(handler != NULL)
 			{
 				completions = handler(*sapCmd, text, *pProtocol,
@@ -477,13 +479,8 @@ int main(int argc, const char *argv[])
 	// Get commands from input
 
 #ifdef HAVE_LIBREADLINE
-	if (useReadline)
+	if(useReadline)
 	{
-#else
-	if (false)
-	{
-#endif
-		#ifdef HAVE_LIBREADLINE
 		// Must initialise the locale before using editline's
 		// readline(), otherwise cannot enter international characters.
 		if (setlocale(LC_ALL, "") == NULL)
@@ -505,57 +502,70 @@ int main(int argc, const char *argv[])
 		pProtocol = &connection;
 		pConfig = &conf;
 		pQueries = &context;
+	}
 
-		char *last_cmd = 0;
-		while(!context.Stop())
+	std::string last_cmd;
+#endif
+
+	std::auto_ptr<FdGetLine> apGetLine;
+	if(fileno(stdin) >= 0)
+	{
+		apGetLine.reset(new FdGetLine(fileno(stdin)));
+	}
+
+	while(!context.Stop() && fileno(stdin) >= 0)
+	{
+		std::string cmd_str;
+
+		#ifdef HAVE_LIBREADLINE
+		if(useReadline)
 		{
-			char *command = readline("query > ");
+			char *cmd_ptr = readline("query > ");
 			
-			if(command == NULL)
+			if(cmd_ptr == NULL)
 			{
 				// Ctrl-D pressed -- terminate now
 				break;
 			}
-			
-			BackupQueries::ParsedCommand cmd(command, false);
-			context.DoCommand(cmd);
 
-			if(last_cmd != 0 && ::strcmp(last_cmd, command) == 0)
-			{
-				free(command);
-			}
-			else
-			{
-				#ifdef HAVE_READLINE_HISTORY
-					add_history(command);
-				#else
-					free(last_cmd);
-				#endif
-				last_cmd = command;
-			}
+			cmd_str = cmd_ptr;
+			free(cmd_ptr);
 		}
-		#ifndef HAVE_READLINE_HISTORY
-			free(last_cmd);
-			last_cmd = 0;
-		#endif
-		#endif // HAVE_READLINE
-	}
-	else // !HAVE_LIBREADLINE || !useReadline
-	{
-		// Version for platforms which don't have readline by default
-		if(fileno(stdin) >= 0)
+		else
+		#endif // HAVE_LIBREADLINE
 		{
-			FdGetLine getLine(fileno(stdin));
-			while(!context.Stop())
+			printf("query > ");
+			fflush(stdout);
+
+			try
 			{
-				printf("query > ");
-				fflush(stdout);
-				std::string command(getLine.GetLine());
-				BackupQueries::ParsedCommand cmd(command,
-					false);
-				context.DoCommand(cmd);
+				cmd_str = apGetLine->GetLine();
+			}
+			catch(CommonException &e)
+			{
+				if(e.GetSubType() == CommonException::GetLineEOF)
+				{
+					break;
+				}
+				throw;
 			}
 		}
+
+		BackupQueries::ParsedCommand cmd_parsed(cmd_str, false);
+		if (cmd_parsed.IsEmpty())
+		{
+			continue;
+		}
+
+		context.DoCommand(cmd_parsed);
+
+		#ifdef HAVE_READLINE_HISTORY
+		if(last_cmd != cmd_str)
+		{
+			add_history(cmd_str.c_str());
+			last_cmd = cmd_str;
+		}
+		#endif // HAVE_READLINE_HISTORY
 	}
 	
 	// Done... stop nicely

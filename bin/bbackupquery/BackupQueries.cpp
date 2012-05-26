@@ -359,6 +359,11 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 	const bool *opts, bool FirstLevel, std::ostream &out)
 {
+#ifdef WIN32
+	DWORD n_chars;
+	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
+	
 	// Generate exclude flags
 	int16_t excludeFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
 	if(!opts[LIST_OPTION_ALLOWOLD]) excludeFlags |= BackupProtocolListDirectory::Flags_OldVersion;
@@ -476,7 +481,9 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			std::string listRootDecoded;
 			if(!ConvertUtf8ToConsole(rListRoot.c_str(), 
 				listRootDecoded)) return;
-			out << listRootDecoded << "/";
+			listRootDecoded = listRootDecoded + "/";
+			WriteConsole(hOut, listRootDecoded.c_str(),
+				strlen(listRootDecoded.c_str()), &n_chars, NULL);
 #else
 			out << rListRoot << "/";
 #endif
@@ -500,7 +507,11 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 		}
 #endif
 
+#ifdef WIN32
+		WriteConsole(hOut, fileName.c_str(), strlen(fileName.c_str()), &n_chars, NULL);
+#else
 		out << fileName;
+#endif
 		
 		if(!en->GetName().IsEncrypted())
 		{

@@ -83,9 +83,12 @@ COMPLETION_FUNCTION(None,)
 
 #ifdef HAVE_A_FILENAME_COMPLETION_FUNCTION
 COMPLETION_FUNCTION(Default,
-	while (const char *match = RL_FILENAME_COMPLETION_FUNCTION(prefix.c_str(), 0))
+	int i = 0;
+	
+	while (const char *match = RL_FILENAME_COMPLETION_FUNCTION(prefix.c_str(), i))
 	{
 		completions.push_back(match);
+		++i;
 	}
 )
 #else // !HAVE_A_FILENAME_COMPLETION_FUNCTION
@@ -177,7 +180,7 @@ std::vector<std::string> CompleteRemoteFileOrDirectory(
 	std::string searchPrefix;
 	std::string listDir = prefix;
 
-	if(rCommand.mArgCount == rCommand.mCmdElements.size())
+	if(rCommand.mCompleteArgCount == rCommand.mCmdElements.size())
 	{
 		// completing an empty name, from the current directory
 		// nothing to change
@@ -257,6 +260,8 @@ std::vector<std::string> CompleteRemoteFileOrDirectory(
 		std::string name = clear.GetClearFilename().c_str();
 		if(name.compare(0, searchPrefix.length(), searchPrefix) == 0)
 		{
+			bool dir_added = false;
+
 			if(en->IsDir() &&
 				(includeFlags & BackupProtocolListDirectory::Flags_Dir) == 0)
 			{
@@ -265,7 +270,31 @@ std::vector<std::string> CompleteRemoteFileOrDirectory(
 				name += "/";
 			}
 
-			if(listDir == "")
+			#ifdef HAVE_LIBREADLINE
+			if(strchr(name.c_str(), ' '))
+			{
+				int n_quote = 0;
+
+				for(int k = strlen(rl_line_buffer); k >= 0; k--)
+				{
+					if (rl_line_buffer[k] == '\"') {
+						++n_quote;
+					}
+				}
+
+				dir_added = false;
+
+				if (!(n_quote % 2))
+				{
+					name = "\"" + (listDir == "" ? name : listDir + "/" + name);
+					dir_added = true;
+				}
+
+				name = name + "\"";
+			}
+			#endif
+
+			if(listDir == "" || dir_added)
 			{
 				completions.push_back(name);
 			}
@@ -428,7 +457,7 @@ BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
 : mInOptions(false),
   mFailed(false),
   pSpec(NULL),
-  mArgCount(0)
+  mCompleteArgCount(0)
 {
 	mCompleteCommand = Command;
 	
@@ -451,77 +480,73 @@ BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
 	}
 
 	// split command into components
-	const char *c = Command.c_str();
 	bool inQuoted = false;
 	mInOptions = false;
 	
-	std::string s;
-	while(*c != 0)
+	std::string currentArg;
+	for (std::string::const_iterator c = Command.begin();
+		c != Command.end(); c++)
 	{
 		// Terminating char?
 		if(*c == ((inQuoted)?'"':' '))
 		{
-			if(!s.empty())
+			if(!currentArg.empty())
 			{
-				mCmdElements.push_back(s);
+				mCmdElements.push_back(currentArg);
 
-				// Because we just parsed a space, if this
-				// wasn't an option word, then we're now 
-				// completing the next (or first) arg
-				if(!mInOptions)
-				{
-					mArgCount++;
-				}
+				// Because we just found a space, and the last
+				// word was not options (otherwise currentArg
+				// would be empty), we've received a complete
+				// command or non-option argument.
+				mCompleteArgCount++;
 			}
 
-			s.resize(0);
+			currentArg.resize(0);
 			inQuoted = false;
 			mInOptions = false;
 		}
+		// Start of quoted parameter?
+		else if(currentArg.empty() && *c == '"')
+		{
+			inQuoted = true;
+		}
+		// Start of options?
+		else if(currentArg.empty() && *c == '-')
+		{
+			mInOptions = true;
+		}
+		else if(mInOptions)
+		{
+			// Option char
+			mOptions += *c;
+		}
 		else
 		{
-			// No. Start of quoted parameter?
-			if(s.empty() && *c == '"')
-			{
-				inQuoted = true;
-			}
-			// Start of options?
-			else if(s.empty() && *c == '-')
-			{
-				mInOptions = true;
-			}
-			else
-			{
-				if(mInOptions)
-				{
-					// Option char
-					mOptions += *c;
-				}
-				else
-				{
-					// Normal string char
-					s += *c;
-				}
-			}
+			// Normal string char, part of current arg
+			currentArg += *c;
 		}
-	
-		++c;
 	}
 	
-	if(!s.empty())
+	if(!currentArg.empty())
 	{
-		mCmdElements.push_back(s);
+		mCmdElements.push_back(currentArg);
+	}
+
+	// If there are no commands then there's nothing to do except return
+	if(mCmdElements.empty())
+	{
+		return;
 	}
 
 	// Work out which command it is...
 	int cmd = 0;
-	while(mCmdElements.size() > 0 && commands[cmd].name != 0 && 
+	while(commands[cmd].name != 0 && 
 		mCmdElements[0] != commands[cmd].name)
 	{
 		cmd++;
 	}
 	
-	if(mCmdElements.size() > 0 && commands[cmd].name == 0)
+	if(commands[cmd].name == 0)
 	{
 		// Check for aliases
 		int a;
@@ -536,7 +561,7 @@ BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
 		}
 	}
 
-	if(mCmdElements.size() == 0 || commands[cmd].name == 0)
+	if(commands[cmd].name == 0)
 	{
 		mFailed = true;
 		return;

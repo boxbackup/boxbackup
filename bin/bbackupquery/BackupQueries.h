@@ -73,9 +73,10 @@ public:
 		// command, but if the command line ends in a space,
 		// e.g. during readline parsing, it can be one greater,
 		// to indicate that we should complete the next item instead.
-		size_t mArgCount;
+		size_t mCompleteArgCount;
 		ParsedCommand(const std::string& Command,
 			bool isFromCommandLine);
+		bool IsEmpty() { return mCmdElements.empty(); }
 	};
 
 	void DoCommand(ParsedCommand& rCommand);
