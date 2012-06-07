@@ -140,7 +140,7 @@ void Daemon::Usage()
 	"  -T         Timestamp console output\n"
 	"  -U         Timestamp console output with microseconds\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
-	"  -V         Run at maximum verbosity, log everything to console and sysystem\n"
+	"  -V         Run at maximum verbosity, log everything to console and system\n"
 	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
 	;
 }
