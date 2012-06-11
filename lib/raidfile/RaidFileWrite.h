@@ -59,7 +59,7 @@ private:
 
 private:
 	int mSetNumber;
-	std::string mFilename;
+	std::string mFilename, mTempFilename;
 	int mOSFileHandle;
 	int mRefCount;
 };

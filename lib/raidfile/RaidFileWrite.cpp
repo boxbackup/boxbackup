@@ -102,7 +102,28 @@ RaidFileWrite::~RaidFileWrite()
 {
 	if(mOSFileHandle != -1)
 	{
-		Discard();
+		// We must not throw exceptions from the destructor
+		// http://stackoverflow.com/a/130123
+		try
+		{
+			Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_ERROR("Failed to discard RaidFile update "
+				"in destructor: " << e.what() << " (" <<
+				e.GetType() << "/" << e.GetSubType() << ")");
+		}
+		catch(std::exception &e)
+		{
+			BOX_ERROR("Failed to discard RaidFile update "
+				"in destructor: " << e.what());
+		}
+		catch(...)
+		{
+			BOX_ERROR("Failed to discard RaidFile update "
+				"in destructor: unknown exception");
+		}
 	}
 }
 
@@ -140,17 +161,17 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	}
 
 	// Get the filename for the write file
-	std::string writeFilename(RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename));
+	mTempFilename = RaidFileUtil::MakeWriteFileName(rdiscSet, mFilename);
 	// Add on a temporary extension
-	writeFilename += 'X';
+	mTempFilename += 'X';
 
 	// Attempt to open
-	mOSFileHandle = ::open(writeFilename.c_str(), 
+	mOSFileHandle = ::open(mTempFilename.c_str(), 
 		O_WRONLY | O_CREAT | O_BINARY,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(mOSFileHandle == -1)
 	{
-		THROW_SYS_FILE_ERROR("Failed to open RaidFile", writeFilename,
+		THROW_SYS_FILE_ERROR("Failed to open RaidFile", mTempFilename,
 			RaidFileException, ErrorOpeningWriteFile);
 	}
 	
@@ -171,27 +192,44 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	if (0)
 #endif
 	{
+		int errnoSaved = errno;
+
 		// Lock was not obtained.
 		bool wasLocked = (errno == errnoBlock);
+
 		// Close the file
 		::close(mOSFileHandle);
 		mOSFileHandle = -1;
+
 		// Report an exception?
 		if(wasLocked)
 		{
-			THROW_EXCEPTION(RaidFileException, FileIsCurrentlyOpenForWriting)
+			THROW_SYS_FILE_ERRNO("Failed to lock RaidFile, "
+				"already locked", mTempFilename, errnoSaved,
+				RaidFileException,
+				FileIsCurrentlyOpenForWriting);
 		}
 		else
 		{
 			// Random error occured
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_FILE_ERRNO("Failed to lock RaidFile",
+				mTempFilename, errnoSaved, RaidFileException,
+				OSError);
 		}
 	}
 	
 	// Truncate it to size zero
 	if(::ftruncate(mOSFileHandle, 0) != 0)
 	{
-		THROW_EXCEPTION(RaidFileException, ErrorOpeningWriteFileOnTruncate)
+		int errnoSaved = errno;
+
+		// Close the file
+		::close(mOSFileHandle);
+		mOSFileHandle = -1;
+
+		THROW_SYS_FILE_ERRNO("Failed to truncate RaidFile",
+			mTempFilename, errnoSaved, RaidFileException,
+			ErrorOpeningWriteFileOnTruncate);
 	}
 	
 	// Done!
@@ -217,9 +255,10 @@ void RaidFileWrite::Write(const void *pBuffer, int Length)
 	int written = ::write(mOSFileHandle, pBuffer, Length);
 	if(written != Length)
 	{
-		BOX_LOG_SYS_ERROR("RaidFileWrite failed, Length = " <<
-			Length << ", written = " << written);
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to write to RaidFile (attempted "
+			"to write " << Length << " bytes but managed only " <<
+			written << ")", mTempFilename, RaidFileException,
+			OSError);
 	}
 }
 
@@ -243,7 +282,8 @@ IOStream::pos_type RaidFileWrite::GetPosition() const
 	off_t p = ::lseek(mOSFileHandle, 0, SEEK_CUR);
 	if(p == -1)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to get position in RaidFile",
+			mTempFilename, RaidFileException, OSError);
 	}
 
 	return p;
@@ -268,7 +308,8 @@ void RaidFileWrite::Seek(IOStream::pos_type SeekTo, int SeekType)
 	// Seek...
 	if(::lseek(mOSFileHandle, SeekTo, ConvertSeekTypeToOSWhence(SeekType)) == -1)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to set position in RaidFile",
+			mTempFilename, RaidFileException, OSError);
 	}
 }
 
@@ -290,9 +331,8 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 
 	if (mRefCount == 0)
 	{
-		BOX_ERROR("Attempted to modify object " << mFilename << 
-			", which has no references");
-		THROW_EXCEPTION(RaidFileException,
+		THROW_FILE_ERROR("Attempted to modify object file with "
+			"no references", mTempFilename, RaidFileException,
 			RequestedModifyUnreferencedFile);
 	}
 
@@ -303,7 +343,8 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	// Close file...
 	if(::close(mOSFileHandle) != 0)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_WIN_FILE_ERROR("Failed to close RaidFile for rename",
+			mTempFilename, RaidFileException, OSError);
 	}
 	mOSFileHandle = -1;
 #endif // WIN32
@@ -338,7 +379,8 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 	// Close file...
 	if(::close(mOSFileHandle) != 0)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to close committed RaidFile",
+			mTempFilename, RaidFileException, OSError);
 	}
 	mOSFileHandle = -1;
 #endif // !WIN32
@@ -385,8 +427,8 @@ void RaidFileWrite::Discard()
 		::close(mOSFileHandle) != 0)
 #endif // !WIN32
 	{
-		BOX_LOG_SYS_ERROR("Failed to delete file: " << writeFilename);
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to delete file", writeFilename,
+			RaidFileException, OSError);
 	}
 	
 	// reset file handle
@@ -687,10 +729,9 @@ void RaidFileWrite::Delete()
 {
 	if (mRefCount != 0 && mRefCount != -1)
 	{
-		BOX_ERROR("Attempted to delete object " << mFilename <<
-			" which has " << mRefCount << " references");
-		THROW_EXCEPTION(RaidFileException,
-			RequestedDeleteReferencedFile);
+		THROW_FILE_ERROR("Attempted to delete object with " <<
+			mRefCount << " references", mFilename, 
+			RaidFileException, RequestedDeleteReferencedFile);
 	}
 
 	// Get disc set
@@ -701,7 +742,9 @@ void RaidFileWrite::Delete()
 	RaidFileUtil::ExistType existance = RaidFileUtil::RaidFileExists(rdiscSet, mFilename);
 	if(existance == RaidFileUtil::NoFile)
 	{
-		THROW_EXCEPTION(RaidFileException, RaidFileDoesntExist)
+		THROW_FILE_ERROR("Attempted to delete object which doesn't "
+			"exist", mFilename, RaidFileException,
+			RequestedDeleteReferencedFile);
 	}
 
 	// Get the filename for the write file
@@ -740,7 +783,8 @@ void RaidFileWrite::Delete()
 	// Check something happened
 	if(!deletedSomething)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_FILE_ERROR("Failed to delete a RaidFile stripe set",
+			mFilename, RaidFileException, OSError);
 	}
 }
 
@@ -811,13 +855,16 @@ void RaidFileWrite::CreateDirectory(const RaidFileDiscSet &rSet, const std::stri
 			if(errno == EEXIST)
 			{
 				// No. Bad things.
-				THROW_FILE_ERROR("Failed to create RaidFile directory",
-					dn, RaidFileException, FileExistsInDirectoryCreation);
+				THROW_SYS_FILE_ERROR("Failed to create "
+					"RaidFile directory", dn,
+					RaidFileException,
+					FileExistsInDirectoryCreation);
 			}
 			else
 			{
-				THROW_FILE_ERROR("Failed to create RaidFile directory",
-					dn, RaidFileException, OSError);
+				THROW_SYS_FILE_ERROR("Failed to create "
+					"RaidFile directory", dn,
+					RaidFileException, OSError);
 			}
 		}
 	}
@@ -900,7 +947,8 @@ IOStream::pos_type RaidFileWrite::GetFileSize()
 	struct stat st;
 	if(fstat(mOSFileHandle, &st) != 0)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to stat RaidFile", mTempFilename,
+			RaidFileException, OSError);
 	}
 	
 	return st.st_size;
@@ -929,7 +977,8 @@ IOStream::pos_type RaidFileWrite::GetDiscUsageInBlocks()
 	struct stat st;
 	if(fstat(mOSFileHandle, &st) != 0)
 	{
-		THROW_EXCEPTION(RaidFileException, OSError)
+		THROW_SYS_FILE_ERROR("Failed to stat RaidFile", mTempFilename,
+			RaidFileException, OSError);
 	}
 	
 	// Then return calculation
