@@ -13,7 +13,7 @@
 class UnixUser
 {
 public:
-	UnixUser(const char *Username);
+	UnixUser(const std::string& Username);
 	UnixUser(uid_t UID, gid_t GID);
 	~UnixUser();
 private:

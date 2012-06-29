@@ -31,13 +31,13 @@
 //		Created: 21/1/04
 //
 // --------------------------------------------------------------------------
-UnixUser::UnixUser(const char *Username)
+UnixUser::UnixUser(const std::string& Username)
 	: mUID(0),
 	  mGID(0),
 	  mRevertOnDestruction(false)
 {
 	// Get password info
-	struct passwd *pwd = ::getpwnam(Username);
+	struct passwd *pwd = ::getpwnam(Username.c_str());
 	if(pwd == 0)
 	{
 		THROW_EXCEPTION(CommonException, CouldNotLookUpUsername)
