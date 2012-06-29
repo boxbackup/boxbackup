@@ -116,8 +116,14 @@ void BackupClientInodeToIDMap::Open(const char *Filename, bool ReadOnly,
 	
 	mpDepot = dpopen(Filename, mode, 0);
 	
-	ASSERT_DBM_OK(mpDepot, "Failed to open inode database", mFilename,
-		BackupStoreException, BerkelyDBFailure);
+	if(!mpDepot)
+	{
+		BOX_WARNING(BOX_DBM_MESSAGE("Failed to open inode "
+			"database: " << mFilename));
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BerkelyDBFailure,
+			BOX_DBM_MESSAGE("Failed to open inode database: " <<
+				mFilename));
+	}
 	
 	// Read only flag
 	mReadOnly = ReadOnly;
