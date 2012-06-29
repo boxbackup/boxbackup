@@ -24,17 +24,18 @@
 #include <ostream>
 #include <vector>
 
-#include "BoxPortsAndFiles.h"
-#include "BackupStoreConfigVerify.h"
-#include "RaidFileController.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
-#include "MainHelper.h"
-#include "BackupStoreInfo.h"
-#include "StoreStructure.h"
-#include "NamedLock.h"
-#include "UnixUser.h"
 #include "BackupStoreCheck.h"
+#include "BackupStoreConfigVerify.h"
+#include "BackupStoreInfo.h"
+#include "BoxPortsAndFiles.h"
+#include "HousekeepStoreAccount.h"
+#include "MainHelper.h"
+#include "NamedLock.h"
+#include "RaidFileController.h"
+#include "StoreStructure.h"
+#include "UnixUser.h"
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
@@ -264,7 +265,6 @@ int SetAccountName(Configuration &rConfig, const std::string &rUsername,
 	return 0;
 }
 
-
 int AccountInfo(Configuration &rConfig, int32_t ID)
 {
 	// Load in the account database 
@@ -438,7 +438,9 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	return retcode;
 }
 
-int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t ID, bool FixErrors, bool Quiet)
+bool OpenAccount(Configuration &rConfig, int32_t ID, 
+	const std::string &rUsername, std::string &rRootDirOut,
+	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser)
 {
 	// Load in the account database 
 	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
@@ -448,23 +450,37 @@ int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t I
 	{
 		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
 			" does not exist.");
-		return 1;
+		return false;
 	}
 	
 	// Get info from the database
 	BackupStoreAccounts acc(*db);
-	std::string rootDir;
-	int discSetNum;
-	acc.GetAccountRoot(ID, rootDir, discSetNum);
+	acc.GetAccountRoot(ID, rRootDirOut, rDiscSetOut);
 	
 	// Become the right user
-	std::auto_ptr<UnixUser> user;
 	if(!rUsername.empty())
 	{
 		// Username specified, change...
-		user.reset(new UnixUser(rUsername.c_str()));
-		user->ChangeProcessUser(true /* temporary */);
-		// Change will be undone at the end of this function
+		apUser.reset(new UnixUser(rUsername));
+		apUser->ChangeProcessUser(true /* temporary */);
+		// Change will be undone when apUser goes out of scope
+		// in the caller.
+	}
+
+	return true;
+}
+
+int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t ID, bool FixErrors, bool Quiet)
+{
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user;
+
+	if(!OpenAccount(rConfig, ID, rUsername, rootDir, discSetNum, user))
+	{
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " for checking.");
+		return 1;
 	}
 
 	// Check it
@@ -494,6 +510,38 @@ int CreateAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(ID) << " created.");
 
 	return 0;
+}
+
+int HousekeepAccountNow(Configuration &rConfig, const std::string &rUsername,
+	int32_t ID)
+{
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user;
+
+	if(!OpenAccount(rConfig, ID, rUsername, rootDir, discSetNum, user))
+	{
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " for housekeeping.");
+		return 1;
+	}
+
+	HousekeepStoreAccount housekeeping(ID, rootDir, discSetNum, NULL);
+	bool success = housekeeping.DoHousekeeping();
+
+	if(!success)
+	{
+		BOX_ERROR("Failed to lock account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " for housekeeping: perhaps a client is "
+			"still connected?");
+		return 1;
+	}
+	else
+	{
+		BOX_TRACE("Finished housekeeping on account " <<
+			BOX_FORMAT_ACCOUNT(ID));
+		return 0;
+	}
 }
 
 void PrintUsageAndExit()
@@ -526,6 +574,10 @@ void PrintUsageAndExit()
 "        Changes the \"name\" of the account to the specified string.\n"
 "        The name is purely cosmetic and intended to make it easier to\n"
 "        identify your accounts.\n"
+"  housekeep <account>\n"
+"        Runs housekeeping immediately on the account. If it cannot be locked,\n"
+"        bbstoreaccounts returns an error status code (1), otherwise success\n"
+"        (0) even if any errors were fixed by housekeeping.\n"
 	);
 	exit(2);
 }
@@ -705,6 +757,10 @@ int main(int argc, const char *argv[])
 	
 		// Check the account
 		return CheckAccount(*config, username, id, fixErrors, quiet);
+	}
+	else if(::strcmp(argv[0], "housekeep") == 0)
+	{
+		return HousekeepAccountNow(*config, username, id);
 	}
 	else
 	{

@@ -14,7 +14,6 @@
 #include <set>
 #include <vector>
 
-class BackupStoreDaemon;
 class BackupStoreDirectory;
 
 class HousekeepingCallback
@@ -39,7 +38,7 @@ public:
 		int StoreDiscSet, HousekeepingCallback* pHousekeepingCallback);
 	~HousekeepStoreAccount();
 	
-	void DoHousekeeping(bool KeepTryingForever = false);
+	bool DoHousekeeping(bool KeepTryingForever = false);
 	int GetRefCountsAdjusted() { return mRefCountsAdjusted; }
 	
 private:
