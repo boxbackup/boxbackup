@@ -13,18 +13,20 @@
 
 #include <map>
 
-#include "HousekeepStoreAccount.h"
-#include "BackupStoreDaemon.h"
-#include "StoreStructure.h"
+#include "autogen_BackupStoreException.h"
+#include "BackupConstants.h"
+#include "BackupStoreAccountDatabase.h"
 #include "BackupStoreConstants.h"
+#include "BackupStoreDirectory.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreInfo.h"
+#include "BackupStoreRefCountDatabase.h"
+#include "BufferedStream.h"
+#include "HousekeepStoreAccount.h"
+#include "NamedLock.h"
 #include "RaidFileRead.h"
 #include "RaidFileWrite.h"
-#include "BackupStoreDirectory.h"
-#include "BackupStoreInfo.h"
-#include "NamedLock.h"
-#include "autogen_BackupStoreException.h"
-#include "BackupStoreFile.h"
-#include "BufferedStream.h"
+#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
@@ -85,10 +87,10 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
+bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 {
 	BOX_TRACE("Starting housekeeping on account " <<
-		BOX_FORMAT_OBJECTID(mAccountID));
+		BOX_FORMAT_ACCOUNT(mAccountID));
 
 	// Attempt to lock the account
 	std::string writeLockFilename;
@@ -111,7 +113,7 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		else
 		{
 			// Couldn't lock the account -- just stop now
-			return;
+			return false;
 		}
 	}
 
@@ -166,7 +168,7 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			info->Save();
 		}
 	
-		return;
+		return false;
 	}
 
 	// Log any difference in opinion between the values recorded in
@@ -366,7 +368,8 @@ void HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	writeLock.ReleaseLock();
 
 	BOX_TRACE("Finished housekeeping on account " <<
-		BOX_FORMAT_OBJECTID(mAccountID));
+		BOX_FORMAT_ACCOUNT(mAccountID));
+	return true;
 }
 
 
