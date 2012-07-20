@@ -133,10 +133,12 @@
     <ClCompile Include="..\..\..\lib\crypto\CipherBlowfish.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\CipherContext.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\CipherDescription.cpp" />
+    <ClCompile Include="..\..\..\lib\crypto\CryptoUtils.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\MD5Digest.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\Random.cpp" />
     <ClCompile Include="..\..\..\lib\crypto\RollingChecksum.cpp" />
     <ClCompile Include="..\..\..\lib\server\Message.cpp" />
+    <ClCompile Include="..\..\..\lib\server\TcpNice.cpp" />
     <ClCompile Include="..\..\..\lib\win32\emu.cpp" />
     <ClCompile Include="..\..\..\lib\win32\getopt_long.cpp" />
     <ClCompile Include="..\..\..\lib\server\autogen_ConnectionException.cpp" />
@@ -188,6 +190,7 @@
     <ClInclude Include="..\..\..\lib\common\Guards.h" />
     <ClInclude Include="..\..\..\lib\common\IOStream.h" />
     <ClInclude Include="..\..\..\lib\common\IOStreamGetLine.h" />
+    <ClInclude Include="..\..\..\lib\crypto\CryptoUtils.h" />
     <ClInclude Include="..\..\..\lib\server\LocalProcessStream.h" />
     <ClInclude Include="..\..\..\lib\common\Logging.h" />
     <ClInclude Include="..\..\..\lib\common\MainHelper.h" />
@@ -217,6 +220,7 @@
     <ClInclude Include="..\..\..\lib\crypto\Random.h" />
     <ClInclude Include="..\..\..\lib\crypto\RollingChecksum.h" />
     <ClInclude Include="..\..\..\lib\server\Message.h" />
+    <ClInclude Include="..\..\..\lib\server\TcpNice.h" />
     <ClInclude Include="..\..\..\lib\win32\emu.h" />
     <ClInclude Include="..\..\..\lib\win32\getopt.h" />
     <ClInclude Include="..\..\..\lib\server\autogen_ConnectionException.h" />

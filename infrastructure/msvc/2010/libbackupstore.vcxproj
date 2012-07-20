@@ -95,6 +95,7 @@
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileRevDiff.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreInfo.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\HousekeepStoreAccount.cpp" />
     <ClCompile Include="..\..\..\lib\backupstore\StoreStructure.cpp" />
     <ClCompile Include="..\..\..\lib\raidfile\autogen_RaidFileException.cpp" />
     <ClCompile Include="..\..\..\lib\raidfile\RaidFileController.cpp" />
@@ -124,6 +125,7 @@
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreInfo.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreObjectMagic.h" />
     <ClInclude Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\HousekeepStoreAccount.h" />
     <ClInclude Include="..\..\..\lib\backupstore\RunStatusProvider.h" />
     <ClInclude Include="..\..\..\lib\backupstore\StoreStructure.h" />
     <ClInclude Include="..\..\..\lib\raidfile\autogen_RaidFileException.h" />
