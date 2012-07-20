@@ -1317,7 +1317,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	}
 
 	// Add all volumes included as backup locations to the snapshot set
-	for(std::vector<Location *>::iterator
+	for(Locations::iterator
 		iLocation  = mLocations.begin();
 		iLocation != mLocations.end();
 		iLocation++)
@@ -1478,7 +1478,7 @@ void BackupDaemon::CreateVssBackupComponents()
 	}
 
 	// lookup new snapshot volume for each location that has a snapshot
-	for(std::vector<Location *>::iterator
+	for(Locations::iterator
 		iLocation  = mLocations.begin();
 		iLocation != mLocations.end();
 		iLocation++)
