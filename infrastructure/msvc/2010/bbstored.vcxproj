@@ -79,11 +79,9 @@
     <ClCompile Include="..\..\..\bin\bbstored\BackupStoreDaemon.cpp" />
     <ClCompile Include="..\..\..\bin\bbstored\bbstored.cpp" />
     <ClCompile Include="..\..\..\bin\bbstored\BBStoreDHousekeeping.cpp" />
-    <ClCompile Include="..\..\..\bin\bbstored\HousekeepStoreAccount.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\bin\bbstored\BackupStoreDaemon.h" />
-    <ClInclude Include="..\..\..\bin\bbstored\HousekeepStoreAccount.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\bin\bbstored\bbstored-certs.in" />
