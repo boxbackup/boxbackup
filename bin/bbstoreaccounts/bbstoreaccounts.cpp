@@ -63,31 +63,31 @@ void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 	}
 }
 
-int BlockSizeOfDiscSet(int DiscSet)
+int BlockSizeOfDiscSet(int discSetNum)
 {
 	// Get controller, check disc set number
 	RaidFileController &controller(RaidFileController::GetController());
-	if(DiscSet < 0 || DiscSet >= controller.GetNumDiscSets())
+	if(discSetNum < 0 || discSetNum >= controller.GetNumDiscSets())
 	{
-		BOX_FATAL("Disc set " << DiscSet << " does not exist.");
+		BOX_FATAL("Disc set " << discSetNum << " does not exist.");
 		exit(1);
 	}
 	
 	// Return block size
-	return controller.GetDiscSet(DiscSet).GetBlockSize();
+	return controller.GetDiscSet(discSetNum).GetBlockSize();
 }
 
-std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int DiscSet)
+std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int discSetNum)
 {
-	return FormatUsageBar(Blocks, Blocks * BlockSizeOfDiscSet(DiscSet),
-		MaxBlocks * BlockSizeOfDiscSet(DiscSet),
+	return FormatUsageBar(Blocks, Blocks * BlockSizeOfDiscSet(discSetNum),
+		MaxBlocks * BlockSizeOfDiscSet(discSetNum),
 		sMachineReadableOutput);
 }
 
-int64_t SizeStringToBlocks(const char *string, int DiscSet)
+int64_t SizeStringToBlocks(const char *string, int discSetNum)
 {
 	// Find block size
-	int blockSize = BlockSizeOfDiscSet(DiscSet);
+	int blockSize = BlockSizeOfDiscSet(discSetNum);
 	
 	// Get number
 	char *endptr = (char*)string;
@@ -128,10 +128,11 @@ int64_t SizeStringToBlocks(const char *string, int DiscSet)
 	}
 }
 
-bool GetWriteLockOnAccount(NamedLock &rLock, const std::string rRootDir, int DiscSetNum)
+bool GetWriteLockOnAccount(NamedLock &rLock, const std::string rRootDir,
+	int discSetNum)
 {
 	std::string writeLockFilename;
-	StoreStructure::MakeWriteLockFilename(rRootDir, DiscSetNum, writeLockFilename);
+	StoreStructure::MakeWriteLockFilename(rRootDir, discSetNum, writeLockFilename);
 
 	bool gotLock = false;
 	int triesLeft = 8;
@@ -156,49 +157,38 @@ bool GetWriteLockOnAccount(NamedLock &rLock, const std::string rRootDir, int Dis
 	return gotLock;
 }
 
-int SetLimit(Configuration &rConfig, const std::string &rUsername, int32_t ID, const char *SoftLimitStr, const char *HardLimitStr)
-{
-	// Become the user specified in the config file?
-	std::auto_ptr<UnixUser> user;
-	if(!rUsername.empty())
-	{
-		// Username specified, change...
-		user.reset(new UnixUser(rUsername.c_str()));
-		user->ChangeProcessUser(true /* temporary */);
-		// Change will be undone at the end of this function
-	}
+bool OpenAccount(Configuration &rConfig, int32_t ID, std::string &rRootDirOut,
+	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser);
 
-	// Load in the account database 
-	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
-	
-	// Already exists?
-	if(!db->EntryExists(ID))
+int SetLimit(Configuration &rConfig, int32_t ID, const char *SoftLimitStr,
+	const char *HardLimitStr)
+{
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
 	{
-		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
-			" does not exist.");
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " to change limits.");
 		return 1;
 	}
 	
-	// Load it in
-	BackupStoreAccounts acc(*db);
-	std::string rootDir;
-	int discSet;
-	acc.GetAccountRoot(ID, rootDir, discSet);
-	
 	// Attempt to lock
 	NamedLock writeLock;
-	if(!GetWriteLockOnAccount(writeLock, rootDir, discSet))
+	if(!GetWriteLockOnAccount(writeLock, rootDir, discSetNum))
 	{
 		// Failed to get lock
 		return 1;
 	}
 
 	// Load the info
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, rootDir, discSet, false /* Read/Write */));
+	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, rootDir,
+		discSetNum, false /* Read/Write */));
 
 	// Change the limits
-	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, discSet);
-	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, discSet);
+	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, discSetNum);
+	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, discSetNum);
 	CheckSoftHardLimits(softlimit, hardlimit);
 	info->ChangeLimits(softlimit, hardlimit);
 	
@@ -212,39 +202,23 @@ int SetLimit(Configuration &rConfig, const std::string &rUsername, int32_t ID, c
 	return 0;
 }
 
-int SetAccountName(Configuration &rConfig, const std::string &rUsername,
-	int32_t ID, const std::string& rNewAccountName)
+int SetAccountName(Configuration &rConfig, int32_t ID,
+	const std::string& rNewAccountName)
 {
-	// Become the user specified in the config file?
-	std::auto_ptr<UnixUser> user;
-	if(!rUsername.empty())
-	{
-		// Username specified, change...
-		user.reset(new UnixUser(rUsername.c_str()));
-		user->ChangeProcessUser(true /* temporary */);
-		// Change will be undone at the end of this function
-	}
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
 
-	// Load in the account database 
-	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
-	
-	// Already exists?
-	if(!db->EntryExists(ID))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
 	{
-		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
-			" does not exist.");
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " to change name.");
 		return 1;
 	}
-	
-	// Load it in
-	BackupStoreAccounts acc(*db);
-	std::string rootDir;
-	int discSet;
-	acc.GetAccountRoot(ID, rootDir, discSet);
-	
+
 	// Attempt to lock
 	NamedLock writeLock;
-	if(!GetWriteLockOnAccount(writeLock, rootDir, discSet))
+	if(!GetWriteLockOnAccount(writeLock, rootDir, discSetNum))
 	{
 		// Failed to get lock
 		return 1;
@@ -252,7 +226,7 @@ int SetAccountName(Configuration &rConfig, const std::string &rUsername,
 
 	// Load the info
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID,
-		rootDir, discSet, false /* Read/Write */));
+		rootDir, discSetNum, false /* Read/Write */));
 
 	info->SetAccountName(rNewAccountName);
 	
@@ -267,26 +241,20 @@ int SetAccountName(Configuration &rConfig, const std::string &rUsername,
 
 int AccountInfo(Configuration &rConfig, int32_t ID)
 {
-	// Load in the account database 
-	std::auto_ptr<BackupStoreAccountDatabase> db(
-		BackupStoreAccountDatabase::Read(
-			rConfig.GetKeyValue("AccountDatabase").c_str()));
-	
-	// Exists?
-	if(!db->EntryExists(ID))
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
 	{
-		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
-			" does not exist.");
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " to display info.");
 		return 1;
 	}
 	
 	// Load it in
-	BackupStoreAccounts acc(*db);
-	std::string rootDir;
-	int discSet;
-	acc.GetAccountRoot(ID, rootDir, discSet);
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID,
-		rootDir, discSet, true /* ReadOnly */));
+		rootDir, discSetNum, true /* ReadOnly */));
 	
 	// Then print out lots of info
 	std::cout << FormatUsageLineStart("Account ID", sMachineReadableOutput) <<
@@ -297,26 +265,26 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 		BOX_FORMAT_OBJECTID(info->GetLastObjectIDUsed()) << std::endl;
 	std::cout << FormatUsageLineStart("Used", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksUsed(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Current files",
 			sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInCurrentFiles(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Old files", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInOldFiles(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Deleted files", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInDeletedFiles(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Directories", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksInDirectories(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Soft limit", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksSoftLimit(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Hard limit", sMachineReadableOutput) <<
 		BlockSizeToString(info->GetBlocksHardLimit(),
-			info->GetBlocksHardLimit(), discSet) << std::endl;
+			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Client store marker", sMachineReadableOutput) <<
 		info->GetLastObjectIDUsed() << std::endl;
 	std::cout << FormatUsageLineStart("Live Files", sMachineReadableOutput) <<
@@ -327,12 +295,46 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 		info->GetNumDeletedFiles() << std::endl;
 	std::cout << FormatUsageLineStart("Directories", sMachineReadableOutput) <<
 		info->GetNumDirectories() << std::endl;
+	std::cout << FormatUsageLineStart("Enabled", sMachineReadableOutput) <<
+		(info->IsAccountEnabled() ? "yes" : "no") << std::endl;
 	
 	return 0;
 }
 
-int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t ID, bool AskForConfirmation)
+int SetAccountEnabled(Configuration &rConfig, int32_t ID, bool enabled)
 {
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	{
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " to change enabled flag.");
+		return 1;
+	}
+	
+	// Load it in
+	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID,
+		rootDir, discSetNum, false /* ReadOnly */));
+	info->SetAccountEnabled(enabled);
+	info->Save();
+	return 0;
+}
+
+int DeleteAccount(Configuration &rConfig, int32_t ID, bool AskForConfirmation)
+{
+	std::string rootDir;
+	int discSetNum;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	{
+		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
+			<< " for deletion.");
+		return 1;
+	}
+
 	// Check user really wants to do this
 	if(AskForConfirmation)
 	{
@@ -346,36 +348,9 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 		}
 	}
 	
-	// Load in the account database 
-	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
-	
-	// Exists?
-	if(!db->EntryExists(ID))
-	{
-		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(ID) << 
-			" does not exist.");
-		return 1;
-	}
-	
-	// Get info from the database
-	BackupStoreAccounts acc(*db);
-	std::string rootDir;
-	int discSetNum;
-	acc.GetAccountRoot(ID, rootDir, discSetNum);
-	
 	// Obtain a write lock, as the daemon user
 	NamedLock writeLock;
 	{
-		// Bbecome the user specified in the config file
-		std::auto_ptr<UnixUser> user;
-		if(!rUsername.empty())
-		{
-			// Username specified, change...
-			user.reset(new UnixUser(rUsername.c_str()));
-			user->ChangeProcessUser(true /* temporary */);
-			// Change will be undone at the end of this function
-		}
-	
 		// Get a write lock
 		if(!GetWriteLockOnAccount(writeLock, rootDir, discSetNum))
 		{
@@ -384,7 +359,10 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 		}
 		
 		// Back to original user, but write is maintained
+		user.reset();
 	}
+
+	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
 
 	// Delete from account database
 	db->DeleteEntry(ID);
@@ -395,15 +373,24 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	// Remove the store files...
 
 	// First, become the user specified in the config file
-	std::auto_ptr<UnixUser> user;
-	if(!rUsername.empty())
+	std::string username;
+	{
+		const Configuration &rserverConfig(rConfig.GetSubConfiguration("Server"));
+		if(rserverConfig.KeyExists("User"))
+		{
+			username = rserverConfig.GetKeyValue("User");
+		}
+	}
+
+	// Become the right user
+	if(!username.empty())
 	{
 		// Username specified, change...
-		user.reset(new UnixUser(rUsername.c_str()));
+		user.reset(new UnixUser(username));
 		user->ChangeProcessUser(true /* temporary */);
-		// Change will be undone at the end of this function
+		// Change will be undone when user goes out of scope
 	}
-	
+
 	// Secondly, work out which directories need wiping
 	std::vector<std::string> toDelete;
 	RaidFileController &rcontroller(RaidFileController::GetController());
@@ -438,8 +425,7 @@ int DeleteAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 	return retcode;
 }
 
-bool OpenAccount(Configuration &rConfig, int32_t ID, 
-	const std::string &rUsername, std::string &rRootDirOut,
+bool OpenAccount(Configuration &rConfig, int32_t ID, std::string &rRootDirOut,
 	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser)
 {
 	// Load in the account database 
@@ -456,12 +442,22 @@ bool OpenAccount(Configuration &rConfig, int32_t ID,
 	// Get info from the database
 	BackupStoreAccounts acc(*db);
 	acc.GetAccountRoot(ID, rRootDirOut, rDiscSetOut);
-	
+
+	// Get the user under which the daemon runs
+	std::string username;
+	{
+		const Configuration &rserverConfig(rConfig.GetSubConfiguration("Server"));
+		if(rserverConfig.KeyExists("User"))
+		{
+			username = rserverConfig.GetKeyValue("User");
+		}
+	}
+
 	// Become the right user
-	if(!rUsername.empty())
+	if(!username.empty())
 	{
 		// Username specified, change...
-		apUser.reset(new UnixUser(rUsername));
+		apUser.reset(new UnixUser(username));
 		apUser->ChangeProcessUser(true /* temporary */);
 		// Change will be undone when apUser goes out of scope
 		// in the caller.
@@ -470,13 +466,13 @@ bool OpenAccount(Configuration &rConfig, int32_t ID,
 	return true;
 }
 
-int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t ID, bool FixErrors, bool Quiet)
+int CheckAccount(Configuration &rConfig, int32_t ID, bool FixErrors, bool Quiet)
 {
 	std::string rootDir;
 	int discSetNum;
-	std::auto_ptr<UnixUser> user;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
 
-	if(!OpenAccount(rConfig, ID, rUsername, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " for checking.");
@@ -490,7 +486,8 @@ int CheckAccount(Configuration &rConfig, const std::string &rUsername, int32_t I
 	return check.ErrorsFound()?1:0;
 }
 
-int CreateAccount(Configuration &rConfig, const std::string &rUsername, int32_t ID, int32_t DiscNumber, int32_t SoftLimit, int32_t HardLimit)
+int CreateAccount(Configuration &rConfig, int32_t ID, int32_t DiscNumber,
+	int32_t SoftLimit, int32_t HardLimit)
 {
 	// Load in the account database 
 	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
@@ -502,24 +499,33 @@ int CreateAccount(Configuration &rConfig, const std::string &rUsername, int32_t 
 			" already exists.");
 		return 1;
 	}
+
+	// Get the user under which the daemon runs
+	std::string username;
+	{
+		const Configuration &rserverConfig(rConfig.GetSubConfiguration("Server"));
+		if(rserverConfig.KeyExists("User"))
+		{
+			username = rserverConfig.GetKeyValue("User");
+		}
+	}
 	
 	// Create it.
 	BackupStoreAccounts acc(*db);
-	acc.Create(ID, DiscNumber, SoftLimit, HardLimit, rUsername);
+	acc.Create(ID, DiscNumber, SoftLimit, HardLimit, username);
 	
 	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(ID) << " created.");
 
 	return 0;
 }
 
-int HousekeepAccountNow(Configuration &rConfig, const std::string &rUsername,
-	int32_t ID)
+int HousekeepAccountNow(Configuration &rConfig, int32_t ID)
 {
 	std::string rootDir;
 	int discSetNum;
-	std::auto_ptr<UnixUser> user;
+	std::auto_ptr<UnixUser> user; // used to reset uid when we return
 
-	if(!OpenAccount(rConfig, ID, rUsername, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " for housekeeping.");
@@ -559,6 +565,8 @@ void PrintUsageAndExit()
 "  info [-m] <account>\n"
 "        Prints information about the specified account including number\n"
 "        of blocks used. The -m option enable machine-readable output.\n"
+"  enabled <accounts> <yes|no>\n"
+"        Sets the account as enabled or disabled for new logins.\n"
 "  setlimit <accounts> <softlimit> <hardlimit>\n"
 "        Changes the limits of the account as specified. Numbers are\n"
 "        interpreted as for the 'create' command (suffixed with B, M or G)\n"
@@ -645,16 +653,6 @@ int main(int argc, const char *argv[])
 			":" << errs);
 	}
 	
-	// Get the user under which the daemon runs
-	std::string username;
-	{
-		const Configuration &rserverConfig(config->GetSubConfiguration("Server"));
-		if(rserverConfig.KeyExists("User"))
-		{
-			username = rserverConfig.GetKeyValue("User");
-		}
-	}
-	
 	// Initialise the raid file controller
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
@@ -672,8 +670,10 @@ int main(int argc, const char *argv[])
 		PrintUsageAndExit();
 	}
 	
+	std::string command = argv[0];
+	
 	// Now do the command.
-	if(::strcmp(argv[0], "create") == 0)
+	if(command == "create")
 	{
 		// which disc?
 		int32_t discnum;
@@ -693,14 +693,39 @@ int main(int argc, const char *argv[])
 		CheckSoftHardLimits(softlimit, hardlimit);
 	
 		// Create the account...
-		return CreateAccount(*config, username, id, discnum, softlimit, hardlimit);
+		return CreateAccount(*config, id, discnum, softlimit, hardlimit);
 	}
-	else if(::strcmp(argv[0], "info") == 0)
+	else if(command == "info")
 	{
 		// Print information on this account
 		return AccountInfo(*config, id);
 	}
-	else if(::strcmp(argv[0], "setlimit") == 0)
+	else if(command == "enabled")
+	{
+		// Change the AccountEnabled flag on this account
+		if(argc != 3)
+		{
+			PrintUsageAndExit();
+		}
+		
+		bool enabled;
+		std::string enabled_string = argv[2];
+		if(enabled_string == "yes")
+		{
+			enabled = true;
+		}
+		else if(enabled_string == "no")
+		{
+			enabled = false;
+		}
+		else
+		{
+			PrintUsageAndExit();
+		}		
+		
+		return SetAccountEnabled(*config, id, enabled);
+	}
+	else if(command == "setlimit")
 	{
 		// Change the limits on this account
 		if(argc < 4)
@@ -709,9 +734,9 @@ int main(int argc, const char *argv[])
 			return 1;
 		}
 		
-		return SetLimit(*config, username, id, argv[2], argv[3]);
+		return SetLimit(*config, id, argv[2], argv[3]);
 	}
-	else if(::strcmp(argv[0], "name") == 0)
+	else if(command == "name")
 	{
 		// Change the limits on this account
 		if(argc != 3)
@@ -720,9 +745,9 @@ int main(int argc, const char *argv[])
 			return 1;
 		}
 		
-		return SetAccountName(*config, username, id, argv[2]);
+		return SetAccountName(*config, id, argv[2]);
 	}
-	else if(::strcmp(argv[0], "delete") == 0)
+	else if(command == "delete")
 	{
 		// Delete an account
 		bool askForConfirmation = true;
@@ -730,9 +755,9 @@ int main(int argc, const char *argv[])
 		{
 			askForConfirmation = false;
 		}
-		return DeleteAccount(*config, username, id, askForConfirmation);
+		return DeleteAccount(*config, id, askForConfirmation);
 	}
-	else if(::strcmp(argv[0], "check") == 0)
+	else if(command == "check")
 	{
 		bool fixErrors = false;
 		bool quiet = false;
@@ -756,15 +781,15 @@ int main(int argc, const char *argv[])
 		}
 	
 		// Check the account
-		return CheckAccount(*config, username, id, fixErrors, quiet);
+		return CheckAccount(*config, id, fixErrors, quiet);
 	}
-	else if(::strcmp(argv[0], "housekeep") == 0)
+	else if(command == "housekeep")
 	{
-		return HousekeepAccountNow(*config, username, id);
+		return HousekeepAccountNow(*config, id);
 	}
 	else
 	{
-		BOX_ERROR("Unknown command '" << argv[0] << "'.");
+		BOX_ERROR("Unknown command '" << command << "'.");
 		return 1;
 	}
 
@@ -772,5 +797,4 @@ int main(int argc, const char *argv[])
 	
 	MAINHELPER_END
 }
-
 
