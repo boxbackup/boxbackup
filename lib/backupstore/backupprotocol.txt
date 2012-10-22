@@ -39,6 +39,7 @@ Error		0	IsError(Type,SubType)	Reply
 	CONSTANT	Err_DoesNotExistInDirectory		13
 	CONSTANT	Err_PatchConsistencyError		14
 	CONSTANT	Err_MultiplyReferencedObject		15
+	CONSTANT	Err_DisabledAccount				16
 
 Version		1	Command(Version)	Reply
 	int32	Version

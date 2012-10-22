@@ -120,6 +120,13 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 	// Load the store info
 	rContext.LoadStoreInfo();
 
+	if(!rContext.GetBackupStoreInfo().IsAccountEnabled())
+	{
+		BOX_WARNING("Refused login from disabled client ID " << 
+			BOX_FORMAT_ACCOUNT(mClientID));
+		return PROTOCOL_ERROR(Err_DisabledAccount);
+	}
+
 	// Get the last client store marker
 	int64_t clientStoreMarker = rContext.GetClientStoreMarker();
 
