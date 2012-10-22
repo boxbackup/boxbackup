@@ -14,7 +14,50 @@
 #include <string>
 #include <vector>
 
+#include "CollectInBufferStream.h"
+
 class BackupStoreCheck;
+
+// set packing to one byte
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
+#include "BeginStructPackForWire.h"
+#else
+BEGIN_STRUCTURE_PACKING_FOR_WIRE
+#endif
+
+// ******************
+// make sure the defaults in CreateNew are modified!
+// ******************
+// Old version, grandfathered, do not change!
+typedef struct
+{
+	int32_t mMagicValue;	// also the version number
+	int32_t mAccountID;
+	int64_t mClientStoreMarker;
+	int64_t mLastObjectIDUsed;
+	int64_t mBlocksUsed;
+	int64_t mBlocksInOldFiles;
+	int64_t mBlocksInDeletedFiles;
+	int64_t mBlocksInDirectories;
+	int64_t mBlocksSoftLimit;
+	int64_t mBlocksHardLimit;
+	uint32_t mCurrentMarkNumber;
+	uint32_t mOptionsPresent;		// bit mask of optional elements present
+	int64_t mNumberDeletedDirectories;
+	// Then loads of int64_t IDs for the deleted directories
+} info_StreamFormat_1;
+
+#define INFO_MAGIC_VALUE_1	0x34832476
+#define INFO_MAGIC_VALUE_2	0x494e4632 /* INF2 */
+
+// Use default packing
+#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
+#include "EndStructPackForWire.h"
+#else
+END_STRUCTURE_PACKING_FOR_WIRE
+#endif
+
+#define INFO_FILENAME	"info"
 
 // --------------------------------------------------------------------------
 //
@@ -63,6 +106,7 @@ public:
 	int64_t GetNumOldFiles() const {return mNumOldFiles;}
 	int64_t GetNumDeletedFiles() const {return mNumDeletedFiles;}
 	int64_t GetNumDirectories() const {return mNumDirectories;}
+	bool IsAccountEnabled() const {return mAccountEnabled;}
 	bool IsReadOnly() const {return mReadOnly;}
 	int GetDiscSetNumber() const {return mDiscSet;}
 
@@ -87,11 +131,13 @@ public:
 	int64_t AllocateObjectID();
 		
 	// Client marker set and get
-	int64_t GetClientStoreMarker() {return mClientStoreMarker;}
+	int64_t GetClientStoreMarker() const {return mClientStoreMarker;}
 	void SetClientStoreMarker(int64_t ClientStoreMarker);
 
-	const std::string& GetAccountName() { return mAccountName; }
+	const std::string& GetAccountName() const { return mAccountName; }
 	void SetAccountName(const std::string& rName);
+	const CollectInBufferStream& GetExtraData() const { return mExtraData; }
+	void SetAccountEnabled(bool IsEnabled) {mAccountEnabled = IsEnabled; }
 
 private:
 	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(
@@ -129,6 +175,8 @@ private:
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;
 	std::vector<int64_t> mDeletedDirectories;
+	bool mAccountEnabled;
+	CollectInBufferStream mExtraData;
 };
 
 #endif // BACKUPSTOREINFO__H
