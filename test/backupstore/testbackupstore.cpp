@@ -12,32 +12,34 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "Archive.h"
+#include "BackupClientCryptoKeys.h"
+#include "BackupClientFileAttributes.h"
+#include "BackupStoreAccountDatabase.h"
+#include "BackupStoreAccounts.h"
+#include "BackupStoreConstants.h"
+#include "BackupStoreDirectory.h"
+#include "BackupStoreException.h"
+#include "BackupStoreInfo.h"
+#include "BackupStoreFilenameClear.h"
+#include "BackupStoreRefCountDatabase.h"
+#include "BackupStoreFile.h"
+#include "BoxPortsAndFiles.h"
+#include "CollectInBufferStream.h"
+#include "FileStream.h"
+#include "HousekeepStoreAccount.h"
+#include "MemBlockStream.h"
+#include "RaidFileController.h"
+#include "RaidFileException.h"
+#include "RaidFileRead.h"
+#include "RaidFileWrite.h"
+#include "SSLLib.h"
+#include "ServerControl.h"
+#include "Socket.h"
+#include "SocketStreamTLS.h"
+#include "TLSContext.h"
 #include "Test.h"
 #include "autogen_BackupProtocol.h"
-#include "SSLLib.h"
-#include "TLSContext.h"
-#include "SocketStreamTLS.h"
-#include "BoxPortsAndFiles.h"
-#include "BackupStoreConstants.h"
-#include "Socket.h"
-#include "BackupStoreFilenameClear.h"
-#include "CollectInBufferStream.h"
-#include "BackupStoreDirectory.h"
-#include "BackupStoreFile.h"
-#include "FileStream.h"
-#include "RaidFileController.h"
-#include "RaidFileWrite.h"
-#include "BackupStoreInfo.h"
-#include "BackupStoreException.h"
-#include "RaidFileException.h"
-#include "MemBlockStream.h"
-#include "BackupClientFileAttributes.h"
-#include "BackupClientCryptoKeys.h"
-#include "ServerControl.h"
-#include "BackupStoreAccountDatabase.h"
-#include "BackupStoreRefCountDatabase.h"
-#include "BackupStoreAccounts.h"
-#include "HousekeepStoreAccount.h"
 
 #include "MemLeakFindOn.h"
 
@@ -221,10 +223,6 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 
 int test1(int argc, const char *argv[])
 {
-	// Initialise the raid file controller
-	RaidFileController &rcontroller = RaidFileController::GetController();
-	rcontroller.Initialise("testfiles/raidfile.conf");
-
 	// test some basics -- encoding and decoding filenames
 	{
 		// Make some filenames in various ways
@@ -1873,235 +1871,274 @@ int test3(int argc, const char *argv[])
 	int pid = LaunchServer(cmd.c_str(), "testfiles/bbstored.pid");
 
 	TEST_THAT(pid != -1 && pid != 0);
-	if(pid > 0)
+	if(pid <= 0)
+	{
+		return 1;
+	}
+
+	::sleep(1);
+	TEST_THAT(ServerIsAlive(pid));
+
+	// BLOCK
+	{
+		// Open a connection to the server
+		SocketStreamTLS conn;
+		conn.Open(context, Socket::TypeINET, "localhost",
+			BOX_PORT_BBSTORED_TEST);
+
+		// Make a protocol
+		BackupProtocolClient protocol(conn);
+
+		// Check the version
+		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+
+		// Login
+		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0)),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
+		
+		// Finish the connection
+		protocol.QueryFinished();
+	}
+
+	// Create an account for the test client
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf create 01234567 0 "
+		"10000B 20000B") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
+	TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
+	TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
+	TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);
+	// make sure something is written to it
+	
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+		BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567), true));
+	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		apReferences->GetLastObjectIDUsed());
+	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+	apReferences.reset();
+	
+	// Test that login fails on a disabled account 
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 no") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	// BLOCK
+	{
+		// Open a connection to the server
+		SocketStreamTLS conn;
+		conn.Open(context, Socket::TypeINET, "localhost",
+			BOX_PORT_BBSTORED_TEST);
+
+		// Make a protocol
+		BackupProtocolClient protocol(conn);
+
+		// Check the version
+		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+
+		// Login
+		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed>
+			loginConf(protocol.QueryLogin(0x01234567, 0)),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
+		int type, subType;
+		TEST_EQUAL_LINE(true, protocol.GetLastError(type, subType),
+			"expected a protocol error");
+		TEST_EQUAL_LINE(BackupProtocolError::ErrorType, type,
+			"expected a BackupProtocolError");
+		TEST_EQUAL_LINE(BackupProtocolError::Err_DisabledAccount, subType,
+			"expected an Err_DisabledAccount");
+		
+		// Finish the connection
+		protocol.QueryFinished();
+	}
+
+	// Re-enable the account so that subsequent logins should succeed
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	// Delete the refcount database and log in again,
+	// check that it is recreated automatically but with
+	// no objects in it, to ensure seamless upgrade.
+	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
+
+	std::auto_ptr<SocketStreamTLS> conn;
+	test_server_login("localhost", context, conn)->QueryFinished();
+
+	BackupStoreAccountDatabase::Entry account =
+		apAccounts->GetEntry(0x1234567);
+	apReferences = BackupStoreRefCountDatabase::Load(account, true);
+	TEST_EQUAL(0, apReferences->GetLastObjectIDUsed());
+
+	TEST_THAT(ServerIsAlive(pid));
+
+	run_housekeeping(account);
+
+	// Check that housekeeping fixed the ref counts
+	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		apReferences->GetLastObjectIDUsed());
+	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+
+	TEST_THAT(ServerIsAlive(pid));
+
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	TEST_THAT(test_server("localhost") == 0);
+
+	// test that all object reference counts have the
+	// expected values
+	TEST_EQUAL(ExpectedRefCounts.size() - 1,
+		apReferences->GetLastObjectIDUsed());
+	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
+		i < ExpectedRefCounts.size(); i++)
+	{
+		TEST_EQUAL_LINE(ExpectedRefCounts[i],
+			apReferences->GetRefCount(i),
+			"object " << BOX_FORMAT_OBJECTID(i));
+	}
+
+	// Delete the refcount database again, and let
+	// housekeeping recreate it and fix the ref counts.
+	// This could also happen after upgrade, if a housekeeping
+	// runs before the user logs in.
+	apReferences.reset();
+	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
+	run_housekeeping(account);
+	apReferences = BackupStoreRefCountDatabase::Load(account, true);
+
+	TEST_EQUAL(ExpectedRefCounts.size() - 1,
+		apReferences->GetLastObjectIDUsed());
+	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
+		i < ExpectedRefCounts.size(); i++)
+	{
+		TEST_EQUAL_LINE(ExpectedRefCounts[i],
+			apReferences->GetRefCount(i),
+			"object " << BOX_FORMAT_OBJECTID(i));
+	}
+	
+	// Test the deletion of objects by the housekeeping system
+	// First, things as they are now.
+	recursive_count_objects_results before = {0,0,0};
+
+	recursive_count_objects("localhost", BackupProtocolListDirectory::RootDirectory, before);
+	
+	TEST_THAT(before.objectsNotDel != 0);
+	TEST_THAT(before.deleted != 0);
+	TEST_THAT(before.old != 0);
+
+	// Kill it
+	TEST_THAT(KillServer(pid));
+	::sleep(1);
+	TEST_THAT(!ServerIsAlive(pid));
+
+	#ifdef WIN32
+		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+	#else
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+	#endif
+	
+	// Set a new limit on the account -- leave the hard limit 
+	// high to make sure the target for freeing space is the 
+	// soft limit.
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+		" -c testfiles/bbstored.conf setlimit 01234567 "
+		"10B 20000B") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	// Start things up
+	pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
+		"testfiles/bbstored.pid");
+
+	::sleep(1);
+	TEST_THAT(ServerIsAlive(pid));
+	
+	// wait for housekeeping to happen
+	printf("waiting for housekeeping:\n");
+	for(int l = 0; l < 30; ++l)
 	{
 		::sleep(1);
-		TEST_THAT(ServerIsAlive(pid));
-
-		// BLOCK
-		{
-			// Open a connection to the server
-			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost",
-				BOX_PORT_BBSTORED_TEST);
-
-			// Make a protocol
-			BackupProtocolClient protocol(conn);
-
-			// Check the version
-			std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-			TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-
-			// Login
-			TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0)),
-				ConnectionException, Conn_Protocol_UnexpectedReply);
-			
-			// Finish the connection
-			protocol.QueryFinished();
-		}
-
-		// Create an account for the test client
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-			" -c testfiles/bbstored.conf create 01234567 0 "
-			"10000B 20000B") == 0);
-
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
-		TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
-		TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
-		TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);
-		// make sure something is written to it
-		
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-
-		std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
-			BackupStoreRefCountDatabase::Load(
-				apAccounts->GetEntry(0x1234567), true));
-		TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
-			apReferences->GetLastObjectIDUsed());
-		TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
-		apReferences.reset();
-
-		// Delete the refcount database and log in again,
-		// check that it is recreated automatically but with
-		// no objects in it, to ensure seamless upgrade.
-		TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
-
-		TLSContext context;
-		std::auto_ptr<SocketStreamTLS> conn;
-		test_server_login("localhost", context, conn)->QueryFinished();
-
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-		apReferences = BackupStoreRefCountDatabase::Load(account, true);
-		TEST_EQUAL(0, apReferences->GetLastObjectIDUsed());
-
-		TEST_THAT(ServerIsAlive(pid));
-
-		run_housekeeping(account);
-
-		// Check that housekeeping fixed the ref counts
-		TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
-			apReferences->GetLastObjectIDUsed());
-		TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
-
-		TEST_THAT(ServerIsAlive(pid));
-
-		set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
-		TEST_THAT(test_server("localhost") == 0);
-
-		// test that all object reference counts have the
-		// expected values
-		TEST_EQUAL(ExpectedRefCounts.size() - 1,
-			apReferences->GetLastObjectIDUsed());
-		for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
-			i < ExpectedRefCounts.size(); i++)
-		{
-			TEST_EQUAL_LINE(ExpectedRefCounts[i],
-				apReferences->GetRefCount(i),
-				"object " << BOX_FORMAT_OBJECTID(i));
-		}
-
-		// Delete the refcount database again, and let
-		// housekeeping recreate it and fix the ref counts.
-		// This could also happen after upgrade, if a housekeeping
-		// runs before the user logs in.
-		apReferences.reset();
-		TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
-		run_housekeeping(account);
-		apReferences = BackupStoreRefCountDatabase::Load(account, true);
-
-		TEST_EQUAL(ExpectedRefCounts.size() - 1,
-			apReferences->GetLastObjectIDUsed());
-		for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
-			i < ExpectedRefCounts.size(); i++)
-		{
-			TEST_EQUAL_LINE(ExpectedRefCounts[i],
-				apReferences->GetRefCount(i),
-				"object " << BOX_FORMAT_OBJECTID(i));
-		}
-		
-		// Test the deletion of objects by the housekeeping system
-		// First, things as they are now.
-		recursive_count_objects_results before = {0,0,0};
-
-		recursive_count_objects("localhost", BackupProtocolListDirectory::RootDirectory, before);
-		
-		TEST_THAT(before.objectsNotDel != 0);
-		TEST_THAT(before.deleted != 0);
-		TEST_THAT(before.old != 0);
-
-		// Kill it
-		TEST_THAT(KillServer(pid));
-		::sleep(1);
-		TEST_THAT(!ServerIsAlive(pid));
-
-		#ifdef WIN32
-			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
-		#else
-			TestRemoteProcessMemLeaks("bbstored.memleaks");
-		#endif
-		
-		// Set a new limit on the account -- leave the hard limit 
-		// high to make sure the target for freeing space is the 
-		// soft limit.
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
-			" -c testfiles/bbstored.conf setlimit 01234567 "
-			"10B 20000B") == 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		// Start things up
-		pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
-			"testfiles/bbstored.pid");
-
-		::sleep(1);
-		TEST_THAT(ServerIsAlive(pid));
-		
-		// wait for housekeeping to happen
-		printf("waiting for housekeeping:\n");
-		for(int l = 0; l < 30; ++l)
-		{
-			::sleep(1);
-			printf(".");
-			fflush(stdout);
-		}
-		printf("\n");
-
-		// Count the objects again
-		recursive_count_objects_results after = {0,0,0};
-		recursive_count_objects("localhost", 
-			BackupProtocolListDirectory::RootDirectory, 
-			after);
-
-		// If these tests fail then try increasing the timeout above
-		TEST_THAT(after.objectsNotDel == before.objectsNotDel);
-		TEST_THAT(after.deleted == 0);
-		TEST_THAT(after.old == 0);
-		
-		// Set a really small hard limit
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
-			" -c testfiles/bbstored.conf setlimit 01234567 "
-			"10B 20B") == 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		// Try to upload a file and create a directory, and check an error is generated
-		{
-			// Open a connection to the server
-			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost",
-				BOX_PORT_BBSTORED_TEST);
-
-			// Make a protocol
-			BackupProtocolClient protocol(conn);
-
-			// Check the version
-			std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-			TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-
-			// Login
-			std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));
-			
-			int64_t modtime = 0;
-			
-			BackupStoreFilenameClear fnx("exceed-limit");
-			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BackupProtocolListDirectory::RootDirectory, fnx, &modtime));
-			TEST_THAT(modtime != 0);
-
-			TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
-					BackupProtocolListDirectory::RootDirectory,
-					modtime,
-					modtime, /* use it for attr hash too */
-					0,							/* diff from ID */
-					fnx,
-					*upload)),
-				ConnectionException, Conn_Protocol_UnexpectedReply);
-
-			MemBlockStream attr(&modtime, sizeof(modtime));
-			BackupStoreFilenameClear fnxd("exceed-limit-dir");
-			TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-					BackupProtocolListDirectory::RootDirectory,
-					9837429842987984LL, fnxd, attr)),
-				ConnectionException, Conn_Protocol_UnexpectedReply);
-
-
-			// Finish the connection
-			protocol.QueryFinished();
-		}
-
-		// Kill it again
-		TEST_THAT(KillServer(pid));
-		::sleep(1);
-		TEST_THAT(!ServerIsAlive(pid));
-
-		#ifdef WIN32
-			TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
-		#else
-			TestRemoteProcessMemLeaks("bbstored.memleaks");
-		#endif
+		printf(".");
+		fflush(stdout);
 	}
+	printf("\n");
+
+	// Count the objects again
+	recursive_count_objects_results after = {0,0,0};
+	recursive_count_objects("localhost", 
+		BackupProtocolListDirectory::RootDirectory, 
+		after);
+
+	// If these tests fail then try increasing the timeout above
+	TEST_THAT(after.objectsNotDel == before.objectsNotDel);
+	TEST_THAT(after.deleted == 0);
+	TEST_THAT(after.old == 0);
+	
+	// Set a really small hard limit
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+		" -c testfiles/bbstored.conf setlimit 01234567 "
+		"10B 20B") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	// Try to upload a file and create a directory, and check an error is generated
+	{
+		// Open a connection to the server
+		SocketStreamTLS conn;
+		conn.Open(context, Socket::TypeINET, "localhost",
+			BOX_PORT_BBSTORED_TEST);
+
+		// Make a protocol
+		BackupProtocolClient protocol(conn);
+
+		// Check the version
+		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+
+		// Login
+		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));
+		
+		int64_t modtime = 0;
+		
+		BackupStoreFilenameClear fnx("exceed-limit");
+		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BackupProtocolListDirectory::RootDirectory, fnx, &modtime));
+		TEST_THAT(modtime != 0);
+
+		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
+				BackupProtocolListDirectory::RootDirectory,
+				modtime,
+				modtime, /* use it for attr hash too */
+				0,							/* diff from ID */
+				fnx,
+				*upload)),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
+
+		MemBlockStream attr(&modtime, sizeof(modtime));
+		BackupStoreFilenameClear fnxd("exceed-limit-dir");
+		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
+				BackupProtocolListDirectory::RootDirectory,
+				9837429842987984LL, fnxd, attr)),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
+
+
+		// Finish the connection
+		protocol.QueryFinished();
+	}
+
+	// Kill it again
+	TEST_THAT(KillServer(pid));
+	::sleep(1);
+	TEST_THAT(!ServerIsAlive(pid));
+
+	#ifdef WIN32
+		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+	#else
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+	#endif
 
 	return 0;
 }
@@ -2149,25 +2186,18 @@ int multi_server()
 	return 0;
 }
 
-#ifdef WIN32
-WCHAR* ConvertUtf8ToWideString(const char* pString);
-std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
-#endif
-
-int test(int argc, const char *argv[])
+void test_open_files_with_limited_win32_permissions()
 {
 #ifdef WIN32
 	// this had better work, or bbstored will die when combining diffs
 	char* file = "foo";
-	std::string abs = ConvertPathToAbsoluteUnicode(file);
-	WCHAR* wfile = ConvertUtf8ToWideString(abs.c_str());
 
 	DWORD accessRights = FILE_READ_ATTRIBUTES | 
 		FILE_LIST_DIRECTORY | FILE_READ_EA | FILE_WRITE_ATTRIBUTES |
 		FILE_WRITE_DATA | FILE_WRITE_EA /*| FILE_ALL_ACCESS*/;
 	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
-	HANDLE h1 = CreateFileW(wfile, accessRights, shareMode,
+	HANDLE h1 = CreateFileA(file, accessRights, shareMode,
 		NULL, OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	assert(h1 != INVALID_HANDLE_VALUE);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
@@ -2175,23 +2205,266 @@ int test(int argc, const char *argv[])
 	accessRights = FILE_READ_ATTRIBUTES | 
 		FILE_LIST_DIRECTORY | FILE_READ_EA;
 
-	HANDLE h2 = CreateFileW(wfile, accessRights, shareMode,
+	HANDLE h2 = CreateFileA(file, accessRights, shareMode,
 		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	assert(h2 != INVALID_HANDLE_VALUE);
 	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
 
 	CloseHandle(h2);
 	CloseHandle(h1);
-	delete [] wfile;
 
-	h1 = openfile("foo", O_CREAT | O_RDWR, 0);
+	h1 = openfile(file, O_CREAT | O_RDWR, 0);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
-	h2 = openfile("foo", O_RDWR, 0);
+	h2 = openfile(file, O_RDWR, 0);
 	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
 	CloseHandle(h2);
 	CloseHandle(h1);
 #endif
+}
 
+void compare_backupstoreinfo_values_to_expected
+(
+	const std::string& test_phase,
+	const info_StreamFormat_1& expected,
+	const BackupStoreInfo& actual
+)
+{
+	TEST_EQUAL_LINE(ntohl(expected.mAccountID), actual.GetAccountID(),
+		test_phase << " AccountID");
+	#define TEST_INFO_EQUAL(property) \
+		TEST_EQUAL_LINE(box_ntoh64(expected.m ## property), \
+			actual.Get ## property (), test_phase << " " #property)
+	TEST_INFO_EQUAL(ClientStoreMarker);
+	TEST_INFO_EQUAL(LastObjectIDUsed);
+	TEST_INFO_EQUAL(BlocksUsed);
+	TEST_INFO_EQUAL(BlocksInOldFiles);
+	TEST_INFO_EQUAL(BlocksInDeletedFiles);
+	TEST_INFO_EQUAL(BlocksInDirectories);
+	TEST_INFO_EQUAL(BlocksSoftLimit);
+	TEST_INFO_EQUAL(BlocksHardLimit);
+	// These attributes of the v2 structure are not supported by v1,
+	// so they should all be initialised to 0
+	TEST_EQUAL_LINE(0, actual.GetBlocksInCurrentFiles(),
+		test_phase << " BlocksInCurrentFiles");
+	TEST_EQUAL_LINE(0, actual.GetNumOldFiles(),
+		test_phase << " NumOldFiles");
+	TEST_EQUAL_LINE(0, actual.GetNumDeletedFiles(),
+		test_phase << " NumDeletedFiles");
+	TEST_EQUAL_LINE(0, actual.GetNumDirectories(),
+		test_phase << " NumDirectories");
+	// These attributes of the old v1 structure are not actually loaded
+	// or used:
+	// TEST_INFO_EQUAL(CurrentMarkNumber);
+	// TEST_INFO_EQUAL(OptionsPresent);
+	TEST_EQUAL_LINE(box_ntoh64(expected.mNumberDeletedDirectories),
+		actual.GetDeletedDirectories().size(),
+		test_phase << " number of deleted directories");
+	TEST_EQUAL_LINE(13, actual.GetDeletedDirectories()[0],
+		test_phase << " deleted directory 1");
+	TEST_EQUAL_LINE(14, actual.GetDeletedDirectories()[1],
+		test_phase << " deleted directory 2");
+	#undef TEST_INFO_EQUAL
+}
+
+int test_read_old_backupstoreinfo_files()
+{
+	// Create an account for the test client
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf create 01234567 0 "
+		"10000B 20000B") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	info_StreamFormat_1 info_v1;
+	info_v1.mMagicValue = htonl(INFO_MAGIC_VALUE_1);
+	info_v1.mAccountID = htonl(0x01234567);
+	info_v1.mClientStoreMarker = box_hton64(3);
+	info_v1.mLastObjectIDUsed = box_hton64(4);
+	info_v1.mBlocksUsed = box_hton64(5);
+	info_v1.mBlocksInOldFiles = box_hton64(6);
+	info_v1.mBlocksInDeletedFiles = box_hton64(7);
+	info_v1.mBlocksInDirectories = box_hton64(8);
+	info_v1.mBlocksSoftLimit = box_hton64(9);
+	info_v1.mBlocksHardLimit = box_hton64(10);
+	info_v1.mCurrentMarkNumber = htonl(11);
+	info_v1.mOptionsPresent = htonl(12);
+	info_v1.mNumberDeletedDirectories = box_hton64(2);
+	// Then mNumberDeletedDirectories * int64_t IDs for the deleted directories
+
+	// Generate the filename
+	std::string info_filename("backup/01234567/" INFO_FILENAME);
+	std::auto_ptr<RaidFileWrite> rfw(new RaidFileWrite(0, info_filename));
+	rfw->Open(/* AllowOverwrite = */ true);
+	rfw->Write(&info_v1, sizeof(info_v1));
+	// Write mNumberDeletedDirectories * int64_t IDs for the deleted directories
+	std::auto_ptr<Archive> apArchive(new Archive(*rfw, IOStream::TimeOutInfinite));
+	apArchive->Write((int64_t) 13);
+	apArchive->Write((int64_t) 14);
+	rfw->Commit(/* ConvertToRaidNow */ true);
+	rfw.reset();
+	
+	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
+		"backup/01234567/", 0, /* ReadOnly */ false);
+	compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
+		*apInfo);
+	TEST_EQUAL_LINE("", apInfo->GetAccountName(),
+		"account loaded from version 1 format should have no name");
+	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+		"account loaded from version 1 format should be enabled by default");
+
+	apInfo->SetAccountName("bonk");
+	
+	// Save the info again
+	apInfo->Save(/* allowOverwrite */ true);
+	
+	// Check that it was saved in the new Archive format
+	std::auto_ptr<RaidFileRead> rfr(RaidFileRead::Open(0, info_filename, 0));
+	int32_t magic;
+	if(!rfr->ReadFullBuffer(&magic, sizeof(magic), 0))
+	{
+		THROW_FILE_ERROR("Failed to read store info file: "
+			"short read of magic number", info_filename,
+			BackupStoreException, CouldNotLoadStoreInfo);
+	}
+	TEST_EQUAL_LINE(INFO_MAGIC_VALUE_2, ntohl(magic),
+		"format version in newly saved BackupStoreInfo");
+	rfr.reset();
+
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
+		/* ReadOnly */ false);
+	compare_backupstoreinfo_values_to_expected("loaded in v1, resaved in v2",
+		info_v1, *apInfo);
+	TEST_EQUAL_LINE("bonk", apInfo->GetAccountName(),
+		"account loaded from version 1 format should have no name");
+	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+		"account resaved in v2 format should preserve AccountEnabled");
+		
+	// Check that the new AccountEnabled flag is saved properly
+	apInfo->SetAccountEnabled(false);
+	apInfo->Save(/* allowOverwrite */ true);
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
+		/* ReadOnly */ false);
+	compare_backupstoreinfo_values_to_expected("saved in v2, loaded in v2",
+		info_v1, *apInfo);
+	TEST_EQUAL_LINE(false, apInfo->IsAccountEnabled(),
+		"AccountEnabled flag was set to false but not loaded correctly");
+	apInfo->SetAccountEnabled(true);
+	apInfo->Save(/* allowOverwrite */ true);
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
+		/* ReadOnly */ true);
+	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+		"AccountEnabled flag was set to true but not loaded correctly");
+	
+	// Now save the info in v2 format without the AccountEnabled flag
+	// (boxbackup 0.11 format) and check that the flag is set to true
+	// for backwards compatibility
+	
+	rfw.reset(new RaidFileWrite(0, info_filename));
+	rfw->Open(/* allowOverwrite */ true);
+	magic = htonl(INFO_MAGIC_VALUE_2);
+	apArchive.reset(new Archive(*rfw, IOStream::TimeOutInfinite));
+	rfw->Write(&magic, sizeof(magic));
+	apArchive->Write(apInfo->GetAccountID());
+	apArchive->Write(std::string("test"));
+	apArchive->Write(apInfo->GetClientStoreMarker());
+	apArchive->Write(apInfo->GetLastObjectIDUsed());
+	apArchive->Write(apInfo->GetBlocksUsed());
+	apArchive->Write(apInfo->GetBlocksInCurrentFiles());
+	apArchive->Write(apInfo->GetBlocksInOldFiles());
+	apArchive->Write(apInfo->GetBlocksInDeletedFiles());
+	apArchive->Write(apInfo->GetBlocksInDirectories());
+	apArchive->Write(apInfo->GetBlocksSoftLimit());
+	apArchive->Write(apInfo->GetBlocksHardLimit());
+	apArchive->Write(apInfo->GetNumFiles());
+	apArchive->Write(apInfo->GetNumOldFiles());
+	apArchive->Write(apInfo->GetNumDeletedFiles());
+	apArchive->Write(apInfo->GetNumDirectories());
+	apArchive->Write((int64_t) apInfo->GetDeletedDirectories().size());
+	apArchive->Write(apInfo->GetDeletedDirectories()[0]);
+	apArchive->Write(apInfo->GetDeletedDirectories()[1]);
+	rfw->Commit(/* ConvertToRaidNow */ true);
+	rfw.reset();
+	
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
+		/* ReadOnly */ false);
+	compare_backupstoreinfo_values_to_expected("saved in v2 without "
+		"AccountEnabled", info_v1, *apInfo);
+	TEST_EQUAL_LINE("test", apInfo->GetAccountName(),
+		"account loaded from short v2 format should preserve AccountName");
+	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+		"default for missing AccountEnabled should be true");
+	// Rewrite using full length, so that the first 4 bytes of extra data
+	// doesn't get swallowed by "extra data".
+	apInfo->Save(/* allowOverwrite */ true);
+		
+	// Append some extra data after the known account values, to simulate a
+	// new addition to the store format. Check that this extra data is loaded
+	// and resaved with the info file. We made the mistake of deleting it in
+	// 0.11, let's not make the same mistake again.
+	CollectInBufferStream info_data;
+	rfr = RaidFileRead::Open(0, info_filename, 0);
+	rfr->CopyStreamTo(info_data);
+	rfr.reset();
+	info_data.SetForReading();
+	rfw.reset(new RaidFileWrite(0, info_filename));
+	rfw->Open(/* allowOverwrite */ true);
+	info_data.CopyStreamTo(*rfw);
+	char extra_string[] = "hello!";
+	MemBlockStream extra_data(extra_string, strlen(extra_string));
+	extra_data.CopyStreamTo(*rfw);
+	rfw->Commit(/* ConvertToRaidNow */ true);
+	rfw.reset();
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
+		/* ReadOnly */ false);
+	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(), 
+		"wrong amount of extra data loaded from info file");
+	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
+		apInfo->GetExtraData().GetBuffer(), extra_data.GetSize()),
+		"extra data loaded from info file has wrong contents");
+	// Save the file and load again, check that the extra data is still there
+	apInfo->Save(/* allowOverwrite */ true);
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(), 
+		"wrong amount of extra data saved and reloaded from info file");
+	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
+		apInfo->GetExtraData().GetBuffer(), extra_data.GetSize()),
+		"extra data saved and reloaded from info file has wrong contents");
+		
+	// Check that the new bbstoreaccounts command sets the flag properly
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 no") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	TEST_EQUAL_LINE(false, apInfo->IsAccountEnabled(),
+		"'bbstoreaccounts disabled no' should have reset AccountEnabled flag");
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+		"'bbstoreaccounts disabled yes' should have set AccountEnabled flag");
+
+	// Delete the account to leave the store in the same state as before	
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf delete 01234567 yes") == 0);
+	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	
+	return 0;
+}
+
+int test(int argc, const char *argv[])
+{
+	test_open_files_with_limited_win32_permissions();
+
+	// Initialise the raid file controller
+	RaidFileController &rcontroller = RaidFileController::GetController();
+	rcontroller.Initialise("testfiles/raidfile.conf");
+	
+	int ret = test_read_old_backupstoreinfo_files();
+	if (ret != 0)
+	{
+		return ret;
+	}
+	
 	// SSL library
 	SSLLib::Initialise();
 	
