@@ -81,7 +81,7 @@ public:
 		int privItem;
 		Read(privItem);
 
-		if (privItem)
+		if(privItem)
 		{
 			rItemOut = true;
 		}
@@ -89,6 +89,12 @@ public:
 		{
 			rItemOut = false;
 		}
+	}
+	void ReadIfPresent(bool &rItemOut, bool ValueIfNotPresent)
+	{
+		int privItem;
+		ReadIfPresent(privItem, ValueIfNotPresent ? 1 : 0);
+		rItemOut = privItem ? true : false;
 	}
 	void ReadExact(uint32_t &rItemOut) { Read((int&)rItemOut); }
 	void Read(int &rItemOut)
@@ -99,6 +105,25 @@ public:
 			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
 		}
 		rItemOut = ntohl(privItem);
+	}
+	void ReadIfPresent(int &rItemOut, int ValueIfNotPresent)
+	{
+		int32_t privItem;
+		int bytesRead;
+		if(mrStream.ReadFullBuffer(&privItem, sizeof(privItem), &bytesRead))
+		{
+			rItemOut = ntohl(privItem);
+		}
+		else if(bytesRead == 0)
+		{
+			// item is simply not present
+			rItemOut = ValueIfNotPresent;
+		}
+		else
+		{
+			// bad number of remaining bytes
+			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+		}
 	}
 	void Read(int64_t &rItemOut)
 	{
