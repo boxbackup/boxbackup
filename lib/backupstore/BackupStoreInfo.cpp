@@ -19,52 +19,11 @@
 
 #include "MemLeakFindOn.h"
 
-// set packing to one byte
-#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#include "BeginStructPackForWire.h"
-#else
-BEGIN_STRUCTURE_PACKING_FOR_WIRE
-#endif
-
-// ******************
-// make sure the defaults in CreateNew are modified!
-// ******************
-// Old version, grandfathered, do not change!
-typedef struct
-{
-	int32_t mMagicValue;	// also the version number
-	int32_t mAccountID;
-	int64_t mClientStoreMarker;
-	int64_t mLastObjectIDUsed;
-	int64_t mBlocksUsed;
-	int64_t mBlocksInOldFiles;
-	int64_t mBlocksInDeletedFiles;
-	int64_t mBlocksInDirectories;
-	int64_t mBlocksSoftLimit;
-	int64_t mBlocksHardLimit;
-	uint32_t mCurrentMarkNumber;
-	uint32_t mOptionsPresent;		// bit mask of optional elements present
-	int64_t mNumberDeletedDirectories;
-	// Then loads of int64_t IDs for the deleted directories
-} info_StreamFormat_1;
-
-#define INFO_MAGIC_VALUE_1	0x34832476
-#define INFO_MAGIC_VALUE_2	0x494e4632 /* INF2 */
-
-// Use default packing
-#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#include "EndStructPackForWire.h"
-#else
-END_STRUCTURE_PACKING_FOR_WIRE
-#endif
-
 #ifdef BOX_RELEASE_BUILD
 	#define 	NUM_DELETED_DIRS_BLOCK	256
 #else
 	#define 	NUM_DELETED_DIRS_BLOCK	2
 #endif
-
-#define INFO_FILENAME	"info"
 
 // --------------------------------------------------------------------------
 //
@@ -127,6 +86,7 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 	ASSERT(rRootDir[rRootDir.size() - 1] == '/' ||
 		rRootDir[rRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 	info.mFilename = rRootDir + INFO_FILENAME;
+	info.mExtraData.SetForReading(); // extra data is empty in this case
 
 	info.Save(false);
 }
@@ -252,7 +212,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 	  	archive.Read(numDelObj);
 	}
 
-	// Then load them in
+	// Then load the list of deleted directories
 	if(numDelObj > 0)
 	{
 		int64_t objs[NUM_DELETED_DIRS_BLOCK];
@@ -284,6 +244,26 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 	{
 		THROW_EXCEPTION(BackupStoreException, BadStoreInfoOnLoad)
 	}
+
+	if(v2)
+	{
+		Archive archive(*rf, IOStream::TimeOutInfinite);
+		archive.ReadIfPresent(info->mAccountEnabled, true);
+	}
+	else
+	{
+		info->mAccountEnabled = true;
+	}
+	
+	// If there's any data left in the info file, from future additions to
+	// the file format, then we need to load it so that it won't be lost when
+	// we resave the file.
+	IOStream::pos_type bytesLeft = rf->BytesLeftToRead();
+	if (bytesLeft > 0)
+	{
+		rf->CopyStreamTo(info->mExtraData);
+	}
+	info->mExtraData.SetForReading();
 	
 	// return it to caller
 	return info;
@@ -412,6 +392,12 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 			tosave -= b;
 		}
 	}
+	
+	archive.Write(mAccountEnabled);
+	
+	mExtraData.Seek(0, IOStream::SeekType_Absolute);
+	mExtraData.CopyStreamTo(rf);
+	mExtraData.Seek(0, IOStream::SeekType_Absolute);
 
 	// Commit it to disc, converting it to RAID now
 	rf.Commit(true);
@@ -717,5 +703,4 @@ void BackupStoreInfo::SetAccountName(const std::string& rName)
 	
 	mIsModified = true;
 }
-
 
