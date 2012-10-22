@@ -31,7 +31,8 @@ private:
 	BackupStoreAccounts(const BackupStoreAccounts &rToCopy);
 
 public:
-	void Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit, int64_t SizeHardLimit, const std::string &rAsUsername);
+	void Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
+		int64_t SizeHardLimit, const std::string &rAsUsername);
 
 	bool AccountExists(int32_t ID);
 	void GetAccountRoot(int32_t ID, std::string &rRootDirOut, int &rDiscSetOut) const;
