@@ -164,7 +164,8 @@ RaidFileDiscSet &RaidFileController::GetDiscSet(unsigned int DiscSetNum)
 {
 	if(DiscSetNum < 0 || DiscSetNum >= mSetList.size())
 	{
-		THROW_EXCEPTION(RaidFileException, NoSuchDiscSet)
+		THROW_EXCEPTION_MESSAGE(RaidFileException, NoSuchDiscSet, DiscSetNum <<
+			" (" << mSetList.size() << " disc sets configured)")
 	}
 
 	return mSetList[DiscSetNum];
