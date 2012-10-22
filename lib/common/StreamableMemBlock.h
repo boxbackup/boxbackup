@@ -2,7 +2,8 @@
 //
 // File
 //		Name:    StreamableMemBlock.h
-//		Purpose: Memory blocks which can be loaded and saved from streams
+//		Purpose: Memory blocks which can be loaded and saved from streams,
+//		         with a header indicating the size of the block.
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
