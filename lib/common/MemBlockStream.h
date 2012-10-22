@@ -41,6 +41,8 @@ public:
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
+	virtual const void* GetBuffer() const { return mpBuffer; }
+	virtual int GetSize() const { return mBytesInBuffer; }
 
 private:
 	const char *mpBuffer;
