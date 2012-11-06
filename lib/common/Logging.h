@@ -144,6 +144,10 @@
 	std::setw(6) << \
 	timespec.tv_usec
 
+#define BOX_FORMAT_MICROSECONDS(t) \
+	(int)((t) / 1000000) << "." << \
+	(int)((t) % 1000000) << " seconds"
+
 #undef ERROR
 
 namespace Log

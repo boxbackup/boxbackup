@@ -170,10 +170,6 @@ void Timers::RescheduleIfNeeded()
 	}
 }
 
-#define FORMAT_MICROSECONDS(t) \
-	(int)(t / 1000000) << "." << \
-	(int)(t % 1000000) << " seconds"
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -242,7 +238,7 @@ void Timers::Reschedule()
 				*/
 				BOX_TRACE(TIMER_ID_OF(**i) "has expired, "
 					"triggering " <<
-					FORMAT_MICROSECONDS(-timeToExpiry) <<
+					BOX_FORMAT_MICROSECONDS(-timeToExpiry) <<
 					" late");
 				rTimer.OnExpire();
 				spTimers->erase(i);
@@ -295,7 +291,7 @@ void Timers::Reschedule()
 	else
 	{
 		BOX_TRACE("timer: next event: " << nameOfNextEvent <<
-			" expires in " << FORMAT_MICROSECONDS(timeToNextEvent));
+			" expires in " << BOX_FORMAT_MICROSECONDS(timeToNextEvent));
 	}
 
 	struct itimerval timeout;
@@ -397,7 +393,7 @@ void Timer::Start()
 	if (timeToExpiry <= 0)
 	{
 		BOX_WARNING(TIMER_ID << "fudging expiry from -" <<
-			FORMAT_MICROSECONDS(-timeToExpiry))
+			BOX_FORMAT_MICROSECONDS(-timeToExpiry))
 		timeToExpiry = 1;
 	}
 
