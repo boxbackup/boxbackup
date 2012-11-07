@@ -482,13 +482,13 @@ Timer::~Timer()
 void Timer::LogAssignment(const Timer &From)
 {
 	#ifndef BOX_RELEASE_BUILD
-	if (mExpired)
+	if (From.mExpired)
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " << 
 			TIMER_ID_OF(From) << ", already expired, "
 			"will not fire");
 	}
-	else if (mExpires == 0)
+	else if (From.mExpires == 0)
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " <<
 			TIMER_ID_OF(From) << ", no expiry, "
@@ -497,8 +497,8 @@ void Timer::LogAssignment(const Timer &From)
 	else
 	{
 		BOX_TRACE(TIMER_ID "initialised from timer " <<
-			TIMER_ID_OF(From) << ", to fire after " <<
-			BOX_FORMAT_MICROSECONDS(From.mExpires));
+			TIMER_ID_OF(From) << ", to fire at " <<
+			FormatTime(From.mExpires, false, true));
 	}
 	#endif
 }
