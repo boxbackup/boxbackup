@@ -30,7 +30,7 @@ std::vector<Timer*>* Timers::spTimers = NULL;
 bool Timers::sRescheduleNeeded = false;
 
 #define TIMER_ID "timer " << mName << " (" << this << ") "
-#define TIMER_ID_OF(t) "timer " << (t).GetName() << " (" << &(t) << ") "
+#define TIMER_ID_OF(t) "timer " << (t).GetName() << " (" << &(t) << ")"
 
 typedef void (*sighandler_t)(int);
 
@@ -232,11 +232,7 @@ void Timers::Reschedule()
 		
 			if (timeToExpiry <= 0)
 			{
-				/*
-				BOX_TRACE("timer " << *i << " has expired, "
-					"triggering it");
-				*/
-				BOX_TRACE(TIMER_ID_OF(**i) "has expired, "
+				BOX_TRACE(TIMER_ID_OF(**i) " has expired, "
 					"triggering " <<
 					BOX_FORMAT_MICROSECONDS(-timeToExpiry) <<
 					" late");
@@ -483,6 +479,30 @@ Timer::~Timer()
 	Stop();
 }
 
+void Timer::LogAssignment(const Timer &From)
+{
+	#ifndef BOX_RELEASE_BUILD
+	if (mExpired)
+	{
+		BOX_TRACE(TIMER_ID "initialised from timer " << 
+			TIMER_ID_OF(From) << ", already expired, "
+			"will not fire");
+	}
+	else if (mExpires == 0)
+	{
+		BOX_TRACE(TIMER_ID "initialised from timer " <<
+			TIMER_ID_OF(From) << ", no expiry, "
+			"will not fire");
+	}
+	else
+	{
+		BOX_TRACE(TIMER_ID "initialised from timer " <<
+			TIMER_ID_OF(From) << ", to fire after " <<
+			BOX_FORMAT_MICROSECONDS(From.mExpires));
+	}
+	#endif
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -502,25 +522,7 @@ Timer::Timer(const Timer& rToCopy)
 , mTimerHandle(INVALID_HANDLE_VALUE)
 #endif
 {
-	#ifndef BOX_RELEASE_BUILD
-	if (mExpired)
-	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
-			"already expired, will not fire");
-	}
-	else if (mExpires == 0)
-	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
-			"no expiry, will not fire");
-	}
-	else
-	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
-			"to fire at " <<
-			(int)(mExpires / MICRO_SEC_IN_SEC_LL) << "." <<
-			(int)(mExpires % MICRO_SEC_IN_SEC_LL));
-	}
-	#endif
+	LogAssignment(rToCopy);
 
 	if (!mExpired && mExpires != 0)
 	{
@@ -543,25 +545,7 @@ Timer::Timer(const Timer& rToCopy)
 
 Timer& Timer::operator=(const Timer& rToCopy)
 {
-	#ifndef BOX_RELEASE_BUILD
-	if (rToCopy.mExpired)
-	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
-			"already expired, will not fire");
-	}
-	else if (rToCopy.mExpires == 0)
-	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
-			"no expiry, will not fire");
-	}
-	else
-	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << &rToCopy << ", "
-			"to fire at " <<
-			(int)(rToCopy.mExpires / MICRO_SEC_IN_SEC_LL) << "." <<
-			(int)(rToCopy.mExpires % MICRO_SEC_IN_SEC_LL));
-	}
-	#endif
+	LogAssignment(rToCopy);
 
 	Timers::Remove(*this);
 	Stop();
