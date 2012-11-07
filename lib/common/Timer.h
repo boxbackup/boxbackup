@@ -76,6 +76,7 @@ private:
 	void Start();
 	void Start(int64_t timeoutMillis);
 	void Stop();
+	void LogAssignment(const Timer &From);
 
 	#ifdef WIN32
 	HANDLE mTimerHandle;
