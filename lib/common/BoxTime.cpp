@@ -127,7 +127,7 @@ void ShortSleep(box_time_t duration, bool logDuration)
 		// when nanosleep() returns later than expected.
 
 		int32_t secs = (int32_t) ts.tv_sec;
-		int64_t remain_ns = (secs * 1000000000) + ts.tv_nsec;
+		int64_t remain_ns = ((int64_t)secs * 1000000000) + ts.tv_nsec;
 
 		if (remain_ns < 0)
 		{
@@ -137,9 +137,8 @@ void ShortSleep(box_time_t duration, bool logDuration)
 			return;
 		}
 
-		BOX_TRACE("nanosleep interrupted with " <<
-			(remain_ns / 1000000000) << " secs remaining, "
-			"sleeping again");
+		BOX_TRACE("nanosleep interrupted with " << remain_ns <<
+			" nanosecs remaining, sleeping again");
 	}
 #endif
 }
