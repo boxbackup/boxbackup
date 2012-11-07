@@ -53,26 +53,29 @@ BackupClientContext::BackupClientContext
 	ProgressNotifier& rProgressNotifier,
 	bool TcpNiceMode
 )
-	: mrResolver(rResolver),
-	  mrTLSContext(rTLSContext),
-	  mHostname(rHostname),
-	  mPort(Port),
-	  mAccountNumber(AccountNumber),
-	  mExtendedLogging(ExtendedLogging),
-	  mExtendedLogToFile(ExtendedLogToFile),
-	  mExtendedLogFile(ExtendedLogFile),
-	  mpExtendedLogFileHandle(NULL),
-	  mClientStoreMarker(ClientStoreMarker_NotKnown),
-	  mpDeleteList(0),
-	  mpCurrentIDMap(0),
-	  mpNewIDMap(0),
-	  mStorageLimitExceeded(false),
-	  mpExcludeFiles(0),
-	  mpExcludeDirs(0),
-	  mKeepAliveTimer(0, "KeepAliveTime"),
-	  mbIsManaged(false),
-	  mrProgressNotifier(rProgressNotifier),
-	  mTcpNiceMode(TcpNiceMode)
+: mExperimentalSnapshotMode(false),
+  mrResolver(rResolver),
+  mrTLSContext(rTLSContext),
+  mHostname(rHostname),
+  mPort(Port),
+  mAccountNumber(AccountNumber),
+  mpSocket(0),
+  mpConnection(0),
+  mExtendedLogging(ExtendedLogging),
+  mExtendedLogToFile(ExtendedLogToFile),
+  mExtendedLogFile(ExtendedLogFile),
+  mpExtendedLogFileHandle(NULL),
+  mClientStoreMarker(ClientStoreMarker_NotKnown),
+  mpDeleteList(0),
+  mpCurrentIDMap(0),
+  mpNewIDMap(0),
+  mStorageLimitExceeded(false),
+  mpExcludeFiles(0),
+  mpExcludeDirs(0),
+  mKeepAliveTimer(0, "KeepAliveTime"),
+  mbIsManaged(false),
+  mrProgressNotifier(rProgressNotifier)
+  mTcpNiceMode(TcpNiceMode)
 {
 }
 
@@ -507,7 +510,8 @@ void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
 	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
 	BOX_TRACE("Set keep-alive time to " << mKeepAliveTime << " seconds");
-	mKeepAliveTimer = Timer(mKeepAliveTime * 1000, "KeepAliveTime");
+	mKeepAliveTimer = Timer(mKeepAliveTime * MILLI_SEC_IN_SEC,
+		"KeepAliveTime");
 }
 
 // --------------------------------------------------------------------------
@@ -567,7 +571,8 @@ void BackupClientContext::DoKeepAlive()
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	mapConnection->QueryGetIsAlive();
 	
-	mKeepAliveTimer = Timer(mKeepAliveTime * 1000, "KeepAliveTime");
+	mKeepAliveTimer = Timer(mKeepAliveTime * MILLI_SEC_IN_SEC,
+		"KeepAliveTime");
 }
 
 int BackupClientContext::GetMaximumDiffingTime() 
