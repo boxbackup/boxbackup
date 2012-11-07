@@ -218,6 +218,8 @@ public:
 		}
 	}
 
+	bool mExperimentalSnapshotMode;
+
 private:
 	LocationResolver &mrResolver;
 	TLSContext &mrTLSContext;
