@@ -646,6 +646,15 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 
 	// Build a new store info
+	std::auto_ptr<MemBlockStream> extra_data;
+	if(pOldInfo.get())
+	{
+		extra_data.reset(new MemBlockStream(pOldInfo->GetExtraData()));
+	}
+	else
+	{
+		extra_data.reset(new MemBlockStream(/* empty */));
+	}
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::CreateForRegeneration(
 		mAccountID,
 		mAccountName,
@@ -658,7 +667,9 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		mBlocksInDeletedFiles,
 		mBlocksInDirectories,
 		softLimit,
-		hardLimit));
+		hardLimit,
+		(pOldInfo.get() ? pOldInfo->IsAccountEnabled() : true),
+		*extra_data));
 	info->AdjustNumFiles(mNumFiles);
 	info->AdjustNumOldFiles(mNumOldFiles);
 	info->AdjustNumDeletedFiles(mNumDeletedFiles);
