@@ -48,7 +48,8 @@ BackupStoreInfo::BackupStoreInfo()
 	  mNumFiles(0),
 	  mNumOldFiles(0),
 	  mNumDeletedFiles(0),
-	  mNumDirectories(0)
+	  mNumDirectories(0),
+	  mAccountEnabled(true)
 {
 }
 

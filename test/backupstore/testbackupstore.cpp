@@ -435,7 +435,7 @@ void test_test_file(int t, IOStream &rStream)
 
 void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 {
-	printf("Test for del: %llx\n", DirID);
+	printf("Test for del: %llx\n", (unsigned long long)DirID);
 	
 	// Command
 	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
@@ -476,7 +476,7 @@ std::vector<uint32_t> ExpectedRefCounts;
 
 void set_refcount(int64_t ObjectID, uint32_t RefCount = 1)
 {
-	if (ExpectedRefCounts.size() <= ObjectID);
+	if ((int64_t)ExpectedRefCounts.size() <= ObjectID);
 	{
 		ExpectedRefCounts.resize(ObjectID + 1, 0);
 	}
@@ -519,7 +519,8 @@ int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
 		subdirid = dirCreate->GetObjectID(); 
 	}
 	
-	printf("Create subdirs, depth = %d, dirid = %llx\n", depth, subdirid);
+	printf("Create subdirs, depth = %d, dirid = %llx\n", depth,
+		(unsigned long long)subdirid);
 
 	TEST_EQUAL(subdirid, rRefCount.GetLastObjectIDUsed());
 	TEST_EQUAL(1, rRefCount.GetRefCount(subdirid))
@@ -2293,6 +2294,10 @@ int test_read_old_backupstoreinfo_files()
 		" -c testfiles/bbstored.conf create 01234567 0 "
 		"10000B 20000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
+		"backup/01234567/", 0, /* ReadOnly */ false);
+	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+		"'bbstoreaccounts create' should have set AccountEnabled flag");
 
 	info_StreamFormat_1 info_v1;
 	info_v1.mMagicValue = htonl(INFO_MAGIC_VALUE_1);
@@ -2322,8 +2327,8 @@ int test_read_old_backupstoreinfo_files()
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
 	
-	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
-		"backup/01234567/", 0, /* ReadOnly */ false);
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
+		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
 		*apInfo, "" /* no name by default */,
 		true /* enabled by default */);
