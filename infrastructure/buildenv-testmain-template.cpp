@@ -153,14 +153,14 @@ bool check_filedes(bool report)
 						flag(S_IFLNK) <<
 						flag(S_IFSOCK) <<
 						" or " << m << ")");
+					allOk = false;
 				}
 				else
 				{
 					BOX_FATAL("File descriptor " << d << 
 						" left open (and stat failed)");
+					allOk = false;
 				}
-	
-				allOk = false;
 			}
 			else if (!report)
 			{
