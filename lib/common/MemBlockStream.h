@@ -27,6 +27,7 @@ class CollectInBufferStream;
 class MemBlockStream : public IOStream
 {
 public:
+	MemBlockStream();
 	MemBlockStream(const void *pBuffer, int Size);
 	MemBlockStream(const StreamableMemBlock &rBlock);
 	MemBlockStream(const CollectInBufferStream &rBuffer);
