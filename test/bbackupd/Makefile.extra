@@ -7,7 +7,7 @@ link-extra: ../../bin/bbackupd/autogen_ClientException.o \
 	../../bin/bbackupd/Win32ServiceFunctions.o \
 	../../bin/bbackupd/BackupDaemon.o \
 	../../bin/bbstored/BBStoreDHousekeeping.o \
-	../../bin/bbstored/HousekeepStoreAccount.o \
+	../../lib/backupstore/HousekeepStoreAccount.o \
 	../../lib/backupstore/autogen_BackupProtocol.o \
 	../../lib/backupstore/BackupStoreContext.o \
 	../../lib/backupstore/BackupCommands.o \
