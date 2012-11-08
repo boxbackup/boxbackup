@@ -2226,7 +2226,10 @@ void compare_backupstoreinfo_values_to_expected
 (
 	const std::string& test_phase,
 	const info_StreamFormat_1& expected,
-	const BackupStoreInfo& actual
+	const BackupStoreInfo& actual,
+	const std::string& expected_account_name,
+	bool expected_account_enabled,
+	const MemBlockStream& extra_data = MemBlockStream(/* empty */)
 )
 {
 	TEST_EQUAL_LINE(ntohl(expected.mAccountID), actual.GetAccountID(),
@@ -2242,6 +2245,8 @@ void compare_backupstoreinfo_values_to_expected
 	TEST_INFO_EQUAL(BlocksInDirectories);
 	TEST_INFO_EQUAL(BlocksSoftLimit);
 	TEST_INFO_EQUAL(BlocksHardLimit);
+	#undef TEST_INFO_EQUAL
+
 	// These attributes of the v2 structure are not supported by v1,
 	// so they should all be initialised to 0
 	TEST_EQUAL_LINE(0, actual.GetBlocksInCurrentFiles(),
@@ -2252,18 +2257,33 @@ void compare_backupstoreinfo_values_to_expected
 		test_phase << " NumDeletedFiles");
 	TEST_EQUAL_LINE(0, actual.GetNumDirectories(),
 		test_phase << " NumDirectories");
+
 	// These attributes of the old v1 structure are not actually loaded
 	// or used:
 	// TEST_INFO_EQUAL(CurrentMarkNumber);
 	// TEST_INFO_EQUAL(OptionsPresent);
+
 	TEST_EQUAL_LINE(box_ntoh64(expected.mNumberDeletedDirectories),
 		actual.GetDeletedDirectories().size(),
 		test_phase << " number of deleted directories");
-	TEST_EQUAL_LINE(13, actual.GetDeletedDirectories()[0],
-		test_phase << " deleted directory 1");
-	TEST_EQUAL_LINE(14, actual.GetDeletedDirectories()[1],
-		test_phase << " deleted directory 2");
-	#undef TEST_INFO_EQUAL
+
+	for (size_t i = 0; i < box_ntoh64(expected.mNumberDeletedDirectories) &&
+		i < actual.GetDeletedDirectories().size(); i++)
+	{
+		TEST_EQUAL_LINE(13 + i, actual.GetDeletedDirectories()[i],
+			test_phase << " deleted directory " << (i+1));
+	}
+
+	TEST_EQUAL_LINE(expected_account_name, actual.GetAccountName(),
+		test_phase << " AccountName");
+	TEST_EQUAL_LINE(expected_account_enabled, actual.IsAccountEnabled(),
+		test_phase << " AccountEnabled");
+
+	TEST_EQUAL_LINE(extra_data.GetSize(), actual.GetExtraData().GetSize(), 
+		test_phase << " extra data has wrong size");
+	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
+		actual.GetExtraData().GetBuffer(), extra_data.GetSize()),
+		test_phase << " extra data has wrong contents");
 }
 
 int test_read_old_backupstoreinfo_files()
@@ -2305,11 +2325,8 @@ int test_read_old_backupstoreinfo_files()
 	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
 		"backup/01234567/", 0, /* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
-		*apInfo);
-	TEST_EQUAL_LINE("", apInfo->GetAccountName(),
-		"account loaded from version 1 format should have no name");
-	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
-		"account loaded from version 1 format should be enabled by default");
+		*apInfo, "" /* no name by default */,
+		true /* enabled by default */);
 
 	apInfo->SetAccountName("bonk");
 	
@@ -2329,14 +2346,11 @@ int test_read_old_backupstoreinfo_files()
 		"format version in newly saved BackupStoreInfo");
 	rfr.reset();
 
+	// load it, and check that all values are loaded properly
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("loaded in v1, resaved in v2",
-		info_v1, *apInfo);
-	TEST_EQUAL_LINE("bonk", apInfo->GetAccountName(),
-		"account loaded from version 1 format should have no name");
-	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
-		"account resaved in v2 format should preserve AccountEnabled");
+		info_v1, *apInfo, "bonk", true);
 		
 	// Check that the new AccountEnabled flag is saved properly
 	apInfo->SetAccountEnabled(false);
@@ -2344,16 +2358,15 @@ int test_read_old_backupstoreinfo_files()
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("saved in v2, loaded in v2",
-		info_v1, *apInfo);
-	TEST_EQUAL_LINE(false, apInfo->IsAccountEnabled(),
-		"AccountEnabled flag was set to false but not loaded correctly");
+		info_v1, *apInfo, "bonk", false /* as modified above */);
 	apInfo->SetAccountEnabled(true);
 	apInfo->Save(/* allowOverwrite */ true);
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ true);
-	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
-		"AccountEnabled flag was set to true but not loaded correctly");
-	
+	compare_backupstoreinfo_values_to_expected("resaved in v2 with "
+		"account enabled", info_v1, *apInfo, "bonk",
+		true /* as modified above */);
+
 	// Now save the info in v2 format without the AccountEnabled flag
 	// (boxbackup 0.11 format) and check that the flag is set to true
 	// for backwards compatibility
@@ -2387,11 +2400,9 @@ int test_read_old_backupstoreinfo_files()
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("saved in v2 without "
-		"AccountEnabled", info_v1, *apInfo);
-	TEST_EQUAL_LINE("test", apInfo->GetAccountName(),
-		"account loaded from short v2 format should preserve AccountName");
-	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
-		"default for missing AccountEnabled should be true");
+		"AccountEnabled", info_v1, *apInfo, "test", true);
+	// Default for missing AccountEnabled should be true
+
 	// Rewrite using full length, so that the first 4 bytes of extra data
 	// doesn't get swallowed by "extra data".
 	apInfo->Save(/* allowOverwrite */ true);
@@ -2423,11 +2434,8 @@ int test_read_old_backupstoreinfo_files()
 	// Save the file and load again, check that the extra data is still there
 	apInfo->Save(/* allowOverwrite */ true);
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
-	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(), 
-		"wrong amount of extra data saved and reloaded from info file");
-	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
-		apInfo->GetExtraData().GetBuffer(), extra_data.GetSize()),
-		"extra data saved and reloaded from info file has wrong contents");
+	compare_backupstoreinfo_values_to_expected("saved in future format "
+		"with extra_data", info_v1, *apInfo, "test", true, extra_data);
 		
 	// Check that the new bbstoreaccounts command sets the flag properly
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
@@ -2442,6 +2450,39 @@ int test_read_old_backupstoreinfo_files()
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
 	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
 		"'bbstoreaccounts disabled yes' should have set AccountEnabled flag");
+
+	// Check that BackupStoreInfo::CreateForRegeneration saves all the
+	// expected properties, including any extra data for forward
+	// compatibility
+	extra_data.Seek(0, IOStream::SeekType_Absolute);
+	apInfo = BackupStoreInfo::CreateForRegeneration(
+		apInfo->GetAccountID(), "spurtle" /* rAccountName */,
+		"backup/01234567/" /* rRootDir */, 0 /* DiscSet */,
+		apInfo->GetLastObjectIDUsed(),
+		apInfo->GetBlocksUsed(),
+		apInfo->GetBlocksInCurrentFiles(),
+		apInfo->GetBlocksInOldFiles(),
+		apInfo->GetBlocksInDeletedFiles(),
+		apInfo->GetBlocksInDirectories(),
+		apInfo->GetBlocksSoftLimit(),
+		apInfo->GetBlocksHardLimit(),
+		false /* AccountEnabled */,
+		extra_data);
+	// CreateForRegeneration always sets the ClientStoreMarker to 0
+	info_v1.mClientStoreMarker = 0;
+	// CreateForRegeneration does not store any deleted directories
+	info_v1.mNumberDeletedDirectories = 0;
+
+	// check that the store info has the correct values in memory
+	compare_backupstoreinfo_values_to_expected("stored by "
+		"BackupStoreInfo::CreateForRegeneration", info_v1, *apInfo,
+		"spurtle", false /* AccountEnabled */, extra_data);
+	// Save the file and load again, check that the extra data is still there
+	apInfo->Save(/* allowOverwrite */ true);
+	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	compare_backupstoreinfo_values_to_expected("saved by "
+		"BackupStoreInfo::CreateForRegeneration and reloaded", info_v1,
+		*apInfo, "spurtle", false /* AccountEnabled */, extra_data);
 
 	// Delete the account to leave the store in the same state as before	
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
