@@ -22,6 +22,20 @@
 //
 // Function
 //		Name:    MemBlockStream::MemBlockStream()
+//		Purpose: Constructor with no contents
+//		Created: 2012/11/07
+//
+// --------------------------------------------------------------------------
+MemBlockStream::MemBlockStream()
+: mpBuffer(NULL),
+  mBytesInBuffer(0),
+  mReadPosition(0)
+{ }
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    MemBlockStream::MemBlockStream()
 //		Purpose: Constructor (doesn't copy block, careful with lifetimes)
 //		Created: 2003/09/05
 //
@@ -68,7 +82,6 @@ MemBlockStream::MemBlockStream(const CollectInBufferStream &rBuffer)
 	ASSERT(mpBuffer != 0);
 	ASSERT(mBytesInBuffer >= 0);
 }
-
 
 // --------------------------------------------------------------------------
 //
