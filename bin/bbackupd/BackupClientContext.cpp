@@ -59,8 +59,6 @@ BackupClientContext::BackupClientContext
   mHostname(rHostname),
   mPort(Port),
   mAccountNumber(AccountNumber),
-  mpSocket(0),
-  mpConnection(0),
   mExtendedLogging(ExtendedLogging),
   mExtendedLogToFile(ExtendedLogToFile),
   mExtendedLogFile(ExtendedLogFile),
@@ -74,7 +72,7 @@ BackupClientContext::BackupClientContext
   mpExcludeDirs(0),
   mKeepAliveTimer(0, "KeepAliveTime"),
   mbIsManaged(false),
-  mrProgressNotifier(rProgressNotifier)
+  mrProgressNotifier(rProgressNotifier),
   mTcpNiceMode(TcpNiceMode)
 {
 }
