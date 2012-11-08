@@ -29,8 +29,10 @@
 	#include <getopt.h>
 #endif
 
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 
 #include <exception>
 #include <string>
@@ -76,7 +78,15 @@ inline bool checkfilesleftopen()  { return false; }
 
 #define FILEDES_MAX 256
 
-bool filedes_open[FILEDES_MAX];
+typedef enum
+{
+	OPEN,
+	CLOSED,
+	SYSLOG
+}
+filedes_t;
+
+filedes_t filedes_open[FILEDES_MAX];
 
 bool check_filedes(bool report)
 {
@@ -87,11 +97,49 @@ bool check_filedes(bool report)
 	{
 		if(::fcntl(d, F_GETFD) != -1)
 		{
-			// File descriptor obviously exists
-			if (report && !filedes_open[d])
+			// File descriptor obviously exists, but is it /dev/log?
+
+			struct stat st;
+			bool stat_success = false;
+			bool is_syslog_socket = false;
+
+			if(fstat(d, &st) == 0)
 			{
-				struct stat st;
-				if (fstat(d, &st) == 0)
+				stat_success = true;
+			}
+
+			if(stat_success && (st.st_mode & S_IFSOCK))
+			{
+				char buffer[256];
+				socklen_t addrlen = sizeof(buffer);
+
+				if(getpeername(d, (sockaddr*)buffer, &addrlen) != 0)
+				{
+					BOX_WARNING("Failed to getpeername(" << 
+						d << "), cannot identify /dev/log");
+				}
+				else
+				{
+					struct sockaddr_un *sa = 
+						(struct sockaddr_un *)buffer;
+					if(sa->sun_family == PF_UNIX &&
+						!strcmp(sa->sun_path, "/dev/log"))
+					{
+						is_syslog_socket = true;
+					}
+				}
+			}
+
+			if(report && filedes_open[d] != OPEN)
+			{
+				if(filedes_open[d] == SYSLOG)
+				{
+					// Different libcs have different ideas
+					// about when to open and close this
+					// socket, and it's not a leak, so
+					// ignore it.
+				}
+				else if(stat_success)
 				{
 					int m = st.st_mode;
 					#define flag(x) ((m & x) ? #x " " : "")
@@ -113,24 +161,33 @@ bool check_filedes(bool report)
 				}
 	
 				allOk = false;
-				
 			}
 			else if (!report)
 			{
-				filedes_open[d] = true;
+				filedes_open[d] = is_syslog_socket ? SYSLOG : OPEN;
 			}
 		}
 		else 
 		{
-			if (report && filedes_open[d])
+			if (report && filedes_open[d] != CLOSED)
 			{
-				BOX_FATAL("File descriptor " << d << 
-					" was open, now closed");
-				allOk = false;
+				if (filedes_open[d] == SYSLOG)
+				{
+					// Different libcs have different ideas
+					// about when to open and close this
+					// socket, and it's not a leak, so
+					// ignore it.
+				}
+				else if(filedes_open[d] == OPEN)
+				{
+					BOX_FATAL("File descriptor " << d << 
+						" was open, now closed");
+					allOk = false;
+				}
 			}
 			else
 			{
-				filedes_open[d] = false;
+				filedes_open[d] = CLOSED;
 			}
 		}
 	}
