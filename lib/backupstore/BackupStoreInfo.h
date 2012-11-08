@@ -139,15 +139,20 @@ public:
 	const CollectInBufferStream& GetExtraData() const { return mExtraData; }
 	void SetAccountEnabled(bool IsEnabled) {mAccountEnabled = IsEnabled; }
 
-private:
+	/**
+         * @return a new BackupStoreInfo with the requested properties.
+	 * This is exposed to allow testing, do not use otherwise!
+	 */
 	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(
 		int32_t AccountID, const std::string &rAccountName,
 		const std::string &rRootDir, int DiscSet,
 		int64_t LastObjectID, int64_t BlocksUsed,
 		int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+		int64_t BlockSoftLimit, int64_t BlockHardLimit,
+		bool AccountEnabled, IOStream& ExtraData);
 
+private:
 	// Location information
 	// Be VERY careful about changing types of these values, as
 	// they now define the sizes of fields on disk (via Archive).

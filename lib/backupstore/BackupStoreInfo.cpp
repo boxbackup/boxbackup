@@ -284,7 +284,8 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	int64_t LastObjectID, int64_t BlocksUsed,
 	int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 	int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
-	int64_t BlockSoftLimit, int64_t BlockHardLimit)
+	int64_t BlockSoftLimit, int64_t BlockHardLimit,
+	bool AccountEnabled, IOStream& ExtraData)
 {
 	// Generate the filename
 	std::string fn(rRootDir + INFO_FILENAME);
@@ -298,7 +299,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	info->mDiscSet = DiscSet;
 	info->mFilename = fn;
 	info->mReadOnly = false;
-	
+
 	// Insert info starting info
 	info->mClientStoreMarker	= 0;
 	info->mLastObjectIDUsed		= LastObjectID;
@@ -309,7 +310,11 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	info->mBlocksInDirectories	= BlocksInDirectories;
 	info->mBlocksSoftLimit		= BlockSoftLimit;
 	info->mBlocksHardLimit		= BlockHardLimit;
+	info->mAccountEnabled		= AccountEnabled;
 	
+	ExtraData.CopyStreamTo(info->mExtraData);
+	info->mExtraData.SetForReading();
+
 	// return it to caller
 	return info;
 }
