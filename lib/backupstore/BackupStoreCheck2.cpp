@@ -12,17 +12,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "BackupStoreCheck.h"
-#include "StoreStructure.h"
-#include "RaidFileRead.h"
-#include "RaidFileWrite.h"
 #include "autogen_BackupStoreException.h"
-#include "BackupStoreObjectMagic.h"
+#include "BackupStoreCheck.h"
+#include "BackupStoreConstants.h"
+#include "BackupStoreDirectory.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreFileWire.h"
-#include "BackupStoreDirectory.h"
-#include "BackupStoreConstants.h"
 #include "BackupStoreInfo.h"
+#include "BackupStoreObjectMagic.h"
+#include "MemBlockStream.h"
+#include "RaidFileRead.h"
+#include "RaidFileWrite.h"
+#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
