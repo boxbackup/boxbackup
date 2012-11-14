@@ -34,8 +34,7 @@ if ! ./configure "$@" --target=i686-pc-mingw32 \
 	CFLAGS="-mno-cygwin -mthreads" \
 	CPPFLAGS="-mno-cygwin" \
 	CXXFLAGS="-mno-cygwin -mthreads" \
-	LDFLAGS="-mno-cygwin -mthreads -L${DEP_PATH}/lib -L${LIBZ_PATH}" \
-	LIBS="-lcrypto -lws2_32 -lgdi32"
+	LDFLAGS="-Wl,-Bstatic -mno-cygwin -mthreads -L${DEP_PATH}/lib -L${LIBZ_PATH}"
 then
 	echo "Error: configure failed, aborting." >&2
 	exit 1
