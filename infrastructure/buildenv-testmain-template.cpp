@@ -29,10 +29,16 @@
 	#include <getopt.h>
 #endif
 
-#include <sys/socket.h>
+#ifdef HAVE_SYS_SOCKET_H
+#	include <sys/socket.h>
+#endif
+
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/un.h>
+
+#ifdef HAVE_SYS_UN_H
+#	include <sys/un.h>
+#endif
 
 #include <exception>
 #include <string>
@@ -113,6 +119,7 @@ bool check_filedes(bool report)
 				char buffer[256];
 				socklen_t addrlen = sizeof(buffer);
 
+#ifdef HAVE_GETPEERNAME
 				if(getpeername(d, (sockaddr*)buffer, &addrlen) != 0)
 				{
 					BOX_WARNING("Failed to getpeername(" << 
@@ -128,6 +135,7 @@ bool check_filedes(bool report)
 						is_syslog_socket = true;
 					}
 				}
+#endif // HAVE_GETPEERNAME
 			}
 
 			if(report && filedes_open[d] != OPEN)
