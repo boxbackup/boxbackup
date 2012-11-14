@@ -109,9 +109,9 @@ AC_ARG_ENABLE(
   [old-ssl],
   [AC_HELP_STRING([--enable-old-ssl],
                   [Allow use of pre-0.9.7 Open SSL - NOT RECOMMENDED, read the documentation])])
-AC_CHECK_LIB(
-  [crypto],
-  [EVP_CipherInit_ex],, [
+AC_SEARCH_LIBS(
+  [EVP_CipherInit_ex],
+  [crypto],, [
   if test "x$enable_old_ssl" = "xyes"; then
     AC_DEFINE([HAVE_OLD_SSL], 1, [Define to 1 if SSL is pre-0.9.7])
   else
@@ -136,8 +136,8 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h process.h pwd.h signal.h])
 AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
 AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
-AC_CHECK_HEADERS([sys/file.h sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
-AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
+AC_CHECK_HEADERS([sys/file.h sys/param.h sys/socket.h sys/time.h sys/types.h])
+AC_CHECK_HEADERS([sys/uio.h sys/un.h sys/wait.h sys/xattr.h])
 AC_CHECK_HEADERS([bsd/unistd.h])
 AC_CHECK_HEADERS([sys/socket.h], [have_sys_socket_h=yes])
 AC_CHECK_HEADERS([winsock2.h], [have_winsock2_h=yes])
@@ -254,7 +254,7 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_FUNC_STAT
-AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid gettimeofday waitpid ftruncate])
+AC_CHECK_FUNCS([getpeereid getpeername lchown setproctitle getpid gettimeofday waitpid ftruncate])
 AC_SEARCH_LIBS([setproctitle], ["bsd"])
 
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
