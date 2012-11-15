@@ -375,8 +375,8 @@ if ($build_os eq 'CYGWIN')
 }
 else
 {
-	print MAKE "\tfind release debug       -type f -exec rm {} \\;\n";
-	print MAKE "\tfind . -name 'autogen_*' -type f -exec rm {} \\;\n";
+	print MAKE "\tfind release debug       -type f -exec rm -f {} \\;\n";
+	print MAKE "\tfind . -name 'autogen_*' -type f -exec rm -f {} \\;\n";
 }
 
 for my $parcel (@parcels)
