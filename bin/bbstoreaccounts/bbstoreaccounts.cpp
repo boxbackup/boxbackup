@@ -358,7 +358,7 @@ int DeleteAccount(Configuration &rConfig, int32_t ID, bool AskForConfirmation)
 			return 1;
 		}
 		
-		// Back to original user, but write is maintained
+		// Back to original user, but write lock is maintained
 		user.reset();
 	}
 
@@ -402,6 +402,11 @@ int DeleteAccount(Configuration &rConfig, int32_t ID, bool AskForConfirmation)
 			toDelete.push_back((*i) + DIRECTORY_SEPARATOR + rootDir);
 		}
 	}
+
+#ifdef WIN32
+	// Cannot remove files while holding a lock on them
+	writeLock.ReleaseLock();
+#endif
 
 	int retcode = 0;
 
