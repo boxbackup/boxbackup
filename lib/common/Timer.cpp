@@ -364,7 +364,7 @@ Timer::Timer(size_t timeoutMillis, const std::string& rName)
 	else
 	{
 		Timers::Add(*this);
-		Start(timeoutMillis * 1000);
+		Start(timeoutMillis);
 	}
 }
 
@@ -393,7 +393,7 @@ void Timer::Start()
 		timeToExpiry = 1;
 	}
 
-	Start(timeToExpiry);
+	Start(timeToExpiry / MICRO_SEC_IN_MILLI_SEC);
 #endif
 }
 
@@ -429,6 +429,10 @@ void Timer::Start(int64_t timeoutMillis)
 		BOX_ERROR(TIMER_ID "failed to create timer: " <<
 			GetErrorMessage(GetLastError()));
 		mTimerHandle = INVALID_HANDLE_VALUE;
+	}
+	else
+	{
+		BOX_INFO(TIMER_ID << "set for " << timeoutMillis << " ms");
 	}
 #endif
 }

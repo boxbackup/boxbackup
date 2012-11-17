@@ -18,6 +18,7 @@ typedef int64_t	box_time_t;
 #define NANO_SEC_IN_USEC_LL (1000LL)
 #define MICRO_SEC_IN_SEC 	(1000000)
 #define MICRO_SEC_IN_SEC_LL	(1000000LL)
+#define MICRO_SEC_IN_MILLI_SEC 	(1000)
 #define MILLI_SEC_IN_SEC		(1000)
 #define MILLI_SEC_IN_SEC_LL	(1000LL)
 
