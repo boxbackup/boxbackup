@@ -67,6 +67,7 @@ public:
 	}
 
 	const std::string& GetName() const { return mName; }
+	virtual void Reset(size_t timeoutMillis);
 	
 private:
 	box_time_t  mExpires;
@@ -77,6 +78,7 @@ private:
 	void Start(int64_t timeoutMillis);
 	void Stop();
 	void LogAssignment(const Timer &From);
+	virtual void Set(size_t timeoutMillis, bool isReset);
 
 	#ifdef WIN32
 	HANDLE mTimerHandle;

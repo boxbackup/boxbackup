@@ -352,17 +352,25 @@ int test(int argc, const char *argv[])
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(t2.HasExpired());
 	TEST_THAT(!t3.HasExpired());
-	
+
+	// Try both ways of resetting an existing timer.
 	t1 = Timer(1000, "t1a");
-	t2 = Timer(2000, "t2a");
+	t2.Reset(2000);
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(!t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(!t3.HasExpired());
 	
 	safe_sleep(1);
 	TEST_THAT(!t0.HasExpired());
 	TEST_THAT(t1.HasExpired());
 	TEST_THAT(!t2.HasExpired());
+	TEST_THAT(t3.HasExpired());
+
+	safe_sleep(1);
+	TEST_THAT(!t0.HasExpired());
+	TEST_THAT(t1.HasExpired());
+	TEST_THAT(t2.HasExpired());
 	TEST_THAT(t3.HasExpired());
 
 	// Leave timers initialised for rest of test.
