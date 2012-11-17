@@ -508,8 +508,7 @@ void BackupClientContext::SetKeepAliveTime(int iSeconds)
 {
 	mKeepAliveTime = iSeconds < 0 ? 0 : iSeconds;
 	BOX_TRACE("Set keep-alive time to " << mKeepAliveTime << " seconds");
-	mKeepAliveTimer = Timer(mKeepAliveTime * MILLI_SEC_IN_SEC,
-		"KeepAliveTime");
+	mKeepAliveTimer.Reset(mKeepAliveTime * MILLI_SEC_IN_SEC);
 }
 
 // --------------------------------------------------------------------------
@@ -569,8 +568,7 @@ void BackupClientContext::DoKeepAlive()
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	mapConnection->QueryGetIsAlive();
 	
-	mKeepAliveTimer = Timer(mKeepAliveTime * MILLI_SEC_IN_SEC,
-		"KeepAliveTime");
+	mKeepAliveTimer.Reset(mKeepAliveTime * MILLI_SEC_IN_SEC);
 }
 
 int BackupClientContext::GetMaximumDiffingTime() 

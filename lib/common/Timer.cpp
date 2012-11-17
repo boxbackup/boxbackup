@@ -119,6 +119,7 @@ void Timers::Add(Timer& rTimer)
 {
 	ASSERT(spTimers);
 	ASSERT(&rTimer);
+	BOX_TRACE(TIMER_ID_OF(rTimer) " added to global queue, rescheduling");
 	spTimers->push_back(&rTimer);
 	Reschedule();
 }
@@ -136,6 +137,7 @@ void Timers::Remove(Timer& rTimer)
 {
 	ASSERT(spTimers);
 	ASSERT(&rTimer);
+	BOX_TRACE(TIMER_ID_OF(rTimer) " removed from global queue, rescheduling");
 
 	bool restart = true;
 	while (restart)
@@ -244,8 +246,8 @@ void Timers::Reschedule()
 			else
 			{
 				/*
-				BOX_TRACE("timer " << *i << " has not "
-					"expired, triggering in " <<
+				BOX_TRACE(TIMER_ID_OF(**i) " has not expired, "
+					"triggering in " <<
 					FORMAT_MICROSECONDS(timeToExpiry) <<
 					" seconds");
 				*/
@@ -286,8 +288,8 @@ void Timers::Reschedule()
 	}
 	else
 	{
-		BOX_TRACE("timer: next event: " << nameOfNextEvent <<
-			" expires in " << BOX_FORMAT_MICROSECONDS(timeToNextEvent));
+		BOX_TRACE("timer: next event: " << nameOfNextEvent << " at " <<
+			FormatTime(timeNow + timeToNextEvent, false, true));
 	}
 
 	struct itimerval timeout;
@@ -337,52 +339,29 @@ void Timers::SignalHandler(int unused)
 // --------------------------------------------------------------------------
 
 Timer::Timer(size_t timeoutMillis, const std::string& rName)
-: mExpires(GetCurrentBoxTime() + MilliSecondsToBoxTime(timeoutMillis)),
+: mExpires(0),
   mExpired(false),
   mName(rName)
 #ifdef WIN32
 , mTimerHandle(INVALID_HANDLE_VALUE)
 #endif
 {
-	#ifndef BOX_RELEASE_BUILD
-	if (timeoutMillis == 0)
-	{
-		BOX_TRACE(TIMER_ID "initialised for " << timeoutMillis << 
-			" ms, will not fire");
-	}
-	else
-	{
-		BOX_TRACE(TIMER_ID "initialised for " << timeoutMillis <<
-			" ms, to fire at " << FormatTime(mExpires, false, true));
-	}
-	#endif
-
-	if (timeoutMillis == 0)
-	{
-		mExpires = 0;
-	}
-	else
-	{
-		Timers::Add(*this);
-		Start(timeoutMillis);
-	}
+	Set(timeoutMillis, true /* isInit */);
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    Timer::Start()
-//		Purpose: This internal function initialises an OS TimerQueue
-//			 timer on Windows, while on Unixes there is only a
-//			 single global timer, managed by the Timers class,
-//			 so this method does nothing.
+//		Purpose: This internal function recalculates the remaining
+//			 time (timeout) from the expiry time, and then calls
+//			 Start(timeoutMillis).
 //		Created: 27/07/2008
 //
 // --------------------------------------------------------------------------
 
 void Timer::Start()
 {
-#ifdef WIN32
 	box_time_t timeNow = GetCurrentBoxTime();
 	int64_t timeToExpiry = mExpires - timeNow;
 
@@ -394,23 +373,24 @@ void Timer::Start()
 	}
 
 	Start(timeToExpiry / MICRO_SEC_IN_MILLI_SEC);
-#endif
 }
 
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    Timer::Start(int64_t timeoutMillis)
-//		Purpose: This internal function initialises an OS TimerQueue
-//			 timer on Windows, with a specified delay already
-//			 calculated to save us doing it again. Like
-//			 Timer::Start(), on Unixes it does nothing.
+//		Purpose: This internal function adds this timer to the global
+//			 timer list, and on Windows it initialises an OS
+//			 TimerQueue timer for it.
 //		Created: 27/07/2008
 //
 // --------------------------------------------------------------------------
 
 void Timer::Start(int64_t timeoutMillis)
 {
+	ASSERT(mExpires != 0);
+	Timers::Add(*this);
+
 #ifdef WIN32
 	// only call me once!
 	ASSERT(mTimerHandle == INVALID_HANDLE_VALUE);
@@ -441,15 +421,20 @@ void Timer::Start(int64_t timeoutMillis)
 //
 // Function
 //		Name:    Timer::Stop()
-//		Purpose: This internal function deletes the associated OS
-//			 TimerQueue timer on Windows, and on Unixes does
-//			 nothing.
+//		Purpose: This internal function removes us from the global
+//			 list of timers, resets our expiry time, and on
+//			 Windows it deletes the associated OS TimerQueue timer.
 //		Created: 27/07/2008
 //
 // --------------------------------------------------------------------------
 
 void Timer::Stop()
 {
+	if (mExpires != 0)
+	{
+		Timers::Remove(*this);
+	}
+
 #ifdef WIN32
 	if (mTimerHandle != INVALID_HANDLE_VALUE)
 	{
@@ -479,29 +464,25 @@ Timer::~Timer()
 	BOX_TRACE(TIMER_ID "destroyed");
 	#endif
 
-	Timers::Remove(*this);
 	Stop();
 }
 
 void Timer::LogAssignment(const Timer &From)
 {
 	#ifndef BOX_RELEASE_BUILD
+	BOX_TRACE(TIMER_ID "initialised from " << TIMER_ID_OF(From));
+
 	if (From.mExpired)
 	{
-		BOX_TRACE(TIMER_ID "initialised from timer " << 
-			TIMER_ID_OF(From) << ", already expired, "
-			"will not fire");
+		BOX_TRACE(TIMER_ID "already expired, will not fire");
 	}
 	else if (From.mExpires == 0)
 	{
-		BOX_TRACE(TIMER_ID "initialised from timer " <<
-			TIMER_ID_OF(From) << ", no expiry, "
-			"will not fire");
+		BOX_TRACE(TIMER_ID "has no expiry time, will not fire");
 	}
 	else
 	{
-		BOX_TRACE(TIMER_ID "initialised from timer " <<
-			TIMER_ID_OF(From) << ", to fire at " <<
+		BOX_TRACE(TIMER_ID "will fire at " <<
 			FormatTime(From.mExpires, false, true));
 	}
 	#endif
@@ -530,7 +511,6 @@ Timer::Timer(const Timer& rToCopy)
 
 	if (!mExpired && mExpires != 0)
 	{
-		Timers::Add(*this);
 		Start();
 	}
 }
@@ -551,7 +531,6 @@ Timer& Timer::operator=(const Timer& rToCopy)
 {
 	LogAssignment(rToCopy);
 
-	Timers::Remove(*this);
 	Stop();
 
 	mExpires = rToCopy.mExpires;
@@ -560,11 +539,71 @@ Timer& Timer::operator=(const Timer& rToCopy)
 
 	if (!mExpired && mExpires != 0)
 	{
-		Timers::Add(*this);
 		Start();
 	}
 
 	return *this;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Timer::Reset(size_t timeoutMillis)
+//		Purpose: Simple reset operation for an existing Timer. Avoids
+//			 the need to create a temporary timer just to modify
+//			 an existing one.
+//		Created: 17/11/2012
+//
+// --------------------------------------------------------------------------
+
+void Timer::Reset(size_t timeoutMillis)
+{
+	Set(timeoutMillis, false /* isInit */);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Timer::Reset(size_t timeoutMillis)
+//		Purpose: Internal set/reset operation for an existing Timer.
+//			 Shared by constructor and Reset().
+//		Created: 17/11/2012
+//
+// --------------------------------------------------------------------------
+
+void Timer::Set(size_t timeoutMillis, bool isInit)
+{
+	Stop();
+	mExpired = false;
+	
+	if (timeoutMillis == 0)
+	{
+		mExpires = 0;
+	}
+	else
+	{
+		mExpires = GetCurrentBoxTime() + 
+			MilliSecondsToBoxTime(timeoutMillis);
+	}
+
+	#ifndef BOX_RELEASE_BUILD
+	if (timeoutMillis == 0)
+	{
+		BOX_TRACE(TIMER_ID << (isInit ? "initialised" : "reset") <<
+			" for " << timeoutMillis << " ms, will not fire");
+	}
+	else
+	{
+		BOX_TRACE(TIMER_ID << (isInit ? "initialised" : "reset") <<
+			" for " << timeoutMillis << " ms, to fire at " <<
+			FormatTime(mExpires, false, true));
+	}
+	#endif
+
+	if (mExpires != 0)
+	{
+		Start(timeoutMillis);
+	}
 }
 
 // --------------------------------------------------------------------------
