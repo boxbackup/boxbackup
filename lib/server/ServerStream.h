@@ -297,7 +297,7 @@ public:
 							
 							// Log it
 							BOX_TRACE("Forked child process " << pid << 
-								"to handle connection from " <<
+								" to handle connection from " <<
 								mConnectionDetails);
 						}
 						else
