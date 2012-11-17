@@ -100,15 +100,23 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 	{
 		try
 		{
-			// Tag log output to identify account
-			std::ostringstream tag;
-			tag << "hk/" << BOX_FORMAT_ACCOUNT(*i);
-			Logging::Tagger tagWithClientID(tag.str());
-
-			// Get the account root
 			std::string rootDir;
 			int discSet = 0;
-			mpAccounts->GetAccountRoot(*i, rootDir, discSet);
+
+			{
+				// Tag log output to identify account
+				std::ostringstream tag;
+				tag << "hk/" << BOX_FORMAT_ACCOUNT(*i);
+				Logging::Tagger tagWithClientID(tag.str());
+
+				// Get the account root
+				mpAccounts->GetAccountRoot(*i, rootDir, discSet);
+
+				// Reset tagging as HousekeepStoreAccount will
+				// do that itself, to avoid duplicate tagging.
+				// Happens automatically when tagWithClientID
+				// goes out of scope.
+			}
 			
 			// Do housekeeping on this account
 			HousekeepStoreAccount housekeeping(*i, rootDir,
