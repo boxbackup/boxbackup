@@ -105,6 +105,8 @@ private:
 	
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;
+
+	Logging::Tagger mTagWithClientID;
 };
 
 #endif // HOUSEKEEPSTOREACCOUNT__H

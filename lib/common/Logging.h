@@ -346,14 +346,23 @@ class Logging
 		std::string mOldTag;
 
 		public:
-		Tagger(const std::string& rTempTag)
+		Tagger()
+		: mOldTag(Logging::GetProgramName())
 		{
-			mOldTag = Logging::GetProgramName();
+		}
+		Tagger(const std::string& rTempTag)
+		: mOldTag(Logging::GetProgramName())
+		{
 			Logging::SetProgramName(mOldTag + " " + rTempTag);
 		}
 		~Tagger()
 		{
 			Logging::SetProgramName(mOldTag);
+		}
+
+		void Change(const std::string& newTempTag)
+		{
+			Logging::SetProgramName(mOldTag + " " + newTempTag);
 		}
 	};
 };
