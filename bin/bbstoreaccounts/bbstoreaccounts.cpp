@@ -128,37 +128,8 @@ int64_t SizeStringToBlocks(const char *string, int discSetNum)
 	}
 }
 
-bool GetWriteLockOnAccount(NamedLock &rLock, const std::string rRootDir,
-	int discSetNum)
-{
-	std::string writeLockFilename;
-	StoreStructure::MakeWriteLockFilename(rRootDir, discSetNum, writeLockFilename);
-
-	bool gotLock = false;
-	int triesLeft = 8;
-	do
-	{
-		gotLock = rLock.TryAndGetLock(writeLockFilename.c_str(), 0600 /* restrictive file permissions */);
-		
-		if(!gotLock)
-		{
-			--triesLeft;
-			::sleep(1);
-		}
-	} while(!gotLock && triesLeft > 0);
-
-	if(!gotLock)
-	{
-		// Couldn't lock the account -- just stop now
-		BOX_ERROR("Failed to lock the account, did not change limits. "
-			"Try again later.");
-	}
-
-	return gotLock;
-}
-
 bool OpenAccount(Configuration &rConfig, int32_t ID, std::string &rRootDirOut,
-	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser);
+	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser, NamedLock* pLock);
 
 int SetLimit(Configuration &rConfig, int32_t ID, const char *SoftLimitStr,
 	const char *HardLimitStr)
@@ -166,22 +137,15 @@ int SetLimit(Configuration &rConfig, int32_t ID, const char *SoftLimitStr,
 	std::string rootDir;
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+	NamedLock writeLock;
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user, &writeLock))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " to change limits.");
 		return 1;
 	}
 	
-	// Attempt to lock
-	NamedLock writeLock;
-	if(!GetWriteLockOnAccount(writeLock, rootDir, discSetNum))
-	{
-		// Failed to get lock
-		return 1;
-	}
-
 	// Load the info
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, rootDir,
 		discSetNum, false /* Read/Write */));
@@ -208,19 +172,12 @@ int SetAccountName(Configuration &rConfig, int32_t ID,
 	std::string rootDir;
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+	NamedLock writeLock;
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user, &writeLock))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " to change name.");
-		return 1;
-	}
-
-	// Attempt to lock
-	NamedLock writeLock;
-	if(!GetWriteLockOnAccount(writeLock, rootDir, discSetNum))
-	{
-		// Failed to get lock
 		return 1;
 	}
 
@@ -245,7 +202,8 @@ int AccountInfo(Configuration &rConfig, int32_t ID)
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user,
+		NULL /* no write lock needed for this read-only operation */))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " to display info.");
@@ -306,8 +264,9 @@ int SetAccountEnabled(Configuration &rConfig, int32_t ID, bool enabled)
 	std::string rootDir;
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+	NamedLock writeLock;
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user, &writeLock))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " to change enabled flag.");
@@ -327,8 +286,10 @@ int DeleteAccount(Configuration &rConfig, int32_t ID, bool AskForConfirmation)
 	std::string rootDir;
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+	NamedLock writeLock;
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	// Obtain a write lock, as the daemon user
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user, &writeLock))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " for deletion.");
@@ -348,19 +309,8 @@ int DeleteAccount(Configuration &rConfig, int32_t ID, bool AskForConfirmation)
 		}
 	}
 	
-	// Obtain a write lock, as the daemon user
-	NamedLock writeLock;
-	{
-		// Get a write lock
-		if(!GetWriteLockOnAccount(writeLock, rootDir, discSetNum))
-		{
-			// Failed to get lock
-			return 1;
-		}
-		
-		// Back to original user, but write lock is maintained
-		user.reset();
-	}
+	// Back to original user, but write lock is maintained
+	user.reset();
 
 	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
 
@@ -431,7 +381,7 @@ int DeleteAccount(Configuration &rConfig, int32_t ID, bool AskForConfirmation)
 }
 
 bool OpenAccount(Configuration &rConfig, int32_t ID, std::string &rRootDirOut,
-	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser)
+	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser, NamedLock* pLock)
 {
 	// Load in the account database 
 	std::auto_ptr<BackupStoreAccountDatabase> db(BackupStoreAccountDatabase::Read(rConfig.GetKeyValue("AccountDatabase").c_str()));
@@ -468,6 +418,11 @@ bool OpenAccount(Configuration &rConfig, int32_t ID, std::string &rRootDirOut,
 		// in the caller.
 	}
 
+	if(pLock)
+	{
+		acc.LockAccount(ID, *pLock);
+	}
+
 	return true;
 }
 
@@ -476,8 +431,9 @@ int CheckAccount(Configuration &rConfig, int32_t ID, bool FixErrors, bool Quiet)
 	std::string rootDir;
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
+	NamedLock writeLock;
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user, &writeLock))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " for checking.");
@@ -530,7 +486,8 @@ int HousekeepAccountNow(Configuration &rConfig, int32_t ID)
 	int discSetNum;
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
 
-	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user))
+	if(!OpenAccount(rConfig, ID, rootDir, discSetNum, user,
+		NULL /* housekeeping locks the account itself */))
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " for housekeeping.");
