@@ -81,40 +81,16 @@ BackupStoreCheck::~BackupStoreCheck()
 //
 // Function
 //		Name:    BackupStoreCheck::Check()
-//		Purpose: Perform the check on the given account
+//		Purpose: Perform the check on the given account. You need to
+//			 hold a lock on the account before calling this!
 //		Created: 21/4/04
 //
 // --------------------------------------------------------------------------
 void BackupStoreCheck::Check()
 {
-	// Lock the account
-	{
-		std::string writeLockFilename;
-		StoreStructure::MakeWriteLockFilename(mStoreRoot, mDiscSetNumber, writeLockFilename);
-
-		bool gotLock = false;
-		int triesLeft = 8;
-		do
-		{
-			gotLock = mAccountLock.TryAndGetLock(writeLockFilename.c_str(), 0600 /* restrictive file permissions */);
-			
-			if(!gotLock)
-			{
-				--triesLeft;
-				::sleep(1);
-			}
-		} while(!gotLock && triesLeft > 0);
-	
-		if(!gotLock)
-		{
-			// Couldn't lock the account -- just stop now
-			if(!mQuiet)
-			{
-				BOX_ERROR("Failed to lock the account -- did not check.\nTry again later after the client has disconnected.\nAlternatively, forcibly kill the server.");
-			}
-			THROW_EXCEPTION(BackupStoreException, CouldNotLockStoreAccount)
-		}
-	}
+	std::string writeLockFilename;
+	StoreStructure::MakeWriteLockFilename(mStoreRoot, mDiscSetNumber, writeLockFilename);
+	ASSERT(FileExists(writeLockFilename));
 
 	if(!mQuiet && mFixErrors)
 	{
