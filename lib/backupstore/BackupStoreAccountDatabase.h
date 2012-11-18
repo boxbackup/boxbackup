@@ -31,11 +31,11 @@ public:
 	friend class _BackupStoreAccountDatabase;	// to stop compiler warnings
 	~BackupStoreAccountDatabase();
 private:
-	BackupStoreAccountDatabase(const char *Filename);
+	BackupStoreAccountDatabase(const std::string& Filename);
 	BackupStoreAccountDatabase(const BackupStoreAccountDatabase &);
 public:
 
-	static std::auto_ptr<BackupStoreAccountDatabase> Read(const char *Filename);
+	static std::auto_ptr<BackupStoreAccountDatabase> Read(const std::string& Filename);
 	void Write();
 
 	class Entry
