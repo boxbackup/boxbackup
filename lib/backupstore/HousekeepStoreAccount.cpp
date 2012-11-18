@@ -66,7 +66,7 @@ HousekeepStoreAccount::HousekeepStoreAccount(int AccountID,
 	  mCountUntilNextInterprocessMsgCheck(POLL_INTERPROCESS_MSG_CHECK_FREQUENCY)
 {
 	std::ostringstream tag;
-	tag << "hk/" << BOX_FORMAT_ACCOUNT(mAccountID);
+	tag << "hk=" << BOX_FORMAT_ACCOUNT(mAccountID);
 	mTagWithClientID.Change(tag.str());
 }
 
@@ -127,11 +127,14 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet,
 			true /* Read Only */));
 
-	// Tag log output to identify account
-	std::ostringstream tag;
-	tag << "hk/" << BOX_FORMAT_ACCOUNT(mAccountID) << "/" <<
-		info->GetAccountName();
-	mTagWithClientID.Change(tag.str());
+	// If the account has a name, change the logging tag to include it
+	if(!(info->GetAccountName().empty()))
+	{
+		std::ostringstream tag;
+		tag << "hk=" << BOX_FORMAT_ACCOUNT(mAccountID) << "/" <<
+			info->GetAccountName();
+		mTagWithClientID.Change(tag.str());
+	}
 
 	// Calculate how much should be deleted
 	mDeletionSizeTarget = info->GetBlocksUsed() - info->GetBlocksSoftLimit();
