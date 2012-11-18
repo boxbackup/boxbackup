@@ -1040,7 +1040,7 @@ int test_server(const char *hostname)
 			TEST_THAT(loginConf->GetClientStoreMarker() == 0x8732523ab23aLL);
 		}
 #else // WIN32
-		BackupProtocolClient& protocolReadOnly(*apProtocol);
+		#define protocolReadOnly (*apProtocol)
 #endif
 
 		test_server_1(*apProtocol, protocolReadOnly);
@@ -2490,6 +2490,7 @@ int test_read_old_backupstoreinfo_files()
 		*apInfo, "spurtle", false /* AccountEnabled */, extra_data);
 
 	// Delete the account to leave the store in the same state as before	
+	apInfo.reset();
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf delete 01234567 yes") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
