@@ -40,7 +40,7 @@ public:
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-BackupStoreAccountDatabase::BackupStoreAccountDatabase(const char *Filename)
+BackupStoreAccountDatabase::BackupStoreAccountDatabase(const std::string& Filename)
 	: pImpl(new _BackupStoreAccountDatabase)
 {
 	pImpl->mFilename = Filename;
@@ -123,7 +123,7 @@ BackupStoreAccountDatabase::Entry::~Entry()
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupStoreAccountDatabase> BackupStoreAccountDatabase::Read(const char *Filename)
+std::auto_ptr<BackupStoreAccountDatabase> BackupStoreAccountDatabase::Read(const std::string& Filename)
 {
 	// Database object to use
 	std::auto_ptr<BackupStoreAccountDatabase> db(new BackupStoreAccountDatabase(Filename));
