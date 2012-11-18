@@ -49,11 +49,13 @@
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
 #include "BackupQueries.h"
+#include "BackupStoreAccounts.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreContext.h"
 #include "BackupStoreDaemon.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
+#include "BackupStoreConfigVerify.h"
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"
 #include "BoxTimeToUnix.h"
@@ -65,6 +67,7 @@
 #include "intercept.h"
 #include "IOStreamGetLine.h"
 #include "LocalProcessStream.h"
+#include "RaidFileController.h"
 #include "SSLLib.h"
 #include "ServerControl.h"
 #include "Socket.h"
@@ -1023,11 +1026,8 @@ int test_bbackupd()
 
 		Timers::Init();
 		
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
+		// stop early to make debugging easier
+		if (failures) return 1;
 
 		// four-second delay on first read() of f1
 		// should mean that no keepalives were sent,
@@ -1293,6 +1293,7 @@ int test_bbackupd()
 	TEST_THAT(ServerIsAlive(bbstored_pid));
 	if (!ServerIsAlive(bbackupd_pid)) return 1;
 	if (!ServerIsAlive(bbstored_pid)) return 1;
+	if (failures) return 1;
 
 	if(bbackupd_pid > 0)
 	{
@@ -1396,11 +1397,7 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
+		if (failures) return 1;
 
 		// ensure time is different to refresh the cache
 		::safe_sleep(1);
@@ -1535,11 +1532,7 @@ int test_bbackupd()
 		}
 		BOX_TRACE("done.");
 
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
+		if (failures) return 1;
 
 		wait_for_operation(5, "housekeeping to remove the "
 			"deleted files");
@@ -1587,11 +1580,7 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
+		if (failures) return 1;
 
 		// Need 22 blocks free to upload everything
 		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
@@ -1629,11 +1618,7 @@ int test_bbackupd()
 			sSocket.Close();
 		}
 
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
+		if (failures) return 1;
 
 		// Put the limit back
 		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
@@ -1653,6 +1638,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 		BOX_TRACE("done.");
 
 		// unpack the initial files again
@@ -1677,12 +1663,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
-
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
+		if (failures) return 1;
 	}
 
 	// Check that no read error has been reported yet
@@ -1816,6 +1797,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 	}
 	#endif // !WIN32
 
@@ -1945,6 +1927,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 	}
 	#endif // !WIN32
 
@@ -1974,6 +1957,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-start.1"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-start.2"));
@@ -2066,6 +2050,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Test2 should be deleted after 10 seconds (4 runs)
 		wait_for_sync_end();
@@ -2111,6 +2096,7 @@ int test_bbackupd()
 	TEST_THAT(ServerIsAlive(bbstored_pid));
 	if (!ServerIsAlive(bbackupd_pid)) return 1;
 	if (!ServerIsAlive(bbstored_pid)) return 1;
+	if (failures) return 1;
 
 	if(bbackupd_pid > 0)
 	{
@@ -2510,6 +2496,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Check that SyncAllowScript is executed and can "
 			"pause backup\n");
@@ -2603,11 +2590,7 @@ int test_bbackupd()
 			// check that backup has run (compare succeeds)
 			TEST_COMPARE(Compare_Same);
 
-			if (failures > 0)
-			{
-				// stop early to make debugging easier
-				return 1;
-			}
+			if (failures) return 1;
 		}
 
 		// Check that no read error has been reported yet
@@ -2617,6 +2600,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Delete file and update another, "
 			"create symlink.\n");
@@ -2668,19 +2652,45 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Check that store errors are reported neatly
 		printf("\n==== Create store error\n");
 		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*")
 			== 0);
 
-		// break the store
-		TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
-			"testfiles/0_0/backup/01234567/info.rf.bak") == 0);
-		TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf",
-			"testfiles/0_1/backup/01234567/info.rf.bak") == 0);
-		TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf",
-			"testfiles/0_2/backup/01234567/info.rf.bak") == 0);
+		// Break the store. We need a write lock on the account
+		// while we do this, otherwise housekeeping might be running
+		// and might rewrite the info files when it finishes,
+		// undoing our breakage.
+		std::string errs;
+		std::auto_ptr<Configuration> config(
+			Configuration::LoadAndVerify
+				("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
+		TEST_EQUAL_LINE(0, errs.size(), "Loading configuration file "
+			"reported errors: " << errs);
+		TEST_THAT(config.get() != 0);
+		// Initialise the raid file controller
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
+		std::auto_ptr<BackupStoreAccountDatabase> db(
+			BackupStoreAccountDatabase::Read(
+				config->GetKeyValue("AccountDatabase")));
+
+		BackupStoreAccounts acc(*db);
+
+		// Lock scope
+		{
+			NamedLock writeLock;
+			acc.LockAccount(0x01234567, writeLock);
+
+			TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
+				"testfiles/0_0/backup/01234567/info.rf.bak") == 0);
+			TEST_THAT(::rename("testfiles/0_1/backup/01234567/info.rf",
+				"testfiles/0_1/backup/01234567/info.rf.bak") == 0);
+			TEST_THAT(::rename("testfiles/0_2/backup/01234567/info.rf",
+				"testfiles/0_2/backup/01234567/info.rf.bak") == 0);
+		}
 
 		// Create a file to trigger an upload
 		{
@@ -2709,6 +2719,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		sync_and_wait();
 
@@ -2795,6 +2806,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		sync_and_wait();
 
@@ -2816,7 +2828,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
 
-		// Set a tag for the notify script to distinguist from
+		// Set a tag for the notify script to distinguish from
 		// previous runs.
 		{
 			int fd1 = open("testfiles/notifyscript.tag", 
@@ -2851,6 +2863,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Bad case: delete a file/symlink, replace it with a directory
 		printf("\n==== Replace symlink with directory, "
@@ -2882,6 +2895,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// And the inverse, replace a directory with a file/symlink
 		printf("\n==== Replace directory with symlink\n");
@@ -2906,6 +2920,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// And then, put it back to how it was before.
 		printf("\n==== Replace symlink with directory "
@@ -2933,6 +2948,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// And finally, put it back to how it was before 
 		// it was put back to how it was before
@@ -2960,6 +2976,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// rename an untracked file over an 
 		// existing untracked file
@@ -3004,6 +3021,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// case which went wrong: rename a tracked file over an
 		// existing tracked file
@@ -3053,6 +3071,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// case which went wrong: rename a tracked file 
 		// over a deleted file
@@ -3072,6 +3091,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Add files with old times, update "
 			"attributes of one to latest time\n");
@@ -3102,6 +3122,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
@@ -3158,6 +3179,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
@@ -3193,6 +3215,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// check that the excluded files did not make it
 		// into the store, and the included files did
@@ -3236,6 +3259,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 #ifndef WIN32
 		// These tests only work as non-root users.
@@ -3284,6 +3308,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Continuously update file, "
 			"check isn't uploaded\n");
@@ -3349,6 +3374,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Delete directory, change attributes\n");
 	
@@ -3446,6 +3472,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 #ifdef WIN32
 		// make one of the files read-only, expect a compare failure
@@ -3503,6 +3530,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Add files with current time\n");
 	
@@ -3525,6 +3553,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Rename directory
 		printf("\n==== Rename directory\n");
@@ -3561,6 +3590,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		// Check that modifying files with madly in the future 
 		// timestamps still get added
@@ -3598,6 +3628,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Change client store marker\n");
 
@@ -3640,6 +3671,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Check change of store marker pauses daemon\n");
 		
@@ -3663,14 +3695,18 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
-		// 100 seconds - (12*3/2)
-		wait_for_operation(82, "bbackupd to recover");
+		wait_for_operation(100, "bbackupd to recover");
+
+		// Then check it has backed up successfully.
+		TEST_COMPARE(Compare_Same);
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 #ifndef WIN32
 		printf("\n==== Interrupted restore\n");
@@ -3714,14 +3750,7 @@ int test_bbackupd()
 			sSocket.Close();
 
 			// Then check it has restored the correct stuff
-			compareReturnValue = ::system(BBACKUPQUERY " "
-				"-c testfiles/bbackupd.conf "
-				"-l testfiles/query14.log "
-				"-Wwarning \"compare -cEQ Test1 "
-				"testfiles/restore-interrupt\" quit");
-			TEST_RETURN(compareReturnValue,
-				BackupQueries::ReturnCode::Compare_Same);
-			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
+			TEST_COMPARE(Compare_Same);
 		}
 #endif // !WIN32
 
@@ -3729,6 +3758,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		printf("\n==== Check restore deleted files\n");
 
@@ -3769,6 +3799,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 #ifdef WIN32
 		printf("\n==== Testing locked file behaviour:\n");
@@ -3795,6 +3826,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		if (handle != 0)
 		{
@@ -3811,6 +3843,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		if (handle != 0)
 		{
@@ -3828,6 +3861,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		if (handle != 0)
 		{
@@ -3840,6 +3874,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		if (handle != 0)
 		{
@@ -3860,6 +3895,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		if (handle != 0)
 		{
@@ -3881,6 +3917,7 @@ int test_bbackupd()
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 		if (!ServerIsAlive(bbackupd_pid)) return 1;
 		if (!ServerIsAlive(bbstored_pid)) return 1;
+		if (failures) return 1;
 
 		if(bbackupd_pid != -1 && bbackupd_pid != 0)
 		{
