@@ -357,7 +357,7 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 //
 // --------------------------------------------------------------------------
 void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
-	const bool *opts, bool FirstLevel, std::ostream &out)
+	const bool *opts, bool FirstLevel, std::ostream* pOut)
 {
 #ifdef WIN32
 	DWORD n_chars;
@@ -402,6 +402,8 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 	BackupStoreDirectory::Entry *en = 0;
 	while((en = i.Next()) != 0)
 	{
+		std::ostringstream buf;
+
 		// Display this entry
 		BackupStoreFilenameClear clear(en->GetName());
 		
@@ -409,7 +411,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 		if(!opts[LIST_OPTION_NOOBJECTID])
 		{
 			// add object ID to line
-			out << std::hex << std::internal << std::setw(8) <<
+			buf << std::hex << std::internal << std::setw(8) <<
 				std::setfill('0') << en->GetObjectID() <<
 				std::dec << " ";
 		}
@@ -438,38 +440,38 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			// terminate
 			*(f++) = ' ';
 			*(f++) = '\0';
-			out << displayflags;
+			buf << displayflags;
 			
 			if(en_flags != 0)
 			{
-				out << "[ERROR: Entry has additional flags set] ";
+				buf << "[ERROR: Entry has additional flags set] ";
 			}
 		}
 		
 		if(opts[LIST_OPTION_TIMES_UTC])
 		{
 			// Show UTC times...
-			out << GetTimeString(*en, false,
+			buf << GetTimeString(*en, false,
 				opts[LIST_OPTION_TIMES_ATTRIBS]) << " ";
 		}
 
 		if(opts[LIST_OPTION_TIMES_LOCAL])
 		{
 			// Show local times...
-			out << GetTimeString(*en, true,
+			buf << GetTimeString(*en, true,
 				opts[LIST_OPTION_TIMES_ATTRIBS]) << " ";
 		}
 		
 		if(opts[LIST_OPTION_DISPLAY_HASH])
 		{
-			out << std::hex << std::internal << std::setw(16) <<
+			buf << std::hex << std::internal << std::setw(16) <<
 				std::setfill('0') << en->GetAttributesHash() <<
 				std::dec;
 		}
 		
 		if(opts[LIST_OPTION_SIZEINBLOCKS])
 		{
-			out << std::internal << std::setw(5) <<
+			buf << std::internal << std::setw(5) <<
 				std::setfill('0') << en->GetSizeInBlocks() <<
 				" ";
 		}
@@ -481,11 +483,12 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			std::string listRootDecoded;
 			if(!ConvertUtf8ToConsole(rListRoot.c_str(), 
 				listRootDecoded)) return;
-			listRootDecoded = listRootDecoded + "/";
+			listRootDecoded += "/";
+			buf << listRootDecoded;
 			WriteConsole(hOut, listRootDecoded.c_str(),
 				strlen(listRootDecoded.c_str()), &n_chars, NULL);
 #else
-			out << rListRoot << "/";
+			buf << rListRoot << "/";
 #endif
 		}
 		
@@ -507,18 +510,33 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 		}
 #endif
 
-#ifdef WIN32
-		WriteConsole(hOut, fileName.c_str(), strlen(fileName.c_str()), &n_chars, NULL);
-#else
-		out << fileName;
-#endif
-		
+		buf << fileName;
+
 		if(!en->GetName().IsEncrypted())
 		{
-			out << " [FILENAME NOT ENCRYPTED]";
+			buf << " [FILENAME NOT ENCRYPTED]";
 		}
 
-		out << std::endl;
+		buf << std::endl;
+		
+		if(pOut)
+		{
+			(*pOut) << buf.str();
+		}
+		else
+		{
+#ifdef WIN32
+			std::string line = buf.str();
+			if (!WriteConsole(hOut, line.c_str(), line.size(),
+				&n_chars, NULL))
+			{
+				// WriteConsole failed, try standard method
+				std::cout << buf.str();
+			}
+#else
+			std::cout << buf.str();
+#endif
+		}
 		
 		// Directory?
 		if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
@@ -531,7 +549,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 				subroot += clear.GetClearFilename();
 				List(en->GetObjectID(), subroot, opts,
 					false /* not the first level to list */,
-					out);
+					pOut);
 			}
 		}
 	}
@@ -834,7 +852,8 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	int64_t id = ::strtoll(args[0].c_str(), 0, 16);
 	if(id == std::numeric_limits<long long>::min() || id == std::numeric_limits<long long>::max() || id == 0)
 	{
-		BOX_ERROR("Not a valid object ID (specified in hex).");
+		BOX_ERROR("Not a valid object ID (specified in hex): " <<
+			args[0]);
 		return;
 	}
 	
@@ -941,7 +960,8 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 			fileId == std::numeric_limits<long long>::max() || 
 			fileId == 0)
 		{
-			BOX_ERROR("Not a valid object ID (specified in hex).");
+			BOX_ERROR("Not a valid object ID (specified in hex): "
+				<< rNameOrIdString);
 			return 0;
 		}
 		
@@ -1883,7 +1903,8 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		dirID = ::strtoll(args[0].c_str(), 0, 16);
 		if(dirID == std::numeric_limits<long long>::min() || dirID == std::numeric_limits<long long>::max() || dirID == 0)
 		{
-			BOX_ERROR("Not a valid object ID (specified in hex)");
+			BOX_ERROR("Not a valid object ID (specified in hex): "
+				<< args[0]);
 			return;
 		}
 		std::ostringstream oss;

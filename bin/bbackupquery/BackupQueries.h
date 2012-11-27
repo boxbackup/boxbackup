@@ -88,10 +88,9 @@ public:
 	int GetReturnCode() {return mReturnCode;}
 
 	void List(int64_t DirID, const std::string &rListRoot, const bool *opts,
-		bool FirstLevel, std::ostream &out = std::cout);
+		bool FirstLevel, std::ostream* pOut = NULL);
 	void CommandList(const std::vector<std::string> &args, const bool *opts);
 
-private:
 	// Commands
 	void CommandChangeDir(const std::vector<std::string> &args, const bool *opts);
 	void CommandChangeLocalDir(const std::vector<std::string> &args);
@@ -107,7 +106,6 @@ private:
 		int64_t HardLimit, int32_t BlockSize, bool MachineReadable);
 	void CommandHelp(const std::vector<std::string> &args);
 
-public:
 	class CompareParams : public BoxBackupCompareParams
 	{
 	public:
