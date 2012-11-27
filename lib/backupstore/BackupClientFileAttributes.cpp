@@ -375,9 +375,8 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 		EMU_STRUCT_STAT st;
 		if(EMU_LSTAT(Filename, &st) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to stat file: '" <<
-				Filename << "'");
-			THROW_EXCEPTION(CommonException, OSFileError)
+			THROW_SYS_FILE_ERROR("Failed to stat file",
+				Filename, CommonException, OSFileError)
 		}
 		
 		// Modification times etc
