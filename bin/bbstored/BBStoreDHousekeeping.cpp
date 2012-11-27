@@ -79,7 +79,18 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 	// Do housekeeping if the time interval has elapsed since the last check
 	if((timeNow - mLastHousekeepingRun) < housekeepingInterval)
 	{
+		BOX_TRACE("No need for housekeeping, " <<
+			BoxTimeToSeconds(timeNow - mLastHousekeepingRun) <<
+			" seconds since last run is less than " <<
+			BoxTimeToSeconds(housekeepingInterval));
 		return;
+	}
+	else
+	{
+		BOX_TRACE("Running housekeeping now, because " <<
+			BoxTimeToSeconds(timeNow - mLastHousekeepingRun) <<
+			" seconds since last run is more than " <<
+			BoxTimeToSeconds(housekeepingInterval));
 	}
 
 	// Store the time
