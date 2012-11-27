@@ -197,8 +197,27 @@ class Logger
 
 	virtual const char* GetType() = 0;
 	Log::Level GetLevel() { return mCurrentLevel; }
-	
+	bool IsEnabled(Log::Level level);
+
 	virtual void SetProgramName(const std::string& rProgramName) = 0;
+
+	class Guard
+	{
+		private:
+		Logger& mLogger;
+		Log::Level mOldLevel;
+
+		public:
+		Guard(Logger& Logger)
+		: mLogger(Logger)
+		{
+			mOldLevel = Logger.GetLevel();
+		}
+		~Guard()
+		{
+			mLogger.Filter(mOldLevel);
+		}
+	};
 };
 
 // --------------------------------------------------------------------------
@@ -306,6 +325,8 @@ class Logging
 	static void SetProgramName(const std::string& rProgramName);
 	static std::string GetProgramName() { return sProgramName; }
 	static void SetFacility(int facility);
+	static Console& GetConsole() { return *spConsole; }
+	static Syslog&  GetSyslog()  { return *spSyslog; }
 
 	class Guard
 	{

@@ -253,6 +253,12 @@ Logger::~Logger()
 	Logging::Remove(this);
 }
 
+bool Logger::IsEnabled(Log::Level level)
+{
+	return Logging::IsEnabled(level) &&
+		(int)mCurrentLevel >= (int)level;
+}
+
 bool Console::sShowTime = false;
 bool Console::sShowTimeMicros = false;
 bool Console::sShowTag = false;
@@ -364,6 +370,8 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	#else
 		fprintf(target, "%s\n", buf.str().c_str());
 	#endif
+
+	fflush(target);
 	
 	return true;
 }
