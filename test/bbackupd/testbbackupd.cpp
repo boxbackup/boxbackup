@@ -1201,7 +1201,7 @@ int test_bbackupd()
 		std::string touchfile = 
 			"testfiles/TestDir1/spacetest/d1/touch-me";
 
-		fd = open(touchfile.c_str(), O_CREAT | O_WRONLY);
+		fd = open(touchfile.c_str(), O_CREAT | O_WRONLY, 0700);
 		TEST_THAT(fd > 0);
 		// write again, to update the file's timestamp
 		TEST_EQUAL_LINE(sizeof(buffer),
