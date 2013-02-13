@@ -7,10 +7,9 @@
 //
 // --------------------------------------------------------------------------
 
-
-#ifndef BOX_RELEASE_BUILD
-
 #include "Box.h"
+
+#ifdef BOX_MEMORY_LEAK_TESTING
 
 #undef malloc
 #undef realloc
@@ -20,11 +19,13 @@
 	#include <unistd.h>
 #endif
 
-#include <map>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#include <set>
+
 #include <cstdlib> // for std::atexit
+#include <map>
+#include <set>
 
 #include "MemLeakFinder.h"
 
@@ -73,6 +74,13 @@ namespace
 	size_t sNotLeaksPreNum = 0;
 }
 
+void memleakfinder_report_on_signal(int unused)
+{
+	// this is not safe! do not send SIGUSR1 to a process
+	// in a production environment!
+	memleakfinder_report_usage_summary();
+}
+
 void memleakfinder_init()
 {
 	ASSERT(!memleakfinder_initialised);
@@ -84,6 +92,21 @@ void memleakfinder_init()
 	}
 
 	memleakfinder_initialised = true;
+
+	#if defined WIN32
+		// no signals, no way to trigger event yet
+	#else
+		struct sigaction newact, oldact;
+		newact.sa_handler = memleakfinder_report_on_signal;
+		newact.sa_flags = SA_RESTART;
+		sigemptyset(&newact.sa_mask);
+		if (::sigaction(SIGUSR1, &newact, &oldact) != 0)
+		{
+			BOX_ERROR("Failed to install USR1 signal handler");
+			THROW_EXCEPTION(CommonException, Internal);
+		}
+		ASSERT(oldact.sa_handler == 0);
+	#endif // WIN32
 }
 
 MemLeakSuppressionGuard::MemLeakSuppressionGuard()
@@ -346,6 +369,85 @@ int memleakfinder_numleaks()
 	return n;
 }
 
+// Summarise all blocks allocated and still allocated, for memory usage
+// diagnostics.
+void memleakfinder_report_usage_summary()
+{
+	InternalAllocGuard guard;
+
+	ASSERT(!sTrackingDataDestroyed);
+
+	typedef std::map<std::string, std::pair<uint64_t, uint64_t> > usage_map_t;
+	usage_map_t usage;
+
+	for(std::map<void *, MallocBlockInfo>::const_iterator
+		i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
+	{
+		std::ostringstream buf;
+		buf << i->second.file << ":" << i->second.line;
+		std::string key = buf.str();
+
+		usage_map_t::iterator ui = usage.find(key);
+		if(ui == usage.end())
+		{
+			usage[key] = std::pair<uint64_t, uint64_t>(1,
+				i->second.size);
+		}
+		else
+		{
+			ui->second.first++;
+			ui->second.second += i->second.size;
+		}
+	}
+
+	for(std::map<void *, ObjectInfo>::const_iterator
+		i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
+	{
+		std::ostringstream buf;
+		buf << i->second.file << ":" << i->second.line;
+		std::string key = buf.str();
+
+		usage_map_t::iterator ui = usage.find(key);
+		if(ui == usage.end())
+		{
+			usage[key] = std::pair<uint64_t, uint64_t>(1,
+				i->second.size);
+		}
+		else
+		{
+			ui->second.first++;
+			ui->second.second += i->second.size;
+		}
+	}
+
+	#ifndef DEBUG_LEAKS
+		BOX_WARNING("Memory use: support not compiled in :(");
+	#else
+	if(usage.empty())
+	{
+		BOX_WARNING("Memory use: none detected?!");
+	}
+	else
+	{
+		uint64_t blocks = 0, bytes = 0;
+		BOX_WARNING("Memory use: report follows");
+
+		for(usage_map_t::iterator i = usage.begin(); i != usage.end();
+			i++)
+		{
+			BOX_WARNING("Memory use: " << i->first << ": " <<
+				i->second.first << " blocks, " <<
+				i->second.second << " bytes");
+			blocks += i->second.first;
+			bytes  += i->second.second;
+		}
+
+		BOX_WARNING("Memory use: report ends, total: " << blocks <<
+			" blocks, " << bytes << " bytes");
+	}
+	#endif // DEBUG_LEAKS
+}
+
 void memleakfinder_reportleaks_file(FILE *file)
 {
 	InternalAllocGuard guard;
@@ -549,4 +651,4 @@ void operator delete(void *ptr) throw ()
 	internal_delete(ptr);
 }
 
-#endif // BOX_RELEASE_BUILD
+#endif // BOX_MEMORY_LEAK_TESTING
