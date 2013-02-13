@@ -36,6 +36,8 @@ void memleakfinder_init();
 
 int memleakfinder_numleaks();
 
+void memleakfinder_report_usage_summary();
+
 void memleakfinder_reportleaks();
 
 void memleakfinder_reportleaks_appendfile(const char *filename, const char *markertext);
