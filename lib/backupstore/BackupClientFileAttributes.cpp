@@ -364,7 +364,7 @@ bool BackupClientFileAttributes::Compare(const BackupClientFileAttributes &rAttr
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::ReadAttributes(const char *Filename,
+void BackupClientFileAttributes::ReadAttributes(const std::string& Filename,
 	bool ZeroModificationTimes, box_time_t *pModTime,
 	box_time_t *pAttrModTime, int64_t *pFileSize,
 	InodeRefType *pInodeNumber, bool *pHasMultipleLinks)
@@ -373,7 +373,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 	try
 	{
 		EMU_STRUCT_STAT st;
-		if(EMU_LSTAT(Filename, &st) != 0)
+		if(EMU_LSTAT(Filename.c_str(), &st) != 0)
 		{
 			THROW_SYS_FILE_ERROR("Failed to stat file",
 				Filename, CommonException, OSFileError)
@@ -465,7 +465,7 @@ void BackupClientFileAttributes::ReadAttributes(const char *Filename,
 //
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::FillAttributes(
-	StreamableMemBlock &outputBlock, const char *Filename,
+	StreamableMemBlock &outputBlock, const std::string& rFilename,
 	const EMU_STRUCT_STAT &st, bool ZeroModificationTimes
 )
 {
@@ -508,14 +508,16 @@ void BackupClientFileAttributes::FillAttributes(
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st)
+void BackupClientFileAttributes::FillAttributesLink(
+	StreamableMemBlock &outputBlock, const std::string& Filename,
+	struct stat &st)
 {
 	// Make sure we're only called for symbolic links
 	ASSERT((st.st_mode & S_IFMT) == S_IFLNK);
 
 	// Get the filename the link is linked to
 	char linkedTo[PATH_MAX+4];
-	int linkedToSize = ::readlink(Filename, linkedTo, PATH_MAX);
+	int linkedToSize = ::readlink(Filename.c_str(), linkedTo, PATH_MAX);
 	if(linkedToSize == -1)
 	{
 		BOX_LOG_SYS_ERROR("Failed to readlink '" << Filename << "'");
@@ -540,7 +542,8 @@ void BackupClientFileAttributes::FillAttributesLink(StreamableMemBlock &outputBl
 //		Created: 2005/06/12
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename)
+void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBlock,
+	const std::string& Filename)
 {
 #ifdef HAVE_SYS_XATTR_H
 	int listBufferSize = 10000;
@@ -550,13 +553,13 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 	{
 		// This returns an unordered list of attribute names, each 0 terminated,
 		// concatenated together
-		int listSize = ::llistxattr(Filename, list, listBufferSize);
+		int listSize = ::llistxattr(Filename.c_str(), list, listBufferSize);
 
 		if(listSize>listBufferSize)
 		{
 			delete[] list, list = NULL;
 			list = new char[listSize];
-			listSize = ::llistxattr(Filename, list, listSize);
+			listSize = ::llistxattr(Filename.c_str(), list, listSize);
 		}
 
 		if(listSize>0)
@@ -606,7 +609,7 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 
 				// Find size of attribute (must call with buffer and length 0 on some platforms,
 				// as -1 is returned if the data doesn't fit.)
-				int valueSize = ::lgetxattr(Filename, attrKey.c_str(), 0, 0);
+				int valueSize = ::lgetxattr(Filename.c_str(), attrKey.c_str(), 0, 0);
 				if(valueSize<0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to get "
@@ -625,7 +628,9 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				}
 
 				// This gets the attribute value (may be text or binary), no termination
-				valueSize = ::lgetxattr(Filename, attrKey.c_str(), buffer+xattrSize, xattrBufferSize-xattrSize);
+				valueSize = ::lgetxattr(Filename.c_str(),
+					attrKey.c_str(), buffer+xattrSize,
+					xattrBufferSize-xattrSize);
 				if(valueSize<0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to get "
@@ -742,7 +747,7 @@ void BackupClientFileAttributes::GetModificationTimes(
 //		Created: 2003/10/07
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::WriteAttributes(const char *Filename,
+void BackupClientFileAttributes::WriteAttributes(const std::string& Filename,
 	bool MakeUserWritable) const
 {
 	// Got something loaded
@@ -795,8 +800,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 			Filename << "'");
 #else
 		// Make a symlink, first deleting anything in the way
-		::unlink(Filename);
-		if(::symlink((char*)(pattr + 1), Filename) != 0)
+		::unlink(Filename.c_str());
+		if(::symlink((char*)(pattr + 1), Filename.c_str()) != 0)
 		{
 			BOX_LOG_SYS_ERROR("Failed to symlink '" << Filename <<
 				"' to '" << (char*)(pattr + 1) << "'");
@@ -815,7 +820,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 			if((mode & S_IFMT) != S_IFLNK)
 			{
 				// Not a link, use normal chown
-				if(::chown(Filename, ntohl(pattr->UID), ntohl(pattr->GID)) != 0)
+				if(::chown(Filename.c_str(), ntohl(pattr->UID), ntohl(pattr->GID)) != 0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to change "
 						"owner of file "
@@ -825,7 +830,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 			}
 		#else
 			// use the version which sets things on symlinks
-			if(::lchown(Filename, ntohl(pattr->UID), ntohl(pattr->GID)) != 0)
+			if(::lchown(Filename.c_str(), ntohl(pattr->UID), ntohl(pattr->GID)) != 0)
 			{
 				BOX_LOG_SYS_ERROR("Failed to change owner of "
 					"symbolic link '" << Filename << "'");
@@ -871,7 +876,7 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 		#endif
 		
 		// Try to apply
-		if(::utimes(Filename, times) != 0)
+		if(::utimes(Filename.c_str(), times) != 0)
 		{
 			BOX_LOG_SYS_WARNING("Failed to change times of "
 				"file '" << Filename << "' to ctime=" <<
@@ -887,8 +892,8 @@ void BackupClientFileAttributes::WriteAttributes(const char *Filename,
 
 	// Apply everything else... (allowable mode flags only)
 	// Mode must be done last (think setuid)
-	if(::chmod(Filename, mode & (S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID
-		| S_ISGID | S_ISVTX)) != 0)
+	if(::chmod(Filename.c_str(), mode & (S_IRWXU | S_IRWXG | S_IRWXO |
+		S_ISUID | S_ISGID | S_ISVTX)) != 0)
 	{
 		BOX_LOG_SYS_ERROR("Failed to change permissions of file "
 			"'" << Filename << "'");
@@ -971,7 +976,7 @@ void BackupClientFileAttributes::EnsureClearAvailable() const
 //		Created: 2005/06/13
 //
 // --------------------------------------------------------------------------
-void BackupClientFileAttributes::WriteExtendedAttr(const char *Filename, int xattrOffset) const
+void BackupClientFileAttributes::WriteExtendedAttr(const std::string& Filename, int xattrOffset) const
 {
 #ifdef HAVE_SYS_XATTR_H
 	const char* buffer = static_cast<char*>(mpClearAttributes->GetBuffer());
@@ -1004,7 +1009,8 @@ void BackupClientFileAttributes::WriteExtendedAttr(const char *Filename, int xat
 		xattrOffset += sizeof(u_int32_t);
 
 		// FIXME: Warn on EOPNOTSUPP
-		if(::lsetxattr(Filename, key, buffer+xattrOffset, valueSize, 0)!=0 && errno!=EOPNOTSUPP)
+		if(::lsetxattr(Filename.c_str(), key, buffer+xattrOffset,
+			valueSize, 0)!=0 && errno!=EOPNOTSUPP)
 		{
 			BOX_LOG_SYS_ERROR("Failed to set extended attributes "
 				"on file '" << Filename << "'");

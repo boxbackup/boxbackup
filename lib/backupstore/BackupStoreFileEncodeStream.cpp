@@ -111,7 +111,7 @@ BackupStoreFileEncodeStream::~BackupStoreFileEncodeStream()
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFileEncodeStream::Setup(const char *Filename,
+void BackupStoreFileEncodeStream::Setup(const std::string& Filename,
 	BackupStoreFileEncodeStream::Recipe *pRecipe,
 	int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
 	int64_t *pModificationTime, ReadLoggingStream::Logger* pLogger,

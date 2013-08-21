@@ -121,7 +121,7 @@ public:
 	// Main interface
 	static std::auto_ptr<IOStream> EncodeFile
 	(
-		const char *Filename,
+		const std::string& Filename,
 		int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
 		int64_t *pModificationTime = 0,
 		ReadLoggingStream::Logger* pLogger = NULL,
@@ -129,7 +129,7 @@ public:
 	);
 	static std::auto_ptr<IOStream> EncodeFileDiff
 	(
-		const char *Filename, int64_t ContainerID,
+		const std::string& Filename, int64_t ContainerID,
 		const BackupStoreFilename &rStoreFilename, 
 		int64_t DiffFromObjectID, IOStream &rDiffFromBlockIndex,
 		int Timeout, 
