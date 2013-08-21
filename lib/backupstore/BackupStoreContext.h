@@ -66,6 +66,19 @@ public:
 	};
 	
 	int GetPhase() const {return mProtocolPhase;}
+	std::string GetPhaseName() const
+	{
+		switch(mProtocolPhase)
+		{
+			case Phase_Version:  return "Phase_Version";
+			case Phase_Login:    return "Phase_Login";
+			case Phase_Commands: return "Phase_Commands";
+			default:
+				std::ostringstream oss;
+				oss << "Unknown phase " << mProtocolPhase;
+				return oss.str();
+		}
+	}
 	void SetPhase(int NewPhase) {mProtocolPhase = NewPhase;}
 	
 	// Read only locking
