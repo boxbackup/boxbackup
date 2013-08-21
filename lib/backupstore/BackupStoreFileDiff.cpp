@@ -125,7 +125,7 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 // --------------------------------------------------------------------------
 std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 (
-	const char *Filename, int64_t ContainerID,
+	const std::string& Filename, int64_t ContainerID,
 	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, 
 	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer, 
 	int64_t *pModificationTime, bool *pIsCompletelyDifferent)
@@ -133,7 +133,7 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 	// Is it a symlink?
 	{
 		EMU_STRUCT_STAT st;
-		if(EMU_LSTAT(Filename, &st) != 0)
+		if(EMU_LSTAT(Filename.c_str(), &st) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}

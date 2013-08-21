@@ -75,7 +75,7 @@ public:
 		int64_t mOtherFileID;
 	};
 	
-	void Setup(const char *Filename, Recipe *pRecipe, int64_t ContainerID,
+	void Setup(const std::string& Filename, Recipe *pRecipe, int64_t ContainerID,
 		const BackupStoreFilename &rStoreFilename,
 		int64_t *pModificationTime,
 		ReadLoggingStream::Logger* pLogger = NULL,

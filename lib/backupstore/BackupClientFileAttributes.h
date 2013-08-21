@@ -43,10 +43,10 @@ public:
 	// Prevent access to base class members accidently
 	void Set();
 
-	void ReadAttributes(const char *Filename, bool ZeroModificationTimes = false,
+	void ReadAttributes(const std::string& Filename, bool ZeroModificationTimes = false,
 		box_time_t *pModTime = 0, box_time_t *pAttrModTime = 0, int64_t *pFileSize = 0,
 		InodeRefType *pInodeNumber = 0, bool *pHasMultipleLinks = 0);
-	void WriteAttributes(const char *Filename, 
+	void WriteAttributes(const std::string& Filename, 
 		bool MakeUserWritable = false) const;
 	void GetModificationTimes(box_time_t *pModificationTime,
 		box_time_t *pAttrModificationTime) const;
@@ -56,15 +56,18 @@ public:
 	static void SetBlowfishKey(const void *pKey, int KeyLength);
 	static void SetAttributeHashSecret(const void *pSecret, int SecretLength);
 	
-	static uint64_t GenerateAttributeHash(EMU_STRUCT_STAT &st, const std::string &filename, const std::string &leafname);
-	static void FillExtendedAttr(StreamableMemBlock &outputBlock, const char *Filename);
+	static uint64_t GenerateAttributeHash(EMU_STRUCT_STAT &st,
+		const std::string& Filename, const std::string &leafname);
+	static void FillExtendedAttr(StreamableMemBlock &outputBlock,
+		const std::string& Filename);
 
 private:
 	static void FillAttributes(StreamableMemBlock &outputBlock,
-		const char *Filename, const EMU_STRUCT_STAT &st,
+		const std::string& Filename, const EMU_STRUCT_STAT &st,
 		bool ZeroModificationTimes);
-	static void FillAttributesLink(StreamableMemBlock &outputBlock, const char *Filename, struct stat &st);
-	void WriteExtendedAttr(const char *Filename, int xattrOffset) const;
+	static void FillAttributesLink(StreamableMemBlock &outputBlock,
+		const std::string& Filename, struct stat &st);
+	void WriteExtendedAttr(const std::string& Filename, int xattrOffset) const;
 
 	void RemoveClear() const;
 	void EnsureClearAvailable() const;
