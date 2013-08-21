@@ -248,7 +248,7 @@ int main(int argc, char * const * argv)
 	
 	int ch;
 	
-	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vPTUV", longopts, NULL))
+	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vPTUVW:", longopts, NULL))
 		!= -1)
 	{
 		switch(ch)
@@ -317,6 +317,17 @@ int main(int argc, char * const * argv)
 			case 'V':
 			{
 				logLevel = Log::EVERYTHING;
+			}
+			break;
+
+			case 'W':
+			{
+				logLevel = Logging::GetNamedLevel(optarg);
+				if (logLevel == Log::INVALID)
+				{
+					BOX_FATAL("Invalid logging level: " << optarg);
+					return 2;
+				}
 			}
 			break;
 
