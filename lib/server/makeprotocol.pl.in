@@ -342,6 +342,7 @@ __E
 	
 	print H "\tvirtual void LogSysLog(const char *Action) const;\n";
 	print H "\tvirtual void LogFile(const char *Action, FILE *file) const;\n";
+	print H "\tvirtual std::string ToString() const;\n";
 	
 	# write member variables and setup for cpp file
 	my @def_constructor_list;
@@ -467,11 +468,24 @@ __E
 
 	my ($log) = make_log_strings_framework($cmd);
 	print CPP <<__E;
+std::string $cmd_class\::ToString() const
+{
+	std::ostringstream oss;
+	try
+	{
+		oss << $log;
+	}
+	catch(std::exception &e)
+	{
+		oss << "Failed to log command: " << e.what();
+	}
+	return oss.str();
+}
 void $cmd_class\::LogSysLog(const char *Action) const
 {
 	try
 	{
-		BOX_TRACE($log);
+		BOX_TRACE(Action << " " << $log);
 	}
 	catch(std::exception &e)
 	{
@@ -481,17 +495,7 @@ void $cmd_class\::LogSysLog(const char *Action) const
 }
 void $cmd_class\::LogFile(const char *Action, FILE *File) const
 {
-	std::ostringstream oss;
-	try
-	{
-		oss << $log;
-	}
-	catch(std::exception &e)
-	{
-		oss << "Failed to log command: " << Action << ": " <<
-			e.what();
-	}
-	::fprintf(File, "%s\\n", oss.str().c_str());
+	::fprintf(File, "%s %s\\n", Action, ToString().c_str());
 	::fflush(File);
 }
 __E
@@ -1184,7 +1188,7 @@ sub make_log_strings_framework
 		}
 	}
 
-	my $log_cmd = "Action << \" $cmd(\" ";
+	my $log_cmd = '"'.$cmd.'(" ';
 	foreach my $arg (@args)
 	{
 		$arg = "<< $arg ";
