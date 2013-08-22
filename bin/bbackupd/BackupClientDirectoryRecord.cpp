@@ -28,6 +28,7 @@
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreFileEncodeStream.h"
+#include "BufferedStream.h"
 #include "CommonException.h"
 #include "CollectInBufferStream.h"
 #include "FileModificationTime.h"
@@ -727,7 +728,7 @@ void BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::
 		BackupProtocolClient &connection(rParams.mrContext.GetConnection());
 
 		// Exception thrown if this doesn't work
-		MemBlockStream attrStream(attr);
+		std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
 		connection.QueryChangeDirAttributes(mObjectID, attrModTime, attrStream);
 	}
 }
@@ -1195,8 +1196,10 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					
 					// Update store
 					BackupClientFileAttributes attr;
-					attr.ReadAttributes(filename.c_str(), false /* put mod times in the attributes, please */);
-					MemBlockStream attrStream(attr);
+					attr.ReadAttributes(filename,
+						false /* put mod times in the attributes, please */);
+					std::auto_ptr<IOStream> attrStream(
+						new MemBlockStream(attr));
 					connection.QuerySetReplacementFileAttributes(mObjectID, attributesHash, storeFilename, attrStream);
 					fileSynced = true;
 				}
@@ -1458,7 +1461,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				// in the else if(...) above will be correct.
 
 				// Build attribute stream for sending
-				MemBlockStream attrStream(attr);
+				std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
 
 				if(renameDir)
 				{
@@ -1688,12 +1691,14 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 
 	// Info
 	int64_t objID = 0;
-	bool doNormalUpload = true;
 	int64_t uploadedSize = -1;
 	
 	// Use a try block to catch store full errors
 	try
 	{
+		std::auto_ptr<BackupStoreFileEncodeStream> apStreamToUpload;
+		int64_t diffFromID = 0;
+
 		// Might an old version be on the server, and is the file
 		// size over the diffing threshold?
 		if(!NoPreviousVersionOnServer &&
@@ -1702,7 +1707,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			// YES -- try to do diff, if possible
 			// First, query the server to see if there's an old version available
 			std::auto_ptr<BackupProtocolSuccess> getBlockIndex(connection.QueryGetBlockIndexByName(mObjectID, rStoreFilename));
-			int64_t diffFromID = getBlockIndex->GetObjectID();
+			diffFromID = getBlockIndex->GetObjectID();
 			
 			if(diffFromID != 0)
 			{
@@ -1721,95 +1726,67 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 
 				bool isCompletelyDifferent = false;
 
-				std::auto_ptr<IOStream> patchStream(
-					BackupStoreFile::EncodeFileDiff(
-						rFilename.c_str(),
-						mObjectID,	/* containing directory */
-						rStoreFilename, diffFromID, *blockIndexStream,
-						connection.GetTimeout(), 
-						&rContext, // DiffTimer implementation
-						0 /* not interested in the modification time */, 
-						&isCompletelyDifferent));
+				apStreamToUpload = BackupStoreFile::EncodeFileDiff(
+					rFilename, 
+					mObjectID, /* containing directory */
+					rStoreFilename, diffFromID, *blockIndexStream,
+					connection.GetTimeout(), 
+					&rContext, // DiffTimer implementation
+					0 /* not interested in the modification time */, 
+					&isCompletelyDifferent);
+
+				if(isCompletelyDifferent)
+				{
+					diffFromID = 0;
+				}
 	
 				rContext.UnManageDiffProcess();
-				rContext.SetNiceMode(true);
-
-				RateLimitingStream rateLimit(*patchStream,
-					rParams.mMaxUploadRate);
-				IOStream* pStreamToUpload;
-
-				if(rParams.mMaxUploadRate > 0)
-				{
-					pStreamToUpload = &rateLimit;
-				}
-				else
-				{
-					pStreamToUpload = patchStream.get();
-				}
-
-				//
-				// Upload the patch to the store
-				//
-				std::auto_ptr<BackupProtocolSuccess> stored(connection.QueryStoreFile(mObjectID, ModificationTime,
-						AttributesHash, isCompletelyDifferent?(0):(diffFromID), rStoreFilename, *pStreamToUpload));
-
-				rContext.SetNiceMode(false);
-				
-				// Get object ID from the result		
-				objID = stored->GetObjectID();
-
-				// Don't attempt to upload it again!
-				doNormalUpload = false;
-
-				// Capture number of bytes sent
-				uploadedSize = ((BackupStoreFileEncodeStream &)
-					*patchStream).GetTotalBytesSent();
 			} 
 		}
 	
-		if(doNormalUpload)
+		if(!apStreamToUpload.get()) // No patch upload, so do a normal upload
 		{
 			// below threshold or nothing to diff from, so upload whole
 			rNotifier.NotifyFileUploading(this, rNonVssFilePath);
 			
 			// Prepare to upload, getting a stream which will encode the file as we go along
-			std::auto_ptr<IOStream> upload(
-				BackupStoreFile::EncodeFile(rFilename.c_str(),
-					mObjectID, rStoreFilename, NULL,
-					&rParams,
-					&(rParams.mrRunStatusProvider)));
-
-			rContext.SetNiceMode(true);
-
-			RateLimitingStream rateLimit(*upload,
-				rParams.mMaxUploadRate);
-			IOStream* pStreamToUpload;
-
-			if(rParams.mMaxUploadRate > 0)
-			{
-				pStreamToUpload = &rateLimit;
-			}
-			else
-			{
-				pStreamToUpload = upload.get();
-			}
-	
-			// Send to store
-			std::auto_ptr<BackupProtocolSuccess> stored(
-				connection.QueryStoreFile(
-					mObjectID, ModificationTime,
-					AttributesHash, 
-					0 /* no diff from file ID */, 
-					rStoreFilename, *pStreamToUpload));
-
-			rContext.SetNiceMode(false);
-	
-			// Get object ID from the result		
-			objID = stored->GetObjectID();
-
-			uploadedSize = ((BackupStoreFileEncodeStream &)
-				*upload).GetTotalBytesSent();
+			apStreamToUpload = BackupStoreFile::EncodeFile(
+				rFilename, mObjectID, /* containing directory */
+				rStoreFilename, NULL, &rParams, 
+				&(rParams.mrRunStatusProvider));
 		}
+
+		rContext.SetNiceMode(true);
+		std::auto_ptr<IOStream> apWrappedStream;
+
+		if(rParams.mMaxUploadRate > 0)
+		{
+			apWrappedStream.reset(new RateLimitingStream(
+				*apStreamToUpload, rParams.mMaxUploadRate));
+		}
+		else
+		{
+			// Wrap the stream in *something*, so that
+			// QueryStoreFile() doesn't delete the original
+			// stream (upload object) and we can retrieve
+			// the byte counter.
+			apWrappedStream.reset(new BufferedStream(
+				*apStreamToUpload));
+		}
+
+		// Send to store
+		std::auto_ptr<BackupProtocolSuccess> stored(
+			connection.QueryStoreFile(
+				mObjectID, ModificationTime,
+				AttributesHash, 
+				diffFromID,
+				rStoreFilename, apWrappedStream));
+
+		rContext.SetNiceMode(false);
+
+		// Get object ID from the result		
+		objID = stored->GetObjectID();
+		uploadedSize = apStreamToUpload->GetTotalBytesSent();
 	}
 	catch(BoxException &e)
 	{

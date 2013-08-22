@@ -60,6 +60,8 @@ public:
 	virtual bool IsManaged() = 0;
 };
 
+class BackupStoreFileEncodeStream;
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -119,7 +121,7 @@ public:
 
 
 	// Main interface
-	static std::auto_ptr<IOStream> EncodeFile
+	static std::auto_ptr<BackupStoreFileEncodeStream> EncodeFile
 	(
 		const std::string& Filename,
 		int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
@@ -127,7 +129,7 @@ public:
 		ReadLoggingStream::Logger* pLogger = NULL,
 		RunStatusProvider* pRunStatusProvider = NULL
 	);
-	static std::auto_ptr<IOStream> EncodeFileDiff
+	static std::auto_ptr<BackupStoreFileEncodeStream> EncodeFileDiff
 	(
 		const std::string& Filename, int64_t ContainerID,
 		const BackupStoreFilename &rStoreFilename, 

@@ -207,7 +207,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 	stream->SetForReading();
 	
 	// Get the protocol to send the stream
-	rProtocol.SendStreamAfterCommand(stream.release());
+	rProtocol.SendStreamAfterCommand(static_cast< std::auto_ptr<IOStream> > (stream));
 
 	return std::auto_ptr<BackupProtocolMessage>(
 		new BackupProtocolSuccess(mObjectID));
@@ -300,7 +300,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObject::DoCommand(BackupPr
 	std::auto_ptr<IOStream> object(rContext.OpenObject(mObjectID));
 
 	// Stream it to the peer
-	rProtocol.SendStreamAfterCommand(object.release());
+	rProtocol.SendStreamAfterCommand(object);
 
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -463,11 +463,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 	}
 
 	// Stream the reordered stream to the peer
-	rProtocol.SendStreamAfterCommand(stream.get());
+	rProtocol.SendStreamAfterCommand(stream);
 	
-	// Don't delete the stream here
-	stream.release();
-
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
 }
@@ -831,7 +828,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(Back
 		// Get the stream ready to go
 		stream->SetForReading();	
 		// Tell the protocol to send the stream
-		rProtocol.SendStreamAfterCommand(stream.release());
+		rProtocol.SendStreamAfterCommand(static_cast< std::auto_ptr<IOStream> >(stream));
 	}
 
 	// Make reply
@@ -859,7 +856,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByID::DoCommand(
 	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
 	
 	// Return the stream to the client
-	rProtocol.SendStreamAfterCommand(stream.release());
+	rProtocol.SendStreamAfterCommand(stream);
 
 	// Return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -911,7 +908,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoComman
 	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
 	
 	// Return the stream to the client
-	rProtocol.SendStreamAfterCommand(stream.release());
+	rProtocol.SendStreamAfterCommand(stream);
 
 	// Return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));

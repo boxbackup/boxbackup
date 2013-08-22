@@ -123,7 +123,7 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 //		Created: 12/1/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
+std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 (
 	const std::string& Filename, int64_t ContainerID,
 	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, 
@@ -206,10 +206,11 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 		// foundBlocks no longer required
 		
 		// Create the stream
-		std::auto_ptr<IOStream> stream(new BackupStoreFileEncodeStream);
+		std::auto_ptr<BackupStoreFileEncodeStream> stream(
+			new BackupStoreFileEncodeStream);
 	
 		// Do the initial setup
-		((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename, precipe, ContainerID, rStoreFilename, pModificationTime);
+		stream->Setup(Filename, precipe, ContainerID, rStoreFilename, pModificationTime);
 		precipe = 0;	// Stream has taken ownership of this
 		
 		// Tell user about completely different status?

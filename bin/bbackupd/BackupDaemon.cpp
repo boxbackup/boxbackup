@@ -2460,7 +2460,8 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				// Execute create directory command
 				try
 				{
-					MemBlockStream attrStream(attr);
+					std::auto_ptr<IOStream> attrStream(
+						new MemBlockStream(attr));
 					std::auto_ptr<BackupProtocolSuccess>
 						dirCreate(connection.QueryCreateDirectory(
 						BackupProtocolListDirectory::RootDirectory,
