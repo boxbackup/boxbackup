@@ -541,7 +541,7 @@ public:
 
 	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
 	virtual int GetTimeout() = 0;
-	void SendStreamAfterCommand(IOStream *pStream);
+	void SendStreamAfterCommand(std::auto_ptr<IOStream> apStream);
 	
 protected:
 	std::list<IOStream*> mStreamsToSend;
@@ -573,10 +573,10 @@ $replyable_base_class\::$replyable_base_class()
 $replyable_base_class\::~$replyable_base_class()
 { }
 
-void $replyable_base_class\::SendStreamAfterCommand(IOStream *pStream)
+void $replyable_base_class\::SendStreamAfterCommand(std::auto_ptr<IOStream> apStream)
 {
-	ASSERT(pStream != NULL);
-	mStreamsToSend.push_back(pStream);
+	ASSERT(apStream.get() != NULL);
+	mStreamsToSend.push_back(apStream.release());
 }
 
 void $replyable_base_class\::DeleteStreamsToSend()
@@ -585,6 +585,7 @@ void $replyable_base_class\::DeleteStreamsToSend()
 	{
 		delete (*i);
 	}
+
 	mStreamsToSend.clear();
 }
 
@@ -668,8 +669,8 @@ for my $cmd (@cmd_list)
 	if(obj_is_type($cmd,'Command'))
 	{
 		my $has_stream = obj_is_type($cmd,'StreamWithCommand');
-		my $argextra = $has_stream?', IOStream &rStream':'';
-		my $queryextra = $has_stream?', rStream':'';
+		my $argextra = $has_stream?', std::auto_ptr<IOStream> apStream':'';
+		my $queryextra = $has_stream?', apStream':'';
 		my $request_class = $cmd_class{$cmd};
 		my $reply_class = $cmd_class{obj_get_type_params($cmd,'Command')};
 		
@@ -772,8 +773,8 @@ __E
 			if(obj_is_type($cmd,'Command'))
 			{
 				my $has_stream = obj_is_type($cmd,'StreamWithCommand');
-				my $argextra = $has_stream?', IOStream &rStream':'';
-				my $queryextra = $has_stream?', rStream':'';
+				my $argextra = $has_stream?', std::auto_ptr<IOStream> apStream':'';
+				my $queryextra = $has_stream?', apStream':'';
 				my $request_class = $cmd_class{$cmd};
 				my $reply_class = $cmd_class{obj_get_type_params($cmd,'Command')};
 				print H "\tstd::auto_ptr<$reply_class> Query(const $request_class &rQuery$argextra);\n";
@@ -1021,7 +1022,7 @@ __E
 				my $reply_class = $cmd_class{$reply_msg};
 				my $reply_id = $cmd_id{$reply_msg};
 				my $has_stream = obj_is_type($cmd,'StreamWithCommand');
-				my $argextra = $has_stream?', IOStream &rStream':'';
+				my $argextra = $has_stream?', std::auto_ptr<IOStream> apStream':'';
 				my $send_stream_extra = '';
 				my $send_stream_method = $writing_client ? "SendStream"
 					: "SendStreamAfterCommand";
@@ -1032,7 +1033,7 @@ __E
 					{
 						$send_stream_extra = <<__E;
 	// Send stream after the command
-	SendStream(rStream);
+	SendStream(*apStream);
 __E
 					}
 					
@@ -1059,7 +1060,7 @@ __E
 					{
 						$send_stream_extra = <<__E;
 	// Send stream after the command
-	SendStreamAfterCommand(&rStream);
+	SendStreamAfterCommand(apStream);
 __E
 					}
 

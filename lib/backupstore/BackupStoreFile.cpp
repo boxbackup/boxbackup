@@ -73,7 +73,7 @@ BackupStoreFileStats BackupStoreFile::msStats = {0,0,0};
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(
+std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFile(
 	const std::string& Filename, int64_t ContainerID,
 	const BackupStoreFilename &rStoreFilename,
 	int64_t *pModificationTime,
@@ -81,13 +81,12 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(
 	RunStatusProvider* pRunStatusProvider)
 {
 	// Create the stream
-	std::auto_ptr<IOStream> stream(new BackupStoreFileEncodeStream);
+	std::auto_ptr<BackupStoreFileEncodeStream> stream(
+		new BackupStoreFileEncodeStream);
 
 	// Do the initial setup
-	((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename,
-		0 /* no recipe, just encode */,
-		ContainerID, rStoreFilename, pModificationTime, pLogger,
-		pRunStatusProvider);
+	stream->Setup(Filename, 0 /* no recipe, just encode */, ContainerID,
+		rStoreFilename, pModificationTime, pLogger, pRunStatusProvider);
 	
 	// Return the stream for the caller
 	return stream;
