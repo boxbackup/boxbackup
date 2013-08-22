@@ -17,20 +17,25 @@
 #include <map>
 
 #include "Test.h"
+#include "BackupClientCryptoKeys.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
+#include "BackupStoreContext.h"
 #include "BackupStoreDirectory.h"
+#include "BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFileWire.h"
+#include "BackupStoreFileEncodeStream.h"
+#include "BackupStoreInfo.h"
+#include "BufferedWriteStream.h"
 #include "FileStream.h"
 #include "RaidFileController.h"
-#include "RaidFileWrite.h"
-#include "RaidFileRead.h"
-#include "BackupStoreInfo.h"
-#include "BackupStoreException.h"
 #include "RaidFileException.h"
-#include "StoreStructure.h"
-#include "BackupStoreFileWire.h"
+#include "RaidFileRead.h"
+#include "RaidFileWrite.h"
 #include "ServerControl.h"
+#include "StoreStructure.h"
+#include "ZeroStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -147,7 +152,9 @@ void check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 	
 	while((en = i.Next()) != 0)
 	{
-		TEST_THAT(ck->name != -1);
+		BackupStoreFilenameClear clear(en->GetName());
+		TEST_LINE(ck->name != -1, "Unexpected entry found in "
+			"directory: " << clear.GetClearFilename());
 		if(ck->name == -1)
 		{
 			break;
@@ -179,9 +186,12 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 		{
 			break;
 		}
-		TEST_THAT(en->GetObjectID() == ck->id);
-		TEST_THAT(en->GetDependsNewer() == ck->depNewer);
-		TEST_THAT(en->GetDependsOlder() == ck->depOlder);
+		TEST_EQUAL_LINE(ck->id, en->GetObjectID(), "Wrong object ID "
+			"for " << BOX_FORMAT_OBJECTID(ck->id));
+		TEST_EQUAL_LINE(ck->depNewer, en->GetDependsNewer(),
+			"Wrong Newer dependency for " << BOX_FORMAT_OBJECTID(ck->id));
+		TEST_EQUAL_LINE(ck->depOlder, en->GetDependsOlder(),
+			"Wrong Older dependency for " << BOX_FORMAT_OBJECTID(ck->id));
 		++ck;
 	}
 	
@@ -283,14 +293,61 @@ void test_dir_fixing()
 	}
 }
 
+int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
+	int64_t diff_from_id)
+{
+	std::auto_ptr<IOStream> upload;
+	if(diff_from_id)
+	{
+		std::auto_ptr<BackupProtocolSuccess> getBlockIndex(
+			client.QueryGetBlockIndexByName(
+				BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0]));
+		std::auto_ptr<IOStream> blockIndexStream(client.ReceiveStream());
+		upload = BackupStoreFile::EncodeFileDiff(
+			file_path,
+			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
+			diff_from_id, *blockIndexStream,
+			IOStream::TimeOutInfinite,
+			NULL, // DiffTimer implementation
+			0 /* not interested in the modification time */, 
+			NULL // isCompletelyDifferent
+			);
+	}
+	else
+	{
+		upload = BackupStoreFile::EncodeFile(
+			file_path,
+			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
+			NULL, 
+			NULL, // pLogger
+			NULL // pRunStatusProvider
+			);
+	}
+
+	return client.QueryStoreFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		1, // ModificationTime
+		2, // AttributesHash
+		diff_from_id, // DiffFromFileID
+		fnames[0], // rFilename
+		upload)->GetObjectID();
+}
+
 int test(int argc, const char *argv[])
 {
+	{
+		MEMLEAKFINDER_NO_LEAKS;
+		fnames[0].SetAsClearFilename("x1");
+		fnames[1].SetAsClearFilename("x2");
+		fnames[2].SetAsClearFilename("x3");
+	}
+
 	// Test the backupstore directory fixing
 	test_dir_fixing();
 
 	// Initialise the raidfile controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
 	rcontroller.Initialise("testfiles/raidfile.conf");
+	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Create an account
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
