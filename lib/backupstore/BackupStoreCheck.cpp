@@ -653,20 +653,21 @@ void BackupStoreCheck::CheckDirectories()
 							*en, pblock->mID[e],
 							iIndex, isModified);
 					}
+					// Item can't be found. Is it a directory?
+					else if(en->IsDir())
+					{
+						// Store the directory for later attention
+						mDirsWhichContainLostDirs[en->GetObjectID()] = pblock->mID[e];
+					}
 					else
 					{
-						// Item can't be found. Is it a directory?
-						if(en->IsDir())
-						{
-							// Store the directory for later attention
-							mDirsWhichContainLostDirs[en->GetObjectID()] = pblock->mID[e];
-						}
-						else
-						{
-							// Just remove the entry
-							badEntry = true;
-							BOX_WARNING("Directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " references object " << BOX_FORMAT_OBJECTID(en->GetObjectID()) << " which does not exist.");
-						}
+						// Just remove the entry
+						badEntry = true;
+						BOX_WARNING("Directory ID " << 
+							BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+							" references object " << 
+							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+							" which does not exist.");
 					}
 					
 					// Is this entry worth keeping?
@@ -674,22 +675,31 @@ void BackupStoreCheck::CheckDirectories()
 					{
 						toDelete.push_back(en->GetObjectID());
 					}
-					else if (en->IsFile())
+					else if(!en->IsFile())
 					{
-						// Add to sizes?
-						if(en->IsOld())
-						{
-							mBlocksInOldFiles += en->GetSizeInBlocks();
-						}
-						if(en->IsDeleted())
-						{
-							mBlocksInDeletedFiles += en->GetSizeInBlocks();
-						}
-						if(!en->IsOld() &&
-							!en->IsDeleted())
-						{
-							mBlocksInCurrentFiles += en->GetSizeInBlocks();
-						}
+						BOX_TRACE("Not counting object " << 
+							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+							" with flags " << en->GetFlags());
+					}
+					else // it's a good file, add to sizes
+					if(en->IsOld() && en->IsDeleted())
+					{
+						BOX_WARNING("File " << 
+							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+							" is both old and deleted, "
+							"this should not happen!");
+					}
+					else if(en->IsOld())
+					{
+						mBlocksInOldFiles += en->GetSizeInBlocks();
+					}
+					else if(en->IsDeleted())
+					{
+						mBlocksInDeletedFiles += en->GetSizeInBlocks();
+					}
+					else
+					{
+						mBlocksInCurrentFiles += en->GetSizeInBlocks();
 					}
 				}
 				
@@ -704,11 +714,25 @@ void BackupStoreCheck::CheckDirectories()
 					// Mark as modified
 					isModified = true;
 					
-					// Check the directory again, now that entries have been removed
-					dir.CheckAndFix();
-					
 					// Errors found
 					++mNumberErrorsFound;
+
+					// Check the directory again, now that entries have been removed
+					if(dir.CheckAndFix())
+					{
+						// Wasn't quite right, and has been modified
+						BOX_WARNING("Directory ID " <<
+							BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+							" was still bad after first pass");
+						++mNumberErrorsFound;
+						isModified = true;
+					}
+					else
+					{
+						BOX_INFO("Directory ID " <<
+							BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+							" was OK after fixing");
+					}
 				}
 				
 				if(isModified && mFixErrors)
