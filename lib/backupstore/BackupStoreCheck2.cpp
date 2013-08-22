@@ -706,7 +706,12 @@ bool BackupStoreDirectory::CheckAndFix()
 	bool changed = false;
 	
 	// Check that if a file depends on a new version, that version is in this directory
+	bool restart;
+
+	do
 	{
+		restart = false;
+
 		std::vector<Entry*>::iterator i(mEntries.begin());
 		for(; i != mEntries.end(); ++i)
 		{
@@ -717,7 +722,7 @@ bool BackupStoreDirectory::CheckAndFix()
 				if(newerEn == 0)
 				{
 					// Depends on something, but it isn't there.
-					BOX_TRACE("Entry id " << FMT_i <<
+					BOX_WARNING("Entry id " << FMT_i <<
 						" removed because depends "
 						"on newer version " <<
 						FMT_OID(dependsNewer) <<
@@ -727,11 +732,12 @@ bool BackupStoreDirectory::CheckAndFix()
 					delete *i;
 					mEntries.erase(i);
 					
-					// Start again at the beginning of the vector, the iterator is now invalid
-					i = mEntries.begin();
-					
 					// Mark as changed
 					changed = true;
+
+					// Start again at the beginning of the vector, the iterator is now invalid
+					restart = true;
+					break;
 				}
 				else
 				{
@@ -753,6 +759,7 @@ bool BackupStoreDirectory::CheckAndFix()
 			}
 		}
 	}
+	while(restart);
 	
 	// Check that if a file has a dependency marked, it exists, and remove it if it doesn't
 	{
