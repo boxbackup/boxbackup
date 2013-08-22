@@ -38,12 +38,17 @@
 #define CHECK_PHASE(phase) \
 	if(rContext.GetPhase() != BackupStoreContext::phase) \
 	{ \
+		BOX_ERROR("Received command " << ToString() << " " \
+			"in wrong protocol phase " << rContext.GetPhaseName() << ", " \
+			"expected in " #phase); \
 		return PROTOCOL_ERROR(Err_NotInRightProtocolPhase); \
 	}
 
 #define CHECK_WRITEABLE_SESSION \
 	if(rContext.SessionIsReadOnly()) \
 	{ \
+		BOX_ERROR("Received command " << ToString() << " " \
+			"in a read-only session"); \
 		return PROTOCOL_ERROR(Err_SessionReadOnly); \
 	}
 
