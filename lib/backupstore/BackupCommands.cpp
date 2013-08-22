@@ -249,13 +249,13 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupPr
 	}
 	
 	// A stream follows, which contains the file
-	std::auto_ptr<IOStream> dirstream(rProtocol.ReceiveStream());
+	std::auto_ptr<IOStream> filestream(rProtocol.ReceiveStream());
 	
 	// Ask the context to store it
 	int64_t id = 0;
 	try
 	{
-		id = rContext.AddFile(*dirstream, mDirectoryObjectID,
+		id = rContext.AddFile(*filestream, mDirectoryObjectID,
 			mModificationTime, mAttributesHash, mDiffFromFileID,
 			mFilename,
 			true /* mark files with same name as old versions */);
@@ -276,7 +276,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupPr
 		}
 	}
 	
-	// Tell the caller what the file was
+	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));
 }
 
