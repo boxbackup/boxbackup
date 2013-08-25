@@ -1025,9 +1025,14 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	char title[256];
 	::vsnprintf(title, sizeof(title), format, args);
 	
+#ifdef WIN32
+	StringCchCatA(title, sizeof(title)," - " PACKAGE_NAME);
+	SetConsoleTitleA(title);
+#else // !WIN32
 	// Set process title
 	::setproctitle("%s", title);
-	
+#endif
+
 #endif // HAVE_SETPROCTITLE
 }
 

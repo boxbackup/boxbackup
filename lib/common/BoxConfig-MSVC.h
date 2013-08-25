@@ -185,7 +185,7 @@
 
 /* Define to 1 if you have the `setproctitle' function. */
 /* #undef HAVE_SETPROCTITLE */
-
+#define HAVE_SETPROCTITLE 1
 /* Define to 1 if you have the `setxattr' function. */
 /* #undef HAVE_SETXATTR */
 
