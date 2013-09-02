@@ -25,6 +25,7 @@
 #include "BackupStoreFile.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreConstants.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
