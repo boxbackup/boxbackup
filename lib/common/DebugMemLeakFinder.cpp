@@ -164,6 +164,16 @@ void *memleakfinder_malloc(size_t size, const char *file, int line)
 	return b;
 }
 
+void *memleakfinder_calloc(size_t blocks, size_t size, const char *file, int line)
+{
+	void *block = memleakfinder_malloc(blocks * size, file, line);
+	if (block != 0)
+	{
+		memset(block, 0, blocks * size);
+	}
+	return block;
+}
+
 void *memleakfinder_realloc(void *ptr, size_t size)
 {
 	InternalAllocGuard guard;

@@ -132,7 +132,7 @@ static std::string demangle(const std::string& mangled_name)
 	{
 		std::string output = result;
 #include "MemLeakFindOff.h"
-		std::free(result);
+		free(result);
 #include "MemLeakFindOn.h"
 		return output;
 	}
