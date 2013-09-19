@@ -28,6 +28,7 @@ class MemLeakSuppressionGuard
 extern "C"
 {
 	void *memleakfinder_malloc(size_t size, const char *file, int line);
+	void *memleakfinder_calloc(size_t blocks, size_t size, const char *file, int line);
 	void *memleakfinder_realloc(void *ptr, size_t size);
 	void memleakfinder_free(void *ptr);
 }
@@ -56,6 +57,7 @@ void *operator new[](size_t size, const char *file, int line);
 // define the malloc functions now, if required
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
 	#define malloc(X)	memleakfinder_malloc(X, __FILE__, __LINE__)
+	#define calloc(X, Y)	memleakfinder_calloc(X, Y, __FILE__, __LINE__)
 	#define realloc		memleakfinder_realloc
 	#define free		memleakfinder_free
 	#define MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
