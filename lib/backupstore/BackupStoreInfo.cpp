@@ -419,7 +419,7 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	#define COMPARE(attribute) \
 	if (rOldInfo.Get ## attribute () != Get ## attribute ()) \
 	{ \
-		BOX_WARNING(#attribute " changed from " << \
+		BOX_ERROR(#attribute " changed from " << \
 			rOldInfo.Get ## attribute () << " to " << \
 			Get ## attribute ()); \
 		numChanges++; \
