@@ -303,7 +303,7 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 			}
 			else
 			{
-				BOX_WARNING("Spurious or invalid directory " <<
+				BOX_ERROR("Spurious or invalid directory " <<
 					rDirName << DIRECTORY_SEPARATOR << 
 					(*i) << " found, " <<
 					(mFixErrors?"deleting":"delete manually"));
@@ -387,7 +387,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			BOX_WARNING("Spurious file " << dirName << 
+			BOX_ERROR("Spurious file " << dirName << 
 				DIRECTORY_SEPARATOR << (*i) << " found" <<
 				(mFixErrors?", deleting":""));
 			++mNumberErrorsFound;
@@ -410,7 +410,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			if(!CheckAndAddObject(StartID | i, dirName + leaf))
 			{
 				// File was bad, delete it
-				BOX_WARNING("Corrupted file " << dirName <<
+				BOX_ERROR("Corrupted file " << dirName <<
 					leaf << " found" <<
 					(mFixErrors?", deleting":""));
 				++mNumberErrorsFound;
@@ -624,57 +624,62 @@ void BackupStoreCheck::CheckDirectories()
 				}
 				
 				// Flag for modifications
-				bool isModified = false;
-				
-				// Check for validity
+				bool isModified = CheckDirectory(dir);
+
+				// Check the directory again, now that entries have been removed
 				if(dir.CheckAndFix())
 				{
 					// Wasn't quite right, and has been modified
-					BOX_WARNING("Directory ID " <<
+					BOX_ERROR("Directory ID " <<
 						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-						" has bad structure");
+						" was still bad after all checks");
 					++mNumberErrorsFound;
 					isModified = true;
 				}
+				else if(isModified)
+				{
+					BOX_INFO("Directory ID " <<
+						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+						" was OK after fixing");
+				}
 				
-				// Go through, and check that everything in that directory exists and is valid
-				std::vector<int64_t> toDelete;
-				
+				if(isModified && mFixErrors)
+				{	
+					BOX_WARNING("Fixing directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]));
+
+					// Save back to disc
+					RaidFileWrite fixed(mDiscSetNumber, filename);
+					fixed.Open(true /* allow overwriting */);
+					dir.WriteToStream(fixed);
+					// Commit it
+					fixed.Commit(true /* convert to raid representation now */);
+				}
+
+				// Count valid entries
 				BackupStoreDirectory::Iterator i(dir);
 				BackupStoreDirectory::Entry *en = 0;
 				while((en = i.Next()) != 0)
 				{
-					// Lookup the item
 					int32_t iIndex;
 					IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
-					bool badEntry = false;
-					if(piBlock != 0)
+
+					ASSERT(piBlock != 0 || 
+						mDirsWhichContainLostDirs.find(en->GetObjectID())
+						!= mDirsWhichContainLostDirs.end());
+					if (piBlock)
 					{
-						badEntry = !CheckDirectoryEntry(
-							*en, pblock->mID[e],
-							iIndex, isModified);
+						// Normally it would exist and this
+						// check would not be necessary, but
+						// we might have missing directories
+						// that we will recreate later.
+						// cf mDirsWhichContainLostDirs.
+						uint8_t iflags = GetFlags(piBlock, iIndex);
+						SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
 					}
-					// Item can't be found. Is it a directory?
-					else if(en->IsDir())
+
+					if(en->IsDir())
 					{
-						// Store the directory for later attention
-						mDirsWhichContainLostDirs[en->GetObjectID()] = pblock->mID[e];
-					}
-					else
-					{
-						// Just remove the entry
-						badEntry = true;
-						BOX_WARNING("Directory ID " << 
-							BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-							" references object " << 
-							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-							" which does not exist.");
-					}
-					
-					// Is this entry worth keeping?
-					if(badEntry)
-					{
-						toDelete.push_back(en->GetObjectID());
+						mNumDirectories++;
 					}
 					else if(!en->IsFile())
 					{
@@ -692,70 +697,117 @@ void BackupStoreCheck::CheckDirectories()
 					}
 					else if(en->IsOld())
 					{
+						mNumFiles++;
+						mNumOldFiles++;
 						mBlocksInOldFiles += en->GetSizeInBlocks();
 					}
 					else if(en->IsDeleted())
 					{
+						mNumFiles++;
+						mNumDeletedFiles++;
 						mBlocksInDeletedFiles += en->GetSizeInBlocks();
 					}
 					else
 					{
+						mNumFiles++;
 						mBlocksInCurrentFiles += en->GetSizeInBlocks();
 					}
-				}
-				
-				if(toDelete.size() > 0)
-				{
-					// Delete entries from directory
-					for(std::vector<int64_t>::const_iterator d(toDelete.begin()); d != toDelete.end(); ++d)
-					{
-						dir.DeleteEntry(*d);
-					}
-					
-					// Mark as modified
-					isModified = true;
-					
-					// Errors found
-					++mNumberErrorsFound;
-
-					// Check the directory again, now that entries have been removed
-					if(dir.CheckAndFix())
-					{
-						// Wasn't quite right, and has been modified
-						BOX_WARNING("Directory ID " <<
-							BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-							" was still bad after first pass");
-						++mNumberErrorsFound;
-						isModified = true;
-					}
-					else
-					{
-						BOX_INFO("Directory ID " <<
-							BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-							" was OK after fixing");
-					}
-				}
-				
-				if(isModified && mFixErrors)
-				{	
-					BOX_WARNING("Fixing directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]));
-
-					// Save back to disc
-					RaidFileWrite fixed(mDiscSetNumber, filename);
-					fixed.Open(true /* allow overwriting */);
-					dir.WriteToStream(fixed);
-					// Commit it
-					fixed.Commit(true /* convert to raid representation now */);
 				}
 			}
 		}
 	}
+}
 
+bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
+{
+	bool restart = true;
+	bool isModified = false;
+
+	while(restart)
+	{
+		std::vector<int64_t> toDelete;
+		restart = false;
+
+		// Check for validity
+		if(dir.CheckAndFix())
+		{
+			// Wasn't quite right, and has been modified
+			BOX_ERROR("Directory ID " <<
+				BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
+				" had invalid entries" <<
+				(mFixErrors ? ", fixed" : ""));
+			++mNumberErrorsFound;
+			isModified = true;
+		}
+		
+		// Go through, and check that everything in that directory exists and is valid
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *en = 0;
+		while((en = i.Next()) != 0)
+		{
+			// Lookup the item
+			int32_t iIndex;
+			IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
+			bool badEntry = false;
+			if(piBlock != 0)
+			{
+				badEntry = !CheckDirectoryEntry(*en,
+					dir.GetObjectID(), isModified);
+			}
+			// Item can't be found. Is it a directory?
+			else if(en->IsDir())
+			{
+				// Store the directory for later attention
+				mDirsWhichContainLostDirs[en->GetObjectID()] =
+					dir.GetObjectID();
+			}
+			else
+			{
+				// Just remove the entry
+				badEntry = true;
+				BOX_ERROR("Directory ID " << 
+					BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
+					" references object " << 
+					BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+					" which does not exist.");
+				++mNumberErrorsFound;
+			}
+			
+			// Is this entry worth keeping?
+			if(badEntry)
+			{
+				toDelete.push_back(en->GetObjectID());
+			}
+		}
+
+		if(toDelete.size() > 0)
+		{
+			// Delete entries from directory
+			for(std::vector<int64_t>::const_iterator d(toDelete.begin()); d != toDelete.end(); ++d)
+			{
+				BOX_ERROR("Removing directory entry " <<
+					BOX_FORMAT_OBJECTID(*d) << " from "
+					"directory " << 
+					BOX_FORMAT_OBJECTID(dir.GetObjectID()));
+				++mNumberErrorsFound;
+				dir.DeleteEntry(*d);
+			}
+			
+			// Mark as modified
+			restart = true;
+			isModified = true;
+			
+			// Errors found
+		}
+	}
+
+	return isModified;
 }
 
 bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
-	int64_t DirectoryID, int32_t IndexInDirBlock, bool& rIsModified)
+	int64_t DirectoryID, bool& rIsModified)
 {
+	int32_t IndexInDirBlock;
 	IDBlock *piBlock = LookupID(rEntry.GetObjectID(), IndexInDirBlock);
 	ASSERT(piBlock != 0);
 
@@ -766,27 +818,30 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	if(((iflags & Flags_IsDir) == Flags_IsDir) != rEntry.IsDir())
 	{
 		// Entry is of wrong type
-		BOX_WARNING("Directory ID " <<
+		BOX_ERROR("Directory ID " <<
 			BOX_FORMAT_OBJECTID(DirectoryID) <<
 			" references object " <<
 			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
 			" which has a different type than expected.");
 		badEntry = true;
+		++mNumberErrorsFound;
 	}
 	// Check that the entry is not already contained.
 	else if(iflags & Flags_IsContained)
 	{
-		BOX_WARNING("Directory ID " <<
+		BOX_ERROR("Directory ID " <<
 			BOX_FORMAT_OBJECTID(DirectoryID) <<
 			" references object " <<
 			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
 			" which is already contained.");
 		badEntry = true;
+		++mNumberErrorsFound;
 	}
 	else
 	{
-		// Not already contained -- mark as contained
-		SetFlags(piBlock, IndexInDirBlock, iflags | Flags_IsContained);
+		// Not already contained by another directory.
+		// Don't set the flag until later, after we finish repairing
+		// the directory and removing all bad entries.
 		
 		// Check that the container ID of the object is correct
 		if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
@@ -795,15 +850,16 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 			if(iflags & Flags_IsDir)
 			{
 				// Add to will fix later list
-				BOX_WARNING("Directory ID " <<
+				BOX_ERROR("Directory ID " <<
 					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
 					<< " has wrong container ID.");
 				mDirsWithWrongContainerID.push_back(rEntry.GetObjectID());
+				++mNumberErrorsFound;
 			}
 			else
 			{
 				// This is OK for files, they might move
-				BOX_WARNING("File ID " <<
+				BOX_NOTICE("File ID " <<
 					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
 					<< " has different container ID, "
 					"probably moved");
@@ -824,34 +880,13 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 
 			// Mark as changed
 			rIsModified = true;
+			++mNumberErrorsFound;
 
 			// Tell user
-			BOX_WARNING("Directory ID " <<
+			BOX_ERROR("Directory ID " <<
 				BOX_FORMAT_OBJECTID(DirectoryID) <<
 				" has wrong size for object " <<
 				BOX_FORMAT_OBJECTID(rEntry.GetObjectID()));
-		}
-	}
-
-	if (!badEntry)
-	{
-		if(rEntry.IsDir())
-		{
-			mNumDirectories++;
-		}
-		else
-		{
-			mNumFiles++;
-
-			if(rEntry.IsDeleted())
-			{
-				mNumDeletedFiles++;
-			}
-
-			if(rEntry.IsOld())
-			{
-				mNumOldFiles++;
-			}
 		}
 	}
 

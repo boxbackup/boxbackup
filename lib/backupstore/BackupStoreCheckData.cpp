@@ -65,16 +65,11 @@ void BackupStoreCheck::AddID(BackupStoreCheck_ID_t ID,
 	if(mpInfoLastBlock == 0 || mInfoLastBlockEntries >= BACKUPSTORECHECK_BLOCK_SIZE)
 	{
 		// No. Allocate a new one
-		IDBlock *pblk = (IDBlock*)::malloc(sizeof(IDBlock));
+		IDBlock *pblk = (IDBlock*)calloc(1, sizeof(IDBlock));
 		if(pblk == 0)
 		{
 			throw std::bad_alloc();
 		}
-		// Zero all the flags entries
-		for(int z = 0; z < (BACKUPSTORECHECK_BLOCK_SIZE * Flags__NumFlags / Flags__NumItemsPerEntry); ++z)
-		{
-			pblk->mFlags[z] = 0;
-		} 
 		// Store in map
 		mInfo[ID] = pblk;
 		// Allocated and stored OK, setup for use
@@ -141,8 +136,8 @@ BackupStoreCheck::IDBlock *BackupStoreCheck::LookupID(BackupStoreCheck_ID_t ID, 
 		pblock = ib->second;
 	}
 
-	ASSERT(pblock != 0);
 	if(pblock == 0) return 0;
+	ASSERT(pblock != 0);
 	
 	// How many entries are there in the block
 	int32_t bentries = (pblock == mpInfoLastBlock)?mInfoLastBlockEntries:BACKUPSTORECHECK_BLOCK_SIZE;
