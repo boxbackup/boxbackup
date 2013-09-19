@@ -744,7 +744,7 @@ void RaidFileWrite::Delete()
 	{
 		THROW_FILE_ERROR("Attempted to delete object which doesn't "
 			"exist", mFilename, RaidFileException,
-			RequestedDeleteReferencedFile);
+			RaidFileDoesntExist);
 	}
 
 	// Get the filename for the write file
