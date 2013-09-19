@@ -138,7 +138,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 			if((flags & Flags_IsContained) == 0)
 			{
 				// Unattached object...
-				BOX_WARNING("Object " <<
+				BOX_ERROR("Object " <<
 					BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
 					" is unattached.");
 				++mNumberErrorsFound;
@@ -158,15 +158,6 @@ void BackupStoreCheck::CheckUnattachedObjects()
 						int64_t diffFromObjectID = 0;
 						std::string filename;
 						StoreStructure::MakeObjectFilename(pblock->mID[e], mStoreRoot, mDiscSetNumber, filename, false /* don't attempt to make sure the dir exists */);
-
-						// Debugging for Sune Molgaard's issue with non-existent files being
-						// detected as unattached and crashing later in CheckUnattachedObjects()
-						if (pblock->mID[e] == 0x90c1a)
-						{
-							BOX_INFO("Trying to open unattached " <<
-								BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-								" from " << filename << " on " << mDiscSetNumber);
-						}
 
 						// The easiest way to do this is to verify it again. Not such a bad penalty, because
 						// this really shouldn't be done very often.
@@ -592,7 +583,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 	catch(...)
 	{
-		BOX_WARNING("Load of existing store info failed, regenerating.");
+		BOX_ERROR("Load of existing store info failed, regenerating.");
 		++mNumberErrorsFound;
 	}
 
@@ -884,7 +875,7 @@ bool BackupStoreDirectory::CheckAndFix()
 				// erase the thing from the list
 				Entry *pentry = (*i);
 				mEntries.erase(i);
-				
+
 				// And delete the entry object
 				delete pentry;
 				
