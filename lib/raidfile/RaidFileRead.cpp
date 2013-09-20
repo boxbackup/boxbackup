@@ -1025,8 +1025,8 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 	RaidFileUtil::ExistType existance = RaidFileUtil::RaidFileExists(rdiscSet, Filename, &startDisc, &existingFiles, pRevisionID);
 	if(existance == RaidFileUtil::NoFile)
 	{
-		BOX_ERROR("Expected raidfile " << Filename << " does not exist");
-		THROW_EXCEPTION(RaidFileException, RaidFileDoesntExist)
+		THROW_FILE_ERROR("Expected raidfile does not exist",
+			Filename, RaidFileException, RaidFileDoesntExist);
 	}
 	else if(existance == RaidFileUtil::NonRaid)
 	{
@@ -1588,7 +1588,7 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 	{
 		// build name
 		std::string dn(rdiscSet[l] + DIRECTORY_SEPARATOR + rDirName);
-		
+
 		// read the contents...
 		DIR *dirHandle = 0;
 		try
