@@ -32,6 +32,7 @@
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
+#include "RaidFileUtil.h"
 #include "RaidFileWrite.h"
 #include "ServerControl.h"
 #include "StoreStructure.h"
@@ -74,6 +75,26 @@ std::map<int32_t, bool> objectIsDir;
 #define RUN_CHECK	\
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567"); \
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567 fix");
+
+bool check_fix_internal(int expected_num_errors)
+{
+	BackupStoreCheck checker(storeRoot, discSetNum,
+		0x01234567, true /* FixErrors */, false /* Quiet */);
+	checker.Check();
+	if (expected_num_errors == -1)
+	{
+		TEST_THAT(checker.ErrorsFound());
+		return checker.ErrorsFound();
+	}
+	else
+	{
+		TEST_EQUAL(expected_num_errors, checker.GetNumErrorsFound());
+		return checker.GetNumErrorsFound() == expected_num_errors;
+	}
+}
+
+#define RUN_CHECK_INTERNAL(expected_num_errors) \
+	TEST_THAT(check_fix_internal(expected_num_errors))
 
 // Get ID of an object given a filename
 int32_t getID(const char *name)
@@ -399,11 +420,7 @@ void check_root_dir_ok(dir_en_check after_entries[],
 {
 	// Check the store, check that the error is detected and
 	// repaired, by removing x1 from the directory.
-	BackupStoreCheck check(storeRoot, discSetNum,
-		0x01234567 /* AccountID */, false /* FixErrors */,
-		true /* Quiet */);
-	check.Check();
-	TEST_THAT(!check.ErrorsFound());
+	RUN_CHECK_INTERNAL(0);
 	
 	// Read the directory back in, check that it's empty
 	BackupStoreDirectory dir;
@@ -418,12 +435,7 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 {
 	// Check the store, check that the error is detected and
 	// repaired.
-	BackupStoreCheck check(storeRoot, discSetNum,
-		0x01234567 /* AccountID */, true /* FixErrors */,
-		true /* Quiet */);
-	check.Check();
-	TEST_THAT(check.ErrorsFound());
-	
+	RUN_CHECK_INTERNAL(-1);
 	check_root_dir_ok(after_entries, after_deps);
 }
 
@@ -528,6 +540,9 @@ int test(int argc, const char *argv[])
 		static checkdepinfoen after_deps[] = {{-1, 0, 0}};
 		check_and_fix_root_dir(after_entries, after_deps);
 	}
+
+	BOX_INFO("  === Test that an entry pointing to a directory whose "
+		"raidfile is corrupted doesn't crash");
 
 	// Start the bbstored server
 	BOX_TRACE("  === Starting bbstored server: " BBSTORED 
@@ -712,8 +727,39 @@ int test(int argc, const char *argv[])
 			f.Commit(true /* write now! */);
 		}
 
+#ifndef BOX_RELEASE_BUILD
+		// Delete two of the three raidfiles and their parent
+		// directories. This used to crash bbstoreaccounts check.
+		// We can only do this, without destroying the entire store,
+		// in debug mode, where the store has a far deeper
+		// structure.
+		// This will destroy or damage objects 18-1b and 58-5b,
+		// some repairably.
+		#define RUN(x) TEST_THAT(system(x) == 0);
+		RUN("mv testfiles/0_0/backup/01234567/02/01/o00.rf "
+			"testfiles/0_0/backup/01234567/02/01/o00.rfw"); // 0x18
+		RUN("mv testfiles/0_1/backup/01234567/02/01/o01.rf "
+			"testfiles/0_1/backup/01234567/02/01/o01.rfw"); // 0x19
+		//RUN("mv testfiles/0_2/backup/01234567/02/01/o02.rf "
+		//	"testfiles/0_0/backup/01234567/02/01/o02.rfw"); // 0x1a
+		RUN("mv testfiles/0_0/backup/01234567/02/01/o03.rf "
+			"testfiles/0_0/backup/01234567/02/01/o03.rfw"); // 0x1b
+		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o00.rf "
+			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw"); // 0x58
+		RUN("mv testfiles/0_1/backup/01234567/02/01/01/o01.rf "
+			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw"); // 0x59
+		//RUN("mv testfiles/0_2/backup/01234567/02/01/01/o02.rf "
+		//	"testfiles/0_0/backup/01234567/02/01/01/o02.rfw"); // 0x5a
+		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o03.rf "
+			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw"); // 0x5b
+		// RUN("rm -r testfiles/0_1/backup/01234567/02/01");
+		RUN("rm -r testfiles/0_2/backup/01234567/02/01");
+		#undef RUN
+#endif // BOX_RELEASE_BUILD
+
 		// Fix it
-		RUN_CHECK
+		RUN_CHECK_INTERNAL(3);
+
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE 
 			" testfiles/testbackupstorefix.pl check 1") 
@@ -721,6 +767,28 @@ int test(int argc, const char *argv[])
 
 		// Check the modified file doesn't exist
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
+
+		// Check that the missing RaidFiles were regenerated and
+		// committed. FileExists returns NonRaid if it find a .rfw
+		// file, so checking for AsRaid excludes this possibility.
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(discSetNum));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o00"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o01"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o02"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o03"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o00"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o01"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o02"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o03"));
 	}
 	
 	// ------------------------------------------------------------------------------------------------		
@@ -761,33 +829,25 @@ int test(int argc, const char *argv[])
 	DeleteObject("Test1/pass/cacted/ming");
 	// Delete a file
 	DeleteObject("Test1/cannes/ict/scely");
-	// Fix it
-	{
-		// Check it
-		BackupStoreCheck checker(storeRoot, discSetNum,
-			0x01234567, true /* FixErrors */, false /* Quiet */);
-		checker.Check();
 
-		// Should just be greater than 1 really, we don't know quite
-		// how good the checker is (or will become) at spotting errors!
-		// But this will help us catch changes in checker behaviour,
-		// so it's not a bad thing to test.
+	// We don't know quite how good the checker is (or will become) at 
+	// spotting errors! But asserting an exact number will help us catch 
+	// changes in checker behaviour, so it's not a bad thing to test.
 
-		// The 11 errors are:
-		// ERROR:   Directory ID 0xb references object 0x3e which does not exist.
-		// ERROR:   Removing directory entry 0x3e from directory 0xb
-		// ERROR:   Directory ID 0xc had invalid entries, fixed
-		// ERROR:   Directory ID 0xc has wrong size for object 0x40
-		// ERROR:   Directory ID 0x17 has wrong container ID.
-		// ERROR:   Object 0x51 is unattached.
-		// ERROR:   Object 0x52 is unattached.
-		// ERROR:   BlocksUsed changed from 282 to 278
-		// ERROR:   BlocksInCurrentFiles changed from 226 to 220
-		// ERROR:   BlocksInDirectories changed from 56 to 54
-		// ERROR:   NumFiles changed from 113 to 110
-		
-		TEST_EQUAL(11, checker.GetNumErrorsFound());
-	}
+	// The 11 errors are:
+	// ERROR:   Directory ID 0xb references object 0x3e which does not exist.
+	// ERROR:   Removing directory entry 0x3e from directory 0xb
+	// ERROR:   Directory ID 0xc had invalid entries, fixed
+	// ERROR:   Directory ID 0xc has wrong size for object 0x40
+	// ERROR:   Directory ID 0x17 has wrong container ID.
+	// ERROR:   Object 0x51 is unattached.
+	// ERROR:   Object 0x52 is unattached.
+	// ERROR:   BlocksUsed changed from 282 to 278
+	// ERROR:   BlocksInCurrentFiles changed from 226 to 220
+	// ERROR:   BlocksInDirectories changed from 56 to 54
+	// ERROR:   NumFiles changed from 113 to 110
+
+	RUN_CHECK_INTERNAL(11);
 
 	// Check everything is as it should be
 	TEST_THAT(::system(PERL_EXECUTABLE 

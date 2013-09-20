@@ -16,15 +16,18 @@
 #	include <unistd.h>
 #endif
 
-#include "BackupStoreCheck.h"
-#include "StoreStructure.h"
-#include "RaidFileRead.h"
-#include "RaidFileWrite.h"
 #include "autogen_BackupStoreException.h"
-#include "BackupStoreObjectMagic.h"
-#include "BackupStoreFile.h"
-#include "BackupStoreDirectory.h"
+#include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
+#include "BackupStoreDirectory.h"
+#include "BackupStoreFile.h"
+#include "BackupStoreObjectMagic.h"
+#include "RaidFileController.h"
+#include "RaidFileException.h"
+#include "RaidFileRead.h"
+#include "RaidFileUtil.h"
+#include "RaidFileWrite.h"
+#include "StoreStructure.h"
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
@@ -281,6 +284,33 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 
 	// Read in all the directories, and recurse downwards
 	{
+		// If any of the directories is missing, create it.
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
+		
+		if(!rdiscSet.IsNonRaidSet())
+		{
+			unsigned int numDiscs = rdiscSet.size();
+			
+			for(unsigned int l = 0; l < numDiscs; ++l)
+			{
+				// build name
+				std::string dn(rdiscSet[l] + DIRECTORY_SEPARATOR + rDirName);
+				struct stat st;
+
+				if(stat(dn.c_str(), &st) != 0 && errno == ENOENT)
+				{
+					if(mkdir(dn.c_str(), 0755) != 0)
+					{
+						THROW_SYS_FILE_ERROR("Failed to "
+							"create missing RaidFile "
+							"directory", dn, 
+							RaidFileException, OSError);
+					}
+				}
+			}
+		}
+
 		std::vector<std::string> dirs;
 		RaidFileRead::ReadDirectoryContents(mDiscSetNumber, rDirName,
 			RaidFileRead::DirReadType_DirsOnly, dirs);
@@ -483,13 +513,6 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 			return false;
 			break;
 		}
-		
-		// Add to usage counts
-		mBlocksUsed += size;
-		if(!isFile)
-		{
-			mBlocksInDirectories += size;
-		}
 	}
 	catch(...)
 	{
@@ -503,18 +526,56 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		return false;
 	}
 
-	// Debugging for Sune Molgaard's issue with non-existent files being
-	// detected as unattached and crashing later in CheckUnattachedObjects()
-	if (ObjectID == 0x90c1a)
-	{
-		BOX_INFO("Adding ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
-			" contained by " << BOX_FORMAT_OBJECTID(containerID) <<
-			" with size " << size << " and isFile " << isFile);
-	}
-
 	// Add to list of IDs known about
 	AddID(ObjectID, containerID, size, isFile);
 
+	// Add to usage counts
+	mBlocksUsed += size;
+	if(!isFile)
+	{
+		mBlocksInDirectories += size;
+	}
+
+	// If it looks like a good object, and it's non-RAID, and
+	// this is a RAID set, then convert it to RAID.
+		
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
+	if(!rdiscSet.IsNonRaidSet())
+	{
+		// See if the file exists
+		RaidFileUtil::ExistType existance = 
+			RaidFileUtil::RaidFileExists(rdiscSet, rFilename);
+		if(existance == RaidFileUtil::NonRaid)
+		{
+			BOX_WARNING("Found non-RAID write file in RAID set" <<
+				(mFixErrors?", transforming to RAID: ":"") <<
+				(mFixErrors?rFilename:""));
+			if(mFixErrors)
+			{
+				RaidFileWrite write(mDiscSetNumber, rFilename);
+				write.TransformToRaidStorage();
+			}
+		}
+		else if(existance == RaidFileUtil::AsRaidWithMissingReadable)
+		{
+			BOX_WARNING("Found damaged but repairable RAID file" <<
+				(mFixErrors?", repairing: ":"") << 
+				(mFixErrors?rFilename:""));
+			if(mFixErrors)
+			{
+				std::auto_ptr<RaidFileRead> read(
+					RaidFileRead::Open(mDiscSetNumber, 
+						rFilename));
+				RaidFileWrite write(mDiscSetNumber, rFilename);
+				write.Open(true /* overwrite */);
+				read->CopyStreamTo(write);
+				read.reset();
+				write.Commit(true /* transform to RAID */);
+			}
+		}
+	}
+			
 	// Report success
 	return true;
 }
@@ -645,13 +706,11 @@ void BackupStoreCheck::CheckDirectories()
 				
 				if(isModified && mFixErrors)
 				{	
-					BOX_WARNING("Fixing directory ID " << BOX_FORMAT_OBJECTID(pblock->mID[e]));
-
-					// Save back to disc
+					BOX_WARNING("Writing modified directory to disk: " <<
+						BOX_FORMAT_OBJECTID(pblock->mID[e]));
 					RaidFileWrite fixed(mDiscSetNumber, filename);
 					fixed.Open(true /* allow overwriting */);
 					dir.WriteToStream(fixed);
-					// Commit it
 					fixed.Commit(true /* convert to raid representation now */);
 				}
 

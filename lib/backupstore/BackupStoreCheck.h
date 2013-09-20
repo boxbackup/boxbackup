@@ -28,9 +28,8 @@ The following problems can be fixed:
 	* Spurious files deleted
 	* Corrupted files deleted
 	* Root ID as file, deleted
-	* Dirs with wrong object id inside, deleted
-	* Direcetory entries pointing to non-existant files, deleted
-	* Doubly references files have second reference deleted
+	* Dirs with wrong object id in header, deleted
+	* Doubly referenced files have second reference deleted
 	* Wrong directory container IDs fixed
 	* Missing root recreated
 	* Reattach files which exist, but aren't referenced
@@ -43,7 +42,9 @@ The following problems can be fixed:
 	* Inside directories,
 		- only one object per name has old version clear
 		- IDs aren't duplicated
-	* Bad store info files regenerated
+		- entries pointing to non-existant files are deleted
+		- patches depending on non-existent objects are deleted
+	* Bad store info and refcount files regenerated
 	* Bad sizes of files in directories fixed
 
 */
