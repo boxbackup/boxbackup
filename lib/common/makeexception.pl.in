@@ -191,7 +191,7 @@ unsigned int ${class}Exception::GetSubType() const throw()
 const char *${class}Exception::what() const throw()
 {
 #ifdef EXCEPTION_CODENAMES_EXTENDED
-	if(mSubType < 0 || mSubType > (sizeof(whats) / sizeof(whats[0])))
+	if(mSubType > (sizeof(whats) / sizeof(whats[0])))
 	{
 		return "${class}";
 	}
