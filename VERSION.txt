@@ -1,2 +1,2 @@
-USE_SVN_VERSION
+0.12
 boxbackup
