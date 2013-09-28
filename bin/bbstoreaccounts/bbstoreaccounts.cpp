@@ -670,7 +670,7 @@ int main(int argc, const char *argv[])
 			PrintUsageAndExit();
 		}
 		
-		bool enabled;
+		bool enabled = true;
 		std::string enabled_string = argv[2];
 		if(enabled_string == "yes")
 		{
