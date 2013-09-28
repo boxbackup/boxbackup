@@ -1,0 +1,26 @@
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it
+#  under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  Server daemon for the BoxBackup software, to which bbackupd clients
+#  connect.
+#
+#  Systemd configuration by Daniel Tihelka <dtihelka at gmail.com>
+
+
+[Unit]
+Description=BoxBackup server side daemon
+After=local-fs.target
+#After=network
+
+[Service]
+ExecStart=/usr/sbin/bbstored -FK
+ExecReload=/bin/kill -HUP $MAINPID
+User=box
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
