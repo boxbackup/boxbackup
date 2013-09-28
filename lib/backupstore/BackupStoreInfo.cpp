@@ -146,8 +146,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 	info->mDiscSet = DiscSet;
 	info->mFilename = fn;
 	info->mReadOnly = ReadOnly;
-	
-	int64_t numDelObj;
+	int64_t numDelObj = 0;
 
 	if (v1)
 	{
