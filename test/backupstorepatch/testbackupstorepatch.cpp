@@ -22,6 +22,7 @@
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreFilenameClear.h"
 #include "BackupStoreInfo.h"
 #include "BoxPortsAndFiles.h"
@@ -370,7 +371,7 @@ int test(int argc, const char *argv[])
 						BackupProtocolListDirectory::RootDirectory, storeFilename));
 				std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
 						BackupProtocolListDirectory::RootDirectory, ModificationTime,
-						ModificationTime, 0 /* no diff from file ID */, storeFilename, *upload));
+						ModificationTime, 0 /* no diff from file ID */, storeFilename, upload));
 				test_files[0].IDOnServer = stored->GetObjectID();
 				test_files[0].IsCompletelyDifferent = true;
 				ModificationTime += MODIFICATION_TIME_INC;
@@ -409,7 +410,8 @@ int test(int argc, const char *argv[])
 					// Upload the patch to the store
 					std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
 							BackupProtocolListDirectory::RootDirectory, ModificationTime,
-							ModificationTime, isCompletelyDifferent?(0):(diffFromID), storeFilename, *patchStream));
+							ModificationTime, isCompletelyDifferent?(0):(diffFromID),
+							storeFilename, patchStream));
 					ModificationTime += MODIFICATION_TIME_INC;
 					
 					// Store details

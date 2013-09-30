@@ -15,6 +15,7 @@
 #include "Test.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreFilenameClear.h"
 #include "FileStream.h"
 #include "BackupStoreFileWire.h"
