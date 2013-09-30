@@ -22,6 +22,7 @@
 #include "BackupStoreException.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreFilenameClear.h"
+#include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "BackupStoreFile.h"
 #include "BoxPortsAndFiles.h"
@@ -476,7 +477,7 @@ std::vector<uint32_t> ExpectedRefCounts;
 
 void set_refcount(int64_t ObjectID, uint32_t RefCount = 1)
 {
-	if ((int64_t)ExpectedRefCounts.size() <= ObjectID);
+	if ((int64_t)ExpectedRefCounts.size() <= ObjectID)
 	{
 		ExpectedRefCounts.resize(ObjectID + 1, 0);
 	}
@@ -496,7 +497,7 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 			0x7362383249872dfLL,		/* attr hash */
 			0,				/* diff from ID */
 			name_encoded,
-			*upload));
+			upload));
 	int64_t objectId = stored->GetObjectID();
 	TEST_EQUAL(objectId, rRefCount.GetLastObjectIDUsed());
 	TEST_EQUAL(1, rRefCount.GetRefCount(objectId))
@@ -512,10 +513,9 @@ int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
 	{
 		// Create with dummy attributes
 		int attrS = 0;
-		MemBlockStream attr(&attrS, sizeof(attrS));
+		std::auto_ptr<IOStream> attr(new MemBlockStream(&attrS, sizeof(attrS)));
 		std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-			indir,
-			9837429842987984LL, dirname, attr));
+			indir, 9837429842987984LL, dirname, attr));
 		subdirid = dirCreate->GetObjectID(); 
 	}
 	
@@ -795,7 +795,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 	// Then send it
 	int64_t store1objid = 0;
 	{
-		FileStream upload("testfiles/file1_upload1");
+		std::auto_ptr<IOStream> upload(new FileStream("testfiles/file1_upload1"));
 		std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
 			BackupProtocolListDirectory::RootDirectory,
 			0x123456789abcdefLL,		/* modification time */
@@ -1087,7 +1087,7 @@ int test_server(const char *hostname)
 				modtime, /* use it for attr hash too */
 				0, /* diff from ID */
 				uploads[t].name,
-				*upload));
+				upload));
 			uploads[t].allocated_objid = stored->GetObjectID();
 			uploads[t].mod_time = modtime;
 			if(maxID < stored->GetObjectID()) maxID = stored->GetObjectID();
@@ -1105,7 +1105,8 @@ int test_server(const char *hostname)
 		// Add some attributes onto one of them
 		{
 			TEST_NUM_FILES(UPLOAD_NUM + 1, 0, 0, 1);
-			MemBlockStream attrnew(attr3, sizeof(attr3));
+			std::auto_ptr<IOStream> attrnew(
+				new MemBlockStream(attr3, sizeof(attr3)));
 			std::auto_ptr<BackupProtocolSuccess> set(apProtocol->QuerySetReplacementFileAttributes(
 				BackupProtocolListDirectory::RootDirectory,
 				32498749832475LL,
@@ -1234,7 +1235,7 @@ int test_server(const char *hostname)
 			// Upload it
 			int64_t patchedID = 0;
 			{
-				FileStream uploadpatch(TEST_FILE_FOR_PATCHING ".patch");
+				std::auto_ptr<IOStream> uploadpatch(new FileStream(TEST_FILE_FOR_PATCHING ".patch"));
 				std::auto_ptr<BackupProtocolSuccess> stored(apProtocol->QueryStoreFile(
 					BackupProtocolListDirectory::RootDirectory,
 					modtime,
@@ -1265,7 +1266,8 @@ int test_server(const char *hostname)
 		BackupStoreFilenameClear dirname("lovely_directory");
 		{
 			// Attributes
-			MemBlockStream attr(attr1, sizeof(attr1));
+			std::auto_ptr<IOStream> attr(
+				new MemBlockStream(attr1, sizeof(attr1)));
 			std::auto_ptr<BackupProtocolSuccess> dirCreate(apProtocol->QueryCreateDirectory(
 				BackupProtocolListDirectory::RootDirectory,
 				9837429842987984LL, dirname, attr));
@@ -1290,7 +1292,7 @@ int test_server(const char *hostname)
 				modtime, /* use for attr hash too */
 				0,							/* diff from ID */
 				uploads[0].name,
-				*upload));
+				upload));
 			subdirfileid = stored->GetObjectID();
 
 			TEST_NUM_FILES(UPLOAD_NUM + 1, 1, 1, 2);
@@ -1383,7 +1385,8 @@ int test_server(const char *hostname)
 
 		// Change attributes on the directory
 		{
-			MemBlockStream attrnew(attr2, sizeof(attr2));
+			std::auto_ptr<IOStream> attrnew(
+				new MemBlockStream(attr2, sizeof(attr2)));
 			std::auto_ptr<BackupProtocolSuccess> changereply(apProtocol->QueryChangeDirAttributes(
 					subdirid,
 					329483209443598LL,
@@ -1503,13 +1506,15 @@ int test_server(const char *hostname)
 		{
 			BackupStoreFilenameClear nd("sub2");
 			// Attributes
-			MemBlockStream attr(attr1, sizeof(attr1));
+			std::auto_ptr<IOStream> attr(new MemBlockStream(attr1,
+				sizeof(attr1)));
 			std::auto_ptr<BackupProtocolSuccess> dirCreate(apProtocol->QueryCreateDirectory(
 				subdirid,
 				9837429842987984LL, nd, attr));
 			subsubdirid = dirCreate->GetObjectID(); 
 
-			FileStream upload("testfiles/file1_upload1");
+			std::auto_ptr<IOStream> upload(
+				new FileStream("testfiles/file1_upload1"));
 			BackupStoreFilenameClear nf("file2");
 			std::auto_ptr<BackupProtocolSuccess> stored(apProtocol->QueryStoreFile(
 				subsubdirid,
@@ -2115,16 +2120,16 @@ int test3(int argc, const char *argv[])
 				modtime, /* use it for attr hash too */
 				0,							/* diff from ID */
 				fnx,
-				*upload)),
+				upload)),
 			ConnectionException, Conn_Protocol_UnexpectedReply);
 
-		MemBlockStream attr(&modtime, sizeof(modtime));
+		std::auto_ptr<IOStream> attr(new MemBlockStream(&modtime, sizeof(modtime)));
 		BackupStoreFilenameClear fnxd("exceed-limit-dir");
-		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
+		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> dirCreate(
+			protocol.QueryCreateDirectory(
 				BackupProtocolListDirectory::RootDirectory,
 				9837429842987984LL, fnxd, attr)),
 			ConnectionException, Conn_Protocol_UnexpectedReply);
-
 
 		// Finish the connection
 		protocol.QueryFinished();

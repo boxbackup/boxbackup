@@ -719,11 +719,13 @@ int test(int argc, const char *argv[])
 			
 			// Try to send a stream
 			{
-				CollectInBufferStream s;
+				std::auto_ptr<CollectInBufferStream>
+					s(new CollectInBufferStream());
 				char buf[1663];
-				s.Write(buf, sizeof(buf));
-				s.SetForReading();
-				std::auto_ptr<TestProtocolGetStream> reply(protocol.QuerySendStream(0x73654353298ffLL, s));
+				s->Write(buf, sizeof(buf));
+				s->SetForReading();
+				std::auto_ptr<TestProtocolGetStream> reply(protocol.QuerySendStream(0x73654353298ffLL, 
+					(std::auto_ptr<IOStream>)s));
 				TEST_THAT(reply->GetStartingValue() == sizeof(buf));
 			}
 
