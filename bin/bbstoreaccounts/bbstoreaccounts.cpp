@@ -24,6 +24,7 @@
 #include <ostream>
 #include <vector>
 
+#include "box_getopt.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"

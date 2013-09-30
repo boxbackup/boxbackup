@@ -68,16 +68,13 @@
 
 #include "getopt.h"
 
-#if defined _MSC_VER || defined __MINGW32__
-#define	REPLACE_GETOPT		/* use this getopt as the system getopt(3) */
+#ifdef REPLACE_GETOPT // until end of file
 
-#ifdef REPLACE_GETOPT
 int	opterr = 1;		/* if error message should be printed */
 int	optind = 1;		/* index into parent argv vector */
 int	optopt = '?';		/* character checked for validity */
 int	optreset;		/* reset getopt */
 char    *optarg;		/* argument associated with option */
-#endif
 
 #define PRINT_ERROR	((opterr) && (*options != ':'))
 
@@ -499,7 +496,6 @@ start:
 	return (optchar);
 }
 
-#ifdef REPLACE_GETOPT
 /*
  * getopt --
  *	Parse argc/argv argument vector.
@@ -520,7 +516,6 @@ getopt(int nargc, char * const *nargv, const char *options)
 	 */
 	return (getopt_internal(nargc, nargv, options, NULL, NULL, 0));
 }
-#endif /* REPLACE_GETOPT */
 
 /*
  * getopt_long --
@@ -548,4 +543,4 @@ getopt_long_only(int nargc, char * const *nargv, const char *options,
 	    FLAG_PERMUTE|FLAG_LONGONLY));
 }
 
-#endif // defined _MSC_VER || defined __MINGW32__
+#endif // REPLACE_GETOPT
