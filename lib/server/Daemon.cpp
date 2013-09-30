@@ -368,7 +368,7 @@ int Daemon::ProcessOptions(int argc, const char *argv[])
 	// reset getopt, just in case anybody used it before.
 	// unfortunately glibc and BSD differ on this point!
 	// http://www.ussg.iu.edu/hypermail/linux/kernel/0305.3/0262.html
-	#if HAVE_DECL_OPTRESET == 1 || defined WIN32
+	#if HAVE_DECL_OPTRESET == 1 || defined BOX_BSD_GETOPT
 		optind = 1;
 		optreset = 1;
 	#elif defined __GLIBC__

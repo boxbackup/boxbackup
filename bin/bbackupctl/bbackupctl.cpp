@@ -18,6 +18,7 @@
 
 #include <cstdlib>
 
+#include "box_getopt.h"
 #include "MainHelper.h"
 #include "BoxPortsAndFiles.h"
 #include "BackupDaemonConfigVerify.h"

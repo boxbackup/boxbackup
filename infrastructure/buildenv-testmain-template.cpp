@@ -25,10 +25,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#ifdef HAVE_GETOPT_H
-	#include <getopt.h>
-#endif
-
 #ifdef HAVE_SYS_SOCKET_H
 #	include <sys/socket.h>
 #endif
@@ -43,6 +39,7 @@
 #include <exception>
 #include <string>
 
+#include "box_getopt.h"
 #include "Logging.h"
 #include "Test.h"
 #include "Timer.h"
@@ -231,7 +228,6 @@ int main(int argc, char * const * argv)
 
 	Logging::SetProgramName(BOX_MODULE);
 
-#ifdef HAVE_GETOPT_H
 	#ifdef BOX_RELEASE_BUILD
 	int logLevel = Log::NOTICE; // need an int to do math with
 	#else
@@ -372,7 +368,6 @@ int main(int argc, char * const * argv)
 
 	argc -= optind - 1;
 	argv += optind - 1;
-#endif // HAVE_GETOPT_H
 
 	// If there is more than one argument, then the test is doing something advanced, so leave it alone
 	bool fulltestmode = (argc == 1);
