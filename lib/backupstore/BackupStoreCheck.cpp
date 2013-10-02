@@ -746,25 +746,19 @@ void BackupStoreCheck::CheckDirectories()
 							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 							" with flags " << en->GetFlags());
 					}
-					else // it's a good file, add to sizes
-					if(en->IsOld() && en->IsDeleted())
+					// otherwise it's a good file, add to sizes
+					else if(en->IsDeleted()) // even if it's Old,
+					// it's still Deleted, don't count it twice.
 					{
-						BOX_WARNING("File " << 
-							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-							" is both old and deleted, "
-							"this should not happen!");
+						mNumFiles++;
+						mNumDeletedFiles++;
+						mBlocksInDeletedFiles += en->GetSizeInBlocks();
 					}
 					else if(en->IsOld())
 					{
 						mNumFiles++;
 						mNumOldFiles++;
 						mBlocksInOldFiles += en->GetSizeInBlocks();
-					}
-					else if(en->IsDeleted())
-					{
-						mNumFiles++;
-						mNumDeletedFiles++;
-						mBlocksInDeletedFiles += en->GetSizeInBlocks();
 					}
 					else
 					{
