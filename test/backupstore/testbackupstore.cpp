@@ -38,6 +38,7 @@
 #include "ServerControl.h"
 #include "Socket.h"
 #include "SocketStreamTLS.h"
+#include "StoreStructure.h"
 #include "TLSContext.h"
 #include "Test.h"
 #include "autogen_BackupProtocol.h"
@@ -782,8 +783,27 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		TEST_THAT(dir.GetNumberOfEntries() == 0);			
 	}
 
+	std::string root_dir_fn;
+	StoreStructure::MakeObjectFilename(
+		BackupProtocolListDirectory::RootDirectory, 
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
+		root_dir_fn, false /* EnsureDirectoryExists */);
+	std::auto_ptr<RaidFileRead> storedFile(RaidFileRead::Open(0, root_dir_fn));
+	int root_dir_blocks = storedFile->GetDiscUsageInBlocks();
+	std::auto_ptr<BackupProtocolAccountUsage> usage;
+	usage = protocol.QueryGetAccountUsage();
+
+	TEST_EQUAL_LINE(root_dir_blocks, usage->GetBlocksUsed(),
+		"wrong BlocksUsed");
+	TEST_EQUAL_LINE(0, usage->GetBlocksInOldFiles(),
+		"wrong BlocksInOldFiles");
+	TEST_EQUAL_LINE(0, usage->GetBlocksInDeletedFiles(), 
+		"wrong BlocksInDeletedFiles");
+	TEST_EQUAL_LINE(root_dir_blocks, usage->GetBlocksInDirectories(),
+		"wrong BlocksInDirectories");
+
 	// Store a file -- first make the encoded file
-	BackupStoreFilenameClear store1name("testfiles/file1");
+	BackupStoreFilenameClear store1name("file1");
 	{
 		FileStream out("testfiles/file1_upload1", O_WRONLY | O_CREAT | O_EXCL);
 		std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/file1", BackupProtocolListDirectory::RootDirectory, store1name));
@@ -892,6 +912,23 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			TEST_THAT(en->GetFlags() == BackupStoreDirectory::Entry::Flags_File);
 		}
 	}
+
+	std::string file1_fn;
+	StoreStructure::MakeObjectFilename(store1objid, 
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
+		file1_fn, false /* EnsureDirectoryExists */);
+	storedFile = RaidFileRead::Open(0, file1_fn);
+	int file1_blocks = storedFile->GetDiscUsageInBlocks();
+
+	usage = protocol.QueryGetAccountUsage();
+	TEST_EQUAL_LINE(root_dir_blocks + file1_blocks, usage->GetBlocksUsed(),
+		"wrong BlocksUsed");
+	TEST_EQUAL_LINE(0, usage->GetBlocksInOldFiles(),
+		"wrong BlocksInOldFiles");
+	TEST_EQUAL_LINE(0, usage->GetBlocksInDeletedFiles(), 
+		"wrong BlocksInDeletedFiles");
+	TEST_EQUAL_LINE(root_dir_blocks,
+		usage->GetBlocksInDirectories(), "wrong BlocksInDirectories");
 
 	// Try using GetFile on a directory
 	{
