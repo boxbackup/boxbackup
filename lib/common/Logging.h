@@ -274,6 +274,7 @@ class Syslog : public Logger
 	virtual const char* GetType() { return "Syslog"; }
 	virtual void SetProgramName(const std::string& rProgramName);
 	virtual void SetFacility(int facility);
+	virtual void Shutdown();
 	static int GetNamedFacility(const std::string& rFacility);
 };
 

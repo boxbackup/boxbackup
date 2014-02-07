@@ -432,6 +432,11 @@ Syslog::Syslog() : mFacility(LOG_LOCAL6)
 
 Syslog::~Syslog()
 {
+	Shutdown();
+}
+
+void Syslog::Shutdown()
+{
 	::closelog();
 }
 

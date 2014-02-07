@@ -416,6 +416,8 @@ int main(int argc, char * const * argv)
 		
 		if(fulltestmode)
 		{
+			Logging::GetSyslog().Shutdown();
+
 			bool filesleftopen = checkfilesleftopen();
 
 			fflush(stdout);
