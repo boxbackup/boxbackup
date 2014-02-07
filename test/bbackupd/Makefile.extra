@@ -13,4 +13,5 @@ link-extra: ../../bin/bbackupd/autogen_ClientException.o \
 	../../lib/backupstore/BackupCommands.o \
 	../../bin/bbstored/BackupStoreDaemon.o \
 	../../bin/bbackupquery/BackupQueries.o \
+	../../bin/bbackupquery/CommandCompletion.o \
 	../../bin/bbackupquery/autogen_Documentation.o
