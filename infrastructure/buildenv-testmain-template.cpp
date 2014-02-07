@@ -37,6 +37,7 @@
 #endif
 
 #include <exception>
+#include <list>
 #include <string>
 
 #include "box_getopt.h"
@@ -386,6 +387,7 @@ int main(int argc, char * const * argv)
 		BOX_NOTICE("Running test TEST_NAME in " MODE_TEXT " mode...");
 
 		// Count open file descriptors for a very crude "files left open" test
+		Logging::GetSyslog().Shutdown();
 		check_filedes(false);
 
 		#ifdef WIN32
