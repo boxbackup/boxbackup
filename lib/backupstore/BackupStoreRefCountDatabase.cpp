@@ -9,6 +9,8 @@
 
 #include "Box.h"
 
+#include <stdio.h>
+
 #include <algorithm>
 
 #include "BackupStoreRefCountDatabase.h"
@@ -34,12 +36,82 @@
 //
 // --------------------------------------------------------------------------
 BackupStoreRefCountDatabase::BackupStoreRefCountDatabase(const
-	BackupStoreAccountDatabase::Entry& rAccount)
+	BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly,
+	bool Temporary, std::auto_ptr<FileStream> apDatabaseFile)
 : mAccount(rAccount),
-  mFilename(GetFilename(rAccount)),
-  mReadOnly(true),
-  mIsModified(false)
+  mFilename(GetFilename(rAccount, Temporary)),
+  mReadOnly(ReadOnly),
+  mIsModified(false),
+  mIsTemporaryFile(Temporary),
+  mapDatabaseFile(apDatabaseFile)
 {
+	ASSERT(!(ReadOnly && Temporary)); // being both doesn't make sense
+}
+
+void BackupStoreRefCountDatabase::Commit()
+{
+	if (!mIsTemporaryFile)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Cannot commit a permanent reference count database");
+	}
+
+	if (!mapDatabaseFile.get())
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Reference count database is already closed");
+	}
+
+	mapDatabaseFile->Close();
+	mapDatabaseFile.reset();
+
+	std::string Final_Filename = GetFilename(mAccount, false);
+
+	#ifdef WIN32
+	if(FileExists(Final_Filename) && unlink(Final_Filename.c_str()) != 0)
+	{
+		THROW_SYS_FILE_ERROR("Failed to delete old permanent refcount "
+			"database file", mFilename, CommonException, OSFileError);
+	}
+	#endif
+
+	if(rename(mFilename.c_str(), Final_Filename.c_str()) != 0)
+	{
+		THROW_SYS_ERROR("Failed to rename temporary refcount database "
+			"file from " << mFilename << " to " <<
+			Final_Filename, CommonException, OSFileError);
+	}
+
+	mFilename = Final_Filename;
+	mIsModified = false;
+	mIsTemporaryFile = false;
+}
+
+void BackupStoreRefCountDatabase::Discard()
+{
+	if (!mIsTemporaryFile)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Cannot discard a permanent reference count database");
+	}
+
+	if (!mapDatabaseFile.get())
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Reference count database is already closed");
+	}
+
+	mapDatabaseFile->Close();
+	mapDatabaseFile.reset();
+
+	if(unlink(mFilename.c_str()) != 0)
+	{
+		THROW_SYS_FILE_ERROR("Failed to delete temporary refcount database "
+			"file ", mFilename, CommonException, OSFileError);
+	}
+
+	mIsModified = false;
+	mIsTemporaryFile = false;
 }
 
 // --------------------------------------------------------------------------
@@ -52,16 +124,27 @@ BackupStoreRefCountDatabase::BackupStoreRefCountDatabase(const
 // --------------------------------------------------------------------------
 BackupStoreRefCountDatabase::~BackupStoreRefCountDatabase()
 {
+	if (mIsTemporaryFile)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"BackupStoreRefCountDatabase destroyed without "
+			"explicit commit or discard");
+		Discard();
+	}
 }
 
 std::string BackupStoreRefCountDatabase::GetFilename(const
-	BackupStoreAccountDatabase::Entry& rAccount)
+	BackupStoreAccountDatabase::Entry& rAccount, bool Temporary)
 {
 	std::string RootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
 	ASSERT(RootDir[RootDir.size() - 1] == '/' ||
 		RootDir[RootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 
-	std::string fn(RootDir + REFCOUNT_FILENAME ".db");
+	std::string fn(RootDir + REFCOUNT_FILENAME ".rdb");
+	if(Temporary)
+	{
+		fn += "X";
+	}
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(rAccount.GetDiscSet()));
 	return RaidFileUtil::MakeWriteFileName(rdiscSet, fn);
@@ -77,35 +160,48 @@ std::string BackupStoreRefCountDatabase::GetFilename(const
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-void BackupStoreRefCountDatabase::Create(const
-	BackupStoreAccountDatabase::Entry& rAccount, bool AllowOverwrite)
+std::auto_ptr<BackupStoreRefCountDatabase>
+	BackupStoreRefCountDatabase::Create
+	(const BackupStoreAccountDatabase::Entry& rAccount)
 {
 	// Initial header
 	refcount_StreamFormat hdr;
 	hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE);
 	hdr.mAccountID = htonl(rAccount.GetID());
 	
-	// Generate the filename
-	std::string Filename = GetFilename(rAccount);
+	std::string Filename = GetFilename(rAccount, true); // temporary
 
 	// Open the file for writing
-	if (FileExists(Filename) && !AllowOverwrite)
+	if (FileExists(Filename))
 	{
-		THROW_FILE_ERROR("Failed to overwrite refcount database: "
-			"not allowed here", Filename, RaidFileException,
-			CannotOverwriteExistingFile);
+		BOX_WARNING(BOX_FILE_MESSAGE(Filename, "Overwriting existing "
+			"temporary reference count database"));
+		if (unlink(Filename.c_str()) != 0)
+		{
+			THROW_SYS_FILE_ERROR("Failed to delete old temporary "
+				"reference count database file", Filename,
+				CommonException, OSFileError);
+		}
 	}
 
-	int flags = O_CREAT | O_BINARY | O_RDWR;
-	if (!AllowOverwrite)
-	{
-		flags |= O_EXCL;
-	}
-
+	int flags = O_CREAT | O_BINARY | O_RDWR | O_EXCL;
 	std::auto_ptr<FileStream> DatabaseFile(new FileStream(Filename, flags));
 	
 	// Write header
 	DatabaseFile->Write(&hdr, sizeof(hdr));
+
+	// Make new object
+	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
+		new BackupStoreRefCountDatabase(rAccount, false, true,
+			DatabaseFile));
+	
+	// The root directory must always have one reference for a database
+	// to be valid, so set that now on the new database. This will leave
+	// mIsModified set to true.
+	refcount->SetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	// return it to caller
+	return refcount;
 }
 
 // --------------------------------------------------------------------------
@@ -122,12 +218,13 @@ void BackupStoreRefCountDatabase::Create(const
 std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 	const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly)
 {
-	// Generate the filename
-	std::string filename = GetFilename(rAccount);
+	// Generate the filename. Cannot open a temporary database, so it must
+	// be a permanent one.
+	std::string Filename = GetFilename(rAccount, false);
 	int flags = ReadOnly ? O_RDONLY : O_RDWR;
 
 	// Open the file for read/write
-	std::auto_ptr<FileStream> dbfile(new FileStream(filename,
+	std::auto_ptr<FileStream> dbfile(new FileStream(Filename,
 		flags | O_BINARY));
 	
 	// Read in a header
@@ -135,7 +232,7 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 	if(!dbfile->ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */))
 	{
 		THROW_FILE_ERROR("Failed to read refcount database: "
-			"short read", filename, BackupStoreException,
+			"short read", Filename, BackupStoreException,
 			CouldNotLoadStoreInfo);
 	}
 	
@@ -144,16 +241,14 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 		(int32_t)ntohl(hdr.mAccountID) != rAccount.GetID())
 	{
 		THROW_FILE_ERROR("Failed to read refcount database: "
-			"bad magic number", filename, BackupStoreException,
+			"bad magic number", Filename, BackupStoreException,
 			BadStoreInfoOnLoad);
 	}
 	
 	// Make new object
-	std::auto_ptr<BackupStoreRefCountDatabase> refcount(new BackupStoreRefCountDatabase(rAccount));
-	
-	// Put in basic location info
-	refcount->mReadOnly = ReadOnly;
-	refcount->mapDatabaseFile = dbfile;
+	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
+		new BackupStoreRefCountDatabase(rAccount, ReadOnly, false,
+			dbfile));
 	
 	// return it to caller
 	return refcount;
@@ -229,6 +324,7 @@ void BackupStoreRefCountDatabase::SetRefCount(int64_t ObjectID,
 	mapDatabaseFile->Seek(offset, SEEK_SET);
 	refcount_t RefCountNetOrder = htonl(NewRefCount);
 	mapDatabaseFile->Write(&RefCountNetOrder, sizeof(RefCountNetOrder));
+	mIsModified = true;
 }
 
 bool BackupStoreRefCountDatabase::RemoveReference(int64_t ObjectID)

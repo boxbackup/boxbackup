@@ -15,6 +15,7 @@
 #include <vector>
 
 class BackupStoreDirectory;
+class BackupStoreRefCountDatabase;
 
 class HousekeepingCallback
 {
@@ -39,18 +40,22 @@ public:
 	~HousekeepStoreAccount();
 	
 	bool DoHousekeeping(bool KeepTryingForever = false);
-	int GetRefCountsAdjusted() { return mRefCountsAdjusted; }
+	int GetErrorCount() { return mErrorCount; }
 	
 private:
 	// utility functions
 	void MakeObjectFilename(int64_t ObjectID, std::string &rFilenameOut);
 
-	bool ScanDirectory(int64_t ObjectID);
-	bool DeleteFiles();
+	bool ScanDirectory(int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
+	bool DeleteFiles(BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteEmptyDirectories();
 	void DeleteEmptyDirectory(int64_t dirId,
 		std::vector<int64_t>& rToExamine);
-	void DeleteFile(int64_t InDirectory, int64_t ObjectID, BackupStoreDirectory &rDirectory, const std::string &rDirectoryFilename, int64_t OriginalDirSizeInBlocks);
+	void DeleteFile(int64_t InDirectory, int64_t ObjectID,
+		BackupStoreDirectory &rDirectory,
+		const std::string &rDirectoryFilename,
+		int64_t OriginalDirSizeInBlocks,
+		BackupStoreInfo& rBackupStoreInfo);
 
 private:
 	typedef struct
@@ -81,6 +86,9 @@ private:
 	
 	// List of directories which are empty, and might be good for deleting
 	std::vector<int64_t> mEmptyDirectories;
+
+	// Count of errors found and fixed
+	int64_t mErrorCount;
 	
 	// The re-calculated blocks used stats
 	int64_t mBlocksUsed;
@@ -99,9 +107,7 @@ private:
 	int64_t mEmptyDirectoriesDeleted;
 
 	// New reference count list
-	std::vector<uint32_t> mNewRefCounts;
-	bool mSuppressRefCountChangeWarnings;
-	int mRefCountsAdjusted;
+	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
 	
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;

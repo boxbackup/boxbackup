@@ -405,7 +405,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			fileOK = false;
 		}
 		// info and refcount databases are OK in the root directory
-		else if(*i == "info" || *i == "refcount.db")
+		else if(*i == "info" || *i == "refcount.db" || *i == "refcount.rdb")
 		{
 			fileOK = true;
 		}
