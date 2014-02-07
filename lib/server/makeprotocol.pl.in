@@ -512,6 +512,7 @@ public:
 	virtual ~$protocol_base_class();
 	virtual const char *GetIdentString();
 	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
+	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
 
 protected:
 	void CheckReply(const std::string& requestCommand,
@@ -534,12 +535,6 @@ public:
 	$replyable_base_class();
 	virtual ~$replyable_base_class();
 
-	/*
-	virtual std::auto_ptr<$message_base_class> Receive() = 0;
-	virtual void Send(const ${message_base_class} &rObject) = 0;
-	*/
-
-	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
 	virtual int GetTimeout() = 0;
 	void SendStreamAfterCommand(std::auto_ptr<IOStream> apStream);
 	
@@ -658,7 +653,6 @@ print H <<__E;
 class $callable_base_class : public virtual $protocol_base_class
 {
 public:
-	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
 	virtual int GetTimeout() = 0;
 __E
 
