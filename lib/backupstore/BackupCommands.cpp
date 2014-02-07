@@ -164,6 +164,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
+	// can be called in any phase
+
 	BOX_NOTICE("Session finished for Client ID " << 
 		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
 		"(name=" << rContext.GetAccountName() << ")");
@@ -171,7 +173,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 	// Let the context know about it
 	rContext.ReceivedFinishCommand();
 
-	// can be called in any phase
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolFinished);
 }
 
