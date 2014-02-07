@@ -571,13 +571,14 @@ DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
 LDFLAGS += @LDFLAGS@ @LDADD_RDYNAMIC@
 
 .ifdef RELEASE
-CXXFLAGS += -DBOX_RELEASE_BUILD $release_flags \$(DEFAULT_CXXFLAGS)
+CXXFLAGS += \$(DEFAULT_CXXFLAGS) -DBOX_RELEASE_BUILD $release_flags
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS += -g \$(DEFAULT_CXXFLAGS)
+# http://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode_using.html#debug_mode.using.mode
+CXXFLAGS += \$(DEFAULT_CXXFLAGS) -g -O0 -D_GLIBCXX_DEBUG
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
