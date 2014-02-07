@@ -990,7 +990,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 	COPY(BlocksInDirectories);
 	COPY(BlocksSoftLimit);
 	COPY(BlocksHardLimit);
-	COPY(NumCurrentFiles);
+	usage->SetNumCurrentFiles(info.GetNumFiles());
 	COPY(NumOldFiles);
 	COPY(NumDeletedFiles);
 	COPY(NumDirectories);
