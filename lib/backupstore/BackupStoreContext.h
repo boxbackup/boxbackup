@@ -86,6 +86,15 @@ public:
 	bool AttemptToGetWriteLock();
 
 	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mStoreRoot = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
+	// Not really an API, but useful for BackupProtocolLocal2.
+	void ReleaseWriteLock()
+	{
+		if(mWriteLock.GotLock())
+		{
+			mWriteLock.ReleaseLock();
+		}
+	}
+
 	bool GetClientHasAccount() const {return mClientHasAccount;}
 	const std::string &GetStoreRoot() const {return mStoreRoot;}
 	int GetStoreDiscSet() const {return mStoreDiscSet;}
