@@ -388,7 +388,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 			
 			// Choose a temporary filename for the result of the combination
 			std::ostringstream fs;
-			fs << rContext.GetStoreRoot() << ".recombinetemp." << p;
+			fs << rContext.GetAccountRoot() << ".recombinetemp." << p;
 			std::string tempFn = 
 				RaidFileController::DiscSetPathToFileSystemPath(
 					rContext.GetStoreDiscSet(), fs.str(),

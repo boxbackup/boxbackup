@@ -133,7 +133,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 {
 	// Make the filename of the write lock file
 	std::string writeLockFile;
-	StoreStructure::MakeWriteLockFilename(mStoreRoot, mStoreDiscSet, writeLockFile);
+	StoreStructure::MakeWriteLockFilename(mAccountRootDir, mStoreDiscSet, writeLockFile);
 
 	// Request the lock
 	bool gotLock = mWriteLock.TryAndGetLock(writeLockFile.c_str(), 0600 /* restrictive file permissions */);
@@ -183,7 +183,7 @@ void BackupStoreContext::LoadStoreInfo()
 	}
 	
 	// Load it up!
-	std::auto_ptr<BackupStoreInfo> i(BackupStoreInfo::Load(mClientID, mStoreRoot, mStoreDiscSet, mReadOnly));
+	std::auto_ptr<BackupStoreInfo> i(BackupStoreInfo::Load(mClientID, mAccountRootDir, mStoreDiscSet, mReadOnly));
 	
 	// Check it
 	if(i->GetAccountID() != mClientID)
@@ -263,7 +263,7 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 void BackupStoreContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists)
 {
 	// Delegate to utility function
-	StoreStructure::MakeObjectFilename(ObjectID, mStoreRoot, mStoreDiscSet, rOutput, EnsureDirectoryExists);
+	StoreStructure::MakeObjectFilename(ObjectID, mAccountRootDir, mStoreDiscSet, rOutput, EnsureDirectoryExists);
 }
 
 
