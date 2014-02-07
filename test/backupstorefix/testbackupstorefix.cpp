@@ -18,6 +18,7 @@
 
 #include "Test.h"
 #include "BackupClientCryptoKeys.h"
+#include "BackupProtocol.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreContext.h"
@@ -66,7 +67,7 @@ delete root, copy a file to it instead (equivalent to deleting it too)
 
 */
 
-std::string storeRoot("backup/01234567/");
+std::string accountRootDir("backup/01234567/");
 int discSetNum = 0;
 
 std::map<std::string, int32_t> nameToID;
@@ -78,7 +79,7 @@ std::map<int32_t, bool> objectIsDir;
 
 bool check_fix_internal(int expected_num_errors)
 {
-	BackupStoreCheck checker(storeRoot, discSetNum,
+	BackupStoreCheck checker(accountRootDir, discSetNum,
 		0x01234567, true /* FixErrors */, false /* Quiet */);
 	checker.Check();
 	if (expected_num_errors == -1)
@@ -110,7 +111,7 @@ int32_t getID(const char *name)
 std::string getObjectName(int32_t id)
 {
 	std::string fn;
-	StoreStructure::MakeObjectFilename(id, storeRoot, discSetNum, fn, false);
+	StoreStructure::MakeObjectFilename(id, accountRootDir, discSetNum, fn, false);
 	return fn;
 }
 
@@ -378,7 +379,7 @@ int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
 void read_bb_dir(int64_t objectId, BackupStoreDirectory& dir)
 {
 	std::string fn;
-	StoreStructure::MakeObjectFilename(1 /* root */, storeRoot,
+	StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
 		discSetNum, fn, true /* EnsureDirectoryExists */);
 
 	std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
@@ -396,9 +397,6 @@ void login_client_and_check_empty(BackupProtocolCallable& client)
 	check_dir(dir, start_entries);
 	static checkdepinfoen start_deps[] = {{-1, 0, 0}};
 	check_dir_dep(dir, start_deps);
-
-	client.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-	client.QueryLogin(0x01234567, 0 /* read/write */);
 
 	read_bb_dir(1 /* root */, dir);
 	
@@ -470,11 +468,8 @@ int test(int argc, const char *argv[])
 		"exist is really deleted");
 
 	{
-		BackupStoreContext ctx(0x01234567,
-			*(HousekeepingInterface *)NULL,
-			"test" /* rConnectionDetails */);
-		ctx.SetClientHasAccount(storeRoot, discSetNum);
-		BackupProtocolLocal client(ctx);
+		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
+			discSetNum, false);
 		login_client_and_check_empty(client);
 
 		std::string file_path = "testfiles/TestDir1/cannes/ict/metegoguered/oats";
@@ -483,7 +478,7 @@ int test(int argc, const char *argv[])
 		// Now break the reverse dependency by deleting x1 (the file,
 		// not the directory entry)
 		std::string x1FileName;
-		StoreStructure::MakeObjectFilename(x1id, storeRoot, discSetNum,
+		StoreStructure::MakeObjectFilename(x1id, accountRootDir, discSetNum,
 			x1FileName, true /* EnsureDirectoryExists */);
 		RaidFileWrite deleteX1(discSetNum, x1FileName);
 		deleteX1.Delete();
@@ -497,11 +492,8 @@ int test(int argc, const char *argv[])
 		"exist is really deleted");
 
 	{
-		BackupStoreContext ctx(0x01234567,
-			*(HousekeepingInterface *)NULL,
-			"test" /* rConnectionDetails */);
-		ctx.SetClientHasAccount(storeRoot, discSetNum);
-		BackupProtocolLocal client(ctx);
+		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
+			discSetNum, false);
 		login_client_and_check_empty(client);
 
 		std::string file_path = "testfiles/TestDir1/cannes/ict/metegoguered/oats";
@@ -530,7 +522,7 @@ int test(int argc, const char *argv[])
 		// Now break the reverse dependency by deleting x1a (the file,
 		// not the directory entry)
 		std::string x1aFileName;
-		StoreStructure::MakeObjectFilename(x1aid, storeRoot, discSetNum,
+		StoreStructure::MakeObjectFilename(x1aid, accountRootDir, discSetNum,
 			x1aFileName, true /* EnsureDirectoryExists */);
 		RaidFileWrite deleteX1a(discSetNum, x1aFileName);
 		deleteX1a.Delete();
@@ -590,7 +582,7 @@ int test(int argc, const char *argv[])
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		
 		std::string fn;
-		StoreStructure::MakeObjectFilename(1 /* root */, storeRoot,
+		StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
 			discSetNum, fn, true /* EnsureDirectoryExists */);
 
 		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
@@ -604,7 +596,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) != 0);
 
 		// Check it
-		BackupStoreCheck checker(storeRoot, discSetNum,
+		BackupStoreCheck checker(accountRootDir, discSetNum,
 			0x01234567, true /* FixErrors */, false /* Quiet */);
 		checker.Check();
 
@@ -651,13 +643,13 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Delete store info, add random file");
 	{
 		// Delete store info
-		RaidFileWrite del(discSetNum, storeRoot + "info");
+		RaidFileWrite del(discSetNum, accountRootDir + "info");
 		del.Delete();
 	}
 	{
 		// Add a spurious file
 		RaidFileWrite random(discSetNum, 
-			storeRoot + "randomfile");
+			accountRootDir + "randomfile");
 		random.Open();
 		random.Write("test", 4);
 		random.Commit(true);
@@ -672,7 +664,7 @@ int test(int argc, const char *argv[])
 	// Check the random file doesn't exist
 	{
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
-			storeRoot + "01/randomfile"));
+			accountRootDir + "01/randomfile"));
 	}
 
 	// ------------------------------------------------------------------------------------------------		
