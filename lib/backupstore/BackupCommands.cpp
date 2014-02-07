@@ -953,3 +953,49 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetIsAlive::DoCommand(BackupP
 	//
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolIsAlive());
 }
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolGetAccountUsage2::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Return the amount of disc space used
+//		Created: 26/12/13
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+
+	// Get store info from context
+	const BackupStoreInfo &info(rContext.GetBackupStoreInfo());
+	
+	// Find block size
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(info.GetDiscSetNumber()));
+	
+	// Return info
+	BackupProtocolAccountUsage2* usage = new BackupProtocolAccountUsage2();
+	std::auto_ptr<BackupProtocolMessage> reply(usage);
+	#define COPY(name) usage->Set ## name (info.Get ## name ())
+	COPY(AccountName);
+	usage->SetAccountEnabled(info.IsAccountEnabled());
+	COPY(ClientStoreMarker);
+	usage->SetBlockSize(rdiscSet.GetBlockSize());
+	COPY(LastObjectIDUsed);
+	COPY(BlocksUsed);
+	COPY(BlocksInCurrentFiles);
+	COPY(BlocksInOldFiles);
+	COPY(BlocksInDeletedFiles);
+	COPY(BlocksInDirectories);
+	COPY(BlocksSoftLimit);
+	COPY(BlocksHardLimit);
+	COPY(NumCurrentFiles);
+	COPY(NumOldFiles);
+	COPY(NumDeletedFiles);
+	COPY(NumDirectories);
+	#undef COPY
+
+	return reply;
+}
+

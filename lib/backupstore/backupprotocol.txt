@@ -7,6 +7,7 @@ IdentString			Box-Backup:v=C
 ServerContextClass	BackupStoreContext	BackupStoreContext.h
 
 AddType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
+AddType		String		std::string
 
 ImplementLog	Server	syslog
 ImplementLog	Client	syslog
@@ -232,4 +233,25 @@ GetIsAlive	42	Command(IsAlive)
 
 IsAlive	43	Reply
 	# no data members
+
+GetAccountUsage2	44	Command(AccountUsage2)
+	# no data members
+
+AccountUsage2	45	Reply
+	String	AccountName
+	bool	AccountEnabled
+	int64	ClientStoreMarker
+	int32	BlockSize
+	int64	LastObjectIDUsed
+	int64	BlocksUsed
+	int64	BlocksInCurrentFiles
+	int64	BlocksInOldFiles
+	int64	BlocksInDeletedFiles
+	int64	BlocksInDirectories
+	int64	BlocksSoftLimit
+	int64	BlocksHardLimit
+	int64	NumCurrentFiles
+	int64	NumOldFiles
+	int64	NumDeletedFiles
+	int64	NumDirectories
 
