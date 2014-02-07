@@ -120,7 +120,10 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		info->Save();
 
 		// Create the refcount database
-		BackupStoreRefCountDatabase::Create(Entry)->Commit();
+		BackupStoreRefCountDatabase::CreateNew(Entry);
+		std::auto_ptr<BackupStoreRefCountDatabase> refcount(
+			BackupStoreRefCountDatabase::Load(Entry, false));
+		refcount->AddReference(BACKUPSTORE_ROOT_DIRECTORY_ID);
 	}
 
 	// As the original user...
@@ -410,7 +413,7 @@ int BackupStoreAccountsControl::PrintAccountInfo(int32_t ID)
 	std::cout << FormatUsageLineStart("Client store marker", mMachineReadableOutput) <<
 		info->GetLastObjectIDUsed() << std::endl;
 	std::cout << FormatUsageLineStart("Current Files", mMachineReadableOutput) <<
-		info->GetNumCurrentFiles() << std::endl;
+		info->GetNumFiles() << std::endl;
 	std::cout << FormatUsageLineStart("Old Files", mMachineReadableOutput) <<
 		info->GetNumOldFiles() << std::endl;
 	std::cout << FormatUsageLineStart("Deleted Files", mMachineReadableOutput) <<
