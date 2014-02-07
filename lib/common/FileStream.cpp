@@ -77,11 +77,13 @@ void FileStream::AfterOpen()
 
 		if(errno == EACCES)
 		{
-			THROW_EXCEPTION(CommonException, AccessDenied)
+			THROW_EXCEPTION_MESSAGE(CommonException, AccessDenied,
+				mFileName);
 		}
 		else
 		{
-			THROW_EXCEPTION(CommonException, OSFileOpenError)
+			THROW_EXCEPTION_MESSAGE(CommonException, OSFileOpenError,
+				mFileName);
 		}
 	}
 }
