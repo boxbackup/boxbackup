@@ -510,8 +510,10 @@ BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
 		{
 			inQuoted = true;
 		}
-		// Start of options?
-		else if(currentArg.empty() && *c == '-')
+		// Start of options? You can't have options if there's no
+		// command before them, so treat the options as a command (which
+		// doesn't exist, so it will fail to parse) in that case.
+		else if(currentArg.empty() && *c == '-' && !mCmdElements.empty())
 		{
 			mInOptions = true;
 		}
