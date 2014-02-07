@@ -77,6 +77,7 @@ public:
 		ParsedCommand(const std::string& Command,
 			bool isFromCommandLine);
 		bool IsEmpty() { return mCmdElements.empty(); }
+		bool IsFailed() { return mFailed; }
 	};
 
 	void DoCommand(ParsedCommand& rCommand);

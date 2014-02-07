@@ -114,7 +114,9 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 
 	if(rCommand.mFailed)
 	{
-		BOX_ERROR("Parse failed");
+		BOX_ERROR("Parse failed: unknown command '" << 
+			rCommand.mCmdElements[0] << "' or failed to convert "
+			"encoding of arguments");
 		return;
 	}
 
