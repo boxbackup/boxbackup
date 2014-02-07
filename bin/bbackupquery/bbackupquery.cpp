@@ -525,6 +525,7 @@ int main(int argc, const char *argv[])
 			if(cmd_ptr == NULL)
 			{
 				// Ctrl-D pressed -- terminate now
+				puts("");
 				break;
 			}
 
