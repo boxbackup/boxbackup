@@ -85,7 +85,6 @@ public:
 	bool SessionIsReadOnly() {return mReadOnly;}
 	bool AttemptToGetWriteLock();
 
-	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mStoreRoot = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
 	// Not really an API, but useful for BackupProtocolLocal2.
 	void ReleaseWriteLock()
 	{
@@ -95,8 +94,9 @@ public:
 		}
 	}
 
+	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mAccountRootDir = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
 	bool GetClientHasAccount() const {return mClientHasAccount;}
-	const std::string &GetStoreRoot() const {return mStoreRoot;}
+	const std::string &GetAccountRoot() const {return mAccountRootDir;}
 	int GetStoreDiscSet() const {return mStoreDiscSet;}
 
 	// Store info
@@ -175,7 +175,7 @@ private:
 	HousekeepingInterface &mrDaemon;
 	int mProtocolPhase;
 	bool mClientHasAccount;
-	std::string mStoreRoot;	// has final directory separator
+	std::string mAccountRootDir;	// has final directory separator
 	int mStoreDiscSet;
 	bool mReadOnly;
 	NamedLock mWriteLock;
