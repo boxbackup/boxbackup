@@ -120,10 +120,7 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		info->Save();
 
 		// Create the refcount database
-		BackupStoreRefCountDatabase::CreateNew(Entry);
-		std::auto_ptr<BackupStoreRefCountDatabase> refcount(
-			BackupStoreRefCountDatabase::Load(Entry, false));
-		refcount->AddReference(BACKUPSTORE_ROOT_DIRECTORY_ID);
+		BackupStoreRefCountDatabase::Create(Entry)->Commit();
 	}
 
 	// As the original user...

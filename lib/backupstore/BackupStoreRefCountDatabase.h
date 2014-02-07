@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "BackupStoreAccountDatabase.h"
+#include "BackupStoreConstants.h"
 #include "FileStream.h"
 
 class BackupStoreCheck;
@@ -59,17 +60,17 @@ public:
 private:
 	// Creation through static functions only
 	BackupStoreRefCountDatabase(const BackupStoreAccountDatabase::Entry&
-		rAccount);
+		rAccount, bool ReadOnly, bool Temporary,
+		std::auto_ptr<FileStream> apDatabaseFile);
 	// No copying allowed
 	BackupStoreRefCountDatabase(const BackupStoreRefCountDatabase &);
 	
 public:
-	// Create a new database for a new account. This method will refuse
-	// to overwrite any existing file.
-	static void CreateNew(const BackupStoreAccountDatabase::Entry& rAccount)
-	{
-		Create(rAccount, false);
-	}
+	// Create a new database for a new account.
+	static std::auto_ptr<BackupStoreRefCountDatabase> Create
+		(const BackupStoreAccountDatabase::Entry& rAccount);
+	void Commit();
+	void Discard();
 	
 	// Load it from the store
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(const
@@ -87,20 +88,9 @@ public:
 	bool RemoveReference(int64_t ObjectID);
 
 private:
-	// Create a new database for an existing account. Used during
-	// account checking if opening the old database throws an exception.
-	// This method will overwrite any existing file.
-	static void CreateForRegeneration(const
-		BackupStoreAccountDatabase::Entry& rAccount)
-	{
-		Create(rAccount, true);
-	}
-
-	static void Create(const BackupStoreAccountDatabase::Entry& rAccount,
-		bool AllowOverwrite);
-
 	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&
-		rAccount);
+		rAccount, bool Temporary);
+
 	IOStream::pos_type GetSize() const
 	{
 		return mapDatabaseFile->GetPosition() +
@@ -122,7 +112,13 @@ private:
 	std::string mFilename;
 	bool mReadOnly;
 	bool mIsModified;
+	bool mIsTemporaryFile;
 	std::auto_ptr<FileStream> mapDatabaseFile;
+
+	bool NeedsCommitOrDiscard()
+	{
+		return mapDatabaseFile.get() && mIsModified && mIsTemporaryFile;
+	}
 };
 
 #endif // BACKUPSTOREREFCOUNTDATABASE__H
