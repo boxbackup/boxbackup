@@ -203,12 +203,11 @@ void BackupStoreContext::LoadStoreInfo()
 	}
 	catch(BoxException &e)
 	{
-		BOX_WARNING("Reference count database is missing or corrupted, "
-			"creating a new one, expect housekeeping to find and "
-			"fix problems with reference counts later.");
-		
-		BackupStoreRefCountDatabase::CreateForRegeneration(account);
-		mapRefCount = BackupStoreRefCountDatabase::Load(account, false);
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			CorruptReferenceCountDatabase, "Reference count "
+			"database is missing or corrupted, cannot safely open "
+			"account. Housekeeping will fix this automatically "
+			"when it next runs.");
 	}
 }
 
