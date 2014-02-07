@@ -395,26 +395,10 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 					p + 16);
 			
 			// Open the temporary file
-			std::auto_ptr<IOStream> combined;
-			try
-			{
-				{
-					// Write nastily to allow this to work with gcc 2.x
-					std::auto_ptr<IOStream> t(
-						new InvisibleTempFileStream(
-							tempFn.c_str(), 
-							O_RDWR | O_CREAT | 
-							O_EXCL | O_BINARY | 
-							O_TRUNC));
-					combined = t;
-				}
-			}
-			catch(...)
-			{
-				// Make sure it goes
-				::unlink(tempFn.c_str());
-				throw;
-			}
+			std::auto_ptr<IOStream> combined(
+				new InvisibleTempFileStream(
+					tempFn, O_RDWR | O_CREAT | O_EXCL |
+					O_BINARY | O_TRUNC));
 			
 			// Do the combining
 			BackupStoreFile::CombineFile(*diff, *diff2, *from, *combined);
