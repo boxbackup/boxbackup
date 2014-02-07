@@ -16,7 +16,7 @@
 class InvisibleTempFileStream : public FileStream
 {
 public:
-	InvisibleTempFileStream(const char *Filename, 
+	InvisibleTempFileStream(const std::string& Filename, 
 #ifdef WIN32
 		int flags = (O_RDONLY | O_BINARY),
 #else
