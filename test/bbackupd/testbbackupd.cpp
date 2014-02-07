@@ -3953,6 +3953,14 @@ int test_bbackupd()
 int test(int argc, const char *argv[])
 {
 	{
+		// This is not a complete command, it should not parse!
+		BackupQueries::ParsedCommand cmd("-od", true);
+		TEST_THAT(cmd.mFailed);
+		TEST_EQUAL(NULL, cmd.pSpec);
+		TEST_EQUAL(0, cmd.mCompleteArgCount);
+	}
+
+	{
 		BackupDaemon daemon;
 
 		TEST_EQUAL(1234, daemon.ParseSyncAllowScriptOutput("test", "1234"));
