@@ -57,6 +57,7 @@ int test(int argc, const char *argv[]);
 int failures = 0;
 int first_fail_line;
 std::string first_fail_file;
+std::list<std::string> run_only_named_tests;
 
 #ifdef WIN32
 	#define QUIET_PROCESS "-Q"
@@ -239,12 +240,13 @@ int main(int argc, char * const * argv)
 		{ "bbackupd-args",	required_argument, NULL, 'c' },
 		{ "bbstored-args",	required_argument, NULL, 's' },
 		{ "test-daemon-args",	required_argument, NULL, 'd' },
+		{ "execute-only",	required_argument, NULL, 'e' },
 		{ NULL,			0,                 NULL,  0  }
 	};
 	
 	int ch;
 	
-	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vPTUVW:", longopts, NULL))
+	while ((ch = getopt_long(argc, argv, "c:d:e:qs:t:vPTUVW:", longopts, NULL))
 		!= -1)
 	{
 		switch(ch)
@@ -273,6 +275,12 @@ int main(int argc, char * const * argv)
 			{
 				bbstored_args += " ";
 				bbstored_args += optarg;
+			}
+			break;
+
+			case 'e':
+			{
+				run_only_named_tests.push_back(optarg);
 			}
 			break;
 
