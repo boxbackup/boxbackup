@@ -78,7 +78,7 @@ sub add_type
 	my ($protocol_name, $cpp_name, $header_file) = split /\s+/,$_[0];
 	
 	$translate_type_info{$protocol_name} = [0, $cpp_name];
-	push @extra_header_files, $header_file;
+	push @extra_header_files, $header_file if $header_file;
 }
 
 # check attributes
