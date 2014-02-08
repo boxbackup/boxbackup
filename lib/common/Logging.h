@@ -384,16 +384,19 @@ class Logging
 	{
 		private:
 		std::string mOldTag;
+		bool mReplace;
 
 		public:
 		Tagger()
-		: mOldTag(Logging::GetProgramName())
+		: mOldTag(Logging::GetProgramName()),
+		  mReplace(false)
 		{
 		}
-		Tagger(const std::string& rTempTag)
-		: mOldTag(Logging::GetProgramName())
+		Tagger(const std::string& rTempTag, bool replace = false)
+		: mOldTag(Logging::GetProgramName()),
+		  mReplace(replace)
 		{
-			Logging::SetProgramName(mOldTag + " " + rTempTag);
+			Change(rTempTag);
 		}
 		~Tagger()
 		{
@@ -402,7 +405,14 @@ class Logging
 
 		void Change(const std::string& newTempTag)
 		{
-			Logging::SetProgramName(mOldTag + " " + newTempTag);
+			if(mReplace || mOldTag.empty())
+			{
+				Logging::SetProgramName(newTempTag);
+			}
+			else
+			{
+				Logging::SetProgramName(mOldTag + " " + newTempTag);
+			}
 		}
 	};
 };
