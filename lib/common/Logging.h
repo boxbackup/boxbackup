@@ -248,6 +248,7 @@ class Console : public Logger
 	static void SetShowTime(bool enabled);
 	static void SetShowTimeMicros(bool enabled);
 	static void SetShowPID(bool enabled);
+	static bool GetShowTag() { return sShowTag; }
 };
 
 // --------------------------------------------------------------------------
