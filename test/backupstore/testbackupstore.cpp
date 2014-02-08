@@ -2006,36 +2006,34 @@ int test3(int argc, const char *argv[])
 		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-	// Delete the refcount database and log in again,
-	// check that it is recreated automatically but with
-	// no objects in it, to ensure seamless upgrade.
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
+	// Delete the refcount database and try to log in again. Check that
+	// we're locked out of the account until housekeeping has recreated
+	// the refcount db.
+	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 
-	std::auto_ptr<SocketStreamTLS> conn;
-	test_server_login("localhost", context, conn)->QueryFinished();
+	std::auto_ptr<SocketStreamTLS> conn(new SocketStreamTLS);
+	TEST_CHECK_THROWS(test_server_login("localhost", context, conn),
+		ConnectionException, Conn_TLSReadFailed);
+	TEST_THAT(ServerIsAlive(pid));
 
 	BackupStoreAccountDatabase::Entry account =
 		apAccounts->GetEntry(0x1234567);
-	apReferences = BackupStoreRefCountDatabase::Load(account, true);
-	TEST_EQUAL(0, apReferences->GetLastObjectIDUsed());
-
-	TEST_THAT(ServerIsAlive(pid));
-
 	run_housekeeping(account);
 
 	// Check that housekeeping fixed the ref counts
+	apReferences = BackupStoreRefCountDatabase::Load(account, true);
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
 		apReferences->GetLastObjectIDUsed());
 	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+	apReferences.reset();
 
 	TEST_THAT(ServerIsAlive(pid));
-
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
 	TEST_THAT(test_server("localhost") == 0);
 
 	// test that all object reference counts have the
 	// expected values
+	apReferences = BackupStoreRefCountDatabase::Load(account, true);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
 	TEST_EQUAL(ExpectedRefCounts.size() - 1,
 		apReferences->GetLastObjectIDUsed());
 	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
@@ -2051,7 +2049,7 @@ int test3(int argc, const char *argv[])
 	// This could also happen after upgrade, if a housekeeping
 	// runs before the user logs in.
 	apReferences.reset();
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.db.rfw"));
+	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	run_housekeeping(account);
 	apReferences = BackupStoreRefCountDatabase::Load(account, true);
 
@@ -2118,9 +2116,9 @@ int test3(int argc, const char *argv[])
 		after);
 
 	// If these tests fail then try increasing the timeout above
-	TEST_THAT(after.objectsNotDel == before.objectsNotDel);
-	TEST_THAT(after.deleted == 0);
-	TEST_THAT(after.old == 0);
+	TEST_EQUAL(before.objectsNotDel, after.objectsNotDel);
+	TEST_EQUAL(0, after.deleted);
+	TEST_EQUAL(0, after.old);
 	
 	// Set a really small hard limit
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
