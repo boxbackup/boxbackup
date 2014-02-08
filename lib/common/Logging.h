@@ -363,6 +363,23 @@ class Logging
 		}
 	};
 
+	class ShowTagOnConsole
+	{
+		private:
+		bool mOldShowTag;
+		
+		public:
+		ShowTagOnConsole()
+		: mOldShowTag(Console::GetShowTag())
+		{
+			Console::SetShowTag(true);
+		}
+		~ShowTagOnConsole()
+		{
+			Console::SetShowTag(mOldShowTag);
+		}
+	};
+
 	class Tagger
 	{
 		private:
