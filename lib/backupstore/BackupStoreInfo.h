@@ -102,7 +102,7 @@ public:
 	const std::vector<int64_t> &GetDeletedDirectories() const {return mDeletedDirectories;}
 	int64_t GetBlocksSoftLimit() const {return mBlocksSoftLimit;}
 	int64_t GetBlocksHardLimit() const {return mBlocksHardLimit;}
-	int64_t GetNumFiles() const {return mNumFiles;}
+	int64_t GetNumCurrentFiles() const {return mNumCurrentFiles;}
 	int64_t GetNumOldFiles() const {return mNumOldFiles;}
 	int64_t GetNumDeletedFiles() const {return mNumDeletedFiles;}
 	int64_t GetNumDirectories() const {return mNumDirectories;}
@@ -122,7 +122,7 @@ public:
 	void AddDeletedDirectory(int64_t DirID);
 	void RemovedDeletedDirectory(int64_t DirID);
 	void ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimit);
-	void AdjustNumFiles(int64_t increase);
+	void AdjustNumCurrentFiles(int64_t increase);
 	void AdjustNumOldFiles(int64_t increase);
 	void AdjustNumDeletedFiles(int64_t increase);
 	void AdjustNumDirectories(int64_t increase);
@@ -175,7 +175,7 @@ private:
 	int64_t mBlocksInDirectories;
 	int64_t mBlocksSoftLimit;
 	int64_t mBlocksHardLimit;
-	int64_t mNumFiles;
+	int64_t mNumCurrentFiles;
 	int64_t mNumOldFiles;
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;

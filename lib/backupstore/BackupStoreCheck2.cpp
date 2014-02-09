@@ -589,7 +589,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		++mNumberErrorsFound;
 	}
 
-	BOX_INFO("Current files: " << mNumFiles << ", "
+	BOX_INFO("Current files: " << mNumCurrentFiles << ", "
 		"old files: " << mNumOldFiles << ", "
 		"deleted files: " << mNumDeletedFiles << ", "
 		"directories: " << mNumDirectories);
@@ -657,7 +657,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		hardLimit,
 		(pOldInfo.get() ? pOldInfo->IsAccountEnabled() : true),
 		*extra_data));
-	info->AdjustNumFiles(mNumFiles);
+	info->AdjustNumCurrentFiles(mNumCurrentFiles);
 	info->AdjustNumOldFiles(mNumOldFiles);
 	info->AdjustNumDeletedFiles(mNumDeletedFiles);
 	info->AdjustNumDirectories(mNumDirectories);
