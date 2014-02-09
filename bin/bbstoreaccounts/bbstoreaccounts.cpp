@@ -87,7 +87,7 @@ int main(int argc, const char *argv[])
 	Logging::SetProgramName("bbstoreaccounts");
 
 	// Filename for configuration file?
-	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+	std::string configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
 	int logLevel = Log::EVERYTHING;
 	bool machineReadableOutput = false;
 	
