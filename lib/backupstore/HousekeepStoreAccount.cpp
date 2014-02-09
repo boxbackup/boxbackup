@@ -693,6 +693,9 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID,
 	std::auto_ptr<RaidFileWrite> padjustedEntry;
 	// BLOCK
 	{
+		BackupStoreRefCountDatabase::refcount_t refs =
+			mapNewRefs->GetRefCount(ObjectID);
+
 		BackupStoreDirectory::Entry *pentry = rDirectory.FindEntryByID(ObjectID);
 		if(pentry == 0)
 		{
@@ -719,7 +722,17 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID,
 		
 		// Record size
 		deletedFileSizeInBlocks = pentry->GetSizeInBlocks();
-		
+
+		if(refs > 1)
+		{
+			// Not safe to merge patches if someone else has a
+			// reference to this object, so just remove the
+			// directory entry and return.
+			rDirectory.DeleteEntry(ObjectID);
+			mapNewRefs->RemoveReference(ObjectID);
+			return;
+		}
+
 		// If the entry is involved in a chain of patches, it needs to be handled
 		// a bit more carefully.
 		if(pentry->GetDependsNewer() != 0 && pentry->GetDependsOlder() == 0)
@@ -845,23 +858,16 @@ void HousekeepStoreAccount::DeleteFile(int64_t InDirectory, int64_t ObjectID,
 		padjustedEntry.reset();	// delete it now
 	}
 
-	// Drop reference count by one. If it reaches zero, delete the file.
-	if(!mapNewRefs->RemoveReference(ObjectID))
-	{
-		// Delete from disc
-		BOX_TRACE("Removing unreferenced object " <<
-			BOX_FORMAT_OBJECTID(ObjectID));
-		std::string objFilename;
-		MakeObjectFilename(ObjectID, objFilename);
-		RaidFileWrite del(mStoreDiscSet, objFilename, 0);
-		del.Delete();
-	}
-	else
-	{
-		BOX_TRACE("Preserving object " <<
-			BOX_FORMAT_OBJECTID(ObjectID) << " with " <<
-			mapNewRefs->GetRefCount(ObjectID) << " references");
-	}
+	// Drop reference count by one. Must now be zero, to delete the file.
+	ASSERT(!mapNewRefs->RemoveReference(ObjectID))
+
+	// Delete from disc
+	BOX_TRACE("Removing unreferenced object " <<
+		BOX_FORMAT_OBJECTID(ObjectID));
+	std::string objFilename;
+	MakeObjectFilename(ObjectID, objFilename);
+	RaidFileWrite del(mStoreDiscSet, objFilename, 0);
+	del.Delete();
 
 	// Adjust counts for the file
 	++mFilesDeleted;
@@ -1020,16 +1026,21 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 			mBlocksInDirectoriesDelta += adjust;
 		}
 
-		
 		if (mapNewRefs->RemoveReference(dir.GetObjectID()))
 		{
-			// Delete the directory itself
-			RaidFileWrite del(mStoreDiscSet, dirFilename, 0);
-			del.Delete();
+			// Still referenced
+			BOX_TRACE("Housekeeping spared empty deleted dir " <<
+				BOX_FORMAT_OBJECTID(dirId) << " due to " <<
+				mapNewRefs->GetRefCount(dir.GetObjectID()) <<
+				"remaining references");
+			return;
 		}
 
-		BOX_INFO("Housekeeping removed empty deleted dir " <<
+		// Delete the directory itself
+		BOX_INFO("Housekeeping removing empty deleted dir " <<
 			BOX_FORMAT_OBJECTID(dirId));
+		RaidFileWrite del(mStoreDiscSet, dirFilename, 0);
+		del.Delete();
 
 		// And adjust usage counts for the directory that's
 		// just been deleted
