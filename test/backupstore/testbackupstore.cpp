@@ -2432,7 +2432,7 @@ int test_read_old_backupstoreinfo_files()
 	apArchive->Write(apInfo->GetBlocksInDirectories());
 	apArchive->Write(apInfo->GetBlocksSoftLimit());
 	apArchive->Write(apInfo->GetBlocksHardLimit());
-	apArchive->Write(apInfo->GetNumFiles());
+	apArchive->Write(apInfo->GetNumCurrentFiles());
 	apArchive->Write(apInfo->GetNumOldFiles());
 	apArchive->Write(apInfo->GetNumDeletedFiles());
 	apArchive->Write(apInfo->GetNumDirectories());

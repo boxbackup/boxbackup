@@ -410,7 +410,7 @@ int BackupStoreAccountsControl::PrintAccountInfo(int32_t ID)
 	std::cout << FormatUsageLineStart("Client store marker", mMachineReadableOutput) <<
 		info->GetLastObjectIDUsed() << std::endl;
 	std::cout << FormatUsageLineStart("Current Files", mMachineReadableOutput) <<
-		info->GetNumFiles() << std::endl;
+		info->GetNumCurrentFiles() << std::endl;
 	std::cout << FormatUsageLineStart("Old Files", mMachineReadableOutput) <<
 		info->GetNumOldFiles() << std::endl;
 	std::cout << FormatUsageLineStart("Deleted Files", mMachineReadableOutput) <<

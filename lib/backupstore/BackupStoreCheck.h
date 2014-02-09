@@ -206,7 +206,7 @@ private:
 	int64_t mBlocksInOldFiles;
 	int64_t mBlocksInDeletedFiles;
 	int64_t mBlocksInDirectories;
-	int64_t mNumFiles;
+	int64_t mNumCurrentFiles;
 	int64_t mNumOldFiles;
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;

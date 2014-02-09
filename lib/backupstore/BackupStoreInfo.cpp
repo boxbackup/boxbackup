@@ -45,7 +45,7 @@ BackupStoreInfo::BackupStoreInfo()
 	  mBlocksInOldFiles(0),
 	  mBlocksInDeletedFiles(0),
 	  mBlocksInDirectories(0),
-	  mNumFiles(0),
+	  mNumCurrentFiles(0),
 	  mNumOldFiles(0),
 	  mNumDeletedFiles(0),
 	  mNumDirectories(0),
@@ -205,11 +205,11 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 		archive.Read(info->mBlocksInDirectories);
 		archive.Read(info->mBlocksSoftLimit);
 		archive.Read(info->mBlocksHardLimit);
-	  	archive.Read(info->mNumFiles);
-	  	archive.Read(info->mNumOldFiles);
-	  	archive.Read(info->mNumDeletedFiles);
-	  	archive.Read(info->mNumDirectories);
-	  	archive.Read(numDelObj);
+		archive.Read(info->mNumCurrentFiles);
+		archive.Read(info->mNumOldFiles);
+		archive.Read(info->mNumDeletedFiles);
+		archive.Read(info->mNumDirectories);
+		archive.Read(numDelObj);
 	}
 
 	// Then load the list of deleted directories
@@ -362,7 +362,7 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 	archive.Write(mBlocksInDirectories);
 	archive.Write(mBlocksSoftLimit);
 	archive.Write(mBlocksHardLimit);
-	archive.Write(mNumFiles);
+	archive.Write(mNumCurrentFiles);
 	archive.Write(mNumOldFiles);
 	archive.Write(mNumDeletedFiles);
 	archive.Write(mNumDirectories);
@@ -434,7 +434,7 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	COMPARE(BlocksInDirectories);
 	COMPARE(BlocksSoftLimit);
 	COMPARE(BlocksHardLimit);
-	COMPARE(NumFiles);
+	COMPARE(NumCurrentFiles);
 	COMPARE(NumOldFiles);
 	COMPARE(NumDeletedFiles);
 	COMPARE(NumDirectories);
@@ -527,9 +527,9 @@ void BackupStoreInfo::ChangeBlocksInDirectories(int64_t Delta)
 	APPLY_DELTA(mBlocksInDirectories, Delta);
 }
 
-void BackupStoreInfo::AdjustNumFiles(int64_t increase)
+void BackupStoreInfo::AdjustNumCurrentFiles(int64_t increase)
 {
-	APPLY_DELTA(mNumFiles, increase);
+	APPLY_DELTA(mNumCurrentFiles, increase);
 }
 
 void BackupStoreInfo::AdjustNumOldFiles(int64_t increase)

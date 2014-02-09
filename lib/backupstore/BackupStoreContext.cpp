@@ -699,7 +699,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 
 	if(DiffFromFileID == 0)
 	{
-		mapStoreInfo->AdjustNumFiles(1);
+		mapStoreInfo->AdjustNumCurrentFiles(1);
 	}
 	else
 	{
@@ -794,7 +794,7 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 			
 			// Modify the store info, and write
 			// It definitely wasn't an old or deleted version
-			mapStoreInfo->AdjustNumFiles(-1);
+			mapStoreInfo->AdjustNumCurrentFiles(-1);
 			mapStoreInfo->AdjustNumDeletedFiles(1);
 			mapStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
 			

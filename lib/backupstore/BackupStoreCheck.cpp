@@ -58,7 +58,7 @@ BackupStoreCheck::BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNum
 	  mBlocksInOldFiles(0),
 	  mBlocksInDeletedFiles(0),
 	  mBlocksInDirectories(0),
-	  mNumFiles(0),
+	  mNumCurrentFiles(0),
 	  mNumOldFiles(0),
 	  mNumDeletedFiles(0),
 	  mNumDirectories(0)
@@ -764,7 +764,7 @@ void BackupStoreCheck::CheckDirectories()
 
 						if(!en->IsDeleted() && !en->IsOld())
 						{
-							mNumFiles++;
+							mNumCurrentFiles++;
 							mBlocksInCurrentFiles += en->GetSizeInBlocks();
 						}
 					}
