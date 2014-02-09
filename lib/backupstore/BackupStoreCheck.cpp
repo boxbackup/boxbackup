@@ -746,24 +746,27 @@ void BackupStoreCheck::CheckDirectories()
 							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 							" with flags " << en->GetFlags());
 					}
-					// otherwise it's a good file, add to sizes
-					else if(en->IsDeleted()) // even if it's Old,
-					// it's still Deleted, don't count it twice.
+					else // it's a good file, add to sizes
 					{
-						mNumFiles++;
-						mNumDeletedFiles++;
-						mBlocksInDeletedFiles += en->GetSizeInBlocks();
-					}
-					else if(en->IsOld())
-					{
-						mNumFiles++;
-						mNumOldFiles++;
-						mBlocksInOldFiles += en->GetSizeInBlocks();
-					}
-					else
-					{
-						mNumFiles++;
-						mBlocksInCurrentFiles += en->GetSizeInBlocks();
+						// It can be both old and deleted.
+						// If neither, then it's current.
+						if(en->IsDeleted())
+						{
+							mNumDeletedFiles++;
+							mBlocksInDeletedFiles += en->GetSizeInBlocks();
+						}
+
+						if(en->IsOld())
+						{
+							mNumOldFiles++;
+							mBlocksInOldFiles += en->GetSizeInBlocks();
+						}
+
+						if(!en->IsDeleted() && !en->IsOld())
+						{
+							mNumFiles++;
+							mBlocksInCurrentFiles += en->GetSizeInBlocks();
+						}
 					}
 				}
 			}

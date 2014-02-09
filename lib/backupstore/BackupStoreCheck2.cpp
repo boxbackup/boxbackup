@@ -178,6 +178,8 @@ void BackupStoreCheck::CheckUnattachedObjects()
 								RaidFileWrite del(mDiscSetNumber, filename);
 								del.Delete();
 							}
+
+							mBlocksUsed -= pblock->mObjectSizeInBlocks[e];
 							
 							// Move on to next item
 							continue;
@@ -587,47 +589,40 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		++mNumberErrorsFound;
 	}
 
-	BOX_NOTICE("Total files: " << mNumFiles << " (of which "
+	BOX_INFO("Current files: " << mNumFiles << ", "
 		"old files: " << mNumOldFiles << ", "
-		"deleted files: " << mNumDeletedFiles << "), "
+		"deleted files: " << mNumDeletedFiles << ", "
 		"directories: " << mNumDirectories);
 
-	// Minimum soft and hard limits
+	// Minimum soft and hard limits to ensure that nothing gets deleted
+	// by housekeeping.
 	int64_t minSoft = ((mBlocksUsed * 11) / 10) + 1024;
 	int64_t minHard = ((minSoft * 11) / 10) + 1024;
 
-	// Need to do anything?
-	if(pOldInfo.get() != 0 &&
-		mNumberErrorsFound == 0 &&
-		pOldInfo->GetAccountID() == mAccountID)
-	{
-		// Leave the store info as it is, no need to alter it because nothing really changed,
-		// and the only essential thing was that the account ID was correct, which is was.
-		return;
-	}
-	
-	// NOTE: We will always build a new store info, so the client store marker gets changed.
+	int64_t softLimit = pOldInfo.get() ? pOldInfo->GetBlocksSoftLimit() : minSoft;
+	int64_t hardLimit = pOldInfo.get() ? pOldInfo->GetBlocksHardLimit() : minHard;
 
-	// Work out the new limits
-	int64_t softLimit = minSoft;
-	int64_t hardLimit = minHard;
-	if(pOldInfo.get() != 0 && pOldInfo->GetBlocksSoftLimit() > minSoft)
+	if(mNumberErrorsFound && pOldInfo.get())
 	{
-		softLimit = pOldInfo->GetBlocksSoftLimit();
-	}
-	else
-	{
-		BOX_WARNING("Soft limit for account changed to ensure "
-			"housekeeping doesn't delete files on next run.");
-	}
-	if(pOldInfo.get() != 0 && pOldInfo->GetBlocksHardLimit() > minHard)
-	{
-		hardLimit = pOldInfo->GetBlocksHardLimit();
-	}
-	else
-	{
-		BOX_WARNING("Hard limit for account changed to ensure "
-			"housekeeping doesn't delete files on next run.");
+		if(pOldInfo->GetBlocksSoftLimit() > minSoft)
+		{
+			softLimit = pOldInfo->GetBlocksSoftLimit();
+		}
+		else
+		{
+			BOX_WARNING("Soft limit for account changed to ensure "
+				"housekeeping doesn't delete files on next run.");
+		}
+
+		if(pOldInfo->GetBlocksHardLimit() > minHard)
+		{
+			hardLimit = pOldInfo->GetBlocksHardLimit();
+		}
+		else
+		{
+			BOX_WARNING("Hard limit for account changed to ensure "
+				"housekeeping doesn't delete files on next run.");
+		}
 	}
 	
 	// Object ID
@@ -666,6 +661,19 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	info->AdjustNumOldFiles(mNumOldFiles);
 	info->AdjustNumDeletedFiles(mNumDeletedFiles);
 	info->AdjustNumDirectories(mNumDirectories);
+
+	// If there are any errors (apart from wrong block counts), then we
+	// should reset the ClientStoreMarker to zero, which
+	// CreateForRegeneration does. But if there are no major errors, then
+	// we should maintain the old ClientStoreMarker, to avoid invalidating
+	// the client's directory cache.
+	if (pOldInfo.get() && !mNumberErrorsFound)
+	{
+		BOX_INFO("No major errors found, preserving old "
+			"ClientStoreMarker: " <<
+			pOldInfo->GetClientStoreMarker());
+		info->SetClientStoreMarker(pOldInfo->GetClientStoreMarker());
+	}
 
 	if(pOldInfo.get())
 	{
