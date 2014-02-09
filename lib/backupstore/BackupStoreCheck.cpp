@@ -98,7 +98,7 @@ void BackupStoreCheck::Check()
 
 	if(!mQuiet && mFixErrors)
 	{
-		BOX_NOTICE("Will fix errors encountered during checking.");
+		BOX_INFO("Will fix errors encountered during checking.");
 	}
 
 	// Phase 1, check objects
