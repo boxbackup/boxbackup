@@ -355,22 +355,22 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	}
 	catch(...)
 	{
-		LogConnectionStats(id, context.GetAccountName(), server);
+		LogConnectionStats(id, context.GetAccountName(), rStream);
 		throw;
 	}
-	LogConnectionStats(id, context.GetAccountName(), server);
+	LogConnectionStats(id, context.GetAccountName(), rStream);
 	context.CleanUp();
 }
 
 void BackupStoreDaemon::LogConnectionStats(uint32_t accountId,
-	const std::string& accountName, const BackupProtocolServer &server)
+	const std::string& accountName, const SocketStreamTLS &s)
 {
 	// Log the amount of data transferred
 	BOX_NOTICE("Connection statistics for " << 
 		BOX_FORMAT_ACCOUNT(accountId) << " "
 		"(name=" << accountName << "):"
-		" IN="  << server.GetBytesRead() <<
-		" OUT=" << server.GetBytesWritten() <<
-		" NET_IN=" << (server.GetBytesRead() - server.GetBytesWritten()) <<
-		" TOTAL=" << (server.GetBytesRead() + server.GetBytesWritten()));
+		" IN="  << s.GetBytesRead() <<
+		" OUT=" << s.GetBytesWritten() <<
+		" NET_IN=" << (s.GetBytesRead() - s.GetBytesWritten()) <<
+		" TOTAL=" << (s.GetBytesRead() + s.GetBytesWritten()));
 }
