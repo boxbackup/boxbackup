@@ -126,6 +126,20 @@ void BackupStoreContext::ReceivedFinishCommand()
 		// Save the store info, not delayed
 		SaveStoreInfo(false);
 	}
+
+	// Just in case someone wants to reuse a local protocol object,
+	// put the context back to its initial state.
+	mProtocolPhase = BackupStoreContext::Phase_Version;
+
+	// Avoid the need to check version again, by not resetting
+	// mClientHasAccount, mAccountRootDir or mStoreDiscSet
+
+	mReadOnly = true;
+	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
+	mpTestHook = NULL;
+	mapStoreInfo.reset();
+	mapRefCount.reset();
+	ClearDirectoryCache();
 }
 
 
@@ -234,6 +248,7 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -434,11 +449,12 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
-	
+
 	// This is going to be a bit complex to make sure it copes OK
 	// with things going wrong.
 	// The only thing which isn't safe is incrementing the object ID
@@ -461,12 +477,13 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	RaidFileWrite *ppreviousVerStoreFile = 0;
 	bool reversedDiffIsCompletelyDifferent = false;
 	int64_t oldVersionNewBlocksUsed = 0;
+	BackupStoreInfo::Adjustment adjustment = {};
+
 	try
 	{
 		RaidFileWrite storeFile(mStoreDiscSet, fn);
 		storeFile.Open(false /* no overwriting */);
 
-		// size adjustment from use of patch in old file
 		int64_t spaceSavedByConversionToPatch = 0;
 
 		// Diff or full file?
@@ -551,6 +568,17 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 					from->GetDiscUsageInBlocks() - 
 					oldVersionNewBlocksUsed;
 
+				adjustment.mBlocksUsed -= spaceSavedByConversionToPatch;
+				// The code below will change the patch from a
+				// Current file to an Old file, so we need to
+				// account for it as a Current file here.
+				adjustment.mBlocksInCurrentFiles -=
+					spaceSavedByConversionToPatch;
+
+				// Don't adjust anything else here. We'll do it
+				// when we update the directory just below,
+				// which also accounts for non-diff replacements.
+
 				// Everything cleans up here...
 			}
 			catch(...)
@@ -563,11 +591,14 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		
 		// Get the blocks used
 		newObjectBlocksUsed = storeFile.GetDiscUsageInBlocks();
+		adjustment.mBlocksUsed += newObjectBlocksUsed;
+		adjustment.mBlocksInCurrentFiles += newObjectBlocksUsed;
+		adjustment.mNumCurrentFiles++;
 		
 		// Exceeds the hard limit?
-		int64_t newBlocksUsed = mapStoreInfo->GetBlocksUsed() + 
-			newObjectBlocksUsed - spaceSavedByConversionToPatch;
-		if(newBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
+		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() + 
+			adjustment.mBlocksUsed;
+		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
 		{
 			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
 			// The store file will be deleted automatically by the RaidFile object
@@ -607,9 +638,23 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	
 	// Modify the directory -- first make all files with the same name
 	// marked as an old version
-	int64_t blocksInOldFiles = 0;
 	try
 	{
+		// Adjust the entry for the object that we replaced with a
+		// patch, above.
+		BackupStoreDirectory::Entry *poldEntry = NULL;
+
+		if(DiffFromFileID != 0)
+		{
+			// Get old version entry
+			poldEntry = dir.FindEntryByID(DiffFromFileID);
+			ASSERT(poldEntry != 0);
+		
+			// Adjust size of old entry
+			int64_t oldSize = poldEntry->GetSizeInBlocks();
+			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
+		}
+
 		if(MarkFileWithSameNameAsOldVersions)
 		{
 			BackupStoreDirectory::Iterator i(dir);
@@ -629,7 +674,10 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 						e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
 						// Can safely do this, because we know we won't be here if it's already 
 						// an old version
-						blocksInOldFiles += e->GetSizeInBlocks();
+						adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
+						adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
+						adjustment.mNumOldFiles++;
+						adjustment.mNumCurrentFiles--;
 					}
 				}
 			}
@@ -637,33 +685,17 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		
 		// Then the new entry
 		BackupStoreDirectory::Entry *pnewEntry = dir.AddEntry(rFilename,
-				ModificationTime, id, newObjectBlocksUsed,
-				BackupStoreDirectory::Entry::Flags_File,
-				AttributesHash);
+			ModificationTime, id, newObjectBlocksUsed,
+			BackupStoreDirectory::Entry::Flags_File,
+			AttributesHash);
 
-		// Adjust for the patch back stuff?
-		if(DiffFromFileID != 0)
+		// Adjust dependency info of file?
+		if(DiffFromFileID && poldEntry && !reversedDiffIsCompletelyDifferent)
 		{
-			// Get old version entry
-			BackupStoreDirectory::Entry *poldEntry = dir.FindEntryByID(DiffFromFileID);
-			ASSERT(poldEntry != 0);
-		
-			// Adjust dependency info of file?
-			if(!reversedDiffIsCompletelyDifferent)
-			{
-				poldEntry->SetDependsNewer(id);
-				pnewEntry->SetDependsOlder(DiffFromFileID);
-			}
-			
-			// Adjust size of old entry
-			int64_t oldSize = poldEntry->GetSizeInBlocks();
-			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
-			
-			// And adjust blocks used count, for later adjustment
-			newObjectBlocksUsed += (oldVersionNewBlocksUsed - oldSize);
-			blocksInOldFiles += (oldVersionNewBlocksUsed - oldSize);
+			poldEntry->SetDependsNewer(id);
+			pnewEntry->SetDependsOlder(DiffFromFileID);
 		}
-
+			
 		// Write the directory back to disc
 		SaveDirectory(dir, InDirectory);
 
@@ -700,20 +732,15 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	ASSERT(ppreviousVerStoreFile == 0);
 	
 	// Modify the store info
-
-	if(DiffFromFileID == 0)
-	{
-		mapStoreInfo->AdjustNumCurrentFiles(1);
-	}
-	else
-	{
-		mapStoreInfo->AdjustNumOldFiles(1);
-	}
-	
-	mapStoreInfo->ChangeBlocksUsed(newObjectBlocksUsed);
-	mapStoreInfo->ChangeBlocksInCurrentFiles(newObjectBlocksUsed -
-		blocksInOldFiles);
-	mapStoreInfo->ChangeBlocksInOldFiles(blocksInOldFiles);
+	mapStoreInfo->AdjustNumCurrentFiles(adjustment.mNumCurrentFiles);
+	mapStoreInfo->AdjustNumOldFiles(adjustment.mNumOldFiles);
+	mapStoreInfo->AdjustNumDeletedFiles(adjustment.mNumDeletedFiles);
+	mapStoreInfo->AdjustNumDirectories(adjustment.mNumDirectories);
+	mapStoreInfo->ChangeBlocksUsed(adjustment.mBlocksUsed);
+	mapStoreInfo->ChangeBlocksInCurrentFiles(adjustment.mBlocksInCurrentFiles);
+	mapStoreInfo->ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
+	mapStoreInfo->ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
+	mapStoreInfo->ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
 	
 	// Increment reference count on the new directory to one
 	mapRefCount->AddReference(id);
@@ -757,9 +784,6 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 	bool madeChanges = false;
 	rObjectIDOut = 0;		// not found
 
-	// Count of deleted blocks
-	int64_t blocksDel = 0;
-
 	try
 	{
 		// Iterate through directory, only looking at files which haven't been deleted
@@ -772,14 +796,28 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 			if(e->GetName() == rFilename)
 			{
 				// Check that it's definately not already deleted
-				ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) == 0);
+				ASSERT(!e->IsDeleted());
 				// Set deleted flag
 				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
 				// Mark as made a change
 				madeChanges = true;
-				// Can safely do this, because we know we won't be here if it's already 
-				// an old version
-				blocksDel += e->GetSizeInBlocks();
+
+				int64_t blocks = e->GetSizeInBlocks();
+				mapStoreInfo->AdjustNumDeletedFiles(1);
+				mapStoreInfo->ChangeBlocksInDeletedFiles(blocks);
+
+				// We're marking all old versions as deleted.
+				// This is how a file can be old and deleted
+				// at the same time. So we don't subtract from
+				// number or size of old files. But if it was
+				// a current file, then it's not any more, so
+				// we do need to adjust the current counts.
+				if(!e->IsOld())
+				{
+					mapStoreInfo->AdjustNumCurrentFiles(-1);
+					mapStoreInfo->ChangeBlocksInCurrentFiles(-blocks);
+				}
+					
 				// Is this the last version?
 				if((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0)
 				{
@@ -795,13 +833,6 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 		{
 			// Save the directory back
 			SaveDirectory(dir, InDirectory);
-			
-			// Modify the store info, and write
-			// It definitely wasn't an old or deleted version
-			mapStoreInfo->AdjustNumCurrentFiles(-1);
-			mapStoreInfo->AdjustNumDeletedFiles(1);
-			mapStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
-			
 			SaveStoreInfo(false);
 		}
 	}
@@ -874,16 +905,16 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 				}
 			}
 		}
-		
+
 		// Save changes?
 		if(madeChanges)
 		{
 			// Save the directory back
 			SaveDirectory(dir, InDirectory);
-			
+
 			// Modify the store info, and write
 			mapStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
-			
+
 			// Maybe postponed save of store info
 			SaveStoreInfo();
 		}
@@ -933,6 +964,7 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t Objec
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
+
 	if(rDir.GetObjectID() != ObjectID)
 	{
 		THROW_EXCEPTION(BackupStoreException, Internal)
@@ -956,7 +988,7 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t Objec
 
 			// Commit directory
 			writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-			
+
 			// Make sure the size of the directory is available for writing the dir back
 			ASSERT(dirSize > 0);
 			int64_t sizeAdjustment = dirSize - rDir.GetUserInfo1_SizeInBlocks();
@@ -1004,10 +1036,10 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
-	
+
 	// Flags as not already existing
 	rAlreadyExists = false;
-	
+
 	// Get the directory we want to modify
 	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
 
@@ -1037,7 +1069,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 		BackupStoreDirectory emptyDir(id, InDirectory);
 		// add the atttribues
 		emptyDir.SetAttributes(Attributes, AttributesModTime);
-		
+
 		// Write...
 		RaidFileWrite dirFile(mStoreDiscSet, fn);
 		dirFile.Open(false /* no overwriting */);
@@ -1053,7 +1085,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 		mapStoreInfo->ChangeBlocksInDirectories(dirSize);
 		// Not added to cache, so don't set the size in the directory
 	}
-	
+
 	// Then add it into the parent directory
 	try
 	{
@@ -1068,10 +1100,10 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 		// Back out on adding that directory
 		RaidFileWrite del(mStoreDiscSet, fn);
 		del.Delete();
-		
+
 		// Remove this entry from the cache
 		RemoveDirectoryFromCache(InDirectory);
-		
+
 		// Don't worry about the incremented number in the store info
 		throw;	
 	}
@@ -1099,6 +1131,7 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1106,9 +1139,6 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 
 	// Containing directory
 	int64_t InDirectory = 0;
-	
-	// Count of blocks deleted
-	int64_t blocksDeleted = 0;
 
 	try
 	{
@@ -1121,13 +1151,13 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 			InDirectory = dir.GetContainerID();
 		
 			// Depth first delete of contents
-			DeleteDirectoryRecurse(ObjectID, blocksDeleted, Undelete);
+			DeleteDirectoryRecurse(ObjectID, Undelete);
 		}
-		
+
 		// Remove the entry from the directory it's in
 		ASSERT(InDirectory != 0);
 		BackupStoreDirectory &parentDir(GetDirectoryInternal(InDirectory));
-		
+
 		BackupStoreDirectory::Iterator i(parentDir);
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(Undelete?(BackupStoreDirectory::Entry::Flags_Deleted):(BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING),
@@ -1144,18 +1174,16 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 				{
 					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
 				}
-							
+
 				// Save it
 				SaveDirectory(parentDir, InDirectory);
-				
+
 				// Done
 				break;
 			}
 		}
-		
+
 		// Update blocks deleted count
-		mapStoreInfo->ChangeBlocksInDeletedFiles(Undelete?(0 - blocksDeleted):(blocksDeleted));
-		mapStoreInfo->AdjustNumDirectories(-1);
 		SaveStoreInfo(false);
 	}
 	catch(...)
@@ -1173,18 +1201,18 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete)
+void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 {
 	try
 	{
 		// Does things carefully to avoid using a directory in the cache after recursive call
 		// because it may have been deleted.
-		
+
 		// Do sub directories
 		{
 			// Get the directory...
 			BackupStoreDirectory &dir(GetDirectoryInternal(ObjectID));
-			
+
 			// Then scan it for directories
 			std::vector<int64_t> subDirs;
 			BackupStoreDirectory::Iterator i(dir);
@@ -1207,11 +1235,11 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBloc
 					subDirs.push_back(en->GetObjectID());
 				}
 			}
-			
+
 			// Done with the directory for now. Recurse to sub directories
 			for(std::vector<int64_t>::const_iterator i = subDirs.begin(); i != subDirs.end(); ++i)
 			{
-				DeleteDirectoryRecurse((*i), rBlocksDeletedOut, Undelete);	
+				DeleteDirectoryRecurse(*i, Undelete);	
 			}
 		}
 		
@@ -1231,6 +1259,22 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBloc
 			while((en = i.Next(Undelete?(BackupStoreDirectory::Entry::Flags_Deleted):(BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING),
 				Undelete?(0):(BackupStoreDirectory::Entry::Flags_Deleted))) != 0)	// Ignore deleted directories (or not deleted if Undelete)
 			{
+				// Keep count of the deleted blocks
+				if(en->IsFile())
+				{
+					int64_t size = en->GetSizeInBlocks();
+					ASSERT(en->IsDeleted() == Undelete); 
+					// Don't adjust counters for old files,
+					// because it can be both old and deleted.
+					if(!en->IsOld())
+					{
+						mapStoreInfo->ChangeBlocksInCurrentFiles(Undelete ? size : -size);
+						mapStoreInfo->AdjustNumCurrentFiles(Undelete ? 1 : -1);
+					}
+					mapStoreInfo->ChangeBlocksInDeletedFiles(Undelete ? -size : size);
+					mapStoreInfo->AdjustNumDeletedFiles(Undelete ? -1 : 1);
+				}
+
 				// Add/remove the deleted flags
 				if(Undelete)
 				{
@@ -1240,13 +1284,7 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBloc
 				{
 					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
 				}
-							
-				// Keep count of the deleted blocks
-				if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) != 0)
-				{
-					rBlocksDeletedOut += en->GetSizeInBlocks();
-				}
-				
+
 				// Did something
 				changesMade = true;
 			}
