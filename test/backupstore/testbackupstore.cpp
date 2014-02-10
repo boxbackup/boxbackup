@@ -17,6 +17,7 @@
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
+#include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -27,6 +28,7 @@
 #include "BackupStoreFile.h"
 #include "BoxPortsAndFiles.h"
 #include "CollectInBufferStream.h"
+#include "Configuration.h"
 #include "FileStream.h"
 #include "HousekeepStoreAccount.h"
 #include "MemBlockStream.h"
@@ -976,7 +978,70 @@ std::auto_ptr<BackupProtocolClient> test_server_login(const char *hostname,
 	return protocol;
 }
 
-void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
+bool check_num_files(int files, int old, int deleted, int dirs)
+{
+	std::auto_ptr<BackupStoreInfo> apInfo =
+		BackupStoreInfo::Load(0x1234567,
+		"backup/01234567/", 0, true);
+	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(),
+		"current files");
+	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(),
+		"old files");
+	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(),
+		"deleted files");
+	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(),
+		"directories");
+
+	return (files == apInfo->GetNumCurrentFiles() &&
+		old == apInfo->GetNumOldFiles() &&
+		deleted == apInfo->GetNumDeletedFiles() &&
+		dirs == apInfo->GetNumDirectories());
+}
+
+bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
+	int Deleted, int Dirs, int Total)
+{
+	std::auto_ptr<BackupProtocolAccountUsage2> usage =
+		Client.QueryGetAccountUsage2();
+	TEST_EQUAL_LINE(Total, usage->GetBlocksUsed(), "wrong BlocksUsed");
+	TEST_EQUAL_LINE(Current, usage->GetBlocksInCurrentFiles(),
+		"wrong BlocksInCurrentFiles");
+	TEST_EQUAL_LINE(Old, usage->GetBlocksInOldFiles(),
+		"wrong BlocksInOldFiles");
+	TEST_EQUAL_LINE(Deleted, usage->GetBlocksInDeletedFiles(),
+		"wrong BlocksInDeletedFiles");
+	TEST_EQUAL_LINE(Dirs, usage->GetBlocksInDirectories(),
+		"wrong BlocksInDirectories");
+	return (Total == usage->GetBlocksUsed() &&
+		Current == usage->GetBlocksInCurrentFiles() &&
+		Old == usage->GetBlocksInOldFiles() &&
+		Deleted == usage->GetBlocksInDeletedFiles() &&
+		Dirs == usage->GetBlocksInDirectories());
+}
+
+bool check_account(Log::Level log_level = Log::WARNING)
+{
+	int errors_fixed;
+
+	{
+		Logging::Guard guard(log_level);
+		Logging::Tagger tag("check fix", true);
+		Logging::ShowTagOnConsole show;
+		std::string errs;
+		std::auto_ptr<Configuration> config(
+			Configuration::LoadAndVerify("testfiles/bbstored.conf",
+				&BackupConfigFileVerify, errs));
+		BackupStoreAccountsControl control(*config);
+		errors_fixed = control.CheckAccount(0x01234567,
+			true, // FixErrors
+			false); // Quiet
+	}
+	TEST_EQUAL_LINE(0, errors_fixed, "store errors found and fixed");
+
+	return (errors_fixed == 0);
+}
+
+int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 {
 	std::string rootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
 	int discSet = rAccount.GetDiscSet();
@@ -985,6 +1050,7 @@ void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
 		discSet, NULL);
 	housekeeping.DoHousekeeping(true /* keep trying forever */);
+	return housekeeping.GetErrorCount();
 }
 
 // Run housekeeping (for which we need to disconnect ourselves) and check
@@ -992,22 +1058,26 @@ void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 //
 // Also check that bbstoreaccounts doesn't change anything
 
-void run_housekeeping_and_check_account(const char *hostname,
-	TLSContext& rContext, std::auto_ptr<SocketStreamTLS>& rapConn,
-	std::auto_ptr<BackupProtocolClient>& rapProtocol)
+bool run_housekeeping_and_check_account()
 {
-	rapProtocol->QueryFinished();
-	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	BackupStoreAccountDatabase::Entry account =
-		apAccounts->GetEntry(0x1234567);
-	run_housekeeping(account);
+	int error_count;
 
-	TEST_THAT(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf check 01234567 fix") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	{
+		Logging::Tagger tag("", true);
+		Logging::ShowTagOnConsole show;
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		BackupStoreAccountDatabase::Entry account =
+			apAccounts->GetEntry(0x1234567);
+		error_count = run_housekeeping(account);
+	}
 
-	rapProtocol = test_server_login(hostname, rContext, rapConn);
+	TEST_EQUAL_LINE(0, error_count, "housekeeping errors");
+
+	bool check_account_is_ok = check_account();
+	TEST_THAT(check_account_is_ok);
+
+	return error_count == 0 && check_account_is_ok;
 }
 
 int test_server(const char *hostname)
@@ -1082,25 +1152,11 @@ int test_server(const char *hostname)
 
 		test_server_1(*apProtocol, protocolReadOnly);
 
-		#define TEST_NUM_FILES(files, old, deleted, dirs) \
-		{ \
-			std::auto_ptr<BackupStoreInfo> apInfo = \
-				BackupStoreInfo::Load(0x1234567, \
-				"backup/01234567/", 0, true); \
-			TEST_EQUAL_LINE(files, apInfo->GetNumFiles(), \
-				"num files"); \
-			TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(), \
-				"old files"); \
-			TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(), \
-				"deleted files"); \
-			TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(), \
-				"directories"); \
-		}
-
-		TEST_NUM_FILES(1, 0, 0, 1);
-		run_housekeeping_and_check_account(hostname, context,
-			conn, apProtocol);
-		TEST_NUM_FILES(1, 0, 0, 1);
+		apProtocol->QueryFinished();
+		TEST_THAT(check_num_files(1, 0, 0, 1));
+		TEST_THAT(run_housekeeping_and_check_account());
+		TEST_THAT(check_num_files(1, 0, 0, 1));
+		apProtocol = test_server_login("localhost", context, conn);
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
@@ -1132,16 +1188,29 @@ int test_server(const char *hostname)
 			BOX_TRACE("wrote file " << filename << " to server "
 				"as object " <<
 				BOX_FORMAT_OBJECTID(stored->GetObjectID()));
-			TEST_NUM_FILES(t + 2, 0, 0, 1);
 
-			run_housekeeping_and_check_account(hostname, context,
-				conn, apProtocol);
-			TEST_NUM_FILES(t + 2, 0, 0, 1);
+			// Some of the uploaded files replace old ones, increasing
+			// the old file count instead of the current file count.
+			int expected_num_old_files = 0;
+			if (t >= 8) expected_num_old_files++;
+			if (t >= 12) expected_num_old_files++;
+			if (t >= 13) expected_num_old_files++;
+			int expected_num_current_files = t + 2 - expected_num_old_files;
+
+			TEST_THAT(check_num_files(expected_num_current_files,
+				expected_num_old_files, 0, 1));
+
+			apProtocol->QueryFinished();
+			TEST_THAT(run_housekeeping_and_check_account());
+			apProtocol = test_server_login("localhost", context, conn);
+
+			TEST_THAT(check_num_files(expected_num_current_files,
+				expected_num_old_files, 0, 1));
 		}
 
 		// Add some attributes onto one of them
 		{
-			TEST_NUM_FILES(UPLOAD_NUM + 1, 0, 0, 1);
+			TEST_THAT(check_num_files(UPLOAD_NUM + 1, 0, 0, 1));
 			std::auto_ptr<IOStream> attrnew(
 				new MemBlockStream(attr3, sizeof(attr3)));
 			std::auto_ptr<BackupProtocolSuccess> set(apProtocol->QuerySetReplacementFileAttributes(
@@ -1150,7 +1219,7 @@ int test_server(const char *hostname)
 				uploads[UPLOAD_ATTRS_EN].name,
 				attrnew));
 			TEST_THAT(set->GetObjectID() == uploads[UPLOAD_ATTRS_EN].allocated_objid);
-			TEST_NUM_FILES(UPLOAD_NUM + 1, 0, 0, 1);
+			TEST_THAT(check_num_files(UPLOAD_NUM + 1, 0, 0, 1));
 		}
 		
 		// Delete one of them (will implicitly delete an old version)
@@ -1159,7 +1228,7 @@ int test_server(const char *hostname)
 				BackupProtocolListDirectory::RootDirectory,
 				uploads[UPLOAD_DELETE_EN].name));
 			TEST_THAT(del->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
-			TEST_NUM_FILES(UPLOAD_NUM, 0, 1, 1);
+			TEST_THAT(check_num_files(UPLOAD_NUM, 0, 1, 1));
 		}
 
 		// Check that the block index can be obtained by name even though it's been deleted
@@ -1220,7 +1289,7 @@ int test_server(const char *hostname)
 			::free(buf);
 		}
 
-		TEST_NUM_FILES(UPLOAD_NUM, 0, 1, 1);
+		TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 1, 1));
 
 		// Run housekeeping (for which we need to disconnect
 		// ourselves) and check that it doesn't change the numbers
@@ -1239,7 +1308,7 @@ int test_server(const char *hostname)
 
 		apProtocol = test_server_login(hostname, context, conn);
 
-		TEST_NUM_FILES(UPLOAD_NUM, 0, 1, 1);
+		TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 1, 1));
 
 		{
 			// Fetch the block index for this one
@@ -1294,8 +1363,7 @@ int test_server(const char *hostname)
 			BackupStoreFile::DecodeFile(*filestream, TEST_FILE_FOR_PATCHING ".downloaded", IOStream::TimeOutInfinite);
 			// Check it's the same
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
-
-			TEST_NUM_FILES(UPLOAD_NUM, 1, 1, 1);
+			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 1));
 		}
 
 		// Create a directory
@@ -1310,8 +1378,7 @@ int test_server(const char *hostname)
 				9837429842987984LL, dirname, attr));
 			subdirid = dirCreate->GetObjectID(); 
 			TEST_THAT(subdirid == maxID + 1);
-
-			TEST_NUM_FILES(UPLOAD_NUM, 1, 1, 2);
+			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 2));
 		}
 
 		set_refcount(subdirid, 1);
@@ -1332,7 +1399,7 @@ int test_server(const char *hostname)
 				upload));
 			subdirfileid = stored->GetObjectID();
 
-			TEST_NUM_FILES(UPLOAD_NUM + 1, 1, 1, 2);
+			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 2));
 		}
 
 		set_refcount(subdirfileid, 1);
