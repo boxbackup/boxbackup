@@ -55,15 +55,17 @@
 // --------------------------------------------------------------------------
 BackupStoreContext::BackupStoreContext(int32_t ClientID,
 	HousekeepingInterface &rDaemon, const std::string& rConnectionDetails)
-	: mConnectionDetails(rConnectionDetails),
-	  mClientID(ClientID),
-	  mrDaemon(rDaemon),
-	  mProtocolPhase(Phase_START),
-	  mClientHasAccount(false),
-	  mStoreDiscSet(-1),
-	  mReadOnly(true),
-	  mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
-	  mpTestHook(NULL)
+: mConnectionDetails(rConnectionDetails),
+  mClientID(ClientID),
+  mrDaemon(rDaemon),
+  mProtocolPhase(Phase_START),
+  mClientHasAccount(false),
+  mStoreDiscSet(-1),
+  mReadOnly(true),
+  mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+  mpTestHook(NULL)
+// If you change the initialisers, be sure to update
+// BackupStoreContext::ReceivedFinishCommand as well!
 {
 }
 
