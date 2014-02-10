@@ -168,6 +168,7 @@ private:
 	void SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID);
 	void RemoveDirectoryFromCache(int64_t ObjectID);
 	void DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete);
+	void ClearDirectoryCache();
 	int64_t AllocateObjectID();
 
 	std::string mConnectionDetails;

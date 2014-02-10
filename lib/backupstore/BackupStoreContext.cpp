@@ -79,13 +79,19 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
 // --------------------------------------------------------------------------
 BackupStoreContext::~BackupStoreContext()
 {
+	ClearDirectoryCache();
+}
+
+void BackupStoreContext::ClearDirectoryCache()
+{
 	// Delete the objects in the cache
-	for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin()); i != mDirectoryCache.end(); ++i)
+	for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin());
+		i != mDirectoryCache.end(); ++i)
 	{
 		delete (i->second);
 	}
+	mDirectoryCache.clear();
 }
-
 
 // --------------------------------------------------------------------------
 //
@@ -321,11 +327,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 	if(mDirectoryCache.size() > MAX_CACHE_SIZE)
 	{
 		// Very simple. Just delete everything!
-		for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin()); i != mDirectoryCache.end(); ++i)
-		{
-			delete (i->second);
-		}
-		mDirectoryCache.clear();
+		ClearDirectoryCache();
 	}
 
 	// Get a RaidFileRead to read it
