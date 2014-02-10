@@ -1803,8 +1803,7 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 		}
 
 		BOX_NOTICE("SyncAllowScript requested a delay of " << 
-			waitInSeconds << " seconds due to SyncAllowScript "
-			<< "(" << script << ")");
+			waitInSeconds << " seconds (" << script << ")");
 	}
 
 	if(iss.eof())
