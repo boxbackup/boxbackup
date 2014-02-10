@@ -152,6 +152,20 @@ public:
 		int64_t BlockSoftLimit, int64_t BlockHardLimit,
 		bool AccountEnabled, IOStream& ExtraData);
 
+	typedef struct
+	{
+		int64_t mLastObjectIDUsed;
+		int64_t mBlocksUsed;
+		int64_t mBlocksInCurrentFiles;
+		int64_t mBlocksInOldFiles;
+		int64_t mBlocksInDeletedFiles;
+		int64_t mBlocksInDirectories;
+		int64_t mNumCurrentFiles;
+		int64_t mNumOldFiles;
+		int64_t mNumDeletedFiles;
+		int64_t mNumDirectories;
+	} Adjustment;
+
 private:
 	// Location information
 	// Be VERY careful about changing types of these values, as
