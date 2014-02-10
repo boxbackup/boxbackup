@@ -88,7 +88,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	if(errno != EWOULDBLOCK)
 	{
 		// Not the expected error
-		THROW_EXCEPTION(CommonException, OSFileError)
+		THROW_SYS_FILE_ERROR("Failed to open lockfile", rFilename,
+			CommonException, OSFileError);
 	}
 
 	return false;
@@ -96,8 +97,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	int fd = ::open(rFilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd == -1)
 	{
-		BOX_WARNING("Failed to open lockfile: " << rFilename);
-		THROW_EXCEPTION(CommonException, OSFileError)
+		THROW_SYS_FILE_ERROR("Failed to open lockfile", rFilename,
+			CommonException, OSFileError);
 	}
 
 #ifdef HAVE_FLOCK
@@ -110,7 +111,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		}
 		else
 		{
-			THROW_EXCEPTION(CommonException, OSFileError)
+			THROW_SYS_FILE_ERROR("Failed to lock lockfile with flock()",
+				rFilename, CommonException, OSFileError);
 		}
 	}
 #elif HAVE_DECL_F_SETLK
@@ -128,7 +130,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		}
 		else
 		{
-			THROW_EXCEPTION(CommonException, OSFileError)
+			THROW_SYS_FILE_ERROR("Failed to lock lockfile with fcntl()",
+				rFilename, CommonException, OSFileError);
 		}
 	}
 #endif
