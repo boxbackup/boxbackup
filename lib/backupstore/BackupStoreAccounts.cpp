@@ -408,7 +408,7 @@ int BackupStoreAccountsControl::PrintAccountInfo(int32_t ID)
 		BlockSizeToString(info->GetBlocksHardLimit(),
 			info->GetBlocksHardLimit(), discSetNum) << std::endl;
 	std::cout << FormatUsageLineStart("Client store marker", mMachineReadableOutput) <<
-		info->GetLastObjectIDUsed() << std::endl;
+		info->GetClientStoreMarker() << std::endl;
 	std::cout << FormatUsageLineStart("Current Files", mMachineReadableOutput) <<
 		info->GetNumCurrentFiles() << std::endl;
 	std::cout << FormatUsageLineStart("Old Files", mMachineReadableOutput) <<
