@@ -50,6 +50,14 @@
 
 #define ENCFILE_SIZE	2765
 
+// Make some test attributes
+#define ATTR1_SIZE 	245
+#define ATTR2_SIZE 	23
+#define ATTR3_SIZE 	122
+int attr1[ATTR1_SIZE];
+int attr2[ATTR2_SIZE];
+int attr3[ATTR3_SIZE];
+
 typedef struct
 {
 	BackupStoreFilenameClear fn;
@@ -738,6 +746,8 @@ bool check_files_same(const char *f1, const char *f2)
 	return same;
 }
 
+bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
+	int Deleted, int Dirs, int Total);
 
 void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protocolReadOnly)
 {
@@ -792,17 +802,8 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		root_dir_fn, false /* EnsureDirectoryExists */);
 	std::auto_ptr<RaidFileRead> storedFile(RaidFileRead::Open(0, root_dir_fn));
 	int root_dir_blocks = storedFile->GetDiscUsageInBlocks();
-	std::auto_ptr<BackupProtocolAccountUsage> usage;
-	usage = protocol.QueryGetAccountUsage();
-
-	TEST_EQUAL_LINE(root_dir_blocks, usage->GetBlocksUsed(),
-		"wrong BlocksUsed");
-	TEST_EQUAL_LINE(0, usage->GetBlocksInOldFiles(),
-		"wrong BlocksInOldFiles");
-	TEST_EQUAL_LINE(0, usage->GetBlocksInDeletedFiles(), 
-		"wrong BlocksInDeletedFiles");
-	TEST_EQUAL_LINE(root_dir_blocks, usage->GetBlocksInDirectories(),
-		"wrong BlocksInDirectories");
+	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
+		root_dir_blocks));
 
 	// Store a file -- first make the encoded file
 	BackupStoreFilenameClear store1name("file1");
@@ -921,16 +922,8 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		file1_fn, false /* EnsureDirectoryExists */);
 	storedFile = RaidFileRead::Open(0, file1_fn);
 	int file1_blocks = storedFile->GetDiscUsageInBlocks();
-
-	usage = protocol.QueryGetAccountUsage();
-	TEST_EQUAL_LINE(root_dir_blocks + file1_blocks, usage->GetBlocksUsed(),
-		"wrong BlocksUsed");
-	TEST_EQUAL_LINE(0, usage->GetBlocksInOldFiles(),
-		"wrong BlocksInOldFiles");
-	TEST_EQUAL_LINE(0, usage->GetBlocksInDeletedFiles(), 
-		"wrong BlocksInDeletedFiles");
-	TEST_EQUAL_LINE(root_dir_blocks,
-		usage->GetBlocksInDirectories(), "wrong BlocksInDirectories");
+	TEST_THAT(check_num_blocks(protocol, file1_blocks, 0, 0, root_dir_blocks,
+		file1_blocks + root_dir_blocks));
 
 	// Try using GetFile on a directory
 	{
@@ -1080,6 +1073,44 @@ bool run_housekeeping_and_check_account()
 	return error_count == 0 && check_account_is_ok;
 }
 
+int64_t create_directory(BackupProtocolCallable& protocol)
+{
+	// Create a directory
+	BackupStoreFilenameClear dirname("lovely_directory");
+	// Attributes
+	std::auto_ptr<IOStream> attr(new MemBlockStream(attr1, sizeof(attr1)));
+
+	std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		9837429842987984LL, dirname, attr));
+
+	int64_t subdirid = dirCreate->GetObjectID(); 
+	set_refcount(subdirid, 1);
+	return subdirid;
+}
+
+int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid)
+{
+	// Stick a file in it
+	write_test_file(0);
+	std::string filename("testfiles/test0");
+	int64_t modtime;
+	std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(filename,
+		subdirid, uploads[0].name, &modtime));
+
+	std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
+		subdirid,
+		modtime,
+		modtime, /* use for attr hash too */
+		0,							/* diff from ID */
+		uploads[0].name,
+		upload));
+
+	int64_t subdirfileid = stored->GetObjectID();
+	set_refcount(subdirfileid, 1);
+	return subdirfileid;
+}
+
 int test_server(const char *hostname)
 {
 	TLSContext context;
@@ -1087,13 +1118,6 @@ int test_server(const char *hostname)
 	std::auto_ptr<BackupProtocolClient> apProtocol =
 		test_server_login(hostname, context, conn);
 
-	// Make some test attributes
-	#define ATTR1_SIZE 	245
-	#define ATTR2_SIZE 	23
-	#define ATTR3_SIZE 	122
-	int attr1[ATTR1_SIZE];
-	int attr2[ATTR2_SIZE];
-	int attr3[ATTR3_SIZE];
 	{
 		R250 r(3465657);
 		for(int l = 0; l < ATTR1_SIZE; ++l) {attr1[l] = r.next();}
@@ -1367,42 +1391,12 @@ int test_server(const char *hostname)
 		}
 
 		// Create a directory
-		int64_t subdirid = 0;
-		BackupStoreFilenameClear dirname("lovely_directory");
-		{
-			// Attributes
-			std::auto_ptr<IOStream> attr(
-				new MemBlockStream(attr1, sizeof(attr1)));
-			std::auto_ptr<BackupProtocolSuccess> dirCreate(apProtocol->QueryCreateDirectory(
-				BackupProtocolListDirectory::RootDirectory,
-				9837429842987984LL, dirname, attr));
-			subdirid = dirCreate->GetObjectID(); 
-			TEST_THAT(subdirid == maxID + 1);
-			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 2));
-		}
-
-		set_refcount(subdirid, 1);
+		int64_t subdirid = create_directory(*apProtocol);
+		TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 2));
 
 		// Stick a file in it
-		int64_t subdirfileid = 0;
-		{
-			std::string filename("testfiles/test0");
-			int64_t modtime;
-			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(filename.c_str(), subdirid, uploads[0].name, &modtime));
-
-			std::auto_ptr<BackupProtocolSuccess> stored(apProtocol->QueryStoreFile(
-				subdirid,
-				modtime,
-				modtime, /* use for attr hash too */
-				0,							/* diff from ID */
-				uploads[0].name,
-				upload));
-			subdirfileid = stored->GetObjectID();
-
-			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 2));
-		}
-
-		set_refcount(subdirfileid, 1);
+		int64_t subdirfileid = create_file(*apProtocol, subdirid);
+		TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 1, 2));
 
 		printf("\n==== Checking upload using read-only connection\n");
 		// Check the directories on the read only connection
@@ -1421,6 +1415,8 @@ int test_server(const char *hostname)
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *en = 0;
 			BackupStoreDirectory::Entry *t = 0;
+			BackupStoreFilenameClear dirname("lovely_directory");
+
 			while((t = i.Next()) != 0)
 			{
 				if(en != 0)
