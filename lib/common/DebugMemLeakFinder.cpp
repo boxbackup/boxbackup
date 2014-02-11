@@ -155,7 +155,17 @@ void *memleakfinder_malloc(size_t size, const char *file, int line)
 	InternalAllocGuard guard;
 
 	void *b = std::malloc(size);
-	if(!memleakfinder_global_enable) return b;
+
+	if(!memleakfinder_global_enable)
+	{
+		// We may not be tracking this allocation, but if
+		// someone realloc()s the buffer later then it will
+		// trigger an untracked buffer warning, which we don't
+		// want to see either.
+		memleakfinder_notaleak(b);
+		return b;
+	}
+
 	if(!memleakfinder_initialised)   return b;
 
 	memleakfinder_malloc_add_block(b, size, file, line);
@@ -176,25 +186,58 @@ void *memleakfinder_calloc(size_t blocks, size_t size, const char *file, int lin
 
 void *memleakfinder_realloc(void *ptr, size_t size)
 {
+	if(!ptr)
+	{
+		return memleakfinder_malloc(size, "realloc", 0);
+	}
+
+	if(!size)
+	{
+		memleakfinder_free(ptr);
+		return NULL;
+	}
+
 	InternalAllocGuard guard;
+
+	ASSERT(ptr != NULL);
+	if(!ptr) return NULL; // defensive
 
 	if(!memleakfinder_global_enable || !memleakfinder_initialised)
 	{
-		return std::realloc(ptr, size);
+		ptr = std::realloc(ptr, size);
+		if(!memleakfinder_global_enable)
+		{
+			// We may not be tracking this allocation, but if
+			// someone realloc()s the buffer later then it will
+			// trigger an untracked buffer warning, which we don't
+			// want to see either.
+			memleakfinder_notaleak(ptr);
+		}
+		return ptr;
 	}
 
 	// Check it's been allocated
 	std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
-	if(ptr && i == sMallocBlocks.end())
+	std::set<void *>::iterator j(sNotLeaks.find(ptr));
+
+	if(i == sMallocBlocks.end() && j == sNotLeaks.end())
 	{
 		BOX_WARNING("Block " << ptr << " realloc()ated, but not "
 			"in list. Error? Or allocated in startup static "
 			"objects?");
 	}
 
+	if(j != sNotLeaks.end())
+	{
+		// It's in the list of not-leaks, so don't warn about it,
+		// but it's being reallocated, so remove it from the list too,
+		// in case it's reassigned, and add the new block below.
+		sNotLeaks.erase(j);
+	}
+
 	void *b = std::realloc(ptr, size);
 
-	if(ptr && i!=sMallocBlocks.end())
+	if(i != sMallocBlocks.end())
 	{
 		// Worked?
 		if(b != 0)
@@ -230,9 +273,18 @@ void memleakfinder_free(void *ptr)
 	{
 		// Check it's been allocated
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
+		std::set<void *>::iterator j(sNotLeaks.find(ptr));
+
 		if(i != sMallocBlocks.end())
 		{
 			sMallocBlocks.erase(i);
+		}
+		else if(j != sNotLeaks.end())
+		{
+			// It's in the list of not-leaks, so don't warn
+			// about it, but it's being freed, so remove it
+			// from the list too, in case it's reassigned.
+			sNotLeaks.erase(j);
 		}
 		else
 		{
@@ -284,7 +336,8 @@ void memleakfinder_notaleak(void *ptr)
 	ASSERT(!sTrackingDataDestroyed);
 
 	memleakfinder_notaleak_insert_pre();
-	if(memleakfinder_global_enable && memleakfinder_initialised)
+
+	if(memleakfinder_initialised)
 	{
 		sNotLeaks.insert(ptr);
 	}
@@ -294,7 +347,9 @@ void memleakfinder_notaleak(void *ptr)
 			 sizeof(sNotLeaksPre)/sizeof(*sNotLeaksPre) )
 			sNotLeaksPre[sNotLeaksPreNum++] = ptr;
 	}
-/*	{
+
+	/*
+	{
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
 		if(i != sMallocBlocks.end()) sMallocBlocks.erase(i);
 	}
@@ -637,7 +692,7 @@ void *operator new(size_t size)
 }
 */
 
-void *operator new[](size_t size)
+void *operator new[](size_t size) throw (std::bad_alloc)
 {
 	return internal_new(size, "standard libraries", 0);
 }
