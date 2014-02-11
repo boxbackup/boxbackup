@@ -749,7 +749,7 @@ int test(int argc, const char *argv[])
 #endif // BOX_RELEASE_BUILD
 
 		// Fix it
-		RUN_CHECK_INTERNAL(3);
+		RUN_CHECK_INTERNAL(4);
 
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE 
