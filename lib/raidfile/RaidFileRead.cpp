@@ -740,7 +740,7 @@ int RaidFileRead_Raid::ReadRecovered(void *pBuffer, int NBytes)
 				// Go XORing!
 				unsigned int *b1 = (unsigned int*)mRecoveryBuffer;
 				unsigned int *b2 = (unsigned int *)(mRecoveryBuffer + mBlockSize);
-				if((mStripe1Handle == -1))
+				if(mStripe1Handle == -1)
 				{
 					b1 = b2;
 					b2 = (unsigned int*)mRecoveryBuffer;
