@@ -426,7 +426,6 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 
 	COMPARE(AccountID);
 	COMPARE(AccountName);
-	COMPARE(LastObjectIDUsed);
 	COMPARE(BlocksUsed);
 	COMPARE(BlocksInCurrentFiles);
 	COMPARE(BlocksInOldFiles);
@@ -440,6 +439,15 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	COMPARE(NumDirectories);
 
 	#undef COMPARE
+
+	if (rOldInfo.GetLastObjectIDUsed() != GetLastObjectIDUsed())
+	{
+		BOX_NOTICE("LastObjectIDUsed changed from " <<
+			rOldInfo.GetLastObjectIDUsed() << " to " <<
+			GetLastObjectIDUsed());
+		// Not important enough to be an error
+		// numChanges++;
+	}
 
 	return numChanges;
 }
