@@ -63,7 +63,7 @@ MemBlockStream::MemBlockStream(const std::string& rMessage)
 {
 	mTempBuffer.Write(rMessage.c_str(), rMessage.size());
 	mTempBuffer.SetForReading();
-	mpBuffer = mTempBuffer.GetBuffer();
+	mpBuffer = (const char *)(mTempBuffer.GetBuffer());
 	mBytesInBuffer = rMessage.size();
 	ASSERT(mpBuffer != 0);
 	ASSERT(mBytesInBuffer >= 0);
