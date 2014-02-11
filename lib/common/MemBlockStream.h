@@ -29,6 +29,7 @@ class MemBlockStream : public IOStream
 public:
 	MemBlockStream();
 	MemBlockStream(const void *pBuffer, int Size);
+	MemBlockStream(const std::string& rMessage);
 	MemBlockStream(const StreamableMemBlock &rBlock);
 	MemBlockStream(const CollectInBufferStream &rBuffer);
 	MemBlockStream(const MemBlockStream &rToCopy);
@@ -46,6 +47,9 @@ public:
 	virtual int GetSize() const { return mBytesInBuffer; }
 
 private:
+	// Use mTempBuffer when we need to hold a copy of the memory block,
+	// and free it ourselves when done.
+	CollectInBufferStream mTempBuffer;
 	const char *mpBuffer;
 	int mBytesInBuffer;
 	int mReadPosition;
