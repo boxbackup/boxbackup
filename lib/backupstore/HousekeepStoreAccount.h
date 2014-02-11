@@ -14,8 +14,9 @@
 #include <set>
 #include <vector>
 
+#include "BackupStoreRefCountDatabase.h"
+
 class BackupStoreDirectory;
-class BackupStoreRefCountDatabase;
 
 class HousekeepingCallback
 {
@@ -48,10 +49,11 @@ private:
 
 	bool ScanDirectory(int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteFiles(BackupStoreInfo& rBackupStoreInfo);
-	bool DeleteEmptyDirectories();
-	void DeleteEmptyDirectory(int64_t dirId,
-		std::vector<int64_t>& rToExamine);
-	void DeleteFile(int64_t InDirectory, int64_t ObjectID,
+	bool DeleteEmptyDirectories(BackupStoreInfo& rBackupStoreInfo);
+	void DeleteEmptyDirectory(int64_t dirId, std::vector<int64_t>& rToExamine,
+		BackupStoreInfo& rBackupStoreInfo);
+	BackupStoreRefCountDatabase::refcount_t DeleteFile(int64_t InDirectory,
+		int64_t ObjectID,
 		BackupStoreDirectory &rDirectory,
 		const std::string &rDirectoryFilename,
 		int64_t OriginalDirSizeInBlocks,
