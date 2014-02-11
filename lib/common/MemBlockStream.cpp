@@ -52,6 +52,26 @@ MemBlockStream::MemBlockStream(const void *pBuffer, int Size)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    MemBlockStream::MemBlockStream(const std::string& rMessage)
+//		Purpose: Convenience constructor for sending a simple string.
+//			 Copies the string, so you can pass a temporary in.
+//		Created: 2014/01/20
+//
+// --------------------------------------------------------------------------
+MemBlockStream::MemBlockStream(const std::string& rMessage)
+: mReadPosition(0)
+{
+	mTempBuffer.Write(rMessage.c_str(), rMessage.size());
+	mTempBuffer.SetForReading();
+	mpBuffer = mTempBuffer.GetBuffer();
+	mBytesInBuffer = rMessage.size();
+	ASSERT(mpBuffer != 0);
+	ASSERT(mBytesInBuffer >= 0);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    MemBlockStream::MemBlockStream(const StreamableMemBlock &)
 //		Purpose: Constructor (doesn't copy block, careful with lifetimes)
 //		Created: 2003/09/05
