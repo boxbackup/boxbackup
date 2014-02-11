@@ -446,7 +446,7 @@ int test(int argc, const char *argv[])
 	}
 
 	// Test the backupstore directory fixing
-	// FIXME reenable: test_dir_fixing();
+	test_dir_fixing();
 
 	// Initialise the raidfile controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
