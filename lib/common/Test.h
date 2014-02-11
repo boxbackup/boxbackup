@@ -51,6 +51,14 @@ extern std::list<std::string> run_only_named_tests;
 
 #define TEST_THAT(condition) {if(!(condition)) TEST_FAIL_WITH_MESSAGE("Condition [" #condition "] failed")}
 #define TEST_THAT_ABORTONFAIL(condition) {if(!(condition)) TEST_ABORT_WITH_MESSAGE("Condition [" #condition "] failed")}
+#define TEST_THAT_THROWONFAIL(condition) \
+	{ \
+		if(!(condition)) \
+		{ \
+			THROW_EXCEPTION_MESSAGE(CommonException, \
+				AssertFailed, "Condition [" #condition "] failed"); \
+		} \
+	}
 
 // NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
 #define TEST_CHECK_THROWS(statement, excepttype, subtype) \
