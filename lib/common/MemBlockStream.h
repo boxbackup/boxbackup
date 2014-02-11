@@ -10,10 +10,10 @@
 #ifndef MEMBLOCKSTREAM__H
 #define MEMBLOCKSTREAM__H
 
+#include "CollectInBufferStream.h"
 #include "IOStream.h"
 
 class StreamableMemBlock;
-class CollectInBufferStream;
 
 // --------------------------------------------------------------------------
 //
