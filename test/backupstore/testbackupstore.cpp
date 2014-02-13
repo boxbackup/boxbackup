@@ -1645,8 +1645,7 @@ int test_server(const char *hostname)
 
 			// Attributes
 			TEST_THAT(dir.HasAttributes());
-			TEST_EQUAL(FAKE_ATTR_MODIFICATION_TIME,
-				dir.GetAttributesModTime());
+			TEST_EQUAL(9837429842987984LL, dir.GetAttributesModTime());
 			StreamableMemBlock attr(attr1, sizeof(attr1));
 			TEST_THAT(dir.GetAttributes() == attr);
 		}
