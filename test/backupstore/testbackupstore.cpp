@@ -717,7 +717,7 @@ void check_dir_after_uploads(BackupProtocolClient &protocol, const StreamableMem
 	TEST_THAT(dirreply->GetObjectID() == BackupProtocolListDirectory::RootDirectory);
 	// Stream
 	BackupStoreDirectory dir(protocol.ReceiveStream());
-	TEST_THAT(dir.GetNumberOfEntries() == UPLOAD_NUM + 1 /* for the first test file */);
+	TEST_EQUAL(UPLOAD_NUM, dir.GetNumberOfEntries());
 	TEST_THAT(!dir.HasAttributes());
 
 	// Check them!
@@ -730,13 +730,22 @@ void check_dir_after_uploads(BackupProtocolClient &protocol, const StreamableMem
 	{
 		en = i.Next();
 		TEST_THAT(en != 0);
-		TEST_THAT(en->GetName() == uploads[t].name);
-		TEST_THAT(en->GetObjectID() == uploads[t].allocated_objid);
-		TEST_THAT(en->GetModificationTime() == uploads[t].mod_time);
+		if (en == 0) continue;
+		TEST_LINE(uploads[t].name == en->GetName(),
+			"uploaded file " << t << " name");
+		BackupStoreFilenameClear clear(en->GetName());
+		TEST_EQUAL_LINE(uploads[t].name.GetClearFilename(),
+			clear.GetClearFilename(),
+			"uploaded file " << t << " name");
+		TEST_EQUAL_LINE(uploads[t].allocated_objid, en->GetObjectID(),
+			"uploaded file " << t << " ID");
+		TEST_EQUAL_LINE(uploads[t].mod_time, en->GetModificationTime(),
+			"uploaded file " << t << " modtime");
 		int correct_flags = BackupProtocolListDirectory::Flags_File;
 		if(uploads[t].should_be_old_version) correct_flags |= BackupProtocolListDirectory::Flags_OldVersion;
 		if(uploads[t].delete_file) correct_flags |= BackupProtocolListDirectory::Flags_Deleted;
-		TEST_THAT(en->GetFlags() == correct_flags);
+		TEST_EQUAL_LINE(correct_flags, en->GetFlags(),
+			"uploaded file " << t << " flags");
 		if(t == UPLOAD_ATTRS_EN)
 		{
 			TEST_THAT(en->HasAttributes());
@@ -980,8 +989,11 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		encoded->CopyStreamTo(out);
 	}
 
-//	printf("SKIPPING\n");
-//	goto skip; {
+	// TODO FIXME use COMMAND macro for all commands to check the returned
+	// object ID.
+	#define COMMAND(command, objectid) \
+		TEST_EQUAL(objectid, protocol.command->GetObjectID());
+
 	// Then send it
 	int64_t store1objid = 0;
 	{
@@ -1085,7 +1097,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			TEST_THAT(en->GetModificationTime() == 0x123456789abcdefLL);
 			TEST_THAT(en->GetAttributesHash() == 0x7362383249872dfLL);
 			TEST_THAT(en->GetObjectID() == store1objid);
-			TEST_THAT(en->GetSizeInBlocks() < ((ENCFILE_SIZE * 4 * 3) / 2 / 2048)+2);
+			TEST_EQUAL(6, en->GetSizeInBlocks());
 			TEST_THAT(en->GetFlags() == BackupStoreDirectory::Entry::Flags_File);
 		}
 	}
@@ -1497,9 +1509,10 @@ int test_server(const char *hostname)
 			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 		BackupStoreAccountDatabase::Entry account =
 			apAccounts->GetEntry(0x1234567);
-		run_housekeeping(account);
+		TEST_EQUAL(0, run_housekeeping(account));
 
-		// Also check that bbstoreaccounts doesn't change anything
+		// Also check that bbstoreaccounts doesn't change anything,
+		// using an external process instead of the internal one.
 		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
@@ -1617,20 +1630,23 @@ int test_server(const char *hostname)
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
 
-			// Check the last one...
+			// Check the (only) one...
 			BackupStoreDirectory::Iterator i(dir);
-			// Discard first
 			BackupStoreDirectory::Entry *en = i.Next();
 			TEST_THAT(en != 0);
-			// Does it look right?
+
+			// Check that it looks right
+			TEST_EQUAL(subdirfileid, en->GetObjectID());
 			TEST_THAT(en->GetName() == uploads[0].name);
-			TEST_THAT(en->GetFlags() == BackupProtocolListDirectory::Flags_File);
-			TEST_THAT(en->GetObjectID() == subdirfileid);
+			TEST_EQUAL(BackupProtocolListDirectory::Flags_File, en->GetFlags());
+			int64_t actual_size = get_raid_file(subdirfileid)->GetDiscUsageInBlocks();
+			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_THAT(en->GetModificationTime() != 0);
 
 			// Attributes
 			TEST_THAT(dir.HasAttributes());
-			TEST_THAT(dir.GetAttributesModTime() == 9837429842987984LL);
+			TEST_EQUAL(FAKE_ATTR_MODIFICATION_TIME,
+				dir.GetAttributesModTime());
 			StreamableMemBlock attr(attr1, sizeof(attr1));
 			TEST_THAT(dir.GetAttributes() == attr);
 		}
@@ -1648,7 +1664,9 @@ int test_server(const char *hostname)
 			TEST_THAT(!dir.HasAttributes());
 		}
 
-		// sleep to ensure that the timestamp on the file will change
+		// Sleep to ensure that the timestamp on the file will change,
+		// invalidating the read-only connection's cache of the
+		// directory, and forcing it to be reloaded.
 		::safe_sleep(1);
 
 		// Change attributes on the directory
@@ -1675,7 +1693,7 @@ int test_server(const char *hostname)
 
 			// Attributes
 			TEST_THAT(dir.HasAttributes());
-			TEST_THAT(dir.GetAttributesModTime() == 329483209443598LL);
+			TEST_EQUAL(329483209443598LL, dir.GetAttributesModTime());
 			StreamableMemBlock attrtest(attr2, sizeof(attr2));
 			TEST_THAT(dir.GetAttributes() == attrtest);
 		}
@@ -2134,8 +2152,6 @@ int test3(int argc, const char *argv[])
 		TEST_THAT(delfiles[1] == 4);
 	}
 
-//printf("SKIPPINGTESTS---------\n");
-//return 0;
 
 	// Context
 	TLSContext context;
@@ -2208,6 +2224,7 @@ int test3(int argc, const char *argv[])
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 no") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
 	// BLOCK
 	{
 		// Open a connection to the server
@@ -2238,7 +2255,11 @@ int test3(int argc, const char *argv[])
 		protocol.QueryFinished();
 	}
 
-	// Re-enable the account so that subsequent logins should succeed
+
+	// It's easier to test this if we disable housekeeping, so run
+	// without a server.
+	// TEST_THAT_THROWONFAIL(StartServer());
+
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
@@ -2777,32 +2798,17 @@ int test_read_old_backupstoreinfo_files()
 
 int test(int argc, const char *argv[])
 {
-	test_open_files_with_limited_win32_permissions();
+	TEST_THAT(test_open_files_with_limited_win32_permissions());
 
 	// Initialise the raid file controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
 	rcontroller.Initialise("testfiles/raidfile.conf");
 	
-	int ret = test_read_old_backupstoreinfo_files();
-	if (ret != 0)
-	{
-		return ret;
-	}
+	TEST_THAT_THROWONFAIL(test_read_old_backupstoreinfo_files());
 	
 	// SSL library
 	SSLLib::Initialise();
 	
-	// Give a test key for the filenames
-//	BackupStoreFilenameClear::SetBlowfishKey(FilenameEncodingKey, sizeof(FilenameEncodingKey));
-	// And set the encoding to blowfish
-//	BackupStoreFilenameClear::SetEncodingMethod(BackupStoreFilename::Encoding_Blowfish);
-	
-	// And for directory attributes -- need to set it, as used in file encoding
-//	BackupClientFileAttributes::SetBlowfishKey(AttributesEncodingKey, sizeof(AttributesEncodingKey));
-	
-	// And finally for file encoding
-//	BackupStoreFile::SetBlowfishKeys(FileEncodingKey, sizeof(FileEncodingKey), FileBlockEntryEncodingKey, sizeof(FileBlockEntryEncodingKey));
-
 	// Use the setup crypto command to set up all these keys, so that the bbackupquery command can be used
 	// for seeing what's going on.
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");	
