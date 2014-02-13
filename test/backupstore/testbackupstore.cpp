@@ -133,6 +133,8 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 // file which will be moved (as well as it's old version)
 #define UPLOAD_FILE_TO_MOVE	8
 
+#define UNLINK_IF_EXISTS(filename) \
+	if (FileExists(filename)) { TEST_THAT(unlink(filename) == 0); }
 
 // Nice random data for testing written files
 class R250 {
@@ -760,7 +762,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 
 		// Write this to a file
 		{
-			FileStream f("testfiles/file1", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream f("testfiles/file1", O_WRONLY | O_CREAT);
 			f.Write(encfile, sizeof(encfile));
 		}
 		
@@ -808,7 +810,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 	// Store a file -- first make the encoded file
 	BackupStoreFilenameClear store1name("file1");
 	{
-		FileStream out("testfiles/file1_upload1", O_WRONLY | O_CREAT | O_EXCL);
+		FileStream out("testfiles/file1_upload1", O_WRONLY | O_CREAT);
 		std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/file1", BackupProtocolListDirectory::RootDirectory, store1name));
 		encoded->CopyStreamTo(out);
 	}
@@ -844,6 +846,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			filestream->CopyStreamTo(f);
 			f.SetForReading();
 			// Get and decode
+			UNLINK_IF_EXISTS("testfiles/file1_upload_retrieved");
 			BackupStoreFile::DecodeFile(f, "testfiles/file1_upload_retrieved", IOStream::TimeOutInfinite);
 		}
 
@@ -852,6 +855,8 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		TEST_THAT(getobj->GetObjectID() == store1objid);
 		// BLOCK
 		{
+			UNLINK_IF_EXISTS("testfiles/file1_upload_retrieved_str");
+
 			// Get stream
 			std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
 			// Get and decode
@@ -1303,7 +1308,7 @@ int test_server(const char *hostname)
 			TEST_THAT(TestGetFileSize(TEST_FILE_FOR_PATCHING) == TEST_FILE_FOR_PATCHING_SIZE);
 			FileStream in(TEST_FILE_FOR_PATCHING);
 			void *buf = ::malloc(TEST_FILE_FOR_PATCHING_SIZE);
-			FileStream out(TEST_FILE_FOR_PATCHING ".mod", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream out(TEST_FILE_FOR_PATCHING ".mod", O_WRONLY | O_CREAT);
 			TEST_THAT(in.Read(buf, TEST_FILE_FOR_PATCHING_PATCH_AT) == TEST_FILE_FOR_PATCHING_PATCH_AT);
 			out.Write(buf, TEST_FILE_FOR_PATCHING_PATCH_AT);
 			char insert[13] = "INSERTINSERT";
@@ -1357,7 +1362,7 @@ int test_server(const char *hostname)
 			TEST_THAT(isCompletelyDifferent == false);
 			// Sent this to a file, so we can check the size, rather than uploading it directly
 			{
-				FileStream patch(TEST_FILE_FOR_PATCHING ".patch", O_WRONLY | O_CREAT | O_EXCL);
+				FileStream patch(TEST_FILE_FOR_PATCHING ".patch", O_WRONLY | O_CREAT);
 				patchstream->CopyStreamTo(patch);
 			}
 			// Make sure the stream is a plausible size for a patch containing only one new block
@@ -1815,13 +1820,13 @@ int test3(int argc, const char *argv[])
 		
 		// The test block to a file
 		{
-			FileStream f("testfiles/testenc1", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream f("testfiles/testenc1", O_WRONLY | O_CREAT);
 			f.Write(encfile, sizeof(encfile));
 		}
 		
 		// Encode it
 		{
-			FileStream out("testfiles/testenc1_enc", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream out("testfiles/testenc1_enc", O_WRONLY | O_CREAT);
 			BackupStoreFilenameClear name("testfiles/testenc1");
 
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testenc1", 32, name));
@@ -1836,6 +1841,7 @@ int test3(int argc, const char *argv[])
 		
 		// Decode it
 		{
+			UNLINK_IF_EXISTS("testfiles/testenc1_orig");
 			FileStream enc("testfiles/testenc1_enc");
 			BackupStoreFile::DecodeFile(enc, "testfiles/testenc1_orig", IOStream::TimeOutInfinite);
 		}
@@ -1865,7 +1871,7 @@ int test3(int argc, const char *argv[])
 		// Test that the last block in a file, if less than 256 bytes, gets put into the last block
 		{
 			#define FILE_SIZE_JUST_OVER	((4096*2)+58)
-			FileStream f("testfiles/testenc2", O_WRONLY | O_CREAT | O_EXCL);
+			FileStream f("testfiles/testenc2", O_WRONLY | O_CREAT);
 			f.Write(encfile + 2, FILE_SIZE_JUST_OVER);
 			BackupStoreFilenameClear name("testenc2");
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testenc2", 32, name));
@@ -1899,6 +1905,7 @@ int test3(int argc, const char *argv[])
 #ifndef WIN32 // no symlinks on Win32
 		// Try out doing this on a symlink
 		{
+			UNLINK_IF_EXISTS("testfiles/testsymlink");
 			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
 			BackupStoreFilenameClear name("testsymlink");
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
@@ -1908,6 +1915,7 @@ int test3(int argc, const char *argv[])
 			encoded->CopyStreamTo(b);
 			b.SetForReading();
 			// Decode it
+			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
 			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 		}
 #endif
