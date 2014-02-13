@@ -631,8 +631,6 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 	TEST_THAT(dirs == 0 || dirs == 2);
 }
 
-std::vector<uint32_t> ExpectedRefCounts;
-
 void set_refcount(int64_t ObjectID, uint32_t RefCount)
 {
 	if ((int64_t)ExpectedRefCounts.size() <= ObjectID)
