@@ -32,6 +32,17 @@ class BackupStoreDirectory
 public:
 	BackupStoreDirectory();
 	BackupStoreDirectory(int64_t ObjectID, int64_t ContainerID);
+	// Convenience constructor from a stream
+	BackupStoreDirectory(IOStream& rStream,
+		int Timeout = IOStream::TimeOutInfinite)
+	{
+		ReadFromStream(rStream, Timeout);
+	}
+	BackupStoreDirectory(std::auto_ptr<IOStream> apStream,
+		int Timeout = IOStream::TimeOutInfinite)
+	{
+		ReadFromStream(*apStream, Timeout);
+	}
 private:
 	// Copying not allowed
 	BackupStoreDirectory(const BackupStoreDirectory &rToCopy);
