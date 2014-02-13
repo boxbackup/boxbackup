@@ -1032,6 +1032,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1065,6 +1066,8 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 	// Create an empty directory with the given attributes on disc
 	std::string fn;
 	MakeObjectFilename(id, fn, true /* make sure the directory it's in exists */);
+	int64_t dirSize;
+
 	{
 		BackupStoreDirectory emptyDir(id, InDirectory);
 		// add the atttribues
@@ -1075,7 +1078,17 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 		dirFile.Open(false /* no overwriting */);
 		emptyDir.WriteToStream(dirFile);
 		// Get disc usage, before it's commited
-		int64_t dirSize = dirFile.GetDiscUsageInBlocks();
+		dirSize = dirFile.GetDiscUsageInBlocks();
+
+		// Exceeds the hard limit?
+		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() + 
+			dirSize;
+		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
+		{
+			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
+			// The file will be deleted automatically by the RaidFile object
+		}
+
 		// Commit the file
 		dirFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);		
 
