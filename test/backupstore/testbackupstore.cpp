@@ -485,8 +485,7 @@ int test2(int argc, const char *argv[])
 			CollectInBufferStream stream;
 			dir1.WriteToStream(stream);
 			stream.SetForReading();
-			BackupStoreDirectory dir2;
-			dir2.ReadFromStream(stream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir2(stream);
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_NUM);
 			TEST_THAT(dir2.GetObjectID() == 12);
 			TEST_THAT(dir2.GetContainerID() == 98);
@@ -498,8 +497,7 @@ int test2(int argc, const char *argv[])
 			CollectInBufferStream stream;
 			dir1.WriteToStream(stream, BackupStoreDirectory::Entry::Flags_File);
 			stream.SetForReading();
-			BackupStoreDirectory dir2;
-			dir2.ReadFromStream(stream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir2(stream);
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_FILES);
 			CheckEntries(dir2, BackupStoreDirectory::Entry::Flags_File, BackupStoreDirectory::Entry::Flags_EXCLUDE_NOTHING);
 		}
@@ -507,8 +505,7 @@ int test2(int argc, const char *argv[])
 			CollectInBufferStream stream;
 			dir1.WriteToStream(stream, BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING, BackupStoreDirectory::Entry::Flags_File);
 			stream.SetForReading();
-			BackupStoreDirectory dir2;
-			dir2.ReadFromStream(stream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir2(stream);
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_DIRS);
 			CheckEntries(dir2, BackupStoreDirectory::Entry::Flags_Dir, BackupStoreDirectory::Entry::Flags_EXCLUDE_NOTHING);
 		}
@@ -516,8 +513,7 @@ int test2(int argc, const char *argv[])
 			CollectInBufferStream stream;
 			dir1.WriteToStream(stream, BackupStoreDirectory::Entry::Flags_File, BackupStoreDirectory::Entry::Flags_OldVersion);
 			stream.SetForReading();
-			BackupStoreDirectory dir2;
-			dir2.ReadFromStream(stream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir2(stream);
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_FILES - DIR_OLD);
 			CheckEntries(dir2, BackupStoreDirectory::Entry::Flags_File, BackupStoreDirectory::Entry::Flags_OldVersion);
 		}
@@ -530,8 +526,7 @@ int test2(int argc, const char *argv[])
 			CollectInBufferStream stream;
 			dir1.WriteToStream(stream, BackupStoreDirectory::Entry::Flags_File);
 			stream.SetForReading();
-			BackupStoreDirectory dir2;
-			dir2.ReadFromStream(stream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir2(stream);
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_FILES - 1);
 		}
 		
@@ -546,8 +541,7 @@ int test2(int argc, const char *argv[])
 			CollectInBufferStream stream;
 			d1.WriteToStream(stream);
 			stream.SetForReading();
-			BackupStoreDirectory d2;
-			d2.ReadFromStream(stream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory d2(stream);
 			TEST_THAT(d2.GetAttributes() == attr);
 			TEST_THAT(d2.GetAttributesModTime() == 56234987324232LL);
 		}
@@ -609,10 +603,7 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	// Stream
-	BackupStoreDirectory dir;
-	std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
-	dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
-	
+	BackupStoreDirectory dir(protocol.ReceiveStream());
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en = 0;
 	int files = 0;
@@ -720,9 +711,7 @@ void check_dir_after_uploads(BackupProtocolClient &protocol, const StreamableMem
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	TEST_THAT(dirreply->GetObjectID() == BackupProtocolListDirectory::RootDirectory);
 	// Stream
-	BackupStoreDirectory dir;
-	std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
-	dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+	BackupStoreDirectory dir(protocol.ReceiveStream());
 	TEST_THAT(dir.GetNumberOfEntries() == UPLOAD_NUM + 1 /* for the first test file */);
 	TEST_THAT(!dir.HasAttributes());
 
@@ -775,9 +764,7 @@ void recursive_count_objects_r(BackupProtocolClient &protocol, int64_t id, recur
 			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	// Stream
-	BackupStoreDirectory dir;
-	std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
-	dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+	BackupStoreDirectory dir(protocol.ReceiveStream());
 
 	// Check them!
 	BackupStoreDirectory::Iterator i(dir);
@@ -1076,9 +1063,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 		// Stream
-		BackupStoreDirectory dir;
-		std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
-		dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+		BackupStoreDirectory dir(protocol.ReceiveStream());
 		TEST_THAT(dir.GetNumberOfEntries() == 1);
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = i.Next();
@@ -1585,10 +1570,9 @@ int test_server(const char *hostname)
 					BackupProtocolListDirectory::RootDirectory,
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */)); // Stream
-			BackupStoreDirectory dir;
-			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
-			TEST_THAT(dir.GetNumberOfEntries() == UPLOAD_NUM + 3 /* for the first test file, the patched upload, and this new dir */);
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+			TEST_EQUAL(UPLOAD_NUM + 3, dir.GetNumberOfEntries());
+			// for the first test file, the patched upload, and this new dir.
 
 			// Check the last one...
 			BackupStoreDirectory::Iterator i(dir);
@@ -1620,10 +1604,7 @@ int test_server(const char *hostname)
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, true /* get attributes */));
 			TEST_THAT(dirreply->GetObjectID() == subdirid);
-			// Stream
-			BackupStoreDirectory dir;
-			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
 
 			// Check the last one...
@@ -1653,9 +1634,7 @@ int test_server(const char *hostname)
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */));
 			// Stream
-			BackupStoreDirectory dir;
-			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
 			TEST_THAT(!dir.HasAttributes());
 		}
 
@@ -1680,9 +1659,7 @@ int test_server(const char *hostname)
 					0,	// no flags
 					BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING, true /* get attributes */));
 			// Stream
-			BackupStoreDirectory dir;
-			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
 			TEST_THAT(dir.GetNumberOfEntries() == 0);
 
 			// Attributes
@@ -1886,9 +1863,7 @@ int test_server(const char *hostname)
 					BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 			// Stream
-			BackupStoreDirectory dir;
-			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
 			
 			// Check there's only that one entry
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
