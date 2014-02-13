@@ -1191,7 +1191,7 @@ bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 		Dirs == usage->GetBlocksInDirectories());
 }
 
-bool check_account(Log::Level log_level = Log::WARNING)
+bool check_account(Log::Level log_level)
 {
 	int errors_fixed;
 
