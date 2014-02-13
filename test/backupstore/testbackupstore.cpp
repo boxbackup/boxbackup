@@ -235,6 +235,158 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
 }
 
+bool create_account(int soft, int hard)
+{
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
+	BackupStoreAccountsControl control(*config);
+	Logging::Guard guard(Log::WARNING);
+	int result = control.CreateAccount(0x01234567, 0, soft, hard);
+	TEST_EQUAL(0, result);
+	return (result == 0);
+}
+
+void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
+
+// test that all object reference counts have the expected values
+bool check_reference_counts()
+{
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	BackupStoreAccountDatabase::Entry account =
+		apAccounts->GetEntry(0x1234567);
+
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+		BackupStoreRefCountDatabase::Load(account, true));
+	TEST_EQUAL(ExpectedRefCounts.size(),
+		apReferences->GetLastObjectIDUsed() + 1);
+
+	bool counts_ok = true;
+
+	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
+		i < ExpectedRefCounts.size(); i++)
+	{
+		TEST_EQUAL_LINE(ExpectedRefCounts[i],
+			apReferences->GetRefCount(i),
+			"object " << BOX_FORMAT_OBJECTID(i));
+		if (ExpectedRefCounts[i] != apReferences->GetRefCount(i))
+		{
+			counts_ok = false;
+		}
+	}
+
+	return counts_ok;
+}
+
+bool check_account(Log::Level log_level = Log::WARNING);
+int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount);
+bool run_housekeeping_and_check_account();
+
+int bbstored_pid = 0;
+
+bool StartServer()
+{
+	std::string cmd = BBSTORED " " + bbstored_args + 
+		" testfiles/bbstored.conf";
+	bbstored_pid = LaunchServer(cmd.c_str(), "testfiles/bbstored.pid");
+
+	TEST_THAT(bbstored_pid != -1 && bbstored_pid != 0);
+	if(bbstored_pid <= 0)
+	{
+		return false;
+	}
+
+	::sleep(1);
+	TEST_THAT_THROWONFAIL(ServerIsAlive(bbstored_pid));
+	return true;
+}
+
+bool StopServer()
+{
+	TEST_THAT_THROWONFAIL(ServerIsAlive(bbstored_pid));
+	TEST_THAT_THROWONFAIL(KillServer(bbstored_pid));
+	::sleep(1);
+
+	TEST_THAT_THROWONFAIL(!ServerIsAlive(bbstored_pid));
+
+	#ifdef WIN32
+		int unlink_result = unlink("testfiles/bbstored.pid");
+		TEST_EQUAL_LINE(0, unlink_result, "unlink testfiles/bbstored.pid");
+		if(unlink_result != 0)
+		{
+			return false;
+		}
+	#else
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+	#endif
+
+	return true;
+}
+
+#define SETUP() if (!setUp(__FUNCTION__)) return true; // skip this test
+
+bool setUp(const char* function_name)
+{
+	if (!run_only_named_tests.empty())
+	{
+		bool run_this_test = false;
+
+		for (std::list<std::string>::iterator
+			i = run_only_named_tests.begin();
+			i != run_only_named_tests.end(); i++)
+		{
+			if (*i == function_name)
+			{
+				run_this_test = true;
+				break;
+			}
+		}
+		
+		if (!run_this_test)
+		{
+			// not in the list, so don't run it.
+			return false;
+		}
+	}
+
+	printf("\n\n== %s ==\n", function_name);
+
+	if (ServerIsAlive(bbstored_pid))
+	{
+		StopServer();
+	}
+
+	TEST_THAT_THROWONFAIL(system("rm -rf testfiles/0_0 testfiles/0_1 "
+		"testfiles/0_2 testfiles/accounts.txt testfiles/test* "
+		"testfiles/file*") == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
+	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
+	TEST_THAT_THROWONFAIL(create_account(10000, 20000));
+
+	set_refcount(BackupProtocolListDirectory::RootDirectory, 1);
+	ExpectedRefCounts[1] = 1;
+
+	return true;
+}
+
+void tearDown()
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		StopServer();
+	}
+
+	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
+	{
+		TEST_THAT(check_reference_counts());
+		TEST_THAT(check_account());
+	}
+}
+
 int test1(int argc, const char *argv[])
 {
 	// test some basics -- encoding and decoding filenames
@@ -488,7 +640,7 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 
 std::vector<uint32_t> ExpectedRefCounts;
 
-void set_refcount(int64_t ObjectID, uint32_t RefCount = 1)
+void set_refcount(int64_t ObjectID, uint32_t RefCount)
 {
 	if ((int64_t)ExpectedRefCounts.size() <= ObjectID)
 	{
@@ -748,8 +900,30 @@ bool check_files_same(const char *f1, const char *f2)
 	return same;
 }
 
+std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
+{
+	std::string filename;
+	StoreStructure::MakeObjectFilename(ObjectID,
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
+		filename, false /* EnsureDirectoryExists */);
+	return RaidFileRead::Open(0, filename);
+}
+
+bool check_num_files(int files, int old, int deleted, int dirs);
 bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 	int Deleted, int Dirs, int Total);
+
+bool change_account_limits(const char* soft, const char* hard)
+{
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
+	BackupStoreAccountsControl control(*config);
+	int result = control.SetLimit(0x01234567, soft, hard);
+	TEST_EQUAL(0, result);
+	return (result == 0);
+}
 
 void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protocolReadOnly)
 {
