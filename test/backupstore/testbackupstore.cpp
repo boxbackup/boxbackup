@@ -248,6 +248,8 @@ bool create_account(int soft, int hard)
 	return (result == 0);
 }
 
+std::vector<uint32_t> ExpectedRefCounts;
+
 void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
 
 // test that all object reference counts have the expected values
