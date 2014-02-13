@@ -47,13 +47,13 @@
 
 #include "MemLeakFindOn.h"
 
-
 #define ENCFILE_SIZE	2765
 
 // Make some test attributes
 #define ATTR1_SIZE 	245
 #define ATTR2_SIZE 	23
 #define ATTR3_SIZE 	122
+
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
 int attr3[ATTR3_SIZE];
@@ -415,6 +415,7 @@ int test1(int argc, const char *argv[])
 			TEST_THAT(fn4.GetClearFilename() == "filenameXYZ");
 			TEST_THAT(fn4 == fn1);
 		}
+
 		// Bung it in a stream, get it out in a server non-Clear filename (two of them into the same var)
 		{
 			BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
@@ -428,6 +429,7 @@ int test1(int argc, const char *argv[])
 			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
 			TEST_THAT(fn5 == fno);
 		}
+
 		// Same again with clear strings
 		{
 			BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
@@ -441,6 +443,7 @@ int test1(int argc, const char *argv[])
 			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
 			TEST_THAT(fn5.GetClearFilename() == "pinglet dksfnsf jksjdf ");
 		}
+
 		// Test a very big filename
 		{
 			const char *fnr = "01234567890123456789012345678901234567890123456789"
@@ -460,6 +463,7 @@ int test1(int argc, const char *argv[])
 			TEST_THAT(fn9.GetClearFilename() == fnr);
 			TEST_THAT(fn9 == fnLong);
 		}
+
 		// Test a filename which went wrong once
 		{
 			BackupStoreFilenameClear dodgy("content-negotiation.html");
@@ -472,7 +476,7 @@ int test2(int argc, const char *argv[])
 {
 	{
 		// Now play with directories
-		
+
 		// Fill in...
 		BackupStoreDirectory dir1(12, 98);
 		for(int e = 0; e < DIR_NUM; ++e)
@@ -622,6 +626,7 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 		{
 			files++;
 		}
+
 		// Check it's deleted
 		TEST_THAT(en->GetFlags() & BackupProtocolListDirectory::Flags_Deleted);
 	}
@@ -926,7 +931,6 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			FileStream f("testfiles/file1", O_WRONLY | O_CREAT);
 			f.Write(encfile, sizeof(encfile));
 		}
-		
 	}
 
 	// Read the root directory a few times (as it's cached, so make sure it doesn't hurt anything)
@@ -992,7 +996,10 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 		store1objid = stored->GetObjectID();
 		TEST_THAT(store1objid == 2);
 	}
+
+	// Update expected reference count of this new object
 	set_refcount(store1objid, 1);
+
 	// And retrieve it
 	{
 		// Retrieve as object
@@ -1031,6 +1038,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			in.Read(encfile_i, sizeof(encfile_i));
 			TEST_THAT(memcmp(encfile, encfile_i, sizeof(encfile)) == 0);
 		}
+
 		{
 			FileStream in("testfiles/file1_upload_retrieved_str");
 			int encfile_i[ENCFILE_SIZE];
@@ -1046,6 +1054,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			// Check against uploaded file
 			TEST_THAT(check_block_index("testfiles/file1_upload1", *blockIndexStream));
 		}
+
 		// and again, by name
 		{
 			std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByName(BackupProtocolListDirectory::RootDirectory, store1name));
@@ -1055,6 +1064,7 @@ void test_server_1(BackupProtocolClient &protocol, BackupProtocolClient &protoco
 			TEST_THAT(check_block_index("testfiles/file1_upload1", *blockIndexStream));
 		}
 	}
+
 	// Get the directory again, and see if the entry is in it
 	{
 		// Command
@@ -1651,6 +1661,7 @@ int test_server(const char *hostname)
 					attrnew));
 			TEST_THAT(changereply->GetObjectID() == subdirid);
 		}
+
 		// Check the new attributes
 		{
 			// Command
@@ -1760,6 +1771,7 @@ int test_server(const char *hostname)
 		int64_t subsubdirid = 0;
 		int64_t subsubfileid = 0;
 		{
+			// TODO FIXME use create_dir() and create_file() instead.
 			BackupStoreFilenameClear nd("sub2");
 			// Attributes
 			std::auto_ptr<IOStream> attr(new MemBlockStream(attr1,
@@ -1836,13 +1848,13 @@ int test_server(const char *hostname)
 				TEST_THAT(fn.GetClearFilename() == testnames[l]);
 			}
 		}
-		
+			
 //}	skip:
 
 		std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 			BackupStoreRefCountDatabase::Load(
 				apAccounts->GetEntry(0x1234567), true));
-	
+
 		// Create some nice recursive directories
 		int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 			BackupProtocolListDirectory::RootDirectory,
@@ -1881,7 +1893,7 @@ int test_server(const char *hostname)
 			// Then... check everything's deleted
 			test_everything_deleted(protocolReadOnly, dirtodelete);
 		}
-			
+
 		// Finish the connections
 #ifndef WIN32
 		protocolReadOnly.QueryFinished();
@@ -1909,7 +1921,7 @@ int test3(int argc, const char *argv[])
 		{
 			encfile[l] = l * 173;
 		}
-		
+
 		// Encode and decode a small block (shouldn't be compressed)
 		{
 			#define SMALL_BLOCK_SIZE	251
@@ -2050,19 +2062,23 @@ int test3(int argc, const char *argv[])
 
 			TEST_THAT(decoded->GetNumBlocks() == 3);
 		}
-		
 #ifndef WIN32 // no symlinks on Win32
+
+	// TODO FIXME indentation
+
 		// Try out doing this on a symlink
 		{
 			UNLINK_IF_EXISTS("testfiles/testsymlink");
 			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
 			BackupStoreFilenameClear name("testsymlink");
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
+
 			// Can't decode it from the stream, because it's in file order, and doesn't have the 
 			// required properties to be able to reorder it. So buffer it...
 			CollectInBufferStream b;
 			encoded->CopyStreamTo(b);
 			b.SetForReading();
+
 			// Decode it
 			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
 			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
@@ -2103,6 +2119,7 @@ int test3(int argc, const char *argv[])
 		TEST_CHECK_THROWS(info->RemovedDeletedDirectory(9), BackupStoreException, StoreInfoDirNotInList);
 		info->Save();
 	}
+
 	{
 		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
 		TEST_THAT(info->GetBlocksUsed() == 7);
@@ -2174,8 +2191,8 @@ int test3(int argc, const char *argv[])
 	TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
 	TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
 	TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);
+
 	// make sure something is written to it
-	
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 
