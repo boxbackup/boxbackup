@@ -1556,3 +1556,42 @@ DiffTimer::DiffTimer()
 DiffTimer::~DiffTimer()
 {	
 }
+
+// Shortcut interface
+int64_t BackupStoreFile::QueryStoreFileDiff(BackupProtocolCallable& protocol,
+	const std::string& LocalFilename, int64_t DirectoryObjectID,
+	int64_t DiffFromFileID, int64_t AttributesHash,
+	const BackupStoreFilenameClear& StoreFilename, int Timeout,
+	DiffTimer *pDiffTimer, ReadLoggingStream::Logger* pLogger,
+	RunStatusProvider* pRunStatusProvider)
+{
+	int64_t ModificationTime;
+	std::auto_ptr<BackupStoreFileEncodeStream> pStream;
+
+	if(DiffFromFileID)
+	{
+		// Fetch the block index for this one
+		std::auto_ptr<BackupProtocolSuccess> getblockindex =
+			protocol.QueryGetBlockIndexByName(DirectoryObjectID,
+				StoreFilename);
+		ASSERT(getblockindex->GetObjectID() == DiffFromFileID);
+		std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
+		
+		pStream = EncodeFileDiff(LocalFilename,
+			DirectoryObjectID, StoreFilename, DiffFromFileID,
+			*(blockIndexStream.get()), Timeout, pDiffTimer,
+			&ModificationTime, NULL // pIsCompletelyDifferent
+			);
+	}
+	else
+	{
+		pStream = BackupStoreFile::EncodeFile(LocalFilename,
+			DirectoryObjectID, StoreFilename);
+	}
+
+	std::auto_ptr<IOStream> upload(pStream.release());
+	return protocol.QueryStoreFile(DirectoryObjectID,
+		ModificationTime, AttributesHash, DiffFromFileID,
+		StoreFilename, upload)->GetObjectID();
+}
+
