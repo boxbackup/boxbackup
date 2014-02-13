@@ -14,6 +14,7 @@
 #include <memory>
 #include <cstdlib>
 
+#include "autogen_BackupProtocol.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreFilename.h"
 #include "IOStream.h"
@@ -40,6 +41,8 @@ class RunStatusProvider;
 // Have some memory allocation commands, note closing "Off" at end of file.
 #include "MemLeakFindOn.h"
 
+class BackupStoreFileEncodeStream;
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -59,8 +62,6 @@ public:
 	virtual int  GetMaximumDiffingTime() = 0;
 	virtual bool IsManaged() = 0;
 };
-
-class BackupStoreFileEncodeStream;
 
 // --------------------------------------------------------------------------
 //
@@ -139,6 +140,16 @@ public:
 		int64_t *pModificationTime = 0, 
 		bool *pIsCompletelyDifferent = 0
 	);
+	// Shortcut interface
+	static int64_t QueryStoreFileDiff(BackupProtocolCallable& protocol,
+		const std::string& LocalFilename, int64_t DirectoryObjectID,
+		int64_t DiffFromFileID, int64_t AttributesHash,
+		const BackupStoreFilenameClear& StoreFilename,
+		int Timeout = IOStream::TimeOutInfinite,
+		DiffTimer *pDiffTimer = NULL,
+		ReadLoggingStream::Logger* pLogger = NULL,
+		RunStatusProvider* pRunStatusProvider = NULL);
+
 	static bool VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFromObjectIDOut = 0, int64_t *pContainerIDOut = 0);
 	static void CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &rFrom, IOStream &rOut);
 	static void CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream &rDiff2b, IOStream &rOut);
