@@ -692,6 +692,8 @@ static int readdir_stop_time = 0;
 static char stat_hook_filename[512];
 
 // First test hook, during the directory scanning stage, returns empty.
+// (Where is this stage? I can't find it, so I switched from using 
+// readdir_test_hook_1 to readdir_test_hook_2 in intercept tests.)
 // This will not match the directory on the store, so a sync will start.
 // We set up the next intercept for the same directory by passing NULL.
 
@@ -711,8 +713,9 @@ extern "C" struct dirent *readdir_test_hook_1(DIR *dir)
 	return NULL;
 }
 
-// Second test hook, during the directory sync stage, keeps returning 
-// new filenames until the timer expires, then disables the intercept.
+// Second test hook, called by BackupClientDirectoryRecord::SyncDirectory,
+// keeps returning new filenames until the timer expires, then disables the
+// intercept.
 
 extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 {
@@ -831,6 +834,25 @@ bool compare_all(BackupQueries::ReturnCode::Type expected_status,
 	TEST_EQUAL_LINE(expected_system_result, returnValue, "compare return value");
 	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	return (returnValue == expected_system_result);
+}
+
+bool touch_and_wait(const std::string& filename)
+{
+	int fd = open(filename.c_str(), O_CREAT | O_WRONLY, 0755);
+	TEST_THAT(fd > 0);
+	if (fd <= 0) return false;
+
+	// write again, to update the file's timestamp
+	int write_result = write(fd, "z", 1);
+	TEST_EQUAL_LINE(1, write_result, "Buffer write");
+	if (write_result != 1) return false;
+
+	TEST_THAT(close(fd) == 0);
+
+	// wait long enough to put file into sync window
+	wait_for_operation(5, "locally modified file to "
+		"mature for sync");
+	return true;
 }
 
 #define TEST_COMPARE(...) \
@@ -979,6 +1001,7 @@ int test_bbackupd()
 			TEST_LINE(comp2 != sub, line);
 		}
 
+		// Remaining tests require timer system to be initialised already
 		Timers::Init();
 		
 		// stop early to make debugging easier
@@ -1009,7 +1032,6 @@ int test_bbackupd()
 			bbackupd.RunSyncNow();
 			TEST_THAT(intercept_triggered());
 			intercept_clear_setup();
-			Timers::Cleanup();
 		}
 
 		// check that the diff was aborted, i.e. upload was not a diff
@@ -1054,29 +1076,25 @@ int test_bbackupd()
 		if (failures > 0)
 		{
 			// stop early to make debugging easier
-			Timers::Init();
 			return 1;
 		}
 
-		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
-			0, 1000, SYS_read, 3);
-		pid = start_internal_daemon();
-		intercept_clear_setup();
+		// Test that keepalives are sent while reading files
+		{
+			BackupDaemon bbackupd;
+			bbackupd.Configure("testfiles/bbackupd.conf");
+			bbackupd.InitCrypto();
 		
-		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
-		TEST_THAT(fd > 0);
-		// write again, to update the file's timestamp
-		TEST_EQUAL_LINE(sizeof(buffer),
-			write(fd, buffer, sizeof(buffer)),
-			"Buffer write");
-		TEST_THAT(close(fd) == 0);	
+			intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
+				0, 1000, SYS_read, 3);
 
-		wait_for_backup_operation("internal daemon to sync "
-			"spacetest/f1 again");
-		// can't test whether intercept was triggered, because
-		// it's in a different process.
-		// TEST_THAT(intercept_triggered());
-		TEST_THAT(stop_internal_daemon(pid));
+			// write again, to update the file's timestamp
+			TEST_THAT(touch_and_wait("testfiles/TestDir1/spacetest/f1"));
+
+			bbackupd.RunSyncNow();
+			TEST_THAT(intercept_triggered());
+			intercept_clear_setup();
+		}
 
 		// check that the diff was aborted, i.e. upload was not a diff
 		found1 = false;
@@ -1144,32 +1162,21 @@ int test_bbackupd()
 			return 1;
 		}
 
-		intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
-			readdir_test_hook_1);
-		
-		// time for at least two keepalives
-		readdir_stop_time = time(NULL) + 12 + 2;
+		// Test that keepalives are sent while reading large directories
+		{
+			BackupDaemon bbackupd;
+			bbackupd.Configure("testfiles/bbackupd.conf");
+			bbackupd.InitCrypto();
+	
+			intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
+				readdir_test_hook_2);
+			// time for at least two keepalives
+			readdir_stop_time = time(NULL) + 12 + 2;
 
-		pid = start_internal_daemon();
-		intercept_clear_setup();
-		
-		std::string touchfile = 
-			"testfiles/TestDir1/spacetest/d1/touch-me";
-
-		fd = open(touchfile.c_str(), O_CREAT | O_WRONLY, 0700);
-		TEST_THAT(fd > 0);
-		// write again, to update the file's timestamp
-		TEST_EQUAL_LINE(sizeof(buffer),
-			write(fd, buffer, sizeof(buffer)),
-			"Buffer write");
-		TEST_THAT(close(fd) == 0);	
-
-		wait_for_backup_operation("internal daemon to scan "
-			"spacetest/d1");
-		// can't test whether intercept was triggered, because
-		// it's in a different process.
-		// TEST_THAT(intercept_triggered());
-		TEST_THAT(stop_internal_daemon(pid));
+			bbackupd.RunSyncNow();
+			TEST_THAT(intercept_triggered());
+			intercept_clear_setup();
+		}
 
 		// check that keepalives were sent during the dir search
 		found1 = false;
@@ -1226,11 +1233,6 @@ int test_bbackupd()
 			Timers::Init();
 			return 1;
 		}
-
-		TEST_THAT(unlink(touchfile.c_str()) == 0);
-
-		// restore timers for rest of tests
-		Timers::Init();
 	}
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
@@ -1645,6 +1647,9 @@ int test_bbackupd()
 		// sleep to make it old enough to upload
 		safe_sleep(4);
 
+		// Start a bbstored with a test hook that makes it terminate
+		// on the first StoreFile command, breaking the connection to
+		// bbackupd.
 		class MyHook : public BackupStoreContext::TestHook
 		{
 			virtual std::auto_ptr<BackupProtocolMessage> StartCommand(
@@ -1685,7 +1690,7 @@ int test_bbackupd()
 			{
 				BackupStoreDaemon bbstored;
 				bbstored.SetTestHook(hook);
-				bbstored.SetRunInForeground(true);
+				bbstored.SetSingleProcess(true);
 				bbstored.Main("testfiles/bbstored.conf");
 			}
 
