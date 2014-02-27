@@ -601,7 +601,8 @@ int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Qu
 	std::auto_ptr<UnixUser> user; // used to reset uid when we return
 	NamedLock writeLock;
 
-	if(!OpenAccount(ID, rootDir, discSetNum, user, &writeLock))
+	if(!OpenAccount(ID, rootDir, discSetNum, user,
+		FixErrors ? &writeLock : NULL)) // don't need a write lock if not making changes
 	{
 		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(ID)
 			<< " for checking.");
