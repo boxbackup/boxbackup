@@ -1056,7 +1056,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 			mBlocksInDirectoriesDelta += adjust;
 		}
 
-		if (!mapNewRefs->RemoveReference(dir.GetObjectID()))
+		if (mapNewRefs->RemoveReference(dir.GetObjectID()))
 		{
 			// Still referenced
 			BOX_TRACE("Housekeeping spared empty deleted dir " <<
