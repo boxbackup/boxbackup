@@ -13,12 +13,12 @@ Make sure to select the following packages during installation:
  * Archive/unzip
  * Devel/automake
  * Devel/autoconf
- * Devel/gcc-mingw
- * Devel/gcc-mingw-g++
+ * Devel/mingw64-x86_64-gcc
+ * Devel/mingw64-x86_64-gcc-g++
  * Devel/make
  * Libs/libxml2
  * Libs/libxslt (for xsltproc)
- * Mingw/mingw-zlib-devel
+ * Devel/mingw64-x86_64-zlib
  * Perl/Perl
 
 If you already have Cygwin installed, please re-run the installer and
@@ -54,7 +54,7 @@ Open a Cygwin shell, go to the base directory, and unpack OpenSSL:
 Configure OpenSSL for MinGW compilation, and build and install it:
 
 	cd openssl-1.0.0e
-	./Configure --prefix=/usr/i686-pc-mingw32/ mingw
+	./Configure --prefix=/usr/x86_64-w64-mingw32/ mingw64 --cross-compile-prefix=x86_64-w64-mingw32-
 	make
 	make install_sw
 
