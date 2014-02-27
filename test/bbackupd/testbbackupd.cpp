@@ -3943,7 +3943,7 @@ int test(int argc, const char *argv[])
 		// This is not a complete command, it should not parse!
 		BackupQueries::ParsedCommand cmd("-od", true);
 		TEST_THAT(cmd.mFailed);
-		TEST_EQUAL(NULL, cmd.pSpec);
+		TEST_EQUAL(0, cmd.pSpec);
 		TEST_EQUAL(0, cmd.mCompleteArgCount);
 	}
 
