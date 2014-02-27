@@ -664,12 +664,17 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 					"attributes of '" << Filename << "': "
 					"buffer too small, not backed up");
 			}
+			else if(errno == ENOENT)
+			{
+				BOX_ERROR("Failed to list extended "
+					"attributes of '" << Filename << "': "
+					"file no longer exists");
+			}
 			else
 			{
-				BOX_LOG_SYS_ERROR("Failed to list extended "
-					"attributes of '" << Filename << "', "
-					"not backed up");
-				THROW_EXCEPTION(CommonException, OSFileError);
+				THROW_SYS_FILE_ERROR("Failed to list extended "
+					"attributes, skipping them", Filename,
+					CommonException, OSFileError);
 			}
 		}
 	}
