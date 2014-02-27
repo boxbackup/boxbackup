@@ -562,7 +562,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	}
 
 	// Pointer to potentially downloaded store directory info
-	BackupStoreDirectory *pdirOnStore = 0;
+	std::auto_ptr<BackupStoreDirectory> apDirOnStore;
 	
 	try
 	{
@@ -570,15 +570,13 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		if(ThisDirHasJustBeenCreated)
 		{
 			// Avoid sending another command to the server when we know it's empty
-			pdirOnStore = new BackupStoreDirectory(mObjectID, ContainingDirectoryID);
+			apDirOnStore.reset(new BackupStoreDirectory(mObjectID,
+				ContainingDirectoryID));
 		}
-		else
+		// Consider asking the store for it
+		else if(!mInitialSyncDone || checksumDifferent || downloadDirectoryRecordBecauseOfFutureFiles)
 		{
-			// Consider asking the store for it
-			if(!mInitialSyncDone || checksumDifferent || downloadDirectoryRecordBecauseOfFutureFiles)
-			{
-				pdirOnStore = FetchDirectoryListing(rParams);
-			}
+			apDirOnStore = FetchDirectoryListing(rParams);
 		}
 				
 		// Make sure the attributes are up to date -- if there's space on the server
@@ -586,17 +584,17 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		// and the checksum is different, implying they *MIGHT* be different.
 		if((!ThisDirHasJustBeenCreated) && checksumDifferent && (!rParams.mrContext.StorageLimitExceeded()))
 		{
-			UpdateAttributes(rParams, pdirOnStore, rLocalPath);
+			UpdateAttributes(rParams, apDirOnStore.get(), rLocalPath);
 		}
 		
 		// Create the list of pointers to directory entries
 		std::vector<BackupStoreDirectory::Entry *> entriesLeftOver;
-		if(pdirOnStore)
+		if(apDirOnStore.get())
 		{
-			entriesLeftOver.resize(pdirOnStore->GetNumberOfEntries(), 0);
-			BackupStoreDirectory::Iterator i(*pdirOnStore);
+			entriesLeftOver.resize(apDirOnStore->GetNumberOfEntries(), 0);
+			BackupStoreDirectory::Iterator i(*apDirOnStore);
 			// Copy in pointers to all the entries
-			for(unsigned int l = 0; l < pdirOnStore->GetNumberOfEntries(); ++l)
+			for(unsigned int l = 0; l < apDirOnStore->GetNumberOfEntries(); ++l)
 			{
 				entriesLeftOver[l] = i.Next();
 			}
@@ -604,7 +602,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		
 		// Do the directory reading
 		bool updateCompleteSuccess = UpdateItems(rParams, rLocalPath,
-			rRemotePath, rBackupLocation, pdirOnStore, entriesLeftOver, files, dirs);
+			rRemotePath, rBackupLocation, apDirOnStore.get(),
+			entriesLeftOver, files, dirs);
 		
 		// LAST THING! (think exception safety)
 		// Store the new checksum -- don't fetch things unnecessarily in the future
@@ -619,23 +618,10 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	catch(...)
 	{
 		// Bad things have happened -- clean up
-		if(pdirOnStore != 0)
-		{
-			delete pdirOnStore;
-			pdirOnStore = 0;
-		}
-		
 		// Set things so that we get a full go at stuff later
 		::memset(mStateChecksum, 0, sizeof(mStateChecksum));
 		
 		throw;
-	}
-	
-	// Clean up directory on store
-	if(pdirOnStore != 0)
-	{
-		delete pdirOnStore;
-		pdirOnStore = 0;
 	}
 	
 	// Flag things as having happened.
@@ -651,37 +637,25 @@ void BackupClientDirectoryRecord::SyncDirectory(
 //		Created: 2003/10/09
 //
 // --------------------------------------------------------------------------
-BackupStoreDirectory *BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::SyncParams &rParams)
+std::auto_ptr<BackupStoreDirectory>
+BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::SyncParams &rParams)
 {
-	BackupStoreDirectory *pdir = 0;
+	std::auto_ptr<BackupStoreDirectory> apDir;
 	
-	try
-	{
-		// Get connection to store
-		BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+	// Get connection to store
+	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
 
-		// Query the directory
-		std::auto_ptr<BackupProtocolSuccess> dirreply(connection.QueryListDirectory(
-				mObjectID,
-				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
-				BackupProtocolListDirectory::Flags_Deleted | 
-				BackupProtocolListDirectory::Flags_OldVersion, // exclude old/deleted stuff
-				true /* want attributes */));
+	// Query the directory
+	std::auto_ptr<BackupProtocolSuccess> dirreply(connection.QueryListDirectory(
+			mObjectID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
+			BackupProtocolListDirectory::Flags_Deleted | 
+			BackupProtocolListDirectory::Flags_OldVersion, // exclude old/deleted stuff
+			true /* want attributes */));
 
-		// Retrieve the directory from the stream following
-		pdir = new BackupStoreDirectory;
-		ASSERT(pdir != 0);
-		std::auto_ptr<IOStream> dirstream(connection.ReceiveStream());
-		pdir->ReadFromStream(*dirstream, connection.GetTimeout());
-	}
-	catch(...)
-	{
-		delete pdir;
-		pdir = 0;
-		throw;
-	}
-	
-	return pdir;
+	// Retrieve the directory from the stream following
+	apDir.reset(new BackupStoreDirectory(connection.ReceiveStream()));
+	return apDir;
 }
 
 

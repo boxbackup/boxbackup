@@ -145,7 +145,7 @@ public:
 
 private:
 	void DeleteSubDirectories();
-	BackupStoreDirectory *FetchDirectoryListing(SyncParams &rParams);
+	std::auto_ptr<BackupStoreDirectory> FetchDirectoryListing(SyncParams &rParams);
 	void UpdateAttributes(SyncParams &rParams,
 		BackupStoreDirectory *pDirOnStore,
 		const std::string &rLocalPath);
