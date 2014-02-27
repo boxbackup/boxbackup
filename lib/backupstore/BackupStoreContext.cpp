@@ -54,10 +54,10 @@
 //
 // --------------------------------------------------------------------------
 BackupStoreContext::BackupStoreContext(int32_t ClientID,
-	HousekeepingInterface &rDaemon, const std::string& rConnectionDetails)
+	HousekeepingInterface* pHousekeeping, const std::string& rConnectionDetails)
 : mConnectionDetails(rConnectionDetails),
   mClientID(ClientID),
-  mrDaemon(rDaemon),
+  mpHousekeeping(pHousekeeping),
   mProtocolPhase(Phase_START),
   mClientHasAccount(false),
   mStoreDiscSet(-1),
@@ -160,13 +160,13 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	// Request the lock
 	bool gotLock = mWriteLock.TryAndGetLock(writeLockFile.c_str(), 0600 /* restrictive file permissions */);
 	
-	if(!gotLock)
+	if(!gotLock && mpHousekeeping)
 	{
 		// The housekeeping process might have the thing open -- ask it to stop
 		char msg[256];
 		int msgLen = sprintf(msg, "r%x\n", mClientID);
 		// Send message
-		mrDaemon.SendMessageToHousekeepingProcess(msg, msgLen);
+		mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
 		
 		// Then try again a few times
 		int tries = MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT;

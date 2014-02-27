@@ -45,7 +45,8 @@ class HousekeepingInterface
 class BackupStoreContext
 {
 public:
-	BackupStoreContext(int32_t ClientID, HousekeepingInterface &rDaemon,
+	BackupStoreContext(int32_t ClientID,
+		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
 	~BackupStoreContext();
 private:
@@ -173,7 +174,7 @@ private:
 
 	std::string mConnectionDetails;
 	int32_t mClientID;
-	HousekeepingInterface &mrDaemon;
+	HousekeepingInterface *mpHousekeeping;
 	int mProtocolPhase;
 	bool mClientHasAccount;
 	std::string mAccountRootDir;	// has final directory separator

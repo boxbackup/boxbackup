@@ -35,7 +35,7 @@ public:
 	// This is rather ugly: the BackupProtocolLocal constructor must not
 	// touch the Context, because it's not initialised yet!
 	: BackupProtocolLocal(mContext),
-	  mContext(AccountNumber, *(HousekeepingInterface *)NULL,
+	  mContext(AccountNumber, (HousekeepingInterface *)NULL,
 		ConnectionDetails)
 	{
 		mContext.SetClientHasAccount(AccountRootDir, DiscSetNumber);
