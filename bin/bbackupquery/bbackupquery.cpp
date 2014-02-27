@@ -154,6 +154,7 @@ char * completion_generator(const char *text, int state)
 	if(state < 0 || state >= (int) completions.size())
 	{
 		rl_attempted_completion_over = 1;
+		sapCmd.reset();
 		return NULL;
 	}
 
