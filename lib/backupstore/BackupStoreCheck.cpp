@@ -92,9 +92,12 @@ BackupStoreCheck::~BackupStoreCheck()
 // --------------------------------------------------------------------------
 void BackupStoreCheck::Check()
 {
-	std::string writeLockFilename;
-	StoreStructure::MakeWriteLockFilename(mStoreRoot, mDiscSetNumber, writeLockFilename);
-	ASSERT(FileExists(writeLockFilename));
+	if(mFixErrors)
+	{
+		std::string writeLockFilename;
+		StoreStructure::MakeWriteLockFilename(mStoreRoot, mDiscSetNumber, writeLockFilename);
+		ASSERT(FileExists(writeLockFilename));
+	}
 
 	if(!mQuiet && mFixErrors)
 	{
