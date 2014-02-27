@@ -313,11 +313,11 @@ bool StartServer()
 	return true;
 }
 
-bool StopServer()
+bool StopServer(bool wait_for_process)
 {
 	TEST_THAT_THROWONFAIL(bbstored_pid != 0);
 	TEST_THAT_THROWONFAIL(ServerIsAlive(bbstored_pid));
-	TEST_THAT_THROWONFAIL(KillServer(bbstored_pid));
+	TEST_THAT_THROWONFAIL(KillServer(bbstored_pid, wait_for_process));
 	::sleep(1);
 
 	TEST_THAT_THROWONFAIL(!ServerIsAlive(bbstored_pid));
