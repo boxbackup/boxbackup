@@ -1601,11 +1601,19 @@ bool test_multiple_uploads()
 		apProtocol = test_server_login("localhost", context, conn);
 
 		// And delete them
+		BackupProtocolLocal2 protocolLocal(0x01234567, "test",
+			"backup/01234567/", 0, false); // Not read-only
+		apProtocol = &protocolLocal;
+
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
 					dirtodelete));
 			TEST_THAT(dirdel->GetObjectID() == dirtodelete);
 		}
+
+		protocolLocal.QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account());
+		TEST_THAT(check_reference_counts());
 
 		// Get the root dir, checking for deleted items
 		{
