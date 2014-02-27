@@ -1239,6 +1239,44 @@ int test_bbackupd()
 	// Check that no read error has been reported yet
 	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
+	// The following files should be on the server:
+	// 00000001 -d---- 00002 (root)
+	// 00000002 -d---- 00002 Test1
+	// 00000003 -d---- 00002 Test1/spacetest
+	// 00000004 f----- 00002 Test1/spacetest/f1
+	// 00000005 f----- 00002 Test1/spacetest/f2
+	// 00000006 -d---- 00002 Test1/spacetest/d1
+	// 00000007 f----- 00002 Test1/spacetest/d1/f3
+	// 00000008 f----- 00002 Test1/spacetest/d1/f4
+	// 00000009 -d---- 00002 Test1/spacetest/d2
+	// 0000000a -d---- 00002 Test1/spacetest/d3
+	// 0000000b -d---- 00002 Test1/spacetest/d3/d4
+	// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
+	// 0000000d -d---- 00002 Test1/spacetest/d6
+	// 0000000e -d---- 00002 Test1/spacetest/d7
+	// This is 28 blocks total.
+
+	// BLOCK
+	{
+#ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+		// No diffs were created, because intercept tests were skipped
+		int expected_num_old = 0;
+		int expected_blocks_old = 0;
+#else // !PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
+		// Some diffs were created by the intercept tests above
+		int expected_num_old = 3;
+		int expected_blocks_old = 6;
+#endif
+
+		std::auto_ptr<BackupProtocolClient> client =
+			ConnectAndLogin(context, 0 /* read-write */);
+		TEST_THAT(check_num_files(5, expected_num_old, 0, 9));
+		TEST_THAT(check_num_blocks(*client, 10, expected_blocks_old,
+			0, 18, 28 + expected_blocks_old));
+		client->QueryFinished();
+		sSocket.Close();
+	}
+
 	std::string cmd = BBACKUPD " " + bbackupd_args + 
 		" testfiles/bbackupd.conf";
 
