@@ -72,6 +72,7 @@
 #include "ServerControl.h"
 #include "Socket.h"
 #include "SocketStreamTLS.h"
+#include "StoreTestUtils.h"
 #include "TLSContext.h"
 #include "Test.h"
 #include "Timer.h"
@@ -92,7 +93,6 @@ void wait_for_backup_operation(const char* message)
 	wait_for_operation(TIME_TO_WAIT_FOR_BACKUP_OPERATION, message);
 }
 
-int bbstored_pid = 0;
 int bbackupd_pid = 0;
 
 #ifdef HAVE_SYS_XATTR_H
@@ -423,51 +423,6 @@ int test_basics()
 	finish_with_write_xattr_test();
 #endif // HAVE_SYS_XATTR_H
 
-	return 0;
-}
-
-int test_setupaccount()
-{
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
-		"testfiles/bbstored.conf create 01234567 0 1000B 2000B") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-	return 0;
-}
-
-int test_run_bbstored()
-{
-	std::string cmd = BBSTORED " " + bbstored_args + 
-		" testfiles/bbstored.conf";
-	bbstored_pid = LaunchServer(cmd, "testfiles/bbstored.pid");
-
-	TEST_THAT(bbstored_pid != -1 && bbstored_pid != 0);
-
-	if(bbstored_pid > 0)
-	{
-		::safe_sleep(1);
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		return 0;	// success
-	}
-	
-	return 1;
-}
-
-int test_kill_bbstored(bool wait_for_process = false)
-{
-	TEST_THAT(KillServer(bbstored_pid, wait_for_process));
-	::safe_sleep(1);
-	TEST_THAT(!ServerIsAlive(bbstored_pid));
-	if (!ServerIsAlive(bbstored_pid))
-	{
-		bbstored_pid = 0;
-	}
-
-	#ifdef WIN32
-		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
-	#else
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-	#endif
-	
 	return 0;
 }
 
@@ -1383,16 +1338,8 @@ int test_bbackupd()
 		{
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context, 0 /* read-write */);
-		
-			std::auto_ptr<BackupProtocolAccountUsage> usage(
-				client->QueryGetAccountUsage());
-			TEST_EQUAL_LINE(24, usage->GetBlocksUsed(),
-				"blocks used");
-			TEST_EQUAL_LINE(0,  usage->GetBlocksInDeletedFiles(),
-				"deleted blocks");
-			TEST_EQUAL_LINE(16, usage->GetBlocksInDirectories(),
-				"directory blocks");
-
+			TEST_THAT(check_num_files(4, 0, 0, 8));
+			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
 			sSocket.Close();
 		}
@@ -1676,7 +1623,7 @@ int test_bbackupd()
 	{
 		// Kill the daemons
 		terminate_bbackupd(bbackupd_pid);
-		test_kill_bbstored();
+		TEST_THAT(StopServer());
 
 		// create a new file to force an upload
 
@@ -1747,8 +1694,8 @@ int test_bbackupd()
 		}
 
 		// in fork parent
-		bbstored_pid = WaitForServerStartup("testfiles/bbstored.pid",
-			bbstored_pid);
+		TEST_EQUAL(bbstored_pid, WaitForServerStartup("testfiles/bbstored.pid",
+			bbstored_pid));
 
 		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
 
@@ -1778,7 +1725,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
 
-		test_kill_bbstored(true);
+		TEST_THAT(StopServer(true));
 
 		if (failures > 0)
 		{
@@ -1786,7 +1733,7 @@ int test_bbackupd()
 			return 1;
 		}
 
-		TEST_THAT(test_run_bbstored() == 0);
+		TEST_THAT(StartServer());
 
 		cmd = BBACKUPD " " + bbackupd_args +
 			" testfiles/bbackupd.conf";
@@ -2670,9 +2617,6 @@ int test_bbackupd()
 		TEST_EQUAL_LINE(0, errs.size(), "Loading configuration file "
 			"reported errors: " << errs);
 		TEST_THAT(config.get() != 0);
-		// Initialise the raid file controller
-		RaidFileController &rcontroller(RaidFileController::GetController());
-		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 		std::auto_ptr<BackupStoreAccountDatabase> db(
 			BackupStoreAccountDatabase::Read(
 				config->GetKeyValue("AccountDatabase")));
@@ -3992,11 +3936,24 @@ int test(int argc, const char *argv[])
 
 	int r = test_basics();
 	if(r != 0) return r;
-	
-	r = test_setupaccount();
+
+	{
+		std::string errs;
+		std::auto_ptr<Configuration> config(
+			Configuration::LoadAndVerify
+				("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
+		TEST_EQUAL_LINE(0, errs.size(), "Loading configuration file "
+			"reported errors: " << errs);
+		TEST_THAT(config.get() != 0);
+		// Initialise the raid file controller
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
+	}
+
+	r = (create_account(1000, 2000) ? 0 : 1);
 	if(r != 0) return r;
 
-	r = test_run_bbstored();
+	r = (StartServer() ? 0 : 1);
 	TEST_THAT(r == 0);
 	if(r != 0) return r;
 	
@@ -4014,7 +3971,7 @@ int test(int argc, const char *argv[])
 		return r;
 	}
 	
-	test_kill_bbstored();
+	TEST_THAT(StopServer());
 
 	return 0;
 }

@@ -67,7 +67,7 @@ bool check_reference_counts();
 bool StartServer();
 
 //! Stops the currently running bbstored test server.
-bool StopServer();
+bool StopServer(bool wait_for_process = false);
 
 //! Creates the standard test account, for example after delete_account().
 bool create_account(int soft, int hard);
