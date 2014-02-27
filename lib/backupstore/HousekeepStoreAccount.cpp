@@ -1025,7 +1025,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 	// Find the entry
 	BackupStoreDirectory::Entry *pdirentry = 
 		containingDir.FindEntryByID(dir.GetObjectID());
-	if((pdirentry != 0) && ((pdirentry->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0))
+	if((pdirentry != 0) && pdirentry->IsDeleted())
 	{
 		// Should be deleted
 		containingDir.DeleteEntry(dir.GetObjectID());
