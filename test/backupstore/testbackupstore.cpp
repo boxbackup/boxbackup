@@ -940,15 +940,155 @@ bool test_server_housekeeping()
 		}
 	}
 
-	std::string file1_fn;
-	StoreStructure::MakeObjectFilename(store1objid, 
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
-		file1_fn, false /* EnsureDirectoryExists */);
-	storedFile = RaidFileRead::Open(0, file1_fn);
-	int file1_blocks = storedFile->GetDiscUsageInBlocks();
+	int file1_blocks = get_raid_file(store1objid)->GetDiscUsageInBlocks();
 	TEST_THAT(check_num_files(1, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, 0, 0, root_dir_blocks,
 		file1_blocks + root_dir_blocks));
+
+	// Upload again, as a patch to the original file.
+	int64_t patch1_id = BackupStoreFile::QueryStoreFileDiff(protocol,
+		"testfiles/file1", // LocalFilename
+		BackupProtocolListDirectory::RootDirectory, // DirectoryObjectID
+		store1objid, // DiffFromFileID
+		0x7362383249872dfLL, // AttributesHash
+		store1name // StoreFilename
+		);
+	TEST_EQUAL_LINE(3, patch1_id, "wrong ObjectID for newly uploaded "
+		"patch file");
+
+	// We need to check the old file's size, because it's been replaced
+	// by a reverse diff, and patch1_id is a complete file, not a diff.
+	int patch1_blocks = get_raid_file(store1objid)->GetDiscUsageInBlocks();
+
+	// It will take extra blocks, even though there are no changes, because
+	// the server code is not smart enough to realise that the file
+	// contents are identical, so it will create an empty patch.
+	
+	TEST_THAT(check_num_files(1, 1, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks, 0,
+		root_dir_blocks, file1_blocks + patch1_blocks + root_dir_blocks));
+
+	// Change the file and upload again, as a patch to the original file.
+	{
+		FileStream out("testfiles/file1", O_WRONLY | O_APPEND);
+		std::string appendix = "appendix!";
+		out.Write(appendix.c_str(), appendix.size());
+		out.Close();
+	}
+
+	int64_t patch2_id = BackupStoreFile::QueryStoreFileDiff(protocol,
+		"testfiles/file1", // LocalFilename
+		BackupProtocolListDirectory::RootDirectory, // DirectoryObjectID
+		patch1_id, // DiffFromFileID
+		0x7362383249872dfLL, // AttributesHash
+		store1name // StoreFilename
+		);
+	TEST_EQUAL_LINE(4, patch2_id, "wrong ObjectID for newly uploaded "
+		"patch file");
+
+	// How many blocks used by the new file?
+	// We need to check the old file's size, because it's been replaced
+	// by a reverse diff, and patch1_id is a complete file, not a diff.
+	int patch2_blocks = get_raid_file(patch1_id)->GetDiscUsageInBlocks();
+
+	TEST_THAT(check_num_files(1, 2, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
+		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
+		root_dir_blocks));
+
+	// Housekeeping should not change anything just yet
+	protocol.QueryFinished();
+	TEST_THAT(run_housekeeping_and_check_account());
+	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
+	protocol.QueryLogin(0x01234567, 0);
+
+	TEST_THAT(check_num_files(1, 2, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
+		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
+		root_dir_blocks));
+
+	// Upload not as a patch, but as a completely different file. This
+	// marks the previous file as old (because the filename is the same)
+	// but used to not adjust the number of old/deleted files properly.
+	int64_t replaced_id = BackupStoreFile::QueryStoreFileDiff(protocol,
+		"testfiles/file1", // LocalFilename
+		BackupProtocolListDirectory::RootDirectory, // DirectoryObjectID
+		0, // DiffFromFileID
+		0x7362383249872dfLL, // AttributesHash
+		store1name // StoreFilename
+		);
+	TEST_EQUAL_LINE(5, replaced_id, "wrong ObjectID for newly uploaded "
+		"full file");
+
+	// How many blocks used by the new file? This time we need to check
+	// the new file, because it's not a patch.
+	int replaced_blocks = get_raid_file(replaced_id)->GetDiscUsageInBlocks();
+
+	TEST_THAT(check_num_files(1, 3, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
+		file1_blocks + patch1_blocks + patch2_blocks, // old
+		0, // deleted
+		root_dir_blocks, // directories
+		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
+		root_dir_blocks)); // total
+
+	// Housekeeping should not change anything just yet
+	protocol.QueryFinished();
+	TEST_THAT(run_housekeeping_and_check_account());
+	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
+	protocol.QueryLogin(0x01234567, 0);
+
+	TEST_THAT(check_num_files(1, 3, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
+		file1_blocks + patch1_blocks + patch2_blocks, // old
+		0, // deleted
+		root_dir_blocks, // directories
+		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
+		root_dir_blocks)); // total
+
+	// But if we reduce the limits, then it will
+	protocol.QueryFinished();
+	TEST_THAT(change_account_limits(
+		"14B", // replaced_blocks + file1_blocks + root_dir_blocks
+		"2000B"));
+	TEST_THAT(run_housekeeping_and_check_account());
+	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
+	protocol.QueryLogin(0x01234567, 0);
+
+	TEST_THAT(check_num_files(1, 1, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
+		file1_blocks, // old
+		0, // deleted
+		root_dir_blocks, // directories
+		file1_blocks + replaced_blocks + root_dir_blocks)); // total
+
+	// Check that deleting files is accounted for as well
+	protocol.QueryDeleteFile(
+		BackupProtocolListDirectory::RootDirectory, // InDirectory
+		store1name); // Filename
+
+	// The old version file is deleted as well!
+	TEST_THAT(check_num_files(0, 1, 2, 1));
+	TEST_THAT(check_num_blocks(protocol, 0, // current
+		file1_blocks, // old
+		replaced_blocks + file1_blocks, // deleted
+		root_dir_blocks, // directories
+		file1_blocks + replaced_blocks + root_dir_blocks));
+
+	// Reduce limits again, check that removed files are subtracted from
+	// block counts.
+	protocol.QueryFinished();
+	TEST_THAT(change_account_limits("0B", "2000B"));
+	TEST_THAT(run_housekeeping_and_check_account());
+	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
+	protocol.QueryLogin(0x01234567, 0);
+
+	TEST_THAT(check_num_files(0, 0, 0, 1));
+	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
+
+	// TODO FIXME These tests should not be here, but in
+	// test_server_commands. But make sure you use a network protocol,
+	// not a local one, when you move them.
 
 	// Try using GetFile on a directory
 	{
@@ -956,7 +1096,11 @@ bool test_server_housekeeping()
 			ConnectionException, Conn_Protocol_UnexpectedReply);
 	}
 
+	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
+	TEST_THAT(run_housekeeping_and_check_account());
+
+	ExpectedRefCounts.resize(2); // stop test failure in tearDown()
 	tearDown();
 	return true;
 }
@@ -1598,12 +1742,10 @@ bool test_multiple_uploads()
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		TEST_THAT(check_reference_counts());
-		apProtocol = test_server_login("localhost", context, conn);
 
 		// And delete them
-		BackupProtocolLocal2 protocolLocal(0x01234567, "test",
-			"backup/01234567/", 0, false); // Not read-only
-		apProtocol = &protocolLocal;
+		apProtocol.reset(new BackupProtocolLocal2(0x01234567, "test",
+			"backup/01234567/", 0, false)); // Not read-only
 
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
@@ -1611,7 +1753,7 @@ bool test_multiple_uploads()
 			TEST_THAT(dirdel->GetObjectID() == dirtodelete);
 		}
 
-		protocolLocal.QueryFinished();
+		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		TEST_THAT(check_reference_counts());
 
