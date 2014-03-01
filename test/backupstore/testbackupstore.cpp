@@ -661,18 +661,9 @@ void recursive_count_objects(const char *hostname, int64_t id, recursive_count_o
 			"testfiles/clientTrustedCAs.pem");
 
 	// Get a connection
-	// TODO FIXME replace with test_server_login
-	SocketStreamTLS connReadOnly;
-	connReadOnly.Open(context, Socket::TypeINET, hostname,
-		BOX_PORT_BBSTORED_TEST);
-	BackupProtocolClient protocolReadOnly(connReadOnly);
+	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
+		"backup/01234567/", 0, false);
 
-	{
-		std::auto_ptr<BackupProtocolVersion> serverVersion(protocolReadOnly.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocolReadOnly.QueryLogin(0x01234567, BackupProtocolLogin::Flags_ReadOnly));
-	}
-	
 	// Count objects
 	recursive_count_objects_r(protocolReadOnly, id, results);
 
@@ -1171,23 +1162,16 @@ bool test_multiple_uploads()
 	SETUP();
 	TEST_THAT_THROWONFAIL(StartServer());
 
-	std::auto_ptr<SocketStreamTLS> conn;
 	std::auto_ptr<BackupProtocolCallable> apProtocol(
-		test_server_login("localhost", context, conn).release());
+		test_server_login("localhost", context).release());
 
 #ifndef WIN32
 	// Open a new connection which is read only
-	std::auto_ptr<SocketStreamTLS> conn2(new SocketStreamTLS);
-	// TODO FIXME replace with test_server_login
-	conn2->Open(context, Socket::TypeINET, "localhost",
-		BOX_PORT_BBSTORED_TEST);
-	BackupProtocolClient protocolReadOnly(*conn2);
-
-	{
-		std::auto_ptr<BackupProtocolVersion> serverVersion(protocolReadOnly.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocolReadOnly.QueryLogin(0x01234567, BackupProtocolLogin::Flags_ReadOnly));
-	}
+	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
+	std::auto_ptr<BackupProtocolCallable> apProtocolReadOnly =
+		test_server_login("localhost", context,
+			BackupProtocolLogin::Flags_ReadOnly);
+	BackupProtocolCallable& protocolReadOnly(*apProtocolReadOnly);
 #else // WIN32
 	BackupProtocolCallable& protocolReadOnly(*apProtocol);
 #endif
@@ -1266,7 +1250,7 @@ bool test_multiple_uploads()
 
 			apProtocol->QueryFinished();
 			TEST_THAT(run_housekeeping_and_check_account());
-			apProtocol = test_server_login("localhost", context, conn);
+			apProtocol = test_server_login("localhost", context);
 
 			TEST_THAT(check_num_files(expected_num_current_files,
 				expected_num_old_files, 0, 1));
@@ -1371,7 +1355,7 @@ bool test_multiple_uploads()
 			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-		apProtocol = test_server_login("localhost", context, conn);
+		apProtocol = test_server_login("localhost", context);
 
 		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 
@@ -1672,7 +1656,7 @@ bool test_multiple_uploads()
 
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = test_server_login("localhost", context, conn);
+		apProtocol = test_server_login("localhost", context);
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
@@ -2053,12 +2037,9 @@ bool test_login_without_account()
 	// BLOCK
 	{
 		// Open a connection to the server
-		SocketStreamTLS conn;
-		conn.Open(context, Socket::TypeINET, "localhost",
-			BOX_PORT_BBSTORED_TEST);
-
-		// Make a protocol
-		BackupProtocolClient protocol(conn);
+		std::auto_ptr<BackupProtocolCallable> apProtocol(new
+			BackupProtocolClient(open_conn("localhost", context)));
+		BackupProtocolCallable& protocol(*apProtocol);
 
 		// Check the version
 		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -2140,12 +2121,9 @@ bool test_login_with_disabled_account()
 	// BLOCK
 	{
 		// Open a connection to the server
-		SocketStreamTLS conn;
-		conn.Open(context, Socket::TypeINET, "localhost",
-			BOX_PORT_BBSTORED_TEST);
-
-		// Make a protocol
-		BackupProtocolClient protocol(conn);
+		std::auto_ptr<BackupProtocolCallable> apProtocol(new
+			BackupProtocolClient(open_conn("localhost", context)));
+		BackupProtocolCallable& protocol(*apProtocol);
 
 		// Check the version
 		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -2189,8 +2167,7 @@ bool test_login_with_no_refcount_db()
 	// the refcount db.
 	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 
-	std::auto_ptr<SocketStreamTLS> conn;
-	TEST_CHECK_THROWS(test_server_login("localhost", context, conn),
+	TEST_CHECK_THROWS(test_server_login("localhost", context),
 		ConnectionException, Conn_TLSReadFailed);
 	TEST_THAT(ServerIsAlive(bbstored_pid));
 
@@ -2328,20 +2305,10 @@ bool test_account_limits_respected()
 	// Try to upload a file and create a directory, and check an error is generated
 	{
 		// Open a connection to the server
-		SocketStreamTLS conn;
-		conn.Open(context, Socket::TypeINET, "localhost",
-			BOX_PORT_BBSTORED_TEST);
+		std::auto_ptr<BackupProtocolCallable> apProtocol =
+			test_server_login("localhost", context);
+		BackupProtocolCallable& protocol(*apProtocol);
 
-		// Make a protocol
-		BackupProtocolClient protocol(conn);
-
-		// Check the version
-		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-
-		// Login
-		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0));
-		
 		int64_t modtime = 0;
 		
 		write_test_file(3);

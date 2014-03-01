@@ -158,7 +158,9 @@ print CPP <<__E;
 #include <sstream>
 
 #include "$filename_base.h"
-#include "IOStream.h"
+#include "CollectInBufferStream.h"
+#include "SocketStream.h"
+#include "MemBlockStream.h"
 __E
 
 print H <<__E;
@@ -179,8 +181,7 @@ print H <<__E;
 #include "ServerException.h"
 
 class IOStream;
-
-
+class SocketStream;
 __E
 
 # extra headers
@@ -741,7 +742,7 @@ __E
 	else
 	{
 		print H <<__E;
-	$server_or_client_class(IOStream &rStream);
+	$server_or_client_class(std::auto_ptr<SocketStream> apConn);
 	std::auto_ptr<$message_base_class> Receive();
 	void Send(const $message_base_class &rObject);
 __E
@@ -885,8 +886,8 @@ __E
 	else
 	{
 		print CPP <<__E;
-$server_or_client_class\::$server_or_client_class(IOStream &rStream)
-: Protocol(rStream)
+$server_or_client_class\::$server_or_client_class(std::auto_ptr<SocketStream> apConn)
+: Protocol(apConn)
 { }
 __E
 	}

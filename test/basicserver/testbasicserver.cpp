@@ -170,7 +170,7 @@ public:
 	testserver() {}
 	~testserver() {}
 	
-	void Connection(SocketStream &rStream);
+	void Connection(std::auto_ptr<SocketStream> apStream);
 	
 	virtual const char *DaemonName() const
 	{
@@ -210,9 +210,9 @@ const ConfigurationVerify *testserver::GetConfigVerify() const
 	return &verify;
 }
 
-void testserver::Connection(SocketStream &rStream)
+void testserver::Connection(std::auto_ptr<SocketStream> apStream)
 {
-	testservers_connection(rStream);
+	testservers_connection(*apStream);
 }
 
 class testProtocolServer : public testserver
@@ -221,7 +221,7 @@ public:
 	testProtocolServer() {}
 	~testProtocolServer() {}
 
-	void Connection(SocketStream &rStream);
+	void Connection(std::auto_ptr<SocketStream> apStream);
 	
 	virtual const char *DaemonName() const
 	{
@@ -229,9 +229,9 @@ public:
 	}
 };
 
-void testProtocolServer::Connection(SocketStream &rStream)
+void testProtocolServer::Connection(std::auto_ptr<SocketStream> apStream)
 {
-	TestProtocolServer server(rStream);
+	TestProtocolServer server(apStream);
 	TestContext context;
 	server.DoServer(context);
 }
@@ -243,7 +243,7 @@ public:
 	testTLSserver() {}
 	~testTLSserver() {}
 	
-	void Connection(SocketStreamTLS &rStream);
+	void Connection(std::auto_ptr<SocketStreamTLS> apStream);
 	
 	virtual const char *DaemonName() const
 	{
@@ -283,9 +283,9 @@ const ConfigurationVerify *testTLSserver::GetConfigVerify() const
 	return &verify;
 }
 
-void testTLSserver::Connection(SocketStreamTLS &rStream)
+void testTLSserver::Connection(std::auto_ptr<SocketStreamTLS> apStream)
 {
-	testservers_connection(rStream);
+	testservers_connection(*apStream);
 }
 
 
@@ -691,15 +691,15 @@ int test(int argc, const char *argv[])
 			TEST_THAT(ServerIsAlive(pid));
 
 			// Open a connection to it		
-			SocketStream conn;
+			std::auto_ptr<SocketStream> apConn(new SocketStream);
 			#ifdef WIN32
-				conn.Open(Socket::TypeINET, "localhost", 2003);
+				apConn->Open(Socket::TypeINET, "localhost", 2003);
 			#else
-				conn.Open(Socket::TypeUNIX, "testfiles/srv4.sock");
+				apConn->Open(Socket::TypeUNIX, "testfiles/srv4.sock");
 			#endif
 			
 			// Create a protocol
-			TestProtocolClient protocol(conn);
+			TestProtocolClient protocol(apConn);
 
 			// Simple query
 			{

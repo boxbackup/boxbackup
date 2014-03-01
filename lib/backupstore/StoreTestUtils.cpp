@@ -132,24 +132,22 @@ void init_context(TLSContext& rContext)
 			"testfiles/clientTrustedCAs.pem");
 }
 
-std::auto_ptr<SocketStreamTLS> open_conn(const char *hostname,
+std::auto_ptr<SocketStream> open_conn(const char *hostname,
 	TLSContext& rContext)
 {
 	init_context(rContext);
 	std::auto_ptr<SocketStreamTLS> conn(new SocketStreamTLS);
 	conn->Open(rContext, Socket::TypeINET, hostname,
 		BOX_PORT_BBSTORED_TEST);
-	return conn;
+	return static_cast<std::auto_ptr<SocketStream> >(conn);
 }
 
-std::auto_ptr<BackupProtocolClient> test_server_login(const char *hostname,
-	TLSContext& rContext, std::auto_ptr<SocketStreamTLS>& rapConn)
+std::auto_ptr<BackupProtocolCallable> test_server_login(const char *hostname,
+	TLSContext& rContext, int flags)
 {
-	rapConn = open_conn(hostname, rContext);
-
 	// Make a protocol
-	std::auto_ptr<BackupProtocolClient> protocol(new
-		BackupProtocolClient(*rapConn));
+	std::auto_ptr<BackupProtocolCallable> protocol(new
+		BackupProtocolClient(open_conn(hostname, rContext)));
 	
 	// Check the version
 	std::auto_ptr<BackupProtocolVersion> serverVersion(
@@ -158,7 +156,7 @@ std::auto_ptr<BackupProtocolClient> test_server_login(const char *hostname,
 
 	// Login
 	std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(
-		protocol->QueryLogin(0x01234567, 0));
+		protocol->QueryLogin(0x01234567, flags));
 
 	return protocol;
 }

@@ -214,7 +214,7 @@ public:
 	{
 		if(mTcpNiceMode)
 		{
-			mapNice->SetEnabled(enabled);
+			mpNice->SetEnabled(enabled);
 		}
 	}
 
@@ -226,8 +226,6 @@ private:
 	std::string mHostname;
 	int mPort;
 	uint32_t mAccountNumber;
-	std::auto_ptr<SocketStream> mapSocket;
-	std::auto_ptr<NiceSocketStream> mapNice;
 	std::auto_ptr<BackupProtocolClient> mapConnection;
 	bool mExtendedLogging;
 	bool mExtendedLogToFile;
@@ -246,6 +244,7 @@ private:
 	int mMaximumDiffingTime;
 	ProgressNotifier &mrProgressNotifier;
 	bool mTcpNiceMode;
+	NiceSocketStream *mpNice;
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

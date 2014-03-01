@@ -59,11 +59,11 @@ public:
 			ForkToHandleRequests>::Run2(rChildExit);
 	}
 	
-	virtual void HandleConnection(SocketStreamTLS &rStream)
+	virtual void HandleConnection(std::auto_ptr<SocketStreamTLS> apStream)
 	{
-		rStream.Handshake(mContext, true /* is server */);
+		apStream->Handshake(mContext, true /* is server */);
 		// this-> in next line required to build under some gcc versions
-		this->Connection(rStream);
+		this->Connection(apStream);
 	}
 	
 private:

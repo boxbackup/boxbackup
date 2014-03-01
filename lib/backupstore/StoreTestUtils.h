@@ -37,12 +37,12 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
 void init_context(TLSContext& rContext);
 
 //! Opens a connection to the server (bbstored).
-std::auto_ptr<SocketStreamTLS> open_conn(const char *hostname,
+std::auto_ptr<SocketStream> open_conn(const char *hostname,
 	TLSContext& rContext);
 
 //! Opens a connection to the server (bbstored) and logs in.
-std::auto_ptr<BackupProtocolClient> test_server_login(const char *hostname,
-	TLSContext& rContext, std::auto_ptr<SocketStreamTLS>& rapConn);
+std::auto_ptr<BackupProtocolCallable> test_server_login(const char *hostname,
+	TLSContext& rContext, int flags = 0);
 
 //! Checks the number of files of each type in the store against expectations.
 bool check_num_files(int files, int old, int deleted, int dirs);
