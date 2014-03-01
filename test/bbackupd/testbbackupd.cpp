@@ -468,10 +468,11 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 		// child process
 		{
 			// connect and log in
-			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost",
-				22011);
-			BackupProtocolClient protocol(conn);
+			SocketStreamTLS* pConn = new SocketStreamTLS;
+			std::auto_ptr<SocketStream> apConn(pConn);
+			pConn->Open(context, Socket::TypeINET, "localhost", 22011);
+			BackupProtocolClient protocol(apConn);
+
 			protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
 			std::auto_ptr<BackupProtocolLoginConfirmed>
 				loginConf(protocol.QueryLogin(0x01234567,
@@ -567,17 +568,17 @@ int64_t SearchDir(BackupStoreDirectory& rDir,
 	return id;
 }
 
-SocketStreamTLS sSocket;
-
 std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext)
 {
-	sSocket.Open(rContext, Socket::TypeINET, 
-		"localhost", 22011);
-	std::auto_ptr<BackupProtocolClient> connection;
-	connection.reset(new BackupProtocolClient(sSocket));
-	connection->Handshake();
+	SocketStreamTLS* pConn = new SocketStreamTLS;
+	std::auto_ptr<SocketStream> apConn(pConn);
+	pConn->Open(rContext, Socket::TypeINET, "localhost", 22011);
+
+	std::auto_ptr<BackupProtocolClient> client;
+	client.reset(new BackupProtocolClient(apConn));
+	client->Handshake();
 	std::auto_ptr<BackupProtocolVersion> 
-		serverVersion(connection->QueryVersion(
+		serverVersion(client->QueryVersion(
 			BACKUP_STORE_SERVER_VERSION));
 	if(serverVersion->GetVersion() != 
 		BACKUP_STORE_SERVER_VERSION)
@@ -585,15 +586,15 @@ std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext)
 		THROW_EXCEPTION(BackupStoreException, 
 			WrongServerVersion);
 	}
-	return connection;
+	return client;
 }
 
 std::auto_ptr<BackupProtocolClient> ConnectAndLogin(TLSContext& rContext,
 	int flags)
 {
-	std::auto_ptr<BackupProtocolClient> connection(Connect(rContext));
-	connection->QueryLogin(0x01234567, flags);
-	return connection;
+	std::auto_ptr<BackupProtocolClient> client(Connect(rContext));
+	client->QueryLogin(0x01234567, flags);
+	return client;
 }
 	
 std::auto_ptr<BackupStoreDirectory> ReadDirectory
@@ -885,7 +886,6 @@ int test_bbackupd()
 		}
 
 		client->QueryFinished();
-		sSocket.Close();
 	}
 
 	// unpack the files for the initial test
@@ -1274,7 +1274,6 @@ int test_bbackupd()
 		TEST_THAT(check_num_blocks(*client, 10, expected_blocks_old,
 			0, 18, 28 + expected_blocks_old));
 		client->QueryFinished();
-		sSocket.Close();
 	}
 
 	std::string cmd = BBACKUPD " " + bbackupd_args + 
@@ -1381,7 +1380,6 @@ int test_bbackupd()
 			TEST_THAT(check_num_files(4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		if (failures) return 1;
@@ -1515,7 +1513,6 @@ int test_bbackupd()
 
 			// Log out.
 			client->QueryFinished();
-			sSocket.Close();
 		}
 		BOX_TRACE("done.");
 
@@ -1564,7 +1561,6 @@ int test_bbackupd()
 
 			// Log out.
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		if (failures) return 1;
@@ -1602,7 +1598,6 @@ int test_bbackupd()
 			// i.e. 2 new files, 1 new directory
 
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		if (failures) return 1;
@@ -1978,7 +1973,6 @@ int test_bbackupd()
 		int64_t testDirId = SearchDir(*dir, "Test2");
 		TEST_THAT(testDirId == 0);
 		client->QueryFinished();
-		sSocket.Close();
 	}
 
 	// create the location directory and unpack some files into it
@@ -2018,7 +2012,6 @@ int test_bbackupd()
 		TEST_THAT(testDirId != 0);
 
 		client->QueryFinished();
-		sSocket.Close();
 	}
 
 	printf("\n==== Testing that redundant locations are deleted on time\n");
@@ -2060,7 +2053,6 @@ int test_bbackupd()
 			TEST_THAT(testDirId != 0);
 
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		wait_for_sync_end();
@@ -2078,7 +2070,6 @@ int test_bbackupd()
 			TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
 
 			client->QueryFinished();
-			sSocket.Close();
 		}
 	}
 
@@ -2325,7 +2316,6 @@ int test_bbackupd()
 			TEST_THAT(SearchDir(*dir, filename.c_str()) != 0);
 			// Log out
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		// Check that bbackupquery shows the dir in console encoding
@@ -3239,7 +3229,6 @@ int test_bbackupd()
 			TEST_THAT(!SearchDir(*dir, "xx_not_this_dir_22"));
 			TEST_THAT(!SearchDir(*dir, "somefile.excludethis"));
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		TEST_THAT(ServerIsAlive(bbackupd_pid));
@@ -3449,7 +3438,6 @@ int test_bbackupd()
 
 			// Log out
 			client->QueryFinished();
-			sSocket.Close();
 		}
 
 		// Compare the restored files
@@ -3644,7 +3632,6 @@ int test_bbackupd()
 					
 					// Log out
 					protocol->QueryFinished();
-					sSocket.Close();
 				}
 				catch(...)
 				{
@@ -3734,7 +3721,7 @@ int test_bbackupd()
 				== Restore_Complete);
 
 			client->QueryFinished();
-			sSocket.Close();
+			client.reset();
 
 			// Then check it has restored the correct stuff
 			TEST_COMPARE(Compare_Same);
@@ -3764,7 +3751,7 @@ int test_bbackupd()
 				== Restore_Complete);
 
 			client->QueryFinished();
-			sSocket.Close();
+			client.reset();
 
 			// Do a compare with the now undeleted files
 			compareReturnValue = ::system(BBACKUPQUERY " "

@@ -73,7 +73,8 @@ BackupClientContext::BackupClientContext
   mKeepAliveTimer(0, "KeepAliveTime"),
   mbIsManaged(false),
   mrProgressNotifier(rProgressNotifier),
-  mTcpNiceMode(TcpNiceMode)
+  mTcpNiceMode(TcpNiceMode),
+  mpNice(NULL)
 {
 }
 
@@ -113,13 +114,12 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	{
 		return *mapConnection;
 	}
-	
-	// there shouldn't be a connection open
-	ASSERT(mapSocket.get() == 0);
+
 	// Defensive. Must close connection before releasing any old socket.
 	mapConnection.reset();
-	mapSocket.reset(new SocketStreamTLS);
-	
+
+	std::auto_ptr<SocketStream> apSocket(new SocketStreamTLS);
+
 	try
 	{
 		// Defensive.
@@ -130,21 +130,22 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			mHostname << "'...");
 
 		// Connect!
-		((SocketStreamTLS *)(mapSocket.get()))->Open(mrTLSContext,
+		((SocketStreamTLS *)(apSocket.get()))->Open(mrTLSContext,
 			Socket::TypeINET, mHostname, mPort);
 		
 		if(mTcpNiceMode)
 		{
-			// Pass control of mapSocket to NiceSocketStream,
+			// Pass control of apSocket to NiceSocketStream,
 			// which will take care of destroying it for us.
-			mapNice.reset(new NiceSocketStream(mapSocket));
-			mapConnection.reset(new BackupProtocolClient(*mapNice));
+			// But we need to hang onto a pointer to the nice
+			// socket, so we can enable and disable nice mode.
+			// This is scary, it could be deallocated under us.
+			mpNice = new NiceSocketStream(apSocket);
+			apSocket.reset(mpNice);
 		}
-		else
-		{
-			mapConnection.reset(new BackupProtocolClient(*mapSocket));
-		}
-		
+
+		mapConnection.reset(new BackupProtocolClient(apSocket));
+
 		// Set logging option
 		mapConnection->SetLogToSysLog(mExtendedLogging);
 		
@@ -165,10 +166,10 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				mapConnection->SetLogToFile(mpExtendedLogFileHandle);
 			}
 		}
-		
+
 		// Handshake
 		mapConnection->Handshake();
-		
+
 		// Check the version of the server
 		{
 			std::auto_ptr<BackupProtocolVersion> serverVersion(
@@ -192,8 +193,6 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				try
 				{
 					mapConnection->QueryFinished();
-					mapNice.reset();
-					mapSocket.reset();
 				}
 				catch(...)
 				{
@@ -222,8 +221,6 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	{
 		// Clean up.
 		mapConnection.reset();
-		mapNice.reset();
-		mapSocket.reset();
 		throw;
 	}
 	
@@ -267,17 +264,6 @@ void BackupClientContext::CloseAnyOpenConnection()
 		
 		// Delete it anyway.
 		mapConnection.reset();
-	}
-
-	try
-	{
-		// Be nice about closing the socket
-		mapNice.reset();
-		mapSocket.reset();
-	}
-	catch(...)
-	{
-		// Ignore errors
 	}
 
 	// Delete any pending list

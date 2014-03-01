@@ -429,15 +429,16 @@ int main(int argc, const char *argv[])
 
 	// 2. Connect to server
 	if(!quiet) BOX_INFO("Connecting to store...");
-	SocketStreamTLS socket;
-	socket.Open(tlsContext, Socket::TypeINET,
+	SocketStreamTLS *socket = new SocketStreamTLS;
+	std::auto_ptr<SocketStream> apSocket(socket);
+	socket->Open(tlsContext, Socket::TypeINET,
 		conf.GetKeyValue("StoreHostname").c_str(),
 		conf.GetKeyValueInt("StorePort"));
 	
 	// 3. Make a protocol, and handshake
 	if(!quiet) BOX_INFO("Handshake with store...");
 	std::auto_ptr<BackupProtocolClient>
-		apConnection(new BackupProtocolClient(socket));
+		apConnection(new BackupProtocolClient(apSocket));
 	BackupProtocolClient& connection(*(apConnection.get()));
 	connection.Handshake();
 	

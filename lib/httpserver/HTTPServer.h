@@ -62,7 +62,7 @@ private:
 	const char *DaemonName() const;
 	const ConfigurationVerify *GetConfigVerify() const;
 	void Run();
-	void Connection(SocketStream &rStream);
+	void Connection(std::auto_ptr<SocketStream> apStream);
 };
 
 // Root level

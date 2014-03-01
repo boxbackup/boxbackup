@@ -132,10 +132,10 @@ void HTTPServer::Run()
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-void HTTPServer::Connection(SocketStream &rStream)
+void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 {
 	// Create a get line object to use
-	IOStreamGetLine getLine(rStream);
+	IOStreamGetLine getLine(*apConn);
 
 	// Notify dervived claases
 	HTTPConnectionOpening();
@@ -152,7 +152,7 @@ void HTTPServer::Connection(SocketStream &rStream)
 		}
 	
 		// Generate a response
-		HTTPResponse response(&rStream);
+		HTTPResponse response(apConn.get());
 		
 		try
 		{

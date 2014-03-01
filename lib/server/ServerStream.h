@@ -286,7 +286,7 @@ public:
 								#endif
 								
 								// The derived class does some server magic with the connection
-								HandleConnection(*connection);
+								HandleConnection(connection);
 								// Since rChildExit == true, the forked process will call _exit() on return from this fn
 								return;
 			
@@ -305,7 +305,7 @@ public:
 						#endif // !WIN32
 							// Just handle in this process
 							SetProcessTitle("handling");
-							HandleConnection(*connection);
+							HandleConnection(connection);
 							SetProcessTitle("idle");										
 						#ifndef WIN32
 						}
@@ -377,12 +377,12 @@ public:
 	}
 	#endif
 
-	virtual void HandleConnection(StreamType &rStream)
+	virtual void HandleConnection(std::auto_ptr<StreamType> apStream)
 	{
-		Connection(rStream);
+		Connection(apStream);
 	}
 
-	virtual void Connection(StreamType &rStream) = 0;
+	virtual void Connection(std::auto_ptr<StreamType> apStream) = 0;
 	
 protected:
 	// For checking code in derived classes -- use if you have an algorithm which

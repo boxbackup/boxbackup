@@ -19,7 +19,7 @@
 
 #include "Protocol.h"
 #include "ProtocolWire.h"
-#include "IOStream.h"
+#include "SocketStream.h"
 #include "ServerException.h"
 #include "PartialReadStream.h"
 #include "ProtocolUncertainStream.h"
@@ -44,8 +44,8 @@
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-Protocol::Protocol(IOStream &rStream)
-: mrStream(rStream),
+Protocol::Protocol(std::auto_ptr<SocketStream> apConn)
+: mapConn(apConn),
   mHandshakeDone(false),
   mMaxObjectSize(PROTOCOL_DEFAULT_MAXOBJSIZE),
   mTimeout(PROTOCOL_DEFAULT_TIMEOUT),
@@ -103,8 +103,8 @@ void Protocol::Handshake()
 	::strncpy(hsSend.mIdent, GetProtocolIdentString(), sizeof(hsSend.mIdent));
 	
 	// Send it
-	mrStream.Write(&hsSend, sizeof(hsSend));
-	mrStream.WriteAllBuffered();
+	mapConn->Write(&hsSend, sizeof(hsSend));
+	mapConn->WriteAllBuffered();
 
 	// Receive a handshake from the peer
 	PW_Handshake hsReceive;
@@ -114,7 +114,7 @@ void Protocol::Handshake()
 	while(bytesToRead > 0)
 	{
 		// Get some data from the stream
-		int bytesRead = mrStream.Read(readInto, bytesToRead, mTimeout);
+		int bytesRead = mapConn->Read(readInto, bytesToRead, mTimeout);
 		if(bytesRead == 0)
 		{
 			THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
@@ -158,7 +158,8 @@ void Protocol::CheckAndReadHdr(void *hdr)
 	}
 
 	// Get some data into this header
-	if(!mrStream.ReadFullBuffer(hdr, sizeof(PW_ObjectHeader), 0 /* not interested in bytes read if this fails */, mTimeout))
+	if(!mapConn->ReadFullBuffer(hdr, sizeof(PW_ObjectHeader),
+		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
 		THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
 	}
@@ -199,7 +200,8 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	EnsureBufferAllocated(objSize);
 	
 	// Read data
-	if(!mrStream.ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader), 0 /* not interested in bytes read if this fails */, mTimeout))
+	if(!mapConn->ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader),
+		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
 		THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
 	}
@@ -292,8 +294,8 @@ void Protocol::SendInternal(const Message &rObject)
 	pobjHeader->mObjType = htonl(rObject.GetType());
 
 	// Write data
-	mrStream.Write(mpBuffer, writtenSize);
-	mrStream.WriteAllBuffered();
+	mapConn->Write(mpBuffer, writtenSize);
+	mapConn->WriteAllBuffered();
 }
 
 // --------------------------------------------------------------------------
@@ -647,13 +649,13 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 	{
 		BOX_TRACE("Receiving stream, size uncertain");
 		return std::auto_ptr<IOStream>(
-			new ProtocolUncertainStream(mrStream));
+			new ProtocolUncertainStream(*mapConn));
 	}
 	else
 	{
 		BOX_TRACE("Receiving stream, size " << streamSize << " bytes");
 		return std::auto_ptr<IOStream>(
-			new PartialReadStream(mrStream, streamSize));
+			new PartialReadStream(*mapConn, streamSize));
 	}
 }
 
@@ -709,7 +711,7 @@ void Protocol::SendStream(IOStream &rStream)
 	objHeader.mObjType = htonl(SPECIAL_STREAM_OBJECT_TYPE);
 
 	// Write header
-	mrStream.Write(&objHeader, sizeof(objHeader));
+	mapConn->Write(&objHeader, sizeof(objHeader));
 	// Could be sent in one of two ways
 	if(uncertainSize)
 	{
@@ -744,7 +746,7 @@ void Protocol::SendStream(IOStream &rStream)
 			// Send final byte to finish the stream
 			BOX_TRACE("Sending end of stream byte");
 			uint8_t endOfStream = ProtocolStreamHeader_EndOfStream;
-			mrStream.Write(&endOfStream, 1);
+			mapConn->Write(&endOfStream, 1);
 			BOX_TRACE("Sent end of stream byte");
 		}
 		catch(...)
@@ -759,13 +761,13 @@ void Protocol::SendStream(IOStream &rStream)
 	else
 	{
 		// Fixed size stream, send it all in one go
-		if(!rStream.CopyStreamTo(mrStream, mTimeout, 4096 /* slightly larger buffer */))
+		if(!rStream.CopyStreamTo(*mapConn, mTimeout, 4096 /* slightly larger buffer */))
 		{
 			THROW_EXCEPTION(ConnectionException, Conn_Protocol_TimeOutWhenSendingStream)
 		}
 	}
 	// Make sure everything is written
-	mrStream.WriteAllBuffered();
+	mapConn->WriteAllBuffered();
 	
 }
 
@@ -816,7 +818,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	Block[-1] = header;
 	
 	// Write everything out
-	mrStream.Write(Block - 1, writeSize + 1);
+	mapConn->Write(Block - 1, writeSize + 1);
 	
 	BOX_TRACE("Sent " << (writeSize+1) << " bytes to stream");
 	// move the remainer to the beginning of the block for the next time round
@@ -1177,6 +1179,12 @@ const uint16_t Protocol::sProtocolStreamHeaderLengths[256] =
 	0		// 255 = special (reserved)
 };
 
+int64_t Protocol::GetBytesRead() const
+{
+	return mapConn->GetBytesRead();
+}
 
-
-
+int64_t Protocol::GetBytesWritten() const
+{
+	return mapConn->GetBytesWritten();
+}
