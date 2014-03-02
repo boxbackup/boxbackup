@@ -684,7 +684,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	if(mFixErrors)
 	{
 		info->Save();
-		BOX_NOTICE("New store info file written successfully.");
+		BOX_INFO("New store info file written successfully.");
 	}
 }
 

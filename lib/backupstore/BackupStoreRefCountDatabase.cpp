@@ -155,8 +155,8 @@ std::string BackupStoreRefCountDatabase::GetFilename(const
 // Function
 //		Name:    BackupStoreRefCountDatabase::Create(int32_t,
 //			 const std::string &, int, bool)
-//		Purpose: Create a new database, overwriting an existing
-//			 one only if AllowOverwrite is true.
+//		Purpose: Create a blank database, using a temporary file that
+//			 you must Discard() or Commit() to make permanent.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------

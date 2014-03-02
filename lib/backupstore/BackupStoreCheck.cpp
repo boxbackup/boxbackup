@@ -918,7 +918,7 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 			else
 			{
 				// This is OK for files, they might move
-				BOX_NOTICE("File ID " <<
+				BOX_INFO("File ID " <<
 					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
 					<< " has different container ID, "
 					"probably moved");

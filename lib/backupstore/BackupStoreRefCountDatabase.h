@@ -66,22 +66,23 @@ private:
 	BackupStoreRefCountDatabase(const BackupStoreRefCountDatabase &);
 	
 public:
-	// Create a new database for a new account.
+	// Create a blank database, using a temporary file that you must
+	// Discard() or Commit() to make permanent.
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const BackupStoreAccountDatabase::Entry& rAccount);
 	void Commit();
 	void Discard();
-	
+
 	// Load it from the store
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(const
 		BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
-	
+
 	typedef uint32_t refcount_t;
 
 	// Data access functions
 	refcount_t GetRefCount(int64_t ObjectID) const;
 	int64_t GetLastObjectIDUsed() const;
-	
+
 	// Data modification functions
 	void AddReference(int64_t ObjectID);
 	// RemoveReference returns false if refcount drops to zero
