@@ -938,8 +938,8 @@ std::auto_ptr<$message_base_class> $server_or_client_class\::Receive()
 	try
 	{
 		apReply = std::auto_ptr<$message_base_class>(
-			($message_base_class *)
-			$custom_protocol_subclass\::ReceiveInternal().release());
+			static_cast<$message_base_class *>
+			($custom_protocol_subclass\::ReceiveInternal().release()));
 	}
 	catch(ConnectionException &e)
 	{
@@ -1111,7 +1111,8 @@ __E
 	CheckReply("$cmd", rQuery, *preply, $reply_id);
 
 	// Correct response, if no exception thrown by CheckReply
-	return std::auto_ptr<$reply_class>(($reply_class *)preply.release());
+	return std::auto_ptr<$reply_class>(
+		static_cast<$reply_class *>(apReply.release()));
 }
 __E
 			}
