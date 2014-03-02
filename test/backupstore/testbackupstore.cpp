@@ -2037,9 +2037,7 @@ bool test_login_without_account()
 	// BLOCK
 	{
 		// Open a connection to the server
-		std::auto_ptr<BackupProtocolCallable> apProtocol(new
-			BackupProtocolClient(open_conn("localhost", context)));
-		BackupProtocolCallable& protocol(*apProtocol);
+		BackupProtocolClient protocol(open_conn("localhost", context));
 
 		// Check the version
 		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -2121,9 +2119,7 @@ bool test_login_with_disabled_account()
 	// BLOCK
 	{
 		// Open a connection to the server
-		std::auto_ptr<BackupProtocolCallable> apProtocol(new
-			BackupProtocolClient(open_conn("localhost", context)));
-		BackupProtocolCallable& protocol(*apProtocol);
+		BackupProtocolClient protocol(open_conn("localhost", context));
 
 		// Check the version
 		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -2305,9 +2301,7 @@ bool test_account_limits_respected()
 	// Try to upload a file and create a directory, and check an error is generated
 	{
 		// Open a connection to the server
-		std::auto_ptr<BackupProtocolCallable> apProtocol =
-			test_server_login("localhost", context);
-		BackupProtocolCallable& protocol(*apProtocol);
+		BackupProtocolClient protocol(open_conn("localhost", context));
 
 		int64_t modtime = 0;
 		
