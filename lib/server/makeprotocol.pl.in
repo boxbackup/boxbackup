@@ -211,13 +211,16 @@ __E
 my $request_base_class = "${protocol_name}ProtocolRequest";
 my $reply_base_class   = "${protocol_name}ProtocolReply";
 # the abstract protocol interface
-my $protocol_base_class = $protocol_name."ProtocolBase";
+my $custom_protocol_subclass = $protocol_name."Protocol";
+my $client_server_base_class = $protocol_name."ProtocolClientServer";
 my $replyable_base_class = $protocol_name."ProtocolReplyable";
+my $callable_base_class = $protocol_name."ProtocolCallable";
 
 print H <<__E;
-class $protocol_base_class;
+class $custom_protocol_subclass;
+class $client_server_base_class;
+class $callable_base_class;
 class $replyable_base_class;
-class $reply_base_class;
 
 class $message_base_class : public Message
 {
@@ -232,6 +235,20 @@ class $reply_base_class
 
 class $request_base_class
 {
+};
+
+class $custom_protocol_subclass : public Protocol
+{
+public:
+	$custom_protocol_subclass(std::auto_ptr<SocketStream> apConn)
+	: Protocol(apConn)
+	{ }
+	virtual ~$custom_protocol_subclass() { }
+	virtual std::auto_ptr<Message> MakeMessage(int ObjType);
+	virtual const char *GetProtocolIdentString();
+
+private:
+	$custom_protocol_subclass(const $custom_protocol_subclass &rToCopy);
 };
 
 __E
@@ -507,34 +524,34 @@ my $error_class = $protocol_name."ProtocolError";
 
 # the abstract protocol interface
 print H <<__E;
-class $protocol_base_class
+
+class $client_server_base_class
 {
 public:
-	$protocol_base_class();
-	virtual ~$protocol_base_class();
-	virtual const char *GetIdentString();
-	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
+	$client_server_base_class();
+	virtual ~$client_server_base_class();
 	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
+	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
 
 protected:
-	void CheckReply(const std::string& requestCommand,
-		const $message_base_class &rReply, int expectedType);
 	void SetLastError(int Type, int SubType)
 	{
 		mLastErrorType = Type;
 		mLastErrorSubType = SubType;
 	}
+	std::string mPreviousCommand;
+	std::string mPreviousReply;
 
 private:
-	$protocol_base_class(const $protocol_base_class &rToCopy); /* do not call */
+	$client_server_base_class(const $client_server_base_class &rToCopy); /* do not call */
 	int mLastErrorType;
 	int mLastErrorSubType;
 };
 
-class $replyable_base_class : public virtual $protocol_base_class
+class $replyable_base_class : public virtual $client_server_base_class
 {
 public:
-	$replyable_base_class();
+	$replyable_base_class() { }
 	virtual ~$replyable_base_class();
 
 	virtual int GetTimeout() = 0;
@@ -551,21 +568,40 @@ private:
 __E
 
 print CPP <<__E;
-$protocol_base_class\::$protocol_base_class()
+$client_server_base_class\::$client_server_base_class()
 : mLastErrorType(Protocol::NoError),
   mLastErrorSubType(Protocol::NoError)
 { }
 
-$protocol_base_class\::~$protocol_base_class()
+$client_server_base_class\::~$client_server_base_class()
 { }
 
-const char *$protocol_base_class\::GetIdentString()
+const char *$custom_protocol_subclass\::GetProtocolIdentString()
 {
 	return "$ident_string";
 }
 
-$replyable_base_class\::$replyable_base_class()
-{ }
+std::auto_ptr<Message> $custom_protocol_subclass\::MakeMessage(int ObjType)
+{
+	switch(ObjType)
+	{
+__E
+
+# do objects within this
+for my $cmd (@cmd_list)
+{
+	print CPP <<__E;
+	case $cmd_id{$cmd}:
+		return std::auto_ptr<Message>(new $cmd_classes{$cmd}());
+		break;
+__E
+}
+
+print CPP <<__E;
+	default:
+		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnknownCommandRecieved)
+	}
+}
 
 $replyable_base_class\::~$replyable_base_class()
 { }
@@ -586,8 +622,9 @@ void $replyable_base_class\::DeleteStreamsToSend()
 	mStreamsToSend.clear();
 }
 
-void $protocol_base_class\::CheckReply(const std::string& requestCommand,
-	const $message_base_class &rReply, int expectedType)
+void $callable_base_class\::CheckReply(const std::string& requestCommandName,
+	const $message_base_class &rCommand, const $message_base_class &rReply,
+	int expectedType)
 {
 	if(rReply.GetType() == expectedType)
 	{
@@ -603,7 +640,7 @@ void $protocol_base_class\::CheckReply(const std::string& requestCommand,
 			SetLastError(type, subType);
 			THROW_EXCEPTION_MESSAGE(ConnectionException,
 				Conn_Protocol_UnexpectedReply,
-				requestCommand << " command failed: "
+				requestCommandName << " command failed: "
 				"received error " <<
 				(($error_class&)rReply).GetMessage());
 		}
@@ -612,11 +649,17 @@ void $protocol_base_class\::CheckReply(const std::string& requestCommand,
 			SetLastError(Protocol::UnknownError, Protocol::UnknownError);
 			THROW_EXCEPTION_MESSAGE(ConnectionException,
 				Conn_Protocol_UnexpectedReply,
-				requestCommand << " command failed: "
+				requestCommandName << " command failed: "
 				"received unexpected response type " <<
 				rReply.GetType());
 		}
 	}
+
+	// As a client, if we get an unexpected reply later, we'll want to know
+	// the last command that we executed, and the reply, to help debug the
+	// server.
+	mPreviousCommand = rCommand.ToString();
+	mPreviousReply = rReply.ToString();
 }
 
 // --------------------------------------------------------------------------
@@ -627,7 +670,7 @@ void $protocol_base_class\::CheckReply(const std::string& requestCommand,
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-bool $protocol_base_class\::GetLastError(int &rTypeOut, int &rSubTypeOut)
+bool $client_server_base_class\::GetLastError(int &rTypeOut, int &rSubTypeOut)
 {
 	if(mLastErrorType == Protocol::NoError)
 	{
@@ -650,12 +693,18 @@ __E
 
 # the callable protocol interface (implemented by Client and Local classes)
 # with Query methods that don't take a context parameter
-my $callable_base_class = $protocol_name."ProtocolCallable";
 print H <<__E;
-class $callable_base_class : public virtual $protocol_base_class
+class $callable_base_class : public virtual $client_server_base_class
 {
 public:
 	virtual int GetTimeout() = 0;
+
+protected:
+	void CheckReply(const std::string& requestCommandName,
+		const $message_base_class &rCommand, 
+		const $message_base_class &rReply, int expectedType);
+
+public:
 __E
 
 # add plain object taking query functions
@@ -722,7 +771,7 @@ foreach my $type ('Client', 'Server', 'Local')
 	}
 	if (not $writing_local)
 	{
-		push @base_classes, "Protocol";
+		push @base_classes, $custom_protocol_subclass;
 	}
 
 	my $base_classes_str = join(", ", map {"public $_"} @base_classes);
@@ -743,8 +792,10 @@ __E
 	{
 		print H <<__E;
 	$server_or_client_class(std::auto_ptr<SocketStream> apConn);
+private:
 	std::auto_ptr<$message_base_class> Receive();
 	void Send(const $message_base_class &rObject);
+public:
 __E
 	}
 	
@@ -786,19 +837,9 @@ private:
 __E
 	}
 	
-	print H <<__E;
-
-protected:
-	virtual std::auto_ptr<Message> MakeMessage(int ObjType);
-
-__E
-
 	if($writing_local)
 	{
 		print H <<__E;
-	virtual void InformStreamReceiving(u_int32_t Size) { }
-	virtual void InformStreamSending(u_int32_t Size) { }
-
 public:
 	virtual std::auto_ptr<IOStream> ReceiveStream()
 	{
@@ -811,29 +852,34 @@ __E
 	else
 	{
 		print H <<__E;
-	virtual void InformStreamReceiving(u_int32_t Size)
-	{
-		this->Protocol::InformStreamReceiving(Size);
-	}
-	virtual void InformStreamSending(u_int32_t Size)
-	{
-		this->Protocol::InformStreamSending(Size);
-	}
-
 public:
-	virtual std::auto_ptr<IOStream> ReceiveStream()
-	{
-		return this->Protocol::ReceiveStream();
-	}
+	virtual std::auto_ptr<IOStream> ReceiveStream();
 __E
-	}
 
-	print H <<__E;
-	virtual const char *GetProtocolIdentString()
+		print CPP <<__E;
+std::auto_ptr<IOStream> $server_or_client_class\::ReceiveStream()
+{
+	try
 	{
-		return GetIdentString();
+		return $custom_protocol_subclass\::ReceiveStream();
 	}
+	catch(ConnectionException &e)
+	{
+		if(e.GetSubType() == ConnectionException::Protocol_ObjWhenStreamExpected)
+		{
+			THROW_EXCEPTION_MESSAGE(ConnectionException,
+				Protocol_ObjWhenStreamExpected,
+				"Last exchange was " << mPreviousCommand <<
+				" => " << mPreviousReply);
+		}
+		else
+		{
+			throw;
+		}
+	}
+}
 __E
+	}
 
 	if($writing_local)
 	{
@@ -849,23 +895,13 @@ __E
 		print H <<__E;
 	virtual int GetTimeout()
 	{
-		return this->Protocol::GetTimeout();
+		return $custom_protocol_subclass\::GetTimeout();
 	}
 __E
 	}	
 	
 	print H <<__E;
-	/*
-	virtual void Handshake()
-	{
-		this->Protocol::Handshake();
-	}
-	virtual bool GetLastError(int &rTypeOut, int &rSubTypeOut)
-	{
-		return this->Protocol::GetLastError(rTypeOut, rSubTypeOut);
-	}
-	*/
-	
+
 private:
 	$server_or_client_class(const $server_or_client_class &rToCopy); /* no copies */
 };
@@ -887,7 +923,7 @@ __E
 	{
 		print CPP <<__E;
 $server_or_client_class\::$server_or_client_class(std::auto_ptr<SocketStream> apConn)
-: Protocol(apConn)
+: $custom_protocol_subclass(apConn)
 { }
 __E
 	}
@@ -899,49 +935,45 @@ $server_or_client_class\::~$server_or_client_class()
 __E
 
 	# write receive and send functions
-	print CPP <<__E;
-std::auto_ptr<Message> $server_or_client_class\::MakeMessage(int ObjType)
-{
-	switch(ObjType)
-	{
-__E
-
-	# do objects within this
-	for my $cmd (@cmd_list)
-	{
-		print CPP <<__E;
-	case $cmd_id{$cmd}:
-		return std::auto_ptr<Message>(new $cmd_classes{$cmd}());
-		break;
-__E
-	}
-
-	print CPP <<__E;
-	default:
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnknownCommandRecieved)
-	}
-}
-__E
-
 	if(not $writing_local)
 	{
 		print CPP <<__E;
 std::auto_ptr<$message_base_class> $server_or_client_class\::Receive()
 {
-	std::auto_ptr<$message_base_class> preply(($message_base_class *)
-		Protocol::ReceiveInternal().release());
+	std::auto_ptr<$message_base_class> apReply;
+
+	try
+	{
+		apReply = std::auto_ptr<$message_base_class>(
+			($message_base_class *)
+			$custom_protocol_subclass\::ReceiveInternal().release());
+	}
+	catch(ConnectionException &e)
+	{
+		if(e.GetSubType() == ConnectionException::Protocol_StreamWhenObjExpected)
+		{
+			THROW_EXCEPTION_MESSAGE(ConnectionException,
+				Protocol_StreamWhenObjExpected,
+				"Last exchange was " << mPreviousCommand <<
+				" => " << mPreviousReply);
+		}
+		else
+		{
+			throw;
+		}
+	}
 
 	if(GetLogToSysLog())
 	{
-		preply->LogSysLog("Receive");
+		apReply->LogSysLog("Receive");
 	}
 
 	if(GetLogToFile() != 0)
 	{
-		preply->LogFile("Receive", GetLogToFile());
+		apReply->LogFile("Receive", GetLogToFile());
 	}
 
-	return preply;
+	return apReply;
 }
 
 void $server_or_client_class\::Send(const $message_base_class &rObject)
@@ -992,6 +1024,15 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 			SendStream(**i);
 		}
 		
+		// As a server, if we get an unexpected message later, we'll
+		// want to know/ the last command that we received, and the
+		// reply, to help debug our response to it.
+		mPreviousCommand = pobj->ToString();
+		std::ostringstream reply;
+		reply << preply->ToString() << " and " <<
+			mStreamsToSend.size() << " streams";
+		mPreviousReply = reply.str();
+
 		// Delete these streams
 		DeleteStreamsToSend();
 
@@ -1022,7 +1063,12 @@ __E
 				my $send_stream_extra = '';
 				my $send_stream_method = $writing_client ? "SendStream"
 					: "SendStreamAfterCommand";
-				
+
+				print CPP <<__E;
+std::auto_ptr<$reply_class> $server_or_client_class\::Query(const $request_class &rQuery$argextra)
+{
+__E
+
 				if($writing_client)
 				{
 					if($has_stream)
@@ -1034,20 +1080,12 @@ __E
 					}
 					
 					print CPP <<__E;
-std::auto_ptr<$reply_class> $server_or_client_class\::Query(const $request_class &rQuery$argextra)
-{
 	// Send query
 	Send(rQuery);
 	$send_stream_extra
 	
 	// Wait for the reply
 	std::auto_ptr<$message_base_class> preply = Receive();
-	
-	CheckReply("$cmd", *preply, $reply_id);
-
-	// Correct response, if no exception thrown by CheckReply
-	return std::auto_ptr<$reply_class>(($reply_class *)preply.release());
-}
 __E
 				}
 				elsif($writing_local)
@@ -1061,19 +1099,28 @@ __E
 					}
 
 					print CPP <<__E;
-std::auto_ptr<$reply_class> $server_or_client_class\::Query(const $request_class &rQuery$argextra)
-{
-	// Send query
+	// Push streams to send, if any, into queue for retrieval by DoCommand.
 	$send_stream_extra
+
+	// Execute the command and get the reply message
 	std::auto_ptr<$message_base_class> preply = rQuery.DoCommand(*this, mrContext);
 	
-	CheckReply("$cmd", *preply, $reply_id);
+	if(!mStreamsToSend.empty())
+	{
+		THROW_EXCEPTION_MESSAGE(ConnectionException,
+			Protocol_StreamsNotConsumed, rQuery.ToString());
+	}
+__E
+				}
+
+				# Common to both client and local
+				print CPP <<__E;
+	CheckReply("$cmd", rQuery, *preply, $reply_id);
 
 	// Correct response, if no exception thrown by CheckReply
 	return std::auto_ptr<$reply_class>(($reply_class *)preply.release());
 }
 __E
-				}
 			}
 		}
 	}

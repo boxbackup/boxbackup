@@ -41,6 +41,7 @@ public:
 
 	virtual void LogSysLog(const char *Action) const { }
 	virtual void LogFile(const char *Action, FILE *file) const { }
+	virtual std::string ToString() const = 0;
 };
 
 /*
