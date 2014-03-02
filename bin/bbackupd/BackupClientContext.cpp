@@ -124,7 +124,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	{
 		// Defensive.
 		mapConnection.reset();
-		
+
 		// Log intention
 		BOX_INFO("Opening connection to server '" <<
 			mHostname << "'...");
@@ -132,7 +132,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		// Connect!
 		((SocketStreamTLS *)(apSocket.get()))->Open(mrTLSContext,
 			Socket::TypeINET, mHostname, mPort);
-		
+
 		if(mTcpNiceMode)
 		{
 			// Pass control of apSocket to NiceSocketStream,
@@ -148,7 +148,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 
 		// Set logging option
 		mapConnection->SetLogToSysLog(mExtendedLogging);
-		
+
 		if (mExtendedLogToFile)
 		{
 			ASSERT(mpExtendedLogFileHandle == NULL);
@@ -183,7 +183,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		// Login -- if this fails, the Protocol will exception
 		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(
 			mapConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
-		
+
 		// Check that the client store marker is the one we expect
 		if(mClientStoreMarker != ClientStoreMarker_NotKnown)
 		{
@@ -203,7 +203,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				THROW_EXCEPTION(BackupStoreException, ClientMarkerNotAsExpected)
 			}
 		}
-		
+
 		// Log success
 		BOX_INFO("Connection made, login successful");
 

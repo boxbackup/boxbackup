@@ -235,7 +235,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	catch(BoxException &e)
 	{
 		BOX_WARNING("Reference count database was missing or "
-			"corrupted during housekeeping, cannot check for "
+			"corrupted during housekeeping, cannot check it for "
 			"errors.");
 	}
 

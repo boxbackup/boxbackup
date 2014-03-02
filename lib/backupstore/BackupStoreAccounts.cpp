@@ -205,7 +205,7 @@ void BackupStoreAccounts::LockAccount(int32_t ID, NamedLock& rNamedLock)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
 			CouldNotLockStoreAccount, "Failed to get exclusive "
-			"lock on account " << ID);
+			"lock on account " << BOX_FORMAT_ACCOUNT(ID));
 	}
 }
 
