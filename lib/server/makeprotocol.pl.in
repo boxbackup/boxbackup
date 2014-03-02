@@ -604,7 +604,11 @@ print CPP <<__E;
 }
 
 $replyable_base_class\::~$replyable_base_class()
-{ }
+{
+	// If there were any streams left over, there's no longer any way to
+	// access them, and we're responsible for them, so we'd better delete them.
+	DeleteStreamsToSend();
+}
 
 void $replyable_base_class\::SendStreamAfterCommand(std::auto_ptr<IOStream> apStream)
 {
