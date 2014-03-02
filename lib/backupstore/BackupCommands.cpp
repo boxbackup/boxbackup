@@ -227,7 +227,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -249,14 +251,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupPr
 		}
 	}
 	
-	// A stream follows, which contains the file
-	std::auto_ptr<IOStream> filestream(rProtocol.ReceiveStream());
-	
 	// Ask the context to store it
 	int64_t id = 0;
 	try
 	{
-		id = rContext.AddFile(*filestream, mDirectoryObjectID,
+		id = rContext.AddFile(rDataStream, mDirectoryObjectID,
 			mModificationTime, mAttributesHash, mDiffFromFileID,
 			mFilename,
 			true /* mark files with same name as old versions */);
@@ -469,11 +468,12 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 //
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(
-	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	return BackupProtocolCreateDirectory2(mContainingDirectoryID,
 		mAttributesModTime, 0 /* ModificationTime */,
-		mDirectoryName).DoCommand(rProtocol, rContext);
+		mDirectoryName).DoCommand(rProtocol, rContext, rDataStream);
 }
 
 
@@ -488,17 +488,16 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(
 //
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
-	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 	
-	// Get the stream containing the attributes
-	std::auto_ptr<IOStream> attrstream(rProtocol.ReceiveStream());
 	// Collect the attributes -- do this now so no matter what the outcome, 
 	// the data has been absorbed.
 	StreamableMemBlock attr;
-	attr.Set(*attrstream, rProtocol.GetTimeout());
+	attr.Set(rDataStream, rProtocol.GetTimeout());
 	
 	// Check to see if the hard limit has been exceeded
 	if(rContext.HardLimitExceeded())
@@ -547,17 +546,17 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	// Get the stream containing the attributes
-	std::auto_ptr<IOStream> attrstream(rProtocol.ReceiveStream());
 	// Collect the attributes -- do this now so no matter what the outcome, 
 	// the data has been absorbed.
 	StreamableMemBlock attr;
-	attr.Set(*attrstream, rProtocol.GetTimeout());
+	attr.Set(rDataStream, rProtocol.GetTimeout());
 
 	// Get the context to do it's magic
 	rContext.ChangeDirAttributes(mObjectID, attr, mAttributesModTime);
@@ -575,17 +574,18 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoComman
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolSetReplacementFileAttributes::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage>
+BackupProtocolSetReplacementFileAttributes::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	// Get the stream containing the attributes
-	std::auto_ptr<IOStream> attrstream(rProtocol.ReceiveStream());
 	// Collect the attributes -- do this now so no matter what the outcome, 
 	// the data has been absorbed.
 	StreamableMemBlock attr;
-	attr.Set(*attrstream, rProtocol.GetTimeout());
+	attr.Set(rDataStream, rProtocol.GetTimeout());
 
 	// Get the context to do it's magic
 	int64_t objectID = 0;
