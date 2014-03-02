@@ -452,22 +452,28 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	return numChanges;
 }
 
-#define APPLY_DELTA(field, delta) \
-	if(mReadOnly) \
-	{ \
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly) \
-	} \
-	\
-	if((field + delta) < 0) \
-	{ \
-		THROW_EXCEPTION_MESSAGE(BackupStoreException, \
-			StoreInfoBlockDeltaMakesValueNegative, \
-			"Failed to reduce " << #field << " from " << \
-			field << " by " << delta); \
-	} \
-	\
-	field += delta; \
+void BackupStoreInfo::ApplyDelta(int64_t& field, const std::string& field_name,
+	const int64_t delta)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly);
+	}
+
+	if((field + delta) < 0)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			StoreInfoBlockDeltaMakesValueNegative,
+			"Failed to reduce " << field_name << " from " <<
+			field << " by " << delta);
+	}
+
+	field += delta;
 	mIsModified = true;
+}
+
+#define APPLY_DELTA(field, delta) \
+	ApplyDelta(field, #field, delta)
 
 // --------------------------------------------------------------------------
 //
