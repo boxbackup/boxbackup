@@ -508,8 +508,26 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
 	}
 
 	bool alreadyExists = false;
-	int64_t id = rContext.AddDirectory(mContainingDirectoryID, mDirectoryName, attr, mAttributesModTime, alreadyExists);
-	
+	int64_t id;
+
+	try
+	{
+		id = rContext.AddDirectory(mContainingDirectoryID,
+			mDirectoryName, attr, mAttributesModTime, mModificationTime,
+			alreadyExists);
+	}
+	catch(BackupStoreException &e)
+	{
+		if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
+		{
+			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
+		}
+		else
+		{
+			throw;
+		}
+	}
+
 	if(alreadyExists)
 	{
 		return PROTOCOL_ERROR(Err_DirectoryAlreadyExists);
