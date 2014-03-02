@@ -2310,27 +2310,26 @@ bool test_account_limits_respected()
 		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BackupProtocolListDirectory::RootDirectory, fnx, &modtime));
 		TEST_THAT(modtime != 0);
 
-		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
+		TEST_CHECK_THROWS(protocol.QueryStoreFile(
 				BackupProtocolListDirectory::RootDirectory,
 				modtime,
 				modtime, /* use it for attr hash too */
 				0,							/* diff from ID */
 				fnx,
-				upload)),
+				upload),
 			ConnectionException, Conn_Protocol_UnexpectedReply);
 
 		// This currently causes a fatal error on the server, which
 		// kills the connection. TODO FIXME return an error instead.
 		std::auto_ptr<IOStream> attr(new MemBlockStream(&modtime, sizeof(modtime)));
 		BackupStoreFilenameClear fnxd("exceed-limit-dir");
-		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> dirCreate(
-			protocol.QueryCreateDirectory(
+		TEST_CHECK_THROWS(protocol.QueryCreateDirectory(
 				BackupProtocolListDirectory::RootDirectory,
-				9837429842987984LL, fnxd, attr)),
-			ConnectionException, TLSReadFailed);
+				9837429842987984LL, fnxd, attr),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
 
 		// Finish the connection. TODO FIXME reinstate this.
-		// protocol.QueryFinished();
+		protocol.QueryFinished();
 	}
 
 	tearDown();
