@@ -468,7 +468,27 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	return BackupProtocolCreateDirectory2(mContainingDirectoryID,
+		mAttributesModTime, 0 /* ModificationTime */,
+		mDirectoryName).DoCommand(rProtocol, rContext);
+}
+
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolCreateDirectory2::DoCommand(Protocol &, BackupStoreContext &)
+//		Purpose: Create directory command, with a specific
+//			 modification time.
+//		Created: 2014/02/11
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
