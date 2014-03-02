@@ -75,5 +75,10 @@ bool create_account(int soft, int hard);
 //! Deletes the standard test account, for testing behaviour with no account.
 bool delete_account();
 
+#define TEST_COMMAND_RETURNS_ERROR(command, error) \
+	TEST_CHECK_THROWS(command, ConnectionException, \
+		Conn_Protocol_UnexpectedReply); \
+	TEST_EQUAL(BackupProtocolError::error, protocol.GetLastErrorType());
+
 #endif // STORETESTUTILS__H
 

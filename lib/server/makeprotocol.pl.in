@@ -532,6 +532,7 @@ public:
 	virtual ~$client_server_base_class();
 	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
 	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
+	int GetLastErrorType() { return mLastErrorSubType; }
 
 protected:
 	void SetLastError(int Type, int SubType)
