@@ -169,8 +169,9 @@ void Protocol::CheckAndReadHdr(void *hdr)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::Recieve()
-//		Purpose: Recieves an object from the stream, creating it from the factory object type
+//		Name:    Protocol::ReceiveInternal()
+//		Purpose: Receives an object from the stream, creating it
+//			 from the factory object type
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
@@ -621,7 +622,7 @@ void Protocol::Write(const std::string &rValue)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::ReceieveStream()
+//		Name:    Protocol::ReceiveStream()
 //		Purpose: Receive a stream from the remote side
 //		Created: 2003/08/26
 //
