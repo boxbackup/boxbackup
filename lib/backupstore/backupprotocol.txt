@@ -124,6 +124,14 @@ CreateDirectory	20	Command(Success)	StreamWithCommand
 	# stream following containing attributes
 
 
+CreateDirectory2	46	Command(Success)	StreamWithCommand
+	int64		ContainingDirectoryID
+	int64		AttributesModTime
+	int64		ModificationTime
+	Filename	DirectoryName
+	# stream following containing attributes
+
+
 ListDirectory	21	Command(Success)
 	int64		ObjectID
 	int16		FlagsMustBeSet
@@ -255,3 +263,4 @@ AccountUsage2	45	Reply
 	int64	NumDeletedFiles
 	int64	NumDirectories
 
+# 46 is CreateDirectory2

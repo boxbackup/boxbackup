@@ -141,7 +141,12 @@ public:
 	
 	// Manipulating files/directories
 	int64_t AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime, int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename, bool MarkFileWithSameNameAsOldVersions);
-	int64_t AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists);
+	int64_t AddDirectory(int64_t InDirectory,
+		const BackupStoreFilename &rFilename,
+		const StreamableMemBlock &Attributes,
+		int64_t AttributesModTime,
+		int64_t ModificationTime,
+		bool &rAlreadyExists);
 	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime);
 	bool ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut);
 	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut);

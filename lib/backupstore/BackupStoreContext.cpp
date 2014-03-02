@@ -1026,7 +1026,12 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t Objec
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists)
+int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
+	const BackupStoreFilename &rFilename,
+	const StreamableMemBlock &Attributes,
+	int64_t AttributesModTime,
+	int64_t ModificationTime,
+	bool &rAlreadyExists)
 {
 	if(mapStoreInfo.get() == 0)
 	{
@@ -1102,7 +1107,9 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 	// Then add it into the parent directory
 	try
 	{
-		dir.AddEntry(rFilename, 0 /* modification time */, id, 0 /* blocks used */, BackupStoreDirectory::Entry::Flags_Dir, 0 /* attributes mod time */);
+		dir.AddEntry(rFilename, ModificationTime, id, dirSize,
+			BackupStoreDirectory::Entry::Flags_Dir,
+			AttributesModTime);
 		SaveDirectory(dir, InDirectory);
 
 		// Increment reference count on the new directory to one
