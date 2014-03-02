@@ -196,6 +196,9 @@ private:
 	std::vector<int64_t> mDeletedDirectories;
 	bool mAccountEnabled;
 	CollectInBufferStream mExtraData;
+
+	void ApplyDelta(int64_t& field, const std::string& field_name,
+		const int64_t delta);
 };
 
 #endif // BACKUPSTOREINFO__H
