@@ -33,6 +33,12 @@ public:
 	
 	~SelfFlushingStream()
 	{
+		if(StreamDataLeft())
+		{
+			BOX_WARNING("Not all data was read from stream, "
+				"discarding the rest");
+		}
+
 		Flush();
 	}
 

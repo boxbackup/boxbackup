@@ -45,6 +45,7 @@
 #include "StoreTestUtils.h"
 #include "TLSContext.h"
 #include "Test.h"
+#include "ZeroStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -1076,6 +1077,18 @@ bool test_server_housekeeping()
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
+
+	// Used to not consume the stream
+	std::auto_ptr<IOStream> upload(new ZeroStream(1000));
+	TEST_COMMAND_RETURNS_ERROR(protocol.QueryStoreFile(
+			BACKUPSTORE_ROOT_DIRECTORY_ID,
+			0,
+			0, /* use for attr hash too */
+			99999, /* diff from ID */
+			uploads[0].name,
+			upload),
+		Err_DiffFromFileDoesNotExist);
+	// TODO FIXME replace all other TEST_CHECK_THROWS with TEST_COMMAND_RETURNS_ERROR
 
 	// TODO FIXME These tests should not be here, but in
 	// test_server_commands. But make sure you use a network protocol,
