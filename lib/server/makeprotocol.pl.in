@@ -785,6 +785,7 @@ foreach my $type ('Client', 'Server', 'Local')
 class $server_or_client_class : $base_classes_str
 {
 public:
+	virtual ~$server_or_client_class();
 __E
 
 	if($writing_local)
@@ -797,17 +798,11 @@ __E
 	{
 		print H <<__E;
 	$server_or_client_class(std::auto_ptr<SocketStream> apConn);
-private:
 	std::auto_ptr<$message_base_class> Receive();
 	void Send(const $message_base_class &rObject);
-public:
 __E
 	}
 	
-	print H <<__E;
-	virtual ~$server_or_client_class();
-__E
-
 	if($writing_server)
 	{
 		# need to put in the conversation function
@@ -839,12 +834,6 @@ __E
 		print H <<__E;
 private:
 	$context_class &mrContext;
-__E
-	}
-	
-	if($writing_local)
-	{
-		print H <<__E;
 public:
 	virtual std::auto_ptr<IOStream> ReceiveStream()
 	{
@@ -857,7 +846,6 @@ __E
 	else
 	{
 		print H <<__E;
-public:
 	virtual std::auto_ptr<IOStream> ReceiveStream();
 __E
 
@@ -904,7 +892,7 @@ __E
 	}
 __E
 	}	
-	
+
 	print H <<__E;
 
 private:
@@ -1030,7 +1018,7 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 		}
 		
 		// As a server, if we get an unexpected message later, we'll
-		// want to know/ the last command that we received, and the
+		// want to know the last command that we received, and the
 		// reply, to help debug our response to it.
 		mPreviousCommand = pobj->ToString();
 		std::ostringstream reply;
@@ -1087,7 +1075,7 @@ __E
 					print CPP <<__E;
 	// Send query
 	Send(rQuery);
-	$send_stream_extra
+$send_stream_extra
 	
 	// Wait for the reply
 	std::auto_ptr<$message_base_class> preply = Receive();
