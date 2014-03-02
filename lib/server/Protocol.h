@@ -211,4 +211,3 @@ class ProtocolContext
 };
 
 #endif // PROTOCOL__H
-

@@ -25,3 +25,4 @@ Protocol_HandshakeFailed				48
 Protocol_StreamWhenObjExpected			49
 Protocol_ObjWhenStreamExpected			50
 Protocol_TimeOutWhenSendingStream		52	Probably a network issue between client and server.
+Protocol_StreamsNotConsumed		53	The server command handler did not consume all streams that were sent.
