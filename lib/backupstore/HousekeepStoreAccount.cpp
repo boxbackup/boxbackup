@@ -210,24 +210,25 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
 			BackupStoreRefCountDatabase::Load(account, false);
 
-		int64_t LastUsedObjectIdOnDisk = mapNewRefs->GetLastObjectIDUsed();
-
-		if (apOldRefs->GetLastObjectIDUsed() > LastUsedObjectIdOnDisk)
-		{
-			LastUsedObjectIdOnDisk = apOldRefs->GetLastObjectIDUsed();
-		}
+		int64_t MaxOldObjectId = apOldRefs->GetLastObjectIDUsed();
+		int64_t MaxNewObjectId = mapNewRefs->GetLastObjectIDUsed();
 
 		for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
-			ObjectID < LastUsedObjectIdOnDisk; ObjectID++)
+			ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
+			ObjectID++)
 		{
-			if (apOldRefs->GetRefCount(ObjectID) !=
-				mapNewRefs->GetRefCount(ObjectID))
+			typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
+			refcount_t OldRefs = (ObjectID <= MaxOldObjectId) ?
+				apOldRefs->GetRefCount(ObjectID) : 0;
+			refcount_t NewRefs = (ObjectID <= MaxNewObjectId) ?
+				mapNewRefs->GetRefCount(ObjectID) : 0;
+
+			if (OldRefs != NewRefs)
 			{
 				BOX_WARNING("Reference count of object " <<
 					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" changed from " <<
-					apOldRefs->GetRefCount(ObjectID) <<
-					" to " << mapNewRefs->GetRefCount(ObjectID));
+					" changed from " << OldRefs <<
+					" to " << NewRefs);
 				mErrorCount++;
 			}
 		}
@@ -237,6 +238,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		BOX_WARNING("Reference count database was missing or "
 			"corrupted during housekeeping, cannot check it for "
 			"errors.");
+		mErrorCount++;
 	}
 
 	// Go and delete items from the accounts
