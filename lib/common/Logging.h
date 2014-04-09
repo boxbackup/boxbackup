@@ -446,6 +446,37 @@ class Logging
 			Logging::Remove(mpLogger);
 		}
 	};
+
+	// --------------------------------------------------------------------------
+	//
+	// Class
+	//		Name:    Logging::OptionParser
+	//		Purpose: Process command-line options
+	//		Created: 2014/04/09
+	//
+	// --------------------------------------------------------------------------
+	class OptionParser
+	{
+	public:
+		OptionParser(Log::Level InitialLevel =
+			#ifdef BOX_RELEASE_BUILD
+			Log::NOTICE
+			#else
+			Log::INFO
+			#endif
+			)
+		: mCurrentLevel(InitialLevel)
+		{ }
+		
+		static std::string GetOptionString();
+		int ProcessOption(signed int option);
+		static std::string GetUsageString();
+		int mCurrentLevel; // need an int to do math with
+		Log::Level GetCurrentLevel()
+		{
+			return (Log::Level) mCurrentLevel;
+		}
+	};
 };
 
 class FileLogger : public Logger
