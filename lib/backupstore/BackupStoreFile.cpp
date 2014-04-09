@@ -78,7 +78,8 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFile(
 	const BackupStoreFilename &rStoreFilename,
 	int64_t *pModificationTime,
 	ReadLoggingStream::Logger* pLogger,
-	RunStatusProvider* pRunStatusProvider)
+	RunStatusProvider* pRunStatusProvider,
+	BackgroundTask* pBackgroundTask)
 {
 	// Create the stream
 	std::auto_ptr<BackupStoreFileEncodeStream> stream(
@@ -86,7 +87,8 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFile(
 
 	// Do the initial setup
 	stream->Setup(Filename, 0 /* no recipe, just encode */, ContainerID,
-		rStoreFilename, pModificationTime, pLogger, pRunStatusProvider);
+		rStoreFilename, pModificationTime, pLogger, pRunStatusProvider,
+		pBackgroundTask);
 	
 	// Return the stream for the caller
 	return stream;

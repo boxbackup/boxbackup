@@ -202,7 +202,8 @@ BackupDaemon::BackupDaemon()
 	  mpProgressNotifier(this),
 	  mpLocationResolver(this),
 	  mpRunStatusProvider(this),
-	  mpSysadminNotifier(this)
+	  mpSysadminNotifier(this),
+	  mapCommandSocketPollTimer(NULL)
 	#ifdef WIN32
 	, mInstallService(false),
 	  mRemoveService(false),
@@ -442,6 +443,9 @@ void BackupDaemon::Run()
 	// initialise global timer mechanism
 	Timers::Init();
 	
+	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
+		"CommandSocketPollTimer"));
+
 	#ifndef WIN32
 		// Ignore SIGPIPE so that if a command connection is broken,
 		// the daemon doesn't terminate.
@@ -926,7 +930,7 @@ void BackupDaemon::RunSyncNow()
 
 	// Set up the sync parameters
 	BackupClientDirectoryRecord::SyncParams params(*mpRunStatusProvider,
-		*mpSysadminNotifier, *mpProgressNotifier, clientContext);
+		*mpSysadminNotifier, *mpProgressNotifier, clientContext, this);
 	params.mSyncPeriodStart = syncPeriodStart;
 	params.mSyncPeriodEnd = syncPeriodEndExtended;
 	// use potentially extended end time
@@ -1840,6 +1844,51 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 	return waitInSeconds;
 }
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupDaemon::RunBackgroundTask()
+//		Purpose: Checks for connections or commands on the command
+//			 socket and handles them with minimal delay. Polled
+//			 during lengthy operations such as file uploads.
+//		Created: 07/04/14
+//
+// --------------------------------------------------------------------------
+bool BackupDaemon::RunBackgroundTask(State state, uint64_t progress,
+	uint64_t maximum)
+{
+	BOX_TRACE("BackupDaemon::RunBackgroundTask: state = " << state <<
+		", progress = " << progress << "/" << maximum);
+	
+	if(mapCommandSocketPollTimer->HasExpired())
+	{
+		mapCommandSocketPollTimer->Reset(COMMAND_SOCKET_POLL_INTERVAL);
+	}
+	else
+	{
+		// Do no more work right now
+		return true;
+	}
+
+	if(mapCommandSocketInfo.get())
+	{
+		BOX_TRACE("BackupDaemon::RunBackgroundTask: polling command socket");
+
+		bool sync_flag_out, sync_is_forced_out;
+
+		WaitOnCommandSocket(0, // RequiredDelay
+			sync_flag_out, sync_is_forced_out);
+
+		if(sync_flag_out)
+		{
+			BOX_WARNING("Ignoring request to sync while "
+				"already syncing.");
+		}
+	}
+
+	return true;
+}
 
 // --------------------------------------------------------------------------
 //

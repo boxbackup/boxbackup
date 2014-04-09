@@ -25,6 +25,7 @@
 #include "TLSContext.h"
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_BackupStoreException.h"
 
 #ifdef WIN32
 	#include "WinNamedPipeListener.h"
@@ -37,6 +38,8 @@
 #	include <VsWriter.h>
 #	include <VsBackup.h>
 #endif
+
+#define COMMAND_SOCKET_POLL_INTERVAL 1000
 
 class BackupClientDirectoryRecord;
 class BackupClientContext;
@@ -55,7 +58,7 @@ class Archive;
 //
 // --------------------------------------------------------------------------
 class BackupDaemon : public Daemon, ProgressNotifier, LocationResolver,
-RunStatusProvider, SysadminNotifier
+RunStatusProvider, SysadminNotifier, BackgroundTask
 {
 public:
 	BackupDaemon();
@@ -232,12 +235,15 @@ public:
 	void SetLocationResolver (LocationResolver*  p) { mpLocationResolver = p; }
 	void SetRunStatusProvider(RunStatusProvider* p) { mpRunStatusProvider = p; }
 	void SetSysadminNotifier (SysadminNotifier*  p) { mpSysadminNotifier = p; }
+	virtual bool RunBackgroundTask(State state, uint64_t progress,
+		uint64_t maximum);
 		
 private:
 	ProgressNotifier* mpProgressNotifier;
 	LocationResolver* mpLocationResolver;
 	RunStatusProvider* mpRunStatusProvider;
 	SysadminNotifier* mpSysadminNotifier;
+	std::auto_ptr<Timer> mapCommandSocketPollTimer;
 	
  	/* ProgressNotifier implementation */
 public:
@@ -250,7 +256,13 @@ public:
 		if (mLogAllFileAccess)
 		{
 			BOX_INFO("Scanning directory: " << rLocalPath);
-		} 
+		}
+
+		if (!RunBackgroundTask(BackgroundTask::Scanning_Dirs, 0, 0))
+		{
+			THROW_EXCEPTION(BackupStoreException,
+				CancelledByBackgroundTask);
+		}
 	}
  	virtual void NotifyDirStatFailed(
  		const BackupClientDirectoryRecord* pDirRecord,
