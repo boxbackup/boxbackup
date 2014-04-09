@@ -888,6 +888,34 @@ int test_bbackupd()
 		client->QueryFinished();
 	}
 
+	printf("\n==== Testing that GetObject on nonexistent file outputs the "
+		"correct error message\n");
+	{
+		std::auto_ptr<BackupProtocolClient> connection = ConnectAndLogin(
+			context, 0 /* read-write */);
+		std::string errs;
+		std::auto_ptr<Configuration> config(
+			Configuration::LoadAndVerify
+				("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
+		BackupQueries query(*connection, *config, false); // read-only
+		std::vector<std::string> args;
+		args.push_back("2"); // object ID
+		args.push_back("testfiles/2.obj"); // output file
+		bool opts[256];
+
+		Capture capture;
+		Logging::TempLoggerGuard guard(&capture);
+		query.CommandGetObject(args, opts);
+		std::vector<Capture::Message> messages = capture.GetMessages();
+		TEST_THAT(!messages.empty());
+		if (!messages.empty())
+		{
+			std::string last_message = messages.back().message;
+			TEST_EQUAL("Object ID 0x2 does not exist on store.",
+				last_message);
+		}
+	}
+		
 	// unpack the files for the initial test
 	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
 	TEST_THAT(::mkdir("testfiles/TestDir1", 0777) == 0);

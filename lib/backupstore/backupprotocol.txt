@@ -77,8 +77,7 @@ SetClientStoreMarker	6	Command(Success)
 
 GetObject	10	Command(Success)
 	int64		ObjectID
-	CONSTANT	NoObject	0
-	# reply has stream following, if ObjectID != NoObject
+	# reply has stream following (if successful)
 
 
 MoveObject	11	Command(Success)

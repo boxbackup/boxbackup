@@ -875,19 +875,25 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	{
 		// Request object
 		std::auto_ptr<BackupProtocolSuccess> getobj(mrConnection.QueryGetObject(id));
-		if(getobj->GetObjectID() != BackupProtocolGetObject::NoObject)
-		{
-			// Stream that object out to the file
-			std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-			objectStream->CopyStreamTo(out);
+
+		// Stream that object out to the file
+		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+		objectStream->CopyStreamTo(out);
 			
-			BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
-				" fetched successfully.");
-		}
-		else
+		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
+			" fetched successfully.");
+	}
+	catch(ConnectionException &e)
+	{
+		if(mrConnection.GetLastErrorType() == BackupProtocolError::Err_DoesNotExist)
 		{
 			BOX_ERROR("Object ID " << BOX_FORMAT_OBJECTID(id) <<
 				" does not exist on store.");
+			::unlink(args[1].c_str());
+		}
+		else
+		{
+			BOX_ERROR("Error occured fetching object.");
 			::unlink(args[1].c_str());
 		}
 	}
