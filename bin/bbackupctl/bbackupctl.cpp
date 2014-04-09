@@ -38,12 +38,14 @@ enum Command
 	WaitForSyncStart,
 	WaitForSyncEnd,
 	SyncAndWaitForEnd,
+	NoCommand,
 };
 
 void PrintUsageAndExit()
 {
 	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
 	"Commands are:\n"
+	"  status -- report daemon status without changing anything\n"
 	"  sync -- start a synchronisation (backup) run now\n"
 	"  force-sync -- force the start of a synchronisation run, "
 	"even if SyncAllowScript says no\n"
@@ -230,6 +232,11 @@ int main(int argc, const char *argv[])
 	{
 		command = SyncAndWaitForEnd;
 	}
+	else if (commandName == "status")
+	{
+		BOX_NOTICE("state " << currentState);
+		command = NoCommand;
+	}
 
 	switch (command)
 	{
@@ -269,8 +276,16 @@ int main(int argc, const char *argv[])
 		{
 			// Normal case, just send the command given 
 			// plus a quit command.
-			std::string cmd = commandName;
-			cmd += "\nquit\n";
+			std::string cmd = commandName + "\n";
+			connection.Write(cmd.c_str(), cmd.size());
+		}
+		// fall through
+
+		case NoCommand:
+		{
+			// Normal case, just send the command given 
+			// plus a quit command.
+			std::string cmd = "quit\n";
 			connection.Write(cmd.c_str(), cmd.size());
 		}
 	}
@@ -280,7 +295,7 @@ int main(int argc, const char *argv[])
 	bool syncIsRunning = false;
 	bool finished = false;
 
-	while(!finished && !getLine.IsEOF() && getLine.GetLine(line))
+	while(command != NoCommand && !finished && !getLine.IsEOF() && getLine.GetLine(line))
 	{
 		switch (command)
 		{
