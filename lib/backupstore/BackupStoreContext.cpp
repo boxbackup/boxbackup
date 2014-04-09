@@ -697,7 +697,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		}
 			
 		// Write the directory back to disc
-		SaveDirectory(dir, InDirectory);
+		SaveDirectory(dir);
 
 		// Commit the old version's new patched version, now that the directory safely reflects
 		// the state of the files on disc.
@@ -832,7 +832,7 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 		if(madeChanges)
 		{
 			// Save the directory back
-			SaveDirectory(dir, InDirectory);
+			SaveDirectory(dir);
 			SaveStoreInfo(false);
 		}
 	}
@@ -910,7 +910,7 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 		if(madeChanges)
 		{
 			// Save the directory back
-			SaveDirectory(dir, InDirectory);
+			SaveDirectory(dir);
 
 			// Modify the store info, and write
 			mapStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
@@ -953,22 +953,19 @@ void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::SaveDirectory(BackupStoreDirectory &, int64_t)
+//		Name:    BackupStoreContext::SaveDirectory(BackupStoreDirectory &)
 //		Purpose: Save directory back to disc, update time in cache
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID)
+void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 {
 	if(mapStoreInfo.get() == 0)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
 
-	if(rDir.GetObjectID() != ObjectID)
-	{
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
+	int64_t ObjectID = rDir.GetObjectID();
 
 	try
 	{
@@ -1110,7 +1107,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		dir.AddEntry(rFilename, ModificationTime, id, dirSize,
 			BackupStoreDirectory::Entry::Flags_Dir,
 			0 /* attributes hash */);
-		SaveDirectory(dir, InDirectory);
+		SaveDirectory(dir);
 
 		// Increment reference count on the new directory to one
 		mapRefCount->AddReference(id);
@@ -1196,7 +1193,7 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 				}
 
 				// Save it
-				SaveDirectory(parentDir, InDirectory);
+				SaveDirectory(parentDir);
 
 				// Done
 				break;
@@ -1312,7 +1309,7 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 			// Save the directory
 			if(changesMade)
 			{
-				SaveDirectory(dir, ObjectID);
+				SaveDirectory(dir);
 			}
 		}
 	}
@@ -1353,7 +1350,7 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 		dir.SetAttributes(Attributes, AttributesModTime);
 		
 		// Save back
-		SaveDirectory(dir, Directory);
+		SaveDirectory(dir);
 	}
 	catch(...)
 	{
@@ -1414,7 +1411,7 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 		}
 	
 		// Save back
-		SaveDirectory(dir, InDirectory);
+		SaveDirectory(dir);
 	}
 	catch(...)
 	{
@@ -1675,7 +1672,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			}
 			
 			// Save the directory back
-			SaveDirectory(dir, MoveFromDirectory);
+			SaveDirectory(dir);
 		}
 		catch(...)
 		{
@@ -1769,7 +1766,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			}
 	
 			// Save back
-			SaveDirectory(to, MoveToDirectory);
+			SaveDirectory(to);
 		}
 
 		// Thirdly... remove them from the first directory -- but if it fails, attempt to delete them from the to directory
@@ -1785,7 +1782,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			}
 	
 			// Save back
-			SaveDirectory(from, MoveFromDirectory);		
+			SaveDirectory(from);
 		}
 		catch(...)
 		{
@@ -1801,7 +1798,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			}
 	
 			// Save back
-			SaveDirectory(to, MoveToDirectory);
+			SaveDirectory(to);
 
 			// Throw the error
 			throw;
@@ -1817,7 +1814,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			change.SetContainerID(MoveToDirectory);
 			
 			// Save it back
-			SaveDirectory(change, *i);
+			SaveDirectory(change);
 		}
 	}
 	catch(...)

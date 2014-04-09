@@ -171,7 +171,7 @@ public:
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID);
-	void SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID);
+	void SaveDirectory(BackupStoreDirectory &rDir);
 	void RemoveDirectoryFromCache(int64_t ObjectID);
 	void ClearDirectoryCache();
 	void DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete);
