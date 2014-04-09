@@ -871,7 +871,6 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	ASSERT(piBlock != 0);
 
 	uint8_t iflags = GetFlags(piBlock, IndexInDirBlock);
-	bool badEntry = false;
 	
 	// Is the type the same?
 	if(((iflags & Flags_IsDir) == Flags_IsDir) != rEntry.IsDir())
@@ -882,73 +881,67 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 			" references object " <<
 			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
 			" which has a different type than expected.");
-		badEntry = true;
 		++mNumberErrorsFound;
+		return false; // remove this entry
 	}
+
 	// Check that the entry is not already contained.
-	else if(iflags & Flags_IsContained)
+	if(iflags & Flags_IsContained)
 	{
 		BOX_ERROR("Directory ID " <<
 			BOX_FORMAT_OBJECTID(DirectoryID) <<
 			" references object " <<
 			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
 			" which is already contained.");
-		badEntry = true;
+		++mNumberErrorsFound;
+		return false; // remove this entry
+	}
+
+	// Not already contained by another directory.
+	// Don't set the flag until later, after we finish repairing
+	// the directory and removing all bad entries.
+	
+	// Check that the container ID of the object is correct
+	if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
+	{
+		// Needs fixing...
+		if(iflags & Flags_IsDir)
+		{
+			// Add to will fix later list
+			BOX_ERROR("Directory ID " <<
+				BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
+				<< " has wrong container ID.");
+			mDirsWithWrongContainerID.push_back(rEntry.GetObjectID());
+			++mNumberErrorsFound;
+		}
+		else
+		{
+			// This is OK for files, they might move
+			BOX_INFO("File ID " <<
+				BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
+				<< " has different container ID, "
+				"probably moved");
+		}
+		
+		// Fix entry for now
+		piBlock->mContainer[IndexInDirBlock] = DirectoryID;
+	}
+
+	// Check the object size
+	if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
+	{
+		// Wrong size, correct it.
+		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
+			" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+			" has wrong size " << rEntry.GetSizeInBlocks() <<
+			", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+		rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+		// Mark as changed
+		rIsModified = true;
 		++mNumberErrorsFound;
 	}
-	else
-	{
-		// Not already contained by another directory.
-		// Don't set the flag until later, after we finish repairing
-		// the directory and removing all bad entries.
-		
-		// Check that the container ID of the object is correct
-		if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
-		{
-			// Needs fixing...
-			if(iflags & Flags_IsDir)
-			{
-				// Add to will fix later list
-				BOX_ERROR("Directory ID " <<
-					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
-					<< " has wrong container ID.");
-				mDirsWithWrongContainerID.push_back(rEntry.GetObjectID());
-				++mNumberErrorsFound;
-			}
-			else
-			{
-				// This is OK for files, they might move
-				BOX_INFO("File ID " <<
-					BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
-					<< " has different container ID, "
-					"probably moved");
-			}
-			
-			// Fix entry for now
-			piBlock->mContainer[IndexInDirBlock] = DirectoryID;
-		}
-	}
-	
-	// Check the object size, if it's OK and a file
-	if(!badEntry && !rEntry.IsDir())
-	{
-		if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
-		{
-			// Wrong size, correct it.
-			rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
 
-			// Mark as changed
-			rIsModified = true;
-			++mNumberErrorsFound;
-
-			// Tell user
-			BOX_ERROR("Directory ID " <<
-				BOX_FORMAT_OBJECTID(DirectoryID) <<
-				" has wrong size for object " <<
-				BOX_FORMAT_OBJECTID(rEntry.GetObjectID()));
-		}
-	}
-
-	return !badEntry;
+	return true; // don't delete this entry
 }
-

@@ -368,6 +368,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 	BackupStoreDirectory dir;
 	BufferedStream buf(*dirStream);
 	dir.ReadFromStream(buf, IOStream::TimeOutInfinite);
+	dir.SetUserInfo1_SizeInBlocks(originalDirSizeInBlocks);
 	dirStream->Close();
 	
 	// Is it empty?
@@ -409,8 +410,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 					&& (en->IsDeleted() || en->IsOld()))
 				{
 					// Delete this immediately.
-					DeleteFile(ObjectID, en->GetObjectID(), dir, objectFilename,
-						originalDirSizeInBlocks, rBackupStoreInfo);
+					DeleteFile(ObjectID, en->GetObjectID(), dir,
+						objectFilename, rBackupStoreInfo);
 					
 					// flag as having done something
 					deletedSomething = true;
@@ -643,19 +644,17 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 		// Get the filename
 		std::string dirFilename;
 		BackupStoreDirectory dir;
-		int64_t dirSizeInBlocksOrig = 0;
 		{
 			MakeObjectFilename(i->mInDirectory, dirFilename);
 			std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet, dirFilename));
-			dirSizeInBlocksOrig = dirStream->GetDiscUsageInBlocks();
 			dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
+			dir.SetUserInfo1_SizeInBlocks(dirStream->GetDiscUsageInBlocks());
 		}
 		
 		// Delete the file
 		BackupStoreRefCountDatabase::refcount_t refs =
 			DeleteFile(i->mInDirectory, i->mObjectID, dir,
-				dirFilename, dirSizeInBlocksOrig,
-				rBackupStoreInfo);
+				dirFilename, rBackupStoreInfo);
 		if(refs == 0)
 		{
 			BOX_INFO("Housekeeping removed " <<
@@ -702,7 +701,7 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 
 BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	int64_t InDirectory, int64_t ObjectID, BackupStoreDirectory &rDirectory,
-	const std::string &rDirectoryFilename, int64_t OriginalDirSizeInBlocks,
+	const std::string &rDirectoryFilename,
 	BackupStoreInfo& rBackupStoreInfo)
 {
 	// Find the entry inside the directory
@@ -727,6 +726,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 				BOX_FORMAT_OBJECTID(InDirectory) << ", "
 				"indicates logic error/corruption? Run "
 				"bbstoreaccounts check <accid> fix");
+			mErrorCount++;
 			return refs;
 		}
 		
@@ -859,7 +859,6 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	
 	// Save directory back to disc
 	// BLOCK
-	int64_t dirRevisedSize = 0;
 	{
 		RaidFileWrite writeDir(mStoreDiscSet, rDirectoryFilename,
 			mapNewRefs->GetRefCount(InDirectory));
@@ -867,18 +866,18 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		rDirectory.WriteToStream(writeDir);
 
 		// Get the disc usage (must do this before commiting it)
-		dirRevisedSize = writeDir.GetDiscUsageInBlocks();
+		int64_t new_size = writeDir.GetDiscUsageInBlocks();
 
 		// Commit directory
 		writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 
 		// Adjust block counts if the directory itself changed in size
-		if(dirRevisedSize > 0)
-		{
-			int64_t adjust = dirRevisedSize - OriginalDirSizeInBlocks;
-			mBlocksUsedDelta += adjust;
-			mBlocksInDirectoriesDelta += adjust;
-		}
+		int64_t original_size = rDirectory.GetUserInfo1_SizeInBlocks();
+		int64_t adjust = new_size - original_size;
+		mBlocksUsedDelta += adjust;
+		mBlocksInDirectoriesDelta += adjust;
+
+		UpdateDirectorySize(rDirectory, new_size);
 	}
 
 	// Commit any new adjusted entry
@@ -926,6 +925,75 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	return 0;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HousekeepStoreAccount::UpdateDirectorySize(
+//			 BackupStoreDirectory& rDirectory,
+//			 IOStream::pos_type new_size_in_blocks)
+//		Purpose: Update the directory size, modifying the parent
+//			 directory's entry for this directory if necessary.
+//		Created: 05/03/14
+//
+// --------------------------------------------------------------------------
+
+void HousekeepStoreAccount::UpdateDirectorySize(
+	BackupStoreDirectory& rDirectory,
+	IOStream::pos_type new_size_in_blocks)
+{
+#ifndef NDEBUG
+	{
+		std::string dirFilename;
+		MakeObjectFilename(rDirectory.GetObjectID(), dirFilename);
+		std::auto_ptr<RaidFileRead> dirStream(
+			RaidFileRead::Open(mStoreDiscSet, dirFilename));
+		ASSERT(new_size_in_blocks == dirStream->GetDiscUsageInBlocks());
+	}
+#endif
+
+	IOStream::pos_type old_size_in_blocks =
+		rDirectory.GetUserInfo1_SizeInBlocks();
+
+	if(new_size_in_blocks == old_size_in_blocks)
+	{
+		return;
+	}
+
+	rDirectory.SetUserInfo1_SizeInBlocks(new_size_in_blocks);
+
+	if (rDirectory.GetObjectID() == BACKUPSTORE_ROOT_DIRECTORY_ID)
+	{
+		return;
+	}
+
+	std::string parentFilename;
+	MakeObjectFilename(rDirectory.GetContainerID(), parentFilename);
+	std::auto_ptr<RaidFileRead> parentStream(
+		RaidFileRead::Open(mStoreDiscSet, parentFilename));
+	BackupStoreDirectory parent(*parentStream);
+	BackupStoreDirectory::Entry* en =
+		parent.FindEntryByID(rDirectory.GetObjectID());
+	ASSERT(en);
+
+	if (en->GetSizeInBlocks() != old_size_in_blocks)
+	{
+		BOX_WARNING("Directory " <<
+			BOX_FORMAT_OBJECTID(rDirectory.GetObjectID()) <<
+			" entry in directory " <<
+			BOX_FORMAT_OBJECTID(rDirectory.GetContainerID()) <<
+			" had incorrect size " << en->GetSizeInBlocks() <<
+			", should have been " << old_size_in_blocks);
+		mErrorCount++;
+	}
+
+	en->SetSizeInBlocks(new_size_in_blocks);
+
+	RaidFileWrite writeDir(mStoreDiscSet, parentFilename,
+		mapNewRefs->GetRefCount(rDirectory.GetContainerID()));
+	writeDir.Open(true /* allow overwriting */);
+	parent.WriteToStream(writeDir);
+	writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+}
 
 // --------------------------------------------------------------------------
 //
@@ -1022,11 +1090,13 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 			containingDirStream->GetDiscUsageInBlocks();
 		containingDir.ReadFromStream(*containingDirStream,
 			IOStream::TimeOutInfinite);
+		containingDir.SetUserInfo1_SizeInBlocks(containingDirSizeInBlocksOrig);
 	}
 
 	// Find the entry
 	BackupStoreDirectory::Entry *pdirentry = 
 		containingDir.FindEntryByID(dir.GetObjectID());
+	// TODO FIXME invert test and reduce indentation
 	if((pdirentry != 0) && pdirentry->IsDeleted())
 	{
 		// Should be deleted
@@ -1049,6 +1119,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 
 		// Commit directory
 		writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+		UpdateDirectorySize(containingDir, dirSize);
 
 		// adjust usage counts for this directory
 		if(dirSize > 0)

@@ -56,10 +56,10 @@ private:
 		int64_t ObjectID,
 		BackupStoreDirectory &rDirectory,
 		const std::string &rDirectoryFilename,
-		int64_t OriginalDirSizeInBlocks,
 		BackupStoreInfo& rBackupStoreInfo);
+	void UpdateDirectorySize(BackupStoreDirectory &rDirectory,
+		IOStream::pos_type new_size_in_blocks);
 
-private:
 	typedef struct
 	{
 		int64_t mObjectID;
