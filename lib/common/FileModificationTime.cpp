@@ -18,11 +18,14 @@
 
 box_time_t FileModificationTime(const EMU_STRUCT_STAT &st)
 {
-#ifndef HAVE_STRUCT_STAT_ST_MTIMESPEC
-	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
-#else
+#if defined HAVE_STRUCT_STAT_ST_ATIM
+	box_time_t datamodified = (((int64_t)st.st_mtim.tv_nsec) / NANO_SEC_IN_USEC_LL)
+			+ (((int64_t)st.st_mtim.tv_sec) * (MICRO_SEC_IN_SEC_LL));
+#elif defined HAVE_STRUCT_STAT_ST_ATIMESPEC
 	box_time_t datamodified = (((int64_t)st.st_mtimespec.tv_nsec) / NANO_SEC_IN_USEC_LL)
 			+ (((int64_t)st.st_mtimespec.tv_sec) * (MICRO_SEC_IN_SEC_LL));
+#else
+	box_time_t datamodified = ((int64_t)st.st_mtime) * (MICRO_SEC_IN_SEC_LL);
 #endif
 	
 	return datamodified;
@@ -31,7 +34,10 @@ box_time_t FileModificationTime(const EMU_STRUCT_STAT &st)
 box_time_t FileAttrModificationTime(const EMU_STRUCT_STAT &st)
 {
 	box_time_t statusmodified =
-#ifdef HAVE_STRUCT_STAT_ST_MTIMESPEC
+#if defined HAVE_STRUCT_STAT_ST_ATIM
+		(((int64_t)st.st_ctim.tv_nsec) / (NANO_SEC_IN_USEC_LL)) +
+		(((int64_t)st.st_ctim.tv_sec)  * (MICRO_SEC_IN_SEC_LL));
+#elif defined HAVE_STRUCT_STAT_ST_ATIMESPEC
 		(((int64_t)st.st_ctimespec.tv_nsec) / (NANO_SEC_IN_USEC_LL)) +
 		(((int64_t)st.st_ctimespec.tv_sec)  * (MICRO_SEC_IN_SEC_LL));
 #elif defined HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC
