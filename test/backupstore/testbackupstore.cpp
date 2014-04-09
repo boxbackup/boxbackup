@@ -515,6 +515,9 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	set_refcount(objectId, 1);
 }
 
+const box_time_t FAKE_MODIFICATION_TIME = 0xfeedfacedeadbeefLL;
+const box_time_t FAKE_ATTR_MODIFICATION_TIME = 0xdeadbeefcafebabeLL;
+
 int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 	int64_t indir, const char *name, int depth,
 	BackupStoreRefCountDatabase* pRefCount)
@@ -527,7 +530,7 @@ int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 		int attrS = 0;
 		std::auto_ptr<IOStream> attr(new MemBlockStream(&attrS, sizeof(attrS)));
 		std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-			indir, 9837429842987984LL, dirname, attr));
+			indir, FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
 		subdirid = dirCreate->GetObjectID(); 
 	}
 	
@@ -1114,7 +1117,7 @@ int64_t create_directory(BackupProtocolCallable& protocol)
 
 	std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
 		BACKUPSTORE_ROOT_DIRECTORY_ID,
-		9837429842987984LL, dirname, attr));
+		FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
 
 	int64_t subdirid = dirCreate->GetObjectID(); 
 	set_refcount(subdirid, 1);
@@ -1492,7 +1495,8 @@ bool test_multiple_uploads()
 
 			// Attributes
 			TEST_THAT(dir.HasAttributes());
-			TEST_EQUAL(9837429842987984LL, dir.GetAttributesModTime());
+			TEST_EQUAL(FAKE_ATTR_MODIFICATION_TIME,
+				dir.GetAttributesModTime());
 			StreamableMemBlock attr(attr1, sizeof(attr1));
 			TEST_THAT(dir.GetAttributes() == attr);
 		}
@@ -1640,10 +1644,8 @@ bool test_multiple_uploads()
 			// Attributes
 			std::auto_ptr<IOStream> attr(new MemBlockStream(attr1,
 				sizeof(attr1)));
-			std::auto_ptr<BackupProtocolSuccess> dirCreate(apProtocol->QueryCreateDirectory(
-				subdirid,
-				9837429842987984LL, nd, attr));
-			subsubdirid = dirCreate->GetObjectID(); 
+			subsubdirid = apProtocol->QueryCreateDirectory(subdirid,
+				FAKE_ATTR_MODIFICATION_TIME, nd, attr)->GetObjectID();
 
 			BackupStoreFilenameClear file2("file2");
 			std::auto_ptr<IOStream> upload(
@@ -2334,7 +2336,7 @@ bool test_account_limits_respected()
 		BackupStoreFilenameClear fnxd("exceed-limit-dir");
 		TEST_CHECK_THROWS(protocol.QueryCreateDirectory(
 				BackupProtocolListDirectory::RootDirectory,
-				9837429842987984LL, fnxd, attr),
+				FAKE_ATTR_MODIFICATION_TIME, fnxd, attr),
 			ConnectionException, Conn_Protocol_UnexpectedReply);
 
 		// Finish the connection. TODO FIXME reinstate this.
