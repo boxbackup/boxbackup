@@ -202,25 +202,26 @@ bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 		Dirs == usage->GetBlocksInDirectories());
 }
 
+int check_account_for_errors(Log::Level log_level)
+{
+	Logging::Guard guard(log_level);
+	Logging::Tagger tag("check fix", true);
+	Logging::ShowTagOnConsole show;
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify("testfiles/bbstored.conf",
+			&BackupConfigFileVerify, errs));
+	BackupStoreAccountsControl control(*config);
+	int errors_fixed = control.CheckAccount(0x01234567,
+		true, // FixErrors
+		false); // Quiet
+	return errors_fixed;
+}
+
 bool check_account(Log::Level log_level)
 {
-	int errors_fixed;
-
-	{
-		Logging::Guard guard(log_level);
-		Logging::Tagger tag("check fix", true);
-		Logging::ShowTagOnConsole show;
-		std::string errs;
-		std::auto_ptr<Configuration> config(
-			Configuration::LoadAndVerify("testfiles/bbstored.conf",
-				&BackupConfigFileVerify, errs));
-		BackupStoreAccountsControl control(*config);
-		errors_fixed = control.CheckAccount(0x01234567,
-			true, // FixErrors
-			false); // Quiet
-	}
-	TEST_EQUAL_LINE(0, errors_fixed, "store errors found and fixed");
-
+	int errors_fixed = check_account_for_errors(log_level);
+	TEST_EQUAL(0, errors_fixed);
 	return (errors_fixed == 0);
 }
 

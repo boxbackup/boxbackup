@@ -51,6 +51,9 @@ bool check_num_files(int files, int old, int deleted, int dirs);
 bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 	int Deleted, int Dirs, int Total);
 
+//! Checks an account for errors, returning the number of errors found and fixed.
+int check_account_for_errors(Log::Level log_level = Log::WARNING);
+
 //! Checks an account for errors, returning true if it's OK, for use in assertions.
 bool check_account(Log::Level log_level = Log::WARNING);
 
