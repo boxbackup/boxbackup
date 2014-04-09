@@ -99,7 +99,7 @@ private:
 	bool mRunInForeground;
 	bool mKeepConsoleOpenAfterFork;
 	bool mHaveConfigFile;
-	int mLogLevel; // need an int to do math with
+	Logging::OptionParser mLogLevel;
 	std::string mLogFile;
 	Log::Level mLogFileLevel;
 	std::auto_ptr<FileLogger> mapLogFileLogger;

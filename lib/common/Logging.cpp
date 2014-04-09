@@ -554,3 +554,151 @@ bool HideSpecificExceptionGuard::IsHidden(int type, int subtype)
 	return false;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Logging::OptionParser::GetOptionString()
+//		Purpose: Returns the valid Getopt command-line options
+//			 that Logging::OptionParser::ProcessOption will handle.
+//		Created: 2014/04/09
+//
+// --------------------------------------------------------------------------
+std::string Logging::OptionParser::GetOptionString()
+{
+	return "PqQt:TUvVW:";
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Logging::OptionParser::ProcessOption(signed int option)
+//		Purpose: Processes the supplied option (equivalent to the
+//			 return code from getopt()). Return zero if the
+//			 option was handled successfully, or nonzero to
+//			 abort the program with that return value.
+//		Created: 2007/09/18
+//
+// --------------------------------------------------------------------------
+int Logging::OptionParser::ProcessOption(signed int option)
+{
+	switch(option)
+	{
+		case 'P':
+		{
+			Console::SetShowPID(true);
+		}
+		break;
+
+		case 'q':
+		{
+			if(mCurrentLevel == Log::NOTHING)
+			{
+				BOX_FATAL("Too many '-q': "
+					"Cannot reduce logging "
+					"level any more");
+				return 2;
+			}
+			mCurrentLevel--;
+		}
+		break;
+
+		case 'Q':
+		{
+			mCurrentLevel = Log::NOTHING;
+		}
+		break;
+
+		case 't':
+		{
+			Logging::SetProgramName(optarg);
+			Console::SetShowTag(true);
+		}
+		break;
+
+		case 'T':
+		{
+			Console::SetShowTime(true);
+		}
+		break;
+
+		case 'U':
+		{
+			Console::SetShowTime(true);
+			Console::SetShowTimeMicros(true);
+		}
+		break;
+
+		case 'v':
+		{
+			if(mCurrentLevel == Log::EVERYTHING)
+			{
+				BOX_FATAL("Too many '-v': "
+					"Cannot increase logging "
+					"level any more");
+				return 2;
+			}
+			mCurrentLevel++;
+		}
+		break;
+
+		case 'V':
+		{
+			mCurrentLevel = Log::EVERYTHING;
+		}
+		break;
+
+		case 'W':
+		{
+			mCurrentLevel = Logging::GetNamedLevel(optarg);
+			if (mCurrentLevel == Log::INVALID)
+			{
+				BOX_FATAL("Invalid logging level: " << optarg);
+				return 2;
+			}
+		}
+		break;
+
+		case '?':
+		{
+			BOX_FATAL("Unknown option on command line: " 
+				<< "'" << (char)optopt << "'");
+			return 2;
+		}
+		break;
+
+		default:
+		{
+			BOX_FATAL("Unknown error in getopt: returned "
+				<< "'" << option << "'");
+			return 1;
+		}
+	}
+
+	// If we didn't explicitly return an error code above, then the option
+	// was fine, so return 0 to continue processing.
+	return 0;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    Logging::OptionParser::GetUsageString()
+//		Purpose: Returns a string suitable for displaying as part
+//			 of a program's command-line usage help message,
+//			 describing the logging options.
+//		Created: 2014/04/09
+//
+// --------------------------------------------------------------------------
+std::string Logging::OptionParser::GetUsageString()
+{
+	return 
+	"  -P         Show process ID (PID) in console output\n"
+	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
+	"  -Q         Run at minimum verbosity, log nothing to console and system\n"
+	"  -t <tag>   Tag console output with specified marker\n"
+	"  -T         Timestamp console output\n"
+	"  -U         Timestamp console output with microseconds\n"
+	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
+	"  -V         Run at maximum verbosity, log everything to console and system\n"
+	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n";
+}
