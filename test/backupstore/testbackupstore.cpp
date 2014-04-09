@@ -775,6 +775,11 @@ bool change_account_limits(const char* soft, const char* hard)
 	return (result == 0);
 }
 
+int64_t create_directory(BackupProtocolCallable& protocol,
+	int64_t parent_dir_id = BACKUPSTORE_ROOT_DIRECTORY_ID);
+int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
+	const std::string& remote_filename = "");
+
 bool test_server_housekeeping()
 {
 	SETUP();
@@ -1079,7 +1084,7 @@ bool test_server_housekeeping()
 
 	// Used to not consume the stream
 	std::auto_ptr<IOStream> upload(new ZeroStream(1000));
-	TEST_COMMAND_RETURNS_ERROR(protocol.QueryStoreFile(
+	TEST_COMMAND_RETURNS_ERROR(protocol, QueryStoreFile(
 			BACKUPSTORE_ROOT_DIRECTORY_ID,
 			0,
 			0, /* use for attr hash too */
@@ -1108,7 +1113,7 @@ bool test_server_housekeeping()
 	return true;
 }
 
-int64_t create_directory(BackupProtocolCallable& protocol)
+int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
 {
 	// Create a directory
 	BackupStoreFilenameClear dirname("lovely_directory");
@@ -1116,29 +1121,40 @@ int64_t create_directory(BackupProtocolCallable& protocol)
 	std::auto_ptr<IOStream> attr(new MemBlockStream(attr1, sizeof(attr1)));
 
 	std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-		BACKUPSTORE_ROOT_DIRECTORY_ID,
-		FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
+		parent_dir_id, FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
 
 	int64_t subdirid = dirCreate->GetObjectID(); 
 	set_refcount(subdirid, 1);
 	return subdirid;
 }
 
-int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid)
+int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
+	const std::string& remote_filename)
 {
 	// Stick a file in it
 	write_test_file(0);
+
+	BackupStoreFilenameClear remote_filename_encoded;
+	if (remote_filename.empty())
+	{
+		remote_filename_encoded = uploads[0].name;
+	}
+	else
+	{
+		remote_filename_encoded = remote_filename;
+	}
+
 	std::string filename("testfiles/test0");
 	int64_t modtime;
 	std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(filename,
-		subdirid, uploads[0].name, &modtime));
+		subdirid, remote_filename_encoded, &modtime));
 
 	std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
 		subdirid,
 		modtime,
 		modtime, /* use for attr hash too */
 		0,							/* diff from ID */
-		uploads[0].name,
+		remote_filename_encoded,
 		upload));
 
 	int64_t subdirfileid = stored->GetObjectID();
@@ -1770,7 +1786,7 @@ bool test_multiple_uploads()
 			TEST_THAT(en != 0);
 			if(en)
 			{
-				TEST_THAT(en->GetObjectID() == dirtodelete);
+				TEST_EQUAL(dirtodelete, en->GetObjectID());
 				BackupStoreFilenameClear n("test_delete");
 				TEST_THAT(en->GetName() == n);
 			}
@@ -1785,7 +1801,182 @@ bool test_multiple_uploads()
 #endif
 		apProtocol->QueryFinished();
 	}
+
+	tearDown();
+	return true;
+}
+
+int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
+	int64_t ContainerID)
+{
+	// Get the root directory cached in the read-only connection
+	protocol.QueryListDirectory(ContainerID, 0, // FlagsMustBeSet
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		false /* no attributes */);
+
+	BackupStoreDirectory dir(protocol.ReceiveStream());
+	BackupStoreDirectory::Entry *en = dir.FindEntryByID(ObjectID);
+	TEST_THAT(en != 0);
+	if (!en) return -1;
+
+	TEST_EQUAL(ObjectID, en->GetObjectID());
+	return en->GetSizeInBlocks();
+}
+
+bool test_directory_parent_entry_tracks_directory_size()
+{
+	SETUP();
+
+	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
+		0, false);
+	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
+		"backup/01234567/", 0, true); // read only
 	
+	int64_t subdirid = create_directory(protocol);
+
+	// Get the root directory cached in the read-only connection, and
+	// test that the initial size is correct.
+	int old_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+	TEST_THAT(old_size > 0);
+	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// TODO FIXME Sleep to ensure that file timestamp changes (win32?)
+
+	// Start adding files until the size on disk increases. This is
+	// guaranteed to happen eventually :)
+	int new_size = old_size;
+	int64_t last_added_file_id = 0;
+	std::string last_added_filename;
+
+	for (int i = 0; new_size == old_size; i++)
+	{
+		std::ostringstream name;
+		name << "testfile_" << i;
+		last_added_filename = name.str();
+		last_added_file_id = create_file(protocol, subdirid, name.str());
+		new_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+	}
+
+	// Check that the root directory entry has been updated	
+	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// Now delete an entry, and check that the size is reduced
+	protocol.QueryDeleteFile(subdirid,
+		BackupStoreFilenameClear(last_added_filename));
+
+	// Reduce the limits, to remove it permanently from the store	
+	protocol.QueryFinished();
+	protocolReadOnly.QueryFinished();
+	TEST_THAT(change_account_limits("0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account());
+	set_refcount(last_added_file_id, 0);
+	protocol.Reopen();
+	protocolReadOnly.Reopen();
+
+	TEST_EQUAL(old_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+
+	// Check that the entry in the root directory was updated too
+	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// Push the limits back up
+	protocol.QueryFinished();
+	protocolReadOnly.QueryFinished();
+	TEST_THAT(change_account_limits("1000B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account());
+	protocol.Reopen();
+	protocolReadOnly.Reopen();
+
+	// Add a directory, this should push the object size back up
+	int64_t dir2id = create_directory(protocol, subdirid);
+	TEST_EQUAL(new_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// Delete it again, which should reduce the object size again
+	protocol.QueryDeleteDirectory(dir2id);
+
+	// Reduce the limits, to remove it permanently from the store	
+	protocol.QueryFinished();
+	protocolReadOnly.QueryFinished();
+	TEST_THAT(change_account_limits("0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account());
+	set_refcount(last_added_file_id, 0);
+	protocol.Reopen();
+	protocolReadOnly.Reopen();
+
+	// Check that the entry in the root directory was updated
+	TEST_EQUAL(old_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// Check that bbstoreaccounts check fix will detect and repair when
+	// a directory's parent entry has the wrong size for the directory.
+
+	protocol.QueryFinished();
+
+	std::auto_ptr<RaidFileRead> root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
+	BackupStoreDirectory root(static_cast<std::auto_ptr<IOStream> >(root_read));
+	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
+	TEST_THAT(en != 0);
+	if (!en) return false;
+	en->SetSizeInBlocks(1234);
+
+	std::string rfn;
+	StoreStructure::MakeObjectFilename(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
+		rfn, false); // EnsureDirectoryExists
+	RaidFileWrite rfw(0, rfn);
+	rfw.Open(true); // AllowOverwrite
+	root.WriteToStream(rfw);
+	rfw.Commit(/* ConvertToRaidNow */ true);
+
+	TEST_EQUAL(1234, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+	TEST_EQUAL(1, check_account_for_errors());
+	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	protocolReadOnly.QueryFinished();
+	tearDown();	
+	return true;
+}
+
+bool test_cannot_open_multiple_writable_connections()
+{
+	SETUP();
+	TEST_THAT_THROWONFAIL(StartServer());
+
+	// First try a local protocol. This works even on Windows.
+	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
+		"backup/01234567/", 0, false); // Not read-only
+
+	// Set the client store marker
+	protocolWritable.QuerySetClientStoreMarker(0x8732523ab23aLL);
+
+	// First try a local protocol. This works even on Windows.
+	BackupProtocolLocal2 protocolWritable2(0x01234567, "test",
+		"backup/01234567/", 0, false); // Not read-only
+	assert_writable_connection_fails(protocolWritable2);
+
+	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
+		"backup/01234567/", 0, true); // Read-only
+	TEST_EQUAL(0x8732523ab23aLL,
+		assert_readonly_connection_succeeds(protocolReadOnly));
+
+	// Try network connections too.
+	TLSContext context;
+
+	BackupProtocolClient protocolWritable3(open_conn("localhost", context));
+	assert_writable_connection_fails(protocolWritable3);
+
+	BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
+	TEST_EQUAL(0x8732523ab23aLL,
+		assert_readonly_connection_succeeds(protocolReadOnly2));
+
+	tearDown();
 	return true;
 }
 
@@ -2740,6 +2931,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_bbstoreaccounts_create());
 	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
+	TEST_THAT(test_directory_parent_entry_tracks_directory_size());
 	TEST_THAT(test_encoding());
 	TEST_THAT(test_symlinks());
 	TEST_THAT(test_store_info());

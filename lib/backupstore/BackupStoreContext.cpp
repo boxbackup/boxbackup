@@ -972,6 +972,8 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 		// Write to disc, adjust size in store info
 		std::string dirfn;
 		MakeObjectFilename(ObjectID, dirfn);
+		int64_t old_dir_size = rDir.GetUserInfo1_SizeInBlocks();
+
 		{
 			RaidFileWrite writeDir(mStoreDiscSet, dirfn);
 			writeDir.Open(true /* allow overwriting */);
@@ -994,6 +996,7 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			// Update size stored in directory
 			rDir.SetUserInfo1_SizeInBlocks(dirSize);
 		}
+
 		// Refresh revision ID in cache
 		{
 			int64_t revid = 0;
@@ -1002,6 +1005,22 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 				THROW_EXCEPTION(BackupStoreException, Internal)
 			}
 			rDir.SetRevisionID(revid);
+		}
+
+		// Update the directory entry in the grandparent, to ensure
+		// that it reflects the current size of the parent directory.
+		int64_t new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
+		if(new_dir_size != old_dir_size &&
+			rDir.GetObjectID() != BACKUPSTORE_ROOT_DIRECTORY_ID)
+		{
+			BackupStoreDirectory& parent(
+				GetDirectoryInternal(rDir.GetContainerID()));
+			BackupStoreDirectory::Entry* en =
+				parent.FindEntryByID(rDir.GetObjectID());
+			ASSERT(en);
+			ASSERT(en->GetSizeInBlocks() == old_dir_size);
+			en->SetSizeInBlocks(new_dir_size);
+			SaveDirectory(parent);
 		}
 	}
 	catch(...)
@@ -1608,7 +1627,9 @@ void BackupStoreContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 //		Created: 12/11/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject)
+void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
+	int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename,
+	bool MoveAllWithSameName, bool AllowMoveOverDeletedObject)
 {
 	if(mReadOnly)
 	{
@@ -1683,8 +1704,9 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		return;
 	}
 
-	// Got to be careful how this is written, as we can't guarentte that if we have two
-	// directories open, the first won't be deleted as the second is opened. (cache)
+	// Got to be careful how this is written, as we can't guarantee that
+	// if we have two directories open, the first won't be deleted as the
+	// second is opened. (cache)
 
 	// List of entries to move
 	std::vector<BackupStoreDirectory::Entry *> moving;
