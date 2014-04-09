@@ -284,6 +284,58 @@ class Syslog : public Logger
 // --------------------------------------------------------------------------
 //
 // Class
+//		Name:    Capture
+//		Purpose: Keeps log messages for analysis in tests.
+//		Created: 2014/03/08
+//
+// --------------------------------------------------------------------------
+
+class Capture : public Logger
+{
+	public:
+	struct Message
+	{
+		Log::Level level;
+		std::string file;
+		int line;
+		std::string message;
+	};
+
+	private:
+	std::vector<Message> mMessages;
+	
+	public:
+	virtual ~Capture() { }
+	
+	virtual bool Log(Log::Level level, const std::string& rFile, 
+		int line, std::string& rMessage)
+	{
+		Message message;
+		message.level = level;
+		message.file = rFile;
+		message.line = line;
+		message.message = rMessage;
+		mMessages.push_back(message);
+		return true;
+	}
+	virtual const char* GetType() { return "Capture"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
+	const std::vector<Message>& GetMessages() const { return mMessages; }
+	std::string GetString() const
+	{
+		std::ostringstream oss;
+		for (std::vector<Message>::const_iterator i = mMessages.begin();
+			i != mMessages.end(); i++)
+		{
+			oss << i->message << "\n";
+		}
+		return oss.str();
+	}
+};
+
+// --------------------------------------------------------------------------
+//
+// Class
 //		Name:    Logging
 //		Purpose: Static logging helper, keeps track of enabled loggers
 //			 and distributes log messages to them.
