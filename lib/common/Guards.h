@@ -37,9 +37,8 @@ public:
 	{
 		if(mOSFileHandle < 0)
 		{
-			BOX_LOG_SYS_ERROR("FileHandleGuard: failed to open " 
-				"file '" << rFilename << "'");
-			THROW_EXCEPTION(CommonException, OSFileOpenError)
+			THROW_SYS_FILE_ERROR("Failed to open file", rFilename,
+				CommonException, OSFileOpenError);
 		}
 	}
 	
