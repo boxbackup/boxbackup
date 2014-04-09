@@ -116,16 +116,8 @@
 	{ \
 		if((!HideExceptionMessageGuard::ExceptionsHidden() \
 			&& !HideSpecificExceptionGuard::IsHidden( \
-				type::ExceptionType, type::subtype)) \
-			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
+				type::ExceptionType, type::subtype))) \
 		{ \
-			std::auto_ptr<Logging::Guard> guard; \
-			\
-			if(Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
-			{ \
-				guard.reset(new Logging::Guard(Log::EVERYTHING)); \
-			} \
-			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
 				#type "(" #subtype ") " \
@@ -140,16 +132,8 @@
 		_box_throw_line << message; \
 		if((!HideExceptionMessageGuard::ExceptionsHidden() \
 			&& !HideSpecificExceptionGuard::IsHidden( \
-				type::ExceptionType, type::subtype)) \
-			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
+				type::ExceptionType, type::subtype))) \
 		{ \
-			std::auto_ptr<Logging::Guard> guard; \
-			\
-			if(Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
-			{ \
-				guard.reset(new Logging::Guard(Log::EVERYTHING)); \
-			} \
-			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
 				#type "(" #subtype ") (" << \

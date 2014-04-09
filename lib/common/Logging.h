@@ -39,9 +39,7 @@
 #define BOX_WARNING(stuff) BOX_LOG(Log::WARNING, stuff)
 #define BOX_NOTICE(stuff)  BOX_LOG(Log::NOTICE,  stuff)
 #define BOX_INFO(stuff)    BOX_LOG(Log::INFO,    stuff)
-#define BOX_TRACE(stuff)   \
-	if (Logging::IsEnabled(Log::TRACE)) \
-	{ BOX_LOG(Log::TRACE, stuff) }
+#define BOX_TRACE(stuff)   BOX_LOG(Log::TRACE,   stuff)
 
 #define BOX_SYS_ERRNO_MESSAGE(error_number, stuff) \
 	stuff << ": " << std::strerror(error_number) << \
@@ -201,19 +199,23 @@ class Logger
 
 	virtual void SetProgramName(const std::string& rProgramName) = 0;
 
-	class Guard
+	class LevelGuard
 	{
 		private:
 		Logger& mLogger;
 		Log::Level mOldLevel;
 
 		public:
-		Guard(Logger& Logger)
+		LevelGuard(Logger& Logger, Log::Level newLevel = Log::INVALID)
 		: mLogger(Logger)
 		{
 			mOldLevel = Logger.GetLevel();
+			if (newLevel != Log::INVALID)
+			{
+				Logger.Filter(newLevel);
+			}
 		}
-		~Guard()
+		~LevelGuard()
 		{
 			mLogger.Filter(mOldLevel);
 		}
@@ -298,7 +300,6 @@ class Logging
 	static bool sContextSet;
 	static Console* spConsole;
 	static Syslog*  spSyslog;
-	static Log::Level sGlobalLevel;
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
 	
@@ -317,51 +318,12 @@ class Logging
 		int line, const std::string& rMessage);
 	static void SetContext(std::string context);
 	static void ClearContext();
-	static void SetGlobalLevel(Log::Level level) { sGlobalLevel = level; }
-	static Log::Level GetGlobalLevel() { return sGlobalLevel; }
 	static Log::Level GetNamedLevel(const std::string& rName);
-	static bool IsEnabled(Log::Level level)
-	{
-		return (int)sGlobalLevel >= (int)level;
-	}
 	static void SetProgramName(const std::string& rProgramName);
 	static std::string GetProgramName() { return sProgramName; }
 	static void SetFacility(int facility);
 	static Console& GetConsole() { return *spConsole; }
 	static Syslog&  GetSyslog()  { return *spSyslog; }
-
-	class Guard
-	{
-		private:
-		Log::Level mOldLevel;
-		static int sGuardCount;
-		static Log::Level sOriginalLevel;
-
-		public:
-		Guard(Log::Level newLevel)
-		{
-			mOldLevel = Logging::GetGlobalLevel();
-			if(sGuardCount == 0)
-			{
-				sOriginalLevel = mOldLevel;
-			}
-			sGuardCount++;
-			Logging::SetGlobalLevel(newLevel);
-		}
-		~Guard()
-		{
-			sGuardCount--;
-			Logging::SetGlobalLevel(mOldLevel);
-		}
-
-		static bool IsActive() { return (sGuardCount > 0); }
-		static Log::Level GetOriginalLevel() { return sOriginalLevel; }
-		static bool IsGuardingFrom(Log::Level originalLevel)
-		{
-			return IsActive() &&
-				(int)sOriginalLevel >= (int)originalLevel;
-		}
-	};
 
 	class ShowTagOnConsole
 	{

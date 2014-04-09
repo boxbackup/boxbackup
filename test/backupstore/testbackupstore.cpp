@@ -1104,6 +1104,11 @@ bool test_server_housekeeping()
 			ConnectionException, Conn_Protocol_UnexpectedReply);
 	}
 
+	// Try retrieving an object that doesn't exist. That used to return
+	// BackupProtocolSuccess(NoObject) for no apparent reason.
+	TEST_COMMAND_RETURNS_ERROR(protocol, QueryGetObject(store1objid + 1),
+		Err_DoesNotExist);
+
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
 	TEST_THAT(run_housekeeping_and_check_account());

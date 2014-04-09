@@ -298,7 +298,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObject::DoCommand(BackupPr
 	// Check the object exists
 	if(!rContext.ObjectExists(mObjectID))
 	{
-		return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(NoObject));
+		return PROTOCOL_ERROR(Err_DoesNotExist);
 	}
 
 	// Open the object
