@@ -1707,7 +1707,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					connection.GetTimeout(), 
 					&rContext, // DiffTimer implementation
 					0 /* not interested in the modification time */, 
-					&isCompletelyDifferent);
+					&isCompletelyDifferent,
+					rParams.mpBackgroundTask);
 
 				if(isCompletelyDifferent)
 				{
@@ -1727,7 +1728,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			apStreamToUpload = BackupStoreFile::EncodeFile(
 				rFilename, mObjectID, /* containing directory */
 				rStoreFilename, NULL, &rParams, 
-				&(rParams.mrRunStatusProvider));
+				&(rParams.mrRunStatusProvider),
+				rParams.mpBackgroundTask);
 		}
 
 		rContext.SetNiceMode(true);
@@ -1842,7 +1844,8 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(
 	RunStatusProvider &rRunStatusProvider,
 	SysadminNotifier &rSysadminNotifier,
 	ProgressNotifier &rProgressNotifier,
-	BackupClientContext &rContext)
+	BackupClientContext &rContext,
+	BackgroundTask *pBackgroundTask)
 : mSyncPeriodStart(0),
   mSyncPeriodEnd(0),
   mMaxUploadWait(0),
@@ -1856,7 +1859,8 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(
   mReadErrorsOnFilesystemObjects(false),
   mMaxUploadRate(0),
   mUploadAfterThisTimeInTheFuture(99999999999999999LL),
-  mHaveLoggedWarningAboutFutureFileTimes(false)
+  mHaveLoggedWarningAboutFutureFileTimes(false),
+  mpBackgroundTask(pBackgroundTask)
 {
 }
 

@@ -27,6 +27,7 @@ typedef struct
 	int64_t mTotalFileStreamSize;
 } BackupStoreFileStats;
 
+class BackgroundTask;
 class RunStatusProvider;
 
 // Uncomment to disable backwards compatibility
@@ -128,7 +129,8 @@ public:
 		int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
 		int64_t *pModificationTime = 0,
 		ReadLoggingStream::Logger* pLogger = NULL,
-		RunStatusProvider* pRunStatusProvider = NULL
+		RunStatusProvider* pRunStatusProvider = NULL,
+		BackgroundTask* pBackgroundTask = NULL
 	);
 	static std::auto_ptr<BackupStoreFileEncodeStream> EncodeFileDiff
 	(
@@ -138,7 +140,8 @@ public:
 		int Timeout, 
 		DiffTimer *pDiffTimer,
 		int64_t *pModificationTime = 0, 
-		bool *pIsCompletelyDifferent = 0
+		bool *pIsCompletelyDifferent = 0,
+		BackgroundTask* pBackgroundTask = NULL
 	);
 	// Shortcut interface
 	static int64_t QueryStoreFileDiff(BackupProtocolCallable& protocol,

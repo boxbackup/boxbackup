@@ -272,6 +272,7 @@ public:
 		virtual void NotifyDirComparing(const std::string& rLocalPath,
 			const std::string& rRemotePath)
 		{
+			BOX_INFO("Comparing directory: " << rLocalPath);
 		}
 
 		virtual void NotifyDirCompared(
@@ -303,6 +304,7 @@ public:
 		virtual void NotifyFileComparing(const std::string& rLocalPath,
 			const std::string& rRemotePath)
 		{
+			BOX_TRACE("Comparing file: " << rLocalPath);
 		}
 		
 		virtual void NotifyFileCompared(const std::string& rLocalPath,

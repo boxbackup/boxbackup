@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 
+#include "BackgroundTask.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupDaemonInterface.h"
 #include "BackupStoreDirectory.h"
@@ -76,7 +77,8 @@ public:
 			RunStatusProvider &rRunStatusProvider, 
 			SysadminNotifier &rSysadminNotifier,
 			ProgressNotifier &rProgressNotifier,
-			BackupClientContext &rContext);
+			BackupClientContext &rContext,
+			BackgroundTask *pBackgroundTask);
 		~SyncParams();
 	private:
 		// No copying
@@ -91,6 +93,7 @@ public:
 		box_time_t mMaxFileTimeInFuture;
 		int32_t mFileTrackingSizeThreshold;
 		int32_t mDiffingUploadSizeThreshold;
+		BackgroundTask *mpBackgroundTask;
 		RunStatusProvider &mrRunStatusProvider;
 		SysadminNotifier &mrSysadminNotifier;
 		ProgressNotifier &mrProgressNotifier;

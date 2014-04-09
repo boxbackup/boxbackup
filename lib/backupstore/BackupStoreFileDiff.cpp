@@ -128,7 +128,8 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 	const std::string& Filename, int64_t ContainerID,
 	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, 
 	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer, 
-	int64_t *pModificationTime, bool *pIsCompletelyDifferent)
+	int64_t *pModificationTime, bool *pIsCompletelyDifferent,
+	BackgroundTask* pBackgroundTask)
 {
 	// Is it a symlink?
 	{
@@ -144,7 +145,11 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 			{
 				*pIsCompletelyDifferent = true;
 			}
-			return EncodeFile(Filename, ContainerID, rStoreFilename, pModificationTime);
+			return EncodeFile(Filename, ContainerID, rStoreFilename,
+				pModificationTime,
+				NULL, // ReadLoggingStream::Logger
+				NULL, // RunStatusProvider
+				pBackgroundTask); // BackgroundTask
 		}
 	}
 
@@ -162,7 +167,11 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 		{
 			*pIsCompletelyDifferent = true;
 		}
-		return EncodeFile(Filename, ContainerID, rStoreFilename, pModificationTime);
+		return EncodeFile(Filename, ContainerID, rStoreFilename,
+			pModificationTime,
+			NULL, // ReadLoggingStream::Logger
+			NULL, // RunStatusProvider
+			pBackgroundTask); // BackgroundTask
 	}
 	
 	// Pointer to recipe we're going to create
@@ -210,7 +219,11 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 			new BackupStoreFileEncodeStream);
 	
 		// Do the initial setup
-		stream->Setup(Filename, precipe, ContainerID, rStoreFilename, pModificationTime);
+		stream->Setup(Filename, precipe, ContainerID, rStoreFilename,
+			pModificationTime,
+			NULL, // ReadLoggingStream::Logger
+			NULL, // RunStatusProvider
+			pBackgroundTask);
 		precipe = 0;	// Stream has taken ownership of this
 		
 		// Tell user about completely different status?

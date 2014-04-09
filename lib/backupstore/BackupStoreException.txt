@@ -71,3 +71,4 @@ PatchChainInfoBadInDirectory	67	A directory contains inconsistent information. R
 UnknownObjectRefCountRequested	68	A reference count was requested for an object whose reference count is not known.
 MultiplyReferencedObject	69	Attempted to modify an object with multiple references, should be uncloned first
 CorruptReferenceCountDatabase	70	The account's refcount database is corrupt and must be rebuilt by housekeeping.
+CancelledByBackgroundTask	71	The current task was cancelled on request by the background task.

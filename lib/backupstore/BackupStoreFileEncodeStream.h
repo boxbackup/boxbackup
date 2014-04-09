@@ -79,7 +79,8 @@ public:
 		const BackupStoreFilename &rStoreFilename,
 		int64_t *pModificationTime,
 		ReadLoggingStream::Logger* pLogger = NULL,
-		RunStatusProvider* pRunStatusProvider = NULL);
+		RunStatusProvider* pRunStatusProvider = NULL,
+		BackgroundTask* pBackgroundTask = NULL);
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout);
 	virtual void Write(const void *pBuffer, int NBytes);
@@ -109,14 +110,18 @@ private:
 	CollectInBufferStream mData;		// buffer for header and index entries
 	IOStream *mpLogging;
 	RunStatusProvider* mpRunStatusProvider;
+	BackgroundTask* mpBackgroundTask;
 	int mStatus;
 	bool mSendData;						// true if there's file data to send (ie not a symlink)
 	int64_t mTotalBlocks;				// Total number of blocks in the file
+	int64_t mBytesToUpload; // Total number of clear bytes to encode and upload
+	int64_t mBytesUploaded; // Total number of clear bytes already encoded
+	// excluding reused blocks already on the server.
 	int64_t mAbsoluteBlockNumber;		// The absolute block number currently being output
 	// Instruction number
 	int64_t mInstructionNumber;
 	// All the below are within the current instruction
-	int64_t mNumBlocks;					// number of blocks. Last one will be a different size to the rest in most cases
+	int64_t mNumBlocks; // number of blocks. Last one will be a different size to the rest in most cases
 	int64_t mCurrentBlock;
 	int32_t mCurrentBlockEncodedSize;
 	int32_t mPositionInCurrentBlock;	// for reading out
