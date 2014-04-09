@@ -40,7 +40,7 @@ public:
 	{
 		mContext.SetClientHasAccount(AccountRootDir, DiscSetNumber);
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
-		QueryLogin(0x01234567,
+		QueryLogin(AccountNumber,
 			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
 	}
 	virtual ~BackupProtocolLocal2() { }
