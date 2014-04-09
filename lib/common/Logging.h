@@ -377,6 +377,23 @@ class Logging
 			}
 		}
 	};
+
+	class TempLoggerGuard
+	{
+		private:
+		Logger* mpLogger;
+
+		public:
+		TempLoggerGuard(Logger* pLogger)
+		: mpLogger(pLogger)
+		{
+			Logging::Add(mpLogger);
+		}
+		~TempLoggerGuard()
+		{
+			Logging::Remove(mpLogger);
+		}
+	};
 };
 
 class FileLogger : public Logger
