@@ -10,6 +10,8 @@
 #ifndef STORETESTUTILS__H
 #define STORETESTUTILS__H
 
+#include "Test.h"
+
 class BackupProtocolCallable;
 class BackupProtocolClient;
 class SocketStreamTLS;
@@ -78,10 +80,31 @@ bool create_account(int soft, int hard);
 //! Deletes the standard test account, for testing behaviour with no account.
 bool delete_account();
 
-#define TEST_COMMAND_RETURNS_ERROR(command, error) \
-	TEST_CHECK_THROWS(command, ConnectionException, \
-		Conn_Protocol_UnexpectedReply); \
-	TEST_EQUAL(BackupProtocolError::error, protocol.GetLastErrorType());
+#define TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error, or_statements) \
+	{ \
+		TEST_CHECK_THROWS_OR(protocol . command, ConnectionException, \
+			Conn_Protocol_UnexpectedReply, or_statements); \
+		int type, subtype; \
+		protocol.GetLastError(type, subtype); \
+		if (type == BackupProtocolError::ErrorType) \
+		{ \
+			TEST_EQUAL_LINE(BackupProtocolError::error, subtype, \
+				"command returned error: " << \
+				BackupProtocolError::GetMessage(subtype)); \
+			if (subtype != BackupProtocolError::error) \
+			{ \
+				or_statements; \
+			} \
+		} \
+		else \
+		{ \
+			TEST_FAIL_WITH_MESSAGE("command returned success"); \
+			or_statements; \
+		} \
+	} 
+
+#define TEST_COMMAND_RETURNS_ERROR(protocol, command, error) \
+	TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error,)
 
 #endif // STORETESTUTILS__H
 
