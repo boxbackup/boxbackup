@@ -991,8 +991,7 @@ bool test_server_housekeeping()
 	// Housekeeping should not change anything just yet
 	protocol.QueryFinished();
 	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-	protocol.QueryLogin(0x01234567, 0);
+	protocol.Reopen();
 
 	TEST_THAT(check_num_files(1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
@@ -1027,8 +1026,7 @@ bool test_server_housekeeping()
 	// Housekeeping should not change anything just yet
 	protocol.QueryFinished();
 	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-	protocol.QueryLogin(0x01234567, 0);
+	protocol.Reopen();
 
 	TEST_THAT(check_num_files(1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
@@ -1044,8 +1042,7 @@ bool test_server_housekeeping()
 		"14B", // replaced_blocks + file1_blocks + root_dir_blocks
 		"2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-	protocol.QueryLogin(0x01234567, 0);
+	protocol.Reopen();
 
 	TEST_THAT(check_num_files(1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
@@ -1072,8 +1069,7 @@ bool test_server_housekeeping()
 	protocol.QueryFinished();
 	TEST_THAT(change_account_limits("0B", "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION);
-	protocol.QueryLogin(0x01234567, 0);
+	protocol.Reopen();
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));

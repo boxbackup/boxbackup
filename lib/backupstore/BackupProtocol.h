@@ -26,6 +26,8 @@ class BackupProtocolLocal2 : public BackupProtocolLocal
 {
 private:
 	BackupStoreContext mContext;
+	int32_t mAccountNumber;
+	bool mReadOnly;
 
 public:
 	BackupProtocolLocal2(int32_t AccountNumber,
@@ -36,7 +38,9 @@ public:
 	// touch the Context, because it's not initialised yet!
 	: BackupProtocolLocal(mContext),
 	  mContext(AccountNumber, (HousekeepingInterface *)NULL,
-		ConnectionDetails)
+		ConnectionDetails),
+	  mAccountNumber(AccountNumber),
+	  mReadOnly(ReadOnly)
 	{
 		mContext.SetClientHasAccount(AccountRootDir, DiscSetNumber);
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
@@ -51,6 +55,13 @@ public:
 			BackupProtocolLocal::Query(rQuery);
 		mContext.ReleaseWriteLock();
 		return finished;
+	}
+
+	void Reopen()
+	{
+		QueryVersion(BACKUP_STORE_SERVER_VERSION);
+		QueryLogin(mAccountNumber,
+			mReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
 	}
 };
 
