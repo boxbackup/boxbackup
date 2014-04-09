@@ -323,8 +323,13 @@ __E
 	
 	if(obj_is_type($cmd,'IsError'))
 	{
-		print H "\tbool IsError(int &rTypeOut, int &rSubTypeOut) const;\n";
-		print H "\tstd::string GetMessage() const;\n";
+		$error_message = $cmd;
+		my ($mem_type,$mem_subtype) = split /,/,obj_get_type_params($cmd,'IsError');
+		print H <<__E;
+	bool IsError(int &rTypeOut, int &rSubTypeOut) const;
+	std::string GetMessage() const { return GetMessage(m$mem_subtype); };
+	static std::string GetMessage(int subtype);
+__E
 	}
 	
 	my $has_stream = obj_is_type($cmd, 'StreamWithCommand');
@@ -496,9 +501,9 @@ bool $cmd_class\::IsError(int &rTypeOut, int &rSubTypeOut) const
 	rSubTypeOut = m$mem_subtype;
 	return true;
 }
-std::string $cmd_class\::GetMessage() const
+std::string $cmd_class\::GetMessage(int subtype)
 {
-	switch(m$mem_subtype)
+	switch(subtype)
 	{
 __E
 		foreach my $const (@{$cmd_constants{$cmd}})
@@ -513,7 +518,7 @@ __E
 		print CPP <<__E;
 		default:
 			std::ostringstream out;
-			out << "Unknown subtype " << m$mem_subtype;
+			out << "Unknown subtype " << subtype;
 			return out.str();
 	}
 }
@@ -669,6 +674,7 @@ void $callable_base_class\::CheckReply(const std::string& requestCommandName,
 	if(rReply.GetType() == expectedType)
 	{
 		// Correct response, do nothing
+		SetLastError(Protocol::NoError, Protocol::NoError);
 	}
 	else
 	{
