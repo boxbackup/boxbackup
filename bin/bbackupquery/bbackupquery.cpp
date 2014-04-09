@@ -66,11 +66,6 @@ void PrintUsageAndExit()
 		"Usage: bbackupquery [options] [command]...\n"
 		"\n"
 		"Options:\n"
-		"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
-		"  -Q         Run at minimum verbosity, log nothing\n"
-		"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
-		"  -V         Run at maximum verbosity, log everything\n"
-		"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
 		"  -w         Read/write mode, allow changes to store\n"
 #ifdef WIN32
 		"  -u         Enable Unicode console, requires font change to Lucida Console\n"
@@ -80,11 +75,13 @@ void PrintUsageAndExit()
 #endif
 		"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
 		"             argument is the configuration file, or else the default \n"
-		"             [" << BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE << 
-		"]\n"
+		"             [" << BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE << "]\n"
 		"  -o <file>  Write logging output to specified file as well as console\n"
 		"  -O <level> Set file verbosity to error/warning/notice/info/trace/everything\n"
 		"  -l <file>  Write protocol debugging logs to specified file\n"
+		<<
+		Logging::OptionParser::GetUsageString()
+		<<
 		"\n"
 		"Parameters: as many commands as you like. If commands are multiple words,\n"
 		"remember to enclose the command in quotes. Remember to use the quit command\n"
@@ -220,12 +217,6 @@ int main(int argc, const char *argv[])
 
 	Logging::SetProgramName("bbackupquery");
 
-	#ifdef BOX_RELEASE_BUILD
-	int consoleLogLevel = Log::NOTICE; // need an int to do math with
-	#else
-	int consoleLogLevel = Log::INFO; // need an int to do math with
-	#endif
-
 #ifdef WIN32
 	#define WIN32_OPTIONS "u"
 	bool unicodeConsole = false;
@@ -240,60 +231,19 @@ int main(int argc, const char *argv[])
 	#define READLINE_OPTIONS
 #endif
 
-	const char* validOpts = "qvVwc:l:o:O:W:" WIN32_OPTIONS READLINE_OPTIONS;
+	std::string options("wc:l:o:O:" WIN32_OPTIONS READLINE_OPTIONS);
+	options += Logging::OptionParser::GetOptionString();
+	Logging::OptionParser LogLevel;
 
 	std::string fileLogFile;
 	Log::Level fileLogLevel = Log::INVALID;
 
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, validOpts)) != -1)
+	while((c = getopt(argc, (char * const *)argv, options.c_str())) != -1)
 	{
 		switch(c)
 		{
-		case 'q':
-			{
-				if(consoleLogLevel == Log::NOTHING)
-				{
-					BOX_FATAL("Too many '-q': "
-						"Cannot reduce logging "
-						"level any more");
-					return 2;
-				}
-				consoleLogLevel--;
-			}
-			break;
-
-		case 'v':
-			{
-				if(consoleLogLevel == Log::EVERYTHING)
-				{
-					BOX_FATAL("Too many '-v': "
-						"Cannot increase logging "
-						"level any more");
-					return 2;
-				}
-				consoleLogLevel++;
-			}
-			break;
-
-		case 'V':
-			{
-				consoleLogLevel = Log::EVERYTHING;
-			}
-			break;
-
-		case 'W':
-			{
-				consoleLogLevel = Logging::GetNamedLevel(optarg);
-				if (consoleLogLevel == Log::INVALID)
-				{
-					BOX_FATAL("Invalid logging level");
-					return 2;
-				}
-			}
-			break;
-
 		case 'w':
 			// Read/write mode
 			readWrite = true;
@@ -342,16 +292,19 @@ int main(int argc, const char *argv[])
 			break;
 #endif
 		
-		case '?':
 		default:
-			PrintUsageAndExit();
+			int ret = LogLevel.ProcessOption(c);
+			if (ret != 0)
+			{
+				PrintUsageAndExit();
+			}
 		}
 	}
 	// Adjust arguments
 	argc -= optind;
 	argv += optind;
 	
-	Logging::GetConsole().Filter((Log::Level)consoleLogLevel);
+	Logging::GetConsole().Filter(LogLevel.GetCurrentLevel());
 
 	std::auto_ptr<FileLogger> fileLogger;
 	if (fileLogLevel != Log::INVALID)
