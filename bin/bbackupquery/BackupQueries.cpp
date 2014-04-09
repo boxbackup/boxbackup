@@ -1967,11 +1967,9 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		// At TRACE level, we print a line for each file and
 		// directory, so we don't need dots.
 
-		bool printDots = ! Logging::IsEnabled(Log::TRACE);
-
 		result = BackupClientRestore(mrConnection, dirID, 
 			storeDirEncoded.c_str(), localName.c_str(), 
-			printDots /* print progress dots */, restoreDeleted, 
+			true /* print progress dots */, restoreDeleted, 
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */,
 			opts['f'] /* force continue after errors */);

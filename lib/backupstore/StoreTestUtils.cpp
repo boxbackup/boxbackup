@@ -34,7 +34,8 @@ bool create_account(int soft, int hard)
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
 	BackupStoreAccountsControl control(*config);
-	Logging::Guard guard(Log::WARNING);
+	
+	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
 	int result = control.CreateAccount(0x01234567, 0, soft, hard);
 	TEST_EQUAL(0, result);
 	return (result == 0);
@@ -47,7 +48,7 @@ bool delete_account()
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
 	BackupStoreAccountsControl control(*config);
-	Logging::Guard guard(Log::WARNING);
+	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
 	TEST_THAT_THROWONFAIL(control.DeleteAccount(0x01234567, false) == 0);
 	return true;
 }
@@ -204,7 +205,7 @@ bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 
 int check_account_for_errors(Log::Level log_level)
 {
-	Logging::Guard guard(log_level);
+	Logger::LevelGuard guard(Logging::GetConsole(), log_level);
 	Logging::Tagger tag("check fix", true);
 	Logging::ShowTagOnConsole show;
 	std::string errs;

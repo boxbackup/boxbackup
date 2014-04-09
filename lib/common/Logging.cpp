@@ -42,15 +42,11 @@ std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
 Console*    Logging::spConsole = NULL;
 Syslog*     Logging::spSyslog  = NULL;
-Log::Level  Logging::sGlobalLevel = Log::EVERYTHING;
 Logging     Logging::sGlobalLogging; //automatic initialisation
 std::string Logging::sProgramName;
 
 HideSpecificExceptionGuard::SuppressedExceptions_t
 	HideSpecificExceptionGuard::sSuppressedExceptions;
-
-int Logging::Guard::sGuardCount = 0;
-Log::Level Logging::Guard::sOriginalLevel = Log::INVALID;
 
 Logging::Logging()
 {
@@ -142,11 +138,6 @@ void Logging::Remove(Logger* pOldLogger)
 void Logging::Log(Log::Level level, const std::string& rFile, 
 	int line, const std::string& rMessage)
 {
-	if (level > sGlobalLevel)
-	{
-		return;
-	}
-
 	std::string newMessage;
 	
 	if (sContextSet)
@@ -171,11 +162,6 @@ void Logging::LogToSyslog(Log::Level level, const std::string& rFile,
 	int line, const std::string& rMessage)
 {
 	if (!sLogToSyslog)
-	{
-		return;
-	}
-
-	if (level > sGlobalLevel)
 	{
 		return;
 	}
@@ -255,8 +241,7 @@ Logger::~Logger()
 
 bool Logger::IsEnabled(Log::Level level)
 {
-	return Logging::IsEnabled(level) &&
-		(int)mCurrentLevel >= (int)level;
+	return (int)mCurrentLevel >= (int)level;
 }
 
 bool Console::sShowTime = false;

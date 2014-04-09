@@ -221,9 +221,9 @@ int main(int argc, const char *argv[])
 	Logging::SetProgramName("bbackupquery");
 
 	#ifdef BOX_RELEASE_BUILD
-	int masterLevel = Log::NOTICE; // need an int to do math with
+	int consoleLogLevel = Log::NOTICE; // need an int to do math with
 	#else
-	int masterLevel = Log::INFO; // need an int to do math with
+	int consoleLogLevel = Log::INFO; // need an int to do math with
 	#endif
 
 #ifdef WIN32
@@ -253,40 +253,40 @@ int main(int argc, const char *argv[])
 		{
 		case 'q':
 			{
-				if(masterLevel == Log::NOTHING)
+				if(consoleLogLevel == Log::NOTHING)
 				{
 					BOX_FATAL("Too many '-q': "
 						"Cannot reduce logging "
 						"level any more");
 					return 2;
 				}
-				masterLevel--;
+				consoleLogLevel--;
 			}
 			break;
 
 		case 'v':
 			{
-				if(masterLevel == Log::EVERYTHING)
+				if(consoleLogLevel == Log::EVERYTHING)
 				{
 					BOX_FATAL("Too many '-v': "
 						"Cannot increase logging "
 						"level any more");
 					return 2;
 				}
-				masterLevel++;
+				consoleLogLevel++;
 			}
 			break;
 
 		case 'V':
 			{
-				masterLevel = Log::EVERYTHING;
+				consoleLogLevel = Log::EVERYTHING;
 			}
 			break;
 
 		case 'W':
 			{
-				masterLevel = Logging::GetNamedLevel(optarg);
-				if (masterLevel == Log::INVALID)
+				consoleLogLevel = Logging::GetNamedLevel(optarg);
+				if (consoleLogLevel == Log::INVALID)
 				{
 					BOX_FATAL("Invalid logging level");
 					return 2;
@@ -351,7 +351,7 @@ int main(int argc, const char *argv[])
 	argc -= optind;
 	argv += optind;
 	
-	Logging::SetGlobalLevel((Log::Level)masterLevel);
+	Logging::GetConsole().Filter((Log::Level)consoleLogLevel);
 
 	std::auto_ptr<FileLogger> fileLogger;
 	if (fileLogLevel != Log::INVALID)
@@ -359,19 +359,7 @@ int main(int argc, const char *argv[])
 		fileLogger.reset(new FileLogger(fileLogFile, fileLogLevel));
 	}
 
-	bool quiet = false;
-	if (masterLevel < Log::NOTICE)
-	{
-		// Quiet mode
-		quiet = true;
-	}
-
-	// Print banner?
-	if(!quiet)
-	{
-		const char *banner = BANNER_TEXT("Backup Query Tool");
-		BOX_NOTICE(banner);
-	}
+	BOX_NOTICE(BANNER_TEXT("Backup Query Tool"));
 
 #ifdef WIN32
 	if (unicodeConsole)
@@ -399,7 +387,7 @@ int main(int argc, const char *argv[])
 #endif // WIN32
 
 	// Read in the configuration file
-	if(!quiet) BOX_INFO("Using configuration file " << configFilename);
+	BOX_INFO("Using configuration file " << configFilename);
 
 	std::string errs;
 	std::auto_ptr<Configuration> config(
@@ -428,7 +416,7 @@ int main(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
 	// 2. Connect to server
-	if(!quiet) BOX_INFO("Connecting to store...");
+	BOX_INFO("Connecting to store...");
 	SocketStreamTLS *socket = new SocketStreamTLS;
 	std::auto_ptr<SocketStream> apSocket(socket);
 	socket->Open(tlsContext, Socket::TypeINET,
@@ -436,7 +424,7 @@ int main(int argc, const char *argv[])
 		conf.GetKeyValueInt("StorePort"));
 	
 	// 3. Make a protocol, and handshake
-	if(!quiet) BOX_INFO("Handshake with store...");
+	BOX_INFO("Handshake with store...");
 	std::auto_ptr<BackupProtocolClient>
 		apConnection(new BackupProtocolClient(apSocket));
 	BackupProtocolClient& connection(*(apConnection.get()));
@@ -449,7 +437,7 @@ int main(int argc, const char *argv[])
 	}
 	
 	// 4. Log in to server
-	if(!quiet) BOX_INFO("Login to store...");
+	BOX_INFO("Login to store...");
 	// Check the version of the server
 	{
 		std::auto_ptr<BackupProtocolVersion> serverVersion(connection.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -463,7 +451,8 @@ int main(int argc, const char *argv[])
 		(readWrite)?0:(BackupProtocolLogin::Flags_ReadOnly));
 
 	// 5. Tell user.
-	if(!quiet) printf("Login complete.\n\nType \"help\" for a list of commands.\n\n");
+	BOX_INFO("Login complete.");
+	BOX_INFO("Type \"help\" for a list of commands.");
 	
 	// Set up a context for our work
 	BackupQueries context(connection, conf, readWrite);
@@ -572,9 +561,9 @@ int main(int argc, const char *argv[])
 	}
 	
 	// Done... stop nicely
-	if(!quiet) BOX_INFO("Logging off...");
+	BOX_INFO("Logging off...");
 	connection.QueryFinished();
-	if(!quiet) BOX_INFO("Session finished.");
+	BOX_INFO("Session finished.");
 	
 	// Return code
 	returnCode = context.GetReturnCode();

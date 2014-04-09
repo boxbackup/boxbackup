@@ -324,7 +324,7 @@ int test_basics()
 	
 	BackupClientFileAttributes t3;
 	{
-		Logging::Guard guard(Log::ERROR);
+		Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
 		TEST_CHECK_THROWS(t3.ReadAttributes("doesn't exist"),
 			CommonException, OSFileError);
 	}
@@ -345,7 +345,7 @@ int test_basics()
 
 #ifndef WIN32
 	{
-		Logging::Guard guard(Log::ERROR);
+		Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
 		TEST_CHECK_THROWS(t1.WriteAttributes("testfiles/test1_nXX"),
 			CommonException, OSFileError);
 		TEST_CHECK_THROWS(t3.WriteAttributes("doesn't exist"),
@@ -879,7 +879,7 @@ int test_bbackupd()
 			context, 0 /* read-write */);
 		
 		{
-			Logging::Guard guard(Log::ERROR);
+			Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
 			TEST_CHECK_THROWS(ReadDirectory(*client, 0x12345678),
 				ConnectionException,
 				Conn_Protocol_UnexpectedReply);
@@ -1713,11 +1713,6 @@ int test_bbackupd()
 			// in fork child
 			TEST_THAT(setsid() != -1);
 
-			if (!Logging::IsEnabled(Log::TRACE))
-			{
-				Logging::SetGlobalLevel(Log::NOTHING);
-			}
-
 			// BackupStoreDaemon must be destroyed before exit(),
 			// to avoid memory leaks being reported.
 			{
@@ -1742,14 +1737,13 @@ int test_bbackupd()
 		::signal(SIGPIPE, SIG_IGN);
 
 		{
-			Log::Level newLevel = Logging::GetGlobalLevel();
+			Console& console(Logging::GetConsole());
+			Logger::LevelGuard guard(console);
 
-			if (!Logging::IsEnabled(Log::TRACE))
+			if (console.GetLevel() < Log::TRACE)
 			{
-				newLevel = Log::NOTHING;
+				console.Filter(Log::NOTHING);
 			}
-
-			Logging::Guard guard(newLevel);
 
 			BackupDaemon bbackupd;
 			bbackupd.Configure("testfiles/bbackupd.conf");
@@ -3424,7 +3418,8 @@ int test_bbackupd()
 			fflush(stdout);
 
 			{
-				Logging::Guard guard(Log::FATAL);
+				Logger::LevelGuard(Logging::GetConsole(),
+					Log::FATAL);
 				TEST_THAT(BackupClientRestore(*client,
 					restoredirid, "Test1",
 					"testfiles/no-such-path/subdir", 
