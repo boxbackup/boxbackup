@@ -1109,7 +1109,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	{
 		dir.AddEntry(rFilename, ModificationTime, id, dirSize,
 			BackupStoreDirectory::Entry::Flags_Dir,
-			AttributesModTime);
+			0 /* attributes hash */);
 		SaveDirectory(dir, InDirectory);
 
 		// Increment reference count on the new directory to one
