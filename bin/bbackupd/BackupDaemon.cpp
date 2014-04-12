@@ -1901,6 +1901,9 @@ bool BackupDaemon::RunBackgroundTask(State state, uint64_t progress,
 // --------------------------------------------------------------------------
 void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut)
 {
+	DoSyncFlagOut = false;
+	SyncIsForcedOut = false;
+
 	ASSERT(mapCommandSocketInfo.get());
 	if(!mapCommandSocketInfo.get())
 	{
