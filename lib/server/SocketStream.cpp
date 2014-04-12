@@ -25,6 +25,10 @@
 	#include <ucred.h>
 #endif
 
+#ifdef HAVE_BSD_UNISTD_H
+	#include <bsd/unistd.h>
+#endif
+
 #include "SocketStream.h"
 #include "ServerException.h"
 #include "CommonException.h"
