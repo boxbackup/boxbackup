@@ -729,13 +729,13 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 
 	// do not retry immediately without a good reason
 	mDoSyncForcedByPreviousSyncError = false;
-	
+
+	// Is it a berkely db failure?
+	bool isBerkelyDbFailure = false;
+
 	// Notify system administrator about the final state of the backup
 	if(errorOccurred)
 	{
-		// Is it a berkely db failure?
-		bool isBerkelyDbFailure = false;
-
 		if (errorCode == BackupStoreException::ExceptionType
 			&& errorSubCode == BackupStoreException::BerkelyDBFailure)
 		{
@@ -806,7 +806,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 	
 	// If we were retrying after an error, and this backup succeeded,
 	// then now would be a good time to stop :-)
-	mDoSyncForcedByPreviousSyncError = errorOccurred;
+	mDoSyncForcedByPreviousSyncError = errorOccurred && !isBerkelyDbFailure;
 
 	OnBackupFinish();
 }
