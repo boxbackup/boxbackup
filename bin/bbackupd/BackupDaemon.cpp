@@ -567,80 +567,105 @@ void BackupDaemon::Run2()
 		bool doSync = false;
 		bool mDoSyncForcedByCommand = false;
 
+		box_time_t currentTime = GetCurrentBoxTime();
+
+		// Check whether we should be stopping, and if so,
+		// don't hang around waiting on the command socket.
+		if(StopRun())
+		{
+			BOX_INFO("Skipping command socket polling "
+				"due to shutdown request");
+			break;
+		}
+
 		// Is a delay necessary?
-		box_time_t currentTime;
+		currentTime = GetCurrentBoxTime();
+		box_time_t requiredDelay = (mNextSyncTime < currentTime)
+				? (0) : (mNextSyncTime - currentTime);
 
-		do
+		if (mDoSyncForcedByPreviousSyncError)
 		{
-			// Check whether we should be stopping,
-			// and don't run a sync if so.
-			if(StopRun()) break;
-			
-			currentTime = GetCurrentBoxTime();
-
-			// Pause a while, but no more than 
-			// MAX_SLEEP_TIME seconds (use the conditional
-			// because times are unsigned)
-			box_time_t requiredDelay = 
-				(mNextSyncTime < currentTime)
-				? (0)
-				: (mNextSyncTime - currentTime);
-
-			// If there isn't automatic backup happening, 
-			// set a long delay. And limit delays at the 
-			// same time.
-			if(!automaticBackup && !mDoSyncForcedByPreviousSyncError)
-			{
-				requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
-			}
-			else if(requiredDelay > SecondsToBoxTime(MAX_SLEEP_TIME))
-			{
-				requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
-			}
-
-			// Only delay if necessary
-			if(requiredDelay > 0)
-			{
-				// Sleep somehow. There are choices 
-				// on how this should be done,
-				// depending on the state of the 
-				// control connection
-				if(mapCommandSocketInfo.get() != 0)
-				{
-					// A command socket exists, 
-					// so sleep by waiting on it
-					WaitOnCommandSocket(requiredDelay,
-						doSync, mDoSyncForcedByCommand);
-				}
-				else
-				{
-					// No command socket or 
-					// connection, just do a 
-					// normal sleep
-					time_t sleepSeconds = 
-						BoxTimeToSeconds(requiredDelay);
-					::sleep((sleepSeconds <= 0)
-						? 1 : sleepSeconds);
-				}
-			}
-			
-			if ((automaticBackup || mDoSyncForcedByPreviousSyncError)
-				&& currentTime >= mNextSyncTime)
-			{
-				doSync = true;
-			}
+			BOX_INFO("Last backup was not successful, "
+				"next one starting at " <<
+				FormatTime(mNextSyncTime, false));
 		}
-		while(!doSync && !StopRun());
-
-		// Time of sync start, and if it's time for another sync 
-		// (and we're doing automatic syncs), set the flag
-		mCurrentSyncStartTime = GetCurrentBoxTime();
-		if((automaticBackup || mDoSyncForcedByPreviousSyncError) &&
-			mCurrentSyncStartTime >= mNextSyncTime)
+		else if (automaticBackup)
 		{
-			doSync = true;
+			BOX_INFO("Automatic backups are enabled, "
+				"next one starting at " <<
+				FormatTime(mNextSyncTime, false));
 		}
-		
+		else
+		{
+			BOX_INFO("No automatic backups, waiting for "
+				"bbackupctl snapshot command");
+			requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
+		}
+
+		if(requiredDelay > SecondsToBoxTime(MAX_SLEEP_TIME))
+		{
+			requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
+		}
+
+		// Only delay if necessary
+		if(requiredDelay == 0)
+		{
+			// No sleep necessary, so don't listen on the command
+			// socket at all right now.
+		}
+		else if(mapCommandSocketInfo.get() != 0)
+		{
+			// A command socket exists, so sleep by waiting for a
+			// connection or command on it.
+			WaitOnCommandSocket(requiredDelay, doSync,
+				mDoSyncForcedByCommand);
+		}
+		else
+		{
+			// No command socket or connection, just do a normal
+			// sleep.
+			time_t sleepSeconds = 
+				BoxTimeToSeconds(requiredDelay);
+			::sleep((sleepSeconds <= 0)
+				? 1 : sleepSeconds);
+		}
+
+		if(StopRun())
+		{
+			BOX_INFO("Stopping idle loop due to shutdown request");
+			break;
+		}
+		else if(doSync)
+		{
+			BOX_INFO("Starting a backup immediately due to "
+				"bbackupctl sync command");
+		}
+		else if(currentTime < mNextSyncTime)
+		{
+			BOX_TRACE("Sleeping again because next sync time "
+				"has not arrived");
+			continue;
+		}
+		else if(mDoSyncForcedByPreviousSyncError)
+		{
+			BOX_INFO("Last backup was not successful, next one "
+				"starting now");
+		}
+		else if(automaticBackup)
+		{
+			BOX_INFO("Automatic backups are enabled, next one "
+				"starting now");
+		}
+		else
+		{
+			BOX_TRACE("Sleeping again because automatic backups "
+				"are not enabled");
+			continue;
+		}
+
+		// If we pass this point, or exit the loop, we should have
+		// logged something at INFO level or higher to explain why.
+
 		// Use a script to see if sync is allowed now?
 		if(!mDoSyncForcedByCommand && doSync && !StopRun())
 		{
@@ -650,21 +675,20 @@ void BackupDaemon::Run2()
 				// Script has asked for a delay
 				mNextSyncTime = GetCurrentBoxTime() + 
 					SecondsToBoxTime(d);
-				doSync = false;
+				BOX_INFO("Impending backup stopped by "
+					"SyncAllowScript, next attempt "
+					"scheduled for " <<
+					FormatTime(mNextSyncTime, false));
+				continue;
 			}
 		}
 
-		// Ready to sync? (but only if we're not supposed 
-		// to be stopping)
-		if(doSync && !StopRun())
-		{
-			RunSyncNowWithExceptionHandling();
-		}
+		RunSyncNowWithExceptionHandling();
 		
 		// Set state
 		SetState(storageLimitExceeded?State_StorageLimitExceeded:State_Idle);
-
-	} while(!StopRun());
+	}
+	while(!StopRun());
 	
 	// Make sure we have a clean start next time round (if restart)
 	DeleteAllLocations();
