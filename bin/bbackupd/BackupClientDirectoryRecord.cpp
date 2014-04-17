@@ -1859,8 +1859,8 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(
   mReadErrorsOnFilesystemObjects(false),
   mMaxUploadRate(0),
   mUploadAfterThisTimeInTheFuture(99999999999999999LL),
-  mHaveLoggedWarningAboutFutureFileTimes(false),
-  mpBackgroundTask(pBackgroundTask)
+  mpBackgroundTask(pBackgroundTask),
+  mHaveLoggedWarningAboutFutureFileTimes(false)
 {
 }
 
