@@ -303,10 +303,19 @@ void BackupClientDirectoryRecord::SyncDirectory(
 			struct dirent *en = 0;
 			EMU_STRUCT_STAT file_st;
 			std::string filename;
+			int num_entries_found = 0;
+
 			while((en = ::readdir(dirHandle)) != 0)
 			{
+				num_entries_found++;
 				rParams.mrContext.DoKeepAlive();
-				
+				if(rParams.mpBackgroundTask)
+				{
+					rParams.mpBackgroundTask->RunBackgroundTask(
+						BackgroundTask::Scanning_Dirs,
+						num_entries_found, 0);
+				}
+
 				// Don't need to use
 				// LinuxWorkaround_FinishDirentStruct(en,
 				// rLocalPath.c_str());
