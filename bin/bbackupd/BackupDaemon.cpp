@@ -826,8 +826,7 @@ void BackupDaemon::RunSyncNow()
 	// Delete the serialised store object file,
 	// so that we don't try to reload it after a
 	// partially completed backup
-	if(mDeleteStoreObjectInfoFile && 
-		!DeleteStoreObjectInfo())
+	if(mDeleteStoreObjectInfoFile && !DeleteStoreObjectInfo())
 	{
 		BOX_ERROR("Failed to delete the StoreObjectInfoFile, "
 			"backup cannot continue safely.");
@@ -914,18 +913,15 @@ void BackupDaemon::RunSyncNow()
 		// than minimumFileAge after the last sync. Deal with it by
 		// moving back syncPeriodStart, which should not do any
 		// damage.
-		syncPeriodStart = syncPeriodEnd -
-			SecondsToBoxTime(1);
+		syncPeriodStart = syncPeriodEnd - SecondsToBoxTime(1);
 	}
 
 	if(syncPeriodStart >= syncPeriodEnd)
 	{
-		BOX_ERROR("Invalid (negative) sync period: "
-			"perhaps your clock is going "
-			"backwards (" << syncPeriodStart <<
-			" to " << syncPeriodEnd << ")");
-		THROW_EXCEPTION(ClientException,
-			ClockWentBackwards);
+		BOX_ERROR("Invalid (negative) sync period: perhaps your clock "
+			"is going backwards? (" << syncPeriodStart << " to " <<
+			syncPeriodEnd << ")");
+		THROW_EXCEPTION(ClientException, ClockWentBackwards);
 	}
 
 	// Check logic
