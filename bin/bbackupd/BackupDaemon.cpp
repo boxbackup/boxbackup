@@ -477,25 +477,23 @@ void BackupDaemon::Run()
 	}
 	catch(...)
 	{
-		if(mapCommandSocketInfo.get())
+		try 
 		{
-			try 
-			{
-				mapCommandSocketInfo.reset();
-			}
-			catch(std::exception &e)
-			{
-				BOX_WARNING("Internal error while "
-					"closing command socket after "
-					"another exception: " << e.what());
-			}
-			catch(...)
-			{
-				BOX_WARNING("Error closing command socket "
-					"after exception, ignored.");
-			}
+			mapCommandSocketInfo.reset();
+		}
+		catch(std::exception &e)
+		{
+			BOX_WARNING("Internal error while closing command "
+				"socket after another exception, ignored: " <<
+				e.what());
+		}
+		catch(...)
+		{
+			BOX_WARNING("Error closing command socket after "
+				"exception, ignored.");
 		}
 
+		mapCommandSocketPollTimer.reset();
 		Timers::Cleanup();
 		
 		throw;
@@ -503,6 +501,7 @@ void BackupDaemon::Run()
 
 	// Clean up
 	mapCommandSocketInfo.reset();
+	mapCommandSocketPollTimer.reset();
 	Timers::Cleanup();
 }
 
