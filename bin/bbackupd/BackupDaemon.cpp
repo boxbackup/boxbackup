@@ -540,10 +540,10 @@ void BackupDaemon::Run2()
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	mLastSyncTime = 0;
 
- 	// --------------------------------------------------------------------------------------------
+	// --------------------------------------------------------------------------------------------
  
- 	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo(
-		mLastSyncTime, mNextSyncTime);
+	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo(mLastSyncTime,
+		mNextSyncTime);
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -1098,8 +1098,7 @@ void BackupDaemon::RunSyncNow()
 	// delete the file next time we start a backup
 
 	mDeleteStoreObjectInfoFile = 
-		SerializeStoreObjectInfo(mLastSyncTime,
-			mNextSyncTime);
+		SerializeStoreObjectInfo(mLastSyncTime, mNextSyncTime);
 
 	// --------------------------------------------------------------------------------------------
 }
