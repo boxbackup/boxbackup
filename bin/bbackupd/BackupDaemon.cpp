@@ -667,7 +667,12 @@ void BackupDaemon::Run2()
 		// logged something at INFO level or higher to explain why.
 
 		// Use a script to see if sync is allowed now?
-		if(!mDoSyncForcedByCommand && doSync && !StopRun())
+		if(mDoSyncForcedByCommand)
+		{
+			BOX_INFO("Skipping SyncAllowScript due to bbackupctl "
+				"force-sync command");
+		}
+		else
 		{
 			int d = UseScriptToSeeIfSyncAllowed();
 			if(d > 0)
