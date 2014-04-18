@@ -1105,8 +1105,6 @@ __E
 				my $has_stream = obj_is_type($cmd,'StreamWithCommand');
 				my $argextra = $has_stream?', std::auto_ptr<IOStream> apDataStream':'';
 				my $send_stream_extra = '';
-				my $send_stream_method = $writing_client ? "SendStream"
-					: "SendStreamAfterCommand";
 
 				print CPP <<__E;
 std::auto_ptr<$reply_class> $server_or_client_class\::Query(const $request_class &rQuery$argextra)
@@ -1119,7 +1117,15 @@ __E
 					{
 						$send_stream_extra = <<__E;
 	// Send stream after the command
-	SendStream(*apDataStream);
+	try
+	{
+		SendStream(*apDataStream);
+	}
+	catch (BoxException &e)
+	{
+		BOX_WARNING("Failed to send stream after command: " <<
+			rQuery.ToString() << ": " << e.what());
+	}
 __E
 					}
 					
