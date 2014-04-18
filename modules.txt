@@ -33,7 +33,7 @@ bin/bbstored		lib/raidfile	lib/server	lib/backupstore
 bin/bbstoreaccounts	lib/raidfile	lib/backupstore
 bin/bbackupd		lib/server	lib/backupclient	qdbm
 bin/bbackupquery	lib/server	lib/backupclient
-bin/bbackupctl		lib/server	lib/backupclient
+bin/bbackupctl		bin/bbackupd
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
