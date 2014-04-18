@@ -561,8 +561,6 @@ void BackupDaemon::Run2()
 		bool doSync = false;
 		bool mDoSyncForcedByCommand = false;
 
-		box_time_t currentTime = GetCurrentBoxTime();
-
 		// Check whether we should be stopping, and if so,
 		// don't hang around waiting on the command socket.
 		if(StopRun())
@@ -573,7 +571,7 @@ void BackupDaemon::Run2()
 		}
 
 		// Is a delay necessary?
-		currentTime = GetCurrentBoxTime();
+		box_time_t currentTime = GetCurrentBoxTime();
 		box_time_t requiredDelay = (mNextSyncTime < currentTime)
 				? (0) : (mNextSyncTime - currentTime);
 
