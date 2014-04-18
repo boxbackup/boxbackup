@@ -19,6 +19,7 @@
 
 #include "box_getopt.h"
 #include "MainHelper.h"
+#include "BackupDaemon.h"
 #include "BoxPortsAndFiles.h"
 #include "BackupDaemonConfigVerify.h"
 #include "Socket.h"
@@ -236,7 +237,21 @@ int main(int argc, const char *argv[])
 	}
 	else if (commandName == "status")
 	{
-		BOX_NOTICE("state " << currentState);
+		std::string stateName;
+
+		#define STATE(x) case BackupDaemon::State_ ## x: stateName = #x; break;
+		switch (currentState)
+		{
+		STATE(Initialising);
+		STATE(Idle);
+		STATE(Connected);
+		STATE(Error);
+		STATE(StorageLimitExceeded);
+		default:
+			stateName = "unknown";
+			break;
+		}
+		BOX_NOTICE("state " << currentState << " " << stateName);
 		command = NoCommand;
 	}
 
