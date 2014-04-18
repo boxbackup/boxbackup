@@ -680,6 +680,7 @@ void BackupDaemon::Run2()
 			}
 		}
 
+		mCurrentSyncStartTime = GetCurrentBoxTime();
 		RunSyncNowWithExceptionHandling();
 		
 		// Set state
