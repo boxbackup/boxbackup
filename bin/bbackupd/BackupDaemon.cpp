@@ -202,8 +202,7 @@ BackupDaemon::BackupDaemon()
 	  mpProgressNotifier(this),
 	  mpLocationResolver(this),
 	  mpRunStatusProvider(this),
-	  mpSysadminNotifier(this),
-	  mapCommandSocketPollTimer(NULL)
+	  mpSysadminNotifier(this)
 	#ifdef WIN32
 	, mInstallService(false),
 	  mRemoveService(false),
@@ -443,9 +442,6 @@ void BackupDaemon::Run()
 	// initialise global timer mechanism
 	Timers::Init();
 	
-	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
-		"CommandSocketPollTimer"));
-
 	#ifndef WIN32
 		// Ignore SIGPIPE so that if a command connection is broken,
 		// the daemon doesn't terminate.
@@ -493,7 +489,6 @@ void BackupDaemon::Run()
 				"exception, ignored.");
 		}
 
-		mapCommandSocketPollTimer.reset();
 		Timers::Cleanup();
 		
 		throw;
@@ -501,7 +496,6 @@ void BackupDaemon::Run()
 
 	// Clean up
 	mapCommandSocketInfo.reset();
-	mapCommandSocketPollTimer.reset();
 	Timers::Cleanup();
 }
 
@@ -1680,6 +1674,10 @@ void BackupDaemon::OnBackupStart()
 	// Notify administrator
 	NotifySysadmin(SysadminNotifier::BackupStart);
 
+	// Setup timer for polling the command socket
+	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
+		"CommandSocketPollTimer"));
+
 	// Set state and log start
 	SetState(State_Connected);
 	BOX_NOTICE("Beginning scan of local files");
@@ -1707,6 +1705,10 @@ void BackupDaemon::OnBackupFinish()
 
 		// Notify administrator
 		NotifySysadmin(SysadminNotifier::BackupFinish);
+
+		// Stop the timer for polling the command socket,
+		// to prevent needless alarms while sleeping.
+		mapCommandSocketPollTimer.reset();
 
 		// Tell anything connected to the command socket
 		SendSyncStartOrFinish(false /* finish */);
