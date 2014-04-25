@@ -1125,6 +1125,7 @@ __E
 	{
 		BOX_WARNING("Failed to send stream after command: " <<
 			rQuery.ToString() << ": " << e.what());
+		throw;
 	}
 __E
 					}
