@@ -1335,6 +1335,19 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			en = 0;
 		}
 
+		// Zero pointer in rEntriesLeftOver, if we have a pointer to zero
+		if(en != 0)
+		{
+			for(unsigned int l = 0; l < rEntriesLeftOver.size(); ++l)
+			{
+				if(rEntriesLeftOver[l] == en)
+				{
+					rEntriesLeftOver[l] = 0;
+					break;
+				}
+			}
+		}
+
 		// Flag for having created directory, so can optimise the
 		// recursive call not to read it again, because we know
 		// it's empty.
@@ -1350,7 +1363,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// In the list, just use this pointer
 			psubDirRecord = e->second;
 		}
-		else 
+		else
 		{
 			// Note: if we have exceeded our storage limit, then
 			// we should not upload any more data, nor create any
@@ -1366,19 +1379,25 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				// No. Exists on the server, and we know about it from the listing.
 				subDirObjectID = en->GetObjectID();
 			}
-			else if(rContext.StorageLimitExceeded())	
+			else if(rContext.StorageLimitExceeded())
 			// know we've got a connection if we get this far,
 			// as dir will have been modified.
 			{
 				doCreateDirectoryRecord = false;
-			}				
+			}
 			else
 			{
 				// Yes, creation required!
 				// It is known that the it doesn't exist:
-				//   if pDirOnStore == 0, then the directory has had an initial sync, and hasn't been modified.
-				//	 so it has definately been created already.
-				//   if en == 0 but pDirOnStore != 0, well... obviously it doesn't exist.
+				//
+				// if en == 0 and pDirOnStore == 0, then the
+				//   directory has had an initial sync, and
+				//   hasn't been modified (Really? then why
+				//   are we here? TODO FIXME)
+				//   so it has definately been created already
+				//   (so why create it again?)
+				//
+				// if en == 0 but pDirOnStore != 0, well... obviously it doesn't exist.
 
 				// Get attributes
 				box_time_t attrModTime = 0;
@@ -1396,11 +1415,14 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 				catch (BoxException &e)
 				{
+					// We used to try to recover from this,
+					// but we'd need an attributes block to
+					// upload to the server, so we have to
+					// skip creating the directory instead.
 					BOX_WARNING("Failed to read attributes "
-						"of directory, cannot check "
-						"for rename, assuming new: '"
-						<< nonVssDirPath << "'");
-					failedToReadAttributes = true;
+						"of directory, ignoring it "
+						"for now: " << nonVssDirPath);
+					continue;
 				}
 
 				// Check to see if the directory been renamed
@@ -1438,9 +1460,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 
 				// Get connection
 				BackupProtocolClient &connection(rContext.GetConnection());
-				
+
 				// Don't do a check for storage limit exceeded here, because if we get to this
-				// stage, a connection will have been opened, and the status known, so the check 
+				// stage, a connection will have been opened, and the status known, so the check
 				// in the else if(...) above will be correct.
 
 				// Build attribute stream for sending
@@ -1452,10 +1474,10 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					connection.QueryMoveObject(renameObjectID,
 						renameInDirectory,
 						mObjectID /* move to this directory */,
-						BackupProtocolMoveObject::Flags_MoveAllWithSameName | 
+						BackupProtocolMoveObject::Flags_MoveAllWithSameName |
 						BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
 						storeFilename);
-						
+
 					// Put the latest attributes on it
 					connection.QueryChangeDirAttributes(renameObjectID, attrModTime, attrStream);
 
@@ -1490,7 +1512,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			}
 
 			if (doCreateDirectoryRecord)
-			{				
+			{
 				// New an object for this
 				psubDirRecord = new BackupClientDirectoryRecord(subDirObjectID, *d);
 				
@@ -1507,9 +1529,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 			}
 		}
-		
+
 		ASSERT(psubDirRecord != 0 || rContext.StorageLimitExceeded());
-		
+
 		if(psubDirRecord)
 		{
 			// Sync this sub directory too
@@ -1517,21 +1539,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				rRemotePath + "/" + *d, rBackupLocation,
 				haveJustCreatedDirOnServer);
 		}
-
-		// Zero pointer in rEntriesLeftOver, if we have a pointer to zero
-		if(en != 0)
-		{
-			for(unsigned int l = 0; l < rEntriesLeftOver.size(); ++l)
-			{
-				if(rEntriesLeftOver[l] == en)
-				{
-					rEntriesLeftOver[l] = 0;
-					break;
-				}
-			}
-		}
 	}
-	
+
 	// Delete everything which is on the store, but not on disc
 	for(unsigned int l = 0; l < rEntriesLeftOver.size(); ++l)
 	{
