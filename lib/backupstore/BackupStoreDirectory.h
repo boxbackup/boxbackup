@@ -139,7 +139,7 @@ public:
 		void WriteToStreamDependencyInfo(IOStream &rStream) const;
 
 	private:
-		BackupStoreFilename	mName;
+		BackupStoreFilename mName;
 		box_time_t mModificationTime;
 		int64_t mObjectID;
 		int64_t mSizeInBlocks;

@@ -1849,7 +1849,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 		0, false);
 	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
 		"backup/01234567/", 0, true); // read only
-	
+
 	int64_t subdirid = create_directory(protocol);
 
 	// Get the root directory cached in the read-only connection, and
@@ -1876,7 +1876,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 		new_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
 	}
 
-	// Check that the root directory entry has been updated	
+	// Check that the root directory entry has been updated
 	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
@@ -1884,7 +1884,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 	protocol.QueryDeleteFile(subdirid,
 		BackupStoreFilenameClear(last_added_filename));
 
-	// Reduce the limits, to remove it permanently from the store	
+	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
 	TEST_THAT(change_account_limits("0B", "20000B"));
@@ -1987,7 +1987,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
 	protocolReadOnly.QueryFinished();
-	tearDown();	
+	tearDown();
 	return true;
 }
 
@@ -2269,7 +2269,7 @@ bool test_store_info()
 		TEST_THAT(delfiles[1] == 4);
 	}
 
-	tearDown();	
+	tearDown();
 	return true;
 }
 
@@ -2532,7 +2532,7 @@ bool test_housekeeping_deletes_files()
 	// will investigate.
 	delete_account();
 
-	tearDown();	
+	tearDown();
 	return true;
 }
 
@@ -2615,7 +2615,6 @@ int multi_server()
 		// Kill it
 		TEST_THAT(StopServer());
 	}
-
 
 	return 0;
 }
