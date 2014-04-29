@@ -33,6 +33,10 @@ public:
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
+	virtual std::string ToString() const
+	{
+		return std::string("Buffered ") + mrSource.ToString();
+	}
 private:
 	BufferedStream(const BufferedStream &rToCopy) 
 	: mrSource(rToCopy.mrSource) { /* do not call */ }

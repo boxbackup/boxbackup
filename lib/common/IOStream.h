@@ -65,6 +65,7 @@ public:
 	void Flush(int Timeout = IOStream::TimeOutInfinite);
 	
 	static int ConvertSeekTypeToOSWhence(int SeekType);
+	virtual std::string ToString() const;
 };
 
 

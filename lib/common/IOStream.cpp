@@ -245,7 +245,30 @@ void IOStream::Flush(int Timeout)
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    IOStream::Write
+//		Purpose: Convenience method for writing a null-terminated
+//			 C string to a protocol buffer.
+//
+// --------------------------------------------------------------------------
 void IOStream::Write(const char *pBuffer)
 {
 	Write(pBuffer, strlen(pBuffer));
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    IOStream::ToString()
+//		Purpose: Returns a string which describes this stream. Useful
+//			 when reporting exceptions about a stream of unknown
+//			 origin, for example in BackupStoreDirectory().
+//		Created: 2014/04/28
+//
+// --------------------------------------------------------------------------
+std::string IOStream::ToString() const
+{
+	return "unknown IOStream";
 }
