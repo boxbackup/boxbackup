@@ -149,6 +149,8 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				if((flags & Flags_IsDir) == Flags_IsDir)
 				{
 					// Directory. Just put into lost and found.
+					// (It doesn't contain its filename, so we
+					// can't recreate the entry in the parent)
 					putIntoDirectoryID = GetLostAndFoundDirID();
 				}
 				else
