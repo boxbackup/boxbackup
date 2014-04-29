@@ -1121,7 +1121,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		}
 
 		// Commit the file
-		dirFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);		
+		dirFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 
 		// Make sure the size of the directory is added to the usage counts in the info
 		ASSERT(dirSize > 0);
@@ -1151,7 +1151,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		RemoveDirectoryFromCache(InDirectory);
 
 		// Don't worry about the incremented number in the store info
-		throw;	
+		throw;
 	}
 
 	// Save the store info (may not be postponed)

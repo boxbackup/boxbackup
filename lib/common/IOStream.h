@@ -58,12 +58,12 @@ public:
 	virtual bool StreamDataLeft() = 0;
 	// Has the stream been closed (writing not possible)
 	virtual bool StreamClosed() = 0;
-	
+
 	// Utility functions
 	bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout = IOStream::TimeOutInfinite);
 	bool CopyStreamTo(IOStream &rCopyTo, int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024);
 	void Flush(int Timeout = IOStream::TimeOutInfinite);
-	
+
 	static int ConvertSeekTypeToOSWhence(int SeekType);
 	virtual std::string ToString() const;
 };
