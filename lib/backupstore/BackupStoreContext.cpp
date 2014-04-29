@@ -1017,10 +1017,20 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 				GetDirectoryInternal(rDir.GetContainerID()));
 			BackupStoreDirectory::Entry* en =
 				parent.FindEntryByID(rDir.GetObjectID());
-			ASSERT(en);
-			ASSERT(en->GetSizeInBlocks() == old_dir_size);
-			en->SetSizeInBlocks(new_dir_size);
-			SaveDirectory(parent);
+			if(!en)
+			{
+				BOX_ERROR("Missing entry for directory " <<
+					BOX_FORMAT_OBJECTID(rDir.GetObjectID()) <<
+					" in directory " <<
+					BOX_FORMAT_OBJECTID(rDir.GetContainerID()) <<
+					" while trying to update dir size in parent");
+			}
+			else
+			{
+				ASSERT(en->GetSizeInBlocks() == old_dir_size);
+				en->SetSizeInBlocks(new_dir_size);
+				SaveDirectory(parent);
+			}
 		}
 	}
 	catch(...)

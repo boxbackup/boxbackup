@@ -1828,6 +1828,19 @@ int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
 	return en->GetSizeInBlocks();
 }
 
+bool write_dir(BackupStoreDirectory& dir)
+{
+	std::string rfn;
+	StoreStructure::MakeObjectFilename(dir.GetObjectID(),
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
+		rfn, false); // EnsureDirectoryExists
+	RaidFileWrite rfw(0, rfn);
+	rfw.Open(true); // AllowOverwrite
+	dir.WriteToStream(rfw);
+	rfw.Commit(/* ConvertToRaidNow */ true);
+	return true;
+}
+
 bool test_directory_parent_entry_tracks_directory_size()
 {
 	SETUP();
@@ -1894,7 +1907,45 @@ bool test_directory_parent_entry_tracks_directory_size()
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
-	// Add a directory, this should push the object size back up
+	// Now modify the root directory to remove its entry for this one
+	std::auto_ptr<RaidFileRead> root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
+	BackupStoreDirectory root(static_cast<std::auto_ptr<IOStream> >(root_read));
+	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
+	TEST_THAT_OR(en, return false);
+	BackupStoreDirectory::Entry enCopy(*en);
+	root.DeleteEntry(subdirid);
+	TEST_THAT(write_dir(root));
+
+	// Add a directory, this should try to push the object size back up,
+	// which will try to modify the subdir's entry in its parent, which
+	// no longer exists, which should just log an error instead of
+	// aborting/segfaulting.
+	create_directory(protocol, subdirid);
+
+	// Repair the error ourselves, as bbstoreaccounts can't.
+	protocol.QueryFinished();
+	enCopy.SetSizeInBlocks(get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	root.AddEntry(enCopy);
+	TEST_THAT(write_dir(root));
+
+	// We also have to remove the entry for lovely_directory created by
+	// create_directory(), because otherwise we can't create it again.
+	// (Perhaps it should not have been committed because we failed to
+	// update the parent, but currently it is.)
+	std::auto_ptr<RaidFileRead> subdir_read(get_raid_file(subdirid));
+	BackupStoreDirectory subdir(static_cast<std::auto_ptr<IOStream> >(subdir_read));
+	{
+		BackupStoreDirectory::Iterator i(subdir);
+		en = i.FindMatchingClearName(
+			BackupStoreFilenameClear("lovely_directory"));
+	}
+	TEST_THAT_OR(en, return false);
+	protocol.Reopen();
+	protocol.QueryDeleteDirectory(en->GetObjectID());
+	set_refcount(en->GetObjectID(), 0);
+
+	// This should have fixed the error, so we should be able to add the
+	// entry now. This should push the object size back up.
 	int64_t dir2id = create_directory(protocol, subdirid);
 	TEST_EQUAL(new_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
 	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
@@ -1903,12 +1954,12 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Delete it again, which should reduce the object size again
 	protocol.QueryDeleteDirectory(dir2id);
 
-	// Reduce the limits, to remove it permanently from the store	
+	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
 	TEST_THAT(change_account_limits("0B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
-	set_refcount(last_added_file_id, 0);
+	set_refcount(dir2id, 0);
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
@@ -1922,21 +1973,12 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	protocol.QueryFinished();
 
-	std::auto_ptr<RaidFileRead> root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
-	BackupStoreDirectory root(static_cast<std::auto_ptr<IOStream> >(root_read));
-	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
-	TEST_THAT(en != 0);
-	if (!en) return false;
+	root_read = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
+	root.ReadFromStream(*root_read, IOStream::TimeOutInfinite);
+	en = root.FindEntryByID(subdirid);
+	TEST_THAT_OR(en != 0, return false);
 	en->SetSizeInBlocks(1234);
-
-	std::string rfn;
-	StoreStructure::MakeObjectFilename(BACKUPSTORE_ROOT_DIRECTORY_ID,
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
-		rfn, false); // EnsureDirectoryExists
-	RaidFileWrite rfw(0, rfn);
-	rfw.Open(true); // AllowOverwrite
-	root.WriteToStream(rfw);
-	rfw.Commit(/* ConvertToRaidNow */ true);
+	TEST_THAT(write_dir(root));
 
 	TEST_EQUAL(1234, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
