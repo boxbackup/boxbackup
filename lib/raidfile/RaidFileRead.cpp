@@ -1767,6 +1767,7 @@ IOStream::pos_type RaidFileRead::GetDiscUsageInBlocks()
 	return RaidFileUtil::DiscUsageInBlocks(GetFileSize(), rdiscSet);
 }
 
-
-
-
+std::string RaidFileRead::ToString() const
+{
+	return std::string("RaidFile ") + mFilename;
+}

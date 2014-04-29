@@ -133,11 +133,11 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	if(OBJECTMAGIC_DIR_MAGIC_VALUE != ntohl(hdr.mMagicValue))
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadDirectoryFormat,
-			"Wrong magic number in directory object " << 
-			BOX_FORMAT_OBJECTID(mObjectID) << ": expected " <<
+			"Wrong magic number for directory: expected " <<
 			BOX_FORMAT_HEX32(OBJECTMAGIC_DIR_MAGIC_VALUE) <<
 			" but found " <<
-			BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)));
+			BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)) << " in " <<
+			rStream.ToString());
 	}
 	
 	// Get data

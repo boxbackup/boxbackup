@@ -49,6 +49,10 @@ public:
 	virtual bool StreamClosed();
 
 	bool CompareWith(IOStream& rOther, int Timeout = IOStream::TimeOutInfinite);
+	std::string ToString() const
+	{
+		return std::string("local file ") + mFileName;
+	}
 
 private:
 	tOSFileHandle mOSFileHandle;

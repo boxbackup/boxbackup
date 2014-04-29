@@ -61,6 +61,7 @@ public:
 	virtual pos_type BytesLeftToRead();
 
 	pos_type GetDiscUsageInBlocks();
+	std::string ToString() const;
 
 	typedef int64_t FileSizeType;
 
