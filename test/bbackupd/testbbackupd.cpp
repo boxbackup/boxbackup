@@ -883,6 +883,7 @@ int test_bbackupd()
 			TEST_CHECK_THROWS(ReadDirectory(*client, 0x12345678),
 				ConnectionException,
 				Protocol_UnexpectedReply);
+			TEST_PROTOCOL_ERROR_OR(*client, Err_DoesNotExist,);
 		}
 
 		client->QueryFinished();
