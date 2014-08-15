@@ -36,6 +36,7 @@
 // in ms
 #define COMMS_READ_TIMEOUT					4
 #define COMMS_SERVER_WAIT_BEFORE_REPLYING	40
+#define SHORT_TIMEOUT 5000
 
 class basicdaemon : public Daemon
 {
@@ -112,7 +113,7 @@ void testservers_connection(SocketStream &rStream)
 				}
 				for(int s = 0; s < (LARGE_DATA_SIZE / LARGE_DATA_BLOCK_SIZE); ++s)
 				{
-					rStream.Write(data, sizeof(data));
+					rStream.Write(data, sizeof(data), SHORT_TIMEOUT);
 				}
 			}
 			{
@@ -120,7 +121,8 @@ void testservers_connection(SocketStream &rStream)
 				char buf[1024];
 				int total = 0;
 				int r = 0;
-				while(total < LARGE_DATA_SIZE && (r = rStream.Read(buf, sizeof(buf))) != 0)
+				while(total < LARGE_DATA_SIZE &&
+					(r = rStream.Read(buf, sizeof(buf), SHORT_TIMEOUT)) != 0)
 				{
 					total += r;
 				}
@@ -142,7 +144,7 @@ void testservers_connection(SocketStream &rStream)
 				}
 				for(int s = 0; s < (LARGE_DATA_SIZE / LARGE_DATA_BLOCK_SIZE); ++s)
 				{
-					rStream.Write(data, sizeof(data));
+					rStream.Write(data, sizeof(data), SHORT_TIMEOUT);
 				}
 			}
 			
@@ -336,7 +338,7 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 	}
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
-		conns[c]->Write("LARGEDATA\n", 10);
+		conns[c]->Write("LARGEDATA\n", 10, SHORT_TIMEOUT);
 	}
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
@@ -344,7 +346,8 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 		char buf[1024];
 		int total = 0;
 		int r = 0;
-		while(total < LARGE_DATA_SIZE && (r = conns[c]->Read(buf, sizeof(buf))) != 0)
+		while(total < LARGE_DATA_SIZE &&
+			(r = conns[c]->Read(buf, sizeof(buf), SHORT_TIMEOUT)) != 0)
 		{
 			total += r;
 		}
@@ -360,7 +363,7 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 		}
 		for(int s = 0; s < (LARGE_DATA_SIZE / LARGE_DATA_BLOCK_SIZE); ++s)
 		{
-			conns[c]->Write(data, sizeof(data));
+			conns[c]->Write(data, sizeof(data), SHORT_TIMEOUT);
 		}
 	}
 	for(unsigned int c = 0; c < conns.size(); ++c)
@@ -369,7 +372,8 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 		char buf[1024];
 		int total = 0;
 		int r = 0;
-		while(total < LARGE_DATA_SIZE && (r = conns[c]->Read(buf, sizeof(buf))) != 0)
+		while(total < LARGE_DATA_SIZE &&
+			(r = conns[c]->Read(buf, sizeof(buf), SHORT_TIMEOUT)) != 0)
 		{
 			total += r;
 		}
@@ -412,7 +416,8 @@ void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainst
 	while(stream->StreamDataLeft())
 	{
 		// Read some data
-		int bytes = stream->Read(((char*)values) + bytesleft, sizeof(values) - bytesleft);
+		int bytes = stream->Read(((char*)values) + bytesleft,
+			sizeof(values) - bytesleft, SHORT_TIMEOUT);
 		bytessofar += bytes;
 		bytes += bytesleft;
 		int n = bytes / 4;
