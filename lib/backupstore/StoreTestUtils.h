@@ -80,10 +80,8 @@ bool create_account(int soft, int hard);
 //! Deletes the standard test account, for testing behaviour with no account.
 bool delete_account();
 
-#define TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error, or_statements) \
+#define TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements) \
 	{ \
-		TEST_CHECK_THROWS_OR(protocol . command, ConnectionException, \
-			Conn_Protocol_UnexpectedReply, or_statements); \
 		int type, subtype; \
 		protocol.GetLastError(type, subtype); \
 		if (type == BackupProtocolError::ErrorType) \
@@ -102,6 +100,11 @@ bool delete_account();
 			or_statements; \
 		} \
 	} 
+
+#define TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error, or_statements) \
+	TEST_CHECK_THROWS_OR(protocol . command, ConnectionException, \
+		Protocol_UnexpectedReply, or_statements); \
+	TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements)
 
 #define TEST_COMMAND_RETURNS_ERROR(protocol, command, error) \
 	TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error,)
