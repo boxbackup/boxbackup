@@ -37,12 +37,12 @@ public:
 	// Call to detach, setting file pointer correctly to last bit read.
 	// Only works for lseek-able file descriptors.
 	void DetachFile();
-	
+
 	virtual bool IsStreamDataLeft()
 	{
 		return mrStream.StreamDataLeft();
 	}
-	
+
 	// For doing interesting stuff with the remaining data...
 	// Be careful with this!
 	const void *GetBufferedData() const {return mBuffer + mBufferBegin;}
@@ -52,7 +52,7 @@ public:
 
 protected:
 	int ReadMore(int Timeout = IOStream::TimeOutInfinite);
-	
+
 private:
 	IOStream &mrStream;
 };
