@@ -173,7 +173,7 @@ IOStream::pos_type ProtocolUncertainStream::BytesLeftToRead()
 //		Created: 2003/12/05
 //
 // --------------------------------------------------------------------------
-void ProtocolUncertainStream::Write(const void *pBuffer, int NBytes)
+void ProtocolUncertainStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(ServerException, CantWriteToProtocolUncertainStream)
 }

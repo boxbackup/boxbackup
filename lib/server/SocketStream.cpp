@@ -34,6 +34,7 @@
 #include "SocketStream.h"
 #include "CommonException.h"
 #include "Socket.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
@@ -204,7 +205,9 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 // --------------------------------------------------------------------------
 int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	CheckForMissingTimeout(Timeout);
+
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -215,7 +218,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		p.fd = mSocketHandle;
 		p.events = POLLIN;
 		p.revents = 0;
-		switch(::poll(&p, 1, (Timeout == IOStream::TimeOutInfinite)?INFTIM:Timeout))
+		switch(::poll(&p, 1, PollTimeout(Timeout)))
 		{
 		case -1:
 			// error
@@ -275,6 +278,43 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 	return r;
 }
 
+bool SocketStream::Poll(short Events, int Timeout)
+{
+	// Wait for data to send.
+	struct pollfd p;
+	p.fd = GetSocketHandle();
+	p.events = Events;
+	p.revents = 0;
+
+	box_time_t start = GetCurrentBoxTime();
+	box_time_t end   = start + MilliSecondsToBoxTime(Timeout);
+	int result;
+
+	do
+	{
+		box_time_t now = GetCurrentBoxTime();
+		result = ::poll(&p, 1, PollTimeout(end - now));
+	}
+	while(result == -1 && errno == EINTR);
+
+	switch(result)
+	{
+	case -1:
+		// error - Bad!
+		THROW_SYS_ERROR("Failed to poll socket", ServerException,
+			SocketPollError);
+		break;
+
+	case 0:
+		// Condition not met, timed out
+		return false;
+
+	default:
+		// good to go!
+		return true;
+	}
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -283,7 +323,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void SocketStream::Write(const void *pBuffer, int NBytes)
+void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	if(mSocketHandle == INVALID_SOCKET_VALUE) 
 	{
@@ -296,7 +336,9 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 	
 	// Bytes left to send
 	int bytesLeft = NBytes;
-	
+	box_time_t start = GetCurrentBoxTime();
+	box_time_t end   = start + MilliSecondsToBoxTime(Timeout);
+
 	while(bytesLeft > 0)
 	{
 		// Try to send.
@@ -327,23 +369,15 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 			BOX_TRACE("Waiting to send data on socket " << 
 				mSocketHandle << " (" << bytesLeft <<
 				" of " << NBytes << " bytes left)");
-			
-			// Wait for data to send.
-			struct pollfd p;
-			p.fd = mSocketHandle;
-			p.events = POLLOUT;
-			p.revents = 0;
-			
-			if(::poll(&p, 1, 16000 /* 16 seconds */) == -1)
+
+			box_time_t now = GetCurrentBoxTime();
+
+			if(!Poll(POLLOUT, PollTimeout(end - now)))
 			{
-				// Don't exception if it's just a signal
-				if(errno != EINTR)
-				{
-					BOX_LOG_SYS_ERROR("Failed to poll "
-						"socket");
-					THROW_EXCEPTION(ServerException,
-						SocketPollError)
-				}
+				THROW_EXCEPTION_MESSAGE(ConnectionException,
+					Protocol_Timeout, "Timed out waiting "
+					"to send " << bytesLeft << " of " <<
+					NBytes << " bytes");
 			}
 		}
 	}
@@ -514,3 +548,11 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 	return false;
 }
 
+void SocketStream::CheckForMissingTimeout(int Timeout)
+{
+	if (Timeout == IOStream::TimeOutInfinite)
+	{
+		BOX_WARNING("Network operation started with no timeout!");
+		DumpStackBacktrace();
+	}
+}

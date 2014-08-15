@@ -667,7 +667,8 @@ void BackupStoreFileEncodeStream::StoreBlockIndexEntry(int64_t EncSizeOrBlkIndex
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFileEncodeStream::Write(const void *pBuffer, int NBytes)
+void BackupStoreFileEncodeStream::Write(const void *pBuffer, int NBytes,
+	int Timeout)
 {
 	THROW_EXCEPTION(BackupStoreException, CantWriteToEncodedFileStream)
 }

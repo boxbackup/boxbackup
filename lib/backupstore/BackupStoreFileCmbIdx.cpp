@@ -32,7 +32,8 @@ public:
 	~BSFCombinedIndexStream();
 	
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	virtual void Initialise(IOStream &rFrom);
@@ -289,7 +290,8 @@ int BSFCombinedIndexStream::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 8/7/04
 //
 // --------------------------------------------------------------------------
-void BSFCombinedIndexStream::Write(const void *pBuffer, int NBytes)
+void BSFCombinedIndexStream::Write(const void *pBuffer, int NBytes,
+	int Timeout)
 {
 	THROW_EXCEPTION(BackupStoreException, StreamDoesntHaveRequiredFeatures)
 }

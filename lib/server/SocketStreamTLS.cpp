@@ -230,16 +230,17 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 // --------------------------------------------------------------------------
 bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 {
-	struct pollfd p;
-	p.fd = GetSocketHandle();
+	CheckForMissingTimeout(Timeout);
+
+	short events;
 	switch(SSLErrorCode)
 	{
 	case SSL_ERROR_WANT_READ:
-		p.events = POLLIN;
+		events = POLLIN;
 		break;
 		
 	case SSL_ERROR_WANT_WRITE:
-		p.events = POLLOUT;
+		events = POLLOUT;
 		break;
 
 	default:
@@ -247,45 +248,8 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 		THROW_EXCEPTION(ServerException, Internal)
 		break;
 	}
-	p.revents = 0;
 
-	int64_t start, end;
-	start = BoxTimeToMilliSeconds(GetCurrentBoxTime());
-	end   = start + Timeout;
-	int result;
-
-	do
-	{
-		int64_t now = BoxTimeToMilliSeconds(GetCurrentBoxTime());
-		int poll_timeout = (int)(end - now);
-		if (poll_timeout < 0) poll_timeout = 0;
-		if (Timeout == IOStream::TimeOutInfinite)
-		{
-			poll_timeout = INFTIM;
-		}
-		result = ::poll(&p, 1, poll_timeout);
-	}
-	while(result == -1 && errno == EINTR);
-
-	switch(result)
-	{
-	case -1:
-		// error - Bad!
-		THROW_EXCEPTION(ServerException, SocketPollError)
-		break;
-
-	case 0:
-		// Condition not met, timed out
-		return false;
-		break;
-
-	default:
-		// good to go!
-		return true;
-		break;
-	}
-
-	return true;
+	return Poll(events, Timeout);
 }
 
 // --------------------------------------------------------------------------
@@ -298,6 +262,7 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 // --------------------------------------------------------------------------
 int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 {
+	CheckForMissingTimeout(Timeout);
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
 	// Make sure zero byte reads work as expected
@@ -352,7 +317,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
+void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 	

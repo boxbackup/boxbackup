@@ -87,7 +87,8 @@ public:
 
 		// Stream functions		
 		virtual int Read(void *pBuffer, int NBytes, int Timeout);
-		virtual void Write(const void *pBuffer, int NBytes);
+		virtual void Write(const void *pBuffer, int NBytes,
+			int Timeout = IOStream::TimeOutInfinite);
 		virtual bool StreamDataLeft();
 		virtual bool StreamClosed();
 		

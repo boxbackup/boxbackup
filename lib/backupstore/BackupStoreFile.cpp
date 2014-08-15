@@ -838,7 +838,8 @@ bool BackupStoreFile::DecodedStream::IsSymLink()
 //		Created: 9/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::DecodedStream::Write(const void *pBuffer, int NBytes)
+void BackupStoreFile::DecodedStream::Write(const void *pBuffer, int NBytes,
+	int Timeout)
 {
 	THROW_EXCEPTION(BackupStoreException, CantWriteToDecodedFileStream)
 }

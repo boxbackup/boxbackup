@@ -179,7 +179,7 @@ IOStream::pos_type MemBlockStream::BytesLeftToRead()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void MemBlockStream::Write(const void *pBuffer, int NBytes)
+void MemBlockStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, MemBlockStreamNotSupported)
 }

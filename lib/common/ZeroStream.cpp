@@ -76,7 +76,7 @@ IOStream::pos_type ZeroStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void ZeroStream::Write(const void *pBuffer, int NBytes)
+void ZeroStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }
