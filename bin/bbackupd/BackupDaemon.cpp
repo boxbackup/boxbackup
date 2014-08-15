@@ -858,13 +858,13 @@ void BackupDaemon::RunSyncNow()
 	{
 		extendedLogFile = conf.GetKeyValue("ExtendedLogFile");
 	}
-	
+
 	if (conf.KeyExists("LogAllFileAccess"))
 	{
 		mLogAllFileAccess = conf.GetKeyValueBool("LogAllFileAccess");
 	}
-	
-	// Then create a client context object (don't 
+
+	// Then create a client context object (don't
 	// just connect, as this may be unnecessary)
 	BackupClientContext clientContext
 	(
@@ -872,14 +872,14 @@ void BackupDaemon::RunSyncNow()
 		mTlsContext, 
 		conf.GetKeyValue("StoreHostname"),
 		conf.GetKeyValueInt("StorePort"),
-		conf.GetKeyValueUint32("AccountNumber"), 
+		conf.GetKeyValueUint32("AccountNumber"),
 		conf.GetKeyValueBool("ExtendedLogging"),
 		conf.KeyExists("ExtendedLogFile"),
 		extendedLogFile,
 		*mpProgressNotifier,
 		conf.GetKeyValueBool("TcpNice")
 	);
-		
+
 	// The minimum age a file needs to be before it will be
 	// considered for uploading
 	box_time_t minimumFileAge = SecondsToBoxTime(
@@ -2414,7 +2414,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 
 			// Does this exist on the server?
 			// Remove from dir object early, so that if we fail
-			// to stat the local directory, we still don't 
+			// to stat the local directory, we still don't
 			// consider to remote one for deletion.
 			BackupStoreDirectory::Iterator iter(dir);
 			BackupStoreFilenameClear dirname(pLoc->mName);	// generate the filename

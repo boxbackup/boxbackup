@@ -126,8 +126,8 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		mapConnection.reset();
 
 		// Log intention
-		BOX_INFO("Opening connection to server '" <<
-			mHostname << "'...");
+		BOX_INFO("Opening connection to server '" << mHostname <<
+			"'...");
 
 		// Connect!
 		((SocketStreamTLS *)(apSocket.get()))->Open(mrTLSContext,
