@@ -200,7 +200,12 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				}
 				
 				// Then throw an exception about this
-				THROW_EXCEPTION(BackupStoreException, ClientMarkerNotAsExpected)
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					ClientMarkerNotAsExpected,
+					"Expected " << mClientStoreMarker <<
+					" but found " << loginConf->GetClientStoreMarker() <<
+					": is someone else writing to the "
+					"same account?");
 			}
 		}
 
