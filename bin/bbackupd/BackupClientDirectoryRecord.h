@@ -162,7 +162,8 @@ private:
 	int64_t UploadFile(SyncParams &rParams,
 		const std::string &rFilename,
 		const std::string &rNonVssFilePath,
-		const BackupStoreFilename &rStoreFilename,
+		const std::string &rRemotePath,
+		const BackupStoreFilenameClear &rStoreFilename,
 		int64_t FileSize, box_time_t ModificationTime,
 		box_time_t AttributesHash, bool NoPreviousVersionOnServer);
 	void SetErrorWhenReadingFilesystemObject(SyncParams &rParams,
