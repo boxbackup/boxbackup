@@ -1092,6 +1092,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					latestObjectID = UploadFile(rParams,
 						filename,
 						nonVssFilePath,
+						rRemotePath + "/" + *f,
 						storeFilename,
 						fileSize, modTime,
 						attributesHash,
@@ -1667,9 +1668,10 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(
 // --------------------------------------------------------------------------
 int64_t BackupClientDirectoryRecord::UploadFile(
 	BackupClientDirectoryRecord::SyncParams &rParams,
-	const std::string &rFilename,
+	const std::string &rLocalPath,
 	const std::string &rNonVssFilePath,
-	const BackupStoreFilename &rStoreFilename,
+	const std::string &rRemotePath,
+	const BackupStoreFilenameClear &rStoreFilename,
 	int64_t FileSize,
 	box_time_t ModificationTime,
 	box_time_t AttributesHash,
@@ -1719,7 +1721,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 				bool isCompletelyDifferent = false;
 
 				apStreamToUpload = BackupStoreFile::EncodeFileDiff(
-					rFilename, 
+					rLocalPath,
 					mObjectID, /* containing directory */
 					rStoreFilename, diffFromID, *blockIndexStream,
 					connection.GetTimeout(), 
@@ -1744,8 +1746,8 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			
 			// Prepare to upload, getting a stream which will encode the file as we go along
 			apStreamToUpload = BackupStoreFile::EncodeFile(
-				rFilename, mObjectID, /* containing directory */
-				rStoreFilename, NULL, &rParams, 
+				rLocalPath, mObjectID, /* containing directory */
+				rStoreFilename, NULL, &rParams,
 				&(rParams.mrRunStatusProvider),
 				rParams.mpBackgroundTask);
 		}
