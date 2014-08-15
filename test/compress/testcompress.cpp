@@ -47,9 +47,10 @@ public:
 
 		return 0;
 	}
-	void Write(const void *pBuffer, int NBytes)
+	void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite)
 	{
-		buffers[(currentBuffer + 1) & 1].Write(pBuffer, NBytes);
+		buffers[(currentBuffer + 1) & 1].Write(pBuffer, NBytes, Timeout);
 	}
 	bool StreamDataLeft()
 	{

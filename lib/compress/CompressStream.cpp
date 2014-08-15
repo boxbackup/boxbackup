@@ -177,12 +177,12 @@ int CompressStream::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 27/5/04
 //
 // --------------------------------------------------------------------------
-void CompressStream::Write(const void *pBuffer, int NBytes)
+void CompressStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	USE_WRITE_COMPRESSOR
 	if(pCompress == 0)
 	{
-		mpStream->Write(pBuffer, NBytes);
+		mpStream->Write(pBuffer, NBytes, Timeout);
 		return;
 	}
 	
@@ -207,7 +207,7 @@ void CompressStream::Write(const void *pBuffer, int NBytes)
 //		Created: 27/5/04
 //
 // --------------------------------------------------------------------------
-void CompressStream::WriteAllBuffered()
+void CompressStream::WriteAllBuffered(int Timeout)
 {
 	if(mIsClosed)
 	{
@@ -215,7 +215,7 @@ void CompressStream::WriteAllBuffered()
 	}
 
 	// Just ask compressed data to be written out, but with the sync flag set
-	WriteCompressedData(true);
+	WriteCompressedData(true, Timeout);
 }
 
 
@@ -238,7 +238,7 @@ void CompressStream::Close()
 			pCompress->FinishInput();
 			WriteCompressedData();
 			
-			// Mark as definately closed
+			// Mark as definitely closed
 			mIsClosed = true;
 		}
 	}
@@ -257,7 +257,7 @@ void CompressStream::Close()
 //		Created: 28/5/04
 //
 // --------------------------------------------------------------------------
-void CompressStream::WriteCompressedData(bool SyncFlush)
+void CompressStream::WriteCompressedData(bool SyncFlush, int Timeout)
 {
 	USE_WRITE_COMPRESSOR
 	if(pCompress == 0) {THROW_EXCEPTION(CompressException, Internal)}
@@ -268,7 +268,7 @@ void CompressStream::WriteCompressedData(bool SyncFlush)
 		s = pCompress->Output(mpBuffer, BUFFER_SIZE, SyncFlush);
 		if(s > 0)
 		{
-			mpStream->Write(mpBuffer, s);
+			mpStream->Write(mpBuffer, s, Timeout);
 		}
 	} while(s > 0);
 	// Check assumption -- all input has been consumed
