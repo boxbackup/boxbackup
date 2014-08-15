@@ -83,7 +83,7 @@ bool delete_account();
 #define TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements) \
 	{ \
 		int type, subtype; \
-		protocol.GetLastError(type, subtype); \
+		(protocol).GetLastError(type, subtype); \
 		if (type == BackupProtocolError::ErrorType) \
 		{ \
 			TEST_EQUAL_LINE(BackupProtocolError::error, subtype, \
@@ -102,7 +102,7 @@ bool delete_account();
 	} 
 
 #define TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error, or_statements) \
-	TEST_CHECK_THROWS_OR(protocol . command, ConnectionException, \
+	TEST_CHECK_THROWS_OR((protocol) . command, ConnectionException, \
 		Protocol_UnexpectedReply, or_statements); \
 	TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements)
 
