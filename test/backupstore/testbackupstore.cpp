@@ -56,6 +56,8 @@
 #define ATTR2_SIZE 	23
 #define ATTR3_SIZE 	122
 
+#define SHORT_TIMEOUT 5000
+
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
 int attr3[ATTR3_SIZE];
@@ -434,7 +436,7 @@ void write_test_file(int t)
 void test_test_file(int t, IOStream &rStream)
 {
 	// Decode to a file
-	BackupStoreFile::DecodeFile(rStream, "testfiles/test_download", IOStream::TimeOutInfinite);
+	BackupStoreFile::DecodeFile(rStream, "testfiles/test_download", SHORT_TIMEOUT);
 	
 	// Compare...
 	FileStream in("testfiles/test_download");
@@ -465,7 +467,7 @@ void test_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
 			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	// Stream
-	BackupStoreDirectory dir(protocol.ReceiveStream());
+	BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en = 0;
 	int files = 0;
@@ -574,7 +576,7 @@ void check_dir_after_uploads(BackupProtocolCallable &protocol,
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	TEST_THAT(dirreply->GetObjectID() == BackupProtocolListDirectory::RootDirectory);
 	// Stream
-	BackupStoreDirectory dir(protocol.ReceiveStream());
+	BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 	TEST_EQUAL(UPLOAD_NUM, dir.GetNumberOfEntries());
 	TEST_THAT(!dir.HasAttributes());
 
@@ -635,7 +637,7 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	// Stream
-	BackupStoreDirectory dir(protocol.ReceiveStream());
+	BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 
 	// Check them!
 	BackupStoreDirectory::Iterator i(dir);
@@ -688,8 +690,8 @@ bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
 	{
 		char buffer1[2048];
 		char buffer2[2048];
-		int s = enc.Read(buffer1, sizeof(buffer1));
-		if(rBlockIndex.Read(buffer2, s) != s)
+		int s = enc.Read(buffer1, sizeof(buffer1), SHORT_TIMEOUT);
+		if(rBlockIndex.Read(buffer2, s, SHORT_TIMEOUT) != s)
 		{
 			same = false;
 			break;
@@ -709,7 +711,7 @@ bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
 		char buffer[2048];
 		while(rBlockIndex.StreamDataLeft())
 		{
-			rBlockIndex.Read(buffer, sizeof(buffer));
+			rBlockIndex.Read(buffer, sizeof(buffer), SHORT_TIMEOUT);
 		}
 	}
 	
@@ -923,7 +925,7 @@ bool test_server_housekeeping()
 				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 		// Stream
-		BackupStoreDirectory dir(protocol.ReceiveStream());
+		BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 		TEST_THAT(dir.GetNumberOfEntries() == 1);
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = i.Next();
@@ -1219,7 +1221,8 @@ bool test_multiple_uploads()
 				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 		// Stream
-		BackupStoreDirectory dir(apProtocol->ReceiveStream());
+		BackupStoreDirectory dir(apProtocol->ReceiveStream(),
+			apProtocol->GetTimeout());
 		TEST_THAT(dir.GetNumberOfEntries() == 0);
 	}
 
@@ -1232,7 +1235,8 @@ bool test_multiple_uploads()
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 			false /* no attributes */));
 	// Stream
-	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+		protocolReadOnly.GetTimeout());
 	TEST_THAT(dir.GetNumberOfEntries() == 0);			
 
 	// BLOCK
@@ -1319,7 +1323,7 @@ bool test_multiple_uploads()
 				FileStream out("testfiles/downloaddelobj", O_WRONLY | O_CREAT);
 				std::auto_ptr<BackupProtocolSuccess> getobj(apProtocol->QueryGetObject(uploads[UPLOAD_DELETE_EN].allocated_objid));
 				std::auto_ptr<IOStream> objstream(apProtocol->ReceiveStream());
-				objstream->CopyStreamTo(out);
+				objstream->CopyStreamTo(out, apProtocol->GetTimeout());
 			}
 			// query index and test
 			std::auto_ptr<BackupProtocolSuccess> getblockindex(apProtocol->QueryGetBlockIndexByName(
@@ -1409,7 +1413,7 @@ bool test_multiple_uploads()
 					uploads[UPLOAD_PATCH_EN].name, 
 					uploads[UPLOAD_PATCH_EN].allocated_objid, 
 					*blockIndexStream,
-					IOStream::TimeOutInfinite, 
+					SHORT_TIMEOUT,
 					NULL, // pointer to DiffTimer impl
 					&modtime, &isCompletelyDifferent));
 			TEST_THAT(isCompletelyDifferent == false);
@@ -1442,7 +1446,8 @@ bool test_multiple_uploads()
 			std::auto_ptr<BackupProtocolSuccess> getFile(apProtocol->QueryGetFile(BackupProtocolListDirectory::RootDirectory, patchedID));
 			TEST_THAT(getFile->GetObjectID() == patchedID);
 			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
-			BackupStoreFile::DecodeFile(*filestream, TEST_FILE_FOR_PATCHING ".downloaded", IOStream::TimeOutInfinite);
+			BackupStoreFile::DecodeFile(*filestream,
+				TEST_FILE_FOR_PATCHING ".downloaded", SHORT_TIMEOUT);
 			// Check it's the same
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 4, 2, 1));
@@ -1464,7 +1469,8 @@ bool test_multiple_uploads()
 					BackupProtocolListDirectory::RootDirectory,
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */)); // Stream
-			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+				SHORT_TIMEOUT);
 			TEST_EQUAL(UPLOAD_NUM + 2, dir.GetNumberOfEntries());
 			// for the patched upload, and this new dir.
 
@@ -1498,7 +1504,8 @@ bool test_multiple_uploads()
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, true /* get attributes */));
 			TEST_THAT(dirreply->GetObjectID() == subdirid);
-			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+				SHORT_TIMEOUT);
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
 
 			// Check the (only) one...
@@ -1531,7 +1538,8 @@ bool test_multiple_uploads()
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */));
 			// Stream
-			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+				SHORT_TIMEOUT);
 			TEST_THAT(!dir.HasAttributes());
 		}
 
@@ -1559,7 +1567,8 @@ bool test_multiple_uploads()
 					0,	// no flags
 					BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING, true /* get attributes */));
 			// Stream
-			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+				SHORT_TIMEOUT);
 			TEST_THAT(dir.GetNumberOfEntries() == 0);
 
 			// Attributes
@@ -1613,7 +1622,7 @@ bool test_multiple_uploads()
 			// Stream
 			BackupStoreDirectory dir;
 			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+			dir.ReadFromStream(*dirstream, SHORT_TIMEOUT);
 			// Read all entries
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *en = 0;
@@ -1635,7 +1644,7 @@ bool test_multiple_uploads()
 			// Stream
 			BackupStoreDirectory dir;
 			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+			dir.ReadFromStream(*dirstream, SHORT_TIMEOUT);
 			// Check entries
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *en = 0;
@@ -1781,7 +1790,8 @@ bool test_multiple_uploads()
 					BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 			// Stream
-			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream());
+			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+				SHORT_TIMEOUT);
 			
 			// Check there's only that one entry
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
