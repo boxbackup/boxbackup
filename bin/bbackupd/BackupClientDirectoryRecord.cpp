@@ -1399,117 +1399,12 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				//   (so why create it again?)
 				//
 				// if en == 0 but pDirOnStore != 0, well... obviously it doesn't exist.
-
-				// Get attributes
-				box_time_t attrModTime = 0;
-				InodeRefType inodeNum = 0;
-				BackupClientFileAttributes attr;
-				bool failedToReadAttributes = false;
-
-				try
-				{
-					attr.ReadAttributes(dirname.c_str(),
-						true /* directories have zero mod times */,
-						0 /* not interested in mod time */,
-						&attrModTime, 0 /* not file size */,
-						&inodeNum);
-				}
-				catch (BoxException &e)
-				{
-					// We used to try to recover from this,
-					// but we'd need an attributes block to
-					// upload to the server, so we have to
-					// skip creating the directory instead.
-					BOX_WARNING("Failed to read attributes "
-						"of directory, ignoring it "
-						"for now: " << nonVssDirPath);
-					continue;
-				}
-
-				// Check to see if the directory been renamed
-				// First, do we have a record in the ID map?
-				int64_t renameObjectID = 0, renameInDirectory = 0;
-				bool renameDir = false;
-				const BackupClientInodeToIDMap &idMap(
-					rContext.GetCurrentIDMap());
-
-				if(!failedToReadAttributes && idMap.Lookup(inodeNum,
-					renameObjectID, renameInDirectory))
-				{
-					// Look up on the server to get the name, to build the local filename
-					std::string localPotentialOldName;
-					bool isDir = false;
-					bool isCurrentVersion = false;
-					if(rContext.FindFilename(renameObjectID,
-						renameInDirectory, localPotentialOldName,
-						isDir, isCurrentVersion))
-					{	
-						// Only interested if it's a directory
-						if(isDir && isCurrentVersion)
-						{
-							// Check that the object doesn't exist already
-							EMU_STRUCT_STAT st;
-							if(EMU_STAT(localPotentialOldName.c_str(), &st) != 0 && errno == ENOENT)
-							{
-								// Doesn't exist locally, but does exist on the server.
-								// Therefore we can safely rename it.
-								renameDir = true;
-							}
-						}
-					}
-				}
-
-				// Get connection
-				BackupProtocolClient &connection(rContext.GetConnection());
-
-				// Don't do a check for storage limit exceeded here, because if we get to this
-				// stage, a connection will have been opened, and the status known, so the check
-				// in the else if(...) above will be correct.
-
-				// Build attribute stream for sending
-				std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
-
-				if(renameDir)
-				{
-					// Rename the existing directory on the server
-					connection.QueryMoveObject(renameObjectID,
-						renameInDirectory,
-						mObjectID /* move to this directory */,
-						BackupProtocolMoveObject::Flags_MoveAllWithSameName |
-						BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
-						storeFilename);
-
-					// Put the latest attributes on it
-					connection.QueryChangeDirAttributes(renameObjectID, attrModTime, attrStream);
-
-					// Stop it being deleted later
-					BackupClientDeleteList &rdelList(
-						rContext.GetDeleteList());
-					rdelList.StopDirectoryDeletion(renameObjectID);
-
-					// This is the ID for the renamed directory
-					subDirObjectID = renameObjectID;
-				}
-				else
-				{
-					// Create a new directory
-					std::auto_ptr<BackupProtocolSuccess> dirCreate(
-						connection.QueryCreateDirectory(
-							mObjectID, attrModTime,
-							storeFilename, attrStream));
-					subDirObjectID = dirCreate->GetObjectID(); 
-					
-					// Flag as having done this for optimisation later
-					haveJustCreatedDirOnServer = true;
-
-					std::string filenameClear = 
-						DecryptFilename(storeFilename,
-							subDirObjectID, 
-							rRemotePath);
-					rNotifier.NotifyDirectoryCreated(
-						subDirObjectID, filenameClear,
-						nonVssDirPath);
-				}
+				//
+				subDirObjectID = CreateRemoteDir(dirname,
+					nonVssDirPath, rRemotePath + "/" + *d,
+					storeFilename, &haveJustCreatedDirOnServer,
+					rParams);
+				doCreateDirectoryRecord = (subDirObjectID != 0);
 			}
 
 			if (doCreateDirectoryRecord)
@@ -1531,7 +1426,11 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			}
 		}
 
-		ASSERT(psubDirRecord != 0 || rContext.StorageLimitExceeded());
+		// ASSERT(psubDirRecord != 0 || rContext.StorageLimitExceeded());
+		// There's another possible reason now: the directory no longer
+		// existed when we finally got around to checking its
+		// attributes. See for example Brendon Baumgartner's reported
+		// error with Wordpress cache directories.
 
 		if(psubDirRecord)
 		{
@@ -1612,6 +1511,143 @@ bool BackupClientDirectoryRecord::UpdateItems(
 	return allUpdatedSuccessfully;
 }
 
+int64_t BackupClientDirectoryRecord::CreateRemoteDir(const std::string& localDirPath,
+	const std::string& nonVssDirPath, const std::string& remoteDirPath,
+	BackupStoreFilenameClear& storeFilename, bool* pHaveJustCreatedDirOnServer,
+	BackupClientDirectoryRecord::SyncParams &rParams)
+{
+	// Get attributes
+	box_time_t attrModTime = 0;
+	InodeRefType inodeNum = 0;
+	BackupClientFileAttributes attr;
+	*pHaveJustCreatedDirOnServer = false;
+	ProgressNotifier& rNotifier(rParams.mrContext.GetProgressNotifier());
+
+	try
+	{
+		attr.ReadAttributes(localDirPath,
+			true /* directories have zero mod times */,
+			0 /* not interested in mod time */,
+			&attrModTime, 0 /* not file size */,
+			&inodeNum);
+	}
+	catch (BoxException &e)
+	{
+		// We used to try to recover from this, but we'd need an
+		// attributes block to upload to the server, so we have to
+		// skip creating the directory instead.
+		BOX_WARNING("Failed to read attributes of directory, "
+			"ignoring it for now: " << nonVssDirPath);
+		return 0; // no object ID
+	}
+
+	// Check to see if the directory been renamed
+	// First, do we have a record in the ID map?
+	int64_t renameObjectID = 0, renameInDirectory = 0;
+	bool renameDir = false;
+	const BackupClientInodeToIDMap &idMap(rParams.mrContext.GetCurrentIDMap());
+
+	if(idMap.Lookup(inodeNum, renameObjectID, renameInDirectory))
+	{
+		// Look up on the server to get the name, to build the local filename
+		std::string localPotentialOldName;
+		bool isDir = false;
+		bool isCurrentVersion = false;
+		if(rParams.mrContext.FindFilename(renameObjectID, renameInDirectory,
+			localPotentialOldName, isDir, isCurrentVersion))
+		{	
+			// Only interested if it's a directory
+			if(isDir && isCurrentVersion)
+			{
+				// Check that the object doesn't exist already
+				EMU_STRUCT_STAT st;
+				if(EMU_STAT(localPotentialOldName.c_str(), &st) != 0 &&
+					errno == ENOENT)
+				{
+					// Doesn't exist locally, but does exist
+					// on the server. Therefore we can
+					// safely rename it.
+					renameDir = true;
+				}
+			}
+		}
+	}
+
+	// Get connection
+	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+
+	// Don't do a check for storage limit exceeded here, because if we get to this
+	// stage, a connection will have been opened, and the status known, so the check
+	// in the else if(...) above will be correct.
+
+	// Build attribute stream for sending
+	std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
+
+	if(renameDir)
+	{
+		// Rename the existing directory on the server
+		connection.QueryMoveObject(renameObjectID,
+			renameInDirectory,
+			mObjectID /* move to this directory */,
+			BackupProtocolMoveObject::Flags_MoveAllWithSameName |
+			BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
+			storeFilename);
+
+		// Put the latest attributes on it
+		connection.QueryChangeDirAttributes(renameObjectID, attrModTime, attrStream);
+
+		// Stop it being deleted later
+		BackupClientDeleteList &rdelList(
+			rParams.mrContext.GetDeleteList());
+		rdelList.StopDirectoryDeletion(renameObjectID);
+
+		// This is the ID for the renamed directory
+		return renameObjectID;
+	}
+	else
+	{
+		int64_t subDirObjectID = 0; // no object ID
+
+		// Create a new directory
+		try
+		{
+			subDirObjectID = connection.QueryCreateDirectory(
+				mObjectID, attrModTime, storeFilename,
+				attrStream)->GetObjectID();
+			// Flag as having done this for optimisation later
+			*pHaveJustCreatedDirOnServer = true;
+		}
+		catch(BoxException &e)
+		{
+			int type, subtype;
+			connection.GetLastError(type, subtype);
+			rNotifier.NotifyFileUploadServerError(this, nonVssDirPath,
+				type, subtype);
+			if(e.GetType() == ConnectionException::ExceptionType &&
+				e.GetSubType() == ConnectionException::Protocol_UnexpectedReply &&
+				type == BackupProtocolError::ErrorType &&
+				subtype == BackupProtocolError::Err_StorageLimitExceeded)
+			{
+				// The hard limit was exceeded on the server, notify!
+				rParams.mrContext.SetStorageLimitExceeded();
+				rParams.mrSysadminNotifier.NotifySysadmin(
+					SysadminNotifier::StoreFull);
+			}
+			else
+			{
+				throw;
+			}
+		}
+
+		if(*pHaveJustCreatedDirOnServer)
+		{
+			rNotifier.NotifyDirectoryCreated(subDirObjectID,
+				nonVssDirPath, remoteDirPath);
+		}
+
+		return subDirObjectID;
+	}
+}
 
 // --------------------------------------------------------------------------
 //
