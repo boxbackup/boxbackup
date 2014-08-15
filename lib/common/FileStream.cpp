@@ -246,7 +246,7 @@ IOStream::pos_type FileStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void FileStream::Write(const void *pBuffer, int NBytes)
+void FileStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	if(mOSFileHandle == INVALID_FILE) 
 	{

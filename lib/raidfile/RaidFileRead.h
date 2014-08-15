@@ -56,7 +56,8 @@ public:
 	static bool ReadDirectoryContents(int SetNumber, const std::string &rDirName, int DirReadType, std::vector<std::string> &rOutput);
 
 	// Common IOStream interface implementation
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual bool StreamClosed();
 	virtual pos_type BytesLeftToRead();
 

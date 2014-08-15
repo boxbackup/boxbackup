@@ -1721,7 +1721,7 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-void RaidFileRead::Write(const void *pBuffer, int NBytes)
+void RaidFileRead::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(RaidFileException, UnsupportedReadWriteOrClose)
 }

@@ -663,7 +663,8 @@ BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::
 			true /* want attributes */));
 
 	// Retrieve the directory from the stream following
-	apDir.reset(new BackupStoreDirectory(connection.ReceiveStream()));
+	apDir.reset(new BackupStoreDirectory(connection.ReceiveStream(),
+		connection.GetTimeout()));
 	return apDir;
 }
 

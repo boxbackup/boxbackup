@@ -213,7 +213,7 @@ IOStream::pos_type ReadGatherStream::BytesLeftToRead()
 //		Created: 10/12/03
 //
 // --------------------------------------------------------------------------
-void ReadGatherStream::Write(const void *pBuffer, int NBytes)
+void ReadGatherStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, CannotWriteToReadGatherStream);
 }

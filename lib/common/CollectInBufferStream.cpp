@@ -98,7 +98,7 @@ IOStream::pos_type CollectInBufferStream::BytesLeftToRead()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void CollectInBufferStream::Write(const void *pBuffer, int NBytes)
+void CollectInBufferStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	if(mInWritePhase != true) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	

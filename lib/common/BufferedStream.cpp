@@ -96,7 +96,7 @@ IOStream::pos_type BufferedStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void BufferedStream::Write(const void *pBuffer, int NBytes)
+void BufferedStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }
