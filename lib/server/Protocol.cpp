@@ -17,10 +17,11 @@
 
 #include <new>
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "Protocol.h"
 #include "ProtocolWire.h"
 #include "SocketStream.h"
-#include "ServerException.h"
 #include "PartialReadStream.h"
 #include "ProtocolUncertainStream.h"
 #include "Logging.h"
@@ -117,7 +118,7 @@ void Protocol::Handshake()
 		int bytesRead = mapConn->Read(readInto, bytesToRead, mTimeout);
 		if(bytesRead == 0)
 		{
-			THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
+			THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
 		}
 		readInto += bytesRead;
 		bytesToRead -= bytesRead;
@@ -127,7 +128,7 @@ void Protocol::Handshake()
 	// Are they the same?
 	if(::memcmp(&hsSend, &hsReceive, sizeof(hsSend)) != 0)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_HandshakeFailed)
+		THROW_EXCEPTION(ConnectionException, Protocol_HandshakeFailed)
 	}
 
 	// Mark as done
@@ -161,7 +162,7 @@ void Protocol::CheckAndReadHdr(void *hdr)
 	if(!mapConn->ReadFullBuffer(hdr, sizeof(PW_ObjectHeader),
 		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
+		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
 	}
 }
 
@@ -184,14 +185,14 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	// Hope it's not a stream
 	if(ntohl(objHeader.mObjType) == SPECIAL_STREAM_OBJECT_TYPE)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_StreamWhenObjExpected)
+		THROW_EXCEPTION(ConnectionException, Protocol_StreamWhenObjExpected)
 	}
 	
 	// Check the object size
 	u_int32_t objSize = ntohl(objHeader.mObjSize);
 	if(objSize < sizeof(objHeader) || objSize > mMaxObjectSize)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_ObjTooBig)
+		THROW_EXCEPTION(ConnectionException, Protocol_ObjTooBig)
 	}
 
 	// Create a blank object
@@ -204,7 +205,7 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	if(!mapConn->ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader),
 		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
+		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
 	}
 
 	// Setup ready to read out data from the buffer
@@ -234,7 +235,7 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	// Exception if not all the data was consumed
 	if(dataLeftOver)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_BadCommandRecieved)
+		THROW_EXCEPTION(ConnectionException, Protocol_BadCommandRecieved)
 	}
 
 	return obj;
@@ -349,7 +350,7 @@ void Protocol::EnsureBufferAllocated(int Size)
 #define READ_CHECK_BYTES_AVAILABLE(bytesRequired)								\
 	if((mReadOffset + (int)(bytesRequired)) > mValidDataSize)					\
 	{																			\
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_BadCommandRecieved)	\
+		THROW_EXCEPTION(ConnectionException, Protocol_BadCommandRecieved)	\
 	}
 
 // --------------------------------------------------------------------------
@@ -636,7 +637,7 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 	// Hope it's not an object
 	if(ntohl(objHeader.mObjType) != SPECIAL_STREAM_OBJECT_TYPE)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_ObjWhenStreamExpected)
+		THROW_EXCEPTION(ConnectionException, Protocol_ObjWhenStreamExpected)
 	}
 	
 	// Get the stream size
@@ -764,7 +765,7 @@ void Protocol::SendStream(IOStream &rStream)
 		// Fixed size stream, send it all in one go
 		if(!rStream.CopyStreamTo(*mapConn, mTimeout, 4096 /* slightly larger buffer */))
 		{
-			THROW_EXCEPTION(ConnectionException, Conn_Protocol_TimeOutWhenSendingStream)
+			THROW_EXCEPTION(ConnectionException, Protocol_TimeOutWhenSendingStream)
 		}
 	}
 	// Make sure everything is written

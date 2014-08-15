@@ -19,9 +19,10 @@
 #include <poll.h>
 #endif
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "BoxTime.h"
 #include "CryptoUtils.h"
-#include "ServerException.h"
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
 #include "TLSContext.h"
@@ -196,7 +197,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			if(WaitWhenRetryRequired(se, TLS_HANDSHAKE_TIMEOUT) == false)
 			{
 				// timed out
-				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeTimedOut)
+				THROW_EXCEPTION(ConnectionException, TLSHandshakeTimedOut)
 			}
 			break;
 			
@@ -205,12 +206,12 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			if(IsServer)
 			{
 				CryptoUtils::LogError("accepting connection");
-				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
+				THROW_EXCEPTION(ConnectionException, TLSHandshakeFailed)
 			}
 			else
 			{
 				CryptoUtils::LogError("connecting");
-				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
+				THROW_EXCEPTION(ConnectionException, TLSHandshakeFailed)
 			}
 		}
 	}
@@ -337,7 +338,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 			
 		default:
 			CryptoUtils::LogError("reading");
-			THROW_EXCEPTION(ConnectionException, Conn_TLSReadFailed)
+			THROW_EXCEPTION(ConnectionException, TLSReadFailed)
 			break;
 		}
 	}
@@ -385,7 +386,7 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 		case SSL_ERROR_ZERO_RETURN:
 			// Connection closed
 			MarkAsWriteClosed();
-			THROW_EXCEPTION(ConnectionException, Conn_TLSClosedWhenWriting)
+			THROW_EXCEPTION(ConnectionException, TLSClosedWhenWriting)
 			break;
 
 		case SSL_ERROR_WANT_READ:
@@ -402,7 +403,7 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 		
 		default:
 			CryptoUtils::LogError("writing");
-			THROW_EXCEPTION(ConnectionException, Conn_TLSWriteFailed)
+			THROW_EXCEPTION(ConnectionException, TLSWriteFailed)
 			break;
 		}
 	}
@@ -444,7 +445,7 @@ void SocketStreamTLS::Shutdown(bool Read, bool Write)
 	if(::SSL_shutdown(mpSSL) < 0)
 	{
 		CryptoUtils::LogError("shutting down");
-		THROW_EXCEPTION(ConnectionException, Conn_TLSShutdownFailed)
+		THROW_EXCEPTION(ConnectionException, TLSShutdownFailed)
 	}
 
 	// Don't ask the base class to shutdown -- BIO does this, apparently.
@@ -467,15 +468,15 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	if(cert == 0)
 	{
 		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, Conn_TLSNoPeerCertificate)
+		THROW_EXCEPTION(ConnectionException, TLSNoPeerCertificate)
 	}
 
-	// Subject details	
-	X509_NAME *subject = ::X509_get_subject_name(cert); 
+	// Subject details
+	X509_NAME *subject = ::X509_get_subject_name(cert);
 	if(subject == 0)
 	{
 		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, Conn_TLSPeerCertificateInvalid)
+		THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
 	}
 	
 	// Common name
@@ -483,7 +484,7 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	if(::X509_NAME_get_text_by_NID(subject, NID_commonName, commonName, sizeof(commonName)) <= 0)
 	{
 		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, Conn_TLSPeerCertificateInvalid)
+		THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
 	}
 	// Terminate just in case
 	commonName[sizeof(commonName)-1] = '\0';

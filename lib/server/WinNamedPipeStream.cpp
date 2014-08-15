@@ -19,10 +19,11 @@
 #include <errno.h>
 #include <windows.h>
 
-#include "WinNamedPipeStream.h"
-#include "ServerException.h"
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "CommonException.h"
 #include "Socket.h"
+#include "WinNamedPipeStream.h"
 
 #include "MemLeakFindOn.h"
 

@@ -29,8 +29,9 @@
 	#include <bsd/unistd.h>
 #endif
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "SocketStream.h"
-#include "ServerException.h"
 #include "CommonException.h"
 #include "Socket.h"
 
@@ -184,7 +185,7 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 #endif // WIN32
 
 		mSocketHandle = INVALID_SOCKET_VALUE;
-		THROW_EXCEPTION(ConnectionException, Conn_SocketConnectError)
+		THROW_EXCEPTION(ConnectionException, SocketConnectError)
 	}
 
 	ResetCounters();
@@ -260,7 +261,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// Other error
 			BOX_LOG_SYS_ERROR("Failed to read from socket");
 			THROW_EXCEPTION(ConnectionException,
-				Conn_SocketReadError);
+				SocketReadError);
 		}
 	}
 
@@ -310,7 +311,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes)
 			mWriteClosed = true;	// assume can't write again
 			BOX_LOG_SYS_ERROR("Failed to write to socket");
 			THROW_EXCEPTION(ConnectionException,
-				Conn_SocketWriteError);
+				SocketWriteError);
 		}
 		
 		// Knock off bytes sent
@@ -401,7 +402,7 @@ void SocketStream::Shutdown(bool Read, bool Write)
 	if(::shutdown(mSocketHandle, how) == -1)
 	{
 		BOX_LOG_SYS_ERROR("Failed to shutdown socket");
-		THROW_EXCEPTION(ConnectionException, Conn_SocketShutdownError)
+		THROW_EXCEPTION(ConnectionException, SocketShutdownError)
 	}
 }
 

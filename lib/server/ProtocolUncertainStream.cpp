@@ -8,8 +8,9 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "ProtocolUncertainStream.h"
-#include "ServerException.h"
 #include "Protocol.h"
 
 #include "MemLeakFindOn.h"

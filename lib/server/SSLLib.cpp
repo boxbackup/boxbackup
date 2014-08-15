@@ -18,9 +18,10 @@
 	#include <wincrypt.h>
 #endif
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "CryptoUtils.h"
 #include "SSLLib.h"
-#include "ServerException.h"
 
 #include "MemLeakFindOn.h"
 
