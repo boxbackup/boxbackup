@@ -1604,7 +1604,7 @@ bool test_multiple_uploads()
 				ConnectionException, Protocol_UnexpectedReply);
 		}
 
-		// Rename within a directory
+		// Rename within a directory (successfully)
 		{
 			BackupStoreFilenameClear newName("moved-files-x");
 			apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
