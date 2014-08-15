@@ -642,7 +642,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					{
 						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks))
 						{
-							BOX_TRACE("Found block match for " << hash << " of " << Sizes[s] << " bytes at offset " << fileOffset);
+							BOX_TRACE("Found block match of " << Sizes[s] << " bytes with hash " << hash << " at offset " << fileOffset);
 							goodnessOfFit[fileOffset] = Sizes[s];
 
 							// Block matched, roll the checksum forward to the next block without doing
@@ -670,7 +670,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 						}
 						else
 						{
-							BOX_TRACE("False alarm match for " << hash << " of " << Sizes[s] << " bytes at offset " << fileOffset);
+							// BOX_TRACE("False alarm match of " << Sizes[s] << " bytes with hash " << hash << " at offset " << fileOffset);
 						}
 
 						int64_t NumBlocksFound = static_cast<int64_t>(
