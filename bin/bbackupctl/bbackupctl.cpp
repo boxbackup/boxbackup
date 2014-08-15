@@ -173,7 +173,7 @@ int main(int argc, const char *argv[])
 	
 	// Wait for the configuration summary
 	std::string configSummary;
-	if(!getLine.GetLine(configSummary))
+	if(!getLine.GetLine(configSummary, PROTOCOL_DEFAULT_TIMEOUT))
 	{
 		BOX_ERROR("Failed to receive configuration summary "
 			"from daemon");
@@ -206,7 +206,7 @@ int main(int argc, const char *argv[])
 		"  MaxUploadWait = " << maxUploadWait << " seconds");
 
 	std::string stateLine;
-	if(!getLine.GetLine(stateLine) || getLine.IsEOF())
+	if(!getLine.GetLine(stateLine, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
 	{
 		BOX_ERROR("Failed to receive state line from daemon");
 		return 1;
@@ -269,7 +269,6 @@ int main(int argc, const char *argv[])
 					"sync will never start!");
 				return 1;
 			}
-
 		}
 		break;
 
@@ -278,7 +277,8 @@ int main(int argc, const char *argv[])
 			// send a sync command
 			commandName = "force-sync";
 			std::string cmd = commandName + "\n";
-			connection.Write(cmd.c_str(), cmd.size());
+			connection.Write(cmd.c_str(), cmd.size(),
+				PROTOCOL_DEFAULT_TIMEOUT);
 			connection.WriteAllBuffered();
 
 			if (currentState != 0)
@@ -291,19 +291,21 @@ int main(int argc, const char *argv[])
 
 		default:
 		{
-			// Normal case, just send the command given 
-			// plus a quit command.
+			// Normal case, just send the command given, plus a
+			// quit command.
 			std::string cmd = commandName + "\n";
-			connection.Write(cmd.c_str(), cmd.size());
+			connection.Write(cmd.c_str(), cmd.size(),
+				PROTOCOL_DEFAULT_TIMEOUT);
 		}
 		// fall through
 
 		case NoCommand:
 		{
-			// Normal case, just send the command given 
-			// plus a quit command.
+			// Normal case, just send the command given plus a
+			// quit command.
 			std::string cmd = "quit\n";
-			connection.Write(cmd.c_str(), cmd.size());
+			connection.Write(cmd.c_str(), cmd.size(),
+				PROTOCOL_DEFAULT_TIMEOUT);
 		}
 	}
 	
@@ -322,8 +324,9 @@ int main(int argc, const char *argv[])
 				if(line == "start-sync")
 				{
 					// Send a quit command to finish nicely
-					connection.Write("quit\n", 5);
-					
+					connection.Write("quit\n", 5,
+						PROTOCOL_DEFAULT_TIMEOUT);
+
 					// And we're done
 					finished = true;
 				}
@@ -344,7 +347,8 @@ int main(int argc, const char *argv[])
 					{
 						BOX_TRACE("Sync finished.");
 						// Send a quit command to finish nicely
-						connection.Write("quit\n", 5);
+						connection.Write("quit\n", 5,
+							PROTOCOL_DEFAULT_TIMEOUT);
 					
 						// And we're done
 						finished = true;
