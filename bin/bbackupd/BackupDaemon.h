@@ -196,10 +196,10 @@ private:
 #endif
 		IOStreamGetLine *mpGetLine;
 	};
-	
+
 	// Using a socket?
 	std::auto_ptr<CommandSocketInfo> mapCommandSocketInfo;
-	
+
 	// Stop notifications being repeated.
 	SysadminNotifier::EventCode mLastNotifiedEvent;
 
@@ -220,7 +220,7 @@ private:
 
 public:
 	int GetMaxBandwidthFromSyncAllowScript() { return mMaxBandwidthFromSyncAllowScript; }
- 	bool StopRun() { return this->Daemon::StopRun(); }
+	bool StopRun() { return this->Daemon::StopRun(); }
 	bool StorageLimitExceeded() { return mStorageLimitExceeded; }
  
 private:
@@ -249,9 +249,9 @@ private:
 public:
 	virtual void NotifyIDMapsSetup(BackupClientContext& rContext) { }
 
- 	virtual void NotifyScanDirectory(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath) 
+	virtual void NotifyScanDirectory(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) 
 	{
 		if (mLogAllFileAccess)
 		{
@@ -264,30 +264,30 @@ public:
 				CancelledByBackgroundTask);
 		}
 	}
- 	virtual void NotifyDirStatFailed(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath, 
- 		const std::string& rErrorMsg)
- 	{
+	virtual void NotifyDirStatFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath, 
+		const std::string& rErrorMsg)
+	{
 		BOX_WARNING("Failed to access directory: " << rLocalPath
 			<< ": " << rErrorMsg);
- 	}
- 	virtual void NotifyFileStatFailed(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		const std::string& rErrorMsg)
- 	{
+	}
+	virtual void NotifyFileStatFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg)
+	{
 		BOX_WARNING("Failed to access file: " << rLocalPath
 			<< ": " << rErrorMsg);
- 	}
- 	virtual void NotifyDirListFailed(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		const std::string& rErrorMsg)
- 	{
+	}
+	virtual void NotifyDirListFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg)
+	{
 		BOX_WARNING("Failed to list directory: " << rLocalPath
 			<< ": " << rErrorMsg);
- 	}
+	}
 	virtual void NotifyMountPointSkipped(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath)
@@ -309,7 +309,7 @@ public:
 		if (mLogAllFileAccess)
 		{
 			BOX_INFO("Skipping excluded file: " << rLocalPath);
-		} 
+		}
 	}
 	virtual void NotifyDirExcluded(
 		const BackupClientDirectoryRecord* pDirRecord,
@@ -318,7 +318,7 @@ public:
 		if (mLogAllFileAccess)
 		{
 			BOX_INFO("Skipping excluded directory: " << rLocalPath);
-		} 
+		}
 	}
 	virtual void NotifyUnsupportedFileType(
 		const BackupClientDirectoryRecord* pDirRecord,
@@ -326,43 +326,43 @@ public:
 	{
 		BOX_WARNING("Ignoring file of unknown type: " << rLocalPath);
 	}
- 	virtual void NotifyFileReadFailed(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		const std::string& rErrorMsg)
- 	{
+	virtual void NotifyFileReadFailed(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const std::string& rErrorMsg)
+	{
 		BOX_WARNING("Error reading file: " << rLocalPath
 			<< ": " << rErrorMsg);
- 	}
- 	virtual void NotifyFileModifiedInFuture(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath)
- 	{
+	}
+	virtual void NotifyFileModifiedInFuture(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
+	{
 		BOX_WARNING("Some files have modification times excessively "
 			"in the future. Check clock synchronisation. "
 			"Example file (only one shown): " << rLocalPath);
- 	}
- 	virtual void NotifyFileSkippedServerFull(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath) 
+	}
+	virtual void NotifyFileSkippedServerFull(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath) 
 	{
 		BOX_WARNING("Skipped file: server is full: " << rLocalPath);
 	}
- 	virtual void NotifyFileUploadException(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		const BoxException& rException)
- 	{
+	virtual void NotifyFileUploadException(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		const BoxException& rException)
+	{
 		if (rException.GetType() == CommonException::ExceptionType &&
 			rException.GetSubType() == CommonException::AccessDenied)
 		{
-			BOX_ERROR("Failed to upload file: " << rLocalPath 
+			BOX_ERROR("Failed to upload file: " << rLocalPath
 				<< ": Access denied");
 		}
 		else
 		{
-			BOX_ERROR("Failed to upload file: " << rLocalPath 
-				<< ": caught exception: " << rException.what() 
+			BOX_ERROR("Failed to upload file: " << rLocalPath
+				<< ": caught exception: " << rException.what()
 				<< " (" << rException.GetType()
 				<< "/"  << rException.GetSubType() << ")");
 		}
@@ -428,41 +428,41 @@ public:
 			}
 		}
 
-		BOX_ERROR("Failed to upload file: " << rLocalPath 
+		BOX_ERROR("Failed to upload file: " << rLocalPath
 			<< ": server error: " << msgs.str());
- 	}
- 	virtual void NotifyFileUploading(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath) 
-	{ 
+	}
+	virtual void NotifyFileUploading(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
+	{
 		if (mLogAllFileAccess)
 		{
 			BOX_NOTICE("Uploading complete file: " << rLocalPath);
-		} 
+		}
 	}
- 	virtual void NotifyFileUploadingPatch(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath) 
+	virtual void NotifyFileUploadingPatch(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
 	{
 		if (mLogAllFileAccess)
 		{
 			BOX_NOTICE("Uploading patch to file: " << rLocalPath);
-		} 
+		}
 	}
- 	virtual void NotifyFileUploadingAttributes(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath) 
+	virtual void NotifyFileUploadingAttributes(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath)
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_NOTICE("Uploading new file attributes: " << 
+			BOX_NOTICE("Uploading new file attributes: " <<
 				rLocalPath);
-		} 
+		}
 	}
- 	virtual void NotifyFileUploaded(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		int64_t FileSize, int64_t UploadedSize) 
+	virtual void NotifyFileUploaded(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int64_t FileSize, int64_t UploadedSize)
 	{
 		if (mLogAllFileAccess)
 		{
@@ -472,10 +472,10 @@ public:
 		}
 		mNumFilesUploaded++;
 	}
- 	virtual void NotifyFileSynchronised(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		int64_t FileSize) 
+	virtual void NotifyFileSynchronised(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int64_t FileSize) 
 	{
 		if (mLogAllFileAccess)
 		{
@@ -489,7 +489,7 @@ public:
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_NOTICE("Created directory: " << rRemotePath << 
+			BOX_NOTICE("Created directory: " << rRemotePath <<
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}

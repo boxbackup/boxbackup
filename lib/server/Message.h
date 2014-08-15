@@ -37,7 +37,7 @@ public:
 
 	// reading and writing with Protocol objects
 	virtual void SetPropertiesFromStreamData(Protocol &rProtocol);
-	virtual void WritePropertiesToStreamData(Protocol &rProtocol) const;	
+	virtual void WritePropertiesToStreamData(Protocol &rProtocol) const;
 
 	virtual void LogSysLog(const char *Action) const { }
 	virtual void LogFile(const char *Action, FILE *file) const { }

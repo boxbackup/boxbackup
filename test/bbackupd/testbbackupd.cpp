@@ -1483,7 +1483,7 @@ int test_bbackupd()
 			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context, 0 /* read-write */);
 		
-			std::auto_ptr<BackupStoreDirectory> rootDir = 
+			std::auto_ptr<BackupStoreDirectory> rootDir =
 				ReadDirectory(*client);
 
 			int64_t testDirId = SearchDir(*rootDir, "Test1");
@@ -1492,7 +1492,7 @@ int test_bbackupd()
 			std::auto_ptr<BackupStoreDirectory> Test1_dir =
 				ReadDirectory(*client, testDirId);
 
-			int64_t spacetestDirId = SearchDir(*Test1_dir, 
+			int64_t spacetestDirId = SearchDir(*Test1_dir,
 				"spacetest");
 			TEST_THAT(spacetestDirId != 0);
 
@@ -1526,18 +1526,12 @@ int test_bbackupd()
 				ReadDirectory(*client, d4_id);
 			TEST_THAT(test_entry_deleted(*d4_dir, "f5"));
 
-			std::auto_ptr<BackupProtocolAccountUsage> usage(
-				client->QueryGetAccountUsage());
-			TEST_EQUAL_LINE(24, usage->GetBlocksUsed(),
-				"blocks used");
-			TEST_EQUAL_LINE(4, usage->GetBlocksInDeletedFiles(),
-				"deleted blocks");
-			TEST_EQUAL_LINE(16, usage->GetBlocksInDirectories(),
-				"directory blocks");
 			// d1/f3 and d1/f4 are the only two files on the
 			// server which are not deleted, they use 2 blocks
 			// each, the rest is directories and 2 deleted files
-			// (f1 and d3/d4/f5)
+			// (f2 and d3/d4/f5)
+			TEST_THAT(check_num_files(2, 0, 2, 8));
+			TEST_THAT(check_num_blocks(*client, 4, 0, 4, 16, 24));
 
 			// Log out.
 			client->QueryFinished();
@@ -1546,15 +1540,22 @@ int test_bbackupd()
 
 		if (failures) return 1;
 
+#ifdef WIN32
+		// Housekeeping runs automatically at the end of each backup,
+		// and didn't run last time (see comments above), so run it
+		// manually.
+		TEST_THAT(run_housekeeping_and_check_account());
+#else
 		wait_for_operation(5, "housekeeping to remove the "
 			"deleted files");
+#endif
 
 		BOX_TRACE("Check that the files were removed");
 		{
-			std::auto_ptr<BackupProtocolClient> client = 
+			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context, 0 /* read-write */);
-			
-			std::auto_ptr<BackupStoreDirectory> rootDir = 
+
+			std::auto_ptr<BackupStoreDirectory> rootDir =
 				ReadDirectory(*client);
 
 			int64_t testDirId = SearchDir(*rootDir, "Test1");
@@ -1563,7 +1564,7 @@ int test_bbackupd()
 			std::auto_ptr<BackupStoreDirectory> Test1_dir =
 				ReadDirectory(*client, testDirId);
 
-			int64_t spacetestDirId = SearchDir(*Test1_dir, 
+			int64_t spacetestDirId = SearchDir(*Test1_dir,
 				"spacetest");
 			TEST_THAT(spacetestDirId != 0);
 
@@ -1611,7 +1612,7 @@ int test_bbackupd()
 
 		// BLOCK
 		{
-			std::auto_ptr<BackupProtocolClient> client = 
+			std::auto_ptr<BackupProtocolClient> client =
 				ConnectAndLogin(context, 0 /* read-write */);
 
 			std::auto_ptr<BackupProtocolAccountUsage> usage(

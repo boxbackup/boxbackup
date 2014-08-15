@@ -1368,7 +1368,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// Note: if we have exceeded our storage limit, then
 			// we should not upload any more data, nor create any
 			// DirectoryRecord representing data that would have
-			// been uploaded. This step will be repeated when 
+			// been uploaded. This step will be repeated when
 			// there is some space available.
 			bool doCreateDirectoryRecord = true;
 			
@@ -1388,13 +1388,13 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			else
 			{
 				// Yes, creation required!
-				// It is known that the it doesn't exist:
+				// It is known that it doesn't exist:
 				//
 				// if en == 0 and pDirOnStore == 0, then the
 				//   directory has had an initial sync, and
 				//   hasn't been modified (Really? then why
 				//   are we here? TODO FIXME)
-				//   so it has definately been created already
+				//   so it has definitely been created already
 				//   (so why create it again?)
 				//
 				// if en == 0 but pDirOnStore != 0, well... obviously it doesn't exist.
@@ -1515,7 +1515,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				// New an object for this
 				psubDirRecord = new BackupClientDirectoryRecord(subDirObjectID, *d);
-				
+
 				// Store in list
 				try
 				{
@@ -1547,7 +1547,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		if(rEntriesLeftOver[l] != 0)
 		{
 			BackupStoreDirectory::Entry *en = rEntriesLeftOver[l];
-		
+
 			// These entries can't be deleted immediately, as it would prevent
 			// renaming and moving of objects working properly. So we add them
 			// to a list, which is actually deleted at the very end of the session.
@@ -1574,7 +1574,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				filenameClear);
 			std::string nonVssLocalName = ConvertVssPathToRealPath(localName,
 				rBackupLocation);
-			
+
 			// Delete this entry -- file or directory?
 			if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) != 0)
 			{
@@ -1588,7 +1588,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				rdel.AddDirectoryDelete(en->GetObjectID(),
 					localName);
 				
-				// If there's a directory record for it in 
+				// If there's a directory record for it in
 				// the sub directory map, delete it now
 				BackupStoreFilenameClear dirname(en->GetName());
 				std::map<std::string, BackupClientDirectoryRecord *>::iterator
@@ -1602,7 +1602,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 
 					BOX_TRACE("Deleted directory record for " << 
 						nonVssLocalName);
-				}				
+				}
 			}
 		}
 	}
@@ -1778,7 +1778,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 
 		rContext.SetNiceMode(false);
 
-		// Get object ID from the result		
+		// Get object ID from the result
 		objID = stored->GetObjectID();
 		uploadedSize = apStreamToUpload->GetTotalBytesSent();
 	}

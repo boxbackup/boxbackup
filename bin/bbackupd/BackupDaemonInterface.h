@@ -11,14 +11,8 @@
 #define BACKUPDAEMONINTERFACE__H
 
 #include <string>
-// #include <map>
 
-// #include "BackupClientFileAttributes.h"
-// #include "BackupStoreDirectory.h"
 #include "BoxTime.h"
-// #include "MD5Digest.h"
-// #include "ReadLoggingStream.h"
-// #include "RunStatusProvider.h"
 
 class Archive;
 class BackupClientContext;
