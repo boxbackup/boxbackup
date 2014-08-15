@@ -3325,10 +3325,12 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 	//
 	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
 	{
+		BOX_NOTICE("Store object info file is not enabled. Will "
+			"download directory listings from store.");
 		return false;
 	}
 
-	std::string StoreObjectInfoFile = 
+	std::string StoreObjectInfoFile =
 		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
 
 	if(StoreObjectInfoFile.size() <= 0)
@@ -3336,150 +3338,161 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 		return false;
 	}
 
-	try
+	int64_t fileSize;
+	if (!FileExists(StoreObjectInfoFile, &fileSize) || fileSize == 0)
 	{
-		FileStream aFile(StoreObjectInfoFile.c_str(), O_RDONLY);
-		Archive anArchive(aFile, 0);
-
-		//
-		// see if the content looks like a valid serialised archive
-		//
-		int iMagicValue = 0;
-		anArchive.Read(iMagicValue);
-
-		if(iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
+		BOX_NOTICE(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+			"Store object info file does not exist or is empty"));
+	}
+	else
+	{
+		try
 		{
-			BOX_WARNING("Store object info file "
-				"is not a valid or compatible serialised "
-				"archive. Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
+			FileStream aFile(StoreObjectInfoFile, O_RDONLY);
+			Archive anArchive(aFile, 0);
 
-		//
-		// get a bit optimistic and read in a string identifier
-		//
-		std::string strMagicValue;
-		anArchive.Read(strMagicValue);
+			//
+			// see if the content looks like a valid serialised archive
+			//
+			int iMagicValue = 0;
+			anArchive.Read(iMagicValue);
 
-		if(strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
-		{
-			BOX_WARNING("Store object info file "
-				"is not a valid or compatible serialised "
-				"archive. Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
-
-		//
-		// check if we are loading some future format
-		// version by mistake
-		//
-		int iVersion = 0;
-		anArchive.Read(iVersion);
-
-		if(iVersion != STOREOBJECTINFO_VERSION)
-		{
-			BOX_WARNING("Store object info file "
-				"version " << iVersion << " unsupported. "
-				"Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
-
-		//
-		// check if this state file is even valid 
-		// for the loaded bbackupd.conf file
-		//
-		box_time_t lastKnownConfigModTime;
-		anArchive.Read(lastKnownConfigModTime);
-
-		if(lastKnownConfigModTime != GetLoadedConfigModifiedTime())
-		{
-			BOX_WARNING("Store object info file "
-				"out of date. Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
-
-		//
-		// this is it, go at it
-		//
-		anArchive.Read(mClientStoreMarker);
-		anArchive.Read(theLastSyncTime);
-		anArchive.Read(theNextSyncTime);
-
-		//
-		//
-		//
-		int64_t iCount = 0;
-		anArchive.Read(iCount);
-
-		for(int v = 0; v < iCount; v++)
-		{
-			Location* pLocation = new Location;
-			if(!pLocation)
+			if(iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
 			{
-				throw std::bad_alloc();
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file is not a valid "
+					"or compatible serialised archive"));
+				return false;
 			}
 
-			pLocation->Deserialize(anArchive);
-			mLocations.push_back(pLocation);
-		}
+			//
+			// get a bit optimistic and read in a string identifier
+			//
+			std::string strMagicValue;
+			anArchive.Read(strMagicValue);
 
-		//
-		//
-		//
-		iCount = 0;
-		anArchive.Read(iCount);
+			if(strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
+			{
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file is not a valid "
+					"or compatible serialised archive"));
+				return false;
+			}
 
-		for(int v = 0; v < iCount; v++)
+			//
+			// check if we are loading some future format
+			// version by mistake
+			//
+			int iVersion = 0;
+			anArchive.Read(iVersion);
+
+			if(iVersion != STOREOBJECTINFO_VERSION)
+			{
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file version " <<
+					iVersion << " is not supported"));
+				return false;
+			}
+
+			//
+			// check if this state file is even valid 
+			// for the loaded bbackupd.conf file
+			//
+			box_time_t lastKnownConfigModTime;
+			anArchive.Read(lastKnownConfigModTime);
+
+			if(lastKnownConfigModTime != GetLoadedConfigModifiedTime())
+			{
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file is older than "
+					"configuration file"));
+				return false;
+			}
+
+			//
+			// this is it, go at it
+			//
+			anArchive.Read(mClientStoreMarker);
+			anArchive.Read(theLastSyncTime);
+			anArchive.Read(theNextSyncTime);
+
+			//
+			//
+			//
+			int64_t iCount = 0;
+			anArchive.Read(iCount);
+
+			for(int v = 0; v < iCount; v++)
+			{
+				Location* pLocation = new Location;
+				if(!pLocation)
+				{
+					throw std::bad_alloc();
+				}
+
+				pLocation->Deserialize(anArchive);
+				mLocations.push_back(pLocation);
+			}
+
+			//
+			//
+			//
+			iCount = 0;
+			anArchive.Read(iCount);
+
+			for(int v = 0; v < iCount; v++)
+			{
+				std::string strItem;
+				anArchive.Read(strItem);
+
+				mIDMapMounts.push_back(strItem);
+			}
+
+			//
+			//
+			//
+			iCount = 0;
+			anArchive.Read(iCount);
+
+			for(int v = 0; v < iCount; v++)
+			{
+				int64_t anId;
+				anArchive.Read(anId);
+
+				std::string aName;
+				anArchive.Read(aName);
+
+				mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+			}
+
+			if (iCount > 0)
+				anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
+
+			//
+			//
+			//
+			aFile.Close();
+
+			BOX_INFO(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+				"Loaded store object info file version " << iVersion));
+			return true;
+		} 
+		catch(std::exception &e)
 		{
-			std::string strItem;
-			anArchive.Read(strItem);
-
-			mIDMapMounts.push_back(strItem);
+			BOX_ERROR(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+				"Internal error reading store object info "
+				"file: " << e.what()));
 		}
-
-		//
-		//
-		//
-		iCount = 0;
-		anArchive.Read(iCount);
-
-		for(int v = 0; v < iCount; v++)
+		catch(...)
 		{
-			int64_t anId;
-			anArchive.Read(anId);
-
-			std::string aName;
-			anArchive.Read(aName);
-
-			mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+			BOX_ERROR(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+				"Internal error reading store object info "
+				"file: unknown error"));
 		}
-
-		if (iCount > 0)
-			anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
-
-		//
-		//
-		//
-		aFile.Close();
-		BOX_INFO("Loaded store object info file version " << iVersion
-			<< " (" << StoreObjectInfoFile << ")");
-		
-		return true;
-	} 
-	catch(std::exception &e)
-	{
-		BOX_ERROR("Internal error reading store object info file: "
-			<< StoreObjectInfoFile << ": " << e.what());
 	}
-	catch(...)
-	{
-		BOX_ERROR("Internal error reading store object info file: "
-			<< StoreObjectInfoFile << ": unknown error");
-	}
+
+	BOX_NOTICE("No usable cache, will download directory listings from "
+		"server.");
 
 	DeleteAllLocations();
 
@@ -3487,10 +3500,6 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 	theLastSyncTime = 0;
 	theNextSyncTime = 0;
 
-	BOX_WARNING("Store object info file is missing, not accessible, "
-		"or inconsistent. Will re-cache from store. "
-		"(" << StoreObjectInfoFile << ")");
-	
 	return false;
 }
 
