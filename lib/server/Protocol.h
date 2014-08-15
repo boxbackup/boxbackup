@@ -67,14 +67,14 @@ public:
 	//		Purpose: Sets the timeout for sending and reciving
 	//		Created: 2003/08/19
 	//
-	// --------------------------------------------------------------------------	
+	// --------------------------------------------------------------------------
 	void SetTimeout(int NewTimeout) {mTimeout = NewTimeout;}
 	
 	
 	// --------------------------------------------------------------------------
 	//
 	// Function
-	//		Name:    Protocol::GetTimeout() 
+	//		Name:    Protocol::GetTimeout()
 	//		Purpose: Get current timeout for sending and receiving
 	//		Created: 2003/09/06
 	//
