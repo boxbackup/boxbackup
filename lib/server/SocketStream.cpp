@@ -218,7 +218,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		p.fd = mSocketHandle;
 		p.events = POLLIN;
 		p.revents = 0;
-		switch(::poll(&p, 1, PollTimeout(Timeout)))
+		switch(::poll(&p, 1, PollTimeout(Timeout, 0)))
 		{
 		case -1:
 			// error
@@ -287,13 +287,11 @@ bool SocketStream::Poll(short Events, int Timeout)
 	p.revents = 0;
 
 	box_time_t start = GetCurrentBoxTime();
-	box_time_t end   = start + MilliSecondsToBoxTime(Timeout);
 	int result;
 
 	do
 	{
-		box_time_t now = GetCurrentBoxTime();
-		result = ::poll(&p, 1, PollTimeout(end - now));
+		result = ::poll(&p, 1, PollTimeout(Timeout, start));
 	}
 	while(result == -1 && errno == EINTR);
 
@@ -337,7 +335,6 @@ void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 	// Bytes left to send
 	int bytesLeft = NBytes;
 	box_time_t start = GetCurrentBoxTime();
-	box_time_t end   = start + MilliSecondsToBoxTime(Timeout);
 
 	while(bytesLeft > 0)
 	{
@@ -370,9 +367,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 				mSocketHandle << " (" << bytesLeft <<
 				" of " << NBytes << " bytes left)");
 
-			box_time_t now = GetCurrentBoxTime();
-
-			if(!Poll(POLLOUT, PollTimeout(end - now)))
+			if(!Poll(POLLOUT, PollTimeout(Timeout, start)))
 			{
 				THROW_EXCEPTION_MESSAGE(ConnectionException,
 					Protocol_Timeout, "Timed out waiting "
