@@ -1884,7 +1884,12 @@ bool BackupDaemon::RunBackgroundTask(State state, uint64_t progress,
 {
 	BOX_TRACE("BackupDaemon::RunBackgroundTask: state = " << state <<
 		", progress = " << progress << "/" << maximum);
-	
+
+	if(!mapCommandSocketPollTimer.get())
+	{
+		return true; // no background task
+	}
+
 	if(mapCommandSocketPollTimer->HasExpired())
 	{
 		mapCommandSocketPollTimer->Reset(COMMAND_SOCKET_POLL_INTERVAL);
