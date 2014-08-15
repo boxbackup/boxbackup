@@ -2117,11 +2117,8 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 //
 // --------------------------------------------------------------------------
 Location::Location()
-	: mIDMapIndex(0),
-	  mpExcludeFiles(0),
-	  mpExcludeDirs(0)
-{
-}
+: mIDMapIndex(0)
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -2132,19 +2129,7 @@ Location::Location()
 //
 // --------------------------------------------------------------------------
 Location::~Location()
-{
-	// Clean up exclude locations
-	if(mpExcludeDirs != 0)
-	{
-		delete mpExcludeDirs;
-		mpExcludeDirs = 0;
-	}
-	if(mpExcludeFiles != 0)
-	{
-		delete mpExcludeFiles;
-		mpExcludeFiles = 0;
-	}
-}
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -2168,7 +2153,7 @@ void Location::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-	if(mpDirectoryRecord.get() == NULL)
+	if(!mapDirectoryRecord.get())
 	{
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
 		rArchive.Write(aMagicMarker);
@@ -2178,13 +2163,13 @@ void Location::Serialize(Archive & rArchive) const
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
 		rArchive.Write(aMagicMarker);
 
-		mpDirectoryRecord->Serialize(rArchive);
+		mapDirectoryRecord->Serialize(rArchive);
 	}
 
 	//
 	//
 	//
-	if(!mpExcludeFiles)
+	if(!mapExcludeFiles.get())
 	{
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
 		rArchive.Write(aMagicMarker);
@@ -2194,13 +2179,13 @@ void Location::Serialize(Archive & rArchive) const
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
 		rArchive.Write(aMagicMarker);
 
-		mpExcludeFiles->Serialize(rArchive);
+		mapExcludeFiles->Serialize(rArchive);
 	}
 
 	//
 	//
 	//
-	if(!mpExcludeDirs)
+	if(!mapExcludeDirs.get())
 	{
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_NOOP;
 		rArchive.Write(aMagicMarker);
@@ -2210,7 +2195,7 @@ void Location::Serialize(Archive & rArchive) const
 		int64_t aMagicMarker = ARCHIVE_MAGIC_VALUE_RECURSE; // be explicit about whether recursion follows
 		rArchive.Write(aMagicMarker);
 
-		mpExcludeDirs->Serialize(rArchive);
+		mapExcludeDirs->Serialize(rArchive);
 	}
 }
 
@@ -2228,17 +2213,9 @@ void Location::Deserialize(Archive &rArchive)
 	//
 	//
 	//
-	mpDirectoryRecord.reset(NULL);
-	if(mpExcludeFiles)
-	{
-		delete mpExcludeFiles;
-		mpExcludeFiles = NULL;
-	}
-	if(mpExcludeDirs)
-	{
-		delete mpExcludeDirs;
-		mpExcludeDirs = NULL;
-	}
+	mapDirectoryRecord.reset();
+	mapExcludeFiles.reset();
+	mapExcludeDirs.reset();
 
 	//
 	//
@@ -2265,8 +2242,8 @@ void Location::Deserialize(Archive &rArchive)
 			throw std::bad_alloc();
 		}
 
-		mpDirectoryRecord.reset(pSubRecord);
-		mpDirectoryRecord->Deserialize(rArchive);
+		mapDirectoryRecord.reset(pSubRecord);
+		mapDirectoryRecord->Deserialize(rArchive);
 	}
 	else
 	{
@@ -2285,13 +2262,13 @@ void Location::Deserialize(Archive &rArchive)
 	}
 	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
 	{
-		mpExcludeFiles = new ExcludeList;
-		if(!mpExcludeFiles)
+		mapExcludeFiles.reset(new ExcludeList);
+		if(!mapExcludeFiles.get())
 		{
 			throw std::bad_alloc();
 		}
 
-		mpExcludeFiles->Deserialize(rArchive);
+		mapExcludeFiles->Deserialize(rArchive);
 	}
 	else
 	{
@@ -2310,13 +2287,13 @@ void Location::Deserialize(Archive &rArchive)
 	}
 	else if(aMagicMarker == ARCHIVE_MAGIC_VALUE_RECURSE)
 	{
-		mpExcludeDirs = new ExcludeList;
-		if(!mpExcludeDirs)
+		mapExcludeDirs.reset(new ExcludeList);
+		if(!mapExcludeDirs.get())
 		{
 			throw std::bad_alloc();
 		}
 
-		mpExcludeDirs->Deserialize(rArchive);
+		mapExcludeDirs->Deserialize(rArchive);
 	}
 	else
 	{

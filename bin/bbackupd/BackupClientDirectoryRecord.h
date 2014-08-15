@@ -214,10 +214,10 @@ private:
 public:
 	std::string mName;
 	std::string mPath;
-	std::auto_ptr<BackupClientDirectoryRecord> mpDirectoryRecord;
+	std::auto_ptr<BackupClientDirectoryRecord> mapDirectoryRecord;
+	std::auto_ptr<ExcludeList> mapExcludeFiles;
+	std::auto_ptr<ExcludeList> mapExcludeDirs;
 	int mIDMapIndex;
-	ExcludeList *mpExcludeFiles;
-	ExcludeList *mpExcludeDirs;
 
 #ifdef ENABLE_VSS
 	bool mIsSnapshotCreated;

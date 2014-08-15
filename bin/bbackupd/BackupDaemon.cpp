@@ -1034,8 +1034,8 @@ void BackupDaemon::RunSyncNow()
 		// Set exclude lists (context doesn't
 		// take ownership)
 		clientContext.SetExcludeLists(
-			(*i)->mpExcludeFiles,
-			(*i)->mpExcludeDirs);
+			(*i)->mapExcludeFiles.get(),
+			(*i)->mapExcludeDirs.get());
 
 		// Sync the directory
 		std::string locationPath = (*i)->mPath;
@@ -1046,7 +1046,7 @@ void BackupDaemon::RunSyncNow()
 		}
 #endif
 
-		(*i)->mpDirectoryRecord->SyncDirectory(params,
+		(*i)->mapDirectoryRecord->SyncDirectory(params,
 			BackupProtocolListDirectory::RootDirectory,
 			locationPath, std::string("/") + (*i)->mName, **i);
 
@@ -2408,8 +2408,8 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				pLoc->mPath = rConfig.GetKeyValue("Path");
 				
 				// Read the exclude lists from the Configuration
-				pLoc->mpExcludeFiles = BackupClientMakeExcludeList_Files(rConfig);
-				pLoc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(rConfig);
+				pLoc->mapExcludeFiles.reset(BackupClientMakeExcludeList_Files(rConfig));
+				pLoc->mapExcludeDirs.reset(BackupClientMakeExcludeList_Dirs(rConfig));
 			}
 
 			// Does this exist on the server?
@@ -2558,11 +2558,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 
 			// Create and store the directory object for the root of this location
 			ASSERT(oid != 0);
-			if(pLoc->mpDirectoryRecord.get() == NULL)
+			if(pLoc->mapDirectoryRecord.get() == NULL)
 			{
-				BackupClientDirectoryRecord *precord =
-					new BackupClientDirectoryRecord(oid, *pLocName);
-				pLoc->mpDirectoryRecord.reset(precord);
+				pLoc->mapDirectoryRecord.reset(
+					new BackupClientDirectoryRecord(oid, *pLocName));
 			}
 			
 			// Remove it from the temporary list to avoid deletion
