@@ -29,11 +29,11 @@ All directory names relative to a "current" directory, or from root if they
 start with '/'. The initial directory is always the root directory.
 
 
-> list [options] [directory-name]
+> ls [options] [directory-name]
 
 	List contents of current directory, or specified directory.
 	
-	-r -- recursively list all files
+	-R -- recursively list all files
 	-d -- list deleted files/directories
 	-o -- list old versions of files/directories
 	-I -- don't display object ID
@@ -45,13 +45,17 @@ start with '/'. The initial directory is always the root directory.
 	-s -- show file size in blocks used on server
 	      (only very approximate indication of size locally)
 	-h -- show file attributes hash
+	-D -- sort directories together with files (not dirs first)
+	-i -- sort by object ID (the old default)
+	-S -- sort by object size in blocks
+	-U -- don't sort the results (new default is to sort by name)
 
-ls can be used as an alias.
+list can be used as an alias.
 <
 
-> ls
+> list
 
-	Alias for 'list'. Type 'help list' for options.
+	Alias for 'ls'. Type 'help ls' for options.
 <
 
 > cd [options] <directory-name>
