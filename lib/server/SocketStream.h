@@ -59,19 +59,33 @@ protected:
 	void MarkAsWriteClosed() {mWriteClosed = true;}
 	void CheckForMissingTimeout(int Timeout);
 
-	int PollTimeout(box_time_t Timeout)
+	int PollTimeout(int timeout, box_time_t start_time)
 	{
-		if (Timeout < 0)
-		{
-			return 0;
-		}
-		else if (Timeout == IOStream::TimeOutInfinite || Timeout > INT_MAX)
+		if (timeout == IOStream::TimeOutInfinite)
 		{
 			return INFTIM;
 		}
+
+		if (start_time == 0)
+		{
+			return timeout; // no adjustment possible
+		}
+
+		box_time_t end_time = start_time + MilliSecondsToBoxTime(timeout);
+		box_time_t now = GetCurrentBoxTime();
+		box_time_t remaining = end_time - now;
+
+		if (remaining < 0)
+		{
+			return 0; // no delay
+		}
+		else if (BoxTimeToMilliSeconds(remaining) > INT_MAX)
+		{
+			return INT_MAX;
+		}
 		else
 		{
-			return (int) Timeout;
+			return (int) BoxTimeToMilliSeconds(remaining);
 		}
 	}
 	bool Poll(short Events, int Timeout);
