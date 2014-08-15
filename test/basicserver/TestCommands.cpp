@@ -72,7 +72,8 @@ std::auto_ptr<TestProtocolMessage> TestProtocolGetStream::DoCommand(TestProtocol
 	return std::auto_ptr<TestProtocolMessage>(new TestProtocolGetStream(mStartingValue, mUncertainSize));
 }
 
-std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
+std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(TestProtocolReplyable &rProtocol,
+	TestContext &rContext, IOStream& rDataStream) const
 {
 	if(mValue != 0x73654353298ffLL)
 	{
@@ -80,15 +81,14 @@ std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(TestProtoco
 	}
 	
 	// Get a stream
-	std::auto_ptr<IOStream> stream(rProtocol.ReceiveStream());
-	bool uncertain = (stream->BytesLeftToRead() == IOStream::SizeOfStreamUnknown);
+	bool uncertain = (rDataStream.BytesLeftToRead() == IOStream::SizeOfStreamUnknown);
 	
 	// Count how many bytes in it
 	int bytes = 0;
 	char buffer[125];
-	while(stream->StreamDataLeft())
+	while(rDataStream.StreamDataLeft())
 	{
-		bytes += stream->Read(buffer, sizeof(buffer));
+		bytes += rDataStream.Read(buffer, sizeof(buffer));
 	}
 
 	// tell the caller how many bytes there were
