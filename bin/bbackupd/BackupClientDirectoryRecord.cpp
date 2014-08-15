@@ -1732,11 +1732,11 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 				{
 					diffFromID = 0;
 				}
-	
+
 				rContext.UnManageDiffProcess();
-			} 
+			}
 		}
-	
+
 		if(!apStreamToUpload.get()) // No patch upload, so do a normal upload
 		{
 			// below threshold or nothing to diff from, so upload whole
