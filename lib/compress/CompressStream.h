@@ -33,8 +33,9 @@ private:
 public:
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
-	virtual void WriteAllBuffered();
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
+	virtual void WriteAllBuffered(int Timeout = IOStream::TimeOutInfinite);
 	virtual void Close();
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
@@ -43,7 +44,8 @@ protected:
 	void CheckRead();
 	void CheckWrite();
 	void CheckBuffer();
-	void WriteCompressedData(bool SyncFlush = false);
+	void WriteCompressedData(bool SyncFlush = false,
+		int Timeout = IOStream::TimeOutInfinite);
 
 private:
 	IOStream *mpStream;

@@ -104,7 +104,7 @@ void Protocol::Handshake()
 	::strncpy(hsSend.mIdent, GetProtocolIdentString(), sizeof(hsSend.mIdent));
 	
 	// Send it
-	mapConn->Write(&hsSend, sizeof(hsSend));
+	mapConn->Write(&hsSend, sizeof(hsSend), GetTimeout());
 	mapConn->WriteAllBuffered();
 
 	// Receive a handshake from the peer
@@ -115,7 +115,7 @@ void Protocol::Handshake()
 	while(bytesToRead > 0)
 	{
 		// Get some data from the stream
-		int bytesRead = mapConn->Read(readInto, bytesToRead, mTimeout);
+		int bytesRead = mapConn->Read(readInto, bytesToRead, GetTimeout());
 		if(bytesRead == 0)
 		{
 			THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
@@ -296,7 +296,7 @@ void Protocol::SendInternal(const Message &rObject)
 	pobjHeader->mObjType = htonl(rObject.GetType());
 
 	// Write data
-	mapConn->Write(mpBuffer, writtenSize);
+	mapConn->Write(mpBuffer, writtenSize, GetTimeout());
 	mapConn->WriteAllBuffered();
 }
 
@@ -713,7 +713,7 @@ void Protocol::SendStream(IOStream &rStream)
 	objHeader.mObjType = htonl(SPECIAL_STREAM_OBJECT_TYPE);
 
 	// Write header
-	mapConn->Write(&objHeader, sizeof(objHeader));
+	mapConn->Write(&objHeader, sizeof(objHeader), GetTimeout());
 	// Could be sent in one of two ways
 	if(uncertainSize)
 	{
@@ -748,7 +748,7 @@ void Protocol::SendStream(IOStream &rStream)
 			// Send final byte to finish the stream
 			BOX_TRACE("Sending end of stream byte");
 			uint8_t endOfStream = ProtocolStreamHeader_EndOfStream;
-			mapConn->Write(&endOfStream, 1);
+			mapConn->Write(&endOfStream, 1, GetTimeout());
 			BOX_TRACE("Sent end of stream byte");
 		}
 		catch(...)
@@ -763,7 +763,8 @@ void Protocol::SendStream(IOStream &rStream)
 	else
 	{
 		// Fixed size stream, send it all in one go
-		if(!rStream.CopyStreamTo(*mapConn, mTimeout, 4096 /* slightly larger buffer */))
+		if(!rStream.CopyStreamTo(*mapConn, GetTimeout(),
+			4096 /* slightly larger buffer */))
 		{
 			THROW_EXCEPTION(ConnectionException, Protocol_TimeOutWhenSendingStream)
 		}
@@ -820,7 +821,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	Block[-1] = header;
 	
 	// Write everything out
-	mapConn->Write(Block - 1, writeSize + 1);
+	mapConn->Write(Block - 1, writeSize + 1, GetTimeout());
 	
 	BOX_TRACE("Sent " << (writeSize+1) << " bytes to stream");
 	// move the remainer to the beginning of the block for the next time round

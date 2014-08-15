@@ -165,7 +165,7 @@ bool IOStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int T
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void IOStream::WriteAllBuffered()
+void IOStream::WriteAllBuffered(int Timeout)
 {
 }
 
