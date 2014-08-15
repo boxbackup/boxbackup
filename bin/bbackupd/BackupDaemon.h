@@ -366,70 +366,15 @@ public:
 				<< " (" << rException.GetType()
 				<< "/"  << rException.GetSubType() << ")");
 		}
- 	}
-  	virtual void NotifyFileUploadServerError(
- 		const BackupClientDirectoryRecord* pDirRecord,
- 		const std::string& rLocalPath,
- 		int type, int subtype)
- 	{
-		std::ostringstream msgs;
-		if (type != BackupProtocolError::ErrorType)
-		{
-			msgs << "unknown error type " << type;
-		}
-		else
-		{
-			switch(subtype)
-			{
-			case BackupProtocolError::Err_WrongVersion:
-				msgs << "WrongVersion";
-				break;
-			case BackupProtocolError::Err_NotInRightProtocolPhase:
-				msgs << "NotInRightProtocolPhase";
-				break;
-			case BackupProtocolError::Err_BadLogin:
-				msgs << "BadLogin";
-				break;
-			case BackupProtocolError::Err_CannotLockStoreForWriting:
-				msgs << "CannotLockStoreForWriting";
-				break;
-			case BackupProtocolError::Err_SessionReadOnly:
-				msgs << "SessionReadOnly";
-				break;
-			case BackupProtocolError::Err_FileDoesNotVerify:
-				msgs << "FileDoesNotVerify";
-				break;
-			case BackupProtocolError::Err_DoesNotExist:
-				msgs << "DoesNotExist";
-				break;
-			case BackupProtocolError::Err_DirectoryAlreadyExists:
-				msgs << "DirectoryAlreadyExists";
-				break;
-			case BackupProtocolError::Err_CannotDeleteRoot:
-				msgs << "CannotDeleteRoot";
-				break;
-			case BackupProtocolError::Err_TargetNameExists:
-				msgs << "TargetNameExists";
-				break;
-			case BackupProtocolError::Err_StorageLimitExceeded:
-				msgs << "StorageLimitExceeded";
-				break;
-			case BackupProtocolError::Err_DiffFromFileDoesNotExist:
-				msgs << "DiffFromFileDoesNotExist";
-				break;
-			case BackupProtocolError::Err_DoesNotExistInDirectory:
-				msgs << "DoesNotExistInDirectory";
-				break;
-			case BackupProtocolError::Err_PatchConsistencyError:
-				msgs << "PatchConsistencyError";
-				break;
-			default:
-				msgs << "unknown error subtype " << subtype;
-			}
-		}
-
-		BOX_ERROR("Failed to upload file: " << rLocalPath
-			<< ": server error: " << msgs.str());
+	}
+	virtual void NotifyFileUploadServerError(
+		const BackupClientDirectoryRecord* pDirRecord,
+		const std::string& rLocalPath,
+		int type, int subtype)
+	{
+		BOX_ERROR("Failed to upload file: " << rLocalPath <<
+			": server error: " <<
+			BackupProtocolError::GetMessage(subtype));
 	}
 	virtual void NotifyFileUploading(
 		const BackupClientDirectoryRecord* pDirRecord,
