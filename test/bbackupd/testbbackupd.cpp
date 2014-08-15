@@ -882,7 +882,7 @@ int test_bbackupd()
 			Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
 			TEST_CHECK_THROWS(ReadDirectory(*client, 0x12345678),
 				ConnectionException,
-				Conn_Protocol_UnexpectedReply);
+				Protocol_UnexpectedReply);
 		}
 
 		client->QueryFinished();

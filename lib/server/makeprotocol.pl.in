@@ -179,7 +179,7 @@ print H <<__E;
 
 #include "Protocol.h"
 #include "Message.h"
-#include "ServerException.h"
+#include "autogen_ConnectionException.h"
 
 class IOStream;
 class SocketStream;
@@ -261,13 +261,13 @@ print CPP <<__E;
 std::auto_ptr<$message_base_class> $message_base_class\::DoCommand($replyable_base_class &rProtocol,
 	$context_class &rContext) const
 {
-	THROW_EXCEPTION(ConnectionException, Conn_Protocol_TriedToExecuteReplyCommand)
+	THROW_EXCEPTION(ConnectionException, Protocol_TriedToExecuteReplyCommand)
 }
 
 std::auto_ptr<$message_base_class> $message_base_class\::DoCommand($replyable_base_class &rProtocol,
 	$context_class &rContext, IOStream& rDataStream) const
 {
-	THROW_EXCEPTION(ConnectionException, Conn_Protocol_TriedToExecuteReplyCommand)
+	THROW_EXCEPTION(ConnectionException, Protocol_TriedToExecuteReplyCommand)
 }
 __E
 
@@ -640,7 +640,7 @@ __E
 
 print CPP <<__E;
 	default:
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_UnknownCommandRecieved)
+		THROW_EXCEPTION(ConnectionException, Protocol_UnknownCommandRecieved)
 	}
 }
 
@@ -685,7 +685,7 @@ void $callable_base_class\::CheckReply(const std::string& requestCommandName,
 		{
 			SetLastError(type, subType);
 			THROW_EXCEPTION_MESSAGE(ConnectionException,
-				Conn_Protocol_UnexpectedReply,
+				Protocol_UnexpectedReply,
 				requestCommandName << " command failed: "
 				"received error " <<
 				(($error_class&)rReply).GetMessage());
@@ -694,7 +694,7 @@ void $callable_base_class\::CheckReply(const std::string& requestCommandName,
 		{
 			SetLastError(Protocol::UnknownError, Protocol::UnknownError);
 			THROW_EXCEPTION_MESSAGE(ConnectionException,
-				Conn_Protocol_UnexpectedReply,
+				Protocol_UnexpectedReply,
 				requestCommandName << " command failed: "
 				"received unexpected response type " <<
 				rReply.GetType());
@@ -1197,7 +1197,7 @@ sub obj_get_type_params
 	{
 		return $1 if $_ =~ m/\A$ty\((.+?)\)\Z/;
 	}
-	die "Can't find attribute $ty\n"
+	die "Can't find attribute $ty on command $c\n"
 }
 
 # returns (is basic type, typename)

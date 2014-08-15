@@ -1101,7 +1101,7 @@ bool test_server_housekeeping()
 	// Try using GetFile on a directory
 	{
 		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolSuccess> getFile(protocol.QueryGetFile(BackupProtocolListDirectory::RootDirectory, BackupProtocolListDirectory::RootDirectory)),
-			ConnectionException, Conn_Protocol_UnexpectedReply);
+			ConnectionException, Protocol_UnexpectedReply);
 	}
 
 	// Try retrieving an object that doesn't exist. That used to return
@@ -1173,7 +1173,7 @@ bool assert_writable_connection_fails(BackupProtocolCallable& protocol)
 		(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 	TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 	TEST_CHECK_THROWS(protocol.QueryLogin(0x01234567, 0),
-		ConnectionException, Conn_Protocol_UnexpectedReply);
+		ConnectionException, Protocol_UnexpectedReply);
 	protocol.QueryFinished();
 	return true;
 }
@@ -1588,11 +1588,11 @@ bool test_multiple_uploads()
 			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					BackupProtocolListDirectory::RootDirectory,
 					subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName),
-				ConnectionException, Conn_Protocol_UnexpectedReply);
+				ConnectionException, Protocol_UnexpectedReply);
 			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					subdirid,
 					subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName),
-				ConnectionException, Conn_Protocol_UnexpectedReply);
+				ConnectionException, Protocol_UnexpectedReply);
 		}
 
 		// Rename within a directory
@@ -2294,7 +2294,7 @@ bool test_login_without_account()
 
 		// Login
 		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0)),
-			ConnectionException, Conn_Protocol_UnexpectedReply);
+			ConnectionException, Protocol_UnexpectedReply);
 		
 		// Finish the connection
 		protocol.QueryFinished();
@@ -2377,7 +2377,7 @@ bool test_login_with_disabled_account()
 		// Login
 		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed>
 			loginConf(protocol.QueryLogin(0x01234567, 0)),
-			ConnectionException, Conn_Protocol_UnexpectedReply);
+			ConnectionException, Protocol_UnexpectedReply);
 		int type, subType;
 		TEST_EQUAL_LINE(true, protocol.GetLastError(type, subType),
 			"expected a protocol error");
@@ -2413,7 +2413,7 @@ bool test_login_with_no_refcount_db()
 	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 
 	TEST_CHECK_THROWS(test_server_login("localhost", context),
-		ConnectionException, Conn_TLSReadFailed);
+		ConnectionException, TLSReadFailed);
 	TEST_THAT(ServerIsAlive(bbstored_pid));
 
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
@@ -2566,7 +2566,7 @@ bool test_account_limits_respected()
 				0,							/* diff from ID */
 				fnx,
 				upload),
-			ConnectionException, Conn_Protocol_UnexpectedReply);
+			ConnectionException, Protocol_UnexpectedReply);
 
 		// This currently causes a fatal error on the server, which
 		// kills the connection. TODO FIXME return an error instead.
@@ -2575,7 +2575,7 @@ bool test_account_limits_respected()
 		TEST_CHECK_THROWS(protocol.QueryCreateDirectory(
 				BackupProtocolListDirectory::RootDirectory,
 				FAKE_ATTR_MODIFICATION_TIME, fnxd, attr),
-			ConnectionException, Conn_Protocol_UnexpectedReply);
+			ConnectionException, Protocol_UnexpectedReply);
 
 		// Finish the connection. TODO FIXME reinstate this.
 		protocol.QueryFinished();

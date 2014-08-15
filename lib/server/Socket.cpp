@@ -24,8 +24,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "Socket.h"
-#include "ServerException.h"
 
 #include "MemLeakFindOn.h"
 
@@ -69,12 +70,12 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
 				}
 				else
 				{
-					THROW_EXCEPTION(ConnectionException, Conn_SocketNameLookupError);
+					THROW_EXCEPTION(ConnectionException, SocketNameLookupError);
 				}
 			}
 			else
 			{
-				THROW_EXCEPTION(ConnectionException, Conn_SocketNameLookupError);
+				THROW_EXCEPTION(ConnectionException, SocketNameLookupError);
 			}
 		}
 		break;

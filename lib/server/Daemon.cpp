@@ -36,12 +36,13 @@
 #	include "BoxVersion.h"
 #endif
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "Configuration.h"
 #include "Daemon.h"
 #include "FileModificationTime.h"
 #include "Guards.h"
 #include "Logging.h"
-#include "ServerException.h"
 #include "UnixUser.h"
 #include "Utils.h"
 

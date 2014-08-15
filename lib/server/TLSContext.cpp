@@ -12,8 +12,9 @@
 #define TLS_CLASS_IMPLEMENTATION_CPP
 #include <openssl/ssl.h>
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "CryptoUtils.h"
-#include "ServerException.h"
 #include "SSLLib.h"
 #include "TLSContext.h"
 

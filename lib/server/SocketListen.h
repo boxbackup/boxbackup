@@ -29,8 +29,9 @@
 #include <memory>
 #include <string>
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "Socket.h"
-#include "ServerException.h"
 
 #include "MemLeakFindOn.h"
 
