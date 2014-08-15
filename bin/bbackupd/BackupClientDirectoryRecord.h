@@ -159,6 +159,12 @@ private:
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 		std::vector<std::string> &rFiles,
 		const std::vector<std::string> &rDirs);
+	int64_t CreateRemoteDir(const std::string& localDirPath,
+		const std::string& nonVssDirPath,
+		const std::string& remoteDirPath,
+		BackupStoreFilenameClear& storeFilename,
+		bool* pHaveJustCreatedDirOnServer,
+		BackupClientDirectoryRecord::SyncParams &rParams);
 	int64_t UploadFile(SyncParams &rParams,
 		const std::string &rFilename,
 		const std::string &rNonVssFilePath,
