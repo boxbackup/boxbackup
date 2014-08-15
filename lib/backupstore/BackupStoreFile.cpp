@@ -433,7 +433,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
 	}
 
-	bool inFileOrder = true;	
+	bool inFileOrder = true;
 	switch(ntohl(magic))
 	{
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
