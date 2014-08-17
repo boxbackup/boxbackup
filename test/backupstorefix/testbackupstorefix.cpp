@@ -614,7 +614,7 @@ int test(int argc, const char *argv[])
 	
 	// Generate a list of all the object IDs
 	TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
-		"-c testfiles/bbackupd.conf \"list -r\" quit "
+		"-c testfiles/bbackupd.conf \"list -R\" quit "
 		"> testfiles/initial-listing.txt") == 0);
 
 	// And load it in

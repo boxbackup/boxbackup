@@ -3934,7 +3934,7 @@ int test_bbackupd()
 	/*
 	// List the files on the server - why?
 	::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf "
-		"-l testfiles/queryLIST.log \"list -rotdh\" quit");
+		"-l testfiles/queryLIST.log \"list -Rotdh\" quit");
 	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 	*/
 
