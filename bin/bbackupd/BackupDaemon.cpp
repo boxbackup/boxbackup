@@ -61,6 +61,7 @@
 #include "BackupClientFileAttributes.h"
 #include "BackupClientInodeToIDMap.h"
 #include "BackupClientMakeExcludeList.h"
+#include "BackupConstants.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
 #include "BackupStoreConstants.h"
@@ -574,6 +575,7 @@ void BackupDaemon::Run2()
 		box_time_t currentTime = GetCurrentBoxTime();
 		box_time_t requiredDelay = (mNextSyncTime < currentTime)
 				? (0) : (mNextSyncTime - currentTime);
+		mNextSyncTime = currentTime + requiredDelay;
 
 		if (mDoSyncForcedByPreviousSyncError)
 		{
@@ -670,7 +672,7 @@ void BackupDaemon::Run2()
 			if(d > 0)
 			{
 				// Script has asked for a delay
-				mNextSyncTime = GetCurrentBoxTime() + 
+				mNextSyncTime = GetCurrentBoxTime() +
 					SecondsToBoxTime(d);
 				BOX_INFO("Impending backup stopped by "
 					"SyncAllowScript, next attempt "
@@ -779,9 +781,9 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 				" " << errorCode << "/" << errorSubCode <<
 				"), reset state and waiting to retry...");
 			::sleep(10);
-			mNextSyncTime = mCurrentSyncStartTime + 
-				SecondsToBoxTime(100) +
-				Random::RandomInt(mUpdateStoreInterval >> 
+			mNextSyncTime = GetCurrentBoxTime() +
+				SecondsToBoxTime(BACKUP_ERROR_RETRY_SECONDS) +
+				Random::RandomInt(mUpdateStoreInterval >>
 					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 		}
 	}
