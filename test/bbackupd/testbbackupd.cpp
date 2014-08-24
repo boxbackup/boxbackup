@@ -2756,10 +2756,12 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		// bbackupd should pause for about 90 seconds from
-		// store_fixed_time, so check that it hasn't run after
-		// 85 seconds after store_fixed_time
-		wait_for_operation(85 - time(NULL) + store_fixed_time,
+		// bbackupd should pause for BACKUP_ERROR_RETRY_SECONDS (plus
+		// a random delay of up to mUpdateStoreInterval/64 or 0.05
+		// extra seconds) from store_fixed_time, so check that it
+		// hasn't run just before this time
+		wait_for_operation(BACKUP_ERROR_RETRY_SECONDS +
+			(store_fixed_time - time(NULL)) - 1,
 			"just before bbackupd recovers");
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
@@ -2767,8 +2769,8 @@ int test_bbackupd()
 		// Should not have backed up, should still get errors
 		TEST_COMPARE(Compare_Different);
 
-		// wait another 10 seconds, bbackup should have run
-		wait_for_operation(10, "bbackupd to recover");
+		// wait another 2 seconds, bbackup should have run
+		wait_for_operation(2, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 	
@@ -2839,10 +2841,12 @@ int test_bbackupd()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		// bbackupd should pause for about 90 seconds from
-		// store_fixed_time, so check that it hasn't run after
-		// 85 seconds from store_fixed_time
-		wait_for_operation(85 - time(NULL) + store_fixed_time,
+		// bbackupd should pause for BACKUP_ERROR_RETRY_SECONDS (plus
+		// a random delay of up to mUpdateStoreInterval/64 or 0.05
+		// extra seconds) from store_fixed_time, so check that it
+		// hasn't run just before this time
+		wait_for_operation(BACKUP_ERROR_RETRY_SECONDS +
+			(store_fixed_time - time(NULL)) - 1,
 			"just before bbackupd recovers");
 		TEST_THAT(!TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
@@ -2850,8 +2854,8 @@ int test_bbackupd()
 		// Should not have backed up, should still get errors
 		TEST_COMPARE(Compare_Different);
 
-		// wait another 10 seconds, bbackup should have run
-		wait_for_operation(10, "bbackupd to recover");
+		// wait another 2 seconds, bbackup should have run
+		wait_for_operation(2, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
 	
