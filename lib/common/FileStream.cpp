@@ -67,24 +67,29 @@ void FileStream::AfterOpen()
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 
-		#ifdef WIN32
-		BOX_LOG_WIN_WARNING_NUMBER("Failed to open file: " <<
-			mFileName, winerrno);
-		#else
-		BOX_LOG_SYS_WARNING("Failed to open file: " <<
-			mFileName);
-		#endif
-
+#ifdef WIN32
 		if(errno == EACCES)
 		{
-			THROW_EXCEPTION_MESSAGE(CommonException, AccessDenied,
-				mFileName);
+			THROW_WIN_FILE_ERROR("Failed to open file", mFileName,
+				CommonException, AccessDenied);
 		}
 		else
 		{
-			THROW_EXCEPTION_MESSAGE(CommonException, OSFileOpenError,
-				mFileName);
+			THROW_WIN_FILE_ERROR("Failed to open file", mFileName,
+				CommonException, OSFileOpenError);
 		}
+#else
+		if(errno == EACCES)
+		{
+			THROW_SYS_FILE_ERROR("Failed to open file", mFileName,
+				CommonException, AccessDenied);
+		}
+		else
+		{
+			THROW_SYS_FILE_ERROR("Failed to open file", mFileName,
+				CommonException, OSFileOpenError);
+		}
+#endif
 	}
 }
 
