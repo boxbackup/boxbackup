@@ -239,6 +239,23 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
 }
 
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP() if (!setUp(__FUNCTION__)) return true; // skip this test
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_backupstore()
+{
+	bool status = tearDown();
+
+	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
+	{
+		TEST_THAT_OR(check_reference_counts(), status = false);
+		TEST_THAT_OR(check_account(), status = false);
+	}
+
+	return status;
+}
+
 bool test_filename_encoding()
 {
 	SETUP();
@@ -322,8 +339,7 @@ bool test_filename_encoding()
 		}
 	}
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_backupstore_directory()
@@ -409,7 +425,7 @@ bool test_backupstore_directory()
 		}
 	}
 
-	return tearDown();
+	return teardown_test_backupstore();
 }
 
 void write_test_file(int t)
@@ -655,6 +671,8 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 		}
 	}
 }
+
+TLSContext context;
 
 void recursive_count_objects(const char *hostname, int64_t id, recursive_count_objects_results &results)
 {
@@ -1096,9 +1114,8 @@ bool test_server_housekeeping()
 	protocol.QueryFinished();
 	TEST_THAT(run_housekeeping_and_check_account());
 
-	ExpectedRefCounts.resize(3); // stop test failure in tearDown()
-	tearDown();
-	return true;
+	ExpectedRefCounts.resize(3); // stop test failure in teardown_test_backupstore()
+	return teardown_test_backupstore();
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
@@ -1174,7 +1191,6 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 
 bool test_multiple_uploads()
 {
-	TLSContext context;
 	SETUP();
 	TEST_THAT_THROWONFAIL(StartServer());
 
@@ -1806,8 +1822,7 @@ bool test_multiple_uploads()
 		apProtocol->QueryFinished();
 	}
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
@@ -1988,8 +2003,8 @@ bool test_directory_parent_entry_tracks_directory_size()
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
 	protocolReadOnly.QueryFinished();
-	tearDown();
-	return true;
+
+	return teardown_test_backupstore();
 }
 
 bool test_cannot_open_multiple_writable_connections()
@@ -2024,8 +2039,8 @@ bool test_cannot_open_multiple_writable_connections()
 	TEST_EQUAL(0x8732523ab23aLL,
 		assert_readonly_connection_succeeds(protocolReadOnly2));
 
-	tearDown();
-	return true;
+	protocolWritable.QueryFinished();
+	return teardown_test_backupstore();
 }
 
 bool test_encoding()
@@ -2185,8 +2200,7 @@ bool test_encoding()
 		}
 	}
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_symlinks()
@@ -2213,7 +2227,7 @@ bool test_symlinks()
 			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
 			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 		}
-	tearDown();	
+	teardown_test_backupstore();	
 #endif
 
 	return true;
@@ -2270,11 +2284,8 @@ bool test_store_info()
 		TEST_THAT(delfiles[1] == 4);
 	}
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
-
-TLSContext context;
 
 bool test_login_without_account()
 {
@@ -2301,11 +2312,10 @@ bool test_login_without_account()
 		protocol.QueryFinished();
 	}
 
-	// Recreate the account so that tearDown() doesn't freak out
+	// Recreate the account so that teardown_test_backupstore() doesn't freak out
 	// TEST_THAT_THROWONFAIL(create_account(10000, 20000));
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_bbstoreaccounts_create()
@@ -2320,8 +2330,7 @@ bool test_bbstoreaccounts_create()
 		"10000B 20000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_bbstoreaccounts_delete()
@@ -2331,11 +2340,10 @@ bool test_bbstoreaccounts_delete()
 		" -c testfiles/bbstored.conf -Wwarning delete 01234567 yes") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-	// Recreate the account so that tearDown() doesn't freak out
+	// Recreate the account so that teardown_test_backupstore() doesn't freak out
 	TEST_THAT_THROWONFAIL(create_account(10000, 20000));
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 // Test that login fails on a disabled account 
@@ -2383,8 +2391,7 @@ bool test_login_with_disabled_account()
 		protocol.QueryFinished();
 	}
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_login_with_no_refcount_db()
@@ -2448,8 +2455,7 @@ bool test_login_with_no_refcount_db()
 	run_housekeeping(account);
 	apReferences = BackupStoreRefCountDatabase::Load(account, true);
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_housekeeping_deletes_files()
@@ -2517,16 +2523,15 @@ bool test_housekeeping_deletes_files()
 	TEST_EQUAL(0, after.old);
 
 	// Adjust reference counts on deleted files, so that the final checks in
-	// tearDown() don't fail.
+	// teardown_test_backupstore() don't fail.
 	ExpectedRefCounts.resize(2);
 
-	// Delete the account to stop tearDown from checking it. TODO FIXME
-	// I'm aware of the block count mismatch that tearDown catches and
-	// will investigate.
+	// Delete the account to stop teardown_test_backupstore from checking it.
+	// TODO FIXME investigate the block count mismatch that teardown_test_backupstore
+	// catches if we don't delete the account.
 	delete_account();
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 bool test_account_limits_respected()
@@ -2574,8 +2579,7 @@ bool test_account_limits_respected()
 		protocol.QueryFinished();
 	}
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 int multi_server()
@@ -2914,14 +2918,13 @@ bool test_read_old_backupstoreinfo_files()
 		"BackupStoreInfo::CreateForRegeneration and reloaded", info_v1,
 		*apInfo, "spurtle", false /* AccountEnabled */, extra_data);
 
-	// Delete the account to stop tearDown checking it for errors.
+	// Delete the account to stop teardown_test_backupstore checking it for errors.
 	apInfo.reset();
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf delete 01234567 yes") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-	tearDown();
-	return true;
+	return teardown_test_backupstore();
 }
 
 int test(int argc, const char *argv[])

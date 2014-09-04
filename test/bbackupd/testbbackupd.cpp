@@ -437,7 +437,47 @@ bool kill_running_daemons()
 	return true;
 }
 
+bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
+	bool do_start_bbstored = true)
+{
+	Timers::Cleanup(false); // don't throw exception if not initialised
+	Timers::Init();
+
+	if (do_start_bbstored)
+	{
+		TEST_THAT_OR(StartServer(), FAIL);
+	}
+
+	if (do_unpack_files)
+	{
+		TEST_THAT_OR(unpack_files("test_base"), FAIL);
+	}
+
+	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
+		FAIL);
+	spDaemon = &bbackupd;
+	return true;
+}
+
 int num_tests_selected = 0;
+
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP() \
+	TEST_THAT(kill_running_daemons()); \
+	if (!setUp(__FUNCTION__)) return true; \
+	num_tests_selected++; \
+	int old_failure_count = failures;
+
+#define SETUP_WITHOUT_FILES() \
+	SETUP() \
+	BackupDaemon bbackupd; \
+	TEST_THAT_OR(setup_test_bbackupd(bbackupd, false), FAIL); \
+	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
+
+#define SETUP_WITH_BBSTORED() \
+	SETUP() \
+	BackupDaemon bbackupd; \
+	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
@@ -461,8 +501,13 @@ bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
 	return tearDown();
 }
 
+#define TEARDOWN() \
+	return teardown_test_bbackupd(__FUNCTION__, old_failure_count);
+
 bool test_basics()
 {
+	SETUP();
+
 	// Read attributes from files
 	BackupClientFileAttributes t1;
 	t1.ReadAttributes("testfiles/test1");
@@ -578,7 +623,7 @@ bool test_basics()
 	finish_with_write_xattr_test();
 #endif // HAVE_SYS_XATTR_H
 
-	return false;
+	TEARDOWN();
 }
 
 int64_t GetDirID(BackupProtocolCallable &protocol, const char *name, int64_t InDirectory)
@@ -3941,11 +3986,6 @@ int test(int argc, const char *argv[])
 			"| ( cd testfiles && tar xf - )") == 0);
 	#endif
 
-	// Do the tests
-
-	int r = test_basics();
-	if(r != 0) return r;
-
 	{
 		std::string errs;
 		std::auto_ptr<Configuration> config(
@@ -3959,10 +3999,10 @@ int test(int argc, const char *argv[])
 		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 	}
 
-	r = (create_account(1000, 2000) ? 0 : 1);
-	if(r != 0) return r;
+	// Do the tests
+	TEST_THAT(test_basics());
 
-	r = (StartServer() ? 0 : 1);
+	int r = (StartServer() ? 0 : 1);
 	TEST_THAT(r == 0);
 	if(r != 0) return r;
 	
