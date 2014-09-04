@@ -761,22 +761,6 @@ std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
 	return RaidFileRead::Open(0, filename);
 }
 
-bool check_num_files(int files, int old, int deleted, int dirs);
-bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
-	int Deleted, int Dirs, int Total);
-
-bool change_account_limits(const char* soft, const char* hard)
-{
-	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify
-			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountsControl control(*config);
-	int result = control.SetLimit(0x01234567, soft, hard);
-	TEST_EQUAL(0, result);
-	return (result == 0);
-}
-
 int64_t create_directory(BackupProtocolCallable& protocol,
 	int64_t parent_dir_id = BACKUPSTORE_ROOT_DIRECTORY_ID);
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
@@ -805,14 +789,8 @@ bool test_server_housekeeping()
 
 	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
 		0, false);
-
-	std::string root_dir_fn;
-	StoreStructure::MakeObjectFilename(
-		BackupProtocolListDirectory::RootDirectory, 
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
-		root_dir_fn, false /* EnsureDirectoryExists */);
-	std::auto_ptr<RaidFileRead> storedFile(RaidFileRead::Open(0, root_dir_fn));
-	int root_dir_blocks = storedFile->GetDiscUsageInBlocks();
+	
+	int root_dir_blocks = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID)->GetDiscUsageInBlocks();
 	TEST_THAT(check_num_files(0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
 		root_dir_blocks));
@@ -1197,14 +1175,14 @@ bool test_multiple_uploads()
 	SETUP();
 	TEST_THAT_THROWONFAIL(StartServer());
 
-	std::auto_ptr<BackupProtocolCallable> apProtocol(
-		test_server_login("localhost", context).release());
+	std::auto_ptr<BackupProtocolCallable> apProtocol =
+		connect_and_login(context);
 
 #ifndef WIN32
 	// Open a new connection which is read only
 	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
 	std::auto_ptr<BackupProtocolCallable> apProtocolReadOnly =
-		test_server_login("localhost", context,
+		connect_and_login(context,
 			BackupProtocolLogin::Flags_ReadOnly);
 	BackupProtocolCallable& protocolReadOnly(*apProtocolReadOnly);
 #else // WIN32
@@ -1287,7 +1265,7 @@ bool test_multiple_uploads()
 
 			apProtocol->QueryFinished();
 			TEST_THAT(run_housekeeping_and_check_account());
-			apProtocol = test_server_login("localhost", context);
+			apProtocol = connect_and_login(context);
 
 			TEST_THAT(check_num_files(expected_num_current_files,
 				expected_num_old_files, 0, 1));
@@ -1392,7 +1370,7 @@ bool test_multiple_uploads()
 			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-		apProtocol = test_server_login("localhost", context);
+		apProtocol = connect_and_login(context);
 
 		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 
@@ -1697,7 +1675,7 @@ bool test_multiple_uploads()
 
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = test_server_login("localhost", context);
+		apProtocol = connect_and_login(context);
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
@@ -2421,10 +2399,9 @@ bool test_login_with_no_refcount_db()
 	// we're locked out of the account until housekeeping has recreated
 	// the refcount db.
 	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
-
-	TEST_CHECK_THROWS(test_server_login("localhost", context),
-		ConnectionException, TLSReadFailed);
-	TEST_THAT(ServerIsAlive(bbstored_pid));
+	TEST_CHECK_THROWS(BackupProtocolLocal2 protocolLocal(0x01234567,
+		"test", "backup/01234567/", 0, false), // Not read-only
+		BackupStoreException, CorruptReferenceCountDatabase);
 
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
