@@ -72,7 +72,7 @@
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-BackupQueries::BackupQueries(BackupProtocolClient &rConnection,
+BackupQueries::BackupQueries(BackupProtocolCallable &rConnection,
 	const Configuration &rConfiguration, bool readWrite)
 	: mReadWrite(readWrite),
 	  mrConnection(rConnection),

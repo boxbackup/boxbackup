@@ -1096,7 +1096,7 @@ int test_bbackupd()
 	printf("\n==== Testing that ReadDirectory on nonexistent directory "
 		"does not crash\n");
 	{
-		std::auto_ptr<BackupProtocolClient> client = ConnectAndLogin(
+		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
 			context, 0 /* read-write */);
 		
 		{
@@ -1113,8 +1113,8 @@ int test_bbackupd()
 	printf("\n==== Testing that GetObject on nonexistent file outputs the "
 		"correct error message\n");
 	{
-		std::auto_ptr<BackupProtocolClient> connection = ConnectAndLogin(
-			context, 0 /* read-write */);
+		std::auto_ptr<BackupProtocolCallable> connection =
+			connect_and_login(context, 0 /* read-write */);
 		std::string errs;
 		std::auto_ptr<Configuration> config(
 			Configuration::LoadAndVerify
@@ -1520,8 +1520,8 @@ int test_bbackupd()
 		int expected_blocks_old = 6;
 #endif
 
-		std::auto_ptr<BackupProtocolClient> client =
-			ConnectAndLogin(context, 0 /* read-write */);
+		std::auto_ptr<BackupProtocolCallable> client =
+			connect_and_login(context, 0 /* read-write */);
 		TEST_THAT(check_num_files(5, expected_num_old, 0, 9));
 		TEST_THAT(check_num_blocks(*client, 10, expected_blocks_old,
 			0, 18, 28 + expected_blocks_old));
@@ -2188,9 +2188,9 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-finish.2"));
 		
 		// Did it actually get created? Should not have been!
-		std::auto_ptr<BackupProtocolClient> client =
-			ConnectAndLogin(context,
-			BackupProtocolLogin::Flags_ReadOnly);
+		std::auto_ptr<BackupProtocolCallable> client =
+			connect_and_login(context,
+				BackupProtocolLogin::Flags_ReadOnly);
 		
 		std::auto_ptr<BackupStoreDirectory> dir = 
 			ReadDirectory(*client);
@@ -2218,9 +2218,9 @@ int test_bbackupd()
 
 	// BLOCK
 	{
-		std::auto_ptr<BackupProtocolClient> client =
-			ConnectAndLogin(context,
-			BackupProtocolLogin::Flags_ReadOnly);
+		std::auto_ptr<BackupProtocolCallable> client =
+			connect_and_login(context,
+				BackupProtocolLogin::Flags_ReadOnly);
 		
 		std::auto_ptr<BackupStoreDirectory> dir = 
 			ReadDirectory(*client,
@@ -2260,10 +2260,10 @@ int test_bbackupd()
 		// not yet! should still be there
 
 		{
-			std::auto_ptr<BackupProtocolClient> client =
-				ConnectAndLogin(context,
-				BackupProtocolLogin::Flags_ReadOnly);
-			
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context,
+					BackupProtocolLogin::Flags_ReadOnly);
+
 			std::auto_ptr<BackupStoreDirectory> dir = 
 				ReadDirectory(*client);
 			int64_t testDirId = SearchDir(*dir, "Test2");
@@ -2277,10 +2277,10 @@ int test_bbackupd()
 		// NOW it should be gone
 
 		{
-			std::auto_ptr<BackupProtocolClient> client =
-				ConnectAndLogin(context,
-				BackupProtocolLogin::Flags_ReadOnly);
-			
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context,
+					BackupProtocolLogin::Flags_ReadOnly);
+
 			std::auto_ptr<BackupStoreDirectory> root_dir = 
 				ReadDirectory(*client);
 
@@ -3738,9 +3738,9 @@ int test_bbackupd()
 
 			printf("\n==== Resume restore\n");
 
-			std::auto_ptr<BackupProtocolClient> client = 
-				ConnectAndLogin(context,
-				BackupProtocolLogin::Flags_ReadOnly);
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context,
+					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Check that the restore fn returns resume possible,
 			// rather than doing anything

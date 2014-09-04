@@ -711,7 +711,7 @@ void BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::
 	if(updateAttr)
 	{
 		// Get connection to store
-		BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+		BackupProtocolCallable &connection(rParams.mrContext.GetConnection());
 
 		// Exception thrown if this doesn't work
 		std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
@@ -898,7 +898,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 							// Therefore we can safely rename it to this new file.
 
 							// Get the connection to the server 
-							BackupProtocolClient &connection(rContext.GetConnection());
+							BackupProtocolCallable &connection(rContext.GetConnection());
 
 							// Only do this step if there is room on the server.
 							// This step will be repeated later when there is space available
@@ -1169,7 +1169,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// been downloaded, and the entry will be available.
 
 			// Get connection
-			BackupProtocolClient &connection(rContext.GetConnection());
+			BackupProtocolCallable &connection(rContext.GetConnection());
 
 			// Only do this step if there is room on the server.
 			// This step will be repeated later when there is
@@ -1327,7 +1327,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		{
 			// Entry exists, but is not a directory. Bad.
 			// Get rid of it.
-			BackupProtocolClient &connection(rContext.GetConnection());
+			BackupProtocolCallable &connection(rContext.GetConnection());
 			connection.QueryDeleteFile(mObjectID /* in directory */, storeFilename);
 
 			std::string filenameClear = DecryptFilename(en,
@@ -1577,7 +1577,7 @@ int64_t BackupClientDirectoryRecord::CreateRemoteDir(const std::string& localDir
 	}
 
 	// Get connection
-	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+	BackupProtocolCallable &connection(rParams.mrContext.GetConnection());
 
 	// Don't do a check for storage limit exceeded here, because if we get to this
 	// stage, a connection will have been opened, and the status known, so the check
@@ -1668,7 +1668,7 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(
 	const std::string &rFilename)
 {
 	// First, delete the directory
-	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+	BackupProtocolCallable &connection(rParams.mrContext.GetConnection());
 	connection.QueryDeleteDirectory(pEntry->GetObjectID());
 
 	BackupStoreFilenameClear clear(pEntry->GetName());
@@ -1720,7 +1720,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 	ProgressNotifier& rNotifier(rContext.GetProgressNotifier());
 
 	// Get the connection
-	BackupProtocolClient &connection(rContext.GetConnection());
+	BackupProtocolCallable &connection(rContext.GetConnection());
 
 	// Info
 	int64_t objID = 0;

@@ -58,7 +58,7 @@ private:
 	BackupClientContext(const BackupClientContext &);
 public:
 
-	BackupProtocolClient &GetConnection();
+	virtual BackupProtocolCallable &GetConnection();
 	void CloseAnyOpenConnection();
 	int GetTimeout() const;
 	BackupClientDeleteList &GetDeleteList();
@@ -223,7 +223,7 @@ private:
 	std::string mHostname;
 	int mPort;
 	uint32_t mAccountNumber;
-	std::auto_ptr<BackupProtocolClient> mapConnection;
+	std::auto_ptr<BackupProtocolCallable> mapConnection;
 	bool mExtendedLogging;
 	bool mExtendedLogToFile;
 	std::string mExtendedLogFile;

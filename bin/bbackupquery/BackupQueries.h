@@ -18,7 +18,7 @@
 #include "BoxBackupCompareParams.h"
 #include "BackupStoreDirectory.h"
 
-class BackupProtocolClient;
+class BackupProtocolCallable;
 class Configuration;
 class ExcludeList;
 
@@ -55,7 +55,7 @@ struct QueryCommandSpecification;
 class BackupQueries
 {
 public:
-	BackupQueries(BackupProtocolClient &rConnection,
+	BackupQueries(BackupProtocolCallable &rConnection,
 		const Configuration &rConfiguration,
 		bool readWrite);
 	~BackupQueries();
@@ -396,7 +396,7 @@ private:
 
 private:
 	bool mReadWrite;
-	BackupProtocolClient &mrConnection;
+	BackupProtocolCallable &mrConnection;
 	const Configuration &mrConfiguration;
 	bool mQuitNow;
 	std::vector<std::pair<std::string, int64_t> > mDirStack;
@@ -407,14 +407,14 @@ private:
 
 typedef std::vector<std::string> (*CompletionHandler)
 	(BackupQueries::ParsedCommand& rCommand, const std::string& prefix,
-	BackupProtocolClient& rProtocol, const Configuration& rConfig,
+	BackupProtocolCallable& rProtocol, const Configuration& rConfig,
 	BackupQueries& rQueries);
 
 std::vector<std::string> CompleteCommand(BackupQueries::ParsedCommand& rCommand,
-	const std::string& prefix, BackupProtocolClient& rProtocol,
+	const std::string& prefix, BackupProtocolCallable& rProtocol,
 	const Configuration& rConfig, BackupQueries& rQueries);
 std::vector<std::string> CompleteOptions(BackupQueries::ParsedCommand& rCommand,
-	const std::string& prefix, BackupProtocolClient& rProtocol,
+	const std::string& prefix, BackupProtocolCallable& rProtocol,
 	const Configuration& rConfig, BackupQueries& rQueries);
 
 #define MAX_COMPLETION_HANDLERS 4
