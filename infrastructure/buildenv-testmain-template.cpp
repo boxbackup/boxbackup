@@ -407,7 +407,7 @@ int main(int argc, char * const * argv)
 
 		Timers::Init();
 		int returncode = test(argc, (const char **)argv);
-		Timers::Cleanup();
+		Timers::Cleanup(false);
 
 		fflush(stdout);
 		fflush(stderr);
