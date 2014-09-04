@@ -42,12 +42,12 @@
 	#include <sys/syscall.h>
 #endif
 
-#include "autogen_BackupProtocol.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupClientRestore.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
+#include "BackupProtocol.h"
 #include "BackupQueries.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreConstants.h"
@@ -491,7 +491,7 @@ bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
 	else
 	{
 		BOX_NOTICE(test_name << " failed"); \
-		s_test_status[test_name] = "failed";
+		s_test_status[test_name] = "FAILED";
 	}
 
 	if(bbackupd_pid != 0)
@@ -508,6 +508,7 @@ bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
 bool test_basics()
 {
 	SETUP();
+	TEST_THAT_OR(unpack_files("test_base"), FAIL);
 
 	// Read attributes from files
 	BackupClientFileAttributes t1;
@@ -937,7 +938,10 @@ extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
 #endif
 
 	// sleep a bit to reduce the number of dirents returned
-	::safe_sleep(1);
+	if (time_now < readdir_stop_time)
+	{
+		::safe_sleep(1);
+	}
 
 	return &readdir_test_dirent;
 }
@@ -1066,20 +1070,10 @@ bool search_for_file(const std::string& filename)
 	return (testDirId != 0);
 }
 
-int test_bbackupd()
+bool test_readdirectory_on_nonexistent_dir()
 {
-	// First, wait for a normal period to make sure the last changes 
-	// attributes are within a normal backup timeframe.
-	// wait_for_backup_operation();
+	SETUP_WITH_BBSTORED();
 
-	// Connection gubbins
-	context.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
-
-	printf("\n==== Testing that ReadDirectory on nonexistent directory "
-		"does not crash\n");
 	{
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
 			context, 0 /* read-write */);
@@ -1095,15 +1089,21 @@ int test_bbackupd()
 		client->QueryFinished();
 	}
 
-	printf("\n==== Testing that GetObject on nonexistent file outputs the "
-		"correct error message\n");
+	TEARDOWN();
+}
+
+bool test_getobject_on_nonexistent_file()
+{
+	SETUP_WITH_BBSTORED();
+
 	{
-		std::auto_ptr<BackupProtocolCallable> connection =
-			connect_and_login(context, 0 /* read-write */);
 		std::string errs;
 		std::auto_ptr<Configuration> config(
 			Configuration::LoadAndVerify
 				("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
+
+		std::auto_ptr<BackupProtocolCallable> connection =
+			connect_and_login(context, 0 /* read-write */);
 		BackupQueries query(*connection, *config, false); // read-only
 		std::vector<std::string> args;
 		args.push_back("2"); // object ID
@@ -1123,33 +1123,29 @@ int test_bbackupd()
 		}
 	}
 		
-	// unpack the files for the initial test
-	TEST_THAT(::system("rm -rf testfiles/TestDir1") == 0);
-	TEST_THAT(::mkdir("testfiles/TestDir1", 0777) == 0);
+	TEARDOWN();
+}
 
-	#ifdef WIN32
-		TEST_THAT(::system("tar xzvf testfiles/spacetest1.tgz "
-			"-C testfiles/TestDir1") == 0);
-	#else
-		TEST_THAT(::system("gzip -d < testfiles/spacetest1.tgz "
-			"| ( cd testfiles/TestDir1 && tar xf - )") == 0);
-	#endif
+bool test_ssl_keepalives()
+{
+	SETUP_WITH_BBSTORED();
 
 #ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-	printf("\n==== Skipping intercept-based KeepAlive tests "
-		"on this platform.\n");
+	BOX_NOTICE("Skipping intercept-based KeepAlive tests on this platform");
 #else
-	printf("\n==== Testing SSL KeepAlive messages\n");
+	// Delete the test_base files unpacked by SETUP()
+	TEST_THAT(::system("rm -r testfiles/TestDir1") == 0);
+	// Unpack spacetest files instead
+	TEST_THAT(::mkdir("testfiles/TestDir1", 0755) == 0);
+	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 
+	// TODO FIXME dedent
 	{
 		#ifdef WIN32
 		#error TODO: implement threads on Win32, or this test \
 			will not finish properly
 		#endif
 
-		// bbackupd daemon will try to initialise timers itself
-		Timers::Cleanup();
-		
 		// something to diff against (empty file doesn't work)
 		int fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 		TEST_THAT(fd > 0);
@@ -1161,35 +1157,42 @@ int test_bbackupd()
 			write(fd, buffer, sizeof(buffer)),
 			"Buffer write");
 		TEST_THAT(close(fd) == 0);
-		
-		int pid = start_internal_daemon();
-		wait_for_backup_operation("internal daemon to run a sync");
-		TEST_THAT(stop_internal_daemon(pid));
+
+		wait_for_operation(5, "f1 to be old enough");
+	}
+	
+	// sleep to make it old enough to upload
+	// is this really necessary? the files have old timestamps.
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
+		#ifdef WIN32
+		#error TODO: implement threads on Win32, or this test \
+			will not finish properly
+		#endif
+
+		TEST_THAT(unlink("testfiles/bbackupd.log") == 0);
+
+		// write again, to update the file's timestamp
+		int fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
+		TEST_THAT(fd > 0);
+		char buffer[10000];
+		memset(buffer, 0, sizeof(buffer));
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
+		TEST_THAT(close(fd) == 0);
+		wait_for_operation(5, "modified file to be old enough");
 
 		// two-second delay on the first read() of f1
 		// should mean that a single keepalive is sent,
 		// and diff does not abort.
-		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
+		intercept_setup_delay("testfiles/TestDir1/spacetest/f1",
 			0, 2000, SYS_read, 1);
-		TEST_THAT(unlink("testfiles/bbackupd.log") == 0);
-
-		pid = start_internal_daemon();
+		bbackupd.RunSyncNow();
+		TEST_THAT(intercept_triggered());
 		intercept_clear_setup();
-		
-		fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
-		TEST_THAT(fd > 0);
-		// write again, to update the file's timestamp
-		TEST_EQUAL_LINE(sizeof(buffer),
-			write(fd, buffer, sizeof(buffer)),
-			"Buffer write");
-		TEST_THAT(close(fd) == 0);	
-
-		wait_for_backup_operation("internal daemon to sync "
-			"spacetest/f1");
-		// can't test whether intercept was triggered, because
-		// it's in a different process.
-		// TEST_THAT(intercept_triggered());
-		TEST_THAT(stop_internal_daemon(pid));
 
 		// check that keepalive was written to logs, and
 		// diff was not aborted, i.e. upload was a diff
@@ -1208,8 +1211,8 @@ int test_bbackupd()
 			}
 		}
 
-		TEST_THAT(found1);
-		if (found1)
+		TEST_THAT_OR(found1, FAIL);
+		// TODO FIXME dedent
 		{
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
@@ -1235,12 +1238,6 @@ int test_bbackupd()
 			TEST_LINE(comp2 != sub, line);
 		}
 
-		// Remaining tests require timer system to be initialised already
-		Timers::Init();
-		
-		// stop early to make debugging easier
-		if (failures) return 1;
-
 		// four-second delay on first read() of f1
 		// should mean that no keepalives were sent,
 		// because diff was immediately aborted
@@ -1249,10 +1246,6 @@ int test_bbackupd()
 			0, 4000, SYS_read, 1);
 		
 		{
-			BackupDaemon bbackupd;
-			bbackupd.Configure("testfiles/bbackupd.conf");
-			bbackupd.InitCrypto();
-		
 			fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
 			TEST_THAT(fd > 0);
 			// write again, to update the file's timestamp
@@ -1282,8 +1275,8 @@ int test_bbackupd()
 			}
 		}
 
-		TEST_THAT(found1);
-		if (found1)
+		TEST_THAT_OR(found1, FAIL);
+		// TODO FIXME dedent
 		{
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
@@ -1307,18 +1300,8 @@ int test_bbackupd()
 			TEST_EQUAL_LINE(comp, sub, line);
 		}
 
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
-
 		// Test that keepalives are sent while reading files
 		{
-			BackupDaemon bbackupd;
-			bbackupd.Configure("testfiles/bbackupd.conf");
-			bbackupd.InitCrypto();
-		
 			intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
 				0, 1000, SYS_read, 3);
 
@@ -1344,8 +1327,8 @@ int test_bbackupd()
 			}
 		}
 
-		TEST_THAT(found1);
-		if (found1)
+		TEST_THAT_OR(found1, FAIL);
+		// TODO FIXME dedent
 		{
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
@@ -1388,24 +1371,16 @@ int test_bbackupd()
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+	}
 
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			Timers::Init();
-			return 1;
-		}
-
+	{
 		// Test that keepalives are sent while reading large directories
 		{
-			BackupDaemon bbackupd;
-			bbackupd.Configure("testfiles/bbackupd.conf");
-			bbackupd.InitCrypto();
-	
 			intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
 				readdir_test_hook_2);
-			// time for at least two keepalives
-			readdir_stop_time = time(NULL) + 12 + 2;
+			// time for two keepalives
+			readdir_stop_time = time(NULL) + 2;
+			TEST_THAT(::unlink("testfiles/bbackupd.log") == 0);
 
 			bbackupd.RunSyncNow();
 			TEST_THAT(intercept_triggered());
@@ -1413,65 +1388,21 @@ int test_bbackupd()
 		}
 
 		// check that keepalives were sent during the dir search
-		found1 = false;
-
-		// skip to next login
-		while (!reader.IsEOF())
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			if (line == "Send ListDirectory(0x3,0xffff,0xc,true)")
-			{
-				found1 = true;
-				break;
-			}
-		}
-
-		TEST_THAT(found1);
-		if (found1)
-		{
-			found1 = false;
-
-			while (!reader.IsEOF())
-			{
-				std::string line;
-				TEST_THAT(reader.GetLine(line));
-				if (line == "Send ListDirectory(0x3,0xffffffff,0xc,true)")
-				{
-					found1 = true;
-					break;
-				}
-			}
-		}
-
-		if (found1)
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive Success(0x3)", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 425", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line);
-		}
-
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			Timers::Init();
-			return 1;
-		}
-	}
-#endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-
-	// Check that no read error has been reported yet
-	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+		FileStream fs("testfiles/bbackupd.log", O_RDONLY);
+		IOStreamGetLine reader(fs);
+		TEST_EQUAL("Send Version(0x1)", reader.GetLine());
+		TEST_EQUAL("Receive Version(0x1)", reader.GetLine());
+		TEST_EQUAL("Send Login(0x1234567,0x0)", reader.GetLine());
+		TEST_STARTSWITH("Receive LoginConfirmed(", reader.GetLine());
+		TEST_EQUAL("Send ListDirectory(0x1,0x2,0xc,false)", reader.GetLine());
+		TEST_EQUAL("Receive Success(0x1)", reader.GetLine());
+		TEST_STARTSWITH("Receiving stream, size ", reader.GetLine());
+		TEST_EQUAL("Send GetIsAlive()", reader.GetLine());
+		TEST_EQUAL("Receive IsAlive()", reader.GetLine());
+		TEST_EQUAL("Send GetIsAlive()", reader.GetLine());
+		TEST_EQUAL("Receive IsAlive()", reader.GetLine());
+		TEST_EQUAL("Send ListDirectory(0x6,0xffff,0xc,true)",
+			reader.GetLine()); // finished reading dir, download to compare
 
 	// The following files should be on the server:
 	// 00000001 -d---- 00002 (root)
@@ -1493,54 +1424,42 @@ int test_bbackupd()
 	// 00000011 f----- 00002 Test1/spacetest/f1
 	// This is 34 blocks total.
 
-	// BLOCK
-	{
-#ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-		// No diffs were created, because intercept tests were skipped
-		int expected_num_old = 0;
-		int expected_blocks_old = 0;
-#else // !PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-		// Some diffs were created by the intercept tests above
-		int expected_num_old = 3;
-		int expected_blocks_old = 6;
-#endif
-
 		std::auto_ptr<BackupProtocolCallable> client =
 			connect_and_login(context, 0 /* read-write */);
-		TEST_THAT(check_num_files(5, expected_num_old, 0, 9));
-		TEST_THAT(check_num_blocks(*client, 10, expected_blocks_old,
-			0, 18, 28 + expected_blocks_old));
+		TEST_THAT(check_num_files(5, 3, 0, 9));
+		TEST_THAT(check_num_blocks(*client, 10, 6, 0, 18, 34));
 		client->QueryFinished();
 	}
+#endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
-	std::string cmd = BBACKUPD " " + bbackupd_args + 
-		" testfiles/bbackupd.conf";
+	TEARDOWN();
+}
 
-	bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-	TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-	::safe_sleep(1);
+bool test_backup_pauses_when_store_is_full()
+{
+	SETUP_WITHOUT_FILES();
+	unpack_files("spacetest1", "testfiles/TestDir1");
+	TEST_THAT_OR(StartClient(), FAIL);
 
-	TEST_THAT(ServerIsAlive(bbackupd_pid));
-	TEST_THAT(ServerIsAlive(bbstored_pid));
-	if (!ServerIsAlive(bbackupd_pid)) return 1;
-	if (!ServerIsAlive(bbstored_pid)) return 1;
-	if (failures) return 1;
-
-	if(bbackupd_pid > 0)
+	// TODO FIXME dedent
 	{
-		printf("\n==== Testing that backup pauses when "
-			"store is full\n");
-
 		// wait for files to be uploaded
-		BOX_TRACE("Waiting for all outstanding files to be uploaded")
+		BOX_TRACE("Waiting for all outstanding files to be uploaded...")
 		wait_for_sync_end();
 		BOX_TRACE("Done. Comparing to check that it worked...")
 		TEST_COMPARE(Compare_Same);
 
-		// Set limit to something very small
-		// 26 blocks will be used at this point.
-		// (12 files + location * 2 for raidfile)
-		// 20 is what we'll need in a minute
+		// BLOCK
+		{
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context, 0 /* read-write */);
+			TEST_THAT(check_num_files(5, 0, 0, 9));
+			TEST_THAT(check_num_blocks(*client, 10, 0, 0, 18, 28));
+			client->QueryFinished();
+		}
+
+		// Set limit to something very small.
+		// 28 blocks are used at this point.
 		// set soft limit to 0 to ensure that all deleted files
 		// are deleted immediately by housekeeping
 		TEST_THAT(change_account_limits("0B", "20B"));
@@ -1595,15 +1514,76 @@ int test_bbackupd()
 		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
 		// But only once!
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
-		
-		// Kill the daemon
-		terminate_bbackupd(bbackupd_pid);
 
-		wait_for_operation(5, "housekeeping to remove the "
-			"deleted files");
+		// BLOCK
+		{
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context, 0 /* read-write */);
+			std::auto_ptr<BackupStoreDirectory> root_dir =
+				ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
 
-		// This removes f1 and d7, which were previously marked
-		// as deleted, so total usage drops by 4 blocks to 24.
+			int64_t test_dir_id = SearchDir(*root_dir, "Test1");
+			TEST_THAT_OR(test_dir_id, FAIL);
+			std::auto_ptr<BackupStoreDirectory> test_dir =
+				ReadDirectory(*client, test_dir_id);
+
+			int64_t spacetest_dir_id = SearchDir(*test_dir, "spacetest");
+			TEST_THAT_OR(spacetest_dir_id, FAIL);
+			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
+				ReadDirectory(*client, spacetest_dir_id);
+
+			int64_t d2_id = SearchDir(*spacetest_dir, "d2");
+			int64_t d6_id = SearchDir(*spacetest_dir, "d6");
+			TEST_THAT_OR(d2_id != 0, FAIL);
+			TEST_THAT_OR(d6_id != 0, FAIL);
+			std::auto_ptr<BackupStoreDirectory> d2_dir =
+				ReadDirectory(*client, d2_id);
+			std::auto_ptr<BackupStoreDirectory> d6_dir =
+				ReadDirectory(*client, d6_id);
+
+			// None of the new files should have been uploaded
+			TEST_EQUAL(SearchDir(*d2_dir, "f6"), 0);
+			TEST_EQUAL(SearchDir(*d6_dir, "d8"), 0);
+
+			// But f1 and d7 should have been marked as deleted
+			// (but not actually deleted yet)
+			TEST_THAT(test_entry_deleted(*spacetest_dir, "f1"))
+			TEST_THAT(test_entry_deleted(*spacetest_dir, "d7"))
+
+			TEST_THAT(check_num_files(4, 0, 1, 9));
+			TEST_THAT(check_num_blocks(*client, 8, 0, 2, 18, 28));
+			client->QueryFinished();
+		}
+	}
+
+	// Increase the limit again, check that all files are backed up on the
+	// next run.
+	TEST_THAT(change_account_limits("0B", "34B"));
+	wait_for_sync_end();
+	TEST_COMPARE(Compare_Same);
+
+	TEARDOWN();
+}
+
+bool test_bbackupd_exclusions()
+{
+	SETUP_WITHOUT_FILES();
+
+	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
+	// Delete a file and a directory
+	TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+	TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+
+	// We need to be OVER the limit, i.e. >24 blocks, or
+	// BackupClientContext will mark us over limit immediately on
+	// connection.
+	TEST_THAT(change_account_limits("0B", "25B"));
+	TEST_THAT_OR(StartClient(), FAIL);
+
+	// Initial run to get the files backed up
+	{
+		bbackupd.RunSyncNow();
+		TEST_THAT(!bbackupd.StorageLimitExceeded());
 
 		// BLOCK
 		{
@@ -1613,40 +1593,48 @@ int test_bbackupd()
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
 		}
+	}
 
-		if (failures) return 1;
+	// Create a directory and then try to run a backup. This should try
+	// to create the directory on the server, fail, and catch the error.
+	// The directory that we create, spacetest/d6/d8, is included in
+	// spacetest2.tgz, so we can ignore this for counting files after we
+	// unpack spacetest2.tgz.
+	TEST_THAT(::mkdir("testfiles/TestDir1/spacetest/d6/d8", 0755) == 0);
+	bbackupd.RunSyncNow();
+	TEST_THAT(bbackupd.StorageLimitExceeded());
 
-		// ensure time is different to refresh the cache
-		::safe_sleep(1);
+	// BLOCK
+	{
+		TEST_THAT(unpack_files("spacetest2", "testfiles/TestDir1"));
+		bbackupd.RunSyncNow();
+		TEST_THAT(bbackupd.StorageLimitExceeded());
 
-		BOX_TRACE("Restart bbackupd with more exclusions");
+		// BLOCK
+		{
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context, 0 /* read-write */);
+			TEST_THAT(check_num_files(4, 0, 0, 8));
+			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
+			client->QueryFinished();
+		}
+	}
+
+	// TODO FIXME dedent
+	{
 		// Start again with a new config that excludes d3 and f2,
 		// and hence also d3/d4 and d3/d4/f5. bbackupd should mark
-		// them as deleted and housekeeping should clean up,
+		// them as deleted and housekeeping should later clean up,
 		// making space to upload the new files.
 		// total required: (13-2-4+3)*2 = 20 blocks
-		/*
-		cmd = BBACKUPD " " + bbackupd_args +
-			" testfiles/bbackupd-exclude.conf";
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		*/
-
-		BackupDaemon bbackupd;
 
 		TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd-exclude.conf"));
 		// Should be marked as deleted by this run. Hold onto the
 		// BackupClientContext to stop housekeeping from running.
-		// wait_for_sync_end();
-		{
-			// Logging::Guard guard(Log::ERROR);
+		std::auto_ptr<BackupClientContext> apClientContext =
 			bbackupd.RunSyncNow();
-		}
-
+		// Housekeeping has not yet deleted the files, so there's not
+		// enough space to upload the new ones.
 		TEST_THAT(bbackupd.StorageLimitExceeded());
 
 		// Check that the notify script was run
@@ -1656,21 +1644,18 @@ int test_bbackupd()
 
 		// All these should be marked as deleted but not removed by
 		// housekeeping yet:
-		// f1		deleted
 		// f2		excluded
 		// d3		excluded
 		// d3/d4	excluded
 		// d3/d4/f5	excluded
 		// Careful with timing here, these files will be removed by
-		// housekeeping the next time it runs. On Win32, housekeeping
-		// runs immediately after disconnect, but only if enough time
-		// has elapsed since the last housekeeping. Since the
-		// backup run closely follows the last one, housekeeping
-		// should not run afterwards. On other platforms, we want to
-		// get in immediately after the backup and hope that
-		// housekeeping doesn't beat us to it.
+		// housekeeping the next time it runs. We hold onto the client
+		// context (and hence an open connection) to stop it from
+		// running for now.
 
-		BOX_TRACE("Find out whether bbackupd marked files as deleted");
+		BOX_INFO("Finding out whether bbackupd marked files as deleted");
+
+		// TODO FIXME dedent
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(context,
@@ -1706,14 +1691,14 @@ int test_bbackupd()
 			TEST_THAT(test_entry_deleted(*spacetest_dir, "d3"));
 
 			int64_t d3_id = SearchDir(*spacetest_dir, "d3");
-			TEST_THAT(d3_id != 0);
+			TEST_THAT_OR(d3_id != 0, FAIL);
 
 			std::auto_ptr<BackupStoreDirectory> d3_dir =
 				ReadDirectory(*client, d3_id);
 			TEST_THAT(test_entry_deleted(*d3_dir, "d4"));
 
 			int64_t d4_id = SearchDir(*d3_dir, "d4");
-			TEST_THAT(d4_id != 0);
+			TEST_THAT_OR(d4_id != 0, FAIL);
 
 			std::auto_ptr<BackupStoreDirectory> d4_dir =
 				ReadDirectory(*client, d4_id);
@@ -1730,17 +1715,10 @@ int test_bbackupd()
 			client->QueryFinished();
 		}
 
-		if (failures) return 1;
-
-#ifdef WIN32
-		// Housekeeping runs automatically at the end of each backup,
-		// and didn't run last time (see comments above), so run it
-		// manually.
+		// Release our BackupClientContext and open connection, and
+		// force housekeeping to run now.
+		apClientContext.reset();
 		TEST_THAT(run_housekeeping_and_check_account());
-#else
-		wait_for_operation(5, "housekeeping to remove the "
-			"deleted files");
-#endif
 
 		BOX_INFO("Checking that the files were removed");
 		{
@@ -1778,8 +1756,6 @@ int test_bbackupd()
 			client->QueryFinished();
 		}
 
-		if (failures) return 1;
-
 		// Need 22 blocks free to upload everything
 		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
 			"testfiles/bbstored.conf setlimit 01234567 0B 22B") 
@@ -1809,78 +1785,109 @@ int test_bbackupd()
 
 			client->QueryFinished();
 		}
+	}
 
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		// Put the limit back
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
-			"testfiles/bbstored.conf setlimit 01234567 "
-			"1000B 2000B") == 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-	
-		// Start again with the old config
-		BOX_TRACE("Restart bbackupd with original configuration");
-		// terminate_bbackupd();
-		cmd = BBACKUPD " " + bbackupd_args +
-			" testfiles/bbackupd.conf";
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-		::safe_sleep(1);
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-		BOX_TRACE("done.");
+bool test_bbackupd_uploads_files()
+{
+	SETUP_WITH_BBSTORED();
 
-		// unpack the initial files again
-		#ifdef WIN32
-			TEST_THAT(::system("tar xzvf testfiles/test_base.tgz "
-				"-C testfiles") == 0);
-		#else
-			TEST_THAT(::system("gzip -d < testfiles/test_base.tgz "
-				"| ( cd testfiles && tar xf - )") == 0);
-		#endif
-
-		wait_for_backup_operation("bbackupd to upload more files");
-		
-		// Check that the contents of the store are the same 
-		// as the contents of the disc 
-		// (-a = all, -c = give result in return code)
-		BOX_TRACE("Check that all files were uploaded successfully");
+	// TODO FIXME dedent
+	{
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
-		BOX_TRACE("done.");
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 	}
 
 	// Check that no read error has been reported yet
 	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
-	#ifndef WIN32 // requires fork
-	printf("\n==== Testing that bbackupd responds correctly to "
-		"connection failure\n");
+	TEARDOWN();
+}
 
+class MockClientContext : public BackupClientContext
+{
+public:
+	BackupProtocolCallable& mrClient;
+	MockClientContext
+	(
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
+		const std::string &rHostname,
+		int32_t Port,
+		uint32_t AccountNumber,
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile,
+		ProgressNotifier &rProgressNotifier,
+		bool TcpNiceMode,
+		BackupProtocolCallable& rClient
+	)
+	: BackupClientContext(rResolver, rTLSContext,
+		rHostname, Port, AccountNumber, ExtendedLogging,
+		ExtendedLogToFile, ExtendedLogFile,
+		rProgressNotifier, TcpNiceMode),
+	  mrClient(rClient)
+	{ }
+
+	BackupProtocolCallable &GetConnection()
 	{
-		// Kill the daemons
-		terminate_bbackupd(bbackupd_pid);
-		TEST_THAT(StopServer());
+		return mrClient;
+	}
+};
 
+class MockBackupDaemon : public BackupDaemon {
+	BackupProtocolCallable& mrClient;
+
+public:
+	MockBackupDaemon(BackupProtocolCallable &rClient)
+	: mrClient(rClient)
+	{ }
+
+	std::auto_ptr<BackupClientContext> GetNewContext
+	(
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
+		const std::string &rHostname,
+		int32_t Port,
+		uint32_t AccountNumber,
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile,
+		ProgressNotifier &rProgressNotifier,
+		bool TcpNiceMode
+	)
+	{
+		std::auto_ptr<BackupClientContext> context(
+			new MockClientContext(rResolver,
+				rTLSContext, rHostname, Port,
+				AccountNumber, ExtendedLogging,
+				ExtendedLogToFile, ExtendedLogFile,
+				rProgressNotifier, TcpNiceMode, mrClient));
+		return context;
+	}
+};
+
+bool test_bbackupd_responds_to_connection_failure()
+{
+	SETUP();
+	TEST_THAT_OR(unpack_files("test_base"), FAIL);
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform"); // requires fork
+#else // !WIN32
+	// TODO FIXME dedent
+	{
 		// create a new file to force an upload
 
 		const char* new_file = "testfiles/TestDir1/force-upload-2";
-		int fd = open(new_file, 
-			O_CREAT | O_EXCL | O_WRONLY, 0700);
-		if (fd <= 0)
-		{
-			perror(new_file);
-		}
-		TEST_THAT(fd > 0);
-	
+		int fd = open(new_file, O_CREAT | O_EXCL | O_WRONLY, 0700);
+		TEST_THAT_OR(fd >= 0,
+			BOX_LOG_SYS_ERROR(BOX_FILE_MESSAGE(new_file,
+				"failed to create new file"));
+			FAIL);
+
 		const char* control_string = "whee!\n";
 		TEST_THAT(write(fd, control_string, 
 			strlen(control_string)) ==
@@ -1905,49 +1912,37 @@ int test_bbackupd()
 					BackupProtocolStoreFile::TypeID)
 				{
 					// terminate badly
-					THROW_EXCEPTION(CommonException,
-						Internal);
+					trigger_count++;
+					THROW_EXCEPTION(ConnectionException,
+						TLSReadFailed);
 				}
 				return std::auto_ptr<BackupProtocolMessage>();
 			}
 		};
-		MyHook hook;
 
-		bbstored_pid = fork();
-
-		if (bbstored_pid < 0)
+		class MockBackupProtocolLocal : public BackupProtocolLocal2
 		{
-			BOX_LOG_SYS_ERROR("failed to fork()");
-			return 1;
-		}
-
-		if (bbstored_pid == 0)
-		{
-			// in fork child
-			TEST_THAT(setsid() != -1);
-
-			// BackupStoreDaemon must be destroyed before exit(),
-			// to avoid memory leaks being reported.
+		public:
+			MyHook hook;
+			MockBackupProtocolLocal(int32_t AccountNumber,
+				const std::string& ConnectionDetails,
+				const std::string& AccountRootDir, int DiscSetNumber,
+				bool ReadOnly)
+			: BackupProtocolLocal2(AccountNumber, ConnectionDetails,
+				AccountRootDir, DiscSetNumber, ReadOnly)
 			{
-				BackupStoreDaemon bbstored;
-				bbstored.SetTestHook(hook);
-				bbstored.SetSingleProcess(true);
-				bbstored.Main("testfiles/bbstored.conf");
+				GetContext().SetTestHook(hook);
 			}
+			virtual ~MockBackupProtocolLocal() { }
+		};
 
-			Timers::Cleanup(); // avoid memory leaks
-			exit(0);
-		}
-
-		// in fork parent
-		TEST_EQUAL(bbstored_pid, WaitForServerStartup("testfiles/bbstored.pid",
-			bbstored_pid));
+		MockBackupProtocolLocal client(0x01234567, "test",
+			"backup/01234567/", 0, false);
+		MockBackupDaemon bbackupd(client);
+		TEST_THAT_OR(setup_test_bbackupd(bbackupd, false, false), FAIL);
 
 		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
-
-		// Ignore SIGPIPE so that when the connection is broken,
-		// the daemon doesn't terminate.
-		::signal(SIGPIPE, SIG_IGN);
+		std::auto_ptr<BackupClientContext> apClientContext;
 
 		{
 			Console& console(Logging::GetConsole());
@@ -1958,45 +1953,31 @@ int test_bbackupd()
 				console.Filter(Log::NOTHING);
 			}
 
-			BackupDaemon bbackupd;
-			bbackupd.Configure("testfiles/bbackupd.conf");
-			bbackupd.InitCrypto();
-			bbackupd.RunSyncNowWithExceptionHandling();
+			apClientContext = bbackupd.RunSyncNowWithExceptionHandling();
 		}
 
-		::signal(SIGPIPE, SIG_DFL);
-
+		TEST_THAT_OR(apClientContext.get(), FAIL);
+		MockClientContext* pContext =
+			static_cast<MockClientContext *>(apClientContext.get());
+		// Should only have been triggered once
+		TEST_EQUAL(1, client.hook.trigger_count);
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
-
-		TEST_THAT(StopServer(true));
-
-		if (failures > 0)
-		{
-			// stop early to make debugging easier
-			return 1;
-		}
-
-		TEST_THAT(StartServer());
-
-		cmd = BBACKUPD " " + bbackupd_args +
-			" testfiles/bbackupd.conf";
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-		::safe_sleep(1);
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 	}
-	#endif // !WIN32
+#endif // !WIN32
 
-	#ifndef WIN32
-	printf("\n==== Testing that absolute symlinks are not followed "
-		"during restore\n");
+	TEARDOWN();
+}
 
+bool test_absolute_symlinks_not_followed_during_restore()
+{
+	SETUP_WITH_BBSTORED();
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform"); // requires symlinks
+#else
+	// TODO FIXME dedent
 	{
 		#define SYM_DIR "testfiles" DIRECTORY_SEPARATOR "TestDir1" \
 			DIRECTORY_SEPARATOR "symlink_test"
@@ -2029,15 +2010,11 @@ int test_bbackupd()
 		// also test symlink-to-self loop does not break restore
 		TEST_THAT(symlink("self", SYM_DIR "/self") == 0);
 
-		wait_for_operation(4, "symlinks to be old enough");
-		sync_and_wait();
+		wait_for_operation(5, "symlinks to be old enough");
+		bbackupd.RunSyncNow();
 
 		// Check that the backup was successful, i.e. no differences
 		TEST_COMPARE(Compare_Same);
-
-		// now stop bbackupd and update the test file,
-		// make the original directory unreadable
-		terminate_bbackupd(bbackupd_pid);
 
 		fp = fopen(SYM_DIR DIRECTORY_SEPARATOR "a"
 			DIRECTORY_SEPARATOR "subdir"
@@ -2070,89 +2047,23 @@ int test_bbackupd()
 		TEST_EQUAL("after", line);
 
 		#undef SYM_DIR
-
-		/*
- 		// This is not worth testing or fixing.
- 		//
-		#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-		printf("\n==== Testing that symlinks to other filesystems "
-			"can be backed up as roots\n");
-
-		intercept_setup_lstat_post_hook(lstat_test_post_hook);
-		TEST_THAT(symlink("TestDir1", "testfiles/symlink-to-TestDir1")
-			== 0);
-
-		struct stat stat_st, lstat_st;
-		TEST_THAT(stat("testfiles/symlink-to-TestDir1", &stat_st) == 0);
-		TEST_THAT(lstat("testfiles/symlink-to-TestDir1", &lstat_st) == 0);
-		TEST_EQUAL_LINE((stat_st.st_dev ^ 0xFFFF), lstat_st.st_dev,
-			"stat vs lstat");
-
-		BackupDaemon bbackupd;
-		bbackupd.Configure("testfiles/bbackupd-symlink.conf");
-		bbackupd.InitCrypto();
-		bbackupd.RunSyncNow();
-		intercept_clear_setup();
-
-		compareReturnValue = ::system(BBACKUPQUERY " "
-			"-c testfiles/bbackupd.conf "
-			"-l testfiles/query0a.log "
-			"-Wwarning \"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue,
-			BackupQueries::ReturnCode::Compare_Same);
-		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-
-		// and again using the symlink during compare
-		compareReturnValue = ::system(BBACKUPQUERY " "
-			"-c testfiles/bbackupd-symlink.conf "
-			"-l testfiles/query0a.log "
-			"-Wwarning \"compare -acQ\" quit");
-		TEST_RETURN(compareReturnValue,
-			BackupQueries::ReturnCode::Compare_Same);
-		TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-		#endif
-		*/
-
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-		::safe_sleep(1);
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 	}
-	#endif // !WIN32
+#endif
 
-	printf("\n==== Testing that nonexistent locations are backed up "
-		"if they are created later\n");
-	
+	TEARDOWN();
+}
+
+// Testing that nonexistent locations are backed up if they are created later
+bool test_initially_missing_locations_are_not_forgotten()
+{
+	SETUP_WITH_BBSTORED();
+
 	// ensure that the directory does not exist at the start
-	TEST_THAT(::system("rm -rf testfiles/TestDir2") == 0);
+	TEST_THAT(!FileExists("testfiles/TestDir2"));
+	TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd-temploc.conf"));
 
 	// BLOCK
 	{
-		// Kill the daemon
-		terminate_bbackupd(bbackupd_pid);
-
-		// Delete any old result marker files
-		TEST_RETURN(0, system("rm -f testfiles/notifyran.*"));
-
-		// Start it with a config that has a temporary location
-		// whose path does not exist yet
-		std::string cmd = BBACKUPD " " + bbackupd_args + 
-			" testfiles/bbackupd-temploc.conf";
-
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-start.1"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-start.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
@@ -2161,7 +2072,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-finish.1"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-finish.2"));
 
-		sync_and_wait();
+		bbackupd.RunSyncNowWithExceptionHandling();
 		TEST_COMPARE(Compare_Same);
 
 		TEST_THAT( TestFileExists("testfiles/notifyran.backup-start.1"));
@@ -2181,7 +2092,7 @@ int test_bbackupd()
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir2"));
 
 	// check that the files are backed up now
-	sync_and_wait();
+	bbackupd.RunSyncNowWithExceptionHandling();
 	TEST_COMPARE(Compare_Same);
 
 	TEST_THAT( TestFileExists("testfiles/notifyran.backup-start.2"));
@@ -2193,66 +2104,47 @@ int test_bbackupd()
 	TEST_THAT( TestFileExists("testfiles/notifyran.backup-finish.2"));
 	TEST_THAT(!TestFileExists("testfiles/notifyran.backup-finish.3"));
 
-	TEST_THAT_OR(search_for_file("Test2"), FAIL);
-
-	printf("\n==== Testing that redundant locations are deleted on time\n");
-
 	// BLOCK
+	TEST_THAT_OR(search_for_file("Test2"), FAIL);
+	TEARDOWN();
+}
+
+bool test_redundant_locations_deleted_on_time()
+{
+	SETUP_WITH_BBSTORED();
+
+	// create the location directory and unpack some files into it
+	TEST_THAT(::mkdir("testfiles/TestDir2", 0777) == 0);
+	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir2"));
+
+	// Use a daemon with the TestDir2 location configured to back it up
+	// to the server.
 	{
-		// Kill the daemon
-		terminate_bbackupd(bbackupd_pid);
+		TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd-temploc.conf"));
+		bbackupd.RunSyncNow();
+		TEST_COMPARE(Compare_Same);
+	}
 
-		// Start it again with the normal config (no Test2)
-		cmd = BBACKUPD " " + bbackupd_args + " testfiles/bbackupd.conf";
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
+	// Now use a daemon with no temporary location, which should delete
+	// it after 10 seconds
+	{
+		TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"));
 
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
+		// Initial run to start the countdown to destruction
+		bbackupd.RunSyncNow();
 
-		::safe_sleep(1);
+		// Not deleted yet!
+		TEST_THAT(search_for_file("Test2"));
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+		wait_for_operation(9, "just before Test2 should be deleted");
+		bbackupd.RunSyncNow();
+		TEST_THAT(search_for_file("Test2"));
 
-		// Test2 should be deleted after 10 seconds (4 runs)
-		wait_for_sync_end();
-		wait_for_sync_end();
-		wait_for_sync_end();
+		// Now wait until after it should be deleted
+		wait_for_operation(2, "just after Test2 should be deleted");
+		bbackupd.RunSyncNow();
 
-		// not yet! should still be there
-
-		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
-					BackupProtocolLogin::Flags_ReadOnly);
-
-			std::auto_ptr<BackupStoreDirectory> dir = 
-				ReadDirectory(*client);
-			int64_t testDirId = SearchDir(*dir, "Test2");
-			TEST_THAT(testDirId != 0);
-
-			client->QueryFinished();
-		}
-
-		wait_for_sync_end();
-
-		// NOW it should be gone
-
-		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
-					BackupProtocolLogin::Flags_ReadOnly);
-
-			std::auto_ptr<BackupStoreDirectory> root_dir = 
-				ReadDirectory(*client);
-
-			TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
-
-			client->QueryFinished();
-		}
-
+		TEST_THAT(search_for_file("Test2"));
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
 			context, 0 /* read-write */);
 		std::auto_ptr<BackupStoreDirectory> root_dir =
@@ -2260,22 +2152,16 @@ int test_bbackupd()
 		TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
 	}
 
-	TEST_THAT(ServerIsAlive(bbackupd_pid));
-	TEST_THAT(ServerIsAlive(bbstored_pid));
-	if (!ServerIsAlive(bbackupd_pid)) return 1;
-	if (!ServerIsAlive(bbstored_pid)) return 1;
-	if (failures) return 1;
+	TEARDOWN();
+}
 
-	if(bbackupd_pid > 0)
+// Check that read-only directories and their contents can be restored.
+bool test_read_only_dirs_can_be_restored()
+{
+	SETUP_WITH_BBSTORED();
+
+	// TODO FIXME dedent
 	{
-		// Delete any old result marker files
-		TEST_RETURN(0, system("rm -f testfiles/notifyran.*"));
-
-		printf("\n==== Check that read-only directories and "
-			"their contents can be restored.\n");
-
-		int compareReturnValue;
-
 		{
 			#ifdef WIN32
 				// Cygwin chmod changes Windows file attributes
@@ -2286,8 +2172,7 @@ int test_bbackupd()
 					0555) == 0);
 			#endif
 
-			wait_for_sync_end(); // too new
-			wait_for_sync_end(); // should be backed up now
+			bbackupd.RunSyncNow();
 			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
 
 			// check that we can restore it
@@ -2310,18 +2195,33 @@ int test_bbackupd()
 					"TestDir1/x1") == 0);
 				TEST_THAT(::system("chmod 0755 testfiles/"
 					"restore1/x1") == 0);
+				TEST_THAT(::system("chmod 0755 testfiles/"
+					"restore-test/Test1/x1") == 0);
 			#else
 				TEST_THAT(chmod("testfiles/TestDir1/x1",
 					0755) == 0);
 				TEST_THAT(chmod("testfiles/restore1/x1",
 					0755) == 0);
+				TEST_THAT(chmod("testfiles/restore-test/Test1/x1",
+					0755) == 0);
 			#endif
 		}
+	}
 
-#ifdef WIN32
-		printf("\n==== Check that filenames in UTF-8 "
-			"can be backed up\n");
+	TEARDOWN();
+}
 
+// Check that filenames in UTF-8 can be backed up
+bool test_unicode_filenames_can_be_backed_up()
+{
+	SETUP_WITH_BBSTORED();
+
+#ifndef WIN32
+	BOX_NOTICE("skipping test on this platform");
+	// requires ConvertConsoleToUtf8()
+#else
+	// TODO FIXME dedent
+	{
 		// We have no guarantee that a random Unicode string can be
 		// represented in the user's character set, so we go the 
 		// other way, taking three random characters from the 
@@ -2407,7 +2307,7 @@ int test_bbackupd()
 			fs.Close();
 		}
 
-		wait_for_backup_operation("upload of file with unicode name");
+		bbackupd.RunSyncNow();
 
 		// Compare to check that the file was uploaded
 		TEST_COMPARE(Compare_Same);
@@ -2534,21 +2434,22 @@ int test_bbackupd()
 		// Compare without attributes. This should fail.
 		TEST_COMPARE(Compare_Different, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName);
-#endif // WIN32
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+	}
+#endif // WIN32
+	
+	TEARDOWN();
+}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+bool test_sync_allow_script_can_pause_backup()
+{
+	SETUP_WITH_BBSTORED();
+	TEST_THAT(StartClient());
 
-		printf("\n==== Check that SyncAllowScript is executed and can "
-			"pause backup\n");
-		fflush(stdout);
-
+	// TODO FIXME dedent
+	{
 		{
 			wait_for_sync_end();
 			// we now have 3 seconds before bbackupd
@@ -2635,22 +2536,24 @@ int test_bbackupd()
 
 			// check that backup has run (compare succeeds)
 			TEST_COMPARE(Compare_Same);
-
-			if (failures) return 1;
 		}
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		printf("\n==== Delete file and update another, "
-			"create symlink.\n");
-		
+// Delete file and update another, create symlink.
+bool test_delete_update_and_symlink_files()
+{
+	SETUP_WITH_BBSTORED();
+
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
 		// Delete a file
 		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 
@@ -2679,23 +2582,31 @@ int test_bbackupd()
 		// wait long enough for new files to be old enough to backup
 		wait_for_operation(5, "new files to be old enough");
 
-		// wait for backup daemon to do it's stuff
-		sync_and_wait();
+		bbackupd.RunSyncNow();
 
 		// compare to make sure that it worked
 		TEST_COMPARE(Compare_Same);
 
 		// Try a quick compare, just for fun
 		TEST_COMPARE(Compare_Same, "", "-acqQ");
-		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	}
 
+	TEARDOWN();
+}
+
+// Check that store errors are reported neatly. This test uses an independent
+// daemon to check the daemon's backup loop delay, so it's easier to debug
+// with the command: ./t -VTttest -e test_store_error_reporting
+// --bbackupd-args=-kTtbbackupd
+bool test_store_error_reporting()
+{
+	SETUP_WITH_BBSTORED();
+	TEST_THAT(StartClient());
+	wait_for_sync_end();
+
+	// TODO FIXME dedent
+	{
 		// Check that store errors are reported neatly
-		printf("\n==== Create store error\n");
 		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*") == 0);
 
 		// Break the store. We need a write lock on the account
@@ -2747,12 +2658,6 @@ int test_bbackupd()
 		// an error, without waiting for another sync command.
 		TEST_THAT(StopClient());
 		TEST_THAT(StartClient("testfiles/bbackupd-snapshot.conf"));
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
 		sync_and_wait();
 
 		// Check that the error was reported once more
@@ -2832,12 +2737,6 @@ int test_bbackupd()
 
 		// Restart bbackupd in automatic mode
 		TEST_THAT_OR(StartClient(), FAIL);
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
 		sync_and_wait();
 
 		// Fix the store again
@@ -2890,16 +2789,27 @@ int test_bbackupd()
 		TEST_COMPARE(Compare_Same);
 
 		TEST_THAT(::unlink("testfiles/notifyscript.tag") == 0);
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		// Bad case: delete a file/symlink, replace it with a directory
-		printf("\n==== Replace symlink with directory, "
-			"add new directory\n");
+bool test_change_file_to_symlink_and_back()
+{
+	SETUP_WITH_BBSTORED();
+
+	#ifndef WIN32
+		// New symlink
+		TEST_THAT(::symlink("does-not-exist",
+			"testfiles/TestDir1/symlink-to-dir") == 0);
+	#endif		
+
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
+		// Bad case: delete a file/symlink, replace it with a directory.
+		// Replace symlink with directory, add new directory.
 
 		#ifndef WIN32
 			TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir")
@@ -2920,17 +2830,11 @@ int test_bbackupd()
 				== 0);
 		#endif
 
-		wait_for_backup_operation("bbackupd to sync the changes");
+		wait_for_operation(5, "files to be old enough");
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
 		// And the inverse, replace a directory with a file/symlink
-		printf("\n==== Replace directory with symlink\n");
 
 		#ifndef WIN32
 			TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file"
@@ -2944,16 +2848,10 @@ int test_bbackupd()
 				"testfiles/TestDir1/x1/dir-to-file") == 0);
 		#endif
 
-		wait_for_backup_operation("bbackupd to sync the changes");
-
+		wait_for_operation(5, "files to be old enough");
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
 		// And then, put it back to how it was before.
 		BOX_INFO("Replace symlink with directory (which was a symlink)");
 
@@ -2971,21 +2869,14 @@ int test_bbackupd()
 				== 0);
 		#endif
 
-		wait_for_backup_operation("bbackupd to sync the changes");
-
+		wait_for_operation(5, "files to be old enough");
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
-		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 
 		// And finally, put it back to how it was before 
 		// it was put back to how it was before
 		// This gets lots of nasty things in the store with 
 		// directories over other old directories.
-		printf("\n==== Put it all back to how it was\n");
 
 		#ifndef WIN32
 			TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file"
@@ -2999,19 +2890,23 @@ int test_bbackupd()
 				"testfiles/TestDir1/x1/dir-to-file") == 0);
 		#endif
 
-		wait_for_backup_operation("bbackupd to sync the changes");
-
+		wait_for_operation(5, "files to be old enough");
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		// rename an untracked file over an 
-		// existing untracked file
-		printf("\n==== Rename over existing untracked file\n");
+bool test_file_rename_tracking()
+{
+	SETUP_WITH_BBSTORED();
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
+		// rename an untracked file over an existing untracked file
+		BOX_INFO("Rename over existing untracked file");
 		int fd1 = open("testfiles/TestDir1/untracked-1", 
 			O_CREAT | O_EXCL | O_WRONLY, 0700);
 		int fd2 = open("testfiles/TestDir1/untracked-2",
@@ -3028,9 +2923,7 @@ int test_bbackupd()
 
 		// back up both files
 		wait_for_operation(5, "untracked files to be old enough");
-		wait_for_backup_operation("bbackupd to sync the "
-			"untracked files");
-
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 
 		#ifdef WIN32
@@ -3043,16 +2936,8 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/untracked-2"));
 
-		wait_for_backup_operation("bbackupd to sync the untracked "
-			"files again");
-
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 
 		// case which went wrong: rename a tracked file over an
 		// existing tracked file
@@ -3076,11 +2961,7 @@ int test_bbackupd()
 
 		// wait for them to be old enough to back up
 		wait_for_operation(5, "tracked files to be old enough");
-		
-		// back up both files
-		sync_and_wait();
-
-		// compare to make sure that it worked
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 
 		#ifdef WIN32
@@ -3093,44 +2974,36 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
 
-		wait_for_backup_operation("bbackupd to sync the tracked "
-			"files again");
-
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
-	
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 
 		// case which went wrong: rename a tracked file
 		// over a deleted file
-		printf("\n==== Rename an existing file over a deleted file\n");
-		TEST_THAT(!TestFileExists("testfiles/TestDir1/x1/dsfdsfs98.fd"));
-		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf", 
+		BOX_INFO("Rename an existing file over a deleted file");
+		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf",
 			"testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
-		
-		wait_for_backup_operation("bbackupd to sync");
 
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		printf("\n==== Add files with old times, update "
-			"attributes of one to latest time\n");
+// Files that suddenly appear, with timestamps before the last sync window,
+// and files whose size or timestamp change, should still be uploaded, even
+// though they look old.
+bool test_upload_very_old_files()
+{
+	SETUP_WITH_BBSTORED();
+	bbackupd.RunSyncNow();
 
-		// Move that file back
-		TEST_THAT(::rename("testfiles/TestDir1/x1/dsfdsfs98.fd", 
-			"testfiles/TestDir1/df9834.dsf") == 0);
-		
+	// TODO FIXME dedent
+	{
 		// Add some more files
 		// Because the 'm' option is not used, these files will
 		// look very old to the daemon.
@@ -3142,24 +3015,15 @@ int test_bbackupd()
 		#endif
 		
 		// Wait and test
-		wait_for_backup_operation("bbackupd to sync old files");
-
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 		// Check that modifying files with old timestamps
 		// still get added
-		printf("\n==== Modify existing file, but change timestamp "
-			"to rather old\n");
-		wait_for_sync_end();
+		BOX_INFO("Modify existing file, but change timestamp to rather old");
 
 		// Then modify an existing file
 		{
@@ -3198,50 +3062,78 @@ int test_bbackupd()
 		}
 
 		// Wait and test
-		wait_for_sync_end(); // files too new
-		wait_for_sync_end(); // should (not) be backed up this time
-
-		TEST_COMPARE(Compare_Same);
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+		bbackupd.RunSyncNow();
+		TEST_COMPARE(Compare_Same); // files too new?
 
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+	}
 
+	TEARDOWN();
+}
+
+bool test_excluded_files_are_not_backed_up()
+{
+	// SETUP_WITH_BBSTORED();
+
+	SETUP()
+
+	BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/",
+		0, false);
+	MockBackupDaemon bbackupd(client);
+	
+	TEST_THAT_OR(setup_test_bbackupd(bbackupd,
+		true, // do_unpack_files
+		false // do_start_bbstored
+		), FAIL);
+
+	// TODO FIXME dedent
+	{
 		// Add some files and directories which are marked as excluded
-		printf("\n==== Add files and dirs for exclusion test\n");
 		TEST_THAT(unpack_files("testexclude"));
+		bbackupd.RunSyncNow();
 
-		// Wait and test
-		wait_for_sync_end();
-		wait_for_sync_end();
-		
 		// compare with exclusions, should not find differences
-		TEST_COMPARE(Compare_Same);
+		// TEST_COMPARE(Compare_Same);
+		std::string errs;
+		std::auto_ptr<Configuration> config(
+			Configuration::LoadAndVerify
+				("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
+		TEST_EQUAL(0, errs.size());
+		BackupQueries bbackupquery(client, *config, false);
+
+		std::vector<std::string> args;
+		bool opts[256] = {};
+		opts['a'] = true;
+		opts['c'] = true;
+		opts['Q'] = true;
+		bbackupquery.CommandCompare(args, opts);
+		TEST_EQUAL(BackupQueries::ReturnCode::Compare_Same,
+			bbackupquery.GetReturnCode());
 
 		// compare without exclusions, should find differences
-		TEST_COMPARE(Compare_Different, "", "-acEQ");
+		// TEST_COMPARE(Compare_Different, "", "-acEQ");
+		opts['E'] = true;
+		bbackupquery.CommandCompare(args, opts);
+		TEST_EQUAL(BackupQueries::ReturnCode::Compare_Different,
+			bbackupquery.GetReturnCode());
 
 		// check that the excluded files did not make it
 		// into the store, and the included files did
-		printf("\n==== Check that exclude/alwaysinclude commands "
-			"actually work\n");
-
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
+			/*
+			std::auto_ptr<BackupProtocolCallable> pClient =
 				connect_and_login(context,
 				BackupProtocolLogin::Flags_ReadOnly);
+			*/
+			BackupProtocolCallable* pClient = &client;
 			
 			std::auto_ptr<BackupStoreDirectory> dir =
-				ReadDirectory(*client);
+				ReadDirectory(*pClient);
 
 			int64_t testDirId = SearchDir(*dir, "Test1");
 			TEST_THAT(testDirId != 0);
-			dir = ReadDirectory(*client, testDirId);
+			dir = ReadDirectory(*pClient, testDirId);
 				
 			TEST_THAT(!SearchDir(*dir, "excluded_1"));
 			TEST_THAT(!SearchDir(*dir, "excluded_2"));
@@ -3256,22 +3148,33 @@ int test_bbackupd()
 
 			int64_t sub23id = SearchDir(*dir, "sub23");
 			TEST_THAT(sub23id != 0);
-			dir = ReadDirectory(*client, sub23id);
+			dir = ReadDirectory(*pClient, sub23id);
 
 			TEST_THAT(!SearchDir(*dir, "xx_not_this_dir_22"));
 			TEST_THAT(!SearchDir(*dir, "somefile.excludethis"));
-			client->QueryFinished();
+
+			// client->QueryFinished();
 		}
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-#ifndef WIN32
+bool test_read_error_reporting()
+{
+	SETUP_WITH_BBSTORED();
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform");
+#else
+	if(::getuid() == 0)
+	{
+		BOX_NOTICE("skipping test because we're running as root");
 		// These tests only work as non-root users.
-		if(::getuid() != 0)
+	}
+	else
+	{
+		// TODO FIXME detent
 		{
 			// Check that the error has not been reported yet
 			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
@@ -3281,6 +3184,8 @@ int test_bbackupd()
 
 			{
 				// Dir and file which can't be read
+				TEST_THAT(::mkdir("testfiles/TestDir1/sub23",
+					0755) == 0);
 				TEST_THAT(::mkdir("testfiles/TestDir1/sub23"
 					"/read-fail-test-dir", 0000) == 0);
 				int fd = ::open("testfiles/TestDir1"
@@ -3290,9 +3195,8 @@ int test_bbackupd()
 				::close(fd);
 			}
 
-			// Wait and test...
-			wait_for_backup_operation("bbackupd to try to sync "
-				"unreadable file");
+			// Wait and test... with sysadmin notification
+			bbackupd.RunSyncNowWithExceptionHandling();
 
 			// should fail with an error due to unreadable file
 			TEST_COMPARE(Compare_Error);
@@ -3310,17 +3214,19 @@ int test_bbackupd()
 			TEST_THAT(::chmod("testfiles/TestDir1"
 				"/read-fail-test-file", 0770) == 0);
 		}
+	}
 #endif
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		printf("\n==== Continuously update file, "
-			"check isn't uploaded\n");
-		
+bool test_continuously_updated_file()
+{
+	SETUP_WITH_BBSTORED();
+	TEST_THAT(StartClient());
+
+	// TODO FIXME dedent
+	{
 		// Make sure everything happens at the same point in the 
 		// sync cycle: wait until exactly the start of a sync
 		wait_for_sync_start();
@@ -3342,7 +3248,7 @@ int test_bbackupd()
 			}
 			
 			// Check there's a difference
-			compareReturnValue = ::system("perl testfiles/"
+			int compareReturnValue = ::system("perl testfiles/"
 				"extcheck1.pl");
 
 			TEST_RETURN(compareReturnValue, 1);
@@ -3368,27 +3274,44 @@ int test_bbackupd()
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
-		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	}
 
-		printf("\n==== Delete directory, change attributes\n");
-	
+	TEARDOWN();
+}
+
+bool test_delete_dir_change_attribute()
+{
+	SETUP_WITH_BBSTORED();
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
 		// Delete a directory
-		TEST_THAT(::system("rm -rf testfiles/TestDir1/x1") == 0);
-		// Change attributes on an original file.
-		::chmod("testfiles/TestDir1/df9834.dsf", 0423);
-		
-		// Wait and test
-		wait_for_backup_operation("bbackupd to sync deletion "
-			"of directory");
+		TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
 
+		// Change attributes on an existing file.
+#ifdef WIN32
+		TEST_EQUAL(0, system("chmod 0423 testfiles/TestDir1/df9834.dsf"));
+#else
+		TEST_THAT(::chmod("testfiles/TestDir1/df9834.dsf", 0423) == 0);
+#endif
+
+		TEST_COMPARE(Compare_Different);
+		
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
-	
-		printf("\n==== Restore files and directories\n");
+	}
+
+	TEARDOWN();
+}
+
+bool test_restore_files_and_directories()
+{
+	SETUP_WITH_BBSTORED();
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
 		int64_t deldirid = 0;
 		int64_t restoredirid = 0;
 		{
@@ -3400,7 +3323,7 @@ int test_bbackupd()
 			// Find the ID of the Test1 directory
 			restoredirid = GetDirID(*client, "Test1",
 				BackupProtocolListDirectory::RootDirectory);
-			TEST_THAT(restoredirid != 0);
+			TEST_THAT_OR(restoredirid != 0, FAIL);
 
 			// Test the restoration
 			TEST_THAT(BackupClientRestore(*client, restoredirid,
@@ -3466,14 +3389,23 @@ int test_bbackupd()
 
 		// Compare the restored files
 		TEST_COMPARE(Compare_Same);
-		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	}
 
-#ifdef WIN32
+	TEARDOWN();
+}
+
+bool test_compare_detects_attribute_changes()
+{
+	SETUP_WITH_BBSTORED();
+
+#ifndef WIN32
+	BOX_NOTICE("skipping test on this platform");
+	// requires openfile(), GetFileTime() and attrib.exe
+#else
+	bbackupd.RunSyncNow()
+
+	// TODO FIXME dedent
+	{
 		// make one of the files read-only, expect a compare failure
 		compareReturnValue = ::system("attrib +r "
 			"testfiles\\restore-Test1\\f1.dat");
@@ -3523,78 +3455,83 @@ int test_bbackupd()
 		TEST_THAT(set_file_time(testfile, creationTime, lastModTime,
 			lastAccessTime));
 		TEST_COMPARE(Compare_Same);
+	}
 #endif // WIN32
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		printf("\n==== Add files with current time\n");
-	
+bool test_sync_new_files()
+{
+	SETUP_WITH_BBSTORED();
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
 		// Add some more files and modify others
 		// Use the m flag this time so they have a recent modification time
 		TEST_THAT(unpack_files("test3", "testfiles", "-m"));
 		
 		// Wait and test
-		wait_for_backup_operation("bbackupd to sync new files");
+		bbackupd.RunSyncNow();
+		TEST_COMPARE(Compare_Different);
 
+		wait_for_operation(5, "newly added files to be old enough");
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
-		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	}
 
-		// Rename directory
-		printf("\n==== Rename directory\n");
+	TEARDOWN();
+}
+
+bool test_rename_operations()
+{
+	SETUP_WITH_BBSTORED();
+
+	TEST_THAT(unpack_files("test2"));
+	TEST_THAT(unpack_files("test3"));
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	// TODO FIXME dedent
+	{
+		BOX_INFO("Rename directory");
 		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss", 
 			"testfiles/TestDir1/renamed-dir") == 0);
 
-		wait_for_backup_operation("bbackupd to sync renamed directory");
-
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 
 		// and again, but with quick flag
 		TEST_COMPARE(Compare_Same, "", "-acqQ");
 
 		// Rename some files -- one under the threshold, others above
-		printf("\n==== Rename files\n");
-		TEST_THAT(rename("testfiles/TestDir1/continousupdate", 
-			"testfiles/TestDir1/continousupdate-ren") == 0);
 		TEST_THAT(rename("testfiles/TestDir1/df324", 
 			"testfiles/TestDir1/df324-ren") == 0);
 		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl", 
 			"testfiles/TestDir1/find2perl-ren") == 0);
 
-		wait_for_backup_operation("bbackupd to sync renamed files");
-
+		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		// Check that modifying files with madly in the future 
-		// timestamps still get added
-		printf("\n==== Create a file with timestamp way ahead "
-			"in the future\n");
+// Check that modifying files with madly in the future timestamps still get added
+bool test_sync_files_with_timestamps_in_future()
+{
+	SETUP_WITH_BBSTORED();
+	bbackupd.RunSyncNow();
 
-		// Time critical, so sync
-		wait_for_sync_start();
-
-		// Then wait a second, to make sure the scan is complete
-		::safe_sleep(1);
-
-		// Then modify an existing file
+	// TODO FIXME dedent
+	{
 		{
+			TEST_THAT(::mkdir("testfiles/TestDir1/sub23",
+				0755) == 0);
 			FILE *f = fopen("testfiles/TestDir1/sub23/"
 				"in-the-future", "w");
-			TEST_THAT(f != 0);
+			TEST_THAT_OR(f != 0, FAIL);
 			fprintf(f, "Back to the future!\n");
 			fclose(f);
 			// and then move the time forwards!
@@ -3608,17 +3545,22 @@ int test_bbackupd()
 		}
 
 		// Wait and test
+		bbackupd.RunSyncNow();
 		wait_for_backup_operation("bbackup to sync future file");
 		TEST_COMPARE(Compare_Same);
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		printf("\n==== Change client store marker\n");
+// Check change of store marker pauses daemon
+bool test_changing_client_store_marker_pauses_daemon()
+{
+	SETUP_WITH_BBSTORED();
+	TEST_THAT(StartClient());
 
+	// TODO FIXME dedent
+	{
 		// Then... connect to the server, and change the 
 		// client store marker. See what that does!
 		{
@@ -3637,6 +3579,9 @@ int test_bbackupd()
 					TEST_THAT(loginConf->GetClientStoreMarker() != 0);
 					
 					// Change it to something else
+					BOX_INFO("Changing client store marker "
+						"from " << loginConf->GetClientStoreMarker() <<
+						" to 12");
 					protocol->QuerySetClientStoreMarker(12);
 					
 					// Success!
@@ -3645,6 +3590,13 @@ int test_bbackupd()
 					// Log out
 					protocol->QueryFinished();
 				}
+				catch(BoxException &e)
+				{
+					BOX_INFO("Failed to connect to bbstored, "
+						<< tries << " retries remaining: "
+						<< e.what());
+					tries--;
+				}
 				catch(...)
 				{
 					tries--;
@@ -3652,15 +3604,7 @@ int test_bbackupd()
 			}
 			TEST_THAT(done);
 		}
-		
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
 
-		printf("\n==== Check change of store marker pauses daemon\n");
-		
 		// Make a change to a file, to detect whether or not 
 		// it's hanging around waiting to retry.
 		{
@@ -3682,29 +3626,39 @@ int test_bbackupd()
 
 		// Then check it has backed up successfully.
 		TEST_COMPARE(Compare_Same);
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-#ifndef WIN32
-		printf("\n==== Interrupted restore\n");
+bool test_interrupted_restore_can_be_recovered()
+{
+	SETUP_WITH_BBSTORED();
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform");
+#else
+	bbackupd.RunSyncNow();
+
+	// TODO FIXME dedent
+	{
 		{
+			std::auto_ptr<BackupProtocolCallable> client =
+				connect_and_login(context,
+					BackupProtocolLogin::Flags_ReadOnly);
+
+			// Find the ID of the Test1 directory
+			int64_t restoredirid = GetDirID(*client, "Test1",
+				BackupProtocolListDirectory::RootDirectory);
+			TEST_THAT_OR(restoredirid != 0, FAIL);
+
 			do_interrupted_restore(context, restoredirid);
 			int64_t resumesize = 0;
 			TEST_THAT(FileExists("testfiles/"
 				"restore-interrupt.boxbackupresume",
 				&resumesize));
 			// make sure it has recorded something to resume
-			TEST_THAT(resumesize > 16);	
-
-			printf("\n==== Resume restore\n");
-
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
-					BackupProtocolLogin::Flags_ReadOnly);
+			TEST_THAT(resumesize > 16);
 
 			// Check that the restore fn returns resume possible,
 			// rather than doing anything
@@ -3733,19 +3687,60 @@ int test_bbackupd()
 			// Then check it has restored the correct stuff
 			TEST_COMPARE(Compare_Same);
 		}
+	}
 #endif // !WIN32
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	TEARDOWN();
+}
 
-		printf("\n==== Check restore deleted files\n");
+bool assert_x1_deleted_or_not(bool expected_deleted)
+{
+	std::auto_ptr<BackupProtocolCallable> client =
+		connect_and_login(context, 0 /* read-write */);
+	
+	std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(*client);
+	int64_t testDirId = SearchDir(*dir, "Test1");
+	TEST_THAT_OR(testDirId != 0, return false);
 
+	dir = ReadDirectory(*client, testDirId);
+	BackupStoreDirectory::Iterator i(*dir);
+	BackupStoreFilenameClear child("x1");
+	BackupStoreDirectory::Entry *en = i.FindMatchingClearName(child);
+	TEST_THAT_OR(en != 0, return false);
+	TEST_EQUAL_OR(expected_deleted, en->IsDeleted(), return false);
+
+	return true;
+}
+
+bool test_restore_deleted_files()
+{
+	SETUP_WITH_BBSTORED();
+
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	TEST_THAT(::unlink("testfiles/TestDir1/f1.dat") == 0);
+	TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
+	TEST_COMPARE(Compare_Different);
+
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+	TEST_THAT(assert_x1_deleted_or_not(true));
+
+	// TODO FIXME dedent
+	{
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(context, 0 /* read-write */);
+
+			// Find the ID of the Test1 directory
+			int64_t restoredirid = GetDirID(*client, "Test1",
+				BackupProtocolListDirectory::RootDirectory);
+			TEST_THAT_OR(restoredirid != 0, FAIL);
+
+			// Find ID of the deleted directory
+			int64_t deldirid = GetDirID(*client, "x1", restoredirid);
+			TEST_THAT_OR(deldirid != 0, FAIL);
 
 			// Do restore and undelete
 			TEST_THAT(BackupClientRestore(*client, deldirid,
@@ -3768,63 +3763,44 @@ int test_bbackupd()
 		// Final check on notifications
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.2"));
+	}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
+	// should have been undeleted by restore
+	TEST_THAT(assert_x1_deleted_or_not(false));
 
-#ifdef WIN32
-		printf("\n==== Testing locked file behaviour:\n");
+	TEARDOWN();
+}
 
+bool test_locked_file_behaviour()
+{
+	SETUP_WITH_BBSTORED();
+
+#ifndef WIN32
+	BOX_NOTICE("skipping test on this platform");
+#else
+	// TODO FIXME dedent
+	{
 		// Test that locked files cannot be backed up,
 		// and the appropriate error is reported.
-		// Wait for the sync to finish, so that we have time to work
-		wait_for_sync_end();
-		// Now we have about three seconds to work
 
-		handle = openfile("testfiles/TestDir1/lockedfile",
-			O_CREAT | O_EXCL | O_LOCK, 0);
-		TEST_THAT(handle != INVALID_HANDLE_VALUE);
+		handle = openfile("testfiles/TestDir1/f1.dat", O_LOCK);
+		TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
-		if (handle != 0)
-		{
-			// first sync will ignore the file, it's too new
-			wait_for_sync_end();
-			TEST_THAT(!TestFileExists("testfiles/"
-				"notifyran.read-error.1"));
-		}
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
-		if (handle != 0)
 		{
 			// this sync should try to back up the file, 
 			// and fail, because it's locked
-			wait_for_sync_end();
+			bbackupd.RunSyncNow();
 			TEST_THAT(TestFileExists("testfiles/"
 				"notifyran.read-error.1"));
 			TEST_THAT(!TestFileExists("testfiles/"
 				"notifyran.read-error.2"));
 		}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
-		if (handle != 0)
 		{
 			// now close the file and check that it is
 			// backed up on the next run.
 			CloseHandle(handle);
-			wait_for_sync_end();
+			bbackupd.RunSyncNow();
 
 			// still no read errors?
 			TEST_THAT(!TestFileExists("testfiles/"
@@ -3832,88 +3808,46 @@ int test_bbackupd()
 			TEST_COMPARE(Compare_Same);
 		}
 
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
-		if (handle != 0)
 		{
 			// open the file again, compare and check that compare
 			// reports the correct error message (and finishes)
-			handle = openfile("testfiles/TestDir1/lockedfile",
+			handle = openfile("testfiles/TestDir1/f1.dat",
 				O_LOCK, 0);
-			TEST_THAT(handle != INVALID_HANDLE_VALUE);
+			TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 			TEST_COMPARE(Compare_Error);
 
 			// close the file again, check that compare
 			// works again
 			CloseHandle(handle);
-		}
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
-		if (handle != 0)
-		{
 			TEST_COMPARE(Compare_Same);
-		}
-#endif
-
-		// Kill the daemon
-		terminate_bbackupd(bbackupd_pid);
-		
-		// Start it again
-		cmd = BBACKUPD " " + bbackupd_args +
-			" testfiles/bbackupd.conf";
-		bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-
-		TEST_THAT(bbackupd_pid != -1 && bbackupd_pid != 0);
-
-		TEST_THAT(ServerIsAlive(bbackupd_pid));
-		TEST_THAT(ServerIsAlive(bbstored_pid));
-		if (!ServerIsAlive(bbackupd_pid)) return 1;
-		if (!ServerIsAlive(bbstored_pid)) return 1;
-		if (failures) return 1;
-
-		if(bbackupd_pid != -1 && bbackupd_pid != 0)
-		{
-			// Wait and compare (a little bit longer than usual)
-			wait_for_operation(
-				(TIME_TO_WAIT_FOR_BACKUP_OPERATION*3) / 2,
-				"bbackupd to sync everything"); 
-			TEST_COMPARE(Compare_Same);
-
-			// Kill it again
-			terminate_bbackupd(bbackupd_pid);
 		}
 	}
+#endif // WIN32
 
-	/*
-	// List the files on the server - why?
-	::system(BBACKUPQUERY " -q -c testfiles/bbackupd.conf "
-		"-l testfiles/queryLIST.log \"list -Rotdh\" quit");
-	TestRemoteProcessMemLeaks("bbackupquery.memleaks");
-	*/
-
-	#ifndef WIN32	
-		if(::getuid() == 0)
-		{
-			::printf("WARNING: This test was run as root. "
-				"Some tests have been omitted.\n");
-		}
-	#endif
-	
-	return 0;
+	TEARDOWN();
 }
 
-int test(int argc, const char *argv[])
+bool test_backup_many_files()
 {
+	SETUP_WITH_BBSTORED();
+
+	unpack_files("test2");
+	unpack_files("test3");
+	unpack_files("testexclude");
+	unpack_files("spacetest1", "testfiles/TestDir1");
+	unpack_files("spacetest2", "testfiles/TestDir1");
+
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	TEARDOWN();
+}
+
+bool test_parse_incomplete_command()
+{
+	SETUP();
+
 	{
 		// This is not a complete command, it should not parse!
 		BackupQueries::ParsedCommand cmd("-od", true);
@@ -3921,6 +3855,13 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(0, cmd.pSpec);
 		TEST_EQUAL(0, cmd.mCompleteArgCount);
 	}
+
+	TEARDOWN();
+}
+
+bool test_parse_syncallowscript_output()
+{
+	SETUP();
 
 	{
 		BackupDaemon daemon;
@@ -3935,20 +3876,16 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(0, daemon.GetMaxBandwidthFromSyncAllowScript());
 	}
 
+	TEARDOWN();
+}
+
+int test(int argc, const char *argv[])
+{
 	// SSL library
 	SSLLib::Initialise();
 
 	// Keys for subsystems
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
-
-	// Initial files
-	#ifdef WIN32
-		TEST_THAT(::system("tar xzvf testfiles/test_base.tgz "
-			"-C testfiles") == 0);
-	#else
-		TEST_THAT(::system("gzip -d < testfiles/test_base.tgz "
-			"| ( cd testfiles && tar xf - )") == 0);
-	#endif
 
 	{
 		std::string errs;
@@ -3957,34 +3894,69 @@ int test(int argc, const char *argv[])
 				("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
 		TEST_EQUAL_LINE(0, errs.size(), "Loading configuration file "
 			"reported errors: " << errs);
-		TEST_THAT(config.get() != 0);
+		TEST_THAT_OR(config.get(), return 1);
 		// Initialise the raid file controller
 		RaidFileController &rcontroller(RaidFileController::GetController());
 		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 	}
 
-	// Do the tests
+	context.Initialise(false /* client */,
+			"testfiles/clientCerts.pem",
+			"testfiles/clientPrivKey.pem",
+			"testfiles/clientTrustedCAs.pem");
+
 	TEST_THAT(test_basics());
+	TEST_THAT(test_readdirectory_on_nonexistent_dir());
+	TEST_THAT(test_getobject_on_nonexistent_file());
+	TEST_THAT(test_ssl_keepalives());
+	TEST_THAT(test_backup_pauses_when_store_is_full());
+	TEST_THAT(test_bbackupd_exclusions());
+	TEST_THAT(test_bbackupd_uploads_files());
+	TEST_THAT(test_bbackupd_responds_to_connection_failure());
+	TEST_THAT(test_absolute_symlinks_not_followed_during_restore());
+	TEST_THAT(test_initially_missing_locations_are_not_forgotten());
+	TEST_THAT(test_redundant_locations_deleted_on_time());
+	TEST_THAT(test_read_only_dirs_can_be_restored());
+	TEST_THAT(test_unicode_filenames_can_be_backed_up());
+	TEST_THAT(test_sync_allow_script_can_pause_backup());
+	TEST_THAT(test_delete_update_and_symlink_files());
+	TEST_THAT(test_store_error_reporting());
+	TEST_THAT(test_change_file_to_symlink_and_back());
+	TEST_THAT(test_file_rename_tracking());
+	TEST_THAT(test_upload_very_old_files());
+	TEST_THAT(test_excluded_files_are_not_backed_up());
+	TEST_THAT(test_read_error_reporting());
+	TEST_THAT(test_continuously_updated_file());
+	TEST_THAT(test_delete_dir_change_attribute());
+	TEST_THAT(test_restore_files_and_directories());
+	TEST_THAT(test_compare_detects_attribute_changes());
+	TEST_THAT(test_sync_new_files());
+	TEST_THAT(test_rename_operations());
+	TEST_THAT(test_sync_files_with_timestamps_in_future());
+	TEST_THAT(test_changing_client_store_marker_pauses_daemon());
+	TEST_THAT(test_interrupted_restore_can_be_recovered());
+	TEST_THAT(test_restore_deleted_files());
+	TEST_THAT(test_locked_file_behaviour());
+	TEST_THAT(test_backup_many_files());
+	TEST_THAT(test_parse_incomplete_command());
+	TEST_THAT(test_parse_syncallowscript_output());
 
-	int r = (StartServer() ? 0 : 1);
-	TEST_THAT(r == 0);
-	if(r != 0) return r;
-	
-	r = test_bbackupd();
-	if(r != 0)
+	typedef std::map<std::string, std::string>::iterator s_test_status_iterator;
+	for(s_test_status_iterator i = s_test_status.begin();
+		i != s_test_status.end(); i++)
 	{
-		if (bbackupd_pid)
-		{
-			KillServer(bbackupd_pid);
-		}
-		if (bbstored_pid)
-		{
-			KillServer(bbstored_pid);
-		}
-		return r;
+		BOX_NOTICE("test result: " << i->second << ": " << i->first);
 	}
-	
-	TEST_THAT(StopServer());
 
-	return 0;
+#ifndef WIN32
+	if(::getuid() == 0)
+	{
+		BOX_WARNING("This test was run as root. Some tests have been omitted.");
+	}
+#endif
+
+	TEST_LINE(num_tests_selected > 0, "No tests matched the patterns "
+		"specified on the command line");
+
+	return (failures == 0 && num_tests_selected > 0);
 }
