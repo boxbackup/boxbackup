@@ -244,13 +244,16 @@ int main(int argc, char * const * argv)
 		{ "execute-only",	required_argument, NULL, 'e' },
 		{ NULL,			0,                 NULL,  0  }
 	};
-	
-	int ch;
-	
-	while ((ch = getopt_long(argc, argv, "c:d:e:qs:t:vPTUVW:", longopts, NULL))
+
+	int c;
+	std::string options("c:d:e:s:");
+	options += Logging::OptionParser::GetOptionString();
+	Logging::OptionParser LogLevel;
+
+	while ((c = getopt_long(argc, argv, options.c_str(), longopts, NULL))
 		!= -1)
 	{
-		switch(ch)
+		switch(c)
 		{
 			case 'c':
 			{
@@ -272,6 +275,12 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
+			case 'e':
+			{
+				run_only_named_tests.push_back(optarg);
+			}
+			break;
+
 			case 's':
 			{
 				bbstored_args += " ";
@@ -279,101 +288,21 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
-			case 'e':
-			{
-				run_only_named_tests.push_back(optarg);
-			}
-			break;
-
-			#ifndef WIN32
-			case 'P':
-			{
-				Console::SetShowPID(true);
-			}
-			break;
-			#endif
-
-			case 'q':
-			{
-				if(logLevel == Log::NOTHING)
-				{
-					BOX_FATAL("Too many '-q': "
-						"Cannot reduce logging "
-						"level any more");
-					return 2;
-				}
-				logLevel--;
-			}
-			break;
-
-			case 'v':
-			{
-				if(logLevel == Log::EVERYTHING)
-				{
-					BOX_FATAL("Too many '-v': "
-						"Cannot increase logging "
-						"level any more");
-					return 2;
-				}
-				logLevel++;
-			}
-			break;
-
-			case 'V':
-			{
-				logLevel = Log::EVERYTHING;
-			}
-			break;
-
-			case 'W':
-			{
-				logLevel = Logging::GetNamedLevel(optarg);
-				if (logLevel == Log::INVALID)
-				{
-					BOX_FATAL("Invalid logging level: " << optarg);
-					return 2;
-				}
-			}
-			break;
-
-			case 't':
-			{
-				Logging::SetProgramName(optarg);
-				Console::SetShowTag(true);
-			}
-			break;
-
-			case 'T':
-			{
-				Console::SetShowTime(true);
-			}
-			break;
-
-			case 'U':
-			{
-				Console::SetShowTime(true);
-				Console::SetShowTimeMicros(true);
-			}
-			break;
-
-			case '?':
-			{
-				fprintf(stderr, "Unknown option: '%c'\n",
-					optopt);
-				exit(2);
-			}
-
 			default:
 			{
-				fprintf(stderr, "Unknown option code '%c'\n",
-					ch);
-				exit(2);
+				int ret = LogLevel.ProcessOption(c);
+				if(ret != 0)
+				{
+					fprintf(stderr, "Unknown option code "
+						"'%c'\n", c);
+					exit(2);
+				}
 			}
 		}
 	}
 
 	Logging::FilterSyslog(Log::NOTHING);
-	Logging::FilterConsole((Log::Level)logLevel);
+	Logging::FilterConsole(LogLevel.GetCurrentLevel());
 
 	argc -= optind - 1;
 	argv += optind - 1;
