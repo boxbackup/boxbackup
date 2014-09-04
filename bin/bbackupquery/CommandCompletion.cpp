@@ -45,7 +45,7 @@
 std::vector<std::string> Complete ## name( \
 	BackupQueries::ParsedCommand& rCommand, \
 	const std::string& prefix, \
-	BackupProtocolClient& rProtocol, const Configuration& rConfig, \
+	BackupProtocolCallable& rProtocol, const Configuration& rConfig, \
 	BackupQueries& rQueries) \
 { \
 	std::vector<std::string> completions; \
@@ -170,7 +170,7 @@ int16_t GetExcludeFlags(BackupQueries::ParsedCommand& rCommand)
 
 std::vector<std::string> CompleteRemoteFileOrDirectory(
 	BackupQueries::ParsedCommand& rCommand,
-	const std::string& prefix, BackupProtocolClient& rProtocol,
+	const std::string& prefix, BackupProtocolCallable& rProtocol,
 	BackupQueries& rQueries, int16_t includeFlags)
 {
 	std::vector<std::string> completions;

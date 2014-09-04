@@ -107,7 +107,7 @@ BackupClientContext::~BackupClientContext()
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-BackupProtocolClient &BackupClientContext::GetConnection()
+BackupProtocolCallable &BackupClientContext::GetConnection()
 {
 	// Already got it? Just return it.
 	if(mapConnection.get())
@@ -144,10 +144,14 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			apSocket.reset(mpNice);
 		}
 
-		mapConnection.reset(new BackupProtocolClient(apSocket));
+		// We need to call some methods that aren't defined in
+		// BackupProtocolCallable, so we need to hang onto a more
+		// strongly typed pointer (to avoid far too many casts).
+		BackupProtocolClient *pClient = new BackupProtocolClient(apSocket);
+		mapConnection.reset(pClient);
 
 		// Set logging option
-		mapConnection->SetLogToSysLog(mExtendedLogging);
+		pClient->SetLogToSysLog(mExtendedLogging);
 
 		if (mExtendedLogToFile)
 		{
@@ -163,12 +167,12 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			}
 			else
 			{
-				mapConnection->SetLogToFile(mpExtendedLogFileHandle);
+				pClient->SetLogToFile(mpExtendedLogFileHandle);
 			}
 		}
 
 		// Handshake
-		mapConnection->Handshake();
+		pClient->Handshake();
 
 		// Check the version of the server
 		{
@@ -405,7 +409,7 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 	bool &rIsCurrentVersionOut, box_time_t *pModTimeOnServer, box_time_t *pAttributesHashOnServer, BackupStoreFilenameClear *pLeafname)
 {
 	// Make a connection to the server
-	BackupProtocolClient &connection(GetConnection());
+	BackupProtocolCallable &connection(GetConnection());
 
 	// Request filenames from the server, in a "safe" manner to ignore errors properly
 	{
