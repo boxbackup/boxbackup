@@ -305,31 +305,28 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 	// Get the filename
 	std::string filename;
 	MakeObjectFilename(ObjectID, filename);
-	
+	int64_t oldRevID = 0, newRevID = 0;
+
 	// Already in cache?
 	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
 	if(item != mDirectoryCache.end())
 	{
+		oldRevID = item->second->GetRevisionID();
+
 		// Check the revision ID of the file -- does it need refreshing?
-		int64_t revID = 0;
-		if(!RaidFileRead::FileExists(mStoreDiscSet, filename, &revID))
+		if(!RaidFileRead::FileExists(mStoreDiscSet, filename, &newRevID))
 		{
 			THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
 		}
 	
-		if(revID == item->second->GetRevisionID())
+		if(newRevID == oldRevID)
 		{
 			// Looks good... return the cached object
 			BOX_TRACE("Returning object " <<
 				BOX_FORMAT_OBJECTID(ObjectID) <<
-				" from cache, modtime = " << revID);
+				" from cache, modtime = " << newRevID)
 			return *(item->second);
 		}
-		
-		BOX_TRACE("Refreshing object " <<
-			BOX_FORMAT_OBJECTID(ObjectID) <<
-			" in cache, modtime changed from " <<
-			item->second->GetRevisionID() << " to " << revID);
 
 		// Delete this cached object
 		delete item->second;
@@ -346,15 +343,28 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 	}
 
 	// Get a RaidFileRead to read it
-	int64_t revID = 0;
-	std::auto_ptr<RaidFileRead> objectFile(RaidFileRead::Open(mStoreDiscSet, filename, &revID));
-	ASSERT(revID != 0);
-	
+	std::auto_ptr<RaidFileRead> objectFile(RaidFileRead::Open(mStoreDiscSet,
+		filename, &newRevID));
+
+	ASSERT(newRevID != 0);
+
+	if (oldRevID == 0)
+	{
+		BOX_TRACE("Loading object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+			" with modtime " << newRevID);
+	}
+	else
+	{
+		BOX_TRACE("Refreshing object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+			" in cache, modtime changed from " << oldRevID <<
+			" to " << newRevID);
+	}
+
 	// Read it from the stream, then set it's revision ID
 	BufferedStream buf(*objectFile);
 	std::auto_ptr<BackupStoreDirectory> dir(new BackupStoreDirectory(buf));
-	dir->SetRevisionID(revID);
-			
+	dir->SetRevisionID(newRevID);
+
 	// Make sure the size of the directory is available for writing the dir back
 	int64_t dirSize = objectFile->GetDiscUsageInBlocks();
 	ASSERT(dirSize > 0);
@@ -363,7 +373,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 	// Store in cache
 	BackupStoreDirectory *pdir = dir.release();
 	try
-	{	
+	{
 		mDirectoryCache[ObjectID] = pdir;
 	}
 	catch(...)
@@ -371,7 +381,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 		delete pdir;
 		throw;
 	}
-	
+
 	// Return it
 	return *pdir;
 }
@@ -593,7 +603,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		adjustment.mNumCurrentFiles++;
 		
 		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() + 
+		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
 			adjustment.mBlocksUsed;
 		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
 		{
@@ -612,7 +622,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			delete ppreviousVerStoreFile;
 			ppreviousVerStoreFile = 0;
 		}
-		
+
 		throw;
 	}
 
@@ -631,8 +641,8 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			// Exception
 			THROW_EXCEPTION(BackupStoreException, AddedFileDoesNotVerify)
 		}
-	}			
-	
+	}
+
 	// Modify the directory -- first make all files with the same name
 	// marked as an old version
 	try
@@ -646,7 +656,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			// Get old version entry
 			poldEntry = dir.FindEntryByID(DiffFromFileID);
 			ASSERT(poldEntry != 0);
-		
+
 			// Adjust size of old entry
 			int64_t oldSize = poldEntry->GetSizeInBlocks();
 			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
@@ -679,7 +689,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 				}
 			}
 		}
-		
+
 		// Then the new entry
 		BackupStoreDirectory::Entry *pnewEntry = dir.AddEntry(rFilename,
 			ModificationTime, id, newObjectBlocksUsed,
@@ -692,7 +702,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			poldEntry->SetDependsNewer(id);
 			pnewEntry->SetDependsOlder(DiffFromFileID);
 		}
-			
+
 		// Write the directory back to disc
 		SaveDirectory(dir);
 
@@ -710,24 +720,24 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		// Back out on adding that file
 		RaidFileWrite del(mStoreDiscSet, fn);
 		del.Delete();
-		
+
 		// Remove this entry from the cache
 		RemoveDirectoryFromCache(InDirectory);
-		
+
 		// Delete any previous version store file
 		if(ppreviousVerStoreFile != 0)
 		{
 			delete ppreviousVerStoreFile;
 			ppreviousVerStoreFile = 0;
 		}
-		
+
 		// Don't worry about the incremented number in the store info
 		throw;
 	}
-	
+
 	// Check logic
 	ASSERT(ppreviousVerStoreFile == 0);
-	
+
 	// Modify the store info
 	mapStoreInfo->AdjustNumCurrentFiles(adjustment.mNumCurrentFiles);
 	mapStoreInfo->AdjustNumOldFiles(adjustment.mNumOldFiles);
@@ -738,14 +748,14 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	mapStoreInfo->ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
 	mapStoreInfo->ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
 	mapStoreInfo->ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
-	
+
 	// Increment reference count on the new directory to one
 	mapRefCount->AddReference(id);
-	
+
 	// Save the store info -- can cope if this exceptions because infomation
 	// will be rebuilt by housekeeping, and ID allocation can recover.
 	SaveStoreInfo(false);
-	
+
 	// Return the ID to the caller
 	return id;
 }
@@ -1001,6 +1011,11 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			{
 				THROW_EXCEPTION(BackupStoreException, Internal)
 			}
+
+			BOX_TRACE("Saved directory " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				", modtime = " << revid);
+
 			rDir.SetRevisionID(revid);
 		}
 
