@@ -697,7 +697,7 @@ void BackupDaemon::Run2()
 	DeleteAllIDMaps();
 }
 
-void BackupDaemon::RunSyncNowWithExceptionHandling()
+std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling()
 {
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
@@ -759,7 +759,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 				<< "/" << errorSubCode 
 				<< ") due to signal");
 			OnBackupFinish();
-			return;
+			return mapClientContext; // releases mapClientContext
 		}
 
 		NotifySysadmin(SysadminNotifier::BackupError);
@@ -811,6 +811,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 	mDoSyncForcedByPreviousSyncError = errorOccurred && !isBerkelyDbFailure;
 
 	OnBackupFinish();
+	return mapClientContext; // releases mapClientContext
 }
 
 void BackupDaemon::ResetCachedState()
@@ -823,8 +824,34 @@ void BackupDaemon::ResetCachedState()
 	DeleteAllIDMaps();
 }
 
-void BackupDaemon::RunSyncNow()
+std::auto_ptr<BackupClientContext> BackupDaemon::GetNewContext
+(
+	LocationResolver &rResolver,
+	TLSContext &rTLSContext,
+	const std::string &rHostname,
+	int32_t Port,
+	uint32_t AccountNumber,
+	bool ExtendedLogging,
+	bool ExtendedLogToFile,
+	std::string ExtendedLogFile,
+	ProgressNotifier &rProgressNotifier,
+	bool TcpNiceMode
+)
 {
+	std::auto_ptr<BackupClientContext> context(new BackupClientContext(
+		rResolver, rTLSContext, rHostname, Port, AccountNumber,
+		ExtendedLogging, ExtendedLogToFile, ExtendedLogFile,
+		rProgressNotifier, TcpNiceMode));
+	return context;
+}
+
+// Returns the BackupClientContext so that tests can use it to hold the
+// connection open and prevent housekeeping from running. Otherwise don't use
+// it, let it be destroyed and close the connection.
+std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
+{
+	Timers::AssertInitialised();
+
 	// Delete the serialised store object file,
 	// so that we don't try to reload it after a
 	// partially completed backup
@@ -870,8 +897,7 @@ void BackupDaemon::RunSyncNow()
 
 	// Then create a client context object (don't
 	// just connect, as this may be unnecessary)
-	BackupClientContext clientContext
-	(
+	mapClientContext = GetNewContext(
 		*mpLocationResolver,
 		mTlsContext,
 		conf.GetKeyValue("StoreHostname"),
@@ -929,7 +955,10 @@ void BackupDaemon::RunSyncNow()
 	// Check logic
 	ASSERT(syncPeriodEnd > syncPeriodStart);
 	// Paranoid check on sync times
-	if(syncPeriodStart >= syncPeriodEnd) return;
+	if(syncPeriodStart >= syncPeriodEnd)
+	{
+		return mapClientContext; // releases mapClientContext
+	}
 	
 	// Adjust syncPeriodEnd to emulate snapshot behaviour properly
 	box_time_t syncPeriodEndExtended = syncPeriodEnd;
@@ -950,7 +979,7 @@ void BackupDaemon::RunSyncNow()
 
 	// Set up the sync parameters
 	BackupClientDirectoryRecord::SyncParams params(*mpRunStatusProvider,
-		*mpSysadminNotifier, *mpProgressNotifier, clientContext, this);
+		*mpSysadminNotifier, *mpProgressNotifier, *mapClientContext, this);
 	params.mSyncPeriodStart = syncPeriodStart;
 	params.mSyncPeriodEnd = syncPeriodEndExtended;
 	// use potentially extended end time
@@ -993,11 +1022,11 @@ void BackupDaemon::RunSyncNow()
 		keepAliveTime = conf.GetKeyValueInt("KeepAliveTime");
 	}
 
-	clientContext.SetMaximumDiffingTime(maximumDiffingTime);
-	clientContext.SetKeepAliveTime(keepAliveTime);
-	
+	mapClientContext->SetMaximumDiffingTime(maximumDiffingTime);
+	mapClientContext->SetKeepAliveTime(keepAliveTime);
+
 	// Set store marker
-	clientContext.SetClientStoreMarker(mClientStoreMarker);
+	mapClientContext->SetClientStoreMarker(mClientStoreMarker);
 
 	// Set up the locations, if necessary -- need to do it here so we have
 	// a (potential) connection to use.
@@ -1008,16 +1037,16 @@ void BackupDaemon::RunSyncNow()
 
 		// Make sure all the directory records
 		// are set up
-		SetupLocations(clientContext, locations);
+		SetupLocations(*mapClientContext, locations);
 	}
 
-	mpProgressNotifier->NotifyIDMapsSetup(clientContext);
+	mpProgressNotifier->NotifyIDMapsSetup(*mapClientContext);
 
 	// Get some ID maps going
 	SetupIDMapsForSync();
 
 	// Delete any unused directories?
-	DeleteUnusedRootDirEntries(clientContext);
+	DeleteUnusedRootDirEntries(*mapClientContext);
 
 #ifdef ENABLE_VSS
 	CreateVssBackupComponents();
@@ -1030,12 +1059,12 @@ void BackupDaemon::RunSyncNow()
 	{
 		// Set current and new ID map pointers
 		// in the context
-		clientContext.SetIDMaps(mCurrentIDMaps[(*i)->mIDMapIndex],
+		mapClientContext->SetIDMaps(mCurrentIDMaps[(*i)->mIDMapIndex],
 			mNewIDMaps[(*i)->mIDMapIndex]);
 	
 		// Set exclude lists (context doesn't
 		// take ownership)
-		clientContext.SetExcludeLists(
+		mapClientContext->SetExcludeLists(
 			(*i)->mapExcludeFiles.get(),
 			(*i)->mapExcludeDirs.get());
 
@@ -1053,24 +1082,21 @@ void BackupDaemon::RunSyncNow()
 			locationPath, std::string("/") + (*i)->mName, **i);
 
 		// Unset exclude lists (just in case)
-		clientContext.SetExcludeLists(0, 0);
+		mapClientContext->SetExcludeLists(0, 0);
 	}
 
 	// Perform any deletions required -- these are
 	// delayed until the end to allow renaming to 
 	// happen neatly.
-	clientContext.PerformDeletions();
-
-	// Close any open connection
-	clientContext.CloseAnyOpenConnection();
+	mapClientContext->PerformDeletions();
 
 #ifdef ENABLE_VSS
 	CleanupVssBackupComponents();
 #endif
 
 	// Get the new store marker
-	mClientStoreMarker = clientContext.GetClientStoreMarker();
-	mStorageLimitExceeded = clientContext.StorageLimitExceeded();
+	mClientStoreMarker = mapClientContext->GetClientStoreMarker();
+	mStorageLimitExceeded = mapClientContext->StorageLimitExceeded();
 	mReadErrorsOnFilesystemObjects |=
 		params.mReadErrorsOnFilesystemObjects;
 
@@ -1102,6 +1128,8 @@ void BackupDaemon::RunSyncNow()
 		SerializeStoreObjectInfo(mLastSyncTime, mNextSyncTime);
 
 	// --------------------------------------------------------------------------------------------
+
+	return mapClientContext; // releases mapClientContext
 }
 
 #ifdef ENABLE_VSS

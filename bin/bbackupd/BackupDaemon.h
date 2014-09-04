@@ -57,8 +57,8 @@ class Archive;
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-class BackupDaemon : public Daemon, ProgressNotifier, LocationResolver,
-RunStatusProvider, SysadminNotifier, BackgroundTask
+class BackupDaemon : public Daemon, public ProgressNotifier, public LocationResolver,
+public RunStatusProvider, public SysadminNotifier, public BackgroundTask
 {
 public:
 	BackupDaemon();
@@ -118,14 +118,29 @@ private:
 
 public:
 	void InitCrypto();
-	void RunSyncNowWithExceptionHandling();
-	void RunSyncNow();
+	std::auto_ptr<BackupClientContext> RunSyncNowWithExceptionHandling();
+	std::auto_ptr<BackupClientContext> RunSyncNow();
 	void ResetCachedState();
 	void OnBackupStart();
 	void OnBackupFinish();
 	// TouchFileInWorkingDir is only here for use by Boxi.
 	// This does NOT constitute an API!
 	void TouchFileInWorkingDir(const char *Filename);
+
+protected:
+	virtual std::auto_ptr<BackupClientContext> GetNewContext
+	(
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
+		const std::string &rHostname,
+		int32_t Port,
+		uint32_t AccountNumber,
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile,
+		ProgressNotifier &rProgressNotifier,
+		bool TcpNiceMode
+	);
 
 private:
 	void DeleteAllLocations();
@@ -244,6 +259,7 @@ private:
 	RunStatusProvider* mpRunStatusProvider;
 	SysadminNotifier* mpSysadminNotifier;
 	std::auto_ptr<Timer> mapCommandSocketPollTimer;
+	std::auto_ptr<BackupClientContext> mapClientContext;
 
 	/* ProgressNotifier implementation */
 public:

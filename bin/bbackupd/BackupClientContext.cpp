@@ -212,6 +212,17 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 					"same account?");
 			}
 		}
+		else // mClientStoreMarker == ClientStoreMarker_NotKnown
+		{
+			// Yes, choose one, the current time will do
+			box_time_t marker = GetCurrentBoxTime();
+			
+			// Set it on the store
+			mapConnection->QuerySetClientStoreMarker(marker);
+			
+			// Record it so that it can be picked up later.
+			mClientStoreMarker = marker;
+		}
 
 		// Log success
 		BOX_INFO("Connection made, login successful");
@@ -250,19 +261,6 @@ void BackupClientContext::CloseAnyOpenConnection()
 	{
 		try
 		{
-			// Need to set a client store marker?
-			if(mClientStoreMarker == ClientStoreMarker_NotKnown)
-			{
-				// Yes, choose one, the current time will do
-				box_time_t marker = GetCurrentBoxTime();
-				
-				// Set it on the store
-				mapConnection->QuerySetClientStoreMarker(marker);
-				
-				// Record it so that it can be picked up later.
-				mClientStoreMarker = marker;
-			}
-		
 			// Quit nicely
 			mapConnection->QueryFinished();
 		}
