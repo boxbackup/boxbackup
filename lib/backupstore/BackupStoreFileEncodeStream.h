@@ -87,6 +87,7 @@ public:
 		int Timeout = IOStream::TimeOutInfinite);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
+	int64_t GetBytesToUpload() { return mBytesToUpload; }
 	int64_t GetTotalBytesSent() { return mTotalBytesSent; }
 
 private:

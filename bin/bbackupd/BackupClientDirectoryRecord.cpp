@@ -1745,8 +1745,6 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			if(diffFromID != 0)
 			{
 				// Found an old version
-				rNotifier.NotifyFileUploadingPatch(this,
-					rNonVssFilePath);
 
 				// Get the index
 				std::auto_ptr<IOStream> blockIndexStream(connection.ReceiveStream());
@@ -1778,7 +1776,12 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			}
 		}
 
-		if(!apStreamToUpload.get()) // No patch upload, so do a normal upload
+		if(apStreamToUpload.get())
+		{
+			rNotifier.NotifyFileUploadingPatch(this, rNonVssFilePath,
+				apStreamToUpload->GetBytesToUpload());
+		}
+		else // No patch upload, so do a normal upload
 		{
 			// below threshold or nothing to diff from, so upload whole
 			rNotifier.NotifyFileUploading(this, rNonVssFilePath);
