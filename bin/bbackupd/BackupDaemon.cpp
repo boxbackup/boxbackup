@@ -490,6 +490,7 @@ void BackupDaemon::Run()
 				"exception, ignored.");
 		}
 
+		mapCommandSocketPollTimer.reset();
 		Timers::Cleanup();
 		
 		throw;
@@ -497,6 +498,7 @@ void BackupDaemon::Run()
 
 	// Clean up
 	mapCommandSocketInfo.reset();
+	mapCommandSocketPollTimer.reset();
 	Timers::Cleanup();
 }
 

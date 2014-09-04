@@ -72,13 +72,23 @@ void Timers::Init()
 //		Created: 6/11/2006
 //
 // --------------------------------------------------------------------------
-void Timers::Cleanup()
+void Timers::Cleanup(bool throw_exception_if_not_initialised)
 {
-	ASSERT(spTimers);
-	if (!spTimers)
+	if (throw_exception_if_not_initialised)
 	{
-		BOX_ERROR("Tried to clean up timers when not initialised!");
-		return;
+		ASSERT(spTimers);
+		if (!spTimers)
+		{
+			BOX_ERROR("Tried to clean up timers when not initialised!");
+			return;
+		}
+	}
+	else
+	{
+		if (!spTimers)
+		{
+			return;
+		}
 	}
 	
 	#if defined WIN32 && ! defined PLATFORM_CYGWIN
@@ -110,6 +120,26 @@ void Timers::Cleanup()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    static void Timers::AssertInitialised()
+//		Purpose: Throw an assertion error if timers are not ready
+//			 NOW. It's a common mistake (for me) when writing
+//			 tests to forget to initialise timers first.
+//		Created: 15/05/2014
+//
+// --------------------------------------------------------------------------
+
+void Timers::AssertInitialised()
+{
+	if (!spTimers)
+	{
+		THROW_EXCEPTION(CommonException, TimersNotInitialised);
+	}
+	ASSERT(spTimers);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    static void Timers::Add(Timer&)
 //		Purpose: Add a new timer to the set, and reschedule next wakeup
 //		Created: 5/11/2006
@@ -135,8 +165,16 @@ void Timers::Add(Timer& rTimer)
 // --------------------------------------------------------------------------
 void Timers::Remove(Timer& rTimer)
 {
-	ASSERT(spTimers);
 	ASSERT(&rTimer);
+
+	if(!spTimers)
+	{
+		BOX_WARNING(TIMER_ID_OF(rTimer) " was still active after "
+			"timer subsystem was cleaned up, already removed.");
+		return;
+	}
+
+	ASSERT(spTimers);
 	BOX_TRACE(TIMER_ID_OF(rTimer) " removed from global queue, rescheduling");
 
 	bool restart = true;
