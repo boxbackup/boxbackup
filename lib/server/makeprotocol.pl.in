@@ -887,6 +887,13 @@ private:
 public:
 	virtual std::auto_ptr<IOStream> ReceiveStream()
 	{
+		if(mStreamsToSend.empty())
+		{
+			THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+				"Tried to ReceiveStream when none was sent or "
+				"made available");
+		}
+
 		std::auto_ptr<IOStream> apStream(mStreamsToSend.front());
 		mStreamsToSend.pop_front();
 		return apStream;
