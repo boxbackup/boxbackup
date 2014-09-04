@@ -52,7 +52,8 @@ public:
 		std::string certFile(serverconf.GetKeyValue("CertificateFile"));
 		std::string keyFile(serverconf.GetKeyValue("PrivateKeyFile"));
 		std::string caFile(serverconf.GetKeyValue("TrustedCAsFile"));
-		mContext.Initialise(true /* as server */, certFile.c_str(), keyFile.c_str(), caFile.c_str());
+		mContext.Initialise(true /* as server */, certFile.c_str(),
+			keyFile.c_str(), caFile.c_str());
 	
 		// Then do normal stream server stuff
 		ServerStream<SocketStreamTLS, Port, ListenBacklog,

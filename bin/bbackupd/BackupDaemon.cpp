@@ -870,8 +870,8 @@ void BackupDaemon::RunSyncNow()
 	// just connect, as this may be unnecessary)
 	BackupClientContext clientContext
 	(
-		*mpLocationResolver, 
-		mTlsContext, 
+		*mpLocationResolver,
+		mTlsContext,
 		conf.GetKeyValue("StoreHostname"),
 		conf.GetKeyValueInt("StorePort"),
 		conf.GetKeyValueUint32("AccountNumber"),
@@ -929,19 +929,18 @@ void BackupDaemon::RunSyncNow()
 	// Paranoid check on sync times
 	if(syncPeriodStart >= syncPeriodEnd) return;
 	
-	// Adjust syncPeriodEnd to emulate snapshot 
-	// behaviour properly
+	// Adjust syncPeriodEnd to emulate snapshot behaviour properly
 	box_time_t syncPeriodEndExtended = syncPeriodEnd;
 
 	// Using zero min file age?
 	if(minimumFileAge == 0)
 	{
 		// Add a year on to the end of the end time,
-		// to make sure we sync files which are 
+		// to make sure we sync files which are
 		// modified after the scan run started.
-		// Of course, they may be eligible to be 
+		// Of course, they may be eligible to be
 		// synced again the next time round,
-		// but this should be OK, because the changes 
+		// but this should be OK, because the changes
 		// only upload should upload no data.
 		syncPeriodEndExtended += SecondsToBoxTime(
 			(time_t)(356*24*3600));
@@ -954,11 +953,11 @@ void BackupDaemon::RunSyncNow()
 	params.mSyncPeriodEnd = syncPeriodEndExtended;
 	// use potentially extended end time
 	params.mMaxUploadWait = maxUploadWait;
-	params.mFileTrackingSizeThreshold = 
+	params.mFileTrackingSizeThreshold =
 		conf.GetKeyValueInt("FileTrackingSizeThreshold");
-	params.mDiffingUploadSizeThreshold = 
+	params.mDiffingUploadSizeThreshold =
 		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
-	params.mMaxFileTimeInFuture = 
+	params.mMaxFileTimeInFuture =
 		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
 	mNumFilesUploaded = 0;
 	mNumDirsCreated = 0;
@@ -997,22 +996,21 @@ void BackupDaemon::RunSyncNow()
 	
 	// Set store marker
 	clientContext.SetClientStoreMarker(mClientStoreMarker);
-	
-	// Set up the locations, if necessary -- 
-	// need to do it here so we have a 
-	// (potential) connection to use
+
+	// Set up the locations, if necessary -- need to do it here so we have
+	// a (potential) connection to use.
 	{
 		const Configuration &locations(
 			conf.GetSubConfiguration(
 				"BackupLocations"));
-		
+
 		// Make sure all the directory records
 		// are set up
 		SetupLocations(clientContext, locations);
 	}
-	
+
 	mpProgressNotifier->NotifyIDMapsSetup(clientContext);
-	
+
 	// Get some ID maps going
 	SetupIDMapsForSync();
 
@@ -1022,7 +1020,7 @@ void BackupDaemon::RunSyncNow()
 #ifdef ENABLE_VSS
 	CreateVssBackupComponents();
 #endif
-					
+
 	// Go through the records, syncing them
 	for(Locations::const_iterator 
 		i(mLocations.begin()); 
@@ -1055,7 +1053,7 @@ void BackupDaemon::RunSyncNow()
 		// Unset exclude lists (just in case)
 		clientContext.SetExcludeLists(0, 0);
 	}
-	
+
 	// Perform any deletions required -- these are
 	// delayed until the end to allow renaming to 
 	// happen neatly.
@@ -1087,8 +1085,8 @@ void BackupDaemon::RunSyncNow()
 	CommitIDMapsAfterSync();
 
 	// Calculate when the next sync run should be
-	mNextSyncTime = mCurrentSyncStartTime + 
-		mUpdateStoreInterval + 
+	mNextSyncTime = mCurrentSyncStartTime +
+		mUpdateStoreInterval +
 		Random::RandomInt(mUpdateStoreInterval >>
 		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 
@@ -1098,7 +1096,7 @@ void BackupDaemon::RunSyncNow()
 	// info. If we save successfully, we must 
 	// delete the file next time we start a backup
 
-	mDeleteStoreObjectInfoFile = 
+	mDeleteStoreObjectInfoFile =
 		SerializeStoreObjectInfo(mLastSyncTime, mNextSyncTime);
 
 	// --------------------------------------------------------------------------------------------
@@ -1804,7 +1802,8 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 
 	if(delay == "")
 	{
-		BOX_ERROR("SyncAllowScript output an empty line");
+		BOX_ERROR("SyncAllowScript output an empty line, sleeping for "
+			<< waitInSeconds << " seconds (" << script << ")");
 		return waitInSeconds;
 	}
 
@@ -1815,7 +1814,7 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 		waitInSeconds = -1;
 
 		BOX_NOTICE("SyncAllowScript requested a backup now "
-			<< "(" << script << ")");
+			"(" << script << ")");
 	}
 	else
 	{
@@ -1832,7 +1831,7 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 			throw;
 		}
 
-		BOX_NOTICE("SyncAllowScript requested a delay of " << 
+		BOX_NOTICE("SyncAllowScript requested a delay of " <<
 			waitInSeconds << " seconds (" << script << ")");
 	}
 
@@ -2546,7 +2545,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 						new MemBlockStream(attr));
 					std::auto_ptr<BackupProtocolSuccess>
 						dirCreate(connection.QueryCreateDirectory(
-						BackupProtocolListDirectory::RootDirectory,
+						BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
 						attrModTime, dirname, attrStream));
 						
 					// Object ID for later creation

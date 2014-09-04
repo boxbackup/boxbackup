@@ -49,7 +49,7 @@ public:
 	virtual bool StreamClosed();
 
 private:
-	ReadLoggingStream(const ReadLoggingStream &rToCopy) 
+	ReadLoggingStream(const ReadLoggingStream &rToCopy)
 	: mrSource(rToCopy.mrSource), mrLogger(rToCopy.mrLogger)
 	{ /* do not call */ }
 };

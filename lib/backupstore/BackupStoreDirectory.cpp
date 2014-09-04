@@ -480,7 +480,8 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 {
 	// Grab the raw bytes from the stream which compose the header
 	en_StreamFormat entry;
-	if(!rStream.ReadFullBuffer(&entry, sizeof(entry), 0 /* not interested in bytes read if this fails */, Timeout))
+	if(!rStream.ReadFullBuffer(&entry, sizeof(entry),
+		0 /* not interested in bytes read if this fails */, Timeout))
 	{
 		THROW_EXCEPTION(BackupStoreException, CouldntReadEntireStructureFromStream)
 	}

@@ -31,7 +31,7 @@ private:
 
 public:
 	BackupProtocolLocal2(int32_t AccountNumber,
-		const std::string& ConnectionDetails, 
+		const std::string& ConnectionDetails,
 		const std::string& AccountRootDir, int DiscSetNumber,
 		bool ReadOnly)
 	// This is rather ugly: the BackupProtocolLocal constructor must not

@@ -709,11 +709,12 @@ bool BackupStoreFileEncodeStream::StreamClosed()
 //		Created: 15/1/04
 //
 // --------------------------------------------------------------------------
-BackupStoreFileEncodeStream::Recipe::Recipe(BackupStoreFileCreation::BlocksAvailableEntry *pBlockIndex,
-		int64_t NumBlocksInIndex, int64_t OtherFileID)
-	: mpBlockIndex(pBlockIndex),
-	  mNumBlocksInIndex(NumBlocksInIndex),
-	  mOtherFileID(OtherFileID)
+BackupStoreFileEncodeStream::Recipe::Recipe(
+	BackupStoreFileCreation::BlocksAvailableEntry *pBlockIndex,
+	int64_t NumBlocksInIndex, int64_t OtherFileID)
+: mpBlockIndex(pBlockIndex),
+  mNumBlocksInIndex(NumBlocksInIndex),
+  mOtherFileID(OtherFileID)
 {
 	ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0))
 }

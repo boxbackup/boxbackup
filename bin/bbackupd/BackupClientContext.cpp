@@ -42,11 +42,11 @@
 // --------------------------------------------------------------------------
 BackupClientContext::BackupClientContext
 (
-	LocationResolver &rResolver, 
-	TLSContext &rTLSContext, 
+	LocationResolver &rResolver,
+	TLSContext &rTLSContext,
 	const std::string &rHostname,
 	int Port,
-	uint32_t AccountNumber, 
+	uint32_t AccountNumber,
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
 	std::string ExtendedLogFile,
@@ -152,7 +152,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		if (mExtendedLogToFile)
 		{
 			ASSERT(mpExtendedLogFileHandle == NULL);
-			
+
 			mpExtendedLogFileHandle = fopen(
 				mExtendedLogFile.c_str(), "a+");
 
@@ -198,7 +198,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				{
 					// IGNORE
 				}
-				
+
 				// Then throw an exception about this
 				THROW_EXCEPTION_MESSAGE(BackupStoreException,
 					ClientMarkerNotAsExpected,

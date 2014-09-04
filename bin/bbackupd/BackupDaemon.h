@@ -237,21 +237,21 @@ public:
 	void SetSysadminNotifier (SysadminNotifier*  p) { mpSysadminNotifier = p; }
 	virtual bool RunBackgroundTask(State state, uint64_t progress,
 		uint64_t maximum);
-		
+
 private:
 	ProgressNotifier* mpProgressNotifier;
 	LocationResolver* mpLocationResolver;
 	RunStatusProvider* mpRunStatusProvider;
 	SysadminNotifier* mpSysadminNotifier;
 	std::auto_ptr<Timer> mapCommandSocketPollTimer;
-	
- 	/* ProgressNotifier implementation */
+
+	/* ProgressNotifier implementation */
 public:
 	virtual void NotifyIDMapsSetup(BackupClientContext& rContext) { }
 
 	virtual void NotifyScanDirectory(
 		const BackupClientDirectoryRecord* pDirRecord,
-		const std::string& rLocalPath) 
+		const std::string& rLocalPath)
 	{
 		if (mLogAllFileAccess)
 		{
@@ -266,7 +266,7 @@ public:
 	}
 	virtual void NotifyDirStatFailed(
 		const BackupClientDirectoryRecord* pDirRecord,
-		const std::string& rLocalPath, 
+		const std::string& rLocalPath,
 		const std::string& rErrorMsg)
 	{
 		BOX_WARNING("Failed to access directory: " << rLocalPath
@@ -293,11 +293,11 @@ public:
 		const std::string& rLocalPath)
 	{
 		#ifdef WIN32
-			BOX_WARNING("Ignored directory: " << rLocalPath << 
+			BOX_WARNING("Ignored directory: " << rLocalPath <<
 				": is an NTFS junction/reparse point; create "
 				"a new location if you want to back it up");
 		#else
-			BOX_WARNING("Ignored directory: " << rLocalPath << 
+			BOX_WARNING("Ignored directory: " << rLocalPath <<
 				": is a mount point; create a new location "
 				"if you want to back it up");
 		#endif
@@ -446,7 +446,7 @@ public:
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_NOTICE("Deleted directory: " << rRemotePath << 
+			BOX_NOTICE("Deleted directory: " << rRemotePath <<
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}
@@ -457,7 +457,7 @@ public:
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_NOTICE("Deleted file: " << rRemotePath << 
+			BOX_NOTICE("Deleted file: " << rRemotePath <<
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}
@@ -465,19 +465,19 @@ public:
 	virtual void NotifyReadProgress(int64_t readSize, int64_t offset,
 		int64_t length, box_time_t elapsed, box_time_t finish)
 	{
-		BOX_TRACE("Read " << readSize << " bytes at " << offset << 
+		BOX_TRACE("Read " << readSize << " bytes at " << offset <<
 			", " << (length - offset) << " remain, eta " <<
 			BoxTimeToSeconds(finish - elapsed) << "s");
 	}
 	virtual void NotifyReadProgress(int64_t readSize, int64_t offset,
 		int64_t length)
 	{
-		BOX_TRACE("Read " << readSize << " bytes at " << offset << 
+		BOX_TRACE("Read " << readSize << " bytes at " << offset <<
 			", " << (length - offset) << " remain");
 	}
 	virtual void NotifyReadProgress(int64_t readSize, int64_t offset)
 	{
-		BOX_TRACE("Read " << readSize << " bytes at " << offset << 
+		BOX_TRACE("Read " << readSize << " bytes at " << offset <<
 			", unknown bytes remaining");
 	}
 

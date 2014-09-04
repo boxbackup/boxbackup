@@ -350,12 +350,9 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 	std::auto_ptr<RaidFileRead> objectFile(RaidFileRead::Open(mStoreDiscSet, filename, &revID));
 	ASSERT(revID != 0);
 	
-	// New directory object
-	std::auto_ptr<BackupStoreDirectory> dir(new BackupStoreDirectory);
-	
 	// Read it from the stream, then set it's revision ID
 	BufferedStream buf(*objectFile);
-	dir->ReadFromStream(buf, IOStream::TimeOutInfinite);
+	std::auto_ptr<BackupStoreDirectory> dir(new BackupStoreDirectory(buf));
 	dir->SetRevisionID(revID);
 			
 	// Make sure the size of the directory is available for writing the dir back

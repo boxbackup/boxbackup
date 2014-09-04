@@ -224,7 +224,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 			DIRECTORY_SEPARATOR_ASCHAR + 
 			rLevel.mNextLevelLocalName);
 		BackupClientRestoreDir(rConnection, rLevel.mNextLevelID,
-			rRemoteDirectoryName + '/' + 
+			rRemoteDirectoryName + '/' +
 			rLevel.mNextLevelLocalName, localDirname,
 			Params, *rLevel.mpNextLevel);
 		
@@ -232,7 +232,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 		rLevel.mRestoredObjects.insert(rLevel.mNextLevelID);
 
 		// Remove the level for the recursed directory
-		rLevel.RemoveLevel();		
+		rLevel.RemoveLevel();
 	}
 	
 	// Create the local directory, if not already done.
@@ -299,7 +299,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 	}
 
 	std::string parentDirectoryName(rLocalDirectoryName);
-	if(parentDirectoryName[parentDirectoryName.size() - 1] == 
+	if(parentDirectoryName[parentDirectoryName.size() - 1] ==
 		DIRECTORY_SEPARATOR_ASCHAR)
 	{
 		parentDirectoryName.resize(parentDirectoryName.size() - 1);
@@ -309,7 +309,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 
 	if(lastSlash == std::string::npos)
 	{
-		// might be a forward slash separator, 
+		// might be a forward slash separator,
 		// especially in the unit tests!
 		lastSlash = parentDirectoryName.rfind('/');
 	}
@@ -889,7 +889,7 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	}
 	
 	// Restore the directory
-	int result = BackupClientRestoreDir(rConnection, DirectoryID, 
+	int result = BackupClientRestoreDir(rConnection, DirectoryID,
 		RemoteDirectoryName, LocalDirectoryName, params,
 		params.mResumeInfo);
 	if (result != Restore_Complete)

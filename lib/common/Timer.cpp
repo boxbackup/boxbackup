@@ -155,7 +155,7 @@ void Timers::Remove(Timer& rTimer)
 			}
 		}
 	}
-		
+
 	Reschedule();
 }
 

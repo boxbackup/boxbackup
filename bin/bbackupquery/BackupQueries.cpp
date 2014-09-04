@@ -291,8 +291,8 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 #endif
 	
 		// Attempt to find the directory
-		rootDir = FindDirectoryObjectID(storeDirEncoded, 
-			opts[LIST_OPTION_ALLOWOLD], 
+		rootDir = FindDirectoryObjectID(storeDirEncoded,
+			opts[LIST_OPTION_ALLOWOLD],
 			opts[LIST_OPTION_ALLOWDELETED]);
 
 		if(rootDir == 0)

@@ -72,8 +72,9 @@ std::auto_ptr<TestProtocolMessage> TestProtocolGetStream::DoCommand(TestProtocol
 	return std::auto_ptr<TestProtocolMessage>(new TestProtocolGetStream(mStartingValue, mUncertainSize));
 }
 
-std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(TestProtocolReplyable &rProtocol,
-	TestContext &rContext, IOStream& rDataStream) const
+std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(
+	TestProtocolReplyable &rProtocol, TestContext &rContext,
+	IOStream& rDataStream) const
 {
 	if(mValue != 0x73654353298ffLL)
 	{

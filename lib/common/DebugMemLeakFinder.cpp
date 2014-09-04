@@ -599,9 +599,6 @@ void memleakfinder_setup_exit_report(const char *filename, const char *markertex
 	}
 }
 
-
-
-
 void add_object_block(void *block, size_t size, const char *file, int line, bool array)
 {
 	InternalAllocGuard guard;
