@@ -674,15 +674,8 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 
 TLSContext context;
 
-void recursive_count_objects(const char *hostname, int64_t id, recursive_count_objects_results &results)
+void recursive_count_objects(int64_t id, recursive_count_objects_results &results)
 {
-	// Context
-	TLSContext context;
-	context.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
-
 	// Get a connection
 	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
 		"backup/01234567/", 0, false);
@@ -2030,10 +2023,9 @@ bool test_cannot_open_multiple_writable_connections()
 		assert_readonly_connection_succeeds(protocolReadOnly));
 
 	// Try network connections too.
-	TLSContext context;
 
 	BackupProtocolClient protocolWritable3(open_conn("localhost", context));
-	assert_writable_connection_fails(protocolWritable3);
+	TEST_THAT(assert_writable_connection_fails(protocolWritable3));
 
 	BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
 	TEST_EQUAL(0x8732523ab23aLL,
@@ -2481,8 +2473,8 @@ bool test_housekeeping_deletes_files()
 	// First, things as they are now.
 	TEST_THAT_ABORTONFAIL(StartServer());
 	recursive_count_objects_results before = {0,0,0};
-	recursive_count_objects("localhost", BACKUPSTORE_ROOT_DIRECTORY_ID, before);
-	
+	recursive_count_objects(BACKUPSTORE_ROOT_DIRECTORY_ID, before);
+
 	TEST_EQUAL(0, before.objectsNotDel);
 	TEST_THAT(before.deleted != 0);
 	TEST_THAT(before.old != 0);
@@ -2493,31 +2485,12 @@ bool test_housekeeping_deletes_files()
 	// Reduce the store limits, so housekeeping will remove all old files.
 	// Leave the hard limit high, so we know that housekeeping's target
 	// for freeing space is the soft limit.
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
-		" -c testfiles/bbstored.conf setlimit 01234567 "
-		"10B 20000B") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-	// Start things up
-	TEST_THAT(StartServer());
-
-	// wait for housekeeping to happen
-	printf("waiting for housekeeping:\n");
-	for(int l = 0; l < 30; ++l)
-	{
-		::sleep(1);
-		printf(".");
-		fflush(stdout);
-	}
-	printf("\n");
+	TEST_THAT(change_account_limits("0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account());
 
 	// Count the objects again
 	recursive_count_objects_results after = {0,0,0};
-	recursive_count_objects("localhost", 
-		BackupProtocolListDirectory::RootDirectory, 
-		after);
-
-	// If these tests fail then try increasing the timeout above
+	recursive_count_objects(BACKUPSTORE_ROOT_DIRECTORY_ID, after);
 	TEST_EQUAL(before.objectsNotDel, after.objectsNotDel);
 	TEST_EQUAL(0, after.deleted);
 	TEST_EQUAL(0, after.old);
