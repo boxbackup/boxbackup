@@ -124,7 +124,7 @@ class ProgressNotifier
 	virtual void NotifyFileUploaded(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
-		int64_t FileSize, int64_t UploadedSize) = 0;
+		int64_t FileSize, int64_t UploadedSize, int64_t ObjectID) = 0;
 	virtual void NotifyFileSynchronised(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,

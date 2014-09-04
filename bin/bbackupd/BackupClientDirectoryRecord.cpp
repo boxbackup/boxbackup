@@ -1278,7 +1278,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 			}
 		}
-		
+
 		if (fileSynced)
 		{
 			rNotifier.NotifyFileSynchronised(this, nonVssFilePath,
@@ -1857,7 +1857,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 	}
 
 	rNotifier.NotifyFileUploaded(this, rNonVssFilePath, FileSize,
-		uploadedSize);
+		uploadedSize, objID);
 
 	// Return the new object ID of this file
 	return objID;
