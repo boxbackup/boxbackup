@@ -189,7 +189,9 @@ void BufferedStream::Close()
 // --------------------------------------------------------------------------
 bool BufferedStream::StreamDataLeft()
 {
-	return mrSource.StreamDataLeft();
+	// Return true if either the source has data left to read, or we have
+	// buffered data still to be read.
+	return mrSource.StreamDataLeft() || (mBufferPosition < mBufferSize);
 }
 
 // --------------------------------------------------------------------------
