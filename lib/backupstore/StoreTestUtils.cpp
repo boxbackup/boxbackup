@@ -55,6 +55,7 @@ bool delete_account()
 
 std::vector<uint32_t> ExpectedRefCounts;
 int bbstored_pid = 0;
+std::string OriginalWorkingDir;
 
 bool setUp(const char* function_name)
 {
@@ -87,17 +88,35 @@ bool setUp(const char* function_name)
 		StopServer();
 	}
 
+	if (OriginalWorkingDir == "")
+	{
+		char buf[1024];
+		if (getcwd(buf, sizeof(buf)) == NULL)
+		{
+			BOX_LOG_SYS_ERROR("getcwd");
+		}
+		OriginalWorkingDir = buf;
+	}
+	else
+	{
+		if (chdir(OriginalWorkingDir.c_str()) != 0)
+		{
+			BOX_LOG_SYS_ERROR("chdir");
+		}
+	}
+
 	TEST_THAT_THROWONFAIL(system(
 		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
 		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
 		"testfiles/file* testfiles/notifyran testfiles/notifyran.* "
 		"testfiles/notifyscript.tag* "
-		"testfiles/restore* "
+		"testfiles/restore* testfiles/bbackupd-data "
 		"testfiles/syncallowscript.control "
 		"testfiles/syncallowscript.notifyran.*") == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
 	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 	TEST_THAT_THROWONFAIL(create_account(10000, 20000));
 
@@ -114,12 +133,6 @@ bool tearDown()
 	if (ServerIsAlive(bbstored_pid))
 	{
 		TEST_THAT_OR(StopServer(), status = false);
-	}
-
-	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
-	{
-		TEST_THAT(check_reference_counts());
-		TEST_THAT(check_account());
 	}
 
 	return status;
