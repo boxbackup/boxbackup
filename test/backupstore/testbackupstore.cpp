@@ -1118,8 +1118,10 @@ int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id
 	// Attributes
 	std::auto_ptr<IOStream> attr(new MemBlockStream(attr1, sizeof(attr1)));
 
-	std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-		parent_dir_id, FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
+	std::auto_ptr<BackupProtocolSuccess> dirCreate(
+		protocol.QueryCreateDirectory2(
+			parent_dir_id, FAKE_ATTR_MODIFICATION_TIME,
+			FAKE_MODIFICATION_TIME, dirname, attr));
 
 	int64_t subdirid = dirCreate->GetObjectID();
 	set_refcount(subdirid, 1);
@@ -1442,17 +1444,38 @@ bool test_multiple_uploads()
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 4, 2, 1));
 		}
+	}
 
+#ifndef WIN32
+	apProtocolReadOnly->QueryFinished();
+#endif
+	apProtocol->QueryFinished();
+
+	return teardown_test_backupstore();
+}
+
+bool test_server_commands()
+{
+	SETUP();
+
+	std::auto_ptr<BackupProtocolLocal2> apProtocol(
+		new BackupProtocolLocal2(0x01234567, "test",
+			"backup/01234567/", 0, false));
+
+	// TODO FIXME dedent this block.
+	{
 		// Create a directory
 		int64_t subdirid = create_directory(*apProtocol);
-		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 4, 2, 2));
+		TEST_THAT(check_num_files(0, 0, 0, 2));
 
 		// Stick a file in it
 		int64_t subdirfileid = create_file(*apProtocol, subdirid);
-		TEST_THAT(check_num_files(UPLOAD_NUM - 3, 4, 2, 2));
+		TEST_THAT(check_num_files(1, 0, 0, 2));
 
-		BOX_TRACE("Checking upload using read-only connection");
-		// Check the directories on the read only connection
+		BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
+			"backup/01234567/", 0, true); // read-only
+
+		BOX_TRACE("Checking root directory using read-only connection");
 		{
 			// Command
 			std::auto_ptr<BackupProtocolSuccess> dirreply(
@@ -1462,8 +1485,9 @@ bool test_multiple_uploads()
 					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */)); // Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
-			TEST_EQUAL(UPLOAD_NUM + 2, dir.GetNumberOfEntries());
-			// for the patched upload, and this new dir.
+
+			// UPLOAD_NUM test files, patch uploaded and new dir
+			TEST_EQUAL(1, dir.GetNumberOfEntries());
 
 			// Check the last one...
 			BackupStoreDirectory::Iterator i(dir);
@@ -1483,10 +1507,12 @@ bool test_multiple_uploads()
 			}
 
 			// Check that the last entry looks right
+			TEST_EQUAL(subdirid, en->GetObjectID());
 			TEST_THAT(en->GetName() == dirname);
-			TEST_THAT(en->GetFlags() == BackupProtocolListDirectory::Flags_Dir);
-			TEST_THAT(en->GetObjectID() == subdirid);
-			TEST_THAT(en->GetModificationTime() == 0);	// dirs don't have modification times.
+			TEST_EQUAL(BackupProtocolListDirectory::Flags_Dir, en->GetFlags());
+			int64_t actual_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
+			TEST_EQUAL(FAKE_MODIFICATION_TIME, en->GetModificationTime());
 		}
 
 		BOX_TRACE("Checking subdirectory using read-only connection");
@@ -1571,6 +1597,29 @@ bool test_multiple_uploads()
 			TEST_THAT(dir.GetAttributes() == attrtest);
 		}
 		
+		BackupStoreFilenameClear& oldName(uploads[0].name);
+		int64_t root_file_id = create_file(*apProtocol, BACKUPSTORE_ROOT_DIRECTORY_ID);
+		TEST_THAT(check_num_files(2, 0, 0, 2));
+
+		// Upload a new version of the file as well, to ensure that the
+		// old version is moved along with the current version.
+		int64_t old_root_file_id = root_file_id;
+		root_file_id = BackupStoreFile::QueryStoreFileDiff(*apProtocol,
+			"testfiles/test0", BACKUPSTORE_ROOT_DIRECTORY_ID,
+			0, // DiffFromFileID
+			0, // AttributesHash
+			oldName);
+		set_refcount(root_file_id, 1);
+		TEST_THAT(check_num_files(2, 1, 0, 2));
+
+		// Check that it's in the root directory (it won't be for long)
+		protocolReadOnly.QueryListDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			0, 0, false);
+		TEST_THAT(BackupStoreDirectory(protocolReadOnly.ReceiveStream())
+			.FindEntryByID(root_file_id) != NULL);
+
+		BackupStoreFilenameClear newName("moved-files");
+
 		// Sleep before modifying the root directory, to ensure that
 		// the timestamp on the file it's stored in will change when
 		// we modify it, invalidating the read-only connection's cache
@@ -1580,12 +1629,10 @@ bool test_multiple_uploads()
 
 		// Test moving a file
 		{
-			BackupStoreFilenameClear newName("moved-files");
-		
-			std::auto_ptr<BackupProtocolSuccess> rep(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+			std::auto_ptr<BackupProtocolSuccess> rep(apProtocol->QueryMoveObject(root_file_id,
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName));
-			TEST_THAT(rep->GetObjectID() == uploads[UPLOAD_FILE_TO_MOVE].allocated_objid);
+			TEST_EQUAL(root_file_id, rep->GetObjectID());
 		}
 
 		// Try some dodgy renames
@@ -1603,31 +1650,17 @@ bool test_multiple_uploads()
 
 		// Rename within a directory (successfully)
 		{
-			BackupStoreFilenameClear newName("moved-files-x");
-			apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
-				subdirid,
-				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName);
+			BackupStoreFilenameClear newName2("moved-files-x");
+			apProtocol->QueryMoveObject(root_file_id, subdirid,
+				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				newName2);
 		}
 
 		// Check it's all gone from the root directory...
-		{
-			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					BackupProtocolListDirectory::RootDirectory,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
-			// Stream
-			BackupStoreDirectory dir;
-			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
-			dir.ReadFromStream(*dirstream, SHORT_TIMEOUT);
-			// Read all entries
-			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry *en = 0;
-			while((en = i.Next()) != 0)
-			{
-				TEST_THAT(en->GetName() != uploads[UPLOAD_FILE_TO_MOVE].name);
-			}
-		}
+		protocolReadOnly.QueryListDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			0, 0, false);
+		TEST_THAT(BackupStoreDirectory(protocolReadOnly.ReceiveStream(),
+			SHORT_TIMEOUT).FindEntryByID(root_file_id) == NULL);
 
 		// Check the old and new versions are in the other directory
 		{
@@ -1675,6 +1708,8 @@ bool test_multiple_uploads()
 			subsubdirid = apProtocol->QueryCreateDirectory(subdirid,
 				FAKE_ATTR_MODIFICATION_TIME, nd, attr)->GetObjectID();
 
+			write_test_file(2);
+
 			BackupStoreFilenameClear file2("file2");
 			std::auto_ptr<IOStream> upload(
 				BackupStoreFile::EncodeFile("testfiles/test2",
@@ -1691,11 +1726,11 @@ bool test_multiple_uploads()
 
 		set_refcount(subsubdirid, 1);
 		set_refcount(subsubfileid, 1);
-		TEST_THAT(check_num_files(UPLOAD_NUM - 2, 4, 2, 3));
+		TEST_THAT(check_num_files(3, 1, 0, 3));
 
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
+		apProtocol->Reopen();
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
@@ -1751,12 +1786,16 @@ bool test_multiple_uploads()
 			
 //}	skip:
 
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 		std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 			BackupStoreRefCountDatabase::Load(
 				apAccounts->GetEntry(0x1234567), true));
 
 		// Create some nice recursive directories
 		TEST_THAT(check_reference_counts());
+
+		write_test_file(1);
 		int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 			BACKUPSTORE_ROOT_DIRECTORY_ID,
 			"test_delete", 6 /* depth */, apRefCount.get());
@@ -1767,8 +1806,7 @@ bool test_multiple_uploads()
 		TEST_THAT(check_reference_counts());
 
 		// And delete them
-		apProtocol.reset(new BackupProtocolLocal2(0x01234567, "test",
-			"backup/01234567/", 0, false)); // Not read-only
+		apProtocol->Reopen();
 
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
@@ -2960,6 +2998,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
 	TEST_THAT(test_server_housekeeping());
+	TEST_THAT(test_server_commands());
 	TEST_THAT(test_account_limits_respected());
 	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
