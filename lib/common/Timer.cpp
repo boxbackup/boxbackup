@@ -256,6 +256,8 @@ void Timers::Reschedule()
 	// win32 timers need no management
 #else
 	box_time_t timeNow = GetCurrentBoxTime();
+	int64_t timeToNextEvent;
+	std::string nameOfNextEvent;
 
 	// scan for, trigger and remove expired timers. Removal requires
 	// us to restart the scan each time, due to std::vector semantics.
@@ -263,6 +265,7 @@ void Timers::Reschedule()
 	while (restart)
 	{
 		restart = false;
+		timeToNextEvent = 0;
 
 		for (std::vector<Timer*>::iterator i = spTimers->begin();
 			i != spTimers->end(); i++)
@@ -290,35 +293,14 @@ void Timers::Reschedule()
 					" seconds");
 				*/
 			}
+
+			if (timeToNextEvent == 0 || timeToNextEvent > timeToExpiry)
+			{
+				timeToNextEvent = timeToExpiry;
+				nameOfNextEvent = rTimer.GetName();
+			}
 		}
 	}
-
-	// Now the only remaining timers should all be in the future.
-	// Scan to find the next one to fire (earliest deadline).
-			
-	int64_t timeToNextEvent = 0;
-	std::string nameOfNextEvent;
-
-	for (std::vector<Timer*>::iterator i = spTimers->begin();
-		i != spTimers->end(); i++)
-	{
-		Timer& rTimer = **i;
-		int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
-
-		ASSERT(timeToExpiry > 0)
-		if (timeToExpiry <= 0)
-		{
-			timeToExpiry = 1;
-		}
-		
-		if (timeToNextEvent == 0 || timeToNextEvent > timeToExpiry)
-		{
-			timeToNextEvent = timeToExpiry;
-			nameOfNextEvent = rTimer.GetName();
-		}
-	}
-	
-	ASSERT(timeToNextEvent >= 0);
 
 	if (timeToNextEvent == 0)
 	{
