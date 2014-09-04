@@ -30,7 +30,10 @@ extern int bbstored_pid;
 bool setUp(const char* function_name);
 
 //! Checks account for errors and shuts down daemons at end of every test.
-void tearDown();
+bool tearDown();
+
+//! Like tearDown() but returns false, because a test failure was detected.
+bool fail();
 
 //! Sets the expected refcount of an object, resizing vector if necessary.
 void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
@@ -42,9 +45,12 @@ void init_context(TLSContext& rContext);
 std::auto_ptr<SocketStream> open_conn(const char *hostname,
 	TLSContext& rContext);
 
+//! Opens a connection to the server (bbstored) without logging in.
+std::auto_ptr<BackupProtocolCallable> connect_to_bbstored(TLSContext& rContext);
+
 //! Opens a connection to the server (bbstored) and logs in.
-std::auto_ptr<BackupProtocolCallable> test_server_login(const char *hostname,
-	TLSContext& rContext, int flags = 0);
+std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
+	int flags = 0);
 
 //! Checks the number of files of each type in the store against expectations.
 bool check_num_files(int files, int old, int deleted, int dirs);
@@ -52,6 +58,9 @@ bool check_num_files(int files, int old, int deleted, int dirs);
 //! Checks the number of blocks in files of each type against expectations.
 bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 	int Deleted, int Dirs, int Total);
+
+//! Change the soft and hard limits on the test account.
+bool change_account_limits(const char* soft, const char* hard);
 
 //! Checks an account for errors, returning the number of errors found and fixed.
 int check_account_for_errors(Log::Level log_level = Log::WARNING);

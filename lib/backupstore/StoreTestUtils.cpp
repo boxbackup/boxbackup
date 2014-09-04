@@ -87,9 +87,14 @@ bool setUp(const char* function_name)
 		StopServer();
 	}
 
-	TEST_THAT_THROWONFAIL(system("rm -rf testfiles/0_0 testfiles/0_1 "
-		"testfiles/0_2 testfiles/accounts.txt testfiles/test* "
-		"testfiles/file*") == 0);
+	TEST_THAT_THROWONFAIL(system(
+		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
+		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
+		"testfiles/file* testfiles/notifyran testfiles/notifyran.* "
+		"testfiles/notifyscript.tag* "
+		"testfiles/restore* "
+		"testfiles/syncallowscript.control "
+		"testfiles/syncallowscript.notifyran.*") == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
@@ -102,11 +107,13 @@ bool setUp(const char* function_name)
 	return true;
 }
 
-void tearDown()
+bool tearDown()
 {
+	bool status = true;
+
 	if (ServerIsAlive(bbstored_pid))
 	{
-		StopServer();
+		TEST_THAT_OR(StopServer(), status = false);
 	}
 
 	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
@@ -114,6 +121,14 @@ void tearDown()
 		TEST_THAT(check_reference_counts());
 		TEST_THAT(check_account());
 	}
+
+	return status;
+}
+
+bool fail()
+{
+	TEST_THAT(tearDown());
+	return false;
 }
 
 void set_refcount(int64_t ObjectID, uint32_t RefCount)
@@ -143,21 +158,29 @@ std::auto_ptr<SocketStream> open_conn(const char *hostname,
 	return static_cast<std::auto_ptr<SocketStream> >(conn);
 }
 
-std::auto_ptr<BackupProtocolCallable> test_server_login(const char *hostname,
-	TLSContext& rContext, int flags)
+std::auto_ptr<BackupProtocolCallable> connect_to_bbstored(TLSContext& rContext)
 {
 	// Make a protocol
 	std::auto_ptr<BackupProtocolCallable> protocol(new
-		BackupProtocolClient(open_conn(hostname, rContext)));
+		BackupProtocolClient(open_conn("localhost", rContext)));
 	
 	// Check the version
 	std::auto_ptr<BackupProtocolVersion> serverVersion(
 		protocol->QueryVersion(BACKUP_STORE_SERVER_VERSION));
 	TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 
+	return protocol;
+}
+
+std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
+	int flags)
+{
+	// Make a protocol
+	std::auto_ptr<BackupProtocolCallable> protocol =
+		connect_to_bbstored(rContext);
+
 	// Login
-	std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(
-		protocol->QueryLogin(0x01234567, flags));
+	protocol->QueryLogin(0x01234567, flags);
 
 	return protocol;
 }
@@ -201,6 +224,18 @@ bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 		Old == usage->GetBlocksInOldFiles() &&
 		Deleted == usage->GetBlocksInDeletedFiles() &&
 		Dirs == usage->GetBlocksInDirectories());
+}
+
+bool change_account_limits(const char* soft, const char* hard)
+{
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
+	BackupStoreAccountsControl control(*config);
+	int result = control.SetLimit(0x01234567, soft, hard);
+	TEST_EQUAL(0, result);
+	return (result == 0);
 }
 
 int check_account_for_errors(Log::Level log_level)
@@ -296,31 +331,27 @@ bool check_reference_counts()
 
 bool StartServer()
 {
-	TEST_THAT_THROWONFAIL(bbstored_pid == 0);
+	TEST_THAT_OR(bbstored_pid == 0, return false);
 
-	std::string cmd = BBSTORED " " + bbstored_args + 
+	std::string cmd = BBSTORED " " + bbstored_args +
 		" testfiles/bbstored.conf";
 	bbstored_pid = LaunchServer(cmd.c_str(), "testfiles/bbstored.pid");
 
-	TEST_THAT(bbstored_pid != -1 && bbstored_pid != 0);
-	if(bbstored_pid <= 0)
-	{
-		return false;
-	}
+	TEST_THAT_OR(bbstored_pid != -1 && bbstored_pid != 0, return false);
 
 	::sleep(1);
-	TEST_THAT_THROWONFAIL(ServerIsAlive(bbstored_pid));
+	TEST_THAT_OR(ServerIsAlive(bbstored_pid), return false);
 	return true;
 }
 
 bool StopServer(bool wait_for_process)
 {
-	TEST_THAT_THROWONFAIL(bbstored_pid != 0);
-	TEST_THAT_THROWONFAIL(ServerIsAlive(bbstored_pid));
-	TEST_THAT_THROWONFAIL(KillServer(bbstored_pid, wait_for_process));
+	TEST_THAT_OR(bbstored_pid != 0, return false);
+	TEST_THAT_OR(ServerIsAlive(bbstored_pid), return false);
+	TEST_THAT_OR(KillServer(bbstored_pid, wait_for_process), return false);
 	::sleep(1);
 
-	TEST_THAT_THROWONFAIL(!ServerIsAlive(bbstored_pid));
+	TEST_THAT_OR(!ServerIsAlive(bbstored_pid), return false);
 	bbstored_pid = 0;
 
 	#ifdef WIN32

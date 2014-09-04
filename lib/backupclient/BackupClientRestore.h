@@ -10,7 +10,7 @@
 #ifndef BACKUPSCLIENTRESTORE_H
 #define BACKUPSCLIENTRESTORE__H
 
-class BackupProtocolClient;
+class BackupProtocolCallable;
 
 enum
 {
@@ -22,7 +22,7 @@ enum
 	Restore_CompleteWithErrors,
 };
 
-int BackupClientRestore(BackupProtocolClient &rConnection,
+int BackupClientRestore(BackupProtocolCallable &rConnection,
 	int64_t DirectoryID,
 	const std::string& RemoteDirectoryName,
 	const std::string& LocalDirectoryName,
