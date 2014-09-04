@@ -2442,11 +2442,11 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				// Setup names in the location record
 				pLoc->mName = *pLocName;
 				pLoc->mPath = rConfig.GetKeyValue("Path");
-				
-				// Read the exclude lists from the Configuration
-				pLoc->mapExcludeFiles.reset(BackupClientMakeExcludeList_Files(rConfig));
-				pLoc->mapExcludeDirs.reset(BackupClientMakeExcludeList_Dirs(rConfig));
 			}
+
+			// Read the exclude lists from the Configuration
+			pLoc->mapExcludeFiles.reset(BackupClientMakeExcludeList_Files(rConfig));
+			pLoc->mapExcludeDirs.reset(BackupClientMakeExcludeList_Dirs(rConfig));
 
 			// Does this exist on the server?
 			// Remove from dir object early, so that if we fail
