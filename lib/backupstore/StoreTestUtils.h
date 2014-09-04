@@ -17,9 +17,6 @@ class BackupProtocolClient;
 class SocketStreamTLS;
 class TLSContext;
 
-//! Simplifies calling setUp() with the current function name in each test.
-#define SETUP() if (!setUp(__FUNCTION__)) return true; // skip this test
-
 //! Holds the expected reference counts of each object.
 extern std::vector<uint32_t> ExpectedRefCounts;
 
