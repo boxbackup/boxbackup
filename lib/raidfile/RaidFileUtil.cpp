@@ -18,6 +18,26 @@
 
 #include "MemLeakFindOn.h"
 
+int64_t adjust_timestamp(int64_t timestamp, size_t file_size)
+{
+#ifndef BOX_RELEASE_BUILD
+	// Remove the microseconds part of the timestamp,
+	// to simulate filesystem with 1-second timestamp
+	// resolution, e.g. MacOS X HFS, old Linuxes.
+	// Otherwise it's easy to write tests that rely
+	// on more accurate timestamps, and pass on
+	// platforms that have them, and fail on others.
+	timestamp -= (timestamp % MICRO_SEC_IN_SEC);
+#endif
+
+	// The resolution of timestamps may be very
+	// low, e.g. 1 second. So add the size to it
+	// to give a bit more chance of it changing.
+	// TODO: Make this better.
+	timestamp += file_size;
+
+	return timestamp;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -63,16 +83,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 					*pRevisionID = FileModificationTime(st);
 				#endif
 
-#ifdef BOX_RELEASE_BUILD
-				// The resolution of timestamps may be very
-				// low, e.g. 1 second. So add the size to it
-				// to give a bit more chance of it changing.
-				// TODO: Make this better.
-				// Disabled in debug mode, to simulate
-				// filesystem with 1-second timestamp
-				// resolution, e.g. MacOS X HFS, Linux.
-				(*pRevisionID) += st.st_size;
-#endif
+				*pRevisionID = adjust_timestamp(*pRevisionID, st.st_size);
 			}
 			
 			// return non-raid file
@@ -116,16 +127,8 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 	}
 	if(pRevisionID != 0)
 	{
+		revisionID = adjust_timestamp(revisionID, revisionIDplus);
 		(*pRevisionID) = revisionID;
-#ifdef BOX_RELEASE_BUILD
-		// The resolution of timestamps may be very low, e.g.
-		// 1 second. So add the size to it to give a bit more
-		// chance of it changing.
-		// TODO: Make this better.
-		// Disabled in debug mode, to simulate filesystem with
-		// 1-second timestamp resolution, e.g. MacOS X HFS, Linux.
-		(*pRevisionID) += revisionIDplus;
-#endif
 	}
 	
 	// Return a status based on how many parts are available
