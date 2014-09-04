@@ -1096,6 +1096,69 @@ bool search_for_file(const std::string& filename)
 	return (testDirId != 0);
 }
 
+class MockClientContext : public BackupClientContext
+{
+public:
+	BackupProtocolCallable& mrClient;
+	MockClientContext
+	(
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
+		const std::string &rHostname,
+		int32_t Port,
+		uint32_t AccountNumber,
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile,
+		ProgressNotifier &rProgressNotifier,
+		bool TcpNiceMode,
+		BackupProtocolCallable& rClient
+	)
+	: BackupClientContext(rResolver, rTLSContext,
+		rHostname, Port, AccountNumber, ExtendedLogging,
+		ExtendedLogToFile, ExtendedLogFile,
+		rProgressNotifier, TcpNiceMode),
+	  mrClient(rClient)
+	{ }
+
+	BackupProtocolCallable &GetConnection()
+	{
+		return mrClient;
+	}
+};
+
+class MockBackupDaemon : public BackupDaemon {
+	BackupProtocolCallable& mrClient;
+
+public:
+	MockBackupDaemon(BackupProtocolCallable &rClient)
+	: mrClient(rClient)
+	{ }
+
+	std::auto_ptr<BackupClientContext> GetNewContext
+	(
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
+		const std::string &rHostname,
+		int32_t Port,
+		uint32_t AccountNumber,
+		bool ExtendedLogging,
+		bool ExtendedLogToFile,
+		std::string ExtendedLogFile,
+		ProgressNotifier &rProgressNotifier,
+		bool TcpNiceMode
+	)
+	{
+		std::auto_ptr<BackupClientContext> context(
+			new MockClientContext(rResolver,
+				rTLSContext, rHostname, Port,
+				AccountNumber, ExtendedLogging,
+				ExtendedLogToFile, ExtendedLogFile,
+				rProgressNotifier, TcpNiceMode, mrClient));
+		return context;
+	}
+};
+
 bool test_readdirectory_on_nonexistent_dir()
 {
 	SETUP_WITH_BBSTORED();
@@ -1831,69 +1894,6 @@ bool test_bbackupd_uploads_files()
 
 	TEARDOWN();
 }
-
-class MockClientContext : public BackupClientContext
-{
-public:
-	BackupProtocolCallable& mrClient;
-	MockClientContext
-	(
-		LocationResolver &rResolver,
-		TLSContext &rTLSContext,
-		const std::string &rHostname,
-		int32_t Port,
-		uint32_t AccountNumber,
-		bool ExtendedLogging,
-		bool ExtendedLogToFile,
-		std::string ExtendedLogFile,
-		ProgressNotifier &rProgressNotifier,
-		bool TcpNiceMode,
-		BackupProtocolCallable& rClient
-	)
-	: BackupClientContext(rResolver, rTLSContext,
-		rHostname, Port, AccountNumber, ExtendedLogging,
-		ExtendedLogToFile, ExtendedLogFile,
-		rProgressNotifier, TcpNiceMode),
-	  mrClient(rClient)
-	{ }
-
-	BackupProtocolCallable &GetConnection()
-	{
-		return mrClient;
-	}
-};
-
-class MockBackupDaemon : public BackupDaemon {
-	BackupProtocolCallable& mrClient;
-
-public:
-	MockBackupDaemon(BackupProtocolCallable &rClient)
-	: mrClient(rClient)
-	{ }
-
-	std::auto_ptr<BackupClientContext> GetNewContext
-	(
-		LocationResolver &rResolver,
-		TLSContext &rTLSContext,
-		const std::string &rHostname,
-		int32_t Port,
-		uint32_t AccountNumber,
-		bool ExtendedLogging,
-		bool ExtendedLogToFile,
-		std::string ExtendedLogFile,
-		ProgressNotifier &rProgressNotifier,
-		bool TcpNiceMode
-	)
-	{
-		std::auto_ptr<BackupClientContext> context(
-			new MockClientContext(rResolver,
-				rTLSContext, rHostname, Port,
-				AccountNumber, ExtendedLogging,
-				ExtendedLogToFile, ExtendedLogFile,
-				rProgressNotifier, TcpNiceMode, mrClient));
-		return context;
-	}
-};
 
 bool test_bbackupd_responds_to_connection_failure()
 {
