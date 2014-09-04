@@ -768,35 +768,6 @@ int64_t SearchDir(BackupStoreDirectory& rDir,
 	return id;
 }
 
-std::auto_ptr<BackupProtocolClient> Connect(TLSContext& rContext)
-{
-	SocketStreamTLS* pConn = new SocketStreamTLS;
-	std::auto_ptr<SocketStream> apConn(pConn);
-	pConn->Open(rContext, Socket::TypeINET, "localhost", 22011);
-
-	std::auto_ptr<BackupProtocolClient> client;
-	client.reset(new BackupProtocolClient(apConn));
-	client->Handshake();
-	std::auto_ptr<BackupProtocolVersion> 
-		serverVersion(client->QueryVersion(
-			BACKUP_STORE_SERVER_VERSION));
-	if(serverVersion->GetVersion() != 
-		BACKUP_STORE_SERVER_VERSION)
-	{
-		THROW_EXCEPTION(BackupStoreException, 
-			WrongServerVersion);
-	}
-	return client;
-}
-
-std::auto_ptr<BackupProtocolClient> ConnectAndLogin(TLSContext& rContext,
-	int flags)
-{
-	std::auto_ptr<BackupProtocolClient> client(Connect(rContext));
-	client->QueryLogin(0x01234567, flags);
-	return client;
-}
-	
 std::auto_ptr<BackupStoreDirectory> ReadDirectory
 (
 	BackupProtocolCallable& rClient,
@@ -1077,8 +1048,22 @@ bool touch_and_wait(const std::string& filename)
 	return true;
 }
 
+TLSContext context;
+
 #define TEST_COMPARE(...) \
 	TEST_THAT(compare(BackupQueries::ReturnCode::__VA_ARGS__));
+
+bool search_for_file(const std::string& filename)
+{
+	std::auto_ptr<BackupProtocolCallable> client =
+		connect_and_login(context, BackupProtocolLogin::Flags_ReadOnly);
+
+	std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(*client);
+	int64_t testDirId = SearchDir(*dir, filename);
+	client->QueryFinished();
+
+	return (testDirId != 0);
+}
 
 int test_bbackupd()
 {
@@ -1087,7 +1072,6 @@ int test_bbackupd()
 	// wait_for_backup_operation();
 
 	// Connection gubbins
-	TLSContext context;
 	context.Initialise(false /* client */,
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
@@ -2188,15 +2172,7 @@ int test_bbackupd()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-finish.2"));
 		
 		// Did it actually get created? Should not have been!
-		std::auto_ptr<BackupProtocolCallable> client =
-			connect_and_login(context,
-				BackupProtocolLogin::Flags_ReadOnly);
-		
-		std::auto_ptr<BackupStoreDirectory> dir = 
-			ReadDirectory(*client);
-		int64_t testDirId = SearchDir(*dir, "Test2");
-		TEST_THAT(testDirId == 0);
-		client->QueryFinished();
+		TEST_THAT_OR(!search_for_file("Test2"), FAIL);
 	}
 
 	// create the location directory and unpack some files into it
@@ -2216,20 +2192,7 @@ int test_bbackupd()
 	TEST_THAT( TestFileExists("testfiles/notifyran.backup-finish.2"));
 	TEST_THAT(!TestFileExists("testfiles/notifyran.backup-finish.3"));
 
-	// BLOCK
-	{
-		std::auto_ptr<BackupProtocolCallable> client =
-			connect_and_login(context,
-				BackupProtocolLogin::Flags_ReadOnly);
-		
-		std::auto_ptr<BackupStoreDirectory> dir = 
-			ReadDirectory(*client,
-			BackupProtocolListDirectory::RootDirectory);
-		int64_t testDirId = SearchDir(*dir, "Test2");
-		TEST_THAT(testDirId != 0);
-
-		client->QueryFinished();
-	}
+	TEST_THAT_OR(search_for_file("Test2"), FAIL);
 
 	printf("\n==== Testing that redundant locations are deleted on time\n");
 
