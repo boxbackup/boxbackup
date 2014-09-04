@@ -1010,6 +1010,30 @@ bool compare(BackupQueries::ReturnCode::Type expected_status,
 	return (returnValue == expected_system_result);
 }
 
+bool compare_local(BackupQueries::ReturnCode::Type expected_status,
+	BackupProtocolCallable& client,
+	const std::string& compare_options = "acQ")
+{
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify
+			("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
+	TEST_EQUAL_OR(0, errs.size(), return false);
+	BackupQueries bbackupquery(client, *config, false);
+
+	std::vector<std::string> args;
+	bool opts[256] = {};
+	for (std::string::const_iterator i = compare_options.begin();
+		i != compare_options.end(); i++)
+	{
+		opts[(unsigned char)*i] = true;
+	}
+	bbackupquery.CommandCompare(args, opts);
+	TEST_EQUAL_OR(expected_status, bbackupquery.GetReturnCode(),
+		return false);
+	return true;
+}
+
 bool bbackupquery(const std::string& arguments,
 	const std::string& memleaks_file = "bbackupquery.memleaks")
 {
@@ -1057,6 +1081,8 @@ TLSContext context;
 
 #define TEST_COMPARE(...) \
 	TEST_THAT(compare(BackupQueries::ReturnCode::__VA_ARGS__));
+#define TEST_COMPARE_LOCAL(...) \
+	TEST_THAT(compare_local(BackupQueries::ReturnCode::__VA_ARGS__));
 
 bool search_for_file(const std::string& filename)
 {
@@ -3095,28 +3121,11 @@ bool test_excluded_files_are_not_backed_up()
 
 		// compare with exclusions, should not find differences
 		// TEST_COMPARE(Compare_Same);
-		std::string errs;
-		std::auto_ptr<Configuration> config(
-			Configuration::LoadAndVerify
-				("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
-		TEST_EQUAL(0, errs.size());
-		BackupQueries bbackupquery(client, *config, false);
-
-		std::vector<std::string> args;
-		bool opts[256] = {};
-		opts['a'] = true;
-		opts['c'] = true;
-		opts['Q'] = true;
-		bbackupquery.CommandCompare(args, opts);
-		TEST_EQUAL(BackupQueries::ReturnCode::Compare_Same,
-			bbackupquery.GetReturnCode());
+		TEST_COMPARE_LOCAL(Compare_Same, client);
 
 		// compare without exclusions, should find differences
 		// TEST_COMPARE(Compare_Different, "", "-acEQ");
-		opts['E'] = true;
-		bbackupquery.CommandCompare(args, opts);
-		TEST_EQUAL(BackupQueries::ReturnCode::Compare_Different,
-			bbackupquery.GetReturnCode());
+		TEST_COMPARE_LOCAL(Compare_Different, client, "acEQ");
 
 		// check that the excluded files did not make it
 		// into the store, and the included files did
