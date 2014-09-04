@@ -403,11 +403,14 @@ public:
 	}
 	virtual void NotifyFileUploadingPatch(
 		const BackupClientDirectoryRecord* pDirRecord,
-		const std::string& rLocalPath)
+		const std::string& rLocalPath,
+		int64_t EstimatedBytesToUpload)
 	{
 		if (mLogAllFileAccess)
 		{
-			BOX_NOTICE("Uploading patch to file: " << rLocalPath);
+			BOX_NOTICE("Uploading patch to file: " << rLocalPath <<
+				", estimated upload size = " <<
+				EstimatedBytesToUpload);
 		}
 	}
 	virtual void NotifyFileUploadingAttributes(
