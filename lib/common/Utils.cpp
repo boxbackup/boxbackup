@@ -131,8 +131,8 @@ static std::string demangle(const std::string& mangled_name)
 
 void DumpStackBacktrace()
 {
-	void  *array[10];
-	size_t size = backtrace(array, 10);
+	void  *array[20];
+	size_t size = backtrace(array, 20);
 	BOX_TRACE("Obtained " << size << " stack frames.");
 
 	for(size_t i = 0; i < size; i++)
