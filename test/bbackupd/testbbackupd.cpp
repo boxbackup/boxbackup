@@ -87,6 +87,7 @@
 
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
+#define SHORT_TIMEOUT 5000
 
 std::string current_test_name;
 std::map<std::string, std::string> s_test_status;
@@ -777,7 +778,7 @@ std::auto_ptr<BackupStoreDirectory> ReadDirectory
 	std::auto_ptr<BackupProtocolSuccess> dirreply(
 		rClient.QueryListDirectory(id, false, 0, false));
 	std::auto_ptr<BackupStoreDirectory> apDir(
-		new BackupStoreDirectory(rClient.ReceiveStream()));
+		new BackupStoreDirectory(rClient.ReceiveStream(), SHORT_TIMEOUT));
 	return apDir;
 }
 	
