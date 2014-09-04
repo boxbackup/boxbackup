@@ -256,6 +256,12 @@ bool teardown_test_backupstore()
 	return status;
 }
 
+#define FAIL { \
+	std::ostringstream os; \
+	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
+	return fail(); \
+}
+
 bool test_filename_encoding()
 {
 	SETUP();
@@ -1187,7 +1193,7 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 bool test_multiple_uploads()
 {
 	SETUP();
-	TEST_THAT_THROWONFAIL(StartServer());
+	TEST_THAT_OR(StartServer(), FAIL);
 
 	std::auto_ptr<BackupProtocolCallable> apProtocol =
 		connect_and_login(context);
@@ -1299,6 +1305,10 @@ bool test_multiple_uploads()
 			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 0, 1));
 		}
 		
+		apProtocol->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account());
+		apProtocol = connect_and_login(context);
+
 		// Delete one of them (will implicitly delete an old version)
 		{
 			std::auto_ptr<BackupProtocolSuccess> del(apProtocol->QueryDeleteFile(
@@ -1307,6 +1317,10 @@ bool test_multiple_uploads()
 			TEST_THAT(del->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 		}
+
+		apProtocol->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account());
+		apProtocol = connect_and_login(context);
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1380,8 +1394,9 @@ bool test_multiple_uploads()
 
 		// Also check that bbstoreaccounts doesn't change anything,
 		// using an external process instead of the internal one.
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
+		TEST_THAT_OR(::system(BBSTOREACCOUNTS
+			" -c testfiles/bbstored.conf check 01234567 fix") == 0,
+			FAIL);
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		apProtocol = connect_and_login(context);
@@ -1462,6 +1477,14 @@ bool test_server_commands()
 		new BackupProtocolLocal2(0x01234567, "test",
 			"backup/01234567/", 0, false));
 
+	// Try using GetFile on a directory
+	{
+		TEST_CHECK_THROWS(apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			BACKUPSTORE_ROOT_DIRECTORY_ID),
+			ConnectionException, Protocol_UnexpectedReply);
+	}
+
+	// BLOCK
 	// TODO FIXME dedent this block.
 	{
 		// Create a directory
@@ -1637,6 +1660,13 @@ bool test_server_commands()
 
 		// Try some dodgy renames
 		{
+			// File doesn't exist at all
+			TEST_CHECK_THROWS(
+				apProtocol->QueryMoveObject(-1,
+					BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid,
+					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+					newName),
+				ConnectionException, Protocol_UnexpectedReply);
 			BackupStoreFilenameClear newName("moved-files");
 			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					BackupProtocolListDirectory::RootDirectory,
@@ -1647,6 +1677,21 @@ bool test_server_commands()
 					subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName),
 				ConnectionException, Protocol_UnexpectedReply);
 		}
+
+		// File exists, but not in this directory (we just moved it)
+		TEST_CHECK_THROWS(apProtocol->QueryMoveObject(root_file_id,
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				newName),
+			ConnectionException, Protocol_UnexpectedReply);
+
+		// Moving file to same directory that it's already in,
+		// with the same name
+		TEST_CHECK_THROWS(apProtocol->QueryMoveObject(root_file_id,
+				subdirid, subdirid,
+				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				newName),
+			ConnectionException, Protocol_UnexpectedReply);
 
 		// Rename within a directory (successfully)
 		{
@@ -1664,6 +1709,7 @@ bool test_server_commands()
 
 		// Check the old and new versions are in the other directory
 		{
+			BackupStoreFilenameClear notThere("moved-files");
 			BackupStoreFilenameClear lookFor("moved-files-x");
 
 			// Command
@@ -1683,6 +1729,10 @@ bool test_server_commands()
 			bool foundOld = false;
 			while((en = i.Next()) != 0)
 			{
+				// If we find the old name, then the rename
+				// operation didn't work.
+				TEST_THAT(en->GetName() != notThere);
+
 				if(en->GetName() == lookFor)
 				{
 					if(en->GetFlags() == (BackupStoreDirectory::Entry::Flags_File)) foundCurrent = true;
@@ -1846,11 +1896,16 @@ bool test_server_commands()
 			assert_everything_deleted(protocolReadOnly, dirtodelete);
 		}
 
+		// Undelete and check that block counts are restored properly
+		apProtocol->Reopen();
+		TEST_EQUAL(dirtodelete,
+			apProtocol->QueryUndeleteDirectory(dirtodelete)->GetObjectID());
+
 		// Finish the connections
-#ifndef WIN32
-		protocolReadOnly.QueryFinished();
-#endif
 		apProtocol->QueryFinished();
+
+		TEST_THAT(run_housekeeping_and_check_account());
+		TEST_THAT(check_reference_counts());
 	}
 
 	return teardown_test_backupstore();
@@ -1866,10 +1921,8 @@ int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
 
 	BackupStoreDirectory dir(protocol.ReceiveStream());
 	BackupStoreDirectory::Entry *en = dir.FindEntryByID(ObjectID);
-	TEST_THAT(en != 0);
-	if (!en) return -1;
-
-	TEST_EQUAL(ObjectID, en->GetObjectID());
+	TEST_THAT_OR(en != 0, return -1);
+	TEST_EQUAL_OR(ObjectID, en->GetObjectID(), return -1);
 	return en->GetSizeInBlocks();
 }
 
@@ -2025,10 +2078,19 @@ bool test_directory_parent_entry_tracks_directory_size()
 	en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
 	en->SetSizeInBlocks(1234);
+
+	// Sleep to ensure that the directory file timestamp changes, so that
+	// the read-only connection will discard its cached copy.
+	safe_sleep(1);
 	TEST_THAT(write_dir(root));
 
 	TEST_EQUAL(1234, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// Sleep to ensure that the directory file timestamp changes, so that
+	// the read-only connection will discard its cached copy.
+	safe_sleep(1);
+
 	TEST_EQUAL(1, check_account_for_errors());
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2041,7 +2103,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 bool test_cannot_open_multiple_writable_connections()
 {
 	SETUP();
-	TEST_THAT_THROWONFAIL(StartServer());
+	TEST_THAT_OR(StartServer(), return false);
 
 	// First try a local protocol. This works even on Windows.
 	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
@@ -2051,14 +2113,20 @@ bool test_cannot_open_multiple_writable_connections()
 	protocolWritable.QuerySetClientStoreMarker(0x8732523ab23aLL);
 
 	// First try a local protocol. This works even on Windows.
-	BackupProtocolLocal2 protocolWritable2(0x01234567, "test",
-		"backup/01234567/", 0, false); // Not read-only
-	assert_writable_connection_fails(protocolWritable2);
+	{
+		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
+		bsContext.SetClientHasAccount("backup/01234567/", 0);
+		BackupProtocolLocal protocolWritable2(bsContext);
+		TEST_THAT(assert_writable_connection_fails(protocolWritable2));
+	}
 
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, true); // Read-only
-	TEST_EQUAL(0x8732523ab23aLL,
-		assert_readonly_connection_succeeds(protocolReadOnly));
+	{
+		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
+		bsContext.SetClientHasAccount("backup/01234567/", 0);
+		BackupProtocolLocal protocolReadOnly(bsContext);
+		TEST_EQUAL(0x8732523ab23aLL,
+			assert_readonly_connection_succeeds(protocolReadOnly));
+	}
 
 	// Try network connections too.
 
@@ -2323,7 +2391,7 @@ bool test_login_without_account()
 
 	SETUP();
 	delete_account();
-	TEST_THAT_THROWONFAIL(StartServer());
+	TEST_THAT_OR(StartServer(), FAIL);
 
 	// BLOCK
 	{
@@ -2355,9 +2423,9 @@ bool test_bbstoreaccounts_create()
 	// Delete the account, and create it again using bbstoreaccounts
 	delete_account();
 
-	TEST_THAT_THROWONFAIL(::system(BBSTOREACCOUNTS
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf -Wwarning create 01234567 0 "
-		"10000B 20000B") == 0);
+		"10000B 20000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	return teardown_test_backupstore();
@@ -2366,12 +2434,12 @@ bool test_bbstoreaccounts_create()
 bool test_bbstoreaccounts_delete()
 {
 	SETUP();
-	TEST_THAT_THROWONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf -Wwarning delete 01234567 yes") == 0);
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf -Wwarning delete 01234567 yes") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
-	TEST_THAT_THROWONFAIL(create_account(10000, 20000));
+	TEST_THAT(create_account(10000, 20000));
 
 	return teardown_test_backupstore();
 }
@@ -2380,7 +2448,7 @@ bool test_bbstoreaccounts_delete()
 bool test_login_with_disabled_account()
 {
 	SETUP();
-	TEST_THAT_THROWONFAIL(StartServer());
+	TEST_THAT_OR(StartServer(), FAIL);
 
 	TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
 	TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
@@ -2400,8 +2468,8 @@ bool test_login_with_disabled_account()
 	apReferences.reset();
 	
 	// Test that login fails on a disabled account 
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 no") == 0);
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// BLOCK
@@ -2427,14 +2495,10 @@ bool test_login_with_disabled_account()
 bool test_login_with_no_refcount_db()
 {
 	SETUP();
-	TEST_THAT_THROWONFAIL(StartServer());
 
-	// It's easier to test this if we disable housekeeping, so run
-	// without a server.
-	// TEST_THAT_THROWONFAIL(StartServer());
-
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
+	// The account is already enabled, but doing it again shouldn't hurt
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Delete the refcount database and try to log in again. Check that
@@ -2450,40 +2514,35 @@ bool test_login_with_no_refcount_db()
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 	BackupStoreAccountDatabase::Entry account =
 		apAccounts->GetEntry(0x1234567);
-	run_housekeeping(account);
+	TEST_EQUAL_LINE(1, run_housekeeping(account),
+		"Housekeeping should report 1 error if the refcount db is missing");
+	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+
+	// And that we can log in afterwards
+	BackupProtocolLocal2(0x01234567, "test", "backup/01234567/", 0,
+		false).QueryFinished(); // Not read-only
 
 	// Check that housekeeping fixed the ref counts
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
-		BackupStoreRefCountDatabase::Load(account, true);
-	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
-		apReferences->GetLastObjectIDUsed());
-	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
-	apReferences.reset();
+	TEST_THAT(check_reference_counts());
+
+	// Start a server and try again, remotely. This is difficult to debug
+	// because housekeeping may fix the refcount database while we're
+	// stepping through.
+	TEST_THAT_THROWONFAIL(StartServer());
+	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_CHECK_THROWS(connect_and_login(context),
+		ConnectionException, Protocol_UnexpectedReply);
 
 	TEST_THAT(ServerIsAlive(bbstored_pid));
 
-	// test that all object reference counts have the
-	// expected values
-	apReferences = BackupStoreRefCountDatabase::Load(account, true);
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-	TEST_EQUAL(ExpectedRefCounts.size() - 1,
-		apReferences->GetLastObjectIDUsed());
-	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
-		i < ExpectedRefCounts.size(); i++)
-	{
-		TEST_EQUAL_LINE(ExpectedRefCounts[i],
-			apReferences->GetRefCount(i),
-			"object " << BOX_FORMAT_OBJECTID(i));
-	}
+	// Run housekeeping, check that it fixes the refcount db
+	TEST_EQUAL_LINE(1, run_housekeeping(account),
+		"Housekeeping should report 1 error if the refcount db is missing");
+	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_THAT(check_reference_counts());
 
-	// Delete the refcount database again, and let
-	// housekeeping recreate it and fix the ref counts.
-	// This could also happen after upgrade, if a housekeeping
-	// runs before the user logs in.
-	apReferences.reset();
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
-	run_housekeeping(account);
-	apReferences = BackupStoreRefCountDatabase::Load(account, true);
+	// And that we can log in afterwards
+	connect_and_login(context)->QueryFinished();
 
 	return teardown_test_backupstore();
 }
@@ -2509,7 +2568,7 @@ bool test_housekeeping_deletes_files()
 	protocolLocal.QueryFinished();
 
 	// First, things as they are now.
-	TEST_THAT_ABORTONFAIL(StartServer());
+	TEST_THAT_OR(StartServer(), FAIL);
 	recursive_count_objects_results before = {0,0,0};
 	recursive_count_objects(BACKUPSTORE_ROOT_DIRECTORY_ID, before);
 
@@ -2548,28 +2607,28 @@ bool test_housekeeping_deletes_files()
 bool test_account_limits_respected()
 {
 	SETUP();
-	TEST_THAT_THROWONFAIL(StartServer());
+	TEST_THAT_OR(StartServer(), FAIL);
 
 	// Set a really small hard limit
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS 
 		" -c testfiles/bbstored.conf setlimit 01234567 "
-		"2B 2B") == 0);
+		"2B 2B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Try to upload a file and create a directory, and check an error is generated
 	{
-		// Open a connection to the server
-		BackupProtocolClient protocol(open_conn("localhost", context));
-
-		int64_t modtime = 0;
-		
 		write_test_file(3);
+
+		// Open a connection to the server
+		std::auto_ptr<BackupProtocolCallable> apProtocol(
+			connect_and_login(context));
 		BackupStoreFilenameClear fnx("exceed-limit");
-		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BackupProtocolListDirectory::RootDirectory, fnx, &modtime));
+		int64_t modtime = 0;
+		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime));
 		TEST_THAT(modtime != 0);
 
-		TEST_CHECK_THROWS(protocol.QueryStoreFile(
-				BackupProtocolListDirectory::RootDirectory,
+		TEST_CHECK_THROWS(apProtocol->QueryStoreFile(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				modtime,
 				modtime, /* use it for attr hash too */
 				0,							/* diff from ID */
@@ -2581,13 +2640,13 @@ bool test_account_limits_respected()
 		// kills the connection. TODO FIXME return an error instead.
 		std::auto_ptr<IOStream> attr(new MemBlockStream(&modtime, sizeof(modtime)));
 		BackupStoreFilenameClear fnxd("exceed-limit-dir");
-		TEST_CHECK_THROWS(protocol.QueryCreateDirectory(
+		TEST_CHECK_THROWS(apProtocol->QueryCreateDirectory(
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				FAKE_ATTR_MODIFICATION_TIME, fnxd, attr),
 			ConnectionException, Protocol_UnexpectedReply);
 
-		// Finish the connection. TODO FIXME reinstate this.
-		protocol.QueryFinished();
+		// Finish the connection.
+		apProtocol->QueryFinished();
 	}
 
 	return teardown_test_backupstore();
@@ -2598,9 +2657,9 @@ int multi_server()
 	printf("Starting server for connection from remote machines...\n");
 
 	// Create an account for the test client
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS 
 		" -c testfiles/bbstored.conf create 01234567 0 "
-		"30000B 40000B") == 0);
+		"30000B 40000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// First, try logging in without an account having been created... just make sure login fails.
@@ -2883,14 +2942,14 @@ bool test_read_old_backupstoreinfo_files()
 		"with extra_data", info_v1, *apInfo, "test", true, extra_data);
 		
 	// Check that the new bbstoreaccounts command sets the flag properly
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 no") == 0);
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
 	TEST_EQUAL_LINE(false, apInfo->IsAccountEnabled(),
 		"'bbstoreaccounts disabled no' should have reset AccountEnabled flag");
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
+		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
 	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
@@ -2931,9 +2990,7 @@ bool test_read_old_backupstoreinfo_files()
 
 	// Delete the account to stop teardown_test_backupstore checking it for errors.
 	apInfo.reset();
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf delete 01234567 yes") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	TEST_THAT(delete_account());
 
 	return teardown_test_backupstore();
 }
@@ -2985,6 +3042,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
 	TEST_THAT(test_directory_parent_entry_tracks_directory_size());
+	TEST_THAT(test_cannot_open_multiple_writable_connections());
 	TEST_THAT(test_encoding());
 	TEST_THAT(test_symlinks());
 	TEST_THAT(test_store_info());
@@ -3003,6 +3061,6 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
 
-	return 0;
+	return (failures == 0);
 }
 

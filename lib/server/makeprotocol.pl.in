@@ -1068,17 +1068,30 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 		std::auto_ptr<$message_base_class> preply;
 
 		// Run the command
-		if(pobj->HasStreamWithCommand())
+		try
 		{
-			std::auto_ptr<IOStream> apDataStream = ReceiveStream();
-			SelfFlushingStream autoflush(*apDataStream);
-			preply = pobj->DoCommand(*this, rContext, *apDataStream);
+			if(pobj->HasStreamWithCommand())
+			{
+				std::auto_ptr<IOStream> apDataStream = ReceiveStream();
+				SelfFlushingStream autoflush(*apDataStream);
+				preply = pobj->DoCommand(*this, rContext, *apDataStream);
+			}
+			else
+			{
+				preply = pobj->DoCommand(*this, rContext);
+			}
 		}
-		else
+		catch (std::exception &e)
 		{
-			preply = pobj->DoCommand(*this, rContext);
+			Send($cmd_classes{$error_message}());
+			throw;
 		}
-
+		catch (...)
+		{
+			Send($cmd_classes{$error_message}());
+			throw;
+		}
+		
 		// Send the reply
 		Send(*preply);
 
