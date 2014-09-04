@@ -43,7 +43,9 @@
 #endif
 
 #include "BackupClientCryptoKeys.h"
+#include "BackupClientContext.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupClientInodeToIDMap.h"
 #include "BackupClientRestore.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
@@ -67,6 +69,7 @@
 #include "intercept.h"
 #include "IOStreamGetLine.h"
 #include "LocalProcessStream.h"
+#include "MemBlockStream.h"
 #include "RaidFileController.h"
 #include "SSLLib.h"
 #include "ServerControl.h"
@@ -1214,6 +1217,158 @@ bool test_getobject_on_nonexistent_file()
 		
 	TEARDOWN();
 }
+
+// ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0)) in
+// BackupStoreFileEncodeStream::Recipe::Recipe once failed, apparently because
+// a zero byte file had a block index but no entries in it. But this test
+// doesn't reproduce the error, so it's not enabled for now.
+
+bool test_replace_zero_byte_file_with_nonzero_byte_file()
+{
+	SETUP();
+
+	TEST_THAT_OR(mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
+	FileStream emptyFile("testfiles/TestDir1/f2",
+		O_WRONLY | O_CREAT | O_EXCL, 0755);
+	wait_for_operation(5, "f2 to be old enough");
+
+	BackupProtocolLocal2 client(0x01234567, "test",
+		"backup/01234567/", 0, false);
+	MockBackupDaemon bbackupd(client);
+	TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"));
+	bbackupd.RunSyncNow();
+	TEST_COMPARE_LOCAL(Compare_Same, client);
+
+	MemBlockStream stream("Hello world");
+	stream.CopyStreamTo(emptyFile);
+	emptyFile.Close();
+	wait_for_operation(5, "f2 to be old enough");
+
+	bbackupd.RunSyncNow();
+	TEST_COMPARE_LOCAL(Compare_Same, client);
+
+	TEARDOWN();
+}
+
+// This caused the issue reported by Brendon Baumgartner and described in my
+// email to the Box Backup list on Mon, 21 Apr 2014 at 18:44:38. If the
+// directory disappears then we used to try to send an empty attributes block
+// to the server, which is illegal.
+bool test_backup_disappearing_directory()
+{
+	SETUP_WITH_BBSTORED();
+
+	class BackupClientDirectoryRecordHooked : public BackupClientDirectoryRecord
+	{
+	public:
+		BackupClientDirectoryRecordHooked(int64_t ObjectID,
+			const std::string &rSubDirName)
+		: BackupClientDirectoryRecord(ObjectID, rSubDirName),
+		  mDeletedOnce(false)
+		{ }
+		bool mDeletedOnce;
+		bool UpdateItems(SyncParams &rParams, const std::string &rLocalPath,
+			const std::string &rRemotePath,
+			const Location& rBackupLocation,
+			BackupStoreDirectory *pDirOnStore,
+			std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
+			std::vector<std::string> &rFiles,
+			const std::vector<std::string> &rDirs)
+		{
+			if(!mDeletedOnce)
+			{
+				TEST_THAT(::rmdir("testfiles/TestDir1/dir23") == 0);
+				mDeletedOnce = true;
+			}
+
+			return BackupClientDirectoryRecord::UpdateItems(rParams,
+				rLocalPath, rRemotePath, rBackupLocation,
+				pDirOnStore, rEntriesLeftOver, rFiles, rDirs);
+		}
+	};
+
+	BackupClientContext clientContext
+	(
+		bbackupd, // rLocationResolver
+		context,
+		"localhost",
+		BOX_PORT_BBSTORED_TEST,
+		0x01234567,
+		false, // ExtendedLogging
+		false, // ExtendedLogFile
+		"", // extendedLogFile
+		bbackupd, // rProgressNotifier
+		false // TcpNice
+	);
+
+	BackupClientInodeToIDMap oldMap, newMap;
+	oldMap.OpenEmpty();
+	newMap.Open("testfiles/test_map.db", false, true);
+	clientContext.SetIDMaps(&oldMap, &newMap);
+
+	BackupClientDirectoryRecord::SyncParams params(
+		bbackupd, // rRunStatusProvider,
+		bbackupd, // rSysadminNotifier,
+		bbackupd, // rProgressNotifier,
+		clientContext,
+		&bbackupd);
+	params.mSyncPeriodEnd = GetCurrentBoxTime();
+
+	BackupProtocolCallable& connection = clientContext.GetConnection();
+
+	BackupClientFileAttributes attr;
+	attr.ReadAttributes("testfiles/TestDir1",
+		false /* put mod times in the attributes, please */);
+	std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
+	BackupStoreFilenameClear dirname("Test1");
+	std::auto_ptr<BackupProtocolSuccess>
+		dirCreate(connection.QueryCreateDirectory(
+			BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
+			0, // attrModTime,
+			dirname, // dirname,
+			attrStream));
+		
+	// Object ID for later creation
+	int64_t oid = dirCreate->GetObjectID();
+	BackupClientDirectoryRecordHooked record(oid, "Test1");
+
+	TEST_COMPARE(Compare_Different);
+
+	Location fakeLocation;
+	record.SyncDirectory(params,
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		"testfiles/TestDir1", // locationPath,
+		"/whee", // remotePath
+		fakeLocation);
+
+	TEST_COMPARE(Compare_Same);
+
+	// Run another backup, check that we haven't got an inconsistent
+	// state that causes a crash.
+	record.SyncDirectory(params,
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		"testfiles/TestDir1", // locationPath,
+		"/whee", // remotePath
+		fakeLocation);
+	TEST_COMPARE(Compare_Same);
+
+	// Now recreate it and run another backup, check that we haven't got
+	// an inconsistent state that causes a crash or prevents us from
+	// creating the directory if it appears later.
+	TEST_THAT(::mkdir("testfiles/TestDir1/dir23", 0755) == 0);
+	TEST_COMPARE(Compare_Different);
+
+	record.SyncDirectory(params,
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		"testfiles/TestDir1", // locationPath,
+		"/whee", // remotePath
+		fakeLocation);
+	TEST_COMPARE(Compare_Same);
+
+	TEARDOWN();
+}
+
+// TODO FIXME check that directory modtimes are backed up by BackupClientDirectoryRecord.
 
 bool test_ssl_keepalives()
 {
@@ -3917,6 +4072,8 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_basics());
 	TEST_THAT(test_readdirectory_on_nonexistent_dir());
 	TEST_THAT(test_getobject_on_nonexistent_file());
+	// TEST_THAT(test_replace_zero_byte_file_with_nonzero_byte_file());
+	TEST_THAT(test_backup_disappearing_directory());
 	TEST_THAT(test_ssl_keepalives());
 	TEST_THAT(test_backup_pauses_when_store_is_full());
 	TEST_THAT(test_bbackupd_exclusions());
