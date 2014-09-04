@@ -1091,7 +1091,7 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 			Send($cmd_classes{$error_message}());
 			throw;
 		}
-		
+
 		// Send the reply
 		Send(*preply);
 
@@ -1102,7 +1102,7 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 		{
 			SendStream(**i);
 		}
-		
+
 		// As a server, if we get an unexpected message later, we'll
 		// want to know the last command that we received, and the
 		// reply, to help debug our response to it.
@@ -1120,7 +1120,7 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 		{
 			inProgress = false;
 		}
-	}	
+	}
 }
 
 __E

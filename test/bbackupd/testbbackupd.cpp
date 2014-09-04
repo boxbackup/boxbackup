@@ -782,7 +782,7 @@ std::auto_ptr<BackupStoreDirectory> ReadDirectory
 		new BackupStoreDirectory(rClient.ReceiveStream(), SHORT_TIMEOUT));
 	return apDir;
 }
-	
+
 int start_internal_daemon()
 {
 	// ensure that no child processes end up running tests!
