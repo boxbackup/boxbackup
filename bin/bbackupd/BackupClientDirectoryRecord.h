@@ -152,13 +152,16 @@ private:
 	void UpdateAttributes(SyncParams &rParams,
 		BackupStoreDirectory *pDirOnStore,
 		const std::string &rLocalPath);
-	bool UpdateItems(SyncParams &rParams, const std::string &rLocalPath,
+protected: // to allow tests to hook in before UpdateItems() runs
+	virtual bool UpdateItems(SyncParams &rParams,
+		const std::string &rLocalPath,
 		const std::string &rRemotePath,
 		const Location& rBackupLocation,
 		BackupStoreDirectory *pDirOnStore,
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 		std::vector<std::string> &rFiles,
 		const std::vector<std::string> &rDirs);
+private:
 	int64_t CreateRemoteDir(const std::string& localDirPath,
 		const std::string& nonVssDirPath,
 		const std::string& remoteDirPath,

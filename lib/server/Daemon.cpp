@@ -887,7 +887,9 @@ const Configuration &Daemon::GetConfiguration() const
 	if(mapConfiguration.get() == 0)
 	{
 		// Shouldn't get anywhere near this if a configuration file can't be loaded
-		THROW_EXCEPTION(ServerException, Internal)
+		THROW_EXCEPTION_MESSAGE(ServerException, Internal,
+			"The daemon has not been configured; no config file "
+			"has been loaded.");
 	}
 	
 	return *mapConfiguration;
