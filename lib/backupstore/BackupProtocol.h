@@ -29,6 +29,9 @@ private:
 	int32_t mAccountNumber;
 	bool mReadOnly;
 
+protected:
+	BackupStoreContext& GetContext() { return mContext; }
+
 public:
 	BackupProtocolLocal2(int32_t AccountNumber,
 		const std::string& ConnectionDetails,
