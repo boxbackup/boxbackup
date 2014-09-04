@@ -33,7 +33,13 @@ private:
 
 public:
 	bool GetLine(std::string &rOutput, bool Preprocess = false, int Timeout = IOStream::TimeOutInfinite);
-	
+	std::string GetLine()
+	{
+		std::string output;
+		GetLine(output);
+		return output;
+	}
+
 	// Call to detach, setting file pointer correctly to last bit read.
 	// Only works for lseek-able file descriptors.
 	void DetachFile();
