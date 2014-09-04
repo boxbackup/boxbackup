@@ -248,7 +248,7 @@ IOStream::pos_type FileStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 void FileStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
-	if(mOSFileHandle == INVALID_FILE) 
+	if(mOSFileHandle == INVALID_FILE)
 	{
 		THROW_EXCEPTION(CommonException, FileClosed)
 	}

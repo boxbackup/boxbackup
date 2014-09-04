@@ -114,20 +114,19 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 // Function
 //		Name:    BackupStoreFile::EncodeFileDiff(const char *, int64_t, const BackupStoreFilename &, int64_t, IOStream &, int64_t *)
 //		Purpose: Similar to EncodeFile, but takes the object ID of the file it's
-//				 diffing from, and the index of the blocks in a stream. It'll then
-//				 calculate which blocks can be reused from that old file.
-//				 The timeout is the timeout value for reading the diff block index.
-//				 If pIsCompletelyDifferent != 0, it will be set to true if the
-//				 the two files are completely different (do not share any block), false otherwise.
-//				 
+//			 diffing from, and the index of the blocks in a stream. It'll then
+//			 calculate which blocks can be reused from that old file.
+//			 The timeout is the timeout value for reading the diff block index.
+//			 If pIsCompletelyDifferent != 0, it will be set to true if the
+//			 the two files are completely different (do not share any block), false otherwise.
 //		Created: 12/1/04
 //
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 (
 	const std::string& Filename, int64_t ContainerID,
-	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, 
-	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer, 
+	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID,
+	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer,
 	int64_t *pModificationTime, bool *pIsCompletelyDifferent,
 	BackgroundTask* pBackgroundTask)
 {
@@ -528,7 +527,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		
 		// Search for each block size in turn
 		// NOTE: Do the smallest size first, so that the scheme for adding
-		// entries in the found list works as expected and replaces smallers block
+		// entries in the found list works as expected and replaces smaller blocks
 		// with larger blocks when it finds matches at the same offset in the file.
 		for(int s = BACKUP_FILE_DIFF_MAX_BLOCK_SIZES - 1; s >= 0; --s)
 		{
@@ -670,6 +669,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 						}
 						else
 						{
+							// Too many to log
 							// BOX_TRACE("False alarm match of " << Sizes[s] << " bytes with hash " << hash << " at offset " << fileOffset);
 						}
 

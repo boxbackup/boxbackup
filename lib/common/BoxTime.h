@@ -10,8 +10,8 @@
 #ifndef BOXTIME__H
 #define BOXTIME__H
 
-// Time is presented as an unsigned 64 bit integer, in microseconds
-typedef int64_t	box_time_t;
+// Time is presented as a signed 64 bit integer, in microseconds
+typedef int64_t box_time_t;
 
 #define NANO_SEC_IN_SEC		(1000000000LL)
 #define NANO_SEC_IN_USEC 	(1000)

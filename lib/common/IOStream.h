@@ -54,7 +54,7 @@ public:
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual void Close();
-	
+
 	// Has all data that can be read been read?
 	virtual bool StreamDataLeft() = 0;
 	// Has the stream been closed (writing not possible)
@@ -69,7 +69,4 @@ public:
 	virtual std::string ToString() const;
 };
 
-
 #endif // IOSTREAM__H
-
-

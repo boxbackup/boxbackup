@@ -42,11 +42,11 @@ class BackupClientContext : public DiffTimer
 public:
 	BackupClientContext
 	(
-		LocationResolver &rResolver, 
-		TLSContext &rTLSContext, 
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
 		const std::string &rHostname,
 		int32_t Port,
-		uint32_t AccountNumber, 
+		uint32_t AccountNumber,
 		bool ExtendedLogging,
 		bool ExtendedLogToFile,
 		std::string ExtendedLogFile,
@@ -59,11 +59,8 @@ private:
 public:
 
 	BackupProtocolClient &GetConnection();
-	
 	void CloseAnyOpenConnection();
-	
 	int GetTimeout() const;
-	
 	BackupClientDeleteList &GetDeleteList();
 	void PerformDeletions();
 
@@ -74,7 +71,7 @@ public:
 
 	void SetClientStoreMarker(int64_t ClientStoreMarker) {mClientStoreMarker = ClientStoreMarker;}
 	int64_t GetClientStoreMarker() const {return mClientStoreMarker;}
-	
+
 	bool StorageLimitExceeded() {return mStorageLimitExceeded;}
 	void SetStorageLimitExceeded() {mStorageLimitExceeded = true;}
 

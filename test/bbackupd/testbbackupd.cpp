@@ -690,7 +690,7 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid)
 #endif // !WIN32
 
 #ifdef WIN32
-bool set_file_time(const char* filename, FILETIME creationTime, 
+bool set_file_time(const char* filename, FILETIME creationTime,
 	FILETIME lastModTime, FILETIME lastAccessTime)
 {
 	HANDLE handle = openfile(filename, O_RDWR, 0);
@@ -706,7 +706,7 @@ bool set_file_time(const char* filename, FILETIME creationTime,
 }
 #endif
 
-void intercept_setup_delay(const char *filename, unsigned int delay_after, 
+void intercept_setup_delay(const char *filename, unsigned int delay_after,
 	int delay_ms, int syscall_to_delay);
 bool intercept_triggered();
 
@@ -714,7 +714,7 @@ int64_t SearchDir(BackupStoreDirectory& rDir,
 	const std::string& rChildName)
 {
 	BackupStoreDirectory::Iterator i(rDir);
-	BackupStoreFilenameClear child(rChildName.c_str());
+	BackupStoreFilenameClear child(rChildName);
 	BackupStoreDirectory::Entry *en = i.FindMatchingClearName(child);
 	if (en == 0) return 0;
 	int64_t id = en->GetObjectID();
@@ -1184,8 +1184,7 @@ int test_bbackupd()
 			std::string line;
 			TEST_THAT(reader.GetLine(line));
 			std::string comp = "Receive Success(0x";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
-				line);
+			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()), line);
 			TEST_THAT(reader.GetLine(line));
 			TEST_EQUAL("Receiving stream, size 124", line);
 			TEST_THAT(reader.GetLine(line));
@@ -1459,7 +1458,10 @@ int test_bbackupd()
 	// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
 	// 0000000d -d---- 00002 Test1/spacetest/d6
 	// 0000000e -d---- 00002 Test1/spacetest/d7
-	// This is 28 blocks total.
+	// 0000000f f--o-- 00002 Test1/spacetest/f1
+	// 00000010 f--o-- 00002 Test1/spacetest/f1
+	// 00000011 f----- 00002 Test1/spacetest/f1
+	// This is 34 blocks total.
 
 	// BLOCK
 	{
@@ -1520,7 +1522,7 @@ int test_bbackupd()
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
 
-		// The following files should be on the server:
+		// The following files should be in the backup directory:
 		// 00000001 -d---- 00002 (root)
 		// 00000002 -d---- 00002 Test1
 		// 00000003 -d---- 00002 Test1/spacetest
@@ -1530,22 +1532,26 @@ int test_bbackupd()
 		// 00000007 f----- 00002 Test1/spacetest/d1/f3
 		// 00000008 f----- 00002 Test1/spacetest/d1/f4
 		// 00000009 -d---- 00002 Test1/spacetest/d2
+		// 00000009 -d---- 00002 Test1/spacetest/d6
 		// 0000000a -d---- 00002 Test1/spacetest/d3
 		// 0000000b -d---- 00002 Test1/spacetest/d3/d4
 		// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
 		// 0000000d -d---- 00002 Test1/spacetest/d6
+		// 0000000d -d---- 00002 Test1/spacetest/d6/d8
+		// 0000000d -d---- 00002 Test1/spacetest/d6/d8/f7
 		// 0000000e -dX--- 00002 Test1/spacetest/d7
-		// This is 28 blocks total, of which 2 in deleted files
+		//
+		// root + location + spacetest1 + spacetest2 = 17 files
+		// = 34 blocks with raidfile. Of which 2 in deleted files
 		// and 18 in directories. Note that f1 and d7 may or may
 		// not be deleted yet.
 		//
-		// spacetest1 + spacetest2 = 16 files = 32 blocks with raidfile
-		// minus one file and one dir is 28 blocks
-		//
-		// d2/f6, d6/d8 and d6/d8/f7 are new
-		// even if the client marks f1 and d7 as deleted, and
-		// housekeeping deleted them, the backup cannot complete
-		// if the limit is 20 blocks.
+		// The files and dirs from spacetest1 are already on the server
+		// (28 blocks). If we set the limit to 20 then the client will
+		// notice as soon as it tries to create the new files and dirs
+		// from spacetest2. It should still delete f1 and d7, but that
+		// won't bring it back under the hard limit, so no files from
+		// spacetest2 should be uploaded.
 
 		BOX_TRACE("Waiting for sync for bbackupd to notice that the "
 			"store is full");
@@ -1554,7 +1560,6 @@ int test_bbackupd()
 
 		BOX_TRACE("Compare to check that there are differences");
 		TEST_COMPARE(Compare_Different);
-		BOX_TRACE("Compare finished.");
 
 		// Check that the notify script was run
 		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
@@ -1619,16 +1624,13 @@ int test_bbackupd()
 		// But only twice!
 		// TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.3"));
 
-		// All these should be marked as deleted but hopefully
-		// not removed by housekeeping yet:
+		// All these should be marked as deleted but not removed by
+		// housekeeping yet:
 		// f1		deleted
 		// f2		excluded
-		// d1		excluded (why?)
-		// d1/f3	excluded (why?)
 		// d3		excluded
 		// d3/d4	excluded
 		// d3/d4/f5	excluded
-		// d7		deleted
 		// Careful with timing here, these files will be removed by
 		// housekeeping the next time it runs. On Win32, housekeeping
 		// runs immediately after disconnect, but only if enough time
@@ -1697,7 +1699,6 @@ int test_bbackupd()
 			// Log out.
 			client->QueryFinished();
 		}
-		BOX_TRACE("done.");
 
 		if (failures) return 1;
 
@@ -1711,7 +1712,7 @@ int test_bbackupd()
 			"deleted files");
 #endif
 
-		BOX_TRACE("Check that the files were removed");
+		BOX_INFO("Checking that the files were removed");
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(context, 0 /* read-write */);
@@ -1736,7 +1737,6 @@ int test_bbackupd()
 			TEST_THAT(SearchDir(*spacetest_dir, "f2") == 0);
 			TEST_THAT(SearchDir(*spacetest_dir, "d3") == 0);
 			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
-
 
 			// f2, d3, d3/d4 and d3/d4/f5 have been removed.
 			// The files were counted as deleted files before, the
@@ -1987,10 +1987,12 @@ int test_bbackupd()
 		char buf[PATH_MAX];
 		TEST_THAT(getcwd(buf, sizeof(buf)) == buf);
 		std::string path = buf;
-		path += DIRECTORY_SEPARATOR SYM_DIR 
+		// testfiles/TestDir1/symlink_test/a/subdir ->
+		// testfiles/TestDir1/symlink_test/b/link
+		path += DIRECTORY_SEPARATOR SYM_DIR
 			DIRECTORY_SEPARATOR "a"
 			DIRECTORY_SEPARATOR "subdir";
-		TEST_THAT(symlink(path.c_str(), SYM_DIR 
+		TEST_THAT(symlink(path.c_str(), SYM_DIR
 			DIRECTORY_SEPARATOR "b"
 			DIRECTORY_SEPARATOR "link") == 0);
 
@@ -2267,6 +2269,7 @@ int test_bbackupd()
 
 		{
 			#ifdef WIN32
+				// Cygwin chmod changes Windows file attributes
 				TEST_THAT(::system("chmod 0555 testfiles/"
 					"TestDir1/x1") == 0);
 			#else
@@ -2607,7 +2610,6 @@ int test_bbackupd()
 			TEST_THAT(unlink(sync_control_file) == 0);
 			wait_for_sync_start();
 			long end_time = time(NULL);
-
 			long wait_time = end_time - start_time + 2;
 
 			// should be about 10 seconds
@@ -2645,15 +2647,15 @@ int test_bbackupd()
 
 		#ifndef WIN32
 			// New symlink
-			TEST_THAT(::symlink("does-not-exist", 
+			TEST_THAT(::symlink("does-not-exist",
 				"testfiles/TestDir1/symlink-to-dir") == 0);
 		#endif		
 
 		// Update a file (will be uploaded as a diff)
 		{
-			// Check that the file is over the diffing 
+			// Check that the file is over the diffing
 			// threshold in the bbackupd.conf file
-			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") 
+			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df")
 				> 1024);
 			
 			// Add a bit to the end
@@ -2661,7 +2663,7 @@ int test_bbackupd()
 			TEST_THAT(f != 0);
 			::fprintf(f, "EXTRA STUFF");
 			::fclose(f);
-			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df") 
+			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df")
 				> 1024);
 		}
 
@@ -2685,8 +2687,7 @@ int test_bbackupd()
 
 		// Check that store errors are reported neatly
 		printf("\n==== Create store error\n");
-		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*")
-			== 0);
+		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*") == 0);
 
 		// Break the store. We need a write lock on the account
 		// while we do this, otherwise housekeeping might be running
@@ -2896,12 +2897,12 @@ int test_bbackupd()
 				== 0);
 		#endif
 
-		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755) 
+		TEST_THAT(::mkdir("testfiles/TestDir1/symlink-to-dir", 0755)
 			== 0);
-		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755) 
+		TEST_THAT(::mkdir("testfiles/TestDir1/x1/dir-to-file", 0755)
 			== 0);
 
-		// NOTE: create a file within the directory to 
+		// NOTE: create a file within the directory to
 		// avoid deletion by the housekeeping process later
 
 		#ifndef WIN32
@@ -2945,8 +2946,7 @@ int test_bbackupd()
 		if (failures) return 1;
 
 		// And then, put it back to how it was before.
-		printf("\n==== Replace symlink with directory "
-			"(which was a symlink)\n");
+		BOX_INFO("Replace symlink with directory (which was a symlink)");
 
 		#ifndef WIN32
 			TEST_THAT(::unlink("testfiles/TestDir1/x1"
@@ -3047,8 +3047,8 @@ int test_bbackupd()
 
 		// case which went wrong: rename a tracked file over an
 		// existing tracked file
-		printf("\n==== Rename over existing tracked file\n");
-		fd1 = open("testfiles/TestDir1/tracked-1", 
+		BOX_INFO("Rename over existing tracked file");
+		fd1 = open("testfiles/TestDir1/tracked-1",
 			O_CREAT | O_EXCL | O_WRONLY, 0700);
 		fd2 = open("testfiles/TestDir1/tracked-2",
 			O_CREAT | O_EXCL | O_WRONLY, 0700);
@@ -3079,7 +3079,7 @@ int test_bbackupd()
 				== 0);
 		#endif
 
-		TEST_THAT(::rename("testfiles/TestDir1/tracked-1", 
+		TEST_THAT(::rename("testfiles/TestDir1/tracked-1",
 			"testfiles/TestDir1/tracked-2") == 0);
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
@@ -3095,7 +3095,7 @@ int test_bbackupd()
 		if (!ServerIsAlive(bbstored_pid)) return 1;
 		if (failures) return 1;
 
-		// case which went wrong: rename a tracked file 
+		// case which went wrong: rename a tracked file
 		// over a deleted file
 		printf("\n==== Rename an existing file over a deleted file\n");
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/x1/dsfdsfs98.fd"));
@@ -3105,7 +3105,7 @@ int test_bbackupd()
 		wait_for_backup_operation("bbackupd to sync");
 
 		TEST_COMPARE(Compare_Same);
-		
+
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
@@ -3123,7 +3123,7 @@ int test_bbackupd()
 			"testfiles/TestDir1/df9834.dsf") == 0);
 		
 		// Add some more files
-		// Because the 'm' option is not used, these files will 
+		// Because the 'm' option is not used, these files will
 		// look very old to the daemon.
 		// Lucky it'll upload them then!
 		TEST_THAT(unpack_files("test2"));
@@ -3227,7 +3227,7 @@ int test_bbackupd()
 				connect_and_login(context,
 				BackupProtocolLogin::Flags_ReadOnly);
 			
-			std::auto_ptr<BackupStoreDirectory> dir = 
+			std::auto_ptr<BackupStoreDirectory> dir =
 				ReadDirectory(*client);
 
 			int64_t testDirId = SearchDir(*dir, "Test1");
@@ -3268,8 +3268,8 @@ int test_bbackupd()
 			TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
 			// Check that read errors are reported neatly
-			printf("\n==== Add unreadable files\n");
-			
+			BOX_INFO("Add unreadable files");
+
 			{
 				// Dir and file which can't be read
 				TEST_THAT(::mkdir("testfiles/TestDir1/sub23"
@@ -3320,7 +3320,8 @@ int test_bbackupd()
 		::safe_sleep(1);
 
 		{
-			// Open a file, then save something to it every second
+			BOX_INFO("Open a file, then save something to it "
+				"every second for 12 seconds");
 			for(int l = 0; l < 12; ++l)
 			{
 				FILE *f = ::fopen("testfiles/TestDir1/continousupdate", "w+");
@@ -3328,13 +3329,8 @@ int test_bbackupd()
 				fprintf(f, "Loop iteration %d\n", l);
 				fflush(f);
 				fclose(f);
-
-				printf(".");
-				fflush(stdout);
 				safe_sleep(1);
 			}
-			printf("\n");
-			fflush(stdout);
 			
 			// Check there's a difference
 			compareReturnValue = ::system("perl testfiles/"
@@ -3343,8 +3339,8 @@ int test_bbackupd()
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
-			printf("\n==== Keep on continuously updating file, "
-				"check it is uploaded eventually\n");
+			BOX_INFO("Keep on continuously updating file for "
+				"28 seconds, check it is uploaded eventually");
 
 			for(int l = 0; l < 28; ++l)
 			{
@@ -3354,13 +3350,8 @@ int test_bbackupd()
 				fprintf(f, "Loop 2 iteration %d\n", l);
 				fflush(f);
 				fclose(f);
-
-				printf(".");
-				fflush(stdout);
 				safe_sleep(1);
 			}
-			printf("\n");
-			fflush(stdout);
 
 			compareReturnValue = ::system("perl testfiles/"
 				"extcheck2.pl");
@@ -3398,12 +3389,12 @@ int test_bbackupd()
 					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
-			restoredirid = GetDirID(*client, "Test1", 
+			restoredirid = GetDirID(*client, "Test1",
 				BackupProtocolListDirectory::RootDirectory);
 			TEST_THAT(restoredirid != 0);
 
 			// Test the restoration
-			TEST_THAT(BackupClientRestore(*client, restoredirid, 
+			TEST_THAT(BackupClientRestore(*client, restoredirid,
 				"Test1" /* remote */,
 				"testfiles/restore-Test1" /* local */,
 				true /* print progress dots */,
@@ -3417,24 +3408,24 @@ int test_bbackupd()
 			// to the server, so we'll compare later.
 
 			// Make sure you can't restore a restored directory
-			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"Test1", "testfiles/restore-Test1", 
+			TEST_THAT(BackupClientRestore(*client, restoredirid,
+				"Test1", "testfiles/restore-Test1",
 				true /* print progress dots */,
 				false /* restore deleted */,
 				false /* undelete after */,
 				false /* resume */,
 				false /* keep going */) 
 				== Restore_TargetExists);
-			
+
 			// Find ID of the deleted directory
 			deldirid = GetDirID(*client, "x1", restoredirid);
 			TEST_THAT(deldirid != 0);
 
-			// Just check it doesn't bomb out -- will check this 
+			// Just check it doesn't bomb out -- will check this
 			// properly later (when bbackupd is stopped)
-			TEST_THAT(BackupClientRestore(*client, deldirid, 
+			TEST_THAT(BackupClientRestore(*client, deldirid,
 				"Test1", "testfiles/restore-Test1-x1",
-				true /* print progress dots */, 
+				true /* print progress dots */,
 				true /* restore deleted */,
 				false /* undelete after */,
 				false /* resume */,
@@ -3695,7 +3686,7 @@ int test_bbackupd()
 			do_interrupted_restore(context, restoredirid);
 			int64_t resumesize = 0;
 			TEST_THAT(FileExists("testfiles/"
-				"restore-interrupt.boxbackupresume", 
+				"restore-interrupt.boxbackupresume",
 				&resumesize));
 			// make sure it has recorded something to resume
 			TEST_THAT(resumesize > 16);	
@@ -3708,8 +3699,8 @@ int test_bbackupd()
 
 			// Check that the restore fn returns resume possible,
 			// rather than doing anything
-			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"Test1", "testfiles/restore-interrupt", 
+			TEST_THAT(BackupClientRestore(*client, restoredirid,
+				"Test1", "testfiles/restore-interrupt",
 				true /* print progress dots */, 
 				false /* restore deleted */, 
 				false /* undelete after */, 
@@ -3718,8 +3709,8 @@ int test_bbackupd()
 				== Restore_ResumePossible);
 
 			// Then resume it
-			TEST_THAT(BackupClientRestore(*client, restoredirid, 
-				"Test1", "testfiles/restore-interrupt", 
+			TEST_THAT(BackupClientRestore(*client, restoredirid,
+				"Test1", "testfiles/restore-interrupt",
 				true /* print progress dots */, 
 				false /* restore deleted */, 
 				false /* undelete after */, 
@@ -3748,8 +3739,8 @@ int test_bbackupd()
 				connect_and_login(context, 0 /* read-write */);
 
 			// Do restore and undelete
-			TEST_THAT(BackupClientRestore(*client, deldirid, 
-				"Test1", "testfiles/restore-Test1-x1-2", 
+			TEST_THAT(BackupClientRestore(*client, deldirid,
+				"Test1", "testfiles/restore-Test1-x1-2",
 				true /* print progress dots */, 
 				true /* deleted files */, 
 				true /* undelete after */,

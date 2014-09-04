@@ -132,7 +132,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 
 	tOSSocketHandle socket = GetSocketHandle();
 	BIO_set_fd(mpBIO, socket, BIO_NOCLOSE);
-	
+
 	// Then the SSL object
 	mpSSL = ::SSL_new(rContext.GetRawContext());
 	if(mpSSL == 0)
@@ -155,7 +155,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
 	}
 #endif
-	
+
 	// FIXME: This is less portable than the above. However, it MAY be needed
 	// for cygwin, which has/had bugs with fcntl
 	//
@@ -223,8 +223,9 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 //
 // Function
 //		Name:    WaitWhenRetryRequired(int, int)
-//		Purpose: Waits until the condition required by the TLS layer is met.
-//				 Returns true if the condition is met, false if timed out.
+//		Purpose: Waits until the condition required by the TLS layer
+//		         is met. Returns true if the condition is met, false
+//		         if timed out.
 //		Created: 2003/08/15
 //
 // --------------------------------------------------------------------------
@@ -320,20 +321,20 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
-	
+
 	// Make sure zero byte writes work as expected
 	if(NBytes == 0)
 	{
 		return;
 	}
-	
+
 	// from man SSL_write
 	//
 	// SSL_write() will only return with success, when the
 	// complete contents of buf of length num has been written.
 	//
 	// So no worries about partial writes and moving the buffer around
-	
+
 	while(true)
 	{
 		// try the write

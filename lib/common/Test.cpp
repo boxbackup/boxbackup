@@ -136,7 +136,7 @@ int ReadPidFile(const char *pidFile)
 	if(!TestFileNotEmpty(pidFile))
 	{
 		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file "
-			"(perhaps one was already running?)");	
+			"(perhaps one was already running?)");
 		return -1;
 	}
 	
@@ -145,7 +145,7 @@ int ReadPidFile(const char *pidFile)
 	FILE *f = fopen(pidFile, "r");
 	if(f == NULL || fscanf(f, "%d", &pid) != 1)
 	{
-		TEST_FAIL_WITH_MESSAGE("Couldn't read PID file");	
+		TEST_FAIL_WITH_MESSAGE("Couldn't read PID file");
 		return -1;
 	}
 	fclose(f);
@@ -155,7 +155,7 @@ int ReadPidFile(const char *pidFile)
 
 int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 {
-	::fprintf(stdout, "Starting server: %s\n", rCommandLine.c_str());
+	BOX_INFO("Starting server: " << rCommandLine);
 
 #ifdef WIN32
 
@@ -189,14 +189,10 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 
 	free(tempCmd);
 
-	if (result == 0)
-	{
-		DWORD err = GetLastError();
-		printf("Launch failed: %s: error %d\n", rCommandLine.c_str(),
-			(int)err);
-		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
+	TEST_THAT_OR(result != 0,
+		BOX_LOG_WIN_ERROR("Launch failed: " << rCommandLine);
 		return -1;
-	}
+		);
 
 	CloseHandle(procInfo.hProcess);
 	CloseHandle(procInfo.hThread);
@@ -205,11 +201,10 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 
 #else // !WIN32
 
-	if(RunCommand(rCommandLine) != 0)
-	{
-		TEST_FAIL_WITH_MESSAGE("Couldn't start server");
+	TEST_THAT_OR(RunCommand(rCommandLine) == 0,
+		TEST_FAIL_WITH_MESSAGE("Failed to start server: " << rCommandLine);
 		return -1;
-	}
+		)
 
 	return WaitForServerStartup(pidFile, 0);
 
@@ -234,7 +229,7 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 
 	for (int i = 0; i < 15; i++)
 	{
-		if (TestFileNotEmpty(pidFile))	
+		if (TestFileNotEmpty(pidFile))
 		{
 			break;
 		}
@@ -252,13 +247,13 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 
 	if (pidIfKnown && !ServerIsAlive(pidIfKnown))
 	{
-		TEST_FAIL_WITH_MESSAGE("Server died!");	
+		TEST_FAIL_WITH_MESSAGE("Server died!");
 		return -1;
 	}
 
 	if (!TestFileNotEmpty(pidFile))
 	{
-		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");	
+		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");
 		return -1;
 	}
 
@@ -381,7 +376,7 @@ void terminate_bbackupd(int pid)
 // Wait a given number of seconds for something to complete
 void wait_for_operation(int seconds, const char* message)
 {
-	BOX_TRACE("Waiting " << seconds << " seconds for " << message);
+	BOX_INFO("Waiting " << seconds << " seconds for " << message);
 
 	for(int l = 0; l < seconds; ++l)
 	{
@@ -395,4 +390,3 @@ void safe_sleep(int seconds)
 {
 	ShortSleep(SecondsToBoxTime(seconds), true);
 }
-

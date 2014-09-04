@@ -157,6 +157,9 @@ extern std::list<std::string> run_only_named_tests;
 		printf("Test failed on <%s>\n", _line_str.c_str()); \
 	}
 
+#define TEST_STARTSWITH(expected, actual) \
+	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
+
 bool TestFileExists(const char *Filename);
 bool TestDirExists(const char *Filename);
 

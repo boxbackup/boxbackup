@@ -323,15 +323,15 @@ bool SocketStream::Poll(short Events, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
-	
+
 	// Buffer in byte sized type.
 	ASSERT(sizeof(char) == 1);
 	const char *buffer = (char *)pBuffer;
-	
+
 	// Bytes left to send
 	int bytesLeft = NBytes;
 	box_time_t start = GetCurrentBoxTime();
@@ -348,22 +348,21 @@ void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 		{
 			// Error.
 			mWriteClosed = true;	// assume can't write again
-			BOX_LOG_SYS_ERROR("Failed to write to socket");
-			THROW_EXCEPTION(ConnectionException,
-				SocketWriteError);
+			THROW_SYS_ERROR("Failed to write to socket",
+				ConnectionException, SocketWriteError);
 		}
-		
+
 		// Knock off bytes sent
 		bytesLeft -= sent;
 		// Move buffer pointer
 		buffer += sent;
 
 		mBytesWritten += sent;
-		
+
 		// Need to wait until it can send again?
 		if(bytesLeft > 0)
 		{
-			BOX_TRACE("Waiting to send data on socket " << 
+			BOX_TRACE("Waiting to send data on socket " <<
 				mSocketHandle << " (" << bytesLeft <<
 				" of " << NBytes << " bytes left)");
 
@@ -388,7 +387,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStream::Close()
 {
-	if(mSocketHandle == INVALID_SOCKET_VALUE) 
+	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
@@ -419,14 +418,14 @@ void SocketStream::Shutdown(bool Read, bool Write)
 	{
 		THROW_EXCEPTION(ServerException, BadSocketHandle)
 	}
-	
+
 	// Do anything?
 	if(!Read && !Write) return;
-	
+
 	int how = SHUT_RDWR;
 	if(Read && !Write) how = SHUT_RD;
 	if(!Read && Write) how = SHUT_WR;
-	
+
 	// Shut it down!
 	if(::shutdown(mSocketHandle, how) == -1)
 	{

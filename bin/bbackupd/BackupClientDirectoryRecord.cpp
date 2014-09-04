@@ -652,14 +652,16 @@ BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::
 	std::auto_ptr<BackupStoreDirectory> apDir;
 	
 	// Get connection to store
-	BackupProtocolClient &connection(rParams.mrContext.GetConnection());
+	BackupProtocolCallable &connection(rParams.mrContext.GetConnection());
 
 	// Query the directory
 	std::auto_ptr<BackupProtocolSuccess> dirreply(connection.QueryListDirectory(
 			mObjectID,
-			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,	// both files and directories
-			BackupProtocolListDirectory::Flags_Deleted | 
-			BackupProtocolListDirectory::Flags_OldVersion, // exclude old/deleted stuff
+			// both files and directories
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			// exclude old/deleted stuff
+			BackupProtocolListDirectory::Flags_Deleted |
+			BackupProtocolListDirectory::Flags_OldVersion,
 			true /* want attributes */));
 
 	// Retrieve the directory from the stream following
@@ -825,7 +827,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				rNotifier.NotifyFileStatFailed(this, nonVssFilePath,
 					strerror(errno));
 
-				// Report the error (logs and 
+				// Report the error (logs and
 				// eventual email to administrator)
 				SetErrorWhenReadingFilesystemObject(rParams, nonVssFilePath);
 
@@ -959,12 +961,12 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		// Condition for upload:
 		//    modification time within sync period
 		//    if it's been seen before but not uploaded, is the time from this first sight longer than the MaxUploadWait
-		//	  and if we know about it from a directory listing, that it hasn't got the same upload time as on the store
+		//    and if we know about it from a directory listing, that it hasn't got the same upload time as on the store
 
 		bool doUpload = false;
 		std::string decisionReason = "unknown";
 
-		// Only upload a file if the mod time locally is 
+		// Only upload a file if the mod time locally is
 		// different to that on the server.
 
 		if (en == 0 || en->GetModificationTime() != modTime)
@@ -987,32 +989,32 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 			}
 
-			// However, just in case things are continually 
+			// However, just in case things are continually
 			// modified, we check the first seen time.
-			// The two compares of syncPeriodEnd and 
-			// pendingFirstSeenTime are because the values 
+			// The two compares of syncPeriodEnd and
+			// pendingFirstSeenTime are because the values
 			// are unsigned.
 
-			if (!doUpload && 
+			if (!doUpload &&
 				pendingFirstSeenTime != 0 &&
 				rParams.mSyncPeriodEnd > pendingFirstSeenTime &&
-				(rParams.mSyncPeriodEnd - pendingFirstSeenTime) 
+				(rParams.mSyncPeriodEnd - pendingFirstSeenTime)
 				> rParams.mMaxUploadWait)
 			{
 				doUpload = true;
 				decisionReason = "continually modified";
 			}
 
-			// Then make sure that if files are added with a 
+			// Then make sure that if files are added with a
 			// time less than the sync period start
-			// (which can easily happen on file server), it 
+			// (which can easily happen on file server), it
 			// gets uploaded. The directory contents checksum
-			// will pick up the fact it has been added, so the 
+			// will pick up the fact it has been added, so the
 			// store listing will be available when this happens.
 
 			if (!doUpload &&
-				modTime <= rParams.mSyncPeriodStart && 
-				en != 0 && 
+				modTime <= rParams.mSyncPeriodStart &&
+				en != 0 &&
 				en->GetModificationTime() != modTime)
 			{
 				doUpload = true;
@@ -1023,7 +1025,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// the future for file server clients,
 			// just upload the file if it's madly in the future.
 
-			if (!doUpload && modTime > 
+			if (!doUpload && modTime >
 				rParams.mUploadAfterThisTimeInTheFuture)
 			{
 				doUpload = true;
@@ -1044,14 +1046,14 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				int age = BoxTimeToSeconds(now -
 					modTime);
 				std::ostringstream s;
-				s << "modified too recently: "
-					"only " << age << " seconds ago";
+				s << "modified too recently: only " <<
+					age << " seconds ago";
 				decisionReason = s.str();
 			}
 			else
 			{
 				std::ostringstream s;
-				s << "mod time is " << modTime << 
+				s << "mod time is " << modTime <<
 					" which is outside sync window, "
 					<< rParams.mSyncPeriodStart << " to "
 					<< rParams.mSyncPeriodEnd;
@@ -1082,7 +1084,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				// Upload the file to the server, recording the
 				// object ID it returns
-				bool noPreviousVersionOnServer = 
+				bool noPreviousVersionOnServer =
 					((pDirOnStore != 0) && (en == 0));
 				
 				// Surround this in a try/catch block, to
@@ -1126,7 +1128,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					if (e.GetType() == BackupStoreException::ExceptionType &&
 						e.GetSubType() == BackupStoreException::SignalReceived)
 					{
-						// abort requested, pass the 
+						// abort requested, pass the
 						// exception on up.
 						throw;
 					}
@@ -1287,7 +1289,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 	// Erase contents of files to save space when recursing
 	rFiles.clear();
 
-	// Delete the pending entries, if the map is entry
+	// Delete the pending entries, if the map is empty
 	if(mpPendingEntries != 0 && mpPendingEntries->size() == 0)
 	{
 		BOX_TRACE("Deleting mpPendingEntries from dir ID " <<
@@ -1761,7 +1763,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					rLocalPath,
 					mObjectID, /* containing directory */
 					rStoreFilename, diffFromID, *blockIndexStream,
-					connection.GetTimeout(), 
+					connection.GetTimeout(),
 					&rContext, // DiffTimer implementation
 					0 /* not interested in the modification time */, 
 					&isCompletelyDifferent,
@@ -1809,11 +1811,9 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 
 		// Send to store
 		std::auto_ptr<BackupProtocolSuccess> stored(
-			connection.QueryStoreFile(
-				mObjectID, ModificationTime,
-				AttributesHash, 
-				diffFromID,
-				rStoreFilename, apWrappedStream));
+			connection.QueryStoreFile(mObjectID, ModificationTime,
+				AttributesHash, diffFromID, rStoreFilename,
+				apWrappedStream));
 
 		rContext.SetNiceMode(false);
 

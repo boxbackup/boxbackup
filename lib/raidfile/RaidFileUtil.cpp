@@ -14,7 +14,7 @@
 
 #include "RaidFileUtil.h"
 #include "FileModificationTime.h"
-#include "RaidFileRead.h"	// for type definition
+#include "RaidFileRead.h" // for type definition
 
 #include "MemLeakFindOn.h"
 

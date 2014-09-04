@@ -811,10 +811,12 @@ foreach my $type ('Client', 'Server', 'Local')
 	{
 		push @base_classes, $replyable_base_class;
 	}
+
 	if (not $writing_server)
 	{
 		push @base_classes, $callable_base_class;
 	}
+
 	if (not $writing_local)
 	{
 		push @base_classes, $custom_protocol_subclass;
