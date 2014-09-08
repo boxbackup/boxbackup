@@ -591,7 +591,20 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteFile::DoCommand(BackupP
 
 	// Context handles this
 	int64_t objectID = 0;
-	rContext.DeleteFile(mFilename, mInDirectory, objectID);
+
+	try
+	{
+		rContext.DeleteFile(mFilename, mInDirectory, objectID);
+	}
+	catch(BackupStoreException &e)
+	{
+		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
+		{
+			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
+		}
+
+		throw;
+	}
 
 	// return the object ID or zero for not found
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));
@@ -646,7 +659,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectory::DoCommand(Ba
 	{
 		rContext.DeleteDirectory(mObjectID);
 	}
-	catch (BackupStoreException &e)
+	catch(BackupStoreException &e)
 	{
 		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
 		{
@@ -965,4 +978,72 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetIsAlive::DoCommand(BackupP
 	// NOOP
 	//
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolIsAlive());
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolAddReference::DoCommand(
+//			 BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Add a reference to an existing object.
+//		Created: 04/12/11
+//
+// --------------------------------------------------------------------------
+/**
+ * Creates a new reference to an existing object ID, with a new name, in the
+ * specified directory (by object ID). The object pointed to by this new
+ * reference will then have at least two references, and therefore be immutable.
+ * However these operations are still possible:
+ *
+ * * Rename and delete from one of its (2+) containers, if that container is not
+ * also immutable;
+ *
+ * * Modify by uploading a patch if it's a file, which creates a new object with
+ * a new ID doesn't logically change the object with this ID, even if its
+ * contents are converted to a reverse diff in the process;
+ * 
+ * * Copy, which changes its object ID to a new copy that initially has no
+ * references, but will presumably have one when inserted into the relevant
+ * container, and will thus be modifiable.
+ */
+std::auto_ptr<BackupProtocolMessage>
+BackupProtocolAddReference::DoCommand(BackupProtocolReplyable &rProtocol,
+	BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+	rContext.AddReference(mObjectToCloneID, mOldDirectoryID,
+		mNewDirectoryID, mNewObjectFileName);
+	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess());
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolCopyDirectory::DoCommand(
+//			 BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Creates a mutable copy of an existing immutable
+//			 object
+//		Created: 04/12/11
+//
+// --------------------------------------------------------------------------
+/**
+ * Makes a copy of a (multiply referenced) object, with a new object ID and a
+ * reference count of 1, and changes the reference in the specified directory
+ * to point to the new copy, making it mutable again.
+ * 
+ * The newly created object will have a different container ID embedded in it,
+ * so it's not a binary identical copy, but it is functionally identical.
+ *
+ * The containing directory must already be mutable, since the object ID will
+ * change if a copy needs to be created.
+ */
+std::auto_ptr<BackupProtocolMessage>
+BackupProtocolCopyDirectory::DoCommand(BackupProtocolReplyable &rProtocol,
+	BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+	int64_t newObjectID = rContext.CopyDirectory(mDirToCopyID,
+		mContainingDirID);
+	return std::auto_ptr<BackupProtocolMessage>(
+		new BackupProtocolSuccess(newObjectID));
 }

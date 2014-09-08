@@ -16,6 +16,7 @@
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFileWire.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreObjectMagic.h"
 #include "BufferedStream.h"
@@ -435,6 +436,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+	AssertMutable(InDirectory);
 	
 	// This is going to be a bit complex to make sure it copes OK
 	// with things going wrong.
@@ -723,7 +725,120 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	return id;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::AddReference(int64_t ObjectID,
+//			 int64_t InDirectory,
+//			 const BackupStoreFilename &rNewFilename)
+//		Purpose: Add a new reference to an existing file, in the
+//			 specified directory with the specified filename.
+//		Created: 2011/12/04
+//
+// --------------------------------------------------------------------------
 
+void BackupStoreContext::AddReference(int64_t ObjectID, int64_t OldDirectoryID,
+	int64_t NewDirectoryID, const BackupStoreFilename &rNewFilename)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
+	}
+
+	AssertMutable(NewDirectoryID);
+	
+	BackupStoreDirectory &oldDir(GetDirectoryInternal(OldDirectoryID));
+	BackupStoreDirectory::Entry *pEntry = oldDir.FindEntryByID(ObjectID);
+	if (!pEntry)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			BadBackupStoreFile,
+			"Failed to find object " <<
+			BOX_FORMAT_OBJECTID(ObjectID) <<
+			" in its supposed directory, " <<
+			BOX_FORMAT_OBJECTID(OldDirectoryID));
+	}
+
+	// Get the directory we want to modify
+	BackupStoreDirectory &newDir(GetDirectoryInternal(NewDirectoryID));
+	
+	try
+	{
+		// Then the new entry
+		newDir.AddEntry(rNewFilename, pEntry->GetModificationTime(),
+			ObjectID, pEntry->GetSizeInBlocks(),
+			pEntry->GetFlags(), pEntry->GetAttributesHash());
+
+		// Write the directory back to disc
+		SaveDirectory(newDir, NewDirectoryID);
+	}
+	catch(...)
+	{
+		// Remove this entry from the cache
+		RemoveDirectoryFromCache(NewDirectoryID);
+		throw;
+	}
+	
+	// Increment reference count on the new directory to one
+	mapRefCount->AddReference(ObjectID);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::CopyDirectory(DirToCopyID,
+//			 ContainingDirID);
+//		Purpose: Copies an immutable directory to make it mutable again.
+//		Created: 2011/12/04
+//
+// --------------------------------------------------------------------------
+
+int64_t BackupStoreContext::CopyDirectory(int64_t DirToCopyID, int64_t ContainingDirID)
+{
+	if(mapStoreInfo.get() == 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
+	}
+
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
+	}
+
+	AssertMutable(ContainingDirID);
+
+	if(mapRefCount->GetRefCount(DirToCopyID) == 1)
+	{
+		// nothing to do
+		return DirToCopyID;
+	}
+
+	BackupStoreDirectory &parentDir(GetDirectoryInternal(ContainingDirID));
+	BackupStoreDirectory::Entry *pEntry = parentDir.FindEntryByID(DirToCopyID);
+	if (!pEntry)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			BadBackupStoreFile,
+			"Failed to find directory " <<
+			BOX_FORMAT_OBJECTID(DirToCopyID) <<
+			" in its supposed container, " <<
+			BOX_FORMAT_OBJECTID(ContainingDirID));
+	}
+
+	BackupStoreDirectory &subDir(GetDirectoryInternal(DirToCopyID));
+	int64_t newObjectID = AllocateObjectID();
+	subDir.SetContainerID(ContainingDirID);
+	SaveDirectory(subDir, newObjectID);
+
+	parentDir.DeleteEntry(DirToCopyID);
+	parentDir.AddEntry(pEntry->GetName(), pEntry->GetModificationTime(),
+		newObjectID, subDir.GetUserInfo1_SizeInBlocks(),
+		pEntry->GetFlags(), pEntry->GetAttributesHash());
+	SaveDirectory(parentDir, ContainingDirID);
+
+	mapStoreInfo->AdjustNumDirectories(1);
+	return newObjectID;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -745,6 +860,8 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+
+	AssertMutable(InDirectory);
 
 	// Find the directory the file is in (will exception if it fails)
 	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
@@ -833,6 +950,8 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+
+	AssertMutable(InDirectory);
 
 	// Find the directory the file is in (will exception if it fails)
 	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
@@ -1001,6 +1120,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory, const BackupStoreF
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+	AssertMutable(InDirectory);
 	
 	// Flags as not already existing
 	rAlreadyExists = false;
@@ -1116,43 +1236,58 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 			
 			// Store the directory it's in for later
 			InDirectory = dir.GetContainerID();
-		
-			// Depth first delete of contents
+		}
+
+		ASSERT(InDirectory != 0);
+
+		// The containing directory must be mutable for us to
+		// change the directory entry.
+		AssertMutable(InDirectory);
+
+		// Depth first delete of contents, if there's only one
+		// reference. If there's more than one, then we're not
+		// allowed to change anything, so just unreference the
+		// directory below.
+		if(mapRefCount->GetRefCount(ObjectID) == 1)
+		{
 			DeleteDirectoryRecurse(ObjectID, blocksDeleted, Undelete);
 		}
 		
 		// Remove the entry from the directory it's in
-		ASSERT(InDirectory != 0);
 		BackupStoreDirectory &parentDir(GetDirectoryInternal(InDirectory));
 		
-		BackupStoreDirectory::Iterator i(parentDir);
-		BackupStoreDirectory::Entry *en = 0;
-		while((en = i.Next(Undelete?(BackupStoreDirectory::Entry::Flags_Deleted):(BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING),
-			Undelete?(0):(BackupStoreDirectory::Entry::Flags_Deleted))) != 0)	// Ignore deleted directories (or not deleted if Undelete)
+		BackupStoreDirectory::Entry *en = parentDir.FindEntryByID(ObjectID);
+		if(!en)
 		{
-			if(en->GetObjectID() == ObjectID)
-			{
-				// This is the one to delete
-				if(Undelete)
-				{
-					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
-				}
-				else
-				{
-					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
-				}
-							
-				// Save it
-				SaveDirectory(parentDir, InDirectory);
-				
-				// Done
-				break;
-			}
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				BadBackupStoreFile,
+				"Failed to find directory " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" in its supposed container, " <<
+				BOX_FORMAT_OBJECTID(InDirectory));
 		}
-		
+
+		if(mapRefCount->GetRefCount(ObjectID) != 1)
+		{
+			// Just remove the reference, don't change flags
+			parentDir.DeleteEntry(ObjectID);
+			mapStoreInfo->AdjustNumDirectories(-1);
+			mapRefCount->RemoveReference(ObjectID);
+		}
+		else if(Undelete)
+		{
+			en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+		}
+		else
+		{
+			en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+		}
+							
+		// Save it
+		SaveDirectory(parentDir, InDirectory);
+				
 		// Update blocks deleted count
 		mapStoreInfo->ChangeBlocksInDeletedFiles(Undelete?(0 - blocksDeleted):(blocksDeleted));
-		mapStoreInfo->AdjustNumDirectories(-1);
 		SaveStoreInfo(false);
 	}
 	catch(...)
@@ -1282,6 +1417,7 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+	AssertMutable(Directory);
 
 	try
 	{	
@@ -1336,6 +1472,8 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 		{
 			if(en->GetName() == rFilename)
 			{
+				AssertMutable(en->GetObjectID());
+
 				// Set attributes
 				en->SetAttributes(Attributes, AttributesHash);
 				
@@ -1556,6 +1694,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+	AssertMutable(MoveFromDirectory);
+	AssertMutable(MoveToDirectory);
 
 	// Should deleted files be excluded when checking for the existance of objects with the target name?
 	int64_t targetSearchExcludeFlags = (AllowMoveOverDeletedObject)
@@ -1625,7 +1765,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		return;
 	}
 
-	// Got to be careful how this is written, as we can't guarentte that if we have two
+	// Got to be careful how this is written, as we can't guarantee that if we have two
 	// directories open, the first won't be deleted as the second is opened. (cache)
 
 	// List of entries to move
@@ -1749,6 +1889,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		// Finally... for all the directories we moved, modify their containing directory ID
 		for(std::vector<int64_t>::iterator i(dirsToChangeContainingID.begin()); i != dirsToChangeContainingID.end(); ++i)
 		{
+			AssertMutable(*i);
+
 			// Load the directory
 			BackupStoreDirectory &change(GetDirectoryInternal(*i));
 			
@@ -1805,4 +1947,110 @@ const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
 	return *(mapStoreInfo.get());
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::AssertMutable(int64_t ObjectID)
+//		Purpose: Throws an exception if the specified object is not
+//			 mutable, either because it's multiply referenced
+//			 itself, or one of its referrers is multiply
+//			 referenced.
+//		Created: 04/12/11
+//
+// --------------------------------------------------------------------------
+void BackupStoreContext::AssertMutable(int64_t ObjectID)
+{
+	int32_t refcount = mapRefCount->GetRefCount(ObjectID);
 
+	if (refcount != 1)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			MultiplyReferencedObject,
+			"Failed to modify object " <<
+			BOX_FORMAT_OBJECTID(ObjectID) <<
+			": multiple references exist (" << refcount << ")");
+	}
+
+	// No point checking the root directory, and we have to stop
+	// recursion somewhere
+	if (ObjectID == BackupProtocolListDirectory::RootDirectory)
+	{
+		return;
+	}
+
+	// check the parents, which means opening it to find out what
+	// kind of object it is, and reading the header
+
+	std::auto_ptr<IOStream> ios = OpenObject(ObjectID);
+
+	// Read the first integer
+	u_int32_t magic;
+	if(!ios->ReadFullBuffer(&magic, sizeof(magic), 0 /* not interested in how many read if failure */))
+	{
+		// Failed to get any bytes, must have failed
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			BadBackupStoreFile,
+			"Failed to read magic from object " <<
+			BOX_FORMAT_OBJECTID(ObjectID));
+	}
+
+	int64_t ContainerID = -1;
+
+	switch (ntohl(magic))
+	{
+		case OBJECTMAGIC_FILE_MAGIC_VALUE_V1:
+		{
+			file_StreamFormat hdr;
+
+			// Read the header, without the magic number
+			if(!ios->ReadFullBuffer(
+				((uint8_t*)&hdr) + sizeof(magic),
+				sizeof(hdr) - sizeof(magic),
+				0 /* not interested in bytes read if this fails */,
+				IOStream::TimeOutInfinite))
+			{
+				// Couldn't read header
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					WhenDecodingExpectedToReadButCouldnt,
+					"Failed to read container ID from "
+					"object " << BOX_FORMAT_OBJECTID(ObjectID));
+			}
+
+			ContainerID = box_ntoh64(hdr.mContainerID);
+		}
+		break;
+
+		case OBJECTMAGIC_DIR_MAGIC_VALUE:
+		{
+			BackupStoreDirectory &dir(GetDirectoryInternal(ObjectID));
+			ContainerID = dir.GetContainerID();
+		}
+		break;
+
+		default:
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				BadBackupStoreFile,
+				"Failed to decode object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				": unknown magic " <<
+				BOX_FORMAT_HEX32(ntohl(magic)));
+		}
+	}
+
+	// Check that the parent directory is correct! i.e. it contains
+	// this object ID. Does moving objects violate this?
+
+	BackupStoreDirectory &parent(GetDirectoryInternal(ContainerID));
+	if (!parent.FindEntryByID(ObjectID))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			BadBackupStoreFile,
+			"Failed to find object " <<
+			BOX_FORMAT_OBJECTID(ObjectID) <<
+			" in its supposed directory, " <<
+			BOX_FORMAT_OBJECTID(ContainerID));
+	}
+
+	AssertMutable(ContainerID);
+}

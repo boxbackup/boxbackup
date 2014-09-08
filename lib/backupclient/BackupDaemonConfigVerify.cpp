@@ -124,9 +124,11 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("KeysFile", ConfigTest_Exists),
-	ConfigurationVerifyKey("DataDirectory", 
-		ConfigTest_Exists | ConfigTest_LastEntry),
+	ConfigurationVerifyKey("DataDirectory", ConfigTest_Exists),
 
+	// enable true snapshot mode
+	ConfigurationVerifyKey("ExperimentalSnapshotMode",
+		ConfigTest_IsBool | ConfigTest_LastEntry, false),
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =

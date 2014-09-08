@@ -59,6 +59,8 @@ BackupClientContext::BackupClientContext
   mHostname(rHostname),
   mPort(Port),
   mAccountNumber(AccountNumber),
+  mpSocket(0),
+  mpConnection(0),
   mExtendedLogging(ExtendedLogging),
   mExtendedLogToFile(ExtendedLogToFile),
   mExtendedLogFile(ExtendedLogFile),

@@ -18,10 +18,11 @@
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreConstants.h"
+#include "BackupStoreDaemon.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
-#include "BackupStoreInfo.h"
 #include "BackupStoreFilenameClear.h"
+#include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "BackupStoreFile.h"
 #include "BoxPortsAndFiles.h"
@@ -464,7 +465,8 @@ void test_everything_deleted(BackupProtocolClient &protocol, int64_t DirID)
 			files++;
 		}
 		// Check it's deleted
-		TEST_THAT(en->GetFlags() & BackupProtocolListDirectory::Flags_Deleted);
+		TEST_EQUAL_LINE(true, en->IsDeleted(), "Expected entry was not "
+			"deleted: " << BOX_FORMAT_OBJECTID(en->GetObjectID()));
 	}
 	
 	// Check there were the right number of files and directories
@@ -483,7 +485,35 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount = 1)
 	ExpectedRefCounts[ObjectID] = RefCount;
 }
 
-void create_file_in_dir(std::string name, std::string source, int64_t parentId,
+bool check_refcounts(BackupStoreRefCountDatabase* pReferences)
+{
+	TEST_EQUAL(ExpectedRefCounts.size(),
+		pReferences->GetLastObjectIDUsed() + 1);
+
+	if (ExpectedRefCounts.size() != pReferences->GetLastObjectIDUsed() + 1)
+	{
+		return false;
+	}
+
+	bool asExpected = true;
+
+	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
+		i < ExpectedRefCounts.size(); i++)
+	{
+		TEST_EQUAL_LINE(ExpectedRefCounts[i],
+			pReferences->GetRefCount(i),
+			"reference count for object " <<
+			BOX_FORMAT_OBJECTID(i));
+		if (ExpectedRefCounts[i] != pReferences->GetRefCount(i))
+		{
+			asExpected = false;
+		}
+	}
+
+	return asExpected;
+}
+
+int64_t create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	BackupProtocolClient &protocol, BackupStoreRefCountDatabase& rRefCount)
 {
 	BackupStoreFilenameClear name_encoded("file_One");
@@ -501,10 +531,13 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	TEST_EQUAL(objectId, rRefCount.GetLastObjectIDUsed());
 	TEST_EQUAL(1, rRefCount.GetRefCount(objectId))
 	set_refcount(objectId, 1);
+	return objectId;
 }
 
 int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
-	const char *name, int depth, BackupStoreRefCountDatabase& rRefCount)
+	const char *name, int depth, BackupStoreRefCountDatabase& rRefCount,
+	int64_t *pFirstFileDirId, BackupStoreFilenameClear *pFirstFileName,
+	int64_t *pFirstDirId)
 {
 	// Create a directory
 	int64_t subdirid = 0;
@@ -513,8 +546,8 @@ int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
 		// Create with dummy attributes
 		int attrS = 0;
 		MemBlockStream attr(&attrS, sizeof(attrS));
-		std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-			indir,
+		std::auto_ptr<BackupProtocolSuccess> dirCreate(
+			protocol.QueryCreateDirectory(indir,
 			9837429842987984LL, dirname, attr));
 		subdirid = dirCreate->GetObjectID(); 
 	}
@@ -529,22 +562,36 @@ int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
 	// Put more directories in it, if we haven't gone down too far
 	if(depth > 0)
 	{
-		create_test_data_subdirs(protocol, subdirid, "dir_One",
-			depth - 1, rRefCount);
+		int64_t firstDirId = create_test_data_subdirs(protocol,
+			subdirid, "dir_One", depth - 1, rRefCount, NULL, NULL,
+			NULL);
+		if (pFirstDirId)
+		{
+			*pFirstDirId = firstDirId;
+		}
 		create_test_data_subdirs(protocol, subdirid, "dir_Two",
-			depth - 1, rRefCount);
+			depth - 1, rRefCount, NULL, NULL, NULL);
 	}
 	
 	// Stick some files in it
 	create_file_in_dir("file_One", "testfiles/file1", subdirid, protocol,
 		rRefCount);
+
+	if (pFirstFileDirId)
+	{
+		*pFirstFileDirId = subdirid;
+	}
+	if (pFirstFileName)
+	{
+		*pFirstFileName = BackupStoreFilenameClear("file_One");
+	}
+
 	create_file_in_dir("file_Two", "testfiles/file1", subdirid, protocol,
 		rRefCount);
 	create_file_in_dir("file_Three", "testfiles/file1", subdirid, protocol,
 		rRefCount);
 	return subdirid;
 }
-
 
 void check_dir_after_uploads(BackupProtocolClient &protocol, const StreamableMemBlock &Attributes)
 {
@@ -939,7 +986,8 @@ std::auto_ptr<BackupProtocolClient> test_server_login(const char *hostname,
 	return protocol;
 }
 
-void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
+bool run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount,
+	bool expectSuccess = true)
 {
 	std::string rootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
 	int discSet = rAccount.GetDiscSet();
@@ -947,7 +995,9 @@ void run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 	// Do housekeeping on this account
 	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
 		discSet, NULL);
-	housekeeping.DoHousekeeping(true /* keep trying forever */);
+	bool success = housekeeping.DoHousekeeping(true /* keep trying forever */);
+	TEST_EQUAL_LINE(expectSuccess, success, "housekeeping");
+	return success;
 }
 
 // Run housekeeping (for which we need to disconnect ourselves) and check
@@ -1583,11 +1633,94 @@ int test_server(const char *hostname)
 				apAccounts->GetEntry(0x1234567), true));
 	
 		// Create some nice recursive directories
+		int64_t firstSubFileDirId, firstSubDirId;
+		BackupStoreFilenameClear firstSubFileName;
 		int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 			BackupProtocolListDirectory::RootDirectory,
-			"test_delete", 6 /* depth */, *apRefCount);
-		
-		// And delete them
+			"test_delete", 6 /* depth */, *apRefCount,
+			&firstSubFileDirId, &firstSubFileName, &firstSubDirId);
+
+		TEST_EQUAL(true, check_refcounts(apRefCount.get()));
+
+		// Also check that the account is sane beforehand.
+		// For which we have to logout.
+		apProtocol->QueryFinished();
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
+		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+		std::auto_ptr<BackupStoreInfo> apInfoBefore =
+			BackupStoreInfo::Load(0x1234567, "backup/01234567/",
+				0, true);
+		apProtocol = test_server_login(hostname, context, conn);
+
+		// Create two snapshot of this directory
+		BackupStoreFilenameClear snapshotName("snapshot");
+		std::auto_ptr<BackupProtocolSuccess> success =
+			apProtocol->QueryAddReference(
+				/* ObjectToCloneID */
+				dirtodelete,
+				/* OldDirectoryID */
+				BackupProtocolListDirectory::RootDirectory,
+				/* mNewDirectoryID */
+				BackupProtocolListDirectory::RootDirectory,
+				/* NewObjectFileName */
+				snapshotName);
+		BOX_INFO("Snapshot created of object ID " << 
+			BOX_FORMAT_OBJECTID(dirtodelete));
+		ExpectedRefCounts[dirtodelete]++;
+
+		BackupStoreFilenameClear snapshot2Name("snapshot2");
+		success = apProtocol->QueryAddReference(
+				/* ObjectToCloneID */
+				dirtodelete,
+				/* OldDirectoryID */
+				BackupProtocolListDirectory::RootDirectory,
+				/* mNewDirectoryID */
+				BackupProtocolListDirectory::RootDirectory,
+				/* NewObjectFileName */
+				snapshot2Name);
+		BOX_INFO("Snapshot created of object ID " << 
+			BOX_FORMAT_OBJECTID(dirtodelete));
+		ExpectedRefCounts[dirtodelete]++;
+
+		// Run housekeeping to check block counts, for which we have to logout
+		apProtocol->QueryFinished();
+		TEST_EQUAL_LINE(true, run_housekeeping(account),
+			"housekeeping after snapshot");
+
+		// Also check that bbstoreaccounts doesn't change anything
+		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
+			" -c testfiles/bbstored.conf check 01234567 fix") == 0);
+		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+		apProtocol = test_server_login(hostname, context, conn);
+		std::auto_ptr<BackupStoreInfo> apInfoAfter =
+			BackupStoreInfo::Load(0x1234567, "backup/01234567/",
+				0, true);
+		TEST_EQUAL_LINE(0, apInfoAfter->ReportChangesTo(*apInfoBefore),
+			"Creating a snapshot changed block counts");
+		TEST_EQUAL(true, check_refcounts(apRefCount.get()));
+
+		// Try to delete a file and a directory in the original
+		// without copying them first. Both should throw an
+		// exception because they're in a multiply referenced
+		// (hence immutable) parent.
+		TEST_CHECK_THROWS(apProtocol->QueryDeleteFile(firstSubFileDirId,
+				firstSubFileName),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
+		int type, subtype;
+		apProtocol->GetLastError(type, subtype);
+		TEST_EQUAL_LINE(BackupProtocolError::Err_MultiplyReferencedObject,
+			subtype, "wrong error code in protocol");
+
+		TEST_CHECK_THROWS(apProtocol->QueryDeleteDirectory(firstSubDirId),
+			ConnectionException, Conn_Protocol_UnexpectedReply);
+		apProtocol->GetLastError(type, subtype);
+		TEST_EQUAL_LINE(BackupProtocolError::Err_MultiplyReferencedObject,
+			subtype, "wrong error code in protocol");
+	
+		// And delete the files in the original
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
 					dirtodelete));
@@ -1606,21 +1739,28 @@ int test_server(const char *hostname)
 			std::auto_ptr<IOStream> dirstream(protocolReadOnly.ReceiveStream());
 			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
 			
-			// Check there's only that one entry
-			TEST_THAT(dir.GetNumberOfEntries() == 1);
-			
-			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry *en = i.Next();
+			// There should be no deleted entries. The directory
+			// that we tried to delete should have been removed
+			// immediately because it had >1 reference, and the
+			// snapshots should not be marked as deleted.
+			TEST_EQUAL(0, dir.GetNumberOfEntries());
+
+			dirreply = protocolReadOnly.QueryListDirectory(
+				BackupProtocolListDirectory::RootDirectory,
+				BackupProtocolListDirectory::Flags_Dir,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+			// Stream
+			dirstream = protocolReadOnly.ReceiveStream();
+			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+
+			en = BackupStoreDirectory::Iterator(dir).Find(snapshotName);
 			TEST_THAT(en != 0);
-			if(en)
-			{
-				TEST_THAT(en->GetObjectID() == dirtodelete);
-				BackupStoreFilenameClear n("test_delete");
-				TEST_THAT(en->GetName() == n);
-			}
+			
+			en = BackupStoreDirectory::Iterator(dir).Find(snapshot2Name);
+			TEST_THAT(en != 0);
 			
 			// Then... check everything's deleted
-			test_everything_deleted(protocolReadOnly, dirtodelete);
+			// test_everything_deleted(protocolReadOnly, dirtodelete);
 		}
 			
 		// Finish the connections
@@ -1954,9 +2094,17 @@ int test3(int argc, const char *argv[])
 			"expected a BackupProtocolError");
 		TEST_EQUAL_LINE(BackupProtocolError::Err_DisabledAccount, subType,
 			"expected an Err_DisabledAccount");
-		
 		// Finish the connection
 		protocol.QueryFinished();
+	}
+
+	{
+		std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+			BackupStoreRefCountDatabase::Load(
+				apAccounts->GetEntry(0x1234567), true));
+		ExpectedRefCounts.resize(2);
+		ExpectedRefCounts[BACKUPSTORE_ROOT_DIRECTORY_ID] = 1;
+		TEST_EQUAL(true, check_refcounts(apReferences.get()));
 	}
 
 	// Re-enable the account so that subsequent logins should succeed
@@ -1979,7 +2127,7 @@ int test3(int argc, const char *argv[])
 
 	TEST_THAT(ServerIsAlive(pid));
 
-	run_housekeeping(account);
+	run_housekeeping(account, false /* we expect errors */);
 
 	// Check that housekeeping fixed the ref counts
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
@@ -1994,15 +2142,7 @@ int test3(int argc, const char *argv[])
 
 	// test that all object reference counts have the
 	// expected values
-	TEST_EQUAL(ExpectedRefCounts.size() - 1,
-		apReferences->GetLastObjectIDUsed());
-	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
-		i < ExpectedRefCounts.size(); i++)
-	{
-		TEST_EQUAL_LINE(ExpectedRefCounts[i],
-			apReferences->GetRefCount(i),
-			"object " << BOX_FORMAT_OBJECTID(i));
-	}
+	TEST_EQUAL(true, check_refcounts(apReferences.get()));
 
 	// Delete the refcount database again, and let
 	// housekeeping recreate it and fix the ref counts.
@@ -2013,20 +2153,11 @@ int test3(int argc, const char *argv[])
 	run_housekeeping(account);
 	apReferences = BackupStoreRefCountDatabase::Load(account, true);
 
-	TEST_EQUAL(ExpectedRefCounts.size() - 1,
-		apReferences->GetLastObjectIDUsed());
-	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
-		i < ExpectedRefCounts.size(); i++)
-	{
-		TEST_EQUAL_LINE(ExpectedRefCounts[i],
-			apReferences->GetRefCount(i),
-			"object " << BOX_FORMAT_OBJECTID(i));
-	}
+	TEST_EQUAL(true, check_refcounts(apReferences.get()));
 	
 	// Test the deletion of objects by the housekeeping system
 	// First, things as they are now.
 	recursive_count_objects_results before = {0,0,0};
-
 	recursive_count_objects("localhost", BackupProtocolListDirectory::RootDirectory, before);
 	
 	TEST_THAT(before.objectsNotDel != 0);

@@ -233,3 +233,38 @@ GetIsAlive	42	Command(IsAlive)
 IsAlive	43	Reply
 	# no data members
 
+# Creates a new reference to an existing object ID, with a new name, in the
+# specified directory (by object ID). The object pointed to by this new
+# reference will then have at least two references, and therefore be immutable.
+# However these operations are still possible:
+#
+# * Rename and delete from one of its (2+) containers, if that container is not
+# also immutable;
+#
+# * Modify by uploading a patch if it's a file, which creates a new object with
+# a new ID doesn't logically change the object with this ID, even if its
+# contents are converted to a reverse diff in the process;
+# 
+# * Copy, which changes its object ID to a new copy that initially has no
+# references, but will presumably have one when inserted into the relevant
+# container, and will thus be modifiable.
+
+AddReference	44	Command(Success)
+	int64		ObjectToCloneID
+	int64		OldDirectoryID
+	int64		NewDirectoryID
+	Filename	NewObjectFileName
+
+# Makes a copy of a (multiply referenced) directory, with a new object ID and a
+# reference count of 1, and changes the reference in the specified directory to
+# point to the new copy, making it mutable again.
+#
+# The newly created directory will have a different container ID embedded in
+# it, so it's not a binary identical copy, but it is functionally identical.
+#
+# The containing directory must already be mutable.
+
+CopyDirectory	45	Command(Success)
+	int64		DirToCopyID
+	int64		ContainingDirID
+

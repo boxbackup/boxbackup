@@ -112,19 +112,22 @@ public:
 	const BackupStoreDirectory &GetDirectory(int64_t ObjectID)
 	{
 		// External callers aren't allowed to change it -- this function
-		// merely turns the the returned directory const.
+		// merely turns the returned directory const.
 		return GetDirectoryInternal(ObjectID);
 	}
 	
 	// Manipulating files/directories
 	int64_t AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime, int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename, bool MarkFileWithSameNameAsOldVersions);
 	int64_t AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists);
+	void AddReference(int64_t ObjectID, int64_t OldDirectoryID,
+		int64_t NewDirectoryID, const BackupStoreFilename &rNewFilename);
 	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime);
 	bool ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut);
 	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut);
 	bool UndeleteFile(int64_t ObjectID, int64_t InDirectory);
 	void DeleteDirectory(int64_t ObjectID, bool Undelete = false);
 	void MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject);
+	int64_t CopyDirectory(int64_t DirToCopyID, int64_t ContainingDirID);
 
 	// Manipulating objects
 	enum
@@ -147,6 +150,7 @@ private:
 	void RemoveDirectoryFromCache(int64_t ObjectID);
 	void DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete);
 	int64_t AllocateObjectID();
+	void AssertMutable(int64_t ObjectID);
 
 	std::string mConnectionDetails;
 	int32_t mClientID;

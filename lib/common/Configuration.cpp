@@ -815,9 +815,18 @@ bool Configuration::Verify(const ConfigurationVerify &rVerify,
 			{
 				// Shouldn't exist, but does.
 				ok = false;
-				rErrorMsg += rLevel + mName + "." + i->first + " (key) is not a known key. Check spelling and placement.\n";
+				rErrorMsg += "The configuration key '" +
+					i->first + "' is not known or not "
+					"expected inside '" + rLevel + mName +
+					"'.";
 			}
 		}
+	}
+	else
+	{
+		// Expected keys not configured, so everything is allowed.
+		// If you want to disable all keys, load an empty array
+		// instead.
 	}
 	
 	// Then the sub configurations

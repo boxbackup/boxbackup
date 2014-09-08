@@ -647,11 +647,13 @@ void BackupStoreCheck::CheckDirectories()
 					int32_t iIndex;
 					IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
 					bool badEntry = false;
+					bool wasAlreadyContained = false;
 					if(piBlock != 0)
 					{
 						badEntry = !CheckDirectoryEntry(
 							*en, pblock->mID[e],
-							iIndex, isModified);
+							iIndex, isModified,
+							wasAlreadyContained);
 					}
 					else
 					{
@@ -677,16 +679,26 @@ void BackupStoreCheck::CheckDirectories()
 					else if (en->IsFile())
 					{
 						// Add to sizes?
-						if(en->IsOld())
+						// If piBlock was zero, then wasAlreadyContained
+						// might be uninitialized; but we only care about
+						// files here, and if a file's piBlock was zero
+						// then badEntry would be set above, so we
+						// wouldn't be here.
+						ASSERT(!badEntry)
+						if(wasAlreadyContained)
+						{
+							// don't double-count objects that are
+							// contained by another directory as well.
+						}
+						else if(en->IsOld())
 						{
 							mBlocksInOldFiles += en->GetSizeInBlocks();
 						}
-						if(en->IsDeleted())
+						else if(en->IsDeleted())
 						{
 							mBlocksInDeletedFiles += en->GetSizeInBlocks();
 						}
-						if(!en->IsOld() &&
-							!en->IsDeleted())
+						else
 						{
 							mBlocksInCurrentFiles += en->GetSizeInBlocks();
 						}
@@ -729,7 +741,8 @@ void BackupStoreCheck::CheckDirectories()
 }
 
 bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
-	int64_t DirectoryID, int32_t IndexInDirBlock, bool& rIsModified)
+	int64_t DirectoryID, int32_t IndexInDirBlock, bool& rIsModified,
+	bool& rWasAlreadyContained)
 {
 	IDBlock *piBlock = LookupID(rEntry.GetObjectID(), IndexInDirBlock);
 	ASSERT(piBlock != 0);
@@ -748,15 +761,11 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 			" which has a different type than expected.");
 		badEntry = true;
 	}
-	// Check that the entry is not already contained.
 	else if(iflags & Flags_IsContained)
 	{
-		BOX_WARNING("Directory ID " <<
-			BOX_FORMAT_OBJECTID(DirectoryID) <<
-			" references object " <<
-			BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
-			" which is already contained.");
-		badEntry = true;
+		// With snapshots it's no longer an error for an object to be
+		// contained in (referenced by) more than one directory.
+		rWasAlreadyContained = true;
 	}
 	else
 	{
@@ -808,7 +817,7 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		}
 	}
 
-	if (!badEntry)
+	if (!badEntry && !rWasAlreadyContained)
 	{
 		if(rEntry.IsDir())
 		{

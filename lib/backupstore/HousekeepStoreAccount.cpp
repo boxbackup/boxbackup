@@ -154,6 +154,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Scan the directory for potential things to delete
 	// This will also remove eligible items marked with RemoveASAP
 	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID);
+	bool errorsFound = false;
 
 	// If scan directory stopped for some reason, probably parent
 	// instructed to terminate, stop now.
@@ -206,6 +207,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 				"," << mBlocksInDeletedFiles << "), dirs (" <<
 				usedDirectories << "," << mBlocksInDirectories
 				<< ")");
+			errorsFound = true;
 		}
 		
 		// If the current values don't match, store them
@@ -219,7 +221,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 				mBlocksInOldFiles, mBlocksInDeletedFiles,
 				mBlocksInDirectories + mBlocksInDirectoriesDelta);
 
-			info->ReportChangesTo(*pOldInfo);
+			errorsFound |= (info->ReportChangesTo(*pOldInfo) != 0);
 			info->Save();
 		}
 	}
@@ -294,6 +296,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 					" not found in database, added"
 					" with " << mNewRefCounts[ObjectID] <<
 					" references");
+				errorsFound = true;
 			}
 			apReferences->SetRefCount(ObjectID,
 				mNewRefCounts[ObjectID]);
@@ -314,6 +317,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			apReferences->SetRefCount(ObjectID,
 				mNewRefCounts[ObjectID]);
 			mRefCountsAdjusted++;
+			errorsFound = true;
 		}
 	}
 
@@ -333,6 +337,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 				" to " << NewRefCount << " (not found)");
 			apReferences->SetRefCount(ObjectID, NewRefCount);
 			mRefCountsAdjusted++;
+			errorsFound = true;
 		}
 	}
 
@@ -459,11 +464,18 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 		while((en = i.Next()) != 0)
 		{
 			// This directory references this object
-			if (mNewRefCounts.size() <= en->GetObjectID())
+			if(mNewRefCounts.size() <= en->GetObjectID())
 			{
 				mNewRefCounts.resize(en->GetObjectID() + 1, 0);
 			}
-			mNewRefCounts[en->GetObjectID()]++;
+
+			// Count file references now, to stop them being
+			// removed too early if they're multiply referenced
+			// Directory references will be counted below.
+			if(en->IsFile())
+			{
+				mNewRefCounts[en->GetObjectID()]++;
+			}
 		}
 	}
 
@@ -484,8 +496,18 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 				if((enFlags & BackupStoreDirectory::Entry::Flags_RemoveASAP) != 0
 					&& (enFlags & (BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_OldVersion)) != 0)
 				{
-					// Delete this immediately.
-					DeleteFile(ObjectID, en->GetObjectID(), dir, objectFilename, originalDirSizeInBlocks);
+					// If it's multiply referenced,
+					// DO NOT remove from the disk,
+					// just remove the directory entry.
+					if(mNewRefCounts[en->GetObjectID()] > 1)
+					{
+						dir.DeleteEntry(en->GetObjectID());
+					}
+					else
+					{
+						// Delete this immediately.
+						DeleteFile(ObjectID, en->GetObjectID(), dir, objectFilename, originalDirSizeInBlocks);
+					}
 					
 					// flag as having done something
 					deletedSomething = true;
@@ -517,8 +539,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 			int16_t enFlags = en->GetFlags();
 			int64_t enSizeInBlocks = en->GetSizeInBlocks();
 			mBlocksUsed += enSizeInBlocks;
-			if(enFlags & BackupStoreDirectory::Entry::Flags_OldVersion) mBlocksInOldFiles += enSizeInBlocks;
-			if(enFlags & BackupStoreDirectory::Entry::Flags_Deleted) mBlocksInDeletedFiles += enSizeInBlocks;
+			if(en->IsOld()) mBlocksInOldFiles += enSizeInBlocks;
+			if(en->IsDeleted()) mBlocksInDeletedFiles += enSizeInBlocks;
 					
 			// Work out ages of this version from the last mark
 			int32_t enVersionAge = 0;
@@ -538,7 +560,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 			// enVersionAge is now the age of this version.
 			
 			// Potentially add it to the list if it's deleted, if it's an old version or deleted
-			if((enFlags & (BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_OldVersion)) != 0)
+			if(en->IsOld() || en->IsDeleted())
 			{
 				// Is deleted / old version.
 				DelEn d;
@@ -547,9 +569,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 				d.mSizeInBlocks = en->GetSizeInBlocks();
 				d.mMarkNumber = en->GetMarkNumber();
 				d.mVersionAgeWithinMark = enVersionAge;
-				d.mIsFlagDeleted = (enFlags &
-					BackupStoreDirectory::Entry::Flags_Deleted)
-					? true : false;
+				d.mIsFlagDeleted = en->IsDeleted();
 				
 				// Add it to the list
 				mPotentialDeletions.insert(d);
@@ -621,13 +641,19 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID)
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
-			// Next level
-			ASSERT((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == BackupStoreDirectory::Entry::Flags_Dir);
-			
-			if(!ScanDirectory(en->GetObjectID()))
+			ASSERT(en->IsDir());
+
+			// Now count multiply referenced directories
+			mNewRefCounts[en->GetObjectID()]++;
+
+			// Don't recurse multiple times into the same dir
+			if(mNewRefCounts[en->GetObjectID()] == 1)
 			{
-				// Halting operation
-				return false;
+				if(!ScanDirectory(en->GetObjectID()))
+				{
+					// Halting operation
+					return false;
+				}
 			}
 		}
 	}

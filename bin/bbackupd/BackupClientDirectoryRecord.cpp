@@ -2106,9 +2106,9 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 //
 // --------------------------------------------------------------------------
 Location::Location()
-	: mIDMapIndex(0),
-	  mpExcludeFiles(0),
-	  mpExcludeDirs(0)
+: mIDMapIndex(0),
+  mpExcludeFiles(0),
+  mpExcludeDirs(0)
 {
 }
 
