@@ -272,11 +272,11 @@ void BackupStoreDaemon::Run()
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-void BackupStoreDaemon::Connection(SocketStreamTLS &rStream)
+void BackupStoreDaemon::Connection(std::auto_ptr<SocketStreamTLS> apStream)
 {
 	try
 	{
-		Connection2(rStream);
+		Connection2(apStream);
 	}
 	catch(BoxException &e)
 	{
@@ -304,10 +304,10 @@ void BackupStoreDaemon::Connection(SocketStreamTLS &rStream)
 //		Created: 2006/11/12
 //
 // --------------------------------------------------------------------------
-void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
+void BackupStoreDaemon::Connection2(std::auto_ptr<SocketStreamTLS> apStream)
 {
 	// Get the common name from the certificate
-	std::string clientCommonName(rStream.GetPeerCommonName());
+	std::string clientCommonName(apStream->GetPeerCommonName());
 	
 	// Log the name
 	BOX_INFO("Client certificate CN: " << clientCommonName);
@@ -329,7 +329,7 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	Logging::Tagger tagWithClientID(tag.str());
 
 	// Create a context, using this ID
-	BackupStoreContext context(id, *this, GetConnectionDetails());
+	BackupStoreContext context(id, this, GetConnectionDetails());
 
 	if (mpTestHook)
 	{
@@ -346,7 +346,8 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	}
 
 	// Handle a connection with the backup protocol
-	BackupProtocolServer server(rStream);
+	std::auto_ptr<SocketStream> apPlainStream(apStream);
+	BackupProtocolServer server(apPlainStream);
 	server.SetLogToSysLog(mExtendedLogging);
 	server.SetTimeout(BACKUP_STORE_TIMEOUT);
 	try
@@ -355,22 +356,22 @@ void BackupStoreDaemon::Connection2(SocketStreamTLS &rStream)
 	}
 	catch(...)
 	{
-		LogConnectionStats(id, context.GetAccountName(), rStream);
+		LogConnectionStats(id, context.GetAccountName(), server);
 		throw;
 	}
-	LogConnectionStats(id, context.GetAccountName(), rStream);
+	LogConnectionStats(id, context.GetAccountName(), server);
 	context.CleanUp();
 }
 
 void BackupStoreDaemon::LogConnectionStats(uint32_t accountId,
-	const std::string& accountName, const SocketStreamTLS &s)
+	const std::string& accountName, const BackupProtocolServer &server)
 {
 	// Log the amount of data transferred
 	BOX_NOTICE("Connection statistics for " << 
 		BOX_FORMAT_ACCOUNT(accountId) << " "
 		"(name=" << accountName << "):"
-		" IN="  << s.GetBytesRead() <<
-		" OUT=" << s.GetBytesWritten() <<
-		" NET_IN=" << (s.GetBytesRead() - s.GetBytesWritten()) <<
-		" TOTAL=" << (s.GetBytesRead() + s.GetBytesWritten()));
+		" IN="  << server.GetBytesRead() <<
+		" OUT=" << server.GetBytesWritten() <<
+		" NET_IN=" << (server.GetBytesRead() - server.GetBytesWritten()) <<
+		" TOTAL=" << (server.GetBytesRead() + server.GetBytesWritten()));
 }

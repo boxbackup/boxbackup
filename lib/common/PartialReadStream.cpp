@@ -104,7 +104,7 @@ IOStream::pos_type PartialReadStream::BytesLeftToRead()
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void PartialReadStream::Write(const void *pBuffer, int NBytes)
+void PartialReadStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, CantWriteToPartialReadStream)
 }

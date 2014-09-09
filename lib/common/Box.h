@@ -40,7 +40,6 @@
 #include "Logging.h"
 
 #ifndef BOX_RELEASE_BUILD
-	
 	extern bool AssertFailuresToSyslog;
 	#define ASSERT_FAILS_TO_SYSLOG_ON {AssertFailuresToSyslog = true;}
 	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
@@ -71,7 +70,6 @@
 	
 	// Exception names
 	#define EXCEPTION_CODENAMES_EXTENDED
-	
 #else
 	#define ASSERT_FAILS_TO_SYSLOG_ON
 	#define ASSERT(cond)
@@ -82,8 +80,19 @@
 	// Box Backup builds release get extra information for exception logging
 	#define EXCEPTION_CODENAMES_EXTENDED
 	#define EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION
-	
 #endif
+
+#if defined DEBUG_LEAKS
+	#ifdef PLATFORM_DISABLE_MEM_LEAK_TESTING
+		#error Compiling with DEBUG_LEAKS enabled, but not supported on this platform
+	#else
+		#define BOX_MEMORY_LEAK_TESTING
+	#endif
+#elif defined BOX_RELEASE_BUILD
+	#ifndef PLATFORM_DISABLE_MEM_LEAK_TESTING
+		#define BOX_MEMORY_LEAK_TESTING
+	#endif
+#endif // DEBUG_LEAKS || BOX_RELEASE_BUILD
 
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Memory leak testing
@@ -107,16 +116,8 @@
 	{ \
 		if((!HideExceptionMessageGuard::ExceptionsHidden() \
 			&& !HideSpecificExceptionGuard::IsHidden( \
-				type::ExceptionType, type::subtype)) \
-			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
+				type::ExceptionType, type::subtype))) \
 		{ \
-			std::auto_ptr<Logging::Guard> guard; \
-			\
-			if(Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
-			{ \
-				guard.reset(new Logging::Guard(Log::EVERYTHING)); \
-			} \
-			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
 				#type "(" #subtype ") " \
@@ -131,16 +132,8 @@
 		_box_throw_line << message; \
 		if((!HideExceptionMessageGuard::ExceptionsHidden() \
 			&& !HideSpecificExceptionGuard::IsHidden( \
-				type::ExceptionType, type::subtype)) \
-			|| Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
+				type::ExceptionType, type::subtype))) \
 		{ \
-			std::auto_ptr<Logging::Guard> guard; \
-			\
-			if(Logging::Guard::IsGuardingFrom(Log::EVERYTHING)) \
-			{ \
-				guard.reset(new Logging::Guard(Log::EVERYTHING)); \
-			} \
-			\
 			OPTIONAL_DO_BACKTRACE \
 			BOX_WARNING("Exception thrown: " \
 				#type "(" #subtype ") (" << \

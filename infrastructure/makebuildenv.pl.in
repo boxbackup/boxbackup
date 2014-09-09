@@ -571,13 +571,14 @@ DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
 LDFLAGS += @LDFLAGS@ @LDADD_RDYNAMIC@
 
 .ifdef RELEASE
-CXXFLAGS += -DBOX_RELEASE_BUILD $release_flags \$(DEFAULT_CXXFLAGS)
+CXXFLAGS += \$(DEFAULT_CXXFLAGS) -DBOX_RELEASE_BUILD $release_flags
 OUTBASE = ../../release
 OUTDIR = ../../release/$mod
 DEPENDMAKEFLAGS = -D RELEASE
 VARIENT = RELEASE
 .else
-CXXFLAGS += -g \$(DEFAULT_CXXFLAGS)
+# http://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode_using.html#debug_mode.using.mode
+CXXFLAGS += \$(DEFAULT_CXXFLAGS) -g -O0 -D_GLIBCXX_DEBUG
 OUTBASE = ../../debug
 OUTDIR = ../../debug/$mod
 DEPENDMAKEFLAGS =
@@ -613,12 +614,12 @@ __E
 	{
 		print MAKE <<__E;
 HIDE     = \$(if \$(V),,@)
-_CXX     = \$(if \$(V),\$(CXX),     @ echo "  [CXX]     \$<" && \$(CXX))
-_LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    \$@" && \$(CXX))
-_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] \$<" && \$(WINDRES))
-_AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      \$@" && \$(AR))
-_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  \$@" && \$(RANLIB))
-_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    \$@" && \$(PERL) >/dev/null)
+_CXX     = \$(if \$(V),\$(CXX),     @ echo "  [CXX]     $mod/\$<" && \$(CXX))
+_LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    $mod/\$@" && \$(CXX))
+_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] $mod/\$<" && \$(WINDRES))
+_AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      $mod/\$@" && \$(AR))
+_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  $mod/\$@" && \$(RANLIB))
+_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    $mod/\$@" && \$(PERL) >/dev/null)
 
 __E
 	}

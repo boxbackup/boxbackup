@@ -11,6 +11,7 @@
 #define TEST__H
 
 #include <cstring>
+#include <list>
 
 #ifdef WIN32
 #define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
@@ -32,6 +33,7 @@ extern int failures;
 extern int first_fail_line;
 extern std::string first_fail_file;
 extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
+extern std::list<std::string> run_only_named_tests;
 
 #define TEST_FAIL_WITH_MESSAGE(msg) \
 { \
@@ -47,11 +49,20 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 
 #define TEST_ABORT_WITH_MESSAGE(msg) {TEST_FAIL_WITH_MESSAGE(msg); return 1;}
 
-#define TEST_THAT(condition) {if(!(condition)) TEST_FAIL_WITH_MESSAGE("Condition [" #condition "] failed")}
+#define TEST_THAT_OR(condition, or_command) \
+	if(!(condition)) \
+	{ \
+		TEST_FAIL_WITH_MESSAGE("Condition [" #condition "] failed"); \
+		or_command; \
+	}
+#define TEST_THAT(condition) TEST_THAT_OR(condition,)
 #define TEST_THAT_ABORTONFAIL(condition) {if(!(condition)) TEST_ABORT_WITH_MESSAGE("Condition [" #condition "] failed")}
+#define TEST_THAT_THROWONFAIL(condition) \
+	TEST_THAT_OR(condition, THROW_EXCEPTION_MESSAGE(CommonException, \
+		AssertFailed, "Condition [" #condition "] failed"));
 
 // NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
-#define TEST_CHECK_THROWS(statement, excepttype, subtype) \
+#define TEST_CHECK_THROWS_OR(statement, excepttype, subtype, or_command) \
 	{ \
 		bool didthrow = false; \
 		HideExceptionMessageGuard hide; \
@@ -76,12 +87,15 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 		} \
 		if(!didthrow) \
 		{ \
-			TEST_FAIL_WITH_MESSAGE("Didn't throw exception " #excepttype "(" #subtype ")") \
+			TEST_FAIL_WITH_MESSAGE("Didn't throw exception " #excepttype "(" #subtype ")"); \
+			or_command; \
 		} \
 	}
+#define TEST_CHECK_THROWS(statement, excepttype, subtype) \
+	TEST_CHECK_THROWS_OR(statement, excepttype, subtype,)
 
 // utility macro for comparing two strings in a line
-#define TEST_EQUAL(_expected, _found) \
+#define TEST_EQUAL_OR(_expected, _found, or_command) \
 { \
 	std::ostringstream _oss1; \
 	_oss1 << _expected; \
@@ -100,8 +114,11 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 		_oss3 << #_found << " != " << #_expected; \
 		\
 		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
+		or_command; \
 	} \
 }
+#define TEST_EQUAL(_expected, _found) \
+	TEST_EQUAL_OR(_expected, _found,)
 
 // utility macro for comparing two strings in a line
 #define TEST_EQUAL_LINE(_expected, _found, _line) \
@@ -139,6 +156,9 @@ extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 		std::string _line_str = _ossl.str(); \
 		printf("Test failed on <%s>\n", _line_str.c_str()); \
 	}
+
+#define TEST_STARTSWITH(expected, actual) \
+	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
 
 bool TestFileExists(const char *Filename);
 bool TestDirExists(const char *Filename);

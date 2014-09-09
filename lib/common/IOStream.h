@@ -47,27 +47,26 @@ public:
 	typedef int64_t pos_type;
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite) = 0;
 	virtual pos_type BytesLeftToRead();	// may return IOStream::SizeOfStreamUnknown (and will for most stream types)
-	virtual void Write(const void *pBuffer, int NBytes) = 0;
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite) = 0;
 	virtual void Write(const char *pBuffer);
-	virtual void WriteAllBuffered();
+	virtual void WriteAllBuffered(int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual void Close();
-	
+
 	// Has all data that can be read been read?
 	virtual bool StreamDataLeft() = 0;
 	// Has the stream been closed (writing not possible)
 	virtual bool StreamClosed() = 0;
-	
+
 	// Utility functions
 	bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout = IOStream::TimeOutInfinite);
 	bool CopyStreamTo(IOStream &rCopyTo, int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024);
 	void Flush(int Timeout = IOStream::TimeOutInfinite);
-	
+
 	static int ConvertSeekTypeToOSWhence(int SeekType);
+	virtual std::string ToString() const;
 };
 
-
 #endif // IOSTREAM__H
-
-

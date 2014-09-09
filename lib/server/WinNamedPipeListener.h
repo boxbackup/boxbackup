@@ -11,10 +11,10 @@
 #ifndef WINNAMEDPIPELISTENER__H
 #define WINNAMEDPIPELISTENER__H
 
-#include <OverlappedIO.h>
-#include <WinNamedPipeStream.h>
-
-#include "ServerException.h"
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
+#include "OverlappedIO.h"
+#include "WinNamedPipeStream.h"
 
 #include "MemLeakFindOn.h"
 

@@ -132,7 +132,7 @@ void intercept_setup_error(const char *filename, unsigned int errorafter, int er
 	intercept_delay_ms = 0;
 }
 
-void intercept_setup_delay(const char *filename, unsigned int delay_after, 
+void intercept_setup_delay(const char *filename, unsigned int delay_after,
 	int delay_ms, int syscall_to_delay, int num_delays)
 {
 	BOX_TRACE("Setup for delay: " << filename <<

@@ -28,9 +28,8 @@ The following problems can be fixed:
 	* Spurious files deleted
 	* Corrupted files deleted
 	* Root ID as file, deleted
-	* Dirs with wrong object id inside, deleted
-	* Direcetory entries pointing to non-existant files, deleted
-	* Doubly references files have second reference deleted
+	* Dirs with wrong object id in header, deleted
+	* Doubly referenced files have second reference deleted
 	* Wrong directory container IDs fixed
 	* Missing root recreated
 	* Reattach files which exist, but aren't referenced
@@ -43,7 +42,9 @@ The following problems can be fixed:
 	* Inside directories,
 		- only one object per name has old version clear
 		- IDs aren't duplicated
-	* Bad store info files regenerated
+		- entries pointing to non-existant files are deleted
+		- patches depending on non-existent objects are deleted
+	* Bad store info and refcount files regenerated
 	* Bad sizes of files in directories fixed
 
 */
@@ -126,11 +127,12 @@ private:
 	int64_t CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName);
 	void CheckObjectsDir(int64_t StartID);
 	bool CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
+	bool CheckDirectory(BackupStoreDirectory& dir);
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, int32_t indexInDirBlock,
-		bool& rIsModified, bool& rWasAlreadyContained);
+		bool& rIsModified, bool* pWasAlreadyContained = NULL);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
-	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);	
+	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);
 
 	// Fixing functions
 	bool TryToRecreateDirectory(int64_t MissingDirectoryID);
@@ -205,7 +207,7 @@ private:
 	int64_t mBlocksInOldFiles;
 	int64_t mBlocksInDeletedFiles;
 	int64_t mBlocksInDirectories;
-	int64_t mNumFiles;
+	int64_t mNumCurrentFiles;
 	int64_t mNumOldFiles;
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;

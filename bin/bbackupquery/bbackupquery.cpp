@@ -66,11 +66,6 @@ void PrintUsageAndExit()
 		"Usage: bbackupquery [options] [command]...\n"
 		"\n"
 		"Options:\n"
-		"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
-		"  -Q         Run at minimum verbosity, log nothing\n"
-		"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
-		"  -V         Run at maximum verbosity, log everything\n"
-		"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
 		"  -w         Read/write mode, allow changes to store\n"
 #ifdef WIN32
 		"  -u         Enable Unicode console, requires font change to Lucida Console\n"
@@ -80,11 +75,13 @@ void PrintUsageAndExit()
 #endif
 		"  -c <file>  Use the specified configuration file. If -c is omitted, the last\n"
 		"             argument is the configuration file, or else the default \n"
-		"             [" << BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE << 
-		"]\n"
+		"             [" << BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE << "]\n"
 		"  -o <file>  Write logging output to specified file as well as console\n"
 		"  -O <level> Set file verbosity to error/warning/notice/info/trace/everything\n"
 		"  -l <file>  Write protocol debugging logs to specified file\n"
+		<<
+		Logging::OptionParser::GetUsageString()
+		<<
 		"\n"
 		"Parameters: as many commands as you like. If commands are multiple words,\n"
 		"remember to enclose the command in quotes. Remember to use the quit command\n"
@@ -154,6 +151,7 @@ char * completion_generator(const char *text, int state)
 	if(state < 0 || state >= (int) completions.size())
 	{
 		rl_attempted_completion_over = 1;
+		sapCmd.reset();
 		return NULL;
 	}
 
@@ -219,12 +217,6 @@ int main(int argc, const char *argv[])
 
 	Logging::SetProgramName("bbackupquery");
 
-	#ifdef BOX_RELEASE_BUILD
-	int masterLevel = Log::NOTICE; // need an int to do math with
-	#else
-	int masterLevel = Log::INFO; // need an int to do math with
-	#endif
-
 #ifdef WIN32
 	#define WIN32_OPTIONS "u"
 	bool unicodeConsole = false;
@@ -239,60 +231,19 @@ int main(int argc, const char *argv[])
 	#define READLINE_OPTIONS
 #endif
 
-	const char* validOpts = "qvVwc:l:o:O:W:" WIN32_OPTIONS READLINE_OPTIONS;
+	std::string options("wc:l:o:O:" WIN32_OPTIONS READLINE_OPTIONS);
+	options += Logging::OptionParser::GetOptionString();
+	Logging::OptionParser LogLevel;
 
 	std::string fileLogFile;
 	Log::Level fileLogLevel = Log::INVALID;
 
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, validOpts)) != -1)
+	while((c = getopt(argc, (char * const *)argv, options.c_str())) != -1)
 	{
 		switch(c)
 		{
-		case 'q':
-			{
-				if(masterLevel == Log::NOTHING)
-				{
-					BOX_FATAL("Too many '-q': "
-						"Cannot reduce logging "
-						"level any more");
-					return 2;
-				}
-				masterLevel--;
-			}
-			break;
-
-		case 'v':
-			{
-				if(masterLevel == Log::EVERYTHING)
-				{
-					BOX_FATAL("Too many '-v': "
-						"Cannot increase logging "
-						"level any more");
-					return 2;
-				}
-				masterLevel++;
-			}
-			break;
-
-		case 'V':
-			{
-				masterLevel = Log::EVERYTHING;
-			}
-			break;
-
-		case 'W':
-			{
-				masterLevel = Logging::GetNamedLevel(optarg);
-				if (masterLevel == Log::INVALID)
-				{
-					BOX_FATAL("Invalid logging level");
-					return 2;
-				}
-			}
-			break;
-
 		case 'w':
 			// Read/write mode
 			readWrite = true;
@@ -341,16 +292,19 @@ int main(int argc, const char *argv[])
 			break;
 #endif
 		
-		case '?':
 		default:
-			PrintUsageAndExit();
+			int ret = LogLevel.ProcessOption(c);
+			if (ret != 0)
+			{
+				PrintUsageAndExit();
+			}
 		}
 	}
 	// Adjust arguments
 	argc -= optind;
 	argv += optind;
 	
-	Logging::SetGlobalLevel((Log::Level)masterLevel);
+	Logging::GetConsole().Filter(LogLevel.GetCurrentLevel());
 
 	std::auto_ptr<FileLogger> fileLogger;
 	if (fileLogLevel != Log::INVALID)
@@ -358,19 +312,7 @@ int main(int argc, const char *argv[])
 		fileLogger.reset(new FileLogger(fileLogFile, fileLogLevel));
 	}
 
-	bool quiet = false;
-	if (masterLevel < Log::NOTICE)
-	{
-		// Quiet mode
-		quiet = true;
-	}
-
-	// Print banner?
-	if(!quiet)
-	{
-		const char *banner = BANNER_TEXT("Backup Query Tool");
-		BOX_NOTICE(banner);
-	}
+	BOX_NOTICE(BANNER_TEXT("Backup Query Tool"));
 
 #ifdef WIN32
 	if (unicodeConsole)
@@ -398,7 +340,7 @@ int main(int argc, const char *argv[])
 #endif // WIN32
 
 	// Read in the configuration file
-	if(!quiet) BOX_INFO("Using configuration file " << configFilename);
+	BOX_INFO("Using configuration file " << configFilename);
 
 	std::string errs;
 	std::auto_ptr<Configuration> config(
@@ -427,16 +369,17 @@ int main(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
 
 	// 2. Connect to server
-	if(!quiet) BOX_INFO("Connecting to store...");
-	SocketStreamTLS socket;
-	socket.Open(tlsContext, Socket::TypeINET,
+	BOX_INFO("Connecting to store...");
+	SocketStreamTLS *socket = new SocketStreamTLS;
+	std::auto_ptr<SocketStream> apSocket(socket);
+	socket->Open(tlsContext, Socket::TypeINET,
 		conf.GetKeyValue("StoreHostname").c_str(),
 		conf.GetKeyValueInt("StorePort"));
 	
 	// 3. Make a protocol, and handshake
-	if(!quiet) BOX_INFO("Handshake with store...");
+	BOX_INFO("Handshake with store...");
 	std::auto_ptr<BackupProtocolClient>
-		apConnection(new BackupProtocolClient(socket));
+		apConnection(new BackupProtocolClient(apSocket));
 	BackupProtocolClient& connection(*(apConnection.get()));
 	connection.Handshake();
 	
@@ -447,7 +390,7 @@ int main(int argc, const char *argv[])
 	}
 	
 	// 4. Log in to server
-	if(!quiet) BOX_INFO("Login to store...");
+	BOX_INFO("Login to store...");
 	// Check the version of the server
 	{
 		std::auto_ptr<BackupProtocolVersion> serverVersion(connection.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -461,7 +404,8 @@ int main(int argc, const char *argv[])
 		(readWrite)?0:(BackupProtocolLogin::Flags_ReadOnly));
 
 	// 5. Tell user.
-	if(!quiet) printf("Login complete.\n\nType \"help\" for a list of commands.\n\n");
+	BOX_INFO("Login complete.");
+	BOX_INFO("Type \"help\" for a list of commands.");
 	
 	// Set up a context for our work
 	BackupQueries context(connection, conf, readWrite);
@@ -525,6 +469,7 @@ int main(int argc, const char *argv[])
 			if(cmd_ptr == NULL)
 			{
 				// Ctrl-D pressed -- terminate now
+				puts("");
 				break;
 			}
 
@@ -569,9 +514,9 @@ int main(int argc, const char *argv[])
 	}
 	
 	// Done... stop nicely
-	if(!quiet) BOX_INFO("Logging off...");
+	BOX_INFO("Logging off...");
 	connection.QueryFinished();
-	if(!quiet) BOX_INFO("Session finished.");
+	BOX_INFO("Session finished.");
 	
 	// Return code
 	returnCode = context.GetReturnCode();

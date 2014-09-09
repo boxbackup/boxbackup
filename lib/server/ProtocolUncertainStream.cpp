@@ -8,8 +8,9 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "ProtocolUncertainStream.h"
-#include "ServerException.h"
 #include "Protocol.h"
 
 #include "MemLeakFindOn.h"
@@ -172,7 +173,7 @@ IOStream::pos_type ProtocolUncertainStream::BytesLeftToRead()
 //		Created: 2003/12/05
 //
 // --------------------------------------------------------------------------
-void ProtocolUncertainStream::Write(const void *pBuffer, int NBytes)
+void ProtocolUncertainStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(ServerException, CantWriteToProtocolUncertainStream)
 }

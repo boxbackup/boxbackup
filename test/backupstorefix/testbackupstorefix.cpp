@@ -17,20 +17,26 @@
 #include <map>
 
 #include "Test.h"
+#include "BackupClientCryptoKeys.h"
+#include "BackupProtocol.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
+#include "BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFileWire.h"
+#include "BackupStoreFileEncodeStream.h"
+#include "BackupStoreInfo.h"
+#include "BufferedWriteStream.h"
 #include "FileStream.h"
 #include "RaidFileController.h"
-#include "RaidFileWrite.h"
-#include "RaidFileRead.h"
-#include "BackupStoreInfo.h"
-#include "BackupStoreException.h"
 #include "RaidFileException.h"
-#include "StoreStructure.h"
-#include "BackupStoreFileWire.h"
+#include "RaidFileRead.h"
+#include "RaidFileUtil.h"
+#include "RaidFileWrite.h"
 #include "ServerControl.h"
+#include "StoreStructure.h"
+#include "ZeroStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -60,7 +66,7 @@ delete root, copy a file to it instead (equivalent to deleting it too)
 
 */
 
-std::string storeRoot("backup/01234567/");
+std::string accountRootDir("backup/01234567/");
 int discSetNum = 0;
 
 std::map<std::string, int32_t> nameToID;
@@ -69,6 +75,26 @@ std::map<int32_t, bool> objectIsDir;
 #define RUN_CHECK	\
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567"); \
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567 fix");
+
+bool check_fix_internal(int expected_num_errors)
+{
+	BackupStoreCheck checker(accountRootDir, discSetNum,
+		0x01234567, true /* FixErrors */, false /* Quiet */);
+	checker.Check();
+	if (expected_num_errors == -1)
+	{
+		TEST_THAT(checker.ErrorsFound());
+		return checker.ErrorsFound();
+	}
+	else
+	{
+		TEST_EQUAL(expected_num_errors, checker.GetNumErrorsFound());
+		return checker.GetNumErrorsFound() == expected_num_errors;
+	}
+}
+
+#define RUN_CHECK_INTERNAL(expected_num_errors) \
+	TEST_THAT(check_fix_internal(expected_num_errors))
 
 // Get ID of an object given a filename
 int32_t getID(const char *name)
@@ -84,7 +110,7 @@ int32_t getID(const char *name)
 std::string getObjectName(int32_t id)
 {
 	std::string fn;
-	StoreStructure::MakeObjectFilename(id, storeRoot, discSetNum, fn, false);
+	StoreStructure::MakeObjectFilename(id, accountRootDir, discSetNum, fn, false);
 	return fn;
 }
 
@@ -147,7 +173,9 @@ void check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 	
 	while((en = i.Next()) != 0)
 	{
-		TEST_THAT(ck->name != -1);
+		BackupStoreFilenameClear clear(en->GetName());
+		TEST_LINE(ck->name != -1, "Unexpected entry found in "
+			"directory: " << clear.GetClearFilename());
 		if(ck->name == -1)
 		{
 			break;
@@ -179,9 +207,12 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 		{
 			break;
 		}
-		TEST_THAT(en->GetObjectID() == ck->id);
-		TEST_THAT(en->GetDependsNewer() == ck->depNewer);
-		TEST_THAT(en->GetDependsOlder() == ck->depOlder);
+		TEST_EQUAL_LINE(ck->id, en->GetObjectID(), "Wrong object ID "
+			"for " << BOX_FORMAT_OBJECTID(ck->id));
+		TEST_EQUAL_LINE(ck->depNewer, en->GetDependsNewer(),
+			"Wrong Newer dependency for " << BOX_FORMAT_OBJECTID(ck->id));
+		TEST_EQUAL_LINE(ck->depOlder, en->GetDependsOlder(),
+			"Wrong Older dependency for " << BOX_FORMAT_OBJECTID(ck->id));
 		++ck;
 	}
 	
@@ -191,19 +222,35 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 
 void test_dir_fixing()
 {
+	// Test that entries pointing to nonexistent entries are removed
 	{
-		MEMLEAKFINDER_NO_LEAKS;
-		fnames[0].SetAsClearFilename("x1");
-		fnames[1].SetAsClearFilename("x2");
-		fnames[2].SetAsClearFilename("x3");
+		BackupStoreDirectory dir;
+		BackupStoreDirectory::Entry* e = dir.AddEntry(fnames[0], 12,
+			2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File |
+			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
+		e->SetDependsNewer(3);
+		
+		TEST_THAT(dir.CheckAndFix() == true);
+		TEST_THAT(dir.CheckAndFix() == false);
+
+		dir_en_check ck[] = {
+			{-1, 0, 0}
+		};
+		
+		check_dir(dir, ck);
 	}
 
 	{
 		BackupStoreDirectory dir;
-		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
-		dir.AddEntry(fnames[1], 12, 2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
-		dir.AddEntry(fnames[0], 12, 3 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
-		dir.AddEntry(fnames[0], 12, 5 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
+		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, 
+			BackupStoreDirectory::Entry::Flags_File, 2);
+		dir.AddEntry(fnames[1], 12, 2 /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File, 2);
+		dir.AddEntry(fnames[0], 12, 3 /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File, 2);
+		dir.AddEntry(fnames[0], 12, 5 /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File | 
+			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		
 		dir_en_check ck[] = {
 			{1, 2, BackupStoreDirectory::Entry::Flags_File},
@@ -240,20 +287,26 @@ void test_dir_fixing()
 	// Test dependency fixing
 	{
 		BackupStoreDirectory dir;
-		BackupStoreDirectory::Entry *e2
-		  = dir.AddEntry(fnames[0], 12, 2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
+		BackupStoreDirectory::Entry *e2 = dir.AddEntry(fnames[0], 12,
+			2 /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File |
+			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		TEST_THAT(e2 != 0);
 		e2->SetDependsNewer(3);
-		BackupStoreDirectory::Entry *e3
-		  = dir.AddEntry(fnames[0], 12, 3 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
+		BackupStoreDirectory::Entry *e3 = dir.AddEntry(fnames[0], 12,
+			3 /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File |
+			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		TEST_THAT(e3 != 0);
 		e3->SetDependsNewer(4); e3->SetDependsOlder(2);
-		BackupStoreDirectory::Entry *e4
-		  = dir.AddEntry(fnames[0], 12, 4 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
+		BackupStoreDirectory::Entry *e4 = dir.AddEntry(fnames[0], 12,
+			4 /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File |
+			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		TEST_THAT(e4 != 0);
 		e4->SetDependsNewer(5); e4->SetDependsOlder(3);
-		BackupStoreDirectory::Entry *e5
-		  = dir.AddEntry(fnames[0], 12, 5 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
+		BackupStoreDirectory::Entry *e5 = dir.AddEntry(fnames[0], 12,
+			5 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
 		TEST_THAT(e5 != 0);
 		e5->SetDependsOlder(4);
 		
@@ -283,14 +336,122 @@ void test_dir_fixing()
 	}
 }
 
+int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
+	int64_t diff_from_id)
+{
+	std::auto_ptr<IOStream> upload;
+	if(diff_from_id)
+	{
+		std::auto_ptr<BackupProtocolSuccess> getBlockIndex(
+			client.QueryGetBlockIndexByName(
+				BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0]));
+		std::auto_ptr<IOStream> blockIndexStream(client.ReceiveStream());
+		upload = BackupStoreFile::EncodeFileDiff(
+			file_path,
+			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
+			diff_from_id, *blockIndexStream,
+			IOStream::TimeOutInfinite,
+			NULL, // DiffTimer implementation
+			0 /* not interested in the modification time */, 
+			NULL // isCompletelyDifferent
+			);
+	}
+	else
+	{
+		upload = BackupStoreFile::EncodeFile(
+			file_path,
+			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
+			NULL, 
+			NULL, // pLogger
+			NULL // pRunStatusProvider
+			);
+	}
+
+	return client.QueryStoreFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		1, // ModificationTime
+		2, // AttributesHash
+		diff_from_id, // DiffFromFileID
+		fnames[0], // rFilename
+		upload)->GetObjectID();
+}
+
+void read_bb_dir(int64_t objectId, BackupStoreDirectory& dir)
+{
+	std::string fn;
+	StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
+		discSetNum, fn, true /* EnsureDirectoryExists */);
+
+	std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
+		fn));
+	dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+}
+
+void login_client_and_check_empty(BackupProtocolCallable& client)
+{
+	// Check that the initial situation matches our expectations.
+	BackupStoreDirectory dir;
+	read_bb_dir(1 /* root */, dir);
+
+	dir_en_check start_entries[] = {{-1, 0, 0}};
+	check_dir(dir, start_entries);
+	static checkdepinfoen start_deps[] = {{-1, 0, 0}};
+	check_dir_dep(dir, start_deps);
+
+	read_bb_dir(1 /* root */, dir);
+	
+	// Everything should be OK at the moment
+	TEST_THAT(dir.CheckAndFix() == false);
+
+	// Check that we've ended up with the right preconditions
+	// for the tests below.
+	dir_en_check before_entries[] = {
+		{-1, 0, 0}
+	};
+	check_dir(dir, before_entries);
+	static checkdepinfoen before_deps[] = {{-1, 0, 0}};
+	check_dir_dep(dir, before_deps);
+}
+
+void check_root_dir_ok(dir_en_check after_entries[],
+	checkdepinfoen after_deps[])
+{
+	// Check the store, check that the error is detected and
+	// repaired, by removing x1 from the directory.
+	RUN_CHECK_INTERNAL(0);
+	
+	// Read the directory back in, check that it's empty
+	BackupStoreDirectory dir;
+	read_bb_dir(1 /* root */, dir);
+
+	check_dir(dir, after_entries);
+	check_dir_dep(dir, after_deps);
+}
+
+void check_and_fix_root_dir(dir_en_check after_entries[],
+	checkdepinfoen after_deps[])
+{
+	// Check the store, check that the error is detected and
+	// repaired.
+	RUN_CHECK_INTERNAL(-1);
+	check_root_dir_ok(after_entries, after_deps);
+}
+
 int test(int argc, const char *argv[])
 {
+	{
+		MEMLEAKFINDER_NO_LEAKS;
+		fnames[0].SetAsClearFilename("x1");
+		fnames[1].SetAsClearFilename("x2");
+		fnames[2].SetAsClearFilename("x3");
+	}
+
 	// Test the backupstore directory fixing
 	test_dir_fixing();
 
 	// Initialise the raidfile controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
 	rcontroller.Initialise("testfiles/raidfile.conf");
+	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Create an account
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
@@ -298,7 +459,85 @@ int test(int argc, const char *argv[])
 		"create 01234567 0 10000B 20000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
+	// Run the perl script to create the initial directories
+	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
+		" testfiles/testbackupstorefix.pl init") == 0);
+
+	BOX_INFO("  === Test that an entry pointing to a file that doesn't "
+		"exist is really deleted");
+
+	{
+		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
+			discSetNum, false);
+		login_client_and_check_empty(client);
+
+		std::string file_path = "testfiles/TestDir1/cannes/ict/metegoguered/oats";
+		int x1id = fake_upload(client, file_path, 0);
+
+		// Now break the reverse dependency by deleting x1 (the file,
+		// not the directory entry)
+		std::string x1FileName;
+		StoreStructure::MakeObjectFilename(x1id, accountRootDir, discSetNum,
+			x1FileName, true /* EnsureDirectoryExists */);
+		RaidFileWrite deleteX1(discSetNum, x1FileName);
+		deleteX1.Delete();
+
+		dir_en_check after_entries[] = {{-1, 0, 0}};
+		static checkdepinfoen after_deps[] = {{-1, 0, 0}};
+		check_and_fix_root_dir(after_entries, after_deps);
+	}
+
+	BOX_INFO("  === Test that an entry pointing to another that doesn't "
+		"exist is really deleted");
+
+	{
+		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
+			discSetNum, false);
+		login_client_and_check_empty(client);
+
+		std::string file_path = "testfiles/TestDir1/cannes/ict/metegoguered/oats";
+		int x1id = fake_upload(client, file_path, 0);
+
+		// Make a small change to the file
+		FileStream fs(file_path, O_WRONLY | O_APPEND);
+		const char* more = " and more oats!";
+		fs.Write(more, strlen(more));
+		fs.Close();
+
+		int x1aid = fake_upload(client, file_path, x1id);
+
+		// Check that we've ended up with the right preconditions
+		// for the tests below.
+		dir_en_check before_entries[] = {
+			{0, x1id, BackupStoreDirectory::Entry::Flags_File |
+				BackupStoreDirectory::Entry::Flags_OldVersion},
+			{0, x1aid, BackupStoreDirectory::Entry::Flags_File},
+			{-1, 0, 0}
+		};
+		static checkdepinfoen before_deps[] = {{x1id, x1aid, 0},
+			{x1aid, 0, x1id}, {-1, 0, 0}};
+		check_root_dir_ok(before_entries, before_deps);
+
+		// Now break the reverse dependency by deleting x1a (the file,
+		// not the directory entry)
+		std::string x1aFileName;
+		StoreStructure::MakeObjectFilename(x1aid, accountRootDir, discSetNum,
+			x1aFileName, true /* EnsureDirectoryExists */);
+		RaidFileWrite deleteX1a(discSetNum, x1aFileName);
+		deleteX1a.Delete();
+
+		// Check and fix the directory, and check that it's left empty
+		dir_en_check after_entries[] = {{-1, 0, 0}};
+		static checkdepinfoen after_deps[] = {{-1, 0, 0}};
+		check_and_fix_root_dir(after_entries, after_deps);
+	}
+
+	BOX_INFO("  === Test that an entry pointing to a directory whose "
+		"raidfile is corrupted doesn't crash");
+
 	// Start the bbstored server
+	BOX_TRACE("  === Starting bbstored server: " BBSTORED 
+		" testfiles/bbstored.conf");
 	int bbstored_pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
 		"testfiles/bbstored.pid");
 	TEST_THAT(bbstored_pid > 0);
@@ -306,10 +545,6 @@ int test(int argc, const char *argv[])
 	
 	::sleep(1);
 	TEST_THAT(ServerIsAlive(bbstored_pid));
-
-	// Run the perl script to create the initial directories
-	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl init") == 0);
 
 	std::string cmd = BBACKUPD " " + bbackupd_args +
 		" testfiles/bbackupd.conf";
@@ -336,34 +571,39 @@ int test(int argc, const char *argv[])
 		TestRemoteProcessMemLeaks("bbackupd.memleaks");
 	#endif
 
-	// Add a reference to a file that doesn't exist, check that it's removed
+	BOX_INFO("  === Add a reference to a file that doesn't exist, check "
+		"that it's removed");
 	{
-		std::string fn;
-		StoreStructure::MakeObjectFilename(1 /* root */, storeRoot,
-			discSetNum, fn, true /* EnsureDirectoryExists */);
-
-		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
-			fn));
 		BackupStoreDirectory dir;
-		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+		read_bb_dir(1 /* root */, dir);
 		
 		dir.AddEntry(fnames[0], 12, 0x1234567890123456LL /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		
+		std::string fn;
+		StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
+			discSetNum, fn, true /* EnsureDirectoryExists */);
+
+		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
+			fn));
 		RaidFileWrite d(discSetNum, fn);
 		d.Open(true /* allow overwrite */);
 		dir.WriteToStream(d);
 		d.Commit(true /* write now! */);
 
-		file = RaidFileRead::Open(discSetNum, fn);
-		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+		read_bb_dir(1 /* root */, dir);
 		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) != 0);
 
 		// Check it
-		BackupStoreCheck checker(storeRoot, discSetNum,
+		BackupStoreCheck checker(accountRootDir, discSetNum,
 			0x01234567, true /* FixErrors */, false /* Quiet */);
 		checker.Check();
-		TEST_EQUAL(1, checker.GetNumErrorsFound());
+
+		// Should just be greater than 1 really, we don't know quite
+		// how good the checker is (or will become) at spotting errors!
+		// But this will help us catch changes in checker behaviour,
+		// so it's not a bad thing to test.
+		TEST_EQUAL(2, checker.GetNumErrorsFound());
 
 		file = RaidFileRead::Open(discSetNum, fn);
 		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
@@ -374,7 +614,7 @@ int test(int argc, const char *argv[])
 	
 	// Generate a list of all the object IDs
 	TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
-		"-c testfiles/bbackupd.conf \"list -r\" quit "
+		"-c testfiles/bbackupd.conf \"list -R\" quit "
 		"> testfiles/initial-listing.txt") == 0);
 
 	// And load it in
@@ -399,16 +639,16 @@ int test(int argc, const char *argv[])
 	}
 
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Delete store info, add random file\n");
+	BOX_INFO("  === Delete store info, add random file");
 	{
 		// Delete store info
-		RaidFileWrite del(discSetNum, storeRoot + "info");
+		RaidFileWrite del(discSetNum, accountRootDir + "info");
 		del.Delete();
 	}
 	{
 		// Add a spurious file
 		RaidFileWrite random(discSetNum, 
-			storeRoot + "randomfile");
+			accountRootDir + "randomfile");
 		random.Open();
 		random.Write("test", 4);
 		random.Commit(true);
@@ -423,11 +663,12 @@ int test(int argc, const char *argv[])
 	// Check the random file doesn't exist
 	{
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
-			storeRoot + "01/randomfile"));
+			accountRootDir + "01/randomfile"));
 	}
 
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Delete an entry for an object from dir, change that object to be a patch, check it's deleted\n");
+	BOX_INFO("  === Delete an entry for an object from dir, change that "
+		"object to be a patch, check it's deleted");
 	{
 		// Open dir and find entry
 		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
@@ -477,8 +718,39 @@ int test(int argc, const char *argv[])
 			f.Commit(true /* write now! */);
 		}
 
+#ifndef BOX_RELEASE_BUILD
+		// Delete two of the three raidfiles and their parent
+		// directories. This used to crash bbstoreaccounts check.
+		// We can only do this, without destroying the entire store,
+		// in debug mode, where the store has a far deeper
+		// structure.
+		// This will destroy or damage objects 18-1b and 58-5b,
+		// some repairably.
+		#define RUN(x) TEST_THAT(system(x) == 0);
+		RUN("mv testfiles/0_0/backup/01234567/02/01/o00.rf "
+			"testfiles/0_0/backup/01234567/02/01/o00.rfw"); // 0x18
+		RUN("mv testfiles/0_1/backup/01234567/02/01/o01.rf "
+			"testfiles/0_1/backup/01234567/02/01/o01.rfw"); // 0x19
+		//RUN("mv testfiles/0_2/backup/01234567/02/01/o02.rf "
+		//	"testfiles/0_0/backup/01234567/02/01/o02.rfw"); // 0x1a
+		RUN("mv testfiles/0_0/backup/01234567/02/01/o03.rf "
+			"testfiles/0_0/backup/01234567/02/01/o03.rfw"); // 0x1b
+		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o00.rf "
+			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw"); // 0x58
+		RUN("mv testfiles/0_1/backup/01234567/02/01/01/o01.rf "
+			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw"); // 0x59
+		//RUN("mv testfiles/0_2/backup/01234567/02/01/01/o02.rf "
+		//	"testfiles/0_0/backup/01234567/02/01/01/o02.rfw"); // 0x5a
+		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o03.rf "
+			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw"); // 0x5b
+		// RUN("rm -r testfiles/0_1/backup/01234567/02/01");
+		RUN("rm -r testfiles/0_2/backup/01234567/02/01");
+		#undef RUN
+#endif // BOX_RELEASE_BUILD
+
 		// Fix it
-		RUN_CHECK
+		RUN_CHECK_INTERNAL(4);
+
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE 
 			" testfiles/testbackupstorefix.pl check 1") 
@@ -486,10 +758,33 @@ int test(int argc, const char *argv[])
 
 		// Check the modified file doesn't exist
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
+
+		// Check that the missing RaidFiles were regenerated and
+		// committed. FileExists returns NonRaid if it find a .rfw
+		// file, so checking for AsRaid excludes this possibility.
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(discSetNum));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o00"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o01"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o02"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/o03"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o00"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o01"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o02"));
+		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
+			rdiscSet, "backup/01234567/02/01/01/o03"));
 	}
 	
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Delete directory, change container ID of another, duplicate entry in dir, spurious file size, delete file\n");
+	BOX_INFO("  === Delete directory, change container ID of another, "
+		"duplicate entry in dir, spurious file size, delete file");
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -525,8 +820,26 @@ int test(int argc, const char *argv[])
 	DeleteObject("Test1/pass/cacted/ming");
 	// Delete a file
 	DeleteObject("Test1/cannes/ict/scely");
-	// Fix it
-	RUN_CHECK
+
+	// We don't know quite how good the checker is (or will become) at 
+	// spotting errors! But asserting an exact number will help us catch 
+	// changes in checker behaviour, so it's not a bad thing to test.
+
+	// The 11 errors are:
+	// ERROR:   Directory ID 0xb references object 0x3e which does not exist.
+	// ERROR:   Removing directory entry 0x3e from directory 0xb
+	// ERROR:   Directory ID 0xc had invalid entries, fixed
+	// ERROR:   Directory ID 0xc has wrong size for object 0x40
+	// ERROR:   Directory ID 0x17 has wrong container ID.
+	// ERROR:   Object 0x51 is unattached.
+	// ERROR:   Object 0x52 is unattached.
+	// ERROR:   BlocksUsed changed from 282 to 278
+	// ERROR:   BlocksInCurrentFiles changed from 226 to 220
+	// ERROR:   BlocksInDirectories changed from 56 to 54
+	// ERROR:   NumFiles changed from 113 to 110
+
+	RUN_CHECK_INTERNAL(11);
+
 	// Check everything is as it should be
 	TEST_THAT(::system(PERL_EXECUTABLE 
 		" testfiles/testbackupstorefix.pl check 2") == 0);
@@ -560,7 +873,8 @@ int test(int argc, const char *argv[])
 	}
 
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Modify the obj ID of dir, delete dir with no members, add extra reference to a file\n");
+	BOX_INFO("  === Modify the obj ID of dir, delete dir with no members, "
+		"add extra reference to a file");
 	// Set bad object ID
 	{
 		BackupStoreDirectory dir;
@@ -594,7 +908,7 @@ int test(int argc, const char *argv[])
 	}
 	
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Orphan files and dirs without being recoverable\n");
+	BOX_INFO("  === Orphan files and dirs without being recoverable");
 	DeleteObject("Test1/dir1");		
 	DeleteObject("Test1/dir1/dir2");		
 	// Fix it
@@ -604,7 +918,7 @@ int test(int argc, const char *argv[])
 		" testfiles/testbackupstorefix.pl check 4") == 0);
 
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Corrupt file and dir\n");
+	BOX_INFO("  === Corrupt file and dir");
 	// File
 	CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
 		33, "34i729834298349283479233472983sdfhasgs");
@@ -618,7 +932,7 @@ int test(int argc, const char *argv[])
 		" testfiles/testbackupstorefix.pl check 5") == 0);
 
 	// ------------------------------------------------------------------------------------------------		
-	::printf("  === Overwrite root with a file\n");
+	BOX_INFO("  === Overwrite root with a file");
 	{
 		std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
 		RaidFileWrite w(discSetNum, getObjectName(1 /* root */));

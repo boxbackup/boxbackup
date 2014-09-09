@@ -72,13 +72,23 @@ void Timers::Init()
 //		Created: 6/11/2006
 //
 // --------------------------------------------------------------------------
-void Timers::Cleanup()
+void Timers::Cleanup(bool throw_exception_if_not_initialised)
 {
-	ASSERT(spTimers);
-	if (!spTimers)
+	if (throw_exception_if_not_initialised)
 	{
-		BOX_ERROR("Tried to clean up timers when not initialised!");
-		return;
+		ASSERT(spTimers);
+		if (!spTimers)
+		{
+			BOX_ERROR("Tried to clean up timers when not initialised!");
+			return;
+		}
+	}
+	else
+	{
+		if (!spTimers)
+		{
+			return;
+		}
 	}
 	
 	#if defined WIN32 && ! defined PLATFORM_CYGWIN
@@ -110,6 +120,26 @@ void Timers::Cleanup()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    static void Timers::AssertInitialised()
+//		Purpose: Throw an assertion error if timers are not ready
+//			 NOW. It's a common mistake (for me) when writing
+//			 tests to forget to initialise timers first.
+//		Created: 15/05/2014
+//
+// --------------------------------------------------------------------------
+
+void Timers::AssertInitialised()
+{
+	if (!spTimers)
+	{
+		THROW_EXCEPTION(CommonException, TimersNotInitialised);
+	}
+	ASSERT(spTimers);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    static void Timers::Add(Timer&)
 //		Purpose: Add a new timer to the set, and reschedule next wakeup
 //		Created: 5/11/2006
@@ -135,8 +165,16 @@ void Timers::Add(Timer& rTimer)
 // --------------------------------------------------------------------------
 void Timers::Remove(Timer& rTimer)
 {
-	ASSERT(spTimers);
 	ASSERT(&rTimer);
+
+	if(!spTimers)
+	{
+		BOX_WARNING(TIMER_ID_OF(rTimer) " was still active after "
+			"timer subsystem was cleaned up, already removed.");
+		return;
+	}
+
+	ASSERT(spTimers);
 	BOX_TRACE(TIMER_ID_OF(rTimer) " removed from global queue, rescheduling");
 
 	bool restart = true;
@@ -155,7 +193,7 @@ void Timers::Remove(Timer& rTimer)
 			}
 		}
 	}
-		
+
 	Reschedule();
 }
 
@@ -218,6 +256,8 @@ void Timers::Reschedule()
 	// win32 timers need no management
 #else
 	box_time_t timeNow = GetCurrentBoxTime();
+	int64_t timeToNextEvent;
+	std::string nameOfNextEvent;
 
 	// scan for, trigger and remove expired timers. Removal requires
 	// us to restart the scan each time, due to std::vector semantics.
@@ -225,6 +265,7 @@ void Timers::Reschedule()
 	while (restart)
 	{
 		restart = false;
+		timeToNextEvent = 0;
 
 		for (std::vector<Timer*>::iterator i = spTimers->begin();
 			i != spTimers->end(); i++)
@@ -252,35 +293,14 @@ void Timers::Reschedule()
 					" seconds");
 				*/
 			}
+
+			if (timeToNextEvent == 0 || timeToNextEvent > timeToExpiry)
+			{
+				timeToNextEvent = timeToExpiry;
+				nameOfNextEvent = rTimer.GetName();
+			}
 		}
 	}
-
-	// Now the only remaining timers should all be in the future.
-	// Scan to find the next one to fire (earliest deadline).
-			
-	int64_t timeToNextEvent = 0;
-	std::string nameOfNextEvent;
-
-	for (std::vector<Timer*>::iterator i = spTimers->begin();
-		i != spTimers->end(); i++)
-	{
-		Timer& rTimer = **i;
-		int64_t timeToExpiry = rTimer.GetExpiryTime() - timeNow;
-
-		ASSERT(timeToExpiry > 0)
-		if (timeToExpiry <= 0)
-		{
-			timeToExpiry = 1;
-		}
-		
-		if (timeToNextEvent == 0 || timeToNextEvent > timeToExpiry)
-		{
-			timeToNextEvent = timeToExpiry;
-			nameOfNextEvent = rTimer.GetName();
-		}
-	}
-	
-	ASSERT(timeToNextEvent >= 0);
 
 	if (timeToNextEvent == 0)
 	{

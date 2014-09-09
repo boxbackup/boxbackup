@@ -11,14 +11,8 @@
 #define BACKUPDAEMONINTERFACE__H
 
 #include <string>
-// #include <map>
 
-// #include "BackupClientFileAttributes.h"
-// #include "BackupStoreDirectory.h"
 #include "BoxTime.h"
-// #include "MD5Digest.h"
-// #include "ReadLoggingStream.h"
-// #include "RunStatusProvider.h"
 
 class Archive;
 class BackupClientContext;
@@ -122,14 +116,15 @@ class ProgressNotifier
 		const std::string& rLocalPath) = 0;
 	virtual void NotifyFileUploadingPatch(
 		const BackupClientDirectoryRecord* pDirRecord,
-		const std::string& rLocalPath) = 0;
+		const std::string& rLocalPath,
+		int64_t EstimatedBytesToUpload) = 0;
 	virtual void NotifyFileUploadingAttributes(
  		const BackupClientDirectoryRecord* pDirRecord,
  		const std::string& rLocalPath) = 0;
 	virtual void NotifyFileUploaded(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,
-		int64_t FileSize, int64_t UploadedSize) = 0;
+		int64_t FileSize, int64_t UploadedSize, int64_t ObjectID) = 0;
 	virtual void NotifyFileSynchronised(
 		const BackupClientDirectoryRecord* pDirRecord,
 		const std::string& rLocalPath,

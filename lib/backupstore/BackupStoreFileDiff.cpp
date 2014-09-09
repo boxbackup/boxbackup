@@ -114,26 +114,26 @@ void BackupStoreFile::MoveStreamPositionToBlockIndex(IOStream &rStream)
 // Function
 //		Name:    BackupStoreFile::EncodeFileDiff(const char *, int64_t, const BackupStoreFilename &, int64_t, IOStream &, int64_t *)
 //		Purpose: Similar to EncodeFile, but takes the object ID of the file it's
-//				 diffing from, and the index of the blocks in a stream. It'll then
-//				 calculate which blocks can be reused from that old file.
-//				 The timeout is the timeout value for reading the diff block index.
-//				 If pIsCompletelyDifferent != 0, it will be set to true if the
-//				 the two files are completely different (do not share any block), false otherwise.
-//				 
+//			 diffing from, and the index of the blocks in a stream. It'll then
+//			 calculate which blocks can be reused from that old file.
+//			 The timeout is the timeout value for reading the diff block index.
+//			 If pIsCompletelyDifferent != 0, it will be set to true if the
+//			 the two files are completely different (do not share any block), false otherwise.
 //		Created: 12/1/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
+std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 (
-	const char *Filename, int64_t ContainerID,
-	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID, 
-	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer, 
-	int64_t *pModificationTime, bool *pIsCompletelyDifferent)
+	const std::string& Filename, int64_t ContainerID,
+	const BackupStoreFilename &rStoreFilename, int64_t DiffFromObjectID,
+	IOStream &rDiffFromBlockIndex, int Timeout, DiffTimer *pDiffTimer,
+	int64_t *pModificationTime, bool *pIsCompletelyDifferent,
+	BackgroundTask* pBackgroundTask)
 {
 	// Is it a symlink?
 	{
 		EMU_STRUCT_STAT st;
-		if(EMU_LSTAT(Filename, &st) != 0)
+		if(EMU_LSTAT(Filename.c_str(), &st) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError)
 		}
@@ -144,7 +144,11 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 			{
 				*pIsCompletelyDifferent = true;
 			}
-			return EncodeFile(Filename, ContainerID, rStoreFilename, pModificationTime);
+			return EncodeFile(Filename, ContainerID, rStoreFilename,
+				pModificationTime,
+				NULL, // ReadLoggingStream::Logger
+				NULL, // RunStatusProvider
+				pBackgroundTask); // BackgroundTask
 		}
 	}
 
@@ -162,7 +166,11 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 		{
 			*pIsCompletelyDifferent = true;
 		}
-		return EncodeFile(Filename, ContainerID, rStoreFilename, pModificationTime);
+		return EncodeFile(Filename, ContainerID, rStoreFilename,
+			pModificationTime,
+			NULL, // ReadLoggingStream::Logger
+			NULL, // RunStatusProvider
+			pBackgroundTask); // BackgroundTask
 	}
 	
 	// Pointer to recipe we're going to create
@@ -206,10 +214,15 @@ std::auto_ptr<IOStream> BackupStoreFile::EncodeFileDiff
 		// foundBlocks no longer required
 		
 		// Create the stream
-		std::auto_ptr<IOStream> stream(new BackupStoreFileEncodeStream);
+		std::auto_ptr<BackupStoreFileEncodeStream> stream(
+			new BackupStoreFileEncodeStream);
 	
 		// Do the initial setup
-		((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename, precipe, ContainerID, rStoreFilename, pModificationTime);
+		stream->Setup(Filename, precipe, ContainerID, rStoreFilename,
+			pModificationTime,
+			NULL, // ReadLoggingStream::Logger
+			NULL, // RunStatusProvider
+			pBackgroundTask);
 		precipe = 0;	// Stream has taken ownership of this
 		
 		// Tell user about completely different status?
@@ -514,7 +527,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 		
 		// Search for each block size in turn
 		// NOTE: Do the smallest size first, so that the scheme for adding
-		// entries in the found list works as expected and replaces smallers block
+		// entries in the found list works as expected and replaces smaller blocks
 		// with larger blocks when it finds matches at the same offset in the file.
 		for(int s = BACKUP_FILE_DIFF_MAX_BLOCK_SIZES - 1; s >= 0; --s)
 		{
@@ -628,7 +641,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					{
 						if(SecondStageMatch(phashTable[hash], rolling, beginnings, endings, offset, Sizes[s], fileBlockNumber, pIndex, rFoundBlocks))
 						{
-							BOX_TRACE("Found block match for " << hash << " of " << Sizes[s] << " bytes at offset " << fileOffset);
+							BOX_TRACE("Found block match of " << Sizes[s] << " bytes with hash " << hash << " at offset " << fileOffset);
 							goodnessOfFit[fileOffset] = Sizes[s];
 
 							// Block matched, roll the checksum forward to the next block without doing
@@ -656,7 +669,8 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 						}
 						else
 						{
-							BOX_TRACE("False alarm match for " << hash << " of " << Sizes[s] << " bytes at offset " << fileOffset);
+							// Too many to log
+							// BOX_TRACE("False alarm match of " << Sizes[s] << " bytes with hash " << hash << " at offset " << fileOffset);
 						}
 
 						int64_t NumBlocksFound = static_cast<int64_t>(

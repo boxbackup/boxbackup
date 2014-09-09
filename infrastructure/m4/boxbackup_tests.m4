@@ -186,7 +186,8 @@ AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 
 AC_CHECK_MEMBERS([struct stat.st_flags])
-AC_CHECK_MEMBERS([struct stat.st_mtimespec])
+AC_CHECK_MEMBERS([struct stat.st_atim])
+AC_CHECK_MEMBERS([struct stat.st_atimespec])
 AC_CHECK_MEMBERS([struct stat.st_atim.tv_nsec])
 AC_CHECK_MEMBERS([struct stat.st_atimensec])
 AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[

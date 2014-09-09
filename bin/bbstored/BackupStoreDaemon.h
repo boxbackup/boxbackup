@@ -52,8 +52,8 @@ protected:
 
 	virtual void Run();
 
-	virtual void Connection(SocketStreamTLS &rStream);
-	void Connection2(SocketStreamTLS &rStream);
+	virtual void Connection(std::auto_ptr<SocketStreamTLS> apStream);
+	void Connection2(std::auto_ptr<SocketStreamTLS> apStream);
 	
 	virtual const char *DaemonName() const;
 	virtual std::string DaemonBanner() const;
@@ -64,7 +64,7 @@ protected:
 	void HousekeepingProcess();
 
 	void LogConnectionStats(uint32_t accountId,
-		const std::string& accountName, const SocketStreamTLS &s);
+		const std::string& accountName, const BackupProtocolServer &server);
 
 public:
 	// HousekeepingInterface implementation

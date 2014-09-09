@@ -40,7 +40,8 @@ public:
 	
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(IOStream::pos_type Offset, int SeekType);
 	virtual void Close();
@@ -49,6 +50,10 @@ public:
 	virtual bool StreamClosed();
 
 	bool CompareWith(IOStream& rOther, int Timeout = IOStream::TimeOutInfinite);
+	std::string ToString() const
+	{
+		return std::string("local file ") + mFileName;
+	}
 
 private:
 	tOSFileHandle mOSFileHandle;

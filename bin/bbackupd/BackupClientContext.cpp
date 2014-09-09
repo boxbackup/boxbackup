@@ -42,11 +42,11 @@
 // --------------------------------------------------------------------------
 BackupClientContext::BackupClientContext
 (
-	LocationResolver &rResolver, 
-	TLSContext &rTLSContext, 
+	LocationResolver &rResolver,
+	TLSContext &rTLSContext,
 	const std::string &rHostname,
 	int Port,
-	uint32_t AccountNumber, 
+	uint32_t AccountNumber,
 	bool ExtendedLogging,
 	bool ExtendedLogToFile,
 	std::string ExtendedLogFile,
@@ -75,7 +75,8 @@ BackupClientContext::BackupClientContext
   mKeepAliveTimer(0, "KeepAliveTime"),
   mbIsManaged(false),
   mrProgressNotifier(rProgressNotifier),
-  mTcpNiceMode(TcpNiceMode)
+  mTcpNiceMode(TcpNiceMode),
+  mpNice(NULL)
 {
 }
 
@@ -108,52 +109,56 @@ BackupClientContext::~BackupClientContext()
 //		Created: 2003/10/08
 //
 // --------------------------------------------------------------------------
-BackupProtocolClient &BackupClientContext::GetConnection()
+BackupProtocolCallable &BackupClientContext::GetConnection()
 {
 	// Already got it? Just return it.
 	if(mapConnection.get())
 	{
 		return *mapConnection;
 	}
-	
-	// there shouldn't be a connection open
-	ASSERT(mapSocket.get() == 0);
+
 	// Defensive. Must close connection before releasing any old socket.
 	mapConnection.reset();
-	mapSocket.reset(new SocketStreamTLS);
-	
+
+	std::auto_ptr<SocketStream> apSocket(new SocketStreamTLS);
+
 	try
 	{
 		// Defensive.
 		mapConnection.reset();
-		
+
 		// Log intention
-		BOX_INFO("Opening connection to server '" <<
-			mHostname << "'...");
+		BOX_INFO("Opening connection to server '" << mHostname <<
+			"'...");
 
 		// Connect!
-		((SocketStreamTLS *)(mapSocket.get()))->Open(mrTLSContext,
+		((SocketStreamTLS *)(apSocket.get()))->Open(mrTLSContext,
 			Socket::TypeINET, mHostname, mPort);
-		
+
 		if(mTcpNiceMode)
 		{
-			// Pass control of mapSocket to NiceSocketStream,
+			// Pass control of apSocket to NiceSocketStream,
 			// which will take care of destroying it for us.
-			mapNice.reset(new NiceSocketStream(mapSocket));
-			mapConnection.reset(new BackupProtocolClient(*mapNice));
+			// But we need to hang onto a pointer to the nice
+			// socket, so we can enable and disable nice mode.
+			// This is scary, it could be deallocated under us.
+			mpNice = new NiceSocketStream(apSocket);
+			apSocket.reset(mpNice);
 		}
-		else
-		{
-			mapConnection.reset(new BackupProtocolClient(*mapSocket));
-		}
-		
+
+		// We need to call some methods that aren't defined in
+		// BackupProtocolCallable, so we need to hang onto a more
+		// strongly typed pointer (to avoid far too many casts).
+		BackupProtocolClient *pClient = new BackupProtocolClient(apSocket);
+		mapConnection.reset(pClient);
+
 		// Set logging option
-		mapConnection->SetLogToSysLog(mExtendedLogging);
-		
+		pClient->SetLogToSysLog(mExtendedLogging);
+
 		if (mExtendedLogToFile)
 		{
 			ASSERT(mpExtendedLogFileHandle == NULL);
-			
+
 			mpExtendedLogFileHandle = fopen(
 				mExtendedLogFile.c_str(), "a+");
 
@@ -164,13 +169,13 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 			}
 			else
 			{
-				mapConnection->SetLogToFile(mpExtendedLogFileHandle);
+				pClient->SetLogToFile(mpExtendedLogFileHandle);
 			}
 		}
-		
+
 		// Handshake
-		mapConnection->Handshake();
-		
+		pClient->Handshake();
+
 		// Check the version of the server
 		{
 			std::auto_ptr<BackupProtocolVersion> serverVersion(
@@ -184,7 +189,7 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 		// Login -- if this fails, the Protocol will exception
 		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(
 			mapConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
-		
+
 		// Check that the client store marker is the one we expect
 		if(mClientStoreMarker != ClientStoreMarker_NotKnown)
 		{
@@ -194,19 +199,33 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 				try
 				{
 					mapConnection->QueryFinished();
-					mapNice.reset();
-					mapSocket.reset();
 				}
 				catch(...)
 				{
 					// IGNORE
 				}
-				
+
 				// Then throw an exception about this
-				THROW_EXCEPTION(BackupStoreException, ClientMarkerNotAsExpected)
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					ClientMarkerNotAsExpected,
+					"Expected " << mClientStoreMarker <<
+					" but found " << loginConf->GetClientStoreMarker() <<
+					": is someone else writing to the "
+					"same account?");
 			}
 		}
-		
+		else // mClientStoreMarker == ClientStoreMarker_NotKnown
+		{
+			// Yes, choose one, the current time will do
+			box_time_t marker = GetCurrentBoxTime();
+			
+			// Set it on the store
+			mapConnection->QuerySetClientStoreMarker(marker);
+			
+			// Record it so that it can be picked up later.
+			mClientStoreMarker = marker;
+		}
+
 		// Log success
 		BOX_INFO("Connection made, login successful");
 
@@ -224,8 +243,6 @@ BackupProtocolClient &BackupClientContext::GetConnection()
 	{
 		// Clean up.
 		mapConnection.reset();
-		mapNice.reset();
-		mapSocket.reset();
 		throw;
 	}
 	
@@ -246,19 +263,6 @@ void BackupClientContext::CloseAnyOpenConnection()
 	{
 		try
 		{
-			// Need to set a client store marker?
-			if(mClientStoreMarker == ClientStoreMarker_NotKnown)
-			{
-				// Yes, choose one, the current time will do
-				box_time_t marker = GetCurrentBoxTime();
-				
-				// Set it on the store
-				mapConnection->QuerySetClientStoreMarker(marker);
-				
-				// Record it so that it can be picked up later.
-				mClientStoreMarker = marker;
-			}
-		
 			// Quit nicely
 			mapConnection->QueryFinished();
 		}
@@ -269,17 +273,6 @@ void BackupClientContext::CloseAnyOpenConnection()
 		
 		// Delete it anyway.
 		mapConnection.reset();
-	}
-
-	try
-	{
-		// Be nice about closing the socket
-		mapNice.reset();
-		mapSocket.reset();
-	}
-	catch(...)
-	{
-		// Ignore errors
 	}
 
 	// Delete any pending list
@@ -416,7 +409,7 @@ bool BackupClientContext::FindFilename(int64_t ObjectID, int64_t ContainingDirec
 	bool &rIsCurrentVersionOut, box_time_t *pModTimeOnServer, box_time_t *pAttributesHashOnServer, BackupStoreFilenameClear *pLeafname)
 {
 	// Make a connection to the server
-	BackupProtocolClient &connection(GetConnection());
+	BackupProtocolCallable &connection(GetConnection());
 
 	// Request filenames from the server, in a "safe" manner to ignore errors properly
 	{

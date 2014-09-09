@@ -39,9 +39,7 @@
 #define BOX_WARNING(stuff) BOX_LOG(Log::WARNING, stuff)
 #define BOX_NOTICE(stuff)  BOX_LOG(Log::NOTICE,  stuff)
 #define BOX_INFO(stuff)    BOX_LOG(Log::INFO,    stuff)
-#define BOX_TRACE(stuff)   \
-	if (Logging::IsEnabled(Log::TRACE)) \
-	{ BOX_LOG(Log::TRACE, stuff) }
+#define BOX_TRACE(stuff)   BOX_LOG(Log::TRACE,   stuff)
 
 #define BOX_SYS_ERRNO_MESSAGE(error_number, stuff) \
 	stuff << ": " << std::strerror(error_number) << \
@@ -141,7 +139,9 @@
 
 #define BOX_FORMAT_TIMESPEC(timespec) \
 	timespec.tv_sec << \
+	"." << \
 	std::setw(6) << \
+	std::setfill('0') << \
 	timespec.tv_usec
 
 #define BOX_FORMAT_MICROSECONDS(t) \
@@ -201,19 +201,23 @@ class Logger
 
 	virtual void SetProgramName(const std::string& rProgramName) = 0;
 
-	class Guard
+	class LevelGuard
 	{
 		private:
 		Logger& mLogger;
 		Log::Level mOldLevel;
 
 		public:
-		Guard(Logger& Logger)
+		LevelGuard(Logger& Logger, Log::Level newLevel = Log::INVALID)
 		: mLogger(Logger)
 		{
 			mOldLevel = Logger.GetLevel();
+			if (newLevel != Log::INVALID)
+			{
+				Logger.Filter(newLevel);
+			}
 		}
-		~Guard()
+		~LevelGuard()
 		{
 			mLogger.Filter(mOldLevel);
 		}
@@ -248,6 +252,7 @@ class Console : public Logger
 	static void SetShowTime(bool enabled);
 	static void SetShowTimeMicros(bool enabled);
 	static void SetShowPID(bool enabled);
+	static bool GetShowTag() { return sShowTag; }
 };
 
 // --------------------------------------------------------------------------
@@ -274,7 +279,60 @@ class Syslog : public Logger
 	virtual const char* GetType() { return "Syslog"; }
 	virtual void SetProgramName(const std::string& rProgramName);
 	virtual void SetFacility(int facility);
+	virtual void Shutdown();
 	static int GetNamedFacility(const std::string& rFacility);
+};
+
+// --------------------------------------------------------------------------
+//
+// Class
+//		Name:    Capture
+//		Purpose: Keeps log messages for analysis in tests.
+//		Created: 2014/03/08
+//
+// --------------------------------------------------------------------------
+
+class Capture : public Logger
+{
+	public:
+	struct Message
+	{
+		Log::Level level;
+		std::string file;
+		int line;
+		std::string message;
+	};
+
+	private:
+	std::vector<Message> mMessages;
+	
+	public:
+	virtual ~Capture() { }
+	
+	virtual bool Log(Log::Level level, const std::string& rFile, 
+		int line, std::string& rMessage)
+	{
+		Message message;
+		message.level = level;
+		message.file = rFile;
+		message.line = line;
+		message.message = rMessage;
+		mMessages.push_back(message);
+		return true;
+	}
+	virtual const char* GetType() { return "Capture"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
+	const std::vector<Message>& GetMessages() const { return mMessages; }
+	std::string GetString() const
+	{
+		std::ostringstream oss;
+		for (std::vector<Message>::const_iterator i = mMessages.begin();
+			i != mMessages.end(); i++)
+		{
+			oss << i->message << "\n";
+		}
+		return oss.str();
+	}
 };
 
 // --------------------------------------------------------------------------
@@ -296,7 +354,6 @@ class Logging
 	static bool sContextSet;
 	static Console* spConsole;
 	static Syslog*  spSyslog;
-	static Log::Level sGlobalLevel;
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
 	
@@ -315,49 +372,27 @@ class Logging
 		int line, const std::string& rMessage);
 	static void SetContext(std::string context);
 	static void ClearContext();
-	static void SetGlobalLevel(Log::Level level) { sGlobalLevel = level; }
-	static Log::Level GetGlobalLevel() { return sGlobalLevel; }
 	static Log::Level GetNamedLevel(const std::string& rName);
-	static bool IsEnabled(Log::Level level)
-	{
-		return (int)sGlobalLevel >= (int)level;
-	}
 	static void SetProgramName(const std::string& rProgramName);
 	static std::string GetProgramName() { return sProgramName; }
 	static void SetFacility(int facility);
 	static Console& GetConsole() { return *spConsole; }
 	static Syslog&  GetSyslog()  { return *spSyslog; }
 
-	class Guard
+	class ShowTagOnConsole
 	{
 		private:
-		Log::Level mOldLevel;
-		static int sGuardCount;
-		static Log::Level sOriginalLevel;
-
+		bool mOldShowTag;
+		
 		public:
-		Guard(Log::Level newLevel)
+		ShowTagOnConsole()
+		: mOldShowTag(Console::GetShowTag())
 		{
-			mOldLevel = Logging::GetGlobalLevel();
-			if(sGuardCount == 0)
-			{
-				sOriginalLevel = mOldLevel;
-			}
-			sGuardCount++;
-			Logging::SetGlobalLevel(newLevel);
+			Console::SetShowTag(true);
 		}
-		~Guard()
+		~ShowTagOnConsole()
 		{
-			sGuardCount--;
-			Logging::SetGlobalLevel(mOldLevel);
-		}
-
-		static bool IsActive() { return (sGuardCount > 0); }
-		static Log::Level GetOriginalLevel() { return sOriginalLevel; }
-		static bool IsGuardingFrom(Log::Level originalLevel)
-		{
-			return IsActive() &&
-				(int)sOriginalLevel >= (int)originalLevel;
+			Console::SetShowTag(mOldShowTag);
 		}
 	};
 
@@ -365,16 +400,19 @@ class Logging
 	{
 		private:
 		std::string mOldTag;
+		bool mReplace;
 
 		public:
 		Tagger()
-		: mOldTag(Logging::GetProgramName())
+		: mOldTag(Logging::GetProgramName()),
+		  mReplace(false)
 		{
 		}
-		Tagger(const std::string& rTempTag)
-		: mOldTag(Logging::GetProgramName())
+		Tagger(const std::string& rTempTag, bool replace = false)
+		: mOldTag(Logging::GetProgramName()),
+		  mReplace(replace)
 		{
-			Logging::SetProgramName(mOldTag + " " + rTempTag);
+			Change(rTempTag);
 		}
 		~Tagger()
 		{
@@ -383,7 +421,62 @@ class Logging
 
 		void Change(const std::string& newTempTag)
 		{
-			Logging::SetProgramName(mOldTag + " " + newTempTag);
+			if(mReplace || mOldTag.empty())
+			{
+				Logging::SetProgramName(newTempTag);
+			}
+			else
+			{
+				Logging::SetProgramName(mOldTag + " " + newTempTag);
+			}
+		}
+	};
+
+	class TempLoggerGuard
+	{
+		private:
+		Logger* mpLogger;
+
+		public:
+		TempLoggerGuard(Logger* pLogger)
+		: mpLogger(pLogger)
+		{
+			Logging::Add(mpLogger);
+		}
+		~TempLoggerGuard()
+		{
+			Logging::Remove(mpLogger);
+		}
+	};
+
+	// --------------------------------------------------------------------------
+	//
+	// Class
+	//		Name:    Logging::OptionParser
+	//		Purpose: Process command-line options
+	//		Created: 2014/04/09
+	//
+	// --------------------------------------------------------------------------
+	class OptionParser
+	{
+	public:
+		OptionParser(Log::Level InitialLevel =
+			#ifdef BOX_RELEASE_BUILD
+			Log::NOTICE
+			#else
+			Log::INFO
+			#endif
+			)
+		: mCurrentLevel(InitialLevel)
+		{ }
+		
+		static std::string GetOptionString();
+		int ProcessOption(signed int option);
+		static std::string GetUsageString();
+		int mCurrentLevel; // need an int to do math with
+		Log::Level GetCurrentLevel()
+		{
+			return (Log::Level) mCurrentLevel;
 		}
 	};
 };

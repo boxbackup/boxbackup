@@ -33,6 +33,12 @@ public:
 	
 	~SelfFlushingStream()
 	{
+		if(StreamDataLeft())
+		{
+			BOX_WARNING("Not all data was read from stream, "
+				"discarding the rest");
+		}
+
 		Flush();
 	}
 
@@ -50,9 +56,10 @@ public:
 	{
 		return mrSource.BytesLeftToRead();
 	}
-	virtual void Write(const void *pBuffer, int NBytes)
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite)
 	{
-		mrSource.Write(pBuffer, NBytes);
+		mrSource.Write(pBuffer, NBytes, Timeout);
 	}
 	virtual bool StreamDataLeft()
 	{

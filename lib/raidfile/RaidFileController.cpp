@@ -171,7 +171,11 @@ RaidFileDiscSet &RaidFileController::GetDiscSet(unsigned int DiscSetNum)
 	return mSetList[DiscSetNum];
 }
 
-
+// Overload to make usable in gdb debugger.
+int RaidFileDiscSet::GetSetNumForWriteFiles(const char* filename) const
+{
+	return GetSetNumForWriteFiles(std::string(filename));
+}
 
 // --------------------------------------------------------------------------
 //

@@ -204,13 +204,13 @@ typedef struct
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientRestoreDir(BackupProtocolClient &,
+//		Name:    BackupClientRestoreDir(BackupProtocolCallable &,
 //			 int64_t, const char *, bool)
 //		Purpose: Restore a directory
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
+static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 	int64_t DirectoryID, const std::string &rRemoteDirectoryName,
 	const std::string &rLocalDirectoryName,
 	RestoreParams &Params, RestoreResumeInfo &rLevel)
@@ -224,7 +224,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 			DIRECTORY_SEPARATOR_ASCHAR + 
 			rLevel.mNextLevelLocalName);
 		BackupClientRestoreDir(rConnection, rLevel.mNextLevelID,
-			rRemoteDirectoryName + '/' + 
+			rRemoteDirectoryName + '/' +
 			rLevel.mNextLevelLocalName, localDirname,
 			Params, *rLevel.mpNextLevel);
 		
@@ -232,7 +232,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 		rLevel.mRestoredObjects.insert(rLevel.mNextLevelID);
 
 		// Remove the level for the recursed directory
-		rLevel.RemoveLevel();		
+		rLevel.RemoveLevel();
 	}
 	
 	// Create the local directory, if not already done.
@@ -299,7 +299,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 	}
 
 	std::string parentDirectoryName(rLocalDirectoryName);
-	if(parentDirectoryName[parentDirectoryName.size() - 1] == 
+	if(parentDirectoryName[parentDirectoryName.size() - 1] ==
 		DIRECTORY_SEPARATOR_ASCHAR)
 	{
 		parentDirectoryName.resize(parentDirectoryName.size() - 1);
@@ -309,7 +309,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 
 	if(lastSlash == std::string::npos)
 	{
-		// might be a forward slash separator, 
+		// might be a forward slash separator,
 		// especially in the unit tests!
 		lastSlash = parentDirectoryName.rfind('/');
 	}
@@ -813,7 +813,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientRestore(BackupProtocolClient &, int64_t,
+//		Name:    BackupClientRestore(BackupProtocolCallable &, int64_t,
 //			 const char *, bool, bool, bool, bool, bool)
 //		Purpose: Restore a directory on the server to a local
 //			 directory on the disc. The local directory must not
@@ -840,7 +840,7 @@ static int BackupClientRestoreDir(BackupProtocolClient &rConnection,
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-int BackupClientRestore(BackupProtocolClient &rConnection,
+int BackupClientRestore(BackupProtocolCallable &rConnection,
 	int64_t DirectoryID, const std::string& RemoteDirectoryName,
 	const std::string& LocalDirectoryName, bool PrintDots, bool RestoreDeleted,
 	bool UndeleteAfterRestoreDeleted, bool Resume,
@@ -889,7 +889,7 @@ int BackupClientRestore(BackupProtocolClient &rConnection,
 	}
 	
 	// Restore the directory
-	int result = BackupClientRestoreDir(rConnection, DirectoryID, 
+	int result = BackupClientRestoreDir(rConnection, DirectoryID,
 		RemoteDirectoryName, LocalDirectoryName, params,
 		params.mResumeInfo);
 	if (result != Restore_Complete)

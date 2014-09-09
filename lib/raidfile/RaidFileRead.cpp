@@ -740,7 +740,7 @@ int RaidFileRead_Raid::ReadRecovered(void *pBuffer, int NBytes)
 				// Go XORing!
 				unsigned int *b1 = (unsigned int*)mRecoveryBuffer;
 				unsigned int *b2 = (unsigned int *)(mRecoveryBuffer + mBlockSize);
-				if((mStripe1Handle == -1))
+				if(mStripe1Handle == -1)
 				{
 					b1 = b2;
 					b2 = (unsigned int*)mRecoveryBuffer;
@@ -1025,8 +1025,8 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 	RaidFileUtil::ExistType existance = RaidFileUtil::RaidFileExists(rdiscSet, Filename, &startDisc, &existingFiles, pRevisionID);
 	if(existance == RaidFileUtil::NoFile)
 	{
-		BOX_ERROR("Expected raidfile " << Filename << " does not exist");
-		THROW_EXCEPTION(RaidFileException, RaidFileDoesntExist)
+		THROW_FILE_ERROR("Expected raidfile does not exist",
+			Filename, RaidFileException, RaidFileDoesntExist);
 	}
 	else if(existance == RaidFileUtil::NonRaid)
 	{
@@ -1588,7 +1588,7 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 	{
 		// build name
 		std::string dn(rdiscSet[l] + DIRECTORY_SEPARATOR + rDirName);
-		
+
 		// read the contents...
 		DIR *dirHandle = 0;
 		try
@@ -1721,7 +1721,7 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-void RaidFileRead::Write(const void *pBuffer, int NBytes)
+void RaidFileRead::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(RaidFileException, UnsupportedReadWriteOrClose)
 }
@@ -1767,6 +1767,7 @@ IOStream::pos_type RaidFileRead::GetDiscUsageInBlocks()
 	return RaidFileUtil::DiscUsageInBlocks(GetFileSize(), rdiscSet);
 }
 
-
-
-
+std::string RaidFileRead::ToString() const
+{
+	return std::string("RaidFile ") + mFilename;
+}

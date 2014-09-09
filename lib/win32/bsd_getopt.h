@@ -37,6 +37,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef REPLACE_GETOPT
+#error You must include box_getopt.h, not bsd_getopt.h
+#endif
+
+#if REPLACE_GETOPT // defined in box_getopt.h; until end of file
+
 #ifndef _GETOPT_H_
 #define _GETOPT_H_
 
@@ -96,3 +102,4 @@ extern   char *suboptarg;               /* getsubopt(3) external variable */
 __END_DECLS
  
 #endif /* !_GETOPT_H_ */
+#endif // REPLACE_GETOPT

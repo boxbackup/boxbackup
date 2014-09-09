@@ -138,7 +138,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 			if((flags & Flags_IsContained) == 0)
 			{
 				// Unattached object...
-				BOX_WARNING("Object " <<
+				BOX_ERROR("Object " <<
 					BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
 					" is unattached.");
 				++mNumberErrorsFound;
@@ -149,6 +149,8 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				if((flags & Flags_IsDir) == Flags_IsDir)
 				{
 					// Directory. Just put into lost and found.
+					// (It doesn't contain its filename, so we
+					// can't recreate the entry in the parent)
 					putIntoDirectoryID = GetLostAndFoundDirID();
 				}
 				else
@@ -158,15 +160,6 @@ void BackupStoreCheck::CheckUnattachedObjects()
 						int64_t diffFromObjectID = 0;
 						std::string filename;
 						StoreStructure::MakeObjectFilename(pblock->mID[e], mStoreRoot, mDiscSetNumber, filename, false /* don't attempt to make sure the dir exists */);
-
-						// Debugging for Sune Molgaard's issue with non-existent files being
-						// detected as unattached and crashing later in CheckUnattachedObjects()
-						if (pblock->mID[e] == 0x90c1a)
-						{
-							BOX_INFO("Trying to open unattached " <<
-								BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
-								" from " << filename << " on " << mDiscSetNumber);
-						}
 
 						// The easiest way to do this is to verify it again. Not such a bad penalty, because
 						// this really shouldn't be done very often.
@@ -187,6 +180,8 @@ void BackupStoreCheck::CheckUnattachedObjects()
 								RaidFileWrite del(mDiscSetNumber, filename);
 								del.Delete();
 							}
+
+							mBlocksUsed -= pblock->mObjectSizeInBlocks[e];
 							
 							// Move on to next item
 							continue;
@@ -592,51 +587,44 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	}
 	catch(...)
 	{
-		BOX_WARNING("Load of existing store info failed, regenerating.");
+		BOX_ERROR("Load of existing store info failed, regenerating.");
 		++mNumberErrorsFound;
 	}
 
-	BOX_NOTICE("Total files: " << mNumFiles << " (of which "
+	BOX_INFO("Current files: " << mNumCurrentFiles << ", "
 		"old files: " << mNumOldFiles << ", "
-		"deleted files: " << mNumDeletedFiles << "), "
+		"deleted files: " << mNumDeletedFiles << ", "
 		"directories: " << mNumDirectories);
 
-	// Minimum soft and hard limits
+	// Minimum soft and hard limits to ensure that nothing gets deleted
+	// by housekeeping.
 	int64_t minSoft = ((mBlocksUsed * 11) / 10) + 1024;
 	int64_t minHard = ((minSoft * 11) / 10) + 1024;
 
-	// Need to do anything?
-	if(pOldInfo.get() != 0 &&
-		mNumberErrorsFound == 0 &&
-		pOldInfo->GetAccountID() == mAccountID)
-	{
-		// Leave the store info as it is, no need to alter it because nothing really changed,
-		// and the only essential thing was that the account ID was correct, which is was.
-		return;
-	}
-	
-	// NOTE: We will always build a new store info, so the client store marker gets changed.
+	int64_t softLimit = pOldInfo.get() ? pOldInfo->GetBlocksSoftLimit() : minSoft;
+	int64_t hardLimit = pOldInfo.get() ? pOldInfo->GetBlocksHardLimit() : minHard;
 
-	// Work out the new limits
-	int64_t softLimit = minSoft;
-	int64_t hardLimit = minHard;
-	if(pOldInfo.get() != 0 && pOldInfo->GetBlocksSoftLimit() > minSoft)
+	if(mNumberErrorsFound && pOldInfo.get())
 	{
-		softLimit = pOldInfo->GetBlocksSoftLimit();
-	}
-	else
-	{
-		BOX_WARNING("Soft limit for account changed to ensure "
-			"housekeeping doesn't delete files on next run.");
-	}
-	if(pOldInfo.get() != 0 && pOldInfo->GetBlocksHardLimit() > minHard)
-	{
-		hardLimit = pOldInfo->GetBlocksHardLimit();
-	}
-	else
-	{
-		BOX_WARNING("Hard limit for account changed to ensure "
-			"housekeeping doesn't delete files on next run.");
+		if(pOldInfo->GetBlocksSoftLimit() > minSoft)
+		{
+			softLimit = pOldInfo->GetBlocksSoftLimit();
+		}
+		else
+		{
+			BOX_WARNING("Soft limit for account changed to ensure "
+				"housekeeping doesn't delete files on next run.");
+		}
+
+		if(pOldInfo->GetBlocksHardLimit() > minHard)
+		{
+			hardLimit = pOldInfo->GetBlocksHardLimit();
+		}
+		else
+		{
+			BOX_WARNING("Hard limit for account changed to ensure "
+				"housekeeping doesn't delete files on next run.");
+		}
 	}
 	
 	// Object ID
@@ -671,10 +659,23 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		hardLimit,
 		(pOldInfo.get() ? pOldInfo->IsAccountEnabled() : true),
 		*extra_data));
-	info->AdjustNumFiles(mNumFiles);
+	info->AdjustNumCurrentFiles(mNumCurrentFiles);
 	info->AdjustNumOldFiles(mNumOldFiles);
 	info->AdjustNumDeletedFiles(mNumDeletedFiles);
 	info->AdjustNumDirectories(mNumDirectories);
+
+	// If there are any errors (apart from wrong block counts), then we
+	// should reset the ClientStoreMarker to zero, which
+	// CreateForRegeneration does. But if there are no major errors, then
+	// we should maintain the old ClientStoreMarker, to avoid invalidating
+	// the client's directory cache.
+	if (pOldInfo.get() && !mNumberErrorsFound)
+	{
+		BOX_INFO("No major errors found, preserving old "
+			"ClientStoreMarker: " <<
+			pOldInfo->GetClientStoreMarker());
+		info->SetClientStoreMarker(pOldInfo->GetClientStoreMarker());
+	}
 
 	if(pOldInfo.get())
 	{
@@ -685,7 +686,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	if(mFixErrors)
 	{
 		info->Save();
-		BOX_NOTICE("New store info file written successfully.");
+		BOX_INFO("New store info file written successfully.");
 	}
 }
 
@@ -706,7 +707,12 @@ bool BackupStoreDirectory::CheckAndFix()
 	bool changed = false;
 	
 	// Check that if a file depends on a new version, that version is in this directory
+	bool restart;
+
+	do
 	{
+		restart = false;
+
 		std::vector<Entry*>::iterator i(mEntries.begin());
 		for(; i != mEntries.end(); ++i)
 		{
@@ -717,7 +723,7 @@ bool BackupStoreDirectory::CheckAndFix()
 				if(newerEn == 0)
 				{
 					// Depends on something, but it isn't there.
-					BOX_TRACE("Entry id " << FMT_i <<
+					BOX_WARNING("Entry id " << FMT_i <<
 						" removed because depends "
 						"on newer version " <<
 						FMT_OID(dependsNewer) <<
@@ -727,11 +733,12 @@ bool BackupStoreDirectory::CheckAndFix()
 					delete *i;
 					mEntries.erase(i);
 					
-					// Start again at the beginning of the vector, the iterator is now invalid
-					i = mEntries.begin();
-					
 					// Mark as changed
 					changed = true;
+
+					// Start again at the beginning of the vector, the iterator is now invalid
+					restart = true;
+					break;
 				}
 				else
 				{
@@ -753,6 +760,7 @@ bool BackupStoreDirectory::CheckAndFix()
 			}
 		}
 	}
+	while(restart);
 	
 	// Check that if a file has a dependency marked, it exists, and remove it if it doesn't
 	{
@@ -863,7 +871,7 @@ bool BackupStoreDirectory::CheckAndFix()
 				// erase the thing from the list
 				Entry *pentry = (*i);
 				mEntries.erase(i);
-				
+
 				// And delete the entry object
 				delete pentry;
 				

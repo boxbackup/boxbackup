@@ -64,7 +64,7 @@ IOStream::pos_type BufferedWriteStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void BufferedWriteStream::Write(const void *pBuffer, int NBytes)
+void BufferedWriteStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	int numBytesRemain = NBytes;
 

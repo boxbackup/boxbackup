@@ -25,10 +25,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#ifdef HAVE_GETOPT_H
-	#include <getopt.h>
-#endif
-
 #ifdef HAVE_SYS_SOCKET_H
 #	include <sys/socket.h>
 #endif
@@ -41,8 +37,10 @@
 #endif
 
 #include <exception>
+#include <list>
 #include <string>
 
+#include "box_getopt.h"
 #include "Logging.h"
 #include "Test.h"
 #include "Timer.h"
@@ -60,6 +58,7 @@ int test(int argc, const char *argv[]);
 int failures = 0;
 int first_fail_line;
 std::string first_fail_file;
+std::list<std::string> run_only_named_tests;
 
 #ifdef WIN32
 	#define QUIET_PROCESS "-Q"
@@ -231,7 +230,6 @@ int main(int argc, char * const * argv)
 
 	Logging::SetProgramName(BOX_MODULE);
 
-#ifdef HAVE_GETOPT_H
 	#ifdef BOX_RELEASE_BUILD
 	int logLevel = Log::NOTICE; // need an int to do math with
 	#else
@@ -243,15 +241,19 @@ int main(int argc, char * const * argv)
 		{ "bbackupd-args",	required_argument, NULL, 'c' },
 		{ "bbstored-args",	required_argument, NULL, 's' },
 		{ "test-daemon-args",	required_argument, NULL, 'd' },
+		{ "execute-only",	required_argument, NULL, 'e' },
 		{ NULL,			0,                 NULL,  0  }
 	};
-	
-	int ch;
-	
-	while ((ch = getopt_long(argc, argv, "c:d:qs:t:vPTUV", longopts, NULL))
+
+	int c;
+	std::string options("c:d:e:s:");
+	options += Logging::OptionParser::GetOptionString();
+	Logging::OptionParser LogLevel;
+
+	while ((c = getopt_long(argc, argv, options.c_str(), longopts, NULL))
 		!= -1)
 	{
-		switch(ch)
+		switch(c)
 		{
 			case 'c':
 			{
@@ -273,6 +275,12 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
+			case 'e':
+			{
+				run_only_named_tests.push_back(optarg);
+			}
+			break;
+
 			case 's':
 			{
 				bbstored_args += " ";
@@ -280,88 +288,24 @@ int main(int argc, char * const * argv)
 			}
 			break;
 
-			#ifndef WIN32
-			case 'P':
-			{
-				Console::SetShowPID(true);
-			}
-			break;
-			#endif
-
-			case 'q':
-			{
-				if(logLevel == Log::NOTHING)
-				{
-					BOX_FATAL("Too many '-q': "
-						"Cannot reduce logging "
-						"level any more");
-					return 2;
-				}
-				logLevel--;
-			}
-			break;
-
-			case 'v':
-			{
-				if(logLevel == Log::EVERYTHING)
-				{
-					BOX_FATAL("Too many '-v': "
-						"Cannot increase logging "
-						"level any more");
-					return 2;
-				}
-				logLevel++;
-			}
-			break;
-
-			case 'V':
-			{
-				logLevel = Log::EVERYTHING;
-			}
-			break;
-
-			case 't':
-			{
-				Logging::SetProgramName(optarg);
-				Console::SetShowTag(true);
-			}
-			break;
-
-			case 'T':
-			{
-				Console::SetShowTime(true);
-			}
-			break;
-
-			case 'U':
-			{
-				Console::SetShowTime(true);
-				Console::SetShowTimeMicros(true);
-			}
-			break;
-
-			case '?':
-			{
-				fprintf(stderr, "Unknown option: '%c'\n",
-					optopt);
-				exit(2);
-			}
-
 			default:
 			{
-				fprintf(stderr, "Unknown option code '%c'\n",
-					ch);
-				exit(2);
+				int ret = LogLevel.ProcessOption(c);
+				if(ret != 0)
+				{
+					fprintf(stderr, "Unknown option code "
+						"'%c'\n", c);
+					exit(2);
+				}
 			}
 		}
 	}
 
-	Logging::SetGlobalLevel((Log::Level)logLevel);
-	Logging::FilterConsole((Log::Level)logLevel);
+	Logging::FilterSyslog(Log::NOTHING);
+	Logging::FilterConsole(LogLevel.GetCurrentLevel());
 
 	argc -= optind - 1;
 	argv += optind - 1;
-#endif // HAVE_GETOPT_H
 
 	// If there is more than one argument, then the test is doing something advanced, so leave it alone
 	bool fulltestmode = (argc == 1);
@@ -372,6 +316,7 @@ int main(int argc, char * const * argv)
 		BOX_NOTICE("Running test TEST_NAME in " MODE_TEXT " mode...");
 
 		// Count open file descriptors for a very crude "files left open" test
+		Logging::GetSyslog().Shutdown();
 		check_filedes(false);
 
 		#ifdef WIN32
@@ -391,7 +336,7 @@ int main(int argc, char * const * argv)
 
 		Timers::Init();
 		int returncode = test(argc, (const char **)argv);
-		Timers::Cleanup();
+		Timers::Cleanup(false);
 
 		fflush(stdout);
 		fflush(stderr);
@@ -410,6 +355,8 @@ int main(int argc, char * const * argv)
 		
 		if(fulltestmode)
 		{
+			Logging::GetSyslog().Shutdown();
+
 			bool filesleftopen = checkfilesleftopen();
 
 			fflush(stdout);

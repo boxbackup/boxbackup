@@ -96,7 +96,7 @@ IOStream::pos_type BufferedStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void BufferedStream::Write(const void *pBuffer, int NBytes)
+void BufferedStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }
@@ -189,7 +189,9 @@ void BufferedStream::Close()
 // --------------------------------------------------------------------------
 bool BufferedStream::StreamDataLeft()
 {
-	return mrSource.StreamDataLeft();
+	// Return true if either the source has data left to read, or we have
+	// buffered data still to be read.
+	return mrSource.StreamDataLeft() || (mBufferPosition < mBufferSize);
 }
 
 // --------------------------------------------------------------------------

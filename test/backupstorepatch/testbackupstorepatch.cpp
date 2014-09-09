@@ -22,6 +22,7 @@
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreFilenameClear.h"
 #include "BackupStoreInfo.h"
 #include "BoxPortsAndFiles.h"
@@ -344,12 +345,13 @@ int test(int argc, const char *argv[])
 
 		{
 			// Open a connection to the server
-			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost",
+			SocketStreamTLS *pConn = new SocketStreamTLS;
+			std::auto_ptr<SocketStream> apConn(pConn);
+			pConn->Open(context, Socket::TypeINET, "localhost",
 				BOX_PORT_BBSTORED_TEST);
 	
 			// Make a protocol
-			BackupProtocolClient protocol(conn);
+			BackupProtocolClient protocol(apConn);
 	
 			// Login
 			{
@@ -370,7 +372,7 @@ int test(int argc, const char *argv[])
 						BackupProtocolListDirectory::RootDirectory, storeFilename));
 				std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
 						BackupProtocolListDirectory::RootDirectory, ModificationTime,
-						ModificationTime, 0 /* no diff from file ID */, storeFilename, *upload));
+						ModificationTime, 0 /* no diff from file ID */, storeFilename, upload));
 				test_files[0].IDOnServer = stored->GetObjectID();
 				test_files[0].IsCompletelyDifferent = true;
 				ModificationTime += MODIFICATION_TIME_INC;
@@ -409,7 +411,8 @@ int test(int argc, const char *argv[])
 					// Upload the patch to the store
 					std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
 							BackupProtocolListDirectory::RootDirectory, ModificationTime,
-							ModificationTime, isCompletelyDifferent?(0):(diffFromID), storeFilename, *patchStream));
+							ModificationTime, isCompletelyDifferent?(0):(diffFromID),
+							storeFilename, patchStream));
 					ModificationTime += MODIFICATION_TIME_INC;
 					
 					// Store details
@@ -452,7 +455,6 @@ int test(int argc, const char *argv[])
 
 			// Finish the connection
 			protocol.QueryFinished();
-			conn.Close();
 		}
 
 		// Fill in initial dependency information
@@ -526,10 +528,11 @@ int test(int argc, const char *argv[])
 			}
 			
 			// Open a connection to the server (need to do this each time, otherwise housekeeping won't delete files)
-			SocketStreamTLS conn;
-			conn.Open(context, Socket::TypeINET, "localhost",
+			SocketStreamTLS *pConn = new SocketStreamTLS;
+			std::auto_ptr<SocketStream> apConn(pConn);
+			pConn->Open(context, Socket::TypeINET, "localhost",
 				BOX_PORT_BBSTORED_TEST);
-			BackupProtocolClient protocol(conn);
+			BackupProtocolClient protocol(apConn);
 			{
 				std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 				TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
@@ -581,7 +584,6 @@ int test(int argc, const char *argv[])
 
 			// Close the connection			
 			protocol.QueryFinished();
-			conn.Close();
 
 			// Mark one of the elements as deleted
 			if(test_file_remove_order[deleteIndex] == -1)

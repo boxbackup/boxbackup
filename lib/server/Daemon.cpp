@@ -36,12 +36,13 @@
 #	include "BoxVersion.h"
 #endif
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "Configuration.h"
 #include "Daemon.h"
 #include "FileModificationTime.h"
 #include "Guards.h"
 #include "Logging.h"
-#include "ServerException.h"
 #include "UnixUser.h"
 #include "Utils.h"
 
@@ -106,11 +107,11 @@ Daemon::~Daemon()
 // --------------------------------------------------------------------------
 std::string Daemon::GetOptionString()
 {
-	return "c:"
+	return std::string("c:"
 	#ifndef WIN32
 		"DF"
 	#endif
-		"hkKo:O:PqQt:TUvVW:";
+		"hkKo:O:") + Logging::OptionParser::GetOptionString();
 }
 
 void Daemon::Usage()
@@ -132,17 +133,8 @@ void Daemon::Usage()
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
 	"  -K         Stop writing log messages to console while daemon is running\n"
 	"  -o <file>  Log to a file, defaults to maximum verbosity\n"
-	"  -O <level> Set file log verbosity to error/warning/notice/info/trace/everything\n"
-	"  -P         Show process ID (PID) in console output\n"
-	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
-	"  -Q         Run at minimum verbosity, log nothing to console and system\n"
-	"  -t <tag>   Tag console output with specified marker\n"
-	"  -T         Timestamp console output\n"
-	"  -U         Timestamp console output with microseconds\n"
-	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
-	"  -V         Run at maximum verbosity, log everything to console and system\n"
-	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
-	;
+	"  -O <level> Set file log verbosity to error/warning/notice/info/trace/everything\n" <<
+	Logging::OptionParser::GetUsageString();
 }
 
 // --------------------------------------------------------------------------
@@ -218,94 +210,9 @@ int Daemon::ProcessOption(signed int option)
 		}
 		break;
 
-		case 'P':
-		{
-			Console::SetShowPID(true);
-		}
-		break;
-
-		case 'q':
-		{
-			if(mLogLevel == Log::NOTHING)
-			{
-				BOX_FATAL("Too many '-q': "
-					"Cannot reduce logging "
-					"level any more");
-				return 2;
-			}
-			mLogLevel--;
-		}
-		break;
-
-		case 'Q':
-		{
-			mLogLevel = Log::NOTHING;
-		}
-		break;
-
-		case 't':
-		{
-			Logging::SetProgramName(optarg);
-			Console::SetShowTag(true);
-		}
-		break;
-
-		case 'T':
-		{
-			Console::SetShowTime(true);
-		}
-		break;
-
-		case 'U':
-		{
-			Console::SetShowTime(true);
-			Console::SetShowTimeMicros(true);
-		}
-		break;
-
-		case 'v':
-		{
-			if(mLogLevel == Log::EVERYTHING)
-			{
-				BOX_FATAL("Too many '-v': "
-					"Cannot increase logging "
-					"level any more");
-				return 2;
-			}
-			mLogLevel++;
-		}
-		break;
-
-		case 'V':
-		{
-			mLogLevel = Log::EVERYTHING;
-		}
-		break;
-
-		case 'W':
-		{
-			mLogLevel = Logging::GetNamedLevel(optarg);
-			if (mLogLevel == Log::INVALID)
-			{
-				BOX_FATAL("Invalid logging level: " << optarg);
-				return 2;
-			}
-		}
-		break;
-
-		case '?':
-		{
-			BOX_FATAL("Unknown option on command line: " 
-				<< "'" << (char)optopt << "'");
-			return 2;
-		}
-		break;
-
 		default:
 		{
-			BOX_FATAL("Unknown error in getopt: returned "
-				<< "'" << option << "'");
-			return 1;
+			return mLogLevel.ProcessOption(option);
 		}
 	}
 
@@ -351,12 +258,6 @@ int Daemon::Main(const std::string& rDefaultConfigFile, int argc,
 
 int Daemon::ProcessOptions(int argc, const char *argv[])
 {
-	#ifdef BOX_RELEASE_BUILD
-	mLogLevel = Log::NOTICE;
-	#else
-	mLogLevel = Log::INFO;
-	#endif
-
 	if (argc == 2 && strcmp(argv[1], "/?") == 0)
 	{
 		Usage();
@@ -368,7 +269,7 @@ int Daemon::ProcessOptions(int argc, const char *argv[])
 	// reset getopt, just in case anybody used it before.
 	// unfortunately glibc and BSD differ on this point!
 	// http://www.ussg.iu.edu/hypermail/linux/kernel/0305.3/0262.html
-	#if HAVE_DECL_OPTRESET == 1 || defined WIN32
+	#if HAVE_DECL_OPTRESET == 1 || defined BOX_BSD_GETOPT
 		optind = 1;
 		optreset = 1;
 	#elif defined __GLIBC__
@@ -406,8 +307,8 @@ int Daemon::ProcessOptions(int argc, const char *argv[])
 		return 2;
 	}
 
-	Logging::FilterConsole((Log::Level)mLogLevel);
-	Logging::FilterSyslog ((Log::Level)mLogLevel);
+	Logging::FilterConsole(mLogLevel.GetCurrentLevel());
+	Logging::FilterSyslog (mLogLevel.GetCurrentLevel());
 
 	if (mLogFileLevel != Log::INVALID)
 	{
@@ -986,7 +887,9 @@ const Configuration &Daemon::GetConfiguration() const
 	if(mapConfiguration.get() == 0)
 	{
 		// Shouldn't get anywhere near this if a configuration file can't be loaded
-		THROW_EXCEPTION(ServerException, Internal)
+		THROW_EXCEPTION_MESSAGE(ServerException, Internal,
+			"The daemon has not been configured; no config file "
+			"has been loaded.");
 	}
 	
 	return *mapConfiguration;
@@ -1025,9 +928,14 @@ void Daemon::SetProcessTitle(const char *format, ...)
 	char title[256];
 	::vsnprintf(title, sizeof(title), format, args);
 	
+#ifdef WIN32
+	StringCchCatA(title, sizeof(title)," - " PACKAGE_NAME);
+	SetConsoleTitleA(title);
+#else // !WIN32
 	// Set process title
 	::setproctitle("%s", title);
-	
+#endif
+
 #endif // HAVE_SETPROCTITLE
 }
 

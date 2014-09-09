@@ -52,18 +52,19 @@ public:
 		std::string certFile(serverconf.GetKeyValue("CertificateFile"));
 		std::string keyFile(serverconf.GetKeyValue("PrivateKeyFile"));
 		std::string caFile(serverconf.GetKeyValue("TrustedCAsFile"));
-		mContext.Initialise(true /* as server */, certFile.c_str(), keyFile.c_str(), caFile.c_str());
+		mContext.Initialise(true /* as server */, certFile.c_str(),
+			keyFile.c_str(), caFile.c_str());
 	
 		// Then do normal stream server stuff
 		ServerStream<SocketStreamTLS, Port, ListenBacklog,
 			ForkToHandleRequests>::Run2(rChildExit);
 	}
 	
-	virtual void HandleConnection(SocketStreamTLS &rStream)
+	virtual void HandleConnection(std::auto_ptr<SocketStreamTLS> apStream)
 	{
-		rStream.Handshake(mContext, true /* is server */);
+		apStream->Handshake(mContext, true /* is server */);
 		// this-> in next line required to build under some gcc versions
-		this->Connection(rStream);
+		this->Connection(apStream);
 	}
 	
 private:

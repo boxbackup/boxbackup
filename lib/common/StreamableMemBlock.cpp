@@ -125,7 +125,9 @@ void StreamableMemBlock::Set(IOStream &rStream, int Timeout)
 	try
 	{
 		// Read in
-		if(!rStream.ReadFullBuffer(pblock, size, 0 /* not interested in bytes read if this fails */))
+		if(!rStream.ReadFullBuffer(pblock, size,
+			0 /* not interested in bytes read if this fails */,
+			Timeout))
 		{
 			THROW_EXCEPTION(CommonException, StreamableMemBlockIncompleteRead)
 		}
@@ -252,7 +254,9 @@ void StreamableMemBlock::ReadFromStream(IOStream &rStream, int Timeout)
 {
 	// Get the size of the block
 	int32_t size_s;
-	if(!rStream.ReadFullBuffer(&size_s, sizeof(size_s), 0 /* not interested in bytes read if this fails */))
+	if(!rStream.ReadFullBuffer(&size_s, sizeof(size_s),
+		0, /* not interested in bytes read if this fails */
+		Timeout))
 	{
 		THROW_EXCEPTION(CommonException, StreamableMemBlockIncompleteRead)
 	}
@@ -270,7 +274,9 @@ void StreamableMemBlock::ReadFromStream(IOStream &rStream, int Timeout)
 	try
 	{
 		// Read in
-		if(!rStream.ReadFullBuffer(pblock, size, 0 /* not interested in bytes read if this fails */))
+		if(!rStream.ReadFullBuffer(pblock, size,
+			0, /* not interested in bytes read if this fails */
+			Timeout))
 		{
 			THROW_EXCEPTION(CommonException, StreamableMemBlockIncompleteRead)
 		}

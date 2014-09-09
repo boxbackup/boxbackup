@@ -96,7 +96,7 @@ IOStream::pos_type ReadLoggingStream::BytesLeftToRead()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void ReadLoggingStream::Write(const void *pBuffer, int NBytes)
+void ReadLoggingStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	THROW_EXCEPTION(CommonException, NotSupported);
 }

@@ -42,11 +42,11 @@ class BackupClientContext : public DiffTimer
 public:
 	BackupClientContext
 	(
-		LocationResolver &rResolver, 
-		TLSContext &rTLSContext, 
+		LocationResolver &rResolver,
+		TLSContext &rTLSContext,
 		const std::string &rHostname,
 		int32_t Port,
-		uint32_t AccountNumber, 
+		uint32_t AccountNumber,
 		bool ExtendedLogging,
 		bool ExtendedLogToFile,
 		std::string ExtendedLogFile,
@@ -58,12 +58,9 @@ private:
 	BackupClientContext(const BackupClientContext &);
 public:
 
-	BackupProtocolClient &GetConnection();
-	
+	virtual BackupProtocolCallable &GetConnection();
 	void CloseAnyOpenConnection();
-	
 	int GetTimeout() const;
-	
 	BackupClientDeleteList &GetDeleteList();
 	void PerformDeletions();
 
@@ -74,7 +71,7 @@ public:
 
 	void SetClientStoreMarker(int64_t ClientStoreMarker) {mClientStoreMarker = ClientStoreMarker;}
 	int64_t GetClientStoreMarker() const {return mClientStoreMarker;}
-	
+
 	bool StorageLimitExceeded() {return mStorageLimitExceeded;}
 	void SetStorageLimitExceeded() {mStorageLimitExceeded = true;}
 
@@ -214,7 +211,7 @@ public:
 	{
 		if(mTcpNiceMode)
 		{
-			mapNice->SetEnabled(enabled);
+			mpNice->SetEnabled(enabled);
 		}
 	}
 
@@ -226,9 +223,7 @@ private:
 	std::string mHostname;
 	int mPort;
 	uint32_t mAccountNumber;
-	std::auto_ptr<SocketStream> mapSocket;
-	std::auto_ptr<NiceSocketStream> mapNice;
-	std::auto_ptr<BackupProtocolClient> mapConnection;
+	std::auto_ptr<BackupProtocolCallable> mapConnection;
 	bool mExtendedLogging;
 	bool mExtendedLogToFile;
 	std::string mExtendedLogFile;
@@ -246,6 +241,7 @@ private:
 	int mMaximumDiffingTime;
 	ProgressNotifier &mrProgressNotifier;
 	bool mTcpNiceMode;
+	NiceSocketStream *mpNice;
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

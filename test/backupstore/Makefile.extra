@@ -1,3 +1,0 @@
-link-extra: ../../bin/bbstored/BackupStoreDaemon.o \
-	../../bin/bbstored/BBStoreDHousekeeping.o \
-	../../lib/backupstore/HousekeepStoreAccount.o

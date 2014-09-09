@@ -132,7 +132,7 @@ void BackupClientDeleteList::PerformDeletions(BackupClientContext &rContext)
 	}
 	
 	// Get a connection
-	BackupProtocolClient &connection(rContext.GetConnection());
+	BackupProtocolCallable &connection(rContext.GetConnection());
 	
 	// Do the deletes
 	for(std::vector<DirToDelete>::iterator i(mDirectoryList.begin());

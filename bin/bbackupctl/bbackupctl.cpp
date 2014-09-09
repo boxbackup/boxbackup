@@ -11,14 +11,15 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
 
-#include <cstdlib>
-
+#include "box_getopt.h"
 #include "MainHelper.h"
+#include "BackupDaemon.h"
 #include "BoxPortsAndFiles.h"
 #include "BackupDaemonConfigVerify.h"
 #include "Socket.h"
@@ -37,12 +38,19 @@ enum Command
 	WaitForSyncStart,
 	WaitForSyncEnd,
 	SyncAndWaitForEnd,
+	NoCommand,
 };
 
-void PrintUsageAndExit()
+void PrintUsageAndExit(int ret)
 {
-	printf("Usage: bbackupctl [-q] [-c config_file] <command>\n"
+	std::cout << 
+	"Usage: bbackupctl [options] <command>\n"
+	"\n"
+	"Options:\n" <<
+	Logging::OptionParser::GetUsageString() <<
+	"\n"
 	"Commands are:\n"
+	"  status -- report daemon status without changing anything\n"
 	"  sync -- start a synchronisation (backup) run now\n"
 	"  force-sync -- force the start of a synchronisation run, "
 	"even if SyncAllowScript says no\n"
@@ -51,8 +59,8 @@ void PrintUsageAndExit()
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
 	"  wait-for-end  -- wait until the next sync finishes, then exit\n"
 	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"
-	);
-	exit(1);
+	;
+	exit(ret);
 }
 
 int main(int argc, const char *argv[])
@@ -69,28 +77,27 @@ int main(int argc, const char *argv[])
 	// Filename for configuration file?
 	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
 	
-	// Quiet?
-	bool quiet = false;
-	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "qc:l:")) != -1)
+	std::string options("c:");
+	options += Logging::OptionParser::GetOptionString();
+	Logging::OptionParser LogLevel;
+
+	while((c = getopt(argc, (char * const *)argv, options.c_str())) != -1)
 	{
 		switch(c)
 		{
-		case 'q':
-			// Quiet mode
-			quiet = true;
-			break;
-		
 		case 'c':
 			// store argument
 			configFilename = optarg;
 			break;
 		
-		case '?':
 		default:
-			PrintUsageAndExit();
+			int ret = LogLevel.ProcessOption(c);
+			if(ret != 0)
+			{
+				PrintUsageAndExit(ret);
+			}
 		}
 	}
 	// Adjust arguments
@@ -100,11 +107,13 @@ int main(int argc, const char *argv[])
 	// Check there's a command
 	if(argc != 1)
 	{
-		PrintUsageAndExit();
+		PrintUsageAndExit(2);
 	}
 
+	Logging::FilterConsole(LogLevel.GetCurrentLevel());
+
 	// Read in the configuration file
-	if(!quiet) BOX_NOTICE("Using configuration file " << configFilename);
+	BOX_INFO("Using configuration file " << configFilename);
 
 	std::string errs;
 	std::auto_ptr<Configuration> config(
@@ -164,7 +173,7 @@ int main(int argc, const char *argv[])
 	
 	// Wait for the configuration summary
 	std::string configSummary;
-	if(!getLine.GetLine(configSummary))
+	if(!getLine.GetLine(configSummary, PROTOCOL_DEFAULT_TIMEOUT))
 	{
 		BOX_ERROR("Failed to receive configuration summary "
 			"from daemon");
@@ -188,19 +197,16 @@ int main(int argc, const char *argv[])
 		return 1;
 	}
 	// Print summary?
-	if(!quiet)
-	{
-		BOX_INFO("Daemon configuration summary:\n"
-			"  AutomaticBackup = " << 
-			(autoBackup?"true":"false") << "\n"
-			"  UpdateStoreInterval = " << updateStoreInterval << 
-			" seconds\n"
-			"  MinimumFileAge = " << minimumFileAge << " seconds\n"
-			"  MaxUploadWait = " << maxUploadWait << " seconds");
-	}
+	BOX_TRACE("Daemon configuration summary:\n"
+		"  AutomaticBackup = " << 
+		(autoBackup?"true":"false") << "\n"
+		"  UpdateStoreInterval = " << updateStoreInterval << 
+		" seconds\n"
+		"  MinimumFileAge = " << minimumFileAge << " seconds\n"
+		"  MaxUploadWait = " << maxUploadWait << " seconds");
 
 	std::string stateLine;
-	if(!getLine.GetLine(stateLine) || getLine.IsEOF())
+	if(!getLine.GetLine(stateLine, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
 	{
 		BOX_ERROR("Failed to receive state line from daemon");
 		return 1;
@@ -229,6 +235,25 @@ int main(int argc, const char *argv[])
 	{
 		command = SyncAndWaitForEnd;
 	}
+	else if (commandName == "status")
+	{
+		std::string stateName;
+
+		#define STATE(x) case BackupDaemon::State_ ## x: stateName = #x; break;
+		switch (currentState)
+		{
+		STATE(Initialising);
+		STATE(Idle);
+		STATE(Connected);
+		STATE(Error);
+		STATE(StorageLimitExceeded);
+		default:
+			stateName = "unknown";
+			break;
+		}
+		BOX_NOTICE("state " << currentState << " " << stateName);
+		command = NoCommand;
+	}
 
 	switch (command)
 	{
@@ -244,7 +269,6 @@ int main(int argc, const char *argv[])
 					"sync will never start!");
 				return 1;
 			}
-
 		}
 		break;
 
@@ -253,7 +277,8 @@ int main(int argc, const char *argv[])
 			// send a sync command
 			commandName = "force-sync";
 			std::string cmd = commandName + "\n";
-			connection.Write(cmd.c_str(), cmd.size());
+			connection.Write(cmd.c_str(), cmd.size(),
+				PROTOCOL_DEFAULT_TIMEOUT);
 			connection.WriteAllBuffered();
 
 			if (currentState != 0)
@@ -266,11 +291,21 @@ int main(int argc, const char *argv[])
 
 		default:
 		{
-			// Normal case, just send the command given 
-			// plus a quit command.
-			std::string cmd = commandName;
-			cmd += "\nquit\n";
-			connection.Write(cmd.c_str(), cmd.size());
+			// Normal case, just send the command given, plus a
+			// quit command.
+			std::string cmd = commandName + "\n";
+			connection.Write(cmd.c_str(), cmd.size(),
+				PROTOCOL_DEFAULT_TIMEOUT);
+		}
+		// fall through
+
+		case NoCommand:
+		{
+			// Normal case, just send the command given plus a
+			// quit command.
+			std::string cmd = "quit\n";
+			connection.Write(cmd.c_str(), cmd.size(),
+				PROTOCOL_DEFAULT_TIMEOUT);
 		}
 	}
 	
@@ -279,7 +314,7 @@ int main(int argc, const char *argv[])
 	bool syncIsRunning = false;
 	bool finished = false;
 
-	while(!finished && !getLine.IsEOF() && getLine.GetLine(line))
+	while(command != NoCommand && !finished && !getLine.IsEOF() && getLine.GetLine(line))
 	{
 		switch (command)
 		{
@@ -289,8 +324,9 @@ int main(int argc, const char *argv[])
 				if(line == "start-sync")
 				{
 					// Send a quit command to finish nicely
-					connection.Write("quit\n", 5);
-					
+					connection.Write("quit\n", 5,
+						PROTOCOL_DEFAULT_TIMEOUT);
+
 					// And we're done
 					finished = true;
 				}
@@ -302,23 +338,24 @@ int main(int argc, const char *argv[])
 			{
 				if(line == "start-sync")
 				{
-					if (!quiet) BOX_INFO("Sync started...");
+					BOX_TRACE("Sync started...");
 					syncIsRunning = true;
 				}
 				else if(line == "finish-sync")
 				{
 					if (syncIsRunning)
 					{
-						if (!quiet) BOX_INFO("Sync finished.");
+						BOX_TRACE("Sync finished.");
 						// Send a quit command to finish nicely
-						connection.Write("quit\n", 5);
+						connection.Write("quit\n", 5,
+							PROTOCOL_DEFAULT_TIMEOUT);
 					
 						// And we're done
 						finished = true;
 					}
 					else
 					{
-						if (!quiet) BOX_INFO("Previous sync finished.");
+						BOX_TRACE("Previous sync finished.");
 					}
 					// daemon must still be busy
 				}
@@ -330,12 +367,9 @@ int main(int argc, const char *argv[])
 				// Is this an OK or error line?
 				if(line == "ok")
 				{
-					if(!quiet)
-					{
-						BOX_INFO("Control command "
-							"sent: " <<
-							commandName);
-					}
+					BOX_TRACE("Control command "
+						"sent: " <<
+						commandName);
 					finished = true;
 				}
 				else if(line == "error")

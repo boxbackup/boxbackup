@@ -17,10 +17,11 @@
 
 #include <new>
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "Protocol.h"
 #include "ProtocolWire.h"
-#include "IOStream.h"
-#include "ServerException.h"
+#include "SocketStream.h"
 #include "PartialReadStream.h"
 #include "ProtocolUncertainStream.h"
 #include "Logging.h"
@@ -44,8 +45,8 @@
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
-Protocol::Protocol(IOStream &rStream)
-: mrStream(rStream),
+Protocol::Protocol(std::auto_ptr<SocketStream> apConn)
+: mapConn(apConn),
   mHandshakeDone(false),
   mMaxObjectSize(PROTOCOL_DEFAULT_MAXOBJSIZE),
   mTimeout(PROTOCOL_DEFAULT_TIMEOUT),
@@ -103,8 +104,8 @@ void Protocol::Handshake()
 	::strncpy(hsSend.mIdent, GetProtocolIdentString(), sizeof(hsSend.mIdent));
 	
 	// Send it
-	mrStream.Write(&hsSend, sizeof(hsSend));
-	mrStream.WriteAllBuffered();
+	mapConn->Write(&hsSend, sizeof(hsSend), GetTimeout());
+	mapConn->WriteAllBuffered();
 
 	// Receive a handshake from the peer
 	PW_Handshake hsReceive;
@@ -114,10 +115,10 @@ void Protocol::Handshake()
 	while(bytesToRead > 0)
 	{
 		// Get some data from the stream
-		int bytesRead = mrStream.Read(readInto, bytesToRead, mTimeout);
+		int bytesRead = mapConn->Read(readInto, bytesToRead, GetTimeout());
 		if(bytesRead == 0)
 		{
-			THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
+			THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
 		}
 		readInto += bytesRead;
 		bytesToRead -= bytesRead;
@@ -127,7 +128,7 @@ void Protocol::Handshake()
 	// Are they the same?
 	if(::memcmp(&hsSend, &hsReceive, sizeof(hsSend)) != 0)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_HandshakeFailed)
+		THROW_EXCEPTION(ConnectionException, Protocol_HandshakeFailed)
 	}
 
 	// Mark as done
@@ -158,9 +159,10 @@ void Protocol::CheckAndReadHdr(void *hdr)
 	}
 
 	// Get some data into this header
-	if(!mrStream.ReadFullBuffer(hdr, sizeof(PW_ObjectHeader), 0 /* not interested in bytes read if this fails */, mTimeout))
+	if(!mapConn->ReadFullBuffer(hdr, sizeof(PW_ObjectHeader),
+		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
+		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
 	}
 }
 
@@ -168,8 +170,9 @@ void Protocol::CheckAndReadHdr(void *hdr)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::Recieve()
-//		Purpose: Recieves an object from the stream, creating it from the factory object type
+//		Name:    Protocol::ReceiveInternal()
+//		Purpose: Receives an object from the stream, creating it
+//			 from the factory object type
 //		Created: 2003/08/19
 //
 // --------------------------------------------------------------------------
@@ -182,14 +185,14 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	// Hope it's not a stream
 	if(ntohl(objHeader.mObjType) == SPECIAL_STREAM_OBJECT_TYPE)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_StreamWhenObjExpected)
+		THROW_EXCEPTION(ConnectionException, Protocol_StreamWhenObjExpected)
 	}
 	
 	// Check the object size
 	u_int32_t objSize = ntohl(objHeader.mObjSize);
 	if(objSize < sizeof(objHeader) || objSize > mMaxObjectSize)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_ObjTooBig)
+		THROW_EXCEPTION(ConnectionException, Protocol_ObjTooBig)
 	}
 
 	// Create a blank object
@@ -199,9 +202,10 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	EnsureBufferAllocated(objSize);
 	
 	// Read data
-	if(!mrStream.ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader), 0 /* not interested in bytes read if this fails */, mTimeout))
+	if(!mapConn->ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader),
+		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_Timeout)
+		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
 	}
 
 	// Setup ready to read out data from the buffer
@@ -231,7 +235,7 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	// Exception if not all the data was consumed
 	if(dataLeftOver)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_BadCommandRecieved)
+		THROW_EXCEPTION(ConnectionException, Protocol_BadCommandRecieved)
 	}
 
 	return obj;
@@ -240,7 +244,7 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::Send()
+//		Name:    Protocol::SendInternal()
 //		Purpose: Send an object to the other side of the connection.
 //		Created: 2003/08/19
 //
@@ -292,8 +296,8 @@ void Protocol::SendInternal(const Message &rObject)
 	pobjHeader->mObjType = htonl(rObject.GetType());
 
 	// Write data
-	mrStream.Write(mpBuffer, writtenSize);
-	mrStream.WriteAllBuffered();
+	mapConn->Write(mpBuffer, writtenSize, GetTimeout());
+	mapConn->WriteAllBuffered();
 }
 
 // --------------------------------------------------------------------------
@@ -346,7 +350,7 @@ void Protocol::EnsureBufferAllocated(int Size)
 #define READ_CHECK_BYTES_AVAILABLE(bytesRequired)								\
 	if((mReadOffset + (int)(bytesRequired)) > mValidDataSize)					\
 	{																			\
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_BadCommandRecieved)	\
+		THROW_EXCEPTION(ConnectionException, Protocol_BadCommandRecieved)	\
 	}
 
 // --------------------------------------------------------------------------
@@ -619,7 +623,7 @@ void Protocol::Write(const std::string &rValue)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::ReceieveStream()
+//		Name:    Protocol::ReceiveStream()
 //		Purpose: Receive a stream from the remote side
 //		Created: 2003/08/26
 //
@@ -633,7 +637,7 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 	// Hope it's not an object
 	if(ntohl(objHeader.mObjType) != SPECIAL_STREAM_OBJECT_TYPE)
 	{
-		THROW_EXCEPTION(ConnectionException, Conn_Protocol_ObjWhenStreamExpected)
+		THROW_EXCEPTION(ConnectionException, Protocol_ObjWhenStreamExpected)
 	}
 	
 	// Get the stream size
@@ -647,13 +651,13 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 	{
 		BOX_TRACE("Receiving stream, size uncertain");
 		return std::auto_ptr<IOStream>(
-			new ProtocolUncertainStream(mrStream));
+			new ProtocolUncertainStream(*mapConn));
 	}
 	else
 	{
 		BOX_TRACE("Receiving stream, size " << streamSize << " bytes");
 		return std::auto_ptr<IOStream>(
-			new PartialReadStream(mrStream, streamSize));
+			new PartialReadStream(*mapConn, streamSize));
 	}
 }
 
@@ -709,7 +713,7 @@ void Protocol::SendStream(IOStream &rStream)
 	objHeader.mObjType = htonl(SPECIAL_STREAM_OBJECT_TYPE);
 
 	// Write header
-	mrStream.Write(&objHeader, sizeof(objHeader));
+	mapConn->Write(&objHeader, sizeof(objHeader), GetTimeout());
 	// Could be sent in one of two ways
 	if(uncertainSize)
 	{
@@ -744,7 +748,7 @@ void Protocol::SendStream(IOStream &rStream)
 			// Send final byte to finish the stream
 			BOX_TRACE("Sending end of stream byte");
 			uint8_t endOfStream = ProtocolStreamHeader_EndOfStream;
-			mrStream.Write(&endOfStream, 1);
+			mapConn->Write(&endOfStream, 1, GetTimeout());
 			BOX_TRACE("Sent end of stream byte");
 		}
 		catch(...)
@@ -759,13 +763,14 @@ void Protocol::SendStream(IOStream &rStream)
 	else
 	{
 		// Fixed size stream, send it all in one go
-		if(!rStream.CopyStreamTo(mrStream, mTimeout, 4096 /* slightly larger buffer */))
+		if(!rStream.CopyStreamTo(*mapConn, GetTimeout(),
+			4096 /* slightly larger buffer */))
 		{
-			THROW_EXCEPTION(ConnectionException, Conn_Protocol_TimeOutWhenSendingStream)
+			THROW_EXCEPTION(ConnectionException, Protocol_TimeOutWhenSendingStream)
 		}
 	}
 	// Make sure everything is written
-	mrStream.WriteAllBuffered();
+	mapConn->WriteAllBuffered();
 	
 }
 
@@ -816,7 +821,7 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 	Block[-1] = header;
 	
 	// Write everything out
-	mrStream.Write(Block - 1, writeSize + 1);
+	mapConn->Write(Block - 1, writeSize + 1, GetTimeout());
 	
 	BOX_TRACE("Sent " << (writeSize+1) << " bytes to stream");
 	// move the remainer to the beginning of the block for the next time round
@@ -1177,6 +1182,12 @@ const uint16_t Protocol::sProtocolStreamHeaderLengths[256] =
 	0		// 255 = special (reserved)
 };
 
+int64_t Protocol::GetBytesRead() const
+{
+	return mapConn->GetBytesRead();
+}
 
-
-
+int64_t Protocol::GetBytesWritten() const
+{
+	return mapConn->GetBytesWritten();
+}

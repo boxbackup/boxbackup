@@ -273,21 +273,21 @@ int test(int argc, const char *argv[])
 	{
 		Timers::Cleanup();
 
-		TEST_THAT(memleakfinder_numleaks() == 0);
+		TEST_EQUAL(0, memleakfinder_numleaks());
 		void *block = ::malloc(12);
-		TEST_THAT(memleakfinder_numleaks() == 1);
+		TEST_EQUAL(1, memleakfinder_numleaks());
 		void *b2 = ::realloc(block, 128*1024);
-		TEST_THAT(memleakfinder_numleaks() == 1);
+		TEST_EQUAL(1, memleakfinder_numleaks());
 		::free(b2);
-		TEST_THAT(memleakfinder_numleaks() == 0);
+		TEST_EQUAL(0, memleakfinder_numleaks());
 		char *test = new char[1024];
-		TEST_THAT(memleakfinder_numleaks() == 1);
+		TEST_EQUAL(1, memleakfinder_numleaks());
 		MemBlockStream *s = new MemBlockStream(test,12);
-		TEST_THAT(memleakfinder_numleaks() == 2);
+		TEST_EQUAL(3, memleakfinder_numleaks());
 		delete s;
-		TEST_THAT(memleakfinder_numleaks() == 1);
+		TEST_EQUAL(1, memleakfinder_numleaks());
 		delete [] test;
-		TEST_THAT(memleakfinder_numleaks() == 0);
+		TEST_EQUAL(0, memleakfinder_numleaks());
 
 		Timers::Init();
 	}

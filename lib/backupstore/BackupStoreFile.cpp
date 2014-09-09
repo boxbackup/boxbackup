@@ -73,21 +73,22 @@ BackupStoreFileStats BackupStoreFile::msStats = {0,0,0};
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreFile::EncodeFile(
-	const char *Filename, int64_t ContainerID,
+std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFile(
+	const std::string& Filename, int64_t ContainerID,
 	const BackupStoreFilename &rStoreFilename,
 	int64_t *pModificationTime,
 	ReadLoggingStream::Logger* pLogger,
-	RunStatusProvider* pRunStatusProvider)
+	RunStatusProvider* pRunStatusProvider,
+	BackgroundTask* pBackgroundTask)
 {
 	// Create the stream
-	std::auto_ptr<IOStream> stream(new BackupStoreFileEncodeStream);
+	std::auto_ptr<BackupStoreFileEncodeStream> stream(
+		new BackupStoreFileEncodeStream);
 
 	// Do the initial setup
-	((BackupStoreFileEncodeStream*)stream.get())->Setup(Filename,
-		0 /* no recipe, just encode */,
-		ContainerID, rStoreFilename, pModificationTime, pLogger,
-		pRunStatusProvider);
+	stream->Setup(Filename, 0 /* no recipe, just encode */, ContainerID,
+		rStoreFilename, pModificationTime, pLogger, pRunStatusProvider,
+		pBackgroundTask);
 	
 	// Return the stream for the caller
 	return stream;
@@ -432,7 +433,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
 	}
 
-	bool inFileOrder = true;	
+	bool inFileOrder = true;
 	switch(ntohl(magic))
 	{
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
@@ -837,7 +838,8 @@ bool BackupStoreFile::DecodedStream::IsSymLink()
 //		Created: 9/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::DecodedStream::Write(const void *pBuffer, int NBytes)
+void BackupStoreFile::DecodedStream::Write(const void *pBuffer, int NBytes,
+	int Timeout)
 {
 	THROW_EXCEPTION(BackupStoreException, CantWriteToDecodedFileStream)
 }
@@ -1557,3 +1559,42 @@ DiffTimer::DiffTimer()
 DiffTimer::~DiffTimer()
 {	
 }
+
+// Shortcut interface
+int64_t BackupStoreFile::QueryStoreFileDiff(BackupProtocolCallable& protocol,
+	const std::string& LocalFilename, int64_t DirectoryObjectID,
+	int64_t DiffFromFileID, int64_t AttributesHash,
+	const BackupStoreFilenameClear& StoreFilename, int Timeout,
+	DiffTimer *pDiffTimer, ReadLoggingStream::Logger* pLogger,
+	RunStatusProvider* pRunStatusProvider)
+{
+	int64_t ModificationTime;
+	std::auto_ptr<BackupStoreFileEncodeStream> pStream;
+
+	if(DiffFromFileID)
+	{
+		// Fetch the block index for this one
+		std::auto_ptr<BackupProtocolSuccess> getblockindex =
+			protocol.QueryGetBlockIndexByName(DirectoryObjectID,
+				StoreFilename);
+		ASSERT(getblockindex->GetObjectID() == DiffFromFileID);
+		std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
+		
+		pStream = EncodeFileDiff(LocalFilename,
+			DirectoryObjectID, StoreFilename, DiffFromFileID,
+			*(blockIndexStream.get()), Timeout, pDiffTimer,
+			&ModificationTime, NULL // pIsCompletelyDifferent
+			);
+	}
+	else
+	{
+		pStream = BackupStoreFile::EncodeFile(LocalFilename,
+			DirectoryObjectID, StoreFilename);
+	}
+
+	std::auto_ptr<IOStream> upload(pStream.release());
+	return protocol.QueryStoreFile(DirectoryObjectID,
+		ModificationTime, AttributesHash, DiffFromFileID,
+		StoreFilename, upload)->GetObjectID();
+}
+

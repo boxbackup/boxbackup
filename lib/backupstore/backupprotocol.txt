@@ -7,6 +7,7 @@ IdentString			Box-Backup:v=C
 ServerContextClass	BackupStoreContext	BackupStoreContext.h
 
 AddType		Filename	BackupStoreFilenameClear	BackupStoreFilenameClear.h
+AddType		String		std::string
 
 ImplementLog	Server	syslog
 ImplementLog	Client	syslog
@@ -76,8 +77,7 @@ SetClientStoreMarker	6	Command(Success)
 
 GetObject	10	Command(Success)
 	int64		ObjectID
-	CONSTANT	NoObject	0
-	# reply has stream following, if ObjectID != NoObject
+	# reply has stream following (if successful)
 
 
 MoveObject	11	Command(Success)
@@ -119,6 +119,14 @@ ObjectName		13	Reply
 CreateDirectory	20	Command(Success)	StreamWithCommand
 	int64		ContainingDirectoryID
 	int64		AttributesModTime
+	Filename	DirectoryName
+	# stream following containing attributes
+
+
+CreateDirectory2	46	Command(Success)	StreamWithCommand
+	int64		ContainingDirectoryID
+	int64		AttributesModTime
+	int64		ModificationTime
 	Filename	DirectoryName
 	# stream following containing attributes
 
@@ -233,6 +241,29 @@ GetIsAlive	42	Command(IsAlive)
 IsAlive	43	Reply
 	# no data members
 
+GetAccountUsage2	44	Command(AccountUsage2)
+	# no data members
+
+AccountUsage2	45	Reply
+	String	AccountName
+	bool	AccountEnabled
+	int64	ClientStoreMarker
+	int32	BlockSize
+	int64	LastObjectIDUsed
+	int64	BlocksUsed
+	int64	BlocksInCurrentFiles
+	int64	BlocksInOldFiles
+	int64	BlocksInDeletedFiles
+	int64	BlocksInDirectories
+	int64	BlocksSoftLimit
+	int64	BlocksHardLimit
+	int64	NumCurrentFiles
+	int64	NumOldFiles
+	int64	NumDeletedFiles
+	int64	NumDirectories
+
+# 46 is CreateDirectory2, above
+
 # Creates a new reference to an existing object ID, with a new name, in the
 # specified directory (by object ID). The object pointed to by this new
 # reference will then have at least two references, and therefore be immutable.
@@ -249,7 +280,7 @@ IsAlive	43	Reply
 # references, but will presumably have one when inserted into the relevant
 # container, and will thus be modifiable.
 
-AddReference	44	Command(Success)
+AddReference	47	Command(Success)
 	int64		ObjectToCloneID
 	int64		OldDirectoryID
 	int64		NewDirectoryID
@@ -264,7 +295,6 @@ AddReference	44	Command(Success)
 #
 # The containing directory must already be mutable.
 
-CopyDirectory	45	Command(Success)
+CopyDirectory	48	Command(Success)
 	int64		DirToCopyID
 	int64		ContainingDirID
-

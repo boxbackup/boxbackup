@@ -45,7 +45,7 @@
 std::vector<std::string> Complete ## name( \
 	BackupQueries::ParsedCommand& rCommand, \
 	const std::string& prefix, \
-	BackupProtocolClient& rProtocol, const Configuration& rConfig, \
+	BackupProtocolCallable& rProtocol, const Configuration& rConfig, \
 	BackupQueries& rQueries) \
 { \
 	std::vector<std::string> completions; \
@@ -170,7 +170,7 @@ int16_t GetExcludeFlags(BackupQueries::ParsedCommand& rCommand)
 
 std::vector<std::string> CompleteRemoteFileOrDirectory(
 	BackupQueries::ParsedCommand& rCommand,
-	const std::string& prefix, BackupProtocolClient& rProtocol,
+	const std::string& prefix, BackupProtocolCallable& rProtocol,
 	BackupQueries& rQueries, int16_t includeFlags)
 {
 	std::vector<std::string> completions;
@@ -428,7 +428,7 @@ QueryCommandSpecification commands[] =
 {
 	{ "quit",	"",		Command_Quit, 	{} },
 	{ "exit",	"",		Command_Quit,	{} },
-	{ "list",	"rodIFtTash",	Command_List,	{CompleteRemoteDir} },
+	{ "list",	"adDFhiIorRsStTU",	Command_List,	{CompleteRemoteDir} },
 	{ "pwd",	"",		Command_pwd,	{} },
 	{ "cd",		"od",		Command_cd,	{CompleteRemoteDir} },
 	{ "lcd",	"",		Command_lcd,	{CompleteLocalDir} },
@@ -510,8 +510,10 @@ BackupQueries::ParsedCommand::ParsedCommand(const std::string& Command,
 		{
 			inQuoted = true;
 		}
-		// Start of options?
-		else if(currentArg.empty() && *c == '-')
+		// Start of options? You can't have options if there's no
+		// command before them, so treat the options as a command (which
+		// doesn't exist, so it will fail to parse) in that case.
+		else if(currentArg.empty() && *c == '-' && !mCmdElements.empty())
 		{
 			mInOptions = true;
 		}

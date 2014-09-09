@@ -61,6 +61,7 @@
 #include "BackupClientFileAttributes.h"
 #include "BackupClientInodeToIDMap.h"
 #include "BackupClientMakeExcludeList.h"
+#include "BackupConstants.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
 #include "BackupStoreConstants.h"
@@ -474,25 +475,23 @@ void BackupDaemon::Run()
 	}
 	catch(...)
 	{
-		if(mapCommandSocketInfo.get())
+		try 
 		{
-			try 
-			{
-				mapCommandSocketInfo.reset();
-			}
-			catch(std::exception &e)
-			{
-				BOX_WARNING("Internal error while "
-					"closing command socket after "
-					"another exception: " << e.what());
-			}
-			catch(...)
-			{
-				BOX_WARNING("Error closing command socket "
-					"after exception, ignored.");
-			}
+			mapCommandSocketInfo.reset();
+		}
+		catch(std::exception &e)
+		{
+			BOX_WARNING("Internal error while closing command "
+				"socket after another exception, ignored: " <<
+				e.what());
+		}
+		catch(...)
+		{
+			BOX_WARNING("Error closing command socket after "
+				"exception, ignored.");
 		}
 
+		mapCommandSocketPollTimer.reset();
 		Timers::Cleanup();
 		
 		throw;
@@ -500,6 +499,7 @@ void BackupDaemon::Run()
 
 	// Clean up
 	mapCommandSocketInfo.reset();
+	mapCommandSocketPollTimer.reset();
 	Timers::Cleanup();
 }
 
@@ -544,10 +544,10 @@ void BackupDaemon::Run2()
 	// When the last sync started (only updated if the store was not full when the sync ended)
 	mLastSyncTime = 0;
 
- 	// --------------------------------------------------------------------------------------------
+	// --------------------------------------------------------------------------------------------
  
- 	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo(
-		mLastSyncTime, mNextSyncTime);
+	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo(mLastSyncTime,
+		mNextSyncTime);
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -565,111 +565,140 @@ void BackupDaemon::Run2()
 		bool doSync = false;
 		bool mDoSyncForcedByCommand = false;
 
+		// Check whether we should be stopping, and if so,
+		// don't hang around waiting on the command socket.
+		if(StopRun())
+		{
+			BOX_INFO("Skipping command socket polling "
+				"due to shutdown request");
+			break;
+		}
+
 		// Is a delay necessary?
-		box_time_t currentTime;
+		box_time_t currentTime = GetCurrentBoxTime();
+		box_time_t requiredDelay = (mNextSyncTime < currentTime)
+				? (0) : (mNextSyncTime - currentTime);
+		mNextSyncTime = currentTime + requiredDelay;
 
-		do
+		if (mDoSyncForcedByPreviousSyncError)
 		{
-			// Check whether we should be stopping,
-			// and don't run a sync if so.
-			if(StopRun()) break;
-			
-			currentTime = GetCurrentBoxTime();
-
-			// Pause a while, but no more than 
-			// MAX_SLEEP_TIME seconds (use the conditional
-			// because times are unsigned)
-			box_time_t requiredDelay = 
-				(mNextSyncTime < currentTime)
-				? (0)
-				: (mNextSyncTime - currentTime);
-
-			// If there isn't automatic backup happening, 
-			// set a long delay. And limit delays at the 
-			// same time.
-			if(!automaticBackup && !mDoSyncForcedByPreviousSyncError)
-			{
-				requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
-			}
-			else if(requiredDelay > SecondsToBoxTime(MAX_SLEEP_TIME))
-			{
-				requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
-			}
-
-			// Only delay if necessary
-			if(requiredDelay > 0)
-			{
-				// Sleep somehow. There are choices 
-				// on how this should be done,
-				// depending on the state of the 
-				// control connection
-				if(mapCommandSocketInfo.get() != 0)
-				{
-					// A command socket exists, 
-					// so sleep by waiting on it
-					WaitOnCommandSocket(requiredDelay,
-						doSync, mDoSyncForcedByCommand);
-				}
-				else
-				{
-					// No command socket or 
-					// connection, just do a 
-					// normal sleep
-					time_t sleepSeconds = 
-						BoxTimeToSeconds(requiredDelay);
-					::sleep((sleepSeconds <= 0)
-						? 1 : sleepSeconds);
-				}
-			}
-			
-			if ((automaticBackup || mDoSyncForcedByPreviousSyncError)
-				&& currentTime >= mNextSyncTime)
-			{
-				doSync = true;
-			}
+			BOX_INFO("Last backup was not successful, "
+				"next one starting at " <<
+				FormatTime(mNextSyncTime, false));
 		}
-		while(!doSync && !StopRun());
-
-		// Time of sync start, and if it's time for another sync 
-		// (and we're doing automatic syncs), set the flag
-		mCurrentSyncStartTime = GetCurrentBoxTime();
-		if((automaticBackup || mDoSyncForcedByPreviousSyncError) &&
-			mCurrentSyncStartTime >= mNextSyncTime)
+		else if (automaticBackup)
 		{
-			doSync = true;
+			BOX_INFO("Automatic backups are enabled, "
+				"next one starting at " <<
+				FormatTime(mNextSyncTime, false));
 		}
-		
+		else
+		{
+			BOX_INFO("No automatic backups, waiting for "
+				"bbackupctl snapshot command");
+			requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
+		}
+
+		if(requiredDelay > SecondsToBoxTime(MAX_SLEEP_TIME))
+		{
+			requiredDelay = SecondsToBoxTime(MAX_SLEEP_TIME);
+		}
+
+		// Only delay if necessary
+		if(requiredDelay == 0)
+		{
+			// No sleep necessary, so don't listen on the command
+			// socket at all right now.
+		}
+		else if(mapCommandSocketInfo.get() != 0)
+		{
+			// A command socket exists, so sleep by waiting for a
+			// connection or command on it.
+			WaitOnCommandSocket(requiredDelay, doSync,
+				mDoSyncForcedByCommand);
+		}
+		else
+		{
+			// No command socket or connection, just do a normal
+			// sleep.
+			time_t sleepSeconds = 
+				BoxTimeToSeconds(requiredDelay);
+			::sleep((sleepSeconds <= 0)
+				? 1 : sleepSeconds);
+		}
+
+		if(StopRun())
+		{
+			BOX_INFO("Stopping idle loop due to shutdown request");
+			break;
+		}
+		else if(doSync)
+		{
+			BOX_INFO("Starting a backup immediately due to "
+				"bbackupctl sync command");
+		}
+		else if(currentTime < mNextSyncTime)
+		{
+			BOX_TRACE("Sleeping again because next sync time "
+				"has not arrived");
+			continue;
+		}
+		else if(mDoSyncForcedByPreviousSyncError)
+		{
+			BOX_INFO("Last backup was not successful, next one "
+				"starting now");
+		}
+		else if(automaticBackup)
+		{
+			BOX_INFO("Automatic backups are enabled, next one "
+				"starting now");
+		}
+		else
+		{
+			BOX_TRACE("Sleeping again because automatic backups "
+				"are not enabled");
+			continue;
+		}
+
+		// If we pass this point, or exit the loop, we should have
+		// logged something at INFO level or higher to explain why.
+
 		// Use a script to see if sync is allowed now?
-		if(!mDoSyncForcedByCommand && doSync && !StopRun())
+		if(mDoSyncForcedByCommand)
+		{
+			BOX_INFO("Skipping SyncAllowScript due to bbackupctl "
+				"force-sync command");
+		}
+		else
 		{
 			int d = UseScriptToSeeIfSyncAllowed();
 			if(d > 0)
 			{
 				// Script has asked for a delay
-				mNextSyncTime = GetCurrentBoxTime() + 
+				mNextSyncTime = GetCurrentBoxTime() +
 					SecondsToBoxTime(d);
-				doSync = false;
+				BOX_INFO("Impending backup stopped by "
+					"SyncAllowScript, next attempt "
+					"scheduled for " <<
+					FormatTime(mNextSyncTime, false));
+				continue;
 			}
 		}
 
-		// Ready to sync? (but only if we're not supposed 
-		// to be stopping)
-		if(doSync && !StopRun())
-		{
-			RunSyncNowWithExceptionHandling();
-		}
+		mCurrentSyncStartTime = GetCurrentBoxTime();
+		RunSyncNowWithExceptionHandling();
 		
 		// Set state
 		SetState(storageLimitExceeded?State_StorageLimitExceeded:State_Idle);
-
-	} while(!StopRun());
+	}
+	while(!StopRun());
 	
 	// Make sure we have a clean start next time round (if restart)
 	DeleteAllLocations();
 	DeleteAllIDMaps();
 }
 
-void BackupDaemon::RunSyncNowWithExceptionHandling()
+std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling()
 {
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
@@ -703,13 +732,13 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 
 	// do not retry immediately without a good reason
 	mDoSyncForcedByPreviousSyncError = false;
-	
+
+	// Is it a berkely db failure?
+	bool isBerkelyDbFailure = false;
+
 	// Notify system administrator about the final state of the backup
 	if(errorOccurred)
 	{
-		// Is it a berkely db failure?
-		bool isBerkelyDbFailure = false;
-
 		if (errorCode == BackupStoreException::ExceptionType
 			&& errorSubCode == BackupStoreException::BerkelyDBFailure)
 		{
@@ -731,7 +760,7 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 				<< "/" << errorSubCode 
 				<< ") due to signal");
 			OnBackupFinish();
-			return;
+			return mapClientContext; // releases mapClientContext
 		}
 
 		NotifySysadmin(SysadminNotifier::BackupError);
@@ -755,9 +784,9 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 				" " << errorCode << "/" << errorSubCode <<
 				"), reset state and waiting to retry...");
 			::sleep(10);
-			mNextSyncTime = mCurrentSyncStartTime + 
-				SecondsToBoxTime(100) +
-				Random::RandomInt(mUpdateStoreInterval >> 
+			mNextSyncTime = GetCurrentBoxTime() +
+				SecondsToBoxTime(BACKUP_ERROR_RETRY_SECONDS) +
+				Random::RandomInt(mUpdateStoreInterval >>
 					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 		}
 	}
@@ -780,9 +809,10 @@ void BackupDaemon::RunSyncNowWithExceptionHandling()
 	
 	// If we were retrying after an error, and this backup succeeded,
 	// then now would be a good time to stop :-)
-	mDoSyncForcedByPreviousSyncError = errorOccurred;
+	mDoSyncForcedByPreviousSyncError = errorOccurred && !isBerkelyDbFailure;
 
 	OnBackupFinish();
+	return mapClientContext; // releases mapClientContext
 }
 
 void BackupDaemon::ResetCachedState()
@@ -795,13 +825,38 @@ void BackupDaemon::ResetCachedState()
 	DeleteAllIDMaps();
 }
 
-void BackupDaemon::RunSyncNow()
+std::auto_ptr<BackupClientContext> BackupDaemon::GetNewContext
+(
+	LocationResolver &rResolver,
+	TLSContext &rTLSContext,
+	const std::string &rHostname,
+	int32_t Port,
+	uint32_t AccountNumber,
+	bool ExtendedLogging,
+	bool ExtendedLogToFile,
+	std::string ExtendedLogFile,
+	ProgressNotifier &rProgressNotifier,
+	bool TcpNiceMode
+)
 {
+	std::auto_ptr<BackupClientContext> context(new BackupClientContext(
+		rResolver, rTLSContext, rHostname, Port, AccountNumber,
+		ExtendedLogging, ExtendedLogToFile, ExtendedLogFile,
+		rProgressNotifier, TcpNiceMode));
+	return context;
+}
+
+// Returns the BackupClientContext so that tests can use it to hold the
+// connection open and prevent housekeeping from running. Otherwise don't use
+// it, let it be destroyed and close the connection.
+std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
+{
+	Timers::AssertInitialised();
+
 	// Delete the serialised store object file,
 	// so that we don't try to reload it after a
 	// partially completed backup
-	if(mDeleteStoreObjectInfoFile && 
-		!DeleteStoreObjectInfo())
+	if(mDeleteStoreObjectInfoFile && !DeleteStoreObjectInfo())
 	{
 		BOX_ERROR("Failed to delete the StoreObjectInfoFile, "
 			"backup cannot continue safely.");
@@ -835,21 +890,20 @@ void BackupDaemon::RunSyncNow()
 	{
 		extendedLogFile = conf.GetKeyValue("ExtendedLogFile");
 	}
-	
+
 	if (conf.KeyExists("LogAllFileAccess"))
 	{
 		mLogAllFileAccess = conf.GetKeyValueBool("LogAllFileAccess");
 	}
-	
-	// Then create a client context object (don't 
+
+	// Then create a client context object (don't
 	// just connect, as this may be unnecessary)
-	BackupClientContext clientContext
-	(
-		*mpLocationResolver, 
-		mTlsContext, 
+	mapClientContext = GetNewContext(
+		*mpLocationResolver,
+		mTlsContext,
 		conf.GetKeyValue("StoreHostname"),
 		conf.GetKeyValueInt("StorePort"),
-		conf.GetKeyValueUint32("AccountNumber"), 
+		conf.GetKeyValueUint32("AccountNumber"),
 		conf.GetKeyValueBool("ExtendedLogging"),
 		conf.KeyExists("ExtendedLogFile"),
 		extendedLogFile,
@@ -859,7 +913,7 @@ void BackupDaemon::RunSyncNow()
 
 	clientContext.mExperimentalSnapshotMode =
 		conf.GetKeyValueBool("ExperimentalSnapshotMode");
-		
+
 	// The minimum age a file needs to be before it will be
 	// considered for uploading
 	box_time_t minimumFileAge = SecondsToBoxTime(
@@ -891,38 +945,37 @@ void BackupDaemon::RunSyncNow()
 		// than minimumFileAge after the last sync. Deal with it by
 		// moving back syncPeriodStart, which should not do any
 		// damage.
-		syncPeriodStart = syncPeriodEnd -
-			SecondsToBoxTime(1);
+		syncPeriodStart = syncPeriodEnd - SecondsToBoxTime(1);
 	}
 
 	if(syncPeriodStart >= syncPeriodEnd)
 	{
-		BOX_ERROR("Invalid (negative) sync period: "
-			"perhaps your clock is going "
-			"backwards (" << syncPeriodStart <<
-			" to " << syncPeriodEnd << ")");
-		THROW_EXCEPTION(ClientException,
-			ClockWentBackwards);
+		BOX_ERROR("Invalid (negative) sync period: perhaps your clock "
+			"is going backwards? (" << syncPeriodStart << " to " <<
+			syncPeriodEnd << ")");
+		THROW_EXCEPTION(ClientException, ClockWentBackwards);
 	}
 
 	// Check logic
 	ASSERT(syncPeriodEnd > syncPeriodStart);
 	// Paranoid check on sync times
-	if(syncPeriodStart >= syncPeriodEnd) return;
+	if(syncPeriodStart >= syncPeriodEnd)
+	{
+		return mapClientContext; // releases mapClientContext
+	}
 	
-	// Adjust syncPeriodEnd to emulate snapshot 
-	// behaviour properly
+	// Adjust syncPeriodEnd to emulate snapshot behaviour properly
 	box_time_t syncPeriodEndExtended = syncPeriodEnd;
 
 	// Using zero min file age?
 	if(minimumFileAge == 0)
 	{
 		// Add a year on to the end of the end time,
-		// to make sure we sync files which are 
+		// to make sure we sync files which are
 		// modified after the scan run started.
-		// Of course, they may be eligible to be 
+		// Of course, they may be eligible to be
 		// synced again the next time round,
-		// but this should be OK, because the changes 
+		// but this should be OK, because the changes
 		// only upload should upload no data.
 		syncPeriodEndExtended += SecondsToBoxTime(
 			(time_t)(356*24*3600));
@@ -930,16 +983,16 @@ void BackupDaemon::RunSyncNow()
 
 	// Set up the sync parameters
 	BackupClientDirectoryRecord::SyncParams params(*mpRunStatusProvider,
-		*mpSysadminNotifier, *mpProgressNotifier, clientContext);
+		*mpSysadminNotifier, *mpProgressNotifier, *mapClientContext, this);
 	params.mSyncPeriodStart = syncPeriodStart;
 	params.mSyncPeriodEnd = syncPeriodEndExtended;
 	// use potentially extended end time
 	params.mMaxUploadWait = maxUploadWait;
-	params.mFileTrackingSizeThreshold = 
+	params.mFileTrackingSizeThreshold =
 		conf.GetKeyValueInt("FileTrackingSizeThreshold");
-	params.mDiffingUploadSizeThreshold = 
+	params.mDiffingUploadSizeThreshold =
 		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
-	params.mMaxFileTimeInFuture = 
+	params.mMaxFileTimeInFuture =
 		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
 	mNumFilesUploaded = 0;
 	mNumDirsCreated = 0;
@@ -973,32 +1026,31 @@ void BackupDaemon::RunSyncNow()
 		keepAliveTime = conf.GetKeyValueInt("KeepAliveTime");
 	}
 
-	clientContext.SetMaximumDiffingTime(maximumDiffingTime);
-	clientContext.SetKeepAliveTime(keepAliveTime);
-	
+	mapClientContext->SetMaximumDiffingTime(maximumDiffingTime);
+	mapClientContext->SetKeepAliveTime(keepAliveTime);
+
 	// Set store marker
-	clientContext.SetClientStoreMarker(mClientStoreMarker);
-	
-	// Set up the locations, if necessary -- 
-	// need to do it here so we have a 
-	// (potential) connection to use
+	mapClientContext->SetClientStoreMarker(mClientStoreMarker);
+
+	// Set up the locations, if necessary -- need to do it here so we have
+	// a (potential) connection to use.
 	{
 		const Configuration &locations(
 			conf.GetSubConfiguration(
 				"BackupLocations"));
-		
+
 		// Make sure all the directory records
 		// are set up
-		SetupLocations(clientContext, locations);
+		SetupLocations(*mapClientContext, locations);
 	}
-	
-	mpProgressNotifier->NotifyIDMapsSetup(clientContext);
-	
+
+	mpProgressNotifier->NotifyIDMapsSetup(*mapClientContext);
+
 	// Get some ID maps going
 	SetupIDMapsForSync();
 
 	// Delete any unused directories?
-	DeleteUnusedRootDirEntries(clientContext);
+	DeleteUnusedRootDirEntries(*mapClientContext);
 
 #ifdef ENABLE_VSS
 	CreateVssBackupComponents();
@@ -1011,14 +1063,14 @@ void BackupDaemon::RunSyncNow()
 	{
 		// Set current and new ID map pointers
 		// in the context
-		clientContext.SetIDMaps(mCurrentIDMaps[(*i)->mIDMapIndex],
+		mapClientContext->SetIDMaps(mCurrentIDMaps[(*i)->mIDMapIndex],
 			mNewIDMaps[(*i)->mIDMapIndex]);
 	
 		// Set exclude lists (context doesn't
 		// take ownership)
-		clientContext.SetExcludeLists(
-			(*i)->mpExcludeFiles,
-			(*i)->mpExcludeDirs);
+		mapClientContext->SetExcludeLists(
+			(*i)->mapExcludeFiles.get(),
+			(*i)->mapExcludeDirs.get());
 
 		// Sync the directory
 		std::string locationPath = (*i)->mPath;
@@ -1029,14 +1081,12 @@ void BackupDaemon::RunSyncNow()
 		}
 #endif
 
-		(*i)->mpDirectoryRecord->SyncDirectory(params,
+		(*i)->mapDirectoryRecord->SyncDirectory(params,
 			BackupProtocolListDirectory::RootDirectory,
 			locationPath, std::string("/") + (*i)->mName, **i);
 
 		// Unset exclude lists (just in case)
-		clientContext.SetExcludeLists(0, 0);
-
-		
+		mapClientContext->SetExcludeLists(0, 0);
 	}
 
 	if (clientContext.mExperimentalSnapshotMode)
@@ -1077,18 +1127,15 @@ void BackupDaemon::RunSyncNow()
 	// Perform any deletions required -- these are
 	// delayed until the end to allow renaming to 
 	// happen neatly.
-	clientContext.PerformDeletions();
-
-	// Close any open connection
-	clientContext.CloseAnyOpenConnection();
+	mapClientContext->PerformDeletions();
 
 #ifdef ENABLE_VSS
 	CleanupVssBackupComponents();
 #endif
 
 	// Get the new store marker
-	mClientStoreMarker = clientContext.GetClientStoreMarker();
-	mStorageLimitExceeded = clientContext.StorageLimitExceeded();
+	mClientStoreMarker = mapClientContext->GetClientStoreMarker();
+	mStorageLimitExceeded = mapClientContext->StorageLimitExceeded();
 	mReadErrorsOnFilesystemObjects |=
 		params.mReadErrorsOnFilesystemObjects;
 
@@ -1105,8 +1152,8 @@ void BackupDaemon::RunSyncNow()
 	CommitIDMapsAfterSync();
 
 	// Calculate when the next sync run should be
-	mNextSyncTime = mCurrentSyncStartTime + 
-		mUpdateStoreInterval + 
+	mNextSyncTime = mCurrentSyncStartTime +
+		mUpdateStoreInterval +
 		Random::RandomInt(mUpdateStoreInterval >>
 		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 
@@ -1116,11 +1163,12 @@ void BackupDaemon::RunSyncNow()
 	// info. If we save successfully, we must 
 	// delete the file next time we start a backup
 
-	mDeleteStoreObjectInfoFile = 
-		SerializeStoreObjectInfo(mLastSyncTime,
-			mNextSyncTime);
+	mDeleteStoreObjectInfoFile =
+		SerializeStoreObjectInfo(mLastSyncTime, mNextSyncTime);
 
 	// --------------------------------------------------------------------------------------------
+
+	return mapClientContext; // releases mapClientContext
 }
 
 #ifdef ENABLE_VSS
@@ -1693,6 +1741,10 @@ void BackupDaemon::OnBackupStart()
 	// Notify administrator
 	NotifySysadmin(SysadminNotifier::BackupStart);
 
+	// Setup timer for polling the command socket
+	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
+		"CommandSocketPollTimer"));
+
 	// Set state and log start
 	SetState(State_Connected);
 	BOX_NOTICE("Beginning scan of local files");
@@ -1720,6 +1772,10 @@ void BackupDaemon::OnBackupFinish()
 
 		// Notify administrator
 		NotifySysadmin(SysadminNotifier::BackupFinish);
+
+		// Stop the timer for polling the command socket,
+		// to prevent needless alarms while sleeping.
+		mapCommandSocketPollTimer.reset();
 
 		// Tell anything connected to the command socket
 		SendSyncStartOrFinish(false /* finish */);
@@ -1815,7 +1871,8 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 
 	if(delay == "")
 	{
-		BOX_ERROR("SyncAllowScript output an empty line");
+		BOX_ERROR("SyncAllowScript output an empty line, sleeping for "
+			<< waitInSeconds << " seconds (" << script << ")");
 		return waitInSeconds;
 	}
 
@@ -1826,7 +1883,7 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 		waitInSeconds = -1;
 
 		BOX_NOTICE("SyncAllowScript requested a backup now "
-			<< "(" << script << ")");
+			"(" << script << ")");
 	}
 	else
 	{
@@ -1843,9 +1900,8 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 			throw;
 		}
 
-		BOX_NOTICE("SyncAllowScript requested a delay of " << 
-			waitInSeconds << " seconds due to SyncAllowScript "
-			<< "(" << script << ")");
+		BOX_NOTICE("SyncAllowScript requested a delay of " <<
+			waitInSeconds << " seconds (" << script << ")");
 	}
 
 	if(iss.eof())
@@ -1886,6 +1942,56 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    BackupDaemon::RunBackgroundTask()
+//		Purpose: Checks for connections or commands on the command
+//			 socket and handles them with minimal delay. Polled
+//			 during lengthy operations such as file uploads.
+//		Created: 07/04/14
+//
+// --------------------------------------------------------------------------
+bool BackupDaemon::RunBackgroundTask(State state, uint64_t progress,
+	uint64_t maximum)
+{
+	BOX_TRACE("BackupDaemon::RunBackgroundTask: state = " << state <<
+		", progress = " << progress << "/" << maximum);
+
+	if(!mapCommandSocketPollTimer.get())
+	{
+		return true; // no background task
+	}
+
+	if(mapCommandSocketPollTimer->HasExpired())
+	{
+		mapCommandSocketPollTimer->Reset(COMMAND_SOCKET_POLL_INTERVAL);
+	}
+	else
+	{
+		// Do no more work right now
+		return true;
+	}
+
+	if(mapCommandSocketInfo.get())
+	{
+		BOX_TRACE("BackupDaemon::RunBackgroundTask: polling command socket");
+
+		bool sync_flag_out, sync_is_forced_out;
+
+		WaitOnCommandSocket(0, // RequiredDelay
+			sync_flag_out, sync_is_forced_out);
+
+		if(sync_flag_out)
+		{
+			BOX_WARNING("Ignoring request to sync while "
+				"already syncing.");
+		}
+	}
+
+	return true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupDaemon::WaitOnCommandSocket(box_time_t, bool &, bool &)
 //		Purpose: Waits on a the command socket for a time of UP TO the required time
 //				 but may be much less, and handles a command if necessary.
@@ -1894,6 +2000,9 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 // --------------------------------------------------------------------------
 void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFlagOut, bool &SyncIsForcedOut)
 {
+	DoSyncFlagOut = false;
+	SyncIsForcedOut = false;
+
 	ASSERT(mapCommandSocketInfo.get());
 	if(!mapCommandSocketInfo.get())
 	{
@@ -2372,15 +2481,15 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				// Setup names in the location record
 				pLoc->mName = *pLocName;
 				pLoc->mPath = rConfig.GetKeyValue("Path");
-				
-				// Read the exclude lists from the Configuration
-				pLoc->mpExcludeFiles = BackupClientMakeExcludeList_Files(rConfig);
-				pLoc->mpExcludeDirs = BackupClientMakeExcludeList_Dirs(rConfig);
 			}
+
+			// Read the exclude lists from the Configuration
+			pLoc->mapExcludeFiles.reset(BackupClientMakeExcludeList_Files(rConfig));
+			pLoc->mapExcludeDirs.reset(BackupClientMakeExcludeList_Dirs(rConfig));
 
 			// Does this exist on the server?
 			// Remove from dir object early, so that if we fail
-			// to stat the local directory, we still don't 
+			// to stat the local directory, we still don't
 			// consider to remote one for deletion.
 			BackupStoreDirectory::Iterator iter(dir);
 			BackupStoreFilenameClear dirname(pLoc->mName);	// generate the filename
@@ -2501,10 +2610,11 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				// Execute create directory command
 				try
 				{
-					MemBlockStream attrStream(attr);
+					std::auto_ptr<IOStream> attrStream(
+						new MemBlockStream(attr));
 					std::auto_ptr<BackupProtocolSuccess>
 						dirCreate(connection.QueryCreateDirectory(
-						BackupProtocolListDirectory::RootDirectory,
+						BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
 						attrModTime, dirname, attrStream));
 						
 					// Object ID for later creation
@@ -2523,11 +2633,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 
 			// Create and store the directory object for the root of this location
 			ASSERT(oid != 0);
-			if(pLoc->mpDirectoryRecord.get() == NULL)
+			if(pLoc->mapDirectoryRecord.get() == NULL)
 			{
-				BackupClientDirectoryRecord *precord =
-					new BackupClientDirectoryRecord(oid, *pLocName);
-				pLoc->mpDirectoryRecord.reset(precord);
+				pLoc->mapDirectoryRecord.reset(
+					new BackupClientDirectoryRecord(oid, *pLocName));
 			}
 			
 			// Remove it from the temporary list to avoid deletion
@@ -3286,10 +3395,12 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 	//
 	if(!GetConfiguration().KeyExists("StoreObjectInfoFile"))
 	{
+		BOX_NOTICE("Store object info file is not enabled. Will "
+			"download directory listings from store.");
 		return false;
 	}
 
-	std::string StoreObjectInfoFile = 
+	std::string StoreObjectInfoFile =
 		GetConfiguration().GetKeyValue("StoreObjectInfoFile");
 
 	if(StoreObjectInfoFile.size() <= 0)
@@ -3297,150 +3408,161 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 		return false;
 	}
 
-	try
+	int64_t fileSize;
+	if (!FileExists(StoreObjectInfoFile, &fileSize) || fileSize == 0)
 	{
-		FileStream aFile(StoreObjectInfoFile.c_str(), O_RDONLY);
-		Archive anArchive(aFile, 0);
-
-		//
-		// see if the content looks like a valid serialised archive
-		//
-		int iMagicValue = 0;
-		anArchive.Read(iMagicValue);
-
-		if(iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
+		BOX_NOTICE(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+			"Store object info file does not exist or is empty"));
+	}
+	else
+	{
+		try
 		{
-			BOX_WARNING("Store object info file "
-				"is not a valid or compatible serialised "
-				"archive. Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
+			FileStream aFile(StoreObjectInfoFile, O_RDONLY);
+			Archive anArchive(aFile, 0);
 
-		//
-		// get a bit optimistic and read in a string identifier
-		//
-		std::string strMagicValue;
-		anArchive.Read(strMagicValue);
+			//
+			// see if the content looks like a valid serialised archive
+			//
+			int iMagicValue = 0;
+			anArchive.Read(iMagicValue);
 
-		if(strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
-		{
-			BOX_WARNING("Store object info file "
-				"is not a valid or compatible serialised "
-				"archive. Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
-
-		//
-		// check if we are loading some future format
-		// version by mistake
-		//
-		int iVersion = 0;
-		anArchive.Read(iVersion);
-
-		if(iVersion != STOREOBJECTINFO_VERSION)
-		{
-			BOX_WARNING("Store object info file "
-				"version " << iVersion << " unsupported. "
-				"Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
-
-		//
-		// check if this state file is even valid 
-		// for the loaded bbackupd.conf file
-		//
-		box_time_t lastKnownConfigModTime;
-		anArchive.Read(lastKnownConfigModTime);
-
-		if(lastKnownConfigModTime != GetLoadedConfigModifiedTime())
-		{
-			BOX_WARNING("Store object info file "
-				"out of date. Will re-cache from store. "
-				"(" << StoreObjectInfoFile << ")");
-			return false;
-		}
-
-		//
-		// this is it, go at it
-		//
-		anArchive.Read(mClientStoreMarker);
-		anArchive.Read(theLastSyncTime);
-		anArchive.Read(theNextSyncTime);
-
-		//
-		//
-		//
-		int64_t iCount = 0;
-		anArchive.Read(iCount);
-
-		for(int v = 0; v < iCount; v++)
-		{
-			Location* pLocation = new Location;
-			if(!pLocation)
+			if(iMagicValue != STOREOBJECTINFO_MAGIC_ID_VALUE)
 			{
-				throw std::bad_alloc();
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file is not a valid "
+					"or compatible serialised archive"));
+				return false;
 			}
 
-			pLocation->Deserialize(anArchive);
-			mLocations.push_back(pLocation);
-		}
+			//
+			// get a bit optimistic and read in a string identifier
+			//
+			std::string strMagicValue;
+			anArchive.Read(strMagicValue);
 
-		//
-		//
-		//
-		iCount = 0;
-		anArchive.Read(iCount);
+			if(strMagicValue != STOREOBJECTINFO_MAGIC_ID_STRING)
+			{
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file is not a valid "
+					"or compatible serialised archive"));
+				return false;
+			}
 
-		for(int v = 0; v < iCount; v++)
+			//
+			// check if we are loading some future format
+			// version by mistake
+			//
+			int iVersion = 0;
+			anArchive.Read(iVersion);
+
+			if(iVersion != STOREOBJECTINFO_VERSION)
+			{
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file version " <<
+					iVersion << " is not supported"));
+				return false;
+			}
+
+			//
+			// check if this state file is even valid 
+			// for the loaded bbackupd.conf file
+			//
+			box_time_t lastKnownConfigModTime;
+			anArchive.Read(lastKnownConfigModTime);
+
+			if(lastKnownConfigModTime != GetLoadedConfigModifiedTime())
+			{
+				BOX_WARNING(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+					"Store object info file is older than "
+					"configuration file"));
+				return false;
+			}
+
+			//
+			// this is it, go at it
+			//
+			anArchive.Read(mClientStoreMarker);
+			anArchive.Read(theLastSyncTime);
+			anArchive.Read(theNextSyncTime);
+
+			//
+			//
+			//
+			int64_t iCount = 0;
+			anArchive.Read(iCount);
+
+			for(int v = 0; v < iCount; v++)
+			{
+				Location* pLocation = new Location;
+				if(!pLocation)
+				{
+					throw std::bad_alloc();
+				}
+
+				pLocation->Deserialize(anArchive);
+				mLocations.push_back(pLocation);
+			}
+
+			//
+			//
+			//
+			iCount = 0;
+			anArchive.Read(iCount);
+
+			for(int v = 0; v < iCount; v++)
+			{
+				std::string strItem;
+				anArchive.Read(strItem);
+
+				mIDMapMounts.push_back(strItem);
+			}
+
+			//
+			//
+			//
+			iCount = 0;
+			anArchive.Read(iCount);
+
+			for(int v = 0; v < iCount; v++)
+			{
+				int64_t anId;
+				anArchive.Read(anId);
+
+				std::string aName;
+				anArchive.Read(aName);
+
+				mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+			}
+
+			if (iCount > 0)
+				anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
+
+			//
+			//
+			//
+			aFile.Close();
+
+			BOX_INFO(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+				"Loaded store object info file version " << iVersion));
+			return true;
+		} 
+		catch(std::exception &e)
 		{
-			std::string strItem;
-			anArchive.Read(strItem);
-
-			mIDMapMounts.push_back(strItem);
+			BOX_ERROR(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+				"Internal error reading store object info "
+				"file: " << e.what()));
 		}
-
-		//
-		//
-		//
-		iCount = 0;
-		anArchive.Read(iCount);
-
-		for(int v = 0; v < iCount; v++)
+		catch(...)
 		{
-			int64_t anId;
-			anArchive.Read(anId);
-
-			std::string aName;
-			anArchive.Read(aName);
-
-			mUnusedRootDirEntries.push_back(std::pair<int64_t, std::string>(anId, aName));
+			BOX_ERROR(BOX_FILE_MESSAGE(StoreObjectInfoFile,
+				"Internal error reading store object info "
+				"file: unknown error"));
 		}
-
-		if (iCount > 0)
-			anArchive.Read(mDeleteUnusedRootDirEntriesAfter);
-
-		//
-		//
-		//
-		aFile.Close();
-		BOX_INFO("Loaded store object info file version " << iVersion
-			<< " (" << StoreObjectInfoFile << ")");
-		
-		return true;
-	} 
-	catch(std::exception &e)
-	{
-		BOX_ERROR("Internal error reading store object info file: "
-			<< StoreObjectInfoFile << ": " << e.what());
 	}
-	catch(...)
-	{
-		BOX_ERROR("Internal error reading store object info file: "
-			<< StoreObjectInfoFile << ": unknown error");
-	}
+
+	BOX_NOTICE("No usable cache, will download directory listings from "
+		"server.");
 
 	DeleteAllLocations();
 
@@ -3448,10 +3570,6 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 	theLastSyncTime = 0;
 	theNextSyncTime = 0;
 
-	BOX_WARNING("Store object info file is missing, not accessible, "
-		"or inconsistent. Will re-cache from store. "
-		"(" << StoreObjectInfoFile << ")");
-	
 	return false;
 }
 

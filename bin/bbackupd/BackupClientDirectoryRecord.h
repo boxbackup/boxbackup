@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 
+#include "BackgroundTask.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupDaemonInterface.h"
 #include "BackupStoreDirectory.h"
@@ -76,7 +77,8 @@ public:
 			RunStatusProvider &rRunStatusProvider, 
 			SysadminNotifier &rSysadminNotifier,
 			ProgressNotifier &rProgressNotifier,
-			BackupClientContext &rContext);
+			BackupClientContext &rContext,
+			BackgroundTask *pBackgroundTask);
 		~SyncParams();
 	private:
 		// No copying
@@ -91,6 +93,7 @@ public:
 		box_time_t mMaxFileTimeInFuture;
 		int32_t mFileTrackingSizeThreshold;
 		int32_t mDiffingUploadSizeThreshold;
+		BackgroundTask *mpBackgroundTask;
 		RunStatusProvider &mrRunStatusProvider;
 		SysadminNotifier &mrSysadminNotifier;
 		ProgressNotifier &mrProgressNotifier;
@@ -145,21 +148,31 @@ public:
 
 private:
 	void DeleteSubDirectories();
-	BackupStoreDirectory *FetchDirectoryListing(SyncParams &rParams);
+	std::auto_ptr<BackupStoreDirectory> FetchDirectoryListing(SyncParams &rParams);
 	void UpdateAttributes(SyncParams &rParams,
 		BackupStoreDirectory *pDirOnStore,
 		const std::string &rLocalPath);
-	bool UpdateItems(SyncParams &rParams, const std::string &rLocalPath,
+protected: // to allow tests to hook in before UpdateItems() runs
+	virtual bool UpdateItems(SyncParams &rParams,
+		const std::string &rLocalPath,
 		const std::string &rRemotePath,
 		const Location& rBackupLocation,
 		BackupStoreDirectory *pDirOnStore,
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 		std::vector<std::string> &rFiles,
 		const std::vector<std::string> &rDirs);
+private:
+	int64_t CreateRemoteDir(const std::string& localDirPath,
+		const std::string& nonVssDirPath,
+		const std::string& remoteDirPath,
+		BackupStoreFilenameClear& storeFilename,
+		bool* pHaveJustCreatedDirOnServer,
+		BackupClientDirectoryRecord::SyncParams &rParams);
 	int64_t UploadFile(SyncParams &rParams,
 		const std::string &rFilename,
 		const std::string &rNonVssFilePath,
-		const BackupStoreFilename &rStoreFilename,
+		const std::string &rRemotePath,
+		const BackupStoreFilenameClear &rStoreFilename,
 		int64_t FileSize, box_time_t ModificationTime,
 		box_time_t AttributesHash, bool NoPreviousVersionOnServer);
 	void SetErrorWhenReadingFilesystemObject(SyncParams &rParams,
@@ -204,10 +217,10 @@ private:
 public:
 	std::string mName;
 	std::string mPath;
-	std::auto_ptr<BackupClientDirectoryRecord> mpDirectoryRecord;
+	std::auto_ptr<BackupClientDirectoryRecord> mapDirectoryRecord;
+	std::auto_ptr<ExcludeList> mapExcludeFiles;
+	std::auto_ptr<ExcludeList> mapExcludeDirs;
 	int mIDMapIndex;
-	ExcludeList *mpExcludeFiles;
-	ExcludeList *mpExcludeDirs;
 
 #ifdef ENABLE_VSS
 	bool mIsSnapshotCreated;

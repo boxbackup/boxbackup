@@ -133,11 +133,11 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	if(OBJECTMAGIC_DIR_MAGIC_VALUE != ntohl(hdr.mMagicValue))
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadDirectoryFormat,
-			"Wrong magic number in directory object " << 
-			BOX_FORMAT_OBJECTID(mObjectID) << ": expected " <<
+			"Wrong magic number for directory: expected " <<
 			BOX_FORMAT_HEX32(OBJECTMAGIC_DIR_MAGIC_VALUE) <<
 			" but found " <<
-			BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)));
+			BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)) << " in " <<
+			rStream.ToString());
 	}
 	
 	// Get data
@@ -480,7 +480,8 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 {
 	// Grab the raw bytes from the stream which compose the header
 	en_StreamFormat entry;
-	if(!rStream.ReadFullBuffer(&entry, sizeof(entry), 0 /* not interested in bytes read if this fails */, Timeout))
+	if(!rStream.ReadFullBuffer(&entry, sizeof(entry),
+		0 /* not interested in bytes read if this fails */, Timeout))
 	{
 		THROW_EXCEPTION(BackupStoreException, CouldntReadEntireStructureFromStream)
 	}

@@ -10,6 +10,9 @@
 #ifndef SOCKETSTREAM__H
 #define SOCKETSTREAM__H
 
+#include <climits>
+
+#include "BoxTime.h"
 #include "IOStream.h"
 #include "Socket.h"
 
@@ -41,7 +44,8 @@ public:
 	void Attach(int socket);
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual void Close();
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
@@ -53,6 +57,38 @@ public:
 protected:
 	void MarkAsReadClosed() {mReadClosed = true;}
 	void MarkAsWriteClosed() {mWriteClosed = true;}
+	void CheckForMissingTimeout(int Timeout);
+
+	int PollTimeout(int timeout, box_time_t start_time)
+	{
+		if (timeout == IOStream::TimeOutInfinite)
+		{
+			return INFTIM;
+		}
+
+		if (start_time == 0)
+		{
+			return timeout; // no adjustment possible
+		}
+
+		box_time_t end_time = start_time + MilliSecondsToBoxTime(timeout);
+		box_time_t now = GetCurrentBoxTime();
+		box_time_t remaining = end_time - now;
+
+		if (remaining < 0)
+		{
+			return 0; // no delay
+		}
+		else if (BoxTimeToMilliSeconds(remaining) > INT_MAX)
+		{
+			return INT_MAX;
+		}
+		else
+		{
+			return (int) BoxTimeToMilliSeconds(remaining);
+		}
+	}
+	bool Poll(short Events, int Timeout);
 
 private:
 	tOSSocketHandle mSocketHandle;

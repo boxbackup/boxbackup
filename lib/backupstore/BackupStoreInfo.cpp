@@ -45,7 +45,7 @@ BackupStoreInfo::BackupStoreInfo()
 	  mBlocksInOldFiles(0),
 	  mBlocksInDeletedFiles(0),
 	  mBlocksInDirectories(0),
-	  mNumFiles(0),
+	  mNumCurrentFiles(0),
 	  mNumOldFiles(0),
 	  mNumDeletedFiles(0),
 	  mNumDirectories(0),
@@ -146,8 +146,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 	info->mDiscSet = DiscSet;
 	info->mFilename = fn;
 	info->mReadOnly = ReadOnly;
-	
-	int64_t numDelObj;
+	int64_t numDelObj = 0;
 
 	if (v1)
 	{
@@ -206,11 +205,11 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
 		archive.Read(info->mBlocksInDirectories);
 		archive.Read(info->mBlocksSoftLimit);
 		archive.Read(info->mBlocksHardLimit);
-	  	archive.Read(info->mNumFiles);
-	  	archive.Read(info->mNumOldFiles);
-	  	archive.Read(info->mNumDeletedFiles);
-	  	archive.Read(info->mNumDirectories);
-	  	archive.Read(numDelObj);
+		archive.Read(info->mNumCurrentFiles);
+		archive.Read(info->mNumOldFiles);
+		archive.Read(info->mNumDeletedFiles);
+		archive.Read(info->mNumDirectories);
+		archive.Read(numDelObj);
 	}
 
 	// Then load the list of deleted directories
@@ -363,7 +362,7 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 	archive.Write(mBlocksInDirectories);
 	archive.Write(mBlocksSoftLimit);
 	archive.Write(mBlocksHardLimit);
-	archive.Write(mNumFiles);
+	archive.Write(mNumCurrentFiles);
 	archive.Write(mNumOldFiles);
 	archive.Write(mNumDeletedFiles);
 	archive.Write(mNumDirectories);
@@ -419,7 +418,7 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	#define COMPARE(attribute) \
 	if (rOldInfo.Get ## attribute () != Get ## attribute ()) \
 	{ \
-		BOX_WARNING(#attribute " changed from " << \
+		BOX_ERROR(#attribute " changed from " << \
 			rOldInfo.Get ## attribute () << " to " << \
 			Get ## attribute ()); \
 		numChanges++; \
@@ -427,7 +426,6 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 
 	COMPARE(AccountID);
 	COMPARE(AccountName);
-	COMPARE(LastObjectIDUsed);
 	COMPARE(BlocksUsed);
 	COMPARE(BlocksInCurrentFiles);
 	COMPARE(BlocksInOldFiles);
@@ -435,32 +433,47 @@ int BackupStoreInfo::ReportChangesTo(BackupStoreInfo& rOldInfo)
 	COMPARE(BlocksInDirectories);
 	COMPARE(BlocksSoftLimit);
 	COMPARE(BlocksHardLimit);
-	COMPARE(NumFiles);
+	COMPARE(NumCurrentFiles);
 	COMPARE(NumOldFiles);
 	COMPARE(NumDeletedFiles);
 	COMPARE(NumDirectories);
 
 	#undef COMPARE
 
+	if (rOldInfo.GetLastObjectIDUsed() != GetLastObjectIDUsed())
+	{
+		BOX_NOTICE("LastObjectIDUsed changed from " <<
+			rOldInfo.GetLastObjectIDUsed() << " to " <<
+			GetLastObjectIDUsed());
+		// Not important enough to be an error
+		// numChanges++;
+	}
+
 	return numChanges;
 }
 
-#define APPLY_DELTA(field, delta) \
-	if(mReadOnly) \
-	{ \
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly) \
-	} \
-	\
-	if((field + delta) < 0) \
-	{ \
-		THROW_EXCEPTION_MESSAGE(BackupStoreException, \
-			StoreInfoBlockDeltaMakesValueNegative, \
-			"Failed to reduce " << #field << " from " << \
-			field << " by " << delta); \
-	} \
-	\
-	field += delta; \
+void BackupStoreInfo::ApplyDelta(int64_t& field, const std::string& field_name,
+	const int64_t delta)
+{
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly);
+	}
+
+	if((field + delta) < 0)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			StoreInfoBlockDeltaMakesValueNegative,
+			"Failed to reduce " << field_name << " from " <<
+			field << " by " << delta);
+	}
+
+	field += delta;
 	mIsModified = true;
+}
+
+#define APPLY_DELTA(field, delta) \
+	ApplyDelta(field, #field, delta)
 
 // --------------------------------------------------------------------------
 //
@@ -528,9 +541,9 @@ void BackupStoreInfo::ChangeBlocksInDirectories(int64_t Delta)
 	APPLY_DELTA(mBlocksInDirectories, Delta);
 }
 
-void BackupStoreInfo::AdjustNumFiles(int64_t increase)
+void BackupStoreInfo::AdjustNumCurrentFiles(int64_t increase)
 {
-	APPLY_DELTA(mNumFiles, increase);
+	APPLY_DELTA(mNumCurrentFiles, increase);
 }
 
 void BackupStoreInfo::AdjustNumOldFiles(int64_t increase)

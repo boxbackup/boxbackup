@@ -83,68 +83,56 @@ void SplitString(const std::string &String, char SplitOn, std::vector<std::strin
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
 static std::string demangle(const std::string& mangled_name)
 {
+	std::string demangled_name = mangled_name;
+
 	#ifdef HAVE_CXXABI_H
+	char buffer[1024];
 	int status;
+	size_t length = sizeof(buffer);
 	
-#include "MemLeakFindOff.h"
 	char* result = abi::__cxa_demangle(mangled_name.c_str(),
-		NULL, NULL, &status);
-#include "MemLeakFindOn.h"
+		buffer, &length, &status);
 
-	if (result == NULL)
+	if (status == 0)
 	{
-		if (status == 0)
-		{
-			BOX_WARNING("Demangle failed but no error: " <<
-				mangled_name);
-		}
-		else if (status == -1)
-		{
-			BOX_WARNING("Demangle failed with "
-				"memory allocation error: " <<
-				mangled_name);
-		}
-		else if (status == -2)
-		{
-			// Probably non-C++ name, don't demangle
-			/*
-			BOX_WARNING("Demangle failed with "
-				"with invalid name: " <<
-				mangled_name);
-			*/
-		}
-		else if (status == -3)
-		{
-			BOX_WARNING("Demangle failed with "
-				"with invalid argument: " <<
-				mangled_name);
-		}
-		else
-		{
-			BOX_WARNING("Demangle failed with "
-				"with unknown error " << status <<
-				": " << mangled_name);
-		}
-
-		return std::string(mangled_name);
+		demangled_name = result;
+	}
+	else if (status == -1)
+	{
+		BOX_WARNING("Demangle failed with "
+			"memory allocation error: " <<
+			mangled_name);
+	}
+	else if (status == -2)
+	{
+		// Probably non-C++ name, don't demangle
+		/*
+		BOX_WARNING("Demangle failed with "
+			"with invalid name: " <<
+			mangled_name);
+		*/
+	}
+	else if (status == -3)
+	{
+		BOX_WARNING("Demangle failed with "
+			"with invalid argument: " <<
+			mangled_name);
 	}
 	else
 	{
-		std::string output = result;
-#include "MemLeakFindOff.h"
-		std::free(result);
-#include "MemLeakFindOn.h"
-		return output;
+		BOX_WARNING("Demangle failed with "
+			"with unknown error " << status <<
+			": " << mangled_name);
 	}
-	#else // !HAVE_CXXABI_H
-	return mangled_name;
 	#endif // HAVE_CXXABI_H
+
+	return demangled_name;
 }
 
 void DumpStackBacktrace()
 {
-	void  *array[10];
-	size_t size = backtrace(array, 10);
+	void  *array[20];
+	size_t size = backtrace(array, 20);
 	BOX_TRACE("Obtained " << size << " stack frames.");
 
 	for(size_t i = 0; i < size; i++)

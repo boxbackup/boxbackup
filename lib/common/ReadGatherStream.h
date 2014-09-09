@@ -37,7 +37,8 @@ public:
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	virtual pos_type GetPosition() const;

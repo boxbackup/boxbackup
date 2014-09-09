@@ -19,18 +19,21 @@
 #include "BoxException.h"
 #include "Logging.h"
 
-#define MAINHELPER_START									\
-	if(argc == 2 && ::strcmp(argv[1], "--version") == 0)	\
-	{ printf(BOX_VERSION "\n"); return 0; }					\
+#define MAINHELPER_START \
+	if(argc == 2 && ::strcmp(argv[1], "--version") == 0) \
+	{ printf(BOX_VERSION "\n"); return 0; } \
 	MEMLEAKFINDER_INIT \
-	MEMLEAKFINDER_START										\
+	MEMLEAKFINDER_START \
 	try {
 
-#define MAINHELPER_END																\
-	} catch(std::exception &e) {													\
+#define MAINHELPER_END \
+	} catch(BoxException &e) { \
+		BOX_FATAL(e.what() << ": " << e.GetMessage()); \
+		return 1; \
+	} catch(std::exception &e) { \
 		BOX_FATAL(e.what()); \
-		return 1;																		\
-	} catch(...) {																	\
+		return 1; \
+	} catch(...) { \
 		BOX_FATAL("UNKNOWN"); \
 		return 1; \
 	}

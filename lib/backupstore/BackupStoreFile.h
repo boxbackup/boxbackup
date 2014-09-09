@@ -14,6 +14,7 @@
 #include <memory>
 #include <cstdlib>
 
+#include "autogen_BackupProtocol.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreFilename.h"
 #include "IOStream.h"
@@ -26,6 +27,7 @@ typedef struct
 	int64_t mTotalFileStreamSize;
 } BackupStoreFileStats;
 
+class BackgroundTask;
 class RunStatusProvider;
 
 // Uncomment to disable backwards compatibility
@@ -39,6 +41,8 @@ class RunStatusProvider;
 
 // Have some memory allocation commands, note closing "Off" at end of file.
 #include "MemLeakFindOn.h"
+
+class BackupStoreFileEncodeStream;
 
 // --------------------------------------------------------------------------
 //
@@ -81,9 +85,10 @@ public:
 	public:
 		~DecodedStream();
 
-		// Stream functions		
+		// Stream functions
 		virtual int Read(void *pBuffer, int NBytes, int Timeout);
-		virtual void Write(const void *pBuffer, int NBytes);
+		virtual void Write(const void *pBuffer, int NBytes,
+			int Timeout = IOStream::TimeOutInfinite);
 		virtual bool StreamDataLeft();
 		virtual bool StreamClosed();
 		
@@ -119,24 +124,36 @@ public:
 
 
 	// Main interface
-	static std::auto_ptr<IOStream> EncodeFile
+	static std::auto_ptr<BackupStoreFileEncodeStream> EncodeFile
 	(
-		const char *Filename,
+		const std::string& Filename,
 		int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
 		int64_t *pModificationTime = 0,
 		ReadLoggingStream::Logger* pLogger = NULL,
-		RunStatusProvider* pRunStatusProvider = NULL
+		RunStatusProvider* pRunStatusProvider = NULL,
+		BackgroundTask* pBackgroundTask = NULL
 	);
-	static std::auto_ptr<IOStream> EncodeFileDiff
+	static std::auto_ptr<BackupStoreFileEncodeStream> EncodeFileDiff
 	(
-		const char *Filename, int64_t ContainerID,
+		const std::string& Filename, int64_t ContainerID,
 		const BackupStoreFilename &rStoreFilename, 
 		int64_t DiffFromObjectID, IOStream &rDiffFromBlockIndex,
 		int Timeout, 
 		DiffTimer *pDiffTimer,
 		int64_t *pModificationTime = 0, 
-		bool *pIsCompletelyDifferent = 0
+		bool *pIsCompletelyDifferent = 0,
+		BackgroundTask* pBackgroundTask = NULL
 	);
+	// Shortcut interface
+	static int64_t QueryStoreFileDiff(BackupProtocolCallable& protocol,
+		const std::string& LocalFilename, int64_t DirectoryObjectID,
+		int64_t DiffFromFileID, int64_t AttributesHash,
+		const BackupStoreFilenameClear& StoreFilename,
+		int Timeout = IOStream::TimeOutInfinite,
+		DiffTimer *pDiffTimer = NULL,
+		ReadLoggingStream::Logger* pLogger = NULL,
+		RunStatusProvider* pRunStatusProvider = NULL);
+
 	static bool VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFromObjectIDOut = 0, int64_t *pContainerIDOut = 0);
 	static void CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &rFrom, IOStream &rOut);
 	static void CombineDiffs(IOStream &rDiff1, IOStream &rDiff2, IOStream &rDiff2b, IOStream &rOut);

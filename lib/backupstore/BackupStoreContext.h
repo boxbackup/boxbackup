@@ -45,7 +45,8 @@ class HousekeepingInterface
 class BackupStoreContext
 {
 public:
-	BackupStoreContext(int32_t ClientID, HousekeepingInterface &rDaemon,
+	BackupStoreContext(int32_t ClientID,
+		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
 	~BackupStoreContext();
 private:
@@ -66,15 +67,37 @@ public:
 	};
 	
 	int GetPhase() const {return mProtocolPhase;}
+	std::string GetPhaseName() const
+	{
+		switch(mProtocolPhase)
+		{
+			case Phase_Version:  return "Phase_Version";
+			case Phase_Login:    return "Phase_Login";
+			case Phase_Commands: return "Phase_Commands";
+			default:
+				std::ostringstream oss;
+				oss << "Unknown phase " << mProtocolPhase;
+				return oss.str();
+		}
+	}
 	void SetPhase(int NewPhase) {mProtocolPhase = NewPhase;}
 	
 	// Read only locking
 	bool SessionIsReadOnly() {return mReadOnly;}
 	bool AttemptToGetWriteLock();
 
-	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mStoreRoot = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
+	// Not really an API, but useful for BackupProtocolLocal2.
+	void ReleaseWriteLock()
+	{
+		if(mWriteLock.GotLock())
+		{
+			mWriteLock.ReleaseLock();
+		}
+	}
+
+	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mAccountRootDir = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
 	bool GetClientHasAccount() const {return mClientHasAccount;}
-	const std::string &GetStoreRoot() const {return mStoreRoot;}
+	const std::string &GetAccountRoot() const {return mAccountRootDir;}
 	int GetStoreDiscSet() const {return mStoreDiscSet;}
 
 	// Store info
@@ -118,7 +141,12 @@ public:
 	
 	// Manipulating files/directories
 	int64_t AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime, int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename, bool MarkFileWithSameNameAsOldVersions);
-	int64_t AddDirectory(int64_t InDirectory, const BackupStoreFilename &rFilename, const StreamableMemBlock &Attributes, int64_t AttributesModTime, bool &rAlreadyExists);
+	int64_t AddDirectory(int64_t InDirectory,
+		const BackupStoreFilename &rFilename,
+		const StreamableMemBlock &Attributes,
+		int64_t AttributesModTime,
+		int64_t ModificationTime,
+		bool &rAlreadyExists);
 	void AddReference(int64_t ObjectID, int64_t OldDirectoryID,
 		int64_t NewDirectoryID, const BackupStoreFilename &rNewFilename);
 	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime);
@@ -146,18 +174,19 @@ public:
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID);
-	void SaveDirectory(BackupStoreDirectory &rDir, int64_t ObjectID);
+	void SaveDirectory(BackupStoreDirectory &rDir);
 	void RemoveDirectoryFromCache(int64_t ObjectID);
-	void DeleteDirectoryRecurse(int64_t ObjectID, int64_t &rBlocksDeletedOut, bool Undelete);
+	void ClearDirectoryCache();
+	void DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete);
 	int64_t AllocateObjectID();
 	void AssertMutable(int64_t ObjectID);
 
 	std::string mConnectionDetails;
 	int32_t mClientID;
-	HousekeepingInterface &mrDaemon;
+	HousekeepingInterface *mpHousekeeping;
 	int mProtocolPhase;
 	bool mClientHasAccount;
-	std::string mStoreRoot;	// has final directory separator
+	std::string mAccountRootDir;	// has final directory separator
 	int mStoreDiscSet;
 	bool mReadOnly;
 	NamedLock mWriteLock;

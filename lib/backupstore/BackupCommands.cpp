@@ -38,12 +38,17 @@
 #define CHECK_PHASE(phase) \
 	if(rContext.GetPhase() != BackupStoreContext::phase) \
 	{ \
+		BOX_ERROR("Received command " << ToString() << " " \
+			"in wrong protocol phase " << rContext.GetPhaseName() << ", " \
+			"expected in " #phase); \
 		return PROTOCOL_ERROR(Err_NotInRightProtocolPhase); \
 	}
 
 #define CHECK_WRITEABLE_SESSION \
 	if(rContext.SessionIsReadOnly()) \
 	{ \
+		BOX_ERROR("Received command " << ToString() << " " \
+			"in a read-only session"); \
 		return PROTOCOL_ERROR(Err_SessionReadOnly); \
 	}
 
@@ -159,6 +164,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
+	// can be called in any phase
+
 	BOX_NOTICE("Session finished for Client ID " << 
 		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
 		"(name=" << rContext.GetAccountName() << ")");
@@ -166,7 +173,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 	// Let the context know about it
 	rContext.ReceivedFinishCommand();
 
-	// can be called in any phase
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolFinished);
 }
 
@@ -207,7 +213,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 	stream->SetForReading();
 	
 	// Get the protocol to send the stream
-	rProtocol.SendStreamAfterCommand(stream.release());
+	rProtocol.SendStreamAfterCommand(static_cast< std::auto_ptr<IOStream> > (stream));
 
 	return std::auto_ptr<BackupProtocolMessage>(
 		new BackupProtocolSuccess(mObjectID));
@@ -221,7 +227,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
@@ -243,14 +251,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupPr
 		}
 	}
 	
-	// A stream follows, which contains the file
-	std::auto_ptr<IOStream> dirstream(rProtocol.ReceiveStream());
-	
 	// Ask the context to store it
 	int64_t id = 0;
 	try
 	{
-		id = rContext.AddFile(*dirstream, mDirectoryObjectID,
+		id = rContext.AddFile(rDataStream, mDirectoryObjectID,
 			mModificationTime, mAttributesHash, mDiffFromFileID,
 			mFilename,
 			true /* mark files with same name as old versions */);
@@ -271,7 +276,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(BackupPr
 		}
 	}
 	
-	// Tell the caller what the file was
+	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));
 }
 
@@ -293,14 +298,14 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObject::DoCommand(BackupPr
 	// Check the object exists
 	if(!rContext.ObjectExists(mObjectID))
 	{
-		return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(NoObject));
+		return PROTOCOL_ERROR(Err_DoesNotExist);
 	}
 
 	// Open the object
 	std::auto_ptr<IOStream> object(rContext.OpenObject(mObjectID));
 
 	// Stream it to the peer
-	rProtocol.SendStreamAfterCommand(object.release());
+	rProtocol.SendStreamAfterCommand(object);
 
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -383,33 +388,17 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 			
 			// Choose a temporary filename for the result of the combination
 			std::ostringstream fs;
-			fs << rContext.GetStoreRoot() << ".recombinetemp." << p;
+			fs << rContext.GetAccountRoot() << ".recombinetemp." << p;
 			std::string tempFn = 
 				RaidFileController::DiscSetPathToFileSystemPath(
 					rContext.GetStoreDiscSet(), fs.str(),
 					p + 16);
 			
 			// Open the temporary file
-			std::auto_ptr<IOStream> combined;
-			try
-			{
-				{
-					// Write nastily to allow this to work with gcc 2.x
-					std::auto_ptr<IOStream> t(
-						new InvisibleTempFileStream(
-							tempFn.c_str(), 
-							O_RDWR | O_CREAT | 
-							O_EXCL | O_BINARY | 
-							O_TRUNC));
-					combined = t;
-				}
-			}
-			catch(...)
-			{
-				// Make sure it goes
-				::unlink(tempFn.c_str());
-				throw;
-			}
+			std::auto_ptr<IOStream> combined(
+				new InvisibleTempFileStream(
+					tempFn, O_RDWR | O_CREAT | O_EXCL |
+					O_BINARY | O_TRUNC));
 			
 			// Do the combining
 			BackupStoreFile::CombineFile(*diff, *diff2, *from, *combined);
@@ -463,11 +452,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 	}
 
 	// Stream the reordered stream to the peer
-	rProtocol.SendStreamAfterCommand(stream.get());
+	rProtocol.SendStreamAfterCommand(stream);
 	
-	// Don't delete the stream here
-	stream.release();
-
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
 }
@@ -481,17 +467,37 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
+{
+	return BackupProtocolCreateDirectory2(mContainingDirectoryID,
+		mAttributesModTime, 0 /* ModificationTime */,
+		mDirectoryName).DoCommand(rProtocol, rContext, rDataStream);
+}
+
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolCreateDirectory2::DoCommand(Protocol &, BackupStoreContext &)
+//		Purpose: Create directory command, with a specific
+//			 modification time.
+//		Created: 2014/02/11
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 	
-	// Get the stream containing the attributes
-	std::auto_ptr<IOStream> attrstream(rProtocol.ReceiveStream());
 	// Collect the attributes -- do this now so no matter what the outcome, 
 	// the data has been absorbed.
 	StreamableMemBlock attr;
-	attr.Set(*attrstream, rProtocol.GetTimeout());
+	attr.Set(rDataStream, rProtocol.GetTimeout());
 	
 	// Check to see if the hard limit has been exceeded
 	if(rContext.HardLimitExceeded())
@@ -501,8 +507,26 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(Ba
 	}
 
 	bool alreadyExists = false;
-	int64_t id = rContext.AddDirectory(mContainingDirectoryID, mDirectoryName, attr, mAttributesModTime, alreadyExists);
-	
+	int64_t id;
+
+	try
+	{
+		id = rContext.AddDirectory(mContainingDirectoryID,
+			mDirectoryName, attr, mAttributesModTime, mModificationTime,
+			alreadyExists);
+	}
+	catch(BackupStoreException &e)
+	{
+		if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
+		{
+			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
+		}
+		else
+		{
+			throw;
+		}
+	}
+
 	if(alreadyExists)
 	{
 		return PROTOCOL_ERROR(Err_DirectoryAlreadyExists);
@@ -522,17 +546,17 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory::DoCommand(Ba
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	// Get the stream containing the attributes
-	std::auto_ptr<IOStream> attrstream(rProtocol.ReceiveStream());
 	// Collect the attributes -- do this now so no matter what the outcome, 
 	// the data has been absorbed.
 	StreamableMemBlock attr;
-	attr.Set(*attrstream, rProtocol.GetTimeout());
+	attr.Set(rDataStream, rProtocol.GetTimeout());
 
 	// Get the context to do it's magic
 	rContext.ChangeDirAttributes(mObjectID, attr, mAttributesModTime);
@@ -550,17 +574,18 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoComman
 //		Created: 2003/09/06
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolSetReplacementFileAttributes::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage>
+BackupProtocolSetReplacementFileAttributes::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	// Get the stream containing the attributes
-	std::auto_ptr<IOStream> attrstream(rProtocol.ReceiveStream());
 	// Collect the attributes -- do this now so no matter what the outcome, 
 	// the data has been absorbed.
 	StreamableMemBlock attr;
-	attr.Set(*attrstream, rProtocol.GetTimeout());
+	attr.Set(rDataStream, rProtocol.GetTimeout());
 
 	// Get the context to do it's magic
 	int64_t objectID = 0;
@@ -844,7 +869,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(Back
 		// Get the stream ready to go
 		stream->SetForReading();	
 		// Tell the protocol to send the stream
-		rProtocol.SendStreamAfterCommand(stream.release());
+		rProtocol.SendStreamAfterCommand(static_cast< std::auto_ptr<IOStream> >(stream));
 	}
 
 	// Make reply
@@ -872,7 +897,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByID::DoCommand(
 	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
 	
 	// Return the stream to the client
-	rProtocol.SendStreamAfterCommand(stream.release());
+	rProtocol.SendStreamAfterCommand(stream);
 
 	// Return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -924,7 +949,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoComman
 	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
 	
 	// Return the stream to the client
-	rProtocol.SendStreamAfterCommand(stream.release());
+	rProtocol.SendStreamAfterCommand(stream);
 
 	// Return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));
@@ -995,7 +1020,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetIsAlive::DoCommand(BackupP
  * reference will then have at least two references, and therefore be immutable.
  * However these operations are still possible:
  *
- * * Rename and delete from one of its (2+) containers, if that container is not
+ * * Rename or delete from one of its (2+) containers, if that container is not
  * also immutable;
  *
  * * Modify by uploading a patch if it's a file, which creates a new object with
@@ -1035,7 +1060,9 @@ BackupProtocolAddReference::DoCommand(BackupProtocolReplyable &rProtocol,
  * so it's not a binary identical copy, but it is functionally identical.
  *
  * The containing directory must already be mutable, since the object ID will
- * change if a copy needs to be created.
+ * change if a copy needs to be created. The new object ID will be returned.
+ * If the directory did not need to be copied (only one reference), then the
+ * same object ID will be returned.
  */
 std::auto_ptr<BackupProtocolMessage>
 BackupProtocolCopyDirectory::DoCommand(BackupProtocolReplyable &rProtocol,
@@ -1047,3 +1074,47 @@ BackupProtocolCopyDirectory::DoCommand(BackupProtocolReplyable &rProtocol,
 	return std::auto_ptr<BackupProtocolMessage>(
 		new BackupProtocolSuccess(newObjectID));
 }
+=======
+//		Name:    BackupProtocolGetAccountUsage2::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Return the amount of disc space used
+//		Created: 26/12/13
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+
+	// Get store info from context
+	const BackupStoreInfo &info(rContext.GetBackupStoreInfo());
+	
+	// Find block size
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(info.GetDiscSetNumber()));
+	
+	// Return info
+	BackupProtocolAccountUsage2* usage = new BackupProtocolAccountUsage2();
+	std::auto_ptr<BackupProtocolMessage> reply(usage);
+	#define COPY(name) usage->Set ## name (info.Get ## name ())
+	COPY(AccountName);
+	usage->SetAccountEnabled(info.IsAccountEnabled());
+	COPY(ClientStoreMarker);
+	usage->SetBlockSize(rdiscSet.GetBlockSize());
+	COPY(LastObjectIDUsed);
+	COPY(BlocksUsed);
+	COPY(BlocksInCurrentFiles);
+	COPY(BlocksInOldFiles);
+	COPY(BlocksInDeletedFiles);
+	COPY(BlocksInDirectories);
+	COPY(BlocksSoftLimit);
+	COPY(BlocksHardLimit);
+	COPY(NumCurrentFiles);
+	COPY(NumOldFiles);
+	COPY(NumDeletedFiles);
+	COPY(NumDirectories);
+	#undef COPY
+
+	return reply;
+}
+
+>>>>>>> master

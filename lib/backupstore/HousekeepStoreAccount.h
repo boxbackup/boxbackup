@@ -14,6 +14,8 @@
 #include <set>
 #include <vector>
 
+#include "BackupStoreRefCountDatabase.h"
+
 class BackupStoreDirectory;
 
 class HousekeepingCallback
@@ -39,20 +41,25 @@ public:
 	~HousekeepStoreAccount();
 	
 	bool DoHousekeeping(bool KeepTryingForever = false);
-	int GetRefCountsAdjusted() { return mRefCountsAdjusted; }
+	int GetErrorCount() { return mErrorCount; }
 	
 private:
 	// utility functions
 	void MakeObjectFilename(int64_t ObjectID, std::string &rFilenameOut);
 
-	bool ScanDirectory(int64_t ObjectID);
-	bool DeleteFiles();
-	bool DeleteEmptyDirectories();
-	void DeleteEmptyDirectory(int64_t dirId,
-		std::vector<int64_t>& rToExamine);
-	void DeleteFile(int64_t InDirectory, int64_t ObjectID, BackupStoreDirectory &rDirectory, const std::string &rDirectoryFilename, int64_t OriginalDirSizeInBlocks);
+	bool ScanDirectory(int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
+	bool DeleteFiles(BackupStoreInfo& rBackupStoreInfo);
+	bool DeleteEmptyDirectories(BackupStoreInfo& rBackupStoreInfo);
+	void DeleteEmptyDirectory(int64_t dirId, std::vector<int64_t>& rToExamine,
+		BackupStoreInfo& rBackupStoreInfo);
+	BackupStoreRefCountDatabase::refcount_t DeleteFile(int64_t InDirectory,
+		int64_t ObjectID,
+		BackupStoreDirectory &rDirectory,
+		const std::string &rDirectoryFilename,
+		BackupStoreInfo& rBackupStoreInfo);
+	void UpdateDirectorySize(BackupStoreDirectory &rDirectory,
+		IOStream::pos_type new_size_in_blocks);
 
-private:
 	typedef struct
 	{
 		int64_t mObjectID;
@@ -81,6 +88,9 @@ private:
 	
 	// List of directories which are empty, and might be good for deleting
 	std::vector<int64_t> mEmptyDirectories;
+
+	// Count of errors found and fixed
+	int64_t mErrorCount;
 	
 	// The re-calculated blocks used stats
 	int64_t mBlocksUsed;
@@ -99,9 +109,7 @@ private:
 	int64_t mEmptyDirectoriesDeleted;
 
 	// New reference count list
-	std::vector<uint32_t> mNewRefCounts;
-	bool mSuppressRefCountChangeWarnings;
-	int mRefCountsAdjusted;
+	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
 	
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;

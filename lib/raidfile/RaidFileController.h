@@ -49,7 +49,7 @@ public:
 	int GetSetID() const {return mSetID;}
 	
 	int GetSetNumForWriteFiles(const std::string &rFilename) const;
-	
+	int GetSetNumForWriteFiles(const char* filename) const;
 	unsigned int GetBlockSize() const {return mBlockSize;}
 
 	// Is this disc set a non-RAID disc set? (ie files never get transformed to raid storage)

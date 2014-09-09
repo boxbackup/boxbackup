@@ -11,6 +11,7 @@
 
 #include <string.h>
 
+#include "BackgroundTask.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreException.h"
@@ -40,25 +41,28 @@ using namespace BackupStoreFileCryptVar;
 //
 // --------------------------------------------------------------------------
 BackupStoreFileEncodeStream::BackupStoreFileEncodeStream()
-	: mpRecipe(0),
-	  mpFile(0),
-	  mpLogging(0),
-	  mpRunStatusProvider(NULL),
-	  mStatus(Status_Header),
-	  mSendData(true),
-	  mTotalBlocks(0),
-	  mAbsoluteBlockNumber(-1),
-	  mInstructionNumber(-1),
-	  mNumBlocks(0),
-	  mCurrentBlock(-1),
-	  mCurrentBlockEncodedSize(0),
-	  mPositionInCurrentBlock(0),
-	  mBlockSize(BACKUP_FILE_MIN_BLOCK_SIZE),
-	  mLastBlockSize(0),
-	  mTotalBytesSent(0),
-	  mpRawBuffer(0),
-	  mAllocatedBufferSize(0),
-	  mEntryIVBase(0)
+: mpRecipe(0),
+  mpFile(0),
+  mpLogging(0),
+  mpRunStatusProvider(NULL),
+  mpBackgroundTask(NULL),
+  mStatus(Status_Header),
+  mSendData(true),
+  mTotalBlocks(0),
+  mBytesToUpload(0),
+  mBytesUploaded(0),
+  mAbsoluteBlockNumber(-1),
+  mInstructionNumber(-1),
+  mNumBlocks(0),
+  mCurrentBlock(-1),
+  mCurrentBlockEncodedSize(0),
+  mPositionInCurrentBlock(0),
+  mBlockSize(BACKUP_FILE_MIN_BLOCK_SIZE),
+  mLastBlockSize(0),
+  mTotalBytesSent(0),
+  mpRawBuffer(0),
+  mAllocatedBufferSize(0),
+  mEntryIVBase(0)
 {
 }
 
@@ -111,11 +115,12 @@ BackupStoreFileEncodeStream::~BackupStoreFileEncodeStream()
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFileEncodeStream::Setup(const char *Filename,
+void BackupStoreFileEncodeStream::Setup(const std::string& Filename,
 	BackupStoreFileEncodeStream::Recipe *pRecipe,
 	int64_t ContainerID, const BackupStoreFilename &rStoreFilename,
 	int64_t *pModificationTime, ReadLoggingStream::Logger* pLogger,
-	RunStatusProvider* pRunStatusProvider)
+	RunStatusProvider* pRunStatusProvider,
+	BackgroundTask* pBackgroundTask)
 {
 	// Pointer to a blank recipe which we might create
 	BackupStoreFileEncodeStream::Recipe *pblankRecipe = 0;
@@ -162,6 +167,7 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename,
 				CalculateBlockSizes((*pRecipe)[inst].mSpaceBefore, numBlocks, blockSize, lastBlockSize);
 				// Add to accumlated total
 				mTotalBlocks += numBlocks;
+				mBytesToUpload += (*pRecipe)[inst].mSpaceBefore;
 				// Update maximum clear size
 				if(blockSize > maxBlockClearSize) maxBlockClearSize = blockSize;
 				if(lastBlockSize > maxBlockClearSize) maxBlockClearSize = lastBlockSize;
@@ -278,6 +284,7 @@ void BackupStoreFileEncodeStream::Setup(const char *Filename,
 	}
 	
 	mpRunStatusProvider = pRunStatusProvider;
+	mpBackgroundTask = pBackgroundTask;
 }
 
 
@@ -339,6 +346,19 @@ int BackupStoreFileEncodeStream::Read(void *pBuffer, int NBytes, int Timeout)
 	if(mpRunStatusProvider && mpRunStatusProvider->StopRun())
 	{
 		THROW_EXCEPTION(BackupStoreException, SignalReceived);
+	}
+
+	if(mpBackgroundTask)
+	{
+		BackgroundTask::State state = (mpRecipe->at(0).mBlocks == 0)
+			? BackgroundTask::Uploading_Full
+			: BackgroundTask::Uploading_Patch;
+		if(!mpBackgroundTask->RunBackgroundTask(state, mBytesUploaded,
+			mBytesToUpload))
+		{
+			THROW_EXCEPTION(BackupStoreException,
+				CancelledByBackgroundTask);
+		}
 	}
 
 	int bytesToRead = NBytes;
@@ -575,6 +595,8 @@ void BackupStoreFileEncodeStream::EncodeCurrentBlock()
 	// Encode it
 	mCurrentBlockEncodedSize = BackupStoreFile::EncodeChunk(mpRawBuffer,
 		blockRawSize, mEncodedBuffer);
+
+	mBytesUploaded += blockRawSize;
 	
 	//TRACE2("Encode: Encoded size of block %d is %d\n", (int32_t)mCurrentBlock, (int32_t)mCurrentBlockEncodedSize);
 	
@@ -645,7 +667,8 @@ void BackupStoreFileEncodeStream::StoreBlockIndexEntry(int64_t EncSizeOrBlkIndex
 //		Created: 8/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreFileEncodeStream::Write(const void *pBuffer, int NBytes)
+void BackupStoreFileEncodeStream::Write(const void *pBuffer, int NBytes,
+	int Timeout)
 {
 	THROW_EXCEPTION(BackupStoreException, CantWriteToEncodedFileStream)
 }
@@ -686,11 +709,12 @@ bool BackupStoreFileEncodeStream::StreamClosed()
 //		Created: 15/1/04
 //
 // --------------------------------------------------------------------------
-BackupStoreFileEncodeStream::Recipe::Recipe(BackupStoreFileCreation::BlocksAvailableEntry *pBlockIndex,
-		int64_t NumBlocksInIndex, int64_t OtherFileID)
-	: mpBlockIndex(pBlockIndex),
-	  mNumBlocksInIndex(NumBlocksInIndex),
-	  mOtherFileID(OtherFileID)
+BackupStoreFileEncodeStream::Recipe::Recipe(
+	BackupStoreFileCreation::BlocksAvailableEntry *pBlockIndex,
+	int64_t NumBlocksInIndex, int64_t OtherFileID)
+: mpBlockIndex(pBlockIndex),
+  mNumBlocksInIndex(NumBlocksInIndex),
+  mOtherFileID(OtherFileID)
 {
 	ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0))
 }

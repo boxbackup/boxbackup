@@ -19,6 +19,7 @@
 #include "Message.h"
 
 class IOStream;
+class SocketStream;
 
 // default timeout is 15 minutes
 #define PROTOCOL_DEFAULT_TIMEOUT	(15*60*1000)
@@ -36,7 +37,7 @@ class IOStream;
 class Protocol
 {
 public:
-	Protocol(IOStream &rStream);
+	Protocol(std::auto_ptr<SocketStream> apConn);
 	virtual ~Protocol();
 	
 private:
@@ -66,14 +67,14 @@ public:
 	//		Purpose: Sets the timeout for sending and reciving
 	//		Created: 2003/08/19
 	//
-	// --------------------------------------------------------------------------	
+	// --------------------------------------------------------------------------
 	void SetTimeout(int NewTimeout) {mTimeout = NewTimeout;}
 	
 	
 	// --------------------------------------------------------------------------
 	//
 	// Function
-	//		Name:    Protocol::GetTimeout() 
+	//		Name:    Protocol::GetTimeout()
 	//		Purpose: Get current timeout for sending and receiving
 	//		Created: 2003/09/06
 	//
@@ -175,6 +176,8 @@ public:
 	FILE *GetLogToFile() { return mLogToFile; }
 	void SetLogToSysLog(bool Log = false) {mLogToSysLog = Log;}
 	void SetLogToFile(FILE *File = 0) {mLogToFile = File;}
+	int64_t GetBytesRead() const;
+	int64_t GetBytesWritten() const;
 
 protected:
 	virtual std::auto_ptr<Message> MakeMessage(int ObjType) = 0;
@@ -190,7 +193,7 @@ private:
 	void EnsureBufferAllocated(int Size);
 	int SendStreamSendBlock(uint8_t *Block, int BytesInBlock);
 
-	IOStream &mrStream;
+	std::auto_ptr<SocketStream> mapConn;
 	bool mHandshakeDone;
 	unsigned int mMaxObjectSize;
 	int mTimeout;
@@ -208,4 +211,3 @@ class ProtocolContext
 };
 
 #endif // PROTOCOL__H
-

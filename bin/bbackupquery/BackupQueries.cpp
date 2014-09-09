@@ -24,6 +24,7 @@
 	#include <dirent.h>
 #endif
 
+#include <algorithm>
 #include <cstring>
 #include <limits>
 #include <iostream>
@@ -71,7 +72,7 @@
 //		Created: 2003/10/10
 //
 // --------------------------------------------------------------------------
-BackupQueries::BackupQueries(BackupProtocolClient &rConnection,
+BackupQueries::BackupQueries(BackupProtocolCallable &rConnection,
 	const Configuration &rConfiguration, bool readWrite)
 	: mReadWrite(readWrite),
 	  mrConnection(rConnection),
@@ -114,7 +115,9 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 
 	if(rCommand.mFailed)
 	{
-		BOX_ERROR("Parse failed");
+		BOX_ERROR("Parse failed: unknown command '" << 
+			rCommand.mCmdElements[0] << "' or failed to convert "
+			"encoding of arguments");
 		return;
 	}
 
@@ -246,6 +249,19 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 	}
 }
 
+#define LIST_OPTION_TIMES_ATTRIBS	'a'
+#define LIST_OPTION_SORT_NO_DIRS_FIRST	'D'
+#define LIST_OPTION_NOFLAGS		'F'
+#define LIST_OPTION_DISPLAY_HASH	'h'
+#define LIST_OPTION_SORT_ID		'i'
+#define LIST_OPTION_NOOBJECTID		'I'
+#define LIST_OPTION_SORT_REVERSE	'r'
+#define LIST_OPTION_RECURSIVE		'R'
+#define LIST_OPTION_SIZEINBLOCKS	's'
+#define LIST_OPTION_SORT_SIZE		'S'
+#define LIST_OPTION_TIMES_LOCAL		't'
+#define LIST_OPTION_TIMES_UTC		'T'
+#define LIST_OPTION_SORT_NONE		'U'
 
 // --------------------------------------------------------------------------
 //
@@ -257,15 +273,6 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 // --------------------------------------------------------------------------
 void BackupQueries::CommandList(const std::vector<std::string> &args, const bool *opts)
 {
-	#define LIST_OPTION_RECURSIVE		'r'
-	#define LIST_OPTION_NOOBJECTID		'I'
-	#define LIST_OPTION_NOFLAGS		'F'
-	#define LIST_OPTION_TIMES_LOCAL		't'
-	#define LIST_OPTION_TIMES_UTC		'T'
-	#define LIST_OPTION_TIMES_ATTRIBS	'a'
-	#define LIST_OPTION_SIZEINBLOCKS	's'
-	#define LIST_OPTION_DISPLAY_HASH	'h'
-
 	// default to using the current directory
 	int64_t rootDir = GetCurrentDirectoryID();
 
@@ -284,8 +291,8 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 #endif
 	
 		// Attempt to find the directory
-		rootDir = FindDirectoryObjectID(storeDirEncoded, 
-			opts[LIST_OPTION_ALLOWOLD], 
+		rootDir = FindDirectoryObjectID(storeDirEncoded,
+			opts[LIST_OPTION_ALLOWOLD],
 			opts[LIST_OPTION_ALLOWDELETED]);
 
 		if(rootDir == 0)
@@ -348,6 +355,75 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 	return out.str();
 }
 
+/* We need a way to pass options to sort functions for sorting. The algorithm
+ * doesn't seem to provide a way to do this, so I'm using a global variable.
+ * Which is not thread safe, but we don't currently use threads so that should
+ * be OK. Do not use threads without checking!
+ */
+const bool *gThreadUnsafeOptions;
+
+int DirsFirst(BackupStoreDirectory::Entry* a,
+	BackupStoreDirectory::Entry* b)
+{
+	if (a->IsDir() && !b->IsDir())
+	{
+		return -1; // a < b
+	}
+	else if (!a->IsDir() && b->IsDir())
+	{
+		return 1; // b > a
+	}
+	else
+	{
+		return 0; // continue comparison
+	}
+}
+
+#define MAYBE_DIRS_FIRST(a, b) \
+	if (!gThreadUnsafeOptions[LIST_OPTION_SORT_NO_DIRS_FIRST]) \
+	{ \
+		int result = DirsFirst(a, b); \
+		if (result < 0) return true; /* a < b */ \
+		else if (result > 0) return false; /* a > b */ \
+		/* else: fall through */ \
+	}
+
+#define MAYBE_REVERSE(result) \
+	(result != gThreadUnsafeOptions[LIST_OPTION_SORT_REVERSE])
+// result is false, opts[reverse] is false => return false
+// result is false, opts[reverse] is true  => return true
+// result is true,  opts[reverse] is false => return true
+// result is true,  opts[reverse] is true  => return false
+// this is logical XOR, for which the boolean operator is !=.
+
+bool SortById(BackupStoreDirectory::Entry* a,
+	BackupStoreDirectory::Entry* b)
+{
+	MAYBE_DIRS_FIRST(a, b);
+	bool result = (a->GetObjectID() < b->GetObjectID());
+	return MAYBE_REVERSE(result);
+}
+
+bool SortBySize(BackupStoreDirectory::Entry* a,
+	BackupStoreDirectory::Entry* b)
+{
+	MAYBE_DIRS_FIRST(a, b);
+	bool result = (a->GetSizeInBlocks() < b->GetSizeInBlocks());
+	return MAYBE_REVERSE(result);
+}
+
+bool SortByName(BackupStoreDirectory::Entry* a,
+	BackupStoreDirectory::Entry* b)
+{
+	MAYBE_DIRS_FIRST(a, b);
+	BackupStoreFilenameClear afc(a->GetName());
+	BackupStoreFilenameClear bfc(b->GetName());
+	std::string an = afc.GetClearFilename();
+	std::string bn = bfc.GetClearFilename();
+	bool result = (an < bn);
+	return MAYBE_REVERSE(result);
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -397,11 +473,51 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 	std::auto_ptr<IOStream> dirstream(mrConnection.ReceiveStream());
 	dir.ReadFromStream(*dirstream, mrConnection.GetTimeout());
 
-	// Then... display everything
+	// Store entry pointers in a std::vector for sorting
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en = 0;
+	std::vector<BackupStoreDirectory::Entry*> sorted_entries;
 	while((en = i.Next()) != 0)
 	{
+		sorted_entries.push_back(en);
+	}
+
+	// Typedef to avoid mind-bending while dealing with pointers to functions.
+	typedef bool (EntryComparator_t)(BackupStoreDirectory::Entry* a,
+		BackupStoreDirectory::Entry* b);
+	// Default is no comparator, i.e. no sorting.
+	EntryComparator_t* pComparator = NULL;
+
+	if (opts[LIST_OPTION_SORT_ID])
+	{
+		pComparator = &SortById;
+	}
+	else if (opts[LIST_OPTION_SORT_SIZE])
+	{
+		pComparator = &SortBySize;
+	}
+	else if (opts[LIST_OPTION_SORT_NONE])
+	{
+		// do nothing
+	}
+	else // sort by name
+	{
+		pComparator = &SortByName;
+	}
+
+	if (pComparator != NULL)
+	{
+		gThreadUnsafeOptions = opts;
+		sort(sorted_entries.begin(), sorted_entries.end(),
+			pComparator);
+		gThreadUnsafeOptions = NULL;
+	}
+
+	for (std::vector<BackupStoreDirectory::Entry*>::const_iterator
+		i = sorted_entries.begin();
+		i != sorted_entries.end(); i++)
+	{
+		en = *i;
 		std::ostringstream buf;
 
 		// Display this entry
@@ -873,19 +989,25 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	{
 		// Request object
 		std::auto_ptr<BackupProtocolSuccess> getobj(mrConnection.QueryGetObject(id));
-		if(getobj->GetObjectID() != BackupProtocolGetObject::NoObject)
-		{
-			// Stream that object out to the file
-			std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-			objectStream->CopyStreamTo(out);
+
+		// Stream that object out to the file
+		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+		objectStream->CopyStreamTo(out);
 			
-			BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
-				" fetched successfully.");
-		}
-		else
+		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
+			" fetched successfully.");
+	}
+	catch(ConnectionException &e)
+	{
+		if(mrConnection.GetLastErrorType() == BackupProtocolError::Err_DoesNotExist)
 		{
 			BOX_ERROR("Object ID " << BOX_FORMAT_OBJECTID(id) <<
 				" does not exist on store.");
+			::unlink(args[1].c_str());
+		}
+		else
+		{
+			BOX_ERROR("Error occured fetching object.");
 			::unlink(args[1].c_str());
 		}
 	}
@@ -1965,11 +2087,9 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		// At TRACE level, we print a line for each file and
 		// directory, so we don't need dots.
 
-		bool printDots = ! Logging::IsEnabled(Log::TRACE);
-
 		result = BackupClientRestore(mrConnection, dirID, 
 			storeDirEncoded.c_str(), localName.c_str(), 
-			printDots /* print progress dots */, restoreDeleted, 
+			true /* print progress dots */, restoreDeleted, 
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */,
 			opts['f'] /* force continue after errors */);

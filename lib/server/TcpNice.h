@@ -83,7 +83,7 @@ private:
 //
 // --------------------------------------------------------------------------
 
-class NiceSocketStream : public IOStream
+class NiceSocketStream : public SocketStream
 {
 private:
 	std::auto_ptr<SocketStream> mapSocket;
@@ -165,6 +165,10 @@ public:
 		return mapSocket->StreamClosed();
 	}
 	virtual void SetEnabled(bool enabled);
+
+	off_t GetBytesRead() const { return mapSocket->GetBytesRead(); }
+	off_t GetBytesWritten() const { return mapSocket->GetBytesWritten(); }
+	void ResetCounters() { mapSocket->ResetCounters(); }
 
 private:
 	NiceSocketStream(const NiceSocketStream &rToCopy) 

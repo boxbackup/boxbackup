@@ -7,10 +7,9 @@
 //
 // --------------------------------------------------------------------------
 
-
-#ifndef BOX_RELEASE_BUILD
-
 #include "Box.h"
+
+#ifdef BOX_MEMORY_LEAK_TESTING
 
 #undef malloc
 #undef realloc
@@ -20,11 +19,13 @@
 	#include <unistd.h>
 #endif
 
-#include <map>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#include <set>
+
 #include <cstdlib> // for std::atexit
+#include <map>
+#include <set>
 
 #include "MemLeakFinder.h"
 
@@ -73,6 +74,13 @@ namespace
 	size_t sNotLeaksPreNum = 0;
 }
 
+void memleakfinder_report_on_signal(int unused)
+{
+	// this is not safe! do not send SIGUSR1 to a process
+	// in a production environment!
+	memleakfinder_report_usage_summary();
+}
+
 void memleakfinder_init()
 {
 	ASSERT(!memleakfinder_initialised);
@@ -84,6 +92,21 @@ void memleakfinder_init()
 	}
 
 	memleakfinder_initialised = true;
+
+	#if defined WIN32
+		// no signals, no way to trigger event yet
+	#else
+		struct sigaction newact, oldact;
+		newact.sa_handler = memleakfinder_report_on_signal;
+		newact.sa_flags = SA_RESTART;
+		sigemptyset(&newact.sa_mask);
+		if (::sigaction(SIGUSR1, &newact, &oldact) != 0)
+		{
+			BOX_ERROR("Failed to install USR1 signal handler");
+			THROW_EXCEPTION(CommonException, Internal);
+		}
+		ASSERT(oldact.sa_handler == 0);
+	#endif // WIN32
 }
 
 MemLeakSuppressionGuard::MemLeakSuppressionGuard()
@@ -132,7 +155,17 @@ void *memleakfinder_malloc(size_t size, const char *file, int line)
 	InternalAllocGuard guard;
 
 	void *b = std::malloc(size);
-	if(!memleakfinder_global_enable) return b;
+
+	if(!memleakfinder_global_enable)
+	{
+		// We may not be tracking this allocation, but if
+		// someone realloc()s the buffer later then it will
+		// trigger an untracked buffer warning, which we don't
+		// want to see either.
+		memleakfinder_notaleak(b);
+		return b;
+	}
+
 	if(!memleakfinder_initialised)   return b;
 
 	memleakfinder_malloc_add_block(b, size, file, line);
@@ -141,27 +174,70 @@ void *memleakfinder_malloc(size_t size, const char *file, int line)
 	return b;
 }
 
+void *memleakfinder_calloc(size_t blocks, size_t size, const char *file, int line)
+{
+	void *block = memleakfinder_malloc(blocks * size, file, line);
+	if (block != 0)
+	{
+		memset(block, 0, blocks * size);
+	}
+	return block;
+}
+
 void *memleakfinder_realloc(void *ptr, size_t size)
 {
+	if(!ptr)
+	{
+		return memleakfinder_malloc(size, "realloc", 0);
+	}
+
+	if(!size)
+	{
+		memleakfinder_free(ptr);
+		return NULL;
+	}
+
 	InternalAllocGuard guard;
+
+	ASSERT(ptr != NULL);
+	if(!ptr) return NULL; // defensive
 
 	if(!memleakfinder_global_enable || !memleakfinder_initialised)
 	{
-		return std::realloc(ptr, size);
+		ptr = std::realloc(ptr, size);
+		if(!memleakfinder_global_enable)
+		{
+			// We may not be tracking this allocation, but if
+			// someone realloc()s the buffer later then it will
+			// trigger an untracked buffer warning, which we don't
+			// want to see either.
+			memleakfinder_notaleak(ptr);
+		}
+		return ptr;
 	}
 
 	// Check it's been allocated
 	std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
-	if(ptr && i == sMallocBlocks.end())
+	std::set<void *>::iterator j(sNotLeaks.find(ptr));
+
+	if(i == sMallocBlocks.end() && j == sNotLeaks.end())
 	{
 		BOX_WARNING("Block " << ptr << " realloc()ated, but not "
 			"in list. Error? Or allocated in startup static "
 			"objects?");
 	}
 
+	if(j != sNotLeaks.end())
+	{
+		// It's in the list of not-leaks, so don't warn about it,
+		// but it's being reallocated, so remove it from the list too,
+		// in case it's reassigned, and add the new block below.
+		sNotLeaks.erase(j);
+	}
+
 	void *b = std::realloc(ptr, size);
 
-	if(ptr && i!=sMallocBlocks.end())
+	if(i != sMallocBlocks.end())
 	{
 		// Worked?
 		if(b != 0)
@@ -197,9 +273,18 @@ void memleakfinder_free(void *ptr)
 	{
 		// Check it's been allocated
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
+		std::set<void *>::iterator j(sNotLeaks.find(ptr));
+
 		if(i != sMallocBlocks.end())
 		{
 			sMallocBlocks.erase(i);
+		}
+		else if(j != sNotLeaks.end())
+		{
+			// It's in the list of not-leaks, so don't warn
+			// about it, but it's being freed, so remove it
+			// from the list too, in case it's reassigned.
+			sNotLeaks.erase(j);
 		}
 		else
 		{
@@ -251,7 +336,8 @@ void memleakfinder_notaleak(void *ptr)
 	ASSERT(!sTrackingDataDestroyed);
 
 	memleakfinder_notaleak_insert_pre();
-	if(memleakfinder_global_enable && memleakfinder_initialised)
+
+	if(memleakfinder_initialised)
 	{
 		sNotLeaks.insert(ptr);
 	}
@@ -261,7 +347,9 @@ void memleakfinder_notaleak(void *ptr)
 			 sizeof(sNotLeaksPre)/sizeof(*sNotLeaksPre) )
 			sNotLeaksPre[sNotLeaksPreNum++] = ptr;
 	}
-/*	{
+
+	/*
+	{
 		std::map<void *, MallocBlockInfo>::iterator i(sMallocBlocks.find(ptr));
 		if(i != sMallocBlocks.end()) sMallocBlocks.erase(i);
 	}
@@ -344,6 +432,85 @@ int memleakfinder_numleaks()
 	}
 
 	return n;
+}
+
+// Summarise all blocks allocated and still allocated, for memory usage
+// diagnostics.
+void memleakfinder_report_usage_summary()
+{
+	InternalAllocGuard guard;
+
+	ASSERT(!sTrackingDataDestroyed);
+
+	typedef std::map<std::string, std::pair<uint64_t, uint64_t> > usage_map_t;
+	usage_map_t usage;
+
+	for(std::map<void *, MallocBlockInfo>::const_iterator
+		i(sMallocBlocks.begin()); i != sMallocBlocks.end(); ++i)
+	{
+		std::ostringstream buf;
+		buf << i->second.file << ":" << i->second.line;
+		std::string key = buf.str();
+
+		usage_map_t::iterator ui = usage.find(key);
+		if(ui == usage.end())
+		{
+			usage[key] = std::pair<uint64_t, uint64_t>(1,
+				i->second.size);
+		}
+		else
+		{
+			ui->second.first++;
+			ui->second.second += i->second.size;
+		}
+	}
+
+	for(std::map<void *, ObjectInfo>::const_iterator
+		i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
+	{
+		std::ostringstream buf;
+		buf << i->second.file << ":" << i->second.line;
+		std::string key = buf.str();
+
+		usage_map_t::iterator ui = usage.find(key);
+		if(ui == usage.end())
+		{
+			usage[key] = std::pair<uint64_t, uint64_t>(1,
+				i->second.size);
+		}
+		else
+		{
+			ui->second.first++;
+			ui->second.second += i->second.size;
+		}
+	}
+
+	#ifndef DEBUG_LEAKS
+		BOX_WARNING("Memory use: support not compiled in :(");
+	#else
+	if(usage.empty())
+	{
+		BOX_WARNING("Memory use: none detected?!");
+	}
+	else
+	{
+		uint64_t blocks = 0, bytes = 0;
+		BOX_WARNING("Memory use: report follows");
+
+		for(usage_map_t::iterator i = usage.begin(); i != usage.end();
+			i++)
+		{
+			BOX_WARNING("Memory use: " << i->first << ": " <<
+				i->second.first << " blocks, " <<
+				i->second.second << " bytes");
+			blocks += i->second.first;
+			bytes  += i->second.second;
+		}
+
+		BOX_WARNING("Memory use: report ends, total: " << blocks <<
+			" blocks, " << bytes << " bytes");
+	}
+	#endif // DEBUG_LEAKS
 }
 
 void memleakfinder_reportleaks_file(FILE *file)
@@ -432,9 +599,6 @@ void memleakfinder_setup_exit_report(const char *filename, const char *markertex
 	}
 }
 
-
-
-
 void add_object_block(void *block, size_t size, const char *file, int line, bool array)
 {
 	InternalAllocGuard guard;
@@ -445,6 +609,10 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 
 	if(block != 0)
 	{
+		std::map<void *, ObjectInfo>::iterator j(sObjectBlocks.find(block));
+		// The same block should not already be tracked!
+		ASSERT(j == sObjectBlocks.end());
+
 		ObjectInfo i;
 		i.size = size;
 		i.file = file;
@@ -525,7 +693,7 @@ void *operator new(size_t size)
 }
 */
 
-void *operator new[](size_t size)
+void *operator new[](size_t size) throw (std::bad_alloc)
 {
 	return internal_new(size, "standard libraries", 0);
 }
@@ -549,4 +717,4 @@ void operator delete(void *ptr) throw ()
 	internal_delete(ptr);
 }
 
-#endif // BOX_RELEASE_BUILD
+#endif // BOX_MEMORY_LEAK_TESTING

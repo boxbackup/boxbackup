@@ -27,7 +27,18 @@ class RaidFileDiscSet;
 class RaidFileWrite : public IOStream
 {
 public:
+	// TODO FIXME we should remove this constructor, and ensure that
+	// anyone who writes to a RaidFile knows what the reference count
+	// is before doing so. That requires supporting regenerating the
+	// reference count database in BackupStoreCheck, and using a real
+	// database instead of an in-memory array in HousekeepStoreAccount,
+	// and supporting multiple databases at a time (old and new) in
+	// BackupStoreRefCountDatabase, and I don't have time to make those
+	// changes right now. We may even absolutely need to have a full
+	// reference database, not just reference counts, to implement
+	// snapshots.
 	RaidFileWrite(int SetNumber, const std::string &Filename);
+
 	RaidFileWrite(int SetNumber, const std::string &Filename, int refcount);
 	~RaidFileWrite();
 private:
@@ -36,7 +47,8 @@ private:
 public:
 	// IOStream interface
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);	// will exception
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual void Close();		// will discard the file! Use commit instead.

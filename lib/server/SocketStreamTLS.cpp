@@ -19,9 +19,10 @@
 #include <poll.h>
 #endif
 
+#include "autogen_ConnectionException.h"
+#include "autogen_ServerException.h"
 #include "BoxTime.h"
 #include "CryptoUtils.h"
-#include "ServerException.h"
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
 #include "TLSContext.h"
@@ -131,7 +132,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 
 	tOSSocketHandle socket = GetSocketHandle();
 	BIO_set_fd(mpBIO, socket, BIO_NOCLOSE);
-	
+
 	// Then the SSL object
 	mpSSL = ::SSL_new(rContext.GetRawContext());
 	if(mpSSL == 0)
@@ -154,7 +155,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 		THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
 	}
 #endif
-	
+
 	// FIXME: This is less portable than the above. However, it MAY be needed
 	// for cygwin, which has/had bugs with fcntl
 	//
@@ -196,7 +197,7 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			if(WaitWhenRetryRequired(se, TLS_HANDSHAKE_TIMEOUT) == false)
 			{
 				// timed out
-				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeTimedOut)
+				THROW_EXCEPTION(ConnectionException, TLSHandshakeTimedOut)
 			}
 			break;
 			
@@ -205,12 +206,12 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			if(IsServer)
 			{
 				CryptoUtils::LogError("accepting connection");
-				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
+				THROW_EXCEPTION(ConnectionException, TLSHandshakeFailed)
 			}
 			else
 			{
 				CryptoUtils::LogError("connecting");
-				THROW_EXCEPTION(ConnectionException, Conn_TLSHandshakeFailed)
+				THROW_EXCEPTION(ConnectionException, TLSHandshakeFailed)
 			}
 		}
 	}
@@ -222,23 +223,25 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 //
 // Function
 //		Name:    WaitWhenRetryRequired(int, int)
-//		Purpose: Waits until the condition required by the TLS layer is met.
-//				 Returns true if the condition is met, false if timed out.
+//		Purpose: Waits until the condition required by the TLS layer
+//		         is met. Returns true if the condition is met, false
+//		         if timed out.
 //		Created: 2003/08/15
 //
 // --------------------------------------------------------------------------
 bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 {
-	struct pollfd p;
-	p.fd = GetSocketHandle();
+	CheckForMissingTimeout(Timeout);
+
+	short events;
 	switch(SSLErrorCode)
 	{
 	case SSL_ERROR_WANT_READ:
-		p.events = POLLIN;
+		events = POLLIN;
 		break;
 		
 	case SSL_ERROR_WANT_WRITE:
-		p.events = POLLOUT;
+		events = POLLOUT;
 		break;
 
 	default:
@@ -246,45 +249,8 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 		THROW_EXCEPTION(ServerException, Internal)
 		break;
 	}
-	p.revents = 0;
 
-	int64_t start, end;
-	start = BoxTimeToMilliSeconds(GetCurrentBoxTime());
-	end   = start + Timeout;
-	int result;
-
-	do
-	{
-		int64_t now = BoxTimeToMilliSeconds(GetCurrentBoxTime());
-		int poll_timeout = (int)(end - now);
-		if (poll_timeout < 0) poll_timeout = 0;
-		if (Timeout == IOStream::TimeOutInfinite)
-		{
-			poll_timeout = INFTIM;
-		}
-		result = ::poll(&p, 1, poll_timeout);
-	}
-	while(result == -1 && errno == EINTR);
-
-	switch(result)
-	{
-	case -1:
-		// error - Bad!
-		THROW_EXCEPTION(ServerException, SocketPollError)
-		break;
-
-	case 0:
-		// Condition not met, timed out
-		return false;
-		break;
-
-	default:
-		// good to go!
-		return true;
-		break;
-	}
-
-	return true;
+	return Poll(events, Timeout);
 }
 
 // --------------------------------------------------------------------------
@@ -297,6 +263,7 @@ bool SocketStreamTLS::WaitWhenRetryRequired(int SSLErrorCode, int Timeout)
 // --------------------------------------------------------------------------
 int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 {
+	CheckForMissingTimeout(Timeout);
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
 	// Make sure zero byte reads work as expected
@@ -337,7 +304,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 			
 		default:
 			CryptoUtils::LogError("reading");
-			THROW_EXCEPTION(ConnectionException, Conn_TLSReadFailed)
+			THROW_EXCEPTION(ConnectionException, TLSReadFailed)
 			break;
 		}
 	}
@@ -351,23 +318,23 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
+void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
-	
+
 	// Make sure zero byte writes work as expected
 	if(NBytes == 0)
 	{
 		return;
 	}
-	
+
 	// from man SSL_write
 	//
 	// SSL_write() will only return with success, when the
 	// complete contents of buf of length num has been written.
 	//
 	// So no worries about partial writes and moving the buffer around
-	
+
 	while(true)
 	{
 		// try the write
@@ -385,24 +352,24 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes)
 		case SSL_ERROR_ZERO_RETURN:
 			// Connection closed
 			MarkAsWriteClosed();
-			THROW_EXCEPTION(ConnectionException, Conn_TLSClosedWhenWriting)
+			THROW_EXCEPTION(ConnectionException, TLSClosedWhenWriting)
 			break;
 
 		case SSL_ERROR_WANT_READ:
 		case SSL_ERROR_WANT_WRITE:
-			// wait for the requried data
+			// wait for the required data
 			{
 			#ifndef BOX_RELEASE_BUILD
-				bool conditionmet = 
+				bool conditionmet =
 			#endif
-				WaitWhenRetryRequired(se, IOStream::TimeOutInfinite);
+				WaitWhenRetryRequired(se, Timeout);
 				ASSERT(conditionmet);
 			}
 			break;
 		
 		default:
 			CryptoUtils::LogError("writing");
-			THROW_EXCEPTION(ConnectionException, Conn_TLSWriteFailed)
+			THROW_EXCEPTION(ConnectionException, TLSWriteFailed)
 			break;
 		}
 	}
@@ -444,7 +411,7 @@ void SocketStreamTLS::Shutdown(bool Read, bool Write)
 	if(::SSL_shutdown(mpSSL) < 0)
 	{
 		CryptoUtils::LogError("shutting down");
-		THROW_EXCEPTION(ConnectionException, Conn_TLSShutdownFailed)
+		THROW_EXCEPTION(ConnectionException, TLSShutdownFailed)
 	}
 
 	// Don't ask the base class to shutdown -- BIO does this, apparently.
@@ -467,15 +434,15 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	if(cert == 0)
 	{
 		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, Conn_TLSNoPeerCertificate)
+		THROW_EXCEPTION(ConnectionException, TLSNoPeerCertificate)
 	}
 
-	// Subject details	
-	X509_NAME *subject = ::X509_get_subject_name(cert); 
+	// Subject details
+	X509_NAME *subject = ::X509_get_subject_name(cert);
 	if(subject == 0)
 	{
 		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, Conn_TLSPeerCertificateInvalid)
+		THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
 	}
 	
 	// Common name
@@ -483,7 +450,7 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	if(::X509_NAME_get_text_by_NID(subject, NID_commonName, commonName, sizeof(commonName)) <= 0)
 	{
 		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, Conn_TLSPeerCertificateInvalid)
+		THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
 	}
 	// Terminate just in case
 	commonName[sizeof(commonName)-1] = '\0';

@@ -25,7 +25,8 @@ public:
 	
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
 	virtual void Seek(IOStream::pos_type Offset, int SeekType);
 	virtual void Close();
@@ -33,6 +34,10 @@ public:
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
+	virtual std::string ToString() const
+	{
+		return std::string("Buffered ") + mrSource.ToString();
+	}
 private:
 	BufferedStream(const BufferedStream &rToCopy) 
 	: mrSource(rToCopy.mrSource) { /* do not call */ }

@@ -243,7 +243,7 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 //		Created: 2003/07/10
 //
 // --------------------------------------------------------------------------
-void RaidFileWrite::Write(const void *pBuffer, int Length)
+void RaidFileWrite::Write(const void *pBuffer, int Length, int Timeout)
 {
 	// open?
 	if(mOSFileHandle == -1)
@@ -744,7 +744,7 @@ void RaidFileWrite::Delete()
 	{
 		THROW_FILE_ERROR("Attempted to delete object which doesn't "
 			"exist", mFilename, RaidFileException,
-			RequestedDeleteReferencedFile);
+			RaidFileDoesntExist);
 	}
 
 	// Get the filename for the write file
