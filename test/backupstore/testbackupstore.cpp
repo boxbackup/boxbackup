@@ -23,14 +23,11 @@
 #include "BackupStoreDaemon.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
-#include "BackupStoreFilenameClear.h"
-<<<<<<< HEAD
-#include "BackupStoreInfo.h"
-=======
-#include "BackupStoreFileEncodeStream.h"
->>>>>>> master
-#include "BackupStoreRefCountDatabase.h"
 #include "BackupStoreFile.h"
+#include "BackupStoreFilenameClear.h"
+#include "BackupStoreFileEncodeStream.h"
+#include "BackupStoreInfo.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "BoxPortsAndFiles.h"
 #include "CollectInBufferStream.h"
 #include "Configuration.h"
@@ -114,7 +111,7 @@ typedef struct
 #define TEST_FILE_FOR_PATCHING_SIZE ((128*1024)+2564)
 #define UPLOAD_PATCH_EN	2
 
-uploadtest uploads[] = 
+uploadtest uploads[] =
 {
 	{"0", BackupStoreFilenameClear(), 324, 455, 0, 0, false, false},
 	{"1", BackupStoreFilenameClear(), 3232432, 2674, 0, 0, true, false},			// old ver
@@ -147,7 +144,7 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 // Nice random data for testing written files
 class R250 {
 public:
-	// Set up internal state table with 32-bit random numbers.  
+	// Set up internal state table with 32-bit random numbers.
 	// The bizarre bit-twiddling is because rand() returns 16 bits of which
 	// the bottom bit is always zero!  Hence, I use only some of the bits.
 	// You might want to do something better than this....
@@ -164,7 +161,7 @@ public:
 
 		// stir up the numbers to ensure they're random
 
-		for (int j = 0; j != stateLen * 4; ++j)			
+		for (int j = 0; j != stateLen * 4; ++j)
 			(void) next();
 	}
 
@@ -196,7 +193,7 @@ int SkipEntries(int e, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 	do
 	{
 		skip = false;
-		
+
 		if(FlagsMustBeSet != BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING)
 		{
 			if((ens[e].flags & FlagsMustBeSet) != FlagsMustBeSet)
@@ -208,20 +205,20 @@ int SkipEntries(int e, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 		{
 			skip = true;
 		}
-		
+
 		if(skip)
 		{
 			++e;
 		}
 	} while(skip && e < DIR_NUM);
-	
+
 	return e;
 }
 
 void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 {
 	int e = 0;
-	
+
 	BackupStoreDirectory::Iterator i(rDir);
 	BackupStoreDirectory::Entry *en = 0;
 	while((en = i.Next()) != 0)
@@ -235,9 +232,9 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 		TEST_THAT(en->GetName() == ens[e].fn && en->GetModificationTime() == ens[e].mod && en->GetObjectID() == ens[e].id && en->GetFlags() == ens[e].flags && en->GetSizeInBlocks() == ens[e].size);
 
 		// next
-		++e;		
+		++e;
 	}
-	
+
 	// Got them all?
 	TEST_THAT(en == 0);
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
@@ -279,11 +276,11 @@ bool test_filename_encoding()
 		BackupStoreFilenameClear fn3(fn1);
 		TEST_THAT(fn1 == fn2);
 		TEST_THAT(fn1 == fn3);
-		
+
 		// Check that it's been encrypted
 		std::string name(fn2.GetEncodedFilename());
 		TEST_THAT(name.find("name") == name.npos);
-			
+
 		// Bung it in a stream, get it out in a Clear filename
 		{
 			CollectInBufferStream stream;
@@ -367,7 +364,7 @@ bool test_backupstore_directory()
 		}
 		// Got the right number
 		TEST_THAT(dir1.GetNumberOfEntries() == DIR_NUM);
-		
+
 		// Stick it into a stream and get it out again
 		{
 			CollectInBufferStream stream;
@@ -379,7 +376,7 @@ bool test_backupstore_directory()
 			TEST_THAT(dir2.GetContainerID() == 98);
 			CheckEntries(dir2, BackupStoreDirectory::Entry::Flags_INCLUDE_EVERYTHING, BackupStoreDirectory::Entry::Flags_EXCLUDE_NOTHING);
 		}
-		
+
 		// Then do selective writes and reads
 		{
 			CollectInBufferStream stream;
@@ -405,7 +402,7 @@ bool test_backupstore_directory()
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_FILES - DIR_OLD);
 			CheckEntries(dir2, BackupStoreDirectory::Entry::Flags_File, BackupStoreDirectory::Entry::Flags_OldVersion);
 		}
-		
+
 		// Finally test deleting items
 		{
 			dir1.DeleteEntry(12312312321LL);
@@ -417,7 +414,7 @@ bool test_backupstore_directory()
 			BackupStoreDirectory dir2(stream);
 			TEST_THAT(dir2.GetNumberOfEntries() == DIR_FILES - 1);
 		}
-		
+
 		// Check attributes
 		{
 			int attrI[4] = {1, 2, 3, 4};
@@ -443,18 +440,18 @@ void write_test_file(int t)
 	std::string filename("testfiles/test");
 	filename += uploads[t].fnextra;
 	BOX_TRACE("Writing " << filename);
-	
+
 	FileStream write(filename.c_str(), O_WRONLY | O_CREAT);
-	
+
 	R250 r(uploads[t].seed);
-	
+
 	unsigned char *data = (unsigned char*)malloc(uploads[t].size);
 	for(int l = 0; l < uploads[t].size; ++l)
 	{
 		data[l] = r.next() & 0xff;
 	}
 	write.Write(data, uploads[t].size);
-	
+
 	free(data);
 }
 
@@ -462,21 +459,21 @@ void test_test_file(int t, IOStream &rStream)
 {
 	// Decode to a file
 	BackupStoreFile::DecodeFile(rStream, "testfiles/test_download", SHORT_TIMEOUT);
-	
+
 	// Compare...
 	FileStream in("testfiles/test_download");
 	TEST_THAT(in.BytesLeftToRead() == uploads[t].size);
-	
+
 	R250 r(uploads[t].seed);
-	
+
 	unsigned char *data = (unsigned char*)malloc(uploads[t].size);
 	TEST_THAT(in.ReadFullBuffer(data, uploads[t].size, 0 /* not interested in bytes read if this fails */));
-	
+
 	for(int l = 0; l < uploads[t].size; ++l)
 	{
 		TEST_THAT(data[l] == (r.next() & 0xff));
 	}
-	
+
 	free(data);
 	in.Close();
 	TEST_THAT(unlink("testfiles/test_download") == 0);
@@ -485,7 +482,7 @@ void test_test_file(int t, IOStream &rStream)
 void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
 {
 	BOX_TRACE("Test for del: " << BOX_FORMAT_OBJECTID(DirID));
-	
+
 	// Command
 	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
 			DirID,
@@ -511,65 +508,21 @@ void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
 		}
 
 		// Check it's deleted
-<<<<<<< HEAD
 		TEST_EQUAL_LINE(true, en->IsDeleted(), "Expected entry was not "
 			"deleted: " << BOX_FORMAT_OBJECTID(en->GetObjectID()));
-=======
 		TEST_THAT(en->IsDeleted());
->>>>>>> master
 	}
-	
+
 	// Check there were the right number of files and directories
 	TEST_THAT(files == 3);
 	TEST_THAT(dirs == 0 || dirs == 2);
 }
 
-<<<<<<< HEAD
-std::vector<uint32_t> ExpectedRefCounts;
-
-void set_refcount(int64_t ObjectID, uint32_t RefCount = 1)
-{
-	if ((int64_t)ExpectedRefCounts.size() <= ObjectID);
-	{
-		ExpectedRefCounts.resize(ObjectID + 1, 0);
-	}
-	ExpectedRefCounts[ObjectID] = RefCount;
-}
-
-bool check_refcounts(BackupStoreRefCountDatabase* pReferences)
-{
-	TEST_EQUAL(ExpectedRefCounts.size(),
-		pReferences->GetLastObjectIDUsed() + 1);
-
-	if (ExpectedRefCounts.size() != pReferences->GetLastObjectIDUsed() + 1)
-	{
-		return false;
-	}
-
-	bool asExpected = true;
-
-	for (unsigned int i = BACKUPSTORE_ROOT_DIRECTORY_ID;
-		i < ExpectedRefCounts.size(); i++)
-	{
-		TEST_EQUAL_LINE(ExpectedRefCounts[i],
-			pReferences->GetRefCount(i),
-			"reference count for object " <<
-			BOX_FORMAT_OBJECTID(i));
-		if (ExpectedRefCounts[i] != pReferences->GetRefCount(i))
-		{
-			asExpected = false;
-		}
-	}
-
-	return asExpected;
-}
+const box_time_t FAKE_MODIFICATION_TIME = 0xfeedfacedeadbeefLL;
+const box_time_t FAKE_ATTR_MODIFICATION_TIME = 0xdeadbeefcafebabeLL;
 
 int64_t create_file_in_dir(std::string name, std::string source, int64_t parentId,
-	BackupProtocolClient &protocol, BackupStoreRefCountDatabase& rRefCount)
-=======
-void create_file_in_dir(std::string name, std::string source, int64_t parentId,
-	BackupProtocolCallable &protocol, BackupStoreRefCountDatabase* pRefCount)
->>>>>>> master
+	BackupProtocolCallable& protocol, BackupStoreRefCountDatabase& rRefCount)
 {
 	BackupStoreFilenameClear name_encoded("file_One");
 	std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(
@@ -577,34 +530,23 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	std::auto_ptr<BackupProtocolSuccess> stored(
 		protocol.QueryStoreFile(
 			parentId,
-			0x123456789abcdefLL,		/* modification time */
-			0x7362383249872dfLL,		/* attr hash */
-			0,				/* diff from ID */
+			FAKE_MODIFICATION_TIME,
+			0x7362383249872dfLL, /* attr hash */
+			0, /* diff from ID */
 			name_encoded,
 			upload));
 	int64_t objectId = stored->GetObjectID();
-	if (pRefCount)
-	{
-		TEST_EQUAL(objectId, pRefCount->GetLastObjectIDUsed());
-		TEST_EQUAL(1, pRefCount->GetRefCount(objectId))
-	}
+	TEST_EQUAL(objectId, rRefCount.GetLastObjectIDUsed());
+	TEST_EQUAL(1, rRefCount.GetRefCount(objectId))
 	set_refcount(objectId, 1);
 	return objectId;
 }
 
-<<<<<<< HEAD
-int64_t create_test_data_subdirs(BackupProtocolClient &protocol, int64_t indir,
-	const char *name, int depth, BackupStoreRefCountDatabase& rRefCount,
-	int64_t *pFirstFileDirId, BackupStoreFilenameClear *pFirstFileName,
-	int64_t *pFirstDirId)
-=======
-const box_time_t FAKE_MODIFICATION_TIME = 0xfeedfacedeadbeefLL;
-const box_time_t FAKE_ATTR_MODIFICATION_TIME = 0xdeadbeefcafebabeLL;
-
-int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
+int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	int64_t indir, const char *name, int depth,
-	BackupStoreRefCountDatabase* pRefCount)
->>>>>>> master
+	BackupStoreRefCountDatabase& rRefCount, int64_t *pFirstFileDirId = NULL,
+	BackupStoreFilenameClear *pFirstFileName = NULL,
+	int64_t *pFirstDirId = NULL)
 {
 	// Create a directory
 	int64_t subdirid = 0;
@@ -612,34 +554,24 @@ int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 	{
 		// Create with dummy attributes
 		int attrS = 0;
-<<<<<<< HEAD
-		MemBlockStream attr(&attrS, sizeof(attrS));
+		std::auto_ptr<IOStream> attr(new MemBlockStream(&attrS, sizeof(attrS)));
 		std::auto_ptr<BackupProtocolSuccess> dirCreate(
 			protocol.QueryCreateDirectory(indir,
-			9837429842987984LL, dirname, attr));
-=======
-		std::auto_ptr<IOStream> attr(new MemBlockStream(&attrS, sizeof(attrS)));
-		std::auto_ptr<BackupProtocolSuccess> dirCreate(protocol.QueryCreateDirectory(
-			indir, FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
->>>>>>> master
-		subdirid = dirCreate->GetObjectID(); 
+				FAKE_ATTR_MODIFICATION_TIME, dirname, attr));
+		subdirid = dirCreate->GetObjectID();
 	}
-	
+
 	BOX_TRACE("Creating subdirs, depth = " << depth << ", dirid = " <<
 		BOX_FORMAT_OBJECTID(subdirid));
 
-	if (pRefCount)
-	{
-		TEST_EQUAL(subdirid, pRefCount->GetLastObjectIDUsed());
-		TEST_EQUAL(1, pRefCount->GetRefCount(subdirid))
-	}
+	TEST_EQUAL(subdirid, rRefCount.GetLastObjectIDUsed());
+	TEST_EQUAL(1, rRefCount.GetRefCount(subdirid))
 
 	set_refcount(subdirid, 1);
-	
+
 	// Put more directories in it, if we haven't gone down too far
 	if(depth > 0)
 	{
-<<<<<<< HEAD
 		int64_t firstDirId = create_test_data_subdirs(protocol,
 			subdirid, "dir_One", depth - 1, rRefCount, NULL, NULL,
 			NULL);
@@ -650,7 +582,7 @@ int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 		create_test_data_subdirs(protocol, subdirid, "dir_Two",
 			depth - 1, rRefCount, NULL, NULL, NULL);
 	}
-	
+
 	// Stick some files in it
 	create_file_in_dir("file_One", "testfiles/file1", subdirid, protocol,
 		rRefCount);
@@ -671,27 +603,8 @@ int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 	return subdirid;
 }
 
-void check_dir_after_uploads(BackupProtocolClient &protocol, const StreamableMemBlock &Attributes)
-=======
-		create_test_data_subdirs(protocol, subdirid, "dir_One",
-			depth - 1, pRefCount);
-		create_test_data_subdirs(protocol, subdirid, "dir_Two",
-			depth - 1, pRefCount);
-	}
-	
-	// Stick some files in it
-	create_file_in_dir("file_One", "testfiles/test1", subdirid, protocol,
-		pRefCount);
-	create_file_in_dir("file_Two", "testfiles/test1", subdirid, protocol,
-		pRefCount);
-	create_file_in_dir("file_Three", "testfiles/test1", subdirid, protocol,
-		pRefCount);
-	return subdirid;
-}
-
 void check_dir_after_uploads(BackupProtocolCallable &protocol,
 	const StreamableMemBlock &Attributes)
->>>>>>> master
 {
 	// Command
 	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
@@ -739,7 +652,7 @@ void check_dir_after_uploads(BackupProtocolCallable &protocol,
 			// No attributes on this one
 			TEST_THAT(!en->HasAttributes());
 		}
-	}				
+	}
 	en = i.Next();
 	TEST_THAT(en == 0);
 }
@@ -767,13 +680,13 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 	BackupStoreDirectory::Iterator i(dir);
 	// Discard first
 	BackupStoreDirectory::Entry *en = 0;
-	
+
 	while((en = i.Next()) != 0)
 	{
 		if((en->GetFlags() & (BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_OldVersion)) == 0) results.objectsNotDel++;
 		if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) results.deleted++;
 		if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) results.old++;
-		
+
 		if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir)
 		{
 			recursive_count_objects_r(protocol, en->GetObjectID(), results);
@@ -821,11 +734,11 @@ bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
 			break;
 		}
 	}
-	
+
 	if(rBlockIndex.StreamDataLeft())
 	{
 		same = false;
-		
+
 		// Absorb all this excess data so procotol is in the first state
 		char buffer[2048];
 		while(rBlockIndex.StreamDataLeft())
@@ -833,7 +746,7 @@ bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
 			rBlockIndex.Read(buffer, sizeof(buffer), SHORT_TIMEOUT);
 		}
 	}
-	
+
 	return same;
 }
 
@@ -862,12 +775,12 @@ bool check_files_same(const char *f1, const char *f2)
 			break;
 		}
 	}
-	
+
 	if(f2s.StreamDataLeft())
 	{
 		same = false;
 	}
-	
+
 	return same;
 }
 
@@ -875,7 +788,7 @@ std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
 {
 	std::string filename;
 	StoreStructure::MakeObjectFilename(ObjectID,
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */, 
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
 		filename, false /* EnsureDirectoryExists */);
 	return RaidFileRead::Open(0, filename);
 }
@@ -908,7 +821,7 @@ bool test_server_housekeeping()
 
 	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
 		0, false);
-	
+
 	int root_dir_blocks = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID)->GetDiscUsageInBlocks();
 	TEST_THAT(check_num_files(0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
@@ -996,7 +909,7 @@ bool test_server_housekeeping()
 			in.Read(encfile_i, sizeof(encfile_i));
 			TEST_THAT(memcmp(encfile, encfile_i, sizeof(encfile)) == 0);
 		}
-		
+
 		// Retrieve the block index, by ID
 		{
 			std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByID(store1objid));
@@ -1064,7 +977,7 @@ bool test_server_housekeeping()
 	// It will take extra blocks, even though there are no changes, because
 	// the server code is not smart enough to realise that the file
 	// contents are identical, so it will create an empty patch.
-	
+
 	TEST_THAT(check_num_files(1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + root_dir_blocks));
@@ -1181,7 +1094,8 @@ bool test_server_housekeeping()
 	protocol.Reopen();
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
+	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks +
+		root_dir_blocks));
 
 	// Used to not consume the stream
 	std::auto_ptr<IOStream> upload(new ZeroStream(1000));
@@ -1237,26 +1151,12 @@ int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id
 	return subdirid;
 }
 
-<<<<<<< HEAD
-bool run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount,
-	bool expectSuccess = true)
-=======
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	const std::string& remote_filename)
->>>>>>> master
 {
 	// Stick a file in it
 	write_test_file(0);
 
-<<<<<<< HEAD
-	// Do housekeeping on this account
-	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
-		discSet, NULL);
-	bool success = housekeeping.DoHousekeeping(true /* keep trying forever */);
-	TEST_EQUAL_LINE(expectSuccess, success, "housekeeping");
-	return success;
-}
-=======
 	BackupStoreFilenameClear remote_filename_encoded;
 	if (remote_filename.empty())
 	{
@@ -1266,7 +1166,6 @@ int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	{
 		remote_filename_encoded = remote_filename;
 	}
->>>>>>> master
 
 	std::string filename("testfiles/test0");
 	int64_t modtime;
@@ -1277,7 +1176,7 @@ int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 		subdirid,
 		modtime,
 		modtime, /* use for attr hash too */
-		0,							/* diff from ID */
+		0, /* diff from ID */
 		remote_filename_encoded,
 		upload));
 
@@ -1353,7 +1252,7 @@ bool test_multiple_uploads()
 	// Stream
 	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 		protocolReadOnly.GetTimeout());
-	TEST_THAT(dir.GetNumberOfEntries() == 0);			
+	TEST_THAT(dir.GetNumberOfEntries() == 0);
 
 	// TODO FIXME dedent
 	{
@@ -1374,7 +1273,7 @@ bool test_multiple_uploads()
 
 			std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(filename.c_str(), BACKUPSTORE_ROOT_DIRECTORY_ID, uploads[t].name, &modtime));
 			TEST_THAT(modtime != 0);
-			
+
 			std::auto_ptr<BackupProtocolSuccess> stored(apProtocol->QueryStoreFile(
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				modtime,
@@ -1422,7 +1321,7 @@ bool test_multiple_uploads()
 			TEST_THAT(set->GetObjectID() == uploads[UPLOAD_ATTRS_EN].allocated_objid);
 			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 0, 1));
 		}
-		
+
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol = connect_and_login(context);
@@ -1477,7 +1376,7 @@ bool test_multiple_uploads()
 			// And on the read/write one
 			check_dir_after_uploads(*apProtocol, attrtest);
 		}
-		
+
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
 
@@ -1527,16 +1426,16 @@ bool test_multiple_uploads()
 				BACKUPSTORE_ROOT_DIRECTORY_ID, uploads[UPLOAD_PATCH_EN].name));
 			TEST_THAT(getblockindex->GetObjectID() == uploads[UPLOAD_PATCH_EN].allocated_objid);
 			std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
-			
+
 			// Do the patching
 			bool isCompletelyDifferent = false;
 			int64_t modtime;
 			std::auto_ptr<IOStream> patchstream(
 				BackupStoreFile::EncodeFileDiff(
-					TEST_FILE_FOR_PATCHING ".mod", 
+					TEST_FILE_FOR_PATCHING ".mod",
 					BACKUPSTORE_ROOT_DIRECTORY_ID,
-					uploads[UPLOAD_PATCH_EN].name, 
-					uploads[UPLOAD_PATCH_EN].allocated_objid, 
+					uploads[UPLOAD_PATCH_EN].name,
+					uploads[UPLOAD_PATCH_EN].allocated_objid,
 					*blockIndexStream,
 					SHORT_TIMEOUT,
 					NULL, // pointer to DiffTimer impl
@@ -1737,7 +1636,7 @@ bool test_server_commands()
 			StreamableMemBlock attrtest(attr2, sizeof(attr2));
 			TEST_THAT(dir.GetAttributes() == attrtest);
 		}
-		
+
 		BackupStoreFilenameClear& oldName(uploads[0].name);
 		int64_t root_file_id = create_file(*apProtocol, BACKUPSTORE_ROOT_DIRECTORY_ID);
 		TEST_THAT(check_num_files(2, 0, 0, 2));
@@ -1903,26 +1802,26 @@ bool test_server_commands()
 		// Query names -- test that invalid stuff returns not found OK
 		{
 			std::auto_ptr<BackupProtocolObjectName> nameRep(apProtocol->QueryGetObjectName(3248972347823478927LL, subsubdirid));
-			TEST_THAT(nameRep->GetNumNameElements() == 0);		
+			TEST_THAT(nameRep->GetNumNameElements() == 0);
 		}
 		{
 			std::auto_ptr<BackupProtocolObjectName> nameRep(apProtocol->QueryGetObjectName(subsubfileid, 2342378424LL));
-			TEST_THAT(nameRep->GetNumNameElements() == 0);		
+			TEST_THAT(nameRep->GetNumNameElements() == 0);
 		}
 		{
 			std::auto_ptr<BackupProtocolObjectName> nameRep(apProtocol->QueryGetObjectName(38947234789LL, 2342378424LL));
-			TEST_THAT(nameRep->GetNumNameElements() == 0);		
+			TEST_THAT(nameRep->GetNumNameElements() == 0);
 		}
 		{
 			std::auto_ptr<BackupProtocolObjectName> nameRep(apProtocol->QueryGetObjectName(BackupProtocolGetObjectName::ObjectID_DirectoryOnly, 2234342378424LL));
-			TEST_THAT(nameRep->GetNumNameElements() == 0);		
+			TEST_THAT(nameRep->GetNumNameElements() == 0);
 		}
 
 		// Query names... first, get info for the file
 		{
 			std::auto_ptr<BackupProtocolObjectName> nameRep(apProtocol->QueryGetObjectName(subsubfileid, subsubdirid));
 			std::auto_ptr<IOStream> namestream(apProtocol->ReceiveStream());
-		
+
 			TEST_THAT(nameRep->GetNumNameElements() == 3);
 			TEST_THAT(nameRep->GetFlags() == BackupProtocolListDirectory::Flags_File);
 			TEST_THAT(nameRep->GetModificationTime() == 0x123456789abcdefLL);
@@ -1940,7 +1839,7 @@ bool test_server_commands()
 		{
 			std::auto_ptr<BackupProtocolObjectName> nameRep(apProtocol->QueryGetObjectName(BackupProtocolGetObjectName::ObjectID_DirectoryOnly, subsubdirid));
 			std::auto_ptr<IOStream> namestream(apProtocol->ReceiveStream());
-		
+
 			TEST_THAT(nameRep->GetNumNameElements() == 2);
 			TEST_THAT(nameRep->GetFlags() == BackupProtocolListDirectory::Flags_Dir);
 			static const char *testnames[] = {"sub2","lovely_directory"};
@@ -1951,7 +1850,7 @@ bool test_server_commands()
 				TEST_THAT(fn.GetClearFilename() == testnames[l]);
 			}
 		}
-			
+
 //}	skip:
 
 		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
@@ -1968,7 +1867,7 @@ bool test_server_commands()
 			BACKUPSTORE_ROOT_DIRECTORY_ID,
 			"test_delete", 6 /* depth */, apRefCount.get());
 		TEST_THAT(check_reference_counts());
-		
+
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		TEST_THAT(check_reference_counts());
@@ -1996,7 +1895,7 @@ bool test_server_commands()
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
-			
+
 			// There should be no deleted entries. The directory
 			// that we tried to delete should have been removed
 			// immediately because it had >1 reference, and the
@@ -2006,15 +1905,18 @@ bool test_server_commands()
 			dirreply = protocolReadOnly.QueryListDirectory(
 				BackupProtocolListDirectory::RootDirectory,
 				BackupProtocolListDirectory::Flags_Dir,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
-			// Stream
-			dirstream = protocolReadOnly.ReceiveStream();
-			dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes */
+				);
+			dir.ReadFromStream(protocolReadOnly.ReceiveStream(),
+				IOStream::TimeOutInfinite);
 
-			en = BackupStoreDirectory::Iterator(dir).Find(snapshotName);
+			BackupStoreDirectory::Iterator i(dir);
+			BackupStoreDirectory::Entry* en =
+				i.FindMatchingClearName(snapshotName);
 			TEST_THAT(en != 0);
-			
-			en = BackupStoreDirectory::Iterator(dir).Find(snapshot2Name);
+
+			en = i.FindMatchingClearName(snapshot2Name);
 			TEST_THAT_OR(en != 0, FAIL);
 			TEST_EQUAL(dirtodelete, en->GetObjectID());
 			BackupStoreFilenameClear n("test_delete");
@@ -2047,6 +1949,12 @@ bool test_snapshot_commands()
 		new BackupProtocolLocal2(0x01234567, "test",
 			"backup/01234567/", 0, false));
 
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
+		BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567), true));
+
 	// Things to test:
 	// Create a snapshot copy of a file in the same dir
 	// Try various commands to modify stuff inside original or snapshot,
@@ -2060,7 +1968,7 @@ bool test_snapshot_commands()
 		"test_delete", 6 /* depth */, *apRefCount,
 		&firstSubFileDirId, &firstSubFileName, &firstSubDirId);
 
-	TEST_EQUAL(true, check_refcounts(apRefCount.get()));
+	TEST_EQUAL(true, check_reference_counts());
 
 	// Also check that the account is sane beforehand.
 	// For which we have to logout.
@@ -2072,7 +1980,7 @@ bool test_snapshot_commands()
 	std::auto_ptr<BackupStoreInfo> apInfoBefore =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
-	apProtocol = test_server_login(hostname, context, conn);
+	apProtocol->Reopen();
 
 	// Create two snapshot of this directory
 	BackupStoreFilenameClear snapshotName("snapshot");
@@ -2086,59 +1994,48 @@ bool test_snapshot_commands()
 			BackupProtocolListDirectory::RootDirectory,
 			/* NewObjectFileName */
 			snapshotName);
-	BOX_INFO("Snapshot created of object ID " << 
+	BOX_INFO("Snapshot created of object ID " <<
 		BOX_FORMAT_OBJECTID(dirtodelete));
 	ExpectedRefCounts[dirtodelete]++;
 
 	BackupStoreFilenameClear snapshot2Name("snapshot2");
 	success = apProtocol->QueryAddReference(
-			/* ObjectToCloneID */
-			dirtodelete,
-			/* OldDirectoryID */
-			BackupProtocolListDirectory::RootDirectory,
-			/* mNewDirectoryID */
-			BackupProtocolListDirectory::RootDirectory,
-			/* NewObjectFileName */
-			snapshot2Name);
-	BOX_INFO("Snapshot created of object ID " << 
+		/* ObjectToCloneID */
+		dirtodelete,
+		/* OldDirectoryID */
+		BackupProtocolListDirectory::RootDirectory,
+		/* mNewDirectoryID */
+		BackupProtocolListDirectory::RootDirectory,
+		/* NewObjectFileName */
+		snapshot2Name);
+	BOX_INFO("Snapshot created of object ID " <<
 		BOX_FORMAT_OBJECTID(dirtodelete));
 	ExpectedRefCounts[dirtodelete]++;
 
 	// Run housekeeping to check block counts, for which we have to logout
 	apProtocol->QueryFinished();
-	TEST_EQUAL_LINE(true, run_housekeeping(account),
+	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
 		"housekeeping after snapshot");
 
-	// Also check that bbstoreaccounts doesn't change anything
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf check 01234567 fix") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-	apProtocol = test_server_login(hostname, context, conn);
+	apProtocol->Reopen();
 	std::auto_ptr<BackupStoreInfo> apInfoAfter =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
 	TEST_EQUAL_LINE(0, apInfoAfter->ReportChangesTo(*apInfoBefore),
 		"Creating a snapshot changed block counts");
-	TEST_EQUAL(true, check_refcounts(apRefCount.get()));
+	TEST_EQUAL(true, check_reference_counts());
 
 	// Try to delete a file and a directory in the original
 	// without copying them first. Both should throw an
 	// exception because they're in a multiply referenced
 	// (hence immutable) parent.
-	TEST_CHECK_THROWS(apProtocol->QueryDeleteFile(firstSubFileDirId,
-			firstSubFileName),
-		ConnectionException, Conn_Protocol_UnexpectedReply);
-	int type, subtype;
-	apProtocol->GetLastError(type, subtype);
-	TEST_EQUAL_LINE(BackupProtocolError::Err_MultiplyReferencedObject,
-		subtype, "wrong error code in protocol");
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryDeleteFile(firstSubFileDirId, firstSubFileName),
+		BackupProtocolError::Err_MultiplyReferencedObject);
 
-	TEST_CHECK_THROWS(apProtocol->QueryDeleteDirectory(firstSubDirId),
-		ConnectionException, Conn_Protocol_UnexpectedReply);
-	apProtocol->GetLastError(type, subtype);
-	TEST_EQUAL_LINE(BackupProtocolError::Err_MultiplyReferencedObject,
-		subtype, "wrong error code in protocol");
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryDeleteDirectory(firstSubDirId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	return teardown_test_backupstore();
 }
@@ -2395,14 +2292,14 @@ bool test_encoding()
 			TEST_THAT(encBlockSize > SMALL_BLOCK_SIZE);
 			BackupStoreFile::EncodingBuffer encoded;
 			encoded.Allocate(encBlockSize / 8);		// make sure reallocation happens
-			
+
 			// Encode!
 			int encSize = BackupStoreFile::EncodeChunk(encfile, SMALL_BLOCK_SIZE, encoded);
 			// Check the header says it's not been compressed
 			TEST_THAT((encoded.mpBuffer[0] & 1) == 0);
 			// Check the output size has been inflated (no compression)
 			TEST_THAT(encSize > SMALL_BLOCK_SIZE);
-			
+
 			// Decode it
 			int decBlockSize = BackupStoreFile::OutputBufferSizeForKnownOutputSize(SMALL_BLOCK_SIZE);
 			TEST_THAT(decBlockSize > SMALL_BLOCK_SIZE);
@@ -2410,10 +2307,10 @@ bool test_encoding()
 			int decSize = BackupStoreFile::DecodeChunk(encoded.mpBuffer, encSize, decoded, decBlockSize);
 			TEST_THAT(decSize < decBlockSize);
 			TEST_THAT(decSize == SMALL_BLOCK_SIZE);
-			
+
 			// Check it came out of the wash the same
 			TEST_THAT(::memcmp(encfile, decoded, SMALL_BLOCK_SIZE) == 0);
-			
+
 			free(decoded);
 		}
 
@@ -2423,14 +2320,14 @@ bool test_encoding()
 			TEST_THAT(encBlockSize > ENCFILE_SIZE);
 			BackupStoreFile::EncodingBuffer encoded;
 			encoded.Allocate(encBlockSize / 8);		// make sure reallocation happens
-			
+
 			// Encode!
 			int encSize = BackupStoreFile::EncodeChunk(encfile, ENCFILE_SIZE, encoded);
 			// Check the header says it's compressed
 			TEST_THAT((encoded.mpBuffer[0] & 1) == 1);
 			// Check the output size make it likely that it's compressed (is very compressible data)
 			TEST_THAT(encSize < ENCFILE_SIZE);
-			
+
 			// Decode it
 			int decBlockSize = BackupStoreFile::OutputBufferSizeForKnownOutputSize(ENCFILE_SIZE);
 			TEST_THAT(decBlockSize > ENCFILE_SIZE);
@@ -2441,16 +2338,16 @@ bool test_encoding()
 
 			// Check it came out of the wash the same
 			TEST_THAT(::memcmp(encfile, decoded, ENCFILE_SIZE) == 0);
-			
+
 			free(decoded);
 		}
-		
+
 		// The test block to a file
 		{
 			FileStream f("testfiles/testenc1", O_WRONLY | O_CREAT);
 			f.Write(encfile, sizeof(encfile));
 		}
-		
+
 		// Encode it
 		{
 			FileStream out("testfiles/testenc1_enc", O_WRONLY | O_CREAT);
@@ -2459,20 +2356,20 @@ bool test_encoding()
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testenc1", 32, name));
 			encoded->CopyStreamTo(out);
 		}
-		
+
 		// Verify it
 		{
 			FileStream enc("testfiles/testenc1_enc");
 			TEST_THAT(BackupStoreFile::VerifyEncodedFileFormat(enc) == true);
 		}
-		
+
 		// Decode it
 		{
 			UNLINK_IF_EXISTS("testfiles/testenc1_orig");
 			FileStream enc("testfiles/testenc1_enc");
 			BackupStoreFile::DecodeFile(enc, "testfiles/testenc1_orig", IOStream::TimeOutInfinite);
 		}
-		
+
 		// Read in rebuilt original, and compare contents
 		{
 			TEST_THAT(TestGetFileSize("testfiles/testenc1_orig") == sizeof(encfile));
@@ -2481,7 +2378,7 @@ bool test_encoding()
 			in.Read(encfile_i, sizeof(encfile_i));
 			TEST_THAT(memcmp(encfile, encfile_i, sizeof(encfile)) == 0);
 		}
-		
+
 		// Check how many blocks it had, and test the stream based interface
 		{
 			FileStream enc("testfiles/testenc1_enc");
@@ -2494,7 +2391,7 @@ bool test_encoding()
 
 			TEST_THAT(decoded->GetNumBlocks() == 3);
 		}
-		
+
 		// Test that the last block in a file, if less than 256 bytes, gets put into the last block
 		{
 			#define FILE_SIZE_JUST_OVER	((4096*2)+58)
@@ -2510,11 +2407,11 @@ bool test_encoding()
 			decoded->CopyStreamTo(d, IOStream::TimeOutInfinite, 879 /* buffer block size */);
 			d.SetForReading();
 			TEST_THAT(d.GetSize() == FILE_SIZE_JUST_OVER);
-			TEST_THAT(memcmp(encfile + 2, d.GetBuffer(), FILE_SIZE_JUST_OVER) == 0);			
+			TEST_THAT(memcmp(encfile + 2, d.GetBuffer(), FILE_SIZE_JUST_OVER) == 0);
 
 			TEST_THAT(decoded->GetNumBlocks() == 2);
 		}
-		
+
 		// Test that reordered streams work too
 		{
 			FileStream enc("testfiles/testenc1_enc");
@@ -2547,7 +2444,7 @@ bool test_symlinks()
 			BackupStoreFilenameClear name("testsymlink");
 			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
 
-			// Can't decode it from the stream, because it's in file order, and doesn't have the 
+			// Can't decode it from the stream, because it's in file order, and doesn't have the
 			// required properties to be able to reorder it. So buffer it...
 			CollectInBufferStream b;
 			encoded->CopyStreamTo(b);
@@ -2557,7 +2454,7 @@ bool test_symlinks()
 			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
 			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 		}
-	teardown_test_backupstore();	
+	teardown_test_backupstore();
 #endif
 
 	return true;
@@ -2637,7 +2534,7 @@ bool test_login_without_account()
 		// Login
 		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0)),
 			ConnectionException, Protocol_UnexpectedReply);
-		
+
 		// Finish the connection
 		protocol.QueryFinished();
 	}
@@ -2676,7 +2573,7 @@ bool test_bbstoreaccounts_delete()
 	return teardown_test_backupstore();
 }
 
-// Test that login fails on a disabled account 
+// Test that login fails on a disabled account
 bool test_login_with_disabled_account()
 {
 	SETUP();
@@ -2698,8 +2595,8 @@ bool test_login_with_disabled_account()
 		apReferences->GetLastObjectIDUsed());
 	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
 	apReferences.reset();
-	
-	// Test that login fails on a disabled account 
+
+	// Test that login fails on a disabled account
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
@@ -2714,48 +2611,19 @@ bool test_login_with_disabled_account()
 		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 
 		// Login
-<<<<<<< HEAD
-		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed>
-			loginConf(protocol.QueryLogin(0x01234567, 0)),
-			ConnectionException, Conn_Protocol_UnexpectedReply);
-		int type, subType;
-		TEST_EQUAL_LINE(true, protocol.GetLastError(type, subType),
-			"expected a protocol error");
-		TEST_EQUAL_LINE(BackupProtocolError::ErrorType, type,
-			"expected a BackupProtocolError");
-		TEST_EQUAL_LINE(BackupProtocolError::Err_DisabledAccount, subType,
-			"expected an Err_DisabledAccount");
-=======
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
 			BackupProtocolError::Err_DisabledAccount);
 
->>>>>>> master
 		// Finish the connection
 		protocol.QueryFinished();
 	}
 
-<<<<<<< HEAD
-	{
-		std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
-			BackupStoreRefCountDatabase::Load(
-				apAccounts->GetEntry(0x1234567), true));
-		ExpectedRefCounts.resize(2);
-		ExpectedRefCounts[BACKUPSTORE_ROOT_DIRECTORY_ID] = 1;
-		TEST_EQUAL(true, check_refcounts(apReferences.get()));
-	}
-
-	// Re-enable the account so that subsequent logins should succeed
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-=======
 	return teardown_test_backupstore();
 }
 
 bool test_login_with_no_refcount_db()
 {
 	SETUP();
->>>>>>> master
 
 	// The account is already enabled, but doing it again shouldn't hurt
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
@@ -2779,13 +2647,9 @@ bool test_login_with_no_refcount_db()
 		"Housekeeping should report 1 error if the refcount db is missing");
 	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 
-<<<<<<< HEAD
-	run_housekeeping(account, false /* we expect errors */);
-=======
 	// And that we can log in afterwards
 	BackupProtocolLocal2(0x01234567, "test", "backup/01234567/", 0,
 		false).QueryFinished(); // Not read-only
->>>>>>> master
 
 	// Check that housekeeping fixed the ref counts
 	TEST_THAT(check_reference_counts());
@@ -2806,25 +2670,14 @@ bool test_login_with_no_refcount_db()
 	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_THAT(check_reference_counts());
 
-<<<<<<< HEAD
-	// test that all object reference counts have the
-	// expected values
-	TEST_EQUAL(true, check_refcounts(apReferences.get()));
-=======
 	// And that we can log in afterwards
 	connect_and_login(context)->QueryFinished();
->>>>>>> master
 
 	return teardown_test_backupstore();
 }
 
-<<<<<<< HEAD
-	TEST_EQUAL(true, check_refcounts(apReferences.get()));
-	
-=======
 bool test_housekeeping_deletes_files()
 {
->>>>>>> master
 	// Test the deletion of objects by the housekeeping system
 
 	SETUP();
@@ -2846,15 +2699,9 @@ bool test_housekeeping_deletes_files()
 	// First, things as they are now.
 	TEST_THAT_OR(StartServer(), FAIL);
 	recursive_count_objects_results before = {0,0,0};
-<<<<<<< HEAD
-	recursive_count_objects("localhost", BackupProtocolListDirectory::RootDirectory, before);
-	
-	TEST_THAT(before.objectsNotDel != 0);
-=======
 	recursive_count_objects(BACKUPSTORE_ROOT_DIRECTORY_ID, before);
 
 	TEST_EQUAL(0, before.objectsNotDel);
->>>>>>> master
 	TEST_THAT(before.deleted != 0);
 	TEST_THAT(before.old != 0);
 
@@ -2892,7 +2739,7 @@ bool test_account_limits_respected()
 	TEST_THAT_OR(StartServer(), FAIL);
 
 	// Set a really small hard limit
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS 
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf setlimit 01234567 "
 		"2B 2B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
@@ -2939,14 +2786,14 @@ int multi_server()
 	printf("Starting server for connection from remote machines...\n");
 
 	// Create an account for the test client
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS 
+	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf create 01234567 0 "
 		"30000B 40000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// First, try logging in without an account having been created... just make sure login fails.
 
-	int pid = LaunchServer(BBSTORED " testfiles/bbstored_multi.conf", 
+	int pid = LaunchServer(BBSTORED " testfiles/bbstored_multi.conf",
 		"testfiles/bbstored.pid");
 
 	TEST_THAT(pid != -1 && pid != 0);
@@ -2974,7 +2821,7 @@ bool test_open_files_with_limited_win32_permissions()
 	// this had better work, or bbstored will die when combining diffs
 	char* file = "foo";
 
-	DWORD accessRights = FILE_READ_ATTRIBUTES | 
+	DWORD accessRights = FILE_READ_ATTRIBUTES |
 		FILE_LIST_DIRECTORY | FILE_READ_EA | FILE_WRITE_ATTRIBUTES |
 		FILE_WRITE_DATA | FILE_WRITE_EA /*| FILE_ALL_ACCESS*/;
 	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
@@ -2984,7 +2831,7 @@ bool test_open_files_with_limited_win32_permissions()
 	assert(h1 != INVALID_HANDLE_VALUE);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
 
-	accessRights = FILE_READ_ATTRIBUTES | 
+	accessRights = FILE_READ_ATTRIBUTES |
 		FILE_LIST_DIRECTORY | FILE_READ_EA;
 
 	HANDLE h2 = CreateFileA(file, accessRights, shareMode,
@@ -3063,7 +2910,7 @@ void compare_backupstoreinfo_values_to_expected
 	TEST_EQUAL_LINE(expected_account_enabled, actual.IsAccountEnabled(),
 		test_phase << " AccountEnabled");
 
-	TEST_EQUAL_LINE(extra_data.GetSize(), actual.GetExtraData().GetSize(), 
+	TEST_EQUAL_LINE(extra_data.GetSize(), actual.GetExtraData().GetSize(),
 		test_phase << " extra data has wrong size");
 	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
 		actual.GetExtraData().GetBuffer(), extra_data.GetSize()),
@@ -3107,7 +2954,7 @@ bool test_read_old_backupstoreinfo_files()
 	apArchive->Write((int64_t) 14);
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
-	
+
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
@@ -3115,10 +2962,10 @@ bool test_read_old_backupstoreinfo_files()
 		true /* enabled by default */);
 
 	apInfo->SetAccountName("bonk");
-	
+
 	// Save the info again
 	apInfo->Save(/* allowOverwrite */ true);
-	
+
 	// Check that it was saved in the new Archive format
 	std::auto_ptr<RaidFileRead> rfr(RaidFileRead::Open(0, info_filename, 0));
 	int32_t magic;
@@ -3137,7 +2984,7 @@ bool test_read_old_backupstoreinfo_files()
 		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("loaded in v1, resaved in v2",
 		info_v1, *apInfo, "bonk", true);
-		
+
 	// Check that the new AccountEnabled flag is saved properly
 	apInfo->SetAccountEnabled(false);
 	apInfo->Save(/* allowOverwrite */ true);
@@ -3156,7 +3003,7 @@ bool test_read_old_backupstoreinfo_files()
 	// Now save the info in v2 format without the AccountEnabled flag
 	// (boxbackup 0.11 format) and check that the flag is set to true
 	// for backwards compatibility
-	
+
 	rfw.reset(new RaidFileWrite(0, info_filename));
 	rfw->Open(/* allowOverwrite */ true);
 	magic = htonl(INFO_MAGIC_VALUE_2);
@@ -3182,7 +3029,7 @@ bool test_read_old_backupstoreinfo_files()
 	apArchive->Write(apInfo->GetDeletedDirectories()[1]);
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
-	
+
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ false);
 	compare_backupstoreinfo_values_to_expected("saved in v2 without "
@@ -3192,7 +3039,7 @@ bool test_read_old_backupstoreinfo_files()
 	// Rewrite using full length, so that the first 4 bytes of extra data
 	// doesn't get swallowed by "extra data".
 	apInfo->Save(/* allowOverwrite */ true);
-		
+
 	// Append some extra data after the known account values, to simulate a
 	// new addition to the store format. Check that this extra data is loaded
 	// and resaved with the info file. We made the mistake of deleting it in
@@ -3212,7 +3059,7 @@ bool test_read_old_backupstoreinfo_files()
 	rfw.reset();
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
 		/* ReadOnly */ false);
-	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(), 
+	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(),
 		"wrong amount of extra data loaded from info file");
 	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
 		apInfo->GetExtraData().GetBuffer(), extra_data.GetSize()),
@@ -3222,7 +3069,7 @@ bool test_read_old_backupstoreinfo_files()
 	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
 	compare_backupstoreinfo_values_to_expected("saved in future format "
 		"with extra_data", info_v1, *apInfo, "test", true, extra_data);
-		
+
 	// Check that the new bbstoreaccounts command sets the flag properly
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
@@ -3284,17 +3131,17 @@ int test(int argc, const char *argv[])
 	// Initialise the raid file controller
 	RaidFileController &rcontroller = RaidFileController::GetController();
 	rcontroller.Initialise("testfiles/raidfile.conf");
-	
+
 	TEST_THAT(test_read_old_backupstoreinfo_files());
-	
+
 	// SSL library
 	SSLLib::Initialise();
-	
+
 	// Use the setup crypto command to set up all these keys, so that the bbackupquery command can be used
 	// for seeing what's going on.
-	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");	
-	
-	// encode in some filenames -- can't do static initialisation 
+	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
+
+	// encode in some filenames -- can't do static initialisation
 	// because the key won't be set up when these are initialised
 	{
 		MEMLEAKFINDER_NO_LEAKS
@@ -3308,7 +3155,7 @@ int test(int argc, const char *argv[])
 			uploads[l].name = BackupStoreFilenameClear(uploads_filenames[l]);
 		}
 	}
-	
+
 	// Trace errors out
 	SET_DEBUG_SSLLIB_TRACE_ERRORS
 
