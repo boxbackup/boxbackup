@@ -307,7 +307,7 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 					{
 						THROW_SYS_FILE_ERROR("Failed to "
 							"create missing RaidFile "
-							"directory", dn, 
+							"directory", dn,
 							RaidFileException, OSError);
 					}
 				}
@@ -337,7 +337,7 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 			else
 			{
 				BOX_ERROR("Spurious or invalid directory " <<
-					rDirName << DIRECTORY_SEPARATOR << 
+					rDirName << DIRECTORY_SEPARATOR <<
 					(*i) << " found, " <<
 					(mFixErrors?"deleting":"delete manually"));
 				++mNumberErrorsFound;
@@ -364,7 +364,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 	std::string dirName;
 	StoreStructure::MakeObjectFilename(StartID, mStoreRoot, mDiscSetNumber, dirName, false /* don't make sure the dir exists */);
 	// Check expectations
-	ASSERT(dirName.size() > 4 && 
+	ASSERT(dirName.size() > 4 &&
 		dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR);
 	// Remove the filename from it
 	dirName.resize(dirName.size() - 4); // four chars for "/o00"
@@ -420,7 +420,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			BOX_ERROR("Spurious file " << dirName << 
+			BOX_ERROR("Spurious file " << dirName <<
 				DIRECTORY_SEPARATOR << (*i) << " found" <<
 				(mFixErrors?", deleting":""));
 			++mNumberErrorsFound;
@@ -547,7 +547,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 	if(!rdiscSet.IsNonRaidSet())
 	{
 		// See if the file exists
-		RaidFileUtil::ExistType existance = 
+		RaidFileUtil::ExistType existance =
 			RaidFileUtil::RaidFileExists(rdiscSet, rFilename);
 		if(existance == RaidFileUtil::NonRaid)
 		{
@@ -563,12 +563,12 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		else if(existance == RaidFileUtil::AsRaidWithMissingReadable)
 		{
 			BOX_WARNING("Found damaged but repairable RAID file" <<
-				(mFixErrors?", repairing: ":"") << 
+				(mFixErrors?", repairing: ":"") <<
 				(mFixErrors?rFilename:""));
 			if(mFixErrors)
 			{
 				std::auto_ptr<RaidFileRead> read(
-					RaidFileRead::Open(mDiscSetNumber, 
+					RaidFileRead::Open(mDiscSetNumber,
 						rFilename));
 				RaidFileWrite write(mDiscSetNumber, rFilename);
 				write.Open(true /* overwrite */);
@@ -731,8 +731,8 @@ void BackupStoreCheck::CheckDirectories()
 					{
 						badEntry = !CheckDirectoryEntry(
 							*en, pblock->mID[e],
-							iIndex, isModified,
-							wasAlreadyContained);
+							piBlock, iIndex, isModified,
+							&wasAlreadyContained);
 					}
 
 					ASSERT(piBlock != 0 ||
@@ -756,7 +756,7 @@ void BackupStoreCheck::CheckDirectories()
 					}
 					else if(!en->IsFile())
 					{
-						BOX_TRACE("Not counting object " << 
+						BOX_TRACE("Not counting object " <<
 							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 							" with flags " << en->GetFlags());
 					}
@@ -833,7 +833,8 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			if(piBlock != 0)
 			{
 				badEntry = !CheckDirectoryEntry(*en,
-					dir.GetObjectID(), iIndex, isModified);
+					dir.GetObjectID(), piBlock, iIndex,
+					isModified);
 			}
 			// Item can't be found. Is it a directory?
 			else if(en->IsDir())
@@ -846,9 +847,9 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			{
 				// Just remove the entry
 				badEntry = true;
-				BOX_ERROR("Directory ID " << 
+				BOX_ERROR("Directory ID " <<
 					BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
-					" references object " << 
+					" references object " <<
 					BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 					" which does not exist.");
 				++mNumberErrorsFound;
@@ -868,7 +869,7 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			{
 				BOX_ERROR("Removing directory entry " <<
 					BOX_FORMAT_OBJECTID(*d) << " from "
-					"directory " << 
+					"directory " <<
 					BOX_FORMAT_OBJECTID(dir.GetObjectID()));
 				++mNumberErrorsFound;
 				dir.DeleteEntry(*d);
@@ -886,11 +887,9 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 }
 
 bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
-	int64_t DirectoryID, int32_t IndexInDirBlock, bool& rIsModified,
-	bool* pWasAlreadyContained)
+	int64_t DirectoryID, IDBlock *piBlock, int32_t IndexInDirBlock,
+	bool& rIsModified, bool* pWasAlreadyContained)
 {
-	int32_t IndexInDirBlock;
-	IDBlock *piBlock = LookupID(rEntry.GetObjectID(), IndexInDirBlock);
 	ASSERT(piBlock != 0);
 
 	bool dummy;

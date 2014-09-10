@@ -807,7 +807,7 @@ void BackupStoreContext::AddReference(int64_t ObjectID, int64_t OldDirectoryID,
 			pEntry->GetFlags(), pEntry->GetAttributesHash());
 
 		// Write the directory back to disc
-		SaveDirectory(newDir, NewDirectoryID);
+		SaveDirectory(newDir);
 	}
 	catch(...)
 	{
@@ -865,13 +865,13 @@ int64_t BackupStoreContext::CopyDirectory(int64_t DirToCopyID, int64_t Containin
 	BackupStoreDirectory &subDir(GetDirectoryInternal(DirToCopyID));
 	int64_t newObjectID = AllocateObjectID();
 	subDir.SetContainerID(ContainingDirID);
-	SaveDirectory(subDir, newObjectID);
+	SaveDirectory(subDir);
 
 	parentDir.DeleteEntry(DirToCopyID);
 	parentDir.AddEntry(pEntry->GetName(), pEntry->GetModificationTime(),
 		newObjectID, subDir.GetUserInfo1_SizeInBlocks(),
 		pEntry->GetFlags(), pEntry->GetAttributesHash());
-	SaveDirectory(parentDir, ContainingDirID);
+	SaveDirectory(parentDir);
 
 	mapStoreInfo->AdjustNumDirectories(1);
 	return newObjectID;
@@ -1374,7 +1374,7 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 		}
 
 		// Save it
-		SaveDirectory(parentDir, InDirectory);
+		SaveDirectory(parentDir);
 
 		// Update blocks deleted count
 		SaveStoreInfo(false);

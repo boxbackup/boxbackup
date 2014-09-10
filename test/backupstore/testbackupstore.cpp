@@ -1094,7 +1094,8 @@ bool test_server_housekeeping()
 	protocol.Reopen();
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks +
+	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, 
+		root_dir_blocks +
 		root_dir_blocks));
 
 	// Used to not consume the stream
@@ -1865,7 +1866,7 @@ bool test_server_commands()
 		write_test_file(1);
 		int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 			BACKUPSTORE_ROOT_DIRECTORY_ID,
-			"test_delete", 6 /* depth */, apRefCount.get());
+			"test_delete", 6 /* depth */, *apRefCount);
 		TEST_THAT(check_reference_counts());
 
 		apProtocol->QueryFinished();

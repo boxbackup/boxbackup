@@ -129,7 +129,7 @@ private:
 	bool CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
 	bool CheckDirectory(BackupStoreDirectory& dir);
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
-		int64_t DirectoryID, int32_t indexInDirBlock,
+		int64_t DirectoryID, IDBlock *piBlock, int32_t indexInDirBlock,
 		bool& rIsModified, bool* pWasAlreadyContained = NULL);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
 	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);
