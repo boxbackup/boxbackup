@@ -600,7 +600,6 @@ BackupProtocolSetReplacementFileAttributes::DoCommand(
 }
 
 
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -724,6 +723,35 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolUndeleteDirectory::DoCommand(
 	// return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
 }
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolDeleteNow::DoCommand(
+//			 BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Delete a file or directory immediately, don't just
+//			 mark it as deleted.
+//		Created: 2014/09/11
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteNow::DoCommand(
+	BackupProtocolReplyable &rProtocol,
+	BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+	CHECK_WRITEABLE_SESSION
+
+	if(!rContext.DeleteNow(mObjectToDeleteID, mContainingDirID))
+	{
+		return PROTOCOL_ERROR(Err_DoesNotExistInDirectory);
+	}
+
+	// return the object ID
+	return std::auto_ptr<BackupProtocolMessage>(
+		new BackupProtocolSuccess(mObjectToDeleteID));
+}
+
 
 // --------------------------------------------------------------------------
 //
@@ -1044,32 +1072,19 @@ BackupProtocolAddReference::DoCommand(BackupProtocolReplyable &rProtocol,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolCopyDirectory::DoCommand(
+//		Name:    BackupProtocolMakeUnique::DoCommand(
 //			 BackupProtocolReplyable &, BackupStoreContext &)
 //		Purpose: Creates a mutable copy of an existing immutable
-//			 object
-//		Created: 04/12/11
+//			 object. See documentation in backupprotocol.txt.
+//		Created: 2014-09-11
 //
 // --------------------------------------------------------------------------
-/**
- * Makes a copy of a (multiply referenced) object, with a new object ID and a
- * reference count of 1, and changes the reference in the specified directory
- * to point to the new copy, making it mutable again.
- *
- * The newly created object will have a different container ID embedded in it,
- * so it's not a binary identical copy, but it is functionally identical.
- *
- * The containing directory must already be mutable, since the object ID will
- * change if a copy needs to be created. The new object ID will be returned.
- * If the directory did not need to be copied (only one reference), then the
- * same object ID will be returned.
- */
 std::auto_ptr<BackupProtocolMessage>
-BackupProtocolCopyDirectory::DoCommand(BackupProtocolReplyable &rProtocol,
+BackupProtocolMakeUnique::DoCommand(BackupProtocolReplyable &rProtocol,
 	BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
-	int64_t newObjectID = rContext.CopyDirectory(mDirToCopyID,
+	int64_t newObjectID = rContext.MakeUnique(mObjectToMakeUniqueID,
 		mContainingDirID);
 	return std::auto_ptr<BackupProtocolMessage>(
 		new BackupProtocolSuccess(newObjectID));

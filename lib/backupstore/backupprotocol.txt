@@ -123,14 +123,6 @@ CreateDirectory	20	Command(Success)	StreamWithCommand
 	# stream following containing attributes
 
 
-CreateDirectory2	46	Command(Success)	StreamWithCommand
-	int64		ContainingDirectoryID
-	int64		AttributesModTime
-	int64		ModificationTime
-	Filename	DirectoryName
-	# stream following containing attributes
-
-
 ListDirectory	21	Command(Success)
 	int64		ObjectID
 	int16		FlagsMustBeSet
@@ -159,9 +151,18 @@ ChangeDirAttributes	22	Command(Success)	StreamWithCommand
 DeleteDirectory	23	Command(Success)
 	int64		ObjectID
 
+
 UndeleteDirectory	24	Command(Success)
 	int64		ObjectID
 	# may not have exactly the desired effect if files within in have been deleted before the directory was deleted.
+
+
+CreateDirectory2	25	Command(Success)	StreamWithCommand
+	int64		ContainingDirectoryID
+	int64		AttributesModTime
+	int64		ModificationTime
+	Filename	DirectoryName
+	# stream following containing attributes
 
 
 # -------------------------------------------------------------------------------------
@@ -262,7 +263,10 @@ AccountUsage2	45	Reply
 	int64	NumDeletedFiles
 	int64	NumDirectories
 
-# 46 is CreateDirectory2, above
+
+# -------------------------------------------------------------------------------------
+#  Snapshot Commands
+# -------------------------------------------------------------------------------------
 
 # Creates a new reference to an existing object ID, with a new name, in the
 # specified directory (by object ID). The object pointed to by this new
@@ -280,21 +284,35 @@ AccountUsage2	45	Reply
 # references, but will presumably have one when inserted into the relevant
 # container, and will thus be modifiable.
 
-AddReference	47	Command(Success)
+AddReference	50	Command(Success)
 	int64		ObjectToCloneID
 	int64		OldDirectoryID
 	int64		NewDirectoryID
 	Filename	NewObjectFileName
 
-# Makes a copy of a (multiply referenced) directory, with a new object ID and a
-# reference count of 1, and changes the reference in the specified directory to
-# point to the new copy, making it mutable again.
+# Find the directory named by ObjectFileName in ContainingDirID, and ensure
+# that it is unique/singly referenced, copying it if necessary.
 #
-# The newly created directory will have a different container ID embedded in
-# it, so it's not a binary identical copy, but it is functionally identical.
+# If the directory is mirrored (multiply referenced), then make a copy of it,
+# adjust the directory entry named ObjectFileName in ContainingDirID to point
+# to the new copy, and return the ID of the new copy, which is now singly
+# referenced and therefore modifiable again. Note that this is not recursive:
+# the newly copied directory contains the same entries as the original, and
+# thus adds a reference to each one of them, making them mirrored.
 #
-# The containing directory must already be mutable.
+# The containing directory must already be unique. The root directory is
+# always unique.
+#
+# If the directory is already unique (singly referenced), then no copy will be
+# made and its existing object ID will be returned.
 
-CopyDirectory	48	Command(Success)
-	int64		DirToCopyID
+MakeUnique	51	Command(Success)
+	int64		ObjectToMakeUniqueID
 	int64		ContainingDirID
+
+DeleteNow	52	Command(Success)
+	int64		ObjectToDeleteID
+	int64		ContainingDirID
+	# will return an error if the object couldn't be found in the specified directory
+
+

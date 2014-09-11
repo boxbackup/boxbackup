@@ -1094,9 +1094,7 @@ bool test_server_housekeeping()
 	protocol.Reopen();
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, 
-		root_dir_blocks +
-		root_dir_blocks));
+	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
 
 	// Used to not consume the stream
 	std::auto_ptr<IOStream> upload(new ZeroStream(1000));
@@ -1909,7 +1907,7 @@ bool test_server_commands()
 				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 				false /* no attributes */
 				);
-			dir.ReadFromStream(protocolReadOnly.ReceiveStream(),
+			dir.ReadFromStream(*protocolReadOnly.ReceiveStream(),
 				IOStream::TimeOutInfinite);
 
 			BackupStoreDirectory::Iterator i(dir);
@@ -1952,16 +1950,39 @@ bool test_snapshot_commands()
 
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	BackupStoreAccountDatabase::Entry& account =
+		apAccounts->GetEntry(0x1234567);
 	std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
-		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true));
+		BackupStoreRefCountDatabase::Load(account, true));
 
 	// Things to test:
 	// Create a snapshot copy of a file in the same dir
 	// Try various commands to modify stuff inside original or snapshot,
 	// test that they are refused.
 	// Copy the snapshot to break the lock.
-	//
+	// Try to clone the root directory, which cannot be immutable, so this should return an error.
+	// Make an object mutable that's already mutable, check return ID.
+	// Try to snapshot and make mutable on files.
+	// Try MakeUnique with a filename that doesn't exist in parent dir.
+	// Try MakeUnique with a filename points to a different object ID.
+	// Check that reference count on original object drops after MakeUnique.
+	// Make changes deeper down inside a snapshotted directory, which should return an error.
+	// MakeUnique should increase number of directories and blocks in them.
+	// MakeUnique should increase reference count on each entry in the new directory.
+	// Try to DeleteNow on the root directory, should return an error.
+	// Recursively DeleteNow a directory containing a mixture of singly
+	// and multiply referenced objects, including some where all references
+	// are removed by the deletion operation, and some which have additional
+	// references outside.
+	// Try to add a reference to an object in a directory which already
+	// contains a reference to that object, which is an error.
+	// Check that a directory containing multiple references to the same
+	// object is an error.
+	// Try DeleteNow on a file and a directory, with and without multiple
+	// references.
+	// Test the immutable and snapshot flags - setting, clearing, enforcement.
+	// Try moving a directory, check that its container ID is updated.
+
 	int64_t firstSubFileDirId, firstSubDirId;
 	BackupStoreFilenameClear firstSubFileName;
 	int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
@@ -1974,56 +1995,62 @@ bool test_snapshot_commands()
 	// Also check that the account is sane beforehand.
 	// For which we have to logout.
 	apProtocol->QueryFinished();
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf check 01234567 fix") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
+	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
+		"housekeeping after snapshot");
 	std::auto_ptr<BackupStoreInfo> apInfoBefore =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
 	apProtocol->Reopen();
 
-	// Create two snapshot of this directory
+	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(dirtodelete));
+
+	// Create two snapshots of this directory
 	BackupStoreFilenameClear snapshotName("snapshot");
-	std::auto_ptr<BackupProtocolSuccess> success =
-		apProtocol->QueryAddReference(
-			/* ObjectToCloneID */
-			dirtodelete,
-			/* OldDirectoryID */
-			BackupProtocolListDirectory::RootDirectory,
-			/* mNewDirectoryID */
-			BackupProtocolListDirectory::RootDirectory,
-			/* NewObjectFileName */
-			snapshotName);
+	apProtocol->QueryAddReference(
+		/* ObjectToCloneID */
+		dirtodelete,
+		/* OldDirectoryID */
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		/* NewDirectoryID */
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		/* NewObjectFileName */
+		snapshotName)->GetObjectID();
 	BOX_INFO("Snapshot created of object ID " <<
 		BOX_FORMAT_OBJECTID(dirtodelete));
 	ExpectedRefCounts[dirtodelete]++;
 
+	TEST_EQUAL(2, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(dirtodelete));
+
 	BackupStoreFilenameClear snapshot2Name("snapshot2");
-	success = apProtocol->QueryAddReference(
+	apProtocol->QueryAddReference(
 		/* ObjectToCloneID */
 		dirtodelete,
 		/* OldDirectoryID */
-		BackupProtocolListDirectory::RootDirectory,
-		/* mNewDirectoryID */
-		BackupProtocolListDirectory::RootDirectory,
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		/* NewDirectoryID */
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
 		/* NewObjectFileName */
 		snapshot2Name);
 	BOX_INFO("Snapshot created of object ID " <<
 		BOX_FORMAT_OBJECTID(dirtodelete));
 	ExpectedRefCounts[dirtodelete]++;
 
+	TEST_EQUAL(3, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(dirtodelete));
+
 	// Run housekeeping to check block counts, for which we have to logout
 	apProtocol->QueryFinished();
 	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
 		"housekeeping after snapshot");
-
 	apProtocol->Reopen();
+
 	std::auto_ptr<BackupStoreInfo> apInfoAfter =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
 	TEST_EQUAL_LINE(0, apInfoAfter->ReportChangesTo(*apInfoBefore),
-		"Creating a snapshot changed block counts");
+		"Creating a snapshot should not have changed block counts");
 	TEST_EQUAL(true, check_reference_counts());
 
 	// Try to delete a file and a directory in the original
@@ -2037,6 +2064,87 @@ bool test_snapshot_commands()
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteDirectory(firstSubDirId),
 		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	// Make the parent directory unique/mutable again
+	int64_t new_parent_id = apProtocol->MakeUnique(dirtodelete,
+		BACKUPSTORE_ROOT_DIRECTORY_ID, snapshotName)->GetObjectID();
+	TEST_THAT(new_parent_id != dirtodelete);
+	TEST_EQUAL(2, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(dirtodelete));
+	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(new_parent_id));
+
+	// Check for errors
+	apProtocol->QueryFinished();
+	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
+		"housekeeping after snapshot");
+	TEST_THAT(check_reference_counts());
+	apProtocol->Reopen();
+
+	// Now delete the mutable directory.
+	TEST_EQUAL(new_parent_id,
+		apProtocol->QueryDeleteNow(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			snapshotName)->GetObjectID());
+
+	TEST_EQUAL(2, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(dirtodelete));
+	TEST_EQUAL(0, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(new_parent_id));
+
+	// And delete the remaining snapshot as well.
+	TEST_EQUAL(dirtodelete,
+		apProtocol->QueryDeleteNow(BACKUPSTORE_ROOT_DIRECTORY_ID,
+			snapshot2Name)->GetObjectID());
+
+	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
+		true)->GetRefCount(dirtodelete));
+
+	apProtocol->QueryFinished();
+	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(check_reference_counts());
+
+	// Get the root dir, checking for deleted items
+	{
+		// Command
+		std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+		// Stream
+		BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
+			SHORT_TIMEOUT);
+
+		// There should be no deleted entries. snapshot 1 was removed
+		// using QueryDeleteNow, which is immediate, and snapshot 2 was
+		// removed using QueryDeleteFile, which when used on a multiply
+		// referenced object, should simply remove the entry from the
+		// parent directory.
+		TEST_EQUAL(0, dir.GetNumberOfEntries(),
+			"There should be no deleted entries in the root directory");
+
+		dirreply = protocolReadOnly.QueryListDirectory(
+			BackupProtocolListDirectory::RootDirectory,
+			BackupProtocolListDirectory::Flags_Dir,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+			false /* no attributes */
+			);
+		dir.ReadFromStream(*protocolReadOnly.ReceiveStream(),
+			IOStream::TimeOutInfinite);
+
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry* en =
+			i.FindMatchingClearName(snapshotName);
+		TEST_THAT(en != 0);
+
+		en = i.FindMatchingClearName(snapshot2Name);
+		TEST_THAT_OR(en != 0, FAIL);
+		TEST_EQUAL(dirtodelete, en->GetObjectID());
+		BackupStoreFilenameClear n("test_delete");
+		TEST_THAT(en->GetName() == n);
+
+		// Then... check everything's deleted
+		assert_everything_deleted(protocolReadOnly, dirtodelete);
+	}
 
 	return teardown_test_backupstore();
 }

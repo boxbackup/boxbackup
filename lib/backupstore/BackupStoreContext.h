@@ -14,15 +14,14 @@
 #include <map>
 #include <memory>
 
-#include "autogen_BackupProtocol.h"
+#include "BackupStoreDirectory.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
-#include "Message.h"
 #include "Utils.h"
 
-class BackupStoreDirectory;
 class BackupStoreFilename;
+class BackupStoreRefCountDatabase;
 class IOStream;
 class BackupProtocolMessage;
 class StreamableMemBlock;
@@ -140,23 +139,39 @@ public:
 	}
 	
 	// Manipulating files/directories
-	int64_t AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime, int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename, bool MarkFileWithSameNameAsOldVersions);
+	int64_t AddFile(IOStream &rFile,
+		int64_t InDirectory,
+		int64_t ModificationTime,
+		int64_t AttributesHash,
+		int64_t DiffFromFileID,
+		const BackupStoreFilename &rFilename,
+		bool MarkFileWithSameNameAsOldVersions);
 	int64_t AddDirectory(int64_t InDirectory,
 		const BackupStoreFilename &rFilename,
 		const StreamableMemBlock &Attributes,
 		int64_t AttributesModTime,
 		int64_t ModificationTime,
 		bool &rAlreadyExists);
-	void AddReference(int64_t ObjectID, int64_t OldDirectoryID,
-		int64_t NewDirectoryID, const BackupStoreFilename &rNewFilename);
+	void AddReference(int64_t ObjectID,
+		int64_t OldDirectoryID,
+		int64_t NewDirectoryID,
+		const BackupStoreFilename &rNewObjectFileName);
+	int64_t MakeUnique(int64_t ObjectToMakeUniqueID,
+		int64_t ContainingDirID);
 	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime);
 	bool ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut);
 	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut);
 	bool UndeleteFile(int64_t ObjectID, int64_t InDirectory);
 	void DeleteDirectory(int64_t ObjectID, bool Undelete = false);
+	bool DeleteNow(int64_t ObjectToDeleteID, int64_t ContainingDirID);
 	void MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject);
-	int64_t CopyDirectory(int64_t DirToCopyID, int64_t ContainingDirID);
 
+private:
+	void DeleteEntryNow(int64_t ParentDirectoryID,
+		BackupStoreDirectory::Entry *pEntry);
+	void DeleteDirEntriesNow(int64_t DirectoryID);
+
+public:
 	// Manipulating objects
 	enum
 	{

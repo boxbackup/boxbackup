@@ -774,8 +774,9 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 //
 // --------------------------------------------------------------------------
 
-void BackupStoreContext::AddReference(int64_t ObjectID, int64_t OldDirectoryID,
-	int64_t NewDirectoryID, const BackupStoreFilename &rNewFilename)
+void BackupStoreContext::AddReference(int64_t ObjectID,
+		int64_t OldDirectoryID, int64_t NewDirectoryID,
+		const BackupStoreFilename &rNewFilename)
 {
 	if(mReadOnly)
 	{
@@ -789,7 +790,7 @@ void BackupStoreContext::AddReference(int64_t ObjectID, int64_t OldDirectoryID,
 	if (!pEntry)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			BadBackupStoreFile,
+			CouldNotFindEntryInDirectory,
 			"Failed to find object " <<
 			BOX_FORMAT_OBJECTID(ObjectID) <<
 			" in its supposed directory, " <<
@@ -823,14 +824,14 @@ void BackupStoreContext::AddReference(int64_t ObjectID, int64_t OldDirectoryID,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::CopyDirectory(DirToCopyID,
-//			 ContainingDirID);
+//		Name:    BackupStoreContext::MakeUnique(DirectoryID,
+//			 ContainingDirID, rObjectFileName);
 //		Purpose: Copies an immutable directory to make it mutable again.
 //		Created: 2011/12/04
 //
 // --------------------------------------------------------------------------
-
-int64_t BackupStoreContext::CopyDirectory(int64_t DirToCopyID, int64_t ContainingDirID)
+int64_t BackupStoreContext::MakeUnique(int64_t ObjectToMakeUniqueID,
+	int64_t ContainingDirID)
 {
 	if(mapStoreInfo.get() == 0)
 	{
@@ -844,34 +845,38 @@ int64_t BackupStoreContext::CopyDirectory(int64_t DirToCopyID, int64_t Containin
 
 	AssertMutable(ContainingDirID);
 
-	if(mapRefCount->GetRefCount(DirToCopyID) == 1)
-	{
-		// nothing to do
-		return DirToCopyID;
-	}
-
 	BackupStoreDirectory &parentDir(GetDirectoryInternal(ContainingDirID));
-	BackupStoreDirectory::Entry *pEntry = parentDir.FindEntryByID(DirToCopyID);
+	// TODO FIXME this isn't unique: which entry's attributes do we copy?
+	BackupStoreDirectory::Entry *pEntry =
+		parentDir.FindEntryByID(ObjectToMakeUniqueID);
 	if (!pEntry)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			BadBackupStoreFile,
-			"Failed to find directory " <<
-			BOX_FORMAT_OBJECTID(DirToCopyID) <<
-			" in its supposed container, " <<
+			CouldNotFindEntryInDirectory,
+			"Failed to find entry for directory " <<
+			BOX_FORMAT_OBJECTID(ObjectToMakeUniqueID) <<
+			" in its supposed parent directory " <<
 			BOX_FORMAT_OBJECTID(ContainingDirID));
 	}
 
-	BackupStoreDirectory &subDir(GetDirectoryInternal(DirToCopyID));
+	if(mapRefCount->GetRefCount(ObjectToMakeUniqueID) == 1)
+	{
+		// nothing to do
+		return ObjectToMakeUniqueID;
+	}
+
+	BackupStoreDirectory &subDir(GetDirectoryInternal(DirectoryID));
 	int64_t newObjectID = AllocateObjectID();
 	subDir.SetContainerID(ContainingDirID);
 	SaveDirectory(subDir);
 
-	parentDir.DeleteEntry(DirToCopyID);
+	parentDir.DeleteEntry(DirectoryID);
 	parentDir.AddEntry(pEntry->GetName(), pEntry->GetModificationTime(),
 		newObjectID, subDir.GetUserInfo1_SizeInBlocks(),
 		pEntry->GetFlags(), pEntry->GetAttributesHash());
 	SaveDirectory(parentDir);
+
+	// TODO FIXME increase reference counts on each entry in the directory
 
 	mapStoreInfo->AdjustNumDirectories(1);
 	return newObjectID;
@@ -1052,6 +1057,229 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 	}
 
 	return fileExisted;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::DeleteEntryNow(
+//			 int64_t ParentDirectoryID,
+//			 BackupStoreDirectory::Entry *pEntry)
+//		Purpose: Deletes a directory entry immediately and
+//			 permanently. You must make sure that the object
+//			 referenced by the entry has no references first!
+//		Created: 2014/09/11
+//
+// --------------------------------------------------------------------------
+void BackupStoreContext::DeleteEntryNow(int64_t ParentDirectoryID,
+	BackupStoreDirectory::Entry *pEntry)
+{
+	ASSERT(mapRefCount->GetRefCount(pEntry->GetObjectID()) == 0);
+
+	if(pEntry->IsDir())
+	{
+		DeleteDirNow(ParentDirectoryID, pEntry->GetObjectID());
+		RemoveDirectoryFromCache(pEntry->GetObjectID());
+
+		// Adjust file and block counts too
+		mapStoreInfo->AdjustNumDirectories(-1);
+		mapStoreInfo->ChangeBlocksInDirectories(
+			- pEntry->GetSizeInBlocks());
+	}
+	else if(pEntry->IsFile())
+	{
+		if(pEntry->IsOld())
+		{
+			mapStoreInfo->AdjustNumOldFiles(-1);
+			mapStoreInfo->ChangeBlocksInOldFiles(
+				- pEntry->GetSizeInBlocks());
+		}
+
+		if(pEntry->IsDeleted())
+		{
+			mapStoreInfo->AdjustNumDeletedFiles(-1);
+			mapStoreInfo->ChangeBlocksInDeletedFiles(
+				- pEntry->GetSizeInBlocks());
+		}
+
+		if(!pEntry->IsOld() && !pEntry->IsDeleted())
+		{
+			mapStoreInfo->AdjustNumCurrentFiles(-1);
+			mapStoreInfo->ChangeBlocksInCurrentFiles(
+				- pEntry->GetSizeInBlocks());
+		}
+	}
+
+	std::string fn;
+	MakeObjectFilename(pEntry->GetObjectID(), fn,
+		false /* no need to make sure that the directory it should be
+		in actually exists */);
+
+	RaidFileWrite deleteChild(mStoreDiscSet, fn);
+	deleteChild.Delete();
+
+	// Save the store info (may be postponed)
+	SaveStoreInfo(true);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::DeleteNow(int64_t, int64_t,
+//			 int64_t &)
+//		Purpose: Deletes a file or directory immediately. Removes the
+//			 directory and its child objects from disk, but only
+//			 if they have no references after their entries are
+//			 deleted. Also works on immutable (multiply
+//			 referenced) directories, in which case only the
+//			 entry is deleted, not its contents.
+//		Created: 2014/09/11
+//
+// --------------------------------------------------------------------------
+bool BackupStoreContext::DeleteNow(int64_t DirToDeleteID,
+	int64_t InDirectory)
+{
+	// Essential checks!
+	if(mapStoreInfo.get() == 0)
+	{
+		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
+	}
+
+	if(mReadOnly)
+	{
+		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
+	}
+
+	AssertMutable(InDirectory);
+
+	// Find the directory the file is in (will exception if it fails)
+	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
+	BackupStoreDirectory::Entry *e = dir.FindEntryByID(DirToDeleteID);
+	if(e == NULL)
+	{
+		return false;
+	}
+
+	if(mapRefCount->RemoveReference(DirToDeleteID) == 0)
+	{
+		DeleteEntryNow(e);
+	}
+	dir.DeleteEntry(DirToDeleteID);
+	SaveDirectory(dir);
+
+	return true;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::DeleteDirEntriesNow(int64_t)
+//		Purpose: Deletes the contents of a directory immediately and
+//			 permanently. You must remove the entry that points
+//			 to this directory first, and reduce its reference
+//			 count, and ensure that it has reached zero. The
+//			 objects pointed to by this directory will be removed
+//			 from disk, only if they will have no references
+//			 after this directory is deleted. You should remove
+//			 the directory itself from disk and adjust block
+//			 counts after calling this.
+//		Created: 2014/09/11
+//
+// --------------------------------------------------------------------------
+
+void BackupStoreContext::DeleteDirEntriesNow(int64_t DirectoryID)
+{
+	ASSERT(mapRefCount->GetRefCount(DirectoryID) == 0);
+
+	// Need to be careful because calling GetDirectoryInternal may flush
+	// the cache, invalidating any directories that we retrieved from it
+	// before, and this function is recursive, so we need to copy the
+	// directory entries before recursively deleting them.
+
+	typedef std::vector<BackupStoreDirectory::Entry> entries_t;
+	entries_t entries;
+	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *e = 0;
+	while((e = i.Next()) != 0)
+	{
+		// Push back a copy, not a pointer that may become invalid
+		entries.push_back(*e);
+	}
+
+	for (entries_t::iterator i = entries.begin(); i != entries.end();
+		i++)
+	{
+		BackupStoreDirectory::Entry entry(*i);
+		if (mapRefCount->RemoveReference(entry.GetObjectID()) == 0)
+		{
+			DeleteEntryNow(entry);
+		}
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::DeleteEntryNow(
+//			 BackupStoreDirectory::Entry& rEntry)
+//		Purpose: Deletes a directory entry immediately and
+//			 permanently. You must make sure that the object
+//			 referenced by the entry has no references first!
+//		Created: 2014/09/11
+//
+// --------------------------------------------------------------------------
+void BackupStoreContext::DeleteEntryNow(BackupStoreDirectory::Entry& rEntry)
+{
+	int64_t EntryID = rEntry.GetObjectID();
+	ASSERT(mapRefCount->GetRefCount(EntryID) == 0);
+
+	if(rEntry.IsDir())
+	{
+		DeleteDirEntriesNow(EntryID);
+		RemoveDirectoryFromCache(EntryID);
+
+		// Adjust file and block counts too
+		mapStoreInfo->AdjustNumDirectories(-1);
+		mapStoreInfo->ChangeBlocksInDirectories(
+			- pEntry->GetSizeInBlocks());
+	}
+	else if(rEntry.IsFile())
+	{
+		if(rEntry.IsOld())
+		{
+			mapStoreInfo->AdjustNumOldFiles(-1);
+			mapStoreInfo->ChangeBlocksInOldFiles(
+				- rEntry.GetSizeInBlocks());
+		}
+
+		if(rEntry.IsDeleted())
+		{
+			mapStoreInfo->AdjustNumDeletedFiles(-1);
+			mapStoreInfo->ChangeBlocksInDeletedFiles(
+				- rEntry.GetSizeInBlocks());
+		}
+
+		if(!rEntry.IsOld() && !rEntry.IsDeleted())
+		{
+			mapStoreInfo->AdjustNumCurrentFiles(-1);
+			mapStoreInfo->ChangeBlocksInCurrentFiles(
+				- rEntry.GetSizeInBlocks());
+		}
+	}
+
+	std::string fn;
+	MakeObjectFilename(EntryID, fn, false /* no need to make sure that
+		the directory it should be in actually exists */);
+
+	RaidFileWrite deleteChild(mStoreDiscSet, fn);
+	deleteChild.Delete();
+
+	// Save the store info (may be postponed)
+	SaveStoreInfo(true);
 }
 
 
@@ -1351,7 +1579,7 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 		if(!en)
 		{
 			THROW_EXCEPTION_MESSAGE(BackupStoreException,
-				BadBackupStoreFile,
+				CouldNotFindEntryInDirectory,
 				"Failed to find directory " <<
 				BOX_FORMAT_OBJECTID(ObjectID) <<
 				" in its supposed container, " <<
