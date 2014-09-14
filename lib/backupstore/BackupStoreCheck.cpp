@@ -17,11 +17,13 @@
 #endif
 
 #include "autogen_BackupStoreException.h"
+#include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreObjectMagic.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
@@ -78,6 +80,13 @@ BackupStoreCheck::~BackupStoreCheck()
 {
 	// Clean up
 	FreeInfo();
+
+	// Avoid an exception if we forget to discard mapNewRefs
+	if (mapNewRefs.get())
+	{
+		mapNewRefs->Discard();
+		mapNewRefs.reset();
+	}
 }
 
 
@@ -104,6 +113,9 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Will fix errors encountered during checking.");
 	}
 
+	BackupStoreAccountDatabase::Entry account(mAccountID, mDiscSetNumber);
+	mapNewRefs = BackupStoreRefCountDatabase::Create(account);
+
 	// Phase 1, check objects
 	if(!mQuiet)
 	{
@@ -112,14 +124,14 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Phase 1, check objects...");
 	}
 	CheckObjects();
-	
+
 	// Phase 2, check directories
 	if(!mQuiet)
 	{
 		BOX_INFO("Phase 2, check directories...");
 	}
 	CheckDirectories();
-	
+
 	// Phase 3, check root
 	if(!mQuiet)
 	{
@@ -141,16 +153,38 @@ void BackupStoreCheck::Check()
 	}
 	FixDirsWithWrongContainerID();
 	FixDirsWithLostDirs();
-	
+
 	// Phase 6, regenerate store info
 	if(!mQuiet)
 	{
 		BOX_INFO("Phase 6, regenerate store info...");
 	}
 	WriteNewStoreInfo();
-	
-//	DUMP_OBJECT_INFO
-	
+
+	try
+	{
+		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
+			BackupStoreRefCountDatabase::Load(account, false);
+		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*apOldRefs);
+	}
+	catch(BoxException &e)
+	{
+		BOX_WARNING("Reference count database was missing or "
+			"corrupted, cannot check it for errors.");
+		mNumberErrorsFound++;
+	}
+
+	// force file to be saved and closed before releasing the lock below
+	if(mFixErrors)
+	{
+		mapNewRefs->Commit();
+	}
+	else
+	{
+		mapNewRefs->Discard();
+	}
+	mapNewRefs.reset();
+
 	if(mNumberErrorsFound > 0)
 	{
 		BOX_WARNING("Finished checking store account ID " <<
@@ -257,12 +291,12 @@ void BackupStoreCheck::CheckObjects()
 		{
 			start.resize(start.size() - 1);
 		}
-	
+
 		maxDir = CheckObjectsScanDir(0, 1, mStoreRoot);
 		BOX_TRACE("Max dir starting ID is " <<
 			BOX_FORMAT_OBJECTID(maxDir));
 	}
-	
+
 	// Then go through and scan all the objects within those directories
 	for(int64_t d = 0; d <= maxDir; d += (1<<STORE_ID_SEGMENT_LENGTH))
 	{
@@ -290,11 +324,11 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 		// If any of the directories is missing, create it.
 		RaidFileController &rcontroller(RaidFileController::GetController());
 		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
-		
+
 		if(!rdiscSet.IsNonRaidSet())
 		{
 			unsigned int numDiscs = rdiscSet.size();
-			
+
 			for(unsigned int l = 0; l < numDiscs; ++l)
 			{
 				// build name
@@ -368,7 +402,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR);
 	// Remove the filename from it
 	dirName.resize(dirName.size() - 4); // four chars for "/o00"
-	
+
 	// Check directory exists
 	if(!RaidFileRead::DirectoryExists(mDiscSetNumber, dirName))
 	{
@@ -380,14 +414,14 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 	std::vector<std::string> files;
 	RaidFileRead::ReadDirectoryContents(mDiscSetNumber, dirName,
 		RaidFileRead::DirReadType_FilesOnly, files);
-	
+
 	// Array of things present
 	bool idsPresent[(1<<STORE_ID_SEGMENT_LENGTH)];
 	for(int l = 0; l < (1<<STORE_ID_SEGMENT_LENGTH); ++l)
 	{
 		idsPresent[l] = false;
 	}
-	
+
 	// Parse each entry, building up a list of object IDs which are present in the dir.
 	// This is done so that whatever order is retured from the directory, objects are scanned
 	// in order.
@@ -408,7 +442,8 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			fileOK = false;
 		}
 		// info and refcount databases are OK in the root directory
-		else if(*i == "info" || *i == "refcount.db" || *i == "refcount.rdb")
+		else if(*i == "info" || *i == "refcount.db" ||
+			*i == "refcount.rdb" || *i == "refcount.rdbX")
 		{
 			fileOK = true;
 		}
@@ -416,7 +451,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		{
 			fileOK = false;
 		}
-		
+
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
@@ -431,7 +466,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			}
 		}
 	}
-	
+
 	// Check all the objects found in this directory
 	for(int i = 0; i < (1<<STORE_ID_SEGMENT_LENGTH); ++i)
 	{
@@ -440,16 +475,16 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			// Check the object is OK, and add entry
 			char leaf[8];
 			::sprintf(leaf, DIRECTORY_SEPARATOR "o%02x", i);
-			if(!CheckAndAddObject(StartID | i, dirName + leaf))
+			std::string filename = dirName + leaf;
+			if(!CheckAndAddObject(StartID | i, filename))
 			{
 				// File was bad, delete it
-				BOX_ERROR("Corrupted file " << dirName <<
-					leaf << " found" <<
-					(mFixErrors?", deleting":""));
+				BOX_ERROR("Corrupted file " << filename <<
+					" found" << (mFixErrors?", deleting":""));
 				++mNumberErrorsFound;
 				if(mFixErrors)
 				{
-					RaidFileWrite del(mDiscSetNumber, dirName + leaf);
+					RaidFileWrite del(mDiscSetNumber, filename);
 					del.Delete();
 				}
 			}
@@ -483,18 +518,20 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		std::auto_ptr<RaidFileRead> file(
 			RaidFileRead::Open(mDiscSetNumber, rFilename));
 		size = file->GetDiscUsageInBlocks();
-		
+
 		// Read in first four bytes -- don't have to worry about
 		// retrying if not all bytes read as is RaidFile
 		uint32_t signature;
 		if(file->Read(&signature, sizeof(signature)) != sizeof(signature))
 		{
-			// Too short, can't read signature from it
+			BOX_ERROR(BOX_FILE_MESSAGE(rFilename,
+				"Object file " << BOX_FORMAT_OBJECTID(ObjectID) <<
+				" too short for signature"));
 			return false;
 		}
 		// Seek back to beginning
 		file->Seek(0, IOStream::SeekType_Absolute);
-		
+
 		// Then... check depending on the type
 		switch(ntohl(signature))
 		{
@@ -513,19 +550,48 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 
 		default:
 			// Unknown signature. Bad file. Very bad file.
+			BOX_ERROR(BOX_FILE_MESSAGE(rFilename,
+				"Object file " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" has unknown magic number: " <<
+				BOX_FORMAT_HEX32(ntohl(signature))));
 			return false;
 			break;
 		}
 	}
+	catch(BoxException &e)
+	{
+		// Error caught, not a good file then, let it be deleted
+		BOX_ERROR(BOX_FILE_MESSAGE(rFilename,
+			"Error while reading object file: " <<
+			BOX_FORMAT_OBJECTID(ObjectID) <<
+			": " << e.GetMessage()));
+		return false;
+	}
+	catch(std::exception &e)
+	{
+		// Error caught, not a good file then, let it be deleted
+		BOX_ERROR(BOX_FILE_MESSAGE(rFilename,
+			"Error while reading object file: " <<
+			BOX_FORMAT_OBJECTID(ObjectID) <<
+			": " << e.what()));
+		return false;
+	}
 	catch(...)
 	{
 		// Error caught, not a good file then, let it be deleted
+		BOX_ERROR(BOX_FILE_MESSAGE(rFilename,
+			"Unknown error while reading object file: " <<
+			BOX_FORMAT_OBJECTID(ObjectID)));
 		return false;
 	}
-	
+
 	// Got a container ID? (ie check was successful)
 	if(containerID == -1)
 	{
+		BOX_ERROR(BOX_FILE_MESSAGE(rFilename,
+			"Failed to determine container ID of object " <<
+			BOX_FORMAT_OBJECTID(ObjectID)));
 		return false;
 	}
 
@@ -541,7 +607,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 
 	// If it looks like a good object, and it's non-RAID, and
 	// this is a RAID set, then convert it to RAID.
-		
+
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
 	if(!rdiscSet.IsNonRaidSet())
@@ -551,9 +617,11 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 			RaidFileUtil::RaidFileExists(rdiscSet, rFilename);
 		if(existance == RaidFileUtil::NonRaid)
 		{
-			BOX_WARNING("Found non-RAID write file in RAID set" <<
+			BOX_WARNING(BOX_FILE_MESSAGE(rFilename,
+				"Found non-RAID write file for object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) << " in RAID set" <<
 				(mFixErrors?", transforming to RAID: ":"") <<
-				(mFixErrors?rFilename:""));
+				(mFixErrors?rFilename:"")));
 			if(mFixErrors)
 			{
 				RaidFileWrite write(mDiscSetNumber, rFilename);
@@ -562,9 +630,12 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		}
 		else if(existance == RaidFileUtil::AsRaidWithMissingReadable)
 		{
-			BOX_WARNING("Found damaged but repairable RAID file" <<
+			BOX_WARNING(BOX_FILE_MESSAGE(rFilename,
+				"Found damaged but repairable RAID file "
+				"for object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+				" in RAID set" <<
 				(mFixErrors?", repairing: ":"") <<
-				(mFixErrors?rFilename:""));
+				(mFixErrors?rFilename:"")));
 			if(mFixErrors)
 			{
 				std::auto_ptr<RaidFileRead> read(
@@ -578,7 +649,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 			}
 		}
 	}
-			
+
 	// Report success
 	return true;
 }
@@ -637,9 +708,12 @@ int64_t BackupStoreCheck::CheckDirInitial(int64_t ObjectID, IOStream &rStream)
 	if(dir.GetObjectID() != ObjectID)
 	{
 		// Wrong object ID
+		BOX_ERROR("Directory ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
+			" thinks it should be " <<
+			BOX_FORMAT_OBJECTID(dir.GetObjectID()));
 		return -1;
 	}
-	
+
 	// Return container ID
 	return dir.GetContainerID();
 }
@@ -672,7 +746,7 @@ void BackupStoreCheck::CheckDirectories()
 	{
 		IDBlock *pblock = i->second;
 		int32_t bentries = (pblock == mpInfoLastBlock)?mInfoLastBlockEntries:BACKUPSTORECHECK_BLOCK_SIZE;
-		
+
 		for(int e = 0; e < bentries; ++e)
 		{
 			uint8_t flags = GetFlags(pblock, e);
@@ -686,14 +760,26 @@ void BackupStoreCheck::CheckDirectories()
 					std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
 					dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
 				}
-				
+
+				bool isModified = false;
+
+				if(dir.GetObjectID() != pblock->mID[e])
+				{
+					BOX_ERROR("Directory ID " <<
+						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+						" has wrong object ID " <<
+						BOX_FORMAT_OBJECTID(dir.GetObjectID()));
+					dir.SetObjectID(pblock->mID[e]);
+					++mNumberErrorsFound;
+					isModified = true;
+				}
+
 				// Flag for modifications
-				bool isModified = CheckDirectory(dir);
+				isModified |= CheckDirectory(dir);
 
 				// Check the directory again, now that entries have been removed
-				if(dir.CheckAndFix())
+				if(isModified && dir.CheckAndFix())
 				{
-					// Wasn't quite right, and has been modified
 					BOX_ERROR("Directory ID " <<
 						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
 						" was still bad after all checks");
@@ -706,9 +792,9 @@ void BackupStoreCheck::CheckDirectories()
 						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
 						" was OK after fixing");
 				}
-				
+
 				if(isModified && mFixErrors)
-				{	
+				{
 					BOX_WARNING("Writing modified directory to disk: " <<
 						BOX_FORMAT_OBJECTID(pblock->mID[e]));
 					RaidFileWrite fixed(mDiscSetNumber, filename);
@@ -717,83 +803,7 @@ void BackupStoreCheck::CheckDirectories()
 					fixed.Commit(true /* convert to raid representation now */);
 				}
 
-				// Count valid entries
-				BackupStoreDirectory::Iterator i(dir);
-				BackupStoreDirectory::Entry *en = 0;
-				while((en = i.Next()) != 0)
-				{
-					int32_t iIndex;
-					IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
-					bool badEntry = false;
-					bool wasAlreadyContained = false;
-
-					if(piBlock != 0)
-					{
-						badEntry = !CheckDirectoryEntry(
-							*en, pblock->mID[e],
-							piBlock, iIndex, isModified,
-							&wasAlreadyContained);
-					}
-
-					ASSERT(piBlock != 0 ||
-						mDirsWhichContainLostDirs.find(en->GetObjectID())
-						!= mDirsWhichContainLostDirs.end());
-
-					if (piBlock)
-					{
-						// Normally it would exist and this
-						// check would not be necessary, but
-						// we might have missing directories
-						// that we will recreate later.
-						// cf mDirsWhichContainLostDirs.
-						uint8_t iflags = GetFlags(piBlock, iIndex);
-						SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
-					}
-
-					if(en->IsDir())
-					{
-						mNumDirectories++;
-					}
-					else if(!en->IsFile())
-					{
-						BOX_TRACE("Not counting object " <<
-							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-							" with flags " << en->GetFlags());
-					}
-					else // it's a good file, add to sizes
-					// don't double-count objects that are
-					// contained by another directory as well.
-					if(!wasAlreadyContained)
-					{
-						// Add to sizes?
-						// If piBlock was zero, then wasAlreadyContained
-						// might be uninitialized; but we only process
-						// files here, and if a file's piBlock was zero
-						// then badEntry would be set above, so we
-						// wouldn't be here.
-						ASSERT(!badEntry)
-
-						// It can be both old and deleted.
-						// If neither, then it's current.
-						if(en->IsDeleted())
-						{
-							mNumDeletedFiles++;
-							mBlocksInDeletedFiles += en->GetSizeInBlocks();
-						}
-
-						if(en->IsOld())
-						{
-							mNumOldFiles++;
-							mBlocksInOldFiles += en->GetSizeInBlocks();
-						}
-
-						if(!en->IsDeleted() && !en->IsOld())
-						{
-							mNumCurrentFiles++;
-							mBlocksInCurrentFiles += en->GetSizeInBlocks();
-						}
-					}
-				}
+				CountDirectoryEntries(dir);
 			}
 		}
 	}
@@ -820,8 +830,8 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			++mNumberErrorsFound;
 			isModified = true;
 		}
-		
-		// Go through, and check that everything in that directory exists and is valid
+
+		// Go through, and check that every entry exists and is valid
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next()) != 0)
@@ -854,7 +864,7 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 					" which does not exist.");
 				++mNumberErrorsFound;
 			}
-			
+
 			// Is this entry worth keeping?
 			if(badEntry)
 			{
@@ -874,16 +884,94 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 				++mNumberErrorsFound;
 				dir.DeleteEntry(*d);
 			}
-			
+
 			// Mark as modified
 			restart = true;
 			isModified = true;
-			
+
 			// Errors found
 		}
 	}
 
 	return isModified;
+}
+
+// Count valid remaining entries and the number of blocks in them.
+void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
+{
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *en = 0;
+	while((en = i.Next()) != 0)
+	{
+		int32_t iIndex;
+		IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
+		bool badEntry = false;
+		bool wasAlreadyContained = false;
+
+		ASSERT(piBlock != 0 ||
+			mDirsWhichContainLostDirs.find(en->GetObjectID())
+			!= mDirsWhichContainLostDirs.end());
+
+		if (piBlock)
+		{
+			// Normally it would exist and this
+			// check would not be necessary, but
+			// we might have missing directories
+			// that we will recreate later.
+			// cf mDirsWhichContainLostDirs.
+			uint8_t iflags = GetFlags(piBlock, iIndex);
+			wasAlreadyContained = (iflags & Flags_IsContained);
+			SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
+		}
+
+		if(wasAlreadyContained)
+		{
+			// don't double-count objects that are
+			// contained by another directory as well.
+		}
+		else if(en->IsDir())
+		{
+			mNumDirectories++;
+		}
+		else if(!en->IsFile())
+		{
+			BOX_TRACE("Not counting object " <<
+				BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+				" with flags " << en->GetFlags());
+		}
+		else // it's a file
+		{
+			// Add to sizes?
+			// If piBlock was zero, then wasAlreadyContained
+			// might be uninitialized; but we only process
+			// files here, and if a file's piBlock was zero
+			// then badEntry would be set above, so we
+			// wouldn't be here.
+			ASSERT(!badEntry)
+
+			// It can be both old and deleted.
+			// If neither, then it's current.
+			if(en->IsDeleted())
+			{
+				mNumDeletedFiles++;
+				mBlocksInDeletedFiles += en->GetSizeInBlocks();
+			}
+
+			if(en->IsOld())
+			{
+				mNumOldFiles++;
+				mBlocksInOldFiles += en->GetSizeInBlocks();
+			}
+
+			if(!en->IsDeleted() && !en->IsOld())
+			{
+				mNumCurrentFiles++;
+				mBlocksInCurrentFiles += en->GetSizeInBlocks();
+			}
+		}
+
+		mapNewRefs->AddReference(en->GetObjectID());
+	}
 }
 
 bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
@@ -899,7 +987,7 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	}
 
 	uint8_t iflags = GetFlags(piBlock, IndexInDirBlock);
-	
+
 	// Is the type the same?
 	if(((iflags & Flags_IsDir) == Flags_IsDir) != rEntry.IsDir())
 	{
@@ -924,12 +1012,47 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	// Don't set the flag until later, after we finish repairing
 	// the directory and removing all bad entries.
 
+	// Check the object size
+	if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
+	{
+		// Wrong size, correct it.
+		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
+			" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+			" has wrong size " << rEntry.GetSizeInBlocks() <<
+			", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+		rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+		// Mark as changed
+		rIsModified = true;
+		++mNumberErrorsFound;
+	}
+
 	// Check that the container ID of the object is correct
 	if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
 	{
-		// Needs fixing...
-		if(iflags & Flags_IsDir)
+		// Don't try to get refcount of an object that's not yet in
+		// the database, as it will throw an exception.
+		if(mapNewRefs->GetLastObjectIDUsed() >= rEntry.GetObjectID() &&
+			mapNewRefs->GetRefCount(rEntry.GetObjectID()) > 0)
 		{
+			// This can't be fixed if the object has multiple
+			// references (at least one reference already, apart
+			// from this one), because all but one of them will be
+			// wrong. But we could check that the directory
+			// which this object thinks is its parent actually
+			// contains an entry pointing to it. TODO FIXME.
+			//
+			// We will find and fix an "error" if the container ID
+			// is different to the lowest numbered reference to this
+			// object. That's because we're still counting
+			// references as we go, so the first time we enter this
+			// branch, the reference count will be just 1. But this
+			// isn't a big problem.
+		}
+		else if(iflags & Flags_IsDir)
+		{
+			// Needs fixing...
 			// Add to will fix later list
 			BOX_ERROR("Directory ID " <<
 				BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
@@ -945,25 +1068,12 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 				<< " has different container ID, "
 				"probably moved");
 		}
-		
-		// Fix entry for now
+
+		// Fix entry for now. In the multiple reference case, we make
+		// sure that the object's container points to a directory (any
+		// directory) which does actually contain it. Why is this
+		// needed anyway?
 		piBlock->mContainer[IndexInDirBlock] = DirectoryID;
-	}
-
-	// Check the object size
-	if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
-	{
-		// Wrong size, correct it.
-		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
-			" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
-			" has wrong size " << rEntry.GetSizeInBlocks() <<
-			", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
-
-		rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
-
-		// Mark as changed
-		rIsModified = true;
-		++mNumberErrorsFound;
 	}
 
 	return true; // don't delete this entry

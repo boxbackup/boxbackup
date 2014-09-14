@@ -119,6 +119,15 @@
 		_name << ", port " << _port << ")")
 #endif
 
+#define BOX_FORMAT_HEX16(number) \
+	std::hex << \
+	std::showbase << \
+	std::internal << \
+	std::setw(6) << \
+	std::setfill('0') << \
+	(number) << \
+	std::dec
+
 #define BOX_FORMAT_HEX32(number) \
 	std::hex << \
 	std::showbase << \

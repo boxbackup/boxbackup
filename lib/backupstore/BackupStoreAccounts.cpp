@@ -613,7 +613,7 @@ int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Qu
 	BackupStoreCheck check(rootDir, discSetNum, ID, FixErrors, Quiet);
 	check.Check();
 	
-	return check.ErrorsFound()?1:0;
+	return check.GetNumErrorsFound();
 }
 
 int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,

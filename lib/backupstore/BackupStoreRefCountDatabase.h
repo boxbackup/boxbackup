@@ -86,6 +86,7 @@ public:
 	// Data modification functions
 	refcount_t AddReference(int64_t ObjectID);
 	refcount_t RemoveReference(int64_t ObjectID);
+	int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs);
 
 private:
 	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&

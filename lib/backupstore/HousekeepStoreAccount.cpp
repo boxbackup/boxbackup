@@ -201,37 +201,16 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	mErrorCount += info->ReportChangesTo(*pOldInfo);
 	info->Save();
 
-	// We want to compare the mapNewRefs to apOldRefs before we delete any
-	// files, because that will also change the reference count in a way that's not an error.
+	// Try to load the old reference count database and check whether
+	// any counts have changed. We want to compare the mapNewRefs to
+	// apOldRefs before we delete any files, because that will also change
+	// the reference count in a way that's not an error.
 
-	// try to load the reference count database
 	try
 	{
 		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
 			BackupStoreRefCountDatabase::Load(account, false);
-
-		int64_t MaxOldObjectId = apOldRefs->GetLastObjectIDUsed();
-		int64_t MaxNewObjectId = mapNewRefs->GetLastObjectIDUsed();
-
-		for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
-			ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
-			ObjectID++)
-		{
-			typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
-			refcount_t OldRefs = (ObjectID <= MaxOldObjectId) ?
-				apOldRefs->GetRefCount(ObjectID) : 0;
-			refcount_t NewRefs = (ObjectID <= MaxNewObjectId) ?
-				mapNewRefs->GetRefCount(ObjectID) : 0;
-
-			if (OldRefs != NewRefs)
-			{
-				BOX_WARNING("Reference count of object " <<
-					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" changed from " << OldRefs <<
-					" to " << NewRefs);
-				mErrorCount++;
-			}
-		}
+		mErrorCount += mapNewRefs->ReportChangesTo(*apOldRefs);
 	}
 	catch(BoxException &e)
 	{
@@ -549,17 +528,17 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		}
 	}
 
+	// Recurse into subdirectories
 	{
-		// Recurse into subdirectories
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
 			ASSERT(en->IsDir());
 
-			// Now count multiply referenced directories
-			// Don't recurse multiple times into the same dir
-			if(mapNewRefs->AddReference(en->GetObjectID()) == 1)
+			// Don't recurse into any directory that has multiple
+			// references. TODO FIXME or into immutable dirs.
+			if(mapNewRefs->GetRefCount(en->GetObjectID()) == 1)
 			{
 				if(!ScanDirectory(en->GetObjectID(), rBackupStoreInfo))
 				{

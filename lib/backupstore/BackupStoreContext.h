@@ -167,8 +167,7 @@ public:
 	void MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject);
 
 private:
-	void DeleteEntryNow(int64_t ParentDirectoryID,
-		BackupStoreDirectory::Entry *pEntry);
+	void DeleteEntryNow(BackupStoreDirectory::Entry& rEntry);
 	void DeleteDirEntriesNow(int64_t DirectoryID);
 
 public:

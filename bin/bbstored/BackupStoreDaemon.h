@@ -19,6 +19,7 @@
 
 class BackupStoreAccounts;
 class BackupStoreAccountDatabase;
+class BackupProtocolServer;
 
 // --------------------------------------------------------------------------
 //

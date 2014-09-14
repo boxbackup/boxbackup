@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "autogen_BackupProtocol.h"
 #include "BackupStoreFilenameClear.h"
 #include "StreamableMemBlock.h"
 #include "BoxTime.h"
@@ -43,6 +44,15 @@ public:
 	{
 		ReadFromStream(*apStream, Timeout);
 	}
+	BackupStoreDirectory(BackupProtocolCallable& protocol,
+		int64_t DirectoryID, int Timeout,
+		int16_t FlagsMustBeSet = BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+		int16_t FlagsNotToBeSet = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		bool FetchAttributes = true)
+	{
+		Download(protocol, DirectoryID, Timeout, FlagsMustBeSet,
+			FlagsNotToBeSet, FetchAttributes);
+	}
 private:
 	// Copying not allowed
 	BackupStoreDirectory(const BackupStoreDirectory &rToCopy);
@@ -65,6 +75,9 @@ public:
 		const BackupStoreFilename &GetName() const {return mName;}
 		box_time_t GetModificationTime() const {return mModificationTime;}
 		int64_t GetObjectID() const {return mObjectID;}
+		// SetObjectID is dangerous! It should only be used when
+		// creating a snapshot.
+		void SetObjectID(int64_t NewObjectID) {mObjectID = NewObjectID;}
 		int64_t GetSizeInBlocks() const {return mSizeInBlocks;}
 		int16_t GetFlags() const {return mFlags;}
 		void AddFlags(int16_t Flags) {mFlags |= Flags;}
@@ -153,11 +166,22 @@ public:
 		uint64_t mDependsOlder;	// older version which depends on this
 	};
 
+	void Download(BackupProtocolCallable& protocol, int64_t DirectoryID, int Timeout,
+		int16_t FlagsMustBeSet = BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+		int16_t FlagsNotToBeSet = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		bool FetchAttributes = true)
+	{
+		protocol.QueryListDirectory(DirectoryID, FlagsMustBeSet,
+			FlagsNotToBeSet, FetchAttributes);
+		// Stream
+		ReadFromStream(*protocol.ReceiveStream(), Timeout);
+	}
+
 	void ReadFromStream(IOStream &rStream, int Timeout);
 	void WriteToStream(IOStream &rStream,
-			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
-			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
-			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
+		int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
+		int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
+		bool StreamAttributes = true, bool StreamDependencyInfo = true) const;
 
 	Entry *AddEntry(const Entry &rEntryToCopy);
 	Entry *AddEntry(const BackupStoreFilename &rName,
@@ -288,9 +312,9 @@ public:
 		int64_t SizeInBlocks, int16_t Flags);
 	bool NameInUse(const BackupStoreFilename &rName);
 
-	// For testing
-	// Don't use these functions in normal code!
-	void TESTONLY_SetObjectID(int64_t ObjectID) {mObjectID = ObjectID;}
+	// Be very careful with SetObjectID! It's intended for use in
+	// BackupStoreContext::MakeUnique only.
+	void SetObjectID(int64_t ObjectID) {mObjectID = ObjectID;}
 	// Debug and diagnostics
 	void Dump(void *clibFileHandle, bool ToTrace); // first arg is FILE *, but avoid including stdio.h everywhere
 

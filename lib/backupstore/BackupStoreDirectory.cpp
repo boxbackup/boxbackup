@@ -358,7 +358,9 @@ void BackupStoreDirectory::DeleteEntry(int64_t ObjectID)
 	}
 	
 	// Not found
-	THROW_EXCEPTION(BackupStoreException, CouldNotFindEntryInDirectory)
+	THROW_EXCEPTION_MESSAGE(BackupStoreException, CouldNotFindEntryInDirectory,
+		"Failed to find entry " << BOX_FORMAT_OBJECTID(ObjectID) <<
+		" in directory " << BOX_FORMAT_OBJECTID(mObjectID));
 }
 
 

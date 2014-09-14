@@ -484,10 +484,11 @@ void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
 	BOX_TRACE("Test for del: " << BOX_FORMAT_OBJECTID(DirID));
 
 	// Command
-	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
-			DirID,
-			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+	protocol.QueryListDirectory(
+		DirID,
+		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		false /* no attributes */);
 	// Stream
 	BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 	BackupStoreDirectory::Iterator i(dir);
@@ -524,7 +525,7 @@ const box_time_t FAKE_ATTR_MODIFICATION_TIME = 0xdeadbeefcafebabeLL;
 int64_t create_file_in_dir(std::string name, std::string source, int64_t parentId,
 	BackupProtocolCallable& protocol, BackupStoreRefCountDatabase& rRefCount)
 {
-	BackupStoreFilenameClear name_encoded("file_One");
+	BackupStoreFilenameClear name_encoded(name);
 	std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile(
 		source.c_str(), parentId, name_encoded));
 	std::auto_ptr<BackupProtocolSuccess> stored(
@@ -548,6 +549,8 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	BackupStoreFilenameClear *pFirstFileName = NULL,
 	int64_t *pFirstDirId = NULL)
 {
+	write_test_file(1);
+
 	// Create a directory
 	int64_t subdirid = 0;
 	BackupStoreFilenameClear dirname(name);
@@ -584,7 +587,7 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	}
 
 	// Stick some files in it
-	create_file_in_dir("file_One", "testfiles/file1", subdirid, protocol,
+	create_file_in_dir("file_One", "testfiles/test1", subdirid, protocol,
 		rRefCount);
 
 	if (pFirstFileDirId)
@@ -596,9 +599,9 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 		*pFirstFileName = BackupStoreFilenameClear("file_One");
 	}
 
-	create_file_in_dir("file_Two", "testfiles/file1", subdirid, protocol,
+	create_file_in_dir("file_Two", "testfiles/test1", subdirid, protocol,
 		rRefCount);
-	create_file_in_dir("file_Three", "testfiles/file1", subdirid, protocol,
+	create_file_in_dir("file_Three", "testfiles/test1", subdirid, protocol,
 		rRefCount);
 	return subdirid;
 }
@@ -607,11 +610,12 @@ void check_dir_after_uploads(BackupProtocolCallable &protocol,
 	const StreamableMemBlock &Attributes)
 {
 	// Command
-	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
+	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		protocol.QueryListDirectory(
 			BACKUPSTORE_ROOT_DIRECTORY_ID,
 			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
-	TEST_THAT(dirreply->GetObjectID() == BACKUPSTORE_ROOT_DIRECTORY_ID);
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+			false /* no attributes */)->GetObjectID());
 	// Stream
 	BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 	TEST_EQUAL(UPLOAD_NUM, dir.GetNumberOfEntries());
@@ -669,10 +673,10 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 	recursive_count_objects_results &results)
 {
 	// Command
-	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
-			id,
-			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+	protocol.QueryListDirectory(
+		id,
+		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */);
 	// Stream
 	BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 
@@ -797,6 +801,17 @@ int64_t create_directory(BackupProtocolCallable& protocol,
 	int64_t parent_dir_id = BACKUPSTORE_ROOT_DIRECTORY_ID);
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	const std::string& remote_filename = "");
+
+bool run_housekeeping_and_check_account(BackupProtocolLocal2& protocol)
+{
+	protocol.QueryFinished();
+	bool check_account_status;
+	TEST_THAT(check_account_status = run_housekeeping_and_check_account());
+	bool check_refcount_status;
+	TEST_THAT(check_refcount_status = check_reference_counts());
+	protocol.Reopen();
+	return check_account_status & check_refcount_status;
+}
 
 bool test_server_housekeeping()
 {
@@ -932,10 +947,10 @@ bool test_server_housekeeping()
 	// Get the directory again, and see if the entry is in it
 	{
 		// Command
-		std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+		protocol.QueryListDirectory(
+			BACKUPSTORE_ROOT_DIRECTORY_ID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */);
 		// Stream
 		BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
 		TEST_THAT(dir.GetNumberOfEntries() == 1);
@@ -1011,10 +1026,7 @@ bool test_server_housekeeping()
 		root_dir_blocks));
 
 	// Housekeeping should not change anything just yet
-	protocol.QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.Reopen();
-
+	TEST_THAT(run_housekeeping_and_check_account(protocol));
 	TEST_THAT(check_num_files(1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
@@ -1046,10 +1058,7 @@ bool test_server_housekeeping()
 		root_dir_blocks)); // total
 
 	// Housekeeping should not change anything just yet
-	protocol.QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.Reopen();
-
+	TEST_THAT(run_housekeeping_and_check_account(protocol));
 	TEST_THAT(check_num_files(1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
@@ -1229,11 +1238,10 @@ bool test_multiple_uploads()
 	for(int l = 0; l < 3; ++l)
 	{
 		// Command
-		std::auto_ptr<BackupProtocolSuccess> dirreply(
-			apProtocol->QueryListDirectory(
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+		apProtocol->QueryListDirectory(
+			BACKUPSTORE_ROOT_DIRECTORY_ID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */);
 		// Stream
 		BackupStoreDirectory dir(apProtocol->ReceiveStream(),
 			apProtocol->GetTimeout());
@@ -1242,12 +1250,11 @@ bool test_multiple_uploads()
 
 	// Read the dir from the readonly connection (make sure it gets in the cache)
 	// Command
-	std::auto_ptr<BackupProtocolSuccess> dirreply(
-		protocolReadOnly.QueryListDirectory(
-			BACKUPSTORE_ROOT_DIRECTORY_ID,
-			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-			false /* no attributes */));
+	protocolReadOnly.QueryListDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		false /* no attributes */);
 	// Stream
 	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 		protocolReadOnly.GetTimeout());
@@ -1517,11 +1524,11 @@ bool test_server_commands()
 		BOX_TRACE("Checking root directory using read-only connection");
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(
-				protocolReadOnly.QueryListDirectory(
-					BACKUPSTORE_ROOT_DIRECTORY_ID,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */)); // Stream
+			protocolReadOnly.QueryListDirectory(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes! */); // Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
 
@@ -1557,12 +1564,12 @@ bool test_server_commands()
 		BOX_TRACE("Checking subdirectory using read-only connection");
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(
+			TEST_EQUAL(subdirid,
 				protocolReadOnly.QueryListDirectory(
 					subdirid,
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, true /* get attributes */));
-			TEST_THAT(dirreply->GetObjectID() == subdirid);
+					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+					true /* get attributes */)->GetObjectID());
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
@@ -1591,10 +1598,11 @@ bool test_server_commands()
 		BOX_TRACE("Checking that we don't get attributes if we don't ask for them");
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					subdirid,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */));
+			protocolReadOnly.QueryListDirectory(
+				subdirid,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes! */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
@@ -1620,10 +1628,11 @@ bool test_server_commands()
 		// Check the new attributes
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					subdirid,
-					0,	// no flags
-					BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING, true /* get attributes */));
+			protocolReadOnly.QueryListDirectory(
+				subdirid,
+				0,	// no flags
+				BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING,
+				true /* get attributes */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
@@ -1729,10 +1738,11 @@ bool test_server_commands()
 			BackupStoreFilenameClear lookFor("moved-files-x");
 
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					subdirid,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+			protocolReadOnly.QueryListDirectory(
+				subdirid,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes */);
 
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
@@ -1887,39 +1897,26 @@ bool test_server_commands()
 		// Get the root dir, checking for deleted items
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					BACKUPSTORE_ROOT_DIRECTORY_ID,
-					BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+			protocolReadOnly.QueryListDirectory(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
 
-			// There should be no deleted entries. The directory
-			// that we tried to delete should have been removed
-			// immediately because it had >1 reference, and the
-			// snapshots should not be marked as deleted.
-			TEST_EQUAL(0, dir.GetNumberOfEntries());
-
-			dirreply = protocolReadOnly.QueryListDirectory(
-				BackupProtocolListDirectory::RootDirectory,
-				BackupProtocolListDirectory::Flags_Dir,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-				false /* no attributes */
-				);
-			dir.ReadFromStream(*protocolReadOnly.ReceiveStream(),
-				IOStream::TimeOutInfinite);
+			// Check there's only that one entry
+			TEST_THAT(dir.GetNumberOfEntries() == 1);
 
 			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry* en =
-				i.FindMatchingClearName(snapshotName);
+			BackupStoreDirectory::Entry *en = i.Next();
 			TEST_THAT(en != 0);
-
-			en = i.FindMatchingClearName(snapshot2Name);
-			TEST_THAT_OR(en != 0, FAIL);
-			TEST_EQUAL(dirtodelete, en->GetObjectID());
-			BackupStoreFilenameClear n("test_delete");
-			TEST_THAT(en->GetName() == n);
+			if(en)
+			{
+				TEST_EQUAL(dirtodelete, en->GetObjectID());
+				BackupStoreFilenameClear n("test_delete");
+				TEST_THAT(en->GetName() == n);
+			}
 
 			// Then... check everything's deleted
 			assert_everything_deleted(protocolReadOnly, dirtodelete);
@@ -1950,8 +1947,8 @@ bool test_snapshot_commands()
 
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	BackupStoreAccountDatabase::Entry& account =
-		apAccounts->GetEntry(0x1234567);
+	BackupStoreAccountDatabase::Entry
+		account(apAccounts->GetEntry(0x1234567));
 	std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 		BackupStoreRefCountDatabase::Load(account, true));
 
@@ -1982,6 +1979,14 @@ bool test_snapshot_commands()
 	// references.
 	// Test the immutable and snapshot flags - setting, clearing, enforcement.
 	// Try moving a directory, check that its container ID is updated.
+	// Resolve how an immutable object can be converted to a patch, which
+	// depends on another object, which is then deleted, and thus lost.
+	// Also if the last remaining reference on an object is a patch, not
+	// a directory, then check that BackupStoreCheck doesn't think it's
+	// unattached and move it to lost+found.
+	// Check that housekeeping doesn't remove anything from a directory
+	// that's multiply referenced or marked as immutable.
+	// Check that directories inside a snapshot are not double-counted.
 
 	int64_t firstSubFileDirId, firstSubDirId;
 	BackupStoreFilenameClear firstSubFileName;
@@ -1991,6 +1996,23 @@ bool test_snapshot_commands()
 		&firstSubFileDirId, &firstSubFileName, &firstSubDirId);
 
 	TEST_EQUAL(true, check_reference_counts());
+
+	// Create two directories to hold snapshots. This will alter block counts.
+	BackupStoreFilenameClear snapshot1DirName("snapshot1dir");
+	std::auto_ptr<IOStream> attr(new MemBlockStream(attr1, sizeof(attr1)));
+	uint64_t snapshot1DirID = apProtocol->QueryCreateDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID, // ContainingDirectoryID
+		0, // AttributesModTime
+		snapshot1DirName, attr)->GetObjectID();
+	set_refcount(snapshot1DirID, 1);
+
+	BackupStoreFilenameClear snapshot2DirName("snapshot2dir");
+	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
+	uint64_t snapshot2DirID = apProtocol->QueryCreateDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID, // ContainingDirectoryID
+		0, // AttributesModTime
+		snapshot2DirName, attr)->GetObjectID();
+	set_refcount(snapshot2DirID, 1);
 
 	// Also check that the account is sane beforehand.
 	// For which we have to logout.
@@ -2006,52 +2028,38 @@ bool test_snapshot_commands()
 		true)->GetRefCount(dirtodelete));
 
 	// Create two snapshots of this directory
-	BackupStoreFilenameClear snapshotName("snapshot");
+	BackupStoreFilenameClear snapshot1Name("snapshot1");
 	apProtocol->QueryAddReference(
-		/* ObjectToCloneID */
-		dirtodelete,
-		/* OldDirectoryID */
-		BACKUPSTORE_ROOT_DIRECTORY_ID,
-		/* NewDirectoryID */
-		BACKUPSTORE_ROOT_DIRECTORY_ID,
-		/* NewObjectFileName */
-		snapshotName)->GetObjectID();
+		dirtodelete, // ObjectToCloneID
+		BACKUPSTORE_ROOT_DIRECTORY_ID, // OldDirectoryID
+		snapshot1DirID, // NewDirectoryID
+		snapshot1Name // NewObjectFileName
+		);
 	BOX_INFO("Snapshot created of object ID " <<
 		BOX_FORMAT_OBJECTID(dirtodelete));
-	ExpectedRefCounts[dirtodelete]++;
-
-	TEST_EQUAL(2, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(dirtodelete));
+	set_refcount(dirtodelete, 2);
+	TEST_THAT(check_reference_counts());
 
 	BackupStoreFilenameClear snapshot2Name("snapshot2");
 	apProtocol->QueryAddReference(
-		/* ObjectToCloneID */
-		dirtodelete,
-		/* OldDirectoryID */
-		BACKUPSTORE_ROOT_DIRECTORY_ID,
-		/* NewDirectoryID */
-		BACKUPSTORE_ROOT_DIRECTORY_ID,
-		/* NewObjectFileName */
-		snapshot2Name);
+		dirtodelete, // ObjectToCloneID
+		BACKUPSTORE_ROOT_DIRECTORY_ID, // OldDirectoryID
+		snapshot2DirID, // NewDirectoryID
+		snapshot2Name // NewObjectFileName
+		);
 	BOX_INFO("Snapshot created of object ID " <<
 		BOX_FORMAT_OBJECTID(dirtodelete));
-	ExpectedRefCounts[dirtodelete]++;
-
-	TEST_EQUAL(3, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(dirtodelete));
+	set_refcount(dirtodelete, 3);
+	TEST_THAT(check_reference_counts());
 
 	// Run housekeeping to check block counts, for which we have to logout
-	apProtocol->QueryFinished();
-	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
-		"housekeeping after snapshot");
-	apProtocol->Reopen();
+	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
 
 	std::auto_ptr<BackupStoreInfo> apInfoAfter =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
 	TEST_EQUAL_LINE(0, apInfoAfter->ReportChangesTo(*apInfoBefore),
 		"Creating a snapshot should not have changed block counts");
-	TEST_EQUAL(true, check_reference_counts());
 
 	// Try to delete a file and a directory in the original
 	// without copying them first. Both should throw an
@@ -2066,86 +2074,107 @@ bool test_snapshot_commands()
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	// Make the parent directory unique/mutable again
-	int64_t new_parent_id = apProtocol->MakeUnique(dirtodelete,
-		BACKUPSTORE_ROOT_DIRECTORY_ID, snapshotName)->GetObjectID();
+	int64_t new_parent_id = apProtocol->QueryMakeUnique(dirtodelete,
+		snapshot1DirID)->GetObjectID();
 	TEST_THAT(new_parent_id != dirtodelete);
-	TEST_EQUAL(2, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(dirtodelete));
-	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(new_parent_id));
+	set_refcount(dirtodelete, 2);
+	set_refcount(new_parent_id, 1);
+
+	// We also need to increase the refcount of everything inside the
+	// directory that we just made mutable.
+	{
+		// List items in the original directory, not the clone,
+		// in case it wasn't cloned properly
+		BackupStoreDirectory dir(*apProtocol, dirtodelete,
+			SHORT_TIMEOUT);
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *en = 0;
+		while((en = i.Next()) != 0)
+		{
+			set_refcount(en->GetObjectID(), 2);
+		}
+	}
 
 	// Check for errors
-	apProtocol->QueryFinished();
-	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
-		"housekeeping after snapshot");
-	TEST_THAT(check_reference_counts());
-	apProtocol->Reopen();
+	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
 
-	// Now delete the mutable directory.
+	// Now delete the mutable directory. First we need to decrease the
+	// refcount of everything inside it, while we still know what they are.
+	{
+		// List items in the original directory, not the clone,
+		// in case it wasn't cloned properly
+		BackupStoreDirectory dir(*apProtocol, dirtodelete,
+			SHORT_TIMEOUT);
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *en = 0;
+		while((en = i.Next()) != 0)
+		{
+			set_refcount(en->GetObjectID(), 1);
+		}
+	}
 	TEST_EQUAL(new_parent_id,
-		apProtocol->QueryDeleteNow(BACKUPSTORE_ROOT_DIRECTORY_ID,
-			snapshotName)->GetObjectID());
-
-	TEST_EQUAL(2, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(dirtodelete));
-	TEST_EQUAL(0, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(new_parent_id));
+		apProtocol->QueryDeleteNow(new_parent_id,
+			snapshot1DirID)->GetObjectID());
+	ExpectedRefCounts[dirtodelete] = 2;
+	ExpectedRefCounts.resize(new_parent_id);
+	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
 
 	// And delete the remaining snapshot as well.
 	TEST_EQUAL(dirtodelete,
-		apProtocol->QueryDeleteNow(BACKUPSTORE_ROOT_DIRECTORY_ID,
-			snapshot2Name)->GetObjectID());
+		apProtocol->QueryDeleteNow(dirtodelete,
+			snapshot2DirID)->GetObjectID());
+	// Note that dirtodelete does not uniquely identify this snapshot,
+	// because it's just another reference to the ssme directory object,
+	// and thus has the same object ID. However within a directory object
+	// IDs must be unique, so within snapshot2DirID, it does identify
+	// the snapshot entry.
+	ExpectedRefCounts[dirtodelete] = 1;
+	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
 
-	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(dirtodelete));
+	// And delete the original directory
+	TEST_EQUAL(dirtodelete,
+		apProtocol->QueryDeleteNow(dirtodelete,
+			BACKUPSTORE_ROOT_DIRECTORY_ID)->GetObjectID());
 
-	apProtocol->QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
-	TEST_THAT(check_reference_counts());
-
-	// Get the root dir, checking for deleted items
+	for (size_t i = 0; i < ExpectedRefCounts.size(); i++)
 	{
-		// Command
-		std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
-		// Stream
-		BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
-			SHORT_TIMEOUT);
-
-		// There should be no deleted entries. snapshot 1 was removed
-		// using QueryDeleteNow, which is immediate, and snapshot 2 was
-		// removed using QueryDeleteFile, which when used on a multiply
-		// referenced object, should simply remove the entry from the
-		// parent directory.
-		TEST_EQUAL(0, dir.GetNumberOfEntries(),
-			"There should be no deleted entries in the root directory");
-
-		dirreply = protocolReadOnly.QueryListDirectory(
-			BackupProtocolListDirectory::RootDirectory,
-			BackupProtocolListDirectory::Flags_Dir,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-			false /* no attributes */
-			);
-		dir.ReadFromStream(*protocolReadOnly.ReceiveStream(),
-			IOStream::TimeOutInfinite);
-
-		BackupStoreDirectory::Iterator i(dir);
-		BackupStoreDirectory::Entry* en =
-			i.FindMatchingClearName(snapshotName);
-		TEST_THAT(en != 0);
-
-		en = i.FindMatchingClearName(snapshot2Name);
-		TEST_THAT_OR(en != 0, FAIL);
-		TEST_EQUAL(dirtodelete, en->GetObjectID());
-		BackupStoreFilenameClear n("test_delete");
-		TEST_THAT(en->GetName() == n);
-
-		// Then... check everything's deleted
-		assert_everything_deleted(protocolReadOnly, dirtodelete);
+		if (i == BACKUPSTORE_ROOT_DIRECTORY_ID ||
+			i == snapshot1DirID ||
+			i == snapshot2DirID)
+		{
+			ExpectedRefCounts[i] = 1;
+		}
+		else
+		{
+			ExpectedRefCounts[i] = 0;
+		}
 	}
 
+	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
+
+	// Check the remaining items on the server.
+	{
+		BackupStoreDirectory dir(*apProtocol,
+			BACKUPSTORE_ROOT_DIRECTORY_ID, SHORT_TIMEOUT);
+
+		// There should be two entries, the two snapshot directories.
+		TEST_EQUAL_LINE(2, dir.GetNumberOfEntries(),
+			"There should be just two snapshot directories remaining");
+		TEST_THAT(BackupStoreDirectory::Iterator(dir).FindMatchingClearName(
+			snapshot1DirName));
+		TEST_THAT(BackupStoreDirectory::Iterator(dir).FindMatchingClearName(
+			snapshot2DirName));
+
+		dir.Download(*apProtocol, snapshot1DirID, SHORT_TIMEOUT);
+		TEST_EQUAL_LINE(0, dir.GetNumberOfEntries(),
+			"There should be no entries in snapshot 1 directory");
+
+		dir.Download(*apProtocol, snapshot2DirID, SHORT_TIMEOUT);
+		TEST_EQUAL_LINE(0, dir.GetNumberOfEntries(),
+			"There should be no entries in snapshot 2 directory");
+	}
+
+	apProtocol->QueryFinished();
 	return teardown_test_backupstore();
 }
 
@@ -2221,6 +2250,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Now delete an entry, and check that the size is reduced
 	protocol.QueryDeleteFile(subdirid,
 		BackupStoreFilenameClear(last_added_filename));
+	ExpectedRefCounts[last_added_file_id] = 0;
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
@@ -2245,45 +2275,13 @@ bool test_directory_parent_entry_tracks_directory_size()
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
-	// Now modify the root directory to remove its entry for this one
-	std::auto_ptr<RaidFileRead> root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
-	BackupStoreDirectory root(static_cast<std::auto_ptr<IOStream> >(root_read));
-	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
-	TEST_THAT_OR(en, return false);
-	BackupStoreDirectory::Entry enCopy(*en);
-	root.DeleteEntry(subdirid);
-	TEST_THAT(write_dir(root));
+	// We used to check here that making a change to a directory that has
+	// no entry in its parent directory does not raise an exception. But
+	// this is a serious condition, especially now that we need to check
+	// the parent directory to ensure mutability. How did you get into such
+	// a directory anyway? So I've removed this check.
 
-	// Add a directory, this should try to push the object size back up,
-	// which will try to modify the subdir's entry in its parent, which
-	// no longer exists, which should just log an error instead of
-	// aborting/segfaulting.
-	create_directory(protocol, subdirid);
-
-	// Repair the error ourselves, as bbstoreaccounts can't.
-	protocol.QueryFinished();
-	enCopy.SetSizeInBlocks(get_raid_file(subdirid)->GetDiscUsageInBlocks());
-	root.AddEntry(enCopy);
-	TEST_THAT(write_dir(root));
-
-	// We also have to remove the entry for lovely_directory created by
-	// create_directory(), because otherwise we can't create it again.
-	// (Perhaps it should not have been committed because we failed to
-	// update the parent, but currently it is.)
-	std::auto_ptr<RaidFileRead> subdir_read(get_raid_file(subdirid));
-	BackupStoreDirectory subdir(static_cast<std::auto_ptr<IOStream> >(subdir_read));
-	{
-		BackupStoreDirectory::Iterator i(subdir);
-		en = i.FindMatchingClearName(
-			BackupStoreFilenameClear("lovely_directory"));
-	}
-	TEST_THAT_OR(en, return false);
-	protocol.Reopen();
-	protocol.QueryDeleteDirectory(en->GetObjectID());
-	set_refcount(en->GetObjectID(), 0);
-
-	// This should have fixed the error, so we should be able to add the
-	// entry now. This should push the object size back up.
+	// Add an object, which should push the object size back up.
 	int64_t dir2id = create_directory(protocol, subdirid);
 	TEST_EQUAL(new_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
 	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
@@ -2311,9 +2309,10 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	protocol.QueryFinished();
 
-	root_read = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
-	root.ReadFromStream(*root_read, IOStream::TimeOutInfinite);
-	en = root.FindEntryByID(subdirid);
+	std::auto_ptr<RaidFileRead>
+		root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
+	BackupStoreDirectory root(*root_read, IOStream::TimeOutInfinite);
+	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
 	en->SetSizeInBlocks(1234);
 
@@ -2696,7 +2695,6 @@ bool test_login_with_disabled_account()
 	// make sure something is written to it
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-
 	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
 		BackupStoreRefCountDatabase::Load(
 			apAccounts->GetEntry(0x1234567), true));
@@ -2796,9 +2794,14 @@ bool test_housekeeping_deletes_files()
 
 	// Create some nice recursive directories
 	write_test_file(1);
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+		BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567), true));
 	int64_t dirtodelete = create_test_data_subdirs(protocolLocal,
 		BACKUPSTORE_ROOT_DIRECTORY_ID, "test_delete", 6 /* depth */,
-		NULL /* pRefCount */);
+		*apReferences);
 
 	TEST_EQUAL(dirtodelete,
 		protocolLocal.QueryDeleteDirectory(dirtodelete)->GetObjectID());
