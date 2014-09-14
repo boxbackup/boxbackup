@@ -52,6 +52,52 @@
 		return PROTOCOL_ERROR(Err_SessionReadOnly); \
 	}
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolMessage::HandleException(BoxException& e)
+//		Purpose: Return an error message appropriate to the passed-in
+//		exception, or rethrow it.
+//		Created: 2014/09/14
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolMessage::HandleException(BoxException& e) const
+{
+	if(e.GetType() == RaidFileException::ExceptionType &&
+		e.GetSubType() == RaidFileException::RaidFileDoesntExist)
+	{
+		return PROTOCOL_ERROR(Err_DoesNotExist);
+	}
+	else if (e.GetType() == BackupStoreException::ExceptionType)
+	{
+		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
+		{
+			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
+		}
+		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
+		{
+			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
+		}
+		else if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
+		{
+			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
+		}
+		else if(e.GetSubType() == BackupStoreException::CouldNotFindEntryInDirectory)
+		{
+			return PROTOCOL_ERROR(Err_DoesNotExist);
+		}
+		else if(e.GetSubType() == BackupStoreException::NameAlreadyExistsInDirectory)
+		{
+			return PROTOCOL_ERROR(Err_TargetNameExists);
+		}
+
+	}
+
+	throw;
+}
+
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -201,13 +247,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 			mFlagsNotToBeSet, mSendAttributes,
 			false /* never send dependency info to the client */);
 	}
-	catch (RaidFileException &e)
+	catch(RaidFileException &e)
 	{
-		if (e.GetSubType() == RaidFileException::RaidFileDoesntExist)
-		{
-			return PROTOCOL_ERROR(Err_DoesNotExist);
-		}
-		throw;
+		return HandleException(e);
 	}
 
 	stream->SetForReading();
@@ -262,18 +304,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 	}
 	catch(BackupStoreException &e)
 	{
-		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
-		{
-			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
-		}
-		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
-		{
-			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
-		}
-		else
-		{
-			throw;
-		}
+		return HandleException(e);
 	}
 
 	// Tell the caller what the file ID was
@@ -517,14 +548,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
 	}
 	catch(BackupStoreException &e)
 	{
-		if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
-		{
-			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
-		}
-		else
-		{
-			throw;
-		}
+		return HandleException(e);
 	}
 
 	if(alreadyExists)
@@ -559,7 +583,14 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoComman
 	attr.Set(rDataStream, rProtocol.GetTimeout());
 
 	// Get the context to do it's magic
-	rContext.ChangeDirAttributes(mObjectID, attr, mAttributesModTime);
+	try
+	{
+		rContext.ChangeDirAttributes(mObjectID, attr, mAttributesModTime);
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
+	}
 
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -589,10 +620,17 @@ BackupProtocolSetReplacementFileAttributes::DoCommand(
 
 	// Get the context to do it's magic
 	int64_t objectID = 0;
-	if(!rContext.ChangeFileAttributes(mFilename, mInDirectory, attr, mAttributesHash, objectID))
+	try
 	{
-		// Didn't exist
-		return PROTOCOL_ERROR(Err_DoesNotExist);
+		if(!rContext.ChangeFileAttributes(mFilename, mInDirectory, attr, mAttributesHash, objectID))
+		{
+			// Didn't exist
+			return PROTOCOL_ERROR(Err_DoesNotExist);
+		}
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
 	}
 
 	// Tell the caller what the file was
@@ -622,12 +660,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteFile::DoCommand(BackupP
 	}
 	catch(BackupStoreException &e)
 	{
-		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
-		{
-			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
-		}
-
-		throw;
+		return HandleException(e);
 	}
 
 	// return the object ID or zero for not found
@@ -651,7 +684,16 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolUndeleteFile::DoCommand(
 	CHECK_WRITEABLE_SESSION
 
 	// Context handles this
-	bool result = rContext.UndeleteFile(mObjectID, mInDirectory);
+	bool result;
+
+	try
+	{
+		result = rContext.UndeleteFile(mObjectID, mInDirectory);
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
+	}
 
 	// return the object ID or zero for not found
 	return std::auto_ptr<BackupProtocolMessage>(
@@ -685,12 +727,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectory::DoCommand(Ba
 	}
 	catch(BackupStoreException &e)
 	{
-		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
-		{
-			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
-		}
-
-		throw;
+		return HandleException(e);
 	}
 
 	// return the object ID
@@ -718,7 +755,14 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolUndeleteDirectory::DoCommand(
 	}
 
 	// Context handles this
-	rContext.DeleteDirectory(mObjectID, true /* undelete */);
+	try
+	{
+		rContext.DeleteDirectory(mObjectID, true /* undelete */);
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
+	}
 
 	// return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -742,9 +786,16 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteNow::DoCommand(
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	if(!rContext.DeleteNow(mObjectToDeleteID, mContainingDirID))
+	try
 	{
-		return PROTOCOL_ERROR(Err_DoesNotExistInDirectory);
+		if(!rContext.DeleteNow(mObjectToDeleteID, mContainingDirID))
+		{
+			return PROTOCOL_ERROR(Err_DoesNotExistInDirectory);
+		}
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
 	}
 
 	// return the object ID
@@ -796,18 +847,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolMoveObject::DoCommand(BackupP
 	}
 	catch(BackupStoreException &e)
 	{
-		if(e.GetSubType() == BackupStoreException::CouldNotFindEntryInDirectory)
-		{
-			return PROTOCOL_ERROR(Err_DoesNotExist);
-		}
-		else if(e.GetSubType() == BackupStoreException::NameAlreadyExistsInDirectory)
-		{
-			return PROTOCOL_ERROR(Err_TargetNameExists);
-		}
-		else
-		{
-			throw;
-		}
+		return HandleException(e);
 	}
 
 	// Return the object ID
@@ -1064,8 +1104,17 @@ BackupProtocolAddReference::DoCommand(BackupProtocolReplyable &rProtocol,
 	BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
-	rContext.AddReference(mObjectToCloneID, mOldDirectoryID,
-		mNewDirectoryID, mNewObjectFileName);
+
+	try
+	{
+		rContext.AddReference(mObjectToCloneID, mOldDirectoryID,
+			mNewDirectoryID, mNewObjectFileName);
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
+	}
+
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess());
 }
 
@@ -1084,8 +1133,18 @@ BackupProtocolMakeUnique::DoCommand(BackupProtocolReplyable &rProtocol,
 	BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
-	int64_t newObjectID = rContext.MakeUnique(mObjectToMakeUniqueID,
-		mContainingDirID);
+	int64_t newObjectID;
+
+	try
+	{
+		newObjectID = rContext.MakeUnique(mObjectToMakeUniqueID,
+			mContainingDirID);
+	}
+	catch(BackupStoreException &e)
+	{
+		return HandleException(e);
+	}
+
 	return std::auto_ptr<BackupProtocolMessage>(
 		new BackupProtocolSuccess(newObjectID));
 }

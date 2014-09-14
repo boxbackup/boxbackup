@@ -783,6 +783,7 @@ void BackupStoreContext::AddReference(int64_t ObjectID,
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
 
+	AssertMutable(OldDirectoryID);
 	AssertMutable(NewDirectoryID);
 
 	BackupStoreDirectory &oldDir(GetDirectoryInternal(OldDirectoryID));
@@ -1768,6 +1769,7 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
+	AssertMutable(InDirectory);
 
 	try
 	{

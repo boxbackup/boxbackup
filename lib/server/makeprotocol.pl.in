@@ -231,6 +231,7 @@ public:
 		$context_class &rContext) const;
 	virtual std::auto_ptr<$message_base_class> DoCommand($replyable_base_class &rProtocol,
 		$context_class &rContext, IOStream& rDataStream) const;
+	virtual std::auto_ptr<$message_base_class> HandleException(BoxException& e) const;
 	virtual bool HasStreamWithCommand() const = 0;
 };
 

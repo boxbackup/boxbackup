@@ -547,7 +547,7 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	int64_t indir, const char *name, int depth,
 	BackupStoreRefCountDatabase& rRefCount, int64_t *pFirstFileDirId = NULL,
 	BackupStoreFilenameClear *pFirstFileName = NULL,
-	int64_t *pFirstDirId = NULL)
+	int64_t *pFirstDirId = NULL, int64_t *pFirstFileId = NULL)
 {
 	write_test_file(1);
 
@@ -587,16 +587,22 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	}
 
 	// Stick some files in it
-	create_file_in_dir("file_One", "testfiles/test1", subdirid, protocol,
-		rRefCount);
+	int64_t first_file_id = create_file_in_dir("file_One",
+		"testfiles/test1", subdirid, protocol, rRefCount);
 
 	if (pFirstFileDirId)
 	{
 		*pFirstFileDirId = subdirid;
 	}
+
 	if (pFirstFileName)
 	{
 		*pFirstFileName = BackupStoreFilenameClear("file_One");
+	}
+
+	if (pFirstFileId)
+	{
+		*pFirstFileId = first_file_id;
 	}
 
 	create_file_in_dir("file_Two", "testfiles/test1", subdirid, protocol,
@@ -1954,8 +1960,6 @@ bool test_snapshot_commands()
 
 	// Things to test:
 	// Create a snapshot copy of a file in the same dir
-	// Try various commands to modify stuff inside original or snapshot,
-	// test that they are refused.
 	// Copy the snapshot to break the lock.
 	// Try to clone the root directory, which cannot be immutable, so this should return an error.
 	// Make an object mutable that's already mutable, check return ID.
@@ -1988,12 +1992,13 @@ bool test_snapshot_commands()
 	// that's multiply referenced or marked as immutable.
 	// Check that directories inside a snapshot are not double-counted.
 
-	int64_t firstSubFileDirId, firstSubDirId;
+	int64_t firstSubFileDirId, firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;
 	int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 		BackupProtocolListDirectory::RootDirectory,
 		"test_delete", 6 /* depth */, *apRefCount,
-		&firstSubFileDirId, &firstSubFileName, &firstSubDirId);
+		&firstSubFileDirId, &firstSubFileName, &firstSubDirId,
+		&firstFileId);
 
 	TEST_EQUAL(true, check_reference_counts());
 
@@ -2071,6 +2076,86 @@ bool test_snapshot_commands()
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteDirectory(firstSubDirId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	// Try various commands to modify stuff inside original or snapshot,
+	// test that they are refused.
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryMoveObject(firstFileId, firstSubDirId,
+			BACKUPSTORE_ROOT_DIRECTORY_ID, 0, BackupStoreFilename()),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryMoveObject(firstSubDirId, BACKUPSTORE_ROOT_DIRECTORY_ID,
+			firstFileId, 0, BackupStoreFilename()),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryCreateDirectory(firstSubDirId, 0, BackupStoreFilename(),
+			attr),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryChangeDirAttributes(firstSubDirId, 0, attr),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryDeleteDirectory(firstSubDirId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryUndeleteDirectory(firstSubDirId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryCreateDirectory2(firstSubDirId, 0, 0, BackupStoreFilename(),
+			attr),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	int64_t modtime = 0;
+	BackupStoreFilenameClear fnx("create-in-multiply-referenced-dir");
+	std::auto_ptr<IOStream>
+		upload(BackupStoreFile::EncodeFile("testfiles/test1",
+			BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime));
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryStoreFile(dirtodelete, 0, 0, 0, fnx, upload),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	// and also in a subdir, to check that immutability is transitive
+	upload = BackupStoreFile::EncodeFile("testfiles/test1",
+		BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime);
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryStoreFile(firstSubDirId, 0, 0, 0, fnx, upload),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QuerySetReplacementFileAttributes(firstFileId, 0,
+			BackupStoreFilename(), attr),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryUndeleteFile(firstSubFileDirId, firstFileId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryAddReference(firstFileId, firstSubFileDirId,
+			dirtodelete, BackupStoreFilename()),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryMakeUnique(firstFileId, firstSubFileDirId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryDeleteNow(firstFileId, firstSubFileDirId),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryDeleteNow(firstFileId, dirtodelete),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	// Make the parent directory unique/mutable again
