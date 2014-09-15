@@ -1319,6 +1319,11 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 {
 	int64_t ObjectID = rDir.GetObjectID();
 
+	if(mapRefCount->GetLastObjectIDUsed() >= ObjectID)
+	{
+		AssertMutable(ObjectID);
+	}
+
 	if(mapStoreInfo.get() == 0)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
@@ -2303,9 +2308,15 @@ const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
 // --------------------------------------------------------------------------
 void BackupStoreContext::AssertMutable(int64_t ObjectID)
 {
+	if (mapRefCount->GetLastObjectIDUsed() < ObjectID)
+	{
+		// Not referenced anywhere, so it must be mutable
+		return;
+	}
+
 	int32_t refcount = mapRefCount->GetRefCount(ObjectID);
 
-	if (refcount != 1)
+	if (refcount > 1)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
 			MultiplyReferencedObject,
