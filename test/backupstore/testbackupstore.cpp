@@ -515,7 +515,7 @@ void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
 	}
 
 	// Check there were the right number of files and directories
-	TEST_THAT(files == 3);
+	TEST_THAT(files == 4);
 	TEST_THAT(dirs == 0 || dirs == 2);
 }
 
@@ -607,6 +607,9 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 
 	create_file_in_dir("file_Two", "testfiles/test1", subdirid, protocol,
 		rRefCount);
+	create_file_in_dir("file_Three", "testfiles/test1", subdirid, protocol,
+		rRefCount);
+	// Upload again, to create an old file
 	create_file_in_dir("file_Three", "testfiles/test1", subdirid, protocol,
 		rRefCount);
 	return subdirid;
@@ -990,6 +993,7 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(3, patch1_id, "wrong ObjectID for newly uploaded "
 		"patch file");
+	set_refcount(patch1_id, 1);
 
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
@@ -1020,6 +1024,7 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(4, patch2_id, "wrong ObjectID for newly uploaded "
 		"patch file");
+	set_refcount(patch2_id, 1);
 
 	// How many blocks used by the new file?
 	// We need to check the old file's size, because it's been replaced
@@ -1050,6 +1055,7 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(5, replaced_id, "wrong ObjectID for newly uploaded "
 		"full file");
+	set_refcount(replaced_id, 1);
 
 	// How many blocks used by the new file? This time we need to check
 	// the new file, because it's not a patch.
@@ -1080,6 +1086,8 @@ bool test_server_housekeeping()
 		"2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
+	set_refcount(store1objid, 0);
+	set_refcount(patch1_id, 0);
 
 	TEST_THAT(check_num_files(1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
@@ -1107,6 +1115,7 @@ bool test_server_housekeeping()
 	TEST_THAT(change_account_limits("0B", "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
@@ -2374,13 +2383,13 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	// Delete it again, which should reduce the object size again
 	protocol.QueryDeleteDirectory(dir2id);
+	ExpectedRefCounts.resize(dir2id);
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
 	TEST_THAT(change_account_limits("0B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
-	set_refcount(dir2id, 0);
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 

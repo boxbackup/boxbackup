@@ -112,7 +112,8 @@ bool setUp(const char* function_name)
 		"testfiles/notifyscript.tag* "
 		"testfiles/restore* testfiles/bbackupd-data "
 		"testfiles/syncallowscript.control "
-		"testfiles/syncallowscript.notifyran.*") == 0);
+		"testfiles/syncallowscript.notifyran.* "
+		"testfiles/test2.downloaded") == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
