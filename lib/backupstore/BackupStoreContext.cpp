@@ -1489,7 +1489,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		dirSize = dirFile.GetDiscUsageInBlocks();
 
 		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() + 
+		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
 			dirSize;
 		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
 		{

@@ -156,21 +156,21 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 			BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)) << " in " <<
 			rStream.ToString());
 	}
-	
+
 	// Get data
 	mObjectID = box_ntoh64(hdr.mObjectID);
 	mContainerID = box_ntoh64(hdr.mContainerID);
 	mAttributesModTime = box_ntoh64(hdr.mAttributesModTime);
-	
+
 	// Options
 	int32_t options = ntohl(hdr.mOptionsPresent);
-	
+
 	// Get attributes
 	mAttributes.ReadFromStream(rStream, Timeout);
-	
+
 	// Decode count
 	int count = ntohl(hdr.mNumEntries);
-	
+
 	// Clear existing list
 	for(std::vector<Entry*>::iterator i = mEntries.begin(); 
 		i != mEntries.end(); i++)
@@ -178,7 +178,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 		delete (*i);
 	}
 	mEntries.clear();
-	
+
 	// Read them in!
 	for(int c = 0; c < count; ++c)
 	{
@@ -187,7 +187,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 		{
 			// Read from stream
 			pen->ReadFromStream(rStream, Timeout);
-			
+
 			// Add to list
 			mEntries.push_back(pen);
 		}
@@ -197,7 +197,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 			throw;
 		}
 	}
-	
+
 	// Read in dependency info?
 	if(options & Option_DependencyInfoPresent)
 	{
@@ -232,11 +232,11 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 			count++;
 		}
 	}
-	
+
 	// Check that sensible IDs have been set
 	ASSERT(mObjectID != 0);
 	ASSERT(mContainerID != 0);
-	
+
 	// Need dependency info?
 	bool dependencyInfoRequired = false;
 	if(StreamDependencyInfo)
@@ -249,9 +249,9 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 			{
 				dependencyInfoRequired = true;
 			}
-		}	
+		}
 	}
-	
+
 	// Options
 	int32_t options = 0;
 	if(dependencyInfoRequired) options |= Option_DependencyInfoPresent;
@@ -264,10 +264,10 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	hdr.mContainerID = box_hton64(mContainerID);
 	hdr.mAttributesModTime = box_hton64(mAttributesModTime);
 	hdr.mOptionsPresent = htonl(options);
-	
+
 	// Write header
 	rStream.Write(&hdr, sizeof(hdr));
-	
+
 	// Write the attributes?
 	if(StreamAttributes)
 	{
@@ -286,7 +286,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 	{
 		pen->WriteToStream(rStream);
 	}
-	
+
 	// Write dependency info?
 	if(dependencyInfoRequired)
 	{
@@ -295,7 +295,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 		while((pen = i.Next(FlagsMustBeSet, FlagsNotToBeSet)) != 0)
 		{
 			pen->WriteToStreamDependencyInfo(rStream);
-		}	
+		}
 	}
 }
 
@@ -320,7 +320,7 @@ BackupStoreDirectory::Entry *BackupStoreDirectory::AddEntry(const Entry &rEntryT
 		delete pnew;
 		throw;
 	}
-	
+
 	return pnew;
 }
 
@@ -349,7 +349,7 @@ BackupStoreDirectory::AddEntry(const BackupStoreFilename &rName,
 		delete pnew;
 		throw;
 	}
-	
+
 	return pnew;
 }
 
@@ -377,7 +377,7 @@ void BackupStoreDirectory::DeleteEntry(int64_t ObjectID)
 			return;
 		}
 	}
-	
+
 	// Not found
 	THROW_EXCEPTION_MESSAGE(BackupStoreException, CouldNotFindEntryInDirectory,
 		"Failed to find entry " << BOX_FORMAT_OBJECTID(ObjectID) <<
@@ -524,11 +524,11 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 	}
 
 	// Do reading first before modifying the variables, to be more exception safe
-	
+
 	// Get the filename
 	BackupStoreFilename name;
 	name.ReadFromStream(rStream, Timeout);
-	
+
 	// Get the attributes
 	mAttributes.ReadFromStream(rStream, Timeout);
 
@@ -560,13 +560,13 @@ void BackupStoreDirectory::Entry::WriteToStream(IOStream &rStream) const
 	entry.mSizeInBlocks = 		box_hton64(mSizeInBlocks);
 	entry.mAttributesHash =		box_hton64(mAttributesHash);
 	entry.mFlags = 				htons(mFlags);
-	
+
 	// Write it
 	rStream.Write(&entry, sizeof(entry));
-	
+
 	// Write the filename
 	mName.WriteToStream(rStream);
-	
+
 	// Write any attributes
 	mAttributes.WriteToStream(rStream);
 }
@@ -608,12 +608,9 @@ void BackupStoreDirectory::Entry::WriteToStreamDependencyInfo(IOStream &rStream)
 {
 	ASSERT_NOT_INVALIDATED;
 	// Build structure
-	en_StreamFormatDepends depends;	
+	en_StreamFormatDepends depends;
 	depends.mDependsNewer = box_hton64(mDependsNewer);
 	depends.mDependsOlder = box_hton64(mDependsOlder);
 	// Write
 	rStream.Write(&depends, sizeof(depends));
 }
-
-
-
