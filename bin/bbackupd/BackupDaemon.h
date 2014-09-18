@@ -445,7 +445,7 @@ public:
 		if (mLogAllFileAccess)
 		{
 			BOX_INFO("Synchronised file: " << rLocalPath);
-		} 
+		}
 	}
 	virtual void NotifyDirectoryCreated(
 		int64_t ObjectID,
