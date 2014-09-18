@@ -79,6 +79,12 @@ HousekeepStoreAccount::HousekeepStoreAccount(int AccountID,
 // --------------------------------------------------------------------------
 HousekeepStoreAccount::~HousekeepStoreAccount()
 {
+	// Avoid an exception if we forget to discard mapNewRefs
+	if (mapNewRefs.get())
+	{
+		mapNewRefs->Discard();
+		mapNewRefs.reset();
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -875,11 +881,13 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	if(padjustedEntry.get() != 0)
 	{
 		padjustedEntry->Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-		padjustedEntry.reset();	// delete it now
+		padjustedEntry.reset(); // delete it now
 	}
 
 	// Drop reference count by one. Must now be zero, to delete the file.
-	ASSERT(!mapNewRefs->RemoveReference(ObjectID))
+	BackupStoreRefCountDatabase::refcount_t refs =
+		mapNewRefs->RemoveReference(ObjectID);
+	ASSERT(!refs);
 
 	// Delete from disc
 	BOX_TRACE("Removing unreferenced object " <<

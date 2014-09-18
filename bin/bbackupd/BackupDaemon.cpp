@@ -911,7 +911,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		conf.GetKeyValueBool("TcpNice")
 	);
 
-	clientContext.mExperimentalSnapshotMode =
+	mapClientContext->mExperimentalSnapshotMode =
 		conf.GetKeyValueBool("ExperimentalSnapshotMode");
 
 	// The minimum age a file needs to be before it will be
@@ -1089,32 +1089,32 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		mapClientContext->SetExcludeLists(0, 0);
 	}
 
-	if (clientContext.mExperimentalSnapshotMode)
+	if (mapClientContext->mExperimentalSnapshotMode)
 	{
 		int64_t snapshotTime = GetCurrentBoxTime();
 
 		EMU_STRUCT_STAT st;
 		st.st_mode = 0600;
 		BackupClientFileAttributes attr(st);
-		MemBlockStream attrStream(attr);
+		std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
 
 		BackupStoreFilenameClear snapshotName(
 			BoxTimeToISO8601String(snapshotTime, false));
 		std::auto_ptr<BackupProtocolSuccess> success =
-			clientContext.GetConnection().QueryCreateDirectory(
+			mapClientContext->GetConnection().QueryCreateDirectory(
 				BackupProtocolListDirectory::RootDirectory,
 				snapshotTime, snapshotName, attrStream);
 		int64_t snapshotId = success->GetObjectID();
 
-		for(std::vector<Location *>::const_iterator 
-			i(mLocations.begin()); 
+		for(std::list<Location *>::const_iterator
+			i(mLocations.begin());
 			i != mLocations.end(); ++i)
 		{
 			BackupStoreFilenameClear locationName((*i)->mName.c_str());
 			std::auto_ptr<BackupProtocolSuccess> success =
-				clientContext.GetConnection().QueryAddReference(
+				mapClientContext->GetConnection().QueryAddReference(
 					/* ObjectToCloneID */
-					(*i)->mpDirectoryRecord->GetObjectID(),
+					(*i)->mapDirectoryRecord->GetObjectID(),
 					/* OldDirectoryID */
 					BackupProtocolListDirectory::RootDirectory,
 					/* mNewDirectoryID */

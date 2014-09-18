@@ -166,10 +166,11 @@ typedef struct
 	int flags;
 } dir_en_check;
 
-void check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
+bool check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 {
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en;
+	bool ok = true;
 	
 	while((en = i.Next()) != 0)
 	{
@@ -180,14 +181,15 @@ void check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 		{
 			break;
 		}
-		TEST_THAT(en->GetName() == fnames[ck->name]);
-		TEST_THAT(en->GetObjectID() == ck->id);
-		TEST_THAT(en->GetFlags() == ck->flags);
+		TEST_THAT_OR(en->GetName() == fnames[ck->name], ok = false);
+		TEST_EQUAL_OR(en->GetObjectID(), ck->id, ok = false);
+		TEST_EQUAL_OR(en->GetFlags(), ck->flags, ok = false);
 		++ck;
 	}
 	
-	TEST_THAT(en == 0);
-	TEST_THAT(ck->name == -1);
+	TEST_EQUAL_OR(en, 0, ok = false);
+	TEST_EQUAL_OR(ck->name, -1, ok = false);
+	return ok;
 }
 
 typedef struct
@@ -237,11 +239,17 @@ void test_dir_fixing()
 			{-1, 0, 0}
 		};
 		
-		check_dir(dir, ck);
+		TEST_THAT(check_dir(dir, ck));
 	}
 
 	{
 		BackupStoreDirectory dir;
+		/*
+		Entry *AddEntry(const BackupStoreFilename &rName,
+			box_time_t ModificationTime, int64_t ObjectID,
+			int64_t SizeInBlocks, int16_t Flags,
+			uint64_t AttributesHash);
+		*/
 		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, 
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[1], 12, 2 /* id */, 1,
@@ -251,7 +259,16 @@ void test_dir_fixing()
 		dir.AddEntry(fnames[0], 12, 5 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File | 
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
-		
+
+		/*
+		typedef struct
+		{
+			int name;
+			int64_t id;
+			int flags;
+		} dir_en_check;
+		*/
+
 		dir_en_check ck[] = {
 			{1, 2, BackupStoreDirectory::Entry::Flags_File},
 			{0, 3, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion},
@@ -261,7 +278,7 @@ void test_dir_fixing()
 		
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
-		check_dir(dir, ck);
+		TEST_THAT(check_dir(dir, ck));
 	}
 
 	{
@@ -281,7 +298,7 @@ void test_dir_fixing()
 		
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
-		check_dir(dir, ck);
+		TEST_THAT(check_dir(dir, ck));
 	}
 
 	// Test dependency fixing
@@ -393,7 +410,7 @@ void login_client_and_check_empty(BackupProtocolCallable& client)
 	read_bb_dir(1 /* root */, dir);
 
 	dir_en_check start_entries[] = {{-1, 0, 0}};
-	check_dir(dir, start_entries);
+	TEST_THAT(check_dir(dir, start_entries));
 	static checkdepinfoen start_deps[] = {{-1, 0, 0}};
 	check_dir_dep(dir, start_deps);
 
@@ -407,7 +424,7 @@ void login_client_and_check_empty(BackupProtocolCallable& client)
 	dir_en_check before_entries[] = {
 		{-1, 0, 0}
 	};
-	check_dir(dir, before_entries);
+	TEST_THAT(check_dir(dir, before_entries));
 	static checkdepinfoen before_deps[] = {{-1, 0, 0}};
 	check_dir_dep(dir, before_deps);
 }
@@ -423,7 +440,7 @@ void check_root_dir_ok(dir_en_check after_entries[],
 	BackupStoreDirectory dir;
 	read_bb_dir(1 /* root */, dir);
 
-	check_dir(dir, after_entries);
+	TEST_THAT(check_dir(dir, after_entries));
 	check_dir_dep(dir, after_deps);
 }
 
@@ -879,7 +896,7 @@ int test(int argc, const char *argv[])
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-		dir.TESTONLY_SetObjectID(73773);
+		dir.SetObjectID(73773);
 		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
 	}
 	// Delete dir with no members

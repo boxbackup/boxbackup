@@ -805,6 +805,7 @@ bool BackupStoreDirectory::CheckAndFix()
 		}
 
 		// Records of things seen
+		std::set<int64_t> idsEncountered;
 		std::set<std::string> filenamesEncountered;
 
 		do
@@ -829,39 +830,50 @@ bool BackupStoreDirectory::CheckAndFix()
 					(*i)->RemoveFlags(Entry::Flags_File);
 					changed = true;
 				}
-
-				// With snapshots, it's no longer an error
-				// to see the same ID more than once in a
-				// directory.
-
-				// Check to see if the name has already been encountered -- if not, then it
-				// needs to have the old version flag set
-				if(filenamesEncountered.find((*i)->GetName().GetEncodedFilename()) != filenamesEncountered.end())
+			
+				// Check...
+				if(idsEncountered.find((*i)->GetObjectID()) != idsEncountered.end())
 				{
-					// Seen before -- check old version flag set
-					if(!((*i)->IsOld()) && !((*i)->IsDeleted()))
-					{
-						// Not set, set it
-						BOX_TRACE("Entry " << FMT_i <<
-							": Set old flag");
-						(*i)->AddFlags(Entry::Flags_OldVersion);
-						changed = true;
-					}
+					// ID already seen, or type doesn't match
+					BOX_TRACE("Entry " << FMT_i <<
+						": Remove because ID already seen");
+					removeEntry = true;
 				}
 				else
 				{
-					// Check old version flag NOT set
-					if((*i)->IsOld())
+					// Haven't already seen this ID, remember it
+					idsEncountered.insert((*i)->GetObjectID());
+					
+					// Check to see if the name has already been encountered -- if not, then it
+					// needs to have the old version flag set
+					if(filenamesEncountered.find((*i)->GetName().GetEncodedFilename()) != filenamesEncountered.end())
 					{
-						// Set, unset it
-						BOX_TRACE("Entry " << FMT_i <<
-							": Old flag unset");
-						(*i)->RemoveFlags(Entry::Flags_OldVersion);
-						changed = true;
+						// Seen before -- check old version flag set
+						if(((*i)->GetFlags() & Entry::Flags_OldVersion) != Entry::Flags_OldVersion
+							&& ((*i)->GetFlags() & Entry::Flags_Deleted) == 0)
+						{
+							// Not set, set it
+							BOX_TRACE("Entry " << FMT_i <<
+								": Set old flag");
+							(*i)->AddFlags(Entry::Flags_OldVersion);
+							changed = true;
+						}
 					}
-
-					// Remember filename
-					filenamesEncountered.insert((*i)->GetName().GetEncodedFilename());
+					else
+					{
+						// Check old version flag NOT set
+						if(((*i)->GetFlags() & Entry::Flags_OldVersion) == Entry::Flags_OldVersion)
+						{
+							// Set, unset it
+							BOX_TRACE("Entry " << FMT_i <<
+								": Old flag unset");
+							(*i)->RemoveFlags(Entry::Flags_OldVersion);
+							changed = true;
+						}
+						
+						// Remember filename
+						filenamesEncountered.insert((*i)->GetName().GetEncodedFilename());
+					}
 				}
 			}
 

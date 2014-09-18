@@ -11,6 +11,11 @@
 #include "MemLeakFindOn.h"
 
 
+std::auto_ptr<TestProtocolMessage> TestProtocolMessage::HandleException(BoxException& e) const
+{
+	throw;
+}
+
 std::auto_ptr<TestProtocolMessage> TestProtocolHello::DoCommand(TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
 	if(mNumber32 != 41 || mNumber16 != 87 || mNumber8 != 11 || mText != "pingu")
