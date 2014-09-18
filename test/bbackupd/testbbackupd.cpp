@@ -416,7 +416,7 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 	MemoryBlockGuard<const char **> argv_buffer(sizeof(const char*) * (args.size() + 1));
 	const char **argv = argv_buffer;
 	argv_buffer[0] = "bbackupd";
-	for (int i = 0; i < args.size(); i++)
+	for (size_t i = 0; i < args.size(); i++)
 	{
 		argv_buffer[i + 1] = args[i].c_str();
 	}
@@ -2184,9 +2184,6 @@ bool test_bbackupd_responds_to_connection_failure()
 			apClientContext = bbackupd.RunSyncNowWithExceptionHandling();
 		}
 
-		TEST_THAT_OR(apClientContext.get(), FAIL);
-		MockClientContext* pContext =
-			static_cast<MockClientContext *>(apClientContext.get());
 		// Should only have been triggered once
 		TEST_EQUAL(1, client.hook.trigger_count);
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
@@ -2847,7 +2844,7 @@ bool test_store_error_reporting()
 				("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
 		TEST_EQUAL_LINE(0, errs.size(), "Loading configuration file "
 			"reported errors: " << errs);
-		TEST_THAT(config.get() != 0);
+		TEST_THAT_OR(config.get(), return false);
 		std::auto_ptr<BackupStoreAccountDatabase> db(
 			BackupStoreAccountDatabase::Read(
 				config->GetKeyValue("AccountDatabase")));
