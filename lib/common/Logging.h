@@ -139,7 +139,9 @@
 
 #define BOX_FORMAT_TIMESPEC(timespec) \
 	timespec.tv_sec << \
+	"." << \
 	std::setw(6) << \
+	std::setfill('0') << \
 	timespec.tv_usec
 
 #define BOX_FORMAT_MICROSECONDS(t) \
