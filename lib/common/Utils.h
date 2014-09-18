@@ -17,7 +17,7 @@
 
 std::string GetBoxBackupVersion();
 
-void SplitString(const std::string &String, char SplitOn, std::vector<std::string> &rOutput);
+void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOutput);
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
 	void DumpStackBacktrace();

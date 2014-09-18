@@ -1013,15 +1013,24 @@ bool compare(BackupQueries::ReturnCode::Type expected_status,
 	return (returnValue == expected_system_result);
 }
 
-bool compare_local(BackupQueries::ReturnCode::Type expected_status,
-	BackupProtocolCallable& client,
-	const std::string& compare_options = "acQ")
+std::auto_ptr<Configuration> load_config_file(
+	std::string config_file = "testfiles/bbackupd.conf")
 {
 	std::string errs;
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
-	TEST_EQUAL_OR(0, errs.size(), return false);
+	TEST_EQUAL_LINE(0, errs.size(), "Failed to load configuration file: " + errs);
+	TEST_EQUAL_OR(0, errs.size(), config.reset());
+	return config;
+}
+
+bool compare_local(BackupQueries::ReturnCode::Type expected_status,
+	BackupProtocolCallable& client,
+	const std::string& compare_options = "acQ")
+{
+	std::auto_ptr<Configuration> config = load_config_file();
+	TEST_THAT_OR(config.get(), return false);
 	BackupQueries bbackupquery(client, *config, false);
 
 	std::vector<std::string> args;
@@ -1184,15 +1193,53 @@ bool test_readdirectory_on_nonexistent_dir()
 	TEARDOWN();
 }
 
+bool test_bbackupquery_parser_escape_slashes()
+{
+	SETUP_WITH_BBSTORED();
+
+	BackupProtocolLocal2 connection(0x01234567, "test",
+		"backup/01234567/", 0, false);
+
+	BackupClientFileAttributes attr;
+	attr.ReadAttributes("testfiles/TestDir1",
+		false /* put mod times in the attributes, please */);
+	std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
+	BackupStoreFilenameClear dirname("foo");
+	int64_t foo_id = connection.QueryCreateDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
+		0, // attrModTime,
+		dirname, // dirname,
+		attrStream)->GetObjectID();
+
+	attrStream.reset(new MemBlockStream(attr));
+	dirname = BackupStoreFilenameClear("/bar");
+	int64_t bar_id = connection.QueryCreateDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
+		0, // attrModTime,
+		dirname, // dirname,
+		attrStream)->GetObjectID();
+
+	std::auto_ptr<Configuration> config = load_config_file();
+	TEST_THAT_OR(config.get(), return false);
+	BackupQueries query(connection, *config, false); // read-only
+
+	TEST_EQUAL(foo_id, query.FindDirectoryObjectID("foo"));
+	TEST_EQUAL(foo_id, query.FindDirectoryObjectID("/foo"));
+	TEST_EQUAL(0, query.FindDirectoryObjectID("\\/foo"));
+	TEST_EQUAL(0, query.FindDirectoryObjectID("/bar"));
+	TEST_EQUAL(bar_id, query.FindDirectoryObjectID("\\/bar"));
+	connection.QueryFinished();
+
+	TEARDOWN();
+}
+
 bool test_getobject_on_nonexistent_file()
 {
 	SETUP_WITH_BBSTORED();
 
 	{
-		std::string errs;
-		std::auto_ptr<Configuration> config(
-			Configuration::LoadAndVerify
-				("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
+		std::auto_ptr<Configuration> config = load_config_file();
+		TEST_THAT_OR(config.get(), return false);
 
 		std::auto_ptr<BackupProtocolCallable> connection =
 			connect_and_login(context, 0 /* read-write */);
@@ -4071,6 +4118,7 @@ int test(int argc, const char *argv[])
 
 	TEST_THAT(test_basics());
 	TEST_THAT(test_readdirectory_on_nonexistent_dir());
+	TEST_THAT(test_bbackupquery_parser_escape_slashes());
 	TEST_THAT(test_getobject_on_nonexistent_file());
 	// TEST_THAT(test_replace_zero_byte_file_with_nonzero_byte_file());
 	TEST_THAT(test_backup_disappearing_directory());
