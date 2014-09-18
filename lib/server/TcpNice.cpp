@@ -154,7 +154,7 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 			BOX_LOG_SYS_WARNING("getsockopt(" << socket << ", SOL_TCP, "
 				"TCP_INFO) failed");
 		}
-		else if(optlen != sizeof(info))
+		else if(optlen < sizeof(info))
 		{
 			BOX_WARNING("getsockopt(" << socket << ", SOL_TCP, "
 				"TCP_INFO) return structure size " << optlen << ", "
