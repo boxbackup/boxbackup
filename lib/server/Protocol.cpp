@@ -244,7 +244,7 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::Send()
+//		Name:    Protocol::SendInternal()
 //		Purpose: Send an object to the other side of the connection.
 //		Created: 2003/08/19
 //
