@@ -105,7 +105,7 @@ bool delete_account();
 			TEST_FAIL_WITH_MESSAGE("command returned success"); \
 			or_statements; \
 		} \
-	} 
+	}
 
 #define TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error, or_statements) \
 	TEST_CHECK_THROWS_OR((protocol) . command, ConnectionException, \
