@@ -51,25 +51,40 @@ std::string GetBoxBackupVersion()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void SplitString(const std::string &String, char SplitOn, std::vector<std::string> &rOutput)
+void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOutput)
 {
 	// Split it up.
-	std::string::size_type b = 0;
-	std::string::size_type e = 0;
-	while(e = String.find_first_of(SplitOn, b), e != String.npos)
+	std::string::size_type begin = 0, end = 0, pos = 0;
+
+	while(end = String.find_first_of(SplitOn, pos), end != String.npos)
 	{
-		// Get this string
-		unsigned int len = e - b;
-		if(len >= 1)
+		// Is it preceded by the escape character?
+		if(end > 0 && String[end - 1] == '\\')
 		{
-			rOutput.push_back(String.substr(b, len));
+			// Ignore this one, don't change begin, let the next
+			// match/fallback consume it instead. But remove the
+			// backslash from the string, and set pos to the
+			// current position, which no longer contains a
+			// separator character.
+			String.erase(end - 1, 1);
+			pos = end;
 		}
-		b = e + 1;
+		else
+		{
+			// Extract the substring and move past it.
+			unsigned int len = end - begin;
+			if(len >= 1)
+			{
+				rOutput.push_back(String.substr(begin, len));
+			}
+			begin = end + 1;
+			pos = begin;
+		}
 	}
 	// Last string
-	if(b < String.size())
+	if(begin < String.size())
 	{
-		rOutput.push_back(String.substr(b));
+		rOutput.push_back(String.substr(begin));
 	}
 /*#ifndef BOX_RELEASE_BUILD
 	BOX_TRACE("Splitting string '" << String << " on " << (char)SplitOn);
