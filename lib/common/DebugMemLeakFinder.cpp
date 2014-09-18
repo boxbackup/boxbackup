@@ -609,6 +609,10 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 
 	if(block != 0)
 	{
+		std::map<void *, ObjectInfo>::iterator j(sObjectBlocks.find(block));
+		// The same block should not already be tracked!
+		ASSERT(j == sObjectBlocks.end());
+
 		ObjectInfo i;
 		i.size = size;
 		i.file = file;
