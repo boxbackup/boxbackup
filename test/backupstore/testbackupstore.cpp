@@ -821,6 +821,34 @@ bool run_housekeeping_and_check_account(BackupProtocolLocal2& protocol)
 	return check_account_status & check_refcount_status;
 }
 
+bool test_temporary_refcount_db_is_independent()
+{
+	SETUP();
+
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	std::auto_ptr<BackupStoreRefCountDatabase> temp(
+		BackupStoreRefCountDatabase::Create(
+			apAccounts->GetEntry(0x1234567)));
+	std::auto_ptr<BackupStoreRefCountDatabase> perm(
+		BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567),
+			false // readonly
+			));
+
+	TEST_CHECK_THROWS(temp->GetRefCount(2),
+		BackupStoreException, UnknownObjectRefCountRequested);
+	TEST_CHECK_THROWS(perm->GetRefCount(2),
+		BackupStoreException, UnknownObjectRefCountRequested);
+	temp->AddReference(2);
+	TEST_EQUAL(1, temp->GetRefCount(2));
+	TEST_CHECK_THROWS(perm->GetRefCount(2),
+		BackupStoreException, UnknownObjectRefCountRequested);
+	temp->Discard();
+
+	return teardown_test_backupstore();
+}
+
 bool test_server_housekeeping()
 {
 	SETUP();
@@ -3372,6 +3400,7 @@ int test(int argc, const char *argv[])
 	}
 
 	TEST_THAT(test_filename_encoding());
+	TEST_THAT(test_temporary_refcount_db_is_independent());
 	TEST_THAT(test_bbstoreaccounts_create());
 	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
