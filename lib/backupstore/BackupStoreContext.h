@@ -135,12 +135,18 @@ public:
 	const BackupStoreDirectory &GetDirectory(int64_t ObjectID)
 	{
 		// External callers aren't allowed to change it -- this function
-		// merely turns the the returned directory const.
+		// merely turns the returned directory const.
 		return GetDirectoryInternal(ObjectID);
 	}
 	
 	// Manipulating files/directories
-	int64_t AddFile(IOStream &rFile, int64_t InDirectory, int64_t ModificationTime, int64_t AttributesHash, int64_t DiffFromFileID, const BackupStoreFilename &rFilename, bool MarkFileWithSameNameAsOldVersions);
+	int64_t AddFile(IOStream &rFile,
+		int64_t InDirectory,
+		int64_t ModificationTime,
+		int64_t AttributesHash,
+		int64_t DiffFromFileID,
+		const BackupStoreFilename &rFilename,
+		bool MarkFileWithSameNameAsOldVersions);
 	int64_t AddDirectory(int64_t InDirectory,
 		const BackupStoreFilename &rFilename,
 		const StreamableMemBlock &Attributes,

@@ -40,7 +40,7 @@ void BackupStoreCheck::CheckRoot()
 {
 	int32_t index = 0;
 	IDBlock *pblock = LookupID(BACKUPSTORE_ROOT_DIRECTORY_ID, index);
-	
+
 	if(pblock != 0)
 	{
 		// Found it. Which is lucky. Mark it as contained.
@@ -49,9 +49,9 @@ void BackupStoreCheck::CheckRoot()
 	else
 	{
 		BOX_WARNING("Root directory doesn't exist");
-		
+
 		++mNumberErrorsFound;
-		
+
 		if(mFixErrors)
 		{
 			// Create a new root directory
@@ -78,7 +78,7 @@ void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t Contain
 	}
 
 	BackupStoreDirectory dir(DirectoryID, ContainingDirID);
-	
+
 	// Serialise to disc
 	std::string filename;
 	StoreStructure::MakeObjectFilename(DirectoryID, mStoreRoot, mDiscSetNumber, filename, true /* make sure the dir exists */);
@@ -87,10 +87,10 @@ void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t Contain
 	dir.WriteToStream(obj);
 	int64_t size = obj.GetDiscUsageInBlocks();
 	obj.Commit(true /* convert to raid now */);
-	
+
 	// Record the fact we've done this
 	mDirsAdded.insert(DirectoryID);
-	
+
 	// Add to sizes
 	mBlocksUsed += size;
 	mBlocksInDirectories += size;
@@ -131,15 +131,16 @@ void BackupStoreCheck::CheckUnattachedObjects()
 	{
 		IDBlock *pblock = i->second;
 		int32_t bentries = (pblock == mpInfoLastBlock)?mInfoLastBlockEntries:BACKUPSTORECHECK_BLOCK_SIZE;
-		
+
 		for(int e = 0; e < bentries; ++e)
 		{
 			uint8_t flags = GetFlags(pblock, e);
 			if((flags & Flags_IsContained) == 0)
 			{
 				// Unattached object...
+				int64_t ObjectID = pblock->mID[e];
 				BOX_ERROR("Object " <<
-					BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
+					BOX_FORMAT_OBJECTID(ObjectID) <<
 					" is unattached.");
 				++mNumberErrorsFound;
 
@@ -159,7 +160,9 @@ void BackupStoreCheck::CheckUnattachedObjects()
 					{
 						int64_t diffFromObjectID = 0;
 						std::string filename;
-						StoreStructure::MakeObjectFilename(pblock->mID[e], mStoreRoot, mDiscSetNumber, filename, false /* don't attempt to make sure the dir exists */);
+						StoreStructure::MakeObjectFilename(ObjectID,
+							mStoreRoot, mDiscSetNumber, filename,
+							false /* don't attempt to make sure the dir exists */);
 
 						// The easiest way to do this is to verify it again. Not such a bad penalty, because
 						// this really shouldn't be done very often.
@@ -172,8 +175,8 @@ void BackupStoreCheck::CheckUnattachedObjects()
 						// Just delete it to be safe.
 						if(diffFromObjectID != 0)
 						{
-							BOX_WARNING("Object " << BOX_FORMAT_OBJECTID(pblock->mID[e]) << " is unattached, and is a patch. Deleting, cannot reliably recover.");
-						
+							BOX_WARNING("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is unattached, and is a patch. Deleting, cannot reliably recover.");
+
 							// Delete this object instead
 							if(mFixErrors)
 							{
@@ -182,12 +185,12 @@ void BackupStoreCheck::CheckUnattachedObjects()
 							}
 
 							mBlocksUsed -= pblock->mObjectSizeInBlocks[e];
-							
+
 							// Move on to next item
 							continue;
 						}
 					}
-					
+
 					// Files contain their original filename, so perhaps the orginal directory still exists,
 					// or we can infer the existance of a directory?
 					// Look for a matching entry in the mDirsWhichContainLostDirs map.
@@ -253,7 +256,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				}
 
 				// Add it to the directory
-				pFixer->InsertObject(pblock->mID[e],
+				pFixer->InsertObject(ObjectID,
 					((flags & Flags_IsDir) == Flags_IsDir),
 					lostDirNameSerial);
 			}
@@ -288,7 +291,7 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 		// Not a missing directory, can't recreate.
 		return false;
 	}
-	
+
 	// Can recreate this! Wooo!
 	if(!mFixErrors)
 	{
@@ -301,12 +304,12 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 
 	BOX_WARNING("Recreating missing directory " << 
 		BOX_FORMAT_OBJECTID(MissingDirectoryID));
-	
+
 	// Create a blank directory
 	BackupStoreDirectory dir(MissingDirectoryID, missing->second /* containing dir ID */);
 	// Note that this directory already contains a directory entry pointing to
 	// this dir, so it doesn't have to be added.
-	
+
 	// Serialise to disc
 	std::string filename;
 	StoreStructure::MakeObjectFilename(MissingDirectoryID, mStoreRoot, mDiscSetNumber, filename, true /* make sure the dir exists */);
@@ -314,10 +317,10 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	root.Open(false /* don't allow overwriting */);
 	dir.WriteToStream(root);
 	root.Commit(true /* convert to raid now */);
-	
+
 	// Record the fact we've done this
 	mDirsAdded.insert(MissingDirectoryID);
-	
+
 	// Remove the entry from the map, so this doesn't happen again
 	mDirsWhichContainLostDirs.erase(missing);
 
@@ -332,7 +335,7 @@ BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(std::string storeRoot,
 	// Generate filename
 	StoreStructure::MakeObjectFilename(ID, mStoreRoot, mDiscSetNumber,
 		mFilename, false /* don't make sure the dir exists */);
-	
+
 	// Read it in
 	std::auto_ptr<RaidFileRead> file(
 		RaidFileRead::Open(mDiscSetNumber, mFilename));
@@ -374,7 +377,7 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 			(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
 			&& ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V0
-#endif		
+#endif
 			))
 		{
 			// This should never happen, everything has been
@@ -397,7 +400,7 @@ BackupStoreDirectoryFixer::~BackupStoreDirectoryFixer()
 {
 	// Fix any flags which have been broken, which there's a good chance of doing
 	mDirectory.CheckAndFix();
-	
+
 	// Write it out
 	RaidFileWrite root(mDiscSetNumber, mFilename);
 	root.Open(true /* allow overwriting */);
@@ -457,7 +460,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 
 	// Create a blank directory
 	CreateBlankDirectory(id, BACKUPSTORE_ROOT_DIRECTORY_ID);
-	
+
 	// Add an entry for it
 	dir.AddEntry(lostAndFound, 0, id, 0, BackupStoreDirectory::Entry::Flags_Dir, 0);
 
@@ -466,7 +469,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	root.Open(true /* allow overwriting */);
 	dir.WriteToStream(root);
 	root.Commit(true /* convert to raid now */);
-	
+
 	// Store
 	mLostAndFoundDirectoryID = id;
 
@@ -498,7 +501,7 @@ void BackupStoreCheck::FixDirsWithWrongContainerID()
 		int32_t index = 0;
 		IDBlock *pblock = LookupID(*i, index);
 		if(pblock == 0) continue;
-		
+
 		// Load in
 		BackupStoreDirectory dir;
 		std::string filename;
@@ -510,7 +513,7 @@ void BackupStoreCheck::FixDirsWithWrongContainerID()
 
 		// Adjust container ID
 		dir.SetContainerID(pblock->mContainer[index]);
-		
+
 		// Write it out
 		RaidFileWrite root(mDiscSetNumber, filename);
 		root.Open(true /* allow overwriting */);
@@ -543,7 +546,7 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 		int32_t index = 0;
 		IDBlock *pblock = LookupID(i->second, index);
 		if(pblock == 0) continue;
-		
+
 		// Load in
 		BackupStoreDirectory dir;
 		std::string filename;
@@ -555,10 +558,10 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 
 		// Delete the dodgy entry
 		dir.DeleteEntry(i->first);
-		
+
 		// Fix it up
 		dir.CheckAndFix();
-		
+
 		// Write it out
 		RaidFileWrite root(mDiscSetNumber, filename);
 		root.Open(true /* allow overwriting */);
@@ -626,7 +629,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 				"housekeeping doesn't delete files on next run.");
 		}
 	}
-	
+
 	// Object ID
 	int64_t lastObjID = mLastIDInInfo;
 	if(mLostAndFoundDirectoryID != 0)
@@ -705,7 +708,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 bool BackupStoreDirectory::CheckAndFix()
 {
 	bool changed = false;
-	
+
 	// Check that if a file depends on a new version, that version is in this directory
 	bool restart;
 
@@ -728,11 +731,11 @@ bool BackupStoreDirectory::CheckAndFix()
 						"on newer version " <<
 						FMT_OID(dependsNewer) <<
 						" which doesn't exist");
-					
+
 					// Remove
 					delete *i;
 					mEntries.erase(i);
-					
+
 					// Mark as changed
 					changed = true;
 
@@ -761,7 +764,7 @@ bool BackupStoreDirectory::CheckAndFix()
 		}
 	}
 	while(restart);
-	
+
 	// Check that if a file has a dependency marked, it exists, and remove it if it doesn't
 	{
 		std::vector<Entry*>::iterator i(mEntries.begin());
@@ -778,7 +781,7 @@ bool BackupStoreDirectory::CheckAndFix()
 					"info cleared");
 
 				(*i)->SetDependsOlder(0);
-				
+
 				// Mark as changed
 				changed = true;
 			}
@@ -790,7 +793,7 @@ bool BackupStoreDirectory::CheckAndFix()
 	{
 		// Reset change marker
 		ch = false;
-		
+
 		// Search backwards -- so see newer versions first
 		std::vector<Entry*>::iterator i(mEntries.end());
 		if(i == mEntries.begin())
@@ -816,10 +819,8 @@ bool BackupStoreDirectory::CheckAndFix()
 			}
 			else
 			{
-				bool isDir = (((*i)->GetFlags() & Entry::Flags_Dir) == Entry::Flags_Dir);
-				
 				// Check mutually exclusive flags
-				if(isDir && (((*i)->GetFlags() & Entry::Flags_File) == Entry::Flags_File))
+				if((*i)->IsDir() && (*i)->IsFile())
 				{
 					// Bad! Unset the file flag
 					BOX_TRACE("Entry " << FMT_i <<
@@ -873,29 +874,29 @@ bool BackupStoreDirectory::CheckAndFix()
 					}
 				}
 			}
-			
+
 			if(removeEntry)
 			{
 				// Mark something as changed, in loop
 				ch = true;
-				
+
 				// Mark something as globally changed
 				changed = true;
-				
+
 				// erase the thing from the list
 				Entry *pentry = (*i);
 				mEntries.erase(i);
 
 				// And delete the entry object
 				delete pentry;
-				
+
 				// Stop going around this loop, as the iterator is now invalid
 				break;
 			}
 		} while(i != mEntries.begin());
 
 	} while(ch != false);
-	
+
 	return changed;
 }
 

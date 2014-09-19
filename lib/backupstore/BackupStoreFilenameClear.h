@@ -42,7 +42,7 @@ public:
 #endif
 	void SetClearFilename(const std::string &rToEncode);
 
-	// Setup for encryption of filenames	
+	// Setup for encryption of filenames
 	static void SetBlowfishKey(const void *pKey, int KeyLength, const void *pIV, int IVLength);
 	static void SetEncodingMethod(int Method);
 	

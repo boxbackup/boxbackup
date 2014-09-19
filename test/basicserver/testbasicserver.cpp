@@ -192,9 +192,9 @@ const ConfigurationVerify *testserver::GetConfigVerify() const
 	static ConfigurationVerify verifyserver[] = 
 	{
 		{
-			"Server",
-			0,
-			verifyserverkeys,
+			"Server", /* mName */
+			0, /* mpSubConfigurations */
+			verifyserverkeys, /* mpKeys */
 			ConfigTest_Exists | ConfigTest_LastEntry,
 			0
 		}
@@ -202,9 +202,9 @@ const ConfigurationVerify *testserver::GetConfigVerify() const
 
 	static ConfigurationVerify verify =
 	{
-		"root",
-		verifyserver,
-		0,
+		"root", /* mName */
+		verifyserver, /* mpSubConfigurations */
+		0, /* mpKeys */
 		ConfigTest_Exists | ConfigTest_LastEntry,
 		0
 	};

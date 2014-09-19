@@ -112,14 +112,14 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Phase 1, check objects...");
 	}
 	CheckObjects();
-	
+
 	// Phase 2, check directories
 	if(!mQuiet)
 	{
 		BOX_INFO("Phase 2, check directories...");
 	}
 	CheckDirectories();
-	
+
 	// Phase 3, check root
 	if(!mQuiet)
 	{
@@ -141,7 +141,7 @@ void BackupStoreCheck::Check()
 	}
 	FixDirsWithWrongContainerID();
 	FixDirsWithLostDirs();
-	
+
 	// Phase 6, regenerate store info
 	if(!mQuiet)
 	{
@@ -257,12 +257,12 @@ void BackupStoreCheck::CheckObjects()
 		{
 			start.resize(start.size() - 1);
 		}
-	
+
 		maxDir = CheckObjectsScanDir(0, 1, mStoreRoot);
 		BOX_TRACE("Max dir starting ID is " <<
 			BOX_FORMAT_OBJECTID(maxDir));
 	}
-	
+
 	// Then go through and scan all the objects within those directories
 	for(int64_t d = 0; d <= maxDir; d += (1<<STORE_ID_SEGMENT_LENGTH))
 	{
@@ -290,11 +290,11 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 		// If any of the directories is missing, create it.
 		RaidFileController &rcontroller(RaidFileController::GetController());
 		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
-		
+
 		if(!rdiscSet.IsNonRaidSet())
 		{
 			unsigned int numDiscs = rdiscSet.size();
-			
+
 			for(unsigned int l = 0; l < numDiscs; ++l)
 			{
 				// build name
@@ -307,7 +307,7 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 					{
 						THROW_SYS_FILE_ERROR("Failed to "
 							"create missing RaidFile "
-							"directory", dn, 
+							"directory", dn,
 							RaidFileException, OSError);
 					}
 				}
@@ -337,7 +337,7 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 			else
 			{
 				BOX_ERROR("Spurious or invalid directory " <<
-					rDirName << DIRECTORY_SEPARATOR << 
+					rDirName << DIRECTORY_SEPARATOR <<
 					(*i) << " found, " <<
 					(mFixErrors?"deleting":"delete manually"));
 				++mNumberErrorsFound;
@@ -364,11 +364,11 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 	std::string dirName;
 	StoreStructure::MakeObjectFilename(StartID, mStoreRoot, mDiscSetNumber, dirName, false /* don't make sure the dir exists */);
 	// Check expectations
-	ASSERT(dirName.size() > 4 && 
+	ASSERT(dirName.size() > 4 &&
 		dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR);
 	// Remove the filename from it
 	dirName.resize(dirName.size() - 4); // four chars for "/o00"
-	
+
 	// Check directory exists
 	if(!RaidFileRead::DirectoryExists(mDiscSetNumber, dirName))
 	{
@@ -380,14 +380,14 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 	std::vector<std::string> files;
 	RaidFileRead::ReadDirectoryContents(mDiscSetNumber, dirName,
 		RaidFileRead::DirReadType_FilesOnly, files);
-	
+
 	// Array of things present
 	bool idsPresent[(1<<STORE_ID_SEGMENT_LENGTH)];
 	for(int l = 0; l < (1<<STORE_ID_SEGMENT_LENGTH); ++l)
 	{
 		idsPresent[l] = false;
 	}
-	
+
 	// Parse each entry, building up a list of object IDs which are present in the dir.
 	// This is done so that whatever order is retured from the directory, objects are scanned
 	// in order.
@@ -416,11 +416,11 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		{
 			fileOK = false;
 		}
-		
+
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			BOX_ERROR("Spurious file " << dirName << 
+			BOX_ERROR("Spurious file " << dirName <<
 				DIRECTORY_SEPARATOR << (*i) << " found" <<
 				(mFixErrors?", deleting":""));
 			++mNumberErrorsFound;
@@ -431,7 +431,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			}
 		}
 	}
-	
+
 	// Check all the objects found in this directory
 	for(int i = 0; i < (1<<STORE_ID_SEGMENT_LENGTH); ++i)
 	{
@@ -483,7 +483,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		std::auto_ptr<RaidFileRead> file(
 			RaidFileRead::Open(mDiscSetNumber, rFilename));
 		size = file->GetDiscUsageInBlocks();
-		
+
 		// Read in first four bytes -- don't have to worry about
 		// retrying if not all bytes read as is RaidFile
 		uint32_t signature;
@@ -494,7 +494,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		}
 		// Seek back to beginning
 		file->Seek(0, IOStream::SeekType_Absolute);
-		
+
 		// Then... check depending on the type
 		switch(ntohl(signature))
 		{
@@ -522,7 +522,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		// Error caught, not a good file then, let it be deleted
 		return false;
 	}
-	
+
 	// Got a container ID? (ie check was successful)
 	if(containerID == -1)
 	{
@@ -541,13 +541,13 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 
 	// If it looks like a good object, and it's non-RAID, and
 	// this is a RAID set, then convert it to RAID.
-		
+
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
 	if(!rdiscSet.IsNonRaidSet())
 	{
 		// See if the file exists
-		RaidFileUtil::ExistType existance = 
+		RaidFileUtil::ExistType existance =
 			RaidFileUtil::RaidFileExists(rdiscSet, rFilename);
 		if(existance == RaidFileUtil::NonRaid)
 		{
@@ -568,7 +568,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 			if(mFixErrors)
 			{
 				std::auto_ptr<RaidFileRead> read(
-					RaidFileRead::Open(mDiscSetNumber, 
+					RaidFileRead::Open(mDiscSetNumber,
 						rFilename));
 				RaidFileWrite write(mDiscSetNumber, rFilename);
 				write.Open(true /* overwrite */);
@@ -578,7 +578,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 			}
 		}
 	}
-			
+
 	// Report success
 	return true;
 }
@@ -639,7 +639,7 @@ int64_t BackupStoreCheck::CheckDirInitial(int64_t ObjectID, IOStream &rStream)
 		// Wrong object ID
 		return -1;
 	}
-	
+
 	// Return container ID
 	return dir.GetContainerID();
 }
@@ -672,7 +672,7 @@ void BackupStoreCheck::CheckDirectories()
 	{
 		IDBlock *pblock = i->second;
 		int32_t bentries = (pblock == mpInfoLastBlock)?mInfoLastBlockEntries:BACKUPSTORECHECK_BLOCK_SIZE;
-		
+
 		for(int e = 0; e < bentries; ++e)
 		{
 			uint8_t flags = GetFlags(pblock, e);
@@ -706,9 +706,9 @@ void BackupStoreCheck::CheckDirectories()
 						BOX_FORMAT_OBJECTID(pblock->mID[e]) <<
 						" was OK after fixing");
 				}
-				
+
 				if(isModified && mFixErrors)
-				{	
+				{
 					BOX_WARNING("Writing modified directory to disk: " <<
 						BOX_FORMAT_OBJECTID(pblock->mID[e]));
 					RaidFileWrite fixed(mDiscSetNumber, filename);
@@ -824,14 +824,14 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			{
 				// Just remove the entry
 				badEntry = true;
-				BOX_ERROR("Directory ID " << 
+				BOX_ERROR("Directory ID " <<
 					BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
-					" references object " << 
+					" references object " <<
 					BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 					" which does not exist.");
 				++mNumberErrorsFound;
 			}
-			
+
 			// Is this entry worth keeping?
 			if(badEntry)
 			{
@@ -846,16 +846,16 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			{
 				BOX_ERROR("Removing directory entry " <<
 					BOX_FORMAT_OBJECTID(*d) << " from "
-					"directory " << 
+					"directory " <<
 					BOX_FORMAT_OBJECTID(dir.GetObjectID()));
 				++mNumberErrorsFound;
 				dir.DeleteEntry(*d);
 			}
-			
+
 			// Mark as modified
 			restart = true;
 			isModified = true;
-			
+
 			// Errors found
 		}
 	}
@@ -871,7 +871,7 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	ASSERT(piBlock != 0);
 
 	uint8_t iflags = GetFlags(piBlock, IndexInDirBlock);
-	
+
 	// Is the type the same?
 	if(((iflags & Flags_IsDir) == Flags_IsDir) != rEntry.IsDir())
 	{
