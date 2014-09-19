@@ -2027,6 +2027,8 @@ bool test_snapshot_commands()
 	// Check that housekeeping doesn't remove anything from a directory
 	// that's multiply referenced or marked as immutable.
 	// Check that directories inside a snapshot are not double-counted.
+	// Create a reference to a directory inside itself (circular)
+	// Create a reference to a directory's parent (circular)
 
 	int64_t firstSubFileDirId, firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;
@@ -2461,7 +2463,6 @@ bool test_directory_parent_entry_tracks_directory_size()
 bool test_cannot_open_multiple_writable_connections()
 {
 	SETUP();
-	TEST_THAT_OR(StartServer(), return false);
 
 	// First try a local protocol. This works even on Windows.
 	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
@@ -2487,6 +2488,7 @@ bool test_cannot_open_multiple_writable_connections()
 	}
 
 	// Try network connections too.
+	TEST_THAT_OR(StartServer(), return false);
 
 	BackupProtocolClient protocolWritable3(open_conn("localhost", context));
 	TEST_THAT(assert_writable_connection_fails(protocolWritable3));
