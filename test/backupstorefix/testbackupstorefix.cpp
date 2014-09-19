@@ -36,6 +36,7 @@
 #include "RaidFileWrite.h"
 #include "ServerControl.h"
 #include "StoreStructure.h"
+#include "StoreTestUtils.h"
 #include "ZeroStream.h"
 
 #include "MemLeakFindOn.h"
@@ -553,24 +554,8 @@ int test(int argc, const char *argv[])
 		"raidfile is corrupted doesn't crash");
 
 	// Start the bbstored server
-	BOX_TRACE("  === Starting bbstored server: " BBSTORED 
-		" testfiles/bbstored.conf");
-	int bbstored_pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
-		"testfiles/bbstored.pid");
-	TEST_THAT(bbstored_pid > 0);
-	if (bbstored_pid <= 0) return 1;
-	
-	::sleep(1);
-	TEST_THAT(ServerIsAlive(bbstored_pid));
-
-	std::string cmd = BBACKUPD " " + bbackupd_args +
-		" testfiles/bbackupd.conf";
-	int bbackupd_pid = LaunchServer(cmd, "testfiles/bbackupd.pid");
-	TEST_THAT(bbackupd_pid > 0);
-	if (bbackupd_pid <= 0) return 1;
-
-	::safe_sleep(1);
-	TEST_THAT(ServerIsAlive(bbackupd_pid));
+	TEST_THAT_OR(StartServer(), return 1);
+	TEST_THAT_OR(StartClient(), return 1);
 
 	// Wait 4 more seconds for the files to be old enough
 	// to upload
@@ -580,13 +565,7 @@ int test(int argc, const char *argv[])
 	::sync_and_wait();
 
 	// Stop bbackupd
-	#ifdef WIN32
-		terminate_bbackupd(bbackupd_pid);
-		// implicit check for memory leaks
-	#else
-		TEST_THAT(KillServer(bbackupd_pid));
-		TestRemoteProcessMemLeaks("bbackupd.memleaks");
-	#endif
+	TEST_THAT_OR(StopClient(), return 1);
 
 	BOX_INFO("  === Add a reference to a file that doesn't exist, check "
 		"that it's removed");
@@ -687,6 +666,10 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
 	{
+		// Temporarily stop the server, so it doesn't repair the
+		// refcount error
+		TEST_THAT(StopServer());
+
 		// Open dir and find entry
 		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
 		{
@@ -766,10 +749,30 @@ int test(int argc, const char *argv[])
 #endif // BOX_RELEASE_BUILD
 
 		// Fix it
-		RUN_CHECK_INTERNAL(4);
+		// ERROR:   Object 0x44 is unattached.
+		// ERROR:   BlocksUsed changed from 284 to 282
+		// ERROR:   BlocksInCurrentFiles changed from 228 to 226
+		// ERROR:   NumCurrentFiles changed from 114 to 113
+		// WARNING: Reference count of object 0x44 changed from 1 to 0
+		RUN_CHECK_INTERNAL(5);
+		{
+			std::auto_ptr<BackupProtocolAccountUsage2> usage =
+				BackupProtocolLocal2(0x01234567, "test",
+					"backup/01234567/", 0,
+					false).QueryGetAccountUsage2();
+			TEST_EQUAL(usage->GetNumCurrentFiles(), 113);
+			TEST_EQUAL(usage->GetNumDirectories(), 28);
+			TEST_EQUAL(usage->GetBlocksUsed(), 282);
+			TEST_EQUAL(usage->GetBlocksInCurrentFiles(), 226);
+			TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
+		}
+
+		// Start the server again, so testbackupstorefix.pl can
+		// run bbackupquery which connects to it.
+		TEST_THAT(StartServer());
 
 		// Check
-		TEST_THAT(::system(PERL_EXECUTABLE 
+		TEST_THAT(::system(PERL_EXECUTABLE
 			" testfiles/testbackupstorefix.pl check 1") 
 			== 0);
 

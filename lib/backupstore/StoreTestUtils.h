@@ -21,7 +21,7 @@ class TLSContext;
 extern std::vector<uint32_t> ExpectedRefCounts;
 
 //! Holds the PID of the currently running bbstored test server.
-extern int bbstored_pid;
+extern int bbstored_pid, bbackupd_pid;
 
 //! Sets up (cleans up) test environment at the start of every test.
 bool setUp(const char* function_name);
@@ -79,6 +79,12 @@ bool StartServer();
 
 //! Stops the currently running bbstored test server.
 bool StopServer(bool wait_for_process = false);
+
+//! Starts the bbackupd client running, which must not already be running.
+bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf");
+
+//! Stops the currently running bbackupd client.
+bool StopClient(bool wait_for_process = false);
 
 //! Creates the standard test account, for example after delete_account().
 bool create_account(int soft, int hard);

@@ -107,46 +107,6 @@ void wait_for_backup_operation(const char* message)
 	wait_for_operation(TIME_TO_WAIT_FOR_BACKUP_OPERATION, message);
 }
 
-int bbackupd_pid = 0;
-
-bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
-{
-	TEST_THAT_OR(bbackupd_pid == 0, FAIL);
-
-	std::string cmd = BBACKUPD " " + bbackupd_args + " " + bbackupd_conf_file;
-	bbackupd_pid = LaunchServer(cmd.c_str(), "testfiles/bbackupd.pid");
-
-	TEST_THAT_OR(bbackupd_pid != -1 && bbackupd_pid != 0, FAIL);
-	::sleep(1);
-	TEST_THAT_OR(ServerIsAlive(bbackupd_pid), FAIL);
-
-	return true;
-}
-
-bool StopClient(bool wait_for_process = false)
-{
-	TEST_THAT_OR(bbackupd_pid != 0, FAIL);
-	TEST_THAT_OR(ServerIsAlive(bbackupd_pid), FAIL);
-	TEST_THAT_OR(KillServer(bbackupd_pid, wait_for_process), FAIL);
-	::sleep(1);
-
-	TEST_THAT_OR(!ServerIsAlive(bbackupd_pid), FAIL);
-	bbackupd_pid = 0;
-
-	#ifdef WIN32
-		int unlink_result = unlink("testfiles/bbackupd.pid");
-		TEST_EQUAL_LINE(0, unlink_result, "unlink testfiles/bbackupd.pid");
-		if(unlink_result != 0)
-		{
-			FAIL;
-		}
-	#else
-		TestRemoteProcessMemLeaks("bbackupd.memleaks");
-	#endif
-
-	return true;
-}
-
 #ifdef HAVE_SYS_XATTR_H
 bool readxattr_into_map(const char *filename, std::map<std::string,std::string> &rOutput)
 {
