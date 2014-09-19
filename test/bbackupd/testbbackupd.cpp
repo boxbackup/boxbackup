@@ -975,6 +975,7 @@ bool compare(BackupQueries::ReturnCode::Type expected_status,
 
 std::auto_ptr<Configuration> load_config_file(
 	std::string config_file = "testfiles/bbackupd.conf")
+{
 	std::string errs;
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
