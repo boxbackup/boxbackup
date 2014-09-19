@@ -670,7 +670,6 @@ void check_dir_after_uploads(BackupProtocolCallable &protocol,
 	TEST_THAT(en == 0);
 }
 
-
 typedef struct
 {
 	int objectsNotDel;

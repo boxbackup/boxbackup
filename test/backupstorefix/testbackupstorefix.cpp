@@ -103,7 +103,7 @@ int32_t getID(const char *name)
 	std::map<std::string, int32_t>::iterator i(nameToID.find(std::string(name)));
 	TEST_THAT(i != nameToID.end());
 	if(i == nameToID.end()) return -1;
-	
+
 	return i->second;
 }
 
@@ -172,7 +172,7 @@ bool check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en;
 	bool ok = true;
-	
+
 	while((en = i.Next()) != 0)
 	{
 		BackupStoreFilenameClear clear(en->GetName());
@@ -187,7 +187,7 @@ bool check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 		TEST_EQUAL_OR(en->GetFlags(), ck->flags, ok = false);
 		++ck;
 	}
-	
+
 	TEST_EQUAL_OR(en, 0, ok = false);
 	TEST_EQUAL_OR(ck->name, -1, ok = false);
 	return ok;
@@ -202,7 +202,7 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 {
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en;
-	
+
 	while((en = i.Next()) != 0)
 	{
 		TEST_THAT(ck->id != -1);
@@ -218,7 +218,7 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 			"Wrong Older dependency for " << BOX_FORMAT_OBJECTID(ck->id));
 		++ck;
 	}
-	
+
 	TEST_THAT(en == 0);
 	TEST_THAT(ck->id == -1);
 }
@@ -232,14 +232,14 @@ void test_dir_fixing()
 			2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		e->SetDependsNewer(3);
-		
+
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
 
 		dir_en_check ck[] = {
 			{-1, 0, 0}
 		};
-		
+
 		TEST_THAT(check_dir(dir, ck));
 	}
 
@@ -276,7 +276,7 @@ void test_dir_fixing()
 			{0, 5, BackupStoreDirectory::Entry::Flags_File},
 			{-1, 0, 0}
 		};
-		
+
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
 		TEST_THAT(check_dir(dir, ck));
@@ -288,7 +288,7 @@ void test_dir_fixing()
 		dir.AddEntry(fnames[1], 12, 10 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_Dir | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		dir.AddEntry(fnames[0], 12, 3 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		dir.AddEntry(fnames[0], 12, 5 /* id */, 1, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion, 2);
-		
+
 		dir_en_check ck[] = {
 			{0, 2, BackupStoreDirectory::Entry::Flags_File | BackupStoreDirectory::Entry::Flags_OldVersion},
 			{1, 10, BackupStoreDirectory::Entry::Flags_Dir},
@@ -296,7 +296,7 @@ void test_dir_fixing()
 			{0, 5, BackupStoreDirectory::Entry::Flags_File},
 			{-1, 0, 0}
 		};
-		
+
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
 		TEST_THAT(check_dir(dir, ck));
@@ -327,7 +327,7 @@ void test_dir_fixing()
 			5 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
 		TEST_THAT(e5 != 0);
 		e5->SetDependsOlder(4);
-		
+
 		// This should all be nice and valid
 		TEST_THAT(dir.CheckAndFix() == false);
 		static checkdepinfoen c1[] = {{2, 3, 0}, {3, 4, 2}, {4, 5, 3}, {5, 0, 4}, {-1, 0, 0}};
@@ -416,7 +416,7 @@ void login_client_and_check_empty(BackupProtocolCallable& client)
 	check_dir_dep(dir, start_deps);
 
 	read_bb_dir(1 /* root */, dir);
-	
+
 	// Everything should be OK at the moment
 	TEST_THAT(dir.CheckAndFix() == false);
 
@@ -436,7 +436,7 @@ void check_root_dir_ok(dir_en_check after_entries[],
 	// Check the store, check that the error is detected and
 	// repaired, by removing x1 from the directory.
 	RUN_CHECK_INTERNAL(0);
-	
+
 	// Read the directory back in, check that it's empty
 	BackupStoreDirectory dir;
 	read_bb_dir(1 /* root */, dir);
@@ -572,10 +572,10 @@ int test(int argc, const char *argv[])
 	{
 		BackupStoreDirectory dir;
 		read_bb_dir(1 /* root */, dir);
-		
+
 		dir.AddEntry(fnames[0], 12, 0x1234567890123456LL /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
-		
+
 		std::string fn;
 		StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
 			discSetNum, fn, true /* EnsureDirectoryExists */);
@@ -607,7 +607,7 @@ int test(int argc, const char *argv[])
 	}
 
 	if (failures > 0) return 1;
-	
+
 	// Generate a list of all the object IDs
 	TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
 		"-c testfiles/bbackupd.conf \"list -R\" quit "
@@ -634,7 +634,7 @@ int test(int argc, const char *argv[])
 		::fclose(f);
 	}
 
-	// ------------------------------------------------------------------------------------------------		
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Delete store info, add random file");
 	{
 		// Delete store info
@@ -662,7 +662,7 @@ int test(int argc, const char *argv[])
 			accountRootDir + "01/randomfile"));
 	}
 
-	// ------------------------------------------------------------------------------------------------		
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
 	{
@@ -679,7 +679,7 @@ int test(int argc, const char *argv[])
 			dir.DeleteEntry(delID);
 			SaveDirectory("Test1/cannes/ict/metegoguered", dir);
 		}
-		
+
 		// Adjust that entry
 		//
 		// IMPORTANT NOTE: There's a special hack in testbackupstorefix.pl to make sure that
@@ -801,8 +801,8 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
 			rdiscSet, "backup/01234567/02/01/01/o03"));
 	}
-	
-	// ------------------------------------------------------------------------------------------------		
+
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Delete directory, change container ID of another, "
 		"duplicate entry in dir, spurious file size, delete file");
 	{
@@ -841,8 +841,8 @@ int test(int argc, const char *argv[])
 	// Delete a file
 	DeleteObject("Test1/cannes/ict/scely");
 
-	// We don't know quite how good the checker is (or will become) at 
-	// spotting errors! But asserting an exact number will help us catch 
+	// We don't know quite how good the checker is (or will become) at
+	// spotting errors! But asserting an exact number will help us catch
 	// changes in checker behaviour, so it's not a bad thing to test.
 
 	// The 11 errors are:
@@ -892,7 +892,7 @@ int test(int argc, const char *argv[])
 		}
 	}
 
-	// ------------------------------------------------------------------------------------------------		
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Modify the obj ID of dir, delete dir with no members, "
 		"add extra reference to a file");
 	// Set bad object ID
@@ -926,18 +926,18 @@ int test(int argc, const char *argv[])
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
 		TEST_THAT(dir.GetObjectID() == getID("Test1/foreomizes/stemptinevidate/ict"));
 	}
-	
-	// ------------------------------------------------------------------------------------------------		
+
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Orphan files and dirs without being recoverable");
-	DeleteObject("Test1/dir1");		
-	DeleteObject("Test1/dir1/dir2");		
+	DeleteObject("Test1/dir1");
+	DeleteObject("Test1/dir1/dir2");
 	// Fix it
 	RUN_CHECK
 	// Check everything is where it is predicted to be
 	TEST_THAT(::system(PERL_EXECUTABLE 
 		" testfiles/testbackupstorefix.pl check 4") == 0);
 
-	// ------------------------------------------------------------------------------------------------		
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Corrupt file and dir");
 	// File
 	CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
@@ -951,7 +951,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(::system(PERL_EXECUTABLE 
 		" testfiles/testbackupstorefix.pl check 5") == 0);
 
-	// ------------------------------------------------------------------------------------------------		
+	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Overwrite root with a file");
 	{
 		std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
