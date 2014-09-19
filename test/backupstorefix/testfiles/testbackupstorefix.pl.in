@@ -11,7 +11,7 @@ my @check_add = (
 	[],
 	[],
 	[],
-	[],
+	[['@f----- Test1/divel/cons', 'f----- Test1/divel/torsines/cruishery/cons']],
 	[['+1', '-d---- lost+found0']],
 	[]
 );
@@ -50,16 +50,18 @@ elsif($ARGV[0] eq 'check')
 	# build set of expected lines
 	my %expected;
 	my %filenames;
+	my %file_ids;
 	my $max_id_seen = 0;
 	open INITIAL,'testfiles/initial-listing.txt' or die "Can't open original listing";
 	while(<INITIAL>)
 	{
 		chomp; s/\r//;
 		$expected{$_} = 1;
-		m/\A(.+?) .+? (.+)\Z/;
-		$filenames{$2} = $_;
-		my $i = hex($1);
-		$max_id_seen = $i if $i > $max_id_seen;
+		m/\A(.+?) (.+? (.+))\Z/;
+		my $id = hex($1);
+		$filenames{$3} = $_;
+		$file_ids{$2} = $id;
+		$max_id_seen = $id if $id > $max_id_seen;
 	}
 	close INITIAL;
 
@@ -75,6 +77,12 @@ elsif($ARGV[0] eq 'check')
 				$max_id_seen++;
 				$id = $max_id_seen;
 			}
+			elsif($id =~ /^@(.*)/)
+			{
+				$id = $file_ids{$1} or die "Entry $1 not ".
+					"found when looking up its ID";
+			}
+
 			my $n = sprintf("%08x ", $id);
 			$expected{$n.$rest} = 1
 		}
