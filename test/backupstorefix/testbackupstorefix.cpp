@@ -931,7 +931,7 @@ int test(int argc, const char *argv[])
 	// Fix it
 	RUN_CHECK
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 3") == 0);
 	{
 		BackupStoreDirectory dir;
