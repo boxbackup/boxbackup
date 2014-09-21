@@ -20,12 +20,6 @@
 
 class IOStream;
 
-#ifndef BOX_RELEASE_BUILD
-	#define ASSERT_NOT_INVALIDATED ASSERT(!mInvalidated);
-#else
-	#define ASSERT_NOT_INVALIDATED
-#endif
-
 // --------------------------------------------------------------------------
 //
 // Class
@@ -115,79 +109,79 @@ public:
 
 		const BackupStoreFilename &GetName() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mName;
 		}
 		box_time_t GetModificationTime() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mModificationTime;
 		}
 		int64_t GetObjectID() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mObjectID;
 		}
 		// SetObjectID is dangerous! It should only be used when
 		// creating a snapshot.
 		void SetObjectID(int64_t NewObjectID)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mObjectID = NewObjectID;
 		}
 		int64_t GetSizeInBlocks() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mSizeInBlocks;
 		}
 		int16_t GetFlags() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mFlags;
 		}
 		void AddFlags(int16_t Flags)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mFlags |= Flags;
 		}
 		void RemoveFlags(int16_t Flags)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mFlags &= ~Flags;
 		}
 
 		// Some things can be changed
 		void SetName(const BackupStoreFilename &rNewName)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mName = rNewName;
 		}
 		void SetSizeInBlocks(int64_t SizeInBlocks)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mSizeInBlocks = SizeInBlocks;
 		}
 
 		// Attributes
 		bool HasAttributes() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return !mAttributes.IsEmpty();
 		}
 		void SetAttributes(const StreamableMemBlock &rAttr, uint64_t AttributesHash)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mAttributes.Set(rAttr);
 			mAttributesHash = AttributesHash;
 		}
 		const StreamableMemBlock &GetAttributes() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mAttributes;
 		}
 		uint64_t GetAttributesHash() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mAttributesHash;
 		}
 
@@ -195,13 +189,13 @@ public:
 		// The lowest mark number a version of a file of this name has ever had
 		uint32_t GetMinMarkNumber() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mMinMarkNumber;
 		}
 		// The mark number on this file
 		uint32_t GetMarkNumber() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mMarkNumber;
 		}
 
@@ -224,27 +218,27 @@ public:
 		// convenience methods
 		bool inline IsDir()
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_Dir;
 		}
 		bool inline IsFile()
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_File;
 		}
 		bool inline IsOld()
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_OldVersion;
 		}
 		bool inline IsDeleted()
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_Deleted;
 		}
 		bool inline MatchesFlags(int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return ((FlagsMustBeSet == Flags_INCLUDE_EVERYTHING) || ((mFlags & FlagsMustBeSet) == FlagsMustBeSet))
 				&& ((mFlags & FlagsNotToBeSet) == 0);
 		};
@@ -253,30 +247,30 @@ public:
 		// new version this depends on
 		int64_t GetDependsNewer() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mDependsNewer;
 		}
 		void SetDependsNewer(int64_t ObjectID)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mDependsNewer = ObjectID;
 		}
 		// older version which depends on this
 		int64_t GetDependsOlder() const
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mDependsOlder;
 		}
 		void SetDependsOlder(int64_t ObjectID)
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			mDependsOlder = ObjectID;
 		}
 
 		// Dependency info saving
 		bool HasDependencies()
 		{
-			ASSERT_NOT_INVALIDATED;
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mDependsNewer != 0 || mDependsOlder != 0;
 		}
 		void ReadFromStreamDependencyInfo(IOStream &rStream, int Timeout);
@@ -302,7 +296,7 @@ public:
 		int16_t FlagsNotToBeSet = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		bool FetchAttributes = true)
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		protocol.QueryListDirectory(DirectoryID, FlagsMustBeSet,
 			FlagsNotToBeSet, FetchAttributes);
 		// Stream
@@ -329,84 +323,76 @@ public:
 		uint64_t AttributesHash);
 	void DeleteEntry(int64_t ObjectID);
 	Entry *FindEntryByID(int64_t ObjectID) const;
-	/*
-	Entry *FindEntryByName(const BackupStoreFilename& rFilename,
-		int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
-		int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
-	{
-		return Iterator(*this).FindMatchingClearName(rFilename,
-			FlagsMustBeSet, FlagsNotToBeSet);
-	}
-	*/
+
 	int64_t GetObjectID() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mObjectID;
 	}
+
 	int64_t GetContainerID() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mContainerID;
 	}
-
 	// Need to be able to update the container ID when moving objects
 	void SetContainerID(int64_t ContainerID)
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		mContainerID = ContainerID;
 	}
 
 	// Purely for use of server -- not serialised into streams
 	int64_t GetRevisionID() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mRevisionID;
 	}
 	void SetRevisionID(int64_t RevisionID)
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		mRevisionID = RevisionID;
 	}
 
 	unsigned int GetNumberOfEntries() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mEntries.size();
 	}
 
 	// User info -- not serialised into streams
 	int64_t GetUserInfo1_SizeInBlocks() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mUserInfo1;
 	}
 	void SetUserInfo1_SizeInBlocks(int64_t UserInfo1)
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		mUserInfo1 = UserInfo1;
 	}
 
 	// Attributes
 	bool HasAttributes() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return !mAttributes.IsEmpty();
 	}
 	void SetAttributes(const StreamableMemBlock &rAttr,
 		box_time_t AttributesModTime)
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		mAttributes.Set(rAttr);
 		mAttributesModTime = AttributesModTime;
 	}
 	const StreamableMemBlock &GetAttributes() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mAttributes;
 	}
 	box_time_t GetAttributesModTime() const
 	{
-		ASSERT_NOT_INVALIDATED;
+		ASSERT(!mInvalidated); // Compiled out of release builds
 		return mAttributesModTime;
 	}
 
@@ -416,16 +402,12 @@ public:
 		Iterator(const BackupStoreDirectory &rDir)
 			: mrDir(rDir), i(rDir.mEntries.begin())
 		{
-#ifndef BOX_RELEASE_BUILD
-			ASSERT(!mrDir.mInvalidated);
-#endif // !BOX_RELEASE_BUILD
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 		}
 
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
-#ifndef BOX_RELEASE_BUILD
-			ASSERT(!mrDir.mInvalidated);
-#endif // !BOX_RELEASE_BUILD
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 			// Skip over things which don't match the required flags
 			while(i != mrDir.mEntries.end() && !(*i)->MatchesFlags(FlagsMustBeSet, FlagsNotToBeSet))
 			{
@@ -445,9 +427,7 @@ public:
 		// In a looping situation, cache the decrypted filenames in another memory structure.
 		BackupStoreDirectory::Entry *FindMatchingClearName(const BackupStoreFilenameClear &rFilename, int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
-#ifndef BOX_RELEASE_BUILD
-			ASSERT(!mrDir.mInvalidated);
-#endif // !BOX_RELEASE_BUILD
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 			// Skip over things which don't match the required flags or filename
 			while( (i != mrDir.mEntries.end())
 				&& ( (!(*i)->MatchesFlags(FlagsMustBeSet, FlagsNotToBeSet))
@@ -477,16 +457,12 @@ public:
 		ReverseIterator(const BackupStoreDirectory &rDir)
 			: mrDir(rDir), i(rDir.mEntries.rbegin())
 		{
-#ifndef BOX_RELEASE_BUILD
-			ASSERT(!mrDir.mInvalidated);
-#endif // !BOX_RELEASE_BUILD
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 		}
 
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
-#ifndef BOX_RELEASE_BUILD
-			ASSERT(!mrDir.mInvalidated);
-#endif // !BOX_RELEASE_BUILD
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 			// Skip over things which don't match the required flags
 			while(i != mrDir.mEntries.rend() && !(*i)->MatchesFlags(FlagsMustBeSet, FlagsNotToBeSet))
 			{
