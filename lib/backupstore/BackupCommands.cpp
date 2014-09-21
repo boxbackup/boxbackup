@@ -288,10 +288,29 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 	}
 
 	// Ask the context to store it
-	int64_t id = rContext.AddFile(rDataStream, mDirectoryObjectID,
-		mModificationTime, mAttributesHash, mDiffFromFileID,
-		mFilename,
-		true /* mark files with same name as old versions */);
+	int64_t id = 0;
+	try
+	{
+		id = rContext.AddFile(rDataStream, mDirectoryObjectID,
+			mModificationTime, mAttributesHash, mDiffFromFileID,
+			mFilename,
+			true /* mark files with same name as old versions */);
+	}
+	catch(BackupStoreException &e)
+	{
+		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
+		{
+			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
+		}
+		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
+		{
+			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
+		}
+		else
+		{
+			throw;
+		}
+	}
 
 	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));

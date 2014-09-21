@@ -1965,8 +1965,10 @@ bool test_server_commands()
 			// Command
 			protocolReadOnly.QueryListDirectory(
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */);
+				BackupProtocolListDirectory::Flags_Dir |
+				BackupProtocolListDirectory::Flags_Deleted,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
