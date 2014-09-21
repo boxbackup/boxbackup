@@ -1012,22 +1012,6 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	// Don't set the flag until later, after we finish repairing
 	// the directory and removing all bad entries.
 
-	// Check the object size
-	if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
-	{
-		// Wrong size, correct it.
-		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
-			" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
-			" has wrong size " << rEntry.GetSizeInBlocks() <<
-			", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
-
-		rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
-
-		// Mark as changed
-		rIsModified = true;
-		++mNumberErrorsFound;
-	}
-
 	// Check that the container ID of the object is correct
 	if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
 	{
@@ -1074,6 +1058,22 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		// directory) which does actually contain it. Why is this
 		// needed anyway?
 		piBlock->mContainer[IndexInDirBlock] = DirectoryID;
+	}
+
+	// Check the object size
+	if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
+	{
+		// Wrong size, correct it.
+		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
+			" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+			" has wrong size " << rEntry.GetSizeInBlocks() <<
+			", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+		rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+
+		// Mark as changed
+		rIsModified = true;
+		++mNumberErrorsFound;
 	}
 
 	return true; // don't delete this entry
