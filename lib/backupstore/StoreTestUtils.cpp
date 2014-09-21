@@ -152,6 +152,17 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount)
 		ExpectedRefCounts.resize(ObjectID + 1, 0);
 	}
 	ExpectedRefCounts[ObjectID] = RefCount;
+	for (size_t i = ExpectedRefCounts.size() - 1; i >= 1; i--)
+	{
+		if (ExpectedRefCounts[i] == 0)
+		{
+			// BackupStoreCheck and housekeeping will both
+			// regenerate the refcount DB without any missing
+			// items at the end, so we need to prune ourselves
+			// of all items with no references to match.
+			ExpectedRefCounts.resize(i);
+		}
+	}
 }
 
 void init_context(TLSContext& rContext)

@@ -2448,7 +2448,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	// Delete it again, which should reduce the object size again
 	protocol.QueryDeleteDirectory(dir2id);
-	ExpectedRefCounts.resize(dir2id);
+	set_refcount(dir2id, 0);
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
