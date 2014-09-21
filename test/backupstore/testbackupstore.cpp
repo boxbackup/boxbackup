@@ -2063,6 +2063,8 @@ bool test_snapshot_commands()
 	// fail without changing anything.
 	// Test that RemoveASAP flag behaves as expected on singly and multiply
 	// referenced files and directories.
+	// Test that if a directory's lowest-numbered container doesn't match its
+	// internal container ID, this error is found and fixed.
 
 	int64_t firstSubFileDirId, firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;

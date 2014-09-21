@@ -885,7 +885,6 @@ int64_t BackupStoreContext::MakeUnique(int64_t ObjectToMakeUniqueID,
 		newObjectID = AllocateObjectID();
 		subDir.SetObjectID(newObjectID);
 		subDir.SetContainerID(ContainingDirID);
-		SaveDirectory(subDir);
 
 		mapStoreInfo->ChangeBlocksUsed(subDir.GetUserInfo1_SizeInBlocks());
 		mapStoreInfo->ChangeBlocksInDirectories(subDir.GetUserInfo1_SizeInBlocks());
@@ -896,6 +895,9 @@ int64_t BackupStoreContext::MakeUnique(int64_t ObjectToMakeUniqueID,
 		{
 			mapRefCount->AddReference(e->GetObjectID());
 		}
+
+		// Need to do this last, because it may invalidate subDir.
+		SaveDirectory(subDir);
 	}
 
 	// BLOCK
@@ -1310,7 +1312,10 @@ void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 //
 // Function
 //		Name:    BackupStoreContext::SaveDirectory(BackupStoreDirectory &)
-//		Purpose: Save directory back to disc, update time in cache
+//		Purpose: Save directory back to disc, update time in cache.
+//			 Warning: this can invalidate the directory that you
+//			 pass to it, if it needs to update the size entry in
+//			 the parent directory!
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
@@ -1386,18 +1391,20 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 		// that it reflects the current size of the parent directory.
 		int64_t new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 		if(new_dir_size != old_dir_size &&
-			rDir.GetObjectID() != BACKUPSTORE_ROOT_DIRECTORY_ID)
+			ObjectID != BACKUPSTORE_ROOT_DIRECTORY_ID)
 		{
+			int64_t ContainerID = rDir.GetContainerID();
 			BackupStoreDirectory& parent(
-				GetDirectoryInternal(rDir.GetContainerID()));
+				GetDirectoryInternal(ContainerID));
+			// rDir is now invalid
 			BackupStoreDirectory::Entry* en =
-				parent.FindEntryByID(rDir.GetObjectID());
+				parent.FindEntryByID(ObjectID);
 			if(!en)
 			{
 				BOX_ERROR("Missing entry for directory " <<
-					BOX_FORMAT_OBJECTID(rDir.GetObjectID()) <<
+					BOX_FORMAT_OBJECTID(ObjectID) <<
 					" in directory " <<
-					BOX_FORMAT_OBJECTID(rDir.GetContainerID()) <<
+					BOX_FORMAT_OBJECTID(ContainerID) <<
 					" while trying to update dir size in parent");
 			}
 			else
