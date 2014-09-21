@@ -806,7 +806,8 @@ std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol,
-	int64_t parent_dir_id = BACKUPSTORE_ROOT_DIRECTORY_ID);
+	int64_t parent_dir_id = BACKUPSTORE_ROOT_DIRECTORY_ID,
+	const std::string& name = "lovely_directory");
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	const std::string& remote_filename = "");
 
@@ -1184,10 +1185,11 @@ bool test_server_housekeeping()
 	return teardown_test_backupstore();
 }
 
-int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
+int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id,
+	const std::string& name)
 {
 	// Create a directory
-	BackupStoreFilenameClear dirname("lovely_directory");
+	BackupStoreFilenameClear dirname(name);
 	// Attributes
 	std::auto_ptr<IOStream> attr(new MemBlockStream(attr1, sizeof(attr1)));
 
@@ -1719,10 +1721,32 @@ bool test_server_commands()
 
 		// Test moving a file
 		{
-			std::auto_ptr<BackupProtocolSuccess> rep(apProtocol->QueryMoveObject(root_file_id,
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName));
+			std::auto_ptr<BackupProtocolSuccess> rep;
+			rep = apProtocol->QueryMoveObject(root_file_id,
+				BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid,
+				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				newName);
 			TEST_EQUAL(root_file_id, rep->GetObjectID());
+		}
+
+		// Test moving a directory
+		{
+			int64_t container1 = create_directory(*apProtocol,
+				BACKUPSTORE_ROOT_DIRECTORY_ID, "container1");
+
+			int64_t container2 = create_directory(*apProtocol,
+				BACKUPSTORE_ROOT_DIRECTORY_ID, "container2");
+
+			int64_t probe = create_directory(*apProtocol,
+				container1, "probe");
+
+			// This triggered a mutability assertion.
+			std::auto_ptr<BackupProtocolSuccess> rep;
+			rep = apProtocol->QueryMoveObject(probe, container1,
+				container2,
+				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				newName);
+			TEST_EQUAL(probe, rep->GetObjectID());
 		}
 
 		// Try some dodgy renames
@@ -1747,8 +1771,8 @@ bool test_server_commands()
 
 		// File exists, but not in this directory (we just moved it)
 		TEST_CHECK_THROWS(apProtocol->QueryMoveObject(root_file_id,
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid,
+				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 				newName),
 			ConnectionException, Protocol_UnexpectedReply);
 
@@ -1844,7 +1868,7 @@ bool test_server_commands()
 
 		set_refcount(subsubdirid, 1);
 		set_refcount(subsubfileid, 1);
-		TEST_THAT(check_num_files(3, 1, 0, 3));
+		TEST_THAT(check_num_files(3, 1, 0, 6));
 
 		apProtocol->QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
@@ -2029,6 +2053,8 @@ bool test_snapshot_commands()
 	// Check that directories inside a snapshot are not double-counted.
 	// Create a reference to a directory inside itself (circular)
 	// Create a reference to a directory's parent (circular)
+	// Create a file in a dir, move to different dir, create another ref
+	// to old dir, try to move again, check that mutability assertion passes
 
 	int64_t firstSubFileDirId, firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;
@@ -2493,9 +2519,12 @@ bool test_cannot_open_multiple_writable_connections()
 	BackupProtocolClient protocolWritable3(open_conn("localhost", context));
 	TEST_THAT(assert_writable_connection_fails(protocolWritable3));
 
-	BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
-	TEST_EQUAL(0x8732523ab23aLL,
-		assert_readonly_connection_succeeds(protocolReadOnly2));
+	// Do not dedent. Object needs to go out of scope to release lock
+	{
+		BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
+		TEST_EQUAL(0x8732523ab23aLL,
+			assert_readonly_connection_succeeds(protocolReadOnly2));
+	}
 
 	protocolWritable.QueryFinished();
 	return teardown_test_backupstore();

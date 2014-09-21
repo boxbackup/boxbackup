@@ -11,7 +11,7 @@
 #include "MemLeakFindOn.h"
 
 
-std::auto_ptr<TestProtocolMessage> TestProtocolMessage::HandleException(BoxException& e) const
+std::auto_ptr<TestProtocolMessage> TestProtocolReplyable::HandleException(BoxException& e) const
 {
 	throw;
 }

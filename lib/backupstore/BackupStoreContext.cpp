@@ -2153,7 +2153,11 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 						moving.push_back(new BackupStoreDirectory::Entry(*c));
 
 						// Check for containing directory correction
-						if(c->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) dirsToChangeContainingID.push_back(c->GetObjectID());
+						if(c->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir)
+						{
+							AssertMutable(c->GetObjectID());
+							dirsToChangeContainingID.push_back(c->GetObjectID());
+						}
 					}
 				}
 				ASSERT(!moving.empty());
@@ -2164,7 +2168,11 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				moving.push_back(new BackupStoreDirectory::Entry(*en));
 
 				// Check for containing directory correction
-				if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) dirsToChangeContainingID.push_back(en->GetObjectID());
+				if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir)
+				{
+					AssertMutable(en->GetObjectID());
+					dirsToChangeContainingID.push_back(en->GetObjectID());
+				}
 			}
 		}
 
@@ -2237,7 +2245,10 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		// Finally... for all the directories we moved, modify their containing directory ID
 		for(std::vector<int64_t>::iterator i(dirsToChangeContainingID.begin()); i != dirsToChangeContainingID.end(); ++i)
 		{
-			AssertMutable(*i);
+			// We can't check AssertMutable here, because the
+			// entries are no longer in their directories, so the
+			// assertion fails. So we checked them earlier when
+			// they were added to the list, before moving them.
 
 			// Load the directory
 			BackupStoreDirectory &change(GetDirectoryInternal(*i));

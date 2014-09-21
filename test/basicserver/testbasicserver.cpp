@@ -31,11 +31,11 @@
 
 #include "MemLeakFindOn.h"
 
-#define SERVER_LISTEN_PORT	2003
+#define SERVER_LISTEN_PORT 2003
 
 // in ms
-#define COMMS_READ_TIMEOUT					4
-#define COMMS_SERVER_WAIT_BEFORE_REPLYING	40
+#define COMMS_READ_TIMEOUT 4
+#define COMMS_SERVER_WAIT_BEFORE_REPLYING 40
 #define SHORT_TIMEOUT 5000
 
 class basicdaemon : public Daemon
