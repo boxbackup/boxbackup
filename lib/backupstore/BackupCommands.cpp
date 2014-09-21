@@ -288,29 +288,10 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 	}
 
 	// Ask the context to store it
-	int64_t id = 0;
-	try
-	{
-		id = rContext.AddFile(rDataStream, mDirectoryObjectID,
-			mModificationTime, mAttributesHash, mDiffFromFileID,
-			mFilename,
-			true /* mark files with same name as old versions */);
-	}
-	catch(BackupStoreException &e)
-	{
-		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
-		{
-			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
-		}
-		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
-		{
-			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
-		}
-		else
-		{
-			throw;
-		}
-	}
+	int64_t id = rContext.AddFile(rDataStream, mDirectoryObjectID,
+		mModificationTime, mAttributesHash, mDiffFromFileID,
+		mFilename,
+		true /* mark files with same name as old versions */);
 
 	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));
@@ -635,7 +616,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteFile::DoCommand(BackupP
 
 	// Context handles this
 	int64_t objectID = 0;
-
 	rContext.DeleteFile(mFilename, mInDirectory, objectID);
 
 	// return the object ID or zero for not found
