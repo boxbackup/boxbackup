@@ -2042,6 +2042,7 @@ bool test_snapshot_commands()
 	// Try DeleteNow on a file and a directory, with and without multiple
 	// references.
 	// Test the immutable and snapshot flags - setting, clearing, enforcement.
+	// Ensure that housekeeping doesn't remove anything in immutable dirs.
 	// Try moving a directory, check that its container ID is updated.
 	// Resolve how an immutable object can be converted to a patch, which
 	// depends on another object, which is then deleted, and thus lost.
@@ -2055,6 +2056,11 @@ bool test_snapshot_commands()
 	// Create a reference to a directory's parent (circular)
 	// Create a file in a dir, move to different dir, create another ref
 	// to old dir, try to move again, check that mutability assertion passes
+	// QueryDeleteDirectory can't work as specified on a directory that
+	// contains a multiple reference anywhere inside it, so it should just
+	// fail without changing anything.
+	// Test that RemoveASAP flag behaves as expected on singly and multiply
+	// referenced files and directories.
 
 	int64_t firstSubFileDirId, firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;

@@ -919,7 +919,6 @@ int64_t BackupStoreContext::MakeUnique(int64_t ObjectToMakeUniqueID,
 		mapRefCount->AddReference(newObjectID);
 	}
 
-	// TODO FIXME increase reference counts on each entry in the directory
 	mapStoreInfo->AdjustNumDirectories(1);
 	return newObjectID;
 }
