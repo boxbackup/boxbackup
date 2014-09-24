@@ -73,3 +73,4 @@ MultiplyReferencedObject	69	Attempted to modify an object with multiple referenc
 CorruptReferenceCountDatabase	70	The account's refcount database is corrupt and must be rebuilt by housekeeping.
 CancelledByBackgroundTask	71	The current task was cancelled on request by the background task.
 ObjectHasUnknownType	72	The command tried to modify an object whose type is not recognised.
+ObjectIdNotUniqueInDir		73	Cannot add another entry to the same object ID in the same directory.

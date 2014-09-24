@@ -545,7 +545,7 @@ int64_t create_file_in_dir(std::string name, std::string source, int64_t parentI
 
 int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	int64_t indir, const char *name, int depth,
-	BackupStoreRefCountDatabase& rRefCount, int64_t *pFirstFileDirId = NULL,
+	BackupStoreRefCountDatabase& rRefCount,
 	BackupStoreFilenameClear *pFirstFileName = NULL,
 	int64_t *pFirstDirId = NULL, int64_t *pFirstFileId = NULL)
 {
@@ -589,11 +589,6 @@ int64_t create_test_data_subdirs(BackupProtocolCallable& protocol,
 	// Stick some files in it
 	int64_t first_file_id = create_file_in_dir("file_One",
 		"testfiles/test1", subdirid, protocol, rRefCount);
-
-	if (pFirstFileDirId)
-	{
-		*pFirstFileDirId = subdirid;
-	}
 
 	if (pFirstFileName)
 	{
@@ -2066,13 +2061,37 @@ bool test_snapshot_commands()
 	// Test that if a directory's lowest-numbered container doesn't match its
 	// internal container ID, this error is found and fixed.
 
-	int64_t firstSubFileDirId, firstSubDirId, firstFileId;
+	int64_t firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;
 	int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
 		BackupProtocolListDirectory::RootDirectory,
 		"test_delete", 6 /* depth */, *apRefCount,
-		&firstSubFileDirId, &firstSubFileName, &firstSubDirId,
-		&firstFileId);
+		&firstSubFileName, &firstSubDirId, &firstFileId);
+
+	TEST_EQUAL(true, check_reference_counts());
+
+	// Try to create a reference to a file and a dir in the same directory,
+	// which should fail because you can't have two entries with the same ID
+	// in the same directory.
+	{
+		BackupStoreFilenameClear copyName("copy");
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryAddReference(
+				firstFileId, // ObjectToCloneID
+				dirtodelete, // OldDirectoryID
+				dirtodelete, // NewDirectoryID
+				copyName // NewObjectFileName
+				),
+			BackupProtocolError::Err_ObjectIdNotUniqueInDir);
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryAddReference(
+				firstSubDirId, // ObjectToCloneID
+				dirtodelete, // OldDirectoryID
+				dirtodelete, // NewDirectoryID
+				copyName // NewObjectFileName
+				),
+			BackupProtocolError::Err_ObjectIdNotUniqueInDir);
+	}
 
 	TEST_EQUAL(true, check_reference_counts());
 
@@ -2131,7 +2150,7 @@ bool test_snapshot_commands()
 	set_refcount(dirtodelete, 3);
 	TEST_THAT(check_reference_counts());
 
-	// Run housekeeping to check block counts, for which we have to logout
+	// Run housekeeping to check block counts.
 	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
 
 	std::auto_ptr<BackupStoreInfo> apInfoAfter =
@@ -2145,7 +2164,7 @@ bool test_snapshot_commands()
 	// exception because they're in a multiply referenced
 	// (hence immutable) parent.
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryDeleteFile(firstSubFileDirId, firstSubFileName),
+		QueryDeleteFile(dirtodelete, firstSubFileName),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
@@ -2212,24 +2231,33 @@ bool test_snapshot_commands()
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryUndeleteFile(firstSubFileDirId, firstFileId),
+		QueryUndeleteFile(dirtodelete, firstFileId),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryAddReference(firstFileId, firstSubFileDirId,
+		QueryAddReference(firstFileId, dirtodelete,
 			dirtodelete, BackupStoreFilename()),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryMakeUnique(firstFileId, firstSubFileDirId),
+		QueryAddReference(firstSubDirId, dirtodelete,
+			dirtodelete, BackupStoreFilename()),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryDeleteNow(firstFileId, firstSubFileDirId),
+		QueryMakeUnique(firstFileId, dirtodelete),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryMakeUnique(firstSubDirId, dirtodelete),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteNow(firstFileId, dirtodelete),
+		BackupProtocolError::Err_MultiplyReferencedObject);
+
+	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+		QueryDeleteNow(firstSubDirId, dirtodelete),
 		BackupProtocolError::Err_MultiplyReferencedObject);
 
 	// Make the parent directory unique/mutable again

@@ -91,6 +91,10 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolReplyable::HandleException(Bo
 		{
 			return PROTOCOL_ERROR(Err_TargetNameExists);
 		}
+		else if(e.GetSubType() == BackupStoreException::ObjectIdNotUniqueInDir)
+		{
+			return PROTOCOL_ERROR(Err_ObjectIdNotUniqueInDir);
+		}
 	}
 
 	throw;

@@ -808,39 +808,57 @@ void BackupStoreContext::AddReference(int64_t ObjectID,
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
 
-	AssertMutable(OldDirectoryID);
 	AssertMutable(NewDirectoryID);
 
-	BackupStoreDirectory &oldDir(GetDirectoryInternal(OldDirectoryID));
-	BackupStoreDirectory::Entry *pEntry = oldDir.FindEntryByID(ObjectID);
-	if (!pEntry)
+	BackupStoreDirectory::Entry *pEntry = NULL;
+
+	// Scoped to prevent access to oldDir when it's invalid.
 	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CouldNotFindEntryInDirectory,
-			"Failed to find object " <<
-			BOX_FORMAT_OBJECTID(ObjectID) <<
-			" in its supposed directory, " <<
-			BOX_FORMAT_OBJECTID(OldDirectoryID));
+		BackupStoreDirectory &oldDir(GetDirectoryInternal(OldDirectoryID));
+		pEntry = oldDir.FindEntryByID(ObjectID);
+		if (!pEntry)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				CouldNotFindEntryInDirectory,
+				"Failed to find object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" in its supposed directory, " <<
+				BOX_FORMAT_OBJECTID(OldDirectoryID));
+		}
 	}
 
-	// Get the directory we want to modify
-	BackupStoreDirectory &newDir(GetDirectoryInternal(NewDirectoryID));
-
-	try
+	// Scoped to prevent access to newDir when it's invalid.
 	{
-		// Then the new entry
-		newDir.AddEntry(rNewFilename, pEntry->GetModificationTime(),
-			ObjectID, pEntry->GetSizeInBlocks(),
-			pEntry->GetFlags(), pEntry->GetAttributesHash());
+		// Get the directory we want to modify
+		BackupStoreDirectory &newDir(GetDirectoryInternal(NewDirectoryID));
 
-		// Write the directory back to disc
-		SaveDirectory(newDir);
-	}
-	catch(...)
-	{
-		// Remove this entry from the cache
-		RemoveDirectoryFromCache(NewDirectoryID);
-		throw;
+		// Check that it doesn't already contain a reference to this object
+		if(newDir.FindEntryByID(ObjectID))
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				ObjectIdNotUniqueInDir,
+				"Object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" already exists in destination directory " <<
+				BOX_FORMAT_OBJECTID(NewDirectoryID));
+		}
+
+		try
+		{
+			// Then the new entry
+			newDir.AddEntry(rNewFilename, pEntry->GetModificationTime(),
+				ObjectID, pEntry->GetSizeInBlocks(),
+				pEntry->GetFlags(), pEntry->GetAttributesHash());
+
+			// Write the directory back to disc
+			SaveDirectory(newDir);
+		}
+		catch(...)
+		{
+			// Remove this entry from the cache
+			RemoveDirectoryFromCache(NewDirectoryID);
+			throw;
+		}
 	}
 
 	// Increment reference count on the new directory to one
