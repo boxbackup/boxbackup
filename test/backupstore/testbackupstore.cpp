@@ -2174,9 +2174,12 @@ bool test_cannot_open_multiple_writable_connections()
 	BackupProtocolClient protocolWritable3(open_conn("localhost", context));
 	TEST_THAT(assert_writable_connection_fails(protocolWritable3));
 
-	BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
-	TEST_EQUAL(0x8732523ab23aLL,
-		assert_readonly_connection_succeeds(protocolReadOnly2));
+	// Do not dedent. Object needs to go out of scope to release lock
+	{
+		BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
+		TEST_EQUAL(0x8732523ab23aLL,
+			assert_readonly_connection_succeeds(protocolReadOnly2));
+	}
 
 	protocolWritable.QueryFinished();
 	return teardown_test_backupstore();
