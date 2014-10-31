@@ -845,7 +845,7 @@ int test(int argc, const char *argv[])
 	// spotting errors! But asserting an exact number will help us catch
 	// changes in checker behaviour, so it's not a bad thing to test.
 
-	// The 11 errors are:
+	// The 12 errors are:
 	// ERROR:   Directory ID 0xb references object 0x3e which does not exist.
 	// ERROR:   Removing directory entry 0x3e from directory 0xb
 	// ERROR:   Directory ID 0xc had invalid entries, fixed
@@ -857,8 +857,20 @@ int test(int argc, const char *argv[])
 	// ERROR:   BlocksInCurrentFiles changed from 226 to 220
 	// ERROR:   BlocksInDirectories changed from 56 to 54
 	// ERROR:   NumFiles changed from 113 to 110
+	// WARNING: Reference count of object 0x3e changed from 1 to 0
 
-	RUN_CHECK_INTERNAL(11);
+	RUN_CHECK_INTERNAL(12);
+
+	{
+		std::auto_ptr<BackupProtocolAccountUsage2> usage =
+			BackupProtocolLocal2(0x01234567, "test",
+				"backup/01234567/", 0,
+				false).QueryGetAccountUsage2();
+		TEST_EQUAL(usage->GetBlocksUsed(), 278);
+		TEST_EQUAL(usage->GetBlocksInCurrentFiles(), 220);
+		TEST_EQUAL(usage->GetBlocksInDirectories(), 54);
+		TEST_EQUAL(usage->GetNumCurrentFiles(), 110);
+	}
 
 	// Check everything is as it should be
 	TEST_THAT(::system(PERL_EXECUTABLE 

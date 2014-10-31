@@ -17,11 +17,13 @@
 #endif
 
 #include "autogen_BackupStoreException.h"
+#include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreObjectMagic.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
@@ -78,6 +80,13 @@ BackupStoreCheck::~BackupStoreCheck()
 {
 	// Clean up
 	FreeInfo();
+
+	// Avoid an exception if we forget to discard mapNewRefs
+	if (mapNewRefs.get())
+	{
+		mapNewRefs->Discard();
+		mapNewRefs.reset();
+	}
 }
 
 
@@ -103,6 +112,9 @@ void BackupStoreCheck::Check()
 	{
 		BOX_INFO("Will fix errors encountered during checking.");
 	}
+
+	BackupStoreAccountDatabase::Entry account(mAccountID, mDiscSetNumber);
+	mapNewRefs = BackupStoreRefCountDatabase::Create(account);
 
 	// Phase 1, check objects
 	if(!mQuiet)
@@ -148,9 +160,31 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Phase 6, regenerate store info...");
 	}
 	WriteNewStoreInfo();
-	
-//	DUMP_OBJECT_INFO
-	
+
+	try
+	{
+		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
+			BackupStoreRefCountDatabase::Load(account, false);
+		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*apOldRefs);
+	}
+	catch(BoxException &e)
+	{
+		BOX_WARNING("Reference count database was missing or "
+			"corrupted, cannot check it for errors.");
+		mNumberErrorsFound++;
+	}
+
+	// force file to be saved and closed before releasing the lock below
+	if(mFixErrors)
+	{
+		mapNewRefs->Commit();
+	}
+	else
+	{
+		mapNewRefs->Discard();
+	}
+	mapNewRefs.reset();
+
 	if(mNumberErrorsFound > 0)
 	{
 		BOX_WARNING("Finished checking store account ID " <<
@@ -408,7 +442,8 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			fileOK = false;
 		}
 		// info and refcount databases are OK in the root directory
-		else if(*i == "info" || *i == "refcount.db" || *i == "refcount.rdb")
+		else if(*i == "info" || *i == "refcount.db" ||
+			*i == "refcount.rdb" || *i == "refcount.rdbX")
 		{
 			fileOK = true;
 		}
@@ -717,61 +752,7 @@ void BackupStoreCheck::CheckDirectories()
 					fixed.Commit(true /* convert to raid representation now */);
 				}
 
-				// Count valid entries
-				BackupStoreDirectory::Iterator i(dir);
-				BackupStoreDirectory::Entry *en = 0;
-				while((en = i.Next()) != 0)
-				{
-					int32_t iIndex;
-					IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
-
-					ASSERT(piBlock != 0 || 
-						mDirsWhichContainLostDirs.find(en->GetObjectID())
-						!= mDirsWhichContainLostDirs.end());
-					if (piBlock)
-					{
-						// Normally it would exist and this
-						// check would not be necessary, but
-						// we might have missing directories
-						// that we will recreate later.
-						// cf mDirsWhichContainLostDirs.
-						uint8_t iflags = GetFlags(piBlock, iIndex);
-						SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
-					}
-
-					if(en->IsDir())
-					{
-						mNumDirectories++;
-					}
-					else if(!en->IsFile())
-					{
-						BOX_TRACE("Not counting object " << 
-							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-							" with flags " << en->GetFlags());
-					}
-					else // it's a good file, add to sizes
-					{
-						// It can be both old and deleted.
-						// If neither, then it's current.
-						if(en->IsDeleted())
-						{
-							mNumDeletedFiles++;
-							mBlocksInDeletedFiles += en->GetSizeInBlocks();
-						}
-
-						if(en->IsOld())
-						{
-							mNumOldFiles++;
-							mBlocksInOldFiles += en->GetSizeInBlocks();
-						}
-
-						if(!en->IsDeleted() && !en->IsOld())
-						{
-							mNumCurrentFiles++;
-							mBlocksInCurrentFiles += en->GetSizeInBlocks();
-						}
-					}
-				}
+				CountDirectoryEntries(dir);
 			}
 		}
 	}
@@ -798,8 +779,8 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			++mNumberErrorsFound;
 			isModified = true;
 		}
-		
-		// Go through, and check that everything in that directory exists and is valid
+
+		// Go through, and check that every entry exists and is valid
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next()) != 0)
@@ -861,6 +842,84 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 	}
 
 	return isModified;
+}
+
+// Count valid remaining entries and the number of blocks in them.
+void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
+{
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *en = 0;
+	while((en = i.Next()) != 0)
+	{
+		int32_t iIndex;
+		IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
+		bool badEntry = false;
+		bool wasAlreadyContained = false;
+
+		ASSERT(piBlock != 0 ||
+			mDirsWhichContainLostDirs.find(en->GetObjectID())
+			!= mDirsWhichContainLostDirs.end());
+
+		if (piBlock)
+		{
+			// Normally it would exist and this
+			// check would not be necessary, but
+			// we might have missing directories
+			// that we will recreate later.
+			// cf mDirsWhichContainLostDirs.
+			uint8_t iflags = GetFlags(piBlock, iIndex);
+			wasAlreadyContained = (iflags & Flags_IsContained);
+			SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
+		}
+
+		if(wasAlreadyContained)
+		{
+			// don't double-count objects that are
+			// contained by another directory as well.
+		}
+		else if(en->IsDir())
+		{
+			mNumDirectories++;
+		}
+		else if(!en->IsFile())
+		{
+			BOX_TRACE("Not counting object " <<
+				BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+				" with flags " << en->GetFlags());
+		}
+		else // it's a file
+		{
+			// Add to sizes?
+			// If piBlock was zero, then wasAlreadyContained
+			// might be uninitialized; but we only process
+			// files here, and if a file's piBlock was zero
+			// then badEntry would be set above, so we
+			// wouldn't be here.
+			ASSERT(!badEntry)
+
+			// It can be both old and deleted.
+			// If neither, then it's current.
+			if(en->IsDeleted())
+			{
+				mNumDeletedFiles++;
+				mBlocksInDeletedFiles += en->GetSizeInBlocks();
+			}
+
+			if(en->IsOld())
+			{
+				mNumOldFiles++;
+				mBlocksInOldFiles += en->GetSizeInBlocks();
+			}
+
+			if(!en->IsDeleted() && !en->IsOld())
+			{
+				mNumCurrentFiles++;
+				mBlocksInCurrentFiles += en->GetSizeInBlocks();
+			}
+		}
+
+		mapNewRefs->AddReference(en->GetObjectID());
+	}
 }
 
 bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,

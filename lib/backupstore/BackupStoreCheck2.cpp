@@ -20,6 +20,7 @@
 #include "BackupStoreFileWire.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreObjectMagic.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "MemBlockStream.h"
 #include "RaidFileRead.h"
 #include "RaidFileWrite.h"
@@ -259,6 +260,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				pFixer->InsertObject(ObjectID,
 					((flags & Flags_IsDir) == Flags_IsDir),
 					lostDirNameSerial);
+				mapNewRefs->AddReference(ObjectID);
 			}
 		}
 	}

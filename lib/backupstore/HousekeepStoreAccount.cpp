@@ -201,37 +201,16 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	mErrorCount += info->ReportChangesTo(*pOldInfo);
 	info->Save();
 
-	// We want to compare the mapNewRefs to apOldRefs before we delete any
-	// files, because that will also change the reference count in a way that's not an error.
+	// Try to load the old reference count database and check whether
+	// any counts have changed. We want to compare the mapNewRefs to
+	// apOldRefs before we delete any files, because that will also change
+	// the reference count in a way that's not an error.
 
-	// try to load the reference count database
 	try
 	{
 		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
 			BackupStoreRefCountDatabase::Load(account, false);
-
-		int64_t MaxOldObjectId = apOldRefs->GetLastObjectIDUsed();
-		int64_t MaxNewObjectId = mapNewRefs->GetLastObjectIDUsed();
-
-		for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
-			ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
-			ObjectID++)
-		{
-			typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
-			refcount_t OldRefs = (ObjectID <= MaxOldObjectId) ?
-				apOldRefs->GetRefCount(ObjectID) : 0;
-			refcount_t NewRefs = (ObjectID <= MaxNewObjectId) ?
-				mapNewRefs->GetRefCount(ObjectID) : 0;
-
-			if (OldRefs != NewRefs)
-			{
-				BOX_WARNING("Reference count of object " <<
-					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" changed from " << OldRefs <<
-					" to " << NewRefs);
-				mErrorCount++;
-			}
-		}
+		mErrorCount += mapNewRefs->ReportChangesTo(*apOldRefs);
 	}
 	catch(BoxException &e)
 	{

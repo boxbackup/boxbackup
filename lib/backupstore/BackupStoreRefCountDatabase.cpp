@@ -336,3 +336,31 @@ bool BackupStoreRefCountDatabase::RemoveReference(int64_t ObjectID)
 	return (refcount > 0);
 }
 
+int BackupStoreRefCountDatabase::ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs)
+{
+	int ErrorCount = 0;
+	int64_t MaxOldObjectId = rOldRefs.GetLastObjectIDUsed();
+	int64_t MaxNewObjectId = GetLastObjectIDUsed();
+
+	for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
+		ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
+		ObjectID++)
+	{
+		typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
+		refcount_t OldRefs = (ObjectID <= MaxOldObjectId) ?
+			rOldRefs.GetRefCount(ObjectID) : 0;
+		refcount_t NewRefs = (ObjectID <= MaxNewObjectId) ?
+			this->GetRefCount(ObjectID) : 0;
+
+		if (OldRefs != NewRefs)
+		{
+			BOX_WARNING("Reference count of object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" changed from " << OldRefs <<
+				" to " << NewRefs);
+			ErrorCount++;
+		}
+	}
+
+	return ErrorCount;
+}

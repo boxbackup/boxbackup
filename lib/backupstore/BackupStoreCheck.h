@@ -20,6 +20,7 @@
 
 class IOStream;
 class BackupStoreFilename;
+class BackupStoreRefCountDatabase;
 
 /*
 
@@ -130,6 +131,7 @@ private:
 	bool CheckDirectory(BackupStoreDirectory& dir);
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, bool& rIsModified);
+	void CountDirectoryEntries(BackupStoreDirectory& dir);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
 	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);
 
@@ -195,6 +197,9 @@ private:
 	
 	// Set of extra directories added
 	std::set<BackupStoreCheck_ID_t> mDirsAdded;
+
+	// The refcount database, being reconstructed as the check/fix progresses
+	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
 	
 	// Misc stuff
 	int32_t mLostDirNameSerial;

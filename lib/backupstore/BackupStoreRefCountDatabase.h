@@ -87,6 +87,7 @@ public:
 	void AddReference(int64_t ObjectID);
 	// RemoveReference returns false if refcount drops to zero
 	bool RemoveReference(int64_t ObjectID);
+	int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs);
 
 private:
 	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&
