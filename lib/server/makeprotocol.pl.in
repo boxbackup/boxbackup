@@ -604,10 +604,11 @@ public:
 
 	virtual int GetTimeout() = 0;
 	void SendStreamAfterCommand(std::auto_ptr<IOStream> apStream);
-	
+
 protected:
 	std::list<IOStream*> mStreamsToSend;
 	void DeleteStreamsToSend();
+	virtual std::auto_ptr<$message_base_class> HandleException(BoxException& e) const;
 
 private:
 	$replyable_base_class(const $replyable_base_class &rToCopy); /* do not call */
@@ -1077,24 +1078,31 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 		// Run the command
 		try
 		{
-			if(pobj->HasStreamWithCommand())
+			try
 			{
-				std::auto_ptr<IOStream> apDataStream = ReceiveStream();
-				SelfFlushingStream autoflush(*apDataStream);
-				preply = pobj->DoCommand(*this, rContext, *apDataStream);
+				if(pobj->HasStreamWithCommand())
+				{
+					std::auto_ptr<IOStream> apDataStream = ReceiveStream();
+					SelfFlushingStream autoflush(*apDataStream);
+					preply = pobj->DoCommand(*this, rContext, *apDataStream);
+				}
+				else
+				{
+					preply = pobj->DoCommand(*this, rContext);
+				}
 			}
-			else
+			catch(BoxException &e)
 			{
-				preply = pobj->DoCommand(*this, rContext);
+				// First try a the built-in exception handler
+				preply = HandleException(e);
 			}
-		}
-		catch (std::exception &e)
-		{
-			Send($cmd_classes{$error_message}());
-			throw;
 		}
 		catch (...)
 		{
+			// Fallback in case the exception isn't a BoxException
+			// or the exception handler fails as well. This path
+			// throws the exception upwards, killing the process
+			// that handles the current client.
 			Send($cmd_classes{$error_message}());
 			throw;
 		}
@@ -1183,19 +1191,32 @@ __E
 				}
 				elsif($writing_local)
 				{
+					print CPP <<__E;
+	std::auto_ptr<$message_base_class> apReply;
+	try
+	{
+__E
 					if($has_stream)
 					{
 						print CPP <<__E;
-	std::auto_ptr<$message_base_class> apReply = rQuery.DoCommand(*this,
-		mrContext, *apDataStream);
+		apReply = rQuery.DoCommand(*this, mrContext, *apDataStream);
 __E
 					}
 					else
 					{
 						print CPP <<__E;
-	std::auto_ptr<$message_base_class> apReply = rQuery.DoCommand(*this, mrContext);
+		apReply = rQuery.DoCommand(*this, mrContext);
 __E
 					}
+
+					print CPP <<__E;
+	}
+	catch(BoxException &e)
+	{
+		// First try a the built-in exception handler
+		apReply = HandleException(e);
+	}
+__E
 				}
 
 				# Common to both client and local

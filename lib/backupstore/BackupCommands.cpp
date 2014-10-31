@@ -52,11 +52,58 @@
 		return PROTOCOL_ERROR(Err_SessionReadOnly); \
 	}
 
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolVersion::DoCommand(Protocol &, BackupStoreContext &)
-//		Purpose: Return the current version, or an error if the requested version isn't allowed
+//		Name:    BackupProtocolMessage::HandleException(BoxException& e)
+//		Purpose: Return an error message appropriate to the passed-in
+//		exception, or rethrow it.
+//		Created: 2014/09/14
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolReplyable::HandleException(BoxException& e) const
+{
+	if(e.GetType() == RaidFileException::ExceptionType &&
+		e.GetSubType() == RaidFileException::RaidFileDoesntExist)
+	{
+		return PROTOCOL_ERROR(Err_DoesNotExist);
+	}
+	else if (e.GetType() == BackupStoreException::ExceptionType)
+	{
+		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
+		{
+			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
+		}
+		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
+		{
+			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
+		}
+		else if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
+		{
+			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
+		}
+		else if(e.GetSubType() == BackupStoreException::CouldNotFindEntryInDirectory)
+		{
+			return PROTOCOL_ERROR(Err_DoesNotExist);
+		}
+		else if(e.GetSubType() == BackupStoreException::NameAlreadyExistsInDirectory)
+		{
+			return PROTOCOL_ERROR(Err_TargetNameExists);
+		}
+	}
+
+	throw;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolVersion::DoCommand(Protocol &,
+//			 BackupStoreContext &)
+//		Purpose: Return the current version, or an error if the
+//			 requested version isn't allowed
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
@@ -192,23 +239,12 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 	// Store the listing to a stream
 	std::auto_ptr<CollectInBufferStream> stream(new CollectInBufferStream);
 
-	try
-	{
-		// Ask the context for a directory
-		const BackupStoreDirectory &rdir(
-			rContext.GetDirectory(mObjectID));
-		rdir.WriteToStream(*stream, mFlagsMustBeSet,
-			mFlagsNotToBeSet, mSendAttributes,
-			false /* never send dependency info to the client */);
-	}
-	catch(RaidFileException &e)
-	{
-		if (e.GetSubType() == RaidFileException::RaidFileDoesntExist)
-		{
-			return PROTOCOL_ERROR(Err_DoesNotExist);
-		}
-		throw;
-	}
+	// Ask the context for a directory
+	const BackupStoreDirectory &rdir(
+		rContext.GetDirectory(mObjectID));
+	rdir.WriteToStream(*stream, mFlagsMustBeSet,
+		mFlagsNotToBeSet, mSendAttributes,
+		false /* never send dependency info to the client */);
 
 	stream->SetForReading();
 
@@ -252,29 +288,10 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 	}
 
 	// Ask the context to store it
-	int64_t id = 0;
-	try
-	{
-		id = rContext.AddFile(rDataStream, mDirectoryObjectID,
-			mModificationTime, mAttributesHash, mDiffFromFileID,
-			mFilename,
-			true /* mark files with same name as old versions */);
-	}
-	catch(BackupStoreException &e)
-	{
-		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
-		{
-			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
-		}
-		else if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
-		{
-			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
-		}
-		else
-		{
-			throw;
-		}
-	}
+	int64_t id = rContext.AddFile(rDataStream, mDirectoryObjectID,
+		mModificationTime, mAttributesHash, mDiffFromFileID,
+		mFilename,
+		true /* mark files with same name as old versions */);
 
 	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));
@@ -507,25 +524,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
 	}
 
 	bool alreadyExists = false;
-	int64_t id;
-
-	try
-	{
-		id = rContext.AddDirectory(mContainingDirectoryID,
-			mDirectoryName, attr, mAttributesModTime, mModificationTime,
-			alreadyExists);
-	}
-	catch(BackupStoreException &e)
-	{
-		if(e.GetSubType() == BackupStoreException::AddedFileExceedsStorageLimit)
-		{
-			return PROTOCOL_ERROR(Err_StorageLimitExceeded);
-		}
-		else
-		{
-			throw;
-		}
-	}
+	int64_t id = rContext.AddDirectory(mContainingDirectoryID,
+		mDirectoryName, attr, mAttributesModTime, mModificationTime,
+		alreadyExists);
 
 	if(alreadyExists)
 	{
@@ -666,19 +667,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectory::DoCommand(Ba
 	}
 
 	// Context handles this
-	try
-	{
-		rContext.DeleteDirectory(mObjectID);
-	}
-	catch(BackupStoreException &e)
-	{
-		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
-		{
-			return PROTOCOL_ERROR(Err_MultiplyReferencedObject);
-		}
-		
-		throw;
-	}
+	rContext.DeleteDirectory(mObjectID);
 
 	// return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
@@ -746,27 +735,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolMoveObject::DoCommand(BackupP
 	CHECK_WRITEABLE_SESSION
 
 	// Let context do this, but modify error reporting on exceptions...
-	try
-	{
-		rContext.MoveObject(mObjectID, mMoveFromDirectory, mMoveToDirectory,
-			mNewFilename, (mFlags & Flags_MoveAllWithSameName) == Flags_MoveAllWithSameName,
-			(mFlags & Flags_AllowMoveOverDeletedObject) == Flags_AllowMoveOverDeletedObject);
-	}
-	catch(BackupStoreException &e)
-	{
-		if(e.GetSubType() == BackupStoreException::CouldNotFindEntryInDirectory)
-		{
-			return PROTOCOL_ERROR(Err_DoesNotExist);
-		}
-		else if(e.GetSubType() == BackupStoreException::NameAlreadyExistsInDirectory)
-		{
-			return PROTOCOL_ERROR(Err_TargetNameExists);
-		}
-		else
-		{
-			throw;
-		}
-	}
+	rContext.MoveObject(mObjectID, mMoveFromDirectory, mMoveToDirectory,
+		mNewFilename, (mFlags & Flags_MoveAllWithSameName) == Flags_MoveAllWithSameName,
+		(mFlags & Flags_AllowMoveOverDeletedObject) == Flags_AllowMoveOverDeletedObject);
 
 	// Return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));

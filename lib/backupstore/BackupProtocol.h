@@ -19,7 +19,7 @@
 // Class
 //		Name:    BackupProtocolLocal2
 //		Purpose: BackupProtocolLocal with a few more IQ points
-//		Created: 2003/08/21
+//		Created: 2014/09/20
 //
 // --------------------------------------------------------------------------
 class BackupProtocolLocal2 : public BackupProtocolLocal
