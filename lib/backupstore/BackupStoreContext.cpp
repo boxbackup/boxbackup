@@ -82,6 +82,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
 BackupStoreContext::~BackupStoreContext()
 {
 	ClearDirectoryCache();
+	CleanUp();
 }
 
 void BackupStoreContext::ClearDirectoryCache()
@@ -470,7 +471,9 @@ int64_t BackupStoreContext::AllocateObjectID()
 //			 int64_t, int64_t, const BackupStoreFilename &, bool)
 //		Purpose: Add a file to the store, from a given stream, into
 //			 a specified directory. Returns object ID of the new
-//			 file.
+//			 file. Any existing entry with the same name that's
+//			 not already marked as Old will be either marked as
+//			 Old, or deleted.
 //		Created: 2003/09/03
 //
 // --------------------------------------------------------------------------
@@ -690,29 +693,44 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
 		}
 
-		if(MarkFileWithSameNameAsOldVersions)
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *e = 0;
+		while((e = i.Next()) != 0)
 		{
-			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry *e = 0;
-			while((e = i.Next()) != 0)
+			// Check it's not an old version first (cheaper comparison)
+			if((!e->IsOld()) && e->GetName() == rFilename)
 			{
-				// First, check it's not an old version (cheaper comparison)
-				if(! e->IsOld())
+				if(MarkFileWithSameNameAsOldVersions)
 				{
-					// Compare name
-					if(e->GetName() == rFilename)
+					// Set old version flag
+					e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion,
+						*mapRefCount);
+					adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
+					adjustment.mNumCurrentFiles--;
+					adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
+					adjustment.mNumOldFiles++;
+				}
+				else
+				{
+					// TODO FIXME delete the actual object if necessary
+					dir.DeleteEntry(e->GetObjectID());
+
+					if(mapRefCount->RemoveReference(e->GetObjectID()) == 0)
 					{
-						// Check that it's definately not an old version
-						ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0);
-						// Set old version flag
-						e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
-						// Can safely do this, because we know we won't be here if it's already 
-						// an old version
-						adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
+						// No more references, so the object
+						// is now properly deleted.
 						adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
-						adjustment.mNumOldFiles++;
 						adjustment.mNumCurrentFiles--;
 					}
+					else
+					{
+						// Someone else is holding onto a
+						// reference, so don't adjust block
+						// counts at all.
+					}
+
+					// iterator invalid, start again
+					i.Reset();
 				}
 			}
 		}
@@ -728,6 +746,10 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		{
 			poldEntry->SetDependsNewer(id);
 			pnewEntry->SetDependsOlder(DiffFromFileID);
+			// We now need the newer object to reconstruct the
+			// older one from its reverse diff, so add a reference
+			// to keep it around.
+			mapRefCount->AddReference(id);
 		}
 
 		// Write the directory back to disc
@@ -988,7 +1010,8 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				// Check that it's definately not already deleted
 				ASSERT(!e->IsDeleted());
 				// Set deleted flag
-				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted,
+					*mapRefCount);
 				// Mark as made a change
 				madeChanges = true;
 
@@ -1084,7 +1107,8 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 				// Check that it's definitely already deleted
 				ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0);
 				// Clear deleted flag
-				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted,
+					*mapRefCount);
 				// Mark as made a change
 				madeChanges = true;
 				blocksDel -= e->GetSizeInBlocks();
@@ -1635,11 +1659,13 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 		}
 		else if(Undelete)
 		{
-			en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+			en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted,
+				*mapRefCount);
 		}
 		else
 		{
-			en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+			en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted,
+				*mapRefCount);
 		}
 
 		// Save it
@@ -1740,11 +1766,13 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 				// Add/remove the deleted flags
 				if(Undelete)
 				{
-					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted,
+						*mapRefCount);
 				}
 				else
 				{
-					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted,
+						*mapRefCount);
 				}
 
 				// Did something
@@ -2441,9 +2469,8 @@ void BackupStoreContext::AssertMutable(int64_t ObjectID)
 	// you get into such a directory anyway? So I've removed that check,
 	// and the exception remains thrown here.
 
-	// This check is too important to skip it, just to
-	// avoid possibly flushing the directory cache, so
-	// we forbid flushing it here.
+	// This check is too important to skip it, just to avoid possibly
+	// flushing the directory cache, so we forbid flushing it here.
 	BackupStoreDirectory &parent(GetDirectoryInternal(ContainerID,
 		false)); // no AllowFlushCache
 	if (!parent.FindEntryByID(ObjectID))

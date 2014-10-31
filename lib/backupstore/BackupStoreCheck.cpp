@@ -546,6 +546,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		case OBJECTMAGIC_DIR_MAGIC_VALUE:
 			isFile = false;
 			containerID = CheckDirInitial(ObjectID, *file);
+			mBlocksInDirectories += size;
 			break;
 
 		default:
@@ -600,10 +601,6 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 
 	// Add to usage counts
 	mBlocksUsed += size;
-	if(!isFile)
-	{
-		mBlocksInDirectories += size;
-	}
 
 	// If it looks like a good object, and it's non-RAID, and
 	// this is a RAID set, then convert it to RAID.
@@ -1006,11 +1003,39 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		// With snapshots it's no longer an error for an object to be
 		// contained in (referenced by) more than one directory.
 		*pWasAlreadyContained = true;
+
+		// However we need to check that the Old and Deleted flags
+		// match, otherwise accounting will become much harder.
+		if((bool)(iflags & Flags_IsOld) != rEntry.IsOld() ||
+			(bool)(iflags & Flags_IsDeleted) != rEntry.IsDeleted())
+		{
+			BOX_ERROR("Directory ID " <<
+				BOX_FORMAT_OBJECTID(DirectoryID) <<
+				" also references object " <<
+				BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+				", but with different flags");
+
+			rEntry.AddFlags(
+				((iflags & Flags_IsOld) & BackupStoreDirectory::Entry::Flags_OldVersion) |
+				((iflags & Flags_IsDeleted) & BackupStoreDirectory::Entry::Flags_Deleted));
+			rEntry.RemoveFlags(
+				(!(iflags & Flags_IsOld) & BackupStoreDirectory::Entry::Flags_OldVersion) |
+				(!(iflags & Flags_IsDeleted) & BackupStoreDirectory::Entry::Flags_Deleted));
+
+			++mNumberErrorsFound;
+			// not fatal, so don't remove entry
+		}
+	}
+	else
+	{
+		SetFlags(piBlock, IndexInDirBlock, iflags |
+			(rEntry.IsOld() ? Flags_IsOld : 0) |
+			(rEntry.IsDeleted() ? Flags_IsDeleted : 0));
 	}
 
-	// Not already contained by another directory.
-	// Don't set the flag until later, after we finish repairing
-	// the directory and removing all bad entries.
+	// Not already contained by another directory. Don't set the
+	// IsContained flag until later, after we finish repairing the
+	// directory and removing all bad entries.
 
 	// Check that the container ID of the object is correct
 	if(piBlock->mContainer[IndexInDirBlock] != DirectoryID)
@@ -1064,16 +1089,32 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	if(rEntry.GetSizeInBlocks() != piBlock->mObjectSizeInBlocks[IndexInDirBlock])
 	{
 		// Wrong size, correct it.
-		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
-			" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
-			" has wrong size " << rEntry.GetSizeInBlocks() <<
-			", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+		//
+		// TODO FIXME: uploading a patch changes the size of the object
+		// in other directories, and we currently fudge it by updating
+		// quietly during bbstoreaccounts check, because we don't have a
+		// way to find all references. So don't count wrong size on a
+		// patch as an error.
+		if(rEntry.GetDependsNewer() != 0)
+		{
+			BOX_INFO("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
+				" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+				" has wrong size " << rEntry.GetSizeInBlocks() <<
+				", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+		}
+		else
+		{
+			BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(DirectoryID) <<
+				" entry for " << BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+				" has wrong size " << rEntry.GetSizeInBlocks() <<
+				", should be " << piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
+			++mNumberErrorsFound;
+		}
 
 		rEntry.SetSizeInBlocks(piBlock->mObjectSizeInBlocks[IndexInDirBlock]);
 
 		// Mark as changed
 		rIsModified = true;
-		++mNumberErrorsFound;
 	}
 
 	return true; // don't delete this entry

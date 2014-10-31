@@ -806,7 +806,7 @@ int64_t create_directory(BackupProtocolCallable& protocol,
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	const std::string& remote_filename = "");
 
-bool run_housekeeping_and_check_account(BackupProtocolLocal2& protocol)
+bool run_housekeeping_and_check_account_and_refcounts(BackupProtocolLocal2& protocol)
 {
 	protocol.QueryFinished();
 	bool check_account_status;
@@ -1060,7 +1060,7 @@ bool test_server_housekeeping()
 		root_dir_blocks));
 
 	// Housekeeping should not change anything just yet
-	TEST_THAT(run_housekeeping_and_check_account(protocol));
+	TEST_THAT(run_housekeeping_and_check_account_and_refcounts(protocol));
 	TEST_THAT(check_num_files(1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
@@ -1093,7 +1093,7 @@ bool test_server_housekeeping()
 		root_dir_blocks)); // total
 
 	// Housekeeping should not change anything just yet
-	TEST_THAT(run_housekeeping_and_check_account(protocol));
+	TEST_THAT(run_housekeeping_and_check_account_and_refcounts(protocol));
 	TEST_THAT(check_num_files(1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
@@ -1865,9 +1865,7 @@ bool test_server_commands()
 		set_refcount(subsubfileid, 1);
 		TEST_THAT(check_num_files(3, 1, 0, 6));
 
-		apProtocol->QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol->Reopen();
+		TEST_THAT(run_housekeeping_and_check_account_and_refcounts(*apProtocol));
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
@@ -1938,22 +1936,16 @@ bool test_server_commands()
 			"test_delete", 6 /* depth */, *apRefCount);
 		TEST_THAT(check_reference_counts());
 
-		apProtocol->QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account_and_refcounts(*apProtocol));
 
 		// And delete them
-		apProtocol->Reopen();
-
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
 					dirtodelete));
 			TEST_THAT(dirdel->GetObjectID() == dirtodelete);
 		}
 
-		apProtocol->QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account_and_refcounts(*apProtocol));
 
 		// Get the root dir, checking for deleted items
 		{
@@ -1986,15 +1978,11 @@ bool test_server_commands()
 		}
 
 		// Undelete and check that block counts are restored properly
-		apProtocol->Reopen();
 		TEST_EQUAL(dirtodelete,
 			apProtocol->QueryUndeleteDirectory(dirtodelete)->GetObjectID());
 
 		// Finish the connections
-		apProtocol->QueryFinished();
-
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account_and_refcounts(*apProtocol));
 	}
 
 	return teardown_test_backupstore();
@@ -2016,8 +2004,8 @@ bool test_snapshot_commands()
 		BackupStoreRefCountDatabase::Load(account, true));
 
 	// Things to test:
-	// Create a snapshot copy of a file in the same dir
-	// Copy the snapshot to break the lock.
+	// Create a snapshot copy of a file, make it unique and modify it (should work).
+	// Create a snapshot copy of a file, and upload a patch to it (should work).
 	// Try to clone the root directory, which cannot be immutable, so this should return an error.
 	// Make an object mutable that's already mutable, check return ID.
 	// Try to snapshot and make mutable on files.
@@ -2060,6 +2048,15 @@ bool test_snapshot_commands()
 	// referenced files and directories.
 	// Test that if a directory's lowest-numbered container doesn't match its
 	// internal container ID, this error is found and fixed.
+	// Test that changing the Old or Deleted flag on an entry for a multiply
+	// referenced object is not allowed, to make Current/Old/Deleted
+	// accounting easier.
+	// Test that MakeUnique fails if the store account is at or over quota.
+	//
+	// TODO FIXME: uploading a patch changes the size of the object in
+	// other directories, and we currently fudge it by updating quietly
+	// during bbstoreaccounts check, because we don't have a way to find
+	// all references.
 
 	int64_t firstSubDirId, firstFileId;
 	BackupStoreFilenameClear firstSubFileName;
@@ -2082,7 +2079,7 @@ bool test_snapshot_commands()
 				dirtodelete, // NewDirectoryID
 				copyName // NewObjectFileName
 				),
-			BackupProtocolError::Err_ObjectIdNotUniqueInDir);
+			Err_ObjectIdNotUniqueInDir);
 		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 			QueryAddReference(
 				firstSubDirId, // ObjectToCloneID
@@ -2090,7 +2087,7 @@ bool test_snapshot_commands()
 				dirtodelete, // NewDirectoryID
 				copyName // NewObjectFileName
 				),
-			BackupProtocolError::Err_ObjectIdNotUniqueInDir);
+			Err_ObjectIdNotUniqueInDir);
 	}
 
 	TEST_EQUAL(true, check_reference_counts());
@@ -2114,13 +2111,11 @@ bool test_snapshot_commands()
 
 	// Also check that the account is sane beforehand.
 	// For which we have to logout.
-	apProtocol->QueryFinished();
-	TEST_EQUAL_LINE(true, run_housekeeping_and_check_account(),
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
 		"housekeeping after snapshot");
 	std::auto_ptr<BackupStoreInfo> apInfoBefore =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
-	apProtocol->Reopen();
 
 	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
 		true)->GetRefCount(dirtodelete));
@@ -2151,7 +2146,8 @@ bool test_snapshot_commands()
 	TEST_THAT(check_reference_counts());
 
 	// Run housekeeping to check block counts.
-	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+		"housekeeping after 2nd snapshot");
 
 	std::auto_ptr<BackupStoreInfo> apInfoAfter =
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
@@ -2165,100 +2161,110 @@ bool test_snapshot_commands()
 	// (hence immutable) parent.
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteFile(dirtodelete, firstSubFileName),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteDirectory(firstSubDirId),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	// Try various commands to modify stuff inside original or snapshot,
 	// test that they are refused.
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryMoveObject(firstFileId, firstSubDirId,
 			BACKUPSTORE_ROOT_DIRECTORY_ID, 0, BackupStoreFilename()),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryMoveObject(firstSubDirId, BACKUPSTORE_ROOT_DIRECTORY_ID,
 			firstFileId, 0, BackupStoreFilename()),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryCreateDirectory(firstSubDirId, 0, BackupStoreFilename(),
 			attr),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryChangeDirAttributes(firstSubDirId, 0, attr),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteDirectory(firstSubDirId),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryUndeleteDirectory(firstSubDirId),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryCreateDirectory2(firstSubDirId, 0, 0, BackupStoreFilename(),
 			attr),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
-	int64_t modtime = 0;
-	BackupStoreFilenameClear fnx("create-in-multiply-referenced-dir");
-	std::auto_ptr<IOStream>
-		upload(BackupStoreFile::EncodeFile("testfiles/test1",
-			BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime));
-	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryStoreFile(dirtodelete, 0, 0, 0, fnx, upload),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+	{
+		int64_t modtime = 0;
+		BackupStoreFilenameClear fnx("create-in-multiply-referenced-dir");
+		std::auto_ptr<IOStream> upload;
+		upload = BackupStoreFile::EncodeFile("testfiles/test1",
+				BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime);
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryStoreFile(dirtodelete, 0, 0, 0, fnx, upload),
+			Err_MultiplyReferencedObject);
 
-	// and also in a subdir, to check that immutability is transitive
-	upload = BackupStoreFile::EncodeFile("testfiles/test1",
-		BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime);
-	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-		QueryStoreFile(firstSubDirId, 0, 0, 0, fnx, upload),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		// And also in a subdir, to check that immutability is transitive
+		upload = BackupStoreFile::EncodeFile("testfiles/test1",
+			BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime);
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryStoreFile(firstSubDirId, 0, 0, 0, fnx, upload),
+			Err_MultiplyReferencedObject);
+
+		// Try to patch an existing file
+		upload = BackupStoreFile::EncodeFile("testfiles/test1",
+			BACKUPSTORE_ROOT_DIRECTORY_ID, firstSubFileName,
+			&modtime);
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryStoreFile(dirtodelete, 0, 0, 0, firstSubFileName, upload),
+			Err_MultiplyReferencedObject);
+	}
 
 	attr.reset(new MemBlockStream(attr1, sizeof(attr1)));
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QuerySetReplacementFileAttributes(firstFileId, 0,
 			BackupStoreFilename(), attr),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryUndeleteFile(dirtodelete, firstFileId),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryAddReference(firstFileId, dirtodelete,
 			dirtodelete, BackupStoreFilename()),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryAddReference(firstSubDirId, dirtodelete,
 			dirtodelete, BackupStoreFilename()),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryMakeUnique(firstFileId, dirtodelete),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryMakeUnique(firstSubDirId, dirtodelete),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteNow(firstFileId, dirtodelete),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 		QueryDeleteNow(firstSubDirId, dirtodelete),
-		BackupProtocolError::Err_MultiplyReferencedObject);
+		Err_MultiplyReferencedObject);
 
 	// Make the parent directory unique/mutable again
 	int64_t new_parent_id = apProtocol->QueryMakeUnique(dirtodelete,
@@ -2283,7 +2289,99 @@ bool test_snapshot_commands()
 	}
 
 	// Check for errors
-	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+		"housekeeping after MakeUnique");
+
+	{
+		// Try to patch an existing file. Even though the directory is
+		// mutable, this should fail because you're not allowed to
+		// change the Old and Deleted flags on a multiply-referenced
+		// object.
+		std::auto_ptr<IOStream> upload;
+		upload = BackupStoreFile::EncodeFile("testfiles/test1",
+			BACKUPSTORE_ROOT_DIRECTORY_ID, firstSubFileName);
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryStoreFile(new_parent_id, 0, 0, 0, firstSubFileName,
+				upload),
+			Err_MultiplyReferencedObject);
+
+		TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+			"housekeeping after attempting to upload another file");
+
+		// We can't create an old version in the other directories,
+		// because they're multiply linked. And we shouldn't create an
+		// old version in this directory either. So we invented a new
+		// upload command that optionally removes the old entry rather
+		// than marking it as Old, which should be allowed.
+		//
+		// Try uploading as a patch first. This will add a second
+		// reference to the new object, which may stop it from being
+		// marked as Old later, because changing flags of objects with
+		// multiple references is forbidden, to make accounting easier.
+		apProtocol->QueryGetBlockIndexByName(new_parent_id, firstSubFileName);
+		std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
+		bool isCompletelyDifferent;
+		upload = BackupStoreFile::EncodeFileDiff(
+			"testfiles/test1",
+			new_parent_id, /* containing directory */
+			firstSubFileName,
+			firstFileId, // DiffFromFileID
+			*blockIndexStream,
+			SHORT_TIMEOUT,
+			NULL, // DiffTimer implementation
+			0 /* not interested in the modification time */,
+			&isCompletelyDifferent,
+			NULL // rParams.mpBackgroundTask
+			);
+		TEST_THAT(!isCompletelyDifferent);
+		int64_t new_patch_id = apProtocol->QueryStoreFile2(new_parent_id,
+			0, // ModificationTime
+			0, // AttributesHash
+			firstFileId, // DiffFromFileID
+			true, // DeleteOldVersions
+			firstSubFileName, upload)->GetObjectID();
+
+		// 2 references: the directory entry and the patched object
+		// (firstFileId) which now requires new_patch_id to reconstruct.
+		set_refcount(new_patch_id, 2);
+		// But the old object is no longer in this directory, so its
+		// refcount drops to 1: the other directory that contains it.
+		set_refcount(firstFileId, 1);
+
+		TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+			"housekeeping after uploading a patch to an old file");
+
+		// Now try a full upload, to see if it fails when it tries to
+		// change the flags of new_patch_id.
+		upload = BackupStoreFile::EncodeFile("testfiles/test1",
+			BACKUPSTORE_ROOT_DIRECTORY_ID, firstSubFileName);
+		int64_t new_object_id = apProtocol->QueryStoreFile2(new_parent_id,
+			0, 0, 0, true, firstSubFileName, upload)->GetObjectID();
+
+		// Just one reference, because there's no patch.
+		set_refcount(new_object_id, 1);
+		// And now that the old object is no longer in this directory,
+		// the only reference to it is the firstFileId which now
+		// depends on it to be restorable.
+		set_refcount(new_patch_id, 1);
+
+		TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+			"housekeeping after uploading another patch to an old file");
+
+		// Check that there's no Old entry in the directory
+		BackupStoreDirectory dir(*apProtocol, new_parent_id,
+			SHORT_TIMEOUT);
+		BackupStoreDirectory::Iterator i(dir);
+		for(BackupStoreDirectory::Entry* en = i.Next(); en; en = i.Next())
+		{
+			TEST_LINE(en->GetObjectID() != firstFileId,
+				"There should be no entry for the original "
+				"file when using QueryStoreFile2");
+		}
+	}
+
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+		"housekeeping after uploading patches to files");
 
 	// Now delete the mutable directory. First we need to decrease the
 	// refcount of everything inside it, while we still know what they are.
@@ -2299,24 +2397,26 @@ bool test_snapshot_commands()
 			set_refcount(en->GetObjectID(), 1);
 		}
 	}
+
 	TEST_EQUAL(new_parent_id,
 		apProtocol->QueryDeleteNow(new_parent_id,
 			snapshot1DirID)->GetObjectID());
 	ExpectedRefCounts[dirtodelete] = 2;
-	ExpectedRefCounts.resize(new_parent_id);
-	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+		"housekeeping after deleting the mutable directory");
 
 	// And delete the remaining snapshot as well.
 	TEST_EQUAL(dirtodelete,
 		apProtocol->QueryDeleteNow(dirtodelete,
 			snapshot2DirID)->GetObjectID());
 	// Note that dirtodelete does not uniquely identify this snapshot,
-	// because it's just another reference to the ssme directory object,
+	// because it's just another reference to the same directory object,
 	// and thus has the same object ID. However within a directory object
 	// IDs must be unique, so within snapshot2DirID, it does identify
 	// the snapshot entry.
 	ExpectedRefCounts[dirtodelete] = 1;
-	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+		"housekeeping after deleting the second snapshot");
 
 	// And delete the original directory
 	TEST_EQUAL(dirtodelete,
@@ -2337,7 +2437,8 @@ bool test_snapshot_commands()
 		}
 	}
 
-	TEST_THAT(run_housekeeping_and_check_account(*apProtocol));
+	TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
+		"housekeeping after deleting the original directory");
 
 	// Check the remaining items on the server.
 	{
@@ -2909,7 +3010,7 @@ bool test_login_with_disabled_account()
 
 		// Login
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
-			BackupProtocolError::Err_DisabledAccount);
+			Err_DisabledAccount);
 
 		// Finish the connection
 		protocol.QueryFinished();

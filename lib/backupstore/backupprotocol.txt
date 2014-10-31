@@ -170,6 +170,7 @@ CreateDirectory2	25	Command(Success)	StreamWithCommand
 #  File commands
 # -------------------------------------------------------------------------------------
 
+# Kept for backwards compatibility, replaced by StoreFile2
 StoreFile	30	Command(Success)	StreamWithCommand
 	int64		DirectoryObjectID
 	int64		ModificationTime
@@ -219,6 +220,16 @@ UndeleteFile	36	Command(Success)
 	int64		InDirectory
 	int64		ObjectID
 	# will return 0 if the object couldn't be found in the specified directory
+
+StoreFile2	37	Command(Success)	StreamWithCommand
+	int64		DirectoryObjectID
+	int64		ModificationTime
+	int64		AttributesHash
+	int64		DiffFromFileID		# 0 if the file is not a diff
+	bool		DeleteOldVersions
+	Filename	Filename
+	# then send a stream containing the encoded file
+
 
 
 # -------------------------------------------------------------------------------------

@@ -424,11 +424,11 @@ COMPLETION_FUNCTION(RestoreRemoteDirOrId,
 )
 
 // Data about commands
-QueryCommandSpecification commands[] = 
+QueryCommandSpecification commands[] =
 {
-	{ "quit",	"",		Command_Quit, 	{} },
+	{ "quit",	"",		Command_Quit,	{} },
 	{ "exit",	"",		Command_Quit,	{} },
-	{ "list",	"adDFhiIorRsStTU",	Command_List,	{CompleteRemoteDir} },
+	{ "list",	"adDFhiIjorRsStTU",	Command_List,	{CompleteRemoteDir} },
 	{ "pwd",	"",		Command_pwd,	{} },
 	{ "cd",		"od",		Command_cd,	{CompleteRemoteDir} },
 	{ "lcd",	"",		Command_lcd,	{CompleteLocalDir} },

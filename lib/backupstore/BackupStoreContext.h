@@ -125,9 +125,8 @@ public:
 	//
 	// Function
 	//		Name:    BackupStoreContext::GetDirectory(int64_t)
-	//		Purpose: Return a reference to a directory. Valid only until the 
-	//				 next time a function which affects directories is called.
-	//				 Mainly this funciton, and creation of files.
+	//		Purpose: Return a reference to a directory. Valid only until
+	//			 the next time GetDirectory(Internal) is called.
 	//		Created: 2003/09/02
 	//
 	// --------------------------------------------------------------------------

@@ -115,7 +115,7 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 
 	if(rCommand.mFailed)
 	{
-		BOX_ERROR("Parse failed: unknown command '" << 
+		BOX_ERROR("Parse failed: unknown command '" <<
 			rCommand.mCmdElements[0] << "' or failed to convert "
 			"encoding of arguments");
 		return;
@@ -140,7 +140,7 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 		}
 		return;
 	}
-		
+
 	if(rCommand.pSpec->type == Command_Unknown)
 	{
 		// No such command
@@ -185,11 +185,11 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 	case Command_Quit:
 		mQuitNow = true;
 		break;
-		
+
 	case Command_List:
 		CommandList(args, opts);
 		break;
-		
+
 	case Command_pwd:
 		{
 			// Simple implementation, so do it here
@@ -202,35 +202,35 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 	case Command_cd:
 		CommandChangeDir(args, opts);
 		break;
-		
+
 	case Command_lcd:
 		CommandChangeLocalDir(args);
 		break;
-		
+
 	case Command_sh:
 		BOX_ERROR("The command to run must be specified as an argument.");
 		break;
-		
+
 	case Command_GetObject:
 		CommandGetObject(args, opts);
 		break;
-		
+
 	case Command_Get:
 		CommandGet(args, opts);
 		break;
-		
+
 	case Command_Compare:
 		CommandCompare(args, opts);
 		break;
-		
+
 	case Command_Restore:
 		CommandRestore(args, opts);
 		break;
-		
+
 	case Command_Usage:
 		CommandUsage(opts);
 		break;
-		
+
 	case Command_Help:
 		CommandHelp(args);
 		break;
@@ -238,22 +238,36 @@ void BackupQueries::DoCommand(ParsedCommand& rCommand)
 	case Command_Undelete:
 		CommandUndelete(args, opts);
 		break;
-		
+
 	case Command_Delete:
 		CommandDelete(args, opts);
 		break;
-		
+
 	default:
 		BOX_ERROR("Unknown command: " << rCommand.mCmdElements[0]);
 		break;
 	}
 }
 
+int64_t ParseObjectIDString(const std::string& id_string)
+{
+	int64_t id = ::strtoll(id_string.c_str(), 0, 16);
+	if(id == std::numeric_limits<long long>::min() ||
+		id == std::numeric_limits<long long>::max() || id <= 0)
+	{
+		BOX_ERROR("Not a valid object ID (specified in hex): " <<
+			id_string);
+		return -1;
+	}
+	return id;
+}
+
+#define LIST_OPTION_DIRECTORY_ID	'i'
 #define LIST_OPTION_TIMES_ATTRIBS	'a'
 #define LIST_OPTION_SORT_NO_DIRS_FIRST	'D'
 #define LIST_OPTION_NOFLAGS		'F'
 #define LIST_OPTION_DISPLAY_HASH	'h'
-#define LIST_OPTION_SORT_ID		'i'
+#define LIST_OPTION_SORT_ID		'j'
 #define LIST_OPTION_NOOBJECTID		'I'
 #define LIST_OPTION_SORT_REVERSE	'r'
 #define LIST_OPTION_RECURSIVE		'R'
@@ -282,28 +296,40 @@ void BackupQueries::CommandList(const std::vector<std::string> &args, const bool
 	// Got a directory in the arguments?
 	if(args.size() > 0)
 	{
-#ifdef WIN32
-		std::string storeDirEncoded;
-		if(!ConvertConsoleToUtf8(args[0].c_str(), storeDirEncoded))
-			return;
-#else
-		const std::string& storeDirEncoded(args[0]);
-#endif
-	
-		// Attempt to find the directory
-		rootDir = FindDirectoryObjectID(storeDirEncoded,
-			opts[LIST_OPTION_ALLOWOLD],
-			opts[LIST_OPTION_ALLOWDELETED]);
-
-		if(rootDir == 0)
+		if(opts['i'])
 		{
-			BOX_ERROR("Directory '" << args[0] << "' not found "
-				"on store.");
-			SetReturnCode(ReturnCode::Command_Error);
-			return;
+			// Specified as ID.
+			rootDir = ParseObjectIDString(args[0]);
+			if(rootDir == -1)
+			{
+				return;
+			}
+		}
+		else
+		{
+#ifdef WIN32
+			std::string storeDirEncoded;
+			if(!ConvertConsoleToUtf8(args[0].c_str(), storeDirEncoded))
+				return;
+#else
+			const std::string& storeDirEncoded(args[0]);
+#endif
+
+			// Attempt to find the directory
+			rootDir = FindDirectoryObjectID(storeDirEncoded,
+				opts[LIST_OPTION_ALLOWOLD],
+				opts[LIST_OPTION_ALLOWDELETED]);
+
+			if(rootDir == 0)
+			{
+				BOX_ERROR("Directory '" << args[0] << "' not found "
+					"on store.");
+				SetReturnCode(ReturnCode::Command_Error);
+				return;
+			}
 		}
 	}
-	
+
 	// List it
 	List(rootDir, listRoot, opts, true /* first level to list */);
 }
@@ -323,11 +349,11 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 	{
 		const StreamableMemBlock &storeAttr(en.GetAttributes());
 		BackupClientFileAttributes attr(storeAttr);
-		
+
 		box_time_t NewModificationTime, NewAttrModificationTime;
 		attr.GetModificationTimes(&NewModificationTime,
 			&NewAttrModificationTime);
-		
+
 		if (showAttrModificationTimes)
 		{
 			newAttributesTime = NewAttrModificationTime;
@@ -336,7 +362,7 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 		{
 			newAttributesTime = NewModificationTime;
 		}
-		
+
 		if (newAttributesTime == originalTime)
 		{
 			out << "*";
@@ -351,7 +377,7 @@ static std::string GetTimeString(BackupStoreDirectory::Entry& en,
 	{
 		out << " ";
 	}
-	
+
 	return out.str();
 }
 
@@ -439,7 +465,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 	DWORD n_chars;
 	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
-	
+
 	// Generate exclude flags
 	int16_t excludeFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
 	if(!opts[LIST_OPTION_ALLOWOLD]) excludeFlags |= BackupProtocolListDirectory::Flags_OldVersion;
@@ -522,7 +548,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 
 		// Display this entry
 		BackupStoreFilenameClear clear(en->GetName());
-		
+
 		// Object ID?
 		if(!opts[LIST_OPTION_NOOBJECTID])
 		{
@@ -531,7 +557,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 				std::setfill('0') << en->GetObjectID() <<
 				std::dec << " ";
 		}
-		
+
 		// Flags?
 		if(!opts[LIST_OPTION_NOFLAGS])
 		{
@@ -557,13 +583,13 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			*(f++) = ' ';
 			*(f++) = '\0';
 			buf << displayflags;
-			
+
 			if(en_flags != 0)
 			{
 				buf << "[ERROR: Entry has additional flags set] ";
 			}
 		}
-		
+
 		if(opts[LIST_OPTION_TIMES_UTC])
 		{
 			// Show UTC times...
@@ -577,27 +603,27 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			buf << GetTimeString(*en, true,
 				opts[LIST_OPTION_TIMES_ATTRIBS]) << " ";
 		}
-		
+
 		if(opts[LIST_OPTION_DISPLAY_HASH])
 		{
 			buf << std::hex << std::internal << std::setw(16) <<
 				std::setfill('0') << en->GetAttributesHash() <<
 				std::dec;
 		}
-		
+
 		if(opts[LIST_OPTION_SIZEINBLOCKS])
 		{
 			buf << std::internal << std::setw(5) <<
 				std::setfill('0') << en->GetSizeInBlocks() <<
 				" ";
 		}
-		
+
 		// add name
 		if(!FirstLevel)
 		{
 #ifdef WIN32
 			std::string listRootDecoded;
-			if(!ConvertUtf8ToConsole(rListRoot.c_str(), 
+			if(!ConvertUtf8ToConsole(rListRoot.c_str(),
 				listRootDecoded)) return;
 			listRootDecoded += "/";
 			buf << listRootDecoded;
@@ -607,7 +633,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			buf << rListRoot << "/";
 #endif
 		}
-		
+
 		std::string fileName;
 		try
 		{
@@ -634,7 +660,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 		}
 
 		buf << std::endl;
-		
+
 		if(pOut)
 		{
 			(*pOut) << buf.str();
@@ -653,7 +679,7 @@ void BackupQueries::List(int64_t DirID, const std::string &rListRoot,
 			std::cout << buf.str();
 #endif
 		}
-		
+
 		// Directory?
 		if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
 		{
@@ -730,12 +756,12 @@ int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
 				{
 					// Remove top element
 					stack.pop_back();
-					
+
 					// New dir ID
 					dirID = (stack.size() > 0)?(stack[stack.size() - 1].second):BackupProtocolListDirectory::RootDirectory;
 				}
 				else
-				{	
+				{
 					// At root anyway
 					dirID = BackupProtocolListDirectory::RootDirectory;
 				}
@@ -763,7 +789,7 @@ int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
 					// Not found
 					return 0;
 				}
-				
+
 				// Object ID for next round of searching
 				dirID = en->GetObjectID();
 
@@ -772,7 +798,7 @@ int64_t BackupQueries::FindDirectoryObjectID(const std::string &rDirName,
 			}
 		}
 	}
-	
+
 	// If required, copy the new stack to the caller
 	if(pStack)
 	{
@@ -798,7 +824,7 @@ int64_t BackupQueries::GetCurrentDirectoryID()
 	{
 		return BackupProtocolListDirectory::RootDirectory;
 	}
-	
+
 	// Otherwise, get from the last entry on the stack
 	return mDirStack[mDirStack.size() - 1].second;
 }
@@ -833,7 +859,7 @@ std::string BackupQueries::GetCurrentDirectoryName()
 		r += mDirStack[l].first;
 #endif
 	}
-	
+
 	return r;
 }
 
@@ -861,18 +887,18 @@ void BackupQueries::CommandChangeDir(const std::vector<std::string> &args, const
 #else
 	const std::string& dirName(args[0]);
 #endif
-	
+
 	std::vector<std::pair<std::string, int64_t> > newStack;
-	int64_t id = FindDirectoryObjectID(dirName, opts['o'], opts['d'], 
+	int64_t id = FindDirectoryObjectID(dirName, opts['o'], opts['d'],
 		&newStack);
-	
+
 	if(id == 0)
 	{
 		BOX_ERROR("Directory '" << args[0] << "' not found.");
 		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
-	
+
 	// Store new stack
 	mDirStack = newStack;
 }
@@ -894,7 +920,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
-	
+
 	// Try changing directory
 #ifdef WIN32
 	std::string dirName;
@@ -923,7 +949,7 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
-	
+
 	// Report current dir
 	char wd[PATH_MAX];
 	if(::getcwd(wd, PATH_MAX) == 0)
@@ -946,7 +972,6 @@ void BackupQueries::CommandChangeLocalDir(const std::vector<std::string> &args)
 #endif
 }
 
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -964,15 +989,13 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 			"<local-filename>");
 		return;
 	}
-	
-	int64_t id = ::strtoll(args[0].c_str(), 0, 16);
-	if(id == std::numeric_limits<long long>::min() || id == std::numeric_limits<long long>::max() || id == 0)
+
+	int64_t id = ParseObjectIDString(args[0]);
+	if(id == -1)
 	{
-		BOX_ERROR("Not a valid object ID (specified in hex): " <<
-			args[0]);
 		return;
 	}
-	
+
 	// Does file exist?
 	EMU_STRUCT_STAT st;
 	if(EMU_STAT(args[1].c_str(), &st) == 0 || errno != ENOENT)
@@ -980,10 +1003,10 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 		BOX_ERROR("The local file '" << args[1] << " already exists.");
 		return;
 	}
-	
+
 	// Open file
 	FileStream out(args[1].c_str(), O_WRONLY | O_CREAT | O_EXCL);
-	
+
 	// Request that object
 	try
 	{
@@ -993,7 +1016,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 		// Stream that object out to the file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
 		objectStream->CopyStreamTo(out);
-			
+
 		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
 			" fetched successfully.");
 	}
@@ -1076,22 +1099,18 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 
 	if(opts['i'])
 	{
-		// Specified as ID. 
-		fileId = ::strtoll(rNameOrIdString.c_str(), 0, 16);
-		if(fileId == std::numeric_limits<long long>::min() || 
-			fileId == std::numeric_limits<long long>::max() || 
-			fileId == 0)
+		// Specified as ID.
+		fileId = ParseObjectIDString(rNameOrIdString);
+		if(fileId == -1)
 		{
-			BOX_ERROR("Not a valid object ID (specified in hex): "
-				<< rNameOrIdString);
 			return 0;
 		}
-		
+
 		// Check that the item is actually in the directory
 		en = dir.FindEntryByID(fileId);
 		if(en == 0)
 		{
-			BOX_ERROR("File ID " << 
+			BOX_ERROR("File ID " <<
 				BOX_FORMAT_OBJECTID(fileId) <<
 				" not found in current directory on store.\n"
 				"(You can only access files by ID from the "
@@ -1100,7 +1119,7 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 		}
 	}
 	else
-	{				
+	{
 		// Specified by name, find the object in the directory to get the ID
 		BackupStoreDirectory::Iterator i(dir);
 		en = i.FindMatchingClearName(fn);
@@ -1111,7 +1130,7 @@ int64_t BackupQueries::FindFileID(const std::string& rNameOrIdString,
 				"(Subdirectories in path not searched.)");
 			return 0;
 		}
-		
+
 		fileId = en->GetObjectID();
 	}
 
@@ -1157,7 +1176,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	std::string localName;
 
 #ifdef WIN32
-	for (std::vector<std::string>::iterator 
+	for (std::vector<std::string>::iterator
 		i = args.begin(); i != args.end(); i++)
 	{
 		std::string out;
@@ -1203,7 +1222,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 		localName = args[1];
 	}
 	else
-	{				
+	{
 		// Specified by name. Local name already set by FindFileID,
 		// but may be overridden by user supplying a second argument.
 		if(args.size() == 2)
@@ -1211,7 +1230,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 			localName = args[1];
 		}
 	}
-	
+
 	// Does local file already exist? (don't want to overwrite)
 	EMU_STRUCT_STAT st;
 	if(EMU_STAT(localName.c_str(), &st) == 0 || errno != ENOENT)
@@ -1221,7 +1240,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 		SetReturnCode(ReturnCode::Command_Error);
 		return;
 	}
-	
+
 	// Request it from the store
 	try
 	{
@@ -1230,7 +1249,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 
 		// Stream containing encoded file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-		
+
 		// Decode it
 		BackupStoreFile::DecodeFile(*objectStream, localName.c_str(), mrConnection.GetTimeout());
 
@@ -1240,7 +1259,7 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	}
 	catch (BoxException &e)
 	{
-		BOX_ERROR("Failed to fetch file: " << 
+		BOX_ERROR("Failed to fetch file: " <<
 			e.what());
 		::unlink(localName.c_str());
 	}
@@ -1288,7 +1307,7 @@ BackupQueries::CompareParams::CompareParams(bool QuickCompare,
 void BackupQueries::CommandCompare(const std::vector<std::string> &args, const bool *opts)
 {
 	box_time_t LatestFileUploadTime = GetCurrentBoxTime();
-	
+
 	// Try and work out the time before which all files should be on the server
 	{
 		std::string syncTimeFilename(mrConfiguration.GetKeyValue("DataDirectory") + DIRECTORY_SEPARATOR_ASCHAR);
@@ -1313,16 +1332,16 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		opts['E'], // ignore excludes
 		opts['A'], // ignore attributes
 		LatestFileUploadTime);
-	
+
 	params.mQuietCompare = opts['Q'];
-	
+
 	// Quick compare?
 	if(params.QuickCompare())
 	{
 		BOX_WARNING("Quick compare used -- file attributes are not "
 			"checked.");
 	}
-	
+
 	if(!opts['l'] && opts['a'] && args.size() == 0)
 	{
 		// Compare all locations
@@ -1346,7 +1365,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	else if(!opts['l'] && !opts['a'] && args.size() == 2)
 	{
 		// Compare directory to directory
-		
+
 		// Can't be bothered to do all the hard work to work out which location it's on, and hence which exclude list
 		if(!params.IgnoreExcludes())
 		{
@@ -1366,7 +1385,7 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 	}
 
 	if (!params.mQuietCompare)
-	{	
+	{
 		BOX_INFO("[ " <<
 			params.mDifferencesExplainedByModTime << " (of " <<
 			params.mDifferences << ") differences probably "
@@ -1377,14 +1396,14 @@ void BackupQueries::CommandCompare(const std::vector<std::string> &args, const b
 		params.mExcludedDirs   << " dirs excluded, " <<
 		params.mExcludedFiles  << " files excluded, " <<
 		params.mUncheckedFiles << " files not checked)");
-	
+
 	// Set return code?
 	if(opts['c'])
 	{
 		if (params.mUncheckedFiles != 0)
 		{
 			SetReturnCode(ReturnCode::Compare_Error);
-		} 
+		}
 		else if (params.mDifferences != 0)
 		{
 			SetReturnCode(ReturnCode::Compare_Different);
@@ -1420,7 +1439,7 @@ void BackupQueries::CompareLocation(const std::string &rLocation,
 	#ifdef WIN32
 	{
 		std::string path = loc.GetKeyValue("Path");
-		if (path.size() > 0 && path[path.size()-1] == 
+		if (path.size() > 0 && path[path.size()-1] ==
 			DIRECTORY_SEPARATOR_ASCHAR)
 		{
 			BOX_WARNING("Location '" << rLocation << "' path ends "
@@ -1429,13 +1448,13 @@ void BackupQueries::CompareLocation(const std::string &rLocation,
 		}
 	}
 	#endif
-	
+
 	// Generate the exclude lists
 	if(!rParams.IgnoreExcludes())
 	{
 		rParams.LoadExcludeLists(loc);
 	}
-			
+
 	// Then get it compared
 	Compare(std::string("/") + rLocation, loc.GetKeyValue("Path"), rParams);
 }
@@ -1462,15 +1481,15 @@ void BackupQueries::Compare(const std::string &rStoreDir,
 	const std::string& localDirEncoded(rLocalDir);
 	const std::string& storeDirEncoded(rStoreDir);
 #endif
-	
+
 	// Get the directory ID of the directory -- only use current data
 	int64_t dirID = FindDirectoryObjectID(storeDirEncoded);
-	
+
 	// Found?
 	if(dirID == 0)
 	{
 		bool modifiedAfterLastSync = false;
-		
+
 		EMU_STRUCT_STAT st;
 		if(EMU_STAT(rLocalDir.c_str(), &st) == 0)
 		{
@@ -1480,12 +1499,12 @@ void BackupQueries::Compare(const std::string &rStoreDir,
 				modifiedAfterLastSync = true;
 			}
 		}
-		
+
 		rParams.NotifyRemoteFileMissing(localDirEncoded,
 			storeDirEncoded, modifiedAfterLastSync);
 		return;
 	}
-	
+
 	// Go!
 	Compare(dirID, storeDirEncoded, localDirEncoded, rParams);
 }
@@ -1509,14 +1528,14 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 	{
 		// Files the same flag?
 		bool equal = true;
-		
+
 		// File modified after last sync flag
 		bool modifiedAfterLastSync = false;
-		
+
 		bool hasDifferentAttribs = false;
 
 		bool alreadyReported = false;
-			
+
 		if(rParams.QuickCompare())
 		{
 			// Compare file -- fetch it
@@ -1524,7 +1543,7 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 
 			// Stream containing block index
 			std::auto_ptr<IOStream> blockIndexStream(mrConnection.ReceiveStream());
-			
+
 			// Compare
 			equal = BackupStoreFile::CompareFileContentsAgainstBlockIndex(
 				rLocalPath.c_str(), *blockIndexStream,
@@ -1558,17 +1577,17 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 				// Use attributes stored in file
 				fileOnServerStream.reset(BackupStoreFile::DecodeFileStream(*objectStream, mrConnection.GetTimeout()).release());
 			}
-			
+
 			// Should always be something in the auto_ptr, it's how the interface is defined. But be paranoid.
 			if(!fileOnServerStream.get())
 			{
 				THROW_EXCEPTION(BackupStoreException, Internal)
 			}
-			
+
 			// Compare attributes
 			BackupClientFileAttributes localAttr;
 			box_time_t fileModTime = 0;
-			localAttr.ReadAttributes(rLocalPath.c_str(), false /* don't zero mod times */, &fileModTime);					
+			localAttr.ReadAttributes(rLocalPath.c_str(), false /* don't zero mod times */, &fileModTime);
 			modifiedAfterLastSync = (fileModTime > rParams.LatestFileUploadTime());
 			bool ignoreAttrModTime = true;
 
@@ -1610,7 +1629,7 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 					alreadyReported = true;
 				}
 				catch(...)
-				{	
+				{
 					rParams.NotifyLocalFileReadFailed(rLocalPath,
 						rStorePath, fileSize);
 					alreadyReported = true;
@@ -1639,7 +1658,7 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 			e);
 	}
 	catch(...)
-	{	
+	{
 		rParams.NotifyDownloadFailed(rLocalPath, rStorePath, fileSize);
 	}
 }
@@ -1702,7 +1721,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 
 		// Get attributes of local directory
 		BackupClientFileAttributes localAttr;
-		localAttr.ReadAttributes(rLocalDir.c_str(), 
+		localAttr.ReadAttributes(rLocalDir.c_str(),
 			true /* directories have zero mod times */);
 
 		if(attr.Compare(localAttr, true, true /* ignore modification times */))
@@ -1713,7 +1732,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 		else
 		{
 			bool modifiedAfterLastSync = false;
-			
+
 			EMU_STRUCT_STAT st;
 			if(EMU_STAT(rLocalDir.c_str(), &st) == 0)
 			{
@@ -1723,7 +1742,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 					modifiedAfterLastSync = true;
 				}
 			}
-			
+
 			rParams.NotifyDirCompared(rLocalDir, rStoreDir,
 				true, modifiedAfterLastSync);
 		}
@@ -1736,7 +1755,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 		rParams.NotifyLocalDirAccessFailed(rLocalDir, rStoreDir);
 		return;
 	}
-	
+
 	try
 	{
 		// Read the files and directories into sets
@@ -1746,11 +1765,11 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 		while((localDirEn = readdir(dirhandle)) != 0)
 		{
 			// Not . and ..!
-			if(localDirEn->d_name[0] == '.' && 
+			if(localDirEn->d_name[0] == '.' &&
 				(localDirEn->d_name[1] == '\0' || (localDirEn->d_name[1] == '.' && localDirEn->d_name[2] == '\0')))
 			{
 				// ignore, it's . or ..
-				
+
 #ifdef HAVE_VALID_DIRENT_D_TYPE
 				if (localDirEn->d_type != DT_DIR)
 				{
@@ -1760,7 +1779,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 					return;
 				}
 #endif
-				
+
 				continue;
 			}
 
@@ -1790,10 +1809,10 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 						OSFileError, localDirPath);
 				}
 			}
-			
+
 			// Entry -- file or dir?
 			if(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))
-			{	
+			{
 			    // File or symbolic link
 			    localFiles.insert(std::string(localDirEn->d_name));
 			}
@@ -1823,18 +1842,18 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				"'" << rLocalDir << "'");
 		}
 		dirhandle = 0;
-	
+
 		// Do the same for the store directories
 		std::set<std::pair<std::string, BackupStoreDirectory::Entry *> > storeFiles;
 		std::set<std::pair<std::string, BackupStoreDirectory::Entry *> > storeDirs;
-		
+
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *storeDirEn = 0;
 		while((storeDirEn = i.Next()) != 0)
 		{
 			// Decrypt filename
 			BackupStoreFilenameClear name(storeDirEn->GetName());
-		
+
 			// What is it?
 			if((storeDirEn->GetFlags() & BackupStoreDirectory::Entry::Flags_File) == BackupStoreDirectory::Entry::Flags_File)
 			{
@@ -1853,7 +1872,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 #else
 		typedef std::set<std::string>::const_iterator string_set_iter_t;
 #endif
-		
+
 		// Now compare files.
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeFiles.begin(); i != storeFiles.end(); ++i)
 		{
@@ -1863,7 +1882,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			std::string storePath(rStoreDir + "/" + fileName);
 
 			rParams.NotifyFileComparing(localPath, storePath);
-			
+
 			// Does the file exist locally?
 			string_set_iter_t local(localFiles.find(fileName));
 			if(local == localFiles.end())
@@ -1873,7 +1892,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 					storePath);
 			}
 			else
-			{				
+			{
 				CompareOneFile(DirID, i->second, localPath,
 					storePath, rParams);
 
@@ -1881,7 +1900,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				localFiles.erase(local);
 			}
 		}
-		
+
 		// Report any files which exist locally, but not on the store
 		for(string_set_iter_t i = localFiles.begin(); i != localFiles.end(); ++i)
 		{
@@ -1892,7 +1911,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			if(!rParams.IsExcludedFile(localPath))
 			{
 				bool modifiedAfterLastSync = false;
-				
+
 				EMU_STRUCT_STAT st;
 				if(EMU_STAT(localPath.c_str(), &st) == 0)
 				{
@@ -1902,7 +1921,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 						modifiedAfterLastSync = true;
 					}
 				}
-				
+
 				rParams.NotifyRemoteFileMissing(localPath,
 					storePath, modifiedAfterLastSync);
 			}
@@ -1911,12 +1930,12 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				rParams.NotifyExcludedFile(localPath,
 					storePath);
 			}
-		}		
-		
+		}
+
 		// Finished with the files, clear the sets to reduce memory usage slightly
 		localFiles.clear();
 		storeFiles.clear();
-		
+
 		// Now do the directories, recursively to check subdirectories
 		for(std::set<std::pair<std::string, BackupStoreDirectory::Entry *> >::const_iterator i = storeDirs.begin(); i != storeDirs.end(); ++i)
 		{
@@ -1946,12 +1965,12 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 				// Compare directory
 				Compare(i->second->GetObjectID(),
 					storePath, localPath, rParams);
-				
+
 				// Remove from set so that we know it's been compared
 				localDirs.erase(local);
 			}
 		}
-		
+
 		// Report any directories which exist locally, but not on the store
 		for(std::set<std::string>::const_iterator
 			i  = localDirs.begin();
@@ -1964,7 +1983,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			if(!rParams.IsExcludedDir(localPath))
 			{
 				bool modifiedAfterLastSync = false;
-				
+
 				// Check the dir modification time
 				EMU_STRUCT_STAT st;
 				if(EMU_STAT(localPath.c_str(), &st) == 0 &&
@@ -1981,7 +2000,7 @@ void BackupQueries::Compare(int64_t DirID, const std::string &rStoreDir,
 			{
 				rParams.NotifyExcludedDir(localPath, storePath);
 			}
-		}		
+		}
 	}
 	catch(...)
 	{
@@ -2021,14 +2040,13 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	int64_t dirID = 0;
 	if(opts['i'])
 	{
-		// Specified as ID. 
-		dirID = ::strtoll(args[0].c_str(), 0, 16);
-		if(dirID == std::numeric_limits<long long>::min() || dirID == std::numeric_limits<long long>::max() || dirID == 0)
+		// Specified as ID.
+		dirID = ParseObjectIDString(args[0]);
+		if(dirID == -1)
 		{
-			BOX_ERROR("Not a valid object ID (specified in hex): "
-				<< args[0]);
 			return;
 		}
+
 		std::ostringstream oss;
 		oss << BOX_FORMAT_OBJECTID(args[0]);
 		storeDirEncoded = oss.str();
@@ -2041,18 +2059,18 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 #else
 		storeDirEncoded = args[0];
 #endif
-	
+
 		// Look up directory ID
-		dirID = FindDirectoryObjectID(storeDirEncoded, 
-			false /* no old versions */, 
+		dirID = FindDirectoryObjectID(storeDirEncoded,
+			false /* no old versions */,
 			restoreDeleted /* find deleted dirs */);
-	}
-	
-	// Allowable?
-	if(dirID == 0)
-	{
-		BOX_ERROR("Directory '" << args[0] << "' not found on server");
-		return;
+
+		// Allowable?
+		if(dirID == 0)
+		{
+			BOX_ERROR("Directory '" << args[0] << "' not found on server");
+			return;
+		}
 	}
 
 	if(dirID == BackupProtocolListDirectory::RootDirectory)
@@ -2087,10 +2105,10 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		// At TRACE level, we print a line for each file and
 		// directory, so we don't need dots.
 
-		result = BackupClientRestore(mrConnection, dirID, 
-			storeDirEncoded.c_str(), localName.c_str(), 
-			true /* print progress dots */, restoreDeleted, 
-			false /* don't undelete after restore! */, 
+		result = BackupClientRestore(mrConnection, dirID,
+			storeDirEncoded.c_str(), localName.c_str(),
+			true /* print progress dots */, restoreDeleted,
+			false /* don't undelete after restore! */,
 			opts['r'] /* resume? */,
 			opts['f'] /* force continue after errors */);
 	}
@@ -2112,24 +2130,24 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	case Restore_Complete:
 		BOX_INFO("Restore complete.");
 		break;
-	
+
 	case Restore_CompleteWithErrors:
 		BOX_WARNING("Restore complete, but some files could not be "
 			"restored.");
 		break;
-	
+
 	case Restore_ResumePossible:
 		BOX_ERROR("Resume possible -- repeat command with -r flag "
 			"to resume.");
 		SetReturnCode(ReturnCode::Command_Error);
 		break;
-	
+
 	case Restore_TargetExists:
 		BOX_ERROR("The target directory exists. You cannot restore "
 			"over an existing directory.");
 		SetReturnCode(ReturnCode::Command_Error);
 		break;
-		
+
 	case Restore_TargetPathNotFound:
 		BOX_ERROR("The target directory path does not exist.\n"
 			"To restore to a directory whose parent "
@@ -2312,7 +2330,7 @@ void BackupQueries::CommandUndelete(const std::vector<std::string> &args, const 
 	}
 	catch (BoxException &e)
 	{
-		BOX_ERROR("Failed to undelete object: " << 
+		BOX_ERROR("Failed to undelete object: " <<
 			e.what());
 	}
 	catch(std::exception &e)
@@ -2395,7 +2413,7 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	}
 	catch (BoxException &e)
 	{
-		BOX_ERROR("Failed to delete object: " << 
+		BOX_ERROR("Failed to delete object: " <<
 			e.what());
 	}
 	catch(std::exception &e)

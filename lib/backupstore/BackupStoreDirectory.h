@@ -14,7 +14,9 @@
 #include <vector>
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_BackupStoreException.h"
 #include "BackupStoreFilenameClear.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "StreamableMemBlock.h"
 #include "BoxTime.h"
 
@@ -139,6 +141,45 @@ public:
 			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mFlags;
 		}
+		void AssertMutable(BackupStoreRefCountDatabase& rRefCount)
+		{
+			// No need to check parent directories, because other
+			// assertions in BackupStoreContext stop us modifying
+			// anything in a directory that has multiple references.
+
+			if(rRefCount.GetRefCount(mObjectID) != 1)
+			{
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					MultiplyReferencedObject,
+					"Refusing to change flags of multiply "
+					"referenced object " <<
+					BOX_FORMAT_OBJECTID(mObjectID));
+			}
+		}
+		void AddFlags(int16_t Flags,
+			BackupStoreRefCountDatabase& rRefCount)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+
+			if((mFlags & Flags) != Flags)
+			{
+				AssertMutable(rRefCount);
+			}
+
+			mFlags |= Flags;
+		}
+		void RemoveFlags(int16_t Flags,
+			BackupStoreRefCountDatabase& rRefCount)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+
+			if((mFlags & Flags) != 0)
+			{
+				AssertMutable(rRefCount);
+			}
+
+			mFlags &= ~Flags;
+		}
 		void AddFlags(int16_t Flags)
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
@@ -149,6 +190,7 @@ public:
 			ASSERT(!mInvalidated); // Compiled out of release builds
 			mFlags &= ~Flags;
 		}
+
 
 		// Some things can be changed
 		void SetName(const BackupStoreFilename &rNewName)
@@ -420,6 +462,10 @@ public:
 			}
 			// Return entry, and increment
 			return (*(i++));
+		}
+		void Reset()
+		{
+			i = mrDir.mEntries.begin();
 		}
 
 		// WARNING: This function is really very inefficient.

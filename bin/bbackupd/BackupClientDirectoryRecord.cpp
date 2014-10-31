@@ -1763,7 +1763,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					rStoreFilename, diffFromID, *blockIndexStream,
 					connection.GetTimeout(),
 					&rContext, // DiffTimer implementation
-					0 /* not interested in the modification time */, 
+					0 /* not interested in the modification time */,
 					&isCompletelyDifferent,
 					rParams.mpBackgroundTask);
 

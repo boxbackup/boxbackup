@@ -696,7 +696,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 }
 
 #define FMT_OID(x) BOX_FORMAT_OBJECTID(x)
-#define FMT_i      BOX_FORMAT_OBJECTID((*i)->GetObjectID())
+#define FMT(en)    BOX_FORMAT_OBJECTID((en)->GetObjectID())
 
 // --------------------------------------------------------------------------
 //
@@ -721,19 +721,45 @@ bool BackupStoreDirectory::CheckAndFix()
 		std::vector<Entry*>::iterator i(mEntries.begin());
 		for(; i != mEntries.end(); ++i)
 		{
+			bool deleteEntry = false;
 			int64_t dependsNewer = (*i)->GetDependsNewer();
-			if(dependsNewer != 0)
+			if(dependsNewer == (*i)->GetObjectID())
+			{
+				BOX_WARNING("Directory " << FMT(this) << " "
+					"entry " << FMT(*i) << " removed "
+					"because it depends on itself");
+				deleteEntry = true;
+			}
+			else if(dependsNewer != 0)
 			{
 				BackupStoreDirectory::Entry *newerEn = FindEntryByID(dependsNewer);
 				if(newerEn == 0)
 				{
 					// Depends on something, but it isn't there.
-					BOX_WARNING("Entry id " << FMT_i <<
-						" removed because depends "
+					BOX_WARNING("Directory " << FMT(this) << " "
+						"entry " << FMT(*i) << " "
+						"removed because it depends "
 						"on newer version " <<
-						FMT_OID(dependsNewer) <<
-						" which doesn't exist");
+						FMT_OID(dependsNewer) << " "
+						"which doesn't exist");
+					deleteEntry = true;
+				}
+				// Check that newerEn has it marked
+				else if(newerEn->GetDependsOlder() != (*i)->GetObjectID())
+				{
+					// Wrong entry
+					BOX_WARNING("Directory " << FMT(this) << " "
+						"entry " << FMT_OID(dependsNewer) << " "
+						"has wrong DependsOlder value " <<
+						FMT_OID(newerEn->GetDependsOlder()) <<
+						", changing to " << FMT(*i));
+					newerEn->SetDependsOlder((*i)->GetObjectID());
+					// Mark as changed
+					changed = true;
+				}
 
+				if (deleteEntry)
+				{
 					// Remove
 					delete *i;
 					mEntries.erase(i);
@@ -744,23 +770,6 @@ bool BackupStoreDirectory::CheckAndFix()
 					// Start again at the beginning of the vector, the iterator is now invalid
 					restart = true;
 					break;
-				}
-				else
-				{
-					// Check that newerEn has it marked
-					if(newerEn->GetDependsOlder() != (*i)->GetObjectID())
-					{
-						// Wrong entry
-						BOX_TRACE("Entry id " <<
-							FMT_OID(dependsNewer) <<
-							", correcting DependsOlder to " <<
-							FMT_i <<
-							", was " <<
-							FMT_OID(newerEn->GetDependsOlder()));
-						newerEn->SetDependsOlder((*i)->GetObjectID());
-						// Mark as changed
-						changed = true;
-					}
 				}
 			}
 		}
@@ -776,11 +785,11 @@ bool BackupStoreDirectory::CheckAndFix()
 			if(dependsOlder != 0 && FindEntryByID(dependsOlder) == 0)
 			{
 				// Has an older version marked, but this doesn't exist. Remove this mark
-				BOX_TRACE("Entry id " << FMT_i <<
-					" was marked as depended on by " <<
-					FMT_OID(dependsOlder) << ", "
-					"which doesn't exist, dependency "
-					"info cleared");
+				BOX_WARNING("Directory " << FMT(this) << " "
+					"entry " << FMT(*i) << " was marked "
+					"as depended on by " <<
+					FMT_OID(dependsOlder) << " which "
+					"doesn't exist, cleared");
 
 				(*i)->SetDependsOlder(0);
 
@@ -816,7 +825,8 @@ bool BackupStoreDirectory::CheckAndFix()
 			bool removeEntry = false;
 			if((*i) == 0)
 			{
-				BOX_TRACE("Remove because null pointer found");
+				BOX_WARNING("Directory " << FMT(this) << " "
+					"contains null entry, removed");
 				removeEntry = true;
 			}
 			else
@@ -825,25 +835,28 @@ bool BackupStoreDirectory::CheckAndFix()
 				if((*i)->IsDir() && (*i)->IsFile())
 				{
 					// Bad! Unset the file flag
-					BOX_TRACE("Entry " << FMT_i <<
-						": File flag and dir flag both set");
+					BOX_WARNING("Directory " << FMT(this) << " "
+						"entry " << FMT(*i) << " had "
+						"both file and directory flags set");
 					(*i)->RemoveFlags(Entry::Flags_File);
 					changed = true;
 				}
-			
+
 				// Check...
 				if(idsEncountered.find((*i)->GetObjectID()) != idsEncountered.end())
 				{
 					// ID already seen, or type doesn't match
-					BOX_TRACE("Entry " << FMT_i <<
-						": Remove because ID already seen");
+					BOX_WARNING("Directory " << FMT(this) << " "
+						"entry " << FMT(*i) << " removed "
+						"because same ID already seen "
+						"in this directory");
 					removeEntry = true;
 				}
 				else
 				{
 					// Haven't already seen this ID, remember it
 					idsEncountered.insert((*i)->GetObjectID());
-					
+
 					// Check to see if the name has already been encountered -- if not, then it
 					// needs to have the old version flag set
 					if(filenamesEncountered.find((*i)->GetName().GetEncodedFilename()) != filenamesEncountered.end())
@@ -853,8 +866,9 @@ bool BackupStoreDirectory::CheckAndFix()
 							&& ((*i)->GetFlags() & Entry::Flags_Deleted) == 0)
 						{
 							// Not set, set it
-							BOX_TRACE("Entry " << FMT_i <<
-								": Set old flag");
+							BOX_WARNING("Directory " << FMT(this) << " "
+								"entry " << FMT(*i) << " "
+								"was missing Old flag, added");
 							(*i)->AddFlags(Entry::Flags_OldVersion);
 							changed = true;
 						}
@@ -865,12 +879,13 @@ bool BackupStoreDirectory::CheckAndFix()
 						if(((*i)->GetFlags() & Entry::Flags_OldVersion) == Entry::Flags_OldVersion)
 						{
 							// Set, unset it
-							BOX_TRACE("Entry " << FMT_i <<
-								": Old flag unset");
+							BOX_WARNING("Directory " << FMT(this) << " "
+								"entry " << FMT(*i) << " "
+								"had Old flag set, clearing");
 							(*i)->RemoveFlags(Entry::Flags_OldVersion);
 							changed = true;
 						}
-						
+
 						// Remember filename
 						filenamesEncountered.insert((*i)->GetName().GetEncodedFilename());
 					}

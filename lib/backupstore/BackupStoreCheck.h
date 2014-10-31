@@ -97,12 +97,14 @@ private:
 		// Bit mask
 		Flags_IsDir = 1,
 		Flags_IsContained = 2,
+		Flags_IsOld = 4,
+		Flags_IsDeleted = 8,
 		// Mask
-		Flags__MASK = 3,
+		Flags__MASK = 0xf,
 		// Number of bits
-		Flags__NumFlags = 2,
+		Flags__NumFlags = 4,
 		// Items per uint8_t
-		Flags__NumItemsPerEntry = 4	// ie 8 / 2
+		Flags__NumItemsPerEntry = 2 // ie 8 / 4
 	};
 
 	typedef struct

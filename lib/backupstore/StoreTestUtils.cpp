@@ -327,6 +327,8 @@ bool run_housekeeping_and_check_account()
 
 bool check_reference_counts()
 {
+	bool counts_ok = true;
+
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 	BackupStoreAccountDatabase::Entry account =
@@ -334,10 +336,8 @@ bool check_reference_counts()
 
 	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
 		BackupStoreRefCountDatabase::Load(account, true));
-	TEST_EQUAL(ExpectedRefCounts.size(),
-		apReferences->GetLastObjectIDUsed() + 1);
-
-	bool counts_ok = true;
+	TEST_EQUAL_OR(ExpectedRefCounts.size(),
+		apReferences->GetLastObjectIDUsed() + 1, counts_ok = false);
 
 	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
 		i < ExpectedRefCounts.size(); i++)

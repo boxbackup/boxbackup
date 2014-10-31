@@ -1,0 +1,37 @@
+Upgrading to 0.12 from 0.11
+---------------------------
+
+Note the new ExperimentalSnapshotMode feature. It is as experimental as it
+says. Don't be surprised if it breaks your backups.
+
+The feature requires the server to support the new commands required to manage
+snapshots (0.12 or higher), but you can use bbackupd with an older server if
+you don't enable it.
+
+When you enable the snapshot mode, it will create a directory called
+"snapshots" by default in the root directory of the store. You can rename this
+directory with the SnapshotDirName option in bbackupd.conf. In this directory
+a subdirectory will be created for each snapshot backup that runs. It is your
+responsibility to delete snapshots that you no longer want. Otherwise the store
+will fill up and backups will stop running.
+
+If any snapshot directories exist, the most recent one will be cloned to make
+a new snapshot each time a backup begins. If not, then any configured locations
+that exist in the root directory will be cloned into the snapshot directory
+instead. These old location roots (/home, /music etc) will no longer be updated
+while ExperimentalSnapshotMode is enabled. You can delete them to reclaim some
+space, probably around the time that you start deleting your old snapshots. The
+only reason to keep them is in case you decide to stop using snapshots.
+
+When you delete one of these directories (a location root or a snapshot), you
+will automatically, immediately and permanently reclaim any space used by files
+which are only referenced by that snapshot. Files still referenced by other
+snapshots, directories or patches will not be reclaimed. The only way to undo
+deletion of a snapshot is to restore the account from your backups. There is no
+undelete command.
+
+If you have any snapshots in the snapshots directory, and you disable
+ExperimentalSnapshotMode, then your backups will most likely fail when they
+try to modify multiply referenced objects, because it doesn't try to use the
+new commands to make them modifiable again. So you should delete all your
+snapshots if you enable, use and then disable this mode.

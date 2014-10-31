@@ -259,15 +259,40 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 		new BackupProtocolSuccess(mObjectID));
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolStoreFile::DoCommand(Protocol &, BackupStoreContext &)
-//		Purpose: Command to store a file on the server
+//		Name:    BackupProtocolStoreFile::DoCommand(Protocol &,
+//			 BackupStoreContext &)
+//		Purpose: Command to store a file on the server. Any non-Old
+//			 file with the same name will be marked as Old,
+//			 rather than deleted.
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
+	IOStream& rDataStream) const
+{
+	return BackupProtocolStoreFile2(mDirectoryObjectID, mModificationTime,
+		mAttributesHash, mDiffFromFileID, false, // DeleteOldVersions
+		mFilename).DoCommand(rProtocol, rContext, rDataStream);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolStoreFile2::DoCommand(Protocol &,
+//			 BackupStoreContext &)
+//		Purpose: Command to store a file on the server. With this
+//			 version you can control whether a non-Old file with
+//			 the same name will be marked as Old, or deleted.
+//		Created: 2014/10/05
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile2::DoCommand(
 	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext,
 	IOStream& rDataStream) const
 {
@@ -295,13 +320,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 	int64_t id = rContext.AddFile(rDataStream, mDirectoryObjectID,
 		mModificationTime, mAttributesHash, mDiffFromFileID,
 		mFilename,
-		true /* mark files with same name as old versions */);
+		!mDeleteOldVersions /* mark files with same name as old versions */);
 
 	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));
 }
-
-
 
 
 // --------------------------------------------------------------------------

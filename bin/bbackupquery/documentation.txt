@@ -33,6 +33,7 @@ start with '/'. The initial directory is always the root directory.
 
 	List contents of current directory, or specified directory.
 	
+	-i -- list files in directory with this ID, instead of by name
 	-R -- recursively list all files
 	-d -- list deleted files/directories
 	-o -- list old versions of files/directories
@@ -46,7 +47,7 @@ start with '/'. The initial directory is always the root directory.
 	      (only very approximate indication of size locally)
 	-h -- show file attributes hash
 	-D -- sort directories together with files (not dirs first)
-	-i -- sort by object ID (the old default)
+	-j -- sort by object ID (the old default)
 	-S -- sort by object size in blocks
 	-U -- don't sort the results (new default is to sort by name)
 
