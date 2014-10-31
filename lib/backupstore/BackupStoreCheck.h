@@ -131,7 +131,7 @@ private:
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, bool& rIsModified);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
-	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);	
+	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);
 
 	// Fixing functions
 	bool TryToRecreateDirectory(int64_t MissingDirectoryID);

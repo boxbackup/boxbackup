@@ -58,7 +58,7 @@ public:
 		~Entry();
 		Entry(const Entry &rToCopy);
 		Entry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, uint64_t AttributesHash);
-		
+
 		void ReadFromStream(IOStream &rStream, int Timeout);
 		void WriteToStream(IOStream &rStream) const;
 		
@@ -148,7 +148,7 @@ public:
 		StreamableMemBlock mAttributes;
 		uint32_t mMinMarkNumber;
 		uint32_t mMarkNumber;
-		
+
 		uint64_t mDependsNewer;	// new version this depends on
 		uint64_t mDependsOlder;	// older version which depends on this
 	};
@@ -196,7 +196,7 @@ public:
 			: mrDir(rDir), i(rDir.mEntries.begin())
 		{
 		}
-		
+
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
 			// Skip over things which don't match the required flags
@@ -238,7 +238,7 @@ public:
 		const BackupStoreDirectory &mrDir;
 		std::vector<Entry*>::const_iterator i;
 	};
-		
+
 	friend class Iterator;
 
 	class ReverseIterator
@@ -248,7 +248,7 @@ public:
 			: mrDir(rDir), i(rDir.mEntries.rbegin())
 		{
 		}
-		
+
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
 			// Skip over things which don't match the required flags
@@ -264,12 +264,12 @@ public:
 			// Return entry, and increment
 			return (*(i++));
 		}
-	
+
 	private:
 		const BackupStoreDirectory &mrDir;
 		std::vector<Entry*>::const_reverse_iterator i;
 	};
-		
+
 	friend class ReverseIterator;
 
 	// For recovery of the store
@@ -297,4 +297,3 @@ private:
 };
 
 #endif // BACKUPSTOREDIRECTORY__H
-

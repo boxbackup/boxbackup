@@ -243,14 +243,14 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 	// Go and delete items from the accounts
 	bool deleteInterrupted = DeleteFiles(*info);
-	
+
 	// If that wasn't interrupted, remove any empty directories which 
 	// are also marked as deleted in their containing directory
 	if(!deleteInterrupted)
 	{
 		deleteInterrupted = DeleteEmptyDirectories(*info);
 	}
-	
+
 	// Log deletion if anything was deleted
 	if(mFilesDeleted > 0 || mEmptyDirectoriesDeleted > 0)
 	{
@@ -272,17 +272,17 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	}
 	if(mBlocksInOldFilesDelta < (0 - info->GetBlocksInOldFiles()))
 	{
- 		mBlocksInOldFilesDelta = (0 - info->GetBlocksInOldFiles());
+		mBlocksInOldFilesDelta = (0 - info->GetBlocksInOldFiles());
 	}
 	if(mBlocksInDeletedFilesDelta < (0 - info->GetBlocksInDeletedFiles()))
 	{
-	 	mBlocksInDeletedFilesDelta = (0 - info->GetBlocksInDeletedFiles());
+		mBlocksInDeletedFilesDelta = (0 - info->GetBlocksInDeletedFiles());
 	}
 	if(mBlocksInDirectoriesDelta < (0 - info->GetBlocksInDirectories()))
 	{
 		mBlocksInDirectoriesDelta = (0 - info->GetBlocksInDirectories());
 	}
-	
+
 	// Update the usage counts in the store
 	info->ChangeBlocksUsed(mBlocksUsedDelta);
 	info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
@@ -291,7 +291,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 	// Save the store info back
 	info->Save();
-	
+
 	// force file to be saved and closed before releasing the lock below
 	mapNewRefs->Commit();
 	mapNewRefs.reset();
@@ -358,19 +358,19 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 	// Open it.
 	std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet,
 		objectFilename));
-	
+
 	// Add the size of the directory on disc to the size being calculated
 	int64_t originalDirSizeInBlocks = dirStream->GetDiscUsageInBlocks();
 	mBlocksInDirectories += originalDirSizeInBlocks;
 	mBlocksUsed += originalDirSizeInBlocks;
-	
+
 	// Read the directory in
 	BackupStoreDirectory dir;
 	BufferedStream buf(*dirStream);
 	dir.ReadFromStream(buf, IOStream::TimeOutInfinite);
 	dir.SetUserInfo1_SizeInBlocks(originalDirSizeInBlocks);
 	dirStream->Close();
-	
+
 	// Is it empty?
 	if(dir.GetNumberOfEntries() == 0)
 	{
@@ -415,7 +415,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 					
 					// flag as having done something
 					deletedSomething = true;
-					
+
 					// Must start the loop from the beginning again, as iterator is now
 					// probably invalid.
 					break;
@@ -423,7 +423,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			}
 		} while(deletedSomething);
 	}
-	
+
 	// BLOCK
 	{
 		// Add files to the list of potential deletions
@@ -443,9 +443,9 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			int16_t enFlags = en->GetFlags();
 			int64_t enSizeInBlocks = en->GetSizeInBlocks();
 			mBlocksUsed += enSizeInBlocks;
-			if(enFlags & BackupStoreDirectory::Entry::Flags_OldVersion) mBlocksInOldFiles += enSizeInBlocks;
-			if(enFlags & BackupStoreDirectory::Entry::Flags_Deleted) mBlocksInDeletedFiles += enSizeInBlocks;
-					
+			if(en->IsOld()) mBlocksInOldFiles += enSizeInBlocks;
+			if(en->IsDeleted()) mBlocksInDeletedFiles += enSizeInBlocks;
+
 			// Work out ages of this version from the last mark
 			int32_t enVersionAge = 0;
 			std::map<version_t, int32_t>::iterator enVersionAgeI(
@@ -462,9 +462,9 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				markVersionAges[version_t(en->GetName().GetEncodedFilename(), en->GetMarkNumber())] = enVersionAge;
 			}
 			// enVersionAge is now the age of this version.
-			
+
 			// Potentially add it to the list if it's deleted, if it's an old version or deleted
-			if((enFlags & (BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_OldVersion)) != 0)
+			if(en->IsOld() || en->IsDeleted())
 			{
 				// Is deleted / old version.
 				DelEn d;
@@ -473,17 +473,15 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				d.mSizeInBlocks = en->GetSizeInBlocks();
 				d.mMarkNumber = en->GetMarkNumber();
 				d.mVersionAgeWithinMark = enVersionAge;
-				d.mIsFlagDeleted = (enFlags &
-					BackupStoreDirectory::Entry::Flags_Deleted)
-					? true : false;
-				
+				d.mIsFlagDeleted = en->IsDeleted();
+
 				// Add it to the list
 				mPotentialDeletions.insert(d);
-				
+
 				// Update various counts
 				mPotentialDeletionsTotalSize += d.mSizeInBlocks;
 				if(d.mSizeInBlocks > mMaxSizeInPotentialDeletions) mMaxSizeInPotentialDeletions = d.mSizeInBlocks;
-				
+
 				// Too much in the list of potential deletions?
 				// (check against the deletion target + the max size in deletions, so that we never delete things
 				// and take the total size below the deletion size target)
@@ -491,7 +489,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				{
 					int64_t sizeToRemove = mPotentialDeletionsTotalSize - (mDeletionSizeTarget + mMaxSizeInPotentialDeletions);
 					bool recalcMaxSize = false;
-					
+
 					while(sizeToRemove > 0)
 					{
 						// Make iterator for the last element, while checking that there's something there in the first place.
@@ -503,7 +501,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 						}
 						// Make this into an iterator pointing to the last element in the set
 						--i;
-						
+
 						// Delete this one?
 						if(sizeToRemove > i->mSizeInBlocks)
 						{
@@ -521,7 +519,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 							break;
 						}
 					}
-					
+
 					if(recalcMaxSize)
 					{
 						// Because an object which was the maximum size recorded was deleted from the set
@@ -541,14 +539,13 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		}
 	}
 
+	// Recurse into subdirectories
 	{
-		// Recurse into subdirectories
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = 0;
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
-			// Next level
-			ASSERT((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) == BackupStoreDirectory::Entry::Flags_Dir);
+			ASSERT(en->IsDir());
 			
 			if(!ScanDirectory(en->GetObjectID(), rBackupStoreInfo))
 			{
@@ -557,7 +554,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			}
 		}
 	}
-	
+
 	return true;
 }
 
@@ -578,7 +575,7 @@ bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount
 
 	// The sort order here is intended to preserve the entries of most value, that is, the newest objects
 	// which are on a mark boundary.
-	
+
 	// Reverse order age, so oldest goes first
 	if(x.mVersionAgeWithinMark > y.mVersionAgeWithinMark)
 	{
@@ -650,7 +647,7 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 			dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
 			dir.SetUserInfo1_SizeInBlocks(dirStream->GetDiscUsageInBlocks());
 		}
-		
+
 		// Delete the file
 		BackupStoreRefCountDatabase::refcount_t refs =
 			DeleteFile(i->mInDirectory, i->mObjectID, dir,
@@ -729,7 +726,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			mErrorCount++;
 			return refs;
 		}
-		
+
 		// Record the flags it's got set
 		wasDeleted = pentry->IsDeleted();
 		wasOldVersion = pentry->IsOld();
@@ -739,7 +736,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			// Things changed size we were last around
 			return refs;
 		}
-		
+
 		// Record size
 		deletedFileSizeInBlocks = pentry->GetSizeInBlocks();
 
@@ -794,7 +791,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			else
 			{
 				// This entry is in the middle of a chain, and two patches need combining.
-				
+
 				// First, adjust the directory entries
 				BackupStoreDirectory::Entry *pnewer = rDirectory.FindEntryByID(pentry->GetDependsNewer());
 				if(pnewer == 0 || pnewer->GetDependsOlder() != ObjectID
@@ -806,7 +803,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 				pnewer->SetDependsOlder(pentry->GetDependsOlder());
 				polder->SetDependsNewer(pentry->GetDependsNewer());
 			}
-			
+
 			// COMMON CODE to both cases
 
 			// Generate the filename of the older version
@@ -835,7 +832,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 				BackupStoreFile::CombineDiffs(*pobjectBeingDeleted, *pdiff, *pdiff2, *padjustedEntry);
 			}
 			// The file will be committed later when the directory is safely commited.
-			
+
 			// Work out the adjusted size
 			int64_t newSize = padjustedEntry->GetDiscUsageInBlocks();
 			int64_t sizeDelta = newSize - polder->GetSizeInBlocks();
@@ -850,13 +847,13 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			}
 			polder->SetSizeInBlocks(newSize);
 		}
-		
+
 		// pentry no longer valid
 	}
-	
+
 	// Delete it from the directory
 	rDirectory.DeleteEntry(ObjectID);
-	
+
 	// Save directory back to disc
 	// BLOCK
 	{
@@ -884,7 +881,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	if(padjustedEntry.get() != 0)
 	{
 		padjustedEntry->Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-		padjustedEntry.reset();	// delete it now
+		padjustedEntry.reset(); // delete it now
 	}
 
 	// Drop reference count by one. Must now be zero, to delete the file.
@@ -913,7 +910,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		mBlocksInOldFilesDelta -= deletedFileSizeInBlocks;
 		rBackupStoreInfo.AdjustNumOldFiles(-1);
 	}
-	
+
 	// Delete the directory?
 	// Do this if... dir has zero entries, and is marked as deleted in it's containing directory
 	if(rDirectory.GetNumberOfEntries() == 0)
@@ -1040,7 +1037,7 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories(BackupStoreInfo& rBackupStore
 		// Swap in new, so it's examined next time round
 		mEmptyDirectories.swap(toExamine);
 	}
-	
+
 	// Not interrupted
 	return false;
 }

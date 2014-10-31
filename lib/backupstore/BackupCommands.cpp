@@ -93,7 +93,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 	// and that the client actually has an account on this machine
 	if(mClientID != rContext.GetClientID())
 	{
-		BOX_WARNING("Failed login from client ID " << 
+		BOX_WARNING("Failed login from client ID " <<
 			BOX_FORMAT_ACCOUNT(mClientID) << ": "
 			"wrong certificate for this account");
 		return PROTOCOL_ERROR(Err_BadLogin);
@@ -101,7 +101,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 
 	if(!rContext.GetClientHasAccount())
 	{
-		BOX_WARNING("Failed login from client ID " << 
+		BOX_WARNING("Failed login from client ID " <<
 			BOX_FORMAT_ACCOUNT(mClientID) << ": "
 			"no such account on this server");
 		return PROTOCOL_ERROR(Err_BadLogin);
@@ -117,17 +117,17 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 				BOX_FORMAT_ACCOUNT(mClientID));
 			return PROTOCOL_ERROR(Err_CannotLockStoreForWriting);
 		}
-		
+
 		// Debug: check we got the lock
 		ASSERT(!rContext.SessionIsReadOnly());
 	}
-	
+
 	// Load the store info
 	rContext.LoadStoreInfo();
 
 	if(!rContext.GetBackupStoreInfo().IsAccountEnabled())
 	{
-		BOX_WARNING("Refused login from disabled client ID " << 
+		BOX_WARNING("Refused login from disabled client ID " <<
 			BOX_FORMAT_ACCOUNT(mClientID));
 		return PROTOCOL_ERROR(Err_DisabledAccount);
 	}
@@ -137,9 +137,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 
 	// Mark the next phase
 	rContext.SetPhase(BackupStoreContext::Phase_Commands);
-	
+
 	// Log login
-	BOX_NOTICE("Login from Client ID " << 
+	BOX_NOTICE("Login from Client ID " <<
 		BOX_FORMAT_ACCOUNT(mClientID) << " "
 		"(name=" << rContext.GetAccountName() << "): " <<
 		(((mFlags & Flags_ReadOnly) != Flags_ReadOnly)
@@ -166,7 +166,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 {
 	// can be called in any phase
 
-	BOX_NOTICE("Session finished for Client ID " << 
+	BOX_NOTICE("Session finished for Client ID " <<
 		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
 		"(name=" << rContext.GetAccountName() << ")");
 
@@ -197,11 +197,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 		// Ask the context for a directory
 		const BackupStoreDirectory &rdir(
 			rContext.GetDirectory(mObjectID));
-		rdir.WriteToStream(*stream, mFlagsMustBeSet, 
+		rdir.WriteToStream(*stream, mFlagsMustBeSet,
 			mFlagsNotToBeSet, mSendAttributes,
 			false /* never send dependency info to the client */);
 	}
-	catch (RaidFileException &e)
+	catch(RaidFileException &e)
 	{
 		if (e.GetSubType() == RaidFileException::RaidFileDoesntExist)
 		{
@@ -211,7 +211,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolListDirectory::DoCommand(Back
 	}
 
 	stream->SetForReading();
-	
+
 	// Get the protocol to send the stream
 	rProtocol.SendStreamAfterCommand(static_cast< std::auto_ptr<IOStream> > (stream));
 
@@ -240,7 +240,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 	{
 		return hookResult;
 	}
-	
+
 	// Check that the diff from file actually exists, if it's specified
 	if(mDiffFromFileID != 0)
 	{
@@ -250,7 +250,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 			return PROTOCOL_ERROR(Err_DiffFromFileDoesNotExist);
 		}
 	}
-	
+
 	// Ask the context to store it
 	int64_t id = 0;
 	try
@@ -275,7 +275,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolStoreFile::DoCommand(
 			throw;
 		}
 	}
-	
+
 	// Tell the caller what the file ID was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(id));
 }
@@ -315,7 +315,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObject::DoCommand(BackupPr
 //
 // Function
 //		Name:    BackupProtocolGetFile::DoCommand(Protocol &, BackupStoreContext &)
-//		Purpose: Command to get an file object from the server -- may have to do a bit of 
+//		Purpose: Command to get an file object from the server -- may have to do a bit of
 //				 work to get the object.
 //		Created: 2003/09/03
 //
@@ -357,13 +357,13 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 			en = rdir.FindEntryByID(id);
 			if(en == 0)
 			{
-				BOX_ERROR("Object " << 
+				BOX_ERROR("Object " <<
 					BOX_FORMAT_OBJECTID(mObjectID) <<
-					" in dir " << 
+					" in dir " <<
 					BOX_FORMAT_OBJECTID(mInDirectory) <<
 					" for account " <<
 					BOX_FORMAT_ACCOUNT(rContext.GetClientID()) <<
-					" references object " << 
+					" references object " <<
 					BOX_FORMAT_OBJECTID(id) <<
 					" which does not exist in dir");
 				return PROTOCOL_ERROR(Err_PatchConsistencyError);
@@ -371,73 +371,73 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 			id = en->GetDependsNewer();
 		}
 		while(en != 0 && id != 0);
-		
+
 		// OK! The last entry in the chain is the full file, the others are patches back from it.
 		// Open the last one, which is the current from file
 		std::auto_ptr<IOStream> from(rContext.OpenObject(patchChain[patchChain.size() - 1]));
-		
+
 		// Then, for each patch in the chain, do a combine
 		for(int p = ((int)patchChain.size()) - 2; p >= 0; --p)
 		{
 			// ID of patch
 			int64_t patchID = patchChain[p];
-			
+
 			// Open it a couple of times
 			std::auto_ptr<IOStream> diff(rContext.OpenObject(patchID));
 			std::auto_ptr<IOStream> diff2(rContext.OpenObject(patchID));
-			
+
 			// Choose a temporary filename for the result of the combination
 			std::ostringstream fs;
 			fs << rContext.GetAccountRoot() << ".recombinetemp." << p;
-			std::string tempFn = 
+			std::string tempFn =
 				RaidFileController::DiscSetPathToFileSystemPath(
 					rContext.GetStoreDiscSet(), fs.str(),
 					p + 16);
-			
+
 			// Open the temporary file
 			std::auto_ptr<IOStream> combined(
 				new InvisibleTempFileStream(
 					tempFn, O_RDWR | O_CREAT | O_EXCL |
 					O_BINARY | O_TRUNC));
-			
+
 			// Do the combining
 			BackupStoreFile::CombineFile(*diff, *diff2, *from, *combined);
-			
+
 			// Move to the beginning of the combined file
 			combined->Seek(0, IOStream::SeekType_Absolute);
-			
+
 			// Then shuffle round for the next go
 			if (from.get()) from->Close();
 			from = combined;
 		}
-		
+
 		// Now, from contains a nice file to send to the client. Reorder it
 		{
 			// Write nastily to allow this to work with gcc 2.x
 			std::auto_ptr<IOStream> t(BackupStoreFile::ReorderFileToStreamOrder(from.get(), true /* take ownership */));
 			stream = t;
 		}
-		
+
 		// Release from file to avoid double deletion
 		from.release();
 	}
 	else
 	{
 		// Simple case: file already exists on disc ready to go
-	
+
 		// Open the object
 		std::auto_ptr<IOStream> object(rContext.OpenObject(mObjectID));
 		BufferedStream buf(*object);
-		
+
 		// Verify it
 		if(!BackupStoreFile::VerifyEncodedFileFormat(buf))
 		{
 			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
 		}
-		
+
 		// Reset stream -- seek to beginning
 		object->Seek(0, IOStream::SeekType_Absolute);
-		
+
 		// Reorder the stream/file into stream order
 		{
 			// Write nastily to allow this to work with gcc 2.x
@@ -445,15 +445,15 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProt
 			stream = t;
 		}
 
-		// Object will be deleted when the stream is deleted, 
-		// so can release the object auto_ptr here to avoid 
+		// Object will be deleted when the stream is deleted,
+		// so can release the object auto_ptr here to avoid
 		// premature deletion
 		object.release();
 	}
 
 	// Stream the reordered stream to the peer
 	rProtocol.SendStreamAfterCommand(stream);
-	
+
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
 }
@@ -493,12 +493,12 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolCreateDirectory2::DoCommand(
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
-	
-	// Collect the attributes -- do this now so no matter what the outcome, 
+
+	// Collect the attributes -- do this now so no matter what the outcome,
 	// the data has been absorbed.
 	StreamableMemBlock attr;
 	attr.Set(rDataStream, rProtocol.GetTimeout());
-	
+
 	// Check to see if the hard limit has been exceeded
 	if(rContext.HardLimitExceeded())
 	{
@@ -553,7 +553,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolChangeDirAttributes::DoComman
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	// Collect the attributes -- do this now so no matter what the outcome, 
+	// Collect the attributes -- do this now so no matter what the outcome,
 	// the data has been absorbed.
 	StreamableMemBlock attr;
 	attr.Set(rDataStream, rProtocol.GetTimeout());
@@ -582,7 +582,7 @@ BackupProtocolSetReplacementFileAttributes::DoCommand(
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
 
-	// Collect the attributes -- do this now so no matter what the outcome, 
+	// Collect the attributes -- do this now so no matter what the outcome,
 	// the data has been absorbed.
 	StreamableMemBlock attr;
 	attr.Set(rDataStream, rProtocol.GetTimeout());
@@ -598,7 +598,6 @@ BackupProtocolSetReplacementFileAttributes::DoCommand(
 	// Tell the caller what the file was
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));
 }
-
 
 
 // --------------------------------------------------------------------------
@@ -671,7 +670,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectory::DoCommand(Ba
 	{
 		rContext.DeleteDirectory(mObjectID);
 	}
-	catch (BackupStoreException &e)
+	catch(BackupStoreException &e)
 	{
 		if(e.GetSubType() == BackupStoreException::MultiplyReferencedObject)
 		{
@@ -745,7 +744,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolMoveObject::DoCommand(BackupP
 {
 	CHECK_PHASE(Phase_Commands)
 	CHECK_WRITEABLE_SESSION
-	
+
 	// Let context do this, but modify error reporting on exceptions...
 	try
 	{
@@ -785,21 +784,21 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolMoveObject::DoCommand(BackupP
 std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
-	
+
 	// Create a stream for the list of filenames
 	std::auto_ptr<CollectInBufferStream> stream(new CollectInBufferStream);
 
 	// Object and directory IDs
 	int64_t objectID = mObjectID;
 	int64_t dirID = mContainingDirectoryID;
-	
+
 	// Data to return in the reply
 	int32_t numNameElements = 0;
 	int16_t objectFlags = 0;
 	int64_t modTime = 0;
 	uint64_t attrModHash = 0;
 	bool haveModTimes = false;
-	
+
 	do
 	{
 		// Check the directory really exists
@@ -822,13 +821,13 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(Back
 				// Abort!
 				return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolObjectName(BackupProtocolObjectName::NumNameElements_ObjectDoesntExist, 0, 0, 0));
 			}
-			
+
 			// Store flags?
 			if(objectFlags == 0)
 			{
 				objectFlags = en->GetFlags();
 			}
-			
+
 			// Store modification times?
 			if(!haveModTimes)
 			{
@@ -836,14 +835,14 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(Back
 				attrModHash = en->GetAttributesHash();
 				haveModTimes = true;
 			}
-			
+
 			// Store the name in the stream
 			en->GetName().WriteToStream(*stream);
-			
+
 			// Count of name elements
 			++numNameElements;
 		}
-		
+
 		// Setup for next time round
 		objectID = dirID;
 		dirID = rdir.GetContainerID();
@@ -854,7 +853,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(Back
 	if(numNameElements > 0)
 	{
 		// Get the stream ready to go
-		stream->SetForReading();	
+		stream->SetForReading();
 		// Tell the protocol to send the stream
 		rProtocol.SendStreamAfterCommand(static_cast< std::auto_ptr<IOStream> >(stream));
 	}
@@ -879,10 +878,10 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByID::DoCommand(
 
 	// Open the file
 	std::auto_ptr<IOStream> stream(rContext.OpenObject(mObjectID));
-	
+
 	// Move the file pointer to the block index
 	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
-	
+
 	// Return the stream to the client
 	rProtocol.SendStreamAfterCommand(stream);
 
@@ -905,7 +904,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoComman
 
 	// Get the directory
 	const BackupStoreDirectory &dir(rContext.GetDirectory(mInDirectory));
-	
+
 	// Find the latest object ID within it which has the same name
 	int64_t objectID = 0;
 	BackupStoreDirectory::Iterator i(dir);
@@ -921,7 +920,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoComman
 			}
 		}
 	}
-	
+
 	// Found anything?
 	if(objectID == 0)
 	{
@@ -931,10 +930,10 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoComman
 
 	// Open the file
 	std::auto_ptr<IOStream> stream(rContext.OpenObject(objectID));
-	
+
 	// Move the file pointer to the block index
 	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
-	
+
 	// Return the stream to the client
 	rProtocol.SendStreamAfterCommand(stream);
 
@@ -957,11 +956,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage::DoCommand(Ba
 
 	// Get store info from context
 	const BackupStoreInfo &rinfo(rContext.GetBackupStoreInfo());
-	
+
 	// Find block size
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(rinfo.GetDiscSetNumber()));
-	
+
 	// Return info
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolAccountUsage(
 		rinfo.GetBlocksUsed(),
@@ -1007,11 +1006,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 
 	// Get store info from context
 	const BackupStoreInfo &info(rContext.GetBackupStoreInfo());
-	
+
 	// Find block size
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(info.GetDiscSetNumber()));
-	
+
 	// Return info
 	BackupProtocolAccountUsage2* usage = new BackupProtocolAccountUsage2();
 	std::auto_ptr<BackupProtocolMessage> reply(usage);
@@ -1036,4 +1035,3 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 
 	return reply;
 }
-

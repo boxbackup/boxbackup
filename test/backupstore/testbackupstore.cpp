@@ -641,7 +641,6 @@ void check_dir_after_uploads(BackupProtocolCallable &protocol,
 	TEST_THAT(en == 0);
 }
 
-
 typedef struct
 {
 	int objectsNotDel;
@@ -1159,7 +1158,7 @@ int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 		subdirid,
 		modtime,
 		modtime, /* use for attr hash too */
-		0,							/* diff from ID */
+		0, /* diff from ID */
 		remote_filename_encoded,
 		upload));
 
@@ -1213,11 +1212,10 @@ bool test_multiple_uploads()
 	for(int l = 0; l < 3; ++l)
 	{
 		// Command
-		std::auto_ptr<BackupProtocolSuccess> dirreply(
-			apProtocol->QueryListDirectory(
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+		apProtocol->QueryListDirectory(
+			BACKUPSTORE_ROOT_DIRECTORY_ID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */);
 		// Stream
 		BackupStoreDirectory dir(apProtocol->ReceiveStream(),
 			apProtocol->GetTimeout());
@@ -1226,12 +1224,11 @@ bool test_multiple_uploads()
 
 	// Read the dir from the readonly connection (make sure it gets in the cache)
 	// Command
-	std::auto_ptr<BackupProtocolSuccess> dirreply(
-		protocolReadOnly.QueryListDirectory(
-			BACKUPSTORE_ROOT_DIRECTORY_ID,
-			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-			false /* no attributes */));
+	protocolReadOnly.QueryListDirectory(
+		BACKUPSTORE_ROOT_DIRECTORY_ID,
+		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		false /* no attributes */);
 	// Stream
 	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 		protocolReadOnly.GetTimeout());
@@ -1501,11 +1498,11 @@ bool test_server_commands()
 		BOX_TRACE("Checking root directory using read-only connection");
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(
-				protocolReadOnly.QueryListDirectory(
-					BACKUPSTORE_ROOT_DIRECTORY_ID,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */)); // Stream
+			protocolReadOnly.QueryListDirectory(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes! */); // Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
 
@@ -1541,12 +1538,12 @@ bool test_server_commands()
 		BOX_TRACE("Checking subdirectory using read-only connection");
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(
+			TEST_EQUAL(subdirid,
 				protocolReadOnly.QueryListDirectory(
 					subdirid,
 					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, true /* get attributes */));
-			TEST_THAT(dirreply->GetObjectID() == subdirid);
+					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+					true /* get attributes */)->GetObjectID());
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
 			TEST_THAT(dir.GetNumberOfEntries() == 1);
@@ -1575,10 +1572,11 @@ bool test_server_commands()
 		BOX_TRACE("Checking that we don't get attributes if we don't ask for them");
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					subdirid,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes! */));
+			protocolReadOnly.QueryListDirectory(
+				subdirid,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes! */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
@@ -1604,10 +1602,11 @@ bool test_server_commands()
 		// Check the new attributes
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					subdirid,
-					0,	// no flags
-					BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING, true /* get attributes */));
+			protocolReadOnly.QueryListDirectory(
+				subdirid,
+				0,	// no flags
+				BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING,
+				true /* get attributes */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
@@ -1713,10 +1712,11 @@ bool test_server_commands()
 			BackupStoreFilenameClear lookFor("moved-files-x");
 
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					subdirid,
-					BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+			protocolReadOnly.QueryListDirectory(
+				subdirid,
+				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes */);
 
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
@@ -1871,10 +1871,12 @@ bool test_server_commands()
 		// Get the root dir, checking for deleted items
 		{
 			// Command
-			std::auto_ptr<BackupProtocolSuccess> dirreply(protocolReadOnly.QueryListDirectory(
-					BACKUPSTORE_ROOT_DIRECTORY_ID,
-					BackupProtocolListDirectory::Flags_Dir | BackupProtocolListDirectory::Flags_Deleted,
-					BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+			protocolReadOnly.QueryListDirectory(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				BackupProtocolListDirectory::Flags_Dir |
+				BackupProtocolListDirectory::Flags_Deleted,
+				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+				false /* no attributes */);
 			// Stream
 			BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
 				SHORT_TIMEOUT);
@@ -2458,7 +2460,6 @@ bool test_login_with_disabled_account()
 	// make sure something is written to it
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-
 	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
 		BackupStoreRefCountDatabase::Load(
 			apAccounts->GetEntry(0x1234567), true));

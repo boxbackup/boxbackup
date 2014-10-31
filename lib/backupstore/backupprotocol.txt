@@ -159,6 +159,7 @@ ChangeDirAttributes	22	Command(Success)	StreamWithCommand
 DeleteDirectory	23	Command(Success)
 	int64		ObjectID
 
+
 UndeleteDirectory	24	Command(Success)
 	int64		ObjectID
 	# may not have exactly the desired effect if files within in have been deleted before the directory was deleted.

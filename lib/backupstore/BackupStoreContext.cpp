@@ -159,7 +159,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 
 	// Request the lock
 	bool gotLock = mWriteLock.TryAndGetLock(writeLockFile.c_str(), 0600 /* restrictive file permissions */);
-	
+
 	if(!gotLock && mpHousekeeping)
 	{
 		// The housekeeping process might have the thing open -- ask it to stop
@@ -167,7 +167,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 		int msgLen = sprintf(msg, "r%x\n", mClientID);
 		// Send message
 		mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
-		
+
 		// Then try again a few times
 		int tries = MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT;
 		do
@@ -175,16 +175,16 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 			::sleep(1 /* second */);
 			--tries;
 			gotLock = mWriteLock.TryAndGetLock(writeLockFile.c_str(), 0600 /* restrictive file permissions */);
-			
+
 		} while(!gotLock && tries > 0);
 	}
-	
+
 	if(gotLock)
 	{
 		// Got the lock, mark as not read only
 		mReadOnly = false;
 	}
-	
+
 	return gotLock;
 }
 
@@ -203,16 +203,16 @@ void BackupStoreContext::LoadStoreInfo()
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoAlreadyLoaded)
 	}
-	
+
 	// Load it up!
 	std::auto_ptr<BackupStoreInfo> i(BackupStoreInfo::Load(mClientID, mAccountRootDir, mStoreDiscSet, mReadOnly));
-	
+
 	// Check it
 	if(i->GetAccountID() != mClientID)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoForWrongAccount)
 	}
-	
+
 	// Keep the pointer to it
 	mapStoreInfo = i;
 
@@ -264,7 +264,7 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 		}
 	}
 
-	// Want to save now	
+	// Want to save now
 	mapStoreInfo->Save();
 
 	// Set count for next delay
@@ -332,9 +332,9 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 		delete item->second;
 		mDirectoryCache.erase(item);
 	}
-	
+
 	// Need to load it up
-	
+
 	// First check to see if the cache is too big
 	if(mDirectoryCache.size() > MAX_CACHE_SIZE)
 	{
@@ -406,12 +406,12 @@ int64_t BackupStoreContext::AllocateObjectID()
 	// to try for finding an unused ID.
 	// (Sizes used in the store info are fixed by the housekeeping process)
 	int retryLimit = (STORE_INFO_SAVE_DELAY * 2);
-	
+
 	while(retryLimit > 0)
 	{
 		// Attempt to allocate an ID from the store
 		int64_t id = mapStoreInfo->AllocateObjectID();
-		
+
 		// Generate filename
 		std::string filename;
 		MakeObjectFilename(id, filename);
@@ -421,17 +421,17 @@ int64_t BackupStoreContext::AllocateObjectID()
 			// Success!
 			return id;
 		}
-		
+
 		// Decrement retry count, and try again
 		--retryLimit;
-		
+
 		// Mark that the store info should be saved as soon as possible
 		mSaveStoreInfoDelay = 0;
-		
+
 		BOX_WARNING("When allocating object ID, found that " <<
 			BOX_FORMAT_OBJECTID(id) << " is already in use");
 	}
-	
+
 	THROW_EXCEPTION(BackupStoreException, CouldNotFindUnusedIDDuringAllocation)
 }
 
@@ -470,13 +470,13 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	// be corrected the next time the account has a housekeeping run,
 	// and the object ID allocation code is tolerant of missed IDs.
 	// (the info is written lazily, so these are necessary)
-	
+
 	// Get the directory we want to modify
 	BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
-	
+
 	// Allocate the next ID
 	int64_t id = AllocateObjectID();
-	
+
 	// Stream the file to disc
 	std::string fn;
 	MakeObjectFilename(id, fn, true /* make sure the directory it's in exists */);
@@ -509,12 +509,12 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			{
 				THROW_EXCEPTION(BackupStoreException, DiffFromIDNotFoundInDirectory)
 			}
-		
+
 			// Diff file, needs to be recreated.
 			// Choose a temporary filename.
 			std::string tempFn(RaidFileController::DiscSetPathToFileSystemPath(mStoreDiscSet, fn + ".difftemp",
 				1 /* NOT the same disc as the write file, to avoid using lots of space on the same disc unnecessarily */));
-			
+
 			try
 			{
 				// Open it twice
@@ -533,13 +533,13 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 					THROW_EXCEPTION(CommonException, OSFileError);
 				}
 #endif
-				
+
 				// Stream the incoming diff to this temporary file
 				if(!rFile.CopyStreamTo(diff, BACKUP_STORE_TIMEOUT))
 				{
 					THROW_EXCEPTION(BackupStoreException, ReadFileFromStreamTimedOut)
 				}
-				
+
 				// Verify the diff
 				diff.Seek(0, IOStream::SeekType_Absolute);
 				if(!BackupStoreFile::VerifyEncodedFileFormat(diff))
@@ -553,7 +553,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 				// Filename of the old version
 				std::string oldVersionFilename;
 				MakeObjectFilename(DiffFromFileID, oldVersionFilename, false /* no need to make sure the directory it's in exists */);
-				
+
 				// Reassemble that diff -- open previous file, and combine the patch and file
 				std::auto_ptr<RaidFileRead> from(RaidFileRead::Open(mStoreDiscSet, oldVersionFilename));
 				BackupStoreFile::CombineFile(diff, diff2, *from, storeFile);
@@ -566,10 +566,10 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 				diff.Seek(0, IOStream::SeekType_Absolute);
 				BackupStoreFile::ReverseDiffFile(diff, *from, *from2, *ppreviousVerStoreFile,
 						DiffFromFileID, &reversedDiffIsCompletelyDifferent);
-				
+
 				// Store disc space used
 				oldVersionNewBlocksUsed = ppreviousVerStoreFile->GetDiscUsageInBlocks();
-				
+
 				// And make a space adjustment for the size calculation
 				spaceSavedByConversionToPatch =
 					from->GetDiscUsageInBlocks() - 
@@ -595,13 +595,13 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 				throw;
 			}
 		}
-		
+
 		// Get the blocks used
 		newObjectBlocksUsed = storeFile.GetDiscUsageInBlocks();
 		adjustment.mBlocksUsed += newObjectBlocksUsed;
 		adjustment.mBlocksInCurrentFiles += newObjectBlocksUsed;
 		adjustment.mNumCurrentFiles++;
-		
+
 		// Exceeds the hard limit?
 		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
 			adjustment.mBlocksUsed;
@@ -637,7 +637,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			// Error! Delete the file
 			RaidFileWrite del(mStoreDiscSet, fn);
 			del.Delete();
-			
+
 			// Exception
 			THROW_EXCEPTION(BackupStoreException, AddedFileDoesNotVerify)
 		}
@@ -665,7 +665,6 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		if(MarkFileWithSameNameAsOldVersions)
 		{
 			BackupStoreDirectory::Iterator i(dir);
-
 			BackupStoreDirectory::Entry *e = 0;
 			while((e = i.Next()) != 0)
 			{
@@ -824,7 +823,7 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 					mapStoreInfo->AdjustNumCurrentFiles(-1);
 					mapStoreInfo->ChangeBlocksInCurrentFiles(-blocks);
 				}
-					
+
 				// Is this the last version?
 				if((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0)
 				{
@@ -834,7 +833,7 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				}
 			}
 		}
-		
+
 		// Save changes?
 		if(madeChanges)
 		{
@@ -1124,7 +1123,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		dirSize = dirFile.GetDiscUsageInBlocks();
 
 		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() + 
+		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
 			dirSize;
 		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
 		{
@@ -1204,7 +1203,7 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 		{
 			// In block, because dir may not be valid after the delete directory call
 			BackupStoreDirectory &dir(GetDirectoryInternal(ObjectID));
-			
+
 			// Store the directory it's in for later
 			InDirectory = dir.GetContainerID();
 		
@@ -1297,20 +1296,20 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 			// Done with the directory for now. Recurse to sub directories
 			for(std::vector<int64_t>::const_iterator i = subDirs.begin(); i != subDirs.end(); ++i)
 			{
-				DeleteDirectoryRecurse(*i, Undelete);	
+				DeleteDirectoryRecurse(*i, Undelete);
 			}
 		}
-		
+
 		// Then, delete the files. Will need to load the directory again because it might have
 		// been removed from the cache.
 		{
 			// Get the directory...
 			BackupStoreDirectory &dir(GetDirectoryInternal(ObjectID));
-	
+
 			// Changes made?
 			bool changesMade = false;
-	
-			// Run through files		
+
+			// Run through files
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *en = 0;
 
@@ -1346,7 +1345,7 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 				// Did something
 				changesMade = true;
 			}
-			
+
 			// Save the directory
 			if(changesMade)
 			{
@@ -1383,13 +1382,13 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 	}
 
 	try
-	{	
+	{
 		// Get the directory we want to modify
 		BackupStoreDirectory &dir(GetDirectoryInternal(Directory));
-	
+
 		// Set attributes
 		dir.SetAttributes(Attributes, AttributesModTime);
-		
+
 		// Save back
 		SaveDirectory(dir);
 	}
@@ -1423,7 +1422,7 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 	{
 		// Get the directory we want to modify
 		BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
-	
+
 		// Find the file entry
 		BackupStoreDirectory::Entry *en = 0;
 		// Iterate through current versions of files, only
@@ -1437,10 +1436,10 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 			{
 				// Set attributes
 				en->SetAttributes(Attributes, AttributesHash);
-				
+
 				// Tell caller the object ID
 				rObjectIDOut = en->GetObjectID();
-				
+
 				// Done
 				break;
 			}
@@ -1450,7 +1449,7 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 			// Didn't find it
 			return false;
 		}
-	
+
 		// Save back
 		SaveDirectory(dir);
 	}
@@ -1459,7 +1458,7 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 		RemoveDirectoryFromCache(InDirectory);
 		throw;
 	}
-	
+
 	// Changed, everything OK
 	return true;
 }
@@ -1479,7 +1478,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
-	
+
 	// Note that we need to allow object IDs a little bit greater than the last one in the store info,
 	// because the store info may not have got saved in an error condition. Max greater ID is
 	// STORE_INFO_SAVE_DELAY in this case, *2 to be safe.
@@ -1488,7 +1487,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 		// Obviously bad object ID
 		return false;
 	}
-	
+
 	// Test to see if it exists on the disc
 	std::string filename;
 	MakeObjectFilename(ObjectID, filename);
@@ -1497,7 +1496,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 		// RaidFile reports no file there
 		return false;
 	}
-	
+
 	// Do we need to be more specific?
 	if(MustBe != ObjectExists_Anything)
 	{
@@ -1522,16 +1521,16 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 
 		// Right one?
 		u_int32_t requiredMagic = (MustBe == ObjectExists_File)?OBJECTMAGIC_FILE_MAGIC_VALUE_V1:OBJECTMAGIC_DIR_MAGIC_VALUE;
-	
+
 		// Check
 		if(ntohl(magic) != requiredMagic)
 		{
 			return false;
 		}
-		
+
 		// File is implicitly closed
 	}
-	
+
 	return true;
 }
 
@@ -1550,7 +1549,7 @@ std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
-	
+
 	// Attempt to open the file
 	std::string fn;
 	MakeObjectFilename(ObjectID, fn);
@@ -1572,7 +1571,7 @@ int64_t BackupStoreContext::GetClientStoreMarker()
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
-	
+
 	return mapStoreInfo->GetClientStoreMarker();
 }
 
@@ -1635,7 +1634,7 @@ void BackupStoreContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
-	
+
 	mapStoreInfo->SetClientStoreMarker(ClientStoreMarker);
 	SaveStoreInfo(false /* don't delay saving this */);
 }
@@ -1662,7 +1661,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 	int64_t targetSearchExcludeFlags = (AllowMoveOverDeletedObject)
 		?(BackupStoreDirectory::Entry::Flags_Deleted)
 		:(BackupStoreDirectory::Entry::Flags_EXCLUDE_NOTHING);
-	
+
 	// Special case if the directories are the same...
 	if(MoveFromDirectory == MoveToDirectory)
 	{
@@ -1670,16 +1669,16 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		{
 			// Get the first directory
 			BackupStoreDirectory &dir(GetDirectoryInternal(MoveFromDirectory));
-		
+
 			// Find the file entry
 			BackupStoreDirectory::Entry *en = dir.FindEntryByID(ObjectID);
-	
+
 			// Error if not found
 			if(en == 0)
 			{
 				THROW_EXCEPTION(BackupStoreException, CouldNotFindEntryInDirectory)
 			}
-			
+
 			// Check the new name doens't already exist (optionally ignoring deleted files)
 			{
 				BackupStoreDirectory::Iterator i(dir);
@@ -1692,7 +1691,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 					}
 				}
 			}
-			
+
 			// Need to get all the entries with the same name?
 			if(MoveAllWithSameName)
 			{
@@ -1713,7 +1712,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				// Just copy this one
 				en->SetName(rNewFilename);
 			}
-			
+
 			// Save the directory back
 			SaveDirectory(dir);
 		}
@@ -1722,7 +1721,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			RemoveDirectoryFromCache(MoveToDirectory); // either will do, as they're the same
 			throw;
 		}
-	
+
 		return;
 	}
 
@@ -1732,27 +1731,27 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 
 	// List of entries to move
 	std::vector<BackupStoreDirectory::Entry *> moving;
-	
+
 	// list of directory IDs which need to have containing dir id changed
 	std::vector<int64_t> dirsToChangeContainingID;
 
 	try
 	{
 		// First of all, get copies of the entries to move to the to directory.
-		
+
 		{
 			// Get the first directory
 			BackupStoreDirectory &from(GetDirectoryInternal(MoveFromDirectory));
-		
+
 			// Find the file entry
 			BackupStoreDirectory::Entry *en = from.FindEntryByID(ObjectID);
-	
+
 			// Error if not found
 			if(en == 0)
 			{
 				THROW_EXCEPTION(BackupStoreException, CouldNotFindEntryInDirectory)
 			}
-			
+
 			// Need to get all the entries with the same name?
 			if(MoveAllWithSameName)
 			{
@@ -1765,7 +1764,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 					{
 						// Copy
 						moving.push_back(new BackupStoreDirectory::Entry(*c));
-						
+
 						// Check for containing directory correction
 						if(c->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) dirsToChangeContainingID.push_back(c->GetObjectID());
 					}
@@ -1781,13 +1780,13 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				if(en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) dirsToChangeContainingID.push_back(en->GetObjectID());
 			}
 		}
-		
+
 		// Secondly, insert them into the to directory, and save it
-		
+
 		{
 			// To directory
 			BackupStoreDirectory &to(GetDirectoryInternal(MoveToDirectory));
-	
+
 			// Check the new name doens't already exist
 			{
 				BackupStoreDirectory::Iterator i(to);
@@ -1800,7 +1799,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 					}
 				}
 			}
-			
+
 			// Copy the entries into it, changing the name as we go
 			for(std::vector<BackupStoreDirectory::Entry *>::iterator i(moving.begin()); i != moving.end(); ++i)
 			{
@@ -1808,7 +1807,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				en->SetName(rNewFilename);
 				to.AddEntry(*en);	// adds copy
 			}
-	
+
 			// Save back
 			SaveDirectory(to);
 		}
@@ -1818,57 +1817,57 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		{
 			// Get directory
 			BackupStoreDirectory &from(GetDirectoryInternal(MoveFromDirectory));
-		
+
 			// Delete each one
 			for(std::vector<BackupStoreDirectory::Entry *>::iterator i(moving.begin()); i != moving.end(); ++i)
 			{
 				from.DeleteEntry((*i)->GetObjectID());
 			}
-	
+
 			// Save back
 			SaveDirectory(from);
 		}
 		catch(...)
 		{
 			// UNDO modification to To directory
-					
+
 			// Get directory
 			BackupStoreDirectory &to(GetDirectoryInternal(MoveToDirectory));
-		
+
 			// Delete each one
 			for(std::vector<BackupStoreDirectory::Entry *>::iterator i(moving.begin()); i != moving.end(); ++i)
 			{
 				to.DeleteEntry((*i)->GetObjectID());
 			}
-	
+
 			// Save back
 			SaveDirectory(to);
 
 			// Throw the error
 			throw;
 		}
-		
+
 		// Finally... for all the directories we moved, modify their containing directory ID
 		for(std::vector<int64_t>::iterator i(dirsToChangeContainingID.begin()); i != dirsToChangeContainingID.end(); ++i)
 		{
 			// Load the directory
 			BackupStoreDirectory &change(GetDirectoryInternal(*i));
-			
+
 			// Modify containing dir ID
 			change.SetContainerID(MoveToDirectory);
-			
+
 			// Save it back
 			SaveDirectory(change);
 		}
 	}
 	catch(...)
 	{
-		// Make sure directories aren't in the cache, as they may have been modified		
+		// Make sure directories aren't in the cache, as they may have been modified
 		RemoveDirectoryFromCache(MoveToDirectory);
 		RemoveDirectoryFromCache(MoveFromDirectory);
 		for(std::vector<int64_t>::iterator i(dirsToChangeContainingID.begin()); i != dirsToChangeContainingID.end(); ++i)
 		{
-			RemoveDirectoryFromCache(*i);			
+			RemoveDirectoryFromCache(*i);
 		}
 
 		while(!moving.empty())
@@ -1877,7 +1876,7 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			moving.pop_back();
 		}
 		throw;
-	}	
+	}
 
 	// Clean up
 	while(!moving.empty())
@@ -1903,7 +1902,7 @@ const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
-	
+
 	return *(mapStoreInfo.get());
 }
 
