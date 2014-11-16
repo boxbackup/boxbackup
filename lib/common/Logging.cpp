@@ -565,7 +565,7 @@ bool HideSpecificExceptionGuard::IsHidden(int type, int subtype)
 // --------------------------------------------------------------------------
 std::string Logging::OptionParser::GetOptionString()
 {
-	return "PqQt:TUvVW:";
+	return "NPqQt:TUvVW:";
 }
 
 // --------------------------------------------------------------------------
@@ -583,6 +583,12 @@ int Logging::OptionParser::ProcessOption(signed int option)
 {
 	switch(option)
 	{
+		case 'N':
+		{
+			mTruncateLogFile = true;
+		}
+		break;
+
 		case 'P':
 		{
 			Console::SetShowPID(true);
@@ -692,6 +698,7 @@ int Logging::OptionParser::ProcessOption(signed int option)
 std::string Logging::OptionParser::GetUsageString()
 {
 	return 
+	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
 	"  -Q         Run at minimum verbosity, log nothing to console and system\n"

@@ -467,13 +467,15 @@ class Logging
 			Log::INFO
 			#endif
 			)
-		: mCurrentLevel(InitialLevel)
+		: mCurrentLevel(InitialLevel),
+		  mTruncateLogFile(false)
 		{ }
 		
 		static std::string GetOptionString();
 		int ProcessOption(signed int option);
 		static std::string GetUsageString();
 		int mCurrentLevel; // need an int to do math with
+		bool mTruncateLogFile;
 		Log::Level GetCurrentLevel()
 		{
 			return (Log::Level) mCurrentLevel;
@@ -489,9 +491,9 @@ class FileLogger : public Logger
 	: mLogFile("") { /* do not call */ }
 	
 	public:
-	FileLogger(const std::string& rFileName, Log::Level Level)
+	FileLogger(const std::string& rFileName, Log::Level Level, bool append)
 	: Logger(Level),
-	  mLogFile(rFileName, O_WRONLY | O_CREAT | O_APPEND)
+	  mLogFile(rFileName, O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC))
 	{ }
 	
 	virtual bool Log(Log::Level Level, const std::string& rFile, 

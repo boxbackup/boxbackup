@@ -313,7 +313,8 @@ int Daemon::ProcessOptions(int argc, const char *argv[])
 	if (mLogFileLevel != Log::INVALID)
 	{
 		mapLogFileLogger.reset(
-			new FileLogger(mLogFile, mLogFileLevel));
+			new FileLogger(mLogFile, mLogFileLevel,
+				!mLogLevel.mTruncateLogFile));
 	}
 
 	return 0;

@@ -1690,6 +1690,8 @@ void BackupDaemon::CleanupVssBackupComponents()
 
 void BackupDaemon::OnBackupStart()
 {
+	ResetLogFile();
+
 	// Touch a file to record times in filesystem
 	TouchFileInWorkingDir("last_sync_start");
 

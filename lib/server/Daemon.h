@@ -85,7 +85,13 @@ protected:
 	bool IsSingleProcess() { return mSingleProcess; }
 	virtual std::string GetOptionString();
 	virtual int ProcessOption(signed int option);
-	
+	void ResetLogFile()
+	{
+		mapLogFileLogger.reset(
+			new FileLogger(mLogFile, mLogFileLevel,
+				!mLogLevel.mTruncateLogFile));
+	}
+
 private:
 	static void SignalHandler(int sigraised);
 	box_time_t GetConfigFileModifiedTime() const;
