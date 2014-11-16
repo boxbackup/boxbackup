@@ -36,7 +36,8 @@ public:
 	// both sides
 	virtual int Read(void *pBuffer, int NBytes, 
 		int Timeout = IOStream::TimeOutInfinite);
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
 	virtual void WriteAllBuffered();
 	virtual void Close();
 	virtual bool StreamDataLeft();

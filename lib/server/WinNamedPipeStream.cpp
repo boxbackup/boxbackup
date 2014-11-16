@@ -91,7 +91,7 @@ WinNamedPipeStream::WinNamedPipeStream(HANDLE hNamedPipe)
 				GetErrorMessage(err));
 			Close();
 			THROW_EXCEPTION(ConnectionException, 
-				Conn_SocketReadError)
+				SocketReadError)
 		}
 	}
 }
@@ -334,7 +334,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 					Close();
 					THROW_EXCEPTION(ConnectionException, 
-						Conn_SocketReadError)
+						SocketReadError)
 				}
 			}
 		}
@@ -394,7 +394,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 					<< GetErrorMessage(err));
 				Close();
 				THROW_EXCEPTION(ConnectionException, 
-					Conn_SocketReadError)
+					SocketReadError)
 			}
 		}
 	}
@@ -424,7 +424,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 				BOX_ERROR("Failed to read from control socket: "
 					<< GetErrorMessage(err));
 				THROW_EXCEPTION(ConnectionException, 
-					Conn_SocketReadError)
+					SocketReadError)
 			}
 		}
 		
@@ -486,7 +486,7 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes)
 			Close();
 
 			THROW_EXCEPTION(ConnectionException, 
-				Conn_SocketWriteError)
+				SocketWriteError)
 		}
 
 		NumBytesWrittenTotal += NumBytesWrittenThisTime;
