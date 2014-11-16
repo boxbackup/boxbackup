@@ -30,13 +30,14 @@
 #include "MemLeakFindOn.h"
 
 
-// Maximum number of directories to keep in the cache
-// When the cache is bigger than this, everything gets
-// deleted.
+// Maximum number of directories to keep in the cache When the cache is bigger
+// than this, everything gets deleted. In tests, we set the cache size to zero
+// to ensure that it's always flushed, which is very inefficient but helps to
+// catch programming errors (use of freed data).
 #ifdef BOX_RELEASE_BUILD
 	#define	MAX_CACHE_SIZE	32
 #else
-	#define	MAX_CACHE_SIZE	2
+	#define	MAX_CACHE_SIZE	0
 #endif
 
 // Allow the housekeeping process 4 seconds to release an account
@@ -292,15 +293,21 @@ void BackupStoreContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutp
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::GetDirectoryInternal(int64_t)
-//		Purpose: Return a reference to a directory. Valid only until the 
-//				 next time a function which affects directories is called.
-//				 Mainly this funciton, and creation of files.
-//				 Private version of this, which returns non-const directories.
+//		Name:    BackupStoreContext::GetDirectoryInternal(int64_t,
+//			 bool)
+//		Purpose: Return a reference to a directory. Valid only until
+//			 the next time a function which affects directories
+//			 is called. Mainly this function, and creation of
+//			 files. Private version of this, which returns
+//			 non-const directories. Unless called with
+//			 AllowFlushCache == false, the cache may be flushed,
+//			 invalidating all directory references that you may
+//			 be holding, so beware.
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
-BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
+BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
+	bool AllowFlushCache)
 {
 	// Get the filename
 	std::string filename;
@@ -309,23 +316,30 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 
 	// Already in cache?
 	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
-	if(item != mDirectoryCache.end())
-	{
-		oldRevID = item->second->GetRevisionID();
+	if(item != mDirectoryCache.end()) {
+#ifndef BOX_RELEASE_BUILD // it might be in the cache, but invalidated
+		// in which case, delete it instead of returning it.
+		if(!item->second->IsInvalidated())
+#else
+		if(true)
+#endif
+		{
+			oldRevID = item->second->GetRevisionID();
 
-		// Check the revision ID of the file -- does it need refreshing?
-		if(!RaidFileRead::FileExists(mStoreDiscSet, filename, &newRevID))
-		{
-			THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
-		}
-	
-		if(newRevID == oldRevID)
-		{
-			// Looks good... return the cached object
-			BOX_TRACE("Returning object " <<
-				BOX_FORMAT_OBJECTID(ObjectID) <<
-				" from cache, modtime = " << newRevID)
-			return *(item->second);
+			// Check the revision ID of the file -- does it need refreshing?
+			if(!RaidFileRead::FileExists(mStoreDiscSet, filename, &newRevID))
+			{
+				THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
+			}
+
+			if(newRevID == oldRevID)
+			{
+				// Looks good... return the cached object
+				BOX_TRACE("Returning object " <<
+					BOX_FORMAT_OBJECTID(ObjectID) <<
+					" from cache, modtime = " << newRevID)
+				return *(item->second);
+			}
 		}
 
 		// Delete this cached object
@@ -336,10 +350,22 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID)
 	// Need to load it up
 
 	// First check to see if the cache is too big
-	if(mDirectoryCache.size() > MAX_CACHE_SIZE)
+	if(mDirectoryCache.size() > MAX_CACHE_SIZE && AllowFlushCache)
 	{
-		// Very simple. Just delete everything!
+		// Very simple. Just delete everything! But in debug builds,
+		// leave the entries in the cache and invalidate them instead,
+		// so that any attempt to access them will cause an assertion
+		// failure that helps to track down the error.
+#ifdef BOX_RELEASE_BUILD
 		ClearDirectoryCache();
+#else
+		for(std::map<int64_t, BackupStoreDirectory*>::iterator
+			i = mDirectoryCache.begin();
+			i != mDirectoryCache.end(); i++)
+		{
+			i->second->Invalidate();
+		}
+#endif
 	}
 
 	// Get a RaidFileRead to read it
@@ -1022,18 +1048,20 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 		// that it reflects the current size of the parent directory.
 		int64_t new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 		if(new_dir_size != old_dir_size &&
-			rDir.GetObjectID() != BACKUPSTORE_ROOT_DIRECTORY_ID)
+			ObjectID != BACKUPSTORE_ROOT_DIRECTORY_ID)
 		{
+			int64_t ContainerID = rDir.GetContainerID();
 			BackupStoreDirectory& parent(
-				GetDirectoryInternal(rDir.GetContainerID()));
+				GetDirectoryInternal(ContainerID));
+			// rDir is now invalid
 			BackupStoreDirectory::Entry* en =
-				parent.FindEntryByID(rDir.GetObjectID());
+				parent.FindEntryByID(ObjectID);
 			if(!en)
 			{
 				BOX_ERROR("Missing entry for directory " <<
-					BOX_FORMAT_OBJECTID(rDir.GetObjectID()) <<
+					BOX_FORMAT_OBJECTID(ObjectID) <<
 					" in directory " <<
-					BOX_FORMAT_OBJECTID(rDir.GetContainerID()) <<
+					BOX_FORMAT_OBJECTID(ContainerID) <<
 					" while trying to update dir size in parent");
 			}
 			else

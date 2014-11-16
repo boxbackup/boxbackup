@@ -75,7 +75,15 @@ END_STRUCTURE_PACKING_FOR_WIRE
 //
 // --------------------------------------------------------------------------
 BackupStoreDirectory::BackupStoreDirectory()
-	: mRevisionID(0), mObjectID(0), mContainerID(0), mAttributesModTime(0), mUserInfo1(0)
+:
+#ifndef BOX_RELEASE_BUILD
+  mInvalidated(false),
+#endif
+  mRevisionID(0),
+  mObjectID(0),
+  mContainerID(0),
+  mAttributesModTime(0),
+  mUserInfo1(0)
 {
 	ASSERT(sizeof(u_int64_t) == sizeof(box_time_t));
 }
@@ -90,7 +98,15 @@ BackupStoreDirectory::BackupStoreDirectory()
 //
 // --------------------------------------------------------------------------
 BackupStoreDirectory::BackupStoreDirectory(int64_t ObjectID, int64_t ContainerID)
-	: mRevisionID(0), mObjectID(ObjectID), mContainerID(ContainerID), mAttributesModTime(0), mUserInfo1(0)
+:
+#ifndef BOX_RELEASE_BUILD
+  mInvalidated(false),
+#endif
+  mRevisionID(0),
+  mObjectID(ObjectID),
+  mContainerID(ContainerID),
+  mAttributesModTime(0),
+  mUserInfo1(0)
 {
 }
 
@@ -122,6 +138,7 @@ BackupStoreDirectory::~BackupStoreDirectory()
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Get the header
 	dir_StreamFormat hdr;
 	if(!rStream.ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */, Timeout))
@@ -202,6 +219,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet, bool StreamAttributes, bool StreamDependencyInfo) const
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Get count of entries
 	int32_t count = mEntries.size();
 	if(FlagsMustBeSet != Entry::Flags_INCLUDE_EVERYTHING || FlagsNotToBeSet != Entry::Flags_EXCLUDE_NOTHING)
@@ -291,6 +309,7 @@ void BackupStoreDirectory::WriteToStream(IOStream &rStream, int16_t FlagsMustBeS
 // --------------------------------------------------------------------------
 BackupStoreDirectory::Entry *BackupStoreDirectory::AddEntry(const Entry &rEntryToCopy)
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	Entry *pnew = new Entry(rEntryToCopy);
 	try
 	{
@@ -318,6 +337,7 @@ BackupStoreDirectory::AddEntry(const BackupStoreFilename &rName,
 	box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks,
 	int16_t Flags, uint64_t AttributesHash)
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	Entry *pnew = new Entry(rName, ModificationTime, ObjectID,
 		SizeInBlocks, Flags, AttributesHash);
 	try
@@ -343,6 +363,7 @@ BackupStoreDirectory::AddEntry(const BackupStoreFilename &rName,
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::DeleteEntry(int64_t ObjectID)
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	for(std::vector<Entry*>::iterator i(mEntries.begin());
 		i != mEntries.end(); ++i)
 	{
@@ -374,6 +395,7 @@ void BackupStoreDirectory::DeleteEntry(int64_t ObjectID)
 // --------------------------------------------------------------------------
 BackupStoreDirectory::Entry *BackupStoreDirectory::FindEntryByID(int64_t ObjectID) const
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	for(std::vector<Entry*>::const_iterator i(mEntries.begin());
 		i != mEntries.end(); ++i)
 	{
@@ -399,6 +421,9 @@ BackupStoreDirectory::Entry *BackupStoreDirectory::FindEntryByID(int64_t ObjectI
 // --------------------------------------------------------------------------
 BackupStoreDirectory::Entry::Entry()
 :
+#ifndef BOX_RELEASE_BUILD
+  mInvalidated(false),
+#endif
   mModificationTime(0),
   mObjectID(0),
   mSizeInBlocks(0),
@@ -433,6 +458,9 @@ BackupStoreDirectory::Entry::~Entry()
 // --------------------------------------------------------------------------
 BackupStoreDirectory::Entry::Entry(const Entry &rToCopy)
 :
+#ifndef BOX_RELEASE_BUILD
+  mInvalidated(false),
+#endif
   mName(rToCopy.mName),
   mModificationTime(rToCopy.mModificationTime),
   mObjectID(rToCopy.mObjectID),
@@ -458,6 +486,9 @@ BackupStoreDirectory::Entry::Entry(const Entry &rToCopy)
 // --------------------------------------------------------------------------
 BackupStoreDirectory::Entry::Entry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, uint64_t AttributesHash)
 :
+#ifndef BOX_RELEASE_BUILD
+  mInvalidated(false),
+#endif
   mName(rName),
   mModificationTime(ModificationTime),
   mObjectID(ObjectID),
@@ -483,6 +514,7 @@ BackupStoreDirectory::Entry::Entry(const BackupStoreFilename &rName, box_time_t 
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Grab the raw bytes from the stream which compose the header
 	en_StreamFormat entry;
 	if(!rStream.ReadFullBuffer(&entry, sizeof(entry),
@@ -520,6 +552,7 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::Entry::WriteToStream(IOStream &rStream) const
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Build a structure
 	en_StreamFormat entry;
 	entry.mModificationTime = 	box_hton64(mModificationTime);
@@ -549,6 +582,7 @@ void BackupStoreDirectory::Entry::WriteToStream(IOStream &rStream) const
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::Entry::ReadFromStreamDependencyInfo(IOStream &rStream, int Timeout)
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Grab the raw bytes from the stream which compose the header
 	en_StreamFormatDepends depends;
 	if(!rStream.ReadFullBuffer(&depends, sizeof(depends), 0 /* not interested in bytes read if this fails */, Timeout))
@@ -572,6 +606,7 @@ void BackupStoreDirectory::Entry::ReadFromStreamDependencyInfo(IOStream &rStream
 // --------------------------------------------------------------------------
 void BackupStoreDirectory::Entry::WriteToStreamDependencyInfo(IOStream &rStream) const
 {
+	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Build structure
 	en_StreamFormatDepends depends;
 	depends.mDependsNewer = box_hton64(mDependsNewer);

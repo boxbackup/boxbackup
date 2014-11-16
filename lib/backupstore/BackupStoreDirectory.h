@@ -29,17 +29,40 @@ class IOStream;
 // --------------------------------------------------------------------------
 class BackupStoreDirectory
 {
+private:
+#ifndef BOX_RELEASE_BUILD
+	bool mInvalidated;
+#endif
+
 public:
+#ifndef BOX_RELEASE_BUILD
+	void Invalidate()
+	{
+		mInvalidated = true;
+		for (std::vector<Entry*>::iterator i = mEntries.begin();
+			i != mEntries.end(); i++)
+		{
+			(*i)->Invalidate();
+		}
+	}
+#endif
+
 	BackupStoreDirectory();
 	BackupStoreDirectory(int64_t ObjectID, int64_t ContainerID);
 	// Convenience constructor from a stream
 	BackupStoreDirectory(IOStream& rStream,
 		int Timeout = IOStream::TimeOutInfinite)
+#ifndef BOX_RELEASE_BUILD
+	: mInvalidated(false)
+#endif
 	{
 		ReadFromStream(rStream, Timeout);
 	}
 	BackupStoreDirectory(std::auto_ptr<IOStream> apStream,
 		int Timeout = IOStream::TimeOutInfinite)
+#ifndef BOX_RELEASE_BUILD
+	: mInvalidated(false)
+#endif
 	{
 		ReadFromStream(*apStream, Timeout);
 	}
@@ -51,7 +74,16 @@ public:
 
 	class Entry
 	{
+	private:
+#ifndef BOX_RELEASE_BUILD
+		bool mInvalidated;
+#endif
+
 	public:
+#ifndef BOX_RELEASE_BUILD
+		void Invalidate() { mInvalidated = true; }
+#endif
+
 		friend class BackupStoreDirectory;
 
 		Entry();
@@ -61,30 +93,98 @@ public:
 
 		void ReadFromStream(IOStream &rStream, int Timeout);
 		void WriteToStream(IOStream &rStream) const;
-		
-		const BackupStoreFilename &GetName() const {return mName;}
-		box_time_t GetModificationTime() const {return mModificationTime;}
-		int64_t GetObjectID() const {return mObjectID;}
-		int64_t GetSizeInBlocks() const {return mSizeInBlocks;}
-		int16_t GetFlags() const {return mFlags;}
-		void AddFlags(int16_t Flags) {mFlags |= Flags;}
-		void RemoveFlags(int16_t Flags) {mFlags &= ~Flags;}
+
+		const BackupStoreFilename &GetName() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mName;
+		}
+		box_time_t GetModificationTime() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mModificationTime;
+		}
+		int64_t GetObjectID() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mObjectID;
+		}
+		// SetObjectID is dangerous! It should only be used when
+		// creating a snapshot.
+		void SetObjectID(int64_t NewObjectID)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mObjectID = NewObjectID;
+		}
+		int64_t GetSizeInBlocks() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mSizeInBlocks;
+		}
+		int16_t GetFlags() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mFlags;
+		}
+		void AddFlags(int16_t Flags)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mFlags |= Flags;
+		}
+		void RemoveFlags(int16_t Flags)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mFlags &= ~Flags;
+		}
 
 		// Some things can be changed
-		void SetName(const BackupStoreFilename &rNewName) {mName = rNewName;}
-		void SetSizeInBlocks(int64_t SizeInBlocks) {mSizeInBlocks = SizeInBlocks;}
+		void SetName(const BackupStoreFilename &rNewName)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mName = rNewName;
+		}
+		void SetSizeInBlocks(int64_t SizeInBlocks)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mSizeInBlocks = SizeInBlocks;
+		}
 
 		// Attributes
-		bool HasAttributes() const {return !mAttributes.IsEmpty();}
-		void SetAttributes(const StreamableMemBlock &rAttr, uint64_t AttributesHash) {mAttributes.Set(rAttr); mAttributesHash = AttributesHash;}
-		const StreamableMemBlock &GetAttributes() const {return mAttributes;}
-		uint64_t GetAttributesHash() const {return mAttributesHash;}
-		
+		bool HasAttributes() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return !mAttributes.IsEmpty();
+		}
+		void SetAttributes(const StreamableMemBlock &rAttr, uint64_t AttributesHash)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mAttributes.Set(rAttr);
+			mAttributesHash = AttributesHash;
+		}
+		const StreamableMemBlock &GetAttributes() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mAttributes;
+		}
+		uint64_t GetAttributesHash() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mAttributesHash;
+		}
+
 		// Marks
 		// The lowest mark number a version of a file of this name has ever had
-		uint32_t GetMinMarkNumber() const {return mMinMarkNumber;}
+		uint32_t GetMinMarkNumber() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mMinMarkNumber;
+		}
 		// The mark number on this file
-		uint32_t GetMarkNumber() const {return mMarkNumber;}
+		uint32_t GetMarkNumber() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mMarkNumber;
+		}
 
 		// Make sure these flags are synced with those in backupprocotol.txt
 		// ListDirectory command
@@ -105,36 +205,61 @@ public:
 		// convenience methods
 		bool inline IsDir()
 		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_Dir;
 		}
 		bool inline IsFile()
 		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_File;
 		}
 		bool inline IsOld()
 		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_OldVersion;
 		}
 		bool inline IsDeleted()
 		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return GetFlags() & Flags_Deleted;
 		}
 		bool inline MatchesFlags(int16_t FlagsMustBeSet, int16_t FlagsNotToBeSet)
 		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
 			return ((FlagsMustBeSet == Flags_INCLUDE_EVERYTHING) || ((mFlags & FlagsMustBeSet) == FlagsMustBeSet))
 				&& ((mFlags & FlagsNotToBeSet) == 0);
 		};
 
 		// Get dependency info
 		// new version this depends on
-		int64_t GetDependsNewer() const {return mDependsNewer;}
-		void SetDependsNewer(int64_t ObjectID) {mDependsNewer = ObjectID;}
+		int64_t GetDependsNewer() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mDependsNewer;
+		}
+		void SetDependsNewer(int64_t ObjectID)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mDependsNewer = ObjectID;
+		}
 		// older version which depends on this
-		int64_t GetDependsOlder() const {return mDependsOlder;}
-		void SetDependsOlder(int64_t ObjectID) {mDependsOlder = ObjectID;}
+		int64_t GetDependsOlder() const
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mDependsOlder;
+		}
+		void SetDependsOlder(int64_t ObjectID)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mDependsOlder = ObjectID;
+		}
 
 		// Dependency info saving
-		bool HasDependencies() {return mDependsNewer != 0 || mDependsOlder != 0;}
+		bool HasDependencies()
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			return mDependsNewer != 0 || mDependsOlder != 0;
+		}
 		void ReadFromStreamDependencyInfo(IOStream &rStream, int Timeout);
 		void WriteToStreamDependencyInfo(IOStream &rStream) const;
 
@@ -152,7 +277,14 @@ public:
 		uint64_t mDependsNewer;	// new version this depends on
 		uint64_t mDependsOlder;	// older version which depends on this
 	};
-	
+
+#ifndef BOX_RELEASE_BUILD
+	bool IsInvalidated()
+	{
+		return mInvalidated;
+	}
+#endif // !BOX_RELEASE_BUILD
+
 	void ReadFromStream(IOStream &rStream, int Timeout);
 	void WriteToStream(IOStream &rStream,
 			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
@@ -166,28 +298,78 @@ public:
 		uint64_t AttributesHash);
 	void DeleteEntry(int64_t ObjectID);
 	Entry *FindEntryByID(int64_t ObjectID) const;
-	
-	int64_t GetObjectID() const {return mObjectID;}
-	int64_t GetContainerID() const {return mContainerID;}
-	
-	// Need to be able to update the container ID when moving objects
-	void SetContainerID(int64_t ContainerID) {mContainerID = ContainerID;}
 
-	// Purely for use of server -- not serialised into streams	
-	int64_t GetRevisionID() const {return mRevisionID;}
-	void SetRevisionID(int64_t RevisionID) {mRevisionID = RevisionID;}
-	
-	unsigned int GetNumberOfEntries() const {return mEntries.size();}
+	int64_t GetObjectID() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mObjectID;
+	}
+
+	int64_t GetContainerID() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mContainerID;
+	}
+	// Need to be able to update the container ID when moving objects
+	void SetContainerID(int64_t ContainerID)
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		mContainerID = ContainerID;
+	}
+
+	// Purely for use of server -- not serialised into streams
+	int64_t GetRevisionID() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mRevisionID;
+	}
+	void SetRevisionID(int64_t RevisionID)
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		mRevisionID = RevisionID;
+	}
+
+	unsigned int GetNumberOfEntries() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mEntries.size();
+	}
 
 	// User info -- not serialised into streams
-	int64_t GetUserInfo1_SizeInBlocks() const {return mUserInfo1;}
-	void SetUserInfo1_SizeInBlocks(int64_t UserInfo1) {mUserInfo1 = UserInfo1;}
+	int64_t GetUserInfo1_SizeInBlocks() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mUserInfo1;
+	}
+	void SetUserInfo1_SizeInBlocks(int64_t UserInfo1)
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		mUserInfo1 = UserInfo1;
+	}
 
 	// Attributes
-	bool HasAttributes() const {return !mAttributes.IsEmpty();}
-	void SetAttributes(const StreamableMemBlock &rAttr, box_time_t AttributesModTime) {mAttributes.Set(rAttr); mAttributesModTime = AttributesModTime;}
-	const StreamableMemBlock &GetAttributes() const {return mAttributes;}
-	box_time_t GetAttributesModTime() const {return mAttributesModTime;}
+	bool HasAttributes() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return !mAttributes.IsEmpty();
+	}
+	void SetAttributes(const StreamableMemBlock &rAttr,
+		box_time_t AttributesModTime)
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		mAttributes.Set(rAttr);
+		mAttributesModTime = AttributesModTime;
+	}
+	const StreamableMemBlock &GetAttributes() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mAttributes;
+	}
+	box_time_t GetAttributesModTime() const
+	{
+		ASSERT(!mInvalidated); // Compiled out of release builds
+		return mAttributesModTime;
+	}
 
 	class Iterator
 	{
@@ -195,10 +377,12 @@ public:
 		Iterator(const BackupStoreDirectory &rDir)
 			: mrDir(rDir), i(rDir.mEntries.begin())
 		{
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 		}
 
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 			// Skip over things which don't match the required flags
 			while(i != mrDir.mEntries.end() && !(*i)->MatchesFlags(FlagsMustBeSet, FlagsNotToBeSet))
 			{
@@ -218,6 +402,7 @@ public:
 		// In a looping situation, cache the decrypted filenames in another memory structure.
 		BackupStoreDirectory::Entry *FindMatchingClearName(const BackupStoreFilenameClear &rFilename, int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 			// Skip over things which don't match the required flags or filename
 			while( (i != mrDir.mEntries.end())
 				&& ( (!(*i)->MatchesFlags(FlagsMustBeSet, FlagsNotToBeSet))
@@ -247,10 +432,12 @@ public:
 		ReverseIterator(const BackupStoreDirectory &rDir)
 			: mrDir(rDir), i(rDir.mEntries.rbegin())
 		{
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 		}
 
 		BackupStoreDirectory::Entry *Next(int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING, int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING)
 		{
+			ASSERT(!mrDir.mInvalidated); // Compiled out of release builds
 			// Skip over things which don't match the required flags
 			while(i != mrDir.mEntries.rend() && !(*i)->MatchesFlags(FlagsMustBeSet, FlagsNotToBeSet))
 			{
