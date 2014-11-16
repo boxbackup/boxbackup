@@ -2024,6 +2024,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Now delete an entry, and check that the size is reduced
 	protocol.QueryDeleteFile(subdirid,
 		BackupStoreFilenameClear(last_added_filename));
+	ExpectedRefCounts[last_added_file_id] = 0;
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
@@ -2094,13 +2095,13 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	// Delete it again, which should reduce the object size again
 	protocol.QueryDeleteDirectory(dir2id);
+	set_refcount(dir2id, 0);
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
 	TEST_THAT(change_account_limits("0B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
-	set_refcount(dir2id, 0);
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
