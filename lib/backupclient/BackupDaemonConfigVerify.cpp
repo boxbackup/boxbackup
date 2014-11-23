@@ -102,6 +102,8 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	// enable logging to a file
 	ConfigurationVerifyKey("LogFileLevel", 0),
 	// set the level of verbosity of file logging
+	ConfigurationVerifyKey("LogFileOverwrite", ConfigTest_IsBool, false),
+	// overwrite the log file on each backup
 	ConfigurationVerifyKey("CommandSocket", 0),
 	// not compulsory to have this
 	ConfigurationVerifyKey("KeepAliveTime", ConfigTest_IsInt),

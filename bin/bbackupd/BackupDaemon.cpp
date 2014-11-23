@@ -874,14 +874,21 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 
 	if (conf.KeyExists("LogFile"))
 	{
+		bool overwrite = false;
+		if (conf.KeyExists("LogFileOverwrite"))
+		{
+			overwrite = conf.GetKeyValueBool("LogFileOverwrite");
+		}
+
 		Log::Level level = Log::INFO;
 		if (conf.KeyExists("LogFileLevel"))
 		{
 			level = Logging::GetNamedLevel(
 				conf.GetKeyValue("LogFileLevel"));
 		}
+
 		fileLogger.reset(new FileLogger(conf.GetKeyValue("LogFile"),
-			level));
+			level, !overwrite));
 	}
 
 	std::string extendedLogFile;

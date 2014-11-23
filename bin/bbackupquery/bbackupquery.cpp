@@ -309,7 +309,8 @@ int main(int argc, const char *argv[])
 	std::auto_ptr<FileLogger> fileLogger;
 	if (fileLogLevel != Log::INVALID)
 	{
-		fileLogger.reset(new FileLogger(fileLogFile, fileLogLevel));
+		fileLogger.reset(new FileLogger(fileLogFile, fileLogLevel,
+			true)); // open in append mode
 	}
 
 	BOX_NOTICE(BANNER_TEXT("Backup Query Tool"));
