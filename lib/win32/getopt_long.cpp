@@ -66,7 +66,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "getopt.h"
+#include "box_getopt.h"
 
 #ifdef REPLACE_GETOPT // until end of file
 

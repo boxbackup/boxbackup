@@ -183,7 +183,7 @@ inline int geteuid(void)
 
 // MinGW provides a getopt implementation
 #ifndef __MINGW32__
-#include "getopt.h"
+#include "box_getopt.h"
 #endif // !__MINGW32__
 
 #define timespec timeval
