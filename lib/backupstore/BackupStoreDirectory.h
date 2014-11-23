@@ -163,23 +163,30 @@ public:
 
 			if((mFlags & Flags) != Flags)
 			{
+				// TODO FIXME: should be allowed to change old
+				// flag even on immutable files, for conversion
+				// to patch.
 				AssertMutable(rRefCount);
+				mFlags |= Flags;
 			}
 
-			mFlags |= Flags;
 		}
 		void RemoveFlags(int16_t Flags,
 			BackupStoreRefCountDatabase& rRefCount)
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
 
-			if((mFlags & Flags) != 0)
+			if((mFlags & ~Flags) != Flags)
 			{
+				// TODO FIXME: should be allowed to change old
+				// flag even on immutable files, for conversion
+				// to patch.
 				AssertMutable(rRefCount);
+				mFlags &= ~Flags;
 			}
-
-			mFlags &= ~Flags;
 		}
+		// Dangerous versions that affect only this directory, without
+		// updating the StoreObjectMetaBase
 		void AddFlags(int16_t Flags)
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
@@ -241,8 +248,8 @@ public:
 			return mMarkNumber;
 		}
 
-		// Make sure these flags are synced with those in backupprocotol.txt
-		// ListDirectory command
+		// Make sure these flags are synced with those in backupprotocol.txt
+		// ListDirectory command, and StoreObjectMetaBase
 		enum
 		{
 			Flags_INCLUDE_EVERYTHING 	= -1,

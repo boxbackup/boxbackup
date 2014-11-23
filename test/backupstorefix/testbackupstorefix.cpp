@@ -64,7 +64,9 @@ similarly with a dir, but that should get a dirxxx name
 corrupt dir
 corrupt file
 delete root, copy a file to it instead (equivalent to deleting it too)
-
+metabase entry must match directory entries (silently fixed)
+metabase must be consistent (object size, patch status, etc).
+reconstruct metabase from directory entries
 */
 
 std::string accountRootDir("backup/01234567/");

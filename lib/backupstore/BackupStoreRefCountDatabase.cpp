@@ -24,8 +24,10 @@
 
 #include "MemLeakFindOn.h"
 
-#define REFCOUNT_MAGIC_VALUE	0x52656643 // RefC
-#define REFCOUNT_FILENAME	"refcount"
+// TODO FIXME replace all references to REFCOUNT with STOREOBJECTMETABASE
+#define REFCOUNT_MAGIC_VALUE_1 0x52656643 // RefC
+#define REFCOUNT_MAGIC_VALUE_2 0x534f4d31 // SOM1 (StoreObjectMetabase1)
+#define REFCOUNT_FILENAME      "StoreObjectMetaBase"
 
 // --------------------------------------------------------------------------
 //
@@ -46,24 +48,28 @@ BackupStoreRefCountDatabase::BackupStoreRefCountDatabase(const
   mapDatabaseFile(apDatabaseFile)
 {
 	ASSERT(!(ReadOnly && Temporary)); // being both doesn't make sense
+	ASSERT(mapDatabaseFile.get());
 }
 
 void BackupStoreRefCountDatabase::Commit()
 {
 	if (!mIsTemporaryFile)
 	{
+		// TODO FIXME replace all references to "refcount" with 
+		// StoreObjectMetaBase
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Cannot commit a permanent reference count database");
+			"Cannot commit a permanent refcount database");
 	}
 
 	if (!mapDatabaseFile.get())
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Reference count database is already closed");
+			"Refcount database is already closed");
 	}
 
 	mapDatabaseFile->Close();
 	mapDatabaseFile.reset();
+	mIsTemporaryFile = false;
 
 	std::string Final_Filename = GetFilename(mAccount, false);
 
@@ -84,7 +90,6 @@ void BackupStoreRefCountDatabase::Commit()
 
 	mFilename = Final_Filename;
 	mIsModified = false;
-	mIsTemporaryFile = false;
 }
 
 void BackupStoreRefCountDatabase::Discard()
@@ -92,13 +97,13 @@ void BackupStoreRefCountDatabase::Discard()
 	if (!mIsTemporaryFile)
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Cannot discard a permanent reference count database");
+			"Cannot discard a permanent refcount database");
 	}
 
 	if (!mapDatabaseFile.get())
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Reference count database is already closed");
+			"Refcount database is already closed");
 	}
 
 	mapDatabaseFile->Close();
@@ -166,9 +171,9 @@ std::auto_ptr<BackupStoreRefCountDatabase>
 {
 	// Initial header
 	refcount_StreamFormat hdr;
-	hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE);
+	hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE_2);
 	hdr.mAccountID = htonl(rAccount.GetID());
-	
+
 	std::string Filename = GetFilename(rAccount, true); // temporary
 
 	// Open the file for writing
@@ -186,7 +191,7 @@ std::auto_ptr<BackupStoreRefCountDatabase>
 
 	int flags = O_CREAT | O_BINARY | O_RDWR | O_EXCL;
 	std::auto_ptr<FileStream> DatabaseFile(new FileStream(Filename, flags));
-	
+
 	// Write header
 	DatabaseFile->Write(&hdr, sizeof(hdr));
 
@@ -194,11 +199,12 @@ std::auto_ptr<BackupStoreRefCountDatabase>
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
 		new BackupStoreRefCountDatabase(rAccount, false, true,
 			DatabaseFile));
-	
+
 	// The root directory must always have one reference for a database
 	// to be valid, so set that now on the new database. This will leave
 	// mIsModified set to true.
-	refcount->SetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+	refcount_t root_refs = refcount->AddReference(BACKUPSTORE_ROOT_DIRECTORY_ID);
+	ASSERT(root_refs == 1);
 
 	// return it to caller
 	return refcount;
@@ -226,7 +232,7 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 	// Open the file for read/write
 	std::auto_ptr<FileStream> dbfile(new FileStream(Filename,
 		flags | O_BINARY));
-	
+
 	// Read in a header
 	refcount_StreamFormat hdr;
 	if(!dbfile->ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */))
@@ -235,21 +241,35 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 			"short read", Filename, BackupStoreException,
 			CouldNotLoadStoreInfo);
 	}
-	
+
 	// Check it
-	if(ntohl(hdr.mMagicValue) != REFCOUNT_MAGIC_VALUE ||
-		(int32_t)ntohl(hdr.mAccountID) != rAccount.GetID())
+	if(ntohl(hdr.mMagicValue) == REFCOUNT_MAGIC_VALUE_1)
 	{
 		THROW_FILE_ERROR("Failed to read refcount database: "
-			"bad magic number", Filename, BackupStoreException,
+			"old magic number", Filename, BackupStoreException,
 			BadStoreInfoOnLoad);
 	}
-	
+
+	if(ntohl(hdr.mMagicValue) != REFCOUNT_MAGIC_VALUE_2)
+	{
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"bad magic number: " << ntohl(hdr.mMagicValue),
+			Filename, BackupStoreException, BadStoreInfoOnLoad);
+	}
+
+	if((int32_t)ntohl(hdr.mAccountID) != rAccount.GetID())
+	{
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"wrong account number: " <<
+			BOX_FORMAT_ACCOUNT(ntohl(hdr.mAccountID)),
+			Filename, BackupStoreException, BadStoreInfoOnLoad);
+	}
+
 	// Make new object
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
 		new BackupStoreRefCountDatabase(rAccount, ReadOnly, false,
 			dbfile));
-	
+
 	// return it to caller
 	return refcount;
 }
@@ -264,8 +284,8 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 //		Created: 2009/06/01
 //
 // --------------------------------------------------------------------------
-BackupStoreRefCountDatabase::refcount_t
-BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
+const BackupStoreRefCountDatabase::EntryData
+BackupStoreRefCountDatabase::GetEntryData(int64_t ObjectID)
 {
 	IOStream::pos_type offset = GetOffset(ObjectID);
 
@@ -279,16 +299,21 @@ BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
 
 	mapDatabaseFile->Seek(offset, SEEK_SET);
 
-	refcount_t refcount;
-	if (mapDatabaseFile->Read(&refcount, sizeof(refcount)) !=
-		sizeof(refcount))
+	EntryData data;
+	if (mapDatabaseFile->Read(&data, sizeof(data)) != sizeof(data))
 	{
 		THROW_FILE_ERROR("Failed to read refcount database: "
 			"short read at offset " << offset, mFilename,
 			BackupStoreException, CouldNotLoadStoreInfo);
 	}
 
-	return ntohl(refcount);
+	data.mFlags = ntohs(data.mFlags);
+	data.mRefCount = ntohl(data.mRefCount);
+	data.mSizeInBlocks = box_ntoh64(data.mSizeInBlocks);
+	data.mDependsNewer = box_ntoh64(data.mDependsNewer);
+	data.mDependsOlder = box_ntoh64(data.mDependsOlder);
+
+	return data;
 }
 
 int64_t BackupStoreRefCountDatabase::GetLastObjectIDUsed() const
@@ -311,42 +336,49 @@ int64_t BackupStoreRefCountDatabase::GetLastObjectIDUsed() const
 BackupStoreRefCountDatabase::refcount_t
 BackupStoreRefCountDatabase::AddReference(int64_t ObjectID)
 {
-	refcount_t refcount;
+	std::auto_ptr<Entry> ape;
 
 	if (ObjectID > GetLastObjectIDUsed())
 	{
 		// new object, assume no previous references
-		refcount = 0;
+		ape.reset(new Entry(ObjectID));
 	}
 	else
 	{
 		// read previous value from database
-		refcount = GetRefCount(ObjectID);
+		const Entry& re = GetEntry(ObjectID);
+		ape.reset(new Entry(ObjectID, re));
 	}
 
-	refcount++;
-
-	SetRefCount(ObjectID, refcount);
+	refcount_t refcount = ape->AddReference();
+	PutEntry(*ape);
 	return refcount;
 }
 
-void BackupStoreRefCountDatabase::SetRefCount(int64_t ObjectID,
-	refcount_t NewRefCount)
+void BackupStoreRefCountDatabase::PutEntryData(int64_t ObjectID,
+	const EntryData& data)
 {
+	EntryData dataOut;
+	dataOut.mFlags = htons(data.mFlags);
+	dataOut.mRefCount = htonl(data.mRefCount);
+	dataOut.mSizeInBlocks = box_hton64(data.mSizeInBlocks);
+	dataOut.mDependsNewer = box_hton64(data.mDependsNewer);
+	dataOut.mDependsOlder = box_hton64(data.mDependsOlder);
+
 	IOStream::pos_type offset = GetOffset(ObjectID);
 	mapDatabaseFile->Seek(offset, SEEK_SET);
-	refcount_t RefCountNetOrder = htonl(NewRefCount);
-	mapDatabaseFile->Write(&RefCountNetOrder, sizeof(RefCountNetOrder));
+	mapDatabaseFile->Write(&dataOut, sizeof(dataOut));
 	mIsModified = true;
 }
 
 BackupStoreRefCountDatabase::refcount_t
 BackupStoreRefCountDatabase::RemoveReference(int64_t ObjectID)
 {
-	refcount_t refcount = GetRefCount(ObjectID); // must exist in database
-	ASSERT(refcount > 0);
-	refcount--;
-	SetRefCount(ObjectID, refcount);
+	// Read previous value from database. Must exist in database.
+	Entry e = GetEntry(ObjectID);
+	refcount_t refcount = e.RemoveReference();
+	ASSERT(refcount >= 0);
+	PutEntry(e);
 	return refcount;
 }
 
