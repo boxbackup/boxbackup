@@ -87,9 +87,12 @@ protected:
 	virtual int ProcessOption(signed int option);
 	void ResetLogFile()
 	{
-		mapLogFileLogger.reset(
-			new FileLogger(mLogFile, mLogFileLevel,
-				!mLogLevel.mTruncateLogFile));
+		if(mapLogFileLogger.get())
+		{
+			mapLogFileLogger.reset(
+				new FileLogger(mLogFile, mLogFileLevel,
+					!mLogLevel.mTruncateLogFile));
+		}
 	}
 
 private:
