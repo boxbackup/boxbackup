@@ -3,3 +3,4 @@
 aclocal -I infrastructure/m4
 autoheader
 autoconf
+(cd qdbm; autoconf)

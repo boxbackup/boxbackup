@@ -12,6 +12,10 @@
 
 #include <climits>
 
+#ifdef HAVE_SYS_POLL_H
+#	include <sys/poll.h>
+#endif
+
 #include "BoxTime.h"
 #include "IOStream.h"
 #include "Socket.h"
