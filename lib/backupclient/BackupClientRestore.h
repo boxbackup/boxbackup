@@ -7,8 +7,8 @@
 //
 // --------------------------------------------------------------------------
 
-#ifndef BACKUPSCLIENTRESTORE_H
-#define BACKUPSCLIENTRESTORE__H
+#ifndef BACKUPCLIENTRESTORE_H
+#define BACKUPCLIENTRESTORE_H
 
 class BackupProtocolCallable;
 
@@ -32,5 +32,5 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	bool Resume,
 	bool ContinueAfterErrors);
 
-#endif // BACKUPSCLIENTRESTORE__H
+#endif // BACKUPCLIENTRESTORE_H
 
