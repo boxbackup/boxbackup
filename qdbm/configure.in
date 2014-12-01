@@ -178,17 +178,16 @@ if uname | egrep -i 'Linux' > /dev/null 2>&1 &&
 then
   MYOPTS="-minline-all-stringops"
 fi
-if uname | egrep -i 'SunOS' > /dev/null 2>&1
+
+if uname | egrep -iq 'FreeBSD' && cc -v 2>&1 | egrep -iq ' clang '; then
+  MYOPTS="-O1 -fno-omit-frame-pointer"
+elif uname | egrep -iq 'SunOS' || \
+	uname | egrep -iq 'BSD' || \
+	gcc --version | egrep -iq '^2\.(8|9)'
 then
   MYOPTS="-O1 -fno-omit-frame-pointer -fno-force-addr"
-fi
-if uname | egrep -i 'BSD' > /dev/null 2>&1
-then
-  MYOPTS="-O1 -fno-omit-frame-pointer -fno-force-addr"
-fi
-if gcc --version | egrep -i '^2\.(8|9)' > /dev/null 2>&1
-then
-  MYOPTS="-O1 -fno-omit-frame-pointer -fno-force-addr"
+else
+  MYOPTS="-O1 -fno-omit-frame-pointer -fforce-addr"
 fi
 
 # Linker
