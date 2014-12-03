@@ -126,46 +126,51 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	}
 
 	// Load the store info to find necessary info for the housekeeping
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
+	std::auto_ptr<BackupStoreInfo> apInfo(BackupStoreInfo::Load(mAccountID,
 		mStoreRoot, mStoreDiscSet, false /* Read/Write */));
 	std::auto_ptr<BackupStoreInfo> pOldInfo(
 		BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet,
 			true /* Read Only */));
 
 	// If the account has a name, change the logging tag to include it
-	if(!(info->GetAccountName().empty()))
+	if(!(apInfo->GetAccountName().empty()))
 	{
 		std::ostringstream tag;
 		tag << "hk=" << BOX_FORMAT_ACCOUNT(mAccountID) << "/" <<
-			info->GetAccountName();
+			apInfo->GetAccountName();
 		mTagWithClientID.Change(tag.str());
 	}
 
 	// Calculate how much should be deleted
-	mDeletionSizeTarget = info->GetBlocksUsed() - info->GetBlocksSoftLimit();
+	mDeletionSizeTarget = apInfo->GetBlocksUsed() - apInfo->GetBlocksSoftLimit();
 	if(mDeletionSizeTarget < 0)
 	{
 		mDeletionSizeTarget = 0;
 	}
 
 	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
-	mapNewRefs = BackupStoreRefCountDatabase::Create(account);
+	mapOldRefs = BackupStoreRefCountDatabase::Load(account, false);
+
+	// We don't know the size of the root directory object yet, so save
+	// the value -1 for now, and we'll update it in ScanDirectory when
+	// we find out.
+	mapNewRefs = BackupStoreRefCountDatabase::Create(account, -1);
 
 	// Scan the directory for potential things to delete
 	// This will also remove eligible items marked with RemoveASAP
 	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
-		*info);
+		*apInfo);
 
 	if(!continueHousekeeping)
 	{
 		// The scan was incomplete, so the new block counts are
 		// incorrect, we can't rely on them. It's better to discard
 		// the new info and adjust the old one instead.
-		info = pOldInfo;
+		apInfo = pOldInfo;
 
 		// We're about to reset counters and exit, so report what
 		// happened now.
-		BOX_INFO("Housekeeping on account " << 
+		BOX_INFO("Housekeeping on account " <<
 			BOX_FORMAT_ACCOUNT(mAccountID) << " removed " <<
 			(0 - mBlocksUsedDelta) << " blocks (" << 
 			mFilesDeleted << " files, " <<
@@ -175,9 +180,9 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 	// If housekeeping made any changes, such as deleting RemoveASAP files,
 	// the differences in block counts will be recorded in the deltas.
-	info->ChangeBlocksUsed(mBlocksUsedDelta);
-	info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
-	info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
+	apInfo->ChangeBlocksUsed(mBlocksUsedDelta);
+	apInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
+	apInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
 
 	// Reset the delta counts for files, as they will include 
 	// RemoveASAP flagged files deleted during the initial scan.
@@ -198,42 +203,74 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	if(!continueHousekeeping)
 	{
 		mapNewRefs->Discard();
-		info->Save();
+		apInfo->Save();
 		return false;
+	}
+
+	// Calculate block usage counts using the entries in the newly rebuilt
+	// StoreObjectMetaBase. Reset all file counts to zero and recount them.
+	apInfo->AdjustNumCurrentFiles(-apInfo->GetNumCurrentFiles());
+	apInfo->AdjustNumOldFiles(-apInfo->GetNumOldFiles());
+	apInfo->AdjustNumDeletedFiles(-apInfo->GetNumDeletedFiles());
+	apInfo->AdjustNumDirectories(-apInfo->GetNumDirectories());
+
+	for(int64_t ObjectID = 1; ObjectID < mapNewRefs->GetLastObjectIDUsed();
+		ObjectID++)
+	{
+		BackupStoreRefCountDatabase::Entry e =
+			mapNewRefs->GetEntry(ObjectID);
+
+		// Update recalculated usage sizes
+		int64_t enSizeInBlocks = e.GetSizeInBlocks();
+		mBlocksUsed += enSizeInBlocks;
+
+		if(e.IsFile())
+		{
+			if(e.IsOld())
+			{
+				apInfo->AdjustNumOldFiles(1);
+				mBlocksInOldFiles += enSizeInBlocks;
+			}
+
+			if(e.IsDeleted())
+			{
+				apInfo->AdjustNumDeletedFiles(1);
+				mBlocksInDeletedFiles += enSizeInBlocks;
+			}
+
+			if(!e.IsOld() && !e.IsDeleted())
+			{
+				apInfo->AdjustNumCurrentFiles(1);
+				mBlocksInDeletedFiles += enSizeInBlocks;
+			}
+		}
+
+		if(e.IsDir())
+		{
+			apInfo->AdjustNumDirectories(1);
+			mBlocksInDirectories += enSizeInBlocks;
+		}
 	}
 
 	// Report any UNexpected changes, and consider them to be errors.
 	// Do this before applying the expected changes below.
-	mErrorCount += info->ReportChangesTo(*pOldInfo);
-	info->Save();
+	mErrorCount += apInfo->ReportChangesTo(*pOldInfo);
+	apInfo->Save();
 
-	// Try to load the old reference count database and check whether
-	// any counts have changed. We want to compare the mapNewRefs to
-	// apOldRefs before we delete any files, because that will also change
-	// the reference count in a way that's not an error.
-
-	try
-	{
-		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
-			BackupStoreRefCountDatabase::Load(account, false);
-		mErrorCount += mapNewRefs->ReportChangesTo(*apOldRefs);
-	}
-	catch(BoxException &e)
-	{
-		BOX_WARNING("Reference count database was missing or "
-			"corrupted during housekeeping, cannot check it for "
-			"errors.");
-		mErrorCount++;
-	}
+	// Check whether any reference counts have changed between the old and
+	// new StoreObjectMetaBase. We want to compare them before we delete any
+	// files, because that will also change the reference count in a way
+	// that's not an error.
+	mErrorCount += mapNewRefs->ReportChangesTo(*mapOldRefs);
 
 	// Go and delete items from the accounts
-	bool deleteInterrupted = DeleteFiles(*info);
+	bool deleteInterrupted = DeleteFiles(*apInfo);
 
-	// If that wasn't interrupted, remove any empty directories which 
-	// are also marked as deleted in their containing directory
+	// If that wasn't interrupted, remove any empty directories which are
+	// also marked as deleted in their containing directory
 	if(!deleteInterrupted)
 	{
-		deleteInterrupted = DeleteEmptyDirectories(*info);
+		deleteInterrupted = DeleteEmptyDirectories(*apInfo);
 	}
 
 	// Log deletion if anything was deleted
@@ -251,31 +288,31 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Make sure the delta's won't cause problems if the counts are 
 	// really wrong, and it wasn't fixed because the store was 
 	// updated during the scan.
-	if(mBlocksUsedDelta < (0 - info->GetBlocksUsed()))
+	if(mBlocksUsedDelta < (0 - apInfo->GetBlocksUsed()))
 	{
-		mBlocksUsedDelta = (0 - info->GetBlocksUsed());
+		mBlocksUsedDelta = (0 - apInfo->GetBlocksUsed());
 	}
-	if(mBlocksInOldFilesDelta < (0 - info->GetBlocksInOldFiles()))
+	if(mBlocksInOldFilesDelta < (0 - apInfo->GetBlocksInOldFiles()))
 	{
-		mBlocksInOldFilesDelta = (0 - info->GetBlocksInOldFiles());
+		mBlocksInOldFilesDelta = (0 - apInfo->GetBlocksInOldFiles());
 	}
-	if(mBlocksInDeletedFilesDelta < (0 - info->GetBlocksInDeletedFiles()))
+	if(mBlocksInDeletedFilesDelta < (0 - apInfo->GetBlocksInDeletedFiles()))
 	{
-		mBlocksInDeletedFilesDelta = (0 - info->GetBlocksInDeletedFiles());
+		mBlocksInDeletedFilesDelta = (0 - apInfo->GetBlocksInDeletedFiles());
 	}
-	if(mBlocksInDirectoriesDelta < (0 - info->GetBlocksInDirectories()))
+	if(mBlocksInDirectoriesDelta < (0 - apInfo->GetBlocksInDirectories()))
 	{
-		mBlocksInDirectoriesDelta = (0 - info->GetBlocksInDirectories());
+		mBlocksInDirectoriesDelta = (0 - apInfo->GetBlocksInDirectories());
 	}
 
 	// Update the usage counts in the store
-	info->ChangeBlocksUsed(mBlocksUsedDelta);
-	info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
-	info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
-	info->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
+	apInfo->ChangeBlocksUsed(mBlocksUsedDelta);
+	apInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
+	apInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
+	apInfo->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
 
 	// Save the store info back
-	info->Save();
+	apInfo->Save();
 
 	// force file to be saved and closed before releasing the lock below
 	mapNewRefs->Commit();
@@ -317,7 +354,7 @@ void HousekeepStoreAccount::MakeObjectFilename(int64_t ObjectID, std::string &rF
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
+bool HousekeepStoreAccount::ScanDirectory(int64_t DirectoryID,
 	BackupStoreInfo& rBackupStoreInfo)
 {
 #ifndef WIN32
@@ -336,25 +373,39 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 	}
 #endif
 
-	// Get the filename
-	std::string objectFilename;
-	MakeObjectFilename(ObjectID, objectFilename);
-
-	// Open it.
-	std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet,
-		objectFilename));
-
-	// Add the size of the directory on disc to the size being calculated
-	int64_t originalDirSizeInBlocks = dirStream->GetDiscUsageInBlocks();
-	mBlocksInDirectories += originalDirSizeInBlocks;
-	mBlocksUsed += originalDirSizeInBlocks;
-
-	// Read the directory in
 	BackupStoreDirectory dir;
-	BufferedStream buf(*dirStream);
-	dir.ReadFromStream(buf, IOStream::TimeOutInfinite);
-	dir.SetUserInfo1_SizeInBlocks(originalDirSizeInBlocks);
-	dirStream->Close();
+
+	{
+		// Get the filename
+		std::string objectFilename;
+		MakeObjectFilename(DirectoryID, objectFilename);
+
+		// Open it.
+		std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet,
+			objectFilename));
+
+		// Add the size of the directory on disc to the size being calculated
+		int64_t originalDirSizeInBlocks = dirStream->GetDiscUsageInBlocks();
+
+		// Initialise the StoreObjectMetaBase::Entry from the old SOMB, except
+		// for the refcount that we're in the process of recounting and don't
+		// want to lose, and write it to the new SOMB.
+		BackupStoreRefCountDatabase::Entry soe = mapOldRefs->GetEntry(DirectoryID);
+		soe.SetRefCount(mapNewRefs->GetRefCount(DirectoryID));
+		// If this is the root directory, silently update the object size. All
+		// other properties will be updated as we read their directory entries.
+		if(soe.GetSizeInBlocks() != originalDirSizeInBlocks)
+		{
+			soe.SetSizeInBlocks(originalDirSizeInBlocks);
+		}
+		mapNewRefs->PutEntry(soe);
+
+		// Read the directory in
+		BufferedStream buf(*dirStream);
+		dir.ReadFromStream(buf, IOStream::TimeOutInfinite);
+		dir.SetUserInfo1_SizeInBlocks(originalDirSizeInBlocks);
+		dirStream->Close();
+	}
 
 	// Is it empty?
 	if(dir.GetNumberOfEntries() == 0)
@@ -362,6 +413,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		// Add it to the list of directories to potentially delete
 		mEmptyDirectories.push_back(dir.GetObjectID());
 	}
+
+	bool isModified = false;
 
 	// Calculate reference counts first, before we start requesting
 	// files to be deleted.
@@ -372,8 +425,47 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 
 		while((en = i.Next()) != 0)
 		{
-			// This directory references this object
-			mapNewRefs->AddReference(en->GetObjectID());
+			// Initialise the StoreObjectMetaBase::Entry from the
+			// old SOMB, except for the refcount that we're in the
+			// process of recounting and don't want to lose.
+			BackupStoreRefCountDatabase::Entry soe =
+				mapOldRefs->GetEntry(en->GetObjectID());
+			if(en->GetObjectID() <= mapNewRefs->GetLastObjectIDUsed())
+			{
+				soe.SetRefCount(mapNewRefs->GetRefCount(en->GetObjectID()));
+			}
+			else
+			{
+				soe.SetRefCount(0);
+			}
+
+			// This directory references this object.
+			soe.AddReference();
+
+			if(en->GetDependsNewer() != 0)
+			{
+				// Add a reference to the object which this
+				// one depends on, to keep it around. Converting
+				// an object to a patch does this, so we need to
+				// do it here and in BackupStoreCheck for
+				// consistency, to avoid detecting mismatched
+				// reference counts as an error.
+				mapNewRefs->AddReference(en->GetDependsNewer());
+			}
+
+			// And write the adjusted old entry into the new SOMB.
+			mapNewRefs->PutEntry(soe);
+
+			// Get the filename
+			std::string objectFilename;
+			MakeObjectFilename(en->GetObjectID(), objectFilename);
+
+			// Open it.
+			std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(mStoreDiscSet,
+				objectFilename));
+
+			// Silently update all directory entries from the SOMB.
+			isModified |= en->UpdateFrom(soe, DirectoryID);
 		}
 	}
 
@@ -400,12 +492,18 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 					if(mapNewRefs->GetRefCount(en->GetObjectID()) > 1)
 					{
 						dir.DeleteEntry(en->GetObjectID());
+						isModified = true;
 					}
 					else
 					{
-						// Delete this immediately.
-						DeleteFile(ObjectID, en->GetObjectID(), dir,
-							objectFilename, rBackupStoreInfo);
+						// Delete this immediately. This
+						// actually writes the directory
+						// while doing so, so it's no
+						// longer modified.
+						DeleteFile(DirectoryID,
+							en->GetObjectID(), dir,
+							rBackupStoreInfo);
+						isModified = false;
 					}
 
 					// flag as having done something
@@ -417,6 +515,12 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				}
 			}
 		} while(deletedSomething);
+	}
+
+	if(isModified)
+	{
+		IOStream::pos_type new_size = WriteDirectory(dir, true);
+		UpdateDirectorySize(dir, new_size);
 	}
 
 	// BLOCK
@@ -435,7 +539,6 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
 		{
 			// Update recalculated usage sizes
-			int16_t enFlags = en->GetFlags();
 			int64_t enSizeInBlocks = en->GetSizeInBlocks();
 			mBlocksUsed += enSizeInBlocks;
 			if(en->IsOld()) mBlocksInOldFiles += enSizeInBlocks;
@@ -464,7 +567,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				// Is deleted / old version.
 				DelEn d;
 				d.mObjectID = en->GetObjectID();
-				d.mInDirectory = ObjectID;
+				d.mInDirectory = DirectoryID;
 				d.mSizeInBlocks = en->GetSizeInBlocks();
 				d.mMarkNumber = en->GetMarkNumber();
 				d.mVersionAgeWithinMark = enVersionAge;
@@ -543,7 +646,9 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			ASSERT(en->IsDir());
 
 			// Don't recurse into any directory that has multiple
-			// references. TODO FIXME or into immutable dirs.
+			// references, so we only recurse in once, the first
+			// time we see this directory. TODO FIXME or into
+			// immutable dirs.
 			if(mapNewRefs->GetRefCount(en->GetObjectID()) == 1)
 			{
 				if(!ScanDirectory(en->GetObjectID(), rBackupStoreInfo))
@@ -651,7 +756,7 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 		// Delete the file
 		BackupStoreRefCountDatabase::refcount_t refs =
 			DeleteFile(i->mInDirectory, i->mObjectID, dir,
-				dirFilename, rBackupStoreInfo);
+				rBackupStoreInfo);
 		if(refs == 0)
 		{
 			BOX_INFO("Housekeeping removed " <<
@@ -698,7 +803,6 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 
 BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	int64_t InDirectory, int64_t ObjectID, BackupStoreDirectory &rDirectory,
-	const std::string &rDirectoryFilename,
 	BackupStoreInfo& rBackupStoreInfo)
 {
 	// Find the entry inside the directory
@@ -857,16 +961,9 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	// Save directory back to disc
 	// BLOCK
 	{
-		RaidFileWrite writeDir(mStoreDiscSet, rDirectoryFilename,
-			mapNewRefs->GetRefCount(InDirectory));
-		writeDir.Open(true /* allow overwriting */);
-		rDirectory.WriteToStream(writeDir);
-
-		// Get the disc usage (must do this before commiting it)
-		int64_t new_size = writeDir.GetDiscUsageInBlocks();
-
-		// Commit directory
-		writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+		// Condition for WriteDirectory() to do the right thing
+		ASSERT(InDirectory == rDirectory.GetContainerID());
+		IOStream::pos_type new_size = WriteDirectory(rDirectory, true);
 
 		// Adjust block counts if the directory itself changed in size
 		int64_t original_size = rDirectory.GetUserInfo1_SizeInBlocks();
@@ -923,6 +1020,33 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 
 	return 0;
 }
+
+
+IOStream::pos_type HousekeepStoreAccount::WriteDirectory(
+	BackupStoreDirectory &rDirectory,
+	bool GetDiskUsageInBlocks)
+{
+	std::string objFilename;
+	MakeObjectFilename(rDirectory.GetObjectID(), objFilename);
+
+	RaidFileWrite writeDir(mStoreDiscSet, objFilename,
+		mapNewRefs->GetRefCount(rDirectory.GetContainerID()));
+	writeDir.Open(true /* allow overwriting */);
+	rDirectory.WriteToStream(writeDir);
+
+	// Get the disc usage (must do this before commiting it)
+	IOStream::pos_type new_size = 0;
+	if(GetDiskUsageInBlocks)
+	{
+		new_size = writeDir.GetDiscUsageInBlocks();
+	}
+
+	// Commit directory
+	writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+
+	return new_size;
+}
+
 
 // --------------------------------------------------------------------------
 //
@@ -987,11 +1111,9 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 
 	en->SetSizeInBlocks(new_size_in_blocks);
 
-	RaidFileWrite writeDir(mStoreDiscSet, parentFilename,
-		mapNewRefs->GetRefCount(rDirectory.GetContainerID()));
-	writeDir.Open(true /* allow overwriting */);
-	parent.WriteToStream(writeDir);
-	writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+	// The parent directory won't have changed in size, so we don't need
+	// to ask for the new size.
+	WriteDirectory(parent, false);
 }
 
 // --------------------------------------------------------------------------
@@ -1108,16 +1230,8 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 		}
 
 		// Write revised parent directory
-		RaidFileWrite writeDir(mStoreDiscSet, containingDirFilename,
-			mapNewRefs->GetRefCount(containingDir.GetObjectID()));
-		writeDir.Open(true /* allow overwriting */);
-		containingDir.WriteToStream(writeDir);
-
 		// get the disc usage (must do this before commiting it)
-		int64_t dirSize = writeDir.GetDiscUsageInBlocks();
-
-		// Commit directory
-		writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+		IOStream::pos_type dirSize = WriteDirectory(containingDir, true);
 		UpdateDirectorySize(containingDir, dirSize);
 
 		// adjust usage counts for this directory

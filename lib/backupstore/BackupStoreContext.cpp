@@ -674,6 +674,12 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		}
 	}
 
+	// Increment reference count on the new file to one
+	BackupStoreRefCountDatabase::Entry soe(id);
+	soe.AddFlags(BackupStoreRefCountDatabase::Entry::Flags_File);
+	soe.SetSizeInBlocks(newObjectBlocksUsed);
+	soe->AddReference();
+
 	// Modify the directory -- first make all files with the same name
 	// marked as an old version
 	try
@@ -685,11 +691,12 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		if(DiffFromFileID != 0)
 		{
 			// Get old version entry
+			// TODO FIXME it may not be in the same directory!
+			// Use the SOMB to get the old size instead.
 			poldEntry = dir.FindEntryByID(DiffFromFileID);
 			ASSERT(poldEntry != 0);
 
 			// Adjust size of old entry
-			int64_t oldSize = poldEntry->GetSizeInBlocks();
 			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
 		}
 
@@ -703,22 +710,28 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 				if(MarkFileWithSameNameAsOldVersions)
 				{
 					// Set old version flag
-					e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion,
-						*mapRefCount);
-					adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
-					adjustment.mNumCurrentFiles--;
-					adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
-					adjustment.mNumOldFiles++;
+					e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
+					BackupStoreRefCountDatabase::Entry soe =
+						mapRefCount->GetEntry(e->GetObjectID());
+					if(!soe.IsOld())
+					{
+						soe.AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
+						adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
+						adjustment.mNumCurrentFiles--;
+						adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
+						adjustment.mNumOldFiles++;
+						mapRefCount->PutEntry(soe);
+					}
 				}
 				else
 				{
-					// TODO FIXME delete the actual object if necessary
 					dir.DeleteEntry(e->GetObjectID());
 
 					if(mapRefCount->RemoveReference(e->GetObjectID()) == 0)
 					{
 						// No more references, so the object
 						// is now properly deleted.
+						// TODO FIXME delete the actual object
 						adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
 						adjustment.mNumCurrentFiles--;
 					}
@@ -744,12 +757,24 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		// Adjust dependency info of file?
 		if(DiffFromFileID && poldEntry && !reversedDiffIsCompletelyDifferent)
 		{
+			// Update the directory entries to link them together
 			poldEntry->SetDependsNewer(id);
 			pnewEntry->SetDependsOlder(DiffFromFileID);
+
+			// Update the old SOMB entry as well
+			BackupStoreRefCountDatabase::Entry osoe =
+				mapRefCount->GetEntry(DiffFromFileID);
+			osoe.SetDependsNewer(id);
+			mapRefCount->PutEntry(osoe);
+
+			// And the new SOMB entry
+			soe.SetDependsOlder(DiffFromFileID);
+
 			// We now need the newer object to reconstruct the
-			// older one from its reverse diff, so add a reference
-			// to keep it around.
-			mapRefCount->AddReference(id);
+			// older one from its reverse diff, so add another
+			// reference to keep it around even if removed from
+			// all snapshots.
+			soe.AddReference();
 		}
 
 		// Write the directory back to disc
@@ -784,6 +809,8 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		throw;
 	}
 
+	mapNewRefs->PutEntry(soe);
+
 	// Check logic
 	ASSERT(ppreviousVerStoreFile == 0);
 
@@ -797,9 +824,6 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	mapStoreInfo->ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
 	mapStoreInfo->ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
 	mapStoreInfo->ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
-
-	// Increment reference count on the new directory to one
-	mapRefCount->AddReference(id);
 
 	// Save the store info -- can cope if this exceptions because infomation
 	// will be rebuilt by housekeeping, and ID allocation can recover.
@@ -1010,8 +1034,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				// Check that it's definately not already deleted
 				ASSERT(!e->IsDeleted());
 				// Set deleted flag
-				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted,
-					*mapRefCount);
+				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				mapRefCount->AddFlags(e->GetObjectID(),
+					BackupStoreDirectory::Entry::Flags_Deleted);
 				// Mark as made a change
 				madeChanges = true;
 
@@ -1107,8 +1132,9 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 				// Check that it's definitely already deleted
 				ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0);
 				// Clear deleted flag
-				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted,
-					*mapRefCount);
+				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				mapRefCount->RemoveFlags(e->GetObjectID(),
+					BackupStoreDirectory::Entry::Flags_Deleted);
 				// Mark as made a change
 				madeChanges = true;
 				blocksDel -= e->GetSizeInBlocks();
@@ -1403,8 +1429,18 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			int64_t sizeAdjustment = dirSize - rDir.GetUserInfo1_SizeInBlocks();
 			mapStoreInfo->ChangeBlocksUsed(sizeAdjustment);
 			mapStoreInfo->ChangeBlocksInDirectories(sizeAdjustment);
+
 			// Update size stored in directory
 			rDir.SetUserInfo1_SizeInBlocks(dirSize);
+
+			// And in the SOMB
+			if(sizeAdjustment)
+			{
+				BackupStoreRefCountDatabase::Entry soe =
+					mapRefCount->GetEntry(ObjectID);
+				soe.SetSizeInBlocks(dirSize);
+				mapRefCount->PutEntry(soe);
+			}
 		}
 		catch(BoxException &e)
 		{
@@ -1563,8 +1599,12 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 			0 /* attributes hash */);
 		SaveDirectory(dir);
 
-		// Increment reference count on the new directory to one
-		mapRefCount->AddReference(id);
+		// Create the new SOMB entry
+		BackupStoreRefCountDatabase::Entry soe(id);
+		soe.AddFlags(BackupStoreDirectory::Entry::Flags_Dir);
+		soe.SetSizeInBlocks(dirSize);
+		soe.AddReference();
+		mapRefCount->PutEntry(soe);
 	}
 	catch(...)
 	{
@@ -1659,13 +1699,15 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 		}
 		else if(Undelete)
 		{
-			en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted,
-				*mapRefCount);
+			en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+			mapRefCount->RemoveFlags(en->GetObjectID(),
+				BackupStoreDirectory::Entry::Flags_Deleted);
 		}
 		else
 		{
-			en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted,
-				*mapRefCount);
+			en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+			mapRefCount->AddFlags(en->GetObjectID(),
+				BackupStoreDirectory::Entry::Flags_Deleted);
 		}
 
 		// Save it
@@ -1766,13 +1808,15 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 				// Add/remove the deleted flags
 				if(Undelete)
 				{
-					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted,
-						*mapRefCount);
+					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					mapRefCount->RemoveFlags(en->GetObjectID(),
+						BackupStoreDirectory::Entry::Flags_Deleted);
 				}
 				else
 				{
-					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted,
-						*mapRefCount);
+					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					mapRefCount->AddFlags(en->GetObjectID(),
+						BackupStoreDirectory::Entry::Flags_Deleted);
 				}
 
 				// Did something

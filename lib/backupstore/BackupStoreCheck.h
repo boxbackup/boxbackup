@@ -122,6 +122,7 @@ private:
 	void CheckDirectories();
 	void CheckRoot();
 	void CheckUnattachedObjects();
+	void CheckStoreObjectMetaBase();
 	void FixDirsWithWrongContainerID();
 	void FixDirsWithLostDirs();
 	void WriteNewStoreInfo();
@@ -134,7 +135,7 @@ private:
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, IDBlock *piBlock, int32_t indexInDirBlock,
 		bool& rIsModified, bool* pWasAlreadyContained = NULL);
-	void CountDirectoryEntries(BackupStoreDirectory& dir);
+	bool CountDirectoryEntries(BackupStoreDirectory& dir);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
 	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);
 
@@ -203,6 +204,9 @@ private:
 
 	// The refcount database, being reconstructed as the check/fix progresses
 	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
+	// The old refcount database, used to recover information about entries
+	// not listed in any directory, if possible.
+	std::auto_ptr<BackupStoreRefCountDatabase> mapOldRefs;
 	
 	// Misc stuff
 	int32_t mLostDirNameSerial;

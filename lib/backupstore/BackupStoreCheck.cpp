@@ -114,7 +114,6 @@ void BackupStoreCheck::Check()
 	}
 
 	BackupStoreAccountDatabase::Entry account(mAccountID, mDiscSetNumber);
-	mapNewRefs = BackupStoreRefCountDatabase::Create(account);
 
 	// Phase 1, check objects
 	if(!mQuiet)
@@ -124,6 +123,11 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Phase 1, check objects...");
 	}
 	CheckObjects();
+
+	int32_t RootIndex;
+	IDBlock *piBlock = LookupID(BACKUPSTORE_ROOT_DIRECTORY_ID, RootIndex);
+	mapNewRefs = BackupStoreRefCountDatabase::Create(account,
+		piBlock->mObjectSizeInBlocks[RootIndex]);
 
 	// Phase 2, check directories
 	if(!mQuiet)
@@ -139,39 +143,49 @@ void BackupStoreCheck::Check()
 	}
 	CheckRoot();
 
-	// Phase 4, check unattached objects
-	if(!mQuiet)
-	{
-		BOX_INFO("Phase 4, fix unattached objects...");
-	}
-	CheckUnattachedObjects();
-
-	// Phase 5, fix bad info
-	if(!mQuiet)
-	{
-		BOX_INFO("Phase 5, fix unrecovered inconsistencies...");
-	}
-	FixDirsWithWrongContainerID();
-	FixDirsWithLostDirs();
-
-	// Phase 6, regenerate store info
-	if(!mQuiet)
-	{
-		BOX_INFO("Phase 6, regenerate store info...");
-	}
-	WriteNewStoreInfo();
-
 	try
 	{
-		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
-			BackupStoreRefCountDatabase::Load(account, false);
-		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*apOldRefs);
+		mapOldRefs = BackupStoreRefCountDatabase::Load(account, false);
 	}
 	catch(BoxException &e)
 	{
 		BOX_WARNING("Reference count database was missing or "
 			"corrupted, cannot check it for errors.");
 		mNumberErrorsFound++;
+	}
+
+	// Phase 4, check StoreObjectMetaBase
+	if(!mQuiet)
+	{
+		BOX_INFO("Phase 4, check StoreObjectMetaBase...");
+	}
+	CheckStoreObjectMetaBase();
+
+	// Phase 5, check unattached objects
+	if(!mQuiet)
+	{
+		BOX_INFO("Phase 5, fix unattached objects...");
+	}
+	CheckUnattachedObjects();
+
+	// Phase 6, fix bad info
+	if(!mQuiet)
+	{
+		BOX_INFO("Phase 6, fix unrecovered inconsistencies...");
+	}
+	FixDirsWithWrongContainerID();
+	FixDirsWithLostDirs();
+
+	// Phase 7, regenerate store info
+	if(!mQuiet)
+	{
+		BOX_INFO("Phase 7, regenerate store info...");
+	}
+	WriteNewStoreInfo();
+
+	if(mapOldRefs.get())
+	{
+		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*mapOldRefs);
 	}
 
 	// force file to be saved and closed before releasing the lock below
@@ -443,7 +457,9 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		}
 		// info and refcount databases are OK in the root directory
 		else if(*i == "info" || *i == "refcount.db" ||
-			*i == "refcount.rdb" || *i == "refcount.rdbX")
+			*i == "refcount.rdb" || *i == "refcount.rdbX" ||
+			*i == "StoreObjectMetaBase.rdb" ||
+			*i == "StoreObjectMetaBase.rdbX")
 		{
 			fileOK = true;
 		}
@@ -733,11 +749,6 @@ void BackupStoreCheck::CheckDirectories()
 	// This phase will check all the files in the directories, make
 	// a note of all directories which are missing, and do initial fixing.
 
-	// The root directory is not contained inside another directory, so
-	// it has no directory entry to scan, but we have to count it
-	// somewhere, so we'll count it here.
-	mNumDirectories++;
-
 	// Scan all objects.
 	for(Info_t::const_iterator i(mInfo.begin()); i != mInfo.end(); ++i)
 	{
@@ -790,6 +801,8 @@ void BackupStoreCheck::CheckDirectories()
 						" was OK after fixing");
 				}
 
+				isModified |= CountDirectoryEntries(dir);
+
 				if(isModified && mFixErrors)
 				{
 					BOX_WARNING("Writing modified directory to disk: " <<
@@ -800,7 +813,6 @@ void BackupStoreCheck::CheckDirectories()
 					fixed.Commit(true /* convert to raid representation now */);
 				}
 
-				CountDirectoryEntries(dir);
 			}
 		}
 	}
@@ -893,82 +905,88 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 	return isModified;
 }
 
-// Count valid remaining entries and the number of blocks in them.
-void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
+// Refcount valid remaining entries, and either update them from the SOMB or
+// use them to initialise a new SOMB entry.
+bool BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 {
 	BackupStoreDirectory::Iterator i(dir);
 	BackupStoreDirectory::Entry *en = 0;
+	bool isModified = false;
+
 	while((en = i.Next()) != 0)
 	{
-		int32_t iIndex;
-		IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
-		bool badEntry = false;
-		bool wasAlreadyContained = false;
-
-		ASSERT(piBlock != 0 ||
-			mDirsWhichContainLostDirs.find(en->GetObjectID())
-			!= mDirsWhichContainLostDirs.end());
-
-		if (piBlock)
+		if(!en->IsFile() && !en->IsDir())
 		{
-			// Normally it would exist and this
-			// check would not be necessary, but
-			// we might have missing directories
-			// that we will recreate later.
-			// cf mDirsWhichContainLostDirs.
-			uint8_t iflags = GetFlags(piBlock, iIndex);
-			wasAlreadyContained = (iflags & Flags_IsContained);
-			SetFlags(piBlock, iIndex, iflags | Flags_IsContained);
-		}
-
-		if(wasAlreadyContained)
-		{
-			// don't double-count objects that are
-			// contained by another directory as well.
-		}
-		else if(en->IsDir())
-		{
-			mNumDirectories++;
-		}
-		else if(!en->IsFile())
-		{
-			BOX_TRACE("Not counting object " <<
+			BOX_WARNING("Directory " <<
+				BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
+				" contains entry " <<
 				BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-				" with flags " << en->GetFlags());
+				" with unknown flags " << en->GetFlags() << ","
+				" not counting");
 		}
-		else // it's a file
+
+		BackupStoreRefCountDatabase::Entry soe(en->GetObjectID());
+		bool rebuild = false;
+
+		if(en->GetObjectID() <= mapNewRefs->GetLastObjectIDUsed())
 		{
-			// Add to sizes?
-			// If piBlock was zero, then wasAlreadyContained
-			// might be uninitialized; but we only process
-			// files here, and if a file's piBlock was zero
-			// then badEntry would be set above, so we
-			// wouldn't be here.
-			ASSERT(!badEntry)
+			soe = mapNewRefs->GetEntry(en->GetObjectID());
+		}
+		else if(mapOldRefs.get() && en->GetObjectID() <= mapOldRefs->GetLastObjectIDUsed())
+		{
+			// Copy data from old SOMB to compare, but set the
+			// reference count to 0 because we're recounting.
 
-			// It can be both old and deleted.
-			// If neither, then it's current.
-			if(en->IsDeleted())
+			try
 			{
-				mNumDeletedFiles++;
-				mBlocksInDeletedFiles += en->GetSizeInBlocks();
+				soe = mapOldRefs->GetEntry(en->GetObjectID());
+				soe.SetRefCount(0);
 			}
-
-			if(en->IsOld())
+			catch (BoxException &e)
 			{
-				mNumOldFiles++;
-				mBlocksInOldFiles += en->GetSizeInBlocks();
-			}
-
-			if(!en->IsDeleted() && !en->IsOld())
-			{
-				mNumCurrentFiles++;
-				mBlocksInCurrentFiles += en->GetSizeInBlocks();
+				BOX_WARNING("Failed to get object metadata "
+					"for " << BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+					"from old StoreObjectMetaBase: " <<
+					e.what());
+				rebuild = true;
 			}
 		}
+		else
+		{
+			rebuild = true;
+		}
 
-		mapNewRefs->AddReference(en->GetObjectID());
+		soe.AddReference();
+
+		if(rebuild)
+		{
+			// Rebuild the SOMB using data from the first directory
+			// entry found. Any subsequent entries will be made
+			// consistent with the SOMB, but no errors will be
+			// reported because it's impossible to keep all directory
+			// entries in sync with the SOMB without regular checks
+			// like this one.
+			soe.SetFlags(en->GetFlags());
+			soe.SetSizeInBlocks(en->GetSizeInBlocks());
+			soe.SetDependsNewer(en->GetDependsNewer());
+			soe.SetDependsOlder(en->GetDependsOlder());
+		}
+		else
+		{
+			// The size and dependencies in the StoreObjectMetaBase
+			// should already be correct.
+			isModified |= en->UpdateFrom(soe, dir.GetObjectID());
+		}
+
+		ASSERT(en->GetFlags() == soe.GetFlags());
+		ASSERT(en->GetSizeInBlocks() == soe.GetSizeInBlocks());
+		ASSERT(en->GetDependsNewer() == soe.GetDependsNewer());
+		ASSERT(en->GetDependsOlder() == soe.GetDependsOlder());
+
+		mapNewRefs->PutEntry(soe);
 	}
+
+	return isModified;
 }
 
 bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
@@ -1118,4 +1136,76 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 	}
 
 	return true; // don't delete this entry
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreCheck::CheckStoreObjectMetaBase()
+//		Purpose: Check each entry in the StoreObjectMetaBase against
+//			 entries on disk, ensure that it's consistent,
+//			 increase reference count of objects that are relied
+//			 on by other objects (patches).
+//		Created: 25/11/14
+//
+// --------------------------------------------------------------------------
+void BackupStoreCheck::CheckStoreObjectMetaBase()
+{
+	int64_t max_real_id = mpInfoLastBlock->mID[mInfoLastBlockEntries - 1];
+	int64_t max_somb_id = mapNewRefs->GetLastObjectIDUsed();
+
+	// If this is wrong, then we made a mistake while regenerating the
+	// StoreObjectMetaBase.
+	ASSERT(max_somb_id == max_real_id);
+
+	// We can only add newer entry dependencies once, regardless of how
+	// many times the old object (patch) might be referenced in various
+	// directories, otherwise we can't keep our accounting straight when
+	// an object is converted to a patch.
+
+	int64_t max_id = std::min(max_real_id, max_somb_id);
+	for (int64_t id = 1; id < max_id; id++)
+	{
+		BackupStoreRefCountDatabase::Entry e = mapNewRefs->GetEntry(id);
+		if(e.GetDependsNewer())
+		{
+			mapNewRefs->AddReference(e.GetDependsNewer());
+		}
+
+		if(e.IsDir())
+		{
+			mNumDirectories++;
+			mBlocksInDirectories += e.GetSizeInBlocks();
+		}
+		else if(e.IsFile())
+		{
+			// It can be both old and deleted.
+			// If neither, then it's current.
+			if(e.IsDeleted())
+			{
+				mNumDeletedFiles++;
+				mBlocksInDeletedFiles += e.GetSizeInBlocks();
+			}
+
+			if(e.IsOld())
+			{
+				mNumOldFiles++;
+				mBlocksInOldFiles += e.GetSizeInBlocks();
+			}
+
+			if(!e.IsDeleted() && !e.IsOld())
+			{
+				mNumCurrentFiles++;
+				mBlocksInCurrentFiles += e.GetSizeInBlocks();
+			}
+		}
+		else // Not a file, nor a directory?
+		{
+			BOX_WARNING("StoreObjectMetaBase contains entry " <<
+				BOX_FORMAT_OBJECTID(id) <<
+				" with unknown flags " << e.GetFlags() << ","
+				" not counting");
+			mNumberErrorsFound++;
+		}
+	}
 }

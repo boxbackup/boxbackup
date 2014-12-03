@@ -66,7 +66,10 @@ int check_account_for_errors(Log::Level log_level = Log::WARNING);
 bool check_account(Log::Level log_level = Log::WARNING);
 
 //! Runs housekeeping on an account, to remove old and deleted files if necessary.
-int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount);
+int run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount);
+
+//! Runs housekeeping on the default test account, 0x01234567
+int run_housekeeping();
 
 //! Runs housekeeping and checks the account, returning true if it's OK.
 bool run_housekeeping_and_check_account();

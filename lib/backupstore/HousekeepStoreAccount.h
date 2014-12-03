@@ -55,8 +55,9 @@ private:
 	BackupStoreRefCountDatabase::refcount_t DeleteFile(int64_t InDirectory,
 		int64_t ObjectID,
 		BackupStoreDirectory &rDirectory,
-		const std::string &rDirectoryFilename,
 		BackupStoreInfo& rBackupStoreInfo);
+	IOStream::pos_type WriteDirectory(BackupStoreDirectory &rDirectory,
+		bool GetDiskUsageInBlocks);
 	void UpdateDirectorySize(BackupStoreDirectory &rDirectory,
 		IOStream::pos_type new_size_in_blocks);
 
@@ -108,9 +109,13 @@ private:
 	int64_t mFilesDeleted;
 	int64_t mEmptyDirectoriesDeleted;
 
-	// New reference count list
+	// The refcount database, being reconstructed as the check/fix progresses
 	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
-	
+	// The old refcount database, used as the master reference for the
+	// Flags, DependsOlder and DependsNewer of directory entries and
+	// the newly built StoreObjectMetaBase.
+	std::auto_ptr<BackupStoreRefCountDatabase> mapOldRefs;
+
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;
 

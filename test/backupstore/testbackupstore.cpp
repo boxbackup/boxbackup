@@ -825,7 +825,7 @@ bool test_temporary_refcount_db_is_independent()
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 	std::auto_ptr<BackupStoreRefCountDatabase> temp(
 		BackupStoreRefCountDatabase::Create(
-			apAccounts->GetEntry(0x1234567)));
+			apAccounts->GetEntry(0x1234567), 1 /* fake size */));
 	std::auto_ptr<BackupStoreRefCountDatabase> perm(
 		BackupStoreRefCountDatabase::Load(
 			apAccounts->GetEntry(0x1234567),
@@ -1016,7 +1016,9 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(3, patch1_id, "wrong ObjectID for newly uploaded "
 		"patch file");
-	set_refcount(patch1_id, 1);
+	// Because it's a patch, the old file now depends on the new one to
+	// restore it successfully, so the refcount increases by 1.
+	set_refcount(patch1_id, 2);
 
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
@@ -1047,7 +1049,9 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(4, patch2_id, "wrong ObjectID for newly uploaded "
 		"patch file");
-	set_refcount(patch2_id, 1);
+	// Because it's a patch, the old file now depends on the new one to
+	// restore it successfully, so the refcount increases by 1.
+	set_refcount(patch2_id, 2);
 
 	// How many blocks used by the new file?
 	// We need to check the old file's size, because it's been replaced
@@ -1923,9 +1927,10 @@ bool test_server_commands()
 
 		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		// Create a non-caching BackupStoreRefCountDatabase
 		std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 			BackupStoreRefCountDatabase::Load(
-				apAccounts->GetEntry(0x1234567), true));
+				apAccounts->GetEntry(0x1234567), true, false));
 
 		// Create some nice recursive directories
 		TEST_THAT(check_reference_counts());
@@ -2000,8 +2005,10 @@ bool test_snapshot_commands()
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 	BackupStoreAccountDatabase::Entry
 		account(apAccounts->GetEntry(0x1234567));
+	// Create a non-caching BackupStoreRefCountDatabase
 	std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
-		BackupStoreRefCountDatabase::Load(account, true));
+		BackupStoreRefCountDatabase::Load(
+			apAccounts->GetEntry(0x1234567), true, false));
 
 	// Things to test:
 	// Create a snapshot copy of a file, make it unique and modify it (should work).
@@ -2117,8 +2124,7 @@ bool test_snapshot_commands()
 		BackupStoreInfo::Load(0x1234567, "backup/01234567/",
 			0, true);
 
-	TEST_EQUAL(1, BackupStoreRefCountDatabase::Load(account,
-		true)->GetRefCount(dirtodelete));
+	TEST_EQUAL(1, apRefCount->GetRefCount(dirtodelete));
 
 	// Create two snapshots of this directory
 	BackupStoreFilenameClear snapshot1Name("snapshot1");
@@ -2293,35 +2299,23 @@ bool test_snapshot_commands()
 		"housekeeping after MakeUnique");
 
 	{
-		// Try to patch an existing file. Even though the directory is
-		// mutable, this should fail because you're not allowed to
-		// change the Old and Deleted flags on a multiply-referenced
-		// object.
-		std::auto_ptr<IOStream> upload;
-		upload = BackupStoreFile::EncodeFile("testfiles/test1",
-			BACKUPSTORE_ROOT_DIRECTORY_ID, firstSubFileName);
-		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
-			QueryStoreFile(new_parent_id, 0, 0, 0, firstSubFileName,
-				upload),
-			Err_MultiplyReferencedObject);
+		int64_t old_size = get_raid_file(firstFileId)->GetDiscUsageInBlocks();
 
-		TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
-			"housekeeping after attempting to upload another file");
-
-		// We can't create an old version in the other directories,
-		// because they're multiply linked. And we shouldn't create an
-		// old version in this directory either. So we invented a new
+		// Patching an existing file should work, because we can change
+		// the old object flags and size in the SOMB. But we can't
+		// create an old version in the other directories, because
+		// they're multiply linked. And we shouldn't create an old
+		// version in this directory either. So we invented a new
 		// upload command that optionally removes the old entry rather
 		// than marking it as Old, which should be allowed.
 		//
 		// Try uploading as a patch first. This will add a second
-		// reference to the new object, which may stop it from being
-		// marked as Old later, because changing flags of objects with
-		// multiple references is forbidden, to make accounting easier.
+		// reference to the new object, which should be marked as Old
+		// even though it has multiple references.
 		apProtocol->QueryGetBlockIndexByName(new_parent_id, firstSubFileName);
 		std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
 		bool isCompletelyDifferent;
-		upload = BackupStoreFile::EncodeFileDiff(
+		std::auto_ptr<BackupStoreFileEncodeStream> upload = BackupStoreFile::EncodeFileDiff(
 			"testfiles/test1",
 			new_parent_id, /* containing directory */
 			firstSubFileName,
@@ -2339,24 +2333,73 @@ bool test_snapshot_commands()
 			0, // AttributesHash
 			firstFileId, // DiffFromFileID
 			true, // DeleteOldVersions
-			firstSubFileName, upload)->GetObjectID();
+			firstSubFileName,
+			static_cast<std::auto_ptr<IOStream> > (upload)
+			)->GetObjectID();
+		int64_t new_size = get_raid_file(firstFileId)->GetDiscUsageInBlocks();
+
+		// It's been converted to a patch, so it should be smaller.
+		TEST_THAT(new_size < old_size);
 
 		// 2 references: the directory entry and the patched object
 		// (firstFileId) which now requires new_patch_id to reconstruct.
 		set_refcount(new_patch_id, 2);
+
 		// But the old object is no longer in this directory, so its
 		// refcount drops to 1: the other directory that contains it.
 		set_refcount(firstFileId, 1);
 
-		TEST_LINE(run_housekeeping_and_check_account_and_refcounts(*apProtocol),
-			"housekeeping after uploading a patch to an old file");
+		// The other directory won't have been updated with the new
+		// flags and size, so if we read it directly off disk, we'll
+		// get the old values.
+
+		BackupStoreDirectory other_dir(*get_raid_file(dirtodelete));
+		BackupStoreDirectory::Entry *en = other_dir.FindEntryByID(firstFileId);
+		TEST_THAT(en != 0);
+		if (en)
+		{
+			TEST_EQUAL(old_size, en->GetSizeInBlocks());
+			TEST_EQUAL(0, en->GetDependsNewer());
+		}
+
+		// But if we read the directory from the server, it should
+		// reflect the new information, because it's read from the SOMB
+		// instead of the directory.
+		other_dir.Download(*apProtocol, dirtodelete, SHORT_TIMEOUT);
+		en = other_dir.FindEntryByID(firstFileId);
+		TEST_THAT(en != 0);
+		if (en)
+		{
+			TEST_EQUAL(new_size, en->GetSizeInBlocks());
+			TEST_EQUAL(new_patch_id, en->GetDependsNewer());
+		}
+
+		// Test that housekeeping alone is enough to fix the old
+		// directory entry.
+		apProtocol->QueryFinished();
+		TEST_EQUAL(0, run_housekeeping());
+		other_dir.ReadFromStream(*get_raid_file(dirtodelete),
+			IOStream::TimeOutInfinite);
+		en = other_dir.FindEntryByID(firstFileId);
+		TEST_THAT(en != 0);
+		if (en)
+		{
+			TEST_EQUAL(new_size, en->GetSizeInBlocks());
+			TEST_EQUAL(new_patch_id, en->GetDependsNewer());
+		}
+
+		TEST_THAT(check_account());
+		TEST_THAT(check_reference_counts());
+		apProtocol->Reopen();
 
 		// Now try a full upload, to see if it fails when it tries to
 		// change the flags of new_patch_id.
 		upload = BackupStoreFile::EncodeFile("testfiles/test1",
 			BACKUPSTORE_ROOT_DIRECTORY_ID, firstSubFileName);
 		int64_t new_object_id = apProtocol->QueryStoreFile2(new_parent_id,
-			0, 0, 0, true, firstSubFileName, upload)->GetObjectID();
+			0, 0, 0, true, firstSubFileName,
+			static_cast<std::auto_ptr<IOStream> >(upload)
+			)->GetObjectID();
 
 		// Just one reference, because there's no patch.
 		set_refcount(new_object_id, 1);
@@ -2599,7 +2642,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	std::auto_ptr<RaidFileRead>
 		root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
-	BackupStoreDirectory root(*root_read, IOStream::TimeOutInfinite);
+	BackupStoreDirectory root(*root_read);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
 	en->SetSizeInBlocks(1234);
@@ -2986,13 +3029,14 @@ bool test_login_with_disabled_account()
 	// make sure something is written to it
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+	// Create a non-caching BackupStoreRefCountDatabase
+	std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true));
+			apAccounts->GetEntry(0x1234567), true, false));
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
-		apReferences->GetLastObjectIDUsed());
-	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
-	apReferences.reset();
+		apRefCount->GetLastObjectIDUsed());
+	TEST_EQUAL(1, apRefCount->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+	apRefCount.reset();
 
 	// Test that login fails on a disabled account
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
@@ -3031,7 +3075,8 @@ bool test_login_with_no_refcount_db()
 	// Delete the refcount database and try to log in again. Check that
 	// we're locked out of the account until housekeeping has recreated
 	// the refcount db.
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, ::unlink("testfiles/0_1/backup/01234567/"
+		REFCOUNT_FILENAME ".rdb.rfw"));
 	TEST_CHECK_THROWS(BackupProtocolLocal2 protocolLocal(0x01234567,
 		"test", "backup/01234567/", 0, false), // Not read-only
 		BackupStoreException, CorruptReferenceCountDatabase);
@@ -3043,7 +3088,8 @@ bool test_login_with_no_refcount_db()
 		apAccounts->GetEntry(0x1234567);
 	TEST_EQUAL_LINE(1, run_housekeeping(account),
 		"Housekeeping should report 1 error if the refcount db is missing");
-	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_THAT(FileExists("testfiles/0_1/backup/01234567/"
+		REFCOUNT_FILENAME ".rdb.rfw"));
 
 	// And that we can log in afterwards
 	BackupProtocolLocal2(0x01234567, "test", "backup/01234567/", 0,
@@ -3056,7 +3102,8 @@ bool test_login_with_no_refcount_db()
 	// because housekeeping may fix the refcount database while we're
 	// stepping through.
 	TEST_THAT_THROWONFAIL(StartServer());
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, ::unlink("testfiles/0_1/backup/01234567/"
+		REFCOUNT_FILENAME ".rdb.rfw"));
 	TEST_CHECK_THROWS(connect_and_login(context),
 		ConnectionException, Protocol_UnexpectedReply);
 
@@ -3065,7 +3112,8 @@ bool test_login_with_no_refcount_db()
 	// Run housekeeping, check that it fixes the refcount db
 	TEST_EQUAL_LINE(1, run_housekeeping(account),
 		"Housekeeping should report 1 error if the refcount db is missing");
-	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_THAT(FileExists("testfiles/0_1/backup/01234567/"
+		REFCOUNT_FILENAME ".rdb.rfw"));
 	TEST_THAT(check_reference_counts());
 
 	// And that we can log in afterwards
@@ -3087,12 +3135,13 @@ bool test_housekeeping_deletes_files()
 	write_test_file(1);
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+	// Create a non-caching BackupStoreRefCountDatabase
+	std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
 		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true));
+			apAccounts->GetEntry(0x1234567), true, false));
 	int64_t dirtodelete = create_test_data_subdirs(protocolLocal,
 		BACKUPSTORE_ROOT_DIRECTORY_ID, "test_delete", 6 /* depth */,
-		*apReferences);
+		*apRefCount);
 
 	TEST_EQUAL(dirtodelete,
 		protocolLocal.QueryDeleteDirectory(dirtodelete)->GetObjectID());

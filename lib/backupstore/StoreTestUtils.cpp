@@ -286,7 +286,7 @@ bool check_account(Log::Level log_level)
 	return (errors_fixed == 0);
 }
 
-int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
+int run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 {
 	std::string rootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
 	int discSet = rAccount.GetDiscSet();
@@ -298,6 +298,17 @@ int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 	return housekeeping.GetErrorCount();
 }
 
+int run_housekeeping()
+{
+	Logging::Tagger tag("", true);
+	Logging::ShowTagOnConsole show;
+	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+	BackupStoreAccountDatabase::Entry account =
+		apAccounts->GetEntry(0x1234567);
+	return run_housekeeping(account);
+}
+
 // Run housekeeping (for which we need to disconnect ourselves) and check
 // that it doesn't change the numbers of files.
 //
@@ -305,18 +316,7 @@ int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 
 bool run_housekeeping_and_check_account()
 {
-	int error_count;
-
-	{
-		Logging::Tagger tag("", true);
-		Logging::ShowTagOnConsole show;
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-		error_count = run_housekeeping(account);
-	}
-
+	int error_count = run_housekeeping();
 	TEST_EQUAL_LINE(0, error_count, "housekeeping errors");
 
 	bool check_account_is_ok = check_account();

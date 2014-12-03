@@ -42,6 +42,8 @@ typedef struct
 END_STRUCTURE_PACKING_FOR_WIRE
 #endif
 
+#define REFCOUNT_FILENAME "StoreObjectMetaBase"
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -62,7 +64,8 @@ private:
 	// Creation through static functions only
 	BackupStoreRefCountDatabase(const BackupStoreAccountDatabase::Entry&
 		rAccount, bool ReadOnly, bool Temporary,
-		std::auto_ptr<FileStream> apDatabaseFile);
+		std::auto_ptr<FileStream> apDatabaseFile,
+		bool CacheLastObjectIDUsed = true);
 	// No copying allowed
 	BackupStoreRefCountDatabase(const BackupStoreRefCountDatabase &);
 
@@ -73,31 +76,33 @@ public:
 		friend class BackupStoreRefCountDatabase;
 
 	protected:
-		int16_t mFlags;
-		refcount_t mRefCount;
 		uint64_t mSizeInBlocks;
 		uint64_t mDependsNewer;
 		uint64_t mDependsOlder;
+		refcount_t mRefCount;
+		int16_t mFlags;
 	public:
 		EntryData()
-		: mFlags(0),
-		  mRefCount(0),
-		  mSizeInBlocks(0),
+		: mSizeInBlocks(0),
 		  mDependsNewer(0),
-		  mDependsOlder(0)
+		  mDependsOlder(0),
+		  mRefCount(0),
+		  mFlags(0)
 		{ }
 
 		EntryData(const EntryData& data)
-		: mFlags(data.mFlags),
-		  mRefCount(data.mRefCount),
-		  mSizeInBlocks(data.mSizeInBlocks),
+		: mSizeInBlocks(data.mSizeInBlocks),
 		  mDependsNewer(data.mDependsNewer),
-		  mDependsOlder(data.mDependsOlder)
+		  mDependsOlder(data.mDependsOlder),
+		  mRefCount(data.mRefCount),
+		  mFlags(data.mFlags)
 		{ }
 	};
 
 	class Entry : public EntryData {
 		friend class BackupStoreRefCountDatabase;
+		friend class BackupStoreCheck;
+		friend class HousekeepStoreAccount;
 
 	private:
 		int64_t mObjectID;
@@ -131,6 +136,10 @@ public:
 		void SetRefCount(refcount_t NewRefCount)
 		{
 			mRefCount = NewRefCount;
+		}
+		void SetFlags(int16_t NewFlags)
+		{
+			mFlags = NewFlags;
 		}
 	public:
 		// Make sure these flags are synced with those in backupprocotol.txt
@@ -173,25 +182,11 @@ public:
 		}
 		void AddFlags(int16_t Flags)
 		{
-			if((mFlags & Flags) != Flags)
-			{
-				// TODO FIXME: should be allowed to change old
-				// flag even on immutable files, for conversion
-				// to patch.
-				AssertMutable();
-				mFlags |= Flags;
-			}
+			mFlags |= Flags;
 		}
 		void RemoveFlags(int16_t Flags)
 		{
-			if((mFlags & ~Flags) != Flags)
-			{
-				// TODO FIXME: should be allowed to change old
-				// flag even on immutable files, for conversion
-				// to patch.
-				AssertMutable();
-				mFlags &= ~Flags;
-			}
+			mFlags &= ~Flags;
 		}
 		int16_t GetFlags() const
 		{
@@ -245,34 +240,40 @@ public:
 		{
 			return mDependsNewer != 0 || mDependsOlder != 0;
 		}
+
 		void ReadFromStreamDependencyInfo(IOStream &rStream, int Timeout);
 		void WriteToStreamDependencyInfo(IOStream &rStream, int Timeout) const;
 	};
 
 	// Create a blank database, using a temporary file that you must
 	// Discard() or Commit() to make permanent.
-	static std::auto_ptr<BackupStoreRefCountDatabase> Create
-		(const BackupStoreAccountDatabase::Entry& rAccount);
+	static std::auto_ptr<BackupStoreRefCountDatabase> Create(
+		const BackupStoreAccountDatabase::Entry& rAccount,
+		int64_t RootDirectorySize, bool CacheLastObjectIDUsed = true);
 	void Commit();
 	void Discard();
 
 	// Load it from the store
-	static std::auto_ptr<BackupStoreRefCountDatabase> Load(const
-		BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly,
+		bool CacheLastObjectIDUsed = true);
 
 	// Data access functions
 	refcount_t GetRefCount(int64_t ObjectID)
 	{
 		return GetEntry(ObjectID).GetRefCount();
 	}
-	int64_t GetLastObjectIDUsed() const;
+	int64_t GetLastObjectIDUsed();
+	Entry GetOrCreateEntry(int64_t ObjectID);
 	Entry GetEntry(int64_t ObjectID)
 	{
 		// Returns a copy, therefore cache-safe and const.
+		ASSERT(ObjectID <= GetLastObjectIDUsed());
 		return Entry(ObjectID, GetEntryData(ObjectID));
 	}
 	void PutEntry(const Entry& entry)
 	{
+		ASSERT(entry.IsFile() || entry.IsDir());
 		PutEntryData(entry.mObjectID, entry);
 	}
 
@@ -280,6 +281,8 @@ public:
 	refcount_t AddReference(int64_t ObjectID);
 	refcount_t RemoveReference(int64_t ObjectID);
 	int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs);
+	void AddFlags(int64_t ObjectID, int16_t Flags);
+	void RemoveFlags(int64_t ObjectID, int16_t Flags);
 
 protected:
 	// Raw data read/write functions
@@ -312,6 +315,8 @@ private:
 	bool mIsModified;
 	bool mIsTemporaryFile;
 	std::auto_ptr<FileStream> mapDatabaseFile;
+	bool mCacheLastObjectIDUsed;
+	int64_t mLastObjectIDUsed;
 
 	bool NeedsCommitOrDiscard()
 	{

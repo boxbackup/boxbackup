@@ -614,3 +614,56 @@ void BackupStoreDirectory::Entry::WriteToStreamDependencyInfo(IOStream &rStream)
 	// Write
 	rStream.Write(&depends, sizeof(depends));
 }
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreDirectory::Entry::UpdateFrom(
+//			 BackupStoreRefCountDatabase&, DirectoryID)
+//		Purpose: The values in this directory entry will be checked
+//			 against those in the StoreObjectMetaBase entry, and
+//			 quietly updated if they don't match. No errors are
+//			 reported because it's impossible to keep all directory
+//			 entries in sync with the SOMB without a complete
+//			 reference database (which we don't have) or regularly
+//			 quietly updating them like this. Returns true if the
+//			 directory entry was modified.
+//		Created: 2014/11/26
+//
+// --------------------------------------------------------------------------
+
+bool BackupStoreDirectory::Entry::UpdateFrom(
+	const BackupStoreRefCountDatabase::Entry& rMetaBaseEntry,
+	int64_t DirectoryID)
+{
+	bool isModified = false;
+
+#define COMPARE_VALUES(name, somb_value, dir_value, fix_command) \
+	if(dir_value != somb_value) { \
+		BOX_TRACE("Directory " << \
+			BOX_FORMAT_OBJECTID(DirectoryID) << \
+			" entry " << BOX_FORMAT_OBJECTID(mObjectID) << \
+			" has different " #name << " than StoreObjectMetaBase:" \
+			" found " << dir_value << ", expected " << somb_value); \
+		fix_command(somb_value); \
+		isModified = true; \
+	}
+
+	COMPARE_VALUES("size", rMetaBaseEntry.GetSizeInBlocks(),
+		GetSizeInBlocks(), SetSizeInBlocks);
+	COMPARE_VALUES("depends newer", rMetaBaseEntry.GetDependsNewer(),
+		GetDependsNewer(), SetDependsNewer);
+	COMPARE_VALUES("depends newer", rMetaBaseEntry.GetDependsOlder(),
+		GetDependsOlder(), SetDependsOlder);
+	COMPARE_VALUES("flags", rMetaBaseEntry.GetFlags(),
+		GetFlags(), SetFlags);
+
+#undef COMPARE_VALUES
+
+	ASSERT(GetSizeInBlocks() == rMetaBaseEntry.GetSizeInBlocks());
+	ASSERT(GetDependsNewer() == rMetaBaseEntry.GetDependsNewer());
+	ASSERT(GetDependsOlder() == rMetaBaseEntry.GetDependsOlder());
+
+	return isModified;
+}

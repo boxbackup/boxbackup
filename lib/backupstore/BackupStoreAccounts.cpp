@@ -120,7 +120,7 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		info->Save();
 
 		// Create the refcount database
-		BackupStoreRefCountDatabase::Create(Entry)->Commit();
+		BackupStoreRefCountDatabase::Create(Entry, rootDirSize)->Commit();
 	}
 
 	// As the original user...

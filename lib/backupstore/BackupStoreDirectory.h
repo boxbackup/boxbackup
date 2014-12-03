@@ -106,7 +106,8 @@ public:
 		Entry(const Entry &rToCopy);
 		Entry(const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags, uint64_t AttributesHash);
 
-		void ReadFromStream(IOStream &rStream, int Timeout);
+		void ReadFromStream(IOStream &rStream,
+			int Timeout = IOStream::TimeOutInfinite);
 		void WriteToStream(IOStream &rStream) const;
 
 		const BackupStoreFilename &GetName() const
@@ -141,6 +142,11 @@ public:
 			ASSERT(!mInvalidated); // Compiled out of release builds
 			return mFlags;
 		}
+		void SetFlags(int16_t NewFlags)
+		{
+			ASSERT(!mInvalidated); // Compiled out of release builds
+			mFlags = NewFlags;
+		}
 		void AssertMutable(BackupStoreRefCountDatabase& rRefCount)
 		{
 			// No need to check parent directories, because other
@@ -156,37 +162,6 @@ public:
 					BOX_FORMAT_OBJECTID(mObjectID));
 			}
 		}
-		void AddFlags(int16_t Flags,
-			BackupStoreRefCountDatabase& rRefCount)
-		{
-			ASSERT(!mInvalidated); // Compiled out of release builds
-
-			if((mFlags & Flags) != Flags)
-			{
-				// TODO FIXME: should be allowed to change old
-				// flag even on immutable files, for conversion
-				// to patch.
-				AssertMutable(rRefCount);
-				mFlags |= Flags;
-			}
-
-		}
-		void RemoveFlags(int16_t Flags,
-			BackupStoreRefCountDatabase& rRefCount)
-		{
-			ASSERT(!mInvalidated); // Compiled out of release builds
-
-			if((mFlags & ~Flags) != Flags)
-			{
-				// TODO FIXME: should be allowed to change old
-				// flag even on immutable files, for conversion
-				// to patch.
-				AssertMutable(rRefCount);
-				mFlags &= ~Flags;
-			}
-		}
-		// Dangerous versions that affect only this directory, without
-		// updating the StoreObjectMetaBase
 		void AddFlags(int16_t Flags)
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
@@ -197,7 +172,6 @@ public:
 			ASSERT(!mInvalidated); // Compiled out of release builds
 			mFlags &= ~Flags;
 		}
-
 
 		// Some things can be changed
 		void SetName(const BackupStoreFilename &rNewName)
@@ -324,6 +298,9 @@ public:
 		}
 		void ReadFromStreamDependencyInfo(IOStream &rStream, int Timeout);
 		void WriteToStreamDependencyInfo(IOStream &rStream) const;
+		bool UpdateFrom(
+			const BackupStoreRefCountDatabase::Entry& rMetaBaseEntry,
+			int64_t DirectoryID);
 
 	private:
 		BackupStoreFilename mName;
