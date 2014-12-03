@@ -13,6 +13,7 @@ AccountNumber = 0x01234567
 
 AutomaticBackup = no
 UpdateStoreInterval = 0
+BackupErrorDelay = 10
 MinimumFileAge = 4
 MaxUploadWait = 24
 DeleteRedundantLocationsAfter = 10

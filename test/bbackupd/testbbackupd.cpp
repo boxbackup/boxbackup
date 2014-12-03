@@ -91,6 +91,7 @@
 // two cycles and a bit
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
 #define SHORT_TIMEOUT 5000
+#define BACKUP_ERROR_DELAY_SHORTENED 10
 
 std::string current_test_name;
 std::map<std::string, std::string> s_test_status;
@@ -328,7 +329,7 @@ bool unpack_files(const std::string& archive_file,
 		"-C " + destination_dir;
 #else
 	std::string cmd("gzip -d < testfiles/");
-	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xv " +
+	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xvf - " +
 		tar_options + ")";
 #endif
 
@@ -2881,7 +2882,7 @@ bool test_store_error_reporting()
 		// a random delay of up to mUpdateStoreInterval/64 or 0.05
 		// extra seconds) from store_fixed_time, so check that it
 		// hasn't run just before this time
-		wait_for_operation(BACKUP_ERROR_RETRY_SECONDS +
+		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED +
 			(store_fixed_time - time(NULL)) - 1,
 			"just before bbackupd recovers");
 		TEST_THAT(!TestFileExists("testfiles/"
@@ -2956,7 +2957,7 @@ bool test_store_error_reporting()
 		// a random delay of up to mUpdateStoreInterval/64 or 0.05
 		// extra seconds) from store_fixed_time, so check that it
 		// hasn't run just before this time
-		wait_for_operation(BACKUP_ERROR_RETRY_SECONDS +
+		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED +
 			(store_fixed_time - time(NULL)) - 1,
 			"just before bbackupd recovers");
 		TEST_THAT(!TestFileExists("testfiles/"
@@ -3789,7 +3790,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 		// Test that there *are* differences
 		TEST_COMPARE(Compare_Different);
 	
-		wait_for_operation(BACKUP_ERROR_RETRY_SECONDS,
+		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED,
 			"bbackupd to recover");
 
 		// Then check it has backed up successfully.
@@ -4020,7 +4021,7 @@ bool test_parse_incomplete_command()
 		// This is not a complete command, it should not parse!
 		BackupQueries::ParsedCommand cmd("-od", true);
 		TEST_THAT(cmd.mFailed);
-		TEST_EQUAL(0, cmd.pSpec);
+		TEST_EQUAL((void *)NULL, cmd.pSpec);
 		TEST_EQUAL(0, cmd.mCompleteArgCount);
 	}
 
