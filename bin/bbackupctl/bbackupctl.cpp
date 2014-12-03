@@ -173,7 +173,7 @@ int main(int argc, const char *argv[])
 	
 	// Wait for the configuration summary
 	std::string configSummary;
-	if(!getLine.GetLine(configSummary, PROTOCOL_DEFAULT_TIMEOUT))
+	if(!getLine.GetLine(configSummary, false, PROTOCOL_DEFAULT_TIMEOUT))
 	{
 		BOX_ERROR("Failed to receive configuration summary "
 			"from daemon");
@@ -206,7 +206,7 @@ int main(int argc, const char *argv[])
 		"  MaxUploadWait = " << maxUploadWait << " seconds");
 
 	std::string stateLine;
-	if(!getLine.GetLine(stateLine, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
+	if(!getLine.GetLine(stateLine, false, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
 	{
 		BOX_ERROR("Failed to receive state line from daemon");
 		return 1;
@@ -314,7 +314,8 @@ int main(int argc, const char *argv[])
 	bool syncIsRunning = false;
 	bool finished = false;
 
-	while(command != NoCommand && !finished && !getLine.IsEOF() && getLine.GetLine(line))
+	while(command != NoCommand && !finished && !getLine.IsEOF() &&
+		getLine.GetLine(line, false, PROTOCOL_DEFAULT_TIMEOUT))
 	{
 		switch (command)
 		{
