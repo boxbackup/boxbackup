@@ -188,7 +188,7 @@ bool check_dir(BackupStoreDirectory &dir, dir_en_check *ck)
 		++ck;
 	}
 
-	TEST_EQUAL_OR(en, 0, ok = false);
+	TEST_EQUAL_OR((void *)NULL, (void *)en, ok = false);
 	TEST_EQUAL_OR(ck->name, -1, ok = false);
 	return ok;
 }
