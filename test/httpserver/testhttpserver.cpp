@@ -34,6 +34,8 @@
 
 #include "MemLeakFindOn.h"
 
+#define SHORT_TIMEOUT 5000
+
 class TestWebServer : public HTTPServer
 {
 public:
@@ -182,8 +184,8 @@ int test(int argc, const char *argv[])
 		{
 			sleep(1); // need time for our process to realise
 			// that the peer has died, otherwise no SIGPIPE :(
-			TEST_CHECK_THROWS(request.Send(sock,
-				IOStream::TimeOutInfinite),
+			TEST_CHECK_THROWS(
+				request.Send(sock, SHORT_TIMEOUT),
 				ConnectionException, SocketWriteError);
 			sock.Close();
 			sock.Open(Socket::TypeINET, "localhost", 1080);
@@ -191,11 +193,11 @@ int test(int argc, const char *argv[])
 		}
 		else
 		{
-			request.Send(sock, IOStream::TimeOutInfinite);
+			request.Send(sock, SHORT_TIMEOUT);
 		}
 
 		HTTPResponse response;
-		response.Receive(sock);
+		response.Receive(sock, SHORT_TIMEOUT);
 		
 		TEST_THAT(response.GetResponseCode() == HTTPResponse::Code_OK);
 		TEST_THAT(response.GetContentType() == "text/html");
@@ -384,10 +386,10 @@ int test(int argc, const char *argv[])
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:0cSX/YPdtXua1aFFpYmH1tc0ajA=");
 		request.SetClientKeepAliveRequested(true);
-		request.Send(sock, IOStream::TimeOutInfinite);
+		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock);
+		response.Receive(sock, SHORT_TIMEOUT);
 		std::string value;
 		TEST_EQUAL(404, response.GetResponseCode());
 	}
@@ -403,10 +405,10 @@ int test(int argc, const char *argv[])
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
 		request.SetClientKeepAliveRequested(true);
-		request.Send(sock, IOStream::TimeOutInfinite);
+		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock);
+		response.Receive(sock, SHORT_TIMEOUT);
 		std::string value;
 		TEST_EQUAL(403, response.GetResponseCode());
 		TEST_THAT(chmod("testfiles/testrequests.pl", 0755) == 0);
@@ -420,10 +422,10 @@ int test(int argc, const char *argv[])
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
 		request.SetClientKeepAliveRequested(true);
-		request.Send(sock, IOStream::TimeOutInfinite);
+		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock);
+		response.Receive(sock, SHORT_TIMEOUT);
 		std::string value;
 		TEST_EQUAL(200, response.GetResponseCode());
 		TEST_EQUAL("qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY", response.GetHeaderValue("x-amz-id-2"));
@@ -447,9 +449,7 @@ int test(int argc, const char *argv[])
 		request.AddHeader("Content-Type", "text/plain");
 		FileStream fs("testfiles/testrequests.pl");
 		HTTPResponse response;
-		request.SendWithStream(sock,
-			IOStream::TimeOutInfinite /* or 10000 milliseconds */,
-			&fs, response);
+		request.SendWithStream(sock, SHORT_TIMEOUT, &fs, response);
 		std::string value;
 		TEST_EQUAL(200, response.GetResponseCode());
 		TEST_EQUAL("LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7", response.GetHeaderValue("x-amz-id-2"));
