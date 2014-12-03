@@ -533,6 +533,7 @@ void BackupDaemon::Run2()
 	// How often to connect to the store (approximate)
 	mUpdateStoreInterval = SecondsToBoxTime(
 		conf.GetKeyValueInt("UpdateStoreInterval"));
+	mBackupErrorDelay = conf.GetKeyValueInt("BackupErrorDelay");
 
 	// But are we connecting automatically?
 	bool automaticBackup = conf.GetKeyValueBool("AutomaticBackup");
@@ -784,7 +785,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 				"), reset state and waiting to retry...");
 			::sleep(10);
 			mNextSyncTime = GetCurrentBoxTime() +
-				SecondsToBoxTime(BACKUP_ERROR_RETRY_SECONDS) +
+				SecondsToBoxTime(mBackupErrorDelay) +
 				Random::RandomInt(mUpdateStoreInterval >>
 					SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 		}

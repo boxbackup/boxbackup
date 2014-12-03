@@ -11,6 +11,7 @@
 #include "BackupDaemonConfigVerify.h"
 #include "Daemon.h"
 #include "BoxPortsAndFiles.h"
+#include "BackupConstants.h"
 
 #include "MemLeakFindOn.h"
 
@@ -68,6 +69,8 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 		ConfigTest_Exists | ConfigTest_IsUint32),
 	ConfigurationVerifyKey("UpdateStoreInterval",
 		ConfigTest_Exists | ConfigTest_IsInt),
+	ConfigurationVerifyKey("BackupErrorDelay",
+		ConfigTest_Exists | ConfigTest_IsInt, BACKUP_ERROR_RETRY_SECONDS),
 	ConfigurationVerifyKey("MinimumFileAge",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("MaxUploadWait",

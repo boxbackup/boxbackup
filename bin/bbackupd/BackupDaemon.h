@@ -226,7 +226,8 @@ private:
 	bool mStorageLimitExceeded;
 	bool mReadErrorsOnFilesystemObjects;
 	box_time_t mLastSyncTime, mNextSyncTime;
-	box_time_t mCurrentSyncStartTime, mUpdateStoreInterval;
+	box_time_t mCurrentSyncStartTime, mUpdateStoreInterval,
+		  mBackupErrorDelay;
 	TLSContext mTlsContext;
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
