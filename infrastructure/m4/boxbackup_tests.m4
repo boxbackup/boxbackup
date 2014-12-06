@@ -235,6 +235,10 @@ AC_CHECK_MEMBERS([struct ucred.uid, struct ucred.cr_uid],,,
 		#ifdef HAVE_SYS_UCRED_H
 		#	include <sys/ucred.h>
 		#endif
+
+		#ifdef HAVE_SYS_SOCKET_H
+		#	include <sys/socket.h>
+		#endif
 	]])
 
 AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
