@@ -25,6 +25,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#ifdef HAVE_NETDB_H
+#	include <netdb.h>
+#endif
+
 #ifdef HAVE_SYS_SOCKET_H
 #	include <sys/socket.h>
 #endif
@@ -121,7 +125,7 @@ bool check_filedes(bool report)
 #ifdef HAVE_GETPEERNAME
 				if(getpeername(d, (sockaddr*)buffer, &addrlen) != 0)
 				{
-					BOX_WARNING("Failed to getpeername(" << 
+					BOX_LOG_SYS_WARNING("Failed to getpeername(" << 
 						d << "), cannot identify /dev/log");
 				}
 				else
@@ -230,12 +234,6 @@ int main(int argc, char * const * argv)
 
 	Logging::SetProgramName(BOX_MODULE);
 
-	#ifdef BOX_RELEASE_BUILD
-	int logLevel = Log::NOTICE; // need an int to do math with
-	#else
-	int logLevel = Log::INFO; // need an int to do math with
-	#endif
-
 	struct option longopts[] = 
 	{
 		{ "bbackupd-args",	required_argument, NULL, 'c' },
@@ -317,6 +315,13 @@ int main(int argc, char * const * argv)
 
 		// Count open file descriptors for a very crude "files left open" test
 		Logging::GetSyslog().Shutdown();
+
+		// On NetBSD, gethostbyname() appears to open a kqueue socket
+		// and it's not clear how to close it again. So let's just do
+		// it once, before counting fds for the first time, so that it's
+		// already open and doesn't count as a leak.
+		::gethostbyname("localhost");
+
 		check_filedes(false);
 
 		#ifdef WIN32
