@@ -3818,17 +3818,23 @@ bool test_changing_client_store_marker_pauses_daemon()
 			::fclose(f);
 		}
 
-		// Wait a little bit longer than usual
-		wait_for_operation((TIME_TO_WAIT_FOR_BACKUP_OPERATION * 
-			3) / 2, "bbackupd to detect changed store marker");
+		// Wait for bbackupd to detect the problem
+		wait_for_sync_end();
 
 		// Test that there *are* differences
 		TEST_COMPARE(Compare_Different);
-	
-		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED,
-			"bbackupd to recover");
 
-		// Then check it has backed up successfully.
+		// Wait out the expected delay in bbackupd	
+		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED - 1,
+			"just before bbackupd recovers");
+
+		// bbackupd should not have recovered yet, so there should
+		// still be differences.
+		TEST_COMPARE(Compare_Different);
+
+		// Now wait for it to recover and finish a sync, and check
+		// that the differences are gone (successful backup).
+		wait_for_operation(2, "bbackupd to recover");
 		TEST_COMPARE(Compare_Same);
 	}
 
