@@ -1866,7 +1866,6 @@ bool test_bbackupd_exclusions()
 	// BackupClientContext will mark us over limit immediately on
 	// connection.
 	TEST_THAT(change_account_limits("0B", "25B"));
-	TEST_THAT_OR(StartClient(), FAIL);
 
 	// Initial run to get the files backed up
 	{
