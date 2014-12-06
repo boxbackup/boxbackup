@@ -416,6 +416,32 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 	if (do_unpack_files)
 	{
 		TEST_THAT_OR(unpack_files("test_base"), FAIL);
+		// Older versions of GNU tar fail to set the timestamps on
+		// symlinks, which makes them appear too recent to be backed
+		// up immediately, causing test_bbackupd_uploads_files() for
+		// example to fail. So restore the timestamps manually.
+		// http://lists.gnu.org/archive/html/bug-tar/2009-08/msg00007.html
+		// http://git.savannah.gnu.org/cgit/tar.git/plain/NEWS?id=release_1_24
+		#ifdef HAVE_UTIMENSAT
+		const struct timespec times[2] = {
+			{1065707200, 0},
+			{1065707200, 0},
+		};
+		const char * filenames[] = {
+			"testfiles/TestDir1/symlink1",
+			"testfiles/TestDir1/symlink2",
+			"testfiles/TestDir1/symlink3",
+			NULL,
+		};
+		for (int i = 0; filenames[i] != NULL; i++)
+		{
+			TEST_THAT_OR(utimensat(AT_FDCWD, filenames[i],
+				times, AT_SYMLINK_NOFOLLOW) == 0,
+				BOX_LOG_SYS_ERROR("Failed to change "
+					"timestamp on symlink: " <<
+					filenames[i]));
+		}
+		#endif
 	}
 
 	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
