@@ -70,7 +70,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("UpdateStoreInterval",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("BackupErrorDelay",
-		ConfigTest_Exists | ConfigTest_IsInt, BACKUP_ERROR_RETRY_SECONDS),
+		ConfigTest_IsInt, BACKUP_ERROR_RETRY_SECONDS),
 	ConfigurationVerifyKey("MinimumFileAge",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("MaxUploadWait",
