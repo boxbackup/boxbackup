@@ -654,9 +654,18 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 		}
 		else if(listSize<0)
 		{
-			if(errno == EOPNOTSUPP || errno == EACCES)
+			if(errno == EOPNOTSUPP || errno == EACCES
+#if HAVE_DECL_ENOTSUP
+				// NetBSD uses ENOTSUP instead
+				// https://mail-index.netbsd.org/tech-kern/2011/12/13/msg012185.html
+				|| errno == ENOTSUP
+#endif
+			)
 			{
-				// fail silently
+				// Not supported by OS, or not on this filesystem
+				BOX_TRACE(BOX_SYS_ERRNO_MESSAGE(errno,
+					BOX_FILE_MESSAGE(Filename, "Failed to "
+						"list extended attributes")));
 			}
 			else if(errno == ERANGE)
 			{
@@ -673,7 +682,7 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 			else
 			{
 				THROW_SYS_FILE_ERROR("Failed to list extended "
-					"attributes, skipping them", Filename,
+					"attributes for unknown reason", Filename,
 					CommonException, OSFileError);
 			}
 		}
