@@ -519,10 +519,10 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 	if(::getsockopt(mSocketHandle, SOL_SOCKET, SO_PEERCRED, &cred,
 		&credLen) == 0)
 	{
-#ifdef HAVE_STRUCT_CRED_UID
+#ifdef HAVE_STRUCT_UCRED_UID
 		rUidOut = cred.uid;
 		rGidOut = cred.gid;
-#else // HAVE_STRUCT_CRED_CR_UID
+#else // HAVE_STRUCT_UCRED_CR_UID
 		rUidOut = cred.cr_uid;
 		rGidOut = cred.cr_gid;
 #endif
