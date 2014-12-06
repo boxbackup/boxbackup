@@ -15,7 +15,7 @@
 
 #include <cstdlib>
 
-#ifdef SHOW_BACKTRACE_ON_EXCEPTION
+#ifdef HAVE_EXECINFO_H
 	#include <execinfo.h>
 	#include <stdlib.h>
 #endif
@@ -95,7 +95,6 @@ void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOu
 #endif*/
 }
 
-#ifdef SHOW_BACKTRACE_ON_EXCEPTION
 static std::string demangle(const std::string& mangled_name)
 {
 	std::string demangled_name = mangled_name;
@@ -146,6 +145,7 @@ static std::string demangle(const std::string& mangled_name)
 
 void DumpStackBacktrace()
 {
+#ifdef HAVE_EXECINFO_H
 	void  *array[20];
 	size_t size = backtrace(array, 20);
 	BOX_TRACE("Obtained " << size << " stack frames.");
@@ -182,8 +182,10 @@ void DumpStackBacktrace()
 
 		BOX_TRACE(output.str());
 	}
+#else // !HAVE_EXECINFO_H
+	BOX_TRACE("Backtrace support was not compiled in");
+#endif // HAVE_EXECINFO_H
 }
-#endif // SHOW_BACKTRACE_ON_EXCEPTION
 
 
 

@@ -19,9 +19,7 @@ std::string GetBoxBackupVersion();
 
 void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOutput);
 
-#ifdef SHOW_BACKTRACE_ON_EXCEPTION
-	void DumpStackBacktrace();
-#endif
+void DumpStackBacktrace();
 
 bool FileExists(const std::string& rFilename, int64_t *pFileSize = 0,
 	bool TreatLinksAsNotExisting = false);
