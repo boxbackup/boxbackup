@@ -116,6 +116,16 @@ bool readxattr_into_map(const char *filename, std::map<std::string,std::string> 
 	ssize_t xattrNamesBufferSize = llistxattr(filename, NULL, 0);
 	if(xattrNamesBufferSize < 0)
 	{
+#if HAVE_DECL_ENOTSUP
+		if(errno == ENOTSUP)
+		{
+			// Pretend that it worked, leaving an empty map, so
+			// that the rest of the attribute comparison will
+			// proceed as normal.
+			return true;
+		}
+#endif // HAVE_DECL_ENOTSUP
+
 		return false;
 	}
 	else if(xattrNamesBufferSize > 0)
