@@ -29,6 +29,14 @@
 	#include <bsd/unistd.h>
 #endif
 
+#ifdef HAVE_SYS_PARAM_H
+	#include <sys/param.h>
+#endif
+
+#ifdef HAVE_SYS_UCRED_H
+	#include <sys/ucred.h>
+#endif
+
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
 #include "SocketStream.h"
@@ -511,8 +519,13 @@ bool SocketStream::GetPeerCredentials(uid_t &rUidOut, gid_t &rGidOut)
 	if(::getsockopt(mSocketHandle, SOL_SOCKET, SO_PEERCRED, &cred,
 		&credLen) == 0)
 	{
+#ifdef HAVE_STRUCT_CRED_UID
 		rUidOut = cred.uid;
 		rGidOut = cred.gid;
+#else // HAVE_STRUCT_CRED_CR_UID
+		rUidOut = cred.cr_uid;
+		rGidOut = cred.cr_gid;
+#endif
 		return true;
 	}
 

@@ -138,6 +138,11 @@ AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
 AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
 AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/time.h])
 AC_CHECK_HEADERS([sys/types.h sys/uio.h sys/un.h sys/wait.h sys/xattr.h])
+AC_CHECK_HEADERS([sys/ucred.h],,, [
+	#ifdef HAVE_SYS_PARAM_H
+	#	include <sys/param.h>
+	#endif
+	])
 AC_CHECK_HEADERS([bsd/unistd.h])
 AC_CHECK_HEADERS([sys/socket.h], [have_sys_socket_h=yes])
 AC_CHECK_HEADERS([winsock2.h], [have_winsock2_h=yes])
@@ -217,6 +222,20 @@ fi
 # Solaris provides getpeerucred() instead of getpeereid() or SO_PEERCRED
 AC_CHECK_HEADERS([ucred.h])
 AC_CHECK_FUNCS([getpeerucred])
+AC_CHECK_MEMBERS([struct ucred.uid, struct ucred.cr_uid],,,
+	[[
+		#ifdef HAVE_UCRED_H
+		#	include <ucred.h>
+		#endif
+
+		#ifdef HAVE_SYS_PARAM_H
+		#	include <sys/param.h>
+		#endif
+
+		#ifdef HAVE_SYS_UCRED_H
+		#	include <sys/ucred.h>
+		#endif
+	]])
 
 AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
 AC_CHECK_DECLS([dirfd],,,
