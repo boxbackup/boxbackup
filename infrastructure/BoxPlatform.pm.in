@@ -1,7 +1,7 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
+@EXPORT = qw/$build_os $build_os_ver $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
 
 BEGIN
 {
@@ -25,16 +25,37 @@ BEGIN
 	# Box Backup tried on Win2000,XP only :)
 	$build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
 	$build_os = 'MINGW32' if $build_os =~ m/MINGW32/;
+	$build_os_ver = `uname -r`;
+	chomp $build_os_ver;
 
 	if ($build_os eq 'Darwin') {
 		$xcode_ver = `xcodebuild -version | awk '/^Xcode/ {print \$2}'`
 	}
 
-	$make_command = ($build_os eq 'Darwin' && $xcode_ver < 4) ? 'bsdmake' : ($build_os eq 'SunOS') ? 'gmake' : 'make';
-
-	$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' &&
-		$build_os ne "MINGW32" && $build_os ne "SunOS"
-		&& $build_os ne 'GNU/kFreeBSD' && $xcode_ver < 4);
+	if ($build_os eq 'Darwin' and $xcode_ver < 4)
+	{
+   	$make_command = 'bsdmake';
+		$bsd_make = 1;
+	}
+	elsif ($build_os eq 'SunOS')
+	{
+		if ($build_os_ver <= 5.10)
+		{
+			$make_command = 'gmake';
+			$bsd_make = 0;
+		}
+		else
+		{
+			$make_command = 'bmake';
+			$bsd_make = 1;
+		}
+	}
+	else
+	{
+		$make_command = 'make';
+		$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' &&
+			$build_os ne "MINGW32" && $build_os ne 'GNU/kFreeBSD');
+	}
 
 	# blank extra flags by default
 	$platform_compile_line_extra = '';

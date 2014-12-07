@@ -20,7 +20,8 @@ my @implicit_deps = ('lib/common');
 use lib 'infrastructure';
 use BoxPlatform;
 
-print "Building on '$build_os'.\n\n";
+print "Building on '$build_os $build_os_ver' using ".
+	($bsd_make ? "BSD" : "GNU")." $make_command.\n\n";
 
 # keep copy of command line args
 my $makebuildenv_args = join(' ',@ARGV);
