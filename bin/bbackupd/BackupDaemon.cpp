@@ -756,9 +756,8 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 		// Handle restart?
 		if(StopRun())
 		{
-			BOX_NOTICE("Exception (" << errorCode
-				<< "/" << errorSubCode 
-				<< ") due to signal");
+			BOX_NOTICE("Exception (" << errorCode << "/" <<
+				errorSubCode << ") due to signal");
 			OnBackupFinish();
 			return mapClientContext; // releases mapClientContext
 		}

@@ -241,21 +241,20 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	EMU_STRUCT_STAT link_st;
 	if(EMU_LSTAT(rLocalPath.c_str(), &link_st) != 0)
 	{
-		// Report the error (logs and 
-		// eventual email to administrator)
-		rNotifier.NotifyFileStatFailed(this, 
+		// Report the error (logs and eventual email to administrator)
+		rNotifier.NotifyFileStatFailed(this,
 			ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
 			strerror(errno));
-		
-		// FIXME move to NotifyFileStatFailed()
+
+		// TODO FIXME move to NotifyFileStatFailed()
 		SetErrorWhenReadingFilesystemObject(rParams, rLocalPath);
-		
+
 		// This shouldn't happen, so we'd better not continue
 		THROW_EXCEPTION(CommonException, OSFileError)
 	}
 
 	// BLOCK
-	{		
+	{
 		// read the contents...
 		DIR *dirHandle = 0;
 		try
@@ -267,8 +266,7 @@ void BackupClientDirectoryRecord::SyncDirectory(
 			dirHandle = ::opendir(rLocalPath.c_str());
 			if(dirHandle == 0)
 			{
-				// Report the error (logs and 
-				// eventual email to administrator)
+				// Report the error (logs and eventual email to administrator)
 				if (errno == EACCES)
 				{
 					rNotifier.NotifyDirListFailed(this,
