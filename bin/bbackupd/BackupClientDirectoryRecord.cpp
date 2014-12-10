@@ -1865,9 +1865,10 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(SyncParams &, const char *)
-//		Purpose: Sets the error state when there were problems reading an object
-//				 from the filesystem.
+//		Name:    BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(
+//			 SyncParams &, const char *)
+//		Purpose: Sets the error state when there were problems
+//			 reading an object from the filesystem.
 //		Created: 29/3/04
 //
 // --------------------------------------------------------------------------
@@ -1878,11 +1879,12 @@ void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(
 	// Zero hash, so it gets synced properly next time round.
 	::memset(mStateChecksum, 0, sizeof(mStateChecksum));
 
-	// Log the error - already done by caller
-	/*
-	rParams.GetProgressNotifier().NotifyFileReadFailed(this, 
-		Filename, strerror(errno));
-	*/
+	// More detailed logging was already done by the caller, but if we
+	// have a read error reported, we need to be able to search the logs
+	// to find out which file it was, so we need to log a consistent and
+	// clear error message.
+	BOX_WARNING("Failed to backup file, see above for details: " <<
+		rFilename);
 
 	// Mark that an error occured in the parameters object
 	rParams.mReadErrorsOnFilesystemObjects = true;
