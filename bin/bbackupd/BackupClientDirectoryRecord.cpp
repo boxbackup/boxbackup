@@ -1927,6 +1927,7 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(
   mMaxFileTimeInFuture(99999999999999999LL),
   mFileTrackingSizeThreshold(16*1024),
   mDiffingUploadSizeThreshold(16*1024),
+  mpBackgroundTask(pBackgroundTask),
   mrRunStatusProvider(rRunStatusProvider),
   mrSysadminNotifier(rSysadminNotifier),
   mrProgressNotifier(rProgressNotifier),
@@ -1934,7 +1935,6 @@ BackupClientDirectoryRecord::SyncParams::SyncParams(
   mReadErrorsOnFilesystemObjects(false),
   mMaxUploadRate(0),
   mUploadAfterThisTimeInTheFuture(99999999999999999LL),
-  mpBackgroundTask(pBackgroundTask),
   mHaveLoggedWarningAboutFutureFileTimes(false)
 {
 }
