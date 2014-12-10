@@ -627,6 +627,9 @@ void BackupDaemon::Run2()
 				? 1 : sleepSeconds);
 		}
 
+		// We have now slept, so if automaticBackup is enabled then
+		// it's time for a backup now.
+
 		if(StopRun())
 		{
 			BOX_INFO("Stopping idle loop due to shutdown request");
@@ -636,12 +639,6 @@ void BackupDaemon::Run2()
 		{
 			BOX_INFO("Starting a backup immediately due to "
 				"bbackupctl sync command");
-		}
-		else if(currentTime < mNextSyncTime)
-		{
-			BOX_TRACE("Sleeping again because next sync time "
-				"has not arrived");
-			continue;
 		}
 		else if(mDoSyncForcedByPreviousSyncError)
 		{
