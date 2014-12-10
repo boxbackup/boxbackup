@@ -352,8 +352,10 @@ Daemon* spDaemon = NULL;
 bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 {
 	// Stop bbackupd initialisation from changing the console logging level
+	// and the program name tag.
 	Logger& console(Logging::GetConsole());
 	Logger::LevelGuard guard(console, console.GetLevel());
+	Logging::Tagger();
 
 	std::vector<std::string> args;
 	size_t last_arg_start = 0;
@@ -3823,12 +3825,15 @@ bool test_changing_client_store_marker_pauses_daemon()
 
 		// Wait for bbackupd to detect the problem
 		wait_for_sync_end();
+		int sync_end_time = time(NULL);
 
 		// Test that there *are* differences
 		TEST_COMPARE(Compare_Different);
 
-		// Wait out the expected delay in bbackupd	
-		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED - 1,
+		// Wait out the expected delay in bbackupd
+		int current_time = time(NULL);
+		wait_for_operation(sync_end_time - current_time +
+			BACKUP_ERROR_DELAY_SHORTENED - 1,
 			"just before bbackupd recovers");
 
 		// bbackupd should not have recovered yet, so there should
