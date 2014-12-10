@@ -13,6 +13,18 @@
 
 #include <dirent.h>
 
+#ifdef __NetBSD__  //__NetBSD_Version__ is defined in sys/param.h
+#include <sys/param.h>
+#endif
+
+#if defined __NetBSD_Version__ && __NetBSD_Version__ >= 399000800 //3.99.8 vers.
+#define FUNC_OPENDIR "__opendir30"
+#define FUNC_READDIR "__readdir30"
+#else
+#define FUNC_OPENDIR "opendir"
+#define FUNC_READDIR "readdir"
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 

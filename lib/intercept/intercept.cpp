@@ -514,7 +514,7 @@ DIR *opendir(const char *dirname)
 {
 	if (opendir_real == NULL)
 	{
-		opendir_real = (opendir_t*)find_function("opendir");
+		opendir_real = (opendir_t*)find_function(FUNC_OPENDIR);
 	}
 
 	if (opendir_real == NULL)
@@ -547,7 +547,7 @@ struct dirent *readdir(DIR *dir)
 
 	if (readdir_real == NULL)
 	{
-		readdir_real = (readdir_t*)find_function("readdir");
+		readdir_real = (readdir_t*)find_function(FUNC_READDIR);
 	}
 
 	if (readdir_real == NULL)
