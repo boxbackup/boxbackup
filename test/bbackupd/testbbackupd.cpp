@@ -2083,6 +2083,9 @@ bool test_bbackupd_uploads_files()
 
 	// TODO FIXME dedent
 	{
+		// The files were all unpacked with timestamps in the past,
+		// so no delay should be needed to make them eligible to be
+		// backed up.
 		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Same);
 	}
