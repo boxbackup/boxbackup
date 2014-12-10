@@ -141,6 +141,17 @@ public:
 		const Location& rBackupLocation,
 		bool ThisDirHasJustBeenCreated = false);
 
+	bool SyncDirectoryEntry(SyncParams &rParams,
+		ProgressNotifier& rNotifier,
+		const Location& rBackupLocation,
+		const std::string &rDirLocalPath,
+		MD5Digest& currentStateChecksum,
+		struct dirent *en,
+		EMU_STRUCT_STAT dir_st,
+		std::vector<std::string>& rDirs,
+		std::vector<std::string>& rFiles,
+		bool& rDownloadDirectoryRecordBecauseOfFutureFiles);
+
 	std::string ConvertVssPathToRealPath(const std::string &rVssPath,
 		const Location& rBackupLocation);
 

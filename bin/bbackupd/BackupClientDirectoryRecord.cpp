@@ -287,20 +287,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				// Ignore this directory for now.
 				return;
 			}
-			
-			// Basic structure for checksum info
-			struct {
-				box_time_t mModificationTime;
-				box_time_t mAttributeModificationTime;
-				int64_t mSize;
-				// And then the name follows
-			} checksum_info;
-			// Be paranoid about structure packing
-			::memset(&checksum_info, 0, sizeof(checksum_info));
-	
+
 			struct dirent *en = 0;
-			EMU_STRUCT_STAT file_st;
-			std::string filename;
 			int num_entries_found = 0;
 
 			while((en = ::readdir(dirHandle)) != 0)
@@ -314,232 +302,13 @@ void BackupClientDirectoryRecord::SyncDirectory(
 						num_entries_found, 0);
 				}
 
-				// Don't need to use
-				// LinuxWorkaround_FinishDirentStruct(en,
-				// rLocalPath.c_str());
-				// on Linux, as a stat is performed to
-				// get all this info
-
-				if(en->d_name[0] == '.' && 
-					(en->d_name[1] == '\0' || (en->d_name[1] == '.' && en->d_name[2] == '\0')))
+				if (!SyncDirectoryEntry(rParams, rNotifier,
+					rBackupLocation, rLocalPath,
+					currentStateChecksum, en, dest_st, dirs,
+					files, downloadDirectoryRecordBecauseOfFutureFiles))
 				{
-					// ignore, it's . or ..
+					// This entry is not to be backed up.
 					continue;
-				}
-
-				// Stat file to get info
-				filename = MakeFullPath(rLocalPath, en->d_name);
-				std::string realFileName = ConvertVssPathToRealPath(filename,
-					rBackupLocation);
-
-				#ifdef WIN32
-				// Don't stat the file just yet, to ensure
-				// that users can exclude unreadable files
-				// to suppress warnings that they are
-				// not accessible.
-				//
-				// Our emulated readdir() abuses en->d_type, 
-				// which would normally contain DT_REG, 
-				// DT_DIR, etc, but we only use it here and 
-				// prefer to have the full file attributes.
-				int type;
-				if (en->d_type & FILE_ATTRIBUTE_DIRECTORY)
-				{
-					type = S_IFDIR;
-				}
-				else
-				{
-					type = S_IFREG;
-				}
-
-				#else // !WIN32
-				if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
-				{
-					if(!(rParams.mrContext.ExcludeDir(
-						filename)))
-					{
-						// Report the error (logs and 
-						// eventual email to
-						// administrator)
- 						rNotifier.NotifyFileStatFailed(
-							this, filename,
-							strerror(errno));
-					
-						// FIXME move to
-						// NotifyFileStatFailed()
-						SetErrorWhenReadingFilesystemObject(rParams, filename);
-					}
-
-					// Ignore this entry for now.
-					continue;
-				}
-
-				int type = file_st.st_mode & S_IFMT;
-
-				// ecryptfs reports nlink > 1 for directories
-				// with contents, but no filesystem supports
-				// hardlinking directories? so we can ignore
-				// this if the entry is a directory.
-				if(file_st.st_nlink != 1 && type == S_IFDIR)
-				{
-					BOX_INFO("Ignoring apparent hard link "
-						"count on directory: " <<
-						filename << ", nlink=" <<
-						file_st.st_nlink);
-				}
-				else if(file_st.st_nlink > 1)
-				{
-					if(!mSuppressMultipleLinksWarning)
-					{
-						BOX_WARNING("File is hard linked, this may "
-							"cause rename tracking to fail and "
-							"move files incorrectly in your "
-							"backup! " << filename << 
-							", nlink=" << file_st.st_nlink <<
-							" (suppressing further warnings)");
-						mSuppressMultipleLinksWarning = true;
-					}
-					SetErrorWhenReadingFilesystemObject(rParams, filename);
-				}
-
-				BOX_TRACE("Stat entry '" << filename << "' "
-					"found device/inode " <<
-					file_st.st_dev << "/" <<
-					file_st.st_ino);
-
-				/* Workaround for apparent btrfs bug, where
-				symlinks appear to be on a different filesystem
-				than their containing directory, thanks to
-				Toke Hoiland-Jorgensen */
-				if(type == S_IFDIR &&
-					file_st.st_dev != dest_st.st_dev)
-				{
-					if(!(rParams.mrContext.ExcludeDir(
-						filename)))
-					{
-						rNotifier.NotifyMountPointSkipped(
-							this, filename);
-					}
-					continue;
-				}
-				#endif
-
-				if(type == S_IFREG || type == S_IFLNK)
-				{
-					// File or symbolic link
-
-					// Exclude it?
-					if(rParams.mrContext.ExcludeFile(realFileName))
-					{
- 						rNotifier.NotifyFileExcluded(this, realFileName);
-						// Next item!
-						continue;
-					}
-
-					// Store on list
-					files.push_back(std::string(en->d_name));
-				}
-				else if(type == S_IFDIR)
-				{
-					// Directory
-
-					// Exclude it?
-					if(rParams.mrContext.ExcludeDir(realFileName))
-					{
- 						rNotifier.NotifyDirExcluded(this, realFileName);
-
-						// Next item!
-						continue;
-					}
-
-					#ifdef WIN32
-					// exclude reparse points, as Application Data points to the
-					// parent directory under Vista and later, and causes an
-					// infinite loop: 
-					// http://social.msdn.microsoft.com/forums/en-US/windowscompatibility/thread/05d14368-25dd-41c8-bdba-5590bf762a68/
-					if (en->d_type & FILE_ATTRIBUTE_REPARSE_POINT)
-					{
- 						rNotifier.NotifyMountPointSkipped(this, realFileName);
-						continue;
-					}
-					#endif
-
-					// Store on list
-					dirs.push_back(std::string(en->d_name));
-				}
-				else // not a file or directory, what is it?
-				{
-					if (type == S_IFSOCK
-#						ifndef WIN32
-						|| type == S_IFIFO
-#						endif
-						)
-					{
-						// removed notification for these types
-						// see Debian bug 479145, no objections
-					}
-					else if(rParams.mrContext.ExcludeFile(realFileName))
-					{
- 						rNotifier.NotifyFileExcluded(this, realFileName);
-					}
-					else
-					{
- 						rNotifier.NotifyUnsupportedFileType(this,
-							realFileName);
-						SetErrorWhenReadingFilesystemObject(rParams,
-							realFileName);
-					}
-
-					continue;
-				}
-				
-				// Here if the object is something to back up (file, symlink or dir, not excluded)
-				// So make the information for adding to the checksum
-				
-				#ifdef WIN32
-				// We didn't stat the file before,
-				// but now we need the information.
-				if(emu_stat(filename.c_str(), &file_st) != 0)
-				{
- 					rNotifier.NotifyFileStatFailed(this, 
-							ConvertVssPathToRealPath(filename, rBackupLocation),
-							strerror(errno));
-					
-					// Report the error (logs and 
-					// eventual email to administrator)
-					SetErrorWhenReadingFilesystemObject(rParams, filename);
-
-					// Ignore this entry for now.
-					continue;
-				}
-
-				if(file_st.st_dev != link_st.st_dev)
-				{
- 					rNotifier.NotifyMountPointSkipped(this, 
-						ConvertVssPathToRealPath(filename, rBackupLocation));
-					continue;
-				}
-				#endif
-
-				checksum_info.mModificationTime = FileModificationTime(file_st);
-				checksum_info.mAttributeModificationTime = FileAttrModificationTime(file_st);
-				checksum_info.mSize = file_st.st_size;
-				currentStateChecksum.Add(&checksum_info, sizeof(checksum_info));
-				currentStateChecksum.Add(en->d_name, strlen(en->d_name));
-				
-				// If the file has been modified madly into the future, download the 
-				// directory record anyway to ensure that it doesn't get uploaded
-				// every single time the disc is scanned.
-				if(checksum_info.mModificationTime > rParams.mUploadAfterThisTimeInTheFuture)
-				{
-					downloadDirectoryRecordBecauseOfFutureFiles = true;
-					// Log that this has happened
-					if(!rParams.mHaveLoggedWarningAboutFutureFileTimes)
-					{
-						rNotifier.NotifyFileModifiedInFuture(this,
-							ConvertVssPathToRealPath(filename, rBackupLocation));
-						rParams.mHaveLoggedWarningAboutFutureFileTimes = true;
-					}
 				}
 			}
 	
@@ -640,6 +409,249 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	// Flag things as having happened.
 	mInitialSyncDone = true;
 	mSyncDone = true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupClientDirectoryRecord::SyncDirectorEntry(
+//			 BackupClientDirectoryRecord::SyncParams &,
+//			 int64_t, const std::string &,
+//			 const std::string &, bool)
+//		Purpose: Recursively synchronise a local directory
+//			 with the server.
+//		Created: 2003/10/08
+//
+// --------------------------------------------------------------------------
+bool BackupClientDirectoryRecord::SyncDirectoryEntry(
+	BackupClientDirectoryRecord::SyncParams &rParams,
+	ProgressNotifier& rNotifier,
+	const Location& rBackupLocation,
+	const std::string &rDirLocalPath,
+	MD5Digest& currentStateChecksum,
+	struct dirent *en,
+	EMU_STRUCT_STAT dir_st,
+	std::vector<std::string>& rDirs,
+	std::vector<std::string>& rFiles,
+	bool& rDownloadDirectoryRecordBecauseOfFutureFiles)
+{
+	std::string entry_name = en->d_name;
+	if(entry_name == "." || entry_name == "..")
+	{
+		// ignore parent directory entries
+		return false;
+	}
+
+	// Stat file to get info
+	std::string filename = MakeFullPath(rDirLocalPath, entry_name);
+	std::string realFileName = ConvertVssPathToRealPath(filename,
+		rBackupLocation);
+	EMU_STRUCT_STAT file_st;
+
+#ifdef WIN32
+	// Don't stat the file just yet, to ensure that users can exclude
+	// unreadable files to suppress warnings that they are not accessible.
+	//
+	// Our emulated readdir() abuses en->d_type, which would normally
+	// contain DT_REG, DT_DIR, etc, but we only use it here and prefer to
+	// have the full file attributes.
+
+	int type;
+	if (en->d_type & FILE_ATTRIBUTE_DIRECTORY)
+	{
+		type = S_IFDIR;
+	}
+	else
+	{
+		type = S_IFREG;
+	}
+#else // !WIN32
+	if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
+	{
+		if(!(rParams.mrContext.ExcludeDir(filename)))
+		{
+			// Report the error (logs and eventual email to
+			// administrator)
+			rNotifier.NotifyFileStatFailed(this, filename,
+				strerror(errno));
+		
+			// FIXME move to NotifyFileStatFailed()
+			SetErrorWhenReadingFilesystemObject(rParams, filename);
+		}
+
+		// Ignore this entry for now.
+		return false;
+	}
+
+	int type = file_st.st_mode & S_IFMT;
+
+	// ecryptfs reports nlink > 1 for directories
+	// with contents, but no filesystem supports
+	// hardlinking directories? so we can ignore
+	// this if the entry is a directory.
+	if(file_st.st_nlink != 1 && type == S_IFDIR)
+	{
+		BOX_INFO("Ignoring apparent hard link count on directory: " <<
+			filename << ", nlink=" << file_st.st_nlink);
+	}
+	else if(file_st.st_nlink > 1)
+	{
+		if(!mSuppressMultipleLinksWarning)
+		{
+			BOX_WARNING("File is hard linked, this may cause "
+				"rename tracking to fail and move files "
+				"incorrectly in your backup! " << filename <<
+				", nlink=" << file_st.st_nlink <<
+				" (suppressing further warnings)");
+			mSuppressMultipleLinksWarning = true;
+		}
+		SetErrorWhenReadingFilesystemObject(rParams, filename);
+	}
+
+	BOX_TRACE("Stat entry '" << filename << "' found device/inode " <<
+		file_st.st_dev << "/" << file_st.st_ino);
+
+	// Workaround for apparent btrfs bug, where symlinks appear to be on
+	// a different filesystem than their containing directory, thanks to
+	// Toke Hoiland-Jorgensen.
+
+	if(type == S_IFDIR && file_st.st_dev != dir_st.st_dev)
+	{
+		if(!(rParams.mrContext.ExcludeDir(filename)))
+		{
+			rNotifier.NotifyMountPointSkipped(this, filename);
+		}
+		return false;
+	}
+#endif
+
+	if(type == S_IFREG || type == S_IFLNK)
+	{
+		// File or symbolic link
+
+		// Exclude it?
+		if(rParams.mrContext.ExcludeFile(realFileName))
+		{
+			rNotifier.NotifyFileExcluded(this, realFileName);
+			// Next item!
+			return false;
+		}
+
+		// Store on list
+		rFiles.push_back(entry_name);
+	}
+	else if(type == S_IFDIR)
+	{
+		// Directory
+
+		// Exclude it?
+		if(rParams.mrContext.ExcludeDir(realFileName))
+		{
+			rNotifier.NotifyDirExcluded(this, realFileName);
+
+			// Next item!
+			return false;
+		}
+
+		#ifdef WIN32
+		// exclude reparse points, as Application Data points to the
+		// parent directory under Vista and later, and causes an
+		// infinite loop:
+		// http://social.msdn.microsoft.com/forums/en-US/windowscompatibility/thread/05d14368-25dd-41c8-bdba-5590bf762a68/
+		if (en->d_type & FILE_ATTRIBUTE_REPARSE_POINT)
+		{
+			rNotifier.NotifyMountPointSkipped(this, realFileName);
+			return false;
+		}
+		#endif
+
+		// Store on list
+		rDirs.push_back(entry_name);
+	}
+	else // not a file or directory, what is it?
+	{
+		if (type == S_IFSOCK
+#ifndef WIN32
+			|| type == S_IFIFO
+#endif
+			)
+		{
+			// removed notification for these types
+			// see Debian bug 479145, no objections
+		}
+		else if(rParams.mrContext.ExcludeFile(realFileName))
+		{
+			rNotifier.NotifyFileExcluded(this, realFileName);
+		}
+		else
+		{
+			rNotifier.NotifyUnsupportedFileType(this, realFileName);
+			SetErrorWhenReadingFilesystemObject(rParams,
+				realFileName);
+		}
+
+		return false;
+	}
+	
+	// Here if the object is something to back up (file, symlink or dir, not excluded)
+	// So make the information for adding to the checksum
+	
+	#ifdef WIN32
+	// We didn't stat the file before,
+	// but now we need the information.
+	if(emu_stat(filename.c_str(), &file_st) != 0)
+	{
+		rNotifier.NotifyFileStatFailed(this,
+				ConvertVssPathToRealPath(filename, rBackupLocation),
+				strerror(errno));
+		
+		// Report the error (logs and eventual email to administrator)
+		SetErrorWhenReadingFilesystemObject(rParams, filename);
+
+		// Ignore this entry for now.
+		return false;
+	}
+
+	if(file_st.st_dev != link_st.st_dev)
+	{
+		rNotifier.NotifyMountPointSkipped(this,
+			ConvertVssPathToRealPath(filename, rBackupLocation));
+		return false;
+	}
+	#endif
+
+	// Basic structure for checksum info
+	struct {
+		box_time_t mModificationTime;
+		box_time_t mAttributeModificationTime;
+		int64_t mSize;
+		// And then the name follows
+	} checksum_info;
+	// Be paranoid about structure packing
+	::memset(&checksum_info, 0, sizeof(checksum_info));
+
+	checksum_info.mModificationTime = FileModificationTime(file_st);
+	checksum_info.mAttributeModificationTime = FileAttrModificationTime(file_st);
+	checksum_info.mSize = file_st.st_size;
+	currentStateChecksum.Add(&checksum_info, sizeof(checksum_info));
+	currentStateChecksum.Add(en->d_name, strlen(en->d_name));
+	
+	// If the file has been modified madly into the future, download the 
+	// directory record anyway to ensure that it doesn't get uploaded
+	// every single time the disc is scanned.
+	if(checksum_info.mModificationTime > rParams.mUploadAfterThisTimeInTheFuture)
+	{
+		rDownloadDirectoryRecordBecauseOfFutureFiles = true;
+		// Log that this has happened
+		if(!rParams.mHaveLoggedWarningAboutFutureFileTimes)
+		{
+			rNotifier.NotifyFileModifiedInFuture(this,
+				ConvertVssPathToRealPath(filename, rBackupLocation));
+			rParams.mHaveLoggedWarningAboutFutureFileTimes = true;
+		}
+	}
+
+	return true;
 }
 
 // --------------------------------------------------------------------------
