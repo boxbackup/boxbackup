@@ -37,8 +37,6 @@ docs/api-notes/raidfile
 docs/api-notes/raidfile/lib_raidfile.txt
 
 LICENSE GPL
-docs/api-notes/backup
-
 docs/images
 docs/htmlguide
 docs/htmlguide/adminguide
