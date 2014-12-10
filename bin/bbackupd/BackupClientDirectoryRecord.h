@@ -106,11 +106,11 @@ public:
 		bool mHaveLoggedWarningAboutFutureFileTimes;
 	
 		bool StopRun() { return mrRunStatusProvider.StopRun(); }
-		void NotifySysadmin(SysadminNotifier::EventCode Event) 
+		void NotifySysadmin(SysadminNotifier::EventCode Event)
 		{ 
-			mrSysadminNotifier.NotifySysadmin(Event); 
+			mrSysadminNotifier.NotifySysadmin(Event);
 		}
-		ProgressNotifier& GetProgressNotifier() const 
+		ProgressNotifier& GetProgressNotifier() const
 		{ 
 			return mrProgressNotifier;
 		}

@@ -275,11 +275,11 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				}
 				else
 				{
-					rNotifier.NotifyDirListFailed(this, 
+					rNotifier.NotifyDirListFailed(this,
 						nonVssDirPath,
 						strerror(errno));
 				}
-				
+
 				// Report the error (logs and eventual email
 				// to administrator)
 				SetErrorWhenReadingFilesystemObject(rParams,
@@ -581,15 +581,19 @@ void BackupClientDirectoryRecord::SyncDirectory(
 				ContainingDirectoryID));
 		}
 		// Consider asking the store for it
-		else if(!mInitialSyncDone || checksumDifferent || downloadDirectoryRecordBecauseOfFutureFiles)
+		else if(!mInitialSyncDone || checksumDifferent ||
+			downloadDirectoryRecordBecauseOfFutureFiles)
 		{
 			apDirOnStore = FetchDirectoryListing(rParams);
 		}
-				
-		// Make sure the attributes are up to date -- if there's space on the server
-		// and this directory has not just been created (because it's attributes will be correct in this case)
-		// and the checksum is different, implying they *MIGHT* be different.
-		if((!ThisDirHasJustBeenCreated) && checksumDifferent && (!rParams.mrContext.StorageLimitExceeded()))
+
+		// Make sure the attributes are up to date -- if there's space
+		// on the server and this directory has not just been created
+		// (because it's attributes will be correct in this case) and
+		// the checksum is different, implying they *MIGHT* be
+		// different.
+		if((!ThisDirHasJustBeenCreated) && checksumDifferent &&
+			!rParams.mrContext.StorageLimitExceeded())
 		{
 			UpdateAttributes(rParams, apDirOnStore.get(), rLocalPath);
 		}
@@ -613,11 +617,13 @@ void BackupClientDirectoryRecord::SyncDirectory(
 			entriesLeftOver, files, dirs);
 		
 		// LAST THING! (think exception safety)
-		// Store the new checksum -- don't fetch things unnecessarily in the future
-		// But... only if 1) the storage limit isn't exceeded -- make sure things are done again if
-		// the directory is modified later
-		// and 2) All the objects within the directory were stored successfully.
-		if(!rParams.mrContext.StorageLimitExceeded() && updateCompleteSuccess)
+		// Store the new checksum -- don't fetch things unnecessarily
+		// in the future But... only if 1) the storage limit isn't
+		// exceeded -- make sure things are done again if the directory
+		// is modified later and 2) All the objects within the
+		// directory were stored successfully.
+		if(!rParams.mrContext.StorageLimitExceeded() &&
+			updateCompleteSuccess)
 		{
 			currentStateChecksum.CopyDigestTo(mStateChecksum);
 		}
@@ -639,13 +645,16 @@ void BackupClientDirectoryRecord::SyncDirectory(
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::SyncParams &)
-//		Purpose: Fetch the directory listing of this directory from the store.
+//		Name:    BackupClientDirectoryRecord::FetchDirectoryListing(
+//			 BackupClientDirectoryRecord::SyncParams &)
+//		Purpose: Fetch the directory listing of this directory from
+//			 the store.
 //		Created: 2003/10/09
 //
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupStoreDirectory>
-BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::SyncParams &rParams)
+BackupClientDirectoryRecord::FetchDirectoryListing(
+	BackupClientDirectoryRecord::SyncParams &rParams)
 {
 	std::auto_ptr<BackupStoreDirectory> apDir;
 	
@@ -672,12 +681,18 @@ BackupClientDirectoryRecord::FetchDirectoryListing(BackupClientDirectoryRecord::
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::SyncParams &, const std::string &)
-//		Purpose: Sets the attributes of the directory on the store, if necessary
+//		Name:    BackupClientDirectoryRecord::UpdateAttributes(
+//			 BackupClientDirectoryRecord::SyncParams &,
+//			 const std::string &)
+//		Purpose: Sets the attributes of the directory on the store,
+//			 if necessary.
 //		Created: 2003/10/09
 //
 // --------------------------------------------------------------------------
-void BackupClientDirectoryRecord::UpdateAttributes(BackupClientDirectoryRecord::SyncParams &rParams, BackupStoreDirectory *pDirOnStore, const std::string &rLocalPath)
+void BackupClientDirectoryRecord::UpdateAttributes(
+	BackupClientDirectoryRecord::SyncParams &rParams,
+	BackupStoreDirectory *pDirOnStore,
+	const std::string &rLocalPath)
 {
 	// Get attributes for the directory
 	BackupClientFileAttributes attr;
@@ -786,7 +801,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			std::string filenameClear;
 			try
 			{
- 				filenameClear = DecryptFilename(en,
+				filenameClear = DecryptFilename(en,
 					rRemotePath);
 				decryptedEntries[filenameClear] = en;
 			}
