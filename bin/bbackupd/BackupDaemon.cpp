@@ -640,21 +640,26 @@ void BackupDaemon::Run2()
 			BOX_INFO("Starting a backup immediately due to "
 				"bbackupctl sync command");
 		}
+		else if(GetCurrentBoxTime() < mNextSyncTime)
+		{
+			BOX_TRACE("Deadline not reached, sleeping again");
+			continue;
+		}
 		else if(mDoSyncForcedByPreviousSyncError)
 		{
 			BOX_INFO("Last backup was not successful, next one "
 				"starting now");
 		}
-		else if(automaticBackup)
-		{
-			BOX_INFO("Automatic backups are enabled, next one "
-				"starting now");
-		}
-		else
+		else if(!automaticBackup)
 		{
 			BOX_TRACE("Sleeping again because automatic backups "
 				"are not enabled");
 			continue;
+		}
+		else
+		{
+			BOX_INFO("Automatic backups are enabled, next one "
+				"starting now");
 		}
 
 		// If we pass this point, or exit the loop, we should have
