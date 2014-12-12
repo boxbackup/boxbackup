@@ -75,13 +75,13 @@ std::string bbackupd_args = QUIET_PROCESS,
 	bbackupquery_args,
 	test_args;
 
-int filedes_open_at_beginning = -1;
+bool filedes_initialised = false;
 
 #ifdef WIN32
 
 // any way to check for open file descriptors on Win32?
-inline bool check_filedes(bool x) { return 0;     }
-inline bool checkfilesleftopen()  { return false; }
+inline bool check_filedes(bool x) { return true; }
+inline bool checkfilesleftopen()  { return true; }
 
 #else // !WIN32
 
@@ -91,7 +91,9 @@ typedef enum
 {
 	OPEN,
 	CLOSED,
-	SYSLOG
+	SYSLOG,
+	STILLOPEN,
+	LEAKED,
 }
 filedes_t;
 
@@ -101,23 +103,60 @@ bool check_filedes(bool report)
 {
 	bool allOk = true;
 
-	// See how many file descriptors there are with values < 256
+	// See how many file descriptors there are with values < 256.
+	// In order to avoid disturbing things, we scan the file descriptors
+	// first, marking the ones that were OPEN at startup (report == FALSE)
+	// as STILLOPEN and the ones that were not as LEAKED. Then we run
+	// through again and print the results.
 	for(int d = 0; d < FILEDES_MAX; ++d)
 	{
 		if(::fcntl(d, F_GETFD) != -1)
 		{
 			// File descriptor obviously exists, but is it /dev/log?
-
-			struct stat st;
-			bool stat_success = false;
-			bool is_syslog_socket = false;
-
-			if(fstat(d, &st) == 0)
+			// Mark it as OPEN for now, and we'll find out later.
+			if(report)
 			{
-				stat_success = true;
+				if(filedes_open[d] == OPEN)
+				{
+					filedes_open[d] = STILLOPEN;
+				}
+				else
+				{
+					filedes_open[d] = LEAKED;
+				}
 			}
+			else
+			{
+				filedes_open[d] = OPEN;
+			}
+		}
+		else
+		{
+			filedes_open[d] = CLOSED;
+		}
+	}
 
-			if(stat_success && (st.st_mode & S_IFSOCK))
+	if(!report)
+	{
+		filedes_initialised = true;
+		return true;
+	}
+
+	// Now loop again, reporting differences.
+	for(int d = 0; d < FILEDES_MAX; ++d)
+	{
+		if(filedes_open[d] != LEAKED)
+		{
+			continue;
+		}
+
+		bool stat_success = false;
+		struct stat st;
+		if(fstat(d, &st) == 0)
+		{
+			stat_success = true;
+
+			if(st.st_mode & S_IFSOCK)
 			{
 				char buffer[256];
 				socklen_t addrlen = sizeof(buffer);
@@ -135,90 +174,61 @@ bool check_filedes(bool report)
 					if(sa->sun_family == PF_UNIX &&
 						!strcmp(sa->sun_path, "/dev/log"))
 					{
-						is_syslog_socket = true;
+						// it's a syslog socket, ignore it
+						filedes_open[d] = SYSLOG;
 					}
 				}
 #endif // HAVE_GETPEERNAME
 			}
-
-			if(report && filedes_open[d] != OPEN)
-			{
-				if(filedes_open[d] == SYSLOG)
-				{
-					// Different libcs have different ideas
-					// about when to open and close this
-					// socket, and it's not a leak, so
-					// ignore it.
-				}
-				else if(stat_success)
-				{
-					int m = st.st_mode;
-					#define flag(x) ((m & x) ? #x " " : "")
-					BOX_FATAL("File descriptor " << d << 
-						" left open (type == " <<
-						flag(S_IFIFO) <<
-						flag(S_IFCHR) <<
-						flag(S_IFDIR) <<
-						flag(S_IFBLK) <<
-						flag(S_IFREG) <<
-						flag(S_IFLNK) <<
-						flag(S_IFSOCK) <<
-						" or " << m << ")");
-					allOk = false;
-				}
-				else
-				{
-					BOX_FATAL("File descriptor " << d << 
-						" left open (and stat failed)");
-					allOk = false;
-				}
-			}
-			else if (!report)
-			{
-				filedes_open[d] = is_syslog_socket ? SYSLOG : OPEN;
-			}
 		}
-		else 
+
+		if(filedes_open[d] == SYSLOG)
 		{
-			if (report && filedes_open[d] != CLOSED)
-			{
-				if (filedes_open[d] == SYSLOG)
-				{
-					// Different libcs have different ideas
-					// about when to open and close this
-					// socket, and it's not a leak, so
-					// ignore it.
-				}
-				else if(filedes_open[d] == OPEN)
-				{
-					BOX_FATAL("File descriptor " << d << 
-						" was open, now closed");
-					allOk = false;
-				}
-			}
-			else
-			{
-				filedes_open[d] = CLOSED;
-			}
+			// Different libcs have different ideas
+			// about when to open and close this
+			// socket, and it's not a leak, so
+			// ignore it.
+		}
+		else if(stat_success)
+		{
+			int m = st.st_mode;
+			#define flag(x) ((m & x) ? #x " " : "")
+			BOX_FATAL("File descriptor " << d << 
+				" left open (type == " <<
+				flag(S_IFIFO) <<
+				flag(S_IFCHR) <<
+				flag(S_IFDIR) <<
+				flag(S_IFBLK) <<
+				flag(S_IFREG) <<
+				flag(S_IFLNK) <<
+				flag(S_IFSOCK) <<
+				" or " << m << ")");
+			allOk = false;
+		}
+		else
+		{
+			BOX_FATAL("File descriptor " << d << 
+				" left open (and stat failed)");
+			allOk = false;
 		}
 	}
 
 	if (!report && allOk)
 	{
-		filedes_open_at_beginning = 0;
+		filedes_initialised = true;
 	}
 	
-	return !allOk;
+	return allOk;
 }
 
 bool checkfilesleftopen()
 {
-	if(filedes_open_at_beginning == -1)
+	if(!filedes_initialised)
 	{
 		// Not used correctly, pretend that there were things 
 		// left open so this gets investigated
 		BOX_FATAL("File descriptor test was not initialised");
-		return true;
+		return false;
 	}
 
 	// Count the file descriptors open
@@ -320,7 +330,7 @@ int main(int argc, char * const * argv)
 		// and it's not clear how to close it again. So let's just do
 		// it once, before counting fds for the first time, so that it's
 		// already open and doesn't count as a leak.
-		::gethostbyname("localhost");
+		::gethostbyname("nonexistent");
 
 		check_filedes(false);
 
@@ -362,7 +372,7 @@ int main(int argc, char * const * argv)
 		{
 			Logging::GetSyslog().Shutdown();
 
-			bool filesleftopen = checkfilesleftopen();
+			bool filesleftopen = !checkfilesleftopen();
 
 			fflush(stdout);
 			fflush(stderr);
@@ -405,7 +415,7 @@ int main(int argc, char * const * argv)
 	}
 	if(fulltestmode)
 	{
-		if(checkfilesleftopen())
+		if(!checkfilesleftopen())
 		{
 			printf("WARNING: Files were left open\n");
 		}
