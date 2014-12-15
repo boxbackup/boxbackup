@@ -63,6 +63,8 @@ protected:
 	void MarkAsWriteClosed() {mWriteClosed = true;}
 	void CheckForMissingTimeout(int Timeout);
 
+	// Converts a timeout in box_time_t (microseconds) to a value used
+	// by the poll() syscall (milliseconds).
 	int PollTimeout(int timeout, box_time_t start_time)
 	{
 		if (timeout == IOStream::TimeOutInfinite)
