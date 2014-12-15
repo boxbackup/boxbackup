@@ -3768,6 +3768,16 @@ bool test_changing_client_store_marker_pauses_daemon()
 	SETUP_WITH_BBSTORED();
 	TEST_THAT(StartClient());
 
+	// Wait for the client to upload all current files.
+	wait_for_sync_end();
+
+	// Time how long a compare takes. On NetBSD it's 3 seconds, and that 
+	// interferes with test timing unless we account for it.
+	int compare_start_time = time(NULL);
+	// There should be no differences right now (yet).
+	TEST_COMPARE(Compare_Same);
+	int compare_time = time(NULL) - compare_start_time;
+
 	// TODO FIXME dedent
 	{
 		// Then... connect to the server, and change the 
@@ -3825,16 +3835,13 @@ bool test_changing_client_store_marker_pauses_daemon()
 
 		// Wait for bbackupd to detect the problem
 		wait_for_sync_end();
-		int sync_end_time = time(NULL);
 
-		// Test that there *are* differences
+		// Test that there *are* differences (still)
 		TEST_COMPARE(Compare_Different);
 
 		// Wait out the expected delay in bbackupd
-		int current_time = time(NULL);
-		wait_for_operation(sync_end_time - current_time +
-			BACKUP_ERROR_DELAY_SHORTENED - 1,
-			"just before bbackupd recovers");
+		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED - 1 -
+			compare_time * 2, "just before bbackupd recovers");
 
 		// bbackupd should not have recovered yet, so there should
 		// still be differences.
