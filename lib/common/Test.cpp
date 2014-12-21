@@ -335,23 +335,29 @@ void force_sync()
 
 void wait_for_sync_start()
 {
+	BOX_TRACE("Waiting for sync to start...");
 	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
 		"wait-for-sync") == 0);
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+	BOX_TRACE("Backup daemon reported that sync has started.");
 }
 
 void wait_for_sync_end()
 {
+	BOX_TRACE("Waiting for sync to finish...");
 	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
 		"wait-for-end") == 0);
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+	BOX_TRACE("Backup daemon reported that sync has finished.");
 }
 
 void sync_and_wait()
 {
+	BOX_TRACE("Starting a sync and waiting for it to finish...");
 	TEST_THAT(::system(BBACKUPCTL " -q -c testfiles/bbackupd.conf "
 		"sync-and-wait") == 0);
 	TestRemoteProcessMemLeaks("bbackupctl.memleaks");
+	BOX_TRACE("Backup daemon reported that sync has finished.");
 }
 
 void terminate_bbackupd(int pid)
