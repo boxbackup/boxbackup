@@ -83,7 +83,7 @@ std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
 
 		if (showMicros)
 		{
-			buf << "." << std::setw(6) << micros;
+			buf << "." << std::setw(3) << (int)(micros / 1000);
 		}
 	}
 	else
@@ -108,8 +108,7 @@ void ShortSleep(box_time_t duration, bool logDuration)
 {
 	if(logDuration)
 	{
-		BOX_TRACE("Sleeping for " << BoxTimeToMicroSeconds(duration) <<
-			" microseconds");
+		BOX_TRACE("Sleeping for " << BOX_FORMAT_MICROSECONDS(duration));
 	}
 
 #ifdef WIN32
@@ -118,7 +117,9 @@ void ShortSleep(box_time_t duration, bool logDuration)
 	struct timespec ts;
 	memset(&ts, 0, sizeof(ts));
 	ts.tv_sec  = duration / MICRO_SEC_IN_SEC;
-	ts.tv_nsec = duration % MICRO_SEC_IN_SEC;
+	ts.tv_nsec = (duration % MICRO_SEC_IN_SEC) * 1000;
+
+	box_time_t start_time = GetCurrentBoxTime();
 
 	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
 	{
@@ -140,6 +141,10 @@ void ShortSleep(box_time_t duration, bool logDuration)
 		BOX_TRACE("nanosleep interrupted with " << remain_ns <<
 			" nanosecs remaining, sleeping again");
 	}
+
+	box_time_t sleep_time = GetCurrentBoxTime() - start_time;	
+	BOX_TRACE("Actually slept for " << BOX_FORMAT_MICROSECONDS(sleep_time) <<
+		", was aiming for " << BOX_FORMAT_MICROSECONDS(duration));
 #endif
 }
 
