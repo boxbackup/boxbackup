@@ -337,16 +337,16 @@ bool unpack_files(const std::string& archive_file,
 		<< ": " << archive_file);
 
 #ifdef WIN32
-	std::string cmd("tar xz ");
+	std::string cmd("tar xz");
 	cmd += tar_options + " -f testfiles/" + archive_file + ".tgz " +
 		"-C " + destination_dir;
 #else
 	std::string cmd("gzip -d < testfiles/");
-	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xf - " +
-		tar_options + ")";
+	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xf" +
+		tar_options + " -)";
 #endif
 
-	TEST_THAT_OR(::system(cmd.c_str()) == 0, return false);
+	TEST_LINE_OR(::system(cmd.c_str()) == 0, cmd, return false);
 	return true;
 }
 
@@ -3682,7 +3682,7 @@ bool test_sync_new_files()
 	{
 		// Add some more files and modify others
 		// Use the m flag this time so they have a recent modification time
-		TEST_THAT(unpack_files("test3", "testfiles", "-m"));
+		TEST_THAT(unpack_files("test3", "testfiles", "m"));
 		
 		// Wait and test
 		bbackupd.RunSyncNow();
