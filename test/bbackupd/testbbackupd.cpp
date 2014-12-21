@@ -333,13 +333,16 @@ bool unpack_files(const std::string& archive_file,
 	const std::string& destination_dir = "testfiles",
 	const std::string& tar_options = "")
 {
+	BOX_INFO("Unpacking test fixture archive into " << destination_dir
+		<< ": " << archive_file);
+
 #ifdef WIN32
-	std::string cmd("tar xzv ");
+	std::string cmd("tar xz ");
 	cmd += tar_options + " -f testfiles/" + archive_file + ".tgz " +
 		"-C " + destination_dir;
 #else
 	std::string cmd("gzip -d < testfiles/");
-	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xvf - " +
+	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xf - " +
 		tar_options + ")";
 #endif
 
@@ -3768,15 +3771,23 @@ bool test_changing_client_store_marker_pauses_daemon()
 	SETUP_WITH_BBSTORED();
 	TEST_THAT(StartClient());
 
-	// Wait for the client to upload all current files.
-	wait_for_sync_end();
+	// Wait for the client to upload all current files. We also time
+	// approximately how long a sync takes.
+	box_time_t sync_start_time = GetCurrentBoxTime();
+	sync_and_wait();
+	box_time_t sync_time = GetCurrentBoxTime() - sync_start_time;
 
 	// Time how long a compare takes. On NetBSD it's 3 seconds, and that 
 	// interferes with test timing unless we account for it.
-	int compare_start_time = time(NULL);
+	box_time_t compare_start_time = GetCurrentBoxTime();
 	// There should be no differences right now (yet).
 	TEST_COMPARE(Compare_Same);
-	int compare_time = time(NULL) - compare_start_time;
+	box_time_t compare_time = GetCurrentBoxTime() - compare_start_time;
+	BOX_TRACE("Compare takes " << BOX_FORMAT_MICROSECONDS(compare_time));
+
+	// Wait for the end of another sync, to give us ~3 seconds to change
+	// the client store marker.
+	wait_for_sync_end();
 
 	// TODO FIXME dedent
 	{
@@ -3833,24 +3844,42 @@ bool test_changing_client_store_marker_pauses_daemon()
 			::fclose(f);
 		}
 
-		// Wait for bbackupd to detect the problem
+		// Wait for bbackupd to detect the problem.
 		wait_for_sync_end();
 
-		// Test that there *are* differences (still)
+		// Test that there *are* differences still, i.e. that bbackupd
+		// didn't successfully run a backup during that time.
+		BOX_TRACE("Compare starting, expecting differences");
 		TEST_COMPARE(Compare_Different);
+		BOX_TRACE("Compare finished, expected differences");
 
-		// Wait out the expected delay in bbackupd
-		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED - 1 -
-			compare_time * 2, "just before bbackupd recovers");
+		// Wait out the expected delay in bbackupd. This is quite
+		// time-sensitive, so we use sub-second precision.
+		box_time_t wait = 
+			SecondsToBoxTime(BACKUP_ERROR_DELAY_SHORTENED - 1) -
+			compare_time * 2;
+		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
+			" (plus another compare taking " <<
+			BOX_FORMAT_MICROSECONDS(compare_time) << ") until "
+			"just before bbackupd recovers");
+		ShortSleep(wait, true);
 
 		// bbackupd should not have recovered yet, so there should
 		// still be differences.
+		BOX_TRACE("Compare starting, expecting differences");
 		TEST_COMPARE(Compare_Different);
+		BOX_TRACE("Compare finished, expected differences");
 
 		// Now wait for it to recover and finish a sync, and check
 		// that the differences are gone (successful backup).
-		wait_for_operation(2, "bbackupd to recover");
+		wait = sync_time + SecondsToBoxTime(2);
+		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
+			" until just after bbackupd recovers and finishes a sync");
+		ShortSleep(wait, true);
+
+		BOX_TRACE("Compare starting, expecting no differences");
 		TEST_COMPARE(Compare_Same);
+		BOX_TRACE("Compare finished, expected no differences");
 	}
 
 	TEARDOWN();
