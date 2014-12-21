@@ -146,9 +146,9 @@
 
 #define BOX_FORMAT_MICROSECONDS(t) \
 	(int)((t) / 1000000) << "." << \
-	std::setw(6) << \
+	std::setw(3) << \
 	std::setfill('0') << \
-	(int)((t) % 1000000) << " seconds"
+	(int)((t % 1000000) / 1000) << " seconds"
 
 #undef ERROR
 
