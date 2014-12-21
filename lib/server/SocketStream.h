@@ -50,6 +50,11 @@ public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	virtual void Write(const std::string& rBuffer,
+		int Timeout = IOStream::TimeOutInfinite)
+	{
+		IOStream::Write(rBuffer, Timeout);
+	}
 	virtual void Close();
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
