@@ -146,7 +146,7 @@ extern std::list<std::string> run_only_named_tests;
 	} \
 }
 
-// utility macro for testing a line
+// utility macros for testing a string/output line
 #define TEST_LINE(_condition, _line) \
 	TEST_THAT(_condition); \
 	if (!(_condition)) \
@@ -155,6 +155,13 @@ extern std::list<std::string> run_only_named_tests;
 		_ossl << _line; \
 		std::string _line_str = _ossl.str(); \
 		printf("Test failed on <%s>\n", _line_str.c_str()); \
+	}
+
+#define TEST_LINE_OR(_condition, _line, _or_command) \
+	TEST_LINE(_condition, _line); \
+	if(!(_condition)) \
+	{ \
+		_or_command; \
 	}
 
 #define TEST_STARTSWITH(expected, actual) \
