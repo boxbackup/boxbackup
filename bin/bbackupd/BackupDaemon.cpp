@@ -584,13 +584,13 @@ void BackupDaemon::Run2()
 		{
 			BOX_INFO("Last backup was not successful, "
 				"next one starting at " <<
-				FormatTime(mNextSyncTime, false));
+				FormatTime(mNextSyncTime, false, true));
 		}
 		else if (automaticBackup)
 		{
 			BOX_INFO("Automatic backups are enabled, "
 				"next one starting at " <<
-				FormatTime(mNextSyncTime, false));
+				FormatTime(mNextSyncTime, false, true));
 		}
 		else
 		{
@@ -1965,8 +1965,9 @@ bool BackupDaemon::RunBackgroundTask(State state, uint64_t progress,
 //
 // Function
 //		Name:    BackupDaemon::WaitOnCommandSocket(box_time_t, bool &, bool &)
-//		Purpose: Waits on a the command socket for a time of UP TO the required time
-//				 but may be much less, and handles a command if necessary.
+//		Purpose: Waits on a the command socket for a time of UP TO
+//			 the required time but may be much less, and handles
+//			 a command if necessary.
 //		Created: 18/2/04
 //
 // --------------------------------------------------------------------------
@@ -1983,7 +1984,8 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		return;
 	}
 	
-	BOX_TRACE("Wait on command socket, delay = " << RequiredDelay);
+	BOX_TRACE("Wait on command socket, delay = " <<
+		BOX_FORMAT_MICROSECONDS(RequiredDelay));
 	
 	try
 	{
