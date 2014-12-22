@@ -177,12 +177,11 @@ print H <<__E;
 #include <syslog.h>
 #endif
 
+#include "autogen_ConnectionException.h"
 #include "Protocol.h"
 #include "Message.h"
-#include "autogen_ConnectionException.h"
+#include "SocketStream.h"
 
-class IOStream;
-class SocketStream;
 __E
 
 # extra headers
