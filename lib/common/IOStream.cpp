@@ -249,13 +249,13 @@ void IOStream::Flush(int Timeout)
 //
 // Function
 //		Name:    IOStream::Write
-//		Purpose: Convenience method for writing a null-terminated
-//			 C string to a protocol buffer.
+//		Purpose: Convenience method for writing a C++ string to a
+//			 protocol buffer.
 //
 // --------------------------------------------------------------------------
-void IOStream::Write(const char *pBuffer)
+void IOStream::Write(const std::string& rBuffer, int Timeout)
 {
-	Write(pBuffer, strlen(pBuffer));
+	Write(rBuffer.c_str(), rBuffer.size(), Timeout);
 }
 
 // --------------------------------------------------------------------------
