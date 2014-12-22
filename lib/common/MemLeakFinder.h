@@ -43,7 +43,7 @@ void memleakfinder_reportleaks();
 
 void memleakfinder_reportleaks_appendfile(const char *filename, const char *markertext);
 
-void memleakfinder_setup_exit_report(const char *filename, const char *markertext);
+void memleakfinder_setup_exit_report(const std::string& filename, const char *markertext);
 
 void memleakfinder_startsectionmonitor();
 

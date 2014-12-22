@@ -586,9 +586,10 @@ extern "C" void memleakfinder_atexit()
 	memleakfinder_reportleaks_appendfile(atexit_filename, atexit_markertext);
 }
 
-void memleakfinder_setup_exit_report(const char *filename, const char *markertext)
+void memleakfinder_setup_exit_report(const std::string& filename, 
+	const char *markertext)
 {
-	::strncpy(atexit_filename, filename, sizeof(atexit_filename)-1);
+	::strncpy(atexit_filename, filename.c_str(), sizeof(atexit_filename)-1);
 	::strncpy(atexit_markertext, markertext, sizeof(atexit_markertext)-1);
 	atexit_filename[sizeof(atexit_filename)-1] = 0;
 	atexit_markertext[sizeof(atexit_markertext)-1] = 0;
