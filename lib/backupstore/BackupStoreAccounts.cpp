@@ -158,9 +158,9 @@ void BackupStoreAccounts::GetAccountRoot(int32_t ID, std::string &rRootDirOut, i
 std::string BackupStoreAccounts::MakeAccountRootDir(int32_t ID, int DiscSet)
 {
 	char accid[64];	// big enough!
-	::sprintf(accid, "%08x" DIRECTORY_SEPARATOR, ID);
-	return std::string(std::string(BOX_RAIDFILE_ROOT_BBSTORED 
-		DIRECTORY_SEPARATOR) + accid);
+	::snprintf(accid, sizeof(accid) - 1, "%08x" DIRECTORY_SEPARATOR, ID);
+	return std::string(BOX_RAIDFILE_ROOT_BBSTORED DIRECTORY_SEPARATOR) + 
+		accid;
 }
 
 

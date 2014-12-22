@@ -567,7 +567,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		// Write PID to file
 		char pid[32];
 
-		int pidsize = sprintf(pid, "%d", (int)getpid());
+		int pidsize = snprintf(pid, sizeof(pid), "%d", (int)getpid());
 
 		if(::write(pidFile, pid, pidsize) != pidsize)
 		{
@@ -579,9 +579,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING
 		{
-			char filename[256];
-			sprintf(filename, "%s.memleaks", DaemonName());
-			memleakfinder_setup_exit_report(filename, DaemonName());
+			memleakfinder_setup_exit_report(std::string(DaemonName()) +
+				".memleaks", DaemonName());
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
 	

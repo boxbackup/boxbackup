@@ -165,7 +165,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	{
 		// The housekeeping process might have the thing open -- ask it to stop
 		char msg[256];
-		int msgLen = sprintf(msg, "r%x\n", mClientID);
+		int msgLen = snprintf(msg, sizeof(msg), "r%x\n", mClientID);
 		// Send message
 		mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
 

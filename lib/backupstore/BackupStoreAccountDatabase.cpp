@@ -247,7 +247,8 @@ void BackupStoreAccountDatabase::Write()
 		{
 			// Write out the entry
 			char line[256];	// more than enough for a couple of integers in string form
-			int s = ::sprintf(line, "%x:%d\n", i->second.GetID(), i->second.GetDiscSet());
+			int s = ::snprintf(line, sizeof(line), "%x:%d\n", 
+				i->second.GetID(), i->second.GetDiscSet());
 			if(::write(file, line, s) != s)
 			{
 				THROW_EXCEPTION(CommonException, OSFileError)

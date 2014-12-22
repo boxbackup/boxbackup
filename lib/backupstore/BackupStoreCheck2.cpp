@@ -356,7 +356,7 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 	{
 		// Directory -- simply generate a name for it.
 		char name[32];
-		::sprintf(name, "dir%08x", lostDirNameSerial);
+		::snprintf(name, sizeof(name), "dir%08x", lostDirNameSerial);
 		objectStoreFilename.SetAsClearFilename(name);
 	}
 	else
@@ -447,7 +447,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	while(true)
 	{
 		char name[32];
-		::sprintf(name, "lost+found%d", n++);
+		::snprintf(name, sizeof(name), "lost+found%d", n++);
 		lostAndFound.SetAsClearFilename(name);
 		if(!dir.NameInUse(lostAndFound))
 		{

@@ -2047,14 +2047,18 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 					
 					// Send a header line summarising the configuration and current state
 					const Configuration &conf(GetConfiguration());
-					char summary[256];
-					int summarySize = sprintf(summary, "bbackupd: %d %d %d %d\nstate %d\n",
-						conf.GetKeyValueBool("AutomaticBackup"),
-						conf.GetKeyValueInt("UpdateStoreInterval"),
-						conf.GetKeyValueInt("MinimumFileAge"),
-						conf.GetKeyValueInt("MaxUploadWait"),
-						mState);
-					mapCommandSocketInfo->mpConnectedSocket->Write(summary, summarySize);
+					std::ostringstream hello;
+					hello << "bbackupd: " << 
+						(conf.GetKeyValueBool("AutomaticBackup") ? 1 : 0) 
+						<< " " <<
+						conf.GetKeyValueInt("UpdateStoreInterval") 
+						<< " " <<
+						conf.GetKeyValueInt("MinimumFileAge") 
+						<< " " <<
+						conf.GetKeyValueInt("MaxUploadWait") 
+						<< "\nstate " << mState << "\n";
+					mapCommandSocketInfo->mpConnectedSocket->Write(
+						hello.str());
 					
 					// Set the timeout to something very small, so we don't wait too long on waiting
 					// for any incoming data
@@ -2965,11 +2969,8 @@ void BackupDaemon::SetState(int State)
 	// If there's a command socket connected, then inform it -- disconnecting from the
 	// command socket if there's an error
 
-	char newState[64];
-	sprintf(newState, "state %d", State);
-	std::string message = newState;
-
-	message += "\n";
+	std::ostringstream msg;
+	msg << "state " << State << "\n";
 
 	if(!mapCommandSocketInfo.get())
 	{
@@ -2984,8 +2985,7 @@ void BackupDaemon::SetState(int State)
 	// Something connected to the command socket, tell it about the new state
 	try
 	{
-		mapCommandSocketInfo->mpConnectedSocket->Write(message.c_str(),
-			message.length());
+		mapCommandSocketInfo->mpConnectedSocket->Write(msg.str());
 	}
 	catch(ConnectionException &ce)
 	{

@@ -474,7 +474,8 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 		{
 			// Check the object is OK, and add entry
 			char leaf[8];
-			::sprintf(leaf, DIRECTORY_SEPARATOR "o%02x", i);
+			::snprintf(leaf, sizeof(leaf),
+				DIRECTORY_SEPARATOR "o%02x", i);
 			if(!CheckAndAddObject(StartID | i, dirName + leaf))
 			{
 				// File was bad, delete it

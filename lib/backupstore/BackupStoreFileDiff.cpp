@@ -1042,9 +1042,11 @@ static void GenerateRecipe(BackupStoreFileEncodeStream::Recipe &rRecipe, BlocksA
 			{
 				char b[64];
 #ifdef WIN32
-				sprintf(b, "%8I64d", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
+				snprintf(b, sizeof(b), "%8I64d", (int64_t)
+					(rRecipe[e].mpStartBlock - pIndex));
 #else
-				sprintf(b, "%8lld", (int64_t)(rRecipe[e].mpStartBlock - pIndex));
+				snprintf(b, sizeof(b), "%8lld", (int64_t)
+					(rRecipe[e].mpStartBlock - pIndex));
 #endif
 				BOX_TRACE(std::setw(8) <<
 					rRecipe[e].mSpaceBefore <<
