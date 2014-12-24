@@ -453,7 +453,11 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 #else // !WIN32
 	if(EMU_LSTAT(filename.c_str(), &file_st) != 0)
 	{
-		if(!(rParams.mrContext.ExcludeDir(filename)))
+		// We don't know whether it's a file or a directory, so check
+		// both. This only affects whether a warning message is
+		// displayed; the file is not backed up in either case.
+		if(!(rParams.mrContext.ExcludeFile(filename)) &&
+			!(rParams.mrContext.ExcludeDir(filename)))
 		{
 			// Report the error (logs and eventual email to
 			// administrator)
