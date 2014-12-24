@@ -238,21 +238,6 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	std::vector<std::string> files;
 	bool downloadDirectoryRecordBecauseOfFutureFiles = false;
 
-	EMU_STRUCT_STAT link_st;
-	if(EMU_LSTAT(rLocalPath.c_str(), &link_st) != 0)
-	{
-		// Report the error (logs and eventual email to administrator)
-		rNotifier.NotifyFileStatFailed(this,
-			ConvertVssPathToRealPath(rLocalPath, rBackupLocation),
-			strerror(errno));
-
-		// TODO FIXME move to NotifyFileStatFailed()
-		SetErrorWhenReadingFilesystemObject(rParams, rLocalPath);
-
-		// This shouldn't happen, so we'd better not continue
-		THROW_EXCEPTION(CommonException, OSFileError)
-	}
-
 	// BLOCK
 	{
 		// read the contents...
@@ -612,7 +597,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 		return false;
 	}
 
-	if(file_st.st_dev != link_st.st_dev)
+	if(file_st.st_dev != dir_st.st_dev)
 	{
 		rNotifier.NotifyMountPointSkipped(this,
 			ConvertVssPathToRealPath(filename, rBackupLocation));
