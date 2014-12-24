@@ -463,7 +463,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 			// administrator)
 			rNotifier.NotifyFileStatFailed(this, filename,
 				strerror(errno));
-		
+
 			// FIXME move to NotifyFileStatFailed()
 			SetErrorWhenReadingFilesystemObject(rParams, filename);
 		}
@@ -581,19 +581,18 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 
 		return false;
 	}
-	
-	// Here if the object is something to back up (file, symlink or dir, not excluded)
-	// So make the information for adding to the checksum
-	
+
+	// The object should be backed up (file, symlink or dir, not excluded).
+	// So make the information for adding to the checksum.
+
 	#ifdef WIN32
-	// We didn't stat the file before,
-	// but now we need the information.
+	// We didn't stat the file before, but now we need the information.
 	if(emu_stat(filename.c_str(), &file_st) != 0)
 	{
 		rNotifier.NotifyFileStatFailed(this,
-				ConvertVssPathToRealPath(filename, rBackupLocation),
-				strerror(errno));
-		
+			ConvertVssPathToRealPath(filename, rBackupLocation),
+			strerror(errno));
+
 		// Report the error (logs and eventual email to administrator)
 		SetErrorWhenReadingFilesystemObject(rParams, filename);
 
@@ -616,6 +615,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 		int64_t mSize;
 		// And then the name follows
 	} checksum_info;
+
 	// Be paranoid about structure packing
 	::memset(&checksum_info, 0, sizeof(checksum_info));
 
