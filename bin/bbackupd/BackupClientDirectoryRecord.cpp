@@ -525,9 +525,6 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 			// Next item!
 			return false;
 		}
-
-		// Store on list
-		rFiles.push_back(entry_name);
 	}
 	else if(type == S_IFDIR)
 	{
@@ -553,9 +550,6 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 			return false;
 		}
 		#endif
-
-		// Store on list
-		rDirs.push_back(entry_name);
 	}
 	else // not a file or directory, what is it?
 	{
@@ -638,6 +632,16 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 				ConvertVssPathToRealPath(filename, rBackupLocation));
 			rParams.mHaveLoggedWarningAboutFutureFileTimes = true;
 		}
+	}
+
+	// We've decided to back it up, so add to file or directory list.
+	if(type == S_IFREG || type == S_IFLNK)
+	{
+		rFiles.push_back(entry_name);
+	}
+	else if(type == S_IFDIR)
+	{
+		rDirs.push_back(entry_name);
 	}
 
 	return true;
