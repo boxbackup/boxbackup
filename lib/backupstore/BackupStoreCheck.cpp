@@ -287,12 +287,14 @@ void BackupStoreCheck::CheckObjects()
 	{
 		// Make sure the starting root dir doesn't end with '/'.
 		std::string start(mStoreRoot);
-		if(start.size() > 0 && start[start.size() - 1] == '/')
+		if(start.size() > 0 && (
+			start[start.size() - 1] == '/' ||
+			start[start.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR))
 		{
 			start.resize(start.size() - 1);
 		}
 
-		maxDir = CheckObjectsScanDir(0, 1, mStoreRoot);
+		maxDir = CheckObjectsScanDir(0, 1, start);
 		BOX_TRACE("Max dir starting ID is " <<
 			BOX_FORMAT_OBJECTID(maxDir));
 	}
