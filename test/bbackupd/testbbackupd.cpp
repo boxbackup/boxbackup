@@ -556,6 +556,8 @@ bool test_basics()
 	// Apply attributes to these new files
 	t1.WriteAttributes("testfiles/test1_n");
 #ifdef WIN32
+	// We can't apply symlink attributes on Win32, so use a normal file's
+	// attributes instead.
 	t1.WriteAttributes("testfiles/test2_n");
 #else
 	t2.WriteAttributes("testfiles/test2_n");
@@ -4041,6 +4043,7 @@ bool test_locked_file_behaviour()
 	SETUP_WITH_BBSTORED();
 
 #ifndef WIN32
+	// There are no tests for mandatory locks on non-Windows platforms yet.
 	BOX_NOTICE("skipping test on this platform");
 #else
 	// TODO FIXME dedent
