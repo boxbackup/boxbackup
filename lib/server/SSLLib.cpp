@@ -80,7 +80,7 @@ void SSLLib::Initialise()
 			BOX_LOG_WIN_ERROR("Failed to release crypto context");
 		}
 	}
-#elif HAVE_RANDOM_DEVICE
+#elif defined HAVE_RANDOM_DEVICE
 	if(::RAND_load_file(RANDOM_DEVICE, 1024) != 1024)
 	{
 		THROW_EXCEPTION(ServerException, SSLRandomInitFailed)
