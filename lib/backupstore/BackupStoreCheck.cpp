@@ -335,9 +335,10 @@ int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const 
 			{
 				// build name
 				std::string dn(rdiscSet[l] + DIRECTORY_SEPARATOR + rDirName);
-				struct stat st;
+				EMU_STRUCT_STAT st;
 
-				if(stat(dn.c_str(), &st) != 0 && errno == ENOENT)
+				if(EMU_STAT(dn.c_str(), &st) != 0 &&
+					errno == ENOENT)
 				{
 					if(mkdir(dn.c_str(), 0755) != 0)
 					{

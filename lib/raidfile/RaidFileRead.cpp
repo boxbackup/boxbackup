@@ -1498,8 +1498,8 @@ bool RaidFileRead::DirectoryExists(const RaidFileDiscSet &rSet, const std::strin
 		std::string dn(rSet[l] + DIRECTORY_SEPARATOR + rDirName);
 		
 		// check for existence
-		struct stat st;
-		if(::stat(dn.c_str(), &st) == 0)
+		EMU_STRUCT_STAT st;
+		if(EMU_STAT(dn.c_str(), &st) == 0)
 		{
 			// Directory?
 			if(st.st_mode & S_IFDIR)
@@ -1617,9 +1617,9 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 #ifdef HAVE_VALID_DIRENT_D_TYPE
 				if(DirReadType == DirReadType_FilesOnly && en->d_type == DT_REG)
 #else
-				struct stat st;
+				EMU_STRUCT_STAT st;
 				std::string fullName(dn + DIRECTORY_SEPARATOR + en->d_name);
-				if(::lstat(fullName.c_str(), &st) != 0)
+				if(EMU_LSTAT(fullName.c_str(), &st) != 0)
 				{
 					THROW_EXCEPTION(RaidFileException, OSError)
 				}
