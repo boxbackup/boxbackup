@@ -279,7 +279,7 @@ void syslog  (int loglevel, const char *fmt, ...);
 #define strtoll _strtoi64
 #endif
 
-inline unsigned int sleep(unsigned int secs)
+extern "C" inline unsigned int sleep(unsigned int secs)
 {
 	Sleep(secs*1000);
 	return(ERROR_SUCCESS);

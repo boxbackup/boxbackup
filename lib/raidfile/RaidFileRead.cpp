@@ -44,8 +44,8 @@
 #define READ_NUMBER_DISCS_REQUIRED	3
 #define READV_MAX_BLOCKS		64
 
-// We want to use POSIX fstat() for now, not the emulated one
-#undef fstat
+// We want to use POSIX fstat() for now, not the emulated one, because it's
+// difficult to rewrite all this code to use HANDLEs instead of ints.
 
 // --------------------------------------------------------------------------
 //

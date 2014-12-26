@@ -40,9 +40,12 @@
 	#endif
 #endif
 
+#include "emu.h"
+
 #ifdef HAVE_SYS_TYPES_H
 	#include <sys/types.h>
 #endif
+
 #ifdef HAVE_INTTYPES_H
 	#include <inttypes.h>
 #else
@@ -181,8 +184,6 @@
 #ifdef WIN32
 	#define WIN32_LEAN_AND_MEAN
 #endif
-
-#include "emu.h"
 
 #ifdef WIN32
 	#define INVALID_FILE INVALID_HANDLE_VALUE

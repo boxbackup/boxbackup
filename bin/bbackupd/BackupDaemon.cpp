@@ -203,7 +203,8 @@ BackupDaemon::BackupDaemon()
 	  mpProgressNotifier(this),
 	  mpLocationResolver(this),
 	  mpRunStatusProvider(this),
-	  mpSysadminNotifier(this)
+	  mpSysadminNotifier(this),
+	  mapCommandSocketPollTimer(NULL)
 	#ifdef WIN32
 	, mInstallService(false),
 	  mRemoveService(false),
@@ -443,6 +444,9 @@ void BackupDaemon::Run()
 	// initialise global timer mechanism
 	Timers::Init();
 	
+	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
+		"CommandSocketPollTimer"));
+
 	#ifndef WIN32
 		// Ignore SIGPIPE so that if a command connection is broken,
 		// the daemon doesn't terminate.
