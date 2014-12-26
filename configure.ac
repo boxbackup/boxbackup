@@ -6,6 +6,7 @@ AC_INIT([Box Backup], 0.11, [boxbackup@boxbackup.org],[boxbackup])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
 AC_CONFIG_AUX_DIR([infrastructure])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
+AC_CONFIG_SUBDIRS([qdbm])
 
 touch install-sh
 AC_CANONICAL_SYSTEM
@@ -128,21 +129,6 @@ if ! $PERL ./infrastructure/makebuildenv.pl \
 	echo "Making infrastructure failed!"
 	exit 1
 fi
-
-cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
-	if test "$cmd" = "subdir"; then
-		echo
-		export CC CXX CFLAGS CXXFLAGS LDFLAGS LIBS
-		args="$configure_args --host=$host_alias --build=$build_alias --target=$target_alias"
-		echo "Configuring $subdir with: $args"
-
-		cd $subdir
-		if ! ./configure $args; then
-			echo "Configuring $subdir with $args failed!" >&2
-			exit 1
-		fi
-	fi
-done || exit $?
 
 # Write summary of important info
 tee config.log.features <<EOC
