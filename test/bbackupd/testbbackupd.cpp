@@ -469,10 +469,10 @@ int num_tests_selected = 0;
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP() \
-	TEST_THAT(kill_running_daemons()); \
 	if (!setUp(__FUNCTION__)) return true; \
 	num_tests_selected++; \
-	int old_failure_count = failures;
+	int old_failure_count = failures; \
+	TEST_THAT(kill_running_daemons());
 
 #define SETUP_WITHOUT_FILES() \
 	SETUP() \
@@ -4214,6 +4214,7 @@ int test(int argc, const char *argv[])
 
 	TEST_LINE(num_tests_selected > 0, "No tests matched the patterns "
 		"specified on the command line");
+	TEST_THAT(kill_running_daemons());
 
 	return (failures == 0 && num_tests_selected > 0);
 }
