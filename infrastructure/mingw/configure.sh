@@ -1,6 +1,16 @@
 #!/bin/sh
 
-DEP_PATH=/usr/i686-pc-mingw32
+
+case "`uname -m`" in
+x86_64)
+	DEP_PATH=/usr/x86_64-w64-mingw32
+	target=x86_64-w64-mingw32 ;;
+i686)
+	DEP_PATH=/usr/i686-pc-mingw32
+	target=i686-pc-mingw32 ;;
+*)
+	echo "Error: unknown machine type `uname -m`" >&2; exit 1 ;;
+esac
 
 if [ ! -r "$DEP_PATH/lib/libssl.a" ]; then
 	echo "Error: install OpenSSL as instructed by" \
@@ -30,11 +40,10 @@ if [ ! -x "configure" ]; then
 	fi
 fi
 
-if ! ./configure "$@" --target=i686-pc-mingw32 \
-	CFLAGS="-mno-cygwin -mthreads" \
-	CPPFLAGS="-mno-cygwin" \
-	CXXFLAGS="-mno-cygwin -mthreads" \
-	LDFLAGS="-Wl,-Bstatic -mno-cygwin -mthreads -L${DEP_PATH}/lib -L${LIBZ_PATH}"
+if ! ./configure "$@" --host=$target \
+	CFLAGS="-mthreads" \
+	CXXFLAGS="-mthreads" \
+	LDFLAGS="-Wl,-Bstatic -mthreads -L${DEP_PATH}/lib -L${LIBZ_PATH}"
 then
 	echo "Error: configure failed, aborting." >&2
 	exit 1
