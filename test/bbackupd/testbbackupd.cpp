@@ -472,7 +472,9 @@ int num_tests_selected = 0;
 	if (!setUp(__FUNCTION__)) return true; \
 	num_tests_selected++; \
 	int old_failure_count = failures; \
-	TEST_THAT(kill_running_daemons());
+	TEST_THAT(kill_running_daemons()); \
+	try \
+	{ // left open
 
 #define SETUP_WITHOUT_FILES() \
 	SETUP() \
@@ -508,7 +510,16 @@ bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
 }
 
 #define TEARDOWN() \
-	return teardown_test_bbackupd(__FUNCTION__, old_failure_count);
+		return teardown_test_bbackupd(__FUNCTION__, old_failure_count); \
+	} \
+	catch (BoxException &e) \
+	{ \
+		BOX_NOTICE(__FUNCTION__ << " errored: " << e.what()); \
+		bool status = teardown_test_bbackupd(__FUNCTION__, old_failure_count); \
+		s_test_status[__FUNCTION__] = "ERRORED"; \
+		return status; \
+	}
+		
 
 bool test_basics()
 {
