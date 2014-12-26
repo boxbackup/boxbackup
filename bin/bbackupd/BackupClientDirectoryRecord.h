@@ -48,7 +48,7 @@ class BackupClientDirectoryRecord
 {
 public:
 	BackupClientDirectoryRecord(int64_t ObjectID, const std::string &rSubDirName);
-	~BackupClientDirectoryRecord();
+	virtual ~BackupClientDirectoryRecord();
 
 	void Deserialize(Archive & rArchive);
 	void Serialize(Archive & rArchive) const;
