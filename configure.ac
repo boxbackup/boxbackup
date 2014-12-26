@@ -132,7 +132,7 @@ cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
 	if test "$cmd" = "subdir"; then
 		echo
 		export CC CXX CFLAGS CXXFLAGS LDFLAGS LIBS
-		args="$configure_args --target=$target_alias"
+		args="$configure_args --host=$host_alias --build=$build_alias --target=$target_alias"
 		echo "Configuring $subdir with: $args"
 
 		cd $subdir
