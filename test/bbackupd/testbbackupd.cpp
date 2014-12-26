@@ -2576,7 +2576,7 @@ bool test_unicode_filenames_can_be_backed_up()
 		}
 
 		// Check that bbackupquery shows the dir in console encoding
-		command = BBACKUPQUERY " -Wwarning "
+		std::string command = BBACKUPQUERY " -Wwarning "
 			"-c testfiles/bbackupd.conf "
 			"-q \"list Test1\" quit";
 		pid_t bbackupquery_pid;
@@ -3627,21 +3627,21 @@ bool test_compare_detects_attribute_changes()
 	BOX_NOTICE("skipping test on this platform");
 	// requires openfile(), GetFileTime() and attrib.exe
 #else
-	bbackupd.RunSyncNow()
+	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
 	{
 		// make one of the files read-only, expect a compare failure
-		compareReturnValue = ::system("attrib +r "
+		int exit_status = ::system("attrib +r "
 			"testfiles\\restore-Test1\\f1.dat");
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(exit_status, 0);
 
 		TEST_COMPARE(Compare_Different);
 	
 		// set it back, expect no failures
-		compareReturnValue = ::system("attrib -r "
+		exit_status = ::system("attrib -r "
 			"testfiles\\restore-Test1\\f1.dat");
-		TEST_RETURN(compareReturnValue, 0);
+		TEST_RETURN(exit_status, 0);
 
 		TEST_COMPARE(Compare_Same);
 
@@ -4051,7 +4051,8 @@ bool test_locked_file_behaviour()
 		// Test that locked files cannot be backed up,
 		// and the appropriate error is reported.
 
-		handle = openfile("testfiles/TestDir1/f1.dat", O_LOCK);
+		HANDLE handle = openfile("testfiles/TestDir1/f1.dat",
+			O_LOCK, 0);
 		TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 		{
