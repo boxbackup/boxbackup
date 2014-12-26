@@ -3656,7 +3656,7 @@ bool test_compare_detects_attribute_changes()
 		TEST_COMPARE(Compare_Same);
 
 		// change the timestamp on a file, expect a compare failure
-		char* testfile = "testfiles\\restore-Test1\\f1.dat";
+		const char* testfile = "testfiles\\restore-Test1\\f1.dat";
 		HANDLE handle = openfile(testfile, O_RDWR, 0);
 		TEST_THAT(handle != INVALID_HANDLE_VALUE);
 		
