@@ -1510,7 +1510,10 @@ bool RaidFileRead::DirectoryExists(const RaidFileDiscSet &rSet, const std::strin
 			else
 			{
 				// No. It's a file. Bad!
-				THROW_EXCEPTION(RaidFileException, UnexpectedFileInDirPlace)
+				THROW_FILE_ERROR("Expected a directory, "
+					"found something else", dn,
+					RaidFileException,
+					UnexpectedFileInDirPlace);
 			}
 		}
 		else
@@ -1519,7 +1522,9 @@ bool RaidFileRead::DirectoryExists(const RaidFileDiscSet &rSet, const std::strin
 			if(errno != ENOENT)
 			{
 				// No. Bad things.
-				THROW_EXCEPTION(RaidFileException, OSError)
+				THROW_SYS_FILE_ERROR("Failed to check for "
+					"existing RaidFile directory", dn,
+					RaidFileException, OSError);
 			}
 		}
 	}
@@ -1621,8 +1626,11 @@ bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirN
 				std::string fullName(dn + DIRECTORY_SEPARATOR + en->d_name);
 				if(EMU_LSTAT(fullName.c_str(), &st) != 0)
 				{
-					THROW_EXCEPTION(RaidFileException, OSError)
+					THROW_SYS_FILE_ERROR("Failed to stat",
+						fullName, RaidFileException,
+						OSError);
 				}
+
 				if(DirReadType == DirReadType_FilesOnly && (st.st_mode & S_IFDIR) == 0)
 #endif
 				{
