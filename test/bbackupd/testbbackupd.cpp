@@ -1376,19 +1376,18 @@ bool test_backup_disappearing_directory()
 		&bbackupd);
 	params.mSyncPeriodEnd = GetCurrentBoxTime();
 
-	BackupProtocolCallable& connection = clientContext.GetConnection();
-
 	BackupClientFileAttributes attr;
 	attr.ReadAttributes("testfiles/TestDir1",
 		false /* put mod times in the attributes, please */);
 	std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
 	BackupStoreFilenameClear dirname("Test1");
 	std::auto_ptr<BackupProtocolSuccess>
-		dirCreate(connection.QueryCreateDirectory(
+		dirCreate(clientContext.GetConnection().QueryCreateDirectory(
 			BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
 			0, // attrModTime,
 			dirname, // dirname,
 			attrStream));
+	clientContext.CloseAnyOpenConnection();
 		
 	// Object ID for later creation
 	int64_t oid = dirCreate->GetObjectID();
@@ -1402,7 +1401,7 @@ bool test_backup_disappearing_directory()
 		"testfiles/TestDir1", // locationPath,
 		"/whee", // remotePath
 		fakeLocation);
-
+	clientContext.CloseAnyOpenConnection();
 	TEST_COMPARE(Compare_Same);
 
 	// Run another backup, check that we haven't got an inconsistent
@@ -1412,6 +1411,7 @@ bool test_backup_disappearing_directory()
 		"testfiles/TestDir1", // locationPath,
 		"/whee", // remotePath
 		fakeLocation);
+	clientContext.CloseAnyOpenConnection();
 	TEST_COMPARE(Compare_Same);
 
 	// Now recreate it and run another backup, check that we haven't got
@@ -1425,6 +1425,7 @@ bool test_backup_disappearing_directory()
 		"testfiles/TestDir1", // locationPath,
 		"/whee", // remotePath
 		fakeLocation);
+	clientContext.CloseAnyOpenConnection();
 	TEST_COMPARE(Compare_Same);
 
 	TEARDOWN();
@@ -1957,11 +1958,20 @@ bool test_bbackupd_exclusions()
 		// housekeeping the next time it runs. We hold onto the client
 		// context (and hence an open connection) to stop it from
 		// running for now.
+		
+		// But we can't do that on Windows, because bbstored only
+		// support one simultaneous connection. So we have to hope that
+		// housekeeping has run recently enough that it doesn't need to
+		// run again when we disconnect.
 
 		BOX_INFO("Finding out whether bbackupd marked files as deleted");
 
 		// TODO FIXME dedent
 		{
+#ifdef WIN32
+			apClientContext.reset();
+#endif
+
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(context,
 					BackupProtocolLogin::Flags_ReadOnly);
