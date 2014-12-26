@@ -10,6 +10,8 @@
 #if ! defined WINNAMEDPIPESTREAM__H && defined WIN32
 #define WINNAMEDPIPESTREAM__H
 
+#include <list>
+
 #include "IOStream.h"
 
 // --------------------------------------------------------------------------
@@ -46,6 +48,8 @@ public:
 protected:
 	void MarkAsReadClosed()  {mReadClosed  = true;}
 	void MarkAsWriteClosed() {mWriteClosed = true;}
+	bool WaitForOverlappedOperation(OVERLAPPED& Overlapped,
+		int Timeout, int64_t* pBytesTransferred);
 
 private:
 	WinNamedPipeStream(const WinNamedPipeStream &rToCopy) 
@@ -60,6 +64,36 @@ private:
 	bool mWriteClosed;
 	bool mIsServer;
 	bool mIsConnected;
+
+	class WriteInProgress {
+	private:
+		friend class WinNamedPipeStream;
+		std::string mBuffer;
+		OVERLAPPED mOverlap;
+		WriteInProgress(const WriteInProgress& other); // do not call
+	public:
+		WriteInProgress(const std::string& dataToWrite)
+		: mBuffer(dataToWrite)
+		{
+			// create the Writable event
+			HANDLE writable_event = CreateEvent(NULL, TRUE, FALSE,
+				NULL);
+			if (writable_event == INVALID_HANDLE_VALUE)
+			{
+				BOX_LOG_WIN_ERROR("Failed to create the "
+					"Writable event");
+				THROW_EXCEPTION(CommonException, Internal)
+			}
+
+			memset(&mOverlap, 0, sizeof(mOverlap));
+			mOverlap.hEvent = writable_event;
+		}
+		~WriteInProgress()
+		{
+			CloseHandle(mOverlap.hEvent);
+		}
+	};
+	std::list<WriteInProgress*> mWritesInProgress;
 
 public:
 	static std::string sPipeNamePrefix;
