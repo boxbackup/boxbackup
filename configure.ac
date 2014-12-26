@@ -4,6 +4,7 @@
 AC_PREREQ(2.59)
 AC_INIT([Box Backup], 0.11, [boxbackup@boxbackup.org],[boxbackup])
 AC_CONFIG_SRCDIR([lib/common/Box.h])
+AC_CONFIG_AUX_DIR([infrastructure])
 AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
 
 touch install-sh
