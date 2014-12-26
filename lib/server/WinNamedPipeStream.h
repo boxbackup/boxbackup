@@ -45,6 +45,13 @@ public:
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
+	// Why not inherited from IOStream?
+	virtual void Write(const std::string& rBuffer,
+		int Timeout = IOStream::TimeOutInfinite)
+	{
+		IOStream::Write(rBuffer, Timeout);
+	}
+
 protected:
 	void MarkAsReadClosed()  {mReadClosed  = true;}
 	void MarkAsWriteClosed() {mWriteClosed = true;}
