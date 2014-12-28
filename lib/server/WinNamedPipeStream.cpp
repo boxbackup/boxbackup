@@ -286,7 +286,8 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 			"result code: " << waitResult);
 	}
 
-	// object is ready to read from
+	// Overlapped operation completed successfully. Return the number
+	// of bytes transferred.
 	if (GetOverlappedResult(mSocketHandle, &Overlapped,
 		&NumBytesTransferred, TRUE))
 	{
@@ -294,7 +295,8 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 		return true;
 	}
 
-	// We are here because there was an error.
+	// We are here because GetOverlappedResult() informed us that the
+	// overlapped operation encountered an error, so what was it?
 	DWORD err = GetLastError();
 
 	if (err == ERROR_HANDLE_EOF)
@@ -356,8 +358,7 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 	int64_t NumBytesRead;
 
-	// satisfy from buffer if possible, to avoid
-	// blocking on read.
+	// Satisfy from buffer if possible, to avoid blocking on read.
 	bool needAnotherRead = false;
 	if (mBytesInBuffer == 0)
 	{
@@ -467,7 +468,10 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes, int Timeout)
 
 	if (Success == TRUE)
 	{
-		BOX_NOTICE("Write claimed success while overlapped?");
+		// Unfortunately this does happen. We should still call
+		// GetOverlappedResult() to get the number of bytes written,
+		// so we can treat it just the same.
+		// BOX_NOTICE("Write claimed success while overlapped?");
 		mWritesInProgress.push_back(new_write);
 	}
 	else

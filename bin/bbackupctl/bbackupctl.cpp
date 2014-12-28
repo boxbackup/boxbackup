@@ -226,26 +226,26 @@ int main(int argc, const char *argv[])
 	Command command = Default;
 	std::string commandName(argv[0]);
 
-	if (commandName == "wait-for-sync")
+	if(commandName == "wait-for-sync")
 	{
 		command = WaitForSyncStart;
 	}
-	else if (commandName == "wait-for-end")
+	else if(commandName == "wait-for-end")
 	{
 		command = WaitForSyncEnd;
 	}
-	else if (commandName == "sync-and-wait")
+	else if(commandName == "sync-and-wait")
 	{
 		command = SyncAndWaitForEnd;
 	}
-	else if (commandName == "status")
+	else if(commandName == "status")
 	{
 		BOX_NOTICE("state " <<
 			BackupDaemon::GetStateName(currentState));
 		command = NoCommand;
 	}
 
-	switch (command)
+	switch(command)
 	{
 		case WaitForSyncStart:
 		case WaitForSyncEnd:
@@ -270,7 +270,7 @@ int main(int argc, const char *argv[])
 			connection.Write(cmd, PROTOCOL_DEFAULT_TIMEOUT);
 			connection.WriteAllBuffered();
 
-			if (currentState != 0)
+			if(currentState != 0)
 			{
 				BOX_INFO("Waiting for current sync/error state "
 					"to finish...");
@@ -283,8 +283,7 @@ int main(int argc, const char *argv[])
 			// Normal case, just send the command given, plus a
 			// quit command.
 			std::string cmd = commandName + "\n";
-			connection.Write(cmd.c_str(), cmd.size(),
-				PROTOCOL_DEFAULT_TIMEOUT);
+			connection.Write(cmd, PROTOCOL_DEFAULT_TIMEOUT);
 		}
 		// fall through
 
@@ -293,8 +292,7 @@ int main(int argc, const char *argv[])
 			// Normal case, just send the command given plus a
 			// quit command.
 			std::string cmd = "quit\n";
-			connection.Write(cmd.c_str(), cmd.size(),
-				PROTOCOL_DEFAULT_TIMEOUT);
+			connection.Write(cmd, PROTOCOL_DEFAULT_TIMEOUT);
 		}
 	}
 	
@@ -323,17 +321,13 @@ int main(int argc, const char *argv[])
 			}
 		}
 
-		switch (command)
+		switch(command)
 		{
 			case WaitForSyncStart:
 			{
 				// Need to wait for the state change...
 				if(line == "start-sync")
 				{
-					// Send a quit command to finish nicely
-					connection.Write("quit\n", 5,
-						PROTOCOL_DEFAULT_TIMEOUT);
-
 					// And we're done
 					finished = true;
 				}
@@ -352,12 +346,8 @@ int main(int argc, const char *argv[])
 				{
 					if (syncIsRunning)
 					{
-						BOX_TRACE("Sync finished.");
-						// Send a quit command to finish nicely
-						connection.Write("quit\n", 5,
-							PROTOCOL_DEFAULT_TIMEOUT);
-					
 						// And we're done
+						BOX_TRACE("Sync finished.");
 						finished = true;
 					}
 					else
@@ -390,6 +380,9 @@ int main(int argc, const char *argv[])
 			}
 		}
 	}
+
+	// Send a quit command to finish nicely
+	connection.Write("quit\n", 5, PROTOCOL_DEFAULT_TIMEOUT);
 
 	MAINHELPER_END
 

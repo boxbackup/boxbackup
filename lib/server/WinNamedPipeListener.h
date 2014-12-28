@@ -53,8 +53,8 @@ private:
 			socket.c_str(),            // pipe name 
 			PIPE_ACCESS_DUPLEX |       // read/write access 
 			FILE_FLAG_OVERLAPPED,      // enabled overlapped I/O
-			PIPE_TYPE_BYTE |           // message type pipe 
-			PIPE_READMODE_BYTE |       // message-read mode 
+			PIPE_TYPE_BYTE |
+			PIPE_READMODE_BYTE |
 			PIPE_WAIT,                 // blocking mode 
 			ListenBacklog + 1,         // max. instances  
 			4096,                      // output buffer size 
