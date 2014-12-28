@@ -220,6 +220,9 @@ int main(int argc, const char *argv[])
 		return 1;
 	}
 
+	BOX_TRACE("Current state: " <<
+		BackupDaemon::GetStateName(currentState));
+
 	Command command = Default;
 	std::string commandName(argv[0]);
 
@@ -237,21 +240,8 @@ int main(int argc, const char *argv[])
 	}
 	else if (commandName == "status")
 	{
-		std::string stateName;
-
-		#define STATE(x) case BackupDaemon::State_ ## x: stateName = #x; break;
-		switch (currentState)
-		{
-		STATE(Initialising);
-		STATE(Idle);
-		STATE(Connected);
-		STATE(Error);
-		STATE(StorageLimitExceeded);
-		default:
-			stateName = "unknown";
-			break;
-		}
-		BOX_NOTICE("state " << currentState << " " << stateName);
+		BOX_NOTICE("state " <<
+			BackupDaemon::GetStateName(currentState));
 		command = NoCommand;
 	}
 
@@ -277,8 +267,7 @@ int main(int argc, const char *argv[])
 			// send a sync command
 			commandName = "force-sync";
 			std::string cmd = commandName + "\n";
-			connection.Write(cmd.c_str(), cmd.size(),
-				PROTOCOL_DEFAULT_TIMEOUT);
+			connection.Write(cmd, PROTOCOL_DEFAULT_TIMEOUT);
 			connection.WriteAllBuffered();
 
 			if (currentState != 0)
@@ -317,6 +306,23 @@ int main(int argc, const char *argv[])
 	while(command != NoCommand && !finished && !getLine.IsEOF() &&
 		getLine.GetLine(line, false, PROTOCOL_DEFAULT_TIMEOUT))
 	{
+		BOX_TRACE("Received line: " << line);
+
+		if(line.substr(0, 6) == "state ")
+		{
+			std::string state_str = line.substr(6);
+			int state_num;
+			if(sscanf(state_str.c_str(), "%d", &state_num) == 1)
+			{
+				BOX_INFO("Daemon state changed to: " <<
+					BackupDaemon::GetStateName(state_num));
+			}
+			else
+			{
+				BOX_WARNING("Failed to parse line: " << line);
+			}
+		}
+
 		switch (command)
 		{
 			case WaitForSyncStart:

@@ -64,9 +64,9 @@ private:
 
 		if (handle == INVALID_HANDLE_VALUE)
 		{
-			BOX_LOG_WIN_ERROR("Failed to create named pipe " <<
-				socket);
-			THROW_EXCEPTION(ServerException, SocketOpenError)
+			THROW_WIN_FILE_ERRNO("Failed to create named pipe",
+				socket, GetLastError(), ServerException,
+				SocketOpenError);
 		}
 
 		return handle;

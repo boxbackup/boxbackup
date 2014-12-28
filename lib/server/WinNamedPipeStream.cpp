@@ -88,10 +88,9 @@ WinNamedPipeStream::WinNamedPipeStream(HANDLE hNamedPipe)
 
 		if (err != ERROR_IO_PENDING)
 		{
-			BOX_ERROR("Failed to start overlapped read: " <<
-				GetErrorMessage(err));
 			Close();
-			THROW_EXCEPTION(ConnectionException, 
+			THROW_WIN_ERROR_NUMBER("Failed to start overlapped "
+				"read", err, ConnectionException,
 				SocketReadError)
 		}
 	}
@@ -261,10 +260,16 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 	DWORD waitResult = WaitForSingleObject(Overlapped.hEvent, Timeout);
 	DWORD NumBytesTransferred = -1;
 
+	if (waitResult == WAIT_FAILED)
+	{
+		THROW_WIN_ERROR_NUMBER("Failed to wait for overlapped I/O",
+			GetLastError(), ServerException, Internal);
+	}
+
 	if (waitResult == WAIT_ABANDONED)
 	{
-		THROW_EXCEPTION_MESSAGE(ServerException, BadSocketHandle,
-			"Wait for command socket read abandoned by system");
+		THROW_EXCEPTION_MESSAGE(ServerException, Internal,
+			"Wait for overlapped I/O abandoned by system");
 	}
 
 	if (waitResult == WAIT_TIMEOUT)
@@ -277,7 +282,7 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 	if (waitResult != WAIT_OBJECT_0)
 	{
 		THROW_EXCEPTION_MESSAGE(ServerException, BadSocketHandle,
-			"Failed to wait for command socket read: unknown "
+			"Failed to wait for overlapped I/O: unknown "
 			"result code: " << waitResult);
 	}
 
@@ -306,12 +311,12 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 		err == ERROR_BROKEN_PIPE)
 	{
 		BOX_INFO(BOX_WIN_ERRNO_MESSAGE(err,
-			"Control client disconnected"));
+			"Named pipe peer disconnected"));
 		Close();
 		return true;
 	}
 
-	THROW_WIN_ERROR_NUMBER("Failed to wait for OVERLAPPED operation "
+	THROW_WIN_ERROR_NUMBER("Failed to wait for overlapped I/O "
 		"to complete", err, ConnectionException, SocketReadError);
 }
 
@@ -333,18 +338,20 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 	
 	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
-		THROW_EXCEPTION(ServerException, BadSocketHandle)
+		THROW_EXCEPTION_MESSAGE(ServerException, BadSocketHandle,
+			"Tried to read from closed pipe");
 	}
 
 	if (mReadClosed)
 	{
-		THROW_EXCEPTION(ConnectionException, SocketShutdownError)
+		THROW_EXCEPTION_MESSAGE(ConnectionException,
+			SocketShutdownError, "Tried to read from closing pipe");
 	}
 
 	// ensure safe to cast NBytes to unsigned
 	if (NBytes < 0)
 	{
-		THROW_EXCEPTION(CommonException, AssertFailed)
+		THROW_EXCEPTION(CommonException, AssertFailed);
 	}
 
 	int64_t NumBytesRead;
@@ -526,8 +533,7 @@ void WinNamedPipeStream::Close()
 
 	if (!CancelIo(mSocketHandle))
 	{
-		BOX_ERROR("Failed to cancel outstanding I/O: " <<
-			GetErrorMessage(GetLastError()));
+		BOX_LOG_WIN_ERROR("Failed to cancel outstanding I/O");
 	}
 
 	if (mReadableEvent == INVALID_HANDLE_VALUE)
@@ -537,16 +543,14 @@ void WinNamedPipeStream::Close()
 	}
 	else if (!CloseHandle(mReadableEvent))
 	{
-		BOX_ERROR("Failed to destroy Readable event: " <<
-			GetErrorMessage(GetLastError()));
+		BOX_LOG_WIN_ERROR("Failed to destroy Readable event");
 	}
 
 	mReadableEvent = INVALID_HANDLE_VALUE;
 
 	if (!FlushFileBuffers(mSocketHandle))
 	{
-		BOX_ERROR("Failed to FlushFileBuffers: " <<
-			GetErrorMessage(GetLastError()));
+		BOX_LOG_WIN_ERROR("Failed to FlushFileBuffers");
 	}
 
 	if (!DisconnectNamedPipe(mSocketHandle))
@@ -554,8 +558,7 @@ void WinNamedPipeStream::Close()
 		DWORD err = GetLastError();
 		if (err != ERROR_PIPE_NOT_CONNECTED)
 		{
-			BOX_ERROR("Failed to DisconnectNamedPipe: " <<
-				GetErrorMessage(err));
+			BOX_LOG_WIN_ERROR("Failed to DisconnectNamedPipe");
 		}
 	}
 

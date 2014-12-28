@@ -109,6 +109,25 @@ public:
 	};
 
 	int GetState() {return mState;}
+	static std::string GetStateName(int state)
+	{
+		std::string stateName;
+
+		#define STATE(x) case BackupDaemon::State_ ## x: stateName = #x; break;
+		switch (state)
+		{
+		STATE(Initialising);
+		STATE(Idle);
+		STATE(Connected);
+		STATE(Error);
+		STATE(StorageLimitExceeded);
+		default:
+			stateName = "unknown";
+		}
+		#undef STATE
+
+		return stateName;
+	}
 
 	// Allow other classes to call this too
 	void NotifySysadmin(SysadminNotifier::EventCode Event);
