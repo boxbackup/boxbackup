@@ -39,13 +39,14 @@ std::string WinNamedPipeStream::sPipeNamePrefix = "\\\\.\\pipe\\";
 //
 // --------------------------------------------------------------------------
 WinNamedPipeStream::WinNamedPipeStream()
-	: mSocketHandle(INVALID_HANDLE_VALUE),
-	  mReadableEvent(INVALID_HANDLE_VALUE),
-	  mBytesInBuffer(0),
-	  mReadClosed(false),
-	  mWriteClosed(false),
-	  mIsServer(false),
-	  mIsConnected(false)
+: mSocketHandle(INVALID_HANDLE_VALUE),
+  mReadableEvent(INVALID_HANDLE_VALUE),
+  mBytesInBuffer(0),
+  mReadClosed(false),
+  mWriteClosed(false),
+  mIsServer(false),
+  mIsConnected(false),
+  mNeedAnotherRead(false)
 { }
 
 // --------------------------------------------------------------------------
@@ -57,14 +58,21 @@ WinNamedPipeStream::WinNamedPipeStream()
 //
 // --------------------------------------------------------------------------
 WinNamedPipeStream::WinNamedPipeStream(HANDLE hNamedPipe)
-	: mSocketHandle(hNamedPipe),
-	  mReadableEvent(INVALID_HANDLE_VALUE),
-	  mBytesInBuffer(0),
-	  mReadClosed(false),
-	  mWriteClosed(false),
-	  mIsServer(true),
-	  mIsConnected(true)
+: mSocketHandle(hNamedPipe),
+  mReadableEvent(INVALID_HANDLE_VALUE),
+  mBytesInBuffer(0),
+  mReadClosed(false),
+  mWriteClosed(false),
+  mIsServer(true),
+  mIsConnected(true),
+  mNeedAnotherRead(false)
 { 
+	StartFirstRead();
+}
+
+// Start the first overlapped read
+void WinNamedPipeStream::StartFirstRead()
+{
 	// create the Readable event
 	mReadableEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
@@ -76,17 +84,45 @@ WinNamedPipeStream::WinNamedPipeStream(HANDLE hNamedPipe)
 		THROW_EXCEPTION(CommonException, Internal)
 	}
 
-	// initialise the OVERLAPPED structure
+	StartOverlappedRead();
+}
+
+void WinNamedPipeStream::StartOverlappedRead()
+{
+	// We should only do this when the buffer is empty. We don't want
+	// to start an overlapped read anywhere else than the start of the
+	// buffer, because it could complete at any time and we don't want
+	// to mess about with interrupting the read already in progress.
+	ASSERT(mBytesInBuffer == 0);
+
+	// Initialise the OVERLAPPED structure
 	memset(&mReadOverlap, 0, sizeof(mReadOverlap));
 	mReadOverlap.hEvent = mReadableEvent;
 
-	// start the first overlapped read
 	if (!ReadFile(mSocketHandle, mReadBuffer, sizeof(mReadBuffer),
 		NULL, &mReadOverlap))
 	{
 		DWORD err = GetLastError();
-
-		if (err != ERROR_IO_PENDING)
+		if (err == ERROR_IO_PENDING)
+		{
+			// Don't reset yet, there might be data
+			// in the buffer waiting to be read, 
+			// will check below.
+			// ResetEvent(mReadableEvent);
+		}
+		else if (err == ERROR_HANDLE_EOF)
+		{
+			BOX_INFO("Control client disconnected");
+			mReadClosed = true;
+		}
+		else if (err == ERROR_BROKEN_PIPE ||
+			err == ERROR_PIPE_NOT_CONNECTED)
+		{
+			BOX_NOTICE("Control client disconnected");
+			mReadClosed = true;
+			mIsConnected = false;
+		}
+		else
 		{
 			Close();
 			THROW_WIN_ERROR_NUMBER("Failed to start overlapped "
@@ -164,36 +200,7 @@ void WinNamedPipeStream::Accept()
 	mIsServer    = true; // must flush and disconnect before closing
 	mIsConnected = true;
 
-	// create the Readable event
-	mReadableEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	if (mReadableEvent == INVALID_HANDLE_VALUE)
-	{
-		BOX_ERROR("Failed to create the Readable event: " <<
-			GetErrorMessage(GetLastError()));
-		Close();
-		THROW_EXCEPTION(CommonException, Internal)
-	}
-
-	// initialise the OVERLAPPED structure
-	memset(&mReadOverlap, 0, sizeof(mReadOverlap));
-	mReadOverlap.hEvent = mReadableEvent;
-
-	// start the first overlapped read
-	if (!ReadFile(mSocketHandle, mReadBuffer, sizeof(mReadBuffer),
-		NULL, &mReadOverlap))
-	{
-		DWORD err = GetLastError();
-
-		if (err != ERROR_IO_PENDING)
-		{
-			BOX_ERROR("Failed to start overlapped read: " <<
-				GetErrorMessage(err));
-			Close();
-			THROW_EXCEPTION(ConnectionException, 
-				Conn_SocketReadError)
-		}
-	}
+	StartFirstRead();
 }
 */
 
@@ -221,7 +228,7 @@ void WinNamedPipeStream::Connect(const std::string& rName)
 		0,              // no sharing 
 		NULL,           // default security attributes
 		OPEN_EXISTING,
-		0,              // default attributes 
+		0, // FILE_FLAG_OVERLAPPED, // dwFlagsAndAttributes
 		NULL);          // no template file 
 
 	if (mSocketHandle == INVALID_HANDLE_VALUE)
@@ -244,6 +251,8 @@ void WinNamedPipeStream::Connect(const std::string& rName)
 	mWriteClosed = false;
 	mIsServer    = false; // just close the socket
 	mIsConnected = true;
+
+	StartFirstRead();
 }
 
 // Returns true if the operation is complete (and you will need to start
@@ -332,12 +341,6 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 // --------------------------------------------------------------------------
 int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	// TODO no support for timeouts yet
-	if (!mIsServer && Timeout != IOStream::TimeOutInfinite)
-	{
-		THROW_EXCEPTION(CommonException, AssertFailed)
-	}
-	
 	if (mSocketHandle == INVALID_HANDLE_VALUE || !mIsConnected) 
 	{
 		THROW_EXCEPTION_MESSAGE(ServerException, BadSocketHandle,
@@ -359,11 +362,16 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 	int64_t NumBytesRead;
 
 	// Satisfy from buffer if possible, to avoid blocking on read.
-	bool needAnotherRead = false;
 	if (mBytesInBuffer == 0)
 	{
-		needAnotherRead = WaitForOverlappedOperation(
-			mReadOverlap, Timeout, &NumBytesRead);
+		if (mNeedAnotherRead)
+		{
+			// Start the next overlapped read
+			StartOverlappedRead();
+		}
+
+		mNeedAnotherRead = WaitForOverlappedOperation(mReadOverlap,
+			Timeout, &NumBytesRead);
 	}
 	else
 	{
@@ -373,62 +381,21 @@ int WinNamedPipeStream::Read(void *pBuffer, int NBytes, int Timeout)
 		NumBytesRead = 0;
 	}
 
-	size_t BytesToCopy = NumBytesRead + mBytesInBuffer;
-	size_t BytesRemaining = 0;
+	int BytesToCopy = NumBytesRead + mBytesInBuffer;
 
-	if (BytesToCopy > (size_t)NBytes)
+	if (NBytes < BytesToCopy)
 	{
-		BytesRemaining = BytesToCopy - NBytes;
 		BytesToCopy = NBytes;
 	}
 
 	memcpy(pBuffer, mReadBuffer, BytesToCopy);
+
+	size_t BytesRemaining = mBytesInBuffer + NumBytesRead - BytesToCopy;
+	ASSERT(BytesToCopy + BytesRemaining <= sizeof(mReadBuffer));
 	memmove(mReadBuffer, mReadBuffer + BytesToCopy, BytesRemaining);
-
 	mBytesInBuffer = BytesRemaining;
-	NumBytesRead = BytesToCopy;
 
-	if (needAnotherRead)
-	{
-		// reinitialise the OVERLAPPED structure
-		memset(&mReadOverlap, 0, sizeof(mReadOverlap));
-		mReadOverlap.hEvent = mReadableEvent;
-	}
-
-	// start the next overlapped read
-	if (needAnotherRead && !ReadFile(mSocketHandle, 
-		mReadBuffer + mBytesInBuffer, 
-		sizeof(mReadBuffer) - mBytesInBuffer,
-		NULL, &mReadOverlap))
-	{
-		DWORD err = GetLastError();
-		if (err == ERROR_IO_PENDING)
-		{
-			// Don't reset yet, there might be data
-			// in the buffer waiting to be read, 
-			// will check below.
-			// ResetEvent(mReadableEvent);
-		}
-		else if (err == ERROR_HANDLE_EOF)
-		{
-			mReadClosed = true;
-		}
-		else if (err == ERROR_BROKEN_PIPE)
-		{
-			BOX_ERROR("Control client disconnected");
-			mReadClosed = true;
-		}
-		else
-		{
-			BOX_ERROR("Failed to start overlapped read: "
-				<< GetErrorMessage(err));
-			Close();
-			THROW_EXCEPTION(ConnectionException, 
-				SocketReadError)
-		}
-	}
-
-	return NumBytesRead;
+	return BytesToCopy;
 }
 
 // --------------------------------------------------------------------------
@@ -494,9 +461,9 @@ void WinNamedPipeStream::Write(const void *pBuffer, int NBytes, int Timeout)
 	}
 
 	// Wait for previous WriteFile operations to complete, one at a time,
-	// until the deadline expires.
+	// until the deadline expires or the pipe becomes disconnected.
 	for(box_time_t remaining = deadline - GetCurrentBoxTime();
-		remaining > 0 && !mWritesInProgress.empty();
+		remaining > 0 && !mWritesInProgress.empty() && mIsConnected;
 		remaining = deadline - GetCurrentBoxTime())
 	{
 		int new_timeout = BoxTimeToMilliSeconds(remaining);
@@ -552,12 +519,12 @@ void WinNamedPipeStream::Close()
 
 	mReadableEvent = INVALID_HANDLE_VALUE;
 
-	if (!FlushFileBuffers(mSocketHandle))
+	if (mIsConnected && !FlushFileBuffers(mSocketHandle))
 	{
 		BOX_LOG_WIN_ERROR("Failed to FlushFileBuffers");
 	}
 
-	if (!DisconnectNamedPipe(mSocketHandle))
+	if (mIsServer && mIsConnected && !DisconnectNamedPipe(mSocketHandle))
 	{
 		DWORD err = GetLastError();
 		if (err != ERROR_PIPE_NOT_CONNECTED)
@@ -566,16 +533,16 @@ void WinNamedPipeStream::Close()
 		}
 	}
 
-	mSocketHandle = INVALID_HANDLE_VALUE;
-	mIsConnected = false;
-	mReadClosed  = true;
-	mWriteClosed = true;
-
 	if (!CloseHandle(mSocketHandle))
 	{
 		THROW_WIN_ERROR_NUMBER("Failed to CloseHandle",
 			GetLastError(), ServerException, SocketCloseError);
 	}
+
+	mSocketHandle = INVALID_HANDLE_VALUE;
+	mIsConnected = false;
+	mReadClosed  = true;
+	mWriteClosed = true;
 }
 
 // --------------------------------------------------------------------------

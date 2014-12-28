@@ -57,6 +57,8 @@ protected:
 	void MarkAsWriteClosed() {mWriteClosed = true;}
 	bool WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 		int Timeout, int64_t* pBytesTransferred);
+	void StartFirstRead();
+	void StartOverlappedRead();
 
 private:
 	WinNamedPipeStream(const WinNamedPipeStream &rToCopy) 
@@ -71,6 +73,7 @@ private:
 	bool mWriteClosed;
 	bool mIsServer;
 	bool mIsConnected;
+	bool mNeedAnotherRead;
 
 	class WriteInProgress {
 	private:
