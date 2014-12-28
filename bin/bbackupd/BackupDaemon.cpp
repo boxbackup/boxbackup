@@ -2062,7 +2062,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 						conf.GetKeyValueInt("MaxUploadWait") 
 						<< "\nstate " << mState << "\n";
 					mapCommandSocketInfo->mpConnectedSocket->Write(
-						hello.str());
+						hello.str(), timeout);
 					
 					// Set the timeout to something very small, so we don't wait too long on waiting
 					// for any incoming data
@@ -2082,7 +2082,8 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		}
 		
 		// Ping the remote side, to provide errors which will mean the socket gets closed
-		mapCommandSocketInfo->mpConnectedSocket->Write("ping\n", 5);
+		mapCommandSocketInfo->mpConnectedSocket->Write("ping\n", 5,
+			timeout);
 		
 		// Wait for a command or something on the socket
 		std::string command;
@@ -2132,7 +2133,9 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			// Send a response back?
 			if(sendResponse)
 			{
-				mapCommandSocketInfo->mpConnectedSocket->Write(sendOK?"ok\n":"error\n", sendOK?3:6);
+				std::string response = sendOK ? "ok\n" : "error\n";
+				mapCommandSocketInfo->mpConnectedSocket->Write(
+					response, timeout);
 			}
 			
 			// Set timeout to something very small, so this just checks for data which is waiting
@@ -2257,8 +2260,8 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 		try
 		{
 			message += "\n";
-			mapCommandSocketInfo->mpConnectedSocket->Write(
-				message.c_str(), message.size());
+			mapCommandSocketInfo->mpConnectedSocket->Write(message,
+				1); // short timeout, it's overlapped
 		}
 		catch(std::exception &e)
 		{
@@ -2989,7 +2992,8 @@ void BackupDaemon::SetState(int State)
 	// Something connected to the command socket, tell it about the new state
 	try
 	{
-		mapCommandSocketInfo->mpConnectedSocket->Write(msg.str());
+		mapCommandSocketInfo->mpConnectedSocket->Write(msg.str(),
+			1); // very short timeout, it's overlapped anyway
 	}
 	catch(ConnectionException &ce)
 	{

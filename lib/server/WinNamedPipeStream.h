@@ -45,9 +45,9 @@ public:
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 
-	// Why not inherited from IOStream?
-	virtual void Write(const std::string& rBuffer,
-		int Timeout = IOStream::TimeOutInfinite)
+	// Why not inherited from IOStream? Never mind, we want to enforce
+	// supplying a timeout for network operations anyway.
+	virtual void Write(const std::string& rBuffer, int Timeout)
 	{
 		IOStream::Write(rBuffer, Timeout);
 	}
