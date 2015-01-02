@@ -19,6 +19,7 @@
 	#include <unistd.h>
 #endif
 
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
