@@ -70,13 +70,13 @@ void FileStream::AfterOpen()
 #ifdef WIN32
 		if(errno == EACCES)
 		{
-			THROW_WIN_FILE_ERROR("Failed to open file", mFileName,
-				CommonException, AccessDenied);
+			THROW_WIN_FILE_ERRNO("Failed to open file", mFileName,
+				winerrno, CommonException, AccessDenied);
 		}
 		else
 		{
-			THROW_WIN_FILE_ERROR("Failed to open file", mFileName,
-				CommonException, OSFileOpenError);
+			THROW_WIN_FILE_ERRNO("Failed to open file", mFileName,
+				winerrno, CommonException, OSFileOpenError);
 		}
 #else
 		if(errno == EACCES)
