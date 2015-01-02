@@ -2477,7 +2477,10 @@ bool test_unicode_filenames_can_be_backed_up()
 		// We have no guarantee that a random Unicode string can be
 		// represented in the user's character set, so we go the 
 		// other way, taking three random characters from the 
-		// character set and converting them to Unicode. 
+		// character set and converting them to Unicode. Unless the
+		// console codepage is CP_UTF8, in which case our random
+		// characters are not valid, so we use the UTF8 version
+		// of them instead.
 		//
 		// We hope that these characters are valid in most 
 		// character sets, but they probably are not in multibyte 
@@ -2497,7 +2500,8 @@ bool test_unicode_filenames_can_be_backed_up()
 		// accented characters, which are supported in code page
 		// 850. Depending on your locale, YYMV (your yak may vomit).
 
-		std::string foreignCharsNative("\x91\x9b\x86");
+		std::string foreignCharsNative = (GetConsoleCP() == CP_UTF8)
+			? "\xc3\xa6\xc3\xb8\xc3\xa5" : "\x91\x9b\x86";
 		std::string foreignCharsUnicode;
 		TEST_THAT(ConvertConsoleToUtf8(foreignCharsNative.c_str(),
 			foreignCharsUnicode));
