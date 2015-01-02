@@ -3708,11 +3708,17 @@ bool test_sync_new_files()
 
 	// TODO FIXME dedent
 	{
-		// Add some more files and modify others
-		// Use the m flag this time so they have a recent modification time
+		// Add some more files and modify others. Use the m flag this
+		// time so they have a recent modification time.
 		TEST_THAT(unpack_files("test3", "testfiles", "m"));
+
+		// OpenBSD's tar interprets the "-m" option quite differently:
+		// it sets the time to epoch zero (1 Jan 1970) instead of the
+		// current time, which doesn't help us. So reset the timestamp
+		// on a file with the touch command, so it won't be backed up.
+		TEST_RETURN(::system("touch testfiles/TestDir1/chsh"), 0);
 		
-		// Wait and test
+		// At least one file is too new to be backed up on the first run.
 		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Different);
 
