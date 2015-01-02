@@ -18,7 +18,12 @@
 #define EMU_INCLUDE
 
 // Need feature detection macros below
-#include "../common/BoxConfig.h"
+#ifdef _MSC_VER
+#	include "../common/BoxConfig-MSVC.h"
+#	define NEED_BOX_VERSION_H
+#else
+#	include "../common/BoxConfig.h"
+#endif
 
 // Shut up stupid new warnings. Thanks MinGW! Ever heard of "compatibility"?
 #ifdef __MINGW32__
