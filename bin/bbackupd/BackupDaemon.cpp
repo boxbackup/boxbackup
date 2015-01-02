@@ -3075,10 +3075,9 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 
 	if(Event < 0 || Event >= SysadminNotifier::MAX)
 	{
-		BOX_ERROR("BackupDaemon::NotifySysadmin() called for "
-			"invalid event code " << Event);
-		THROW_EXCEPTION(BackupStoreException,
-			BadNotifySysadminEventCode);
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			BadNotifySysadminEventCode, "NotifySysadmin() called "
+			"for unknown event code " << Event);
 	}
 
 	BOX_TRACE("BackupDaemon::NotifySysadmin() called, event = " << 
