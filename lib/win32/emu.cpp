@@ -1863,7 +1863,7 @@ int writev(int filedes, const struct iovec *vector, size_t count)
 	return bytes;
 }
 
-// need this for conversions
+// Need this for conversions. Works in UTC.
 time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 {
 	SYSTEMTIME stUTC;
@@ -1882,18 +1882,17 @@ time_t ConvertFileTimeToTime_t(FILETIME *fileTime)
 	// timeinfo.tm_yday = ...;
 	timeinfo.tm_year = stUTC.wYear - 1900;
 
-	time_t retVal = mktime(&timeinfo) - _timezone;
+	time_t retVal = _mkgmtime(&timeinfo);
 	return retVal;
 }
 
 bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
 {
-	time_t adjusted = from + _timezone;
-	struct tm *time_breakdown = gmtime(&adjusted);
+	struct tm *time_breakdown = gmtime(&from);
 	if (time_breakdown == NULL)
 	{
 		::syslog(LOG_ERR, "Error: failed to convert time format: "
-			"%d is not a valid time\n", adjusted);
+			"%d is not a valid time\n", from);
 		return false;
 	}
 
