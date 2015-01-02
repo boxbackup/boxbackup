@@ -111,7 +111,6 @@
     <ClCompile Include="..\..\..\lib\common\DebugAssertFailed.cpp" />
     <ClCompile Include="..\..\..\lib\common\DebugMemLeakFinder.cpp" />
     <ClCompile Include="..\..\..\lib\common\DebugPrintf.cpp" />
-    <ClCompile Include="..\..\..\lib\common\EventWatchFilesystemObject.cpp" />
     <ClCompile Include="..\..\..\lib\common\ExcludeList.cpp" />
     <ClCompile Include="..\..\..\lib\common\FdGetLine.cpp" />
     <ClCompile Include="..\..\..\lib\common\FileStream.cpp" />
@@ -182,7 +181,6 @@
     <ClInclude Include="..\..\..\lib\common\Configuration.h" />
     <ClInclude Include="..\..\..\lib\common\Conversion.h" />
     <ClInclude Include="..\..\..\lib\common\EndStructPackForWire.h" />
-    <ClInclude Include="..\..\..\lib\common\EventWatchFilesystemObject.h" />
     <ClInclude Include="..\..\..\lib\common\ExcludeList.h" />
     <ClInclude Include="..\..\..\lib\common\FdGetLine.h" />
     <ClInclude Include="..\..\..\lib\common\FileModificationTime.h" />
