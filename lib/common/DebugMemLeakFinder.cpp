@@ -589,7 +589,11 @@ extern "C" void memleakfinder_atexit()
 void memleakfinder_setup_exit_report(const std::string& filename, 
 	const char *markertext)
 {
-	::strncpy(atexit_filename, filename.c_str(), sizeof(atexit_filename)-1);
+	char buffer[PATH_MAX];
+	std::string abs_filename = std::string(getcwd(buffer, sizeof(buffer))) +
+		DIRECTORY_SEPARATOR + filename;
+	::strncpy(atexit_filename, abs_filename.c_str(),
+		sizeof(atexit_filename)-1);
 	::strncpy(atexit_markertext, markertext, sizeof(atexit_markertext)-1);
 	atexit_filename[sizeof(atexit_filename)-1] = 0;
 	atexit_markertext[sizeof(atexit_markertext)-1] = 0;
