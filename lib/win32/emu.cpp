@@ -1078,7 +1078,6 @@ DIR *opendir(const char *name)
 	}
 
 	pDir->fd = FindFirstFileW(pDir->name, &pDir->info);
-	DWORD tmp = GetLastError();
 
 	if (pDir->fd == INVALID_HANDLE_VALUE)
 	{
