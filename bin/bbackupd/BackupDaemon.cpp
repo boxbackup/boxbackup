@@ -164,6 +164,39 @@
 			}
 		}
 #	endif
+
+	// Mutex support by Achim: see https://www.boxbackup.org/ticket/67
+
+	// Creates the two mutexes checked for by the installer/uninstaller to
+	// see if the program is still running.  One of the mutexes is created
+	// in the global name space (which makes it possible to access the
+	// mutex across user sessions in Windows XP); the other is created in
+	// the session name space (because versions of Windows NT prior to
+	// 4.0 TSE don't have a global name space and don't support the
+	// 'Global\' prefix).
+
+	void CreateMutexes(const std::string& rName)
+	{
+		SECURITY_DESCRIPTOR SecurityDesc;
+		SECURITY_ATTRIBUTES SecurityAttr;
+
+		/* By default on Windows NT, created mutexes are accessible only by the user
+		   running the process. We need our mutexes to be accessible to all users, so
+		   that the mutex detection can work across user sessions in Windows XP. To
+		   do this we use a security descriptor with a null DACL.
+		*/
+
+		InitializeSecurityDescriptor(&SecurityDesc, SECURITY_DESCRIPTOR_REVISION);
+		SetSecurityDescriptorDacl(&SecurityDesc, TRUE, NULL, FALSE);
+		SecurityAttr.nLength = sizeof(SecurityAttr);
+		SecurityAttr.lpSecurityDescriptor = &SecurityDesc;
+		SecurityAttr.bInheritHandle = FALSE;
+		// We don't care if this succeeds or fails. It's only used to
+		// ensure that an installer can detect if Box Backup is running.
+		CreateMutexA(&SecurityAttr, FALSE, rName.c_str());
+		std::string global_name = "Global\\" + rName;
+		CreateMutexA(&SecurityAttr, FALSE, global_name.c_str());
+	}
 #endif
 
 #include "MemLeakFindOn.h"
@@ -410,6 +443,8 @@ int BackupDaemon::Main(const std::string &rConfigFileName)
 	}
 #endif
 
+	CreateMutexes("__boxbackup_mutex__");
+
 	int returnCode;
 
 	if (mRunAsService)
@@ -429,7 +464,7 @@ int BackupDaemon::Main(const std::string &rConfigFileName)
 	
 	return returnCode;
 }
-#endif
+#endif // WIN32
 
 // --------------------------------------------------------------------------
 //
