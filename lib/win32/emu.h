@@ -214,6 +214,7 @@ inline int geteuid(void)
 #define vsnprintf _vsnprintf
 
 #ifndef __MINGW32__
+#define snprintf _snprintf
 inline int strcasecmp(const char *s1, const char *s2)
 {
 	return _stricmp(s1,s2);
