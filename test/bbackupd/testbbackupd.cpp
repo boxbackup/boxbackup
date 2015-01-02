@@ -2436,8 +2436,7 @@ bool test_read_only_dirs_can_be_restored()
 			// directory.
 			TEST_THAT(::mkdir("testfiles/restore-test", 0700) == 0);
 			TEST_THAT(bbackupquery("\"lcd testfiles/restore-test\" "
-				"\"restore Test1\"",
-				"testfiles/restore-test/bbackupquery.memleaks"));
+				"\"restore Test1\""));
 			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 "
 				"testfiles/restore-test/Test1");
 
@@ -2561,6 +2560,11 @@ bool test_unicode_filenames_can_be_backed_up()
 			TEST_EQUAL_LINE(12, fs.GetPosition(),
 				"FileStream position");
 			fs.Close();
+
+			// Set modtime back in time to allow immediate backup
+			struct timeval times[2] = {};
+			times[1].tv_sec = 1000000000;
+			TEST_THAT(emu_utimes(filepath.c_str(), times) == 0);
 		}
 
 		bbackupd.RunSyncNow();
@@ -2681,14 +2685,10 @@ bool test_unicode_filenames_can_be_backed_up()
 			"\"cd Test1/" + systemDirName + "\" " + 
 			"\"get " + systemFileName + "\""));
 
-		// Compare to make sure it was restored properly.
-		// The Get command does not restore attributes, so
-		// we must compare without them (-A) to succeed.
-		TEST_COMPARE(Compare_Same, "", "-cAEQ Test1/" + systemDirName +
-			" testfiles/restore-" + systemDirName);
-
-		// Compare without attributes. This should fail.
-		TEST_COMPARE(Compare_Different, "", "-cEQ Test1/" + systemDirName +
+		// Compare to make sure it was restored properly. The Get
+		// command does restore attributes, so we don't need to
+		// specify the -A option for this to succeed.
+		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName);
 
 		// Check that no read error has been reported yet
@@ -3642,25 +3642,26 @@ bool test_compare_detects_attribute_changes()
 	// requires openfile(), GetFileTime() and attrib.exe
 #else
 	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
 
 	// TODO FIXME dedent
 	{
 		// make one of the files read-only, expect a compare failure
 		int exit_status = ::system("attrib +r "
-			"testfiles\\restore-Test1\\f1.dat");
+			"testfiles\\TestDir1\\f1.dat");
 		TEST_RETURN(exit_status, 0);
 
 		TEST_COMPARE(Compare_Different);
 	
 		// set it back, expect no failures
 		exit_status = ::system("attrib -r "
-			"testfiles\\restore-Test1\\f1.dat");
+			"testfiles\\TestDir1\\f1.dat");
 		TEST_RETURN(exit_status, 0);
 
 		TEST_COMPARE(Compare_Same);
 
 		// change the timestamp on a file, expect a compare failure
-		const char* testfile = "testfiles\\restore-Test1\\f1.dat";
+		const char* testfile = "testfiles\\TestDir1\\f1.dat";
 		HANDLE handle = openfile(testfile, O_RDWR, 0);
 		TEST_THAT(handle != INVALID_HANDLE_VALUE);
 		
@@ -4072,7 +4073,7 @@ bool test_locked_file_behaviour()
 		{
 			// this sync should try to back up the file, 
 			// and fail, because it's locked
-			bbackupd.RunSyncNow();
+			bbackupd.RunSyncNowWithExceptionHandling();
 			TEST_THAT(TestFileExists("testfiles/"
 				"notifyran.read-error.1"));
 			TEST_THAT(!TestFileExists("testfiles/"
