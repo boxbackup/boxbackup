@@ -1667,6 +1667,73 @@ int emu_mkdir(const char* pPathName)
 	return 0;
 }
 
+int emu_link(const char* pOldPath, const char* pNewPath)
+{
+	std::string AbsOldPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pOldPath);
+
+	if (AbsOldPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	std::string AbsNewPathWithUnicode = 
+		ConvertPathToAbsoluteUnicode(pNewPath);
+
+	if (AbsNewPathWithUnicode.size() == 0)
+	{
+		// error already logged by ConvertPathToAbsoluteUnicode()
+		return -1;
+	}
+
+	WCHAR* pOldBuffer = ConvertUtf8ToWideString(AbsOldPathWithUnicode.c_str());
+	if (!pOldBuffer)
+	{
+		return -1;
+	}
+
+	WCHAR* pNewBuffer = ConvertUtf8ToWideString(AbsNewPathWithUnicode.c_str());
+	if (!pNewBuffer)
+	{
+		delete [] pOldBuffer;
+		return -1;
+	}
+
+	BOOL result = CreateHardLinkW(pNewBuffer, pOldBuffer, NULL);
+	DWORD err = GetLastError();
+	delete [] pOldBuffer;
+	delete [] pNewBuffer;
+
+	if (!result)
+	{
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		{
+			errno = ENOENT;
+		}
+		else if (err == ERROR_SHARING_VIOLATION)
+		{
+			errno = EBUSY;
+		}
+		else if (err == ERROR_ACCESS_DENIED)
+		{
+			errno = EACCES;
+		}
+		else
+		{
+			::syslog(LOG_WARNING, "Failed to hardlink file "
+				"'%s' to '%s': %s", pOldPath, pNewPath,
+				GetErrorMessage(err).c_str());
+			errno = ENOSYS;
+		}
+
+		return -1;
+	}
+
+	return 0;
+
+}
+
 int emu_unlink(const char* pFileName)
 {
 	std::string AbsPathWithUnicode = 
@@ -1709,6 +1776,7 @@ int emu_unlink(const char* pFileName)
 				GetErrorMessage(err).c_str());
 			errno = ENOSYS;
 		}
+
 		return -1;
 	}
 

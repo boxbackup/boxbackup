@@ -1742,6 +1742,39 @@ bool test_ssl_keepalives()
 	TEARDOWN();
 }
 
+bool test_backup_hardlinked_files()
+{
+	SETUP_WITH_BBSTORED();
+
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	// Create some hard links. First in the same directory:
+	TEST_THAT(link("testfiles/TestDir1/x1/dsfdsfs98.fd",
+		"testfiles/TestDir1/x1/hardlink1") == 0);
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	// Now in a different directory
+	TEST_THAT(mkdir("testfiles/TestDir1/x2", 0755) == 0);
+	TEST_THAT(link("testfiles/TestDir1/x1/dsfdsfs98.fd",
+		"testfiles/TestDir1/x2/hardlink2") == 0);
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	// Now delete one of them
+	TEST_THAT(unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	// And another.
+	TEST_THAT(unlink("testfiles/TestDir1/x1/hardlink1") == 0);
+	bbackupd.RunSyncNow();
+	TEST_COMPARE(Compare_Same);
+
+	TEARDOWN();
+}
+
 bool test_backup_pauses_when_store_is_full()
 {
 	SETUP_WITHOUT_FILES();
@@ -4202,6 +4235,7 @@ int test(int argc, const char *argv[])
 	// TEST_THAT(test_replace_zero_byte_file_with_nonzero_byte_file());
 	TEST_THAT(test_backup_disappearing_directory());
 	TEST_THAT(test_ssl_keepalives());
+	TEST_THAT(test_backup_hardlinked_files());
 	TEST_THAT(test_backup_pauses_when_store_is_full());
 	TEST_THAT(test_bbackupd_exclusions());
 	TEST_THAT(test_bbackupd_uploads_files());

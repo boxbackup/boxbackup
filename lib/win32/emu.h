@@ -353,6 +353,7 @@ bool   ConvertTime_tToFileTime(const time_t from, FILETIME *pTo);
 
 int   emu_chdir  (const char* pDirName);
 int   emu_mkdir  (const char* pPathName);
+int   emu_link   (const char* pOldPath, const char* pNewPath);
 int   emu_unlink (const char* pFileName);
 int   emu_fstat  (HANDLE file,       struct emu_stat* st);
 int   emu_stat   (const char* pName, struct emu_stat* st);
@@ -363,6 +364,7 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 
 #define chdir(directory)         emu_chdir  (directory)
 #define mkdir(path,     mode)    emu_mkdir  (path)
+#define link(oldpath,   newpath) emu_link   (oldpath, newpath)
 #define unlink(file)             emu_unlink (file)
 #define utimes(buffer,  times)   emu_utimes (buffer,   times)
 #define chmod(file,     mode)    emu_chmod  (file,     mode)
