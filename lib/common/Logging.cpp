@@ -284,12 +284,6 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	}
 	
 	FILE* target = stdout;
-	
-	if (level <= Log::WARNING)
-	{
-		target = stderr;
-	}
-
 	std::ostringstream buf;
 
 	if (sShowTime)
