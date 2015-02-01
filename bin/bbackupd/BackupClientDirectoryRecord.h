@@ -202,7 +202,6 @@ private:
 	std::string 	mSubDirName;
 	bool 		mInitialSyncDone;
 	bool 		mSyncDone;
-	bool		mSuppressMultipleLinksWarning;
 
 	// Checksum of directory contents and attributes, used to detect changes
 	uint8_t mStateChecksum[MD5Digest::DigestLength];

@@ -56,7 +56,6 @@ BackupClientDirectoryRecord::BackupClientDirectoryRecord(int64_t ObjectID, const
 	  mSubDirName(rSubDirName),
 	  mInitialSyncDone(false),
 	  mSyncDone(false),
-	  mSuppressMultipleLinksWarning(false),
 	  mpPendingEntries(0)
 {
 	::memset(mStateChecksum, 0, sizeof(mStateChecksum));
@@ -472,31 +471,6 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 		return false;
 	}
 
-	int type = file_st.st_mode & S_IFMT;
-
-	// ecryptfs reports nlink > 1 for directories
-	// with contents, but no filesystem supports
-	// hardlinking directories? so we can ignore
-	// this if the entry is a directory.
-	if(file_st.st_nlink != 1 && type == S_IFDIR)
-	{
-		BOX_INFO("Ignoring apparent hard link count on directory: " <<
-			filename << ", nlink=" << file_st.st_nlink);
-	}
-	else if(file_st.st_nlink > 1)
-	{
-		if(!mSuppressMultipleLinksWarning)
-		{
-			BOX_WARNING("File is hard linked, this may cause "
-				"rename tracking to fail and move files "
-				"incorrectly in your backup! " << filename <<
-				", nlink=" << file_st.st_nlink <<
-				" (suppressing further warnings)");
-			mSuppressMultipleLinksWarning = true;
-		}
-		SetErrorWhenReadingFilesystemObject(rParams, filename);
-	}
-
 	BOX_TRACE("Stat entry '" << filename << "' found device/inode " <<
 		file_st.st_dev << "/" << file_st.st_ino);
 
@@ -504,6 +478,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 	// a different filesystem than their containing directory, thanks to
 	// Toke Hoiland-Jorgensen.
 
+	int type = file_st.st_mode & S_IFMT;
 	if(type == S_IFDIR && file_st.st_dev != dir_st.st_dev)
 	{
 		if(!(rParams.mrContext.ExcludeDir(filename)))
@@ -904,7 +879,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				if(rContext.FindFilename(renameObjectID, renameInDirectory,
 					localPotentialOldName, isDir, isCurrentVersion,
 					&srvModTime, &srvAttributesHash, &oldLeafname))
-				{	
+				{
 					// Only interested if it's a file and the latest version
 					if(!isDir && isCurrentVersion)
 					{
@@ -915,7 +890,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 							// Doesn't exist locally, but does exist on the server.
 							// Therefore we can safely rename it to this new file.
 
-							// Get the connection to the server 
+							// Get the connection to the server
 							BackupProtocolCallable &connection(rContext.GetConnection());
 
 							// Only do this step if there is room on the server.
