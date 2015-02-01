@@ -1234,16 +1234,6 @@ bool BackupDaemon::CallAndWaitForAsync(AsyncMethod method,
 	return WaitForAsync(pAsync, description);
 }
 
-void FreeSnapshotProp(VSS_SNAPSHOT_PROP *pSnap)
-{
-	CoTaskMemFree(pSnap->m_pwszSnapshotDeviceObject);
-	CoTaskMemFree(pSnap->m_pwszOriginalVolumeName);
-	CoTaskMemFree(pSnap->m_pwszOriginatingMachine);
-	CoTaskMemFree(pSnap->m_pwszServiceMachine);
-	CoTaskMemFree(pSnap->m_pwszExposedName);
-	CoTaskMemFree(pSnap->m_pwszExposedPath);
-}
-
 void BackupDaemon::CreateVssBackupComponents()
 {
 	std::map<char, VSS_ID> volumesIncluded;
@@ -1449,21 +1439,6 @@ void BackupDaemon::CreateVssBackupComponents()
 						" to snapshot set");
 					volumesIncluded[path[0]] = newVolumeId;
 					rLocation.mSnapshotVolumeId = newVolumeId;
-					rLocation.mIsSnapshotCreated = true;
-
-					// If the snapshot path starts with the volume root
-					// (drive letter), because the path is absolute (as
-					// it should be), then remove it so that the
-					// resulting snapshot path can be appended to the
-					// snapshot device object to make a real path,
-					// without a spurious drive letter in it.
-
-					if (path.substr(0, volumeRoot.length()) == volumeRoot)
-					{
-						path = path.substr(volumeRoot.length());
-					}
-
-					rLocation.mSnapshotPath = path;
 				}
 				else
 				{
@@ -1478,8 +1453,23 @@ void BackupDaemon::CreateVssBackupComponents()
 				BOX_TRACE("VSS: Skipping already included volume " <<
 					volumeRoot << " for backup location " << path);
 				rLocation.mSnapshotVolumeId = i->second;
-				rLocation.mIsSnapshotCreated = true;
 			}
+
+			rLocation.mIsSnapshotCreated = true;
+
+			// If the snapshot path starts with the volume root
+			// (drive letter), because the path is absolute (as it
+			// should be), then remove it so that the resulting
+			// snapshot path can be appended to the snapshot device
+			// object to make a real path, without a spurious drive
+			// letter in it.
+
+			if (path.substr(0, volumeRoot.length()) == volumeRoot)
+			{
+				path = path.substr(volumeRoot.length());
+			}
+
+			rLocation.mSnapshotPath = path;
 		}
 		else
 		{
@@ -1600,7 +1590,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			rLocation.mSnapshotPath =
 				WideStringToString(prop.m_pwszSnapshotDeviceObject) +
 				DIRECTORY_SEPARATOR + rLocation.mSnapshotPath;
-			FreeSnapshotProp(&prop);
+			VssFreeSnapshotProperties(&prop);
 
 			BOX_INFO("VSS: Location " << rLocation.mPath << " using "
 				"snapshot path " << rLocation.mSnapshotPath);
@@ -1698,7 +1688,7 @@ void BackupDaemon::CreateVssBackupComponents()
 			}
 
 			BOX_TRACE("VSS: Snapshot status: " << status);
-			FreeSnapshotProp(pSnap);
+			VssFreeSnapshotProperties(pSnap);
 		}
 	}
 
