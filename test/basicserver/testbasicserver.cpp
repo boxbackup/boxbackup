@@ -486,7 +486,7 @@ int test(int argc, const char *argv[])
 
 	// Launch a basic server
 	{
-		std::string cmd = "./test --test-daemon-args=";
+		std::string cmd = "./_test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv1 testfiles/srv1.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv1.pid");
@@ -532,7 +532,7 @@ int test(int argc, const char *argv[])
 	
 	// Launch a test forking server
 	{
-		std::string cmd = "./test --test-daemon-args=";
+		std::string cmd = "./_test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv2 testfiles/srv2.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv2.pid");
@@ -602,7 +602,7 @@ int test(int argc, const char *argv[])
 
 	// Launch a test SSL server
 	{
-		std::string cmd = "./test --test-daemon-args=";
+		std::string cmd = "./_test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv3 testfiles/srv3.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv3.pid");
@@ -683,7 +683,7 @@ int test(int argc, const char *argv[])
 //protocolserver:
 	// Launch a test protocol handling server
 	{
-		std::string cmd = "./test --test-daemon-args=";
+		std::string cmd = "./_test --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv4 testfiles/srv4.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv4.pid");
