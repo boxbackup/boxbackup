@@ -1,6 +1,6 @@
 Box Backup, http://www.boxbackup.org/
 
-Copyright (c) 2003-2010, Ben Summers and contributors.
+Copyright (c) 2003-2015, Ben Summers and contributors.
 All rights reserved.
 
 The license of the code was changed on 23-Jan-2010 in order to meet the
