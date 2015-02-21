@@ -1,0 +1,10 @@
+language: cpp
+compiler:
+  - gcc
+  - clang
+script:
+  - ./bootstrap
+  - ./configure
+  - make
+  - ./runtest.pl ALL debug
+  - ./runtest.pl ALL release
