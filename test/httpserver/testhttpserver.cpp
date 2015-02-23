@@ -145,7 +145,7 @@ int test(int argc, const char *argv[])
 	}
 	
 	// Start the server
-	int pid = LaunchServer("./test server testfiles/httpserver.conf", "testfiles/httpserver.pid");
+	int pid = LaunchServer("./_test server testfiles/httpserver.conf", "testfiles/httpserver.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid <= 0)
 	{
@@ -369,7 +369,7 @@ int test(int argc, const char *argv[])
 	}
 
 	// Start the S3Simulator server
-	pid = LaunchServer("./test s3server testfiles/s3simulator.conf",
+	pid = LaunchServer("./_test s3server testfiles/s3simulator.conf",
 		"testfiles/s3simulator.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid <= 0)
