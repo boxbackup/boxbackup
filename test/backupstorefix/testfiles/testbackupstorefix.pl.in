@@ -105,6 +105,7 @@ elsif($ARGV[0] eq 'check')
 		print LISTING_COPY;
 		chomp; s/\r//;
 		s/ \[FILENAME NOT ENCRYPTED\]//;
+		next if /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
 		if(exists $expected{$_})
 		{
 			delete $expected{$_}
@@ -142,6 +143,7 @@ elsif($ARGV[0] eq 'reroot')
 		print LISTING_COPY;
 		chomp;
 		s/\[FILENAME NOT ENCRYPTED\]//;
+		next if /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
 		my ($id,$type,$name) = split / /;
 		$count++;
 		if($name !~ /\Alost\+found0/)
