@@ -74,6 +74,7 @@ int test_file_remove_order[] = {0, 2, 3, 5, 8, 1, 4, -1};
 #define NUMBER_FILES	((sizeof(test_files) / sizeof(test_files[0])))
 #define FIRST_FILE_SIZE	(64*1024+3)
 #define BUFFER_SIZE		(256*1024)
+#define SHORT_TIMEOUT 5000
 
 // Chunk of memory to use for copying files, etc
 static void *buffer = 0;
@@ -194,7 +195,7 @@ void create_test_files()
 		FileStream out(fnt, O_WRONLY | O_CREAT);
 		
 		// Copy up to the change point
-		int b = previous.Read(buffer, test_files[f].ChangePoint, IOStream::TimeOutInfinite);
+		int b = previous.Read(buffer, test_files[f].ChangePoint, SHORT_TIMEOUT);
 		out.Write(buffer, b);
 		
 		// Add new bytes?
@@ -209,7 +210,7 @@ void create_test_files()
 			previous.Seek(test_files[f].DeleteBytes, IOStream::SeekType_Relative);
 		}
 		// Copy rest of data
-		b = previous.Read(buffer, BUFFER_SIZE, IOStream::TimeOutInfinite);
+		b = previous.Read(buffer, BUFFER_SIZE, SHORT_TIMEOUT);
 		out.Write(buffer, b);
 	}
 }
@@ -245,7 +246,7 @@ void test_depends_in_dirs()
 		// Load the directory back in
 		BackupStoreDirectory dir2;
 		FileStream in("testfiles/dir.1");
-		dir2.ReadFromStream(in, IOStream::TimeOutInfinite);
+		dir2.ReadFromStream(in, SHORT_TIMEOUT);
 		// Check entries
 		TEST_THAT(dir2.GetNumberOfEntries() == 4);
 		for(int i = 2; i <= 5; ++i)
@@ -273,7 +274,7 @@ void test_depends_in_dirs()
 		{
 			BackupStoreDirectory dir3;
 			FileStream in("testfiles/dir.2");
-			dir3.ReadFromStream(in, IOStream::TimeOutInfinite);
+			dir3.ReadFromStream(in, SHORT_TIMEOUT);
 			dir3.Dump(0, true);
 			for(int i = 2; i <= 5; ++i)
 			{
@@ -442,7 +443,7 @@ int test(int argc, const char *argv[])
 				// Stream
 				BackupStoreDirectory dir;
 				std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
-				dir.ReadFromStream(*dirstream, IOStream::TimeOutInfinite);
+				dir.ReadFromStream(*dirstream, SHORT_TIMEOUT);
 				
 				BackupStoreDirectory::Iterator i(dir);
 				BackupStoreDirectory::Entry *en = 0;
@@ -482,7 +483,7 @@ int test(int argc, const char *argv[])
 			BackupStoreDirectory dir;
 			{
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
-				dir.ReadFromStream(*dirStream, IOStream::TimeOutInfinite);
+				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
 				dir.Dump(0, true);
 				
 				// Check that dependency info is correct
@@ -567,7 +568,7 @@ int test(int argc, const char *argv[])
 						// Get stream
 						std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
 						// Get and decode
-						BackupStoreFile::DecodeFile(*filestream, filename_fetched, IOStream::TimeOutInfinite);
+						BackupStoreFile::DecodeFile(*filestream, filename_fetched, SHORT_TIMEOUT);
 					}
 				}
 				// Test for identicalness
@@ -578,7 +579,7 @@ int test(int argc, const char *argv[])
 					std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByID(test_files[f].IDOnServer));
 					TEST_THAT(getblockindex->GetObjectID() == test_files[f].IDOnServer);
 					std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
-					TEST_THAT(BackupStoreFile::CompareFileContentsAgainstBlockIndex(filename, *blockIndexStream, IOStream::TimeOutInfinite));
+					TEST_THAT(BackupStoreFile::CompareFileContentsAgainstBlockIndex(filename, *blockIndexStream, SHORT_TIMEOUT));
 				}
 			}
 
