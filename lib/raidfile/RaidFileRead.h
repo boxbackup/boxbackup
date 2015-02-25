@@ -16,9 +16,17 @@
 #include <vector>
 
 #include "IOStream.h"
+#include "Logging.h"
 
 class RaidFileDiscSet;
 
+class RaidFileReadCategory : public Log::Category
+{
+	public:
+		RaidFileReadCategory(const std::string& name)
+		: Log::Category(std::string("RaidFileRead/") + name)
+		{ }
+};
 
 // --------------------------------------------------------------------------
 //
@@ -65,6 +73,10 @@ public:
 	std::string ToString() const;
 
 	typedef int64_t FileSizeType;
+
+	static const RaidFileReadCategory OPEN_IN_RECOVERY;
+	static const RaidFileReadCategory IO_ERROR;
+	static const RaidFileReadCategory RECOVERING_IO_ERROR;
 
 protected:
 	int mSetNumber;

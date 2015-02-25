@@ -216,6 +216,12 @@ void testReadingFileContents(int set, const char *filename, void *data, int data
 	// Be nasty, and create some errors for the RAID stuff to recover from...
 	if(TestRAIDProperties)
 	{
+		HideCategoryGuard hide(RaidFileRead::OPEN_IN_RECOVERY);
+		hide.Add(RaidFileRead::IO_ERROR);
+		hide.Add(RaidFileRead::RECOVERING_IO_ERROR);
+		HideSpecificExceptionGuard hex(RaidFileException::ExceptionType,
+			RaidFileException::ErrorOpeningFileForRead);
+
 		char stripe1fn[256], stripe1fnRename[256];
 		sprintf(stripe1fn, "testfiles" DIRECTORY_SEPARATOR "%d_%d"
 			DIRECTORY_SEPARATOR "%s.rf", set, startDisc, filename);
@@ -273,7 +279,6 @@ void testReadingFileContents(int set, const char *filename, void *data, int data
 			DIRECTORY_SEPARATOR ".raidfile-unreadable"
 			DIRECTORY_SEPARATOR "%s", set, 
 			(startDisc + 1) % RAID_NUMBER_DISCS, mungefilename);
-		
 
 #ifdef TRF_CAN_INTERCEPT
 		// Test I/O errors on opening

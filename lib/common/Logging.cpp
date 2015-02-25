@@ -42,8 +42,9 @@ std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
 Console*    Logging::spConsole = NULL;
 Syslog*     Logging::spSyslog  = NULL;
-Logging     Logging::sGlobalLogging; //automatic initialisation
+Logging     Logging::sGlobalLogging; // automatic initialisation
 std::string Logging::sProgramName;
+const Log::Category Logging::UNCATEGORISED("Uncategorised");
 
 HideSpecificExceptionGuard::SuppressedExceptions_t
 	HideSpecificExceptionGuard::sSuppressedExceptions;
@@ -135,8 +136,9 @@ void Logging::Remove(Logger* pOldLogger)
 	}
 }
 
-void Logging::Log(Log::Level level, const std::string& rFile, 
-	int line, const std::string& rMessage)
+void Logging::Log(Log::Level level, const std::string& file, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
 {
 	std::string newMessage;
 	
@@ -145,12 +147,13 @@ void Logging::Log(Log::Level level, const std::string& rFile,
 		newMessage += "[" + sContext + "] ";
 	}
 	
-	newMessage += rMessage;
+	newMessage += message;
 	
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
 	{
-		bool result = (*i)->Log(level, rFile, line, newMessage);
+		bool result = (*i)->Log(level, file, line, function, category,
+			newMessage);
 		if (!result)
 		{
 			return;
@@ -158,8 +161,9 @@ void Logging::Log(Log::Level level, const std::string& rFile,
 	}
 }
 
-void Logging::LogToSyslog(Log::Level level, const std::string& rFile, 
-	int line, const std::string& rMessage)
+void Logging::LogToSyslog(Log::Level level, const std::string& rFile, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
 {
 	if (!sLogToSyslog)
 	{
@@ -173,9 +177,9 @@ void Logging::LogToSyslog(Log::Level level, const std::string& rFile,
 		newMessage += "[" + sContext + "] ";
 	}
 	
-	newMessage += rMessage;
+	newMessage += message;
 
-	spSyslog->Log(level, rFile, line, newMessage);
+	spSyslog->Log(level, rFile, line, function, category, newMessage);
 }
 
 void Logging::SetContext(std::string context)
@@ -275,8 +279,9 @@ void Console::SetShowPID(bool enabled)
 	sShowPID = enabled;
 }
 
-bool Console::Log(Log::Level level, const std::string& rFile, 
-	int line, std::string& rMessage)
+bool Console::Log(Log::Level level, const std::string& file, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
 {
 	if (level > GetLevel())
 	{
@@ -333,7 +338,7 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 		buf << "TRACE:   ";
 	}
 
-	buf << rMessage;
+	buf << message;
 
 	#ifdef WIN32
 		std::string output = buf.str();
@@ -355,8 +360,9 @@ bool Console::Log(Log::Level level, const std::string& rFile,
 	return true;
 }
 
-bool Syslog::Log(Log::Level level, const std::string& rFile, 
-	int line, std::string& rMessage)
+bool Syslog::Log(Log::Level level, const std::string& file, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
 {
 	if (level > GetLevel())
 	{
@@ -397,7 +403,7 @@ bool Syslog::Log(Log::Level level, const std::string& rFile,
 		msg = "NOTICE: ";
 	}
 
-	msg += rMessage;
+	msg += message;
 
 	syslog(syslogLevel, "%s", msg.c_str());
 	
@@ -451,8 +457,9 @@ int Syslog::GetNamedFacility(const std::string& rFacility)
 	return LOG_LOCAL6;
 }
 
-bool FileLogger::Log(Log::Level Level, const std::string& rFile, 
-	int line, std::string& rMessage)
+bool FileLogger::Log(Log::Level Level, const std::string& file, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
 {
 	if (mLogFile.StreamClosed())
 	{
@@ -499,7 +506,7 @@ bool FileLogger::Log(Log::Level Level, const std::string& rFile,
 		buf << "[TRACE]   ";
 	}
 
-	buf << rMessage << "\n";
+	buf << message << "\n";
 	std::string output = buf.str();
 
 	#ifdef WIN32
@@ -703,3 +710,16 @@ std::string Logging::OptionParser::GetUsageString()
 	"  -V         Run at maximum verbosity, log everything to console and system\n"
 	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n";
 }
+
+bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
+{
+	// Return false if category is in our list, to suppress further
+	// logging (thus, return true if it's not in our list, i.e. we
+	// found nothing).
+	std::list<Log::Category>::iterator i = std::find(mCategories.begin(),
+		mCategories.end(), category);
+	return i == mCategories.end();
+}
+

@@ -47,6 +47,10 @@
 // We want to use POSIX fstat() for now, not the emulated one, because it's
 // difficult to rewrite all this code to use HANDLEs instead of ints.
 
+const RaidFileReadCategory RaidFileRead::OPEN_IN_RECOVERY("OpenInRecovery");
+const RaidFileReadCategory RaidFileRead::IO_ERROR("IoError");
+const RaidFileReadCategory RaidFileRead::RECOVERING_IO_ERROR("RecoverIoError");
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -548,7 +552,8 @@ void RaidFileRead_Raid::MoveDamagedFileAlertDaemon(int SetNumber, const std::str
 // --------------------------------------------------------------------------
 void RaidFileRead_Raid::AttemptToRecoverFromIOError(bool Stripe1)
 {
-	BOX_WARNING("Attempting to recover from I/O error: " << mSetNumber <<
+	BOX_LOG_CATEGORY(Log::WARNING, RaidFileRead::RECOVERING_IO_ERROR,
+		"Attempting to recover from I/O error: " << mSetNumber <<
 		" " << mFilename << ", on stripe " << (Stripe1?1:2));
 
 	// Close offending file
@@ -861,10 +866,10 @@ void RaidFileRead_Raid::SetPosition(pos_type FilePosition)
 		{
 			if(errno == EIO)
 			{
-				BOX_ERROR("I/O error when seeking in " <<
-					mSetNumber << " " << mFilename <<
-					" (to " << FilePosition << "), " <<
-					"stripe 1");
+				BOX_LOG_CATEGORY(Log::ERROR, RaidFileRead::IO_ERROR,
+					"I/O error when seeking in set " << mSetNumber <<
+					": " << mFilename << " (to " << FilePosition <<
+					"), " << "stripe 1");
 				// Attempt to recover
 				AttemptToRecoverFromIOError(true /* is stripe 1 */);
 				ASSERT(mStripe1Handle == -1);
@@ -881,10 +886,10 @@ void RaidFileRead_Raid::SetPosition(pos_type FilePosition)
 		{
 			if(errno == EIO)
 			{
-				BOX_ERROR("I/O error when seeking in " <<
-					mSetNumber << " " << mFilename <<
-					" (to " << FilePosition << "), " <<
-					"stripe 2");
+				BOX_LOG_CATEGORY(Log::ERROR, RaidFileRead::IO_ERROR,
+					"I/O error when seeking in set " << mSetNumber <<
+					": " << mFilename << " (to " << FilePosition <<
+					"), " << "stripe 2");
 				// Attempt to recover
 				AttemptToRecoverFromIOError(false /* is stripe 2 */);
 				ASSERT(mStripe2Handle == -1);
@@ -1155,8 +1160,9 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			bool oktotryagain = true;
 			if(stripe1errno == EIO)
 			{
-				BOX_ERROR("I/O error on opening " <<
-					SetNumber << " " << Filename <<
+				BOX_LOG_CATEGORY(Log::ERROR,
+					RaidFileRead::RECOVERING_IO_ERROR, "I/O error "
+					"on opening " << SetNumber << " " << Filename <<
 					" stripe 1, trying recovery mode");
 				RaidFileRead_Raid::MoveDamagedFileAlertDaemon(SetNumber, Filename, true /* is stripe 1 */);
 
@@ -1172,8 +1178,9 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 			
 			if(stripe2errno == EIO)
 			{
-				BOX_ERROR("I/O error on opening " <<
-					SetNumber << " " << Filename <<
+				BOX_LOG_CATEGORY(Log::ERROR,
+					RaidFileRead::RECOVERING_IO_ERROR, "I/O error "
+					"on opening " << SetNumber << " " << Filename <<
 					" stripe 2, trying recovery mode");
 				RaidFileRead_Raid::MoveDamagedFileAlertDaemon(SetNumber, Filename, false /* is stripe 2 */);
 
@@ -1196,7 +1203,8 @@ std::auto_ptr<RaidFileRead> RaidFileRead::Open(int SetNumber, const std::string 
 
 	if(existance == RaidFileUtil::AsRaidWithMissingReadable)
 	{
-		BOX_ERROR("Attempting to open RAID file " << SetNumber <<
+		BOX_LOG_CATEGORY(Log::ERROR, RaidFileRead::OPEN_IN_RECOVERY,
+			"Attempting to open RAID file " << SetNumber <<
 			" " << Filename << " in recovery mode (stripe " <<
 			((existingFiles & RaidFileUtil::Stripe1Exists)?1:2) <<
 			" present)");

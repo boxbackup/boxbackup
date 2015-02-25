@@ -12,9 +12,11 @@
 
 #include <assert.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <iomanip>
+#include <list>
 #include <sstream>
 #include <vector>
 
@@ -24,14 +26,24 @@
 { \
 	std::ostringstream _box_log_line; \
 	_box_log_line << stuff; \
-	Logging::Log(level, __FILE__, __LINE__, _box_log_line.str()); \
+	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
+		Logging::UNCATEGORISED, _box_log_line.str()); \
+}
+
+#define BOX_LOG_CATEGORY(level, category, stuff) \
+{ \
+	std::ostringstream _box_log_line; \
+	_box_log_line << stuff; \
+	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
+		category, _box_log_line.str()); \
 }
 
 #define BOX_SYSLOG(level, stuff) \
 { \
 	std::ostringstream _box_log_line; \
 	_box_log_line << stuff; \
-	Logging::LogToSyslog(level, __FILE__, __LINE__, _box_log_line.str()); \
+	Logging::LogToSyslog(level, __FILE__, __LINE__, __FUNCTION__, \
+		_box_log_line.str()); \
 }
 
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
@@ -83,18 +95,19 @@
 		BOX_FILE_MESSAGE(filename, message))
 
 #ifdef WIN32
+	#define BOX_WIN_ERRNO_MESSAGE(error_number, stuff) \
+		stuff << ": " << GetErrorMessage(error_number) << \
+		" (" << error_number << ")"
 	#define BOX_LOG_WIN_ERROR(stuff) \
-		BOX_ERROR(stuff << ": " << GetErrorMessage(GetLastError()))
+		BOX_ERROR(BOX_WIN_ERRNO_MESSAGE(GetLastError(), stuff))
 	#define BOX_LOG_WIN_WARNING(stuff) \
-		BOX_WARNING(stuff << ": " << GetErrorMessage(GetLastError()))
+		BOX_WARNING(BOX_WIN_ERRNO_MESSAGE(GetLastError(), stuff))
 	#define BOX_LOG_WIN_ERROR_NUMBER(stuff, number) \
-		BOX_ERROR(stuff << ": " << GetErrorMessage(number))
+		BOX_ERROR(BOX_WIN_ERRNO_MESSAGE(number, stuff))
 	#define BOX_LOG_WIN_WARNING_NUMBER(stuff, number) \
-		BOX_WARNING(stuff << ": " << GetErrorMessage(number))
+		BOX_WARNING(BOX_WIN_ERRNO_MESSAGE(number, stuff))
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_WIN_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_WIN_WARNING(stuff)
-	#define BOX_WIN_ERRNO_MESSAGE(error_number, stuff) \
-		stuff << ": " << GetErrorMessage(error_number)
 	#define THROW_WIN_ERROR_NUMBER(message, error_number, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
 			BOX_WIN_ERRNO_MESSAGE(error_number, message))
@@ -166,6 +179,18 @@ namespace Log
 		EVERYTHING,
 		INVALID = -1
 	};
+
+	class Category {
+	private:
+		std::string mName;
+
+	public:
+		Category(const std::string& name)
+		: mName(name)
+		{ }
+		const std::string& ToString() { return mName; }
+		bool operator==(const Category& other) { return mName == other.mName; }
+	};
 }
 
 // --------------------------------------------------------------------------
@@ -187,8 +212,9 @@ class Logger
 	Logger(Log::Level level);
 	virtual ~Logger();
 	
-	virtual bool Log(Log::Level level, const std::string& rFile, 
-		int line, std::string& rMessage) = 0;
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message) = 0;
 	
 	void Filter(Log::Level level)
 	{
@@ -243,8 +269,9 @@ class Console : public Logger
 	static std::string sTag;
 
 	public:
-	virtual bool Log(Log::Level level, const std::string& rFile, 
-		int line, std::string& rMessage);
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
 	virtual const char* GetType() { return "Console"; }
 	virtual void SetProgramName(const std::string& rProgramName);
 
@@ -274,8 +301,9 @@ class Syslog : public Logger
 	Syslog();
 	virtual ~Syslog();
 	
-	virtual bool Log(Log::Level level, const std::string& rFile, 
-		int line, std::string& rMessage);
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
 	virtual const char* GetType() { return "Syslog"; }
 	virtual void SetProgramName(const std::string& rProgramName);
 	virtual void SetFacility(int facility);
@@ -297,9 +325,13 @@ class Capture : public Logger
 	public:
 	struct Message
 	{
+		Message(const Log::Category& category)
+		: mCategory(category) { }
 		Log::Level level;
 		std::string file;
 		int line;
+		std::string function;
+		Log::Category mCategory;
 		std::string message;
 	};
 
@@ -309,15 +341,17 @@ class Capture : public Logger
 	public:
 	virtual ~Capture() { }
 	
-	virtual bool Log(Log::Level level, const std::string& rFile, 
-		int line, std::string& rMessage)
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message)
 	{
-		Message message;
-		message.level = level;
-		message.file = rFile;
-		message.line = line;
-		message.message = rMessage;
-		mMessages.push_back(message);
+		Message msg(category);
+		msg.level = level;
+		msg.file = file;
+		msg.line = line;
+		msg.function = function;
+		msg.message = message;
+		mMessages.push_back(msg);
 		return true;
 	}
 	virtual const char* GetType() { return "Capture"; }
@@ -366,10 +400,12 @@ class Logging
 	static void FilterConsole (Log::Level level);
 	static void Add    (Logger* pNewLogger);
 	static void Remove (Logger* pOldLogger);
-	static void Log(Log::Level level, const std::string& rFile, 
-		int line, const std::string& rMessage);
-	static void LogToSyslog(Log::Level level, const std::string& rFile, 
-		int line, const std::string& rMessage);
+	static void Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
+	static void LogToSyslog(Log::Level level, const std::string& rFile, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
 	static void SetContext(std::string context);
 	static void ClearContext();
 	static Log::Level GetNamedLevel(const std::string& rName);
@@ -481,6 +517,8 @@ class Logging
 			return (Log::Level) mCurrentLevel;
 		}
 	};
+
+	static const Log::Category UNCATEGORISED;
 };
 
 class FileLogger : public Logger
@@ -496,8 +534,9 @@ class FileLogger : public Logger
 	  mLogFile(rFileName, O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC))
 	{ }
 	
-	virtual bool Log(Log::Level Level, const std::string& rFile, 
-		int Line, std::string& rMessage);
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
 	
 	virtual const char* GetType() { return "FileLogger"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
@@ -544,6 +583,34 @@ class HideSpecificExceptionGuard
 		sSuppressedExceptions.pop_back();
 	}
 	static bool IsHidden(int type, int subtype);
+};
+
+class HideCategoryGuard : public Logger
+{
+	private:
+	std::list<Log::Category> mCategories;
+	HideCategoryGuard(const HideCategoryGuard& other); // no copying
+	HideCategoryGuard& operator=(const HideCategoryGuard& other); // no assignment
+
+	public:
+	HideCategoryGuard(const Log::Category& category)
+	{
+		mCategories.push_back(category);
+		Logging::Add(this);
+	}
+	~HideCategoryGuard()
+	{
+		Logging::Remove(this);
+	}
+	void Add(const Log::Category& category)
+	{
+		mCategories.push_back(category);
+	}
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
+	virtual const char* GetType() { return "HideCategoryGuard"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 
 std::string PrintEscapedBinaryData(const std::string& rInput);
