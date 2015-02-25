@@ -43,7 +43,7 @@
 	std::ostringstream _box_log_line; \
 	_box_log_line << stuff; \
 	Logging::LogToSyslog(level, __FILE__, __LINE__, __FUNCTION__, \
-		_box_log_line.str()); \
+		Logging::UNCATEGORISED, _box_log_line.str()); \
 }
 
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
