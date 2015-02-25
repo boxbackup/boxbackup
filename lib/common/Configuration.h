@@ -27,6 +27,14 @@ enum
 	ConfigTest_IsBool = 32
 };
 
+class ConfigurationCategory : public Log::Category
+{
+	public:
+		ConfigurationCategory(const std::string& name)
+		: Log::Category(std::string("Configuration/") + name)
+		{ }
+};
+
 class ConfigurationVerifyKey
 {
 public:
@@ -75,6 +83,7 @@ public:
 	const ConfigurationVerifyKey *mpKeys;
 	int Tests;	
 	void *TestFunction; // set to zero for now, will implement later
+	static const ConfigurationCategory VERIFY_ERROR;
 };
 
 class FdGetLine;

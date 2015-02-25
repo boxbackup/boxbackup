@@ -34,6 +34,8 @@ inline bool iw(int c)
 static const char *sValueBooleanStrings[] = {"yes", "true", "no", "false", 0};
 static const bool sValueBooleanValue[] = {true, true, false, false};
 
+const ConfigurationCategory ConfigurationVerify::VERIFY_ERROR("VerifyError");
+
 ConfigurationVerifyKey::ConfigurationVerifyKey
 (
 	std::string name,
@@ -212,8 +214,8 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 		if(!rErrorMsg.empty())
 		{
 			// An error occured, return now
-			BOX_ERROR("Error in Configuration::LoadInto: " << 
-				rErrorMsg);
+			BOX_LOG_CATEGORY(Log::ERROR, ConfigurationVerify::VERIFY_ERROR,
+				"Error in Configuration::LoadInto: " << rErrorMsg);
 			return std::auto_ptr<Configuration>(0);
 		}
 
@@ -222,8 +224,11 @@ std::auto_ptr<Configuration> Configuration::LoadAndVerify(
 		{
 			if(!apConfig->Verify(*pVerify, std::string(), rErrorMsg))
 			{
-				BOX_ERROR("Error verifying configuration: " <<
-					rErrorMsg);
+				BOX_LOG_CATEGORY(Log::ERROR,
+					ConfigurationVerify::VERIFY_ERROR,
+					"Error verifying configuration: " <<
+					rErrorMsg.substr(0, rErrorMsg.size() > 0
+						? rErrorMsg.size() - 1 : 0));
 				return std::auto_ptr<Configuration>(0);
 			}
 		}
@@ -425,7 +430,8 @@ const std::string &Configuration::GetKeyValue(const std::string& rKeyName) const
 	
 	if(i == mKeys.end())
 	{
-		BOX_ERROR("Missing configuration key: " << rKeyName);
+		BOX_LOG_CATEGORY(Log::ERROR, ConfigurationVerify::VERIFY_ERROR,
+			"Missing configuration key: " << rKeyName);
 		THROW_EXCEPTION(CommonException, ConfigNoKey)
 	}
 	else

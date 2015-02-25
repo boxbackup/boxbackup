@@ -160,8 +160,9 @@ class TestLogger : public Logger
 	bool IsTriggered() { return mTriggered; }
 	void Reset()       { mTriggered = false; }
 
-	virtual bool Log(Log::Level level, const std::string& rFile,
-		int line, std::string& rMessage)
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message)
 	{
 		if (level == mTargetLevel)
 		{
@@ -407,20 +408,18 @@ int test(int argc, const char *argv[])
 			DIRECTORY_SEPARATOR "fdgetlinetest.txt");
 		FdGetLine getline(file);
 		
-  		int l = 0;
-  		while(testfilelines[l] != 0)
-  		{
-	  		TEST_THAT(!getline.IsEOF());
-	  		std::string line = getline.GetLine(true);
-	  		printf("expected |%s| got |%s|\n", testfilelines[l],
-				line.c_str());
-	  		TEST_LINE(strcmp(testfilelines[l], line.c_str()) == 0,
-				line);
-	  		l++;
-  		}
-  		TEST_THAT(getline.IsEOF());
-  		TEST_CHECK_THROWS(getline.GetLine(true), CommonException, GetLineEOF);
+		int l = 0;
+		while(testfilelines[l] != 0)
+		{
+			TEST_THAT(!getline.IsEOF());
+			std::string line = getline.GetLine(true);
+			TEST_EQUAL(testfilelines[l], line);
+			l++;
+		}
+		TEST_THAT(getline.IsEOF());
+		TEST_CHECK_THROWS(getline.GetLine(true), CommonException, GetLineEOF);
 	}
+
 	// and again without pre-processing
 	{
 		FileHandleGuard<O_RDONLY> file("testfiles"
@@ -430,7 +429,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT_ABORTONFAIL(file2 != 0);
 		FdGetLine getline(file);
 		char ll[512];
-		
+
 		while(!feof(file2))
 		{
 			fgets(ll, sizeof(ll), file2);
@@ -440,40 +439,38 @@ int test(int argc, const char *argv[])
 				e--;
 			}
 			ll[e] = '\0';
-		
-	  		TEST_THAT(!getline.IsEOF());
-	  		std::string line = getline.GetLine(false);
-	  		//printf("expected |%s| got |%s|\n", ll, line.c_str());
-	  		TEST_THAT(strcmp(ll, line.c_str()) == 0);
+
+			TEST_THAT(!getline.IsEOF());
+			std::string line = getline.GetLine(false);
+			TEST_EQUAL(ll, line);
 		}
-  		TEST_THAT(getline.IsEOF());
-  		TEST_CHECK_THROWS(getline.GetLine(true), CommonException, GetLineEOF);
+		TEST_THAT(getline.IsEOF());
+		TEST_CHECK_THROWS(getline.GetLine(true), CommonException, GetLineEOF);
 		
 		fclose(file2);
 	}
-	
+
 	// Then the IOStream version of get line, seeing as we're here...
 	{
 		FileStream file("testfiles" DIRECTORY_SEPARATOR 
 			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
 		
-  		int l = 0;
-  		while(testfilelines[l] != 0)
-  		{
-	  		TEST_THAT(!getline.IsEOF());
-	  		std::string line;
-	  		while(!getline.GetLine(line, true))
-	  			;
-	  		printf("expected |%s| got |%s|\n", testfilelines[l],
-				line.c_str());
-	  		TEST_LINE(strcmp(testfilelines[l], line.c_str()) == 0,
-				line);
-	  		l++;
-  		}
-  		TEST_THAT(getline.IsEOF());
-  		std::string dummy;
-  		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
+		int l = 0;
+		while(testfilelines[l] != 0)
+		{
+			TEST_THAT(!getline.IsEOF());
+			std::string line;
+			while(!getline.GetLine(line, true))
+			{
+				// skip line
+			}
+			TEST_EQUAL(testfilelines[l], line);
+			l++;
+		}
+		TEST_THAT(getline.IsEOF());
+		std::string dummy;
+		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
 	}
 	// and again without pre-processing
 	{
@@ -495,21 +492,20 @@ int test(int argc, const char *argv[])
 				e--;
 			}
 			ll[e] = '\0';
-		
-	  		TEST_THAT(!getline.IsEOF());
-	  		std::string line;
-	  		while(!getline.GetLine(line, false))
-	  			;
-	  		//printf("expected |%s| got |%s|\n", ll, line.c_str());
-	  		TEST_THAT(strcmp(ll, line.c_str()) == 0);
+
+			TEST_THAT(!getline.IsEOF());
+			std::string line;
+			while(!getline.GetLine(line, false))
+				;
+			TEST_EQUAL(ll, line);
 		}
-  		TEST_THAT(getline.IsEOF());
-  		std::string dummy;
-  		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
+		TEST_THAT(getline.IsEOF());
+		std::string dummy;
+		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
 		
 		fclose(file2);
 	}
-	
+
 	// Doesn't exist
 	{
 		std::string errMsg;
@@ -569,50 +565,69 @@ int test(int argc, const char *argv[])
 		TEST_THAT(sub1_3.GetKeyValue("terrible") == "absolutely");
 	}	
 
-	static const char *file[] =
+	static const char *file[][2] =
 	{
-		"testfiles" DIRECTORY_SEPARATOR "config2.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config2.txt",
+			"<root>.TOPlevel (key) is missing."},
 			// Value missing from root
-		"testfiles" DIRECTORY_SEPARATOR "config3.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config3.txt",
+			"Unexpected start block in test1"},
 			// Unexpected {
-		"testfiles" DIRECTORY_SEPARATOR "config4.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config4.txt",
+			"Root level has close block -- forgot to terminate subblock?"},
 			// Missing }
-		"testfiles" DIRECTORY_SEPARATOR "config5.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config5.txt",
+			"Block subconfig2 wasn't started correctly (no '{' on line of it's own)\n"
+			"Root level has close block -- forgot to terminate subblock?"},
 			// { expected, but wasn't there
-		"testfiles" DIRECTORY_SEPARATOR "config6.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config6.txt",
+			"test1.subconfig2.bing (key) multi value not allowed (duplicated key?)."},
 			// Duplicate key
-		"testfiles" DIRECTORY_SEPARATOR "config7.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config7.txt",
+			"Invalid configuration key: = invalid thing here!"},
 			// Invalid key (no name)
-		"testfiles" DIRECTORY_SEPARATOR "config8.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config8.txt",
+			"File ended without terminating all subblocks"},
 			// Not all sub blocks terminated
-		"testfiles" DIRECTORY_SEPARATOR "config9.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config9.txt",
+			"test1.subconfig3.carrots (key) is not a valid integer."},
 			// Not valid integer
-		"testfiles" DIRECTORY_SEPARATOR "config9b.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config9b.txt",
+			"test1.subconfig2.carrots (key) is not a valid integer."},
 			// Not valid integer
-		"testfiles" DIRECTORY_SEPARATOR "config9c.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config9c.txt",
+			"test1.subconfig2.carrots (key) is not a valid integer."},
 			// Not valid integer
-		"testfiles" DIRECTORY_SEPARATOR "config9d.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config9d.txt",
+			"test1.subconfig3.carrots (key) is not a valid integer."},
 			// Not valid integer
-		"testfiles" DIRECTORY_SEPARATOR "config10.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config10.txt",
+			"test1.subconfig.carrots (key) is missing."},
 			// Missing key (in subblock)
-		"testfiles" DIRECTORY_SEPARATOR "config11.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config11.txt",
+			"test1.subconfig3.NOTEXPECTED (key) is not a known key. Check spelling and placement."},
 			// Unknown key
-		"testfiles" DIRECTORY_SEPARATOR "config12.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config12.txt",
+			"<root>.test1.otherthing (block) is missing."},
 			// Missing block
-		"testfiles" DIRECTORY_SEPARATOR "config13.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config13.txt",
+			"<root>.test1.* (block) is missing (a block must be present).\n"
+			"<root>.test1.otherthing (block) is missing."},
 			// Subconfig (wildcarded) should exist, but missing (ie nothing present)
-		"testfiles" DIRECTORY_SEPARATOR "config16.txt", 
+		{"testfiles" DIRECTORY_SEPARATOR "config16.txt",
+			"<root>.BoolTrue1 (key) is not a valid boolean value."},
 			// bad boolean value
-		0
+		{NULL, NULL},
 	};
 
-	for(int l = 0; file[l] != 0; ++l)	
+	for(int l = 0; file[l][0] != 0; ++l)
 	{
+		HideCategoryGuard hide(ConfigurationVerify::VERIFY_ERROR);
 		std::string errMsg;
-		std::auto_ptr<Configuration> pconfig(Configuration::LoadAndVerify(file[l], &verify, errMsg));
+		std::auto_ptr<Configuration> pconfig(Configuration::LoadAndVerify(file[l][0], &verify, errMsg));
 		TEST_THAT(pconfig.get() == 0);
-		TEST_THAT(!errMsg.empty());
-		printf("(%s) Error msg is:\n------\n%s------\n", file[l], errMsg.c_str());
+		errMsg = errMsg.substr(0, errMsg.size() > 0 ? errMsg.size() - 1 : 0);
+		TEST_EQUAL_LINE(file[l][1], errMsg, file[l][0]);
 	}
 	
 	// Check that multivalues happen as expected
@@ -764,10 +779,13 @@ int test(int argc, const char *argv[])
 
 		// Add regex entries
 		#ifdef HAVE_REGEX_SUPPORT
+		{
+			HideCategoryGuard hide(ConfigurationVerify::VERIFY_ERROR);
 			elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$"));
 			elist.AddRegexEntries(std::string(""));
 			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[:not_valid")), CommonException, BadRegularExpression);
 			TEST_THAT(elist.SizeOfRegexList() == 3);
+		}
 		#else
 			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$")), CommonException, RegexNotSupportedOnThisPlatform);
 			TEST_THAT(elist.SizeOfRegexList() == 0);

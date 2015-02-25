@@ -139,9 +139,10 @@ void ExcludeList::AddDefiniteEntries(const std::string &rEntries)
 			if (entry.size() > 0 && entry[entry.size() - 1] == 
 				DIRECTORY_SEPARATOR_ASCHAR)
 			{
-				BOX_WARNING("Exclude entry ends in path "
-					"separator, will never match: " 
-					<< entry);
+				BOX_LOG_CATEGORY(Log::WARNING,
+					ConfigurationVerify::VERIFY_ERROR,
+					"Exclude entry ends in path separator, "
+					"will never match: " << entry);
 			}
 
 			mDefinite.insert(entry);
@@ -198,7 +199,9 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				{
 					char buf[1024];
 					regerror(errcode, pregex, buf, sizeof(buf));
-					BOX_ERROR("Invalid regular expression: " <<
+					BOX_LOG_CATEGORY(Log::ERROR,
+						ConfigurationVerify::VERIFY_ERROR,
+						"Invalid regular expression: " <<
 						entry << ": " << buf);
 					THROW_EXCEPTION(CommonException, BadRegularExpression)
 				}
