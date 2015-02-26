@@ -864,7 +864,8 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	}
 
 	// Drop reference count by one. Must now be zero, to delete the file.
-	ASSERT(!mapNewRefs->RemoveReference(ObjectID))
+	bool remaining_refs = mapNewRefs->RemoveReference(ObjectID);
+	ASSERT(!remaining_refs);
 
 	// Delete from disc
 	BOX_TRACE("Removing unreferenced object " <<
