@@ -7,10 +7,5 @@ compiler:
   - clang
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq libwww-perl
-script:
-  - ./bootstrap
-  - ./configure
-  - make
-  - ./runtest.pl ALL debug
-  - ./runtest.pl ALL release
+  - sudo apt-get install -qq libssl-dev zlib1g-dev libreadline-dev libdb-dev xsltproc libwww-perl
+script: ./bootstrap && ./configure && make && ./runtest.pl ALL debug && ./runtest.pl ALL release
