@@ -1708,31 +1708,40 @@ bool test_ssl_keepalives()
 		TEST_EQUAL("Receive IsAlive()", reader.GetLine());
 		TEST_EQUAL("Send GetIsAlive()", reader.GetLine());
 		TEST_EQUAL("Receive IsAlive()", reader.GetLine());
-		TEST_EQUAL("Send ListDirectory(0x6,0xffff,0xc,true)",
-			reader.GetLine()); // finished reading dir, download to compare
 
-	// The following files should be on the server:
-	// 00000001 -d---- 00002 (root)
-	// 00000002 -d---- 00002 Test1
-	// 00000003 -d---- 00002 Test1/spacetest
-	// 00000004 f----- 00002 Test1/spacetest/f1
-	// 00000005 f----- 00002 Test1/spacetest/f2
-	// 00000006 -d---- 00002 Test1/spacetest/d1
-	// 00000007 f----- 00002 Test1/spacetest/d1/f3
-	// 00000008 f----- 00002 Test1/spacetest/d1/f4
-	// 00000009 -d---- 00002 Test1/spacetest/d2
-	// 0000000a -d---- 00002 Test1/spacetest/d3
-	// 0000000b -d---- 00002 Test1/spacetest/d3/d4
-	// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
-	// 0000000d -d---- 00002 Test1/spacetest/d6
-	// 0000000e -d---- 00002 Test1/spacetest/d7
-	// 0000000f f--o-- 00002 Test1/spacetest/f1
-	// 00000010 f--o-- 00002 Test1/spacetest/f1
-	// 00000011 f----- 00002 Test1/spacetest/f1
-	// This is 34 blocks total.
-
+		// Finished reading dir, download to compare. We expect a listing of d1
+		// now, but we don't know its directory ID yet, so ask the store for it.
 		std::auto_ptr<BackupProtocolCallable> client =
 			connect_and_login(context, 0 /* read-write */);
+		int64_t test1_id = GetDirID(*client, "Test1",
+			BackupProtocolListDirectory::RootDirectory);
+		int64_t spacetest_id = GetDirID(*client, "spacetest", test1_id);
+		int64_t d1_id = GetDirID(*client, "d1", spacetest_id);
+		std::ostringstream expected;
+		expected << "Send ListDirectory(" << BOX_FORMAT_OBJECTID(d1_id) <<
+			",0xffff,0xc,true)";
+		TEST_EQUAL(expected.str(), reader.GetLine());
+
+		// The following files should be on the server:
+		// 00000001 -d---- 00002 (root)
+		// 00000002 -d---- 00002 Test1
+		// 00000003 -d---- 00002 Test1/spacetest
+		// 00000004 f----- 00002 Test1/spacetest/f1
+		// 00000005 f----- 00002 Test1/spacetest/f2
+		// 00000006 -d---- 00002 Test1/spacetest/d1
+		// 00000007 f----- 00002 Test1/spacetest/d1/f3
+		// 00000008 f----- 00002 Test1/spacetest/d1/f4
+		// 00000009 -d---- 00002 Test1/spacetest/d2
+		// 0000000a -d---- 00002 Test1/spacetest/d3
+		// 0000000b -d---- 00002 Test1/spacetest/d3/d4
+		// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
+		// 0000000d -d---- 00002 Test1/spacetest/d6
+		// 0000000e -d---- 00002 Test1/spacetest/d7
+		// 0000000f f--o-- 00002 Test1/spacetest/f1
+		// 00000010 f--o-- 00002 Test1/spacetest/f1
+		// 00000011 f----- 00002 Test1/spacetest/f1
+		// This is 34 blocks total.
+
 		TEST_THAT(check_num_files(5, 3, 0, 9));
 		TEST_THAT(check_num_blocks(*client, 10, 6, 0, 18, 34));
 		client->QueryFinished();
