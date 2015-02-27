@@ -784,6 +784,8 @@ int test(int argc, const char *argv[])
 		// file, so checking for AsRaid excludes this possibility.
 		RaidFileController &rcontroller(RaidFileController::GetController());
 		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(discSetNum));
+
+#ifndef BOX_RELEASE_BUILD // Only if we destroyed these particular files, above.
 		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
 			rdiscSet, "backup/01234567/02/01/o00"));
 		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
@@ -800,6 +802,7 @@ int test(int argc, const char *argv[])
 			rdiscSet, "backup/01234567/02/01/01/o02"));
 		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
 			rdiscSet, "backup/01234567/02/01/01/o03"));
+#endif
 	}
 
 	// ------------------------------------------------------------------------------------------------
