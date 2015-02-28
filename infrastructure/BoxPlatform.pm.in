@@ -8,7 +8,7 @@ BEGIN
 	# which OS are we building under?
 	$target_os = '@target_os@';
 	$target_windows = 0;
-	$target_windows = 1 if $target_os =~ m'^mingw32' 
+	$target_windows = 1 if $target_os =~ m'^mingw32'
 		or $target_os eq "winnt";
 
 	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
@@ -34,7 +34,7 @@ BEGIN
 
 	if ($build_os eq 'Darwin' and $xcode_ver < 4)
 	{
-   	$make_command = 'bsdmake';
+		$make_command = 'bsdmake';
 		$bsd_make = 1;
 	}
 	elsif ($build_os eq 'SunOS')
@@ -54,7 +54,8 @@ BEGIN
 	{
 		$make_command = 'make';
 		$bsd_make = ($build_os ne 'Linux' && $build_os ne 'CYGWIN' &&
-			$build_os ne "MINGW32" && $build_os ne 'GNU/kFreeBSD');
+			$build_os ne "MINGW32" && $build_os ne 'GNU/kFreeBSD' && 
+			$build_os ne 'Darwin');
 	}
 
 	# blank extra flags by default
@@ -129,7 +130,7 @@ BEGIN
 		print STDERR "$cpus processors detected, will set make to perform concurrent jobs\n";
 		$sub_make_options = ' -j '.($cpus + 1);
 	}
-		
+
 	# if it's Darwin,
 	if($build_os eq 'Darwin')
 	{
