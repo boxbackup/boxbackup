@@ -1,0 +1,11 @@
+
+# NOTE: Exception descriptions are for public distributions of Box Backup only -- do not rely for other applications.
+
+
+EXCEPTION Client 13
+
+Internal				0
+AssertFailed				1
+ClockWentBackwards			2	Invalid (negative) sync period: perhaps your clock is going backwards?
+FailedToDeleteStoreObjectInfoFile	3	Failed to delete the StoreObjectInfoFile, backup cannot continue safely.
+CorruptStoreObjectInfoFile		4	The store object info file contained an invalid value and is probably corrupt. Try deleting it.

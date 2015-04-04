@@ -1,0 +1,52 @@
+TITLE lib/common
+
+This module is the basic building block of the project. It is included implicitly as a dependency of all other modules.
+
+It provides basic services such as file and stream functionality, platform information, and various bits of utility code which doesn't fit naturally anywhere else but is useful to many other applications.
+
+
+SUBTITLE Box.h
+
+The main include file for the project. It should be the first file included in every cpp file, followed by any system headers, then other project headers. This order has been chosen so that eventually it can be used as a target for pre-compiled headers. (This will be important for the Windows port)
+
+
+SUBTITLE BoxPlatform.h
+
+This contains various bits of information on platform differences. The build scripts include a compile command line definition like PLATFORM_OPENBSD, which is then used to select the required options.
+
+Some of the stuff is not particularly pleasant, but it aims to produce a consistent compilation environment, and to have a abstracted way of setting other defines to tell the other files what things are available on this platform.
+
+GNU configure is not used, as it would be just another dependency. Although something does have to be done about compilation on Linux, which is just too different on each distribution to be caught by a common configuration here.
+
+
+SUBTITLE Streams
+
+Much use is made of streams -- files, connections, buffers, all sorts of things are implemented using streams.
+
+The abstract base class IOStream defines the interface, see the class file for more details.
+
+Streams are lib/common's basic contribution to the project. A standard interface for handling data, and a number of utility classes which make performing common stream functions easy.
+
+
+SUBTITLE Serialisation
+
+Note there is no "serialisable" class. Instead, objects which need to be serialised into Streams simply have two functions, ReadFromStream and WriteToStream. These perform as expected.
+
+As it turns out, there's no real need for a specific serialisation base class. If you do need to be able to serialise arbitary objects, there are two approaches.
+
+1) If you're serialising an arbitary object, you're going to know roughly what type it is. So it's likely to be a subclass of a known base class... in which case, you simply use virtual functions.
+
+2) If it really is an arbitary type, then you just write your function which accepts any type of object to serialise as a template.
+
+
+SUBTITLE BoxException
+
+The exception base class for the project. All exceptions thrown by this code are dervied from BoxException. In general, each module which has unique errors has it's own exception class.
+
+CommonException errors are thrown throughout the project.
+
+
+SUBTITLE Other bits
+
+There are some other extra useful bits which are documented only in the source files.
+

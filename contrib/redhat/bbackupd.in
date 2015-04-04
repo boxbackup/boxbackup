@@ -1,0 +1,83 @@
+#! /bin/bash
+#
+# bbackupd          Start/Stop the box backup client daemon.
+#
+# chkconfig: 345 93 07
+# description: bbackupd is the client side deamon for Box Backup, \
+#              a completely automatic on-line backup system.
+# processname: bbackupd
+# config: @sysconfdir_expanded@/box
+# pidfile: @localstatedir_expanded@/bbackupd.pid
+
+# Source function library.
+. /etc/init.d/functions
+
+RETVAL=0
+
+# See how we were called.
+
+prog="bbackupd"
+
+# Check that configuration exists.
+[ -f @sysconfdir_expanded@/box/$prog.conf ] || exit 0
+
+start() {
+	echo -n $"Starting $prog: "
+	daemon @sbindir_expanded@/$prog
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc @sbindir_expanded@/$prog
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$prog
+	return $RETVAL
+}
+
+rhstatus() {
+	status @sbindir_expanded@/$prog
+}
+
+restart() {
+  	stop
+	start
+}
+
+reload() {
+        echo -n $"Reloading $prog configuration: "
+        killproc @sbindir_expanded@/$prog -HUP
+        retval=$?
+        echo
+        return $RETVAL
+}
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+  	restart
+	;;
+  reload)
+        reload
+        ;;
+  status)
+  	rhstatus
+	;;
+  condrestart)
+  	[ -f /var/lock/subsys/$prog ] && restart || :
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|reload|restart|condrestart}"
+	exit 1
+esac
+
+exit $?

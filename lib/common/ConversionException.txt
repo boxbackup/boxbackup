@@ -1,0 +1,8 @@
+
+EXCEPTION Conversion 12
+
+Internal							0
+CannotConvertEmptyStringToInt		1
+BadStringRepresentationOfInt		2
+IntOverflowInConvertFromString		3
+BadIntSize							4

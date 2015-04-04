@@ -1,0 +1,434 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ(2.59)
+AC_INIT([Box Backup], 0.11, [boxbackup@boxbackup.org])
+AC_CONFIG_SRCDIR([lib/common/Box.h])
+AC_CONFIG_HEADERS([lib/common/BoxConfig.h])
+
+touch install-sh
+AC_CANONICAL_SYSTEM
+test -s install-sh || rm install-sh
+
+### Checks for programs.
+
+AC_LANG([C++])
+AC_PROG_CC
+AC_PROG_CXX
+AC_CXX_EXCEPTIONS
+AC_CXX_NAMESPACES
+if test "x$ac_cv_cxx_exceptions" != "xyes" || \
+   test "x$ac_cv_cxx_namespaces" != "xyes"; then
+  AC_MSG_ERROR([[basic compile checks failed, the C++ compiler is broken]])
+fi
+
+if test "x$GXX" = "xyes"; then
+  # Use -Wall if we have gcc. This gives better warnings
+  AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
+
+  # Use -rdynamic if we have gcc, but not mingw. This is needed for backtrace
+  case $target_os in
+    mingw*) ;;
+    *) AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic']) ;;
+  esac
+fi
+
+AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
+
+case $target_os in
+mingw*) 
+	TARGET_PERL=perl
+	;;
+*)
+	TARGET_PERL=$PERL
+	;;
+esac
+
+AC_SUBST([TARGET_PERL])
+AC_DEFINE_UNQUOTED([PERL_EXECUTABLE], ["$TARGET_PERL"], 
+	[Location of the perl executable])
+
+AC_CHECK_TOOL([AR],     [ar],    
+	[AC_MSG_ERROR([[cannot find ar executable]])])
+AC_CHECK_TOOL([RANLIB], [ranlib],
+	[AC_MSG_ERROR([[cannot find ranlib executable]])])
+
+case $target_os in
+mingw*) 
+	AC_CHECK_TOOL([WINDRES], [windres],
+		[AC_MSG_ERROR([[cannot find windres executable]])])
+	;;
+esac
+
+### Checks for libraries.
+
+case $target_os in
+mingw32*) ;;
+winnt)    ;;
+*)
+  AC_SEARCH_LIBS([nanosleep], [rt], [ac_have_nanosleep=yes],
+                 [AC_MSG_ERROR([[cannot find a short sleep function (nanosleep)]])])
+	;;
+esac
+
+AC_CHECK_HEADER([zlib.h],, [AC_MSG_ERROR([[cannot find zlib.h]])])
+AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
+VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
+
+## Check for Berkely DB. Restrict to certain versions
+AX_PATH_BDB([1.x or 4.1], [
+  LIBS="$BDB_LIBS $LIBS"
+  LDFLAGS="$BDB_LDFLAGS $LDFLAGS"
+  CPPFLAGS="$CPPFLAGS $BDB_CPPFLAGS"
+
+  AX_COMPARE_VERSION([$BDB_VERSION],[ge],[4.1],,
+    [AX_COMPARE_VERSION([$BDB_VERSION],[lt],[2],,
+      [AC_MSG_ERROR([[only Berkely DB versions 1.x or at least 4.1 are currently supported]])]
+      )]
+  )
+  AX_SPLIT_VERSION([BDB_VERSION], [$BDB_VERSION])
+])
+
+## Check for Open SSL, use old versions only if explicitly requested
+AC_SEARCH_LIBS([gethostbyname], [nsl socket resolv])
+AC_SEARCH_LIBS([shutdown], [nsl socket resolv])
+AX_CHECK_SSL(, [AC_MSG_ERROR([[OpenSSL is not installed but is required]])])
+AC_ARG_ENABLE(
+  [old-ssl],
+  [AC_HELP_STRING([--enable-old-ssl],
+                  [Allow use of pre-0.9.7 Open SSL - NOT RECOMMENDED, read the documentation])])
+AC_CHECK_LIB(
+  [crypto],
+  [EVP_CipherInit_ex],, [
+  if test "x$enable_old_ssl" = "xyes"; then
+    AC_DEFINE([HAVE_OLD_SSL], 1, [Define to 1 if SSL is pre-0.9.7])
+  else
+    AC_MSG_ERROR([[found an old (pre 0.9.7) version of SSL.
+Upgrade or read the documentation for alternatives]])
+  fi
+  ])
+
+
+### Checks for header files.
+
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
+  AC_HEADER_DIRENT
+  ;;
+esac
+
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS([dlfcn.h execinfo.h getopt.h process.h pwd.h signal.h])
+AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
+AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([sys/param.h sys/socket.h sys/time.h sys/types.h sys/wait.h])
+AC_CHECK_HEADERS([sys/uio.h sys/xattr.h])
+
+AC_CHECK_HEADER([regex.h], [have_regex_h=yes])
+
+if test "$have_regex_h" = "yes"; then
+  AC_DEFINE([HAVE_REGEX_H], [1], [Define to 1 if regex.h is available])
+else
+  AC_CHECK_HEADER([pcreposix.h], [have_pcreposix_h=yes])
+fi
+
+if test "$have_pcreposix_h" = "yes"; then
+  AC_DEFINE([PCRE_STATIC], [1], [Box Backup always uses static PCRE])
+  AC_SEARCH_LIBS([regcomp], ["pcreposix -lpcre"],,[have_pcreposix_h=no_regcomp])
+fi
+
+if test "$have_pcreposix_h" = "yes"; then
+  AC_DEFINE([HAVE_PCREPOSIX_H], [1], [Define to 1 if pcreposix.h is available])
+fi
+
+if test "$have_regex_h" = "yes" -o "$have_pcreposix_h" = "yes"; then
+  have_regex_support=yes
+  AC_DEFINE([HAVE_REGEX_SUPPORT], [1], [Define to 1 if regular expressions are supported])
+else
+  have_regex_support=no
+fi
+
+AC_SEARCH_LIBS([dlsym], ["dl"])
+
+### Checks for typedefs, structures, and compiler characteristics.
+
+AC_CHECK_TYPES([u_int8_t, u_int16_t, u_int32_t, u_int64_t])
+AC_CHECK_TYPES([uint8_t, uint16_t, uint32_t, uint64_t])
+
+AC_HEADER_STDBOOL
+AC_C_CONST
+AC_C_BIGENDIAN
+AC_TYPE_UID_T
+AC_TYPE_MODE_T
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+
+AC_CHECK_MEMBERS([struct stat.st_flags])
+AC_CHECK_MEMBERS([struct stat.st_mtimespec])
+AC_CHECK_MEMBERS([struct stat.st_atim.tv_nsec])
+AC_CHECK_MEMBERS([struct stat.st_atimensec])
+AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
+  #include <sys/types.h>
+  #include <netinet/in.h>
+  ]])
+AC_CHECK_MEMBERS([DIR.d_fd],,,  [[#include <dirent.h>]])
+AC_CHECK_MEMBERS([DIR.dd_fd],,, [[#include <dirent.h>]])
+
+AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
+AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
+AC_CHECK_DECLS([O_BINARY],,,)
+
+# Solaris provides getpeerucred() instead of getpeereid() or SO_PEERCRED
+AC_CHECK_HEADERS([ucred.h])
+AC_CHECK_FUNCS([getpeerucred])
+
+AC_CHECK_DECLS([optreset],,, [[#include <getopt.h>]])
+AC_CHECK_DECLS([dirfd],,,
+	[[
+		#include <getopt.h>
+		#include <dirent.h>
+	]])
+
+AC_HEADER_TIME
+AC_STRUCT_TM
+AX_CHECK_DIRENT_D_TYPE
+AC_SYS_LARGEFILE
+AX_CHECK_DEFINE_PRAGMA
+if test "x$ac_cv_c_bigendian" != "xyes"; then
+  AX_BSWAP64
+fi
+
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
+  AX_RANDOM_DEVICE
+  AX_CHECK_MOUNT_POINT(,[
+    AC_MSG_ERROR([[cannot work out how to discover mount points on your platform]])
+  ])
+  AC_CHECK_MEMBERS([struct dirent.d_ino],,, [[#include <dirent.h>]])
+;;
+esac
+
+AX_CHECK_MALLOC_WORKAROUND
+
+
+### Checks for library functions.
+
+AC_FUNC_CLOSEDIR_VOID
+AC_FUNC_ERROR_AT_LINE
+AC_TYPE_SIGNAL
+AC_FUNC_STAT
+AC_CHECK_FUNCS([getpeereid lchown setproctitle getpid gettimeofday waitpid])
+
+# NetBSD implements kqueue too differently for us to get it fixed by 0.10
+# TODO: Remove this when NetBSD kqueue implementation is working
+netbsd_hack=`echo $target_os | sed 's/netbsd.*/netbsd/'`
+if test "$netbsd_hack" != "netbsd"; then
+  AC_CHECK_FUNCS([kqueue])
+fi
+
+AX_FUNC_SYSCALL
+AX_CHECK_SYSCALL_LSEEK
+AC_CHECK_FUNCS([listxattr llistxattr getxattr lgetxattr setxattr lsetxattr])
+AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
+
+
+### Miscellaneous complicated feature checks
+
+## Check for large file support active. AC_SYS_LARGEFILE has already worked
+## out how to enable it if necessary, we just use this to report to the user
+AC_CACHE_CHECK([if we have large file support enabled],
+  [box_cv_have_large_file_support],
+  [AC_TRY_RUN([
+    $ac_includes_default
+    int main()
+    {
+      return sizeof(off_t)==4;
+    }
+    ],
+    [box_cv_have_large_file_support=yes],
+    [box_cv_have_large_file_support=no],
+    [box_cv_have_large_file_support=no # safe for cross-compile]
+    )
+  ])
+
+if test "x$box_cv_have_large_file_support" = "xyes"; then
+	AC_DEFINE([HAVE_LARGE_FILE_SUPPORT], [1],
+		[Define to 1 if large files are supported])
+fi
+
+## Find out how to do file locking
+AC_CHECK_FUNCS([flock])
+AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
+AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
+
+case $target_os in
+mingw32*) ;;
+winnt*)   ;;
+*)
+if test "x$ac_cv_func_flock" != "xyes" && \
+   test "x$ac_cv_have_decl_O_EXLOCK" != "xyes" && \
+   test "x$ac_cv_have_decl_F_SETLK" != "xyes"
+then
+  AC_MSG_ERROR([[cannot work out how to do file locking on your platform]])
+fi
+;;
+esac
+
+## Get tmpdir
+temp_directory_name="/tmp"
+AC_ARG_WITH(
+  [tmp-dir],
+  [AC_HELP_STRING([--with-tmp-dir=DIR], [Directory for temporary files [/tmp]])],
+  [temp_directory_name="$withval"])
+AC_DEFINE_UNQUOTED([TEMP_DIRECTORY_NAME], ["$temp_directory_name"], [TMP directory name])
+
+## Allow linking binaries with static libraries
+AC_ARG_ENABLE(
+  [static-bin],
+  [AC_HELP_STRING([--enable-static-bin], [Link binaries with static libraries])])
+if test "x$enable_static_bin" = "xyes"; then
+  AC_CHECK_LIB([ssl],[SSL_read],,, [crypto])
+  LIBS="-Wl,-Bstatic $LIBS -Wl,-Bdynamic"
+fi
+
+# override default sysconfdir, for backwards compatibility
+test "$sysconfdir" = '${prefix}/etc' && sysconfdir=/etc
+test "$localstatedir" = '${prefix}/var' && localstatedir=/var
+
+## Kludge to allow makeparcels.pl to use bindir. This is not a good long term
+## solution because it prevents use of "make exec_prefix=/some/dir"
+saved_prefix=$prefix
+saved_exec_prefix=$exec_prefix
+test "x$prefix" = xNONE && prefix=$ac_default_prefix
+test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
+eval bindir_expanded=`       eval "echo $bindir"`
+eval sbindir_expanded=`      eval "echo $sbindir"`
+eval sysconfdir_expanded=`   eval "echo $sysconfdir"`
+eval localstatedir_expanded=`eval "echo $localstatedir"`
+prefix=$saved_prefix
+exec_prefix=$saved_exec_prefix
+AC_SUBST([bindir_expanded])
+AC_SUBST([sbindir_expanded])
+AC_SUBST([sysconfdir_expanded])
+AC_SUBST([localstatedir_expanded])
+
+## Figure out the client parcel directory and substitute it
+build_dir=`dirname $0`
+build_dir=`cd $build_dir && pwd`
+client_parcel_dir=`$PERL infrastructure/parcelpath.pl backup-client $target_os`
+
+if test "$build_os" = "cygwin"; then
+	client_parcel_dir=`cygpath -wa $client_parcel_dir | sed -e 's|\\\|/|g'`
+	build_dir=`        cygpath -wa $build_dir         | sed -e 's|\\\|/|g'`
+fi
+
+AC_SUBST([client_parcel_dir])
+AC_SUBST([build_dir])
+
+## Figure out version and substitute it in
+box_version=`$PERL infrastructure/printversion.pl`
+AC_SUBST([box_version])
+
+### Output files
+AC_CONFIG_FILES([infrastructure/BoxPlatform.pm
+                 contrib/mac_osx/org.boxbackup.bbackupd.plist
+                 contrib/mac_osx/org.boxbackup.bbstored.plist
+                 contrib/solaris/bbackupd-manifest.xml
+                 contrib/solaris/bbstored-manifest.xml
+                 lib/common/BoxPortsAndFiles.h
+                 test/bbackupd/testfiles/bbackupd.conf
+                 test/bbackupd/testfiles/bbackupd-exclude.conf
+                 test/bbackupd/testfiles/bbackupd-snapshot.conf
+                 test/bbackupd/testfiles/bbackupd-symlink.conf
+  		 ])
+AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
+                   bin/bbackupquery/makedocumentation.pl
+                   bin/bbstored/bbstored-certs
+                   bin/bbstored/bbstored-config
+                   contrib/debian/bbackupd
+                   contrib/debian/bbstored
+                   contrib/redhat/bbackupd
+                   contrib/redhat/bbstored
+                   contrib/suse/bbackupd
+                   contrib/suse/bbstored
+                   contrib/solaris/bbackupd-smf-method
+                   contrib/solaris/bbstored-smf-method
+                   contrib/windows/installer/boxbackup.mpi
+                   infrastructure/makebuildenv.pl
+                   infrastructure/makeparcels.pl
+                   infrastructure/makedistribution.pl
+                   lib/common/makeexception.pl
+                   lib/raidfile/raidfile-config
+                   lib/server/makeprotocol.pl
+                   runtest.pl
+                   test/backupstorefix/testfiles/testbackupstorefix.pl
+                   test/bbackupd/testfiles/extcheck1.pl
+                   test/bbackupd/testfiles/extcheck2.pl
+                   test/bbackupd/testfiles/notifyscript.pl
+                   test/bbackupd/testfiles/syncallowscript.pl])
+# TODO: Need to do contrib/cygwin/install-cygwin-service.pl but location varies
+AC_OUTPUT
+
+# Configure the Box build system
+echo
+if ! $PERL ./infrastructure/makebuildenv.pl \
+|| ! $PERL ./infrastructure/makeparcels.pl; then
+	echo "Making infrastructure failed!"
+	exit 1
+fi
+
+cat parcels.txt | sed -e 's/#.*//' | while read cmd subdir configure_args; do
+	if test "$cmd" = "configure"; then
+		echo
+		export CC CXX CXXFLAGS LDFLAGS LIBS
+		args="$configure_args --target=$target_alias"
+		echo "Configuring $subdir with: $args"
+
+		cd $subdir
+		if ! ./configure $args; then
+			echo "Configuring $subdir with $args failed!" >&2
+			exit 1
+		fi
+	fi
+done || exit $?
+
+# Write summary of important info
+cat <<EOC
+A summary of the build configuration is below. Box Backup will function
+without these features, but will work better where they are present. Refer
+to the documentation for more information on each feature.
+
+Regular expressions: $have_regex_support
+Large files:         $box_cv_have_large_file_support
+Berkeley DB:         $ax_path_bdb_ok
+Readline:            $have_libreadline
+Extended attributes: $ac_cv_header_sys_xattr_h
+EOC | tee config.log.features
+
+
+### Warnings at end for visibility
+
+if test "x$box_cv_gcc_3_plus" != "xyes" && test "x$box_cv_malloc_workaround" != "xyes"; then
+  echo
+  AC_MSG_WARN([[the implementation of the C++ STL on this platform may
+have a flaw which causes it to apparently leak memory, and this flaw cannot be
+worked around.
+
+When running the daemons, check their memory usage does not constantly
+increase. The STL flaw can cause excessive memory use.]])
+fi
+
+case "$vl_cv_lib_readline" in
+  *readline*)
+    echo
+    AC_MSG_WARN([[do not distribute binaries compiled against GNU readline,
+as this could violate the GNU readline licence, which is GPL. You may use
+libedit or libeditline instead.]])
+    ;;
+esac

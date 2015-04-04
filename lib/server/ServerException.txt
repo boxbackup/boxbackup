@@ -1,0 +1,39 @@
+EXCEPTION Server 3
+
+# for historic reasons, some codes are not used
+
+Internal						0
+FailedToLoadConfiguration		1
+DaemoniseFailed					2
+AlreadyDaemonConstructed		3
+BadSocketHandle					4
+DupError						5
+SocketAlreadyOpen				8
+SocketOpenError					10
+SocketPollError					11
+SocketCloseError				13
+SocketNameUNIXPathTooLong		14
+SocketBindError					16	Check the ListenAddresses directive in your config file -- must refer to local IP addresses only
+SocketAcceptError				17
+ServerStreamBadListenAddrs		18
+ServerForkError					19
+ServerWaitOnChildError			20
+TooManySocketsInMultiListen		21	There is a limit on how many addresses you can listen on simulatiously.
+ServerStreamTooManyListenAddresses	22
+TLSContextNotInitialised		23
+TLSAllocationFailed				24
+TLSLoadCertificatesFailed		25
+TLSLoadPrivateKeyFailed			26
+TLSLoadTrustedCAsFailed			27
+TLSSetCiphersFailed				28
+SSLLibraryInitialisationError	29
+TLSNoSSLObject					31
+TLSAlreadyHandshaked			35
+SocketSetNonBlockingFailed		40
+Protocol_BadUsage				43
+Protocol_UnsuitableStreamTypeForSending		51
+CantWriteToProtocolUncertainStream			53
+ProtocolUncertainStreamBadBlockHeader		54
+SocketPairFailed				55
+CouldNotChangePIDFileOwner		56
+SSLRandomInitFailed				57	Read from /dev/*random device failed

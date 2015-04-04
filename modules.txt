@@ -1,0 +1,50 @@
+
+# first entry is module name, next entries are dependencies or -l<libname> library includes
+
+# put !<platform-name>,<platform-name> after a module / library to exclude it from a particular platform
+# put !+<platform-name>,... to include it only on those platforms
+
+# -l libaries must be in the order they should appear on the command line.
+# Note that order is important on platforms which do not have shared libraries.
+
+# Generic support code and modules
+
+lib/raidfile
+lib/crypto
+lib/server
+lib/compress
+lib/intercept
+
+test/common
+test/crypto		lib/crypto
+test/compress		lib/compress
+test/raidfile		lib/raidfile	lib/intercept
+test/basicserver	lib/server
+
+# IF_DISTRIBUTION(boxbackup)
+
+# Backup system
+
+lib/backupclient	lib/server	lib/crypto	lib/compress
+lib/backupstore		lib/server	lib/raidfile	lib/backupclient		bundled/tdb
+
+bin/bbackupobjdump	lib/backupclient lib/backupstore
+bin/bbstored		lib/raidfile	lib/server	lib/backupstore	lib/backupclient	bundled/tdb
+bin/bbstoreaccounts	lib/raidfile	lib/backupstore
+bin/bbackupd		lib/server	lib/backupclient	bundled/tdb
+bin/bbackupquery	lib/server	lib/backupclient
+bin/bbackupctl		lib/server	lib/backupclient
+
+test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
+test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
+test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile
+test/backupdiff		lib/backupclient
+test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
+
+# HTTP server system
+lib/httpserver          lib/server 
+test/httpserver         lib/httpserver 
+bin/s3simulator		lib/httpserver
+
+# END_IF_DISTRIBUTION
+

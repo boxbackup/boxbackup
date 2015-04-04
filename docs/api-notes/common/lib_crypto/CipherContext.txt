@@ -1,0 +1,28 @@
+CLASS CipherContext
+
+Encryption and decryption using OpenSSL EVP interface.
+
+See the cpp file for more documentation in the function headers, and test/crypto for examples.
+
+General notes below.
+
+
+SUBTITLE Construction
+
+Construct with the encryption direction, and a CipherDescription of the cipher and key required.
+
+
+SUBTITLE Encrypting or decrypting
+
+Begin() and Transform() allow piece by piece transformation of a block.
+
+TransformBlock() transforms an entire block.
+
+
+SUBTITLE Buffering
+
+All transforms expect to have enough space in the buffers for their entire output. Because of block boundaries and padding, it is necessary that the output buffer should be bigger than the input buffer. The amount of space depends on the cipher.
+
+InSizeForOutBufferSize() and MaxOutSizeForInBufferSize() perform these space calculations, returning the maximuim in size for a specified out size, and the reverse, respectively.
+
+

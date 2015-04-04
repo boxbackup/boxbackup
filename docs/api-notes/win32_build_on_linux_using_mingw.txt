@@ -1,0 +1,108 @@
+How to build Box Backup for Windows (Native) on Linux using MinGW
+By Chris Wilson, 2005-12-07
+
+Install the MinGW cross-compiler for Windows:
+
+- Debian and Ubuntu users can "apt-get install mingw32"
+- Fedora and SuSE users can download RPM packages from 
+  [http://mirzam.it.vu.nl/mingw/]
+
+You will need to know the prefix used by the cross-compiler executables.
+It will usually be something like "ix86-mingw32*-". All the binaries in the
+cross-compiler package will start with this prefix. The documentation below
+assumes that it is "i386-mingw32-". Adjust to taste.
+
+You will also need to install Wine and the Linux kernel "binary formats"
+(binfmt) support, so that you can run Windows executables on Linux,
+otherwise the configure scripts will not work properly with a cross-compiler.
+On Ubuntu, run:
+
+	apt-get install wine binfmt-support
+	/etc/init.d/binfmt-support start
+
+Start by downloading Zlib from [http://www.zlib.net/], unpack and enter
+source directory:
+
+	export CC=i386-mingw32-gcc 
+	export AR="i386-mingw32-ar rc" 
+	export RANLIB="i386-mingw32-ranlib"
+	./configure
+	make
+	make install prefix=/usr/local/i386-mingw32
+
+Download OpenSSL 0.9.8b from 
+[http://www.openssl.org/source/openssl-0.9.8b.tar.gz]
+
+Unpack and configure:
+
+	tar xzvf openssl-0.9.8b.tar.gz
+	cd openssl-0.9.8b
+	./Configure --prefix=/usr/local/i386-mingw32 mingw
+	make makefile.one
+	wget http://www.boxbackup.org/svn/box/chris/win32/support/openssl-0.9.8b-mingw-cross.patch
+	patch -p1 < openssl-0.9.8b-mingw-cross.patch
+	make -f makefile.one
+	make -f makefile.one install
+
+Download PCRE from 
+[http://prdownloads.sourceforge.net/pcre/pcre-6.3.tar.bz2?download]
+
+Unpack:
+
+	tar xjvf pcre-6.3.tar.bz2
+	cd pcre-6.3
+
+Configure and make:
+
+	export AR=i386-mingw32-ar
+	./configure --host=i386-mingw32 --prefix=/usr/local/i386-mingw32/
+	make winshared
+
+If you get this error:
+
+	./dftables.exe pcre_chartables.c
+	/bin/bash: ./dftables.exe: cannot execute binary file
+	make: *** [pcre_chartables.c] Error 126
+
+then run:
+
+	wine ./dftables.exe pcre_chartables.c
+	make winshared
+
+to complete the build. Finally:
+
+	cp .libs/libpcre.a /usr/local/i386-pc-mingw32/lib
+	cp .libs/libpcreposix.a /usr/local/i386-pc-mingw32/lib
+	cp pcreposix.h /usr/local/i386-pc-mingw32/include
+
+You will need to find a copy of mingwm10.dll that matches your cross-compiler.
+Most MinGW distributions should come with it. On Debian and Ubuntu, for some
+bizarre reason, you'll find it compressed as
+/usr/share/doc/mingw32-runtime/mingwm10.dll.gz, in which case you'll
+have to un-gzip it with "gzip -d". Copy it to a known location, e.g.
+/usr/local/i386-mingw32/bin.
+
+Download and extract Box Backup, and change into the base directory,
+e.g. boxbackup-0.11rc2. Change the path to mingwm10.dll in parcels.txt to
+match where you found or installed it.
+
+Now configure Box with:
+
+	./configure --host=i386-mingw32 \
+		CXXFLAGS="-mthreads -I/usr/local/i386-mingw32/include" \
+		LDFLAGS=" -mthreads -L/usr/local/i386-mingw32/lib" \
+		LIBS="-lcrypto -lws2_32 -lgdi32"
+	make
+
+or, if that fails, try this:
+
+	export CXX="i386-mingw32-g++"
+	export AR=i386-mingw32-ar
+	export RANLIB=i386-mingw32-ranlib
+	export CFLAGS="-mthreads"
+	export CXXFLAGS="-mthreads"
+	export LDFLAGS="-mthreads"
+	export LIBS="-lcrypto -lws2_32 -lgdi32"
+	(if you don't have a "configure" file, run "./bootstrap")
+	./configure --target=i386-mingw32
+	make CXX="$CXX" AR="$AR" RANLIB="$RANLIB" WINDRES="i386-mingw32-windres"

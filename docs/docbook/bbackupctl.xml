@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry version="5.0" xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xmlns:svg="http://www.w3.org/2000/svg"
+          xmlns:m="http://www.w3.org/1998/Math/MathML"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:db="http://docbook.org/ns/docbook">
+  <refmeta>
+    <refentrytitle>bbackupctl</refentrytitle>
+
+    <manvolnum>8</manvolnum>
+
+    <refmiscinfo class="manual">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="source">Box Backup</refmiscinfo>
+
+    <refmiscinfo class="version">0.11</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>bbackupctl</refname>
+
+    <refpurpose>Control the Box Backup client daemon</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>bbackupctl</command>
+
+      <arg>-q</arg>
+
+      <arg>-c config-file</arg>
+
+      <arg choice="plain">command</arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para><command>bbackupctl</command> sends commands to a running
+    <command>bbackupd</command> daemon on a client machine. It can be used to
+    force an immediate backup, tell the daemon to reload its configuration
+    files or stop the daemon. If <command>bbackupd</command> is configured in
+    snapshot mode, it will not back up automatically, and the
+    <command>bbackupctl</command> must be used to tell it when to start a
+    backup.</para>
+
+    <para>Communication with the bbackupd daemon takes place over a local
+    socket (not over the network). Some platforms (notably Windows) can't
+    determine if the user connecting on this socket has the correct
+    credentials to execute the commands. On these platforms, ANY local user
+    can interfere with bbackupd. To avoid this, remove the CommandSocket
+    option from bbackupd.conf, which will also disable bbackupctl. See the
+    Client Configuration page for more information.</para>
+
+    <para><command>bbackupctl</command> needs to read the
+    <command>bbackupd</command> configuration file to find out the name of the
+    CommandSocket. If you have to tell <command>bbackupd</command> where to
+    find the configuration file, you will have to tell
+    <command>bbackupctl</command> as well. The default on Unix systems is
+    usually <filename>/etc/box/bbackupd.conf</filename>. On Windows systems,
+    it is <filename>bbackupd.conf</filename> in the same directory where
+    <command>bbackupd.exe</command> is located. If
+    <command>bbackupctl</command> cannot find or read the configuration file,
+    it will log an error message and exit.</para>
+
+    <para><command>bbackupctl</command> usually writes error messages to the
+    console and the system logs. If it is not doing what you expect, please
+    check these outputs first of all.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><option>-q</option></term>
+
+        <listitem>
+          <para>Run in quiet mode.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-c</option> config-file</term>
+
+        <listitem>
+          <para>Specify configuration file.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <refsection>
+      <title>Commands</title>
+
+      <para>The following commands are available in bbackupctl:</para>
+
+      <variablelist>
+        <varlistentry>
+          <term><command>terminate</command></term>
+
+          <listitem>
+            <para>This command cleanly shuts down <command>bbackupd</command>.
+            This is better than killing or terminating it any other
+            way.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>reload</command></term>
+
+          <listitem>
+            <para>Causes the <command>bbackupd</command> daemon to re-read all
+            its configuration files. Equivalent to <command>kill
+            -HUP</command>.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>sync</command></term>
+
+          <listitem>
+            <para>Initiates a backup. If no files need to be backed up, no
+            connection will be made to the server.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>force-sync</command></term>
+
+          <listitem>
+            <para>Initiates a backup, even if the
+            <varname>SyncAllowScript</varname> says that no backup should run
+            now.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>wait-for-sync</command></term>
+
+          <listitem>
+            <para>Passively waits until the next backup starts of its own
+            accord, and then terminates.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>wait-for-end</command></term>
+
+          <listitem>
+            <para>Passively waits until the next backup starts of its own
+            accord and finishes, and then terminates.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><command>sync-and-wait</command></term>
+
+          <listitem>
+            <para>Initiates a backup, waits for it to finish, and then
+            terminates.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+    </refsection>
+  </refsection>
+
+  <refsection>
+    <title>Files</title>
+
+    <para><filename>/etc/box/bbackupd.conf</filename></para>
+  </refsection>
+
+  <refsection>
+    <title>See Also</title>
+
+    <para><citerefentry>
+        <refentrytitle>bbackupd.conf</refentrytitle>
+
+        <manvolnum>5</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupd-config</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry>, <citerefentry>
+        <refentrytitle>bbackupctl</refentrytitle>
+
+        <manvolnum>8</manvolnum>
+      </citerefentry></para>
+  </refsection>
+
+  <refsection>
+    <title>Authors</title>
+
+    <para><author>
+        <personname>Ben Summers</personname>
+      </author></para>
+
+    <para><author>
+        <personname>Per Thomsen</personname>
+      </author></para>
+
+    <para><author>
+        <personname>James O'Gorman</personname>
+      </author></para>
+  </refsection>
+</refentry>

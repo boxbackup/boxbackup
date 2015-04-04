@@ -1,0 +1,11 @@
+CLASS FdGetLine
+
+See IOStreamGetLine, difference is that it works on basic UNIX file descriptors rather than full blown streams. Follows basic interface, except...
+
+
+FUNCTION FdGetLine::GetLine
+
+Returns a string containing the optionally preprocessed line.
+
+Do not call if IsEOF if true.
+
