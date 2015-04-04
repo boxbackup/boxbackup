@@ -1,7 +1,0 @@
-
-MAKEEXCEPTION = ../../lib/common/makeexception.pl
-
-# AUTOGEN SEEDING
-autogen_HTTPException.h autogen_HTTPException.cpp:	$(MAKEEXCEPTION) HTTPException.txt
-	$(_PERL) $(MAKEEXCEPTION) HTTPException.txt
-

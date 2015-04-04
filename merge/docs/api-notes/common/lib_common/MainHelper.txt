@@ -1,4 +1,0 @@
-TITLE MainHelper.h
-
-This header contains a couple of macros which add exception handling and reporting to main() functions for executable programs.
-

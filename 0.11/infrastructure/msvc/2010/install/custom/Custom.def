@@ -1,6 +1,0 @@
-LIBRARY "custom"
-
-EXPORTS
-
-GenerateCSR
-GenerateKeyFile
