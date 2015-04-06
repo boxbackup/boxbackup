@@ -55,8 +55,8 @@ void Timers::Init()
 		sigemptyset(&newact.sa_mask);
 		if (::sigaction(SIGALRM, &newact, &oldact) != 0)
 		{
-			BOX_ERROR("Failed to install signal handler");
-			THROW_EXCEPTION(CommonException, Internal);
+			THROW_SYS_ERROR("Failed to install signal handler",
+				CommonException, Internal);
 		}
 		ASSERT(oldact.sa_handler == 0);
 	#endif // WIN32 && !PLATFORM_CYGWIN
@@ -97,8 +97,11 @@ void Timers::Cleanup(bool throw_exception_if_not_initialised)
 		struct itimerval timeout;
 		memset(&timeout, 0, sizeof(timeout));
 
-		int result = ::setitimer(ITIMER_REAL, &timeout, NULL);
-		ASSERT(result == 0);
+		if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
+		{
+			THROW_SYS_ERROR("Failed to set interval timer",
+				CommonException, Internal);
+		}
 
 		struct sigaction newact, oldact;
 		newact.sa_handler = SIG_DFL;
@@ -106,8 +109,8 @@ void Timers::Cleanup(bool throw_exception_if_not_initialised)
 		sigemptyset(&(newact.sa_mask));
 		if (::sigaction(SIGALRM, &newact, &oldact) != 0)
 		{
-			BOX_ERROR("Failed to remove signal handler");
-			THROW_EXCEPTION(CommonException, Internal);
+			THROW_SYS_ERROR("Failed to remove signal handler",
+				CommonException, Internal);
 		}
 		ASSERT(oldact.sa_handler == Timers::SignalHandler);
 	#endif // WIN32 && !PLATFORM_CYGWIN
@@ -223,26 +226,24 @@ void Timers::Reschedule()
 	ASSERT(spTimers);
 	if (spTimers == NULL)
 	{
-		THROW_EXCEPTION(CommonException, Internal)
+		THROW_EXCEPTION(CommonException, TimersNotInitialised);
 	}
 
 	#ifndef WIN32
 		struct sigaction oldact;
 		if (::sigaction(SIGALRM, NULL, &oldact) != 0)
 		{
-			BOX_ERROR("Failed to check signal handler");
-			THROW_EXCEPTION(CommonException, Internal)
+			THROW_SYS_ERROR("Failed to check signal handler",
+				CommonException, Internal);
 		}
 
 		ASSERT(oldact.sa_handler == Timers::SignalHandler);
 
 		if (oldact.sa_handler != Timers::SignalHandler)
 		{
-			BOX_ERROR("Signal handler was " <<
-				(void *)oldact.sa_handler << 
-				", expected " <<
-				(void *)Timers::SignalHandler);
-			THROW_EXCEPTION(CommonException, Internal)
+			THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+				"Signal handler was " << (void *)oldact.sa_handler <<
+				", expected " << (void *)Timers::SignalHandler);
 		}
 	#endif
 
@@ -322,8 +323,8 @@ void Timers::Reschedule()
 
 	if(::setitimer(ITIMER_REAL, &timeout, NULL) != 0)
 	{
-		BOX_ERROR("Failed to initialise system timer\n");
-		THROW_EXCEPTION(CommonException, Internal)
+		THROW_SYS_ERROR("Failed to initialise system timer",
+			CommonException, Internal);
 	}
 #endif
 }
