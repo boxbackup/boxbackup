@@ -2739,7 +2739,7 @@ bool test_open_files_with_limited_win32_permissions()
 {
 #ifdef WIN32
 	// this had better work, or bbstored will die when combining diffs
-	char* file = "foo";
+	const char* file = "foo";
 
 	DWORD accessRights = FILE_READ_ATTRIBUTES |
 		FILE_LIST_DIRECTORY | FILE_READ_EA | FILE_WRITE_ATTRIBUTES |
