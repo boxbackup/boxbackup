@@ -49,18 +49,18 @@ public:
 	void Write(int Item)
 	{
 		int32_t privItem = htonl(Item);
-		mrStream.Write(&privItem, sizeof(privItem));
+		mrStream.Write(&privItem, sizeof(privItem), mTimeout);
 	}
 	void Write(int64_t Item)
 	{
 		int64_t privItem = box_hton64(Item);
-		mrStream.Write(&privItem, sizeof(privItem));
+		mrStream.Write(&privItem, sizeof(privItem), mTimeout);
 	}
 	void WriteExact(uint64_t Item) { Write(Item); }
 	void Write(uint64_t Item)
 	{
 		uint64_t privItem = box_hton64(Item);
-		mrStream.Write(&privItem, sizeof(privItem));
+		mrStream.Write(&privItem, sizeof(privItem), mTimeout);
 	}
 	void Write(uint8_t Item)
 	{
@@ -71,7 +71,7 @@ public:
 	{
 		int size = Item.size();
 		Write(size);
-		mrStream.Write(Item.c_str(), size);
+		mrStream.Write(Item.c_str(), size, mTimeout);
 	}
 	//
 	//
@@ -100,7 +100,9 @@ public:
 	void Read(int &rItemOut)
 	{
 		int32_t privItem;
-		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem), 0 /* not interested in bytes read if this fails */))
+		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem),
+			0 /* not interested in bytes read if this fails */,
+			mTimeout))
 		{
 			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
 		}
@@ -110,7 +112,8 @@ public:
 	{
 		int32_t privItem;
 		int bytesRead;
-		if(mrStream.ReadFullBuffer(&privItem, sizeof(privItem), &bytesRead))
+		if(mrStream.ReadFullBuffer(&privItem, sizeof(privItem),
+			&bytesRead, mTimeout))
 		{
 			rItemOut = ntohl(privItem);
 		}
@@ -128,7 +131,9 @@ public:
 	void Read(int64_t &rItemOut)
 	{
 		int64_t privItem;
-		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem), 0 /* not interested in bytes read if this fails */))
+		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem),
+			0 /* not interested in bytes read if this fails */,
+			mTimeout))
 		{
 			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
 		}
@@ -138,7 +143,9 @@ public:
 	void Read(uint64_t &rItemOut)
 	{
 		uint64_t privItem;
-		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem), 0 /* not interested in bytes read if this fails */))
+		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem),
+			0 /* not interested in bytes read if this fails */,
+			mTimeout))
 		{
 			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
 		}
