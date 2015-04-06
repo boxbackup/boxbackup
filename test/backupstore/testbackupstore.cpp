@@ -817,6 +817,11 @@ bool test_temporary_refcount_db_is_independent()
 		BackupStoreException, UnknownObjectRefCountRequested);
 	temp->Discard();
 
+	// Need to delete perm object so it doesn't keep a filehandle open,
+	// preventing tearDown from rewriting the refcount DB and thus causing
+	// test failure.
+	perm.reset();
+
 	return teardown_test_backupstore();
 }
 

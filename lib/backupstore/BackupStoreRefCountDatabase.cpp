@@ -96,14 +96,15 @@ void BackupStoreRefCountDatabase::Discard()
 			"Cannot discard a permanent reference count database");
 	}
 
-	if (!mapDatabaseFile.get())
+	// Under normal conditions, we should know whether the file is still
+	// open or not, and not Discard it unless it's open. However if the
+	// final rename() fails during Commit(), the file will already be
+	// closed, and we don't want to blow up here in that case.
+	if (mapDatabaseFile.get())
 	{
-		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Reference count database is already closed");
+		mapDatabaseFile->Close();
+		mapDatabaseFile.reset();
 	}
-
-	mapDatabaseFile->Close();
-	mapDatabaseFile.reset();
 
 	if(unlink(mFilename.c_str()) != 0)
 	{

@@ -79,6 +79,10 @@ HousekeepStoreAccount::HousekeepStoreAccount(int AccountID,
 // --------------------------------------------------------------------------
 HousekeepStoreAccount::~HousekeepStoreAccount()
 {
+	if(mapNewRefs.get())
+	{
+		mapNewRefs->Discard();
+	}
 }
 
 // --------------------------------------------------------------------------
