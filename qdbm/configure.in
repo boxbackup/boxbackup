@@ -181,7 +181,7 @@ fi
 
 echo "Compiler version:" `$CC -v`
 
-if $CC -v 2>&1 | egrep -iq ' clang '; then
+if $CC -v 2>&1 | egrep -iq '(^| )clang '; then
   MYOPTS="-O1 -fno-omit-frame-pointer"
 elif uname | egrep -iq 'SunOS' || \
 	uname | egrep -iq 'BSD' || \
