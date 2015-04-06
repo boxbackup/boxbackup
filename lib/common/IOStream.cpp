@@ -127,8 +127,8 @@ int IOStream::ConvertSeekTypeToOSWhence(int SeekType)
 // Function
 //		Name:    IOStream::ReadFullBuffer(void *, int, int)
 //		Purpose: Reads bytes into buffer, returning whether or not it managed to
-//				 get all the bytes required. Exception and abort use of stream
-//				 if this returns false.
+//			 get all the bytes required. Exception and abort use of stream
+//			 if this returns false.
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------

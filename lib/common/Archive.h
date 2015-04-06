@@ -26,7 +26,7 @@ class Archive
 {
 public:
 	Archive(IOStream &Stream, int Timeout)
-		: mrStream(Stream)
+	: mrStream(Stream)
 	{
 		mTimeout = Timeout;
 	}
@@ -38,6 +38,7 @@ public:
 	~Archive()
 	{
 	}
+
 	//
 	//
 	//
@@ -104,7 +105,7 @@ public:
 			0 /* not interested in bytes read if this fails */,
 			mTimeout))
 		{
-			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
 		}
 		rItemOut = ntohl(privItem);
 	}
@@ -125,7 +126,7 @@ public:
 		else
 		{
 			// bad number of remaining bytes
-			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
 		}
 	}
 	void Read(int64_t &rItemOut)
@@ -135,7 +136,7 @@ public:
 			0 /* not interested in bytes read if this fails */,
 			mTimeout))
 		{
-			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
 		}
 		rItemOut = box_ntoh64(privItem);
 	}
@@ -147,7 +148,7 @@ public:
 			0 /* not interested in bytes read if this fails */,
 			mTimeout))
 		{
-			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
 		}
 		rItemOut = box_ntoh64(privItem);
 	}
@@ -167,9 +168,12 @@ public:
 		if(size < (int) sizeof(buf))
 		{
 			// Fetch rest of pPayload, relying on the Protocol to error on stupidly large sizes for us
-			if(!mrStream.ReadFullBuffer(buf, size, 0 /* not interested in bytes read if this fails */, mTimeout))
+			if(!mrStream.ReadFullBuffer(buf, size,
+				0 /* not interested in bytes read if this fails */,
+				mTimeout))
 			{
-				THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+				THROW_EXCEPTION(CommonException,
+					ArchiveBlockIncompleteRead);
 			}
 			// assign to this string, storing the header and the extra payload
 			rItemOut.assign(buf, size);
@@ -181,9 +185,12 @@ public:
 			char *ppayload = dataB;
 
 			// Fetch rest of pPayload, relying on the Protocol to error on stupidly large sizes for us
-			if(!mrStream.ReadFullBuffer(ppayload, size, 0 /* not interested in bytes read if this fails */, mTimeout))
+			if(!mrStream.ReadFullBuffer(ppayload, size,
+				0 /* not interested in bytes read if this fails */,
+				mTimeout))
 			{
-				THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead)
+				THROW_EXCEPTION(CommonException,
+					ArchiveBlockIncompleteRead);
 			}
 			// assign to this string, storing the header and the extra pPayload
 			rItemOut.assign(ppayload, size);

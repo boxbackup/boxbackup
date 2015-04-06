@@ -271,7 +271,7 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 	{
 		return 0;
 	}
-	
+
 	while(true)
 	{
 		int r = ::SSL_read(mpSSL, pBuffer, NBytes);

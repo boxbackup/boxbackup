@@ -207,7 +207,7 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 //			 int64_t &, int64_t &) const
 //		Purpose: Looks up an inode in the map, returning true if it
 //			 exists, and the object ids of it and the directory
-//			 it's in the reference arguments. 
+//			 it's in the reference arguments.
 //		Created: 11/11/03
 //
 // --------------------------------------------------------------------------
