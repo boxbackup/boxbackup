@@ -70,14 +70,15 @@ void BackupStoreRefCountDatabase::Commit()
 	#ifdef WIN32
 	if(FileExists(Final_Filename) && unlink(Final_Filename.c_str()) != 0)
 	{
-		THROW_SYS_FILE_ERROR("Failed to delete old permanent refcount "
-			"database file", mFilename, CommonException, OSFileError);
+		THROW_EMU_FILE_ERROR("Failed to delete old permanent refcount "
+			"database file", mFilename, CommonException,
+			OSFileError);
 	}
 	#endif
 
 	if(rename(mFilename.c_str(), Final_Filename.c_str()) != 0)
 	{
-		THROW_SYS_ERROR("Failed to rename temporary refcount database "
+		THROW_EMU_ERROR("Failed to rename temporary refcount database "
 			"file from " << mFilename << " to " <<
 			Final_Filename, CommonException, OSFileError);
 	}
@@ -106,8 +107,9 @@ void BackupStoreRefCountDatabase::Discard()
 
 	if(unlink(mFilename.c_str()) != 0)
 	{
-		THROW_SYS_FILE_ERROR("Failed to delete temporary refcount database "
-			"file ", mFilename, CommonException, OSFileError);
+		THROW_EMU_FILE_ERROR("Failed to delete temporary refcount "
+			"database file", mFilename, CommonException,
+			OSFileError);
 	}
 
 	mIsModified = false;

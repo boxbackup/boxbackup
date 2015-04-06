@@ -98,6 +98,8 @@
 	#define BOX_WIN_ERRNO_MESSAGE(error_number, stuff) \
 		stuff << ": " << GetErrorMessage(error_number) << \
 		" (" << error_number << ")"
+	#define BOX_NATIVE_ERRNO_MESSAGE(error_number, stuff) \
+		BOX_WIN_ERRNO_MESSAGE(error_number, stuff)
 	#define BOX_LOG_WIN_ERROR(stuff) \
 		BOX_ERROR(BOX_WIN_ERRNO_MESSAGE(GetLastError(), stuff))
 	#define BOX_LOG_WIN_WARNING(stuff) \
@@ -117,10 +119,24 @@
 	#define THROW_WIN_FILE_ERROR(message, filename, exception, subtype) \
 		THROW_WIN_FILE_ERRNO(message, filename, GetLastError(), \
 			exception, subtype)
+	#define EMU_ERRNO winerrno
+	#define THROW_EMU_ERROR(message, exception, subtype) \
+		THROW_EXCEPTION_MESSAGE(exception, subtype, \
+			BOX_NATIVE_ERRNO_MESSAGE(EMU_ERRNO, message))
 #else
+	#define BOX_NATIVE_ERRNO_MESSAGE(error_number, stuff) \
+		BOX_SYS_ERRNO_MESSAGE(error_number, stuff)
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_SYS_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_SYS_WARNING(stuff)
+	#define EMU_ERRNO errno
+	#define THROW_EMU_ERROR(message, exception, subtype) \
+		THROW_EXCEPTION_MESSAGE(exception, subtype, \
+			BOX_SYS_ERRNO_MESSAGE(EMU_ERRNO, message))
 #endif
+
+#define THROW_EMU_FILE_ERROR(message, filename, exception, subtype) \
+	THROW_EMU_ERROR(BOX_FILE_MESSAGE(filename, message), \
+		exception, subtype)
 
 #ifdef WIN32
 #	define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \

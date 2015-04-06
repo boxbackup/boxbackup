@@ -32,8 +32,9 @@ bool EnableBackupRights()
 	if(!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, 
 		&hToken))
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to open process token: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		return false;
 	}
 
@@ -45,8 +46,9 @@ bool EnableBackupRights()
 		SE_BACKUP_NAME, //the name of the privilege
 		&( token_priv.Privileges[0].Luid ))) //result
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to lookup backup privilege: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		CloseHandle(hToken);
 		return false;
 	}
@@ -68,8 +70,9 @@ bool EnableBackupRights()
 		//this function is a little tricky - if we were adjusting
 		//more than one privilege, it could return success but not
 		//adjust them all - in the general case, you need to trap this
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to enable backup privilege: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		CloseHandle(hToken);
 		return false;
 
@@ -238,9 +241,10 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		errno = EINVAL;
 		return NULL;
 	}
@@ -270,9 +274,10 @@ char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage)
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		errno = EACCES;
 		delete [] buffer;
 		return NULL;
@@ -299,9 +304,10 @@ bool ConvertFromWideString(const std::wstring& rInput,
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		errno = EINVAL;
 		return false;
 	}
@@ -331,9 +337,10 @@ bool ConvertFromWideString(const std::wstring& rInput,
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, 
 			"Failed to convert wide string to narrow: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		errno = EACCES;
 		delete [] buffer;
 		return false;
@@ -363,10 +370,11 @@ bool ConvertEncoding(const std::string& rSource, int sourceCodePage,
 		true);
 	if (pWide == NULL)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to convert string '%s' from "
 			"current code page %d to wide string: %s",
 			rSource.c_str(), sourceCodePage,
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		return false;
 	}
 
@@ -641,7 +649,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 
 		::syslog(LOG_WARNING, "Failed to open file '%s': "
 			"%s", pFileName, 
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 
 		return INVALID_HANDLE_VALUE;
 	}
@@ -684,16 +692,18 @@ int emu_fstat(HANDLE hdir, struct emu_stat * st)
 	BY_HANDLE_FILE_INFORMATION fi;
 	if (!GetFileInformationByHandle(hdir, &fi))
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, "Failed to read file information: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		errno = EACCES;
 		return -1;
 	}
 
 	if (INVALID_FILE_ATTRIBUTES == fi.dwFileAttributes)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, "Failed to get file attributes: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		errno = EACCES;
 		return -1;
 	}
@@ -826,10 +836,10 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 
 	if (handle == INVALID_HANDLE_VALUE)
 	{
-		DWORD err = GetLastError();
+		winerrno = GetLastError();
 
-		if (err == ERROR_FILE_NOT_FOUND ||
-			err == ERROR_PATH_NOT_FOUND)
+		if (winerrno == ERROR_FILE_NOT_FOUND ||
+			winerrno == ERROR_PATH_NOT_FOUND)
 		{
 			errno = ENOENT;
 		}
@@ -837,7 +847,7 @@ HANDLE OpenFileByNameUtf8(const char* pFileName, DWORD flags)
 		{
 			::syslog(LOG_WARNING, "Failed to open '%s': "
 				"%s", pFileName, 
-				GetErrorMessage(err).c_str());
+				GetErrorMessage(winerrno).c_str());
 			errno = EACCES;
 		}
 
@@ -906,9 +916,10 @@ int statfs(const char * pName, struct statfs * s)
 	BY_HANDLE_FILE_INFORMATION fi;
 	if (!GetFileInformationByHandle(handle, &fi))
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_WARNING, "Failed to get file information "
 			"for '%s': %s", pName,
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		CloseHandle(handle);
 		errno = EACCES;
 		return -1;
@@ -961,8 +972,9 @@ int emu_utimes(const char * pName, const struct timeval times[])
 
 	if (!SetFileTime(handle, &creationTime, NULL, &modificationTime))
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set times on '%s': %s", pName,
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		CloseHandle(handle);
 		return 1;
 	}
@@ -1004,8 +1016,9 @@ int emu_chmod(const char * pName, mode_t mode)
 	DWORD attribs = GetFileAttributesW(pBuffer);
 	if (attribs == INVALID_FILE_ATTRIBUTES)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to get file attributes of '%s': %s",
-			pName, GetErrorMessage(GetLastError()).c_str());
+			pName, GetErrorMessage(winerrno).c_str());
 		errno = EACCES;
 		free(pBuffer);
 		return -1;
@@ -1022,8 +1035,9 @@ int emu_chmod(const char * pName, mode_t mode)
 
 	if (!SetFileAttributesW(pBuffer, attribs))
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set file attributes of '%s': %s",
-			pName, GetErrorMessage(GetLastError()).c_str());
+			pName, GetErrorMessage(winerrno).c_str());
 		errno = EACCES;
 		free(pBuffer);
 		return -1;
@@ -1308,8 +1322,9 @@ BOOL AddEventSource
 
 	if (len == 0)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to get the program file name: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		return FALSE;
 	}
 
@@ -1326,8 +1341,9 @@ BOOL AddEventSource
 			 0, NULL, REG_OPTION_NON_VOLATILE,
 			 KEY_WRITE, NULL, &hk, &dwDisp)) 
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to create the registry key: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		return FALSE;
 	}
 
@@ -1340,8 +1356,9 @@ BOOL AddEventSource
 			   (LPBYTE)cmd,        // pointer to value data 
 			   len*sizeof(WCHAR))) // data size
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the event message file: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1358,8 +1375,9 @@ BOOL AddEventSource
 			  (LPBYTE) &dwData, // pointer to value data 
 			  sizeof(DWORD)))   // length of value data 
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the supported types: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1373,8 +1391,9 @@ BOOL AddEventSource
 			   (LPBYTE)cmd,           // pointer to value data 
 			   len*sizeof(WCHAR)))    // data size
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the category message file: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1386,8 +1405,9 @@ BOOL AddEventSource
 			  (LPBYTE) &dwNum, // pointer to value data 
 			  sizeof(DWORD)))  // length of value data 
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the category count: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
@@ -1427,8 +1447,9 @@ void openlog(const char * daemonName, int, int)
 	HANDLE newSyslogH = RegisterEventSource(NULL, nameStr.c_str());
 	if (newSyslogH == NULL)
 	{
+		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to register our own event source: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		return;
 	}
 
@@ -1540,8 +1561,8 @@ void syslog(int loglevel, const char *frmt, ...)
 		
 	if (result == 0)
 	{
-		DWORD err = GetLastError();
-		if (err == ERROR_LOG_FILE_FULL)
+		winerrno = GetLastError();
+		if (winerrno == ERROR_LOG_FILE_FULL)
 		{
 			if (!sHaveWarnedEventLogFull)
 			{
@@ -1554,7 +1575,7 @@ void syslog(int loglevel, const char *frmt, ...)
 		else
 		{
 			printf("Unable to send message to Event Log: %s:\r\n",
-				GetErrorMessage(err).c_str());
+				GetErrorMessage(winerrno).c_str());
 			fflush(stdout);
 		}
 	}
@@ -1588,8 +1609,9 @@ int emu_chdir(const char* pDirName)
 	if (result != 0) return 0;
 
 	errno = EACCES;
+	winerrno = GetLastError();
 	fprintf(stderr, "Failed to change directory to '%s': %s\n",
-		pDirName, GetErrorMessage(GetLastError()).c_str());
+		pDirName, GetErrorMessage(winerrno).c_str());
 	return -1;
 }
 
@@ -1701,21 +1723,22 @@ int emu_link(const char* pOldPath, const char* pNewPath)
 	}
 
 	BOOL result = CreateHardLinkW(pNewBuffer, pOldBuffer, NULL);
-	DWORD err = GetLastError();
+	winerrno = GetLastError();
 	delete [] pOldBuffer;
 	delete [] pNewBuffer;
 
 	if (!result)
 	{
-		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		if (winerrno == ERROR_FILE_NOT_FOUND ||
+			winerrno == ERROR_PATH_NOT_FOUND)
 		{
 			errno = ENOENT;
 		}
-		else if (err == ERROR_SHARING_VIOLATION)
+		else if (winerrno == ERROR_SHARING_VIOLATION)
 		{
 			errno = EBUSY;
 		}
-		else if (err == ERROR_ACCESS_DENIED)
+		else if (winerrno == ERROR_ACCESS_DENIED)
 		{
 			errno = EACCES;
 		}
@@ -1723,7 +1746,7 @@ int emu_link(const char* pOldPath, const char* pNewPath)
 		{
 			::syslog(LOG_WARNING, "Failed to hardlink file "
 				"'%s' to '%s': %s", pOldPath, pNewPath,
-				GetErrorMessage(err).c_str());
+				GetErrorMessage(winerrno).c_str());
 			errno = ENOSYS;
 		}
 
@@ -1752,20 +1775,21 @@ int emu_unlink(const char* pFileName)
 	}
 
 	BOOL result = DeleteFileW(pBuffer);
-	DWORD err = GetLastError();
+	winerrno  = GetLastError();
 	delete [] pBuffer;
 
 	if (!result)
 	{
-		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		if (winerrno == ERROR_FILE_NOT_FOUND ||
+			winerrno == ERROR_PATH_NOT_FOUND)
 		{
 			errno = ENOENT;
 		}
-		else if (err == ERROR_SHARING_VIOLATION)
+		else if (winerrno == ERROR_SHARING_VIOLATION)
 		{
 			errno = EBUSY;
 		}
-		else if (err == ERROR_ACCESS_DENIED)
+		else if (winerrno == ERROR_ACCESS_DENIED)
 		{
 			errno = EACCES;
 		}
@@ -1773,7 +1797,7 @@ int emu_unlink(const char* pFileName)
 		{
 			::syslog(LOG_WARNING, "Failed to delete file "
 				"'%s': %s", pFileName, 
-				GetErrorMessage(err).c_str());
+				GetErrorMessage(winerrno).c_str());
 			errno = ENOSYS;
 		}
 
@@ -1818,21 +1842,22 @@ int emu_rename(const char* pOldFileName, const char* pNewFileName)
 	}
 
 	BOOL result = MoveFileW(pOldBuffer, pNewBuffer);
-	DWORD err = GetLastError();
+	winerrno = GetLastError();
 	delete [] pOldBuffer;
 	delete [] pNewBuffer;
 
 	if (!result)
 	{
-		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		if (winerrno == ERROR_FILE_NOT_FOUND ||
+			winerrno == ERROR_PATH_NOT_FOUND)
 		{
 			errno = ENOENT;
 		}
-		else if (err == ERROR_SHARING_VIOLATION)
+		else if (winerrno == ERROR_SHARING_VIOLATION)
 		{
 			errno = EBUSY;
 		}
-		else if (err == ERROR_ACCESS_DENIED)
+		else if (winerrno == ERROR_ACCESS_DENIED)
 		{
 			errno = EACCES;
 		}
@@ -1840,7 +1865,7 @@ int emu_rename(const char* pOldFileName, const char* pNewFileName)
 		{
 			::syslog(LOG_WARNING, "Failed to rename file "
 				"'%s' to '%s': %s", pOldFileName, pNewFileName,
-				GetErrorMessage(err).c_str());
+				GetErrorMessage(winerrno).c_str());
 			errno = ENOSYS;
 		}
 		return -1;
@@ -1855,8 +1880,9 @@ int console_read(char* pBuffer, size_t BufferSize)
 
 	if (hConsole == INVALID_HANDLE_VALUE)
 	{
+		winerrno = GetLastError();
 		::fprintf(stderr, "Failed to get a handle on standard input: "
-			"%s", GetErrorMessage(GetLastError()).c_str());
+			"%s", GetErrorMessage(winerrno).c_str());
 		return -1;
 	}
 
@@ -1879,8 +1905,9 @@ int console_read(char* pBuffer, size_t BufferSize)
 			NULL // reserved
 		)) 
 	{
+		winerrno = GetLastError();
 		::fprintf(stderr, "Failed to read from console: %s\n",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		return -1;
 	}
 
@@ -1977,8 +2004,9 @@ bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
 	// Convert the last-write time to local time.
 	if (!SystemTimeToFileTime(&stUTC, pTo))
 	{
+		winerrno = GetLastError();
 		syslog(LOG_ERR, "Failed to convert between time formats: %s",
-			GetErrorMessage(GetLastError()).c_str());
+			GetErrorMessage(winerrno).c_str());
 		return false;
 	}
 
