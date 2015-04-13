@@ -73,6 +73,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		THROW_EXCEPTION(CommonException, NamedLockAlreadyLockingSomething)
 	}
 
+	mFileName = rFilename;
+
 	// See if the lock can be got
 #if HAVE_DECL_O_EXLOCK
 	int fd = ::open(rFilename.c_str(),
@@ -94,11 +96,28 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 
 	return false;
 #else
-	int fd = ::open(rFilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+	int flags = O_WRONLY | O_CREAT | O_TRUNC;
+
+# if !HAVE_DECL_F_SETLK && !defined HAVE_FLOCK
+	// We have no other way to get a lock, so all we can do is fail if
+	// the file already exists, and take the risk of stale locks.
+	flags |= O_EXCL;
+# endif
+
+	int fd = ::open(rFilename.c_str(), flags, mode);
 	if(fd == -1)
 	{
-		THROW_SYS_FILE_ERROR("Failed to open lockfile", rFilename,
-			CommonException, OSFileError);
+		if(errno == EEXIST && (flags & O_EXCL))
+		{
+			// Lockfile already exists, and we tried to open it
+			// exclusively, which means we failed to lock it.
+			return false;
+		}
+		else
+		{
+			THROW_SYS_FILE_ERROR("Failed to open lockfile",
+				rFilename, CommonException, OSFileError);
+		}
 	}
 
 #ifdef HAVE_FLOCK
@@ -162,8 +181,20 @@ void NamedLock::ReleaseLock()
 	// Close the file
 	if(::close(mFileDescriptor) != 0)
 	{
-		THROW_EXCEPTION(CommonException, OSFileError)
+		THROW_EMU_ERROR(
+			BOX_FILE_MESSAGE(mFileName, "Failed to close lockfile"),
+			CommonException, OSFileError);
 	}
+
+	// Delete the file
+	if(::unlink(mFileName.c_str()) != 0)
+	{
+		THROW_EMU_ERROR(
+			BOX_FILE_MESSAGE(mFileName,
+				"Failed to delete lockfile"),
+			CommonException, OSFileError);
+	}
+
 	// Mark as unlocked
 	mFileDescriptor = -1;
 }

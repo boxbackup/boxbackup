@@ -35,6 +35,7 @@ public:
 	
 private:
 	int mFileDescriptor;
+	std::string mFileName;
 };
 
 #endif // NAMEDLOCK__H

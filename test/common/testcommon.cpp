@@ -262,6 +262,18 @@ int test(int argc, const char *argv[])
 		TEST_THAT(!TestFileExists(tempfile.c_str()));
 	}
 
+	// Test that named locks work as expected
+	{
+		NamedLock lock1;
+		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
+		// With a lock held, we should not be able to acquire another.
+		TEST_THAT(!NamedLock().TryAndGetLock("testfiles/locktest"));
+	}
+	{
+		// But with the lock released, we should be able to.
+		TEST_THAT(NamedLock().TryAndGetLock("testfiles/locktest"));
+	}
+
 	// Test that memory leak detection doesn't crash
 	{
 		char *test = new char[1024];
