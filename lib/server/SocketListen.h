@@ -74,7 +74,8 @@ private:
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-template<typename SocketType, int ListenBacklog = 128, typename SocketLockingType = _NoSocketLocking, int MaxMultiListenSockets = 16>
+template<typename SocketType, int ListenBacklog = 128,
+	typename SocketLockingType = _NoSocketLocking, int MaxMultiListenSockets = 16>
 class SocketListen
 {
 public:
@@ -113,10 +114,9 @@ public:
 			if(::close(mSocketHandle) == -1)
 #endif
 			{
-				BOX_LOG_SOCKET_ERROR(mType, mName, mPort,
-					"Failed to close network socket");
-				THROW_EXCEPTION(ServerException,
-					SocketCloseError)
+				THROW_EXCEPTION_MESSAGE(ServerException, SocketCloseError,
+					BOX_SOCKET_ERROR_MESSAGE(mType, mName, mPort,
+						"Failed to close network socket"));
 			}
 		}
 		mSocketHandle = -1;
@@ -153,9 +153,9 @@ public:
 			0 /* let OS choose protocol */);
 		if(mSocketHandle == -1)
 		{
-			BOX_LOG_SOCKET_ERROR(Type, Name, Port,
-				"Failed to create a network socket");
-			THROW_EXCEPTION(ServerException, SocketOpenError)
+			THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+				BOX_SOCKET_ERROR_MESSAGE(Type, Name, Port,
+					"Failed to create a network socket"));
 		}
 		
 		// Set an option to allow reuse (useful for -HUP situations!)
@@ -168,28 +168,29 @@ public:
 			&option, sizeof(option)) == -1)
 #endif
 		{
-			BOX_LOG_SOCKET_ERROR(Type, Name, Port,
-				"Failed to set socket options");
-			THROW_EXCEPTION(ServerException, SocketOpenError)
+			THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+				BOX_SOCKET_ERROR_MESSAGE(Type, Name, Port,
+					"Failed to set socket options"));
 		}
 
 		// Bind it to the right port, and start listening
 		if(::bind(mSocketHandle, &addr.sa_generic, addrLen) == -1
 			|| ::listen(mSocketHandle, ListenBacklog) == -1)
 		{
-			int err_number = errno;
-
-			BOX_LOG_SOCKET_ERROR(Type, Name, Port,
-				"Failed to bind socket");
-
-			// Dispose of the socket
-			::close(mSocketHandle);
-			mSocketHandle = -1;
-
-			THROW_SYS_FILE_ERRNO("Failed to bind or listen "
-				"on socket", Name, err_number,
-				ServerException, SocketBindError);
-		}	
+			try
+			{
+				THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+					BOX_SOCKET_ERROR_MESSAGE(Type, Name, Port,
+						"Failed to bind socket to name/port"));
+			}
+			catch(ServerException &e) // finally
+			{
+				// Dispose of the socket
+				::close(mSocketHandle);
+				mSocketHandle = -1;
+				throw;
+			}
+		}
 	}
 	
 	// ------------------------------------------------------------------
@@ -249,10 +250,10 @@ public:
 				}
 				else
 				{
-					BOX_LOG_SOCKET_ERROR(mType, mName, mPort,
-						"Failed to poll connection");
-					THROW_EXCEPTION(ServerException,
-						SocketPollError)
+					THROW_EXCEPTION_MESSAGE(ServerException,
+						SocketPollError,
+						BOX_SOCKET_ERROR_MESSAGE(mType, mName,
+							mPort, "Failed to poll connection"));
 				}
 				break;
 			case 0:	// timed out
@@ -269,9 +270,9 @@ public:
 		// Got socket (or error), unlock (implicit in destruction)
 		if(sock == -1)
 		{
-			BOX_LOG_SOCKET_ERROR(mType, mName, mPort,
-				"Failed to accept connection");
-			THROW_EXCEPTION(ServerException, SocketAcceptError)
+			THROW_EXCEPTION_MESSAGE(ServerException, SocketAcceptError,
+				BOX_SOCKET_ERROR_MESSAGE(mType, mName,
+					mPort, "Failed to accept connection"));
 		}
 
 		// Log it
