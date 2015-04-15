@@ -114,8 +114,8 @@ bool delete_account();
 	}
 
 #define TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error, or_statements) \
-	TEST_CHECK_THROWS_OR((protocol) . command, ConnectionException, \
-		Protocol_UnexpectedReply, or_statements); \
+	TEST_CHECK_THROWS_AND_OR((protocol) . command, ConnectionException, \
+		Protocol_UnexpectedReply, /* and_command */, or_statements); \
 	TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements)
 
 #define TEST_COMMAND_RETURNS_ERROR(protocol, command, error) \

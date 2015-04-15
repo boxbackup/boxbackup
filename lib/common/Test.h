@@ -62,7 +62,7 @@ extern std::list<std::string> run_only_named_tests;
 		AssertFailed, "Condition [" #condition "] failed"));
 
 // NOTE: The 0- bit is to allow this to work with stuff which has negative constants for flags (eg ConnectionException)
-#define TEST_CHECK_THROWS_OR(statement, excepttype, subtype, or_command) \
+#define TEST_CHECK_THROWS_AND_OR(statement, excepttype, subtype, and_command, or_command) \
 	{ \
 		bool didthrow = false; \
 		HideExceptionMessageGuard hide; \
@@ -80,6 +80,7 @@ extern std::list<std::string> run_only_named_tests;
 				throw; \
 			} \
 			didthrow = true; \
+			and_command; \
 		} \
 		catch(...) \
 		{ \
@@ -92,7 +93,7 @@ extern std::list<std::string> run_only_named_tests;
 		} \
 	}
 #define TEST_CHECK_THROWS(statement, excepttype, subtype) \
-	TEST_CHECK_THROWS_OR(statement, excepttype, subtype,)
+	TEST_CHECK_THROWS_AND_OR(statement, excepttype, subtype,,)
 
 // utility macro for comparing two strings in a line
 #define TEST_EQUAL_OR(_expected, _found, or_command) \
