@@ -113,7 +113,7 @@ print H <<__E;
 	{
 		return mMessage;
 	}
-
+	static const char* GetMessage(int SubType);
 private:
 	unsigned int mSubType;
 	std::string mMessage;
@@ -188,19 +188,43 @@ unsigned int ${class}Exception::GetSubType() const throw()
 	return mSubType;
 }
 
-const char *${class}Exception::what() const throw()
+const char * ${class}Exception::what() const throw()
 {
+	std::string what = "${class}";
+
 #ifdef EXCEPTION_CODENAMES_EXTENDED
-	if(mSubType > (sizeof(whats) / sizeof(whats[0])))
+	if(mSubType < (sizeof(whats) / sizeof(whats[0])))
 	{
-		return "${class}";
+		what = whats[mSubType];
 	}
-	return whats[mSubType];
-#else
-	return "${class}";
 #endif
+
+	if(mMessage != "")
+	{
+		what += ": " + mMessage;
+	}
+
+	return what.c_str();
 }
 
+const char * ${class}Exception::GetMessage(int SubType)
+{
+	switch(SubType)
+	{
+__E
+
+for(my $e = 0; $e <= $#exception; $e++)
+{
+	if($exception[$e] ne '')
+	{
+		print CPP "\t\tcase ".$exception[$e].': return "'.$exception[$e].'";'."\n";
+	}
+}
+
+print CPP <<__E;
+		default: return "Unknown";
+	}
+}
 __E
 
 close H;
