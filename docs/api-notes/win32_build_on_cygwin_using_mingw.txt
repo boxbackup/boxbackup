@@ -11,14 +11,14 @@ Start by installing Cygwin on your Windows machine from [http://www.cygwin.org/c
 Make sure to select the following packages during installation:
 
  * Archive/unzip
- * Devel/automake
  * Devel/autoconf
+ * Devel/automake
+ * Devel/make
  * Devel/mingw64-x86_64-gcc
  * Devel/mingw64-x86_64-gcc-g++
- * Devel/make
+ * Devel/mingw64-x86_64-zlib
  * Libs/libxml2
  * Libs/libxslt (for xsltproc)
- * Devel/mingw64-x86_64-zlib
  * Perl/Perl
 
 If you already have Cygwin installed, please re-run the installer and
@@ -70,8 +70,8 @@ install PCRE:
 
 	tar xjvf pcre-8.34.tar.bz2
 	cd pcre-8.34
-	./configure --prefix=/usr/x86_64-w64-mingw32 --disable-shared --target=x86_64-w64-mingw32
-	make 
+	./configure --prefix=/usr/x86_64-w64-mingw32 --disable-shared --host=x86_64-w64-mingw32
+	make
 	make install
 
 Note: we must disable shared libraries on Windows because otherwise
@@ -95,7 +95,7 @@ unpack it, compile and install it:
 	tar xzvf PDCurses-3.4.tar.gz
 	cd PDCurses-3.4/win32
 	make -f gccwin32.mak CC="gcc -mno-cygwin" LINK="gcc -mno-cygwin"
-	cp pdcurses.a /usr/i686-pc-mingw32/lib/libpdcurses.a
+	cp pdcurses.a /usr/x86_64-w64-mingw32/lib/libpdcurses.a
 
 Download Readline version 6.2 from
 [ftp://ftp.cwru.edu/pub/bash/readline-6.2.tar.gz], and unpack
@@ -103,12 +103,10 @@ and install it thus:
 
 	tar xzvf readline-6.2.tar.gz
 	cd readline-6.2
-	./configure --prefix=/usr/i686-pc-mingw32 \
-		CFLAGS="-mno-cygwin" \
-		CPPFLAGS="-mno-cygwin" \
-		LDFLAGS="-mno-cygwin" \
-		LIBS="-lpdcurses" \
-		--with-curses --disable-shared
+	./configure --prefix=/usr/x86_64-w64-mingw32 \
+		--host=x86_64-w64-mingw32 \
+		LIBS="-lpdcurses" --with-curses --disable-shared \
+		CFLAGS="-DSIGHUP=0 -DSIGQUIT=0 -DS_ISUID=0 -DS_ISGID=0 -DS_IXGRP=0 -DS_IXOTH=0 -DS_IWOTH=0"
 	make
 	make install
 
