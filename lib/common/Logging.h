@@ -139,13 +139,13 @@
 		exception, subtype)
 
 #ifdef WIN32
-#	define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \
-	BOX_LOG_WIN_ERROR_NUMBER(stuff << " (type " << _type << ", name " << \
-		_name << ", port " << _port << ")", WSAGetLastError())
+#	define BOX_SOCKET_ERROR_MESSAGE(_type, _name, _port, stuff) \
+	BOX_WIN_ERRNO_MESSAGE(WSAGetLastError(), stuff << " (type " << _type << \
+		", name " << _name << ", port " << _port << ")")
 #else
-#	define BOX_LOG_SOCKET_ERROR(_type, _name, _port, stuff) \
-	BOX_LOG_NATIVE_ERROR(stuff << " (type " << _type << ", name " << \
-		_name << ", port " << _port << ")")
+#	define BOX_SOCKET_ERROR_MESSAGE(_type, _name, _port, stuff) \
+	BOX_SYS_ERROR_MESSAGE(stuff << " (type " << _type << ", name " << _name << \
+		", port " << _port << ")")
 #endif
 
 #define BOX_FORMAT_HEX32(number) \

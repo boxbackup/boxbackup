@@ -176,25 +176,31 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 		0 /* let OS choose protocol */);
 	if(mSocketHandle == INVALID_SOCKET_VALUE)
 	{
-		BOX_LOG_SOCKET_ERROR(Type, rName, Port,
-			"Failed to create a network socket");
-		THROW_EXCEPTION(ServerException, SocketOpenError)
+		THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+			BOX_SOCKET_ERROR_MESSAGE(Type, rName, Port,
+			"Failed to create a network socket"));
 	}
 	
 	// Connect it
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
 		// Dispose of the socket
-		BOX_LOG_SOCKET_ERROR(Type, rName, Port,
-			"Failed to connect to socket");
+		try
+		{
+			THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+				BOX_SOCKET_ERROR_MESSAGE(Type, rName, Port,
+				"Failed to connect to socket"));
+		}
+		catch(ServerException &e)
+		{
 #ifdef WIN32
-		::closesocket(mSocketHandle);
+			::closesocket(mSocketHandle);
 #else // !WIN32
-		::close(mSocketHandle);
+			::close(mSocketHandle);
 #endif // WIN32
-
-		mSocketHandle = INVALID_SOCKET_VALUE;
-		THROW_EXCEPTION(ConnectionException, SocketConnectError)
+			mSocketHandle = INVALID_SOCKET_VALUE;
+			throw;
+		}
 	}
 
 	ResetCounters();
