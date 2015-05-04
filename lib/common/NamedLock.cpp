@@ -77,6 +77,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 
 	// See if the lock can be got
 #if HAVE_DECL_O_EXLOCK
+	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXLOCK");
 	int fd = ::open(rFilename.c_str(),
 		O_WRONLY | O_NONBLOCK | O_CREAT | O_TRUNC | O_EXLOCK, mode);
 	if(fd != -1)
@@ -102,6 +103,9 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	// We have no other way to get a lock, so all we can do is fail if
 	// the file already exists, and take the risk of stale locks.
 	flags |= O_EXCL;
+	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXCL");
+# else
+	BOX_TRACE("Trying to create lockfile " << rFilename << " without special flags");
 # endif
 
 	int fd = ::open(rFilename.c_str(), flags, mode);
@@ -111,6 +115,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		{
 			// Lockfile already exists, and we tried to open it
 			// exclusively, which means we failed to lock it.
+			BOX_NOTICE("Failed to lock lockfile with O_EXCL: " << rFilename
+				<< ": already locked by another process?");
 			return false;
 		}
 		else
@@ -120,12 +126,17 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		}
 	}
 
+	try
+	{
 #ifdef HAVE_FLOCK
+	BOX_TRACE("Trying to lock lockfile " << rFilename << " using flock()");
 	if(::flock(fd, LOCK_EX | LOCK_NB) != 0)
 	{
-		::close(fd);
 		if(errno == EWOULDBLOCK)
 		{
+			::close(fd);
+			BOX_NOTICE("Failed to lock lockfile with flock(): " << rFilename
+				<< ": already locked by another process");
 			return false;
 		}
 		else
@@ -140,11 +151,14 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	desc.l_whence = SEEK_SET;
 	desc.l_start = 0;
 	desc.l_len = 0;
+	BOX_TRACE("Trying to lock lockfile " << rFilename << " using fcntl()");
 	if(::fcntl(fd, F_SETLK, &desc) != 0)
 	{
-		::close(fd);
 		if(errno == EAGAIN)
 		{
+			::close(fd);
+			BOX_NOTICE("Failed to lock lockfile with fcntl(): " << rFilename
+				<< ": already locked by another process");
 			return false;
 		}
 		else
@@ -154,9 +168,25 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		}
 	}
 #endif
+	}
+	catch(BoxException &e)
+	{
+		::close(fd);
+		BOX_NOTICE("Failed to lock lockfile " << rFilename << ": " << e.what());
+		throw;
+	}
+
+	if(!FileExists(rFilename))
+	{
+		BOX_ERROR("Locked lockfile " << rFilename << ", but lockfile no longer "
+			"exists, bailing out");
+		::close(fd);
+		return false;
+	}
 
 	// Success
 	mFileDescriptor = fd;
+	BOX_TRACE("Successfully locked lockfile " << rFilename);
 
 	return true;
 #endif
@@ -195,10 +225,12 @@ void NamedLock::ReleaseLock()
 			CommonException, OSFileError);
 	}
 
-	// Mark as unlocked
+	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
 	mFileDescriptor = -1;
 }
 
 
 
+	BOX_TRACE("Released lock and deleted lockfile " << mFileName);
+}
 
