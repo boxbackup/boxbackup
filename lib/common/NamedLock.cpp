@@ -207,7 +207,19 @@ void NamedLock::ReleaseLock()
 	{
 		THROW_EXCEPTION(CommonException, NamedLockNotHeld)
 	}
-	
+
+	// Delete the file. We need to do this before closing the filehandle, otherwise
+	// someone could acquire the lock, release and delete it between us closing (and
+	// hence releasing) and deleting it, and we'd fail when it came to deleting the
+	// file. This happens in tests much more often than you'd expect!
+
+	if(::unlink(mFileName.c_str()) != 0)
+	{
+		THROW_EMU_ERROR(
+			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),
+			CommonException, OSFileError);
+	}
+
 	// Close the file
 	if(::close(mFileDescriptor) != 0)
 	{
@@ -216,20 +228,8 @@ void NamedLock::ReleaseLock()
 			CommonException, OSFileError);
 	}
 
-	// Delete the file
-	if(::unlink(mFileName.c_str()) != 0)
-	{
-		THROW_EMU_ERROR(
-			BOX_FILE_MESSAGE(mFileName,
-				"Failed to delete lockfile"),
-			CommonException, OSFileError);
-	}
-
 	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
 	mFileDescriptor = -1;
-}
-
-
 
 	BOX_TRACE("Released lock and deleted lockfile " << mFileName);
 }
