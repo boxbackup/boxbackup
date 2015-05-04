@@ -385,6 +385,9 @@ class Capture : public Logger
 	}
 };
 
+// Forward declaration
+class HideFileGuard;
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -406,7 +409,8 @@ class Logging
 	static Syslog*  spSyslog;
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
-	
+	static std::auto_ptr<HideFileGuard> sapHideFileGuard;
+
 	public:
 	Logging ();
 	~Logging();
@@ -501,11 +505,16 @@ class Logging
 		}
 	};
 
+	// Process global options
+	static std::string GetOptionString();
+	static int ProcessOption(signed int option);
+	static std::string GetUsageString();
+
 	// --------------------------------------------------------------------------
 	//
 	// Class
 	//		Name:    Logging::OptionParser
-	//		Purpose: Process command-line options
+	//		Purpose: Process command-line options, some global, some local
 	//		Created: 2014/04/09
 	//
 	// --------------------------------------------------------------------------
@@ -626,6 +635,36 @@ class HideCategoryGuard : public Logger
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
 	virtual const char* GetType() { return "HideCategoryGuard"; }
+	virtual void SetProgramName(const std::string& rProgramName) { }
+};
+
+class HideFileGuard : public Logger
+{
+	private:
+	std::list<std::string> mFileNames;
+	HideFileGuard(const HideFileGuard& other); // no copying
+	HideFileGuard& operator=(const HideFileGuard& other); // no assignment
+	bool mHideAllButSelected;
+
+	public:
+	HideFileGuard(const std::string& rFileName, bool HideAllButSelected = false)
+	: mHideAllButSelected(HideAllButSelected)
+	{
+		mFileNames.push_back(rFileName);
+		Logging::Add(this);
+	}
+	~HideFileGuard()
+	{
+		Logging::Remove(this);
+	}
+	void Add(const std::string& rFileName)
+	{
+		mFileNames.push_back(rFileName);
+	}
+	virtual bool Log(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
+	virtual const char* GetType() { return "HideFileGuard"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 

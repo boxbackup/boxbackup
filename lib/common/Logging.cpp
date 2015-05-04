@@ -45,6 +45,7 @@ Syslog*     Logging::spSyslog  = NULL;
 Logging     Logging::sGlobalLogging; // automatic initialisation
 std::string Logging::sProgramName;
 const Log::Category Logging::UNCATEGORISED("Uncategorised");
+std::auto_ptr<HideFileGuard> Logging::sapHideFileGuard;
 
 HideSpecificExceptionGuard::SuppressedExceptions_t
 	HideSpecificExceptionGuard::sSuppressedExceptions;
@@ -566,7 +567,7 @@ bool HideSpecificExceptionGuard::IsHidden(int type, int subtype)
 // --------------------------------------------------------------------------
 std::string Logging::OptionParser::GetOptionString()
 {
-	return "NPqQt:TUvVW:";
+	return "L:NPqQt:TUvVW:";
 }
 
 // --------------------------------------------------------------------------
@@ -584,6 +585,20 @@ int Logging::OptionParser::ProcessOption(signed int option)
 {
 	switch(option)
 	{
+		case 'L':
+		{
+			if(sapHideFileGuard.get())
+			{
+				sapHideFileGuard->Add(optarg);
+			}
+			else
+			{
+				sapHideFileGuard.reset(new HideFileGuard(
+					optarg, true)); // HideAllButSelected
+			}
+		}
+		break;
+
 		case 'N':
 		{
 			mTruncateLogFile = true;
@@ -698,7 +713,8 @@ int Logging::OptionParser::ProcessOption(signed int option)
 // --------------------------------------------------------------------------
 std::string Logging::OptionParser::GetUsageString()
 {
-	return 
+	return
+	"  -L <file>  Filter out log messages except from specified file, can repeat\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -715,11 +731,35 @@ bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
-	// Return false if category is in our list, to suppress further
-	// logging (thus, return true if it's not in our list, i.e. we
-	// found nothing).
 	std::list<Log::Category>::iterator i = std::find(mCategories.begin(),
 		mCategories.end(), category);
-	return i == mCategories.end();
+	// Return false if category is in our list, to suppress further
+	// logging (thus, return true if it's not in our list, i.e. we
+	// found nothing, to allow it).
+	return (i == mCategories.end());
+}
+
+bool HideFileGuard::Log(Log::Level level, const std::string& file, int line,
+	const std::string& function, const Log::Category& category,
+	const std::string& message)
+{
+	std::list<std::string>::iterator i = std::find(mFileNames.begin(),
+		mFileNames.end(), file);
+	bool allow_log_message;
+	if(mHideAllButSelected)
+	{
+		// Return true if filename is in our list, to allow further
+		// logging (thus, return false if it's not in our list, i.e. we
+		// found nothing, to suppress it).
+		allow_log_message = (i != mFileNames.end());
+	}
+	else
+	{
+		// Return false if filename is in our list, to suppress further
+		// logging (thus, return true if it's not in our list, i.e. we
+		// found nothing, to allow it).
+		allow_log_message = (i == mFileNames.end());
+	}
+	return allow_log_message;
 }
 
