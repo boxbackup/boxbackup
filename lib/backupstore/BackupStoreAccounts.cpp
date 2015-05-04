@@ -519,10 +519,10 @@ int BackupStoreAccountsControl::DeleteAccount(int32_t ID, bool AskForConfirmatio
 		}
 	}
 
-#ifdef WIN32
-	// Cannot remove files while holding a lock on them
+	// NamedLock will throw an exception if it can't delete the lockfile,
+	// which it can't if it doesn't exist. Now that we've deleted the account,
+	// nobody can open it anyway, so it's safe to unlock.
 	writeLock.ReleaseLock();
-#endif
 
 	int retcode = 0;
 
