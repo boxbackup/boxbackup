@@ -4295,5 +4295,5 @@ int test(int argc, const char *argv[])
 		"specified on the command line");
 	TEST_THAT(kill_running_daemons());
 
-	return (failures == 0 && num_tests_selected > 0);
+	return (failures == 0 && num_tests_selected > 0) ? 0 : 1;
 }

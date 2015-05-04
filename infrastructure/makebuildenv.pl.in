@@ -465,7 +465,7 @@ __E
 				close FL;
 			}
 
-			print TESTFILE "$runcmd\n";
+			print TESTFILE "$runcmd\nexit_status=\$?\n";
 
 			if (-d "$module/testfiles")
 			{
@@ -474,6 +474,7 @@ kill_daemons
 __E
 			}
 
+			print TESTFILE "exit \$exit_status\n";
 			close TESTFILE;
 		}
 		

@@ -239,8 +239,12 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
 }
 
+int num_tests_selected = 0;
+
 //! Simplifies calling setUp() with the current function name in each test.
-#define SETUP() if (!setUp(__FUNCTION__)) return true; // skip this test
+#define SETUP() \
+	if (!setUp(__FUNCTION__)) return true; \
+	num_tests_selected++;
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_backupstore()
@@ -3111,6 +3115,9 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
 
-	return (failures == 0);
+	TEST_LINE(num_tests_selected > 0, "No tests matched the patterns "
+		"specified on the command line");
+
+	return (failures == 0 && num_tests_selected > 0) ? 0 : 1;
 }
 
