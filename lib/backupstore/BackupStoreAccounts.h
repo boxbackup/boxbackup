@@ -76,7 +76,8 @@ public:
 	int PrintAccountInfo(int32_t ID);
 	int SetAccountEnabled(int32_t ID, bool enabled);
 	int DeleteAccount(int32_t ID, bool AskForConfirmation);
-	int CheckAccount(int32_t ID, bool FixErrors, bool Quiet);
+	int CheckAccount(int32_t ID, bool FixErrors, bool Quiet,
+		bool ReturnNumErrorsFound = false);
 	int CreateAccount(int32_t ID, int32_t DiscNumber, int32_t SoftLimit,
 		int32_t HardLimit);
 	int HousekeepAccountNow(int32_t ID);

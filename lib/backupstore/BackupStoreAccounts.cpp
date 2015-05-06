@@ -594,7 +594,8 @@ bool BackupStoreAccountsControl::OpenAccount(int32_t ID, std::string &rRootDirOu
 	return true;
 }
 
-int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Quiet)
+int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Quiet,
+	bool ReturnNumErrorsFound)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -612,8 +613,15 @@ int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Qu
 	// Check it
 	BackupStoreCheck check(rootDir, discSetNum, ID, FixErrors, Quiet);
 	check.Check();
-	
-	return check.ErrorsFound()?1:0;
+
+	if(ReturnNumErrorsFound)
+	{
+		return check.GetNumErrorsFound();
+	}
+	else
+	{
+		return check.ErrorsFound() ? 1 : 0;
+	}
 }
 
 int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,

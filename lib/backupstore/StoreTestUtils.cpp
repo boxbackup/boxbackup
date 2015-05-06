@@ -276,7 +276,8 @@ int check_account_for_errors(Log::Level log_level)
 	BackupStoreAccountsControl control(*config);
 	int errors_fixed = control.CheckAccount(0x01234567,
 		true, // FixErrors
-		false); // Quiet
+		false, // Quiet
+		true); // ReturnNumErrorsFound
 	return errors_fixed;
 }
 

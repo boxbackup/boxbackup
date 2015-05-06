@@ -77,26 +77,6 @@ std::map<int32_t, bool> objectIsDir;
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567"); \
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567 fix");
 
-bool check_fix_internal(int expected_num_errors)
-{
-	BackupStoreCheck checker(accountRootDir, discSetNum,
-		0x01234567, true /* FixErrors */, false /* Quiet */);
-	checker.Check();
-	if (expected_num_errors == -1)
-	{
-		TEST_THAT(checker.ErrorsFound());
-		return checker.ErrorsFound();
-	}
-	else
-	{
-		TEST_EQUAL(expected_num_errors, checker.GetNumErrorsFound());
-		return checker.GetNumErrorsFound() == expected_num_errors;
-	}
-}
-
-#define RUN_CHECK_INTERNAL(expected_num_errors) \
-	TEST_THAT(check_fix_internal(expected_num_errors))
-
 // Get ID of an object given a filename
 int32_t getID(const char *name)
 {
@@ -435,7 +415,7 @@ void check_root_dir_ok(dir_en_check after_entries[],
 {
 	// Check the store, check that the error is detected and
 	// repaired, by removing x1 from the directory.
-	RUN_CHECK_INTERNAL(0);
+	TEST_EQUAL(0, check_account_for_errors());
 
 	// Read the directory back in, check that it's empty
 	BackupStoreDirectory dir;
@@ -450,7 +430,7 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 {
 	// Check the store, check that the error is detected and
 	// repaired.
-	RUN_CHECK_INTERNAL(-1);
+	TEST_THAT(check_account_for_errors() > 0);
 	check_root_dir_ok(after_entries, after_deps);
 }
 
@@ -491,6 +471,7 @@ int test(int argc, const char *argv[])
 
 		std::string file_path = "testfiles/TestDir1/cannes/ict/metegoguered/oats";
 		int x1id = fake_upload(client, file_path, 0);
+		client.QueryFinished();
 
 		// Now break the reverse dependency by deleting x1 (the file,
 		// not the directory entry)
@@ -523,6 +504,7 @@ int test(int argc, const char *argv[])
 		fs.Close();
 
 		int x1aid = fake_upload(client, file_path, x1id);
+		client.QueryFinished();
 
 		// Check that we've ended up with the right preconditions
 		// for the tests below.
@@ -590,16 +572,11 @@ int test(int argc, const char *argv[])
 		read_bb_dir(1 /* root */, dir);
 		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) != 0);
 
-		// Check it
-		BackupStoreCheck checker(accountRootDir, discSetNum,
-			0x01234567, true /* FixErrors */, false /* Quiet */);
-		checker.Check();
-
 		// Should just be greater than 1 really, we don't know quite
 		// how good the checker is (or will become) at spotting errors!
 		// But this will help us catch changes in checker behaviour,
 		// so it's not a bad thing to test.
-		TEST_EQUAL(2, checker.GetNumErrorsFound());
+		TEST_EQUAL(2, check_account_for_errors());
 
 		file = RaidFileRead::Open(discSetNum, fn);
 		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
@@ -754,7 +731,7 @@ int test(int argc, const char *argv[])
 		// ERROR:   BlocksInCurrentFiles changed from 228 to 226
 		// ERROR:   NumCurrentFiles changed from 114 to 113
 		// WARNING: Reference count of object 0x44 changed from 1 to 0
-		RUN_CHECK_INTERNAL(5);
+		TEST_EQUAL(5, check_account_for_errors());
 		{
 			std::auto_ptr<BackupProtocolAccountUsage2> usage =
 				BackupProtocolLocal2(0x01234567, "test",
@@ -862,7 +839,7 @@ int test(int argc, const char *argv[])
 	// ERROR:   NumFiles changed from 113 to 110
 	// WARNING: Reference count of object 0x3e changed from 1 to 0
 
-	RUN_CHECK_INTERNAL(12);
+	TEST_EQUAL(12, check_account_for_errors());
 
 	{
 		std::auto_ptr<BackupProtocolAccountUsage2> usage =
