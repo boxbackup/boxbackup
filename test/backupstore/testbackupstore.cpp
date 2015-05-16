@@ -808,7 +808,7 @@ bool test_temporary_refcount_db_is_independent()
 	std::auto_ptr<BackupStoreRefCountDatabase> perm(
 		BackupStoreRefCountDatabase::Load(
 			apAccounts->GetEntry(0x1234567),
-			false // readonly
+			true // ReadOnly
 			));
 
 	TEST_CHECK_THROWS(temp->GetRefCount(2),
@@ -1245,16 +1245,9 @@ bool test_multiple_uploads()
 	std::auto_ptr<BackupProtocolCallable> apProtocol =
 		connect_and_login(context);
 
-#ifndef WIN32
-	// Open a new connection which is read only
 	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
-	std::auto_ptr<BackupProtocolCallable> apProtocolReadOnly =
-		connect_and_login(context,
-			BackupProtocolLogin::Flags_ReadOnly);
-	BackupProtocolCallable& protocolReadOnly(*apProtocolReadOnly);
-#else // WIN32
-	BackupProtocolCallable& protocolReadOnly(*apProtocol);
-#endif
+	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
+		"backup/01234567/", 0, true); // ReadOnly
 
 	// Read the root directory a few times (as it's cached, so make sure it doesn't hurt anything)
 	for(int l = 0; l < 3; ++l)
@@ -1329,8 +1322,10 @@ bool test_multiple_uploads()
 				expected_num_old_files, 0, 1));
 
 			apProtocol->QueryFinished();
+			protocolReadOnly.QueryFinished();
 			TEST_THAT(run_housekeeping_and_check_account());
 			apProtocol = connect_and_login(context);
+			protocolReadOnly.Reopen();
 
 			TEST_THAT(check_num_files(expected_num_current_files,
 				expected_num_old_files, 0, 1));
@@ -1351,8 +1346,10 @@ bool test_multiple_uploads()
 		}
 
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol = connect_and_login(context);
+		protocolReadOnly.Reopen();
 
 		// Delete one of them (will implicitly delete an old version)
 		{
@@ -1364,8 +1361,10 @@ bool test_multiple_uploads()
 		}
 
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol = connect_and_login(context);
+		protocolReadOnly.Reopen();
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1430,7 +1429,10 @@ bool test_multiple_uploads()
 		// Run housekeeping (for which we need to disconnect
 		// ourselves) and check that it doesn't change the numbers
 		// of files
+
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
+
 		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 		BackupStoreAccountDatabase::Entry account =
@@ -1445,6 +1447,7 @@ bool test_multiple_uploads()
 		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 		apProtocol = connect_and_login(context);
+		protocolReadOnly.Reopen();
 
 		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 
@@ -1506,10 +1509,8 @@ bool test_multiple_uploads()
 		}
 	}
 
-#ifndef WIN32
-	apProtocolReadOnly->QueryFinished();
-#endif
 	apProtocol->QueryFinished();
+	protocolReadOnly.QueryFinished();
 
 	return teardown_test_backupstore();
 }
@@ -1673,7 +1674,6 @@ bool test_server_commands()
 
 		// Upload a new version of the file as well, to ensure that the
 		// old version is moved along with the current version.
-		int64_t old_root_file_id = root_file_id;
 		root_file_id = BackupStoreFile::QueryStoreFileDiff(*apProtocol,
 			"testfiles/test0", BACKUPSTORE_ROOT_DIRECTORY_ID,
 			0, // DiffFromFileID
@@ -1827,8 +1827,10 @@ bool test_server_commands()
 		TEST_THAT(check_num_files(3, 1, 0, 3));
 
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol->Reopen();
+		protocolReadOnly.Reopen();
 
 		// Query names -- test that invalid stuff returns not found OK
 		{
@@ -1884,27 +1886,35 @@ bool test_server_commands()
 
 //}	skip:
 
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
-			BackupStoreRefCountDatabase::Load(
-				apAccounts->GetEntry(0x1234567), true));
-
 		// Create some nice recursive directories
 		TEST_THAT(check_reference_counts());
 
 		write_test_file(1);
-		int64_t dirtodelete = create_test_data_subdirs(*apProtocol,
-			BACKUPSTORE_ROOT_DIRECTORY_ID,
-			"test_delete", 6 /* depth */, apRefCount.get());
+		int64_t dirtodelete;
+
+		{
+			std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+				BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+			std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
+				BackupStoreRefCountDatabase::Load(
+					apAccounts->GetEntry(0x1234567), true));
+
+
+	 		dirtodelete = create_test_data_subdirs(*apProtocol,
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				"test_delete", 6 /* depth */, apRefCount.get());
+		}
+
 		TEST_THAT(check_reference_counts());
 
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		TEST_THAT(check_reference_counts());
 
 		// And delete them
 		apProtocol->Reopen();
+		protocolReadOnly.Reopen();
 
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
@@ -1913,8 +1923,10 @@ bool test_server_commands()
 		}
 
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		TEST_THAT(check_reference_counts());
+		protocolReadOnly.Reopen();
 
 		// Get the root dir, checking for deleted items
 		{
@@ -1953,6 +1965,7 @@ bool test_server_commands()
 
 		// Finish the connections
 		apProtocol->QueryFinished();
+		protocolReadOnly.QueryFinished();
 
 		TEST_THAT(run_housekeeping_and_check_account());
 		TEST_THAT(check_reference_counts());
@@ -2059,8 +2072,8 @@ bool test_directory_parent_entry_tracks_directory_size()
 	protocolReadOnly.Reopen();
 
 	// Now modify the root directory to remove its entry for this one
-	std::auto_ptr<RaidFileRead> root_read(get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID));
-	BackupStoreDirectory root(static_cast<std::auto_ptr<IOStream> >(root_read));
+	BackupStoreDirectory root(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
+		IOStream::TimeOutInfinite);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en, return false);
 	BackupStoreDirectory::Entry enCopy(*en);
@@ -2083,8 +2096,8 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// create_directory(), because otherwise we can't create it again.
 	// (Perhaps it should not have been committed because we failed to
 	// update the parent, but currently it is.)
-	std::auto_ptr<RaidFileRead> subdir_read(get_raid_file(subdirid));
-	BackupStoreDirectory subdir(static_cast<std::auto_ptr<IOStream> >(subdir_read));
+	BackupStoreDirectory subdir(*get_raid_file(subdirid),
+		IOStream::TimeOutInfinite);
 	{
 		BackupStoreDirectory::Iterator i(subdir);
 		en = i.FindMatchingClearName(
@@ -2124,8 +2137,8 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	protocol.QueryFinished();
 
-	root_read = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
-	root.ReadFromStream(*root_read, IOStream::TimeOutInfinite);
+	root.ReadFromStream(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
+		IOStream::TimeOutInfinite);
 	en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
 	en->SetSizeInBlocks(1234);
@@ -2142,10 +2155,12 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// the read-only connection will discard its cached copy.
 	safe_sleep(1);
 
+	protocolReadOnly.QueryFinished();
 	TEST_EQUAL(1, check_account_for_errors());
+
+	protocolReadOnly.Reopen();
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
-
 	protocolReadOnly.QueryFinished();
 
 	return teardown_test_backupstore();

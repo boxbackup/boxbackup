@@ -716,7 +716,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		// Check this should be deleted
 		if(!wasDeleted && !wasOldVersion)
 		{
-			// Things changed size we were last around
+			// Things changed since we were last around
 			return refs;
 		}
 
@@ -952,6 +952,8 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 	std::auto_ptr<RaidFileRead> parentStream(
 		RaidFileRead::Open(mStoreDiscSet, parentFilename));
 	BackupStoreDirectory parent(*parentStream);
+	parentStream.reset();
+
 	BackupStoreDirectory::Entry* en =
 		parent.FindEntryByID(rDirectory.GetObjectID());
 	ASSERT(en);
