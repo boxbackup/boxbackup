@@ -562,8 +562,6 @@ int test(int argc, const char *argv[])
 		StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
 			discSetNum, fn, true /* EnsureDirectoryExists */);
 
-		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
-			fn));
 		RaidFileWrite d(discSetNum, fn);
 		d.Open(true /* allow overwrite */);
 		dir.WriteToStream(d);
@@ -578,7 +576,8 @@ int test(int argc, const char *argv[])
 		// so it's not a bad thing to test.
 		TEST_EQUAL(2, check_account_for_errors());
 
-		file = RaidFileRead::Open(discSetNum, fn);
+		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
+			fn));
 		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
 		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) == 0);
 	}
