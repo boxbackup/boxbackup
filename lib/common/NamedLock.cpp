@@ -21,8 +21,9 @@
 	#include <sys/file.h>
 #endif
 
-#include "NamedLock.h"
 #include "CommonException.h"
+#include "NamedLock.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
@@ -208,10 +209,17 @@ void NamedLock::ReleaseLock()
 		THROW_EXCEPTION(CommonException, NamedLockNotHeld)
 	}
 
-	// Delete the file. We need to do this before closing the filehandle, otherwise
-	// someone could acquire the lock, release and delete it between us closing (and
-	// hence releasing) and deleting it, and we'd fail when it came to deleting the
-	// file. This happens in tests much more often than you'd expect!
+#ifndef WIN32
+	// Delete the file. We need to do this before closing the filehandle, 
+	// if we used flock() or fcntl() to lock it, otherwise someone could
+	// acquire the lock, release and delete it between us closing (and
+	// hence releasing) and deleting it, and we'd fail when it came to
+	// deleting the file. This happens in tests much more often than
+	// you'd expect!
+	//
+	// This doesn't apply on systems using plain lockfile locking, such as
+	// Windows, and there we need to close the file before deleting it,
+	// otherwise the system won't let us delete it.
 
 	if(::unlink(mFileName.c_str()) != 0)
 	{
@@ -219,6 +227,7 @@ void NamedLock::ReleaseLock()
 			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),
 			CommonException, OSFileError);
 	}
+#endif // !WIN32
 
 	// Close the file
 	if(::close(mFileDescriptor) != 0)
@@ -227,6 +236,18 @@ void NamedLock::ReleaseLock()
 			BOX_FILE_MESSAGE(mFileName, "Failed to close lockfile"),
 			CommonException, OSFileError);
 	}
+
+#ifdef WIN32
+	// On Windows we need to close the file before deleting it, otherwise
+	// the system won't let us delete it.
+
+	if(::unlink(mFileName.c_str()) != 0)
+	{
+		THROW_EMU_ERROR(
+			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),
+			CommonException, OSFileError);
+	}
+#endif // WIN32
 
 	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
 	mFileDescriptor = -1;
