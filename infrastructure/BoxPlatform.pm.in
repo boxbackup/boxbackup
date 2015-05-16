@@ -1,15 +1,18 @@
 package BoxPlatform;
 use Exporter;
 @ISA = qw/Exporter/;
-@EXPORT = qw/$build_os $build_os_ver $target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
+@EXPORT = qw/$build_os $build_os_ver $ac_target $ac_target_cpu $ac_target_vendor $ac_target_os $make_command $bsd_make $platform_define $platform_cpu $gcc_v3 $product_version $product_name $install_into_dir $sub_make_options $platform_compile_line_extra $platform_link_line_extra $platform_lib_files $platform_exe_ext $target_windows/;
 
 BEGIN
 {
 	# which OS are we building under?
-	$target_os = '@target_os@';
+	$ac_target = '@target@';
+	$ac_target_cpu = '@target_cpu@';
+	$ac_target_vendor = '@target_vendor@';
+	$ac_target_os = '@target_os@';
 	$target_windows = 0;
-	$target_windows = 1 if $target_os =~ m'^mingw32'
-		or $target_os eq "winnt";
+	$target_windows = 1 if $ac_target_os =~ m'^mingw32'
+		or $ac_target_os eq "winnt";
 
 	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
 	{
@@ -155,7 +158,7 @@ sub make_flag
 
 sub parcel_root
 {
-	my $tos = $_[1] || $target_os;
+	my $tos = $_[1] || $ac_target_os;
 	return $product_name.'-'.$product_version.'-'.$_[0].'-'.$tos;
 }
 

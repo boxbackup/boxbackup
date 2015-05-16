@@ -212,7 +212,7 @@ for(@modules_files)
 
 	if(m/\AOMIT:(.+)/)
 	{
-		if($1 eq $build_os or $1 eq $target_os)
+		if($1 eq $build_os or $1 eq $ac_target_os)
 		{
 			$modules_omitted = 1;
 			$modules_omitting = 1;

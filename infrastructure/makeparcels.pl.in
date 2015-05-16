@@ -20,7 +20,10 @@ sub os_matches ($)
 	foreach my $prefix (@prefixes)
 	{
 		return 1 if starts_with($build_os,  $prefix);
-		return 1 if starts_with($target_os, $prefix);
+		return 1 if starts_with($ac_target_os, $prefix);
+		return 1 if starts_with("$ac_target_cpu-$ac_target_os",
+			$prefix);
+		return 1 if starts_with($ac_target, $prefix);
 	}
 	return 0;
 }
@@ -133,8 +136,8 @@ my @clean_deps;
 for my $parcel (@parcels)
 {
 	my $version = BoxPlatform::parcel_root($parcel);
-	my $target  = BoxPlatform::parcel_target($parcel);
-	my $dir     = BoxPlatform::parcel_dir($parcel);
+	my $make_target = BoxPlatform::parcel_target($parcel);
+	my $dir = BoxPlatform::parcel_dir($parcel);
 	my @parcel_deps;
 
 	# Need to use BSD install on Solaris
@@ -186,6 +189,9 @@ EOF
 		}
 		elsif ($type eq 'script')
 		{
+			# Replace any variables ($ac_target etc.) with their
+			# values.
+			$name =~ s|(\$[^/ ]+)|$1|eeg;
 			my $fullpath = $name;
 			my $filename = $name;
 			# remove path from script name
@@ -266,9 +272,9 @@ EOF
 	}
 
 	print MAKE <<EOF;
-build-$parcel:	$target
+build-$parcel:	$make_target
 
-$target: @parcel_deps
+$make_target: @parcel_deps
 	test -d $dir || mkdir $dir
 EOF
 	
