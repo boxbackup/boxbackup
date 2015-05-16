@@ -1337,11 +1337,11 @@ BOOL AddEventSource
 	HKEY hk;
 	DWORD dwDisp;
 
-	if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(), 
-			 0, NULL, REG_OPTION_NON_VOLATILE,
-			 KEY_WRITE, NULL, &hk, &dwDisp)) 
+	winerrno = RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(), 
+		 0, NULL, REG_OPTION_NON_VOLATILE,
+		 KEY_WRITE, NULL, &hk, &dwDisp);
+	if (winerrno != ERROR_SUCCESS)
 	{
-		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to create the registry key: %s",
 			GetErrorMessage(winerrno).c_str());
 		return FALSE;
@@ -1349,14 +1349,14 @@ BOOL AddEventSource
 
 	// Set the name of the message file. 
  
-	if (RegSetValueExW(hk,                 // subkey handle 
-			   L"EventMessageFile", // value name 
-			   0,                  // must be zero 
-			   REG_EXPAND_SZ,      // value type 
-			   (LPBYTE)cmd,        // pointer to value data 
-			   len*sizeof(WCHAR))) // data size
+	winerrno = RegSetValueExW(hk,   // subkey handle 
+		   L"EventMessageFile", // value name 
+		   0,                   // must be zero 
+		   REG_EXPAND_SZ,       // value type 
+		   (LPBYTE)cmd,         // pointer to value data 
+		   len*sizeof(WCHAR));  // data size
+	if (winerrno != ERROR_SUCCESS)
 	{
-		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the event message file: %s",
 			GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
@@ -1368,14 +1368,14 @@ BOOL AddEventSource
 	DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | 
 		  EVENTLOG_INFORMATION_TYPE; 
  
-	if (RegSetValueEx(hk,               // subkey handle 
-			  "TypesSupported", // value name 
-			  0,                // must be zero 
-			  REG_DWORD,        // value type 
-			  (LPBYTE) &dwData, // pointer to value data 
-			  sizeof(DWORD)))   // length of value data 
+	winerrno = RegSetValueEx(hk, // subkey handle 
+		  "TypesSupported",  // value name 
+		  0,                 // must be zero 
+		  REG_DWORD,         // value type 
+		  (LPBYTE) &dwData,  // pointer to value data 
+		  sizeof(DWORD));    // length of value data 
+	if (winerrno != ERROR_SUCCESS)
 	{
-		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the supported types: %s",
 			GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
@@ -1384,28 +1384,28 @@ BOOL AddEventSource
  
 	// Set the category message file and number of categories.
 
-	if (RegSetValueExW(hk,                    // subkey handle 
-			   L"CategoryMessageFile", // value name 
-			   0,                     // must be zero 
-			   REG_EXPAND_SZ,         // value type 
-			   (LPBYTE)cmd,           // pointer to value data 
-			   len*sizeof(WCHAR)))    // data size
+	winerrno = RegSetValueExW(hk,      // subkey handle 
+		   L"CategoryMessageFile", // value name 
+		   0,                      // must be zero 
+		   REG_EXPAND_SZ,          // value type 
+		   (LPBYTE)cmd,            // pointer to value data 
+		   len*sizeof(WCHAR));     // data size
+	if (winerrno != ERROR_SUCCESS)
 	{
-		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the category message file: "
 			"%s", GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
 		return FALSE;
 	}
  
-	if (RegSetValueEx(hk,              // subkey handle 
+	winerrno = RegSetValueEx(hk,       // subkey handle 
 			  "CategoryCount", // value name 
 			  0,               // must be zero 
 			  REG_DWORD,       // value type 
 			  (LPBYTE) &dwNum, // pointer to value data 
-			  sizeof(DWORD)))  // length of value data 
+			  sizeof(DWORD));  // length of value data 
+	if (winerrno != ERROR_SUCCESS)
 	{
-		winerrno = GetLastError();
 		::syslog(LOG_ERR, "Failed to set the category count: %s",
 			GetErrorMessage(winerrno).c_str());
 		RegCloseKey(hk); 
