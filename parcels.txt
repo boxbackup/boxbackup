@@ -35,9 +35,12 @@ ONLY:mingw32,mingw32msvc
 END-ONLY
 
 ONLY:mingw32
-	script /usr/i686-pc-mingw32/sys-root/mingw/bin/libz-1.dll
-	script /usr/i686-pc-mingw32/sys-root/mingw/bin/mingwm10.dll
-	script /usr/i686-pc-mingw32/sys-root/mingw/bin/libgcc_s_dw2-1.dll
+	script /usr/$ac_target/sys-root/mingw/bin/zlib1.dll
+	script /usr/$ac_target/sys-root/mingw/bin/libgcc_s_seh-1.dll
+END-ONLY
+
+ONLY:i686-w64-mingw32
+	script /usr/$ac_target/sys-root/mingw/bin/libgcc_s_sjlj-1.dll
 END-ONLY
 
 ONLY:SunOS
