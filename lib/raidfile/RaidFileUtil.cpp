@@ -59,8 +59,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 		*pExistingFiles = 0;
 	}
 	
-	// For stat call, although the results are not examined
-	struct stat st;
+	EMU_STRUCT_STAT st;
 
 	// check various files
 	int startDisc = 0;
@@ -70,19 +69,14 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 		{
 			*pStartDisc = startDisc;
 		}
-		if(::stat(writeFile.c_str(), &st) == 0)
+		if(EMU_STAT(writeFile.c_str(), &st) == 0)
 		{
 			// write file exists, use that
 			
 			// Get unique ID
 			if(pRevisionID != 0)
 			{
-				#ifdef WIN32
-					*pRevisionID = st.st_mtime;
-				#else
-					*pRevisionID = FileModificationTime(st);
-				#endif
-
+				*pRevisionID = FileModificationTime(st);
 				*pRevisionID = adjust_timestamp(*pRevisionID, st.st_size);
 			}
 			
@@ -102,7 +96,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 	for(int f = 0; f < setSize; ++f)
 	{
 		std::string componentFile(RaidFileUtil::MakeRaidComponentName(rDiscSet, rFilename, (f + startDisc) % setSize));
-		if(::stat(componentFile.c_str(), &st) == 0)
+		if(EMU_STAT(componentFile.c_str(), &st) == 0)
 		{
 			// Component file exists, add to count
 			rfCount++;
@@ -114,12 +108,7 @@ RaidFileUtil::ExistType RaidFileUtil::RaidFileExists(RaidFileDiscSet &rDiscSet,
 			// Revision ID
 			if(pRevisionID != 0)
 			{
-				#ifdef WIN32
-					int64_t rid = st.st_mtime;
-				#else
-					int64_t rid = FileModificationTime(st);
-				#endif
-
+				int64_t rid = FileModificationTime(st);
 				if(rid > revisionID) revisionID = rid;
 				revisionIDplus += st.st_size;
 			}
