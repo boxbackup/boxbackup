@@ -82,19 +82,30 @@ BEGIN
 	if($product_version =~ /USE_SVN_VERSION/)
 	{
 		# for developers, use SVN version
-		my $svnversion = `svnversion .`;
-		chomp $svnversion;
-		$svnversion =~ tr/0-9A-Za-z/_/c;
-		open INFO,'svn info . |';
-		my $svnurl;
-		while(<INFO>)
+		my $svnversion = 'unknown';
+		my $svnurl = 'unknown';
+
+		if(-d '.svn')
 		{
-			if(m/^URL: (.+?)[\n\r]+/)
+			my $svnversion = `svnversion .`;
+			chomp $svnversion;
+			$svnversion =~ tr/0-9A-Za-z/_/c;
+			open INFO,'svn info . |';
+			while(<INFO>)
 			{
-				$svnurl = $1
+				if(m/^URL: (.+?)[\n\r]+/)
+				{
+					$svnurl = $1
+				}
 			}
+			close INFO;
 		}
-		close INFO;
+		elsif(-d '.git')
+		{
+			$svnversion = `git svn info | grep '^Revision:' | cut -d' ' -f2`;
+			chomp $svnversion;
+			$svnurl = `git svn info --url`;
+		}
 
 		my $svndir;
 		if ($svnurl =~ m!/box/(.+)$!)
@@ -158,7 +169,7 @@ sub make_flag
 
 sub parcel_root
 {
-	my $tos = $_[1] || $ac_target_os;
+	my $tos = $_[1] || $ac_target;
 	return $product_name.'-'.$product_version.'-'.$_[0].'-'.$tos;
 }
 
