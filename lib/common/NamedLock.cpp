@@ -77,41 +77,40 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	mFileName = rFilename;
 
 	// See if the lock can be got
-#if HAVE_DECL_O_EXLOCK
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXLOCK");
-	int fd = ::open(rFilename.c_str(),
-		O_WRONLY | O_NONBLOCK | O_CREAT | O_TRUNC | O_EXLOCK, mode);
-	if(fd != -1)
-	{
-		// Got a lock, lovely
-		mFileDescriptor = fd;
-		return true;
-	}
-	
-	// Failed. Why?
-	if(errno != EWOULDBLOCK)
-	{
-		// Not the expected error
-		THROW_SYS_FILE_ERROR("Failed to open lockfile", rFilename,
-			CommonException, OSFileError);
-	}
-
-	return false;
-#else
 	int flags = O_WRONLY | O_CREAT | O_TRUNC;
 
-# if !HAVE_DECL_F_SETLK && !defined HAVE_FLOCK
+#if HAVE_DECL_O_EXLOCK
+	flags |= O_NONBLOCK | O_EXLOCK;
+	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXLOCK");
+#elif !HAVE_DECL_F_SETLK && !defined HAVE_FLOCK
 	// We have no other way to get a lock, so all we can do is fail if
 	// the file already exists, and take the risk of stale locks.
 	flags |= O_EXCL;
 	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXCL");
-# else
+#else
 	BOX_TRACE("Trying to create lockfile " << rFilename << " without special flags");
-# endif
+#endif
 
 	int fd = ::open(rFilename.c_str(), flags, mode);
 	if(fd == -1)
-	{
+#if HAVE_DECL_O_EXLOCK
+	{ // if()
+		if(errno == EWOULDBLOCK)
+		{
+			// Lockfile already exists, and we tried to open it
+			// exclusively, which means we failed to lock it.
+			BOX_NOTICE("Failed to lock lockfile with O_EXLOCK: " << rFilename
+				<< ": already locked by another process?");
+			return false;
+		}
+		else
+		{
+			THROW_SYS_FILE_ERROR("Failed to open lockfile with O_EXLOCK",
+				rFilename, CommonException, OSFileError);
+		}
+	}
+#else // !HAVE_DECL_O_EXLOCK
+	{ // if()
 		if(errno == EEXIST && (flags & O_EXCL))
 		{
 			// Lockfile already exists, and we tried to open it
@@ -122,53 +121,53 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		}
 		else
 		{
-			THROW_SYS_FILE_ERROR("Failed to open lockfile",
+			THROW_SYS_FILE_ERROR("Failed to open lockfile with O_EXCL",
 				rFilename, CommonException, OSFileError);
 		}
 	}
 
 	try
 	{
-#ifdef HAVE_FLOCK
-	BOX_TRACE("Trying to lock lockfile " << rFilename << " using flock()");
-	if(::flock(fd, LOCK_EX | LOCK_NB) != 0)
-	{
-		if(errno == EWOULDBLOCK)
+# ifdef HAVE_FLOCK
+		BOX_TRACE("Trying to lock lockfile " << rFilename << " using flock()");
+		if(::flock(fd, LOCK_EX | LOCK_NB) != 0)
 		{
-			::close(fd);
-			BOX_NOTICE("Failed to lock lockfile with flock(): " << rFilename
-				<< ": already locked by another process");
-			return false;
+			if(errno == EWOULDBLOCK)
+			{
+				::close(fd);
+				BOX_NOTICE("Failed to lock lockfile with flock(): " << rFilename
+					<< ": already locked by another process");
+				return false;
+			}
+			else
+			{
+				THROW_SYS_FILE_ERROR("Failed to lock lockfile with flock()",
+					rFilename, CommonException, OSFileError);
+			}
 		}
-		else
+# elif HAVE_DECL_F_SETLK
+		struct flock desc;
+		desc.l_type = F_WRLCK;
+		desc.l_whence = SEEK_SET;
+		desc.l_start = 0;
+		desc.l_len = 0;
+		BOX_TRACE("Trying to lock lockfile " << rFilename << " using fcntl()");
+		if(::fcntl(fd, F_SETLK, &desc) != 0)
 		{
-			THROW_SYS_FILE_ERROR("Failed to lock lockfile with flock()",
-				rFilename, CommonException, OSFileError);
+			if(errno == EAGAIN)
+			{
+				::close(fd);
+				BOX_NOTICE("Failed to lock lockfile with fcntl(): " << rFilename
+					<< ": already locked by another process");
+				return false;
+			}
+			else
+			{
+				THROW_SYS_FILE_ERROR("Failed to lock lockfile with fcntl()",
+					rFilename, CommonException, OSFileError);
+			}
 		}
-	}
-#elif HAVE_DECL_F_SETLK
-	struct flock desc;
-	desc.l_type = F_WRLCK;
-	desc.l_whence = SEEK_SET;
-	desc.l_start = 0;
-	desc.l_len = 0;
-	BOX_TRACE("Trying to lock lockfile " << rFilename << " using fcntl()");
-	if(::fcntl(fd, F_SETLK, &desc) != 0)
-	{
-		if(errno == EAGAIN)
-		{
-			::close(fd);
-			BOX_NOTICE("Failed to lock lockfile with fcntl(): " << rFilename
-				<< ": already locked by another process");
-			return false;
-		}
-		else
-		{
-			THROW_SYS_FILE_ERROR("Failed to lock lockfile with fcntl()",
-				rFilename, CommonException, OSFileError);
-		}
-	}
-#endif
+# endif
 	}
 	catch(BoxException &e)
 	{
@@ -176,6 +175,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		BOX_NOTICE("Failed to lock lockfile " << rFilename << ": " << e.what());
 		throw;
 	}
+#endif // HAVE_DECL_O_EXLOCK
 
 	if(!FileExists(rFilename))
 	{
@@ -190,7 +190,6 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	BOX_TRACE("Successfully locked lockfile " << rFilename);
 
 	return true;
-#endif
 }
 
 // --------------------------------------------------------------------------
