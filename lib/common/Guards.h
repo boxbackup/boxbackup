@@ -77,7 +77,16 @@ class MemoryBlockGuard
 {
 public:
 	MemoryBlockGuard(int BlockSize)
-		: mpBlock(::malloc(BlockSize))
+	: mpBlock(::malloc(BlockSize))
+	{
+		if(mpBlock == 0)
+		{
+			throw std::bad_alloc();
+		}
+	}
+
+	MemoryBlockGuard(void *pBlock)
+	: mpBlock(pBlock)
 	{
 		if(mpBlock == 0)
 		{
