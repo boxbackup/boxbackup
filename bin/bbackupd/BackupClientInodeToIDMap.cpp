@@ -16,15 +16,16 @@
 #include "BackupClientInodeToIDMap.h"
 #undef BACKIPCLIENTINODETOIDMAP_IMPLEMENTATION
 
+#include "Archive.h"
 #include "BackupStoreException.h"
+#include "CollectInBufferStream.h"
+#include "MemBlockStream.h"
+#include "autogen_CommonException.h"
 
 #include "MemLeakFindOn.h"
 
-typedef struct
-{
-	int64_t mObjectID;
-	int64_t mInDirectory;
-} IDBRecord;
+#define BOX_DBM_INODE_DB_VERSION_KEY "BackupClientInodeToIDMap.Version"
+#define BOX_DBM_INODE_DB_VERSION_CURRENT 2
 
 #define BOX_DBM_MESSAGE(stuff) stuff << " (qdbm): " << dperrmsg(dpecode)
 
@@ -118,11 +119,57 @@ void BackupClientInodeToIDMap::Open(const char *Filename, bool ReadOnly,
 	
 	if(!mpDepot)
 	{
-		BOX_WARNING(BOX_DBM_MESSAGE("Failed to open inode "
-			"database: " << mFilename));
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BerkelyDBFailure,
 			BOX_DBM_MESSAGE("Failed to open inode database: " <<
 				mFilename));
+	}
+
+	const char* version_key = BOX_DBM_INODE_DB_VERSION_KEY;
+	int32_t version = 0;
+
+	if(CreateNew)
+	{
+		version = BOX_DBM_INODE_DB_VERSION_CURRENT;
+
+		int ret = dpput(mpDepot, version_key, strlen(version_key),
+			(char *)(&version), sizeof(version), DP_DKEEP);
+
+		if(!ret)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BerkelyDBFailure,
+				BOX_DBM_MESSAGE("Failed to write version number to inode "
+					"database: " << mFilename));
+		}
+	}
+	else
+	{
+		int ret = dpgetwb(mpDepot, version_key, strlen(version_key), 0,
+			sizeof(version), (char *)(&version));
+
+		if(ret == -1)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BerkelyDBFailure,
+				"Missing version number in inode database. Perhaps it "
+				"needs to be recreated: " << mFilename);
+		}
+
+		if(ret != sizeof(version))
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BerkelyDBFailure,
+				"Wrong size version number in inode database: expected "
+				<< sizeof(version) << " bytes but found " << ret);
+		}
+
+		if(version != BOX_DBM_INODE_DB_VERSION_CURRENT)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BerkelyDBFailure,
+				"Wrong version number in inode database: expected " <<
+				BOX_DBM_INODE_DB_VERSION_CURRENT << " but found " <<
+				version << ". Perhaps it needs to be recreated: " <<
+				mFilename);
+		}
+
+		// By this point the version number has been checked and is OK.
 	}
 	
 	// Read only flag
@@ -175,7 +222,7 @@ void BackupClientInodeToIDMap::Close()
 //
 // --------------------------------------------------------------------------
 void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
-	int64_t InDirectory)
+	int64_t InDirectory, const std::string& LocalPath)
 {
 	if(mReadOnly)
 	{
@@ -190,12 +237,15 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 	ASSERT_DBM_OPEN();
 
 	// Setup structures
-	IDBRecord rec;
-	rec.mObjectID = ObjectID;
-	rec.mInDirectory = InDirectory;
+	CollectInBufferStream buf;
+	Archive arc(buf, IOStream::TimeOutInfinite);
+	arc.WriteExact((uint64_t)ObjectID);
+	arc.WriteExact((uint64_t)InDirectory);
+	arc.Write(LocalPath);
+	buf.SetForReading();
 
 	ASSERT_DBM_OK(dpput(mpDepot, (const char *)&InodeRef, sizeof(InodeRef),
-		(const char *)&rec, sizeof(rec), DP_DOVER),
+		(const char *)buf.GetBuffer(), buf.GetSize(), DP_DOVER),
 		"Failed to add record to inode database", mFilename,
 		BackupStoreException, BerkelyDBFailure);
 }
@@ -211,8 +261,8 @@ void BackupClientInodeToIDMap::AddToMap(InodeRefType InodeRef, int64_t ObjectID,
 //		Created: 11/11/03
 //
 // --------------------------------------------------------------------------
-bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef,
-	int64_t &rObjectIDOut, int64_t &rInDirectoryOut) const
+bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDOut,
+	int64_t &rInDirectoryOut, std::string* pLocalPathOut) const
 {
 	if(mEmpty)
 	{
@@ -226,19 +276,44 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef,
 	}
 	
 	ASSERT_DBM_OPEN();
-
-	IDBRecord rec;
-	
-	if(dpgetwb(mpDepot, (const char *)&InodeRef, sizeof(InodeRef),
-		0, sizeof(IDBRecord), (char *)&rec) == -1)
+	int size;
+	char* data = dpget(mpDepot, (const char *)&InodeRef, sizeof(InodeRef),
+		0, -1, &size);
+	if(data == NULL)
 	{
 		// key not in file
 		return false;
 	}
-		
+
+	// Free data automatically when the guard goes out of scope.
+	MemoryBlockGuard<char *> guard(data);
+	MemBlockStream stream(data, size);
+	Archive arc(stream, IOStream::TimeOutInfinite);
+
 	// Return data
-	rObjectIDOut = rec.mObjectID;
-	rInDirectoryOut = rec.mInDirectory;
+	try
+	{
+		arc.Read(rObjectIDOut);
+		arc.Read(rInDirectoryOut);
+		if(pLocalPathOut)
+		{
+			arc.Read(*pLocalPathOut);
+		}
+	}
+	catch(CommonException &e)
+	{
+		if(e.GetSubType() == CommonException::ArchiveBlockIncompleteRead)
+		{
+			THROW_FILE_ERROR("Failed to lookup record in inode database: "
+				<< InodeRef << ": not enough data in record", mFilename,
+				BackupStoreException, BerkelyDBFailure);
+			// Need to throw precisely that exception to ensure that the
+			// invalid database is deleted, so that we don't hit the same
+			// error next time.
+		}
+
+		throw;
+	}
 
 	// Found
 	return true;

@@ -40,8 +40,10 @@ public:
 	void Open(const char *Filename, bool ReadOnly, bool CreateNew);
 	void OpenEmpty();
 
-	void AddToMap(InodeRefType InodeRef, int64_t ObjectID, int64_t InDirectory);
-	bool Lookup(InodeRefType InodeRef, int64_t &rObjectIDOut, int64_t &rInDirectoryOut) const;
+	void AddToMap(InodeRefType InodeRef, int64_t ObjectID,
+		int64_t InDirectory, const std::string& LocalPath);
+	bool Lookup(InodeRefType InodeRef, int64_t &rObjectIDOut,
+		int64_t &rInDirectoryOut, std::string* pLocalPathOut = NULL) const;
 
 	void Close();
 

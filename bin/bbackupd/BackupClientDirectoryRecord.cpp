@@ -207,8 +207,8 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		{
 			BackupClientInodeToIDMap &idMap(
 				rParams.mrContext.GetNewIDMap());
-			idMap.AddToMap(dest_st.st_ino, mObjectID,
-				ContainingDirectoryID);
+			idMap.AddToMap(dest_st.st_ino, mObjectID, ContainingDirectoryID,
+				ConvertVssPathToRealPath(rLocalPath, rBackupLocation));
 		}
 		// Add attributes to checksum
 		currentStateChecksum.Add(&dest_st.st_mode,
@@ -1227,17 +1227,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			BackupClientInodeToIDMap &idMap(rContext.GetNewIDMap());
 		
 			// Need to get an ID from somewhere...
-			if(latestObjectID != 0)
-			{
-				// Use this one
-				BOX_TRACE("Storing uploaded file ID " <<
-					inodeNum << " (" << nonVssFilePath << ") "
-					"in ID map as object " <<
-					latestObjectID << " with parent " <<
-					mObjectID);
-				idMap.AddToMap(inodeNum, latestObjectID, mObjectID /* containing directory */);
-			}
-			else
+			if(latestObjectID == 0)
 			{
 				// Don't know it -- haven't sent anything to the store, and didn't get a listing.
 				// Look it up in the current map, and if it's there, use that.
@@ -1263,13 +1253,23 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// into it. However, in a long running process this may happen occasionally and
 					// not indicate anything wrong.
 					// Run the release version for real life use, where this check is not made.
-					BOX_TRACE("Storing found file ID " << inodeNum <<
-						" (" << nonVssFilePath << ") in ID map as "
-						"object " << objid << " with parent " << mObjectID);
-					idMap.AddToMap(inodeNum, objid,
-						mObjectID /* containing directory */);
+
+					latestObjectID = objid;
 				}
 			}
+
+			if(latestObjectID != 0)
+			{
+				BOX_TRACE("Storing uploaded file ID " <<
+					inodeNum << " (" << nonVssFilePath << ") "
+					"in ID map as object " <<
+					latestObjectID << " with parent " <<
+					mObjectID);
+				idMap.AddToMap(inodeNum, latestObjectID,
+					mObjectID /* containing directory */,
+					nonVssFilePath);
+			}
+
 		}
 
 		if (fileSynced)
