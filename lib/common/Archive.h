@@ -161,7 +161,7 @@ public:
 	void Read(std::string &rItemOut)
 	{
 		int size;
-		Read(size);
+		Read(size, mTimeout);
 
 		// Assume most strings are relatively small
 		char buf[256];
