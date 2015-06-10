@@ -158,10 +158,35 @@ public:
 		Read(privItem);
 		rItemOut = privItem;
 	}
+	void ReadIfPresent(std::string &rItemOut, const std::string& ValueIfNotPresent)
+	{
+		Read(rItemOut, &ValueIfNotPresent);
+	}
 	void Read(std::string &rItemOut)
 	{
+		Read(rItemOut, NULL);
+	}
+private:
+	void Read(std::string &rItemOut, const std::string* pValueIfNotPresent)
+	{
 		int size;
-		Read(size, mTimeout);
+		int bytesRead;
+		if(!mrStream.ReadFullBuffer(&size, sizeof(size), &bytesRead, mTimeout))
+		{
+			if(bytesRead == 0 && pValueIfNotPresent != NULL)
+			{
+				// item is simply not present
+				rItemOut = *pValueIfNotPresent;
+				return;
+			}
+			else
+			{
+				// bad number of remaining bytes
+				THROW_EXCEPTION(CommonException,
+					ArchiveBlockIncompleteRead)
+			}
+		}
+		size = ntohl(size);
 
 		// Assume most strings are relatively small
 		char buf[256];
