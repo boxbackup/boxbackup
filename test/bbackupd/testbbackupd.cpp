@@ -515,11 +515,12 @@ bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
 	catch (BoxException &e) \
 	{ \
 		BOX_NOTICE(__FUNCTION__ << " errored: " << e.what()); \
+		failures++; \
 		bool status = teardown_test_bbackupd(__FUNCTION__, old_failure_count); \
 		s_test_status[__FUNCTION__] = "ERRORED"; \
 		return status; \
 	}
-		
+
 
 bool test_basics()
 {
