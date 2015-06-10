@@ -715,6 +715,7 @@ std::string Logging::OptionParser::GetUsageString()
 {
 	return
 	"  -L <file>  Filter out log messages except from specified file, can repeat\n"
+	"             (for example, -L " __FILE__ ")\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
