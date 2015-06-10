@@ -134,8 +134,8 @@ void Daemon::Usage()
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
 	"  -K         Stop writing log messages to console while daemon is running\n"
 	"  -o <file>  Log to a file, defaults to maximum verbosity\n"
-	"  -O <level> Set file log verbosity to error/warning/notice/info/trace/everything\n" <<
-	Logging::OptionParser::GetUsageString();
+	"  -O <level> Set file log verbosity to error/warning/notice/info/trace/everything\n"
+	<< Logging::OptionParser::GetUsageString();
 }
 
 // --------------------------------------------------------------------------

@@ -15,11 +15,11 @@ lib/server		qdbm	lib/crypto
 lib/compress
 lib/intercept
 
-test/common
-test/crypto		lib/crypto
-test/compress		lib/compress
-test/raidfile		lib/raidfile	lib/intercept
-test/basicserver	lib/server
+test/common		qdbm
+test/crypto		qdbm	lib/crypto
+test/compress		qdbm	lib/compress
+test/raidfile		qdbm	lib/raidfile	lib/intercept
+test/basicserver	qdbm	lib/server
 
 # IF_DISTRIBUTION(boxbackup)
 

@@ -41,10 +41,12 @@
 #endif
 
 #include <exception>
+#include <iostream>
 #include <list>
 #include <string>
 
 #include "box_getopt.h"
+#include "depot.h"
 #include "Logging.h"
 #include "Test.h"
 #include "Timer.h"
@@ -237,6 +239,23 @@ bool checkfilesleftopen()
 
 #endif
 
+int Usage(const std::string& ProgramName)
+{
+	std::cout << 
+	"(built with QDBM " << dpversion << ")\n"
+	"\n"
+	"Usage: " << ProgramName << " [options]\n"
+	"\n"
+	"Options:\n"
+	"  -c/--bbackupd-args <args>     Arguments to pass to bbackupd/BackupDaemon\n"
+	"  -s/--bbstored-args <args>     Arguments to pass to bbstored/BackupStoreDaemon\n"
+	"  -d/--test-daemon-args <args>  Arguments to pass to TestDaemon\n"
+	"  -e/--execute-only <test>      Execute only specific named test, can repeat\n"
+	"  -h/--help                     Show this command-line help\n"
+	<< Logging::OptionParser::GetUsageString();
+	return 0;
+}
+
 int main(int argc, char * const * argv)
 {
 	// Start memory leak testing
@@ -250,11 +269,12 @@ int main(int argc, char * const * argv)
 		{ "bbstored-args",	required_argument, NULL, 's' },
 		{ "test-daemon-args",	required_argument, NULL, 'd' },
 		{ "execute-only",	required_argument, NULL, 'e' },
+		{ "help",		no_argument, NULL,       'h' },
 		{ NULL,			0,                 NULL,  0  }
 	};
 
 	int c;
-	std::string options("c:d:e:s:");
+	std::string options("c:d:e:hs:");
 	options += Logging::OptionParser::GetOptionString();
 	Logging::OptionParser LogLevel;
 
@@ -286,6 +306,12 @@ int main(int argc, char * const * argv)
 			case 'e':
 			{
 				run_only_named_tests.push_back(optarg);
+			}
+			break;
+
+			case 'h':
+			{
+				return Usage(argv[0]);
 			}
 			break;
 
