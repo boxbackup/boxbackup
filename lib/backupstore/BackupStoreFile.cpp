@@ -1589,7 +1589,7 @@ int64_t BackupStoreFile::QueryStoreFileDiff(BackupProtocolCallable& protocol,
 	else
 	{
 		pStream = BackupStoreFile::EncodeFile(LocalFilename,
-			DirectoryObjectID, StoreFilename);
+			DirectoryObjectID, StoreFilename, &ModificationTime);
 	}
 
 	std::auto_ptr<IOStream> upload(pStream.release());
