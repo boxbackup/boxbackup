@@ -209,28 +209,6 @@ void BackupStoreAccounts::LockAccount(int32_t ID, NamedLock& rNamedLock)
 	}
 }
 
-BackupStoreAccountsControl::BackupStoreAccountsControl(
-	const Configuration& config, bool machineReadableOutput)
-: mConfig(config),
-  mMachineReadableOutput(machineReadableOutput)
-{ }
-
-void BackupStoreAccountsControl::CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
-{
-	if(SoftLimit > HardLimit)
-	{
-		BOX_FATAL("Soft limit must be less than the hard limit.");
-		exit(1);
-	}
-	if(SoftLimit > ((HardLimit * MAX_SOFT_LIMIT_SIZE) / 100))
-	{
-		BOX_WARNING("We recommend setting the soft limit below " <<
-			MAX_SOFT_LIMIT_SIZE << "% of the hard limit, or " <<
-			HumanReadableSize((HardLimit * MAX_SOFT_LIMIT_SIZE)
-				/ 100) << " in this case.");
-	}
-}
-
 int BackupStoreAccountsControl::BlockSizeOfDiscSet(int discSetNum)
 {
 	// Get controller, check disc set number
@@ -243,57 +221,6 @@ int BackupStoreAccountsControl::BlockSizeOfDiscSet(int discSetNum)
 	
 	// Return block size
 	return controller.GetDiscSet(discSetNum).GetBlockSize();
-}
-
-std::string BackupStoreAccountsControl::BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int discSetNum)
-{
-	return FormatUsageBar(Blocks, Blocks * BlockSizeOfDiscSet(discSetNum),
-		MaxBlocks * BlockSizeOfDiscSet(discSetNum),
-		mMachineReadableOutput);
-}
-
-int64_t BackupStoreAccountsControl::SizeStringToBlocks(const char *string, int discSetNum)
-{
-	// Find block size
-	int blockSize = BlockSizeOfDiscSet(discSetNum);
-	
-	// Get number
-	char *endptr = (char*)string;
-	int64_t number = strtol(string, &endptr, 0);
-	if(endptr == string || number == LONG_MIN || number == LONG_MAX)
-	{
-		BOX_FATAL("'" << string << "' is not a valid number.");
-		exit(1);
-	}
-	
-	// Check units
-	switch(*endptr)
-	{
-	case 'M':
-	case 'm':
-		// Units: Mb
-		return (number * 1024*1024) / blockSize;
-		break;
-		
-	case 'G':
-	case 'g':
-		// Units: Gb
-		return (number * 1024*1024*1024) / blockSize;
-		break;
-		
-	case 'B':
-	case 'b':
-		// Units: Blocks
-		// Easy! Just return the number specified.
-		return number;
-		break;
-	
-	default:
-		BOX_FATAL(string << " has an invalid units specifier "
-			"(use B for blocks, M for MB, G for GB, eg 2GB)");
-		exit(1);
-		break;		
-	}
 }
 
 int BackupStoreAccountsControl::SetLimit(int32_t ID, const char *SoftLimitStr,
@@ -316,8 +243,9 @@ int BackupStoreAccountsControl::SetLimit(int32_t ID, const char *SoftLimitStr,
 		discSetNum, false /* Read/Write */));
 
 	// Change the limits
-	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, discSetNum);
-	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, discSetNum);
+	int blocksize = BlockSizeOfDiscSet(discSetNum);
+	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, blocksize);
+	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, blocksize);
 	CheckSoftHardLimits(softlimit, hardlimit);
 	info->ChangeLimits(softlimit, hardlimit);
 	
@@ -377,50 +305,9 @@ int BackupStoreAccountsControl::PrintAccountInfo(int32_t ID)
 	// Load it in
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID,
 		rootDir, discSetNum, true /* ReadOnly */));
-	
-	// Then print out lots of info
-	std::cout << FormatUsageLineStart("Account ID", mMachineReadableOutput) <<
-		BOX_FORMAT_ACCOUNT(ID) << std::endl;
-	std::cout << FormatUsageLineStart("Account Name", mMachineReadableOutput) <<
-		info->GetAccountName() << std::endl;
-	std::cout << FormatUsageLineStart("Last object ID", mMachineReadableOutput) <<
-		BOX_FORMAT_OBJECTID(info->GetLastObjectIDUsed()) << std::endl;
-	std::cout << FormatUsageLineStart("Used", mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksUsed(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Current files",
-			mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksInCurrentFiles(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Old files", mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksInOldFiles(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Deleted files", mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksInDeletedFiles(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Directories", mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksInDirectories(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Soft limit", mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksSoftLimit(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Hard limit", mMachineReadableOutput) <<
-		BlockSizeToString(info->GetBlocksHardLimit(),
-			info->GetBlocksHardLimit(), discSetNum) << std::endl;
-	std::cout << FormatUsageLineStart("Client store marker", mMachineReadableOutput) <<
-		info->GetClientStoreMarker() << std::endl;
-	std::cout << FormatUsageLineStart("Current Files", mMachineReadableOutput) <<
-		info->GetNumCurrentFiles() << std::endl;
-	std::cout << FormatUsageLineStart("Old Files", mMachineReadableOutput) <<
-		info->GetNumOldFiles() << std::endl;
-	std::cout << FormatUsageLineStart("Deleted Files", mMachineReadableOutput) <<
-		info->GetNumDeletedFiles() << std::endl;
-	std::cout << FormatUsageLineStart("Directories", mMachineReadableOutput) <<
-		info->GetNumDirectories() << std::endl;
-	std::cout << FormatUsageLineStart("Enabled", mMachineReadableOutput) <<
-		(info->IsAccountEnabled() ? "yes" : "no") << std::endl;
-	
-	return 0;
+
+	return BackupAccountControl::PrintAccountInfo(*info,
+		BlockSizeOfDiscSet(discSetNum));
 }
 
 int BackupStoreAccountsControl::SetAccountEnabled(int32_t ID, bool enabled)

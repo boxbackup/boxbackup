@@ -13,6 +13,7 @@
 #include <string>
 
 #include "BackupStoreAccountDatabase.h"
+#include "BackupAccountControl.h"
 #include "NamedLock.h"
 
 // --------------------------------------------------------------------------
@@ -54,20 +55,14 @@ private:
 class Configuration;
 class UnixUser;
 
-class BackupStoreAccountsControl
+class BackupStoreAccountsControl : public BackupAccountControl
 {
-private:
-	const Configuration& mConfig;
-	bool mMachineReadableOutput;
-
 public:
 	BackupStoreAccountsControl(const Configuration& config,
-		bool machineReadableOutput = false);
-
-	void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit);
+		bool machineReadableOutput = false)
+	: BackupAccountControl(config, machineReadableOutput)
+	{ }
 	int BlockSizeOfDiscSet(int discSetNum);
-	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int discSetNum);
-	int64_t SizeStringToBlocks(const char *string, int discSetNum);
 	bool OpenAccount(int32_t ID, std::string &rRootDirOut,
 		int &rDiscSetOut, std::auto_ptr<UnixUser> apUser, NamedLock* pLock);
 	int SetLimit(int32_t ID, const char *SoftLimitStr,

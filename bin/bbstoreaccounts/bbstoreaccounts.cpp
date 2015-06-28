@@ -177,8 +177,9 @@ int main(int argc, const char *argv[])
 		}
 		
 		// Decode limits
-		softlimit = control.SizeStringToBlocks(argv[3], discnum);
-		hardlimit = control.SizeStringToBlocks(argv[4], discnum);
+		int blocksize = control.BlockSizeOfDiscSet(discnum);
+		softlimit = control.SizeStringToBlocks(argv[3], blocksize);
+		hardlimit = control.SizeStringToBlocks(argv[4], blocksize);
 		control.CheckSoftHardLimits(softlimit, hardlimit);
 	
 		// Create the account...

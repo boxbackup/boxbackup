@@ -25,7 +25,7 @@ test/basicserver	qdbm	lib/server
 
 # Backup system
 
-lib/backupstore		lib/server	lib/raidfile	lib/crypto	lib/compress
+lib/backupstore		lib/server	lib/raidfile	lib/crypto	lib/compress	lib/httpserver
 lib/backupclient	lib/backupstore
 
 bin/bbackupobjdump	lib/backupclient lib/backupstore
