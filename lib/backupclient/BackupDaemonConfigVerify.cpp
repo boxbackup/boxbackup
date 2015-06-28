@@ -45,13 +45,30 @@ static const ConfigurationVerifyKey verifyserverkeys[] =
 	DAEMON_VERIFY_SERVER_KEYS
 };
 
-static const ConfigurationVerify verifyserver[] = 
+static const ConfigurationVerifyKey verifys3keys[] =
+{
+	// These values are only required for Amazon S3-compatible stores
+	ConfigurationVerifyKey("BucketName", 0),
+	ConfigurationVerifyKey("Port", ConfigTest_IsInt, 80),
+	ConfigurationVerifyKey("BasePath", 0),
+	ConfigurationVerifyKey("AccessKey", 0),
+	ConfigurationVerifyKey("SecretKey", ConfigTest_LastEntry)
+};
+
+static const ConfigurationVerify verifyserver[] =
 {
 	{
 		"Server",
 		0,
 		verifyserverkeys,
 		ConfigTest_Exists,
+		0
+	},
+	{
+		"S3Store",
+		0,
+		verifys3keys,
+		0,
 		0
 	},
 	{
