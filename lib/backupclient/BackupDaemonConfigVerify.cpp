@@ -16,7 +16,7 @@
 #include "MemLeakFindOn.h"
 
 
-static const ConfigurationVerifyKey backuplocationkeys[] = 
+static const ConfigurationVerifyKey backuplocationkeys[] =
 {
 	ConfigurationVerifyKey("ExcludeFile", ConfigTest_MultiValueAllowed),
 	ConfigurationVerifyKey("ExcludeFilesRegex", ConfigTest_MultiValueAllowed),
@@ -29,7 +29,7 @@ static const ConfigurationVerifyKey backuplocationkeys[] =
 	ConfigurationVerifyKey("Path", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
-static const ConfigurationVerify backuplocations[] = 
+static const ConfigurationVerify backuplocations[] =
 {
 	{
 		"*",
@@ -40,7 +40,7 @@ static const ConfigurationVerify backuplocations[] =
 	}
 };
 
-static const ConfigurationVerifyKey verifyserverkeys[] = 
+static const ConfigurationVerifyKey verifyserverkeys[] =
 {
 	DAEMON_VERIFY_SERVER_KEYS
 };
@@ -63,7 +63,7 @@ static const ConfigurationVerify verifyserver[] =
 	}
 };
 
-static const ConfigurationVerifyKey verifyrootkeys[] = 
+static const ConfigurationVerifyKey verifyrootkeys[] =
 {
 	ConfigurationVerifyKey("AccountNumber",
 		ConfigTest_Exists | ConfigTest_IsUint32),
@@ -92,9 +92,6 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("DiffingUploadSizeThreshold",
 		ConfigTest_Exists | ConfigTest_IsInt),
-	ConfigurationVerifyKey("StoreHostname", ConfigTest_Exists),
-	ConfigurationVerifyKey("StorePort", ConfigTest_IsInt,
-		BOX_PORT_BBSTORED),
 	ConfigurationVerifyKey("ExtendedLogging", ConfigTest_IsBool, false),
 	// extended log to syslog
 	ConfigurationVerifyKey("ExtendedLogFile", 0),
@@ -125,13 +122,16 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("TcpNice", ConfigTest_IsBool, false),
 	// optional enable of tcp nice/background mode
 
-	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists),
-	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists),
-	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists),
 	ConfigurationVerifyKey("KeysFile", ConfigTest_Exists),
-	ConfigurationVerifyKey("DataDirectory", 
-		ConfigTest_Exists | ConfigTest_LastEntry),
+	ConfigurationVerifyKey("DataDirectory", ConfigTest_Exists),
 
+	// These values are only required for bbstored stores:
+	ConfigurationVerifyKey("StoreHostname", 0),
+	ConfigurationVerifyKey("StorePort", ConfigTest_IsInt,
+		BOX_PORT_BBSTORED),
+	ConfigurationVerifyKey("CertificateFile", 0),
+	ConfigurationVerifyKey("PrivateKeyFile", 0),
+	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_LastEntry),
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =

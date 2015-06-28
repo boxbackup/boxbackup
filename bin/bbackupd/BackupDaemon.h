@@ -187,10 +187,8 @@ private:
 	
 	void DeleteUnusedRootDirEntries(BackupClientContext &rContext);
 
-#ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 	// For warning user about potential security hole
 	virtual void SetupInInitialProcess();
-#endif
 
 	int UseScriptToSeeIfSyncAllowed();
 

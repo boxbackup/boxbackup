@@ -321,7 +321,6 @@ const ConfigurationVerify *BackupDaemon::GetConfigVerify() const
 	return &BackupDaemonConfigVerify;
 }
 
-#ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 // --------------------------------------------------------------------------
 //
 // Function
@@ -334,6 +333,36 @@ const ConfigurationVerify *BackupDaemon::GetConfigVerify() const
 // --------------------------------------------------------------------------
 void BackupDaemon::SetupInInitialProcess()
 {
+	const Configuration& config(GetConfiguration());
+
+	// These keys may or may not be required, depending on the configured
+	// store type (e.g. not when using Amazon S3 stores), so they can't be
+	// verified by BackupDaemonConfigVerify.
+	std::vector<std::string> requiredKeys;
+	requiredKeys.push_back("StoreHostname");
+	requiredKeys.push_back("CertificateFile");
+	requiredKeys.push_back("PrivateKeyFile");
+	requiredKeys.push_back("TrustedCAsFile");
+	bool missingRequiredKeys = false;
+
+	for(std::vector<std::string>::const_iterator i = requiredKeys.begin();
+		i != requiredKeys.end(); i++)
+	{
+		if(!config.KeyExists(*i))
+		{
+			BOX_ERROR("Missing required configuration key: " << *i);
+			missingRequiredKeys = true;
+		}
+	}
+
+	if(missingRequiredKeys)
+	{
+		THROW_EXCEPTION_MESSAGE(ClientException, InvalidConfiguration,
+			"Some required configuration keys are missing in " <<
+			GetConfigFileName());
+	}
+
+#ifdef PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 	// Print a warning on this platform if the CommandSocket is used.
 	if(GetConfiguration().KeyExists("CommandSocket"))
 	{
@@ -346,8 +375,8 @@ void BackupDaemon::SetupInInitialProcess()
 			"==============================================================================\n"
 			);
 	}
-}
 #endif
+}
 
 
 // --------------------------------------------------------------------------

@@ -376,17 +376,17 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 		BOX_ERROR("Failed to load or verify configuration file");
 		return false;
 	}
-	
+
 	if(!Configure(*apConfig))
 	{
 		BOX_ERROR("Failed to verify configuration file");
-		return false;		
+		return false;
 	}
-	
+
 	// Store configuration
 	mConfigFileName = rConfigFileName;
 	mLoadedConfigModifiedTime = GetConfigFileModifiedTime();
-		
+
 	return true;
 }
 
@@ -416,14 +416,14 @@ bool Daemon::Configure(const Configuration& rConfig)
 		BOX_ERROR("Configuration errors: " << errors);
 		return false;
 	}
-	
+
 	// Store configuration
 	mapConfiguration = apConf;
-	
+
 	// Let the derived class have a go at setting up stuff
 	// in the initial process
 	SetupInInitialProcess();
-		
+
 	return true;
 }
 
