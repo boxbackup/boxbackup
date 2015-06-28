@@ -1,4 +1,4 @@
-link-extra: ../../bin/bbackupd/autogen_ClientException.o \
+link-extra: \
 	../../bin/bbackupd/BackupClientContext.o \
 	../../bin/bbackupd/BackupClientDeleteList.o \
 	../../bin/bbackupd/BackupClientDirectoryRecord.o \
