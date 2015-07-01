@@ -140,6 +140,35 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 #define UNLINK_IF_EXISTS(filename) \
 	if (FileExists(filename)) { TEST_THAT(unlink(filename) == 0); }
 
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP_TEST_BACKUPSTORE() \
+	SETUP(); \
+	if (ServerIsAlive(bbstored_pid)) \
+		TEST_THAT_OR(StopServer(), FAIL); \
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1); \
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1); \
+	TEST_THAT_OR(create_account(10000, 20000), FAIL);
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_backupstore()
+{
+	bool status = true;
+
+	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
+	{
+		TEST_THAT_OR(check_reference_counts(), status = false);
+		TEST_THAT_OR(check_account(), status = false);
+	}
+
+	return status;
+}
+
+#define TEARDOWN_TEST_BACKUPSTORE() \
+	if (ServerIsAlive(bbstored_pid)) \
+		StopServer(); \
+	TEST_THAT(teardown_test_backupstore()); \
+	TEARDOWN();
+
 // Nice random data for testing written files
 class R250 {
 public:
@@ -239,36 +268,9 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
 }
 
-int num_tests_selected = 0;
-
-//! Simplifies calling setUp() with the current function name in each test.
-#define SETUP() \
-	if (!setUp(__FUNCTION__)) return true; \
-	num_tests_selected++;
-
-//! Checks account for errors and shuts down daemons at end of every test.
-bool teardown_test_backupstore()
-{
-	bool status = tearDown();
-
-	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
-	{
-		TEST_THAT_OR(check_reference_counts(), status = false);
-		TEST_THAT_OR(check_account(), status = false);
-	}
-
-	return status;
-}
-
-#define FAIL { \
-	std::ostringstream os; \
-	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
-	return fail(); \
-}
-
 bool test_filename_encoding()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	// test some basics -- encoding and decoding filenames
 	{
@@ -349,12 +351,12 @@ bool test_filename_encoding()
 		}
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_backupstore_directory()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	{
 		// Now play with directories
@@ -435,7 +437,7 @@ bool test_backupstore_directory()
 		}
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 void write_test_file(int t)
@@ -798,7 +800,7 @@ bool run_housekeeping_and_check_account(BackupProtocolLocal2& protocol)
 
 bool test_temporary_refcount_db_is_independent()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
@@ -826,12 +828,12 @@ bool test_temporary_refcount_db_is_independent()
 	// test failure.
 	perm.reset();
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_server_housekeeping()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	int encfile[ENCFILE_SIZE];
 	{
@@ -1161,7 +1163,7 @@ bool test_server_housekeeping()
 	TEST_THAT(run_housekeeping_and_check_account());
 
 	ExpectedRefCounts.resize(3); // stop test failure in teardown_test_backupstore()
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
@@ -1239,7 +1241,7 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 
 bool test_multiple_uploads()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 	TEST_THAT_OR(StartServer(), FAIL);
 
 	std::auto_ptr<BackupProtocolCallable> apProtocol =
@@ -1512,12 +1514,12 @@ bool test_multiple_uploads()
 	apProtocol->QueryFinished();
 	protocolReadOnly.QueryFinished();
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_server_commands()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	std::auto_ptr<BackupProtocolLocal2> apProtocol(
 		new BackupProtocolLocal2(0x01234567, "test",
@@ -1971,7 +1973,7 @@ bool test_server_commands()
 		TEST_THAT(check_reference_counts());
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
@@ -2004,7 +2006,7 @@ bool write_dir(BackupStoreDirectory& dir)
 
 bool test_directory_parent_entry_tracks_directory_size()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
 		0, false);
@@ -2163,12 +2165,12 @@ bool test_directory_parent_entry_tracks_directory_size()
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 	protocolReadOnly.QueryFinished();
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_cannot_open_multiple_writable_connections()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	// First try a local protocol. This works even on Windows.
 	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
@@ -2207,7 +2209,7 @@ bool test_cannot_open_multiple_writable_connections()
 	}
 
 	protocolWritable.QueryFinished();
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_encoding()
@@ -2216,7 +2218,7 @@ bool test_encoding()
 	// TODO: This test needs to check failure situations as well as everything working,
 	// but this will be saved for the full implementation.
 
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	int encfile[ENCFILE_SIZE];
 	{
@@ -2367,13 +2369,13 @@ bool test_encoding()
 		}
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_symlinks()
 {
 #ifndef WIN32 // no symlinks on Win32
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	// TODO FIXME indentation
 
@@ -2397,12 +2399,12 @@ bool test_symlinks()
 	teardown_test_backupstore();
 #endif
 
-	return true;
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_store_info()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	{
 		RaidFileWrite::CreateDirectory(0, "test-info");
@@ -2451,14 +2453,14 @@ bool test_store_info()
 		TEST_THAT(delfiles[1] == 4);
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_login_without_account()
 {
 	// First, try logging in without an account having been created... just make sure login fails.
 
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 	delete_account();
 	TEST_THAT_OR(StartServer(), FAIL);
 
@@ -2482,12 +2484,12 @@ bool test_login_without_account()
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
 	// TEST_THAT_THROWONFAIL(create_account(10000, 20000));
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_bbstoreaccounts_create()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	// Delete the account, and create it again using bbstoreaccounts
 	delete_account();
@@ -2497,12 +2499,12 @@ bool test_bbstoreaccounts_create()
 		"10000B 20000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_bbstoreaccounts_delete()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf -Wwarning delete 01234567 yes") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
@@ -2510,13 +2512,13 @@ bool test_bbstoreaccounts_delete()
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
 	TEST_THAT(create_account(10000, 20000));
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 // Test that login fails on a disabled account
 bool test_login_with_disabled_account()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 	TEST_THAT_OR(StartServer(), FAIL);
 
 	TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
@@ -2557,12 +2559,12 @@ bool test_login_with_disabled_account()
 		protocol.QueryFinished();
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_login_with_no_refcount_db()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	// The account is already enabled, but doing it again shouldn't hurt
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
@@ -2612,14 +2614,14 @@ bool test_login_with_no_refcount_db()
 	// And that we can log in afterwards
 	connect_and_login(context)->QueryFinished();
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_housekeeping_deletes_files()
 {
 	// Test the deletion of objects by the housekeeping system
 
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	BackupProtocolLocal2 protocolLocal(0x01234567, "test",
 		"backup/01234567/", 0, false); // Not read-only
@@ -2669,12 +2671,12 @@ bool test_housekeeping_deletes_files()
 	// catches if we don't delete the account.
 	delete_account();
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 bool test_account_limits_respected()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 	TEST_THAT_OR(StartServer(), FAIL);
 
 	// Set a really small hard limit
@@ -2717,7 +2719,7 @@ bool test_account_limits_respected()
 		apProtocol->QueryFinished();
 	}
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 int multi_server()
@@ -2858,7 +2860,7 @@ void compare_backupstoreinfo_values_to_expected
 
 bool test_read_old_backupstoreinfo_files()
 {
-	SETUP();
+	SETUP_TEST_BACKUPSTORE();
 
 	// Create an account for the test client
 	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
@@ -3060,7 +3062,7 @@ bool test_read_old_backupstoreinfo_files()
 	apInfo.reset();
 	TEST_THAT(delete_account());
 
-	return teardown_test_backupstore();
+	TEARDOWN_TEST_BACKUPSTORE();
 }
 
 int test(int argc, const char *argv[])
@@ -3130,9 +3132,6 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
 
-	TEST_LINE(num_tests_selected > 0, "No tests matched the patterns "
-		"specified on the command line");
-
-	return (failures == 0 && num_tests_selected > 0) ? 0 : 1;
+	return finish_test_suite();
 }
 

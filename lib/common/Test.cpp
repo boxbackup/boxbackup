@@ -24,6 +24,122 @@
 #include "BoxTime.h"
 #include "Test.h"
 
+int num_tests_selected = 0;
+int num_failures = 0;
+int old_failure_count = 0;
+int first_fail_line;
+std::string original_working_dir;
+std::string first_fail_file;
+std::string current_test_name;
+std::list<std::string> run_only_named_tests;
+std::map<std::string, std::string> s_test_status;
+
+bool setUp(const char* function_name)
+{
+	current_test_name = function_name;
+
+	if (!run_only_named_tests.empty())
+	{
+		bool run_this_test = false;
+
+		for (std::list<std::string>::iterator
+			i = run_only_named_tests.begin();
+			i != run_only_named_tests.end(); i++)
+		{
+			if (*i == current_test_name)
+			{
+				run_this_test = true;
+				break;
+			}
+		}
+		
+		if (!run_this_test)
+		{
+			// not in the list, so don't run it.
+			return false;
+		}
+	}
+
+	printf("\n\n== %s ==\n", function_name);
+	num_tests_selected++;
+	old_failure_count = num_failures;
+
+	if (original_working_dir == "")
+	{
+		char buf[1024];
+		if (getcwd(buf, sizeof(buf)) == NULL)
+		{
+			BOX_LOG_SYS_ERROR("getcwd");
+		}
+		original_working_dir = buf;
+	}
+	else
+	{
+		if (chdir(original_working_dir.c_str()) != 0)
+		{
+			BOX_LOG_SYS_ERROR("chdir");
+		}
+	}
+
+	TEST_THAT_THROWONFAIL(system(
+		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
+		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
+		"testfiles/file* testfiles/notifyran testfiles/notifyran.* "
+		"testfiles/notifyscript.tag* "
+		"testfiles/restore* testfiles/bbackupd-data "
+		"testfiles/syncallowscript.control "
+		"testfiles/syncallowscript.notifyran.* "
+		"testfiles/test2.downloaded"
+		) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
+	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
+
+	return true;
+}
+
+bool tearDown()
+{
+	if (num_failures == old_failure_count)
+	{
+		BOX_NOTICE(current_test_name << " passed");
+		s_test_status[current_test_name] = "passed";
+		return true;
+	}
+	else
+	{
+		BOX_NOTICE(current_test_name << " failed"); \
+		s_test_status[current_test_name] = "FAILED";
+		return false;
+	}
+}
+
+bool fail()
+{
+	num_failures++;
+	return tearDown();
+}
+
+int finish_test_suite()
+{
+	printf("\n");
+	printf("Test results:\n");
+
+	typedef std::map<std::string, std::string>::iterator s_test_status_iterator;
+	for(s_test_status_iterator i = s_test_status.begin();
+		i != s_test_status.end(); i++)
+	{
+		BOX_NOTICE("test result: " << i->second << ": " << i->first);
+	}
+
+	TEST_LINE(num_tests_selected > 0, "No tests matched the patterns "
+		"specified on the command line");
+
+	return (num_failures == 0 && num_tests_selected > 0) ? 0 : 1;
+}
+
 bool TestFileExists(const char *Filename)
 {
 	EMU_STRUCT_STAT st;
@@ -287,12 +403,12 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 	// Does the file exist?
 	if(!TestFileExists(filename))
 	{
-		if (failures == 0)
+		if (num_failures == 0)
 		{
 			first_fail_file = file;
 			first_fail_line = line;
 		}
-		++failures;
+		++num_failures;
 		printf("FAILURE: MemLeak report not available (file %s) "
 			"at %s:%d\n", filename, file, line);
 	}
@@ -301,12 +417,12 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 		// Is it empty?
 		if(TestGetFileSize(filename) > 0)
 		{
-			if (failures == 0)
+			if (num_failures == 0)
 			{
 				first_fail_file = file;
 				first_fail_line = line;
 			}
-			++failures;
+			++num_failures;
 			printf("FAILURE: Memory leaks found in other process "
 				"(file %s) at %s:%d\n==========\n", 
 				filename, file, line);

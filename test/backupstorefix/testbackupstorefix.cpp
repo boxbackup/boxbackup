@@ -582,8 +582,6 @@ int test(int argc, const char *argv[])
 		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) == 0);
 	}
 
-	if (failures > 0) return 1;
-
 	// Generate a list of all the object IDs
 	TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
 		"-c testfiles/bbackupd.conf \"list -R\" quit "

@@ -93,16 +93,6 @@
 #define SHORT_TIMEOUT 5000
 #define BACKUP_ERROR_DELAY_SHORTENED 10
 
-std::string current_test_name;
-std::map<std::string, std::string> s_test_status;
-
-#define FAIL { \
-	std::ostringstream os; \
-	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
-	s_test_status[current_test_name] = os.str(); \
-	return fail(); \
-}
-
 void wait_for_backup_operation(const char* message)
 {
 	wait_for_operation(TIME_TO_WAIT_FOR_BACKUP_OPERATION, message);
@@ -465,66 +455,32 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 	return true;
 }
 
-int num_tests_selected = 0;
-
 //! Simplifies calling setUp() with the current function name in each test.
-#define SETUP() \
-	if (!setUp(__FUNCTION__)) return true; \
-	num_tests_selected++; \
-	int old_failure_count = failures; \
+#define SETUP_TEST_BBACKUPD() \
+	SETUP(); \
 	TEST_THAT(kill_running_daemons()); \
-	try \
-	{ // left open
+	TEST_THAT(create_account(10000, 20000));
 
 #define SETUP_WITHOUT_FILES() \
-	SETUP() \
+	SETUP_TEST_BBACKUPD() \
 	BackupDaemon bbackupd; \
 	TEST_THAT_OR(setup_test_bbackupd(bbackupd, false), FAIL); \
 	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
 
 #define SETUP_WITH_BBSTORED() \
-	SETUP() \
+	SETUP_TEST_BBACKUPD() \
 	BackupDaemon bbackupd; \
 	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
 
-//! Checks account for errors and shuts down daemons at end of every test.
-bool teardown_test_bbackupd(std::string test_name, int old_failure_count)
-{
-	if (failures == old_failure_count)
-	{
-		BOX_NOTICE(test_name << " passed");
-		s_test_status[test_name] = "passed";
-	}
-	else
-	{
-		BOX_NOTICE(test_name << " failed"); \
-		s_test_status[test_name] = "FAILED";
-	}
-
-	if(bbackupd_pid != 0)
-	{
-		TEST_THAT(StopClient());
-	}
-
-	return tearDown();
-}
-
-#define TEARDOWN() \
-		return teardown_test_bbackupd(__FUNCTION__, old_failure_count); \
-	} \
-	catch (BoxException &e) \
-	{ \
-		BOX_NOTICE(__FUNCTION__ << " errored: " << e.what()); \
-		failures++; \
-		bool status = teardown_test_bbackupd(__FUNCTION__, old_failure_count); \
-		s_test_status[__FUNCTION__] = "ERRORED"; \
-		return status; \
-	}
-
+#define TEARDOWN_TEST_BBACKUPD() \
+	TEST_THAT(bbackupd_pid == 0 || StopClient()); \
+	TEST_THAT(bbstored_pid == 0 || StopServer()); \
+	TEST_THAT(kill_running_daemons()); \
+	TEARDOWN();
 
 bool test_basics()
 {
-	SETUP();
+	SETUP_TEST_BBACKUPD();
 	TEST_THAT_OR(unpack_files("test_base"), FAIL);
 
 	// Read attributes from files
@@ -644,7 +600,7 @@ bool test_basics()
 	finish_with_write_xattr_test();
 #endif // HAVE_SYS_XATTR_H
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 int64_t GetDirID(BackupProtocolCallable &protocol, const char *name, int64_t InDirectory)
@@ -1206,7 +1162,7 @@ bool test_readdirectory_on_nonexistent_dir()
 		client->QueryFinished();
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_bbackupquery_parser_escape_slashes()
@@ -1246,7 +1202,7 @@ bool test_bbackupquery_parser_escape_slashes()
 	TEST_EQUAL(bar_id, query.FindDirectoryObjectID("\\/bar"));
 	connection.QueryFinished();
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_getobject_on_nonexistent_file()
@@ -1278,7 +1234,7 @@ bool test_getobject_on_nonexistent_file()
 		}
 	}
 		
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0)) in
@@ -1288,7 +1244,7 @@ bool test_getobject_on_nonexistent_file()
 
 bool test_replace_zero_byte_file_with_nonzero_byte_file()
 {
-	SETUP();
+	SETUP_TEST_BBACKUPD();
 
 	TEST_THAT_OR(mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
 	FileStream emptyFile("testfiles/TestDir1/f2",
@@ -1310,7 +1266,7 @@ bool test_replace_zero_byte_file_with_nonzero_byte_file()
 	bbackupd.RunSyncNow();
 	TEST_COMPARE_LOCAL(Compare_Same, client);
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // This caused the issue reported by Brendon Baumgartner and described in my
@@ -1429,7 +1385,7 @@ bool test_backup_disappearing_directory()
 	clientContext.CloseAnyOpenConnection();
 	TEST_COMPARE(Compare_Same);
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // TODO FIXME check that directory modtimes are backed up by BackupClientDirectoryRecord.
@@ -1441,7 +1397,7 @@ bool test_ssl_keepalives()
 #ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	BOX_NOTICE("Skipping intercept-based KeepAlive tests on this platform");
 #else
-	// Delete the test_base files unpacked by SETUP()
+	// Delete the test_base files unpacked by SETUP_TEST_BBACKUPD()
 	TEST_THAT(::system("rm -r testfiles/TestDir1") == 0);
 	// Unpack spacetest files instead
 	TEST_THAT(::mkdir("testfiles/TestDir1", 0755) == 0);
@@ -1749,7 +1705,7 @@ bool test_ssl_keepalives()
 	}
 #endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_backup_hardlinked_files()
@@ -1782,7 +1738,7 @@ bool test_backup_hardlinked_files()
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_backup_pauses_when_store_is_full()
@@ -1912,7 +1868,7 @@ bool test_backup_pauses_when_store_is_full()
 	wait_for_sync_end();
 	TEST_COMPARE(Compare_Same);
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_bbackupd_exclusions()
@@ -2145,7 +2101,7 @@ bool test_bbackupd_exclusions()
 		}
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_bbackupd_uploads_files()
@@ -2164,12 +2120,12 @@ bool test_bbackupd_uploads_files()
 	// Check that no read error has been reported yet
 	TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_bbackupd_responds_to_connection_failure()
 {
-	SETUP();
+	SETUP_TEST_BBACKUPD();
 	TEST_THAT_OR(unpack_files("test_base"), FAIL);
 
 #ifdef WIN32
@@ -2262,7 +2218,7 @@ bool test_bbackupd_responds_to_connection_failure()
 	}
 #endif // !WIN32
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_absolute_symlinks_not_followed_during_restore()
@@ -2345,7 +2301,7 @@ bool test_absolute_symlinks_not_followed_during_restore()
 	}
 #endif
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Testing that nonexistent locations are backed up if they are created later
@@ -2401,7 +2357,7 @@ bool test_initially_missing_locations_are_not_forgotten()
 
 	// BLOCK
 	TEST_THAT_OR(search_for_file("Test2"), FAIL);
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_redundant_locations_deleted_on_time()
@@ -2447,7 +2403,7 @@ bool test_redundant_locations_deleted_on_time()
 		TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Check that read-only directories and their contents can be restored.
@@ -2502,7 +2458,7 @@ bool test_read_only_dirs_can_be_restored()
 		}
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Check that filenames in UTF-8 can be backed up
@@ -2739,7 +2695,7 @@ bool test_unicode_filenames_can_be_backed_up()
 	}
 #endif // WIN32
 	
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_sync_allow_script_can_pause_backup()
@@ -2841,7 +2797,7 @@ bool test_sync_allow_script_can_pause_backup()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Delete file and update another, create symlink.
@@ -2890,7 +2846,7 @@ bool test_delete_update_and_symlink_files()
 		TEST_COMPARE(Compare_Same, "", "-acqQ");
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Check that store errors are reported neatly. This test uses an independent
@@ -3090,7 +3046,7 @@ bool test_store_error_reporting()
 		TEST_THAT(::unlink("testfiles/notifyscript.tag") == 0);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_change_file_to_symlink_and_back()
@@ -3194,7 +3150,7 @@ bool test_change_file_to_symlink_and_back()
 		TEST_COMPARE(Compare_Same);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_file_rename_tracking()
@@ -3290,7 +3246,7 @@ bool test_file_rename_tracking()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Files that suddenly appear, with timestamps before the last sync window,
@@ -3368,14 +3324,13 @@ bool test_upload_very_old_files()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_excluded_files_are_not_backed_up()
 {
 	// SETUP_WITH_BBSTORED();
-
-	SETUP()
+	SETUP_TEST_BBACKUPD();
 
 	BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/",
 		0, false);
@@ -3439,7 +3394,7 @@ bool test_excluded_files_are_not_backed_up()
 		}
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_read_error_reporting()
@@ -3499,7 +3454,7 @@ bool test_read_error_reporting()
 	}
 #endif
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_continuously_updated_file()
@@ -3558,7 +3513,7 @@ bool test_continuously_updated_file()
 		}
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_delete_dir_change_attribute()
@@ -3584,7 +3539,7 @@ bool test_delete_dir_change_attribute()
 		TEST_COMPARE(Compare_Same);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_restore_files_and_directories()
@@ -3673,7 +3628,7 @@ bool test_restore_files_and_directories()
 		TEST_COMPARE(Compare_Same);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_compare_detects_attribute_changes()
@@ -3741,7 +3696,7 @@ bool test_compare_detects_attribute_changes()
 	}
 #endif // WIN32
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_sync_new_files()
@@ -3770,7 +3725,7 @@ bool test_sync_new_files()
 		TEST_COMPARE(Compare_Same);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_rename_operations()
@@ -3804,7 +3759,7 @@ bool test_rename_operations()
 		TEST_COMPARE(Compare_Same);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Check that modifying files with madly in the future timestamps still get added
@@ -3839,7 +3794,7 @@ bool test_sync_files_with_timestamps_in_future()
 		TEST_COMPARE(Compare_Same);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 // Check change of store marker pauses daemon
@@ -3959,7 +3914,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 		BOX_TRACE("Compare finished, expected no differences");
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_interrupted_restore_can_be_recovered()
@@ -4021,7 +3976,7 @@ bool test_interrupted_restore_can_be_recovered()
 	}
 #endif // !WIN32
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool assert_x1_deleted_or_not(bool expected_deleted)
@@ -4099,7 +4054,7 @@ bool test_restore_deleted_files()
 	// should have been undeleted by restore
 	TEST_THAT(assert_x1_deleted_or_not(false));
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_locked_file_behaviour()
@@ -4158,7 +4113,7 @@ bool test_locked_file_behaviour()
 	}
 #endif // WIN32
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_backup_many_files()
@@ -4174,12 +4129,12 @@ bool test_backup_many_files()
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_parse_incomplete_command()
 {
-	SETUP();
+	SETUP_TEST_BBACKUPD();
 
 	{
 		// This is not a complete command, it should not parse!
@@ -4189,12 +4144,12 @@ bool test_parse_incomplete_command()
 		TEST_EQUAL(0, cmd.mCompleteArgCount);
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 bool test_parse_syncallowscript_output()
 {
-	SETUP();
+	SETUP_TEST_BBACKUPD();
 
 	{
 		BackupDaemon daemon;
@@ -4209,7 +4164,7 @@ bool test_parse_syncallowscript_output()
 		TEST_EQUAL(0, daemon.GetMaxBandwidthFromSyncAllowScript());
 	}
 
-	TEARDOWN();
+	TEARDOWN_TEST_BBACKUPD();
 }
 
 int test(int argc, const char *argv[])
@@ -4278,12 +4233,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_parse_incomplete_command());
 	TEST_THAT(test_parse_syncallowscript_output());
 
-	typedef std::map<std::string, std::string>::iterator s_test_status_iterator;
-	for(s_test_status_iterator i = s_test_status.begin();
-		i != s_test_status.end(); i++)
-	{
-		BOX_NOTICE("test result: " << i->second << ": " << i->first);
-	}
+	TEST_THAT(kill_running_daemons());
 
 #ifndef WIN32
 	if(::getuid() == 0)
@@ -4292,9 +4242,5 @@ int test(int argc, const char *argv[])
 	}
 #endif
 
-	TEST_LINE(num_tests_selected > 0, "No tests matched the patterns "
-		"specified on the command line");
-	TEST_THAT(kill_running_daemons());
-
-	return (failures == 0 && num_tests_selected > 0) ? 0 : 1;
+	return finish_test_suite();
 }

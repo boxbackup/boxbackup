@@ -12,6 +12,7 @@
 
 #include <cstring>
 #include <list>
+#include <map>
 
 #ifdef WIN32
 #define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
@@ -29,20 +30,48 @@
 #define TEST_RETURN(actual, expected) TEST_EQUAL((expected << 8), actual);
 #endif
 
-extern int failures;
+extern int num_failures;
 extern int first_fail_line;
 extern std::string first_fail_file;
 extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 extern std::list<std::string> run_only_named_tests;
+extern std::string current_test_name;
+extern std::map<std::string, std::string> s_test_status;
+
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP() \
+	if (!setUp(__FUNCTION__)) return true; \
+	try \
+	{ // left open for TEARDOWN()
+
+#define TEARDOWN() \
+		return tearDown(); \
+	} \
+	catch (BoxException &e) \
+	{ \
+		BOX_NOTICE(__FUNCTION__ << " errored: " << e.what()); \
+		num_failures++; \
+		tearDown(); \
+		s_test_status[__FUNCTION__] = "ERRORED"; \
+		return false; \
+	}
+
+//! End the current test. Only use within a test function, because it just returns false!
+#define FAIL { \
+	std::ostringstream os; \
+	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
+	s_test_status[current_test_name] = os.str(); \
+	return fail(); \
+}
 
 #define TEST_FAIL_WITH_MESSAGE(msg) \
 { \
-	if (failures == 0) \
+	if (num_failures == 0) \
 	{ \
 		first_fail_file = __FILE__; \
 		first_fail_line = __LINE__; \
 	} \
-	failures++; \
+	num_failures++; \
 	BOX_ERROR("**** TEST FAILURE: " << msg << " at " << __FILE__ << \
 		":" << __LINE__); \
 }
@@ -167,6 +196,18 @@ extern std::list<std::string> run_only_named_tests;
 
 #define TEST_STARTSWITH(expected, actual) \
 	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
+
+//! Sets up (cleans up) test environment at the start of every test.
+bool setUp(const char* function_name);
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool tearDown();
+
+//! Like tearDown() but returns false, because a test failure was detected.
+bool fail();
+
+//! Report final status of all tests, and return the correct value to test main().
+int finish_test_suite();
 
 bool TestFileExists(const char *Filename);
 bool TestDirExists(const char *Filename);

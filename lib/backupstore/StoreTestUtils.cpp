@@ -55,96 +55,6 @@ bool delete_account()
 
 std::vector<uint32_t> ExpectedRefCounts;
 int bbstored_pid = 0, bbackupd_pid = 0;
-std::string OriginalWorkingDir;
-
-bool setUp(const char* function_name)
-{
-	if (!run_only_named_tests.empty())
-	{
-		bool run_this_test = false;
-
-		for (std::list<std::string>::iterator
-			i = run_only_named_tests.begin();
-			i != run_only_named_tests.end(); i++)
-		{
-			if (*i == function_name)
-			{
-				run_this_test = true;
-				break;
-			}
-		}
-		
-		if (!run_this_test)
-		{
-			// not in the list, so don't run it.
-			return false;
-		}
-	}
-
-	printf("\n\n== %s ==\n", function_name);
-
-	if (ServerIsAlive(bbstored_pid))
-	{
-		StopServer();
-	}
-
-	if (OriginalWorkingDir == "")
-	{
-		char buf[1024];
-		if (getcwd(buf, sizeof(buf)) == NULL)
-		{
-			BOX_LOG_SYS_ERROR("getcwd");
-		}
-		OriginalWorkingDir = buf;
-	}
-	else
-	{
-		if (chdir(OriginalWorkingDir.c_str()) != 0)
-		{
-			BOX_LOG_SYS_ERROR("chdir");
-		}
-	}
-
-	TEST_THAT_THROWONFAIL(system(
-		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
-		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
-		"testfiles/file* testfiles/notifyran testfiles/notifyran.* "
-		"testfiles/notifyscript.tag* "
-		"testfiles/restore* testfiles/bbackupd-data "
-		"testfiles/syncallowscript.control "
-		"testfiles/syncallowscript.notifyran.* "
-		"testfiles/test2.downloaded"
-		) == 0);
-	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
-	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
-	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
-	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
-	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
-	TEST_THAT_THROWONFAIL(create_account(10000, 20000));
-
-	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
-	return true;
-}
-
-bool tearDown()
-{
-	bool status = true;
-
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), status = false);
-	}
-
-	return status;
-}
-
-bool fail()
-{
-	TEST_THAT(tearDown());
-	return false;
-}
 
 void set_refcount(int64_t ObjectID, uint32_t RefCount)
 {
@@ -367,18 +277,21 @@ bool StartServer()
 	TEST_THAT_OR(bbstored_pid != -1 && bbstored_pid != 0, return false);
 
 	::sleep(1);
-	TEST_THAT_OR(ServerIsAlive(bbstored_pid), return false);
+	TEST_THAT_OR(ServerIsAlive(bbstored_pid), bbstored_pid = 0; return false);
 	return true;
 }
 
 bool StopServer(bool wait_for_process)
 {
 	TEST_THAT_OR(bbstored_pid != 0, return false);
-	TEST_THAT_OR(ServerIsAlive(bbstored_pid), return false);
-	TEST_THAT_OR(KillServer(bbstored_pid, wait_for_process), return false);
+	TEST_THAT_OR(ServerIsAlive(bbstored_pid),
+		bbstored_pid = 0; return false);
+	TEST_THAT_OR(KillServer(bbstored_pid, wait_for_process),
+		bbstored_pid = 0; return false);
 	::sleep(1);
 
-	TEST_THAT_OR(!ServerIsAlive(bbstored_pid), return false);
+	TEST_THAT_OR(!ServerIsAlive(bbstored_pid),
+		bbstored_pid = 0; return false);
 	bbstored_pid = 0;
 
 	#ifdef WIN32
@@ -393,16 +306,6 @@ bool StopServer(bool wait_for_process)
 	#endif
 
 	return true;
-}
-
-#define FAIL { \
-	/* \
-	std::ostringstream os; \
-	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
-	s_test_status[current_test_name] = os.str(); \
-	return fail(); \
-	*/ \
-	return false; \
 }
 
 bool StartClient(const std::string& bbackupd_conf_file)

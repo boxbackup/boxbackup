@@ -61,11 +61,6 @@ int test(int argc, const char *argv[]);
 	#define MODE_TEXT	"debug"
 #endif
 
-int failures = 0;
-int first_fail_line;
-std::string first_fail_file;
-std::list<std::string> run_only_named_tests;
-
 #ifdef WIN32
 	#define QUIET_PROCESS "-Q"
 #else
@@ -386,7 +381,7 @@ int main(int argc, char * const * argv)
 		#ifdef BOX_MEMORY_LEAK_TESTING
 			if(memleakfinder_numleaks() != 0)
 			{
-				failures++;
+				num_failures++;
 				printf("FAILURE: Memory leaks detected in test code\n");
 				printf("==== MEMORY LEAKS =================================\n");
 				memleakfinder_reportleaks();
@@ -405,13 +400,13 @@ int main(int argc, char * const * argv)
 		
 			if(filesleftopen)
 			{
-				failures++;
+				num_failures++;
 				printf("IMPLICIT TEST FAILED: Something left files open\n");
 			}
-			if(failures > 0)
+			if(num_failures > 0)
 			{
 				printf("FAILED: %d tests failed (first at "
-					"%s:%d)\n", failures, 
+					"%s:%d)\n", num_failures, 
 					first_fail_file.c_str(),
 					first_fail_line);
 			}
