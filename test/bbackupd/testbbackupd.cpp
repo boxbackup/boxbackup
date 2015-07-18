@@ -1821,10 +1821,15 @@ bool test_backup_pauses_when_store_is_full()
 		// But only once!
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 
+		// We can't guarantee to get in before housekeeping runs, so it's safer
+		// (more reliable) to wait for it to finish.
+		wait_for_operation(5, "housekeeping to run");
+
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(context,
+					BackupProtocolLogin::Flags_ReadOnly);
 			std::auto_ptr<BackupStoreDirectory> root_dir =
 				ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
 
@@ -1851,13 +1856,12 @@ bool test_backup_pauses_when_store_is_full()
 			TEST_EQUAL(SearchDir(*d2_dir, "f6"), 0);
 			TEST_EQUAL(SearchDir(*d6_dir, "d8"), 0);
 
-			// But f1 and d7 should have been marked as deleted
-			// (but not actually deleted yet)
-			TEST_THAT(test_entry_deleted(*spacetest_dir, "f1"))
-			TEST_THAT(test_entry_deleted(*spacetest_dir, "d7"))
+			// But f1 and d7 should have been deleted.
+			TEST_EQUAL(SearchDir(*spacetest_dir, "f1"), 0);
+			TEST_EQUAL(SearchDir(*spacetest_dir, "d7"), 0);
 
-			TEST_THAT(check_num_files(4, 0, 1, 9));
-			TEST_THAT(check_num_blocks(*client, 8, 0, 2, 18, 28));
+			TEST_THAT(check_num_files(4, 0, 0, 8));
+			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
 		}
 	}
