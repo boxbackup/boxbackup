@@ -23,7 +23,7 @@
 class FileStream : public IOStream
 {
 public:
-	FileStream(const std::string& rFilename, 
+	FileStream(const std::string& rFilename,
 		int flags = (O_RDONLY | O_BINARY),
 		int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
 
@@ -54,6 +54,7 @@ public:
 	{
 		return std::string("local file ") + mFileName;
 	}
+	const std::string GetFileName() const { return mFileName; }
 
 private:
 	tOSFileHandle mOSFileHandle;

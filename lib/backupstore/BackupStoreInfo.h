@@ -77,20 +77,24 @@ private:
 	BackupStoreInfo();
 	// No copying allowed
 	BackupStoreInfo(const BackupStoreInfo &);
-	
+
 public:
 	// Create a New account, saving a blank info object to the disc
 	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet, int64_t BlockSoftLimit, int64_t BlockHardLimit);
-	
+
 	// Load it from the store
 	static std::auto_ptr<BackupStoreInfo> Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID = 0);
-	
+
+	// Load it from a stream (file or RaidFile)
+	static std::auto_ptr<BackupStoreInfo> Load(IOStream& rStream,
+		const std::string FileName, bool ReadOnly);
+
 	// Has info been modified?
 	bool IsModified() const {return mIsModified;}
-	
+
 	// Save modified infomation back to store
 	void Save(bool allowOverwrite = true);
-	
+
 	// Data access functions
 	int32_t GetAccountID() const {return mAccountID;}
 	int64_t GetLastObjectIDUsed() const {return mLastObjectIDUsed;}
@@ -111,7 +115,7 @@ public:
 	int GetDiscSetNumber() const {return mDiscSet;}
 
 	int ReportChangesTo(BackupStoreInfo& rOldInfo);
-	
+
 	// Data modification functions
 	void ChangeBlocksUsed(int64_t Delta);
 	void ChangeBlocksInCurrentFiles(int64_t Delta);
@@ -126,10 +130,10 @@ public:
 	void AdjustNumOldFiles(int64_t increase);
 	void AdjustNumDeletedFiles(int64_t increase);
 	void AdjustNumDirectories(int64_t increase);
-	
+
 	// Object IDs
 	int64_t AllocateObjectID();
-		
+
 	// Client marker set and get
 	int64_t GetClientStoreMarker() const {return mClientStoreMarker;}
 	void SetClientStoreMarker(int64_t ClientStoreMarker);
@@ -176,10 +180,10 @@ private:
 	std::string mFilename;
 	bool mReadOnly;
 	bool mIsModified;
-	
+
 	// Client infomation
 	int64_t mClientStoreMarker;
-	
+
 	// Account information
 	int64_t mLastObjectIDUsed;
 	int64_t mBlocksUsed;
