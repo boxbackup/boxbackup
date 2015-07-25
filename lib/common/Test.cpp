@@ -512,3 +512,16 @@ void safe_sleep(int seconds)
 {
 	ShortSleep(SecondsToBoxTime(seconds), true);
 }
+
+std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
+	const ConfigurationVerify& verify)
+{
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify(config_file, &verify, errs));
+	TEST_EQUAL_LINE(0, errs.size(), "Failed to load configuration file: " + config_file +
+		": " + errs);
+	TEST_EQUAL_OR(0, errs.size(), config.reset());
+	return config;
+}
+

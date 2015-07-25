@@ -89,9 +89,10 @@
 #endif
 
 // two cycles and a bit
-#define TIME_TO_WAIT_FOR_BACKUP_OPERATION	12
+#define TIME_TO_WAIT_FOR_BACKUP_OPERATION 12
 #define SHORT_TIMEOUT 5000
 #define BACKUP_ERROR_DELAY_SHORTENED 10
+#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
 
 void wait_for_backup_operation(const char* message)
 {
@@ -462,13 +463,13 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 	TEST_THAT(create_account(10000, 20000));
 
 #define SETUP_WITHOUT_FILES() \
-	SETUP_TEST_BBACKUPD() \
+	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
 	TEST_THAT_OR(setup_test_bbackupd(bbackupd, false), FAIL); \
 	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
 
 #define SETUP_WITH_BBSTORED() \
-	SETUP_TEST_BBACKUPD() \
+	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
 	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
 
@@ -985,23 +986,12 @@ bool compare(BackupQueries::ReturnCode::Type expected_status,
 	return (returnValue == expected_system_result);
 }
 
-std::auto_ptr<Configuration> load_config_file(
-	std::string config_file = "testfiles/bbackupd.conf")
-{
-	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify
-			("testfiles/bbackupd.conf", &BackupDaemonConfigVerify, errs));
-	TEST_EQUAL_LINE(0, errs.size(), "Failed to load configuration file: " + errs);
-	TEST_EQUAL_OR(0, errs.size(), config.reset());
-	return config;
-}
-
 bool compare_local(BackupQueries::ReturnCode::Type expected_status,
 	BackupProtocolCallable& client,
 	const std::string& compare_options = "acQ")
 {
-	std::auto_ptr<Configuration> config = load_config_file();
+	std::auto_ptr<Configuration> config =
+		load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
 	TEST_THAT_OR(config.get(), return false);
 	BackupQueries bbackupquery(client, *config, false);
 
@@ -1191,7 +1181,8 @@ bool test_bbackupquery_parser_escape_slashes()
 		dirname, // dirname,
 		attrStream)->GetObjectID();
 
-	std::auto_ptr<Configuration> config = load_config_file();
+	std::auto_ptr<Configuration> config =
+		load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
 	TEST_THAT_OR(config.get(), return false);
 	BackupQueries query(connection, *config, false); // read-only
 
@@ -1210,7 +1201,8 @@ bool test_getobject_on_nonexistent_file()
 	SETUP_WITH_BBSTORED();
 
 	{
-		std::auto_ptr<Configuration> config = load_config_file();
+		std::auto_ptr<Configuration> config =
+			load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
 		TEST_THAT_OR(config.get(), return false);
 
 		std::auto_ptr<BackupProtocolCallable> connection =

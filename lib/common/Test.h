@@ -14,6 +14,8 @@
 #include <list>
 #include <map>
 
+#include "Configuration.h"
+
 #ifdef WIN32
 #define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
 #define BBACKUPD        "..\\..\\bin\\bbackupd\\bbackupd.exe"
@@ -236,5 +238,7 @@ void terminate_bbackupd(int pid);
 // Wait a given number of seconds for something to complete
 void wait_for_operation(int seconds, const char* message);
 void safe_sleep(int seconds);
+std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
+	const ConfigurationVerify& verify);
 
 #endif // TEST__H
