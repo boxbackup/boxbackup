@@ -23,15 +23,6 @@ extern std::vector<uint32_t> ExpectedRefCounts;
 //! Holds the PID of the currently running bbstored test server.
 extern int bbstored_pid, bbackupd_pid;
 
-//! Sets up (cleans up) test environment at the start of every test.
-bool setUp(const char* function_name);
-
-//! Checks account for errors and shuts down daemons at end of every test.
-bool tearDown();
-
-//! Like tearDown() but returns false, because a test failure was detected.
-bool fail();
-
 //! Sets the expected refcount of an object, resizing vector if necessary.
 void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
 
