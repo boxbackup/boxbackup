@@ -207,7 +207,10 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		s << rResponse.GetResponseCode();
 		SendInternalErrorResponse(s.str().c_str(), rResponse);
 	}
-	
+
+	BOX_NOTICE(rResponse.GetResponseCode() << " " << rRequest.GetMethodName() << " " <<
+		rRequest.GetRequestURI());
+
 	return;
 }
 
