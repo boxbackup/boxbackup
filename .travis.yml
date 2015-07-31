@@ -5,6 +5,7 @@ branches:
 compiler:
   - gcc
   - clang
+cache: apt
 sudo: false
 addons:
   apt:
