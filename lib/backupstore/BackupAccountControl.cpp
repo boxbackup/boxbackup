@@ -12,9 +12,13 @@
 #include <climits>
 #include <iostream>
 
+#include "autogen_CommonException.h"
 #include "BackupAccountControl.h"
+#include "BackupStoreConstants.h"
+#include "BackupStoreDirectory.h"
 #include "BackupStoreInfo.h"
 #include "Configuration.h"
+#include "HTTPResponse.h"
 
 #include "MemLeakFindOn.h"
 
@@ -127,5 +131,128 @@ int BackupAccountControl::PrintAccountInfo(const BackupStoreInfo& info,
 		(info.IsAccountEnabled() ? "yes" : "no") << std::endl;
 
 	return 0;
+}
+
+S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
+	bool machineReadableOutput)
+: BackupAccountControl(config, machineReadableOutput)
+{
+	if(!mConfig.SubConfigurationExists("S3Store"))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			InvalidConfiguration,
+			"The S3Store configuration subsection is required "
+			"when S3Store mode is enabled");
+	}
+	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
+
+	mBasePath = s3config.GetKeyValue("BasePath");
+	if(mBasePath.size() == 0)
+	{
+		mBasePath = "/";
+	}
+	else
+	{
+		if(mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
+		{
+			THROW_EXCEPTION_MESSAGE(CommonException,
+				InvalidConfiguration,
+				"If S3Store.BasePath is not empty then it must start and "
+				"end with a slash, e.g. '/subdir/', but it currently does not.");
+		}
+	}
+
+	mapS3Client.reset(new S3Client(
+		s3config.GetKeyValue("HostName"),
+		s3config.GetKeyValueInt("Port"),
+		s3config.GetKeyValue("AccessKey"),
+		s3config.GetKeyValue("SecretKey")));
+
+	mapFileSystem.reset(new S3BackupFileSystem(mConfig, mBasePath, *mapS3Client));
+}
+
+std::string S3BackupAccountControl::GetFullURL(const std::string ObjectPath) const
+{
+	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
+	return std::string("http://") + s3config.GetKeyValue("HostName") + ":" +
+		s3config.GetKeyValue("Port") + GetFullPath(ObjectPath);
+}
+
+int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftLimit,
+	int32_t HardLimit)
+{
+	// Try getting the info file. If we get a 200 response then it already
+	// exists, and we should bail out. If we get a 404 then it's safe to
+	// continue. Otherwise something else is wrong and we should bail out.
+	std::string info_url = GetFullURL(S3_INFO_FILE_NAME);
+
+	HTTPResponse response = GetObject(S3_INFO_FILE_NAME);
+	if(response.GetResponseCode() != HTTPResponse::Code_NotFound)
+	{
+		mapS3Client->CheckResponse(response, std::string("The BackupStoreInfo file already "
+			"exists at this URL: ") + info_url);
+	}
+
+	BackupStoreInfo info(0, // fake AccountID for S3 stores
+		info_url, // FileName,
+		SoftLimit, HardLimit);
+	info.SetAccountName(name);
+
+	// And an empty directory
+	BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID, BACKUPSTORE_ROOT_DIRECTORY_ID);
+	int64_t rootDirSize = mapFileSystem->PutDirectory(rootDir);
+
+	// Update the store info to reflect the size of the root directory
+	info.ChangeBlocksUsed(rootDirSize);
+	info.ChangeBlocksInDirectories(rootDirSize);
+	info.AdjustNumDirectories(1);
+	int64_t id = info.AllocateObjectID();
+	ASSERT(id == BACKUPSTORE_ROOT_DIRECTORY_ID);
+
+	CollectInBufferStream out;
+	info.Save(out);
+	out.SetForReading();
+
+	response = PutObject(S3_INFO_FILE_NAME, out);
+	mapS3Client->CheckResponse(response, std::string("Failed to upload the new BackupStoreInfo "
+		"file to this URL: ") + info_url);
+
+	// Now get the file again, to check that it really worked.
+	response = GetObject(S3_INFO_FILE_NAME);
+	mapS3Client->CheckResponse(response, std::string("Failed to download the new BackupStoreInfo "
+		"file that we just created: ") + info_url);
+
+	return 0;
+}
+
+std::string S3BackupFileSystem::GetDirectoryURI(int64_t ObjectID)
+{
+	std::ostringstream out;
+	out << mBasePath << "dirs/" << BOX_FORMAT_OBJECTID(ObjectID) << ".dir";
+	return out.str();
+}
+
+std::auto_ptr<HTTPResponse> S3BackupFileSystem::GetDirectory(BackupStoreDirectory& rDir)
+{
+	std::string uri = GetDirectoryURI(rDir.GetObjectID());
+	HTTPResponse response = mrClient.GetObject(uri);
+	mrClient.CheckResponse(response,
+		std::string("Failed to download directory: ") + uri);
+	return std::auto_ptr<HTTPResponse>(new HTTPResponse(response));
+}
+
+int S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
+{
+	CollectInBufferStream out;
+	rDir.WriteToStream(out);
+	out.SetForReading();
+
+	std::string uri = GetDirectoryURI(rDir.GetObjectID());
+	HTTPResponse response = mrClient.PutObject(uri, out);
+	mrClient.CheckResponse(response,
+		std::string("Failed to upload directory: ") + uri);
+
+	int blocks = (out.GetSize() + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
+	return blocks;
 }
 

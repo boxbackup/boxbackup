@@ -48,11 +48,11 @@ static const ConfigurationVerifyKey verifyserverkeys[] =
 static const ConfigurationVerifyKey verifys3keys[] =
 {
 	// These values are only required for Amazon S3-compatible stores
-	ConfigurationVerifyKey("BucketName", 0),
-	ConfigurationVerifyKey("Port", ConfigTest_IsInt, 80),
-	ConfigurationVerifyKey("BasePath", 0),
-	ConfigurationVerifyKey("AccessKey", 0),
-	ConfigurationVerifyKey("SecretKey", ConfigTest_LastEntry)
+	ConfigurationVerifyKey("HostName", ConfigTest_Exists),
+	ConfigurationVerifyKey("Port", ConfigTest_Exists | ConfigTest_IsInt, 80),
+	ConfigurationVerifyKey("BasePath", ConfigTest_Exists),
+	ConfigurationVerifyKey("AccessKey", ConfigTest_Exists),
+	ConfigurationVerifyKey("SecretKey", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 static const ConfigurationVerify verifyserver[] =

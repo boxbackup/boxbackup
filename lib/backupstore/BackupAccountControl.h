@@ -13,9 +13,11 @@
 #include <string>
 
 #include "BackupStoreAccountDatabase.h"
-#include "S3Client.h"
+#include "HTTPResponse.h"
 #include "NamedLock.h"
+#include "S3Client.h"
 
+class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
 
@@ -37,20 +39,56 @@ public:
 	int PrintAccountInfo(const BackupStoreInfo& info, int BlockSize);
 };
 
+class S3BackupFileSystem
+{
+private:
+	const Configuration& mConfig;
+	std::string mBasePath;
+	S3Client& mrClient;
+public:
+	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
+		S3Client& rClient)
+	: mConfig(config),
+	  mBasePath(BasePath),
+	  mrClient(rClient)
+	{ }
+	std::string GetDirectoryURI(int64_t ObjectID);
+	std::auto_ptr<HTTPResponse> GetDirectory(BackupStoreDirectory& rDir);
+	int PutDirectory(BackupStoreDirectory& rDir);
+};
+
 class S3BackupAccountControl : public BackupAccountControl
 {
+private:
+	std::string mBasePath;
+	std::auto_ptr<S3Client> mapS3Client;
+	std::auto_ptr<S3BackupFileSystem> mapFileSystem;
 public:
 	S3BackupAccountControl(const Configuration& config,
-		bool machineReadableOutput = false)
-	: BackupAccountControl(config, machineReadableOutput)
-	{ }
-	std::string GetStoreRootURL();
+		bool machineReadableOutput = false);
+	std::string GetFullPath(const std::string ObjectPath) const
+	{
+		return mBasePath + ObjectPath;
+	}
+	std::string GetFullURL(const std::string ObjectPath) const;
 	int CreateAccount(const std::string& name, int32_t SoftLimit, int32_t HardLimit);
 	int GetBlockSize() { return 4096; }
+	HTTPResponse GetObject(const std::string& name)
+	{
+		return mapS3Client->GetObject(GetFullPath(name));
+	}
+	HTTPResponse PutObject(const std::string& name, IOStream& rStreamToSend,
+		const char* pContentType = NULL)
+	{
+		return mapS3Client->PutObject(GetFullPath(name), rStreamToSend,
+			pContentType);
+	}
 };
 
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
+#define S3_INFO_FILE_NAME		"boxbackup.info"
+#define S3_NOTIONAL_BLOCK_SIZE		1048576
 
 #endif // BACKUPACCOUNTCONTROL__H
 
