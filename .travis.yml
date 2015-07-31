@@ -5,7 +5,15 @@ branches:
 compiler:
   - gcc
   - clang
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq libssl-dev zlib1g-dev libreadline-dev libdb-dev xsltproc libwww-perl
+sudo: false
+addons:
+  apt:
+    packages:
+      - libdb-dev
+      - libreadline-dev
+      - libssl-dev
+      - libwww-perl
+      - xsltproc
+      - zlib1g-dev
 script: ./bootstrap && ./configure && make && ./runtest.pl ALL debug && ./runtest.pl ALL release
+
