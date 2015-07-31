@@ -56,3 +56,4 @@ DatabaseRecordBadSize			48	The database contains a record with an invalid size
 DatabaseIterateFailed			49	Failed to iterate over the database keys
 ReferenceNotFound			50	The database does not contain an expected reference
 TimersNotInitialised			51	The timer framework should have been ready at this point
+InvalidConfiguration			52	Some required values are missing or incorrect in the configuration file.

@@ -52,7 +52,7 @@
 #include "SSLLib.h"
 
 #include "autogen_BackupProtocol.h"
-#include "autogen_ClientException.h"
+#include "autogen_CommonException.h"
 #include "autogen_ConversionException.h"
 #include "Archive.h"
 #include "BackupClientContext.h"
@@ -358,7 +358,7 @@ void BackupDaemon::SetupInInitialProcess()
 
 	if(missingRequiredKeys)
 	{
-		THROW_EXCEPTION_MESSAGE(ClientException, InvalidConfiguration,
+		THROW_EXCEPTION_MESSAGE(CommonException, InvalidConfiguration,
 			"Some required configuration keys are missing in " <<
 			GetConfigFileName());
 	}

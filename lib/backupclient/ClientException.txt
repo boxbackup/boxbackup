@@ -9,4 +9,3 @@ AssertFailed				1
 ClockWentBackwards			2	Invalid (negative) sync period: perhaps your clock is going backwards?
 FailedToDeleteStoreObjectInfoFile	3	Failed to delete the StoreObjectInfoFile, backup cannot continue safely.
 CorruptStoreObjectInfoFile		4	The store object info file contained an invalid value and is probably corrupt. Try deleting it.
-InvalidConfiguration			5	Some required values are missing or incorrect in the configuration file.
