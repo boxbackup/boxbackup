@@ -34,22 +34,24 @@
 //
 // --------------------------------------------------------------------------
 BackupStoreInfo::BackupStoreInfo()
-	: mAccountID(-1),
-	  mDiscSet(-1),
-	  mReadOnly(true),
-	  mIsModified(false),
-	  mClientStoreMarker(0),
-	  mLastObjectIDUsed(-1),
-	  mBlocksUsed(0),
-	  mBlocksInCurrentFiles(0),
-	  mBlocksInOldFiles(0),
-	  mBlocksInDeletedFiles(0),
-	  mBlocksInDirectories(0),
-	  mNumCurrentFiles(0),
-	  mNumOldFiles(0),
-	  mNumDeletedFiles(0),
-	  mNumDirectories(0),
-	  mAccountEnabled(true)
+: mAccountID(-1),
+  mDiscSet(-1),
+  mReadOnly(true),
+  mIsModified(false),
+  mClientStoreMarker(0),
+  mLastObjectIDUsed(-1),
+  mBlocksUsed(0),
+  mBlocksInCurrentFiles(0),
+  mBlocksInOldFiles(0),
+  mBlocksInDeletedFiles(0),
+  mBlocksInDirectories(0),
+  mBlocksSoftLimit(0),
+  mBlocksHardLimit(0),
+  mNumCurrentFiles(0),
+  mNumOldFiles(0),
+  mNumDeletedFiles(0),
+  mNumDirectories(0),
+  mAccountEnabled(true)
 {
 }
 
@@ -90,6 +92,31 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 	info.mExtraData.SetForReading(); // extra data is empty in this case
 
 	info.Save(false);
+}
+
+BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
+	int64_t BlockSoftLimit, int64_t BlockHardLimit)
+: mAccountID(AccountID),
+  mDiscSet(-1),
+  mFilename(FileName),
+  mReadOnly(false),
+  mIsModified(false),
+  mClientStoreMarker(0),
+  mLastObjectIDUsed(0),
+  mBlocksUsed(0),
+  mBlocksInCurrentFiles(0),
+  mBlocksInOldFiles(0),
+  mBlocksInDeletedFiles(0),
+  mBlocksInDirectories(0),
+  mBlocksSoftLimit(BlockSoftLimit),
+  mBlocksHardLimit(BlockHardLimit),
+  mNumCurrentFiles(0),
+  mNumOldFiles(0),
+  mNumDeletedFiles(0),
+  mNumDirectories(0),
+  mAccountEnabled(true)
+{
+	mExtraData.SetForReading(); // extra data is empty in this case
 }
 
 // --------------------------------------------------------------------------
@@ -344,11 +371,18 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 	// Then... open a write file
 	RaidFileWrite rf(mDiscSet, mFilename);
 	rf.Open(allowOverwrite);
+	Save(rf);
 
+	// Commit it to disc, converting it to RAID now
+	rf.Commit(true);
+}
+
+void BackupStoreInfo::Save(IOStream& rOutStream)
+{
 	// Make header
 	int32_t magic = htonl(INFO_MAGIC_VALUE_2);
-	rf.Write(&magic, sizeof(magic));
-	Archive archive(rf, IOStream::TimeOutInfinite);
+	rOutStream.Write(&magic, sizeof(magic));
+	Archive archive(rOutStream, IOStream::TimeOutInfinite);
 
 	archive.Write(mAccountID);
 	archive.Write(mAccountName);
@@ -389,8 +423,8 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 				i++;
 			}
 
-			// Write			
-			rf.Write(objs, b * sizeof(int64_t));
+			// Write
+			rOutStream.Write(objs, b * sizeof(int64_t));
 
 			// Number saved
 			tosave -= b;
@@ -400,11 +434,8 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 	archive.Write(mAccountEnabled);
 
 	mExtraData.Seek(0, IOStream::SeekType_Absolute);
-	mExtraData.CopyStreamTo(rf);
+	mExtraData.CopyStreamTo(rOutStream);
 	mExtraData.Seek(0, IOStream::SeekType_Absolute);
-
-	// Commit it to disc, converting it to RAID now
-	rf.Commit(true);
 
 	// Mark is as not modified
 	mIsModified = false;

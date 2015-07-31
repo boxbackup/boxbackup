@@ -80,7 +80,10 @@ private:
 
 public:
 	// Create a New account, saving a blank info object to the disc
-	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet, int64_t BlockSoftLimit, int64_t BlockHardLimit);
+	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet,
+		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+	BackupStoreInfo(int32_t AccountID, const std::string &FileName,
+		int64_t BlockSoftLimit, int64_t BlockHardLimit);
 
 	// Load it from the store
 	static std::auto_ptr<BackupStoreInfo> Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID = 0);
@@ -94,6 +97,7 @@ public:
 
 	// Save modified infomation back to store
 	void Save(bool allowOverwrite = true);
+	void Save(IOStream& rOutStream);
 
 	// Data access functions
 	int32_t GetAccountID() const {return mAccountID;}
