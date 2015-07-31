@@ -268,80 +268,32 @@ bool check_reference_counts()
 
 bool StartServer()
 {
-	TEST_THAT_OR(bbstored_pid == 0, return false);
-
-	std::string cmd = BBSTORED " " + bbstored_args +
-		" testfiles/bbstored.conf";
-	bbstored_pid = LaunchServer(cmd.c_str(), "testfiles/bbstored.pid");
-
-	TEST_THAT_OR(bbstored_pid != -1 && bbstored_pid != 0, return false);
-
-	::sleep(1);
-	TEST_THAT_OR(ServerIsAlive(bbstored_pid), bbstored_pid = 0; return false);
-	return true;
+	bbstored_pid = StartDaemon(bbstored_pid,
+		BBSTORED " " + bbstored_args + " testfiles/bbstored.conf",
+		"testfiles/bbstored.pid");
+	return bbstored_pid != 0;
 }
 
 bool StopServer(bool wait_for_process)
 {
-	TEST_THAT_OR(bbstored_pid != 0, return false);
-	TEST_THAT_OR(ServerIsAlive(bbstored_pid),
-		bbstored_pid = 0; return false);
-	TEST_THAT_OR(KillServer(bbstored_pid, wait_for_process),
-		bbstored_pid = 0; return false);
-	::sleep(1);
-
-	TEST_THAT_OR(!ServerIsAlive(bbstored_pid),
-		bbstored_pid = 0; return false);
+	bool result = StopDaemon(bbstored_pid, "testfiles/bbstored.pid",
+		"bbstored.memleaks", wait_for_process);
 	bbstored_pid = 0;
-
-	#ifdef WIN32
-		int unlink_result = unlink("testfiles/bbstored.pid");
-		TEST_EQUAL_LINE(0, unlink_result, "unlink testfiles/bbstored.pid");
-		if(unlink_result != 0)
-		{
-			return false;
-		}
-	#else
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-	#endif
-
-	return true;
+	return result;
 }
 
 bool StartClient(const std::string& bbackupd_conf_file)
 {
-	TEST_THAT_OR(bbackupd_pid == 0, FAIL);
-
-	std::string cmd = BBACKUPD " " + bbackupd_args + " " + bbackupd_conf_file;
-	bbackupd_pid = LaunchServer(cmd.c_str(), "testfiles/bbackupd.pid");
-
-	TEST_THAT_OR(bbackupd_pid != -1 && bbackupd_pid != 0, FAIL);
-	::sleep(1);
-	TEST_THAT_OR(ServerIsAlive(bbackupd_pid), FAIL);
-
-	return true;
+	bbstored_pid = StartDaemon(bbackupd_pid,
+		BBACKUPD " " + bbackupd_args + " " + bbackupd_conf_file,
+		"testfiles/bbackupd.pid");
+	return bbackupd_pid != 0;
 }
 
 bool StopClient(bool wait_for_process)
 {
-	TEST_THAT_OR(bbackupd_pid != 0, FAIL);
-	TEST_THAT_OR(ServerIsAlive(bbackupd_pid), FAIL);
-	TEST_THAT_OR(KillServer(bbackupd_pid, wait_for_process), FAIL);
-	::sleep(1);
-
-	TEST_THAT_OR(!ServerIsAlive(bbackupd_pid), FAIL);
+	bool result = StopDaemon(bbackupd_pid, "testfiles/bbackupd.pid",
+		"bbackupd.memleaks", wait_for_process);
 	bbackupd_pid = 0;
-
-	#ifdef WIN32
-		int unlink_result = unlink("testfiles/bbackupd.pid");
-		TEST_EQUAL_LINE(0, unlink_result, "unlink testfiles/bbackupd.pid");
-		if(unlink_result != 0)
-		{
-			FAIL;
-		}
-	#else
-		TestRemoteProcessMemLeaks("bbackupd.memleaks");
-	#endif
-
-	return true;
+	return result;
 }
