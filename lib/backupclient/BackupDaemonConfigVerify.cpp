@@ -82,8 +82,6 @@ static const ConfigurationVerify verifyserver[] =
 
 static const ConfigurationVerifyKey verifyrootkeys[] =
 {
-	ConfigurationVerifyKey("AccountNumber",
-		ConfigTest_Exists | ConfigTest_IsUint32),
 	ConfigurationVerifyKey("UpdateStoreInterval",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("BackupErrorDelay",
@@ -146,6 +144,8 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("StoreHostname", 0),
 	ConfigurationVerifyKey("StorePort", ConfigTest_IsInt,
 		BOX_PORT_BBSTORED),
+	ConfigurationVerifyKey("AccountNumber",
+		ConfigTest_IsUint32),
 	ConfigurationVerifyKey("CertificateFile", 0),
 	ConfigurationVerifyKey("PrivateKeyFile", 0),
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_LastEntry),

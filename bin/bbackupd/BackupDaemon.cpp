@@ -340,6 +340,7 @@ void BackupDaemon::SetupInInitialProcess()
 	// verified by BackupDaemonConfigVerify.
 	std::vector<std::string> requiredKeys;
 	requiredKeys.push_back("StoreHostname");
+	requiredKeys.push_back("AccountNumber");
 	requiredKeys.push_back("CertificateFile");
 	requiredKeys.push_back("PrivateKeyFile");
 	requiredKeys.push_back("TrustedCAsFile");
