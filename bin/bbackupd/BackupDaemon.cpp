@@ -52,6 +52,7 @@
 #include "SSLLib.h"
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_ClientException.h"
 #include "autogen_CommonException.h"
 #include "autogen_ConversionException.h"
 #include "Archive.h"
@@ -930,7 +931,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 	{
 		BOX_ERROR("Failed to delete the StoreObjectInfoFile, "
 			"backup cannot continue safely.");
-		THROW_EXCEPTION(ClientException, 
+		THROW_EXCEPTION(ClientException,
 			FailedToDeleteStoreObjectInfoFile);
 	}
 
