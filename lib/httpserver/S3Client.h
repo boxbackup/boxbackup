@@ -51,6 +51,7 @@ class S3Client
 	HTTPResponse GetObject(const std::string& rObjectURI);
 	HTTPResponse PutObject(const std::string& rObjectURI,
 		IOStream& rStreamToSend, const char* pContentType = NULL);
+	void CheckResponse(const HTTPResponse& response, const std::string& message) const;
 
 	private:
 	HTTPServer* mpSimulator;

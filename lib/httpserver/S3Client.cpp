@@ -245,4 +245,26 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 	}
 
 	return response;
-}	
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Client::CheckResponse(HTTPResponse&,
+//			 std::string& message)
+//		Purpose: Check the status code of an Amazon S3 response, and
+//			 throw an exception with a useful message (including
+//			 the supplied message) if it's not a 200 OK response.
+//		Created: 26/07/15
+//
+// --------------------------------------------------------------------------
+
+void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message) const
+{
+	if(response.GetResponseCode() != HTTPResponse::Code_OK)
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, RequestFailedUnexpectedly,
+			message);
+	}
+}
+
