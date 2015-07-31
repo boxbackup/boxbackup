@@ -17,6 +17,7 @@
 	#include <sys/wait.h>
 #endif
 
+#include "autogen_ServerException.h"
 #include "Daemon.h"
 #include "SocketListen.h"
 #include "Utils.h"
@@ -344,10 +345,20 @@ public:
 			p = ::waitpid(0 /* any child in process group */,
 				&status, WNOHANG);
 
-			if(p == -1 && errno != ECHILD && errno != EINTR)
+			if(p == -1)
 			{
-				THROW_EXCEPTION(ServerException,
-					ServerWaitOnChildError)
+				if (errno == ECHILD || errno == EINTR)
+				{
+					// Nothing actually happened, so there's no reason
+					// to wait again.
+					break;
+				}
+				else
+				{
+					THROW_SYS_ERROR("Failed to wait for daemon child "
+						"process", ServerException,
+						ServerWaitOnChildError);
+				}
 			}
 			else if(p == 0)
 			{
