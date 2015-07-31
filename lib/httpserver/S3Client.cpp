@@ -224,9 +224,9 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 
 HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 	IOStream* pStreamToSend, const char* pStreamContentType)
-{		
+{
 	HTTPResponse response;
-	
+
 	if (pStreamToSend)
 	{
 		rRequest.SendWithStream(*mapClientSocket,
@@ -238,6 +238,11 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 		rRequest.Send(*mapClientSocket, 30000 /* milliseconds */);
 		response.Receive(*mapClientSocket, 30000 /* milliseconds */);
 	}
-		
+
+	if(!response.IsKeepAlive())
+	{
+		mapClientSocket.reset();
+	}
+
 	return response;
 }	
