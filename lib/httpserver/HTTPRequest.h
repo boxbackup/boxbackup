@@ -77,6 +77,7 @@ public:
 	//
 	// --------------------------------------------------------------------------
 	enum Method GetMethod() const {return mMethod;}
+	std::string GetMethodName() const;
 	const std::string &GetRequestURI() const {return mRequestURI;}
 
 	// Note: the HTTPRequest generates and parses the Host: header

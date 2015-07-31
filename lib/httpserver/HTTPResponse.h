@@ -63,7 +63,7 @@ public:
 	typedef std::pair<std::string, std::string> Header;
 
 	void SetResponseCode(int Code);
-	int GetResponseCode() { return mResponseCode; }
+	int GetResponseCode() const { return mResponseCode; }
 	void SetContentType(const char *ContentType);
 	const std::string& GetContentType() { return mContentType; }
 
@@ -107,6 +107,7 @@ public:
 	void SetResponseIsDynamicContent(bool IsDynamic) {mResponseIsDynamicContent = IsDynamic;}
 	// Set keep alive control, default is to mark as to be closed
 	void SetKeepAlive(bool KeepAlive) {mKeepAlive = KeepAlive;}
+	bool IsKeepAlive() {return mKeepAlive;}
 
 	void SetCookie(const char *Name, const char *Value, const char *Path = "/", int ExpiresAt = 0);
 

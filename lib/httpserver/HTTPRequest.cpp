@@ -94,6 +94,32 @@ HTTPRequest::~HTTPRequest()
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPRequest::GetMethodName()
+//		Purpose: Returns the name of the request's HTTP method verb
+//			 as a string.
+//		Created: 28/7/15
+//
+// --------------------------------------------------------------------------
+
+std::string HTTPRequest::GetMethodName() const
+{
+	switch(mMethod)
+	{
+		case Method_UNINITIALISED: return "uninitialised";
+		case Method_UNKNOWN: return "unknown";
+		case Method_GET: return "GET";
+		case Method_HEAD: return "HEAD";
+		case Method_POST: return "POST";
+		case Method_PUT: return "PUT";
+		default:
+			std::ostringstream oss;
+			oss << "unknown-" << mMethod;
+			return oss.str();
+	};
+}
 
 // --------------------------------------------------------------------------
 //
