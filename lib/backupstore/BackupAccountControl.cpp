@@ -139,7 +139,7 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 {
 	if(!mConfig.SubConfigurationExists("S3Store"))
 	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+		THROW_EXCEPTION_MESSAGE(CommonException,
 			InvalidConfiguration,
 			"The S3Store configuration subsection is required "
 			"when S3Store mode is enabled");
