@@ -16,6 +16,7 @@
 #include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupDaemonConfigVerify.h"
+#include "BackupStoreDirectory.h"
 #include "BackupStoreInfo.h"
 #include "Configuration.h"
 #include "RaidFileController.h"
@@ -94,6 +95,10 @@ bool test_create_account_with_account_control()
 	TEST_EQUAL(true, info->IsReadOnly());
 	TEST_EQUAL(0, info->GetClientStoreMarker());
 	TEST_EQUAL("test", info->GetAccountName());
+
+	FileStream root_stream("testfiles/store/subdir/dirs/0x1.dir");
+	BackupStoreDirectory root_dir(root_stream);
+	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
 	TEARDOWN_TEST_S3SIMULATOR();
 }
