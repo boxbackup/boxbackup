@@ -774,7 +774,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 {
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
-	const char* errorString = "unknown";
+	std::string errorString = "unknown";
 
 	try
 	{
