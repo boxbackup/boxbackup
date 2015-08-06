@@ -143,6 +143,8 @@ int test(int argc, const char *argv[])
 		S3Simulator server;
 		return server.Main("doesnotexist", argc - 1, argv + 1);
 	}
+
+	TEST_THAT(system("rm -rf *.memleaks") == 0);
 	
 	// Start the server
 	int pid = LaunchServer("./_test server testfiles/httpserver.conf", "testfiles/httpserver.pid");
@@ -244,7 +246,7 @@ int test(int argc, const char *argv[])
 	#ifdef WIN32
 		TEST_THAT(unlink("testfiles/httpserver.pid") == 0);
 	#else
-		TestRemoteProcessMemLeaks("s3simulator.memleaks");
+		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
 	#endif
 
 	// correct, official signature should succeed, with lower-case header
@@ -472,7 +474,7 @@ int test(int argc, const char *argv[])
 	#ifdef WIN32
 		TEST_THAT(unlink("testfiles/s3simulator.pid") == 0);
 	#else
-		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+		TestRemoteProcessMemLeaks("s3simulator.memleaks");
 	#endif
 
 	return 0;
