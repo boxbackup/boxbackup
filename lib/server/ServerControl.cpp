@@ -229,11 +229,10 @@ bool KillServer(int pid, bool WaitForProcess)
 
 int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file)
 {
-	TEST_THAT_OR(current_pid == 0, return false);
+	TEST_THAT_OR(current_pid == 0, return 0);
 
 	int new_pid = LaunchServer(cmd_line, pid_file);
-
-	TEST_THAT_OR(new_pid != -1 && new_pid != 0, return false);
+	TEST_THAT_OR(new_pid != -1 && new_pid != 0, return 0);
 
 	::sleep(1);
 	TEST_THAT_OR(ServerIsAlive(new_pid), return 0);
