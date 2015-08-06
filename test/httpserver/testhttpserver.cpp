@@ -244,7 +244,7 @@ int test(int argc, const char *argv[])
 	#ifdef WIN32
 		TEST_THAT(unlink("testfiles/httpserver.pid") == 0);
 	#else
-		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
+		TestRemoteProcessMemLeaks("s3simulator.memleaks");
 	#endif
 
 	// correct, official signature should succeed, with lower-case header
