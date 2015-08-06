@@ -1139,7 +1139,6 @@ bool test_server_housekeeping()
 			uploads[0].name,
 			upload),
 		Err_DiffFromFileDoesNotExist);
-	// TODO FIXME replace all other TEST_CHECK_THROWS with TEST_COMMAND_RETURNS_ERROR
 
 	// TODO FIXME These tests should not be here, but in
 	// test_server_commands. But make sure you use a network protocol,
@@ -1525,11 +1524,12 @@ bool test_server_commands()
 		new BackupProtocolLocal2(0x01234567, "test",
 			"backup/01234567/", 0, false));
 
-	// Try using GetFile on a directory
+	// Try using GetFile on an object ID that doesn't exist in the directory
 	{
-		TEST_CHECK_THROWS(apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
-			BACKUPSTORE_ROOT_DIRECTORY_ID),
-			ConnectionException, Protocol_UnexpectedReply);
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
+				BACKUPSTORE_ROOT_DIRECTORY_ID),
+			Err_DoesNotExistInDirectory);
 	}
 
 	// BLOCK
@@ -1538,6 +1538,14 @@ bool test_server_commands()
 		// Create a directory
 		int64_t subdirid = create_directory(*apProtocol);
 		TEST_THAT(check_num_files(0, 0, 0, 2));
+
+		// Try using GetFile on the directory
+		{
+			TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+				QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
+					subdirid),
+				Err_FileDoesNotVerify);
+		}
 
 		// Stick a file in it
 		int64_t subdirfileid = create_file(*apProtocol, subdirid);
@@ -1710,37 +1718,49 @@ bool test_server_commands()
 		// Try some dodgy renames
 		{
 			// File doesn't exist at all
-			TEST_CHECK_THROWS(
-				apProtocol->QueryMoveObject(-1,
+			TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+				QueryMoveObject(-1,
 					BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid,
 					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 					newName),
-				ConnectionException, Protocol_UnexpectedReply);
+				Err_DoesNotExist);
 			BackupStoreFilenameClear newName("moved-files");
-			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+			TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+				QueryMoveObject(
+					uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					BackupProtocolListDirectory::RootDirectory,
-					subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName),
-				ConnectionException, Protocol_UnexpectedReply);
-			TEST_CHECK_THROWS(apProtocol->QueryMoveObject(uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
 					subdirid,
-					subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName, newName),
-				ConnectionException, Protocol_UnexpectedReply);
+					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+					newName),
+				Err_DoesNotExist);
+			TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+				QueryMoveObject(
+					uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
+					subdirid,
+					subdirid,
+					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+					newName),
+				Err_DoesNotExist);
 		}
 
 		// File exists, but not in this directory (we just moved it)
-		TEST_CHECK_THROWS(apProtocol->QueryMoveObject(root_file_id,
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryMoveObject(root_file_id,
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				subdirid, BackupProtocolMoveObject::Flags_MoveAllWithSameName,
+				subdirid,
+				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 				newName),
-			ConnectionException, Protocol_UnexpectedReply);
+			Err_DoesNotExist);
 
 		// Moving file to same directory that it's already in,
 		// with the same name
-		TEST_CHECK_THROWS(apProtocol->QueryMoveObject(root_file_id,
-				subdirid, subdirid,
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryMoveObject(root_file_id,
+				subdirid,
+				subdirid,
 				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 				newName),
-			ConnectionException, Protocol_UnexpectedReply);
+			Err_TargetNameExists);
 
 		// Rename within a directory (successfully)
 		{
@@ -2474,15 +2494,12 @@ bool test_login_without_account()
 		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 
 		// Login
-		TEST_CHECK_THROWS(std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(protocol.QueryLogin(0x01234567, 0)),
-			ConnectionException, Protocol_UnexpectedReply);
+		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
+			Err_BadLogin);
 
 		// Finish the connection
 		protocol.QueryFinished();
 	}
-
-	// Recreate the account so that teardown_test_backupstore() doesn't freak out
-	// TEST_THAT_THROWONFAIL(create_account(10000, 20000));
 
 	TEARDOWN_TEST_BACKUPSTORE();
 }
@@ -2685,7 +2702,8 @@ bool test_account_limits_respected()
 		"2B 2B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
-	// Try to upload a file and create a directory, and check an error is generated
+	// Try to upload a file and create a directory, both of which would exceed the
+	// current account limits, and check that each command returns an error.
 	{
 		write_test_file(3);
 
@@ -2697,23 +2715,25 @@ bool test_account_limits_respected()
 		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime));
 		TEST_THAT(modtime != 0);
 
-		TEST_CHECK_THROWS(apProtocol->QueryStoreFile(
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
+			QueryStoreFile(
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				modtime,
 				modtime, /* use it for attr hash too */
-				0,							/* diff from ID */
+				0, /* diff from ID */
 				fnx,
 				upload),
-			ConnectionException, Protocol_UnexpectedReply);
+			Err_StorageLimitExceeded);
 
 		// This currently causes a fatal error on the server, which
 		// kills the connection. TODO FIXME return an error instead.
 		std::auto_ptr<IOStream> attr(new MemBlockStream(&modtime, sizeof(modtime)));
 		BackupStoreFilenameClear fnxd("exceed-limit-dir");
-		TEST_CHECK_THROWS(apProtocol->QueryCreateDirectory(
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, 
+			QueryCreateDirectory(
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				FAKE_ATTR_MODIFICATION_TIME, fnxd, attr),
-			ConnectionException, Protocol_UnexpectedReply);
+			Err_StorageLimitExceeded);
 
 		// Finish the connection.
 		apProtocol->QueryFinished();
