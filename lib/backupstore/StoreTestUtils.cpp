@@ -284,7 +284,7 @@ bool StopServer(bool wait_for_process)
 
 bool StartClient(const std::string& bbackupd_conf_file)
 {
-	bbstored_pid = StartDaemon(bbackupd_pid,
+	bbackupd_pid = StartDaemon(bbackupd_pid,
 		BBACKUPD " " + bbackupd_args + " " + bbackupd_conf_file,
 		"testfiles/bbackupd.pid");
 	return bbackupd_pid != 0;
@@ -297,3 +297,4 @@ bool StopClient(bool wait_for_process)
 	bbackupd_pid = 0;
 	return result;
 }
+
