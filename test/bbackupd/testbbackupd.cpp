@@ -459,6 +459,8 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BBACKUPD() \
 	SETUP(); \
+	TEST_THAT(bbackupd_pid == 0 || StopClient()); \
+	TEST_THAT(bbstored_pid == 0 || StopServer()); \
 	TEST_THAT(kill_running_daemons()); \
 	TEST_THAT(create_account(10000, 20000));
 
