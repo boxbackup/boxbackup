@@ -331,7 +331,9 @@ __E
 	{
 		$error_message = $cmd;
 		my ($mem_type,$mem_subtype) = split /,/,obj_get_type_params($cmd,'IsError');
+		my $error_type = $cmd_constants{"ErrorType"};
 		print H <<__E;
+	$cmd_class(int SubType) : m$mem_type($error_type), m$mem_subtype(SubType) { }
 	bool IsError(int &rTypeOut, int &rSubTypeOut) const;
 	std::string GetMessage() const { return GetMessage(m$mem_subtype); };
 	static std::string GetMessage(int subtype);
@@ -1102,7 +1104,7 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 			// or the exception handler fails as well. This path
 			// throws the exception upwards, killing the process
 			// that handles the current client.
-			Send($cmd_classes{$error_message}());
+			Send($cmd_classes{$error_message}(-1));
 			throw;
 		}
 
