@@ -99,7 +99,9 @@ bool delete_account();
 		} \
 		else \
 		{ \
-			TEST_FAIL_WITH_MESSAGE("command returned success"); \
+			TEST_FAIL_WITH_MESSAGE("command did not return an error, but a " \
+				"response of type " << type << ", subtype " << subtype << \
+				" instead"); \
 			or_statements; \
 		} \
 	}
