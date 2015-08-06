@@ -15,6 +15,7 @@
 	#include <signal.h>
 #endif
 
+#include "BoxTime.h"
 #include "ServerControl.h"
 #include "Test.h"
 
@@ -197,18 +198,18 @@ bool KillServer(int pid, bool WaitForProcess)
 	}
 	#endif
 
-	for (int i = 0; i < 30; i++)
+	printf("Waiting for server to die (pid %d): ", pid);
+
+	for (int i = 0; i < 300; i++)
 	{
-		if (i == 0) 
+		if (i % 10 == 0)
 		{
-			printf("Waiting for server to die (pid %d): ", pid);
+			printf(".");
+			fflush(stdout);
 		}
 
-		printf(".");
-		fflush(stdout);
-
 		if (!ServerIsAlive(pid)) break;
-		::sleep(1);
+		ShortSleep(MilliSecondsToBoxTime(100), false);
 		if (!ServerIsAlive(pid)) break;
 	}
 
