@@ -89,7 +89,7 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFile(
 	stream->Setup(Filename, 0 /* no recipe, just encode */, ContainerID,
 		rStoreFilename, pModificationTime, pLogger, pRunStatusProvider,
 		pBackgroundTask);
-	
+
 	// Return the stream for the caller
 	return stream;
 }
@@ -122,7 +122,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		// Couldn't read header
 		return false;
 	}
-	
+
 	// Check magic number
 	if(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
@@ -132,7 +132,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 	{
 		return false;
 	}
-	
+
 	// Get a filename, see if it loads OK
 	try
 	{
@@ -144,7 +144,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		// an error occured while reading it, so that's not good
 		return false;
 	}
-	
+
 	// Skip the attributes -- because they're encrypted, the server can't tell whether they're OK or not
 	try
 	{
@@ -165,10 +165,10 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 
 	// Get current position in file -- the end of the header
 	int64_t headerEnd = rFile.GetPosition();
-	
+
 	// Get number of blocks
 	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
-	
+
 	// Calculate where the block index will be, check it's reasonable
 	int64_t blockIndexLoc = fileSize - ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
 	if(blockIndexLoc < headerEnd)
@@ -185,7 +185,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		// Couldn't read block index header -- assume bad file
 		return false;
 	}
-	
+
 	// Check header
 	if((ntohl(blkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
@@ -197,10 +197,10 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		// Bad header -- either magic value or number of blocks is wrong
 		return false;
 	}
-	
+
 	// Flag for recording whether a block is referenced from another file
 	bool blockFromOtherFileReferenced = false;
-	
+
 	// Read the index, checking that the length values all make sense
 	int64_t currentBlockStart = headerEnd;
 	for(int64_t b = 0; b < numBlocks; ++b)
@@ -212,7 +212,7 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 			// Couldn't read block index entry -- assume bad file
 			return false;
 		}
-		
+
 		// Check size and location
 		int64_t blkSize = box_ntoh64(blk.mEncodedSize);
 		if(blkSize <= 0)
@@ -228,19 +228,20 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 				// Encoded size makes the block run over the index
 				return false;
 			}
-			
-			// Move the current block start ot the end of this block
+
+			// Move the current block start to the end of this block
 			currentBlockStart += blkSize;
 		}
 	}
-	
+
 	// Check that there's no empty space
 	if(currentBlockStart != blockIndexLoc)
 	{
 		return false;
 	}
-	
-	// Check that if another block is references, then the ID is there, and if one isn't there is no ID.
+
+	// Check that if another file is referenced, then the ID is there, and if one
+	// isn't then there is no ID.
 	int64_t otherID = box_ntoh64(blkhdr.mOtherFileID);
 	if((otherID != 0 && blockFromOtherFileReferenced == false)
 		|| (otherID == 0 && blockFromOtherFileReferenced == true))
@@ -248,13 +249,13 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 		// Doesn't look good!
 		return false;
 	}
-	
+
 	// Does the caller want the other ID?
 	if(pDiffFromObjectIDOut)
 	{
 		*pDiffFromObjectIDOut = otherID;
 	}
-	
+
 	// Does the caller want the container ID?
 	if(pContainerIDOut)
 	{
@@ -281,7 +282,7 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 	{
 		THROW_EXCEPTION(BackupStoreException, OutputFileAlreadyExists)
 	}
-	
+
 	// Try, delete output file if error
 	try
 	{
@@ -290,7 +291,7 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 
 		// Get the decoding stream
 		std::auto_ptr<DecodedStream> stream(DecodeFileStream(rEncodedFile, Timeout, pAlterativeAttr));
-		
+
 		// Is it a symlink?
 		if(!stream->IsSymLink())
 		{
@@ -313,7 +314,7 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 		// of the block index. I hope that reading an extra byte
 		// doesn't hurt!
 		// ASSERT(drained == 0);
-		
+
 		// Write the attributes
 		try
 		{
@@ -350,10 +351,10 @@ std::auto_ptr<BackupStoreFile::DecodedStream> BackupStoreFile::DecodeFileStream(
 {
 	// Create stream
 	std::auto_ptr<DecodedStream> stream(new DecodedStream(rEncodedFile, Timeout));
-	
+
 	// Get it ready
 	stream->Setup(pAlterativeAttr);
-	
+
 	// Return to caller
 	return stream;
 }
@@ -457,7 +458,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 	default:
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// If not in file order, then the index list must be read now
 	if(!inFileOrder)
 	{
@@ -486,7 +487,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 			// Couldn't read header
 			THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
 		}
-	}	
+	}
 
 	// Check magic number
 	if(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
@@ -500,7 +501,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 
 	// Get the filename
 	mFilename.ReadFromStream(mrEncodedFile, mTimeout);
-	
+
 	// Get the attributes (either from stream, or supplied attributes)
 	if(pAlterativeAttr != 0)
 	{
@@ -516,7 +517,7 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		// Read the attributes from the stream
 		mAttributes.ReadFromStream(mrEncodedFile, mTimeout);
 	}
-	
+
 	// If it is in file order, go and read the file attributes
 	// Requires that the stream can seek
 	if(inFileOrder)
@@ -526,30 +527,30 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		{
 			THROW_EXCEPTION(BackupStoreException, StreamDoesntHaveRequiredFeatures)
 		}
-	
+
 		// Store current location (beginning of encoded blocks)
 		int64_t endOfHeaderPos = mrEncodedFile.GetPosition();
-		
+
 		// Work out where the index is
 		int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
 		int64_t blockHeaderPos = fileSize - ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
-		
+
 		// Seek to that position
 		mrEncodedFile.Seek(blockHeaderPos, IOStream::SeekType_Absolute);
-		
+
 		// Read the block index
-		ReadBlockIndex(false /* magic number still to be read */);		
-		
+		ReadBlockIndex(false /* magic number still to be read */);
+
 		// Seek back to the end of header position, ready for reading the chunks
 		mrEncodedFile.Seek(endOfHeaderPos, IOStream::SeekType_Absolute);
 	}
-	
+
 	// Check view of blocks from block header and file header match
 	if(mNumBlocks != (int64_t)box_ntoh64(hdr.mNumBlocks))
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// Need to allocate some memory for the two blocks for reading encoded data, and clear data
 	if(mNumBlocks > 0)
 	{
@@ -562,11 +563,11 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 			// Get the clear and encoded size
 			int32_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
 			ASSERT(encodedSize > 0);
-			
+
 			// Larger?
 			if(encodedSize > maxEncodedDataSize) maxEncodedDataSize = encodedSize;
 		}
-		
+
 		// Allocate those blocks!
 		mpEncodedData = (uint8_t*)BackupStoreFile::CodingChunkAlloc(maxEncodedDataSize + 32);
 
@@ -591,7 +592,7 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 {
 	// Header
 	file_BlockIndexHeader blkhdr;
-	
+
 	// Read it in -- way depends on how whether the magic number has already been read
 	if(MagicAlreadyRead)
 	{
@@ -611,7 +612,7 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 			// Couldn't read header
 			THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
 		}
-		
+
 		// Check magic value
 		if(ntohl(blkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
@@ -622,26 +623,26 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 			THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 		}
 	}
-	
+
 	// Get the number of blocks out of the header
 	mNumBlocks = box_ntoh64(blkhdr.mNumBlocks);
-	
+
 	// Read the IV base
 	mEntryIVBase = box_ntoh64(blkhdr.mEntryIVBase);
-	
+
 	// Load the block entries in?
 	if(mNumBlocks > 0)
 	{
 		// How big is the index?
 		int64_t indexSize = sizeof(file_BlockIndexEntry) * mNumBlocks;
-		
+
 		// Allocate some memory
 		mpBlockIndex = ::malloc(indexSize);
 		if(mpBlockIndex == 0)
 		{
 			throw std::bad_alloc();
 		}
-		
+
 		// Read it in
 		if(!mrEncodedFile.ReadFullBuffer(mpBlockIndex, indexSize, 0 /* not interested in bytes read if this fails */, mTimeout))
 		{
@@ -678,7 +679,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 	int bytesToRead = NBytes;
 	uint8_t *output = (uint8_t*)pBuffer;
-	
+
 	while(bytesToRead > 0 && mCurrentBlock < mNumBlocks)
 	{
 		// Anything left in the current block?
@@ -687,16 +688,16 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// Copy data out of this buffer
 			int s = mCurrentBlockClearSize - mPositionInCurrentBlock;
 			if(s > bytesToRead) s = bytesToRead;	// limit to requested data
-			
+
 			// Copy
 			::memcpy(output, mpClearData + mPositionInCurrentBlock, s);
-			
+
 			// Update positions
 			output += s;
 			mPositionInCurrentBlock += s;
 			bytesToRead -= s;
 		}
-		
+
 		// Need to get some more data?
 		if(bytesToRead > 0 && mPositionInCurrentBlock >= mCurrentBlockClearSize)
 		{
@@ -707,7 +708,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 				// Stop now!
 				break;
 			}
-		
+
 			// Get the size from the block index
 			const file_BlockIndexEntry *entry = (file_BlockIndexEntry *)mpBlockIndex;
 			int32_t encodedSize = box_ntoh64(entry[mCurrentBlock].mEncodedSize);
@@ -718,14 +719,14 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 				// It needs to be combined with the previous version first.
 				THROW_EXCEPTION(BackupStoreException, CannotDecodeDiffedFilesWithoutCombining)
 			}
-			
+
 			// Load in next block
 			if(!mrEncodedFile.ReadFullBuffer(mpEncodedData, encodedSize, 0 /* not interested in bytes read if this fails */, mTimeout))
 			{
 				// Couldn't read header
 				THROW_EXCEPTION(BackupStoreException, WhenDecodingExpectedToReadButCouldnt)
 			}
-			
+
 			// Decode the data
 			mCurrentBlockClearSize = BackupStoreFile::DecodeChunk(mpEncodedData, encodedSize, mpClearData, mClearDataSize);
 
@@ -736,7 +737,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// platforms with different endiannesses.
 			iv = box_hton64(iv);
 			sBlowfishDecryptBlockEntry.SetIV(&iv);
-			
+
 			// Decrypt the encrypted section
 			file_BlockIndexEntryEnc entryEnc;
 			int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
@@ -781,7 +782,7 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 				THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 #endif
 			}
-			
+
 			// Check the digest
 			MD5Digest md5;
 			md5.Add(mpClearData, mCurrentBlockClearSize);
@@ -790,12 +791,12 @@ int BackupStoreFile::DecodedStream::Read(void *pBuffer, int NBytes, int Timeout)
 			{
 				THROW_EXCEPTION(BackupStoreException, BackupStoreFileFailedIntegrityCheck)
 			}
-			
+
 			// Set vars to say what's happening
 			mPositionInCurrentBlock = 0;
 		}
 	}
-	
+
 	ASSERT(bytesToRead >= 0);
 	ASSERT(bytesToRead <= NBytes);
 
@@ -818,14 +819,14 @@ bool BackupStoreFile::DecodedStream::IsSymLink()
 	{
 		return false;
 	}
-	
+
 	// So the attributes think it is a symlink.
 	// Consistency check...
 	if(mNumBlocks != 0)
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	return true;
 }
 
@@ -919,7 +920,7 @@ void BackupStoreFile::SetAESKey(const void *pKey, int KeyLength)
 	sAESEncrypt.Init(CipherContext::Encrypt, CipherAES(CipherDescription::Mode_CBC, pKey, KeyLength));
 	sAESDecrypt.Reset();
 	sAESDecrypt.Init(CipherContext::Decrypt, CipherAES(CipherDescription::Mode_CBC, pKey, KeyLength));
-	
+
 	// Set encryption to use this key, instead of the "default" blowfish key
 	spEncrypt = &sAESEncrypt;
 	sEncryptCipherType = HEADER_AES_ENCODING;
@@ -964,7 +965,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 	{
 		rOutput.Reallocate(256);
 	}
-	
+
 	// Check alignment of the block
 	ASSERT((((uint64_t)rOutput.mpBuffer) % BACKUPSTOREFILE_CODING_BLOCKSIZE) == BACKUPSTOREFILE_CODING_OFFSET);
 
@@ -984,10 +985,10 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 	const void *iv = spEncrypt->SetRandomIV(ivLen);
 	::memcpy(rOutput.mpBuffer + outOffset, iv, ivLen);
 	outOffset += ivLen;
-	
+
 	// Start encryption process
 	spEncrypt->Begin();
-	
+
 	#define ENCODECHUNK_CHECK_SPACE(ToEncryptSize)									\
 		{																			\
 			if((rOutput.mBufferSize - outOffset) < ((ToEncryptSize) + 128))			\
@@ -995,13 +996,13 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 				rOutput.Reallocate(rOutput.mBufferSize + (ToEncryptSize) + 128);	\
 			}																		\
 		}
-	
+
 	// Encode the chunk
 	if(compressChunk)
 	{
 		// buffer to compress into
 		uint8_t buffer[2048];
-		
+
 		// Set compressor with all the chunk as an input
 		Compress<true> compress;
 		compress.Input(Chunk, ChunkSize);
@@ -1014,7 +1015,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 			if(s > 0)
 			{
 				ENCODECHUNK_CHECK_SPACE(s)
-				outOffset += spEncrypt->Transform(rOutput.mpBuffer + outOffset, rOutput.mBufferSize - outOffset, buffer, s);				
+				outOffset += spEncrypt->Transform(rOutput.mpBuffer + outOffset, rOutput.mBufferSize - outOffset, buffer, s);
 			}
 			else
 			{
@@ -1034,7 +1035,7 @@ int BackupStoreFile::EncodeChunk(const void *Chunk, int ChunkSize, BackupStoreFi
 		ENCODECHUNK_CHECK_SPACE(16)
 		outOffset += spEncrypt->Final(rOutput.mpBuffer + outOffset, rOutput.mBufferSize - outOffset);
 	}
-	
+
 	ASSERT(outOffset < rOutput.mBufferSize);		// first check should have sorted this -- merely logic check
 
 	return outOffset;
@@ -1063,7 +1064,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 	}
 
 	const uint8_t *input = (uint8_t*)Encoded;
-	
+
 	// Get header, make checks, etc
 	uint8_t header = input[0];
 	bool chunkCompressed = (header & HEADER_CHUNK_IS_COMPRESSED) == HEADER_CHUNK_IS_COMPRESSED;
@@ -1072,7 +1073,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 	{
 		THROW_EXCEPTION(BackupStoreException, ChunkHasUnknownEncoding)
 	}
-	
+
 #ifndef HAVE_OLD_SSL
 	// Choose cipher
 	CipherContext &cipher((encodingType == HEADER_AES_ENCODING)?sAESDecrypt:sBlowfishDecrypt);
@@ -1084,7 +1085,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 	}
 	CipherContext &cipher(sBlowfishDecrypt);
 #endif
-	
+
 	// Check enough space for header, an IV and one byte of input
 	int ivLen = cipher.GetIVLength();
 	if(EncodedSize < (1 + ivLen + 1))
@@ -1095,7 +1096,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 	// Set IV in decrypt context, and start
 	cipher.SetIV(input + 1);
 	cipher.Begin();
-	
+
 	// Setup vars for code
 	int inOffset = 1 + ivLen;
 	uint8_t *output = (uint8_t*)Output;
@@ -1107,10 +1108,10 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 		// Do things in chunks
 		uint8_t buffer[2048];
 		int inputBlockLen = cipher.InSizeForOutBufferSize(sizeof(buffer));
-		
+
 		// Decompressor
 		Compress<false> decompress;
-		
+
 		while(inOffset < EncodedSize)
 		{
 			// Decrypt a block
@@ -1118,7 +1119,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 			if(bl > (EncodedSize - inOffset)) bl = EncodedSize - inOffset;	// not too long
 			int s = cipher.Transform(buffer, sizeof(buffer), input + inOffset, bl);
 			inOffset += bl;
-			
+
 			// Decompress the decrypted data
 			if(s > 0)
 			{
@@ -1129,7 +1130,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 					os = decompress.Output(output + outOffset, OutputSize - outOffset);
 					outOffset += os;
 				} while(os > 0);
-				
+
 				// Check that there's space left in the output buffer -- there always should be
 				if(outOffset >= OutputSize)
 				{
@@ -1137,7 +1138,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 				}
 			}
 		}
-		
+
 		// Get any compressed data remaining in the cipher context and compression
 		int s = cipher.Final(buffer, sizeof(buffer));
 		decompress.Input(buffer, s);
@@ -1160,7 +1161,7 @@ int BackupStoreFile::DecodeChunk(const void *Encoded, int EncodedSize, void *Out
 		outOffset += cipher.Transform(output + outOffset, OutputSize - outOffset, input + inOffset, EncodedSize - inOffset);
 		outOffset += cipher.Final(output + outOffset, OutputSize - outOffset);
 	}
-	
+
 	return outOffset;
 }
 
@@ -1212,10 +1213,10 @@ std::auto_ptr<IOStream> BackupStoreFile::ReorderFileToStreamOrder(IOStream *pStr
 	{
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// Get number of blocks
 	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
-	
+
 	// Calculate where the block index will be, check it's reasonable
 	int64_t blockIndexSize = ((numBlocks * sizeof(file_BlockIndexEntry)) + sizeof(file_BlockIndexHeader));
 	int64_t blockIndexLoc = fileSize - blockIndexSize;
@@ -1224,10 +1225,10 @@ std::auto_ptr<IOStream> BackupStoreFile::ReorderFileToStreamOrder(IOStream *pStr
 		// Doesn't look good!
 		THROW_EXCEPTION(BackupStoreException, BadBackupStoreFile)
 	}
-	
+
 	// Build a reordered stream
 	std::auto_ptr<IOStream> reordered(new ReadGatherStream(TakeOwnership));
-	
+
 	// Set it up...
 	ReadGatherStream &rreordered(*((ReadGatherStream*)reordered.get()));
 	int component = rreordered.AddComponent(pStream);
@@ -1235,7 +1236,7 @@ std::auto_ptr<IOStream> BackupStoreFile::ReorderFileToStreamOrder(IOStream *pStr
 	rreordered.AddBlock(component, blockIndexSize, true, blockIndexLoc);
 	// And then the rest of the file
 	rreordered.AddBlock(component, blockIndexLoc, true, 0);
-		
+
 	return reordered;
 }
 
@@ -1290,7 +1291,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 	{
 		in.reset(new FileStream(Filename));
 	}
-	
+
 	// Read header
 	file_BlockIndexHeader hdr;
 	if(!rBlockIndex.ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */, Timeout))
@@ -1316,17 +1317,17 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 	// Get basic information
 	int64_t numBlocks = box_ntoh64(hdr.mNumBlocks);
 	uint64_t entryIVBase = box_ntoh64(hdr.mEntryIVBase);
-	
+
 	//TODO: Verify that these sizes look reasonable
-	
+
 	// setup
 	void *data = 0;
 	int32_t dataSize = -1;
 	bool matches = true;
 	int64_t totalSizeInBlockIndex = 0;
-	
+
 	try
-	{	
+	{
 		for(int64_t b = 0; b < numBlocks; ++b)
 		{
 			// Read an entry from the stream
@@ -1335,8 +1336,8 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 			{
 				// Couldn't read entry
 				THROW_EXCEPTION(BackupStoreException, CouldntReadEntireStructureFromStream)
-			}	
-		
+			}
+
 			// Calculate IV for this entry
 			uint64_t iv = entryIVBase;
 			iv += b;
@@ -1348,8 +1349,8 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 				iv = box_swap64(iv);
 			}
 #endif
-			sBlowfishDecryptBlockEntry.SetIV(&iv);			
-			
+			sBlowfishDecryptBlockEntry.SetIV(&iv);
+
 			// Decrypt the encrypted section
 			file_BlockIndexEntryEnc entryEnc;
 			int sectionSize = sBlowfishDecryptBlockEntry.TransformBlock(&entryEnc, sizeof(entryEnc),
@@ -1384,7 +1385,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 				}
 				dataSize = blockClearSize + 128;
 			}
-			
+
 			// Load in the block from the file, if it's not a symlink
 			if(!sourceIsSymlink)
 			{
@@ -1406,7 +1407,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 					}
 				}
 			}
-			
+
 			// Keep on going regardless, to make sure the entire block index stream is read
 			// -- must always be consistent about what happens with the stream.
 		}
@@ -1421,14 +1422,14 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 		}
 		throw;
 	}
-	
+
 	// free block
 	if(data != 0)
 	{
 		::free(data);
 		data = 0;
 	}
-	
+
 	// Check for data left over if it's not a symlink
 	if(!sourceIsSymlink)
 	{
@@ -1439,13 +1440,13 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 			matches = false;
 		}
 	}
-	
+
 	// Symlinks must have zero size on server
 	if(sourceIsSymlink)
 	{
 		matches = (totalSizeInBlockIndex == 0);
 	}
-	
+
 	return matches;
 }
 
@@ -1525,10 +1526,10 @@ void BackupStoreFile::EncodingBuffer::Reallocate(int NewSize)
 	}
 	// Copy data
 	::memcpy(buffer, mpBuffer, (NewSize > mBufferSize)?mBufferSize:NewSize);
-	
+
 	// Free old
 	BackupStoreFile::CodingChunkFree(mpBuffer);
-	
+
 	// Store new buffer
 	mpBuffer = buffer;
 	mBufferSize = NewSize;
@@ -1557,7 +1558,7 @@ DiffTimer::DiffTimer()
 //
 // --------------------------------------------------------------------------
 DiffTimer::~DiffTimer()
-{	
+{
 }
 
 // Shortcut interface
@@ -1579,7 +1580,7 @@ int64_t BackupStoreFile::QueryStoreFileDiff(BackupProtocolCallable& protocol,
 				StoreFilename);
 		ASSERT(getblockindex->GetObjectID() == DiffFromFileID);
 		std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
-		
+
 		pStream = EncodeFileDiff(LocalFilename,
 			DirectoryObjectID, StoreFilename, DiffFromFileID,
 			*(blockIndexStream.get()), Timeout, pDiffTimer,

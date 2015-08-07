@@ -49,7 +49,7 @@ public:
 	virtual pos_type BytesLeftToRead();	// may return IOStream::SizeOfStreamUnknown (and will for most stream types)
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite) = 0;
-	virtual void Write(const std::string& rBuffer,   
+	virtual void Write(const std::string& rBuffer,
 		int Timeout = IOStream::TimeOutInfinite);
 	virtual void WriteAllBuffered(int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
