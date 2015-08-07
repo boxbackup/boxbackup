@@ -1816,7 +1816,10 @@ bool test_backup_pauses_when_store_is_full()
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.2"));
 
 		// We can't guarantee to get in before housekeeping runs, so it's safer
-		// (more reliable) to wait for it to finish.
+		// (more reliable) to wait for it to finish. But we also need to stop the
+		// client first, otherwise it might be connected when housekeeping tries
+		// to run, and that would prevent it from running, causing test to fail.
+		TEST_THAT_OR(StopClient(), FAIL);
 		wait_for_operation(5, "housekeeping to run");
 
 		// BLOCK
@@ -1863,6 +1866,7 @@ bool test_backup_pauses_when_store_is_full()
 	// Increase the limit again, check that all files are backed up on the
 	// next run.
 	TEST_THAT(change_account_limits("0B", "34B"));
+	TEST_THAT_OR(StartClient(), FAIL);
 	wait_for_sync_end();
 	TEST_COMPARE(Compare_Same);
 
