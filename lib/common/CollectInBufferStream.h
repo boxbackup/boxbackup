@@ -26,12 +26,24 @@ class CollectInBufferStream : public IOStream
 public:
 	CollectInBufferStream();
 	~CollectInBufferStream();
+
+	// Move constructor:
+	CollectInBufferStream(CollectInBufferStream& rOther)
+	: mBuffer(rOther.mBuffer.Release()),
+	  mBufferSize(rOther.mBufferSize),
+	  mBytesInBuffer(rOther.mBytesInBuffer),
+	  mReadPosition(rOther.mReadPosition),
+	  mInWritePhase(rOther.mInWritePhase)
+	{
+		rOther.Reset();
+	}
+
 private:
-	// No copying
+	// No copying (only moving, as defined above)
 	CollectInBufferStream(const CollectInBufferStream &);
 	CollectInBufferStream(const IOStream &);
-public:
 
+public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes,
