@@ -2323,6 +2323,42 @@ bool test_encoding()
 		{
 			FileStream enc("testfiles/testenc1_enc");
 			TEST_THAT(BackupStoreFile::VerifyEncodedFileFormat(enc) == true);
+
+			// And using the stream-based interface, writing different
+			// block sizes at a time.
+			CollectInBufferStream contents;
+			enc.Seek(0, IOStream::SeekType_Absolute);
+			enc.CopyStreamTo(contents);
+			contents.SetForReading();
+
+			enc.Seek(0, IOStream::SeekType_End);
+			size_t file_size = enc.GetPosition();
+			TEST_EQUAL(file_size, contents.GetSize());
+
+			for(int buffer_size = 1; ; buffer_size <<= 1)
+			{
+				enc.Seek(0, IOStream::SeekType_Absolute);
+				CollectInBufferStream temp_copy;
+				BackupStoreFile::VerifyStream verifier(&temp_copy);
+				enc.CopyStreamTo(verifier, IOStream::TimeOutInfinite,
+					buffer_size);
+
+				// The block index is only validated on Close(), which
+				// CopyStreamTo() doesn't do.
+				verifier.Close();
+
+				temp_copy.SetForReading();
+				TEST_EQUAL(file_size, temp_copy.GetSize());
+				TEST_THAT(memcmp(contents.GetBuffer(),
+					temp_copy.GetBuffer(), file_size) == 0);
+
+				// Keep doubling buffer size until we've copied the
+				// entire encoded file in a single pass, then stop.
+				if(buffer_size > file_size)
+				{
+					break;
+				}
+			}
 		}
 
 		// Decode it

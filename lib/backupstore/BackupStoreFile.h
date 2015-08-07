@@ -16,7 +16,9 @@
 
 #include "autogen_BackupProtocol.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupStoreFileWire.h"
 #include "BackupStoreFilename.h"
+#include "CollectInBufferStream.h"
 #include "IOStream.h"
 #include "ReadLoggingStream.h"
 
@@ -122,6 +124,64 @@ public:
 #endif
 	};
 
+	class VerifyStream : public IOStream
+	{
+	private:
+		enum
+		{
+			State_Header = 0,
+			State_FilenameHeader,
+			State_Filename,
+			State_AttributesSize,
+			State_Attributes,
+			State_Blocks,
+		};
+
+		int mState;
+		IOStream* mpCopyToStream;
+		CollectInBufferStream mCurrentUnitData;
+		size_t mCurrentUnitSize;
+		int64_t mNumBlocks;
+		int64_t mBlockIndexSize;
+		int64_t mCurrentPosition;
+		int64_t mBlockDataPosition;
+		bool mCurrentBufferIsAlternate;
+		CollectInBufferStream mAlternateData;
+		bool mBlockFromOtherFileReferenced;
+		int64_t mContainerID;
+		int64_t mDiffFromObjectID;
+
+	public:
+		VerifyStream(IOStream* pCopyToStream = NULL)
+		: mState(State_Header),
+		  mpCopyToStream(pCopyToStream),
+		  mCurrentUnitSize(sizeof(file_StreamFormat)),
+		  mNumBlocks(0),
+		  mBlockIndexSize(0),
+		  mCurrentPosition(0),
+		  mBlockDataPosition(0),
+		  mCurrentBufferIsAlternate(false),
+		  mBlockFromOtherFileReferenced(false),
+		  mContainerID(0),
+		  mDiffFromObjectID(0)
+		{ }
+		virtual int Read(void *pBuffer, int NBytes,
+			int Timeout = IOStream::TimeOutInfinite)
+		{
+			THROW_EXCEPTION(CommonException, NotSupported);
+		}
+		virtual void Write(const void *pBuffer, int NBytes,
+			int Timeout = IOStream::TimeOutInfinite);
+		virtual void Close();
+		virtual bool StreamDataLeft()
+		{
+			THROW_EXCEPTION(CommonException, NotSupported);
+		}
+		virtual bool StreamClosed()
+		{
+			THROW_EXCEPTION(CommonException, NotSupported);
+		}
+	};
 
 	// Main interface
 	static std::auto_ptr<BackupStoreFileEncodeStream> EncodeFile

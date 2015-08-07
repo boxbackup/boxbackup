@@ -102,7 +102,15 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFile(
 //			 requirements. Doesn't verify that the data is intact
 //			 and can be decoded. Optionally returns the ID of the
 //			 file which it is diffed from, and the (original)
-//			 container ID.
+//			 container ID. This is more efficient than
+//			 BackupStoreFile::VerifyStream() when the file data
+//			 already exists on disk and we can Seek() around in
+//			 it, but less efficient if we are reading the stream
+//			 from the network and not intending to Write() it to
+//			 a file first, so we need both unfortunately.
+//			 TODO FIXME: use a modified VerifyStream() which
+//			 repositions the file pointer and Close()s early to
+//			 deduplicate this code.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
@@ -265,6 +273,346 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 	// Passes all tests
 	return true;
 }
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreFile::VerifyStream::Write()
+//		Purpose: Handles writes to the verifying stream. If the write
+//			 completes the current unit, then verify it, copy it
+//			 to mpCopyToStream if not NULL, and move on to the
+//			 next unit, otherwise throw an exception.
+//		Created: 2015/08/07
+//
+// --------------------------------------------------------------------------
+
+void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int Timeout)
+{
+	// Check that we haven't already written too much to the current unit
+	size_t BytesToAdd;
+	if(mState == State_Blocks)
+	{
+		// We don't know how many bytes to expect
+		ASSERT(mCurrentUnitSize == 0);
+		BytesToAdd = NBytes;
+	}
+	else
+	{
+		ASSERT(mCurrentUnitData.GetSize() < mCurrentUnitSize);
+		size_t BytesLeftInCurrentUnit = mCurrentUnitSize -
+			mCurrentUnitData.GetSize();
+		// Add however many bytes are needed/available to the current unit's buffer.
+		BytesToAdd = std::min(BytesLeftInCurrentUnit, (size_t)NBytes);
+	}
+
+	// We must make progress here, or we could have infinite recursion.
+	ASSERT(BytesToAdd > 0);
+
+	CollectInBufferStream* pCurrentBuffer = (mCurrentBufferIsAlternate ?
+		&mAlternateData : &mCurrentUnitData);
+	pCurrentBuffer->Write(pBuffer, BytesToAdd, Timeout);
+	if(mpCopyToStream)
+	{
+		mpCopyToStream->Write(pBuffer, BytesToAdd, Timeout);
+	}
+
+	pBuffer = (uint8_t *)pBuffer + BytesToAdd;
+	NBytes -= BytesToAdd;
+	mCurrentPosition += BytesToAdd;
+
+	if(mState == State_Blocks)
+	{
+		// The block index follows the blocks themselves, but without seeing the
+		// index we don't know how big the blocks are. So we just have to keep
+		// reading, holding the last mBlockIndexSize bytes in two buffers, until
+		// we reach the end of the file (when Close() is called) when we can look
+		// back over those buffers and extract the block index from them.
+		if(pCurrentBuffer->GetSize() >= mBlockIndexSize)
+		{
+			// Time to swap buffers, and clear the one we're about to
+			// overwrite.
+			mCurrentBufferIsAlternate = !mCurrentBufferIsAlternate;
+			pCurrentBuffer = (mCurrentBufferIsAlternate ?
+				&mAlternateData : &mCurrentUnitData);
+			pCurrentBuffer->Reset();
+		}
+
+		// We don't want to move data into the finished buffer while we're in this
+		// state, and we don't need to call ourselves recursively, so just return.
+		return;
+	}
+
+	ASSERT(mState != State_Blocks);
+
+	// If the current unit is not complete, just return now.
+	if(mCurrentUnitData.GetSize() < mCurrentUnitSize)
+	{
+		return;
+	}
+
+	ASSERT(mCurrentUnitData.GetSize() == mCurrentUnitSize);
+	mCurrentUnitData.SetForReading();
+	CollectInBufferStream finished(mCurrentUnitData);
+
+	// This should leave mCurrentUnitData empty in write phase
+	ASSERT(!mCurrentUnitData.StreamClosed());
+	ASSERT(mCurrentUnitData.GetSize() == 0);
+
+	// Advance automatically to next state (to reduce code duplication) if the current
+	// state is anything but State_Blocks. We remain in that state for more than one
+	// read (processing one block at a time), and exit it manually.
+	int oldState = mState;
+	if(mState != State_Blocks)
+	{
+		mState++;
+	}
+
+	// Process and complete the current unit, depending what it is.
+	if(oldState == State_Header)
+	{
+		// Get the header...
+		file_StreamFormat hdr;
+		ASSERT(finished.GetSize() == sizeof(hdr));
+		memcpy(&hdr, finished.GetBuffer(), sizeof(hdr));
+
+		// Check magic number
+		if(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
+#ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
+			&& ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V0
+#endif
+			)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+				"Invalid header magic in stream: expected " <<
+				BOX_FORMAT_HEX32(OBJECTMAGIC_FILE_MAGIC_VALUE_V1) <<
+				" or " <<
+				BOX_FORMAT_HEX32(OBJECTMAGIC_FILE_MAGIC_VALUE_V0) <<
+				" but found " <<
+				BOX_FORMAT_HEX32(ntohl(hdr.mMagicValue)));
+		}
+
+		mNumBlocks = box_ntoh64(hdr.mNumBlocks);
+		mBlockIndexSize = (mNumBlocks * sizeof(file_BlockIndexEntry)) +
+			sizeof(file_BlockIndexHeader);
+		mContainerID = box_ntoh64(hdr.mContainerID);
+
+		ASSERT(mState == State_FilenameHeader);
+		mCurrentUnitSize = 2;
+	}
+	else if(oldState == State_FilenameHeader)
+	{
+		// Check that the encoding is an accepted value.
+		unsigned int encoding =
+			BACKUPSTOREFILENAME_GET_ENCODING(
+				(uint8_t *)finished.GetBuffer());
+		if(encoding < BackupStoreFilename::Encoding_Min ||
+			encoding >  BackupStoreFilename::Encoding_Max)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+				"Invalid encoding in filename: " << encoding);
+		}
+
+		ASSERT(mState == State_Filename);
+		mCurrentUnitSize = BACKUPSTOREFILENAME_GET_SIZE(
+			(uint8_t *)finished.GetBuffer());
+		// Copy the first two bytes back into the new buffer, to be used by the
+		// completed filename.
+		finished.CopyStreamTo(mCurrentUnitData);
+	}
+	else if(oldState == State_Filename)
+	{
+		BackupStoreFilename fn;
+		fn.ReadFromStream(finished, IOStream::TimeOutInfinite);
+		ASSERT(mState == State_AttributesSize);
+		mCurrentUnitSize = sizeof(int32_t);
+	}
+	else if(oldState == State_AttributesSize)
+	{
+		ASSERT(mState == State_Attributes);
+		mCurrentUnitSize = ntohl(*(int32_t *)finished.GetBuffer());
+	}
+	else if(oldState == State_Attributes)
+	{
+		// Skip the attributes -- because they're encrypted, the server can't tell
+		// whether they're OK or not.
+		ASSERT(mState == State_Blocks);
+		mBlockDataPosition = mCurrentPosition;
+		mCurrentUnitSize = 0;
+	}
+	else if(oldState == State_Blocks)
+	{
+		// The block index follows the blocks themselves, but without seeing the
+		// index we don't know how big the blocks are. So we just have to keep
+		// reading, holding the last mBlockIndexSize bytes in two buffers, until
+		// we reach the end of the file (when Close() is called) when we can look
+		// back over those buffers and extract the block index from them.
+		ASSERT(mState == State_Blocks);
+		if(pCurrentBuffer->GetSize() >= mBlockIndexSize)
+		{
+			// Time to swap buffers, and clear the one we're about to
+			// overwrite.
+			mCurrentBufferIsAlternate = !mCurrentBufferIsAlternate;
+			pCurrentBuffer = (mCurrentBufferIsAlternate ?
+				&mAlternateData : &mCurrentUnitData);
+			pCurrentBuffer->Reset();
+		}
+	}
+
+	if(NBytes > 0)
+	{
+		// Still some data to process, so call recursively to deal with it.
+		Write(pBuffer, NBytes, Timeout);
+	}
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreFile::VerifyStream::Write()
+//		Purpose: Handles closing the verifying stream, which tells us
+//			 that there is no more incoming data, at which point
+//			 we can extract the block index from the data most
+//			 recently read, and verify it.
+//		Created: 2015/08/07
+//
+// --------------------------------------------------------------------------
+
+
+void BackupStoreFile::VerifyStream::Close()
+{
+	if(mpCopyToStream)
+	{
+		mpCopyToStream->Close();
+	}
+
+	if(mState != State_Blocks)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+			"Stream closed too early to be a valid BackupStoreFile: was in "
+			"state " << mState << " instead of " << State_Blocks);
+	}
+
+	// Find the last mBlockIndexSize bytes.
+	CollectInBufferStream finished;
+
+	CollectInBufferStream* pCurrentBuffer = mCurrentBufferIsAlternate ?
+		&mAlternateData : &mCurrentUnitData;
+	CollectInBufferStream* pPreviousBuffer = mCurrentBufferIsAlternate ?
+		&mCurrentUnitData : &mAlternateData;
+
+	int64_t BytesFromCurrentBuffer = std::min(mBlockIndexSize,
+		(int64_t)pCurrentBuffer->GetSize());
+	int64_t BytesFromPreviousBuffer = mBlockIndexSize - BytesFromCurrentBuffer;
+
+	if(pPreviousBuffer->GetSize() < BytesFromPreviousBuffer)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+			"Not enough bytes for block index: expected " <<
+			mBlockIndexSize << " but had collected " <<
+			(pPreviousBuffer->GetSize() + pCurrentBuffer->GetSize()) <<
+			" at " << mCurrentPosition << " bytes into file");
+	}
+
+	size_t PreviousBufferOffset = pPreviousBuffer->GetSize() -
+		BytesFromPreviousBuffer;
+	size_t CurrentBufferOffset = pCurrentBuffer->GetSize() -
+		BytesFromCurrentBuffer;
+
+	file_BlockIndexHeader blkhdr;
+	finished.Write((uint8_t *)pPreviousBuffer->GetBuffer() + PreviousBufferOffset,
+		BytesFromPreviousBuffer);
+	finished.Write((uint8_t *)pCurrentBuffer->GetBuffer() + CurrentBufferOffset,
+		BytesFromCurrentBuffer);
+	ASSERT(finished.GetSize() == mBlockIndexSize);
+
+	// Load the block index header
+	memcpy(&blkhdr, finished.GetBuffer(), sizeof(blkhdr));
+
+	if(ntohl(blkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1
+#ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
+		&& ntohl(blkhdr.mMagicValue) != OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V0
+#endif
+		)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+			"Invalid block index magic in stream: expected " <<
+			BOX_FORMAT_HEX32(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1) <<
+			" or " <<
+			BOX_FORMAT_HEX32(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V0) <<
+			" but found " <<
+			BOX_FORMAT_HEX32(ntohl(blkhdr.mMagicValue)));
+	}
+
+	if((int64_t)box_ntoh64(blkhdr.mNumBlocks) != mNumBlocks)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+			"Invalid block index size in stream: expected " <<
+			BOX_FORMAT_OBJECTID(mNumBlocks) <<
+			" but found " <<
+			BOX_FORMAT_OBJECTID(box_ntoh64(blkhdr.mNumBlocks)));
+	}
+
+	// Flag for recording whether a block is referenced from another file
+	mBlockFromOtherFileReferenced = false;
+	int64_t blockIndexLoc = mCurrentPosition - mBlockIndexSize;
+
+	// Read the index, checking that the length values all make sense
+	int64_t currentBlockStart = mBlockDataPosition;
+	file_BlockIndexEntry* pBlk = (file_BlockIndexEntry *)
+		((uint8_t *)finished.GetBuffer() + sizeof(blkhdr));
+	for(int64_t b = 0; b < mNumBlocks; ++b)
+	{
+		// Check size and location
+		int64_t blkSize = box_ntoh64(pBlk[b].mEncodedSize);
+		if(blkSize <= 0)
+		{
+			// Mark that this file references another file
+			mBlockFromOtherFileReferenced = true;
+		}
+		else
+		{
+			// This block is actually in this file
+			if((currentBlockStart + blkSize) > blockIndexLoc)
+			{
+				// Encoded size makes the block run over the index
+				THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+					"Invalid block index: entry " << b << " makes "
+					"total size of block data exceed the available "
+					"space");
+			}
+
+			// Move the current block start to the end of this block
+			currentBlockStart += blkSize;
+		}
+	}
+
+	// Check that there's no empty space
+	if(currentBlockStart != blockIndexLoc)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+			"Invalid block index: total size of blocks does not match the "
+			"actual amount of block data in the stream: expected " <<
+			(blockIndexLoc - mBlockDataPosition) << " but found " <<
+			(currentBlockStart - mBlockDataPosition));
+	}
+
+	// Check that if another file is referenced, then the ID is there, and if one
+	// isn't then there is no ID.
+	int64_t otherID = box_ntoh64(blkhdr.mOtherFileID);
+	if((otherID != 0 && mBlockFromOtherFileReferenced == false)
+		|| (otherID == 0 && mBlockFromOtherFileReferenced == true))
+	{
+		// Doesn't look good!
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
+			"Invalid block index header: actual dependency status does not "
+			"match the file header: expected to depend on file object " <<
+			BOX_FORMAT_OBJECTID(otherID));
+	}
+
+	mDiffFromObjectID = otherID;
+}
+
 
 // --------------------------------------------------------------------------
 //
