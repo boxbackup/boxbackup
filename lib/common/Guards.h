@@ -77,7 +77,8 @@ class MemoryBlockGuard
 {
 public:
 	MemoryBlockGuard(int BlockSize)
-	: mpBlock(::malloc(BlockSize))
+	: mpBlock(::malloc(BlockSize)),
+	  mBlockSize(BlockSize)
 	{
 		if(mpBlock == 0)
 		{
@@ -118,9 +119,21 @@ public:
 		}
 		mpBlock = ptrn;
 	}
+
+	void* Release()
+	{
+		void* pBlock = mpBlock;
+		mpBlock = ::malloc(mBlockSize);
+		if(mpBlock == 0)
+		{
+			throw std::bad_alloc();
+		}
+		return pBlock;
+	}
 	
 private:
 	void *mpBlock;
+	int mBlockSize;
 };
 
 #include "MemLeakFindOff.h"
