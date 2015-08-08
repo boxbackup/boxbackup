@@ -54,7 +54,8 @@ void memleakfinder_notaleak(void *ptr);
 void *operator new  (size_t size, const char *file, int line);
 void *operator new[](size_t size, const char *file, int line);
 
-// define the malloc functions now, if required
+// Define the malloc functions now, if required. These should match the definitions
+// in MemLeakFindOn.h.
 #ifdef MEMLEAKFINDER_FULL_MALLOC_MONITORING
 	#define malloc(X)	memleakfinder_malloc(X, __FILE__, __LINE__)
 	#define calloc(X, Y)	memleakfinder_calloc(X, Y, __FILE__, __LINE__)
