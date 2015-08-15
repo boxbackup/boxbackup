@@ -1723,7 +1723,7 @@ bool test_server_commands()
 					BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid,
 					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 					newName),
-				Err_DoesNotExist);
+				Err_DoesNotExistInDirectory);
 			BackupStoreFilenameClear newName("moved-files");
 			TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 				QueryMoveObject(
@@ -1732,7 +1732,7 @@ bool test_server_commands()
 					subdirid,
 					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 					newName),
-				Err_DoesNotExist);
+				Err_DoesNotExistInDirectory);
 			TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 				QueryMoveObject(
 					uploads[UPLOAD_FILE_TO_MOVE].allocated_objid,
@@ -1740,7 +1740,7 @@ bool test_server_commands()
 					subdirid,
 					BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 					newName),
-				Err_DoesNotExist);
+				Err_DoesNotExistInDirectory);
 		}
 
 		// File exists, but not in this directory (we just moved it)
@@ -1750,7 +1750,7 @@ bool test_server_commands()
 				subdirid,
 				BackupProtocolMoveObject::Flags_MoveAllWithSameName,
 				newName),
-			Err_DoesNotExist);
+			Err_DoesNotExistInDirectory);
 
 		// Moving file to same directory that it's already in,
 		// with the same name

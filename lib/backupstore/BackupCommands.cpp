@@ -85,11 +85,19 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolReplyable::HandleException(Bo
 		}
 		else if(e.GetSubType() == BackupStoreException::CouldNotFindEntryInDirectory)
 		{
-			return PROTOCOL_ERROR(Err_DoesNotExist);
+			return PROTOCOL_ERROR(Err_DoesNotExistInDirectory);
 		}
 		else if(e.GetSubType() == BackupStoreException::NameAlreadyExistsInDirectory)
 		{
 			return PROTOCOL_ERROR(Err_TargetNameExists);
+		}
+		else if(e.GetSubType() == BackupStoreException::ObjectDoesNotExist)
+		{
+			return PROTOCOL_ERROR(Err_DoesNotExist);
+		}
+		else if(e.GetSubType() == BackupStoreException::PatchChainInfoBadInDirectory)
+		{
+			return PROTOCOL_ERROR(Err_PatchConsistencyError);
 		}
 	}
 
@@ -779,7 +787,28 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObjectName::DoCommand(Back
 		}
 
 		// Load up the directory
-		const BackupStoreDirectory &rdir(rContext.GetDirectory(dirID));
+		const BackupStoreDirectory *pDir;
+
+		try
+		{
+			pDir = &rContext.GetDirectory(dirID);
+		}
+		catch(BackupStoreException &e)
+		{
+			if(e.GetSubType() == BackupStoreException::ObjectDoesNotExist)
+			{
+				// If this can't be found, then there is a problem...
+				// tell the caller it can't be found.
+				return std::auto_ptr<BackupProtocolMessage>(
+					new BackupProtocolObjectName(
+						BackupProtocolObjectName::NumNameElements_ObjectDoesntExist,
+						0, 0, 0));
+			}
+
+			throw;
+		}
+
+		const BackupStoreDirectory& rdir(*pDir);
 
 		// Find the element in this directory and store it's name
 		if(objectID != ObjectID_DirectoryOnly)
