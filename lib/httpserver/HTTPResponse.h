@@ -66,6 +66,7 @@ public:
 	int GetResponseCode() const { return mResponseCode; }
 	void SetContentType(const char *ContentType);
 	const std::string& GetContentType() { return mContentType; }
+	int64_t GetContentLength() { return mContentLength; }
 
 	void SetAsRedirect(const char *RedirectTo, bool IsLocalURI = true);
 	void SetAsNotFound(const char *URI);
@@ -164,7 +165,7 @@ private:
 	bool mKeepAlive;
 	std::string mContentType;
 	std::vector<Header> mExtraHeaders;
-	int mContentLength; // only used when reading response from stream
+	int64_t mContentLength; // only used when reading response from stream
 	IOStream* mpStreamToSendTo; // nonzero only when constructed with a stream
 	
 	static std::string msDefaultURIPrefix;

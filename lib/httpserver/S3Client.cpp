@@ -34,7 +34,7 @@
 //		Name:    S3Client::GetObject(const std::string& rObjectURI)
 //		Purpose: Retrieve the object with the specified URI (key)
 //			 from your S3 bucket.
-//		Created: 09/01/09
+//		Created: 09/01/2009
 //
 // --------------------------------------------------------------------------
 
@@ -46,12 +46,29 @@ HTTPResponse S3Client::GetObject(const std::string& rObjectURI)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    S3Client::HeadObject(const std::string& rObjectURI)
+//		Purpose: Retrieve the metadata for the object with the
+//			 specified URI (key) from your S3 bucket.
+//		Created: 03/08/2015
+//
+// --------------------------------------------------------------------------
+
+HTTPResponse S3Client::HeadObject(const std::string& rObjectURI)
+{
+	return FinishAndSendRequest(HTTPRequest::Method_HEAD, rObjectURI);
+}
+
+
+HTTPResponse HeadObject(const std::string& rObjectURI);
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    S3Client::PutObject(const std::string& rObjectURI,
 //			 IOStream& rStreamToSend, const char* pContentType)
 //		Purpose: Upload the stream to S3, creating or overwriting the
 //			 object with the specified URI (key) in your S3
 //			 bucket.
-//		Created: 09/01/09
+//		Created: 09/01/2009
 //
 // --------------------------------------------------------------------------
 
@@ -77,7 +94,7 @@ HTTPResponse S3Client::PutObject(const std::string& rObjectURI,
 //			 connection to the server if necessary, which may
 //			 throw a ConnectionException. Returns the HTTP
 //			 response returned by S3, which may be a 500 error.
-//		Created: 09/01/09
+//		Created: 09/01/2009
 //
 // --------------------------------------------------------------------------
 
@@ -218,7 +235,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 //			 necessary, which may throw a ConnectionException.
 //			 Returns the HTTP response returned by S3, which may
 //			 be a 500 error.
-//		Created: 09/01/09
+//		Created: 09/01/2009
 //
 // --------------------------------------------------------------------------
 
@@ -229,14 +246,13 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 
 	if (pStreamToSend)
 	{
-		rRequest.SendWithStream(*mapClientSocket,
-			30000 /* milliseconds */,
+		rRequest.SendWithStream(*mapClientSocket, mNetworkTimeout,
 			pStreamToSend, response);
 	}
 	else
 	{
-		rRequest.Send(*mapClientSocket, 30000 /* milliseconds */);
-		response.Receive(*mapClientSocket, 30000 /* milliseconds */);
+		rRequest.Send(*mapClientSocket, mNetworkTimeout);
+		response.Receive(*mapClientSocket, mNetworkTimeout);
 	}
 
 	if(!response.IsKeepAlive())
@@ -255,7 +271,7 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 //		Purpose: Check the status code of an Amazon S3 response, and
 //			 throw an exception with a useful message (including
 //			 the supplied message) if it's not a 200 OK response.
-//		Created: 26/07/15
+//		Created: 26/07/2015
 //
 // --------------------------------------------------------------------------
 

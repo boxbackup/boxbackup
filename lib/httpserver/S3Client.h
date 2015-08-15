@@ -36,7 +36,8 @@ class S3Client
 	: mpSimulator(pSimulator),
 	  mHostName(rHostName),
 	  mAccessKey(rAccessKey),
-	  mSecretKey(rSecretKey)
+	  mSecretKey(rSecretKey),
+	  mNetworkTimeout(30000)
 	{ }
 	
 	S3Client(std::string HostName, int Port, const std::string& rAccessKey,
@@ -49,9 +50,11 @@ class S3Client
 	{ }
 		
 	HTTPResponse GetObject(const std::string& rObjectURI);
+	HTTPResponse HeadObject(const std::string& rObjectURI);
 	HTTPResponse PutObject(const std::string& rObjectURI,
 		IOStream& rStreamToSend, const char* pContentType = NULL);
 	void CheckResponse(const HTTPResponse& response, const std::string& message) const;
+	int GetNetworkTimeout() const { return mNetworkTimeout; }
 
 	private:
 	HTTPServer* mpSimulator;
@@ -59,6 +62,7 @@ class S3Client
 	int mPort;
 	std::auto_ptr<SocketStream> mapClientSocket;
 	std::string mAccessKey, mSecretKey;
+	int mNetworkTimeout; // milliseconds
 
 	HTTPResponse FinishAndSendRequest(HTTPRequest::Method Method,
 		const std::string& rRequestURI,
