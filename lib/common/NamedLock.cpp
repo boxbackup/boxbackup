@@ -236,6 +236,9 @@ void NamedLock::ReleaseLock()
 			CommonException, OSFileError);
 	}
 
+	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
+	mFileDescriptor = -1;
+
 #ifdef WIN32
 	// On Windows we need to close the file before deleting it, otherwise
 	// the system won't let us delete it.
@@ -247,9 +250,6 @@ void NamedLock::ReleaseLock()
 			CommonException, OSFileError);
 	}
 #endif // WIN32
-
-	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
-	mFileDescriptor = -1;
 
 	BOX_TRACE("Released lock and deleted lockfile " << mFileName);
 }
