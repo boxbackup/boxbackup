@@ -70,6 +70,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
 {
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -83,6 +84,7 @@ BackupStoreContext::~BackupStoreContext()
 	ClearDirectoryCache();
 }
 
+
 void BackupStoreContext::ClearDirectoryCache()
 {
 	// Delete the objects in the cache
@@ -93,6 +95,7 @@ void BackupStoreContext::ClearDirectoryCache()
 	}
 	mDirectoryCache.clear();
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -111,6 +114,7 @@ void BackupStoreContext::CleanUp()
 		mapStoreInfo->Save();
 	}
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -411,6 +415,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	// Return it
 	return *pdir;
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -790,8 +795,11 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::DeleteFile(const BackupStoreFilename &, int64_t, int64_t &)
-//		Purpose: Deletes a file, returning true if the file existed. Object ID returned too, set to zero if not found.
+//		Name:    BackupStoreContext::DeleteFile(
+//			 const BackupStoreFilename &, int64_t, int64_t &)
+//		Purpose: Deletes a file by name, returning true if the file
+//			 existed. Object ID returned too, set to zero if not
+//			 found.
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
@@ -1201,6 +1209,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	return id;
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1277,6 +1286,7 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 		throw;
 	}
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -1389,7 +1399,6 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 }
 
 
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1426,6 +1435,7 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 		throw;
 	}
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -1915,7 +1925,6 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 }
 
 
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1933,5 +1942,4 @@ const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
 
 	return *(mapStoreInfo.get());
 }
-
 

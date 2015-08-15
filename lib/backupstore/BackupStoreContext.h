@@ -65,7 +65,7 @@ public:
 		Phase_Login		= 1,
 		Phase_Commands	= 2
 	};
-	
+
 	int GetPhase() const {return mProtocolPhase;}
 	std::string GetPhaseName() const
 	{
@@ -81,7 +81,7 @@ public:
 		}
 	}
 	void SetPhase(int NewPhase) {mProtocolPhase = NewPhase;}
-	
+
 	// Read only locking
 	bool SessionIsReadOnly() {return mReadOnly;}
 	bool AttemptToGetWriteLock();
@@ -116,7 +116,7 @@ public:
 	// Client marker
 	int64_t GetClientStoreMarker();
 	void SetClientStoreMarker(int64_t ClientStoreMarker);
-	
+
 	// Usage information
 	void GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocksSoftLimit, int64_t &rBlocksHardLimit);
 	bool HardLimitExceeded();
@@ -138,7 +138,7 @@ public:
 		// merely turns the returned directory const.
 		return GetDirectoryInternal(ObjectID);
 	}
-	
+
 	// Manipulating files/directories
 	int64_t AddFile(IOStream &rFile,
 		int64_t InDirectory,
@@ -191,16 +191,17 @@ private:
 	bool mClientHasAccount;
 	std::string mAccountRootDir;	// has final directory separator
 	int mStoreDiscSet;
+
 	bool mReadOnly;
 	NamedLock mWriteLock;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
-	
+
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
 
 	// Refcount database
 	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
-	
+
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
 

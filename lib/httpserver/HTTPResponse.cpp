@@ -148,7 +148,7 @@ void HTTPResponse::Send(bool OmitContent)
 	{
 		THROW_EXCEPTION(HTTPException, NoStreamConfigured);
 	}
-	
+
 	if (GetSize() != 0 && mContentType.empty())
 	{
 		THROW_EXCEPTION(HTTPException, NoContentTypeSet);
@@ -193,11 +193,11 @@ void HTTPResponse::Send(bool OmitContent)
 			header += "\r\nConnection: close\r\n\r\n";
 		}
 		// NOTE: header ends with blank line in all cases
-		
+
 		// Write to stream
 		mpStreamToSendTo->Write(header.c_str(), header.size());
 	}
-	
+
 	// Send content
 	if(!OmitContent)
 	{
@@ -227,16 +227,16 @@ void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 		if(rGetLine.IsEOF())
 		{
 			// Header terminates unexpectedly
-			THROW_EXCEPTION(HTTPException, BadRequest)		
+			THROW_EXCEPTION(HTTPException, BadRequest)
 		}
 
-		std::string currentLine;	
+		std::string currentLine;
 		if(!rGetLine.GetLine(currentLine, false /* no preprocess */, Timeout))
 		{
 			// Timeout
 			THROW_EXCEPTION(HTTPException, RequestReadFailed)
 		}
-		
+
 		// Is this a continuation of the previous line?
 		bool processHeader = haveHeader;
 		if(!currentLine.empty() && (currentLine[0] == ' ' || currentLine[0] == '\t'))
@@ -245,7 +245,7 @@ void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 			processHeader = false;
 		}
 		//TRACE3("%d:%d:%s\n", processHeader, haveHeader, currentLine.c_str());
-		
+
 		// Parse the header -- this will actually process the header
 		// from the previous run around the loop.
 		if(processHeader)
@@ -263,7 +263,7 @@ void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 			{
 				++dataStart;
 			}
-		
+
 			if(p == sizeof("Content-Length")-1
 				&& ::strncasecmp(h, "Content-Length", sizeof("Content-Length")-1) == 0)
 			{
@@ -308,7 +308,7 @@ void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 				std::string headerName = header.substr(0, p);
 				AddHeader(headerName, h + dataStart);
 			}
-			
+
 			// Unset have header flag, as it's now been processed
 			haveHeader = false;
 		}
@@ -329,7 +329,7 @@ void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 		{
 			// All done!
 			break;
-		}		
+		}
 	}
 }
 
@@ -340,10 +340,10 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	if(rGetLine.IsEOF())
 	{
 		// Connection terminated unexpectedly
-		THROW_EXCEPTION(HTTPException, BadResponse)		
+		THROW_EXCEPTION(HTTPException, BadResponse)
 	}
 
-	std::string statusLine;	
+	std::string statusLine;
 	if(!rGetLine.GetLine(statusLine, false /* no preprocess */, Timeout))
 	{
 		// Timeout
@@ -355,7 +355,7 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	{
 		// Status line terminated unexpectedly
 		BOX_ERROR("Bad response status line: " << statusLine);
-		THROW_EXCEPTION(HTTPException, BadResponse)		
+		THROW_EXCEPTION(HTTPException, BadResponse)
 	}
 
 	if (statusLine[5] == '1' && statusLine[7] == '1')
@@ -363,7 +363,7 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 		// HTTP/1.1 default is to keep alive
 		mKeepAlive = true;
 	}
-		
+
 	// Decode the status code
 	long status = ::strtol(statusLine.substr(9, 3).c_str(), NULL, 10);
 	// returns zero in error case, this is OK
@@ -376,7 +376,7 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	{
 		return;
 	}
-	
+
 	ParseHeaders(rGetLine, Timeout);
 
 	// push back whatever bytes we have left
@@ -549,7 +549,7 @@ void HTTPResponse::SetAsRedirect(const char *RedirectTo, bool IsLocalURI)
 	if(IsLocalURI) header += msDefaultURIPrefix;
 	header += RedirectTo;
 	mExtraHeaders.push_back(Header("Location", header));
-	
+
 	// Set up some default content
 	mContentType = "text/html";
 	#define REDIRECT_HTML_1 "<html><head><title>Redirection</title></head>\n<body><p><a href=\""
@@ -622,7 +622,7 @@ void HTTPResponse::WriteStringDefang(const char *String, unsigned int StringLen)
 			StringLen -= toWrite;
 			String += toWrite;
 		}
-		
+
 		// Is it a bad character next?
 		while(StringLen > 0)
 		{

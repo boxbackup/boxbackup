@@ -41,6 +41,7 @@ public:
 
 	RaidFileWrite(int SetNumber, const std::string &Filename, int refcount);
 	~RaidFileWrite();
+
 private:
 	RaidFileWrite(const RaidFileWrite &rToCopy);
 
@@ -66,8 +67,6 @@ public:
 	
 	static void CreateDirectory(int SetNumber, const std::string &rDirName, bool Recursive = false, int mode = 0777);
 	static void CreateDirectory(const RaidFileDiscSet &rSet, const std::string &rDirName, bool Recursive = false, int mode = 0777);
-	
-private:
 
 private:
 	int mSetNumber;
