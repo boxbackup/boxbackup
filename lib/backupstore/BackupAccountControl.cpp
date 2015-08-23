@@ -19,6 +19,7 @@
 #include "BackupStoreInfo.h"
 #include "Configuration.h"
 #include "HTTPResponse.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
