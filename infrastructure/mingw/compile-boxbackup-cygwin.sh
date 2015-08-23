@@ -19,7 +19,7 @@ latest_openssl=`wget -O- -q $openssl_source \
 | sed -e 's/.tar.gz">.*//' -e 's/.*"//' | sort | tail -1`
 
 wget -c $openssl_source/$latest_openssl.tar.gz
-tar xzf $latest_openssl.tar.gz
+tar xzf $latest_openssl.tar.gz --exclude $latest_openssl/Makefile
 (
 	cd $latest_openssl
 	[ -r Makefile ] || \
