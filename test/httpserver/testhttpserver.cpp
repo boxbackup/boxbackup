@@ -147,16 +147,14 @@ int test(int argc, const char *argv[])
 	TEST_THAT(system("rm -rf *.memleaks") == 0);
 
 	// Start the server
-	int pid = LaunchServer("./_test server testfiles/httpserver.conf", "testfiles/httpserver.pid");
-	TEST_THAT(pid != -1 && pid != 0);
-	if(pid <= 0)
-	{
-		return 0;
-	}
+	int pid = StartDaemon(0, "./_test server testfiles/httpserver.conf",
+		"testfiles/httpserver.pid");
+	TEST_THAT_OR(pid > 0, return 1);
 
 	// Run the request script
 	TEST_THAT(::system("perl testfiles/testrequests.pl") == 0);
 
+#ifdef ENABLE_KEEPALIVE_SUPPORT // incomplete, need chunked encoding support
 	#ifndef WIN32
 	signal(SIGPIPE, SIG_IGN);
 	#endif
@@ -238,16 +236,25 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("</body>", line);
 		TEST_THAT(getline.GetLine(line));
 		TEST_EQUAL("</html>", line);
-	}
-	
-	// Kill it
-	TEST_THAT(KillServer(pid));
 
-	#ifdef WIN32
-		TEST_THAT(unlink("testfiles/httpserver.pid") == 0);
-	#else
-		TestRemoteProcessMemLeaks("generic-httpserver.memleaks");
-	#endif
+		if(!response.IsKeepAlive())
+		{
+			BOX_TRACE("Server will close the connection, closing our end too.");
+			sock.Close();
+			sock.Open(Socket::TypeINET, "localhost", 1080);
+		}
+		else
+		{
+			BOX_TRACE("Server will keep the connection open for more requests.");
+		}
+	}
+
+	sock.Close();
+#endif // ENABLE_KEEPALIVE_SUPPORT
+
+	// Kill it
+	TEST_THAT(StopDaemon(pid, "testfiles/httpserver.pid",
+		"generic-httpserver.memleaks", true));
 
 	// correct, official signature should succeed, with lower-case header
 	{
@@ -372,18 +379,14 @@ int test(int argc, const char *argv[])
 	}
 
 	// Start the S3Simulator server
-	pid = LaunchServer("./_test s3server testfiles/s3simulator.conf",
+	pid = StartDaemon(0, "./_test s3server testfiles/s3simulator.conf",
 		"testfiles/s3simulator.pid");
-	TEST_THAT(pid != -1 && pid != 0);
-	if(pid <= 0)
-	{
-		return 0;
-	}
-
-	sock.Close();
-	sock.Open(Socket::TypeINET, "localhost", 1080);
+	TEST_THAT_OR(pid > 0, return 1);
 
 	{
+		SocketStream sock;
+		sock.Open(Socket::TypeINET, "localhost", 1080);
+
 		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
@@ -401,6 +404,9 @@ int test(int argc, const char *argv[])
 	// Make file inaccessible, should cause server to return a 403 error,
 	// unless of course the test is run as root :)
 	{
+		SocketStream sock;
+		sock.Open(Socket::TypeINET, "localhost", 1080);
+
 		TEST_THAT(chmod("testfiles/testrequests.pl", 0) == 0);
 		HTTPRequest request(HTTPRequest::Method_GET,
 			"/testrequests.pl");
@@ -419,6 +425,9 @@ int test(int argc, const char *argv[])
 	#endif
 
 	{
+		SocketStream sock;
+		sock.Open(Socket::TypeINET, "localhost", 1080);
+
 		HTTPRequest request(HTTPRequest::Method_GET,
 			"/testrequests.pl");
 		request.SetHostName("quotes.s3.amazonaws.com");
@@ -444,6 +453,9 @@ int test(int argc, const char *argv[])
 	}
 
 	{
+		SocketStream sock;
+		sock.Open(Socket::TypeINET, "localhost", 1080);
+
 		HTTPRequest request(HTTPRequest::Method_PUT,
 			"/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
@@ -469,14 +481,10 @@ int test(int argc, const char *argv[])
 		TEST_THAT(f1.CompareWith(f2));
 	}
 
-	// Kill it
-	TEST_THAT(KillServer(pid));
 
-	#ifdef WIN32
-		TEST_THAT(unlink("testfiles/s3simulator.pid") == 0);
-	#else
-		TestRemoteProcessMemLeaks("s3simulator.memleaks");
-	#endif
+	// Kill it
+	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
+		"s3simulator.memleaks", true));
 
 	return 0;
 }
