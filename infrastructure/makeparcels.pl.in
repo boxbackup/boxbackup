@@ -118,11 +118,17 @@ __E
 
 print MAKE "all:\t",join(' ',map {"build-".$_} @parcels),"\n\n";
 
+my $runtest_script = $target_windows ? './infrastructure/mingw/runtest.sh' 
+	: './runtest.pl';
+
 print MAKE <<__END_OF_FRAGMENT;
-test:	release/common/test
+test:	debug/common/test release/common/test
+
+debug/common/test:
+	$runtest_script ALL debug
 
 release/common/test:
-	./runtest.pl ALL release
+	$runtest_script ALL release
 
 .PHONY: docs
 docs:
