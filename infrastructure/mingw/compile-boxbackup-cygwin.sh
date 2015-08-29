@@ -48,8 +48,7 @@ svn co https://www.boxbackup.org/svn/box/trunk/ bb-trunk
 	cd bb-trunk
 	./infrastructure/mingw/configure.sh
 	make
-	./runtest ALL
-	./runtest ALL release
+	./infrastructure/mingw/runtest.sh ALL
+	./infrastructure/mingw/runtest.sh ALL release
 )
-
 
