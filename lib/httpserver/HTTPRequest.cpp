@@ -267,7 +267,9 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			int major, minor;
 			if(::sscanf(requestLinePtr + p + 5, "%d.%d", &major, &minor) != 2)
 			{
-				THROW_EXCEPTION(HTTPException, BadRequest)		
+				THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+					"Unable to parse HTTP version number: " <<
+					requestLinePtr);
 			}
 
 			// Store version
@@ -276,7 +278,9 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		else
 		{
 			// Not good -- wrong string found
-			THROW_EXCEPTION(HTTPException, BadRequest)		
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+				"Unable to parse HTTP request line: " <<
+				requestLinePtr);
 		}
 	}
 
@@ -343,7 +347,8 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			if(r == 0)
 			{
 				// Timeout, just error
-				THROW_EXCEPTION(HTTPException, RequestReadFailed)
+				THROW_EXCEPTION_MESSAGE(HTTPException, RequestReadFailed,
+					"Failed to read complete request with the timeout");
 			}
 			decoder.DecodeChunk(buf, r);
 			bytesToGo -= r;
@@ -423,7 +428,8 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 	case HTTPVersion_1_0: rStream.Write("HTTP/1.0"); break;
 	case HTTPVersion_1_1: rStream.Write("HTTP/1.1"); break;
 	default:
-		THROW_EXCEPTION(HTTPException, NotImplemented);
+		THROW_EXCEPTION_MESSAGE(HTTPException, NotImplemented,
+			"Unsupported HTTP version: " << mHTTPVersion);
 	}
 
 	rStream.Write("\n");
@@ -454,7 +460,8 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 
 	if (mpCookies)
 	{
-		THROW_EXCEPTION(HTTPException, NotImplemented);
+		THROW_EXCEPTION_MESSAGE(HTTPException, NotImplemented,
+			"Cookie support not implemented yet");
 	}
 
 	if (mClientKeepAliveRequested)

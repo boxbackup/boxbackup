@@ -217,6 +217,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 			}
 			else
 			{
+				BOX_TRACE("S3Client: " << mHostName << " ! " << ce.what());
 				throw;
 			}
 		}
