@@ -258,7 +258,12 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 
 	if(!response.IsKeepAlive())
 	{
+		BOX_TRACE("Server will close the connection, closing our end too.");
 		mapClientSocket.reset();
+	}
+	else
+	{
+		BOX_TRACE("Server will keep the connection open for more requests.");
 	}
 
 	return response;
