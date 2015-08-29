@@ -479,9 +479,9 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 // --------------------------------------------------------------------------
 
 
-void BackupStoreFile::VerifyStream::Close()
+void BackupStoreFile::VerifyStream::Close(bool CloseCopyStream)
 {
-	if(mpCopyToStream)
+	if(mpCopyToStream && CloseCopyStream)
 	{
 		mpCopyToStream->Close();
 	}

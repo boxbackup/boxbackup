@@ -172,7 +172,7 @@ public:
 		}
 		virtual void Write(const void *pBuffer, int NBytes,
 			int Timeout = IOStream::TimeOutInfinite);
-		virtual void Close();
+		virtual void Close(bool CloseCopyStream = true);
 		virtual bool StreamDataLeft()
 		{
 			THROW_EXCEPTION(CommonException, NotSupported);
