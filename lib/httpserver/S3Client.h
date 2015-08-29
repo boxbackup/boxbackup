@@ -46,7 +46,8 @@ class S3Client
 	  mHostName(HostName),
 	  mPort(Port),
 	  mAccessKey(rAccessKey),
-	  mSecretKey(rSecretKey)
+	  mSecretKey(rSecretKey),
+	  mNetworkTimeout(30000)
 	{ }
 		
 	HTTPResponse GetObject(const std::string& rObjectURI);
