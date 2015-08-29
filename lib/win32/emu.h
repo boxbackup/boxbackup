@@ -115,21 +115,29 @@ inline struct passwd * getpwnam(const char * name)
 	return &gTempPasswd;
 }
 
-#define S_IRWXG 1
-#define S_IRWXO 2
+#ifndef S_IRGRP
+	// these constants are only defined in MinGW64, not the original MinGW headers,
+	// nor MSVC, so use poor man's feature detection to define them only if needed.
+	//not sure if these are correct
+	//S_IWRITE -   writing permitted
+	//_S_IREAD -   reading permitted
+	//_S_IREAD | _S_IWRITE - 
+#	define S_IRUSR S_IWRITE
+#	define S_IWUSR S_IREAD
+#	define S_IRGRP S_IWRITE
+#	define S_IWGRP S_IREAD
+#	define S_IROTH S_IWRITE | S_IREAD
+#	define S_IWOTH S_IREAD | S_IREAD
+#	define S_IRWXU (S_IREAD|S_IWRITE|S_IEXEC)
+#	define S_IRWXG 1
+#	define S_IRWXO 2
+#endif
+
 #define S_ISUID 4
 #define S_ISGID 8
 #define S_ISVTX 16
 
 #ifndef __MINGW32__
-	//not sure if these are correct
-	//S_IWRITE -   writing permitted
-	//_S_IREAD -   reading permitted
-	//_S_IREAD | _S_IWRITE - 
-	#define S_IRUSR S_IWRITE
-	#define S_IWUSR S_IREAD
-	#define S_IRWXU (S_IREAD|S_IWRITE|S_IEXEC)
-
 	#define S_ISREG(x) (S_IFREG & x)
 	#define S_ISDIR(x) (S_IFDIR & x)
 #endif
@@ -199,11 +207,6 @@ inline int geteuid(void)
 #ifndef __MINGW32__
 	typedef int socklen_t;
 #endif
-
-#define S_IRGRP S_IWRITE
-#define S_IWGRP S_IREAD
-#define S_IROTH S_IWRITE | S_IREAD
-#define S_IWOTH S_IREAD | S_IREAD
 
 //again need to verify these
 #define S_IFLNK 1
