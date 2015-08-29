@@ -27,7 +27,8 @@ class HTTPResponse;
 class HTTPServer : public ServerStream<SocketStream, 80>
 {
 public:
-	HTTPServer();
+	HTTPServer(int Timeout = 60000);
+	// default timeout leaves 1 minute for clients to get a second request in.
 	~HTTPServer();
 private:
 	// no copying

@@ -27,7 +27,9 @@ class HTTPResponse;
 class S3Simulator : public HTTPServer
 {
 public:
-	S3Simulator() { }
+	// Increase timeout to 5 minutes, from HTTPServer default of 1 minute,
+	// to help with debugging.
+	S3Simulator() : HTTPServer(300000) { }
 	~S3Simulator() { }
 
 	const ConfigurationVerify* GetConfigVerify() const;

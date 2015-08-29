@@ -27,8 +27,8 @@
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
-HTTPServer::HTTPServer()
-	: mTimeout(20000)	// default timeout leaves a little while for clients to get the second request in.
+HTTPServer::HTTPServer(int Timeout)
+: mTimeout(Timeout)
 {
 }
 
