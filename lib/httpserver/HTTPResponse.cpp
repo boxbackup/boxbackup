@@ -341,22 +341,22 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	if(rGetLine.IsEOF())
 	{
 		// Connection terminated unexpectedly
-		THROW_EXCEPTION(HTTPException, BadResponse)
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+			"HTTP server closed the connection without sending a response");
 	}
 
 	std::string statusLine;
 	if(!rGetLine.GetLine(statusLine, false /* no preprocess */, Timeout))
 	{
 		// Timeout
-		THROW_EXCEPTION(HTTPException, ResponseReadFailed)
+		THROW_EXCEPTION_MESSAGE(HTTPException, ResponseReadFailed,
+			"Failed to get a response from the HTTP server within the timeout");
 	}
 
-	if (statusLine.substr(0, 7) != "HTTP/1." ||
-		statusLine[8] != ' ')
+	if (statusLine.substr(0, 7) != "HTTP/1." || statusLine[8] != ' ')
 	{
-		// Status line terminated unexpectedly
-		BOX_ERROR("Bad response status line: " << statusLine);
-		THROW_EXCEPTION(HTTPException, BadResponse)
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+			"HTTP server sent an invalid HTTP status line: " << statusLine);
 	}
 
 	if (statusLine[5] == '1' && statusLine[7] == '1')
