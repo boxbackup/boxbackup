@@ -13,6 +13,7 @@
 #include <iostream>
 
 #include "autogen_CommonException.h"
+#include "autogen_BackupStoreException.h"
 #include "BackupAccountControl.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
@@ -188,10 +189,17 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	std::string info_url = GetFullURL(S3_INFO_FILE_NAME);
 
 	HTTPResponse response = GetObject(S3_INFO_FILE_NAME);
+	if(response.GetResponseCode() == HTTPResponse::Code_OK)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, AccountAlreadyExists,
+			"The BackupStoreInfo file already exists at this URL: " <<
+			info_url);
+	}
+
 	if(response.GetResponseCode() != HTTPResponse::Code_NotFound)
 	{
-		mapS3Client->CheckResponse(response, std::string("The BackupStoreInfo file already "
-			"exists at this URL: ") + info_url);
+		mapS3Client->CheckResponse(response, std::string("Failed to check for an "
+			"existing BackupStoreInfo file at this URL: ") + info_url);
 	}
 
 	BackupStoreInfo info(0, // fake AccountID for S3 stores

@@ -73,3 +73,4 @@ MultiplyReferencedObject	69	Attempted to modify an object with multiple referenc
 CorruptReferenceCountDatabase	70	The account's refcount database is corrupt and must be rebuilt by housekeeping.
 CancelledByBackgroundTask	71	The current task was cancelled on request by the background task.
 ObjectDoesNotExist		72	The specified object ID does not exist in the store.
+AccountAlreadyExists		73	Tried to create an account that already exists.
