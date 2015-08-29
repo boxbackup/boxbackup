@@ -86,7 +86,7 @@ const ConfigurationVerify *HTTPServer::GetConfigVerify() const
 			0
 		}
 	};
-	
+
 	static ConfigurationVerifyKey verifyrootkeys[] = 
 	{
 		HTTPSERVER_VERIFY_ROOT_KEYS
@@ -150,10 +150,10 @@ void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 			// Didn't get request, connection probably closed.
 			break;
 		}
-	
+
 		// Generate a response
 		HTTPResponse response(apConn.get());
-		
+
 		try
 		{
 			Handle(request, response);

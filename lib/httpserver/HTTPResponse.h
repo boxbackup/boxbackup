@@ -129,7 +129,7 @@ public:
 	};
 
 	static const char *ResponseCodeToString(int ResponseCode);
-	
+
 	void WriteStringDefang(const char *String, unsigned int StringLen);
 	void WriteStringDefang(const std::string &rString) {WriteStringDefang(rString.c_str(), rString.size());}
 
@@ -167,7 +167,7 @@ private:
 	std::vector<Header> mExtraHeaders;
 	int64_t mContentLength; // only used when reading response from stream
 	IOStream* mpStreamToSendTo; // nonzero only when constructed with a stream
-	
+
 	static std::string msDefaultURIPrefix;
 
 	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);

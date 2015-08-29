@@ -137,7 +137,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	// Check caller's logic
 	if(mMethod != Method_UNINITIALISED)
 	{
-		THROW_EXCEPTION(HTTPException, RequestAlreadyBeenRead)
+		THROW_EXCEPTION(HTTPException, RequestAlreadyBeenRead);
 	}
 
 	// Read the first line, which is of a different format to the rest of the lines
@@ -152,8 +152,8 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	// Check the method
 	size_t p = 0;	// current position in string
 	p = requestLine.find(' '); // end of first word
-	
-	if (p == std::string::npos)
+
+	if(p == std::string::npos)
 	{
 		// No terminating space, looks bad
 		p = requestLine.size();
@@ -189,14 +189,14 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	{
 		++p;
 	}
-	
+
 	// Check there's a URI following...
 	if(requestLinePtr[p] == '\0')
 	{
 		// Didn't get the request line, probably end of connection which had been kept alive
 		return false;
 	}
-	
+
 	// Read the URI, unescaping any %XX hex codes
 	while(requestLinePtr[p] != ' ' && requestLinePtr[p] != '\0')
 	{
@@ -227,10 +227,10 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			{
 				code[1] = requestLinePtr[++p];
 			}
-			
+
 			// Convert into a char code
 			long c = ::strtol(code, NULL, 16);
-			
+
 			// Accept it?
 			if(c > 0 && c <= 255)
 			{
@@ -269,7 +269,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			{
 				THROW_EXCEPTION(HTTPException, BadRequest)		
 			}
-			
+
 			// Store version
 			mHTTPVersion = (major * HTTPVersion__MajorMultiplier) + minor;
 		}
@@ -279,16 +279,16 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			THROW_EXCEPTION(HTTPException, BadRequest)		
 		}
 	}
-	
+
 	BOX_TRACE("HTTPRequest: method=" << mMethod << ", uri=" <<
 		mRequestURI << ", version=" << mHTTPVersion);
-	
+
 	// If HTTP 1.1 or greater, assume keep-alive
 	if(mHTTPVersion >= HTTPVersion_1_1)
 	{
 		mClientKeepAliveRequested = true;
 	}
-	
+
 	// Decode query string?
 	if((mMethod == Method_GET || mMethod == Method_HEAD) && !mQueryString.empty())
 	{
@@ -296,28 +296,28 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		decoder.DecodeChunk(mQueryString.c_str(), mQueryString.size());
 		decoder.Finish();
 	}
-	
+
 	// Now parse the headers
 	ParseHeaders(rGetLine, Timeout);
-	
+
 	std::string expected;
-	if (GetHeader("Expect", &expected))
+	if(GetHeader("Expect", &expected))
 	{
-		if (expected == "100-continue")
+		if(expected == "100-continue")
 		{
 			mExpectContinue = true;
 		}
 	}
-	
+
 	// Parse form data?
 	if(mMethod == Method_POST && mContentLength >= 0)
 	{
 		// Too long? Don't allow people to be nasty by sending lots of data
 		if(mContentLength > MAX_CONTENT_SIZE)
 		{
-			THROW_EXCEPTION(HTTPException, POSTContentTooLong)
+			THROW_EXCEPTION(HTTPException, POSTContentTooLong);
 		}
-	
+
 		// Some data in the request to follow, parsing it bit by bit
 		HTTPQueryDecoder decoder(mQuery);
 		// Don't forget any data left in the GetLine object
@@ -362,7 +362,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		SetForReading();
 		mpStreamToReadFrom = &(rGetLine.GetUnderlyingStream());
 	}
-	
+
 	return true;
 }
 
@@ -372,7 +372,7 @@ void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
 	
 	CopyStreamTo(rStreamToWriteTo);
 	IOStream::pos_type bytesCopied = GetSize();
-	
+
 	while (bytesCopied < mContentLength)
 	{
 		char buffer[1024];
@@ -471,7 +471,7 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 	{
 		oss << i->first << ": " << i->second << "\n";
 	}
-	
+
 	if (ExpectContinue)
 	{
 		oss << "Expect: 100-continue\n";
@@ -487,23 +487,22 @@ void HTTPRequest::SendWithStream(IOStream &rStreamToSendTo, int Timeout,
 	IOStream* pStreamToSend, HTTPResponse& rResponse)
 {
 	IOStream::pos_type size = pStreamToSend->BytesLeftToRead();
-	
 	if (size != IOStream::SizeOfStreamUnknown)
 	{
 		mContentLength = size;
 	}
-	
+
 	Send(rStreamToSendTo, Timeout, true);
-	
+
 	rResponse.Receive(rStreamToSendTo, Timeout);
 	if (rResponse.GetResponseCode() != 100)
 	{
 		// bad response, abort now
 		return;
 	}
-	
+
 	pStreamToSend->CopyStreamTo(rStreamToSendTo, Timeout);
-	
+
 	// receive the final response
 	rResponse.Receive(rStreamToSendTo, Timeout);
 }
@@ -528,13 +527,13 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 			THROW_EXCEPTION(HTTPException, BadRequest)		
 		}
 
-		std::string currentLine;	
+		std::string currentLine;
 		if(!rGetLine.GetLine(currentLine, false /* no preprocess */, Timeout))
 		{
 			// Timeout
 			THROW_EXCEPTION(HTTPException, RequestReadFailed)
 		}
-		
+
 		// Is this a continuation of the previous line?
 		bool processHeader = haveHeader;
 		if(!currentLine.empty() && (currentLine[0] == ' ' || currentLine[0] == '\t'))
@@ -543,7 +542,7 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 			processHeader = false;
 		}
 		//TRACE3("%d:%d:%s\n", processHeader, haveHeader, currentLine.c_str());
-		
+
 		// Parse the header -- this will actually process the header
 		// from the previous run around the loop.
 		if(processHeader)
@@ -564,7 +563,7 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 
 			std::string header_name(ToLowerCase(std::string(h,
 				p)));
-			
+
 			if (header_name == "content-length")
 			{
 				// Decode number
@@ -582,17 +581,17 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 			{
 				// Store host header
 				mHostName = h + dataStart;
-				
+
 				// Is there a port number to split off?
 				std::string::size_type colon = mHostName.find_first_of(':');
 				if(colon != std::string::npos)
 				{
 					// There's a port in the string... attempt to turn it into an int
 					mHostPort = ::strtol(mHostName.c_str() + colon + 1, 0, 10);
-					
+
 					// Truncate the string to just the hostname
 					mHostName = mHostName.substr(0, colon);
-					
+
 					BOX_TRACE("Host: header, hostname = " <<
 						"'" << mHostName << "', host "
 						"port = " << mHostPort);
@@ -622,7 +621,7 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 				mExtraHeaders.push_back(Header(header_name,
 					h + dataStart));
 			}
-			
+
 			// Unset have header flag, as it's now been processed
 			haveHeader = false;
 		}
@@ -643,7 +642,7 @@ void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
 		{
 			// All done!
 			break;
-		}		
+		}
 	}
 }
 
@@ -662,13 +661,13 @@ void HTTPRequest::ParseCookies(const std::string &rHeader, int DataStarts)
 	const char *pos = data;
 	const char *itemStart = pos;
 	std::string name;
-	
+
 	enum
 	{
 		s_NAME, s_VALUE, s_VALUE_QUOTED, s_FIND_NEXT_NAME
 	} state = s_NAME;
 
-	do	
+	do
 	{
 		switch(state)
 		{
@@ -691,7 +690,7 @@ void HTTPRequest::ParseCookies(const std::string &rHeader, int DataStarts)
 				}
 			}
 			break;
-		
+
 		case s_VALUE:
 			{
 				if(*pos == ';' || *pos == ',' || *pos == '\0')
@@ -705,7 +704,7 @@ void HTTPRequest::ParseCookies(const std::string &rHeader, int DataStarts)
 				}
 			}
 			break;
-		
+
 		case s_VALUE_QUOTED:
 			{
 				if(*pos == '"')
@@ -719,7 +718,7 @@ void HTTPRequest::ParseCookies(const std::string &rHeader, int DataStarts)
 				}
 			}
 			break;
-		
+
 		case s_FIND_NEXT_NAME:
 			{
 				// Skip over terminators and white space to get to the next name
@@ -731,7 +730,7 @@ void HTTPRequest::ParseCookies(const std::string &rHeader, int DataStarts)
 				}
 			}
 			break;
-		
+
 		default:
 			// Ooops
 			THROW_EXCEPTION(HTTPException, Internal)
@@ -758,7 +757,7 @@ bool HTTPRequest::GetCookie(const char *CookieName, std::string &rValueOut) cons
 	{
 		return false;
 	}
-	
+
 	// See if it's there
 	CookieJar_t::const_iterator v(mpCookies->find(std::string(CookieName)));
 	if(v != mpCookies->end())
@@ -767,7 +766,7 @@ bool HTTPRequest::GetCookie(const char *CookieName, std::string &rValueOut) cons
 		rValueOut = v->second;
 		return true;
 	}
-	
+
 	return false;
 }
 
@@ -790,7 +789,7 @@ const std::string &HTTPRequest::GetCookie(const char *CookieName) const
 	{
 		return noCookie;
 	}
-	
+
 	// See if it's there
 	CookieJar_t::const_iterator v(mpCookies->find(std::string(CookieName)));
 	if(v != mpCookies->end())
@@ -798,7 +797,7 @@ const std::string &HTTPRequest::GetCookie(const char *CookieName) const
 		// Return the value
 		return v->second;
 	}
-	
+
 	return noCookie;
 }
 

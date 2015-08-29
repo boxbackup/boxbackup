@@ -136,7 +136,7 @@ int test(int argc, const char *argv[])
 		TestWebServer server;
 		return server.Main("doesnotexist", argc - 1, argv + 1);
 	}
-	
+
 	if(argc >= 2 && ::strcmp(argv[1], "s3server") == 0)
 	{
 		// Run a server
@@ -145,7 +145,7 @@ int test(int argc, const char *argv[])
 	}
 
 	TEST_THAT(system("rm -rf *.memleaks") == 0);
-	
+
 	// Start the server
 	int pid = LaunchServer("./_test server testfiles/httpserver.conf", "testfiles/httpserver.pid");
 	TEST_THAT(pid != -1 && pid != 0);
@@ -200,7 +200,7 @@ int test(int argc, const char *argv[])
 
 		HTTPResponse response;
 		response.Receive(sock, SHORT_TIMEOUT);
-		
+
 		TEST_THAT(response.GetResponseCode() == HTTPResponse::Code_OK);
 		TEST_THAT(response.GetContentType() == "text/html");
 
@@ -257,16 +257,16 @@ int test(int argc, const char *argv[])
 		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
 		request.AddHeader("authorization",
 			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
-		
+
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
-		
+
 		CollectInBufferStream response_buffer;
 		HTTPResponse response(&response_buffer);
-		
+
 		simulator.Handle(request, response);
 		TEST_EQUAL(200, response.GetResponseCode());
-		
+
 		std::string response_data((const char *)response.GetBuffer(),
 			response.GetSize());
 		TEST_EQUAL("omgpuppies!\n", response_data);
@@ -280,16 +280,16 @@ int test(int argc, const char *argv[])
 		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
 		request.AddHeader("authorization",
 			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=");
-		
+
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
-		
+
 		CollectInBufferStream response_buffer;
 		HTTPResponse response(&response_buffer);
-		
+
 		simulator.Handle(request, response);
 		TEST_EQUAL(401, response.GetResponseCode());
-		
+
 		std::string response_data((const char *)response.GetBuffer(),
 			response.GetSize());
 		TEST_EQUAL("<html><head>"
@@ -301,7 +301,7 @@ int test(int argc, const char *argv[])
 			"</html>\n", response_data);
 	}
 
-	// S3Client tests
+	// S3Client tests with S3Simulator in-process server for debugging
 	{
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
@@ -336,26 +336,27 @@ int test(int argc, const char *argv[])
 	}
 
 	{
-		HTTPRequest request(HTTPRequest::Method_PUT,
-			"/newfile");
+		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("authorization", "AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+		request.AddHeader("authorization",
+			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
 		request.AddHeader("Content-Type", "text/plain");
-		
+
 		FileStream fs("testfiles/testrequests.pl");
 		fs.CopyStreamTo(request);
 		request.SetForReading();
 
 		CollectInBufferStream response_buffer;
 		HTTPResponse response(&response_buffer);
-		
+
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
 		simulator.Handle(request, response);
-		
+
 		TEST_EQUAL(200, response.GetResponseCode());
-		TEST_EQUAL("LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7", response.GetHeaderValue("x-amz-id-2"));
+		TEST_EQUAL("LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7",
+			response.GetHeaderValue("x-amz-id-2"));
 		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
 		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));

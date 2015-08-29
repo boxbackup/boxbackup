@@ -54,9 +54,9 @@ public:
 	virtual bool StreamClosed();
 
 	void SetForReading();
-	
+
 	void Reset();
-	
+
 	void *GetBuffer() const;
 	int GetSize() const;
 	bool IsSetForReading() const {return !mInWritePhase;}

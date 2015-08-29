@@ -138,8 +138,7 @@ void HTTPResponse::SetContentType(const char *ContentType)
 // Function
 //		Name:    HTTPResponse::Send(IOStream &, bool)
 //		Purpose: Build the response, and send via the stream.
-//			 Optionally omitting the content.
-//		Created: 26/3/04
+//		Created: 26/3/2004
 //
 // --------------------------------------------------------------------------
 void HTTPResponse::Send(bool OmitContent)
@@ -184,6 +183,7 @@ void HTTPResponse::Send(bool OmitContent)
 			// static is allowed to be cached for a day
 			header += "\r\nCache-Control: max-age=86400";
 		}
+
 		if(mKeepAlive)
 		{
 			header += "\r\nConnection: keep-alive\r\n\r\n";
@@ -192,6 +192,7 @@ void HTTPResponse::Send(bool OmitContent)
 		{
 			header += "\r\nConnection: close\r\n\r\n";
 		}
+
 		// NOTE: header ends with blank line in all cases
 
 		// Write to stream

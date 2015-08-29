@@ -40,12 +40,12 @@
 // --------------------------------------------------------------------------
 const ConfigurationVerify* S3Simulator::GetConfigVerify() const
 {
-	static ConfigurationVerifyKey verifyserverkeys[] = 
+	static ConfigurationVerifyKey verifyserverkeys[] =
 	{
 		HTTPSERVER_VERIFY_SERVER_KEYS(ConfigurationVerifyKey::NoDefaultValue) // no default addresses
 	};
 
-	static ConfigurationVerify verifyserver[] = 
+	static ConfigurationVerify verifyserver[] =
 	{
 		{
 			"Server",
@@ -55,8 +55,8 @@ const ConfigurationVerify* S3Simulator::GetConfigVerify() const
 			0
 		}
 	};
-	
-	static ConfigurationVerifyKey verifyrootkeys[] = 
+
+	static ConfigurationVerifyKey verifyrootkeys[] =
 	{
 		ConfigurationVerifyKey("AccessKey", ConfigTest_Exists),
 		ConfigurationVerifyKey("SecretKey", ConfigTest_Exists),
@@ -99,11 +99,11 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		const Configuration& rConfig(GetConfiguration());
 		std::string access_key = rConfig.GetKeyValue("AccessKey");
 		std::string secret_key = rConfig.GetKeyValue("SecretKey");
-		
+
 		std::string md5, date, bucket;
 		rRequest.GetHeader("content-md5", &md5);
 		rRequest.GetHeader("date", &date);
-		
+
 		std::string host = rRequest.GetHostName();
 		std::string s3suffix = ".s3.amazonaws.com";
 		if (host.size() > s3suffix.size())
@@ -116,7 +116,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 					s3suffix.size());
 			}
 		}
-		
+
 		std::ostringstream data;
 		data << rRequest.GetVerb() << "\n";
 		data << md5 << "\n";
@@ -127,7 +127,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
                 std::sort(headers.begin(), headers.end());
-		
+
 		for (std::vector<HTTPRequest::Header>::iterator
 			i = headers.begin(); i != headers.end(); i++)
 		{
@@ -135,13 +135,13 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 			{
 				data << i->first << ":" << i->second << "\n";
 			}
-		}		
-		
+		}
+
 		if (! bucket.empty())
 		{
 			data << "/" << bucket;
 		}
-		
+
 		data << rRequest.GetRequestURI();
 		std::string data_string = data.str();
 
@@ -152,17 +152,17 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 			(const unsigned char*)data_string.c_str(),
 			data_string.size(), digest_buffer, &digest_size);
 		std::string digest((const char *)digest_buffer, digest_size);
-		
+
 		base64::encoder encoder;
 		std::string expectedAuth = "AWS " + access_key + ":" +
 			encoder.encode(digest);
-		
+
 		if (expectedAuth[expectedAuth.size() - 1] == '\n')
 		{
 			expectedAuth = expectedAuth.substr(0,
 				expectedAuth.size() - 1);
 		}
-		
+
 		std::string actualAuth;
 		if (!rRequest.GetHeader("authorization", &actualAuth) ||
 			actualAuth != expectedAuth)
@@ -170,7 +170,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 			rResponse.SetResponseCode(HTTPResponse::Code_Unauthorized);
 			SendInternalErrorResponse("Authentication Failed",
 				rResponse);
-		}	
+		}
 		else if (rRequest.GetMethod() == HTTPRequest::Method_GET)
 		{
 			HandleGet(rRequest, rResponse);
@@ -198,7 +198,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	{
 		SendInternalErrorResponse("Unknown exception", rResponse);
 	}
-	
+
 	if (rResponse.GetResponseCode() != 200 &&
 		rResponse.GetSize() == 0)
 	{

@@ -130,7 +130,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	{
 		request.AddHeader("Content-Type", pStreamContentType);
 	}
-	
+
 	std::string s3suffix = ".s3.amazonaws.com";
 	std::string bucket;
 	if (mHostName.size() > s3suffix.size())
@@ -143,18 +143,18 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				s3suffix.size());
 		}
 	}
-	
+
 	std::ostringstream data;
 	data << request.GetVerb() << "\n";
 	data << "\n"; /* Content-MD5 */
 	data << request.GetContentType() << "\n";
 	data << date.str() << "\n";
-		
+
 	if (! bucket.empty())
 	{
 		data << "/" << bucket;
 	}
-	
+
 	data << request.GetRequestURI();
 	std::string data_string = data.str();
 
@@ -165,7 +165,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 		(const unsigned char*)data_string.c_str(),
 		data_string.size(), digest_buffer, &digest_size);
 	std::string digest((const char *)digest_buffer, digest_size);
-	
+
 	base64::encoder encoder;
 	std::string auth_code = "AWS " + mAccessKey + ":" +
 		encoder.encode(digest);

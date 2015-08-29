@@ -3,7 +3,7 @@
 // File
 //		Name:    HTTPRequest.h
 //		Purpose: Request object for HTTP connections
-//		Created: 26/3/04
+//		Created: 26/3/2004
 //
 // --------------------------------------------------------------------------
 
@@ -23,8 +23,12 @@ class IOStreamGetLine;
 //
 // Class
 //		Name:    HTTPRequest
-//		Purpose: Request object for HTTP connections
-//		Created: 26/3/04
+//		Purpose: Request object for HTTP connections. Although it
+//			 inherits from CollectInBufferStream, not all of the
+//			 request data is held in memory, only the beginning.
+//			 Use ReadContent() to write it all (including the
+//			 buffered beginning) to another stream, e.g. a file.
+//		Created: 26/3/2004
 //
 // --------------------------------------------------------------------------
 class HTTPRequest : public CollectInBufferStream
