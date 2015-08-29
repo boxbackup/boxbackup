@@ -169,9 +169,18 @@ void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 		{
 			SendInternalErrorResponse("unknown", response);
 		}
-		
-		// Keep alive?
-		if(request.GetClientKeepAliveRequested())
+
+		// Keep alive? response.GetSize() works for CollectInBufferStream, but
+		// when we make HTTPResponse stream the response instead, we'll need to
+		// figure out whether we can get the response length from the IOStream
+		// to be streamed, or not. Also, we don't currently support chunked
+		// encoding, and http://tools.ietf.org/html/rfc7230#section-3.3.1 says
+		// that "If any transfer coding other than chunked is applied to a
+		// response payload body, the sender MUST either apply chunked as the
+		// final transfer coding or terminate the message by closing the
+		// connection. So for now, keepalive stays off.
+		if(false && request.GetClientKeepAliveRequested() &&
+			response.GetSize() >= 0)
 		{
 			// Mark the response to the client as supporting keepalive
 			response.SetKeepAlive(true);
