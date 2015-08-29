@@ -12,7 +12,7 @@ esac
 
 if test "x$GXX" = "xyes"; then
   # Use -Wall if we have gcc. This gives better warnings
-  AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef'])
+  AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef -Werror=return-type'])
 
   # Don't check for gcc -rdynamic on Solaris as it's broken, but returns 0.
   # On Cygwin it does nothing except cause gcc to emit a warning message.
