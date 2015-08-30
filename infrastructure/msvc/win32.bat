@@ -3,6 +3,8 @@
 echo quick and dirty to get up and running by generating the required files 
 echo using Cygwin and Perl
 
+cd ..\..
+
 copy .\infrastructure\BoxPlatform.pm.in .\infrastructure\BoxPlatform.pm
 copy .\lib\common\BoxPortsAndFiles.h.in .\lib\common\BoxPortsAndFiles.h
 copy .\lib\common\BoxConfig-MSVC.h .\lib\common\BoxConfig.h
@@ -22,7 +24,7 @@ cd ..\..\
 cd .\lib\raidfile & perl ./../../lib/common/makeexception.pl.in RaidFileException.txt
 cd ..\..\
 
-cd .\bin\bbackupd & perl ./../../lib/common/makeexception.pl.in ClientException.txt
+cd .\lib\backupclient & perl ./../../lib/common/makeexception.pl.in ClientException.txt
 cd ..\..\
 
 cd .\lib\crypto & perl ./../../lib/common/makeexception.pl.in CipherException.txt
