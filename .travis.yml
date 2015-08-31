@@ -16,5 +16,13 @@ addons:
       - libwww-perl
       - xsltproc
       - zlib1g-dev
-script: ./bootstrap && ./configure && make && ./runtest.pl ALL debug && ./runtest.pl ALL release
+
+before_script: 
+  - ./bootstrap 
+  - ./configure 
+  - make 
+
+script: 
+  - ./runtest.pl ALL debug 
+  - ./runtest.pl ALL release
 
