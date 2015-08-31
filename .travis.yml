@@ -1,12 +1,17 @@
 language: cpp
+
 branches:
   only:
     - master
+
 compiler:
   - gcc
   - clang
+
 cache: apt
+
 sudo: false
+
 addons:
   apt:
     packages:
