@@ -27,7 +27,10 @@ before_script:
   - ./configure 
   - make 
 
+env:
+  - TEST_TARGET=debug
+  - TEST_TARGET=release
+
 script: 
-  - ./runtest.pl ALL debug 
-  - ./runtest.pl ALL release
+  - ./runtest.pl ALL $TEST_TARGET
 
