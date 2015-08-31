@@ -1,12 +1,19 @@
 language: cpp
+
 branches:
   only:
     - master
+
 compiler:
   - gcc
   - clang
-cache: apt
+
+cache:
+  - apt
+  - ccache
+
 sudo: false
+
 addons:
   apt:
     packages:
@@ -17,12 +24,12 @@ addons:
       - xsltproc
       - zlib1g-dev
 
-before_script: 
-  - ./bootstrap 
-  - ./configure 
-  - make 
+before_script:
+  - ./bootstrap
+  - ./configure
+  - make
 
-script: 
-  - ./runtest.pl ALL debug 
+script:
+  - ./runtest.pl ALL debug
   - ./runtest.pl ALL release
 
