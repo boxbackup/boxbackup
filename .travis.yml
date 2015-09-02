@@ -24,12 +24,15 @@ addons:
       - xsltproc
       - zlib1g-dev
 
+before_cache: ccache -s
+
 before_script:
   - ./bootstrap
-  - ./configure
+  - ./configure CC='ccache clang -Qunused-arguments -fcolor-diagnostics' CXX='ccache clang -Qunused-arguments -fcolor-diagnostics'
   - make
 
 script:
   - ./runtest.pl ALL debug
   - ./runtest.pl ALL release
 
+after_cache: ccache -s
