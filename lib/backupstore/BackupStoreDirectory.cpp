@@ -36,11 +36,6 @@ typedef struct
 	// Then a StreamableMemBlock for attributes
 } dir_StreamFormat;
 
-typedef enum
-{
-	Option_DependencyInfoPresent = 1
-} dir_StreamFormatOptions;
-
 typedef struct
 {
 	uint64_t mModificationTime;
