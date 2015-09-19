@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    BackupStoreDirectory.h
+//		Name:    BackupStoreDirectory.cpp
 //		Purpose: Representation of a backup directory
 //		Created: 2003/08/26
 //
@@ -172,7 +172,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	int count = ntohl(hdr.mNumEntries);
 
 	// Clear existing list
-	for(std::vector<Entry*>::iterator i = mEntries.begin(); 
+	for(std::vector<Entry*>::iterator i = mEntries.begin();
 		i != mEntries.end(); i++)
 	{
 		delete (*i);
