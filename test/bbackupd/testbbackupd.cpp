@@ -1053,7 +1053,7 @@ bool touch_and_wait(const std::string& filename)
 	return true;
 }
 
-TLSContext context;
+TLSContext sTlsContext;
 
 #define TEST_COMPARE(...) \
 	TEST_THAT(compare(BackupQueries::ReturnCode::__VA_ARGS__));
@@ -1063,7 +1063,7 @@ TLSContext context;
 bool search_for_file(const std::string& filename)
 {
 	std::auto_ptr<BackupProtocolCallable> client =
-		connect_and_login(context, BackupProtocolLogin::Flags_ReadOnly);
+		connect_and_login(sTlsContext, BackupProtocolLogin::Flags_ReadOnly);
 
 	std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(*client);
 	int64_t testDirId = SearchDir(*dir, filename);
@@ -1141,7 +1141,7 @@ bool test_readdirectory_on_nonexistent_dir()
 
 	{
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
-			context, 0 /* read-write */);
+			sTlsContext, 0 /* read-write */);
 		
 		{
 			Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
@@ -1208,7 +1208,7 @@ bool test_getobject_on_nonexistent_file()
 		TEST_THAT_OR(config.get(), return false);
 
 		std::auto_ptr<BackupProtocolCallable> connection =
-			connect_and_login(context, 0 /* read-write */);
+			connect_and_login(sTlsContext, 0 /* read-write */);
 		BackupQueries query(*connection, *config, false); // read-only
 		std::vector<std::string> args;
 		args.push_back("2"); // object ID
@@ -1303,7 +1303,7 @@ bool test_backup_disappearing_directory()
 	BackupClientContext clientContext
 	(
 		bbackupd, // rLocationResolver
-		context,
+		sTlsContext,
 		"localhost",
 		BOX_PORT_BBSTORED_TEST,
 		0x01234567,
@@ -1663,7 +1663,7 @@ bool test_ssl_keepalives()
 		// Finished reading dir, download to compare. We expect a listing of d1
 		// now, but we don't know its directory ID yet, so ask the store for it.
 		std::auto_ptr<BackupProtocolCallable> client =
-			connect_and_login(context, 0 /* read-write */);
+			connect_and_login(sTlsContext, 0 /* read-write */);
 		int64_t test1_id = GetDirID(*client, "Test1",
 			BackupProtocolListDirectory::RootDirectory);
 		int64_t spacetest_id = GetDirID(*client, "spacetest", test1_id);
@@ -1752,7 +1752,7 @@ bool test_backup_pauses_when_store_is_full()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 			TEST_THAT(check_num_files(5, 0, 0, 9));
 			TEST_THAT(check_num_blocks(*client, 10, 0, 0, 18, 28));
 			client->QueryFinished();
@@ -1825,7 +1825,7 @@ bool test_backup_pauses_when_store_is_full()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 			std::auto_ptr<BackupStoreDirectory> root_dir =
 				ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
@@ -1895,7 +1895,7 @@ bool test_bbackupd_exclusions()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 			TEST_THAT(check_num_files(4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
@@ -1920,7 +1920,7 @@ bool test_bbackupd_exclusions()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 			TEST_THAT(check_num_files(4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
@@ -1974,7 +1974,7 @@ bool test_bbackupd_exclusions()
 #endif
 
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 		
 			std::auto_ptr<BackupStoreDirectory> rootDir =
@@ -2039,7 +2039,7 @@ bool test_bbackupd_exclusions()
 		BOX_INFO("Checking that the files were removed");
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			std::auto_ptr<BackupStoreDirectory> rootDir =
 				ReadDirectory(*client);
@@ -2091,7 +2091,7 @@ bool test_bbackupd_exclusions()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			TEST_THAT(check_num_files(4, 0, 0, 7));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 14, 22));
@@ -2399,7 +2399,7 @@ bool test_redundant_locations_deleted_on_time()
 
 		TEST_THAT(search_for_file("Test2"));
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
-			context, 0 /* read-write */);
+			sTlsContext, 0 /* read-write */);
 		std::auto_ptr<BackupStoreDirectory> root_dir =
 			ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
 		TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
@@ -2576,7 +2576,7 @@ bool test_unicode_filenames_can_be_backed_up()
 		// Check that we can find it in directory listing
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0);
+				connect_and_login(sTlsContext, 0);
 
 			std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
 				*client);
@@ -3556,7 +3556,7 @@ bool test_restore_files_and_directories()
 		{
 			// connect and log in
 			std::auto_ptr<BackupProtocolCallable> client = 
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
@@ -3835,7 +3835,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 				try
 				{
 					std::auto_ptr<BackupProtocolCallable>
-						protocol = connect_to_bbstored(context);
+						protocol = connect_to_bbstored(sTlsContext);
 					// Make sure the marker isn't zero,
 					// because that's the default, and
 					// it should have changed
@@ -3932,7 +3932,7 @@ bool test_interrupted_restore_can_be_recovered()
 	{
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
@@ -3940,7 +3940,7 @@ bool test_interrupted_restore_can_be_recovered()
 				BackupProtocolListDirectory::RootDirectory);
 			TEST_THAT_OR(restoredirid != 0, FAIL);
 
-			do_interrupted_restore(context, restoredirid);
+			do_interrupted_restore(sTlsContext, restoredirid);
 			int64_t resumesize = 0;
 			TEST_THAT(FileExists("testfiles/"
 				"restore-interrupt.boxbackupresume",
@@ -3984,7 +3984,7 @@ bool test_interrupted_restore_can_be_recovered()
 bool assert_x1_deleted_or_not(bool expected_deleted)
 {
 	std::auto_ptr<BackupProtocolCallable> client =
-		connect_and_login(context, 0 /* read-write */);
+		connect_and_login(sTlsContext, 0 /* read-write */);
 	
 	std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(*client);
 	int64_t testDirId = SearchDir(*dir, "Test1");
@@ -4019,7 +4019,7 @@ bool test_restore_deleted_files()
 	{
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			// Find the ID of the Test1 directory
 			int64_t restoredirid = GetDirID(*client, "Test1",
@@ -4190,7 +4190,7 @@ int test(int argc, const char *argv[])
 		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 	}
 
-	context.Initialise(false /* client */,
+	sTlsContext.Initialise(false /* client */,
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
