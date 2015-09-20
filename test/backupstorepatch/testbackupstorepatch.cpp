@@ -504,9 +504,13 @@ int test(int argc, const char *argv[])
 							storeRootDir, discSet,
 							filenameOut,
 							false /* don't bother ensuring the directory exists */);
-						TEST_EQUAL(RaidFileUtil::NoFile,
+						std::ostringstream msg;
+						msg << "Unreferenced object " <<
+							test_files[f].IDOnServer <<
+							" was not deleted by housekeeping";
+						TEST_EQUAL_LINE(RaidFileUtil::NoFile,
 							RaidFileUtil::RaidFileExists(
-								rfd, filenameOut));
+								rfd, filenameOut), msg.str());
 					}
 					else
 					{
