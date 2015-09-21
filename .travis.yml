@@ -1,9 +1,5 @@
 language: cpp
 
-branches:
-  only:
-    - master
-
 compiler:
   - gcc
   - clang
@@ -31,7 +27,10 @@ before_script:
   - grep CXX config.status
   - make
 
+env:
+  - TEST_TARGET=debug
+  - TEST_TARGET=release
+
 script:
-  - ./runtest.pl ALL debug
-  - ./runtest.pl ALL release
+  - ./runtest.pl ALL $TEST_TARGET
   - ccache -s
