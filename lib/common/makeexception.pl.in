@@ -73,12 +73,13 @@ class ${class}Exception : public BoxException
 public:
 	${class}Exception(unsigned int SubType,
 		const std::string& rMessage = "")
-	: mSubType(SubType), mMessage(rMessage)
+	: mSubType(SubType), mMessage(rMessage),
+	  mWhat(GetMessage(SubType) + std::string(rMessage.empty() ? "" : ": ") + rMessage)
 	{
 	}
 	
 	${class}Exception(const ${class}Exception &rToCopy)
-	: mSubType(rToCopy.mSubType), mMessage(rToCopy.mMessage)
+	: mSubType(rToCopy.mSubType), mMessage(rToCopy.mMessage), mWhat(rToCopy.mWhat)
 	{
 	}
 	
@@ -117,6 +118,7 @@ print H <<__E;
 private:
 	unsigned int mSubType;
 	std::string mMessage;
+	std::string mWhat;
 };
 
 #endif // $guardname
@@ -133,51 +135,6 @@ print CPP <<__E;
 
 #include "MemLeakFindOn.h"
 
-#ifdef EXCEPTION_CODENAMES_EXTENDED
-	#ifdef EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION
-static const char *whats[] = {
-__E
-
-my $last_seen = -1;
-for(my $e = 0; $e <= $#exception; $e++)
-{
-	if($exception[$e] ne '')
-	{
-		for(my $s = $last_seen + 1; $s < $e; $s++)
-		{
-			print CPP "\t\"UNUSED\",\n"
-		}
-		my $ext = ($exception_desc[$e] ne '')?" ($exception_desc[$e])":'';
-		print CPP "\t\"${class} ".$exception[$e].$ext.'"'.(($e==$#exception)?'':',')."\n";
-		$last_seen = $e;
-	}
-}
-
-print CPP <<__E;
-};
-	#else
-static const char *whats[] = {
-__E
-
-$last_seen = -1;
-for(my $e = 0; $e <= $#exception; $e++)
-{
-	if($exception[$e] ne '')
-	{
-		for(my $s = $last_seen + 1; $s < $e; $s++)
-		{
-			print CPP "\t\"UNUSED\",\n"
-		}
-		print CPP "\t\"${class} ".$exception[$e].'"'.(($e==$#exception)?'':',')."\n";
-		$last_seen = $e;
-	}
-}
-
-print CPP <<__E;
-};
-	#endif
-#endif
-
 unsigned int ${class}Exception::GetType() const throw()
 {
 	return ${class}Exception::ExceptionType;
@@ -190,21 +147,7 @@ unsigned int ${class}Exception::GetSubType() const throw()
 
 const char * ${class}Exception::what() const throw()
 {
-	std::string what = "${class}";
-
-#ifdef EXCEPTION_CODENAMES_EXTENDED
-	if(mSubType < (sizeof(whats) / sizeof(whats[0])))
-	{
-		what = whats[mSubType];
-	}
-#endif
-
-	if(mMessage != "")
-	{
-		what += ": " + mMessage;
-	}
-
-	return what.c_str();
+	return mWhat.c_str();
 }
 
 const char * ${class}Exception::GetMessage(int SubType)
