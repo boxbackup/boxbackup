@@ -247,6 +247,11 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 	return *mapConnection;
 }
 
+BackupProtocolCallable* BackupClientContext::GetOpenConnection() const
+{
+	return mapConnection.get();
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -257,18 +262,19 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 // --------------------------------------------------------------------------
 void BackupClientContext::CloseAnyOpenConnection()
 {
-	if(mapConnection.get())
+	BackupProtocolCallable* pConnection(GetOpenConnection());
+	if(pConnection)
 	{
 		try
 		{
 			// Quit nicely
-			mapConnection->QueryFinished();
+			pConnection->QueryFinished();
 		}
 		catch(...)
 		{
 			// Ignore errors here
 		}
-		
+
 		// Delete it anyway.
 		mapConnection.reset();
 	}
@@ -299,9 +305,10 @@ void BackupClientContext::CloseAnyOpenConnection()
 // --------------------------------------------------------------------------
 int BackupClientContext::GetTimeout() const
 {
-	if(mapConnection.get())
+	BackupProtocolCallable* pConnection(GetOpenConnection());
+	if(pConnection)
 	{
-		return mapConnection->GetTimeout();
+		return pConnection->GetTimeout();
 	}
 	
 	return (15*60*1000);
@@ -543,7 +550,8 @@ void BackupClientContext::UnManageDiffProcess()
 // --------------------------------------------------------------------------
 void BackupClientContext::DoKeepAlive()
 {
-	if (!mapConnection.get())
+	BackupProtocolCallable* pConnection(GetOpenConnection());
+	if (!pConnection)
 	{
 		return;
 	}
@@ -559,7 +567,7 @@ void BackupClientContext::DoKeepAlive()
 	}
 	
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
-	mapConnection->QueryGetIsAlive();
+	pConnection->QueryGetIsAlive();
 	
 	mKeepAliveTimer.Reset(mKeepAliveTime * MILLI_SEC_IN_SEC);
 }
