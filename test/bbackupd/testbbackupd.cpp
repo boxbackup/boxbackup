@@ -58,6 +58,7 @@
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
 #include "BackupStoreConfigVerify.h"
+#include "BackupStoreFileEncodeStream.h"
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"
 #include "BoxTimeToUnix.h"
@@ -1053,7 +1054,7 @@ bool touch_and_wait(const std::string& filename)
 	return true;
 }
 
-TLSContext context;
+TLSContext sTlsContext;
 
 #define TEST_COMPARE(...) \
 	TEST_THAT(compare(BackupQueries::ReturnCode::__VA_ARGS__));
@@ -1063,7 +1064,7 @@ TLSContext context;
 bool search_for_file(const std::string& filename)
 {
 	std::auto_ptr<BackupProtocolCallable> client =
-		connect_and_login(context, BackupProtocolLogin::Flags_ReadOnly);
+		connect_and_login(sTlsContext, BackupProtocolLogin::Flags_ReadOnly);
 
 	std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(*client);
 	int64_t testDirId = SearchDir(*dir, filename);
@@ -1076,6 +1077,9 @@ class MockClientContext : public BackupClientContext
 {
 public:
 	BackupProtocolCallable& mrClient;
+	int mNumKeepAlivesPolled;
+	int mKeepAliveTime;
+
 	MockClientContext
 	(
 		LocationResolver &rResolver,
@@ -1094,16 +1098,36 @@ public:
 		rHostname, Port, AccountNumber, ExtendedLogging,
 		ExtendedLogToFile, ExtendedLogFile,
 		rProgressNotifier, TcpNiceMode),
-	  mrClient(rClient)
+	  mrClient(rClient),
+	  mNumKeepAlivesPolled(0),
+	  mKeepAliveTime(-1)
 	{ }
 
 	BackupProtocolCallable &GetConnection()
 	{
 		return mrClient;
 	}
+
+	virtual BackupProtocolCallable* GetOpenConnection() const
+	{
+		return &mrClient;
+	}
+
+	void SetKeepAliveTime(int iSeconds)
+	{
+		mKeepAliveTime = iSeconds;
+		BackupClientContext::SetKeepAliveTime(iSeconds);
+	}
+
+	virtual void DoKeepAlive()
+	{
+		mNumKeepAlivesPolled++;
+		BackupClientContext::DoKeepAlive();
+	}
 };
 
-class MockBackupDaemon : public BackupDaemon {
+class MockBackupDaemon : public BackupDaemon
+{
 	BackupProtocolCallable& mrClient;
 
 public:
@@ -1141,7 +1165,7 @@ bool test_readdirectory_on_nonexistent_dir()
 
 	{
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
-			context, 0 /* read-write */);
+			sTlsContext, 0 /* read-write */);
 		
 		{
 			Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
@@ -1208,7 +1232,7 @@ bool test_getobject_on_nonexistent_file()
 		TEST_THAT_OR(config.get(), return false);
 
 		std::auto_ptr<BackupProtocolCallable> connection =
-			connect_and_login(context, 0 /* read-write */);
+			connect_and_login(sTlsContext, 0 /* read-write */);
 		BackupQueries query(*connection, *config, false); // read-only
 		std::vector<std::string> args;
 		args.push_back("2"); // object ID
@@ -1303,7 +1327,7 @@ bool test_backup_disappearing_directory()
 	BackupClientContext clientContext
 	(
 		bbackupd, // rLocationResolver
-		context,
+		sTlsContext,
 		"localhost",
 		BOX_PORT_BBSTORED_TEST,
 		0x01234567,
@@ -1382,323 +1406,122 @@ bool test_backup_disappearing_directory()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
-// TODO FIXME check that directory modtimes are backed up by BackupClientDirectoryRecord.
+class KeepAliveBackupProtocolLocal : public BackupProtocolLocal2
+{
+public:
+	int mNumKeepAlivesSent;
+	int mNumKeepAlivesReceived;
+
+public:
+	KeepAliveBackupProtocolLocal(int32_t AccountNumber,
+		const std::string& ConnectionDetails,
+		const std::string& AccountRootDir, int DiscSetNumber,
+		bool ReadOnly)
+	: BackupProtocolLocal2(AccountNumber, ConnectionDetails, AccountRootDir,
+		DiscSetNumber, ReadOnly),
+	  mNumKeepAlivesSent(0),
+	  mNumKeepAlivesReceived(0)
+	{ }
+
+	std::auto_ptr<BackupProtocolIsAlive> Query(const BackupProtocolGetIsAlive &rQuery)
+	{
+		mNumKeepAlivesSent++;
+		std::auto_ptr<BackupProtocolIsAlive> response =
+			BackupProtocolLocal::Query(rQuery);
+		mNumKeepAlivesReceived++;
+		return response;
+	}
+};
 
 bool test_ssl_keepalives()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_TEST_BBACKUPD();
 
-#ifdef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-	BOX_NOTICE("Skipping intercept-based KeepAlive tests on this platform");
-#else
-	// Delete the test_base files unpacked by SETUP_TEST_BBACKUPD()
-	TEST_THAT(::system("rm -r testfiles/TestDir1") == 0);
-	// Unpack spacetest files instead
-	TEST_THAT(::mkdir("testfiles/TestDir1", 0755) == 0);
-	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
+	KeepAliveBackupProtocolLocal connection(0x01234567, "test", "backup/01234567/",
+		0, false);
+	MockBackupDaemon bbackupd(connection);
+	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
 
-	// TODO FIXME dedent
+	// Test that sending a keepalive actually works, when the timeout has expired,
+	// but doesn't send anything at the beginning:
 	{
-		#ifdef WIN32
-		#error TODO: implement threads on Win32, or this test \
-			will not finish properly
-		#endif
-
-		// something to diff against (empty file doesn't work)
-		int fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
-		TEST_THAT(fd > 0);
-
-		char buffer[10000];
-		memset(buffer, 0, sizeof(buffer));
-
-		TEST_EQUAL_LINE(sizeof(buffer),
-			write(fd, buffer, sizeof(buffer)),
-			"Buffer write");
-		TEST_THAT(close(fd) == 0);
-
-		wait_for_operation(5, "f1 to be old enough");
-	}
-	
-	// sleep to make it old enough to upload
-	// is this really necessary? the files have old timestamps.
-	bbackupd.RunSyncNow();
-
-	// TODO FIXME dedent
-	{
-		#ifdef WIN32
-		#error TODO: implement threads on Win32, or this test \
-			will not finish properly
-		#endif
-
-		TEST_THAT(unlink("testfiles/bbackupd.log") == 0);
-
-		// write again, to update the file's timestamp
-		int fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
-		TEST_THAT(fd > 0);
-		char buffer[10000];
-		memset(buffer, 0, sizeof(buffer));
-		TEST_EQUAL_LINE(sizeof(buffer),
-			write(fd, buffer, sizeof(buffer)),
-			"Buffer write");
-		TEST_THAT(close(fd) == 0);
-		wait_for_operation(5, "modified file to be old enough");
-
-		// two-second delay on the first read() of f1
-		// should mean that a single keepalive is sent,
-		// and diff does not abort.
-		intercept_setup_delay("testfiles/TestDir1/spacetest/f1",
-			0, 2000, SYS_read, 1);
-		bbackupd.RunSyncNow();
-		TEST_THAT(intercept_triggered());
-		intercept_clear_setup();
-
-		// check that keepalive was written to logs, and
-		// diff was not aborted, i.e. upload was a diff
-		FileStream fs("testfiles/bbackupd.log", O_RDONLY);
-		IOStreamGetLine reader(fs);
-		bool found1 = false;
-
-		while (!reader.IsEOF())
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			if (line == "Send GetBlockIndexByName(0x3,\"f1\")")
-			{
-				found1 = true;
-				break;
-			}
-		}
-
-		TEST_THAT_OR(found1, FAIL);
-		// TODO FIXME dedent
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			std::string comp = "Receive Success(0x";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()), line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 124", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line);
-
-			TEST_THAT(reader.GetLine(line));
-			comp = "Send StoreFile(0x3,";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
-				line);
-			comp = ",\"f1\")";
-			std::string sub = line.substr(line.size() - comp.size());
-			TEST_EQUAL_LINE(comp, sub, line);
-			std::string comp2 = ",0x0,";
-			sub = line.substr(line.size() - comp.size() -
-				comp2.size() + 1, comp2.size());
-			TEST_LINE(comp2 != sub, line);
-		}
-
-		// four-second delay on first read() of f1
-		// should mean that no keepalives were sent,
-		// because diff was immediately aborted
-		// before any matching blocks could be found.
-		intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
-			0, 4000, SYS_read, 1);
+		MockClientContext context(
+			bbackupd, // rResolver
+			sTlsContext, // rTLSContext
+			"localhost", // rHostname
+			BOX_PORT_BBSTORED_TEST,
+			0x01234567, // AccountNumber
+			false, // ExtendedLogging
+			false, // ExtendedLogToFile
+			"", // ExtendedLogFile
+			bbackupd, // rProgressNotifier
+			false, // TcpNiceMode
+			connection); // rClient
 		
-		{
-			fd = open("testfiles/TestDir1/spacetest/f1", O_WRONLY);
-			TEST_THAT(fd > 0);
-			// write again, to update the file's timestamp
-			TEST_EQUAL_LINE(1, write(fd, "z", 1), "Buffer write");
-			TEST_THAT(close(fd) == 0);
+		// Set the timeout to 1 second
+		context.SetKeepAliveTime(1);
 
-			// wait long enough to put file into sync window
-			wait_for_operation(5, "locally modified file to "
-				"mature for sync");
+		// Check that DoKeepAlive() does nothing right now
+		context.DoKeepAlive();
+		TEST_EQUAL(0, connection.mNumKeepAlivesSent);
 
-			bbackupd.RunSyncNow();
-			TEST_THAT(intercept_triggered());
-			intercept_clear_setup();
-		}
+		// Sleep until just before the timer expires, check that DoKeepAlive()
+		// still does nothing.
+		ShortSleep(MilliSecondsToBoxTime(900), true);
+		context.DoKeepAlive();
+		TEST_EQUAL(0, connection.mNumKeepAlivesSent);
 
-		// check that the diff was aborted, i.e. upload was not a diff
-		found1 = false;
-
-		while (!reader.IsEOF())
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			if (line == "Send GetBlockIndexByName(0x3,\"f1\")")
-			{
-				found1 = true;
-				break;
-			}
-		}
-
-		TEST_THAT_OR(found1, FAIL);
-		// TODO FIXME dedent
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			std::string comp = "Receive Success(0x";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
-				line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 124", line);
-
-			// delaying for 4 seconds in one step means that
-			// the diff timer and the keepalive timer will
-			// both expire, and the diff timer is honoured first,
-			// so there will be no keepalives.
-
-			TEST_THAT(reader.GetLine(line));
-			comp = "Send StoreFile(0x3,";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
-				line);
-			comp = ",0x0,\"f1\")";
-			std::string sub = line.substr(line.size() - comp.size());
-			TEST_EQUAL_LINE(comp, sub, line);
-		}
-
-		// Test that keepalives are sent while reading files
-		{
-			intercept_setup_delay("testfiles/TestDir1/spacetest/f1", 
-				0, 1000, SYS_read, 3);
-
-			// write again, to update the file's timestamp
-			TEST_THAT(touch_and_wait("testfiles/TestDir1/spacetest/f1"));
-
-			bbackupd.RunSyncNow();
-			TEST_THAT(intercept_triggered());
-			intercept_clear_setup();
-		}
-
-		// check that the diff was aborted, i.e. upload was not a diff
-		found1 = false;
-
-		while (!reader.IsEOF())
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			if (line == "Send GetBlockIndexByName(0x3,\"f1\")")
-			{
-				found1 = true;
-				break;
-			}
-		}
-
-		TEST_THAT_OR(found1, FAIL);
-		// TODO FIXME dedent
-		{
-			std::string line;
-			TEST_THAT(reader.GetLine(line));
-			std::string comp = "Receive Success(0x";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
-				line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receiving stream, size 124", line);
-
-			// delaying for 3 seconds in steps of 1 second
-			// means that the keepalive timer will expire 3 times,
-			// and on the 3rd time the diff timer will expire too.
-			// The diff timer is honoured first, so there will be 
-			// only two keepalives.
-			
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Send GetIsAlive()", line);
-			TEST_THAT(reader.GetLine(line));
-			TEST_EQUAL("Receive IsAlive()", line);
-
-			// but two matching blocks should have been found
-			// already, so the upload should be a diff.
-
-			TEST_THAT(reader.GetLine(line));
-			comp = "Send StoreFile(0x3,";
-			TEST_EQUAL_LINE(comp, line.substr(0, comp.size()),
-				line);
-			comp = ",\"f1\")";
-			std::string sub = line.substr(line.size() - comp.size());
-			TEST_EQUAL_LINE(comp, sub, line);
-			std::string comp2 = ",0x0,";
-			sub = line.substr(line.size() - comp.size() -
-				comp2.size() + 1, comp2.size());
-			TEST_LINE(comp2 != sub, line);
-		}
-
-		// Check that no read error has been reported yet
-		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
+		// Sleep until just after the timer expires, check that DoKeepAlive()
+		// sends a GetIsAlive message now.
+		ShortSleep(MilliSecondsToBoxTime(200), true);
+		context.DoKeepAlive();
+		TEST_EQUAL(1, connection.mNumKeepAlivesSent);
+		TEST_EQUAL(1, connection.mNumKeepAlivesReceived);
+		TEST_EQUAL(3, context.mNumKeepAlivesPolled);
 	}
+
+	// Do the initial backup. There are no existing files to diff, so the only
+	// keepalives polled should be the ones for each directory entry while reading
+	// directories, and the one in UpdateItems(), which is also once per item (file
+	// or directory). test_base.tgz has 16 directory entries, so we expect 2 * 16 = 32
+	// keepalives in total.
+	std::auto_ptr<BackupClientContext> apContext = bbackupd.RunSyncNow();
+	MockClientContext* pContext = (MockClientContext *)(apContext.get());
+	TEST_EQUAL(32, pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(1, pContext->mKeepAliveTime);
+
+	// Calculate the number of blocks that will be in ./TestDir1/x1/dsfdsfs98.fd,
+	// which is 4269 bytes long.
+	int64_t NumBlocks;
+	int32_t BlockSize, LastBlockSize;
+	BackupStoreFileEncodeStream::CalculateBlockSizes(4269, NumBlocks, BlockSize, LastBlockSize);
+	TEST_EQUAL(4096, BlockSize);
+	TEST_EQUAL(173, LastBlockSize);
+	TEST_EQUAL(2, NumBlocks);
+
+	// Now modify the file and run another backup. It's the only file that should be
+	// diffed, and DoKeepAlive() should be called for each block size in the original
+	// file, times the number of times that block size fits into the new file,
+	// i.e. 1 + (4269 / 256) = 18 times (plus the same 32 while scanning, as above).
 
 	{
-		// Test that keepalives are sent while reading large directories
-		{
-			intercept_setup_readdir_hook("testfiles/TestDir1/spacetest/d1", 
-				readdir_test_hook_2);
-			// time for two keepalives
-			readdir_stop_time = time(NULL) + 2;
-			TEST_THAT(::unlink("testfiles/bbackupd.log") == 0);
+		int fd = open("testfiles/TestDir1/x1/dsfdsfs98.fd", O_WRONLY);
+		TEST_THAT_OR(fd > 0, FAIL);
 
-			bbackupd.RunSyncNow();
-			TEST_THAT(intercept_triggered());
-			intercept_clear_setup();
-		}
+		char buffer[4000];
+		memset(buffer, 0, sizeof(buffer));
 
-		// check that keepalives were sent during the dir search
-		FileStream fs("testfiles/bbackupd.log", O_RDONLY);
-		IOStreamGetLine reader(fs);
-		TEST_EQUAL("Send Version(0x1)", reader.GetLine());
-		TEST_EQUAL("Receive Version(0x1)", reader.GetLine());
-		TEST_EQUAL("Send Login(0x1234567,0x0)", reader.GetLine());
-		TEST_STARTSWITH("Receive LoginConfirmed(", reader.GetLine());
-		TEST_EQUAL("Send ListDirectory(0x1,0x2,0xc,false)", reader.GetLine());
-		TEST_EQUAL("Receive Success(0x1)", reader.GetLine());
-		TEST_STARTSWITH("Receiving stream, size ", reader.GetLine());
-		TEST_EQUAL("Send GetIsAlive()", reader.GetLine());
-		TEST_EQUAL("Receive IsAlive()", reader.GetLine());
-		TEST_EQUAL("Send GetIsAlive()", reader.GetLine());
-		TEST_EQUAL("Receive IsAlive()", reader.GetLine());
+		TEST_EQUAL_LINE(sizeof(buffer),
+			write(fd, buffer, sizeof(buffer)),
+			"Buffer write");
+		TEST_THAT(close(fd) == 0);
 
-		// Finished reading dir, download to compare. We expect a listing of d1
-		// now, but we don't know its directory ID yet, so ask the store for it.
-		std::auto_ptr<BackupProtocolCallable> client =
-			connect_and_login(context, 0 /* read-write */);
-		int64_t test1_id = GetDirID(*client, "Test1",
-			BackupProtocolListDirectory::RootDirectory);
-		int64_t spacetest_id = GetDirID(*client, "spacetest", test1_id);
-		int64_t d1_id = GetDirID(*client, "d1", spacetest_id);
-		std::ostringstream expected;
-		expected << "Send ListDirectory(" << BOX_FORMAT_OBJECTID(d1_id) <<
-			",0xffff,0xc,true)";
-		TEST_EQUAL(expected.str(), reader.GetLine());
-
-		// The following files should be on the server:
-		// 00000001 -d---- 00002 (root)
-		// 00000002 -d---- 00002 Test1
-		// 00000003 -d---- 00002 Test1/spacetest
-		// 00000004 f----- 00002 Test1/spacetest/f1
-		// 00000005 f----- 00002 Test1/spacetest/f2
-		// 00000006 -d---- 00002 Test1/spacetest/d1
-		// 00000007 f----- 00002 Test1/spacetest/d1/f3
-		// 00000008 f----- 00002 Test1/spacetest/d1/f4
-		// 00000009 -d---- 00002 Test1/spacetest/d2
-		// 0000000a -d---- 00002 Test1/spacetest/d3
-		// 0000000b -d---- 00002 Test1/spacetest/d3/d4
-		// 0000000c f----- 00002 Test1/spacetest/d3/d4/f5
-		// 0000000d -d---- 00002 Test1/spacetest/d6
-		// 0000000e -d---- 00002 Test1/spacetest/d7
-		// 0000000f f--o-- 00002 Test1/spacetest/f1
-		// 00000010 f--o-- 00002 Test1/spacetest/f1
-		// 00000011 f----- 00002 Test1/spacetest/f1
-		// This is 34 blocks total.
-
-		TEST_THAT(check_num_files(5, 3, 0, 9));
-		TEST_THAT(check_num_blocks(*client, 10, 6, 0, 18, 34));
-		client->QueryFinished();
+		wait_for_operation(5, "modified file to be old enough");
 	}
-#endif // PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
+	apContext = bbackupd.RunSyncNow();
+	pContext = (MockClientContext *)(apContext.get());
+	TEST_EQUAL(32 + (4269/4096) + (4269/173), pContext->mNumKeepAlivesPolled);
 	TEARDOWN_TEST_BBACKUPD();
 }
 
@@ -1752,7 +1575,7 @@ bool test_backup_pauses_when_store_is_full()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 			TEST_THAT(check_num_files(5, 0, 0, 9));
 			TEST_THAT(check_num_blocks(*client, 10, 0, 0, 18, 28));
 			client->QueryFinished();
@@ -1825,7 +1648,7 @@ bool test_backup_pauses_when_store_is_full()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 			std::auto_ptr<BackupStoreDirectory> root_dir =
 				ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
@@ -1895,7 +1718,7 @@ bool test_bbackupd_exclusions()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 			TEST_THAT(check_num_files(4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
@@ -1920,7 +1743,7 @@ bool test_bbackupd_exclusions()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 			TEST_THAT(check_num_files(4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
@@ -1974,7 +1797,7 @@ bool test_bbackupd_exclusions()
 #endif
 
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 		
 			std::auto_ptr<BackupStoreDirectory> rootDir =
@@ -2039,7 +1862,7 @@ bool test_bbackupd_exclusions()
 		BOX_INFO("Checking that the files were removed");
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			std::auto_ptr<BackupStoreDirectory> rootDir =
 				ReadDirectory(*client);
@@ -2091,7 +1914,7 @@ bool test_bbackupd_exclusions()
 		// BLOCK
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			TEST_THAT(check_num_files(4, 0, 0, 7));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 14, 22));
@@ -2399,7 +2222,7 @@ bool test_redundant_locations_deleted_on_time()
 
 		TEST_THAT(search_for_file("Test2"));
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
-			context, 0 /* read-write */);
+			sTlsContext, 0 /* read-write */);
 		std::auto_ptr<BackupStoreDirectory> root_dir =
 			ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
 		TEST_THAT(test_entry_deleted(*root_dir, "Test2"));
@@ -2576,7 +2399,7 @@ bool test_unicode_filenames_can_be_backed_up()
 		// Check that we can find it in directory listing
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0);
+				connect_and_login(sTlsContext, 0);
 
 			std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(
 				*client);
@@ -3556,7 +3379,7 @@ bool test_restore_files_and_directories()
 		{
 			// connect and log in
 			std::auto_ptr<BackupProtocolCallable> client = 
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
@@ -3835,7 +3658,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 				try
 				{
 					std::auto_ptr<BackupProtocolCallable>
-						protocol = connect_to_bbstored(context);
+						protocol = connect_to_bbstored(sTlsContext);
 					// Make sure the marker isn't zero,
 					// because that's the default, and
 					// it should have changed
@@ -3932,7 +3755,7 @@ bool test_interrupted_restore_can_be_recovered()
 	{
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context,
+				connect_and_login(sTlsContext,
 					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
@@ -3940,7 +3763,7 @@ bool test_interrupted_restore_can_be_recovered()
 				BackupProtocolListDirectory::RootDirectory);
 			TEST_THAT_OR(restoredirid != 0, FAIL);
 
-			do_interrupted_restore(context, restoredirid);
+			do_interrupted_restore(sTlsContext, restoredirid);
 			int64_t resumesize = 0;
 			TEST_THAT(FileExists("testfiles/"
 				"restore-interrupt.boxbackupresume",
@@ -3984,7 +3807,7 @@ bool test_interrupted_restore_can_be_recovered()
 bool assert_x1_deleted_or_not(bool expected_deleted)
 {
 	std::auto_ptr<BackupProtocolCallable> client =
-		connect_and_login(context, 0 /* read-write */);
+		connect_and_login(sTlsContext, 0 /* read-write */);
 	
 	std::auto_ptr<BackupStoreDirectory> dir = ReadDirectory(*client);
 	int64_t testDirId = SearchDir(*dir, "Test1");
@@ -4019,7 +3842,7 @@ bool test_restore_deleted_files()
 	{
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(context, 0 /* read-write */);
+				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			// Find the ID of the Test1 directory
 			int64_t restoredirid = GetDirID(*client, "Test1",
@@ -4190,7 +4013,7 @@ int test(int argc, const char *argv[])
 		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 	}
 
-	context.Initialise(false /* client */,
+	sTlsContext.Initialise(false /* client */,
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");

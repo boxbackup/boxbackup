@@ -90,6 +90,9 @@ public:
 	int64_t GetBytesToUpload() { return mBytesToUpload; }
 	int64_t GetTotalBytesSent() { return mTotalBytesSent; }
 
+	static void CalculateBlockSizes(int64_t DataSize, int64_t &rNumBlocksOut,
+		int32_t &rBlockSizeOut, int32_t &rLastBlockSizeOut);
+
 private:
 	enum
 	{
@@ -98,15 +101,12 @@ private:
 		Status_BlockListing = 2,
 		Status_Finished = 3
 	};
-	
-private:
+
 	void EncodeCurrentBlock();
-	void CalculateBlockSizes(int64_t DataSize, int64_t &rNumBlocksOut, int32_t &rBlockSizeOut, int32_t &rLastBlockSizeOut);
 	void SkipPreviousBlocksInInstruction();
 	void SetForInstruction();
 	void StoreBlockIndexEntry(int64_t WncSizeOrBlkIndex, int32_t ClearSize, uint32_t WeakChecksum, uint8_t *pStrongChecksum);
 
-private:
 	Recipe *mpRecipe;
 	IOStream *mpFile;					// source file
 	CollectInBufferStream mData;		// buffer for header and index entries

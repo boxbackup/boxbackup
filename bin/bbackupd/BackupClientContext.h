@@ -54,11 +54,16 @@ public:
 		bool TcpNiceMode
 	);
 	virtual ~BackupClientContext();
+
 private:
 	BackupClientContext(const BackupClientContext &);
-public:
 
-	virtual BackupProtocolCallable &GetConnection();
+public:
+	// GetConnection() will open a connection if none is currently open.
+	virtual BackupProtocolCallable& GetConnection();
+	// GetOpenConnection() will not open a connection, just return NULL if there is
+	// no connection already open.
+	virtual BackupProtocolCallable* GetOpenConnection() const;
 	void CloseAnyOpenConnection();
 	int GetTimeout() const;
 	BackupClientDeleteList &GetDeleteList();
@@ -167,7 +172,7 @@ public:
 	//		Created: 04/19/2005
 	//
 	// --------------------------------------------------------------------------
-	void SetKeepAliveTime(int iSeconds);
+	virtual void SetKeepAliveTime(int iSeconds);
 
 	// --------------------------------------------------------------------------
 	//
