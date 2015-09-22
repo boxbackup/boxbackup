@@ -1,6 +1,6 @@
 # Box Backup
 
-![https://travis-ci.org/boxbackup/boxbackup.svg?branch=master](https://travis-ci.org/boxbackup/boxbackup)
+![Travis CI](https://travis-ci.org/boxbackup/boxbackup.svg?branch=master)
 
 Box Backup is an open source, completely automatic, secure, encrypted on-line backup system.
 
