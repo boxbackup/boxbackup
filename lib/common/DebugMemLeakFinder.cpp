@@ -428,7 +428,6 @@ int memleakfinder_numleaks()
 	
 	for(std::map<void *, ObjectInfo>::const_iterator i(sObjectBlocks.begin()); i != sObjectBlocks.end(); ++i)
 	{
-		const ObjectInfo& rInfo = i->second;
 		if(is_leak(i->first)) ++n;
 	}
 
@@ -536,7 +535,7 @@ void memleakfinder_reportleaks_file(FILE *file)
 	{
 		if(is_leak(i->first))
 		{
-			::fprintf(file, "Object%s %p size %d allocated at "
+			::fprintf(file, "Object %s %p size %d allocated at "
 				"%s:%d\n", i->second.array?" []":"",
 				i->first, i->second.size, i->second.file,
 				i->second.line);

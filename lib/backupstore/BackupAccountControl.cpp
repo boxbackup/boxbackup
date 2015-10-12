@@ -215,8 +215,7 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	info.ChangeBlocksUsed(rootDirSize);
 	info.ChangeBlocksInDirectories(rootDirSize);
 	info.AdjustNumDirectories(1);
-	int64_t id = info.AllocateObjectID();
-	ASSERT(id == BACKUPSTORE_ROOT_DIRECTORY_ID);
+	ASSERT(info.AllocateObjectID(); == BACKUPSTORE_ROOT_DIRECTORY_ID);
 
 	CollectInBufferStream out;
 	info.Save(out);
