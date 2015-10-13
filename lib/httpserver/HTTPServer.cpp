@@ -127,17 +127,17 @@ void HTTPServer::Run()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPServer::Connection(SocketStream &) 
+//		Name:    HTTPServer::Connection(SocketStream &)
 //		Purpose: As interface, handle connection
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
 void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 {
-	// Create a get line object to use
+	// Create an IOStreamGetLine object to help read the request in.
 	IOStreamGetLine getLine(*apConn);
 
-	// Notify dervived claases
+	// Notify derived classes
 	HTTPConnectionOpening();
 
 	bool handleRequests = true;

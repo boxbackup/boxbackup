@@ -58,8 +58,6 @@ HTTPResponse S3Client::HeadObject(const std::string& rObjectURI)
 	return FinishAndSendRequest(HTTPRequest::Method_HEAD, rObjectURI);
 }
 
-
-HTTPResponse HeadObject(const std::string& rObjectURI);
 // --------------------------------------------------------------------------
 //
 // Function

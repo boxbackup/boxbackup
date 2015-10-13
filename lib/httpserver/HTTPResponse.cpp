@@ -353,13 +353,13 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 			"Failed to get a response from the HTTP server within the timeout");
 	}
 
-	if (statusLine.substr(0, 7) != "HTTP/1." || statusLine[8] != ' ')
+	if(statusLine.substr(0, 7) != "HTTP/1." || statusLine[8] != ' ')
 	{
 		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
 			"HTTP server sent an invalid HTTP status line: " << statusLine);
 	}
 
-	if (statusLine[5] == '1' && statusLine[7] == '1')
+	if(statusLine[5] == '1' && statusLine[7] == '1')
 	{
 		// HTTP/1.1 default is to keep alive
 		mKeepAlive = true;
@@ -368,12 +368,12 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	// Decode the status code
 	long status = ::strtol(statusLine.substr(9, 3).c_str(), NULL, 10);
 	// returns zero in error case, this is OK
-	if (status < 0) status = 0;
+	if(status < 0) status = 0;
 	// Store
 	mResponseCode = status;
 
 	// 100 Continue responses have no headers, terminating newline, or body
-	if (status == 100)
+	if(status == 100)
 	{
 		return;
 	}
@@ -382,9 +382,9 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 
 	// push back whatever bytes we have left
 	// rGetLine.DetachFile();
-	if (mContentLength > 0)
+	if(mContentLength > 0)
 	{
-		if (mContentLength < rGetLine.GetSizeOfBufferedData())
+		if(mContentLength < rGetLine.GetSizeOfBufferedData())
 		{
 			// very small response, not good!
 			THROW_EXCEPTION(HTTPException, NotImplemented);
@@ -396,16 +396,17 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 			rGetLine.GetSizeOfBufferedData());
 	}
 
-	while (mContentLength != 0) // could be -1 as well
+	while(mContentLength != 0) // could be -1 as well
 	{
 		char buffer[4096];
 		int readSize = sizeof(buffer);
-		if (mContentLength > 0 && mContentLength < readSize)
+		if(mContentLength > 0 && mContentLength < readSize)
 		{
 			readSize = mContentLength;
 		}
+
 		readSize = rStream.Read(buffer, readSize, Timeout);
-		if (readSize == 0)
+		if(readSize == 0)
 		{
 			break;
 		}

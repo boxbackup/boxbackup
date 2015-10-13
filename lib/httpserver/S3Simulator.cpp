@@ -108,12 +108,12 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		std::string s3suffix = ".s3.amazonaws.com";
 		if (host.size() > s3suffix.size())
 		{
-			std::string suffix = host.substr(host.size() -
-				s3suffix.size(), s3suffix.size());
+			std::string suffix = host.substr(host.size() - s3suffix.size(),
+				s3suffix.size());
+
 			if (suffix == s3suffix)
 			{
-				bucket = host.substr(0, host.size() -
-					s3suffix.size());
+				bucket = host.substr(0, host.size() - s3suffix.size());
 			}
 		}
 
@@ -124,9 +124,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		data << date << "\n";
 
 		// header names are already in lower case, i.e. canonical form
-
 		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
-                std::sort(headers.begin(), headers.end());
+		std::sort(headers.begin(), headers.end());
 
 		for (std::vector<HTTPRequest::Header>::iterator
 			i = headers.begin(); i != headers.end(); i++)

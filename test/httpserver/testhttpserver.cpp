@@ -256,7 +256,8 @@ int test(int argc, const char *argv[])
 	TEST_THAT(StopDaemon(pid, "testfiles/httpserver.pid",
 		"generic-httpserver.memleaks", true));
 
-	// correct, official signature should succeed, with lower-case header
+	// This is the example from the Amazon S3 Developers Guide, page 31.
+	// Correct, official signature should succeed, with lower-case headers.
 	{
 		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
@@ -279,7 +280,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("omgpuppies!\n", response_data);
 	}
 
-	// modified signature should fail
+	// Modified signature should fail.
 	{
 		// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAuthentication.html
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");

@@ -34,8 +34,8 @@ private:
 	// no copying
 	HTTPServer(const HTTPServer &);
 	HTTPServer &operator=(const HTTPServer &);
-public:
 
+public:
 	int GetTimeout() const {return mTimeout;}
 
 	// --------------------------------------------------------------------------

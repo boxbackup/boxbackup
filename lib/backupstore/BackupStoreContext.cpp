@@ -223,7 +223,7 @@ void BackupStoreContext::LoadStoreInfo()
 
 	BackupStoreAccountDatabase::Entry account(mClientID, mStoreDiscSet);
 
-	// try to load the reference count database
+	// Try to load the reference count database
 	try
 	{
 		mapRefCount = BackupStoreRefCountDatabase::Load(account, false);
@@ -272,7 +272,7 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 	// Want to save now
 	mapStoreInfo->Save();
 
-	// Set count for next delay
+	// Reset counter for next delayed save.
 	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
 }
 
@@ -299,14 +299,14 @@ void BackupStoreContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutp
 // Function
 //		Name:    BackupStoreContext::GetDirectoryInternal(int64_t,
 //			 bool)
-//		Purpose: Return a reference to a directory. Valid only until
-//			 the next time a function which affects directories
-//			 is called. Mainly this function, and creation of
-//			 files. Private version of this, which returns
-//			 non-const directories. Unless called with
-//			 AllowFlushCache == false, the cache may be flushed,
-//			 invalidating all directory references that you may
-//			 be holding, so beware.
+//		Purpose: Return a reference to a directory, valid only until
+//			 the next time a function which may flush the
+//			 directory cache is called: mainly this function
+//			 (with AllowFlushCache == true) or creation of files.
+//			 This is a private function which returns non-const
+//			 references to directories in the cache. If the cache
+//			 is flushed, it will invalidate all directory
+//			 references that you may be holding, so beware.
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------

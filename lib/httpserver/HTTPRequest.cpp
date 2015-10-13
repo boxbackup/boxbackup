@@ -324,9 +324,14 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 
 		// Some data in the request to follow, parsing it bit by bit
 		HTTPQueryDecoder decoder(mQuery);
+
 		// Don't forget any data left in the GetLine object
 		int fromBuffer = rGetLine.GetSizeOfBufferedData();
-		if(fromBuffer > mContentLength) fromBuffer = mContentLength;
+		if(fromBuffer > mContentLength)
+		{
+			fromBuffer = mContentLength;
+		}
+
 		if(fromBuffer > 0)
 		{
 			BOX_TRACE("Decoding " << fromBuffer << " bytes of "
@@ -335,6 +340,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			// And tell the getline object to ignore the data we just used
 			rGetLine.IgnoreBufferedData(fromBuffer);
 		}
+
 		// Then read any more data, as required
 		int bytesToGo = mContentLength - fromBuffer;
 		while(bytesToGo > 0)
@@ -392,14 +398,19 @@ void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
 	}
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPRequest::Send(IOStream &, int)
-//		Purpose: Write the request to an IOStream using HTTP.
+//		Name:    HTTPRequest::Send(IOStream &, int, bool)
+//		Purpose: Write a request with NO CONTENT to an IOStream using
+//			 HTTP. If you want to send a request WITH content,
+//			 such as a PUT or POST request, use SendWithStream()
+//			 instead.
 //		Created: 03/01/09
 //
 // --------------------------------------------------------------------------
+
 bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 {
 	switch (mMethod)
