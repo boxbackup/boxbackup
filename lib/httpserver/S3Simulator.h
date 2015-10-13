@@ -34,8 +34,10 @@ public:
 
 	const ConfigurationVerify* GetConfigVerify() const;
 	virtual void Handle(HTTPRequest &rRequest, HTTPResponse &rResponse);
-	virtual void HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
+		bool IncludeContent = true);
 	virtual void HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void HandleHead(HTTPRequest &rRequest, HTTPResponse &rResponse);
 
 	virtual const char *DaemonName() const
 	{

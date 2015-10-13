@@ -33,8 +33,6 @@ std::string HTTPResponse::msDefaultURIPrefix;
 HTTPResponse::HTTPResponse(IOStream* pStreamToSendTo)
 	: mResponseCode(HTTPResponse::Code_NoContent),
 	  mResponseIsDynamicContent(true),
-	  mKeepAlive(false),
-	  mContentLength(-1),
 	  mpStreamToSendTo(pStreamToSendTo)
 {
 }
@@ -51,10 +49,32 @@ HTTPResponse::HTTPResponse(IOStream* pStreamToSendTo)
 HTTPResponse::HTTPResponse()
 	: mResponseCode(HTTPResponse::Code_NoContent),
 	  mResponseIsDynamicContent(true),
-	  mKeepAlive(false),
-	  mContentLength(-1),
 	  mpStreamToSendTo(NULL)
 {
+}
+
+
+// allow copying, but be very careful with the response stream,
+// you can only read it once! (this class doesn't police it).
+HTTPResponse::HTTPResponse(const HTTPResponse& rOther)
+: mResponseCode(rOther.mResponseCode),
+  mResponseIsDynamicContent(rOther.mResponseIsDynamicContent),
+  mpStreamToSendTo(rOther.mpStreamToSendTo),
+  mHeaders(rOther.mHeaders)
+{
+	Write(rOther.GetBuffer(), rOther.GetSize());
+}
+
+
+HTTPResponse &HTTPResponse::operator=(const HTTPResponse &rOther)
+{
+	Reset();
+	Write(rOther.GetBuffer(), rOther.GetSize());
+	mResponseCode = rOther.mResponseCode;
+	mResponseIsDynamicContent = rOther.mResponseIsDynamicContent;
+	mHeaders = rOther.mHeaders;
+	mpStreamToSendTo = rOther.mpStreamToSendTo;
+	return *this;
 }
 
 
@@ -122,216 +142,58 @@ void HTTPResponse::SetResponseCode(int Code)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPResponse::SetContentType(const char *)
-//		Purpose: Set content type
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-void HTTPResponse::SetContentType(const char *ContentType)
-{
-	mContentType = ContentType;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    HTTPResponse::Send(IOStream &, bool)
 //		Purpose: Build the response, and send via the stream.
 //		Created: 26/3/2004
 //
 // --------------------------------------------------------------------------
-void HTTPResponse::Send(bool OmitContent)
+void HTTPResponse::Send(int Timeout)
 {
 	if (!mpStreamToSendTo)
 	{
 		THROW_EXCEPTION(HTTPException, NoStreamConfigured);
 	}
 
-	if (GetSize() != 0 && mContentType.empty())
+	if (GetSize() != 0 && mHeaders.GetContentType().empty())
 	{
 		THROW_EXCEPTION(HTTPException, NoContentTypeSet);
 	}
 
 	// Build and send header
 	{
-		std::string header("HTTP/1.1 ");
-		header += ResponseCodeToString(mResponseCode);
-		header += "\r\nContent-Type: ";
-		header += mContentType;
-		header += "\r\nContent-Length: ";
-		{
-			char len[32];
-			::sprintf(len, "%d", OmitContent?(0):(GetSize()));
-			header += len;
-		}
-		// Extra headers...
-		for(std::vector<std::pair<std::string, std::string> >::const_iterator i(mExtraHeaders.begin()); i != mExtraHeaders.end(); ++i)
-		{
-			header += "\r\n";
-			header += i->first + ": " + i->second;
-		}
-		// NOTE: a line ending must be included here in all cases
+		std::ostringstream header;
+		header << "HTTP/1.1 ";
+		header << ResponseCodeToString(mResponseCode);
+		header << "\r\n";
+		mpStreamToSendTo->Write(header.str(), Timeout);
+
 		// Control whether the response is cached
 		if(mResponseIsDynamicContent)
 		{
 			// dynamic is private and can't be cached
-			header += "\r\nCache-Control: no-cache, private";
+			mHeaders.AddHeader("Cache-Control", "no-cache, private");
 		}
 		else
 		{
 			// static is allowed to be cached for a day
-			header += "\r\nCache-Control: max-age=86400";
+			mHeaders.AddHeader("Cache-Control", "max-age=86400");
 		}
-
-		if(mKeepAlive)
-		{
-			header += "\r\nConnection: keep-alive\r\n\r\n";
-		}
-		else
-		{
-			header += "\r\nConnection: close\r\n\r\n";
-		}
-
-		// NOTE: header ends with blank line in all cases
 
 		// Write to stream
-		mpStreamToSendTo->Write(header.c_str(), header.size());
+		mHeaders.WriteTo(*mpStreamToSendTo, Timeout);
+
+		// NOTE: header ends with blank line in all cases
+		mpStreamToSendTo->Write(std::string("\r\n"), Timeout);
 	}
 
 	// Send content
-	if(!OmitContent)
-	{
-		mpStreamToSendTo->Write(GetBuffer(), GetSize());
-	}
+	SetForReading();
+	CopyStreamTo(*mpStreamToSendTo, Timeout);
 }
 
-void HTTPResponse::SendContinue()
+void HTTPResponse::SendContinue(int Timeout)
 {
-	mpStreamToSendTo->Write("HTTP/1.1 100 Continue\r\n");
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPResponse::ParseHeaders(IOStreamGetLine &, int)
-//		Purpose: Private. Parse the headers of the response
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-void HTTPResponse::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
-{
-	std::string header;
-	bool haveHeader = false;
-	while(true)
-	{
-		if(rGetLine.IsEOF())
-		{
-			// Header terminates unexpectedly
-			THROW_EXCEPTION(HTTPException, BadRequest)
-		}
-
-		std::string currentLine;
-		if(!rGetLine.GetLine(currentLine, false /* no preprocess */, Timeout))
-		{
-			// Timeout
-			THROW_EXCEPTION(HTTPException, RequestReadFailed)
-		}
-
-		// Is this a continuation of the previous line?
-		bool processHeader = haveHeader;
-		if(!currentLine.empty() && (currentLine[0] == ' ' || currentLine[0] == '\t'))
-		{
-			// A continuation, don't process anything yet
-			processHeader = false;
-		}
-		//TRACE3("%d:%d:%s\n", processHeader, haveHeader, currentLine.c_str());
-
-		// Parse the header -- this will actually process the header
-		// from the previous run around the loop.
-		if(processHeader)
-		{
-			// Find where the : is in the line
-			const char *h = header.c_str();
-			int p = 0;
-			while(h[p] != '\0' && h[p] != ':')
-			{
-				++p;
-			}
-			// Skip white space
-			int dataStart = p + 1;
-			while(h[dataStart] == ' ' || h[dataStart] == '\t')
-			{
-				++dataStart;
-			}
-
-			if(p == sizeof("Content-Length")-1
-				&& ::strncasecmp(h, "Content-Length", sizeof("Content-Length")-1) == 0)
-			{
-				// Decode number
-				long len = ::strtol(h + dataStart, NULL, 10);	// returns zero in error case, this is OK
-				if(len < 0) len = 0;
-				// Store
-				mContentLength = len;
-			}
-			else if(p == sizeof("Content-Type")-1
-				&& ::strncasecmp(h, "Content-Type", sizeof("Content-Type")-1) == 0)
-			{
-				// Store rest of string as content type
-				mContentType = h + dataStart;
-			}
-			else if(p == sizeof("Cookie")-1
-				&& ::strncasecmp(h, "Cookie", sizeof("Cookie")-1) == 0)
-			{
-				THROW_EXCEPTION(HTTPException, NotImplemented);
-				/*
-				// Parse cookies
-				ParseCookies(header, dataStart);
-				*/
-			}
-			else if(p == sizeof("Connection")-1
-				&& ::strncasecmp(h, "Connection", sizeof("Connection")-1) == 0)
-			{
-				// Connection header, what is required?
-				const char *v = h + dataStart;
-				if(::strcasecmp(v, "close") == 0)
-				{
-					mKeepAlive = false;
-				}
-				else if(::strcasecmp(v, "keep-alive") == 0)
-				{
-					mKeepAlive = true;
-				}
-				// else don't understand, just assume default for protocol version
-			}
-			else
-			{
-				std::string headerName = header.substr(0, p);
-				AddHeader(headerName, h + dataStart);
-			}
-
-			// Unset have header flag, as it's now been processed
-			haveHeader = false;
-		}
-
-		// Store the chunk of header the for next time round
-		if(haveHeader)
-		{
-			header += currentLine;
-		}
-		else
-		{
-			header = currentLine;
-			haveHeader = true;
-		}
-
-		// End of headers?
-		if(currentLine.empty())
-		{
-			// All done!
-			break;
-		}
-	}
+	mpStreamToSendTo->Write(std::string("HTTP/1.1 100 Continue\r\n"), Timeout);
 }
 
 void HTTPResponse::Receive(IOStream& rStream, int Timeout)
@@ -362,7 +224,7 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	if(statusLine[5] == '1' && statusLine[7] == '1')
 	{
 		// HTTP/1.1 default is to keep alive
-		mKeepAlive = true;
+		mHeaders.SetKeepAlive(true);
 	}
 
 	// Decode the status code
@@ -378,31 +240,39 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 		return;
 	}
 
-	ParseHeaders(rGetLine, Timeout);
+	mHeaders.ReadFromStream(rGetLine, Timeout);
+	int remaining_bytes = mHeaders.GetContentLength();
 
 	// push back whatever bytes we have left
 	// rGetLine.DetachFile();
-	if(mContentLength > 0)
+	if(remaining_bytes == -1 || remaining_bytes > 0)
 	{
-		if(mContentLength < rGetLine.GetSizeOfBufferedData())
+		if(remaining_bytes != -1 &&
+			remaining_bytes < rGetLine.GetSizeOfBufferedData())
 		{
 			// very small response, not good!
-			THROW_EXCEPTION(HTTPException, NotImplemented);
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+				"HTTP server sent a very small response: " <<
+				mHeaders.GetContentLength() << " bytes");
 		}
 
-		mContentLength -= rGetLine.GetSizeOfBufferedData();
+		if(remaining_bytes > 0)
+		{
+			remaining_bytes -= rGetLine.GetSizeOfBufferedData();
+		}
 
 		Write(rGetLine.GetBufferedData(),
 			rGetLine.GetSizeOfBufferedData());
 	}
 
-	while(mContentLength != 0) // could be -1 as well
+	while(remaining_bytes != 0) // could be -1 as well
 	{
 		char buffer[4096];
 		int readSize = sizeof(buffer);
-		if(mContentLength > 0 && mContentLength < readSize)
+
+		if(remaining_bytes > 0 && remaining_bytes < readSize)
 		{
-			readSize = mContentLength;
+			readSize = remaining_bytes;
 		}
 
 		readSize = rStream.Read(buffer, readSize, Timeout);
@@ -410,82 +280,15 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 		{
 			break;
 		}
-		mContentLength -= readSize;
+
 		Write(buffer, readSize);
+		if(remaining_bytes > 0)
+		{
+			remaining_bytes -= readSize;
+		}
 	}
 
 	SetForReading();
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPResponse::AddHeader(const char *)
-//		Purpose: Add header, given entire line
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-/*
-void HTTPResponse::AddHeader(const char *EntireHeaderLine)
-{
-	mExtraHeaders.push_back(std::string(EntireHeaderLine));
-}
-*/
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPResponse::AddHeader(const std::string &)
-//		Purpose: Add header, given entire line
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-/*
-void HTTPResponse::AddHeader(const std::string &rEntireHeaderLine)
-{
-	mExtraHeaders.push_back(rEntireHeaderLine);
-}
-*/
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPResponse::AddHeader(const char *, const char *)
-//		Purpose: Add header, given header name and it's value
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-void HTTPResponse::AddHeader(const char *pHeader, const char *pValue)
-{
-	mExtraHeaders.push_back(Header(pHeader, pValue));
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPResponse::AddHeader(const char *, const std::string &)
-//		Purpose: Add header, given header name and it's value
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-void HTTPResponse::AddHeader(const char *pHeader, const std::string &rValue)
-{
-	mExtraHeaders.push_back(Header(pHeader, rValue));
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPResponse::AddHeader(const std::string &, const std::string &)
-//		Purpose: Add header, given header name and it's value
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-void HTTPResponse::AddHeader(const std::string &rHeader, const std::string &rValue)
-{
-	mExtraHeaders.push_back(Header(rHeader, rValue));
 }
 
 
@@ -521,7 +324,7 @@ void HTTPResponse::SetCookie(const char *Name, const char *Value, const char *Pa
 	h += "; Version=1; Path=";
 	h += Path;
 
-	mExtraHeaders.push_back(Header("Set-Cookie", h));
+	AddHeader("Set-Cookie", h);
 }
 
 
@@ -537,7 +340,7 @@ void HTTPResponse::SetCookie(const char *Name, const char *Value, const char *Pa
 void HTTPResponse::SetAsRedirect(const char *RedirectTo, bool IsLocalURI)
 {
 	if(mResponseCode != HTTPResponse::Code_NoContent
-		|| !mContentType.empty()
+		|| !mHeaders.GetContentType().empty()
 		|| GetSize() != 0)
 	{
 		THROW_EXCEPTION(HTTPException, CannotSetRedirectIfReponseHasData)
@@ -550,10 +353,10 @@ void HTTPResponse::SetAsRedirect(const char *RedirectTo, bool IsLocalURI)
 	std::string header;
 	if(IsLocalURI) header += msDefaultURIPrefix;
 	header += RedirectTo;
-	mExtraHeaders.push_back(Header("Location", header));
+	mHeaders.AddHeader("location", header);
 
 	// Set up some default content
-	mContentType = "text/html";
+	mHeaders.SetContentType("text/html");
 	#define REDIRECT_HTML_1 "<html><head><title>Redirection</title></head>\n<body><p><a href=\""
 	#define REDIRECT_HTML_2 "\">Redirect to content</a></p></body></html>\n"
 	Write(REDIRECT_HTML_1, sizeof(REDIRECT_HTML_1) - 1);
@@ -574,8 +377,8 @@ void HTTPResponse::SetAsRedirect(const char *RedirectTo, bool IsLocalURI)
 void HTTPResponse::SetAsNotFound(const char *URI)
 {
 	if(mResponseCode != HTTPResponse::Code_NoContent
-		|| mExtraHeaders.size() != 0
-		|| !mContentType.empty()
+		|| !mHeaders.GetExtraHeaders().empty()
+		|| !mHeaders.GetContentType().empty()
 		|| GetSize() != 0)
 	{
 		THROW_EXCEPTION(HTTPException, CannotSetNotFoundIfReponseHasData)
@@ -585,7 +388,7 @@ void HTTPResponse::SetAsNotFound(const char *URI)
 	mResponseCode = Code_NotFound;
 
 	// Set data
-	mContentType = "text/html";
+	mHeaders.SetContentType("text/html");
 	#define NOT_FOUND_HTML_1 "<html><head><title>404 Not Found</title></head>\n<body><h1>404 Not Found</h1>\n<p>The URI <i>"
 	#define NOT_FOUND_HTML_2 "</i> was not found on this server.</p></body></html>\n"
 	Write(NOT_FOUND_HTML_1, sizeof(NOT_FOUND_HTML_1) - 1);

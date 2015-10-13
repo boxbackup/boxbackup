@@ -27,8 +27,8 @@ class HTTPResponse;
 class HTTPServer : public ServerStream<SocketStream, 80>
 {
 public:
-	HTTPServer(int Timeout = 60000);
-	// default timeout leaves 1 minute for clients to get a second request in.
+	HTTPServer(int Timeout = 600000);
+	// default timeout leaves a little while for clients to get a second request in.
 	~HTTPServer();
 private:
 	// no copying
@@ -56,7 +56,6 @@ public:
 protected:
 	void SendInternalErrorResponse(const std::string& rErrorMsg,
 		HTTPResponse& rResponse);
-	int GetTimeout() { return mTimeout; }
 
 private:
 	int mTimeout;	// Timeout for read operations

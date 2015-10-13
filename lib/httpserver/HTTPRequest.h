@@ -14,6 +14,8 @@
 #include <map>
 
 #include "CollectInBufferStream.h"
+#include "HTTPHeaders.h"
+#include "SocketStream.h"
 
 class HTTPResponse;
 class IOStream;
@@ -65,10 +67,11 @@ public:
 	};
 
 	bool Receive(IOStreamGetLine &rGetLine, int Timeout);
+	bool SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue = false);
 	bool Send(IOStream &rStream, int Timeout, bool ExpectContinue = false);
-	void SendWithStream(IOStream &rStreamToSendTo, int Timeout,
+	IOStream::pos_type SendWithStream(SocketStream &rStreamToSendTo, int Timeout,
 		IOStream* pStreamToSend, HTTPResponse& rResponse);
-	void ReadContent(IOStream& rStreamToWriteTo);
+	void ReadContent(IOStream& rStreamToWriteTo, int Timeout);
 
 	typedef std::map<std::string, std::string> CookieJar_t;
 	
@@ -86,39 +89,29 @@ public:
 
 	// Note: the HTTPRequest generates and parses the Host: header
 	// Do not attempt to set one yourself with AddHeader().
-	const std::string &GetHostName() const {return mHostName;}
+	const std::string &GetHostName() const {return mHeaders.GetHostName();}
 	void SetHostName(const std::string& rHostName)
 	{
-		mHostName = rHostName;
+		mHeaders.SetHostName(rHostName);
 	}
-
-	const int GetHostPort() const {return mHostPort;}
+	const int GetHostPort() const {return mHeaders.GetHostPort();}
 	const std::string &GetQueryString() const {return mQueryString;}
 	int GetHTTPVersion() const {return mHTTPVersion;}
 	const Query_t &GetQuery() const {return mQuery;}
-	int GetContentLength() const {return mContentLength;}
-	const std::string &GetContentType() const {return mContentType;}
+	int GetContentLength() const {return mHeaders.GetContentLength();}
+	const std::string &GetContentType() const {return mHeaders.GetContentType();}
 	const CookieJar_t *GetCookies() const {return mpCookies;} // WARNING: May return NULL
 	bool GetCookie(const char *CookieName, std::string &rValueOut) const;
 	const std::string &GetCookie(const char *CookieName) const;
 	bool GetHeader(const std::string& rName, std::string* pValueOut) const
 	{
-		std::string header = ToLowerCase(rName);
-
-		for (std::vector<Header>::const_iterator
-			i  = mExtraHeaders.begin();
-			i != mExtraHeaders.end(); i++)
-		{
-			if (i->first == header)
-			{
-				*pValueOut = i->second;
-				return true;
-			}
-		}
-
-		return false;
+		return mHeaders.GetHeader(rName, pValueOut);
 	}
-	std::vector<Header> GetHeaders() { return mExtraHeaders; }
+	void AddHeader(const std::string& rName, const std::string& rValue)
+	{
+		mHeaders.AddHeader(rName, rValue);
+	}
+	HTTPHeaders& GetHeaders() { return mHeaders; }
 
 	// --------------------------------------------------------------------------
 	//
@@ -129,16 +122,12 @@ public:
 	//		Created: 22/12/04
 	//
 	// --------------------------------------------------------------------------
-	bool GetClientKeepAliveRequested() const {return mClientKeepAliveRequested;}
+	bool GetClientKeepAliveRequested() const {return mHeaders.IsKeepAlive();}
 	void SetClientKeepAliveRequested(bool keepAlive)
 	{
-		mClientKeepAliveRequested = keepAlive;
+		mHeaders.SetKeepAlive(keepAlive);
 	}
 
-	void AddHeader(const std::string& rName, const std::string& rValue)
-	{
-		mExtraHeaders.push_back(Header(ToLowerCase(rName), rValue));
-	}
 	bool IsExpectingContinue() const { return mExpectContinue; }
 	const char* GetVerb() const
 	{
@@ -157,37 +146,28 @@ public:
 		}
 		return "Bad";
 	}
-	
+
+	// This is not supposed to be an API, but the S3Simulator needs to be able to
+	// associate a data stream with an HTTPRequest when handling it in-process.
+	void SetDataStream(IOStream* pStreamToReadFrom)
+	{
+		ASSERT(!mpStreamToReadFrom);
+		mpStreamToReadFrom = pStreamToReadFrom;
+	}
+
 private:
-	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
-	void ParseCookies(const std::string &rHeader, int DataStarts);
+	void ParseCookies(const std::string &rCookieString);
 
 	enum Method mMethod;
 	std::string mRequestURI;
-	std::string mHostName;
-	int mHostPort;
 	std::string mQueryString;
 	int mHTTPVersion;
 	Query_t mQuery;
-	int mContentLength;
-	std::string mContentType;
 	CookieJar_t *mpCookies;
-	bool mClientKeepAliveRequested;
-	std::vector<Header> mExtraHeaders;
+	HTTPHeaders mHeaders;
 	bool mExpectContinue;
 	IOStream* mpStreamToReadFrom;
 	std::string mHttpVerb;
-
-	std::string ToLowerCase(const std::string& rInput) const
-	{
-		std::string output = rInput;
-		for (std::string::iterator c = output.begin();
-			c != output.end(); c++)
-		{
-			*c = tolower(*c);
-		}
-		return output;
-	}
 };
 
 #endif // HTTPREQUEST__H

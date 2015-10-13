@@ -124,7 +124,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		data << date << "\n";
 
 		// header names are already in lower case, i.e. canonical form
-		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
+		std::vector<HTTPRequest::Header> headers =
+			rRequest.GetHeaders().GetExtraHeaders();
 		std::sort(headers.begin(), headers.end());
 
 		for (std::vector<HTTPRequest::Header>::iterator
@@ -174,6 +175,10 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		{
 			HandleGet(rRequest, rResponse);
 		}
+		else if (rRequest.GetMethod() == HTTPRequest::Method_HEAD)
+		{
+			HandleHead(rRequest, rResponse);
+		}
 		else if (rRequest.GetMethod() == HTTPRequest::Method_PUT)
 		{
 			HandlePut(rRequest, rResponse);
@@ -216,6 +221,22 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    S3Simulator::HandleHead(HTTPRequest &rRequest,
+//			 HTTPResponse &rResponse)
+//		Purpose: Handles an S3 HEAD request, i.e. downloading just
+//			 the headers for an existing object.
+//		Created: 15/08/2015
+//
+// --------------------------------------------------------------------------
+
+void S3Simulator::HandleHead(HTTPRequest &rRequest, HTTPResponse &rResponse)
+{
+	HandleGet(rRequest, rResponse, false); // no content
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    S3Simulator::HandleGet(HTTPRequest &rRequest,
 //			 HTTPResponse &rResponse)
 //		Purpose: Handles an S3 GET request, i.e. downloading an
@@ -224,7 +245,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 //
 // --------------------------------------------------------------------------
 
-void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
+void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
+	bool IncludeContent)
 {
 	std::string path = GetConfiguration().GetKeyValue("StoreDirectory");
 	path += rRequest.GetRequestURI();
@@ -247,8 +269,12 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		throw;
 	}
 
+	if(IncludeContent)
+	{
+		apFile->CopyStreamTo(rResponse);
+	}
+
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
-	apFile->CopyStreamTo(rResponse);
 	rResponse.AddHeader("x-amz-id-2", "qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY");
 	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
 	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
@@ -297,7 +323,7 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		rResponse.SendContinue();
 	}
 
-	rRequest.ReadContent(*apFile);
+	rRequest.ReadContent(*apFile, GetTimeout());
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTObjectPUT.html
 	rResponse.AddHeader("x-amz-id-2", "LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7");

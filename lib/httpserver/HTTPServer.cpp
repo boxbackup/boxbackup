@@ -190,9 +190,9 @@ void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 			// Stop now
 			handleRequests = false;
 		}
-	
-		// Send the response (omit any content if this is a HEAD method request)
-		response.Send(request.GetMethod() == HTTPRequest::Method_HEAD);
+
+		// Send the response
+		response.Send(mTimeout);
 	}
 
 	// Notify derived classes
@@ -223,7 +223,7 @@ void HTTPServer::SendInternalErrorResponse(const std::string& rErrorMsg,
 	// rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
 	rResponse.SetContentType("text/html");
 	rResponse.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
-	rResponse.IOStream::Write(rErrorMsg.c_str());
+	rResponse.IOStream::Write(rErrorMsg);
 	rResponse.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
 }
 

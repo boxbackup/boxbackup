@@ -35,6 +35,7 @@
 #include "MemLeakFindOn.h"
 
 #define SHORT_TIMEOUT 5000
+#define LONG_TIMEOUT 300000
 
 class TestWebServer : public HTTPServer
 {
@@ -128,6 +129,42 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 TestWebServer::TestWebServer() {}
 TestWebServer::~TestWebServer() {}
 
+bool exercise_s3client(S3Client& client)
+{
+	bool success = true;
+
+	HTTPResponse response = client.GetObject("/photos/puppy.jpg");
+	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	TEST_EQUAL_OR("omgpuppies!\n", response_data, success = false);
+	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+
+	// make sure that assigning to HTTPResponse does clear stream
+	response = client.GetObject("/photos/puppy.jpg");
+	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
+	response_data = std::string((const char *)response.GetBuffer(),
+		response.GetSize());
+	TEST_EQUAL_OR("omgpuppies!\n", response_data, success = false);
+	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+
+	response = client.GetObject("/nonexist");
+	TEST_EQUAL_OR(404, response.GetResponseCode(), success = false);
+	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+
+	FileStream fs("testfiles/testrequests.pl");
+	response = client.PutObject("/newfile", fs);
+	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
+	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+
+	response = client.GetObject("/newfile");
+	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
+	TEST_THAT_OR(fs.CompareWith(response), success = false);
+	TEST_EQUAL_OR(0, ::unlink("testfiles/newfile"), success = false);
+
+	return success;
+}
+
 int test(int argc, const char *argv[])
 {
 	if(argc >= 2 && ::strcmp(argv[1], "server") == 0)
@@ -145,6 +182,101 @@ int test(int argc, const char *argv[])
 	}
 
 	TEST_THAT(system("rm -rf *.memleaks") == 0);
+
+	// Test that HTTPRequest can be written to and read from a stream.
+	{
+		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
+		request.SetHostName("quotes.s3.amazonaws.com");
+		// Write headers in lower case.
+		request.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		request.AddHeader("authorization",
+			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+		request.AddHeader("Content-Type", "text/plain");
+		request.SetClientKeepAliveRequested(true);
+
+		// Stream it to a CollectInBufferStream
+		CollectInBufferStream request_buffer;
+
+		// Because there isn't an HTTP server to respond to us, we can't use
+		// SendWithStream, so just send the content after the request.
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		FileStream fs("testfiles/testrequests.pl");
+		fs.CopyStreamTo(request_buffer);
+
+		request_buffer.SetForReading();
+
+		IOStreamGetLine getLine(request_buffer);
+		HTTPRequest request2;
+		TEST_THAT(request2.Receive(getLine, IOStream::TimeOutInfinite));
+
+		TEST_EQUAL(HTTPRequest::Method_PUT, request2.GetMethod());
+		TEST_EQUAL("PUT", request2.GetMethodName());
+		TEST_EQUAL("/newfile", request2.GetRequestURI());
+		TEST_EQUAL("quotes.s3.amazonaws.com", request2.GetHostName());
+		TEST_EQUAL(80, request2.GetHostPort());
+		TEST_EQUAL("", request2.GetQueryString());
+		TEST_EQUAL("text/plain", request2.GetContentType());
+		// Content-Length was not known when the stream was sent, so it should
+		// be unknown in the received stream too (certainly before it has all
+		// been read!)
+		TEST_EQUAL(-1, request2.GetContentLength());
+		HTTPHeaders& headers(request2.GetHeaders());
+		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT",
+			headers.GetHeaderValue("Date"));
+		TEST_EQUAL("AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
+			headers.GetHeaderValue("Authorization"));
+		TEST_THAT(request2.GetClientKeepAliveRequested());
+
+		CollectInBufferStream request_data;
+		request2.ReadContent(request_data, IOStream::TimeOutInfinite);
+		TEST_EQUAL(fs.GetPosition(), request_data.GetPosition());
+		request_data.SetForReading();
+		fs.Seek(0, IOStream::SeekType_Absolute);
+		TEST_THAT(fs.CompareWith(request_data, IOStream::TimeOutInfinite));
+	}
+
+	// Test that HTTPResponse can be written to and read from a stream.
+	// TODO FIXME: we should stream the response instead of buffering it, on both
+	// sides (send and receive).
+	{
+		// Stream it to a CollectInBufferStream
+		CollectInBufferStream response_buffer;
+
+		HTTPResponse response(&response_buffer);
+		FileStream fs("testfiles/testrequests.pl");
+		// Write headers in lower case.
+		response.SetResponseCode(HTTPResponse::Code_OK);
+		response.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
+		response.AddHeader("authorization",
+			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+		response.AddHeader("content-type", "text/perl");
+		fs.CopyStreamTo(response);
+		response.Send();
+		response_buffer.SetForReading();
+
+		HTTPResponse response2;
+		response2.Receive(response_buffer);
+
+		TEST_EQUAL(200, response2.GetResponseCode());
+		TEST_EQUAL("text/perl", response2.GetContentType());
+		// Content-Length was not known when the stream was sent, so it should
+		// be unknown in the received stream too (certainly before it has all
+		// been read!)
+		TEST_EQUAL(fs.GetPosition(), response2.GetContentLength());
+		HTTPHeaders& headers(response2.GetHeaders());
+		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT",
+			headers.GetHeaderValue("Date"));
+		TEST_EQUAL("AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
+			headers.GetHeaderValue("Authorization"));
+
+		CollectInBufferStream response_data;
+		// request2.ReadContent(request_data, IOStream::TimeOutInfinite);
+		response2.CopyStreamTo(response_data);
+		TEST_EQUAL(fs.GetPosition(), response_data.GetPosition());
+		response_data.SetForReading();
+		fs.Seek(0, IOStream::SeekType_Absolute);
+		TEST_THAT(fs.CompareWith(response_data, IOStream::TimeOutInfinite));
+	}
 
 	// Start the server
 	int pid = StartDaemon(0, "./_test server testfiles/httpserver.conf",
@@ -316,31 +448,7 @@ int test(int argc, const char *argv[])
 		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
 			"0PN5J17HBGZHT7JJ3X82",
 			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
-		
-		HTTPResponse response = client.GetObject("/photos/puppy.jpg");
-		TEST_EQUAL(200, response.GetResponseCode());
-		std::string response_data((const char *)response.GetBuffer(),
-			response.GetSize());
-		TEST_EQUAL("omgpuppies!\n", response_data);
-
-		// make sure that assigning to HTTPResponse does clear stream
-		response = client.GetObject("/photos/puppy.jpg");
-		TEST_EQUAL(200, response.GetResponseCode());
-		response_data = std::string((const char *)response.GetBuffer(),
-			response.GetSize());
-		TEST_EQUAL("omgpuppies!\n", response_data);
-
-		response = client.GetObject("/nonexist");
-		TEST_EQUAL(404, response.GetResponseCode());
-		
-		FileStream fs("testfiles/testrequests.pl");
-		response = client.PutObject("/newfile", fs);
-		TEST_EQUAL(200, response.GetResponseCode());
-
-		response = client.GetObject("/newfile");
-		TEST_EQUAL(200, response.GetResponseCode());
-		TEST_THAT(fs.CompareWith(response));
-		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
+		TEST_THAT(exercise_s3client(client));
 	}
 
 	{
@@ -349,10 +457,10 @@ int test(int argc, const char *argv[])
 		request.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("authorization",
 			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
-		request.AddHeader("Content-Type", "text/plain");
+		// request.AddHeader("Content-Type", "text/plain");
 
 		FileStream fs("testfiles/testrequests.pl");
-		fs.CopyStreamTo(request);
+		request.SetDataStream(&fs);
 		request.SetForReading();
 
 		CollectInBufferStream response_buffer;
@@ -372,6 +480,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_EQUAL(0, response.GetSize());
+		TEST_THAT(!response.IsKeepAlive());
 
 		FileStream f1("testfiles/testrequests.pl");
 		FileStream f2("testfiles/newfile");
@@ -383,6 +492,24 @@ int test(int argc, const char *argv[])
 	pid = StartDaemon(0, "./_test s3server testfiles/s3simulator.conf",
 		"testfiles/s3simulator.pid");
 	TEST_THAT_OR(pid > 0, return 1);
+
+	// This is the example from the Amazon S3 Developers Guide, page 31
+	{
+		SocketStream sock;
+		sock.Open(Socket::TypeINET, "localhost", 1080);
+
+		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
+		request.SetHostName("johnsmith.s3.amazonaws.com");
+		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		request.AddHeader("authorization",
+			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
+		request.Send(sock, SHORT_TIMEOUT);
+
+		HTTPResponse response;
+		response.Receive(sock, SHORT_TIMEOUT);
+		std::string value;
+		TEST_EQUAL(200, response.GetResponseCode());
+	}
 
 	{
 		SocketStream sock;
@@ -399,6 +526,7 @@ int test(int argc, const char *argv[])
 		response.Receive(sock, SHORT_TIMEOUT);
 		std::string value;
 		TEST_EQUAL(404, response.GetResponseCode());
+		TEST_THAT(!response.IsKeepAlive());
 	}
 
 	#ifndef WIN32 // much harder to make files inaccessible on WIN32
@@ -448,6 +576,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("\"828ef3fdfa96f00ad9f27c383fc9ac7f\"", response.GetHeaderValue("ETag"));
 		TEST_EQUAL("text/plain", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
+		TEST_THAT(!response.IsKeepAlive());
 
 		FileStream file("testfiles/testrequests.pl");
 		TEST_THAT(file.CompareWith(response));
@@ -465,7 +594,7 @@ int test(int argc, const char *argv[])
 		request.AddHeader("Content-Type", "text/plain");
 		FileStream fs("testfiles/testrequests.pl");
 		HTTPResponse response;
-		request.SendWithStream(sock, SHORT_TIMEOUT, &fs, response);
+		request.SendWithStream(sock, LONG_TIMEOUT, &fs, response);
 		std::string value;
 		TEST_EQUAL(200, response.GetResponseCode());
 		TEST_EQUAL("LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7", response.GetHeaderValue("x-amz-id-2"));
@@ -476,12 +605,19 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_EQUAL(0, response.GetSize());
+		TEST_THAT(!response.IsKeepAlive());
 
 		FileStream f1("testfiles/testrequests.pl");
 		FileStream f2("testfiles/newfile");
 		TEST_THAT(f1.CompareWith(f2));
 	}
 
+	// S3Client tests with S3Simulator daemon for realism
+	{
+		S3Client client("localhost", 1080, "0PN5J17HBGZHT7JJ3X82",
+			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
+		TEST_THAT(exercise_s3client(client));
+	}
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
