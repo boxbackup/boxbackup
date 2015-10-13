@@ -763,10 +763,22 @@ void Protocol::SendStream(IOStream &rStream)
 	else
 	{
 		// Fixed size stream, send it all in one go
-		if(!rStream.CopyStreamTo(*mapConn, GetTimeout(),
-			4096 /* slightly larger buffer */))
+		try
 		{
-			THROW_EXCEPTION(ConnectionException, Protocol_TimeOutWhenSendingStream)
+			rStream.CopyStreamTo(*mapConn, GetTimeout(),
+				4096 /* slightly larger buffer */);
+		}
+		catch(CommonException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				THROW_EXCEPTION_MESSAGE(ConnectionException,
+					Protocol_TimeOutWhenSendingStream, e.GetMessage());
+			}
+			else
+			{
+				throw;
+			}
 		}
 	}
 	// Make sure everything is written
