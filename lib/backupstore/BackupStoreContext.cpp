@@ -528,9 +528,21 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		if(DiffFromFileID == 0)
 		{
 			// A full file, just store to disc
-			if(!rFile.CopyStreamTo(storeFile, BACKUP_STORE_TIMEOUT))
+			try
 			{
-				THROW_EXCEPTION(BackupStoreException, ReadFileFromStreamTimedOut)
+				rFile.CopyStreamTo(storeFile, BACKUP_STORE_TIMEOUT);
+			}
+			catch(CommonException &e)
+			{
+				if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+				{
+					THROW_EXCEPTION_MESSAGE(BackupStoreException,
+						ReadFileFromStreamTimedOut, e.GetMessage());
+				}
+				else
+				{
+					throw;
+				}
 			}
 		}
 		else
@@ -566,9 +578,21 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 #endif
 
 				// Stream the incoming diff to this temporary file
-				if(!rFile.CopyStreamTo(diff, BACKUP_STORE_TIMEOUT))
+				try
 				{
-					THROW_EXCEPTION(BackupStoreException, ReadFileFromStreamTimedOut)
+					rFile.CopyStreamTo(diff, BACKUP_STORE_TIMEOUT);
+				}
+				catch(CommonException &e)
+				{
+					if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+					{
+						THROW_EXCEPTION_MESSAGE(BackupStoreException,
+							ReadFileFromStreamTimedOut, e.GetMessage());
+					}
+					else
+					{
+						throw;
+					}
 				}
 
 				// Verify the diff
