@@ -70,7 +70,6 @@
 #include "Configuration.h"
 #include "FileModificationTime.h"
 #include "FileStream.h"
-#include "intercept.h"
 #include "IOStreamGetLine.h"
 #include "LocalProcessStream.h"
 #include "MemBlockStream.h"
@@ -750,10 +749,6 @@ bool set_file_time(const char* filename, FILETIME creationTime,
 }
 #endif
 
-void intercept_setup_delay(const char *filename, unsigned int delay_after,
-	int delay_ms, int syscall_to_delay);
-bool intercept_triggered();
-
 int64_t SearchDir(BackupStoreDirectory& rDir,
 	const std::string& rChildName)
 {
@@ -852,120 +847,6 @@ bool stop_internal_daemon(int pid)
 	bool killed_server = KillServer(pid, false);
 	TEST_THAT(killed_server);
 	return killed_server;
-}
-
-static struct dirent readdir_test_dirent;
-static int readdir_test_counter = 0;
-static int readdir_stop_time = 0;
-static char stat_hook_filename[512];
-
-// First test hook, during the directory scanning stage, returns empty.
-// (Where is this stage? I can't find it, so I switched from using 
-// readdir_test_hook_1 to readdir_test_hook_2 in intercept tests.)
-// This will not match the directory on the store, so a sync will start.
-// We set up the next intercept for the same directory by passing NULL.
-
-extern "C" struct dirent *readdir_test_hook_2(DIR *dir);
-
-#ifdef LINUX_WEIRD_LSTAT
-extern "C" int lstat_test_hook(int ver, const char *file_name, struct stat *buf);
-#else
-extern "C" int lstat_test_hook(const char *file_name, struct stat *buf);
-#endif
-
-extern "C" struct dirent *readdir_test_hook_1(DIR *dir)
-{
-#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-	intercept_setup_readdir_hook(NULL, readdir_test_hook_2);
-#endif
-	return NULL;
-}
-
-// Second test hook, called by BackupClientDirectoryRecord::SyncDirectory,
-// keeps returning new filenames until the timer expires, then disables the
-// intercept.
-
-extern "C" struct dirent *readdir_test_hook_2(DIR *dir)
-{
-	if (spDaemon->IsTerminateWanted())
-	{
-		// force daemon to crash, right now
-		return NULL;
-	}
-
-	time_t time_now = time(NULL);
-
-	if (time_now >= readdir_stop_time)
-	{
-#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-		BOX_NOTICE("Cancelling readdir hook at " << time_now);
-		intercept_setup_readdir_hook(NULL, NULL);
-		intercept_setup_lstat_hook  (NULL, NULL);
-		// we will not be called again.
-#else
-		BOX_NOTICE("Failed to cancel readdir hook at " << time_now);
-#endif
-	}
-	else
-	{
-		BOX_TRACE("readdir hook still active at " << time_now << ", "
-			"waiting for " << readdir_stop_time);
-	}
-
-	// fill in the struct dirent appropriately
-	memset(&readdir_test_dirent, 0, sizeof(readdir_test_dirent));
-
-	#ifdef HAVE_STRUCT_DIRENT_D_INO
-		readdir_test_dirent.d_ino = ++readdir_test_counter;
-	#endif
-
-	snprintf(readdir_test_dirent.d_name, 
-		sizeof(readdir_test_dirent.d_name),
-		"test.%d", readdir_test_counter);
-	BOX_TRACE("readdir hook returning " << readdir_test_dirent.d_name);
-
-	// ensure that when bbackupd stats the file, it gets the 
-	// right answer
-	snprintf(stat_hook_filename, sizeof(stat_hook_filename),
-		"testfiles/TestDir1/spacetest/d1/test.%d", 
-		readdir_test_counter);
-
-#ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-	intercept_setup_lstat_hook(stat_hook_filename, lstat_test_hook);
-#endif
-
-	// sleep a bit to reduce the number of dirents returned
-	if (time_now < readdir_stop_time)
-	{
-		::safe_sleep(1);
-	}
-
-	return &readdir_test_dirent;
-}
-
-#ifdef LINUX_WEIRD_LSTAT
-extern "C" int lstat_test_hook(int ver, const char *file_name, struct stat *buf)
-#else
-extern "C" int lstat_test_hook(const char *file_name, struct stat *buf)
-#endif
-{
-	// TRACE1("lstat hook triggered for %s", file_name);
-	memset(buf, 0, sizeof(*buf));
-	buf->st_mode = S_IFREG;
-	return 0;
-}
-
-// Simulate a symlink that is on a different device than the file
-// that it points to.
-int lstat_test_post_hook(int old_ret, const char *file_name, struct stat *buf)
-{
-	BOX_TRACE("lstat post hook triggered for " << file_name);
-	if (old_ret == 0 &&
-		strcmp(file_name, "testfiles/symlink-to-TestDir1") == 0)
-	{
-		buf->st_dev ^= 0xFFFF;
-	}
-	return old_ret;
 }
 
 bool test_entry_deleted(BackupStoreDirectory& rDir,
