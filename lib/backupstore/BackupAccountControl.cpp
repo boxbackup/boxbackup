@@ -148,14 +148,14 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 	}
 	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
 
-	mBasePath = s3config.GetKeyValue("BasePath");
-	if(mBasePath.size() == 0)
+	std::string BasePath = s3config.GetKeyValue("BasePath");
+	if(BasePath.size() == 0)
 	{
-		mBasePath = "/";
+		BasePath = "/";
 	}
 	else
 	{
-		if(mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
+		if(BasePath[0] != '/' || BasePath[BasePath.size() - 1] != '/')
 		{
 			THROW_EXCEPTION_MESSAGE(CommonException,
 				InvalidConfiguration,
@@ -170,14 +170,7 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 		s3config.GetKeyValue("AccessKey"),
 		s3config.GetKeyValue("SecretKey")));
 
-	mapFileSystem.reset(new S3BackupFileSystem(mConfig, mBasePath, *mapS3Client));
-}
-
-std::string S3BackupAccountControl::GetFullURL(const std::string ObjectPath) const
-{
-	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
-	return std::string("http://") + s3config.GetKeyValue("HostName") + ":" +
-		s3config.GetKeyValue("Port") + GetFullPath(ObjectPath);
+	mapFileSystem.reset(new S3BackupFileSystem(mConfig, BasePath, *mapS3Client));
 }
 
 int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftLimit,
@@ -186,20 +179,12 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	// Try getting the info file. If we get a 200 response then it already
 	// exists, and we should bail out. If we get a 404 then it's safe to
 	// continue. Otherwise something else is wrong and we should bail out.
-	std::string info_url = GetFullURL(S3_INFO_FILE_NAME);
-
-	HTTPResponse response = GetObject(S3_INFO_FILE_NAME);
-	if(response.GetResponseCode() == HTTPResponse::Code_OK)
-	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException, AccountAlreadyExists,
-			"The BackupStoreInfo file already exists at this URL: " <<
-			info_url);
-	}
-
+	std::string info_url = mapFileSystem->GetObjectURL(S3_INFO_FILE_NAME);
+	HTTPResponse response = mapFileSystem->GetObject(S3_INFO_FILE_NAME);
 	if(response.GetResponseCode() != HTTPResponse::Code_NotFound)
 	{
-		mapS3Client->CheckResponse(response, std::string("Failed to check for an "
-			"existing BackupStoreInfo file at this URL: ") + info_url);
+		mapS3Client->CheckResponse(response, std::string("The BackupStoreInfo file already "
+			"exists at this URL: ") + info_url);
 	}
 
 	BackupStoreInfo info(0, // fake AccountID for S3 stores
@@ -219,18 +204,13 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	int64_t id = info.AllocateObjectID();
 	ASSERT(id == BACKUPSTORE_ROOT_DIRECTORY_ID);
 
-	CollectInBufferStream out;
-	info.Save(out);
-	out.SetForReading();
-
-	response = PutObject(S3_INFO_FILE_NAME, out);
-	mapS3Client->CheckResponse(response, std::string("Failed to upload the new BackupStoreInfo "
-		"file to this URL: ") + info_url);
+	mapFileSystem->PutBackupStoreInfo(info);
 
 	// Now get the file again, to check that it really worked.
-	response = GetObject(S3_INFO_FILE_NAME);
-	mapS3Client->CheckResponse(response, std::string("Failed to download the new BackupStoreInfo "
-		"file that we just created: ") + info_url);
+	std::auto_ptr<BackupStoreInfo> apInfoCopy =
+		mapFileSystem->GetBackupStoreInfo(0, // fake AccountID for S3 stores
+			true); // ReadOnly
+	ASSERT(info.ReportChangesTo(*apInfoCopy) == 0);
 
 	return 0;
 }
