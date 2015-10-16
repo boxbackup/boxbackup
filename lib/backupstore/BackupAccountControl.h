@@ -13,7 +13,8 @@
 #include <string>
 
 #include "BackupStoreAccountDatabase.h"
-#include "HTTPResponse.h"
+#include "BackupFileSystem.h"
+#include "NamedLock.h"
 #include "S3Client.h"
 
 class BackupStoreDirectory;
@@ -37,22 +38,6 @@ public:
 	int64_t SizeStringToBlocks(const char *string, int BlockSize);
 	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize);
 	int PrintAccountInfo(const BackupStoreInfo& info, int BlockSize);
-};
-
-class S3BackupFileSystem
-{
-private:
-	std::string mBasePath;
-	S3Client& mrClient;
-public:
-	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
-		S3Client& rClient)
-	: mBasePath(BasePath),
-	  mrClient(rClient)
-	{ }
-	std::string GetDirectoryURI(int64_t ObjectID);
-	std::auto_ptr<HTTPResponse> GetDirectory(BackupStoreDirectory& rDir);
-	int PutDirectory(BackupStoreDirectory& rDir);
 };
 
 class S3BackupAccountControl : public BackupAccountControl
