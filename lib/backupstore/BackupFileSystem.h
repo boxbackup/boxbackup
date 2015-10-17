@@ -70,6 +70,48 @@ public:
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
 };
 
+class RaidBackupFileSystem : public BackupFileSystem
+{
+private:
+	const std::string mAccountRootDir;
+	const int mStoreDiscSet;
+	std::string GetObjectFileName(int64_t ObjectID, bool EnsureDirectoryExists);
+	NamedLock mWriteLock;
+
+public:
+	RaidBackupFileSystem(const std::string &AccountRootDir, int discSet)
+	: BackupFileSystem(),
+	  mAccountRootDir(AccountRootDir),
+	  mStoreDiscSet(discSet)
+	{ }
+	virtual bool TryGetLock();
+	virtual void ReleaseLock()
+	{
+		mWriteLock.ReleaseLock();
+	}
+	virtual int GetBlockSize();
+	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,
+		bool ReadOnly);
+	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
+	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
+		bool ReadOnly);
+	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
+	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
+	virtual void PutDirectory(BackupStoreDirectory& rDir);
+	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
+		IOStream& rFileData);
+	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
+		int64_t DiffFromFileID, IOStream& rPatchData);
+	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
+	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
+		std::vector<int64_t>& rPatchChain);
+	virtual void DeleteFile(int64_t ObjectID);
+	virtual void DeleteDirectory(int64_t ObjectID)
+	{
+		DeleteFile(ObjectID);
+	}
+};
+
 class S3BackupFileSystem : public BackupFileSystem
 {
 private:

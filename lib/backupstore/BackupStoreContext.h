@@ -15,9 +15,9 @@
 #include <memory>
 
 #include "autogen_BackupProtocol.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
-#include "NamedLock.h"
 #include "Message.h"
 #include "Utils.h"
 
@@ -89,16 +89,14 @@ public:
 	// Not really an API, but useful for BackupProtocolLocal2.
 	void ReleaseWriteLock()
 	{
-		if(mWriteLock.GotLock())
+		if(!mReadOnly)
 		{
-			mWriteLock.ReleaseLock();
+			mapFileSystem->ReleaseLock();
 		}
 	}
 
-	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mAccountRootDir = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
+	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet);
 	bool GetClientHasAccount() const {return mClientHasAccount;}
-	const std::string &GetAccountRoot() const {return mAccountRootDir;}
-	int GetStoreDiscSet() const {return mStoreDiscSet;}
 
 	// Store info
 	void LoadStoreInfo();
@@ -169,13 +167,14 @@ public:
 	};
 	bool ObjectExists(int64_t ObjectID, int MustBe = ObjectExists_Anything);
 	std::auto_ptr<IOStream> OpenObject(int64_t ObjectID);
-	
+	std::auto_ptr<IOStream> GetFile(int64_t ObjectID, int64_t InDirectory);
+
 	// Info
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
+	virtual int GetBlockSize() { return mapFileSystem->GetBlockSize(); }
 
 private:
-	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID,
 		bool AllowFlushCache = true);
 	void SaveDirectory(BackupStoreDirectory &rDir);
@@ -189,15 +188,12 @@ private:
 	HousekeepingInterface *mpHousekeeping;
 	int mProtocolPhase;
 	bool mClientHasAccount;
-	std::string mAccountRootDir;	// has final directory separator
-	int mStoreDiscSet;
-
 	bool mReadOnly;
-	NamedLock mWriteLock;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
 
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
+	std::auto_ptr<BackupFileSystem> mapFileSystem;
 
 	// Refcount database
 	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;

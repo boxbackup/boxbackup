@@ -20,7 +20,6 @@
 #include "BackupStoreInfo.h"
 #include "Configuration.h"
 #include "HTTPResponse.h"
-#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
@@ -181,8 +180,19 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	// continue. Otherwise something else is wrong and we should bail out.
 	std::string info_url = mapFileSystem->GetObjectURL(S3_INFO_FILE_NAME);
 	HTTPResponse response = mapFileSystem->GetObject(S3_INFO_FILE_NAME);
-	if(response.GetResponseCode() != HTTPResponse::Code_NotFound)
+	if(response.GetResponseCode() == HTTPResponse::Code_OK)
 	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, AccountAlreadyExists,
+			"The BackupStoreInfo file already exists at this URL: " <<
+			info_url);
+	}
+	else if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		// 404 not found is exactly what we want here.
+	}
+	else
+	{
+		// This should report an error in a consistent way.
 		mapS3Client->CheckResponse(response, std::string("The BackupStoreInfo file already "
 			"exists at this URL: ") + info_url);
 	}
