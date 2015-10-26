@@ -304,7 +304,7 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 		size_t BytesLeftInCurrentUnit = mCurrentUnitSize -
 			mCurrentUnitData.GetSize();
 		// Add however many bytes are needed/available to the current unit's buffer.
-		BytesToAdd = min(BytesLeftInCurrentUnit, (size_t)NBytes);
+		BytesToAdd = std::min(BytesLeftInCurrentUnit, (size_t)NBytes);
 	}
 
 	// We must make progress here, or we could have infinite recursion.
@@ -502,7 +502,7 @@ void BackupStoreFile::VerifyStream::Close(bool CloseCopyStream)
 	CollectInBufferStream* pPreviousBuffer = mCurrentBufferIsAlternate ?
 		&mCurrentUnitData : &mAlternateData;
 
-	int64_t BytesFromCurrentBuffer = min(mBlockIndexSize,
+	int64_t BytesFromCurrentBuffer = std::min(mBlockIndexSize,
 		(int64_t)pCurrentBuffer->GetSize());
 	int64_t BytesFromPreviousBuffer = mBlockIndexSize - BytesFromCurrentBuffer;
 

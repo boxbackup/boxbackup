@@ -346,7 +346,7 @@ int BackupStoreRefCountDatabase::ReportChangesTo(BackupStoreRefCountDatabase& rO
 	int64_t MaxNewObjectId = GetLastObjectIDUsed();
 
 	for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
-		ObjectID < max(MaxOldObjectId, MaxNewObjectId);
+		ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
 		ObjectID++)
 	{
 		typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
