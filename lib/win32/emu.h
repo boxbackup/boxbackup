@@ -44,8 +44,8 @@
 	typedef          __int32 int32_t;
 	typedef unsigned __int16 uint16_t;
 	typedef          __int16 int16_t;
-	typedef unsigned __int8  uint8_t;
-	typedef          __int8  int8_t;
+	typedef unsigned char    uint8_t;
+	typedef signed   char    int8_t;
 #endif
 
 // emulated types, present on MinGW but not MSVC or vice versa
@@ -83,13 +83,14 @@
 
 #ifdef _MSC_VER
 // Microsoft decided to deprecate the standard POSIX functions. Great!
-#define open(file,flags,mode) _open(file,flags,mode)
-#define close(fd)             _close(fd)
-#define dup(fd)               _dup(fd)
-#define read(fd,buf,count)    _read(fd,buf,count)
-#define write(fd,buf,count)   _write(fd,buf,count)
-#define lseek(fd,off,whence)  _lseek(fd,off,whence)
-#define fileno(struct_file)   _fileno(struct_file)
+// #define open(file,flags,mode) _open(file,flags,mode)
+// #define close(fd)             _close(fd)
+// #define dup(fd)               _dup(fd)
+// #define read(fd,buf,count)    _read(fd,buf,count) //collision with lib\httpserver\decode.h@61 (istream_in.read((char*)code, N);)
+// #define write(fd,buf,count)   _write(fd,buf,count) //collision with lib\httpserver\decode.h@64 ostream_in.write((const char*)plaintext, plainlength);
+// #define lseek(fd,off,whence)  _lseek(fd,off,whence)
+// #define fileno(struct_file)   _fileno(struct_file)
+#define strncasecmp(buf, msg, cbLength) _strnicmp(buf, msg, cbLength)
 #endif
 
 struct passwd {
