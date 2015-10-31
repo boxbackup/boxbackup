@@ -48,9 +48,11 @@ public:
 	BackupStoreContext(int32_t ClientID,
 		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
-	~BackupStoreContext();
+	virtual ~BackupStoreContext();
+
 private:
-	BackupStoreContext(const BackupStoreContext &rToCopy);
+	BackupStoreContext(const BackupStoreContext &rToCopy); // no copying
+
 public:
 
 	void ReceivedFinishCommand();

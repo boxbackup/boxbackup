@@ -243,6 +243,7 @@ class $request_base_class
 
 class $send_receive_class {
 public:
+	virtual ~$send_receive_class() { }
 	virtual void Send(const $message_base_class &rObject) = 0;
 	virtual std::auto_ptr<$message_base_class> Receive() = 0;
 };
