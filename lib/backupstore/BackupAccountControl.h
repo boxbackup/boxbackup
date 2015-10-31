@@ -33,6 +33,7 @@ public:
 	: mConfig(config),
 	  mMachineReadableOutput(machineReadableOutput)
 	{ }
+	virtual ~BackupAccountControl() { }
 	void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit);
 	int64_t SizeStringToBlocks(const char *string, int BlockSize);
 	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize);

@@ -48,6 +48,7 @@ public:
 	};
 
 	BackupFileSystem() { }
+	virtual ~BackupFileSystem() { }
 	virtual bool TryGetLock() = 0;
 	virtual void ReleaseLock() = 0;
 	virtual int GetBlockSize() = 0;
