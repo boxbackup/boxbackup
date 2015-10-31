@@ -157,10 +157,10 @@ int main(int argc, const char *argv[])
 	{
 		PrintUsageAndExit();
 	}
-	
+
 	std::string command = argv[0];
 	BackupStoreAccountsControl control(*config, machineReadableOutput);
-	
+
 	// Now do the command.
 	if(command == "create")
 	{
@@ -175,7 +175,7 @@ int main(int argc, const char *argv[])
 				"soft and hard limits.");
 			return 1;
 		}
-		
+
 		// Decode limits
 		int blocksize = control.BlockSizeOfDiscSet(discnum);
 		softlimit = control.SizeStringToBlocks(argv[3], blocksize);
@@ -197,7 +197,7 @@ int main(int argc, const char *argv[])
 		{
 			PrintUsageAndExit();
 		}
-		
+
 		bool enabled = true;
 		std::string enabled_string = argv[2];
 		if(enabled_string == "yes")
@@ -211,8 +211,8 @@ int main(int argc, const char *argv[])
 		else
 		{
 			PrintUsageAndExit();
-		}		
-		
+		}
+
 		return control.SetAccountEnabled(id, enabled);
 	}
 	else if(command == "setlimit")
@@ -223,7 +223,7 @@ int main(int argc, const char *argv[])
 			BOX_ERROR("setlimit requires soft and hard limits.");
 			return 1;
 		}
-		
+
 		return control.SetLimit(id, argv[2], argv[3]);
 	}
 	else if(command == "name")
@@ -234,7 +234,7 @@ int main(int argc, const char *argv[])
 			BOX_ERROR("name command requires a new name.");
 			return 1;
 		}
-		
+
 		return control.SetAccountName(id, argv[2]);
 	}
 	else if(command == "delete")
@@ -269,7 +269,7 @@ int main(int argc, const char *argv[])
 				return 2;
 			}
 		}
-	
+
 		// Check the account
 		return control.CheckAccount(id, fixErrors, quiet);
 	}
@@ -284,7 +284,7 @@ int main(int argc, const char *argv[])
 	}
 
 	return 0;
-	
+
 	MAINHELPER_END
 }
 

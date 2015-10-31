@@ -2476,6 +2476,7 @@ bool test_store_info()
 		TEST_CHECK_THROWS(info->AddDeletedDirectory(2), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->SetAccountName("hello"), BackupStoreException, StoreInfoIsReadOnly);
 	}
+
 	{
 		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, false));
 		info->ChangeBlocksUsed(8);

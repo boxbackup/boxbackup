@@ -77,7 +77,7 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 	// Create the entry in the database
 	BackupStoreAccountDatabase::Entry Entry(mrDatabase.AddEntry(ID,
 		DiscSet));
-	
+
 	{
 		// Become the user specified in the config file?
 		std::auto_ptr<UnixUser> user;
@@ -91,13 +91,13 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 
 		// Get directory name
 		std::string dirName(MakeAccountRootDir(ID, DiscSet));
-	
+
 		// Create a directory on disc
 		RaidFileWrite::CreateDirectory(DiscSet, dirName, true /* recursive */);
-		
+
 		// Create an info file
 		BackupStoreInfo::CreateNew(ID, dirName, DiscSet, SizeSoftLimit, SizeHardLimit);
-		
+
 		// And an empty directory
 		BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID, BACKUPSTORE_ROOT_DIRECTORY_ID);
 		int64_t rootDirSize = 0;
@@ -109,13 +109,13 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 			rootDirSize = rf.GetDiscUsageInBlocks();
 			rf.Commit(true);
 		}
-	
+
 		// Update the store info to reflect the size of the root directory
 		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, dirName, DiscSet, false /* ReadWrite */));
 		info->ChangeBlocksUsed(rootDirSize);
 		info->ChangeBlocksInDirectories(rootDirSize);
 		info->AdjustNumDirectories(1);
-		
+
 		// Save it back
 		info->Save();
 
@@ -141,7 +141,7 @@ void BackupStoreAccounts::GetAccountRoot(int32_t ID, std::string &rRootDirOut, i
 {
 	// Find the account
 	const BackupStoreAccountDatabase::Entry &en(mrDatabase.GetEntry(ID));
-	
+
 	rRootDirOut = MakeAccountRootDir(ID, en.GetDiscSet());
 	rDiscSetOut = en.GetDiscSet();
 }

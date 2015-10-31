@@ -76,15 +76,16 @@ class BackupStoreCheck
 public:
 	BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNumber, int32_t AccountID, bool FixErrors, bool Quiet);
 	~BackupStoreCheck();
+
 private:
 	// no copying
 	BackupStoreCheck(const BackupStoreCheck &);
 	BackupStoreCheck &operator=(const BackupStoreCheck &);
-public:
 
+public:
 	// Do the exciting things
 	void Check();
-	
+
 	bool ErrorsFound() {return mNumberErrorsFound > 0;}
 	inline int64_t GetNumErrorsFound()
 	{
@@ -114,7 +115,7 @@ private:
 		BackupStoreCheck_ID_t mContainer[BACKUPSTORECHECK_BLOCK_SIZE];
 		BackupStoreCheck_Size_t mObjectSizeInBlocks[BACKUPSTORECHECK_BLOCK_SIZE];
 	} IDBlock;
-	
+
 	// Phases of the check
 	void CheckObjects();
 	void CheckDirectories();
@@ -150,7 +151,7 @@ private:
 		ASSERT(pBlock != 0);
 		ASSERT(Index < BACKUPSTORECHECK_BLOCK_SIZE);
 		ASSERT(Flags < (1 << Flags__NumFlags));
-		
+
 		pBlock->mFlags[Index / Flags__NumItemsPerEntry]
 			|= (Flags << ((Index % Flags__NumItemsPerEntry) * Flags__NumFlags));
 	}
@@ -161,7 +162,7 @@ private:
 
 		return (pBlock->mFlags[Index / Flags__NumItemsPerEntry] >> ((Index % Flags__NumItemsPerEntry) * Flags__NumFlags)) & Flags__MASK;
 	}
-	
+
 #ifndef BOX_RELEASE_BUILD
 	void DumpObjectInfo();
 	#define DUMP_OBJECT_INFO DumpObjectInfo();
@@ -176,35 +177,35 @@ private:
 	std::string mAccountName;
 	bool mFixErrors;
 	bool mQuiet;
-	
+
 	int64_t mNumberErrorsFound;
-	
+
 	// Lock for the store account
 	NamedLock mAccountLock;
-	
+
 	// Storage for ID data
 	typedef std::map<BackupStoreCheck_ID_t, IDBlock*> Info_t;
 	Info_t mInfo;
 	BackupStoreCheck_ID_t mLastIDInInfo;
 	IDBlock *mpInfoLastBlock;
 	int32_t mInfoLastBlockEntries;
-	
+
 	// List of stuff to fix
 	std::vector<BackupStoreCheck_ID_t> mDirsWithWrongContainerID;
 	// This is a map of lost dir ID -> existing dir ID
 	std::map<BackupStoreCheck_ID_t, BackupStoreCheck_ID_t>
 		mDirsWhichContainLostDirs;
-	
+
 	// Set of extra directories added
 	std::set<BackupStoreCheck_ID_t> mDirsAdded;
 
 	// The refcount database, being reconstructed as the check/fix progresses
 	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
-	
+
 	// Misc stuff
 	int32_t mLostDirNameSerial;
 	int64_t mLostAndFoundDirectoryID;
-	
+
 	// Usage
 	int64_t mBlocksUsed;
 	int64_t mBlocksInCurrentFiles;

@@ -49,13 +49,13 @@ public:
 		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
 	~BackupStoreContext();
-private:
-	BackupStoreContext(const BackupStoreContext &rToCopy);
-public:
 
+private:
+	BackupStoreContext(const BackupStoreContext &rToCopy); // no copying
+
+public:
 	void ReceivedFinishCommand();
 	void CleanUp();
-
 	int32_t GetClientID() {return mClientID;}
 
 	enum

@@ -674,7 +674,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	// CreateForRegeneration does. But if there are no major errors, then
 	// we should maintain the old ClientStoreMarker, to avoid invalidating
 	// the client's directory cache.
-	if (pOldInfo.get() && !mNumberErrorsFound)
+	if(pOldInfo.get() && !mNumberErrorsFound)
 	{
 		BOX_INFO("No major errors found, preserving old "
 			"ClientStoreMarker: " <<

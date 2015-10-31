@@ -41,7 +41,7 @@
 
 #include "MemLeakFindOn.h"
 
-/* 
+/*
 
 Errors checked:
 
@@ -231,14 +231,14 @@ void test_dir_fixing()
 			int64_t SizeInBlocks, int16_t Flags,
 			uint64_t AttributesHash);
 		*/
-		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, 
+		dir.AddEntry(fnames[0], 12, 2 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[1], 12, 2 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[0], 12, 3 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[0], 12, 5 /* id */, 1,
-			BackupStoreDirectory::Entry::Flags_File | 
+			BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 
 		/*
@@ -350,7 +350,7 @@ int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
 			diff_from_id, *blockIndexStream,
 			IOStream::TimeOutInfinite,
 			NULL, // DiffTimer implementation
-			0 /* not interested in the modification time */, 
+			0 /* not interested in the modification time */,
 			NULL // isCompletelyDifferent
 			);
 	}
@@ -359,7 +359,7 @@ int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
 		upload = BackupStoreFile::EncodeFile(
 			file_path,
 			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
-			NULL, 
+			NULL,
 			NULL, // pLogger
 			NULL // pRunStatusProvider
 			);
@@ -452,13 +452,13 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Create an account
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf "
 		"create 01234567 0 10000B 20000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Run the perl script to create the initial directories
-	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
+	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl init") == 0);
 
 	BOX_INFO("  === Test that an entry pointing to a file that doesn't "
@@ -597,7 +597,7 @@ int test(int argc, const char *argv[])
 		char name[256];
 		while(::fgets(line, sizeof(line), f) != 0)
 		{
-			TEST_THAT(::sscanf(line, "%x %s %s", &id, 
+			TEST_THAT(::sscanf(line, "%x %s %s", &id,
 				flags, name) == 3);
 			bool isDir = (::strcmp(flags, "-d---") == 0);
 			//TRACE3("%x,%d,%s\n", id, isDir, name);
@@ -617,7 +617,7 @@ int test(int argc, const char *argv[])
 	}
 	{
 		// Add a spurious file
-		RaidFileWrite random(discSetNum, 
+		RaidFileWrite random(discSetNum,
 			accountRootDir + "randomfile");
 		random.Open();
 		random.Write("test", 4);
@@ -628,11 +628,11 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it was
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 0") == 0);
 	// Check the random file doesn't exist
 	{
-		TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
+		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
 			accountRootDir + "01/randomfile"));
 	}
 
@@ -747,7 +747,7 @@ int test(int argc, const char *argv[])
 
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE
-			" testfiles/testbackupstorefix.pl check 1") 
+			" testfiles/testbackupstorefix.pl check 1")
 			== 0);
 
 		// Check the modified file doesn't exist
@@ -850,7 +850,7 @@ int test(int argc, const char *argv[])
 	}
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 2") == 0);
 	{
 		BackupStoreDirectory dir;
@@ -908,7 +908,7 @@ int test(int argc, const char *argv[])
 	// Fix it
 	RUN_CHECK
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 3") == 0);
 	{
 		BackupStoreDirectory dir;
@@ -923,7 +923,7 @@ int test(int argc, const char *argv[])
 	// Fix it
 	RUN_CHECK
 	// Check everything is where it is predicted to be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 4") == 0);
 
 	// ------------------------------------------------------------------------------------------------
@@ -932,12 +932,12 @@ int test(int argc, const char *argv[])
 	CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
 		33, "34i729834298349283479233472983sdfhasgs");
 	// Dir
-	CorruptObject("Test1/cannes/imulatrougge/foreomizes",23, 
+	CorruptObject("Test1/cannes/imulatrougge/foreomizes",23,
 		"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
 	// Fix it
 	RUN_CHECK
 	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 5") == 0);
 
 	// ------------------------------------------------------------------------------------------------
@@ -952,9 +952,8 @@ int test(int argc, const char *argv[])
 	// Fix it
 	RUN_CHECK
 	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl reroot 6") == 0);
-
 
 	// ---------------------------------------------------------
 	// Stop server
