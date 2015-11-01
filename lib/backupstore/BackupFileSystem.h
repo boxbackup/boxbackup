@@ -50,6 +50,7 @@ public:
 	BackupFileSystem() { }
 	virtual ~BackupFileSystem() { }
 	virtual bool TryGetLock() = 0;
+	virtual void GetLock();
 	virtual void ReleaseLock() = 0;
 	virtual int GetBlockSize() = 0;
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,

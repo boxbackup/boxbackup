@@ -36,6 +36,29 @@
 
 #include "MemLeakFindOn.h"
 
+void BackupFileSystem::GetLock()
+{
+	bool gotLock = false;
+	int triesLeft = 8;
+	do
+	{
+		gotLock = TryGetLock();
+		if(!gotLock)
+		{
+			--triesLeft;
+			::sleep(1);
+		}
+	}
+	while (!gotLock && triesLeft > 0);
+
+	if (!gotLock)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			CouldNotLockStoreAccount, "Failed to get exclusive "
+			"lock on account");
+	}
+}
+
 bool RaidBackupFileSystem::TryGetLock()
 {
 	// Make the filename of the write lock file

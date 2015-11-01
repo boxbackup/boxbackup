@@ -19,6 +19,7 @@
 #include <sys/types.h>
 
 #include "box_getopt.h"
+#include "BackupAccountControl.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
@@ -90,6 +91,7 @@ int main(int argc, const char *argv[])
 	std::string configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
 	int logLevel = Log::EVERYTHING;
 	bool machineReadableOutput = false;
+	bool amazon_S3_mode = false;
 	
 	// See if there's another entry on the command line
 	int c;
@@ -129,11 +131,27 @@ int main(int argc, const char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	// We should have at least one argument at this point.
+	if(argc < 1)
+	{
+		PrintUsageAndExit();
+	}
+	std::string command = argv[0];
+	argv++;
+	argc--;
+
 	// Read in the configuration file
 	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify
-			(configFilename, &BackupConfigFileVerify, errs));
+	std::auto_ptr<Configuration> config;
+	if(!amazon_S3_mode)
+	{
+		if(configFilename.empty())
+		{
+			configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
+		}
+		config = Configuration::LoadAndVerify
+			(configFilename, &BackupConfigFileVerify, errs);
+	}
 
 	if(config.get() == 0 || !errs.empty())
 	{
@@ -141,65 +159,76 @@ int main(int argc, const char *argv[])
 			":" << errs);
 	}
 
-	// Initialise the raid file controller
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
+	std::auto_ptr<BackupStoreAccountControl> apStoreControl;
+	BackupAccountControl* pControl;
 
-	// Then... check we have two arguments
-	if(argc < 2)
+	if(amazon_S3_mode)
 	{
 		PrintUsageAndExit();
 	}
-	
-	// Get the id
-	int32_t id;
-	if(::sscanf(argv[1], "%x", &id) != 1)
+	else
 	{
-		PrintUsageAndExit();
+		// Initialise the raid file controller. Not needed in Amazon S3 mode.
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
+
+		// Get the Account ID (in hex without the leading 0x).
+		int32_t id;
+		if(::sscanf(argv[0], "%x", &id) != 1)
+		{
+			PrintUsageAndExit();
+		}
+		argv++;
+		argc--;
+
+		apStoreControl.reset(new BackupStoreAccountControl(*config, id,
+			machineReadableOutput));
+		pControl = apStoreControl.get();
 	}
 
-	std::string command = argv[0];
-	BackupStoreAccountsControl control(*config, machineReadableOutput);
+	BackupAccountControl& control(*pControl);
 
 	// Now do the command.
 	if(command == "create")
 	{
 		// which disc?
 		int32_t discnum;
-		int32_t softlimit;
-		int32_t hardlimit;
-		if(argc < 5
-			|| ::sscanf(argv[2], "%d", &discnum) != 1)
+
+		if(!amazon_S3_mode)
 		{
-			BOX_ERROR("create requires raid file disc number, "
-				"soft and hard limits.");
-			return 1;
+			if(argc != 3 || ::sscanf(argv[0], "%d", &discnum) != 1)
+			{
+				BOX_ERROR("create requires raid file disc number, "
+					"soft and hard limits.");
+				return 2;
+			}
 		}
 
-		// Decode limits
-		int blocksize = control.BlockSizeOfDiscSet(discnum);
-		softlimit = control.SizeStringToBlocks(argv[3], blocksize);
-		hardlimit = control.SizeStringToBlocks(argv[4], blocksize);
-		control.CheckSoftHardLimits(softlimit, hardlimit);
-	
 		// Create the account...
-		return control.CreateAccount(id, discnum, softlimit, hardlimit);
+		if(!amazon_S3_mode)
+		{
+			int blocksize = apStoreControl->BlockSizeOfDiscSet(discnum);
+			// Decode limits
+			int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
+			int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
+			return apStoreControl->CreateAccount(discnum, softlimit, hardlimit);
+		}
 	}
 	else if(command == "info")
 	{
 		// Print information on this account
-		return control.PrintAccountInfo(id);
+		return control.PrintAccountInfo();
 	}
 	else if(command == "enabled")
 	{
 		// Change the AccountEnabled flag on this account
-		if(argc != 3)
+		if(argc != 1)
 		{
 			PrintUsageAndExit();
 		}
 
 		bool enabled = true;
-		std::string enabled_string = argv[2];
+		std::string enabled_string = argv[0];
 		if(enabled_string == "yes")
 		{
 			enabled = true;
@@ -213,39 +242,39 @@ int main(int argc, const char *argv[])
 			PrintUsageAndExit();
 		}
 
-		return control.SetAccountEnabled(id, enabled);
+		return control.SetAccountEnabled(enabled);
 	}
 	else if(command == "setlimit")
 	{
 		// Change the limits on this account
-		if(argc < 4)
+		if(argc != 2)
 		{
 			BOX_ERROR("setlimit requires soft and hard limits.");
-			return 1;
+			return 2;
 		}
 
-		return control.SetLimit(id, argv[2], argv[3]);
+		return control.SetLimit(argv[0], argv[1]);
 	}
 	else if(command == "name")
 	{
 		// Change the limits on this account
-		if(argc != 3)
+		if(argc != 1)
 		{
 			BOX_ERROR("name command requires a new name.");
 			return 1;
 		}
 
-		return control.SetAccountName(id, argv[2]);
+		return control.SetAccountName(argv[0]);
 	}
 	else if(command == "delete")
 	{
 		// Delete an account
 		bool askForConfirmation = true;
-		if(argc >= 3 && (::strcmp(argv[2], "yes") == 0))
+		if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
 		{
 			askForConfirmation = false;
 		}
-		return control.DeleteAccount(id, askForConfirmation);
+		return apStoreControl->DeleteAccount(askForConfirmation);
 	}
 	else if(command == "check")
 	{
@@ -253,7 +282,7 @@ int main(int argc, const char *argv[])
 		bool quiet = false;
 		
 		// Look at other options
-		for(int o = 2; o < argc; ++o)
+		for(int o = 0; o < argc; ++o)
 		{
 			if(::strcmp(argv[o], "fix") == 0)
 			{
@@ -271,16 +300,16 @@ int main(int argc, const char *argv[])
 		}
 
 		// Check the account
-		return control.CheckAccount(id, fixErrors, quiet);
+		return apStoreControl->CheckAccount(fixErrors, quiet);
 	}
 	else if(command == "housekeep")
 	{
-		return control.HousekeepAccountNow(id);
+		return apStoreControl->HousekeepAccountNow();
 	}
 	else
 	{
 		BOX_ERROR("Unknown command '" << command << "'.");
-		return 1;
+		return 2;
 	}
 
 	return 0;
