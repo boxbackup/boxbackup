@@ -14,8 +14,6 @@
 #include "Archive.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreException.h"
-#include "RaidFileWrite.h"
-#include "RaidFileRead.h"
 
 #include "MemLeakFindOn.h"
 
@@ -35,7 +33,6 @@
 // --------------------------------------------------------------------------
 BackupStoreInfo::BackupStoreInfo()
 : mAccountID(-1),
-  mDiscSet(-1),
   mReadOnly(true),
   mIsModified(false),
   mClientStoreMarker(0),
@@ -67,38 +64,9 @@ BackupStoreInfo::~BackupStoreInfo()
 {
 }
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreInfo::CreateNew(int32_t, const std::string &, int)
-//		Purpose: Create a new info file on disc
-//		Created: 2003/08/28
-//
-// --------------------------------------------------------------------------
-void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet, int64_t BlockSoftLimit, int64_t BlockHardLimit)
-{
-	BackupStoreInfo info;
-	info.mAccountID = AccountID;
-	info.mDiscSet = DiscSet;
-	info.mReadOnly = false;
-	info.mLastObjectIDUsed = 1;
-	info.mBlocksSoftLimit = BlockSoftLimit;
-	info.mBlocksHardLimit = BlockHardLimit;
-
-	// Generate the filename
-	ASSERT(rRootDir[rRootDir.size() - 1] == '/' ||
-		rRootDir[rRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
-	info.mFilename = rRootDir + INFO_FILENAME;
-	info.mExtraData.SetForReading(); // extra data is empty in this case
-
-	info.Save(false);
-}
-
-BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-	int64_t BlockSoftLimit, int64_t BlockHardLimit)
+BackupStoreInfo::BackupStoreInfo(int32_t AccountID, int64_t BlockSoftLimit,
+	int64_t BlockHardLimit)
 : mAccountID(AccountID),
-  mDiscSet(-1),
-  mFilename(FileName),
   mReadOnly(false),
   mIsModified(false),
   mClientStoreMarker(0),
@@ -119,40 +87,8 @@ BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
 	mExtraData.SetForReading(); // extra data is empty in this case
 }
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreInfo::Load(int32_t, const std::string &,
-//			 int, bool)
-//		Purpose: Loads the info from disc, given the root
-//			 information. Can be marked as read only.
-//		Created: 2003/08/28
-//
-// --------------------------------------------------------------------------
-std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(int32_t AccountID,
-	const std::string &rRootDir, int DiscSet, bool ReadOnly,
-	int64_t *pRevisionID)
-{
-	// Generate the filename
-	std::string fn(rRootDir + INFO_FILENAME);
-
-	// Open the file for reading (passing on optional request for revision ID)
-	std::auto_ptr<RaidFileRead> rf(RaidFileRead::Open(DiscSet, fn, pRevisionID));
-	std::auto_ptr<BackupStoreInfo> info = Load(*rf, fn, ReadOnly);
-
-	// Check it
-	if(info->GetAccountID() != AccountID)
-	{
-		THROW_FILE_ERROR("Found wrong account ID in store info",
-			fn, BackupStoreException, BadStoreInfoOnLoad);
-	}
-
-	info->mDiscSet = DiscSet;
-	return info;
-}
-
 std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
-	const std::string FileName, bool ReadOnly)
+	const std::string& FileName, bool ReadOnly)
 {
 	// Read in format and version
 	int32_t magic;
@@ -184,7 +120,6 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 	std::auto_ptr<BackupStoreInfo> info(new BackupStoreInfo);
 
 	// Put in basic location info
-	info->mFilename = FileName;
 	info->mReadOnly = ReadOnly;
 	int64_t numDelObj = 0;
 
@@ -306,24 +241,18 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	int32_t AccountID, const std::string& rAccountName,
-	const std::string &rRootDir, int DiscSet,
 	int64_t LastObjectID, int64_t BlocksUsed,
 	int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 	int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
 	int64_t BlockSoftLimit, int64_t BlockHardLimit,
 	bool AccountEnabled, IOStream& ExtraData)
 {
-	// Generate the filename
-	std::string fn(rRootDir + INFO_FILENAME);
-
 	// Make new object
 	std::auto_ptr<BackupStoreInfo> info(new BackupStoreInfo);
 
 	// Put in basic info
 	info->mAccountID = AccountID;
 	info->mAccountName = rAccountName;
-	info->mDiscSet = DiscSet;
-	info->mFilename = fn;
 	info->mReadOnly = false;
 
 	// Insert info starting info
@@ -345,37 +274,6 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	return info;
 }
 
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreInfo::Save(bool allowOverwrite)
-//		Purpose: Save modified info back to disc
-//		Created: 2003/08/28
-//
-// --------------------------------------------------------------------------
-void BackupStoreInfo::Save(bool allowOverwrite)
-{
-	// Make sure we're initialised (although should never come to this)
-	if(mFilename.empty() || mAccountID == -1 || mDiscSet == -1)
-	{
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
-
-	// Can we do this?
-	if(mReadOnly)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoIsReadOnly)
-	}
-
-	// Then... open a write file
-	RaidFileWrite rf(mDiscSet, mFilename);
-	rf.Open(allowOverwrite);
-	Save(rf);
-
-	// Commit it to disc, converting it to RAID now
-	rf.Commit(true);
-}
 
 void BackupStoreInfo::Save(IOStream& rOutStream)
 {

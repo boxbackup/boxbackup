@@ -2589,8 +2589,8 @@ bool test_store_error_reporting()
 
 		// Lock scope
 		{
-			NamedLock writeLock;
-			acc.LockAccount(0x01234567, writeLock);
+			RaidBackupFileSystem fs("backup/01234567/", 0);
+			fs.GetLock();
 
 			TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",
 				"testfiles/0_0/backup/01234567/info.rf.bak") == 0);

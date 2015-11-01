@@ -111,7 +111,7 @@ void BackupStoreContext::CleanUp()
 	if(mapStoreInfo.get() && !(mapStoreInfo->IsReadOnly()) &&
 		mapStoreInfo->IsModified())
 	{
-		mapStoreInfo->Save();
+		mapFileSystem->PutBackupStoreInfo(*mapStoreInfo);
 	}
 }
 

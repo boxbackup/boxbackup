@@ -15,6 +15,7 @@
 
 #include "autogen_BackupStoreException.h"
 #include "BackupConstants.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
@@ -124,11 +125,11 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	}
 
 	// Load the store info to find necessary info for the housekeeping
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
-		mStoreRoot, mStoreDiscSet, false /* Read/Write */));
-	std::auto_ptr<BackupStoreInfo> pOldInfo(
-		BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet,
-			true /* Read Only */));
+	RaidBackupFileSystem fs(mStoreRoot, mStoreDiscSet);
+	std::auto_ptr<BackupStoreInfo> info =
+		fs.GetBackupStoreInfo(mAccountID, false); // !ReadOnly
+	std::auto_ptr<BackupStoreInfo> pOldInfo =
+		fs.GetBackupStoreInfo(mAccountID, true); // ReadOnly
 
 	// If the account has a name, change the logging tag to include it
 	if(!(info->GetAccountName().empty()))
@@ -196,14 +197,13 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	if(!continueHousekeeping)
 	{
 		mapNewRefs->Discard();
-		info->Save();
+		fs.PutBackupStoreInfo(*info);
 		return false;
 	}
 
 	// Report any UNexpected changes, and consider them to be errors.
 	// Do this before applying the expected changes below.
 	mErrorCount += info->ReportChangesTo(*pOldInfo);
-	info->Save();
 
 	// Try to load the old reference count database and check whether
 	// any counts have changed. We want to compare the mapNewRefs to
@@ -273,7 +273,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	info->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
 
 	// Save the store info back
-	info->Save();
+	fs.PutBackupStoreInfo(*info);
 
 	// force file to be saved and closed before releasing the lock below
 	mapNewRefs->Commit();

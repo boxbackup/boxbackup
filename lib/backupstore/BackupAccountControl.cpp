@@ -536,7 +536,6 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	}
 
 	BackupStoreInfo info(0, // fake AccountID for S3 stores
-		info_url, // FileName,
 		SoftLimit, HardLimit);
 	info.SetAccountName(name);
 

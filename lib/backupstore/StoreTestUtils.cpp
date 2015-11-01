@@ -124,9 +124,9 @@ std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
 
 bool check_num_files(int files, int old, int deleted, int dirs)
 {
+	RaidBackupFileSystem fs("backup/01234567/", 0);
 	std::auto_ptr<BackupStoreInfo> apInfo =
-		BackupStoreInfo::Load(0x1234567,
-		"backup/01234567/", 0, true);
+		fs.GetBackupStoreInfo(0x01234567, true); // !ReadOnly
 	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(),
 		"current files");
 	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(),

@@ -71,37 +71,25 @@ class BackupStoreInfo
 {
 	friend class BackupStoreCheck;
 public:
+	BackupStoreInfo(int32_t AccountID, int64_t BlockSoftLimit,
+		int64_t BlockHardLimit);
 	~BackupStoreInfo();
+
 private:
-	// Creation through static functions only
-	BackupStoreInfo();
 	// No copying allowed
 	BackupStoreInfo(const BackupStoreInfo &);
 
+protected:
+	BackupStoreInfo();
+
 public:
-	// Create a New account, saving a blank info object to the disc
-	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
-	BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
-
-	// Load it from the store
-	// TODO FIXME: remove this RaidFile version of Load(), let BackupFileSystem
-	// handle the RaidFile part.
-	static std::auto_ptr<BackupStoreInfo> Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID = 0);
-
 	// Load it from a stream (file or RaidFile)
 	static std::auto_ptr<BackupStoreInfo> Load(IOStream& rStream,
-		const std::string FileName, bool ReadOnly);
+		const std::string& FileName, bool ReadOnly);
+	void Save(IOStream& rOutStream);
 
 	// Has info been modified?
 	bool IsModified() const {return mIsModified;}
-
-	// Save modified infomation back to store
-	// TODO FIXME: remove this RaidFile version of Save(), let BackupFileSystem
-	// handle the RaidFile part.
-	void Save(bool allowOverwrite = true);
-	void Save(IOStream& rOutStream);
 
 	// Data access functions
 	int32_t GetAccountID() const {return mAccountID;}
@@ -120,7 +108,6 @@ public:
 	int64_t GetNumDirectories() const {return mNumDirectories;}
 	bool IsAccountEnabled() const {return mAccountEnabled;}
 	bool IsReadOnly() const {return mReadOnly;}
-	int GetDiscSetNumber() const {return mDiscSet;}
 
 	int ReportChangesTo(BackupStoreInfo& rOldInfo);
 
@@ -138,6 +125,10 @@ public:
 	void AdjustNumOldFiles(int64_t increase);
 	void AdjustNumDeletedFiles(int64_t increase);
 	void AdjustNumDirectories(int64_t increase);
+	void SetLastObjectIDUsed(int64_t LastObjectIDUsed)
+	{
+		mLastObjectIDUsed = LastObjectIDUsed;
+	}
 
 	// Object IDs
 	int64_t AllocateObjectID();
@@ -157,7 +148,6 @@ public:
 	 */
 	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(
 		int32_t AccountID, const std::string &rAccountName,
-		const std::string &rRootDir, int DiscSet,
 		int64_t LastObjectID, int64_t BlocksUsed,
 		int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
@@ -184,8 +174,6 @@ private:
 	// they now define the sizes of fields on disk (via Archive).
 	int32_t mAccountID;
 	std::string mAccountName;
-	int mDiscSet;
-	std::string mFilename;
 	bool mReadOnly;
 	bool mIsModified;
 

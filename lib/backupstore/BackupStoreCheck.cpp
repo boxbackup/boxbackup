@@ -53,6 +53,7 @@ BackupStoreCheck::BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNum
 	  mLastIDInInfo(0),
 	  mpInfoLastBlock(0),
 	  mInfoLastBlockEntries(0),
+	  mFileSystem(rStoreRoot, DiscSetNumber),
 	  mLostDirNameSerial(0),
 	  mLostAndFoundDirectoryID(0),
 	  mBlocksUsed(0),

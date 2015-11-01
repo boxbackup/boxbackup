@@ -90,13 +90,30 @@ int RaidBackupFileSystem::GetBlockSize()
 std::auto_ptr<BackupStoreInfo> RaidBackupFileSystem::GetBackupStoreInfo(int32_t AccountID,
 	bool ReadOnly)
 {
-	return BackupStoreInfo::Load(AccountID, mAccountRootDir, mStoreDiscSet,
-		ReadOnly);
+	// Generate the filename
+	std::string fn(mAccountRootDir + INFO_FILENAME);
+
+	// Open the file for reading (passing on optional request for revision ID)
+	std::auto_ptr<RaidFileRead> rf(RaidFileRead::Open(mStoreDiscSet, fn));
+	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(*rf, fn, ReadOnly);
+
+	// Check it
+	if(info->GetAccountID() != AccountID)
+	{
+		THROW_FILE_ERROR("Found wrong account ID in store info",
+			fn, BackupStoreException, BadStoreInfoOnLoad);
+	}
+
+	return info;
 }
 
 void RaidBackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 {
-	ASSERT(!rInfo.IsReadOnly());
+	if(rInfo.IsReadOnly())
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, StoreInfoIsReadOnly,
+			"Tried to save BackupStoreInfo when configured as read-only");
+	}
 
 	std::string filename(mAccountRootDir + INFO_FILENAME);
 	RaidFileWrite rf(mStoreDiscSet, filename);
@@ -525,8 +542,8 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfo(int32_t Ac
 	mrClient.CheckResponse(response, std::string("No BackupStoreInfo file exists "
 		"at this URL: ") + info_url);
 
-	std::auto_ptr<BackupStoreInfo> info =
-		BackupStoreInfo::Load(response, info_url, ReadOnly);
+	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(response, info_url,
+		ReadOnly);
 
 	// Check it
 	if(info->GetAccountID() != AccountID)
@@ -540,6 +557,12 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfo(int32_t Ac
 
 void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 {
+	if(rInfo.IsReadOnly())
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, StoreInfoIsReadOnly,
+			"Tried to save BackupStoreInfo when configured as read-only");
+	}
+
 	CollectInBufferStream out;
 	rInfo.Save(out);
 	out.SetForReading();

@@ -13,8 +13,8 @@
 #include <string>
 
 #include "BackupStoreAccountDatabase.h"
-#include "BackupAccountControl.h"
-#include "NamedLock.h"
+
+class NamedLock;
 
 // --------------------------------------------------------------------------
 //
@@ -43,12 +43,10 @@ public:
 	{
 		return MakeAccountRootDir(rEntry.GetID(), rEntry.GetDiscSet());
 	}
-	void LockAccount(int32_t ID, NamedLock& rNamedLock);
 
 private:
 	static std::string MakeAccountRootDir(int32_t ID, int DiscSet);
 
-private:
 	BackupStoreAccountDatabase &mrDatabase;
 };
 

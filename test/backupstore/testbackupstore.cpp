@@ -2463,12 +2463,18 @@ bool test_store_info()
 {
 	SETUP_TEST_BACKUPSTORE();
 
+	RaidBackupFileSystem fs("test-info/", 0);
+
 	{
 		RaidFileWrite::CreateDirectory(0, "test-info");
-		BackupStoreInfo::CreateNew(76, "test-info/", 0, 3461231233455433LL, 2934852487LL);
-		TEST_CHECK_THROWS(BackupStoreInfo::CreateNew(76, "test-info/", 0, 0, 0), RaidFileException, CannotOverwriteExistingFile);
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
-		TEST_CHECK_THROWS(info->Save(), BackupStoreException, StoreInfoIsReadOnly);
+		BackupStoreInfo info(76, 3461231233455433LL, 2934852487LL);
+		fs.PutBackupStoreInfo(info);
+	}
+
+	{
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfo(76,
+			true); // ReadOnly
+		TEST_CHECK_THROWS(fs.PutBackupStoreInfo(*info), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksUsed(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInOldFiles(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInDeletedFiles(1), BackupStoreException, StoreInfoIsReadOnly);
@@ -2478,7 +2484,8 @@ bool test_store_info()
 	}
 
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, false));
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfo(76,
+			false); // !ReadOnly
 		info->ChangeBlocksUsed(8);
 		info->ChangeBlocksInOldFiles(9);
 		info->ChangeBlocksInDeletedFiles(10);
@@ -2494,11 +2501,12 @@ bool test_store_info()
 		info->RemovedDeletedDirectory(3);
 		info->SetAccountName("whee");
 		TEST_CHECK_THROWS(info->RemovedDeletedDirectory(9), BackupStoreException, StoreInfoDirNotInList);
-		info->Save();
+		fs.PutBackupStoreInfo(*info);
 	}
 
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfo(76,
+			true); // ReadOnly
 		TEST_THAT(info->GetBlocksUsed() == 7);
 		TEST_THAT(info->GetBlocksInOldFiles() == 5);
 		TEST_THAT(info->GetBlocksInDeletedFiles() == 1);
@@ -2553,6 +2561,34 @@ bool test_bbstoreaccounts_create()
 		" -c testfiles/bbstored.conf -Wwarning create 01234567 0 "
 		"10000B 20000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	// This code is almost exactly the same as tests3store.cpp:check_new_account_info()
+	RaidBackupFileSystem fs("backup/01234567/", 0);
+	std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfo(0x01234567,
+		true); // ReadOnly
+	TEST_EQUAL(0x01234567, info->GetAccountID());
+	TEST_EQUAL(1, info->GetLastObjectIDUsed());
+	TEST_EQUAL(2, info->GetBlocksUsed());
+	TEST_EQUAL(0, info->GetBlocksInCurrentFiles());
+	TEST_EQUAL(0, info->GetBlocksInOldFiles());
+	TEST_EQUAL(0, info->GetBlocksInDeletedFiles());
+	TEST_EQUAL(2, info->GetBlocksInDirectories());
+	TEST_EQUAL(0, info->GetDeletedDirectories().size());
+	TEST_EQUAL(10000, info->GetBlocksSoftLimit());
+	TEST_EQUAL(20000, info->GetBlocksHardLimit());
+	TEST_EQUAL(0, info->GetNumCurrentFiles());
+	TEST_EQUAL(0, info->GetNumOldFiles());
+	TEST_EQUAL(0, info->GetNumDeletedFiles());
+	TEST_EQUAL(1, info->GetNumDirectories());
+	TEST_EQUAL(true, info->IsAccountEnabled());
+	TEST_EQUAL(true, info->IsReadOnly());
+	TEST_EQUAL(0, info->GetClientStoreMarker());
+	TEST_EQUAL("", info->GetAccountName());
+
+	std::auto_ptr<RaidFileRead> root_stream =
+		get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
+	BackupStoreDirectory root_dir(*root_stream);
+	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
 	TEARDOWN_TEST_BACKUPSTORE();
 }
@@ -2920,9 +2956,11 @@ bool test_read_old_backupstoreinfo_files()
 {
 	SETUP_TEST_BACKUPSTORE();
 
+	RaidBackupFileSystem fs("backup/01234567/", 0);
+
 	// Create an account for the test client
-	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
-		"backup/01234567/", 0, /* ReadOnly */ false);
+	std::auto_ptr<BackupStoreInfo> apInfo = fs.GetBackupStoreInfo(0x1234567,
+		false); // ReadOnly
 	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
 		"'bbstoreaccounts create' should have set AccountEnabled flag");
 
@@ -2954,8 +2992,7 @@ bool test_read_old_backupstoreinfo_files()
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
 
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, false); // !ReadOnly
 	compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
 		*apInfo, "" /* no name by default */,
 		true /* enabled by default */);
@@ -2963,7 +3000,7 @@ bool test_read_old_backupstoreinfo_files()
 	apInfo->SetAccountName("bonk");
 
 	// Save the info again
-	apInfo->Save(/* allowOverwrite */ true);
+	fs.PutBackupStoreInfo(*apInfo);
 
 	// Check that it was saved in the new Archive format
 	std::auto_ptr<RaidFileRead> rfr(RaidFileRead::Open(0, info_filename, 0));
@@ -2979,22 +3016,19 @@ bool test_read_old_backupstoreinfo_files()
 	rfr.reset();
 
 	// load it, and check that all values are loaded properly
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, false); // !ReadOnly
 	compare_backupstoreinfo_values_to_expected("loaded in v1, resaved in v2",
 		info_v1, *apInfo, "bonk", true);
 
 	// Check that the new AccountEnabled flag is saved properly
 	apInfo->SetAccountEnabled(false);
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
+	fs.PutBackupStoreInfo(*apInfo);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, false); // !ReadOnly
 	compare_backupstoreinfo_values_to_expected("saved in v2, loaded in v2",
 		info_v1, *apInfo, "bonk", false /* as modified above */);
 	apInfo->SetAccountEnabled(true);
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ true);
+	fs.PutBackupStoreInfo(*apInfo);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, true); // ReadOnly
 	compare_backupstoreinfo_values_to_expected("resaved in v2 with "
 		"account enabled", info_v1, *apInfo, "bonk",
 		true /* as modified above */);
@@ -3029,15 +3063,14 @@ bool test_read_old_backupstoreinfo_files()
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
 
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, false); // !ReadOnly
 	compare_backupstoreinfo_values_to_expected("saved in v2 without "
 		"AccountEnabled", info_v1, *apInfo, "test", true);
 	// Default for missing AccountEnabled should be true
 
 	// Rewrite using full length, so that the first 4 bytes of extra data
 	// doesn't get swallowed by "extra data".
-	apInfo->Save(/* allowOverwrite */ true);
+	fs.PutBackupStoreInfo(*apInfo);
 
 	// Append some extra data after the known account values, to simulate a
 	// new addition to the store format. Check that this extra data is loaded
@@ -3056,16 +3089,15 @@ bool test_read_old_backupstoreinfo_files()
 	extra_data.CopyStreamTo(*rfw);
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, false); // !ReadOnly
 	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(),
 		"wrong amount of extra data loaded from info file");
 	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
 		apInfo->GetExtraData().GetBuffer(), extra_data.GetSize()),
 		"extra data loaded from info file has wrong contents");
 	// Save the file and load again, check that the extra data is still there
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	fs.PutBackupStoreInfo(*apInfo);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, true); // ReadOnly
 	compare_backupstoreinfo_values_to_expected("saved in future format "
 		"with extra_data", info_v1, *apInfo, "test", true, extra_data);
 
@@ -3073,13 +3105,13 @@ bool test_read_old_backupstoreinfo_files()
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, true);
 	TEST_EQUAL_LINE(false, apInfo->IsAccountEnabled(),
 		"'bbstoreaccounts disabled no' should have reset AccountEnabled flag");
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, true);
 	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
 		"'bbstoreaccounts disabled yes' should have set AccountEnabled flag");
 
@@ -3089,7 +3121,6 @@ bool test_read_old_backupstoreinfo_files()
 	extra_data.Seek(0, IOStream::SeekType_Absolute);
 	apInfo = BackupStoreInfo::CreateForRegeneration(
 		apInfo->GetAccountID(), "spurtle" /* rAccountName */,
-		"backup/01234567/" /* rRootDir */, 0 /* DiscSet */,
 		apInfo->GetLastObjectIDUsed(),
 		apInfo->GetBlocksUsed(),
 		apInfo->GetBlocksInCurrentFiles(),
@@ -3110,8 +3141,8 @@ bool test_read_old_backupstoreinfo_files()
 		"BackupStoreInfo::CreateForRegeneration", info_v1, *apInfo,
 		"spurtle", false /* AccountEnabled */, extra_data);
 	// Save the file and load again, check that the extra data is still there
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
+	fs.PutBackupStoreInfo(*apInfo);
+	apInfo = fs.GetBackupStoreInfo(0x1234567, true);
 	compare_backupstoreinfo_values_to_expected("saved by "
 		"BackupStoreInfo::CreateForRegeneration and reloaded", info_v1,
 		*apInfo, "spurtle", false /* AccountEnabled */, extra_data);

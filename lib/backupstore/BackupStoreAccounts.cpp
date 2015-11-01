@@ -15,6 +15,7 @@
 #include <cstring>
 #include <iostream>
 
+#include "BackupFileSystem.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
@@ -96,7 +97,7 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		RaidFileWrite::CreateDirectory(DiscSet, dirName, true /* recursive */);
 
 		// Create an info file
-		BackupStoreInfo::CreateNew(ID, dirName, DiscSet, SizeSoftLimit, SizeHardLimit);
+		BackupStoreInfo info(ID, SizeSoftLimit, SizeHardLimit);
 
 		// And an empty directory
 		BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID, BACKUPSTORE_ROOT_DIRECTORY_ID);
@@ -111,13 +112,14 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		}
 
 		// Update the store info to reflect the size of the root directory
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(ID, dirName, DiscSet, false /* ReadWrite */));
-		info->ChangeBlocksUsed(rootDirSize);
-		info->ChangeBlocksInDirectories(rootDirSize);
-		info->AdjustNumDirectories(1);
+		info.SetLastObjectIDUsed(BACKUPSTORE_ROOT_DIRECTORY_ID);
+		info.ChangeBlocksUsed(rootDirSize);
+		info.ChangeBlocksInDirectories(rootDirSize);
+		info.AdjustNumDirectories(1);
 
-		// Save it back
-		info->Save();
+		// Save it
+		RaidBackupFileSystem fs(dirName, DiscSet);
+		fs.PutBackupStoreInfo(info);
 
 		// Create the refcount database
 		BackupStoreRefCountDatabase::Create(Entry)->Commit();
@@ -177,35 +179,4 @@ bool BackupStoreAccounts::AccountExists(int32_t ID)
 	return mrDatabase.EntryExists(ID);
 }
 
-void BackupStoreAccounts::LockAccount(int32_t ID, NamedLock& rNamedLock)
-{
-	const BackupStoreAccountDatabase::Entry &en(mrDatabase.GetEntry(ID));
-	std::string rootDir = MakeAccountRootDir(ID, en.GetDiscSet());
-	int discSet = en.GetDiscSet();
-
-	std::string writeLockFilename;
-	StoreStructure::MakeWriteLockFilename(rootDir, discSet, writeLockFilename);
-
-	bool gotLock = false;
-	int triesLeft = 8;
-	do
-	{
-		gotLock = rNamedLock.TryAndGetLock(writeLockFilename,
-			0600 /* restrictive file permissions */);
-		
-		if(!gotLock)
-		{
-			--triesLeft;
-			::sleep(1);
-		}
-	}
-	while (!gotLock && triesLeft > 0);
-
-	if (!gotLock)
-	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CouldNotLockStoreAccount, "Failed to get exclusive "
-			"lock on account " << BOX_FORMAT_ACCOUNT(ID));
-	}
-}
 
