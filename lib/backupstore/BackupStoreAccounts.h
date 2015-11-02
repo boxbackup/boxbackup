@@ -20,7 +20,10 @@ class NamedLock;
 //
 // Class
 //		Name:    BackupStoreAccounts
-//		Purpose: Account management for backup store server
+//		Purpose: Account management for backup store server. This
+//			 class now serves very little purpose, and it should
+//			 probably be folded into other classes, such as
+//			 BackupStoreAccountDatabase and RaidBackupFileSystem.
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------

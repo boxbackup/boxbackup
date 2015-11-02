@@ -179,4 +179,3 @@ bool BackupStoreAccounts::AccountExists(int32_t ID)
 	return mrDatabase.EntryExists(ID);
 }
 
-
