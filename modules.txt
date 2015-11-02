@@ -30,7 +30,7 @@ lib/backupclient	lib/backupstore
 
 bin/bbackupobjdump	lib/backupclient lib/backupstore
 bin/bbstored		lib/raidfile	lib/server	lib/backupstore
-bin/bbstoreaccounts	lib/raidfile	lib/backupstore
+bin/bbstoreaccounts	lib/raidfile	lib/backupclient
 bin/bbackupd		lib/server	lib/backupclient	qdbm
 bin/bbackupquery	lib/server	lib/backupclient
 bin/bbackupctl		bin/bbackupd
@@ -40,7 +40,7 @@ test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfil
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
-test/s3store		lib/backupclient lib/httpserver bin/s3simulator
+test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
 lib/httpserver          lib/server 

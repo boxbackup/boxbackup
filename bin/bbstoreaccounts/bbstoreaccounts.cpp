@@ -20,6 +20,7 @@
 
 #include "box_getopt.h"
 #include "BackupAccountControl.h"
+#include "BackupDaemonConfigVerify.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
@@ -41,15 +42,21 @@
 void PrintUsageAndExit()
 {
 	printf(
-"Usage: bbstoreaccounts [-c config_file] action account_id [args]\n"
+"Usage: bbstoreaccounts [-3] [-c config_file] <action> <account_id> [args]\n"
 "Account ID is integer specified in hex\n"
+"\n"
+"Options:\n"
+"  -3    Amazon S3 mode. Not all commands are supported yet. Supply account\n"
+"        name as <account_id>. Reads bbackupd.conf instead of bbstored.conf.\n"
+"  -c    Use an alternate configuration file instead of the default.\n"
+"  -W    Set logging/output level to warning, info, debug, etc.\n"
 "\n"
 "Commands (and arguments):\n"
 "  create <account> <discnum> <softlimit> <hardlimit>\n"
-"        Creates the specified account number (in hex with no 0x) on the\n"
-"        specified raidfile disc set number (see raidfile.conf for valid\n"
-"        set numbers) with the specified soft and hard limits (in blocks\n"
-"        if suffixed with B, MB with M, GB with G)\n"
+"        Creates a RaidFile account with the specified account number (in hex\n"
+"        with no 0x) on the specified RaidFile disc set number (see\n"
+"        raidfile.conf for valid set numbers) with the specified soft and hard\n"
+"        limits (in blocks if suffixed with B, MB with M, GB with G)\n"
 "  info [-m] <account>\n"
 "        Prints information about the specified account including number\n"
 "        of blocks used. The -m option enable machine-readable output.\n"
@@ -95,10 +102,14 @@ int main(int argc, const char *argv[])
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "c:W:m")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "3c:W:m")) != -1)
 	{
 		switch(c)
 		{
+		case '3':
+			amazon_S3_mode = true;
+			break;
+
 		case 'c':
 			// store argument
 			configFilename = optarg;
@@ -143,7 +154,17 @@ int main(int argc, const char *argv[])
 	// Read in the configuration file
 	std::string errs;
 	std::auto_ptr<Configuration> config;
-	if(!amazon_S3_mode)
+	if(amazon_S3_mode)
+	{
+		// Read a bbackupd configuration file, instead of a bbstored one.
+		if(configFilename.empty())
+		{
+			configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+		}
+		config = Configuration::LoadAndVerify
+			(configFilename, &BackupDaemonConfigVerify, errs);
+	}
+	else
 	{
 		if(configFilename.empty())
 		{
@@ -159,12 +180,23 @@ int main(int argc, const char *argv[])
 			":" << errs);
 	}
 
+	std::auto_ptr<S3BackupAccountControl> apS3Control;
 	std::auto_ptr<BackupStoreAccountControl> apStoreControl;
 	BackupAccountControl* pControl;
 
+#define STORE_ONLY \
+	if(amazon_S3_mode) \
+	{ \
+		BOX_ERROR("The '" << command << "' command only applies to bbstored " \
+			"backends"); \
+		return 2; \
+	}
+
 	if(amazon_S3_mode)
 	{
-		PrintUsageAndExit();
+		apS3Control.reset(new S3BackupAccountControl(*config,
+			machineReadableOutput));
+		pControl = apS3Control.get();
 	}
 	else
 	{
@@ -194,7 +226,16 @@ int main(int argc, const char *argv[])
 		// which disc?
 		int32_t discnum;
 
-		if(!amazon_S3_mode)
+		if(amazon_S3_mode)
+		{
+			if(argc != 3)
+			{
+				BOX_ERROR("create requires an account name/label, "
+					"soft and hard limits.");
+				return 2;
+			}
+		}
+		else
 		{
 			if(argc != 3 || ::sscanf(argv[0], "%d", &discnum) != 1)
 			{
@@ -205,7 +246,15 @@ int main(int argc, const char *argv[])
 		}
 
 		// Create the account...
-		if(!amazon_S3_mode)
+		if(amazon_S3_mode)
+		{
+			int blocksize = apS3Control->GetBlockSize();
+			// Decode limits
+			int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
+			int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
+			return apS3Control->CreateAccount(argv[0], softlimit, hardlimit);
+		}
+		else
 		{
 			int blocksize = apStoreControl->BlockSizeOfDiscSet(discnum);
 			// Decode limits
@@ -269,6 +318,8 @@ int main(int argc, const char *argv[])
 	else if(command == "delete")
 	{
 		// Delete an account
+		STORE_ONLY;
+
 		bool askForConfirmation = true;
 		if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
 		{
@@ -278,6 +329,8 @@ int main(int argc, const char *argv[])
 	}
 	else if(command == "check")
 	{
+		STORE_ONLY;
+
 		bool fixErrors = false;
 		bool quiet = false;
 		
@@ -304,6 +357,7 @@ int main(int argc, const char *argv[])
 	}
 	else if(command == "housekeep")
 	{
+		STORE_ONLY;
 		return apStoreControl->HousekeepAccountNow();
 	}
 	else
