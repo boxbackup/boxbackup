@@ -82,19 +82,30 @@ bool setUp(const char* function_name)
 	}
 
 	TEST_THAT_THROWONFAIL(system(
-		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
-		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
-		"testfiles/file* testfiles/notifyran testfiles/notifyran.* "
+		"rm -rf "
+		"testfiles/TestDir* "
+		"testfiles/0_0 "
+		"testfiles/0_1 "
+		"testfiles/0_2 "
+		"testfiles/accounts.txt " // testfiles/test* .tgz!
+		"testfiles/bbackupd-data "
+		"testfiles/file* "
+		"testfiles/notifyran "
+		"testfiles/notifyran.* "
 		"testfiles/notifyscript.tag* "
-		"testfiles/restore* testfiles/bbackupd-data "
+		"testfiles/restore* "
+		"testfiles/store "
 		"testfiles/syncallowscript.control "
 		"testfiles/syncallowscript.notifyran.* "
-		"testfiles/test2.downloaded"
+		"testfiles/test2.downloaded "
 		) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir/dirs", 0755) == 0);
 	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 
 	return true;
