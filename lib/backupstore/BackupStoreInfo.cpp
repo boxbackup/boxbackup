@@ -10,7 +10,7 @@
 #include "Box.h"
 
 #include <algorithm>
-
+#include <iostream>
 #include "Archive.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreException.h"
@@ -51,6 +51,7 @@ BackupStoreInfo::BackupStoreInfo()
   mNumOldFiles(0),
   mNumDeletedFiles(0),
   mNumDirectories(0),
+  mVersionCountLimit(0),
   mAccountEnabled(true)
 {
 }
@@ -75,7 +76,7 @@ BackupStoreInfo::~BackupStoreInfo()
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet, int64_t BlockSoftLimit, int64_t BlockHardLimit)
+void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet, int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionCountLimit)
 {
 	BackupStoreInfo info;
 	info.mAccountID = AccountID;
@@ -84,6 +85,7 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 	info.mLastObjectIDUsed = 1;
 	info.mBlocksSoftLimit = BlockSoftLimit;
 	info.mBlocksHardLimit = BlockHardLimit;
+    info.mVersionCountLimit = VersionCountLimit;
 
 	// Generate the filename
 	ASSERT(rRootDir[rRootDir.size() - 1] == '/' ||
@@ -95,7 +97,7 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 }
 
 BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-	int64_t BlockSoftLimit, int64_t BlockHardLimit)
+    int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionCountLimit)
 : mAccountID(AccountID),
   mDiscSet(-1),
   mFilename(FileName),
@@ -114,6 +116,7 @@ BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
   mNumOldFiles(0),
   mNumDeletedFiles(0),
   mNumDirectories(0),
+  mVersionCountLimit(VersionCountLimit),
   mAccountEnabled(true)
 {
 	mExtraData.SetForReading(); // extra data is empty in this case
@@ -163,16 +166,20 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 			BackupStoreException, CouldNotLoadStoreInfo);
 	}
 
-	bool v1 = false, v2 = false;
+    int version=0;
 
 	if(ntohl(magic) == INFO_MAGIC_VALUE_1)
 	{
-		v1 = true;
+        version=1;
 	}
 	else if(ntohl(magic) == INFO_MAGIC_VALUE_2)
 	{
-		v2 = true;
+        version=2;
 	}
+    else if(ntohl(magic) == INFO_MAGIC_VALUE_3)
+    {
+        version=3;
+    }
 	else
 	{
 		THROW_FILE_ERROR("Failed to read store info file: "
@@ -188,7 +195,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 	info->mReadOnly = ReadOnly;
 	int64_t numDelObj = 0;
 
-	if (v1)
+    if (version==1)
 	{
 		// Read in a header
 		info_StreamFormat_1 hdr;
@@ -215,10 +222,9 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 		// Load up array of deleted objects
 		numDelObj = box_ntoh64(hdr.mNumberDeletedDirectories);
 	}
-	else if(v2)
+    else if( version>=2 )
 	{
 		Archive archive(rStream, IOStream::TimeOutInfinite);
-
 		// Check it
 		archive.Read(info->mAccountID);
 		archive.Read(info->mAccountName);
@@ -236,7 +242,11 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 		archive.Read(info->mNumDeletedFiles);
 		archive.Read(info->mNumDirectories);
 		archive.Read(numDelObj);
-	}
+
+        if ( version>=3 ) {
+            archive.Read(info->mVersionCountLimit);
+        }
+    }
 
 	// Then load the list of deleted directories
 	if(numDelObj > 0)
@@ -271,7 +281,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::Load(IOStream& rStream,
 		THROW_EXCEPTION(BackupStoreException, BadStoreInfoOnLoad)
 	}
 
-	if(v2)
+    if(version>=2)
 	{
 		Archive archive(rStream, IOStream::TimeOutInfinite);
 		archive.ReadIfPresent(info->mAccountEnabled, true);
@@ -310,7 +320,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	int64_t LastObjectID, int64_t BlocksUsed,
 	int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 	int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
-	int64_t BlockSoftLimit, int64_t BlockHardLimit,
+    int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionCountLimit,
 	bool AccountEnabled, IOStream& ExtraData)
 {
 	// Generate the filename
@@ -336,6 +346,7 @@ std::auto_ptr<BackupStoreInfo> BackupStoreInfo::CreateForRegeneration(
 	info->mBlocksInDirectories	= BlocksInDirectories;
 	info->mBlocksSoftLimit		= BlockSoftLimit;
 	info->mBlocksHardLimit		= BlockHardLimit;
+    info->mVersionCountLimit    = VersionCountLimit;
 	info->mAccountEnabled		= AccountEnabled;
 
 	ExtraData.CopyStreamTo(info->mExtraData);
@@ -380,7 +391,7 @@ void BackupStoreInfo::Save(bool allowOverwrite)
 void BackupStoreInfo::Save(IOStream& rOutStream)
 {
 	// Make header
-	int32_t magic = htonl(INFO_MAGIC_VALUE_2);
+    int32_t magic = htonl(INFO_MAGIC_VALUE_3);
 	rOutStream.Write(&magic, sizeof(magic));
 	Archive archive(rOutStream, IOStream::TimeOutInfinite);
 
@@ -400,8 +411,10 @@ void BackupStoreInfo::Save(IOStream& rOutStream)
 	archive.Write(mNumDeletedFiles);
 	archive.Write(mNumDirectories);
 
+
 	int64_t numDelObj = mDeletedDirectories.size();
 	archive.Write(numDelObj);
+    archive.Write(mVersionCountLimit);
 
 	// Write the deleted object list
 	if(mDeletedDirectories.size() > 0)
@@ -431,7 +444,7 @@ void BackupStoreInfo::Save(IOStream& rOutStream)
 		}
 	}
 
-	archive.Write(mAccountEnabled);
+    archive.Write(mAccountEnabled);
 
 	mExtraData.Seek(0, IOStream::SeekType_Absolute);
 	mExtraData.CopyStreamTo(rOutStream);
@@ -670,7 +683,7 @@ void BackupStoreInfo::RemovedDeletedDirectory(int64_t DirID)
 //		Created: 15/12/03
 //
 // --------------------------------------------------------------------------
-void BackupStoreInfo::ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimit)
+void BackupStoreInfo::ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionsLimit)
 {
 	if(mReadOnly)
 	{
@@ -679,6 +692,7 @@ void BackupStoreInfo::ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimi
 
 	mBlocksSoftLimit = BlockSoftLimit;
 	mBlocksHardLimit = BlockHardLimit;
+    mVersionCountLimit = VersionsLimit;
 
 	mIsModified = true;
 }

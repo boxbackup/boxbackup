@@ -10,7 +10,7 @@
 #include "Box.h"
 
 #include <stdio.h>
-
+#include <iostream>
 #include "BackupConstants.h"
 #include "BackupStoreContext.h"
 #include "BackupStoreDirectory.h"
@@ -697,27 +697,68 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		{
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *e = 0;
+            std::list<BackupStoreDirectory::Entry*> oldEntries;
+
 			while((e = i.Next()) != 0)
 			{
 				// First, check it's not an old version (cheaper comparison)
-				if(! e->IsOld())
-				{
+                if(mapStoreInfo->GetVersionCountLimit()>0 || !e->IsOld())
+                {
 					// Compare name
+
 					if(e->GetName() == rFilename)
 					{
-						// Check that it's definately not an old version
-						ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0);
-						// Set old version flag
-						e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
-						// Can safely do this, because we know we won't be here if it's already 
-						// an old version
-						adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
-						adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
-						adjustment.mNumOldFiles++;
-						adjustment.mNumCurrentFiles--;
+                        if(! e->IsOld()) {
+                            // Check that it's definately not an old version
+                            ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0);
+
+                            // Set old version flag
+                            e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
+                            // Can safely do this, because we know we won't be here if it's already
+                            // an old version
+                            adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
+                            adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
+                            adjustment.mNumOldFiles++;
+                            adjustment.mNumCurrentFiles--;
+                        }
+
+                        oldEntries.push_back(e);
+
 					}
-				}
+                }
 			}
+
+            int versionsCount=0;
+            if ( mapStoreInfo->GetVersionCountLimit()>0 && !oldEntries.empty() ) {
+                // cjean: we have a limit, let's do some cleanup
+                BackupStoreDirectory::Entry *latestVersion=0;
+                for (std::list<BackupStoreDirectory::Entry*>::reverse_iterator it=oldEntries.rbegin(); it != oldEntries.rend(); ++it) {
+
+                    if ( ++versionsCount>mapStoreInfo->GetVersionCountLimit()-1 ) {
+                        int64_t objectID=(*it)->GetObjectID();
+                        dir.DeleteEntry(objectID);
+                        adjustment.mBlocksUsed -= (*it)->GetSizeInBlocks();
+                        adjustment.mBlocksInOldFiles -= (*it)->GetSizeInBlocks();
+                        adjustment.mNumOldFiles--;
+
+                        std::string objFilename;
+                        MakeObjectFilename(objectID, objFilename);
+
+                        mapRefCount->RemoveReference(objectID);
+
+                        RaidFileWrite del(mStoreDiscSet, objFilename, mapRefCount->GetRefCount(objectID));
+                        del.Delete();
+
+                        if ( latestVersion ) {
+                            latestVersion->SetDependsOlder(0);
+                            latestVersion=0;
+                        }
+                    } else {
+                        latestVersion=(*it);
+                    }
+                }
+            }
+
 		}
 
 		// Then the new entry

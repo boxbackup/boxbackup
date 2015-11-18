@@ -71,7 +71,7 @@ public:
 		return mBasePath + ObjectPath;
 	}
 	std::string GetFullURL(const std::string ObjectPath) const;
-	int CreateAccount(const std::string& name, int32_t SoftLimit, int32_t HardLimit);
+    int CreateAccount(const std::string& name, int64_t SoftLimit, int64_t HardLimit,int32_t VersionsCount);
 	int GetBlockSize() { return 4096; }
 	HTTPResponse GetObject(const std::string& name)
 	{

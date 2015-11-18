@@ -608,7 +608,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 
 	int64_t softLimit = pOldInfo.get() ? pOldInfo->GetBlocksSoftLimit() : minSoft;
 	int64_t hardLimit = pOldInfo.get() ? pOldInfo->GetBlocksHardLimit() : minHard;
-
+    int32_t versionsLimit = pOldInfo.get() ? pOldInfo->GetVersionCountLimit() : 0;
 	if(mNumberErrorsFound && pOldInfo.get())
 	{
 		if(pOldInfo->GetBlocksSoftLimit() > minSoft)
@@ -662,6 +662,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		mBlocksInDirectories,
 		softLimit,
 		hardLimit,
+        versionsLimit,
 		(pOldInfo.get() ? pOldInfo->IsAccountEnabled() : true),
 		*extra_data));
 	info->AdjustNumCurrentFiles(mNumCurrentFiles);

@@ -36,7 +36,7 @@ bool create_account(int soft, int hard)
 	BackupStoreAccountsControl control(*config);
 	
 	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
-	int result = control.CreateAccount(0x01234567, 0, soft, hard);
+    int result = control.CreateAccount(0x01234567, 0, soft, hard, 0);
 	TEST_EQUAL(0, result);
 	return (result == 0);
 }

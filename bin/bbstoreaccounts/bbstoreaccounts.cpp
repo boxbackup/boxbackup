@@ -44,7 +44,7 @@ void PrintUsageAndExit()
 "Account ID is integer specified in hex\n"
 "\n"
 "Commands (and arguments):\n"
-"  create <account> <discnum> <softlimit> <hardlimit>\n"
+"  create <account> <discnum> <softlimit> <hardlimit> <versionslimit>\n"
 "        Creates the specified account number (in hex with no 0x) on the\n"
 "        specified raidfile disc set number (see raidfile.conf for valid\n"
 "        set numbers) with the specified soft and hard limits (in blocks\n"
@@ -54,7 +54,7 @@ void PrintUsageAndExit()
 "        of blocks used. The -m option enable machine-readable output.\n"
 "  enabled <accounts> <yes|no>\n"
 "        Sets the account as enabled or disabled for new logins.\n"
-"  setlimit <accounts> <softlimit> <hardlimit>\n"
+"  setlimit <accounts> <softlimit> <hardlimit> <versionslimit>\n"
 "        Changes the limits of the account as specified. Numbers are\n"
 "        interpreted as for the 'create' command (suffixed with B, M or G)\n"
 "  delete <account> [yes]\n"
@@ -166,8 +166,9 @@ int main(int argc, const char *argv[])
 	{
 		// which disc?
 		int32_t discnum;
-		int32_t softlimit;
-		int32_t hardlimit;
+        int64_t softlimit;
+        int64_t hardlimit;
+        int32_t versionslimit;
 		if(argc < 5
 			|| ::sscanf(argv[2], "%d", &discnum) != 1)
 		{
@@ -180,10 +181,11 @@ int main(int argc, const char *argv[])
 		int blocksize = control.BlockSizeOfDiscSet(discnum);
 		softlimit = control.SizeStringToBlocks(argv[3], blocksize);
 		hardlimit = control.SizeStringToBlocks(argv[4], blocksize);
+        versionslimit=atoi(argv[5]);
 		control.CheckSoftHardLimits(softlimit, hardlimit);
 	
 		// Create the account...
-		return control.CreateAccount(id, discnum, softlimit, hardlimit);
+        return control.CreateAccount(id, discnum, softlimit, hardlimit, versionslimit);
 	}
 	else if(command == "info")
 	{
@@ -224,11 +226,11 @@ int main(int argc, const char *argv[])
 			return 1;
 		}
 		
-		return control.SetLimit(id, argv[2], argv[3]);
+        return control.SetLimit(id, argv[2], argv[3],argv[4]);
 	}
 	else if(command == "name")
 	{
-		// Change the limits on this account
+        // Change the name on this account
 		if(argc != 3)
 		{
 			BOX_ERROR("name command requires a new name.");

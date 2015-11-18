@@ -95,6 +95,8 @@ int BackupAccountControl::PrintAccountInfo(const BackupStoreInfo& info,
 		BOX_FORMAT_ACCOUNT(info.GetAccountID()) << std::endl;
 	std::cout << FormatUsageLineStart("Account Name", mMachineReadableOutput) <<
 		info.GetAccountName() << std::endl;
+    std::cout << FormatUsageLineStart("Version Count limit", mMachineReadableOutput) <<
+        info.GetVersionCountLimit() << std::endl;
 	std::cout << FormatUsageLineStart("Last object ID", mMachineReadableOutput) <<
 		BOX_FORMAT_OBJECTID(info.GetLastObjectIDUsed()) << std::endl;
 	std::cout << FormatUsageLineStart("Used", mMachineReadableOutput) <<
@@ -180,8 +182,8 @@ std::string S3BackupAccountControl::GetFullURL(const std::string ObjectPath) con
 		s3config.GetKeyValue("Port") + GetFullPath(ObjectPath);
 }
 
-int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftLimit,
-	int32_t HardLimit)
+int S3BackupAccountControl::CreateAccount(const std::string& name, int64_t SoftLimit,
+    int64_t HardLimit, int32_t VersionsLimit)
 {
 	// Try getting the info file. If we get a 200 response then it already
 	// exists, and we should bail out. If we get a 404 then it's safe to
@@ -204,7 +206,7 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 
 	BackupStoreInfo info(0, // fake AccountID for S3 stores
 		info_url, // FileName,
-		SoftLimit, HardLimit);
+        SoftLimit, HardLimit, VersionsLimit);
 	info.SetAccountName(name);
 
 	// And an empty directory

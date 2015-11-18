@@ -435,6 +435,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				markVersionAges.find(
 					version_t(en->GetName().GetEncodedFilename(),
 						en->GetMarkNumber())));
+
 			if(enVersionAgeI != markVersionAges.end())
 			{
 				enVersionAge = enVersionAgeI->second + 1;

@@ -72,7 +72,7 @@ BackupStoreAccounts::~BackupStoreAccounts()
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit, int64_t SizeHardLimit, const std::string &rAsUsername)
+void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit, int64_t SizeHardLimit, int32_t VersionsLimit, const std::string &rAsUsername)
 {
 	// Create the entry in the database
 	BackupStoreAccountDatabase::Entry Entry(mrDatabase.AddEntry(ID,
@@ -96,7 +96,7 @@ void BackupStoreAccounts::Create(int32_t ID, int DiscSet, int64_t SizeSoftLimit,
 		RaidFileWrite::CreateDirectory(DiscSet, dirName, true /* recursive */);
 		
 		// Create an info file
-		BackupStoreInfo::CreateNew(ID, dirName, DiscSet, SizeSoftLimit, SizeHardLimit);
+        BackupStoreInfo::CreateNew(ID, dirName, DiscSet, SizeSoftLimit, SizeHardLimit, VersionsLimit);
 		
 		// And an empty directory
 		BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID, BACKUPSTORE_ROOT_DIRECTORY_ID);
@@ -224,7 +224,7 @@ int BackupStoreAccountsControl::BlockSizeOfDiscSet(int discSetNum)
 }
 
 int BackupStoreAccountsControl::SetLimit(int32_t ID, const char *SoftLimitStr,
-	const char *HardLimitStr)
+    const char *HardLimitStr, const char *VersionsLimitStr)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -246,15 +246,16 @@ int BackupStoreAccountsControl::SetLimit(int32_t ID, const char *SoftLimitStr,
 	int blocksize = BlockSizeOfDiscSet(discSetNum);
 	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, blocksize);
 	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, blocksize);
+    int32_t versionslimit = atoi(VersionsLimitStr);
 	CheckSoftHardLimits(softlimit, hardlimit);
-	info->ChangeLimits(softlimit, hardlimit);
+    info->ChangeLimits(softlimit, hardlimit, versionslimit);
 	
 	// Save
 	info->Save();
 
 	BOX_NOTICE("Limits on account " << BOX_FORMAT_ACCOUNT(ID) <<
 		" changed to " << softlimit << " soft, " <<
-		hardlimit << " hard.");
+        hardlimit << " hard, "<<versionslimit<<" versions.");
 
 	return 0;
 }
@@ -512,7 +513,7 @@ int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Qu
 }
 
 int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,
-	int32_t SoftLimit, int32_t HardLimit)
+    int64_t SoftLimit, int64_t HardLimit, int32_t VersionsLimit)
 {
 	// Load in the account database 
 	std::auto_ptr<BackupStoreAccountDatabase> db(
@@ -539,7 +540,7 @@ int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,
 	
 	// Create it.
 	BackupStoreAccounts acc(*db);
-	acc.Create(ID, DiscNumber, SoftLimit, HardLimit, username);
+    acc.Create(ID, DiscNumber, SoftLimit, HardLimit, VersionsLimit, username);
 	
 	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(ID) << " created.");
 
