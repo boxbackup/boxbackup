@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include "Archive.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreException.h"
@@ -718,10 +719,8 @@ int64_t BackupStoreInfo::AllocateObjectID()
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotInitialised)
 	}
 
-	mIsModified = true;
-
-	// Return the next object ID
-	return ++mLastObjectIDUsed;
+    // Return the next object ID and prevent overflow
+    return ( std::numeric_limits<uint64_t>::max() == mLastObjectIDUsed ) ? 1 : ++mLastObjectIDUsed;
 }
 
 

@@ -730,7 +730,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 
             int versionsCount=0;
             if ( mapStoreInfo->GetVersionCountLimit()>0 && !oldEntries.empty() ) {
-                // cjean: we have a limit, let's do some cleanup
+                //  we have a version limit, let's do some cleanup
                 BackupStoreDirectory::Entry *latestVersion=0;
                 for (std::list<BackupStoreDirectory::Entry*>::reverse_iterator it=oldEntries.rbegin(); it != oldEntries.rend(); ++it) {
 
@@ -744,10 +744,15 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
                         std::string objFilename;
                         MakeObjectFilename(objectID, objFilename);
 
+
                         mapRefCount->RemoveReference(objectID);
 
-                        RaidFileWrite del(mStoreDiscSet, objFilename, mapRefCount->GetRefCount(objectID));
-                        del.Delete();
+                        BackupStoreRefCountDatabase::refcount_t refs=mapRefCount->GetRefCount(objectID);
+                        if ( refs==0 )
+                        {
+                            RaidFileWrite del(mStoreDiscSet, objFilename, refs);
+                            del.Delete();
+                        }
 
                         if ( latestVersion ) {
                             latestVersion->SetDependsOlder(0);
