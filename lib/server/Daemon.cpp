@@ -63,6 +63,7 @@ Daemon *Daemon::spDaemon = 0;
 Daemon::Daemon()
 	: mReloadConfigWanted(false),
 	  mTerminateWanted(false),
+      mCancelSyncWanted(false),
 	#ifdef WIN32
 	  mSingleProcess(true),
 	  mRunInForeground(true),
@@ -660,38 +661,44 @@ int Daemon::Main(const std::string &rConfigFileName)
 		while(!mTerminateWanted)
 		{
 			Run();
-			
-			if(mReloadConfigWanted && !mTerminateWanted)
-			{
-				// Need to reload that config file...
-				BOX_NOTICE("Reloading configuration file: "
-					<< mConfigFileName);
-				std::string errors;
-				std::auto_ptr<Configuration> pconfig(
-					Configuration::LoadAndVerify(
-						mConfigFileName.c_str(),
-						GetConfigVerify(), errors));
+            if ( !mTerminateWanted ) {
+                if(mReloadConfigWanted )
+                {
+                    // Need to reload that config file...
+                    BOX_NOTICE("Reloading configuration file: "
+                        << mConfigFileName);
+                    std::string errors;
+                    std::auto_ptr<Configuration> pconfig(
+                        Configuration::LoadAndVerify(
+                            mConfigFileName.c_str(),
+                            GetConfigVerify(), errors));
 
-				// Got errors?
-				if(pconfig.get() == 0 || !errors.empty())
-				{
-					// Tell user about errors
-					BOX_FATAL("Error in configuration "
-						<< "file: " << mConfigFileName
-						<< ": " << errors);
-					// And give up
-					retcode = 1;
-					break;
-				}
-				
-				// Store configuration
-				mapConfiguration = pconfig;
-				mLoadedConfigModifiedTime =
-					GetConfigFileModifiedTime();
-				
-				// Stop being marked for loading config again
-				mReloadConfigWanted = false;
-			}
+                    // Got errors?
+                    if(pconfig.get() == 0 || !errors.empty())
+                    {
+                        // Tell user about errors
+                        BOX_FATAL("Error in configuration "
+                            << "file: " << mConfigFileName
+                            << ": " << errors);
+                        // And give up
+                        retcode = 1;
+                        break;
+                    }
+
+                    // Store configuration
+                    mapConfiguration = pconfig;
+                    mLoadedConfigModifiedTime =
+                        GetConfigFileModifiedTime();
+
+                    // Stop being marked for loading config again
+                    mReloadConfigWanted = false;
+                }
+
+                if( mCancelSyncWanted ) {
+                    // at this point sync should have been canceled
+                    mCancelSyncWanted = false;
+                }
+            }
 		}
 		
 		// Delete the PID file

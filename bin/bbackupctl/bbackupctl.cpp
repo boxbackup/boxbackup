@@ -56,6 +56,7 @@ void PrintUsageAndExit(int ret)
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
+    "  stop-sync -- cancel the sync now\n"
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
 	"  wait-for-end  -- wait until the next sync finishes, then exit\n"
 	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"

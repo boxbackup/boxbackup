@@ -59,13 +59,15 @@ public:
 	virtual bool Configure(const std::string& rConfigFileName);
 	virtual bool Configure(const Configuration& rConfig);
 
-	bool StopRun() {return mReloadConfigWanted | mTerminateWanted;}
+    bool StopRun() {return mCancelSyncWanted | mReloadConfigWanted | mTerminateWanted;}
 	bool IsReloadConfigWanted() {return mReloadConfigWanted;}
 	bool IsTerminateWanted() {return mTerminateWanted;}
+    bool IsCancelSyncWanted() { return mCancelSyncWanted;}
 
 	// To allow derived classes to get these signals in other ways
 	void SetReloadConfigWanted() {mReloadConfigWanted = true;}
 	void SetTerminateWanted() {mTerminateWanted = true;}
+    void SetCancelSyncWanted() { mCancelSyncWanted = true;}
 	
 	virtual void EnterChild();
 	
@@ -103,6 +105,7 @@ private:
 	std::auto_ptr<Configuration> mapConfiguration;
 	box_time_t mLoadedConfigModifiedTime;
 	bool mReloadConfigWanted;
+    bool mCancelSyncWanted;
 	bool mTerminateWanted;
 	bool mSingleProcess;
 	bool mRunInForeground;

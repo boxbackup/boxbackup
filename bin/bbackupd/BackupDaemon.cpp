@@ -2184,7 +2184,12 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 				// Terminate the daemon cleanly
 				SetTerminateWanted();
 				sendOK = true;
-			}
+            }
+            else if(command == "stop-sync")
+            {
+                SetCancelSyncWanted();
+                sendOK = true;
+            }
 			
 			// Send a response back?
 			if(sendResponse)
