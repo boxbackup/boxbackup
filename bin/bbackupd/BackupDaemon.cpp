@@ -230,8 +230,6 @@ BackupDaemon::BackupDaemon()
 	  mUpdateStoreInterval(0),
 	  mDeleteStoreObjectInfoFile(false),
 	  mDoSyncForcedByPreviousSyncError(false),
-	  mNumFilesUploaded(-1),
-	  mNumDirsCreated(-1),
 	  mMaxBandwidthFromSyncAllowScript(0),
 	  mLogAllFileAccess(false),
 	  mpProgressNotifier(this),
@@ -249,6 +247,7 @@ BackupDaemon::BackupDaemon()
 	, mpVssBackupComponents(NULL)
 #endif
 {
+    memset(&mStats, 0, sizeof(SyncStats));
 	// Only ever one instance of a daemon
 	SSLLib::Initialise();
 }
@@ -1069,8 +1068,10 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
 	params.mMaxFileTimeInFuture =
 		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
-	mNumFilesUploaded = 0;
-	mNumDirsCreated = 0;
+    mStats.startTime=GetCurrentBoxTime();
+    mStats.state=State_Connected;
+    mStats.NumFilesUploaded = 0;
+    mStats.NumDirsCreated = 0;
 
 	if(conf.KeyExists("MaxUploadRate"))
 	{
@@ -1186,7 +1187,10 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		// exceeded (as things won't have been done properly if
 		// it was)
 		mLastSyncTime = syncPeriodEnd;
-	}
+        mStats.state=State_Idle;
+    } else {
+        mStats.state=State_StorageLimitExceeded;
+    }
 
 	// Commit the ID Maps
 	CommitIDMapsAfterSync();
@@ -1197,6 +1201,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		Random::RandomInt(mUpdateStoreInterval >>
 		SYNC_PERIOD_RANDOM_EXTRA_TIME_SHIFT_BY);
 
+    mStats.endTime=GetCurrentBoxTime();
 	// --------------------------------------------------------------------------------------------
 
 	// We had a successful backup, save the store 
@@ -1796,8 +1801,8 @@ void BackupDaemon::OnBackupFinish()
 			<< BackupStoreFile::msStats.mBytesAlreadyOnServer
 			<< ", encoded size "
 			<< BackupStoreFile::msStats.mTotalFileStreamSize
-			<< ", " << mNumFilesUploaded << " files uploaded, "
-			<< mNumDirsCreated << " dirs created");
+            << ", " << mStats.NumFilesUploaded << " files uploaded, "
+            << mStats.NumDirsCreated << " dirs created");
 
 		// Reset statistics again
 		BackupStoreFile::ResetStats();
@@ -2116,7 +2121,14 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 						conf.GetKeyValueInt("MinimumFileAge") 
 						<< " " <<
 						conf.GetKeyValueInt("MaxUploadWait") 
-						<< "\nstate " << mState << "\n";
+                        << "\nstate: " << mState
+                        << "\nstats: "<< mStats.state << " "<<
+                            mStats.startTime << " " <<
+                            mStats.endTime << " " <<
+                            mStats.NumFilesUploaded << " " <<
+                            mStats.TotalSizeUploaded
+                        <<"\n";
+                    std::cout << hello.str() <<std::endl;
 					mapCommandSocketInfo->mpConnectedSocket->Write(
 						hello.str(), timeout);
 					

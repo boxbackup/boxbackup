@@ -206,6 +206,8 @@ int main(int argc, const char *argv[])
 		"  MinimumFileAge = " << minimumFileAge << " seconds\n"
 		"  MaxUploadWait = " << maxUploadWait << " seconds");
 
+
+
 	std::string stateLine;
 	if(!getLine.GetLine(stateLine, false, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
 	{
@@ -215,7 +217,7 @@ int main(int argc, const char *argv[])
 
 	// Decode it
 	int currentState;
-	if(::sscanf(stateLine.c_str(), "state %d", &currentState) != 1)
+    if(::sscanf(stateLine.c_str(), "state: %d", &currentState) != 1)
 	{
 		BOX_ERROR("Received invalid state line from daemon");
 		return 1;
@@ -223,6 +225,26 @@ int main(int argc, const char *argv[])
 
 	BOX_TRACE("Current state: " <<
 		BackupDaemon::GetStateName(currentState));
+
+
+    std::string statsLine;
+    if(!getLine.GetLine(statsLine, false, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
+    {
+        BOX_ERROR("Failed to receive stats line from daemon");
+        return 1;
+    }
+
+    // Decode it
+    int statsState;
+    box_time_t statsStartTime, statsEndTime;
+    uint64_t statsFileCount, statsSizeUploaded;
+    if(::sscanf(statsLine.c_str(), "stats: %d %lu %lu %llu %llu", &statsState, &statsStartTime,
+                &statsEndTime, &statsFileCount, &statsSizeUploaded) != 5)
+    {
+        BOX_ERROR("Received invalid stats line from daemon");
+        return 1;
+    }
+
 
 	Command command = Default;
 	std::string commandName(argv[0]);
@@ -243,6 +265,11 @@ int main(int argc, const char *argv[])
 	{
 		BOX_NOTICE("state " <<
 			BackupDaemon::GetStateName(currentState));
+        BOX_NOTICE("lastSync " << statsState
+                   <<" "<<statsStartTime
+                   <<" "<<statsEndTime
+                   <<" "<<statsFileCount
+                   <<" "<<statsSizeUploaded);
 		command = NoCommand;
 	}
 

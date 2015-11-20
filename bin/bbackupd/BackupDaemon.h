@@ -132,6 +132,15 @@ public:
 	// Allow other classes to call this too
 	void NotifySysadmin(SysadminNotifier::EventCode Event);
 
+    typedef struct  {
+        int state;
+        box_time_t startTime;
+        box_time_t endTime;
+        uint64_t TotalSizeUploaded;
+        uint64_t NumFilesUploaded;
+        uint64_t NumDirsCreated;
+    } SyncStats;
+
 private:
 	void Run2();
 
@@ -248,7 +257,8 @@ private:
 	TLSContext mTlsContext;
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
-	int64_t mNumFilesUploaded, mNumDirsCreated;
+    SyncStats mStats;
+    //int64_t mNumFilesUploaded, mNumDirsCreated;
 	int mMaxBandwidthFromSyncAllowScript;
 
 public:
@@ -453,7 +463,8 @@ public:
 				"): total size = " << FileSize << ", "
 				"uploaded size = " << UploadedSize);
 		}
-		mNumFilesUploaded++;
+        mStats.TotalSizeUploaded+=FileSize;
+        mStats.NumFilesUploaded++;
 	}
 	virtual void NotifyFileSynchronised(
 		const BackupClientDirectoryRecord* pDirRecord,
@@ -476,7 +487,7 @@ public:
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}
-		mNumDirsCreated++;
+        mStats.NumDirsCreated++;
 	}
 	virtual void NotifyDirectoryDeleted(
 		int64_t ObjectID,
