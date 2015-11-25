@@ -25,7 +25,7 @@
 #include "Socket.h"
 #include "SocketStream.h"
 #include "IOStreamGetLine.h"
-
+#include <signal.h>
 #ifdef WIN32
 	#include "WinNamedPipeStream.h"
 #endif
@@ -37,7 +37,8 @@ enum Command
 	Default,
 	WaitForSyncStart,
 	WaitForSyncEnd,
-	SyncAndWaitForEnd,
+    SyncAndWaitForEnd,
+    GetStats,
 	NoCommand,
 };
 
@@ -50,8 +51,9 @@ void PrintUsageAndExit(int ret)
 	Logging::OptionParser::GetUsageString() <<
 	"\n"
 	"Commands are:\n"
-	"  status -- report daemon status without changing anything\n"
-	"  sync -- start a synchronisation (backup) run now\n"
+    "  status -- report daemon status without changing anything\n"
+    "  get-stats -- get some statistics about daemon activity\n"
+    "  sync -- start a synchronisation (backup) run now\n"
 	"  force-sync -- force the start of a synchronisation run, "
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
@@ -71,7 +73,7 @@ int main(int argc, const char *argv[])
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", 
 		"bbackupctl")
 
-	MAINHELPER_START
+    MAINHELPER_START
 
 	Logging::SetProgramName("bbackupctl");
 
@@ -227,25 +229,6 @@ int main(int argc, const char *argv[])
 		BackupDaemon::GetStateName(currentState));
 
 
-    std::string statsLine;
-    if(!getLine.GetLine(statsLine, false, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
-    {
-        BOX_ERROR("Failed to receive stats line from daemon");
-        return 1;
-    }
-
-    // Decode it
-    int statsState;
-    box_time_t statsStartTime, statsEndTime;
-    uint64_t statsFileCount, statsSizeUploaded;
-    if(::sscanf(statsLine.c_str(), "stats: %d %lu %lu %llu %llu", &statsState, &statsStartTime,
-                &statsEndTime, &statsFileCount, &statsSizeUploaded) != 5)
-    {
-        BOX_ERROR("Received invalid stats line from daemon");
-        return 1;
-    }
-
-
 	Command command = Default;
 	std::string commandName(argv[0]);
 
@@ -264,14 +247,11 @@ int main(int argc, const char *argv[])
 	else if(commandName == "status")
 	{
 		BOX_NOTICE("state " <<
-			BackupDaemon::GetStateName(currentState));
-        BOX_NOTICE("lastSync " << statsState
-                   <<" "<<statsStartTime
-                   <<" "<<statsEndTime
-                   <<" "<<statsFileCount
-                   <<" "<<statsSizeUploaded);
-		command = NoCommand;
-	}
+            BackupDaemon::GetStateName(currentState));
+        command = NoCommand;
+    } else if(commandName == "get-stats") {
+        command=GetStats;
+    }
 
 	switch(command)
 	{
@@ -304,7 +284,9 @@ int main(int argc, const char *argv[])
 					"to finish...");
 			}
 		}
-		break;
+        break;
+
+
 
 		default:
 		{
@@ -385,7 +367,30 @@ int main(int argc, const char *argv[])
 					// daemon must still be busy
 				}
 			}
-			break;
+            break;
+
+            case GetStats:
+            {
+                 // Decode line
+                static int statsCount=0;
+                int statsState;
+                box_time_t statsStartTime, statsEndTime;
+                uint64_t statsFileCount, statsSizeUploaded;
+                if(::sscanf(line.c_str(), "%d %lu %lu %lu %lu", &statsState, &statsStartTime,
+                            &statsEndTime, &statsFileCount, &statsSizeUploaded) == 5)
+                {
+                    BOX_NOTICE("#" << ++statsCount
+                               <<" "<<statsState
+                               <<" "<<statsStartTime
+                               <<" "<<statsEndTime
+                               <<" "<<statsFileCount
+                               <<" "<<statsSizeUploaded);
+                }
+
+            }
+            break;
+
+
 
 			default:
 			{
@@ -409,14 +414,14 @@ int main(int argc, const char *argv[])
 		}
 	}
 
-	// Send a quit command to finish nicely
-	connection.Write("quit\n", 5, PROTOCOL_DEFAULT_TIMEOUT);
 
+    // Send a quit command to finish nicely
+    //connection.Write("quit\n", 5, PROTOCOL_DEFAULT_TIMEOUT);
 	MAINHELPER_END
 
-#if defined WIN32 && ! defined BOX_RELEASE_BUILD
+
+        #if defined WIN32 && ! defined BOX_RELEASE_BUILD
 	closelog();
 #endif
-	
 	return returnCode;
 }

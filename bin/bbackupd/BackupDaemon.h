@@ -74,6 +74,31 @@ private:
 	bool DeleteStoreObjectInfo() const;
 	BackupDaemon(const BackupDaemon &);
 
+    typedef struct  {
+        int state;
+        box_time_t startTime;
+        box_time_t endTime;
+        uint64_t TotalSizeUploaded;
+        uint64_t NumFilesUploaded;
+        uint64_t NumDirsCreated;
+    } SyncStats;
+
+    void setStartSync(SysadminNotifier::EventCode state) {
+        SyncStats stats;
+        memset(&stats, 0, sizeof(SyncStats));
+        stats.startTime=GetCurrentBoxTime();
+        stats.state=(int)state;
+        if ( mStats.size()>=mStatsHistoryLength)
+            mStats.resize(mStatsHistoryLength-1);
+        mStats.push_front(stats);
+    }
+
+    void setEndSync(SysadminNotifier::EventCode state) {
+        mStats.front().state=(int)state;
+        mStats.front().endTime=GetCurrentBoxTime();
+    }
+
+
 public:
 	#ifdef WIN32
 		// add command-line options to handle Windows services
@@ -132,14 +157,7 @@ public:
 	// Allow other classes to call this too
 	void NotifySysadmin(SysadminNotifier::EventCode Event);
 
-    typedef struct  {
-        int state;
-        box_time_t startTime;
-        box_time_t endTime;
-        uint64_t TotalSizeUploaded;
-        uint64_t NumFilesUploaded;
-        uint64_t NumDirsCreated;
-    } SyncStats;
+
 
 private:
 	void Run2();
@@ -150,7 +168,7 @@ public:
 	std::auto_ptr<BackupClientContext> RunSyncNow();
 	void ResetCachedState();
 	void OnBackupStart();
-	void OnBackupFinish();
+    void OnBackupFinish(SysadminNotifier::EventCode state);
 	// TouchFileInWorkingDir is only here for use by Boxi.
 	// This does NOT constitute an API!
 	void TouchFileInWorkingDir(const char *Filename);
@@ -257,7 +275,7 @@ private:
 	TLSContext mTlsContext;
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
-    SyncStats mStats;
+    std::list<SyncStats> mStats;
     //int64_t mNumFilesUploaded, mNumDirsCreated;
 	int mMaxBandwidthFromSyncAllowScript;
 
@@ -268,6 +286,7 @@ public:
  
 private:
 	bool mLogAllFileAccess;
+    uint32_t mStatsHistoryLength;
 
 public:
 	ProgressNotifier*  GetProgressNotifier()  { return mpProgressNotifier; }
@@ -463,8 +482,8 @@ public:
 				"): total size = " << FileSize << ", "
 				"uploaded size = " << UploadedSize);
 		}
-        mStats.TotalSizeUploaded+=FileSize;
-        mStats.NumFilesUploaded++;
+        mStats.front().TotalSizeUploaded+=FileSize;
+        mStats.front().NumFilesUploaded++;
 	}
 	virtual void NotifyFileSynchronised(
 		const BackupClientDirectoryRecord* pDirRecord,
@@ -487,7 +506,7 @@ public:
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}
-        mStats.NumDirsCreated++;
+        mStats.front().NumDirsCreated++;
 	}
 	virtual void NotifyDirectoryDeleted(
 		int64_t ObjectID,

@@ -118,6 +118,8 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("LogFileLevel", 0),
 	// set the level of verbosity of file logging
 	ConfigurationVerifyKey("LogFileOverwrite", ConfigTest_IsBool, false),
+    // set the number of sync stats to keep in memory
+    ConfigurationVerifyKey("StatsHistoryLength", ConfigTest_IsUint32, 1),
 	// overwrite the log file on each backup
 	ConfigurationVerifyKey("CommandSocket", 0),
 	// not compulsory to have this
