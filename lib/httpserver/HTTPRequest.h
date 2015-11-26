@@ -98,6 +98,39 @@ public:
 	const std::string &GetQueryString() const {return mQueryString;}
 	int GetHTTPVersion() const {return mHTTPVersion;}
 	const Query_t &GetQuery() const {return mQuery;}
+	void AddParameter(const std::string& name, const std::string& value)
+	{
+		mQuery.insert(QueryEn_t(name, value));
+	}
+	void SetParameter(const std::string& name, const std::string& value)
+	{
+		mQuery.erase(name);
+		mQuery.insert(QueryEn_t(name, value));
+	}
+	void RemoveParameter(const std::string& name)
+	{
+		mQuery.erase(name);
+	}
+	std::string GetParameterString(const std::string& name)
+	{
+		Query_t::iterator i = mQuery.find(name);
+		if(i == mQuery.end())
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, ParameterNotFound, name);
+		}
+		const std::string& value(i->second);
+		i++;
+		if(i != mQuery.end() && i->first == name)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, DuplicateParameter, name);
+		}
+		return value;
+	}
+	const Query_t GetParameters() const
+	{
+		return mQuery;
+	}
+
 	int GetContentLength() const {return mHeaders.GetContentLength();}
 	const std::string &GetContentType() const {return mHeaders.GetContentType();}
 	const CookieJar_t *GetCookies() const {return mpCookies;} // WARNING: May return NULL
