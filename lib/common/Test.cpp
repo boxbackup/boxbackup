@@ -34,7 +34,7 @@ std::string current_test_name;
 std::list<std::string> run_only_named_tests;
 std::map<std::string, std::string> s_test_status;
 
-bool setUp(const char* function_name)
+bool setUp(const std::string& function_name)
 {
 	current_test_name = function_name;
 
@@ -60,7 +60,7 @@ bool setUp(const char* function_name)
 		}
 	}
 
-	printf("\n\n== %s ==\n", function_name);
+	printf("\n\n== %s ==\n", function_name.c_str());
 	num_tests_selected++;
 	old_failure_count = num_failures;
 

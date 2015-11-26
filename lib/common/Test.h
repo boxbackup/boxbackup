@@ -48,22 +48,32 @@ extern std::map<std::string, std::string> s_test_status;
 	try \
 	{ // left open for TEARDOWN()
 
+#define SETUP_SPECIALISED(name) \
+	{ \
+		std::ostringstream full_name; \
+		full_name << __FUNCTION__ << "(" << name << ")"; \
+		if (!setUp(full_name.str())) return true; \
+	} \
+	\
+	try \
+	{ // left open for TEARDOWN()
+
 #define TEARDOWN() \
 		return tearDown(); \
 	} \
 	catch (BoxException &e) \
 	{ \
-		BOX_NOTICE(__FUNCTION__ << " errored: " << e.what()); \
+		BOX_NOTICE(current_test_name << " errored: " << e.what()); \
 		num_failures++; \
 		tearDown(); \
-		s_test_status[__FUNCTION__] = "ERRORED"; \
+		s_test_status[current_test_name] = "ERRORED"; \
 		return false; \
 	}
 
 //! End the current test. Only use within a test function, because it just returns false!
 #define FAIL { \
 	std::ostringstream os; \
-	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
+	os << "failed at " << current_test_name << ":" << __LINE__; \
 	s_test_status[current_test_name] = os.str(); \
 	return fail(); \
 }
@@ -202,7 +212,7 @@ extern std::map<std::string, std::string> s_test_status;
 	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
 
 //! Sets up (cleans up) test environment at the start of every test.
-bool setUp(const char* function_name);
+bool setUp(const std::string& function_name);
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool tearDown();
