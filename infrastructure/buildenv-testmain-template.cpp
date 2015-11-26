@@ -420,8 +420,7 @@ int main(int argc, char * const * argv)
 	}
 	catch(BoxException &e)
 	{
-		printf("FAILED: Exception caught: %s: %s\n", e.what(),
-			e.GetMessage().c_str());
+		printf("FAILED: Exception caught: %s\n", e.what());
 		return 1;
 	}
 	catch(std::exception &e)
