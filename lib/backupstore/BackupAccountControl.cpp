@@ -165,14 +165,12 @@ int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 
 bool BackupStoreAccountControl::LoadBackupStoreInfo(bool readWrite)
 {
-	if(!OpenAccount(true)) // readWrite
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID));
-		return false;
-	}
+	OpenAccount(readWrite); // readWrite
 
 	// Load the info
-	mapStoreInfo = mapFileSystem->GetBackupStoreInfo(mAccountID, false); // !ReadOnly
+	mapStoreInfo = mapFileSystem->GetBackupStoreInfo(mAccountID,
+		!readWrite); // ReadOnly
+
 	return true;
 }
 
@@ -198,7 +196,6 @@ int BackupAccountControl::SetLimit(int64_t softlimit, int64_t hardlimit)
 
 	// Change the limits
 	LOAD_BACKUP_STORE_INFO(true); // readWrite
-
 	mapStoreInfo->ChangeLimits(softlimit, hardlimit);
 	mapFileSystem->PutBackupStoreInfo(*mapStoreInfo);
 
@@ -235,12 +232,7 @@ int BackupAccountControl::SetAccountEnabled(bool enabled)
 int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 {
 	// Obtain a write lock, as the daemon user
-	if(!OpenAccount(true)) // readWrite
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for deletion.");
-		return 1;
-	}
+	OpenAccount(true); // readWrite
 
 	// Check user really wants to do this
 	if(AskForConfirmation)
@@ -328,7 +320,7 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	return retcode;
 }
 
-bool BackupStoreAccountControl::OpenAccount(bool readWrite)
+void BackupStoreAccountControl::OpenAccount(bool readWrite)
 {
 	// Load in the account database
 	std::auto_ptr<BackupStoreAccountDatabase> db(
@@ -338,9 +330,9 @@ bool BackupStoreAccountControl::OpenAccount(bool readWrite)
 	// Exists?
 	if(!db->EntryExists(mAccountID))
 	{
-		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(mAccountID) <<
-			" does not exist.");
-		return false;
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, AccountDoesNotExist,
+			"Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID) <<
+			": does not exist");
 	}
 
 	// Get info from the database
@@ -372,19 +364,13 @@ bool BackupStoreAccountControl::OpenAccount(bool readWrite)
 	{
 		mapFileSystem->GetLock();
 	}
-
-	return true;
 }
 
 int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
-	if(!OpenAccount(FixErrors)) // don't need a write lock if not making changes
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for checking.");
-		return 1;
-	}
+	// Don't need a write lock if not making changes.
+	OpenAccount(FixErrors); // readWrite
 
 	// Check it
 	BackupStoreCheck check(mRootDir, mDiscSetNum, mAccountID, FixErrors, Quiet);
@@ -439,12 +425,8 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLim
 
 int BackupStoreAccountControl::HousekeepAccountNow()
 {
-	if(!OpenAccount(false)) // !readWrite; housekeeping locks the account itself
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for housekeeping.");
-		return 1;
-	}
+	// Housekeeping locks the account itself, so we can't.
+	OpenAccount(false); // readWrite
 
 	HousekeepStoreAccount housekeeping(mAccountID, mRootDir, mDiscSetNum, NULL);
 	bool success = housekeeping.DoHousekeeping();

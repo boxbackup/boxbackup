@@ -53,13 +53,14 @@ public:
 	virtual int SetAccountName(const std::string& rNewAccountName);
 	virtual int PrintAccountInfo();
 	virtual int SetAccountEnabled(bool enabled);
+	virtual BackupFileSystem& GetFileSystem() { return *mapFileSystem; }
 };
 
 class BackupStoreAccountControl : public BackupAccountControl
 {
 private:
 	int32_t mAccountID;
-	bool OpenAccount(bool readWrite);
+	void OpenAccount(bool readWrite);
 	std::string mRootDir;
 	int mDiscSetNum;
 	std::auto_ptr<UnixUser> mapChangeUser; // used to reset uid when we return
@@ -86,6 +87,13 @@ public:
 	int CreateAccount(int32_t DiscNumber, int32_t SoftLimit,
 		int32_t HardLimit);
 	int HousekeepAccountNow();
+	virtual BackupFileSystem& GetFileSystem()
+	{
+		// We don't know whether the caller wants a write-locked filesystem or
+		// not, but they can lock it themselves if they want to.
+		OpenAccount(false); // !ReadWrite
+		return *mapFileSystem;
+	}
 };
 
 class S3BackupAccountControl : public BackupAccountControl
