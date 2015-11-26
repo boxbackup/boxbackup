@@ -48,6 +48,9 @@ public:
 	BackupStoreContext(int32_t ClientID,
 		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
+	BackupStoreContext(BackupFileSystem& rFileSystem, int32_t ClientID,
+		HousekeepingInterface* mpHousekeeping,
+		const std::string& rConnectionDetails);
 	virtual ~BackupStoreContext();
 
 private:
@@ -91,11 +94,17 @@ public:
 	{
 		if(!mReadOnly)
 		{
-			mapFileSystem->ReleaseLock();
+			mpFileSystem->ReleaseLock();
 		}
 	}
 
+	// TODO: stop using this version, which has the side-effect of creating a
+	// BackupStoreFileSystem:
 	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet);
+	void SetClientHasAccount()
+	{
+		mClientHasAccount = true;
+	}
 	bool GetClientHasAccount() const {return mClientHasAccount;}
 
 	// Store info
@@ -151,12 +160,18 @@ public:
 		int64_t AttributesModTime,
 		int64_t ModificationTime,
 		bool &rAlreadyExists);
-	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime);
-	bool ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut);
-	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut);
+	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes,
+		int64_t AttributesModTime);
+	bool ChangeFileAttributes(const BackupStoreFilename &rFilename,
+		int64_t InDirectory, const StreamableMemBlock &Attributes,
+		int64_t AttributesHash, int64_t &rObjectIDOut);
+	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory,
+		int64_t &rObjectIDOut);
 	bool UndeleteFile(int64_t ObjectID, int64_t InDirectory);
 	void DeleteDirectory(int64_t ObjectID, bool Undelete = false);
-	void MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject);
+	void MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
+		int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename,
+		bool MoveAllWithSameName, bool AllowMoveOverDeletedObject);
 
 	// Manipulating objects
 	enum
@@ -172,7 +187,7 @@ public:
 	// Info
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
-	virtual int GetBlockSize() { return mapFileSystem->GetBlockSize(); }
+	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
 
 private:
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID,
@@ -193,7 +208,17 @@ private:
 
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
-	std::auto_ptr<BackupFileSystem> mapFileSystem;
+
+	// mapOwnFileSystem is initialised when we created our own BackupFileSystem,
+	// using the old constructor. It ensures that the BackupFileSystem is deleted
+	// when this BackupStoreContext is destroyed. TODO: stop using that old
+	// constructor, and remove this member.
+	std::auto_ptr<BackupFileSystem> mapOwnFileSystem;
+
+	// mpFileSystem is always initialised when SetClientHasAccount() has been called,
+	// whether or not we created it ourselves, and all internal functions use this
+	// member instead of mapOwnFileSystem.
+	BackupFileSystem* mpFileSystem;
 
 	// Refcount database
 	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;

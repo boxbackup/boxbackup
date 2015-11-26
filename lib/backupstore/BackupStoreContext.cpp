@@ -42,7 +42,7 @@
 #define STORE_INFO_SAVE_DELAY	96
 
 #define CHECK_FILESYSTEM_INITIALISED() \
-if(!mapFileSystem.get()) { \
+if(!mpFileSystem) { \
 	THROW_EXCEPTION(BackupStoreException, FileSystemNotInitialised); \
 }
 
@@ -50,7 +50,7 @@ if(!mapFileSystem.get()) { \
 //
 // Function
 //		Name:    BackupStoreContext::BackupStoreContext()
-//		Purpose: Constructor
+//		Purpose: Traditional constructor (for RAID filesystems only)
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
@@ -63,6 +63,31 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mClientHasAccount(false),
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+  mpFileSystem(NULL),
+  mpTestHook(NULL)
+// If you change the initialisers, be sure to update
+// BackupStoreContext::ReceivedFinishCommand as well!
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::BackupStoreContext()
+//		Purpose: New constructor (for any type of BackupFileSystem)
+//		Created: 2015/11/02
+//
+// --------------------------------------------------------------------------
+BackupStoreContext::BackupStoreContext(BackupFileSystem& rFileSystem, int32_t ClientID,
+	HousekeepingInterface* pHousekeeping, const std::string& rConnectionDetails)
+: mClientID(ClientID),
+  mpHousekeeping(pHousekeeping),
+  mProtocolPhase(Phase_START),
+  mClientHasAccount(false),
+  mReadOnly(true),
+  mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+  mpFileSystem(&rFileSystem),
   mpTestHook(NULL)
 // If you change the initialisers, be sure to update
 // BackupStoreContext::ReceivedFinishCommand as well!
@@ -111,7 +136,8 @@ void BackupStoreContext::CleanUp()
 	if(mapStoreInfo.get() && !(mapStoreInfo->IsReadOnly()) &&
 		mapStoreInfo->IsModified())
 	{
-		mapFileSystem->PutBackupStoreInfo(*mapStoreInfo);
+		CHECK_FILESYSTEM_INITIALISED();
+		mpFileSystem->PutBackupStoreInfo(*mapStoreInfo);
 	}
 }
 
@@ -161,7 +187,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	CHECK_FILESYSTEM_INITIALISED();
 
 	// Request the lock
-	bool gotLock = mapFileSystem->TryGetLock();
+	bool gotLock = mpFileSystem->TryGetLock();
 
 	if(!gotLock && mpHousekeeping)
 	{
@@ -177,7 +203,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 		{
 			::sleep(1 /* second */);
 			--tries;
-			gotLock = mapFileSystem->TryGetLock();
+			gotLock = mpFileSystem->TryGetLock();
 
 		} while(!gotLock && tries > 0);
 	}
@@ -195,8 +221,12 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 void BackupStoreContext::SetClientHasAccount(const std::string &rStoreRoot,
 	int StoreDiscSet)
 {
+	// Check that the BackupStoreContext hasn't already been initialised, or already
+	// created its own BackupFileSystem.
+	ASSERT(!mpFileSystem);
 	mClientHasAccount = true;
-	mapFileSystem.reset(new RaidBackupFileSystem(rStoreRoot, StoreDiscSet));
+	mapOwnFileSystem.reset(new RaidBackupFileSystem(rStoreRoot, StoreDiscSet));
+	mpFileSystem = mapOwnFileSystem.get();
 }
 
 // --------------------------------------------------------------------------
@@ -217,7 +247,7 @@ void BackupStoreContext::LoadStoreInfo()
 	}
 
 	// Load it up!
-	std::auto_ptr<BackupStoreInfo> i = mapFileSystem->GetBackupStoreInfo(mClientID,
+	std::auto_ptr<BackupStoreInfo> i = mpFileSystem->GetBackupStoreInfo(mClientID,
 		mReadOnly);
 
 	// Check it
@@ -232,7 +262,7 @@ void BackupStoreContext::LoadStoreInfo()
 	// Try to load the reference count database
 	try
 	{
-		mapRefCount = mapFileSystem->GetRefCountDatabase(mClientID, mReadOnly);
+		mapRefCount = mpFileSystem->GetRefCountDatabase(mClientID, mReadOnly);
 	}
 	catch(BoxException &e)
 	{
@@ -276,7 +306,8 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 	}
 
 	// Want to save now
-	mapFileSystem->PutBackupStoreInfo(*mapStoreInfo);
+	CHECK_FILESYSTEM_INITIALISED();
+	mpFileSystem->PutBackupStoreInfo(*mapStoreInfo);
 
 	// Reset counter for next delayed save.
 	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
@@ -321,7 +352,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 			oldRevID = item->second->GetRevisionID();
 
 			// Check the revision ID of the file -- does it need refreshing?
-			if(!mapFileSystem->ObjectExists(ObjectID, &newRevID))
+			if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
 			{
 				THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
 			}
@@ -366,7 +397,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 
 	if(!gotRevID)
 	{
-		if(!mapFileSystem->ObjectExists(ObjectID, &newRevID))
+		if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
 		{
 			THROW_EXCEPTION(BackupStoreException, ObjectDoesNotExist);
 		}
@@ -389,7 +420,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 
 	// Read it from the stream, then set it's revision ID
 	std::auto_ptr<BackupStoreDirectory> apDir(new BackupStoreDirectory());
-	mapFileSystem->GetDirectory(ObjectID, *apDir);
+	mpFileSystem->GetDirectory(ObjectID, *apDir);
 
 	// Store in cache
 	mDirectoryCache[ObjectID] = apDir.release();
@@ -428,7 +459,7 @@ int64_t BackupStoreContext::AllocateObjectID()
 		int64_t id = mapStoreInfo->AllocateObjectID();
 
 		// Check it doesn't exist
-		if(!mapFileSystem->ObjectExists(id))
+		if(!mpFileSystem->ObjectExists(id))
 		{
 			// Success!
 			return id;
@@ -498,7 +529,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	// Diff or full file?
 	if(DiffFromFileID == 0)
 	{
-		apTransaction = mapFileSystem->PutFileComplete(id, rFile);
+		apTransaction = mpFileSystem->PutFileComplete(id, rFile);
 	}
 	else
 	{
@@ -509,7 +540,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 				DiffFromIDNotFoundInDirectory)
 		}
 
-		apTransaction = mapFileSystem->PutFilePatch(id, DiffFromFileID,
+		apTransaction = mpFileSystem->PutFilePatch(id, DiffFromFileID,
 			rFile);
 	}
 
@@ -863,7 +894,7 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 		// Write to disc, adjust size in store info
 		int64_t old_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 
-		mapFileSystem->PutDirectory(rDir);
+		mpFileSystem->PutDirectory(rDir);
 		int64_t new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 
 		{
@@ -971,7 +1002,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		emptyDir.SetAttributes(Attributes, AttributesModTime);
 
 		// Write...
-		mapFileSystem->PutDirectory(emptyDir);
+		mpFileSystem->PutDirectory(emptyDir);
 		dirSize = emptyDir.GetUserInfo1_SizeInBlocks();
 
 		// Exceeds the hard limit?
@@ -979,7 +1010,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 			dirSize;
 		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
 		{
-			mapFileSystem->DeleteDirectory(id);
+			mpFileSystem->DeleteDirectory(id);
 			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
 		}
 
@@ -1004,7 +1035,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	catch(...)
 	{
 		// Back out on adding that directory
-		mapFileSystem->DeleteDirectory(id);
+		mpFileSystem->DeleteDirectory(id);
 
 		// Remove this entry from the cache
 		RemoveDirectoryFromCache(InDirectory);
@@ -1350,7 +1381,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 	}
 
 	// We don't try to check this any more.
-	if (!mapFileSystem->ObjectExists(ObjectID))
+	if (!mpFileSystem->ObjectExists(ObjectID))
 	{
 		return false;
 	}
@@ -1360,8 +1391,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 	{
 		// Open the file. TODO FIXME: don't download the entire file from S3
 		// to read the first four bytes.
-		std::auto_ptr<IOStream> objectFile =
-			mapFileSystem->GetFile(ObjectID);
+		std::auto_ptr<IOStream> objectFile = mpFileSystem->GetFile(ObjectID);
 
 		// Read the first integer
 		u_int32_t magic;
@@ -1415,7 +1445,7 @@ std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 	// Attempt to open the file
 	try
 	{
-		return mapFileSystem->GetFile(ObjectID);
+		return mpFileSystem->GetFile(ObjectID);
 	}
 	catch(BackupStoreException &e)
 	{
@@ -1423,7 +1453,7 @@ std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 		{
 			// Try again as a directory (unlikely).
 			BackupStoreDirectory dir;
-			mapFileSystem->GetDirectory(ObjectID, dir);
+			mpFileSystem->GetDirectory(ObjectID, dir);
 			CollectInBufferStream* pStream = new CollectInBufferStream();
 			std::auto_ptr<IOStream> apStream(pStream);
 			dir.WriteToStream(*pStream);
@@ -1497,7 +1527,7 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 		}
 		while(en != 0 && id != 0);
 
-		stream = mapFileSystem->GetFilePatch(ObjectID, patchChain);
+		stream = mpFileSystem->GetFilePatch(ObjectID, patchChain);
 	}
 	else
 	{
