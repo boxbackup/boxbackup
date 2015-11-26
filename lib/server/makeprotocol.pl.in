@@ -887,6 +887,13 @@ __E
 private:
 	$context_class &mrContext;
 	std::auto_ptr<$message_base_class> mapLastReply;
+
+protected:
+	$context_class& GetContext()
+	{
+		return mrContext;
+	}
+
 public:
 	virtual std::auto_ptr<IOStream> ReceiveStream()
 	{
