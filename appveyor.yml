@@ -16,7 +16,7 @@ configuration:
   - Release
 
 environment:
-  - VisualStudioVersion: 10.0
+  VisualStudioVersion: 10.0
 
 build:
   parallel: true
