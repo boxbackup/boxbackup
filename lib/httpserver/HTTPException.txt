@@ -15,3 +15,8 @@ BadResponse				11
 ResponseReadFailed			12
 NoStreamConfigured			13
 RequestFailedUnexpectedly		14	The request was expected to succeed, but it failed.
+ContentLengthAlreadySet			15	Tried to send a request without content, but the Content-Length header is already set.
+WrongContentLength			16	There was too much or not enough data in the request content stream.
+ParameterNotFound			17	An expected parameter was not found in the request.
+DuplicateParameter			18	A parameter was unexpectedly duplicated in the request.
+AuthenticationFailed			19	The request could not be authenticated.
