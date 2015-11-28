@@ -19,3 +19,4 @@ ContentLengthAlreadySet			15	Tried to send a request without content, but the Co
 WrongContentLength			16	There was too much or not enough data in the request content stream.
 ParameterNotFound			17	An expected parameter was not found in the request.
 DuplicateParameter			18	A parameter was unexpectedly duplicated in the request.
+AuthenticationFailed			19	The request could not be authenticated.

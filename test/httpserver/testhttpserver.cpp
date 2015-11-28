@@ -436,8 +436,9 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("<html><head>"
 			"<title>Internal Server Error</title></head>\n"
 			"<h1>Internal Server Error</h1>\n"
-			"<p>An error, type Authentication Failed occured "
-			"when processing the request.</p>"
+			"<p>An error occurred while processing the request:</p>\n"
+			"<pre>HTTPException(AuthenticationFailed): "
+			"Authentication code mismatch</pre>\n"
 			"<p>Please try again later.</p></body>\n"
 			"</html>\n", response_data);
 	}

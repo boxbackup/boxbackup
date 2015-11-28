@@ -167,9 +167,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		if (!rRequest.GetHeader("authorization", &actualAuth) ||
 			actualAuth != expectedAuth)
 		{
-			rResponse.SetResponseCode(HTTPResponse::Code_Unauthorized);
-			SendInternalErrorResponse("Authentication Failed",
-				rResponse);
+			THROW_EXCEPTION_MESSAGE(HTTPException, AuthenticationFailed,
+				"Authentication code mismatch");
 		}
 		else if (rRequest.GetMethod() == HTTPRequest::Method_GET)
 		{
@@ -185,14 +184,27 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		}
 		else
 		{
-			rResponse.SetResponseCode(HTTPResponse::Code_MethodNotAllowed);
-			SendInternalErrorResponse("Unsupported Method",
-				rResponse);
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+				"Unsupported Amazon S3 Method");
 		}
 	}
-	catch (CommonException &ce)
+	catch (BoxException &ce)
 	{
 		SendInternalErrorResponse(ce.what(), rResponse);
+
+		// Override the default status code 500 for a few specific exceptions.
+		if(EXCEPTION_IS_TYPE(ce, CommonException, OSFileOpenError))
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
+		}
+		else if(EXCEPTION_IS_TYPE(ce, CommonException, AccessDenied))
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
+		}
+		else if(EXCEPTION_IS_TYPE(ce, HTTPException, AuthenticationFailed))
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_Unauthorized);
+		}
 	}
 	catch (std::exception &e)
 	{
@@ -252,22 +264,7 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 	path += rRequest.GetRequestURI();
 	std::auto_ptr<FileStream> apFile;
 
-	try
-	{
-		apFile.reset(new FileStream(path));
-	}
-	catch (CommonException &ce)
-	{
-		if (ce.GetSubType() == CommonException::OSFileOpenError)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
-		}
-		else if (ce.GetSubType() == CommonException::AccessDenied)
-		{
-			rResponse.SetResponseCode(HTTPResponse::Code_Forbidden);
-		}
-		throw;
-	}
+	apFile.reset(new FileStream(path));
 
 	if(IncludeContent)
 	{

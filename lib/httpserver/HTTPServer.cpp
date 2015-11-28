@@ -214,17 +214,16 @@ void HTTPServer::SendInternalErrorResponse(const std::string& rErrorMsg,
 {
 	#define ERROR_HTML_1 "<html><head><title>Internal Server Error</title></head>\n" \
 			"<h1>Internal Server Error</h1>\n" \
-			"<p>An error, type "
-	#define ERROR_HTML_2 " occured when processing the request.</p>" \
-			"<p>Please try again later.</p>" \
+			"<p>An error occurred while processing the request:</p>\n<pre>"
+	#define ERROR_HTML_2 "</pre>\n<p>Please try again later.</p>" \
 			"</body>\n</html>\n"
 
 	// Generate the error page
-	// rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
+	rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
 	rResponse.SetContentType("text/html");
-	rResponse.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
-	rResponse.IOStream::Write(rErrorMsg);
-	rResponse.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
+	rResponse.Write(ERROR_HTML_1);
+	rResponse.Write(rErrorMsg);
+	rResponse.Write(ERROR_HTML_2);
 }
 
 
