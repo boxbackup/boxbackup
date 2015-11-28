@@ -180,7 +180,7 @@ void HTTPHeaders::AddHeader(const std::string& rName, const std::string& value)
 //		Created: 2015-08-22
 //
 // --------------------------------------------------------------------------
-void HTTPHeaders::WriteTo(IOStream& rOutput, int Timeout)
+void HTTPHeaders::WriteTo(IOStream& rOutput, int Timeout) const
 {
 	std::ostringstream oss;
 
@@ -196,14 +196,7 @@ void HTTPHeaders::WriteTo(IOStream& rOutput, int Timeout)
 
 	if (mHostName != "")
 	{
-		if (mHostPort != 80)
-		{
-			oss << "Host: " << mHostName << ":" << mHostPort << "\r\n";
-		}
-		else
-		{
-			oss << "Host: " << mHostName << "\r\n";
-		}
+		oss << "Host: " << GetHostNameWithPort() << "\r\n";
 	}
 
 	if (mKeepAlive)
@@ -215,12 +208,27 @@ void HTTPHeaders::WriteTo(IOStream& rOutput, int Timeout)
 		oss << "Connection: close\r\n";
 	}
 
-	for (std::vector<Header>::iterator i = mExtraHeaders.begin();
+	for (std::vector<Header>::const_iterator i = mExtraHeaders.begin();
 		i != mExtraHeaders.end(); i++)
 	{
 		oss << i->first << ": " << i->second << "\r\n";
 	}
 
 	rOutput.Write(oss.str(), Timeout);
+}
+
+std::string HTTPHeaders::GetHostNameWithPort() const
+{
+
+	if (mHostPort != 80)
+	{
+		std::ostringstream oss;
+		oss << mHostName << ":" << mHostPort;
+		return oss.str();
+	}
+	else
+	{
+		return mHostName;
+	}
 }
 

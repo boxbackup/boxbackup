@@ -221,7 +221,7 @@ int test(int argc, const char *argv[])
 		// be unknown in the received stream too (certainly before it has all
 		// been read!)
 		TEST_EQUAL(-1, request2.GetContentLength());
-		HTTPHeaders& headers(request2.GetHeaders());
+		const HTTPHeaders& headers(request2.GetHeaders());
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT",
 			headers.GetHeaderValue("Date"));
 		TEST_EQUAL("AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=",

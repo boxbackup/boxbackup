@@ -144,7 +144,7 @@ public:
 	{
 		mHeaders.AddHeader(rName, rValue);
 	}
-	HTTPHeaders& GetHeaders() { return mHeaders; }
+	const HTTPHeaders& GetHeaders() const { return mHeaders; }
 
 	// --------------------------------------------------------------------------
 	//

@@ -40,7 +40,7 @@ public:
 	void ReadFromStream(IOStreamGetLine &rGetLine, int Timeout);
 	void ParseHeaderLine(const std::string& line);
 	void AddHeader(const std::string& name, const std::string& value);
-	void WriteTo(IOStream& rOutput, int Timeout);
+	void WriteTo(IOStream& rOutput, int Timeout) const;
 	typedef std::pair<std::string, std::string> Header;
 	bool GetHeader(const std::string& name, std::string* pValueOut) const
 	{
@@ -89,6 +89,7 @@ public:
 	int64_t GetContentLength() const { return mContentLength; }
 	const std::string &GetHostName() const {return mHostName;}
 	const int GetHostPort() const {return mHostPort;}
+	std::string GetHostNameWithPort() const;
 	void SetHostName(const std::string& rHostName)
 	{
 		AddHeader("host", rHostName);
