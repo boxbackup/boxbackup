@@ -160,12 +160,13 @@ for(my $e = 0; $e <= $#exception; $e++)
 {
 	if($exception[$e] ne '')
 	{
-		print CPP "\t\tcase ".$exception[$e].': return "'.$exception[$e].'";'."\n";
+		print CPP "\t\tcase ".$exception[$e].': return "'.$class.'Exception'.
+			'('.$exception[$e].')";'."\n";
 	}
 }
 
 print CPP <<__E;
-		default: return "Unknown";
+		default: return "${class}Exception(Unknown)";
 	}
 }
 __E

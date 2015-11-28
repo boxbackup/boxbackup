@@ -42,6 +42,11 @@ public:
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	virtual void Write(const std::string& rBuffer,
+		int Timeout = IOStream::TimeOutInfinite)
+	{
+		IOStream::Write(rBuffer, Timeout);
+	}
 	virtual pos_type GetPosition() const;
 	virtual void Seek(pos_type Offset, int SeekType);
 	virtual bool StreamDataLeft();
