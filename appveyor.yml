@@ -23,9 +23,9 @@ build:
   project: infrastructure/msvc/2010/boxbackup.sln
 
 install:
-  - cinst: strawberryperl
-  - cinst: svn
-  - cinst: 7zip.commandline
+  - cinst strawberryperl
+  - cinst svn
+  - cinst 7zip.commandline
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-1.0.2d.tar.gz'
   - 7za x openssl-1.0.2d.tar.gz
