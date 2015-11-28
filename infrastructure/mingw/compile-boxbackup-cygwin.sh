@@ -8,7 +8,8 @@ wget -c https://cygwin.com/setup-x86_64.exe \
 
 ./setup-x86_64.exe --quiet-mode --packages \
 	"autoconf,automake,gdb,make,mingw64-x86_64-gcc,mingw64-x86_64-gcc-g++,
-	,mingw64-x86_64-zlib,libxml2,libxslt,perl,subversion,unzip,vim,wget"
+	,mingw64-x86_64-zlib,libxml2,libxslt,perl,subversion,unzip,vim,wget,
+	,perl-libwww-perl"
 
 install_prefix=/usr/x86_64-w64-mingw32
 compiler_prefix=x86_64-w64-mingw32
