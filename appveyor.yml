@@ -1,0 +1,43 @@
+version: 1.0.{build}-{branch}
+
+clone_depth: 1
+
+# Do not build on tags (GitHub only)
+skip_tags: true
+
+os: Windows Server 2012
+
+platform:
+  - x86
+  - x64
+
+configuration:
+  - Debug
+  - Release
+
+environment:
+  - VisualStudioVersion: 10.0
+
+build:
+  parallel: true
+  project: infrastructure/msvc/2010/boxbackup.sln
+
+install:
+  - cinst: strawberryperl
+  - cinst: svn
+  - cinst: 7zip.commandline
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: (new-object net.webclient).DownloadFile('https://www.openssl.org/source/openssl-1.0.2d.tar.gz', 'openssl-1.0.2d.tar.gz')
+  - 7za x openssl-1.0.2d.tar.gz
+  - cd openssl-1.0.2d
+  - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl
+  - ms\do_ms
+  - nmake -f ms\nt.mak
+  - nmake -f ms\nt.mak install
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: (new-object net.webclient).DownloadFile('http://zlib.net/zlib128-dll.zip', 'zlib128-dll.zip')
+  - 7za x zlib128-dll.zip
+
+test_script:
+  - perl runtest.pl
+
