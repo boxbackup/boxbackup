@@ -54,6 +54,7 @@ install:
   - cmake pcre
   - cd %APPVEYOR_BUILD_FOLDER%
   - dir
+  - infrastructure\msvc\win32.bat
 
 test_script:
   - perl runtest.pl
