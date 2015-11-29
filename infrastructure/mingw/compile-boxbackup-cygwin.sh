@@ -3,6 +3,9 @@
 set -e
 set -x
 
+basedir=`cd $(dirname $0)/../../.. && pwd`
+cd $basedir
+
 wget -c https://cygwin.com/setup-x86_64.exe \
 || powershell wget https://cygwin.com/setup-x86_64.exe -UseBasicParsing -outfile setup-x86_64.exe
 
