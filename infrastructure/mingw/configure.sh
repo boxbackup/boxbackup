@@ -35,7 +35,7 @@ if ! ./configure "$@" --host=$target \
 	--with-ssl-lib="${DEP_PATH}/lib" \
 	CFLAGS="-mthreads" \
 	CXXFLAGS="-mthreads" \
-	LDFLAGS="-Wl,-Bstatic -mthreads -L${LIBZ_PATH}"
+	LDFLAGS="-Wl,-Bstatic -mthreads -L${LIBZ_PATH} -lgdi32"
 then
 	echo "Error: configure failed, aborting." >&2
 	exit 1
