@@ -27,6 +27,7 @@ install:
   - cinst svn
   - cinst 7zip.commandline
   - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: [Net.ServicePointManager]::SecurityProtocol = 'Tls12'
   - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-1.0.2d.tar.gz'
   - 7za x openssl-1.0.2d.tar.gz
   - cd openssl-1.0.2d
