@@ -49,7 +49,7 @@ install:
   - cinst cmake
   - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
   - 7za x pcre-8.38.zip
-  - cd %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
+  - cd %APPVEYOR_BUILD_FOLDER%\..
   - rename pcre-8.38 pcre
   - cmake pcre
   - cd %APPVEYOR_BUILD_FOLDER%
