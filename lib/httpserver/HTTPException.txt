@@ -20,3 +20,6 @@ WrongContentLength			16	There was too much or not enough data in the request con
 ParameterNotFound			17	An expected parameter was not found in the request.
 DuplicateParameter			18	A parameter was unexpectedly duplicated in the request.
 AuthenticationFailed			19	The request could not be authenticated.
+S3SimulatorError			20	An unspecified error occurred in the S3Simulator.
+ConditionalPutConflict			21	Conditional PutAttributes request failed because the current attribute values did not match.
+ConditionalPutNotFound			22	Conditional PutAttributes request failed because the expected attribute values were not found.

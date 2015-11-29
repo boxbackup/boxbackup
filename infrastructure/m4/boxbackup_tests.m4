@@ -184,6 +184,10 @@ else
   have_regex_support=no
 fi
 
+# Check for Boost PropertyTree (XML and JSON support for lib/httpserver)
+AC_CHECK_HEADER([boost/property_tree/ptree.hpp],,
+	[AC_MSG_ERROR([[cannot find Boost::PropertyTree, try installing libboost-dev]])])
+
 ### Checks for typedefs, structures, and compiler characteristics.
 
 AC_CHECK_TYPES([u_int8_t, u_int16_t, u_int32_t, u_int64_t])

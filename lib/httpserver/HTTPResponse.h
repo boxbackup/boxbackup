@@ -91,6 +91,7 @@ public:
 		Code_Unauthorized = 401,
 		Code_Forbidden = 403,
 		Code_NotFound = 404,
+		Code_Conflict = 409,
 		Code_InternalServerError = 500,
 		Code_NotImplemented = 501
 	};
@@ -131,6 +132,16 @@ public:
 	{
 		CollectInBufferStream::SetForReading();
 		mHeaders.SetContentLength(GetSize());
+	}
+
+	// Clear all state for reading again
+	void Reset()
+	{
+		CollectInBufferStream::Reset();
+		mHeaders = HTTPHeaders();
+		mResponseCode = HTTPResponse::Code_NoContent;
+		mResponseIsDynamicContent = true;
+		mpStreamToSendTo = NULL;
 	}
 
 private:

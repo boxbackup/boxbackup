@@ -114,6 +114,7 @@ const char *HTTPResponse::ResponseCodeToString(int ResponseCode)
 	case Code_Unauthorized: return "401 Unauthorized"; break;
 	case Code_Forbidden: return "403 Forbidden"; break;
 	case Code_NotFound: return "404 Not Found"; break;
+	case Code_Conflict: return "409 Conflict"; break;
 	case Code_InternalServerError: return "500 Internal Server Error"; break;
 	case Code_NotImplemented: return "501 Not Implemented"; break;
 	default:

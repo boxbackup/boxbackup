@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 
@@ -18,6 +19,10 @@
 	#include <signal.h>
 #endif
 
+#include <boost/foreach.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+#include <openssl/x509.h>
 #include <openssl/hmac.h>
 
 #include "autogen_HTTPException.h"
@@ -37,6 +42,8 @@
 
 #define SHORT_TIMEOUT 5000
 #define LONG_TIMEOUT 300000
+
+using boost::property_tree::ptree;
 
 class TestWebServer : public HTTPServer
 {
@@ -166,6 +173,230 @@ bool exercise_s3client(S3Client& client)
 	return success;
 }
 
+// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+std::string generate_query_string(const HTTPRequest& request)
+{
+	std::vector<std::string> param_names;
+	std::map<std::string, std::string> param_values;
+
+	const HTTPRequest::Query_t& params(request.GetQuery());
+	for(HTTPRequest::Query_t::const_iterator i = params.begin();
+		i != params.end(); i++)
+	{
+		// We don't want to include the Signature parameter in the sorted query
+		// string, because the client didn't either when computing the signature!
+		if(i->first != "Signature")
+		{
+			param_names.push_back(i->first);
+			// This algorithm only supports non-repeated parameters, so
+			// assert that we don't already have a parameter with this name.
+			TEST_LINE_OR(param_values.find(i->first) == param_values.end(),
+				"Multiple values for parameter '" << i->first << "'",
+				return "");
+			param_values[i->first] = i->second;
+		}
+	}
+
+	std::sort(param_names.begin(), param_names.end());
+	std::ostringstream out;
+
+	for(std::vector<std::string>::iterator i = param_names.begin();
+		i != param_names.end(); i++)
+	{
+		if(i != param_names.begin())
+		{
+			out << "&";
+		}
+		out << HTTPQueryDecoder::URLEncode(*i) << "=" <<
+			HTTPQueryDecoder::URLEncode(param_values[*i]);
+	}
+
+	return out.str();
+}
+
+// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+std::string calculate_simpledb_signature(const HTTPRequest& request,
+	const std::string& aws_secret_access_key)
+{
+	// This code is very similar to that in S3Client::FinishAndSendRequest,
+	// but using EVP_sha256 instead of EVP_sha1. TODO FIXME: factor out the
+	// common parts.
+	std::string query_string = generate_query_string(request);
+	TEST_THAT_OR(query_string != "", return "");
+
+	std::ostringstream buffer_to_sign;
+	buffer_to_sign << request.GetMethodName() << "\n" <<
+		request.GetHeaders().GetHostNameWithPort() << "\n" <<
+		// The HTTPRequestURI component is the HTTP absolute path component
+		// of the URI up to, but not including, the query string. If the 
+		// HTTPRequestURI is empty, use a forward slash ( / ).
+		request.GetRequestURI() << "\n" <<
+		query_string;
+
+	// Thanks to https://gist.github.com/tsupo/112188:
+	unsigned int digest_size;
+	unsigned char digest_buffer[EVP_MAX_MD_SIZE];
+	std::string string_to_sign = buffer_to_sign.str();
+
+	HMAC(EVP_sha256(),
+		aws_secret_access_key.c_str(), aws_secret_access_key.size(),
+		(const unsigned char *)string_to_sign.c_str(), string_to_sign.size(),
+		digest_buffer, &digest_size);
+
+	base64::encoder encoder;
+	std::string digest((const char *)digest_buffer, digest_size);
+	std::string auth_code = encoder.encode(digest);
+
+	if (auth_code[auth_code.size() - 1] == '\n')
+	{
+		auth_code = auth_code.substr(0, auth_code.size() - 1);
+	}
+
+	return auth_code;
+}
+
+bool add_simpledb_signature(HTTPRequest& request, const std::string& aws_secret_access_key)
+{
+	std::string signature = calculate_simpledb_signature(request,
+		aws_secret_access_key);
+	request.SetParameter("Signature", signature);
+	return !signature.empty();
+}
+
+bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
+	int expected_status_code = 200)
+{
+	SocketStream sock;
+	sock.Open(Socket::TypeINET, "localhost", 1080);
+	TEST_THAT(request.Send(sock, LONG_TIMEOUT));
+
+	response.Reset();
+	response.Receive(sock, LONG_TIMEOUT);
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	TEST_EQUAL_LINE(expected_status_code, response.GetResponseCode(),
+		response_data);
+	return (response.GetResponseCode() == expected_status_code);
+}
+
+bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
+	const std::string& expected_root_element)
+{
+	HTTPResponse response;
+	TEST_THAT_OR(send_and_receive(request, response), return false);
+
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	std::auto_ptr<std::istringstream> ap_response_stream(
+		new std::istringstream(response_data));
+	read_xml(*ap_response_stream, response_tree,
+		boost::property_tree::xml_parser::trim_whitespace);
+
+	TEST_EQUAL_OR(expected_root_element, response_tree.begin()->first, return false);
+	TEST_LINE(++(response_tree.begin()) == response_tree.end(),
+		"There should only be one item in the response tree root");
+
+	return true;
+}
+
+std::vector<std::string> simpledb_list_domains(const std::string& access_key,
+	const std::string& secret_key)
+{
+	HTTPRequest request(HTTPRequest::Method_GET, "/");
+	request.SetHostName("sdb.eu-west-1.amazonaws.com");
+	request.AddParameter("Action", "ListDomains");
+	request.AddParameter("AWSAccessKeyId", access_key);
+	request.AddParameter("SignatureVersion", "2");
+	request.AddParameter("SignatureMethod", "HmacSHA256");
+	request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
+	request.AddParameter("Version", "2009-04-15");
+
+	TEST_THAT_OR(add_simpledb_signature(request, secret_key),
+		return std::vector<std::string>());
+
+	ptree response_tree;
+	TEST_THAT(send_and_receive_xml(request, response_tree, "ListDomainsResponse"));
+
+	std::vector<std::string> domains;
+	BOOST_FOREACH(ptree::value_type &v,
+		response_tree.get_child("ListDomainsResponse.ListDomainsResult"))
+	{
+		domains.push_back(v.second.data());
+	}
+
+	return domains;
+}
+
+bool simpledb_get_attributes(const std::string& access_key, const std::string& secret_key,
+	const std::multimap<std::string, std::string> const_attributes)
+{
+	HTTPRequest request(HTTPRequest::Method_GET, "/");
+	request.SetHostName("sdb.eu-west-1.amazonaws.com");
+	request.AddParameter("Action", "GetAttributes");
+	request.AddParameter("DomainName", "MyDomain");
+	request.AddParameter("ItemName", "JumboFez");
+	request.AddParameter("AWSAccessKeyId", access_key);
+	request.AddParameter("SignatureVersion", "2");
+	request.AddParameter("SignatureMethod", "HmacSHA256");
+	request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
+	request.AddParameter("Version", "2009-04-15");
+	TEST_THAT_OR(add_simpledb_signature(request, secret_key), return false);
+
+	ptree response_tree;
+	TEST_THAT(send_and_receive_xml(request, response_tree,
+		"GetAttributesResponse"));
+
+	// Check that all attributes were written correctly
+	std::multimap<std::string, std::string> attributes = const_attributes;
+	TEST_EQUAL_LINE(const_attributes.size(),
+		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size(),
+		"Wrong number of attributes in response");
+
+	bool all_match = (const_attributes.size() ==
+		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size());
+
+	std::multimap<std::string, std::string>::iterator i = attributes.begin();
+	BOOST_FOREACH(ptree::value_type &v,
+		response_tree.get_child(
+			"GetAttributesResponse.GetAttributesResult"))
+	{
+		std::string name = v.second.get<std::string>("Name");
+		std::string value = v.second.get<std::string>("Value");
+		if(i == attributes.end())
+		{
+			TEST_EQUAL_LINE("", name, "Unexpected attribute name");
+			TEST_EQUAL_LINE("", value, "Unexpected attribute value");
+			all_match = false;
+		}
+		else
+		{
+			TEST_EQUAL_LINE(i->first, name, "Wrong attribute name");
+			TEST_EQUAL_LINE(i->second, value, "Wrong attribute value");
+			all_match &= (i->first == name);
+			all_match &= (i->second == value);
+			i++;
+		}
+	}
+
+	return all_match;
+}
+
+bool compare_lists(const std::vector<std::string>& expected_items,
+	const std::vector<std::string>& actual_items)
+{
+	bool all_match = (expected_items.size() == actual_items.size());
+
+	for(size_t i = 0; i < std::max(expected_items.size(), actual_items.size()); i++)
+	{
+		const std::string& expected = (i < expected_items.size()) ? expected_items[i] : "None";
+		const std::string& actual   = (i < actual_items.size())   ? actual_items[i]   : "None";
+		TEST_EQUAL_LINE(expected, actual, "Item " << i);
+		all_match &= (expected == actual);
+	}
+
+	return all_match;
+}
+
 int test(int argc, const char *argv[])
 {
 	if(argc >= 2 && ::strcmp(argv[1], "server") == 0)
@@ -182,7 +413,8 @@ int test(int argc, const char *argv[])
 		return server.Main("doesnotexist", argc - 1, argv + 1);
 	}
 
-	TEST_THAT(system("rm -rf *.memleaks") == 0);
+	TEST_THAT(system("rm -rf *.memleaks testfiles/domains.qdbm testfiles/items.qdbm")
+		== 0);
 
 	// Test that HTTPRequest can be written to and read from a stream.
 	{
@@ -287,11 +519,11 @@ int test(int argc, const char *argv[])
 	// Run the request script
 	TEST_THAT(::system("perl testfiles/testrequests.pl") == 0);
 
-#ifdef ENABLE_KEEPALIVE_SUPPORT // incomplete, need chunked encoding support
 	#ifndef WIN32
 	signal(SIGPIPE, SIG_IGN);
 	#endif
 
+#ifdef ENABLE_KEEPALIVE_SUPPORT // incomplete, need chunked encoding support
 	SocketStream sock;
 	sock.Open(Socket::TypeINET, "localhost", 1080);
 
@@ -497,37 +729,25 @@ int test(int argc, const char *argv[])
 
 	// This is the example from the Amazon S3 Developers Guide, page 31
 	{
-		SocketStream sock;
-		sock.Open(Socket::TypeINET, "localhost", 1080);
-
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
 		request.SetHostName("johnsmith.s3.amazonaws.com");
 		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
 		request.AddHeader("authorization",
 			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
-		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock, SHORT_TIMEOUT);
-		std::string value;
-		TEST_EQUAL(200, response.GetResponseCode());
+		TEST_THAT(send_and_receive(request, response));
 	}
 
 	{
-		SocketStream sock;
-		sock.Open(Socket::TypeINET, "localhost", 1080);
-
 		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:0cSX/YPdtXua1aFFpYmH1tc0ajA=");
 		request.SetClientKeepAliveRequested(true);
-		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock, SHORT_TIMEOUT);
-		std::string value;
-		TEST_EQUAL(404, response.GetResponseCode());
+		TEST_THAT(send_and_receive(request, response, 404));
 		TEST_THAT(!response.IsKeepAlive());
 	}
 
@@ -535,9 +755,6 @@ int test(int argc, const char *argv[])
 	// Make file inaccessible, should cause server to return a 403 error,
 	// unless of course the test is run as root :)
 	{
-		SocketStream sock;
-		sock.Open(Socket::TypeINET, "localhost", 1080);
-
 		TEST_THAT(chmod("testfiles/testrequests.pl", 0) == 0);
 		HTTPRequest request(HTTPRequest::Method_GET,
 			"/testrequests.pl");
@@ -545,33 +762,26 @@ int test(int argc, const char *argv[])
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
 		request.SetClientKeepAliveRequested(true);
-		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock, SHORT_TIMEOUT);
-		std::string value;
-		TEST_EQUAL(403, response.GetResponseCode());
+		TEST_THAT(send_and_receive(request, response, 403));
 		TEST_THAT(chmod("testfiles/testrequests.pl", 0755) == 0);
 	}
 	#endif
 
 	{
-		SocketStream sock;
-		sock.Open(Socket::TypeINET, "localhost", 1080);
-
 		HTTPRequest request(HTTPRequest::Method_GET,
 			"/testrequests.pl");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
 		request.SetClientKeepAliveRequested(true);
-		request.Send(sock, SHORT_TIMEOUT);
 
 		HTTPResponse response;
-		response.Receive(sock, SHORT_TIMEOUT);
-		std::string value;
-		TEST_EQUAL(200, response.GetResponseCode());
-		TEST_EQUAL("qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY", response.GetHeaderValue("x-amz-id-2"));
+		TEST_THAT(send_and_receive(request, response));
+
+		TEST_EQUAL("qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY",
+			response.GetHeaderValue("x-amz-id-2"));
 		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
 		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
@@ -625,6 +835,138 @@ int test(int argc, const char *argv[])
 	TEST_EQUAL("AZaz09-_.~", HTTPQueryDecoder::URLEncode("AZaz09-_.~"));
 	TEST_EQUAL("%00%01%FF",
 		HTTPQueryDecoder::URLEncode(std::string("\0\x01\xff", 3)));
+
+	// Test that we can calculate the correct signature for a known request:
+	// http://docs.aws.amazon.com/AWSECommerceService/latest/DG/rest-signature.html
+	{
+		HTTPRequest request(HTTPRequest::Method_GET, "/onca/xml");
+		request.SetHostName("webservices.amazon.com");
+		request.AddParameter("Service", "AWSECommerceService");
+		request.AddParameter("AWSAccessKeyId", "AKIAIOSFODNN7EXAMPLE");
+		request.AddParameter("AssociateTag", "mytag-20");
+		request.AddParameter("Operation", "ItemLookup");
+		request.AddParameter("ItemId", "0679722769");
+		request.AddParameter("ResponseGroup",
+			"Images,ItemAttributes,Offers,Reviews");
+		request.AddParameter("Version", "2013-08-01");
+		request.AddParameter("Timestamp", "2014-08-18T12:00:00Z");
+
+		std::string auth_code = calculate_simpledb_signature(request,
+			"1234567890");
+		TEST_EQUAL("j7bZM0LXZ9eXeZruTqWm2DIvDYVUU3wxPPpp+iXxzQc=", auth_code);
+	}
+
+	// Test the S3Simulator's implementation of SimpleDB
+	{
+		std::string access_key = "0PN5J17HBGZHT7JJ3X82";
+		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
+
+		HTTPRequest request(HTTPRequest::Method_GET, "/");
+		request.SetHostName("sdb.eu-west-1.amazonaws.com");
+		request.AddParameter("Action", "ListDomains");
+		request.AddParameter("AWSAccessKeyId", access_key);
+		request.AddParameter("SignatureVersion", "2");
+		request.AddParameter("SignatureMethod", "HmacSHA256");
+		request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
+		request.AddParameter("Version", "2009-04-15");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+
+		// Send directly to in-process simulator, useful for debugging.
+		// CollectInBufferStream response_buffer;
+		// HTTPResponse response(&response_buffer);
+		HTTPResponse response;
+
+		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
+		simulator.Handle(request, response);
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
+		TEST_EQUAL_LINE(200, response.GetResponseCode(), response_data);
+
+		// Send to out-of-process simulator, useful for testing HTTP
+		// implementation.
+		TEST_THAT(send_and_receive(request, response));
+
+		// Check that there are no existing domains at the start
+		std::vector<std::string> domains = simpledb_list_domains(access_key, secret_key);
+		std::vector<std::string> expected_domains;
+		TEST_THAT(compare_lists(expected_domains, domains));
+
+		// Create a domain
+		request.SetParameter("Action", "CreateDomain");
+		request.SetParameter("DomainName", "MyDomain");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+
+		ptree response_tree;
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"CreateDomainResponse"));
+
+		// List domains again, check that our new domain is present.
+		domains = simpledb_list_domains(access_key, secret_key);
+		expected_domains.push_back("MyDomain");
+		TEST_THAT(compare_lists(expected_domains, domains));
+
+		// Create an item
+		request.SetParameter("Action", "PutAttributes");
+		request.SetParameter("DomainName", "MyDomain");
+		request.SetParameter("ItemName", "JumboFez");
+		request.SetParameter("Attribute.1.Name", "Color");
+		request.SetParameter("Attribute.1.Value", "Blue");
+		request.SetParameter("Attribute.2.Name", "Size");
+		request.SetParameter("Attribute.2.Value", "Med");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// Get the item back, and check that all attributes were written
+		// correctly.
+		std::multimap<std::string, std::string> expected_attrs;
+		typedef std::multimap<std::string, std::string>::value_type attr_t;
+		expected_attrs.insert(attr_t("Color", "Blue"));
+		expected_attrs.insert(attr_t("Size", "Med"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Add more attributes. The Size attribute is added with the Replace
+		// option, so it replaces the previous value. The Color attribute is not,
+		// so it adds another value.
+		request.SetParameter("Attribute.1.Value", "Not Blue");
+		request.SetParameter("Attribute.1.Replace", "true");
+		request.SetParameter("Attribute.2.Value", "Large");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// Check that all attributes were written correctly, by getting the item
+		// again.
+		expected_attrs.erase("Color");
+		expected_attrs.insert(attr_t("Color", "Not Blue"));
+		expected_attrs.insert(attr_t("Size", "Large"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional PutAttributes that fails (doesn't match) and therefore
+		// doesn't change anything.
+		request.SetParameter("Attribute.1.Value", "Green");
+		request.SetParameter("Attribute.2.Replace", "true");
+		request.SetParameter("Expected.1.Name", "Color");
+		request.SetParameter("Expected.1.Value", "What?");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive(request, response, HTTPResponse::Code_Conflict));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional PutAttributes again, with the correct value for the Color
+		// attribute this time, so the request should succeed.
+		request.SetParameter("Expected.1.Value", "Not Blue");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// If it does, because Replace is set for the Size parameter as well, both
+		// Size values will be replaced by the new single value.
+		expected_attrs.clear();
+		expected_attrs.insert(attr_t("Color", "Green"));
+		expected_attrs.insert(attr_t("Size", "Large"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+	}
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",

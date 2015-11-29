@@ -19,6 +19,7 @@ addons:
       - libwww-perl
       - xsltproc
       - zlib1g-dev
+      - libboost-dev
 
 before_script:
   - ccache -s
