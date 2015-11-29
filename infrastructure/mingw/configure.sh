@@ -36,7 +36,7 @@ if ! ./configure "$@" --host=$target \
 	CFLAGS="-mthreads" \
 	CXXFLAGS="-mthreads" \
 	LDFLAGS="-Wl,-Bstatic -mthreads -L${LIBZ_PATH}" \
-	LIBS="-lgdi32"
+	LIBS="-lws2_32 -lgdi32"
 then
 	echo "Error: configure failed, aborting." >&2
 	exit 1
