@@ -41,7 +41,16 @@ install:
   - nmake -f ms\nt.mak install
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload 'http://zlib.net/zlib128-dll.zip'
-  - 7za x zlib128-dll.zip
+  - mkdir %APPVEYOR_BUILD_FOLDER%\..\zlib
+  - cd %APPVEYOR_BUILD_FOLDER%\..\zlib
+  - 7za x %APPVEYOR_BUILD_FOLDER%\..\zlib128-dll.zip
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - cinst cmake
+  - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
+  - 7za x pcre-8.38.zip
+  - cd %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
+  - rename pcre-8.38 pcre
+  - cmake pcre
   - cd %APPVEYOR_BUILD_FOLDER%
   - dir
 
