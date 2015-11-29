@@ -24,7 +24,6 @@ build:
 
 install:
   - cinst strawberryperl
-  - cinst svn
   - cinst 7zip.commandline
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - "ps: [Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
