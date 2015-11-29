@@ -29,7 +29,7 @@ install:
   - dir "C:\Program Files\Microsoft SDKs\Windows"
   - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1"
   - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin"
-  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
+  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
   - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-1.0.2d.tar.gz'
