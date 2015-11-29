@@ -29,6 +29,7 @@ install:
   - ps: "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
   - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-1.0.2d.tar.gz'
   - 7za x openssl-1.0.2d.tar.gz
+  - 7za x openssl-1.0.2d.tar
   - cd openssl-1.0.2d
   - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl
   - ms\do_ms
