@@ -38,8 +38,8 @@ install:
   - cd openssl-1.0.2d
   - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl
   - ms\do_ms
-  - nmake /c /f ms\nt.mak
-  - nmake /c /f ms\nt.mak install
+  - nmake /s /f ms\nt.mak
+  - nmake /s /f ms\nt.mak install
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload 'http://zlib.net/zlib128-dll.zip'
   - mkdir %APPVEYOR_BUILD_FOLDER%\..\zlib
