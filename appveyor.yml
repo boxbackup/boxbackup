@@ -52,7 +52,7 @@ install:
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - rename pcre-8.38 pcre
   - cd pcre
-  - cmake
+  - cmake .
   - dir
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - dir
