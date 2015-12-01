@@ -20,9 +20,9 @@ environment:
   VisualStudioVersion: 10.0
 
 cache:
-  - %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
-  - %APPVEYOR_BUILD_FOLDER%\..\openssl-1.0.2d
-  - %APPVEYOR_BUILD_FOLDER%\%PLATFORM%
+  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%'
+  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-1.0.2d'
+  - '%APPVEYOR_BUILD_FOLDER%\%PLATFORM%'
 
 build:
   parallel: true
