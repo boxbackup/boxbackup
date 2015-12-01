@@ -21,7 +21,7 @@ environment:
 
 build:
   parallel: true
-  project: ..\pcre\pcre.sln infrastructure/msvc/2010/boxbackup.sln
+  project: infrastructure/msvc/2010/boxbackup.sln
 
 install:
   - cinst strawberryperl
@@ -54,6 +54,7 @@ install:
   - cd pcre
   - cmake .
   - dir
+  - msbuild PCRE.sln /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - dir
   - cd %APPVEYOR_BUILD_FOLDER%
