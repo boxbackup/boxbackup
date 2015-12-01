@@ -181,7 +181,6 @@ int main(int argc, const char *argv[])
 		int blocksize = control.BlockSizeOfDiscSet(discnum);
 		softlimit = control.SizeStringToBlocks(argv[3], blocksize);
 		hardlimit = control.SizeStringToBlocks(argv[4], blocksize);
-        std::cout<<"nb "<<argc<<std::endl;
         versionslimit= argc>5 ? atoi(argv[5]) : 0;
 		control.CheckSoftHardLimits(softlimit, hardlimit);
 	
