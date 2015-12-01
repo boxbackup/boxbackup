@@ -49,7 +49,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupstore;$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\pcre;$(ProjectDir)..\..\..\..\openssl-$(Platform)\include;$(ProjectDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\backupstore;$(ProjectDir)..\..\..\lib\backupclient;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\pcre-$(Platform)\include;$(ProjectDir)..\..\..\..\openssl-$(Platform)\include;$(ProjectDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
