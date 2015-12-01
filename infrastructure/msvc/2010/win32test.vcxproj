@@ -79,7 +79,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\out32dll\libeay32.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\out32dll\ssleay32.lib;$(ProjectDir)..\..\..\Release\common.lib;$(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcreposix.lib;$(ProjectDir)..\..\..\..\pcre\bin\release\lib_pcre.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\out32dll\libeay32.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\out32dll\ssleay32.lib;$(ProjectDir)..\..\..\Release\common.lib;$(ProjectDir)..\..\..\..\pcre-$(Platform)\lib\pcreposixd.lib;$(ProjectDir)..\..\..\..\pcre-$(Platform)\lib\pcred.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)win32test.exe</OutputFile>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
