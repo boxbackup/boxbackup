@@ -57,7 +57,7 @@ install:
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - rename pcre-8.38 pcre
   - cd pcre
-  - cmake .
+  - cmake . -G "Visual Studio %VisualStudioVersion%" -A %PLATFORM%
   - dir
   - msbuild PCRE.sln /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - cd %APPVEYOR_BUILD_FOLDER%\..
