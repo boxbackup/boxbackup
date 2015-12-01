@@ -60,10 +60,10 @@ install:
   - cd pcre-8.38
   - cmake . -G "Visual Studio 10" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%"
   - dir
-  - msbuild PCRE.sln /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - dir
-  - dir pcre
+  - dir pcre-%PLATFORM%
   - cd %APPVEYOR_BUILD_FOLDER%
   - dir
   - cd infrastructure\msvc
