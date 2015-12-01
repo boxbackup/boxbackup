@@ -21,7 +21,7 @@ environment:
 
 build:
   parallel: true
-  project: infrastructure/msvc/2010/boxbackup.sln
+  project: ..\pcre\pcre.sln infrastructure/msvc/2010/boxbackup.sln
 
 install:
   - cinst strawberryperl
