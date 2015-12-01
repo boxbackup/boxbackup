@@ -64,6 +64,8 @@ install:
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - dir
   - dir pcre-%PLATFORM%
+  - dir pcre-%PLATFORM%\bin
+  - dir pcre-%PLATFORM%\lib
   - cd %APPVEYOR_BUILD_FOLDER%
   - dir
   - cd infrastructure\msvc
