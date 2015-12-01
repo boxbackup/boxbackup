@@ -19,6 +19,11 @@ configuration:
 environment:
   VisualStudioVersion: 10.0
 
+cache:
+  - %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
+  - %APPVEYOR_BUILD_FOLDER%\..\openssl-1.0.2d
+  - %APPVEYOR_BUILD_FOLDER%\%PLATFORM%
+
 build:
   parallel: true
   project: infrastructure/msvc/2010/boxbackup.sln
@@ -36,7 +41,7 @@ install:
   - 7za x openssl-1.0.2d.tar.gz
   - 7za x openssl-1.0.2d.tar
   - cd openssl-1.0.2d
-  - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl
+  - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
   - ms\do_ms
   - nmake /s /f ms\nt.mak
   - nmake /s /f ms\nt.mak install

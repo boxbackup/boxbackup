@@ -49,7 +49,7 @@
     <PreBuildEvent />
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\qdbm;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\openssl\include;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\..\pcre</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\qdbm;$(ProjectDir)..\..\..\lib\common;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\openssl-$(Platform)\include;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\..\pcre</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -65,7 +65,7 @@
     <CustomBuildStep />
     <CustomBuildStep />
     <Lib>
-      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcre.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcreposix.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcre.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcreposix.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\lib\ssleay32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PreBuildEvent>
       <Command>perl $(ProjectDir)..\getversion.pl</Command>
@@ -77,7 +77,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\common\;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\openssl\inc32;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\..\pcre\pcre-6.7\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\lib\common\;$(ProjectDir)..\..\..\lib\compress;$(ProjectDir)..\..\..\lib\crypto;$(ProjectDir)..\..\..\lib\server;$(ProjectDir)..\..\..\lib\win32;$(ProjectDir)..\..\..\..\openssl-$(Platform)\inc32;$(ProjectDir)..\..\..\..\zlib\include;$(ProjectDir)..\..\..\..\pcre\pcre-6.7\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;BOX_RELEASE_BUILD;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
