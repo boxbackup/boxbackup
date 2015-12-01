@@ -20,8 +20,10 @@ environment:
   VisualStudioVersion: 10.0
 
 cache:
-  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%'
   - '%APPVEYOR_BUILD_FOLDER%\..\openssl-1.0.2d'
+  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%'
+  - '%APPVEYOR_BUILD_FOLDER%\..\pcre-8.38'
+  - '%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%'
   - '%APPVEYOR_BUILD_FOLDER%\%PLATFORM%'
 
 build:
@@ -55,13 +57,13 @@ install:
   - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
   - 7za x pcre-8.38.zip
   - cd %APPVEYOR_BUILD_FOLDER%\..
-  - rename pcre-8.38 pcre
-  - cd pcre
-  - cmake . -G "Visual Studio %VisualStudioVersion%" -A %PLATFORM%
+  - cd pcre-8.38
+  - cmake . -G "Visual Studio 10" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%"
   - dir
   - msbuild PCRE.sln /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - dir
+  - dir pcre
   - cd %APPVEYOR_BUILD_FOLDER%
   - dir
   - cd infrastructure\msvc
