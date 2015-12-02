@@ -38,12 +38,6 @@ public:
 		rOther.Reset();
 	}
 
-private:
-	// No copying (only moving, as defined above)
-	CollectInBufferStream(const CollectInBufferStream &);
-	CollectInBufferStream(const IOStream &);
-
-public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes,
