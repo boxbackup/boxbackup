@@ -65,7 +65,7 @@
     <CustomBuildStep />
     <CustomBuildStep />
     <Lib>
-      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\pcre-$(Platform)\lib\pcred.lib;$(ProjectDir)..\..\..\..\pcre\build\vc2010\debug\pcreposix.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\lib\ssleay32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\..\..\..\pcre-$(Platform)\lib\pcred.lib;$(ProjectDir)..\..\..\..\pcre-$(Platform)\lib\pcreposixd.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl-$(Platform)\lib\ssleay32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PreBuildEvent>
       <Command>perl $(ProjectDir)..\getversion.pl</Command>
