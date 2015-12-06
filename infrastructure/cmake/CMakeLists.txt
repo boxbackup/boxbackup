@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.6)
 project(BoxBackup)
 
-set(base_dir ../..)
+set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
 set(files_to_configure
 	infrastructure/BoxPlatform.pm
@@ -47,7 +47,8 @@ foreach(file_to_configure ${files_to_configure})
 endforeach()
 
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
-foreach(module_dep ${module_deps})
+# qdbm, lib/common and lib/win32 aren't listed in modules.txt, so hard-code them.
+foreach(module_dep "qdbm" "lib/win32" "lib/common lib/win32" ${module_deps})
 	string(REGEX MATCH "([^	 ]+)[	 ]*(.*)" valid_module_line ${module_dep})
 	if(valid_module_line)
 		if(DEBUG)
@@ -57,16 +58,23 @@ foreach(module_dep ${module_deps})
 		set(module_dir ${base_dir}/${CMAKE_MATCH_1})
 		string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
 		string(REPLACE "/" "_" dependencies "${CMAKE_MATCH_2}")
+		file(GLOB module_files ${module_dir}/*.c ${module_dir}/*.cpp)
+
+		# everything except lib/common and lib/win32 implicitly depend on
+		# lib/common, so express that dependency here.
+		if(module_name MATCHES "^lib_(common|win32)$")
+		else()
+			set(dependencies "${dependencies} lib_common")
+		endif()
 		string(REGEX REPLACE "^ " "" dependencies "${dependencies}")
 		string(REGEX REPLACE " $" "" dependencies "${dependencies}")
-		file(GLOB module_files ${module_dir}/*.c ${module_dir}/*.cpp)
 
 		if(module_name MATCHES "^(bin|test)_")
 			if(DEBUG)
 				message(STATUS "add executable '${module_name}': '${module_files}'")
 			endif()
 			add_executable(${module_name} ${module_files})
-		elseif(module_name MATCHES "^lib_")
+		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
 			if(DEBUG)
 				message(STATUS "add library '${module_name}': '${module_files}'")
 			endif()
@@ -75,9 +83,65 @@ foreach(module_dep ${module_deps})
 			message(FATAL_ERROR "Unsupported module type: " ${module_dir})
 		endif()
 
-		if(DEBUG)
-			message(STATUS "add dependencies to '${module_name}': '${dependencies}'")
+		if(dependencies MATCHES ".")
+			if(DEBUG)
+				message(STATUS "add dependencies to '${module_name}': '${dependencies}'")
+			endif()
+			string(REGEX REPLACE "[ 	]+" ";" dependency_list "${dependencies}")
+			foreach(dependency ${dependency_list})
+				add_dependencies(${module_name} ${dependency})
+				if(dependency MATCHES "^lib_")
+					target_link_libraries(${module_name} PUBLIC ${dependency})
+				endif()
+			endforeach()
 		endif()
-		target_link_libraries(${module_name} ${dependencies})
+
+		target_include_directories(${module_name} PUBLIC ${module_dir})
 	endif()
 endforeach()
+
+# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules are
+# hard-coded here.
+set(exception_files
+	lib/backupclient/ClientException.txt
+	lib/backupstore/BackupStoreException.txt
+	lib/common/CommonException.txt
+	lib/common/ConversionException.txt
+	lib/compress/CompressException.txt
+	lib/crypto/CipherException.txt
+	lib/httpserver/HTTPException.txt
+	lib/raidfile/RaidFileException.txt
+	lib/server/ServerException.txt
+	lib/server/ConnectionException.txt
+)
+
+include(FindPerl)
+
+execute_process(
+	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl
+	RESULT_VARIABLE status
+	OUTPUT_VARIABLE command_output
+	ERROR_VARIABLE command_output)
+if(NOT status EQUAL 0)
+	message(FATAL_ERROR "Failed to execute: "
+		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl: "
+		"status ${status}: ${command_output}")
+endif()
+
+foreach(exception_file ${exception_files})
+	string(REGEX MATCH "(.*)/(.*)" valid_exception_file ${exception_file})
+	if(NOT valid_exception_file)
+		message(FATAL_ERROR "invalid exception file: '${exception_file}'")
+	endif()
+
+	execute_process(
+		COMMAND ${PERL_EXECUTABLE} ${base_dir}/lib/common/makeexception.pl ${CMAKE_MATCH_2}
+		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}"
+		RESULT_VARIABLE status)
+	if(NOT status EQUAL 0)
+		message(FATAL_ERROR "Failed to execute: "
+			"${PERL_EXECUTABLE} ${base_dir}/lib/common/makeexception.pl ${CMAKE_MATCH_2}"
+			"(in ${CMAKE_MATCH_1}): ${status}")
+	endif()
+endforeach()
+
