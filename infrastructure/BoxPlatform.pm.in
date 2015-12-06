@@ -17,7 +17,7 @@ BEGIN
 	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
 	{
 		$build_os = "winnt";
-		use Win32;
+		eval "use Win32";
 		$build_os_ver = Win32::GetOSName();
 	}
 	else
