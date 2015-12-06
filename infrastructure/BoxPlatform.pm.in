@@ -17,19 +17,21 @@ BEGIN
 	if ($^O eq "MSWin32" and not -x "/usr/bin/uname")
 	{
 		$build_os = "winnt";
+		use Win32;
+		$build_os_ver = Win32::GetOSName();
 	}
 	else
 	{
 		$build_os = `uname`;
+		$build_os_ver = `uname -r`;
 		chomp $build_os;
+		chomp $build_os_ver;
 	}
 
 	# Cygwin Builds usually something like CYGWIN_NT-5.0, CYGWIN_NT-5.1
 	# Box Backup tried on Win2000,XP only :)
 	$build_os = 'CYGWIN' if $build_os =~ m/CYGWIN/;
 	$build_os = 'MINGW32' if $build_os =~ m/MINGW32/;
-	$build_os_ver = `uname -r`;
-	chomp $build_os_ver;
 
 	if ($build_os eq 'Darwin') {
 		$xcode_ver = `xcodebuild -version | awk '/^Xcode/ {print \$2}'`
@@ -81,44 +83,10 @@ BEGIN
 
 	if($product_version =~ /USE_SVN_VERSION/)
 	{
-		# for developers, use SVN version
-		my $svnversion = 'unknown';
-		my $svnurl = 'unknown';
-
-		if(-d '.svn')
-		{
-			my $svnversion = `svnversion .`;
-			chomp $svnversion;
-			$svnversion =~ tr/0-9A-Za-z/_/c;
-			open INFO,'svn info . |';
-			while(<INFO>)
-			{
-				if(m/^URL: (.+?)[\n\r]+/)
-				{
-					$svnurl = $1
-				}
-			}
-			close INFO;
-		}
-		elsif(-d '.git')
-		{
-			$svnversion = `git svn info | grep '^Revision:' | cut -d' ' -f2`;
-			chomp $svnversion;
-			$svnurl = `git svn info --url`;
-		}
-
-		my $svndir;
-		if ($svnurl =~ m!/box/(.+)$!)
-		{
-			$svndir = $1;
-		}
-		elsif ($svnurl =~ m'/(boxi/.+)/boxi/boxbackup')
-		{
-			$svndir = $1;
-		}
-
-		$svndir =~ tr/0-9A-Za-z/_/c;
-		$product_version =~ s/USE_SVN_VERSION/$svndir.'_'.$svnversion/e;
+		# for developers, use Git version (SVN is no more):
+		my $gitversion = `git rev-parse HEAD`;
+		chomp $gitversion;
+		$product_version =~ s/USE_SVN_VERSION/git_$gitversion/;
 	}
 
 	# where to put the files
