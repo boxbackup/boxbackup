@@ -189,7 +189,7 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	}
 	
 	// Check the object size
-	u_int32_t objSize = ntohl(objHeader.mObjSize);
+	uint32_t objSize = ntohl(objHeader.mObjSize);
 	if(objSize < sizeof(objHeader) || objSize > mMaxObjectSize)
 	{
 		THROW_EXCEPTION(ConnectionException, Protocol_ObjTooBig)
@@ -641,7 +641,7 @@ std::auto_ptr<IOStream> Protocol::ReceiveStream()
 	}
 	
 	// Get the stream size
-	u_int32_t streamSize = ntohl(objHeader.mObjSize);
+	uint32_t streamSize = ntohl(objHeader.mObjSize);
 
 	// Inform sub class
 	InformStreamReceiving(streamSize);
@@ -836,12 +836,12 @@ int Protocol::SendStreamSendBlock(uint8_t *Block, int BytesInBlock)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::InformStreamReceiving(u_int32_t)
+//		Name:    Protocol::InformStreamReceiving(uint32_t)
 //		Purpose: Informs sub classes about streams being received
 //		Created: 2003/10/27
 //
 // --------------------------------------------------------------------------
-void Protocol::InformStreamReceiving(u_int32_t Size)
+void Protocol::InformStreamReceiving(uint32_t Size)
 {
 	if(GetLogToSysLog())
 	{
@@ -868,12 +868,12 @@ void Protocol::InformStreamReceiving(u_int32_t Size)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Protocol::InformStreamSending(u_int32_t)
+//		Name:    Protocol::InformStreamSending(uint32_t)
 //		Purpose: Informs sub classes about streams being sent
 //		Created: 2003/10/27
 //
 // --------------------------------------------------------------------------
-void Protocol::InformStreamSending(u_int32_t Size)
+void Protocol::InformStreamSending(uint32_t Size)
 {
 	if(GetLogToSysLog())
 	{

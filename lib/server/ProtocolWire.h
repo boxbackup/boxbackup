@@ -26,8 +26,8 @@ typedef struct
 
 typedef struct
 {
-	u_int32_t	mObjSize;
-	u_int32_t	mObjType;
+	uint32_t	mObjSize;
+	uint32_t	mObjType;
 } PW_ObjectHeader;
 
 #define SPECIAL_STREAM_OBJECT_TYPE		0xffffffff

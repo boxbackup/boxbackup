@@ -108,56 +108,6 @@
 	#endif
 #endif
 
-#if defined WIN32 && !defined __MINGW32__
-	typedef __int8  int8_t;
-	typedef __int16 int16_t;
-	typedef __int32 int32_t;
-	typedef __int64 int64_t;
-
-	typedef unsigned __int8  u_int8_t;
-	typedef unsigned __int16 u_int16_t;
-	typedef unsigned __int32 u_int32_t;
-	typedef unsigned __int64 u_int64_t;
-
-	#define HAVE_U_INT8_T
-	#define HAVE_U_INT16_T
-	#define HAVE_U_INT32_T
-	#define HAVE_U_INT64_T
-#endif // WIN32 && !__MINGW32__
-
-// Define missing types
-#ifndef HAVE_UINT8_T
-	typedef u_int8_t uint8_t;
-#endif
-
-#ifndef HAVE_UINT16_T
-	typedef u_int16_t uint16_t;
-#endif
-
-#ifndef HAVE_UINT32_T
-	typedef u_int32_t uint32_t;
-#endif
-
-#ifndef HAVE_UINT64_T
-	typedef u_int64_t uint64_t;
-#endif
-
-#ifndef HAVE_U_INT8_T
-	typedef uint8_t u_int8_t;
-#endif
-
-#ifndef HAVE_U_INT16_T
-	typedef uint16_t u_int16_t;
-#endif
-
-#ifndef HAVE_U_INT32_T
-	typedef uint32_t u_int32_t;
-#endif
-
-#ifndef HAVE_U_INT64_T
-	typedef uint64_t u_int64_t;
-#endif
-
 #if !HAVE_DECL_INFTIM
 	#define INFTIM -1
 #endif
@@ -176,7 +126,7 @@
 #endif
 
 #ifdef WIN32
-	typedef u_int64_t InodeRefType;
+	typedef uint64_t InodeRefType;
 #else
 	typedef ino_t InodeRefType;
 #endif
