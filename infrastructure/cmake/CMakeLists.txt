@@ -3,6 +3,16 @@ project(BoxBackup)
 
 set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
+link_libraries(ws2_32 gdi32)
+
+include_directories(${base_dir}/../openssl-win32/include)
+link_directories(${base_dir}/../openssl-win32/lib)
+link_libraries(libeay32 ssleay32)
+
+include_directories(${base_dir}/../pcre-win32/include)
+link_directories(${base_dir}/../pcre-win32/lib)
+link_libraries(pcreposixd pcred)
+
 set(files_to_configure
 	infrastructure/BoxPlatform.pm
 	contrib/mac_osx/org.boxbackup.bbackupd.plist
@@ -46,59 +56,96 @@ foreach(file_to_configure ${files_to_configure})
 	configure_file("${base_dir}/${file_to_configure}.in" "${base_dir}/${file_to_configure}" @ONLY)
 endforeach()
 
+file(READ "${base_dir}/infrastructure/buildenv-testmain-template.cpp" test_template)
+
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 # qdbm, lib/common and lib/win32 aren't listed in modules.txt, so hard-code them.
-foreach(module_dep "qdbm" "lib/win32" "lib/common lib/win32" ${module_deps})
+foreach(module_dep
+	"qdbm"
+	"lib/win32"
+	"lib/common qdbm lib/win32"
+	${module_deps})
+
 	string(REGEX MATCH "([^	 ]+)[	 ]*(.*)" valid_module_line ${module_dep})
 	if(valid_module_line)
 		if(DEBUG)
 			message(STATUS "found module: ${CMAKE_MATCH_1} -> ${CMAKE_MATCH_2}")
 		endif()
 
-		set(module_dir ${base_dir}/${CMAKE_MATCH_1})
+		set(module_dir ${CMAKE_MATCH_1})
+		set(module_path ${base_dir}/${module_dir})
 		string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
 		string(REPLACE "/" "_" dependencies "${CMAKE_MATCH_2}")
-		file(GLOB module_files ${module_dir}/*.c ${module_dir}/*.cpp)
+		file(GLOB module_files ${module_path}/*.c ${module_path}/*.cpp)
 
-		# everything except lib/common and lib/win32 implicitly depend on
+		# everything except qdbm, lib/common and lib/win32 implicitly depend on
 		# lib/common, so express that dependency here.
-		if(module_name MATCHES "^lib_(common|win32)$")
+		if(module_name MATCHES "^(qdbm|lib_(common|win32))$")
 		else()
 			set(dependencies "${dependencies} lib_common")
 		endif()
 		string(REGEX REPLACE "^ " "" dependencies "${dependencies}")
 		string(REGEX REPLACE " $" "" dependencies "${dependencies}")
 
-		if(module_name MATCHES "^(bin|test)_")
+		if(module_name MATCHES "^bin_")
 			if(DEBUG)
 				message(STATUS "add executable '${module_name}': '${module_files}'")
 			endif()
 			add_executable(${module_name} ${module_files})
+		elseif(module_name MATCHES "^test_")
+			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
+			set(test_name ${CMAKE_MATCH_1})
+
+			if(DEBUG)
+				message(STATUS "add test '${module_name}': '${module_files}'")
+			endif()
+
+			string(REPLACE "TEST_NAME" ${test_name} test_main "${test_template}")
+			file(WRITE "${module_path}/_main.cpp" "${test_main}")
+			add_executable(${module_name} ${module_files}
+				"${module_path}/_main.cpp")
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
 			if(DEBUG)
 				message(STATUS "add library '${module_name}': '${module_files}'")
 			endif()
 			add_library(${module_name} STATIC ${module_files})
 		else()
-			message(FATAL_ERROR "Unsupported module type: " ${module_dir})
+			message(FATAL_ERROR "Unsupported module type: " ${module_name})
 		endif()
 
+		target_compile_definitions(${module_name} PRIVATE -DBOX_MODULE="${module_dir}")
+
 		if(dependencies MATCHES ".")
-			if(DEBUG)
-				message(STATUS "add dependencies to '${module_name}': '${dependencies}'")
-			endif()
 			string(REGEX REPLACE "[ 	]+" ";" dependency_list "${dependencies}")
+
 			foreach(dependency ${dependency_list})
-				add_dependencies(${module_name} ${dependency})
-				if(dependency MATCHES "^lib_")
+				if(DEBUG)
+					message(STATUS "add dependency to '${module_name}': '${dependency}'")
+				endif()
+				# add_dependencies(${module_name} ${dependency})
+				if(dependency MATCHES "^(lib_.*|qdbm)$")
+					# message(STATUS "add link library to '${module_name}': '${dependency}'")
 					target_link_libraries(${module_name} PUBLIC ${dependency})
 				endif()
 			endforeach()
 		endif()
 
-		target_include_directories(${module_name} PUBLIC ${module_dir})
+		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
 endforeach()
+
+include(FindPerl)
+
+execute_process(
+	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl
+	RESULT_VARIABLE status
+	OUTPUT_VARIABLE command_output
+	ERROR_VARIABLE command_output)
+if(NOT status EQUAL 0)
+	message(FATAL_ERROR "Failed to execute: "
+		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl: "
+		"status ${status}: ${command_output}")
+endif()
 
 # Parsing Makefile.extra files in CMake script is a pain, so the relevant rules are
 # hard-coded here.
@@ -115,33 +162,25 @@ set(exception_files
 	lib/server/ConnectionException.txt
 )
 
-include(FindPerl)
-
-execute_process(
-	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl
-	RESULT_VARIABLE status
-	OUTPUT_VARIABLE command_output
-	ERROR_VARIABLE command_output)
-if(NOT status EQUAL 0)
-	message(FATAL_ERROR "Failed to execute: "
-		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl: "
-		"status ${status}: ${command_output}")
-endif()
-
 foreach(exception_file ${exception_files})
-	string(REGEX MATCH "(.*)/(.*)" valid_exception_file ${exception_file})
+	string(REGEX MATCH "(.*)/(.*).txt" valid_exception_file ${exception_file})
 	if(NOT valid_exception_file)
 		message(FATAL_ERROR "invalid exception file: '${exception_file}'")
 	endif()
 
-	execute_process(
-		COMMAND ${PERL_EXECUTABLE} ${base_dir}/lib/common/makeexception.pl ${CMAKE_MATCH_2}
-		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}"
-		RESULT_VARIABLE status)
-	if(NOT status EQUAL 0)
-		message(FATAL_ERROR "Failed to execute: "
-			"${PERL_EXECUTABLE} ${base_dir}/lib/common/makeexception.pl ${CMAKE_MATCH_2}"
-			"(in ${CMAKE_MATCH_1}): ${status}")
-	endif()
+	add_custom_command(OUTPUT "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp"
+		MAIN_DEPENDENCY "${base_dir}/${exception_file}"
+		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/common/makeexception.pl" "${CMAKE_MATCH_2}.txt"
+		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
+	add_custom_target(${CMAKE_MATCH_2}
+		DEPENDS "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
+
+	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
+	add_dependencies(${module_name} ${CMAKE_MATCH_2})
 endforeach()
+
+#include(ExternalProject)
+#ExternalProject_Add(pcre
+#	PREFIX "../pcre"
+#	BUILD_COMMAND "${CMAKE_EXECUTABLE
 
