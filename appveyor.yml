@@ -51,7 +51,7 @@ install:
   - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
-  - ps: Start-FileDownload "https://www.openssl.org/source/openssl-" + $env:OPENSSL_VERSION + ".tar.gz"
+  - ps: Start-FileDownload "https://www.openssl.org/source/openssl-$($env:OPENSSL_VERSION).tar.gz"
   - 7za x openssl-%OPENSSL_VERSION%.tar.gz
   - 7za x openssl-%OPENSSL_VERSION%.tar
   - cd openssl-%OPENSSL_VERSION%
