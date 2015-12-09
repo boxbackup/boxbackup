@@ -19,9 +19,10 @@ configuration:
 environment:
   VisualStudioVersion: 10.0
   Generator: Visual Studio 10
+  OPENSSL_VERSION: 1.0.2e
 
 cache:
-  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-1.0.2d'
+  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%'
   - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%'
   - '%APPVEYOR_BUILD_FOLDER%\..\pcre-8.38'
   - '%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%'
@@ -50,10 +51,10 @@ install:
   - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
-  - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-1.0.2d.tar.gz'
-  - 7za x openssl-1.0.2d.tar.gz
-  - 7za x openssl-1.0.2d.tar
-  - cd openssl-1.0.2d
+  - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-%OPENSSL_VERSION%.tar.gz'
+  - 7za x openssl-%OPENSSL_VERSION%.tar.gz
+  - 7za x openssl-%OPENSSL_VERSION%.tar
+  - cd openssl-%OPENSSL_VERSION%
   - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
   - ms\do_ms
   - nmake /s /f ms\nt.mak
