@@ -18,6 +18,7 @@ configuration:
 
 environment:
   VisualStudioVersion: 10.0
+  Generator: Visual Studio 10
 
 cache:
   - '%APPVEYOR_BUILD_FOLDER%\..\openssl-1.0.2d'
@@ -28,17 +29,27 @@ cache:
 
 build:
   parallel: true
-  project: infrastructure/msvc/2010/boxbackup.sln
+  project: infrastructure/cmake/BoxBackup.sln
 
 install:
   - cinst strawberryperl
   - cinst 7zip.commandline
+  - cinst cmake
+
   - dir "C:\Program Files\Microsoft SDKs\Windows"
   - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1"
   - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin"
   - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
-  - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
+
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: Start-FileDownload 'http://zlib.net/zlib128.zip'
+  - 7za x zlib128.zip
+  - cd zlib-1.2.8
+  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\zlib-%PLATFORM%" .
+  - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+
+  - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload 'https://www.openssl.org/source/openssl-1.0.2d.tar.gz'
   - 7za x openssl-1.0.2d.tar.gz
   - 7za x openssl-1.0.2d.tar
@@ -47,18 +58,13 @@ install:
   - ms\do_ms
   - nmake /s /f ms\nt.mak
   - nmake /s /f ms\nt.mak install
+
   - cd %APPVEYOR_BUILD_FOLDER%\..
-  - ps: Start-FileDownload 'http://zlib.net/zlib128-dll.zip'
-  - mkdir %APPVEYOR_BUILD_FOLDER%\..\zlib
-  - cd %APPVEYOR_BUILD_FOLDER%\..\zlib
-  - 7za x %APPVEYOR_BUILD_FOLDER%\..\zlib128-dll.zip
-  - cd %APPVEYOR_BUILD_FOLDER%\..
-  - cinst cmake
   - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
   - 7za x pcre-8.38.zip
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - cd pcre-8.38
-  - cmake . -G "Visual Studio 10" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%"
+  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
   - dir
   - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - cd %APPVEYOR_BUILD_FOLDER%\..
@@ -66,10 +72,12 @@ install:
   - dir pcre-%PLATFORM%
   - dir pcre-%PLATFORM%\bin
   - dir pcre-%PLATFORM%\lib
+
   - cd %APPVEYOR_BUILD_FOLDER%
   - dir
-  - cd infrastructure\msvc
-  - win32.bat
+  - cd infrastructure\cmake
+  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
+  - dir
   - cd %APPVEYOR_BUILD_FOLDER%
 
 test_script:

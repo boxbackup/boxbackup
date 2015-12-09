@@ -3,16 +3,6 @@ project(BoxBackup)
 
 set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
-link_libraries(ws2_32 gdi32)
-
-include_directories(${base_dir}/../openssl-win32/include)
-link_directories(${base_dir}/../openssl-win32/lib)
-link_libraries(libeay32 ssleay32)
-
-include_directories(${base_dir}/../pcre-win32/include)
-link_directories(${base_dir}/../pcre-win32/lib)
-link_libraries(pcreposixd pcred)
-
 set(files_to_configure
 	infrastructure/BoxPlatform.pm
 	contrib/mac_osx/org.boxbackup.bbackupd.plist
@@ -183,4 +173,29 @@ endforeach()
 #ExternalProject_Add(pcre
 #	PREFIX "../pcre"
 #	BUILD_COMMAND "${CMAKE_EXECUTABLE
+
+# Tell QDBM not to build itself as a DLL, because we want to link statically to it.
+target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
+
+# Silence some less-useful warnings
+if(MSVC)
+	add_definitions(/wd4996)
+	# target_link_libraries(qdbm PRIVATE /IGNORE:LNK4006)
+	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006)
+endif(MSVC)
+
+target_link_libraries(lib_common PUBLIC ws2_32 gdi32)
+
+# Link to OpenSSL
+include_directories(${base_dir}/../openssl-win32/include)
+find_library(libeay32_lib_path libeay32 ${base_dir}/../openssl-win32/lib)
+find_library(ssleay32_lib_path ssleay32 ${base_dir}/../openssl-win32/lib)
+target_link_libraries(lib_crypto PUBLIC ${libeay32_lib_path} ${ssleay32_lib_path})
+
+# Link to PCRE
+include_directories(${base_dir}/../pcre-win32/include)
+target_compile_definitions(lib_common PUBLIC -DPCRE_STATIC)
+find_library(pcreposixd_lib_path pcreposixd ${base_dir}/../pcre-win32/lib)
+find_library(pcred_lib_path pcred ${base_dir}/../pcre-win32/lib)
+target_link_libraries(lib_common PUBLIC "${pcreposixd_lib_path}" "${pcred_lib_path}")
 
