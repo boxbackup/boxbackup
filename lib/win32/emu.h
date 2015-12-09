@@ -65,17 +65,6 @@
 
 #define ITIMER_REAL 0
 
-#ifdef _MSC_VER
-// Microsoft decided to deprecate the standard POSIX functions. Great!
-#define open(file,flags,mode) _open(file,flags,mode)
-#define close(fd)             _close(fd)
-#define dup(fd)               _dup(fd)
-#define read(fd,buf,count)    _read(fd,buf,count)
-#define write(fd,buf,count)   _write(fd,buf,count)
-#define lseek(fd,off,whence)  _lseek(fd,off,whence)
-#define fileno(struct_file)   _fileno(struct_file)
-#endif
-
 struct passwd {
 	char *pw_name;
 	char *pw_passwd;
@@ -204,7 +193,11 @@ inline int geteuid(void)
 #define snprintf _snprintf
 inline int strcasecmp(const char *s1, const char *s2)
 {
-	return _stricmp(s1,s2);
+	return _stricmp(s1, s2);
+}
+inline int strncasecmp(const char *s1, const char *s2, size_t count)
+{
+	return _strnicmp(s1, s2, count);
 }
 #endif
 
