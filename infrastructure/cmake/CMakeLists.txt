@@ -186,6 +186,11 @@ endif(MSVC)
 
 target_link_libraries(lib_common PUBLIC ws2_32 gdi32)
 
+# Link to ZLib
+include_directories(${base_dir}/../zlib-win32/include)
+find_library(zlibstaticd_lib_path zlibstaticd ${base_dir}/../zlib-win32/lib)
+target_link_libraries(lib_compress PUBLIC ${zlibstaticd_lib_path})
+
 # Link to OpenSSL
 include_directories(${base_dir}/../openssl-win32/include)
 find_library(libeay32_lib_path libeay32 ${base_dir}/../openssl-win32/lib)
