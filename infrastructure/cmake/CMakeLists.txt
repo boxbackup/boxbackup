@@ -169,6 +169,28 @@ foreach(exception_file ${exception_files})
 	add_dependencies(${module_name} ${CMAKE_MATCH_2})
 endforeach()
 
+set(protocol_files
+	lib/backupstore/backupprotocol.txt
+	test/basicserver/testprotocol.txt
+)
+
+foreach(protocol_file ${protocol_files})
+	string(REGEX MATCH "(.*)/(.*).txt" valid_protocol_file ${protocol_file})
+	if(NOT valid_protocol_file)
+		message(FATAL_ERROR "invalid protocol file: '${protocol_file}'")
+	endif()
+
+	add_custom_command(OUTPUT "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp"
+		MAIN_DEPENDENCY "${base_dir}/${protocol_file}"
+		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/server/makeprotocol.pl" "${CMAKE_MATCH_2}.txt"
+		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
+	add_custom_target(${CMAKE_MATCH_2}
+		DEPENDS "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
+
+	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
+	add_dependencies(${module_name} ${CMAKE_MATCH_2})
+endforeach()
+
 #include(ExternalProject)
 #ExternalProject_Add(pcre
 #	PREFIX "../pcre"
