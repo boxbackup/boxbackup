@@ -201,7 +201,7 @@ target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
 
 # Silence some less-useful warnings
 if(MSVC)
-	add_definitions(/wd4996)
+	add_definitions(/wd4996 /wd4291)
 	# target_link_libraries(qdbm PRIVATE /IGNORE:LNK4006)
 	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006)
 endif(MSVC)
