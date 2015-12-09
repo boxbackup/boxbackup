@@ -15,7 +15,6 @@
 	#include <sys/syscall.h>
 #endif
 #include <sys/types.h>
-#include <unistd.h>
 
 #ifdef HAVE_SYS_UIO_H
 	#include <sys/uio.h>
