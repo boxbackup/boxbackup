@@ -2431,29 +2431,23 @@ bool test_encoding()
 
 bool test_symlinks()
 {
-#ifndef WIN32 // no symlinks on Win32
 	SETUP_TEST_BACKUPSTORE();
 
-	// TODO FIXME indentation
+#ifndef WIN32 // no symlinks on Win32
+	UNLINK_IF_EXISTS("testfiles/testsymlink");
+	TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
+	BackupStoreFilenameClear name("testsymlink");
+	std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
 
-		// Try out doing this on a symlink
-		{
-			UNLINK_IF_EXISTS("testfiles/testsymlink");
-			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
-			BackupStoreFilenameClear name("testsymlink");
-			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
+	// Can't decode it from the stream, because it's in file order, and doesn't have the
+	// required properties to be able to reorder it. So buffer it...
+	CollectInBufferStream b;
+	encoded->CopyStreamTo(b);
+	b.SetForReading();
 
-			// Can't decode it from the stream, because it's in file order, and doesn't have the
-			// required properties to be able to reorder it. So buffer it...
-			CollectInBufferStream b;
-			encoded->CopyStreamTo(b);
-			b.SetForReading();
-
-			// Decode it
-			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
-			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
-		}
-	teardown_test_backupstore();
+	// Decode it
+	UNLINK_IF_EXISTS("testfiles/testsymlink_2");
+	BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 #endif
 
 	TEARDOWN_TEST_BACKUPSTORE();
