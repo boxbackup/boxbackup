@@ -47,6 +47,9 @@ public:
 		Write((int) Item);
 	}
 	void WriteExact(uint32_t Item) { Write((int)Item); }
+	// TODO FIXME: use of "int" here is dangerous and deprecated. It can lead to
+	// incompatible serialisation on non-32-bit machines. Passing anything other
+	// than one of the specifically supported fixed size types should be forbidden.
 	void Write(int Item)
 	{
 		int32_t privItem = htonl(Item);
@@ -55,6 +58,11 @@ public:
 	void Write(int64_t Item)
 	{
 		int64_t privItem = box_hton64(Item);
+		mrStream.Write(&privItem, sizeof(privItem), mTimeout);
+	}
+	void WriteInt16(uint16_t Item)
+	{
+		uint16_t privItem = htons(Item);
 		mrStream.Write(&privItem, sizeof(privItem), mTimeout);
 	}
 	void WriteExact(uint64_t Item) { Write(Item); }
@@ -109,6 +117,15 @@ public:
 		}
 		rItemOut = ntohl(privItem);
 	}
+	void ReadFullBuffer(void* Buffer, size_t Size)
+	{
+		if(!mrStream.ReadFullBuffer(Buffer, Size,
+			0 /* not interested in bytes read if this fails */,
+			mTimeout))
+		{
+			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
+		}
+	}
 	void ReadIfPresent(int &rItemOut, int ValueIfNotPresent)
 	{
 		int32_t privItem;
@@ -132,25 +149,21 @@ public:
 	void Read(int64_t &rItemOut)
 	{
 		int64_t privItem;
-		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem),
-			0 /* not interested in bytes read if this fails */,
-			mTimeout))
-		{
-			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
-		}
+		ReadFullBuffer(&privItem, sizeof(privItem));
 		rItemOut = box_ntoh64(privItem);
 	}
 	void ReadExact(uint64_t &rItemOut) { Read(rItemOut); }
 	void Read(uint64_t &rItemOut)
 	{
 		uint64_t privItem;
-		if(!mrStream.ReadFullBuffer(&privItem, sizeof(privItem),
-			0 /* not interested in bytes read if this fails */,
-			mTimeout))
-		{
-			THROW_EXCEPTION(CommonException, ArchiveBlockIncompleteRead);
-		}
+		ReadFullBuffer(&privItem, sizeof(privItem));
 		rItemOut = box_ntoh64(privItem);
+	}
+	void ReadInt16(uint16_t &rItemOut)
+	{
+		uint16_t privItem;
+		ReadFullBuffer(&privItem, sizeof(privItem));
+		rItemOut = ntohs(privItem);
 	}
 	void Read(uint8_t &rItemOut)
 	{
@@ -160,14 +173,14 @@ public:
 	}
 	void ReadIfPresent(std::string &rItemOut, const std::string& ValueIfNotPresent)
 	{
-		Read(rItemOut, &ValueIfNotPresent);
+		ReadString(rItemOut, &ValueIfNotPresent);
 	}
 	void Read(std::string &rItemOut)
 	{
-		Read(rItemOut, NULL);
+		ReadString(rItemOut, NULL);
 	}
 private:
-	void Read(std::string &rItemOut, const std::string* pValueIfNotPresent)
+	void ReadString(std::string &rItemOut, const std::string* pValueIfNotPresent)
 	{
 		int size;
 		int bytesRead;
@@ -193,13 +206,7 @@ private:
 		if(size < (int) sizeof(buf))
 		{
 			// Fetch rest of pPayload, relying on the Protocol to error on stupidly large sizes for us
-			if(!mrStream.ReadFullBuffer(buf, size,
-				0 /* not interested in bytes read if this fails */,
-				mTimeout))
-			{
-				THROW_EXCEPTION(CommonException,
-					ArchiveBlockIncompleteRead);
-			}
+			ReadFullBuffer(buf, size);
 			// assign to this string, storing the header and the extra payload
 			rItemOut.assign(buf, size);
 		}
@@ -210,13 +217,7 @@ private:
 			char *ppayload = dataB;
 
 			// Fetch rest of pPayload, relying on the Protocol to error on stupidly large sizes for us
-			if(!mrStream.ReadFullBuffer(ppayload, size,
-				0 /* not interested in bytes read if this fails */,
-				mTimeout))
-			{
-				THROW_EXCEPTION(CommonException,
-					ArchiveBlockIncompleteRead);
-			}
+			ReadFullBuffer(ppayload, size);
 			// assign to this string, storing the header and the extra pPayload
 			rItemOut.assign(ppayload, size);
 		}

@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    BackupStoreDirectory.h
+//		Name:    BackupStoreDirectory.cpp
 //		Purpose: Representation of a backup directory
 //		Created: 2003/08/26
 //
@@ -35,11 +35,6 @@ typedef struct
 	int32_t mOptionsPresent;	// bit mask of optional sections / features present
 	// Then a StreamableMemBlock for attributes
 } dir_StreamFormat;
-
-typedef enum
-{
-	Option_DependencyInfoPresent = 1
-} dir_StreamFormatOptions;
 
 typedef struct
 {
@@ -172,7 +167,7 @@ void BackupStoreDirectory::ReadFromStream(IOStream &rStream, int Timeout)
 	int count = ntohl(hdr.mNumEntries);
 
 	// Clear existing list
-	for(std::vector<Entry*>::iterator i = mEntries.begin(); 
+	for(std::vector<Entry*>::iterator i = mEntries.begin();
 		i != mEntries.end(); i++)
 	{
 		delete (*i);

@@ -22,11 +22,12 @@
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
-#include "BackupStoreInfo.h"
+#include "BackupStoreFile.h"
 #include "BackupStoreFilenameClear.h"
 #include "BackupStoreFileEncodeStream.h"
+#include "BackupStoreInfo.h"
+#include "BackupStoreObjectMagic.h"
 #include "BackupStoreRefCountDatabase.h"
-#include "BackupStoreFile.h"
 #include "BoxPortsAndFiles.h"
 #include "CollectInBufferStream.h"
 #include "Configuration.h"
@@ -3121,6 +3122,94 @@ bool test_read_old_backupstoreinfo_files()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
+// Test that attributes can be correctly read from and written to the standard
+// format, for compatibility with other servers and clients. See
+// http://mailman.uk.freebsd.org/pipermail../public/boxbackup/2010-November/005818.html and
+// http://lists.boxbackup.org/pipermail/boxbackup/2011-February/005978.html for
+// details of the problems with packed structs.
+bool test_read_write_attr_streamformat()
+{
+	SETUP_TEST_BACKUPSTORE();
+
+	// Construct a minimal valid directory with 1 entry in memory using Archive, and
+	// try to read it back.
+	CollectInBufferStream buf;
+	Archive darc(buf, IOStream::TimeOutInfinite);
+
+	// Write a dir_StreamFormat structure
+	darc.Write((int32_t)OBJECTMAGIC_DIR_MAGIC_VALUE); // mMagicValue
+	darc.Write((int32_t)1); // mNumEntries
+	darc.Write((int64_t)0x0123456789abcdef); // mObjectID
+	darc.Write((int64_t)0x0000000000000001); // mContainerID
+	darc.Write((uint64_t)0x23456789abcdef01); // mAttributesModTime
+	darc.Write((int32_t)BackupStoreDirectory::Option_DependencyInfoPresent);
+	// mOptionsPresent
+	// 36 bytes to here
+
+	// Write fake attributes to make it valid.
+	StreamableMemBlock attr;
+	attr.WriteToStream(buf);
+	// 40 bytes to here
+
+	// Write a single entry in an en_StreamFormat structure
+	darc.Write((uint64_t)0x3456789012345678); // mModificationTime
+	darc.Write((int64_t)0x0000000000000002); // mObjectID
+	darc.Write((int64_t)0x0000000000000003); // mSizeInBlocks
+	darc.Write((uint64_t)0x0000000000000004); // mAttributesHash
+	darc.WriteInt16((int16_t)0x3141); // mFlags
+	// 74 bytes to here
+
+	// Then a BackupStoreFilename
+	BackupStoreFilename fn;
+	fn.SetAsClearFilename("hello");
+	fn.WriteToStream(buf);
+	// 81 bytes to here
+
+	// Then a StreamableMemBlock for attributes
+	attr.WriteToStream(buf);
+	// 85 bytes to here
+
+	// Then an en_StreamFormatDepends for dependency info.
+	darc.Write((uint64_t)0x0000000000000005); // mDependsNewer
+	darc.Write((uint64_t)0x0000000000000006); // mDependsOlder
+	// 101 bytes to here
+
+	// Make sure none of the fields was expanded in transit by Archive.
+	TEST_EQUAL(101, buf.GetSize());
+
+	buf.SetForReading();
+	BackupStoreDirectory dir(buf);
+
+	TEST_EQUAL(1, dir.GetNumberOfEntries());
+	TEST_EQUAL(0x0123456789abcdef, dir.GetObjectID());
+	TEST_EQUAL(0x0000000000000001, dir.GetContainerID());
+	TEST_EQUAL(0x23456789abcdef01, dir.GetAttributesModTime());
+
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry* pen = i.Next();
+	TEST_THAT_OR(pen != NULL, FAIL);
+	TEST_EQUAL(0x3456789012345678, pen->GetModificationTime());
+	TEST_EQUAL(0x0000000000000002, pen->GetObjectID());
+	TEST_EQUAL(0x0000000000000003, pen->GetSizeInBlocks());
+	TEST_EQUAL(0x0000000000000004, pen->GetAttributesHash());
+	TEST_EQUAL(0x0000000000000005, pen->GetDependsNewer());
+	TEST_EQUAL(0x0000000000000006, pen->GetDependsOlder());
+	TEST_EQUAL(0x3141, pen->GetFlags());
+
+	CollectInBufferStream buf2;
+	dir.WriteToStream(buf2);
+	buf2.SetForReading();
+	buf.Seek(0, IOStream::SeekType_Absolute);
+	TEST_EQUAL(101, buf2.GetSize());
+	TEST_EQUAL(buf.GetSize(), buf2.GetSize());
+
+	// Test that the stream written out for the Directory is exactly the same as the
+	// one we hand-crafted earlier.
+	TEST_EQUAL(0, memcmp(buf.GetBuffer(), buf2.GetBuffer(), buf.GetSize()));
+
+	TEARDOWN_TEST_BACKUPSTORE();
+}
+
 int test(int argc, const char *argv[])
 {
 	TEST_THAT(test_open_files_with_limited_win32_permissions());
@@ -3187,6 +3276,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_account_limits_respected());
 	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
+	TEST_THAT(test_read_write_attr_streamformat());
 
 	return finish_test_suite();
 }
