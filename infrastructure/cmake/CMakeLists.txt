@@ -48,6 +48,78 @@ endforeach()
 
 file(READ "${base_dir}/infrastructure/buildenv-testmain-template.cpp" test_template)
 
+include(FindPerl)
+
+execute_process(
+	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl
+	RESULT_VARIABLE status
+	OUTPUT_VARIABLE command_output
+	ERROR_VARIABLE command_output)
+if(NOT status EQUAL 0)
+	message(FATAL_ERROR "Failed to execute: "
+		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl: "
+		"status ${status}: ${command_output}")
+endif()
+
+# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules are
+# hard-coded here.
+set(exception_files
+	lib/backupclient/ClientException.txt
+	lib/backupstore/BackupStoreException.txt
+	lib/common/CommonException.txt
+	lib/common/ConversionException.txt
+	lib/compress/CompressException.txt
+	lib/crypto/CipherException.txt
+	lib/httpserver/HTTPException.txt
+	lib/raidfile/RaidFileException.txt
+	lib/server/ServerException.txt
+	lib/server/ConnectionException.txt
+)
+
+foreach(exception_file ${exception_files})
+	string(REGEX MATCH "(.*)/(.*).txt" valid_exception_file ${exception_file})
+	if(NOT valid_exception_file)
+		message(FATAL_ERROR "invalid exception file: '${exception_file}'")
+	endif()
+
+	set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
+	add_custom_command(OUTPUT "${output_file}"
+		MAIN_DEPENDENCY "${base_dir}/${exception_file}"
+		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/common/makeexception.pl" "${CMAKE_MATCH_2}.txt"
+		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
+
+	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
+	set(${module_name}_extra_files ${${module_name}_extra_files} ${output_file})
+endforeach()
+
+set(protocol_files
+	lib/backupstore/backupprotocol.txt
+	test/basicserver/testprotocol.txt
+)
+
+foreach(protocol_file ${protocol_files})
+	string(REGEX MATCH "(.*)/(.*).txt" valid_protocol_file ${protocol_file})
+	if(NOT valid_protocol_file)
+		message(FATAL_ERROR "invalid protocol file: '${protocol_file}'")
+	endif()
+
+	set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
+	add_custom_command(OUTPUT "${output_file}"
+		MAIN_DEPENDENCY "${base_dir}/${protocol_file}"
+		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/server/makeprotocol.pl" "${CMAKE_MATCH_2}.txt"
+		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
+
+	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
+	set(${module_name}_extra_files ${${module_name}_extra_files} ${output_file})
+endforeach()
+
+set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
+add_custom_command(OUTPUT "${output_file}"
+	MAIN_DEPENDENCY "${base_dir}/bin/bbackupquery/documentation.txt"
+	COMMAND ${PERL_EXECUTABLE} "${base_dir}/bin/bbackupquery/makedocumentation.pl"
+	WORKING_DIRECTORY "${base_dir}/bin/bbackupquery")
+set(bin_bbackupquery_extra_files ${bin_bbackupquery_extra_files} ${output_file})
+
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 # qdbm, lib/common and lib/win32 aren't listed in modules.txt, so hard-code them.
 foreach(module_dep
@@ -67,6 +139,7 @@ foreach(module_dep
 		string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
 		string(REPLACE "/" "_" dependencies "${CMAKE_MATCH_2}")
 		file(GLOB module_files ${module_path}/*.c ${module_path}/*.cpp)
+		set(module_files ${module_files} ${${module_name}_extra_files})
 
 		# everything except qdbm, lib/common and lib/win32 implicitly depend on
 		# lib/common, so express that dependency here.
@@ -123,81 +196,6 @@ foreach(module_dep
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
 endforeach()
-
-include(FindPerl)
-
-execute_process(
-	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl
-	RESULT_VARIABLE status
-	OUTPUT_VARIABLE command_output
-	ERROR_VARIABLE command_output)
-if(NOT status EQUAL 0)
-	message(FATAL_ERROR "Failed to execute: "
-		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl: "
-		"status ${status}: ${command_output}")
-endif()
-
-# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules are
-# hard-coded here.
-set(exception_files
-	lib/backupclient/ClientException.txt
-	lib/backupstore/BackupStoreException.txt
-	lib/common/CommonException.txt
-	lib/common/ConversionException.txt
-	lib/compress/CompressException.txt
-	lib/crypto/CipherException.txt
-	lib/httpserver/HTTPException.txt
-	lib/raidfile/RaidFileException.txt
-	lib/server/ServerException.txt
-	lib/server/ConnectionException.txt
-)
-
-foreach(exception_file ${exception_files})
-	string(REGEX MATCH "(.*)/(.*).txt" valid_exception_file ${exception_file})
-	if(NOT valid_exception_file)
-		message(FATAL_ERROR "invalid exception file: '${exception_file}'")
-	endif()
-
-	add_custom_command(OUTPUT "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp"
-		MAIN_DEPENDENCY "${base_dir}/${exception_file}"
-		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/common/makeexception.pl" "${CMAKE_MATCH_2}.txt"
-		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
-	add_custom_target(${CMAKE_MATCH_2}
-		DEPENDS "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
-
-	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
-	add_dependencies(${module_name} ${CMAKE_MATCH_2})
-endforeach()
-
-set(protocol_files
-	lib/backupstore/backupprotocol.txt
-	test/basicserver/testprotocol.txt
-)
-
-foreach(protocol_file ${protocol_files})
-	string(REGEX MATCH "(.*)/(.*).txt" valid_protocol_file ${protocol_file})
-	if(NOT valid_protocol_file)
-		message(FATAL_ERROR "invalid protocol file: '${protocol_file}'")
-	endif()
-
-	add_custom_command(OUTPUT "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp"
-		MAIN_DEPENDENCY "${base_dir}/${protocol_file}"
-		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/server/makeprotocol.pl" "${CMAKE_MATCH_2}.txt"
-		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
-	add_custom_target(${CMAKE_MATCH_2}
-		DEPENDS "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
-
-	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
-	add_dependencies(${module_name} ${CMAKE_MATCH_2})
-endforeach()
-
-add_custom_command(OUTPUT "${base_dir}/bin/bbackupquery/autogen_Documentation.cpp"
-	MAIN_DEPENDENCY "${base_dir}/bin/bbackupquery/documentation.txt"
-	COMMAND ${PERL_EXECUTABLE} "${base_dir}/bin/bbackupquery/makedocumentation.pl"
-	WORKING_DIRECTORY "${base_dir}/bin/bbackupquery")
-add_custom_target(bin_bbackupquery_docs
-	DEPENDS "${base_dir}/bin/bbackupquery/autogen_Documentation.cpp")
-add_dependencies(bin_bbackupquery bin_bbackupquery_docs)
 
 #include(ExternalProject)
 #ExternalProject_Add(pcre
