@@ -47,6 +47,11 @@ public:
 	}
 #endif
 
+	typedef enum
+	{
+		Option_DependencyInfoPresent = 1
+	} dir_StreamFormatOptions;
+
 	BackupStoreDirectory();
 	BackupStoreDirectory(int64_t ObjectID, int64_t ContainerID);
 	// Convenience constructor from a stream

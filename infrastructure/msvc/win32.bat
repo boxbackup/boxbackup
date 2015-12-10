@@ -30,6 +30,9 @@ cd ..\..\
 cd .\lib\crypto & perl ./../../lib/common/makeexception.pl.in CipherException.txt
 cd ..\..\
 
+cd .\lib\httpserver & perl ./../../lib/common/makeexception.pl.in HTTPException.txt
+cd ..\..\
+
 echo server parts - which appears as though some of the clients rely on
 
 cd .\lib\server & perl ./../../lib/common/makeexception.pl.in ServerException.txt & perl ./../../lib/common/makeexception.pl.in ConnectionException.txt

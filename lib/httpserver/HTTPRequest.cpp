@@ -10,9 +10,10 @@
 #include "Box.h"
 
 #include <string.h>
-#include <strings.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#include <sstream>
 
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"

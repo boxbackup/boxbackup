@@ -1,0 +1,184 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{97D89AEF-2BE4-4E34-8703-03BA67BF4494}</ProjectGuid>
+    <RootNamespace>libbackupstore</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(ProjectDir)..\..\..\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <TargetExt>.lib</TargetExt>
+    <IntDir>$(ProjectDir)..\..\..\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(ProjectDir)..\..\..\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\..\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\lib\httpserver;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4521</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Ws2_32.lib;Advapi32.lib;User32.lib;$(ProjectDir)..\..\..\..\zlib\lib\zdll.lib;$(ProjectDir)..\..\..\..\openssl\lib\libeay32.lib;$(ProjectDir)..\..\..\..\openssl\lib\ssleay32.lib;$(ProjectDir)..\..\..\$(Configuration)\common.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Lib />
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\lib\backupclient;$(SolutionDir)..\..\..\lib\backupstore;$(SolutionDir)..\..\..\lib\raidfile;$(SolutionDir)..\..\..\lib\common;$(SolutionDir)..\..\..\lib\compress;$(SolutionDir)..\..\..\lib\crypto;$(SolutionDir)..\..\..\lib\server;$(SolutionDir)..\..\..\lib\win32;$(SolutionDir)..\..\..\lib\httpserver;$(SolutionDir)..\..\..\qdbm;$(SolutionDir)..\..\..\..\openssl\include;$(SolutionDir)..\..\..\..\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;BOX_RELEASE_BUILD;_LIB;PLATFORM_DISABLE_MEM_LEAK_TESTING;_CRT_SECURE_NO_DEPRECATE;PCRE_STATIC;QDBM_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4521</DisableSpecificWarnings>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupProtocol.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\autogen_BackupStoreException.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupAccountControl.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupClientFileAttributes.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupCommands.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreAccountDatabase.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreAccounts.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheck.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheck2.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreCheckData.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreConfigVerify.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreContext.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreDirectory.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFile.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCmbDiff.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCmbIdx.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCombine.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileCryptVar.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileDiff.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileEncodeStream.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFilename.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFilenameClear.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreFileRevDiff.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreInfo.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\HousekeepStoreAccount.cpp" />
+    <ClCompile Include="..\..\..\lib\backupstore\StoreStructure.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\autogen_HTTPException.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\cdecode.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\cencode.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\HTTPQueryDecoder.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\HTTPRequest.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\HTTPResponse.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\HTTPServer.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\S3Client.cpp" />
+    <ClCompile Include="..\..\..\lib\httpserver\S3Simulator.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\autogen_RaidFileException.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileController.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileRead.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileUtil.cpp" />
+    <ClCompile Include="..\..\..\lib\raidfile\RaidFileWrite.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupProtocol.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\autogen_BackupStoreException.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupAccountControl.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupClientFileAttributes.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupConstants.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreAccountDatabase.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreAccounts.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreCheck.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreConfigVerify.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreConstants.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreContext.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreDirectory.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreException.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFile.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFileCryptVar.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFileEncodeStream.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFilename.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFilenameClear.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreFileWire.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreInfo.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreObjectMagic.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\BackupStoreRefCountDatabase.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\HousekeepStoreAccount.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\RunStatusProvider.h" />
+    <ClInclude Include="..\..\..\lib\backupstore\StoreStructure.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\autogen_HTTPException.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\cdecode.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\cencode.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\decode.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\encode.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\HTTPQueryDecoder.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\HTTPRequest.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\HTTPResponse.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\HTTPServer.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\S3Client.h" />
+    <ClInclude Include="..\..\..\lib\httpserver\S3Simulator.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\autogen_RaidFileException.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileController.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileException.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileRead.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileUtil.h" />
+    <ClInclude Include="..\..\..\lib\raidfile\RaidFileWrite.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\lib\backupstore\backupprotocol.txt" />
+    <None Include="..\..\..\lib\backupstore\BackupStoreException.txt" />
+    <None Include="..\..\..\lib\backupstore\Makefile.extra" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="common.vcxproj">
+      <Project>{a089cee6-ebf0-4232-a0c0-74850a8127a6}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
