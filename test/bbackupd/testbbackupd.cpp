@@ -21,7 +21,6 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <string.h>
-#include <unistd.h>
 
 #ifdef HAVE_SYS_WAIT_H
 	#include <sys/wait.h>
