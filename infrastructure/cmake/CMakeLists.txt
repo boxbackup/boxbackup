@@ -191,6 +191,14 @@ foreach(protocol_file ${protocol_files})
 	add_dependencies(${module_name} ${CMAKE_MATCH_2})
 endforeach()
 
+add_custom_command(OUTPUT "${base_dir}/bin/bbackupquery/autogen_Documentation.cpp"
+	MAIN_DEPENDENCY "${base_dir}/bin/bbackupquery/documentation.txt"
+	COMMAND ${PERL_EXECUTABLE} "${base_dir}/bin/bbackupquery/makedocumentation.pl"
+	WORKING_DIRECTORY "${base_dir}/bin/bbackupquery")
+add_custom_target(bin_bbackupquery_docs
+	DEPENDS "${base_dir}/bin/bbackupquery/autogen_Documentation.cpp")
+add_dependencies(bin_bbackupquery bin_bbackupquery_docs)
+
 #include(ExternalProject)
 #ExternalProject_Add(pcre
 #	PREFIX "../pcre"
@@ -226,3 +234,5 @@ find_library(pcreposixd_lib_path pcreposixd ${base_dir}/../pcre-win32/lib)
 find_library(pcred_lib_path pcred ${base_dir}/../pcre-win32/lib)
 target_link_libraries(lib_common PUBLIC "${pcreposixd_lib_path}" "${pcred_lib_path}")
 
+# Define the location of the Perl executable, needed by testbackupstorefix
+target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${PERL_EXECUTABLE}")
