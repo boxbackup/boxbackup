@@ -40,12 +40,12 @@ test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	bin/bbacku
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
+bin/s3simulator		lib/httpserver
 test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
 lib/httpserver          lib/server 
 test/httpserver         lib/httpserver 
-bin/s3simulator		lib/httpserver
 
 # END_IF_DISTRIBUTION
 

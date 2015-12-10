@@ -61,8 +61,9 @@ if(NOT status EQUAL 0)
 		"status ${status}: ${command_output}")
 endif()
 
-# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules are
-# hard-coded here.
+# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules for 
+# code-generating Perl scripts are hard-coded here.
+
 set(exception_files
 	lib/backupclient/ClientException.txt
 	lib/backupstore/BackupStoreException.txt
@@ -113,12 +114,25 @@ foreach(protocol_file ${protocol_files})
 	set(${module_name}_extra_files ${${module_name}_extra_files} ${output_file})
 endforeach()
 
-set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
-add_custom_command(OUTPUT "${output_file}"
-	MAIN_DEPENDENCY "${base_dir}/bin/bbackupquery/documentation.txt"
-	COMMAND ${PERL_EXECUTABLE} "${base_dir}/bin/bbackupquery/makedocumentation.pl"
-	WORKING_DIRECTORY "${base_dir}/bin/bbackupquery")
-set(bin_bbackupquery_extra_files ${bin_bbackupquery_extra_files} ${output_file})
+set(documentation_files
+	bin/bbackupquery/documentation.txt
+)
+
+foreach(documentation_file ${documentation_files})
+	string(REGEX MATCH "(.*)/(.*).txt" valid_documentation_file ${documentation_file})
+	if(NOT valid_documentation_file)
+		message(FATAL_ERROR "invalid documentation file: '${documentation_file}'")
+	endif()
+
+	set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
+	add_custom_command(OUTPUT "${output_file}"
+		MAIN_DEPENDENCY "${base_dir}/${documentation_file}"
+		COMMAND ${PERL_EXECUTABLE} "${base_dir}/bin/bbackupquery/makedocumentation.pl"
+		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
+
+	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
+	set(${module_name}_extra_files ${${module_name}_extra_files} ${output_file})
+endforeach()
 
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 # qdbm, lib/common and lib/win32 aren't listed in modules.txt, so hard-code them.
@@ -178,7 +192,7 @@ foreach(module_dep
 
 		target_compile_definitions(${module_name} PRIVATE -DBOX_MODULE="${module_dir}")
 
-		if(dependencies MATCHES ".")
+		if(dependencies)
 			string(REGEX REPLACE "[ 	]+" ";" dependency_list "${dependencies}")
 
 			foreach(dependency ${dependency_list})
@@ -189,6 +203,16 @@ foreach(module_dep
 				if(dependency MATCHES "^(lib_.*|qdbm)$")
 					# message(STATUS "add link library to '${module_name}': '${dependency}'")
 					target_link_libraries(${module_name} PUBLIC ${dependency})
+				endif()
+
+				# We can't make a binary depend on another binary, so we need to
+				# add the dependency's directory directly to our include path.
+				if(dependency MATCHES "^bin_")
+					get_property(dep_include_dirs
+						TARGET ${dependency}
+						PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+					target_include_directories(${module_name} 
+						PUBLIC ${dep_include_dirs})
 				endif()
 			endforeach()
 		endif()
