@@ -2601,7 +2601,7 @@ bool test_login_with_disabled_account()
 
 		// Login
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
-			BackupProtocolError::Err_DisabledAccount);
+			Err_DisabledAccount);
 
 		// Finish the connection
 		protocol.QueryFinished();
