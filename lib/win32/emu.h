@@ -162,6 +162,10 @@ inline int geteuid(void)
 {
 	return 0;
 }
+inline int getpid(void)
+{
+	return GetCurrentProcessId();
+}
 
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
