@@ -27,19 +27,21 @@ test/basicserver	qdbm	lib/server
 
 lib/backupstore		lib/server	lib/raidfile	lib/crypto	lib/compress	lib/httpserver
 lib/backupclient	lib/backupstore
+lib/bbackupd		lib/backupclient	qdbm
+lib/bbackupquery	lib/backupclient
 
 bin/bbackupobjdump	lib/backupclient
 bin/bbstored		lib/backupstore
 bin/bbstoreaccounts	lib/backupclient
-bin/bbackupd		lib/backupclient	qdbm
-bin/bbackupquery	lib/backupclient
-bin/bbackupctl		lib/backupclient	qdbm	bin/bbackupd
+bin/bbackupd		lib/bbackupd
+bin/bbackupquery	lib/bbackupquery
+bin/bbackupctl		lib/backupclient	qdbm	lib/bbackupd
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient
-test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
+test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/bbackupquery lib/bbackupd lib/server lib/backupstore lib/backupclient	lib/intercept
 bin/s3simulator		lib/httpserver
 test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
 

@@ -16,7 +16,7 @@ set(files_to_configure
 	test/bbackupd/testfiles/bbackupd-symlink.conf
 	test/bbackupd/testfiles/bbackupd-temploc.conf
 	bin/bbackupd/bbackupd-config
-	bin/bbackupquery/makedocumentation.pl
+	lib/bbackupquery/makedocumentation.pl
 	bin/bbstored/bbstored-certs
 	bin/bbstored/bbstored-config
 	contrib/debian/bbackupd
@@ -115,7 +115,7 @@ foreach(protocol_file ${protocol_files})
 endforeach()
 
 set(documentation_files
-	bin/bbackupquery/documentation.txt
+	lib/bbackupquery/documentation.txt
 )
 
 foreach(documentation_file ${documentation_files})
@@ -127,7 +127,7 @@ foreach(documentation_file ${documentation_files})
 	set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
 	add_custom_command(OUTPUT "${output_file}"
 		MAIN_DEPENDENCY "${base_dir}/${documentation_file}"
-		COMMAND ${PERL_EXECUTABLE} "${base_dir}/bin/bbackupquery/makedocumentation.pl"
+		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/bbackupquery/makedocumentation.pl"
 		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
 
 	string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
