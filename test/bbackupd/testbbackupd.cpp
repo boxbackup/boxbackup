@@ -35,6 +35,10 @@
 	#include <signal.h>
 #endif
 
+#ifdef WIN32
+	#include <process.h>
+#endif
+
 #include <map>
 
 #ifdef HAVE_SYSCALL

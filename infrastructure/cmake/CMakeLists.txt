@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.6)
 project(BoxBackup)
+enable_testing()
 
 set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
@@ -61,7 +62,7 @@ if(NOT status EQUAL 0)
 		"status ${status}: ${command_output}")
 endif()
 
-# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules for 
+# Parsing Makefile.extra files in CMake script is a pain, so the relevant rules for
 # code-generating Perl scripts are hard-coded here.
 
 set(exception_files
@@ -166,10 +167,18 @@ foreach(module_dep
 		string(REGEX REPLACE " $" "" dependencies "${dependencies}")
 
 		if(module_name MATCHES "^bin_")
+			string(REGEX MATCH "^bin_(.*)" valid_exe ${module_name})
+			set(bin_name ${CMAKE_MATCH_1})
 			if(DEBUG)
 				message(STATUS "add executable '${module_name}': '${module_files}'")
 			endif()
 			add_executable(${module_name} ${module_files})
+
+			# We need to install binaries in specific places so that tests
+			# can find them:
+			install(FILES "$<TARGET_FILE:${module_name}>"
+				DESTINATION "${base_dir}/debug/${module_dir}"
+				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
@@ -182,6 +191,8 @@ foreach(module_dep
 			file(WRITE "${module_path}/_main.cpp" "${test_main}")
 			add_executable(${module_name} ${module_files}
 				"${module_path}/_main.cpp")
+			add_test(NAME ${test_name}
+				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl ${test_name})
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
 			if(DEBUG)
 				message(STATUS "add library '${module_name}': '${module_files}'")
@@ -191,7 +202,7 @@ foreach(module_dep
 			message(FATAL_ERROR "Unsupported module type: " ${module_name})
 		endif()
 
-		target_compile_definitions(${module_name} PRIVATE -DBOX_MODULE="${module_dir}")
+		target_compile_definitions(${module_name} PRIVATE -DBOX_MODULE="${module_name}")
 
 		if(dependencies)
 			string(REGEX REPLACE "[ 	]+" ";" dependency_list "${dependencies}")
@@ -212,7 +223,7 @@ foreach(module_dep
 					get_property(dep_include_dirs
 						TARGET ${dependency}
 						PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-					target_include_directories(${module_name} 
+					target_include_directories(${module_name}
 						PUBLIC ${dep_include_dirs})
 				endif()
 			endforeach()
