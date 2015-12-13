@@ -3899,7 +3899,7 @@ bool test_locked_file_behaviour()
 		// and the appropriate error is reported.
 
 		HANDLE handle = openfile("testfiles/TestDir1/f1.dat",
-			O_LOCK, 0);
+			BOX_OPEN_LOCK, 0);
 		TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 		{
@@ -3928,7 +3928,7 @@ bool test_locked_file_behaviour()
 			// open the file again, compare and check that compare
 			// reports the correct error message (and finishes)
 			handle = openfile("testfiles/TestDir1/f1.dat",
-				O_LOCK, 0);
+				BOX_OPEN_LOCK, 0);
 			TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 			TEST_COMPARE(Compare_Error);

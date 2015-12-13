@@ -224,7 +224,7 @@ struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
 
 // local constant to open file exclusively without shared access
-#define O_LOCK 0x10000
+#define BOX_OPEN_LOCK 0x10000
 
 extern DWORD winerrno; /* used to report errors from openfile() */
 HANDLE openfile(const char *filename, int flags, int mode);

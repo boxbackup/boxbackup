@@ -613,7 +613,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		createDisposition = CREATE_NEW;
 	}
 
-	if (flags & O_LOCK)
+	if (flags & BOX_OPEN_LOCK)
 	{
 		shareMode = 0;
 	}

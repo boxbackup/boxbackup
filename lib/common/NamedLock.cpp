@@ -82,6 +82,9 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 #if HAVE_DECL_O_EXLOCK
 	flags |= O_NONBLOCK | O_EXLOCK;
 	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXLOCK");
+#elif defined BOX_OPEN_LOCK
+	flags |= BOX_OPEN_LOCK;
+	BOX_TRACE("Trying to create lockfile " << rFilename << " using BOX_OPEN_LOCK");
 #elif !HAVE_DECL_F_SETLK && !defined HAVE_FLOCK
 	// We have no other way to get a lock, so all we can do is fail if
 	// the file already exists, and take the risk of stale locks.
