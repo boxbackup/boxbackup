@@ -2819,8 +2819,8 @@ bool test_open_files_with_limited_win32_permissions()
 	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
 	HANDLE h1 = CreateFileA(file, accessRights, shareMode,
-		NULL, OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	assert(h1 != INVALID_HANDLE_VALUE);
+		NULL, OPEN_ALWAYS, // create file if it doesn't exist
+		FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
 
 	accessRights = FILE_READ_ATTRIBUTES |
@@ -2828,7 +2828,6 @@ bool test_open_files_with_limited_win32_permissions()
 
 	HANDLE h2 = CreateFileA(file, accessRights, shareMode,
 		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	assert(h2 != INVALID_HANDLE_VALUE);
 	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
 
 	CloseHandle(h2);
