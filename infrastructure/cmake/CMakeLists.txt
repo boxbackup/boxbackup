@@ -152,7 +152,8 @@ foreach(module_dep
 		set(module_path ${base_dir}/${module_dir})
 		string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
 		string(REPLACE "/" "_" dependencies "${CMAKE_MATCH_2}")
-		file(GLOB module_files ${module_path}/*.c ${module_path}/*.cpp)
+		file(GLOB module_files ${module_path}/*.c ${module_path}/*.cpp
+			${module_path}/*.h)
 		set(module_files ${module_files} ${${module_name}_extra_files})
 
 		# everything except qdbm, lib/common and lib/win32 implicitly depend on
