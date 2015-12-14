@@ -1567,16 +1567,14 @@ void syslog(int loglevel, const char *frmt, ...)
 			if (!sHaveWarnedEventLogFull)
 			{
 				printf("Unable to send message to Event Log "
-					"(Event Log is full):\r\n");
-				fflush(stdout);
+					"(Event Log is full): %s\r\n", buffer);
 				sHaveWarnedEventLogFull = TRUE;
 			}
 		}
 		else
 		{
-			printf("Unable to send message to Event Log: %s:\r\n",
-				GetErrorMessage(winerrno).c_str());
-			fflush(stdout);
+			printf("Unable to send message to Event Log: %s: %s\r\n",
+				GetErrorMessage(winerrno).c_str(), buffer);
 		}
 	}
 	else
