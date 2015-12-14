@@ -36,7 +36,11 @@
 //
 // --------------------------------------------------------------------------
 NamedLock::NamedLock()
-	: mFileDescriptor(-1)
+#ifdef WIN32
+: mFileDescriptor(INVALID_HANDLE_VALUE)
+#else
+: mFileDescriptor(-1)
+#endif
 {
 }
 
@@ -50,7 +54,11 @@ NamedLock::NamedLock()
 // --------------------------------------------------------------------------
 NamedLock::~NamedLock()
 {
+#ifdef WIN32
+	if(mFileDescriptor != INVALID_HANDLE_VALUE)
+#else
 	if(mFileDescriptor != -1)
+#endif
 	{
 		ReleaseLock();
 	}
@@ -69,7 +77,11 @@ NamedLock::~NamedLock()
 bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 {
 	// Check
+#ifdef WIN32
+	if(mFileDescriptor != INVALID_HANDLE_VALUE)
+#else
 	if(mFileDescriptor != -1)
+#endif
 	{
 		THROW_EXCEPTION(CommonException, NamedLockAlreadyLockingSomething)
 	}
@@ -94,8 +106,13 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	BOX_TRACE("Trying to create lockfile " << rFilename << " without special flags");
 #endif
 
+#ifdef WIN32
+	HANDLE fd = openfile(rFilename.c_str(), flags, mode);
+	if(fd == INVALID_HANDLE_VALUE)
+#else
 	int fd = ::open(rFilename.c_str(), flags, mode);
 	if(fd == -1)
+#endif
 #if HAVE_DECL_O_EXLOCK
 	{ // if()
 		if(errno == EWOULDBLOCK)
@@ -114,7 +131,11 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	}
 #else // !HAVE_DECL_O_EXLOCK
 	{ // if()
+# if defined BOX_OPEN_LOCK
+		if(errno == EBUSY)
+# else // !BOX_OPEN_LOCK
 		if(errno == EEXIST && (flags & O_EXCL))
+# endif
 		{
 			// Lockfile already exists, and we tried to open it
 			// exclusively, which means we failed to lock it.
@@ -174,7 +195,11 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	}
 	catch(BoxException &e)
 	{
+# ifdef WIN32
+		CloseHandle(fd);
+# else
 		::close(fd);
+# endif
 		BOX_NOTICE("Failed to lock lockfile " << rFilename << ": " << e.what());
 		throw;
 	}
@@ -184,7 +209,11 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	{
 		BOX_ERROR("Locked lockfile " << rFilename << ", but lockfile no longer "
 			"exists, bailing out");
+# ifdef WIN32
+		CloseHandle(fd);
+# else
 		::close(fd);
+# endif
 		return false;
 	}
 
@@ -206,7 +235,11 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 void NamedLock::ReleaseLock()
 {
 	// Got a lock?
+#ifdef WIN32
+	if(mFileDescriptor == INVALID_HANDLE_VALUE)
+#else
 	if(mFileDescriptor == -1)
+#endif
 	{
 		THROW_EXCEPTION(CommonException, NamedLockNotHeld)
 	}
@@ -232,7 +265,11 @@ void NamedLock::ReleaseLock()
 #endif // !WIN32
 
 	// Close the file
+# ifdef WIN32
+	if(!CloseHandle(mFileDescriptor))
+# else
 	if(::close(mFileDescriptor) != 0)
+# endif
 	{
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to close lockfile"),
@@ -240,7 +277,11 @@ void NamedLock::ReleaseLock()
 	}
 
 	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
+#ifdef WIN32
+	mFileDescriptor = INVALID_HANDLE_VALUE;
+#else
 	mFileDescriptor = -1;
+#endif
 
 #ifdef WIN32
 	// On Windows we need to close the file before deleting it, otherwise
@@ -256,4 +297,3 @@ void NamedLock::ReleaseLock()
 
 	BOX_TRACE("Released lock and deleted lockfile " << mFileName);
 }
-
