@@ -983,7 +983,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	
 	// Open file
 	FileStream out(args[1].c_str(), O_WRONLY | O_CREAT | O_EXCL);
-	
+
 	// Request that object
 	try
 	{
@@ -992,11 +992,12 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 
 		// Stream that object out to the file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+        int64_t fileSize=objectStream->BytesLeftToRead();
 		objectStream->CopyStreamTo(out);
 			
 		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
-			" fetched successfully.");
-	}
+            " fetched successfully. ("<<fileSize<<" B)");
+    }
 	catch(ConnectionException &e)
 	{
 		if(mrConnection.GetLastErrorType() == BackupProtocolError::Err_DoesNotExist)

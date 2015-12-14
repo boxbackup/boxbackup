@@ -95,7 +95,7 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 // --------------------------------------------------------------------------
 bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 {
-	BOX_TRACE("Starting housekeeping on account " <<
+    BOX_INFO("Starting housekeeping on account " <<
 		BOX_FORMAT_ACCOUNT(mAccountID));
 
 	// Attempt to lock the account

@@ -602,7 +602,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 
 				// Add it to the list of done itmes
 				rLevel.mRestoredObjects.insert(en->GetObjectID());
-				
+
 				// Save restore info?
 				int64_t fileSize;
 				bool exists = false;
@@ -647,6 +647,9 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 						return Restore_UnknownError;
 					}
 				}
+
+                BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+                    " fetched successfully. ("<<fileSize<<" B)");
 
 				if(exists)
 				{
