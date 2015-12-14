@@ -992,11 +992,11 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 
 		// Stream that object out to the file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-        int64_t fileSize=objectStream->BytesLeftToRead();
+        int64_t bytes=objectStream->BytesLeftToRead();
 		objectStream->CopyStreamTo(out);
 			
 		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
-            " fetched successfully. ("<<fileSize<<" B)");
+            " fetched successfully. ("<<bytes<<" B)");
     }
 	catch(ConnectionException &e)
 	{
@@ -1231,13 +1231,16 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 
 		// Stream containing encoded file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-		
+
 		// Decode it
 		BackupStoreFile::DecodeFile(*objectStream, localName.c_str(), mrConnection.GetTimeout());
 
+        int64_t fileSize=0;
+        FileExists(localName.c_str(), &fileSize, true );
+
 		// Done.
-		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(fileId) <<
-			" fetched successfully.");
+        BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(fileId) <<
+            " fetched successfully. ("<<fileSize<<" B)");
 	}
 	catch (BoxException &e)
 	{

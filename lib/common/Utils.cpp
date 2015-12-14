@@ -212,11 +212,10 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 			THROW_EXCEPTION(CommonException, OSFileError);
 		}
 	}
-
 	// is it a file?	
 	if((st.st_mode & S_IFDIR) == 0)
 	{
-		if(TreatLinksAsNotExisting && ((st.st_mode & S_IFLNK) != 0))
+        if(TreatLinksAsNotExisting && ((st.st_mode & S_IFLNK) == S_IFLNK))
 		{
 			return false;
 		}
@@ -229,6 +228,7 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 	
 		return true;
 	}
+
 	else
 	{
 		return false;
