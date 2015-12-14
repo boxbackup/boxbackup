@@ -22,7 +22,9 @@
 #endif
 
 #include "BoxTime.h"
+#include "FileStream.h"
 #include "Test.h"
+#include "Utils.h"
 
 int num_tests_selected = 0;
 int num_failures = 0;
@@ -81,6 +83,60 @@ bool setUp(const char* function_name)
 		}
 	}
 
+#ifdef _MSC_VER
+	DIR* pDir = opendir("testfiles");
+	if(!pDir)
+	{
+		THROW_SYS_FILE_ERROR("Failed to open test temporary directory",
+			"testfiles", CommonException, Internal);
+	}
+	struct dirent* pEntry;
+	for(pEntry = readdir(pDir); pEntry; pEntry = readdir(pDir))
+	{
+		std::string filename = pEntry->d_name;
+		if(StartsWith("TestDir", filename) ||
+			StartsWith("0_", filename) ||
+			filename == "accounts.txt" ||
+			StartsWith("file", filename) ||
+			StartsWith("notifyran", filename) ||
+			StartsWith("notifyscript.tag", filename) ||
+			StartsWith("restore", filename) ||
+			filename == "bbackupd-data" ||
+			filename == "syncallowscript.control" ||
+			StartsWith("syncallowscript.notifyran.", filename) ||
+			filename == "test2.downloaded")
+		{
+			int filetype = ObjectExists(std::string("testfiles/") + filename);
+			if(filetype == ObjectExists_File)
+			{
+				if(!::unlink(filename.c_str()))
+				{
+					TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
+						"test fixture file: unlink(\"" << filename << "\")"));
+				}
+			}
+			else if(filetype == ObjectExists_Dir)
+			{
+				std::string cmd = "rmdir /s /q testfiles\\" + filename;
+				int status = system(cmd.c_str());
+				if(status != 0)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete test fixture "
+						"file: command '" << cmd << "' exited with "
+						"status " << status);
+				}
+			}
+			else
+			{
+				TEST_FAIL_WITH_MESSAGE("Don't know how to delete file " << filename << 
+					" of type " << filetype);
+			}
+		}
+	}
+	closedir(pDir);
+	FileStream touch("testfiles/accounts.txt", O_WRONLY | O_CREAT | O_TRUNC,
+		S_IRUSR | S_IWUSR);
+#else
 	TEST_THAT_THROWONFAIL(system(
 		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
 		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
@@ -91,11 +147,12 @@ bool setUp(const char* function_name)
 		"testfiles/syncallowscript.notifyran.* "
 		"testfiles/test2.downloaded"
 		) == 0);
+	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
+#endif
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
-	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 
 	return true;
 }

@@ -31,9 +31,12 @@ if [ ! -x "configure" ]; then
 fi
 
 if ! ./configure "$@" --host=$target \
+	--with-ssl-headers="${DEP_PATH}/include" \
+	--with-ssl-lib="${DEP_PATH}/lib" \
 	CFLAGS="-mthreads" \
 	CXXFLAGS="-mthreads" \
-	LDFLAGS="-Wl,-Bstatic -mthreads -L${DEP_PATH}/lib -L${LIBZ_PATH}"
+	LDFLAGS="-Wl,-Bstatic -mthreads -L${LIBZ_PATH}" \
+	LIBS="-lws2_32 -lgdi32"
 then
 	echo "Error: configure failed, aborting." >&2
 	exit 1

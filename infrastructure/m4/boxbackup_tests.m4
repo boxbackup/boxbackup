@@ -25,6 +25,7 @@ if test "x$GXX" = "xyes"; then
     # [http://readlist.com/lists/gcc.gnu.org/gcc/6/31502.html]
     # This is needed to get symbols in backtraces.
     # Note that this apparently fails on HP-UX and Solaris
+    save_LDFLAGS=$LDFLAGS
     LDFLAGS="$LDFLAGS -rdynamic"
     AC_MSG_CHECKING([whether gcc accepts -rdynamic])
     AC_TRY_LINK([], [return 0;],
@@ -33,8 +34,10 @@ if test "x$GXX" = "xyes"; then
     if test x"$have_rdynamic" = x"yes" ; then
       AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
     fi
+    LDFLAGS=$save_LDFLAGS
     ;;
   esac
+
 fi
 
 AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])

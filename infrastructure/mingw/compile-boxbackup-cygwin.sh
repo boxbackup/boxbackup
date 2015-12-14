@@ -3,9 +3,13 @@
 set -e
 set -x
 
+basedir=`cd $(dirname $0)/../../.. && pwd`
+cd $basedir
+
 wget -c https://cygwin.com/setup-x86_64.exe \
 || powershell wget https://cygwin.com/setup-x86_64.exe -UseBasicParsing -outfile setup-x86_64.exe
 
+chmod a+x setup-x86_64.exe
 ./setup-x86_64.exe --quiet-mode --packages \
 	"autoconf,automake,gdb,make,mingw64-x86_64-gcc,mingw64-x86_64-gcc-g++,
 	,mingw64-x86_64-zlib,libxml2,libxslt,perl,subversion,unzip,vim,wget"
@@ -41,14 +45,5 @@ tar xjf `basename $pcre_url`
 		--host=$compiler_prefix
 	make
 	make install
-)
-
-svn co https://www.boxbackup.org/svn/box/trunk/ bb-trunk
-(
-	cd bb-trunk
-	./infrastructure/mingw/configure.sh
-	make
-	./infrastructure/mingw/runtest.sh ALL
-	./infrastructure/mingw/runtest.sh ALL release
 )
 
