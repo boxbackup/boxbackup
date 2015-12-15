@@ -75,12 +75,10 @@ install:
   - dir pcre-%PLATFORM%\lib
 
   - cd %APPVEYOR_BUILD_FOLDER%
-  - dir
   - cd infrastructure\cmake
-  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
-  - dir
-  - cd %APPVEYOR_BUILD_FOLDER%
+  - cmake -G "%Generator%" -A %PLATFORM%
 
 test_script:
-  - perl runtest.pl
+  - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
+  - ctest -C %CONFIGURATION%
 
