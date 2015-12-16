@@ -25,7 +25,7 @@
 #define BOX_LOG(level, stuff) \
 { \
 	std::ostringstream _box_log_line; \
-	_box_log_line << stuff; \
+    _box_log_line << stuff; \
 	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
 		Logging::UNCATEGORISED, _box_log_line.str()); \
 }
@@ -33,7 +33,7 @@
 #define BOX_LOG_CATEGORY(level, category, stuff) \
 { \
 	std::ostringstream _box_log_line; \
-	_box_log_line << stuff; \
+    _box_log_line << stuff; \
 	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
 		category, _box_log_line.str()); \
 }
@@ -41,7 +41,7 @@
 #define BOX_SYSLOG(level, stuff) \
 { \
 	std::ostringstream _box_log_line; \
-	_box_log_line << stuff; \
+    _box_log_line << stuff; \
 	Logging::LogToSyslog(level, __FILE__, __LINE__, __FUNCTION__, \
 		Logging::UNCATEGORISED, _box_log_line.str()); \
 }

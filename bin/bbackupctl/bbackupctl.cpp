@@ -76,6 +76,9 @@ int main(int argc, const char *argv[])
     MAINHELPER_START
 
 	Logging::SetProgramName("bbackupctl");
+    Logging::ToConsole(true);
+    Logging::ToSyslog (false);
+
 
 	// Filename for configuration file?
 	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
@@ -314,7 +317,6 @@ int main(int argc, const char *argv[])
 	while(command != NoCommand && !finished && !getLine.IsEOF() &&
 		getLine.GetLine(line, false, PROTOCOL_DEFAULT_TIMEOUT))
 	{
-		BOX_TRACE("Received line: " << line);
 
 		if(line.substr(0, 6) == "state ")
 		{

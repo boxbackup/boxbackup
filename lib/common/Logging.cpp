@@ -72,7 +72,7 @@ Logging::~Logging()
 
 void Logging::ToSyslog(bool enabled)
 {
-	if (!sLogToSyslog && enabled)
+    if (!sLogToSyslog && enabled)
 	{
 		Add(spSyslog);
 	}
@@ -112,6 +112,7 @@ void Logging::FilterSyslog(Log::Level level)
 
 void Logging::Add(Logger* pNewLogger)
 {
+
 	for (std::vector<Logger*>::iterator i = sLoggers.begin();
 		i != sLoggers.end(); i++)
 	{
@@ -175,9 +176,9 @@ void Logging::LogToSyslog(Log::Level level, const std::string& rFile, int line,
 	
 	if (sContextSet)
 	{
-		newMessage += "[" + sContext + "] ";
+        newMessage += "[" + sContext + "] ";
 	}
-	
+
 	newMessage += message;
 
 	spSyslog->Log(level, rFile, line, function, category, newMessage);

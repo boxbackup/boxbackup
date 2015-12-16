@@ -35,7 +35,7 @@ class SysadminNotifier
 	{
 		StoreFull = 0,
 		ReadError,
-		BackupError,
+        BackupError,
 		BackupStart,
 		BackupFinish,
 		BackupOK,
