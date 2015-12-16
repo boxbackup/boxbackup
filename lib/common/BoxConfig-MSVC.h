@@ -2,6 +2,9 @@
 /* lib/common/BoxConfig.h.in.  Generated from configure.ac by autoheader.  */
 /* Hacked by hand to work for MSVC by Chris Wilson */
 
+// using std::min/max 
+#define NOMINMAX
+
 /* Define to major version for BDB_VERSION */
 /* #undef BDB_VERSION_MAJOR */
 
