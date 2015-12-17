@@ -173,15 +173,10 @@ foreach(module_dep
 				message(STATUS "add executable '${module_name}': '${module_files}'")
 			endif()
 			add_executable(${module_name} ${module_files})
-
-			# We need to install binaries in specific places so that tests
-			# can find them:
-			install(FILES "$<TARGET_FILE:${module_name}>"
-				DESTINATION "${base_dir}/debug/${module_dir}"
-				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
+			set(bin_name ${module_name})
 
 			if(DEBUG)
 				message(STATUS "add test '${module_name}': '${module_files}'")
@@ -200,6 +195,14 @@ foreach(module_dep
 			add_library(${module_name} STATIC ${module_files})
 		else()
 			message(FATAL_ERROR "Unsupported module type: " ${module_name})
+		endif()
+
+		if(module_name MATCHES "^(bin|test)_")
+			# We need to install binaries in specific places so that test
+			# runner can find them:
+			install(FILES "$<TARGET_FILE:${module_name}>"
+				DESTINATION "${base_dir}/debug/${module_dir}"
+				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
 		endif()
 
 		target_compile_definitions(${module_name} PRIVATE -DBOX_MODULE="${module_name}")
