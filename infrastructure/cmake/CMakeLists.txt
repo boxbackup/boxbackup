@@ -4,6 +4,14 @@ enable_testing()
 
 set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
+macro(cmake_to_native_path cmake_path native_path)
+	if(WIN32)
+		string(REPLACE "/" "\\" ${native_path} "${cmake_path}")
+	else()
+		set(${native_path} "${cmake_path}")
+	endif()
+endmacro()
+
 set(files_to_configure
 	infrastructure/BoxPlatform.pm
 	contrib/mac_osx/org.boxbackup.bbackupd.plist
@@ -272,4 +280,5 @@ find_library(pcred_lib_path pcred ${base_dir}/../pcre-win32/lib)
 target_link_libraries(lib_common PUBLIC "${pcreposixd_lib_path}" "${pcred_lib_path}")
 
 # Define the location of the Perl executable, needed by testbackupstorefix
-target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${PERL_EXECUTABLE}")
+cmake_to_native_path(PERL_EXECUTABLE perl_executable_native)
+target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_executable_native}")
