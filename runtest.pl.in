@@ -157,6 +157,17 @@ sub runtest
 							"status $status";
 					}
 				}
+				elsif ($line =~ m/^cp (.*) (.*)/)
+				{
+					my ($src, $dst) = ($1, $2);
+					$src =~ s|/|\\|g;
+					$dst =~ s|/|\\|g;
+					my $cmd = "xcopy /s /i /y /q ".
+						"$test_dst_dir\\$src $test_dst_dir\\$dst";
+					my $status = system($cmd);
+					$status == 0 or die "$cmd: failed with ".
+						"status $status";
+				}
 				else
 				{
 					die "Unsupported command in ".
