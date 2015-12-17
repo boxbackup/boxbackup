@@ -700,27 +700,32 @@ int test(int argc, const char *argv[])
 		// structure.
 		// This will destroy or damage objects 18-1b and 58-5b,
 		// some repairably.
-		#define RUN(x) TEST_THAT(system(x) == 0);
-		RUN("mv testfiles/0_0/backup/01234567/02/01/o00.rf "
-			"testfiles/0_0/backup/01234567/02/01/o00.rfw"); // 0x18
-		RUN("mv testfiles/0_1/backup/01234567/02/01/o01.rf "
-			"testfiles/0_1/backup/01234567/02/01/o01.rfw"); // 0x19
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/o00.rf",
+			"testfiles/0_0/backup/01234567/02/01/o00.rfw") == 0); // 0x18
+		TEST_THAT(rename("testfiles/0_1/backup/01234567/02/01/o01.rf",
+			"testfiles/0_1/backup/01234567/02/01/o01.rfw") == 0); // 0x19
 		//RUN("mv testfiles/0_2/backup/01234567/02/01/o02.rf "
 		//	"testfiles/0_0/backup/01234567/02/01/o02.rfw"); // 0x1a
-		RUN("mv testfiles/0_0/backup/01234567/02/01/o03.rf "
-			"testfiles/0_0/backup/01234567/02/01/o03.rfw"); // 0x1b
-		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o00.rf "
-			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw"); // 0x58
-		RUN("mv testfiles/0_1/backup/01234567/02/01/01/o01.rf "
-			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw"); // 0x59
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/o03.rf",
+			"testfiles/0_0/backup/01234567/02/01/o03.rfw") == 0); // 0x1b
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/01/o00.rf",
+			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw") == 0); // 0x58
+		TEST_THAT(rename("testfiles/0_1/backup/01234567/02/01/01/o01.rf",
+			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw") == 0); // 0x59
 		//RUN("mv testfiles/0_2/backup/01234567/02/01/01/o02.rf "
 		//	"testfiles/0_0/backup/01234567/02/01/01/o02.rfw"); // 0x5a
-		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o03.rf "
-			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw"); // 0x5b
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/01/o03.rf",
+			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw") == 0); // 0x5b
 		// RUN("rm -r testfiles/0_1/backup/01234567/02/01");
+
+# define RUN(x) TEST_THAT(system(x) == 0);
+# ifdef WIN32
+		RUN("rmdir /s/q testfiles\\0_2\\backup\\01234567\\02\\01");
+# else // !WIN32
 		RUN("rm -r testfiles/0_2/backup/01234567/02/01");
-		#undef RUN
-#endif // BOX_RELEASE_BUILD
+# endif // WIN32
+# undef RUN
+#endif // !BOX_RELEASE_BUILD
 
 		// Fix it
 		// ERROR:   Object 0x44 is unattached.
