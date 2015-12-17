@@ -77,6 +77,7 @@ install:
   - cd %APPVEYOR_BUILD_FOLDER%
   - cd infrastructure\cmake
   - cmake -G "%Generator%" -A %PLATFORM%
+  - cd %APPVEYOR_BUILD_FOLDER%
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
