@@ -141,15 +141,26 @@ sub runtest
 				or die "$test_src_dir/testextra: $!";
 			foreach my $line (<EXTRA>)
 			{
+				chomp $line;
 				if ($line =~ m/^mkdir (.*)/)
 				{
 					mkdir("$test_dst_dir/$1")
 						or die "$test_dst_dir/$1: $!";
 				}
+				elsif ($line =~ m/^rm -rf (.*)/)
+				{
+					if(-d "$test_dst_dir\\$1")
+					{
+						my $cmd = "rmdir /s/q $test_dst_dir\\$1";
+						my $status = system($cmd);
+						$status == 0 or die "$cmd: failed with ".
+							"status $status";
+					}
+				}
 				else
 				{
 					die "Unsupported command in ".
-						"$test_src_dir/testextra: $!";
+						"$test_src_dir/testextra: $line";
 				}
 			}
 		}
