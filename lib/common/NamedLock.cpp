@@ -194,7 +194,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
     std::ostringstream convert;   // stream used for the conversion
     convert << getpid();
     pidStr=convert.str();
-    ::write(fd, pidStr.c_str(), pidStr.length());
+    ::write(fd, pidStr.c_str(), (size_t)pidStr.length());
 
 	return true;
 }
