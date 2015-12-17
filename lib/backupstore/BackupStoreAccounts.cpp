@@ -418,8 +418,23 @@ int BackupStoreAccountsControl::DeleteAccount(int32_t ID, bool AskForConfirmatio
 	{
 		BOX_NOTICE("Deleting store directory " << (*d) << "...");
 		// Just use the rm command to delete the files
+#ifdef WIN32
+		std::string cmd("rmdir /s/q ");
+		std::string dir = *d;
+
+		// rmdir doesn't understand forward slashes, so replace them all.
+		for(std::string::iterator i = dir.begin(); i != dir.end(); i++)
+		{
+			if(*i == '/')
+			{
+				*i = '\\';
+			}
+		}
+		cmd += dir;
+#else
 		std::string cmd("rm -rf ");
 		cmd += *d;
+#endif
 		// Run command
 		if(::system(cmd.c_str()) != 0)
 		{
