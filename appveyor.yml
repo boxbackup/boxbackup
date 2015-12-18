@@ -81,5 +81,5 @@ install:
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
-  - ctest -C %CONFIGURATION%
+  - ctest -C %CONFIGURATION% -V
 
