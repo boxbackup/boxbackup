@@ -222,7 +222,7 @@ foreach(module_dep
 				if(DEBUG)
 					message(STATUS "add dependency to '${module_name}': '${dependency}'")
 				endif()
-				# add_dependencies(${module_name} ${dependency})
+				add_dependencies(${module_name} ${dependency})
 				if(dependency MATCHES "^(lib_.*|qdbm)$")
 					# message(STATUS "add link library to '${module_name}': '${dependency}'")
 					target_link_libraries(${module_name} PUBLIC ${dependency})
