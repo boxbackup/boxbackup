@@ -280,5 +280,6 @@ find_library(pcred_lib_path pcred ${base_dir}/../pcre-win32/lib)
 target_link_libraries(lib_common PUBLIC "${pcreposixd_lib_path}" "${pcred_lib_path}")
 
 # Define the location of the Perl executable, needed by testbackupstorefix
-cmake_to_native_path(PERL_EXECUTABLE perl_executable_native)
-target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_executable_native}")
+cmake_to_native_path("${PERL_EXECUTABLE}" perl_executable_native)
+string(REPLACE "\\" "\\\\" perl_path_escaped ${perl_executable_native})
+target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_path_escaped}")
