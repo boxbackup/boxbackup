@@ -43,6 +43,9 @@ install:
   - echo %PATH%
   - mkdir foo
   - rmdir /s/q foo
+  - mkdir foo
+  - c:\perl\bin\perl -e "print system('rmdir /s/q foo')"
+  - c:\perl\bin\perl -v
 
   - ps: "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
 
