@@ -1,0 +1,6 @@
+
+# AUTOGEN SEEDING
+autogen_Documentation.cpp:	makedocumentation.pl documentation.txt
+	$(_PERL) makedocumentation.pl
+
+
