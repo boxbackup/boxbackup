@@ -33,14 +33,17 @@ build:
   project: infrastructure/cmake/BoxBackup.sln
 
 install:
-  - cinst strawberryperl
-  - cinst 7zip.commandline
-  - cinst cmake
+  - cinst strawberryperl 7zip.commandline cmake
 
   - dir "C:\Program Files\Microsoft SDKs\Windows"
   - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1"
   - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin"
   - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
+
+  - echo %PATH%
+  - mkdir foo
+  - rmdir /s/q foo
+
   - ps: "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
@@ -78,6 +81,10 @@ install:
   - cd infrastructure\cmake
   - cmake -G "%Generator%" -A %PLATFORM%
   - cd %APPVEYOR_BUILD_FOLDER%
+
+  - echo %PATH%
+  - mkdir foo
+  - rmdir /s/q foo
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
