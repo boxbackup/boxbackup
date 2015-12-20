@@ -117,7 +117,7 @@ bool setUp(const char* function_name)
 			}
 			else if(filetype == ObjectExists_Dir)
 			{
-				std::string cmd = "rmdir /s /q testfiles\\" + filename;
+				std::string cmd = "rd /s /q testfiles\\" + filename;
 				int status = system(cmd.c_str());
 				if(status != 0)
 				{

@@ -720,7 +720,7 @@ int test(int argc, const char *argv[])
 
 # define RUN(x) TEST_THAT(system(x) == 0);
 # ifdef WIN32
-		RUN("rmdir /s/q testfiles\\0_2\\backup\\01234567\\02\\01");
+		RUN("rd /s/q testfiles\\0_2\\backup\\01234567\\02\\01");
 # else // !WIN32
 		RUN("rm -r testfiles/0_2/backup/01234567/02/01");
 # endif // WIN32

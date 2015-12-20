@@ -129,7 +129,7 @@ sub runtest
 
 		if(-d $test_dst_dir)
 		{
-			unshift @commands, "rmdir /s /q $test_dst_dir";
+			unshift @commands, "rd /s /q $test_dst_dir";
 		}
 
 		foreach my $command (@commands)
@@ -159,7 +159,7 @@ sub runtest
 				{
 					if(-d "$test_dst_dir\\$1")
 					{
-						my $cmd = "rmdir /s/q $test_dst_dir\\$1";
+						my $cmd = "rd /s/q $test_dst_dir\\$1";
 						my $status = system($cmd);
 						$status == 0 or die "$cmd: failed with ".
 							"status $status";
