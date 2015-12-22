@@ -549,6 +549,22 @@ int test(int argc, const char *argv[])
 	// Stop bbackupd
 	TEST_THAT_OR(StopClient(), return 1);
 
+	// Check that we're starting off with the right numbers of files and blocks.
+	// Otherwise the test that check the counts after breaking things will fail
+	// because the numbers won't match.
+	TEST_EQUAL(0, check_account_for_errors());
+	{
+		std::auto_ptr<BackupProtocolAccountUsage2> usage =
+			BackupProtocolLocal2(0x01234567, "test",
+				"backup/01234567/", 0,
+				false).QueryGetAccountUsage2();
+		TEST_EQUAL(usage->GetNumCurrentFiles(), 114);
+		TEST_EQUAL(usage->GetNumDirectories(), 28);
+		TEST_EQUAL(usage->GetBlocksUsed(), 284);
+		TEST_EQUAL(usage->GetBlocksInCurrentFiles(), 228);
+		TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
+	}
+
 	BOX_INFO("  === Add a reference to a file that doesn't exist, check "
 		"that it's removed");
 	{
