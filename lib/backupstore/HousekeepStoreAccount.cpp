@@ -81,7 +81,17 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 {
 	if(mapNewRefs.get())
 	{
-		mapNewRefs->Discard();
+		// Discard() can throw exception, but destructors aren't supposed to do that, so
+		// just catch and log them.
+		try
+		{
+			mapNewRefs->Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_ERROR("Failed to destroy housekeeper: discarding the refcount "
+				"database threw an exception: " << e.what());
+		}
 	}
 }
 
