@@ -22,11 +22,14 @@ environment:
   OPENSSL_VERSION: 1.0.2e
 
 cache:
-  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%'
-  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%'
-  - '%APPVEYOR_BUILD_FOLDER%\..\pcre-8.38'
-  - '%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%'
-  - '%APPVEYOR_BUILD_FOLDER%\%PLATFORM%'
+  - %APPVEYOR_BUILD_FOLDER%\..\zlib-1.2.8
+  - %APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM%
+  - %APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%
+  - %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
+  - %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
+  - %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
+  - %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%
+  - %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir
 
 build:
   parallel: true
@@ -61,7 +64,7 @@ install:
   - 7za x openssl-%OPENSSL_VERSION%.tar.gz
   - 7za x openssl-%OPENSSL_VERSION%.tar
   - cd openssl-%OPENSSL_VERSION%
-  - perl Configure debug-VC-WIN32 no-asm --prefix=%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
+  - perl Configure debug-VC-WIN32 no-asm --prefix="%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%"
   - ms\do_ms
   - nmake /s /f ms\nt.mak
   - nmake /s /f ms\nt.mak install
@@ -88,6 +91,15 @@ install:
   - echo %PATH%
   - mkdir foo
   - rmdir /s/q foo
+
+  - dir %APPVEYOR_BUILD_FOLDER%\..\zlib-1.2.8
+  - dir %APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%
+  - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
+  - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
