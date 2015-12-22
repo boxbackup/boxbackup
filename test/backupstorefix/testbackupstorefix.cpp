@@ -656,9 +656,12 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
 	{
-		// Temporarily stop the server, so it doesn't repair the
-		// refcount error
+		// Temporarily stop the server, so it doesn't repair the refcount error. Except 
+		// on win32, where hard-killing the server can leave a lockfile in place,
+		// breaking the rest of the test.
+#ifndef WIN32
 		TEST_THAT(StopServer());
+#endif
 
 		// Open dir and find entry
 		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
@@ -762,9 +765,11 @@ int test(int argc, const char *argv[])
 			TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
 		}
 
-		// Start the server again, so testbackupstorefix.pl can
-		// run bbackupquery which connects to it.
+		// Start the server again, so testbackupstorefix.pl can run bbackupquery which
+		// connects to it. Except on win32, where we didn't stop it earlier.
+#ifndef WIN32
 		TEST_THAT(StartServer());
+#endif
 
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE
