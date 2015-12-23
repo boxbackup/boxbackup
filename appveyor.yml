@@ -102,10 +102,10 @@ install:
   - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
   - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
   - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir
 
 test_script:
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir
   - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
   - ctest -C %CONFIGURATION% -V
 
