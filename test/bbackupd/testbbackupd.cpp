@@ -412,13 +412,19 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 
 bool kill_running_daemons()
 {
-	TEST_THAT_OR(::system("test ! -r testfiles/bbstored.pid || "
-		"kill `cat testfiles/bbstored.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("test ! -r testfiles/bbackupd.pid || "
-		"kill `cat testfiles/bbackupd.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("rm -f testfiles/bbackupd.pid "
-		"testfiles/bbstored.pid") == 0, FAIL);
-	return true;
+	bool success = true;
+
+	if(FileExists("testfiles/bbstored.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbstored.pid", true), success = false);
+	}
+
+	if(FileExists("testfiles/bbackupd.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbackupd.pid", true), success = false);
+	}
+
+	return success;
 }
 
 bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
