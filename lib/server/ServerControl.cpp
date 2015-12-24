@@ -16,13 +16,13 @@
 #endif
 
 #include "BoxTime.h"
+#include "IOStreamGetLine.h"
 #include "ServerControl.h"
 #include "Test.h"
 
 #ifdef WIN32
 
 #include "WinNamedPipeStream.h"
-#include "IOStreamGetLine.h"
 #include "BoxPortsAndFiles.h"
 
 static std::string sPipeName;
