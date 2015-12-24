@@ -226,7 +226,7 @@ private:
 		SocketListen<SocketStream, 1 /* listen backlog */> mListeningSocket;
 		std::auto_ptr<SocketStream> mpConnectedSocket;
 #endif
-		IOStreamGetLine *mpGetLine;
+		std::auto_ptr<IOStreamGetLine> mapGetLine;
 	};
 
 	// Using a socket?

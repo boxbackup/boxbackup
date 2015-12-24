@@ -2058,8 +2058,13 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		// Wait for socket connection, or handle a command?
 		if(mapCommandSocketInfo->mpConnectedSocket.get() == 0)
 		{
+			// There should be no GetLine, as it would be holding onto a
+			// pointer to a dead mpConnectedSocket.
+			ASSERT(!mapCommandSocketInfo->mapGetLine.get());
+
 			// No connection, listen for a new one
-			mapCommandSocketInfo->mpConnectedSocket.reset(mapCommandSocketInfo->mListeningSocket.Accept(timeout).release());
+			mapCommandSocketInfo->mpConnectedSocket.reset(
+				mapCommandSocketInfo->mListeningSocket.Accept(timeout).release());
 			
 			if(mapCommandSocketInfo->mpConnectedSocket.get() == 0)
 			{
@@ -2125,17 +2130,15 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 					timeout = 10; // milliseconds
 				}
 			}
+
+			mapCommandSocketInfo->mapGetLine.reset(
+				new IOStreamGetLine(
+					*(mapCommandSocketInfo->mpConnectedSocket.get())));
 		}
 
 		// So there must be a connection now.
 		ASSERT(mapCommandSocketInfo->mpConnectedSocket.get() != 0);
-		
-		// Is there a getline object ready?
-		if(mapCommandSocketInfo->mpGetLine == 0)
-		{
-			// Create a new one
-			mapCommandSocketInfo->mpGetLine = new IOStreamGetLine(*(mapCommandSocketInfo->mpConnectedSocket.get()));
-		}
+		ASSERT(mapCommandSocketInfo->mapGetLine.get() != 0);
 		
 		// Ping the remote side, to provide errors which will mean the socket gets closed
 		mapCommandSocketInfo->mpConnectedSocket->Write("ping\n", 5,
@@ -2143,8 +2146,9 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		
 		// Wait for a command or something on the socket
 		std::string command;
-		while(mapCommandSocketInfo->mpGetLine != 0 && !mapCommandSocketInfo->mpGetLine->IsEOF()
-			&& mapCommandSocketInfo->mpGetLine->GetLine(command, false /* no preprocessing */, timeout))
+		while(mapCommandSocketInfo->mapGetLine.get() != 0
+			&& !mapCommandSocketInfo->mapGetLine->IsEOF()
+			&& mapCommandSocketInfo->mapGetLine->GetLine(command, false /* no preprocessing */, timeout))
 		{
 			BOX_TRACE("Receiving command '" << command 
 				<< "' over command socket");
@@ -2199,7 +2203,8 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		}
 		
 		// Close on EOF?
-		if(mapCommandSocketInfo->mpGetLine != 0 && mapCommandSocketInfo->mpGetLine->IsEOF())
+		if(mapCommandSocketInfo->mapGetLine.get() != 0 &&
+			mapCommandSocketInfo->mapGetLine->IsEOF())
 		{
 			CloseCommandConnection();
 		}
@@ -2275,12 +2280,7 @@ void BackupDaemon::CloseCommandConnection()
 	try
 	{
 		BOX_TRACE("Closing command connection");
-		
-		if(mapCommandSocketInfo->mpGetLine)
-		{
-			delete mapCommandSocketInfo->mpGetLine;
-			mapCommandSocketInfo->mpGetLine = 0;
-		}
+		mapCommandSocketInfo->mapGetLine.reset();
 		mapCommandSocketInfo->mpConnectedSocket.reset();
 	}
 	catch(std::exception &e)
@@ -3273,7 +3273,6 @@ typedef struct
 //
 // --------------------------------------------------------------------------
 BackupDaemon::CommandSocketInfo::CommandSocketInfo()
-	: mpGetLine(0)
 {
 }
 
@@ -3288,11 +3287,6 @@ BackupDaemon::CommandSocketInfo::CommandSocketInfo()
 // --------------------------------------------------------------------------
 BackupDaemon::CommandSocketInfo::~CommandSocketInfo()
 {
-	if(mpGetLine)
-	{
-		delete mpGetLine;
-		mpGetLine = 0;
-	}
 }
 
 // --------------------------------------------------------------------------
