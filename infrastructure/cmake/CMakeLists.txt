@@ -13,21 +13,13 @@ macro(cmake_to_native_path cmake_path native_path)
 endmacro()
 
 set(files_to_configure
-	infrastructure/BoxPlatform.pm
+	bin/bbackupd/bbackupd-config
+	bin/bbstored/bbstored-certs
+	bin/bbstored/bbstored-config
 	contrib/mac_osx/org.boxbackup.bbackupd.plist
 	contrib/mac_osx/org.boxbackup.bbstored.plist
 	contrib/solaris/bbackupd-manifest.xml
 	contrib/solaris/bbstored-manifest.xml
-	lib/common/BoxPortsAndFiles.h
-	test/bbackupd/testfiles/bbackupd.conf
-	test/bbackupd/testfiles/bbackupd-exclude.conf
-	test/bbackupd/testfiles/bbackupd-snapshot.conf
-	test/bbackupd/testfiles/bbackupd-symlink.conf
-	test/bbackupd/testfiles/bbackupd-temploc.conf
-	bin/bbackupd/bbackupd-config
-	lib/bbackupquery/makedocumentation.pl
-	bin/bbstored/bbstored-certs
-	bin/bbstored/bbstored-config
 	contrib/debian/bbackupd
 	contrib/debian/bbstored
 	contrib/redhat/bbackupd
@@ -37,19 +29,32 @@ set(files_to_configure
 	contrib/solaris/bbackupd-smf-method
 	contrib/solaris/bbstored-smf-method
 	contrib/windows/installer/boxbackup.mpi
+	infrastructure/BoxPlatform.pm
 	infrastructure/makebuildenv.pl
 	infrastructure/makeparcels.pl
 	infrastructure/makedistribution.pl
+	lib/bbackupquery/makedocumentation.pl
+	lib/common/BoxPortsAndFiles.h
 	lib/common/makeexception.pl
 	lib/raidfile/raidfile-config
 	lib/server/makeprotocol.pl
 	runtest.pl
 	test/backupstorefix/testfiles/testbackupstorefix.pl
+	test/bbackupd/testfiles/bbackupd.conf
+	test/bbackupd/testfiles/bbackupd-exclude.conf
+	test/bbackupd/testfiles/bbackupd-snapshot.conf
+	test/bbackupd/testfiles/bbackupd-symlink.conf
+	test/bbackupd/testfiles/bbackupd-temploc.conf
 	test/bbackupd/testfiles/extcheck1.pl
 	test/bbackupd/testfiles/extcheck2.pl
 	test/bbackupd/testfiles/notifyscript.pl
 	test/bbackupd/testfiles/syncallowscript.pl
 )
+
+# We need to substitute TARGET_PERL in test/bbackupd/testfiles/bbackupd.conf, so define it
+# as a variable before running configure_file().
+include(FindPerl)
+set(TARGET_PERL ${PERL_EXECUTABLE})
 
 foreach(file_to_configure ${files_to_configure})
 	configure_file("${base_dir}/${file_to_configure}.in" "${base_dir}/${file_to_configure}" @ONLY)
@@ -57,7 +62,6 @@ endforeach()
 
 file(READ "${base_dir}/infrastructure/buildenv-testmain-template.cpp" test_template)
 
-include(FindPerl)
 
 execute_process(
 	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/msvc/getversion.pl
