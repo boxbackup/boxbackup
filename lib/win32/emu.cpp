@@ -1422,7 +1422,7 @@ BOOL AddEventSource
 	return TRUE;
 }
 
-static HANDLE gSyslogH = 0;
+static HANDLE gSyslogH = INVALID_HANDLE_VALUE;
 static bool sHaveWarnedEventLogFull = false;
 
 void openlog(const char * daemonName, int, int)
@@ -1431,13 +1431,18 @@ void openlog(const char * daemonName, int, int)
 	nameStr += daemonName;
 	nameStr += ")";
 
-	// register a default event source, so that we can
-	// log errors with the process of adding or registering our own.
+	// Don't try to open a new handle when one is already open. It will leak handles.
+	assert(gSyslogH == INVALID_HANDLE_VALUE);
+
+	// Register a default event source, so that we can log errors with the process of
+	// adding or registering our own, which follows. If this fails, there's not much we
+	// can do about it, certainly not send anything to the event log!
 	gSyslogH = RegisterEventSource(
 		NULL,        // uses local computer 
 		nameStr.c_str()); // source name
 	if (gSyslogH == NULL) 
 	{
+		gSyslogH = INVALID_HANDLE_VALUE;
 	}
 
 	char* name = strdup(nameStr.c_str());
@@ -1465,7 +1470,11 @@ void openlog(const char * daemonName, int, int)
 
 void closelog(void)
 {
-	DeregisterEventSource(gSyslogH); 
+	if(gSyslogH != INVALID_HANDLE_VALUE)
+	{
+		DeregisterEventSource(gSyslogH);
+		gSyslogH = INVALID_HANDLE_VALUE;
+	}
 }
 
 void syslog(int loglevel, const char *frmt, ...)
@@ -1520,7 +1529,7 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	va_end(args);
 
-	if (gSyslogH == 0)
+	if (gSyslogH == INVALID_HANDLE_VALUE)
 	{
 		printf("%s\r\n", buffer);
 		fflush(stdout);
