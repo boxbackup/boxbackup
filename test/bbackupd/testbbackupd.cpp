@@ -1610,7 +1610,11 @@ bool test_backup_pauses_when_store_is_full()
 
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
+#else
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+#endif
 
 		// The following files should be in the backup directory:
 		// 00000001 -d---- 00002 (root)
@@ -1721,7 +1725,12 @@ bool test_bbackupd_exclusions()
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 	// Delete a file and a directory
 	TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+
+#ifdef WIN32
+	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
+#else
 	TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+#endif
 
 	// We need to be OVER the limit, i.e. >24 blocks, or
 	// BackupClientContext will mark us over limit immediately on
@@ -3367,8 +3376,11 @@ bool test_delete_dir_change_attribute()
 	// TODO FIXME dedent
 	{
 		// Delete a directory
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
+#else
 		TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
-
+#endif
 		// Change attributes on an existing file.
 #ifdef WIN32
 		TEST_EQUAL(0, system("chmod 0423 testfiles/TestDir1/df9834.dsf"));
@@ -3849,7 +3861,11 @@ bool test_restore_deleted_files()
 	TEST_COMPARE(Compare_Same);
 
 	TEST_THAT(::unlink("testfiles/TestDir1/f1.dat") == 0);
+#ifdef WIN32
+	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
+#else
 	TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
+#endif
 	TEST_COMPARE(Compare_Different);
 
 	bbackupd.RunSyncNow();
