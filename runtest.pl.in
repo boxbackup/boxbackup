@@ -4,21 +4,23 @@ use strict;
 use warnings;
 
 use File::Basename;
+use Getopt::Std;
+
 chdir(dirname($0));
 use lib dirname($0).'/infrastructure';
 
 use BoxPlatform;
 
 my $prepare_only = 0;
-if (@ARGV and $ARGV[0] eq '-n')
-{
-	# Don't actually run the test, just prepare for it.
-	$prepare_only = 1;
-	shift @ARGV;
-}
+my $verbose_build = 0;
+our ($opt_n, $opt_v);
+getopts('nv');
+
+# Don't actually run the test, just prepare for it.
+$prepare_only = $opt_n;
+$verbose_build = $opt_v;
 
 my ($test_name,$test_mode) = @ARGV;
-
 $test_mode = 'debug' if not defined $test_mode or $test_mode eq '';
 
 if($test_name eq '' || ($test_mode ne 'debug' && $test_mode ne 'release'))
@@ -119,9 +121,10 @@ sub runtest
 		# MSBuild to run the tests.
 		my $test_src_dir = "test\\$t";
 		my $test_dst_dir = "$test_mode\\test\\$t";
+		my $quiet = $verbose_build ? "" : "/consoleloggerparameters:ErrorsOnly";
 
 		my @commands = (
-			"msbuild /nologo /consoleloggerparameters:ErrorsOnly ".
+			"msbuild /nologo $quiet ".
 			"infrastructure\\cmake\\INSTALL.vcxproj",
 			"xcopy /s /i /y /q $test_src_dir $test_dst_dir",
 			"copy infrastructure\\cmake\\$test_mode\\$test_project_exe.exe $test_dst_dir"
@@ -186,7 +189,8 @@ sub runtest
 	}
 	else
 	{
-		$make_res = system("cd test/$t && $make_command $flag");
+		my $quiet = $verbose_build ? "VERBOSE=1" : "";
+		$make_res = system("cd test/$t && $make_command $quiet $flag");
 	}
 
 	if($make_res != 0)
