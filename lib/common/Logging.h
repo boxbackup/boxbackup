@@ -96,8 +96,7 @@
 
 #ifdef WIN32
 	#define BOX_WIN_ERRNO_MESSAGE(error_number, stuff) \
-		stuff << ": " << GetErrorMessage(error_number) << \
-		" (" << error_number << ")"
+		stuff << ": " << GetErrorMessage(error_number)
 	#define BOX_NATIVE_ERRNO_MESSAGE(error_number, stuff) \
 		BOX_WIN_ERRNO_MESSAGE(error_number, stuff)
 	#define BOX_LOG_WIN_ERROR(stuff) \
