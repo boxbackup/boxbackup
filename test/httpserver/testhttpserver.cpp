@@ -36,12 +36,6 @@
 
 #define SHORT_TIMEOUT 5000
 
-#ifdef _MSC_VER
-#	define TEST_EXECUTABLE "test_httpserver.exe"
-#else
-#	define TEST_EXECUTABLE "./_test"
-#endif
-
 class TestWebServer : public HTTPServer
 {
 public:
