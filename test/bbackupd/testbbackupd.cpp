@@ -331,11 +331,20 @@ bool unpack_files(const std::string& archive_file,
 	BOX_INFO("Unpacking test fixture archive into " << destination_dir
 		<< ": " << archive_file);
 
-#ifdef WIN32
+#ifdef _MSC_VER // No tar, use 7zip.
+	// 7za only extracts the tgz file to a tar file, which we have to extract in a
+	// separate step.
+	std::string cmd = std::string("7za x testfiles/") + archive_file + ".tgz -aos "
+		"-otestfiles >nul:";
+	TEST_LINE_OR(::system(cmd.c_str()) == 0, cmd, return false);
+
+	cmd = std::string("7za x testfiles/") + archive_file + ".tar -aos "
+		"-o" + destination_dir + " -x!.\\TestDir1\\symlink? >nul:";
+#elif defined WIN32 // Cygwin + MinGW, we can use real tar.
 	std::string cmd("tar xz");
 	cmd += tar_options + " -f testfiles/" + archive_file + ".tgz " +
 		"-C " + destination_dir;
-#else
+#else // Unixish, but Solaris tar doesn't like decompressing gzip files.
 	std::string cmd("gzip -d < testfiles/");
 	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xf" +
 		tar_options + " -)";
