@@ -227,6 +227,30 @@ bool KillServer(int pid, bool WaitForProcess)
 	return !ServerIsAlive(pid);
 }
 
+bool KillServer(std::string pid_file, bool WaitForProcess)
+{
+	FileStream fs(pid_file);
+	IOStreamGetLine getline(fs);
+	std::string line = getline.GetLine();
+	int pid = atoi(line.c_str());
+	bool status = KillServer(pid, WaitForProcess);
+	TEST_EQUAL_LINE(true, status, std::string("kill(") + pid_file + ")");
+
+#ifdef WIN32
+	if(WaitForProcess)
+	{
+		int unlink_result = unlink(pid_file.c_str());
+		TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
+		if(unlink_result != 0)
+		{
+			return false;
+		}
+	}
+#endif
+
+	return status;
+}
+
 int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file)
 {
 	TEST_THAT_OR(current_pid == 0, return 0);
