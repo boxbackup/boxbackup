@@ -61,7 +61,10 @@ install:
   - 7za x zlib128.zip
   - cd zlib-1.2.8
   - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\zlib-%PLATFORM%" .
+  # We need to build both versions, debug and release, because cmake requires both to be
+  # present to generate its multi-configuration project files for Visual Studio/MSBuild.
   - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild INSTALL.vcxproj /m /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload "https://www.openssl.org/source/openssl-$($env:OPENSSL_VERSION).tar.gz"
@@ -80,7 +83,10 @@ install:
   - cd pcre-8.38
   - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
   - dir
+  # We need to build both versions, debug and release, because cmake requires both to be
+  # present to generate its multi-configuration project files for Visual Studio/MSBuild.
   - msbuild INSTALL.vcxproj /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild INSTALL.vcxproj /m /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - dir
   - dir pcre-%PLATFORM%

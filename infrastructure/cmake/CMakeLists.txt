@@ -264,7 +264,9 @@ target_link_libraries(lib_common PUBLIC ws2_32 gdi32)
 # Link to ZLib
 include_directories(${base_dir}/../zlib-win32/include)
 find_library(zlibstaticd_lib_path zlibstaticd ${base_dir}/../zlib-win32/lib)
-target_link_libraries(lib_compress PUBLIC ${zlibstaticd_lib_path})
+find_library(zlibstatic_lib_path  zlibstatic  ${base_dir}/../zlib-win32/lib)
+target_link_libraries(lib_compress PUBLIC debug     ${zlibstaticd_lib_path})
+target_link_libraries(lib_compress PUBLIC optimized ${zlibstatic_lib_path})
 
 # Link to OpenSSL
 include_directories(${base_dir}/../openssl-win32/include)
@@ -275,9 +277,12 @@ target_link_libraries(lib_crypto PUBLIC ${libeay32_lib_path} ${ssleay32_lib_path
 # Link to PCRE
 include_directories(${base_dir}/../pcre-win32/include)
 target_compile_definitions(lib_common PUBLIC -DPCRE_STATIC)
+find_library(pcreposix_lib_path  pcreposix  ${base_dir}/../pcre-win32/lib)
 find_library(pcreposixd_lib_path pcreposixd ${base_dir}/../pcre-win32/lib)
+find_library(pcre_lib_path  pcre  ${base_dir}/../pcre-win32/lib)
 find_library(pcred_lib_path pcred ${base_dir}/../pcre-win32/lib)
-target_link_libraries(lib_common PUBLIC "${pcreposixd_lib_path}" "${pcred_lib_path}")
+target_link_libraries(lib_common PUBLIC debug "${pcreposixd_lib_path}" optimized "${pcreposix_lib_path}")
+target_link_libraries(lib_common PUBLIC debug "${pcred_lib_path}"      optimized "${pcre_lib_path}")
 
 # Define the location of the Perl executable, needed by testbackupstorefix
 cmake_to_native_path("${PERL_EXECUTABLE}" perl_executable_native)
