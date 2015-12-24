@@ -1340,10 +1340,16 @@ BOOL AddEventSource
 	winerrno = RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(), 
 		 0, NULL, REG_OPTION_NON_VOLATILE,
 		 KEY_WRITE, NULL, &hk, &dwDisp);
-	if (winerrno != ERROR_SUCCESS)
+	if (winerrno == ERROR_ACCESS_DENIED)
 	{
-		::syslog(LOG_ERR, "Failed to create the registry key: %s",
-			GetErrorMessage(winerrno).c_str());
+		::syslog(LOG_ERR, "Failed to create the registry key: access denied. You must "
+			"be an Administrator to register new event sources in %s", regkey.c_str());
+		return FALSE;
+	}
+	else if (winerrno != ERROR_SUCCESS)
+	{
+		::syslog(LOG_ERR, "Failed to create the registry key: %s: %s",
+			GetErrorMessage(winerrno).c_str(), regkey.c_str());
 		return FALSE;
 	}
 
