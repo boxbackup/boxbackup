@@ -536,7 +536,10 @@ std::string GetErrorMessage(DWORD errorCode)
 
 	if (chars == 0 || pMsgBuf == NULL)
 	{
-		return std::string("failed to get error message");
+		std::ostringstream oss;
+		oss << "Failed to get error message for error code " << errorCode << ": error " <<
+			GetLastError();
+		return oss.str();
 	}
 
 	// remove embedded newline
