@@ -209,7 +209,12 @@ foreach(module_dep
 			# We need to install binaries in specific places so that test
 			# runner can find them:
 			install(FILES "$<TARGET_FILE:${module_name}>"
+				CONFIGURATIONS Debug
 				DESTINATION "${base_dir}/debug/${module_dir}"
+				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
+			install(FILES "$<TARGET_FILE:${module_name}>"
+				CONFIGURATIONS Release
+				DESTINATION "${base_dir}/release/${module_dir}"
 				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
 		endif()
 
