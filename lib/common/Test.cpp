@@ -104,9 +104,11 @@ bool setUp(const char* function_name)
 			filename == "bbackupd-data" ||
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
-			filename == "test2.downloaded")
+			filename == "test2.downloaded" ||
+			EndsWith("testfile", filename))
 		{
 			std::string filepath = std::string("testfiles\\") + filename;
+
 			int filetype = ObjectExists(filepath);
 			if(filetype == ObjectExists_File)
 			{
@@ -118,14 +120,67 @@ bool setUp(const char* function_name)
 			}
 			else if(filetype == ObjectExists_Dir)
 			{
-				std::string cmd = "rd /s /q " + filepath;
-				int status = system(cmd.c_str());
-				if(status != 0)
+				std::string cmd = "cmd /c rd /s /q " + filepath;
+				WCHAR* wide_cmd = ConvertUtf8ToWideString(cmd.c_str());
+				if(wide_cmd == NULL)
 				{
-					TEST_FAIL_WITH_MESSAGE("Failed to delete test fixture "
-						"file: command '" << cmd << "' exited with "
-						"status " << status);
+					TEST_FAIL_WITH_MESSAGE("Failed to convert string "
+						"to wide string: " << cmd);
+					continue;
 				}
+
+				STARTUPINFOW si;
+				PROCESS_INFORMATION pi;
+
+				ZeroMemory( &si, sizeof(si) );
+				si.cb = sizeof(si);
+				ZeroMemory( &pi, sizeof(pi) );
+
+				BOOL result = CreateProcessW(
+					NULL, // lpApplicationName
+					wide_cmd, // lpCommandLine
+					NULL, // lpProcessAttributes
+					NULL, // lpThreadAttributes
+					TRUE, // bInheritHandles
+					0, // dwCreationFlags
+					NULL, // lpEnvironment
+					NULL, // lpCurrentDirectory
+					&si, // lpStartupInfo
+					&pi // lpProcessInformation
+				);
+				delete [] wide_cmd;
+
+				if(result == FALSE)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete test "
+						"fixture file: failed to execute command "
+						"'" << cmd << "': " <<
+						GetErrorMessage(GetLastError()));
+					continue;
+				}
+
+				// Wait until child process exits.
+				WaitForSingleObject(pi.hProcess, INFINITE);
+				DWORD exit_code;
+				result = GetExitCodeProcess(pi.hProcess, &exit_code);
+
+				if(result == FALSE)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete "
+						"test fixture file: failed to get "
+						"command exit status: '" <<
+						cmd << "': " <<
+						GetErrorMessage(GetLastError()));
+				}
+				else if(exit_code != 0)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete test "
+						"fixture file: command '" << cmd << "' "
+						"exited with status " << exit_code);
+				}
+
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
 			}
 			else
 			{
