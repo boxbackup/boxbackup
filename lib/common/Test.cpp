@@ -106,18 +106,19 @@ bool setUp(const char* function_name)
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded")
 		{
-			int filetype = ObjectExists(std::string("testfiles/") + filename);
+			std::string filepath = std::string("testfiles\\") + filename;
+			int filetype = ObjectExists(filepath);
 			if(filetype == ObjectExists_File)
 			{
-				if(!::unlink(filename.c_str()))
+				if(::unlink(filepath.c_str()) != 0)
 				{
 					TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
-						"test fixture file: unlink(\"" << filename << "\")"));
+						"test fixture file: unlink(\"" << filepath << "\")"));
 				}
 			}
 			else if(filetype == ObjectExists_Dir)
 			{
-				std::string cmd = "rd /s /q testfiles\\" + filename;
+				std::string cmd = "rd /s /q " + filepath;
 				int status = system(cmd.c_str());
 				if(status != 0)
 				{
@@ -128,7 +129,7 @@ bool setUp(const char* function_name)
 			}
 			else
 			{
-				TEST_FAIL_WITH_MESSAGE("Don't know how to delete file " << filename << 
+				TEST_FAIL_WITH_MESSAGE("Don't know how to delete file " << filepath <<
 					" of type " << filetype);
 			}
 		}
