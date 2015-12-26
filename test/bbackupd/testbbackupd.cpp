@@ -339,7 +339,7 @@ bool unpack_files(const std::string& archive_file,
 	TEST_LINE_OR(::system(cmd.c_str()) == 0, cmd, return false);
 
 	cmd = std::string("7za x testfiles/") + archive_file + ".tar -aos "
-		"-o" + destination_dir + " -x!.\\TestDir1\\symlink? >nul:";
+		"-o" + destination_dir + " -x!.\\TestDir1\\symlink? -x!.\\test2 >nul:";
 #elif defined WIN32 // Cygwin + MinGW, we can use real tar.
 	std::string cmd("tar xz");
 	cmd += tar_options + " -f testfiles/" + archive_file + ".tgz " +
