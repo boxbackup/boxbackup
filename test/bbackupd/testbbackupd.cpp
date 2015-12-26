@@ -1502,10 +1502,19 @@ bool test_ssl_keepalives()
 	// keepalives polled should be the ones for each directory entry while reading
 	// directories, and the one in UpdateItems(), which is also once per item (file
 	// or directory). test_base.tgz has 16 directory entries, so we expect 2 * 16 = 32
-	// keepalives in total.
+	// keepalives in total. Except on Windows where there are no symlinks, and when
+	// compiled with MSVC we exclude them from the tar extract operation as 7za
+	// complains about them, so there should be 3 files less, and thus only 26
+	// keepalives.
+#ifdef _MSC_VER
+	#define NUM_KEEPALIVES_BASE 26
+#else
+	#define NUM_KEEPALIVES_BASE 32
+#endif
+
 	std::auto_ptr<BackupClientContext> apContext = bbackupd.RunSyncNow();
 	MockClientContext* pContext = (MockClientContext *)(apContext.get());
-	TEST_EQUAL(32, pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(NUM_KEEPALIVES_BASE, pContext->mNumKeepAlivesPolled);
 	TEST_EQUAL(1, pContext->mKeepAliveTime);
 
 	// Calculate the number of blocks that will be in ./TestDir1/x1/dsfdsfs98.fd,
@@ -1539,7 +1548,8 @@ bool test_ssl_keepalives()
 
 	apContext = bbackupd.RunSyncNow();
 	pContext = (MockClientContext *)(apContext.get());
-	TEST_EQUAL(32 + (4269/4096) + (4269/173), pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(NUM_KEEPALIVES_BASE + (4269/4096) + (4269/173),
+		pContext->mNumKeepAlivesPolled);
 	TEARDOWN_TEST_BBACKUPD();
 }
 
