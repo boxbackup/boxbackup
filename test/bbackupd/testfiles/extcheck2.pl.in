@@ -1,9 +1,12 @@
 #!@PERL@
 use strict;
 
-my $flags = $ARGV[0] or "";
+use File::Spec;
 
-unless(open IN,"../../bin/bbackupquery/bbackupquery -Wwarning " .
+my $flags = $ARGV[0] or "";
+my $bbackupquery = File::Spec->catfile('..', '..', 'bin', 'bbackupquery', 'bbackupquery');
+
+unless(open IN, "$bbackupquery -Wwarning " .
 	"-c testfiles/bbackupd.conf " .
 	"-l testfiles/query4.log " .
 	"\"compare -ac$flags\" quit 2>&1 |")
