@@ -34,16 +34,26 @@ my @check_move = (
 
 if($ARGV[0] eq 'init')
 {
+	open(my $fh, ">>", "testfiles/file-listing.txt")
+		or die "cannot open testfiles/file-listing.txt: $!";
 	# create the initial tree of words
-	make_dir('testfiles/TestDir1', 0, 4, 0);
-	
+	make_dir($fh, 'testfiles/TestDir1', 0, 4, 0);
+
 	# add some useful extra bits to it
-	mkdir('testfiles/TestDir1/dir-no-members', 0755);
-	mkdir('testfiles/TestDir1/dir1', 0755);
-	mkdir('testfiles/TestDir1/dir1/dir2', 0755);
-	mkdir('testfiles/TestDir1/dir1/dir2/dir3', 0755);
-	make_file('testfiles/TestDir1/dir1/dir2/file1');
-	make_file('testfiles/TestDir1/dir1/dir2/dir3/file2');
+	foreach my $subdir (
+		'testfiles/TestDir1/dir-no-members',
+		'testfiles/TestDir1/dir1',
+		'testfiles/TestDir1/dir1/dir2',
+		'testfiles/TestDir1/dir1/dir2/dir3',
+	)
+	{
+		mkdir($subdir, 0755);
+		print $fh "$subdir/\n";
+	}
+	make_file($fh, 'testfiles/TestDir1/dir1/dir2/file1');
+	make_file($fh, 'testfiles/TestDir1/dir1/dir2/dir3/file2');
+
+	close $fh;
 }
 elsif($ARGV[0] eq 'check')
 {
@@ -172,20 +182,19 @@ else
 
 sub make_dir
 {
-	my ($dir,$start,$quantity,$level) = @_;
-
+	my ($fh,$dir,$start,$quantity,$level) = @_;
 	return $start if $level >= 4;
 
 	mkdir $dir,0755;
-	
+	print $fh "$dir/\n";
 	return $start if $start > $#words;
-	
+
 	while($start <= $#words && $quantity > 0)
 	{
 		my $subdirs = length($words[$start]) - 2;
 		$subdirs = 2 if $subdirs > 2;
 		my $entries = $subdirs + 1;
-		
+
 		for(0 .. ($entries - 1))
 		{
 			my $w = $words[$start + $_];
@@ -198,26 +207,31 @@ sub make_dir
 			}
 			print FL "\n";
 			close FL;
+
+			print $fh "$dir/$w\n";
 		}
+
 		$start += $entries;
 		my $w = $words[$start + $_];
-		$start = make_dir("$dir/$w", $start + 1, $subdirs, $level + 1);
-	
+		$start = make_dir($fh, "$dir/$w", $start + 1, $subdirs, $level + 1);
+
 		$quantity--;
 	}
-	
+
 	return $start;
 }
 
 sub make_file
 {
-	my ($fn) = @_;
-	
+	my ($fh, $fn) = @_;
+
 	open FL,'>'.$fn or die "can't open $fn for writing";
 	for(0 .. 255)
 	{
 		print FL $fn
 	}
 	close FL;
+
+	print $fh "$fn\n";
 }
 
