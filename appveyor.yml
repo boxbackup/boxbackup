@@ -22,14 +22,14 @@ environment:
   OPENSSL_VERSION: 1.0.2e
 
 cache:
-  - %APPVEYOR_BUILD_FOLDER%\..\zlib-1.2.8
-  - %APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM%
-  - %APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%
-  - %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
-  - %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
-  - %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
-  - %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%
-  - %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir
+  - '%APPVEYOR_BUILD_FOLDER%\..\zlib-1.2.8'
+  - '%APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM%'
+  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%'
+  - '%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%'
+  - '%APPVEYOR_BUILD_FOLDER%\..\pcre-8.38'
+  - '%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%'
+  - '%APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%'
+  - '%APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir'
   
 init:
   - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
