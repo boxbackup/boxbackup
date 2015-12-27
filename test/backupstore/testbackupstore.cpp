@@ -1362,11 +1362,21 @@ bool test_multiple_uploads()
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 		}
 
+#ifdef _MSC_VER
+		BOX_TRACE("1");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol = connect_and_login(context);
 		protocolReadOnly.Reopen();
+
+#ifdef _MSC_VER
+		BOX_TRACE("2");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1395,6 +1405,11 @@ bool test_multiple_uploads()
 			test_test_file(t, *filestream);
 		}
 
+#ifdef _MSC_VER
+		BOX_TRACE("3");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		{
 			StreamableMemBlock attrtest(attr3, sizeof(attr3));
 
@@ -1408,6 +1423,11 @@ bool test_multiple_uploads()
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
+
+#ifdef _MSC_VER
+		BOX_TRACE("4");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 
 		// Check diffing and rsync like stuff...
 		// Build a modified file
@@ -1432,6 +1452,11 @@ bool test_multiple_uploads()
 		// ourselves) and check that it doesn't change the numbers
 		// of files
 
+#ifdef _MSC_VER
+		BOX_TRACE("5");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 
@@ -1439,6 +1464,10 @@ bool test_multiple_uploads()
 			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 		BackupStoreAccountDatabase::Entry account =
 			apAccounts->GetEntry(0x1234567);
+#ifdef _MSC_VER
+		BOX_TRACE("6");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 		TEST_EQUAL(0, run_housekeeping(account));
 
 		// Also check that bbstoreaccounts doesn't change anything,
