@@ -200,7 +200,7 @@ foreach(module_dep
 				"${module_path}/_main.cpp")
 			add_test(NAME ${test_name}
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl.in ${test_name}
-				${CMAKE_BUILD_TYPE})
+				$<CONFIG>)
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
 			if(DEBUG)
 				message(STATUS "add library '${module_name}': '${module_files}'")
