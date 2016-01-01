@@ -666,17 +666,19 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 				if(pov == attributes.end())
 				{
 					THROW_EXCEPTION_MESSAGE(HTTPException,
-						ConditionalPutConflict, "Attribute value '"
-						<< attr_name << "' was expected to be '"
-						<< expected_value << "' but was not found");
+						ConditionalPutConflict, "The value of "
+						"attribute '" << attr_name << "' was "
+						"expected to be '" << expected_value <<
+						"' but it was unset instead");
 				}
 				else if(pov->second != expected_value)
 				{
 					THROW_EXCEPTION_MESSAGE(HTTPException,
-						ConditionalPutConflict, "Attribute value "
-						"'" << attr_name << "' was not the "
-						"expected '" << expected_value << "' but "
-						"'" << pov->second << "'");
+						ConditionalPutConflict, "The value of "
+						"attribute '" << attr_name << "' was "
+						"expected to be '" << expected_value <<
+						"' but was '" << pov->second << "' "
+						"instead");
 				}
 			}
 
