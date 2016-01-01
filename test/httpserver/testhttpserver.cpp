@@ -268,7 +268,7 @@ bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
 {
 	SocketStream sock;
 	sock.Open(Socket::TypeINET, "localhost", 1080);
-	TEST_THAT(request.Send(sock, LONG_TIMEOUT));
+	request.Send(sock, LONG_TIMEOUT);
 
 	response.Reset();
 	response.Receive(sock, LONG_TIMEOUT);

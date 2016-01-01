@@ -67,8 +67,8 @@ public:
 	};
 
 	bool Receive(IOStreamGetLine &rGetLine, int Timeout);
-	bool SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue = false);
-	bool Send(IOStream &rStream, int Timeout, bool ExpectContinue = false);
+	void SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue = false);
+	void Send(IOStream &rStream, int Timeout, bool ExpectContinue = false);
 	IOStream::pos_type SendWithStream(SocketStream &rStreamToSendTo, int Timeout,
 		IOStream* pStreamToSend, HTTPResponse& rResponse);
 	void ReadContent(IOStream& rStreamToWriteTo, int Timeout);

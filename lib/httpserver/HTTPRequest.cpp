@@ -446,7 +446,7 @@ void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo, int Timeout)
 //
 // --------------------------------------------------------------------------
 
-bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
+void HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 {
 	if(mHeaders.GetContentLength() > 0)
 	{
@@ -461,7 +461,7 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 	}
 
 	mHeaders.SetContentLength(0);
-	return SendHeaders(rStream, Timeout, ExpectContinue);
+	SendHeaders(rStream, Timeout, ExpectContinue);
 }
 
 
@@ -477,7 +477,7 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 //
 // --------------------------------------------------------------------------
 
-bool HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue)
+void HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue)
 {
 	switch (mMethod)
 	{
@@ -531,8 +531,6 @@ bool HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinu
 	}
 
 	rStream.Write("\r\n");
-
-	return true;
 }
 
 
