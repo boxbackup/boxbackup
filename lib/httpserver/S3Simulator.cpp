@@ -200,7 +200,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.SetContentType("text/plain");
 
 	bool is_simpledb = false;
-	if(rRequest.GetHostName() == "sdb.eu-west-1.amazonaws.com")
+	if(rRequest.GetHostName() == SIMPLEDB_SIMULATOR_HOST)
 	{
 		is_simpledb = true;
 	}
@@ -799,7 +799,6 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.AddHeader("Server", "AmazonS3");
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 }
-
 
 std::vector<std::string> SimpleDBSimulator::ListDomains()
 {

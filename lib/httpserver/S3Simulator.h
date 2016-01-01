@@ -21,6 +21,8 @@ class ConfigurationVerify;
 class HTTPRequest;
 class HTTPResponse;
 
+#define SIMPLEDB_SIMULATOR_HOST "sdb.localhost"
+
 // --------------------------------------------------------------------------
 //
 // Class

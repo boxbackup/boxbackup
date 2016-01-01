@@ -303,7 +303,7 @@ std::vector<std::string> simpledb_list_domains(const std::string& access_key,
 	const std::string& secret_key)
 {
 	HTTPRequest request(HTTPRequest::Method_GET, "/");
-	request.SetHostName("sdb.eu-west-1.amazonaws.com");
+	request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
 	request.AddParameter("Action", "ListDomains");
 	request.AddParameter("AWSAccessKeyId", access_key);
 	request.AddParameter("SignatureVersion", "2");
@@ -331,7 +331,7 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 	const std::multimap<std::string, std::string> const_attributes)
 {
 	HTTPRequest request(HTTPRequest::Method_GET, "/");
-	request.SetHostName("sdb.eu-west-1.amazonaws.com");
+	request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
 	request.AddParameter("Action", "GetAttributes");
 	request.AddParameter("DomainName", "MyDomain");
 	request.AddParameter("ItemName", "JumboFez");
@@ -862,7 +862,8 @@ int test(int argc, const char *argv[])
 		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
 
 		HTTPRequest request(HTTPRequest::Method_GET, "/");
-		request.SetHostName("sdb.eu-west-1.amazonaws.com");
+		request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
+
 		request.AddParameter("Action", "ListDomains");
 		request.AddParameter("AWSAccessKeyId", access_key);
 		request.AddParameter("SignatureVersion", "2");
