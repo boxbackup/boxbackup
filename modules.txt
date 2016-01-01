@@ -28,12 +28,12 @@ test/basicserver	qdbm	lib/server
 lib/backupstore		lib/server	lib/raidfile	lib/crypto	lib/compress	lib/httpserver
 lib/backupclient	lib/backupstore
 
-bin/bbackupobjdump	lib/backupclient lib/backupstore
-bin/bbstored		lib/raidfile	lib/server	lib/backupstore
-bin/bbstoreaccounts	lib/raidfile	lib/backupclient
-bin/bbackupd		lib/server	lib/backupclient	qdbm
-bin/bbackupquery	lib/server	lib/backupclient
-bin/bbackupctl		bin/bbackupd
+bin/bbackupobjdump	lib/backupstore
+bin/bbstored		lib/backupstore
+bin/bbstoreaccounts	lib/backupclient
+bin/bbackupd		lib/backupclient	qdbm
+bin/bbackupquery	lib/backupclient
+bin/bbackupctl		bin/bbackupd	lib/backupclient	qdbm
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
@@ -43,8 +43,8 @@ test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bi
 test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
-lib/httpserver          lib/server 
-test/httpserver         lib/httpserver 
+lib/httpserver          lib/server
+test/httpserver         lib/httpserver bin/s3simulator
 bin/s3simulator		lib/httpserver
 
 # END_IF_DISTRIBUTION
