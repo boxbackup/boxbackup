@@ -44,17 +44,12 @@ extern std::map<std::string, std::string> s_test_status;
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP() \
-	if (!setUp(__FUNCTION__)) return true; \
+	if (!setUp(__FUNCTION__, "")) return true; \
 	try \
 	{ // left open for TEARDOWN()
 
-#define SETUP_SPECIALISED(name) \
-	{ \
-		std::ostringstream full_name; \
-		full_name << __FUNCTION__ << "(" << name << ")"; \
-		if (!setUp(full_name.str())) return true; \
-	} \
-	\
+#define SETUP_SPECIALISED(specialisation) \
+	if (!setUp(__FUNCTION__, specialisation)) return true; \
 	try \
 	{ // left open for TEARDOWN()
 
@@ -212,7 +207,7 @@ extern std::map<std::string, std::string> s_test_status;
 	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
 
 //! Sets up (cleans up) test environment at the start of every test.
-bool setUp(const std::string& function_name);
+bool setUp(const std::string& function_name, const std::string& specialisation);
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool tearDown();
