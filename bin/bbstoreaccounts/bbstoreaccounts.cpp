@@ -221,149 +221,157 @@ int main(int argc, const char *argv[])
 	BackupAccountControl& control(*pControl);
 
 	// Now do the command.
-	if(command == "create")
+	try
 	{
-		// which disc?
-		int32_t discnum;
-
-		if(amazon_S3_mode)
+		if(command == "create")
 		{
-			if(argc != 3)
+			// which disc?
+			int32_t discnum;
+
+			if(amazon_S3_mode)
 			{
-				BOX_ERROR("create requires an account name/label, "
-					"soft and hard limits.");
-				return 2;
-			}
-		}
-		else
-		{
-			if(argc != 3 || ::sscanf(argv[0], "%d", &discnum) != 1)
-			{
-				BOX_ERROR("create requires raid file disc number, "
-					"soft and hard limits.");
-				return 2;
-			}
-		}
-
-		// Create the account...
-		if(amazon_S3_mode)
-		{
-			int blocksize = apS3Control->GetBlockSize();
-			// Decode limits
-			int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
-			int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
-			return apS3Control->CreateAccount(argv[0], softlimit, hardlimit);
-		}
-		else
-		{
-			int blocksize = apStoreControl->BlockSizeOfDiscSet(discnum);
-			// Decode limits
-			int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
-			int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
-			return apStoreControl->CreateAccount(discnum, softlimit, hardlimit);
-		}
-	}
-	else if(command == "info")
-	{
-		// Print information on this account
-		return control.PrintAccountInfo();
-	}
-	else if(command == "enabled")
-	{
-		// Change the AccountEnabled flag on this account
-		if(argc != 1)
-		{
-			PrintUsageAndExit();
-		}
-
-		bool enabled = true;
-		std::string enabled_string = argv[0];
-		if(enabled_string == "yes")
-		{
-			enabled = true;
-		}
-		else if(enabled_string == "no")
-		{
-			enabled = false;
-		}
-		else
-		{
-			PrintUsageAndExit();
-		}
-
-		return control.SetAccountEnabled(enabled);
-	}
-	else if(command == "setlimit")
-	{
-		// Change the limits on this account
-		if(argc != 2)
-		{
-			BOX_ERROR("setlimit requires soft and hard limits.");
-			return 2;
-		}
-
-		return control.SetLimit(argv[0], argv[1]);
-	}
-	else if(command == "name")
-	{
-		// Change the limits on this account
-		if(argc != 1)
-		{
-			BOX_ERROR("name command requires a new name.");
-			return 1;
-		}
-
-		return control.SetAccountName(argv[0]);
-	}
-	else if(command == "delete")
-	{
-		// Delete an account
-		STORE_ONLY;
-
-		bool askForConfirmation = true;
-		if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
-		{
-			askForConfirmation = false;
-		}
-		return apStoreControl->DeleteAccount(askForConfirmation);
-	}
-	else if(command == "check")
-	{
-		STORE_ONLY;
-
-		bool fixErrors = false;
-		bool quiet = false;
-		
-		// Look at other options
-		for(int o = 0; o < argc; ++o)
-		{
-			if(::strcmp(argv[o], "fix") == 0)
-			{
-				fixErrors = true;
-			}
-			else if(::strcmp(argv[o], "quiet") == 0)
-			{
-				quiet = true;
+				if(argc != 3)
+				{
+					BOX_ERROR("create requires an account name/label, "
+						"soft and hard limits.");
+					return 2;
+				}
 			}
 			else
 			{
-				BOX_ERROR("Unknown option " << argv[o] << ".");
-				return 2;
+				if(argc != 3 || ::sscanf(argv[0], "%d", &discnum) != 1)
+				{
+					BOX_ERROR("create requires raid file disc number, "
+						"soft and hard limits.");
+					return 2;
+				}
+			}
+
+			// Create the account...
+			if(amazon_S3_mode)
+			{
+				int blocksize = apS3Control->GetBlockSize();
+				// Decode limits
+				int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
+				int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
+				return apS3Control->CreateAccount(argv[0], softlimit, hardlimit);
+			}
+			else
+			{
+				int blocksize = apStoreControl->BlockSizeOfDiscSet(discnum);
+				// Decode limits
+				int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
+				int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
+				return apStoreControl->CreateAccount(discnum, softlimit, hardlimit);
 			}
 		}
+		else if(command == "info")
+		{
+			// Print information on this account
+			return control.PrintAccountInfo();
+		}
+		else if(command == "enabled")
+		{
+			// Change the AccountEnabled flag on this account
+			if(argc != 1)
+			{
+				PrintUsageAndExit();
+			}
 
-		// Check the account
-		return apStoreControl->CheckAccount(fixErrors, quiet);
+			bool enabled = true;
+			std::string enabled_string = argv[0];
+			if(enabled_string == "yes")
+			{
+				enabled = true;
+			}
+			else if(enabled_string == "no")
+			{
+				enabled = false;
+			}
+			else
+			{
+				PrintUsageAndExit();
+			}
+
+			return control.SetAccountEnabled(enabled);
+		}
+		else if(command == "setlimit")
+		{
+			// Change the limits on this account
+			if(argc != 2)
+			{
+				BOX_ERROR("setlimit requires soft and hard limits.");
+				return 2;
+			}
+
+			return control.SetLimit(argv[0], argv[1]);
+		}
+		else if(command == "name")
+		{
+			// Change the limits on this account
+			if(argc != 1)
+			{
+				BOX_ERROR("name command requires a new name.");
+				return 1;
+			}
+
+			return control.SetAccountName(argv[0]);
+		}
+		else if(command == "delete")
+		{
+			// Delete an account
+			STORE_ONLY;
+
+			bool askForConfirmation = true;
+			if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
+			{
+				askForConfirmation = false;
+			}
+			return apStoreControl->DeleteAccount(askForConfirmation);
+		}
+		else if(command == "check")
+		{
+			STORE_ONLY;
+
+			bool fixErrors = false;
+			bool quiet = false;
+
+			// Look at other options
+			for(int o = 0; o < argc; ++o)
+			{
+				if(::strcmp(argv[o], "fix") == 0)
+				{
+					fixErrors = true;
+				}
+				else if(::strcmp(argv[o], "quiet") == 0)
+				{
+					quiet = true;
+				}
+				else
+				{
+					BOX_ERROR("Unknown option " << argv[o] << ".");
+					return 2;
+				}
+			}
+
+			// Check the account
+			return apStoreControl->CheckAccount(fixErrors, quiet);
+		}
+		else if(command == "housekeep")
+		{
+			STORE_ONLY;
+			return apStoreControl->HousekeepAccountNow();
+		}
+		else
+		{
+			BOX_ERROR("Unknown command '" << command << "'.");
+			return 2;
+		}
 	}
-	else if(command == "housekeep")
+	catch(BoxException &e)
 	{
-		STORE_ONLY;
-		return apStoreControl->HousekeepAccountNow();
-	}
-	else
-	{
-		BOX_ERROR("Unknown command '" << command << "'.");
-		return 2;
+		BOX_ERROR("Failed command: " << command << ": " << e.what());
+		return 1;
 	}
 
 	return 0;
