@@ -44,9 +44,12 @@ SimpleDBSimulator::SimpleDBSimulator()
 : mDomainsFile("testfiles/domains.qdbm"),
   mItemsFile("testfiles/items.qdbm")
 {
-	// Open the database file
-	int mode = DP_OWRITER | DP_OCREAT;
+	Open(DP_OWRITER | DP_OCREAT);
+}
 
+// Open the database file
+void SimpleDBSimulator::Open(int mode)
+{
 	mpDomains = dpopen(mDomainsFile.c_str(), mode, 0);
 	if(!mpDomains)
 	{
@@ -62,8 +65,12 @@ SimpleDBSimulator::SimpleDBSimulator()
 	}
 }
 
-
 SimpleDBSimulator::~SimpleDBSimulator()
+{
+	Close();
+}
+
+void SimpleDBSimulator::Close()
 {
 	if(mpDomains && !dpclose(mpDomains))
 	{
@@ -513,7 +520,7 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 
 	std::string domain;
-	if(action != "ListDomains")
+	if(action != "ListDomains" && action != "Reset")
 	{
 		domain = rRequest.GetParameterString("DomainName");
 	}
@@ -736,6 +743,11 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 				attribute);
 		}
 	}
+	else if(action == "Reset")
+	{
+		simpledb.Reset();
+		response_tree.add("ResetResponse", "");
+	}
 	else
 	{
 		rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
@@ -821,6 +833,11 @@ std::vector<std::string> SimpleDBSimulator::ListDomains()
 	return domains;
 }
 
+void SimpleDBSimulator::Reset()
+{
+	Close();
+	Open(DP_OWRITER | DP_OCREAT | DP_OTRUNC);
+}
 
 void SimpleDBSimulator::CreateDomain(const std::string& domain_name)
 {

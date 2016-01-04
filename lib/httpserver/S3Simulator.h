@@ -46,8 +46,11 @@ public:
 		const std::string& domain_name,
 		const std::string& item_name,
 		bool throw_if_not_found = true);
+	void Reset();
 
 protected:
+	void Open(int mode);
+	void Close();
 	boost::property_tree::ptree GetDomainProps(const std::string& domain_name);
 	void PutDomainProps(const std::string& domain_name,
 		const boost::property_tree::ptree domain_props);

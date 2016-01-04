@@ -967,6 +967,15 @@ int test(int argc, const char *argv[])
 		expected_attrs.insert(attr_t("Color", "Green"));
 		expected_attrs.insert(attr_t("Size", "Large"));
 		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Reset for the next test
+		request.SetParameter("Action", "Reset");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"ResetResponse"));
+		domains = simpledb_list_domains(access_key, secret_key);
+		expected_domains.clear();
+		TEST_THAT(compare_lists(expected_domains, domains));
 	}
 
 	// Kill it
