@@ -49,10 +49,42 @@ public:
 	HTTPRequest();
 	HTTPRequest(enum Method method, const std::string& rURI);
 	~HTTPRequest();
-private:
-	// no copying
-	HTTPRequest(const HTTPRequest &);
-	HTTPRequest &operator=(const HTTPRequest &);
+
+	HTTPRequest(const HTTPRequest &to_copy)
+	: mMethod(to_copy.mMethod),
+	  mRequestURI(to_copy.mRequestURI),
+	  mQueryString(to_copy.mQueryString),
+	  mHTTPVersion(to_copy.mHTTPVersion),
+	  mQuery(to_copy.mQuery),
+	  // it's not safe to copy this, as it may be consumed or destroyed:
+	  mpCookies(NULL),
+	  mHeaders(to_copy.mHeaders),
+	  mExpectContinue(to_copy.mExpectContinue),
+	  // it's not safe to copy this, as it may be consumed or destroyed:
+	  mpStreamToReadFrom(NULL),
+	  mHttpVerb(to_copy.mHttpVerb)
+	// If you ever add members, be sure to update this list too!
+	{ }
+
+	HTTPRequest &operator=(const HTTPRequest &to_copy)
+	{
+		mMethod = to_copy.mMethod;
+		mRequestURI = to_copy.mRequestURI;
+		mQueryString = to_copy.mQueryString;
+		mHTTPVersion = to_copy.mHTTPVersion;
+		mQuery = to_copy.mQuery;
+		// it's not safe to copy this; as it may be modified or destroyed:
+		mpCookies = NULL;
+		mHeaders = to_copy.mHeaders;
+		mExpectContinue = to_copy.mExpectContinue;
+		// it's not safe to copy this; as it may be consumed or destroyed:
+		mpStreamToReadFrom = NULL;
+		mHttpVerb = to_copy.mHttpVerb;
+		// If you ever add members, be sure to update this list too!
+
+		return *this;
+	}
+
 public:
 	typedef std::multimap<std::string, std::string> Query_t;
 	typedef Query_t::value_type QueryEn_t;
@@ -201,6 +233,7 @@ private:
 	bool mExpectContinue;
 	IOStream* mpStreamToReadFrom;
 	std::string mHttpVerb;
+	// If you ever add members, be sure to update the copy constructor too!
 };
 
 #endif // HTTPREQUEST__H

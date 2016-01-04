@@ -34,6 +34,7 @@
 #include "S3Client.h"
 #include "S3Simulator.h"
 #include "ServerControl.h"
+#include "SimpleDBClient.h"
 #include "Test.h"
 #include "decode.h"
 #include "encode.h"
@@ -299,6 +300,9 @@ bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
 	return true;
 }
 
+typedef std::multimap<std::string, std::string> multimap_t;
+typedef multimap_t::value_type attr_t;
+
 std::vector<std::string> simpledb_list_domains(const std::string& access_key,
 	const std::string& secret_key)
 {
@@ -328,7 +332,7 @@ std::vector<std::string> simpledb_list_domains(const std::string& access_key,
 }
 
 bool simpledb_get_attributes(const std::string& access_key, const std::string& secret_key,
-	const std::multimap<std::string, std::string> const_attributes)
+	const multimap_t& const_attributes)
 {
 	HTTPRequest request(HTTPRequest::Method_GET, "/");
 	request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
@@ -392,6 +396,54 @@ bool compare_lists(const std::vector<std::string>& expected_items,
 		const std::string& actual   = (i < actual_items.size())   ? actual_items[i]   : "None";
 		TEST_EQUAL_LINE(expected, actual, "Item " << i);
 		all_match &= (expected == actual);
+	}
+
+	return all_match;
+}
+
+bool compare_maps(const SimpleDBClient::str_map_t& expected_attrs,
+	const SimpleDBClient::str_map_t& actual_attrs)
+{
+	bool all_match = (expected_attrs.size() == actual_attrs.size());
+
+	for(SimpleDBClient::str_map_t::const_iterator i = actual_attrs.begin();
+		i != actual_attrs.end(); i++)
+	{
+		std::string name = i->first;
+		std::string value = i->second;
+		SimpleDBClient::str_map_t::const_iterator found = expected_attrs.find(name);
+		if(found == expected_attrs.end())
+		{
+			TEST_EQUAL_LINE("", name, "Unexpected attribute name");
+			TEST_EQUAL_LINE("", value, "Unexpected attribute value");
+			all_match = false;
+		}
+		else
+		{
+			TEST_EQUAL_LINE(found->first, name, "Wrong attribute name");
+			TEST_EQUAL_LINE(found->second, value, "Wrong attribute value");
+			all_match &= (found->first == name);
+			all_match &= (found->second == value);
+		}
+	}
+
+	// Now try the other way around
+	for(SimpleDBClient::str_map_t::const_iterator i = expected_attrs.begin();
+		i != expected_attrs.end(); i++)
+	{
+		std::string name = i->first;
+		std::string value = i->second;
+		SimpleDBClient::str_map_t::const_iterator found = actual_attrs.find(name);
+		if(found == actual_attrs.end())
+		{
+			TEST_EQUAL_LINE("", name, "Missing attribute name");
+			TEST_EQUAL_LINE("", value, "Missing attribute value");
+			all_match = false;
+		}
+		else
+		{
+			// No need to report anything, we would have done so already above
+		}
 	}
 
 	return all_match;
@@ -976,6 +1028,83 @@ int test(int argc, const char *argv[])
 		domains = simpledb_list_domains(access_key, secret_key);
 		expected_domains.clear();
 		TEST_THAT(compare_lists(expected_domains, domains));
+	}
+
+	// Test that SimpleDBClient works the same way.
+	{
+		std::string access_key = "0PN5J17HBGZHT7JJ3X82";
+		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
+		SimpleDBClient client(access_key, secret_key, "localhost", 1080,
+			SIMPLEDB_SIMULATOR_HOST);
+
+		// Test that date formatting produces the correct output format
+		// date -d "2010-01-25T15:01:28-07:00" +%s => 1264456888
+		client.SetFixedTimestamp(SecondsToBoxTime(1264456888), -7 * 60);
+		HTTPRequest request = client.StartRequest(HTTPRequest::Method_GET, "");
+		TEST_EQUAL("2010-01-25T15:01:28-07:00",
+			request.GetParameterString("Timestamp"));
+
+		client.SetFixedTimestamp(SecondsToBoxTime(1264431688), 0);
+		request = client.StartRequest(HTTPRequest::Method_GET, "");
+		TEST_EQUAL("2010-01-25T15:01:28Z",
+			request.GetParameterString("Timestamp"));
+		client.SetFixedTimestamp(0, 0);
+		TEST_EQUAL(20, request.GetParameterString("Timestamp").length());
+
+		std::vector<std::string> domains = client.ListDomains();
+		TEST_EQUAL(0, domains.size());
+
+		std::string domain = "MyDomain";
+		std::string item = "JumboFez";
+		client.CreateDomain(domain);
+		domains = client.ListDomains();
+		TEST_EQUAL(1, domains.size());
+		if(domains.size() > 0)
+		{
+			TEST_EQUAL(domain, domains[0]);
+		}
+
+		// Create an item
+		SimpleDBClient::str_map_t expected_attrs;
+		expected_attrs["Color"] = "Blue";
+		expected_attrs["Size"] = "Med";
+		client.PutAttributes(domain, item, expected_attrs);
+		SimpleDBClient::str_map_t actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+
+		// Add more attributes. SimpleDBClient always replaces existing values
+		// for attributes.
+		expected_attrs.clear();
+		expected_attrs["Color"] = "Not Blue";
+		expected_attrs["Size"] = "Large";
+		client.PutAttributes(domain, item, expected_attrs);
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+
+		// Conditional PutAttributes that fails (doesn't match) and therefore
+		// doesn't change anything (so we don't change expected_attrs).
+		SimpleDBClient::str_map_t new_attrs = expected_attrs;
+		new_attrs["Color"] = "Green";
+
+		SimpleDBClient::str_map_t conditional_attrs;
+		conditional_attrs["Color"] = "What?";
+
+		TEST_CHECK_THROWS(
+			client.PutAttributes(domain, item, new_attrs, conditional_attrs),
+			HTTPException, RequestFailedUnexpectedly);
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+
+		// Conditional PutAttributes again, with the correct value for the Color
+		// attribute this time, so the request should succeed.
+		conditional_attrs["Color"] = "Not Blue";
+		client.PutAttributes(domain, item, new_attrs, conditional_attrs);
+
+		// If it does, because Replace is set by default (enforced) by
+		// SimpleDBClient, the Size value will be replaced by the new single
+		// value.
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(new_attrs, actual_attrs));
 	}
 
 	// Kill it
