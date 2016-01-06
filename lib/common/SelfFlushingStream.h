@@ -39,7 +39,8 @@ public:
 				"discarding the rest");
 		}
 
-		Flush();
+        // FIXME flushing here may conduce to infinite wait
+        //Flush();
 	}
 
 private:

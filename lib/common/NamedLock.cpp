@@ -77,7 +77,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	mFileName = rFilename;
 
 	// See if the lock can be got
-    int flags = O_WRONLY | O_CREAT | O_TRUNC | O_SYNC;
+    int flags = O_WRONLY | O_CREAT | O_SYNC;
 
 #if HAVE_DECL_O_EXLOCK
 	flags |= O_NONBLOCK | O_EXLOCK;
@@ -194,6 +194,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
     std::ostringstream convert;   // stream used for the conversion
     convert << getpid();
     pidStr=convert.str();
+    ::ftruncate(fd, 0);
     ::write(fd, pidStr.c_str(), (size_t)pidStr.length());
 
 	return true;
