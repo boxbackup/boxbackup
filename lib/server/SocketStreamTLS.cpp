@@ -298,16 +298,17 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 			if(WaitWhenRetryRequired(se, Timeout) == false)
 			{
 				// timed out
+				MarkAsReadClosed();
 				return 0;
 			}
-			break;
-			
-		default:
-			CryptoUtils::LogError("reading");
-			THROW_EXCEPTION(ConnectionException, TLSReadFailed)
-			break;
-		}
-	}
+            break;
+
+        default:
+            CryptoUtils::LogError("reading");
+            THROW_EXCEPTION(ConnectionException, TLSReadFailed)
+            break;
+        }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -320,59 +321,59 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 {
-	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+    if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
-	// Make sure zero byte writes work as expected
-	if(NBytes == 0)
-	{
-		return;
-	}
+    // Make sure zero byte writes work as expected
+    if(NBytes == 0)
+    {
+        return;
+    }
 
-	// from man SSL_write
-	//
-	// SSL_write() will only return with success, when the
-	// complete contents of buf of length num has been written.
-	//
-	// So no worries about partial writes and moving the buffer around
+    // from man SSL_write
+    //
+    // SSL_write() will only return with success, when the
+    // complete contents of buf of length num has been written.
+    //
+    // So no worries about partial writes and moving the buffer around
 
-	while(true)
-	{
-		// try the write
-		int r = ::SSL_write(mpSSL, pBuffer, NBytes);
-		
-		int se;
-		switch((se = ::SSL_get_error(mpSSL, r)))
-		{
-		case SSL_ERROR_NONE:
-			// No error, data sent, return success
-			mBytesWritten += r;
-			return;
-			break;
+    while(true)
+    {
+        // try the write
+        int r = ::SSL_write(mpSSL, pBuffer, NBytes);
 
-		case SSL_ERROR_ZERO_RETURN:
-			// Connection closed
-			MarkAsWriteClosed();
-			THROW_EXCEPTION(ConnectionException, TLSClosedWhenWriting)
-			break;
+        int se;
+        switch((se = ::SSL_get_error(mpSSL, r)))
+        {
+        case SSL_ERROR_NONE:
+            // No error, data sent, return success
+            mBytesWritten += r;
+            return;
+            break;
 
-		case SSL_ERROR_WANT_READ:
-		case SSL_ERROR_WANT_WRITE:
-			// wait for the required data
-			{
-			#ifndef BOX_RELEASE_BUILD
-				bool conditionmet =
-			#endif
-				WaitWhenRetryRequired(se, Timeout);
-				ASSERT(conditionmet);
-			}
-			break;
-		
-		default:
-			CryptoUtils::LogError("writing");
-			THROW_EXCEPTION(ConnectionException, TLSWriteFailed)
-			break;
-		}
-	}
+        case SSL_ERROR_ZERO_RETURN:
+            // Connection closed
+            MarkAsWriteClosed();
+            THROW_EXCEPTION(ConnectionException, TLSClosedWhenWriting)
+            break;
+
+        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_WRITE:
+            // wait for the required data
+            {
+            #ifndef BOX_RELEASE_BUILD
+                bool conditionmet =
+            #endif
+                WaitWhenRetryRequired(se, Timeout);
+                ASSERT(conditionmet);
+            }
+            break;
+
+        default:
+            CryptoUtils::LogError("writing");
+            THROW_EXCEPTION(ConnectionException, TLSWriteFailed)
+            break;
+        }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -385,15 +386,15 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 void SocketStreamTLS::Close()
 {
-	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+    if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
-	// Base class to close
-	SocketStream::Close();
+    // Base class to close
+    SocketStream::Close();
 
-	// Free resources
-	::SSL_free(mpSSL);
-	mpSSL = 0;
-	mpBIO = 0;	// implicitly freed by SSL_free
+    // Free resources
+    ::SSL_free(mpSSL);
+    mpSSL = 0;
+    mpBIO = 0;	// implicitly freed by SSL_free
 }
 
 // --------------------------------------------------------------------------
@@ -406,15 +407,15 @@ void SocketStreamTLS::Close()
 // --------------------------------------------------------------------------
 void SocketStreamTLS::Shutdown(bool Read, bool Write)
 {
-	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+    if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
-	if(::SSL_shutdown(mpSSL) < 0)
-	{
-		CryptoUtils::LogError("shutting down");
-		THROW_EXCEPTION(ConnectionException, TLSShutdownFailed)
-	}
+    if(::SSL_shutdown(mpSSL) < 0)
+    {
+        CryptoUtils::LogError("shutting down");
+        THROW_EXCEPTION(ConnectionException, TLSShutdownFailed)
+    }
 
-	// Don't ask the base class to shutdown -- BIO does this, apparently.
+    // Don't ask the base class to shutdown -- BIO does this, apparently.
 }
 
 // --------------------------------------------------------------------------
@@ -427,34 +428,34 @@ void SocketStreamTLS::Shutdown(bool Read, bool Write)
 // --------------------------------------------------------------------------
 std::string SocketStreamTLS::GetPeerCommonName()
 {
-	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+    if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
-	// Get certificate
-	X509 *cert = ::SSL_get_peer_certificate(mpSSL);
-	if(cert == 0)
-	{
-		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, TLSNoPeerCertificate)
-	}
+    // Get certificate
+    X509 *cert = ::SSL_get_peer_certificate(mpSSL);
+    if(cert == 0)
+    {
+        ::X509_free(cert);
+        THROW_EXCEPTION(ConnectionException, TLSNoPeerCertificate)
+    }
 
-	// Subject details
-	X509_NAME *subject = ::X509_get_subject_name(cert);
-	if(subject == 0)
-	{
-		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
-	}
-	
-	// Common name
-	char commonName[256];
-	if(::X509_NAME_get_text_by_NID(subject, NID_commonName, commonName, sizeof(commonName)) <= 0)
-	{
-		::X509_free(cert);
-		THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
-	}
-	// Terminate just in case
-	commonName[sizeof(commonName)-1] = '\0';
-	
-	// Done.
-	return std::string(commonName);
+    // Subject details
+    X509_NAME *subject = ::X509_get_subject_name(cert);
+    if(subject == 0)
+    {
+        ::X509_free(cert);
+        THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
+    }
+
+    // Common name
+    char commonName[256];
+    if(::X509_NAME_get_text_by_NID(subject, NID_commonName, commonName, sizeof(commonName)) <= 0)
+    {
+        ::X509_free(cert);
+        THROW_EXCEPTION(ConnectionException, TLSPeerCertificateInvalid)
+    }
+    // Terminate just in case
+    commonName[sizeof(commonName)-1] = '\0';
+
+    // Done.
+    return std::string(commonName);
 }

@@ -11,6 +11,8 @@
 #ifndef SELFFLUSHINGSTREAM__H
 #define SELFFLUSHINGSTREAM__H
 
+
+#define SELF_FLUSH_TIMEOUT (60*1000)
 #include "IOStream.h"
 
 // --------------------------------------------------------------------------
@@ -39,8 +41,7 @@ public:
 				"discarding the rest");
 		}
 
-        // FIXME flushing here may conduce to infinite wait
-        //Flush();
+		Flush(SELF_FLUSH_TIMEOUT);
 	}
 
 private:
