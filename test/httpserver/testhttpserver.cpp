@@ -1020,6 +1020,22 @@ int test(int argc, const char *argv[])
 		expected_attrs.insert(attr_t("Size", "Large"));
 		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
 
+		// Test that we can delete values. We are supposed to pass some
+		// attribute values, but what happens if they don't match the current
+		// values is not specified.
+		request.SetParameter("Action", "DeleteAttributes");
+		request.RemoveParameter("Expected.1.Name");
+		request.RemoveParameter("Expected.1.Value");
+		request.RemoveParameter("Attribute.1.Replace");
+		request.RemoveParameter("Attribute.2.Replace");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"DeleteAttributesResponse"));
+
+		// Check that it has actually been removed.
+		expected_attrs.clear();
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
 		// Reset for the next test
 		request.SetParameter("Action", "Reset");
 		TEST_THAT(add_simpledb_signature(request, secret_key));
@@ -1105,6 +1121,16 @@ int test(int argc, const char *argv[])
 		// value.
 		actual_attrs = client.GetAttributes(domain, item);
 		TEST_THAT(compare_maps(new_attrs, actual_attrs));
+
+		// Test that we can delete values. We are supposed to pass some
+		// attribute values, but what happens if they don't match the current
+		// values is not specified.
+		client.DeleteAttributes(domain, item, new_attrs);
+
+		// Check that it has actually been removed.
+		expected_attrs.clear();
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
 	}
 
 	// Kill it

@@ -398,6 +398,35 @@ SimpleDBClient::str_map_t SimpleDBClient::GetAttributes(const std::string& domai
 	return attributes;
 }
 
+void SimpleDBClient::AddPutAttributes(HTTPRequest& request, const str_map_t& attributes,
+	const str_map_t& expected, bool add_required)
+{
+	int counter = 1;
+	for(str_map_t::const_iterator i = attributes.begin(); i != attributes.end(); i++)
+	{
+		std::ostringstream oss;
+		oss << "Attribute.";
+		oss << counter++;
+		request.AddParameter(oss.str() + ".Name", i->first);
+		request.AddParameter(oss.str() + ".Value", i->second);
+
+		if(add_required)
+		{
+			request.AddParameter(oss.str() + ".Replace", "true");
+		}
+	}
+
+	counter = 1;
+	for(str_map_t::const_iterator i = expected.begin(); i != expected.end(); i++)
+	{
+		std::ostringstream oss;
+		oss << "Expected.";
+		oss << counter++;
+		request.AddParameter(oss.str() + ".Name", i->first);
+		request.AddParameter(oss.str() + ".Value", i->second);
+	}
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -421,37 +450,49 @@ SimpleDBClient::str_map_t SimpleDBClient::GetAttributes(const std::string& domai
 
 void SimpleDBClient::PutAttributes(const std::string& domain_name,
 	const std::string& item_name, const SimpleDBClient::str_map_t& attributes,
-		const SimpleDBClient::str_map_t& expected)
+	const SimpleDBClient::str_map_t& expected)
 {
 	HTTPRequest request = StartRequest(HTTPRequest::Method_GET, "PutAttributes");
 	request.AddParameter("DomainName", domain_name);
 	request.AddParameter("ItemName", item_name);
 
-	int counter = 1;
-	for(str_map_t::const_iterator i = attributes.begin(); i != attributes.end(); i++)
-	{
-		std::ostringstream oss;
-		oss << "Attribute.";
-		oss << counter++;
-		request.AddParameter(oss.str() + ".Name", i->first);
-		request.AddParameter(oss.str() + ".Value", i->second);
-		request.AddParameter(oss.str() + ".Replace", "true");
-	}
-
-	counter = 1;
-	for(str_map_t::const_iterator i = expected.begin(); i != expected.end(); i++)
-	{
-		std::ostringstream oss;
-		oss << "Expected.";
-		oss << counter++;
-		request.AddParameter(oss.str() + ".Name", i->first);
-		request.AddParameter(oss.str() + ".Value", i->second);
-	}
-
+	AddPutAttributes(request, attributes, expected, true); // add_required
 	request.AddParameter("Signature", CalculateSimpleDBSignature(request));
 
 	ptree response_tree;
 	SendAndReceiveXML(request, response_tree, "PutAttributesResponse");
 }
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:	 SimpleDBClient::DeleteAttributes(
+//			 const std::string& domain_name,
+//			 const std::string& item_name,
+//			 const SimpleDBClient::str_map_t& attributes)
+//		Purpose: Deletes one or more attributes associated with the
+//			 item. If all attributes of an item are deleted, the
+//			 item is deleted. If you specify DeleteAttributes
+//			 without attributes or values, all the attributes for
+//			 the item are deleted (and hence the item itself).
+//		Created: 09/01/2016
+//
+// --------------------------------------------------------------------------
+// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_DeleteAttributes.html
+
+void SimpleDBClient::DeleteAttributes(const std::string& domain_name,
+	const std::string& item_name, const SimpleDBClient::str_map_t& attributes,
+	const SimpleDBClient::str_map_t& expected)
+{
+	HTTPRequest request = StartRequest(HTTPRequest::Method_GET, "DeleteAttributes");
+	request.AddParameter("DomainName", domain_name);
+	request.AddParameter("ItemName", item_name);
+
+	AddPutAttributes(request, attributes, expected, false); // add_required
+	request.AddParameter("Signature", CalculateSimpleDBSignature(request));
+
+	ptree response_tree;
+	SendAndReceiveXML(request, response_tree, "DeleteAttributesResponse");
+}
 

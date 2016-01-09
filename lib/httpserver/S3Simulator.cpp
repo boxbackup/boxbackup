@@ -551,11 +551,16 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 				false); // !throw_if_not_found
 
 		// Iterate over all parameters looking for "Attribute.X.Name" and
-		// "Attribute.X.Value" attributes, putting them into two maps.
+		// "Attribute.X.Value" attributes, putting them into the
+		// param_index_to_* maps. Note that we keep the "index" as a string
+		// here, even though it should be an integer, to avoid needlessly
+		// converting back and forth. Hence all these maps are keyed on
+		// strings.
 		std::map<std::string, std::string> param_index_to_name;
 		std::map<std::string, std::string> param_index_to_value;
 		std::map<std::string, bool> param_index_to_replace;
-		// Index to name and value maps for Expected (conditional Put) values.
+		// At the same time, add all "Expected.X.Name" and "Expected.X.Value"
+		// attributes to the expected_index_to_* maps.
 		std::map<std::string, std::string> expected_index_to_name;
 		std::map<std::string, std::string> expected_index_to_value;
 
@@ -627,7 +632,8 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 
 		std::map<std::string, std::string> expected_values;
 		// Iterate over the expected maps, matching up the names and values,
-		// putting them into the expected_values map.
+		// putting them into the expected_values map, which is easier to work
+		// with.
 		for(std::map<std::string, std::string>::iterator
 			i = expected_index_to_name.begin();
 			i != expected_index_to_name.end(); i++)
@@ -651,7 +657,8 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 		}
 
 		// Iterate over the attribute maps, matching up the names and values,
-		// putting them into the item data XML tree.
+		// putting them into the item data XML tree. Check the expected values
+		// at the same time, and stop immediately if they don't match.
 		for(std::map<std::string, std::string>::iterator
 			i = param_index_to_name.begin();
 			i != param_index_to_name.end(); i++)
@@ -660,8 +667,8 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 			std::string attr_name = i->second;
 
 			// If there is an Expected value for this attribute, and it
-			// doesn't match the actual current value, then don't change
-			// anything.
+			// doesn't match the actual current value, then throw an
+			// exception, which ensures that no data is changed.
 			std::map<std::string, std::string>::iterator pe =
 				expected_values.find(attr_name);
 			if(pe != expected_values.end())
@@ -720,6 +727,8 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 					attr_name, new_value));
 		}
 
+		// Write the new item data XML tree back to the database, overwriting the
+		// previous values of all attributes.
 		simpledb.PutAttributes(domain, rRequest.GetParameterString("ItemName"),
 			attributes);
 		response_tree.add("PutAttributesResponse", "");
@@ -729,6 +738,10 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 		std::multimap<std::string, std::string> attributes =
 			simpledb.GetAttributes(domain,
 				rRequest.GetParameterString("ItemName"));
+
+		// Ensure that the root element is present, even if there are no
+		// individual attributes.
+		response_tree.add("GetAttributesResponse.GetAttributesResult", "");
 
 		// Add the attributes to the response tree.
 		for(std::multimap<std::string, std::string>::iterator
@@ -743,6 +756,111 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 				attribute);
 		}
 	}
+	else if(action == "DeleteAttributes")
+	{
+		// Get the existing attributes for this item, if it exists.
+		std::multimap<std::string, std::string> attributes =
+			simpledb.GetAttributes(domain,
+				rRequest.GetParameterString("ItemName"),
+				false); // !throw_if_not_found
+
+		// Iterate over all parameters looking for "Attribute.X.Name" and
+		// "Attribute.X.Value" attributes, putting them into the
+		// param_index_to_* maps. Note that we keep the "index" as a string
+		// here, even though it should be an integer, to avoid needlessly
+		// converting back and forth. Hence all these maps are keyed on
+		// strings.
+		std::map<std::string, std::string> param_index_to_name;
+		std::map<std::string, std::string> param_index_to_value;
+
+		for(HTTPRequest::Query_t::const_iterator i = params.begin();
+			i != params.end(); i++)
+		{
+			std::string param_name = i->first;
+			std::string param_value = i->second;
+			std::string param_number_type = RemovePrefix("Attribute.",
+				param_name);
+			if(!param_number_type.empty())
+			{
+				std::string param_index_name = RemoveSuffix(".Name",
+					param_number_type);
+				std::string param_index_value = RemoveSuffix(".Value",
+					param_number_type);
+				if(!param_index_name.empty())
+				{
+					param_index_to_name[param_index_name] =
+						param_value;
+				}
+				else if(!param_index_value.empty())
+				{
+					param_index_to_value[param_index_value] =
+						param_value;
+				}
+				else
+				{
+					THROW_EXCEPTION_MESSAGE(HTTPException,
+						S3SimulatorError, "DeleteAttributes: "
+						"Unparsed Attribute parameter: " <<
+						param_name);
+				}
+			}
+		}
+
+		// Iterate over the attribute maps, matching up the names and values,
+		// searching for and removing them from the item data XML tree.
+		for(std::map<std::string, std::string>::iterator
+			i = param_index_to_name.begin();
+			i != param_index_to_name.end(); i++)
+		{
+			std::string index = i->first;
+			std::string attr_name = i->second;
+
+			std::map<std::string, std::string>::iterator pv =
+				param_index_to_value.find(index);
+			if(pv == param_index_to_value.end())
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException,
+					S3SimulatorError, "DeleteAttributes: "
+					"Attribute Name without Value: " <<
+					index << ": " << attr_name);
+			}
+			std::string expected_value = pv->second;
+
+			bool deleted;
+			do
+			{
+				deleted = false;
+				typedef std::multimap<std::string, std::string>::iterator
+					iter_t;
+				std::pair<iter_t, iter_t> range =
+					attributes.equal_range(attr_name);
+
+				// Loop over all values for this attribute name (attr_name), which
+				// must all lie between range->first and range->second.
+				for(iter_t p_orig_attr = range.first; p_orig_attr != range.second;
+					p_orig_attr++)
+				{
+					if(p_orig_attr->second == expected_value)
+					{
+						attributes.erase(p_orig_attr);
+						deleted = true;
+						// The iterator is not valid any more, so
+						// break out and search again.
+						break;
+					}
+				}
+			}
+			while(deleted);
+		}
+
+		// Write the new item data XML tree back to the database, overwriting the
+		// previous values of all attributes, and in particular, removing any that
+		// are no longer present in the attributes map.
+		simpledb.PutAttributes(domain, rRequest.GetParameterString("ItemName"),
+			attributes);
+		response_tree.add("DeleteAttributesResponse", "");
+	}
+
 	else if(action == "Reset")
 	{
 		simpledb.Reset();
@@ -907,16 +1025,25 @@ std::multimap<std::string, std::string> SimpleDBSimulator::GetAttributes(
 	free(result);
 	ptree item_data = XmlStringToPtree(item_data_str);
 
-	// Iterate over the attributes in the item data tree, adding names and values
-	// to the attributes map.
-	BOOST_FOREACH(ptree::value_type &v,
-		item_data.get_child(PTREE_ITEM_ATTRIBUTES))
+	// There might not be any attributes, e.g. if they have all been deleted,
+	// so we need to check for and handle that situation, as it's not an error.
+	try
 	{
-		std::string name = v.first;
-		std::string value = v.second.data();
-		attributes.insert(
-			std::multimap<std::string, std::string>::value_type(name,
-				value));
+		// Iterate over the attributes in the item data tree, adding names and values
+		// to the attributes map.
+		BOOST_FOREACH(ptree::value_type &v,
+			item_data.get_child(PTREE_ITEM_ATTRIBUTES))
+		{
+			std::string name = v.first;
+			std::string value = v.second.data();
+			attributes.insert(
+				std::multimap<std::string, std::string>::value_type(name,
+					value));
+		}
+	}
+	catch(boost::property_tree::ptree_bad_path &e)
+	{
+		// Do nothing, just don't add any attributes to the list.
 	}
 
 	return attributes;

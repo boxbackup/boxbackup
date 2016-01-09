@@ -70,6 +70,9 @@ public:
 	void PutAttributes(const std::string& domain_name,
 		const std::string& item_name, const str_map_t& attributes,
 		const str_map_t& expected = str_map_t());
+	void DeleteAttributes(const std::string& domain_name,
+		const std::string& item_name, const str_map_t& attributes,
+		const str_map_t& expected = str_map_t());
 
 	// These shouldn't really be APIs, but exposing them makes it easier to test
 	// this class.
@@ -87,6 +90,8 @@ private:
 	void SendAndReceiveXML(HTTPRequest& request, ptree& response_tree,
 		const std::string& expected_root_element);
 	std::string CalculateSimpleDBSignature(const HTTPRequest& request);
+	void AddPutAttributes(HTTPRequest& request, const str_map_t& attributes,
+		const str_map_t& expected, bool add_required);
 };
 
 
