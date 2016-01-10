@@ -331,8 +331,8 @@ std::vector<std::string> simpledb_list_domains(const std::string& access_key,
 	return domains;
 }
 
-bool simpledb_get_attributes(const std::string& access_key, const std::string& secret_key,
-	const multimap_t& const_attributes)
+HTTPRequest simpledb_get_attributes_request(const std::string& access_key,
+	const std::string& secret_key)
 {
 	HTTPRequest request(HTTPRequest::Method_GET, "/");
 	request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
@@ -344,11 +344,29 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 	request.AddParameter("SignatureMethod", "HmacSHA256");
 	request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
 	request.AddParameter("Version", "2009-04-15");
-	TEST_THAT_OR(add_simpledb_signature(request, secret_key), return false);
+	TEST_THAT(add_simpledb_signature(request, secret_key));
+	return request;
+}
+
+bool simpledb_get_attributes_error(const std::string& access_key,
+	const std::string& secret_key, int expected_status_code)
+{
+	HTTPRequest request = simpledb_get_attributes_request(access_key, secret_key);
+	HTTPResponse response;
+	TEST_THAT_OR(send_and_receive(request, response, expected_status_code),
+		return false);
+	// Nothing else to check: there is no XML
+	return true;
+}
+
+bool simpledb_get_attributes(const std::string& access_key, const std::string& secret_key,
+	const multimap_t& const_attributes)
+{
+	HTTPRequest request = simpledb_get_attributes_request(access_key, secret_key);
 
 	ptree response_tree;
-	TEST_THAT(send_and_receive_xml(request, response_tree,
-		"GetAttributesResponse"));
+	TEST_THAT_OR(send_and_receive_xml(request, response_tree,
+		"GetAttributesResponse"), return false);
 
 	// Check that all attributes were written correctly
 	std::multimap<std::string, std::string> attributes = const_attributes;
@@ -1032,9 +1050,66 @@ int test(int argc, const char *argv[])
 		TEST_THAT(send_and_receive_xml(request, response_tree,
 			"DeleteAttributesResponse"));
 
-		// Check that it has actually been removed.
+		// Since we've deleted all attributes, the server should have deleted
+		// the whole item, and the response to a GetAttributes request should be
+		// 404 not found.
+		TEST_THAT(simpledb_get_attributes_error(access_key, secret_key,
+			HTTPResponse::Code_NotFound));
+
+		// Create an item to use with conditional delete tests.
+		request.SetParameter("Action", "PutAttributes");
+		request.SetParameter("DomainName", "MyDomain");
+		request.SetParameter("ItemName", "JumboFez");
+		request.SetParameter("Attribute.1.Name", "Color");
+		request.SetParameter("Attribute.1.Value", "Blue");
+		request.SetParameter("Attribute.2.Name", "Size");
+		request.SetParameter("Attribute.2.Value", "Med");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// Conditional delete that should fail
+		request.SetParameter("Action", "DeleteAttributes");
+		request.SetParameter("Expected.1.Name", "Color");
+		request.SetParameter("Expected.1.Value", "What?");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive(request, response, HTTPResponse::Code_Conflict));
+
+		// Check that it did actually fail
 		expected_attrs.clear();
+		expected_attrs.insert(attr_t("Color", "Blue"));
+		expected_attrs.insert(attr_t("Size", "Med"));
 		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional delete of one attribute ("Color") that should succeed
+		request.SetParameter("Expected.1.Value", "Blue");
+		// Remove attribute 1 ("Color") from the request, so it won't be deleted.
+		// Attribute 2 ("Size") remains in the request, and should be deleted.
+		request.RemoveParameter("Attribute.1.Name");
+		request.RemoveParameter("Attribute.1.Value");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"DeleteAttributesResponse"));
+
+		// Check that the "Size" attribute is no longer present, but "Color"
+		// still is.
+		expected_attrs.erase("Size");
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional delete without specifying attributes, should remove all
+		// remaining attributes, and hence the item itself. The condition
+		// (expected values) set above should still be valid and match this item.
+		request.RemoveParameter("Attribute.2.Name");
+		request.RemoveParameter("Attribute.2.Value");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"DeleteAttributesResponse"));
+
+		// Since we've deleted all attributes, the server should have deleted
+		// the whole item, and the response to a GetAttributes request should be
+		// 404 not found.
+		TEST_THAT(simpledb_get_attributes_error(access_key, secret_key,
+			HTTPResponse::Code_NotFound));
 
 		// Reset for the next test
 		request.SetParameter("Action", "Reset");
@@ -1107,7 +1182,7 @@ int test(int argc, const char *argv[])
 
 		TEST_CHECK_THROWS(
 			client.PutAttributes(domain, item, new_attrs, conditional_attrs),
-			HTTPException, RequestFailedUnexpectedly);
+			HTTPException, ConditionalRequestConflict);
 		actual_attrs = client.GetAttributes(domain, item);
 		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
 
@@ -1127,10 +1202,58 @@ int test(int argc, const char *argv[])
 		// values is not specified.
 		client.DeleteAttributes(domain, item, new_attrs);
 
-		// Check that it has actually been removed.
-		expected_attrs.clear();
+		// Check that it has actually been removed. Since we've deleted all
+		// attributes, the server should have deleted the whole item, and the
+		// response to a GetAttributes request should be 404 not found.
+		TEST_CHECK_THROWS(client.GetAttributes(domain, item),
+			HTTPException, SimpleDBItemNotFound);
+
+		// Create an item to use with conditional delete tests.
+		expected_attrs["Color"] = "Blue";
+		expected_attrs["Size"] = "Med";
+		client.PutAttributes(domain, item, expected_attrs);
 		actual_attrs = client.GetAttributes(domain, item);
 		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+
+		// Conditional delete that should fail. If it succeeded, it should delete
+		// the whole item, because no attributes are provided.
+		expected_attrs["Color"] = "What?";
+		SimpleDBClient::str_map_t empty_attrs;
+		TEST_CHECK_THROWS(
+			client.DeleteAttributes(domain, item, empty_attrs, // attributes
+				expected_attrs), // expected
+			HTTPException, ConditionalRequestConflict);
+
+		// Check that the item was not actually deleted, nor any of its
+		// attributes, and "Color" should still be "Blue".
+		expected_attrs["Color"] = "Blue";
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+
+		// Conditional delete of one attribute ("Color") that should succeed
+		SimpleDBClient::str_map_t attrs_to_remove;
+		attrs_to_remove["Size"] = "Med";
+		expected_attrs["Color"] = "Blue";
+		client.DeleteAttributes(domain, item, attrs_to_remove, // attributes
+			expected_attrs); // expected
+
+		// Check that the "Size" attribute is no longer present, but "Color"
+		// still is.
+		expected_attrs.erase("Size");
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+
+		// Conditional delete without specifying attributes, should remove all
+		// remaining attributes, and hence the item itself. The condition
+		// (expected_attrs) set above should still be valid and match this item.
+		client.DeleteAttributes(domain, item, empty_attrs, // attributes
+			expected_attrs); // expected
+
+		// Since we've deleted all attributes, the server should have deleted
+		// the whole item, and the response to a GetAttributes request should be
+		// 404 not found.
+		TEST_CHECK_THROWS(client.GetAttributes(domain, item),
+			HTTPException, SimpleDBItemNotFound);
 	}
 
 	// Kill it

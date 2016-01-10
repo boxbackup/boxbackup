@@ -165,10 +165,27 @@ void SimpleDBClient::SendAndReceive(HTTPRequest& request, HTTPResponse& response
 		response.GetSize());
 	if(response.GetResponseCode() != expected_status_code)
 	{
-		THROW_EXCEPTION_MESSAGE(HTTPException, RequestFailedUnexpectedly,
-			"Expected a " << expected_status_code << " response but received "
-			"a " << response.GetResponseCode() << " instead: " <<
-			response_data);
+		if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, SimpleDBItemNotFound,
+				"Expected a " << expected_status_code << " response but "
+				"received a " << response.GetResponseCode() << " "
+				"instead: " << response_data);
+		}
+		else if(response.GetResponseCode() == HTTPResponse::Code_Conflict)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, ConditionalRequestConflict,
+				"Expected a " << expected_status_code << " response but "
+				"received a " << response.GetResponseCode() << " "
+				"instead: " << response_data);
+		}
+		else
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, RequestFailedUnexpectedly,
+				"Expected a " << expected_status_code << " response but "
+				"received a " << response.GetResponseCode() << " "
+				"instead: " << response_data);
+		}
 	}
 }
 
@@ -383,7 +400,23 @@ SimpleDBClient::str_map_t SimpleDBClient::GetAttributes(const std::string& domai
 	request.AddParameter("Signature", CalculateSimpleDBSignature(request));
 
 	ptree response_tree;
-	SendAndReceiveXML(request, response_tree, "GetAttributesResponse");
+	try
+	{
+		SendAndReceiveXML(request, response_tree, "GetAttributesResponse");
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, SimpleDBItemNotFound))
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, SimpleDBItemNotFound,
+				"The requested SimpleDB item '" << item_name << "' "
+				"was not found in domain '" << domain_name << "'");
+		}
+		else
+		{
+			throw;
+		}
+	}
 
 	str_map_t attributes;
 	BOOST_FOREACH(ptree::value_type &v,

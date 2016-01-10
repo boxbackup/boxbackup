@@ -46,6 +46,8 @@ public:
 		const std::string& domain_name,
 		const std::string& item_name,
 		bool throw_if_not_found = true);
+	void DeleteItem(const std::string& domain_name, const std::string& item_name,
+		bool throw_if_not_found = true);
 	void Reset();
 
 protected:

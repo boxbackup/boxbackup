@@ -21,6 +21,6 @@ ParameterNotFound			17	An expected parameter was not found in the request.
 DuplicateParameter			18	A parameter was unexpectedly duplicated in the request.
 AuthenticationFailed			19	The request could not be authenticated.
 S3SimulatorError			20	An unspecified error occurred in the S3Simulator.
-ConditionalPutConflict			21	Conditional PutAttributes request failed because the current attribute values did not match.
-ConditionalPutNotFound			22	Conditional PutAttributes request failed because the expected attribute values were not found.
-UnexpectedResponseData			23	The response does not have the expected XML structure.
+ConditionalRequestConflict		21	A SimpleDb conditional request failed because the item has different attributes than expected.
+UnexpectedResponseData			22	The response does not have the expected XML structure.
+SimpleDBItemNotFound			23	The requested item does not exist on the server.
