@@ -928,15 +928,15 @@ void SimpleDBSimulator::CreateDomain(const std::string& domain_name)
 	if(result != NULL)
 	{
 		free(result);
-		THROW_EXCEPTION_MESSAGE(HTTPException, S3SimulatorError,
-			"CreateDomain: Already exists: " << domain_name);
+		// "CreateDomain is an idempotent operation; running it multiple times
+		// using the same domain name will not result in an error response."
+		return;
 	}
 
 	ptree domain_props;
 	domain_props.add(PTREE_DOMAIN_NEXT_ID_SEQ, 1);
 	PutDomainProps(domain_name, domain_props);
 }
-
 
 void SimpleDBSimulator::PutAttributes(const std::string& domain_name,
 	const std::string& item_name,

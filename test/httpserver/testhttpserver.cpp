@@ -977,6 +977,18 @@ int test(int argc, const char *argv[])
 		expected_domains.push_back("MyDomain");
 		TEST_THAT(compare_lists(expected_domains, domains));
 
+		// Create the same domain again. "CreateDomain is an idempotent operation;
+		// running it multiple times using the same domain name will not result in
+		// an error response."
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"CreateDomainResponse"));
+
+		// List domains again, check that our new domain is present only once
+		// (it wasn't created a second time). Therefore expected_domains is the
+		// same as it was above.
+		domains = simpledb_list_domains(access_key, secret_key);
+		TEST_THAT(compare_lists(expected_domains, domains));
+
 		// Create an item
 		request.SetParameter("Action", "PutAttributes");
 		request.SetParameter("DomainName", "MyDomain");
