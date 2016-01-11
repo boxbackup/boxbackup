@@ -419,52 +419,19 @@ bool compare_lists(const std::vector<std::string>& expected_items,
 	return all_match;
 }
 
-bool compare_maps(const SimpleDBClient::str_map_t& expected_attrs,
+bool test_equal_maps(const SimpleDBClient::str_map_t& expected_attrs,
 	const SimpleDBClient::str_map_t& actual_attrs)
 {
-	bool all_match = (expected_attrs.size() == actual_attrs.size());
-
-	for(SimpleDBClient::str_map_t::const_iterator i = actual_attrs.begin();
-		i != actual_attrs.end(); i++)
+	str_map_diff_t differences = compare_str_maps(expected_attrs, actual_attrs);
+	for(str_map_diff_t::iterator i = differences.begin(); i != differences.end(); i++)
 	{
-		std::string name = i->first;
-		std::string value = i->second;
-		SimpleDBClient::str_map_t::const_iterator found = expected_attrs.find(name);
-		if(found == expected_attrs.end())
-		{
-			TEST_EQUAL_LINE("", name, "Unexpected attribute name");
-			TEST_EQUAL_LINE("", value, "Unexpected attribute value");
-			all_match = false;
-		}
-		else
-		{
-			TEST_EQUAL_LINE(found->first, name, "Wrong attribute name");
-			TEST_EQUAL_LINE(found->second, value, "Wrong attribute value");
-			all_match &= (found->first == name);
-			all_match &= (found->second == value);
-		}
+		const std::string& name = i->first;
+		const std::string& expected = i->second.first;
+		const std::string& actual = i->second.second;
+		TEST_EQUAL_LINE(expected, actual, "Wrong value for attribute " << name);
 	}
 
-	// Now try the other way around
-	for(SimpleDBClient::str_map_t::const_iterator i = expected_attrs.begin();
-		i != expected_attrs.end(); i++)
-	{
-		std::string name = i->first;
-		std::string value = i->second;
-		SimpleDBClient::str_map_t::const_iterator found = actual_attrs.find(name);
-		if(found == actual_attrs.end())
-		{
-			TEST_EQUAL_LINE("", name, "Missing attribute name");
-			TEST_EQUAL_LINE("", value, "Missing attribute value");
-			all_match = false;
-		}
-		else
-		{
-			// No need to report anything, we would have done so already above
-		}
-	}
-
-	return all_match;
+	return differences.empty();
 }
 
 int test(int argc, const char *argv[])
@@ -1173,7 +1140,7 @@ int test(int argc, const char *argv[])
 		expected_attrs["Size"] = "Med";
 		client.PutAttributes(domain, item, expected_attrs);
 		SimpleDBClient::str_map_t actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
 
 		// Add more attributes. SimpleDBClient always replaces existing values
 		// for attributes.
@@ -1182,7 +1149,7 @@ int test(int argc, const char *argv[])
 		expected_attrs["Size"] = "Large";
 		client.PutAttributes(domain, item, expected_attrs);
 		actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
 
 		// Conditional PutAttributes that fails (doesn't match) and therefore
 		// doesn't change anything (so we don't change expected_attrs).
@@ -1196,7 +1163,7 @@ int test(int argc, const char *argv[])
 			client.PutAttributes(domain, item, new_attrs, conditional_attrs),
 			HTTPException, ConditionalRequestConflict);
 		actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
 
 		// Conditional PutAttributes again, with the correct value for the Color
 		// attribute this time, so the request should succeed.
@@ -1207,7 +1174,7 @@ int test(int argc, const char *argv[])
 		// SimpleDBClient, the Size value will be replaced by the new single
 		// value.
 		actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(new_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(new_attrs, actual_attrs));
 
 		// Test that we can delete values. We are supposed to pass some
 		// attribute values, but what happens if they don't match the current
@@ -1225,7 +1192,7 @@ int test(int argc, const char *argv[])
 		expected_attrs["Size"] = "Med";
 		client.PutAttributes(domain, item, expected_attrs);
 		actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
 
 		// Conditional delete that should fail. If it succeeded, it should delete
 		// the whole item, because no attributes are provided.
@@ -1240,7 +1207,7 @@ int test(int argc, const char *argv[])
 		// attributes, and "Color" should still be "Blue".
 		expected_attrs["Color"] = "Blue";
 		actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
 
 		// Conditional delete of one attribute ("Color") that should succeed
 		SimpleDBClient::str_map_t attrs_to_remove;
@@ -1253,7 +1220,7 @@ int test(int argc, const char *argv[])
 		// still is.
 		expected_attrs.erase("Size");
 		actual_attrs = client.GetAttributes(domain, item);
-		TEST_THAT(compare_maps(expected_attrs, actual_attrs));
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
 
 		// Conditional delete without specifying attributes, should remove all
 		// remaining attributes, and hence the item itself. The condition

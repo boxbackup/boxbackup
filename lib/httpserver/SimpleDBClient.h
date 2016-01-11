@@ -66,7 +66,7 @@ public:
 	list_t ListDomains();
 	void CreateDomain(const std::string& domain_name);
 	str_map_t GetAttributes(const std::string& domain_name,
-		const std::string& item);
+		const std::string& item, bool consistent_read = true);
 	void PutAttributes(const std::string& domain_name,
 		const std::string& item_name, const str_map_t& attributes,
 		const str_map_t& expected = str_map_t());

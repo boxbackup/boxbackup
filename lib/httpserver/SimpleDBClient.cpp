@@ -383,7 +383,8 @@ void SimpleDBClient::CreateDomain(const std::string& domain_name)
 // Function
 //		Name:	 SimpleDBClient::GetAttributes(
 //			 const std::string& domain_name,
-//			 const std::string& item_name)
+//			 const std::string& item_name,
+//			 bool consistent_read)
 //		Purpose: Get the attributes of the specified item in the
 //			 specified domain (previously created with
 //			 CreateDomain).
@@ -392,11 +393,15 @@ void SimpleDBClient::CreateDomain(const std::string& domain_name)
 // --------------------------------------------------------------------------
 
 SimpleDBClient::str_map_t SimpleDBClient::GetAttributes(const std::string& domain_name,
-	const std::string& item_name)
+	const std::string& item_name, bool consistent_read)
 {
 	HTTPRequest request = StartRequest(HTTPRequest::Method_GET, "GetAttributes");
 	request.AddParameter("DomainName", domain_name);
 	request.AddParameter("ItemName", item_name);
+	if(consistent_read)
+	{
+		request.AddParameter("ConsistentRead", "true");
+	}
 	request.AddParameter("Signature", CalculateSimpleDBSignature(request));
 
 	ptree response_tree;
