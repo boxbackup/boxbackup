@@ -38,37 +38,47 @@
 
 void BackupFileSystem::GetLock()
 {
-	bool gotLock = false;
-	int triesLeft = 8;
-	do
+	for(int triesLeft = 8; triesLeft >= 0; triesLeft--)
 	{
-		gotLock = TryGetLock();
-		if(!gotLock)
+		try
 		{
-			--triesLeft;
-			::sleep(1);
+			TryGetLock();
 		}
-	}
-	while (!gotLock && triesLeft > 0);
-
-	if (!gotLock)
-	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CouldNotLockStoreAccount, "Failed to get exclusive "
-			"lock on account");
+		catch(BackupStoreException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, BackupStoreException,
+				CouldNotLockStoreAccount) && triesLeft)
+			{
+				// Try again as long as we have retries left.
+			}
+			else
+			{
+				throw;
+			}
+		}
 	}
 }
 
-bool RaidBackupFileSystem::TryGetLock()
+void RaidBackupFileSystem::TryGetLock()
 {
+	if(mWriteLock.GotLock())
+	{
+		return;
+	}
+
 	// Make the filename of the write lock file
 	std::string writeLockFile;
 	StoreStructure::MakeWriteLockFilename(mAccountRootDir, mStoreDiscSet,
 		writeLockFile);
 
 	// Request the lock
-	return mWriteLock.TryAndGetLock(writeLockFile.c_str(),
-		0600 /* restrictive file permissions */);
+	if(!mWriteLock.TryAndGetLock(writeLockFile.c_str(),
+		0600 /* restrictive file permissions */))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			CouldNotLockStoreAccount, "Failed to get exclusive "
+			"lock on account");
+	}
 }
 
 std::string RaidBackupFileSystem::GetObjectFileName(int64_t ObjectID,

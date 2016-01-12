@@ -13,6 +13,7 @@
 
 #include <string>
 
+#include "autogen_BackupStoreException.h"
 #include "HTTPResponse.h"
 #include "NamedLock.h"
 #include "S3Client.h"
@@ -49,7 +50,7 @@ public:
 
 	BackupFileSystem() { }
 	virtual ~BackupFileSystem() { }
-	virtual bool TryGetLock() = 0;
+	virtual void TryGetLock() = 0;
 	virtual void GetLock();
 	virtual void ReleaseLock() = 0;
 	virtual int GetBlockSize() = 0;
@@ -86,7 +87,7 @@ public:
 	  mAccountRootDir(AccountRootDir),
 	  mStoreDiscSet(discSet)
 	{ }
-	virtual bool TryGetLock();
+	virtual void TryGetLock();
 	virtual void ReleaseLock()
 	{
 		mWriteLock.ReleaseLock();
@@ -135,7 +136,7 @@ public:
 	  mBasePath(BasePath),
 	  mrClient(rClient)
 	{ }
-	virtual bool TryGetLock() { return false; }
+	virtual void TryGetLock() { THROW_EXCEPTION(BackupStoreException, CouldNotLockStoreAccount); }
 	virtual void ReleaseLock() { }
 	virtual int GetBlockSize();
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,
