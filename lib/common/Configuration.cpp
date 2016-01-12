@@ -430,14 +430,11 @@ const std::string &Configuration::GetKeyValue(const std::string& rKeyName) const
 
 	if(i == mKeys.end())
 	{
-		BOX_LOG_CATEGORY(Log::ERROR, ConfigurationVerify::VERIFY_ERROR,
+		THROW_EXCEPTION_MESSAGE(CommonException, ConfigNoKey,
 			"Missing configuration key: " << rKeyName);
-		THROW_EXCEPTION(CommonException, ConfigNoKey)
 	}
-	else
-	{
-		return i->second;
-	}
+
+	return i->second;
 }
 
 
@@ -451,22 +448,17 @@ const std::string &Configuration::GetKeyValue(const std::string& rKeyName) const
 // --------------------------------------------------------------------------
 int Configuration::GetKeyValueInt(const std::string& rKeyName) const
 {
-	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
-	
-	if(i == mKeys.end())
+	std::string value_str = GetKeyValue(rKeyName);
+	long value = ::strtol(value_str.c_str(), NULL, 0 /* C style handling */);
+
+	if(value == LONG_MAX || value == LONG_MIN)
 	{
-		THROW_EXCEPTION(CommonException, ConfigNoKey)
+		THROW_EXCEPTION_MESSAGE(CommonException, ConfigBadIntValue,
+			"Invalid integer value for configuration key: " <<
+			rKeyName << ": '" << value_str << "'");
 	}
-	else
-	{
-		long value = ::strtol((i->second).c_str(), NULL,
-			0 /* C style handling */);
-		if(value == LONG_MAX || value == LONG_MIN)
-		{
-			THROW_EXCEPTION(CommonException, ConfigBadIntValue)
-		}
-		return (int)value;
-	}
+
+	return (int)value;
 }
 
 
@@ -480,23 +472,18 @@ int Configuration::GetKeyValueInt(const std::string& rKeyName) const
 // --------------------------------------------------------------------------
 uint32_t Configuration::GetKeyValueUint32(const std::string& rKeyName) const
 {
-	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
-	
-	if(i == mKeys.end())
+	std::string value_str = GetKeyValue(rKeyName);
+	errno = 0;
+	long value = ::strtoul(value_str.c_str(), NULL, 0 /* C style handling */);
+
+	if(errno != 0)
 	{
-		THROW_EXCEPTION(CommonException, ConfigNoKey)
+		THROW_EXCEPTION_MESSAGE(CommonException, ConfigBadIntValue,
+			"Invalid integer value for configuration key: " <<
+			rKeyName << ": '" << value_str << "'");
 	}
-	else
-	{
-		errno = 0;
-		long value = ::strtoul((i->second).c_str(), NULL,
-			0 /* C style handling */);
-		if(errno != 0)
-		{
-			THROW_EXCEPTION(CommonException, ConfigBadIntValue)
-		}
-		return (int)value;
-	}
+
+	return (int)value;
 }
 
 
@@ -510,33 +497,24 @@ uint32_t Configuration::GetKeyValueUint32(const std::string& rKeyName) const
 // --------------------------------------------------------------------------
 bool Configuration::GetKeyValueBool(const std::string& rKeyName) const
 {
-	std::map<std::string, std::string>::const_iterator i(mKeys.find(rKeyName));
-	
-	if(i == mKeys.end())
+	std::string value_str = GetKeyValue(rKeyName);
+	bool value = false;
+
+	// Anything this is called for should have been verified as having a correct
+	// string in the verification section. However, this does default to false
+	// if it isn't in the string table.
+
+	for(int l = 0; sValueBooleanStrings[l] != 0; ++l)
 	{
-		THROW_EXCEPTION(CommonException, ConfigNoKey)
-	}
-	else
-	{
-		bool value = false;
-		
-		// Anything this is called for should have been verified as having a correct
-		// string in the verification section. However, this does default to false
-		// if it isn't in the string table.
-		
-		for(int l = 0; sValueBooleanStrings[l] != 0; ++l)
+		if(::strcasecmp(value_str.c_str(), sValueBooleanStrings[l]) == 0)
 		{
-			if(::strcasecmp((i->second).c_str(), sValueBooleanStrings[l]) == 0)
-			{
-				// Found.
-				value = sValueBooleanValue[l];
-				break;
-			}
+			// Found.
+			value = sValueBooleanValue[l];
+			break;
 		}
-		
-		return value;
 	}
 
+	return value;
 }
 
 
@@ -617,7 +595,8 @@ const Configuration &Configuration::GetSubConfiguration(const std::string&
 		}
 	}
 
-	THROW_EXCEPTION(CommonException, ConfigNoSubConfig)
+	THROW_EXCEPTION_MESSAGE(CommonException, ConfigNoSubConfig,
+		"Missing sub-configuration section: " << rSubName);
 }
 
 
@@ -647,7 +626,8 @@ Configuration &Configuration::GetSubConfigurationEditable(const std::string&
 		}
 	}
 
-	THROW_EXCEPTION(CommonException, ConfigNoSubConfig)
+	THROW_EXCEPTION_MESSAGE(CommonException, ConfigNoSubConfig,
+		"Missing sub-configuration section: " << rSubName);
 }
 
 
