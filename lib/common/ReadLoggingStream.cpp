@@ -65,7 +65,7 @@ int ReadLoggingStream::Read(void *pBuffer, int NBytes, int Timeout)
 	{
 		box_time_t timeNow = GetCurrentBoxTime();
 		box_time_t elapsed = timeNow - mStartTime;
-		box_time_t finish  = (elapsed * mLength) / mTotalRead;
+		box_time_t finish  = ((float)elapsed * (float)mLength) / mTotalRead;
 		// box_time_t remain  = finish - elapsed;
 		mrLogger.Log(numBytesRead, mOffset, mLength, elapsed, finish);
 	}
