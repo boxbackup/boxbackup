@@ -31,16 +31,26 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    S3Client::GetObject(const std::string& rObjectURI)
+//		Name:    S3Client::GetObject(const std::string& rObjectURI,
+//			 const std::string& MD5Checksum)
 //		Purpose: Retrieve the object with the specified URI (key)
-//			 from your S3 bucket.
+//			 from your S3 bucket. If you supply an MD5 checksum,
+//			 then it is assumed that you already have the file
+//			 data with that checksum, and if the file version on
+//			 the server is the same, then you will get a 304
+//			 Not Modified response instead of a 200 OK, and no
+//			 file data.
 //		Created: 09/01/2009
 //
 // --------------------------------------------------------------------------
 
-HTTPResponse S3Client::GetObject(const std::string& rObjectURI)
+HTTPResponse S3Client::GetObject(const std::string& rObjectURI,
+	const std::string& MD5Checksum)
 {
-	return FinishAndSendRequest(HTTPRequest::Method_GET, rObjectURI);
+	return FinishAndSendRequest(HTTPRequest::Method_GET, rObjectURI,
+		NULL, // pStreamToSend
+		NULL, // pStreamContentType
+		MD5Checksum);
 }
 
 // --------------------------------------------------------------------------
@@ -98,7 +108,7 @@ HTTPResponse S3Client::PutObject(const std::string& rObjectURI,
 
 HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	const std::string& rRequestURI, IOStream* pStreamToSend,
-	const char* pStreamContentType)
+	const char* pStreamContentType, const std::string& MD5Checksum)
 {
 	HTTPRequest request(Method, rRequestURI);
 	request.SetHostName(mHostName);
@@ -130,6 +140,12 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	if (pStreamContentType)
 	{
 		request.AddHeader("Content-Type", pStreamContentType);
+	}
+
+	if (!MD5Checksum.empty())
+	{
+		request.AddHeader("If-None-Match",
+			std::string("\"") + MD5Checksum + "\"");
 	}
 
 	std::string s3suffix = ".s3.amazonaws.com";
