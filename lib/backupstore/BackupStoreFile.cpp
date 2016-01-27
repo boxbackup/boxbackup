@@ -279,24 +279,21 @@ bool BackupStoreFile::VerifyEncodedFileFormat(IOStream &rFile, int64_t *pDiffFro
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreFile::VerifyStream::Write()
-//		Purpose: Handles writes to the verifying stream. If the write
-//			 completes the current unit, then verify it, copy it
-//			 to mpCopyToStream if not NULL, and move on to the
-//			 next unit, otherwise throw an exception.
+//		Name:    BackupStoreFile::VerifyStream::Read()
+//		Purpose: Handles reads from the verifying stream. If the read
+//			 completes the current unit, then verify it and move
+//			 on to the next unit.
 //		Created: 2015/08/07
 //
 // --------------------------------------------------------------------------
 
-void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int Timeout)
+int BackupStoreFile::VerifyStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	// Check that we haven't already written too much to the current unit
-	size_t BytesToAdd;
+	// Check that we haven't already read too much for the current unit
 	if(mState == State_Blocks)
 	{
 		// We don't know how many bytes to expect
 		ASSERT(mCurrentUnitSize == 0);
-		BytesToAdd = NBytes;
 	}
 	else
 	{
@@ -304,31 +301,30 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 		size_t BytesLeftInCurrentUnit = mCurrentUnitSize -
 			mCurrentUnitData.GetSize();
 		// Add however many bytes are needed/available to the current unit's buffer.
-		BytesToAdd = std::min(BytesLeftInCurrentUnit, (size_t)NBytes);
+		NBytes = std::min(BytesLeftInCurrentUnit, (size_t)NBytes);
 	}
 
+	if(NBytes == 0)
+	{
+		return 0;
+	}
 	// We must make progress here, or we could have infinite recursion.
-	ASSERT(BytesToAdd > 0);
+	ASSERT(NBytes >= 0);
+	NBytes = mReadFromStream.Read(pBuffer, NBytes, Timeout);
 
 	CollectInBufferStream* pCurrentBuffer = (mCurrentBufferIsAlternate ?
 		&mAlternateData : &mCurrentUnitData);
-	pCurrentBuffer->Write(pBuffer, BytesToAdd, Timeout);
-	if(mpCopyToStream)
-	{
-		mpCopyToStream->Write(pBuffer, BytesToAdd, Timeout);
-	}
-
-	pBuffer = (uint8_t *)pBuffer + BytesToAdd;
-	NBytes -= BytesToAdd;
-	mCurrentPosition += BytesToAdd;
+	pCurrentBuffer->Write(pBuffer, NBytes);
+	mCurrentPosition += NBytes;
 
 	if(mState == State_Blocks)
 	{
 		// The block index follows the blocks themselves, but without seeing the
 		// index we don't know how big the blocks are. So we just have to keep
-		// reading, holding the last mBlockIndexSize bytes in two buffers, until
-		// we reach the end of the file (when Close() is called) when we can look
-		// back over those buffers and extract the block index from them.
+		// reading, holding (at least) the last mBlockIndexSize bytes in two
+		// buffers, until we reach the end of the file (when Close() is called)
+		// when we can look back over those buffers and extract the block index
+		// from them.
 		if(pCurrentBuffer->GetSize() >= mBlockIndexSize)
 		{
 			// Time to swap buffers, and clear the one we're about to
@@ -340,8 +336,8 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 		}
 
 		// We don't want to move data into the finished buffer while we're in this
-		// state, and we don't need to call ourselves recursively, so just return.
-		return;
+		// state, so just return.
+		return NBytes;
 	}
 
 	ASSERT(mState != State_Blocks);
@@ -349,7 +345,7 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 	// If the current unit is not complete, just return now.
 	if(mCurrentUnitData.GetSize() < mCurrentUnitSize)
 	{
-		return;
+		return NBytes;
 	}
 
 	ASSERT(mCurrentUnitData.GetSize() == mCurrentUnitSize);
@@ -460,11 +456,9 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 		}
 	}
 
-	if(NBytes > 0)
-	{
-		// Still some data to process, so call recursively to deal with it.
-		Write(pBuffer, NBytes, Timeout);
-	}
+	// It's OK to read less data than requested, so we don't need to call ourselves
+	// recursively to read more data, we can just return what we have.
+	return NBytes;
 }
 
 // --------------------------------------------------------------------------
@@ -479,12 +473,11 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 //
 // --------------------------------------------------------------------------
 
-
-void BackupStoreFile::VerifyStream::Close(bool CloseCopyStream)
+void BackupStoreFile::VerifyStream::Close(bool CloseReadFromStream)
 {
-	if(mpCopyToStream && CloseCopyStream)
+	if(CloseReadFromStream)
 	{
-		mpCopyToStream->Close();
+		mReadFromStream.Close();
 	}
 
 	if(mState != State_Blocks)

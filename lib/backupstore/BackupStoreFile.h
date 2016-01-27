@@ -138,7 +138,7 @@ public:
 		};
 
 		int mState;
-		IOStream* mpCopyToStream;
+		IOStream& mReadFromStream;
 		CollectInBufferStream mCurrentUnitData;
 		size_t mCurrentUnitSize;
 		int64_t mNumBlocks;
@@ -150,11 +150,12 @@ public:
 		bool mBlockFromOtherFileReferenced;
 		int64_t mContainerID;
 		int64_t mDiffFromObjectID;
+		bool mClosed;
 
 	public:
-		VerifyStream(IOStream* pCopyToStream = NULL)
+		VerifyStream(IOStream& ReadFromStream)
 		: mState(State_Header),
-		  mpCopyToStream(pCopyToStream),
+		  mReadFromStream(ReadFromStream),
 		  mCurrentUnitSize(sizeof(file_StreamFormat)),
 		  mNumBlocks(0),
 		  mBlockIndexSize(0),
@@ -163,23 +164,24 @@ public:
 		  mCurrentBufferIsAlternate(false),
 		  mBlockFromOtherFileReferenced(false),
 		  mContainerID(0),
-		  mDiffFromObjectID(0)
+		  mDiffFromObjectID(0),
+		  mClosed(false)
 		{ }
 		virtual int Read(void *pBuffer, int NBytes,
+			int Timeout = IOStream::TimeOutInfinite);
+		virtual void Write(const void *pBuffer, int NBytes,
 			int Timeout = IOStream::TimeOutInfinite)
 		{
 			THROW_EXCEPTION(CommonException, NotSupported);
 		}
-		virtual void Write(const void *pBuffer, int NBytes,
-			int Timeout = IOStream::TimeOutInfinite);
-		virtual void Close(bool CloseCopyStream = true);
+		virtual void Close(bool CloseReadFromStream = true);
 		virtual bool StreamDataLeft()
 		{
-			THROW_EXCEPTION(CommonException, NotSupported);
+			return mReadFromStream.StreamDataLeft();
 		}
 		virtual bool StreamClosed()
 		{
-			THROW_EXCEPTION(CommonException, NotSupported);
+			return mClosed;
 		}
 	};
 

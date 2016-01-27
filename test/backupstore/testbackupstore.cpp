@@ -2339,14 +2339,14 @@ bool test_encoding()
 			for(int buffer_size = 1; ; buffer_size <<= 1)
 			{
 				enc.Seek(0, IOStream::SeekType_Absolute);
+				BackupStoreFile::VerifyStream verifier(enc);
 				CollectInBufferStream temp_copy;
-				BackupStoreFile::VerifyStream verifier(&temp_copy);
-				enc.CopyStreamTo(verifier, IOStream::TimeOutInfinite,
-					buffer_size);
+				verifier.CopyStreamTo(temp_copy,
+					IOStream::TimeOutInfinite, buffer_size);
 
 				// The block index is only validated on Close(), which
 				// CopyStreamTo() doesn't do.
-				verifier.Close();
+				verifier.Close(false); // !CloseReadFromStream
 
 				temp_copy.SetForReading();
 				TEST_EQUAL(file_size, temp_copy.GetSize());

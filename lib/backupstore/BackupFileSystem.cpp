@@ -247,10 +247,10 @@ RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData)
 	RaidFileWrite& rStoreFile(pTrans->GetRaidFile());
 	rStoreFile.Open(false /* no overwriting */);
 
-	BackupStoreFile::VerifyStream validator(&rStoreFile);
+	BackupStoreFile::VerifyStream validator(rFileData);
 
 	// A full file, just store to disc
-	if(!rFileData.CopyStreamTo(validator, BACKUP_STORE_TIMEOUT))
+	if(!validator.CopyStreamTo(rStoreFile, BACKUP_STORE_TIMEOUT))
 	{
 		THROW_EXCEPTION(BackupStoreException, ReadFileFromStreamTimedOut);
 	}
