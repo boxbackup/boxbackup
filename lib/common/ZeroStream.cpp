@@ -18,19 +18,6 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    ZeroStream::ZeroStream(IOStream::pos_type)
-//		Purpose: Constructor
-//		Created: 2007/04/28
-//
-// --------------------------------------------------------------------------
-ZeroStream::ZeroStream(IOStream::pos_type size)
-: mSize(size), mPosition(0)
-{ }
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    ZeroStream::Read(void *, int)
 //		Purpose: Reads bytes from the file
 //		Created: 2007/01/16
@@ -78,7 +65,10 @@ IOStream::pos_type ZeroStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 void ZeroStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
-	THROW_EXCEPTION(CommonException, NotSupported);
+	if(!mDiscardWrites)
+	{
+		THROW_EXCEPTION(CommonException, NotSupported);
+	}
 }
 
 
@@ -138,7 +128,10 @@ void ZeroStream::Seek(IOStream::pos_type Offset, int SeekType)
 // --------------------------------------------------------------------------
 void ZeroStream::Close()
 {
-	THROW_EXCEPTION(CommonException, NotSupported);
+	if(!mDiscardWrites)
+	{
+		THROW_EXCEPTION(CommonException, NotSupported);
+	}
 }
 
 
