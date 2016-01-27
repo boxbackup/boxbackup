@@ -59,9 +59,8 @@ public:
 	~BackupStoreRefCountDatabase();
 private:
 	// Creation through static functions only
-	BackupStoreRefCountDatabase(const BackupStoreAccountDatabase::Entry&
-		rAccount, bool ReadOnly, bool Temporary,
-		std::auto_ptr<FileStream> apDatabaseFile);
+	BackupStoreRefCountDatabase(const std::string& Filename, int64_t AccountID,
+		bool ReadOnly, bool Temporary, std::auto_ptr<FileStream> apDatabaseFile);
 	// No copying allowed
 	BackupStoreRefCountDatabase(const BackupStoreRefCountDatabase &);
 	
@@ -70,12 +69,17 @@ public:
 	// Discard() or Commit() to make permanent.
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const BackupStoreAccountDatabase::Entry& rAccount);
+	static std::auto_ptr<BackupStoreRefCountDatabase> Create
+		(const std::string& Filename, int64_t AccountID);
 	void Commit();
 	void Discard();
 
 	// Load it from the store
-	static std::auto_ptr<BackupStoreRefCountDatabase> Load(const
-		BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
+	// Load it from a stream (file or RaidFile)
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const std::string& FileName, int64_t AccountID, bool ReadOnly);
 
 	typedef uint32_t refcount_t;
 
@@ -91,8 +95,7 @@ public:
 
 private:
 	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&
-		rAccount, bool Temporary);
-
+		rAccount);
 	IOStream::pos_type GetSize() const
 	{
 		return mapDatabaseFile->GetPosition() +
@@ -110,8 +113,8 @@ private:
 	void SetRefCount(int64_t ObjectID, refcount_t NewRefCount);
 	
 	// Location information
-	BackupStoreAccountDatabase::Entry mAccount;
-	std::string mFilename;
+	int64_t mAccountID;
+	std::string mFilename, mFinalFilename;
 	bool mReadOnly;
 	bool mIsModified;
 	bool mIsTemporaryFile;
