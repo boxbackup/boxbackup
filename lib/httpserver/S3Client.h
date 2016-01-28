@@ -65,6 +65,7 @@ class S3Client
 	HTTPResponse HeadObject(const std::string& rObjectURI);
 	HTTPResponse PutObject(const std::string& rObjectURI,
 		IOStream& rStreamToSend, const char* pContentType = NULL);
+	HTTPResponse DeleteObject(const std::string& rObjectURI);
 	void CheckResponse(const HTTPResponse& response, const std::string& message) const;
 	int GetNetworkTimeout() const { return mNetworkTimeout; }
 

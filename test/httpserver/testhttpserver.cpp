@@ -174,11 +174,15 @@ bool exercise_s3client(S3Client& client)
 		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
 	}
 
+	TEST_THAT_OR(!FileExists("testfiles/newfile"), success = false);
 	response = client.PutObject("/newfile", fs);
 	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
 	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
 	TEST_EQUAL_OR("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"),
 		success = false);
+
+	// This will fail if the file was created in the wrong place:
+	TEST_THAT_OR(FileExists("testfiles/newfile"), success = false);
 
 	response = client.GetObject("/newfile");
 	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
@@ -195,8 +199,10 @@ bool exercise_s3client(S3Client& client)
 	TEST_EQUAL_OR("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"),
 		success = false);
 
-	// This will fail if the file was created in the wrong place:
-	TEST_EQUAL_OR(0, ::unlink("testfiles/newfile"), success = false);
+	response = client.DeleteObject("/newfile");
+	TEST_EQUAL_OR(HTTPResponse::Code_NoContent, response.GetResponseCode(),
+		success = false);
+	TEST_THAT_OR(!FileExists("testfiles/newfile"), success = false);
 	return success;
 }
 
@@ -884,6 +890,7 @@ int test(int argc, const char *argv[])
 		FileStream f1("testfiles/dsfdsfs98.fd");
 		FileStream f2("testfiles/newfile");
 		TEST_THAT(f1.CompareWith(f2));
+		TEST_THAT(::unlink("testfiles/newfile") == 0);
 	}
 
 	// S3Client tests with S3Simulator daemon for realism

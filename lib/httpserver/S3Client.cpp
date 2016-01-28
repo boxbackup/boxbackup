@@ -71,6 +71,22 @@ HTTPResponse S3Client::HeadObject(const std::string& rObjectURI)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    S3Client::DeleteObject(const std::string& rObjectURI)
+//		Purpose: Delete the object with the specified URI (key) from
+//			 your S3 bucket.
+//		Created: 27/01/2016
+//
+// --------------------------------------------------------------------------
+
+HTTPResponse S3Client::DeleteObject(const std::string& rObjectURI)
+{
+	return FinishAndSendRequest(HTTPRequest::Method_DELETE, rObjectURI);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    S3Client::PutObject(const std::string& rObjectURI,
 //			 IOStream& rStreamToSend, const char* pContentType)
 //		Purpose: Upload the stream to S3, creating or overwriting the
@@ -162,7 +178,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	}
 
 	std::ostringstream data;
-	data << request.GetVerb() << "\n";
+	data << request.GetMethodName() << "\n";
 	data << "\n"; /* Content-MD5 */
 	data << request.GetContentType() << "\n";
 	data << date.str() << "\n";

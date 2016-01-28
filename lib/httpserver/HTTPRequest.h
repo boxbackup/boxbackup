@@ -43,7 +43,8 @@ public:
 		Method_GET = 1,
 		Method_HEAD = 2,
 		Method_POST = 3,
-		Method_PUT = 4
+		Method_PUT = 4,
+		Method_DELETE = 5
 	};
 	
 	HTTPRequest();
@@ -194,23 +195,6 @@ public:
 	}
 
 	bool IsExpectingContinue() const { return mExpectContinue; }
-	const char* GetVerb() const
-	{
-		if (!mHttpVerb.empty())
-		{
-			return mHttpVerb.c_str();
-		}
-		switch (mMethod)
-		{
-			case Method_UNINITIALISED: return "Uninitialized";
-			case Method_UNKNOWN: return "Unknown";
-			case Method_GET: return "GET";
-			case Method_HEAD: return "HEAD";
-			case Method_POST: return "POST";
-			case Method_PUT: return "PUT";
-		}
-		return "Bad";
-	}
 
 	// This is not supposed to be an API, but the S3Simulator needs to be able to
 	// associate a data stream with an HTTPRequest when handling it in-process.

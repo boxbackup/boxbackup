@@ -110,6 +110,7 @@ std::string HTTPRequest::GetMethodName() const
 		case Method_HEAD: return "HEAD";
 		case Method_POST: return "POST";
 		case Method_PUT: return "PUT";
+		case Method_DELETE: return "DELETE";
 		default:
 			std::ostringstream oss;
 			oss << "unknown-" << mMethod;
@@ -173,8 +174,14 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		{
 			mMethod = Method_PUT;
 		}
+		else if (mHttpVerb == "DELETE")
+		{
+			mMethod = Method_DELETE;
+		}
 		else
 		{
+			BOX_WARNING("Received HTTP request with unrecognised method: " <<
+				mHttpVerb);
 			mMethod = Method_UNKNOWN;
 		}
 	}
@@ -485,14 +492,8 @@ void HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinu
 		THROW_EXCEPTION(HTTPException, RequestNotInitialised); break;
 	case Method_UNKNOWN:
 		THROW_EXCEPTION(HTTPException, BadRequest); break;
-	case Method_GET:
-		rStream.Write("GET"); break;
-	case Method_HEAD:
-		rStream.Write("HEAD"); break;
-	case Method_POST:
-		rStream.Write("POST"); break;
-	case Method_PUT:
-		rStream.Write("PUT"); break;
+	default:
+		rStream.Write(GetMethodName());
 	}
 
 	rStream.Write(" ");
