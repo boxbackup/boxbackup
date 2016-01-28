@@ -435,37 +435,6 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 	return all_match;
 }
 
-bool compare_lists(const std::vector<std::string>& expected_items,
-	const std::vector<std::string>& actual_items)
-{
-	bool all_match = (expected_items.size() == actual_items.size());
-
-	for(size_t i = 0; i < std::max(expected_items.size(), actual_items.size()); i++)
-	{
-		const std::string& expected = (i < expected_items.size()) ? expected_items[i] : "None";
-		const std::string& actual   = (i < actual_items.size())   ? actual_items[i]   : "None";
-		TEST_EQUAL_LINE(expected, actual, "Item " << i);
-		all_match &= (expected == actual);
-	}
-
-	return all_match;
-}
-
-bool test_equal_maps(const SimpleDBClient::str_map_t& expected_attrs,
-	const SimpleDBClient::str_map_t& actual_attrs)
-{
-	str_map_diff_t differences = compare_str_maps(expected_attrs, actual_attrs);
-	for(str_map_diff_t::iterator i = differences.begin(); i != differences.end(); i++)
-	{
-		const std::string& name = i->first;
-		const std::string& expected = i->second.first;
-		const std::string& actual = i->second.second;
-		TEST_EQUAL_LINE(expected, actual, "Wrong value for attribute " << name);
-	}
-
-	return differences.empty();
-}
-
 int test(int argc, const char *argv[])
 {
 	if(argc >= 2 && ::strcmp(argv[1], "server") == 0)
