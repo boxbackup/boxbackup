@@ -641,8 +641,8 @@ Configuration &Configuration::GetSubConfigurationEditable(const std::string&
 // --------------------------------------------------------------------------
 std::vector<std::string> Configuration::GetSubConfigurationNames() const
 {
-	std::list<std::pair<std::string, Configuration> >::const_iterator i(mSubConfigurations.begin());
-
+	std::list<std::pair<std::string, Configuration> >::const_iterator
+		i(mSubConfigurations.begin());
 	std::vector<std::string> r;
 
 	for(; i != mSubConfigurations.end(); ++i)
@@ -657,7 +657,8 @@ std::vector<std::string> Configuration::GetSubConfigurationNames() const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    Configuration::Verify(const ConfigurationVerify &, const std::string &, std::string &)
+//		Name:    Configuration::Verify(const ConfigurationVerify &,
+//			 const std::string &, std::string &)
 //		Purpose: Checks that the configuration is valid according to the
 //			 supplied verifier
 //		Created: 2003/07/24
