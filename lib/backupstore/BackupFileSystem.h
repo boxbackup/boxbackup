@@ -13,10 +13,10 @@
 
 #include <string>
 
-#include "autogen_BackupStoreException.h"
 #include "HTTPResponse.h"
 #include "NamedLock.h"
 #include "S3Client.h"
+#include "SimpleDBClient.h"
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
@@ -87,6 +87,13 @@ public:
 	  mAccountRootDir(AccountRootDir),
 	  mStoreDiscSet(discSet)
 	{ }
+	~RaidBackupFileSystem()
+	{
+		if(mWriteLock.GotLock())
+		{
+			ReleaseLock();
+		}
+	}
 	virtual void TryGetLock();
 	virtual void ReleaseLock()
 	{
@@ -121,23 +128,23 @@ private:
 	const Configuration& mrConfig;
 	std::string mBasePath;
 	S3Client& mrClient;
-	std::string GetDirectoryURI(int64_t ObjectID);
-	std::string GetFileURI(int64_t ObjectID);
+	std::auto_ptr<SimpleDBClient> mapSimpleDBClient;
 	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
-	int GetSizeInBlocks(int64_t bytes)
-	{
-		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
-	}
+	bool mHaveLock;
+	std::string mSimpleDBDomain, mLockName, mLockValue, mCurrentUserName,
+		mCurrentHostName;
+	SimpleDBClient::str_map_t mLockAttributes;
+	void ReportLockMismatches(str_map_diff_t mismatches);
+
+	S3BackupFileSystem(const S3BackupFileSystem& forbidden); // no copying
+	S3BackupFileSystem& operator=(const S3BackupFileSystem& forbidden); // no assignment
 
 public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
-		S3Client& rClient)
-	: mrConfig(config),
-	  mBasePath(BasePath),
-	  mrClient(rClient)
-	{ }
-	virtual void TryGetLock() { THROW_EXCEPTION(BackupStoreException, CouldNotLockStoreAccount); }
-	virtual void ReleaseLock() { }
+		S3Client& rClient);
+	~S3BackupFileSystem();
+	virtual void TryGetLock();
+	virtual void ReleaseLock();
 	virtual int GetBlockSize();
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,
 		bool ReadOnly);
@@ -195,6 +202,28 @@ public:
 	{
 		return mrClient.PutObject(GetObjectURI(ObjectPath), rStreamToSend,
 			pContentType);
+	}
+
+	// These should not really be APIs, but they are public to make them testable:
+	const std::string& GetSimpleDBDomain() const { return mSimpleDBDomain; }
+	const std::string& GetSimpleDBLockName() const { return mLockName; }
+	const std::string& GetSimpleDBLockValue() const { return mLockValue; }
+	const std::string& GetCurrentUserName() const { return mCurrentUserName; }
+	const std::string& GetCurrentHostName() const { return mCurrentHostName; }
+	const box_time_t GetSinceTime() const
+	{
+		// Unfortunately operator[] is not const, so use a const_iterator to
+		// get the value that we want.
+		const std::string& since(mLockAttributes.find("since")->second);
+		return strtoull(since.c_str(), NULL, 10);
+	}
+
+	// And these are public to help with writing tests ONLY:
+	std::string GetDirectoryURI(int64_t ObjectID);
+	std::string GetFileURI(int64_t ObjectID);
+	int GetSizeInBlocks(int64_t bytes)
+	{
+		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
 	}
 };
 

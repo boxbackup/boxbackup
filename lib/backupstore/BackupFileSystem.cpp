@@ -10,6 +10,9 @@
 
 #include "Box.h"
 
+#include <pwd.h>
+#include <signal.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 #include "autogen_BackupStoreException.h"
@@ -500,6 +503,42 @@ void RaidBackupFileSystem::DeleteFile(int64_t ObjectID)
 	deleteFile.Delete();
 }
 
+S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
+	const std::string& BasePath, S3Client& rClient)
+: mrConfig(config),
+  mBasePath(BasePath),
+  mrClient(rClient),
+  mHaveLock(false)
+{
+	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	const std::string& s3_hostname(s3config.GetKeyValue("HostName"));
+	const std::string& s3_base_path(s3config.GetKeyValue("BasePath"));
+	mSimpleDBDomain = s3config.GetKeyValue("SimpleDBDomain");
+
+	// The lock name should be the same for all hosts/files/daemons potentially
+	// writing to the same region of the S3 store. The default is the Amazon S3 bucket
+	// name and path, concatenated.
+	mLockName = s3config.GetKeyValueDefault("SimpleDBLockName",
+		s3_hostname + s3_base_path);
+
+	// The lock value should be unique for each host potentially accessing the same
+	// region of the store, and should help you to identify which one is currently
+	// holding the lock. The default is username@hostname(pid).
+	mCurrentUserName = getpwuid(getuid())->pw_name;
+
+	char hostname_buf[1024];
+	if(gethostname(hostname_buf, sizeof(hostname_buf)) != 0)
+	{
+		THROW_SYS_ERROR("Failed to get hostname", CommonException, Internal);
+	}
+	mCurrentHostName = hostname_buf;
+
+	std::ostringstream lock_value_buf;
+	lock_value_buf << mCurrentUserName << "@" << hostname_buf << "(" << getpid() << ")";
+	mLockValue = s3config.GetKeyValueDefault("SimpleDBLockValue",
+		lock_value_buf.str());
+}
+
 int S3BackupFileSystem::GetBlockSize()
 {
 	return S3_NOTIONAL_BLOCK_SIZE;
@@ -588,13 +627,13 @@ void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 //! revision ID, which for a RaidFile is based on its timestamp and file size.
 bool S3BackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
 {
-	std::string uri = GetDirectoryURI(ObjectID);
+	std::string uri = GetObjectURI(GetDirectoryURI(ObjectID));
 	HTTPResponse response = mrClient.HeadObject(uri);
 
 	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
 	{
 		// A file might exist, check that too.
-		uri = GetFileURI(ObjectID);
+		uri = GetObjectURI(GetFileURI(ObjectID));
 		response = mrClient.HeadObject(uri);
 	}
 
@@ -648,7 +687,6 @@ void S3BackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& rD
 	rDirOut.ReadFromStream(response, mrClient.GetNetworkTimeout());
 
 	rDirOut.SetRevisionID(GetRevisionID(uri, response));
-	ASSERT(false); // set the size in blocks
 	rDirOut.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(response.GetContentLength()));
 }
 
@@ -667,5 +705,226 @@ void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 
 	rDir.SetRevisionID(GetRevisionID(uri, response));
 	rDir.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(out.GetSize()));
+}
+
+void S3BackupFileSystem::ReportLockMismatches(str_map_diff_t mismatches)
+{
+	if(!mismatches.empty())
+	{
+		std::ostringstream error_buf;
+		bool first_item = true;
+		for(str_map_diff_t::iterator i = mismatches.begin();
+			i != mismatches.end(); i++)
+		{
+			if(!first_item)
+			{
+				error_buf << ", ";
+			}
+			first_item = false;
+			const std::string& name(i->first);
+			const std::string& expected(i->second.first);
+			const std::string& actual(i->second.second);
+
+			error_buf << name << " was not '" << expected << "' but '" <<
+				actual << "'";
+		}
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			CouldNotLockStoreAccount, "Lock on '" << mLockName <<
+			"' was concurrently modified: " << error_buf.str());
+	}
+}
+
+void S3BackupFileSystem::TryGetLock()
+{
+	if(mHaveLock)
+	{
+		return;
+	}
+
+	const Configuration s3config = mrConfig.GetSubConfiguration("S3Store");
+
+	if(!mapSimpleDBClient.get())
+	{
+		mapSimpleDBClient.reset(new SimpleDBClient(s3config));
+		// timeout left at the default 300 seconds.
+	}
+
+	// Create the domain, to ensure that it exists. This is idempotent.
+	mapSimpleDBClient->CreateDomain(mSimpleDBDomain);
+	SimpleDBClient::str_map_t conditional;
+
+	// Check to see whether someone already holds the lock
+	try
+	{
+		SimpleDBClient::str_map_t attributes;
+		{
+			HideSpecificExceptionGuard hex(HTTPException::ExceptionType,
+				HTTPException::SimpleDBItemNotFound);
+			attributes = mapSimpleDBClient->GetAttributes(mSimpleDBDomain,
+				mLockName);
+		}
+
+		// This succeeded, which means that someone once held the lock. If the
+		// locked attribute is empty, then they released it cleanly, and we can
+		// access the account safely.
+		box_time_t since_time = strtoull(attributes["since"].c_str(), NULL, 10);
+
+		if(attributes["locked"] == "")
+		{
+			// The account was locked, but no longer. Make sure it stays that
+			// way, to avoid a race condition.
+			conditional = attributes;
+		}
+		// Otherwise, someone holds the lock right now. If the lock is held by
+		// this computer (same hostname) and the PID is no longer running, then
+		// it's reasonable to assume that we can override it because the original
+		// process is dead.
+		else if(attributes["hostname"] == mCurrentHostName)
+		{
+			char* end_ptr;
+			int locking_pid = strtol(attributes["pid"].c_str(), &end_ptr, 10);
+			if(*end_ptr != 0)
+			{
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					CouldNotLockStoreAccount, "Failed to parse PID "
+					"from existing lock: " << attributes["pid"]);
+			}
+
+			if(kill(locking_pid, 0) == 0)
+			{
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					CouldNotLockStoreAccount, "Lock on '" <<
+					mLockName << "' is held by '" <<
+					attributes["locker"] << "' (process " <<
+					locking_pid << " on this host, " <<
+					mCurrentHostName << ", which is still running), "
+					"since " << FormatTime(since_time,
+						true)); // includeDate
+			}
+			else
+			{
+				BOX_WARNING(
+					"Lock on '" << mLockName << "' was held by '" <<
+					attributes["locker"] << "' (process " <<
+					locking_pid << " on this host, " <<
+					mCurrentHostName << ", which appears to have ended) "
+					"since " << FormatTime(since_time,
+						true) // includeDate
+					<< ", overriding it");
+				conditional = attributes;
+			}
+		}
+		else
+		{
+			// If the account is locked by a process on a different host, then
+			// we have no way to check whether it is still running, so we can
+			// only give up.
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				CouldNotLockStoreAccount, "Lock on '" << mLockName <<
+				"' is held by '" << attributes["locker"] << " since " <<
+				FormatTime(since_time, true)); // includeDate
+		}
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, SimpleDBItemNotFound))
+		{
+			// The lock doesn't exist, so it's safe to create it. We can't
+			// make this request conditional, so there is a race condition
+			// here! We deal with that by reading back the attributes with
+			// a ConsistentRead after writing them.
+		}
+		else
+		{
+			// Something else went wrong.
+			throw;
+		}
+	}
+
+	mLockAttributes["locked"] = "true";
+	mLockAttributes["locker"] = mLockValue;
+	mLockAttributes["hostname"] = mCurrentHostName;
+	{
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		mLockAttributes["pid"] = pid_buf.str();
+	}
+	{
+		std::ostringstream since_buf;
+		since_buf << GetCurrentBoxTime();
+		mLockAttributes["since"] = since_buf.str();
+	}
+
+	// This will throw an exception if the conditional PUT fails:
+	mapSimpleDBClient->PutAttributes(mSimpleDBDomain, mLockName, mLockAttributes,
+		conditional);
+
+	// To avoid the race condition, read back the attribute values with a consistent
+	// read, to check that nobody else sneaked in at the same time:
+	SimpleDBClient::str_map_t attributes_read = mapSimpleDBClient->GetAttributes(
+		mSimpleDBDomain, mLockName, true); // consistent_read
+
+	str_map_diff_t mismatches = compare_str_maps(mLockAttributes, attributes_read);
+
+	// This should throw an exception if there are any mismatches:
+	ReportLockMismatches(mismatches);
+	ASSERT(mismatches.empty());
+
+	// Now we have the lock!
+	mHaveLock = true;
+}
+
+void S3BackupFileSystem::ReleaseLock()
+{
+	// Releasing is so much easier!
+	if(!mHaveLock)
+	{
+		return;
+	}
+
+	// If we have a lock, we should also have the SimpleDBClient that we used to
+	// acquire it!
+	ASSERT(mapSimpleDBClient.get());
+
+	// Read the current values, and check that they match what we expected, i.e. that
+	// nobody stole the lock from under us
+	SimpleDBClient::str_map_t attributes_read = mapSimpleDBClient->GetAttributes(
+		mSimpleDBDomain, mLockName, true); // consistent_read
+	str_map_diff_t mismatches = compare_str_maps(mLockAttributes, attributes_read);
+
+	// This should throw an exception if there are any mismatches:
+	ReportLockMismatches(mismatches);
+	ASSERT(mismatches.empty());
+
+	// Now write the same values back, except with "locked" = ""
+	mLockAttributes["locked"] = "";
+
+	// Conditional PUT, using the values that we just read, to ensure that nobody
+	// changes it under our feet right now. This will throw an exception if the
+	// conditional PUT fails:
+	mapSimpleDBClient->PutAttributes(mSimpleDBDomain, mLockName, mLockAttributes,
+		attributes_read);
+
+	// Read back, to check that we unlocked successfully:
+	attributes_read = mapSimpleDBClient->GetAttributes(mSimpleDBDomain, mLockName,
+		true); // consistent_read
+	mismatches = compare_str_maps(mLockAttributes, attributes_read);
+
+	// This should throw an exception if there are any mismatches:
+	ReportLockMismatches(mismatches);
+	ASSERT(mismatches.empty());
+
+	// Now we no longer have the lock!
+	mHaveLock = false;
+}
+
+S3BackupFileSystem::~S3BackupFileSystem()
+{
+	// This needs to be in the source file, not inline, as long as we don't include
+	// the whole of SimpleDBClient.h in BackupFileSystem.h.
+	if(mHaveLock)
+	{
+		ReleaseLock();
+	}
 }
 

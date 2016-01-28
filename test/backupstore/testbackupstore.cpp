@@ -13,8 +13,10 @@
 #include <string.h>
 
 #include "Archive.h"
+#include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupDaemonConfigVerify.h"
 #include "BackupProtocol.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
@@ -38,8 +40,10 @@
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
 #include "RaidFileWrite.h"
+#include "S3Simulator.h"
 #include "SSLLib.h"
 #include "ServerControl.h"
+#include "SimpleDBClient.h"
 #include "Socket.h"
 #include "SocketStreamTLS.h"
 #include "StoreStructure.h"
@@ -53,11 +57,13 @@
 #define ENCFILE_SIZE	2765
 
 // Make some test attributes
-#define ATTR1_SIZE 	245
-#define ATTR2_SIZE 	23
-#define ATTR3_SIZE 	122
+#define ATTR1_SIZE	245
+#define ATTR2_SIZE	23
+#define ATTR3_SIZE	122
 
 #define SHORT_TIMEOUT 5000
+
+#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
 
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
@@ -140,6 +146,32 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 
 #define UNLINK_IF_EXISTS(filename) \
 	if (FileExists(filename)) { TEST_THAT(unlink(filename) == 0); }
+
+int s3simulator_pid = 0;
+
+bool StartSimulator()
+{
+	s3simulator_pid = StartDaemon(s3simulator_pid,
+		"../../bin/s3simulator/s3simulator " + bbstored_args +
+		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
+	return s3simulator_pid != 0;
+}
+
+bool StopSimulator()
+{
+	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
+		"s3simulator.memleaks", true);
+	s3simulator_pid = 0;
+	return result;
+}
+
+bool kill_running_daemons()
+{
+	TEST_THAT_OR(::system("test ! -r testfiles/s3simulator.pid || "
+		"kill `cat testfiles/s3simulator.pid`") == 0, FAIL);
+	TEST_THAT_OR(::system("rm -f testfiles/s3simulator.pid") == 0, FAIL);
+	return true;
+}
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BACKUPSTORE() \
@@ -2336,7 +2368,7 @@ bool test_encoding()
 			size_t file_size = enc.GetPosition();
 			TEST_EQUAL(file_size, contents.GetSize());
 
-			for(int buffer_size = 1; ; buffer_size <<= 1)
+			for(size_t buffer_size = 1; ; buffer_size <<= 1)
 			{
 				enc.Seek(0, IOStream::SeekType_Absolute);
 				BackupStoreFile::VerifyStream verifier(enc);
@@ -3242,6 +3274,109 @@ bool test_read_write_attr_streamformat()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
+// Test that the S3 backend correctly locks and unlocks the store using SimpleDB.
+bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3control)
+{
+	SETUP_TEST_BACKUPSTORE();
+
+	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	S3Client s3client(s3config);
+	SimpleDBClient client(s3config);
+
+	// There should be no locks at the beginning. In fact the domain should not even
+	// exist: the client should create it itself.
+	std::vector<std::string> expected_domains;
+	TEST_THAT(compare_lists(expected_domains, client.ListDomains()));
+
+	SimpleDBClient::str_map_t expected;
+
+	// Create a client in a scope, so it will be destroyed when the scope ends.
+	{
+		S3BackupFileSystem fs(config, "/foo/", s3client);
+
+		// Check that it hasn't acquired a lock yet.
+		TEST_CHECK_THROWS(
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/"),
+			HTTPException, SimpleDBItemNotFound);
+
+		box_time_t before = GetCurrentBoxTime();
+		// If this fails, it will throw an exception:
+		fs.GetLock();
+		box_time_t after = GetCurrentBoxTime();
+
+		// Check that it has now acquired a lock.
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		expected["locked"] = "true";
+
+		std::ostringstream locker_buf;
+		locker_buf << fs.GetCurrentUserName() << "@" << fs.GetCurrentHostName() <<
+			"(" << getpid() << ")";
+		TEST_EQUAL(locker_buf.str(), fs.GetSimpleDBLockValue());
+		expected["locker"] = locker_buf.str();
+
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		expected["pid"] = pid_buf.str();
+
+		char hostname_buf[1024];
+		TEST_EQUAL(0, gethostname(hostname_buf, sizeof(hostname_buf)));
+		TEST_EQUAL(hostname_buf, fs.GetCurrentHostName());
+		expected["hostname"] = hostname_buf;
+
+		TEST_THAT(fs.GetSinceTime() >= before);
+		TEST_THAT(fs.GetSinceTime() <= after);
+		std::ostringstream since_buf;
+		since_buf << fs.GetSinceTime();
+		expected["since"] = since_buf.str();
+
+		TEST_THAT(test_equal_maps(expected, attributes));
+
+		// Try to acquire another one, check that it fails.
+		S3BackupFileSystem fs2(config, "/foo/", s3client);
+		TEST_CHECK_THROWS(
+			fs2.GetLock(),
+			BackupStoreException, CouldNotLockStoreAccount);
+
+		// And that the lock was not disturbed
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// Check that when the S3BackupFileSystem went out of scope, it released the lock
+	expected["locked"] = "";
+	{
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// And that we can acquire it again:
+	{
+		S3BackupFileSystem fs(config, "/foo/", s3client);
+		fs.GetLock();
+
+		expected["locked"] = "true";
+		std::ostringstream since_buf;
+		since_buf << fs.GetSinceTime();
+		expected["since"] = since_buf.str();
+
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// And release it again:
+	expected["locked"] = "";
+	{
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	TEARDOWN_TEST_BACKUPSTORE();
+}
+
+
 int test(int argc, const char *argv[])
 {
 	TEST_THAT(test_open_files_with_limited_win32_permissions());
@@ -3289,7 +3424,16 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_bbstoreaccounts_create());
 	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
-	TEST_THAT(test_directory_parent_entry_tracks_directory_size());
+
+	std::auto_ptr<Configuration> s3config = load_config_file(
+		DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
+	S3BackupAccountControl s3control(*s3config);
+
+	TEST_THAT(kill_running_daemons());
+	TEST_THAT(StartSimulator());
+	TEST_THAT(test_simpledb_locking(*s3config, s3control));
+	TEST_THAT(StopSimulator());
+
 	TEST_THAT(test_cannot_open_multiple_writable_connections());
 	TEST_THAT(test_encoding());
 	TEST_THAT(test_symlinks());

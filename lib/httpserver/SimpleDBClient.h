@@ -17,6 +17,7 @@
 #include <boost/property_tree/ptree.hpp>
 
 #include "BoxTime.h"
+#include "Configuration.h"
 #include "HTTPRequest.h"
 
 using boost::property_tree::ptree;
@@ -58,6 +59,18 @@ public:
 	  mOffsetMinutes(0),
 	  mPort(port),
 	  mTimeout(timeout)
+	{ }
+
+	SimpleDBClient(const Configuration& s3config)
+	: mHostName(s3config.GetKeyValue("SimpleDBHostName")),
+	  mEndpoint(s3config.GetKeyValue("SimpleDBEndpoint")),
+	  mAccessKey(s3config.GetKeyValue("AccessKey")),
+	  mSecretKey(s3config.GetKeyValue("SecretKey")),
+	  mFixedTimestamp(0),
+	  mOffsetMinutes(0),
+	  mPort(s3config.GetKeyValueInt("SimpleDBPort")),
+	  // Set a default timeout of 300 seconds to make debugging easier
+	  mTimeout(300)
 	{ }
 
 	typedef std::vector<std::string> list_t;

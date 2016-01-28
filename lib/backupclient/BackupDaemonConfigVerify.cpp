@@ -50,9 +50,16 @@ static const ConfigurationVerifyKey verifys3keys[] =
 	// These values are only required for Amazon S3-compatible stores
 	ConfigurationVerifyKey("HostName", ConfigTest_Exists),
 	ConfigurationVerifyKey("Port", ConfigTest_Exists | ConfigTest_IsInt, 80),
-	ConfigurationVerifyKey("BasePath", ConfigTest_Exists),
+	ConfigurationVerifyKey("BasePath", 0, "/"),
 	ConfigurationVerifyKey("AccessKey", ConfigTest_Exists),
-	ConfigurationVerifyKey("SecretKey", ConfigTest_Exists | ConfigTest_LastEntry)
+	ConfigurationVerifyKey("SecretKey", ConfigTest_Exists),
+	ConfigurationVerifyKey("SimpleDBHostName", 0, "sdb.amazonaws.com"),
+	ConfigurationVerifyKey("SimpleDBPort", ConfigTest_IsInt, 80),
+	ConfigurationVerifyKey("SimpleDBEndpoint", 0, ""),
+	ConfigurationVerifyKey("SimpleDBDomain", 0, "boxbackup_locks"),
+	ConfigurationVerifyKey("SimpleDBLockName", 0),
+	ConfigurationVerifyKey("SimpleDBLockValue", 0),
+	ConfigurationVerifyKey("CacheDirectory", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 static const ConfigurationVerify verifyserver[] =
