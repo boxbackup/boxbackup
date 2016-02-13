@@ -58,7 +58,7 @@ install:
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload 'http://zlib.net/zlib128.zip'
-  - 7za x zlib128.zip
+  - 7za x -aoa zlib128.zip
   - cd zlib-1.2.8
   - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\zlib-%PLATFORM%" .
   # We need to build both versions, debug and release, because cmake requires both to be
@@ -68,8 +68,8 @@ install:
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload "https://www.openssl.org/source/openssl-$($env:OPENSSL_VERSION).tar.gz"
-  - 7za x openssl-%OPENSSL_VERSION%.tar.gz
-  - 7za x openssl-%OPENSSL_VERSION%.tar
+  - 7za x -aoa openssl-%OPENSSL_VERSION%.tar.gz
+  - 7za x -aoa openssl-%OPENSSL_VERSION%.tar
   - cd openssl-%OPENSSL_VERSION%
   - perl Configure debug-VC-WIN32 no-asm --prefix="%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%"
   - ms\do_ms
@@ -78,7 +78,7 @@ install:
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
-  - 7za x pcre-8.38.zip
+  - 7za x -aoa pcre-8.38.zip
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - cd pcre-8.38
   - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
