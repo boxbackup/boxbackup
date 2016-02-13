@@ -28,8 +28,7 @@ cache:
   - '..\openssl-%PLATFORM%'
   - '..\pcre-8.38'
   - '..\pcre-%PLATFORM%'
-  - 'infrastructure\cmake\%PLATFORM%'
-# - 'infrastructure\cmake\*.dir'
+  - 'infrastructure\cmake\build'
 
 init:
   - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
@@ -37,7 +36,7 @@ init:
 
 build:
   parallel: true
-  project: infrastructure/cmake/BoxBackup.sln
+  project: infrastructure/cmake/build/BoxBackup.sln
 
 install:
   - cinst strawberryperl 7zip.commandline cmake
@@ -94,8 +93,8 @@ install:
   - dir pcre-%PLATFORM%\lib
 
   - cd %APPVEYOR_BUILD_FOLDER%
-  - cd infrastructure\cmake
-  - cmake -G "%Generator%" -A %PLATFORM%
+  - cd infrastructure\cmake\build
+  - cmake -G "%Generator%" -A %PLATFORM% ..
   - cd %APPVEYOR_BUILD_FOLDER%
 
   - echo %PATH%
@@ -110,8 +109,9 @@ install:
   - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
 
 test_script:
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\*.dir
-  - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\*.dir
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
+  - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
   - ctest -C %CONFIGURATION% -V
 
