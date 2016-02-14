@@ -126,9 +126,9 @@ sub runtest
 
 		my @commands = (
 			"msbuild /nologo $quiet ".
-			"infrastructure\\cmake\\INSTALL.vcxproj",
+			"infrastructure\\cmake\\build\\INSTALL.vcxproj",
 			"xcopy /s /i /y /q $test_src_dir $test_dst_dir",
-			"copy infrastructure\\cmake\\$test_mode\\$test_project_exe.exe $test_dst_dir"
+			"copy infrastructure\\cmake\\build\\$test_mode\\$test_project_exe.exe $test_dst_dir"
 		);
 
 		if(-d $test_dst_dir)
