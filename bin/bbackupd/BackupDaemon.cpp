@@ -832,6 +832,9 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 		{
 			BOX_NOTICE("Exception (" << errorCode << "/" <<
 				errorSubCode << ") due to signal");
+			if ( IsCancelSyncWanted() ) {
+				status=SysadminNotifier::BackupCanceled;
+			}
             OnBackupFinish(status);
 			return mapClientContext; // releases mapClientContext
 		}
@@ -3169,6 +3172,7 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 		"backup-start",
 		"backup-finish",
 		"backup-ok",
+		"backup-canceled",
 		0
 	};
 

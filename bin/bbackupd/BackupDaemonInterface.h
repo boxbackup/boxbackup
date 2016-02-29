@@ -39,6 +39,7 @@ class SysadminNotifier
 		BackupStart,
 		BackupFinish,
 		BackupOK,
+		BackupCanceled,
 		MAX
 		// When adding notifications, remember to add
 		// strings to NotifySysadmin()
