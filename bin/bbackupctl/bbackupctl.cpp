@@ -77,7 +77,7 @@ int main(int argc, const char *argv[])
 
 	Logging::SetProgramName("bbackupctl");
     Logging::ToConsole(true);
-    Logging::ToSyslog (false);
+	//Logging::ToSyslog (false);
 
 
 	// Filename for configuration file?
@@ -252,7 +252,7 @@ int main(int argc, const char *argv[])
 		BOX_NOTICE("state " <<
             BackupDaemon::GetStateName(currentState));
         command = NoCommand;
-    } else if(commandName == "get-stats") {
+	} else if(commandName == "get-stats") {
         command=GetStats;
     }
 

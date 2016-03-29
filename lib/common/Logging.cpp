@@ -568,7 +568,7 @@ bool HideSpecificExceptionGuard::IsHidden(int type, int subtype)
 // --------------------------------------------------------------------------
 std::string Logging::OptionParser::GetOptionString()
 {
-	return "L:NPqQt:TUvVW:";
+	return "L:NPqQt:TUvVW:S";
 }
 
 // --------------------------------------------------------------------------
@@ -586,6 +586,10 @@ int Logging::OptionParser::ProcessOption(signed int option)
 {
 	switch(option)
 	{
+		case 'S':
+			Logging::ToSyslog (false);
+		break;
+
 		case 'L':
 		{
 			if(sapHideFileGuard.get())
@@ -726,7 +730,8 @@ std::string Logging::OptionParser::GetUsageString()
 	"  -U         Timestamp console output with microseconds\n"
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity, log everything to console and system\n"
-	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n";
+	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n"
+	"  -S         Do not log to syslog\n";
 }
 
 bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
