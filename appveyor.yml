@@ -1,0 +1,117 @@
+version: 1.0.{build}-{branch}
+
+clone_depth: 1
+
+# Do not build on tags (GitHub only)
+skip_tags: true
+
+os: Windows Server 2012
+
+platform:
+# - x86
+# - x64
+  - Win32
+
+configuration:
+  - Debug
+  - Release
+
+environment:
+  VisualStudioVersion: 10.0
+  Generator: Visual Studio 10
+  OPENSSL_VERSION: 1.0.2f
+
+cache:
+  - '..\zlib-1.2.8'
+  - '..\zlib-%PLATFORM%'
+  - '..\openssl-%OPENSSL_VERSION%'
+  - '..\openssl-%PLATFORM%'
+  - '..\pcre-8.38'
+  - '..\pcre-%PLATFORM%'
+  - 'infrastructure\cmake\build'
+
+init:
+  - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+build:
+  parallel: true
+  project: infrastructure/cmake/build/BoxBackup.sln
+
+install:
+  - cinst strawberryperl 7zip.commandline cmake
+
+  - dir "C:\Program Files\Microsoft SDKs\Windows"
+  - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1"
+  - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin"
+  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
+
+  - echo %PATH%
+  - mkdir foo
+  - rmdir /s/q foo
+  - mkdir foo
+  - c:\perl\bin\perl -e "print system('rmdir /s/q foo')"
+  - c:\perl\bin\perl -v
+
+  - ps: "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'"
+
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: Start-FileDownload 'http://zlib.net/zlib128.zip'
+  - 7za x -aoa zlib128.zip
+  - cd zlib-1.2.8
+  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\zlib-%PLATFORM%" .
+  # We need to build both versions, debug and release, because cmake requires both to be
+  # present to generate its multi-configuration project files for Visual Studio/MSBuild.
+  - msbuild INSTALL.vcxproj /m /p:Configuration=Debug   /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild INSTALL.vcxproj /m /p:Configuration=Release /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: Start-FileDownload "https://www.openssl.org/source/openssl-$($env:OPENSSL_VERSION).tar.gz"
+  - 7za x -aoa openssl-%OPENSSL_VERSION%.tar.gz
+  - 7za x -aoa openssl-%OPENSSL_VERSION%.tar
+  - cd openssl-%OPENSSL_VERSION%
+  - perl Configure debug-VC-WIN32 no-asm --prefix="%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%"
+  - ms\do_ms
+  - nmake /s /f ms\nt.mak
+  - nmake /s /f ms\nt.mak install
+
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
+  - 7za x -aoa pcre-8.38.zip
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - cd pcre-8.38
+  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
+  - dir
+  # We need to build both versions, debug and release, because cmake requires both to be
+  # present to generate its multi-configuration project files for Visual Studio/MSBuild.
+  - msbuild INSTALL.vcxproj /m /p:Configuration=Debug   /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild INSTALL.vcxproj /m /p:Configuration=Release /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - cd %APPVEYOR_BUILD_FOLDER%\..
+  - dir
+  - dir pcre-%PLATFORM%
+  - dir pcre-%PLATFORM%\bin
+  - dir pcre-%PLATFORM%\lib
+
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - cd infrastructure\cmake\build
+  - cmake -G "%Generator%" -A %PLATFORM% ..
+  - cd %APPVEYOR_BUILD_FOLDER%
+
+  - echo %PATH%
+  - mkdir foo
+  - rmdir /s/q foo
+
+  - dir %APPVEYOR_BUILD_FOLDER%\..\zlib-1.2.8
+  - dir %APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%
+  - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-8.38
+  - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
+
+test_script:
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\*.dir
+  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
+  - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
+  - ctest -C %CONFIGURATION% -V
+

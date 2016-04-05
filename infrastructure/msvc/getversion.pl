@@ -1,8 +1,7 @@
 #!perl
 
 $basedir = $0;
-$basedir =~ s/\\[^\\]*$//;
-$basedir =~ s/\\[^\\]*$//;
+$basedir =~ s|/|\\|g;
 $basedir =~ s/\\[^\\]*$//;
 $basedir =~ s/\\[^\\]*$//;
 $basedir =~ s/\\[^\\]*$//;

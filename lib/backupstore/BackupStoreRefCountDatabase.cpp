@@ -129,10 +129,18 @@ BackupStoreRefCountDatabase::~BackupStoreRefCountDatabase()
 {
 	if (mIsTemporaryFile)
 	{
-		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"BackupStoreRefCountDatabase destroyed without "
+		// Don't throw exceptions in a destructor.
+		BOX_ERROR("BackupStoreRefCountDatabase destroyed without "
 			"explicit commit or discard");
-		Discard();
+		try
+		{
+			Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_LOG_SYS_ERROR("Failed to discard BackupStoreRefCountDatabase "
+				"in destructor: " << e.what());
+		}
 	}
 }
 

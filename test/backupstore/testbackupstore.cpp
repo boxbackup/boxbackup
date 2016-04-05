@@ -1362,11 +1362,21 @@ bool test_multiple_uploads()
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 		}
 
+#ifdef _MSC_VER
+		BOX_TRACE("1");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol = connect_and_login(context);
 		protocolReadOnly.Reopen();
+
+#ifdef _MSC_VER
+		BOX_TRACE("2");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1395,6 +1405,11 @@ bool test_multiple_uploads()
 			test_test_file(t, *filestream);
 		}
 
+#ifdef _MSC_VER
+		BOX_TRACE("3");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		{
 			StreamableMemBlock attrtest(attr3, sizeof(attr3));
 
@@ -1408,6 +1423,11 @@ bool test_multiple_uploads()
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
+
+#ifdef _MSC_VER
+		BOX_TRACE("4");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 
 		// Check diffing and rsync like stuff...
 		// Build a modified file
@@ -1432,6 +1452,11 @@ bool test_multiple_uploads()
 		// ourselves) and check that it doesn't change the numbers
 		// of files
 
+#ifdef _MSC_VER
+		BOX_TRACE("5");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 
@@ -1439,6 +1464,10 @@ bool test_multiple_uploads()
 			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 		BackupStoreAccountDatabase::Entry account =
 			apAccounts->GetEntry(0x1234567);
+#ifdef _MSC_VER
+		BOX_TRACE("6");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 		TEST_EQUAL(0, run_housekeeping(account));
 
 		// Also check that bbstoreaccounts doesn't change anything,
@@ -2431,29 +2460,23 @@ bool test_encoding()
 
 bool test_symlinks()
 {
-#ifndef WIN32 // no symlinks on Win32
 	SETUP_TEST_BACKUPSTORE();
 
-	// TODO FIXME indentation
+#ifndef WIN32 // no symlinks on Win32
+	UNLINK_IF_EXISTS("testfiles/testsymlink");
+	TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
+	BackupStoreFilenameClear name("testsymlink");
+	std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
 
-		// Try out doing this on a symlink
-		{
-			UNLINK_IF_EXISTS("testfiles/testsymlink");
-			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
-			BackupStoreFilenameClear name("testsymlink");
-			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
+	// Can't decode it from the stream, because it's in file order, and doesn't have the
+	// required properties to be able to reorder it. So buffer it...
+	CollectInBufferStream b;
+	encoded->CopyStreamTo(b);
+	b.SetForReading();
 
-			// Can't decode it from the stream, because it's in file order, and doesn't have the
-			// required properties to be able to reorder it. So buffer it...
-			CollectInBufferStream b;
-			encoded->CopyStreamTo(b);
-			b.SetForReading();
-
-			// Decode it
-			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
-			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
-		}
-	teardown_test_backupstore();
+	// Decode it
+	UNLINK_IF_EXISTS("testfiles/testsymlink_2");
+	BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 #endif
 
 	TEARDOWN_TEST_BACKUPSTORE();
@@ -2607,7 +2630,7 @@ bool test_login_with_disabled_account()
 
 		// Login
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
-			BackupProtocolError::Err_DisabledAccount);
+			Err_DisabledAccount);
 
 		// Finish the connection
 		protocol.QueryFinished();
@@ -2825,8 +2848,8 @@ bool test_open_files_with_limited_win32_permissions()
 	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
 	HANDLE h1 = CreateFileA(file, accessRights, shareMode,
-		NULL, OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	assert(h1 != INVALID_HANDLE_VALUE);
+		NULL, OPEN_ALWAYS, // create file if it doesn't exist
+		FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
 
 	accessRights = FILE_READ_ATTRIBUTES |
@@ -2834,7 +2857,6 @@ bool test_open_files_with_limited_win32_permissions()
 
 	HANDLE h2 = CreateFileA(file, accessRights, shareMode,
 		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	assert(h2 != INVALID_HANDLE_VALUE);
 	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
 
 	CloseHandle(h2);

@@ -311,6 +311,7 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 	if (err == ERROR_HANDLE_EOF)
 	{
 		Close();
+		*pBytesTransferred = 0;
 		return true;
 	}
 
@@ -324,6 +325,7 @@ bool WinNamedPipeStream::WaitForOverlappedOperation(OVERLAPPED& Overlapped,
 		BOX_INFO(BOX_WIN_ERRNO_MESSAGE(err,
 			"Named pipe peer disconnected"));
 		Close();
+		*pBytesTransferred = 0;
 		return true;
 	}
 

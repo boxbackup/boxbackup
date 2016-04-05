@@ -2,7 +2,9 @@
 use strict;
 use LWP::UserAgent;
 
-my $url_base = 'http://localhost:1080';
+# Use 127.0.0.1 instead of localhost to force use of IPv4, as that is what the server
+# binds to. Windows tends to use IPv6 instead if possible, breaking the test.
+my $url_base = 'http://127.0.0.1:1080';
 
 my $ua = LWP::UserAgent->new(env_proxy => 0, keep_alive => 1, timeout => 30);
 

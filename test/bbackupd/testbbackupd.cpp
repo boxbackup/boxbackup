@@ -21,7 +21,6 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <string.h>
-#include <unistd.h>
 
 #ifdef HAVE_SYS_WAIT_H
 	#include <sys/wait.h>
@@ -34,6 +33,10 @@
 
 #ifdef HAVE_SIGNAL_H
 	#include <signal.h>
+#endif
+
+#ifdef WIN32
+	#include <process.h>
 #endif
 
 #include <map>
@@ -328,11 +331,20 @@ bool unpack_files(const std::string& archive_file,
 	BOX_INFO("Unpacking test fixture archive into " << destination_dir
 		<< ": " << archive_file);
 
-#ifdef WIN32
+#ifdef _MSC_VER // No tar, use 7zip.
+	// 7za only extracts the tgz file to a tar file, which we have to extract in a
+	// separate step.
+	std::string cmd = std::string("7za x testfiles/") + archive_file + ".tgz -aos "
+		"-otestfiles >nul:";
+	TEST_LINE_OR(::system(cmd.c_str()) == 0, cmd, return false);
+
+	cmd = std::string("7za x testfiles/") + archive_file + ".tar -aos "
+		"-o" + destination_dir + " -x!.\\TestDir1\\symlink? -x!.\\test2 >nul:";
+#elif defined WIN32 // Cygwin + MinGW, we can use real tar.
 	std::string cmd("tar xz");
 	cmd += tar_options + " -f testfiles/" + archive_file + ".tgz " +
 		"-C " + destination_dir;
-#else
+#else // Unixish, but Solaris tar doesn't like decompressing gzip files.
 	std::string cmd("gzip -d < testfiles/");
 	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xf" +
 		tar_options + " -)";
@@ -400,13 +412,19 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 
 bool kill_running_daemons()
 {
-	TEST_THAT_OR(::system("test ! -r testfiles/bbstored.pid || "
-		"kill `cat testfiles/bbstored.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("test ! -r testfiles/bbackupd.pid || "
-		"kill `cat testfiles/bbackupd.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("rm -f testfiles/bbackupd.pid "
-		"testfiles/bbstored.pid") == 0, FAIL);
-	return true;
+	bool success = true;
+
+	if(FileExists("testfiles/bbstored.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbstored.pid", true), success = false);
+	}
+
+	if(FileExists("testfiles/bbackupd.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbackupd.pid", true), success = false);
+	}
+
+	return success;
 }
 
 bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
@@ -1484,10 +1502,19 @@ bool test_ssl_keepalives()
 	// keepalives polled should be the ones for each directory entry while reading
 	// directories, and the one in UpdateItems(), which is also once per item (file
 	// or directory). test_base.tgz has 16 directory entries, so we expect 2 * 16 = 32
-	// keepalives in total.
+	// keepalives in total. Except on Windows where there are no symlinks, and when
+	// compiled with MSVC we exclude them from the tar extract operation as 7za
+	// complains about them, so there should be 3 files less, and thus only 26
+	// keepalives.
+#ifdef _MSC_VER
+	#define NUM_KEEPALIVES_BASE 26
+#else
+	#define NUM_KEEPALIVES_BASE 32
+#endif
+
 	std::auto_ptr<BackupClientContext> apContext = bbackupd.RunSyncNow();
 	MockClientContext* pContext = (MockClientContext *)(apContext.get());
-	TEST_EQUAL(32, pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(NUM_KEEPALIVES_BASE, pContext->mNumKeepAlivesPolled);
 	TEST_EQUAL(1, pContext->mKeepAliveTime);
 
 	// Calculate the number of blocks that will be in ./TestDir1/x1/dsfdsfs98.fd,
@@ -1521,7 +1548,8 @@ bool test_ssl_keepalives()
 
 	apContext = bbackupd.RunSyncNow();
 	pContext = (MockClientContext *)(apContext.get());
-	TEST_EQUAL(32 + (4269/4096) + (4269/173), pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(NUM_KEEPALIVES_BASE + (4269/4096) + (4269/173),
+		pContext->mNumKeepAlivesPolled);
 	TEARDOWN_TEST_BBACKUPD();
 }
 
@@ -1592,7 +1620,11 @@ bool test_backup_pauses_when_store_is_full()
 
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
+#else
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+#endif
 
 		// The following files should be in the backup directory:
 		// 00000001 -d---- 00002 (root)
@@ -1703,7 +1735,12 @@ bool test_bbackupd_exclusions()
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 	// Delete a file and a directory
 	TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+
+#ifdef WIN32
+	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
+#else
 	TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+#endif
 
 	// We need to be OVER the limit, i.e. >24 blocks, or
 	// BackupClientContext will mark us over limit immediately on
@@ -3349,8 +3386,11 @@ bool test_delete_dir_change_attribute()
 	// TODO FIXME dedent
 	{
 		// Delete a directory
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
+#else
 		TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
-
+#endif
 		// Change attributes on an existing file.
 #ifdef WIN32
 		TEST_EQUAL(0, system("chmod 0423 testfiles/TestDir1/df9834.dsf"));
@@ -3831,7 +3871,11 @@ bool test_restore_deleted_files()
 	TEST_COMPARE(Compare_Same);
 
 	TEST_THAT(::unlink("testfiles/TestDir1/f1.dat") == 0);
+#ifdef WIN32
+	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
+#else
 	TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
+#endif
 	TEST_COMPARE(Compare_Different);
 
 	bbackupd.RunSyncNow();
@@ -3896,7 +3940,7 @@ bool test_locked_file_behaviour()
 		// and the appropriate error is reported.
 
 		HANDLE handle = openfile("testfiles/TestDir1/f1.dat",
-			O_LOCK, 0);
+			BOX_OPEN_LOCK, 0);
 		TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 		{
@@ -3925,7 +3969,7 @@ bool test_locked_file_behaviour()
 			// open the file again, compare and check that compare
 			// reports the correct error message (and finishes)
 			handle = openfile("testfiles/TestDir1/f1.dat",
-				O_LOCK, 0);
+				BOX_OPEN_LOCK, 0);
 			TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 			TEST_COMPARE(Compare_Error);

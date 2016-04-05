@@ -80,7 +80,7 @@ BackupStoreDirectory::BackupStoreDirectory()
   mAttributesModTime(0),
   mUserInfo1(0)
 {
-	ASSERT(sizeof(u_int64_t) == sizeof(box_time_t));
+	ASSERT(sizeof(uint64_t) == sizeof(box_time_t));
 }
 
 

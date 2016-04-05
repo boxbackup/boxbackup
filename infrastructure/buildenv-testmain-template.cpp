@@ -23,7 +23,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #ifdef HAVE_NETDB_H
 #	include <netdb.h>
@@ -417,12 +416,6 @@ int main(int argc, char * const * argv)
 		}
 		
 		return returncode;
-	}
-	catch(BoxException &e)
-	{
-		printf("FAILED: Exception caught: %s: %s\n", e.what(),
-			e.GetMessage().c_str());
-		return 1;
 	}
 	catch(std::exception &e)
 	{

@@ -55,20 +55,20 @@ BEGIN_STRUCTURE_PACKING_FOR_WIRE
 typedef struct 
 {
 	int32_t		AttributeType;
-	u_int32_t	UID;
-	u_int32_t	GID;
-	u_int64_t	ModificationTime;
-	u_int64_t	AttrModificationTime;
-	u_int32_t	UserDefinedFlags;
-	u_int32_t	FileGenerationNumber;
-	u_int16_t	Mode;
+	uint32_t	UID;
+	uint32_t	GID;
+	uint64_t	ModificationTime;
+	uint64_t	AttrModificationTime;
+	uint32_t	UserDefinedFlags;
+	uint32_t	FileGenerationNumber;
+	uint16_t	Mode;
 	// Symbolic link filename may follow
 	// Extended attribute (xattr) information may follow, format is:
-	//   u_int32_t     Size of extended attribute block (excluding this word)
+	//   uint32_t     Size of extended attribute block (excluding this word)
 	// For each of NumberOfAttributes (sorted by AttributeName):
-	//   u_int16_t     AttributeNameLength
+	//   uint16_t     AttributeNameLength
 	//   char          AttributeName[AttributeNameLength]
-	//   u_int32_t     AttributeValueLength
+	//   uint32_t     AttributeValueLength
 	//   unsigned char AttributeValue[AttributeValueLength]
 	// AttributeName is 0 terminated, AttributeValue is not (and may be binary data)
 } attr_StreamFormat;
@@ -117,7 +117,7 @@ namespace
 BackupClientFileAttributes::BackupClientFileAttributes()
 	: mpClearAttributes(0)
 {
-	ASSERT(sizeof(u_int64_t) == sizeof(box_time_t));
+	ASSERT(sizeof(uint64_t) == sizeof(box_time_t));
 }
 
 // --------------------------------------------------------------------------
@@ -131,7 +131,7 @@ BackupClientFileAttributes::BackupClientFileAttributes()
 BackupClientFileAttributes::BackupClientFileAttributes(const EMU_STRUCT_STAT &st)
 : mpClearAttributes(0)
 {
-	ASSERT(sizeof(u_int64_t) == sizeof(box_time_t));
+	ASSERT(sizeof(uint64_t) == sizeof(box_time_t));
 	StreamableMemBlock *pnewAttr = new StreamableMemBlock;
 	FillAttributes(*pnewAttr, (const char *)NULL, st, true);
 
@@ -411,7 +411,7 @@ void BackupClientFileAttributes::ReadAttributes(const std::string& Filename,
 		// __time64_t winTime = BoxTimeToSeconds(
 		// pnewAttr->ModificationTime);
 
-		u_int64_t  modTime = box_ntoh64(pattr->ModificationTime);
+		uint64_t  modTime = box_ntoh64(pattr->ModificationTime);
 		box_time_t modSecs = BoxTimeToSeconds(modTime);
 		__time64_t winTime = modSecs;
 
@@ -582,30 +582,30 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 
 			// Leave space for attr block size later
 			int xattrBlockSizeOffset = xattrSize;
-			xattrSize += sizeof(u_int32_t);
+			xattrSize += sizeof(uint32_t);
 
 			// Loop for each attribute
 			for(std::vector<std::string>::const_iterator attrKeyI = attrKeys.begin(); attrKeyI!=attrKeys.end(); ++attrKeyI)
 			{
 				std::string attrKey(*attrKeyI);
 
-				if(xattrSize+sizeof(u_int16_t)+attrKey.size()+1+sizeof(u_int32_t)>static_cast<unsigned int>(xattrBufferSize))
+				if(xattrSize+sizeof(uint16_t)+attrKey.size()+1+sizeof(uint32_t)>static_cast<unsigned int>(xattrBufferSize))
 				{
-					xattrBufferSize = (xattrBufferSize+sizeof(u_int16_t)+attrKey.size()+1+sizeof(u_int32_t))*2;
+					xattrBufferSize = (xattrBufferSize+sizeof(uint16_t)+attrKey.size()+1+sizeof(uint32_t))*2;
 					outputBlock.ResizeBlock(xattrBufferSize);
 					buffer = static_cast<unsigned char*>(outputBlock.GetBuffer());
 				}
 
 				// Store length and text for attibute name
-				u_int16_t keyLength = htons(attrKey.size()+1);
-				std::memcpy(buffer+xattrSize, &keyLength, sizeof(u_int16_t));
-				xattrSize += sizeof(u_int16_t);
+				uint16_t keyLength = htons(attrKey.size()+1);
+				std::memcpy(buffer+xattrSize, &keyLength, sizeof(uint16_t));
+				xattrSize += sizeof(uint16_t);
 				std::memcpy(buffer+xattrSize, attrKey.c_str(), attrKey.size()+1);
 				xattrSize += attrKey.size()+1;
 
 				// Leave space for value size
 				int valueSizeOffset = xattrSize;
-				xattrSize += sizeof(u_int32_t);
+				xattrSize += sizeof(uint32_t);
 
 				// Find size of attribute (must call with buffer and length 0 on some platforms,
 				// as -1 is returned if the data doesn't fit.)
@@ -642,13 +642,13 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 				xattrSize += valueSize;
 
 				// Fill in value size
-				u_int32_t valueLength = htonl(valueSize);
-				std::memcpy(buffer+valueSizeOffset, &valueLength, sizeof(u_int32_t));
+				uint32_t valueLength = htonl(valueSize);
+				std::memcpy(buffer+valueSizeOffset, &valueLength, sizeof(uint32_t));
 			}
 
 			// Fill in attribute block size
-			u_int32_t xattrBlockLength = htonl(xattrSize-xattrBlockSizeOffset-sizeof(u_int32_t));
-			std::memcpy(buffer+xattrBlockSizeOffset, &xattrBlockLength, sizeof(u_int32_t));
+			uint32_t xattrBlockLength = htonl(xattrSize-xattrBlockSizeOffset-sizeof(uint32_t));
+			std::memcpy(buffer+xattrBlockSizeOffset, &xattrBlockLength, sizeof(uint32_t));
 
 			outputBlock.ResizeBlock(xattrSize);
 		}
@@ -853,7 +853,7 @@ void BackupClientFileAttributes::WriteAttributes(const std::string& Filename,
 		#endif
 	}
 
-	if(static_cast<int>(xattrOffset+sizeof(u_int32_t))<=mpClearAttributes->GetSize())
+	if(static_cast<int>(xattrOffset+sizeof(uint32_t))<=mpClearAttributes->GetSize())
 	{
 		WriteExtendedAttr(Filename, xattrOffset);
 	}
@@ -995,10 +995,10 @@ void BackupClientFileAttributes::WriteExtendedAttr(const std::string& Filename, 
 #ifdef HAVE_SYS_XATTR_H
 	const char* buffer = static_cast<char*>(mpClearAttributes->GetBuffer());
 
-	u_int32_t xattrBlockLength = 0;
-	std::memcpy(&xattrBlockLength, buffer+xattrOffset, sizeof(u_int32_t));
+	uint32_t xattrBlockLength = 0;
+	std::memcpy(&xattrBlockLength, buffer+xattrOffset, sizeof(uint32_t));
 	int xattrBlockSize = ntohl(xattrBlockLength);
-	xattrOffset += sizeof(u_int32_t);
+	xattrOffset += sizeof(uint32_t);
 
 	int xattrEnd = xattrOffset+xattrBlockSize;
 	if(xattrEnd>mpClearAttributes->GetSize())
@@ -1009,18 +1009,18 @@ void BackupClientFileAttributes::WriteExtendedAttr(const std::string& Filename, 
 
 	while(xattrOffset<xattrEnd)
 	{
-		u_int16_t keyLength = 0;
-		std::memcpy(&keyLength, buffer+xattrOffset, sizeof(u_int16_t));
+		uint16_t keyLength = 0;
+		std::memcpy(&keyLength, buffer+xattrOffset, sizeof(uint16_t));
 		int keySize = ntohs(keyLength);
-		xattrOffset += sizeof(u_int16_t);
+		xattrOffset += sizeof(uint16_t);
 
 		const char* key = buffer+xattrOffset;
 		xattrOffset += keySize;
 
-		u_int32_t valueLength = 0;
-		std::memcpy(&valueLength, buffer+xattrOffset, sizeof(u_int32_t));
+		uint32_t valueLength = 0;
+		std::memcpy(&valueLength, buffer+xattrOffset, sizeof(uint32_t));
 		int valueSize = ntohl(valueLength);
-		xattrOffset += sizeof(u_int32_t);
+		xattrOffset += sizeof(uint32_t);
 
 		// FIXME: Warn on EOPNOTSUPP
 		if(::lsetxattr(Filename.c_str(), key, buffer+xattrOffset,

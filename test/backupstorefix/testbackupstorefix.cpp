@@ -29,6 +29,7 @@
 #include "BackupStoreInfo.h"
 #include "BufferedWriteStream.h"
 #include "FileStream.h"
+#include "IOStreamGetLine.h"
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
@@ -335,8 +336,14 @@ void test_dir_fixing()
 }
 
 int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
-	int64_t diff_from_id)
+	int64_t diff_from_id, int64_t container_id = BACKUPSTORE_ROOT_DIRECTORY_ID,
+	BackupStoreFilename* fn = NULL)
 {
+	if(fn == NULL)
+	{
+		fn = &fnames[0];
+	}
+
 	std::auto_ptr<IOStream> upload;
 	if(diff_from_id)
 	{
@@ -346,11 +353,13 @@ int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
 		std::auto_ptr<IOStream> blockIndexStream(client.ReceiveStream());
 		upload = BackupStoreFile::EncodeFileDiff(
 			file_path,
-			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
-			diff_from_id, *blockIndexStream,
+			container_id,
+			*fn,
+			diff_from_id,
+			*blockIndexStream,
 			IOStream::TimeOutInfinite,
 			NULL, // DiffTimer implementation
-			0 /* not interested in the modification time */, 
+			0 /* not interested in the modification time */,
 			NULL // isCompletelyDifferent
 			);
 	}
@@ -358,18 +367,19 @@ int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
 	{
 		upload = BackupStoreFile::EncodeFile(
 			file_path,
-			BACKUPSTORE_ROOT_DIRECTORY_ID, fnames[0],
-			NULL, 
+			container_id,
+			*fn,
+			NULL,
 			NULL, // pLogger
 			NULL // pRunStatusProvider
 			);
 	}
 
-	return client.QueryStoreFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
+	return client.QueryStoreFile(container_id,
 		1, // ModificationTime
 		2, // AttributesHash
 		diff_from_id, // DiffFromFileID
-		fnames[0], // rFilename
+		*fn, // rFilename
 		upload)->GetObjectID();
 }
 
@@ -537,17 +547,80 @@ int test(int argc, const char *argv[])
 
 	// Start the bbstored server
 	TEST_THAT_OR(StartServer(), return 1);
-	TEST_THAT_OR(StartClient(), return 1);
 
-	// Wait 4 more seconds for the files to be old enough
-	// to upload
-	::safe_sleep(4);
+	// Instead of starting a client, read the file listing file created by
+	// testbackupstorefix.pl and upload them in the correct order, so that the object
+	// IDs will not vary depending on the order in which readdir() returns entries.
+	{
+		FileStream listing("testfiles/file-listing.txt", O_RDONLY);
+		IOStreamGetLine getline(listing);
+		std::map<std::string, int64_t> dirname_to_id;
+		std::string line;
+		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
+			discSetNum, false);
 
-	// Upload files to create a nice store directory
-	::sync_and_wait();
+		for(getline.GetLine(line, true); line != ""; getline.GetLine(line, true))
+		{
+			std::string full_path = line;
+			ASSERT(StartsWith("testfiles/TestDir1/", full_path));
 
-	// Stop bbackupd
-	TEST_THAT_OR(StopClient(), return 1);
+			bool is_dir = (full_path[full_path.size() - 1] == '/');
+			if(is_dir)
+			{
+				full_path = full_path.substr(0, full_path.size() - 1);
+			}
+
+			std::string::size_type last_slash = full_path.rfind('/');
+			int64_t container_id;
+			std::string filename;
+
+			if(full_path == "testfiles/TestDir1")
+			{
+				container_id = BACKUPSTORE_ROOT_DIRECTORY_ID;
+				filename = "Test1";
+			}
+			else
+			{
+				std::string containing_dir =
+					full_path.substr(0, last_slash);
+				container_id = dirname_to_id[containing_dir];
+				filename = full_path.substr(last_slash + 1);
+			}
+
+			BackupStoreFilenameClear fn(filename);
+			if(is_dir)
+			{
+				std::auto_ptr<IOStream> attr_stream(
+					new CollectInBufferStream);
+				((CollectInBufferStream &)
+					*attr_stream).SetForReading();
+
+				dirname_to_id[full_path] = client.QueryCreateDirectory(
+					container_id, 0, // AttributesModTime
+					fn, attr_stream)->GetObjectID();
+			}
+			else
+			{
+				fake_upload(client, line, 0, container_id, &fn);
+			}
+		}
+	}
+
+	// Check that we're starting off with the right numbers of files and blocks.
+	// Otherwise the test that check the counts after breaking things will fail
+	// because the numbers won't match.
+	TEST_EQUAL(0, check_account_for_errors());
+	{
+		std::auto_ptr<BackupProtocolAccountUsage2> usage =
+			BackupProtocolLocal2(0x01234567, "test",
+				"backup/01234567/", 0,
+				false).QueryGetAccountUsage2();
+		TEST_EQUAL(usage->GetNumCurrentFiles(), 114);
+		TEST_EQUAL(usage->GetNumDirectories(), 28);
+		TEST_EQUAL(usage->GetBlocksUsed(), 284);
+		TEST_EQUAL(usage->GetBlocksInCurrentFiles(), 228);
+		TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
+	}
 
 	BOX_INFO("  === Add a reference to a file that doesn't exist, check "
 		"that it's removed");
@@ -640,9 +713,12 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
 	{
-		// Temporarily stop the server, so it doesn't repair the
-		// refcount error
+		// Temporarily stop the server, so it doesn't repair the refcount error. Except 
+		// on win32, where hard-killing the server can leave a lockfile in place,
+		// breaking the rest of the test.
+#ifndef WIN32
 		TEST_THAT(StopServer());
+#endif
 
 		// Open dir and find entry
 		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
@@ -700,27 +776,32 @@ int test(int argc, const char *argv[])
 		// structure.
 		// This will destroy or damage objects 18-1b and 58-5b,
 		// some repairably.
-		#define RUN(x) TEST_THAT(system(x) == 0);
-		RUN("mv testfiles/0_0/backup/01234567/02/01/o00.rf "
-			"testfiles/0_0/backup/01234567/02/01/o00.rfw"); // 0x18
-		RUN("mv testfiles/0_1/backup/01234567/02/01/o01.rf "
-			"testfiles/0_1/backup/01234567/02/01/o01.rfw"); // 0x19
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/o00.rf",
+			"testfiles/0_0/backup/01234567/02/01/o00.rfw") == 0); // 0x18
+		TEST_THAT(rename("testfiles/0_1/backup/01234567/02/01/o01.rf",
+			"testfiles/0_1/backup/01234567/02/01/o01.rfw") == 0); // 0x19
 		//RUN("mv testfiles/0_2/backup/01234567/02/01/o02.rf "
 		//	"testfiles/0_0/backup/01234567/02/01/o02.rfw"); // 0x1a
-		RUN("mv testfiles/0_0/backup/01234567/02/01/o03.rf "
-			"testfiles/0_0/backup/01234567/02/01/o03.rfw"); // 0x1b
-		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o00.rf "
-			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw"); // 0x58
-		RUN("mv testfiles/0_1/backup/01234567/02/01/01/o01.rf "
-			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw"); // 0x59
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/o03.rf",
+			"testfiles/0_0/backup/01234567/02/01/o03.rfw") == 0); // 0x1b
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/01/o00.rf",
+			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw") == 0); // 0x58
+		TEST_THAT(rename("testfiles/0_1/backup/01234567/02/01/01/o01.rf",
+			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw") == 0); // 0x59
 		//RUN("mv testfiles/0_2/backup/01234567/02/01/01/o02.rf "
 		//	"testfiles/0_0/backup/01234567/02/01/01/o02.rfw"); // 0x5a
-		RUN("mv testfiles/0_0/backup/01234567/02/01/01/o03.rf "
-			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw"); // 0x5b
+		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/01/o03.rf",
+			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw") == 0); // 0x5b
 		// RUN("rm -r testfiles/0_1/backup/01234567/02/01");
+
+# define RUN(x) TEST_THAT(system(x) == 0);
+# ifdef WIN32
+		RUN("rd /s/q testfiles\\0_2\\backup\\01234567\\02\\01");
+# else // !WIN32
 		RUN("rm -r testfiles/0_2/backup/01234567/02/01");
-		#undef RUN
-#endif // BOX_RELEASE_BUILD
+# endif // WIN32
+# undef RUN
+#endif // !BOX_RELEASE_BUILD
 
 		// Fix it
 		// ERROR:   Object 0x44 is unattached.
@@ -741,9 +822,11 @@ int test(int argc, const char *argv[])
 			TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
 		}
 
-		// Start the server again, so testbackupstorefix.pl can
-		// run bbackupquery which connects to it.
+		// Start the server again, so testbackupstorefix.pl can run bbackupquery which
+		// connects to it. Except on win32, where we didn't stop it earlier.
+#ifndef WIN32
 		TEST_THAT(StartServer());
+#endif
 
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE
@@ -813,8 +896,11 @@ int test(int argc, const char *argv[])
 		}
 		SaveDirectory("Test1/cannes/ict/peep", dir);
 	}
-	// Delete a directory
+
+	// Delete a directory. The checker should be able to reconstruct it using the
+	// ContainerID of the contained files.
 	DeleteObject("Test1/pass/cacted/ming");
+
 	// Delete a file
 	DeleteObject("Test1/cannes/ict/scely");
 
@@ -822,7 +908,7 @@ int test(int argc, const char *argv[])
 	// spotting errors! But asserting an exact number will help us catch
 	// changes in checker behaviour, so it's not a bad thing to test.
 
-	// The 12 errors are:
+	// The 12 errors that we currently expect are:
 	// ERROR:   Directory ID 0xb references object 0x3e which does not exist.
 	// ERROR:   Removing directory entry 0x3e from directory 0xb
 	// ERROR:   Directory ID 0xc had invalid entries, fixed
@@ -850,7 +936,7 @@ int test(int argc, const char *argv[])
 	}
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 2") == 0);
 	{
 		BackupStoreDirectory dir;
@@ -905,10 +991,12 @@ int test(int argc, const char *argv[])
 		dir2.AddEntry(*en);
 		SaveDirectory("Test1/divel/torsines/cruishery", dir2);
 	}
+
 	// Fix it
 	RUN_CHECK
+
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 3") == 0);
 	{
 		BackupStoreDirectory dir;
@@ -920,10 +1008,12 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Orphan files and dirs without being recoverable");
 	DeleteObject("Test1/dir1");
 	DeleteObject("Test1/dir1/dir2");
+
 	// Fix it
 	RUN_CHECK
+
 	// Check everything is where it is predicted to be
-	TEST_THAT(::system(PERL_EXECUTABLE 
+	TEST_THAT(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl check 4") == 0);
 
 	// ------------------------------------------------------------------------------------------------

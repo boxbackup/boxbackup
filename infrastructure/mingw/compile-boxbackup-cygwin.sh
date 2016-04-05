@@ -26,9 +26,17 @@ wget -c $openssl_source/$latest_openssl.tar.gz
 tar xzf $latest_openssl.tar.gz --exclude $latest_openssl/Makefile
 (
 	cd $latest_openssl
-	[ -r Makefile ] || \
-		./Configure --prefix=$install_prefix mingw64 \
+	./Configure --prefix=$install_prefix mingw64 \
 		--cross-compile-prefix=$compiler_prefix-
+
+	# Avoid recompilation by caching the previous Makefile for its timestamp,
+	# and reusing if it hasn't changed.
+	if diff --brief Makefile ../openssl.makefile.cache; then
+		cp -a ../openssl.makefile.cache Makefile
+	else
+		cp -a Makefile ../openssl.makefile.cache
+	fi
+
 	make
 	make install_sw
 )

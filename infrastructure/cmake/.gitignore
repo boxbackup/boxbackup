@@ -1,0 +1,6 @@
+*.vcxproj
+*.vcxproj.filters
+BoxBackup.sln
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake

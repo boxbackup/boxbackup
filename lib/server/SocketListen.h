@@ -186,8 +186,7 @@ public:
 			catch(ServerException &e) // finally
 			{
 				// Dispose of the socket
-				::close(mSocketHandle);
-				mSocketHandle = -1;
+				Close();
 				throw;
 			}
 		}

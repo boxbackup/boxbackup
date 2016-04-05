@@ -95,7 +95,6 @@ AC_CONFIG_FILES([infrastructure/BoxPlatform.pm
                  test/bbackupd/testfiles/bbackupd-temploc.conf
   		 ])
 AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
-                   bin/bbackupquery/makedocumentation.pl
                    bin/bbstored/bbstored-certs
                    bin/bbstored/bbstored-config
                    contrib/debian/bbackupd
@@ -110,6 +109,7 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    infrastructure/makebuildenv.pl
                    infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl
+                   lib/bbackupquery/makedocumentation.pl
                    lib/common/makeexception.pl
                    lib/raidfile/raidfile-config
                    lib/server/makeprotocol.pl

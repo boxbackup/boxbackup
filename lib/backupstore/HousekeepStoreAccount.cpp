@@ -2,7 +2,7 @@
 //
 // File
 //		Name:    HousekeepStoreAccount.cpp
-//		Purpose: 
+//		Purpose:
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
@@ -81,7 +81,17 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 {
 	if(mapNewRefs.get())
 	{
-		mapNewRefs->Discard();
+		// Discard() can throw exception, but destructors aren't supposed to do that, so
+		// just catch and log them.
+		try
+		{
+			mapNewRefs->Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_ERROR("Failed to destroy housekeeper: discarding the refcount "
+				"database threw an exception: " << e.what());
+		}
 	}
 }
 
@@ -163,9 +173,9 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 		// We're about to reset counters and exit, so report what
 		// happened now.
-		BOX_INFO("Housekeeping on account " << 
+		BOX_INFO("Housekeeping on account " <<
 			BOX_FORMAT_ACCOUNT(mAccountID) << " removed " <<
-			(0 - mBlocksUsedDelta) << " blocks (" << 
+			(0 - mBlocksUsedDelta) << " blocks (" <<
 			mFilesDeleted << " files, " <<
 			mEmptyDirectoriesDeleted << " dirs) and the directory "
 			"scan was interrupted");
@@ -177,7 +187,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
 	info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
 
-	// Reset the delta counts for files, as they will include 
+	// Reset the delta counts for files, as they will include
 	// RemoveASAP flagged files deleted during the initial scan.
 	// keep removeASAPBlocksUsedDelta for reporting
 	int64_t removeASAPBlocksUsedDelta = mBlocksUsedDelta;
@@ -227,7 +237,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Go and delete items from the accounts
 	bool deleteInterrupted = DeleteFiles(*info);
 
-	// If that wasn't interrupted, remove any empty directories which 
+	// If that wasn't interrupted, remove any empty directories which
 	// are also marked as deleted in their containing directory
 	if(!deleteInterrupted)
 	{
@@ -237,7 +247,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Log deletion if anything was deleted
 	if(mFilesDeleted > 0 || mEmptyDirectoriesDeleted > 0)
 	{
-		BOX_INFO("Housekeeping on account " << 
+		BOX_INFO("Housekeeping on account " <<
 			BOX_FORMAT_ACCOUNT(mAccountID) << " "
 			"removed " <<
 			(0 - (mBlocksUsedDelta + removeASAPBlocksUsedDelta)) <<
@@ -246,8 +256,8 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			(deleteInterrupted?" and was interrupted":""));
 	}
 
-	// Make sure the delta's won't cause problems if the counts are 
-	// really wrong, and it wasn't fixed because the store was 
+	// Make sure the delta's won't cause problems if the counts are
+	// really wrong, and it wasn't fixed because the store was
 	// updated during the scan.
 	if(mBlocksUsedDelta < (0 - info->GetBlocksUsed()))
 	{
@@ -279,7 +289,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	mapNewRefs->Commit();
 	mapNewRefs.reset();
 
-	// Explicity release the lock (would happen automatically on 
+	// Explicity release the lock (would happen automatically on
 	// going out of scope, included for code clarity)
 	writeLock.ReleaseLock();
 
@@ -395,7 +405,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 					// Delete this immediately.
 					DeleteFile(ObjectID, en->GetObjectID(), dir,
 						objectFilename, rBackupStoreInfo);
-					
+
 					// flag as having done something
 					deletedSomething = true;
 
@@ -529,7 +539,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
 			ASSERT(en->IsDir());
-			
+
 			if(!ScanDirectory(en->GetObjectID(), rBackupStoreInfo))
 			{
 				// Halting operation
@@ -554,7 +564,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount::DelEn &x, const HousekeepStoreAccount::DelEn &y)
 {
 	// STL spec says this:
-	// A Strict Weak Ordering is a Binary Predicate that compares two objects, returning true if the first precedes the second. 
+	// A Strict Weak Ordering is a Binary Predicate that compares two objects, returning true if the first precedes the second.
 
 	// The sort order here is intended to preserve the entries of most value, that is, the newest objects
 	// which are on a mark boundary.
@@ -702,7 +712,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 				BOX_FORMAT_ACCOUNT(mAccountID) << " "
 				"found error: object " <<
 				BOX_FORMAT_OBJECTID(ObjectID) << " "
-				"not found in dir " << 
+				"not found in dir " <<
 				BOX_FORMAT_OBJECTID(InDirectory) << ", "
 				"indicates logic error/corruption? Run "
 				"bbstoreaccounts check <accid> fix");
@@ -1069,7 +1079,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 		std::auto_ptr<RaidFileRead> containingDirStream(
 			RaidFileRead::Open(mStoreDiscSet,
 				containingDirFilename));
-		containingDirSizeInBlocksOrig = 
+		containingDirSizeInBlocksOrig =
 			containingDirStream->GetDiscUsageInBlocks();
 		containingDir.ReadFromStream(*containingDirStream,
 			IOStream::TimeOutInfinite);
@@ -1077,7 +1087,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 	}
 
 	// Find the entry
-	BackupStoreDirectory::Entry *pdirentry = 
+	BackupStoreDirectory::Entry *pdirentry =
 		containingDir.FindEntryByID(dir.GetObjectID());
 	// TODO FIXME invert test and reduce indentation
 	if((pdirentry != 0) && pdirentry->IsDeleted())

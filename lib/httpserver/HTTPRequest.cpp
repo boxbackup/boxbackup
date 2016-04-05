@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <sstream>
+
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
 #include "HTTPQueryDecoder.h"
