@@ -76,7 +76,7 @@ install:
   - nmake /s /f ms\nt.mak install
 
   - cd %APPVEYOR_BUILD_FOLDER%\..
-  - ps: Start-FileDownload 'ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
+  - ps: Start-FileDownload 'http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.zip'
   - 7za x -aoa pcre-8.38.zip
   - cd %APPVEYOR_BUILD_FOLDER%\..
   - cd pcre-8.38
