@@ -93,7 +93,7 @@ int main(int argc, const char *argv[])
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "c:W:m")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "c:W:mS")) != -1)
 	{
 		switch(c)
 		{
@@ -101,7 +101,9 @@ int main(int argc, const char *argv[])
 			// store argument
 			configFilename = optarg;
 			break;
-		
+		case 'S':
+			Logging::ToSyslog (false);
+			break;
 		case 'W':
 			logLevel = Logging::GetNamedLevel(optarg);
 			if(logLevel == Log::INVALID)
@@ -123,7 +125,7 @@ int main(int argc, const char *argv[])
 	}
 
 	Logging::FilterConsole((Log::Level) logLevel);
-	Logging::FilterSyslog (Log::NOTHING);
+	Logging::FilterSyslog((Log::Level) logLevel);
 
 	// Adjust arguments
 	argc -= optind;

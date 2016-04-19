@@ -253,7 +253,7 @@ int main(int argc, const char *argv[])
             BackupDaemon::GetStateName(currentState));
         command = NoCommand;
 	} else if(commandName == "get-stats") {
-        command=GetStats;
+		command=GetStats;
     }
 
 	switch(command)
