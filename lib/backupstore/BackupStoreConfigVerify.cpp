@@ -37,8 +37,10 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("TimeBetweenHousekeeping",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("ExtendedLogging", ConfigTest_IsBool, false),
+	ConfigurationVerifyKey("DisableHouseKeeping", ConfigTest_IsBool, false),
 	// make value "yes" to enable in config file
 	ConfigurationVerifyKey("RaidFileConf", ConfigTest_LastEntry)
+
 };
 
 const ConfigurationVerify BackupConfigFileVerify =

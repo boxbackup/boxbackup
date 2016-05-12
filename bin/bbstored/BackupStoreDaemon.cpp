@@ -172,9 +172,9 @@ void BackupStoreDaemon::Run()
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
 	bool disabledHouseKeeping=false;
-	if (config.KeyExists("DisableHouseKeeping")) {
+	//if (config.KeyExists("DisableHouseKeeping")) {
 		disabledHouseKeeping=config.GetKeyValueBool("DisableHouseKeeping");
-	}
+	//}
 
 	// Fork off housekeeping daemon -- must only do this the first
 	// time Run() is called.  Housekeeping runs synchronously on Win32
