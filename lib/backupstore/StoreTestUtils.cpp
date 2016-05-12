@@ -206,7 +206,7 @@ int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 	// Do housekeeping on this account
 	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
 		discSet, NULL);
-	housekeeping.DoHousekeeping(true /* keep trying forever */);
+	housekeeping.DoHousekeeping(HousekeepStoreAccount::DefaultAction, true /* keep trying forever */);
 	return housekeeping.GetErrorCount();
 }
 

@@ -12,6 +12,7 @@
 
 #include <string>
 
+#include "HousekeepStoreAccount.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupAccountControl.h"
 #include "NamedLock.h"
@@ -55,6 +56,7 @@ private:
 class Configuration;
 class UnixUser;
 
+
 class BackupStoreAccountsControl : public BackupAccountControl
 {
 public:
@@ -75,7 +77,7 @@ public:
 		bool ReturnNumErrorsFound = false);
     int CreateAccount(int32_t ID, int32_t DiscNumber, int64_t SoftLimit,
         int64_t HardLimit, int32_t VersionsLimit);
-	int HousekeepAccountNow(int32_t ID);
+	int HousekeepAccountNow(int32_t ID,  int32_t flags);
 };
 
 // max size of soft limit as percent of hard limit

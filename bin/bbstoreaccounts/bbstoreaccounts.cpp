@@ -69,7 +69,7 @@ void PrintUsageAndExit()
 "        Changes the \"name\" of the account to the specified string.\n"
 "        The name is purely cosmetic and intended to make it easier to\n"
 "        identify your accounts.\n"
-"  housekeep <account>\n"
+"  housekeep <account> [remove-deleted] [remove-old]\n"
 "        Runs housekeeping immediately on the account. If it cannot be locked,\n"
 "        bbstoreaccounts returns an error status code (1), otherwise success\n"
 "        (0) even if any errors were fixed by housekeeping.\n"
@@ -279,7 +279,29 @@ int main(int argc, const char *argv[])
 	}
 	else if(command == "housekeep")
 	{
-		return control.HousekeepAccountNow(id);
+		int32_t flags=HousekeepStoreAccount::DefaultAction;
+
+		// Look at other options
+		for(int o = 2; o < argc; ++o)
+		{
+			if(::strcmp(argv[o], "remove-deleted") == 0)
+			{
+				flags|=HousekeepStoreAccount::RemoveDeleted;
+			}
+			else if(::strcmp(argv[o], "remove-old") == 0)
+			{
+				flags|=HousekeepStoreAccount::RemoveOldVersions;
+			}
+			else
+			{
+				BOX_ERROR("Unknown option " << argv[o] << ".");
+				return 2;
+			}
+		}
+
+
+
+		return control.HousekeepAccountNow(id, flags);
 	}
 	else
 	{

@@ -25,7 +25,6 @@
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "BoxPortsAndFiles.h"
-#include "HousekeepStoreAccount.h"
 #include "NamedLock.h"
 #include "RaidFileController.h"
 #include "RaidFileWrite.h"
@@ -547,7 +546,7 @@ int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,
 	return 0;
 }
 
-int BackupStoreAccountsControl::HousekeepAccountNow(int32_t ID)
+int BackupStoreAccountsControl::HousekeepAccountNow(int32_t ID, int32_t flags)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -562,7 +561,7 @@ int BackupStoreAccountsControl::HousekeepAccountNow(int32_t ID)
 	}
 
 	HousekeepStoreAccount housekeeping(ID, rootDir, discSetNum, NULL);
-	bool success = housekeeping.DoHousekeeping();
+	bool success = housekeeping.DoHousekeeping(flags);
 
 	if(!success)
 	{
