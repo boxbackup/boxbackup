@@ -45,17 +45,16 @@ build:
 install:
   # Show compiled files restored from cache
   - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\bin_bbackupd.dir
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\bin_bbackupd.dir\%CONFIGURATION%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%\%CONFIGURATION%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%\%CONFIGURATION%\ALL_BUILD
-
-  - cinst strawberryperl 7zip.commandline cmake
-
-  # - dir "C:\Program Files\Microsoft SDKs\Windows"
-  # - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1"
-  # - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin"
+  # test_bbackupd needs 7zip to extract tar archives on Windows:
+  - cinst -y --limit-output 7zip.commandline
+  # Install cmake.portable instead of cmake, to get it on the path again:
+  # http://disq.us/p/xdknrt
+  - dir "c:\Program Files"
+  - dir "c:\Program Files (x86)"
+  # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
+  # If you are doing this on a fresh box for development, you would probably want to
+  # install Chocolatey and then run:
+  # cinst -y cmake strawberryperl git vim visualstudio2012wdx
 
   - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
 
@@ -109,9 +108,6 @@ install:
   - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PCRE_VERSION%
   - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
   - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\bin_bbackupd.dir
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%\%CONFIGURATION%
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
