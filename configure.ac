@@ -107,7 +107,6 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    contrib/solaris/bbstored-smf-method
                    contrib/windows/installer/boxbackup.mpi
                    infrastructure/makebuildenv.pl
-                   infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl
                    lib/bbackupquery/makedocumentation.pl
                    lib/common/makeexception.pl
@@ -124,8 +123,7 @@ AC_OUTPUT
 
 # Configure the Box build system
 echo
-if ! $PERL ./infrastructure/makebuildenv.pl \
-|| ! $PERL ./infrastructure/makeparcels.pl; then
+if ! $PERL ./infrastructure/makebuildenv.pl; then
 	echo "Making infrastructure failed!"
 	exit 1
 fi
