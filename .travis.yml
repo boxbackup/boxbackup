@@ -20,17 +20,9 @@ addons:
       - xsltproc
       - zlib1g-dev
 
-before_script:
-  - ccache -s
-  - ./bootstrap
-  - ./configure CC="ccache $CC" CXX="ccache $CXX"
-  - grep CXX config.status
-  - make
-
 env:
   - TEST_TARGET=debug
   - TEST_TARGET=release
 
 script:
-  - ./runtest.pl ALL $TEST_TARGET
-  - ccache -s
+  - ./infrastructure/travis-build.sh
