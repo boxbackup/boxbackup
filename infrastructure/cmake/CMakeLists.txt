@@ -106,8 +106,8 @@ foreach(exception_file ${exception_files})
 endforeach()
 
 set(protocol_files
-	lib/backupstore/backupprotocol.txt
-	test/basicserver/testprotocol.txt
+	lib/backupstore/BackupProtocol.txt
+	test/basicserver/TestProtocol.txt
 )
 
 foreach(protocol_file ${protocol_files})
@@ -127,7 +127,7 @@ foreach(protocol_file ${protocol_files})
 endforeach()
 
 set(documentation_files
-	lib/bbackupquery/documentation.txt
+	lib/bbackupquery/Documentation.txt
 )
 
 foreach(documentation_file ${documentation_files})
