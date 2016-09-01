@@ -242,10 +242,9 @@ foreach(module_dep ${module_deps})
 	endif()
 endforeach()
 
-#include(ExternalProject)
-#ExternalProject_Add(pcre
-#	PREFIX "../pcre"
-#	BUILD_COMMAND "${CMAKE_EXECUTABLE
+# We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
+# generators such as MSVC. We need to use a generator expression instead.
+target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:-DBOX_RELEASE_BUILD>)
 
 # Tell QDBM not to build itself as a DLL, because we want to link statically to it.
 target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
@@ -260,27 +259,74 @@ endif(MSVC)
 target_link_libraries(lib_common PUBLIC ws2_32 gdi32)
 
 # Link to ZLib
+# http://stackoverflow.com/a/6174604/648162
 include_directories(${base_dir}/../zlib-win32/include)
-find_library(zlibstaticd_lib_path zlibstaticd ${base_dir}/../zlib-win32/lib)
-find_library(zlibstatic_lib_path  zlibstatic  ${base_dir}/../zlib-win32/lib)
-target_link_libraries(lib_compress PUBLIC debug     ${zlibstaticd_lib_path})
-target_link_libraries(lib_compress PUBLIC optimized ${zlibstatic_lib_path})
+# On Windows we want to statically link zlib to make debugging and distribution easier,
+# but FindZLIB.cmake doesn't offer that as an option, so we have to go through some
+# contortions to "find" the correct library. ZLIB_ROOT is required in this case.
+if(WIN32)
+	if(NOT DEFINED ZLIB_ROOT)
+		message(FATAL_ERROR "You must set ZLIB_ROOT to point to include/zlib.h and lib/zlibstatic[d].lib on Windows")
+	endif()
+
+	message(STATUS "Searching for Zlib in: ${ZLIB_ROOT}")
+	find_path(ZLIB_INCLUDE_DIR zlib.h PATHS ${ZLIB_ROOT}/include NO_DEFAULT_PATH)
+	include_directories(${ZLIB_INCLUDE_DIR})
+	message(STATUS "Found Zlib headers: ${ZLIB_INCLUDE_DIR}")
+
+	# We must link against zlibstaticD if this is a debug build, otherwise
+	# we have a C runtime mismatch (/MD versus /MDd) and the application
+	# crashes at runtime.
+	find_library(ZLIB_LIBRARY_STATIC_DEBUG NAMES zlibstaticd
+		PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+	find_library(ZLIB_LIBRARY_STATIC_RELEASE NAMES zlibstatic
+		PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+
+	target_link_libraries(lib_compress PUBLIC
+		debug ${ZLIB_LIBRARY_STATIC_DEBUG}
+		optimized ${ZLIB_LIBRARY_STATIC_RELEASE})
+else()
+	find_package(ZLIB REQUIRED)
+	include_directories(${ZLIB_INCLUDE_DIRS})
+	target_link_libraries(lib_compress PUBLIC ${ZLIB_LIBRARIES})
+endif()
 
 # Link to OpenSSL
-include_directories(${base_dir}/../openssl-win32/include)
-find_library(libeay32_lib_path libeay32 ${base_dir}/../openssl-win32/lib)
-find_library(ssleay32_lib_path ssleay32 ${base_dir}/../openssl-win32/lib)
-target_link_libraries(lib_crypto PUBLIC ${libeay32_lib_path} ${ssleay32_lib_path})
+find_package(OpenSSL REQUIRED)
+include_directories(${OPENSSL_INCLUDE_DIR})
+target_link_libraries(lib_crypto PUBLIC ${OPENSSL_LIBRARIES})
 
 # Link to PCRE
-include_directories(${base_dir}/../pcre-win32/include)
-target_compile_definitions(lib_common PUBLIC -DPCRE_STATIC)
-find_library(pcreposix_lib_path  pcreposix  ${base_dir}/../pcre-win32/lib)
-find_library(pcreposixd_lib_path pcreposixd ${base_dir}/../pcre-win32/lib)
-find_library(pcre_lib_path  pcre  ${base_dir}/../pcre-win32/lib)
-find_library(pcred_lib_path pcred ${base_dir}/../pcre-win32/lib)
-target_link_libraries(lib_common PUBLIC debug "${pcreposixd_lib_path}" optimized "${pcreposix_lib_path}")
-target_link_libraries(lib_common PUBLIC debug "${pcred_lib_path}"      optimized "${pcre_lib_path}")
+if (WIN32)
+	if(NOT DEFINED PCRE_ROOT)
+		message(FATAL_ERROR "You must set PCRE_ROOT to point to include/pcreposix.h and lib/pcreposix[d].lib on Windows")
+	endif()
+
+	target_compile_definitions(lib_common PUBLIC -DPCRE_STATIC)
+	find_library(pcreposix_lib_path  pcreposix  ${PCRE_ROOT}/lib)
+	find_library(pcreposixd_lib_path pcreposixd ${PCRE_ROOT}/lib)
+	find_library(pcre_lib_path  pcre  ${PCRE_ROOT}/lib)
+	find_library(pcred_lib_path pcred ${PCRE_ROOT}/lib)
+	target_link_libraries(lib_common PUBLIC debug "${pcreposixd_lib_path}" optimized "${pcreposix_lib_path}")
+	target_link_libraries(lib_common PUBLIC debug "${pcred_lib_path}"      optimized "${pcre_lib_path}")
+	include_directories(${PCRE_ROOT}/include)
+else()
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(PCRE REQUIRED libpcreposix)
+	include_directories(${PCRE_INCLUDE_DIRS})
+	target_link_libraries(lib_common PUBLIC ${PCRE_LIBRARIES})
+
+	if(DEBUG)
+		message(STATUS "Linking PCRE libraries from ${PCRE_LIBRARY_DIRS}: ${PCRE_LIBRARIES}")
+	endif()
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}")
+find_package(Readline)
+if(READLINE_FOUND)
+	include_directories(${Readline_INCLUDE_DIR})
+	target_link_libraries(lib_common PUBLIC ${Readline_LIBRARY})
+endif()
 
 # Define the location of the Perl executable, needed by testbackupstorefix
 cmake_to_native_path("${PERL_EXECUTABLE}" perl_executable_native)

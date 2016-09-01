@@ -97,7 +97,7 @@ install:
 
   - cd %APPVEYOR_BUILD_FOLDER%
   - cd infrastructure\cmake\build
-  - cmake -G "%Generator%" -A %PLATFORM% ..
+  - cmake -G "%Generator%" -A %PLATFORM% -DZLIB_ROOT=%APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM% -DOPENSSL_ROOT_DIR=%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM% -DPCRE_ROOT=%APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM% ..
   - cd %APPVEYOR_BUILD_FOLDER%
 
   # Show files after build
