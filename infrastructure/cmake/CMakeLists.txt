@@ -175,8 +175,17 @@ foreach(module_dep ${module_deps})
 		set(module_path ${base_dir}/${module_dir})
 		string(REPLACE "/" "_" module_name ${CMAKE_MATCH_1})
 		string(REPLACE "/" "_" dependencies "${CMAKE_MATCH_2}")
-		file(GLOB module_files ${module_path}/*.c ${module_path}/*.cpp
-			${module_path}/*.h)
+
+		# We are replacing QDBM's normal build system, and we only want to include
+		# the modules that we actually need, to avoid warnings about duplicate
+		# definitions, and potential conflicts with Box Backup code in future, so
+		# we specify the C files to compile in explicitly.
+		if(module_name STREQUAL "qdbm")
+			file(GLOB module_files ${module_path}/depot.c ${module_path}/myconf.c)
+		else()
+			file(GLOB module_files ${module_path}/*.cpp ${module_path}/*.h)
+		endif()
+
 		set(module_files ${module_files} ${${module_name}_extra_files})
 
 		string(REGEX REPLACE "^ " "" dependencies "${dependencies}")
