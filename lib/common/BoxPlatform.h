@@ -96,16 +96,19 @@
 #endif
 
 // Handle differing xattr APIs
-#ifdef HAVE_SYS_XATTR_H
-	#if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define llistxattr(a,b,c) listxattr(a,b,c,XATTR_NOFOLLOW)
-	#endif
-	#if !defined(HAVE_LGETXATTR) && defined(HAVE_GETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define lgetxattr(a,b,c,d) getxattr(a,b,c,d,0,XATTR_NOFOLLOW)
-	#endif
-	#if !defined(HAVE_LSETXATTR) && defined(HAVE_SETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define lsetxattr(a,b,c,d,e) setxattr(a,b,c,d,0,(e)|XATTR_NOFOLLOW)
-	#endif
+#if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+	#define llistxattr(a,b,c) listxattr(a,b,c,XATTR_NOFOLLOW)
+	#define HAVE_LLISTXATTR
+#endif
+
+#if !defined(HAVE_LGETXATTR) && defined(HAVE_GETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+	#define lgetxattr(a,b,c,d) getxattr(a,b,c,d,0,XATTR_NOFOLLOW)
+	#define HAVE_LGETXATTR
+#endif
+
+#if !defined(HAVE_LSETXATTR) && defined(HAVE_SETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+	#define lsetxattr(a,b,c,d,e) setxattr(a,b,c,d,0,(e)|XATTR_NOFOLLOW)
+	#define HAVE_LSETXATTR
 #endif
 
 #if !HAVE_DECL_INFTIM

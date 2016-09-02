@@ -932,7 +932,7 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 	BackupStoreDirectory& rDirectory,
 	IOStream::pos_type new_size_in_blocks)
 {
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	{
 		std::string dirFilename;
 		MakeObjectFilename(rDirectory.GetObjectID(), dirFilename);

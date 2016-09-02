@@ -9,15 +9,19 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <errno.h>
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
+
+#ifdef HAVE_PROCESS_H
+#	include <process.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#	include <unistd.h>
+#endif
 
 #ifdef HAVE_BSD_UNISTD_H
 	#include <bsd/unistd.h>
@@ -26,7 +30,6 @@
 #ifdef WIN32
 	#include <Strsafe.h>
 	#include <ws2tcpip.h>
-	#include <process.h>
 #endif
 
 #include "depot.h"

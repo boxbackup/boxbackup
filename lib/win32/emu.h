@@ -39,7 +39,13 @@
 #ifndef __MINGW32__
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
+	typedef unsigned int uid_t;
+	typedef unsigned int gid_t;
 #endif
+
+// Disable Windows' non-standard implementation of min() and max():
+// http://stackoverflow.com/a/5004874/648162
+#define NOMINMAX
 
 // Windows headers
 
