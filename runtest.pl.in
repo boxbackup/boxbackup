@@ -3,24 +3,44 @@
 use strict;
 use warnings;
 
+use Cwd;
 use File::Basename;
 use Getopt::Std;
 
 chdir(dirname($0));
-use lib dirname($0).'/infrastructure';
+my $base_dir = getcwd();
+use lib dirname($0)."/infrastructure";
 
 use BoxPlatform;
 
-my $prepare_only = 0;
-my $verbose_build = 0;
-our ($opt_n, $opt_v);
-getopts('nv');
+my %opts;
+getopts('acnv', \%opts);
 
 # Don't actually run the test, just prepare for it.
-$prepare_only = $opt_n;
-$verbose_build = $opt_v;
+my $cmake_build = $opts{'c'};
+my $prepare_only = $opts{'n'};
+my $verbose_build = $opts{'v'};
+my $appveyor_mode = $opts{'a'};
 
-my ($test_name,$test_mode) = @ARGV;
+my $test_name = shift @ARGV;
+my $test_mode = shift @ARGV;
+my $test_src_exe;
+my $test_dst_exe;
+
+if($cmake_build)
+{
+	# To support different build environments (Windows/MSVC and Linux/Makefile) which
+	# place compiled executables in different locations, we need to accept the name of
+	# the compiled test executable as an additional command-line parameter.
+	die "test name is required in cmake mode" unless $test_name;
+	die "test mode is required in cmake mode" unless $test_mode;
+	die "only a single test name is supported in cmake mode" if $test_name =~ /,/;
+	$test_src_exe = shift @ARGV;
+	die "test project source executable path is required in cmake mode" unless $test_src_exe;
+	$test_dst_exe = shift @ARGV;
+	die "test project destination executable name is required in cmake mode" unless $test_dst_exe;
+}
+
 $test_mode = 'debug' if not defined $test_mode or $test_mode eq '';
 $test_mode = lc($test_mode);
 
@@ -52,7 +72,7 @@ if($test_name ne 'ALL')
 	}
 	else
 	{
-		runtest($test_name);
+		runtest($test_name, $test_src_exe, $test_dst_exe);
 	}
 }
 else
@@ -107,47 +127,68 @@ __E
 
 exit $exit_code;
 
+sub appveyor_test_status
+{
+	my ($test_name, $status, $duration, $message, $stdout) = @_;
+
+	if(!$appveyor_mode)
+	{
+		return;
+	}
+
+	# Assume that the test was already "Added" by CMakeLists.txt.
+	my $cmdline = "appveyor UpdateTest -Name $test_name -Framework Custom ".
+		"-FileName \"\" -Outcome $status";
+	if(defined $duration)
+	{
+		$cmdline .= " -Duration ".($duration * 1000);
+	}
+
+	if($message)
+	{
+		$cmdline .= " -ErrorMessage \"$message\"";
+	}
+
+	if(system($cmdline))
+	{
+		warn "AppVeyor test command failed: $cmdline";
+	}
+	else
+	{
+		print "Notified: $cmdline\n";
+	}
+}
+
 sub runtest
 {
-	my ($t) = @_;
+	my ($t, $test_src_exe, $test_dst_exe) = @_;
 
 	# Attempt to make this test.
 	my $flag = ($test_mode eq 'release')?(BoxPlatform::make_flag('RELEASE')):'';
-	my ($make_res, $test_project_exe);
+	my $make_res;
+	my $test_dst_dir = "$test_mode/test/$t";
+	my $start_time = time();
 
-	if($target_msvc)
+	if($cmake_build)
 	{
-		$test_project_exe = "test_$t";
-		# Assume that MSVC projects are built with CMake, so we can use
-		# MSBuild to run the tests.
-		my $test_src_dir = "test\\$t";
-		my $test_dst_dir = "$test_mode\\test\\$t";
-		my $quiet = $verbose_build ? "" : "/consoleloggerparameters:ErrorsOnly";
+		appveyor_test_status($t, "Running", 0);
+
+		# Test executables have a different name on Windows to work around
+		# restrictions on running different executables with the same name.
+		my $test_src_dir = "test/$t";
 
 		my @commands = (
-			"msbuild /nologo $quiet ".
-			"infrastructure\\cmake\\build\\INSTALL.vcxproj",
-			"xcopy /s /i /y /q $test_src_dir $test_dst_dir",
-			"copy infrastructure\\cmake\\build\\$test_mode\\$test_project_exe.exe $test_dst_dir"
+			"cmake -E remove_directory $test_dst_dir",
+			"cmake -E copy_directory $test_src_dir $test_dst_dir",
+			"cmake -E copy $test_src_exe $test_dst_dir/$test_dst_exe",
+			# We could do a "make install" here, to ensure that everything
+			# is up to date, but it's really slow, verbose and wasteful:
+			# "cmake --build infrastructure/cmake/build --target install",
 		);
 
-		if(-d $test_dst_dir)
-		{
-			unshift @commands, "rd /s /q $test_dst_dir";
-		}
-
-		foreach my $command (@commands)
-		{
-			$make_res = system($command);
-			if ($make_res != 0)
-			{ 
-				push @results, "$t: make failed: $command";
-				last; 
-			}
-		}
-
-		# Windows doesn't support testextra files either, so fake it.
-		if ($make_res == 0 and -r "$test_src_dir/testextra")
+		# Our CMake buildsystem doesn't do anything to support testextra files
+		# (Makfile syntax), so fake it.
+		if (-r "$test_src_dir/testextra")
 		{
 			open EXTRA, "$test_src_dir/testextra"
 				or die "$test_src_dir/testextra: $!";
@@ -156,29 +197,17 @@ sub runtest
 				chomp $line;
 				if ($line =~ m/^mkdir (.*)/)
 				{
-					mkdir("$test_dst_dir/$1")
-						or die "$test_dst_dir/$1: $!";
+					push @commands, "cmake -E make_directory $test_dst_dir/$1";
 				}
 				elsif ($line =~ m/^rm -rf (.*)/)
 				{
-					if(-d "$test_dst_dir\\$1")
-					{
-						my $cmd = "rd /s/q $test_dst_dir\\$1";
-						my $status = system($cmd);
-						$status == 0 or die "$cmd: failed with ".
-							"status $status";
-					}
+					push @commands, "cmake -E remove_directory $test_dst_dir/$1";
 				}
-				elsif ($line =~ m/^cp (.*) (.*)/)
+				elsif ($line =~ m/^cp (.*)\*\.\* (.*)/)
 				{
 					my ($src, $dst) = ($1, $2);
-					$src =~ s|/|\\|g;
-					$dst =~ s|/|\\|g;
-					my $cmd = "xcopy /s /i /y /q ".
-						"$test_dst_dir\\$src $test_dst_dir\\$dst";
-					my $status = system($cmd);
-					$status == 0 or die "$cmd: failed with ".
-						"status $status";
+					push @commands, "cmake -E copy_directory ".
+						"$test_dst_dir/$src $test_dst_dir/$dst";
 				}
 				else
 				{
@@ -187,16 +216,31 @@ sub runtest
 				}
 			}
 		}
+
+		foreach my $command (@commands)
+		{
+			$make_res = system($command);
+			if ($make_res != 0)
+			{
+				push @results, "$t: pre-test command failed: $command";
+				appveyor_test_status($t, "NotRunnable", time() - $start_time,
+					"pre-test command failed: $command");
+				last;
+			}
+		}
 	}
 	else
 	{
 		my $quiet = $verbose_build ? "VERBOSE=1" : "";
 		$make_res = system("cd test/$t && $make_command $quiet $flag");
+		$test_dst_exe = "_test$platform_exe_ext";
 	}
 
 	if($make_res != 0)
 	{
 		push @results,"$t: make failed";
+		appveyor_test_status($t, "NotRunnable", time() - $start_time,
+			"pre-test commands failed");
 		$exit_code = 2;
 		return;
 	}
@@ -206,17 +250,21 @@ sub runtest
 
 	if($prepare_only)
 	{
+		appveyor_test_status($t, "Skipped", time() - $start_time,
+			"we are only preparing this test");
 		return;
 	}
 	
 	# run it
-	if($target_msvc)
+	if($cmake_build)
 	{
-		# no tee.exe, so let's do it ourselves.
+		# no tee.exe on Windows, so let's do it ourselves.
 		open LOG, ">$logfile" or die "$logfile: $!";
-		chdir("$test_mode/test/$t");
-		open TEE, "$test_project_exe.exe |"
-			or die "$test_project_exe.exe: $!";
+		chdir("$base_dir/$test_mode/test/$t");
+
+		open TEE, "$test_dst_exe |"
+			or die "$test_dst_dir/$test_dst_exe: $!";
+
 		while (my $line = <TEE>)
 		{
 			print $line;
@@ -224,11 +272,12 @@ sub runtest
 		}
 		close LOG;
 		close TEE;
-		chdir("../../..");
+		chdir($base_dir);
 	}
 	else
 	{
-		$test_res = system("cd $test_mode/test/$t ; ./t 2>&1 " .
+		chdir($base_dir);
+		$test_res = system("cd $test_mode/test/$t ; sh t 2>&1 " .
 			"| tee ../../../$logfile");
 	}
 
@@ -242,19 +291,38 @@ sub runtest
 		}
 		close RESULTS;
 
-		chomp $last;
-		$last =~ s/\r//;
-		push @results, "$t: $last";
-
-		if ($last ne "PASSED") 
-		{ 
+		if(!defined $last)
+		{
+			push @results, "$t: test produced no output";
+			appveyor_test_status($t, "Failed", time() - $start_time,
+				"test produced no output");
 			$exit_code = 1;
+		}
+		else
+		{
+			chomp $last;
+			$last =~ s/\r//;
+			push @results, "$t: $last";
+
+			if ($last ne "PASSED")
+			{
+				$exit_code = 1;
+				appveyor_test_status($t, "Failed", time() - $start_time,
+					"test ended with: $last");
+			}
+			else
+			{
+				appveyor_test_status($t, "Passed", time() - $start_time);
+			}
 		}
 	}
 	else
 	{
+		my $cwd = getcwd();
 		push @results, 
-			"$t: failed to open test log file: $logfile: $!";
+			"$t: failed to open test log file: $logfile: $! (in $cwd)";
+		appveyor_test_status($t, "Inconclusive", time() - $start_time,
+			"failed to open test log file: $logfile: $!");
 	}
 	
 	# delete test results

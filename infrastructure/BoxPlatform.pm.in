@@ -127,6 +127,11 @@ BEGIN
 			$platform_link_line_extra = '-L/sw/lib ';
 		}
 	}
+
+	if ($target_windows)
+	{
+		$platform_exe_ext = '.exe';
+	}
 }
 
 sub make_flag
