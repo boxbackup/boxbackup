@@ -40,7 +40,7 @@ init:
 
 build:
   parallel: true
-  project: infrastructure/cmake/build/BoxBackup.sln
+  project: infrastructure/cmake/build/INSTALL.vcxproj
 
 install:
   # Show compiled files restored from cache
