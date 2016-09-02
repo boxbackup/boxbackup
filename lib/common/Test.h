@@ -243,12 +243,14 @@ void safe_sleep(int seconds);
 std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
 	const ConfigurationVerify& verify);
 
-#ifdef _MSC_VER
-	// Our CMakeFiles compile tests to different executable filenames,
-	// e.g. test_common.exe instead of _test.exe.
-	#define TEST_EXECUTABLE BOX_MODULE ".exe"
-#else
-	#define TEST_EXECUTABLE "./_test"
-#endif
+#ifndef TEST_EXECUTABLE
+#	ifdef _MSC_VER
+		// Our CMakeFiles compile tests to different executable filenames,
+		// e.g. test_common.exe instead of _test.exe.
+		#define TEST_EXECUTABLE BOX_MODULE ".exe"
+#	else
+		#define TEST_EXECUTABLE "./_test"
+#	endif
+#endif // TEST_EXECUTABLE
 
 #endif // TEST__H

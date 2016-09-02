@@ -18,7 +18,9 @@
 #define EMU_INCLUDE
 
 // Need feature detection macros below
-#ifdef _MSC_VER
+#if defined BOX_CMAKE
+#	include "../common/BoxConfig.cmake.h"
+#elif defined _MSC_VER
 #	include "../common/BoxConfig-MSVC.h"
 #	define NEED_BOX_VERSION_H
 #else
