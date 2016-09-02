@@ -89,6 +89,10 @@ if(NOT status EQUAL 0)
 		"status ${status}: ${command_output}")
 endif()
 
+if(WIN32)
+	add_definitions(-DWIN32)
+endif()
+
 # Parsing Makefile.extra files in CMake script is a pain, so the relevant rules for
 # code-generating Perl scripts are hard-coded here.
 

@@ -2277,9 +2277,8 @@ bool test_read_only_dirs_can_be_restored()
 	{
 		{
 			#ifdef WIN32
-				// Cygwin chmod changes Windows file attributes
-				TEST_THAT(::system("chmod 0555 testfiles/"
-					"TestDir1/x1") == 0);
+				TEST_THAT(::system("attrib +r testfiles\\TestDir1\\x1")
+					== 0);
 			#else
 				TEST_THAT(chmod("testfiles/TestDir1/x1",
 					0555) == 0);
@@ -2303,12 +2302,12 @@ bool test_read_only_dirs_can_be_restored()
 
 			// put the permissions back to sensible values
 			#ifdef WIN32
-				TEST_THAT(::system("chmod 0755 testfiles/"
-					"TestDir1/x1") == 0);
-				TEST_THAT(::system("chmod 0755 testfiles/"
-					"restore1/x1") == 0);
-				TEST_THAT(::system("chmod 0755 testfiles/"
-					"restore-test/Test1/x1") == 0);
+				TEST_THAT(::system("attrib -r testfiles\\TestDir1\\x1")
+					== 0);
+				TEST_THAT(::system("attrib -r testfiles\\restore1\\x1")
+					== 0);
+				TEST_THAT(::system("attrib -r testfiles\\restore-test\\"
+					"Test1\\x1") == 0);
 			#else
 				TEST_THAT(chmod("testfiles/TestDir1/x1",
 					0755) == 0);
@@ -2723,9 +2722,6 @@ bool test_store_error_reporting()
 
 	// TODO FIXME dedent
 	{
-		// Check that store errors are reported neatly
-		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*") == 0);
-
 		// Break the store. We need a write lock on the account
 		// while we do this, otherwise housekeeping might be running
 		// and might rewrite the info files when it finishes,
@@ -3146,11 +3142,11 @@ bool test_upload_very_old_files()
 		{
 			// in the archive, it's read only
 			#ifdef WIN32
-				TEST_THAT(::system("chmod 0777 testfiles"
-					"/TestDir1/sub23/rand.h") == 0);
+				TEST_THAT(::system("attrib -r "
+					"testfiles\\TestDir\\sub23\\rand.h") == 0);
 			#else
-				TEST_THAT(chmod("testfiles/TestDir1/sub23"
-					"/rand.h", 0777) == 0);
+				TEST_THAT(chmod("testfiles/TestDir1/sub23/rand.h",
+					0777) == 0);
 			#endif
 
 			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h", 
@@ -3393,7 +3389,7 @@ bool test_delete_dir_change_attribute()
 #endif
 		// Change attributes on an existing file.
 #ifdef WIN32
-		TEST_EQUAL(0, system("chmod 0423 testfiles/TestDir1/df9834.dsf"));
+		TEST_EQUAL(0, system("attrib +r testfiles\\TestDir1\\df9834.dsf"));
 #else
 		TEST_THAT(::chmod("testfiles/TestDir1/df9834.dsf", 0423) == 0);
 #endif
@@ -3578,8 +3574,14 @@ bool test_sync_new_files()
 		// OpenBSD's tar interprets the "-m" option quite differently:
 		// it sets the time to epoch zero (1 Jan 1970) instead of the
 		// current time, which doesn't help us. So reset the timestamp
-		// on a file with the touch command, so it won't be backed up.
-		TEST_RETURN(::system("touch testfiles/TestDir1/chsh"), 0);
+		// on a file by touching it, so it won't be backed up.
+		{
+#ifndef WIN32
+			TEST_THAT(chmod("testfiles/TestDir1/chsh", 0755) == 0);
+#endif
+			FileStream fs("testfiles/TestDir1/chsh", O_WRONLY);
+			fs.Write("a", 1);
+		}
 		
 		// At least one file is too new to be backed up on the first run.
 		bbackupd.RunSyncNow();
