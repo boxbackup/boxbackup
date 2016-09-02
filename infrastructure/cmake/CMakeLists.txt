@@ -11,14 +11,6 @@ enable_testing()
 
 set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
-macro(cmake_to_native_path cmake_path native_path)
-	if(WIN32)
-		string(REPLACE "/" "\\" ${native_path} "${cmake_path}")
-	else()
-		set(${native_path} "${cmake_path}")
-	endif()
-endmacro()
-
 set(files_to_configure
 	bin/bbackupd/bbackupd-config
 	bin/bbstored/bbstored-certs
@@ -402,6 +394,6 @@ if(READLINE_FOUND)
 endif()
 
 # Define the location of the Perl executable, needed by testbackupstorefix
-cmake_to_native_path("${PERL_EXECUTABLE}" perl_executable_native)
+file(TO_NATIVE_PATH "${PERL_EXECUTABLE}" perl_executable_native)
 string(REPLACE "\\" "\\\\" perl_path_escaped ${perl_executable_native})
 target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_path_escaped}")
