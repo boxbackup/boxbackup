@@ -473,6 +473,7 @@ my %module_resources_win32;
 my @debug_build_targets;
 my @release_build_targets;
 my @all_clean_targets;
+my @all_realclean_targets;
 my %mod_type_name;
 my %mod_end_targets;
 my %library_targets;
@@ -520,8 +521,6 @@ for my $mod (@implicit_deps, @modules)
 	my ($type,$name) = @{$mod_type_name{$mod}};
 	my $end_target_file = $mod_end_targets{$mod};
 	my $target_is_library = $library_targets{$mod};
-
-	print $mod,": $type\n";
 
 	# add additional files for tests
 	if($type eq 'test')
@@ -703,6 +702,14 @@ ${makefile_ifdef_prefix}endif
 .PHONY: default
 default:
 	\$(MAKE) -C ../.. \$(TARGET)
+
+.PHONY: clean
+clean:
+	\$(MAKE) -C ../.. clean_${type}_${name}
+
+.PHONY: realclean
+realclean:
+	\$(MAKE) -C ../.. realclean_${type}_${name}
 __E
 	close MINI_MODULE_MAKEFILE;
 
@@ -920,8 +927,13 @@ __E
 clean_${type}_${name}:
 	rm -rf \$(DEBUG_OUTBASE)/$mod/*
 	rm -rf \$(RELEASE_OUTBASE)/$mod/*
+
+realclean_${type}_${name}: clean_${type}_${name}
+	rm -f $mod/t $mod/t-gdb $mod/Makefile
+	find $mod -name 'autogen_*' -type f -exec rm -f {} \\;
 __E
 	push @all_clean_targets, "clean_${type}_${name}";
+	push @all_realclean_targets, "realclean_${type}_${name}";
 
 	my $includes = "";
 	
@@ -1295,8 +1307,7 @@ install:
 clean:         @all_clean_targets
 	cd docs; \$(MAKE) clean
 
-realclean: clean
-	find . -name 'autogen_*' -type f -exec rm -f {} \\;
+realclean: clean @all_realclean_targets
 	find release debug       -type f -exec rm -f {} \\;
 
 # and finally a target for rebuilding the build system:
