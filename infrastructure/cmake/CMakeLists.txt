@@ -72,7 +72,10 @@ function(move_file_if_exists source_file dest_file)
 endfunction()
 
 foreach(file_to_configure ${files_to_configure})
-	configure_file("${base_dir}/${file_to_configure}.in" "${base_dir}/${file_to_configure}" @ONLY)
+	configure_file("${base_dir}/${file_to_configure}.in" "${base_dir}/${file_to_configure}.out" @ONLY)
+	replace_file_if_different(
+		"${base_dir}/${file_to_configure}"
+		"${base_dir}/${file_to_configure}.out")
 endforeach()
 
 # Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
