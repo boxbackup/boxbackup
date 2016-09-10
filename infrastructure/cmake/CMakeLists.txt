@@ -670,3 +670,19 @@ endif(MSVC)
 file(TO_NATIVE_PATH "${PERL_EXECUTABLE}" perl_executable_native)
 string(REPLACE "\\" "\\\\" perl_path_escaped ${perl_executable_native})
 target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_path_escaped}")
+
+# Configure test timeouts:
+# I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:
+# https://ci.appveyor.com/project/qris/boxbackup/build/job/xm10itascygtu93j
+set_tests_properties(common PROPERTIES TIMEOUT 20)
+set_tests_properties(crypto PROPERTIES TIMEOUT 4)
+set_tests_properties(compress PROPERTIES TIMEOUT 80)
+set_tests_properties(raidfile PROPERTIES TIMEOUT 32)
+set_tests_properties(basicserver PROPERTIES TIMEOUT 80)
+set_tests_properties(backupstore PROPERTIES TIMEOUT 560)
+set_tests_properties(backupstorefix PROPERTIES TIMEOUT 300)
+set_tests_properties(backupstorepatch PROPERTIES TIMEOUT 320)
+set_tests_properties(backupdiff PROPERTIES TIMEOUT 32)
+set_tests_properties(bbackupd PROPERTIES TIMEOUT 1200)
+set_tests_properties(s3store PROPERTIES TIMEOUT 20)
+set_tests_properties(httpserver PROPERTIES TIMEOUT 40)
