@@ -33,7 +33,7 @@ public:
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite)
 	{
-		Write(pBuffer, NBytes, Timeout);
+		mrSink.Write(pBuffer, NBytes, Timeout);
 	}
 	virtual pos_type BytesLeftToRead()
 	{
