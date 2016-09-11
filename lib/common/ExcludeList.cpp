@@ -199,11 +199,9 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				{
 					char buf[1024];
 					regerror(errcode, pregex, buf, sizeof(buf));
-					BOX_LOG_CATEGORY(Log::ERROR,
-						ConfigurationVerify::VERIFY_ERROR,
+					THROW_EXCEPTION_MESSAGE(CommonException, BadRegularExpression,
 						"Invalid regular expression: " <<
 						entry << ": " << buf);
-					THROW_EXCEPTION(CommonException, BadRegularExpression)
 				}
 				
 				// Store in list of regular expressions
