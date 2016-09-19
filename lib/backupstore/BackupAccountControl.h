@@ -14,7 +14,6 @@
 
 #include "BackupStoreAccountDatabase.h"
 #include "HTTPResponse.h"
-#include "NamedLock.h"
 #include "S3Client.h"
 
 class BackupStoreDirectory;
