@@ -19,6 +19,7 @@
 #include "Test.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupProtocol.h"
+#include "BackupStoreAccounts.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
@@ -716,7 +717,15 @@ int test(int argc, const char *argv[])
 		// Temporarily stop the server, so it doesn't repair the refcount error. Except 
 		// on win32, where hard-killing the server can leave a lockfile in place,
 		// breaking the rest of the test.
-#ifndef WIN32
+#ifdef WIN32
+		// Wait for the server to finish housekeeping first, by getting a lock on
+		// the account.
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		BackupStoreAccounts acc(*apAccounts);
+		NamedLock lock;
+		acc.LockAccount(0x1234567, lock);
+#else
 		TEST_THAT(StopServer());
 #endif
 
@@ -774,6 +783,9 @@ int test(int argc, const char *argv[])
 		// ERROR:   BlocksInCurrentFiles changed from 228 to 226
 		// ERROR:   NumCurrentFiles changed from 114 to 113
 		// WARNING: Reference count of object 0x44 changed from 1 to 0
+#ifdef WIN32
+		lock.ReleaseLock();
+#endif
 		TEST_EQUAL(5, check_account_for_errors());
 		{
 			std::auto_ptr<BackupProtocolAccountUsage2> usage =
