@@ -118,10 +118,8 @@ public:
 	// --------------------------------------------------------------------------
 	enum Method GetMethod() const {return mMethod;}
 	std::string GetMethodName() const;
-	const std::string &GetRequestURI() const {return mRequestURI;}
+	std::string GetRequestURI(bool with_parameters_for_get_request = false) const;
 
-	// Note: the HTTPRequest generates and parses the Host: header
-	// Do not attempt to set one yourself with AddHeader().
 	const std::string &GetHostName() const {return mHeaders.GetHostName();}
 	void SetHostName(const std::string& rHostName)
 	{
@@ -144,20 +142,14 @@ public:
 	{
 		mQuery.erase(name);
 	}
+	std::string GetParameterString(const std::string& name,
+		const std::string& default_value)
+	{
+		return GetParameterString(name, default_value, false); // !required
+	}
 	std::string GetParameterString(const std::string& name)
 	{
-		Query_t::iterator i = mQuery.find(name);
-		if(i == mQuery.end())
-		{
-			THROW_EXCEPTION_MESSAGE(HTTPException, ParameterNotFound, name);
-		}
-		const std::string& value(i->second);
-		i++;
-		if(i != mQuery.end() && i->first == name)
-		{
-			THROW_EXCEPTION_MESSAGE(HTTPException, DuplicateParameter, name);
-		}
-		return value;
+		return GetParameterString(name, "", true); // required
 	}
 	const Query_t GetParameters() const
 	{
@@ -205,6 +197,31 @@ public:
 	}
 
 private:
+	std::string GetParameterString(const std::string& name,
+		const std::string& default_value, bool required)
+	{
+		Query_t::iterator i = mQuery.find(name);
+		if(i == mQuery.end())
+		{
+			if(required)
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, ParameterNotFound,
+					name);
+			}
+			else
+			{
+				return default_value;
+			}
+		}
+		const std::string& value(i->second);
+		i++;
+		if(i != mQuery.end() && i->first == name)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, DuplicateParameter, name);
+		}
+		return value;
+	}
+
 	void ParseCookies(const std::string &rCookieString);
 
 	enum Method mMethod;

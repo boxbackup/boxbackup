@@ -71,7 +71,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	// Check
 	if(mFileDescriptor != -1)
 	{
-		THROW_EXCEPTION(CommonException, NamedLockAlreadyLockingSomething)
+		THROW_FILE_ERROR("Named lock already in use", rFilename, CommonException,
+			NamedLockAlreadyLockingSomething);
 	}
 
 	mFileName = rFilename;
@@ -172,8 +173,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	catch(BoxException &e)
 	{
 		::close(fd);
-		BOX_NOTICE("Failed to lock lockfile " << rFilename << ": " << e.what());
-		throw;
+		THROW_FILE_ERROR("Failed to lock lockfile: " << e.what(), rFilename,
+			CommonException, NamedLockFailed);
 	}
 #endif // HAVE_DECL_O_EXLOCK
 
@@ -209,7 +210,7 @@ void NamedLock::ReleaseLock()
 	}
 
 #ifndef WIN32
-	// Delete the file. We need to do this before closing the filehandle, 
+	// Delete the file. We need to do this before closing the filehandle,
 	// if we used flock() or fcntl() to lock it, otherwise someone could
 	// acquire the lock, release and delete it between us closing (and
 	// hence releasing) and deleting it, and we'd fail when it came to
@@ -222,6 +223,9 @@ void NamedLock::ReleaseLock()
 
 	if(::unlink(mFileName.c_str()) != 0)
 	{
+		// Don't try to release it again
+		close(mFileDescriptor);
+		mFileDescriptor = -1;
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),
 			CommonException, OSFileError);
@@ -231,6 +235,8 @@ void NamedLock::ReleaseLock()
 	// Close the file
 	if(::close(mFileDescriptor) != 0)
 	{
+		// Don't try to release it again
+		mFileDescriptor = -1;
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to close lockfile"),
 			CommonException, OSFileError);

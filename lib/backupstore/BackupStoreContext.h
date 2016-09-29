@@ -57,16 +57,15 @@ private:
 	BackupStoreContext(const BackupStoreContext &rToCopy); // no copying
 
 public:
-	void ReceivedFinishCommand();
 	void CleanUp();
 	int32_t GetClientID() {return mClientID;}
 
 	enum
 	{
-		Phase_START		= 0,
-		Phase_Version	= 0,
-		Phase_Login		= 1,
-		Phase_Commands	= 2
+		Phase_START    = 0,
+		Phase_Version  = 0,
+		Phase_Login    = 1,
+		Phase_Commands = 2
 	};
 
 	int GetPhase() const {return mProtocolPhase;}
@@ -110,14 +109,20 @@ public:
 	// Store info
 	void LoadStoreInfo();
 	void SaveStoreInfo(bool AllowDelay = true);
-	const BackupStoreInfo &GetBackupStoreInfo() const;
+
+	// Const version for external use:
+	const BackupStoreInfo& GetBackupStoreInfo() const
+	{
+		return GetBackupStoreInfoInternal();
+	}
+
 	const std::string GetAccountName()
 	{
-		if(!mapStoreInfo.get())
+		if(!mpFileSystem)
 		{
 			return "Unknown";
 		}
-		return mapStoreInfo->GetAccountName();
+		return mpFileSystem->GetBackupStoreInfo(true).GetAccountName(); // ReadOnly
 	}
 
 	// Client marker
@@ -206,9 +211,6 @@ private:
 	bool mReadOnly;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
 
-	// Store info
-	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
-
 	// mapOwnFileSystem is initialised when we created our own BackupFileSystem,
 	// using the old constructor. It ensures that the BackupFileSystem is deleted
 	// when this BackupStoreContext is destroyed. TODO: stop using that old
@@ -220,8 +222,18 @@ private:
 	// member instead of mapOwnFileSystem.
 	BackupFileSystem* mpFileSystem;
 
+	// Non-const version for internal use:
+	BackupStoreInfo& GetBackupStoreInfoInternal() const
+	{
+		if(!mpFileSystem)
+		{
+			THROW_EXCEPTION(BackupStoreException, FileSystemNotInitialised);
+		}
+		return mpFileSystem->GetBackupStoreInfo(mReadOnly);
+	}
+
 	// Refcount database
-	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
+	BackupStoreRefCountDatabase* mpRefCount;
 
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;

@@ -52,6 +52,7 @@ public:
 		QueryLogin(AccountNumber,
 			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
 	}
+
 	BackupProtocolLocal2(BackupStoreContext& rContext, int32_t AccountNumber,
 		bool ReadOnly)
 	: BackupProtocolLocal(rContext),
@@ -69,7 +70,7 @@ public:
 	{
 		std::auto_ptr<BackupProtocolFinished> finished =
 			BackupProtocolLocal::Query(rQuery);
-		GetContext().ReleaseWriteLock();
+		GetContext().CleanUp();
 		return finished;
 	}
 

@@ -1445,6 +1445,8 @@ bool test_backup_pauses_when_store_is_full()
 	unpack_files("spacetest1", "testfiles/TestDir1");
 	TEST_THAT_OR(StartClient(), FAIL);
 
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+
 	// TODO FIXME dedent
 	{
 		// wait for files to be uploaded
@@ -1457,7 +1459,7 @@ bool test_backup_pauses_when_store_is_full()
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(sTlsContext, 0 /* read-write */);
-			TEST_THAT(check_num_files(5, 0, 0, 9));
+			TEST_THAT(check_num_files(fs, 5, 0, 0, 9));
 			TEST_THAT(check_num_blocks(*client, 10, 0, 0, 18, 28));
 			client->QueryFinished();
 		}
@@ -1561,7 +1563,7 @@ bool test_backup_pauses_when_store_is_full()
 			TEST_EQUAL(SearchDir(*spacetest_dir, "f1"), 0);
 			TEST_EQUAL(SearchDir(*spacetest_dir, "d7"), 0);
 
-			TEST_THAT(check_num_files(4, 0, 0, 8));
+			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
 		}
@@ -1580,6 +1582,8 @@ bool test_backup_pauses_when_store_is_full()
 bool test_bbackupd_exclusions()
 {
 	SETUP_WITHOUT_FILES();
+
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 	// Delete a file and a directory
@@ -1600,7 +1604,7 @@ bool test_bbackupd_exclusions()
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(sTlsContext, 0 /* read-write */);
-			TEST_THAT(check_num_files(4, 0, 0, 8));
+			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
 		}
@@ -1625,7 +1629,7 @@ bool test_bbackupd_exclusions()
 		{
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(sTlsContext, 0 /* read-write */);
-			TEST_THAT(check_num_files(4, 0, 0, 8));
+			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
 			client->QueryFinished();
 		}
@@ -1728,7 +1732,7 @@ bool test_bbackupd_exclusions()
 			// server which are not deleted, they use 2 blocks
 			// each, the rest is directories and 2 deleted files
 			// (f2 and d3/d4/f5)
-			TEST_THAT(check_num_files(2, 0, 2, 8));
+			TEST_THAT(check_num_files(fs, 2, 0, 2, 8));
 			TEST_THAT(check_num_blocks(*client, 4, 0, 4, 16, 24));
 
 			// Log out.
@@ -1769,7 +1773,7 @@ bool test_bbackupd_exclusions()
 			// f2, d3, d3/d4 and d3/d4/f5 have been removed.
 			// The files were counted as deleted files before, the
 			// deleted directories just as directories.
-			TEST_THAT(check_num_files(2, 0, 0, 6));
+			TEST_THAT(check_num_files(fs, 2, 0, 0, 6));
 			TEST_THAT(check_num_blocks(*client, 4, 0, 0, 12, 16));
 
 			// Log out.
@@ -1797,7 +1801,7 @@ bool test_bbackupd_exclusions()
 			std::auto_ptr<BackupProtocolCallable> client =
 				connect_and_login(sTlsContext, 0 /* read-write */);
 
-			TEST_THAT(check_num_files(4, 0, 0, 7));
+			TEST_THAT(check_num_files(fs, 4, 0, 0, 7));
 			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 14, 22));
 
 			// d2/f6, d6/d8 and d6/d8/f7 are new
@@ -2589,7 +2593,7 @@ bool test_store_error_reporting()
 
 		// Lock scope
 		{
-			RaidBackupFileSystem fs("backup/01234567/", 0);
+			RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 			fs.GetLock();
 
 			TEST_THAT(::rename("testfiles/0_0/backup/01234567/info.rf",

@@ -64,17 +64,23 @@ InternalAlgorithmErrorCheckIDNotMonotonicallyIncreasing	60
 CouldNotLockStoreAccount		61	Another process is accessing this account -- is a client connected to the server?
 AttributeHashSecretNotSet		62
 AEScipherNotSupportedByInstalledOpenSSL	63	The system needs to be compiled with support for OpenSSL 0.9.7 or later to be able to decode files encrypted with AES
-SignalReceived					64	A signal was received by the process, restart or terminate needed. Exception thrown to abort connection.
+SignalReceived					64	A signal was received by the process, restart or terminate needed. Exception thrown to abort connection
 IncompatibleFromAndDiffFiles	65	Attempt to use a diff and a from file together, when they're not related
 DiffFromIDNotFoundInDirectory	66	When uploading via a diff, the diff from file must be in the same directory
-PatchChainInfoBadInDirectory	67	A directory contains inconsistent information. Run bbstoreaccounts check to fix it.
-UnknownObjectRefCountRequested	68	A reference count was requested for an object whose reference count is not known.
+PatchChainInfoBadInDirectory	67	A directory contains inconsistent information. Run bbstoreaccounts check to fix it
+UnknownObjectRefCountRequested	68	A reference count was requested for an object whose reference count is not known
 MultiplyReferencedObject	69	Attempted to modify an object with multiple references, should be uncloned first
-CorruptReferenceCountDatabase	70	The account's refcount database is corrupt and must be rebuilt by housekeeping.
-CancelledByBackgroundTask	71	The current task was cancelled on request by the background task.
-MissingEtagHeader		72	The S3 HTTP response did not contain an ETag header as expected.
-InvalidEtagHeader		73	The S3 HTTP response contain a malformed or unexpected ETag header as expected.
-FileSystemNotInitialised	74	No BackupFileSystem has been configured for this account.
-ObjectDoesNotExist		75	The specified object ID does not exist in the store.
-AccountAlreadyExists		76	Tried to create an account that already exists.
-AccountDoesNotExist		77	Tried to open an account that does not exist.
+CorruptReferenceCountDatabase	70	The account's refcount database is corrupt and must be rebuilt by housekeeping
+CancelledByBackgroundTask	71	The current task was cancelled on request by the background task
+MissingEtagHeader		72	The S3 HTTP response did not contain an ETag header as expected
+InvalidEtagHeader		73	The S3 HTTP response contain a malformed or unexpected ETag header as expected
+FileSystemNotInitialised	74	No BackupFileSystem has been configured for this account
+ObjectDoesNotExist		75	The specified object ID does not exist in the store, or is not of this type
+AccountAlreadyExists		76	Tried to create an account that already exists
+AccountDoesNotExist		77	Tried to open an account that does not exist
+FileDownloadedIncorrectly	78	The downloaded file had different data than expected, so was downloaded badly
+FileUploadFailed		79	Failed to upload the file to the storage server
+CacheDirectoryLocked		80	The cache directory is already locked by another process
+FileSystemCannotMerge		81	This filesystem does not support merging patches, so it cannot delete this file
+BadConfiguration		82	The configuration file contains an error or invalid value
+TooManyFilesInDirectory		83	The S3 directory contains too many files for it to be a Boxbackup store, please check and/or empty it

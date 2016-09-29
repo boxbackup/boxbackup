@@ -430,7 +430,7 @@ start:
 	}
 
 	if ((optchar = (int)*place++) == (int)':' ||
-	    optchar == (int)'-' && *place != '\0' ||
+	    (optchar == (int)'-' && *place != '\0') ||
 	    (oli = strchr(options, optchar)) == NULL) {
 		/*
 		 * If the user specified "-" and  '-' isn't listed in

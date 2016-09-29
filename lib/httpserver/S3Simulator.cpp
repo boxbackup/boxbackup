@@ -14,7 +14,9 @@
 #include <cstring>
 #include <string>
 
+#include <dirent.h>
 #include <openssl/hmac.h>
+#include <sys/types.h>
 
 #include "Database.h"
 #include "HTTPRequest.h"
@@ -35,6 +37,27 @@
 #define PTREE_ITEM_ATTRIBUTES "attributes"
 
 using boost::property_tree::ptree;
+
+ptree XmlStringToPtree(const std::string& string)
+{
+	ptree pt;
+	std::istringstream stream(string);
+	read_xml(stream, pt, boost::property_tree::xml_parser::trim_whitespace);
+	return pt;
+}
+
+std::string PtreeToXmlString(const ptree& pt)
+{
+	std::ostringstream buf;
+#if BOOST_VERSION >= 105500
+	// http://www.pcl-users.org/problem-getting-PCL-1-7-1-on-osx-10-9-td4035213.html
+	auto settings = boost::property_tree::xml_writer_make_settings<std::string> ('\t', 1);
+#else
+	boost::property_tree::xml_writer_settings<char> settings('\t', 1);
+#endif
+	write_xml(buf, pt, settings);
+	return buf.str();
+}
 
 S3Simulator::S3Simulator()
 : HTTPServer(300000)
@@ -213,6 +236,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		is_simpledb = true;
 	}
 
+	std::string bucket_name;
+
 	try
 	{
 		const Configuration& rConfig(GetConfiguration());
@@ -236,7 +261,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		}
 		else
 		{
-			std::string md5, date, bucket;
+			std::string md5, date;
 			rRequest.GetHeader("content-md5", &md5);
 			rRequest.GetHeader("date", &date);
 
@@ -249,7 +274,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 				if (suffix == s3suffix)
 				{
-					bucket = host.substr(0, host.size() - s3suffix.size());
+					bucket_name = host.substr(0,
+						host.size() - s3suffix.size());
 				}
 			}
 
@@ -272,9 +298,9 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 				}
 			}
 
-			if (! bucket.empty())
+			if (! bucket_name.empty())
 			{
-				buffer_to_sign << "/" << bucket;
+				buffer_to_sign << "/" << bucket_name;
 			}
 
 			buffer_to_sign << rRequest.GetRequestURI();
@@ -321,7 +347,9 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		if(actual_auth != expected_auth)
 		{
 			THROW_EXCEPTION_MESSAGE(HTTPException,
-				AuthenticationFailed, "Authentication code mismatch");
+				AuthenticationFailed, "Authentication code mismatch: " <<
+				"expected " << expected_auth << " but received " <<
+				actual_auth);
 		}
 
 		if(is_simpledb && rRequest.GetMethod() == HTTPRequest::Method_GET)
@@ -332,6 +360,12 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		{
 			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
 				"Unsupported Amazon SimpleDB Method");
+		}
+		else if(rRequest.GetMethod() == HTTPRequest::Method_GET &&
+			(rRequest.GetRequestURI() == "" ||
+			 rRequest.GetRequestURI() == "/"))
+		{
+			HandleListObjects(bucket_name, rRequest, rResponse);
 		}
 		else if(rRequest.GetMethod() == HTTPRequest::Method_GET)
 		{
@@ -377,9 +411,17 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		{
 			rResponse.SetResponseCode(HTTPResponse::Code_Conflict);
 		}
+		else if(EXCEPTION_IS_TYPE(ce, HTTPException, FileNotFound))
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
+		}
 		else if(EXCEPTION_IS_TYPE(ce, HTTPException, SimpleDBItemNotFound))
 		{
 			rResponse.SetResponseCode(HTTPResponse::Code_NotFound);
+		}
+		else if(EXCEPTION_IS_TYPE(ce, HTTPException, BadRequest))
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_BadRequest);
 		}
 	}
 	catch (std::exception &e)
@@ -404,10 +446,214 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	}
 
 	BOX_NOTICE(rResponse.GetResponseCode() << " " << rRequest.GetMethodName() << " " <<
-		rRequest.GetRequestURI());
+		rRequest.GetRequestURI(true)); // with_parameters_for_get_request
 
 	return;
 }
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Simulator::HandleListObjects(
+//			 const std::string& bucket_name,
+//			 HTTPRequest &rRequest,
+//			 HTTPResponse &rResponse)
+//		Purpose: Handles an S3 list objects request.
+//		Created: 15/03/2016
+//
+// --------------------------------------------------------------------------
+
+void S3Simulator::HandleListObjects(const std::string& bucket_name,
+	HTTPRequest &request, HTTPResponse &response)
+{
+	if(bucket_name.empty())
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+			"A bucket name is required");
+	}
+
+	std::string delimiter = request.GetParameterString("delimiter", "/");
+	if(delimiter != "/")
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest, "Delimiter must be /");
+	}
+
+	std::string prefix = request.GetParameterString("prefix", "");
+	if(prefix != "" && !EndsWith("/", prefix))
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+			"Prefix must be empty, or end with /, but was: '" << prefix << "'");
+	}
+
+	std::string marker = request.GetParameterString("marker", "");
+	std::string max_keys_str = request.GetParameterString("max-keys", "1000");
+	int max_keys;
+	{
+		char* p_end;
+		max_keys = strtol(max_keys_str.c_str(), &p_end, 10);
+		if(*p_end != 0)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+				"max-keys parameter must be an integer: '" <<
+				max_keys_str << "'");
+		}
+	}
+
+	std::string base_path = GetConfiguration().GetKeyValue("StoreDirectory");
+	std::string prefixed_path = base_path + "/" + prefix;
+	if(!EndsWith("/", prefixed_path))
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, Internal,
+			"Directory name must end with '/': " << prefixed_path);
+	}
+	RemoveSuffix("/", prefixed_path);
+
+	DIR *p_dir = opendir(prefixed_path.c_str());
+	if(p_dir == NULL)
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, FileNotFound,
+			"Directory not found: " << prefixed_path);
+	}
+
+	typedef std::map<std::string, int> object_name_to_type_t;
+	object_name_to_type_t object_name_to_type;
+
+	try
+	{
+		for(struct dirent* p_dirent = readdir(p_dir); p_dirent != NULL;
+			p_dirent = readdir(p_dir))
+		{
+			std::string entry_name(p_dirent->d_name);
+			if(entry_name == "." || entry_name == "..")
+			{
+				continue;
+			}
+
+			std::string entry_path = prefixed_path + DIRECTORY_SEPARATOR +
+				entry_name;
+
+			// Prefix must be empty, or end with /
+			ASSERT(prefix == "" || EndsWith("/", prefix));
+			std::string object_name = prefix + entry_name;
+
+			if(p_dirent->d_type == DT_UNKNOWN)
+			{
+				int entry_type = ObjectExists(entry_path);
+				if(entry_type == ObjectExists_File)
+				{
+					object_name_to_type[object_name] =
+							ObjectExists_File;
+				}
+				else if(entry_type == ObjectExists_Dir)
+				{
+					object_name_to_type[object_name] =
+							ObjectExists_Dir;
+				}
+				else
+				{
+					continue;
+				}
+			}
+			else if(p_dirent->d_type == DT_REG)
+			{
+				object_name_to_type[object_name] = ObjectExists_File;
+			}
+			else if(p_dirent->d_type == DT_DIR)
+			{
+				object_name_to_type[object_name] = ObjectExists_Dir;
+			}
+			else
+			{
+				continue;
+			}
+		}
+	}
+	catch(BoxException &e)
+	{
+		closedir(p_dir);
+		throw;
+	}
+
+	ptree result;
+	result.add("Name", bucket_name);
+	result.add("Prefix", prefix);
+	result.add("Marker", marker);
+	result.add("Delimiter", delimiter);
+
+	ptree common_prefixes;
+
+	bool truncated = false;
+	int result_count = 0;
+	for(object_name_to_type_t::iterator i = object_name_to_type.lower_bound(marker);
+		i != object_name_to_type.end(); i++)
+	{
+		if(result_count >= max_keys)
+		{
+			truncated = true;
+			break;
+		}
+
+		// Both Contents and CommonPrefixes count towards number of
+		// elements returned. Each CommonPrefix counts as a single return,
+		// regardless of the number of files it contains/abbreviates.
+		result_count++;
+
+		if(i->second == ObjectExists_Dir)
+		{
+			common_prefixes.add("Prefix", i->first + delimiter);
+			continue;
+		}
+
+		std::string entry_path = base_path + DIRECTORY_SEPARATOR + i->first;
+		int64_t size;
+		if(!FileExists(entry_path, &size, true)) // TreatLinksAsNotExisting
+		{
+			continue;
+		}
+
+		ptree contents;
+		contents.add("Key", i->first);
+
+		std::string digest;
+		{
+			std::auto_ptr<FileStream> ap_file;
+			ap_file.reset(new FileStream(entry_path));
+
+			MD5DigestStream digester;
+			ap_file->CopyStreamTo(digester);
+			ap_file->Seek(0, IOStream::SeekType_Absolute);
+			digester.Close();
+			digest = "&quot;" + digester.DigestAsString() + "&quot;";
+		}
+		contents.add("ETag", digest);
+
+		std::ostringstream size_stream;
+		size_stream << size;
+		contents.add("Size", size_stream.str());
+
+		result.add_child("Contents", contents);
+	}
+
+	closedir(p_dir);
+
+	result.add("IsTruncated", truncated ? "true" : "false");
+	result.add_child("CommonPrefixes", common_prefixes);
+
+	ptree response_tree;
+	response_tree.add_child("ListBucketResult", result);
+
+	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
+	response.AddHeader("x-amz-id-2", "qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY");
+	response.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
+	response.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+	response.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
+	response.AddHeader("Server", "AmazonS3");
+
+	response.SetResponseCode(HTTPResponse::Code_OK);
+	response.Write(PtreeToXmlString(response_tree));
+}
+
 
 // --------------------------------------------------------------------------
 //
@@ -424,6 +670,7 @@ void S3Simulator::HandleHead(HTTPRequest &rRequest, HTTPResponse &rResponse)
 {
 	HandleGet(rRequest, rResponse, false); // no content
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -443,17 +690,37 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 	path += rRequest.GetRequestURI();
 	std::auto_ptr<FileStream> apFile;
 	apFile.reset(new FileStream(path));
+	int64_t file_length;
 
 	std::string digest;
 	{
 		MD5DigestStream digester;
 		apFile->CopyStreamTo(digester);
+		file_length = apFile->GetPosition();
 		apFile->Seek(0, IOStream::SeekType_Absolute);
 		digester.Close();
 		digest = "\"" + digester.DigestAsString() + "\"";
 	}
 
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
+
+	if(!IncludeContent)
+	{
+		// For HEAD requests, we must set the Content-Length. See RFC 2616 section
+		// 4.4, and the Amazon Simple Storage Service API Reference, section "HEAD
+		// Object" examples, which set it. Also, our S3BackupFileSystem needs it!
+		//
+		// There are no examples for 304 Not Modified responses to requests with
+		// If-None-Match (ETag match) so clients should not depend on this, so the
+		// S3Simulator should return 0 instead of the object size and no ETag, to
+		// ensure that any code which tries to use the Content-Length or ETag of
+		// such a response will fail.
+		//
+		// We do that by checking IncludeContent here, before clearing it in case
+		// of a digest match below, to leave them unset in that case.
+		rResponse.GetHeaders().SetContentLength(file_length);
+		rResponse.AddHeader("ETag", digest);
+	}
 
 	std::string if_none_match = rRequest.GetHeaders().GetHeaderValue("if-none-match",
 		false); // required
@@ -466,6 +733,11 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 	if(IncludeContent)
 	{
 		apFile->CopyStreamTo(rResponse);
+		// We allow the HTTPResponse to set the response size itself in this case,
+		// but we must add the ETag header. TODO: proper support for streaming
+		// responses will require us to set the content-length here, because we
+		// know it but the HTTPResponse does not.
+		rResponse.AddHeader("ETag", digest);
 	}
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
@@ -473,9 +745,9 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
 	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
-	rResponse.AddHeader("ETag", digest);
 	rResponse.AddHeader("Server", "AmazonS3");
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -510,22 +782,6 @@ void S3Simulator::HandleDelete(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
 	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 	rResponse.AddHeader("Server", "AmazonS3");
-}
-
-ptree XmlStringToPtree(const std::string& string)
-{
-	ptree pt;
-	std::istringstream stream(string);
-	read_xml(stream, pt, boost::property_tree::xml_parser::trim_whitespace);
-	return pt;
-}
-
-std::string PtreeToXmlString(const ptree& pt)
-{
-	std::ostringstream buf;
-	boost::property_tree::xml_writer_settings<char> settings('\t', 1);
-	write_xml(buf, pt, settings);
-	return buf.str();
 }
 
 ptree SimpleDBSimulator::GetDomainProps(const std::string& domain_name)
@@ -606,17 +862,17 @@ void ProcessConditionalRequest(const std::string& domain, HTTPRequest& rRequest,
 		std::string param_name = i->first;
 		std::string param_value = i->second;
 		std::string param_number_type = RemovePrefix("Attribute.",
-			param_name);
+			param_name, false); // !force
 		std::string expected_number_type = RemovePrefix("Expected.",
-			param_name);
+			param_name, false); // !force
 		if(!param_number_type.empty())
 		{
 			std::string param_index_name = RemoveSuffix(".Name",
-				param_number_type);
+				param_number_type, false); // !force
 			std::string param_index_value = RemoveSuffix(".Value",
-				param_number_type);
+				param_number_type, false); // !force
 			std::string param_index_replace = RemoveSuffix(".Replace",
-				param_number_type);
+				param_number_type, false); // !force
 			if(!param_index_name.empty())
 			{
 				param_index_to_name[param_index_name] =
@@ -644,9 +900,9 @@ void ProcessConditionalRequest(const std::string& domain, HTTPRequest& rRequest,
 		else if(!expected_number_type.empty())
 		{
 			std::string expected_index_name = RemoveSuffix(".Name",
-				expected_number_type);
+				expected_number_type, false); // !force
 			std::string expected_index_value = RemoveSuffix(".Value",
-				expected_number_type);
+				expected_number_type, false); // !force
 			if(!expected_index_name.empty())
 			{
 				expected_index_to_name[expected_index_name] =
@@ -812,6 +1068,7 @@ void ProcessConditionalRequest(const std::string& domain, HTTPRequest& rRequest,
 	}
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -900,10 +1157,7 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 			"Unsupported SimpleDB Action: " << action);
 	}
 
-	std::ostringstream response_buf;
-	boost::property_tree::xml_writer_settings<char> settings('\t', 1);
-	write_xml(response_buf, response_tree, settings);
-	rResponse.Write(response_buf.str());
+	rResponse.Write(PtreeToXmlString(response_tree));
 }
 
 
@@ -920,13 +1174,40 @@ void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rRespon
 
 void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 {
-	std::string path = GetConfiguration().GetKeyValue("StoreDirectory");
-	path += rRequest.GetRequestURI();
+	std::string base_path = GetConfiguration().GetKeyValue("StoreDirectory");
 	std::auto_ptr<FileStream> apFile;
 
+	// Amazon S3 has no explicit directories or directory creation operation, but we
+	// are using the filesystem for storage, so we need to ensure that any directories
+	// used in the file's path actually exist before we can create the file itself.
+	std::string file_uri = rRequest.GetRequestURI();
+	for(std::string::size_type next_slash = file_uri.find('/', 1);
+		next_slash != std::string::npos;
+		next_slash = file_uri.find('/', next_slash + 1))
+	{
+		std::string parent_dir_path = base_path + file_uri.substr(0, next_slash);
+		int what_exists = ObjectExists(parent_dir_path);
+		if(what_exists == 0)
+		{
+			// Does not exist, need to create it
+			mkdir(parent_dir_path.c_str(), 0755);
+		}
+		else if(what_exists == ObjectExists_Dir)
+		{
+			// Directory already exists, nothing to do
+		}
+		else
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+				"Cannot create directory: something else already exists "
+				"with this name: " << parent_dir_path);
+		}
+	}
+
+	std::string file_path = base_path + file_uri;
 	try
 	{
-		apFile.reset(new FileStream(path, O_CREAT | O_RDWR));
+		apFile.reset(new FileStream(file_path, O_CREAT | O_TRUNC | O_RDWR));
 	}
 	catch (CommonException &ce)
 	{

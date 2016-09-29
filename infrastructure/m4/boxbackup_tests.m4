@@ -19,6 +19,8 @@ AX_CHECK_COMPILE_FLAG(-Werror=non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=non-virtual-dtor"])
 AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
+AX_CHECK_COMPILE_FLAG(-Werror=parentheses,
+	[cxxflags_strict="$cxxflags_strict -Werror=parentheses"])
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
@@ -185,6 +187,17 @@ else
 fi
 
 # Check for Boost PropertyTree (XML and JSON support for lib/httpserver)
+AX_BOOST_BASE(,
+	# ax_check_boost.m4 thwarts our attempts to modify CPPFLAGS and
+	# LDFLAGS by restoring them AFTER running ACTION-IF-FOUND. But we
+	# can fight back by updating the _SAVED variables instead, and use
+	# the fact that we know that CPPFLAGS and LDFLAGS are still set with
+	# the correct values for Boost, to preserve them by overwriting
+	# CPPFLAGS_SAVED and LDFLAGS_SAVED.
+	[CPPFLAGS_SAVED="$CPPFLAGS"
+	 LDFLAGS_SAVED="$LDFLAGS"],
+	[AC_MSG_ERROR([[cannot find Boost, try installing libboost-dev]])])
+
 AC_CHECK_HEADER([boost/property_tree/ptree.hpp],,
 	[AC_MSG_ERROR([[cannot find Boost::PropertyTree, try installing libboost-dev]])])
 

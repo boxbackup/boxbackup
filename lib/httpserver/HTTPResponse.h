@@ -84,10 +84,10 @@ public:
 		Code_OK = 200,
 		Code_NoContent = 204,
 		Code_MovedPermanently = 301,
-		Code_Found = 302,	// redirection
+		Code_Found = 302, // redirection
 		Code_NotModified = 304,
 		Code_TemporaryRedirect = 307,
-		Code_MethodNotAllowed = 400,
+		Code_BadRequest = 400,
 		Code_Unauthorized = 401,
 		Code_Forbidden = 403,
 		Code_NotFound = 404,
@@ -97,6 +97,10 @@ public:
 	};
 
 	static const char *ResponseCodeToString(int ResponseCode);
+	const char *ResponseCodeString() const
+	{
+		return ResponseCodeToString(mResponseCode);
+	}
 
 	void WriteStringDefang(const char *String, unsigned int StringLen);
 	void WriteStringDefang(const std::string &rString) {WriteStringDefang(rString.c_str(), rString.size());}
@@ -131,7 +135,13 @@ public:
 	void SetForReading()
 	{
 		CollectInBufferStream::SetForReading();
-		mHeaders.SetContentLength(GetSize());
+		// If the ContentLength is unknown, set it to the size of the response.
+		// But if the user has specifically set it to something, then leave it
+		// alone.
+		if(mHeaders.GetContentLength() == HTTPHeaders::UNKNOWN_CONTENT_LENGTH)
+		{
+			mHeaders.SetContentLength(GetSize());
+		}
 	}
 
 	// Clear all state for reading again

@@ -21,21 +21,25 @@ std::string GetBoxBackupVersion();
 void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOutput);
 bool StartsWith(const std::string& prefix, const std::string& haystack);
 bool EndsWith(const std::string& prefix, const std::string& haystack);
-std::string RemovePrefix(const std::string& prefix, const std::string& haystack);
-std::string RemoveSuffix(const std::string& suffix, const std::string& haystack);
+std::string RemovePrefix(const std::string& prefix, const std::string& haystack,
+	bool force = true);
+std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
+	bool force = true);
 
 void DumpStackBacktrace();
 
 bool FileExists(const std::string& rFilename, int64_t *pFileSize = 0,
 	bool TreatLinksAsNotExisting = false);
 
-enum
+typedef enum
 {
+	ObjectExists_Unknown = -1,
 	ObjectExists_NoObject = 0,
 	ObjectExists_File = 1,
 	ObjectExists_Dir = 2
-};
-int ObjectExists(const std::string& rFilename);
+} object_exists_t;
+
+object_exists_t ObjectExists(const std::string& rFilename);
 std::string HumanReadableSize(int64_t Bytes);
 std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 	bool MachineReadable);

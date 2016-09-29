@@ -112,10 +112,85 @@ void HTTPHeaders::ParseHeaderLine(const std::string& rLine)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    HTTPHeaders::GetHeader(const std::string& name,
+//			 const std::string* pValueOut)
+//		Purpose: Get the value of a single header, with the specified
+//			 name, into the std::string pointed to by pValueOut.
+//			 Returns true if the header exists, and false if it
+//			 does not (in which case *pValueOut is not modified).
+//			 Certain headers are stored in specific fields, e.g.
+//			 content-length and host, but this should be done
+//			 transparently to callers of AddHeader and GetHeader.
+//		Created: 2016-03-12
+//
+// --------------------------------------------------------------------------
+bool HTTPHeaders::GetHeader(const std::string& rName, std::string* pValueOut) const
+{
+	const std::string name = ToLowerCase(rName);
+
+	// Remember to change AddHeader() and GetHeader() together for each
+	// item in this list!
+	if(name == "content-length")
+	{
+		// Convert number to string.
+		std::ostringstream out;
+		out << mContentLength;
+		*pValueOut = out.str();
+	}
+	else if(name == "content-type")
+	{
+		*pValueOut = mContentType;
+	}
+	else if(name == "connection")
+	{
+		// TODO FIXME: not all values of the Connection header can be
+		// stored and retrieved at the moment.
+		*pValueOut = mKeepAlive ? "keep-alive" : "close";
+	}
+	else if (name == "host")
+	{
+		std::ostringstream out;
+		out << mHostName;
+		if(mHostPort != DEFAULT_PORT)
+		{
+			out << ":" << mHostPort;
+		}
+		*pValueOut = out.str();
+	}
+	else
+	{
+		// All other headers are stored in mExtraHeaders.
+
+		for (std::vector<Header>::const_iterator
+			i  = mExtraHeaders.begin();
+			i != mExtraHeaders.end(); i++)
+		{
+			if (i->first == name)
+			{
+				*pValueOut = i->second;
+				return true;
+			}
+		}
+
+		// Not found in mExtraHeaders.
+		return false;
+	}
+
+	// For all except the else case above (searching mExtraHeaders), we must have
+	// found a value, as there will always be one.
+	return true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    HTTPHeaders::AddHeader(const std::string& name,
 //			 const std::string& value)
 //		Purpose: Add a single header, with the specified name and
-//			 value, to the internal list of headers.
+//			 value, to the internal list of headers. Certain
+//			 headers are stored in specific fields, e.g.
+//			 content-length and host, but this should be done
+//			 transparently to callers of AddHeader and GetHeader.
 //		Created: 2015-08-22
 //
 // --------------------------------------------------------------------------
@@ -123,6 +198,8 @@ void HTTPHeaders::AddHeader(const std::string& rName, const std::string& value)
 {
 	std::string name = ToLowerCase(rName);
 
+	// Remember to change AddHeader() and GetHeader() together for each
+	// item in this list!
 	if(name == "content-length")
 	{
 		// Decode number

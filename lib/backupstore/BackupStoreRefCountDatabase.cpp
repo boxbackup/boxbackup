@@ -27,18 +27,113 @@
 #define REFCOUNT_MAGIC_VALUE	0x52656643 // RefC
 #define REFCOUNT_FILENAME	"refcount"
 
+typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
+
+// --------------------------------------------------------------------------
+//
+// Class
+//		Name:    BackupStoreRefCountDatabaseImpl
+//		Purpose: Implementation of the BackupStoreRefCountDatabase
+//			 interface.
+//		Created: 2016/04/17
+//
+// --------------------------------------------------------------------------
+class BackupStoreRefCountDatabaseImpl : public BackupStoreRefCountDatabase
+{
+public:
+	~BackupStoreRefCountDatabaseImpl();
+
+	BackupStoreRefCountDatabaseImpl(const std::string& Filename, int64_t AccountID,
+		bool ReadOnly, bool Temporary, std::auto_ptr<FileStream> apDatabaseFile);
+
+private:
+	// No copying allowed
+	BackupStoreRefCountDatabaseImpl(const BackupStoreRefCountDatabase &);
+
+public:
+	// Create a blank database, using a temporary file that you must
+	// Discard() or Commit() to make permanent.
+	static std::auto_ptr<BackupStoreRefCountDatabase> Create
+		(const BackupStoreAccountDatabase::Entry& rAccount);
+	static std::auto_ptr<BackupStoreRefCountDatabase> Create
+		(const std::string& Filename, int64_t AccountID);
+	void Commit();
+	void Discard();
+	void Close()
+	{
+		// If this was a temporary database, it should have been Commit()ed first.
+		ASSERT(!mIsTemporaryFile);
+		mapDatabaseFile.reset();
+	}
+	void Reopen();
+	bool IsReadOnly() { return mReadOnly; }
+
+	// Load it from the store
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
+	// Load it from a stream (file or RaidFile)
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const std::string& FileName, int64_t AccountID, bool ReadOnly);
+
+	// Data access functions
+	refcount_t GetRefCount(int64_t ObjectID) const;
+	int64_t GetLastObjectIDUsed() const;
+
+	// SetRefCount is not private, but this whole implementation is effectively
+	// private, and SetRefCount is not in the interface, so it's not callable from
+	// anywhere else.
+	void SetRefCount(int64_t ObjectID, refcount_t NewRefCount);
+
+	// Data modification functions
+	void AddReference(int64_t ObjectID);
+	// RemoveReference returns false if refcount drops to zero
+	bool RemoveReference(int64_t ObjectID);
+	int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs);
+
+private:
+	IOStream::pos_type GetSize() const
+	{
+		return mapDatabaseFile->GetPosition() +
+			mapDatabaseFile->BytesLeftToRead();
+	}
+	IOStream::pos_type GetEntrySize() const
+	{
+		return sizeof(refcount_t);
+	}
+	IOStream::pos_type GetOffset(int64_t ObjectID) const
+	{
+		return ((ObjectID - 1) * GetEntrySize()) +
+			sizeof(refcount_StreamFormat);
+	}
+
+	// Location information
+	int64_t mAccountID;
+	std::string mFilename, mFinalFilename;
+	bool mReadOnly;
+	bool mIsModified;
+	bool mIsTemporaryFile;
+	std::auto_ptr<FileStream> mapDatabaseFile;
+
+	bool NeedsCommitOrDiscard()
+	{
+		return mapDatabaseFile.get() && mIsModified && mIsTemporaryFile;
+	}
+};
+
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreRefCountDatabase::BackupStoreRefCountDatabase()
+//		Name:    BackupStoreRefCountDatabaseImpl::BackupStoreRefCountDatabase()
 //		Purpose: Default constructor
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-BackupStoreRefCountDatabase::BackupStoreRefCountDatabase(const std::string& Filename,
-	int64_t mAccountID, bool ReadOnly, bool Temporary,
+BackupStoreRefCountDatabaseImpl::BackupStoreRefCountDatabaseImpl(
+	const std::string& Filename, int64_t AccountID, bool ReadOnly, bool Temporary,
 	std::auto_ptr<FileStream> apDatabaseFile)
-: mFilename(Filename + (Temporary ? "X" : "")),
+: mAccountID(AccountID),
+  mFilename(Filename + (Temporary ? "X" : "")),
   mFinalFilename(Filename),
   mReadOnly(ReadOnly),
   mIsModified(false),
@@ -48,7 +143,7 @@ BackupStoreRefCountDatabase::BackupStoreRefCountDatabase(const std::string& File
 	ASSERT(!(ReadOnly && Temporary)); // being both doesn't make sense
 }
 
-void BackupStoreRefCountDatabase::Commit()
+void BackupStoreRefCountDatabaseImpl::Commit()
 {
 	if (!mIsTemporaryFile)
 	{
@@ -86,7 +181,7 @@ void BackupStoreRefCountDatabase::Commit()
 	mIsTemporaryFile = false;
 }
 
-void BackupStoreRefCountDatabase::Discard()
+void BackupStoreRefCountDatabaseImpl::Discard()
 {
 	if (!mIsTemporaryFile)
 	{
@@ -118,12 +213,12 @@ void BackupStoreRefCountDatabase::Discard()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreRefCountDatabase::~BackupStoreRefCountDatabase
+//		Name:    BackupStoreRefCountDatabaseImpl::~BackupStoreRefCountDatabase
 //		Purpose: Destructor
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
-BackupStoreRefCountDatabase::~BackupStoreRefCountDatabase()
+BackupStoreRefCountDatabaseImpl::~BackupStoreRefCountDatabaseImpl()
 {
 	if (mIsTemporaryFile)
 	{
@@ -150,8 +245,8 @@ std::string BackupStoreRefCountDatabase::GetFilename(const
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreRefCountDatabase::Create(int32_t,
-//			 const std::string &, int, bool)
+//		Name:    BackupStoreRefCountDatabase::Create(
+//			 const BackupStoreAccountDatabase::Entry& rAccount)
 //		Purpose: Create a blank database, using a temporary file that
 //			 you must Discard() or Commit() to make permanent.
 //		Created: 2003/08/28
@@ -164,6 +259,16 @@ BackupStoreRefCountDatabase::Create(const BackupStoreAccountDatabase::Entry& rAc
 	return Create(Filename, rAccount.GetID());
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreRefCountDatabase::Create(
+//			 const std::string& Filename, int64_t AccountID)
+//		Purpose: Create a blank database, using a temporary file that
+//			 you must Discard() or Commit() to make permanent.
+//		Created: 2003/08/28
+//
+// --------------------------------------------------------------------------
 std::auto_ptr<BackupStoreRefCountDatabase>
 BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t AccountID)
 {
@@ -191,16 +296,17 @@ BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t Account
 	DatabaseFile->Write(&hdr, sizeof(hdr));
 
 	// Make new object
-	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
-		new BackupStoreRefCountDatabase(Filename, AccountID,
+	BackupStoreRefCountDatabaseImpl* p_impl = new BackupStoreRefCountDatabaseImpl(
+		Filename, AccountID,
 		false, // ReadOnly
 		true, // Temporary
-		DatabaseFile));
+		DatabaseFile);
+	std::auto_ptr<BackupStoreRefCountDatabase> refcount(p_impl);
 
 	// The root directory must always have one reference for a database
 	// to be valid, so set that now on the new database. This will leave
 	// mIsModified set to true.
-	refcount->SetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+	p_impl->SetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
 
 	// return it to caller
 	return refcount;
@@ -224,14 +330,9 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 		rAccount.GetID(), ReadOnly);
 }
 
-std::auto_ptr<BackupStoreRefCountDatabase>
-BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID,
+std::auto_ptr<FileStream> OpenDatabaseFile(const std::string& Filename, int64_t AccountID,
 	bool ReadOnly)
 {
-	// You cannot reopen a temporary database, so it must be the permanent filename,
-	// so no need to append an X to it.
-	ASSERT(Filename.size() > 0 && Filename[Filename.size() - 1] != 'X');
-
 	int flags = ReadOnly ? O_RDONLY : O_RDWR;
 	std::auto_ptr<FileStream> database_file(new FileStream(Filename, flags | O_BINARY));
 
@@ -254,29 +355,62 @@ BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID
 			BadStoreInfoOnLoad);
 	}
 
-	// Make new object
+	return database_file;
+}
+
+
+std::auto_ptr<BackupStoreRefCountDatabase>
+BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID,
+	bool ReadOnly)
+{
+	// You cannot reopen a temporary database, so it must be the permanent filename,
+	// so no need to append an X to it.
+	ASSERT(Filename.size() > 0 && Filename[Filename.size() - 1] != 'X');
+
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
-		new BackupStoreRefCountDatabase(Filename, AccountID, ReadOnly,
+		new BackupStoreRefCountDatabaseImpl(Filename, AccountID, ReadOnly,
 			false, // Temporary
-			database_file));
+			OpenDatabaseFile(Filename, AccountID, ReadOnly)));
 
 	// return it to caller
 	return refcount;
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreRefCountDatabase::GetRefCount(int64_t
+//		Name:    BackupStoreRefCountDatabaseImpl::Reopen()
+//		Purpose: Reopen a previously-opened and then closed refcount
+//			 database.
+//		Created: 2016/04/25
+//
+// --------------------------------------------------------------------------
+void BackupStoreRefCountDatabaseImpl::Reopen()
+{
+	ASSERT(!mapDatabaseFile.get());
+
+	// You cannot reopen a temporary database, so it must be the permanent filename,
+	// so no need to append an X to it.
+	ASSERT(mFilename.size() > 0 && mFilename[mFilename.size() - 1] != 'X');
+
+	mapDatabaseFile = OpenDatabaseFile(mFilename, mAccountID, mReadOnly);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreRefCountDatabaseImpl::GetRefCount(int64_t
 //			 ObjectID)
 //		Purpose: Get the number of references to the specified object
 //			 out of the database
 //		Created: 2009/06/01
 //
 // --------------------------------------------------------------------------
-BackupStoreRefCountDatabase::refcount_t
-BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
+refcount_t BackupStoreRefCountDatabaseImpl::GetRefCount(int64_t ObjectID) const
 {
+	ASSERT(mapDatabaseFile.get());
 	IOStream::pos_type offset = GetOffset(ObjectID);
 
 	if (GetSize() < offset + GetEntrySize())
@@ -301,13 +435,13 @@ BackupStoreRefCountDatabase::GetRefCount(int64_t ObjectID) const
 	return ntohl(refcount);
 }
 
-int64_t BackupStoreRefCountDatabase::GetLastObjectIDUsed() const
+int64_t BackupStoreRefCountDatabaseImpl::GetLastObjectIDUsed() const
 {
 	return (GetSize() - sizeof(refcount_StreamFormat)) /
 		sizeof(refcount_t);
 }
 
-void BackupStoreRefCountDatabase::AddReference(int64_t ObjectID)
+void BackupStoreRefCountDatabaseImpl::AddReference(int64_t ObjectID)
 {
 	refcount_t refcount;
 
@@ -327,9 +461,10 @@ void BackupStoreRefCountDatabase::AddReference(int64_t ObjectID)
 	SetRefCount(ObjectID, refcount);
 }
 
-void BackupStoreRefCountDatabase::SetRefCount(int64_t ObjectID,
+void BackupStoreRefCountDatabaseImpl::SetRefCount(int64_t ObjectID,
 	refcount_t NewRefCount)
 {
+	ASSERT(mapDatabaseFile.get());
 	IOStream::pos_type offset = GetOffset(ObjectID);
 	mapDatabaseFile->Seek(offset, SEEK_SET);
 	refcount_t RefCountNetOrder = htonl(NewRefCount);
@@ -337,7 +472,7 @@ void BackupStoreRefCountDatabase::SetRefCount(int64_t ObjectID,
 	mIsModified = true;
 }
 
-bool BackupStoreRefCountDatabase::RemoveReference(int64_t ObjectID)
+bool BackupStoreRefCountDatabaseImpl::RemoveReference(int64_t ObjectID)
 {
 	refcount_t refcount = GetRefCount(ObjectID); // must exist in database
 	ASSERT(refcount > 0);
@@ -346,7 +481,7 @@ bool BackupStoreRefCountDatabase::RemoveReference(int64_t ObjectID)
 	return (refcount > 0);
 }
 
-int BackupStoreRefCountDatabase::ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs)
+int BackupStoreRefCountDatabaseImpl::ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs)
 {
 	int ErrorCount = 0;
 	int64_t MaxOldObjectId = rOldRefs.GetLastObjectIDUsed();
@@ -356,7 +491,6 @@ int BackupStoreRefCountDatabase::ReportChangesTo(BackupStoreRefCountDatabase& rO
 		ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
 		ObjectID++)
 	{
-		typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
 		refcount_t OldRefs = (ObjectID <= MaxOldObjectId) ?
 			rOldRefs.GetRefCount(ObjectID) : 0;
 		refcount_t NewRefs = (ObjectID <= MaxNewObjectId) ?

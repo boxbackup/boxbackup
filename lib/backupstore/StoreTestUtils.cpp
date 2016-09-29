@@ -16,6 +16,7 @@
 #include "BackupAccountControl.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
+#include "BackupStoreCheck.h"
 #include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreInfo.h"
@@ -122,19 +123,13 @@ std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
 	return protocol;
 }
 
-bool check_num_files(int files, int old, int deleted, int dirs)
+bool check_num_files(BackupFileSystem& fs, int files, int old, int deleted, int dirs)
 {
-	RaidBackupFileSystem fs("backup/01234567/", 0);
-	std::auto_ptr<BackupStoreInfo> apInfo =
-		fs.GetBackupStoreInfo(0x01234567, true); // !ReadOnly
-	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(),
-		"current files");
-	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(),
-		"old files");
-	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(),
-		"deleted files");
-	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(),
-		"directories");
+	std::auto_ptr<BackupStoreInfo> apInfo = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(), "current files");
+	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(), "old files");
+	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(), "deleted files");
+	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(), "directories");
 
 	return (files == apInfo->GetNumCurrentFiles() &&
 		old == apInfo->GetNumOldFiles() &&
@@ -170,6 +165,12 @@ bool change_account_limits(const char* soft, const char* hard)
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
 	BackupStoreAccountControl control(*config, 0x01234567);
+	return change_account_limits(control, soft, hard);
+}
+
+bool change_account_limits(BackupAccountControl& control, const char* soft,
+	const char* hard)
+{
 	int result = control.SetLimit(soft, hard);
 	TEST_EQUAL(0, result);
 	return (result == 0);
@@ -177,36 +178,55 @@ bool change_account_limits(const char* soft, const char* hard)
 
 int check_account_for_errors(Log::Level log_level)
 {
-	Logger::LevelGuard guard(Logging::GetConsole(), log_level);
-	Logging::Tagger tag("check fix", true);
-	Logging::ShowTagOnConsole show;
+	// TODO FIXME remove this backward-compatibility function
 	std::string errs;
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify("testfiles/bbstored.conf",
 			&BackupConfigFileVerify, errs));
+	TEST_EQUAL(0, errs.size());
+
 	BackupStoreAccountControl control(*config, 0x01234567);
-	int errors_fixed = control.CheckAccount(
-		true, // FixErrors
-		false, // Quiet
-		true); // ReturnNumErrorsFound
-	return errors_fixed;
+	return check_account_for_errors(control.GetFileSystem(), log_level);
 }
 
-bool check_account(Log::Level log_level)
+int check_account_for_errors(BackupFileSystem& filesystem, Log::Level log_level)
 {
-	int errors_fixed = check_account_for_errors(log_level);
-	TEST_EQUAL(0, errors_fixed);
-	return (errors_fixed == 0);
+	Logger::LevelGuard guard(Logging::GetConsole(), log_level);
+	Logging::Tagger tag("check fix", true);
+	Logging::ShowTagOnConsole show;
+
+	// The caller may already have opened a permanent read-write database, but
+	// BackupStoreCheck needs to open a temporary one, so we need to close the
+	// permanent one in that case.
+	if(filesystem.GetCurrentRefCountDatabase() &&
+		!filesystem.GetCurrentRefCountDatabase()->IsReadOnly())
+	{
+		filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+	}
+
+	filesystem.TryGetLock();
+	BackupStoreCheck check(filesystem,
+		true, // FixErrors
+		false); // Quiet
+	check.Check();
+	return check.GetNumErrorsFound();
 }
 
 int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 {
+	// TODO FIXME remove this backward-compatibility function
 	std::string rootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
 	int discSet = rAccount.GetDiscSet();
+	RaidBackupFileSystem fs(rAccount.GetID(), rootDir, discSet);
 
 	// Do housekeeping on this account
-	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
-		discSet, NULL);
+	return run_housekeeping(fs);
+}
+
+int64_t run_housekeeping(BackupFileSystem& filesystem)
+{
+	// Do housekeeping on this account
+	HousekeepStoreAccount housekeeping(filesystem, NULL);
 	housekeeping.DoHousekeeping(true /* keep trying forever */);
 	return housekeeping.GetErrorCount();
 }
@@ -218,24 +238,41 @@ int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 
 bool run_housekeeping_and_check_account()
 {
-	int error_count;
+	// TODO FIXME remove this backward-compatibility function
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify("testfiles/bbstored.conf",
+			&BackupConfigFileVerify, errs));
+	TEST_EQUAL(0, errs.size());
+
+	BackupStoreAccountControl control(*config, 0x01234567);
+	return run_housekeeping_and_check_account(control.GetFileSystem());
+}
+
+bool run_housekeeping_and_check_account(BackupFileSystem& filesystem)
+{
+	if(filesystem.GetCurrentRefCountDatabase() != NULL)
+	{
+		filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+	}
+
+	int num_housekeeping_errors;
 
 	{
 		Logging::Tagger tag("", true);
 		Logging::ShowTagOnConsole show;
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-		error_count = run_housekeeping(account);
+		num_housekeeping_errors = run_housekeeping(filesystem);
 	}
+	TEST_EQUAL_LINE(0, num_housekeeping_errors, "run_housekeeping");
 
-	TEST_EQUAL_LINE(0, error_count, "housekeeping errors");
+	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
 
-	bool check_account_is_ok = check_account();
-	TEST_THAT(check_account_is_ok);
+	int num_check_errors = check_account_for_errors(filesystem);
+	TEST_EQUAL_LINE(0, num_check_errors, "check_account_for_errors");
 
-	return error_count == 0 && check_account_is_ok;
+	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+
+	return num_housekeeping_errors == 0 && num_check_errors == 0;
 }
 
 bool check_reference_counts()
@@ -245,20 +282,25 @@ bool check_reference_counts()
 	BackupStoreAccountDatabase::Entry account =
 		apAccounts->GetEntry(0x1234567);
 
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
-		BackupStoreRefCountDatabase::Load(account, true));
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
+		BackupStoreRefCountDatabase::Load(account, true);
 	TEST_EQUAL(ExpectedRefCounts.size(),
 		apReferences->GetLastObjectIDUsed() + 1);
 
+	return check_reference_counts(*apReferences);
+}
+
+bool check_reference_counts(BackupStoreRefCountDatabase& references)
+{
 	bool counts_ok = true;
 
 	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
 		i < ExpectedRefCounts.size(); i++)
 	{
 		TEST_EQUAL_LINE(ExpectedRefCounts[i],
-			apReferences->GetRefCount(i),
+			references.GetRefCount(i),
 			"object " << BOX_FORMAT_OBJECTID(i));
-		if (ExpectedRefCounts[i] != apReferences->GetRefCount(i))
+		if (ExpectedRefCounts[i] != references.GetRefCount(i))
 		{
 			counts_ok = false;
 		}

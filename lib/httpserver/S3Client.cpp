@@ -14,6 +14,9 @@
 // #include <cstdio>
 // #include <ctime>
 
+#include <boost/foreach.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 #include <openssl/hmac.h>
 
 #include "HTTPRequest.h"
@@ -27,6 +30,123 @@
 #include "encode.h"
 
 #include "MemLeakFindOn.h"
+
+using boost::property_tree::ptree;
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Client::ListBucket(const std::string& prefix,
+//			 const std::string& delimiter,
+//			 std::vector<S3Client::BucketEntry>* p_contents_out,
+//			 std::vector<std::string>* p_common_prefixes_out,
+//			 bool* p_truncated_out, int max_keys,
+//			 const std::string& marker)
+//		Purpose: Retrieve a list of objects in a bucket, with a
+//			 common prefix, optionally starting from a specified
+//			 marker, up to some limit. The entries, and common
+//			 prefixes of entries containing the specified
+//			 delimiter, will be appended to p_contents_out and
+//			 p_common_prefixes_out. Returns the number of items
+//			 appended (p_contents_out + p_common_prefixes_out),
+//			 which may be 0 if there is nothing left to iterate
+//			 over, or no matching files in the bucket.
+//		Created: 18/03/2016
+//
+// --------------------------------------------------------------------------
+
+int S3Client::ListBucket(std::vector<S3Client::BucketEntry>* p_contents_out,
+	std::vector<std::string>* p_common_prefixes_out,
+	const std::string& prefix, const std::string& delimiter,
+	bool* p_truncated_out, int max_keys, const std::string& marker)
+{
+	HTTPRequest request(HTTPRequest::Method_GET, "/");
+	request.SetParameter("delimiter", delimiter);
+	request.SetParameter("prefix", prefix);
+	request.SetParameter("marker", marker);
+	if(max_keys != -1)
+	{
+		std::ostringstream max_keys_stream;
+		max_keys_stream << max_keys;
+		request.SetParameter("max-keys", max_keys_stream.str());
+	}
+
+	HTTPResponse response = FinishAndSendRequest(request);
+	CheckResponse(response, "Failed to list files in bucket");
+	ASSERT(response.GetResponseCode() == HTTPResponse::Code_OK);
+
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	std::auto_ptr<std::istringstream> ap_response_stream(
+		new std::istringstream(response_data));
+
+	ptree response_tree;
+	read_xml(*ap_response_stream, response_tree,
+		boost::property_tree::xml_parser::trim_whitespace);
+
+	if(response_tree.begin()->first != "ListBucketResult")
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+			"Failed to list files in bucket: unexpected root element in "
+			"response: " << response_tree.begin()->first);
+	}
+
+	if(++(response_tree.begin()) != response_tree.end())
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+			"Failed to list files in bucket: multiple root elements in "
+			"response: " << (++(response_tree.begin()))->first);
+	}
+
+	ptree result = response_tree.get_child("ListBucketResult");
+	ASSERT(result.get<std::string>("Delimiter") == delimiter);
+	ASSERT(result.get<std::string>("Prefix") == prefix);
+	ASSERT(result.get<std::string>("Marker") == marker);
+
+	std::string truncated = result.get<std::string>("IsTruncated");
+	ASSERT(truncated == "true" || truncated == "false");
+	if(p_truncated_out)
+	{
+		*p_truncated_out = (truncated == "true");
+	}
+
+	int num_results = 0;
+
+	// Iterate over all the children of the ListBucketResult, looking for
+	// nodes called "Contents", and examine them.
+	BOOST_FOREACH(ptree::value_type &v, result)
+	{
+		if(v.first == "Contents")
+		{
+			std::string name = v.second.get<std::string>("Key");
+			std::string etag = v.second.get<std::string>("ETag");
+			std::string size = v.second.get<std::string>("Size");
+			char* size_end_ptr;
+			int64_t size_int = strtoull(size.c_str(), &size_end_ptr, 10);
+			if(*size_end_ptr != 0)
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+					"Failed to list files in bucket: bad size in "
+					"contents: " << size);
+			}
+
+			p_contents_out->push_back(BucketEntry(name, etag, size_int));
+			num_results++;
+		}
+	}
+
+	ptree common_prefixes = result.get_child("CommonPrefixes");
+	BOOST_FOREACH(ptree::value_type &v, common_prefixes)
+	{
+		if(v.first == "Prefix")
+		{
+			p_common_prefixes_out->push_back(v.second.data());
+			num_results++;
+		}
+	}
+
+	return num_results;
+}
 
 // --------------------------------------------------------------------------
 //
@@ -126,11 +246,32 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	const std::string& rRequestURI, IOStream* pStreamToSend,
 	const char* pStreamContentType, const std::string& MD5Checksum)
 {
+	// It's very unlikely that you want to request a URI from Amazon S3 servers
+	// that doesn't start with a /. Very very unlikely.
+	ASSERT(rRequestURI[0] == '/');
 	HTTPRequest request(Method, rRequestURI);
-	request.SetHostName(mHostName);
+	return FinishAndSendRequest(request, pStreamToSend, pStreamContentType, MD5Checksum);
+}
 
+HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStreamToSend,
+	const char* pStreamContentType, const std::string& MD5Checksum)
+{
+	std::string virtual_host_name;
+
+	if(!mVirtualHostName.empty())
+	{
+		virtual_host_name = mVirtualHostName;
+	}
+	else
+	{
+		virtual_host_name = mHostName;
+	}
+
+	bool with_parameters_for_get_request = (
+		request.GetMethod() == HTTPRequest::Method_GET ||
+		request.GetMethod() == HTTPRequest::Method_HEAD);
 	BOX_TRACE("S3Client: " << mHostName << " > " << request.GetMethodName() <<
-		" " << rRequestURI);
+	" " << request.GetRequestURI(with_parameters_for_get_request));
 
 	std::ostringstream date;
 	time_t tt = time(NULL);
@@ -164,15 +305,16 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 			std::string("\"") + MD5Checksum + "\"");
 	}
 
+	request.SetHostName(virtual_host_name);
 	std::string s3suffix = ".s3.amazonaws.com";
 	std::string bucket;
-	if (mHostName.size() > s3suffix.size())
+	if (virtual_host_name.size() > s3suffix.size())
 	{
-		std::string suffix = mHostName.substr(mHostName.size() -
+		std::string suffix = virtual_host_name.substr(virtual_host_name.size() -
 			s3suffix.size(), s3suffix.size());
 		if (suffix == s3suffix)
 		{
-			bucket = mHostName.substr(0, mHostName.size() -
+			bucket = virtual_host_name.substr(0, virtual_host_name.size() -
 				s3suffix.size());
 		}
 	}
@@ -330,13 +472,22 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 //
 // --------------------------------------------------------------------------
 
-void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message) const
+void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message,
+	bool ExpectNoContent) const
 {
-	if(response.GetResponseCode() != HTTPResponse::Code_OK)
+	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
 	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, FileNotFound,
+			message << ": " << response.ResponseCodeString());
+	}
+	else if(response.GetResponseCode() !=
+		(ExpectNoContent ? HTTPResponse::Code_NoContent : HTTPResponse::Code_OK))
+	{
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
 		THROW_EXCEPTION_MESSAGE(HTTPException, RequestFailedUnexpectedly,
-			message << ": " <<
-			HTTPResponse::ResponseCodeToString(response.GetResponseCode()));
+			message << ": " << response.ResponseCodeString() << ":\n" <<
+			response_data);
 	}
 }
 

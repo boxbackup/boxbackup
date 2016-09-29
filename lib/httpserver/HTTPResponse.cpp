@@ -110,7 +110,7 @@ const char *HTTPResponse::ResponseCodeToString(int ResponseCode)
 	case Code_Found: return "302 Found"; break;
 	case Code_NotModified: return "304 Not Modified"; break;
 	case Code_TemporaryRedirect: return "307 Temporary Redirect"; break;
-	case Code_MethodNotAllowed: return "400 Method Not Allowed"; break;
+	case Code_BadRequest: return "400 Bad Request"; break;
 	case Code_Unauthorized: return "401 Unauthorized"; break;
 	case Code_Forbidden: return "403 Forbidden"; break;
 	case Code_NotFound: return "404 Not Found"; break;

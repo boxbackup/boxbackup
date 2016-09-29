@@ -493,7 +493,10 @@ int test(int argc, const char *argv[])
 					BackupStoreDirectory::Entry *en = dir.FindEntryByID(test_files[f].IDOnServer);
 					if(en == 0)
 					{
-						TEST_THAT(test_files[f].HasBeenDeleted);
+						TEST_THAT_LINE(test_files[f].HasBeenDeleted,
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") was unexpectedly deleted by housekeeping");
 						// check that unreferenced
 						// object was removed by
 						// housekeeping
@@ -516,7 +519,11 @@ int test(int argc, const char *argv[])
 					{
 						TEST_THAT(!test_files[f].HasBeenDeleted);
 						TEST_THAT(en->GetDependsNewer() == test_files[f].DepNewer);
-						TEST_THAT(en->GetDependsOlder() == test_files[f].DepOlder);
+						TEST_EQUAL_LINE(test_files[f].DepOlder, en->GetDependsOlder(),
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") has different dependencies than "
+							"expected after housekeeping");
 						// Test that size is plausible
 						if(en->GetDependsNewer() == 0)
 						{

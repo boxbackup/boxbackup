@@ -31,8 +31,7 @@ public:
 	bool TryAndGetLock(const std::string& rFilename, int mode = 0755);
 	bool GotLock() {return mFileDescriptor != -1;}
 	void ReleaseLock();
-	
-	
+
 private:
 	int mFileDescriptor;
 	std::string mFileName;

@@ -172,16 +172,12 @@ extern std::map<std::string, std::string> s_test_status;
 	\
 	if(_exp_str != _found_str) \
 	{ \
-		std::ostringstream _ossl; \
-		_ossl << _line; \
-		std::string _line_str = _ossl.str(); \
-		printf("Expected <%s> but found <%s> in <%s>\n", \
-			_exp_str.c_str(), _found_str.c_str(), _line_str.c_str()); \
-		\
 		std::ostringstream _oss3; \
-		_oss3 << #_found << " != " << #_expected << " in " << _line; \
-		\
-		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
+		_oss3 << #_found << " != " << #_expected << ": " \
+			"expected <" << _exp_str << "> " \
+			"but found <" << _found_str << "> " \
+			"in <" << _line << ">"; \
+		TEST_FAIL_WITH_MESSAGE(_oss3.str()); \
 	} \
 }
 

@@ -222,7 +222,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 		"(name=" << rContext.GetAccountName() << ")");
 
 	// Let the context know about it
-	rContext.ReceivedFinishCommand();
+	rContext.CleanUp();
 
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolFinished);
 }
@@ -344,16 +344,23 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObject::DoCommand(BackupPr
 std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
+	std::auto_ptr<IOStream> stream;
 
-	// Check the objects exist
-	if(!rContext.ObjectExists(mObjectID)
-		|| !rContext.ObjectExists(mInDirectory))
+	try
 	{
-		return PROTOCOL_ERROR(Err_DoesNotExist);
+		stream = rContext.GetFile(mObjectID, mInDirectory);
 	}
-
-	std::auto_ptr<IOStream> stream =
-		rContext.GetFile(mObjectID, mInDirectory);
+	catch(BackupStoreException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, BackupStoreException, ObjectDoesNotExist))
+		{
+			return PROTOCOL_ERROR(Err_DoesNotExist);
+		}
+		else
+		{
+			throw;
+		}
+	}
 
 	// Stream the reordered stream to the peer
 	rProtocol.SendStreamAfterCommand(stream);

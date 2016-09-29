@@ -999,7 +999,8 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 //
 // Function
 //		Name:    BackupStoreFile::DecodedStream::Read(void *, int, int)
-//		Purpose: As interface. Reads decrpyted data.
+//		Purpose: An interface to read decrypted data from an
+//			 encrypted file stream.
 //		Created: 9/12/03
 //
 // --------------------------------------------------------------------------

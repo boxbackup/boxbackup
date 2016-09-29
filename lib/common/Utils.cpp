@@ -107,11 +107,18 @@ bool EndsWith(const std::string& suffix, const std::string& haystack)
 		haystack.substr(haystack.size() - suffix.size()) == suffix;
 }
 
-std::string RemovePrefix(const std::string& prefix, const std::string& haystack)
+std::string RemovePrefix(const std::string& prefix, const std::string& haystack,
+	bool force)
 {
 	if(StartsWith(prefix, haystack))
 	{
 		return haystack.substr(prefix.size());
+	}
+	else if(force)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"String '" << haystack << "' was expected to start with prefix "
+			"'" << prefix << "', but did not.");
 	}
 	else
 	{
@@ -119,11 +126,18 @@ std::string RemovePrefix(const std::string& prefix, const std::string& haystack)
 	}
 }
 
-std::string RemoveSuffix(const std::string& suffix, const std::string& haystack)
+std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
+	bool force)
 {
 	if(EndsWith(suffix, haystack))
 	{
 		return haystack.substr(0, haystack.size() - suffix.size());
+	}
+	else if(force)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"String '" << haystack << "' was expected to end with suffix "
+			"'" << suffix << "', but did not.");
 	}
 	else
 	{
@@ -139,7 +153,7 @@ static std::string demangle(const std::string& mangled_name)
 	char buffer[1024];
 	int status;
 	size_t length = sizeof(buffer);
-	
+
 	char* result = abi::__cxa_demangle(mangled_name.c_str(),
 		buffer, &length, &status);
 
@@ -249,20 +263,20 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 		}
 	}
 
-	// is it a file?	
-	if((st.st_mode & S_IFDIR) == 0)
+	// is it a file?
+	if(!S_ISDIR(st.st_mode))
 	{
-		if(TreatLinksAsNotExisting && ((st.st_mode & S_IFLNK) != 0))
+		if(TreatLinksAsNotExisting && S_ISLNK(st.st_mode))
 		{
 			return false;
 		}
-	
+
 		// Yes. Tell caller the size?
 		if(pFileSize != 0)
 		{
 			*pFileSize = st.st_size;
 		}
-	
+
 		return true;
 	}
 	else
@@ -279,7 +293,7 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-int ObjectExists(const std::string& rFilename)
+object_exists_t ObjectExists(const std::string& rFilename)
 {
 	EMU_STRUCT_STAT st;
 	if(EMU_STAT(rFilename.c_str(), &st) != 0)
@@ -331,7 +345,7 @@ std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 	bool MachineReadable)
 {
 	std::ostringstream result;
-	
+
 
 	if (MachineReadable)
 	{
@@ -353,14 +367,14 @@ std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 			bar[l] = ' ';
 		}
 		bar[sizeof(bar)-1] = '\0';
-		
+
 		result << std::fixed <<
 			std::setw(10) << Blocks << " blocks, " <<
 			std::setw(10) << HumanReadableSize(Bytes) << ", " << 
 			std::setw(3) << std::setprecision(0) <<
 			((Bytes*100)/Max) << "% |" << bar << "|";
 	}
-	
+
 	return result.str();
 }
 
@@ -390,7 +404,7 @@ std::string BoxGetTemporaryDirectoryName()
 	DWORD dwRetVal;
 	char lpPathBuffer[1024];
 	DWORD dwBufSize = sizeof(lpPathBuffer);
-	
+
 	// Get the temp path.
 	dwRetVal = GetTempPath(dwBufSize,     // length of the buffer
 						   lpPathBuffer); // buffer for path 
@@ -398,11 +412,11 @@ std::string BoxGetTemporaryDirectoryName()
 	{
 		THROW_EXCEPTION(CommonException, TempDirPathTooLong)
 	}
-	
+
 	return std::string(lpPathBuffer);
 #elif defined TEMP_DIRECTORY_NAME
 	return std::string(TEMP_DIRECTORY_NAME);
-#else	
+#else
 	#error non-static temporary directory names not supported yet
 #endif
 }
@@ -446,4 +460,6 @@ std::map<std::string, str_pair_t> compare_str_maps(const str_map_t& expected,
 
 	return differences;
 }
+
+
 

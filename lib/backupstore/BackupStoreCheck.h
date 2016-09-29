@@ -75,7 +75,7 @@ typedef int64_t BackupStoreCheck_Size_t;
 class BackupStoreCheck
 {
 public:
-	BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNumber, int32_t AccountID, bool FixErrors, bool Quiet);
+	BackupStoreCheck(BackupFileSystem& rFileSystem, bool FixErrors, bool Quiet);
 	~BackupStoreCheck();
 
 private:
@@ -129,7 +129,7 @@ private:
 	// Checking functions
 	int64_t CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName);
 	void CheckObjectsDir(int64_t StartID);
-	bool CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
+	object_exists_t CheckAndAddObject(int64_t ObjectID);
 	bool CheckDirectory(BackupStoreDirectory& dir);
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, bool& rIsModified);
@@ -172,8 +172,6 @@ private:
 #endif
 
 private:
-	std::string mStoreRoot;
-	int mDiscSetNumber;
 	int32_t mAccountID;
 	std::string mAccountName;
 	bool mFixErrors;
@@ -201,9 +199,9 @@ private:
 	std::set<BackupStoreCheck_ID_t> mDirsAdded;
 
 	// The refcount database, being reconstructed as the check/fix progresses
-	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
+	BackupStoreRefCountDatabase* mpNewRefs;
 	// Abstracted interface to software-RAID filesystem
-	RaidBackupFileSystem mFileSystem;
+	BackupFileSystem& mrFileSystem;
 
 	// Misc stuff
 	int32_t mLostDirNameSerial;
@@ -219,6 +217,7 @@ private:
 	int64_t mNumOldFiles;
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;
+	int mTimeout;
 };
 
 #endif // BACKUPSTORECHECK__H

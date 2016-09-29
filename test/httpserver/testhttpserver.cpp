@@ -37,6 +37,7 @@
 #include "ServerControl.h"
 #include "SimpleDBClient.h"
 #include "Test.h"
+#include "ZeroStream.h"
 #include "decode.h"
 #include "encode.h"
 
@@ -139,28 +140,39 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 TestWebServer::TestWebServer() {}
 TestWebServer::~TestWebServer() {}
 
+std::vector<std::string> get_entry_names(const std::vector<S3Client::BucketEntry> entries)
+{
+	std::vector<std::string> entry_names;
+	for(std::vector<S3Client::BucketEntry>::const_iterator i = entries.begin();
+		i != entries.end(); i++)
+	{
+		entry_names.push_back(i->name());
+	}
+	return entry_names;
+}
+
 bool exercise_s3client(S3Client& client)
 {
-	bool success = true;
+	int num_failures_initial = num_failures;
 
 	HTTPResponse response = client.GetObject("/photos/puppy.jpg");
-	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
+	TEST_EQUAL(200, response.GetResponseCode());
 	std::string response_data((const char *)response.GetBuffer(),
 		response.GetSize());
-	TEST_EQUAL_OR("omgpuppies!\n", response_data, success = false);
-	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+	TEST_EQUAL("omgpuppies!\n", response_data);
+	TEST_THAT(!response.IsKeepAlive());
 
 	// make sure that assigning to HTTPResponse does clear stream
 	response = client.GetObject("/photos/puppy.jpg");
-	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
+	TEST_EQUAL(200, response.GetResponseCode());
 	response_data = std::string((const char *)response.GetBuffer(),
 		response.GetSize());
-	TEST_EQUAL_OR("omgpuppies!\n", response_data, success = false);
-	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+	TEST_EQUAL("omgpuppies!\n", response_data);
+	TEST_THAT(!response.IsKeepAlive());
 
 	response = client.GetObject("/nonexist");
-	TEST_EQUAL_OR(404, response.GetResponseCode(), success = false);
-	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
+	TEST_EQUAL(404, response.GetResponseCode());
+	TEST_THAT(!response.IsKeepAlive());
 
 	FileStream fs("testfiles/dsfdsfs98.fd");
 	std::string digest;
@@ -174,36 +186,158 @@ bool exercise_s3client(S3Client& client)
 		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
 	}
 
-	TEST_THAT_OR(!FileExists("testfiles/newfile"), success = false);
+	TEST_THAT(!FileExists("testfiles/store/newfile"));
 	response = client.PutObject("/newfile", fs);
-	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
-	TEST_THAT_OR(!response.IsKeepAlive(), success = false);
-	TEST_EQUAL_OR("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"),
-		success = false);
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_THAT(!response.IsKeepAlive());
+	TEST_EQUAL("\"" + digest + "\"",
+		response.GetHeaders().GetHeaderValue("etag", false)); // !required
 
 	// This will fail if the file was created in the wrong place:
-	TEST_THAT_OR(FileExists("testfiles/newfile"), success = false);
+	TEST_THAT(FileExists("testfiles/store/newfile"));
 
 	response = client.GetObject("/newfile");
-	TEST_EQUAL_OR(200, response.GetResponseCode(), success = false);
-	TEST_THAT_OR(fs.CompareWith(response), success = false);
-	TEST_EQUAL_OR("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"),
-		success = false);
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_THAT(fs.CompareWith(response));
+	TEST_EQUAL("\"" + digest + "\"",
+		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+
+	// Test that GET requests set the Content-Length header correctly.
+	int actual_size = TestGetFileSize("testfiles/dsfdsfs98.fd");
+	TEST_THAT(actual_size > 0);
+	TEST_EQUAL(actual_size, response.GetContentLength());
 
 	// Try to get it again, with the etag of the existing copy, and check that we get
 	// a 304 Not Modified response.
 	response = client.GetObject("/newfile", digest);
-	TEST_EQUAL_OR(HTTPResponse::Code_NotModified, response.GetResponseCode(),
-		success = false);
-	TEST_EQUAL_OR(0, response.GetContentLength(), success = false);
-	TEST_EQUAL_OR("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"),
-		success = false);
+	TEST_EQUAL(HTTPResponse::Code_NotModified, response.GetResponseCode());
+
+	// There are no examples for 304 Not Modified responses to requests with
+	// If-None-Match (ETag match) so clients should not depend on this, so the
+	// S3Simulator should return 0 instead of the object size and no ETag, to ensure
+	// that any code which tries to use the Content-Length or ETag of such a response
+	// will fail.
+	TEST_EQUAL(0, response.GetContentLength());
+	TEST_EQUAL("", response.GetHeaders().GetHeaderValue("etag", false)); // !required
+
+	// Test that HEAD requests set the Content-Length header correctly. We need the
+	// actual object size, not 0, despite there being no content in the response.
+	// RFC 2616 section 4.4 says "1.Any response message which "MUST NOT" include a
+	// message-body (such as ... any response to a HEAD request) is always terminated
+	// by the first empty line after the header fields, regardless of the
+	// entity-header fields present in the message... If a Content-Length header field
+	// (section 14.13) is present, its decimal value in OCTETs represents both the
+	// entity-length and the transfer-length."
+	//
+	// Also the Amazon Simple Storage Service API Reference, section "HEAD Object"
+	// examples show the Content-Length being returned as non-zero for a HEAD request,
+	// and ETag being returned too.
+
+	response = client.HeadObject("/newfile");
+	TEST_EQUAL(actual_size, response.GetContentLength());
+	TEST_EQUAL(200, response.GetResponseCode());
+	// We really need the ETag header in response to HEAD requests!
+	TEST_EQUAL("\"" + digest + "\"",
+		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+	// Check that there is NO body. The request should not have been treated as a
+	// GET request!
+	ZeroStream empty(0);
+	TEST_THAT(fs.CompareWith(response));
+
+	// Replace the file contents with a smaller file, check that it works and that
+	// the file is truncated at the end of the new data.
+	CollectInBufferStream test_data;
+	test_data.Write(std::string("hello"));
+	test_data.SetForReading();
+	response = client.PutObject("/newfile", test_data);
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_EQUAL("\"5d41402abc4b2a76b9719d911017c592\"",
+		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+	TEST_EQUAL(5, TestGetFileSize("testfiles/store/newfile"));
 
 	response = client.DeleteObject("/newfile");
-	TEST_EQUAL_OR(HTTPResponse::Code_NoContent, response.GetResponseCode(),
-		success = false);
-	TEST_THAT_OR(!FileExists("testfiles/newfile"), success = false);
-	return success;
+	TEST_EQUAL(HTTPResponse::Code_NoContent, response.GetResponseCode());
+	TEST_THAT(!FileExists("testfiles/store/newfile"));
+
+	// Try uploading a file in a subdirectory, which should create it implicitly
+	// and automatically.
+	TEST_EQUAL(0, ObjectExists("testfiles/store/sub"));
+	TEST_THAT(!FileExists("testfiles/store/sub/newfile"));
+	response = client.PutObject("/sub/newfile", fs);
+	TEST_EQUAL(200, response.GetResponseCode());
+	response = client.GetObject("/sub/newfile");
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_THAT(fs.CompareWith(response));
+	response = client.DeleteObject("/sub/newfile");
+	TEST_EQUAL(HTTPResponse::Code_NoContent, response.GetResponseCode());
+	TEST_THAT(!FileExists("testfiles/store/sub/newfile"));
+
+	// There is no way to explicitly delete a directory either, so we must do that
+	// ourselves
+	TEST_THAT(rmdir("testfiles/store/sub") == 0);
+
+	// Test the ListBucket command.
+	std::vector<S3Client::BucketEntry> actual_contents;
+	std::vector<std::string> actual_common_prefixes;
+	TEST_EQUAL(3, client.ListBucket(&actual_contents, &actual_common_prefixes));
+	std::vector<std::string> actual_entry_names =
+		get_entry_names(actual_contents);
+
+	std::vector<std::string> expected_contents;
+	expected_contents.push_back("dsfdsfs98.fd");
+	TEST_THAT(compare_lists(expected_contents, actual_entry_names));
+
+	std::vector<std::string> expected_common_prefixes;
+	expected_common_prefixes.push_back("photos/");
+	expected_common_prefixes.push_back("subdir/");
+	TEST_THAT(compare_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test that max_keys works.
+	actual_contents.clear();
+	actual_common_prefixes.clear();
+
+	bool is_truncated;
+	TEST_EQUAL(2,
+		client.ListBucket(
+			&actual_contents, &actual_common_prefixes,
+			"", // prefix
+			"/", // delimiter
+			&is_truncated,
+			2)); // max_keys
+
+	TEST_THAT(is_truncated);
+	expected_contents.clear();
+	expected_contents.push_back("dsfdsfs98.fd");
+	actual_entry_names = get_entry_names(actual_contents);
+	TEST_THAT(compare_lists(expected_contents, actual_entry_names));
+
+	expected_common_prefixes.clear();
+	expected_common_prefixes.push_back("photos/");
+	TEST_THAT(compare_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test that marker works.
+	actual_contents.clear();
+	actual_common_prefixes.clear();
+
+	TEST_EQUAL(2,
+		client.ListBucket(
+			&actual_contents, &actual_common_prefixes,
+			"", // prefix
+			"/", // delimiter
+			&is_truncated,
+			2, // max_keys
+			"photos")); // marker
+
+	TEST_THAT(!is_truncated);
+	expected_contents.clear();
+	actual_entry_names = get_entry_names(actual_contents);
+	TEST_THAT(compare_lists(expected_contents, actual_entry_names));
+
+	expected_common_prefixes.push_back("subdir/");
+	TEST_THAT(compare_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test is successful if the number of failures has not increased.
+	return (num_failures == num_failures_initial);
 }
 
 // http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
@@ -245,6 +379,64 @@ std::string generate_query_string(const HTTPRequest& request)
 	}
 
 	return out.str();
+}
+
+// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+std::string calculate_s3_signature(const HTTPRequest& request,
+	const std::string& aws_secret_access_key)
+{
+	// This code is very similar to that in S3Client::FinishAndSendRequest.
+	// TODO FIXME: factor out the common parts.
+
+	std::ostringstream buffer_to_sign;
+	buffer_to_sign << request.GetMethodName() << "\n" <<
+		request.GetHeaders().GetHeaderValue("Content-MD5",
+			false) << "\n" << // !required
+		request.GetContentType() << "\n" <<
+		request.GetHeaders().GetHeaderValue("Date",
+			true) << "\n"; // required
+
+	// TODO FIXME: add support for X-Amz headers (S3 DG page 38)
+
+	std::string bucket;
+	std::string host_header = request.GetHeaders().GetHeaderValue("Host",
+		true); // required
+	std::string s3suffix = ".s3.amazonaws.com";
+	if(host_header.size() > s3suffix.size())
+	{
+		std::string suffix = host_header.substr(host_header.size() -
+			s3suffix.size(), s3suffix.size());
+		if (suffix == s3suffix)
+		{
+			bucket = "/" + host_header.substr(0, host_header.size() -
+				s3suffix.size());
+		}
+	}
+
+	buffer_to_sign << bucket << request.GetRequestURI();
+
+	// TODO FIXME: add support for sub-resources. S3 DG page 36.
+
+	// Thanks to https://gist.github.com/tsupo/112188:
+	unsigned int digest_size;
+	unsigned char digest_buffer[EVP_MAX_MD_SIZE];
+	std::string string_to_sign = buffer_to_sign.str();
+
+	HMAC(EVP_sha1(),
+		aws_secret_access_key.c_str(), aws_secret_access_key.size(),
+		(const unsigned char *)string_to_sign.c_str(), string_to_sign.size(),
+		digest_buffer, &digest_size);
+
+	base64::encoder encoder;
+	std::string digest((const char *)digest_buffer, digest_size);
+	std::string auth_code = encoder.encode(digest);
+
+	if (auth_code[auth_code.size() - 1] == '\n')
+	{
+		auth_code = auth_code.substr(0, auth_code.size() - 1);
+	}
+
+	return auth_code;
 }
 
 // http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
@@ -312,12 +504,9 @@ bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
 	return (response.GetResponseCode() == expected_status_code);
 }
 
-bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
+bool parse_xml_response(HTTPResponse& response, ptree& response_tree,
 	const std::string& expected_root_element)
 {
-	HTTPResponse response;
-	TEST_THAT_OR(send_and_receive(request, response), return false);
-
 	std::string response_data((const char *)response.GetBuffer(),
 		response.GetSize());
 	std::auto_ptr<std::istringstream> ap_response_stream(
@@ -330,6 +519,14 @@ bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
 		"There should only be one item in the response tree root");
 
 	return true;
+}
+
+bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
+	const std::string& expected_root_element)
+{
+	HTTPResponse response;
+	TEST_THAT_OR(send_and_receive(request, response), return false);
+	return parse_xml_response(response, response_tree, expected_root_element);
 }
 
 typedef std::multimap<std::string, std::string> multimap_t;
@@ -401,7 +598,6 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 		"GetAttributesResponse"), return false);
 
 	// Check that all attributes were written correctly
-	std::multimap<std::string, std::string> attributes = const_attributes;
 	TEST_EQUAL_LINE(const_attributes.size(),
 		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size(),
 		"Wrong number of attributes in response");
@@ -409,6 +605,7 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 	bool all_match = (const_attributes.size() ==
 		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size());
 
+	std::multimap<std::string, std::string> attributes = const_attributes;
 	std::multimap<std::string, std::string>::iterator i = attributes.begin();
 	BOOST_FOREACH(ptree::value_type &v,
 		response_tree.get_child(
@@ -435,24 +632,12 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 	return all_match;
 }
 
-int test(int argc, const char *argv[])
+#define EXAMPLE_S3_ACCESS_KEY "0PN5J17HBGZHT7JJ3X82"
+#define EXAMPLE_S3_SECRET_KEY "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o"
+
+bool test_httpserver()
 {
-	if(argc >= 2 && ::strcmp(argv[1], "server") == 0)
-	{
-		// Run a server
-		TestWebServer server;
-		return server.Main("doesnotexist", argc - 1, argv + 1);
-	}
-
-	if(argc >= 2 && ::strcmp(argv[1], "s3server") == 0)
-	{
-		// Run a server
-		S3Simulator server;
-		return server.Main("doesnotexist", argc - 1, argv + 1);
-	}
-
-	TEST_THAT(system("rm -rf *.memleaks testfiles/domains.qdbm testfiles/items.qdbm")
-		== 0);
+	SETUP();
 
 	// Test that HTTPRequest can be written to and read from a stream.
 	{
@@ -461,7 +646,7 @@ int test(int argc, const char *argv[])
 		// Write headers in lower case.
 		request.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("authorization",
-			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
 		request.AddHeader("Content-Type", "text/plain");
 		request.SetClientKeepAliveRequested(true);
 
@@ -494,7 +679,7 @@ int test(int argc, const char *argv[])
 		const HTTPHeaders& headers(request2.GetHeaders());
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT",
 			headers.GetHeaderValue("Date"));
-		TEST_EQUAL("AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
+		TEST_EQUAL("AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
 			headers.GetHeaderValue("Authorization"));
 		TEST_THAT(request2.GetClientKeepAliveRequested());
 
@@ -519,7 +704,7 @@ int test(int argc, const char *argv[])
 		response.SetResponseCode(HTTPResponse::Code_OK);
 		response.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		response.AddHeader("authorization",
-			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
 		response.AddHeader("content-type", "text/perl");
 		fs.CopyStreamTo(response);
 		response.Send();
@@ -530,14 +715,17 @@ int test(int argc, const char *argv[])
 
 		TEST_EQUAL(200, response2.GetResponseCode());
 		TEST_EQUAL("text/perl", response2.GetContentType());
-		// Content-Length was not known when the stream was sent, so it should
-		// be unknown in the received stream too (certainly before it has all
-		// been read!)
+
+		// TODO FIXME: Content-Length was not known when the stream was sent,
+		// so it should be unknown in the received stream too (certainly before
+		// it has all been read!) This is currently wrong because we read the
+		// entire response into memory immediately.
 		TEST_EQUAL(fs.GetPosition(), response2.GetContentLength());
+
 		HTTPHeaders& headers(response2.GetHeaders());
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT",
 			headers.GetHeaderValue("Date"));
-		TEST_EQUAL("AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
+		TEST_EQUAL("AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
 			headers.GetHeaderValue("Authorization"));
 
 		CollectInBufferStream response_data;
@@ -659,6 +847,14 @@ int test(int argc, const char *argv[])
 	TEST_THAT(StopDaemon(pid, "testfiles/httpserver.pid",
 		"generic-httpserver.memleaks", true));
 
+	// Copy testfiles/puppy.jpg to testfiles/store/photos/puppy.jpg
+	{
+		TEST_THAT(::mkdir("testfiles/store/photos", 0755) == 0);
+		FileStream in("testfiles/puppy.jpg", O_RDONLY);
+		FileStream out("testfiles/store/photos/puppy.jpg", O_CREAT | O_WRONLY);
+		in.CopyStreamTo(out);
+	}
+
 	// This is the example from the Amazon S3 Developers Guide, page 31.
 	// Correct, official signature should succeed, with lower-case headers.
 	{
@@ -666,8 +862,11 @@ int test(int argc, const char *argv[])
 		HTTPRequest request(HTTPRequest::Method_GET, "/photos/puppy.jpg");
 		request.SetHostName("johnsmith.s3.amazonaws.com");
 		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		std::string signature = calculate_s3_signature(request,
+			EXAMPLE_S3_SECRET_KEY);
+		TEST_EQUAL(signature, "xXjDGYUmKxnwqr5KXNPGldn5LbA=");
 		request.AddHeader("authorization",
-			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":" + signature);
 
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
@@ -690,7 +889,7 @@ int test(int argc, const char *argv[])
 		request.SetHostName("johnsmith.s3.amazonaws.com");
 		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
 		request.AddHeader("authorization",
-			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=");
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":xXjDGYUmKxnwqr5KXNPGldn5LbB=");
 
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
@@ -708,9 +907,92 @@ int test(int argc, const char *argv[])
 			"<h1>Internal Server Error</h1>\n"
 			"<p>An error occurred while processing the request:</p>\n"
 			"<pre>HTTPException(AuthenticationFailed): "
-			"Authentication code mismatch</pre>\n"
+			"Authentication code mismatch: expected AWS 0PN5J17HBGZHT7JJ3X82"
+			":xXjDGYUmKxnwqr5KXNPGldn5LbA= but received AWS "
+			"0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=</pre>\n"
 			"<p>Please try again later.</p></body>\n"
 			"</html>\n", response_data);
+	}
+
+	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
+	{
+		FileStream in("testfiles/dsfdsfs98.fd", O_RDONLY);
+		FileStream out("testfiles/store/dsfdsfs98.fd", O_CREAT | O_WRONLY);
+		in.CopyStreamTo(out);
+	}
+
+	// Tests for the S3Simulator ListBucket implementation
+	{
+		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
+
+		// List contents of bucket
+		HTTPRequest request(HTTPRequest::Method_GET, "/");
+		request.SetParameter("delimiter", "/");
+		request.SetHostName("johnsmith.s3.amazonaws.com");
+		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		std::string signature = calculate_s3_signature(request,
+			EXAMPLE_S3_SECRET_KEY);
+		request.AddHeader("authorization",
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":" + signature);
+
+		HTTPResponse response;
+		simulator.Handle(request, response);
+		TEST_EQUAL(HTTPResponse::Code_OK, response.GetResponseCode());
+		std::vector<std::string> expected_contents;
+
+		if(response.GetResponseCode() == HTTPResponse::Code_OK)
+		{
+			ptree response_tree;
+			TEST_THAT(parse_xml_response(response, response_tree,
+				"ListBucketResult"));
+			// A response containing a single item should not be truncated!
+			TEST_EQUAL("false",
+				response_tree.get<std::string>(
+					"ListBucketResult.IsTruncated"));
+
+			// Iterate over all the children of the ListBucketResult, looking for
+			// nodes called "Contents", and examine them.
+			std::vector<std::string> contents;
+			BOOST_FOREACH(ptree::value_type &v,
+				response_tree.get_child("ListBucketResult"))
+			{
+				if(v.first == "Contents")
+				{
+					std::string name = v.second.get<std::string>("Key");
+					contents.push_back(name);
+					if(name == "dsfdsfs98.fd")
+					{
+						TEST_EQUAL("&quot;dc3b8c5e57e71d31a0a9d7cbeee2e011&quot;",
+							v.second.get<std::string>("ETag"));
+						TEST_EQUAL("4269", v.second.get<std::string>("Size"));
+					}
+				}
+			}
+
+			expected_contents.push_back("dsfdsfs98.fd");
+			TEST_THAT(compare_lists(expected_contents, contents));
+
+			int num_common_prefixes = 0;
+			BOOST_FOREACH(ptree::value_type &v,
+				response_tree.get_child("ListBucketResult.CommonPrefixes"))
+			{
+				num_common_prefixes++;
+				TEST_EQUAL("Prefix", v.first);
+				std::string expected_name;
+				if(num_common_prefixes == 1)
+				{
+					expected_name = "photos/";
+				}
+				else
+				{
+					expected_name = "subdir/";
+				}
+				TEST_EQUAL_LINE(expected_name, v.second.data(),
+					"line " << num_common_prefixes);
+			}
+			TEST_EQUAL(2, num_common_prefixes);
+		}
 	}
 
 	// S3Client tests with S3Simulator in-process server for debugging
@@ -718,8 +1000,7 @@ int test(int argc, const char *argv[])
 		S3Simulator simulator;
 		simulator.Configure("testfiles/s3simulator.conf");
 		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
-			"0PN5J17HBGZHT7JJ3X82",
-			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
+			EXAMPLE_S3_ACCESS_KEY, EXAMPLE_S3_SECRET_KEY);
 		TEST_THAT(exercise_s3client(client));
 	}
 
@@ -727,9 +1008,13 @@ int test(int argc, const char *argv[])
 		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("authorization",
-			"AWS 0PN5J17HBGZHT7JJ3X82:XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
 		// request.AddHeader("Content-Type", "text/plain");
+
+		std::string signature = calculate_s3_signature(request,
+			EXAMPLE_S3_SECRET_KEY);
+		TEST_EQUAL(signature, "XtMYZf0hdOo4TdPYQknZk0Lz7rw=");
+		request.AddHeader("authorization", "AWS " EXAMPLE_S3_ACCESS_KEY ":" +
+			signature);
 
 		FileStream fs("testfiles/dsfdsfs98.fd");
 		request.SetDataStream(&fs);
@@ -755,9 +1040,9 @@ int test(int argc, const char *argv[])
 		TEST_THAT(!response.IsKeepAlive());
 
 		FileStream f1("testfiles/dsfdsfs98.fd");
-		FileStream f2("testfiles/newfile");
+		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
+		TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
 	}
 
 	// Start the S3Simulator server
@@ -771,7 +1056,7 @@ int test(int argc, const char *argv[])
 		request.SetHostName("johnsmith.s3.amazonaws.com");
 		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
 		request.AddHeader("authorization",
-			"AWS 0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbA=");
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":xXjDGYUmKxnwqr5KXNPGldn5LbA=");
 
 		HTTPResponse response;
 		TEST_THAT(send_and_receive(request, response));
@@ -781,37 +1066,43 @@ int test(int argc, const char *argv[])
 		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:0cSX/YPdtXua1aFFpYmH1tc0ajA=");
 		request.SetClientKeepAliveRequested(true);
+
+		std::string signature = calculate_s3_signature(request,
+			EXAMPLE_S3_SECRET_KEY);
+		TEST_EQUAL(signature, "0cSX/YPdtXua1aFFpYmH1tc0ajA=");
+		request.AddHeader("authorization", "AWS " EXAMPLE_S3_ACCESS_KEY ":" +
+			signature);
 
 		HTTPResponse response;
 		TEST_THAT(send_and_receive(request, response, 404));
 		TEST_THAT(!response.IsKeepAlive());
 	}
 
-	#ifndef WIN32 // much harder to make files inaccessible on WIN32
+#ifndef WIN32 // much harder to make files inaccessible on WIN32
 	// Make file inaccessible, should cause server to return a 403 error,
 	// unless of course the test is run as root :)
 	{
-		TEST_THAT(chmod("testfiles/testrequests.pl", 0) == 0);
-		HTTPRequest request(HTTPRequest::Method_GET,
-			"/testrequests.pl");
+		TEST_THAT(chmod("testfiles/store/dsfdsfs98.fd", 0) == 0);
+		HTTPRequest request(HTTPRequest::Method_GET, "/dsfdsfs98.fd");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
+		request.AddHeader("Authorization", "AWS " EXAMPLE_S3_ACCESS_KEY
+			":NO9tjQuMCK83z2VZFaJOGKeDi7M=");
 		request.SetClientKeepAliveRequested(true);
 
 		HTTPResponse response;
 		TEST_THAT(send_and_receive(request, response, 403));
-		TEST_THAT(chmod("testfiles/testrequests.pl", 0755) == 0);
+		TEST_THAT(chmod("testfiles/store/dsfdsfs98.fd", 0755) == 0);
 	}
-	#endif
+#endif
 
 	{
-		HTTPRequest request(HTTPRequest::Method_GET, "/testrequests.pl");
+		HTTPRequest request(HTTPRequest::Method_GET, "/dsfdsfs98.fd");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:qc1e8u8TVl2BpIxwZwsursIb8U8=");
+		request.AddHeader("Authorization", "AWS " EXAMPLE_S3_ACCESS_KEY
+			":NO9tjQuMCK83z2VZFaJOGKeDi7M=");
 		request.SetClientKeepAliveRequested(true);
 
 		HTTPResponse response;
@@ -827,7 +1118,7 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_THAT(!response.IsKeepAlive());
 
-		FileStream file("testfiles/testrequests.pl");
+		FileStream file("testfiles/dsfdsfs98.fd");
 		TEST_THAT(file.CompareWith(response));
 	}
 
@@ -839,7 +1130,8 @@ int test(int argc, const char *argv[])
 			"/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
-		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:kfY1m6V3zTufRy2kj92FpQGKz4M=");
+		request.AddHeader("Authorization", "AWS " EXAMPLE_S3_ACCESS_KEY
+			":kfY1m6V3zTufRy2kj92FpQGKz4M=");
 		request.AddHeader("Content-Type", "text/plain");
 		FileStream fs("testfiles/dsfdsfs98.fd");
 		HTTPResponse response;
@@ -857,15 +1149,15 @@ int test(int argc, const char *argv[])
 		TEST_THAT(!response.IsKeepAlive());
 
 		FileStream f1("testfiles/dsfdsfs98.fd");
-		FileStream f2("testfiles/newfile");
+		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_THAT(::unlink("testfiles/newfile") == 0);
+		TEST_THAT(::unlink("testfiles/store/newfile") == 0);
 	}
 
 	// S3Client tests with S3Simulator daemon for realism
 	{
-		S3Client client("localhost", 1080, "0PN5J17HBGZHT7JJ3X82",
-			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
+		S3Client client("localhost", 1080, EXAMPLE_S3_ACCESS_KEY,
+			EXAMPLE_S3_SECRET_KEY, "johnsmith.s3.amazonaws.com");
 		TEST_THAT(exercise_s3client(client));
 	}
 
@@ -896,8 +1188,8 @@ int test(int argc, const char *argv[])
 
 	// Test the S3Simulator's implementation of SimpleDB
 	{
-		std::string access_key = "0PN5J17HBGZHT7JJ3X82";
-		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
+		std::string access_key = EXAMPLE_S3_ACCESS_KEY;
+		std::string secret_key = EXAMPLE_S3_SECRET_KEY;
 
 		HTTPRequest request(HTTPRequest::Method_GET, "/");
 		request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
@@ -1103,8 +1395,8 @@ int test(int argc, const char *argv[])
 
 	// Test that SimpleDBClient works the same way.
 	{
-		std::string access_key = "0PN5J17HBGZHT7JJ3X82";
-		std::string secret_key = "uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o";
+		std::string access_key = EXAMPLE_S3_ACCESS_KEY;
+		std::string secret_key = EXAMPLE_S3_SECRET_KEY;
 		SimpleDBClient client(access_key, secret_key, "localhost", 1080,
 			SIMPLEDB_SIMULATOR_HOST);
 
@@ -1240,6 +1532,26 @@ int test(int argc, const char *argv[])
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
 		"s3simulator.memleaks", true));
 
-	return 0;
+	TEARDOWN();
 }
 
+int test(int argc, const char *argv[])
+{
+	if(argc >= 2 && ::strcmp(argv[1], "server") == 0)
+	{
+		// Run a server
+		TestWebServer server;
+		return server.Main("doesnotexist", argc - 1, argv + 1);
+	}
+
+	if(argc >= 2 && ::strcmp(argv[1], "s3server") == 0)
+	{
+		// Run a server
+		S3Simulator server;
+		return server.Main("doesnotexist", argc - 1, argv + 1);
+	}
+
+	TEST_THAT(test_httpserver());
+
+	return finish_test_suite();
+}

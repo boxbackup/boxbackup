@@ -29,10 +29,16 @@ class IOStreamGetLine;
 class HTTPHeaders
 {
 public:
+	enum {
+		DEFAULT_PORT = 80,
+		UNKNOWN_CONTENT_LENGTH = -1,
+	};
+
 	HTTPHeaders()
 	: mKeepAlive(false),
-	  mHostPort(80), // default if not specified
-	  mContentLength(-1)
+	  mHostPort(DEFAULT_PORT), // default if not specified: if you change this,
+	  // remember to change GetHeader("host") as well.
+	  mContentLength(UNKNOWN_CONTENT_LENGTH)
 	{ }
 	virtual ~HTTPHeaders() { }
 	// copying is fine
@@ -42,23 +48,7 @@ public:
 	void AddHeader(const std::string& name, const std::string& value);
 	void WriteTo(IOStream& rOutput, int Timeout) const;
 	typedef std::pair<std::string, std::string> Header;
-	bool GetHeader(const std::string& name, std::string* pValueOut) const
-	{
-		const std::string lc_name = ToLowerCase(name);
-
-		for (std::vector<Header>::const_iterator
-			i  = mExtraHeaders.begin();
-			i != mExtraHeaders.end(); i++)
-		{
-			if (i->first == lc_name)
-			{
-				*pValueOut = i->second;
-				return true;
-			}
-		}
-
-		return false;
-	}
+	bool GetHeader(const std::string& name, std::string* pValueOut) const;
 	std::string GetHeaderValue(const std::string& name, bool required = true) const
 	{
 		std::string value;

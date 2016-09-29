@@ -48,11 +48,16 @@ static const ConfigurationVerifyKey verifyserverkeys[] =
 static const ConfigurationVerifyKey verifys3keys[] =
 {
 	// These values are only required for Amazon S3-compatible stores
+	// HostName is the network address that we will connect to (e.g. localhost).
 	ConfigurationVerifyKey("HostName", ConfigTest_Exists),
 	ConfigurationVerifyKey("Port", ConfigTest_Exists | ConfigTest_IsInt, 80),
 	ConfigurationVerifyKey("BasePath", 0, "/"),
 	ConfigurationVerifyKey("AccessKey", ConfigTest_Exists),
 	ConfigurationVerifyKey("SecretKey", ConfigTest_Exists),
+	// S3VirtualHostName is the Host header that we will send, e.g.
+	// "quotes.s3.amazonaws.com". If missing or empty, HostName will be used as a
+	// default.
+	ConfigurationVerifyKey("S3VirtualHostName", 0, ""),
 	ConfigurationVerifyKey("SimpleDBHostName", 0, "sdb.amazonaws.com"),
 	ConfigurationVerifyKey("SimpleDBPort", ConfigTest_IsInt, 80),
 	ConfigurationVerifyKey("SimpleDBEndpoint", 0, ""),
