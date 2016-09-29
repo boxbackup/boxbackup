@@ -35,7 +35,10 @@
 // in ms
 #define COMMS_READ_TIMEOUT					4
 #define COMMS_SERVER_WAIT_BEFORE_REPLYING	40
-#define SHORT_TIMEOUT 5000
+// Use a longer timeout to give Srv2TestConversations time to write 20 MB to each of
+// three child processes before starting to read it back again, without the children
+// timing out and aborting.
+#define SHORT_TIMEOUT 30000
 
 class basicdaemon : public Daemon
 {
@@ -103,6 +106,12 @@ void testservers_connection(SocketStream &rStream)
 		}
 		if(line == "LARGEDATA")
 		{
+			// This part of the test is timing-sensitive, because we write
+			// 20 MB to the test and then have to wait while it reads 20 MB
+			// from the other two children before writing anything back to us.
+			// We could timeout waiting for it to talk to us again. So we
+			// increased the SHORT_TIMEOUT from 5 seconds to 30 to allow 
+			// more time.
 			{
 				// Send lots of data
 				char data[LARGE_DATA_BLOCK_SIZE];
@@ -339,6 +348,11 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 	{
 		conns[c]->Write("LARGEDATA\n", 10, SHORT_TIMEOUT);
 	}
+	// This part of the test is timing-sensitive, because we read 20 MB from each of
+	// three daemon processes, then write 20 MB to each of them, then read back 
+	// another 20 MB from each of them. Each child could timeout waiting for us to
+	// read from it, or write to it, while we're servicing another child. So we
+	// increased the SHORT_TIMEOUT from 5 seconds to 30 to allow enough time.
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
 		// Receive lots of data
