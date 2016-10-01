@@ -1313,7 +1313,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 
 BOOL AddEventSource
 (
-	LPTSTR pszSrcName, // event source name
+	const std::string& name, // event source name
 	DWORD  dwNum       // number of categories
 )
 {
@@ -1335,7 +1335,7 @@ BOOL AddEventSource
 
 	std::string regkey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\"
 		"Application\\");
-	regkey += pszSrcName; 
+	regkey += name;
  
 	HKEY hk;
 	DWORD dwDisp;
@@ -1448,10 +1448,7 @@ void openlog(const char * daemonName, int, int)
 		gSyslogH = INVALID_HANDLE_VALUE;
 	}
 
-	char* name = strdup(nameStr.c_str());
-	BOOL success = AddEventSource(name, 0);
-	free(name);
-
+	BOOL success = AddEventSource(nameStr, 0);
 	if (!success)
 	{
 		::syslog(LOG_ERR, "Failed to add our own event source");

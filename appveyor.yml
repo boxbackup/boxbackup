@@ -40,80 +40,37 @@ init:
 
 build:
   parallel: true
-  project: infrastructure/cmake/build/BoxBackup.sln
+  project: ..\cmake\BoxBackup_Windows.sln
+  verbosity: quiet
 
 install:
-  # Show compiled files restored from cache
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\bin_bbackupd.dir
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\bin_bbackupd.dir\%CONFIGURATION%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%\%CONFIGURATION%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%\%CONFIGURATION%\ALL_BUILD
-
-  - cinst strawberryperl 7zip.commandline cmake
-
-  # - dir "C:\Program Files\Microsoft SDKs\Windows"
-  # - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1"
-  # - dir "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin"
+  # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
+  - cinst -y --limit-output 7zip.commandline
+  # Install cmake.portable instead of cmake, to get it on the path again:
+  # http://disq.us/p/xdknrt
+  - dir "c:\Program Files"
+  - dir "c:\Program Files (x86)"
+  # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
+  # If you are doing this on a fresh box for development, you would probably want to
+  # install Chocolatey and then run:
+  # cinst -y cmake strawberryperl git vim visualstudio2012wdx
 
   - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
-
   - cd %APPVEYOR_BUILD_FOLDER%\..
-  - if not exist zlib128.zip appveyor DownloadFile "http://zlib.net/zlib128.zip"
-  - 7za x -aoa zlib128.zip
-  - cd zlib-1.2.8
-  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\zlib-%PLATFORM%" .
-  # We need to build both versions, debug and release, because cmake requires both to be
-  # present to generate its multi-configuration project files for Visual Studio/MSBuild.
-  - msbuild INSTALL.vcxproj /m /p:Configuration=Debug   /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild INSTALL.vcxproj /m /p:Configuration=Release /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if not exist cmake md cmake
+  - cd cmake
+  # We need to specify the generator here, in case the user has more than one installed.
+  # CMake always seems to default to the latest version of Visual Studio, not the one on
+  # the current PATH.
+  - cmake -G "%Generator%" -A %PLATFORM% %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
-  - cd %APPVEYOR_BUILD_FOLDER%\..
-  - if not exist openssl-%OPENSSL_VERSION%.tar.gz appveyor DownloadFile "https://www.openssl.org/source/openssl-%OPENSSL_VERSION%.tar.gz"
-  - 7za x -aoa openssl-%OPENSSL_VERSION%.tar.gz
-  - 7za x -aoa openssl-%OPENSSL_VERSION%.tar
-  - cd openssl-%OPENSSL_VERSION%
-  - perl Configure debug-VC-WIN32 no-asm --prefix="%APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%"
-  - ms\do_ms
-  - nmake /s /f ms\nt.mak
-  - nmake /s /f ms\nt.mak install
-
-  - cd %APPVEYOR_BUILD_FOLDER%\..
-  - if not exist pcre-%PCRE_VERSION%.zip appveyor DownloadFile "http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-%PCRE_VERSION%.zip"
-  - 7za x -aoa pcre-%PCRE_VERSION%.zip
-  - cd %APPVEYOR_BUILD_FOLDER%\..
-  - cd pcre-%PCRE_VERSION%
-  - cmake -G "%Generator%" -A %PLATFORM% -DCMAKE_INSTALL_PREFIX="..\pcre-%PLATFORM%" .
-  - dir
-  # We need to build both versions, debug and release, because cmake requires both to be
-  # present to generate its multi-configuration project files for Visual Studio/MSBuild.
-  - msbuild INSTALL.vcxproj /m /p:Configuration=Debug   /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild INSTALL.vcxproj /m /p:Configuration=Release /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - cd %APPVEYOR_BUILD_FOLDER%\..
-  - dir
-  - dir pcre-%PLATFORM%
-  - dir pcre-%PLATFORM%\bin
-  - dir pcre-%PLATFORM%\lib
-
-  - cd %APPVEYOR_BUILD_FOLDER%
-  - cd infrastructure\cmake\build
-  - cmake -G "%Generator%" -A %PLATFORM% ..
-  - cd %APPVEYOR_BUILD_FOLDER%
-
-  # Show files after build
-  - dir %APPVEYOR_BUILD_FOLDER%\..\zlib-1.2.8
-  - dir %APPVEYOR_BUILD_FOLDER%\..\zlib-%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%OPENSSL_VERSION%
-  - dir %APPVEYOR_BUILD_FOLDER%\..\openssl-%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PCRE_VERSION%
-  - dir %APPVEYOR_BUILD_FOLDER%\..\pcre-%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\bin_bbackupd.dir
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%
-  - dir %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build\%PLATFORM%\%CONFIGURATION%
+  # Leave the current directory in the correct place to find the solution file using its relative path above.
 
 test_script:
-  - cd %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\build
+  - cd %APPVEYOR_BUILD_FOLDER%\..\cmake\src\boxbackup-build
+  # - dir
+  # - dir bin_bbackupd.dir
+  # - dir %PLATFORM%
+  # - dir %PLATFORM%\%CONFIGURATION%
   - ctest -C %CONFIGURATION% -V
 

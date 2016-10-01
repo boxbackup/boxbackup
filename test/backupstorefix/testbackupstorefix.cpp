@@ -19,6 +19,7 @@
 #include "Test.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupProtocol.h"
+#include "BackupStoreAccounts.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
@@ -716,7 +717,15 @@ int test(int argc, const char *argv[])
 		// Temporarily stop the server, so it doesn't repair the refcount error. Except 
 		// on win32, where hard-killing the server can leave a lockfile in place,
 		// breaking the rest of the test.
-#ifndef WIN32
+#ifdef WIN32
+		// Wait for the server to finish housekeeping first, by getting a lock on
+		// the account.
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		BackupStoreAccounts acc(*apAccounts);
+		NamedLock lock;
+		acc.LockAccount(0x1234567, lock);
+#else
 		TEST_THAT(StopServer());
 #endif
 
@@ -768,47 +777,15 @@ int test(int argc, const char *argv[])
 			f.Commit(true /* write now! */);
 		}
 
-#ifndef BOX_RELEASE_BUILD
-		// Delete two of the three raidfiles and their parent
-		// directories. This used to crash bbstoreaccounts check.
-		// We can only do this, without destroying the entire store,
-		// in debug mode, where the store has a far deeper
-		// structure.
-		// This will destroy or damage objects 18-1b and 58-5b,
-		// some repairably.
-		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/o00.rf",
-			"testfiles/0_0/backup/01234567/02/01/o00.rfw") == 0); // 0x18
-		TEST_THAT(rename("testfiles/0_1/backup/01234567/02/01/o01.rf",
-			"testfiles/0_1/backup/01234567/02/01/o01.rfw") == 0); // 0x19
-		//RUN("mv testfiles/0_2/backup/01234567/02/01/o02.rf "
-		//	"testfiles/0_0/backup/01234567/02/01/o02.rfw"); // 0x1a
-		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/o03.rf",
-			"testfiles/0_0/backup/01234567/02/01/o03.rfw") == 0); // 0x1b
-		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/01/o00.rf",
-			"testfiles/0_0/backup/01234567/02/01/01/o00.rfw") == 0); // 0x58
-		TEST_THAT(rename("testfiles/0_1/backup/01234567/02/01/01/o01.rf",
-			"testfiles/0_1/backup/01234567/02/01/01/o01.rfw") == 0); // 0x59
-		//RUN("mv testfiles/0_2/backup/01234567/02/01/01/o02.rf "
-		//	"testfiles/0_0/backup/01234567/02/01/01/o02.rfw"); // 0x5a
-		TEST_THAT(rename("testfiles/0_0/backup/01234567/02/01/01/o03.rf",
-			"testfiles/0_0/backup/01234567/02/01/01/o03.rfw") == 0); // 0x5b
-		// RUN("rm -r testfiles/0_1/backup/01234567/02/01");
-
-# define RUN(x) TEST_THAT(system(x) == 0);
-# ifdef WIN32
-		RUN("rd /s/q testfiles\\0_2\\backup\\01234567\\02\\01");
-# else // !WIN32
-		RUN("rm -r testfiles/0_2/backup/01234567/02/01");
-# endif // WIN32
-# undef RUN
-#endif // !BOX_RELEASE_BUILD
-
 		// Fix it
 		// ERROR:   Object 0x44 is unattached.
 		// ERROR:   BlocksUsed changed from 284 to 282
 		// ERROR:   BlocksInCurrentFiles changed from 228 to 226
 		// ERROR:   NumCurrentFiles changed from 114 to 113
 		// WARNING: Reference count of object 0x44 changed from 1 to 0
+#ifdef WIN32
+		lock.ReleaseLock();
+#endif
 		TEST_EQUAL(5, check_account_for_errors());
 		{
 			std::auto_ptr<BackupProtocolAccountUsage2> usage =
@@ -841,25 +818,6 @@ int test(int argc, const char *argv[])
 		// file, so checking for AsRaid excludes this possibility.
 		RaidFileController &rcontroller(RaidFileController::GetController());
 		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(discSetNum));
-
-#ifndef BOX_RELEASE_BUILD // Only if we destroyed these particular files, above.
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/o00"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/o01"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/o02"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/o03"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/01/o00"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/01/o01"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/01/o02"));
-		TEST_EQUAL(RaidFileUtil::AsRaid, RaidFileUtil::RaidFileExists(
-			rdiscSet, "backup/01234567/02/01/01/o03"));
-#endif
 	}
 
 	// ------------------------------------------------------------------------------------------------

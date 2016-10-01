@@ -14,7 +14,6 @@
 
 #include "BackupStoreAccountDatabase.h"
 #include "HTTPResponse.h"
-#include "NamedLock.h"
 #include "S3Client.h"
 
 class BackupStoreDirectory;
@@ -42,14 +41,12 @@ public:
 class S3BackupFileSystem
 {
 private:
-	const Configuration& mConfig;
 	std::string mBasePath;
 	S3Client& mrClient;
 public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
 		S3Client& rClient)
-	: mConfig(config),
-	  mBasePath(BasePath),
+	: mBasePath(BasePath),
 	  mrClient(rClient)
 	{ }
 	std::string GetDirectoryURI(int64_t ObjectID);

@@ -146,7 +146,7 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 		int socket = mapSocket->GetSocketHandle();
 		int rtt = 50; // WAG
 
-#	if HAVE_DECL_SOL_TCP && HAVE_DECL_TCP_INFO && HAVE_STRUCT_TCP_INFO_TCPI_RTT
+#	if HAVE_DECL_SOL_TCP && defined HAVE_STRUCT_TCP_INFO_TCPI_RTT
 		struct tcp_info info;
 		socklen_t optlen = sizeof(info);
 		if(getsockopt(socket, SOL_TCP, TCP_INFO, &info, &optlen) == -1)
@@ -164,7 +164,7 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 		{
 			rtt = info.tcpi_rtt;
 		}
-#	endif
+#	endif // HAVE_DECL_SOL_TCP && defined HAVE_STRUCT_TCP_INFO_TCPI_RTT
 		
 		int newWindow = mTcpNice.GetNextWindowSize(mBytesWrittenThisPeriod,
 			elapsed, rtt);

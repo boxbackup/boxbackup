@@ -18,7 +18,9 @@
 #define EMU_INCLUDE
 
 // Need feature detection macros below
-#ifdef _MSC_VER
+#if defined BOX_CMAKE
+#	include "../common/BoxConfig.cmake.h"
+#elif defined _MSC_VER
 #	include "../common/BoxConfig-MSVC.h"
 #	define NEED_BOX_VERSION_H
 #else
@@ -39,7 +41,13 @@
 #ifndef __MINGW32__
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
+	typedef unsigned int uid_t;
+	typedef unsigned int gid_t;
 #endif
+
+// Disable Windows' non-standard implementation of min() and max():
+// http://stackoverflow.com/a/5004874/648162
+#define NOMINMAX
 
 // Windows headers
 

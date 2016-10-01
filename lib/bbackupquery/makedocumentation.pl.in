@@ -3,7 +3,7 @@ use strict;
 
 print "Creating built-in documentation for bbackupquery...\n";
 
-open DOC,"documentation.txt" or die "Can't open documentation.txt file";
+open DOC, "Documentation.txt" or die "Can't open Documentation.txt file: $!";
 my $section;
 my %help;
 my @in_order;

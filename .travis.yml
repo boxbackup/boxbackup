@@ -12,7 +12,13 @@ sudo: false
 
 addons:
   apt:
+    # We need cmake > 2.8.7
+    # https://github.com/travis-ci/travis-ci/issues/4631#issuecomment-191153634
+    sources:
+      - george-edison55-precise-backports # cmake 3.2.3 / doxygen 1.8.3
     packages:
+      - cmake
+      - cmake-data
       - libdb-dev
       - libreadline-dev
       - libssl-dev
@@ -20,17 +26,11 @@ addons:
       - xsltproc
       - zlib1g-dev
 
-before_script:
-  - ccache -s
-  - ./bootstrap
-  - ./configure CC="ccache $CC" CXX="ccache $CXX"
-  - grep CXX config.status
-  - make
-
 env:
   - TEST_TARGET=debug
   - TEST_TARGET=release
+  - BUILD=cmake TEST_TARGET=debug
+  - BUILD=cmake TEST_TARGET=release
 
 script:
-  - ./runtest.pl ALL $TEST_TARGET
-  - ccache -s
+  - ./infrastructure/travis-build.sh

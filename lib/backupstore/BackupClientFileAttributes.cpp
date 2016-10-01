@@ -545,7 +545,7 @@ void BackupClientFileAttributes::FillAttributesLink(
 void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBlock,
 	const std::string& Filename)
 {
-#ifdef HAVE_SYS_XATTR_H
+#if defined HAVE_LLISTXATTR && defined HAVE_LGETXATTR
 	int listBufferSize = 10000;
 	char* list = new char[listBufferSize];
 
@@ -693,7 +693,7 @@ void BackupClientFileAttributes::FillExtendedAttr(StreamableMemBlock &outputBloc
 		throw;
 	}
 	delete[] list;
-#endif
+#endif // defined HAVE_LLISTXATTR && defined HAVE_LGETXATTR
 }
 
 // --------------------------------------------------------------------------
@@ -992,7 +992,7 @@ void BackupClientFileAttributes::EnsureClearAvailable() const
 // --------------------------------------------------------------------------
 void BackupClientFileAttributes::WriteExtendedAttr(const std::string& Filename, int xattrOffset) const
 {
-#ifdef HAVE_SYS_XATTR_H
+#if defined HAVE_LSETXATTR
 	const char* buffer = static_cast<char*>(mpClearAttributes->GetBuffer());
 
 	uint32_t xattrBlockLength = 0;

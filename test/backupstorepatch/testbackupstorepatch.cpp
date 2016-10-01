@@ -610,10 +610,13 @@ int test(int argc, const char *argv[])
 				writedir.Commit(true);
 			}
 
+			// Get the revision number of the root directory, before housekeeping makes any changes.
+			int64_t first_revision = 0;
+			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
+
 #ifdef WIN32
-			// Cannot signal bbstored to do housekeeping now,
-			// so just wait until we're sure it's done
-			wait_for_operation(12, "housekeeping to run");
+			// Cannot signal bbstored to do housekeeping now, and we don't need to, as we will
+			// wait up to 32 seconds and detect automatically when it has finished.
 #else
 			// Send the server a restart signal, so it does 
 			// housekeeping immediately, and wait for it to happen
@@ -622,10 +625,8 @@ int test(int argc, const char *argv[])
 			::kill(pid, SIGHUP);
 #endif
 
-			// Get the revision number of the info file
-			int64_t first_revision = 0;
-			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
-			for(int l = 0; l < 32; ++l)
+			// Wait for changes to be written back to the root directory.
+			for(int secs_remaining = 32; secs_remaining >= 0; secs_remaining--)
 			{
 				// Sleep a while, and print a dot
 				::sleep(1);
@@ -633,7 +634,7 @@ int test(int argc, const char *argv[])
 				::fflush(stdout);
 				
 				// Early end?
-				if(l > 2)
+				if(!TestFileExists("testfiles/0_0/backup/01234567/write.lock"))
 				{
 					int64_t revid = 0;
 					RaidFileRead::FileExists(0, "backup/01234567/o01", &revid);
@@ -642,6 +643,8 @@ int test(int argc, const char *argv[])
 						break;
 					}
 				}
+
+				TEST_LINE(secs_remaining != 0, "No changes detected to root directory after 32 seconds");
 			}
 			::printf("\n");
 			

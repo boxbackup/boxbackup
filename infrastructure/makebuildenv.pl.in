@@ -14,7 +14,10 @@ $|=1;
 
 print "Box build environment setup.\n";
 
-my @implicit_deps = ('lib/common');
+# Modules that everything else depends on, without being explicitly specified.
+# Deprecated because we can't specify dependencies between them in the usual way,
+# and it's totally unnecessary anyway:
+my @implicit_deps;
 
 # work out platform variables
 use lib 'infrastructure';
@@ -26,10 +29,6 @@ print "Building on '$build_os $build_os_ver' using ".
 # keep copy of command line args
 my $makebuildenv_args = join(' ',@ARGV);
 
-# do command line arguments
-my $compile_line_extra = $platform_compile_line_extra;
-my $link_line_extra = $platform_link_line_extra;
-
 # make sure local files directory exists
 unless(-d 'local')
 {
@@ -39,9 +38,6 @@ unless(-d 'local')
 
 # flags about the environment
 my %env_flags;
-
-$module_dependency{"lib/common"} = ["lib/win32"];
-push @implicit_deps, "lib/win32";
 
 # print "Flag: $_\n" for(keys %env_flags);
 
@@ -377,17 +373,155 @@ for my $mod (@modules, @implicit_deps)
 	closedir DIR;
 }
 
-# Then write a makefile for each module
+my $default_cflags = '@CFLAGS@';
+my $default_cxxflags = '@CXXFLAGS@';
+$default_cflags =~ s/ -O2//g;
+$default_cxxflags =~ s/ -O2//g;
+my $debug_base_dir = 'debug';
+my $release_base_dir = 'release';
+
+my $release_flags = "-O2";
+if ($target_windows)
+{
+	$release_flags = "-O0 -g";
+}
+
+# Then write a master Makefile, and a mini-Makefile for each module
 print "done\n\nGenerating Makefiles...\n";
 
-my %module_resources_win32;
+my $makefile_ifdef_prefix = $bsd_make ? "." : "";
 
+open MASTER_MAKEFILE, ">Makefile" or die "Makefile: $!";
+print MASTER_MAKEFILE <<__E;
+#
+# AUTOMATICALLY GENERATED FILE
+#    do not edit!
+#
+#
+
+# "parcels" is defined near the end of this Makefile.
+default: parcels
+
+CC = @CC@
+CXX = @CXX@
+AR = @AR@
+RANLIB = @RANLIB@
+PERL = @PERL@
+WINDRES = @WINDRES@
+
+# Work around a mistake in QDBM (using <angled> includes for a file not in the
+# system path) by adding it to the include path with -I.
+DEFAULT_CFLAGS = \@CPPFLAGS@ $default_cflags \@CXXFLAGS_STRICT@ \\
+	$extra_platform_defines $platform_compile_line_extra \\
+	-DBOX_VERSION="\\"$product_version\\"" -Iqdbm
+DEFAULT_CXXFLAGS = \@CPPFLAGS@ $default_cxxflags \@CXXFLAGS_STRICT@ \\
+	$extra_platform_defines $platform_compile_line_extra \\
+	-DBOX_VERSION="\\"$product_version\\""
+LDFLAGS += \@LDFLAGS@ \@LDADD_RDYNAMIC@ $platform_link_line_extra
+
+RELEASE_CFLAGS   = \$(DEFAULT_CFLAGS)   -DBOX_RELEASE_BUILD $release_flags
+RELEASE_CXXFLAGS = \$(DEFAULT_CXXFLAGS) -DBOX_RELEASE_BUILD $release_flags
+RELEASE_OUTBASE  = $release_base_dir
+# http://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode_using.html#debug_mode.using.mode
+DEBUG_CFLAGS   = \$(DEFAULT_CFLAGS)   -g -O0 -D_GLIBCXX_DEBUG
+DEBUG_CXXFLAGS = \$(DEFAULT_CXXFLAGS) -g -O0 -D_GLIBCXX_DEBUG
+DEBUG_OUTBASE  = $debug_base_dir
+
+__E
+
+if ($bsd_make)
+{
+	print MASTER_MAKEFILE <<__E;
+.ifdef V
+HIDE     = 
+_CC      = \$(CC)
+_CXX     = \$(CXX)
+_LINK    = \$(CXX)
+_WINDRES = \$(WINDRES)
+_AR      = \$(AR)
+_RANLIB  = \$(RANLIB)
+_PERL    = \$(PERL)
+.else
+HIDE     = @
+_CC      = @ echo "  [CC]     " \$(*F) && \$(CC)
+_CXX     = @ echo "  [CXX]    " \$(*F) && \$(CXX)
+_LINK    = @ echo "  [LINK]   " \$(*F) && \$(CXX)
+_WINDRES = @ echo "  [WINDRES]" \$(*F) && \$(WINDRES)
+_AR      = @ echo "  [AR]     " \$(*F) && \$(AR)
+_RANLIB  = @ echo "  [RANLIB] " \$(*F) && \$(RANLIB)
+_PERL    = @ echo "  [PERL]   " \$(*F) && \$(PERL) >/dev/null
+.endif
+
+__E
+}
+else
+{
+	print MASTER_MAKEFILE <<__E;
+HIDE     = \$(if \$(V),,@)
+_CC      = \$(if \$(V),\$(CC),      @ echo "  [CC]      \$<" && \$(CC))
+_CXX     = \$(if \$(V),\$(CXX),     @ echo "  [CXX]     \$<" && \$(CXX))
+_LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    \$@" && \$(CXX))
+_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] \$<" && \$(WINDRES))
+_AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      \$@" && \$(AR))
+_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  \$@" && \$(RANLIB))
+_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    \$@" && \$(PERL) >/dev/null)
+
+__E
+}
+
+my %module_resources_win32;
+my @debug_build_targets;
+my @release_build_targets;
+my @all_clean_targets;
+my @all_realclean_targets;
+my %mod_type_name;
+my %mod_end_targets;
+my %library_targets;
+
+# First, loop over all modules and quickly categorise them and generate the target filenames.
+# We need this to write correct dependency info into the makefile when modules are listed
+# out of order in modules.txt, which isn't strictly necessary but may look tidier.
 for my $mod (@implicit_deps, @modules)
 {
 	print $mod,"\n";
 	
 	my ($type,$name) = split /\//,$mod;
-	
+	if (not $name)
+	{
+		# External modules such as qdbm have no "type" in the directory path.
+		$name = $mod;
+		$type = 'lib';
+	}
+
+	# is target a library?
+	my $target_is_library = ($type ne 'bin' && $type ne 'test');
+
+	# make target name
+	my $end_target_file = $name;
+
+	if ($target_is_library)
+	{
+		$end_target_file .= '.a';
+	}
+	else
+	{
+		$end_target_file .= $platform_exe_ext;
+	}
+
+	$end_target_file = '_test'.$platform_exe_ext if $type eq 'test';
+
+	$mod_type_name{$mod} = [$type, $name];
+	$mod_end_targets{$mod} = $end_target_file;
+	$library_targets{$mod} = $target_is_library;
+}
+
+# Now loop over them again, generating makefile instructions etc.
+for my $mod (@implicit_deps, @modules)
+{
+	my ($type,$name) = @{$mod_type_name{$mod}};
+	my $end_target_file = $mod_end_targets{$mod};
+	my $target_is_library = $library_targets{$mod};
+
 	# add additional files for tests
 	if($type eq 'test')
 	{
@@ -478,9 +612,9 @@ __E
 			close TESTFILE;
 		}
 		
-		writetestfile("$mod/_t", "GLIBCXX_FORCE_NEW=1 ".
+		writetestfile("$mod/t", "GLIBCXX_FORCE_NEW=1 ".
 			'./_test' . $platform_exe_ext . ' "$@"', $mod);
-		writetestfile("$mod/_t-gdb", "GLIBCXX_FORCE_NEW=1 ".
+		writetestfile("$mod/t-gdb", "GLIBCXX_FORCE_NEW=1 ".
 			'gdb ./_test' . $platform_exe_ext . ' "$@"', $mod);
 		
 	}
@@ -516,124 +650,70 @@ __E
 			}
 		}
 	}	
-	
+
+	# get the list of library things to add -- in order of dependency 
+	# so things link properly
+	my @lib_files;
+	my @dep_targets;
+	my @include_search_dirs;
+
+	foreach my $dep (reverse @all_deps_for_module)
+	{
+		my $dep_target = $mod_end_targets{$dep};
+		die "No output file found for $dep" unless $dep_target;
+		$dep_target = "$dep/$dep_target";
+		push @dep_targets, $dep_target;
+
+		if ($dep =~ m|^lib\/(.+)$|)
+		{
+			push @lib_files, $dep_target;
+			push @include_search_dirs, $dep;
+		}
+		elsif ($dep =~ m|^([^/]+)$|)
+		{
+			push @lib_files, $dep_target;
+			push @include_search_dirs, $dep;
+		}
+	}
 
 	# make include path
-	my $include_paths = join(' ',map {'-I../../'.$_} @all_deps_for_module);
-
-	# is target a library?
-	my $target_is_library = ($type ne 'bin' && $type ne 'test');
-
-	# make target name
-	my $end_target = $name;
-
-	if ($target_is_library)
-	{
-		$end_target .= '.a';
-	}
-	else
-	{
-		$end_target .= $platform_exe_ext;
-	}
-
-	$end_target = '_test'.$platform_exe_ext if $type eq 'test';
+	my $cpp_include_paths = join(' ',map {"-I$_"} @include_search_dirs);
+	print MASTER_MAKEFILE "${type}_${name}_includes = $cpp_include_paths\n";
 
 	# adjust for outdir
-	$end_target = '$(OUTDIR)/' . $end_target;
+	my $debug_end_target   = "\$(DEBUG_OUTBASE)/$mod/$end_target_file";
+	my $release_end_target = "\$(RELEASE_OUTBASE)/$mod/$end_target_file";
+	push @debug_build_targets,   $debug_end_target;
+	push @release_build_targets, $release_end_target;
 
 	# start the makefile
-	my $mk_name_extra = ($bsd_make)?'':'X';
-	open MAKE,">$mod/Makefile".$mk_name_extra or die "Can't open Makefile for $mod\n";
-	my $debug_link_extra = ($target_is_library)?'':'../../debug/lib/debug/debug.a';
-
-	my $default_cxxflags = '@CXXFLAGS@';
-	$default_cxxflags =~ s/ -O2//g;
-
-	my $release_flags = "-O2";
-	if ($target_windows)
-	{
-		$release_flags = "-O0 -g";
-	}
-
-	print MAKE <<__E;
+	open MINI_MODULE_MAKEFILE,">$mod/Makefile" or die "Can't open Makefile for $mod\n";
+	print MINI_MODULE_MAKEFILE <<__E;
 #
 # AUTOMATICALLY GENERATED FILE
 #    do not edit!
 #
-#
-CXX = @CXX@
-AR = @AR@
-RANLIB = @RANLIB@
-PERL = @PERL@
-WINDRES = @WINDRES@
+${makefile_ifdef_prefix}ifdef RELEASE
+TARGET = $release_base_dir/$mod/$end_target_file
+${makefile_ifdef_prefix}else
+TARGET = $debug_base_dir/$mod/$end_target_file
+${makefile_ifdef_prefix}endif
 
-DEFAULT_CXXFLAGS = @CPPFLAGS@ $default_cxxflags @CXXFLAGS_STRICT@ \\
-	$include_paths $extra_platform_defines \\
-	-DBOX_VERSION="\\"$product_version\\""
-LDFLAGS += @LDFLAGS@ @LDADD_RDYNAMIC@
+.PHONY: default
+default:
+	\$(MAKE) -C ../.. \$(TARGET)
 
-.ifdef RELEASE
-CXXFLAGS += \$(DEFAULT_CXXFLAGS) -DBOX_RELEASE_BUILD $release_flags
-OUTBASE = ../../release
-OUTDIR = ../../release/$mod
-DEPENDMAKEFLAGS = -D RELEASE
-VARIENT = RELEASE
-.else
-# http://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode_using.html#debug_mode.using.mode
-CXXFLAGS += \$(DEFAULT_CXXFLAGS) -g -O0 -D_GLIBCXX_DEBUG
-OUTBASE = ../../debug
-OUTDIR = ../../debug/$mod
-DEPENDMAKEFLAGS =
-VARIENT = DEBUG
-.endif
+.PHONY: clean
+clean:
+	\$(MAKE) -C ../.. clean_${type}_${name}
 
+.PHONY: realclean
+realclean:
+	\$(MAKE) -C ../.. realclean_${type}_${name}
 __E
+	close MINI_MODULE_MAKEFILE;
 
-	if ($bsd_make)
-	{
-		print MAKE <<__E;
-.ifdef V
-HIDE     = 
-_CXX     = \$(CXX)
-_LINK    = \$(CXX)
-_WINDRES = \$(WINDRES)
-_AR      = \$(AR)
-_RANLIB  = \$(RANLIB)
-_PERL    = \$(PERL)
-.else
-HIDE     = @
-_CXX     = @ echo "  [CXX]    " \$(*F) && \$(CXX)
-_LINK    = @ echo "  [LINK]   " \$(*F) && \$(CXX)
-_WINDRES = @ echo "  [WINDRES]" \$(*F) && \$(WINDRES)
-_AR      = @ echo "  [AR]     " \$(*F) && \$(AR)
-_RANLIB  = @ echo "  [RANLIB] " \$(*F) && \$(RANLIB)
-_PERL    = @ echo "  [PERL]   " \$(*F) && \$(PERL) >/dev/null
-.endif
-
-__E
-	}
-	else
-	{
-		print MAKE <<__E;
-HIDE     = \$(if \$(V),,@)
-_CXX     = \$(if \$(V),\$(CXX),     @ echo "  [CXX]     $mod/\$<" && \$(CXX))
-_LINK    = \$(if \$(V),\$(CXX),     @ echo "  [LINK]    $mod/\$@" && \$(CXX))
-_WINDRES = \$(if \$(V),\$(WINDRES), @ echo "  [WINDRES] $mod/\$<" && \$(WINDRES))
-_AR      = \$(if \$(V),\$(AR),      @ echo "  [AR]      $mod/\$@" && \$(AR))
-_RANLIB  = \$(if \$(V),\$(RANLIB),  @ echo "  [RANLIB]  $mod/\$@" && \$(RANLIB))
-_PERL    = \$(if \$(V),\$(PERL),    @ echo "  [PERL]    $mod/\$@" && \$(PERL) >/dev/null)
-
-__E
-	}
-
-	# if there is a Makefile.pre, include it now
-	if(-e "$mod/Makefile.pre")
-	{
-		print MAKE ".include <Makefile.pre>\n\n";
-	}
-	
-	# read directory
-	opendir DIR,$mod;
+	opendir DIR, $mod;
 	my @items = readdir DIR;
 	closedir DIR;
 	
@@ -646,10 +726,10 @@ __E
 			{
 				# Read items
 				my $d = "$mod/$di";
-				opendir DIR,$d;
+				opendir DIR, $d;
 				my @i = readdir DIR;
 				closedir DIR;
-				for(@i)
+				for (@i)
 				{
 					next if m/\A\./;
 					push @autogen_items,"$di/$_"
@@ -678,293 +758,586 @@ __E
 		}
 	}
 	
-	# ready for the rest of the details...
-	my $make;
-	
-	# then... do the cpp files...
-	my @obj_base;
-	for my $file (@items)
+	# write the recipes for debug and release builds of each file
+	foreach my $var_prefix ('DEBUG', 'RELEASE')
 	{
-		my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
-		my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
-		my $base = $1;
+		my $make;
 
+		# then... do the cpp files...
+		my @obj_base;
+		for my $file (@items)
+		{
+			my $is_c = $file =~ m/\A(.+)\.c\Z/i;
+			my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
+			my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
+			my $base = $1;
+
+			# Don't try to compile .rc files except on Windows:
+			next if not $is_c and not $is_cpp and not ($is_rc and $target_windows);
+			next if $file =~ /\A\._/; # Temp Mac OS Resource hack
+
+			# store for later
+			push @obj_base, $base;
+		
+			# get the file...
+			open FL, "$mod/$file";
+			my $f;
+			read FL, $f, -s "$mod/$file";
+			close FL;
+			
+			my %dep;
+
+			while($f =~ m/\#include\s+"([^"]+?)"/g)
+			{
+				insert_dep($1, \%dep) if exists $hfiles{$1};
+			}
+			
+			# output filename
+			my $out_name = "\$(${var_prefix}_OUTBASE)/$mod/$base.o";
+			
+			# write the line for this cpp file
+			my @dep_paths = map 
+			{ 
+				($hfiles{$_} eq $mod)
+				? "$mod/$_" 
+				: $hfiles{$_}."/$_"
+			}
+			keys %dep;
+
+			$make .= "$out_name: $mod/$file @dep_paths\n";
+
+			if ($is_c)
+			{
+				$make .= "\t\$(_CC) \$(${var_prefix}_CFLAGS) ".
+					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
+					"-c $mod/$file -o $out_name\n\n";
+			}
+			if ($is_cpp)
+			{
+				$make .= "\t\$(_CXX) \$(${var_prefix}_CXXFLAGS) ".
+					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
+					"-c $mod/$file -o $out_name\n\n";
+			}
+			elsif ($is_rc)
+			{
+				$make .= "\t\$(_WINDRES) $file $out_name\n\n";
+				my $res_list = $module_resources_win32{$mod};
+				$res_list ||= [];
+				push @$res_list, $base.'.o';
+				$module_resources_win32{$mod} = $res_list;
+			}
+		}
+
+		# need to see if the extra makefile fragments require extra object files
+		# or include any more makefiles
+		my @objs = @obj_base;
+		my @makefile_includes;
+		
+		additional_objects_from_make_fragment("$mod/Makefile.extra", \@objs, \@makefile_includes);
+		additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
+
+		my $prefixed_end_target = "\$(${var_prefix}_OUTBASE)/$mod/$end_target_file";
+		my $o_file_list = join(' ',map {"\$(${var_prefix}_OUTBASE)/$mod/$_.o"} sort @objs);
+		my @prefixed_lib_files = map {"\$(${var_prefix}_OUTBASE)/$_"} @lib_files;
+		my @prefixed_dep_targets = map {"\$(${var_prefix}_OUTBASE)/$_"} @dep_targets;
+
+		print MASTER_MAKEFILE "$prefixed_end_target: $o_file_list";
+		print MASTER_MAKEFILE " @prefixed_dep_targets" unless $target_is_library;
+		print MASTER_MAKEFILE "\n";
+		
 		if ($target_windows)
 		{
-			next if not $is_cpp and not $is_rc;
+			foreach my $dep (@all_deps_for_module)
+			{
+				my $res_list = $module_resources_win32{$dep};
+				next unless $res_list;
+				$o_file_list .= ' '.join(' ', 
+					map {"\$(${var_prefix}_OUTBASE)/$dep/$_"} @$res_list);
+			}
+		}
+
+		# stuff to make the final target...
+		if($target_is_library)
+		{
+			# make a library archive...
+			print MASTER_MAKEFILE "\t\$(HIDE) (rm -f $prefixed_end_target)\n";
+			print MASTER_MAKEFILE "\t\$(_AR) cq $prefixed_end_target $o_file_list\n";
+			print MASTER_MAKEFILE "\t\$(_RANLIB) $prefixed_end_target\n";
 		}
 		else
 		{
-			next if not $is_cpp;
-		}
-
-		next if $file =~ /\A\._/; # Temp Mac OS Resource hack
-
-		# store for later
-		push @obj_base,$base;
-	
-		# get the file...
-		open FL,"$mod/$file";
-		my $f;
-		read FL,$f,-s "$mod/$file";
-		close FL;
-		
-		my %dep;
-
-		while($f =~ m/\#include\s+"([^"]+?)"/g)
-		{
-			insert_dep($1, \%dep) if exists $hfiles{$1};
-		}
-		
-		# output filename
-		my $out_name = '$(OUTDIR)/'.$base.'.o';
-		
-		# write the line for this cpp file
-		my @dep_paths = map 
-		{ 
-			($hfiles{$_} eq $mod)
-			? $_ 
-			: '../../'.$hfiles{$_}."/$_"
-		}
-		keys %dep;
-
-		$make .= $out_name.': '.join(' ',$file,@dep_paths)."\n";
-
-		if ($is_cpp)
-		{
-			$make .= "\t\$(_CXX) \$(CXXFLAGS) $compile_line_extra ".
-				"-DBOX_MODULE=\"\\\"$mod\\\"\" " .
-				"-c $file -o $out_name\n\n";
-		}
-		elsif ($is_rc)
-		{
-			$make .= "\t\$(_WINDRES) $file $out_name\n\n";
-			my $res_list = $module_resources_win32{$mod};
-			$res_list ||= [];
-			push @$res_list, $base.'.o';
-			$module_resources_win32{$mod} = $res_list;
-		}
-	}
-
-	my $has_deps = ($#{$module_dependency{$mod}} >= 0);
-# ----- # always has dependencies with debug library
-	$has_deps = 1;
-	$has_deps = 0 if $target_is_library;
-
-	# Dependency stuff
-	my $deps_makeinfo;
-	if($has_deps)
-	{
-		if($bsd_make)
-		{
-			$deps_makeinfo = <<'__E';
-.BEGIN::
-.ifndef NODEPS
-.	if $(.TARGETS) == ""
-__E
-		}
-		else
-		{
-			# gnu make
-			$deps_makeinfo = <<'__E';
-.PHONY:	dep_modules
-dep_modules:
-ifndef NODEPS
-ifeq ($(strip $(.TARGETS)),)
-__E
-		}
-		
-		# run make for things we require
-		for my $dep (@all_deps_for_module)
-		{
-			my $dep_target = "";
-			if ($dep =~ m|^lib/(.*)|)
-			{
-				$dep_target = "\$(OUTBASE)/$dep/$1.a";
-			}
-			elsif ($dep =~ m|^.*/(.*)|)
-			{
-				$dep_target = "\$(OUTBASE)/$dep/$1$platform_exe_ext";
-			}
-			else
-			{
-				$dep_target = "lib$dep.a";
-			}
-
-			$deps_makeinfo .= <<EOF;
-	\$(HIDE) ( \\
-		cd ../../$dep; \\
-		\$(MAKE) $sub_make_options -q \$(DEPENDMAKEFLAGS) -D NODEPS $dep_target \\
-		|| \$(MAKE) $sub_make_options \$(DEPENDMAKEFLAGS) -D NODEPS $dep_target \\
-	)
-EOF
-		}
-
-		$deps_makeinfo .= ".\tendif\n.endif\n\n";
-	}
-	print MAKE $deps_makeinfo if $bsd_make;
-	
-	# get the list of library things to add -- in order of dependency 
-	# so things link properly
-	my @lib_files;
-	foreach my $dep (reverse @all_deps_for_module)
-	{
-		if ($dep =~ m|^lib\/(.+)$|)
-		{
-			push @lib_files, "\$(OUTBASE)/$dep/$1.a";
-		}
-		elsif ($dep =~ m|^([^/]+)$|)
-		{
-			push @lib_files, "../../$dep/lib$1.a";
-		}
-	}
-
-	# need to see if the extra makefile fragments require extra object files
-	# or include any more makefiles
-	my @objs = @obj_base;
-	my @makefile_includes;
-	
-	additional_objects_from_make_fragment("$mod/Makefile.extra", \@objs, \@makefile_includes);
-	additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
-
-	my $o_file_list = join(' ',map {'$(OUTDIR)/'.$_.'.o'} sort @objs);
-
-	if ($has_deps and not $bsd_make)
-	{
-		print MAKE ".PHONY: all\n" .
-			"all: dep_modules $end_target\n\n";
-	}
-
-	print MAKE $end_target,': ',$o_file_list;
-	print MAKE " @lib_files" unless $target_is_library;
-	print MAKE "\n";
-	
-	if ($target_windows)
-	{
-		foreach my $dep (@all_deps_for_module)
-		{
-			my $res_list = $module_resources_win32{$dep};
-			next unless $res_list;
-			$o_file_list .= ' '.join(' ', 
-				map {'$(OUTBASE)/'.$dep."/$_"} @$res_list);
-		}
-	}
-
-	# stuff to make the final target...
-	if($target_is_library)
-	{
-		# make a library archive...
-		print MAKE "\t\$(HIDE) (echo -n > $end_target; rm $end_target)\n";
-		print MAKE "\t\$(_AR) cq $end_target $o_file_list\n";
-		print MAKE "\t\$(_RANLIB) $end_target\n";
-	}
-	else
-	{
-		# work out library options
-		# need to be... least used first, in absolute order they appear in the modules.txt file
-		my @libops;
-		
-		sub libops_fill
-		{
-			my ($module, $libops_ref) = @_;
+			# work out library options
+			# need to be... least used first, in absolute order they appear in the modules.txt file
+			my @libops;
 			
-			my $library_link_opts = $module_library_link_opts{$module};
-			if ($library_link_opts)
+			sub libops_fill
 			{
-				push @$libops_ref, @$library_link_opts;
+				my ($module, $libops_ref) = @_;
+				
+				my $library_link_opts = $module_library_link_opts{$module};
+				if ($library_link_opts)
+				{
+					push @$libops_ref, @$library_link_opts;
+				}
+				
+				my $deps = $module_dependency{$module};
+				foreach my $dep (@$deps)
+				{
+					libops_fill($dep, $libops_ref);
+				}
 			}
 			
-			my $deps = $module_dependency{$module};
-			foreach my $dep (@$deps)
+			libops_fill($mod,\@libops);
+			
+			my $lo = '';
+			my %ldone;
+			for(@libops)
 			{
-				libops_fill($dep, $libops_ref);
+				next if exists $ldone{$_};
+				$lo .= ' '.$_;
+				$ldone{$_} = 1;
 			}
+		
+			# link line...
+			print MASTER_MAKEFILE "\t\$(_LINK) \$(LDFLAGS) " .
+				"-o $prefixed_end_target $o_file_list " .
+				"@prefixed_lib_files $lo $platform_lib_files\n";
 		}
-		
-		libops_fill($mod,\@libops);
-		
-		my $lo = '';
-		my %ldone;
-		for(@libops)
+
+		# tests need to copy the test file over
+		if($type eq 'test')
 		{
-			next if exists $ldone{$_};
-			$lo .= ' '.$_;
-			$ldone{$_} = 1;
+			print MASTER_MAKEFILE <<__E;
+	\$(HIDE) cp $mod/t \$(${var_prefix}_OUTBASE)/$mod/t
+	\$(HIDE) chmod u+x \$(${var_prefix}_OUTBASE)/$mod/t
+	\$(HIDE) cp $mod/t-gdb \$(${var_prefix}_OUTBASE)/$mod/t-gdb
+	\$(HIDE) chmod u+x \$(${var_prefix}_OUTBASE)/$mod/t-gdb
+__E
 		}
-	
-		# link line...
-		print MAKE "\t\$(_LINK) \$(LDFLAGS) $link_line_extra " .
-			"-o $end_target $o_file_list " .
-			"@lib_files $lo $platform_lib_files\n";
-	}
 
-	# tests need to copy the test file over
-	if($type eq 'test')
-	{
-		print MAKE "\tcp _t \$(OUTDIR)/t\n\tchmod u+x \$(OUTDIR)/t\n";
-		print MAKE "\tcp _t-gdb \$(OUTDIR)/t-gdb\n\tchmod u+x \$(OUTDIR)/t-gdb\n";
-	}
+		print MASTER_MAKEFILE $make,"\n";
 
-	# dependency line?
-	print MAKE "\n";
+		for(@makefile_includes)
+		{
+			print MASTER_MAKEFILE "\n.include <$_>\n";
+		}
+}
 
-	# module dependencies for GNU make?
-	print MAKE $deps_makeinfo if !$bsd_make;
+	print MASTER_MAKEFILE <<__E;
+clean_${type}_${name}:
+	rm -rf \$(DEBUG_OUTBASE)/$mod/*
+	rm -rf \$(RELEASE_OUTBASE)/$mod/*
+
+realclean_${type}_${name}: clean_${type}_${name}
+	rm -f $mod/t $mod/t-gdb $mod/Makefile
+	find $mod -name 'autogen_*' -type f -exec rm -f {} \\;
+__E
+	push @all_clean_targets, "clean_${type}_${name}";
+	push @all_realclean_targets, "realclean_${type}_${name}";
+
+	my $includes = "";
 	
-	# print the rest of the file
-	print MAKE $make,"\n";
-	
-	# and a clean target
-	print MAKE <<EOF;
-clean:
-	-rm -rf \$(OUTDIR)/*
-.	ifndef SUBCLEAN
-EOF
-	for my $dep (@all_deps_for_module)
-	{
-		print MAKE "\t\$(HIDE) (cd ../../$dep; \$(MAKE) \$(DEPENDMAKEFLAGS) -D SUBCLEAN clean)\n";
-	}
-	print MAKE ".\tendif\n";
-	
-	# include any extra stuff
-	print MAKE "\n\n";
 	if(-e "$mod/Makefile.extra")
 	{
-		print MAKE ".include <Makefile.extra>\n\n";
+		$includes .= ".include <$mod/Makefile.extra>\n\n";
 	}
 	if(-e "$mod/Makefile.extra.$build_os")
 	{
-		print MAKE ".include <Makefile.extra.$build_os>\n\n";
+		$includes .= ".include <$mod/Makefile.extra.$build_os>\n\n";
 	}
-	for(@makefile_includes)
-	{
-		print MAKE ".include <$_>\n\n";
-	}
-	
-	# and finally a target for rebuilding the build system
-	print MAKE "\nbuildsystem:\n\t(cd ../..; perl ./infrastructure/makebuildenv.pl $makebuildenv_args)\n\n";
-	
-	close MAKE;
 
 	if(!$bsd_make)
 	{
 		# need to post process this into a GNU makefile
-		open MAKE,">$mod/Makefile";
-		open MAKEB,"$mod/MakefileX";
+		$includes =~ s/\A\.\s*(ifdef|else|endif|ifndef)/$1/;
+		$includes =~ s/\A\.\s*include\s+<(.+?)>/include $1/;
+		$includes =~ s/-D\s+(\w+)/$1=1/g;
+	}
 
-		while(<MAKEB>)
+	print MASTER_MAKEFILE $includes;
+}
+
+my @parcels;
+my %parcel_contents;
+
+sub starts_with ($$)
+{
+	my ($string,$expected) = @_;
+	return substr($string, 0, length $expected) eq $expected;
+}
+
+sub os_matches ($)
+{
+	my ($prefix_string) = @_;
+	my @prefixes = split m'\,', $prefix_string;
+	foreach my $prefix (@prefixes)
+	{
+		return 1 if starts_with($build_os,  $prefix);
+		return 1 if starts_with($ac_target_os, $prefix);
+		return 1 if starts_with("$ac_target_cpu-$ac_target_os",
+			$prefix);
+		return 1 if starts_with($ac_target, $prefix);
+	}
+	return 0;
+}
+
+my $copy_command = "cp -p";
+
+open PARCELS,"parcels.txt" or die "Can't open parcels file";
+{
+	my $cur_parcel = '';
+	while(<PARCELS>)
+	{
+		chomp; s/#.+\Z//; s/\s+\Z//; s/\s+/ /g;
+		next unless m/\S/;
+		
+		# omit bits on some platforms?
+		next if m/\AEND-OMIT/;
+		if(m/\AOMIT:(.+)/)
 		{
-			s/\A\.\s*(ifdef|else|endif|ifndef)/$1/;
-			s/\A\.\s*include\s+<(.+?)>/include $1/;
-			s/-D\s+(\w+)/$1=1/g;
-			print MAKE;
+			if (os_matches($1))
+			{
+				while(<PARCELS>)
+				{
+					last if m/\AEND-OMIT/;	
+				}
+			}
+			next;
 		}
 
-		close MAKEB;
-		close MAKE;
-		unlink "$mod/MakefileX";
+		if (m'\AONLY:(.+)')
+		{
+			if (not os_matches($1))
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-ONLY';
+				}
+			}
+			next;
+		}
+		next if (m'\AEND-ONLY');
+
+		if (m'\AEXCEPT:(.+)')
+		{
+			if (os_matches($1))
+			{
+				while (<PARCELS>)
+				{
+					last if m'\AEND-EXCEPT';
+				}
+			}
+			next;
+		}
+		next if (m'\AEND-EXCEPT');
+		
+		# new parcel, or a new parcel definition?
+		if(m/\A\s+(.+)\Z/)
+		{
+			push @{$parcel_contents{$cur_parcel}},$1
+		}
+		else
+		{
+			$cur_parcel = $_;
+			push @parcels,$_;
+		}
 	}
 }
+close PARCELS;
+
+# create parcels directory
+mkdir "parcels",0755;
+mkdir "parcels/scripts",0755;
+
+print MASTER_MAKEFILE "parcels:\t",join(' ',map {"build-".$_} @parcels),"\n\n";
+
+my $runtest_script = $target_windows ? './infrastructure/mingw/runtest.sh' 
+	: './runtest.pl';
+
+print MASTER_MAKEFILE <<__END_OF_FRAGMENT;
+.PHONY: test
+test:	debug_tests release_tests
+
+.PHONY: debug_tests
+debug_tests:
+	$runtest_script ALL debug
+
+.PHONY: release_tests
+release_tests:
+	$runtest_script ALL release
+
+.PHONY: docs
+docs:
+	cd docs; \$(MAKE)
+
+__END_OF_FRAGMENT
+
+my $release_flag = BoxPlatform::make_flag('RELEASE');
+my @parcel_targets;
+
+for my $parcel (@parcels)
+{
+	my $version = BoxPlatform::parcel_root($parcel);
+	my $make_target = BoxPlatform::parcel_target($parcel);
+	my $dir = BoxPlatform::parcel_dir($parcel);
+	my @parcel_deps;
+
+	# Need to use BSD install on Solaris
+	my $install_bin = $build_os eq 'SunOS' ? '/usr/ucb/install' : 'install';
+
+	unless ($target_windows)
+	{
+		open SCRIPT,">parcels/scripts/install-$parcel" or die
+			"Can't open installer script for $parcel for writing";
+		print SCRIPT "#!/bin/sh\n\n";
+	}
+
+	for(@{$parcel_contents{$parcel}})
+	{
+		my @args = split /\s+/;
+
+		my ($type,$name,$dest) = @args;
+		my $optional = 0;
+		my $install  = 1;
+
+		if ($type eq 'optional')
+		{
+			$optional = 1;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'noinstall')
+		{
+			$install = 0;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if($type eq 'bin')
+		{
+			my $exeext = $platform_exe_ext;
+			print MASTER_MAKEFILE <<EOF;
+$dir/$name$exeext: release/bin/$name/$name$exeext
+	mkdir -p $dir
+	$copy_command release/bin/$name/$name$exeext $dir
+
+EOF
+			push @parcel_deps, "$dir/$name$exeext";
+		}
+		elsif ($type eq 'script')
+		{
+			# Replace any variables ($ac_target etc.) with their
+			# values.
+			$name =~ s|(\$[^/ ]+)|$1|eeg;
+			my $fullpath = $name;
+			my $filename = $name;
+			# remove path from script name
+			$filename =~ s{.*/}{};
+
+			print MASTER_MAKEFILE <<EOF;
+$dir/$filename: $fullpath
+	mkdir -p $dir
+EOF
+
+			if ($optional)
+			{
+				print MASTER_MAKEFILE "\ttest -r $fullpath " .
+					"&& $copy_command $fullpath $dir || true\n";
+			}
+			else
+			{
+				print MASTER_MAKEFILE "\t$copy_command $fullpath $dir\n";
+			}
+
+			print MASTER_MAKEFILE "\n";
+
+			push @parcel_deps, "$dir/$filename";
+		}
+		elsif($type eq 'man')
+		{
+			print MASTER_MAKEFILE <<EOF;
+$dir/${name}.gz: docs/man/${name}.gz
+	mkdir -p $dir
+	$copy_command docs/man/${name}.gz $dir
+
+EOF
+			# Releases have the docs pre-made, but users
+			# may want to rebuild them for some reason.
+			my $docbook_source = "docs/docbook/${name}";
+			$docbook_source =~ s/\.[58]$/.xml/;
+			print MASTER_MAKEFILE <<EOF;
+docs/man/${name}.gz: $docbook_source docs/docbook/bb-man.xsl
+	cd docs; \$(MAKE) man/${name}.gz
+
+EOF
+			push @parcel_deps, "$dir/${name}.gz";
+		}
+		elsif($type eq 'html')
+		{
+			print MASTER_MAKEFILE <<EOF;
+$dir/docs/${name}.html: docs/htmlguide/man-html/${name}.html
+	mkdir -p $dir/docs
+	$copy_command docs/htmlguide/man-html/${name}.html $dir/docs
+
+EOF
+			# Releases have the docs pre-made, but users
+			# may want to rebuild them for some reason.
+			my $docbook_source = "docs/docbook/${name}.xml";
+			print MASTER_MAKEFILE <<EOF;
+docs/htmlguide/man-html/${name}.html: $docbook_source docs/docbook/bb-nochunk-book.xsl
+	cd docs; \$(MAKE) htmlguide/man-html/${name}.html
+
+EOF
+			push @parcel_deps, "$dir/docs/${name}.html";
+		}
+		elsif ($type eq 'subdir')
+		{
+			push @parcel_deps, "build_${type}_${name}";
+		}
+	}
+
+	print MASTER_MAKEFILE <<EOF;
+build-$parcel:	$make_target
+
+$make_target: @parcel_deps
+	test -d $dir || mkdir $dir
+EOF
+
+	push @parcel_targets, "build-$parcel";
+	
+	for(@{$parcel_contents{$parcel}})
+	{
+		my @args = split /\s+/;
+
+		my ($type,$name,$dest) = @args;
+
+		my $optional = 0;
+		my $install  = 1;
+
+		if ($type eq 'optional')
+		{
+			$optional = 1;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'noinstall')
+		{
+			$install = 0;
+			shift @args;
+			($type,$name,$dest) = @args;
+		}
+
+		if ($type eq 'script')
+		{
+			# remove path from script name
+			$name =~ s{.*/}{};
+		}
+
+		if ($type eq 'html')
+		{
+			$dest = "share/doc/@PACKAGE_TARNAME@";
+			$name = "docs/$name.html";
+		}
+
+		if ($type eq 'man')
+		{
+			$name =~ /([0-9])$/;
+			$dest = "man/man$1";
+			$name =~ s/$/\.gz/;
+		}
+
+		if ($install and not $target_windows and not $type eq "subdir")
+		{
+			my $local_install_dir = $install_into_dir;
+			if (defined $dest)
+			{
+				if ($dest =~ m,^/,)
+				{
+					# Don't add $prefix if $dest is a literal path
+					$local_install_dir = $dest;
+				}
+				else
+				{
+					$local_install_dir = "@prefix@/$dest";
+				}
+			}
+			print SCRIPT "mkdir -p " .
+				"\${DESTDIR}$local_install_dir/\n";
+			print SCRIPT "$install_bin $name " .
+				"\${DESTDIR}$local_install_dir\n";
+		}
+	}
+
+	unless ($target_windows)
+	{	
+		close SCRIPT;
+		chmod 0755,"parcels/scripts/install-$parcel";
+	}
+	
+	my $root = BoxPlatform::parcel_root($parcel);
+
+	unless ($target_windows)
+	{
+		print MAKE "\tcp parcels/scripts/install-$parcel $dir\n";
+	}
+
+	print MASTER_MAKEFILE "\t(cd parcels; tar cf - $root | gzip -9 - > $root.tgz )\n";
+	
+	print MASTER_MAKEFILE "\n";
+
+	unless ($target_windows)
+	{	
+		print MASTER_MAKEFILE "install-$parcel:\n";
+		print MASTER_MAKEFILE "\t(cd $dir; ./install-$parcel)\n\n";
+	}
+}
+
+print MASTER_MAKEFILE <<EOF;
+
+debug_build:   @debug_build_targets
+release_build: @release_build_targets
+parcels:       @parcel_targets
+
+# well-known targets that users might expect to be able to build:
+install:
+	cat local/install.msg
+
+clean:         @all_clean_targets
+	cd docs; \$(MAKE) clean
+
+realclean: clean @all_realclean_targets
+	find release debug       -type f -exec rm -f {} \\;
+
+# and finally a target for rebuilding the build system:
+buildsystem:
+	perl ./infrastructure/makebuildenv.pl $makebuildenv_args
+EOF
+
+for my $parcel (@parcels)
+{
+	# need to use -f to avoid error if they don't exist (already cleaned)
+	print MASTER_MAKEFILE "\trm -rf ", BoxPlatform::parcel_dir($parcel),    "\n";
+	print MASTER_MAKEFILE "\trm -f  ", BoxPlatform::parcel_target($parcel), "\n";
+}
+
+open INSTALLMSG,">local/install.msg" or die "Can't open install message file for writing";
+print INSTALLMSG <<__E;
+
+Parcels need to be installed separately, and as root. Type one of the following:
+
+__E
+
+for(@parcels)
+{
+	print INSTALLMSG "    $make_command install-".$_."\n";
+}
+print INSTALLMSG "\n";
+
+close INSTALLMSG;
+
+close MASTER_MAKEFILE;
 
 print "\nType 'cd <module_dir>; $make_command' to build a module\n\n";
 
