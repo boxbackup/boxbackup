@@ -2076,7 +2076,7 @@ static void odcleannormalized(ODEUM *odeum, CBLIST *nwords){
   int i = 0;
   for(i = 0; i < cblistnum(nwords); i++){
     tk = (char *)cblistval(nwords, i, &tk_len);
-    if(tk_len == 0 || (!odeum->statechars[*(unsigned char *)tk] == 0)){
+    if(tk_len == 0 || !(odeum->statechars[*(unsigned char *)tk] == OD_EVWORD)){
       /* not a word so delete it */
       tk = cblistremove(nwords, i, &tk_len);
       free(tk);
