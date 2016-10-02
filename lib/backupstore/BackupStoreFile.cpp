@@ -473,13 +473,8 @@ int BackupStoreFile::VerifyStream::Read(void *pBuffer, int NBytes, int Timeout)
 //
 // --------------------------------------------------------------------------
 
-void BackupStoreFile::VerifyStream::Close(bool CloseReadFromStream)
+void BackupStoreFile::VerifyStream::Close()
 {
-	if(CloseReadFromStream)
-	{
-		mReadFromStream.Close();
-	}
-
 	if(mState != State_Blocks)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,

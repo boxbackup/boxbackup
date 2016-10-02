@@ -174,7 +174,17 @@ public:
 		{
 			THROW_EXCEPTION(CommonException, NotSupported);
 		}
-		virtual void Close(bool CloseReadFromStream = true);
+		// Declare twice (with different parameters) to avoid warnings that
+		// Close(bool) hides overloaded virtual function.
+		virtual void Close(bool CloseReadFromStream)
+		{
+			if(CloseReadFromStream)
+			{
+				mReadFromStream.Close();
+			}
+			Close();
+		}
+		virtual void Close();
 		virtual bool StreamDataLeft()
 		{
 			return mReadFromStream.StreamDataLeft();
