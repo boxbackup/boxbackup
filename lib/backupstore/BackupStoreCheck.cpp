@@ -80,6 +80,24 @@ BackupStoreCheck::~BackupStoreCheck()
 {
 	// Clean up
 	FreeInfo();
+
+	// Avoid an exception if we forget to discard mapNewRefs
+	if (mapNewRefs.get())
+	{
+		// Discard() can throw exception, but destructors aren't supposed to do that, so
+		// just catch and log them.
+		try
+		{
+			mapNewRefs->Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_ERROR("Error while destroying BackupStoreCheck: discarding "
+				"the refcount database threw an exception: " << e.what());
+		}
+
+		mapNewRefs.reset();
+	}
 }
 
 

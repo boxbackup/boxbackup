@@ -7,15 +7,20 @@
 # -l libaries must be in the order they should appear on the command line.
 # Note that order is important on platforms which do not have shared libraries.
 
+# QDBM is currently built from a copy distributed in-tree, which we need to fix.
+qdbm
+
 # Generic support code and modules
 
-lib/raidfile
-lib/crypto
+lib/win32
+lib/common		lib/win32
+lib/raidfile		lib/common
+lib/crypto		lib/common
 lib/server		qdbm	lib/crypto
-lib/compress
-lib/intercept
+lib/compress		lib/common
+lib/intercept		lib/common
 
-test/common		qdbm
+test/common		qdbm	lib/common
 test/crypto		qdbm	lib/crypto
 test/compress		qdbm	lib/compress
 test/raidfile		qdbm	lib/raidfile	lib/intercept
@@ -27,25 +32,28 @@ test/basicserver	qdbm	lib/server
 
 lib/backupstore		lib/server	lib/raidfile	lib/crypto	lib/compress	lib/httpserver
 lib/backupclient	lib/backupstore
+lib/bbackupd		lib/backupclient	qdbm
+lib/bbackupquery	lib/backupclient
+lib/bbstored		lib/backupstore
 
-bin/bbackupobjdump	lib/backupstore
-bin/bbstored		lib/backupstore
+bin/bbackupobjdump	lib/backupclient
+bin/bbstored		lib/bbstored
 bin/bbstoreaccounts	lib/backupclient
-bin/bbackupd		lib/backupclient	qdbm
-bin/bbackupquery	lib/backupclient
-bin/bbackupctl		bin/bbackupd	lib/backupclient	qdbm
+bin/bbackupd		lib/bbackupd
+bin/bbackupquery	lib/bbackupquery
+bin/bbackupctl		lib/backupclient	qdbm	lib/bbackupd
+bin/s3simulator		lib/httpserver
 
-test/backupstore	bin/bbstored	bin/bbstoreaccounts lib/server lib/backupstore lib/backupclient lib/raidfile bin/s3simulator
-test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore	lib/raidfile	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
+test/backupstore	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	lib/raidfile 	bin/s3simulator
+test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore		bin/bbackupquery	bin/bbackupd	bin/bbackupctl
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient
-test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/server lib/backupstore lib/backupclient	lib/intercept
+test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/bbackupquery lib/bbackupd lib/bbstored lib/server lib/intercept
 test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
 lib/httpserver          lib/server
 test/httpserver         lib/httpserver bin/s3simulator
-bin/s3simulator		lib/httpserver
 
 # END_IF_DISTRIBUTION
 

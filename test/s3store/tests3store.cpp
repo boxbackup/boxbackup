@@ -23,6 +23,7 @@
 #include "ServerControl.h"
 #include "SSLLib.h"
 #include "Test.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
@@ -48,10 +49,14 @@ bool StopSimulator()
 
 bool kill_running_daemons()
 {
-	TEST_THAT_OR(::system("test ! -r testfiles/s3simulator.pid || "
-		"kill `cat testfiles/s3simulator.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("rm -f testfiles/s3simulator.pid") == 0, FAIL);
-	return true;
+	if(FileExists("testfiles/s3simulator.pid"))
+	{
+		return KillServer("testfiles/s3simulator.pid", true);
+	}
+	else
+	{
+		return true;
+	}
 }
 
 //! Simplifies calling setUp() with the current function name in each test.

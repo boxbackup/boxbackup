@@ -10,7 +10,8 @@ solaris*)
   ;;
 esac
 
-# Use -Wall if the compiler supports it. This gives better warnings.
+# Enable some compiler flags if the compiler supports them. This gives better warnings
+# and detects some problems early.
 AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
 AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
 AX_CHECK_COMPILE_FLAG(-Werror=return-type,
@@ -35,6 +36,7 @@ if test "x$GXX" = "xyes"; then
     # [http://readlist.com/lists/gcc.gnu.org/gcc/6/31502.html]
     # This is needed to get symbols in backtraces.
     # Note that this apparently fails on HP-UX and Solaris
+    save_LDFLAGS=$LDFLAGS
     LDFLAGS="$LDFLAGS -rdynamic"
     AC_MSG_CHECKING([whether gcc accepts -rdynamic])
     AC_TRY_LINK([], [return 0;],
@@ -43,6 +45,7 @@ if test "x$GXX" = "xyes"; then
     if test x"$have_rdynamic" = x"yes" ; then
       AC_SUBST([LDADD_RDYNAMIC], ['-rdynamic'])
     fi
+    LDFLAGS=$save_LDFLAGS
     ;;
   esac
 fi
@@ -108,7 +111,7 @@ AX_PATH_BDB([1.x or 4.1], [
 ])
 
 # need to find libdl before trying to link openssl, apparently
-AC_SEARCH_LIBS([dlsym], ["dl"])
+AC_SEARCH_LIBS([dlsym], [dl])
 AC_CHECK_FUNCS([dlsym dladdr])
 
 ## Check for Open SSL, use old versions only if explicitly requested
@@ -133,20 +136,12 @@ Upgrade or read the documentation for alternatives]])
 
 ### Checks for header files.
 
-case $target_os in
-mingw32*) ;;
-winnt*)   ;;
-*)
-  AC_HEADER_DIRENT
-  ;;
-esac
-
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h netdb.h process.h pwd.h signal.h])
-AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
+AC_CHECK_HEADERS([cxxabi.h dirent.h dlfcn.h fcntl.h getopt.h netdb.h process.h pwd.h signal.h])
+AC_CHECK_HEADERS([syslog.h time.h unistd.h])
 AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
-AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/time.h])
+AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/stat.h sys/time.h])
 AC_CHECK_HEADERS([sys/types.h sys/uio.h sys/un.h sys/wait.h sys/xattr.h])
 AC_CHECK_HEADERS([sys/ucred.h],,, [
 	#ifdef HAVE_SYS_PARAM_H
@@ -215,11 +210,11 @@ AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 
-AC_CHECK_MEMBERS([struct stat.st_flags])
-AC_CHECK_MEMBERS([struct stat.st_atim])
-AC_CHECK_MEMBERS([struct stat.st_atimespec])
-AC_CHECK_MEMBERS([struct stat.st_atim.tv_nsec])
-AC_CHECK_MEMBERS([struct stat.st_atimensec])
+AC_CHECK_MEMBERS([struct stat.st_flags],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atim],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atimespec],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atim.tv_nsec],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atimensec],,, [[#include <sys/stat.h>]])
 AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   #include <sys/types.h>
   #include <netinet/in.h>
@@ -228,7 +223,7 @@ AC_CHECK_MEMBERS([DIR.d_fd],,,  [[#include <dirent.h>]])
 AC_CHECK_MEMBERS([DIR.dd_fd],,, [[#include <dirent.h>]])
 AC_CHECK_MEMBERS([struct tcp_info.tcpi_rtt],,, [[#include <netinet/tcp.h>]])
 
-AC_CHECK_DECLS([O_BINARY])
+AC_CHECK_DECLS([O_BINARY],,, [[#include <fcntl.h>]])
 
 AC_CHECK_DECLS([ENOTSUP],,, [[#include <sys/errno.h>]])
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
@@ -307,7 +302,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid gettimeofday lchown])
 AC_CHECK_FUNCS([setproctitle utimensat])
-AC_SEARCH_LIBS([setproctitle], ["bsd"])
+AC_SEARCH_LIBS([setproctitle], [bsd])
 
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
 # TODO: Remove this when NetBSD kqueue implementation is working. The main

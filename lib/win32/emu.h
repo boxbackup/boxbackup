@@ -18,7 +18,9 @@
 #define EMU_INCLUDE
 
 // Need feature detection macros below
-#ifdef _MSC_VER
+#if defined BOX_CMAKE
+#	include "../common/BoxConfig.cmake.h"
+#elif defined _MSC_VER
 #	include "../common/BoxConfig-MSVC.h"
 #	define NEED_BOX_VERSION_H
 #else
@@ -32,30 +34,20 @@
 
 // basic types, may be required by other headers since we
 // don't include sys/types.h
-
-#ifdef __MINGW32__
-	#include <stdint.h>
-#else // MSVC
-	typedef unsigned __int64 u_int64_t;
-	typedef unsigned __int64 uint64_t;
-	typedef          __int64 int64_t;
-	typedef unsigned __int32 uint32_t;
-	typedef unsigned __int32 u_int32_t;
-	typedef          __int32 int32_t;
-	typedef unsigned __int16 uint16_t;
-	typedef          __int16 int16_t;
-	typedef unsigned __int8  uint8_t;
-	typedef          __int8  int8_t;
-#endif
+#include <stdint.h>
 
 // emulated types, present on MinGW but not MSVC or vice versa
 
-#ifdef __MINGW32__
-	typedef uint32_t u_int32_t;
-#else
+#ifndef __MINGW32__
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
+	typedef unsigned int uid_t;
+	typedef unsigned int gid_t;
 #endif
+
+// Disable Windows' non-standard implementation of min() and max():
+// http://stackoverflow.com/a/5004874/648162
+#define NOMINMAX
 
 // Windows headers
 
@@ -80,17 +72,6 @@
 	(_result) )
 
 #define ITIMER_REAL 0
-
-#ifdef _MSC_VER
-// Microsoft decided to deprecate the standard POSIX functions. Great!
-#define open(file,flags,mode) _open(file,flags,mode)
-#define close(fd)             _close(fd)
-#define dup(fd)               _dup(fd)
-#define read(fd,buf,count)    _read(fd,buf,count)
-#define write(fd,buf,count)   _write(fd,buf,count)
-#define lseek(fd,off,whence)  _lseek(fd,off,whence)
-#define fileno(struct_file)   _fileno(struct_file)
-#endif
 
 struct passwd {
 	char *pw_name;
@@ -142,7 +123,7 @@ inline struct passwd * getpwnam(const char * name)
 	#define S_ISDIR(x) (S_IFDIR & x)
 #endif
 
-inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
+inline int chown(const char * Filename, uint32_t uid, uint32_t gid)
 {
 	//important - this needs implementing
 	//If a large restore is required then 
@@ -220,7 +201,11 @@ inline int geteuid(void)
 #define snprintf _snprintf
 inline int strcasecmp(const char *s1, const char *s2)
 {
-	return _stricmp(s1,s2);
+	return _stricmp(s1, s2);
+}
+inline int strncasecmp(const char *s1, const char *s2, size_t count)
+{
+	return _strnicmp(s1, s2, count);
 }
 #endif
 
@@ -247,7 +232,7 @@ struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
 
 // local constant to open file exclusively without shared access
-#define O_LOCK 0x10000
+#define BOX_OPEN_LOCK 0x10000
 
 extern DWORD winerrno; /* used to report errors from openfile() */
 HANDLE openfile(const char *filename, int flags, int mode);
@@ -414,6 +399,7 @@ bool ConvertConsoleToUtf8(const std::string& rSource, std::string& rDest);
 char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
 bool ConvertFromWideString(const std::wstring& rInput, 
 	std::string* pOutput, unsigned int codepage);
+WCHAR* ConvertUtf8ToWideString(const char* pString);
 std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
 
 // Utility function which returns a default config file name,

@@ -10,9 +10,9 @@
 #include "Box.h"
 
 #ifdef HAVE_REGEX_SUPPORT
-	#ifdef HAVE_PCREPOSIX_H
+	#if defined HAVE_PCREPOSIX_H
 		#include <pcreposix.h>
-	#else
+	#elif defined HAVE_REGEX_H
 		#include <regex.h>
 	#endif
 	#define EXCLUDELIST_IMPLEMENTATION_REGEX_T_DEFINED
@@ -199,11 +199,9 @@ void ExcludeList::AddRegexEntries(const std::string &rEntries)
 				{
 					char buf[1024];
 					regerror(errcode, pregex, buf, sizeof(buf));
-					BOX_LOG_CATEGORY(Log::ERROR,
-						ConfigurationVerify::VERIFY_ERROR,
+					THROW_EXCEPTION_MESSAGE(CommonException, BadRegularExpression,
 						"Invalid regular expression: " <<
 						entry << ": " << buf);
-					THROW_EXCEPTION(CommonException, BadRegularExpression)
 				}
 				
 				// Store in list of regular expressions

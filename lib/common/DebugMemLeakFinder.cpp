@@ -15,14 +15,18 @@
 #undef realloc
 #undef free
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef HAVE_PROCESS_H
+#	include <process.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#	include <unistd.h>
+#endif
 
 #include <cstdlib> // for std::atexit
 #include <map>

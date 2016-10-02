@@ -29,11 +29,20 @@ private:
 
 public:
 	bool TryAndGetLock(const std::string& rFilename, int mode = 0755);
+# ifdef WIN32
+	bool GotLock() {return mFileDescriptor != INVALID_HANDLE_VALUE;}
+# else
 	bool GotLock() {return mFileDescriptor != -1;}
+# endif
 	void ReleaseLock();
 
 private:
+# ifdef WIN32
+	HANDLE mFileDescriptor;
+# else
 	int mFileDescriptor;
+# endif
+
 	std::string mFileName;
 };
 

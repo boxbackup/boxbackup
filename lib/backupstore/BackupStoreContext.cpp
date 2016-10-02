@@ -1384,7 +1384,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 		std::auto_ptr<IOStream> objectFile = mpFileSystem->GetObject(ObjectID);
 
 		// Read the first integer
-		u_int32_t magic;
+		uint32_t magic;
 		if(!objectFile->ReadFullBuffer(&magic, sizeof(magic), 0 /* not interested in how many read if failure */))
 		{
 			// Failed to get any bytes, must have failed
@@ -1400,7 +1400,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 #endif
 
 		// Right one?
-		u_int32_t requiredMagic = (MustBe == ObjectExists_File)?OBJECTMAGIC_FILE_MAGIC_VALUE_V1:OBJECTMAGIC_DIR_MAGIC_VALUE;
+		uint32_t requiredMagic = (MustBe == ObjectExists_File)?OBJECTMAGIC_FILE_MAGIC_VALUE_V1:OBJECTMAGIC_DIR_MAGIC_VALUE;
 
 		// Check
 		if(ntohl(magic) != requiredMagic)

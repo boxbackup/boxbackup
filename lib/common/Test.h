@@ -250,4 +250,14 @@ bool compare_lists(const std::vector<std::string>& expected_items,
 typedef std::map<std::string, std::string> str_map_t;
 bool test_equal_maps(const str_map_t& expected_attrs, const str_map_t& actual_attrs);
 
+#ifndef TEST_EXECUTABLE
+#	ifdef _MSC_VER
+		// Our CMakeFiles compile tests to different executable filenames,
+		// e.g. test_common.exe instead of _test.exe.
+		#define TEST_EXECUTABLE BOX_MODULE ".exe"
+#	else
+		#define TEST_EXECUTABLE "./_test"
+#	endif
+#endif // TEST_EXECUTABLE
+
 #endif // TEST__H

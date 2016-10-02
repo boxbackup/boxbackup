@@ -46,8 +46,6 @@ std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 std::string FormatUsageLineStart(const std::string& rName,
 	bool MachineReadable);
 
-std::string BoxGetTemporaryDirectoryName();
-
 typedef std::pair<std::string, std::string> str_pair_t;
 typedef std::map<std::string, std::string> str_map_t;
 typedef std::map<std::string, str_pair_t> str_map_diff_t;

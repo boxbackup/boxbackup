@@ -21,7 +21,6 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <string.h>
-#include <unistd.h>
 
 #ifdef HAVE_SYS_WAIT_H
 	#include <sys/wait.h>
@@ -34,6 +33,10 @@
 
 #ifdef HAVE_SIGNAL_H
 	#include <signal.h>
+#endif
+
+#ifdef WIN32
+	#include <process.h>
 #endif
 
 #include <map>
@@ -327,11 +330,20 @@ bool unpack_files(const std::string& archive_file,
 	BOX_INFO("Unpacking test fixture archive into " << destination_dir
 		<< ": " << archive_file);
 
-#ifdef WIN32
+#ifdef _MSC_VER // No tar, use 7zip.
+	// 7za only extracts the tgz file to a tar file, which we have to extract in a
+	// separate step.
+	std::string cmd = std::string("7za x testfiles/") + archive_file + ".tgz -aos "
+		"-otestfiles >nul:";
+	TEST_LINE_OR(::system(cmd.c_str()) == 0, cmd, return false);
+
+	cmd = std::string("7za x testfiles/") + archive_file + ".tar -aos "
+		"-o" + destination_dir + " -x!.\\TestDir1\\symlink? -x!.\\test2 >nul:";
+#elif defined WIN32 // Cygwin + MinGW, we can use real tar.
 	std::string cmd("tar xz");
 	cmd += tar_options + " -f testfiles/" + archive_file + ".tgz " +
 		"-C " + destination_dir;
-#else
+#else // Unixish, but Solaris tar doesn't like decompressing gzip files.
 	std::string cmd("gzip -d < testfiles/");
 	cmd += archive_file + ".tgz | ( cd " + destination_dir + " && tar xf" +
 		tar_options + " -)";
@@ -399,13 +411,19 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 
 bool kill_running_daemons()
 {
-	TEST_THAT_OR(::system("test ! -r testfiles/bbstored.pid || "
-		"kill `cat testfiles/bbstored.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("test ! -r testfiles/bbackupd.pid || "
-		"kill `cat testfiles/bbackupd.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("rm -f testfiles/bbackupd.pid "
-		"testfiles/bbstored.pid") == 0, FAIL);
-	return true;
+	bool success = true;
+
+	if(FileExists("testfiles/bbstored.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbstored.pid", true), success = false);
+	}
+
+	if(FileExists("testfiles/bbackupd.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbackupd.pid", true), success = false);
+	}
+
+	return success;
 }
 
 bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
@@ -1365,10 +1383,19 @@ bool test_ssl_keepalives()
 	// keepalives polled should be the ones for each directory entry while reading
 	// directories, and the one in UpdateItems(), which is also once per item (file
 	// or directory). test_base.tgz has 16 directory entries, so we expect 2 * 16 = 32
-	// keepalives in total.
+	// keepalives in total. Except on Windows where there are no symlinks, and when
+	// compiled with MSVC we exclude them from the tar extract operation as 7za
+	// complains about them, so there should be 3 files less, and thus only 26
+	// keepalives.
+#ifdef _MSC_VER
+	#define NUM_KEEPALIVES_BASE 26
+#else
+	#define NUM_KEEPALIVES_BASE 32
+#endif
+
 	std::auto_ptr<BackupClientContext> apContext = bbackupd.RunSyncNow();
 	MockClientContext* pContext = (MockClientContext *)(apContext.get());
-	TEST_EQUAL(32, pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(NUM_KEEPALIVES_BASE, pContext->mNumKeepAlivesPolled);
 	TEST_EQUAL(1, pContext->mKeepAliveTime);
 
 	// Calculate the number of blocks that will be in ./TestDir1/x1/dsfdsfs98.fd,
@@ -1402,7 +1429,8 @@ bool test_ssl_keepalives()
 
 	apContext = bbackupd.RunSyncNow();
 	pContext = (MockClientContext *)(apContext.get());
-	TEST_EQUAL(32 + (4269/4096) + (4269/173), pContext->mNumKeepAlivesPolled);
+	TEST_EQUAL(NUM_KEEPALIVES_BASE + (4269/4096) + (4269/173),
+		pContext->mNumKeepAlivesPolled);
 	TEARDOWN_TEST_BBACKUPD();
 }
 
@@ -1475,7 +1503,11 @@ bool test_backup_pauses_when_store_is_full()
 
 		// Delete a file and a directory
 		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
+#else
 		TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+#endif
 
 		// The following files should be in the backup directory:
 		// 00000001 -d---- 00002 (root)
@@ -1588,7 +1620,12 @@ bool test_bbackupd_exclusions()
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 	// Delete a file and a directory
 	TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+
+#ifdef WIN32
+	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
+#else
 	TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
+#endif
 
 	// We need to be OVER the limit, i.e. >24 blocks, or
 	// BackupClientContext will mark us over limit immediately on
@@ -2125,9 +2162,8 @@ bool test_read_only_dirs_can_be_restored()
 	{
 		{
 			#ifdef WIN32
-				// Cygwin chmod changes Windows file attributes
-				TEST_THAT(::system("chmod 0555 testfiles/"
-					"TestDir1/x1") == 0);
+				TEST_THAT(::system("attrib +r testfiles\\TestDir1\\x1")
+					== 0);
 			#else
 				TEST_THAT(chmod("testfiles/TestDir1/x1",
 					0555) == 0);
@@ -2151,12 +2187,12 @@ bool test_read_only_dirs_can_be_restored()
 
 			// put the permissions back to sensible values
 			#ifdef WIN32
-				TEST_THAT(::system("chmod 0755 testfiles/"
-					"TestDir1/x1") == 0);
-				TEST_THAT(::system("chmod 0755 testfiles/"
-					"restore1/x1") == 0);
-				TEST_THAT(::system("chmod 0755 testfiles/"
-					"restore-test/Test1/x1") == 0);
+				TEST_THAT(::system("attrib -r testfiles\\TestDir1\\x1")
+					== 0);
+				TEST_THAT(::system("attrib -r testfiles\\restore1\\x1")
+					== 0);
+				TEST_THAT(::system("attrib -r testfiles\\restore-test\\"
+					"Test1\\x1") == 0);
 			#else
 				TEST_THAT(chmod("testfiles/TestDir1/x1",
 					0755) == 0);
@@ -2571,9 +2607,6 @@ bool test_store_error_reporting()
 
 	// TODO FIXME dedent
 	{
-		// Check that store errors are reported neatly
-		TEST_THAT(system("rm -f testfiles/notifyran.backup-error.*") == 0);
-
 		// Break the store. We need a write lock on the account
 		// while we do this, otherwise housekeeping might be running
 		// and might rewrite the info files when it finishes,
@@ -2994,11 +3027,11 @@ bool test_upload_very_old_files()
 		{
 			// in the archive, it's read only
 			#ifdef WIN32
-				TEST_THAT(::system("chmod 0777 testfiles"
-					"/TestDir1/sub23/rand.h") == 0);
+				TEST_THAT(::system("attrib -r "
+					"testfiles\\TestDir\\sub23\\rand.h") == 0);
 			#else
-				TEST_THAT(chmod("testfiles/TestDir1/sub23"
-					"/rand.h", 0777) == 0);
+				TEST_THAT(chmod("testfiles/TestDir1/sub23/rand.h",
+					0777) == 0);
 			#endif
 
 			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h",
@@ -3234,11 +3267,14 @@ bool test_delete_dir_change_attribute()
 	// TODO FIXME dedent
 	{
 		// Delete a directory
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
+#else
 		TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
-
+#endif
 		// Change attributes on an existing file.
 #ifdef WIN32
-		TEST_EQUAL(0, system("chmod 0423 testfiles/TestDir1/df9834.dsf"));
+		TEST_EQUAL(0, system("attrib +r testfiles\\TestDir1\\df9834.dsf"));
 #else
 		TEST_THAT(::chmod("testfiles/TestDir1/df9834.dsf", 0423) == 0);
 #endif
@@ -3423,9 +3459,15 @@ bool test_sync_new_files()
 		// OpenBSD's tar interprets the "-m" option quite differently:
 		// it sets the time to epoch zero (1 Jan 1970) instead of the
 		// current time, which doesn't help us. So reset the timestamp
-		// on a file with the touch command, so it won't be backed up.
-		TEST_RETURN(::system("touch testfiles/TestDir1/chsh"), 0);
-
+		// on a file by touching it, so it won't be backed up.
+		{
+#ifndef WIN32
+			TEST_THAT(chmod("testfiles/TestDir1/chsh", 0755) == 0);
+#endif
+			FileStream fs("testfiles/TestDir1/chsh", O_WRONLY);
+			fs.Write("a", 1);
+		}
+		
 		// At least one file is too new to be backed up on the first run.
 		bbackupd.RunSyncNow();
 		TEST_COMPARE(Compare_Different);
@@ -3716,7 +3758,11 @@ bool test_restore_deleted_files()
 	TEST_COMPARE(Compare_Same);
 
 	TEST_THAT(::unlink("testfiles/TestDir1/f1.dat") == 0);
+#ifdef WIN32
+	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
+#else
 	TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
+#endif
 	TEST_COMPARE(Compare_Different);
 
 	bbackupd.RunSyncNow();
@@ -3781,7 +3827,7 @@ bool test_locked_file_behaviour()
 		// and the appropriate error is reported.
 
 		HANDLE handle = openfile("testfiles/TestDir1/f1.dat",
-			O_LOCK, 0);
+			BOX_OPEN_LOCK, 0);
 		TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 		{
@@ -3810,7 +3856,7 @@ bool test_locked_file_behaviour()
 			// open the file again, compare and check that compare
 			// reports the correct error message (and finishes)
 			handle = openfile("testfiles/TestDir1/f1.dat",
-				O_LOCK, 0);
+				BOX_OPEN_LOCK, 0);
 			TEST_THAT_OR(handle != INVALID_HANDLE_VALUE, FAIL);
 
 			TEST_COMPARE(Compare_Error);

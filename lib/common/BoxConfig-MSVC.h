@@ -386,9 +386,6 @@
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */
 
-/* Define to `int' if <sys/types.h> doesn't define. */
-#define gid_t int
-
 /* Define to `int' if <sys/types.h> does not define. */
 /* #undef mode_t */
 
@@ -400,6 +397,3 @@
 
 /* Define to `unsigned' if <sys/types.h> does not define. */
 /* #undef size_t */
-
-/* Define to `int' if <sys/types.h> doesn't define. */
-#define uid_t int

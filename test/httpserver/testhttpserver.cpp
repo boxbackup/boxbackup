@@ -737,8 +737,12 @@ bool test_httpserver()
 		TEST_THAT(fs.CompareWith(response_data, IOStream::TimeOutInfinite));
 	}
 
+#ifndef WIN32
+	TEST_THAT(system("rm -rf *.memleaks") == 0);
+#endif
+
 	// Start the server
-	int pid = StartDaemon(0, "./_test server testfiles/httpserver.conf",
+	int pid = StartDaemon(0, TEST_EXECUTABLE " server testfiles/httpserver.conf",
 		"testfiles/httpserver.pid");
 	TEST_THAT_OR(pid > 0, return 1);
 
@@ -1046,7 +1050,7 @@ bool test_httpserver()
 	}
 
 	// Start the S3Simulator server
-	pid = StartDaemon(0, "./_test s3server testfiles/s3simulator.conf",
+	pid = StartDaemon(0, TEST_EXECUTABLE " s3server testfiles/s3simulator.conf",
 		"testfiles/s3simulator.pid");
 	TEST_THAT_OR(pid > 0, return 1);
 

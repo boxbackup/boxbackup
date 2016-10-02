@@ -10,7 +10,6 @@
 #include "Box.h"
 
 #include <string.h>
-#include <strings.h>
 #include <openssl/rand.h>
 
 #include "Test.h"

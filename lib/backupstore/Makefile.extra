@@ -1,9 +1,9 @@
 MAKEPROTOCOL = ../../lib/server/makeprotocol.pl
 
-GEN_CMD = $(MAKEPROTOCOL) backupprotocol.txt
+GEN_CMD = $(MAKEPROTOCOL) BackupProtocol.txt
 
 # AUTOGEN SEEDING
-autogen_BackupProtocol.cpp autogen_BackupProtocol.h:	$(MAKEPROTOCOL) backupprotocol.txt
+autogen_BackupProtocol.cpp autogen_BackupProtocol.h:	$(MAKEPROTOCOL) BackupProtocol.txt
 	$(_PERL) $(GEN_CMD)
 
 

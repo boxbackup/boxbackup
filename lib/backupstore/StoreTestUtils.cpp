@@ -227,7 +227,7 @@ int64_t run_housekeeping(BackupFileSystem& filesystem)
 {
 	// Do housekeeping on this account
 	HousekeepStoreAccount housekeeping(filesystem, NULL);
-	housekeeping.DoHousekeeping(true /* keep trying forever */);
+	TEST_THAT(housekeeping.DoHousekeeping(true /* keep trying forever */));
 	return housekeeping.GetErrorCount();
 }
 

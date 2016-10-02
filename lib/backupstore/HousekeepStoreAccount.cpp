@@ -79,10 +79,21 @@ HousekeepStoreAccount::HousekeepStoreAccount(BackupFileSystem& FileSystem,
 // --------------------------------------------------------------------------
 HousekeepStoreAccount::~HousekeepStoreAccount()
 {
-	if(mpNewRefs)
+	if(mapNewRefs.get())
 	{
-		mpNewRefs->Discard();
-		mpNewRefs = NULL;
+		// Discard() can throw exception, but destructors aren't supposed to do that, so
+		// just catch and log them.
+		try
+		{
+			mapNewRefs->Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_ERROR("Failed to destroy housekeeper: discarding the refcount "
+				"database threw an exception: " << e.what());
+		}
+
+		mapNewRefs.reset();
 	}
 }
 
@@ -172,7 +183,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	pInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
 	pInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
 
-	// Reset the delta counts for files, as they will include 
+	// Reset the delta counts for files, as they will include
 	// RemoveASAP flagged files deleted during the initial scan.
 	// keep removeASAPBlocksUsedDelta for reporting
 	int64_t removeASAPBlocksUsedDelta = mBlocksUsedDelta;
@@ -222,7 +233,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Go and delete items from the accounts
 	bool deleteInterrupted = DeleteFiles(*pInfo);
 
-	// If that wasn't interrupted, remove any empty directories which 
+	// If that wasn't interrupted, remove any empty directories which
 	// are also marked as deleted in their containing directory
 	if(!deleteInterrupted)
 	{
@@ -240,8 +251,8 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			(deleteInterrupted?" and was interrupted":""));
 	}
 
-	// Make sure the delta's won't cause problems if the counts are 
-	// really wrong, and it wasn't fixed because the store was 
+	// Make sure the delta's won't cause problems if the counts are
+	// really wrong, and it wasn't fixed because the store was
 	// updated during the scan.
 	if(mBlocksUsedDelta < (0 - pInfo->GetBlocksUsed()))
 	{
@@ -550,7 +561,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount::DelEn &x, const HousekeepStoreAccount::DelEn &y)
 {
 	// STL spec says this:
-	// A Strict Weak Ordering is a Binary Predicate that compares two objects, returning true if the first precedes the second. 
+	// A Strict Weak Ordering is a Binary Predicate that compares two objects, returning true if the first precedes the second.
 
 	// The sort order here is intended to preserve the entries of most value, that is, the newest objects
 	// which are on a mark boundary.

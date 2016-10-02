@@ -22,7 +22,9 @@
 #endif
 
 #include "BoxTime.h"
+#include "FileStream.h"
 #include "Test.h"
+#include "Utils.h"
 
 int num_tests_selected = 0;
 int num_failures = 0;
@@ -89,6 +91,116 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 		}
 	}
 
+#ifdef _MSC_VER
+	DIR* pDir = opendir("testfiles");
+	if(!pDir)
+	{
+		THROW_SYS_FILE_ERROR("Failed to open test temporary directory",
+			"testfiles", CommonException, Internal);
+	}
+	struct dirent* pEntry;
+	for(pEntry = readdir(pDir); pEntry; pEntry = readdir(pDir))
+	{
+		std::string filename = pEntry->d_name;
+		if(StartsWith("TestDir", filename) ||
+			StartsWith("0_", filename) ||
+			filename == "accounts.txt" ||
+			StartsWith("file", filename) ||
+			StartsWith("notifyran", filename) ||
+			StartsWith("notifyscript.tag", filename) ||
+			StartsWith("restore", filename) ||
+			filename == "bbackupd-data" ||
+			filename == "syncallowscript.control" ||
+			StartsWith("syncallowscript.notifyran.", filename) ||
+			filename == "test2.downloaded" ||
+			EndsWith("testfile", filename))
+		{
+			std::string filepath = std::string("testfiles\\") + filename;
+
+			int filetype = ObjectExists(filepath);
+			if(filetype == ObjectExists_File)
+			{
+				if(::unlink(filepath.c_str()) != 0)
+				{
+					TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
+						"test fixture file: unlink(\"" << filepath << "\")"));
+				}
+			}
+			else if(filetype == ObjectExists_Dir)
+			{
+				std::string cmd = "cmd /c rd /s /q " + filepath;
+				WCHAR* wide_cmd = ConvertUtf8ToWideString(cmd.c_str());
+				if(wide_cmd == NULL)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to convert string "
+						"to wide string: " << cmd);
+					continue;
+				}
+
+				STARTUPINFOW si;
+				PROCESS_INFORMATION pi;
+
+				ZeroMemory( &si, sizeof(si) );
+				si.cb = sizeof(si);
+				ZeroMemory( &pi, sizeof(pi) );
+
+				BOOL result = CreateProcessW(
+					NULL, // lpApplicationName
+					wide_cmd, // lpCommandLine
+					NULL, // lpProcessAttributes
+					NULL, // lpThreadAttributes
+					TRUE, // bInheritHandles
+					0, // dwCreationFlags
+					NULL, // lpEnvironment
+					NULL, // lpCurrentDirectory
+					&si, // lpStartupInfo
+					&pi // lpProcessInformation
+				);
+				delete [] wide_cmd;
+
+				if(result == FALSE)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete test "
+						"fixture file: failed to execute command "
+						"'" << cmd << "': " <<
+						GetErrorMessage(GetLastError()));
+					continue;
+				}
+
+				// Wait until child process exits.
+				WaitForSingleObject(pi.hProcess, INFINITE);
+				DWORD exit_code;
+				result = GetExitCodeProcess(pi.hProcess, &exit_code);
+
+				if(result == FALSE)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete "
+						"test fixture file: failed to get "
+						"command exit status: '" <<
+						cmd << "': " <<
+						GetErrorMessage(GetLastError()));
+				}
+				else if(exit_code != 0)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to delete test "
+						"fixture file: command '" << cmd << "' "
+						"exited with status " << exit_code);
+				}
+
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
+			}
+			else
+			{
+				TEST_FAIL_WITH_MESSAGE("Don't know how to delete file " << filepath <<
+					" of type " << filetype);
+			}
+		}
+	}
+	closedir(pDir);
+	FileStream touch("testfiles/accounts.txt", O_WRONLY | O_CREAT | O_TRUNC,
+		S_IRUSR | S_IWUSR);
+#else
 	TEST_THAT_THROWONFAIL(system(
 		"rm -rf "
 		"testfiles/TestDir* "
@@ -108,6 +220,8 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 		"testfiles/syncallowscript.notifyran.* "
 		"testfiles/test2.downloaded "
 		) == 0);
+	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
+#endif
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
