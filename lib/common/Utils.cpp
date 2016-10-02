@@ -435,7 +435,3 @@ std::map<std::string, str_pair_t> compare_str_maps(const str_map_t& expected,
 	return differences;
 }
 
-
-
-=======
->>>>>>> master
