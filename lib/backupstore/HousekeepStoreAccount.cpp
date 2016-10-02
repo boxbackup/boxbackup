@@ -79,13 +79,13 @@ HousekeepStoreAccount::HousekeepStoreAccount(BackupFileSystem& FileSystem,
 // --------------------------------------------------------------------------
 HousekeepStoreAccount::~HousekeepStoreAccount()
 {
-	if(mapNewRefs.get())
+	if(mpNewRefs)
 	{
 		// Discard() can throw exception, but destructors aren't supposed to do that, so
 		// just catch and log them.
 		try
 		{
-			mapNewRefs->Discard();
+			mpNewRefs->Discard();
 		}
 		catch(BoxException &e)
 		{
@@ -93,7 +93,7 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 				"database threw an exception: " << e.what());
 		}
 
-		mapNewRefs.reset();
+		mpNewRefs = NULL;
 	}
 }
 

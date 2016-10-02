@@ -82,13 +82,13 @@ BackupStoreCheck::~BackupStoreCheck()
 	FreeInfo();
 
 	// Avoid an exception if we forget to discard mapNewRefs
-	if (mapNewRefs.get())
+	if (mpNewRefs)
 	{
 		// Discard() can throw exception, but destructors aren't supposed to do that, so
 		// just catch and log them.
 		try
 		{
-			mapNewRefs->Discard();
+			mpNewRefs->Discard();
 		}
 		catch(BoxException &e)
 		{
@@ -96,7 +96,7 @@ BackupStoreCheck::~BackupStoreCheck()
 				"the refcount database threw an exception: " << e.what());
 		}
 
-		mapNewRefs.reset();
+		mpNewRefs = NULL;
 	}
 }
 
