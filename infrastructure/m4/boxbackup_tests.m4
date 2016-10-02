@@ -13,7 +13,9 @@ esac
 # Enable some compiler flags if the compiler supports them. This gives better warnings
 # and detects some problems early.
 AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
-AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
+# -Wundef would be a good idea, but Boost is full of undefined variable use, so we need
+# to disable it for now so that we can concentrate on real errors:
+dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
 AX_CHECK_COMPILE_FLAG(-Werror=return-type,
 	[cxxflags_strict="$cxxflags_strict -Werror=return-type"])
 AX_CHECK_COMPILE_FLAG(-Werror=non-virtual-dtor,
