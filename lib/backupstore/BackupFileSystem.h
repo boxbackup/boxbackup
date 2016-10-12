@@ -280,6 +280,8 @@ public:
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch);
 
 private:
 	void CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName,

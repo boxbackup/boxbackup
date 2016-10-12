@@ -158,7 +158,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	mpNewRefs = &mrFileSystem.GetTemporaryRefCountDatabase();
 
 	// Scan the directory for potential things to delete
-	// This will also remove eligible items marked with RemoveASAP
+	// This will also find and enqueue eligible items marked with RemoveASAP
 	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, *pInfo);
 
 	if(!continueHousekeeping)
@@ -177,19 +177,12 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 			"directory scan was interrupted");
 	}
 
-	// If housekeeping made any changes, such as deleting RemoveASAP files,
-	// the differences in block counts will be recorded in the deltas.
-	pInfo->ChangeBlocksUsed(mBlocksUsedDelta);
-	pInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
-	pInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
-
-	// Reset the delta counts for files, as they will include
-	// RemoveASAP flagged files deleted during the initial scan.
-	// keep removeASAPBlocksUsedDelta for reporting
-	int64_t removeASAPBlocksUsedDelta = mBlocksUsedDelta;
-	mBlocksUsedDelta = 0;
-	mBlocksInOldFilesDelta = 0;
-	mBlocksInDeletedFilesDelta = 0;
+	if(!continueHousekeeping)
+	{
+		// Report any UNexpected changes, and consider them to be errors.
+		// Do this before applying the expected changes below.
+		mErrorCount += pInfo->ReportChangesTo(*apOldInfo);
+	}
 
 	// If scan directory stopped for some reason, probably parent
 	// instructed to terminate, stop now.
@@ -206,10 +199,6 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		mrFileSystem.PutBackupStoreInfo(*pInfo);
 		return false;
 	}
-
-	// Report any UNexpected changes, and consider them to be errors.
-	// Do this before applying the expected changes below.
-	mErrorCount += pInfo->ReportChangesTo(*apOldInfo);
 
 	// Try to load the old reference count database and check whether
 	// any counts have changed. We want to compare the mpNewRefs to
@@ -243,11 +232,9 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Log deletion if anything was deleted
 	if(mFilesDeleted > 0 || mEmptyDirectoriesDeleted > 0)
 	{
-		BOX_INFO("Housekeeping on account " <<
-			mrFileSystem.GetAccountIdentifier() << " removed " <<
-			(0 - (mBlocksUsedDelta + removeASAPBlocksUsedDelta)) <<
-			" blocks (" << mFilesDeleted << " files, " <<
-			mEmptyDirectoriesDeleted << " dirs)" <<
+		BOX_INFO("Housekeeping on account " << mrFileSystem.GetAccountIdentifier() << " "
+			"removed " << -mBlocksUsedDelta << " blocks (" << mFilesDeleted << " "
+			"files, " << mEmptyDirectoriesDeleted << " dirs)" <<
 			(deleteInterrupted?" and was interrupted":""));
 	}
 
@@ -358,47 +345,49 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 
 	// BLOCK
 	{
-		// Remove any files which are marked for removal as soon
-		// as they become old or deleted.
-		bool deletedSomething = false;
-		do
+		// Add to mDefiniteDeletions any files which are marked for removal as soon as
+		// they become old or deleted.
+
+		// Iterate through the directory
+		BackupStoreDirectory::Iterator i(dir);
+		BackupStoreDirectory::Entry *en = 0;
+		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
 		{
-			// Iterate through the directory
-			deletedSomething = false;
-			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry *en = 0;
-			while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
+			int16_t enFlags = en->GetFlags();
+			if((enFlags & BackupStoreDirectory::Entry::Flags_RemoveASAP) != 0
+				&& (en->IsDeleted() || en->IsOld()))
 			{
-				int16_t enFlags = en->GetFlags();
-				if((enFlags & BackupStoreDirectory::Entry::Flags_RemoveASAP) != 0
-					&& (en->IsDeleted() || en->IsOld()))
+				if(!mrFileSystem.CanMergePatches() &&
+					en->GetDependsNewer() != 0)
 				{
-					if(!mrFileSystem.CanMergePatches() &&
-						en->GetDependsNewer() != 0)
+					BOX_ERROR("Cannot delete file " <<
+						BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
+						" flagged as RemoveASAP because "
+						"another file depends on it (" <<
+						BOX_FORMAT_OBJECTID(en->GetDependsNewer()) <<
+						" and the filesystem does not "
+						"support merging patches");
+					continue;
+				}
+
+				mDefiniteDeletions.push_back(
+					std::pair<int64_t, int64_t>(en->GetObjectID(),
+						ObjectID)); // of the directory
+
+				// Because we are definitely deleting this file, we don't need
+				// housekeeping to delete potential files to free up the space
+				// that it occupies, so reduce the deletion target by this file's
+				// size.
+				if(mDeletionSizeTarget > 0)
+				{
+					mDeletionSizeTarget -= en->GetSizeInBlocks();
+					if(mDeletionSizeTarget < 0)
 					{
-						BOX_ERROR("Cannot delete file " <<
-							BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-							" flagged as RemoveASAP because "
-							"another file depends on it (" <<
-							BOX_FORMAT_OBJECTID(en->GetDependsNewer()) <<
-							" and the filesystem does not "
-							"support merging patches");
-						continue;
+						mDeletionSizeTarget = 0;
 					}
-
-					// Delete this immediately.
-					DeleteFile(ObjectID, en->GetObjectID(), dir,
-						rBackupStoreInfo);
-
-					// flag as having done something
-					deletedSomething = true;
-
-					// Must start the loop from the beginning again, as iterator is now
-					// probably invalid.
-					break;
 				}
 			}
-		} while(deletedSomething);
+		}
 	}
 
 	// BLOCK
@@ -417,7 +406,6 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
 		{
 			// Update recalculated usage sizes
-			int16_t enFlags = en->GetFlags();
 			int64_t enSizeInBlocks = en->GetSizeInBlocks();
 			mBlocksUsed += enSizeInBlocks;
 			if(en->IsOld()) mBlocksInOldFiles += enSizeInBlocks;
@@ -440,19 +428,19 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			}
 			// enVersionAge is now the age of this version.
 
-			// Potentially add it to the list if it's deleted, if it's an old version or deleted
+			// Add it to the list of potential files to remove, if it's an old version
+			// or deleted:
 			if(en->IsOld() || en->IsDeleted())
 			{
 				if(!mrFileSystem.CanMergePatches() &&
 					en->GetDependsNewer() != 0)
 				{
-					BOX_TRACE("Cannot delete file " <<
+					BOX_TRACE("Cannot remove old/deleted file " <<
 						BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-						" flagged as RemoveASAP because "
-						"another file depends on it (" <<
+						" now, because another file depends on it (" <<
 						BOX_FORMAT_OBJECTID(en->GetDependsNewer()) <<
-						" and the filesystem does not "
-						"support merging patches");
+						" and the filesystem does not support merging "
+						"patches");
 					continue;
 				}
 
@@ -602,7 +590,19 @@ bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount
 // --------------------------------------------------------------------------
 bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 {
-	// Only delete files if the deletion target is greater than zero
+	// Delete all the definite deletions first, because we promised that we would, and because
+	// the deletion target might only be zero because we are definitely deleting enough files
+	// to free up all required space. So if we didn't delete them, the store would remain over
+	// its target size.
+	for(std::vector<std::pair<int64_t, int64_t> >::iterator i = mDefiniteDeletions.begin();
+		i != mDefiniteDeletions.end(); i++)
+	{
+		int64_t FileID = i->first;
+		int64_t DirID = i->second;
+		RemoveReferenceAndMaybeDeleteFile(FileID, DirID, "RemoveASAP", rBackupStoreInfo);
+	}
+
+	// Only delete potentially deletable files if the deletion target is greater than zero
 	// (otherwise we delete one file each time round, which gradually deletes the old versions)
 	if(mDeletionSizeTarget <= 0)
 	{
@@ -624,35 +624,14 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 				// include account ID here as the specified account is now locked
 				mpHousekeepingCallback->CheckForInterProcessMsg(account_id))
 			{
-				// Need to abort now
+				// Need to abort now. Return true to signal that we were interrupted.
 				return true;
 			}
 		}
 #endif
 
-		// Load up the directory it's in
-		// Get the filename
-		BackupStoreDirectory dir;
-		mrFileSystem.GetDirectory(i->mInDirectory, dir);
-
-		// Delete the file
-		BackupStoreRefCountDatabase::refcount_t refs =
-			DeleteFile(i->mInDirectory, i->mObjectID, dir, rBackupStoreInfo);
-		if(refs == 0)
-		{
-			BOX_INFO("Housekeeping removed " <<
-				(i->mIsFlagDeleted ? "deleted" : "old") <<
-				" file " << BOX_FORMAT_OBJECTID(i->mObjectID) <<
-				" from dir " << BOX_FORMAT_OBJECTID(i->mInDirectory));
-		}
-		else
-		{
-			BOX_TRACE("Housekeeping preserved " <<
-				(i->mIsFlagDeleted ? "deleted" : "old") <<
-				" file " << BOX_FORMAT_OBJECTID(i->mObjectID) <<
-				" in dir " << BOX_FORMAT_OBJECTID(i->mInDirectory) <<
-				" with " << refs << " references");
-		}
+		RemoveReferenceAndMaybeDeleteFile(i->mObjectID, i->mInDirectory,
+			(i->mIsFlagDeleted ? "deleted" : "old"), rBackupStoreInfo);
 
 		// Stop if the deletion target has been matched or exceeded
 		// (checking here rather than at the beginning will tend to reduce the
@@ -665,6 +644,30 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 	}
 
 	return false;
+}
+
+void HousekeepStoreAccount::RemoveReferenceAndMaybeDeleteFile(int64_t FileID, int64_t DirID,
+	const std::string& reason, BackupStoreInfo& rBackupStoreInfo)
+{
+	// Load up the directory it's in
+	// Get the filename
+	BackupStoreDirectory dir;
+	mrFileSystem.GetDirectory(DirID, dir);
+
+	// Delete the file
+	BackupStoreRefCountDatabase::refcount_t refs =
+		DeleteFile(DirID, FileID, dir, rBackupStoreInfo);
+	if(refs == 0)
+	{
+		BOX_INFO("Housekeeping removed " << reason << " file " <<
+			BOX_FORMAT_OBJECTID(FileID) << " from dir " << BOX_FORMAT_OBJECTID(DirID));
+	}
+	else
+	{
+		BOX_TRACE("Housekeeping preserved " << reason << " file " <<
+			BOX_FORMAT_OBJECTID(FileID) << " in dir " << BOX_FORMAT_OBJECTID(DirID) <<
+			" with " << refs << " references");
+	}
 }
 
 
@@ -747,23 +750,8 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			return refs - 1;
 		}
 
-		// If the entry is involved in a chain of patches, it needs to be handled
-		// a bit more carefully.
-		if(!mrFileSystem.CanMergePatches())
-		{
-			// In this case, we can only remove objects that nothing
-			// depends on, i.e. with no DependsNewer.
-
-			if(pentry->GetDependsNewer() != 0)
-			{
-				THROW_EXCEPTION_MESSAGE(BackupStoreException,
-					FileSystemCannotMerge, "Unable to delete file " <<
-					BOX_FORMAT_OBJECTID(ObjectID) << " on which "
-					"newer object " <<
-					BOX_FORMAT_OBJECTID(pentry->GetDependsNewer()) <<
-					" depends");
-			}
-		}
+		// If the entry is involved in a chain of patches, it needs to be handled a bit
+		// more carefully.
 
 		if(pentry->GetDependsNewer() != 0 && pentry->GetDependsOlder() == 0)
 		{
@@ -778,6 +766,10 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		}
 		else if(pentry->GetDependsOlder() != 0)
 		{
+			// We should have checked whether the BackupFileSystem can merge patches
+			// before this point:
+			ASSERT(mrFileSystem.CanMergePatches());
+
 			BackupStoreDirectory::Entry *polder = rDirectory.FindEntryByID(pentry->GetDependsOlder());
 			if(pentry->GetDependsNewer() == 0)
 			{

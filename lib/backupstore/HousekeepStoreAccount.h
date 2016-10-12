@@ -48,6 +48,8 @@ private:
 	// utility functions
 	bool ScanDirectory(int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteFiles(BackupStoreInfo& rBackupStoreInfo);
+	void RemoveReferenceAndMaybeDeleteFile(int64_t FileID, int64_t DirID,
+		const std::string& reason, BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteEmptyDirectories(BackupStoreInfo& rBackupStoreInfo);
 	void DeleteEmptyDirectory(int64_t dirId, std::vector<int64_t>& rToExamine,
 		BackupStoreInfo& rBackupStoreInfo);
@@ -79,6 +81,7 @@ private:
 
 	int64_t mDeletionSizeTarget;
 
+	std::vector<std::pair<int64_t, int64_t> > mDefiniteDeletions;
 	std::set<DelEn, DelEnCompare> mPotentialDeletions;
 	int64_t mPotentialDeletionsTotalSize;
 	int64_t mMaxSizeInPotentialDeletions;

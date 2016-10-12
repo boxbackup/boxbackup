@@ -95,8 +95,8 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db)
 {
 	ASSERT(&refcount_db == mapTemporaryRefCountDatabase.get());
-	// This is the temporary database, so it is about to be commithas already been
-	// committed, so we need to close the permanent database first.
+	// This is the temporary database, so it is about to be committed and become the permanent
+	// database, so we need to close the current permanent database (if any) first.
 	mapPermanentRefCountDatabase.reset();
 }
 
@@ -436,11 +436,16 @@ public:
 	: mStoreFile(StoreDiscSet, filename, refcount),
 	  mFileName(filename),
 	  mDiscSet(StoreDiscSet),
-	  mCommitted(false)
+	  mCommitted(false),
+	  mNumBlocks(-1)
 	{ }
 	~RaidPutFileCompleteTransaction();
 	virtual void Commit();
-	virtual int64_t GetNumBlocks() { return mNumBlocks; }
+	virtual int64_t GetNumBlocks()
+	{
+		ASSERT(mNumBlocks != -1);
+		return mNumBlocks;
+	}
 	RaidFileWrite& GetRaidFile() { return mStoreFile; }
 
 	// It doesn't matter what we return here, because this should never be called
@@ -762,20 +767,21 @@ void RaidBackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
 
 
 std::auto_ptr<BackupFileSystem::Transaction>
-RaidBackupFileSystem::CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
+RaidBackupFileSystem::CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch)
 {
 	// This normally only happens during housekeeping, which is using a temporary
 	// refcount database, so insist on that for now.
 	BackupStoreRefCountDatabase* pRefCount = mapTemporaryRefCountDatabase.get();
 	ASSERT(pRefCount != NULL);
-	ASSERT(mapPermanentRefCountDatabase.get() == NULL);
+	ASSERT(mapPermanentRefCountDatabase.get() == NULL ||
+		mapPermanentRefCountDatabase->IsReadOnly());
 
 	// Open the older object twice (the patch)
 	std::auto_ptr<IOStream> pdiff = GetFile(OlderPatchID);
 	std::auto_ptr<IOStream> pdiff2 = GetFile(OlderPatchID);
 
 	// Open the newer object (the file to be deleted)
-	std::auto_ptr<IOStream> pobjectBeingDeleted = GetFile(NewerFileID);
+	std::auto_ptr<IOStream> pobjectBeingDeleted = GetFile(NewerObjectID);
 
 	// And open a write file to overwrite the older object (the patch)
 	std::string older_filename = GetObjectFileName(OlderPatchID,
@@ -788,8 +794,19 @@ RaidBackupFileSystem::CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
 	RaidFileWrite& overwrite_older(ap_overwrite_older->GetRaidFile());
 	overwrite_older.Open(true /* allow overwriting */);
 
-	// There exists an older version which depends on this one. Need to combine the two over that one.
-	BackupStoreFile::CombineFile(*pdiff, *pdiff2, *pobjectBeingDeleted, overwrite_older);
+	if(NewerIsPatch)
+	{
+		// Combine two adjacent patches (reverse diffs) into a single one object.
+		BackupStoreFile::CombineDiffs(*pobjectBeingDeleted, *pdiff, *pdiff2, overwrite_older);
+	}
+	else
+	{
+		// Combine an older patch (reverse diff) with the subsequent complete file.
+		BackupStoreFile::CombineFile(*pdiff, *pdiff2, *pobjectBeingDeleted, overwrite_older);
+	}
+
+	// Need to do this before committing the RaidFile, can't do it after.
+	ap_overwrite_older->mNumBlocks = overwrite_older.GetDiscUsageInBlocks();
 
 	// The file will be committed later when the directory is safely commited.
 	return static_cast<std::auto_ptr<BackupFileSystem::Transaction> >(ap_overwrite_older);
@@ -797,37 +814,16 @@ RaidBackupFileSystem::CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
 
 
 std::auto_ptr<BackupFileSystem::Transaction>
+RaidBackupFileSystem::CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
+{
+	return CombineFileOrDiff(OlderPatchID, NewerFileID, false); // !NewerIsPatch
+}
+
+
+std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID)
 {
-	// This normally only happens during housekeeping, which is using a temporary
-	// refcount database, so insist on that for now.
-	BackupStoreRefCountDatabase* pRefCount = mapTemporaryRefCountDatabase.get();
-	ASSERT(pRefCount != NULL);
-	ASSERT(mapPermanentRefCountDatabase.get() == NULL);
-
-	// Open the older object twice (the patch)
-	std::auto_ptr<IOStream> pdiff = GetFile(OlderPatchID);
-	std::auto_ptr<IOStream> pdiff2 = GetFile(OlderPatchID);
-
-	// Open the newer object (the file to be deleted)
-	std::auto_ptr<IOStream> pobjectBeingDeleted = GetFile(NewerPatchID);
-
-	// And open a write file to overwrite the older object (the patch)
-	std::string older_filename = GetObjectFileName(OlderPatchID,
-		false); // no need to make sure the directory it's in exists.
-
-	std::auto_ptr<RaidPutFileCompleteTransaction>
-		ap_overwrite_older(new RaidPutFileCompleteTransaction(
-			mStoreDiscSet, older_filename,
-			pRefCount->GetRefCount(OlderPatchID)));
-	RaidFileWrite& overwrite_older(ap_overwrite_older->GetRaidFile());
-	overwrite_older.Open(true /* allow overwriting */);
-
-	// This entry is in the middle of a chain, and two patches need combining.
-	BackupStoreFile::CombineDiffs(*pobjectBeingDeleted, *pdiff, *pdiff2, overwrite_older);
-
-	// The file will be committed later when the directory is safely commited.
-	return static_cast<std::auto_ptr<BackupFileSystem::Transaction> >(ap_overwrite_older);
+	return CombineFileOrDiff(OlderPatchID, NewerPatchID, true); // NewerIsPatch
 }
 
 
