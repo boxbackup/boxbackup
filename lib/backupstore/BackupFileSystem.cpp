@@ -166,7 +166,7 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db)
 {
 	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
-	// This is the temporary database, so it is about to be committed and become the permanent
+	// This is the potential database, so it is about to be committed and become the permanent
 	// database, so we need to close the current permanent database (if any) first.
 	mapPermanentRefCountDatabase.reset();
 }

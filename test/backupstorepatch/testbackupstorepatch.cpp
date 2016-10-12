@@ -13,7 +13,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "autogen_BackupProtocol.h"
 #include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
@@ -523,6 +522,10 @@ int test(int argc, const char *argv[])
 			// Load up the root directory
 			BackupStoreDirectory dir;
 			{
+				// Take a lock before actually reading files from disk,
+				// to avoid them changing under our feet.
+				filesystem.TryGetLock();
+
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
 				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
 				dir.Dump(0, true);
@@ -638,6 +641,8 @@ int test(int argc, const char *argv[])
 						test_files[f].CurrentSizeInBlocks = en->GetSizeInBlocks();
 					}
 				}
+
+				filesystem.ReleaseLock();
 			}
 			
 #ifdef HOUSEKEEPING_IN_PROCESS
@@ -717,6 +722,10 @@ int test(int argc, const char *argv[])
 			// Close the connection
 			protocol.QueryFinished();
 
+			// Take a lock before modifying the directory
+			filesystem.GetLock();
+			filesystem.GetDirectory(BackupProtocolListDirectory::RootDirectory, dir);
+
 			// Mark one of the elements as deleted
 			if(test_file_remove_order[deleteIndex] == -1)
 			{
@@ -732,17 +741,14 @@ int test(int argc, const char *argv[])
 				break);
 
 			pentry->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
-			// Save it back
-			{
-				RaidFileWrite writedir(0, "backup/01234567/o01");
-				writedir.Open(true /* overwrite */);
-				dir.WriteToStream(writedir);
-				writedir.Commit(true);
-			}
+			filesystem.PutDirectory(dir);
 
-			// Get the revision number of the root directory, before housekeeping makes any changes.
+			// Get the revision number of the root directory, before we release
+			// the lock (and therefore before housekeeping makes any changes).
 			int64_t first_revision = 0;
-			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
+			TEST_THAT(filesystem.ObjectExists(BackupProtocolListDirectory::RootDirectory,
+				&first_revision));
+			filesystem.ReleaseLock();
 
 #ifdef HOUSEKEEPING_IN_PROCESS
 			// Housekeeping wants to open both a temporary and a permanent refcount DB,
@@ -781,9 +787,11 @@ int test(int argc, const char *argv[])
 				// Early end?
 				try
 				{
+					filesystem.TryGetLock();
 					int64_t current_revision = 0;
 					TEST_THAT(filesystem.ObjectExists(BackupProtocolListDirectory::RootDirectory,
 						&current_revision));
+					filesystem.ReleaseLock();
 
 					if(current_revision != first_revision)
 					{
