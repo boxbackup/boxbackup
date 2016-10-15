@@ -33,5 +33,14 @@ env:
   - BUILD=cmake TEST_TARGET=debug
   - BUILD=cmake TEST_TARGET=release
 
+os:
+  - linux
+  - osx
+
+matrix:
+  allow_failures:
+    # OSX on Travis is in testing, it's allowed to fail for now.
+    - os: osx
+
 script:
   - ./infrastructure/travis-build.sh
