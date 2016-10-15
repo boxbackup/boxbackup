@@ -65,7 +65,7 @@
 
 #define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
 #define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
-#define DEFAULT_S3_CACHE_DIR "testfiles/cache"
+#define DEFAULT_S3_CACHE_DIR "testfiles/bbackupd-cache"
 
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
