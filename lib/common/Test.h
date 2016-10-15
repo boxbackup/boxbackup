@@ -10,6 +10,9 @@
 #ifndef TEST__H
 #define TEST__H
 
+// for printf:
+#include <stdio.h>
+
 #include <cstring>
 #include <list>
 #include <map>
