@@ -209,7 +209,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 		"testfiles/0_2 "
 		"testfiles/accounts.txt " // testfiles/test* .tgz!
 		"testfiles/bbackupd-data "
-		"testfiles/cache "
+		"testfiles/bbackupd-cache "
 		"testfiles/file* "
 		"testfiles/notifyran "
 		"testfiles/notifyran.* "
@@ -226,7 +226,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
-	TEST_THAT_THROWONFAIL(mkdir("testfiles/cache", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
 	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
