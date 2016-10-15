@@ -44,12 +44,14 @@ bin/bbackupquery	lib/bbackupquery
 bin/bbackupctl		lib/backupclient	qdbm	lib/bbackupd
 bin/s3simulator		lib/httpserver
 
-test/backupstore	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	lib/raidfile 	bin/s3simulator
-test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupstore		bin/bbackupquery	bin/bbackupd	bin/bbackupctl
-test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
+# With CMake, dependency on a binary target is not enough to inherit the header files for
+# libraries that it uses, so we need to specify lib targets as well as bin dependencies:
+test/backupstore	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/s3simulator
+test/backupstorefix	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
+test/backupstorepatch	lib/backupclient	bin/bbstored	bin/bbstoreaccounts
 test/backupdiff		lib/backupclient
-test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/bbackupquery lib/bbackupd lib/bbstored lib/server lib/intercept
-test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
+test/bbackupd		lib/bbackupd	lib/bbstored	lib/bbackupquery	bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl
+test/s3store		lib/backupclient	bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
 lib/httpserver          lib/server
