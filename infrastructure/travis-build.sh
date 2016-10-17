@@ -5,7 +5,9 @@ set -x
 
 if [ "$TRAVIS_OS_NAME" == "osx" ]; then
 	brew update
-	brew install boost ccache openssl
+	# Travis appears to have Boost and OpenSSL installed already:
+	# brew install boost ccache openssl
+	brew install ccache
 fi
 
 ccache -s
