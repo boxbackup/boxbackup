@@ -3,7 +3,7 @@
 set -e
 set -x
 
-if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+if [ "$TRAVIS_OS_NAME" = "osx" ]; then
 	brew update
 	# Travis appears to have Boost and OpenSSL installed already:
 	# brew install boost ccache openssl
@@ -21,7 +21,7 @@ if [ "$BUILD" = 'cmake' ]; then
 	make install
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
-	if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+	if [ "$TRAVIS_OS_NAME" = "osx" ]; then
 		EXTRA_ARGS="--with-ssl-lib=/usr/local/Cellar/openssl/*/lib --with-ssl-headers=/usr/local/Cellar/openssl/*/include -with-boost=/usr/local/Cellar/boost/*"
 	fi
 
