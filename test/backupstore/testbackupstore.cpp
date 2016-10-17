@@ -218,10 +218,6 @@ bool setup_test_backupstore_specialised(const std::string& spec_name,
 }
 
 #define SETUP_TEST_BACKUPSTORE_SPECIALISED(name, control) \
-	if(control.GetCurrentFileSystem() != NULL) \
-	{ \
-		control.GetCurrentFileSystem()->ReleaseLock(); \
-	} \
 	SETUP_SPECIALISED(name); \
 	TEST_THAT_OR(setup_test_backupstore_specialised(name, control), FAIL);
 
@@ -264,6 +260,10 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 #define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
 	if (ServerIsAlive(bbstored_pid)) \
 		StopServer(); \
+	if(control.GetCurrentFileSystem() != NULL) \
+	{ \
+		control.GetCurrentFileSystem()->ReleaseLock(); \
+	} \
 	TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
 	TEARDOWN();
 

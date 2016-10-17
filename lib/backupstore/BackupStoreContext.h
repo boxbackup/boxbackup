@@ -91,10 +91,10 @@ public:
 	// Not really an API, but useful for BackupProtocolLocal2.
 	void ReleaseWriteLock()
 	{
-		if(!mReadOnly)
-		{
-			mpFileSystem->ReleaseLock();
-		}
+		// Even a read-only filesystem may hold some locks, for example
+		// S3BackupFileSystem's cache lock, so we always notify the filesystem
+		// to release any locks that it holds, even if we are read-only.
+		mpFileSystem->ReleaseLock();
 	}
 
 	// TODO: stop using this version, which has the side-effect of creating a
