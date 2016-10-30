@@ -122,7 +122,7 @@ bool setUp(const char* function_name)
 			int filetype = ObjectExists(filepath);
 			if(filetype == ObjectExists_File)
 			{
-				if(::unlink(filepath.c_str()) != 0)
+				if(EMU_UNLINK(filepath.c_str()) != 0)
 				{
 					TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
 						"test fixture file: unlink(\"" << filepath << "\")"));
@@ -585,7 +585,7 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 		}
 		
 		// Delete it
-		::unlink(filename);
+		EMU_UNLINK(filename);
 	}
 #endif
 }
