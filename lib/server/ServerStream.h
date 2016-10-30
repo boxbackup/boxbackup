@@ -204,7 +204,7 @@ public:
 								}
 
 								// unlink anything there
-								::unlink(c[1].c_str());
+								EMU_UNLINK(c[1].c_str());
 								
 								psocket->Listen(Socket::TypeUNIX, c[1].c_str());
 							#endif // WIN32
