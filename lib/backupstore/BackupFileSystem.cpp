@@ -10,7 +10,14 @@
 
 #include "Box.h"
 
-#include <pwd.h>
+#ifdef HAVE_PWD_H
+#	include <pwd.h>
+#endif
+
+#ifdef HAVE_LMCONS_H
+#	include <lmcons.h>
+#endif
+
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -1154,7 +1161,18 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 	// The lock value should be unique for each host potentially accessing the same
 	// region of the store, and should help you to identify which one is currently
 	// holding the lock. The default is username@hostname(pid).
+#ifdef HAVE_GETUSERNAMEA
+	char username_buffer[UNLEN + 1];
+	if(!GetUserNameA(username_buffer, sizeof(username_buffer)))
+	{
+		THROW_WIN_ERROR("Failed to GetUserName()");
+	}
+	mCurrentUserName = username_buffer;
+#elif defined HAVE_GETPWUID
 	mCurrentUserName = getpwuid(getuid())->pw_name;
+#else
+#	error Don't know how to get current user name
+#endif
 
 	char hostname_buf[1024];
 	if(gethostname(hostname_buf, sizeof(hostname_buf)) != 0)
