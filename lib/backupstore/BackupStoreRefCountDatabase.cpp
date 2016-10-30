@@ -161,7 +161,7 @@ void BackupStoreRefCountDatabaseImpl::Commit()
 	mapDatabaseFile.reset();
 
 	#ifdef WIN32
-	if(FileExists(mFinalFilename) && unlink(mFinalFilename.c_str()) != 0)
+	if(FileExists(mFinalFilename) && EMU_UNLINK(mFinalFilename.c_str()) != 0)
 	{
 		THROW_EMU_FILE_ERROR("Failed to delete old permanent refcount "
 			"database file", mFinalFilename, CommonException,
@@ -199,7 +199,7 @@ void BackupStoreRefCountDatabaseImpl::Discard()
 		mapDatabaseFile.reset();
 	}
 
-	if(unlink(mFilename.c_str()) != 0)
+	if(EMU_UNLINK(mFilename.c_str()) != 0)
 	{
 		THROW_EMU_FILE_ERROR("Failed to delete temporary refcount "
 			"database file", mFilename, CommonException,
@@ -284,9 +284,9 @@ BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t Account
 	std::string temp_filename = Filename + "X";
 	if(FileExists(temp_filename))
 	{
-		BOX_WARNING(BOX_FILE_MESSAGE(Filename, "Overwriting existing "
+		BOX_WARNING(BOX_FILE_MESSAGE(temp_filename, "Overwriting existing "
 			"temporary reference count database"));
-		if (unlink(temp_filename.c_str()) != 0)
+		if (EMU_UNLINK(temp_filename.c_str()) != 0)
 		{
 			THROW_SYS_FILE_ERROR("Failed to delete old temporary "
 				"reference count database file", temp_filename,

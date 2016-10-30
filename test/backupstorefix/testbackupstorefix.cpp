@@ -1008,7 +1008,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(KillServer(bbstored_pid));
 
 	#ifdef WIN32
-		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/bbstored.pid") == 0);
 	#else
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
 	#endif

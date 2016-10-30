@@ -768,7 +768,7 @@ void S3Simulator::HandleDelete(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	// I think that DELETE is idempotent.
 	if(FileExists(path))
 	{
-		if(::unlink(path.c_str()) != 0)
+		if(EMU_UNLINK(path.c_str()) != 0)
 		{
 			THROW_SYS_FILE_ERROR("Failed to delete file", path,
 				HTTPException, S3SimulatorError);

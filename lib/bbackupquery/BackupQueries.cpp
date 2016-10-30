@@ -1003,17 +1003,17 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 		{
 			BOX_ERROR("Object ID " << BOX_FORMAT_OBJECTID(id) <<
 				" does not exist on store.");
-			::unlink(args[1].c_str());
+			EMU_UNLINK(args[1].c_str());
 		}
 		else
 		{
 			BOX_ERROR("Error occured fetching object.");
-			::unlink(args[1].c_str());
+			EMU_UNLINK(args[1].c_str());
 		}
 	}
 	catch(...)
 	{
-		::unlink(args[1].c_str());
+		EMU_UNLINK(args[1].c_str());
 		BOX_ERROR("Error occured fetching object.");
 	}
 }
@@ -1242,18 +1242,18 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 	{
 		BOX_ERROR("Failed to fetch file: " << 
 			e.what());
-		::unlink(localName.c_str());
+		EMU_UNLINK(localName.c_str());
 	}
 	catch(std::exception &e)
 	{
 		BOX_ERROR("Failed to fetch file: " <<
 			e.what());
-		::unlink(localName.c_str());
+		EMU_UNLINK(localName.c_str());
 	}
 	catch(...)
 	{
 		BOX_ERROR("Failed to fetch file: unknown error");
-		::unlink(localName.c_str());
+		EMU_UNLINK(localName.c_str());
 	}
 }
 

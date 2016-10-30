@@ -1443,25 +1443,25 @@ bool test_backup_hardlinked_files()
 	TEST_COMPARE(Compare_Same);
 
 	// Create some hard links. First in the same directory:
-	TEST_THAT(link("testfiles/TestDir1/x1/dsfdsfs98.fd",
+	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x1/hardlink1") == 0);
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
 	// Now in a different directory
 	TEST_THAT(mkdir("testfiles/TestDir1/x2", 0755) == 0);
-	TEST_THAT(link("testfiles/TestDir1/x1/dsfdsfs98.fd",
+	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x2/hardlink2") == 0);
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
 	// Now delete one of them
-	TEST_THAT(unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
 	// And another.
-	TEST_THAT(unlink("testfiles/TestDir1/x1/hardlink1") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/hardlink1") == 0);
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
@@ -1503,7 +1503,7 @@ bool test_backup_pauses_when_store_is_full()
 		unpack_files("spacetest2", "testfiles/TestDir1");
 
 		// Delete a file and a directory
-		TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/TestDir1/spacetest/f1") == 0);
 #ifdef WIN32
 		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
 #else
@@ -1620,7 +1620,7 @@ bool test_bbackupd_exclusions()
 
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 	// Delete a file and a directory
-	TEST_THAT(::unlink("testfiles/TestDir1/spacetest/f1") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/spacetest/f1") == 0);
 
 #ifdef WIN32
 	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
@@ -2407,7 +2407,7 @@ bool test_unicode_filenames_can_be_backed_up()
 
 		std::string fileToUnlink = "testfiles/restore-" +
 			dirname + "/" + filename;
-		TEST_THAT(::unlink(fileToUnlink.c_str()) == 0);
+		TEST_THAT(EMU_UNLINK(fileToUnlink.c_str()) == 0);
 
 		// Check that bbackupquery can get the file when given
 		// on the command line in system encoding.
@@ -2423,7 +2423,7 @@ bool test_unicode_filenames_can_be_backed_up()
 
 		// cannot overwrite a file that exists, so delete it
 		std::string tmp = "testfiles/" + filename;
-		TEST_THAT(::unlink(tmp.c_str()) == 0);
+		TEST_THAT(EMU_UNLINK(tmp.c_str()) == 0);
 
 		// And after changing directory to an absolute path
 		TEST_THAT(bbackupquery(
@@ -2519,7 +2519,7 @@ bool test_sync_allow_script_can_pause_backup()
 			// check that no backup has run (compare fails)
 			TEST_COMPARE(Compare_Different);
 
-			TEST_THAT(unlink(sync_control_file) == 0);
+			TEST_THAT(EMU_UNLINK(sync_control_file) == 0);
 			wait_for_sync_start();
 			long end_time = time(NULL);
 			long wait_time = end_time - start_time + 2;
@@ -2557,7 +2557,7 @@ bool test_delete_update_and_symlink_files()
 	// TODO FIXME dedent
 	{
 		// Delete a file
-		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 
 		#ifndef WIN32
 			// New symlink
@@ -2712,7 +2712,7 @@ bool test_store_error_reporting()
 		// Check that it did get uploaded, and we have no more errors
 		TEST_COMPARE(Compare_Same);
 
-		TEST_THAT(::unlink("testfiles/notifyscript.tag") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/notifyscript.tag") == 0);
 
 		// Stop the snapshot bbackupd
 		TEST_THAT(StopClient());
@@ -2787,7 +2787,7 @@ bool test_store_error_reporting()
 		// Check that it did get uploaded, and we have no more errors
 		TEST_COMPARE(Compare_Same);
 
-		TEST_THAT(::unlink("testfiles/notifyscript.tag") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/notifyscript.tag") == 0);
 	}
 
 	TEARDOWN_TEST_BBACKUPD();
@@ -2811,7 +2811,7 @@ bool test_change_file_to_symlink_and_back()
 		// Replace symlink with directory, add new directory.
 
 		#ifndef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/symlink-to-dir")
+			TEST_THAT(EMU_UNLINK("testfiles/TestDir1/symlink-to-dir")
 				== 0);
 		#endif
 
@@ -2836,7 +2836,7 @@ bool test_change_file_to_symlink_and_back()
 		// And the inverse, replace a directory with a file/symlink
 
 		#ifndef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file"
+			TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dir-to-file"
 				"/contents") == 0);
 		#endif
 
@@ -2855,7 +2855,7 @@ bool test_change_file_to_symlink_and_back()
 		BOX_INFO("Replace symlink with directory (which was a symlink)");
 
 		#ifndef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/x1"
+			TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1"
 				"/dir-to-file") == 0);
 		#endif
 
@@ -2878,7 +2878,7 @@ bool test_change_file_to_symlink_and_back()
 		// directories over other old directories.
 
 		#ifndef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/x1/dir-to-file"
+			TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dir-to-file"
 				"/contents2") == 0);
 		#endif
 
@@ -2926,7 +2926,7 @@ bool test_file_rename_tracking()
 		TEST_COMPARE(Compare_Same);
 
 		#ifdef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/untracked-2")
+			TEST_THAT(EMU_UNLINK("testfiles/TestDir1/untracked-2")
 				== 0);
 		#endif
 
@@ -2964,7 +2964,7 @@ bool test_file_rename_tracking()
 		TEST_COMPARE(Compare_Same);
 
 		#ifdef WIN32
-			TEST_THAT(::unlink("testfiles/TestDir1/tracked-2")
+			TEST_THAT(EMU_UNLINK("testfiles/TestDir1/tracked-2")
 				== 0);
 		#endif
 
@@ -2979,7 +2979,7 @@ bool test_file_rename_tracking()
 		// case which went wrong: rename a tracked file
 		// over a deleted file
 		BOX_INFO("Rename an existing file over a deleted file");
-		TEST_THAT(::unlink("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf",
 			"testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 
@@ -3758,7 +3758,7 @@ bool test_restore_deleted_files()
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
-	TEST_THAT(::unlink("testfiles/TestDir1/f1.dat") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/f1.dat") == 0);
 #ifdef WIN32
 	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x1") == 0);
 #else

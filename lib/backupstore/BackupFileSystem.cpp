@@ -624,7 +624,7 @@ RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 		FileStream diff2(tempFn.c_str(), O_RDONLY);
 
 		// Unlink it immediately, so it definitely goes away
-		if(::unlink(tempFn.c_str()) != 0)
+		if(EMU_UNLINK(tempFn.c_str()) != 0)
 		{
 			THROW_EXCEPTION(CommonException, OSFileError);
 		}
@@ -677,7 +677,7 @@ RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 	catch(...)
 	{
 		// Be very paranoid about deleting this temp file -- we could only leave a zero byte file anyway
-		::unlink(tempFn.c_str());
+		EMU_UNLINK(tempFn.c_str());
 		throw;
 	}
 }

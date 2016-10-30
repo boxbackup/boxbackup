@@ -665,7 +665,7 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 	}
 	catch(...)
 	{
-		::unlink(DecodedFilename);
+		EMU_UNLINK(DecodedFilename);
 		throw;
 	}
 }

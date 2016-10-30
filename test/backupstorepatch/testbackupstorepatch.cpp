@@ -681,7 +681,7 @@ int test(int argc, const char *argv[])
 				char filename[64], filename_fetched[64];
 				::sprintf(filename, "testfiles/%d.test", f);
 				::sprintf(filename_fetched, "testfiles/%d.test.fetched", f);
-				::unlink(filename_fetched);
+				EMU_UNLINK(filename_fetched);
 	
 				// Fetch the file
 				try

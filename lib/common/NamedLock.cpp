@@ -257,7 +257,7 @@ void NamedLock::ReleaseLock()
 	// Windows, and there we need to close the file before deleting it,
 	// otherwise the system won't let us delete it.
 
-	if(::unlink(mFileName.c_str()) != 0)
+	if(EMU_UNLINK(mFileName.c_str()) != 0)
 	{
 		// Don't try to release it again
 		close(mFileDescriptor);
@@ -293,7 +293,7 @@ void NamedLock::ReleaseLock()
 	// On Windows we need to close the file before deleting it, otherwise
 	// the system won't let us delete it.
 
-	if(::unlink(mFileName.c_str()) != 0)
+	if(EMU_UNLINK(mFileName.c_str()) != 0)
 	{
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),

@@ -1046,7 +1046,7 @@ bool test_httpserver()
 		FileStream f1("testfiles/dsfdsfs98.fd");
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
 	}
 
 	// Start the S3Simulator server
@@ -1155,7 +1155,7 @@ bool test_httpserver()
 		FileStream f1("testfiles/dsfdsfs98.fd");
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_THAT(::unlink("testfiles/store/newfile") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles/store/newfile") == 0);
 	}
 
 	// S3Client tests with S3Simulator daemon for realism
