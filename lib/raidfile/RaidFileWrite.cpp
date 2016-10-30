@@ -358,7 +358,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 
 #ifdef WIN32
 	// need to delete the target first
-	if(::unlink(renameTo.c_str()) != 0)
+	if(EMU_UNLINK(renameTo.c_str()) != 0)
 	{
 		DWORD errorNumber = GetLastError();
 		if (errorNumber != ERROR_FILE_NOT_FOUND)
@@ -421,9 +421,9 @@ void RaidFileWrite::Discard()
 #ifdef WIN32
 	// On Win32 we must close it first
 	if (::close(mOSFileHandle) != 0 ||
-		::unlink(writeFilename.c_str()) != 0)
+		EMU_UNLINK(writeFilename.c_str()) != 0)
 #else // !WIN32
-	if (::unlink(writeFilename.c_str()) != 0 ||
+	if (EMU_UNLINK(writeFilename.c_str()) != 0 ||
 		::close(mOSFileHandle) != 0)
 #endif // !WIN32
 	{
@@ -670,7 +670,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		// Must delete before renaming
 		#define CHECK_UNLINK(file) \
 		{ \
-			if (::unlink(file) != 0 && errno != ENOENT) \
+			if (EMU_UNLINK(file) != 0 && errno != ENOENT) \
 			{ \
 				THROW_EMU_ERROR("Failed to unlink raidfile " \
 					"stripe: " << file, RaidFileException, \
@@ -695,7 +695,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		writeFile.Close();
 
 		// Finally delete the write file
-		if(::unlink(writeFilename.c_str()) != 0)
+		if(EMU_UNLINK(writeFilename.c_str()) != 0)
 		{
 			BOX_LOG_SYS_ERROR("Failed to delete file: " <<
 				writeFilename);
@@ -705,12 +705,12 @@ void RaidFileWrite::TransformToRaidStorage()
 	catch(...)
 	{
 		// Unlink all the dodgy files
-		::unlink(stripe1Filename.c_str());
-		::unlink(stripe2Filename.c_str());
-		::unlink(parityFilename.c_str());
-		::unlink(stripe1FilenameW.c_str());
-		::unlink(stripe2FilenameW.c_str());
-		::unlink(parityFilenameW.c_str());
+		EMU_UNLINK(stripe1Filename.c_str());
+		EMU_UNLINK(stripe2Filename.c_str());
+		EMU_UNLINK(parityFilename.c_str());
+		EMU_UNLINK(stripe1FilenameW.c_str());
+		EMU_UNLINK(stripe2FilenameW.c_str());
+		EMU_UNLINK(parityFilenameW.c_str());
 		
 		// and send the error on its way
 		throw;
@@ -754,7 +754,7 @@ void RaidFileWrite::Delete()
 
 	// Attempt to delete it
 	bool deletedSomething = false;
-	if(::unlink(writeFilename.c_str()) == 0)
+	if(EMU_UNLINK(writeFilename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
@@ -769,15 +769,15 @@ void RaidFileWrite::Delete()
 	std::string stripe1Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 0 % TRANSFORM_NUMBER_DISCS_REQUIRED));
 	std::string stripe2Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 1 % TRANSFORM_NUMBER_DISCS_REQUIRED));
 	std::string parityFilename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 2 % TRANSFORM_NUMBER_DISCS_REQUIRED));
-	if(::unlink(stripe1Filename.c_str()) == 0)
+	if(EMU_UNLINK(stripe1Filename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
-	if(::unlink(stripe2Filename.c_str()) == 0)
+	if(EMU_UNLINK(stripe2Filename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
-	if(::unlink(parityFilename.c_str()) == 0)
+	if(EMU_UNLINK(parityFilename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
