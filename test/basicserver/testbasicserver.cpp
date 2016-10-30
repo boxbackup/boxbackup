@@ -663,7 +663,7 @@ int test(int argc, const char *argv[])
 
 			// Move the config file over
 			#ifdef WIN32
-				TEST_THAT(::unlink("testfiles"
+				TEST_THAT(EMU_UNLINK("testfiles"
 					DIRECTORY_SEPARATOR "srv1.conf") != -1);
 			#endif
 

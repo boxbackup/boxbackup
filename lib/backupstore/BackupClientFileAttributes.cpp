@@ -814,7 +814,7 @@ void BackupClientFileAttributes::WriteAttributes(const std::string& Filename,
 			Filename << "'");
 #else
 		// Make a symlink, first deleting anything in the way
-		::unlink(Filename.c_str());
+		EMU_UNLINK(Filename.c_str());
 		if(::symlink((char*)(pattr + 1), Filename.c_str()) != 0)
 		{
 			BOX_LOG_SYS_ERROR("Failed to symlink '" << Filename <<

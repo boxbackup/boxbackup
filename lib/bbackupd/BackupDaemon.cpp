@@ -531,7 +531,7 @@ void BackupDaemon::Run()
 			mapCommandSocketInfo->mListeningSocket.Listen(
 				socketName);
 		#else
-			::unlink(socketName);
+			EMU_UNLINK(socketName);
 			mapCommandSocketInfo->mListeningSocket.Listen(
 				Socket::TypeUNIX, socketName);
 		#endif
@@ -2829,7 +2829,7 @@ void BackupDaemon::FillIDMapVector(std::vector<BackupClientInodeToIDMap *> &rVec
 				BOX_NOTICE("Found an incomplete ID map "
 					"database, deleting it to start "
 					"afresh: " << filename);
-				if(unlink(filename.c_str()) != 0)
+				if(EMU_UNLINK(filename.c_str()) != 0)
 				{
 					BOX_LOG_NATIVE_ERROR(BOX_FILE_MESSAGE(
 						filename, "Failed to delete "
@@ -2878,14 +2878,14 @@ void BackupDaemon::DeleteCorruptBerkelyDbFiles()
 		
 		// Delete the file
 		BOX_TRACE("Deleting " << filename);
-		::unlink(filename.c_str());
+		EMU_UNLINK(filename.c_str());
 		
 		// Add a suffix for the new map
 		filename += ".n";
 
 		// Delete that too
 		BOX_TRACE("Deleting " << filename);
-		::unlink(filename.c_str());
+		EMU_UNLINK(filename.c_str());
 	}
 }
 
@@ -3636,7 +3636,7 @@ bool BackupDaemon::DeleteStoreObjectInfo() const
 	}
 
 	// Actually delete it
-	if(::unlink(storeObjectInfoFile.c_str()) != 0)
+	if(EMU_UNLINK(storeObjectInfoFile.c_str()) != 0)
 	{
 		BOX_LOG_SYS_ERROR("Failed to delete the old "
 			"StoreObjectInfoFile: " << storeObjectInfoFile);

@@ -139,7 +139,7 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 #define UPLOAD_FILE_TO_MOVE	8
 
 #define UNLINK_IF_EXISTS(filename) \
-	if (FileExists(filename)) { TEST_THAT(unlink(filename) == 0); }
+	if (FileExists(filename)) { TEST_THAT(EMU_UNLINK(filename) == 0); }
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BACKUPSTORE() \
@@ -496,7 +496,7 @@ void test_test_file(int t, IOStream &rStream)
 
 	free(data);
 	in.Close();
-	TEST_THAT(unlink("testfiles/test_download") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/test_download") == 0);
 }
 
 void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
@@ -2665,7 +2665,7 @@ bool test_login_with_no_refcount_db()
 	// Delete the refcount database and try to log in again. Check that
 	// we're locked out of the account until housekeeping has recreated
 	// the refcount db.
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_CHECK_THROWS(BackupProtocolLocal2 protocolLocal(0x01234567,
 		"test", "backup/01234567/", 0, false), // Not read-only
 		BackupStoreException, CorruptReferenceCountDatabase);
@@ -2690,7 +2690,7 @@ bool test_login_with_no_refcount_db()
 	// because housekeeping may fix the refcount database while we're
 	// stepping through.
 	TEST_THAT_THROWONFAIL(StartServer());
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_CHECK_THROWS(connect_and_login(context),
 		ConnectionException, Protocol_UnexpectedReply);
 

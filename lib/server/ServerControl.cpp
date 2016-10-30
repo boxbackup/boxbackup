@@ -241,7 +241,7 @@ bool KillServer(const std::string& pid_file, bool WaitForProcess)
 #ifdef WIN32
 	if(WaitForProcess)
 	{
-		int unlink_result = unlink(pid_file.c_str());
+		int unlink_result = EMU_UNLINK(pid_file.c_str());
 		TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
 		if(unlink_result != 0)
 		{
@@ -439,7 +439,7 @@ bool StopDaemon(int current_pid, const std::string& pid_file,
 	TEST_THAT_OR(!ServerIsAlive(current_pid), return false);
 
 	#ifdef WIN32
-		int unlink_result = unlink(pid_file.c_str());
+		int unlink_result = EMU_UNLINK(pid_file.c_str());
 		TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
 		if(unlink_result != 0)
 		{
