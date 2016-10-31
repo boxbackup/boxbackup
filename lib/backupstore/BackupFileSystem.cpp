@@ -1825,7 +1825,7 @@ void S3BackupFileSystem::TryGetLock()
 					"from existing lock: " << attributes["pid"]);
 			}
 
-			if(kill(locking_pid, 0) == 0)
+			if(process_is_running(locking_pid))
 			{
 				THROW_EXCEPTION_MESSAGE(BackupStoreException,
 					CouldNotLockStoreAccount, "Lock on '" <<

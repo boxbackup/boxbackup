@@ -51,6 +51,8 @@ typedef std::map<std::string, std::string> str_map_t;
 typedef std::map<std::string, str_pair_t> str_map_diff_t;
 str_map_diff_t compare_str_maps(const str_map_t& expected, const str_map_t& actual);
 
+bool process_is_running(int pid);
+
 #include "MemLeakFindOff.h"
 
 #endif // UTILS__H

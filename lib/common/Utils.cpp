@@ -435,3 +435,38 @@ std::map<std::string, str_pair_t> compare_str_maps(const str_map_t& expected,
 	return differences;
 }
 
+bool process_is_running(int pid)
+{
+#ifdef WIN32
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION,
+		false, pid);
+	if (hProcess == NULL)
+	{
+		if (GetLastError() != ERROR_INVALID_PARAMETER)
+		{
+			BOX_LOG_WIN_ERROR("Failed to open process " << pid);
+		}
+		return false;
+	}
+
+	DWORD exitCode;
+	BOOL result = GetExitCodeProcess(hProcess, &exitCode);
+	CloseHandle(hProcess);
+
+	if (result == 0)
+	{
+		BOX_LOG_WIN_ERROR("Failed to get exit code for process " << pid);
+		return false;
+	}
+
+	if (exitCode == STILL_ACTIVE)
+	{
+		return true;
+	}
+
+	return false;
+#else // !WIN32
+	if(pid == 0) return false;
+	return ::kill(pid, 0) != -1;
+#endif // WIN32
+}
