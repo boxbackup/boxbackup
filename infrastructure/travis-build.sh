@@ -13,11 +13,16 @@ fi
 ccache -s
 
 if [ "$BUILD" = 'cmake' ]; then
+	if [ -z "$TEST_TARGET" ]; then
+		echo "TEST_TARGET must be set to 'release' or 'debug' for CMake builds"
+		exit 2
+	fi
+
 	cd `dirname $0`
 	mkdir -p cmake/build
 	cd cmake/build
 	cmake --version
-	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET ..
+	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET "$@" ..
 	make install
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
