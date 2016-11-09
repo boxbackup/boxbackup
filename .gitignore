@@ -62,8 +62,8 @@ test/*/*.memleaks
 
 # built by makebuildenv.pl
 test/*/_main.cpp
-test/*/_t
-test/*/_t-gdb
+test/*/t
+test/*/t-gdb
 bin/*/autogen_*.cpp
 bin/*/autogen_*.h
 lib/*/autogen_*.cpp
@@ -105,3 +105,7 @@ qdbm/vltsv
 *.patch
 .*.swo
 .*.swp
+
+# generated documentation
+docs/htmlguide
+docs/man
