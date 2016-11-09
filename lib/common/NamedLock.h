@@ -35,7 +35,7 @@ public:
 	bool GotLock() {return mFileDescriptor != -1;}
 # endif
 	void ReleaseLock();
-	
+
 private:
 # ifdef WIN32
 	HANDLE mFileDescriptor;

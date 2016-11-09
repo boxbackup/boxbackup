@@ -204,7 +204,7 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 
 	// Buffer
 	MemoryBlockGuard<char*> buffer(BufferSize);
-	
+
 	// Get copying!
 	while(StreamDataLeft())
 	{
@@ -221,7 +221,7 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 			rCopyTo.Write(buffer, bytes);
 		}
 	}
-	
+
 	return true;	// completed
 }
 

@@ -61,7 +61,7 @@ void BackupStoreDaemon::HousekeepingProcess()
 		if(secondsToGo < 1) secondsToGo = 1;
 		if(secondsToGo > 60) secondsToGo = 60;
 		int32_t millisecondsToGo = ((int)secondsToGo) * 1000;
-	
+
 		// Check to see if there's any message pending
 		CheckForInterProcessMsg(0 /* no account */, millisecondsToGo);
 	}
@@ -103,9 +103,9 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 	{
 		mpAccountDatabase->GetAllAccountIDs(accounts);
 	}
-			
+
 	SetProcessTitle("housekeeping, active");
-			
+
 	// Check them all
 	for(std::vector<int32_t>::const_iterator i = accounts.begin(); i != accounts.end(); ++i)
 	{
@@ -128,7 +128,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 				// Happens automatically when tagWithClientID
 				// goes out of scope.
 			}
-			
+
 			// Do housekeeping on this account
 			HousekeepStoreAccount housekeeping(*i, rootDir,
 				discSet, this);
@@ -156,7 +156,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 				"aborting run for this account: "
 				"unknown exception");
 		}
-	
+
 		int64_t timeNow = GetCurrentBoxTime();
 		time_t secondsToGo = BoxTimeToSeconds(
 			(mLastHousekeepingRun + housekeepingInterval) - 
@@ -174,7 +174,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 			break;
 		}
 	}
-		
+
 	BOX_INFO("Finished housekeeping");
 
 	// Placed here for accuracy, if StopRun() is true, for example.
@@ -226,9 +226,9 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 	{
 		BOX_TRACE("Housekeeping received command '" << line <<
 			"' over interprocess comms");
-	
+
 		int account = 0;
-	
+
 		if(line == "h")
 		{
 			// HUP signal received by main process
@@ -254,7 +254,7 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 			}
 		}
 	}
-	
+
 	return false;
 }
 

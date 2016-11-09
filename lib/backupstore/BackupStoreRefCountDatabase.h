@@ -64,7 +64,7 @@ private:
 		std::auto_ptr<FileStream> apDatabaseFile);
 	// No copying allowed
 	BackupStoreRefCountDatabase(const BackupStoreRefCountDatabase &);
-	
+
 public:
 	// Create a blank database, using a temporary file that you must
 	// Discard() or Commit() to make permanent.
