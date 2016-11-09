@@ -1280,7 +1280,7 @@ EOF
 
 	unless ($target_windows)
 	{
-		print MAKE "\tcp parcels/scripts/install-$parcel $dir\n";
+		print MASTER_MAKEFILE "\tcp parcels/scripts/install-$parcel $dir\n";
 	}
 
 	print MASTER_MAKEFILE "\t(cd parcels; tar cf - $root | gzip -9 - > $root.tgz )\n";

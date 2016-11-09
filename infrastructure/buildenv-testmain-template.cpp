@@ -417,11 +417,6 @@ int main(int argc, char * const * argv)
 		
 		return returncode;
 	}
-	catch(BoxException &e)
-	{
-		printf("FAILED: Exception caught: %s\n", e.what());
-		return 1;
-	}
 	catch(std::exception &e)
 	{
 		printf("FAILED: Exception caught: %s\n", e.what());
