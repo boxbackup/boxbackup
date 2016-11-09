@@ -50,7 +50,7 @@ int64_t BackupAccountControl::SizeStringToBlocks(const char *string, int blockSi
 		BOX_FATAL("'" << string << "' is not a valid number.");
 		exit(1);
 	}
-	
+
 	// Check units
 	switch(*endptr)
 	{
@@ -59,25 +59,25 @@ int64_t BackupAccountControl::SizeStringToBlocks(const char *string, int blockSi
 		// Units: Mb
 		return (number * 1024*1024) / blockSize;
 		break;
-		
+
 	case 'G':
 	case 'g':
 		// Units: Gb
 		return (number * 1024*1024*1024) / blockSize;
 		break;
-		
+
 	case 'B':
 	case 'b':
 		// Units: Blocks
 		// Easy! Just return the number specified.
 		return number;
 		break;
-	
+
 	default:
 		BOX_FATAL(string << " has an invalid units specifier "
 			"(use B for blocks, M for MB, G for GB, eg 2GB)");
 		exit(1);
-		break;		
+		break;
 	}
 }
 

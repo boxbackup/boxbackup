@@ -310,7 +310,7 @@ int BackupClientContext::GetTimeout() const
 	{
 		return pConnection->GetTimeout();
 	}
-	
+
 	return (15*60*1000);
 }
 
@@ -555,7 +555,7 @@ void BackupClientContext::DoKeepAlive()
 	{
 		return;
 	}
-	
+
 	if (mKeepAliveTime == 0)
 	{
 		return;
@@ -565,14 +565,14 @@ void BackupClientContext::DoKeepAlive()
 	{
 		return;
 	}
-	
+
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	pConnection->QueryGetIsAlive();
-	
+
 	mKeepAliveTimer.Reset(mKeepAliveTime * MILLI_SEC_IN_SEC);
 }
 
-int BackupClientContext::GetMaximumDiffingTime() 
+int BackupClientContext::GetMaximumDiffingTime()
 {
 	return mMaximumDiffingTime;
 }

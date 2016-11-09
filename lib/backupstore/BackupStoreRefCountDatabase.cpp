@@ -246,7 +246,7 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 			"short read", Filename, BackupStoreException,
 			CouldNotLoadStoreInfo);
 	}
-	
+
 	// Check it
 	if(ntohl(hdr.mMagicValue) != REFCOUNT_MAGIC_VALUE ||
 		(int32_t)ntohl(hdr.mAccountID) != rAccount.GetID())

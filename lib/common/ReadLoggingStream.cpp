@@ -54,7 +54,7 @@ int ReadLoggingStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 
 	if (mLength == 0)
-	{	
+	{
 		mrLogger.Log(numBytesRead, mOffset);
 	}
 	else if (mTotalRead == 0)
@@ -62,14 +62,14 @@ int ReadLoggingStream::Read(void *pBuffer, int NBytes, int Timeout)
 		mrLogger.Log(numBytesRead, mOffset, mLength);
 	}
 	else
-	{	
+	{
 		box_time_t timeNow = GetCurrentBoxTime();
 		box_time_t elapsed = timeNow - mStartTime;
 		box_time_t finish  = (elapsed * mLength) / mTotalRead;
 		// box_time_t remain  = finish - elapsed;
 		mrLogger.Log(numBytesRead, mOffset, mLength, elapsed, finish);
 	}
-	
+
 	return numBytesRead;
 }
 

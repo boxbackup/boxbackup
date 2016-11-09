@@ -81,7 +81,7 @@ public:
 	std::string mName; // "*" for all other sub config names
 	const ConfigurationVerify *mpSubConfigurations;
 	const ConfigurationVerifyKey *mpKeys;
-	int Tests;	
+	int Tests;
 	void *TestFunction; // set to zero for now, will implement later
 	static const ConfigurationCategory VERIFY_ERROR;
 };
@@ -102,13 +102,13 @@ public:
 	Configuration(const std::string &rName);
 	Configuration(const Configuration &rToCopy);
 	~Configuration();
-	
+
 	enum
 	{
 		// The character to separate multi-values
 		MultiValueSeparator = '\x01'
 	};
-	
+
 	static std::auto_ptr<Configuration> LoadAndVerify(
 		const std::string& rFilename,
 		const ConfigurationVerify *pVerify,
@@ -118,35 +118,35 @@ public:
 		const std::string& rFilename,
 		std::string &rErrorMsg)
 	{ return LoadAndVerify(rFilename, 0, rErrorMsg); }
-	
+
 	bool KeyExists(const std::string& rKeyName) const;
 	const std::string &GetKeyValue(const std::string& rKeyName) const;
 	int GetKeyValueInt(const std::string& rKeyName) const;
 	uint32_t GetKeyValueUint32(const std::string& rKeyName) const;
 	bool GetKeyValueBool(const std::string& rKeyName) const;
 	std::vector<std::string> GetKeyNames() const;
-	
+
 	bool SubConfigurationExists(const std::string& rSubName) const;
 	const Configuration &GetSubConfiguration(const std::string& rSubName) const;
 	Configuration &GetSubConfigurationEditable(const std::string& rSubName);
 	std::vector<std::string> GetSubConfigurationNames() const;
-	
+
 	void AddKeyValue(const std::string& rKey, const std::string& rValue);
 	void AddSubConfig(const std::string& rName, const Configuration& rSubConfig);
-	
+
 	bool Verify(const ConfigurationVerify &rVerify, std::string &rErrorMsg)
 	{
 		return Verify(rVerify, std::string(), rErrorMsg);
 	}
 
-private:	
+private:
 	std::string mName;
 	// Order of keys not preserved
 	std::map<std::string, std::string> mKeys;
 	// Order of sub blocks preserved
 	typedef std::list<std::pair<std::string, Configuration> > SubConfigListType;
 	SubConfigListType mSubConfigurations;
-	
+
 	static bool LoadInto(Configuration &rConfig, FdGetLine &rGetLine, std::string &rErrorMsg, bool RootLevel);
 	bool Verify(const ConfigurationVerify &rVerify, const std::string &rLevel,
 		std::string &rErrorMsg);

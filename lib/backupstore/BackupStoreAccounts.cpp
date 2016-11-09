@@ -48,6 +48,7 @@ BackupStoreAccounts::BackupStoreAccounts(BackupStoreAccountDatabase &rDatabase)
 {
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -141,7 +142,7 @@ void BackupStoreAccounts::GetAccountRoot(int32_t ID, std::string &rRootDirOut, i
 {
 	// Find the account
 	const BackupStoreAccountDatabase::Entry &en(mrDatabase.GetEntry(ID));
-	
+
 	rRootDirOut = MakeAccountRootDir(ID, en.GetDiscSet());
 	rDiscSetOut = en.GetDiscSet();
 }

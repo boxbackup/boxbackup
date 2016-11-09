@@ -336,6 +336,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 			// And tell the getline object to ignore the data we just used
 			rGetLine.IgnoreBufferedData(fromBuffer);
 		}
+
 		// Then read any more data, as required
 		int bytesToGo = mContentLength - fromBuffer;
 		while(bytesToGo > 0)
@@ -375,7 +376,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
 {
 	Seek(0, SeekType_Absolute);
-	
+
 	CopyStreamTo(rStreamToWriteTo);
 	IOStream::pos_type bytesCopied = GetSize();
 
@@ -392,6 +393,7 @@ void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
 		bytesCopied += bytesToCopy;
 	}
 }
+
 
 // --------------------------------------------------------------------------
 //

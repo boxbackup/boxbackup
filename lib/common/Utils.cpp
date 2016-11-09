@@ -139,7 +139,7 @@ static std::string demangle(const std::string& mangled_name)
 	char buffer[1024];
 	int status;
 	size_t length = sizeof(buffer);
-	
+
 	char* result = abi::__cxa_demangle(mangled_name.c_str(),
 		buffer, &length, &status);
 
@@ -256,13 +256,13 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 		{
 			return false;
 		}
-	
+
 		// Yes. Tell caller the size?
 		if(pFileSize != 0)
 		{
 			*pFileSize = st.st_size;
 		}
-	
+
 		return true;
 	}
 	else
@@ -331,7 +331,7 @@ std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 	bool MachineReadable)
 {
 	std::ostringstream result;
-	
+
 
 	if (MachineReadable)
 	{
@@ -353,14 +353,14 @@ std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 			bar[l] = ' ';
 		}
 		bar[sizeof(bar)-1] = '\0';
-		
+
 		result << std::fixed <<
 			std::setw(10) << Blocks << " blocks, " <<
 			std::setw(10) << HumanReadableSize(Bytes) << ", " << 
 			std::setw(3) << std::setprecision(0) <<
 			((Bytes*100)/Max) << "% |" << bar << "|";
 	}
-	
+
 	return result.str();
 }
 

@@ -350,7 +350,7 @@ int main(int argc, const char *argv[])
 	}
 	// Easier coding
 	const Configuration &conf(*config);
-	
+
 	// Setup and connect
 	// 1. TLS context
 	SSLLib::Initialise();
