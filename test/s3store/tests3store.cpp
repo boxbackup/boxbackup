@@ -70,14 +70,26 @@ bool kill_running_daemons()
 	TEST_THAT(kill_running_daemons()); \
 	TEARDOWN();
 
+bool check_new_account_info();
+
 bool test_create_account_with_account_control()
 {
 	SETUP_TEST_S3SIMULATOR();
 
 	std::auto_ptr<Configuration> config = load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE,
 		BackupDaemonConfigVerify);
+	TEST_LINE_OR(config.get(), "Failed to load configuration, aborting", FAIL);
+
 	S3BackupAccountControl control(*config);
 	control.CreateAccount("test", 1000, 2000);
+	TEST_THAT(check_new_account_info());
+
+	TEARDOWN_TEST_S3SIMULATOR();
+}
+
+bool check_new_account_info()
+{
+	int old_failure_count_local = num_failures;
 
 	FileStream fs("testfiles/store/subdir/" S3_INFO_FILE_NAME);
 	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(fs, fs.GetFileName(),
@@ -105,7 +117,8 @@ bool test_create_account_with_account_control()
 	BackupStoreDirectory root_dir(root_stream);
 	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
-	TEARDOWN_TEST_S3SIMULATOR();
+	// Return true if no new failures.
+	return (old_failure_count_local == num_failures);
 }
 
 int test(int argc, const char *argv[])
