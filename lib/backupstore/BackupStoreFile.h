@@ -172,7 +172,17 @@ public:
 		}
 		virtual void Write(const void *pBuffer, int NBytes,
 			int Timeout = IOStream::TimeOutInfinite);
-		virtual void Close(bool CloseCopyStream = true);
+		// Declare twice (with different parameters) to avoid warnings that
+		// Close(bool) hides overloaded virtual function.
+		virtual void Close(bool CloseCopyStream)
+		{
+			if(CloseCopyStream)
+			{
+				mpCopyToStream->Close();
+			}
+			Close();
+		}
+		virtual void Close();
 		virtual bool StreamDataLeft()
 		{
 			THROW_EXCEPTION(CommonException, NotSupported);

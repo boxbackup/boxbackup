@@ -479,14 +479,8 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 //
 // --------------------------------------------------------------------------
 
-
-void BackupStoreFile::VerifyStream::Close(bool CloseCopyStream)
+void BackupStoreFile::VerifyStream::Close()
 {
-	if(mpCopyToStream && CloseCopyStream)
-	{
-		mpCopyToStream->Close();
-	}
-
 	if(mState != State_Blocks)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadBackupStoreFile,
