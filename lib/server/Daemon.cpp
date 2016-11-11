@@ -564,11 +564,11 @@ int Daemon::Main(const std::string &rConfigFileName)
 #endif // !WIN32
 
 		// Write PID to file
-		char pid[32];
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		std::string pid_str = pid_buf.str();
 
-		int pidsize = snprintf(pid, sizeof(pid), "%d", (int)getpid());
-
-		if(::write(pidFile, pid, pidsize) != pidsize)
+		if(::write(pidFile, pid_str.c_str(), pid_str.size()) != pid_str.size())
 		{
 			BOX_LOG_SYS_FATAL("Failed to write PID file: " <<
 				pidFileName);
