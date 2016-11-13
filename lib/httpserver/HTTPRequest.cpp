@@ -22,6 +22,8 @@
 #include "IOStream.h"
 #include "IOStreamGetLine.h"
 #include "Logging.h"
+#include "PartialReadStream.h"
+#include "ReadGatherStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -42,11 +44,8 @@
 // --------------------------------------------------------------------------
 HTTPRequest::HTTPRequest()
 	: mMethod(Method_UNINITIALISED),
-	  mHostPort(80),	// default if not specified
 	  mHTTPVersion(0),
-	  mContentLength(-1),
 	  mpCookies(0),
-	  mClientKeepAliveRequested(false),
 	  mExpectContinue(false),
 	  mpStreamToReadFrom(NULL)
 {
@@ -65,11 +64,8 @@ HTTPRequest::HTTPRequest()
 HTTPRequest::HTTPRequest(enum Method method, const std::string& rURI)
 	: mMethod(method),
 	  mRequestURI(rURI),
-	  mHostPort(80), // default if not specified
 	  mHTTPVersion(HTTPVersion_1_1),
-	  mContentLength(-1),
 	  mpCookies(0),
-	  mClientKeepAliveRequested(false),
 	  mExpectContinue(false),
 	  mpStreamToReadFrom(NULL)
 {
@@ -115,11 +111,17 @@ std::string HTTPRequest::GetMethodName() const
 		case Method_HEAD: return "HEAD";
 		case Method_POST: return "POST";
 		case Method_PUT: return "PUT";
+		case Method_DELETE: return "DELETE";
 		default:
 			std::ostringstream oss;
 			oss << "unknown-" << mMethod;
 			return oss.str();
 	};
+}
+
+std::string HTTPRequest::GetRequestURI() const
+{
+	return mRequestURI;
 }
 
 // --------------------------------------------------------------------------
@@ -178,8 +180,14 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		{
 			mMethod = Method_PUT;
 		}
+		else if (mHttpVerb == "DELETE")
+		{
+			mMethod = Method_DELETE;
+		}
 		else
 		{
+			BOX_WARNING("Received HTTP request with unrecognised method: " <<
+				mHttpVerb);
 			mMethod = Method_UNKNOWN;
 		}
 	}
@@ -291,7 +299,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	// If HTTP 1.1 or greater, assume keep-alive
 	if(mHTTPVersion >= HTTPVersion_1_1)
 	{
-		mClientKeepAliveRequested = true;
+		mHeaders.SetKeepAlive(true);
 	}
 
 	// Decode query string?
@@ -303,7 +311,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	}
 
 	// Now parse the headers
-	ParseHeaders(rGetLine, Timeout);
+	mHeaders.ReadFromStream(rGetLine, Timeout);
 
 	std::string expected;
 	if(GetHeader("Expect", &expected))
@@ -314,20 +322,36 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		}
 	}
 
+	const std::string& cookies = mHeaders.GetHeaderValue("cookie", false);
+	// false => not required, returns "" if header is not present.
+	if(!cookies.empty())
+	{
+		ParseCookies(cookies);
+	}
+
 	// Parse form data?
-	if(mMethod == Method_POST && mContentLength >= 0)
+	int64_t contentLength = mHeaders.GetContentLength();
+	if(mMethod == Method_POST && contentLength >= 0)
 	{
 		// Too long? Don't allow people to be nasty by sending lots of data
-		if(mContentLength > MAX_CONTENT_SIZE)
+		if(contentLength > MAX_CONTENT_SIZE)
 		{
-			THROW_EXCEPTION(HTTPException, POSTContentTooLong);
+			THROW_EXCEPTION_MESSAGE(HTTPException, POSTContentTooLong,
+				"Client tried to upload " << contentLength << " bytes of "
+				"content, but our maximum supported size is " <<
+				MAX_CONTENT_SIZE);
 		}
 
 		// Some data in the request to follow, parsing it bit by bit
 		HTTPQueryDecoder decoder(mQuery);
+
 		// Don't forget any data left in the GetLine object
 		int fromBuffer = rGetLine.GetSizeOfBufferedData();
-		if(fromBuffer > mContentLength) fromBuffer = mContentLength;
+		if(fromBuffer > contentLength)
+		{
+			fromBuffer = contentLength;
+		}
+
 		if(fromBuffer > 0)
 		{
 			BOX_TRACE("Decoding " << fromBuffer << " bytes of "
@@ -338,7 +362,7 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		}
 
 		// Then read any more data, as required
-		int bytesToGo = mContentLength - fromBuffer;
+		int bytesToGo = contentLength - fromBuffer;
 		while(bytesToGo > 0)
 		{
 			char buf[4096];
@@ -358,12 +382,12 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 		// Finish off
 		decoder.Finish();
 	}
-	else if (mContentLength > 0)
+	else
 	{
 		IOStream::pos_type bytesToCopy = rGetLine.GetSizeOfBufferedData();
-		if (bytesToCopy > mContentLength)
+		if (contentLength != -1 && bytesToCopy > contentLength)
 		{
-			bytesToCopy = mContentLength;
+			bytesToCopy = contentLength;
 		}
 		Write(rGetLine.GetBufferedData(), bytesToCopy);
 		SetForReading();
@@ -373,24 +397,52 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 	return true;
 }
 
-void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
+void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo, int Timeout)
 {
+	// TODO FIXME: POST requests (above) do not set mpStreamToReadFrom, would we
+	// ever want to call ReadContent() on them? I hope not!
+	ASSERT(mpStreamToReadFrom != NULL);
+
 	Seek(0, SeekType_Absolute);
 
-	CopyStreamTo(rStreamToWriteTo);
+	// Copy any data that we've already buffered.
+	CopyStreamTo(rStreamToWriteTo, Timeout);
 	IOStream::pos_type bytesCopied = GetSize();
 
-	while (bytesCopied < mContentLength)
+	// Copy the data stream, but only upto the content-length.
+	int64_t contentLength = mHeaders.GetContentLength();
+	if(contentLength == -1)
 	{
-		char buffer[1024];
-		IOStream::pos_type bytesToCopy = sizeof(buffer);
-		if (bytesToCopy > mContentLength - bytesCopied)
+		// There is no content-length, so copy all of it. Include the buffered
+		// data (already copied above) in the final content-length, which we
+		// update in the HTTPRequest headers.
+		contentLength = bytesCopied;
+
+		// If there is a stream to read from, then copy its contents too.
+		if(mpStreamToReadFrom != NULL)
 		{
-			bytesToCopy = mContentLength - bytesCopied;
+			contentLength +=
+				mpStreamToReadFrom->CopyStreamTo(rStreamToWriteTo,
+					Timeout);
 		}
-		bytesToCopy = mpStreamToReadFrom->Read(buffer, bytesToCopy);
-		rStreamToWriteTo.Write(buffer, bytesToCopy);
-		bytesCopied += bytesToCopy;
+		mHeaders.SetContentLength(contentLength);
+	}
+	else
+	{
+		// Subtract the amount of data already buffered (and already copied above)
+		// from the total content-length, to get the amount that we are allowed
+		// and expected to read from the stream. This will leave the stream
+		// positioned ready for the next request, or EOF, as the client decides.
+		PartialReadStream partial(*mpStreamToReadFrom, contentLength -
+			bytesCopied);
+		partial.CopyStreamTo(rStreamToWriteTo, Timeout);
+
+		// In case of a timeout or error, PartialReadStream::CopyStreamTo
+		// should have thrown an exception, so this is just defensive, to
+		// ensure that the source stream is properly positioned to read
+		// from again, and the destination received the correct number of
+		// bytes.
+		ASSERT(!partial.StreamDataLeft());
 	}
 }
 
@@ -398,12 +450,47 @@ void HTTPRequest::ReadContent(IOStream& rStreamToWriteTo)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPRequest::Send(IOStream &, int)
-//		Purpose: Write the request to an IOStream using HTTP.
+//		Name:    HTTPRequest::Send(IOStream &, int, bool)
+//		Purpose: Write a request with NO CONTENT to an IOStream using
+//			 HTTP. If you want to send a request WITH content,
+//			 such as a PUT or POST request, use SendWithStream()
+//			 instead.
 //		Created: 03/01/09
 //
 // --------------------------------------------------------------------------
-bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
+
+void HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
+{
+	if(mHeaders.GetContentLength() > 0)
+	{
+		THROW_EXCEPTION(HTTPException, ContentLengthAlreadySet);
+	}
+
+	if(GetSize() != 0)
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, WrongContentLength,
+			"Tried to send a request without content, but there is data "
+			"in the request buffer waiting to be sent.")
+	}
+
+	mHeaders.SetContentLength(0);
+	SendHeaders(rStream, Timeout, ExpectContinue);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPRequest::SendHeaders(IOStream &, int, bool)
+//		Purpose: Write the start of a request to an IOStream using
+//			 HTTP. If you want to send a request WITH content,
+//			 but you can't wait for a response, use this followed
+//			 by sending your stream directly to the socket.
+//		Created: 2015-10-08
+//
+// --------------------------------------------------------------------------
+
+void HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue)
 {
 	switch (mMethod)
 	{
@@ -411,14 +498,8 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 		THROW_EXCEPTION(HTTPException, RequestNotInitialised); break;
 	case Method_UNKNOWN:
 		THROW_EXCEPTION(HTTPException, BadRequest); break;
-	case Method_GET:
-		rStream.Write("GET"); break;
-	case Method_HEAD:
-		rStream.Write("HEAD"); break;
-	case Method_POST:
-		rStream.Write("POST"); break;
-	case Method_PUT:
-		rStream.Write("PUT"); break;
+	default:
+		rStream.Write(GetMethodName());
 	}
 
 	rStream.Write(" ");
@@ -435,31 +516,8 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 			"Unsupported HTTP version: " << mHTTPVersion);
 	}
 
-	rStream.Write("\n");
-	std::ostringstream oss;
-
-	if (mContentLength != -1)
-	{
-		oss << "Content-Length: " << mContentLength << "\n";
-	}
-
-	if (mContentType != "")
-	{
-		oss << "Content-Type: " << mContentType << "\n";
-	}
-
-	if (mHostName != "")
-	{
-		if (mHostPort != 80)
-		{
-			oss << "Host: " << mHostName << ":" << mHostPort <<
-				"\n";
-		}
-		else
-		{
-			oss << "Host: " << mHostName << "\n";
-		}
-	}
+	rStream.Write("\r\n");
+	mHeaders.WriteTo(rStream, Timeout);
 
 	if (mpCookies)
 	{
@@ -467,207 +525,104 @@ bool HTTPRequest::Send(IOStream &rStream, int Timeout, bool ExpectContinue)
 			"Cookie support not implemented yet");
 	}
 
-	if (mClientKeepAliveRequested)
-	{
-		oss << "Connection: keep-alive\n";
-	}
-	else
-	{
-		oss << "Connection: close\n";
-	}
-
-	for (std::vector<Header>::iterator i = mExtraHeaders.begin();
-		i != mExtraHeaders.end(); i++)
-	{
-		oss << i->first << ": " << i->second << "\n";
-	}
-
 	if (ExpectContinue)
 	{
-		oss << "Expect: 100-continue\n";
+		rStream.Write("Expect: 100-continue\r\n");
 	}
 
-	rStream.Write(oss.str().c_str());
-	rStream.Write("\n");
-
-	return true;
+	rStream.Write("\r\n");
 }
 
-void HTTPRequest::SendWithStream(IOStream &rStreamToSendTo, int Timeout,
-	IOStream* pStreamToSend, HTTPResponse& rResponse)
-{
-	IOStream::pos_type size = pStreamToSend->BytesLeftToRead();
-	if (size != IOStream::SizeOfStreamUnknown)
-	{
-		mContentLength = size;
-	}
 
-	Send(rStreamToSendTo, Timeout, true);
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPRequest::SendWithStream(IOStream &rStreamToSendTo,
+//			 int Timeout, IOStream* pStreamToSend,
+//			 HTTPResponse& rResponse)
+//		Purpose: Write a request WITH CONTENT to an IOStream using
+//			 HTTP. If you want to send a request WITHOUT content,
+//			 such as a GET or DELETE request, use Send() instead.
+//			 Because this is interactive (it uses 100 Continue
+//			 responses) it can only be sent to a SocketStream.
+//		Created: 03/01/09
+//
+// --------------------------------------------------------------------------
+
+IOStream::pos_type HTTPRequest::SendWithStream(SocketStream &rStreamToSendTo,
+	int Timeout, IOStream* pStreamToSend, HTTPResponse& rResponse)
+{
+	SendHeaders(rStreamToSendTo, Timeout, true); // ExpectContinue
 
 	rResponse.Receive(rStreamToSendTo, Timeout);
 	if (rResponse.GetResponseCode() != 100)
 	{
 		// bad response, abort now
-		return;
+		return 0;
 	}
 
-	pStreamToSend->CopyStreamTo(rStreamToSendTo, Timeout);
+	IOStream::pos_type bytes_sent = 0;
+
+	if(mHeaders.GetContentLength() == -1)
+	{
+		// We don't know how long the stream is, so just send it all.
+		// Including any data buffered in the HTTPRequest.
+		CopyStreamTo(rStreamToSendTo, Timeout);
+		pStreamToSend->CopyStreamTo(rStreamToSendTo, Timeout);
+	}
+	else
+	{
+		// Check that the length of the stream is correct, and ensure
+		// that we don't send too much without realising.
+		ReadGatherStream gather(false); // don't delete anything
+
+		// Send any data buffered in the HTTPRequest first.
+		gather.AddBlock(gather.AddComponent(this), GetSize());
+		
+		// And the remaining bytes should be read from the supplied stream.
+		gather.AddBlock(gather.AddComponent(pStreamToSend),
+			mHeaders.GetContentLength() - GetSize());
+		
+		bytes_sent = gather.CopyStreamTo(rStreamToSendTo, Timeout);
+		
+		if(pStreamToSend->StreamDataLeft())
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, WrongContentLength,
+				"Expected to send " << mHeaders.GetContentLength() <<
+				" bytes, but there is still unsent data left in the "
+				"stream");
+		}
+
+		if(gather.StreamDataLeft())
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, WrongContentLength,
+				"Expected to send " << mHeaders.GetContentLength() <<
+				" bytes, but there was not enough data in the stream");
+		}
+	}
+
+	// We don't support keep-alive, so we must shutdown the write side of the stream
+	// to signal to the other end that we have no more data to send.
+	ASSERT(!GetClientKeepAliveRequested());
+	rStreamToSendTo.Shutdown(false, true); // !read, write
 
 	// receive the final response
 	rResponse.Receive(rStreamToSendTo, Timeout);
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    HTTPRequest::ParseHeaders(IOStreamGetLine &, int)
-//		Purpose: Private. Parse the headers of the request
-//		Created: 26/3/04
-//
-// --------------------------------------------------------------------------
-void HTTPRequest::ParseHeaders(IOStreamGetLine &rGetLine, int Timeout)
-{
-	std::string header;
-	bool haveHeader = false;
-	while(true)
-	{
-		if(rGetLine.IsEOF())
-		{
-			// Header terminates unexpectedly
-			THROW_EXCEPTION(HTTPException, BadRequest)		
-		}
-
-		std::string currentLine;
-		if(!rGetLine.GetLine(currentLine, false /* no preprocess */, Timeout))
-		{
-			// Timeout
-			THROW_EXCEPTION(HTTPException, RequestReadFailed)
-		}
-
-		// Is this a continuation of the previous line?
-		bool processHeader = haveHeader;
-		if(!currentLine.empty() && (currentLine[0] == ' ' || currentLine[0] == '\t'))
-		{
-			// A continuation, don't process anything yet
-			processHeader = false;
-		}
-		//TRACE3("%d:%d:%s\n", processHeader, haveHeader, currentLine.c_str());
-
-		// Parse the header -- this will actually process the header
-		// from the previous run around the loop.
-		if(processHeader)
-		{
-			// Find where the : is in the line
-			const char *h = header.c_str();
-			int p = 0;
-			while(h[p] != '\0' && h[p] != ':')
-			{
-				++p;
-			}
-			// Skip white space
-			int dataStart = p + 1;
-			while(h[dataStart] == ' ' || h[dataStart] == '\t')
-			{
-				++dataStart;
-			}
-
-			std::string header_name(ToLowerCase(std::string(h,
-				p)));
-
-			if (header_name == "content-length")
-			{
-				// Decode number
-				long len = ::strtol(h + dataStart, NULL, 10);	// returns zero in error case, this is OK
-				if(len < 0) len = 0;
-				// Store
-				mContentLength = len;
-			}
-			else if (header_name == "content-type")
-			{
-				// Store rest of string as content type
-				mContentType = h + dataStart;
-			}
-			else if (header_name == "host")
-			{
-				// Store host header
-				mHostName = h + dataStart;
-
-				// Is there a port number to split off?
-				std::string::size_type colon = mHostName.find_first_of(':');
-				if(colon != std::string::npos)
-				{
-					// There's a port in the string... attempt to turn it into an int
-					mHostPort = ::strtol(mHostName.c_str() + colon + 1, 0, 10);
-
-					// Truncate the string to just the hostname
-					mHostName = mHostName.substr(0, colon);
-
-					BOX_TRACE("Host: header, hostname = " <<
-						"'" << mHostName << "', host "
-						"port = " << mHostPort);
-				}
-			}
-			else if (header_name == "cookie")
-			{
-				// Parse cookies
-				ParseCookies(header, dataStart);
-			}
-			else if (header_name == "connection")
-			{
-				// Connection header, what is required?
-				const char *v = h + dataStart;
-				if(::strcasecmp(v, "close") == 0)
-				{
-					mClientKeepAliveRequested = false;
-				}
-				else if(::strcasecmp(v, "keep-alive") == 0)
-				{
-					mClientKeepAliveRequested = true;
-				}
-				// else don't understand, just assume default for protocol version
-			}
-			else
-			{
-				mExtraHeaders.push_back(Header(header_name,
-					h + dataStart));
-			}
-
-			// Unset have header flag, as it's now been processed
-			haveHeader = false;
-		}
-
-		// Store the chunk of header the for next time round
-		if(haveHeader)
-		{
-			header += currentLine;
-		}
-		else
-		{
-			header = currentLine;
-			haveHeader = true;
-		}
-
-		// End of headers?
-		if(currentLine.empty())
-		{
-			// All done!
-			break;
-		}
-	}
+	return bytes_sent;
 }
 
 
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPRequest::ParseCookies(const std::string &, int)
+//		Name:    HTTPRequest::ParseCookies(const std::string &)
 //		Purpose: Parse the cookie header
 //		Created: 20/8/04
 //
 // --------------------------------------------------------------------------
-void HTTPRequest::ParseCookies(const std::string &rHeader, int DataStarts)
+void HTTPRequest::ParseCookies(const std::string &rCookieString)
 {
-	const char *data = rHeader.c_str() + DataStarts;
+	const char *data = rCookieString.c_str();
 	const char *pos = data;
 	const char *itemStart = pos;
 	std::string name;

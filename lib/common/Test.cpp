@@ -210,6 +210,9 @@ bool setUp(const char* function_name)
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
 
 	return true;
 }

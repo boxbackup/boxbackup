@@ -145,7 +145,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	}
 
 	std::ostringstream data;
-	data << request.GetVerb() << "\n";
+	data << request.GetMethodName() << "\n";
 	data << "\n"; /* Content-MD5 */
 	data << request.GetContentType() << "\n";
 	data << date.str() << "\n";
@@ -181,7 +181,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	{
 		if (pStreamToSend)
 		{
-			pStreamToSend->CopyStreamTo(request);
+			request.SetDataStream(pStreamToSend);
 		}
 
 		request.SetForReading();

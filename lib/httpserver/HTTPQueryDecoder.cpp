@@ -9,7 +9,7 @@
 
 #include "Box.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "HTTPQueryDecoder.h"
 

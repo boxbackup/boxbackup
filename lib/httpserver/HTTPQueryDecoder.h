@@ -25,12 +25,13 @@ class HTTPQueryDecoder
 public:
 	HTTPQueryDecoder(HTTPRequest::Query_t &rDecodeInto);
 	~HTTPQueryDecoder();
+
 private:
 	// no copying
 	HTTPQueryDecoder(const HTTPQueryDecoder &);
-	HTTPQueryDecoder &operator=(const HTTPQueryDecoder &);
-public:
+	HTTPQueryDecoder& operator=(const HTTPQueryDecoder &);
 
+public:
 	void DecodeChunk(const char *pQueryString, int QueryStringSize);
 	void Finish();
 
