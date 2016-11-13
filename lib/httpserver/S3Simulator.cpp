@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    S3Client.cpp
+//		Name:    S3Simulator.cpp
 //		Purpose: Amazon S3 client helper implementation class
 //		Created: 09/01/2009
 //
@@ -118,14 +118,14 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		}
 
 		std::ostringstream data;
-		data << rRequest.GetVerb() << "\n";
+		data << rRequest.GetMethodName() << "\n";
 		data << md5 << "\n";
 		data << rRequest.GetContentType() << "\n";
 		data << date << "\n";
 
 		// header names are already in lower case, i.e. canonical form
 
-		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders();
+		std::vector<HTTPRequest::Header> headers = rRequest.GetHeaders().GetExtraHeaders();
                 std::sort(headers.begin(), headers.end());
 
 		for (std::vector<HTTPRequest::Header>::iterator
@@ -201,6 +201,10 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		{
 			rResponse.SetResponseCode(HTTPResponse::Code_Unauthorized);
 		}
+		else if(EXCEPTION_IS_TYPE(ce, HTTPException, BadRequest))
+		{
+			rResponse.SetResponseCode(HTTPResponse::Code_BadRequest);
+		}
 	}
 	catch (std::exception &e)
 	{
@@ -269,13 +273,40 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 {
-	std::string path = GetConfiguration().GetKeyValue("StoreDirectory");
-	path += rRequest.GetRequestURI();
+	std::string base_path = GetConfiguration().GetKeyValue("StoreDirectory");
 	std::auto_ptr<FileStream> apFile;
 
+	// Amazon S3 has no explicit directories or directory creation operation, but we
+	// are using the filesystem for storage, so we need to ensure that any directories
+	// used in the file's path actually exist before we can create the file itself.
+	std::string file_uri = rRequest.GetRequestURI();
+	for(std::string::size_type next_slash = file_uri.find('/', 1);
+		next_slash != std::string::npos;
+		next_slash = file_uri.find('/', next_slash + 1))
+	{
+		std::string parent_dir_path = base_path + file_uri.substr(0, next_slash);
+		int what_exists = ObjectExists(parent_dir_path);
+		if(what_exists == 0)
+		{
+			// Does not exist, need to create it
+			mkdir(parent_dir_path.c_str(), 0755);
+		}
+		else if(what_exists == ObjectExists_Dir)
+		{
+			// Directory already exists, nothing to do
+		}
+		else
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+				"Cannot create directory: something else already exists "
+				"with this name: " << parent_dir_path);
+		}
+	}
+
+	std::string file_path = base_path + file_uri;
 	try
 	{
-		apFile.reset(new FileStream(path, O_CREAT | O_WRONLY));
+		apFile.reset(new FileStream(file_path, O_CREAT | O_TRUNC | O_RDWR));
 	}
 	catch (CommonException &ce)
 	{
@@ -295,7 +326,7 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		rResponse.SendContinue();
 	}
 
-	rRequest.ReadContent(*apFile);
+	rRequest.ReadContent(*apFile, GetTimeout());
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTObjectPUT.html
 	rResponse.AddHeader("x-amz-id-2", "LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7");
