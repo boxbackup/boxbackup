@@ -33,8 +33,8 @@
 #define SERVER_LISTEN_PORT	2003
 
 // in ms
-#define COMMS_READ_TIMEOUT					4
-#define COMMS_SERVER_WAIT_BEFORE_REPLYING	40
+#define COMMS_READ_TIMEOUT	4
+#define COMMS_SERVER_WAIT_BEFORE_REPLYING	1000
 // Use a longer timeout to give Srv2TestConversations time to write 20 MB to each of
 // three child processes before starting to read it back again, without the children
 // timing out and aborting.
@@ -67,9 +67,10 @@ void testservers_pause_before_reply()
 #ifdef WIN32
 	Sleep(COMMS_SERVER_WAIT_BEFORE_REPLYING);
 #else
+	int64_t nsec = COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000LL * 1000;	// convert to ns
 	struct timespec t;
-	t.tv_sec = 0;
-	t.tv_nsec = COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000 * 1000;	// convert to ns
+	t.tv_sec = nsec / NANO_SEC_IN_SEC;
+	t.tv_nsec = nsec % NANO_SEC_IN_SEC;
 	::nanosleep(&t, NULL);
 #endif
 }
@@ -91,7 +92,11 @@ void testservers_connection(SocketStream &rStream)
 		std::string line1("CONNECTED:");
 		line1 += rtls.GetPeerCommonName();
 		line1 += '\n';
+
+		// Reply after a short delay, to allow the client to test timing out
+		// in GetLine():
 		testservers_pause_before_reply();
+
 		rStream.Write(line1.c_str(), line1.size());
 	}
 
@@ -313,7 +318,6 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 	{
 		getline[c] = new IOStreamGetLine(*conns[c]);
 		
-		bool hadTimeout = false;
 		if(typeid(*conns[c]) == typeid(SocketStreamTLS))
 		{
 			SocketStreamTLS *ptls = (SocketStreamTLS *)conns[c];
@@ -323,10 +327,18 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			conns[c]->Write("Hello\n", 6);
 		
 			std::string line1;
-			while(!getline[c]->GetLine(line1, false, COMMS_READ_TIMEOUT))
-				hadTimeout = true;
-			TEST_THAT(line1 == "CONNECTED:CLIENT");
-			TEST_THAT(hadTimeout)
+
+			// First read should timeout, while server sleeps in
+			// testservers_pause_before_reply():
+			TEST_THAT(!getline[c]->GetLine(line1, false,
+				COMMS_SERVER_WAIT_BEFORE_REPLYING * 0.5));
+			TEST_EQUAL(line1, "");
+
+			// Second read should not timeout, because we should have waited
+			// COMMS_SERVER_WAIT_BEFORE_REPLYING * 1.5
+			TEST_THAT(getline[c]->GetLine(line1, false,
+				COMMS_SERVER_WAIT_BEFORE_REPLYING));
+			TEST_EQUAL(line1, "CONNECTED:CLIENT");
 		}
 	}
 	

@@ -15,8 +15,9 @@
 	#include <unistd.h>
 #endif
 
+#include "autogen_CommonException.h"
+#include "BoxTime.h"
 #include "GetLine.h"
-#include "CommonException.h"
 
 #include "MemLeakFindOn.h"
 
@@ -56,8 +57,8 @@ GetLine::GetLine()
 //		Created: 2011/04/22
 //
 // --------------------------------------------------------------------------
-bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
-	int Timeout)
+bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
+	int timeout)
 {
 	// EOF?
 	if(mEOF) {THROW_EXCEPTION(CommonException, GetLineEOF)}
@@ -66,9 +67,12 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
 	rOutput = mPendingString;
 	mPendingString.erase();
 
-	bool foundLineEnd = false;
+	box_time_t start_time = GetCurrentBoxTime();
+	box_time_t remaining_time = MilliSecondsToBoxTime(timeout);
+	box_time_t end_time = start_time + remaining_time;
+	bool found_line_end = false;
 
-	while(!foundLineEnd && !mEOF)
+	while(!found_line_end && !mEOF)
 	{
 		// Use any bytes left in the buffer
 		while(mBufferBegin < mBytesInBuffer)
@@ -81,7 +85,7 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
 			else if(c == '\n')
 			{
 				// Line end!
-				foundLineEnd = true;
+				found_line_end = true;
 				break;
 			}
 			else
@@ -93,7 +97,7 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
 			// Implicit line ending at EOF
 			if(mBufferBegin >= mBytesInBuffer && mPendingEOF)
 			{
-				foundLineEnd = true;
+				found_line_end = true;
 			}
 		}
 		
@@ -102,11 +106,36 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
 		{
 			THROW_EXCEPTION(CommonException, GetLineTooLarge)
 		}
-		
-		// Read more in?
-		if(!foundLineEnd && mBufferBegin >= mBytesInBuffer && !mPendingEOF)
+
+		if(timeout != IOStream::TimeOutInfinite)
 		{
-			int bytes = ReadMore(Timeout);
+			// Update remaining time, and if we have run out and not yet found EOL, then
+			// stash what we've read so far, and return false. (If the timeout is infinite,
+			// the only way out is EOL or EOF.)
+			remaining_time = end_time - GetCurrentBoxTime();
+			if(!found_line_end && remaining_time < 0)
+			{
+			       mPendingString = rOutput;
+			       return false;
+			}
+		}
+
+		// Read more in?
+		if(!found_line_end && mBufferBegin >= mBytesInBuffer && !mPendingEOF)
+		{
+			int64_t read_timeout_ms;
+			if(timeout == IOStream::TimeOutInfinite)
+			{
+				read_timeout_ms = IOStream::TimeOutInfinite;
+			}
+			else
+			{
+				// We should have exited above, if remaining_time < 0.
+				ASSERT(remaining_time >= 0);
+				read_timeout_ms = BoxTimeToMilliSeconds(remaining_time);
+			}
+
+			int bytes = ReadMore(read_timeout_ms);
 			
 			// Error?
 			if(bytes == -1)
@@ -117,7 +146,7 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
 			// Adjust buffer info
 			mBytesInBuffer = bytes;
 			mBufferBegin = 0;
-			
+
 			// No data returned?
 			if(bytes == 0 && IsStreamDataLeft())
 			{
@@ -136,7 +165,7 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool Preprocess,
 		}
 	}
 
-	if(Preprocess)
+	if(preprocess)
 	{
 		// Check for comment char, but char before must be whitespace
 		// end points to a gap between characters, may equal start if
