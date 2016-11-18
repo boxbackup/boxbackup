@@ -520,7 +520,9 @@ bool test_httpserver()
 			"<h1>Internal Server Error</h1>\n"
 			"<p>An error occurred while processing the request:</p>\n"
 			"<pre>HTTPException(AuthenticationFailed): "
-			"Authentication code mismatch</pre>\n"
+			"Authentication code mismatch: expected AWS 0PN5J17HBGZHT7JJ3X82"
+			":xXjDGYUmKxnwqr5KXNPGldn5LbA= but received AWS "
+			"0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=</pre>\n"
 			"<p>Please try again later.</p></body>\n"
 			"</html>\n", response_data);
 	}
