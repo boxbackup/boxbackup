@@ -27,6 +27,7 @@
 #include "HTTPServer.h"
 #include "HTTPTest.h"
 #include "IOStreamGetLine.h"
+#include "MD5Digest.h"
 #include "S3Client.h"
 #include "S3Simulator.h"
 #include "ServerControl.h"
@@ -247,6 +248,16 @@ bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
 bool test_httpserver()
 {
 	SETUP();
+
+	{
+		FileStream fs("testfiles/dsfdsfs98.fd");
+		MD5DigestStream digester;
+		fs.CopyStreamTo(digester);
+		fs.Seek(0, IOStream::SeekType_Absolute);
+		digester.Close();
+		std::string digest = digester.DigestAsString();
+		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
+	}
 
 	// Test that HTTPRequest can be written to and read from a stream.
 	{
