@@ -25,6 +25,7 @@
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
 #include "HTTPServer.h"
+#include "HTTPTest.h"
 #include "IOStreamGetLine.h"
 #include "S3Client.h"
 #include "S3Simulator.h"
@@ -41,11 +42,12 @@
 class TestWebServer : public HTTPServer
 {
 public:
-	TestWebServer();
-	~TestWebServer();
+	TestWebServer()
+	: HTTPServer(LONG_TIMEOUT)
+	{ }
+	~TestWebServer() { }
 
 	virtual void Handle(HTTPRequest &rRequest, HTTPResponse &rResponse);
-
 };
 
 // Build a nice HTML response, so this can also be tested neatly in a browser
@@ -127,8 +129,32 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.Write(DEFAULT_RESPONSE_2, sizeof(DEFAULT_RESPONSE_2) - 1);
 }
 
-TestWebServer::TestWebServer() {}
-TestWebServer::~TestWebServer() {}
+bool exercise_s3client(S3Client& client)
+{
+	int num_failures_initial = num_failures;
+
+	HTTPResponse response = client.GetObject("/photos/puppy.jpg");
+	TEST_EQUAL(200, response.GetResponseCode());
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	TEST_EQUAL("omgpuppies!\n", response_data);
+	TEST_THAT(!response.IsKeepAlive());
+
+	// make sure that assigning to HTTPResponse does clear stream
+	response = client.GetObject("/photos/puppy.jpg");
+	TEST_EQUAL(200, response.GetResponseCode());
+	response_data = std::string((const char *)response.GetBuffer(),
+		response.GetSize());
+	TEST_EQUAL("omgpuppies!\n", response_data);
+	TEST_THAT(!response.IsKeepAlive());
+
+	response = client.GetObject("/nonexist");
+	TEST_EQUAL(404, response.GetResponseCode());
+	TEST_THAT(!response.IsKeepAlive());
+
+	// Test is successful if the number of failures has not increased.
+	return (num_failures == num_failures_initial);
+}
 
 // http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
 std::string calculate_s3_signature(const HTTPRequest& request,
@@ -423,6 +449,14 @@ bool test_httpserver()
 	TEST_THAT(StopDaemon(pid, "testfiles/httpserver.pid",
 		"generic-httpserver.memleaks", true));
 
+	// Copy testfiles/puppy.jpg to testfiles/store/photos/puppy.jpg
+	{
+		TEST_THAT(::mkdir("testfiles/store/photos", 0755) == 0);
+		FileStream in("testfiles/puppy.jpg", O_RDONLY);
+		FileStream out("testfiles/store/photos/puppy.jpg", O_CREAT | O_WRONLY);
+		in.CopyStreamTo(out);
+	}
+
 	// This is the example from the Amazon S3 Developers Guide, page 31.
 	// Correct, official signature should succeed, with lower-case headers.
 	{
@@ -511,7 +545,7 @@ bool test_httpserver()
 		response = client.GetObject("/newfile");
 		TEST_EQUAL(200, response.GetResponseCode());
 		TEST_THAT(fs.CompareWith(response));
-		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
+		TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
 	}
 
 	{
@@ -549,9 +583,25 @@ bool test_httpserver()
 		TEST_EQUAL(0, response.GetSize());
 
 		FileStream f1("testfiles/testrequests.pl");
-		FileStream f2("testfiles/newfile");
+		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
+		TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
+	}
+
+	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
+	{
+		FileStream in("testfiles/dsfdsfs98.fd", O_RDONLY);
+		FileStream out("testfiles/store/dsfdsfs98.fd", O_CREAT | O_WRONLY);
+		in.CopyStreamTo(out);
+	}
+
+	// S3Client tests with S3Simulator in-process server for debugging
+	{
+		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
+		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
+			EXAMPLE_S3_ACCESS_KEY, EXAMPLE_S3_SECRET_KEY);
+		TEST_THAT(exercise_s3client(client));
 	}
 
 	// Start the S3Simulator server
@@ -571,6 +621,7 @@ bool test_httpserver()
 		TEST_THAT(send_and_receive(request, response));
 	}
 
+	// Test that requests for nonexistent files correctly return a 404 error
 	{
 		HTTPRequest request(HTTPRequest::Method_GET, "/nonexist");
 		request.SetHostName("quotes.s3.amazonaws.com");
@@ -592,7 +643,7 @@ bool test_httpserver()
 	// Make file inaccessible, should cause server to return a 403 error,
 	// unless of course the test is run as root :)
 	{
-		TEST_THAT(chmod("testfiles/dsfdsfs98.fd", 0) == 0);
+		TEST_THAT(chmod("testfiles/store/dsfdsfs98.fd", 0) == 0);
 		HTTPRequest request(HTTPRequest::Method_GET, "/dsfdsfs98.fd");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
@@ -602,7 +653,7 @@ bool test_httpserver()
 
 		HTTPResponse response;
 		TEST_THAT(send_and_receive(request, response, 403));
-		TEST_THAT(chmod("testfiles/dsfdsfs98.fd", 0755) == 0);
+		TEST_THAT(chmod("testfiles/store/dsfdsfs98.fd", 0755) == 0);
 	}
 #endif
 
@@ -657,14 +708,32 @@ bool test_httpserver()
 		TEST_THAT(!response.IsKeepAlive());
 
 		FileStream f1("testfiles/dsfdsfs98.fd");
-		FileStream f2("testfiles/newfile");
+		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_THAT(::unlink("testfiles/newfile") == 0);
+		TEST_THAT(::unlink("testfiles/store/newfile") == 0);
+	}
+
+	// S3Client tests with S3Simulator daemon for realism
+	{
+		S3Client client("localhost", 1080, EXAMPLE_S3_ACCESS_KEY,
+			EXAMPLE_S3_SECRET_KEY);
+		TEST_THAT(exercise_s3client(client));
 	}
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
 		"s3simulator.memleaks", true));
+
+	TEST_THAT(StartSimulator());
+
+	// S3Client tests with s3simulator executable for even more realism
+	{
+		S3Client client("localhost", 1080, EXAMPLE_S3_ACCESS_KEY,
+			EXAMPLE_S3_SECRET_KEY);
+		TEST_THAT(exercise_s3client(client));
+	}
+
+	TEST_THAT(StopSimulator());
 
 	TEARDOWN();
 }
