@@ -423,6 +423,13 @@ if(READLINE_FOUND)
 	target_link_libraries(lib_common PUBLIC ${Readline_LIBRARY})
 endif()
 
+find_package(Boost)
+if(NOT Boost_FOUND)
+	message(FATAL_ERROR "Cannot find Boost libraries, which are required. Please set BOOST_ROOT")
+endif()
+include_directories(${Boost_INCLUDE_DIRS})
+target_link_libraries(lib_httpserver PUBLIC ${Boost_LIBRARIES})
+
 set(boxconfig_cmake_h_dir "${base_dir}/lib/common")
 # Get the values of all directories added to the INCLUDE_DIRECTORIES property
 # by include_directory() statements, and save it in CMAKE_REQUIRED_INCLUDES
