@@ -27,6 +27,7 @@ addons:
       - time
       - xsltproc
       - zlib1g-dev
+      - libboost-dev
 
 env:
   - TEST_TARGET=debug
