@@ -15,8 +15,11 @@ set(OPENSSL_VERSION 1.0.2h CACHE STRING "Version of OpenSSL to download, build, 
 set(OPENSSL_HASH SHA256=1d4007e53aad94a5b2002fe045ee7bb0b3d98f1a47f8b2bc851dcd1c74332919
 	CACHE STRING "Hash of the OpenSSL download file, to be verified after download")
 set(PCRE_VERSION    8.38   CACHE STRING "Version of PCRE to download, build, and compile Box Backup against")
-set(OPENSSL_HASH SHA256=dbef7cf80258c29396d435804cd5dba34006a77548850bca8bad6db6a6eac110
+set(PCRE_HASH SHA256=dbef7cf80258c29396d435804cd5dba34006a77548850bca8bad6db6a6eac110
 	CACHE STRING "Hash of the PCRE download file, to be verified after download")
+set(BOOST_VERSION    1.62.0   CACHE STRING "Version of Boost to download, unpack, and compile Box Backup against")
+set(BOOST_HASH SHA1=5fd97433c3f859d8cbab1eaed4156d3068ae3648
+	CACHE STRING "Hash of the Boost download file, to be verified after download")
 
 include(ExternalProject)
 
@@ -81,9 +84,24 @@ ExternalProject_Add(pcre
 	COMMAND         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Release
 )
 
+string(REPLACE "." "_" BOOST_VERSION_UNDERSCORES ${BOOST_VERSION})
+ExternalProject_Add(boost
+	URL "http://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORES}.tar.bz2"
+	URL_HASH ${BOOST_HASH}
+	# DOWNLOAD_NO_PROGRESS 1
+	CONFIGURE_COMMAND "" # none needed
+	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed" # none needed
+	INSTALL_COMMAND "" # none needed
+)
+
 ExternalProject_Add(boxbackup
 	DEPENDS zlib openssl pcre
 	SOURCE_DIR ${boxbackup_dir}/infrastructure/cmake
-	CMAKE_ARGS -DZLIB_ROOT=${install_dir} -DOPENSSL_ROOT_DIR=${install_dir} -DPCRE_ROOT=${install_dir} -DAPPVEYOR_MODE=1
+	CMAKE_ARGS
+		-DZLIB_ROOT=${install_dir}
+		-DOPENSSL_ROOT_DIR=${install_dir}
+		-DPCRE_ROOT=${install_dir}
+		-DBOOST_ROOT=${CMAKE_BINARY_DIR}/src/boost
+		-DAPPVEYOR_MODE=1
 	STEP_TARGETS configure build install
 )
