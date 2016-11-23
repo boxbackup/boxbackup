@@ -50,8 +50,8 @@ public:
 	void SetAsRedirect(const char *RedirectTo, bool IsLocalURI = true);
 	void SetAsNotFound(const char *URI);
 
-	void Send(bool OmitContent = false);
-	void SendContinue();
+	void Send(int Timeout = IOStream::TimeOutInfinite);
+	void SendContinue(int Timeout = IOStream::TimeOutInfinite);
 	void Receive(IOStream& rStream, int Timeout = IOStream::TimeOutInfinite);
 
 	bool GetHeader(const std::string& name, std::string* pValueOut) const
@@ -97,10 +97,6 @@ public:
 	};
 
 	static const char *ResponseCodeToString(int ResponseCode);
-	const char *ResponseCodeString() const
-	{
-		return ResponseCodeToString(mResponseCode);
-	}
 
 	void WriteStringDefang(const char *String, unsigned int StringLen);
 	void WriteStringDefang(const std::string &rString) {WriteStringDefang(rString.c_str(), rString.size());}

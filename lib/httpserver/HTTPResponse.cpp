@@ -148,7 +148,7 @@ void HTTPResponse::SetResponseCode(int Code)
 //		Created: 26/3/2004
 //
 // --------------------------------------------------------------------------
-void HTTPResponse::Send(bool OmitContent)
+void HTTPResponse::Send(int Timeout)
 {
 	if (!mpStreamToSendTo)
 	{
@@ -166,7 +166,7 @@ void HTTPResponse::Send(bool OmitContent)
 		header << "HTTP/1.1 ";
 		header << ResponseCodeToString(mResponseCode);
 		header << "\r\n";
-		mpStreamToSendTo->Write(header.str());
+		mpStreamToSendTo->Write(header.str(), Timeout);
 
 		// Control whether the response is cached
 		if(mResponseIsDynamicContent)
@@ -181,23 +181,20 @@ void HTTPResponse::Send(bool OmitContent)
 		}
 
 		// Write to stream
-		mHeaders.WriteTo(*mpStreamToSendTo, IOStream::TimeOutInfinite);
+		mHeaders.WriteTo(*mpStreamToSendTo, Timeout);
 
 		// NOTE: header ends with blank line in all cases
-		mpStreamToSendTo->Write(std::string("\r\n"));
+		mpStreamToSendTo->Write(std::string("\r\n"), Timeout);
 	}
 
 	// Send content
-	if(!OmitContent)
-	{
-		SetForReading();
-		CopyStreamTo(*mpStreamToSendTo);
-	}
+	SetForReading();
+	CopyStreamTo(*mpStreamToSendTo, Timeout);
 }
 
-void HTTPResponse::SendContinue()
+void HTTPResponse::SendContinue(int Timeout)
 {
-	mpStreamToSendTo->Write(std::string("HTTP/1.1 100 Continue\r\n"));
+	mpStreamToSendTo->Write(std::string("HTTP/1.1 100 Continue\r\n"), Timeout);
 }
 
 void HTTPResponse::Receive(IOStream& rStream, int Timeout)
