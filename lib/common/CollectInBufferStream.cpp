@@ -100,6 +100,7 @@ IOStream::pos_type CollectInBufferStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 void CollectInBufferStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
+	ASSERT(NBytes >= 0);
 	if(mInWritePhase != true) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
 	// Enough space in the buffer
