@@ -106,7 +106,10 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	ASSERT(rRequestURI[0] == '/');
 	HTTPRequest request(Method, rRequestURI);
 	request.SetHostName(mHostName);
-	
+
+	BOX_TRACE("S3Client: " << mHostName << " > " << request.GetMethodName() <<
+		" " << rRequestURI);
+
 	std::ostringstream date;
 	time_t tt = time(NULL);
 	struct tm *tp = gmtime(&tt);
