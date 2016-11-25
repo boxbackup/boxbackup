@@ -52,32 +52,6 @@ private:
 	BackupStoreAccountDatabase &mrDatabase;
 };
 
-class Configuration;
-class UnixUser;
-
-class BackupStoreAccountsControl : public BackupAccountControl
-{
-public:
-	BackupStoreAccountsControl(const Configuration& config,
-		bool machineReadableOutput = false)
-	: BackupAccountControl(config, machineReadableOutput)
-	{ }
-	int BlockSizeOfDiscSet(int discSetNum);
-	bool OpenAccount(int32_t ID, std::string &rRootDirOut,
-		int &rDiscSetOut, std::auto_ptr<UnixUser> apUser, NamedLock* pLock);
-	int SetLimit(int32_t ID, const char *SoftLimitStr,
-		const char *HardLimitStr);
-	int SetAccountName(int32_t ID, const std::string& rNewAccountName);
-	int PrintAccountInfo(int32_t ID);
-	int SetAccountEnabled(int32_t ID, bool enabled);
-	int DeleteAccount(int32_t ID, bool AskForConfirmation);
-	int CheckAccount(int32_t ID, bool FixErrors, bool Quiet,
-		bool ReturnNumErrorsFound = false);
-	int CreateAccount(int32_t ID, int32_t DiscNumber, int32_t SoftLimit,
-		int32_t HardLimit);
-	int HousekeepAccountNow(int32_t ID);
-};
-
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
 
