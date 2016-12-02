@@ -369,4 +369,10 @@ fi
 ;;
 esac
 
-
+AC_CHECK_PROGS(default_debugger, [lldb gdb])
+AC_ARG_WITH([debugger],
+            [AS_HELP_STRING([--with-debugger=<gdb|lldb|...>],
+              [use this debugger in t-gdb scripts to debug tests @<:@default=lldb if present, otherwise gdb@:>@])],
+            [],
+            [with_debugger=$default_debugger])
+AC_SUBST([with_debugger])
