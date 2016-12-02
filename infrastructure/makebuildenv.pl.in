@@ -379,6 +379,7 @@ $default_cflags =~ s/ -O2//g;
 $default_cxxflags =~ s/ -O2//g;
 my $debug_base_dir = 'debug';
 my $release_base_dir = 'release';
+my $debugger = '@with_debugger@';
 
 my $release_flags = "-O2";
 if ($target_windows)
@@ -614,9 +615,18 @@ __E
 		
 		writetestfile("$mod/t", "GLIBCXX_FORCE_NEW=1 ".
 			'./_test' . $platform_exe_ext . ' "$@"', $mod);
-		writetestfile("$mod/t-gdb", "GLIBCXX_FORCE_NEW=1 ".
-			'gdb ./_test' . $platform_exe_ext . ' "$@"', $mod);
-		
+
+		if($debugger)
+		{
+			writetestfile("$mod/t-gdb", "GLIBCXX_FORCE_NEW=1 ".
+				$debugger . ' ./_test' . $platform_exe_ext . ' "$@"', $mod);
+		}
+		else
+		{
+			writetestfile("$mod/t-gdb",
+				"echo 'No debugger was detected by configure script'\n".
+				"exit 2");
+		}
 	}
 	
 	my @all_deps_for_module;
