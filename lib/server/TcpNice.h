@@ -128,7 +128,9 @@ public:
 	}
 
 	// This is the only magic
-	virtual void Write(const void *pBuffer, int NBytes);
+	virtual void Write(const void *pBuffer, int NBytes,
+		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
 
 	// Everything else is delegated to the sink
 	virtual int Read(void *pBuffer, int NBytes,

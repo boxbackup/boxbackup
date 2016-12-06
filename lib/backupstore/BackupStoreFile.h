@@ -91,6 +91,8 @@ public:
 		virtual int Read(void *pBuffer, int NBytes, int Timeout);
 		virtual void Write(const void *pBuffer, int NBytes,
 			int Timeout = IOStream::TimeOutInfinite);
+		using IOStream::Write;
+
 		virtual bool StreamDataLeft();
 		virtual bool StreamClosed();
 		
@@ -174,6 +176,8 @@ public:
 		{
 			THROW_EXCEPTION(CommonException, NotSupported);
 		}
+		using IOStream::Write;
+
 		// Declare twice (with different parameters) to avoid warnings that
 		// Close(bool) hides overloaded virtual function.
 		virtual void Close(bool CloseReadFromStream)

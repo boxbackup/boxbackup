@@ -59,6 +59,8 @@ public:
 		mrUnderlying.Write(pBuffer, NBytes, Timeout);
 		mNumBytesWritten += NBytes;
 	}
+	using IOStream::Write;
+
 	virtual bool StreamDataLeft()
 	{
 		return mrUnderlying.StreamDataLeft();

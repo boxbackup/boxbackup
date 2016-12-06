@@ -1330,6 +1330,7 @@ public:
 		mNumKeepAlivesReceived++;
 		return response;
 	}
+	using BackupProtocolLocal2::Query;
 };
 
 bool test_ssl_keepalives()

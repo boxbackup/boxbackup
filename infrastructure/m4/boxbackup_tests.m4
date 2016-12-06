@@ -24,6 +24,11 @@ AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
 AX_CHECK_COMPILE_FLAG(-Werror=parentheses,
 	[cxxflags_strict="$cxxflags_strict -Werror=parentheses"])
+# We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
+dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
+dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
+AX_CHECK_COMPILE_FLAG(-Werror=overloaded-virtual,
+	[cxxflags_strict="$cxxflags_strict -Werror=overloaded-virtual"])
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then

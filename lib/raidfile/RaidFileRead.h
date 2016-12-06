@@ -66,6 +66,8 @@ public:
 	// Common IOStream interface implementation
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
+
 	virtual bool StreamClosed();
 	virtual pos_type BytesLeftToRead();
 

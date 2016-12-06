@@ -45,6 +45,8 @@ public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
+
 	virtual void Close();
 	virtual void Shutdown(bool Read = true, bool Write = true);
 

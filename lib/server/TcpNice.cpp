@@ -130,13 +130,14 @@ NiceSocketStream::NiceSocketStream(std::auto_ptr<SocketStream> apSocket)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    NiceSocketStream::Write(const void *pBuffer, int NBytes)
-//		Purpose: Writes bytes to the underlying stream, adjusting window size
-//               using a TcpNice calculator.
+//		Name:    NiceSocketStream::Write(const void *pBuffer,
+//		         int NBytes, int Timeout)
+//		Purpose: Writes bytes to the underlying stream, adjusting
+//		         window size using a TcpNice calculator.
 //		Created: 2012/02/11
 //
 // --------------------------------------------------------------------------
-void NiceSocketStream::Write(const void *pBuffer, int NBytes)
+void NiceSocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
 #if HAVE_DECL_SO_SNDBUF && HAVE_DECL_TCP_INFO
 	if(mEnabled && mapTimer.get() && mapTimer->HasExpired())
@@ -193,7 +194,7 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 	mBytesWrittenThisPeriod += NBytes;
 #endif // HAVE_DECL_SO_SNDBUF
 
-	mapSocket->Write(pBuffer, NBytes);
+	mapSocket->Write(pBuffer, NBytes, Timeout);
 }
 
 // --------------------------------------------------------------------------

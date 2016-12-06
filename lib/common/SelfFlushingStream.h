@@ -61,6 +61,8 @@ public:
 	{
 		mrSource.Write(pBuffer, NBytes, Timeout);
 	}
+	using IOStream::Write;
+
 	virtual bool StreamDataLeft()
 	{
 		return mrSource.StreamDataLeft();
