@@ -36,11 +36,7 @@
 //
 // --------------------------------------------------------------------------
 NamedLock::NamedLock()
-#ifdef WIN32
-: mFileDescriptor(INVALID_HANDLE_VALUE)
-#else
-: mFileDescriptor(-1)
-#endif
+: mFileDescriptor(INVALID_FILE)
 {
 }
 
@@ -54,11 +50,7 @@ NamedLock::NamedLock()
 // --------------------------------------------------------------------------
 NamedLock::~NamedLock()
 {
-#ifdef WIN32
-	if(mFileDescriptor != INVALID_HANDLE_VALUE)
-#else
-	if(mFileDescriptor != -1)
-#endif
+	if(mFileDescriptor != INVALID_FILE)
 	{
 		ReleaseLock();
 	}
@@ -77,11 +69,7 @@ NamedLock::~NamedLock()
 bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 {
 	// Check
-#ifdef WIN32
-	if(mFileDescriptor != INVALID_HANDLE_VALUE)
-#else
-	if(mFileDescriptor != -1)
-#endif
+	if(mFileDescriptor != INVALID_FILE)
 	{
 		THROW_EXCEPTION(CommonException, NamedLockAlreadyLockingSomething)
 	}
@@ -238,11 +226,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 void NamedLock::ReleaseLock()
 {
 	// Got a lock?
-#ifdef WIN32
-	if(mFileDescriptor == INVALID_HANDLE_VALUE)
-#else
-	if(mFileDescriptor == -1)
-#endif
+	if(mFileDescriptor == INVALID_FILE)
 	{
 		THROW_EXCEPTION(CommonException, NamedLockNotHeld)
 	}
@@ -274,17 +258,15 @@ void NamedLock::ReleaseLock()
 	if(::close(mFileDescriptor) != 0)
 #endif
 	{
+		// Don't try to release it again
+		mFileDescriptor = INVALID_FILE;
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to close lockfile"),
 			CommonException, OSFileError);
 	}
 
 	// Mark as unlocked, so we don't try to close it again if the unlink() fails.
-#ifdef WIN32
-	mFileDescriptor = INVALID_HANDLE_VALUE;
-#else
-	mFileDescriptor = -1;
-#endif
+	mFileDescriptor = INVALID_FILE;
 
 #ifdef WIN32
 	// On Windows we need to close the file before deleting it, otherwise
