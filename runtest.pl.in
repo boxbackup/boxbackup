@@ -109,7 +109,8 @@ if ($exit_code != 0)
 {
 	print <<__E;
 
-One or more tests have failed. Please check the following common causes:
+One or more tests have failed in $test_mode mode. Please check the following
+common causes:
 
 * Check that no instances of bbstored or bbackupd are already running
   on this machine.
