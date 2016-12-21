@@ -19,11 +19,15 @@ if [ "$BUILD" = 'cmake' ]; then
 		exit 2
 	fi
 
+	if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+		EXTRA_ARGS="-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DBOOST_ROOT=/usr/local/opt/boost"
+	fi
+
 	cd `dirname $0`
 	mkdir -p cmake/build
 	cd cmake/build
 	cmake --version
-	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET "$@" ..
+	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET $EXTRA_ARGS "$@" ..
 	make install
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
