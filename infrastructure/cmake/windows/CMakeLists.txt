@@ -103,5 +103,6 @@ ExternalProject_Add(boxbackup
 		-DPCRE_ROOT=${install_dir}
 		-DBOOST_ROOT=${CMAKE_BINARY_DIR}/src/boost
 		-DAPPVEYOR_MODE=1
+		-DDEBUG=${DEBUG}
 	STEP_TARGETS configure build install
 )
