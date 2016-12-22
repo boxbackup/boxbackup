@@ -15,9 +15,10 @@
 #include <vector>
 #include <set>
 
-#include "NamedLock.h"
 #include "BackupFileSystem.h"
 #include "BackupStoreDirectory.h"
+#include "NamedLock.h"
+#include "Utils.h" // for object_exists_t
 
 class IOStream;
 class BackupStoreFilename;

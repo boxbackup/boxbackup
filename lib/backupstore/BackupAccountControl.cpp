@@ -27,6 +27,7 @@
 #include "RaidFileController.h"
 #include "RaidFileWrite.h"
 #include "UnixUser.h"
+#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 

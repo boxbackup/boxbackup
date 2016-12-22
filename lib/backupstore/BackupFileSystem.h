@@ -19,6 +19,7 @@
 #include "NamedLock.h"
 #include "S3Client.h"
 #include "SimpleDBClient.h"
+#include "Utils.h" // for ObjectExists_*
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
@@ -390,7 +391,7 @@ public:
 		// Unfortunately operator[] is not const, so use a const_iterator to
 		// get the value that we want.
 		const std::string& since(mLockAttributes.find("since")->second);
-		return strtoull(since.c_str(), NULL, 10);
+		return box_strtoui64(since.c_str(), NULL, 10);
 	}
 
 	// And these are public to help with writing tests ONLY:
