@@ -1141,7 +1141,15 @@ struct dirent *readdir(DIR *dp)
 					NULL, NULL);
 				//den->d_name = (char *)dp->info.name;
 				den->d_name = &tempbuff[0];
-				den->d_type = dp->info.dwFileAttributes;
+				den->win_attrs = dp->info.dwFileAttributes;
+				if(dp->info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				{
+					den->d_type = DT_DIR;
+				}
+				else
+				{
+					den->d_type = DT_REG;
+				}
 			}
 			else // FindNextFileW failed
 			{

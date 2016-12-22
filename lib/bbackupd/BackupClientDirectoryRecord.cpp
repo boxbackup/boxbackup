@@ -435,13 +435,9 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 #ifdef WIN32
 	// Don't stat the file just yet, to ensure that users can exclude
 	// unreadable files to suppress warnings that they are not accessible.
-	//
-	// Our emulated readdir() abuses en->d_type, which would normally
-	// contain DT_REG, DT_DIR, etc, but we only use it here and prefer to
-	// have the full file attributes.
 
 	int type;
-	if (en->d_type & FILE_ATTRIBUTE_DIRECTORY)
+	if (en->d_type == DT_DIR)
 	{
 		type = S_IFDIR;
 	}
@@ -514,24 +510,24 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 			return false;
 		}
 
-		#ifdef WIN32
+#ifdef WIN32
 		// exclude reparse points, as Application Data points to the
 		// parent directory under Vista and later, and causes an
 		// infinite loop:
 		// http://social.msdn.microsoft.com/forums/en-US/windowscompatibility/thread/05d14368-25dd-41c8-bdba-5590bf762a68/
-		if (en->d_type & FILE_ATTRIBUTE_REPARSE_POINT)
+		if (en->win_attrs & FILE_ATTRIBUTE_REPARSE_POINT)
 		{
 			rNotifier.NotifyMountPointSkipped(this, realFileName);
 			return false;
 		}
-		#endif
+#endif // WIN32
 	}
 	else // not a file or directory, what is it?
 	{
 		if (type == S_IFSOCK
 #ifndef WIN32
 			|| type == S_IFIFO
-#endif
+#endif // !WIN32
 			)
 		{
 			// removed notification for these types
