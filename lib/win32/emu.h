@@ -222,10 +222,22 @@ inline int strncasecmp(const char *s1, const char *s2, size_t count)
 #error You must not include the MinGW dirent.h!
 #endif
 
+// File types for struct dirent.d_type. Not all are supported by our emulated readdir():
+#define DT_UNKNOWN       0
+#define DT_FIFO          1
+#define DT_CHR           2
+#define DT_DIR           4
+#define DT_BLK           6
+#define DT_REG           8
+#define DT_LNK          10
+#define DT_SOCK         12
+#define DT_WHT          14
+
 struct dirent
 {
 	char *d_name;
-	DWORD d_type; // file attributes
+	int d_type; // emulated UNIX file attributes
+	DWORD win_attrs; // WIN32_FIND_DATA.dwFileAttributes
 };
 
 struct DIR
