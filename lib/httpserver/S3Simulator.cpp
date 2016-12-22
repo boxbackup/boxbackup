@@ -9,14 +9,17 @@
 
 #include "Box.h"
 
+#ifdef HAVE_DIRENT_H
+#	include <dirent.h>
+#endif
+
+#include <openssl/hmac.h>
+#include <sys/types.h>
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <string>
-
-#include <dirent.h>
-#include <openssl/hmac.h>
-#include <sys/types.h>
 
 #include "Database.h"
 #include "HTTPRequest.h"

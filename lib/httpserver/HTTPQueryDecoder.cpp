@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <cctype> // for std::isalnum
 #include <cstdlib>
 #include <ostream>
 
