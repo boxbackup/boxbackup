@@ -32,7 +32,7 @@ if [ "$BUILD" = 'cmake' ]; then
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
 	if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-		EXTRA_ARGS="--with-ssl-lib=/usr/local/opt/openssl/lib --with-ssl-headers=/usr/local/opt/openssl/include --with-boost=/usr/local/Cellar/boost/*"
+		EXTRA_ARGS="--with-ssl-lib=/usr/local/opt/openssl/lib --with-ssl-headers=/usr/local/opt/openssl/include --with-boost=/usr/local/opt/boost"
 	fi
 
 	cd `dirname $0`/..
