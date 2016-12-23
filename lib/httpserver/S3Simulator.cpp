@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    S3Client.cpp
+//		Name:    S3Simulator.cpp
 //		Purpose: Amazon S3 client helper implementation class
 //		Created: 09/01/2009
 //
