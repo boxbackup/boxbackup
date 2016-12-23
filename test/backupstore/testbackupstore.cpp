@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_PROCESS_H
+#	include <process.h> // for getpid() on Windows
+#endif
+
 #include "Archive.h"
 #include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
