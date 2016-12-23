@@ -1165,7 +1165,7 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 	// The lock value should be unique for each host potentially accessing the same
 	// region of the store, and should help you to identify which one is currently
 	// holding the lock. The default is username@hostname(pid).
-#ifdef HAVE_DECL_GETUSERNAMEA
+#if HAVE_DECL_GETUSERNAMEA
 	char username_buffer[UNLEN + 1];
 	DWORD buffer_size = sizeof(username_buffer);
 	if(!GetUserNameA(username_buffer, &buffer_size))
