@@ -18,6 +18,10 @@
 #	include <lmcons.h>
 #endif
 
+#ifdef HAVE_PROCESS_H
+#	include <process.h> // for getpid() on Windows
+#endif
+
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -1163,7 +1167,8 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 	// holding the lock. The default is username@hostname(pid).
 #ifdef HAVE_DECL_GETUSERNAMEA
 	char username_buffer[UNLEN + 1];
-	if(!GetUserNameA(username_buffer, sizeof(username_buffer)))
+	DWORD buffer_size = sizeof(username_buffer);
+	if(!GetUserNameA(username_buffer, &buffer_size))
 	{
 		THROW_WIN_ERROR("Failed to GetUserName()");
 	}
@@ -1231,7 +1236,7 @@ int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
 	}
 
 	char* pEnd = NULL;
-	int64_t revID = strtoull(etag.substr(1, 16).c_str(), &pEnd, 16);
+	int64_t revID = box_strtoui64(etag.substr(1, 16).c_str(), &pEnd, 16);
 	if(*pEnd != '\0')
 	{
 		THROW_SYS_ERROR("Failed to get the MD5 checksum of the file or "
@@ -1802,7 +1807,7 @@ void S3BackupFileSystem::TryGetLock()
 		// This succeeded, which means that someone once held the lock. If the
 		// locked attribute is empty, then they released it cleanly, and we can
 		// access the account safely.
-		box_time_t since_time = strtoull(attributes["since"].c_str(), NULL, 10);
+		box_time_t since_time = box_strtoui64(attributes["since"].c_str(), NULL, 10);
 
 		if(attributes["locked"] == "")
 		{
@@ -2198,7 +2203,7 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 			if(!object_id_str.empty())
 			{
 				char* p_end;
-				int64_t object_id = strtoull(object_id_str.c_str() + 2,
+				int64_t object_id = box_strtoui64(object_id_str.c_str() + 2,
 					&p_end, 16);
 				if(*p_end != 0)
 				{

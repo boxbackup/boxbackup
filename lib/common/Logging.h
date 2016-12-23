@@ -112,6 +112,8 @@
 	#define THROW_WIN_ERROR_NUMBER(message, error_number, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
 			BOX_WIN_ERRNO_MESSAGE(error_number, message))
+	#define THROW_WIN_ERROR(message, exception, subtype) \
+		THROW_WIN_ERROR_NUMBER(message, GetLastError(), exception, subtype)
 	#define THROW_WIN_FILE_ERRNO(message, filename, error_number, exception, subtype) \
 		THROW_WIN_ERROR_NUMBER(BOX_FILE_MESSAGE(filename, message), \
 			error_number, exception, subtype)
