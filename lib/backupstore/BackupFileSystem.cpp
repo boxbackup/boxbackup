@@ -1171,7 +1171,7 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 #elif defined HAVE_GETPWUID
 	mCurrentUserName = getpwuid(getuid())->pw_name;
 #else
-#	error Don't know how to get current user name
+#	error "Don't know how to get current user name"
 #endif
 
 	char hostname_buf[1024];
