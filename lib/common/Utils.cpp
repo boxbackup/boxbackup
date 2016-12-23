@@ -15,17 +15,20 @@
 
 #include <cstdlib>
 
-#ifdef HAVE_EXECINFO_H
-	#include <execinfo.h>
-	#include <stdlib.h>
-#endif
-
 #ifdef HAVE_CXXABI_H
 	#include <cxxabi.h>
 #endif
 
 #ifdef HAVE_DLFCN_H
 	#include <dlfcn.h>
+#endif
+
+#ifdef HAVE_EXECINFO_H
+	#include <execinfo.h>
+#endif
+
+#ifdef HAVE_SIGNAL_H
+	#include <signal.h>
 #endif
 
 #ifdef NEED_BOX_VERSION_H
