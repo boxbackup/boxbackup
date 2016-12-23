@@ -1170,7 +1170,7 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 	DWORD buffer_size = sizeof(username_buffer);
 	if(!GetUserNameA(username_buffer, &buffer_size))
 	{
-		THROW_WIN_ERROR("Failed to GetUserName()");
+		THROW_WIN_ERROR("Failed to GetUserName()", CommonException, Internal);
 	}
 	mCurrentUserName = username_buffer;
 #elif defined HAVE_GETPWUID
