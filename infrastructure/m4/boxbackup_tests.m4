@@ -29,6 +29,10 @@ dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
 dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
 AX_CHECK_COMPILE_FLAG(-Werror=overloaded-virtual,
 	[cxxflags_strict="$cxxflags_strict -Werror=overloaded-virtual"])
+# This error is detected by MSVC, but not usually by GCC/Clang:
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
+AX_CHECK_COMPILE_FLAG(-Werror=delete-incomplete,
+	[cxxflags_strict="$cxxflags_strict -Werror=delete-incomplete"])
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
