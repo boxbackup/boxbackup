@@ -38,6 +38,10 @@ os:
   - osx
 
 matrix:
+  exclude:
+    # No point testing both GCC and Clang on Mac OS X, as they're the same thing.
+    - os: osx
+      compiler: gcc
   allow_failures:
     # OSX on Travis is in testing, it's allowed to fail for now.
     - os: osx
