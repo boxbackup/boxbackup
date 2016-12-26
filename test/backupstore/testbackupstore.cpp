@@ -173,9 +173,11 @@ bool StopSimulator()
 
 bool kill_running_daemons()
 {
+#ifndef WIN32
 	TEST_THAT_OR(::system("test ! -r testfiles/s3simulator.pid || "
 		"kill `cat testfiles/s3simulator.pid`") == 0, FAIL);
 	TEST_THAT_OR(::system("rm -f testfiles/s3simulator.pid") == 0, FAIL);
+#endif
 	return true;
 }
 
