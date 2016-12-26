@@ -42,6 +42,10 @@ extern std::list<std::string> run_only_named_tests;
 extern std::string current_test_name;
 extern std::map<std::string, std::string> s_test_status;
 
+#ifdef WIN32
+extern HANDLE sTestChildDaemonJobObject;
+#endif
+
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP() \
 	if (!setUp(__FUNCTION__)) return true; \
