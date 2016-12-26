@@ -199,7 +199,8 @@ public:
 				"Account root directory is empty");
 		}
 
-		ASSERT(AccountRootDir[AccountRootDir.size() - 1] == '/');
+		ASSERT(AccountRootDir[AccountRootDir.size() - 1] == '/' ||
+			AccountRootDir[AccountRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 	}
 	~RaidBackupFileSystem()
 	{
