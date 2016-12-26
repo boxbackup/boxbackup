@@ -376,7 +376,7 @@ int main(int argc, char * const * argv)
 		// This is the best way to avoid daemons hanging around and
 		// causing subsequent tests to fail, and/or the test runner to
 		// hang waiting for a daemon that will never terminate.
-		
+
 		sTestChildDaemonJobObject = CreateJobObject(NULL, NULL);
 		if(sTestChildDaemonJobObject == INVALID_HANDLE_VALUE)
 		{

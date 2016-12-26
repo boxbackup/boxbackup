@@ -240,6 +240,8 @@ struct dirent
 	DWORD win_attrs; // WIN32_FIND_DATA.dwFileAttributes
 };
 
+#define HAVE_VALID_DIRENT_D_TYPE 1
+
 struct DIR
 {
 	HANDLE           fd;     // the HANDLE returned by FindFirstFile
