@@ -349,7 +349,7 @@ int test(int argc, const char *argv[])
 	BackupStoreAccountControl control(*config, 0x01234567);
 	BackupFileSystem& filesystem(control.GetFileSystem());
 
-	int pid = LaunchServer(BBSTORED " -c testfiles/bbstored.conf" + bbstored_args, 
+	int pid = LaunchServer(BBSTORED " -c testfiles/bbstored.conf " + bbstored_args,
 		"testfiles/bbstored.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
