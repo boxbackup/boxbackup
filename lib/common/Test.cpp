@@ -229,7 +229,6 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
-	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 
 	return true;
 }
