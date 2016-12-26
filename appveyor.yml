@@ -24,25 +24,25 @@ environment:
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
-- reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
-- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+# - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 build:
   parallel: true
   project: ..\cmake\BoxBackup_Windows.sln
-  # verbosity: quiet
+  verbosity: quiet
 
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline
-  # Install cmake.portable instead of cmake, to get it on the path again:
-  # http://disq.us/p/xdknrt
   - dir "c:\Program Files"
   - dir "c:\Program Files (x86)"
   # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
   # If you are doing this on a fresh box for development, you would probably want to
   # install Chocolatey and then run:
-  # cinst -y cmake strawberryperl git vim visualstudio2012wdx
+  # cinst -y cmake.portable strawberryperl git vim visualstudio2012wdx
+  # We install cmake.portable instead of cmake, to get it on the path again
+  # <http://disq.us/p/xdknrt>.
 
   - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
   - cd %APPVEYOR_BUILD_FOLDER%\..
