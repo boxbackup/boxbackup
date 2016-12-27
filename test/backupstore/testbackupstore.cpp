@@ -2837,7 +2837,8 @@ bool test_login_with_disabled_account()
 			apAccounts->GetEntry(0x1234567), true);
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
 		apReferences->GetLastObjectIDUsed());
-	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
+	apReferences.reset();
 
 	// Test that login fails on a disabled account
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
