@@ -81,15 +81,7 @@
 	#define PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 #endif
 
-#ifdef HAVE_DEFINE_PRAGMA
-	// set packing to one bytes (can't use push/pop on gcc)
-	#define BEGIN_STRUCTURE_PACKING_FOR_WIRE	#pragma pack(1)
-
-	// Use default packing
-	#define END_STRUCTURE_PACKING_FOR_WIRE		#pragma pack()
-#else
-	#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#endif
+#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 
 // Handle differing xattr APIs
 #if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
