@@ -408,7 +408,6 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStre
 
 	BOX_TRACE("S3Client: " << mHostName << " < " << response.GetResponseCode() <<
 		": " << response.GetContentLength() << " bytes")
-	response.SetForReading();
 
 	return response;
 }
