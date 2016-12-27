@@ -404,9 +404,17 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 	free(tempCmd);
 
 	TEST_THAT_OR(result != 0,
-		BOX_LOG_WIN_ERROR("Launch failed: " << rCommandLine);
+		BOX_LOG_WIN_ERROR("Failed to CreateProcess: " << rCommandLine);
 		return -1;
 		);
+
+	if(sTestChildDaemonJobObject != INVALID_HANDLE_VALUE)
+	{
+		if(!AssignProcessToJobObject(sTestChildDaemonJobObject, procInfo.hProcess))
+		{
+			BOX_LOG_WIN_WARNING("Failed to add child process to job object");
+		}
+	}
 
 	CloseHandle(procInfo.hProcess);
 	CloseHandle(procInfo.hThread);

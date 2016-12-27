@@ -392,7 +392,7 @@ int main(int argc, char * const * argv)
 				JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
 			if(!SetInformationJobObject(
 				sTestChildDaemonJobObject,
-				JobObjectBasicLimitInformation,
+				JobObjectExtendedLimitInformation,
 				&limits,
 				sizeof(limits)))
 			{
