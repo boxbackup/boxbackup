@@ -197,10 +197,9 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 				CloseHandle(pi.hProcess);
 				CloseHandle(pi.hThread);
 #else // !WIN32
-				// Deleting directories is so much easier on
-				// Unix!
-				std::string cmd = "rm -rf " + filepath;
-				TEST_THAT_THROWONFAIL(system(cmd.c_str()));
+				// Deleting directories is so much easier on Unix!
+				std::string cmd = "rm -rf '" + filepath + "'";
+				TEST_THAT_THROWONFAIL(system(cmd.c_str()) == 0);
 #endif // WIN32
 			}
 			else
