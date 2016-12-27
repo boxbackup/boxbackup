@@ -177,6 +177,10 @@ foreach(documentation_file ${documentation_files})
 	set(${module_name}_extra_files ${${module_name}_extra_files} ${output_file})
 endforeach()
 
+set(testmain_template_cpp
+	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
+)
+
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 foreach(module_dep ${module_deps})
 
@@ -234,13 +238,8 @@ foreach(module_dep ${module_deps})
 				message(STATUS "add test '${module_name}': '${module_files}'")
 			endif()
 
-			string(REPLACE "TEST_NAME" ${test_name} test_main "${test_template}")
-			file(WRITE "${module_path}/_main.cpp.new" "${test_main}")
-			replace_file_if_different(
-				"${module_path}/_main.cpp"
-				"${module_path}/_main.cpp.new")
 			add_executable(${module_name} ${module_files}
-				"${module_path}/_main.cpp")
+				"${testmain_template_cpp}")
 
 			if(WIN32)
 				install(PROGRAMS "$<TARGET_FILE:${module_name}>"

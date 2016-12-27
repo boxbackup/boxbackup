@@ -111,11 +111,6 @@ print "done\n\n";
 
 # open test mail program template file
 my $test_template_file = 'infrastructure/buildenv-testmain-template.cpp';
-open FL,$test_template_file or die "Can't open test template file\n";
-my $test_template;
-read FL,$test_template,-s $test_template_file;
-close FL;
-
 
 # extra platform defines
 my $extra_platform_defines = '';
@@ -526,12 +521,6 @@ for my $mod (@implicit_deps, @modules)
 	# add additional files for tests
 	if($type eq 'test')
 	{
-		my $testmain = $test_template;
-		$testmain =~ s/TEST_NAME/$name/g;
-		open TESTMAIN,">$mod/_main.cpp" or die "Can't open test main file for $mod for writing\n";
-		print TESTMAIN $testmain;
-		close TESTMAIN;
-		
 		# test file...
 		sub writetestfile
 		{
@@ -715,9 +704,15 @@ __E
 	close MINI_MODULE_MAKEFILE;
 
 	opendir DIR, $mod;
-	my @items = readdir DIR;
+	my @files = readdir DIR;
 	closedir DIR;
+	my @items = map {"$mod/$_"} @files;
 	
+	if($type eq 'test')
+	{
+		push @items, $test_template_file;
+	}
+		
 	# add in items from autogen directories, and create output directories
 	{
 		my @autogen_items;
@@ -768,9 +763,9 @@ __E
 		my @obj_base;
 		for my $file (@items)
 		{
-			my $is_c = $file =~ m/\A(.+)\.c\Z/i;
-			my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
-			my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
+			my $is_c   = $file =~ m@([^/]+)\.c\Z@i;
+			my $is_cpp = $file =~ m@([^/]+)\.cpp\Z@i;
+			my $is_rc  = $file =~ m@([^/]+)\.rc\Z@i;
 			my $base = $1;
 
 			# Don't try to compile .rc files except on Windows:
@@ -781,9 +776,9 @@ __E
 			push @obj_base, $base;
 		
 			# get the file...
-			open FL, "$mod/$file";
+			open FL, $file or die "$file: $!";
 			my $f;
-			read FL, $f, -s "$mod/$file";
+			read FL, $f, -s $file;
 			close FL;
 			
 			my %dep;
@@ -805,19 +800,19 @@ __E
 			}
 			keys %dep;
 
-			$make .= "$out_name: $mod/$file @dep_paths\n";
+			$make .= "$out_name: $file @dep_paths\n";
 
 			if ($is_c)
 			{
 				$make .= "\t\$(_CC) \$(${var_prefix}_CFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-c $mod/$file -o $out_name\n\n";
+					"-c $file -o $out_name\n\n";
 			}
-			if ($is_cpp)
+			elsif ($is_cpp)
 			{
 				$make .= "\t\$(_CXX) \$(${var_prefix}_CXXFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-c $mod/$file -o $out_name\n\n";
+					"-c $file -o $out_name\n\n";
 			}
 			elsif ($is_rc)
 			{

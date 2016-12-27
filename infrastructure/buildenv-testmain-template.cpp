@@ -341,7 +341,9 @@ int main(int argc, char * const * argv)
 	if(fulltestmode)
 	{
 		// banner
-		BOX_NOTICE("Running test TEST_NAME in " MODE_TEXT " mode...");
+		std::string box_module = BOX_MODULE;
+		std::string test_name = box_module.substr(5);
+		BOX_NOTICE("Running test " << test_name << " in " MODE_TEXT " mode...");
 
 		// Count open file descriptors for a very crude "files left open" test
 		Logging::GetSyslog().Shutdown();
