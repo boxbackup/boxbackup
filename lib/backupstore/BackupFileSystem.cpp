@@ -1236,13 +1236,14 @@ int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
 	}
 
 	char* pEnd = NULL;
-	int64_t revID = box_strtoui64(etag.substr(1, 16).c_str(), &pEnd, 16);
+	std::string checksum = etag.substr(1, 16);
+	int64_t revID = box_strtoui64(checksum.c_str(), &pEnd, 16);
 	if(*pEnd != '\0')
 	{
-		THROW_SYS_ERROR("Failed to get the MD5 checksum of the file or "
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, InvalidEtagHeader,
+			"Failed to get the MD5 checksum of the file or "
 			"directory at this URL: " << uri << ": invalid character '" <<
-			*pEnd << "' in '" << etag << "'", BackupStoreException,
-			InvalidEtagHeader);
+			*pEnd << "' in '" << etag << "'");
 	}
 
 	return revID;
