@@ -61,5 +61,5 @@ test_script:
   # - dir bin_bbackupd.dir
   # - dir %PLATFORM%
   # - dir %PLATFORM%\%CONFIGURATION%
-  - ctest -C %CONFIGURATION% -V
+  - ctest -C %CONFIGURATION% -V --interactive-debug-mode 0
 
