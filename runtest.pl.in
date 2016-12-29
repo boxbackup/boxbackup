@@ -172,7 +172,9 @@ sub runtest
 
 	if($cmake_build)
 	{
-		appveyor_test_status($t, "Running", 0);
+		# Set the initial status to Cancelled, in case CTest kills the test due to a
+		# timeout, in which case we won't have a chance to set the status again.
+		appveyor_test_status($t, "Cancelled", 0, "Still running or timed out");
 
 		# Test executables have a different name on Windows to work around
 		# restrictions on running different executables with the same name.
@@ -241,7 +243,7 @@ sub runtest
 	{
 		push @results,"$t: make failed";
 		appveyor_test_status($t, "NotRunnable", time() - $start_time,
-			"pre-test commands failed");
+			"make failed");
 		$exit_code = 2;
 		return;
 	}
