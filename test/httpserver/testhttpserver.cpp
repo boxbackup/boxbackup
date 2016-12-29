@@ -198,6 +198,9 @@ bool exercise_s3client(S3Client& client)
 
 	response = client.GetObject("/newfile");
 	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_EQUAL(4269, response.GetSize());
+
+	fs.Seek(0, IOStream::SeekType_Absolute);
 	TEST_THAT(fs.CompareWith(response));
 	TEST_EQUAL("\"" + digest + "\"",
 		response.GetHeaders().GetHeaderValue("etag", false)); // !required

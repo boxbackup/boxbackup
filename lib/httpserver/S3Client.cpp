@@ -188,6 +188,7 @@ HTTPResponse S3Client::HeadObject(const std::string& rObjectURI)
 	return FinishAndSendRequest(HTTPRequest::Method_HEAD, rObjectURI);
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -368,6 +369,10 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStre
 		// We should do that here too, but currently our HTTP implementation
 		// doesn't support chunked encoding, so it's disabled there, so we don't
 		// do it here either.
+
+		// We are definitely finished writing to the HTTPResponse, so leave it
+		// ready for reading back.
+		response.SetForReading();
 	}
 	else
 	{
@@ -399,6 +404,9 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStre
 				throw;
 			}
 		}
+
+		// No need to call response.SetForReading() because HTTPResponse::Receive()
+		// already did that.
 	}
 
 	// It's not valid to have a keep-alive response if the length isn't known.
@@ -463,10 +471,11 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 //
 // Function
 //		Name:    S3Client::CheckResponse(HTTPResponse&,
-//			 std::string& message)
+//		         std::string& message)
 //		Purpose: Check the status code of an Amazon S3 response, and
-//			 throw an exception with a useful message (including
-//			 the supplied message) if it's not a 200 OK response.
+//		         throw an exception with a useful message (including
+//		         the supplied message) if it's not a 200 OK response
+//		         (or 304 if ExpectNoContent is true).
 //		Created: 26/07/2015
 //
 // --------------------------------------------------------------------------
@@ -474,6 +483,8 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message,
 	bool ExpectNoContent) const
 {
+	// Throw a different exception type (FileNotFound) for 404 responses, since this makes
+	// debugging easier (makes the actual cause more obvious).
 	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
 	{
 		THROW_EXCEPTION_MESSAGE(HTTPException, FileNotFound,

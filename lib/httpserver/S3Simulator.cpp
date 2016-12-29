@@ -707,40 +707,33 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 
-	if(!IncludeContent)
-	{
-		// For HEAD requests, we must set the Content-Length. See RFC 2616 section
-		// 4.4, and the Amazon Simple Storage Service API Reference, section "HEAD
-		// Object" examples, which set it. Also, our S3BackupFileSystem needs it!
-		//
-		// There are no examples for 304 Not Modified responses to requests with
-		// If-None-Match (ETag match) so clients should not depend on this, so the
-		// S3Simulator should return 0 instead of the object size and no ETag, to
-		// ensure that any code which tries to use the Content-Length or ETag of
-		// such a response will fail.
-		//
-		// We do that by checking IncludeContent here, before clearing it in case
-		// of a digest match below, to leave them unset in that case.
-		rResponse.GetHeaders().SetContentLength(file_length);
-		rResponse.AddHeader("ETag", digest);
-	}
+	// For GET and HEAD requests, we must set the Content-Length.  See RFC
+	// 2616 section 4.4, and the Amazon Simple Storage Service API
+	// Reference, section "HEAD Object" examples, which set it. Also, our
+	// S3BackupFileSystem needs it!
+	//
+	// There are no examples for 304 Not Modified responses to requests
+	// with If-None-Match (ETag match) so clients should not depend on
+	// this, so the S3Simulator should not set Content-Length or ETag, to
+	// ensure that any code which tries to use these headers will fail.
 
 	std::string if_none_match = rRequest.GetHeaders().GetHeaderValue("if-none-match",
 		false); // required
 	if(digest == if_none_match)
 	{
 		rResponse.SetResponseCode(HTTPResponse::Code_NotModified);
+		rResponse.GetHeaders().SetContentLength(0);
 		IncludeContent = false;
+	}
+	else
+	{
+		rResponse.GetHeaders().SetContentLength(file_length);
+		rResponse.AddHeader("ETag", digest);
 	}
 
 	if(IncludeContent)
 	{
 		apFile->CopyStreamTo(rResponse);
-		// We allow the HTTPResponse to set the response size itself in this case,
-		// but we must add the ETag header. TODO: proper support for streaming
-		// responses will require us to set the content-length here, because we
-		// know it but the HTTPResponse does not.
-		rResponse.AddHeader("ETag", digest);
 	}
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
