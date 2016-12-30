@@ -24,6 +24,8 @@ AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
 AX_CHECK_COMPILE_FLAG(-Werror=parentheses,
 	[cxxflags_strict="$cxxflags_strict -Werror=parentheses"])
+AX_CHECK_COMPILE_FLAG(-Werror=undefined-bool-conversion,
+	[cxxflags_strict="$cxxflags_strict -Werror=undefined-bool-conversion"])
 # We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
 dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
 dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
