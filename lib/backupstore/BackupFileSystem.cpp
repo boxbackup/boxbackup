@@ -1235,7 +1235,7 @@ int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
 			"at this URL: " << GetObjectURL(uri));
 	}
 
-	char* pEnd = NULL;
+	const char * pEnd = NULL;
 	std::string checksum = etag.substr(1, 16);
 	int64_t revID = box_strtoui64(checksum.c_str(), &pEnd, 16);
 	if(*pEnd != '\0')
@@ -2203,7 +2203,7 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 
 			if(!object_id_str.empty())
 			{
-				char* p_end;
+				const char * p_end;
 				int64_t object_id = box_strtoui64(object_id_str.c_str() + 2,
 					&p_end, 16);
 				if(*p_end != 0)

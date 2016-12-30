@@ -465,14 +465,9 @@ int console_read(char* pBuffer, size_t BufferSize);
 
 #endif // WIN32
 
-// MSVC < 12 (2013) does not have strtoull(), so use non-portable _strtoi64 instead.
-inline uint64_t box_strtoui64(const char *nptr, char **endptr, int base)
-{
-#ifdef _MSC_VER
-	return (uint64_t)_strtoi64(nptr, endptr, base);
-#else
-	return (uint64_t)strtoull(nptr, endptr, base);
-#endif
-}
+// MSVC < 12 (2013) does not have strtoull(), and _strtoi64 is signed only (truncates all values
+// greater than 1<<63 to _I64_MAX, so we roll our own using std::istringstream
+// <http://stackoverflow.com/questions/1070497/c-convert-hex-string-to-signed-integer>
+uint64_t box_strtoui64(const char *nptr, const char **endptr, int base);
 
 #endif // !EMU_INCLUDE

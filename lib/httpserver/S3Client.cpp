@@ -121,7 +121,7 @@ int S3Client::ListBucket(std::vector<S3Client::BucketEntry>* p_contents_out,
 			std::string name = v.second.get<std::string>("Key");
 			std::string etag = v.second.get<std::string>("ETag");
 			std::string size = v.second.get<std::string>("Size");
-			char* size_end_ptr;
+			const char * size_end_ptr;
 			int64_t size_int = box_strtoui64(size.c_str(), &size_end_ptr, 10);
 			if(*size_end_ptr != 0)
 			{

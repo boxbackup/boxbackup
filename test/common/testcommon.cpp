@@ -921,5 +921,16 @@ int test(int argc, const char *argv[])
 		}
 	}
 
+	// Test that box_strtoui64 works properly
+	TEST_EQUAL(1234567890123456, box_strtoui64("1234567890123456", NULL, 10));
+	TEST_EQUAL(0x1234567890123456, box_strtoui64("1234567890123456", NULL, 16));
+	TEST_EQUAL(0xd9385a13c3842ba0, box_strtoui64("d9385a13c3842ba0", NULL, 16));
+	const char *input = "12a34";
+	const char *endptr;
+	TEST_EQUAL(12, box_strtoui64(input, &endptr, 10));
+	TEST_EQUAL(input + 2, endptr);
+	TEST_EQUAL(0x12a34, box_strtoui64(input, &endptr, 16));
+	TEST_EQUAL(input + 5, endptr);
+
 	return 0;
 }
