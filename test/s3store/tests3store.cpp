@@ -132,21 +132,21 @@ bool test_bbstoreaccounts_commands()
 {
 	SETUP_TEST_S3SIMULATOR();
 
-	TEST_RETURN(0, system(BBSTOREACCOUNTS_COMMAND "create test 1000B 2000B"));
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "create test 1000B 2000B"), 0);
 	TEST_THAT(check_new_account_info());
 
-	TEST_RETURN(0, system(BBSTOREACCOUNTS_COMMAND "name foo"));
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "name foo"), 0);
 	FileStream fs("testfiles/store/subdir/" S3_INFO_FILE_NAME);
 	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(fs, fs.GetFileName(),
 		true); // ReadOnly
 	TEST_EQUAL("foo", apInfo->GetAccountName());
 
-	TEST_RETURN(0, system(BBSTOREACCOUNTS_COMMAND "enabled no"));
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "enabled no"), 0);
 	fs.Seek(0, IOStream::SeekType_Absolute);
 	apInfo = BackupStoreInfo::Load(fs, fs.GetFileName(), true); // ReadOnly
 	TEST_EQUAL(false, apInfo->IsAccountEnabled());
 
-	TEST_RETURN(0, system(BBSTOREACCOUNTS_COMMAND "info"));
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "info"), 0);
 
 	TEARDOWN_TEST_S3SIMULATOR();
 }
