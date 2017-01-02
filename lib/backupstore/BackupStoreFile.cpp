@@ -655,7 +655,7 @@ void BackupStoreFile::DecodeFile(IOStream &rEncodedFile, const char *DecodedFile
 		// Protocol::ProtocolStreamHeader_EndOfStream byte
 		// out of our connection stream.
 		char buffer[1];
-		int drained = rEncodedFile.Read(buffer, 1);
+		rEncodedFile.Read(buffer, 1);
 
 		// The Read will return 0 if we are actually at the end
 		// of the stream, but some tests decode files directly,

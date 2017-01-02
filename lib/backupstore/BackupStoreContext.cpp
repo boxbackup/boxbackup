@@ -689,7 +689,6 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			ASSERT(poldEntry != 0);
 
 			// Adjust size of old entry
-			int64_t oldSize = poldEntry->GetSizeInBlocks();
 			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
 		}
 

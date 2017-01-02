@@ -724,7 +724,7 @@ bool Configuration::Verify(const ConfigurationVerify &rVerify,
 					// Test it...
 					char *end;
 					errno = 0;
-					uint32_t r = ::strtoul(val, &end, 0);
+					::strtoul(val, &end, 0);
 					if(errno != 0 || end != (val + rval.size()))
 					{
 						// not a good value
