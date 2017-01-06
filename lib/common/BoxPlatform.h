@@ -62,12 +62,6 @@
 	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif
 
-// Disable memory testing under Darwin, it just doesn't like it very much.
-#ifdef __APPLE__
-	// TODO: We really should get some decent leak detection code.
-	#define PLATFORM_DISABLE_MEM_LEAK_TESTING
-#endif
-
 // Darwin also has a weird idea of permissions and dates on symlinks:
 // perms are fixed at creation time by your umask, and dates can't be
 // changed. This breaks unit tests if we try to compare these things.
