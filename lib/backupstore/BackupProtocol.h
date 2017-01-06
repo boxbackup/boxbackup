@@ -64,7 +64,6 @@ public:
 		QueryLogin(AccountNumber,
 			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
 	}
-	virtual ~BackupProtocolLocal2() { }
 
 	std::auto_ptr<BackupProtocolFinished> Query(const BackupProtocolFinished &rQuery)
 	{
