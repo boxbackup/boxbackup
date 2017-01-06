@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HAVE_EXECINFO_H
+	#include <execinfo.h>
+#endif
+
 #ifdef HAVE_PROCESS_H
 #	include <process.h>
 #endif
@@ -33,6 +37,7 @@
 #include <set>
 
 #include "MemLeakFinder.h"
+#include "Utils.h"
 
 static bool memleakfinder_initialised = false;
 bool memleakfinder_global_enable = false;
@@ -42,6 +47,10 @@ typedef struct
 	size_t size;
 	const char *file;
 	int line;
+#if! defined BOX_RELEASE_BUILD && defined HAVE_EXECINFO_H
+	void  *stack_frames[20];
+	size_t stack_size;
+#endif
 } MallocBlockInfo;
 
 typedef struct
@@ -50,6 +59,10 @@ typedef struct
 	const char *file;
 	int line;
 	bool array;
+#if! defined BOX_RELEASE_BUILD && defined HAVE_EXECINFO_H
+	void  *stack_frames[20];
+	size_t stack_size;
+#endif
 } ObjectInfo;
 
 namespace
@@ -544,6 +557,9 @@ void memleakfinder_reportleaks_file(FILE *file)
 				"%s:%d\n", i->second.array?" []":"",
 				i->first, i->second.size, i->second.file,
 				i->second.line);
+#ifdef HAVE_EXECINFO_H
+			DumpStackBacktrace(i->second.stack_size, i->second.stack_frames);
+#endif
 		}
 	}
 }
@@ -628,6 +644,11 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 		i.file = file;
 		i.line = line;
 		i.array = array;
+#ifdef HAVE_EXECINFO_H
+		i.stack_size = backtrace(i.stack_frames, 20);
+#else
+		i.stack_size = 0;
+#endif
 		sObjectBlocks[block] = i;
 		
 		if(sTrackObjectsInSection)

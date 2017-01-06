@@ -148,6 +148,10 @@ std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
 	}
 }
 
+// The backtrace routines are used by DebugMemLeakFinder, so we need to disable memory leak
+// tracking during them, otherwise we could end up with infinite recursion.
+#include "MemLeakFindOff.h"
+
 static std::string demangle(const std::string& mangled_name)
 {
 	std::string demangled_name = mangled_name;
@@ -202,7 +206,15 @@ void DumpStackBacktrace()
 	void  *array[20];
 	size_t size = backtrace(array, 20);
 	BOX_TRACE("Obtained " << size << " stack frames.");
+	DumpStackBacktrace(size, array);
+#else // !HAVE_EXECINFO_H
+	BOX_TRACE("Backtrace support was not compiled in");
+#endif
+}
 
+void DumpStackBacktrace(size_t size, void * const * array)
+{
+#ifdef HAVE_EXECINFO_H
 	for(size_t i = 0; i < size; i++)
 	{
 		std::ostringstream output;
@@ -240,7 +252,7 @@ void DumpStackBacktrace()
 #endif // HAVE_EXECINFO_H
 }
 
-
+#include "MemLeakFindOn.h"
 
 // --------------------------------------------------------------------------
 //

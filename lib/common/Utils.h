@@ -14,8 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "MemLeakFindOn.h"
-
 std::string GetBoxBackupVersion();
 
 void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOutput);
@@ -27,6 +25,7 @@ std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
 	bool force = true);
 
 void DumpStackBacktrace();
+void DumpStackBacktrace(size_t size, void * const * array);
 
 bool FileExists(const std::string& rFilename, int64_t *pFileSize = 0,
 	bool TreatLinksAsNotExisting = false);
@@ -52,7 +51,5 @@ typedef std::map<std::string, str_pair_t> str_map_diff_t;
 str_map_diff_t compare_str_maps(const str_map_t& expected, const str_map_t& actual);
 
 bool process_is_running(int pid);
-
-#include "MemLeakFindOff.h"
 
 #endif // UTILS__H
