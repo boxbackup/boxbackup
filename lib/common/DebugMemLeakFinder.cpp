@@ -42,12 +42,16 @@
 static bool memleakfinder_initialised = false;
 bool memleakfinder_global_enable = false;
 
+#if !defined BOX_RELEASE_BUILD && defined HAVE_EXECINFO_H
+#	define BOX_MEMORY_LEAK_BACKTRACE_ENABLED
+#endif
+
 typedef struct
 {
 	size_t size;
 	const char *file;
 	int line;
-#ifdef HAVE_EXECINFO_H
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
 	void  *stack_frames[20];
 	size_t stack_size;
 #endif
@@ -59,7 +63,7 @@ typedef struct
 	const char *file;
 	int line;
 	bool array;
-#ifdef HAVE_EXECINFO_H
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
 	void  *stack_frames[20];
 	size_t stack_size;
 #endif
@@ -557,7 +561,7 @@ void memleakfinder_reportleaks_file(FILE *file)
 				"%s:%d\n", i->second.array?" []":"",
 				i->first, (unsigned long)i->second.size, i->second.file,
 				i->second.line);
-#ifdef HAVE_EXECINFO_H
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
 			if(file == stdout)
 			{
 				DumpStackBacktrace(__FILE__, i->second.stack_size,
@@ -648,7 +652,7 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 		i.file = file;
 		i.line = line;
 		i.array = array;
-#ifdef HAVE_EXECINFO_H
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
 		i.stack_size = backtrace(i.stack_frames, 20);
 #endif
 		sObjectBlocks[block] = i;
