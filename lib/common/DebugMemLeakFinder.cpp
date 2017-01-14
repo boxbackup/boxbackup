@@ -646,8 +646,6 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 		i.array = array;
 #ifdef HAVE_EXECINFO_H
 		i.stack_size = backtrace(i.stack_frames, 20);
-#else
-		i.stack_size = 0;
 #endif
 		sObjectBlocks[block] = i;
 		
