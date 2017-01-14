@@ -47,7 +47,7 @@ typedef struct
 	size_t size;
 	const char *file;
 	int line;
-#if !defined BOX_RELEASE_BUILD && defined HAVE_EXECINFO_H
+#ifdef HAVE_EXECINFO_H
 	void  *stack_frames[20];
 	size_t stack_size;
 #endif
@@ -59,7 +59,7 @@ typedef struct
 	const char *file;
 	int line;
 	bool array;
-#if !defined BOX_RELEASE_BUILD && defined HAVE_EXECINFO_H
+#ifdef HAVE_EXECINFO_H
 	void  *stack_frames[20];
 	size_t stack_size;
 #endif
