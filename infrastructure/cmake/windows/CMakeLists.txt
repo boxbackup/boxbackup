@@ -8,9 +8,9 @@ set(install_dir ${CMAKE_BINARY_DIR}/install)
 
 # Automate the process of downloading, building and "installing" dependencies on Windows,
 # as used by AppVeyor.
-set(ZLIB_VERSION    1.2.8  CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
-set(ZLIB_HASH MD5=126f8676442ffbd97884eb4d6f32afb4
-	CACHE STRING "Hash of the zlib download file, to be verified after download")
+set(ZLIB_VERSION    1.2.10 CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
+set(ZLIB_HASH SHA256=a23d3d1da69d800d96d749c0a7c1a5b423dcc7381d1d5095d8f14a28dc453733
+	CACHE STRING "Hash of zlib-${ZLIB_VERSION}.zip, to be verified after download")
 set(OPENSSL_VERSION 1.0.2h CACHE STRING "Version of OpenSSL to download, build, and compile Box Backup against")
 set(OPENSSL_HASH SHA256=1d4007e53aad94a5b2002fe045ee7bb0b3d98f1a47f8b2bc851dcd1c74332919
 	CACHE STRING "Hash of the OpenSSL download file, to be verified after download")
