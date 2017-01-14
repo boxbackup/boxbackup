@@ -51,6 +51,8 @@ void memleakfinder_traceblocksinsection();
 
 void memleakfinder_notaleak(void *ptr);
 
+void memleakfinder_delete(void *ptr);
+
 void *operator new  (size_t size, const char *file, int line);
 void *operator new[](size_t size, const char *file, int line);
 

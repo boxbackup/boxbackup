@@ -375,10 +375,11 @@ BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID
 	// so no need to append an X to it.
 	ASSERT(Filename.size() > 0 && Filename[Filename.size() - 1] != 'X');
 
+	std::auto_ptr<FileStream> database_file = OpenDatabaseFile(Filename, AccountID, ReadOnly);
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
 		new BackupStoreRefCountDatabaseImpl(Filename, AccountID, ReadOnly,
 			false, // Temporary
-			OpenDatabaseFile(Filename, AccountID, ReadOnly)));
+			database_file));
 
 	// return it to caller
 	return refcount;

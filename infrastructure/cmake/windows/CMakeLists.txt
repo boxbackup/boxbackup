@@ -11,12 +11,12 @@ set(install_dir ${CMAKE_BINARY_DIR}/install)
 set(ZLIB_VERSION    1.2.10 CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
 set(ZLIB_HASH SHA256=a23d3d1da69d800d96d749c0a7c1a5b423dcc7381d1d5095d8f14a28dc453733
 	CACHE STRING "Hash of zlib-${ZLIB_VERSION}.zip, to be verified after download")
-set(OPENSSL_VERSION 1.0.2h CACHE STRING "Version of OpenSSL to download, build, and compile Box Backup against")
-set(OPENSSL_HASH SHA256=1d4007e53aad94a5b2002fe045ee7bb0b3d98f1a47f8b2bc851dcd1c74332919
-	CACHE STRING "Hash of the OpenSSL download file, to be verified after download")
-set(PCRE_VERSION    8.38   CACHE STRING "Version of PCRE to download, build, and compile Box Backup against")
-set(PCRE_HASH SHA256=dbef7cf80258c29396d435804cd5dba34006a77548850bca8bad6db6a6eac110
-	CACHE STRING "Hash of the PCRE download file, to be verified after download")
+set(OPENSSL_VERSION 1.0.2j CACHE STRING "Version of OpenSSL to download, build, and compile Box Backup against")
+set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431
+	CACHE STRING "Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download")
+set(PCRE_VERSION    8.40   CACHE STRING "Version of PCRE to download, build, and compile Box Backup against")
+set(PCRE_HASH SHA256=99e19194fa57d37c38e897d07ecb3366b18e8c395b36c6d555706a7f1df0a5d4
+	CACHE STRING "Hash of pcre-${PCRE_VERSION}.zip, to be verified after download")
 set(BOOST_VERSION    1.62.0   CACHE STRING "Version of Boost to download, unpack, and compile Box Backup against")
 set(BOOST_HASH SHA1=5fd97433c3f859d8cbab1eaed4156d3068ae3648
 	CACHE STRING "Hash of the Boost download file, to be verified after download")

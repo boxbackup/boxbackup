@@ -2892,8 +2892,11 @@ bool test_login_with_no_refcount_db()
 	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 
 	// And that we can log in afterwards
-	BackupProtocolLocal2(0x01234567, "test", "backup/01234567/", 0,
-		false).QueryFinished(); // Not read-only
+	{
+		BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/", 0,
+			false); // Not read-only
+		client.QueryFinished();
+	}
 
 	// Check that housekeeping fixed the ref counts
 	TEST_THAT(check_reference_counts());
