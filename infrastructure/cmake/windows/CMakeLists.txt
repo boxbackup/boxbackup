@@ -8,9 +8,9 @@ set(install_dir ${CMAKE_BINARY_DIR}/install)
 
 # Automate the process of downloading, building and "installing" dependencies on Windows,
 # as used by AppVeyor.
-set(ZLIB_VERSION    1.2.10 CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
-set(ZLIB_HASH SHA256=a23d3d1da69d800d96d749c0a7c1a5b423dcc7381d1d5095d8f14a28dc453733
-	CACHE STRING "Hash of zlib-${ZLIB_VERSION}.zip, to be verified after download")
+set(ZLIB_VERSION    1.2.11 CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
+set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1
+	CACHE STRING "Hash of zlib-${ZLIB_VERSION}.tar.gz, to be verified after download")
 set(OPENSSL_VERSION 1.0.2j CACHE STRING "Version of OpenSSL to download, build, and compile Box Backup against")
 set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431
 	CACHE STRING "Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download")
@@ -23,9 +23,8 @@ set(BOOST_HASH SHA1=5fd97433c3f859d8cbab1eaed4156d3068ae3648
 
 include(ExternalProject)
 
-string(REPLACE "." "" zlib_version_nodots ${ZLIB_VERSION})
 ExternalProject_Add(zlib
-	URL "http://zlib.net/zlib${zlib_version_nodots}.zip"
+	URL "http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
 	URL_HASH ${ZLIB_HASH}
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
