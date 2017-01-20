@@ -12,28 +12,30 @@ esac
 
 # Enable some compiler flags if the compiler supports them. This gives better warnings
 # and detects some problems early.
+AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
+	[cxxflags_strict="$cxxflags_strict -Werror=unknown-warning-option"])
 AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
 # -Wundef would be a good idea, but Boost is full of undefined variable use, so we need
 # to disable it for now so that we can concentrate on real errors:
 dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=return-type,
+AX_CHECK_COMPILE_FLAG(-Werror=return-type,
 	[cxxflags_strict="$cxxflags_strict -Werror=return-type"])
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=non-virtual-dtor,
+AX_CHECK_COMPILE_FLAG(-Werror=non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=non-virtual-dtor"])
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=delete-non-virtual-dtor,
+AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=parentheses,
+AX_CHECK_COMPILE_FLAG(-Werror=parentheses,
 	[cxxflags_strict="$cxxflags_strict -Werror=parentheses"])
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=undefined-bool-conversion,
+AX_CHECK_COMPILE_FLAG(-Werror=undefined-bool-conversion,
 	[cxxflags_strict="$cxxflags_strict -Werror=undefined-bool-conversion"])
 # We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
-dnl AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=sometimes-uninitialized,
+dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
 dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=overloaded-virtual,
+AX_CHECK_COMPILE_FLAG(-Werror=overloaded-virtual,
 	[cxxflags_strict="$cxxflags_strict -Werror=overloaded-virtual"])
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
-AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option -Werror=delete-incomplete,
+AX_CHECK_COMPILE_FLAG(-Werror=delete-incomplete,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-incomplete"])
 AX_CHECK_COMPILE_FLAG(-std=c++0x,
 	[cxxflags_strict="$cxxflags_strict -std=c++0x"])
