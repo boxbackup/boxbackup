@@ -407,7 +407,7 @@ WINDRES = @WINDRES@
 
 # Work around a mistake in QDBM (using <angled> includes for a file not in the
 # system path) by adding it to the include path with -I.
-DEFAULT_CFLAGS = \@CPPFLAGS@ $default_cflags \@CXXFLAGS_STRICT@ \\
+DEFAULT_CFLAGS = \@CPPFLAGS@ $default_cflags \\
 	$extra_platform_defines $platform_compile_line_extra \\
 	-DBOX_VERSION="\\"$product_version\\"" -Iqdbm
 DEFAULT_CXXFLAGS = \@CPPFLAGS@ $default_cxxflags \@CXXFLAGS_STRICT@ \\
