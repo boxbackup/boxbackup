@@ -35,6 +35,10 @@ AX_CHECK_COMPILE_FLAG(-Werror=overloaded-virtual,
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 AX_CHECK_COMPILE_FLAG(-Werror=delete-incomplete,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-incomplete"])
+AX_CHECK_COMPILE_FLAG(-std=c++0x,
+	[cxxflags_strict="$cxxflags_strict -std=c++0x"])
+AX_CHECK_COMPILE_FLAG(-Wno-deprecated-declarations,
+	[cxxflags_strict="$cxxflags_strict -Wno-deprecated-declarations"])
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then

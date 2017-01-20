@@ -21,6 +21,8 @@
 #include <cstring>
 #include <string>
 
+#include <boost/version.hpp>
+
 #include "Database.h"
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"

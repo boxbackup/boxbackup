@@ -688,6 +688,8 @@ file(TO_NATIVE_PATH "${PERL_EXECUTABLE}" perl_executable_native)
 string(REPLACE "\\" "\\\\" perl_path_escaped ${perl_executable_native})
 target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_path_escaped}")
 
+target_compile_features(lib_httpserver PRIVATE cxx_auto_type)
+
 # Configure test timeouts:
 # I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:
 # https://ci.appveyor.com/project/qris/boxbackup/build/job/xm10itascygtu93j
