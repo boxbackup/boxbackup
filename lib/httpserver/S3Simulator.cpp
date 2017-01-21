@@ -54,9 +54,14 @@ ptree XmlStringToPtree(const std::string& string)
 std::string PtreeToXmlString(const ptree& pt)
 {
 	std::ostringstream buf;
-#if BOOST_VERSION >= 105500
-	// http://www.pcl-users.org/problem-getting-PCL-1-7-1-on-osx-10-9-td4035213.html
-	auto settings = boost::property_tree::xml_writer_make_settings<std::string> ('\t', 1);
+// The original direct instantiation of xml_writer_settings stopped in 1.55:
+// http://www.pcl-users.org/problem-getting-PCL-1-7-1-on-osx-10-9-td4035213.html
+// The arguments to xml_writer_make_settings were changed backwards-incompatibly in Boost 1.56:
+// https://github.com/boostorg/property_tree/commit/8af8b6bf3b65fa59792d849b526678f176d87132
+#if BOOST_VERSION >= 105600
+	auto settings = boost::property_tree::xml_writer_make_settings<std::string>('\t', 1);
+#elif BOOST_VERSION >= 105500
+	auto settings = boost::property_tree::xml_writer_make_settings<char>('\t', 1);
 #else
 	boost::property_tree::xml_writer_settings<char> settings('\t', 1);
 #endif
