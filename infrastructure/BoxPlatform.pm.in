@@ -47,16 +47,8 @@ BEGIN
 	}
 	elsif ($build_os eq 'SunOS')
 	{
-		if ($build_os_ver <= 5.10)
-		{
-			$make_command = 'gmake';
-			$bsd_make = 0;
-		}
-		else
-		{
-			$make_command = 'bmake';
-			$bsd_make = 1;
-		}
+		$make_command = 'gmake';
+		$bsd_make = 0;
 	}
 	else
 	{
