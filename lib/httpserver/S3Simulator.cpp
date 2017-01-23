@@ -547,7 +547,12 @@ void S3Simulator::HandleListObjects(const std::string& bucket_name,
 			ASSERT(prefix == "" || EndsWith("/", prefix));
 			std::string object_name = prefix + entry_name;
 
+#ifdef HAVE_VALID_DIRENT_D_TYPE
 			if(p_dirent->d_type == DT_UNKNOWN)
+#else
+			// Always use this branch if we don't have struct dirent.d_type:
+			if(true)
+#endif
 			{
 				int entry_type = ObjectExists(entry_path);
 				if(entry_type == ObjectExists_File)
@@ -565,6 +570,7 @@ void S3Simulator::HandleListObjects(const std::string& bucket_name,
 					continue;
 				}
 			}
+#ifdef HAVE_VALID_DIRENT_D_TYPE
 			else if(p_dirent->d_type == DT_REG)
 			{
 				object_name_to_type[object_name] = ObjectExists_File;
@@ -573,6 +579,7 @@ void S3Simulator::HandleListObjects(const std::string& bucket_name,
 			{
 				object_name_to_type[object_name] = ObjectExists_Dir;
 			}
+#endif // HAVE_VALID_DIRENT_D_TYPE
 			else
 			{
 				continue;

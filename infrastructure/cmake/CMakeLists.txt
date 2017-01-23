@@ -560,6 +560,11 @@ endforeach()
 check_symbol_exists(dirfd "dirent.h" HAVE_DECL_DIRFD)
 file(APPEND "${boxconfig_h_file}" "#cmakedefine01 HAVE_DECL_DIRFD\n")
 
+if(WIN32)
+	# We emulate this in lib/win32, so we know it's present:
+	file(APPEND "${boxconfig_h_file}" "#define HAVE_VALID_DIRENT_D_TYPE 1\n")
+endif()
+
 # Emulate ax_check_mount_point.m4
 # These checks are run by multi-line M4 commands which are harder to parse/fake using
 # regexps above, so we hard-code them here:
