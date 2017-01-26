@@ -389,7 +389,7 @@ lseek(int fildes, off_t offset, int whence)
 #else
 	#ifdef HAVE_LSEEK_DUMMY_PARAM
 		off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
-	#elif defined(_FILE_OFFSET_BITS)
+	#elif defined(_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 32
 		// Don't bother trying to call SYS__llseek on 32 bit since it is
 		// fiddly and not needed for the tests
 		off_t r = syscall(SYS_lseek, fildes, (uint32_t)offset, whence);
