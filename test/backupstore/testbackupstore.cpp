@@ -403,15 +403,14 @@ int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
 }
 
 std::auto_ptr<IOStream> get_object_stream(bool IsDirectory, int64_t ObjectID,
-	const std::string& SpecialisationName, BackupAccountControl& control)
+	const std::string& SpecialisationName, BackupFileSystem& fs)
 {
 	if(SpecialisationName == "s3")
 	{
-		S3BackupFileSystem& fs
-			(dynamic_cast<S3BackupFileSystem&>(control.GetFileSystem()));
+		S3BackupFileSystem& s3fs(dynamic_cast<S3BackupFileSystem&>(fs));
 		std::string local_path = "testfiles/store" +
-			(IsDirectory ? fs.GetDirectoryURI(ObjectID) :
-			 fs.GetFileURI(ObjectID));
+			(IsDirectory ? s3fs.GetDirectoryURI(ObjectID) :
+			 s3fs.GetFileURI(ObjectID));
 		return std::auto_ptr<IOStream>(new FileStream(local_path));
 	}
 	else
@@ -1733,6 +1732,9 @@ bool test_server_commands(const std::string& specialisation_name,
 		int64_t subdirfileid = create_file(*apProtocol, subdirid);
 		TEST_THAT(check_num_files(fs, 1, 0, 0, 2));
 
+		// Flush the cache so that the read-only connection works
+		rwContext.FlushDirectoryCache();
+
 		BOX_TRACE("Checking root directory using read-only connection");
 		{
 			// Command
@@ -1765,6 +1767,7 @@ bool test_server_commands(const std::string& specialisation_name,
 			}
 
 			// Check that the last entry looks right
+			TEST_THAT_OR(en != NULL, FAIL);
 			TEST_EQUAL(subdirid, en->GetObjectID());
 			TEST_THAT(en->GetName() == dirname);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_Dir, en->GetFlags());
@@ -1862,6 +1865,9 @@ bool test_server_commands(const std::string& specialisation_name,
 
 		// Check the new attributes using the read-only connection
 		{
+			rwContext.FlushDirectoryCache();
+			roContext.ClearDirectoryCache();
+
 			// Command
 			protocolReadOnly.QueryListDirectory(
 				subdirid,
@@ -1895,6 +1901,8 @@ bool test_server_commands(const std::string& specialisation_name,
 		TEST_THAT(check_num_files(fs, 2, 1, 0, 2));
 
 		// Check that it's in the root directory (it won't be for long)
+		rwContext.FlushDirectoryCache();
+		roContext.ClearDirectoryCache();
 		protocolReadOnly.QueryListDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
 			0, 0, false);
 		TEST_THAT(BackupStoreDirectory(protocolReadOnly.ReceiveStream())
@@ -1973,6 +1981,8 @@ bool test_server_commands(const std::string& specialisation_name,
 		}
 
 		// Check it's all gone from the root directory...
+		rwContext.FlushDirectoryCache();
+		roContext.ClearDirectoryCache();
 		protocolReadOnly.QueryListDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
 			0, 0, false);
 		TEST_THAT(BackupStoreDirectory(protocolReadOnly.ReceiveStream(),
@@ -2240,6 +2250,9 @@ bool test_directory_parent_entry_tracks_directory_size(
 	BackupProtocolLocal2 protocolReadOnly(roContext, 0x01234567, true); // ReadOnly
 
 	int64_t subdirid = create_directory(protocol);
+	// The updated entry for subdirid in the root directory (needed by get_object_size below)
+	// may not have been written out of the cache yet, so flush it:
+	rwContext.FlushDirectoryCache();
 
 	// Get the root directory cached in the read-only connection, and
 	// test that the initial size is correct.
@@ -2264,12 +2277,18 @@ bool test_directory_parent_entry_tracks_directory_size(
 		std::ostringstream name;
 		name << "testfile_" << i;
 		last_added_filename = name.str();
+		// No need to catch exceptions here, because we do not expect to hit the account
+		// hard limit, and if we do it should cause the test to fail.
 		last_added_file_id = create_file(protocol, subdirid, name.str());
+		// We need to flush the directory cache every time, because we want to catch the
+		// exact moment when the directory size goes over one block.
+		rwContext.FlushDirectoryCache();
 		new_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
 			control);
 	}
 
 	// Check that the root directory entry has been updated
+	roContext.ClearDirectoryCache();
 	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
@@ -2305,7 +2324,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	BackupStoreDirectory root(
 		*get_object_stream(true, // IsDirectory
 			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
-			specialisation_name, control),
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en, return false);
@@ -2313,11 +2332,14 @@ bool test_directory_parent_entry_tracks_directory_size(
 	root.DeleteEntry(subdirid);
 	fs.PutDirectory(root);
 
-	// Add a directory, this should try to push the object size back up,
-	// which will try to modify the subdir's entry in its parent, which
-	// no longer exists, which should just log an error instead of
-	// aborting/segfaulting.
+	// Add a directory, this should try to push the object size back up, which will try to
+	// modify the subdir's entry in its parent, which no longer exists, which should return
+	// an error, but only when the cache is flushed (which could be much later):
 	create_directory(protocol, subdirid);
+	TEST_CHECK_THROWS(
+		rwContext.FlushDirectoryCache(),
+		BackupStoreException,
+		CouldNotFindEntryInDirectory);
 
 	// Repair the error ourselves, as bbstoreaccounts can't.
 	protocol.QueryFinished();
@@ -2333,7 +2355,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	BackupStoreDirectory subdir(
 		*get_object_stream(true, // IsDirectory
 			subdirid, // ObjectID
-			specialisation_name, control),
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 
 	{
@@ -2379,7 +2401,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	root.ReadFromStream(
 		*get_object_stream(true, // IsDirectory
 			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
-			specialisation_name, control),
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 	en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);

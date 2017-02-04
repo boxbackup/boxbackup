@@ -106,6 +106,7 @@ bool create_account(int soft, int hard);
 //! Deletes the standard test account, for testing behaviour with no account.
 bool delete_account();
 
+// You might want to use TEST_COMMAND_RETURNS_ERROR instead of TEST_PROTOCOL_ERROR_OR for new code:
 #define TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements) \
 	{ \
 		int type, subtype; \

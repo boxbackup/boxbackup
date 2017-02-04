@@ -16,12 +16,12 @@
 
 #include "autogen_BackupProtocol.h"
 #include "BackupFileSystem.h"
+#include "BackupStoreDirectory.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "Message.h"
 #include "Utils.h"
 
-class BackupStoreDirectory;
 class BackupStoreFilename;
 class IOStream;
 class BackupProtocolMessage;
@@ -194,12 +194,17 @@ public:
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
 	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
 
+	// This is not an API, but it's useful in tests with multiple contexts, to allow
+	// synchronisation between them:
+	void FlushDirectoryCache();
+	void ClearDirectoryCache();
+
 private:
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID,
 		bool AllowFlushCache = true);
-	void SaveDirectory(BackupStoreDirectory &rDir);
+	void SaveDirectoryLater(BackupStoreDirectory &rDir);
+	int64_t SaveDirectoryNow(BackupStoreDirectory &rDir);
 	void RemoveDirectoryFromCache(int64_t ObjectID);
-	void ClearDirectoryCache();
 	void DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete);
 	int64_t AllocateObjectID();
 
@@ -235,8 +240,25 @@ private:
 	// Refcount database
 	BackupStoreRefCountDatabase* mpRefCount;
 
+protected:
+	class DirectoryCacheEntry
+	{
+	public:
+		BackupStoreDirectory mDir;
+		bool mDirty;
+
+		DirectoryCacheEntry(bool dirty)
+		: mDirty(dirty)
+		{ }
+
+		DirectoryCacheEntry(int64_t dir_id, int64_t container_id, bool dirty)
+		: mDir(dir_id, container_id),
+		  mDirty(dirty)
+		{ }
+	};
+
 	// Directory cache
-	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
+	std::map<int64_t, DirectoryCacheEntry*> mDirectoryCache;
 
 public:
 	class TestHook

@@ -26,14 +26,10 @@
 
 
 // Maximum number of directories to keep in the cache When the cache is bigger
-// than this, everything gets deleted. In tests, we set the cache size to zero
+// than this, everything gets deleted.
 // to ensure that it's always flushed, which is very inefficient but helps to
 // catch programming errors (use of freed data).
-#ifdef BOX_RELEASE_BUILD
-	#define	MAX_CACHE_SIZE	32
-#else
-	#define	MAX_CACHE_SIZE	0
-#endif
+#define	MAX_CACHE_SIZE	32
 
 // Allow the housekeeping process 4 seconds to release an account
 #define MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT	4
@@ -108,8 +104,8 @@ BackupStoreContext::~BackupStoreContext()
 {
 	try
 	{
-		ReleaseWriteLock();
 		ClearDirectoryCache();
+		ReleaseWriteLock();
 	}
 	catch(BoxException &e)
 	{
@@ -118,13 +114,41 @@ BackupStoreContext::~BackupStoreContext()
 }
 
 
+void BackupStoreContext::FlushDirectoryCache()
+{
+	// Flush any dirty cache entries to disk. Flushing a directory can modify the cache
+	// (by getting the parent directory to update the child's size in it) which invalidates
+	// our iterator, so we need to restart if that happens.
+	bool restart = true;
+	while(restart)
+	{
+		restart = false;
+		for(auto i = mDirectoryCache.begin(); i != mDirectoryCache.end(); ++i)
+		{
+			if(i->second->mDirty)
+			{
+#ifndef BOX_RELEASE_BUILD
+				// Might be invalidated, so fix that now, so that SaveDirectoryNow()
+				// can work:
+				i->second->mDir.Invalidate(false);
+#endif
+				SaveDirectoryNow(i->second->mDir);
+				restart = true;
+				break;
+			}
+		}
+	}
+}
+
+
 void BackupStoreContext::ClearDirectoryCache()
 {
+	FlushDirectoryCache();
+
 	// Delete the objects in the cache
-	for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin());
-		i != mDirectoryCache.end(); ++i)
+	for(auto i(mDirectoryCache.begin()); i != mDirectoryCache.end(); ++i)
 	{
-		delete (i->second);
+		delete i->second;
 	}
 	mDirectoryCache.clear();
 }
@@ -146,6 +170,10 @@ void BackupStoreContext::CleanUp()
 	}
 
 	CHECK_FILESYSTEM_INITIALISED();
+
+	// ClearDirectoryCache() could modify the store info (number of blocks used by
+	// directories), so we need to do it before writing back the store info:
+	ClearDirectoryCache();
 
 	if(!mReadOnly)
 	{
@@ -180,7 +208,6 @@ void BackupStoreContext::CleanUp()
 	mReadOnly = true;
 	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
 	mpTestHook = NULL;
-	ClearDirectoryCache();
 }
 
 
@@ -356,9 +383,9 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 //			 directory cache is called: mainly this function
 //			 (with AllowFlushCache == true) or creation of files.
 //			 This is a private function which returns non-const
-//			 references to directories in the cache. If the cache
-//			 is flushed, it will invalidate all directory
-//			 references that you may be holding, so beware.
+//			 references to directories in the cache. It will
+//			 invalidate all directory references that you may be
+//			 holding, except for the one that it returns.
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
@@ -367,41 +394,52 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 {
 	CHECK_FILESYSTEM_INITIALISED();
 
+#ifndef BOX_RELEASE_BUILD
+	// In debug builds, if AllowFlushCache is true, we invalidate the entire cache. That's
+	// because it could be flushed at any time, invalidating any pointers held to any entry
+	// except the one returned by this function. Invalidating makes all attempted accesses
+	// throw exceptions, so it should catch any such programming error. We will need to
+	// uninvalidate whatever entry we return, before returning it, otherwise it cannot be used.
+	for(auto i = mDirectoryCache.begin(); i != mDirectoryCache.end(); i++)
+	{
+		i->second->mDir.Invalidate(true);
+	}
+#endif
+
 	// Get the filename
 	int64_t oldRevID = 0, newRevID = 0;
 	bool gotRevID = false;
 
 	// Already in cache?
-	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
-	if(item != mDirectoryCache.end()) {
-#ifndef BOX_RELEASE_BUILD // it might be in the cache, but invalidated
-		// in which case, delete it instead of returning it.
-		if(!item->second->IsInvalidated())
-#else
-		if(true)
+	auto item = mDirectoryCache.find(ObjectID);
+	if(item != mDirectoryCache.end())
+	{
+#ifndef BOX_RELEASE_BUILD
+		item->second->mDir.Invalidate(false);
 #endif
+		oldRevID = item->second->mDir.GetRevisionID();
+
+		// Check the revision ID of the file -- does it need refreshing?
+		if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
 		{
-			oldRevID = item->second->GetRevisionID();
-
-			// Check the revision ID of the file -- does it need refreshing?
-			if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
-			{
-				THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
-			}
-
-			gotRevID = true;
-
-			if(newRevID == oldRevID)
-			{
-				// Looks good... return the cached object
-				BOX_TRACE("Returning object " <<
-					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" from cache, modtime = " << newRevID)
-				return *(item->second);
-			}
+			THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
 		}
 
-		// Delete this cached object
+		gotRevID = true;
+
+		if(newRevID == oldRevID)
+		{
+			// Looks good... return the cached object
+			BOX_TRACE("Returning object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" from cache, modtime = " << newRevID)
+			return item->second->mDir;
+		}
+
+		// The cached object is stale, so remove it from the cache. It had better not be
+		// dirty in this case, or we didn't write it back in time, and someone modified it
+		// under our feet!
+		ASSERT(!item->second->mDirty);
 		delete item->second;
 		mDirectoryCache.erase(item);
 	}
@@ -411,24 +449,14 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	// First check to see if the cache is too big
 	if(mDirectoryCache.size() > MAX_CACHE_SIZE && AllowFlushCache)
 	{
-		// Very simple. Just delete everything! But in debug builds,
-		// leave the entries in the cache and invalidate them instead,
-		// so that any attempt to access them will cause an assertion
-		// failure that helps to track down the error.
-#ifdef BOX_RELEASE_BUILD
+		// Trivial policy: just delete everything!
 		ClearDirectoryCache();
-#else
-		for(std::map<int64_t, BackupStoreDirectory*>::iterator
-			i = mDirectoryCache.begin();
-			i != mDirectoryCache.end(); i++)
-		{
-			i->second->Invalidate();
-		}
-#endif
 	}
 
 	if(!gotRevID)
 	{
+		// We failed to find it in the cache, so it might not exist at all (if it was in
+		// the cache then it definitely does). Check for it now:
 		if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
 		{
 			THROW_EXCEPTION(BackupStoreException, ObjectDoesNotExist);
@@ -451,14 +479,16 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	}
 
 	// Read it from the stream, then set it's revision ID
-	std::auto_ptr<BackupStoreDirectory> apDir(new BackupStoreDirectory());
-	mpFileSystem->GetDirectory(ObjectID, *apDir);
+	std::auto_ptr<DirectoryCacheEntry> apEntry(
+		new DirectoryCacheEntry(false)); // !dirty
+	mpFileSystem->GetDirectory(ObjectID, apEntry->mDir);
 
 	// Store in cache
-	mDirectoryCache[ObjectID] = apDir.release();
+	ASSERT(mDirectoryCache.find(ObjectID) == mDirectoryCache.end());
+	mDirectoryCache[ObjectID] = apEntry.release();
 
-	// Return it
-	return *mDirectoryCache[ObjectID];
+	// Since it's freshly loaded, it won't be invalidated, and we can just return it:
+	return mDirectoryCache[ObjectID]->mDir;
 }
 
 
@@ -647,8 +677,8 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			pnewEntry->SetDependsOlder(DiffFromFileID);
 		}
 
-		// Write the directory back to disc
-		SaveDirectory(dir);
+		// Save the directory back (or actually just mark it dirty)
+		SaveDirectoryLater(dir);
 
 		// It is now safe to commit the old version's new patched version, now
 		// that the directory safely reflects the state of the files on disc.
@@ -769,8 +799,10 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 		// Save changes?
 		if(madeChanges)
 		{
-			// Save the directory back
-			SaveDirectory(dir);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(dir);
+
+			// Maybe postponed save of store info
 			SaveStoreInfo(false);
 		}
 	}
@@ -844,8 +876,8 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 		// Save changes?
 		if(madeChanges)
 		{
-			// Save the directory back
-			SaveDirectory(dir);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(dir);
 
 			// Modify the store info, and write
 			BackupStoreInfo& info(GetBackupStoreInfoInternal());
@@ -875,12 +907,12 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 // --------------------------------------------------------------------------
 void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 {
-	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
+	auto item = mDirectoryCache.find(ObjectID);
 	if(item != mDirectoryCache.end())
 	{
 		// Delete this cached object
 		delete item->second;
-		// Erase the entry form the map
+		// Erase the entry from the map
 		mDirectoryCache.erase(item);
 	}
 }
@@ -889,16 +921,40 @@ void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreContext::SaveDirectory(BackupStoreDirectory &)
-//		Purpose: Save directory back to disc, update time in cache
+//		Name:    BackupStoreContext::SaveDirectoryLater(
+//		         BackupStoreDirectory &)
+//		Purpose: Marks the directory as dirty in the cache, so it
+//		         will eventually be written back to the filesystem.
+//		Created: 2017-02-02
+//
+// --------------------------------------------------------------------------
+void BackupStoreContext::SaveDirectoryLater(BackupStoreDirectory &rDir)
+{
+	int64_t ObjectID = rDir.GetObjectID();
+	auto i = mDirectoryCache.find(ObjectID);
+	ASSERT(i != mDirectoryCache.end());
+	i->second->mDirty = true;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::SaveDirectoryNow(BackupStoreDirectory &)
+//		Purpose: Write directory to filesystem now, and mark as clean
+//		         in the cache. Returns the size of the saved
+//		         directory in blocks.
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
+int64_t BackupStoreContext::SaveDirectoryNow(BackupStoreDirectory &rDir)
 {
 	CHECK_FILESYSTEM_INITIALISED();
 
 	int64_t ObjectID = rDir.GetObjectID();
+	auto i = mDirectoryCache.find(ObjectID);
+	ASSERT(i != mDirectoryCache.end());
+
+	int64_t new_dir_size;
 
 	try
 	{
@@ -906,7 +962,7 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 		int64_t old_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 
 		mpFileSystem->PutDirectory(rDir);
-		int64_t new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
+		new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 
 		{
 			int64_t sizeAdjustment = new_dir_size - old_dir_size;
@@ -914,6 +970,9 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			info.ChangeBlocksUsed(sizeAdjustment);
 			info.ChangeBlocksInDirectories(sizeAdjustment);
 		}
+
+		// Need to do this before calling GetDirectoryInternal():
+		i->second->mDirty = false;
 
 		// Update the directory entry in the grandparent, to ensure
 		// that it reflects the current size of the parent directory.
@@ -923,12 +982,14 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			int64_t ContainerID = rDir.GetContainerID();
 			BackupStoreDirectory& parent(
 				GetDirectoryInternal(ContainerID));
-			// rDir is now invalid
+			// i and rDir are now invalid
 			BackupStoreDirectory::Entry* en =
 				parent.FindEntryByID(ObjectID);
 			if(!en)
 			{
-				BOX_ERROR("Missing entry for directory " <<
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					CouldNotFindEntryInDirectory,
+					"Missing entry for directory " <<
 					BOX_FORMAT_OBJECTID(ObjectID) <<
 					" in directory " <<
 					BOX_FORMAT_OBJECTID(ContainerID) <<
@@ -938,7 +999,8 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			{
 				ASSERT(en->GetSizeInBlocks() == old_dir_size);
 				en->SetSizeInBlocks(new_dir_size);
-				SaveDirectory(parent);
+				// Save the parent directory back (or actually just mark it dirty)
+				SaveDirectoryLater(parent);
 			}
 		}
 	}
@@ -948,6 +1010,8 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 		RemoveDirectoryFromCache(ObjectID);
 		throw;
 	}
+
+	return new_dir_size;
 }
 
 
@@ -1005,15 +1069,23 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	// Create an empty directory with the given attributes on disc
 	int64_t dirSize;
 
+	// Prepare a fresh cache entry, which contains a directory that we can use:
+	std::auto_ptr<DirectoryCacheEntry> apEntry(
+		// It might be dirty temporarily, but it won't be when we add it to the cache:
+		new DirectoryCacheEntry(id, InDirectory, false)); // !dirty
+	BackupStoreDirectory& emptyDir(apEntry->mDir);
+
 	{
-		BackupStoreDirectory emptyDir(id, InDirectory);
 		// add the atttribues
 		emptyDir.SetAttributes(Attributes, AttributesModTime);
 
-		// Write...
+		// Write, but not using SaveDirectoryNow because that tries to update the entry
+		// in the parent directory with the new size, and that entry hasn't been added yet!
 		mpFileSystem->PutDirectory(emptyDir);
 		dirSize = emptyDir.GetUserInfo1_SizeInBlocks();
+	}
 
+	{
 		// Exceeds the hard limit?
 		int64_t newTotalBlocksUsed = info.GetBlocksUsed() + dirSize;
 		if(newTotalBlocksUsed > info.GetBlocksHardLimit())
@@ -1026,7 +1098,6 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		ASSERT(dirSize > 0);
 		info.ChangeBlocksUsed(dirSize);
 		info.ChangeBlocksInDirectories(dirSize);
-		// Not added to cache, so don't set the size in the directory
 	}
 
 	// Then add it into the parent directory
@@ -1035,7 +1106,9 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		dir.AddEntry(rFilename, ModificationTime, id, dirSize,
 			BackupStoreDirectory::Entry::Flags_Dir,
 			0 /* attributes hash */);
-		SaveDirectory(dir);
+
+		// Save the directory back (or actually just mark it dirty)
+		SaveDirectoryLater(dir);
 
 		// Increment reference count on the new directory to one
 		mpRefCount->AddReference(id);
@@ -1047,6 +1120,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 
 		// Remove this entry from the cache
 		RemoveDirectoryFromCache(InDirectory);
+		RemoveDirectoryFromCache(id);
 
 		// Don't worry about the incremented number in the store info
 		throw;
@@ -1055,6 +1129,14 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	// Save the store info (may not be postponed)
 	info.AdjustNumDirectories(1);
 	SaveStoreInfo(false);
+
+	// Add the directory that we just created to the cache, because it's quite likely that
+	// we'll be asked to add some entries to it soon. Only do this if it won't take the cache
+	// over its size limit:
+	if(mDirectoryCache.size() < MAX_CACHE_SIZE)
+	{
+		mDirectoryCache[id] = apEntry.release();
+	}
 
 	// tell caller what the ID was
 	return id;
@@ -1117,8 +1199,8 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
 				}
 
-				// Save it
-				SaveDirectory(parentDir);
+				// Save the directory back (or actually just mark it dirty)
+				SaveDirectoryLater(parentDir);
 
 				// Done
 				break;
@@ -1235,10 +1317,10 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 				changesMade = true;
 			}
 
-			// Save the directory
 			if(changesMade)
 			{
-				SaveDirectory(dir);
+				// Save the directory back (or actually just mark it dirty)
+				SaveDirectoryLater(dir);
 			}
 		}
 	}
@@ -1275,8 +1357,8 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 		// Set attributes
 		dir.SetAttributes(Attributes, AttributesModTime);
 
-		// Save back
-		SaveDirectory(dir);
+		// Save the directory back (or actually just mark it dirty)
+		SaveDirectoryLater(dir);
 	}
 	catch(...)
 	{
@@ -1335,8 +1417,8 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 			return false;
 		}
 
-		// Save back
-		SaveDirectory(dir);
+		// Save the directory back (or actually just mark it dirty)
+		SaveDirectoryLater(dir);
 	}
 	catch(...)
 	{
@@ -1605,6 +1687,11 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
 
+	// We need to flush any modified directories out to disk, because we might need to abort
+	// and discard modified cached directories below, and we don't want to lose any changes
+	// already made to them in that case.
+	FlushDirectoryCache();
+
 	// Should deleted files be excluded when checking for the existance of objects with the target name?
 	int64_t targetSearchExcludeFlags = (AllowMoveOverDeletedObject)
 		?(BackupStoreDirectory::Entry::Flags_Deleted)
@@ -1661,8 +1748,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				en->SetName(rNewFilename);
 			}
 
-			// Save the directory back
-			SaveDirectory(dir);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(dir);
 		}
 		catch(...)
 		{
@@ -1756,8 +1843,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				to.AddEntry(*en);	// adds copy
 			}
 
-			// Save back
-			SaveDirectory(to);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(to);
 		}
 
 		// Thirdly... remove them from the first directory -- but if it fails, attempt to delete them from the to directory
@@ -1772,8 +1859,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				from.DeleteEntry((*i)->GetObjectID());
 			}
 
-			// Save back
-			SaveDirectory(from);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(from);
 		}
 		catch(...)
 		{
@@ -1788,8 +1875,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 				to.DeleteEntry((*i)->GetObjectID());
 			}
 
-			// Save back
-			SaveDirectory(to);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(to);
 
 			// Throw the error
 			throw;
@@ -1804,8 +1891,8 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 			// Modify containing dir ID
 			change.SetContainerID(MoveToDirectory);
 
-			// Save it back
-			SaveDirectory(change);
+			// Save the directory back (or actually just mark it dirty)
+			SaveDirectoryLater(change);
 		}
 	}
 	catch(...)
