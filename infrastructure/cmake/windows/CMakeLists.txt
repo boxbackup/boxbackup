@@ -73,8 +73,10 @@ else()
 endif()
 
 ExternalProject_Add(pcre
-	URL "http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-${PCRE_VERSION}.tar.gz"
-	URL_HASH ${PCRE_HASH}
+	# Temporarily use SVN repo until the PCRE_STATIC issue in 8.40 is fixed:
+	# https://vcs.pcre.org/pcre?view=revision&revision=1677
+	SVN_REPOSITORY svn://vcs.exim.org/pcre/code/trunk
+	SVN_REVISION -r 1677
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
 	# We need to build both versions, debug and release, because cmake requires both to be
