@@ -19,11 +19,14 @@
 #include "BoxException.h"
 #include "Logging.h"
 
+void mainhelper_init_win32_sockets();
+
 #define MAINHELPER_START \
 	if(argc == 2 && ::strcmp(argv[1], "--version") == 0) \
 	{ printf(BOX_VERSION "\n"); return 0; } \
 	MEMLEAKFINDER_INIT \
 	MEMLEAKFINDER_START \
+	mainhelper_init_win32_sockets(); \
 	try {
 
 #define MAINHELPER_END \

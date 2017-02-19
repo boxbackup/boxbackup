@@ -633,20 +633,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 		return 1;
 	}
 
-#ifdef WIN32
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-
-	WSADATA info;
-
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
-	{
-		// will not run without sockets
-		BOX_FATAL("Failed to initialise Windows Sockets");
-		THROW_EXCEPTION(CommonException, Internal)
-	}
-#endif
-
 	int retcode = 0;
 	
 	// Main Daemon running

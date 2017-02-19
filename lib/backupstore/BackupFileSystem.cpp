@@ -1182,7 +1182,12 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 	char hostname_buf[1024];
 	if(gethostname(hostname_buf, sizeof(hostname_buf)) != 0)
 	{
+#ifdef WIN32
+		DWORD wserrno = WSAGetLastError();
+		THROW_WIN_ERROR_NUMBER("Failed to get hostname", wserrno, CommonException, Internal);
+#else
 		THROW_SYS_ERROR("Failed to get hostname", CommonException, Internal);
+#endif
 	}
 	mCurrentHostName = hostname_buf;
 
