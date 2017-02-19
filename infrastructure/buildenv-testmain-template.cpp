@@ -47,6 +47,7 @@
 #include "box_getopt.h"
 #include "depot.h"
 #include "Logging.h"
+#include "MainHelper.h"
 #include "Test.h"
 #include "Timer.h"
 
@@ -252,8 +253,8 @@ int Usage(const std::string& ProgramName)
 
 int main(int argc, char * const * argv)
 {
-	// Start memory leak testing
-	MEMLEAKFINDER_START
+	// Initialise sockets, start memory leak monitoring, catch exceptions:
+	MAINHELPER_START
 
 	Logging::SetProgramName(BOX_MODULE);
 
@@ -355,22 +356,10 @@ int main(int argc, char * const * argv)
 		::gethostbyname("nonexistent");
 
 		check_filedes(false);
-
-		#ifdef WIN32
-			// Under win32 we must initialise the Winsock library
-			// before using sockets
-
-			WSADATA info;
-			TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
-		#endif
 	}
 
 	try
 	{
-		#ifdef BOX_MEMORY_LEAK_TESTING
-		memleakfinder_init();
-		#endif
-
 #ifdef WIN32
 		// Create a Windows "Job Object" for Test.cpp to use as a
 		// container for all our child processes (daemons). We will
@@ -478,5 +467,7 @@ int main(int argc, char * const * argv)
 #ifdef WIN32
 	CloseHandle(sTestChildDaemonJobObject);
 #endif
+
+	MAINHELPER_END
 }
 
