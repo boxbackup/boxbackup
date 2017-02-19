@@ -118,10 +118,6 @@ public:
 		{
 			// Child task, dump leaks to trace, which we make sure is on
 			#ifdef BOX_MEMORY_LEAK_TESTING
-				#ifndef BOX_RELEASE_BUILD
-					TRACE_TO_SYSLOG(true);
-					TRACE_TO_STDOUT(true);
-				#endif
 				memleakfinder_traceblocksinsection();
 			#endif
 
