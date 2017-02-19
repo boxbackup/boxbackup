@@ -120,6 +120,8 @@
 	#define THROW_WIN_FILE_ERROR(message, filename, exception, subtype) \
 		THROW_WIN_FILE_ERRNO(message, filename, GetLastError(), \
 			exception, subtype)
+	#define THROW_SOCKET_ERROR(message, exception, subtype) \
+		THROW_WIN_ERROR_NUMBER(message, WSAGetLastError(), exception, subtype)
 	#define EMU_ERRNO winerrno
 	#define THROW_EMU_ERROR(message, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
@@ -129,6 +131,8 @@
 		BOX_SYS_ERRNO_MESSAGE(error_number, stuff)
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_SYS_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_SYS_WARNING(stuff)
+	#define THROW_SOCKET_ERROR(message, exception, subtype) \
+		THROW_SYS_ERROR(message, exception, subtype)
 	#define EMU_ERRNO errno
 	#define THROW_EMU_ERROR(message, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
