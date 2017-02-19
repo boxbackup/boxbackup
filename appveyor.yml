@@ -56,7 +56,7 @@ install:
   # Leave the current directory in the correct place to find the solution file using its relative path above.
 
 test_script:
-  - cd %APPVEYOR_BUILD_FOLDER%\..\cmake\src\boxbackup-build
+  - cd %APPVEYOR_BUILD_FOLDER%\..\cmake\Build\boxbackup
   # - dir
   # - dir bin_bbackupd.dir
   # - dir %PLATFORM%
