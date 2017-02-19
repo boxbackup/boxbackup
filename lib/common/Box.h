@@ -40,8 +40,6 @@
 #include "Logging.h"
 
 #ifndef BOX_RELEASE_BUILD
-	extern bool AssertFailuresToSyslog;
-	#define ASSERT_FAILS_TO_SYSLOG_ON {AssertFailuresToSyslog = true;}
 	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
 	#define ASSERT(cond) \
 	{ \
@@ -53,17 +51,6 @@
 		} \
 	}
 
-	// Note that syslog tracing is independent of BoxDebugTraceOn,
-	// but stdout tracing is not
-	extern bool BoxDebugTraceToSyslog;
-	#define TRACE_TO_SYSLOG(x) {BoxDebugTraceToSyslog = x;}
-	extern bool BoxDebugTraceToStdout;
-	#define TRACE_TO_STDOUT(x) {BoxDebugTraceToStdout = x;}
-
-	extern bool BoxDebugTraceOn;
-	int BoxDebug_printf(const char *format, ...);
-	int BoxDebugTrace(const char *format, ...);
-	
 	#ifndef PLATFORM_DISABLE_MEM_LEAK_TESTING
 		#define BOX_MEMORY_LEAK_TESTING
 	#endif
@@ -71,11 +58,7 @@
 	// Exception names
 	#define EXCEPTION_CODENAMES_EXTENDED
 #else
-	#define ASSERT_FAILS_TO_SYSLOG_ON
 	#define ASSERT(cond)
-
-	#define TRACE_TO_SYSLOG(x) {}
-	#define TRACE_TO_STDOUT(x) {}
 
 	// Box Backup builds release get extra information for exception logging
 	#define EXCEPTION_CODENAMES_EXTENDED

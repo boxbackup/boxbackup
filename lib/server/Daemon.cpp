@@ -79,10 +79,6 @@ Daemon::Daemon()
 	  mLogFileLevel(Log::INVALID),
 	  mAppName(DaemonName())
 {
-	// In debug builds, switch on assert failure logging to syslog
-	ASSERT_FAILS_TO_SYSLOG_ON
-	// And trace goes to syslog too
-	TRACE_TO_SYSLOG(true)
 }
 
 // --------------------------------------------------------------------------
@@ -611,10 +607,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 			{
 				::close(devnull);
 			}
-
-			// And definitely don't try and send anything to those file descriptors
-			// -- this has in the past sent text to something which isn't expecting it.
-			TRACE_TO_STDOUT(false);
 #endif // ! WIN32
 			Logging::ToConsole(false);
 		}

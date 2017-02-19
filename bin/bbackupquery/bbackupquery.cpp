@@ -202,11 +202,6 @@ int main(int argc, const char *argv[])
 	}
 #endif
 
-	// Really don't want trace statements happening, even in debug mode
-	#ifndef BOX_RELEASE_BUILD
-		BoxDebugTraceOn = false;
-	#endif
-	
 	FILE *logFile = 0;
 
 	// Filename for configuration file?
