@@ -47,4 +47,4 @@ matrix:
     - os: osx
 
 script:
-  - ./infrastructure/travis-build.sh
+  - travis_wait ./infrastructure/travis-build.sh
