@@ -19,6 +19,7 @@ addons:
     packages:
       - cmake
       - cmake-data
+      - libboost-dev
       - libdb-dev
       - libreadline-dev
       - libssl-dev
@@ -26,7 +27,6 @@ addons:
       - time
       - xsltproc
       - zlib1g-dev
-      - libboost-dev
 
 env:
   - TEST_TARGET=debug
@@ -48,4 +48,4 @@ matrix:
     - os: osx
 
 script:
-  - travis_wait ./infrastructure/travis-build.sh
+  - travis_wait env EXTRA_MAKE_ARGS=-j2 ./infrastructure/travis-build.sh
