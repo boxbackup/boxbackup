@@ -279,9 +279,11 @@ sub runtest
 	}
 	else
 	{
+		my $time_test_command_prefix = $target_windows ? "" : "/usr/bin/time";
 		chdir($base_dir);
-		$test_res = system("cd $test_mode/test/$t ; sh t 2>&1 " .
-			"| tee ../../../$logfile");
+		$test_res = system("cd $test_mode/test/$t; ".
+			"$time_test_command_prefix sh -c "
+			"'sh t 2>&1 | tee ../../../$logfile'");
 	}
 
 	# open test results

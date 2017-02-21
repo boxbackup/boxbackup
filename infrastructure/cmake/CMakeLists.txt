@@ -181,6 +181,12 @@ set(testmain_template_cpp
 	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
 )
 
+if(WIN32)
+	set(time_test_command_prefix "")
+else()
+	set(time_test_command_prefix "/usr/bin/time")
+endif()
+
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 foreach(module_dep ${module_deps})
 
@@ -273,7 +279,8 @@ foreach(module_dep ${module_deps})
 			target_compile_definitions(${module_name} PRIVATE
 				-DTEST_EXECUTABLE="${test_executable}")
 			add_test(NAME ${test_name}
-				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
+				COMMAND ${time_test_command_prefix}
+				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				${appveyor_runtest_pl_switch} -c ${test_name}
 				$<CONFIG> "$<TARGET_FILE:${module_name}>" "${test_executable}"
 				WORKING_DIRECTORY ${base_dir})
