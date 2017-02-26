@@ -447,7 +447,14 @@ int main(int argc, char * const * argv)
 				printf("PASSED\n");
 			}
 		}
-		
+
+		// If test() returns 0 but there have been some failures, we still want
+		// to return nonzero to the OS.
+		if(returncode == 0 && num_failures)
+		{
+			returncode = 1;
+		}
+
 		return returncode;
 	}
 	catch(std::exception &e)
