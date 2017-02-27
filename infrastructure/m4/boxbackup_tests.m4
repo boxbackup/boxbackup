@@ -10,27 +10,28 @@ solaris*)
   ;;
 esac
 
+# If the compiler supports it, force errors on unknown flags, so that detection works:
+AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
+	[cxxflags_force_error="-Werror=unknown-warning-option"])
+
+# Reduce compiler flag checking to a one-liner, needed for CMake to parse them
+AC_DEFUN([BOX_CHECK_CXX_FLAG],
+	AX_CHECK_COMPILE_FLAG($1,
+		[cxxflags_strict="$cxxflags_strict $1"],,
+		$cxxflags_force_error)
+)
+
 # Enable some compiler flags if the compiler supports them. This gives better warnings
 # and detects some problems early.
-AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
-# -Wundef would be a good idea, but Boost is full of undefined variable use, so we need
-# to disable it for now so that we can concentrate on real errors:
-dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
-AX_CHECK_COMPILE_FLAG(-Werror=return-type,
-	[cxxflags_strict="$cxxflags_strict -Werror=return-type"])
-AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
-AX_CHECK_COMPILE_FLAG(-Werror=undefined-bool-conversion,
-	[cxxflags_strict="$cxxflags_strict -Werror=undefined-bool-conversion"])
-# We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
-dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
-dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
+BOX_CHECK_CXX_FLAG(-Wall)
+BOX_CHECK_CXX_FLAG(-Werror=return-type)
+BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
-AX_CHECK_COMPILE_FLAG(-Werror=delete-incomplete,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-incomplete"])
-AX_CHECK_COMPILE_FLAG(-Wno-deprecated-declarations,
-	[cxxflags_strict="$cxxflags_strict -Wno-deprecated-declarations"])
+BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations)
+
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
