@@ -10,47 +10,42 @@ solaris*)
   ;;
 esac
 
-# Enable some compiler flags if the compiler supports them. This gives better warnings
-# and detects some problems early.
-AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
 # If the compiler supports it, force errors on unknown flags, so that detection works:
 AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
 	[cxxflags_force_error="-Werror=unknown-warning-option"])
+
+# Reduce compiler flag checking to a one-liner, needed for CMake to parse them
+AC_DEFUN([BOX_CHECK_CXX_FLAG],
+	AX_CHECK_COMPILE_FLAG($1,
+		[cxxflags_strict="$cxxflags_strict $1"],,
+		$cxxflags_force_error)
+)
+
+# Enable some compiler flags if the compiler supports them. This gives better warnings
+# and detects some problems early.
+BOX_CHECK_CXX_FLAG(-Wall)
 # -Wundef would be a good idea, but Boost is full of undefined variable use, so we need
 # to disable it for now so that we can concentrate on real errors:
 dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
-AX_CHECK_COMPILE_FLAG(-Werror=return-type,
-	[cxxflags_strict="$cxxflags_strict -Werror=return-type"],,
-	$cxxflags_force_error)
-AX_CHECK_COMPILE_FLAG(-Werror=non-virtual-dtor,
-	[cxxflags_strict="$cxxflags_strict -Werror=non-virtual-dtor"],,
-	$cxxflags_force_error)
-AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"],,
-	$cxxflags_force_error)
-AX_CHECK_COMPILE_FLAG(-Werror=parentheses,
-	[cxxflags_strict="$cxxflags_strict -Werror=parentheses"],,
-	$cxxflags_force_error)
-AX_CHECK_COMPILE_FLAG(-Werror=undefined-bool-conversion,
-	[cxxflags_strict="$cxxflags_strict -Werror=undefined-bool-conversion"],,
-	$cxxflags_force_error)
+BOX_CHECK_CXX_FLAG(-Werror=return-type)
+BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=parentheses)
+BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
 # We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
 dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
 dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
-AX_CHECK_COMPILE_FLAG(-Werror=overloaded-virtual,
-	[cxxflags_strict="$cxxflags_strict -Werror=overloaded-virtual"],,
-	$cxxflags_force_error)
+BOX_CHECK_CXX_FLAG(-Werror=overloaded-virtual)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
-AX_CHECK_COMPILE_FLAG(-Werror=delete-incomplete,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-incomplete"],,
-	$cxxflags_force_error)
-# Using Boost properly seems to need C++0x, or at least the "auto" type:
+BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+# Using Boost properly seems to need C++0x, or at least the "auto" type.
+# We don't need CMake to parse this, because it has built-in feature detecting macros
+# which we use instead:
 AX_CHECK_COMPILE_FLAG(-std=c++0x,
 	[cxxflags_strict="$cxxflags_strict -std=c++0x"])
 # And if we're going to do that, we don't want warnings about std::auto_ptr being deprecated:
-AX_CHECK_COMPILE_FLAG(-Wno-deprecated-declarations,
-	[cxxflags_strict="$cxxflags_strict -Wno-deprecated-declarations"])
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then

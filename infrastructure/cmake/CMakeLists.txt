@@ -344,11 +344,12 @@ target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUI
 # Detect platform features and write BoxConfig.h.in. Reuse code from
 # infrastructure/m4/boxbackup_tests.m4 where possible
 
-include(CheckIncludeFiles)
-include(CheckFunctionExists)
-include(CheckSymbolExists)
-include(CheckLibraryExists)
+include(CheckCXXCompilerFlag)
 include(CheckCXXSourceCompiles)
+include(CheckFunctionExists)
+include(CheckIncludeFiles)
+include(CheckLibraryExists)
+include(CheckSymbolExists)
 
 set(boxconfig_h_file "${CMAKE_BINARY_DIR}/BoxConfig.h.in")
 file(REMOVE "${boxconfig_h_file}")
@@ -450,7 +451,7 @@ move_file_if_exists(
 	"${boxconfig_cmake_h_dir}/BoxConfig.cmake.h.bak")
 
 foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m4)
-	file(STRINGS "${base_dir}/infrastructure/m4/${m4_filename}" m4_functions REGEX "^ *AC[_A-Z]+\\(.*\\)$")
+	file(STRINGS "${base_dir}/infrastructure/m4/${m4_filename}" m4_functions REGEX "^ *(AC|AX|BOX)_[A-Z_]+\\(.*\\)$")
 	foreach(m4_function ${m4_functions})
 		if(DEBUG)
 			message(STATUS "Processing m4_function: ${m4_function}")
@@ -532,6 +533,22 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 				}
 				]=] "HAVE_${platform_var_name}")
 			file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_${platform_var_name}\n")
+		elseif(m4_function MATCHES "^ *BOX_CHECK_CXX_FLAG\\((-[A-Za-z_,=-]+)\\)")
+			if(DEBUG)
+				message(STATUS "Processing BOX_CHECK_CXX_FLAG: ${CMAKE_MATCH_1}")
+			endif()
+
+			if(NOT CMAKE_MATCH_1 STREQUAL "-Wall")
+				set(flag "${CMAKE_MATCH_1}")
+				string(TOLOWER "have_flag_${flag}" have_flag_var_name)
+				string(REGEX REPLACE "[^a-z_]" "_" have_flag_var_name ${have_flag_var_name})
+				string(REGEX REPLACE "__+" "_" have_flag_var_name ${have_flag_var_name})
+
+				CHECK_CXX_COMPILER_FLAG(${flag} ${have_flag_var_name})
+				if(${have_flag_var_name})
+					add_definitions("${flag}")
+				endif()
+			endif()
 		endif()
 	endforeach()
 
@@ -691,7 +708,7 @@ target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
 
 # Silence some less-useful warnings
 if(MSVC)
-	add_definitions(/wd4996 /wd4291)
+	add_definitions(/wd4291 /wd4710 /wd4820 /wd4996)
 	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006)
 endif(MSVC)
 
