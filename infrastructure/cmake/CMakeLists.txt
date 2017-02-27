@@ -480,7 +480,7 @@ move_file_if_exists(
 	"${boxconfig_cmake_h_dir}/BoxConfig.cmake.h.bak")
 
 foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m4)
-	file(STRINGS "${base_dir}/infrastructure/m4/${m4_filename}" m4_functions REGEX "^ *AC[_A-Z]+\\(.*\\)$")
+	file(STRINGS "${base_dir}/infrastructure/m4/${m4_filename}" m4_functions REGEX "^ *(AC|AX|BOX)_[A-Z_]+\\(.*\\)$")
 	foreach(m4_function ${m4_functions})
 		if(DEBUG)
 			message(STATUS "Processing m4_function: ${m4_function}")
@@ -562,6 +562,22 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 				}
 				]=] "HAVE_${platform_var_name}")
 			file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_${platform_var_name}\n")
+		elseif(m4_function MATCHES "^ *BOX_CHECK_CXX_FLAG\\((-[A-Za-z_,=-]+)\\)")
+			if(DEBUG)
+				message(STATUS "Processing BOX_CHECK_CXX_FLAG: ${CMAKE_MATCH_1}")
+			endif()
+
+			if(NOT CMAKE_MATCH_1 STREQUAL "-Wall")
+				set(flag "${CMAKE_MATCH_1}")
+				string(TOLOWER "have_flag_${flag}" have_flag_var_name)
+				string(REGEX REPLACE "[^a-z_]" "_" have_flag_var_name ${have_flag_var_name})
+				string(REGEX REPLACE "__+" "_" have_flag_var_name ${have_flag_var_name})
+
+				CHECK_CXX_COMPILER_FLAG(${flag} ${have_flag_var_name})
+				if(${have_flag_var_name})
+					add_definitions("${flag}")
+				endif()
+			endif()
 		endif()
 	endforeach()
 
