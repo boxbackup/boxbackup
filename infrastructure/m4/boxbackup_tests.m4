@@ -10,17 +10,27 @@ solaris*)
   ;;
 esac
 
-# Use -Wall if the compiler supports it. This gives better warnings.
-AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
-AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
-AX_CHECK_COMPILE_FLAG(-Werror=return-type,
-	[cxxflags_strict="$cxxflags_strict -Werror=return-type"])
-AX_CHECK_COMPILE_FLAG(-Werror=non-virtual-dtor,
-	[cxxflags_strict="$cxxflags_strict -Werror=non-virtual-dtor"])
-AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
-AX_CHECK_COMPILE_FLAG(-Werror=narrowing,
-	[cxxflags_strict="$cxxflags_strict -Werror=narrowing"])
+# If the compiler supports it, force errors on unknown flags, so that detection works:
+AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
+	[cxxflags_force_error="-Werror=unknown-warning-option"])
+
+# Reduce compiler flag checking to a one-liner, needed for CMake to parse them
+AC_DEFUN([BOX_CHECK_CXX_FLAG],
+	AX_CHECK_COMPILE_FLAG($1,
+		[cxxflags_strict="$cxxflags_strict $1"],,
+		$cxxflags_force_error)
+)
+
+# Enable some compiler flags if the compiler supports them. This gives better warnings
+# and detects some problems early.
+BOX_CHECK_CXX_FLAG(-Wall)
+BOX_CHECK_CXX_FLAG(-Werror=return-type)
+BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+# This error is detected by MSVC, but not usually by GCC/Clang:
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
+BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
