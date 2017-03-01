@@ -15,11 +15,11 @@
 #include "BackupStoreAccountDatabase.h"
 #include "BackupFileSystem.h"
 #include "S3Client.h"
+#include "UnixUser.h"
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
-class UnixUser;
 
 class BackupAccountControl
 {
