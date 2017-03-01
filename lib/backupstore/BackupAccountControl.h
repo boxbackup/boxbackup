@@ -16,12 +16,11 @@
 #include "BackupFileSystem.h"
 #include "NamedLock.h"
 #include "S3Client.h"
+#include "UnixUser.h"
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
-class NamedLock;
-class UnixUser;
 
 class BackupAccountControl
 {
