@@ -30,7 +30,7 @@ init:
 build:
   parallel: true
   project: ..\cmake\BoxBackup_Windows.sln
-# verbosity: quiet
+  verbosity: quiet
 
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
