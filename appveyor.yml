@@ -63,3 +63,6 @@ test_script:
   # - dir %PLATFORM%\%CONFIGURATION%
   - ctest -C %CONFIGURATION% -V --interactive-debug-mode 0
 
+on_failure:
+  - type %APPVEYOR_BUILD_FOLDER%\test-*.log
+
