@@ -39,6 +39,7 @@ std::string first_fail_file;
 std::string current_test_name;
 std::list<std::string> run_only_named_tests;
 std::map<std::string, std::string> s_test_status;
+box_time_t current_test_start;
 
 bool setUp(const std::string& function_name, const std::string& specialisation)
 {
@@ -77,6 +78,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	printf("\n\n== %s ==\n", current_test_name.c_str());
 	num_tests_selected++;
 	old_failure_count = num_failures;
+	current_test_start = GetCurrentBoxTime();
 
 	if (original_working_dir == "")
 	{
@@ -227,15 +229,21 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 
 bool tearDown()
 {
+	box_time_t elapsed_time = GetCurrentBoxTime() - current_test_start;
+	std::ostringstream buf;
+	buf.setf(std::ios_base::fixed);
+	buf.precision(1);
+	buf << " (" << ((float)BoxTimeToMilliSeconds(elapsed_time) / 1000) << " sec)";
+
 	if (num_failures == old_failure_count)
 	{
-		BOX_NOTICE(current_test_name << " passed");
+		BOX_NOTICE(current_test_name << " passed" << buf.str());
 		s_test_status[current_test_name] = "passed";
 		return true;
 	}
 	else
 	{
-		BOX_NOTICE(current_test_name << " failed"); \
+		BOX_NOTICE(current_test_name << " failed" << buf.str()); \
 		s_test_status[current_test_name] = "FAILED";
 		return false;
 	}
