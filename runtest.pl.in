@@ -14,13 +14,14 @@ use lib dirname($0)."/infrastructure";
 use BoxPlatform;
 
 my %opts;
-getopts('acnv', \%opts);
+getopts('acnTv', \%opts);
 
-# Don't actually run the test, just prepare for it.
-my $cmake_build = $opts{'c'};
-my $prepare_only = $opts{'n'};
-my $verbose_build = $opts{'v'};
 my $appveyor_mode = $opts{'a'};
+my $cmake_build = $opts{'c'};
+# Don't actually run the test, just prepare for it:
+my $prepare_only = $opts{'n'};
+my $timestamp_tests = $opts{'T'};
+my $verbose_build = $opts{'v'};
 
 my $test_name = shift @ARGV;
 my $test_mode = shift @ARGV;
@@ -248,9 +249,6 @@ sub runtest
 		return;
 	}
 
-	my $logfile = "test-$t.log";
-	my $test_res;
-
 	if($prepare_only)
 	{
 		appveyor_test_status($t, "Skipped", time() - $start_time,
@@ -258,6 +256,10 @@ sub runtest
 		return;
 	}
 	
+	my $test_res;
+	my $logfile = "test-$t.log";
+	my $test_options = $timestamp_tests ? "-T" : "";
+
 	# run it
 	if($cmake_build)
 	{
@@ -265,7 +267,7 @@ sub runtest
 		open LOG, ">$logfile" or die "$logfile: $!";
 		chdir("$base_dir/$test_mode/test/$t");
 
-		open TEE, "$test_dst_exe |"
+		open TEE, "$test_dst_exe $test_options |"
 			or die "$test_dst_dir/$test_dst_exe: $!";
 
 		while (my $line = <TEE>)
@@ -283,7 +285,7 @@ sub runtest
 		chdir($base_dir);
 		$test_res = system("cd $test_mode/test/$t; ".
 			"$time_test_command_prefix sh -c ".
-			"'sh t 2>&1 | tee ../../../$logfile'");
+			"'sh t $test_options 2>&1 | tee ../../../$logfile'");
 	}
 
 	# open test results
