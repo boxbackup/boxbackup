@@ -233,7 +233,7 @@ foreach(module_dep ${module_deps})
 
 			# For "make install" and CPack generators:
 			install(TARGETS ${module_name} RUNTIME
-				CONFIGURATIONS Debug;Release
+				CONFIGURATIONS Debug;Release;RelWithDebInfo
 				DESTINATION "."
 				COMPONENT Applications)
 		elseif(module_name MATCHES "^test_")
@@ -333,7 +333,10 @@ endforeach()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
 # generators such as MSVC. We need to use a generator expression instead.
-target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUILD>)
+target_compile_definitions(lib_common PUBLIC
+	$<$<CONFIG:Release>:BOX_RELEASE_BUILD>
+	$<$<CONFIG:RelWithDebInfo>:BOX_RELEASE_BUILD>
+)
 
 # Detect platform features and write BoxConfig.h.in. Reuse code from
 # infrastructure/m4/boxbackup_tests.m4 where possible
