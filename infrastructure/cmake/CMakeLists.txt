@@ -224,17 +224,12 @@ foreach(module_dep ${module_deps})
 			endif()
 			add_executable(${module_name} ${module_files})
 
-			# Unfortunately we have to use install(PROGRAMS) instead of
-			# install(TARGETS) because TARGETS doesn't allow us to change
-			# the executable name.
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
+			install(TARGETS ${module_name} RUNTIME
 				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}"
-				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Release
-				DESTINATION "${base_dir}/release/${module_dir}"
-				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
+				DESTINATION "${base_dir}/debug/${module_dir}")
+			install(TARGETS ${module_name} RUNTIME
+				CONFIGURATIONS Release;RelWithDebInfo
+				DESTINATION "${base_dir}/release/${module_dir}")
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
@@ -247,42 +242,27 @@ foreach(module_dep ${module_deps})
 			add_executable(${module_name} ${module_files}
 				"${testmain_template_cpp}")
 
-			if(WIN32)
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Debug
-					DESTINATION "${base_dir}/debug/${module_dir}")
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Release
-					DESTINATION "${base_dir}/release/${module_dir}")
-				set(test_executable "$<TARGET_FILE_NAME:${module_name}>")
-			else()
-				# Unfortunately we have to use install(PROGRAMS) instead of
-				# install(TARGETS) because TARGETS doesn't allow us to change
-				# the executable name.
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Debug
-					DESTINATION "${base_dir}/debug/${module_dir}"
-					RENAME "_test")
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Release
-					DESTINATION "${base_dir}/release/${module_dir}"
-					RENAME "_test")
-				set(test_executable "./_test")
-			endif()
-
+			install(TARGETS ${module_name} RUNTIME
+				CONFIGURATIONS Debug
+				DESTINATION "${base_dir}/debug/${module_dir}")
+			install(TARGETS ${module_name} RUNTIME
+				CONFIGURATIONS Release;RelWithDebInfo
+				DESTINATION "${base_dir}/release/${module_dir}")
 			if(${APPVEYOR_MODE})
 				set(appveyor_runtest_pl_switch -a)
 			else()
 				set(appveyor_runtest_pl_switch)
 			endif()
 
+			set(test_executable "$<TARGET_FILE_NAME:${module_name}>")
 			target_compile_definitions(${module_name} PRIVATE
 				-DTEST_EXECUTABLE="${test_executable}")
 			add_test(NAME ${test_name}
 				COMMAND ${time_test_command_prefix}
 				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				${appveyor_runtest_pl_switch} -c ${test_name}
-				$<CONFIG> "$<TARGET_FILE:${module_name}>" "${test_executable}"
+				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				"$<TARGET_FILE:${module_name}>" "${test_executable}"
 				WORKING_DIRECTORY ${base_dir})
 
 			if(${APPVEYOR_MODE})
@@ -339,7 +319,10 @@ endforeach()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
 # generators such as MSVC. We need to use a generator expression instead.
-target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUILD>)
+target_compile_definitions(lib_common PUBLIC 
+	$<$<CONFIG:Release>:BOX_RELEASE_BUILD>
+	$<$<CONFIG:RelWithDebInfo>:BOX_RELEASE_BUILD>
+)
 
 # Detect platform features and write BoxConfig.h.in. Reuse code from
 # infrastructure/m4/boxbackup_tests.m4 where possible
