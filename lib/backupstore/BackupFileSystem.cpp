@@ -1670,12 +1670,8 @@ S3PutFileCompleteTransaction::~S3PutFileCompleteTransaction()
 	if(!mCommitted)
 	{
 		HTTPResponse response = mrClient.DeleteObject(mFileURI);
-		if(response.GetResponseCode() != HTTPResponse::Code_OK)
-		{
-			THROW_EXCEPTION_MESSAGE(BackupStoreException, FileUploadFailed,
-				"Failed to delete uploaded file from Amazon S3: " <<
-				response.ResponseCodeString());
-		}
+		mrClient.CheckResponse(response, "Failed to delete uploaded file from Amazon S3",
+			true); // ExpectNoContent
 	}
 }
 

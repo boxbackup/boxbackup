@@ -3002,16 +3002,26 @@ bool test_housekeeping_deletes_files()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_account_limits_respected()
+bool test_account_limits_respected(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(StartServer(), FAIL);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
 	// Set a really small hard limit
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf setlimit 01234567 "
-		"2B 2B") == 0, FAIL);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	if(specialisation_name == "s3")
+	{
+		control.SetLimit("1B", "1B");
+	}
+	else
+	{
+		control.SetLimit("2B", "2B");
+	}
 
 	// Try to upload a file and create a directory, both of which would exceed the
 	// current account limits, and check that each command returns an error.
@@ -3019,8 +3029,8 @@ bool test_account_limits_respected()
 		write_test_file(3);
 
 		// Open a connection to the server
-		std::auto_ptr<BackupProtocolCallable> apProtocol(
-			connect_and_login(context));
+		std::auto_ptr<BackupProtocolLocal2> apProtocol(
+			new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
 		BackupStoreFilenameClear fnx("exceed-limit");
 		int64_t modtime = 0;
 		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime));
@@ -3048,7 +3058,7 @@ bool test_account_limits_respected()
 		apProtocol->QueryFinished();
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 int multi_server()
@@ -3753,9 +3763,9 @@ int test(int argc, const char *argv[])
 		i != specialisations.end(); i++)
 	{
 		RUN_TEST(i->first, i->second, test_server_commands);
+		RUN_TEST(i->first, i->second, test_account_limits_respected);
 	}
 
-	TEST_THAT(test_account_limits_respected());
 	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
 	TEST_THAT(test_read_write_attr_streamformat());

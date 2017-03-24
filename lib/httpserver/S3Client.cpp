@@ -475,7 +475,7 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 //		Purpose: Check the status code of an Amazon S3 response, and
 //		         throw an exception with a useful message (including
 //		         the supplied message) if it's not a 200 OK response
-//		         (or 304 if ExpectNoContent is true).
+//		         (or 204 if ExpectNoContent is true).
 //		Created: 26/07/2015
 //
 // --------------------------------------------------------------------------
