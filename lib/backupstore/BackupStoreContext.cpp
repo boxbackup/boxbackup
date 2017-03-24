@@ -1141,9 +1141,9 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		throw;
 	}
 
-	// Save the store info (may not be postponed)
+	// Update and save the store info
 	info.AdjustNumDirectories(1);
-	SaveStoreInfo(false);
+	SaveStoreInfo(true); // Allow defer: it's just an empty directory.
 
 	// Add the directory that we just created to the cache, because it's quite likely that
 	// we'll be asked to add some entries to it soon. Only do this if it won't take the cache
