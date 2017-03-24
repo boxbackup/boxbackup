@@ -79,6 +79,8 @@ ExternalProject_Add(pcre
 	SVN_REVISION -r 1677
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
+	-DPCRE_SUPPORT_LIBREADLINE=OFF
+	-DPCRE_SUPPORT_LIBBZ2=OFF
 	# We need to build both versions, debug and release, because cmake requires both to be
 	# present to generate its multi-configuration project files for Visual Studio/MSBuild.
 	INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
