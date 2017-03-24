@@ -272,7 +272,7 @@ foreach(module_dep ${module_deps})
 			endif()
 
 			target_compile_definitions(${module_name} PRIVATE
-				-DTEST_EXECUTABLE="${test_executable}")
+				-DTEST_EXECUTABLE="${test_command_internal}")
 			add_test(NAME ${test_name}
 				COMMAND ${time_test_command_prefix}
 				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
