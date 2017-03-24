@@ -281,6 +281,10 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	{
 		// Got the lock, mark as not read only
 		mReadOnly = false;
+		// GetDirectoryInternal assumes that if we have the write lock, everything in the
+		// cache was loaded with that lock, and cannot be stale. That would be violated if
+		// we had anything in the cache already when the lock was obtained, so clear it now.
+		ClearDirectoryCache();
 	}
 
 	return gotLock;
@@ -420,6 +424,17 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 		oldRevID = item->second->mDir.GetRevisionID();
 
 		// Check the revision ID of the file -- does it need refreshing?
+		// We assume that if we have the write lock, everything in the cache was loaded
+		// with that lock held, and therefore cannot be stale.
+		if(!mReadOnly)
+		{
+			// Looks good... return the cached object
+			BOX_TRACE("Returning locked object " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" from cache, modtime = " << oldRevID)
+			return item->second->mDir;
+		}
+
 		if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
 		{
 			THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
