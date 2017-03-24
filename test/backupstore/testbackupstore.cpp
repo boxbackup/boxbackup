@@ -1329,8 +1329,8 @@ int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	const std::string& remote_filename)
 {
-	// Stick a file in it
-	write_test_file(0);
+	// write_test_file(0) should be called by each test that uses create_file(), before calling it.
+	// Not rewriting the test file over and over makes a surprisingly big difference on Windows.
 
 	BackupStoreFilenameClear remote_filename_encoded;
 	if (remote_filename.empty())
@@ -1694,6 +1694,9 @@ bool test_server_commands(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+
+	// Write the test file for create_file to upload:
+	write_test_file(0);
 
 	BackupFileSystem& fs(control.GetFileSystem());
 	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
@@ -2239,6 +2242,9 @@ bool test_directory_parent_entry_tracks_directory_size(
 	const std::string& specialisation_name, BackupAccountControl& control)
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+
+	// Write the test file for create_file to upload:
+	write_test_file(0);
 
 	BackupFileSystem& fs(control.GetFileSystem());
 	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
