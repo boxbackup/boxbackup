@@ -727,7 +727,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	// Increment reference count on the new directory to one
 	mpRefCount->AddReference(id);
 
-	// Save the store info -- can cope if this exceptions because infomation
+	// Save the store info -- can cope if this exceptions because information
 	// will be rebuilt by housekeeping, and ID allocation can recover.
 	SaveStoreInfo(false);
 

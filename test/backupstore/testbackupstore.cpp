@@ -1721,6 +1721,8 @@ bool test_server_commands(const std::string& specialisation_name,
 	{
 		// Create a directory
 		int64_t subdirid = create_directory(*apProtocol);
+		// Ensure that store info is flushed out to disk, so we can check it:
+		rwContext.SaveStoreInfo(false); // !AllowDelay
 		TEST_THAT(check_num_files(fs, 0, 0, 0, 2));
 
 		// Try using GetFile on the directory
