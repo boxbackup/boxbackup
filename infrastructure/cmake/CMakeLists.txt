@@ -265,7 +265,12 @@ foreach(module_dep ${module_deps})
 				set(appveyor_runtest_pl_switch)
 			endif()
 
-			set(test_executable "$<TARGET_FILE_NAME:${module_name}>")
+			if(WIN32)
+				set(test_command_internal "$<TARGET_FILE_NAME:${module_name}>")
+			else()
+				set(test_command_internal "./$<TARGET_FILE_NAME:${module_name}>")
+			endif()
+
 			target_compile_definitions(${module_name} PRIVATE
 				-DTEST_EXECUTABLE="${test_executable}")
 			add_test(NAME ${test_name}
@@ -273,7 +278,7 @@ foreach(module_dep ${module_deps})
 				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				${appveyor_runtest_pl_switch} -cT ${test_name}
 				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
-				"$<TARGET_FILE:${module_name}>" "${test_executable}"
+				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 
 			if(${APPVEYOR_MODE})
@@ -287,7 +292,7 @@ foreach(module_dep ${module_deps})
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				-n -c ${test_name}
 				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
-				"$<TARGET_FILE:${module_name}>" "${test_executable}"
+				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
 			if(DEBUG)
