@@ -222,14 +222,25 @@ foreach(module_dep ${module_deps})
 			if(DEBUG)
 				message(STATUS "add executable '${module_name}': '${module_files}'")
 			endif()
+
+			# The executable target name should be the same as the output .exe file
+			# (otherwise a special and less powerful form of install() is needed to
+			# RENAME it), but we want to refer to module names everywhere in this
+			# file, when adding dependencies, files, etc. So we create an alias
+			# from the module name to the executable name.
 			add_executable(${module_name} ${module_files})
 
-			install(TARGETS ${module_name} RUNTIME
+			# Unfortunately we have to use install(PROGRAMS) instead of
+			# install(TARGETS) because TARGETS doesn't allow us to change
+			# the executable name (from bin_bbackupd.exe to bbackupd.exe).
+			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
 				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}")
-			install(TARGETS ${module_name} RUNTIME
+				DESTINATION "${base_dir}/debug/${module_dir}"
+				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
+			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
 				CONFIGURATIONS Release;RelWithDebInfo
-				DESTINATION "${base_dir}/release/${module_dir}")
+				DESTINATION "${base_dir}/release/${module_dir}"
+				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
