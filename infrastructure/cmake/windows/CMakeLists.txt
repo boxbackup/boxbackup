@@ -8,18 +8,26 @@ set(install_dir ${CMAKE_BINARY_DIR}/install)
 
 # Automate the process of downloading, building and "installing" dependencies on Windows,
 # as used by AppVeyor.
-set(ZLIB_VERSION    1.2.11 CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
-set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1
-	CACHE STRING "Hash of zlib-${ZLIB_VERSION}.tar.gz, to be verified after download")
-set(OPENSSL_VERSION 1.0.2j CACHE STRING "Version of OpenSSL to download, build, and compile Box Backup against")
-set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431
-	CACHE STRING "Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download")
-set(PCRE_VERSION    8.39   CACHE STRING "Version of PCRE to download, build, and compile Box Backup against")
-set(PCRE_HASH SHA256=ccdf7e788769838f8285b3ee672ed573358202305ee361cfec7a4a4fb005bbc7
-	CACHE STRING "Hash of pcre-${PCRE_VERSION}.tar.gz, to be verified after download")
-set(BOOST_VERSION    1.62.0   CACHE STRING "Version of Boost to download, unpack, and compile Box Backup against")
-set(BOOST_HASH SHA1=5fd97433c3f859d8cbab1eaed4156d3068ae3648
-	CACHE STRING "Hash of the Boost download file, to be verified after download")
+
+# Version of zlib to download, build, and compile Box Backup against:
+set(ZLIB_VERSION    1.2.11)
+# Hash of zlib-${ZLIB_VERSION}.tar.gz, to be verified after download:
+set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1)
+
+# Version of OpenSSL to download, build, and compile Box Backup against:
+set(OPENSSL_VERSION 1.0.2j)
+# Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download:
+set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431)
+
+# Version of PCRE to download, build, and compile Box Backup against:
+set(PCRE_VERSION    8.39)
+# Hash of pcre-${PCRE_VERSION}.tar.gz, to be verified after download:
+set(PCRE_HASH SHA256=ccdf7e788769838f8285b3ee672ed573358202305ee361cfec7a4a4fb005bbc7)
+
+# Version of Boost to download, unpack, and compile Box Backup against:
+set(BOOST_VERSION    1.62.0)
+# Hash of the Boost download file, to be verified after download:
+set(BOOST_HASH SHA1=5fd97433c3f859d8cbab1eaed4156d3068ae3648)
 
 include(ExternalProject)
 
