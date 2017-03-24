@@ -103,6 +103,7 @@ ExternalProject_Add(boxbackup
 		-DOPENSSL_ROOT_DIR=${install_dir}
 		-DPCRE_ROOT=${install_dir}
 		-DBOOST_ROOT=${CMAKE_BINARY_DIR}/Source/boost
+		-DBOX_SUPPORT_READLINE=OFF
 		-DAPPVEYOR_MODE=1
 		-DDEBUG=${DEBUG}
 	STEP_TARGETS configure build install

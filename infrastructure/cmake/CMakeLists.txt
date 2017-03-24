@@ -417,9 +417,13 @@ else()
 	endif()
 endif()
 
+# Enable the readline option (BOX_SUPPORT_READLINE), on by default, if readline is detected.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}")
 find_package(Readline)
 if(READLINE_FOUND)
+	option(BOX_SUPPORT_READLINE "Enable support for linking with libreadline." ON)
+endif()
+if(BOX_SUPPORT_READLINE)
 	include_directories(${Readline_INCLUDE_DIR})
 	target_link_libraries(lib_common PUBLIC ${Readline_LIBRARY})
 endif()
