@@ -1234,7 +1234,7 @@ int closedir(DIR *dp)
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
+int poll(EMU_STRUCT_POLLFD *ufds, unsigned long nfds, int timeout)
 {
 	try
 	{
@@ -1259,7 +1259,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 
 		for (unsigned long i = 0; i < nfds; i++)
 		{
-			struct pollfd* ufd = &(ufds[i]);
+			EMU_STRUCT_POLLFD* ufd = &(ufds[i]);
 
 			if (ufd->events & POLLIN)
 			{
@@ -1285,7 +1285,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		{
 			// int errval = WSAGetLastError();
 
-			struct pollfd* pufd = ufds;
+			EMU_STRUCT_POLLFD* pufd = ufds;
 			for (unsigned long i = 0; i < nfds; i++)
 			{
 				pufd->revents = POLLERR;
@@ -1297,7 +1297,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		{
 			for (unsigned long i = 0; i < nfds; i++)
 			{
-				struct pollfd *ufd = &(ufds[i]);
+				EMU_STRUCT_POLLFD *ufd = &(ufds[i]);
 
 				if (FD_ISSET(ufd->fd, &readfd))
 				{

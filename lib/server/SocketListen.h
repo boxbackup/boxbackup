@@ -231,7 +231,7 @@ public:
 			}
 			
 			// poll this socket
-			struct pollfd p;
+			EMU_STRUCT_POLLFD p;
 			p.fd = mSocketHandle;
 			p.events = POLLIN;
 			p.revents = 0;
