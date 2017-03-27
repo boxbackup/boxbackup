@@ -11,10 +11,6 @@
 
 // We need WINVER at least 0x0500 to use GetFileSizeEx on Cygwin/MinGW,
 // and 0x0501 for FindFirstFile(W) for opendir/readdir.
-//
-// WIN32_WINNT versions 0x0600 (Vista) and higher enable WSAPoll() in
-// winsock2.h, whose struct pollfd conflicts with ours below, so for
-// now we just set it lower than that, to Windows XP (0x0501).
 
 #ifdef WINVER
 #	if WINVER != 0x0501
@@ -26,12 +22,12 @@
 #define WINVER 0x0501
 
 #ifdef _WIN32_WINNT
-#	if _WIN32_WINNT != 0x0501
+#	if _WIN32_WINNT != 0x0600
 // provoke a redefinition warning to track down the offender
-#		define _WIN32_WINNT 0x0501
+#		define _WIN32_WINNT 0x0600
 #		error Must include emu.h before setting _WIN32_WINNT
 #	endif
 #endif
-#define _WIN32_WINNT 0x0501
+#define _WIN32_WINNT 0x0600
 
 #endif // _EMU_WINVER_H

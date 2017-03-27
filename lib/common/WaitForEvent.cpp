@@ -141,7 +141,8 @@ void *WaitForEvent::Wait()
 	if(mpPollInfo == 0)
 	{
 		// Yes...
-		mpPollInfo = (struct pollfd *)::malloc((sizeof(struct pollfd) * mItems.size()) + 4);
+		mpPollInfo = (EMU_STRUCT_POLLFD *)::malloc(
+			(sizeof(EMU_STRUCT_POLLFD) * mItems.size()) + 4);
 		if(mpPollInfo == 0)
 		{
 			throw std::bad_alloc();
