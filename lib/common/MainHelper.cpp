@@ -11,13 +11,14 @@
 
 #ifdef WIN32
 #	include <winsock2.h>
+#	include <dbghelp.h>
 #endif
 
 #include "autogen_CommonException.h"
 #include "Logging.h"
 
 // Windows requires winsock to be initialised before use, unlike every other platform.
-void mainhelper_init_win32_sockets()
+void mainhelper_init_win32()
 {
 #ifdef WIN32
 	WSADATA info;
@@ -31,6 +32,13 @@ void mainhelper_init_win32_sockets()
 		DWORD wserrno = WSAGetLastError();
 		THROW_WIN_ERROR_NUMBER("Failed to initialise Windows Sockets library", wserrno,
 			CommonException, Internal)
+	}
+
+	HANDLE hProcess = GetCurrentProcess();
+	if(!SymInitialize(hProcess, NULL, TRUE))
+	{
+		BOX_LOG_WIN_WARNING("Failed to initialize symbol lookup for exception "
+			"backtraces");
 	}
 #endif
 }
