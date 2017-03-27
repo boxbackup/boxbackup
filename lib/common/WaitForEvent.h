@@ -141,7 +141,7 @@ private:
 #else
 	int mTimeout;
 	std::vector<ItemInfo> mItems;
-	struct pollfd *mpPollInfo;
+	EMU_STRUCT_POLLFD *mpPollInfo;
 #endif
 };
 
