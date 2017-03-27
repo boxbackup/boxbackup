@@ -235,6 +235,14 @@ foreach(module_dep ${module_deps})
 			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
 				CONFIGURATIONS Release;RelWithDebInfo
 				DESTINATION "${base_dir}/release/${module_dir}")
+
+			# This target is just for use by CPack on Windows:
+			if(WIN32)
+				install(TARGETS ${module_name} RUNTIME
+					CONFIGURATIONS Release
+					DESTINATION "."
+					COMPONENT Applications)
+			endif()
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
@@ -733,3 +741,21 @@ set_tests_properties(backupdiff PROPERTIES TIMEOUT 32)
 set_tests_properties(bbackupd PROPERTIES TIMEOUT 1200)
 set_tests_properties(s3store PROPERTIES TIMEOUT 20)
 set_tests_properties(httpserver PROPERTIES TIMEOUT 40)
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Box Backup is an open source, completely automatic, on-line backup system")
+set(CPACK_PACKAGE_VENDOR "www.BoxBackup.org")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${base_dir}/README.md")
+set(CPACK_RESOURCE_FILE_LICENSE "${base_dir}/LICENSE.txt")
+set(CPACK_PACKAGE_VERSION_MAJOR "0")
+set(CPACK_PACKAGE_VERSION_MINOR "12")
+string(TIMESTAMP date "%Y%m%d" UTC)
+set(CPACK_PACKAGE_VERSION_PATCH "0_appveyor_ci")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "Box Backup")
+set(CPACK_COMPONENTS_ALL Applications)
+set(CPACK_GENERATOR "ZIP;NSIS")
+set(CPACK_NSIS_DISPLAY_NAME "Box Backup")
+set(CPACK_NSIS_HELP_LINK "http://www.boxbackup.org/")
+set(CPACK_NSIS_URL_INFO_ABOUT "http://www.boxbackup.org/")
+set(CPACK_NSIS_CONTACT "boxbackup@boxbackup.org")
+set(CPACK_NSIS_MODIFY_PATH ON)
+include(CPack)

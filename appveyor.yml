@@ -34,7 +34,7 @@ build:
 
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
-  - cinst -y --limit-output 7zip.commandline
+  - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
   - dir "c:\Program Files (x86)"
   # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
@@ -65,4 +65,22 @@ test_script:
 
 on_failure:
   - type %APPVEYOR_BUILD_FOLDER%\test-*.log
+
+on_finish:
+  - cmake --build . --config Release --target package
+
+artifacts:
+  - path: '..\cmake\Build\boxbackup\BoxBackup-*.zip'
+    name: Windows Client ZIP
+    type: Zip
+  - path: '..\cmake\Build\boxbackup\BoxBackup-*.exe'
+    name: Windows Client Installer
+    type: File
+
+deploy:
+  - provider: GitHub
+    draft: false
+    prerelease: true
+    on:
+      branch: master
 
