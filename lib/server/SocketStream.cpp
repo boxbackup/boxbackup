@@ -228,7 +228,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 	if(Timeout != IOStream::TimeOutInfinite)
 	{
-		struct pollfd p;
+		EMU_STRUCT_POLLFD p;
 		p.fd = mSocketHandle;
 		p.events = POLLIN;
 		p.revents = 0;
@@ -295,7 +295,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 bool SocketStream::Poll(short Events, int Timeout)
 {
 	// Wait for data to send.
-	struct pollfd p;
+	EMU_STRUCT_POLLFD p;
 	p.fd = GetSocketHandle();
 	p.events = Events;
 	p.revents = 0;

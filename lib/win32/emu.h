@@ -10,6 +10,7 @@
 
 #ifdef WIN32
 	#define EMU_STRUCT_STAT struct emu_stat
+	#define EMU_STRUCT_POLLFD struct emu_pollfd
 	#define EMU_STAT   emu_stat
 	#define EMU_FSTAT  emu_fstat
 	#define EMU_LSTAT  emu_stat
@@ -17,6 +18,7 @@
 	#define EMU_UNLINK emu_unlink
 #else
 	#define EMU_STRUCT_STAT struct stat
+	#define EMU_STRUCT_POLLFD struct pollfd
 	#define EMU_STAT   ::stat
 	#define EMU_FSTAT  ::fstat
 	#define EMU_LSTAT  ::lstat
@@ -320,7 +322,7 @@ extern "C" inline unsigned int sleep(unsigned int secs)
 #define SHUT_RD SD_RECEIVE
 #define SHUT_WR SD_SEND
 
-struct pollfd
+EMU_STRUCT_POLLFD
 {
 	SOCKET fd;
 	short int events;
@@ -397,7 +399,7 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 
 int statfs(const char * name, struct statfs * s);
 
-int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
+int poll(EMU_STRUCT_POLLFD *ufds, unsigned long nfds, int timeout);
 
 struct iovec {
 	void *iov_base;   /* Starting address */
