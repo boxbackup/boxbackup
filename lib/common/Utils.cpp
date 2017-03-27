@@ -15,17 +15,24 @@
 
 #include <cstdlib>
 
-#ifdef HAVE_EXECINFO_H
-	#include <execinfo.h>
-	#include <stdlib.h>
-#endif
-
 #ifdef HAVE_CXXABI_H
 	#include <cxxabi.h>
 #endif
 
 #ifdef HAVE_DLFCN_H
 	#include <dlfcn.h>
+#endif
+
+#ifdef HAVE_EXECINFO_H
+	#include <execinfo.h>
+#endif
+
+#ifdef HAVE_SIGNAL_H
+	#include <signal.h>
+#endif
+
+#ifdef WIN32
+#	include <dbghelp.h>
 #endif
 
 #ifdef NEED_BOX_VERSION_H
@@ -134,9 +141,19 @@ std::string RemoveSuffix(const std::string& suffix, const std::string& haystack)
 static std::string demangle(const std::string& mangled_name)
 {
 	std::string demangled_name = mangled_name;
-
-	#ifdef HAVE_CXXABI_H
 	char buffer[1024];
+
+#if defined WIN32
+	if(UnDecorateSymbolName(mangled_name.c_str(), buffer, sizeof(buffer),
+		UNDNAME_COMPLETE))
+	{
+		demangled_name = buffer;
+	}
+	else
+	{
+		BOX_LOG_WIN_ERROR("UnDecorateSymbolName failed");
+	}
+#elif defined HAVE_CXXABI_H
 	int status;
 	size_t length = sizeof(buffer);
 
@@ -174,53 +191,88 @@ static std::string demangle(const std::string& mangled_name)
 			"with unknown error " << status <<
 			": " << mangled_name);
 	}
-	#endif // HAVE_CXXABI_H
+#endif // HAVE_CXXABI_H
 
 	return demangled_name;
 }
 
 void DumpStackBacktrace()
 {
-#ifdef HAVE_EXECINFO_H
-	void  *array[20];
+	const int max_length = 20;
+	void  *array[max_length];
+
+#if defined WIN32
+	size_t size = CaptureStackBackTrace(0, max_length, array, NULL);
+#elif defined HAVE_EXECINFO_H
 	size_t size = backtrace(array, 20);
+#else
+	BOX_TRACE("Backtrace support was not compiled in");
+	return;
+#endif
+
 	BOX_TRACE("Obtained " << size << " stack frames.");
+	DumpStackBacktrace(size, array);
+}
+
+void DumpStackBacktrace(size_t size, void * const * array)
+{
+#if defined WIN32
+	HANDLE hProcess = GetCurrentProcess();
+	// SymInitialize was called in mainhelper_init_win32()
+	DWORD64 displacement;
+	char symbol_info_buf[sizeof(SYMBOL_INFO) + 256];
+	PSYMBOL_INFO pInfo = (SYMBOL_INFO *)symbol_info_buf;
+	pInfo->MaxNameLen = 256;
+	pInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
+#endif
 
 	for(size_t i = 0; i < size; i++)
 	{
 		std::ostringstream output;
 		output << "Stack frame " << i << ": ";
 
-		#ifdef HAVE_DLADDR
-			Dl_info info;
-			int result = dladdr(array[i], &info);
+#if defined WIN32
+		if(!SymFromAddr(hProcess, (DWORD64)array[i], &displacement, pInfo))
+#elif defined HAVE_DLADDR
+		Dl_info info;
+		int result = dladdr(array[i], &info);
+		if(result == 0)
+#endif
+		{
+			BOX_LOG_NATIVE_WARNING("Failed to resolve "
+				"backtrace address " << array[i]);
+			output << "unresolved address " << array[i];
+			continue;
+		}
 
-			if(result == 0)
-			{
-				BOX_LOG_SYS_WARNING("Failed to resolve "
-					"backtrace address " << array[i]);
-				output << "unresolved address " << array[i];
-			}
-			else if(info.dli_sname == NULL)
-			{
-				output << "unknown address " << array[i];
-			}
-			else
-			{
-				uint64_t diff = (uint64_t) array[i];
-				diff -= (uint64_t) info.dli_saddr;
-				output << demangle(info.dli_sname) << "+" <<
-					(void *)diff;
-			}
-		#else
-			output << "address " << array[i];
-		#endif // HAVE_DLADDR
+		const char* mangled_name = NULL;
+		void* start_addr;
+#if defined WIN32
+		mangled_name = &(pInfo->Name[0]);
+		start_addr   = (void *)(pInfo->Address);
+#elif defined HAVE_DLADDR
+		mangled_name = info.dli_sname;
+		start_addr   = info.dli_saddr;
+#else
+		output << "address " << array[i];
+		BOX_TRACE(output.str());
+		continue;
+#endif
+
+		if(mangled_name == NULL)
+		{
+			output << "unknown address " << array[i];
+		}
+		else
+		{
+			uint64_t diff = (uint64_t) array[i];
+			diff -= (uint64_t) start_addr;
+			output << demangle(mangled_name) << "+" <<
+				(void *)diff;
+		}
 
 		BOX_TRACE(output.str());
 	}
-#else // !HAVE_EXECINFO_H
-	BOX_TRACE("Backtrace support was not compiled in");
-#endif // HAVE_EXECINFO_H
 }
 
 

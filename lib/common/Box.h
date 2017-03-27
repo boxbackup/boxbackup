@@ -25,7 +25,7 @@
 
 // Show backtraces on exceptions in release builds until further notice
 // (they are only logged at TRACE level anyway)
-#ifdef HAVE_EXECINFO_H
+#if defined WIN32 || defined HAVE_EXECINFO_H
 	#define SHOW_BACKTRACE_ON_EXCEPTION
 #endif
 
