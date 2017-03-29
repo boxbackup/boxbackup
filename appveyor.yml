@@ -67,13 +67,18 @@ on_failure:
   - type %APPVEYOR_BUILD_FOLDER%\test-*.log
 
 on_finish:
-  - cmake --build . --config Release --target package
+  - cmake --build . --config %CONFIGURATION% --target package
+  # AppVeyor refuses to package files outside of the project directory, so we need to copy the
+  # built package files into it:
+  - mkdir %APPVEYOR_BUILD_FOLDER%\packages
+  - cp BoxBackup-*.zip %APPVEYOR_BUILD_FOLDER%\packages
+  - cp BoxBackup-*.exe %APPVEYOR_BUILD_FOLDER%\packages
 
 artifacts:
-  - path: '..\cmake\Build\boxbackup\BoxBackup-*.zip'
+  - path: 'packages\BoxBackup-*.zip'
     name: Windows Client ZIP
     type: Zip
-  - path: '..\cmake\Build\boxbackup\BoxBackup-*.exe'
+  - path: 'packages\BoxBackup-*.exe'
     name: Windows Client Installer
     type: File
 
