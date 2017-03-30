@@ -3655,9 +3655,11 @@ bool test_changing_client_store_marker_pauses_daemon()
 		TEST_COMPARE(Compare_Different);
 		BOX_TRACE("Compare finished, expected differences");
 
-		// Now wait for it to recover and finish a sync, and check
-		// that the differences are gone (successful backup).
-		wait = sync_time + SecondsToBoxTime(2);
+		// Now wait for it to recover and finish a sync, and check that
+		// the differences are gone (successful backup). Wait until ~2
+		// seconds after we expect the sync to have finished, to reduce
+		// the risk of random failure on AppVeyor when heavily loaded.
+		wait = sync_time + SecondsToBoxTime(3);
 		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
 			" until just after bbackupd recovers and finishes a sync");
 		ShortSleep(wait, true);
