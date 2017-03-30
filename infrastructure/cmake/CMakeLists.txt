@@ -139,6 +139,7 @@ foreach(exception_file ${exception_files})
 	set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
 	add_custom_command(OUTPUT "${output_file}"
 		MAIN_DEPENDENCY "${base_dir}/${exception_file}"
+		DEPENDS "${base_dir}/lib/common/makeexception.pl"
 		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/common/makeexception.pl" "${CMAKE_MATCH_2}.txt"
 		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
 
@@ -160,6 +161,7 @@ foreach(protocol_file ${protocol_files})
 	set(output_file "${base_dir}/${CMAKE_MATCH_1}/autogen_${CMAKE_MATCH_2}.cpp")
 	add_custom_command(OUTPUT "${output_file}"
 		MAIN_DEPENDENCY "${base_dir}/${protocol_file}"
+		DEPENDS "${base_dir}/lib/server/makeprotocol.pl.in"
 		COMMAND ${PERL_EXECUTABLE} "${base_dir}/lib/server/makeprotocol.pl" "${CMAKE_MATCH_2}.txt"
 		WORKING_DIRECTORY "${base_dir}/${CMAKE_MATCH_1}")
 
