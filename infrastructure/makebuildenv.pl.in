@@ -763,10 +763,11 @@ __E
 		my @obj_base;
 		for my $file (@items)
 		{
-			my $is_c   = $file =~ m@([^/]+)\.c\Z@i;
-			my $is_cpp = $file =~ m@([^/]+)\.cpp\Z@i;
-			my $is_rc  = $file =~ m@([^/]+)\.rc\Z@i;
-			my $base = $1;
+			my $is_c   = $file =~ m@(([^/]+)\.c)\Z@i;
+			my $is_cpp = $file =~ m@(([^/]+)\.cpp)\Z@i;
+			my $is_rc  = $file =~ m@(([^/]+)\.rc)\Z@i;
+			my $basename = $1;
+			my $base = $2;
 
 			# Don't try to compile .rc files except on Windows:
 			next if not $is_c and not $is_cpp and not ($is_rc and $target_windows);
@@ -806,13 +807,13 @@ __E
 			{
 				$make .= "\t\$(_CC) \$(${var_prefix}_CFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-c $file -o $out_name\n\n";
+					"-DBOX_CURRENT_FILE=\"$basename\" -c $file -o $out_name\n\n";
 			}
 			elsif ($is_cpp)
 			{
 				$make .= "\t\$(_CXX) \$(${var_prefix}_CXXFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-c $file -o $out_name\n\n";
+					"-DBOX_CURRENT_FILE=\"$basename\" -c $file -o $out_name\n\n";
 			}
 			elsif ($is_rc)
 			{

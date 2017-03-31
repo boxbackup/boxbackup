@@ -253,8 +253,8 @@ foreach(module_dep ${module_deps})
 				message(STATUS "add test '${module_name}': '${module_files}'")
 			endif()
 
-			add_executable(${module_name} ${module_files}
-				"${testmain_template_cpp}")
+			set(module_files ${module_files} "${testmain_template_cpp}")
+			add_executable(${module_name} ${module_files})
 
 			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
 				CONFIGURATIONS Debug
@@ -332,6 +332,13 @@ foreach(module_dep ${module_deps})
 				endif()
 			endforeach()
 		endif()
+
+		foreach(module_file ${module_files})
+			string(REGEX REPLACE ".*/" "" module_file_basename ${module_file})
+			set_source_files_properties(${module_file}
+				PROPERTIES COMPILE_DEFINITIONS
+				BOX_CURRENT_FILE="${module_file_basename}")
+		endforeach()
 
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
