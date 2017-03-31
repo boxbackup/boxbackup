@@ -26,7 +26,7 @@
 { \
 	std::ostringstream _box_log_line; \
 	_box_log_line << stuff; \
-	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
+	Logging::Log(level, BOX_CURRENT_FILE, __LINE__, __FUNCTION__, \
 		Logging::UNCATEGORISED, _box_log_line.str()); \
 }
 
@@ -410,8 +410,33 @@ class Capture : public Logger
 	}
 };
 
-// Forward declaration
-class HideFileGuard;
+class LogLevelOverrideByFileGuard
+{
+	private:
+	std::list<std::string> mFileNames;
+	Log::Level mNewLevel;
+	bool mOverrideAllButSelected;
+
+	public:
+	LogLevelOverrideByFileGuard(const std::string& rFileName, Log::Level NewLevel,
+		bool OverrideAllButSelected = false)
+	: mNewLevel(NewLevel), mOverrideAllButSelected(OverrideAllButSelected)
+	{
+		mFileNames.push_back(rFileName);
+	}
+	virtual ~LogLevelOverrideByFileGuard()
+	{
+	}
+	void Add(const std::string& rFileName)
+	{
+		mFileNames.push_back(rFileName);
+	}
+	bool IsOverridden(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
+	Log::Level GetNewLevel() { return mNewLevel; }
+};
+
 
 // --------------------------------------------------------------------------
 //
@@ -434,7 +459,7 @@ class Logging
 	static Syslog*  spSyslog;
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
-	static std::auto_ptr<HideFileGuard> sapHideFileGuard;
+	static std::vector<LogLevelOverrideByFileGuard> sLogLevelOverrideByFileGuards;
 
 	public:
 	Logging ();
@@ -445,6 +470,9 @@ class Logging
 	static void FilterConsole (Log::Level level);
 	static void Add    (Logger* pNewLogger);
 	static void Remove (Logger* pOldLogger);
+	static bool ShouldLog(Log::Level default_level, Log::Level message_level,
+		const std::string& file, int line, const std::string& function,
+		const Log::Category& category, const std::string& message);
 	static void Log(Log::Level level, const std::string& file, int line,
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
@@ -660,36 +688,6 @@ class HideCategoryGuard : public Logger
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
 	virtual const char* GetType() { return "HideCategoryGuard"; }
-	virtual void SetProgramName(const std::string& rProgramName) { }
-};
-
-class HideFileGuard : public Logger
-{
-	private:
-	std::list<std::string> mFileNames;
-	HideFileGuard(const HideFileGuard& other); // no copying
-	HideFileGuard& operator=(const HideFileGuard& other); // no assignment
-	bool mHideAllButSelected;
-
-	public:
-	HideFileGuard(const std::string& rFileName, bool HideAllButSelected = false)
-	: mHideAllButSelected(HideAllButSelected)
-	{
-		mFileNames.push_back(rFileName);
-		Logging::Add(this);
-	}
-	~HideFileGuard()
-	{
-		Logging::Remove(this);
-	}
-	void Add(const std::string& rFileName)
-	{
-		mFileNames.push_back(rFileName);
-	}
-	virtual bool Log(Log::Level level, const std::string& file, int line,
-		const std::string& function, const Log::Category& category,
-		const std::string& message);
-	virtual const char* GetType() { return "HideFileGuard"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 
