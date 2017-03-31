@@ -14,7 +14,7 @@ use lib dirname($0)."/infrastructure";
 use BoxPlatform;
 
 my %opts;
-getopts('acnTVv', \%opts);
+getopts('acnTO:v', \%opts);
 
 my $appveyor_mode = $opts{'a'};
 my $cmake_build = $opts{'c'};
@@ -22,7 +22,7 @@ my $cmake_build = $opts{'c'};
 my $prepare_only = $opts{'n'};
 my $timestamp_tests = $opts{'T'};
 my $verbose_build = $opts{'v'};
-my $verbose_tests = $opts{'V'};
+my $extra_options = $opts{'O'};
 
 my $test_name = shift @ARGV;
 my $test_mode = shift @ARGV;
@@ -259,10 +259,7 @@ sub runtest
 	
 	my $test_res;
 	my $logfile = "test-$t.log";
-	my $test_options = join(" ",
-		$timestamp_tests ? "-T" : "",
-		$verbose_tests   ? "-V" : ""
-	);
+	my $test_options = ($timestamp_tests ? "-T" : "")." ".$extra_options;
 
 	# run it
 	if($cmake_build)

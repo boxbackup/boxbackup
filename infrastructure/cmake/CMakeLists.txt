@@ -279,7 +279,8 @@ foreach(module_dep ${module_deps})
 			add_test(NAME ${test_name}
 				COMMAND ${time_test_command_prefix}
 				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
-				${appveyor_runtest_pl_switch} -cT$<$<CONFIG:Debug>:V> ${test_name}
+				${appveyor_runtest_pl_switch}
+				-cT$<$<CONFIG:Debug>:O-LBackupFileSystem.cpp=trace> ${test_name}
 				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
 				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
