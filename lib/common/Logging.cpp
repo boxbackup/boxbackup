@@ -284,12 +284,23 @@ bool Logging::ShouldLog(Log::Level default_level, Log::Level message_level,
 	const std::string& file, int line, const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
+	// Based on http://stackoverflow.com/a/40947954/648162 and
+	// http://stackoverflow.com/a/41367919/648162, but since we have to do this at runtime for
+	// each logging call, don't do the strrchr unless we have at least one override configured
+	// (otherwise it's never used, and a waste of CPU):
+	const char* current_file = NULL;
+	if(Logging::sLogLevelOverrideByFileGuards.begin() !=
+		Logging::sLogLevelOverrideByFileGuards.end())
+	{
+		current_file = strrchr(file.c_str(), DIRECTORY_SEPARATOR_ASCHAR) + 1;
+	}
+
 	Log::Level level_filter = default_level;
 	for(std::vector<LogLevelOverrideByFileGuard>::iterator
 		i = Logging::sLogLevelOverrideByFileGuards.begin();
 		i != Logging::sLogLevelOverrideByFileGuards.end(); i++)	
 	{
-		if(i->IsOverridden(message_level, file, line, function, category, message))
+		if(i->IsOverridden(message_level, current_file, line, function, category, message))
 		{
 			level_filter = i->GetNewLevel();
 		}
@@ -745,9 +756,14 @@ int Logging::OptionParser::ProcessOption(signed int option)
 // --------------------------------------------------------------------------
 std::string Logging::OptionParser::GetUsageString()
 {
-	return
+	// Based on http://stackoverflow.com/a/40947954/648162 and
+	// http://stackoverflow.com/a/41367919/648162:
+	const char* current_file = strrchr(__FILE__, DIRECTORY_SEPARATOR_ASCHAR) + 1;
+
+	std::ostringstream buf;
+	buf <<
 	"  -L <file>=<level>  Override log level for specified file, can repeat\n"
-	"             (for example, -L '" __FILE__ "=trace')\n"
+	"             (for example, -L '" << current_file << "=trace')\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -758,6 +774,7 @@ std::string Logging::OptionParser::GetUsageString()
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity, log everything to console and system\n"
 	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n";
+	return buf.str();
 }
 
 bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
