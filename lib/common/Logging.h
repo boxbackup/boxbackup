@@ -411,7 +411,7 @@ class LogLevelOverrideByFileGuard
 	{
 		mFileNames.push_back(rFileName);
 	}
-	virtual bool IsOverridden(Log::Level level, const std::string& file, int line,
+	bool IsOverridden(Log::Level level, const std::string& file, int line,
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
 	Log::Level GetNewLevel() { return mNewLevel; }
