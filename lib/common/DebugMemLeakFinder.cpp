@@ -558,7 +558,7 @@ void memleakfinder_reportleaks_file(FILE *file)
 				i->first, i->second.size, i->second.file,
 				i->second.line);
 #ifdef HAVE_EXECINFO_H
-			DumpStackBacktrace(i->second.stack_size, i->second.stack_frames);
+			DumpStackBacktrace(BOX_CURRENT_FILE, i->second.stack_size, i->second.stack_frames);
 #endif
 		}
 	}

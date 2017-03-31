@@ -24,8 +24,8 @@ std::string RemovePrefix(const std::string& prefix, const std::string& haystack,
 std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
 	bool force = true);
 
-void DumpStackBacktrace();
-void DumpStackBacktrace(size_t size, void * const * array);
+void DumpStackBacktrace(const std::string& filename);
+void DumpStackBacktrace(const std::string& filename, size_t size, void * const * array);
 
 bool FileExists(const std::string& rFilename, int64_t *pFileSize = 0,
 	bool TreatLinksAsNotExisting = false);

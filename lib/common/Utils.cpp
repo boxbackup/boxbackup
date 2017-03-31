@@ -156,6 +156,8 @@ std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
 // tracking during them, otherwise we could end up with infinite recursion.
 #include "MemLeakFindOff.h"
 
+const Log::Category BACKTRACE("Backtrace");
+
 static std::string demangle(const std::string& mangled_name)
 {
 	std::string demangled_name = mangled_name;
@@ -214,7 +216,7 @@ static std::string demangle(const std::string& mangled_name)
 	return demangled_name;
 }
 
-void DumpStackBacktrace()
+void DumpStackBacktrace(const std::string& filename)
 {
 	const int max_length = 20;
 	void  *array[max_length];
@@ -228,11 +230,18 @@ void DumpStackBacktrace()
 	return;
 #endif
 
-	BOX_TRACE("Obtained " << size << " stack frames.");
-	DumpStackBacktrace(size, array);
+	// Instead of calling BOX_TRACE, we call Logging::Log directly in order to pass filename
+	// as the source file. This allows exception backtraces to be turned on and off by file,
+	// instead of all of them originating in Utils.cpp.
+	std::ostringstream output;
+	output << "Obtained " << size << " stack frames.";
+	Logging::Log(Log::TRACE, filename, 0, // line
+		__FUNCTION__, BACKTRACE, output.str());
+	
+	DumpStackBacktrace(filename, size, array);
 }
 
-void DumpStackBacktrace(size_t size, void * const * array)
+void DumpStackBacktrace(const std::string& filename, size_t size, void * const * array)
 {
 #if defined WIN32
 	HANDLE hProcess = GetCurrentProcess();
@@ -289,7 +298,11 @@ void DumpStackBacktrace(size_t size, void * const * array)
 				(void *)diff;
 		}
 
-		BOX_TRACE(output.str());
+		// Instead of calling BOX_TRACE, we call Logging::Log directly in order to pass filename
+		// as the source file. This allows exception backtraces to be turned on and off by file,
+		// instead of all of them originating in Utils.cpp.
+		Logging::Log(Log::TRACE, filename, 0, // line
+			__FUNCTION__, BACKTRACE, output.str());
 	}
 }
 
