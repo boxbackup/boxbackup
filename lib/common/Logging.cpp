@@ -45,7 +45,7 @@ Syslog*     Logging::spSyslog  = NULL;
 Logging     Logging::sGlobalLogging; // automatic initialisation
 std::string Logging::sProgramName;
 const Log::Category Logging::UNCATEGORISED("Uncategorised");
-std::auto_ptr<HideFileGuard> Logging::sapHideFileGuard;
+std::vector<LogLevelOverrideByFileGuard> Logging::sLogLevelOverrideByFileGuards;
 
 HideSpecificExceptionGuard::SuppressedExceptions_t
 	HideSpecificExceptionGuard::sSuppressedExceptions;
@@ -280,12 +280,32 @@ void Console::SetShowPID(bool enabled)
 	sShowPID = enabled;
 }
 
+bool Logging::ShouldLog(Log::Level default_level, Log::Level message_level,
+	const std::string& file, int line, const std::string& function, const Log::Category& category,
+	const std::string& message)
+{
+	Log::Level level_filter = default_level;
+	for(std::vector<LogLevelOverrideByFileGuard>::iterator
+		i = Logging::sLogLevelOverrideByFileGuards.begin();
+		i != Logging::sLogLevelOverrideByFileGuards.end(); i++)	
+	{
+		if(i->IsOverridden(message_level, file, line, function, category, message))
+		{
+			level_filter = i->GetNewLevel();
+		}
+	}
+
+	// Should log if the message level is less than the filter level, otherwise not.
+	return (message_level <= level_filter);
+}
+
 bool Console::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
-	if (level > GetLevel())
+	if(!Logging::ShouldLog(GetLevel(), level, file, line, function, category, message))
 	{
+		// Skip the rest of this logger, but continue with the others
 		return true;
 	}
 	
@@ -365,8 +385,9 @@ bool Syslog::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
-	if (level > GetLevel())
+	if(!Logging::ShouldLog(GetLevel(), level, file, line, function, category, message))
 	{
+		// Skip the rest of this logger, but continue with the others
 		return true;
 	}
 	
@@ -587,15 +608,26 @@ int Logging::OptionParser::ProcessOption(signed int option)
 	{
 		case 'L':
 		{
-			if(sapHideFileGuard.get())
+			std::string arg_value(optarg);
+			std::string::size_type equals_pos = arg_value.find('=');
+			if(equals_pos == std::string::npos)
 			{
-				sapHideFileGuard->Add(optarg);
+				BOX_FATAL("Option -L argument should be 'filename=level'");
+				return 2;
 			}
-			else
+
+			std::string filename = arg_value.substr(0, equals_pos);
+			std::string level_name = arg_value.substr(equals_pos + 1);
+			Log::Level level = Logging::GetNamedLevel(level_name);
+			if (level == Log::INVALID)
 			{
-				sapHideFileGuard.reset(new HideFileGuard(
-					optarg, true)); // HideAllButSelected
+				BOX_FATAL("Invalid logging level: " << level_name);
+				return 2;
 			}
+
+			sLogLevelOverrideByFileGuards.push_back(
+				LogLevelOverrideByFileGuard(filename, level, false) // !OverrideAllButSelected
+			);
 		}
 		break;
 
@@ -714,8 +746,8 @@ int Logging::OptionParser::ProcessOption(signed int option)
 std::string Logging::OptionParser::GetUsageString()
 {
 	return
-	"  -L <file>  Filter out log messages except from specified file, can repeat\n"
-	"             (for example, -L " __FILE__ ")\n"
+	"  -L <file>=<level>  Override log level for specified file, can repeat\n"
+	"             (for example, -L '" __FILE__ "=trace')\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -740,27 +772,21 @@ bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
 	return (i == mCategories.end());
 }
 
-bool HideFileGuard::Log(Log::Level level, const std::string& file, int line,
+bool LogLevelOverrideByFileGuard::IsOverridden(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
 	std::list<std::string>::iterator i = std::find(mFileNames.begin(),
 		mFileNames.end(), file);
-	bool allow_log_message;
-	if(mHideAllButSelected)
+	if(!mOverrideAllButSelected)
 	{
-		// Return true if filename is in our list, to allow further
-		// logging (thus, return false if it's not in our list, i.e. we
-		// found nothing, to suppress it).
-		allow_log_message = (i != mFileNames.end());
+		// Return true if filename is in our list, i.e. its level is overridden.
+		return (i != mFileNames.end());
 	}
 	else
 	{
-		// Return false if filename is in our list, to suppress further
-		// logging (thus, return true if it's not in our list, i.e. we
-		// found nothing, to allow it).
-		allow_log_message = (i == mFileNames.end());
+		// Return true if filename is not in our list, i.e. its level is overridden.
+		return (i == mFileNames.end());
 	}
-	return allow_log_message;
 }
 
