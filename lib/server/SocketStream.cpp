@@ -566,6 +566,6 @@ void SocketStream::CheckForMissingTimeout(int Timeout)
 	if (Timeout == IOStream::TimeOutInfinite)
 	{
 		BOX_WARNING("Network operation started with no timeout!");
-		DumpStackBacktrace();
+		OPTIONAL_DO_BACKTRACE;
 	}
 }
