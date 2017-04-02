@@ -360,8 +360,8 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 	// Stop bbackupd initialisation from changing the console logging level
 	// and the program name tag.
 	Logger& console(Logging::GetConsole());
-	Logger::LevelGuard guard(console, console.GetLevel());
-	Logging::Tagger();
+	Logger::LevelGuard undo_log_level_change(console, console.GetLevel());
+	Logging::Tagger undo_program_name_change;
 
 	std::vector<std::string> args;
 	size_t last_arg_start = 0;
@@ -3644,7 +3644,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 			SecondsToBoxTime(BACKUP_ERROR_DELAY_SHORTENED - 1) -
 			compare_time * 2;
 		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
-			" (plus another compare taking " <<
+			" (including another compare taking " <<
 			BOX_FORMAT_MICROSECONDS(compare_time) << ") until "
 			"just before bbackupd recovers");
 		ShortSleep(wait, true);
