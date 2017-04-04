@@ -117,7 +117,7 @@ public:
 #define S3_FAKE_ACCOUNT_ID 0x53336964 // 'S3id'
 #define S3_CACHE_LOCK_NAME "boxbackup.cache.lock"
 
-#ifdef NDEBUG // release
+#ifdef BOX_RELEASE_BUILD
 	// Use a larger block size for efficiency
 	#define S3_NOTIONAL_BLOCK_SIZE 1048576
 #else
