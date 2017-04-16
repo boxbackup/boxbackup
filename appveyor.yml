@@ -52,7 +52,7 @@ install:
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
   - cmake -G "%Generator%" -A %PLATFORM% -DDEBUG=1
-    -DCPACK_PACKAGE_VERSION_PATCH=0_appveyor_ci_%CONFIGURATION%
+    -DPACKAGE_VERSION_PATCH=0_appveyor_ci_%CONFIGURATION%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
