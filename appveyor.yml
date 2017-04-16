@@ -89,5 +89,5 @@ deploy:
     draft: false
     prerelease: true
     on:
-      branch: master
+      branch: master,s3_support
 
