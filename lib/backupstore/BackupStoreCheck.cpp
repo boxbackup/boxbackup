@@ -610,7 +610,6 @@ void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 	{
 		int32_t iIndex;
 		IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
-		bool badEntry = false;
 		bool wasAlreadyContained = false;
 
 		ASSERT(piBlock != 0 ||
@@ -648,11 +647,8 @@ void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 		{
 			// Add to sizes?
 			// If piBlock was zero, then wasAlreadyContained
-			// might be uninitialized; but we only process
-			// files here, and if a file's piBlock was zero
-			// then badEntry would be set above, so we
-			// wouldn't be here.
-			ASSERT(!badEntry)
+			// might be uninitialized.
+			ASSERT(piBlock != NULL)
 
 			// It can be both old and deleted.
 			// If neither, then it's current.
