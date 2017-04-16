@@ -18,9 +18,11 @@
 
 #include <sys/types.h>
 
-#ifndef WIN32
+#ifdef WIN32
+	#include <ws2tcpip.h> // for InetNtop
+#else
 	#include <poll.h>
-	#include <arpa/inet.h>
+	#include <arpa/inet.h> // for inet_ntop
 #endif
 
 #ifdef HAVE_UCRED_H
