@@ -13,12 +13,14 @@
 	#include <unistd.h>
 #endif
 
-#include <sys/types.h>
 #include <errno.h>
 #include <string.h>
 
+#include <sys/types.h>
+
 #ifndef WIN32
 	#include <poll.h>
+	#include <arpa/inet.h>
 #endif
 
 #ifdef HAVE_UCRED_H
@@ -182,13 +184,44 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 	}
 	
 	// Connect it
+	std::string name_pretty;
+	if(Type == Socket::TypeUNIX)
+	{
+		// For a UNIX socket, the path is all we need to show the user:
+		name_pretty = rName;
+	}
+	else
+	{
+		// For an IP socket, try to include the resolved IP address as well as the hostname:
+		std::ostringstream name_oss;
+		char name_buf[256];
+#ifdef WIN32
+		const char* addr_str = InetNtop(sockDomain, &addr.sa_generic, name_buf,
+			sizeof(name_buf));
+#else
+		const char* addr_str = inet_ntop(sockDomain, &addr.sa_generic, name_buf,
+			sizeof(name_buf));
+#endif
+		name_oss << rName << " (";
+		if(addr_str == NULL)
+		{
+			name_oss << "failed to convert IP address to string";
+		}
+		else
+		{
+			name_oss << addr_str;
+		}
+		name_oss << ")";
+		name_pretty = name_oss.str();
+	}
+
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
 		// Dispose of the socket
 		try
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
-				BOX_SOCKET_ERROR_MESSAGE(Type, rName, Port,
+				BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
 				"Failed to connect to socket"));
 		}
 		catch(ServerException &e)
