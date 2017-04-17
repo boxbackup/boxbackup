@@ -542,8 +542,8 @@ void memleakfinder_reportleaks_file(FILE *file)
 	{
 		if(is_leak(i->first))
 		{
-			::fprintf(file, "Block %p size %d allocated at "
-				"%s:%d\n", i->first, i->second.size,
+			::fprintf(file, "Block %p size %lu allocated at "
+				"%s:%d\n", i->first, (unsigned long)i->second.size,
 				i->second.file, i->second.line);
 		}
 	}
@@ -553,9 +553,9 @@ void memleakfinder_reportleaks_file(FILE *file)
 	{
 		if(is_leak(i->first))
 		{
-			::fprintf(file, "Object%s %p size %d allocated at "
+			::fprintf(file, "Object%s %p size %lu allocated at "
 				"%s:%d\n", i->second.array?" []":"",
-				i->first, i->second.size, i->second.file,
+				i->first, (unsigned long)i->second.size, i->second.file,
 				i->second.line);
 #ifdef HAVE_EXECINFO_H
 			DumpStackBacktrace(BOX_CURRENT_FILE, i->second.stack_size, i->second.stack_frames);
