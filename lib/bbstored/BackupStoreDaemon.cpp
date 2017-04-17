@@ -96,7 +96,7 @@ const char *BackupStoreDaemon::DaemonName() const
 // --------------------------------------------------------------------------
 std::string BackupStoreDaemon::DaemonBanner() const
 {
-	return BANNER_TEXT("Backup Store Server");
+	return BANNER_TEXT("store server (bbstored)");
 }
 
 
