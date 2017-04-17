@@ -81,6 +81,7 @@ BEGIN
 		# for developers, use Git version (SVN is no more):
 		my $gitversion = `git rev-parse HEAD`;
 		chomp $gitversion;
+		$gitversion = substr($gitversion, 0, 7);
 		$product_version =~ s/USE_SVN_VERSION/git_$gitversion/;
 	}
 
