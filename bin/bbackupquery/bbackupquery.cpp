@@ -295,7 +295,7 @@ int main(int argc, const char *argv[])
 			true)); // open in append mode
 	}
 
-	BOX_NOTICE(BANNER_TEXT("Backup Query Tool"));
+	BOX_NOTICE(BANNER_TEXT("query tool (bbackupquery)"));
 
 #ifdef WIN32
 	if (unicodeConsole)
