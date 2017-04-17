@@ -298,11 +298,18 @@ void DumpStackBacktrace(const std::string& filename, size_t size, void * const *
 				(void *)diff;
 		}
 
-		// Instead of calling BOX_TRACE, we call Logging::Log directly in order to pass filename
-		// as the source file. This allows exception backtraces to be turned on and off by file,
-		// instead of all of them originating in Utils.cpp.
+		// Instead of calling BOX_TRACE, we call Logging::Log directly in order to pass
+		// filename as the source file. This allows exception backtraces to be turned on
+		// and off by file, instead of all of them originating in Utils.cpp.
 		Logging::Log(Log::TRACE, filename, 0, // line
 			__FUNCTION__, BACKTRACE, output.str());
+
+		// We don't really care about frames after main() (e.g. CRT startup), and sometimes
+		// they contain invalid data (not function pointers) such as 0x7.
+		if(strcmp(mangled_name, "main") == 0)
+		{
+			break;
+		}
 	}
 }
 
