@@ -18,6 +18,8 @@
 
 #include <sys/types.h>
 
+#include <iostream>
+
 #include "box_getopt.h"
 #include "BackupAccountControl.h"
 #include "BackupDaemonConfigVerify.h"
@@ -26,6 +28,7 @@
 #include "BackupStoreCheck.h"
 #include "BackupStoreConfigVerify.h"
 #include "BackupStoreInfo.h"
+#include "BannerText.h"
 #include "BoxPortsAndFiles.h"
 #include "HousekeepStoreAccount.h"
 #include "MainHelper.h"
@@ -38,50 +41,54 @@
 
 #include <cstring>
 
-void PrintUsageAndExit()
+int PrintUsage()
 {
-	printf(
-"Usage: bbstoreaccounts [-3] [-c config_file] <action> <account_id> [args]\n"
-"Account ID is integer specified in hex\n"
-"\n"
-"Options:\n"
-"  -3    Amazon S3 mode. Not all commands are supported yet. Supply account\n"
-"        name as <account_id>. Reads bbackupd.conf instead of bbstored.conf.\n"
-"  -c    Use an alternate configuration file instead of the default.\n"
-"  -W    Set logging/output level to warning, info, debug, etc.\n"
-"\n"
-"Commands (and arguments):\n"
-"  create <account> <discnum> <softlimit> <hardlimit>\n"
-"        Creates a RaidFile account with the specified account number (in hex\n"
-"        with no 0x) on the specified RaidFile disc set number (see\n"
-"        raidfile.conf for valid set numbers) with the specified soft and hard\n"
-"        limits (in blocks if suffixed with B, MB with M, GB with G)\n"
-"  info [-m] <account>\n"
-"        Prints information about the specified account including number\n"
-"        of blocks used. The -m option enable machine-readable output.\n"
-"  enabled <accounts> <yes|no>\n"
-"        Sets the account as enabled or disabled for new logins.\n"
-"  setlimit <accounts> <softlimit> <hardlimit>\n"
-"        Changes the limits of the account as specified. Numbers are\n"
-"        interpreted as for the 'create' command (suffixed with B, M or G)\n"
-"  delete <account> [yes]\n"
-"        Deletes the specified account. Prompts for confirmation unless\n"
-"        the optional 'yes' parameter is provided.\n"
-"  check <account> [fix] [quiet]\n"
-"        Checks the specified account for errors. If the 'fix' option is\n"
-"        provided, any errors discovered that can be fixed automatically\n"
-"        will be fixed. If the 'quiet' option is provided, less output is\n"
-"        produced.\n"
-"  name <account> <new name>\n"
-"        Changes the \"name\" of the account to the specified string.\n"
-"        The name is purely cosmetic and intended to make it easier to\n"
-"        identify your accounts.\n"
-"  housekeep <account>\n"
-"        Runs housekeeping immediately on the account. If it cannot be locked,\n"
-"        bbstoreaccounts returns an error status code (1), otherwise success\n"
-"        (0) even if any errors were fixed by housekeeping.\n"
-	);
-	exit(2);
+	std::string configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
+
+	std::cout <<
+	BANNER_TEXT("account management utility (bbstoreaccounts)") << "\n"
+	"\n"
+	"Usage: bbstoreaccounts [-3] [-c config_file] <action> <account_id> [args]\n"
+	"Account ID is integer specified in hex, with no 0x prefix.\n"
+	"\n"
+	"Options:\n"
+	"  -3         Amazon S3 mode. Not all commands are supported yet. Use account\n"
+	"             name for <account_id>, and bbackupd.conf for <config_file>.\n"
+	"  -c         Use an alternate configuration file instead of\n"
+	"             " << configFilename << ".\n"
+	<< Logging::OptionParser::GetUsageString() <<
+	"\n"
+	"Commands (and arguments):\n"
+	"  create <account> <discnum> <softlimit> <hardlimit>\n"
+	"        Creates a RaidFile account with the specified account number, on the\n"
+	"        specified RaidFile disc set number (see raidfile.conf for valid set\n"
+	"        numbers) with the specified soft and hard limits (in blocks if\n"
+	"        suffixed with B, MB with M, GB with G).\n"
+	"  info [-m] <account>\n"
+	"        Prints information about the specified account including number\n"
+	"        of blocks used. The -m option enables machine-readable output.\n"
+	"  enabled <accounts> <yes|no>\n"
+	"        Sets the account as enabled or disabled for new logins.\n"
+	"  setlimit <accounts> <softlimit> <hardlimit>\n"
+	"        Changes the limits of the account as specified. Numbers are\n"
+	"        interpreted as for the 'create' command (suffixed with B, M or G).\n"
+	"  delete <account> [yes]\n"
+	"        Deletes the specified account. Prompts for confirmation unless\n"
+	"        the optional 'yes' parameter is provided.\n"
+	"  check <account> [fix] [quiet]\n"
+	"        Checks the specified account for errors. If the 'fix' option is\n"
+	"        provided, any errors discovered that can be fixed automatically\n"
+	"        will be fixed. If the 'quiet' option is provided, less output is\n"
+	"        produced.\n"
+	"  name <account> <new name>\n"
+	"        Changes the \"name\" of the account to the specified string.\n"
+	"        The name is purely cosmetic and intended to make it easier to\n"
+	"        identify your accounts.\n"
+	"  housekeep <account>\n"
+	"        Runs housekeeping immediately on the account. If it cannot be locked,\n"
+	"        bbstoreaccounts returns an error status code (1), otherwise success\n"
+	"        (0) even if any errors were fixed by housekeeping.\n";
+	return 2;
 }
 
 int main(int argc, const char *argv[])
@@ -95,13 +102,14 @@ int main(int argc, const char *argv[])
 
 	// Filename for configuration file?
 	std::string configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
-	int logLevel = Log::EVERYTHING;
+	Logging::OptionParser log_level;
 	bool machineReadableOutput = false;
 	bool amazon_S3_mode = false;
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "3c:W:m")) != -1)
+	std::string options = Logging::OptionParser::GetOptionString() + "3c:m";
+	while((c = getopt(argc, (char * const *)argv, options.c_str())) != -1)
 	{
 		switch(c)
 		{
@@ -114,27 +122,24 @@ int main(int argc, const char *argv[])
 			configFilename = optarg;
 			break;
 		
-		case 'W':
-			logLevel = Logging::GetNamedLevel(optarg);
-			if(logLevel == Log::INVALID)
-			{
-				BOX_FATAL("Invalid logging level: " << optarg);
-				return 2;
-			}
-			break;
-
 		case 'm':
 			// enable machine readable output
 			machineReadableOutput = true;
 			break;
 
 		case '?':
+			return PrintUsage();
+			break;
+
 		default:
-			PrintUsageAndExit();
+			if(log_level.ProcessOption(c) != 0)
+			{
+				return PrintUsage();
+			}
 		}
 	}
 
-	Logging::FilterConsole((Log::Level) logLevel);
+	Logging::FilterConsole(log_level.GetCurrentLevel());
 	Logging::FilterSyslog (Log::NOTHING);
 
 	// Adjust arguments
@@ -144,7 +149,7 @@ int main(int argc, const char *argv[])
 	// We should have at least one argument at this point.
 	if(argc < 1)
 	{
-		PrintUsageAndExit();
+		return PrintUsage();
 	}
 	std::string command = argv[0];
 	argv++;
@@ -205,9 +210,10 @@ int main(int argc, const char *argv[])
 
 		// Get the Account ID (in hex without the leading 0x).
 		int32_t id;
-		if(::sscanf(argv[0], "%x", &id) != 1)
+		if(argc == 0 || ::sscanf(argv[0], "%x", &id) != 1)
 		{
-			PrintUsageAndExit();
+			BOX_FATAL("All commands require an account ID, in hex without 0x");
+			return PrintUsage();
 		}
 		argv++;
 		argc--;
@@ -274,7 +280,7 @@ int main(int argc, const char *argv[])
 			// Change the AccountEnabled flag on this account
 			if(argc != 1)
 			{
-				PrintUsageAndExit();
+				return PrintUsage();
 			}
 
 			bool enabled = true;
@@ -289,7 +295,7 @@ int main(int argc, const char *argv[])
 			}
 			else
 			{
-				PrintUsageAndExit();
+				return PrintUsage();
 			}
 
 			return control.SetAccountEnabled(enabled);
