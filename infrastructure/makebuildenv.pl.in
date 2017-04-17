@@ -697,13 +697,30 @@ __E
 #
 ${makefile_ifdef_prefix}ifdef RELEASE
 TARGET = $release_base_dir/$mod/$end_target_file
+TEST_DEST = ../../$release_base_dir/$mod
+TEST_MODE = RELEASE
 ${makefile_ifdef_prefix}else
 TARGET = $debug_base_dir/$mod/$end_target_file
+TEST_DEST = ../../$debug_base_dir/$mod
+TEST_MODE = DEBUG
 ${makefile_ifdef_prefix}endif
+
+TESTFILES_DEST = \$(TEST_DEST)/testfiles
 
 .PHONY: default
 default:
 	\$(MAKE) -C ../.. \$(TARGET)
+
+.PHONY: prepare
+prepare: default
+	../../runtest.pl -n ${name} \$(TEST_MODE)
+	test ! -r \$(TESTFILES_DEST) || chmod -R a+rwx \$(TESTFILES_DEST)
+	rm -rf \$(TESTFILES_DEST)
+	cp -p -R testfiles \$(TEST_DEST)
+
+.PHONY: test
+test: default
+	../../runtest.pl ${name} \$(TEST_MODE)
 
 .PHONY: clean
 clean:
