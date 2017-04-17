@@ -22,7 +22,7 @@ my $cmake_build = $opts{'c'};
 my $prepare_only = $opts{'n'};
 my $timestamp_tests = $opts{'T'};
 my $verbose_build = $opts{'v'};
-my $extra_options = $opts{'O'} or '';
+my $extra_options = $opts{'O'} || '';
 
 my $test_name = shift @ARGV;
 my $test_mode = shift @ARGV;
@@ -192,7 +192,7 @@ sub runtest
 		);
 
 		# Our CMake buildsystem doesn't do anything to support testextra files
-		# (Makfile syntax), so fake it.
+		# (Makefile syntax), so fake it.
 		if (-r "$test_src_dir/testextra")
 		{
 			open EXTRA, "$test_src_dir/testextra"
