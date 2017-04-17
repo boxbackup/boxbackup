@@ -291,7 +291,7 @@ const char *BackupDaemon::DaemonName() const
 // --------------------------------------------------------------------------
 std::string BackupDaemon::DaemonBanner() const
 {
-	return BANNER_TEXT("Backup Client");
+	return BANNER_TEXT("client daemon (bbackupd)");
 }
 
 void BackupDaemon::Usage()

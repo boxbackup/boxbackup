@@ -15,8 +15,8 @@
 #endif
 
 #define BANNER_TEXT(UtilityName) \
-	"Box " UtilityName " v" BOX_VERSION ", (c) Ben Summers and " \
-	"contributors 2003-2014"
+	"Box Backup " UtilityName " v" BOX_VERSION "\n" \
+	"(c) Ben Summers and contributors 2003-2017"
 
 #endif // BANNERTEXT__H
 
