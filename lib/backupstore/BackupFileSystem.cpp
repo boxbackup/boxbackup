@@ -69,7 +69,8 @@ void BackupFileSystem::GetLock()
 			if(EXCEPTION_IS_TYPE(e, BackupStoreException,
 				CouldNotLockStoreAccount) && triesLeft)
 			{
-				// Try again as long as we have retries left.
+				// Sleep a bit, and try again, as long as we have retries left.
+				ShortSleep(MilliSecondsToBoxTime(1000), true);
 			}
 			else
 			{
