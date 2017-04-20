@@ -72,9 +72,8 @@ test_script:
   # AppVeyor refuses to package files outside of the project directory, so we need to copy the
   # built package files into it:
   - dir
-  - mkdir %APPVEYOR_BUILD_FOLDER%\packages
-  - copy BoxBackup-*.zip %APPVEYOR_BUILD_FOLDER%\packages
-  - copy BoxBackup-*.exe %APPVEYOR_BUILD_FOLDER%\packages
+  - appveyor PushArtifact BoxBackup-*.zip -FileName BoxBackup-$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION).zip
+  - appveyor PushArtifact BoxBackup-*.exe -FileName BoxBackup-$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION).exe
 
 artifacts:
   - path: 'packages\BoxBackup-*.zip'
@@ -86,8 +85,8 @@ artifacts:
 
 deploy:
   - provider: GitHub
-    release: boxbackup_win32_$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION)
-    artifact: packages
+    release: boxbackup_$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION)
+    artifact: BoxBackup-$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION).*
     description: "Windows client binaries auto-built by AppVeyor"
     draft: false
     prerelease: true
