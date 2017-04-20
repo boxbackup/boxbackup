@@ -87,7 +87,9 @@ artifacts:
 deploy:
   - provider: GitHub
     release: boxbackup_win32_$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION)
-    artifact: 'packages\BoxBackup-*.zip','packages\BoxBackup-*.exe'
+    artifact:
+      - packages\BoxBackup-*.zip
+      - packages\BoxBackup-*.exe
     description: "Windows client binaries auto-built by AppVeyor"
     draft: false
     prerelease: true
