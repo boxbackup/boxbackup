@@ -95,7 +95,6 @@ deploy:
     prerelease: true
     auth_token:
       secure: WZi3MJGA5zIIAAij0if4auYeltJlyWUOePTYlCGvrNrgEVjYRkqILHzvVKDnLn43
-    artifact: 'packages\BoxBackup-*.zip','packages\BoxBackup-*.exe'
     on:
       branch:
         - master
