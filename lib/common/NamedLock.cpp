@@ -78,21 +78,31 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 
 	// See if the lock can be got
 	int flags = O_WRONLY | O_CREAT | O_TRUNC;
+	std::string method_name;
 
-#if HAVE_DECL_O_EXLOCK
+#ifdef BOX_LOCK_TYPE_O_EXLOCK
 	flags |= O_NONBLOCK | O_EXLOCK;
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXLOCK");
-#elif defined BOX_OPEN_LOCK
+	method_name = "O_EXLOCK";
+#elif defined BOX_LOCK_TYPE_WIN32
 	flags |= BOX_OPEN_LOCK;
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using BOX_OPEN_LOCK");
-#elif !HAVE_DECL_F_SETLK && !defined HAVE_FLOCK
-	// We have no other way to get a lock, so all we can do is fail if
-	// the file already exists, and take the risk of stale locks.
+	method_name = "BOX_OPEN_LOCK";
+#elif defined BOX_LOCK_TYPE_F_OFD_SETLK
+	method_name = "no special flags (for F_OFD_SETLK)";
+#elif defined BOX_LOCK_TYPE_F_SETLK
+	method_name = "no special flags (for F_SETLK)";
+#elif defined BOX_LOCK_TYPE_FLOCK
+	method_name = "no special flags (for flock())";
+#elif defined BOX_LOCK_TYPE_DUMB
+	// We have no other way to get a lock, so all we can do is fail if the
+	// file already exists, and take the risk of stale locks.
 	flags |= O_EXCL;
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXCL");
+	method_name = "O_EXCL";
+	method = LOCKTYPE_DUMB;
 #else
-	BOX_TRACE("Trying to create lockfile " << rFilename << " without special flags");
+#	error "Unknown locking type"
 #endif
+
+	BOX_TRACE("Trying to create lockfile " << rFilename << " using " << method_name);
 
 #ifdef WIN32
 	HANDLE fd = openfile(rFilename.c_str(), flags, mode);
@@ -101,49 +111,39 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	int fd = ::open(rFilename.c_str(), flags, mode);
 	if(fd == -1)
 #endif
-#if HAVE_DECL_O_EXLOCK
-	{ // if()
+	{
+		// Failed to open the file. What's the reason? The errno which indicates a lock
+		// conflict depends on the locking method.
+
+#ifdef BOX_LOCK_TYPE_O_EXLOCK
 		if(errno == EWOULDBLOCK)
-		{
-			// Lockfile already exists, and we tried to open it
-			// exclusively, which means we failed to lock it.
-			BOX_NOTICE("Failed to lock lockfile with O_EXLOCK: " << rFilename
-				<< ": already locked by another process?");
-			return false;
-		}
-		else
-		{
-			THROW_SYS_FILE_ERROR("Failed to open lockfile with O_EXLOCK",
-				rFilename, CommonException, OSFileError);
-		}
-	}
-#else // !HAVE_DECL_O_EXLOCK
-	{ // if()
-# if defined BOX_OPEN_LOCK
+#elif defined BOX_LOCK_TYPE_WIN32
 		if(errno == EBUSY)
-# else // !BOX_OPEN_LOCK
-		if(errno == EEXIST && (flags & O_EXCL))
-# endif
+#elif defined BOX_LOCK_TYPE_DUMB
+		if(errno == EEXIST)
+#else // F_OFD_SETLK, F_SETLK or FLOCK
+		if(false)
+#endif
 		{
 			// Lockfile already exists, and we tried to open it
 			// exclusively, which means we failed to lock it, which
 			// means that it's locked by someone else, which is an
 			// expected error condition, signalled by returning
 			// false instead of throwing.
-			BOX_NOTICE("Failed to lock lockfile with O_EXCL: " << rFilename
-				<< ": already locked by another process?");
+			BOX_NOTICE("Failed to lock lockfile with " << method_name << ": " <<
+				rFilename << ": already locked by another process?");
 			return false;
 		}
 		else
 		{
-			THROW_SYS_FILE_ERROR("Failed to open lockfile with O_EXCL",
+			THROW_SYS_FILE_ERROR("Failed to open lockfile with " << method_name,
 				rFilename, CommonException, OSFileError);
 		}
 	}
 
 	try
 	{
-# ifdef HAVE_FLOCK
+#ifdef BOX_LOCK_TYPE_FLOCK
 		BOX_TRACE("Trying to lock lockfile " << rFilename << " using flock()");
 		if(::flock(fd, LOCK_EX | LOCK_NB) != 0)
 		{
@@ -160,14 +160,19 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 					rFilename, CommonException, OSFileError);
 			}
 		}
-# elif HAVE_DECL_F_SETLK
+#elif defined BOX_LOCK_TYPE_F_SETLK || defined BOX_LOCK_TYPE_F_OFD_SETLK
 		struct flock desc;
 		desc.l_type = F_WRLCK;
 		desc.l_whence = SEEK_SET;
 		desc.l_start = 0;
 		desc.l_len = 0;
+		desc.l_pid = 0;
 		BOX_TRACE("Trying to lock lockfile " << rFilename << " using fcntl()");
+#	if defined BOX_LOCK_TYPE_F_OFD_SETLK
+		if(::fcntl(fd, F_OFD_SETLK, &desc) != 0)
+#	else // BOX_LOCK_TYPE_F_SETLK
 		if(::fcntl(fd, F_SETLK, &desc) != 0)
+#	endif
 		{
 			if(errno == EAGAIN)
 			{
@@ -182,7 +187,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 					rFilename, CommonException, OSFileError);
 			}
 		}
-# endif
+#endif
 	}
 	catch(BoxException &e)
 	{
@@ -191,10 +196,9 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 #else
 		::close(fd);
 #endif
-		BOX_NOTICE("Failed to lock lockfile " << rFilename << ": " << e.what());
-		throw;
+		THROW_FILE_ERROR("Failed to lock lockfile: " << e.what(), rFilename,
+			CommonException, NamedLockFailed);
 	}
-#endif // HAVE_DECL_O_EXLOCK
 
 	if(!FileExists(rFilename))
 	{
@@ -210,7 +214,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 
 	// Success
 	mFileDescriptor = fd;
-	BOX_TRACE("Successfully locked lockfile " << rFilename);
+	BOX_TRACE("Successfully locked lockfile " << rFilename << " using " << method_name);
 
 	return true;
 }
@@ -231,6 +235,8 @@ void NamedLock::ReleaseLock()
 		THROW_EXCEPTION(CommonException, NamedLockNotHeld)
 	}
 
+	bool success = true;
+
 #ifndef WIN32
 	// Delete the file. We need to do this before closing the filehandle,
 	// if we used flock() or fcntl() to lock it, otherwise someone could
@@ -245,9 +251,9 @@ void NamedLock::ReleaseLock()
 
 	if(EMU_UNLINK(mFileName.c_str()) != 0)
 	{
-		THROW_EMU_ERROR(
-			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),
-			CommonException, OSFileError);
+		// Let the function continue so that we close the file and reset the handle
+		// before returning the error to the user.
+		success = false;
 	}
 #endif // !WIN32
 
@@ -274,11 +280,16 @@ void NamedLock::ReleaseLock()
 
 	if(EMU_UNLINK(mFileName.c_str()) != 0)
 	{
+		success = false;
+	}
+#endif // WIN32
+
+	if(!success)
+	{
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to delete lockfile"),
 			CommonException, OSFileError);
 	}
-#endif // WIN32
 
 	BOX_TRACE("Released lock and deleted lockfile " << mFileName);
 }
