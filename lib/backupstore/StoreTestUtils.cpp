@@ -309,11 +309,11 @@ bool check_reference_counts(BackupStoreRefCountDatabase& references)
 	return counts_ok;
 }
 
-bool StartServer()
+bool StartServer(const std::string& daemon_args)
 {
-	bbstored_pid = StartDaemon(bbstored_pid,
-		BBSTORED " " + bbstored_args + " testfiles/bbstored.conf",
-		"testfiles/bbstored.pid");
+	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbstored_args);
+	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + daemon_args_final +
+		" testfiles/bbstored.conf", "testfiles/bbstored.pid");
 	return bbstored_pid != 0;
 }
 

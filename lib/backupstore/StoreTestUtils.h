@@ -89,7 +89,7 @@ bool check_reference_counts();
 bool check_reference_counts(BackupStoreRefCountDatabase& references);
 
 //! Starts the bbstored test server running, which must not already be running.
-bool StartServer();
+bool StartServer(const std::string& daemon_args = "");
 
 //! Stops the currently running bbstored test server.
 bool StopServer(bool wait_for_process = false);

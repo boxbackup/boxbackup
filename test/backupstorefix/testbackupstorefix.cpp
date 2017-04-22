@@ -76,6 +76,7 @@ std::map<std::string, int32_t> nameToID;
 std::map<int32_t, bool> objectIsDir;
 
 #define RUN_CHECK \
+	BOX_INFO("Running bbstoreaccounts to check and then repair the account"); \
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Ttbbstoreaccounts " \
 		"check 01234567"); \
 	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Ttbbstoreaccounts " \
@@ -447,6 +448,16 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 	check_root_dir_ok(after_entries, after_deps);
 }
 
+bool compare_store_contents_with_expected(int phase)
+{
+	BOX_INFO("Running testbackupstorefix.pl to check contents of store (phase " <<
+		phase << ")");
+	std::ostringstream cmd;
+	cmd << PERL_EXECUTABLE " testfiles/testbackupstorefix.pl ";
+	cmd << ((phase == 6) ? "reroot" : "check") << " " << phase;
+	return ::system(cmd.str().c_str()) == 0;
+}
+
 int test(int argc, const char *argv[])
 {
 	{
@@ -548,8 +559,11 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Test that an entry pointing to a directory whose "
 		"raidfile is corrupted doesn't crash");
 
-	// Start the bbstored server
-	TEST_THAT_OR(StartServer(), return 1);
+	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
+	// locked when we try to check or query it (race conditions):
+	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
+		"-k -Winfo -tbbstored -T");
+	TEST_THAT_OR(StartServer(daemon_args), return 1);
 
 	// Instead of starting a client, read the file listing file created by
 	// testbackupstorefix.pl and upload them in the correct order, so that the object
@@ -704,8 +718,8 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it was
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 0") == 0);
+	TEST_THAT(compare_store_contents_with_expected(0));
+
 	// Check the random file doesn't exist
 	{
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
@@ -794,9 +808,7 @@ int test(int argc, const char *argv[])
 		}
 
 		// Check
-		TEST_THAT(::system(PERL_EXECUTABLE
-			" testfiles/testbackupstorefix.pl check 1")
-			== 0);
+		TEST_THAT(compare_store_contents_with_expected(1));
 
 		// Check the modified file doesn't exist
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
@@ -882,8 +894,8 @@ int test(int argc, const char *argv[])
 	}
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 2") == 0);
+	TEST_THAT(compare_store_contents_with_expected(2));
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -942,8 +954,8 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 3") == 0);
+	TEST_THAT(compare_store_contents_with_expected(3));
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -959,8 +971,7 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is where it is predicted to be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 4") == 0);
+	TEST_THAT(compare_store_contents_with_expected(4));
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Corrupt file and dir");
@@ -970,11 +981,12 @@ int test(int argc, const char *argv[])
 	// Dir
 	CorruptObject("Test1/cannes/imulatrougge/foreomizes",23,
 		"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+
 	// Fix it
 	RUN_CHECK
+
 	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 5") == 0);
+	TEST_THAT(compare_store_contents_with_expected(5));
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Overwrite root with a file");
@@ -985,21 +997,16 @@ int test(int argc, const char *argv[])
 		r->CopyStreamTo(w);
 		w.Commit(true /* convert now */);
 	}
+
 	// Fix it
 	RUN_CHECK
+
 	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl reroot 6") == 0);
+	TEST_THAT(compare_store_contents_with_expected(6));
 
 	// ---------------------------------------------------------
 	// Stop server
-	TEST_THAT(KillServer(bbstored_pid));
-
-	#ifdef WIN32
-		TEST_THAT(EMU_UNLINK("testfiles/bbstored.pid") == 0);
-	#else
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-	#endif
+	TEST_THAT(StopServer());
 
 	return 0;
 }

@@ -71,6 +71,7 @@ std::string bbackupd_args = QUIET_PROCESS,
 	bbstored_args = QUIET_PROCESS,
 	bbackupquery_args,
 	test_args;
+bool bbstored_args_overridden = false;
 
 bool filedes_initialised = false;
 
@@ -314,6 +315,7 @@ int main(int argc, char * const * argv)
 			{
 				bbstored_args += " ";
 				bbstored_args += optarg;
+				bbstored_args_overridden = true;
 			}
 			break;
 
