@@ -30,7 +30,7 @@ init:
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
   - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
   - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
-  - ps: $env:compiled_version=$($env:boxbackup_version_full)_$($env:PLATFORM)_$($env:CONFIGURATION)
+  - ps: $env:compiled_version="$($env:boxbackup_version_full)_$($env:PLATFORM)_$($env:CONFIGURATION)"
 
 build:
   parallel: true
