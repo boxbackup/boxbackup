@@ -8,9 +8,8 @@ skip_tags: true
 os: Windows Server 2012
 
 platform:
-# - x86
-# - x64
-  - Win32
+  - x86
+  - x64
 
 configuration:
   - Debug
@@ -22,15 +21,16 @@ environment:
   OPENSSL_VERSION: 1.0.2f
   PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
-  BOXBACKUP_VERSION: 0.12
+  BOXBACKUP_VERSION_BASE: 0.12
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
   - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
   - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
-  - ps: $env:version_suffix="$env:APPVEYOR_REPO_BRANCH.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
-  - ps: Update-AppveyorBuild -Version "$env:BOXBACKUP_VERSION.$env:version_suffix"
+  - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
+  - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
+  - ps: $env:compiled_version=%boxbackup_version_full%_%PLATFORM%_%CONFIGURATION%
 
 build:
   parallel: true
@@ -56,7 +56,7 @@ install:
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
   - cmake -G "%Generator%" -A %PLATFORM% -DDEBUG=1
-    -DPACKAGE_VERSION_PATCH=%version_suffix%_%CONFIGURATION%
+    -DBOXBACKUP_VERSION=%compiled_version%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
@@ -76,21 +76,15 @@ test_script:
   # AppVeyor refuses to package files outside of the project directory, so we need to copy the
   # built package files into it:
   - dir
-  - appveyor PushArtifact BoxBackup-%BOXBACKUP_VERSION%.%version_suffix%_%CONFIGURATION%.zip
-  - appveyor PushArtifact BoxBackup-%BOXBACKUP_VERSION%.%version_suffix%_%CONFIGURATION%.exe
-
-artifacts:
-  - path: 'packages\BoxBackup-*.zip'
-    name: Windows Client ZIP
-    type: Zip
-  - path: 'packages\BoxBackup-*.exe'
-    name: Windows Client Installer
-    type: File
+  - appveyor PushArtifact BoxBackup-%compiled_version%.zip
+    -DeploymentName "Windows Client ZIP"
+  - appveyor PushArtifact BoxBackup-%compiled_version%.exe
+    -DeploymentName "Windows Client Installer"
 
 deploy:
   - provider: GitHub
-    release: boxbackup_$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION)
-    artifact: BoxBackup-$(APPVEYOR_BUILD_VERSION)_$(PLATFORM)_$(CONFIGURATION).*
+    release: BoxBackup-$(compiled_version)
+    artifact: BoxBackup-$(compiled_version).*
     description: "Windows client binaries auto-built by AppVeyor"
     draft: false
     prerelease: true

@@ -105,8 +105,8 @@ ExternalProject_Add(boost
 	INSTALL_COMMAND "" # none needed
 )
 
-if(PACKAGE_VERSION_PATCH)
-	list(APPEND boxbackup_cmake_args "-DPACKAGE_VERSION_PATCH=${PACKAGE_VERSION_PATCH}")
+if(BOXBACKUP_VERSION)
+	list(APPEND boxbackup_cmake_args "-DBOXBACKUP_VERSION=${BOXBACKUP_VERSION}")
 endif()
 string(REPLACE ";" " " boxbackup_cmake_args "${boxbackup_cmake_args}")
 

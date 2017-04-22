@@ -78,25 +78,33 @@ foreach(file_to_configure ${files_to_configure})
 		"${base_dir}/${file_to_configure}.out")
 endforeach()
 
-# Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
-# but only if it has changed, to avoid unnecessary complete rebuilds due to timestamps.
-execute_process(
-	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl
-	WORKING_DIRECTORY ${base_dir}/infrastructure
-	RESULT_VARIABLE status
-	OUTPUT_VARIABLE new_version_define
-	ERROR_VARIABLE command_output)
-if(NOT status EQUAL 0)
-	message(FATAL_ERROR "Failed to execute: "
-		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl: "
-		"status ${status}: ${command_output}")
+if(BOXBACKUP_VERSION)
+	set(boxbackup_version ${BOXBACKUP_VERSION})
+else()
+	# Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
+	# but only if it has changed, to avoid unnecessary complete rebuilds due to timestamps.
+	execute_process(
+		COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl
+		WORKING_DIRECTORY ${base_dir}/infrastructure
+		RESULT_VARIABLE status
+		OUTPUT_VARIABLE boxbackup_version
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_VARIABLE command_output)
+	if(NOT status EQUAL 0)
+		message(FATAL_ERROR "Failed to execute: "
+			"${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl: "
+			"status ${status}: ${command_output}")
+	endif()
 endif()
-file(WRITE "${base_dir}/lib/common/BoxVersion.h.new" "${new_version_define}")
+
+file(WRITE "${base_dir}/lib/common/BoxVersion.h.new"
+	"#define BOX_VERSION \"${boxbackup_version}\"\n")
 replace_file_if_different(
 	"${base_dir}/lib/common/BoxVersion.h"
 	"${base_dir}/lib/common/BoxVersion.h.new")
 
-add_definitions(-DBOX_CMAKE -DNEED_BOX_VERSION_H)
+add_definitions(-DBOX_CMAKE -DNEED_BOX_VERSION)
+
 if(WIN32)
 	add_definitions(-DWIN32)
 endif()
@@ -758,8 +766,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Box Backup is an open source, completely 
 set(CPACK_PACKAGE_VENDOR "www.BoxBackup.org")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${base_dir}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${base_dir}/LICENSE.txt")
-set(CPACK_PACKAGE_VERSION_MAJOR "0")
-set(CPACK_PACKAGE_VERSION_MINOR "12")
+set(CPACK_PACKAGE_VERSION ${boxbackup_version})
 string(TIMESTAMP date "%Y%m%d" UTC)
 # This may be overridden by the CMake command line to add an extra suffix:
 set(CPACK_PACKAGE_VERSION_PATCH "${PACKAGE_VERSION_PATCH}")

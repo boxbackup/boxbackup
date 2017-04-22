@@ -562,7 +562,7 @@ int test(int argc, const char *argv[])
 	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
 	// locked when we try to check or query it (race conditions):
 	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
-		"-k -Winfo -tbbstored -T");
+		"-kT -Winfo -tbbstored");
 	TEST_THAT_OR(StartServer(daemon_args), return 1);
 
 	// Instead of starting a client, read the file listing file created by

@@ -95,7 +95,8 @@ bool StartServer(const std::string& daemon_args = "");
 bool StopServer(bool wait_for_process = false);
 
 //! Starts the bbackupd client running, which must not already be running.
-bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf");
+bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf",
+	const std::string& daemon_args = "");
 
 //! Stops the currently running bbackupd client.
 bool StopClient(bool wait_for_process = false);

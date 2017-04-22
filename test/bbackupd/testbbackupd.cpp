@@ -3554,7 +3554,12 @@ bool test_sync_files_with_timestamps_in_future()
 bool test_changing_client_store_marker_pauses_daemon()
 {
 	SETUP_WITH_BBSTORED();
-	TEST_THAT(StartClient());
+
+	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
+	// locked when we try to check or query it (race conditions):
+	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
+		"-kT -Wnotice -tbbackupd");
+	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 
 	// Wait for the client to upload all current files. We also time
 	// approximately how long a sync takes.
