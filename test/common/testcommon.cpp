@@ -314,11 +314,6 @@ bool test_named_locks()
 				DIRECTORY_SEPARATOR "non-exist"
 				DIRECTORY_SEPARATOR "lock2"),
 			CommonException, NamedLockAlreadyLockingSomething);
-
-		// And again on that name
-		NamedLock lock2;
-		TEST_THAT(lock2.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock1") == false);
 	}
 
 	{
@@ -344,9 +339,9 @@ bool test_named_locks()
 			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
 	}
 
+#ifndef WIN32 // Windows locking is tested differently, below
 	{
 		// Test that named locks are actually exclusive!
-#ifndef WIN32
 		int child_pid = fork();
 		if(child_pid == 0)
 		{
@@ -358,26 +353,43 @@ bool test_named_locks()
 		{
 			sleep(1);
 		}
-#else
-		// Can't fork on win32, so take the lock in the same process. This doesn't work
-		// for most Unix lock types, but does work for BOX_OPEN_LOCK on Win32.
-		NamedLock lock1;
-		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
-#endif
 
 		// With a lock held, we should not be able to acquire another.
 		TEST_THAT(!NamedLock().TryAndGetLock("testfiles/locktest"));
 
-#ifndef WIN32
 		kill(child_pid, SIGTERM);
 		waitpid(child_pid, NULL, 0);
-#endif
 	}
 
 	{
 		// But with the lock released (by killing the child process), we should be able to
 		// acquire it here:
 		TEST_THAT(NamedLock().TryAndGetLock("testfiles/locktest"));
+	}
+#endif // !WIN32
+
+	// Test that double-acquiring locks fails on platforms with non-re-entrant locks
+	// (BOX_LOCK_TYPE_O_EXLOCK and BOX_LOCK_TYPE_WIN32) and raises an exception when the outer
+	// lock is unlocked (and the error is discovered) on other platforms.
+	{
+		NamedLock lock1;
+		TEST_THAT(lock1.TryAndGetLock("testfiles" DIRECTORY_SEPARATOR "lock"));
+
+		// And again on that name. This works on platforms that have
+		// non-reentrant file locks: Windows and O_EXLOCK.
+		NamedLock lock2;
+#if defined BOX_LOCK_TYPE_F_SETLK
+		// This lock type is reentrant, unfortunately. It appears that we can lock the same
+		// file again, and we only detect the problem when we unlock and then try to delete
+		// the lockfile for the first lock, when we discover that we've already deleted it,
+		// which means that we made a mistake:
+		TEST_THAT(lock2.TryAndGetLock("testfiles" DIRECTORY_SEPARATOR "lock"));
+		lock2.ReleaseLock();
+		TEST_CHECK_THROWS(lock1.ReleaseLock(), CommonException, OSFileError);
+#else
+		// These lock types are non-reentrant, so any attempt to lock them again should fail:
+		TEST_THAT(!lock2.TryAndGetLock("testfiles" DIRECTORY_SEPARATOR "lock"));
+#endif
 	}
 
 	TEARDOWN();
