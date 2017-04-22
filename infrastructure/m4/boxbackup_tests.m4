@@ -381,6 +381,7 @@ fi
 AC_CHECK_FUNCS([flock fcntl])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
+AC_CHECK_DECLS([F_OFD_SETLK],,, [[#include <fcntl.h>]])
 
 case $target_os in
 mingw32*) ;;
