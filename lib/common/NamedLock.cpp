@@ -79,21 +79,26 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 
 	// See if the lock can be got
 	int flags = O_WRONLY | O_CREAT | O_TRUNC;
+	std::string method;
 
 #if HAVE_DECL_O_EXLOCK
 	flags |= O_NONBLOCK | O_EXLOCK;
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXLOCK");
+	method = "O_EXLOCK";
 #elif defined BOX_OPEN_LOCK
 	flags |= BOX_OPEN_LOCK;
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using BOX_OPEN_LOCK");
-#elif !HAVE_DECL_F_SETLK && !defined HAVE_FLOCK
+	method = "BOX_OPEN_LOCK";
+#elif HAVE_DECL_F_SETLK
+	method = "no special flags (for F_SETLK)";
+#elif defined HAVE_FLOCK
+	method = "no special flags (for flock())";
+#else
 	// We have no other way to get a lock, so all we can do is fail if
 	// the file already exists, and take the risk of stale locks.
 	flags |= O_EXCL;
-	BOX_TRACE("Trying to create lockfile " << rFilename << " using O_EXCL");
-#else
-	BOX_TRACE("Trying to create lockfile " << rFilename << " without special flags");
+	method = "O_EXCL";
 #endif
+
+	BOX_TRACE("Trying to create lockfile " << rFilename << " using " << method);
 
 #ifdef WIN32
 	HANDLE fd = openfile(rFilename.c_str(), flags, mode);
@@ -108,13 +113,10 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		{
 			// Lockfile already exists, and we tried to open it
 			// exclusively, which means we failed to lock it.
-			BOX_NOTICE("Failed to lock lockfile with O_EXLOCK: " << rFilename
-				<< ": already locked by another process?");
-			return false;
 		}
 		else
 		{
-			THROW_SYS_FILE_ERROR("Failed to open lockfile with O_EXLOCK",
+			THROW_SYS_FILE_ERROR("Failed to open lockfile with " << method,
 				rFilename, CommonException, OSFileError);
 		}
 	}
@@ -128,15 +130,19 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		{
 			// Lockfile already exists, and we tried to open it
 			// exclusively, which means we failed to lock it.
-			BOX_NOTICE("Failed to lock lockfile with O_EXCL: " << rFilename
-				<< ": already locked by another process?");
-			return false;
 		}
 		else
 		{
-			THROW_SYS_FILE_ERROR("Failed to open lockfile with O_EXCL",
+			THROW_SYS_FILE_ERROR("Failed to open lockfile with " << method,
 				rFilename, CommonException, OSFileError);
 		}
+
+		// If we didn't throw an exception above, it means that the lockfile is locked
+		// by someone else, which is an expected error condition, signalled by returning
+		// false instead of throwing.
+		BOX_NOTICE("Failed to lock lockfile with " << method << ": " <<
+			rFilename << ": already locked by another process?");
+		return false;
 	}
 
 	try
