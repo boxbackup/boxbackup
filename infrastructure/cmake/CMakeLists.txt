@@ -103,7 +103,7 @@ replace_file_if_different(
 	"${base_dir}/lib/common/BoxVersion.h"
 	"${base_dir}/lib/common/BoxVersion.h.new")
 
-add_definitions(-DBOX_CMAKE -DNEED_BOX_VERSION)
+add_definitions(-DBOX_CMAKE -DNEED_BOX_VERSION_H)
 
 if(WIN32)
 	add_definitions(-DWIN32)
