@@ -78,8 +78,13 @@ foreach(file_to_configure ${files_to_configure})
 		"${base_dir}/${file_to_configure}.out")
 endforeach()
 
+# If BOXBACKUP_VERSION is defined when running CMake (as the AppVeyor config does), use it
+# as-is, since it contains the full version number, branch, and platform (Win32/Win64):
 if(BOXBACKUP_VERSION)
 	set(boxbackup_version ${BOXBACKUP_VERSION})
+	# Remove CPACK_SYSTEM_NAME from the default CPACK_PACKAGE_NAME, because it's already
+	# included in the CPACK_PACKAGE_VERSION:
+	set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}
 else()
 	# Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
 	# but only if it has changed, to avoid unnecessary complete rebuilds due to timestamps.
@@ -759,17 +764,11 @@ set_tests_properties(bbackupd PROPERTIES TIMEOUT 1200)
 set_tests_properties(s3store PROPERTIES TIMEOUT 20)
 set_tests_properties(httpserver PROPERTIES TIMEOUT 40)
 
-# This may be overridden by the CMake command line to add an extra suffix:
-set(PACKAGE_VERSION_PATCH "0" CACHE STRING "Package version suffix (patch version)")
-
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Box Backup is an open source, completely automatic, on-line backup system")
 set(CPACK_PACKAGE_VENDOR "www.BoxBackup.org")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${base_dir}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${base_dir}/LICENSE.txt")
 set(CPACK_PACKAGE_VERSION ${boxbackup_version})
-string(TIMESTAMP date "%Y%m%d" UTC)
-# This may be overridden by the CMake command line to add an extra suffix:
-set(CPACK_PACKAGE_VERSION_PATCH "${PACKAGE_VERSION_PATCH}")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Box Backup")
 set(CPACK_COMPONENTS_ALL Applications)
 set(CPACK_GENERATOR "ZIP;NSIS")

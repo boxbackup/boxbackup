@@ -27,7 +27,7 @@ init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
   - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
   - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-  - ps: $env:date_string = Get-Date -Format "yymmdd"
+  - ps: $env:date_string = Get-Date -Format "yyMMdd"
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
   - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$($env:date_string).$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
   - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
@@ -60,6 +60,9 @@ install:
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
+  - echo cmake -G "%Generator%" -A %PLATFORM% -DDEBUG=1
+    -DBOXBACKUP_VERSION=%compiled_version%
+    %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
   - cmake -G "%Generator%" -A %PLATFORM% -DDEBUG=1
     -DBOXBACKUP_VERSION=%compiled_version%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
