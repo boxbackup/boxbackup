@@ -16,8 +16,8 @@ configuration:
   - Release
 
 environment:
-  VisualStudioVersion: 10.0
-  Generator: Visual Studio 10
+  VisualStudioVersion: 11.0
+  Generator: Visual Studio 11
   OPENSSL_VERSION: 1.0.2f
   PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
