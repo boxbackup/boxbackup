@@ -366,7 +366,7 @@ std::string GetTempDirPath()
 {
 #ifdef WIN32
 	char buffer[PATH_MAX+1];
-	int len = GetTempPath(buffer, sizeof(buffer));
+	int len = GetTempPath(sizeof(buffer), buffer);
 	if(len > sizeof(buffer))
 	{
 		THROW_EXCEPTION(CommonException, TempDirPathTooLong);
