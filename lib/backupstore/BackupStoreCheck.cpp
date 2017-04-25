@@ -139,12 +139,11 @@ void BackupStoreCheck::Check()
 	}
 	else
 	{
-		std::string temp_file = GetTempDirPath() + DIRECTORY_SEPARATOR +
-			"boxbackup_refcount_db_XXXXXX";
+		std::string temp_file = GetTempDirPath() + "boxbackup_refcount_db_XXXXXX";
 		char temp_file_buf[PATH_MAX];
 		strncpy(temp_file_buf, temp_file.c_str(), sizeof(temp_file_buf));
 #ifdef WIN32
-		if(_mktemp_s(temp_file_buf, temp_file.size()) != 0)
+		if(_mktemp_s(temp_file_buf, sizeof(temp_file_buf)) != 0)
 		{
 			THROW_EXCEPTION_MESSAGE(BackupStoreException, FailedToCreateTemporaryFile,
 				"Failed to get a temporary file name based on " << temp_file);
