@@ -266,11 +266,11 @@ void NamedLock::ReleaseLock()
 #endif // !WIN32
 
 	// Close the file
-# ifdef WIN32
+#ifdef WIN32
 	if(!CloseHandle(mFileDescriptor))
-# else
+#else
 	if(::close(mFileDescriptor) != 0)
-# endif
+#endif
 	{
 		// Don't try to release it again
 		mFileDescriptor = INVALID_FILE;
