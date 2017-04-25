@@ -155,7 +155,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 		mDeletionSizeTarget = 0;
 	}
 
-	mpNewRefs = &mrFileSystem.GetTemporaryRefCountDatabase();
+	mpNewRefs = &mrFileSystem.GetPotentialRefCountDatabase();
 
 	// Scan the directory for potential things to delete
 	// This will also find and enqueue eligible items marked with RemoveASAP

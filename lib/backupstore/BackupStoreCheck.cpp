@@ -123,7 +123,7 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Will fix errors encountered during checking.");
 	}
 
-	mpNewRefs = &mrFileSystem.GetTemporaryRefCountDatabase();
+	mpNewRefs = &mrFileSystem.GetPotentialRefCountDatabase();
 
 	// Phase 1, check objects
 	if(!mQuiet)

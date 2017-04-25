@@ -240,7 +240,7 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 
 	// We also need to create and upload a fresh refcount DB.
 	BackupStoreRefCountDatabase& refcount(
-		mapFileSystem->GetTemporaryRefCountDatabase());
+		mapFileSystem->GetPotentialRefCountDatabase());
 	refcount.Commit();
 
 	return 0;

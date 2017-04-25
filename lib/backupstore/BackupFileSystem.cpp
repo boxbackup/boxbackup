@@ -106,7 +106,7 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 
 void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db)
 {
-	ASSERT(&refcount_db == mapTemporaryRefCountDatabase.get());
+	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
 	// This is the temporary database, so it is about to be committed and become the permanent
 	// database, so we need to close the current permanent database (if any) first.
 	mapPermanentRefCountDatabase.reset();
@@ -116,12 +116,12 @@ void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase&
 void BackupFileSystem::RefCountDatabaseAfterCommit(BackupStoreRefCountDatabase& refcount_db)
 {
 	// Can only commit a temporary database:
-	ASSERT(&refcount_db == mapTemporaryRefCountDatabase.get());
+	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
 
 	// This was the temporary database, but it is now permanent, and has replaced the
 	// permanent file, so we need to change the databases returned by the temporary
 	// and permanent getter functions:
-	mapPermanentRefCountDatabase = mapTemporaryRefCountDatabase;
+	mapPermanentRefCountDatabase = mapPotentialRefCountDatabase;
 
 	// And save it to permanent storage (TODO: avoid double Save() by AfterCommit
 	// handler and refcount DB destructor):
@@ -134,8 +134,8 @@ void BackupFileSystem::RefCountDatabaseAfterCommit(BackupStoreRefCountDatabase& 
 
 void BackupFileSystem::RefCountDatabaseAfterDiscard(BackupStoreRefCountDatabase& refcount_db)
 {
-	ASSERT(&refcount_db == mapTemporaryRefCountDatabase.get());
-	mapTemporaryRefCountDatabase.reset();
+	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
+	mapPotentialRefCountDatabase.reset();
 }
 
 
@@ -332,7 +332,7 @@ BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPermanentRefCountDatabase(
 	// be too easy to update the refcounts in the wrong one by mistake), and temporary
 	// databases are always read-write, so if a temporary database is already open
 	// then we should only allow a read-only permanent database to be opened.
-	ASSERT(!mapTemporaryRefCountDatabase.get() || ReadOnly);
+	ASSERT(!mapPotentialRefCountDatabase.get() || ReadOnly);
 
 	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
 	mapPermanentRefCountDatabase = BackupStoreRefCountDatabase::Load(account,
@@ -341,11 +341,11 @@ BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPermanentRefCountDatabase(
 }
 
 
-BackupStoreRefCountDatabase& RaidBackupFileSystem::GetTemporaryRefCountDatabase()
+BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPotentialRefCountDatabase()
 {
-	if(mapTemporaryRefCountDatabase.get())
+	if(mapPotentialRefCountDatabase.get())
 	{
-		return *mapTemporaryRefCountDatabase;
+		return *mapPotentialRefCountDatabase;
 	}
 
 	// It's dangerous to have two read-write databases open at the same time (it would
@@ -358,10 +358,10 @@ BackupStoreRefCountDatabase& RaidBackupFileSystem::GetTemporaryRefCountDatabase(
 	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
 	std::auto_ptr<BackupStoreRefCountDatabase> ap_new_db =
 		BackupStoreRefCountDatabase::Create(account);
-	mapTemporaryRefCountDatabase.reset(
+	mapPotentialRefCountDatabase.reset(
 		new BackupStoreRefCountDatabaseWrapper(ap_new_db, *this));
 
-	return *mapTemporaryRefCountDatabase;
+	return *mapPotentialRefCountDatabase;
 }
 
 
@@ -783,7 +783,7 @@ RaidBackupFileSystem::CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjec
 {
 	// This normally only happens during housekeeping, which is using a temporary
 	// refcount database, so insist on that for now.
-	BackupStoreRefCountDatabase* pRefCount = mapTemporaryRefCountDatabase.get();
+	BackupStoreRefCountDatabase* pRefCount = mapPotentialRefCountDatabase.get();
 	ASSERT(pRefCount != NULL);
 	ASSERT(mapPermanentRefCountDatabase.get() == NULL ||
 		mapPermanentRefCountDatabase->IsReadOnly());
@@ -1322,7 +1322,7 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 	// be too easy to update the refcounts in the wrong one by mistake), and temporary
 	// databases are always read-write, so if a temporary database is already open
 	// then we should only allow a read-only permanent database to be opened.
-	ASSERT(!mapTemporaryRefCountDatabase.get() || ReadOnly);
+	ASSERT(!mapPotentialRefCountDatabase.get() || ReadOnly);
 
 	GetCacheLock();
 
@@ -1400,11 +1400,11 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 }
 
 
-BackupStoreRefCountDatabase& S3BackupFileSystem::GetTemporaryRefCountDatabase()
+BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
 {
-	if(mapTemporaryRefCountDatabase.get())
+	if(mapPotentialRefCountDatabase.get())
 	{
-		return *mapTemporaryRefCountDatabase;
+		return *mapPotentialRefCountDatabase;
 	}
 
 	// It's dangerous to have two read-write databases open at the same time (it would
@@ -1422,10 +1422,10 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetTemporaryRefCountDatabase()
 
 	std::auto_ptr<BackupStoreRefCountDatabase> ap_new_db =
 		BackupStoreRefCountDatabase::Create(local_path, S3_FAKE_ACCOUNT_ID);
-	mapTemporaryRefCountDatabase.reset(
+	mapPotentialRefCountDatabase.reset(
 		new BackupStoreRefCountDatabaseWrapper(ap_new_db, *this));
 
-	return *mapTemporaryRefCountDatabase;
+	return *mapPotentialRefCountDatabase;
 }
 
 
@@ -1971,11 +1971,11 @@ void S3BackupFileSystem::ReleaseLock()
 S3BackupFileSystem::~S3BackupFileSystem()
 {
 	// Close any open refcount DBs before partially destroying the
-	// BackupFileSystem that they need to close down. Need to do this in the
-	// subclass to avoid calling SaveRefCountDatabase() when the subclass
-	// has already been partially destroyed.
+	// BackupFileSystem that they need to close down. Need to do this in
+	// the subclass to avoid calling SaveRefCountDatabase() when the
+	// subclass has already been partially destroyed.
 	// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
-	mapTemporaryRefCountDatabase.reset();
+	mapPotentialRefCountDatabase.reset();
 	mapPermanentRefCountDatabase.reset();
 
 	// This needs to be in the source file, not inline, as long as we don't include

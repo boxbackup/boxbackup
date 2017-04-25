@@ -55,7 +55,7 @@ public:
 	virtual void ReleaseLock()
 	{
 		mapBackupStoreInfo.reset();
-		mapTemporaryRefCountDatabase.reset();
+		mapPotentialRefCountDatabase.reset();
 		mapPermanentRefCountDatabase.reset();
 	}
 
@@ -81,13 +81,13 @@ public:
 		return GetBackupStoreInfoInternal(true); // ReadOnly
 	}
 
-	// GetTemporaryRefCountDatabase() returns the current temporary database if it
+	// GetPotentialRefCountDatabase() returns the current potential database if it
 	// has been already obtained and not closed, otherwise creates a new one.
 	// This same database will never be returned by both this function and
 	// GetPermanentRefCountDatabase() at the same time; it must be committed to
 	// convert it to a permanent DB before GetPermanentRefCountDatabase() will
-	// return it, and GetTemporaryRefCountDatabase() no longer will after that.
-	virtual BackupStoreRefCountDatabase& GetTemporaryRefCountDatabase() = 0;
+	// return it, and GetPotentialRefCountDatabase() no longer will after that.
+	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase() = 0;
 	// GetPermanentRefCountDatabase returns the current permanent database, if already
 	// open, otherwise refreshes the cached copy, opens it, and returns it.
 	virtual BackupStoreRefCountDatabase&
@@ -161,9 +161,9 @@ protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
 	std::auto_ptr<BackupStoreInfo> mapBackupStoreInfo;
 	// You can have one temporary and one permanent refcound DB open at any time,
-	// obtained with GetTemporaryRefCountDatabase() and
+	// obtained with GetPotentialRefCountDatabase() and
 	// GetPermanentRefCountDatabase() respectively:
-	std::auto_ptr<BackupStoreRefCountDatabase> mapTemporaryRefCountDatabase;
+	std::auto_ptr<BackupStoreRefCountDatabase> mapPotentialRefCountDatabase;
 	std::auto_ptr<BackupStoreRefCountDatabase> mapPermanentRefCountDatabase;
 
 protected:
@@ -209,10 +209,10 @@ public:
 		// subclass to avoid calling SaveRefCountDatabase() when the subclass
 		// has already been partially destroyed.
 		// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
-		if(mapTemporaryRefCountDatabase.get())
+		if(mapPotentialRefCountDatabase.get())
 		{
-			mapTemporaryRefCountDatabase->Discard();
-			mapTemporaryRefCountDatabase.reset();
+			mapPotentialRefCountDatabase->Discard();
+			mapPotentialRefCountDatabase.reset();
 		}
 
 		mapPermanentRefCountDatabase.reset();
@@ -238,7 +238,7 @@ public:
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 
-	virtual BackupStoreRefCountDatabase& GetTemporaryRefCountDatabase();
+	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
 	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 
@@ -341,7 +341,7 @@ public:
 	}
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
-	virtual BackupStoreRefCountDatabase& GetTemporaryRefCountDatabase();
+	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
 	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
 	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true);
