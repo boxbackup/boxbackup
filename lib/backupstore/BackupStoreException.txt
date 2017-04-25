@@ -84,3 +84,4 @@ CacheDirectoryLocked		80	The cache directory is already locked by another proces
 FileSystemCannotMerge		81	This filesystem does not support merging patches, so it cannot delete this file
 BadConfiguration		82	The configuration file contains an error or invalid value
 TooManyFilesInDirectory		83	The S3 directory contains too many files for it to be a Boxbackup store, please check and/or empty it
+FailedToCreateTemporaryFile	84	Failed to create a temporary file

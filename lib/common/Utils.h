@@ -27,6 +27,7 @@ std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
 void DumpStackBacktrace(const std::string& filename);
 void DumpStackBacktrace(const std::string& filename, size_t size, void * const * array);
 
+std::string GetTempDirPath();
 bool FileExists(const std::string& rFilename, int64_t *pFileSize = 0,
 	bool TreatLinksAsNotExisting = false);
 

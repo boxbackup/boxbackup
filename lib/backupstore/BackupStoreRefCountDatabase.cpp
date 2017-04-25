@@ -44,7 +44,8 @@ public:
 	~BackupStoreRefCountDatabaseImpl();
 
 	BackupStoreRefCountDatabaseImpl(const std::string& Filename, int64_t AccountID,
-		bool ReadOnly, bool Temporary, std::auto_ptr<FileStream> apDatabaseFile);
+		bool ReadOnly, bool PotentialDB, bool TemporaryDB,
+		std::auto_ptr<FileStream> apDatabaseFile);
 
 private:
 	// No copying allowed
@@ -61,8 +62,15 @@ public:
 	void Discard();
 	void Close()
 	{
-		// If this was a temporary database, it should have been Commit()ed first.
-		ASSERT(!mIsTemporaryFile);
+		// If this was a potential database, it should have been
+		// Commit()ed or Discard()ed first.
+		ASSERT(!mIsPotentialDB);
+		// If this is a temporary database, we should Discard() it to
+		// delete the file:
+		if(mIsTemporaryDB)
+		{
+			Discard();
+		}
 		mapDatabaseFile.reset();
 	}
 	void Reopen();
@@ -111,12 +119,13 @@ private:
 	std::string mFilename, mFinalFilename;
 	bool mReadOnly;
 	bool mIsModified;
-	bool mIsTemporaryFile;
+	bool mIsPotentialDB;
+	bool mIsTemporaryDB;
 	std::auto_ptr<FileStream> mapDatabaseFile;
 
 	bool NeedsCommitOrDiscard()
 	{
-		return mapDatabaseFile.get() && mIsModified && mIsTemporaryFile;
+		return mapDatabaseFile.get() && mIsModified && mIsPotentialDB;
 	}
 };
 
@@ -130,22 +139,26 @@ private:
 //
 // --------------------------------------------------------------------------
 BackupStoreRefCountDatabaseImpl::BackupStoreRefCountDatabaseImpl(
-	const std::string& Filename, int64_t AccountID, bool ReadOnly, bool Temporary,
-	std::auto_ptr<FileStream> apDatabaseFile)
+	const std::string& Filename, int64_t AccountID, bool ReadOnly, bool PotentialDB,
+	bool TemporaryDB, std::auto_ptr<FileStream> apDatabaseFile)
 : mAccountID(AccountID),
-  mFilename(Filename + (Temporary ? "X" : "")),
-  mFinalFilename(Filename),
+  mFilename(Filename + (PotentialDB ? "X" : "")),
+  mFinalFilename(TemporaryDB ? "" : Filename),
   mReadOnly(ReadOnly),
   mIsModified(false),
-  mIsTemporaryFile(Temporary),
+  mIsPotentialDB(PotentialDB),
+  mIsTemporaryDB(TemporaryDB),
   mapDatabaseFile(apDatabaseFile)
 {
-	ASSERT(!(ReadOnly && Temporary)); // being both doesn't make sense
+	ASSERT(!(PotentialDB && TemporaryDB)); // being both doesn't make sense
+	ASSERT(!(ReadOnly && PotentialDB)); // being both doesn't make sense
 }
 
 void BackupStoreRefCountDatabaseImpl::Commit()
 {
-	if (!mIsTemporaryFile)
+	ASSERT(!mIsTemporaryDB);
+
+	if (!mIsPotentialDB)
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
 			"Cannot commit a permanent reference count database");
@@ -178,12 +191,12 @@ void BackupStoreRefCountDatabaseImpl::Commit()
 
 	mFilename = mFinalFilename;
 	mIsModified = false;
-	mIsTemporaryFile = false;
+	mIsPotentialDB = false;
 }
 
 void BackupStoreRefCountDatabaseImpl::Discard()
 {
-	if (!mIsTemporaryFile)
+	if (!mIsTemporaryDB && !mIsPotentialDB)
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
 			"Cannot discard a permanent reference count database");
@@ -201,13 +214,14 @@ void BackupStoreRefCountDatabaseImpl::Discard()
 
 	if(EMU_UNLINK(mFilename.c_str()) != 0)
 	{
-		THROW_EMU_FILE_ERROR("Failed to delete temporary refcount "
+		THROW_EMU_FILE_ERROR("Failed to delete temporary/potential refcount "
 			"database file", mFilename, CommonException,
 			OSFileError);
 	}
 
 	mIsModified = false;
-	mIsTemporaryFile = false;
+	mIsTemporaryDB = false;
+	mIsPotentialDB = false;
 }
 
 // --------------------------------------------------------------------------
@@ -220,11 +234,15 @@ void BackupStoreRefCountDatabaseImpl::Discard()
 // --------------------------------------------------------------------------
 BackupStoreRefCountDatabaseImpl::~BackupStoreRefCountDatabaseImpl()
 {
-	if (mIsTemporaryFile)
+	if (mIsTemporaryDB || mIsPotentialDB)
 	{
 		// Don't throw exceptions in a destructor.
-		BOX_ERROR("BackupStoreRefCountDatabase destroyed without "
-			"explicit commit or discard");
+		if(mIsPotentialDB)
+		{
+			BOX_ERROR("Potential new BackupStoreRefCountDatabase destroyed "
+				"without explicit commit or discard");
+		}
+
 		try
 		{
 			Discard();
@@ -274,41 +292,61 @@ BackupStoreRefCountDatabase::Create(const BackupStoreAccountDatabase::Entry& rAc
 //			 const std::string& Filename, int64_t AccountID)
 //		Purpose: Create a blank database, using a temporary file that
 //			 you must Discard() or Commit() to make permanent.
+//		         Be careful with reuse_existing_file, because it
+//		         makes it easy to bypass the restriction of only one
+//		         (committable) temporary database at a time, and to
+//		         accidentally overwrite the main DB.
 //		Created: 2003/08/28
 //
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupStoreRefCountDatabase>
-BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t AccountID)
+BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t AccountID,
+	bool reuse_existing_file)
 {
 	// Open the file for writing
-	std::string temp_filename = Filename + "X";
+	std::string temp_filename = Filename + (reuse_existing_file ? "" : "X");
+	int flags = O_CREAT | O_BINARY | O_RDWR | O_EXCL;
+
 	if(FileExists(temp_filename))
 	{
-		BOX_WARNING(BOX_FILE_MESSAGE(temp_filename, "Overwriting existing "
-			"temporary reference count database"));
-		if (EMU_UNLINK(temp_filename.c_str()) != 0)
+		if(reuse_existing_file)
 		{
-			THROW_SYS_FILE_ERROR("Failed to delete old temporary "
-				"reference count database file", temp_filename,
-				CommonException, OSFileError);
+			// Don't warn, and don't fail because the file already exists. This allows
+			// creating a temporary file securely with mkstemp() and then opening it as
+			// a refcount database, avoiding a race condition.
+			flags &= ~O_EXCL;
+		}
+		else
+		{
+			BOX_WARNING(BOX_FILE_MESSAGE(temp_filename, "Overwriting existing "
+				"temporary reference count database"));
+			if (EMU_UNLINK(temp_filename.c_str()) != 0)
+			{
+				THROW_SYS_FILE_ERROR("Failed to delete old temporary "
+					"reference count database file", temp_filename,
+					CommonException, OSFileError);
+			}
 		}
 	}
 
-	int flags = O_CREAT | O_BINARY | O_RDWR | O_EXCL;
-	std::auto_ptr<FileStream> DatabaseFile(new FileStream(temp_filename, flags));
+#ifdef BOX_OPEN_LOCK
+	flags |= BOX_OPEN_LOCK;
+#endif
+	std::auto_ptr<FileStream> database_file(new FileStream(temp_filename, flags));
 
 	// Write header
 	refcount_StreamFormat hdr;
 	hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE);
 	hdr.mAccountID = htonl(AccountID);
-	DatabaseFile->Write(&hdr, sizeof(hdr));
+	database_file->Write(&hdr, sizeof(hdr));
 
 	// Make new object
 	BackupStoreRefCountDatabaseImpl* p_impl = new BackupStoreRefCountDatabaseImpl(
 		Filename, AccountID,
 		false, // ReadOnly
-		true, // Temporary
-		DatabaseFile);
+		!reuse_existing_file, // PotentialDB
+		reuse_existing_file, // TemporaryDB
+		database_file);
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(p_impl);
 
 	// The root directory must always have one reference for a database
@@ -378,7 +416,8 @@ BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID
 	std::auto_ptr<FileStream> database_file = OpenDatabaseFile(Filename, AccountID, ReadOnly);
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
 		new BackupStoreRefCountDatabaseImpl(Filename, AccountID, ReadOnly,
-			false, // Temporary
+			false, // PotentialDB
+			false, // TemporaryDB
 			database_file));
 
 	// return it to caller

@@ -361,6 +361,37 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 	}
 }
 
+
+std::string GetTempDirPath()
+{
+#ifdef WIN32
+	char buffer[PATH_MAX+1];
+	int len = GetTempPath(buffer, sizeof(buffer));
+	if(len > sizeof(buffer))
+	{
+		THROW_EXCEPTION(CommonException, TempDirPathTooLong);
+	}
+	if(len == 0)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Failed to get temporary directory path");
+	}
+	return std::string(buffer);
+#else
+	char* result = getenv("TEMP");
+	if(result == NULL)
+	{
+		result = getenv("TMP");
+	}
+	if(result == NULL)
+	{
+		THROW_EXCEPTION(CommonException, TempDirNotSet);
+	}
+	return std::string(result);
+#endif
+}
+
+
 // --------------------------------------------------------------------------
 //
 // Function

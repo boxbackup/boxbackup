@@ -343,18 +343,29 @@ BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPermanentRefCountDatabase(
 
 BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPotentialRefCountDatabase()
 {
+	// Creating the "official" potential refcount DB is actually a change
+	// to the store, even if you don't commit it, because it's in the same
+	// directory and would conflict with another process trying to do the
+	// same thing, so it requires that you hold the write lock.
+	ASSERT(mWriteLock.GotLock());
+
 	if(mapPotentialRefCountDatabase.get())
 	{
 		return *mapPotentialRefCountDatabase;
 	}
 
-	// It's dangerous to have two read-write databases open at the same time (it would
-	// be too easy to update the refcounts in the wrong one by mistake), and temporary
-	// databases are always read-write, so if a permanent database is already open
-	// then it must be a read-only one.
+	// It's dangerous to have two read-write databases open at the same
+	// time (it would be too easy to update the refcounts in the wrong one
+	// by mistake), and temporary databases are always read-write, so if a
+	// permanent database is already open then it must be a read-only one.
 	ASSERT(!mapPermanentRefCountDatabase.get() ||
 		mapPermanentRefCountDatabase->IsReadOnly());
 
+	// We deliberately do not give the caller control of the
+	// reuse_existing_file parameter to Create(), because that would make
+	// it easy to bypass the restriction of only one (committable)
+	// temporary database at a time, and to accidentally overwrite the main
+	// refcount DB.
 	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
 	std::auto_ptr<BackupStoreRefCountDatabase> ap_new_db =
 		BackupStoreRefCountDatabase::Create(account);
@@ -1402,6 +1413,12 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 
 BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
 {
+	// Creating the "official" temporary refcount DB is actually a change
+	// to the cache, even if you don't commit it, because it's in the same
+	// directory and would conflict with another process trying to do the
+	// same thing, so it requires that you hold the write lock.
+	ASSERT(mHaveLock);
+
 	if(mapPotentialRefCountDatabase.get())
 	{
 		return *mapPotentialRefCountDatabase;
@@ -1420,6 +1437,11 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
 	// download it into the cache. Just create one and return it.
 	std::string local_path = GetRefCountDatabaseCachePath();
 
+	// We deliberately do not give the caller control of the
+	// reuse_existing_file parameter to Create(), because that would make
+	// it easy to bypass the restriction of only one (committable)
+	// temporary database at a time, and to accidentally overwrite the main
+	// refcount DB.
 	std::auto_ptr<BackupStoreRefCountDatabase> ap_new_db =
 		BackupStoreRefCountDatabase::Create(local_path, S3_FAKE_ACCOUNT_ID);
 	mapPotentialRefCountDatabase.reset(

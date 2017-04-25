@@ -16,6 +16,10 @@
 #	include <unistd.h>
 #endif
 
+#ifdef WIN32
+#	include <io.h> // for _mktemp_s
+#endif
+
 #include "autogen_BackupStoreException.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
@@ -123,7 +127,43 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Will fix errors encountered during checking.");
 	}
 
-	mpNewRefs = &mrFileSystem.GetPotentialRefCountDatabase();
+	// If we are read-only, then we should not call GetPotentialRefCountDatabase because
+	// that does actually change the store: the temporary file would conflict with any other
+	// process which wants to do the same thing at the same time (e.g. housekeeping), and if
+	// neither process locks the store, they will break each other. We can still create a
+	// refcount DB in a temporary directory, and Commit() will not really commit it in that
+	// case (it will rename it, but still in the temporary directory).
+	if(mFixErrors)
+	{
+		mpNewRefs = &mrFileSystem.GetPotentialRefCountDatabase();
+	}
+	else
+	{
+		std::string temp_file = GetTempDirPath() + DIRECTORY_SEPARATOR +
+			"boxbackup_refcount_db_XXXXXX";
+		char temp_file_buf[PATH_MAX];
+		strncpy(temp_file_buf, temp_file.c_str(), sizeof(temp_file_buf));
+#ifdef WIN32
+		if(_mktemp_s(temp_file_buf, temp_file.size()) != 0)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, FailedToCreateTemporaryFile,
+				"Failed to get a temporary file name based on " << temp_file);
+		}
+#else
+		int fd = mkstemp(temp_file_buf);
+		if(fd == -1)
+		{
+			THROW_SYS_FILE_ERROR("Failed to get a temporary file name based on",
+				temp_file, BackupStoreException, FailedToCreateTemporaryFile);
+		}
+		close(fd);
+#endif
+
+		BOX_TRACE("Creating temporary refcount DB in a temporary file: " << temp_file_buf);
+		mapOwnNewRefs = BackupStoreRefCountDatabase::Create(temp_file_buf,
+			mrFileSystem.GetAccountID(), true); // reuse_existing_file
+		mpNewRefs = mapOwnNewRefs.get();
+	}
 
 	// Phase 1, check objects
 	if(!mQuiet)
@@ -194,6 +234,7 @@ void BackupStoreCheck::Check()
 	else
 	{
 		mpNewRefs->Discard();
+		mapOwnNewRefs.reset();
 	}
 	mpNewRefs = NULL;
 

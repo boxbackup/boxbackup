@@ -89,7 +89,7 @@ public:
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const BackupStoreAccountDatabase::Entry& rAccount);
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
-		(const std::string& Filename, int64_t AccountID);
+		(const std::string& Filename, int64_t AccountID, bool reuse_existing_file = false);
 	// Load it from the store
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
 		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);

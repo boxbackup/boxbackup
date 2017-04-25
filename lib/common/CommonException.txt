@@ -59,3 +59,4 @@ TimersNotInitialised			51	The timer framework should have been ready at this poi
 InvalidConfiguration			52	Some required values are missing or incorrect in the configuration file
 IOStreamTimedOut			53	A network operation timed out
 NamedLockFailed				54	Failed to acquire a named lock
+TempDirNotSet				55	Your temporary directory is not set. Either the TMP or TEMP environment variable should be set to a path
