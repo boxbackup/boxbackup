@@ -35,6 +35,16 @@ public:
 private:
 	tOSFileHandle mFileDescriptor;
 	std::string mFileName;
+
+	typedef enum
+	{
+		LOCKTYPE_O_EXLOCK = 1,
+		LOCKTYPE_WIN32 = 2,
+		LOCKTYPE_F_SETLK = 3,
+		LOCKTYPE_FLOCK = 4,
+		LOCKTYPE_DUMB = 5,
+	}
+	LockType;
 };
 
 #endif // NAMEDLOCK__H
