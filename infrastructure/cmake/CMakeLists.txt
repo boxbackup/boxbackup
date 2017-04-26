@@ -84,7 +84,7 @@ if(BOXBACKUP_VERSION)
 	set(boxbackup_version ${BOXBACKUP_VERSION})
 	# Remove CPACK_SYSTEM_NAME from the default CPACK_PACKAGE_NAME, because it's already
 	# included in the CPACK_PACKAGE_VERSION:
-	set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION})
+	set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}-${boxbackup_version})
 else()
 	# Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
 	# but only if it has changed, to avoid unnecessary complete rebuilds due to timestamps.
