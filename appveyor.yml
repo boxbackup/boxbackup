@@ -34,7 +34,7 @@ init:
   - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:PLATFORM)_$($env:CONFIGURATION)"
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
   # to the generator name if you want a 64-bit build (x64 platform):
-  - ps: $env:generator_name="$($env:Generator) $(if ($env:PLATFORM.equals('x64')) {'Win64'})"
+  - ps: $env:generator_name="$($env:Generator)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
 build:
   parallel: true
