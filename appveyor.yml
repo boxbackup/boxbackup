@@ -90,7 +90,7 @@ test_script:
 deploy:
   - provider: GitHub
     release: BoxBackup-$(compiled_version)
-    artifact: BoxBackup-$(compiled_version).*
+    artifact: '*'
     description: "Windows client binaries auto-built by AppVeyor"
     draft: false
     prerelease: true
