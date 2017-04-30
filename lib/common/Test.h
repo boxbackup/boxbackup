@@ -41,7 +41,7 @@ extern int num_tests_selected;
 extern int old_failure_count;
 extern std::string first_fail_file;
 extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
-extern bool bbstored_args_overridden;
+extern bool bbackupd_args_overridden, bbstored_args_overridden;
 extern std::list<std::string> run_only_named_tests;
 extern std::string current_test_name;
 extern std::map<std::string, std::string> s_test_status;
