@@ -2596,14 +2596,17 @@ bool test_delete_update_and_symlink_files()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
-// Check that store errors are reported neatly. This test uses an independent
-// daemon to check the daemon's backup loop delay, so it's easier to debug
-// with the command: ./t -VTttest -e test_store_error_reporting
-// --bbackupd-args=-kTtbbackupd
+// Check that store errors are reported neatly.
 bool test_store_error_reporting()
 {
 	SETUP_WITH_BBSTORED();
-	TEST_THAT(StartClient());
+
+	// Start the bbackupd client. Enable logging to help debug race
+	// conditions causing test failure:
+	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
+		"-kT -Wnotice -tbbackupd");
+	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
+
 	wait_for_sync_end();
 
 	// TODO FIXME dedent
@@ -3553,11 +3556,14 @@ bool test_sync_files_with_timestamps_in_future()
 // Check change of store marker pauses daemon
 bool test_changing_client_store_marker_pauses_daemon()
 {
+	// Debugging this test requires INFO level logging
+	Logger::LevelGuard(Logging::GetConsole(), Log::INFO);
+
 	SETUP_WITH_BBSTORED();
 
-	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
-	// locked when we try to check or query it (race conditions):
-	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
+	// Start the bbackupd client. Enable logging to help debug race
+	// conditions causing test failure:
+	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
 		"-kT -Wnotice -tbbackupd");
 	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 
@@ -3639,7 +3645,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 
 		// Test that there *are* differences still, i.e. that bbackupd
 		// didn't successfully run a backup during that time.
-		BOX_TRACE("Compare starting, expecting differences");
+		BOX_INFO("Compare starting, expecting differences");
 		TEST_COMPARE(Compare_Different);
 		BOX_TRACE("Compare finished, expected differences");
 
@@ -3648,7 +3654,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 		box_time_t wait =
 			SecondsToBoxTime(BACKUP_ERROR_DELAY_SHORTENED - 1) -
 			compare_time * 2;
-		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
+		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
 			" (including another compare taking " <<
 			BOX_FORMAT_MICROSECONDS(compare_time) << ") until "
 			"just before bbackupd recovers");
@@ -3656,7 +3662,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 
 		// bbackupd should not have recovered yet, so there should
 		// still be differences.
-		BOX_TRACE("Compare starting, expecting differences");
+		BOX_INFO("Compare starting, expecting differences");
 		TEST_COMPARE(Compare_Different);
 		BOX_TRACE("Compare finished, expected differences");
 
@@ -3665,11 +3671,11 @@ bool test_changing_client_store_marker_pauses_daemon()
 		// seconds after we expect the sync to have finished, to reduce
 		// the risk of random failure on AppVeyor when heavily loaded.
 		wait = sync_time + SecondsToBoxTime(3);
-		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
+		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
 			" until just after bbackupd recovers and finishes a sync");
 		ShortSleep(wait, true);
 
-		BOX_TRACE("Compare starting, expecting no differences");
+		BOX_INFO("Compare starting, expecting no differences");
 		TEST_COMPARE(Compare_Same);
 		BOX_TRACE("Compare finished, expected no differences");
 	}
