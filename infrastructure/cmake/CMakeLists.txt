@@ -238,6 +238,7 @@ foreach(module_dep ${module_deps})
 			endif()
 
 			add_executable(${module_name} ${module_files})
+			# Rename the output executable from bin_bbackupd(.exe) to bbackupd(.exe):
 			set_target_properties(${module_name} PROPERTIES OUTPUT_NAME
 				"${bin_name}")
 
@@ -250,10 +251,10 @@ foreach(module_dep ${module_deps})
 				CONFIGURATIONS Release;RelWithDebInfo
 				DESTINATION "${base_dir}/release/${module_dir}")
 
-			# This target is just for use by CPack on Windows:
+			# This target is just for use by CPack on Windows, ZIP generator:
 			if(WIN32)
 				install(TARGETS ${module_name} RUNTIME
-					CONFIGURATIONS Release
+					CONFIGURATIONS Debug;Release
 					DESTINATION "."
 					COMPONENT Applications)
 			endif()
@@ -357,6 +358,16 @@ foreach(module_dep ${module_deps})
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
 endforeach()
+
+if(WIN32)
+	install(FILES ${base_dir}/bin/bbackupd/win32/NotifySysAdmin.vbs
+		DESTINATION "." COMPONENT Extras)
+	install(FILES ${base_dir}/bin/bbackupd/win32/bbackupd.conf
+		DESTINATION "." COMPONENT Extras)
+else()
+	install(FILES ${base_dir}/bin/bbackupd/bbackupd-config
+		DESTINATION "." COMPONENT Extras)
+endif()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
 # generators such as MSVC. We need to use a generator expression instead.
@@ -770,7 +781,7 @@ set(CPACK_PACKAGE_DESCRIPTION_FILE "${base_dir}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${base_dir}/LICENSE.txt")
 set(CPACK_PACKAGE_VERSION ${boxbackup_version})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Box Backup")
-set(CPACK_COMPONENTS_ALL Applications)
+set(CPACK_COMPONENTS_ALL Applications Extras)
 set(CPACK_GENERATOR "ZIP;NSIS")
 set(CPACK_NSIS_DISPLAY_NAME "Box Backup")
 set(CPACK_NSIS_HELP_LINK "http://www.boxbackup.org/")
