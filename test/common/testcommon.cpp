@@ -13,6 +13,22 @@
 #include <stdio.h>
 #include <time.h>
 
+#ifdef HAVE_SIGNAL_H
+#	include <signal.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#	include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_WAIT_H
+#	include <sys/wait.h>
+#endif
+
 #include "Test.h"
 #include "Configuration.h"
 #include "FdGetLine.h"
@@ -177,6 +193,14 @@ class TestLogger : public Logger
 
 int test(int argc, const char *argv[])
 {
+	if(argc == 2 && strcmp(argv[1], "lockwait") == 0)
+	{
+		NamedLock lock1;
+		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
+		sleep(3600);
+		return 0;
+	}
+
 	// Test PartialReadStream and ReadGatherStream handling of files
 	// over 2GB (refs #2)
 	{
@@ -260,18 +284,6 @@ int test(int argc, const char *argv[])
 
 		// now that it's closed, it should be invisible on all platforms
 		TEST_THAT(!TestFileExists(tempfile.c_str()));
-	}
-
-	// Test that named locks work as expected
-	{
-		NamedLock lock1;
-		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
-		// With a lock held, we should not be able to acquire another.
-		TEST_THAT(!NamedLock().TryAndGetLock("testfiles/locktest"));
-	}
-	{
-		// But with the lock released, we should be able to.
-		TEST_THAT(NamedLock().TryAndGetLock("testfiles/locktest"));
 	}
 
 	// Test that memory leak detection doesn't crash
@@ -703,12 +715,6 @@ int test(int argc, const char *argv[])
 				DIRECTORY_SEPARATOR "non-exist"
 				DIRECTORY_SEPARATOR "lock2"), 
 			CommonException, NamedLockAlreadyLockingSomething);
-#if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
-		// And again on that name
-		NamedLock lock2;
-		TEST_THAT(lock2.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock1") == false);
-#endif
 	}
 	{
 		// Check that it unlocked when it went out of scope
@@ -730,6 +736,39 @@ int test(int argc, const char *argv[])
 		// And can reuse it
 		TEST_THAT(lock4.TryAndGetLock(
 			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
+	}
+	{
+		// Test that named locks are actually exclusive!
+#ifndef WIN32
+		int child_pid = fork();
+		if(child_pid == 0)
+		{
+			// This is the child process. Run ourselves with a special argument
+			// which will lock the lockfile until killed
+			TEST_THAT(execl(TEST_EXECUTABLE, TEST_EXECUTABLE, "lockwait", NULL) == 0);
+		}
+		else
+		{
+			sleep(1);
+		}
+#else
+		// Can't fork on win32, so take the lock in the same process. This doesn't work
+		// for most Unix lock types, but does work for BOX_OPEN_LOCK on Win32.
+		NamedLock lock1;
+		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
+#endif
+
+		// With a lock held, we should not be able to acquire another.
+		TEST_THAT(!NamedLock().TryAndGetLock("testfiles/locktest"));
+
+#ifndef WIN32
+		kill(child_pid, SIGTERM);
+		waitpid(child_pid, NULL, 0);
+#endif
+	}
+	{
+		// But with the lock released, we should be able to.
+		TEST_THAT(NamedLock().TryAndGetLock("testfiles/locktest"));
 	}
 
 	// Test the ReadGatherStream
