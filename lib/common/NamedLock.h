@@ -45,6 +45,8 @@ private:
 		LOCKTYPE_DUMB = 5,
 	}
 	LockType;
+
+	LockType mMethod;
 };
 
 #endif // NAMEDLOCK__H
