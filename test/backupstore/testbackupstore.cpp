@@ -2442,20 +2442,22 @@ bool test_cannot_open_multiple_writable_connections()
 {
 	SETUP_TEST_BACKUPSTORE();
 
-	// First try a local protocol. This works even on Windows.
+	// First try a local protocol (makes debugging easier):
 	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
 		"backup/01234567/", 0, false); // Not read-only
 
 	// Set the client store marker
 	protocolWritable.QuerySetClientStoreMarker(0x8732523ab23aLL);
 
-	// First try a local protocol. This works even on Windows.
+	// This works on platforms that have non-reentrant file locks: Windows and O_EXLOCK
+#if HAVE_DECL_O_EXLOCK || defined BOX_OPEN_LOCK
 	{
 		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
 		bsContext.SetClientHasAccount("backup/01234567/", 0);
 		BackupProtocolLocal protocolWritable2(bsContext);
 		TEST_THAT(assert_writable_connection_fails(protocolWritable2));
 	}
+#endif
 
 	{
 		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
