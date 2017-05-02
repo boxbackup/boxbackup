@@ -306,7 +306,7 @@ void DumpStackBacktrace(const std::string& filename, size_t size, void * const *
 
 		// We don't really care about frames after main() (e.g. CRT startup), and sometimes
 		// they contain invalid data (not function pointers) such as 0x7.
-		if(strcmp(mangled_name, "main") == 0)
+		if(mangled_name != NULL && strcmp(mangled_name, "main") == 0)
 		{
 			break;
 		}
