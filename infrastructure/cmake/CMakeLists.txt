@@ -361,12 +361,12 @@ endforeach()
 
 if(WIN32)
 	install(FILES ${base_dir}/bin/bbackupd/win32/NotifySysAdmin.vbs
-		DESTINATION "." COMPONENT Extras)
+		DESTINATION "${base_dir}/parcels" COMPONENT Extras)
 	install(FILES ${base_dir}/bin/bbackupd/win32/bbackupd.conf
-		DESTINATION "." COMPONENT Extras)
+		DESTINATION "${base_dir}/parcels" COMPONENT Extras)
 else()
 	install(FILES ${base_dir}/bin/bbackupd/bbackupd-config
-		DESTINATION "." COMPONENT Extras)
+		DESTINATION "${base_dir}/parcels" COMPONENT Extras)
 endif()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
