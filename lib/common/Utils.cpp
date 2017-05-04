@@ -378,14 +378,19 @@ std::string GetTempDirPath()
 	}
 	return std::string(buffer);
 #else
-	char* result = getenv("TEMP");
+	char* result = getenv("TMPDIR");
+	if(result == NULL)
+	{
+		result = getenv("TEMP");
+	}
 	if(result == NULL)
 	{
 		result = getenv("TMP");
 	}
 	if(result == NULL)
 	{
-		THROW_EXCEPTION(CommonException, TempDirNotSet);
+		BOX_WARNING("TMPDIR/TEMP/TMP not set, falling back to /tmp");
+		result = "/tmp";
 	}
 	return std::string(result);
 #endif
