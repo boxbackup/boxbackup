@@ -2650,7 +2650,7 @@ bool test_store_error_reporting()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		wait_for_operation(4, "bbackupd to try to access the store");
+		wait_for_operation(6, "bbackupd to try to access the store");
 
 		// Check that an error was reported just once
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
