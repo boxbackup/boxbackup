@@ -251,13 +251,13 @@ foreach(module_dep ${module_deps})
 				CONFIGURATIONS Release;RelWithDebInfo
 				DESTINATION "${base_dir}/release/${module_dir}")
 
-			# This target is just for use by CPack on Windows, ZIP generator:
-			if(WIN32)
-				install(TARGETS ${module_name} RUNTIME
-					CONFIGURATIONS Debug;Release
-					DESTINATION "."
-					COMPONENT Applications)
-			endif()
+			# This target is just for use by CPack generators, which ignore the
+			# absolute-path installations above, and for "make install" to actually
+			# install Box Backup on your system:
+			install(TARGETS ${module_name} RUNTIME
+				CONFIGURATIONS Debug;Release
+				DESTINATION "."
+				COMPONENT Applications)
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
@@ -361,12 +361,12 @@ endforeach()
 
 if(WIN32)
 	install(FILES ${base_dir}/bin/bbackupd/win32/NotifySysAdmin.vbs
-		DESTINATION "${base_dir}/parcels" COMPONENT Extras)
+		DESTINATION "." COMPONENT Extras)
 	install(FILES ${base_dir}/bin/bbackupd/win32/bbackupd.conf
-		DESTINATION "${base_dir}/parcels" COMPONENT Extras)
+		DESTINATION "." COMPONENT Extras)
 else()
 	install(FILES ${base_dir}/bin/bbackupd/bbackupd-config
-		DESTINATION "${base_dir}/parcels" COMPONENT Extras)
+		DESTINATION "." COMPONENT Extras)
 endif()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
