@@ -194,6 +194,9 @@ endforeach()
 set(testmain_template_cpp
 	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
 )
+set(release_or_debug_dir
+	"${base_dir}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>$<$<CONFIG:RelWithDebInfo>:release>"
+)
 
 if(WIN32)
 	set(time_test_command_prefix "")
@@ -242,18 +245,16 @@ foreach(module_dep ${module_deps})
 			set_target_properties(${module_name} PROPERTIES OUTPUT_NAME
 				"${bin_name}")
 
-			# Try using install(PROGRAMS) to avoid confusing the CPack NSIS
-			# generator with our absolute-path installations:
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}")
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Release;RelWithDebInfo
-				DESTINATION "${base_dir}/release/${module_dir}")
+			# Use a custom post-build command instead of install(...) to install
+			# binaries ready for running tests, because we don't want "make install" to
+			# do this too, and absolute-path installations break the CPack generators.
+			add_custom_command(TARGET ${module_name} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+				"$<TARGET_FILE:${module_name}>"
+				"${release_or_debug_dir}/${module_dir}"
+				VERBATIM)
 
-			# This target is just for use by CPack generators, which ignore the
-			# absolute-path installations above, and for "make install" to actually
-			# install Box Backup on your system:
+			# For "make install" and CPack generators:
 			install(TARGETS ${module_name} RUNTIME
 				CONFIGURATIONS Debug;Release
 				DESTINATION "."
@@ -270,12 +271,15 @@ foreach(module_dep ${module_deps})
 			set(module_files ${module_files} "${testmain_template_cpp}")
 			add_executable(${module_name} ${module_files})
 
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}")
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Release;RelWithDebInfo
-				DESTINATION "${base_dir}/release/${module_dir}")
+			# Use a custom post-build command instead of install(...) to install
+			# binaries ready for running tests, because we don't want "make install" to
+			# do this too, and absolute-path installations break the CPack generators.
+			add_custom_command(TARGET ${module_name} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+				"$<TARGET_FILE:${module_name}>"
+				"${release_or_debug_dir}/${module_dir}"
+				VERBATIM)
+
 			if(${APPVEYOR_MODE})
 				set(appveyor_runtest_pl_switch -a)
 			else()

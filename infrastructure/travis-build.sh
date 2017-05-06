@@ -28,12 +28,7 @@ if [ "$BUILD" = 'cmake' ]; then
 	cd cmake/build
 	cmake --version
 	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET $EXTRA_ARGS "$@" ..
-
-	# We need to "make install" to install binaries in the boxbackup release/debug directories
-	# before we can run the tests. We don't particularly care about installing "for real" in
-	# /usr/local, and we don't have permission to do so anyway, but there's no way to prevent
-	# it, so redirect these files to /tmp instead:
-	make install DESTDIR=/tmp
+	make
 
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
@@ -46,7 +41,9 @@ else
 	./configure CC="ccache $CC" CXX="ccache $CXX" $EXTRA_ARGS "$@"
 	grep CXX config.status
 	make V=1 $EXTRA_MAKE_ARGS
-	./runtest.pl ALL $TEST_TARGET
+
+	[ "$TEST" = "n" ] || ./runtest.pl ALL $TEST_TARGET
+
 	if [ "$TEST_TARGET" = "release" ]; then
 		make
 		make parcels
