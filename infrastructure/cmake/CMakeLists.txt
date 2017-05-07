@@ -251,7 +251,7 @@ foreach(module_dep ${module_deps})
 			add_custom_command(TARGET ${module_name} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy
 				"$<TARGET_FILE:${module_name}>"
-				"${release_or_debug_dir}/${module_dir}"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}"
 				VERBATIM)
 
 			# For "make install" and CPack generators:
@@ -277,7 +277,7 @@ foreach(module_dep ${module_deps})
 			add_custom_command(TARGET ${module_name} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy
 				"$<TARGET_FILE:${module_name}>"
-				"${release_or_debug_dir}/${module_dir}"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}"
 				VERBATIM)
 
 			if(${APPVEYOR_MODE})
