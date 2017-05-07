@@ -2245,6 +2245,9 @@ bool test_directory_parent_entry_tracks_directory_size(
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
+#ifdef BOX_RELEASE_BUILD
+	BOX_NOTICE("skipping test: takes too long in release mode");
+#else
 	// Write the test file for create_file to upload:
 	write_test_file(0);
 
@@ -2434,6 +2437,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 	protocolReadOnly.QueryFinished();
+#endif // BOX_RELEASE_BUILD
 
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
