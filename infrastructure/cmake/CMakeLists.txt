@@ -242,8 +242,8 @@ foreach(module_dep ${module_deps})
 
 			add_executable(${module_name} ${module_files})
 			# Rename the output executable from bin_bbackupd(.exe) to bbackupd(.exe):
-			set_target_properties(${module_name} PROPERTIES OUTPUT_NAME
-				"${bin_name}")
+			set_target_properties(${module_name} PROPERTIES
+				OUTPUT_NAME "${bin_name}")
 
 			# Use a custom post-build command instead of install(...) to install
 			# binaries ready for running tests, because we don't want "make install" to
@@ -251,7 +251,7 @@ foreach(module_dep ${module_deps})
 			add_custom_command(TARGET ${module_name} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy
 				"$<TARGET_FILE:${module_name}>"
-				"${release_or_debug_dir}/${module_dir}/${bin_name}"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}${CMAKE_EXECUTABLE_SUFFIX}"
 				VERBATIM)
 
 			# For "make install" and CPack generators:
@@ -277,7 +277,7 @@ foreach(module_dep ${module_deps})
 			add_custom_command(TARGET ${module_name} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy
 				"$<TARGET_FILE:${module_name}>"
-				"${release_or_debug_dir}/${module_dir}/${bin_name}"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}${CMAKE_EXECUTABLE_SUFFIX}"
 				VERBATIM)
 
 			if(${APPVEYOR_MODE})
