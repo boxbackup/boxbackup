@@ -3675,6 +3675,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 	box_time_t sync_start_time = GetCurrentBoxTime();
 	sync_and_wait();
 	box_time_t sync_time = GetCurrentBoxTime() - sync_start_time;
+	BOX_INFO("Sync takes " << BOX_FORMAT_MICROSECONDS(sync_time));
 
 	// Time how long a compare takes. On NetBSD it's 3 seconds, and that 
 	// interferes with test timing unless we account for it.
@@ -3682,7 +3683,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 	// There should be no differences right now (yet).
 	TEST_COMPARE(Compare_Same);
 	box_time_t compare_time = GetCurrentBoxTime() - compare_start_time;
-	BOX_TRACE("Compare takes " << BOX_FORMAT_MICROSECONDS(compare_time));
+	BOX_INFO("Compare takes " << BOX_FORMAT_MICROSECONDS(compare_time));
 
 	// Wait for the end of another sync, to give us ~3 seconds to change
 	// the client store marker.
