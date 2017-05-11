@@ -306,7 +306,7 @@ void DumpStackBacktrace(const std::string& filename, size_t size, void * const *
 
 		// We don't really care about frames after main() (e.g. CRT startup), and sometimes
 		// they contain invalid data (not function pointers) such as 0x7.
-		if(strcmp(mangled_name, "main") == 0)
+		if(mangled_name != NULL && strcmp(mangled_name, "main") == 0)
 		{
 			break;
 		}
@@ -378,14 +378,19 @@ std::string GetTempDirPath()
 	}
 	return std::string(buffer);
 #else
-	char* result = getenv("TEMP");
+	char* result = getenv("TMPDIR");
+	if(result == NULL)
+	{
+		result = getenv("TEMP");
+	}
 	if(result == NULL)
 	{
 		result = getenv("TMP");
 	}
 	if(result == NULL)
 	{
-		THROW_EXCEPTION(CommonException, TempDirNotSet);
+		BOX_WARNING("TMPDIR/TEMP/TMP not set, falling back to /tmp");
+		result = "/tmp";
 	}
 	return std::string(result);
 #endif

@@ -28,7 +28,8 @@ if [ "$BUILD" = 'cmake' ]; then
 	cd cmake/build
 	cmake --version
 	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET $EXTRA_ARGS "$@" ..
-	make install
+	make
+
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
 	if [ "$TRAVIS_OS_NAME" = "osx" ]; then
@@ -40,7 +41,9 @@ else
 	./configure CC="ccache $CC" CXX="ccache $CXX" $EXTRA_ARGS "$@"
 	grep CXX config.status
 	make V=1 $EXTRA_MAKE_ARGS
-	./runtest.pl ALL $TEST_TARGET
+
+	[ "$TEST" = "n" ] || ./runtest.pl ALL $TEST_TARGET
+
 	if [ "$TEST_TARGET" = "release" ]; then
 		make
 		make parcels

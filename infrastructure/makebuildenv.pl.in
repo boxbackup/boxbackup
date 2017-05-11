@@ -604,9 +604,18 @@ __E
 		
 		writetestfile("$mod/t", "GLIBCXX_FORCE_NEW=1 ".
 			'./_test' . $platform_exe_ext . ' "$@"', $mod);
-		writetestfile("$mod/t-gdb", "GLIBCXX_FORCE_NEW=1 ".
-			$debugger . ' ./_test' . $platform_exe_ext . ' "$@"', $mod);
-		
+
+		if($debugger)
+		{
+			writetestfile("$mod/t-gdb", "GLIBCXX_FORCE_NEW=1 ".
+				$debugger . ' ./_test' . $platform_exe_ext . ' "$@"', $mod);
+		}
+		else
+		{
+			writetestfile("$mod/t-gdb",
+				"echo 'No debugger was detected by configure script'\n".
+				"exit 2");
+		}
 	}
 	
 	my @all_deps_for_module;

@@ -194,6 +194,9 @@ endforeach()
 set(testmain_template_cpp
 	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
 )
+set(release_or_debug_dir
+	"${base_dir}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>$<$<CONFIG:RelWithDebInfo>:release>"
+)
 
 if(WIN32)
 	set(time_test_command_prefix "")
@@ -238,25 +241,24 @@ foreach(module_dep ${module_deps})
 			endif()
 
 			add_executable(${module_name} ${module_files})
-			set_target_properties(${module_name} PROPERTIES OUTPUT_NAME
-				"${bin_name}")
+			# Rename the output executable from bin_bbackupd(.exe) to bbackupd(.exe):
+			set_target_properties(${module_name} PROPERTIES
+				OUTPUT_NAME "${bin_name}")
 
-			# Try using install(PROGRAMS) to avoid confusing the CPack NSIS
-			# generator with our absolute-path installations:
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}")
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Release;RelWithDebInfo
-				DESTINATION "${base_dir}/release/${module_dir}")
+			# Use a custom post-build command instead of install(...) to install
+			# binaries ready for running tests, because we don't want "make install" to
+			# do this too, and absolute-path installations break the CPack generators.
+			add_custom_command(TARGET ${module_name} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+				"$<TARGET_FILE:${module_name}>"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}${CMAKE_EXECUTABLE_SUFFIX}"
+				VERBATIM)
 
-			# This target is just for use by CPack on Windows:
-			if(WIN32)
-				install(TARGETS ${module_name} RUNTIME
-					CONFIGURATIONS Release
-					DESTINATION "."
-					COMPONENT Applications)
-			endif()
+			# For "make install" and CPack generators:
+			install(TARGETS ${module_name} RUNTIME
+				CONFIGURATIONS Debug;Release
+				DESTINATION "."
+				COMPONENT Applications)
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
@@ -269,12 +271,15 @@ foreach(module_dep ${module_deps})
 			set(module_files ${module_files} "${testmain_template_cpp}")
 			add_executable(${module_name} ${module_files})
 
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}")
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Release;RelWithDebInfo
-				DESTINATION "${base_dir}/release/${module_dir}")
+			# Use a custom post-build command instead of install(...) to install
+			# binaries ready for running tests, because we don't want "make install" to
+			# do this too, and absolute-path installations break the CPack generators.
+			add_custom_command(TARGET ${module_name} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+				"$<TARGET_FILE:${module_name}>"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}${CMAKE_EXECUTABLE_SUFFIX}"
+				VERBATIM)
+
 			if(${APPVEYOR_MODE})
 				set(appveyor_runtest_pl_switch -a)
 			else()
@@ -357,6 +362,16 @@ foreach(module_dep ${module_deps})
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
 endforeach()
+
+if(WIN32)
+	install(FILES ${base_dir}/bin/bbackupd/win32/NotifySysAdmin.vbs
+		DESTINATION "." COMPONENT Extras)
+	install(FILES ${base_dir}/bin/bbackupd/win32/bbackupd.conf
+		DESTINATION "." COMPONENT Extras)
+else()
+	install(FILES ${base_dir}/bin/bbackupd/bbackupd-config
+		DESTINATION "." COMPONENT Extras)
+endif()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
 # generators such as MSVC. We need to use a generator expression instead.
@@ -770,7 +785,7 @@ set(CPACK_PACKAGE_DESCRIPTION_FILE "${base_dir}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${base_dir}/LICENSE.txt")
 set(CPACK_PACKAGE_VERSION ${boxbackup_version})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Box Backup")
-set(CPACK_COMPONENTS_ALL Applications)
+set(CPACK_COMPONENTS_ALL Applications Extras)
 set(CPACK_GENERATOR "ZIP;NSIS")
 set(CPACK_NSIS_DISPLAY_NAME "Box Backup")
 set(CPACK_NSIS_HELP_LINK "http://www.boxbackup.org/")
