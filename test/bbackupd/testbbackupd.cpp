@@ -3572,6 +3572,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 	box_time_t sync_start_time = GetCurrentBoxTime();
 	sync_and_wait();
 	box_time_t sync_time = GetCurrentBoxTime() - sync_start_time;
+	BOX_INFO("Sync takes " << BOX_FORMAT_MICROSECONDS(sync_time));
 
 	// Time how long a compare takes. On NetBSD it's 3 seconds, and that
 	// interferes with test timing unless we account for it.
@@ -3579,7 +3580,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 	// There should be no differences right now (yet).
 	TEST_COMPARE(Compare_Same);
 	box_time_t compare_time = GetCurrentBoxTime() - compare_start_time;
-	BOX_TRACE("Compare takes " << BOX_FORMAT_MICROSECONDS(compare_time));
+	BOX_INFO("Compare takes " << BOX_FORMAT_MICROSECONDS(compare_time));
 
 	// Wait for the end of another sync, to give us ~3 seconds to change
 	// the client store marker.
@@ -3654,10 +3655,8 @@ bool test_changing_client_store_marker_pauses_daemon()
 		box_time_t wait =
 			SecondsToBoxTime(BACKUP_ERROR_DELAY_SHORTENED - 1) -
 			compare_time * 2;
-		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
-			" (including another compare taking " <<
-			BOX_FORMAT_MICROSECONDS(compare_time) << ") until "
-			"just before bbackupd recovers");
+		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) << " "
+			"until just before bbackupd recovers");
 		ShortSleep(wait, true);
 
 		// bbackupd should not have recovered yet, so there should
@@ -3670,7 +3669,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 		// the differences are gone (successful backup). Wait until ~2
 		// seconds after we expect the sync to have finished, to reduce
 		// the risk of random failure on AppVeyor when heavily loaded.
-		wait = sync_time + SecondsToBoxTime(3);
+		wait = sync_time + SecondsToBoxTime(6);
 		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
 			" until just after bbackupd recovers and finishes a sync");
 		ShortSleep(wait, true);
