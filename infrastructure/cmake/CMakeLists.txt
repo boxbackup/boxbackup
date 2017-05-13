@@ -204,6 +204,7 @@ else()
 	set(time_test_command_prefix "/usr/bin/time")
 endif()
 
+
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 foreach(module_dep ${module_deps})
 
@@ -351,13 +352,6 @@ foreach(module_dep ${module_deps})
 				endif()
 			endforeach()
 		endif()
-
-		foreach(module_file ${module_files})
-			string(REGEX REPLACE ".*/" "" module_file_basename ${module_file})
-			set_source_files_properties(${module_file}
-				PROPERTIES COMPILE_DEFINITIONS
-				BOX_CURRENT_FILE="${module_file_basename}")
-		endforeach()
 
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
@@ -767,7 +761,7 @@ target_compile_features(lib_backupstore PRIVATE cxx_auto_type)
 # I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:
 # https://ci.appveyor.com/project/qris/boxbackup/build/job/xm10itascygtu93j
 set_tests_properties(common PROPERTIES TIMEOUT 20)
-set_tests_properties(crypto PROPERTIES TIMEOUT 4)
+set_tests_properties(crypto PROPERTIES TIMEOUT 10)
 set_tests_properties(compress PROPERTIES TIMEOUT 80)
 set_tests_properties(raidfile PROPERTIES TIMEOUT 32)
 set_tests_properties(basicserver PROPERTIES TIMEOUT 80)
