@@ -57,9 +57,9 @@ box_time_t GetCurrentBoxTime()
 	GetSystemTime(&system_time);
 	time_now += MilliSecondsToBoxTime(system_time.wMilliseconds);
 	return time_now;
-#else
-	return SecondsToBoxTime(time(0));
 #endif
+
+	return SecondsToBoxTime(time(0));
 }
 
 std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
