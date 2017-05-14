@@ -204,7 +204,6 @@ else()
 	set(time_test_command_prefix "/usr/bin/time")
 endif()
 
-
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 foreach(module_dep ${module_deps})
 
@@ -352,6 +351,13 @@ foreach(module_dep ${module_deps})
 				endif()
 			endforeach()
 		endif()
+
+		foreach(module_file ${module_files})
+			string(REGEX REPLACE ".*/" "" module_file_basename ${module_file})
+			set_source_files_properties(${module_file}
+				PROPERTIES COMPILE_DEFINITIONS
+				BOX_CURRENT_FILE="${module_file_basename}")
+		endforeach()
 
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
