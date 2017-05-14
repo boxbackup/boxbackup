@@ -833,13 +833,13 @@ __E
 			{
 				$make .= "\t\$(_CC) \$(${var_prefix}_CFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-DBOX_CURRENT_FILE=\"\\\"$basename\\\"\" -c $file -o $out_name\n\n";
+					"-c $file -o $out_name\n\n";
 			}
 			elsif ($is_cpp)
 			{
 				$make .= "\t\$(_CXX) \$(${var_prefix}_CXXFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-DBOX_CURRENT_FILE=\"\\\"$basename\\\"\" -c $file -o $out_name\n\n";
+					"-c $file -o $out_name\n\n";
 			}
 			elsif ($is_rc)
 			{

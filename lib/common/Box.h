@@ -31,7 +31,7 @@
 
 #ifdef SHOW_BACKTRACE_ON_EXCEPTION
 	#include "Utils.h"
-	#define OPTIONAL_DO_BACKTRACE DumpStackBacktrace(BOX_CURRENT_FILE);
+	#define OPTIONAL_DO_BACKTRACE DumpStackBacktrace(__FILE__);
 #else
 	#define OPTIONAL_DO_BACKTRACE
 #endif

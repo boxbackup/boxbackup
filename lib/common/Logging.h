@@ -26,7 +26,7 @@
 { \
 	std::ostringstream _box_log_line; \
 	_box_log_line << stuff; \
-	Logging::Log(level, BOX_CURRENT_FILE, __LINE__, __FUNCTION__, \
+	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
 		Logging::UNCATEGORISED, _box_log_line.str()); \
 }
 

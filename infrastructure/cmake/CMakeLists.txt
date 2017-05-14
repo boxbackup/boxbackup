@@ -352,13 +352,6 @@ foreach(module_dep ${module_deps})
 			endforeach()
 		endif()
 
-		foreach(module_file ${module_files})
-			string(REGEX REPLACE ".*/" "" module_file_basename ${module_file})
-			set_source_files_properties(${module_file}
-				PROPERTIES COMPILE_DEFINITIONS
-				BOX_CURRENT_FILE="${module_file_basename}")
-		endforeach()
-
 		target_include_directories(${module_name} PUBLIC ${module_path})
 	endif()
 endforeach()

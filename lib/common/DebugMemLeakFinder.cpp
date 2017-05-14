@@ -560,7 +560,7 @@ void memleakfinder_reportleaks_file(FILE *file)
 #ifdef HAVE_EXECINFO_H
 			if(file == stdout)
 			{
-				DumpStackBacktrace(BOX_CURRENT_FILE, i->second.stack_size,
+				DumpStackBacktrace(__FILE__, i->second.stack_size,
 					i->second.stack_frames);
 			}
 #endif
