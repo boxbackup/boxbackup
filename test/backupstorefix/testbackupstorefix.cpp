@@ -976,12 +976,25 @@ int test(int argc, const char *argv[])
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Corrupt file and dir");
-	// File
-	CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
-		33, "34i729834298349283479233472983sdfhasgs");
-	// Dir
-	CorruptObject("Test1/cannes/imulatrougge/foreomizes",23, 
-		"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+	{
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to avoid a race condition where bbstored runs housekeeping
+		// after we disconnect, extremely slowly on AppVeyor, and this causes the second
+		// bbstoreaccounts check command to time out waiting for a lock.
+		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
+			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
+		BackupStoreAccounts acc(*apAccounts);
+		NamedLock lock;
+		acc.LockAccount(0x1234567, lock);
+
+		// File
+		CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge", 33,
+			"34i729834298349283479233472983sdfhasgs");
+		// Dir
+		CorruptObject("Test1/cannes/imulatrougge/foreomizes", 23,
+			"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+	}
+
 	// Fix it
 	RUN_CHECK
 	// Check everything is where it should be
