@@ -19,10 +19,12 @@ addons:
     packages:
       - cmake
       - cmake-data
+      - libboost-dev
       - libdb-dev
       - libreadline-dev
       - libssl-dev
       - libwww-perl
+      - time
       - xsltproc
       - zlib1g-dev
 
@@ -32,5 +34,15 @@ env:
   - BUILD=cmake TEST_TARGET=debug
   - BUILD=cmake TEST_TARGET=release
 
+os:
+  - linux
+  - osx
+
+matrix:
+  exclude:
+    # No point testing both GCC and Clang on Mac OS X, as they're the same thing.
+    - os: osx
+      compiler: gcc
+
 script:
-  - ./infrastructure/travis-build.sh
+  - env EXTRA_MAKE_ARGS=-j2 ./infrastructure/travis-build.sh
