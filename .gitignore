@@ -62,8 +62,8 @@ test/*/*.memleaks
 
 # built by makebuildenv.pl
 test/*/_main.cpp
-test/*/_t
-test/*/_t-gdb
+test/*/t
+test/*/t-gdb
 bin/*/autogen_*.cpp
 bin/*/autogen_*.h
 lib/*/autogen_*.cpp
@@ -77,9 +77,35 @@ qdbm/libqdbm.a
 qdbm/qdbm.pc
 qdbm/qdbm.spec
 qdbm/LTmakefile
+qdbm/cbcodec
+qdbm/cbtest
+qdbm/crmgr
+qdbm/crtest
+qdbm/crtsv
+qdbm/dpmgr
+qdbm/dptest
+qdbm/dptsv
+qdbm/hvmgr
+qdbm/hvtest
+qdbm/libqdbm.so
+qdbm/libqdbm.so.14
+qdbm/libqdbm.so.14.13.0
+qdbm/odidx
+qdbm/odmgr
+qdbm/odtest
+qdbm/qmttest
+qdbm/rlmgr
+qdbm/rltest
+qdbm/vlmgr
+qdbm/vltest
+qdbm/vltsv
 
 # development
 *.orig
 *.patch
 .*.swo
 .*.swp
+
+# generated documentation
+docs/htmlguide
+docs/man
