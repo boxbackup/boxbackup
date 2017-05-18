@@ -3,26 +3,36 @@ cmake_minimum_required(VERSION 2.6)
 project(BoxBackup_Windows)
 
 set(boxbackup_dir ${CMAKE_SOURCE_DIR}/../../..)
-set_property(DIRECTORY PROPERTY EP_PREFIX .)
+set_property(DIRECTORY PROPERTY EP_BASE .)
 set(install_dir ${CMAKE_BINARY_DIR}/install)
 
 # Automate the process of downloading, building and "installing" dependencies on Windows,
 # as used by AppVeyor.
-set(ZLIB_VERSION    1.2.8  CACHE STRING "Version of zlib to download, build, and compile Box Backup against")
-set(ZLIB_HASH MD5=126f8676442ffbd97884eb4d6f32afb4
-	CACHE STRING "Hash of the zlib download file, to be verified after download")
-set(OPENSSL_VERSION 1.0.2h CACHE STRING "Version of OpenSSL to download, build, and compile Box Backup against")
-set(OPENSSL_HASH SHA256=1d4007e53aad94a5b2002fe045ee7bb0b3d98f1a47f8b2bc851dcd1c74332919
-	CACHE STRING "Hash of the OpenSSL download file, to be verified after download")
-set(PCRE_VERSION    8.38   CACHE STRING "Version of PCRE to download, build, and compile Box Backup against")
-set(OPENSSL_HASH SHA256=dbef7cf80258c29396d435804cd5dba34006a77548850bca8bad6db6a6eac110
-	CACHE STRING "Hash of the PCRE download file, to be verified after download")
+
+# Version of zlib to download, build, and compile Box Backup against:
+set(ZLIB_VERSION    1.2.11)
+# Hash of zlib-${ZLIB_VERSION}.tar.gz, to be verified after download:
+set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1)
+
+# Version of OpenSSL to download, build, and compile Box Backup against:
+set(OPENSSL_VERSION 1.0.2j)
+# Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download:
+set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431)
+
+# Version of PCRE to download, build, and compile Box Backup against:
+set(PCRE_VERSION    8.39)
+# Hash of pcre-${PCRE_VERSION}.tar.gz, to be verified after download:
+set(PCRE_HASH SHA256=ccdf7e788769838f8285b3ee672ed573358202305ee361cfec7a4a4fb005bbc7)
+
+# Version of Boost to download, unpack, and compile Box Backup against:
+set(BOOST_VERSION    1.62.0)
+# Hash of the Boost download file, to be verified after download:
+set(BOOST_HASH SHA1=5fd97433c3f859d8cbab1eaed4156d3068ae3648)
 
 include(ExternalProject)
 
-string(REPLACE "." "" zlib_version_nodots ${ZLIB_VERSION})
 ExternalProject_Add(zlib
-	URL "http://zlib.net/zlib${zlib_version_nodots}.zip"
+	URL "http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
 	URL_HASH ${ZLIB_HASH}
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
@@ -71,19 +81,46 @@ else()
 endif()
 
 ExternalProject_Add(pcre
-	URL "http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-${PCRE_VERSION}.zip"
-	URL_HASH ${PCRE_HASH}
+	# Temporarily use SVN repo until the PCRE_STATIC issue in 8.40 is fixed:
+	# https://vcs.pcre.org/pcre?view=revision&revision=1677
+	SVN_REPOSITORY svn://vcs.exim.org/pcre/code/trunk
+	SVN_REVISION -r 1677
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
+	-DPCRE_SUPPORT_LIBREADLINE=OFF
+	-DPCRE_SUPPORT_LIBBZ2=OFF
 	# We need to build both versions, debug and release, because cmake requires both to be
 	# present to generate its multi-configuration project files for Visual Studio/MSBuild.
 	INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
 	COMMAND         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Release
 )
 
+string(REPLACE "." "_" BOOST_VERSION_UNDERSCORES ${BOOST_VERSION})
+ExternalProject_Add(boost
+	URL "http://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORES}.tar.bz2"
+	URL_HASH ${BOOST_HASH}
+	# DOWNLOAD_NO_PROGRESS 1
+	CONFIGURE_COMMAND "" # none needed
+	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed" # none needed
+	INSTALL_COMMAND "" # none needed
+)
+
+if(BOXBACKUP_VERSION)
+	list(APPEND boxbackup_cmake_args "-DBOXBACKUP_VERSION=${BOXBACKUP_VERSION}")
+endif()
+string(REPLACE ";" " " boxbackup_cmake_args "${boxbackup_cmake_args}")
+
 ExternalProject_Add(boxbackup
-	DEPENDS zlib openssl pcre
+	DEPENDS zlib openssl pcre boost
 	SOURCE_DIR ${boxbackup_dir}/infrastructure/cmake
-	CMAKE_ARGS -DZLIB_ROOT=${install_dir} -DOPENSSL_ROOT_DIR=${install_dir} -DPCRE_ROOT=${install_dir} -DAPPVEYOR_MODE=1
+	CMAKE_ARGS
+		-DZLIB_ROOT=${install_dir}
+		-DOPENSSL_ROOT_DIR=${install_dir}
+		-DPCRE_ROOT=${install_dir}
+		-DBOOST_ROOT=${CMAKE_BINARY_DIR}/Source/boost
+		-DBOX_SUPPORT_READLINE=OFF
+		-DAPPVEYOR_MODE=1
+		-DDEBUG=${DEBUG}
+		${boxbackup_cmake_args}
 	STEP_TARGETS configure build install
 )
