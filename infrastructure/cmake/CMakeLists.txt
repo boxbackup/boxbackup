@@ -101,8 +101,6 @@ if(WIN32)
 	add_definitions(-DWIN32)
 endif()
 
-file(READ "${base_dir}/infrastructure/buildenv-testmain-template.cpp" test_template)
-
 # Parsing Makefile.extra files in CMake script is a pain, so the relevant rules for
 # code-generating Perl scripts are hard-coded here.
 
@@ -176,6 +174,13 @@ foreach(documentation_file ${documentation_files})
 	set(${module_name}_extra_files ${${module_name}_extra_files} ${output_file})
 endforeach()
 
+set(testmain_template_cpp
+	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
+)
+set(release_or_debug_dir
+	"${base_dir}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>$<$<CONFIG:RelWithDebInfo>:release>"
+)
+
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 foreach(module_dep ${module_deps})
 
@@ -211,19 +216,26 @@ foreach(module_dep ${module_deps})
 			if(DEBUG)
 				message(STATUS "add executable '${module_name}': '${module_files}'")
 			endif()
-			add_executable(${module_name} ${module_files})
 
-			# Unfortunately we have to use install(PROGRAMS) instead of
-			# install(TARGETS) because TARGETS doesn't allow us to change
-			# the executable name.
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Debug
-				DESTINATION "${base_dir}/debug/${module_dir}"
-				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
-			install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-				CONFIGURATIONS Release
-				DESTINATION "${base_dir}/release/${module_dir}"
-				RENAME "${bin_name}${CMAKE_EXECUTABLE_SUFFIX}")
+			add_executable(${module_name} ${module_files})
+			# Rename the output executable from bin_bbackupd(.exe) to bbackupd(.exe):
+			set_target_properties(${module_name} PROPERTIES
+				OUTPUT_NAME "${bin_name}")
+
+			# Use a custom post-build command instead of install(...) to install
+			# binaries ready for running tests, because we don't want "make install" to
+			# do this too, and absolute-path installations break the CPack generators.
+			add_custom_command(TARGET ${module_name} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+				"$<TARGET_FILE:${module_name}>"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}${CMAKE_EXECUTABLE_SUFFIX}"
+				VERBATIM)
+
+			# For "make install" and CPack generators:
+			install(TARGETS ${module_name} RUNTIME
+				CONFIGURATIONS Debug;Release
+				DESTINATION "."
+				COMPONENT Applications)
 		elseif(module_name MATCHES "^test_")
 			string(REGEX MATCH "^test_(.*)" valid_test ${module_name})
 			set(test_name ${CMAKE_MATCH_1})
@@ -233,36 +245,17 @@ foreach(module_dep ${module_deps})
 				message(STATUS "add test '${module_name}': '${module_files}'")
 			endif()
 
-			string(REPLACE "TEST_NAME" ${test_name} test_main "${test_template}")
-			file(WRITE "${module_path}/_main.cpp.new" "${test_main}")
-			replace_file_if_different(
-				"${module_path}/_main.cpp"
-				"${module_path}/_main.cpp.new")
-			add_executable(${module_name} ${module_files}
-				"${module_path}/_main.cpp")
+			set(module_files ${module_files} "${testmain_template_cpp}")
+			add_executable(${module_name} ${module_files})
 
-			if(WIN32)
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Debug
-					DESTINATION "${base_dir}/debug/${module_dir}")
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Release
-					DESTINATION "${base_dir}/release/${module_dir}")
-				set(test_executable "$<TARGET_FILE_NAME:${module_name}>")
-			else()
-				# Unfortunately we have to use install(PROGRAMS) instead of
-				# install(TARGETS) because TARGETS doesn't allow us to change
-				# the executable name.
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Debug
-					DESTINATION "${base_dir}/debug/${module_dir}"
-					RENAME "_test")
-				install(PROGRAMS "$<TARGET_FILE:${module_name}>"
-					CONFIGURATIONS Release
-					DESTINATION "${base_dir}/release/${module_dir}"
-					RENAME "_test")
-				set(test_executable "./_test")
-			endif()
+			# Use a custom post-build command instead of install(...) to install
+			# binaries ready for running tests, because we don't want "make install" to
+			# do this too, and absolute-path installations break the CPack generators.
+			add_custom_command(TARGET ${module_name} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+				"$<TARGET_FILE:${module_name}>"
+				"${release_or_debug_dir}/${module_dir}/${bin_name}${CMAKE_EXECUTABLE_SUFFIX}"
+				VERBATIM)
 
 			if(${APPVEYOR_MODE})
 				set(appveyor_runtest_pl_switch -a)
@@ -270,12 +263,19 @@ foreach(module_dep ${module_deps})
 				set(appveyor_runtest_pl_switch)
 			endif()
 
+			if(WIN32)
+				set(test_command_internal "$<TARGET_FILE_NAME:${module_name}>")
+			else()
+				set(test_command_internal "./$<TARGET_FILE_NAME:${module_name}>")
+			endif()
+
 			target_compile_definitions(${module_name} PRIVATE
-				-DTEST_EXECUTABLE="${test_executable}")
+				-DTEST_EXECUTABLE="${test_command_internal}")
 			add_test(NAME ${test_name}
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				${appveyor_runtest_pl_switch} -c ${test_name}
-				$<CONFIG> "$<TARGET_FILE:${module_name}>" "${test_executable}"
+				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 
 			if(${APPVEYOR_MODE})
@@ -288,7 +288,8 @@ foreach(module_dep ${module_deps})
 			add_custom_target(${module_name}-prepare
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				-n -c ${test_name}
-				$<CONFIG> "$<TARGET_FILE:${module_name}>" "${test_executable}"
+				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
 			if(DEBUG)
@@ -337,11 +338,12 @@ target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUI
 # Detect platform features and write BoxConfig.h.in. Reuse code from
 # infrastructure/m4/boxbackup_tests.m4 where possible
 
-include(CheckIncludeFiles)
-include(CheckFunctionExists)
-include(CheckSymbolExists)
-include(CheckLibraryExists)
+include(CheckCXXCompilerFlag)
 include(CheckCXXSourceCompiles)
+include(CheckFunctionExists)
+include(CheckIncludeFiles)
+include(CheckLibraryExists)
+include(CheckSymbolExists)
 
 set(boxconfig_h_file "${CMAKE_BINARY_DIR}/BoxConfig.h.in")
 file(REMOVE "${boxconfig_h_file}")
@@ -662,7 +664,7 @@ target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
 
 # Silence some less-useful warnings
 if(MSVC)
-	add_definitions(/wd4996 /wd4291)
+	add_definitions(/wd4291 /wd4710 /wd4820 /wd4996)
 	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006)
 endif(MSVC)
 
@@ -675,12 +677,12 @@ target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl
 # I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:
 # https://ci.appveyor.com/project/qris/boxbackup/build/job/xm10itascygtu93j
 set_tests_properties(common PROPERTIES TIMEOUT 20)
-set_tests_properties(crypto PROPERTIES TIMEOUT 4)
+set_tests_properties(crypto PROPERTIES TIMEOUT 10)
 set_tests_properties(compress PROPERTIES TIMEOUT 80)
 set_tests_properties(raidfile PROPERTIES TIMEOUT 32)
 set_tests_properties(basicserver PROPERTIES TIMEOUT 80)
-set_tests_properties(backupstore PROPERTIES TIMEOUT 560)
-set_tests_properties(backupstorefix PROPERTIES TIMEOUT 140)
+set_tests_properties(backupstore PROPERTIES TIMEOUT 1320)
+set_tests_properties(backupstorefix PROPERTIES TIMEOUT 180)
 set_tests_properties(backupstorepatch PROPERTIES TIMEOUT 320)
 set_tests_properties(backupdiff PROPERTIES TIMEOUT 32)
 set_tests_properties(bbackupd PROPERTIES TIMEOUT 1200)
