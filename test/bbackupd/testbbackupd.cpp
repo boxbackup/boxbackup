@@ -361,8 +361,8 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 	// Stop bbackupd initialisation from changing the console logging level
 	// and the program name tag.
 	Logger& console(Logging::GetConsole());
-	Logger::LevelGuard guard(console, console.GetLevel());
-	Logging::Tagger();
+	Logger::LevelGuard undo_log_level_change(console, console.GetLevel());
+	Logging::Tagger undo_program_name_change;
 
 	std::vector<std::string> args;
 	size_t last_arg_start = 0;
@@ -3748,35 +3748,35 @@ bool test_changing_client_store_marker_pauses_daemon()
 
 		// Test that there *are* differences still, i.e. that bbackupd
 		// didn't successfully run a backup during that time.
-		BOX_TRACE("Compare starting, expecting differences");
+		BOX_INFO("Compare starting, expecting differences");
 		TEST_COMPARE(Compare_Different);
 		BOX_TRACE("Compare finished, expected differences");
 
 		// Wait out the expected delay in bbackupd. This is quite
 		// time-sensitive, so we use sub-second precision.
-		box_time_t wait = 
+		box_time_t wait =
 			SecondsToBoxTime(BACKUP_ERROR_DELAY_SHORTENED - 1) -
 			compare_time * 2;
-		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
-			" (plus another compare taking " <<
-			BOX_FORMAT_MICROSECONDS(compare_time) << ") until "
-			"just before bbackupd recovers");
+		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) << " "
+			"until just before bbackupd recovers");
 		ShortSleep(wait, true);
 
 		// bbackupd should not have recovered yet, so there should
 		// still be differences.
-		BOX_TRACE("Compare starting, expecting differences");
+		BOX_INFO("Compare starting, expecting differences");
 		TEST_COMPARE(Compare_Different);
 		BOX_TRACE("Compare finished, expected differences");
 
-		// Now wait for it to recover and finish a sync, and check
-		// that the differences are gone (successful backup).
-		wait = sync_time + SecondsToBoxTime(2);
-		BOX_TRACE("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
+		// Now wait for it to recover and finish a sync, and check that
+		// the differences are gone (successful backup). Wait until ~2
+		// seconds after we expect the sync to have finished, to reduce
+		// the risk of random failure on AppVeyor when heavily loaded.
+		wait = sync_time + SecondsToBoxTime(6);
+		BOX_INFO("Waiting for " << BOX_FORMAT_MICROSECONDS(wait) <<
 			" until just after bbackupd recovers and finishes a sync");
 		ShortSleep(wait, true);
 
-		BOX_TRACE("Compare starting, expecting no differences");
+		BOX_INFO("Compare starting, expecting no differences");
 		TEST_COMPARE(Compare_Same);
 		BOX_TRACE("Compare finished, expected no differences");
 	}
