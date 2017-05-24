@@ -353,9 +353,7 @@ public:
 		int64_t DiffFromFileID, IOStream& rPatchData,
 		BackupStoreRefCountDatabase::refcount_t refcount)
 	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-		ASSERT(refcount == 0 || refcount == 1);
-		return std::auto_ptr<Transaction>();
+		return PutFileComplete(ObjectID, rPatchData, refcount);
 	}
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
