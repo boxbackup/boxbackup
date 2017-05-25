@@ -391,9 +391,6 @@ if(WIN32)
 	target_link_libraries(lib_common PUBLIC dbghelp ws2_32 gdi32)
 endif()
 
-# Link to ZLib
-# http://stackoverflow.com/a/6174604/648162
-include_directories(${base_dir}/../zlib-win32/include)
 # On Windows we want to statically link zlib to make debugging and distribution easier,
 # but FindZLIB.cmake doesn't offer that as an option, so we have to go through some
 # contortions to "find" the correct library. ZLIB_ROOT is required in this case.
@@ -448,6 +445,11 @@ else()
 	pkg_check_modules(PCRE REQUIRED libpcreposix)
 	include_directories(${PCRE_INCLUDE_DIRS})
 	target_link_libraries(lib_common PUBLIC ${PCRE_LIBRARIES})
+
+	if(NOT PCRE_FOUND)
+		# You must use pkg-config. PCRE_ROOT is not used except on Win32.
+		message(FATAL_ERROR "Please install libpcre and ensure that pkg-config --list-all can find it")
+	endif()
 
 	if(DEBUG)
 		message(STATUS "Linking PCRE libraries from ${PCRE_LIBRARY_DIRS}: ${PCRE_LIBRARIES}")
@@ -603,7 +605,7 @@ foreach(header_file ${detect_header_files})
 endforeach()
 
 if(NOT HAVE_PCREPOSIX_H)
-	message(FATAL_ERROR "pcreposix.h not found at PCRE_ROOT/include: ${PCRE_ROOT}/include")
+	message(FATAL_ERROR "pcreposix.h not found even though PCRE was apparently detected?!")
 endif()
 
 # PCRE is required, so unconditionally define this:
