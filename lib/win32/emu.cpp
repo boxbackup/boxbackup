@@ -2,9 +2,14 @@
 
 #include "emu.h"
 
+#include <assert.h>
+#include <string.h> // for strlen()
+
+#include <iomanip>
+#include <sstream>
+
 #ifdef WIN32
 
-#include <assert.h>
 #include <fcntl.h>
 #include <process.h>
 #include <windows.h>
@@ -15,7 +20,6 @@
 
 #include <string>
 #include <list>
-#include <sstream>
 
 // message resource definitions for syslog()
 #include "messages.h"
@@ -2035,4 +2039,32 @@ bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
 }
 
 #endif // WIN32
+
+// MSVC < 12 (2013) does not have strtoull(), and _strtoi64 is signed only (truncates all values
+// greater than 1<<63 to _I64_MAX, so we roll our own using std::istringstream
+// <http://stackoverflow.com/questions/1070497/c-convert-hex-string-to-signed-integer>
+uint64_t box_strtoui64(const char *nptr, const char **endptr, int base)
+{
+	std::istringstream iss((std::string(nptr)));
+	uint64_t result;
+
+	assert(base == 0 || base == 8 || base == 10 || base == 16);
+	iss >> std::setbase(base);
+	iss >> result;
+
+	if(endptr != NULL)
+	{
+		if(iss.eof())
+		{
+			*endptr = nptr + strlen(nptr);
+		}
+		else
+		{
+			assert(iss.tellg() >= 0);
+			*endptr = nptr + iss.tellg();
+		}
+	}
+
+	return result;
+}
 

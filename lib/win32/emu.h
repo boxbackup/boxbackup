@@ -2,6 +2,12 @@
 
 #include "emu_winver.h"
 
+#include <stdint.h> // for uint64_t
+#include <stdlib.h> // for strtoull()
+
+#if ! defined EMU_INCLUDE
+#define EMU_INCLUDE
+
 #ifdef WIN32
 	#define EMU_STRUCT_STAT struct emu_stat
 	#define EMU_STAT  emu_stat
@@ -14,8 +20,7 @@
 	#define EMU_LSTAT ::lstat
 #endif
 
-#if ! defined EMU_INCLUDE && defined WIN32
-#define EMU_INCLUDE
+#ifdef WIN32
 
 // Need feature detection macros below
 #if defined BOX_CMAKE
@@ -450,4 +455,11 @@ int console_read(char* pBuffer, size_t BufferSize);
 	#pragma warning(disable:4996)		// POSIX name for this item is deprecated
 #endif // _MSC_VER
 
-#endif // !EMU_INCLUDE && WIN32
+#endif // WIN32
+
+// MSVC < 12 (2013) does not have strtoull(), and _strtoi64 is signed only (truncates all values
+// greater than 1<<63 to _I64_MAX, so we roll our own using std::istringstream
+// <http://stackoverflow.com/questions/1070497/c-convert-hex-string-to-signed-integer>
+uint64_t box_strtoui64(const char *nptr, const char **endptr, int base);
+
+#endif // !EMU_INCLUDE
