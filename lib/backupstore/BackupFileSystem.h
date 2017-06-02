@@ -16,14 +16,13 @@
 #include "HTTPResponse.h"
 #include "NamedLock.h"
 #include "S3Client.h"
+#include "Utils.h"
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class BackupStoreRefCountDatabase;
 class Configuration;
 class IOStream;
-
-#define S3_NOTIONAL_BLOCK_SIZE 1048576
 
 // --------------------------------------------------------------------------
 //
@@ -113,14 +112,25 @@ public:
 	}
 };
 
+#define S3_INFO_FILE_NAME "boxbackup.info"
+#define S3_REFCOUNT_FILE_NAME "boxbackup.refcount.db"
+#define S3_FAKE_ACCOUNT_ID 0x53336964 // 'S3id'
+#define S3_CACHE_LOCK_NAME "boxbackup.cache.lock"
+
+#ifdef NDEBUG // release
+	// Use a larger block size for efficiency
+	#define S3_NOTIONAL_BLOCK_SIZE 1048576
+#else
+	// Use a smaller block size to make tests run faster
+	#define S3_NOTIONAL_BLOCK_SIZE 16384
+#endif
+
 class S3BackupFileSystem : public BackupFileSystem
 {
 private:
 	const Configuration& mrConfig;
 	std::string mBasePath;
 	S3Client& mrClient;
-	std::string GetDirectoryURI(int64_t ObjectID);
-	std::string GetFileURI(int64_t ObjectID);
 	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
 	int GetSizeInBlocks(int64_t bytes)
 	{
@@ -175,24 +185,63 @@ public:
 	{
 		THROW_EXCEPTION(CommonException, NotSupported);
 	}
-	std::string GetObjectURI(const std::string& ObjectPath) const
+
+	// And these are public to help with writing tests ONLY:
+	// The returned URI should start with mBasePath.
+	std::string GetMetadataURI(const std::string& MetadataFilename) const
 	{
-		return mBasePath + ObjectPath;
+		return mBasePath + MetadataFilename;
 	}
-	std::string GetObjectURL(const std::string& ObjectPath) const;
-	HTTPResponse GetObject(const std::string& ObjectPath)
+	// The returned URI should start with mBasePath.
+	std::string GetDirectoryURI(int64_t ObjectID)
 	{
-		return mrClient.GetObject(GetObjectURI(ObjectPath));
+		return GetObjectURI(ObjectID, ObjectExists_Dir);
 	}
-	HTTPResponse HeadObject(const std::string& ObjectPath)
+	// The returned URI should start with mBasePath.
+	std::string GetFileURI(int64_t ObjectID)
 	{
-		return mrClient.HeadObject(GetObjectURI(ObjectPath));
+		return GetObjectURI(ObjectID, ObjectExists_File);
 	}
-	HTTPResponse PutObject(const std::string& ObjectPath,
+
+private:
+	// S3BackupAccountControl wants to call some of these private APIs, but nobody else should:
+	friend class S3BackupAccountControl;
+
+	// GetObjectURL() returns the complete URL for an object at the given
+	// path, by adding the hostname, port and the object's URI (which can
+	// be retrieved from GetMetadataURI or GetObjectURI).
+	std::string GetObjectURL(const std::string& ObjectURI) const;
+
+	// GetObjectURI() is a private interface which converts an object ID
+	// and type into a URI, which starts with mBasePath:
+	std::string GetObjectURI(int64_t ObjectID, int Type) const;
+
+	// GetObject() retrieves the object with the specified URI from the
+	// configured S3 server. S3Client has no idea about path prefixes
+	// (mBasePath), so it must already be added: the supplied ObjectURI
+	// must start with it.
+	HTTPResponse GetObject(const std::string& ObjectURI)
+	{
+		return mrClient.GetObject(ObjectURI);
+	}
+
+	// HeadObject() retrieves the headers (metadata) for the object with
+	// the specified URI from the configured S3 server. S3Client has no
+	// idea about path prefixes (mBasePath), so it must already be added:
+	// the supplied ObjectURI must start with it.
+	HTTPResponse HeadObject(const std::string& ObjectURI)
+	{
+		return mrClient.HeadObject(ObjectURI);
+	}
+
+	// PutObject() uploads the supplied stream to the configured S3 server,
+	// saving it with the supplied URI. S3Client has no idea about path
+	// prefixes (mBasePath), so it must already be added: the supplied
+	// ObjectURI must start with it.
+	HTTPResponse PutObject(const std::string& ObjectURI,
 		IOStream& rStreamToSend, const char* pContentType = NULL)
 	{
-		return mrClient.PutObject(GetObjectURI(ObjectPath), rStreamToSend,
-			pContentType);
+		return mrClient.PutObject(ObjectURI, rStreamToSend, pContentType);
 	}
 };
 
