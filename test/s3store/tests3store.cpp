@@ -113,7 +113,7 @@ bool check_new_account_info()
 	TEST_EQUAL(0, info->GetClientStoreMarker());
 	TEST_EQUAL("test", info->GetAccountName());
 
-	FileStream root_stream("testfiles/store/subdir/dirs/0x1.dir");
+	FileStream root_stream("testfiles/store/subdir/0x1.dir");
 	BackupStoreDirectory root_dir(root_stream);
 	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
