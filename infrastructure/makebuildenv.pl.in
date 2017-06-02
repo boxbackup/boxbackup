@@ -390,6 +390,9 @@ if ($target_windows)
 print "done\n\nGenerating Makefiles...\n";
 
 my $makefile_ifdef_prefix = $bsd_make ? "." : "";
+my $autoconf_cppflags = '@CPPFLAGS@';
+my $autoconf_cxxflags = '@CXXFLAGS_STRICT@';
+my $autoconf_ldflags  = '@LDFLAGS@';
 
 open MASTER_MAKEFILE, ">Makefile" or die "Makefile: $!";
 print MASTER_MAKEFILE <<__E;
@@ -411,13 +414,13 @@ WINDRES = @WINDRES@
 
 # Work around a mistake in QDBM (using <angled> includes for a file not in the
 # system path) by adding it to the include path with -I.
-DEFAULT_CFLAGS = \@CPPFLAGS@ $default_cflags \@CXXFLAGS_STRICT@ \\
+DEFAULT_CFLAGS = $autoconf_cppflags $default_cflags $autoconf_cxxflags \\
 	$extra_platform_defines $platform_compile_line_extra \\
 	-DBOX_VERSION="\\"$product_version\\"" -Iqdbm
-DEFAULT_CXXFLAGS = \@CPPFLAGS@ $default_cxxflags \@CXXFLAGS_STRICT@ \\
+DEFAULT_CXXFLAGS = $autoconf_cppflags $default_cxxflags $autoconf_cxxflags \\
 	$extra_platform_defines $platform_compile_line_extra \\
 	-DBOX_VERSION="\\"$product_version\\""
-LDFLAGS += \@LDFLAGS@ \@LDADD_RDYNAMIC@ $platform_link_line_extra
+LDFLAGS += $autoconf_ldflags \@LDADD_RDYNAMIC@ $platform_link_line_extra
 
 RELEASE_CFLAGS   = \$(DEFAULT_CFLAGS)   -DBOX_RELEASE_BUILD $release_flags
 RELEASE_CXXFLAGS = \$(DEFAULT_CXXFLAGS) -DBOX_RELEASE_BUILD $release_flags
