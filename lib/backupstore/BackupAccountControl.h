@@ -70,8 +70,6 @@ public:
 
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
-#define S3_INFO_FILE_NAME		"boxbackup.info"
-#define S3_NOTIONAL_BLOCK_SIZE		1048576
 
 #endif // BACKUPACCOUNTCONTROL__H
 

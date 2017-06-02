@@ -12,6 +12,8 @@
 
 #include <sys/types.h>
 
+#include <sstream>
+
 #include "autogen_BackupStoreException.h"
 #include "BackupConstants.h"
 #include "BackupStoreDirectory.h"
@@ -29,6 +31,7 @@
 #include "IOStream.h"
 #include "InvisibleTempFileStream.h"
 #include "S3Client.h"
+#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
@@ -41,7 +44,7 @@ std::string S3BackupFileSystem::GetObjectURL(const std::string& ObjectPath) cons
 {
 	const Configuration s3config = mrConfig.GetSubConfiguration("S3Store");
 	return std::string("http://") + s3config.GetKeyValue("HostName") + ":" +
-		s3config.GetKeyValue("Port") + GetObjectURI(ObjectPath);
+		s3config.GetKeyValue("Port") + ObjectPath;
 }
 
 int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
@@ -146,21 +149,65 @@ bool S3BackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
 	return true;
 }
 
-// This URI should NOT include the BasePath, because the S3Client will add that
-// automatically when we make a request for this URI.
-std::string S3BackupFileSystem::GetDirectoryURI(int64_t ObjectID)
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3BackupFileSystem::GetObjectURI(int64_t ObjectID,
+//			 int Type)
+//		Purpose: Builds the object filename for a given object,
+//			 including mBasePath. Very similar to
+//			 StoreStructure::MakeObjectFilename(), but files and
+//			 directories have different extensions, and the
+//			 filename is the full object ID, not just the lower
+//			 STORE_ID_SEGMENT_LENGTH bits.
+//		Created: 2016/03/21
+//
+// --------------------------------------------------------------------------
+std::string S3BackupFileSystem::GetObjectURI(int64_t ObjectID, int Type) const
 {
+	const static char *hex = "0123456789abcdef";
+	ASSERT(mBasePath.size() > 0 && mBasePath[0] == '/' &&
+		mBasePath[mBasePath.size() - 1] == '/');
 	std::ostringstream out;
-	out << "dirs/" << BOX_FORMAT_OBJECTID(ObjectID) << ".dir";
-	return out.str();
-}
+	out << mBasePath;
 
-// This URI should NOT include the BasePath, because the S3Client will add that
-// automatically when we make a request for this URI.
-std::string S3BackupFileSystem::GetFileURI(int64_t ObjectID)
-{
-	std::ostringstream out;
-	out << "files/" << BOX_FORMAT_OBJECTID(ObjectID) << ".dir";
+	// Get the id value from the stored object ID into an unsigned int64_t, so that
+	// we can do bitwise operations on it safely.
+	uint64_t id = (uint64_t)ObjectID;
+
+	// Shift off the bits which make up the leafname
+	id >>= STORE_ID_SEGMENT_LENGTH;
+
+	// build pathname
+	while(id != 0)
+	{
+		// assumes that the segments are no bigger than 8 bits
+		int v = id & STORE_ID_SEGMENT_MASK;
+		out << hex[(v & 0xf0) >> 4];
+		out << hex[v & 0xf];
+		out << "/";
+
+		// shift the bits we used off the pathname
+		id >>= STORE_ID_SEGMENT_LENGTH;
+	}
+
+	// append the filename
+	out << BOX_FORMAT_OBJECTID(ObjectID);
+	if(Type == ObjectExists_File)
+	{
+		out << ".file";
+	}
+	else if(Type == ObjectExists_Dir)
+	{
+		out << ".dir";
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Unknown file type for object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+			": " << Type);
+	}
+
 	return out.str();
 }
 
