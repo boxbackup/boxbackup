@@ -407,7 +407,26 @@ else()
 endif()
 
 # Link to OpenSSL
-find_package(OpenSSL REQUIRED)
+# Workaround for incorrect library suffixes searched by FindOpenSSL:
+# https://gitlab.kitware.com/cmake/cmake/issues/17604
+if(WIN32 AND MSVC)
+	find_package(OpenSSL)
+	set(OPENSSL_SSL_LIBRARY ${SSL_EAY_RELEASE})
+	set(OPENSSL_CRYPTO_LIBRARY ${LIB_EAY_RELEASE})
+	set(OPENSSL_LIBRARIES ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY} crypt32)
+	find_package_handle_standard_args(OpenSSL
+	REQUIRED_VARS
+		OPENSSL_SSL_LIBRARY
+		OPENSSL_CRYPTO_LIBRARY
+		OPENSSL_INCLUDE_DIR
+	VERSION_VAR
+		OPENSSL_VERSION
+	FAIL_MESSAGE
+		"Could NOT find OpenSSL, try to set the path to OpenSSL root folder in the system variable OPENSSL_ROOT_DIR"
+	)
+else()
+	find_package(OpenSSL REQUIRED)
+endif()
 include_directories(${OPENSSL_INCLUDE_DIR})
 target_link_libraries(lib_crypto PUBLIC ${OPENSSL_LIBRARIES})
 
