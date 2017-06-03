@@ -206,7 +206,7 @@ void CipherBlowfish::SetupParameters(EVP_CIPHER_CTX *pCipherContext) const
 	}
 	// Set key
 #ifndef HAVE_OLD_SSL
-	if(EVP_CipherInit_ex(pCipherContext, NULL, NULL, (unsigned char*)mpKey, (unsigned char*)mpInitialisationVector, -1) != 1)
+	if(EVP_CipherInit_ex(pCipherContext, GetCipher(), NULL, (unsigned char*)mpKey, (unsigned char*)mpInitialisationVector, -1) != 1)
 #else
 	if(EVP_CipherInit(pCipherContext, NULL, (unsigned char*)mKey.c_str(), (unsigned char*)mInitialisationVector, -1) != 1)
 #endif

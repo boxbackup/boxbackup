@@ -2,7 +2,7 @@
 //
 // File
 //		Name:    CipherContext.cpp
-//		Purpose: Context for symmetric encryption / descryption
+//		Purpose: Context for symmetric encryption / decryption
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
@@ -50,7 +50,7 @@ CipherContext::~CipherContext()
 	if(mInitialised)
 	{
 		// Clean up
-		EVP_CIPHER_CTX_cleanup(&ctx);
+		BOX_OPENSSL_CLEANUP_CTX(ctx);
 		mInitialised = false;
 	}
 #ifdef HAVE_OLD_SSL
@@ -98,7 +98,7 @@ void CipherContext::Init(CipherContext::CipherFunction Function, const CipherDes
 	// Check for bad usage
 	if(mInitialised)
 	{
-		THROW_EXCEPTION(CipherException, AlreadyInitialised)
+		THROW_EXCEPTION(CipherException, AlreadyInitialised);
 	}
 	if(Function != Decrypt && Function != Encrypt)
 	{
@@ -109,43 +109,45 @@ void CipherContext::Init(CipherContext::CipherFunction Function, const CipherDes
 	mFunction = Function;
 
 	// Initialise the cipher
-#ifndef HAVE_OLD_SSL
-	EVP_CIPHER_CTX_init(&ctx); // no error return code, even though the docs says it does
-
-	if(EVP_CipherInit_ex(&ctx, rDescription.GetCipher(), NULL, NULL, NULL,
-		(mFunction == Encrypt) ? 1 : 0) != 1)
-#else
+#ifdef HAVE_OLD_SSL
 	// Use old version of init call
 	if(EVP_CipherInit(&ctx, rDescription.GetCipher(), NULL, NULL,
+		(mFunction == Encrypt) ? 1 : 0) != 1)
+#else
+	BOX_OPENSSL_INIT_CTX(ctx);
+
+	// Don't set key or IV yet, because we will modify the parameters:
+	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), rDescription.GetCipher(), NULL, NULL, NULL,
 		(mFunction == Encrypt) ? 1 : 0) != 1)
 #endif
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
 			"Failed to initialise " << rDescription.GetFullName()
-			<< "cipher: " << LogError("initialising cipher"));
+			<< ": " << LogError("initialising cipher"));
 	}
+	UsePadding(mPaddingOn);
 	
 	try
 	{
 		mCipherName = rDescription.GetFullName();
 #ifndef HAVE_OLD_SSL
 		// Let the description set up everything else
-		rDescription.SetupParameters(&ctx);
+		mpDescription = &rDescription;
 #else
 		// With the old version, a copy needs to be taken first.
 		mpDescription = rDescription.Clone();
 		// Mark it as not a leak, otherwise static cipher contexts
 		// cause spurious memory leaks to be reported
 		MEMLEAKFINDER_NOT_A_LEAK(mpDescription);
-		mpDescription->SetupParameters(&ctx);
 #endif
+		mpDescription->SetupParameters(BOX_OPENSSL_CTX(ctx));
 	}
 	catch(...)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
-			"Failed to configure " << mCipherName << " cipher: " <<
+			"Failed to configure " << mCipherName << ": " <<
 			LogError("configuring cipher"));
-		EVP_CIPHER_CTX_cleanup(&ctx);
+		BOX_OPENSSL_CLEANUP_CTX(ctx);
 		throw;
 	}
 
@@ -166,7 +168,7 @@ void CipherContext::Reset()
 	if(mInitialised)
 	{
 		// Clean up
-		EVP_CIPHER_CTX_cleanup(&ctx);
+		EVP_CIPHER_CTX_cleanup(BOX_OPENSSL_CTX(ctx));
 		mInitialised = false;
 	}
 #ifdef HAVE_OLD_SSL
@@ -177,6 +179,7 @@ void CipherContext::Reset()
 	}
 #endif
 	mWithinTransform = false;
+	mIV.clear();
 }
 
 
@@ -192,24 +195,22 @@ void CipherContext::Begin()
 {
 	if(!mInitialised)
 	{
-		THROW_EXCEPTION(CipherException, NotInitialised)
+		THROW_EXCEPTION(CipherException, NotInitialised);
 	}
 
-	// Warn if in a transformation (not an error, because a context might not have been finalised if an exception occured)
 	if(mWithinTransform)
 	{
-		BOX_WARNING("CipherContext::Begin called when context "
-			"flagged as within a transform");
+		THROW_EXCEPTION(CipherException, AlreadyInTransform);
 	}
 
-	// Initialise the cipher context again
-	if(EVP_CipherInit(&ctx, NULL, NULL, NULL, -1) != 1)
+	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL,
+		(const unsigned char *)(mIV.size() > 0 ? mIV.c_str() : NULL),
+		-1) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
-			"Failed to reset " << mCipherName << " cipher: " <<
-			LogError("resetting cipher"));
+			"Failed to set IV for " << mCipherName << ": " << LogError(GetFunction()));
 	}
-	
+
 	// Mark as being within a transform
 	mWithinTransform = true;
 }
@@ -251,18 +252,18 @@ int CipherContext::Transform(void *pOutBuffer, int OutLength, const void *pInBuf
 	}
 	
 	// Check output buffer size
-	if(OutLength < (InLength + EVP_CIPHER_CTX_block_size(&ctx)))
+	if(OutLength < (InLength + EVP_CIPHER_CTX_block_size(BOX_OPENSSL_CTX(ctx))))
 	{
 		THROW_EXCEPTION(CipherException, OutputBufferTooSmall);
 	}
 	
 	// Do the transform
 	int outLength = OutLength;
-	if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
+	if(EVP_CipherUpdate(BOX_OPENSSL_CTX(ctx), (unsigned char*)pOutBuffer, &outLength,
+		(unsigned char*)pInBuffer, InLength) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPUpdateFailure,
-			"Failed to " << GetFunction() << " (update) " <<
-			mCipherName << " cipher: " << LogError(GetFunction()));
+			"Failed to update " << mCipherName << ": " << LogError(GetFunction()));
 	}
 
 	return outLength;
@@ -300,7 +301,7 @@ int CipherContext::Final(void *pOutBuffer, int OutLength)
 	}
 
 	// Check output buffer size
-	if(OutLength < (2 * EVP_CIPHER_CTX_block_size(&ctx)))
+	if(OutLength < (2 * EVP_CIPHER_CTX_block_size(BOX_OPENSSL_CTX(ctx))))
 	{
 		THROW_EXCEPTION(CipherException, OutputBufferTooSmall);
 	}
@@ -308,12 +309,11 @@ int CipherContext::Final(void *pOutBuffer, int OutLength)
 	// Do the transform
 	int outLength = OutLength;
 #ifndef HAVE_OLD_SSL
-	if(EVP_CipherFinal(&ctx, (unsigned char*)pOutBuffer, &outLength) != 1)
+	if(EVP_CipherFinal(BOX_OPENSSL_CTX(ctx), (unsigned char*)pOutBuffer, &outLength) != 1)
 	{
 		mWithinTransform = false;
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPFinalFailure,
-			"Failed to " << GetFunction() << " (final) " <<
-			mCipherName << " cipher: " << LogError(GetFunction()));
+			"Failed to finalise " << mCipherName << ": " << LogError(GetFunction()));
 	}
 #else
 	OldOpenSSLFinal((unsigned char*)pOutBuffer, outLength);
@@ -340,11 +340,11 @@ void CipherContext::OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut)
 	// Old version needs to use a different form, and then set up the cipher again for next time around
 	int outLength = rOutLengthOut;
 	// Have to emulate padding off...
-	int blockSize = EVP_CIPHER_CTX_block_size(&ctx);
+	int blockSize = EVP_CIPHER_CTX_block_size(ctx);
 	if(mPaddingOn)
 	{
 		// Just use normal final call
-		if(EVP_CipherFinal(&ctx, Buffer, &outLength) != 1)
+		if(EVP_CipherFinal(ctx, Buffer, &outLength) != 1)
 		{
 			THROW_EXCEPTION(CipherException, EVPFinalFailure)
 		}
@@ -357,13 +357,13 @@ void CipherContext::OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut)
 		{
 			// NASTY -- fiddling around with internals like this is bad.
 			// But only way to get this working on old versions of OpenSSL.
-			if(!EVP_EncryptUpdate(&ctx,Buffer,&outLength,ctx.buf,0)
+			if(!EVP_EncryptUpdate(ctx,Buffer,&outLength,ctx.buf,0)
 				|| outLength != blockSize)
 			{
 				THROW_EXCEPTION(CipherException, EVPFinalFailure)
 			}
 			// Clean up
-			EVP_CIPHER_CTX_cleanup(&ctx);
+			EVP_CIPHER_CTX_free(ctx);
 		}
 		else
 		{
@@ -391,12 +391,14 @@ void CipherContext::OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut)
 		}
 	}
 	// Reinitialise the cipher for the next time around
-	if(EVP_CipherInit(&ctx, mpDescription->GetCipher(), NULL, NULL,
+	if(EVP_CipherInit_ex(&ctx, mpDescription->GetCipher(), NULL, NULL,
+		(const unsigned char *)(mIV.size() > 0 ? mIV.c_str() : NULL),
 		(mFunction == Encrypt) ? 1 : 0) != 1)
 	{
 		THROW_EXCEPTION(CipherException, EVPInitFailure)
 	}
 	mpDescription->SetupParameters(&ctx);
+	UsePadding(mPaddingOn);
 
 	// Update length for caller
 	rOutLengthOut = outLength;
@@ -421,7 +423,7 @@ int CipherContext::InSizeForOutBufferSize(int OutLength)
 
 	// Strictly speaking, the *2 is unnecessary. However... 
 	// Final() is paranoid, and requires two input blocks of space to work.
-	return OutLength - (EVP_CIPHER_CTX_block_size(&ctx) * 2);
+	return OutLength - (EVP_CIPHER_CTX_block_size(BOX_OPENSSL_CTX(ctx)) * 2);
 }
 
 // --------------------------------------------------------------------------
@@ -442,7 +444,7 @@ int CipherContext::MaxOutSizeForInBufferSize(int InLength)
 
 	// Final() is paranoid, and requires two input blocks of space to work, and so we need to add
 	// three blocks on to be absolutely sure.
-	return InLength + (EVP_CIPHER_CTX_block_size(&ctx) * 3);
+	return InLength + (EVP_CIPHER_CTX_block_size(BOX_OPENSSL_CTX(ctx)) * 3);
 }
 
 
@@ -456,20 +458,8 @@ int CipherContext::MaxOutSizeForInBufferSize(int InLength)
 // --------------------------------------------------------------------------
 int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *pInBuffer, int InLength)
 {
-	if(!mInitialised)
-	{
-		THROW_EXCEPTION(CipherException, NotInitialised)
-	}
-	
-	// Warn if in a transformation
-	if(mWithinTransform)
-	{
-		BOX_WARNING("CipherContext::TransformBlock called when "
-			"context flagged as within a transform");
-	}
-
 	// Check output buffer size
-	if(OutLength < (InLength + EVP_CIPHER_CTX_block_size(&ctx)))
+	if(OutLength < (InLength + EVP_CIPHER_CTX_block_size(BOX_OPENSSL_CTX(ctx))))
 	{
 		// Check if padding is off, in which case the buffer can be smaller
 		if(!mPaddingOn && OutLength <= InLength)
@@ -481,40 +471,36 @@ int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *p
 			THROW_EXCEPTION(CipherException, OutputBufferTooSmall);
 		}
 	}
-	
-	// Initialise the cipher context again
-	if(EVP_CipherInit(&ctx, NULL, NULL, NULL, -1) != 1)
-	{
-		THROW_EXCEPTION(CipherException, EVPInitFailure)
-	}
+
+	Begin();
 	
 	// Do the entire block
-	int outLength = 0;
+	int output_space_used = OutLength;
 
 	// Update
-	outLength = OutLength;
-	if(EVP_CipherUpdate(&ctx, (unsigned char*)pOutBuffer, &outLength, (unsigned char*)pInBuffer, InLength) != 1)
+	if(EVP_CipherUpdate(BOX_OPENSSL_CTX(ctx), (unsigned char*)pOutBuffer, &output_space_used,
+		(unsigned char*)pInBuffer, InLength) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPUpdateFailure,
-			"Failed to " << GetFunction() << " (update) " <<
-			mCipherName << " cipher: " << LogError(GetFunction()));
+			"Failed to update " << mCipherName << ": " << LogError(GetFunction()));
 	}
 
 	// Finalise
-	int outLength2 = OutLength - outLength;
-#ifndef HAVE_OLD_SSL
-	if(EVP_CipherFinal(&ctx, ((unsigned char*)pOutBuffer) + outLength, &outLength2) != 1)
+	int output_space_remain = OutLength - output_space_used;
+
+#ifdef HAVE_OLD_SSL
+	OldOpenSSLFinal(((unsigned char*)pOutBuffer) + output_space_used, output_space_remain);
+#else
+	if(EVP_CipherFinal(BOX_OPENSSL_CTX(ctx), ((unsigned char*)pOutBuffer) + output_space_used,
+		&output_space_remain) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPFinalFailure,
-			"Failed to " << GetFunction() << " (final) " <<
-			mCipherName << " cipher: " << LogError(GetFunction()));
+			"Failed to finalise " << mCipherName << ": " << LogError(GetFunction()));
 	}
-#else
-	OldOpenSSLFinal(((unsigned char*)pOutBuffer) + outLength, outLength2);
 #endif
-	outLength += outLength2;
 
-	return outLength;
+	mWithinTransform = false;
+	return output_space_used + output_space_remain;
 }
 
 
@@ -533,7 +519,7 @@ int CipherContext::GetIVLength()
 		THROW_EXCEPTION(CipherException, NotInitialised)
 	}
 	
-	return EVP_CIPHER_CTX_iv_length(&ctx);
+	return EVP_CIPHER_CTX_iv_length(BOX_OPENSSL_CTX(ctx));
 }
 
 
@@ -559,12 +545,14 @@ void CipherContext::SetIV(const void *pIV)
 			"flagged as within a transform");
 	}
 
+	mIV = std::string((const char *)pIV, GetIVLength());
+
 	// Set IV
-	if(EVP_CipherInit(&ctx, NULL, NULL, (unsigned char *)pIV, -1) != 1)
+	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL,
+		(const unsigned char *)mIV.c_str(), -1) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
-			"Failed to " << GetFunction() << " (set IV) " <<
-			mCipherName << " cipher: " << LogError(GetFunction()));
+			"Failed to set IV for " << mCipherName << ": " << LogError(GetFunction()));
 	}
 
 #ifdef HAVE_OLD_SSL
@@ -601,19 +589,20 @@ const void *CipherContext::SetRandomIV(int &rLengthOut)
 	}
 
 	// Get length of IV
-	unsigned int ivLen = EVP_CIPHER_CTX_iv_length(&ctx);
-	if(ivLen > sizeof(mGeneratedIV))
+	uint8_t generated_iv[CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH];
+	unsigned int ivLen = EVP_CIPHER_CTX_iv_length(BOX_OPENSSL_CTX(ctx));
+	if(ivLen > sizeof(generated_iv))
 	{
 		THROW_EXCEPTION(CipherException, IVSizeImplementationLimitExceeded)
 	}
 	
 	// Generate some random data
-	Random::Generate(mGeneratedIV, ivLen);
-	SetIV(mGeneratedIV);
+	Random::Generate(generated_iv, ivLen);
+	SetIV(generated_iv);
 
 	// Return the IV and it's length
 	rLengthOut = ivLen;
-	return mGeneratedIV;
+	return mIV.c_str();
 }
 
 
@@ -628,9 +617,11 @@ const void *CipherContext::SetRandomIV(int &rLengthOut)
 void CipherContext::UsePadding(bool Padding)
 {
 #ifndef HAVE_OLD_SSL
-	if(EVP_CIPHER_CTX_set_padding(&ctx, Padding) != 1)
+	if(EVP_CIPHER_CTX_set_padding(BOX_OPENSSL_CTX(ctx), Padding) != 1)
 	{
-		THROW_EXCEPTION(CipherException, EVPSetPaddingFailure)
+		THROW_EXCEPTION_MESSAGE(CipherException, EVPSetPaddingFailure,
+			"Failed to set padding for " << mCipherName << ": " <<
+			LogError(GetFunction()));
 	}
 #endif
 	mPaddingOn = Padding;
