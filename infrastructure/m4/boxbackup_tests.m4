@@ -40,6 +40,7 @@ BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations)
 # We also get copious warnings from the 'register' storage class specifier in the system
 # headers (ntohl and friends) which we can't do much about, so disable it:
 BOX_CHECK_CXX_FLAG(-Wno-deprecated-register)
+BOX_CHECK_CXX_FLAG(-Werror=narrowing)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
