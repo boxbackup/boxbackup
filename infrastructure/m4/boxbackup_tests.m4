@@ -19,6 +19,8 @@ AX_CHECK_COMPILE_FLAG(-Werror=non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=non-virtual-dtor"])
 AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
 	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
+AX_CHECK_COMPILE_FLAG(-Werror=narrowing,
+	[cxxflags_strict="$cxxflags_strict -Werror=narrowing"])
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
