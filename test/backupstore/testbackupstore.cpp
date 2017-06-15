@@ -1382,18 +1382,21 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 	return loginConf->GetClientStoreMarker();
 }
 
-bool test_multiple_uploads()
+bool test_multiple_uploads(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(StartServer(), FAIL);
-	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
-	std::auto_ptr<BackupProtocolCallable> apProtocol =
-		connect_and_login(context);
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
-	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, true); // ReadOnly
+	std::auto_ptr<BackupProtocolLocal2> apProtocol(
+		new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
+	std::auto_ptr<BackupProtocolLocal2> apProtocolReadOnly(
+		new BackupProtocolLocal2(roContext, 0x01234567, true)); // ReadOnly
 
 	// Read the root directory a few times (as it's cached, so make sure it doesn't hurt anything)
 	for(int l = 0; l < 3; ++l)
@@ -1411,14 +1414,14 @@ bool test_multiple_uploads()
 
 	// Read the dir from the readonly connection (make sure it gets in the cache)
 	// Command
-	protocolReadOnly.QueryListDirectory(
+	apProtocolReadOnly->QueryListDirectory(
 		BACKUPSTORE_ROOT_DIRECTORY_ID,
 		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		false /* no attributes */);
 	// Stream
-	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
-		protocolReadOnly.GetTimeout());
+	BackupStoreDirectory dir(apProtocolReadOnly->ReceiveStream(),
+		apProtocolReadOnly->GetTimeout());
 	TEST_THAT(dir.GetNumberOfEntries() == 0);
 
 	// TODO FIXME dedent
@@ -1468,10 +1471,10 @@ bool test_multiple_uploads()
 				expected_num_old_files, 0, 1));
 
 			apProtocol->QueryFinished();
-			protocolReadOnly.QueryFinished();
-			TEST_THAT(run_housekeeping_and_check_account());
-			apProtocol = connect_and_login(context);
-			protocolReadOnly.Reopen();
+			apProtocolReadOnly->QueryFinished();
+			TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+			apProtocol->Reopen();
+			apProtocolReadOnly->Reopen();
 
 			TEST_THAT(check_num_files(fs, expected_num_current_files,
 				expected_num_old_files, 0, 1));
@@ -1492,10 +1495,10 @@ bool test_multiple_uploads()
 		}
 
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		// Delete one of them (will implicitly delete an old version)
 		{
@@ -1506,21 +1509,11 @@ bool test_multiple_uploads()
 			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 		}
 
-#ifdef _MSC_VER
-		BOX_TRACE("1");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
-
-#ifdef _MSC_VER
-		BOX_TRACE("2");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1549,17 +1542,12 @@ bool test_multiple_uploads()
 			test_test_file(t, *filestream);
 		}
 
-#ifdef _MSC_VER
-		BOX_TRACE("3");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-
 		{
 			StreamableMemBlock attrtest(attr3, sizeof(attr3));
 
 			// Use the read only connection to verify that the directory is as we expect
 			printf("\n\n==== Reading directory using read-only connection\n");
-			check_dir_after_uploads(protocolReadOnly, attrtest);
+			check_dir_after_uploads(*apProtocolReadOnly, attrtest);
 			printf("done.\n\n");
 			// And on the read/write one
 			check_dir_after_uploads(*apProtocol, attrtest);
@@ -1567,11 +1555,6 @@ bool test_multiple_uploads()
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
-
-#ifdef _MSC_VER
-		BOX_TRACE("4");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
 
 		// Check diffing and rsync like stuff...
 		// Build a modified file
@@ -1595,34 +1578,11 @@ bool test_multiple_uploads()
 		// Run housekeeping (for which we need to disconnect
 		// ourselves) and check that it doesn't change the numbers
 		// of files
-
-#ifdef _MSC_VER
-		BOX_TRACE("5");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-#ifdef _MSC_VER
-		BOX_TRACE("6");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-		TEST_EQUAL(0, run_housekeeping(account));
-
-		// Also check that bbstoreaccounts doesn't change anything,
-		// using an external process instead of the internal one.
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS
-			" -c testfiles/bbstored.conf check 01234567 fix") == 0,
-			FAIL);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 
@@ -1673,7 +1633,8 @@ bool test_multiple_uploads()
 			set_refcount(patchedID, 1);
 
 			// Then download it to check it's OK
-			std::auto_ptr<BackupProtocolSuccess> getFile(apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, patchedID));
+			std::auto_ptr<BackupProtocolSuccess> getFile(
+				apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, patchedID));
 			TEST_THAT(getFile->GetObjectID() == patchedID);
 			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			BackupStoreFile::DecodeFile(*filestream,
@@ -1685,9 +1646,9 @@ bool test_multiple_uploads()
 	}
 
 	apProtocol->QueryFinished();
-	protocolReadOnly.QueryFinished();
+	apProtocolReadOnly->QueryFinished();
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_server_commands(const std::string& specialisation_name,
@@ -3778,9 +3739,9 @@ int test(int argc, const char *argv[])
 	{
 		RUN_TEST(i->first, i->second, test_server_commands);
 		RUN_TEST(i->first, i->second, test_account_limits_respected);
+		RUN_TEST(i->first, i->second, test_multiple_uploads);
 	}
 
-	TEST_THAT(test_multiple_uploads());
 	TEST_THAT(test_housekeeping_deletes_files());
 	TEST_THAT(test_read_write_attr_streamformat());
 
