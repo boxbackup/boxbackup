@@ -242,6 +242,10 @@ extern "C" int
 	open(const char *path, int flags, ...)
 #endif // DEFINE_ONLY_OPEN64
 {
+	// Some newer architectures don't have an open() syscall, but use openat() instead.
+	// In these cases we will need to call sys_openat() instead of sys_open().
+	// https://chromium.googlesource.com/linux-syscall-support/
+
 	if(intercept_count > 0)
 	{
 		if(intercept_filename != NULL &&
@@ -264,6 +268,8 @@ extern "C" int
 
 #ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_open(path, flags, mode);
+#elif HAVE_DECL_SYS_OPENAT && !HAVE_DECL_SYS_OPEN
+	int r = syscall(SYS_openat, AT_FDCWD, path, flags, mode);
 #else
 	int r = syscall(SYS_open, path, flags, mode);
 #endif

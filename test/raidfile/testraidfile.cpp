@@ -25,6 +25,7 @@
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
 #include "Guards.h"
+#include "intercept.h"
 
 #include "MemLeakFindOn.h"
 
@@ -35,13 +36,6 @@
 
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	#define	TRF_CAN_INTERCEPT
-#endif
-
-#ifdef TRF_CAN_INTERCEPT
-// function in intercept.cpp for setting up errors
-void intercept_setup_error(const char *filename, unsigned int errorafter, int errortoreturn, int syscalltoerror);
-bool intercept_triggered();
-void intercept_clear_setup();
 #endif
 
 // Nice random data for testing written files
