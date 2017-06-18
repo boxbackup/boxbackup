@@ -62,5 +62,14 @@ void intercept_setup_stat_post_hook (lstat_post_hook_t hookfn);
 
 void intercept_clear_setup();
 
+// Some newer architectures don't have an open() syscall, but use openat() instead.
+// In these cases we define SYS_open (which is otherwise undefined) to equal SYS_openat
+// (which is defined) so that everywhere else we can call intercept_setup_error(SYS_open)
+// without caring about the difference.
+// https://chromium.googlesource.com/linux-syscall-support/
+#if !HAVE_DECL_SYS_OPEN && HAVE_DECL_SYS_OPENAT
+#	define SYS_open SYS_openat
+#endif
+
 #endif // !PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 #endif // !INTERCEPT_H
