@@ -363,47 +363,54 @@ int test(int argc, const char *argv[])
 	// that kind of precision in practice. So we reduce the timer intervals by 100ms to
 	// be safe.
 
-	Timer t0(0, "t0"); // should never expire
-	Timer t1(900, "t1");
-	Timer t2(1900, "t2");
-	Timer t3(2900, "t3");
+	{
+		Logger::LevelGuard temporary_verbosity(Logging::GetConsole(), Log::Level::TRACE);
+		Console::SettingsGuard save_old_settings;
+		Console::SetShowTime(true);
+		Console::SetShowTimeMicros(true);
 
-	TEST_THAT(!t0.HasExpired());
-	TEST_THAT(!t1.HasExpired());
-	TEST_THAT(!t2.HasExpired());
-	TEST_THAT(!t3.HasExpired());
-	safe_sleep(1);
+		Timer t0(0, "t0"); // should never expire
+		Timer t1(900, "t1");
+		Timer t2(1900, "t2");
+		Timer t3(2900, "t3");
 
-	TEST_THAT(!t0.HasExpired());
-	TEST_THAT(t1.HasExpired());
-	TEST_THAT(!t2.HasExpired());
-	TEST_THAT(!t3.HasExpired());
+		TEST_THAT(!t0.HasExpired());
+		TEST_THAT(!t1.HasExpired());
+		TEST_THAT(!t2.HasExpired());
+		TEST_THAT(!t3.HasExpired());
+		safe_sleep(1);
 
-	safe_sleep(1);
-	TEST_THAT(!t0.HasExpired());
-	TEST_THAT(t1.HasExpired());
-	TEST_THAT(t2.HasExpired());
-	TEST_THAT(!t3.HasExpired());
+		TEST_THAT(!t0.HasExpired());
+		TEST_THAT(t1.HasExpired());
+		TEST_THAT(!t2.HasExpired());
+		TEST_THAT(!t3.HasExpired());
 
-	// Try both ways of resetting an existing timer.
-	t1 = Timer(900, "t1a");
-	t2.Reset(1900);
-	TEST_THAT(!t0.HasExpired());
-	TEST_THAT(!t1.HasExpired());
-	TEST_THAT(!t2.HasExpired());
-	TEST_THAT(!t3.HasExpired());
+		safe_sleep(1);
+		TEST_THAT(!t0.HasExpired());
+		TEST_THAT(t1.HasExpired());
+		TEST_THAT(t2.HasExpired());
+		TEST_THAT(!t3.HasExpired());
 
-	safe_sleep(1);
-	TEST_THAT(!t0.HasExpired());
-	TEST_THAT(t1.HasExpired());
-	TEST_THAT(!t2.HasExpired());
-	TEST_THAT(t3.HasExpired());
+		// Try both ways of resetting an existing timer.
+		t1 = Timer(900, "t1a");
+		t2.Reset(1900);
+		TEST_THAT(!t0.HasExpired());
+		TEST_THAT(!t1.HasExpired());
+		TEST_THAT(!t2.HasExpired());
+		TEST_THAT(!t3.HasExpired());
 
-	safe_sleep(1);
-	TEST_THAT(!t0.HasExpired());
-	TEST_THAT(t1.HasExpired());
-	TEST_THAT(t2.HasExpired());
-	TEST_THAT(t3.HasExpired());
+		safe_sleep(1);
+		TEST_THAT(!t0.HasExpired());
+		TEST_THAT(t1.HasExpired());
+		TEST_THAT(!t2.HasExpired());
+		TEST_THAT(t3.HasExpired());
+
+		safe_sleep(1);
+		TEST_THAT(!t0.HasExpired());
+		TEST_THAT(t1.HasExpired());
+		TEST_THAT(t2.HasExpired());
+		TEST_THAT(t3.HasExpired());
+	}
 
 	// Leave timers initialised for rest of test.
 	// Test main() will cleanup after test finishes.

@@ -301,6 +301,32 @@ class Console : public Logger
 	static void SetShowTimeMicros(bool enabled);
 	static void SetShowPID(bool enabled);
 	static bool GetShowTag() { return sShowTag; }
+
+	class SettingsGuard
+	{
+		private:
+		bool mShowTag;
+		bool mShowTime;
+		bool mShowTimeMicros;
+		bool mShowPID;
+		std::string mTag;
+		public:
+		SettingsGuard()
+		: mShowTag(Console::sShowTag),
+		  mShowTime(Console::sShowTime),
+		  mShowTimeMicros(Console::sShowTimeMicros),
+		  mShowPID(Console::sShowPID),
+		  mTag(Console::sTag)
+		{ }
+		~SettingsGuard()
+		{
+			Console::SetShowTag(mShowTag);
+			Console::SetShowTime(mShowTime);
+			Console::SetShowTimeMicros(mShowTimeMicros);
+			Console::SetShowPID(mShowPID);
+			Console::sTag = mTag;
+		}
+	};
 };
 
 // --------------------------------------------------------------------------
