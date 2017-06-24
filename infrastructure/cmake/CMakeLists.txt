@@ -498,7 +498,7 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 			foreach(header_file ${header_files})
 				list(APPEND detect_header_files ${header_file})
 			endforeach()
-		elseif(m4_function MATCHES "^ *AC_CHECK_FUNCS\\(\\[([a-z./_ ]+)\\](.*)\\)$")
+		elseif(m4_function MATCHES "^ *AC_CHECK_FUNCS\\(\\[([a-z0-9./_ ]+)\\](.*)\\)$")
 			if(DEBUG)
 				message(STATUS "Processing ac_check_funcs: ${CMAKE_MATCH_1}")
 			endif()
