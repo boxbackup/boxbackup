@@ -70,11 +70,6 @@ END_STRUCTURE_PACKING_FOR_WIRE
 class BackupStoreInfo
 {
 	friend class BackupStoreCheck;
-public:
-	BackupStoreInfo(int32_t AccountID, int64_t BlockSoftLimit,
-		int64_t BlockHardLimit);
-	~BackupStoreInfo();
-
 private:
 	// No copying allowed
 	BackupStoreInfo(const BackupStoreInfo &);
@@ -83,6 +78,10 @@ protected:
 	BackupStoreInfo();
 
 public:
+	BackupStoreInfo(int32_t AccountID, int64_t BlockSoftLimit,
+		int64_t BlockHardLimit);
+	~BackupStoreInfo();
+
 	// Load it from a stream (file or RaidFile)
 	static std::auto_ptr<BackupStoreInfo> Load(IOStream& rStream,
 		const std::string& FileName, bool ReadOnly);

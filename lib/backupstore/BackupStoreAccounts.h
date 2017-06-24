@@ -50,9 +50,6 @@ private:
 	BackupStoreAccountDatabase &mrDatabase;
 };
 
-class Configuration;
-class UnixUser;
-
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
 

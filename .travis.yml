@@ -27,6 +27,7 @@ addons:
       - time
       - xsltproc
       - zlib1g-dev
+      - libboost-dev
 
 env:
   - TEST_TARGET=debug
@@ -43,12 +44,6 @@ matrix:
     # No point testing both GCC and Clang on Mac OS X, as they're the same thing.
     - os: osx
       compiler: gcc
-  allow_failures:
-    # OSX on Travis is in testing, it's allowed to fail for now.
-    - os: osx
 
 script:
-  - travis_wait env EXTRA_MAKE_ARGS=-j2 ./infrastructure/travis-build.sh
-
-after_failure:
-  - for i in test-*.log; do echo $i; cat $i; done
+  - env EXTRA_MAKE_ARGS=-j2 ./infrastructure/travis-build.sh

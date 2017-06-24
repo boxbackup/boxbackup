@@ -2047,7 +2047,7 @@ uint64_t box_strtoui64(const char *nptr, const char **endptr, int base)
 {
 	std::istringstream iss((std::string(nptr)));
 	uint64_t result;
-	
+
 	assert(base == 0 || base == 8 || base == 10 || base == 16);
 	iss >> std::setbase(base);
 	iss >> result;

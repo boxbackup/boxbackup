@@ -73,7 +73,7 @@ MultiplyReferencedObject	69	Attempted to modify an object with multiple referenc
 CorruptReferenceCountDatabase	70	The account's refcount database is corrupt and must be rebuilt by housekeeping
 CancelledByBackgroundTask	71	The current task was cancelled on request by the background task
 MissingEtagHeader		72	The S3 HTTP response did not contain an ETag header as expected
-InvalidEtagHeader		73	The S3 HTTP response contain a malformed or unexpected ETag header as expected
+InvalidEtagHeader		73	The S3 HTTP response contain a malformed or unexpected ETag header
 FileSystemNotInitialised	74	No BackupFileSystem has been configured for this account
 ObjectDoesNotExist		75	The specified object ID does not exist in the store, or is not of this type
 AccountAlreadyExists		76	Tried to create an account that already exists

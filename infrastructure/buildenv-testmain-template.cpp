@@ -394,6 +394,37 @@ int main(int argc, char * const * argv)
 		}
 #endif // WIN32
 
+#ifdef WIN32
+		// Create a Windows "Job Object" for Test.cpp to use as a
+		// container for all our child processes (daemons). We will
+		// close the handle (killing any running daemons) when we exit.
+		// This is the best way to avoid daemons hanging around and
+		// causing subsequent tests to fail, and/or the test runner to
+		// hang waiting for a daemon that will never terminate.
+
+		sTestChildDaemonJobObject = CreateJobObject(NULL, NULL);
+		if(sTestChildDaemonJobObject == INVALID_HANDLE_VALUE)
+		{
+			BOX_LOG_WIN_WARNING("Failed to create job object "
+				"to contain child daemons");
+		}
+		else
+		{
+			JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
+			limits.BasicLimitInformation.LimitFlags =
+				JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+			if(!SetInformationJobObject(
+				sTestChildDaemonJobObject,
+				JobObjectExtendedLimitInformation,
+				&limits,
+				sizeof(limits)))
+			{
+				BOX_LOG_WIN_WARNING("Failed to set limits on "
+					"job object for child daemons");
+			}
+		}
+#endif // WIN32
+
 		Timers::Init();
 		int returncode = test(argc, (const char **)argv);
 		Timers::Cleanup(false);

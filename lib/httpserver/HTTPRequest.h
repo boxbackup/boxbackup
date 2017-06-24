@@ -108,14 +108,6 @@ public:
 
 	typedef std::map<std::string, std::string> CookieJar_t;
 	
-	// --------------------------------------------------------------------------
-	//
-	// Function
-	//		Name:    HTTPResponse::Get*()
-	//		Purpose: Various Get accessors
-	//		Created: 26/3/04
-	//
-	// --------------------------------------------------------------------------
 	enum Method GetMethod() const {return mMethod;}
 	std::string GetMethodName() const;
 	std::string GetRequestURI(bool with_parameters_for_get_request = false) const;

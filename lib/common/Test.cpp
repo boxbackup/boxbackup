@@ -18,7 +18,7 @@
 #include <sys/types.h>
 
 #ifdef HAVE_DIRENT_H
-#	include <dirent.h>
+#	include <dirent.h> // for opendir(), struct DIR
 #endif
 
 #ifdef HAVE_UNISTD_H
@@ -97,6 +97,8 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 		}
 	}
 
+	// We need to do something more complex than "rm -rf testfiles" to clean up the mess and
+	// prepare for the next test, in a way that works on Windows (without rm -rf) as well.
 	DIR* pDir = opendir("testfiles");
 	if(!pDir)
 	{
@@ -114,16 +116,16 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
 			StartsWith("restore", filename) ||
-			filename == "store" ||
 			filename == "bbackupd-cache" ||
 			filename == "bbackupd-data" ||
+			filename == "store" ||
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
 			EndsWith("testfile", filename))
 		{
-			std::string filepath = std::string("testfiles" 
-				DIRECTORY_SEPARATOR) + filename;
+			std::string filepath = std::string("testfiles" DIRECTORY_SEPARATOR) +
+				filename;
 
 			int filetype = ObjectExists(filepath);
 			if(filetype == ObjectExists_File)
@@ -136,7 +138,9 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 			}
 			else if(filetype == ObjectExists_Dir)
 			{
-#ifdef WIN32
+#ifdef _MSC_VER
+				// More complex command invocation required to properly encode
+				// arguments when non-ASCII characters are involved:
 				std::string cmd = "cmd /c rd /s /q " + filepath;
 				WCHAR* wide_cmd = ConvertUtf8ToWideString(cmd.c_str());
 				if(wide_cmd == NULL)
@@ -198,11 +202,11 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 
 				CloseHandle(pi.hProcess);
 				CloseHandle(pi.hThread);
-#else // !WIN32
+#else // !_MSC_VER
 				// Deleting directories is so much easier on Unix!
 				std::string cmd = "rm -rf '" + filepath + "'";
-				TEST_THAT_THROWONFAIL(system(cmd.c_str()) == 0);
-#endif // WIN32
+				TEST_EQUAL_LINE(0, system(cmd.c_str()), "system() failed: " << cmd);
+#endif
 			}
 			else
 			{
@@ -223,6 +227,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir/dirs", 0755) == 0);
 
 	return true;
 }

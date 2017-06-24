@@ -87,7 +87,6 @@ test_script:
   - appveyor PushArtifact -path BoxBackup-%compiled_version%.zip -DeploymentName BoxBackup-%compiled_version%
   - appveyor PushArtifact -path BoxBackup-%compiled_version%.exe -DeploymentName BoxBackup-%compiled_version%
 
-
 deploy:
   - provider: GitHub
     release: BoxBackup-$(boxbackup_version_full)

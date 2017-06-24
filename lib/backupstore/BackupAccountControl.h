@@ -20,6 +20,8 @@
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
+class NamedLock;
+class UnixUser;
 
 class BackupAccountControl
 {
@@ -60,6 +62,7 @@ public:
 		mapFileSystem.reset();
 	}
 };
+
 
 class BackupStoreAccountControl : public BackupAccountControl
 {

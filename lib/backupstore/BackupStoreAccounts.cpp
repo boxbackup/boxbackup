@@ -18,8 +18,6 @@
 #include "BackupFileSystem.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
-#include "BackupStoreCheck.h"
-#include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -32,7 +30,6 @@
 #include "RaidFileWrite.h"
 #include "StoreStructure.h"
 #include "UnixUser.h"
-#include "Utils.h"
 
 #include "MemLeakFindOn.h"
 

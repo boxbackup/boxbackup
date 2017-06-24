@@ -114,8 +114,6 @@ if(WIN32)
 	add_definitions(-DWIN32)
 endif()
 
-file(READ "${base_dir}/infrastructure/buildenv-testmain-template.cpp" test_template)
-
 # Parsing Makefile.extra files in CMake script is a pain, so the relevant rules for
 # code-generating Perl scripts are hard-coded here.
 
@@ -297,8 +295,7 @@ foreach(module_dep ${module_deps})
 			add_test(NAME ${test_name}
 				COMMAND ${time_test_command_prefix}
 				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
-				${appveyor_runtest_pl_switch}
-				-cT$<$<CONFIG:Debug>:O-LBackupFileSystem.cpp=trace> ${test_name}
+				${appveyor_runtest_pl_switch} -c ${test_name}
 				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
 				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})

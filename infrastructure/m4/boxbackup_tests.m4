@@ -30,8 +30,10 @@ dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
 BOX_CHECK_CXX_FLAG(-Werror=return-type)
 BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
 BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=narrowing)
 BOX_CHECK_CXX_FLAG(-Werror=parentheses)
 BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
+BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
 # We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
 dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
 dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])

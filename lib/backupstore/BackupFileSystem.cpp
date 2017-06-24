@@ -1003,8 +1003,8 @@ void RaidBackupFileSystem::CheckObjectsScanDir(int64_t StartID, int Level,
 		}
 		else
 		{
-			BOX_ERROR("Spurious or invalid directory " << rDirName <<
-				DIRECTORY_SEPARATOR << (*i) << " found, " <<
+			BOX_ERROR("Spurious or invalid directory '" << rDirName <<
+				DIRECTORY_SEPARATOR << (*i) << "' found, " <<
 				(fix_errors?"deleting":"delete manually"));
 			++Result.numErrorsFound;
 		}
@@ -1521,12 +1521,12 @@ bool S3BackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
 //		Created: 2016/03/21
 //
 // --------------------------------------------------------------------------
-std::string S3BackupFileSystem::GetObjectURI(int64_t ObjectID, int Type)
+std::string S3BackupFileSystem::GetObjectURI(int64_t ObjectID, int Type) const
 {
 	const static char *hex = "0123456789abcdef";
-	std::ostringstream out;
 	ASSERT(mBasePath.size() > 0 && mBasePath[0] == '/' &&
 		mBasePath[mBasePath.size() - 1] == '/');
+	std::ostringstream out;
 	out << mBasePath;
 
 	// Get the id value from the stored object ID into an unsigned int64_t, so that
@@ -1644,9 +1644,8 @@ class S3PutFileCompleteTransaction : public BackupFileSystem::Transaction
 private:
 	S3Client& mrClient;
 	std::string mFileURI;
-	bool mWritten, mCommitted;
+	bool mCommitted;
 	int64_t mNumBlocks;
-	IOStream& mrFileData;
 
 public:
 	S3PutFileCompleteTransaction(S3BackupFileSystem& fs, S3Client& client,
@@ -1667,8 +1666,7 @@ S3PutFileCompleteTransaction::S3PutFileCompleteTransaction(S3BackupFileSystem& f
 : mrClient(client),
   mFileURI(file_uri),
   mCommitted(false),
-  mNumBlocks(0),
-  mrFileData(file_data)
+  mNumBlocks(0)
 {
 	ByteCountingStream counter(file_data);
 	HTTPResponse response = mrClient.PutObject(file_uri, counter);
@@ -2156,8 +2154,12 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 		}
 		else
 		{
-			BOX_ERROR("Spurious or invalid directory " << subdir_name <<
-				" found, " << (fix_errors?"deleting":"delete manually"));
+			// We can't really "delete" directories on S3 because they don't exist
+			// as separate objects, just prefixes for files, so we'd have to
+			// recursively delete all files within that directory, and I don't feel
+			// like writing that code right now.
+			BOX_ERROR("Spurious or invalid directory '" << subdir_name <<
+				"' found, please remove it");
 			++result.numErrorsFound;
 		}
 	}
@@ -2275,5 +2277,4 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 		}
 	}
 }
-
 
