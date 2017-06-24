@@ -34,15 +34,15 @@ extern "C"
 	typedef struct dirent *(readdir_t) (DIR *dir);
 	typedef struct dirent *(readdir_t) (DIR *dir);
 	typedef int            (closedir_t)(DIR *dir);
-#if defined __GNUC__ && __GNUC__ >= 2
+#if defined HAVE___LXSTAT64 || defined HAVE___LXSTAT
+	// Linux glibc implements the stat function using inline redirection
+	// to __lxstat(64), so that's what we have to intercept.
 	#define LINUX_WEIRD_LSTAT
 	#define STAT_STRUCT struct stat /* should be stat64 */
-		typedef int    (lstat_t)   (int ver, const char *file_name, 
-					    STAT_STRUCT *buf);
+	typedef int (lstat_t) (int ver, const char *file_name, STAT_STRUCT *buf);
 #else
 	#define STAT_STRUCT struct stat
-		typedef int    (lstat_t)   (const char *file_name, 
-					    STAT_STRUCT *buf);
+	typedef int (lstat_t) (const char *file_name, STAT_STRUCT *buf);
 #endif
 }
 
