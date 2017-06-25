@@ -436,7 +436,7 @@ public:
 	}
 
 private:
-	std::string GetObjectURI(int64_t ObjectID, int Type);
+	std::string GetObjectURI(int64_t ObjectID, int Type) const;
 	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
 	void CheckObjectsScanDir(int64_t start_id, int level, const std::string &dir_name,
 		CheckObjectsResult& result, bool fix_errors,
