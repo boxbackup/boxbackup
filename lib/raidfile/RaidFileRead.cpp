@@ -1583,7 +1583,8 @@ bool RaidFileRead::FileExists(int SetNumber, const std::string &rFilename, int64
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
-bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirName, int DirReadType, std::vector<std::string> &rOutput)
+bool RaidFileRead::ReadDirectoryContents(int SetNumber, const std::string &rDirName,
+	DirReadType_t DirReadType, std::vector<std::string> &rOutput)
 {
 	// Remove anything in the vector to begin with.
 	rOutput.clear();
