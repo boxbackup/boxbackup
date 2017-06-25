@@ -18,11 +18,15 @@
 #endif
 
 #if defined __NetBSD_Version__ && __NetBSD_Version__ >= 399000800 //3.99.8 vers.
-#define FUNC_OPENDIR "__opendir30"
-#define FUNC_READDIR "__readdir30"
+#	define FUNC_OPENDIR "__opendir30"
+#	define FUNC_READDIR "__readdir30"
+#elif defined __APPLE__
+// https://github.com/rust-lang/libc/issues/414#issuecomment-251246205
+#	define FUNC_OPENDIR "opendir$INODE64"
+#	define FUNC_READDIR "readdir$INODE64"
 #else
-#define FUNC_OPENDIR "opendir"
-#define FUNC_READDIR "readdir"
+#	define FUNC_OPENDIR "opendir"
+#	define FUNC_READDIR "readdir"
 #endif
 
 #include <sys/types.h>

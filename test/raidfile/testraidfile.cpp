@@ -37,7 +37,6 @@
 	#define	TRF_CAN_INTERCEPT
 #endif
 
-
 #ifdef TRF_CAN_INTERCEPT
 // function in intercept.cpp for setting up errors
 void intercept_setup_error(const char *filename, unsigned int errorafter, int errortoreturn, int syscalltoerror);
@@ -505,7 +504,8 @@ bool list_matches(const std::vector<std::string> &rList, const char *compareto[]
 	int count = 0;
 	while(compareto[count] != 0)
 		count++;
-	
+
+	TEST_EQUAL(rList.size(), count);
 	if((int)rList.size() != count)
 	{
 		return false;
@@ -538,12 +538,12 @@ bool list_matches(const std::vector<std::string> &rList, const char *compareto[]
 	{
 		if(found[c] == false)
 		{
+			TEST_FAIL_WITH_MESSAGE("Expected to find " << compareto[c] << " in list");
 			ret = false;
 		}
 	}
 
 	delete [] found;
-	
 	return ret;
 }
 
