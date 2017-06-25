@@ -32,6 +32,7 @@ class IOStream;
 class S3Client
 {
 	public:
+	// Constructor with a simulator:
 	S3Client(HTTPServer* pSimulator, const std::string& rHostName,
 		const std::string& rAccessKey, const std::string& rSecretKey)
 	: mpSimulator(pSimulator),
@@ -41,6 +42,7 @@ class S3Client
 	  mNetworkTimeout(30000)
 	{ }
 
+	// Constructor with a specific hostname, virtualhost name, port etc:
 	S3Client(const std::string& HostName, int Port, const std::string& rAccessKey,
 		const std::string& rSecretKey, const std::string& VirtualHostName = "")
 	: mpSimulator(NULL),
@@ -52,6 +54,7 @@ class S3Client
 	  mNetworkTimeout(30000)
 	{ }
 
+	// Constructor with a Configuration (file):
 	S3Client(const Configuration& s3config)
 	: mpSimulator(NULL),
 	  mHostName(s3config.GetKeyValue("HostName")),
