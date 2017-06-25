@@ -139,33 +139,6 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.Write(DEFAULT_RESPONSE_2, sizeof(DEFAULT_RESPONSE_2) - 1);
 }
 
-bool exercise_s3client(S3Client& client)
-{
-	int num_failures_initial = num_failures;
-
-	HTTPResponse response = client.GetObject("/photos/puppy.jpg");
-	TEST_EQUAL(200, response.GetResponseCode());
-	std::string response_data((const char *)response.GetBuffer(),
-		response.GetSize());
-	TEST_EQUAL("omgpuppies!\n", response_data);
-	TEST_THAT(!response.IsKeepAlive());
-
-	// make sure that assigning to HTTPResponse does clear stream
-	response = client.GetObject("/photos/puppy.jpg");
-	TEST_EQUAL(200, response.GetResponseCode());
-	response_data = std::string((const char *)response.GetBuffer(),
-		response.GetSize());
-	TEST_EQUAL("omgpuppies!\n", response_data);
-	TEST_THAT(!response.IsKeepAlive());
-
-	response = client.GetObject("/nonexist");
-	TEST_EQUAL(404, response.GetResponseCode());
-	TEST_THAT(!response.IsKeepAlive());
-
-	// Test is successful if the number of failures has not increased.
-	return (num_failures == num_failures_initial);
-}
-
 std::vector<std::string> get_entry_names(const std::vector<S3Client::BucketEntry> entries)
 {
 	std::vector<std::string> entry_names;
@@ -1078,7 +1051,6 @@ bool test_httpserver()
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
-		TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
 	}
 
 	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
@@ -1589,7 +1561,7 @@ bool test_httpserver()
 	// S3Client tests with s3simulator executable for even more realism
 	{
 		S3Client client("localhost", 1080, EXAMPLE_S3_ACCESS_KEY,
-			EXAMPLE_S3_SECRET_KEY);
+			EXAMPLE_S3_SECRET_KEY, "johnsmith.s3.amazonaws.com");
 		TEST_THAT(exercise_s3client(client));
 	}
 
