@@ -686,6 +686,24 @@ endif()
 file(APPEND "${boxconfig_h_file}" "#cmakedefine RANDOM_DEVICE \"${RANDOM_DEVICE}\"\n")
 file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_RANDOM_DEVICE\n")
 
+# Emulate check for HAVE___SYSCALL_NEED_DEFN in ax_func_syscall.m4:
+if(HAVE___SYSCALL)
+	CHECK_CXX_SOURCE_COMPILES([=[
+		#include "BoxConfig.cmake.h"
+		#ifdef HAVE_SYS_SYSCALL_H
+		#	include <sys/syscall.h>
+		#endif
+		int main()
+		{
+			return __syscall(SYS_exit, 0);
+		}
+		]=] "HAVE___SYSCALL_DONT_NEED_DEFN")
+	if(NOT HAVE___SYSCALL_DONT_NEED_DEFN)
+		set(HAVE___SYSCALL_NEED_DEFN 1)
+	endif()
+	file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE___SYSCALL_NEED_DEFN\n")
+endif()
+
 # Build an intermediate version of BoxConfig.cmake.h for use in the following tests:
 configure_file("${boxconfig_h_file}" "${boxconfig_cmake_h_dir}/BoxConfig.cmake.h")
 
