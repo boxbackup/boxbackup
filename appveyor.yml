@@ -42,6 +42,11 @@ build:
   project: ..\cmake\BoxBackup_Windows.sln
   verbosity: minimal
 
+# Remove Xamarin to remove 500 lines of junk from build logs
+# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
+before_build:
+  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
+
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
