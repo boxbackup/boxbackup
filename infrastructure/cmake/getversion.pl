@@ -8,6 +8,6 @@ chdir $basedir or die "Failed to change to base directory: $basedir: $!";
 
 require "$basedir/infrastructure/BoxPlatform.pm.in";
 
-print "#define BOX_VERSION \"$BoxPlatform::product_version\"\n";
+print "$BoxPlatform::product_version\n";
 
 exit 0;
