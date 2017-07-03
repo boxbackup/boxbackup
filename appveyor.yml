@@ -1,4 +1,4 @@
-version: 1.0.{build}-{branch}
+version: 0.12.{branch}.appveyor_{build}
 
 clone_depth: 1
 
@@ -8,25 +8,34 @@ skip_tags: true
 os: Windows Server 2012
 
 platform:
-# - x86
-# - x64
-  - Win32
+  - Win32 # CMake sucks
+  - x64
 
 configuration:
   - Debug
   - Release
 
 environment:
-  VisualStudioVersion: 10.0
-  Generator: Visual Studio 10
+  VisualStudioVersion: 11.0
+  Generator_Base: Visual Studio 11 2012
   OPENSSL_VERSION: 1.0.2f
   PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
+  BOXBACKUP_VERSION_BASE: 0.12
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
 # - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
 # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+  - ps: $env:date_string = Get-Date -Format "yyMMdd"
+  - ps: $env:sane_platform = $($env:PLATFORM.replace("Win32", "x86"))
+  # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
+  - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$env:APPVEYOR_REPO_BRANCH.$env:date_string.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
+  - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
+  - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:CONFIGURATION)"
+  # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
+  # to the generator name if you want a 64-bit build (x64 platform):
+  - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
 build:
   parallel: true
@@ -35,15 +44,15 @@ build:
 
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
-  - cinst -y --limit-output 7zip.commandline
-  # Install cmake.portable instead of cmake, to get it on the path again:
-  # http://disq.us/p/xdknrt
+  - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
   - dir "c:\Program Files (x86)"
   # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
   # If you are doing this on a fresh box for development, you would probably want to
   # install Chocolatey and then run:
-  # cinst -y cmake strawberryperl git vim visualstudio2012wdx
+  # cinst -y cmake.portable strawberryperl git vim visualstudio2012wdx
+  # We install cmake.portable instead of cmake, to get it on the path again
+  # <http://disq.us/p/xdknrt>.
 
   - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
   - if not exist %CMAKE_UNIBUILD_DIR% md %CMAKE_UNIBUILD_DIR%
@@ -51,7 +60,12 @@ install:
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
-  - cmake -G "%Generator%" -A %PLATFORM% %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
+  - echo cmake -G "%generator_name%" -DDEBUG=1
+    -DBOXBACKUP_VERSION=%compiled_version%
+    %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
+  - cmake -G "%generator_name%" -DDEBUG=1
+    -DBOXBACKUP_VERSION=%compiled_version%
+    %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
 
@@ -62,4 +76,27 @@ test_script:
   # - dir %PLATFORM%
   # - dir %PLATFORM%\%CONFIGURATION%
   - ctest -C %CONFIGURATION% -V --interactive-debug-mode 0
+
+  # After running tests successfully, and before collecting artifacts, build them and copy them
+  # to the right place:
+  - cmake --build . --config %CONFIGURATION% --target package
+
+  # AppVeyor refuses to package files outside of the project directory, so we need to push them:
+  - dir
+  - appveyor PushArtifact -path BoxBackup-%compiled_version%.zip -DeploymentName BoxBackup-%compiled_version%
+  - appveyor PushArtifact -path BoxBackup-%compiled_version%.exe -DeploymentName BoxBackup-%compiled_version%
+
+deploy:
+  - provider: GitHub
+    release: BoxBackup-$(boxbackup_version_full)
+    artifact: BoxBackup-$(compiled_version)
+    description: "Windows client binaries auto-built by AppVeyor"
+    draft: false
+    prerelease: true
+    auth_token:
+      secure: WZi3MJGA5zIIAAij0if4auYeltJlyWUOePTYlCGvrNrgEVjYRkqILHzvVKDnLn43
+    on:
+      branch:
+        - master
+        - s3_support_merge
 
