@@ -58,9 +58,11 @@ install:
   # the current PATH.
   - echo cmake -G "%generator_name%" -DDEBUG=1
     -DBOXBACKUP_VERSION=%compiled_version%
+    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
   - cmake -G "%generator_name%" -DDEBUG=1
     -DBOXBACKUP_VERSION=%compiled_version%
+    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
