@@ -47,6 +47,7 @@ build:
 before_build:
   - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
 
+# scripts that run after cloning repository (before the build step, not after!)
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
@@ -67,9 +68,11 @@ install:
   # the current PATH.
   - echo cmake -G "%generator_name%" -DDEBUG=1
     -DBOXBACKUP_VERSION=%compiled_version%
+    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
   - cmake -G "%generator_name%" -DDEBUG=1
     -DBOXBACKUP_VERSION=%compiled_version%
+    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
