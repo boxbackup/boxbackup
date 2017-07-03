@@ -35,6 +35,9 @@ ExternalProject_Add(zlib
 	URL "http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
 	URL_HASH ${ZLIB_HASH}
 	DOWNLOAD_NO_PROGRESS 1
+	LOG_CONFIGURE 1
+	LOG_BUILD 1
+	LOG_INSTALL 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	# We need to build both versions, debug and release, because cmake requires both to be
 	# present to generate its multi-configuration project files for Visual Studio/MSBuild.
@@ -86,6 +89,9 @@ ExternalProject_Add(pcre
 	SVN_REPOSITORY svn://vcs.exim.org/pcre/code/trunk
 	SVN_REVISION -r 1677
 	DOWNLOAD_NO_PROGRESS 1
+	LOG_CONFIGURE 1
+	LOG_BUILD 1
+	LOG_INSTALL 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	-DPCRE_SUPPORT_LIBREADLINE=OFF
 	-DPCRE_SUPPORT_LIBBZ2=OFF
@@ -113,6 +119,9 @@ string(REPLACE ";" " " boxbackup_cmake_args "${boxbackup_cmake_args}")
 ExternalProject_Add(boxbackup
 	DEPENDS zlib openssl pcre boost
 	SOURCE_DIR ${boxbackup_dir}/infrastructure/cmake
+	LOG_CONFIGURE 1
+	LOG_BUILD 1
+	LOG_INSTALL 1
 	CMAKE_ARGS
 		-DZLIB_ROOT=${install_dir}
 		-DOPENSSL_ROOT_DIR=${install_dir}
