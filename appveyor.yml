@@ -37,16 +37,6 @@ init:
   # to the generator name if you want a 64-bit build (x64 platform):
   - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
-build:
-  parallel: true
-  project: ..\cmake\BoxBackup_Windows.sln
-  verbosity: minimal
-
-# Remove Xamarin to remove 500 lines of junk from build logs
-# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
-before_build:
-  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
-
 # scripts that run after cloning repository (before the build step, not after!)
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
@@ -76,6 +66,16 @@ install:
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
+
+# Remove Xamarin to remove 500 lines of junk from build logs
+# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
+before_build:
+  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
+
+build:
+  parallel: true
+  project: ..\cmake\BoxBackup_Windows.sln
+  verbosity: minimal
 
 test_script:
   - cd %CMAKE_UNIBUILD_DIR%\Build\boxbackup
