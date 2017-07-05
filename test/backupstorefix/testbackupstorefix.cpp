@@ -75,9 +75,11 @@ int discSetNum = 0;
 std::map<std::string, int32_t> nameToID;
 std::map<int32_t, bool> objectIsDir;
 
-#define RUN_CHECK	\
-	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567"); \
-	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567 fix");
+#define RUN_CHECK \
+	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Ttbbstoreaccounts " \
+		"check 01234567"); \
+	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Ttbbstoreaccounts " \
+		"check 01234567 fix");
 
 // Get ID of an object given a filename
 int32_t getID(const char *name)
