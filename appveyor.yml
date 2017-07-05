@@ -25,8 +25,8 @@ environment:
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
-  - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
-  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+# - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - ps: $env:date_string = Get-Date -Format "yyMMdd"
   - ps: $env:sane_platform = $($env:PLATFORM.replace("Win32", "x86"))
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
@@ -37,11 +37,7 @@ init:
   # to the generator name if you want a 64-bit build (x64 platform):
   - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
-build:
-  parallel: true
-  project: ..\cmake\BoxBackup_Windows.sln
-  verbosity: minimal
-
+# scripts that run after cloning repository (before the build step, not after!)
 install:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
@@ -60,14 +56,26 @@ install:
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
-  - echo cmake -G "%generator_name%" -DDEBUG=1
+  - echo cmake -G "%generator_name%"
     -DBOXBACKUP_VERSION=%compiled_version%
+    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%generator_name%" -DDEBUG=1
+  - cmake -G "%generator_name%"
     -DBOXBACKUP_VERSION=%compiled_version%
+    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
+
+# Remove Xamarin to remove 500 lines of junk from build logs
+# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
+before_build:
+  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
+
+build:
+  parallel: true
+  project: ..\cmake\BoxBackup_Windows.sln
+  verbosity: minimal
 
 test_script:
   - cd %CMAKE_UNIBUILD_DIR%\Build\boxbackup
@@ -77,12 +85,10 @@ test_script:
   # - dir %PLATFORM%\%CONFIGURATION%
   - ctest -C %CONFIGURATION% -V --interactive-debug-mode 0
 
-  # After running tests successfully, and before collecting artifacts, build them and copy them
-  # to the right place:
+  # After running tests successfully, build the artifacts that we want to upload:
   - cmake --build . --config %CONFIGURATION% --target package
 
-  # AppVeyor refuses to package files outside of the project directory, so we need to copy the
-  # built package files into it:
+  # AppVeyor refuses to package files outside of the project directory, so we need to push them:
   - dir
   - appveyor PushArtifact -path BoxBackup-%compiled_version%.zip -DeploymentName BoxBackup-%compiled_version%
   - appveyor PushArtifact -path BoxBackup-%compiled_version%.exe -DeploymentName BoxBackup-%compiled_version%
@@ -99,5 +105,5 @@ deploy:
     on:
       branch:
         - master
-        - s3_support
+        - s3_support_merge
 
