@@ -105,7 +105,7 @@ int main(int argc, const char *argv[])
 	Logging::OptionParser log_level;
 	bool machineReadableOutput = false;
 	bool amazon_S3_mode = false;
-	
+
 	// See if there's another entry on the command line
 	int c;
 	std::string options = Logging::OptionParser::GetOptionString() + "3c:m";
@@ -121,7 +121,7 @@ int main(int argc, const char *argv[])
 			// store argument
 			configFilename = optarg;
 			break;
-		
+
 		case 'm':
 			// enable machine readable output
 			machineReadableOutput = true;
