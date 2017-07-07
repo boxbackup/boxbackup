@@ -2591,14 +2591,17 @@ bool test_delete_update_and_symlink_files()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
-// Check that store errors are reported neatly. This test uses an independent
-// daemon to check the daemon's backup loop delay, so it's easier to debug
-// with the command: ./t -VTttest -e test_store_error_reporting
-// --bbackupd-args=-kTtbbackupd
+// Check that store errors are reported neatly.
 bool test_store_error_reporting()
 {
 	SETUP_WITH_BBSTORED();
-	TEST_THAT(StartClient());
+
+	// Start the bbackupd client. Enable logging to help debug race
+	// conditions causing test failure:
+	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
+		"-kT -Wnotice -tbbackupd");
+	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
+
 	wait_for_sync_end();
 
 	// TODO FIXME dedent
@@ -3548,14 +3551,23 @@ bool test_sync_files_with_timestamps_in_future()
 // Check change of store marker pauses daemon
 bool test_changing_client_store_marker_pauses_daemon()
 {
+	// Debugging this test requires INFO level logging
+	Logger::LevelGuard increase_to_info(Logging::GetConsole(), Log::INFO);
+
 	SETUP_WITH_BBSTORED();
-	TEST_THAT(StartClient());
+
+	// Start the bbackupd client. Enable logging to help debug race
+	// conditions causing test failure:
+	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
+		"-kT -Wnotice -tbbackupd");
+	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 
 	// Wait for the client to upload all current files. We also time
 	// approximately how long a sync takes.
 	box_time_t sync_start_time = GetCurrentBoxTime();
 	sync_and_wait();
 	box_time_t sync_time = GetCurrentBoxTime() - sync_start_time;
+	BOX_INFO("Sync takes " << BOX_FORMAT_MICROSECONDS(sync_time));
 
 	// Time how long a compare takes. On NetBSD it's 3 seconds, and that
 	// interferes with test timing unless we account for it.

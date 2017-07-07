@@ -548,8 +548,11 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Test that an entry pointing to a directory whose "
 		"raidfile is corrupted doesn't crash");
 
-	// Start the bbstored server
-	TEST_THAT_OR(StartServer(), return 1);
+	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
+	// locked when we try to check or query it (race conditions):
+	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
+		"-kT -Winfo -tbbstored");
+	TEST_THAT_OR(StartServer(daemon_args), return 1);
 
 	// Instead of starting a client, read the file listing file created by
 	// testbackupstorefix.pl and upload them in the correct order, so that the object
@@ -804,7 +807,7 @@ int test(int argc, const char *argv[])
 		// Start the server again, so testbackupstorefix.pl can run bbackupquery which
 		// connects to it. Except on win32, where we didn't stop it earlier.
 #ifndef WIN32
-		TEST_THAT(StartServer());
+		TEST_THAT(StartServer(daemon_args));
 #endif
 
 		// Check
