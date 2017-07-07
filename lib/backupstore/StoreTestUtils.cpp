@@ -266,11 +266,11 @@ bool check_reference_counts()
 	return counts_ok;
 }
 
-bool StartServer()
+bool StartServer(const std::string& daemon_args)
 {
-	bbstored_pid = StartDaemon(bbstored_pid,
-		BBSTORED " " + bbstored_args + " testfiles/bbstored.conf",
-		"testfiles/bbstored.pid");
+	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbstored_args);
+	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + daemon_args_final +
+		" testfiles/bbstored.conf", "testfiles/bbstored.pid");
 	return bbstored_pid != 0;
 }
 
@@ -282,11 +282,11 @@ bool StopServer(bool wait_for_process)
 	return result;
 }
 
-bool StartClient(const std::string& bbackupd_conf_file)
+bool StartClient(const std::string& bbackupd_conf_file, const std::string& daemon_args)
 {
-	bbackupd_pid = StartDaemon(bbackupd_pid,
-		BBACKUPD " " + bbackupd_args + " " + bbackupd_conf_file,
-		"testfiles/bbackupd.pid");
+	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbackupd_args);
+	bbackupd_pid = StartDaemon(bbackupd_pid, BBACKUPD " " + daemon_args_final +
+		" -c " + bbackupd_conf_file, "testfiles/bbackupd.pid");
 	return bbackupd_pid != 0;
 }
 
