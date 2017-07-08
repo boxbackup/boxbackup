@@ -34,10 +34,10 @@ bool create_account(int soft, int hard)
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountControl control(*config);
+	BackupStoreAccountControl control(*config, 0x01234567);
 	
 	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
-	int result = control.CreateAccount(0x01234567, 0, soft, hard);
+	int result = control.CreateAccount(0, soft, hard);
 	TEST_EQUAL(0, result);
 	return (result == 0);
 }
@@ -48,9 +48,9 @@ bool delete_account()
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountControl control(*config);
+	BackupStoreAccountControl control(*config, 0x01234567);
 	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
-	TEST_THAT_THROWONFAIL(control.DeleteAccount(0x01234567, false) == 0);
+	TEST_THAT_THROWONFAIL(control.DeleteAccount(false) == 0);
 	return true;
 }
 
@@ -169,8 +169,8 @@ bool change_account_limits(const char* soft, const char* hard)
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountControl control(*config);
-	int result = control.SetLimit(0x01234567, soft, hard);
+	BackupStoreAccountControl control(*config, 0x01234567);
+	int result = control.SetLimit(soft, hard);
 	TEST_EQUAL(0, result);
 	return (result == 0);
 }
@@ -184,8 +184,8 @@ int check_account_for_errors(Log::Level log_level)
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify("testfiles/bbstored.conf",
 			&BackupConfigFileVerify, errs));
-	BackupStoreAccountControl control(*config);
-	int errors_fixed = control.CheckAccount(0x01234567,
+	BackupStoreAccountControl control(*config, 0x01234567);
+	int errors_fixed = control.CheckAccount(
 		true, // FixErrors
 		false, // Quiet
 		true); // ReturnNumErrorsFound
