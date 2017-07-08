@@ -13,12 +13,13 @@
 #include <vector>
 
 #include "autogen_BackupProtocol.h"
-#include "BoxPortsAndFiles.h"
+#include "BackupAccountControl.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreInfo.h"
+#include "BoxPortsAndFiles.h"
 #include "HousekeepStoreAccount.h"
 #include "Logging.h"
 #include "ServerControl.h"
@@ -33,7 +34,7 @@ bool create_account(int soft, int hard)
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountsControl control(*config);
+	BackupStoreAccountControl control(*config);
 	
 	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
 	int result = control.CreateAccount(0x01234567, 0, soft, hard);
@@ -47,7 +48,7 @@ bool delete_account()
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountsControl control(*config);
+	BackupStoreAccountControl control(*config);
 	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
 	TEST_THAT_THROWONFAIL(control.DeleteAccount(0x01234567, false) == 0);
 	return true;
@@ -168,7 +169,7 @@ bool change_account_limits(const char* soft, const char* hard)
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountsControl control(*config);
+	BackupStoreAccountControl control(*config);
 	int result = control.SetLimit(0x01234567, soft, hard);
 	TEST_EQUAL(0, result);
 	return (result == 0);
@@ -183,7 +184,7 @@ int check_account_for_errors(Log::Level log_level)
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify("testfiles/bbstored.conf",
 			&BackupConfigFileVerify, errs));
-	BackupStoreAccountsControl control(*config);
+	BackupStoreAccountControl control(*config);
 	int errors_fixed = control.CheckAccount(0x01234567,
 		true, // FixErrors
 		false, // Quiet
