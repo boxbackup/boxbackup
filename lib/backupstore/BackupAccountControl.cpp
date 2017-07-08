@@ -144,7 +144,7 @@ int BackupAccountControl::PrintAccountInfo(const BackupStoreInfo& info,
 	return 0;
 }
 
-int BackupStoreAccountsControl::BlockSizeOfDiscSet(int discSetNum)
+int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 {
 	// Get controller, check disc set number
 	RaidFileController &controller(RaidFileController::GetController());
@@ -158,7 +158,7 @@ int BackupStoreAccountsControl::BlockSizeOfDiscSet(int discSetNum)
 	return controller.GetDiscSet(discSetNum).GetBlockSize();
 }
 
-int BackupStoreAccountsControl::SetLimit(int32_t ID, const char *SoftLimitStr,
+int BackupStoreAccountControl::SetLimit(int32_t ID, const char *SoftLimitStr,
 	const char *HardLimitStr)
 {
 	std::string rootDir;
@@ -194,7 +194,7 @@ int BackupStoreAccountsControl::SetLimit(int32_t ID, const char *SoftLimitStr,
 	return 0;
 }
 
-int BackupStoreAccountsControl::SetAccountName(int32_t ID, const std::string& rNewAccountName)
+int BackupStoreAccountControl::SetAccountName(int32_t ID, const std::string& rNewAccountName)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -223,7 +223,7 @@ int BackupStoreAccountsControl::SetAccountName(int32_t ID, const std::string& rN
 	return 0;
 }
 
-int BackupStoreAccountsControl::PrintAccountInfo(int32_t ID)
+int BackupStoreAccountControl::PrintAccountInfo(int32_t ID)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -245,7 +245,7 @@ int BackupStoreAccountsControl::PrintAccountInfo(int32_t ID)
 		BlockSizeOfDiscSet(discSetNum));
 }
 
-int BackupStoreAccountsControl::SetAccountEnabled(int32_t ID, bool enabled)
+int BackupStoreAccountControl::SetAccountEnabled(int32_t ID, bool enabled)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -267,7 +267,7 @@ int BackupStoreAccountsControl::SetAccountEnabled(int32_t ID, bool enabled)
 	return 0;
 }
 
-int BackupStoreAccountsControl::DeleteAccount(int32_t ID, bool AskForConfirmation)
+int BackupStoreAccountControl::DeleteAccount(int32_t ID, bool AskForConfirmation)
 {
 	std::string rootDir;
 	int discSetNum;
@@ -383,7 +383,7 @@ int BackupStoreAccountsControl::DeleteAccount(int32_t ID, bool AskForConfirmatio
 	return retcode;
 }
 
-bool BackupStoreAccountsControl::OpenAccount(int32_t ID, std::string &rRootDirOut,
+bool BackupStoreAccountControl::OpenAccount(int32_t ID, std::string &rRootDirOut,
 	int &rDiscSetOut, std::auto_ptr<UnixUser> apUser, NamedLock* pLock)
 {
 	// Load in the account database
@@ -431,7 +431,7 @@ bool BackupStoreAccountsControl::OpenAccount(int32_t ID, std::string &rRootDirOu
 	return true;
 }
 
-int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Quiet,
+int BackupStoreAccountControl::CheckAccount(int32_t ID, bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
 	std::string rootDir;
@@ -461,7 +461,7 @@ int BackupStoreAccountsControl::CheckAccount(int32_t ID, bool FixErrors, bool Qu
 	}
 }
 
-int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,
+int BackupStoreAccountControl::CreateAccount(int32_t ID, int32_t DiscNumber,
 	int32_t SoftLimit, int32_t HardLimit)
 {
 	// Load in the account database
@@ -496,7 +496,7 @@ int BackupStoreAccountsControl::CreateAccount(int32_t ID, int32_t DiscNumber,
 	return 0;
 }
 
-int BackupStoreAccountsControl::HousekeepAccountNow(int32_t ID)
+int BackupStoreAccountControl::HousekeepAccountNow(int32_t ID)
 {
 	std::string rootDir;
 	int discSetNum;
