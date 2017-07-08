@@ -21,6 +21,7 @@
 #include <iostream>
 
 #include "box_getopt.h"
+#include "BackupAccountControl.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
@@ -175,7 +176,7 @@ int main(int argc, const char *argv[])
 	argc--;
 
 
-	BackupStoreAccountsControl control(*config, machineReadableOutput);
+	BackupStoreAccountControl control(*config, machineReadableOutput);
 	
 	// Now do the command.
 	if(command == "create")
