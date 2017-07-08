@@ -27,6 +27,7 @@ class BackupAccountControl
 protected:
 	const Configuration& mConfig;
 	bool mMachineReadableOutput;
+	std::auto_ptr<BackupFileSystem> mapFileSystem;
 
 public:
 	BackupAccountControl(const Configuration& config,
@@ -44,25 +45,31 @@ public:
 
 class BackupStoreAccountControl : public BackupAccountControl
 {
+private:
+	int32_t mAccountID;
+	std::string mRootDir;
+	int mDiscSetNum;
+	std::auto_ptr<UnixUser> mapChangeUser; // used to reset uid when we return
+
 public:
-	BackupStoreAccountControl(const Configuration& config,
+	BackupStoreAccountControl(const Configuration& config, int32_t AccountID,
 		bool machineReadableOutput = false)
-	: BackupAccountControl(config, machineReadableOutput)
+	: BackupAccountControl(config, machineReadableOutput),
+	  mAccountID(AccountID),
+	  mDiscSetNum(0)
 	{ }
 	int BlockSizeOfDiscSet(int discSetNum);
-	bool OpenAccount(int32_t ID, std::string &rRootDirOut,
-		int &rDiscSetOut, std::auto_ptr<UnixUser> apUser, NamedLock* pLock);
-	int SetLimit(int32_t ID, const char *SoftLimitStr,
+	bool OpenAccount(NamedLock* pLock);
+	int SetLimit(const char *SoftLimitStr,
 		const char *HardLimitStr);
-	int SetAccountName(int32_t ID, const std::string& rNewAccountName);
-	int PrintAccountInfo(int32_t ID);
-	int SetAccountEnabled(int32_t ID, bool enabled);
-	int DeleteAccount(int32_t ID, bool AskForConfirmation);
-	int CheckAccount(int32_t ID, bool FixErrors, bool Quiet,
+	int SetAccountName(const std::string& rNewAccountName);
+	int PrintAccountInfo();
+	int SetAccountEnabled(bool enabled);
+	int DeleteAccount(bool AskForConfirmation);
+	int CheckAccount(bool FixErrors, bool Quiet,
 		bool ReturnNumErrorsFound = false);
-	int CreateAccount(int32_t ID, int32_t DiscNumber, int32_t SoftLimit,
-		int32_t HardLimit);
-	int HousekeepAccountNow(int32_t ID);
+	int CreateAccount(int32_t DiscNumber, int32_t SoftLimit, int32_t HardLimit);
+	int HousekeepAccountNow();
 };
 
 class S3BackupAccountControl : public BackupAccountControl
@@ -70,7 +77,8 @@ class S3BackupAccountControl : public BackupAccountControl
 private:
 	std::string mBasePath;
 	std::auto_ptr<S3Client> mapS3Client;
-	std::auto_ptr<S3BackupFileSystem> mapFileSystem;
+	// mapFileSystem is inherited from BackupAccountControl
+
 public:
 	S3BackupAccountControl(const Configuration& config,
 		bool machineReadableOutput = false);
