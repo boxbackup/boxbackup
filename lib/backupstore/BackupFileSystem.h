@@ -51,8 +51,6 @@ public:
 	virtual bool TryGetLock() = 0;
 	virtual void ReleaseLock() = 0;
 	virtual int GetBlockSize() = 0;
-	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,
-		bool ReadOnly) = 0;
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
 	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
 		bool ReadOnly) = 0;
