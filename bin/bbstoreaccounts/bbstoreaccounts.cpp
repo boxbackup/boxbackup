@@ -175,8 +175,7 @@ int main(int argc, const char *argv[])
 	argv++;
 	argc--;
 
-
-	BackupStoreAccountControl control(*config, machineReadableOutput);
+	BackupStoreAccountControl control(*config, id, machineReadableOutput);
 	
 	// Now do the command.
 	if(command == "create")
@@ -200,12 +199,12 @@ int main(int argc, const char *argv[])
 		control.CheckSoftHardLimits(softlimit, hardlimit);
 	
 		// Create the account...
-		return control.CreateAccount(id, discnum, softlimit, hardlimit);
+		return control.CreateAccount(discnum, softlimit, hardlimit);
 	}
 	else if(command == "info")
 	{
 		// Print information on this account
-		return control.PrintAccountInfo(id);
+		return control.PrintAccountInfo();
 	}
 	else if(command == "enabled")
 	{
@@ -230,7 +229,7 @@ int main(int argc, const char *argv[])
 			return PrintUsage();
 		}		
 		
-		return control.SetAccountEnabled(id, enabled);
+		return control.SetAccountEnabled(enabled);
 	}
 	else if(command == "setlimit")
 	{
@@ -241,7 +240,7 @@ int main(int argc, const char *argv[])
 			return 1;
 		}
 		
-		return control.SetLimit(id, argv[0], argv[1]);
+		return control.SetLimit(argv[0], argv[1]);
 	}
 	else if(command == "name")
 	{
@@ -251,8 +250,7 @@ int main(int argc, const char *argv[])
 			BOX_ERROR("name command requires a new name.");
 			return 1;
 		}
-		
-		return control.SetAccountName(id, argv[0]);
+		return control.SetAccountName(argv[0]);
 	}
 	else if(command == "delete")
 	{
@@ -262,7 +260,7 @@ int main(int argc, const char *argv[])
 		{
 			askForConfirmation = false;
 		}
-		return control.DeleteAccount(id, askForConfirmation);
+		return control.DeleteAccount(askForConfirmation);
 	}
 	else if(command == "check")
 	{
@@ -288,11 +286,11 @@ int main(int argc, const char *argv[])
 		}
 	
 		// Check the account
-		return control.CheckAccount(id, fixErrors, quiet);
+		return control.CheckAccount(fixErrors, quiet);
 	}
 	else if(command == "housekeep")
 	{
-		return control.HousekeepAccountNow(id);
+		return control.HousekeepAccountNow();
 	}
 	else
 	{
