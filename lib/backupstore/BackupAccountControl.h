@@ -41,10 +41,11 @@ public:
 	int PrintAccountInfo(const BackupStoreInfo& info, int BlockSize);
 };
 
-class BackupStoreAccountsControl : public BackupAccountControl
+
+class BackupStoreAccountControl : public BackupAccountControl
 {
 public:
-	BackupStoreAccountsControl(const Configuration& config,
+	BackupStoreAccountControl(const Configuration& config,
 		bool machineReadableOutput = false)
 	: BackupAccountControl(config, machineReadableOutput)
 	{ }
