@@ -13,8 +13,8 @@
 #include <cstdio>
 #include <iostream>
 
-#include "autogen_CommonException.h"
 #include "autogen_BackupStoreException.h"
+#include "autogen_CommonException.h"
 #include "BackupAccountControl.h"
 #include "BackupFileSystem.h"
 #include "BackupStoreAccountDatabase.h"
@@ -468,6 +468,7 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber,
 
 	return 0;
 }
+
 
 int BackupStoreAccountControl::HousekeepAccountNow()
 {
