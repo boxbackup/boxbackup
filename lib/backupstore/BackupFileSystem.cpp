@@ -62,6 +62,7 @@ std::string RaidBackupFileSystem::GetObjectFileName(int64_t ObjectID,
 	return filename;
 }
 
+
 int RaidBackupFileSystem::GetBlockSize()
 {
 	RaidFileController &rcontroller(RaidFileController::GetController());
@@ -115,6 +116,7 @@ std::auto_ptr<BackupStoreRefCountDatabase> RaidBackupFileSystem::GetRefCountData
 	return BackupStoreRefCountDatabase::Load(account, ReadOnly);
 }
 
+
 //! Returns whether an object (a file or directory) exists with this object ID, and its
 //! revision ID, which for a RaidFile is based on its timestamp and file size.
 bool RaidBackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
@@ -123,6 +125,7 @@ bool RaidBackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
 	std::string filename = GetObjectFileName(ObjectID, false);
 	return RaidFileRead::FileExists(mStoreDiscSet, filename, pRevisionID);
 }
+
 
 //! Reads a directory with the specified ID into the supplied BackupStoreDirectory
 //! object, also initialising its revision ID and SizeInBlocks.
@@ -144,6 +147,7 @@ void RaidBackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& 
 	ASSERT(dirSize > 0);
 	rDirOut.SetUserInfo1_SizeInBlocks(dirSize);
 }
+
 
 void RaidBackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 {
@@ -172,6 +176,7 @@ void RaidBackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 	rDir.SetRevisionID(revid);
 }
 
+
 class RaidPutFileCompleteTransaction : public BackupFileSystem::Transaction
 {
 private:
@@ -187,14 +192,21 @@ public:
 	virtual void Commit();
 	virtual int64_t GetNumBlocks() { return mNumBlocks; }
 	RaidFileWrite& GetRaidFile() { return mStoreFile; }
+
+	// It doesn't matter what we return here, because this should never be called
+	// for a PutFileCompleteTransaction (the API is intended for
+	// PutFilePatchTransaction instead):
 	virtual bool IsNewFileIndependent() { return false; }
+
 	int64_t mNumBlocks;
 };
+
 
 void RaidPutFileCompleteTransaction::Commit()
 {
 	mCommitted = true;
 }
+
 
 RaidPutFileCompleteTransaction::~RaidPutFileCompleteTransaction()
 {
@@ -207,6 +219,7 @@ RaidPutFileCompleteTransaction::~RaidPutFileCompleteTransaction()
 		GetRaidFile().Delete();
 	}
 }
+
 
 std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData)
@@ -253,6 +266,7 @@ RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData)
 
 	return apTrans;
 }
+
 
 class RaidPutFilePatchTransaction : public BackupFileSystem::Transaction
 {
@@ -302,11 +316,13 @@ public:
 	}
 };
 
+
 void RaidPutFilePatchTransaction::Commit()
 {
 	mNewCompleteFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 	mReversedPatchFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 }
+
 
 std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
@@ -412,15 +428,13 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetFile(int64_t ObjectID)
 	return static_cast<std::auto_ptr<IOStream> >(objectFile);
 }
 
+
 std::auto_ptr<IOStream> RaidBackupFileSystem::GetFilePatch(int64_t ObjectID,
 	std::vector<int64_t>& rPatchChain)
 {
 	// File exists, but is a patch from a new version. Generate the older version.
-
-	// The result
-
-	// OK! The last entry in the chain is the full file, the others are patches back from it.
-	// Open the last one, which is the current from file
+	// The last entry in the chain is the full file, the others are patches back from it.
+	// Open the last one, which is the current full file.
 	std::auto_ptr<IOStream> from(GetFile(rPatchChain[rPatchChain.size() - 1]));
 
 	// Then, for each patch in the chain, do a combine
@@ -453,7 +467,11 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetFilePatch(int64_t ObjectID,
 		combined->Seek(0, IOStream::SeekType_Absolute);
 
 		// Then shuffle round for the next go
-		if (from.get()) from->Close();
+		if(from.get())
+		{
+			from->Close();
+		}
+
 		from = combined;
 	}
 
@@ -540,6 +558,7 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfo(int32_t Ac
 	return info;
 }
 
+
 void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 {
 	CollectInBufferStream out;
@@ -552,6 +571,7 @@ void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 	mrClient.CheckResponse(response, std::string("Failed to upload the new "
 		"BackupStoreInfo file to this URL: ") + info_url);
 }
+
 
 //! Returns whether an object (a file or directory) exists with this object ID, and its
 //! revision ID, which for a RaidFile is based on its timestamp and file size.
@@ -650,6 +670,7 @@ std::string S3BackupFileSystem::GetObjectURI(int64_t ObjectID, int Type) const
 	return out.str();
 }
 
+
 //! Reads a directory with the specified ID into the supplied BackupStoreDirectory
 //! object, also initialising its revision ID and SizeInBlocks.
 void S3BackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut)
@@ -664,6 +685,7 @@ void S3BackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& rD
 	ASSERT(false); // set the size in blocks
 	rDirOut.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(response.GetContentLength()));
 }
+
 
 //! Writes the supplied BackupStoreDirectory object to the store, and updates its revision
 //! ID and SizeInBlocks.
