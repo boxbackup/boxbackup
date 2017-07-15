@@ -138,7 +138,10 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 # endif
 		{
 			// Lockfile already exists, and we tried to open it
-			// exclusively, which means we failed to lock it.
+			// exclusively, which means we failed to lock it, which
+			// means that it's locked by someone else, which is an
+			// expected error condition, signalled by returning
+			// false instead of throwing.
 			BOX_NOTICE("Failed to lock lockfile with O_EXCL: " << rFilename
 				<< ": already locked by another process?");
 			return false;
@@ -195,11 +198,11 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	}
 	catch(BoxException &e)
 	{
-# ifdef WIN32
+#ifdef WIN32
 		CloseHandle(fd);
-# else
+#else
 		::close(fd);
-# endif
+#endif
 		BOX_NOTICE("Failed to lock lockfile " << rFilename << ": " << e.what());
 		throw;
 	}
@@ -209,11 +212,11 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 	{
 		BOX_ERROR("Locked lockfile " << rFilename << ", but lockfile no longer "
 			"exists, bailing out");
-# ifdef WIN32
+#ifdef WIN32
 		CloseHandle(fd);
-# else
+#else
 		::close(fd);
-# endif
+#endif
 		return false;
 	}
 
@@ -245,7 +248,7 @@ void NamedLock::ReleaseLock()
 	}
 
 #ifndef WIN32
-	// Delete the file. We need to do this before closing the filehandle, 
+	// Delete the file. We need to do this before closing the filehandle,
 	// if we used flock() or fcntl() to lock it, otherwise someone could
 	// acquire the lock, release and delete it between us closing (and
 	// hence releasing) and deleting it, and we'd fail when it came to
@@ -265,11 +268,11 @@ void NamedLock::ReleaseLock()
 #endif // !WIN32
 
 	// Close the file
-# ifdef WIN32
+#ifdef WIN32
 	if(!CloseHandle(mFileDescriptor))
-# else
+#else
 	if(::close(mFileDescriptor) != 0)
-# endif
+#endif
 	{
 		THROW_EMU_ERROR(
 			BOX_FILE_MESSAGE(mFileName, "Failed to close lockfile"),

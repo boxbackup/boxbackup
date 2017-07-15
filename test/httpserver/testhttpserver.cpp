@@ -534,7 +534,7 @@ bool test_httpserver()
 		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
 			"0PN5J17HBGZHT7JJ3X82",
 			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
-		
+
 		HTTPResponse response = client.GetObject("/photos/puppy.jpg");
 		TEST_EQUAL(200, response.GetResponseCode());
 		std::string response_data((const char *)response.GetBuffer(),
@@ -550,7 +550,7 @@ bool test_httpserver()
 
 		response = client.GetObject("/nonexist");
 		TEST_EQUAL(404, response.GetResponseCode());
-		
+
 		FileStream fs("testfiles/testrequests.pl");
 		response = client.PutObject("/newfile", fs);
 		TEST_EQUAL(200, response.GetResponseCode());

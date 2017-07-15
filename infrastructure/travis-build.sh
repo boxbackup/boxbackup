@@ -29,6 +29,7 @@ if [ "$BUILD" = 'cmake' ]; then
 	cmake --version
 	cmake -DCMAKE_BUILD_TYPE:STRING=$TEST_TARGET $EXTRA_ARGS "$@" ..
 	make
+
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
 	if [ "$TRAVIS_OS_NAME" = "osx" ]; then

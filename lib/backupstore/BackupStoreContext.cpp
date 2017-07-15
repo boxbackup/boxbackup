@@ -223,7 +223,7 @@ void BackupStoreContext::LoadStoreInfo()
 
 	BackupStoreAccountDatabase::Entry account(mClientID, mStoreDiscSet);
 
-	// try to load the reference count database
+	// Try to load the reference count database
 	try
 	{
 		mapRefCount = BackupStoreRefCountDatabase::Load(account, false);
@@ -272,7 +272,7 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 	// Want to save now
 	mapStoreInfo->Save();
 
-	// Set count for next delay
+	// Reset counter for next delayed save.
 	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
 }
 
@@ -320,7 +320,8 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 
 	// Already in cache?
 	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
-	if(item != mDirectoryCache.end()) {
+	if(item != mDirectoryCache.end())
+	{
 #ifndef BOX_RELEASE_BUILD // it might be in the cache, but invalidated
 		// in which case, delete it instead of returning it.
 		if(!item->second->IsInvalidated())
@@ -747,8 +748,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		// Then the new entry
 		BackupStoreDirectory::Entry *pnewEntry = dir.AddEntry(rFilename,
 			ModificationTime, id, newObjectBlocksUsed,
-			BackupStoreDirectory::Entry::Flags_File,
-			AttributesHash);
+			BackupStoreDirectory::Entry::Flags_File, AttributesHash);
 
 		// Adjust dependency info of file?
 		if(DiffFromFileID && poldEntry && !reversedDiffIsCompletelyDifferent)
@@ -806,7 +806,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	// Increment reference count on the new directory to one
 	mapRefCount->AddReference(id);
 
-	// Save the store info -- can cope if this exceptions because infomation
+	// Save the store info -- can cope if this exceptions because information
 	// will be rebuilt by housekeeping, and ID allocation can recover.
 	SaveStoreInfo(false);
 
@@ -1008,7 +1008,7 @@ void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 	{
 		// Delete this cached object
 		delete item->second;
-		// Erase the entry form the map
+		// Erase the entry from the map
 		mDirectoryCache.erase(item);
 	}
 }
