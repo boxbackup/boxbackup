@@ -41,6 +41,26 @@ my %env_flags;
 
 # print "Flag: $_\n" for(keys %env_flags);
 
+sub substitute_make_vars($$)
+{
+	my ($input, $vars) = @_;
+
+	# substitute variables, repeatedly
+	while(1)
+	{
+		my $did_subst = 0;
+
+		for my $k (keys %$vars)
+		{
+			$did_subst = 1 if $input =~ s/\$\($k\)/$vars->{$k}/g;
+		}
+
+		last unless $did_subst;
+	}
+
+	return $input;
+}
+
 # seed autogen code
 print "Seeding autogen code...\n";
 open FINDAUTOGEN,"find . -follow -name Makefile.extra |" or die "Can't use find for locating files";
@@ -80,19 +100,8 @@ while(<FINDAUTOGEN>)
 				$do_cmds = 2; # flag something has been done
 
 				# substitute variables, repeatedly
-				my $c = $_;
+				my $c = substitute_make_vars($_, \%vars);
 				$c =~ s/\A\s+//;
-				while(1)
-				{
-					my $did_subst = 0;
-
-					for my $k (keys %vars)
-					{
-						$did_subst = 1 if $c =~ s/\$\($k\)/$vars{$k}/g;
-					}
-
-					last unless $did_subst;
-				}
 
 				# run command
 				unless (0 == system("(cd $dir; $c)"))
@@ -783,13 +792,51 @@ __E
 		}
 	}
 
+	# need to see if the extra makefile fragments require extra object files
+	# or include any more makefiles
+	my @objs_extra;
+	my @makefile_includes;
+	my %autogen_targets_global;
+	my %autogen_targets_platform;
+
+	my %makefile_to_autogen = (
+		"$mod/Makefile.extra" => \%autogen_targets_global,
+		"$mod/Makefile.extra.$build_os" => \%autogen_targets_platform,
+	);
+
+	while (my ($makefile, $autogens) = each %makefile_to_autogen)
+	{
+		additional_objects_from_make_fragment($makefile, \@objs_extra,
+			\@makefile_includes, $autogens);
+	}
+
+	while (my ($makefile, $autogens) = each %makefile_to_autogen)
+	{
+		$makefile =~ s|^$mod/||g or die "$makefile should start with $mod";
+		while (my ($outputs, $inputs) = each %$autogens)
+		{
+			my @prefixed_inputs  = map {"$mod/$_"} (split /\s+/, $inputs);
+			my @prefixed_outputs = map {"$mod/$_"} (split /\s+/, $outputs);
+			# Delegate to the extra sub-makefile:
+			print MASTER_MAKEFILE "\n";
+			print MASTER_MAKEFILE "@prefixed_outputs: @prefixed_inputs\n";
+			# Since the command produces all $outputs, to avoid a spurious "target
+			# is up to date" message for the 2nd+ targets, we only make the first:
+			my $first_output = $outputs;
+			$first_output =~ s/\s+.*//;
+			print MASTER_MAKEFILE "\t\$(MAKE) -C $mod -f $makefile $first_output\n";
+		}
+	}
+
+	print MASTER_MAKEFILE "\n";
+
 	# write the recipes for debug and release builds of each file
 	foreach my $var_prefix ('DEBUG', 'RELEASE')
 	{
 		my $make;
 
 		# then... do the cpp files...
-		my @obj_base;
+		my @objs = @objs_extra;
 		for my $file (@items)
 		{
 			my $is_c   = $file =~ m@(([^/]+)\.c)\Z@i;
@@ -803,7 +850,7 @@ __E
 			next if $file =~ /\A\._/; # Temp Mac OS Resource hack
 
 			# store for later
-			push @obj_base, $base;
+			push @objs, $base;
 
 			# get the file...
 			open FL, $file or die "$file: $!";
@@ -853,14 +900,6 @@ __E
 				$module_resources_win32{$mod} = $res_list;
 			}
 		}
-
-		# need to see if the extra makefile fragments require extra object files
-		# or include any more makefiles
-		my @objs = @obj_base;
-		my @makefile_includes;
-		
-		additional_objects_from_make_fragment("$mod/Makefile.extra", \@objs, \@makefile_includes);
-		additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
 
 		my $prefixed_end_target = "\$(${var_prefix}_OUTBASE)/$mod/$end_target_file";
 		my $o_file_list = join(' ',map {"\$(${var_prefix}_OUTBASE)/$mod/$_.o"} sort @objs);
@@ -960,27 +999,6 @@ realclean_${type}_${name}: clean_${type}_${name}
 __E
 	push @all_clean_targets, "clean_${type}_${name}";
 	push @all_realclean_targets, "realclean_${type}_${name}";
-
-	my $includes = "";
-	
-	if(-e "$mod/Makefile.extra")
-	{
-		$includes .= ".include <$mod/Makefile.extra>\n\n";
-	}
-	if(-e "$mod/Makefile.extra.$build_os")
-	{
-		$includes .= ".include <$mod/Makefile.extra.$build_os>\n\n";
-	}
-
-	if(!$bsd_make)
-	{
-		# need to post process this into a GNU makefile
-		$includes =~ s/\A\.\s*(ifdef|else|endif|ifndef)/$1/;
-		$includes =~ s/\A\.\s*include\s+<(.+?)>/include $1/;
-		$includes =~ s/-D\s+(\w+)/$1=1/g;
-	}
-
-	print MASTER_MAKEFILE $includes;
 }
 
 my @parcels;
@@ -1389,16 +1407,23 @@ sub insert_dep
 
 sub additional_objects_from_make_fragment
 {
-	my ($fn,$objs_r,$include_r) = @_;
-	
+	my ($fn,$objs_r,$include_r,$autogen_targets_r) = @_;
+
 	if(-e $fn)
 	{
 		open FL,$fn or die "Can't open $fn";
+		my %vars;
 
 		while(<FL>)
 		{
 			chomp;
-			if(m/link-extra:\s*(.+)\Z/)
+			if(m/\A(.+)\s+=\s+(.+)\Z/)
+			{
+				# is a variable
+				$vars{$1} = $2;
+				next;
+			}
+			elsif(m/link-extra:\s*(.+)\Z/)
 			{
 				my $extra = $1;
 				do
@@ -1416,6 +1441,14 @@ sub additional_objects_from_make_fragment
 			elsif(m/include-makefile:\s*(\S+)/)
 			{
 				push @$include_r,$1
+			}
+			elsif(m/^(\S.*\S)\s*:\s*(\S.*\S)\s*$/)
+			{
+				my $outputs = $1;
+				my $inputs = $2;
+				$outputs = substitute_make_vars($outputs, \%vars);
+				$inputs  = substitute_make_vars($inputs,  \%vars);
+				$autogen_targets_r->{$outputs} = $inputs;
 			}
 		}
 
