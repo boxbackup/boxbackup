@@ -2638,7 +2638,7 @@ bool test_store_error_reporting()
 
 		// Create a file to trigger an upload
 		{
-			int fd1 = open("testfiles/TestDir1/force-upload", 
+			int fd1 = open("testfiles/TestDir1/force-upload",
 				O_CREAT | O_EXCL | O_WRONLY, 0700);
 			TEST_THAT(fd1 > 0);
 			TEST_THAT(write(fd1, "just do it", 10) == 10);
@@ -2682,7 +2682,7 @@ bool test_store_error_reporting()
 		// Set a tag for the notify script to distinguish from
 		// previous runs.
 		{
-			int fd1 = open("testfiles/notifyscript.tag", 
+			int fd1 = open("testfiles/notifyscript.tag",
 				O_CREAT | O_EXCL | O_WRONLY, 0700);
 			TEST_THAT(fd1 > 0);
 			TEST_THAT(write(fd1, "wait-snapshot", 13) == 13);

@@ -197,7 +197,7 @@ std::auto_ptr<BackupStoreRefCountDatabase>
 
 	int flags = O_CREAT | O_BINARY | O_RDWR | O_EXCL;
 	std::auto_ptr<FileStream> DatabaseFile(new FileStream(Filename, flags));
-	
+
 	// Write header
 	DatabaseFile->Write(&hdr, sizeof(hdr));
 
