@@ -30,7 +30,7 @@
 #include "RaidFileUtil.h"
 #include "RaidFileWrite.h"
 #include "StoreStructure.h"
-#include "Utils.h"
+#include "Utils.h" // for ObjectExists_* (object_exists_t)
 
 #include "MemLeakFindOn.h"
 
@@ -493,12 +493,11 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			char leaf[8];
 			::snprintf(leaf, sizeof(leaf),
 				DIRECTORY_SEPARATOR "o%02x", i);
-			if(!CheckAndAddObject(StartID | i, dirName + leaf))
+			if(CheckAndAddObject(StartID | i, dirName + leaf) == ObjectExists_Unknown)
 			{
 				// File was bad, delete it
-				BOX_ERROR("Corrupted file " << dirName <<
-					leaf << " found" <<
-					(mFixErrors?", deleting":""));
+				BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(StartID | i) << " "
+					"is corrupt" << (mFixErrors?", deleting":""));
 				++mNumberErrorsFound;
 				if(mFixErrors)
 				{
@@ -522,7 +521,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 //		Created: 21/4/04
 //
 // --------------------------------------------------------------------------
-bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
+object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 	const std::string &rFilename)
 {
 	// Info on object...
@@ -543,7 +542,9 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		if(file->Read(&signature, sizeof(signature)) != sizeof(signature))
 		{
 			// Too short, can't read signature from it
-			return false;
+			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is "
+				"too small to have a valid header");
+			return ObjectExists_Unknown;
 		}
 
 		// Seek back to beginning
@@ -556,31 +557,34 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
 		case OBJECTMAGIC_FILE_MAGIC_VALUE_V0:
 #endif
-			// File... check
+			// Check it as a file.
 			containerID = CheckFile(ObjectID, *file);
 			break;
 
 		case OBJECTMAGIC_DIR_MAGIC_VALUE:
+			// Check it as a directory.
 			isFile = false;
 			containerID = CheckDirInitial(ObjectID, *file);
 			break;
 
 		default:
 			// Unknown signature. Bad file. Very bad file.
-			return false;
+			return ObjectExists_Unknown;
 			break;
 		}
 	}
-	catch(...)
+	catch(std::exception &e)
 	{
 		// Error caught, not a good file then, let it be deleted
-		return false;
+		BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " failed initial "
+			"validation: " << e.what());
+		return ObjectExists_Unknown;
 	}
 
 	// Got a container ID? (ie check was successful)
 	if(containerID == -1)
 	{
-		return false;
+		return ObjectExists_Unknown;
 	}
 
 	// Add to list of IDs known about
@@ -634,7 +638,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 	}
 
 	// Report success
-	return true;
+	return isFile ? ObjectExists_File : ObjectExists_Dir;
 }
 
 
@@ -664,7 +668,8 @@ int64_t BackupStoreCheck::CheckFile(int64_t ObjectID, IOStream &rStream)
 		0 /* don't want diffing from ID */,
 		&originalContainerID))
 	{
-		// Didn't verify
+		BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " does not "
+			"verify as a file");
 		return -1;
 	}
 
@@ -690,7 +695,9 @@ int64_t BackupStoreCheck::CheckDirInitial(int64_t ObjectID, IOStream &rStream)
 	// Check object ID
 	if(dir.GetObjectID() != ObjectID)
 	{
-		// Wrong object ID
+		BOX_ERROR("Directory " << BOX_FORMAT_OBJECTID(ObjectID) << " has a "
+			"different internal object ID than expected: " <<
+			BOX_FORMAT_OBJECTID(dir.GetObjectID()));
 		return -1;
 	}
 
