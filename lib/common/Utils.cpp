@@ -355,7 +355,7 @@ bool FileExists(const std::string& rFilename, int64_t *pFileSize,
 //		Created: 23/11/03
 //
 // --------------------------------------------------------------------------
-int ObjectExists(const std::string& rFilename)
+object_exists_t ObjectExists(const std::string& rFilename)
 {
 	EMU_STRUCT_STAT st;
 	if(EMU_STAT(rFilename.c_str(), &st) != 0)
