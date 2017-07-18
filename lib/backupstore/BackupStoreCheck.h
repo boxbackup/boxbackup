@@ -128,7 +128,7 @@ private:
 	// Checking functions
 	int64_t CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName);
 	void CheckObjectsDir(int64_t StartID);
-	bool CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
+	object_exists_t CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
 	bool CheckDirectory(BackupStoreDirectory& dir);
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, bool& rIsModified);
