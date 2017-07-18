@@ -23,6 +23,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "S3Simulator.h"
+#include "Utils.h" // for ObjectExists_* (object_exists_t)
 #include "decode.h"
 #include "encode.h"
 
@@ -320,8 +321,8 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		next_slash = file_uri.find('/', next_slash + 1))
 	{
 		std::string parent_dir_path = base_path + file_uri.substr(0, next_slash);
-		int what_exists = ObjectExists(parent_dir_path);
-		if(what_exists == 0)
+		object_exists_t what_exists = ObjectExists(parent_dir_path);
+		if(what_exists == ObjectExists_NoObject)
 		{
 			// Does not exist, need to create it
 			mkdir(parent_dir_path.c_str(), 0755);
