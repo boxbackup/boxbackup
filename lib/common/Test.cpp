@@ -28,7 +28,7 @@
 #include "BoxTime.h"
 #include "FileStream.h"
 #include "Test.h"
-#include "Utils.h"
+#include "Utils.h" // for ObjectExists_* (object_exists_t)
 
 int num_tests_selected = 0;
 int num_failures = 0;
@@ -127,7 +127,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 			std::string filepath = std::string("testfiles" DIRECTORY_SEPARATOR) +
 				filename;
 
-			int filetype = ObjectExists(filepath);
+			object_exists_t filetype = ObjectExists(filepath);
 			if(filetype == ObjectExists_File)
 			{
 				if(EMU_UNLINK(filepath.c_str()) != 0)

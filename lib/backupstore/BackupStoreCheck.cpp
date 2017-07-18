@@ -34,7 +34,7 @@
 #include "RaidFileUtil.h"
 #include "RaidFileWrite.h"
 #include "StoreStructure.h"
-#include "Utils.h"
+#include "Utils.h" // for ObjectExists_* (object_exists_t)
 
 #include "MemLeakFindOn.h"
 
