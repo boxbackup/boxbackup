@@ -1002,6 +1002,43 @@ void test_box_strtoui64()
 	TEST_EQUAL(input + 5, endptr);
 }
 
+// Test that RemovePrefix and RemoveSuffix work properly
+void test_remove_prefix_suffix()
+{
+	TEST_EQUAL("food", RemovePrefix("", "food", false)); // !force
+	TEST_EQUAL("food", RemoveSuffix("", "food", false)); // !force
+	TEST_EQUAL("", RemovePrefix("d", "food", false)); // !force
+	TEST_EQUAL("", RemoveSuffix("f", "food", false)); // !force
+	TEST_EQUAL("", RemovePrefix("dz", "food", false)); // !force
+	TEST_EQUAL("", RemoveSuffix("fz", "food", false)); // !force
+	TEST_EQUAL("ood", RemovePrefix("f", "food", false)); // !force
+	TEST_EQUAL("foo", RemoveSuffix("d", "food", false)); // !force
+	TEST_EQUAL("od", RemovePrefix("fo", "food", false)); // !force
+	TEST_EQUAL("fo", RemoveSuffix("od", "food", false)); // !force
+	TEST_EQUAL("", RemovePrefix("food", "food", false)); // !force
+	TEST_EQUAL("", RemoveSuffix("food", "food", false)); // !force
+	TEST_EQUAL("", RemovePrefix("foodz", "food", false)); // !force
+	TEST_EQUAL("", RemoveSuffix("foodz", "food", false)); // !force
+	TEST_EQUAL("", RemoveSuffix("zfood", "food", false)); // !force
+
+	TEST_EQUAL("food", RemovePrefix("", "food", true)); // force
+	TEST_EQUAL("food", RemoveSuffix("", "food", true)); // force
+	TEST_CHECK_THROWS(RemovePrefix("d", "food", true), CommonException, Internal); // force
+	TEST_CHECK_THROWS(RemoveSuffix("f", "food", true), CommonException, Internal); // force
+	TEST_CHECK_THROWS(RemovePrefix("dz", "food", true), CommonException, Internal); // force
+	TEST_CHECK_THROWS(RemoveSuffix("fz", "food", true), CommonException, Internal); // force
+	TEST_EQUAL("ood", RemovePrefix("f", "food", true)); // force
+	TEST_EQUAL("foo", RemoveSuffix("d", "food", true)); // force
+	TEST_EQUAL("od", RemovePrefix("fo", "food", true)); // force
+	TEST_EQUAL("fo", RemoveSuffix("od", "food", true)); // force
+	TEST_CHECK_THROWS(RemovePrefix("foodz", "food", true), CommonException, Internal); // force
+	TEST_CHECK_THROWS(RemoveSuffix("foodz", "food", true), CommonException, Internal); // force
+	TEST_CHECK_THROWS(RemoveSuffix("zfood", "food", true), CommonException, Internal); // force
+
+	// Test that force defaults to true:
+	TEST_CHECK_THROWS(RemovePrefix("d", "food"), CommonException, Internal);
+}
+
 int test(int argc, const char *argv[])
 {
 	if(argc == 2 && strcmp(argv[1], "lockwait") == 0)
@@ -1024,6 +1061,7 @@ int test(int argc, const char *argv[])
 	test_conversions();
 	test_archive();
 	test_box_strtoui64();
+	test_remove_prefix_suffix();
 
 	return 0;
 }
