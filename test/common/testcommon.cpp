@@ -69,7 +69,7 @@ ConfigurationVerifyKey verifykeys1_1_2[] =
 };
 
 
-ConfigurationVerify verifysub1_1[] = 
+ConfigurationVerify verifysub1_1[] =
 {
 	{
 		"*",
@@ -94,13 +94,13 @@ ConfigurationVerifyKey verifykeys1_1[] =
 	ConfigurationVerifyKey("string2", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
-ConfigurationVerifyKey verifykeys1_2[] = 
+ConfigurationVerifyKey verifykeys1_2[] =
 {
 	ConfigurationVerifyKey("carrots", ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("string", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
-ConfigurationVerify verifysub1[] = 
+ConfigurationVerify verifysub1[] =
 {
 	{
 		"test1",
@@ -127,7 +127,7 @@ ConfigurationVerifyKey verifykeys1[] =
 		ConfigurationVerifyKey("BoolTrue2", ConfigTest_IsBool),
 		ConfigurationVerifyKey("BoolFalse1", ConfigTest_IsBool),
 		ConfigurationVerifyKey("BoolFalse2", ConfigTest_IsBool),
-		ConfigurationVerifyKey("TOPlevel", 
+		ConfigurationVerifyKey("TOPlevel",
 			ConfigTest_LastEntry | ConfigTest_Exists)
 };
 
@@ -147,12 +147,12 @@ class TestLogger : public Logger
 	Log::Level mTargetLevel;
 
 	public:
-	TestLogger(Log::Level targetLevel) 
+	TestLogger(Log::Level targetLevel)
 	: mTriggered(false), mTargetLevel(targetLevel)
-	{ 
+	{
 		Logging::Add(this);
 	}
-	~TestLogger() 
+	~TestLogger()
 	{
 		Logging::Remove(this);
 	}
@@ -175,105 +175,148 @@ class TestLogger : public Logger
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 
-int test(int argc, const char *argv[])
+// Test PartialReadStream and ReadGatherStream handling of files over 2GB (refs #2)
+void test_stream_large_files()
 {
-	// Test PartialReadStream and ReadGatherStream handling of files
-	// over 2GB (refs #2)
+	char buffer[8];
+
+	ZeroStream zero(0x80000003);
+	zero.Seek(0x7ffffffe, IOStream::SeekType_Absolute);
+	TEST_THAT(zero.GetPosition() == 0x7ffffffe);
+	TEST_THAT(zero.Read(buffer, 8) == 5);
+	TEST_THAT(zero.GetPosition() == 0x80000003);
+	TEST_THAT(zero.Read(buffer, 8) == 0);
+	zero.Seek(0, IOStream::SeekType_Absolute);
+	TEST_THAT(zero.GetPosition() == 0);
+
+	char* buffer2 = new char [0x1000000];
+	TEST_THAT(buffer2 != NULL);
+
+	PartialReadStream part(zero, 0x80000002);
+	for (int i = 0; i < 0x80; i++)
 	{
-		char buffer[8];
-
-		ZeroStream zero(0x80000003);
-		zero.Seek(0x7ffffffe, IOStream::SeekType_Absolute);
-		TEST_THAT(zero.GetPosition() == 0x7ffffffe);
-		TEST_THAT(zero.Read(buffer, 8) == 5);
-		TEST_THAT(zero.GetPosition() == 0x80000003);
-		TEST_THAT(zero.Read(buffer, 8) == 0);
-		zero.Seek(0, IOStream::SeekType_Absolute);
-		TEST_THAT(zero.GetPosition() == 0);
-
-		char* buffer2 = new char [0x1000000];
-		TEST_THAT(buffer2 != NULL);
-
-		PartialReadStream part(zero, 0x80000002);
-		for (int i = 0; i < 0x80; i++)
-		{
-			int read = part.Read(buffer2, 0x1000000);
-			TEST_THAT(read == 0x1000000);
-		}
-		TEST_THAT(part.Read(buffer, 8) == 2);
-		TEST_THAT(part.Read(buffer, 8) == 0);
-
-		delete [] buffer2;
-
-		ReadGatherStream gather(false);
-		zero.Seek(0, IOStream::SeekType_Absolute);
-		int component = gather.AddComponent(&zero);
-		gather.AddBlock(component, 0x80000002);
-		TEST_THAT(gather.Read(buffer, 8) == 8);
+		int read = part.Read(buffer2, 0x1000000);
+		TEST_THAT(read == 0x1000000);
 	}
+	TEST_THAT(part.Read(buffer, 8) == 2);
+	TEST_THAT(part.Read(buffer, 8) == 0);
 
-	// Test self-deleting temporary file streams
-	{
-		std::string tempfile("testfiles/tempfile");
-		TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()), 
-			CommonException, OSFileOpenError);
-		InvisibleTempFileStream fs(tempfile.c_str(), O_CREAT);
+	delete [] buffer2;
 
-	#ifdef WIN32
-		// file is still visible under Windows
-		TEST_THAT(TestFileExists(tempfile.c_str()));
+	ReadGatherStream gather(false);
+	zero.Seek(0, IOStream::SeekType_Absolute);
+	int component = gather.AddComponent(&zero);
+	gather.AddBlock(component, 0x80000002);
+	TEST_THAT(gather.Read(buffer, 8) == 8);
+}
 
-		// opening it again should work
-		InvisibleTempFileStream fs2(tempfile.c_str());
-		TEST_THAT(TestFileExists(tempfile.c_str()));
+// Test self-deleting temporary file streams
+void test_invisible_temp_file_stream()
+{
+	std::string tempfile("testfiles/tempfile");
+	TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()),
+		CommonException, OSFileOpenError);
+	InvisibleTempFileStream fs(tempfile.c_str(), O_CREAT);
 
-		// opening it to create should work
-		InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
-		TEST_THAT(TestFileExists(tempfile.c_str()));
+#ifdef WIN32
+	// file is still visible under Windows
+	TEST_THAT(TestFileExists(tempfile.c_str()));
 
-		// opening it to create exclusively should fail
-		TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(), 
-			O_CREAT | O_EXCL), CommonException, OSFileOpenError);
+	// opening it again should work
+	InvisibleTempFileStream fs2(tempfile.c_str());
+	TEST_THAT(TestFileExists(tempfile.c_str()));
 
-		fs2.Close();
-	#else
-		// file is not visible under Unix
-		TEST_THAT(!TestFileExists(tempfile.c_str()));
+	// opening it to create should work
+	InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+	TEST_THAT(TestFileExists(tempfile.c_str()));
 
-		// opening it again should fail
-		TEST_CHECK_THROWS(InvisibleTempFileStream fs2(tempfile.c_str()),
-			CommonException, OSFileOpenError);
+	// opening it to create exclusively should fail
+	TEST_CHECK_THROWS(InvisibleTempFileStream fs4(tempfile.c_str(),
+		O_CREAT | O_EXCL), CommonException, OSFileOpenError);
 
-		// opening it to create should work
-		InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
-		TEST_THAT(!TestFileExists(tempfile.c_str()));
+	fs2.Close();
+#else
+	// file is not visible under Unix
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
 
-		// opening it to create exclusively should work
-		InvisibleTempFileStream fs4(tempfile.c_str(), O_CREAT | O_EXCL);
-		TEST_THAT(!TestFileExists(tempfile.c_str()));
+	// opening it again should fail
+	TEST_CHECK_THROWS(InvisibleTempFileStream fs2(tempfile.c_str()),
+		CommonException, OSFileOpenError);
 
-		fs4.Close();
-	#endif
+	// opening it to create should work
+	InvisibleTempFileStream fs3(tempfile.c_str(), O_CREAT);
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
 
-		fs.Close();
-		fs3.Close();
+	// opening it to create exclusively should work
+	InvisibleTempFileStream fs4(tempfile.c_str(), O_CREAT | O_EXCL);
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
 
-		// now that it's closed, it should be invisible on all platforms
-		TEST_THAT(!TestFileExists(tempfile.c_str()));
-	}
+	fs4.Close();
+#endif
 
-	// Test that named locks work as expected
+	fs.Close();
+	fs3.Close();
+
+	// now that it's closed, it should be invisible on all platforms
+	TEST_THAT(!TestFileExists(tempfile.c_str()));
+}
+
+// Test that named locks work as expected
+void test_named_locks()
+{
 	{
 		NamedLock lock1;
-		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
-		// With a lock held, we should not be able to acquire another.
-		TEST_THAT(!NamedLock().TryAndGetLock("testfiles/locktest"));
-	}
-	{
-		// But with the lock released, we should be able to.
-		TEST_THAT(NamedLock().TryAndGetLock("testfiles/locktest"));
+		// Try and get a lock on a name in a directory which doesn't exist
+		TEST_CHECK_THROWS(lock1.TryAndGetLock(
+				"testfiles"
+				DIRECTORY_SEPARATOR "non-exist"
+				DIRECTORY_SEPARATOR "lock"),
+			CommonException, OSFileError);
+
+		// And a more resonable request
+		TEST_THAT(lock1.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
+
+		// Try to lock something using the same lock
+		TEST_CHECK_THROWS(
+			lock1.TryAndGetLock(
+				"testfiles"
+				DIRECTORY_SEPARATOR "non-exist"
+				DIRECTORY_SEPARATOR "lock2"),
+			CommonException, NamedLockAlreadyLockingSomething);
+
+		// And again on that name
+		NamedLock lock2;
+		TEST_THAT(lock2.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == false);
 	}
 
+	{
+		// Check that it unlocked when it went out of scope
+		NamedLock lock3;
+		TEST_THAT(lock3.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
+	}
+
+	{
+		// And unlocking works
+		NamedLock lock4;
+		TEST_CHECK_THROWS(lock4.ReleaseLock(), CommonException,
+			NamedLockNotHeld);
+		TEST_THAT(lock4.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock4") == true);
+		lock4.ReleaseLock();
+		NamedLock lock5;
+		TEST_THAT(lock5.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock4") == true);
+		// And can reuse it
+		TEST_THAT(lock4.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
+	}
+}
+
+void test_memory_leak_detection()
+{
 	// Test that memory leak detection doesn't crash
 	{
 		char *test = new char[1024];
@@ -305,16 +348,19 @@ int test(int argc, const char *argv[])
 		Timers::Init();
 	}
 #endif // BOX_MEMORY_LEAK_TESTING
+}
 
+void test_timers()
+{
 	// test main() initialises timers for us, so uninitialise them
 	Timers::Cleanup();
 
 	// Check that using timer methods without initialisation
 	// throws an assertion failure. Can only do this in debug mode
 	#ifndef BOX_RELEASE_BUILD
-		TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL), 
+		TEST_CHECK_THROWS(Timers::Add(*(Timer*)NULL),
 			CommonException, AssertFailed);
-		TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL), 
+		TEST_CHECK_THROWS(Timers::Remove(*(Timer*)NULL),
 			CommonException, AssertFailed);
 	#endif
 
@@ -401,7 +447,10 @@ int test(int argc, const char *argv[])
 
 	// Leave timers initialised for rest of test.
 	// Test main() will cleanup after test finishes.
+}
 
+void test_getline()
+{
 	static const char *testfilelines[] =
 	{
 		"First line",
@@ -449,9 +498,9 @@ int test(int argc, const char *argv[])
 	{
 		FileHandleGuard<O_RDONLY> file("testfiles"
 			DIRECTORY_SEPARATOR "fdgetlinetest.txt");
-		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR 
+		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR
 			"fdgetlinetest.txt", "r");
-		TEST_THAT_ABORTONFAIL(file2 != 0);
+		TEST_THAT(file2 != 0);
 		FdGetLine getline(file);
 		char ll[512];
 
@@ -477,7 +526,7 @@ int test(int argc, const char *argv[])
 
 	// Then the IOStream version of get line, seeing as we're here...
 	{
-		FileStream file("testfiles" DIRECTORY_SEPARATOR 
+		FileStream file("testfiles" DIRECTORY_SEPARATOR
 			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
 
@@ -497,15 +546,16 @@ int test(int argc, const char *argv[])
 		std::string dummy;
 		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
 	}
+
 	// and again without pre-processing
 	{
-		FileStream file("testfiles" DIRECTORY_SEPARATOR 
+		FileStream file("testfiles" DIRECTORY_SEPARATOR
 			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
 
-		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR 
+		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR
 			"fdgetlinetest.txt", "r");
-		TEST_THAT_ABORTONFAIL(file2 != 0);
+		TEST_THAT(file2 != 0);
 		char ll[512];
 
 		while(!feof(file2))
@@ -530,14 +580,17 @@ int test(int argc, const char *argv[])
 
 		fclose(file2);
 	}
+}
 
+void test_configuration()
+{
 	// Doesn't exist
 	{
 		std::string errMsg;
 		TEST_CHECK_THROWS(std::auto_ptr<Configuration> pconfig(
 			Configuration::LoadAndVerify(
-				"testfiles" DIRECTORY_SEPARATOR "DOESNTEXIST", 
-				&verify, errMsg)), 
+				"testfiles" DIRECTORY_SEPARATOR "DOESNTEXIST",
+				&verify, errMsg)),
 			CommonException, OSFileOpenError);
 	}
 
@@ -546,13 +599,14 @@ int test(int argc, const char *argv[])
 		std::string errMsg;
 		std::auto_ptr<Configuration> pconfig(
 			Configuration::LoadAndVerify(
-				"testfiles" DIRECTORY_SEPARATOR "config1.txt", 
+				"testfiles" DIRECTORY_SEPARATOR "config1.txt",
 				&verify, errMsg));
 		if(!errMsg.empty())
 		{
 			printf("UNEXPECTED error msg is:\n------\n%s------\n", errMsg.c_str());
 		}
-		TEST_THAT_ABORTONFAIL(pconfig.get() != 0);
+
+		TEST_THAT(pconfig.get() != 0);
 		TEST_THAT(errMsg.empty());
 		TEST_THAT(pconfig->KeyExists("TOPlevel"));
 		TEST_THAT(pconfig->GetKeyValue("TOPlevel") == "value");
@@ -687,253 +741,206 @@ int test(int argc, const char *argv[])
 		TEST_THAT(pconfig->GetKeyValueBool("BoolFalse1") == false);
 		TEST_THAT(pconfig->GetKeyValueBool("BoolFalse2") == false);
 	}
+}
 
-	// Test named locks
+// Test the ReadGatherStream
+void test_read_gather_stream()
+{
+	#define GATHER_DATA1 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	#define GATHER_DATA2 "ZYZWVUTSRQPOMNOLKJIHGFEDCBA9876543210zyxwvutsrqpomno"
+
+	// Make two streams
+	MemBlockStream s1(GATHER_DATA1, sizeof(GATHER_DATA1));
+	MemBlockStream s2(GATHER_DATA2, sizeof(GATHER_DATA2));
+
+	// And a gather stream
+	ReadGatherStream gather(false /* no deletion */);
+
+	// Add the streams
+	int s1_c = gather.AddComponent(&s1);
+	int s2_c = gather.AddComponent(&s2);
+	TEST_THAT(s1_c == 0);
+	TEST_THAT(s2_c == 1);
+
+	// Set up some blocks
+	gather.AddBlock(s1_c, 11);
+	gather.AddBlock(s1_c, 2);
+	gather.AddBlock(s1_c, 8, true, 2);
+	gather.AddBlock(s2_c, 20);
+	gather.AddBlock(s1_c, 20);
+	gather.AddBlock(s2_c, 25);
+	gather.AddBlock(s1_c, 10, true, 0);
+	#define GATHER_RESULT "0123456789abc23456789ZYZWVUTSRQPOMNOLKJIHabcdefghijklmnopqrstGFEDCBA9876543210zyxwvuts0123456789"
+
+	// Read them in...
+	char buffer[1024];
+	unsigned int r = 0;
+	while(r < sizeof(GATHER_RESULT) - 1)
 	{
-		NamedLock lock1;
-		// Try and get a lock on a name in a directory which doesn't exist
-		TEST_CHECK_THROWS(lock1.TryAndGetLock(
-				"testfiles" 
-				DIRECTORY_SEPARATOR "non-exist"
-				DIRECTORY_SEPARATOR "lock"), 
-			CommonException, OSFileError);
+		int s = gather.Read(buffer + r, 7);
+		r += s;
 
-		// And a more resonable request
-		TEST_THAT(lock1.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
-
-		// Try to lock something using the same lock
-		TEST_CHECK_THROWS(
-			lock1.TryAndGetLock(
-				"testfiles" 
-				DIRECTORY_SEPARATOR "non-exist"
-				DIRECTORY_SEPARATOR "lock2"), 
-			CommonException, NamedLockAlreadyLockingSomething);
-#if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
-		// And again on that name
-		NamedLock lock2;
-		TEST_THAT(lock2.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock1") == false);
-#endif
-	}
-	{
-		// Check that it unlocked when it went out of scope
-		NamedLock lock3;
-		TEST_THAT(lock3.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
-	}
-	{
-		// And unlocking works
-		NamedLock lock4;
-		TEST_CHECK_THROWS(lock4.ReleaseLock(), CommonException, 
-			NamedLockNotHeld);
-		TEST_THAT(lock4.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock4") == true);
-		lock4.ReleaseLock();
-		NamedLock lock5;
-		TEST_THAT(lock5.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock4") == true);
-		// And can reuse it
-		TEST_THAT(lock4.TryAndGetLock(
-			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
-	}
-
-	// Test the ReadGatherStream
-	{
-		#define GATHER_DATA1 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		#define GATHER_DATA2 "ZYZWVUTSRQPOMNOLKJIHGFEDCBA9876543210zyxwvutsrqpomno"
-
-		// Make two streams
-		MemBlockStream s1(GATHER_DATA1, sizeof(GATHER_DATA1));
-		MemBlockStream s2(GATHER_DATA2, sizeof(GATHER_DATA2));
-
-		// And a gather stream
-		ReadGatherStream gather(false /* no deletion */);
-
-		// Add the streams
-		int s1_c = gather.AddComponent(&s1);
-		int s2_c = gather.AddComponent(&s2);
-		TEST_THAT(s1_c == 0);
-		TEST_THAT(s2_c == 1);
-
-		// Set up some blocks
-		gather.AddBlock(s1_c, 11);
-		gather.AddBlock(s1_c, 2);
-		gather.AddBlock(s1_c, 8, true, 2);
-		gather.AddBlock(s2_c, 20);
-		gather.AddBlock(s1_c, 20);
-		gather.AddBlock(s2_c, 25);
-		gather.AddBlock(s1_c, 10, true, 0);
-		#define GATHER_RESULT "0123456789abc23456789ZYZWVUTSRQPOMNOLKJIHabcdefghijklmnopqrstGFEDCBA9876543210zyxwvuts0123456789"
-
-		// Read them in...
-		char buffer[1024];
-		unsigned int r = 0;
-		while(r < sizeof(GATHER_RESULT) - 1)
+		TEST_THAT(gather.GetPosition() == r);
+		if(r < sizeof(GATHER_RESULT) - 1)
 		{
-			int s = gather.Read(buffer + r, 7);
-			r += s;
-
-			TEST_THAT(gather.GetPosition() == r);
-			if(r < sizeof(GATHER_RESULT) - 1)
-			{
-				TEST_THAT(gather.StreamDataLeft());
-				TEST_THAT(static_cast<size_t>(gather.BytesLeftToRead()) == sizeof(GATHER_RESULT) - 1 - r);
-			}
-			else
-			{
-				TEST_THAT(!gather.StreamDataLeft());
-				TEST_THAT(gather.BytesLeftToRead() == 0);
-			}
+			TEST_THAT(gather.StreamDataLeft());
+			TEST_THAT(static_cast<size_t>(gather.BytesLeftToRead()) == sizeof(GATHER_RESULT) - 1 - r);
 		}
-		TEST_THAT(r == sizeof(GATHER_RESULT) - 1);
-		TEST_THAT(::memcmp(buffer, GATHER_RESULT, sizeof(GATHER_RESULT) - 1) == 0);
-	}
-
-	// Test ExcludeList
-	{
-		ExcludeList elist;
-		// Check assumption
-		TEST_THAT(Configuration::MultiValueSeparator == '\x01');
-		// Add definite entries
-		elist.AddDefiniteEntries(std::string("\x01"));
-		elist.AddDefiniteEntries(std::string(""));
-		elist.AddDefiniteEntries(std::string("Definite1\x01/dir/DefNumberTwo\x01\x01ThingDefThree"));
-		elist.AddDefiniteEntries(std::string("AnotherDef"));
-		TEST_THAT(elist.SizeOfDefiniteList() == 4);
-
-		// Add regex entries
-		#ifdef HAVE_REGEX_SUPPORT
+		else
 		{
-			HideCategoryGuard hide(ConfigurationVerify::VERIFY_ERROR);
-			elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$"));
-			elist.AddRegexEntries(std::string(""));
-			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[:not_valid")), CommonException, BadRegularExpression);
-			TEST_THAT(elist.SizeOfRegexList() == 3);
+			TEST_THAT(!gather.StreamDataLeft());
+			TEST_THAT(gather.BytesLeftToRead() == 0);
 		}
-		#else
-			TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$")), CommonException, RegexNotSupportedOnThisPlatform);
-			TEST_THAT(elist.SizeOfRegexList() == 0);
-		#endif
-
-		#ifdef WIN32
-		#define CASE_SENSITIVE false
-		#else
-		#define CASE_SENSITIVE true
-		#endif
-
-		// Try some matches!
-		TEST_THAT(elist.IsExcluded(std::string("Definite1")) == true);
-		TEST_THAT(elist.IsExcluded(std::string("/dir/DefNumberTwo")) == true);
-		TEST_THAT(elist.IsExcluded(std::string("ThingDefThree")) == true);
-		TEST_THAT(elist.IsExcluded(std::string("AnotherDef")) == true);
-		TEST_THAT(elist.IsExcluded(std::string("dir/DefNumberTwo")) == false);
-
-		// Try some case insensitive matches,
-		// that should pass on Win32 and fail elsewhere
-		TEST_THAT(elist.IsExcluded("DEFINITe1") 
-			== !CASE_SENSITIVE);
-		TEST_THAT(elist.IsExcluded("/Dir/DefNumberTwo") 
-			== !CASE_SENSITIVE);
-		TEST_THAT(elist.IsExcluded("thingdefthree") 
-			== !CASE_SENSITIVE);
-
-		#ifdef HAVE_REGEX_SUPPORT
-			TEST_THAT(elist.IsExcluded(std::string("b.reg")) == true);
-			TEST_THAT(elist.IsExcluded(std::string("B.reg")) == !CASE_SENSITIVE);
-			TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == !CASE_SENSITIVE);
-			TEST_THAT(elist.IsExcluded(std::string("e.reg")) == false);
-			TEST_THAT(elist.IsExcluded(std::string("e.Reg")) == false);
-			TEST_THAT(elist.IsExcluded(std::string("DEfinite1")) == !CASE_SENSITIVE);
-			TEST_THAT(elist.IsExcluded(std::string("DEXCLUDEfinite1")) == true);
-			TEST_THAT(elist.IsExcluded(std::string("DEfinitexclude1")) == !CASE_SENSITIVE);
-			TEST_THAT(elist.IsExcluded(std::string("exclude")) == true);
-			TEST_THAT(elist.IsExcluded(std::string("ExcludE")) == !CASE_SENSITIVE);
-		#endif
-
-		#undef CASE_SENSITIVE
-
-		TestLogger logger(Log::WARNING);
-		TEST_THAT(!logger.IsTriggered());
-		elist.AddDefiniteEntries(std::string("/foo"));
-		TEST_THAT(!logger.IsTriggered());
-		elist.AddDefiniteEntries(std::string("/foo/"));
-		TEST_THAT(logger.IsTriggered());
-		logger.Reset();
-		elist.AddDefiniteEntries(std::string("/foo" 
-			DIRECTORY_SEPARATOR));
-		TEST_THAT(logger.IsTriggered());
-		logger.Reset();
-		elist.AddDefiniteEntries(std::string("/foo" 
-			DIRECTORY_SEPARATOR "bar\x01/foo"));
-		TEST_THAT(!logger.IsTriggered());
-		elist.AddDefiniteEntries(std::string("/foo" 
-			DIRECTORY_SEPARATOR "bar\x01/foo" 
-			DIRECTORY_SEPARATOR));
-		TEST_THAT(logger.IsTriggered());
 	}
+	TEST_THAT(r == sizeof(GATHER_RESULT) - 1);
+	TEST_THAT(::memcmp(buffer, GATHER_RESULT, sizeof(GATHER_RESULT) - 1) == 0);
+}
 
-	test_conversions();
+// Test ExcludeList
+void test_exclude_list()
+{
+	ExcludeList elist;
+	// Check assumption
+	TEST_THAT(Configuration::MultiValueSeparator == '\x01');
+	// Add definite entries
+	elist.AddDefiniteEntries(std::string("\x01"));
+	elist.AddDefiniteEntries(std::string(""));
+	elist.AddDefiniteEntries(std::string("Definite1\x01/dir/DefNumberTwo\x01\x01ThingDefThree"));
+	elist.AddDefiniteEntries(std::string("AnotherDef"));
+	TEST_THAT(elist.SizeOfDefiniteList() == 4);
 
-	// test that we can use Archive and CollectInBufferStream
-	// to read and write arbitrary types to a memory buffer
+	// Add regex entries
+	#ifdef HAVE_REGEX_SUPPORT
+	{
+		HideCategoryGuard hide(ConfigurationVerify::VERIFY_ERROR);
+		elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$"));
+		elist.AddRegexEntries(std::string(""));
+		TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[:not_valid")), CommonException, BadRegularExpression);
+		TEST_THAT(elist.SizeOfRegexList() == 3);
+	}
+	#else
+		TEST_CHECK_THROWS(elist.AddRegexEntries(std::string("[a-d]+\\.reg$" "\x01" "EXCLUDE" "\x01" "^exclude$")), CommonException, RegexNotSupportedOnThisPlatform);
+		TEST_THAT(elist.SizeOfRegexList() == 0);
+	#endif
+
+	#ifdef WIN32
+	#define CASE_SENSITIVE false
+	#else
+	#define CASE_SENSITIVE true
+	#endif
+
+	// Try some matches!
+	TEST_THAT(elist.IsExcluded(std::string("Definite1")) == true);
+	TEST_THAT(elist.IsExcluded(std::string("/dir/DefNumberTwo")) == true);
+	TEST_THAT(elist.IsExcluded(std::string("ThingDefThree")) == true);
+	TEST_THAT(elist.IsExcluded(std::string("AnotherDef")) == true);
+	TEST_THAT(elist.IsExcluded(std::string("dir/DefNumberTwo")) == false);
+
+	// Try some case insensitive matches,
+	// that should pass on Win32 and fail elsewhere
+	TEST_THAT(elist.IsExcluded("DEFINITe1")
+		== !CASE_SENSITIVE);
+	TEST_THAT(elist.IsExcluded("/Dir/DefNumberTwo")
+		== !CASE_SENSITIVE);
+	TEST_THAT(elist.IsExcluded("thingdefthree")
+		== !CASE_SENSITIVE);
+
+	#ifdef HAVE_REGEX_SUPPORT
+		TEST_THAT(elist.IsExcluded(std::string("b.reg")) == true);
+		TEST_THAT(elist.IsExcluded(std::string("B.reg")) == !CASE_SENSITIVE);
+		TEST_THAT(elist.IsExcluded(std::string("b.Reg")) == !CASE_SENSITIVE);
+		TEST_THAT(elist.IsExcluded(std::string("e.reg")) == false);
+		TEST_THAT(elist.IsExcluded(std::string("e.Reg")) == false);
+		TEST_THAT(elist.IsExcluded(std::string("DEfinite1")) == !CASE_SENSITIVE);
+		TEST_THAT(elist.IsExcluded(std::string("DEXCLUDEfinite1")) == true);
+		TEST_THAT(elist.IsExcluded(std::string("DEfinitexclude1")) == !CASE_SENSITIVE);
+		TEST_THAT(elist.IsExcluded(std::string("exclude")) == true);
+		TEST_THAT(elist.IsExcluded(std::string("ExcludE")) == !CASE_SENSITIVE);
+	#endif
+
+	#undef CASE_SENSITIVE
+
+	TestLogger logger(Log::WARNING);
+	TEST_THAT(!logger.IsTriggered());
+	elist.AddDefiniteEntries(std::string("/foo"));
+	TEST_THAT(!logger.IsTriggered());
+	elist.AddDefiniteEntries(std::string("/foo/"));
+	TEST_THAT(logger.IsTriggered());
+	logger.Reset();
+	elist.AddDefiniteEntries(std::string("/foo"
+		DIRECTORY_SEPARATOR));
+	TEST_THAT(logger.IsTriggered());
+	logger.Reset();
+	elist.AddDefiniteEntries(std::string("/foo"
+		DIRECTORY_SEPARATOR "bar\x01/foo"));
+	TEST_THAT(!logger.IsTriggered());
+	elist.AddDefiniteEntries(std::string("/foo"
+		DIRECTORY_SEPARATOR "bar\x01/foo"
+		DIRECTORY_SEPARATOR));
+	TEST_THAT(logger.IsTriggered());
+}
+
+// Test that we can use Archive and CollectInBufferStream
+// to read and write arbitrary types to a memory buffer
+void test_archive()
+{
+	CollectInBufferStream buffer;
+	ASSERT(buffer.GetPosition() == 0);
 
 	{
-		CollectInBufferStream buffer;
+		Archive archive(buffer, 0);
 		ASSERT(buffer.GetPosition() == 0);
 
-		{
-			Archive archive(buffer, 0);
-			ASSERT(buffer.GetPosition() == 0);
-
-			archive.Write((bool) true);
-			archive.Write((bool) false);
-			archive.Write((int) 0x12345678);
-			archive.Write((int) 0x87654321);
-			archive.Write((int64_t)  0x0badfeedcafebabeLL);
-			archive.Write((uint64_t) 0xfeedfacedeadf00dLL);
-			archive.Write((uint8_t)  0x01);
-			archive.Write((uint8_t)  0xfe);
-			archive.Write(std::string("hello world!"));
-			archive.Write(std::string("goodbye cruel world!"));
-		}
-
-		CollectInBufferStream buf2;
-		buf2.Write(buffer.GetBuffer(), buffer.GetSize());
-		TEST_THAT(buf2.GetPosition() == buffer.GetSize());
-
-		buf2.SetForReading();
-		TEST_THAT(buf2.GetPosition() == 0);
-
-		{
-			Archive archive(buf2, 0);
-			TEST_THAT(buf2.GetPosition() == 0);
-
-			bool b;
-			archive.Read(b); TEST_THAT(b == true);
-			archive.Read(b); TEST_THAT(b == false);
-
-			int i;
-			archive.Read(i); TEST_THAT(i == 0x12345678);
-			archive.Read(i); TEST_THAT((unsigned int)i == 0x87654321);
-
-			uint64_t i64;
-			archive.Read(i64); TEST_THAT(i64 == 0x0badfeedcafebabeLL);
-			archive.Read(i64); TEST_THAT(i64 == 0xfeedfacedeadf00dLL);
-
-			uint8_t i8;
-			archive.Read(i8); TEST_THAT(i8 == 0x01);
-			archive.Read(i8); TEST_THAT(i8 == 0xfe);
-
-			std::string s;
-			archive.Read(s); TEST_THAT(s == "hello world!");
-			archive.Read(s); TEST_THAT(s == "goodbye cruel world!");
-
-			TEST_THAT(!buf2.StreamDataLeft());
-		}
+		archive.Write((bool) true);
+		archive.Write((bool) false);
+		archive.Write((int) 0x12345678);
+		archive.Write((int) 0x87654321);
+		archive.Write((int64_t)  0x0badfeedcafebabeLL);
+		archive.Write((uint64_t) 0xfeedfacedeadf00dLL);
+		archive.Write((uint8_t)  0x01);
+		archive.Write((uint8_t)  0xfe);
+		archive.Write(std::string("hello world!"));
+		archive.Write(std::string("goodbye cruel world!"));
 	}
 
-	// Test that box_strtoui64 works properly
+	CollectInBufferStream buf2;
+	buf2.Write(buffer.GetBuffer(), buffer.GetSize());
+	TEST_THAT(buf2.GetPosition() == buffer.GetSize());
+
+	buf2.SetForReading();
+	TEST_THAT(buf2.GetPosition() == 0);
+
+	{
+		Archive archive(buf2, 0);
+		TEST_THAT(buf2.GetPosition() == 0);
+
+		bool b;
+		archive.Read(b); TEST_THAT(b == true);
+		archive.Read(b); TEST_THAT(b == false);
+
+		int i;
+		archive.Read(i); TEST_THAT(i == 0x12345678);
+		archive.Read(i); TEST_THAT((unsigned int)i == 0x87654321);
+
+		uint64_t i64;
+		archive.Read(i64); TEST_THAT(i64 == 0x0badfeedcafebabeLL);
+		archive.Read(i64); TEST_THAT(i64 == 0xfeedfacedeadf00dLL);
+
+		uint8_t i8;
+		archive.Read(i8); TEST_THAT(i8 == 0x01);
+		archive.Read(i8); TEST_THAT(i8 == 0xfe);
+
+		std::string s;
+		archive.Read(s); TEST_THAT(s == "hello world!");
+		archive.Read(s); TEST_THAT(s == "goodbye cruel world!");
+
+		TEST_THAT(!buf2.StreamDataLeft());
+	}
+}
+
+// Test that box_strtoui64 works properly
+void test_box_strtoui64()
+{
 	TEST_EQUAL(1234567890123456, box_strtoui64("1234567890123456", NULL, 10));
 	TEST_EQUAL(0x1234567890123456, box_strtoui64("1234567890123456", NULL, 16));
 	TEST_EQUAL(0xd9385a13c3842ba0, box_strtoui64("d9385a13c3842ba0", NULL, 16));
@@ -943,6 +950,22 @@ int test(int argc, const char *argv[])
 	TEST_EQUAL(input + 2, endptr);
 	TEST_EQUAL(0x12a34, box_strtoui64(input, &endptr, 16));
 	TEST_EQUAL(input + 5, endptr);
+}
+
+int test(int argc, const char *argv[])
+{
+	test_stream_large_files();
+	test_invisible_temp_file_stream();
+	test_named_locks();
+	test_memory_leak_detection();
+	test_timers();
+	test_getline();
+	test_configuration();
+	test_read_gather_stream();
+	test_exclude_list();
+	test_conversions();
+	test_archive();
+	test_box_strtoui64();
 
 	return 0;
 }
