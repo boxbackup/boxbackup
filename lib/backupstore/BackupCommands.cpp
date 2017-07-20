@@ -226,7 +226,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 		"(name=" << rContext.GetAccountName() << ")");
 
 	// Let the context know about it
-	rContext.ReceivedFinishCommand();
+	rContext.CleanUp();
 
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolFinished);
 }
