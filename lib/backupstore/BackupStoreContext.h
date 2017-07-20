@@ -54,8 +54,6 @@ private:
 	BackupStoreContext(const BackupStoreContext &rToCopy); // no copying
 
 public:
-
-	void ReceivedFinishCommand();
 	void CleanUp();
 	int32_t GetClientID() {return mClientID;}
 
