@@ -66,7 +66,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
   mpTestHook(NULL)
 // If you change the initialisers, be sure to update
-// BackupStoreContext::ReceivedFinishCommand as well!
+// BackupStoreContext::CleanUp as well!
 {
 }
 
@@ -113,24 +113,15 @@ void BackupStoreContext::CleanUp()
 	{
 		mapStoreInfo->Save();
 	}
-}
 
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreContext::ReceivedFinishCommand()
-//		Purpose: Called when the finish command is received by the protocol
-//		Created: 16/12/03
-//
-// --------------------------------------------------------------------------
-void BackupStoreContext::ReceivedFinishCommand()
-{
 	if(!mReadOnly && mapStoreInfo.get())
 	{
 		// Save the store info, not delayed
 		SaveStoreInfo(false);
 	}
+
+	ReleaseWriteLock();
 
 	// Just in case someone wants to reuse a local protocol object,
 	// put the context back to its initial state.
