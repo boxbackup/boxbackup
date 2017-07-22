@@ -30,7 +30,16 @@ BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
-
+# Using Boost properly seems to need C++0x, or at least the "auto" type.
+# We don't need CMake to parse this, because it has built-in feature detecting macros
+# which we use instead:
+AX_CHECK_COMPILE_FLAG(-std=c++0x,
+	[cxxflags_strict="$cxxflags_strict -std=c++0x"])
+# And if we're going to do that, we don't want warnings about std::auto_ptr being deprecated:
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations)
+# We also get copious warnings from the 'register' storage class specifier in the system
+# headers (ntohl and friends) which we can't do much about, so disable it:
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-register)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
