@@ -46,6 +46,12 @@
 // Maximum amount of store info updates before it's actually saved to disc.
 #define STORE_INFO_SAVE_DELAY	96
 
+#define CHECK_FILESYSTEM_INITIALISED() \
+	if(mapStoreInfo.get() == 0) \
+	{ \
+		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded) \
+	}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -107,12 +113,16 @@ void BackupStoreContext::ClearDirectoryCache()
 // --------------------------------------------------------------------------
 void BackupStoreContext::CleanUp()
 {
-	// Make sure the store info is saved, if it has been loaded, isn't read only and has been modified
-	if(mapStoreInfo.get() && !(mapStoreInfo->IsReadOnly()) &&
-		mapStoreInfo->IsModified())
+	if(!mReadOnly)
 	{
-		// Save the store info, not delayed
-		SaveStoreInfo(false);
+		// Make sure the store info is saved, if it has been loaded, isn't
+		// read only and has been modified.
+		BackupStoreInfo& info(GetBackupStoreInfoInternal());
+		if(!info.IsReadOnly() && info.IsModified())
+		{
+			// Save the store info, not delayed
+			SaveStoreInfo(false);
+		}
 	}
 
 	ReleaseWriteLock();
@@ -216,10 +226,10 @@ void BackupStoreContext::LoadStoreInfo()
 	catch(BoxException &e)
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CorruptReferenceCountDatabase, "Reference count "
-			"database is missing or corrupted, cannot safely open "
-			"account. Housekeeping will fix this automatically "
-			"when it next runs.");
+			CorruptReferenceCountDatabase, "Account " <<
+			BOX_FORMAT_ACCOUNT(mClientID) << " reference count database is "
+			"missing or corrupted, cannot safely open account. Housekeeping "
+			"will fix this automatically when it next runs.");
 	}
 }
 
@@ -234,10 +244,7 @@ void BackupStoreContext::LoadStoreInfo()
 // --------------------------------------------------------------------------
 void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	if(mReadOnly)
 	{
@@ -413,10 +420,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 // --------------------------------------------------------------------------
 int64_t BackupStoreContext::AllocateObjectID()
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	// Given that the store info may not be saved for STORE_INFO_SAVE_DELAY
 	// times after it has been updated, this is a reasonable number of times
@@ -427,7 +431,8 @@ int64_t BackupStoreContext::AllocateObjectID()
 	while(retryLimit > 0)
 	{
 		// Attempt to allocate an ID from the store
-		int64_t id = mapStoreInfo->AllocateObjectID();
+		BackupStoreInfo& info(GetBackupStoreInfoInternal());
+		int64_t id = info.AllocateObjectID();
 
 		// Generate filename
 		std::string filename;
@@ -469,10 +474,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	int64_t DiffFromFileID, const BackupStoreFilename &rFilename,
 	bool MarkFileWithSameNameAsOldVersions)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	if(mReadOnly)
 	{
@@ -502,6 +504,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	bool reversedDiffIsCompletelyDifferent = false;
 	int64_t oldVersionNewBlocksUsed = 0;
 	BackupStoreInfo::Adjustment adjustment = {};
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
 
 	try
 	{
@@ -644,9 +647,8 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		adjustment.mNumCurrentFiles++;
 
 		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
-			adjustment.mBlocksUsed;
-		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
+		int64_t newTotalBlocksUsed = info.GetBlocksUsed() + adjustment.mBlocksUsed;
+		if(newTotalBlocksUsed > info.GetBlocksHardLimit())
 		{
 			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
 			// The store file will be deleted automatically by the RaidFile object
@@ -778,15 +780,15 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	ASSERT(ppreviousVerStoreFile == 0);
 
 	// Modify the store info
-	mapStoreInfo->AdjustNumCurrentFiles(adjustment.mNumCurrentFiles);
-	mapStoreInfo->AdjustNumOldFiles(adjustment.mNumOldFiles);
-	mapStoreInfo->AdjustNumDeletedFiles(adjustment.mNumDeletedFiles);
-	mapStoreInfo->AdjustNumDirectories(adjustment.mNumDirectories);
-	mapStoreInfo->ChangeBlocksUsed(adjustment.mBlocksUsed);
-	mapStoreInfo->ChangeBlocksInCurrentFiles(adjustment.mBlocksInCurrentFiles);
-	mapStoreInfo->ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
-	mapStoreInfo->ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
-	mapStoreInfo->ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
+	info.AdjustNumCurrentFiles(adjustment.mNumCurrentFiles);
+	info.AdjustNumOldFiles(adjustment.mNumOldFiles);
+	info.AdjustNumDeletedFiles(adjustment.mNumDeletedFiles);
+	info.AdjustNumDirectories(adjustment.mNumDirectories);
+	info.ChangeBlocksUsed(adjustment.mBlocksUsed);
+	info.ChangeBlocksInCurrentFiles(adjustment.mBlocksInCurrentFiles);
+	info.ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
+	info.ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
+	info.ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
 
 	// Increment reference count on the new directory to one
 	mapRefCount->AddReference(id);
@@ -814,12 +816,9 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 // --------------------------------------------------------------------------
 bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut)
 {
-	// Essential checks!
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
+	// Essential checks!
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -852,8 +851,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				madeChanges = true;
 
 				int64_t blocks = e->GetSizeInBlocks();
-				mapStoreInfo->AdjustNumDeletedFiles(1);
-				mapStoreInfo->ChangeBlocksInDeletedFiles(blocks);
+				BackupStoreInfo& info(GetBackupStoreInfoInternal());
+				info.AdjustNumDeletedFiles(1);
+				info.ChangeBlocksInDeletedFiles(blocks);
 
 				// We're marking all old versions as deleted.
 				// This is how a file can be old and deleted
@@ -863,8 +863,8 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				// we do need to adjust the current counts.
 				if(!e->IsOld())
 				{
-					mapStoreInfo->AdjustNumCurrentFiles(-1);
-					mapStoreInfo->ChangeBlocksInCurrentFiles(-blocks);
+					info.AdjustNumCurrentFiles(-1);
+					info.ChangeBlocksInCurrentFiles(-blocks);
 				}
 
 				// Is this the last version?
@@ -906,12 +906,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 // --------------------------------------------------------------------------
 bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 {
-	// Essential checks!
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
+	// Essential checks!
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -962,7 +959,8 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 			SaveDirectory(dir);
 
 			// Modify the store info, and write
-			mapStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
+			BackupStoreInfo& info(GetBackupStoreInfoInternal());
+			info.ChangeBlocksInDeletedFiles(blocksDel);
 
 			// Maybe postponed save of store info
 			SaveStoreInfo();
@@ -1009,10 +1007,7 @@ void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 // --------------------------------------------------------------------------
 void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	int64_t ObjectID = rDir.GetObjectID();
 
@@ -1040,8 +1035,9 @@ void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 			// Make sure the size of the directory is available for writing the dir back
 			ASSERT(dirSize > 0);
 			int64_t sizeAdjustment = dirSize - rDir.GetUserInfo1_SizeInBlocks();
-			mapStoreInfo->ChangeBlocksUsed(sizeAdjustment);
-			mapStoreInfo->ChangeBlocksInDirectories(sizeAdjustment);
+			BackupStoreInfo& info(GetBackupStoreInfoInternal());
+			info.ChangeBlocksUsed(sizeAdjustment);
+			info.ChangeBlocksInDirectories(sizeAdjustment);
 			// Update size stored in directory
 			rDir.SetUserInfo1_SizeInBlocks(dirSize);
 		}
@@ -1115,10 +1111,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	int64_t ModificationTime,
 	bool &rAlreadyExists)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	if(mReadOnly)
 	{
@@ -1147,6 +1140,8 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		}
 	}
 
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+
 	// Allocate the next ID
 	int64_t id = AllocateObjectID();
 
@@ -1168,9 +1163,8 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		dirSize = dirFile.GetDiscUsageInBlocks();
 
 		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
-			dirSize;
-		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
+		int64_t newTotalBlocksUsed = info.GetBlocksUsed() + dirSize;
+		if(newTotalBlocksUsed > info.GetBlocksHardLimit())
 		{
 			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
 			// The file will be deleted automatically by the RaidFile object
@@ -1181,9 +1175,8 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 
 		// Make sure the size of the directory is added to the usage counts in the info
 		ASSERT(dirSize > 0);
-		mapStoreInfo->ChangeBlocksUsed(dirSize);
-		mapStoreInfo->ChangeBlocksInDirectories(dirSize);
-		// Not added to cache, so don't set the size in the directory
+		info.ChangeBlocksUsed(dirSize);
+		info.ChangeBlocksInDirectories(dirSize);
 	}
 
 	// Then add it into the parent directory
@@ -1210,9 +1203,9 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		throw;
 	}
 
-	// Save the store info (may not be postponed)
-	mapStoreInfo->AdjustNumDirectories(1);
-	SaveStoreInfo(false);
+	// Update and save the store info
+	info.AdjustNumDirectories(1);
+	SaveStoreInfo(true); // Allow defer: it's just an empty directory.
 
 	// tell caller what the ID was
 	return id;
@@ -1229,12 +1222,9 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 // --------------------------------------------------------------------------
 void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 {
-	// Essential checks!
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
+	// Essential checks!
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1307,6 +1297,8 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 // --------------------------------------------------------------------------
 void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 {
+	CHECK_FILESYSTEM_INITIALISED();
+
 	try
 	{
 		// Does things carefully to avoid using a directory in the cache after recursive call
@@ -1370,13 +1362,14 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 					ASSERT(en->IsDeleted() == Undelete); 
 					// Don't adjust counters for old files,
 					// because it can be both old and deleted.
+					BackupStoreInfo& info(GetBackupStoreInfoInternal());
 					if(!en->IsOld())
 					{
-						mapStoreInfo->ChangeBlocksInCurrentFiles(Undelete ? size : -size);
-						mapStoreInfo->AdjustNumCurrentFiles(Undelete ? 1 : -1);
+						info.ChangeBlocksInCurrentFiles(Undelete ? size : -size);
+						info.AdjustNumCurrentFiles(Undelete ? 1 : -1);
 					}
-					mapStoreInfo->ChangeBlocksInDeletedFiles(Undelete ? -size : size);
-					mapStoreInfo->AdjustNumDeletedFiles(Undelete ? -1 : 1);
+					info.ChangeBlocksInDeletedFiles(Undelete ? -size : size);
+					info.AdjustNumDeletedFiles(Undelete ? -1 : 1);
 				}
 
 				// Add/remove the deleted flags
@@ -1418,10 +1411,8 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 // --------------------------------------------------------------------------
 void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1456,10 +1447,8 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 // --------------------------------------------------------------------------
 bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1521,15 +1510,12 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 // --------------------------------------------------------------------------
 bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	// Note that we need to allow object IDs a little bit greater than the last one in the store info,
 	// because the store info may not have got saved in an error condition. Max greater ID is
 	// STORE_INFO_SAVE_DELAY in this case, *2 to be safe.
-	if(ObjectID <= 0 || ObjectID > (mapStoreInfo->GetLastObjectIDUsed() + (STORE_INFO_SAVE_DELAY * 2)))
+	if(ObjectID <= 0 || ObjectID > (GetBackupStoreInfo().GetLastObjectIDUsed() + (STORE_INFO_SAVE_DELAY * 2)))
 	{
 		// Obviously bad object ID
 		return false;
@@ -1592,10 +1578,7 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 // --------------------------------------------------------------------------
 std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	// Attempt to open the file
 	std::string fn;
@@ -1614,12 +1597,7 @@ std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 // --------------------------------------------------------------------------
 int64_t BackupStoreContext::GetClientStoreMarker()
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	return mapStoreInfo->GetClientStoreMarker();
+	return GetBackupStoreInfo().GetClientStoreMarker();
 }
 
 
@@ -1633,14 +1611,10 @@ int64_t BackupStoreContext::GetClientStoreMarker()
 // --------------------------------------------------------------------------
 void BackupStoreContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocksSoftLimit, int64_t &rBlocksHardLimit)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	rBlocksUsed = mapStoreInfo->GetBlocksUsed();
-	rBlocksSoftLimit = mapStoreInfo->GetBlocksSoftLimit();
-	rBlocksHardLimit = mapStoreInfo->GetBlocksHardLimit();
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+	rBlocksUsed = info.GetBlocksUsed();
+	rBlocksSoftLimit = info.GetBlocksSoftLimit();
+	rBlocksHardLimit = info.GetBlocksHardLimit();
 }
 
 
@@ -1654,12 +1628,8 @@ void BackupStoreContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rB
 // --------------------------------------------------------------------------
 bool BackupStoreContext::HardLimitExceeded()
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	return mapStoreInfo->GetBlocksUsed() > mapStoreInfo->GetBlocksHardLimit();
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+	return info.GetBlocksUsed() > info.GetBlocksHardLimit();
 }
 
 
@@ -1673,16 +1643,12 @@ bool BackupStoreContext::HardLimitExceeded()
 // --------------------------------------------------------------------------
 void BackupStoreContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
 
-	mapStoreInfo->SetClientStoreMarker(ClientStoreMarker);
+	GetBackupStoreInfoInternal().SetClientStoreMarker(ClientStoreMarker);
 	SaveStoreInfo(false /* don't delay saving this */);
 }
 
@@ -1931,24 +1897,5 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		delete moving.back();
 		moving.pop_back();
 	}
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreContext::GetBackupStoreInfo()
-//		Purpose: Return the backup store info object, exception if it isn't loaded
-//		Created: 19/4/04
-//
-// --------------------------------------------------------------------------
-const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
-{
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	return *(mapStoreInfo.get());
 }
 

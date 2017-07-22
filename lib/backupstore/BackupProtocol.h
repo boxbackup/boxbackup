@@ -29,10 +29,10 @@ private:
 	int32_t mAccountNumber;
 	bool mReadOnly;
 
-protected:
+public:
+	// This is not intended to be an API, but is useful in tests:
 	BackupStoreContext& GetContext() { return mContext; }
 
-public:
 	BackupProtocolLocal2(int32_t AccountNumber,
 		const std::string& ConnectionDetails,
 		const std::string& AccountRootDir, int DiscSetNumber,
