@@ -1539,6 +1539,10 @@ bool test_server_commands()
 	{
 		// Create a directory
 		int64_t subdirid = create_directory(*apProtocol);
+		// BackupStoreInfo flush should have been deferred, so counts not updated yet:
+		TEST_THAT(check_num_files(0, 0, 0, 1));
+		// Flush updated BackupStoreInfo to disk now, so that we can check it:
+		apProtocol->GetContext().SaveStoreInfo(false); // !AllowDelay
 		TEST_THAT(check_num_files(0, 0, 0, 2));
 
 		// Try using GetFile on the directory
