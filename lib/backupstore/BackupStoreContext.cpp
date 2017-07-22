@@ -94,8 +94,7 @@ BackupStoreContext::~BackupStoreContext()
 void BackupStoreContext::ClearDirectoryCache()
 {
 	// Delete the objects in the cache
-	for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin());
-		i != mDirectoryCache.end(); ++i)
+	for(auto i(mDirectoryCache.begin()); i != mDirectoryCache.end(); ++i)
 	{
 		delete (i->second);
 	}
@@ -311,7 +310,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	int64_t oldRevID = 0, newRevID = 0;
 
 	// Already in cache?
-	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
+	auto item = mDirectoryCache.find(ObjectID);
 	if(item != mDirectoryCache.end())
 	{
 #ifndef BOX_RELEASE_BUILD // it might be in the cache, but invalidated
@@ -986,7 +985,7 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 // --------------------------------------------------------------------------
 void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 {
-	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
+	auto item = mDirectoryCache.find(ObjectID);
 	if(item != mDirectoryCache.end())
 	{
 		// Delete this cached object
