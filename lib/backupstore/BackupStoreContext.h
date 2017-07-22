@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_BackupStoreException.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
@@ -102,7 +103,13 @@ public:
 	// Store info
 	void LoadStoreInfo();
 	void SaveStoreInfo(bool AllowDelay = true);
-	const BackupStoreInfo &GetBackupStoreInfo() const;
+
+	// Const version for external use:
+	const BackupStoreInfo& GetBackupStoreInfo() const
+	{
+		return GetBackupStoreInfoInternal();
+	}
+
 	const std::string GetAccountName()
 	{
 		if(!mapStoreInfo.get())
@@ -203,6 +210,16 @@ private:
 
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
+
+	// Non-const version for internal use:
+	BackupStoreInfo& GetBackupStoreInfoInternal() const
+	{
+		if(!mapStoreInfo.get())
+		{
+			THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded);
+		}
+		return *mapStoreInfo;
+	}
 
 	// Refcount database
 	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
