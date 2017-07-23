@@ -48,12 +48,14 @@ public:
 
 	BackupFileSystem() { }
 	virtual ~BackupFileSystem() { }
-	virtual bool TryGetLock() = 0;
+	virtual void TryGetLock() = 0;
+	virtual void GetLock();
 	virtual void ReleaseLock()
 	{
 		mapBackupStoreInfo.reset();
 	}
 
+	virtual bool HaveLock() = 0;
 	virtual int GetBlockSize() = 0;
 	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
@@ -97,11 +99,18 @@ public:
 	{
 		ReleaseLock();
 	}
-	virtual bool TryGetLock();
+	virtual void TryGetLock();
 	virtual void ReleaseLock()
 	{
 		BackupFileSystem::ReleaseLock();
-		mWriteLock.ReleaseLock();
+		if(HaveLock())
+		{
+			mWriteLock.ReleaseLock();
+		}
+	}
+	virtual bool HaveLock()
+	{
+		return mWriteLock.GotLock();
 	}
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
@@ -159,8 +168,9 @@ public:
 	  mBasePath(BasePath),
 	  mrClient(rClient)
 	{ }
-	virtual bool TryGetLock() { return false; }
+	virtual void TryGetLock() { }
 	virtual void ReleaseLock() { }
+	virtual bool HaveLock() { return false; }
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
