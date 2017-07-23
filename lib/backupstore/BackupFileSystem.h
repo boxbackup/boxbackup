@@ -49,8 +49,13 @@ public:
 	BackupFileSystem() { }
 	virtual ~BackupFileSystem() { }
 	virtual bool TryGetLock() = 0;
-	virtual void ReleaseLock() = 0;
+	virtual void ReleaseLock()
+	{
+		mapBackupStoreInfo.reset();
+	}
+
 	virtual int GetBlockSize() = 0;
+	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
 	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
 		bool ReadOnly) = 0;
@@ -66,30 +71,39 @@ public:
 		std::vector<int64_t>& rPatchChain) = 0;
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
+
+protected:
+	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
+	std::auto_ptr<BackupStoreInfo> mapBackupStoreInfo;
 };
 
 class RaidBackupFileSystem : public BackupFileSystem
 {
 private:
+	const int64_t mAccountID;
 	const std::string mAccountRootDir;
 	const int mStoreDiscSet;
 	std::string GetObjectFileName(int64_t ObjectID, bool EnsureDirectoryExists);
 	NamedLock mWriteLock;
 
 public:
-	RaidBackupFileSystem(const std::string &AccountRootDir, int discSet)
+	RaidBackupFileSystem(int64_t AccountID, const std::string &AccountRootDir, int discSet)
 	: BackupFileSystem(),
+	  mAccountID(AccountID),
 	  mAccountRootDir(AccountRootDir),
 	  mStoreDiscSet(discSet)
 	{ }
+	~RaidBackupFileSystem()
+	{
+		ReleaseLock();
+	}
 	virtual bool TryGetLock();
 	virtual void ReleaseLock()
 	{
+		BackupFileSystem::ReleaseLock();
 		mWriteLock.ReleaseLock();
 	}
 	virtual int GetBlockSize();
-	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,
-		bool ReadOnly);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
 		bool ReadOnly);
@@ -108,6 +122,9 @@ public:
 	{
 		DeleteFile(ObjectID);
 	}
+
+protected:
+	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 };
 
 #define S3_INFO_FILE_NAME "boxbackup.info"
@@ -145,8 +162,6 @@ public:
 	virtual bool TryGetLock() { return false; }
 	virtual void ReleaseLock() { }
 	virtual int GetBlockSize();
-	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfo(int32_t AccountID,
-		bool ReadOnly);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
 		bool ReadOnly)
@@ -241,6 +256,9 @@ private:
 	{
 		return mrClient.PutObject(ObjectURI, rStreamToSend, pContentType);
 	}
+
+protected:
+	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 };
 
 #endif // BACKUPFILESYSTEM__H
