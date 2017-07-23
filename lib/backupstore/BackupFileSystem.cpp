@@ -40,6 +40,29 @@
 #include "MemLeakFindOn.h"
 
 
+// Refresh forces the any current BackupStoreInfo to be discarded and reloaded from the
+// store. This would be dangerous if anyone was holding onto a reference to it!
+BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refresh)
+{
+	if(mapBackupStoreInfo.get())
+	{
+		if(!Refresh && (ReadOnly || !mapBackupStoreInfo->IsReadOnly()))
+		{
+			// Return the current BackupStoreInfo
+			return *mapBackupStoreInfo;
+		}
+		else
+		{
+			// Need to reopen to change from read-only to read-write.
+			mapBackupStoreInfo.reset();
+		}
+	}
+
+	mapBackupStoreInfo = GetBackupStoreInfoInternal(ReadOnly);
+	return *mapBackupStoreInfo;
+}
+
+
 bool RaidBackupFileSystem::TryGetLock()
 {
 	// Make the filename of the write lock file
@@ -71,8 +94,7 @@ int RaidBackupFileSystem::GetBlockSize()
 }
 
 
-std::auto_ptr<BackupStoreInfo> RaidBackupFileSystem::GetBackupStoreInfo(int32_t AccountID,
-	bool ReadOnly)
+std::auto_ptr<BackupStoreInfo> RaidBackupFileSystem::GetBackupStoreInfoInternal(bool ReadOnly)
 {
 	// Generate the filename
 	std::string fn(mAccountRootDir + INFO_FILENAME);
@@ -82,7 +104,7 @@ std::auto_ptr<BackupStoreInfo> RaidBackupFileSystem::GetBackupStoreInfo(int32_t 
 	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(*rf, fn, ReadOnly);
 
 	// Check it
-	if(info->GetAccountID() != AccountID)
+	if(info->GetAccountID() != mAccountID)
 	{
 		THROW_FILE_ERROR("Found wrong account ID in store info",
 			fn, BackupStoreException, BadStoreInfoOnLoad);
@@ -537,19 +559,21 @@ int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
 	return revID;
 }
 
-std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfo(int32_t AccountID,
-	bool ReadOnly)
+
+// TODO FIXME ADD CACHING!
+std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfoInternal(bool ReadOnly)
 {
-	std::string info_url = GetObjectURL(S3_INFO_FILE_NAME);
-	HTTPResponse response = GetObject(S3_INFO_FILE_NAME);
+	std::string info_uri = GetMetadataURI(S3_INFO_FILE_NAME);
+	std::string info_url = GetObjectURL(info_uri);
+	HTTPResponse response = GetObject(info_uri);
 	mrClient.CheckResponse(response, std::string("No BackupStoreInfo file exists "
 		"at this URL: ") + info_url);
 
-	std::auto_ptr<BackupStoreInfo> info =
-		BackupStoreInfo::Load(response, info_url, ReadOnly);
+	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(response, info_url,
+		ReadOnly);
 
-	// Check it
-	if(info->GetAccountID() != AccountID)
+	// We don't actually use AccountID to distinguish accounts on S3 stores.
+	if(info->GetAccountID() != S3_FAKE_ACCOUNT_ID)
 	{
 		THROW_FILE_ERROR("Found wrong account ID in store info",
 			info_url, BackupStoreException, BadStoreInfoOnLoad);
