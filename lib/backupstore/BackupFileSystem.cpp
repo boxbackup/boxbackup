@@ -39,6 +39,30 @@
 
 #include "MemLeakFindOn.h"
 
+void BackupFileSystem::GetLock()
+{
+	for(int triesLeft = 8; triesLeft >= 0; triesLeft--)
+	{
+		try
+		{
+			TryGetLock();
+		}
+		catch(BackupStoreException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, BackupStoreException,
+				CouldNotLockStoreAccount) && triesLeft)
+			{
+				// Sleep a bit, and try again, as long as we have retries left.
+				ShortSleep(MilliSecondsToBoxTime(1000), true);
+			}
+			else
+			{
+				throw;
+			}
+		}
+	}
+}
+
 
 // Refresh forces the any current BackupStoreInfo to be discarded and reloaded from the
 // store. This would be dangerous if anyone was holding onto a reference to it!
@@ -63,16 +87,26 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 }
 
 
-bool RaidBackupFileSystem::TryGetLock()
+void RaidBackupFileSystem::TryGetLock()
 {
+	if(mWriteLock.GotLock())
+	{
+		return;
+	}
+
 	// Make the filename of the write lock file
 	std::string writeLockFile;
 	StoreStructure::MakeWriteLockFilename(mAccountRootDir, mStoreDiscSet,
 		writeLockFile);
 
 	// Request the lock
-	return mWriteLock.TryAndGetLock(writeLockFile.c_str(),
-		0600 /* restrictive file permissions */);
+	if(!mWriteLock.TryAndGetLock(writeLockFile.c_str(),
+		0600 /* restrictive file permissions */))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			CouldNotLockStoreAccount, "Failed to get exclusive "
+			"lock on account");
+	}
 }
 
 
