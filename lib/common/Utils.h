@@ -47,6 +47,8 @@ std::string FormatUsageBar(int64_t Blocks, int64_t Bytes, int64_t Max,
 std::string FormatUsageLineStart(const std::string& rName,
 	bool MachineReadable);
 
+bool process_is_running(int pid);
+
 #include "MemLeakFindOff.h"
 
 #endif // UTILS__H
