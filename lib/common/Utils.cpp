@@ -507,6 +507,46 @@ std::string FormatUsageLineStart(const std::string& rName,
 	return result.str();
 }
 
+std::map<std::string, str_pair_t> compare_str_maps(const str_map_t& expected,
+	const str_map_t& actual)
+{
+	str_map_diff_t differences;
+
+	// First check that every key in the expected map is present in the actual map,
+	// with the correct value.
+	for(str_map_t::const_iterator i = expected.begin(); i != expected.end(); i++)
+	{
+		std::string name = i->first;
+		std::string value = i->second;
+		str_map_t::const_iterator found = actual.find(name);
+		if(found == actual.end())
+		{
+			differences[name] = str_pair_t(value, "");
+		}
+		else if(found->second != value)
+		{
+			differences[name] = str_pair_t(value, found->second);
+		}
+	}
+
+	// Now try the other way around: check that every key in the actual map is present
+	// in the expected map. We don't need to check values here, because if the key is
+	// present in both maps but with different values, the first pass above will
+	// already have recorded it.
+	for(str_map_t::const_iterator i = actual.begin(); i != actual.end(); i++)
+	{
+		std::string name = i->first;
+		std::string value = i->second;
+		str_map_t::const_iterator found = expected.find(name);
+		if(found == expected.end())
+		{
+			differences[name] = str_pair_t("", value);
+		}
+	}
+
+	return differences;
+}
+
 bool process_is_running(int pid)
 {
 #ifdef WIN32

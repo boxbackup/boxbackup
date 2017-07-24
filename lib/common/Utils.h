@@ -10,6 +10,7 @@
 #ifndef UTILS__H
 #define UTILS__H
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,11 @@ std::string FormatUsageLineStart(const std::string& rName,
 	bool MachineReadable);
 
 bool process_is_running(int pid);
+
+typedef std::pair<std::string, std::string> str_pair_t;
+typedef std::map<std::string, std::string> str_map_t;
+typedef std::map<std::string, str_pair_t> str_map_diff_t;
+str_map_diff_t compare_str_maps(const str_map_t& expected, const str_map_t& actual);
 
 #include "MemLeakFindOff.h"
 
