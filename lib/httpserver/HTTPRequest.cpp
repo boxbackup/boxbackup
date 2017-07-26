@@ -504,6 +504,13 @@ void HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinu
 
 	rStream.Write(" ");
 	rStream.Write(mRequestURI.c_str());
+	for(Query_t::iterator i = mQuery.begin(); i != mQuery.end(); i++)
+	{
+		rStream.Write(
+			((i == mQuery.begin()) ? "?" : "&") +
+			HTTPQueryDecoder::URLEncode(i->first) + "=" +
+			HTTPQueryDecoder::URLEncode(i->second));
+	}
 	rStream.Write(" ");
 
 	switch (mHTTPVersion)
