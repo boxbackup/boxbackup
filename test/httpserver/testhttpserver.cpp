@@ -260,6 +260,54 @@ bool test_httpserver()
 		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
 	}
 
+	// Test that HTTPRequest with parameters is encoded correctly
+	{
+		HTTPRequest request(HTTPRequest::Method_GET, "/newfile");
+		CollectInBufferStream request_buffer;
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_buffer.SetForReading();
+
+		std::string request_str((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		const std::string expected_str("GET /newfile HTTP/1.1\r\nConnection: close\r\n\r\n");
+		TEST_EQUAL(expected_str, request_str);
+
+		request.AddParameter("foo", "Bar");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=Bar HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		request.AddParameter("foo", "baz");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=Bar&foo=baz HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		request.SetParameter("whee", "bonk");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=Bar&foo=baz&whee=bonk HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		request.SetParameter("foo", "bolt");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=bolt&whee=bonk HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		HTTPRequest newreq = request;
+		TEST_EQUAL("bolt", newreq.GetParameterString("foo"));
+		TEST_EQUAL("bonk", newreq.GetParameterString("whee"));
+		TEST_EQUAL("blue", newreq.GetParameterString("colour", "blue"));
+		TEST_CHECK_THROWS(newreq.GetParameterString("colour"), HTTPException,
+			ParameterNotFound);
+	}
+
 	// Test that HTTPRequest can be written to and read from a stream.
 	{
 		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
@@ -271,15 +319,30 @@ bool test_httpserver()
 		request.AddHeader("Content-Type", "text/plain");
 		request.SetClientKeepAliveRequested(true);
 
-		// Stream it to a CollectInBufferStream
+		// First stream just the headers into a CollectInBufferStream, and check the
+		// exact contents written:
 		CollectInBufferStream request_buffer;
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_buffer.SetForReading();
+		const std::string request_str((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		const std::string expected_str(
+			"PUT /newfile HTTP/1.1\r\n"
+			"Content-Type: text/plain\r\n"
+			"Host: quotes.s3.amazonaws.com\r\n"
+			"Connection: keep-alive\r\n"
+			"date: Wed, 01 Mar  2006 12:00:00 GMT\r\n"
+			"authorization: AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=\r\n"
+			"\r\n");
+		TEST_EQUAL(expected_str, request_str);
 
-		// Because there isn't an HTTP server to respond to us, we can't use
-		// SendWithStream, so just send the content after the request.
+		// Now stream the entire request into the CollectInBufferStream. Because there
+		// isn't an HTTP server to respond to us, we can't use SendWithStream, so just
+		// send the headers and then the content separately:
+		request_buffer.Reset();
 		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
 		FileStream fs("testfiles/photos/puppy.jpg");
 		fs.CopyStreamTo(request_buffer);
-
 		request_buffer.SetForReading();
 
 		IOStreamGetLine getLine(request_buffer);
