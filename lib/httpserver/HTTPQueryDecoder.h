@@ -34,6 +34,7 @@ private:
 public:
 	void DecodeChunk(const char *pQueryString, int QueryStringSize);
 	void Finish();
+	static std::string URLEncode(const std::string& value);
 
 private:
 	HTTPRequest::Query_t &mrDecodeInto;

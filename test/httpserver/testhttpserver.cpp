@@ -22,6 +22,7 @@
 #include <openssl/hmac.h>
 
 #include "autogen_HTTPException.h"
+#include "HTTPQueryDecoder.h"
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"
 #include "HTTPServer.h"
@@ -710,6 +711,11 @@ bool test_httpserver()
 			EXAMPLE_S3_SECRET_KEY);
 		TEST_THAT(exercise_s3client(client));
 	}
+
+	// Test the HTTPQueryDecoder::URLEncode method.
+	TEST_EQUAL("AZaz09-_.~", HTTPQueryDecoder::URLEncode("AZaz09-_.~"));
+	TEST_EQUAL("%00%01%FF",
+		HTTPQueryDecoder::URLEncode(std::string("\0\x01\xff", 3)));
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
