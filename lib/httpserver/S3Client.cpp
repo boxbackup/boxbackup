@@ -209,6 +209,10 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 		// We should do that here too, but currently our HTTP implementation
 		// doesn't support chunked encoding, so it's disabled there, so we don't
 		// do it here either.
+
+		// We are definitely finished writing to the HTTPResponse, so leave it
+		// ready for reading back.
+		response.SetForReading();
 	}
 	else
 	{
@@ -240,6 +244,9 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				throw;
 			}
 		}
+
+		// No need to call response.SetForReading() because HTTPResponse::Receive()
+		// already did that.
 	}
 
 	// It's not valid to have a keep-alive response if the length isn't known.
@@ -249,7 +256,6 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 
 	BOX_TRACE("S3Client: " << mHostName << " < " << response.GetResponseCode() <<
 		": " << response.GetContentLength() << " bytes")
-	response.SetForReading();
 
 	return response;
 }
