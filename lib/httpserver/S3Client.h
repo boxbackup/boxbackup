@@ -40,13 +40,14 @@ class S3Client
 	  mSecretKey(rSecretKey),
 	  mNetworkTimeout(30000)
 	{ }
-	
+
 	// Constructor with a specific hostname, virtualhost name, port etc:
-	S3Client(std::string HostName, int Port, const std::string& rAccessKey,
-		const std::string& rSecretKey)
+	S3Client(const std::string& HostName, int Port, const std::string& rAccessKey,
+		const std::string& rSecretKey, const std::string& VirtualHostName = "")
 	: mpSimulator(NULL),
 	  mHostName(HostName),
 	  mPort(Port),
+	  mVirtualHostName(VirtualHostName),
 	  mAccessKey(rAccessKey),
 	  mSecretKey(rSecretKey),
 	  mNetworkTimeout(30000)
@@ -61,8 +62,12 @@ class S3Client
 
 	private:
 	HTTPServer* mpSimulator;
+	// mHostName is the network address that we will connect to (e.g. localhost):
 	std::string mHostName;
 	int mPort;
+	// mVirtualHostName is the Host header that we will send, e.g.
+	// "quotes.s3.amazonaws.com". If empty, mHostName will be used as a default.
+	std::string mVirtualHostName;
 	std::auto_ptr<SocketStream> mapClientSocket;
 	std::string mAccessKey, mSecretKey;
 	int mNetworkTimeout; // milliseconds

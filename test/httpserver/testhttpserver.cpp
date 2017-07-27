@@ -770,7 +770,7 @@ bool test_httpserver()
 	// S3Client tests with S3Simulator daemon for realism
 	{
 		S3Client client("localhost", 1080, EXAMPLE_S3_ACCESS_KEY,
-			EXAMPLE_S3_SECRET_KEY);
+			EXAMPLE_S3_SECRET_KEY, "johnsmith.s3.amazonaws.com");
 		TEST_THAT(exercise_s3client(client));
 	}
 
@@ -788,7 +788,7 @@ bool test_httpserver()
 	// S3Client tests with s3simulator executable for even more realism
 	{
 		S3Client client("localhost", 1080, EXAMPLE_S3_ACCESS_KEY,
-			EXAMPLE_S3_SECRET_KEY);
+			EXAMPLE_S3_SECRET_KEY, "johnsmith.s3.amazonaws.com");
 		TEST_THAT(exercise_s3client(client));
 	}
 
