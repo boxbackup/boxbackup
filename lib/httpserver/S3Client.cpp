@@ -101,8 +101,21 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	const std::string& rRequestURI, IOStream* pStreamToSend,
 	const char* pStreamContentType)
 {
+	// It's very unlikely that you want to request a URI from Amazon S3 servers
+	// that doesn't start with a /. Very very unlikely.
+	ASSERT(rRequestURI[0] == '/');
 	HTTPRequest request(Method, rRequestURI);
-	request.SetHostName(mHostName);
+
+	std::string virtual_host_name;
+
+	if(!mVirtualHostName.empty())
+	{
+		virtual_host_name = mVirtualHostName;
+	}
+	else
+	{
+		virtual_host_name = mHostName;
+	}
 
 	BOX_TRACE("S3Client: " << mHostName << " > " << request.GetMethodName() <<
 		" " << rRequestURI);
@@ -133,15 +146,16 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 		request.AddHeader("Content-Type", pStreamContentType);
 	}
 
+	request.SetHostName(virtual_host_name);
 	std::string s3suffix = ".s3.amazonaws.com";
 	std::string bucket;
-	if (mHostName.size() > s3suffix.size())
+	if (virtual_host_name.size() > s3suffix.size())
 	{
-		std::string suffix = mHostName.substr(mHostName.size() -
+		std::string suffix = virtual_host_name.substr(virtual_host_name.size() -
 			s3suffix.size(), s3suffix.size());
 		if (suffix == s3suffix)
 		{
-			bucket = mHostName.substr(0, mHostName.size() -
+			bucket = virtual_host_name.substr(0, virtual_host_name.size() -
 				s3suffix.size());
 		}
 	}
