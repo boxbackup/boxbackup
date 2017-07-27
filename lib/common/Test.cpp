@@ -114,7 +114,8 @@ bool setUp(const char* function_name)
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
-			EndsWith("testfile", filename))
+			EndsWith("testfile", filename) ||
+			EndsWith(".qdbm", filename))
 		{
 			std::string filepath = std::string("testfiles" DIRECTORY_SEPARATOR) +
 				filename;
