@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 
@@ -18,6 +19,9 @@
 	#include <signal.h>
 #endif
 
+#include <boost/foreach.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 #include <openssl/x509.h>
 #include <openssl/hmac.h>
 
@@ -32,6 +36,7 @@
 #include "S3Client.h"
 #include "S3Simulator.h"
 #include "ServerControl.h"
+#include "SimpleDBClient.h"
 #include "Test.h"
 #include "decode.h"
 #include "encode.h"
@@ -40,6 +45,8 @@
 
 #define SHORT_TIMEOUT 5000
 #define LONG_TIMEOUT 300000
+
+using boost::property_tree::ptree;
 
 class TestWebServer : public HTTPServer
 {
@@ -169,7 +176,48 @@ bool exercise_s3client(S3Client& client)
 	return (num_failures == num_failures_initial);
 }
 
-// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+
+std::string generate_query_string(const HTTPRequest& request)
+{
+	std::vector<std::string> param_names;
+	std::map<std::string, std::string> param_values;
+
+	const HTTPRequest::Query_t& params(request.GetQuery());
+	for(HTTPRequest::Query_t::const_iterator i = params.begin();
+		i != params.end(); i++)
+	{
+		// We don't want to include the Signature parameter in the sorted query
+		// string, because the client didn't either when computing the signature!
+		if(i->first != "Signature")
+		{
+			param_names.push_back(i->first);
+			// This algorithm only supports non-repeated parameters, so
+			// assert that we don't already have a parameter with this name.
+			TEST_LINE_OR(param_values.find(i->first) == param_values.end(),
+				"Multiple values for parameter '" << i->first << "'",
+				return "");
+			param_values[i->first] = i->second;
+		}
+	}
+
+	std::sort(param_names.begin(), param_names.end());
+	std::ostringstream out;
+
+	for(std::vector<std::string>::iterator i = param_names.begin();
+		i != param_names.end(); i++)
+	{
+		if(i != param_names.begin())
+		{
+			out << "&";
+		}
+		out << HTTPQueryDecoder::URLEncode(*i) << "=" <<
+			HTTPQueryDecoder::URLEncode(param_values[*i]);
+	}
+
+	return out.str();
+}
+
+
 std::string calculate_s3_signature(const HTTPRequest& request,
 	const std::string& aws_secret_access_key)
 {
@@ -227,6 +275,56 @@ std::string calculate_s3_signature(const HTTPRequest& request,
 	return auth_code;
 }
 
+
+// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+std::string calculate_simpledb_signature(const HTTPRequest& request,
+	const std::string& aws_secret_access_key)
+{
+	// This code is very similar to that in S3Client::FinishAndSendRequest,
+	// but using EVP_sha256 instead of EVP_sha1. TODO FIXME: factor out the
+	// common parts.
+	std::string query_string = generate_query_string(request);
+	TEST_THAT_OR(query_string != "", return "");
+
+	std::ostringstream buffer_to_sign;
+	buffer_to_sign << request.GetMethodName() << "\n" <<
+		request.GetHeaders().GetHostNameWithPort() << "\n" <<
+		// The HTTPRequestURI component is the HTTP absolute path component
+		// of the URI up to, but not including, the query string. If the
+		// HTTPRequestURI is empty, use a forward slash ( / ).
+		request.GetRequestURI() << "\n" <<
+		query_string;
+
+	// Thanks to https://gist.github.com/tsupo/112188:
+	unsigned int digest_size;
+	unsigned char digest_buffer[EVP_MAX_MD_SIZE];
+	std::string string_to_sign = buffer_to_sign.str();
+
+	HMAC(EVP_sha256(),
+		aws_secret_access_key.c_str(), aws_secret_access_key.size(),
+		(const unsigned char *)string_to_sign.c_str(), string_to_sign.size(),
+		digest_buffer, &digest_size);
+
+	base64::encoder encoder;
+	std::string digest((const char *)digest_buffer, digest_size);
+	std::string auth_code = encoder.encode(digest);
+
+	if (auth_code[auth_code.size() - 1] == '\n')
+	{
+		auth_code = auth_code.substr(0, auth_code.size() - 1);
+	}
+
+	return auth_code;
+}
+
+bool add_simpledb_signature(HTTPRequest& request, const std::string& aws_secret_access_key)
+{
+	std::string signature = calculate_simpledb_signature(request,
+		aws_secret_access_key);
+	request.SetParameter("Signature", signature);
+	return !signature.empty();
+}
+
 bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
 	int expected_status_code = 200)
 {
@@ -241,6 +339,129 @@ bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
 	TEST_EQUAL_LINE(expected_status_code, response.GetResponseCode(),
 		response_data);
 	return (response.GetResponseCode() == expected_status_code);
+}
+
+bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
+	const std::string& expected_root_element)
+{
+	HTTPResponse response;
+	TEST_THAT_OR(send_and_receive(request, response), return false);
+
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	std::auto_ptr<std::istringstream> ap_response_stream(
+		new std::istringstream(response_data));
+	read_xml(*ap_response_stream, response_tree,
+		boost::property_tree::xml_parser::trim_whitespace);
+
+	TEST_EQUAL_OR(expected_root_element, response_tree.begin()->first, return false);
+	TEST_LINE(++(response_tree.begin()) == response_tree.end(),
+		"There should only be one item in the response tree root");
+
+	return true;
+}
+
+typedef std::multimap<std::string, std::string> multimap_t;
+typedef multimap_t::value_type attr_t;
+
+std::vector<std::string> simpledb_list_domains(const std::string& access_key,
+	const std::string& secret_key)
+{
+	HTTPRequest request(HTTPRequest::Method_GET, "/");
+	request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
+	request.AddParameter("Action", "ListDomains");
+	request.AddParameter("AWSAccessKeyId", access_key);
+	request.AddParameter("SignatureVersion", "2");
+	request.AddParameter("SignatureMethod", "HmacSHA256");
+	request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
+	request.AddParameter("Version", "2009-04-15");
+
+	TEST_THAT_OR(add_simpledb_signature(request, secret_key),
+		return std::vector<std::string>());
+
+	ptree response_tree;
+	TEST_THAT(send_and_receive_xml(request, response_tree, "ListDomainsResponse"));
+
+	std::vector<std::string> domains;
+	BOOST_FOREACH(ptree::value_type &v,
+		response_tree.get_child("ListDomainsResponse.ListDomainsResult"))
+	{
+		domains.push_back(v.second.data());
+	}
+
+	return domains;
+}
+
+HTTPRequest simpledb_get_attributes_request(const std::string& access_key,
+	const std::string& secret_key)
+{
+	HTTPRequest request(HTTPRequest::Method_GET, "/");
+	request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
+	request.AddParameter("Action", "GetAttributes");
+	request.AddParameter("DomainName", "MyDomain");
+	request.AddParameter("ItemName", "JumboFez");
+	request.AddParameter("AWSAccessKeyId", access_key);
+	request.AddParameter("SignatureVersion", "2");
+	request.AddParameter("SignatureMethod", "HmacSHA256");
+	request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
+	request.AddParameter("Version", "2009-04-15");
+	TEST_THAT(add_simpledb_signature(request, secret_key));
+	return request;
+}
+
+bool simpledb_get_attributes_error(const std::string& access_key,
+	const std::string& secret_key, int expected_status_code)
+{
+	HTTPRequest request = simpledb_get_attributes_request(access_key, secret_key);
+	HTTPResponse response;
+	TEST_THAT_OR(send_and_receive(request, response, expected_status_code),
+		return false);
+	// Nothing else to check: there is no XML
+	return true;
+}
+
+bool simpledb_get_attributes(const std::string& access_key, const std::string& secret_key,
+	const multimap_t& const_attributes)
+{
+	HTTPRequest request = simpledb_get_attributes_request(access_key, secret_key);
+
+	ptree response_tree;
+	TEST_THAT_OR(send_and_receive_xml(request, response_tree,
+		"GetAttributesResponse"), return false);
+
+	// Check that all attributes were written correctly
+	TEST_EQUAL_LINE(const_attributes.size(),
+		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size(),
+		"Wrong number of attributes in response");
+
+	bool all_match = (const_attributes.size() ==
+		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size());
+
+	multimap_t attributes = const_attributes;
+	multimap_t::iterator i = attributes.begin();
+	BOOST_FOREACH(ptree::value_type &v,
+		response_tree.get_child(
+			"GetAttributesResponse.GetAttributesResult"))
+	{
+		std::string name = v.second.get<std::string>("Name");
+		std::string value = v.second.get<std::string>("Value");
+		if(i == attributes.end())
+		{
+			TEST_EQUAL_LINE("", name, "Unexpected attribute name");
+			TEST_EQUAL_LINE("", value, "Unexpected attribute value");
+			all_match = false;
+		}
+		else
+		{
+			TEST_EQUAL_LINE(i->first, name, "Wrong attribute name");
+			TEST_EQUAL_LINE(i->second, value, "Wrong attribute value");
+			all_match &= (i->first == name);
+			all_match &= (i->second == value);
+			i++;
+		}
+	}
+
+	return all_match;
 }
 
 #define EXAMPLE_S3_ACCESS_KEY "0PN5J17HBGZHT7JJ3X82"
@@ -259,6 +480,9 @@ bool test_httpserver()
 		std::string digest = digester.DigestAsString();
 		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
 	}
+
+	TEST_THAT(system("rm -rf *.memleaks testfiles/domains.qdbm testfiles/items.qdbm")
+		== 0);
 
 	// Test that HTTPRequest with parameters is encoded correctly
 	{
@@ -778,6 +1002,367 @@ bool test_httpserver()
 	TEST_EQUAL("AZaz09-_.~", HTTPQueryDecoder::URLEncode("AZaz09-_.~"));
 	TEST_EQUAL("%00%01%FF",
 		HTTPQueryDecoder::URLEncode(std::string("\0\x01\xff", 3)));
+
+	// Test that we can calculate the correct signature for a known request:
+	// http://docs.aws.amazon.com/AWSECommerceService/latest/DG/rest-signature.html
+	{
+		HTTPRequest request(HTTPRequest::Method_GET, "/onca/xml");
+		request.SetHostName("webservices.amazon.com");
+		request.AddParameter("Service", "AWSECommerceService");
+		request.AddParameter("AWSAccessKeyId", "AKIAIOSFODNN7EXAMPLE");
+		request.AddParameter("AssociateTag", "mytag-20");
+		request.AddParameter("Operation", "ItemLookup");
+		request.AddParameter("ItemId", "0679722769");
+		request.AddParameter("ResponseGroup",
+			"Images,ItemAttributes,Offers,Reviews");
+		request.AddParameter("Version", "2013-08-01");
+		request.AddParameter("Timestamp", "2014-08-18T12:00:00Z");
+
+		std::string auth_code = calculate_simpledb_signature(request,
+			"1234567890");
+		TEST_EQUAL("j7bZM0LXZ9eXeZruTqWm2DIvDYVUU3wxPPpp+iXxzQc=", auth_code);
+	}
+
+	// Test the S3Simulator's implementation of SimpleDB
+	{
+		std::string access_key = EXAMPLE_S3_ACCESS_KEY;
+		std::string secret_key = EXAMPLE_S3_SECRET_KEY;
+
+		HTTPRequest request(HTTPRequest::Method_GET, "/");
+		request.SetHostName(SIMPLEDB_SIMULATOR_HOST);
+
+		request.AddParameter("Action", "ListDomains");
+		request.AddParameter("AWSAccessKeyId", access_key);
+		request.AddParameter("SignatureVersion", "2");
+		request.AddParameter("SignatureMethod", "HmacSHA256");
+		request.AddParameter("Timestamp", "2010-01-25T15:01:28-07:00");
+		request.AddParameter("Version", "2009-04-15");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+
+		// Send directly to in-process simulator, useful for debugging.
+		// CollectInBufferStream response_buffer;
+		// HTTPResponse response(&response_buffer);
+		HTTPResponse response;
+
+		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
+		simulator.Handle(request, response);
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
+		TEST_EQUAL_LINE(200, response.GetResponseCode(), response_data);
+
+		// Send to out-of-process simulator, useful for testing HTTP
+		// implementation.
+		TEST_THAT(send_and_receive(request, response));
+
+		// Check that there are no existing domains at the start
+		std::vector<std::string> domains = simpledb_list_domains(access_key, secret_key);
+		std::vector<std::string> expected_domains;
+		TEST_THAT(test_equal_lists(expected_domains, domains));
+
+		// Create a domain
+		request.SetParameter("Action", "CreateDomain");
+		request.SetParameter("DomainName", "MyDomain");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+
+		ptree response_tree;
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"CreateDomainResponse"));
+
+		// List domains again, check that our new domain is present.
+		domains = simpledb_list_domains(access_key, secret_key);
+		expected_domains.push_back("MyDomain");
+		TEST_THAT(test_equal_lists(expected_domains, domains));
+
+		// Create the same domain again. "CreateDomain is an idempotent operation;
+		// running it multiple times using the same domain name will not result in
+		// an error response."
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"CreateDomainResponse"));
+
+		// List domains again, check that our new domain is present only once
+		// (it wasn't created a second time). Therefore expected_domains is the
+		// same as it was above.
+		domains = simpledb_list_domains(access_key, secret_key);
+		TEST_THAT(test_equal_lists(expected_domains, domains));
+
+		// Create an item
+		request.SetParameter("Action", "PutAttributes");
+		request.SetParameter("DomainName", "MyDomain");
+		request.SetParameter("ItemName", "JumboFez");
+		request.SetParameter("Attribute.1.Name", "Color");
+		request.SetParameter("Attribute.1.Value", "Blue");
+		request.SetParameter("Attribute.2.Name", "Size");
+		request.SetParameter("Attribute.2.Value", "Med");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// Get the item back, and check that all attributes were written
+		// correctly.
+		multimap_t expected_attrs;
+		expected_attrs.insert(attr_t("Color", "Blue"));
+		expected_attrs.insert(attr_t("Size", "Med"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Add more attributes. The Size attribute is added with the Replace
+		// option, so it replaces the previous value. The Color attribute is not,
+		// so it adds another value.
+		request.SetParameter("Attribute.1.Value", "Not Blue");
+		request.SetParameter("Attribute.1.Replace", "true");
+		request.SetParameter("Attribute.2.Value", "Large");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// Check that all attributes were written correctly, by getting the item
+		// again.
+		expected_attrs.erase("Color");
+		expected_attrs.insert(attr_t("Color", "Not Blue"));
+		expected_attrs.insert(attr_t("Size", "Large"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional PutAttributes that fails (doesn't match) and therefore
+		// doesn't change anything.
+		request.SetParameter("Attribute.1.Value", "Green");
+		request.SetParameter("Attribute.2.Replace", "true");
+		request.SetParameter("Expected.1.Name", "Color");
+		request.SetParameter("Expected.1.Value", "What?");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive(request, response, HTTPResponse::Code_Conflict));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional PutAttributes again, with the correct value for the Color
+		// attribute this time, so the request should succeed.
+		request.SetParameter("Expected.1.Value", "Not Blue");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// If it does, because Replace is set for the Size parameter as well, both
+		// Size values will be replaced by the new single value.
+		expected_attrs.clear();
+		expected_attrs.insert(attr_t("Color", "Green"));
+		expected_attrs.insert(attr_t("Size", "Large"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Test that we can delete values. We are supposed to pass some
+		// attribute values, but what happens if they don't match the current
+		// values is not specified.
+		request.SetParameter("Action", "DeleteAttributes");
+		request.RemoveParameter("Expected.1.Name");
+		request.RemoveParameter("Expected.1.Value");
+		request.RemoveParameter("Attribute.1.Replace");
+		request.RemoveParameter("Attribute.2.Replace");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"DeleteAttributesResponse"));
+
+		// Since we've deleted all attributes, the server should have deleted
+		// the whole item, and the response to a GetAttributes request should be
+		// 404 not found.
+		TEST_THAT(simpledb_get_attributes_error(access_key, secret_key,
+			HTTPResponse::Code_NotFound));
+
+		// Create an item to use with conditional delete tests.
+		request.SetParameter("Action", "PutAttributes");
+		request.SetParameter("DomainName", "MyDomain");
+		request.SetParameter("ItemName", "JumboFez");
+		request.SetParameter("Attribute.1.Name", "Color");
+		request.SetParameter("Attribute.1.Value", "Blue");
+		request.SetParameter("Attribute.2.Name", "Size");
+		request.SetParameter("Attribute.2.Value", "Med");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"PutAttributesResponse"));
+
+		// Conditional delete that should fail
+		request.SetParameter("Action", "DeleteAttributes");
+		request.SetParameter("Expected.1.Name", "Color");
+		request.SetParameter("Expected.1.Value", "What?");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive(request, response, HTTPResponse::Code_Conflict));
+
+		// Check that it did actually fail
+		expected_attrs.clear();
+		expected_attrs.insert(attr_t("Color", "Blue"));
+		expected_attrs.insert(attr_t("Size", "Med"));
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional delete of one attribute ("Color") that should succeed
+		request.SetParameter("Expected.1.Value", "Blue");
+		// Remove attribute 1 ("Color") from the request, so it won't be deleted.
+		// Attribute 2 ("Size") remains in the request, and should be deleted.
+		request.RemoveParameter("Attribute.1.Name");
+		request.RemoveParameter("Attribute.1.Value");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"DeleteAttributesResponse"));
+
+		// Check that the "Size" attribute is no longer present, but "Color"
+		// still is.
+		expected_attrs.erase("Size");
+		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
+
+		// Conditional delete without specifying attributes, should remove all
+		// remaining attributes, and hence the item itself. The condition
+		// (expected values) set above should still be valid and match this item.
+		request.RemoveParameter("Attribute.2.Name");
+		request.RemoveParameter("Attribute.2.Value");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"DeleteAttributesResponse"));
+
+		// Since we've deleted all attributes, the server should have deleted
+		// the whole item, and the response to a GetAttributes request should be
+		// 404 not found.
+		TEST_THAT(simpledb_get_attributes_error(access_key, secret_key,
+			HTTPResponse::Code_NotFound));
+
+		// Reset for the next test
+		request.SetParameter("Action", "Reset");
+		TEST_THAT(add_simpledb_signature(request, secret_key));
+		TEST_THAT(send_and_receive_xml(request, response_tree,
+			"ResetResponse"));
+		domains = simpledb_list_domains(access_key, secret_key);
+		expected_domains.clear();
+		TEST_THAT(test_equal_lists(expected_domains, domains));
+	}
+
+	// Test that SimpleDBClient works the same way.
+	{
+		std::string access_key = EXAMPLE_S3_ACCESS_KEY;
+		std::string secret_key = EXAMPLE_S3_SECRET_KEY;
+		SimpleDBClient client(access_key, secret_key, "localhost", 1080,
+			SIMPLEDB_SIMULATOR_HOST);
+
+		// Test that date formatting produces the correct output format
+		// date -d "2010-01-25T15:01:28-07:00" +%s => 1264456888
+		client.SetFixedTimestamp(SecondsToBoxTime(1264456888), -7 * 60);
+		HTTPRequest request = client.StartRequest(HTTPRequest::Method_GET, "");
+		TEST_EQUAL("2010-01-25T15:01:28-07:00",
+			request.GetParameterString("Timestamp"));
+
+		client.SetFixedTimestamp(SecondsToBoxTime(1264431688), 0);
+		request = client.StartRequest(HTTPRequest::Method_GET, "");
+		TEST_EQUAL("2010-01-25T15:01:28Z",
+			request.GetParameterString("Timestamp"));
+		client.SetFixedTimestamp(0, 0);
+		TEST_EQUAL(20, request.GetParameterString("Timestamp").length());
+
+		std::vector<std::string> domains = client.ListDomains();
+		TEST_EQUAL(0, domains.size());
+
+		std::string domain = "MyDomain";
+		std::string item = "JumboFez";
+		client.CreateDomain(domain);
+		domains = client.ListDomains();
+		TEST_EQUAL(1, domains.size());
+		if(domains.size() > 0)
+		{
+			TEST_EQUAL(domain, domains[0]);
+		}
+
+		// Create an item
+		SimpleDBClient::str_map_t expected_attrs;
+		expected_attrs["Color"] = "Blue";
+		expected_attrs["Size"] = "Med";
+		client.PutAttributes(domain, item, expected_attrs);
+		SimpleDBClient::str_map_t actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
+
+		// Add more attributes. SimpleDBClient always replaces existing values
+		// for attributes.
+		expected_attrs.clear();
+		expected_attrs["Color"] = "Not Blue";
+		expected_attrs["Size"] = "Large";
+		client.PutAttributes(domain, item, expected_attrs);
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
+
+		// Conditional PutAttributes that fails (doesn't match) and therefore
+		// doesn't change anything (so we don't change expected_attrs).
+		SimpleDBClient::str_map_t new_attrs = expected_attrs;
+		new_attrs["Color"] = "Green";
+
+		SimpleDBClient::str_map_t conditional_attrs;
+		conditional_attrs["Color"] = "What?";
+
+		TEST_CHECK_THROWS(
+			client.PutAttributes(domain, item, new_attrs, conditional_attrs),
+			HTTPException, ConditionalRequestConflict);
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
+
+		// Conditional PutAttributes again, with the correct value for the Color
+		// attribute this time, so the request should succeed.
+		conditional_attrs["Color"] = "Not Blue";
+		client.PutAttributes(domain, item, new_attrs, conditional_attrs);
+
+		// If it does, because Replace is set by default (enforced) by
+		// SimpleDBClient, the Size value will be replaced by the new single
+		// value.
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(new_attrs, actual_attrs));
+
+		// Test that we can delete values. We are supposed to pass some
+		// attribute values, but what happens if they don't match the current
+		// values is not specified.
+		client.DeleteAttributes(domain, item, new_attrs);
+
+		// Check that it has actually been removed. Since we've deleted all
+		// attributes, the server should have deleted the whole item, and the
+		// response to a GetAttributes request should be 404 not found.
+		TEST_CHECK_THROWS(client.GetAttributes(domain, item),
+			HTTPException, SimpleDBItemNotFound);
+
+		// Create an item to use with conditional delete tests.
+		expected_attrs["Color"] = "Blue";
+		expected_attrs["Size"] = "Med";
+		client.PutAttributes(domain, item, expected_attrs);
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
+
+		// Conditional delete that should fail. If it succeeded, it should delete
+		// the whole item, because no attributes are provided.
+		expected_attrs["Color"] = "What?";
+		SimpleDBClient::str_map_t empty_attrs;
+		TEST_CHECK_THROWS(
+			client.DeleteAttributes(domain, item, empty_attrs, // attributes
+				expected_attrs), // expected
+			HTTPException, ConditionalRequestConflict);
+
+		// Check that the item was not actually deleted, nor any of its
+		// attributes, and "Color" should still be "Blue".
+		expected_attrs["Color"] = "Blue";
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
+
+		// Conditional delete of one attribute ("Color") that should succeed
+		SimpleDBClient::str_map_t attrs_to_remove;
+		attrs_to_remove["Size"] = "Med";
+		expected_attrs["Color"] = "Blue";
+		client.DeleteAttributes(domain, item, attrs_to_remove, // attributes
+			expected_attrs); // expected
+
+		// Check that the "Size" attribute is no longer present, but "Color"
+		// still is.
+		expected_attrs.erase("Size");
+		actual_attrs = client.GetAttributes(domain, item);
+		TEST_THAT(test_equal_maps(expected_attrs, actual_attrs));
+
+		// Conditional delete without specifying attributes, should remove all
+		// remaining attributes, and hence the item itself. The condition
+		// (expected_attrs) set above should still be valid and match this item.
+		client.DeleteAttributes(domain, item, empty_attrs, // attributes
+			expected_attrs); // expected
+
+		// Since we've deleted all attributes, the server should have deleted
+		// the whole item, and the response to a GetAttributes request should be
+		// 404 not found.
+		TEST_CHECK_THROWS(client.GetAttributes(domain, item),
+			HTTPException, SimpleDBItemNotFound);
+	}
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
