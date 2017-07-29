@@ -103,7 +103,7 @@ int main(int argc, const char *argv[])
 	std::string configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
 	Logging::OptionParser log_level;
 	bool machineReadableOutput = false;
-	
+
 	// See if there's another entry on the command line
 	int c;
 	std::string options = Logging::OptionParser::GetOptionString() + "3c:m";
@@ -115,7 +115,7 @@ int main(int argc, const char *argv[])
 			// store argument
 			configFilename = optarg;
 			break;
-		
+
 		case 'm':
 			// enable machine readable output
 			machineReadableOutput = true;

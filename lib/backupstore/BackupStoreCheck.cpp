@@ -44,26 +44,26 @@
 //
 // --------------------------------------------------------------------------
 BackupStoreCheck::BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNumber, int32_t AccountID, bool FixErrors, bool Quiet)
-	: mStoreRoot(rStoreRoot),
-	  mDiscSetNumber(DiscSetNumber),
-	  mAccountID(AccountID),
-	  mFixErrors(FixErrors),
-	  mQuiet(Quiet),
-	  mNumberErrorsFound(0),
-	  mLastIDInInfo(0),
-	  mpInfoLastBlock(0),
-	  mInfoLastBlockEntries(0),
-	  mLostDirNameSerial(0),
-	  mLostAndFoundDirectoryID(0),
-	  mBlocksUsed(0),
-	  mBlocksInCurrentFiles(0),
-	  mBlocksInOldFiles(0),
-	  mBlocksInDeletedFiles(0),
-	  mBlocksInDirectories(0),
-	  mNumCurrentFiles(0),
-	  mNumOldFiles(0),
-	  mNumDeletedFiles(0),
-	  mNumDirectories(0)
+: mStoreRoot(rStoreRoot),
+  mDiscSetNumber(DiscSetNumber),
+  mAccountID(AccountID),
+  mFixErrors(FixErrors),
+  mQuiet(Quiet),
+  mNumberErrorsFound(0),
+  mLastIDInInfo(0),
+  mpInfoLastBlock(0),
+  mInfoLastBlockEntries(0),
+  mLostDirNameSerial(0),
+  mLostAndFoundDirectoryID(0),
+  mBlocksUsed(0),
+  mBlocksInCurrentFiles(0),
+  mBlocksInOldFiles(0),
+  mBlocksInDeletedFiles(0),
+  mBlocksInDirectories(0),
+  mNumCurrentFiles(0),
+  mNumOldFiles(0),
+  mNumDeletedFiles(0),
+  mNumDirectories(0)
 {
 }
 
@@ -180,8 +180,8 @@ void BackupStoreCheck::Check()
 	}
 	catch(BoxException &e)
 	{
-		BOX_WARNING("Reference count database was missing or "
-			"corrupted, cannot check it for errors.");
+		BOX_WARNING("Old reference count database was missing or corrupted, "
+			"cannot check it for errors.");
 		mNumberErrorsFound++;
 	}
 
@@ -201,16 +201,19 @@ void BackupStoreCheck::Check()
 		BOX_WARNING("Finished checking store account ID " <<
 			BOX_FORMAT_ACCOUNT(mAccountID) << ": " <<
 			mNumberErrorsFound << " errors found");
+
 		if(!mFixErrors)
 		{
 			BOX_WARNING("No changes to the store account "
 				"have been made.");
 		}
+
 		if(!mFixErrors && mNumberErrorsFound > 0)
 		{
 			BOX_WARNING("Run again with fix option to "
 				"fix these errors");
 		}
+
 		if(mFixErrors && mNumberErrorsFound > 0)
 		{
 			BOX_WARNING("You should now use bbackupquery "
@@ -542,6 +545,7 @@ bool BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 			// Too short, can't read signature from it
 			return false;
 		}
+
 		// Seek back to beginning
 		file->Seek(0, IOStream::SeekType_Absolute);
 

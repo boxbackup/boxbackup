@@ -57,7 +57,6 @@ if test "x$GXX" = "xyes"; then
     LDFLAGS=$save_LDFLAGS
     ;;
   esac
-
 fi
 
 AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])

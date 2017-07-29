@@ -119,8 +119,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 				if (suffix == s3suffix)
 				{
-					bucket_name = host.substr(0,
-						host.size() - s3suffix.size());
+					bucket_name = host.substr(0, host.size() - s3suffix.size());
 				}
 			}
 
@@ -166,8 +165,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 		if(true)
 		{
-			expected_auth = "AWS " + access_key + ":" +
-				encoder.encode(digest);
+			expected_auth = "AWS " + access_key + ":" + encoder.encode(digest);
 
 			if(!rRequest.GetHeader("authorization", &actual_auth))
 			{

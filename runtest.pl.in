@@ -16,9 +16,9 @@ use BoxPlatform;
 my %opts;
 getopts('acnTO:v', \%opts);
 
-# Don't actually run the test, just prepare for it.
 my $appveyor_mode = $opts{'a'};
 my $cmake_build = $opts{'c'};
+# Don't actually run the test, just prepare for it:
 my $prepare_only = $opts{'n'};
 my $timestamp_tests = $opts{'T'};
 my $extra_options = $opts{'O'} || '';
@@ -111,7 +111,8 @@ if ($exit_code != 0)
 {
 	print <<__E;
 
-One or more tests have failed. Please check the following common causes:
+One or more tests have failed in $test_mode mode. Please check the following
+common causes:
 
 * Check that no instances of bbstored or bbackupd are already running
   on this machine.
@@ -242,7 +243,7 @@ sub runtest
 	{
 		push @results,"$t: make failed";
 		appveyor_test_status($t, "NotRunnable", time() - $start_time,
-			"pre-test commands failed");
+			"make failed");
 		$exit_code = 2;
 		return;
 	}

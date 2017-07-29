@@ -550,6 +550,7 @@ bool test_httpserver()
 			"</html>\n", response_data);
 	}
 
+	// Test the S3Simulator's implementation of PUT file uploads
 	{
 		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
