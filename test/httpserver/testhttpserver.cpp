@@ -183,6 +183,18 @@ bool exercise_s3client(S3Client& client)
 	TEST_THAT(fs.CompareWith(response));
 	TEST_EQUAL("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"));
 
+	// Try to get it again, with the etag of the existing copy, and check that we get
+	// a 304 Not Modified response.
+	response = client.GetObject("/newfile", digest);
+	TEST_EQUAL(HTTPResponse::Code_NotModified, response.GetResponseCode());
+	TEST_EQUAL(0, response.GetContentLength());
+
+	// There are no examples for 304 Not Modified responses to requests
+	// with If-None-Match (ETag match) so clients should not depend on
+	// this, so the S3Simulator should not set Content-Length or ETag, to
+	// ensure that any code which tries to use these headers will fail.
+	TEST_EQUAL("", response.GetHeaders().GetHeaderValue("etag", false));
+
 	// This will fail if the file was created in the wrong place:
 	TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
 
