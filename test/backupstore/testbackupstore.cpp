@@ -53,9 +53,9 @@
 #define ENCFILE_SIZE	2765
 
 // Make some test attributes
-#define ATTR1_SIZE 	245
-#define ATTR2_SIZE 	23
-#define ATTR3_SIZE 	122
+#define ATTR1_SIZE	245
+#define ATTR2_SIZE	23
+#define ATTR3_SIZE	122
 
 #define SHORT_TIMEOUT 5000
 
@@ -537,7 +537,7 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 			name_encoded,
 			upload));
 	int64_t objectId = stored->GetObjectID();
-	if (pRefCount)
+	if(pRefCount)
 	{
 		TEST_EQUAL(objectId, pRefCount->GetLastObjectIDUsed());
 		TEST_EQUAL(1, pRefCount->GetRefCount(objectId))
@@ -567,7 +567,7 @@ int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 	BOX_TRACE("Creating subdirs, depth = " << depth << ", dirid = " <<
 		BOX_FORMAT_OBJECTID(subdirid));
 
-	if (pRefCount)
+	if(pRefCount)
 	{
 		TEST_EQUAL(subdirid, pRefCount->GetLastObjectIDUsed());
 		TEST_EQUAL(1, pRefCount->GetRefCount(subdirid))
@@ -1500,7 +1500,8 @@ bool test_multiple_uploads()
 			set_refcount(patchedID, 1);
 
 			// Then download it to check it's OK
-			std::auto_ptr<BackupProtocolSuccess> getFile(apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, patchedID));
+			std::auto_ptr<BackupProtocolSuccess> getFile(
+				apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, patchedID));
 			TEST_THAT(getFile->GetObjectID() == patchedID);
 			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			BackupStoreFile::DecodeFile(*filestream,
@@ -1652,7 +1653,8 @@ bool test_server_commands()
 		{
 			std::auto_ptr<IOStream> attrnew(
 				new MemBlockStream(attr2, sizeof(attr2)));
-			std::auto_ptr<BackupProtocolSuccess> changereply(apProtocol->QueryChangeDirAttributes(
+			std::auto_ptr<BackupProtocolSuccess> changereply(
+				apProtocol->QueryChangeDirAttributes(
 					subdirid,
 					329483209443598LL,
 					attrnew));
@@ -1906,8 +1908,6 @@ bool test_server_commands()
 				TEST_THAT(fn.GetClearFilename() == testnames[l]);
 			}
 		}
-
-//}	skip:
 
 		// Create some nice recursive directories
 		TEST_THAT(check_reference_counts());
@@ -2193,7 +2193,7 @@ bool test_cannot_open_multiple_writable_connections()
 {
 	SETUP_TEST_BACKUPSTORE();
 
-	// First try a local protocol. This works even on Windows.
+	// First try a local protocol (makes debugging easier):
 	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
 		"backup/01234567/", 0, false); // Not read-only
 
@@ -2233,7 +2233,7 @@ bool test_cannot_open_multiple_writable_connections()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_encoding()
+bool test_file_encoding()
 {
 	// Now test encoded files
 	// TODO: This test needs to check failure situations as well as everything working,
@@ -2582,7 +2582,7 @@ bool test_login_with_disabled_account()
 			apAccounts->GetEntry(0x1234567), true));
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
 		apReferences->GetLastObjectIDUsed());
-	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
 	apReferences.reset();
 
 	// Test that login fails on a disabled account
@@ -3252,7 +3252,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_backupstore_directory());
 	TEST_THAT(test_directory_parent_entry_tracks_directory_size());
 	TEST_THAT(test_cannot_open_multiple_writable_connections());
-	TEST_THAT(test_encoding());
+	TEST_THAT(test_file_encoding());
 	TEST_THAT(test_symlinks());
 	TEST_THAT(test_store_info());
 
