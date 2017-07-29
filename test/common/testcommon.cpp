@@ -722,6 +722,12 @@ int test(int argc, const char *argv[])
 				DIRECTORY_SEPARATOR "non-exist"
 				DIRECTORY_SEPARATOR "lock2"), 
 			CommonException, NamedLockAlreadyLockingSomething);
+#if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
+		// And again on that name
+		NamedLock lock2;
+		TEST_THAT(lock2.TryAndGetLock(
+			"testfiles" DIRECTORY_SEPARATOR "lock1") == false);
+#endif
 	}
 	{
 		// Check that it unlocked when it went out of scope

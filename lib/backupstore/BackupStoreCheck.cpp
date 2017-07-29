@@ -42,7 +42,8 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreCheck::BackupStoreCheck(const std::string &, int, int32_t, bool, bool)
+//		Name:    BackupStoreCheck::BackupStoreCheck(const std::string &,
+//		         int, int32_t, bool, bool)
 //		Purpose: Constructor
 //		Created: 21/4/04
 //

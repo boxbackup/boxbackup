@@ -38,7 +38,7 @@
 //
 // Function
 //		Name:    HousekeepStoreAccount::HousekeepStoreAccount(
-//			 const std::string &, int, BackupStoreDaemon &)
+//		         BackupFileSystem&, HousekeepingCallback*)
 //		Purpose: Constructor
 //		Created: 11/12/03
 //
@@ -921,6 +921,8 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 
 	if(new_size_in_blocks == old_size_in_blocks)
 	{
+		// The root directory has no parent, so no entry for it that might need
+		// updating.
 		return;
 	}
 

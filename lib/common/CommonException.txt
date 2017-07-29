@@ -43,7 +43,7 @@ KEventErrorRemove						35
 KQueueNotSupportedOnThisPlatform		36
 IOStreamGetLineNotEnoughDataToIgnore	37	Bad value passed to IOStreamGetLine::IgnoreBufferedData()
 TempDirPathTooLong				38	Your temporary directory path is too long. Check the TMP and TEMP environment variables
-ArchiveBlockIncompleteRead		39	The Store Object Info File is too short or corrupted, and will be rewritten automatically when the next backup completes.
+ArchiveBlockIncompleteRead		39	The Store Object Info File is too short or corrupted, and will be rewritten automatically when the next backup completes
 AccessDenied				40	Access to the file or directory was denied. Please check the permissions
 DatabaseOpenFailed			41	Failed to open the database file
 DatabaseReadFailed			42	Failed to read a record from the database file

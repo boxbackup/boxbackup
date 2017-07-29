@@ -1003,15 +1003,7 @@ bool test_httpserver()
 		}
 	}
 
-	// S3Client tests with S3Simulator in-process server for debugging
-	{
-		S3Simulator simulator;
-		simulator.Configure("testfiles/s3simulator.conf");
-		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
-			EXAMPLE_S3_ACCESS_KEY, EXAMPLE_S3_SECRET_KEY);
-		TEST_THAT(exercise_s3client(client));
-	}
-
+	// Test the S3Simulator's implementation of PUT file uploads
 	{
 		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
@@ -1051,13 +1043,6 @@ bool test_httpserver()
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
-	}
-
-	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
-	{
-		FileStream in("testfiles/dsfdsfs98.fd", O_RDONLY);
-		FileStream out("testfiles/store/dsfdsfs98.fd", O_CREAT | O_WRONLY);
-		in.CopyStreamTo(out);
 	}
 
 	// S3Client tests with S3Simulator in-process server for debugging

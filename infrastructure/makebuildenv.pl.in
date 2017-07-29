@@ -78,22 +78,22 @@ while(<FINDAUTOGEN>)
 			if($do_cmds)
 			{
 				$do_cmds = 2; # flag something has been done
-				
-				# subsitute variables, repeatedly
+
+				# substitute variables, repeatedly
 				my $c = $_;
 				$c =~ s/\A\s+//;
 				while(1)
 				{
 					my $did_subst = 0;
-					
+
 					for my $k (keys %vars)
 					{
 						$did_subst = 1 if $c =~ s/\$\($k\)/$vars{$k}/g;
 					}
-					
+
 					last unless $did_subst;
 				}
-				
+
 				# run command
 				unless (0 == system("(cd $dir; $c)"))
 				{
@@ -191,7 +191,7 @@ for(@modules_files)
 	# clean up line
 	chomp; s/\A\s+//; s/#.*\Z//; s/\s+\Z//; s/\s+/ /g;
 	next unless m/\S/;
-	
+
 	# omit bits on some platforms?
 	if(m/\AEND-OMIT/)
 	{
@@ -210,13 +210,13 @@ for(@modules_files)
 		}
 		next;
 	}
-	
+
 	# split up...
 	my ($mod, @deps_i) = split / /;
-	
+
 	# ignore this module?
 	next if ignore_module($mod);
-	
+
 	# deps for this platform
 	my @deps;
 	for(@deps_i)
@@ -245,10 +245,10 @@ for(@modules_files)
 			push @deps,$dep if $inc
 		}
 	}
-	
+
 	# check directory exists
 	die "Module $mod can't be found\n" unless -d $mod;
-	
+
 	# and put in lists
 	push @modules,$mod;
 	my @md;	# module dependencies
@@ -266,7 +266,7 @@ for(@modules_files)
 	}
 	$module_dependency{$mod} = [@implicit_deps,@md];
 	$module_library_link_opts{$mod} = [@lo];
-	
+
 	# make directories, but not if we're using an external library and this a library module
 	my ($s,$d) = split /\//,$mod;
 	if ($s ne 'lib' or $external_lib eq '')
@@ -315,7 +315,7 @@ for my $mod (@modules, @implicit_deps)
 	# add in items from autogen directories, and create output directories
 	{
 		my @autogen_items;
-		
+
 		for my $di (@items)
 		{
 			if($di =~ m/\Aautogen/ && -d "$mod/$di")
@@ -483,7 +483,7 @@ my %library_targets;
 for my $mod (@implicit_deps, @modules)
 {
 	print $mod,"\n";
-	
+
 	my ($type,$name) = split /\//,$mod;
 	if (not $name)
 	{
@@ -527,7 +527,7 @@ for my $mod (@implicit_deps, @modules)
 		# test file...
 		sub writetestfile
 		{
-			my ($filename,$runcmd,$module) = @_;		
+			my ($filename,$runcmd,$module) = @_;
 
 			open TESTFILE,">$filename" or die "Can't open " .
 				"test script file for $module for writing\n";
@@ -604,7 +604,7 @@ __E
 			print TESTFILE "exit \$exit_status\n";
 			close TESTFILE;
 		}
-		
+
 		writetestfile("$mod/t", "GLIBCXX_FORCE_NEW=1 ".
 			'./_test' . $platform_exe_ext . ' "$@"', $mod);
 
@@ -620,7 +620,7 @@ __E
 				"exit 2");
 		}
 	}
-	
+
 	my @all_deps_for_module;
 
 	{
@@ -651,7 +651,7 @@ __E
 				$d_done{$dep} = 1;
 			}
 		}
-	}	
+	}
 
 	# get the list of library things to add -- in order of dependency 
 	# so things link properly
@@ -736,7 +736,7 @@ __E
 	my @files = readdir DIR;
 	closedir DIR;
 	my @items = map {"$mod/$_"} @files;
-	
+
 	if($type eq 'test')
 	{
 		push @items, $test_template_file;
@@ -759,7 +759,7 @@ __E
 					next if m/\A\./;
 					push @autogen_items,"$di/$_"
 				}
-				
+
 				# output directories
 				mkdir "release/$mod/$di",0755;
 				mkdir "debug/$mod/$di",0755;
@@ -767,7 +767,7 @@ __E
 		}
 		@items = (@items, @autogen_items);
 	}
-	
+
 	# first, obtain a list of dependencies within the .h files
 	my %headers;
 	for my $h (grep /\.h\Z/i, @items)
@@ -782,7 +782,7 @@ __E
 			${$headers{$h}}{$1} = 1 if exists $hfiles{$1};
 		}
 	}
-	
+
 	# write the recipes for debug and release builds of each file
 	foreach my $var_prefix ('DEBUG', 'RELEASE')
 	{
@@ -804,23 +804,23 @@ __E
 
 			# store for later
 			push @obj_base, $base;
-		
+
 			# get the file...
 			open FL, $file or die "$file: $!";
 			my $f;
 			read FL, $f, -s $file;
 			close FL;
-			
+
 			my %dep;
 
 			while($f =~ m/\#include\s+"([^"]+?)"/g)
 			{
 				insert_dep($1, \%dep) if exists $hfiles{$1};
 			}
-			
+
 			# output filename
 			my $out_name = "\$(${var_prefix}_OUTBASE)/$mod/$base.o";
-			
+
 			# write the line for this cpp file
 			my @dep_paths = map 
 			{ 
@@ -870,7 +870,7 @@ __E
 		print MASTER_MAKEFILE "$prefixed_end_target: $o_file_list";
 		print MASTER_MAKEFILE " @prefixed_dep_targets" unless $target_is_library;
 		print MASTER_MAKEFILE "\n";
-		
+
 		if ($target_windows)
 		{
 			foreach my $dep (@all_deps_for_module)
@@ -895,26 +895,26 @@ __E
 			# work out library options
 			# need to be... least used first, in absolute order they appear in the modules.txt file
 			my @libops;
-			
+
 			sub libops_fill
 			{
 				my ($module, $libops_ref) = @_;
-				
+
 				my $library_link_opts = $module_library_link_opts{$module};
 				if ($library_link_opts)
 				{
 					push @$libops_ref, @$library_link_opts;
 				}
-				
+
 				my $deps = $module_dependency{$module};
 				foreach my $dep (@$deps)
 				{
 					libops_fill($dep, $libops_ref);
 				}
 			}
-			
+
 			libops_fill($mod,\@libops);
-			
+
 			my $lo = '';
 			my %ldone;
 			for(@libops)
@@ -923,7 +923,7 @@ __E
 				$lo .= ' '.$_;
 				$ldone{$_} = 1;
 			}
-		
+
 			# link line...
 			print MASTER_MAKEFILE "\t\$(_LINK) \$(LDFLAGS) " .
 				"-o $prefixed_end_target $o_file_list " .
@@ -1016,7 +1016,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 	{
 		chomp; s/#.+\Z//; s/\s+\Z//; s/\s+/ /g;
 		next unless m/\S/;
-		
+
 		# omit bits on some platforms?
 		next if m/\AEND-OMIT/;
 		if(m/\AOMIT:(.+)/)
@@ -1025,7 +1025,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 			{
 				while(<PARCELS>)
 				{
-					last if m/\AEND-OMIT/;	
+					last if m/\AEND-OMIT/;
 				}
 			}
 			next;
@@ -1056,7 +1056,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 			next;
 		}
 		next if (m'\AEND-EXCEPT');
-		
+
 		# new parcel, or a new parcel definition?
 		if(m/\A\s+(.+)\Z/)
 		{
@@ -1231,7 +1231,7 @@ $make_target: @parcel_deps
 EOF
 
 	push @parcel_targets, "build-$parcel";
-	
+
 	for(@{$parcel_contents{$parcel}})
 	{
 		my @args = split /\s+/;
@@ -1297,11 +1297,11 @@ EOF
 	}
 
 	unless ($target_windows)
-	{	
+	{
 		close SCRIPT;
 		chmod 0755,"parcels/scripts/install-$parcel";
 	}
-	
+
 	my $root = BoxPlatform::parcel_root($parcel);
 
 	unless ($target_windows)
@@ -1310,11 +1310,11 @@ EOF
 	}
 
 	print MASTER_MAKEFILE "\t(cd parcels; tar cf - $root | gzip -9 - > $root.tgz )\n";
-	
+
 	print MASTER_MAKEFILE "\n";
 
 	unless ($target_windows)
-	{	
+	{
 		print MASTER_MAKEFILE "install-$parcel:\n";
 		print MASTER_MAKEFILE "\t(cd $dir; ./install-$parcel)\n\n";
 	}
@@ -1375,10 +1375,10 @@ if($modules_omitted)
 sub insert_dep
 {
 	my ($h,$dep_r) = @_;
-	
+
 	# stop random recusion
 	return if exists $$dep_r{$h};
-	
+
 	# insert more depencies
 	insert_dep($_,$dep_r) for keys %{$header_dependency{$h}};
 
@@ -1394,7 +1394,7 @@ sub additional_objects_from_make_fragment
 	if(-e $fn)
 	{
 		open FL,$fn or die "Can't open $fn";
-		
+
 		while(<FL>)
 		{
 			chomp;
@@ -1418,11 +1418,10 @@ sub additional_objects_from_make_fragment
 				push @$include_r,$1
 			}
 		}
-		
+
 		close FL;
 	}
 }
-
 
 sub ignore_module
 {
