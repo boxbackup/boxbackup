@@ -24,6 +24,7 @@
 #include "autogen_HTTPException.h"
 #include "IOStream.h"
 #include "Logging.h"
+#include "MD5Digest.h"
 #include "S3Simulator.h"
 #include "Utils.h" // for ObjectExists_* (object_exists_t)
 #include "decode.h"
@@ -458,17 +459,30 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	path += rRequest.GetRequestURI();
 	std::auto_ptr<FileStream> apFile;
 	apFile.reset(new FileStream(path));
+	int64_t file_length;
+
+	std::string digest;
+	{
+		MD5DigestStream digester;
+		apFile->CopyStreamTo(digester);
+		file_length = apFile->GetPosition();
+		apFile->Seek(0, IOStream::SeekType_Absolute);
+		digester.Close();
+		digest = "\"" + digester.DigestAsString() + "\"";
+	}
 
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 
+	// For GET and HEAD requests, we must set the Content-Length.  See RFC
+	// 2616 section 4.4, and the Amazon Simple Storage Service API
+	// Reference, section "HEAD Object" examples, which set it. Also, our
+	// S3BackupFileSystem needs it!
+
 	if(true)
 	{
+		rResponse.GetHeaders().SetContentLength(file_length);
+		rResponse.AddHeader("ETag", digest);
 		apFile->CopyStreamTo(rResponse);
-		// We allow the HTTPResponse to set the response size itself in this case,
-		// but we must add the ETag header. TODO: proper support for streaming
-		// responses will require us to set the content-length here, because we
-		// know it but the HTTPResponse does not.
-		rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
 	}
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
@@ -923,13 +937,22 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	}
 
 	rRequest.ReadContent(*apFile, GetTimeout());
+	apFile->Seek(0, IOStream::SeekType_Absolute);
+
+	std::string digest;
+	{
+		MD5DigestStream digester;
+		apFile->CopyStreamTo(digester);
+		digester.Close();
+		digest = "\"" + digester.DigestAsString() + "\"";
+	}
 
 	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTObjectPUT.html
 	rResponse.AddHeader("x-amz-id-2", "LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7");
 	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
 	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 	rResponse.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
-	rResponse.AddHeader("ETag", "\"828ef3fdfa96f00ad9f27c383fc9ac7f\"");
+	rResponse.AddHeader("ETag", digest);
 	rResponse.SetContentType("");
 	rResponse.AddHeader("Server", "AmazonS3");
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
