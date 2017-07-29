@@ -43,7 +43,7 @@
 
 #include "MemLeakFindOn.h"
 
-/* 
+/*
 
 Errors checked:
 
@@ -235,14 +235,14 @@ void test_dir_fixing()
 			int64_t SizeInBlocks, int16_t Flags,
 			uint64_t AttributesHash);
 		*/
-		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, 
+		dir.AddEntry(fnames[0], 12, 2 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[1], 12, 2 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[0], 12, 3 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[0], 12, 5 /* id */, 1,
-			BackupStoreDirectory::Entry::Flags_File | 
+			BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 
 		/*
@@ -465,13 +465,13 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Create an account
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf "
 		"create 01234567 0 10000B 20000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Run the perl script to create the initial directories
-	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
+	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl init") == 0);
 
 	BOX_INFO("  === Test that an entry pointing to a file that doesn't "
@@ -676,7 +676,7 @@ int test(int argc, const char *argv[])
 		char name[256];
 		while(::fgets(line, sizeof(line), f) != 0)
 		{
-			TEST_THAT(::sscanf(line, "%x %s %s", &id, 
+			TEST_THAT(::sscanf(line, "%x %s %s", &id,
 				flags, name) == 3);
 			bool isDir = (::strcmp(flags, "-d---") == 0);
 			//TRACE3("%x,%d,%s\n", id, isDir, name);
@@ -696,7 +696,7 @@ int test(int argc, const char *argv[])
 	}
 	{
 		// Add a spurious file
-		RaidFileWrite random(discSetNum, 
+		RaidFileWrite random(discSetNum,
 			accountRootDir + "randomfile");
 		random.Open();
 		random.Write("test", 4);
@@ -711,7 +711,7 @@ int test(int argc, const char *argv[])
 		" testfiles/testbackupstorefix.pl check 0") == 0);
 	// Check the random file doesn't exist
 	{
-		TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
+		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
 			accountRootDir + "01/randomfile"));
 	}
 
@@ -1002,6 +1002,7 @@ int test(int argc, const char *argv[])
 
 	// Fix it
 	RUN_CHECK
+
 	// Check everything is where it should be
 	TEST_THAT(::system(PERL_EXECUTABLE 
 		" testfiles/testbackupstorefix.pl check 5") == 0);
@@ -1015,6 +1016,7 @@ int test(int argc, const char *argv[])
 		r->CopyStreamTo(w);
 		w.Commit(true /* convert now */);
 	}
+
 	// Fix it
 	RUN_CHECK
 	// Check everything is where it should be

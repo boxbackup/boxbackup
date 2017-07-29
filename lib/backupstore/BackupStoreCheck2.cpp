@@ -50,7 +50,6 @@ void BackupStoreCheck::CheckRoot()
 	else
 	{
 		BOX_WARNING("Root directory doesn't exist");
-
 		++mNumberErrorsFound;
 
 		if(mFixErrors)
@@ -309,6 +308,7 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 
 	// Create a blank directory
 	BackupStoreDirectory dir(MissingDirectoryID, missing->second /* containing dir ID */);
+
 	// Note that this directory already contains a directory entry pointing to
 	// this dir, so it doesn't have to be added.
 
