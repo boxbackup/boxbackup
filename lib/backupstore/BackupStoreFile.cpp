@@ -326,9 +326,10 @@ void BackupStoreFile::VerifyStream::Write(const void *pBuffer, int NBytes, int T
 	{
 		// The block index follows the blocks themselves, but without seeing the
 		// index we don't know how big the blocks are. So we just have to keep
-		// reading, holding the last mBlockIndexSize bytes in two buffers, until
-		// we reach the end of the file (when Close() is called) when we can look
-		// back over those buffers and extract the block index from them.
+		// reading, holding (at least) the last mBlockIndexSize bytes in two
+		// buffers, until we reach the end of the file (when Close() is called)
+		// when we can look back over those buffers and extract the block index
+		// from them.
 		if(pCurrentBuffer->GetSize() >= mBlockIndexSize)
 		{
 			// Time to swap buffers, and clear the one we're about to
@@ -1000,7 +1001,8 @@ void BackupStoreFile::DecodedStream::ReadBlockIndex(bool MagicAlreadyRead)
 //
 // Function
 //		Name:    BackupStoreFile::DecodedStream::Read(void *, int, int)
-//		Purpose: As interface. Reads decrpyted data.
+//		Purpose: An interface to read decrypted data from an
+//			 encrypted file stream.
 //		Created: 9/12/03
 //
 // --------------------------------------------------------------------------
