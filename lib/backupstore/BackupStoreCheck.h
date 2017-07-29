@@ -201,7 +201,7 @@ private:
 
 	// The refcount database, being reconstructed as the check/fix progresses
 	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
-	
+
 	// Misc stuff
 	int32_t mLostDirNameSerial;
 	int64_t mLostAndFoundDirectoryID;

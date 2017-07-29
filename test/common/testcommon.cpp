@@ -46,7 +46,7 @@ void test_conversions()
 	TEST_CHECK_THROWS((Convert<int8_t, const char *>("500")), ConversionException, IntOverflowInConvertFromString);
 	TEST_CHECK_THROWS((Convert<int8_t, const char *>("pants")), ConversionException, BadStringRepresentationOfInt);
 	TEST_CHECK_THROWS((Convert<int8_t, const char *>("")), ConversionException, CannotConvertEmptyStringToInt);
-	
+
 	std::string a(Convert<std::string, int32_t>(63));
 	TEST_THAT(a == "63");
 	std::string b(Convert<std::string, int32_t>(-3473463));
@@ -308,7 +308,7 @@ int test(int argc, const char *argv[])
 
 	// test main() initialises timers for us, so uninitialise them
 	Timers::Cleanup();
-	
+
 	// Check that using timer methods without initialisation
 	// throws an assertion failure. Can only do this in debug mode
 	#ifndef BOX_RELEASE_BUILD
@@ -323,10 +323,10 @@ int test(int argc, const char *argv[])
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
 			AssertFailed);
 	#endif
-	
+
 	// Check that we can initialise the timers
 	Timers::Init();
-	
+
 	// Check that double initialisation throws an exception
 	#ifndef BOX_RELEASE_BUILD
 		TEST_CHECK_THROWS(Timers::Init(), CommonException,
@@ -335,7 +335,7 @@ int test(int argc, const char *argv[])
 
 	// Check that we can clean up the timers
 	Timers::Cleanup();
-	
+
 	// Check that double cleanup throws an exception
 	#ifndef BOX_RELEASE_BUILD
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
@@ -432,7 +432,7 @@ int test(int argc, const char *argv[])
 		FileHandleGuard<O_RDONLY> file("testfiles"
 			DIRECTORY_SEPARATOR "fdgetlinetest.txt");
 		FdGetLine getline(file);
-		
+
 		int l = 0;
 		while(testfilelines[l] != 0)
 		{
@@ -471,7 +471,7 @@ int test(int argc, const char *argv[])
 		}
 		TEST_THAT(getline.IsEOF());
 		TEST_CHECK_THROWS(getline.GetLine(true), CommonException, GetLineEOF);
-		
+
 		fclose(file2);
 	}
 
@@ -480,7 +480,7 @@ int test(int argc, const char *argv[])
 		FileStream file("testfiles" DIRECTORY_SEPARATOR 
 			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
-		
+
 		int l = 0;
 		while(testfilelines[l] != 0)
 		{
@@ -507,7 +507,7 @@ int test(int argc, const char *argv[])
 			"fdgetlinetest.txt", "r");
 		TEST_THAT_ABORTONFAIL(file2 != 0);
 		char ll[512];
-		
+
 		while(!feof(file2))
 		{
 			fgets(ll, sizeof(ll), file2);
@@ -527,7 +527,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(getline.IsEOF());
 		std::string dummy;
 		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
-		
+
 		fclose(file2);
 	}
 
@@ -588,7 +588,7 @@ int test(int argc, const char *argv[])
 		const Configuration &sub1_3 = sub1.GetSubConfiguration("subconfig3");
 		TEST_THAT(sub1_3.GetKeyValueInt("carrots") == 050);
 		TEST_THAT(sub1_3.GetKeyValue("terrible") == "absolutely");
-	}	
+	}
 
 	static const char *file[][2] =
 	{
@@ -654,7 +654,7 @@ int test(int argc, const char *argv[])
 		errMsg = errMsg.substr(0, errMsg.size() > 0 ? errMsg.size() - 1 : 0);
 		TEST_EQUAL_LINE(file[l][1], errMsg, file[l][0]);
 	}
-	
+
 	// Check that multivalues happen as expected
 	// (single value in a multivalue already checked)
 	{
@@ -673,7 +673,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(pconfig->GetKeyValue("MultiValue") == expectedvalue);
 	}
 
-	// Check boolean values	
+	// Check boolean values
 	{
 		std::string errMsg;
 		std::auto_ptr<Configuration> pconfig(
@@ -687,7 +687,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(pconfig->GetKeyValueBool("BoolFalse1") == false);
 		TEST_THAT(pconfig->GetKeyValueBool("BoolFalse2") == false);
 	}
-	
+
 	// Test named locks
 	{
 		NamedLock lock1;
@@ -708,7 +708,7 @@ int test(int argc, const char *argv[])
 				"testfiles" 
 				DIRECTORY_SEPARATOR "non-exist"
 				DIRECTORY_SEPARATOR "lock2"), 
-			CommonException, NamedLockAlreadyLockingSomething);		
+			CommonException, NamedLockAlreadyLockingSomething);
 #if defined(HAVE_FLOCK) || HAVE_DECL_O_EXLOCK
 		// And again on that name
 		NamedLock lock2;
@@ -749,13 +749,13 @@ int test(int argc, const char *argv[])
 
 		// And a gather stream
 		ReadGatherStream gather(false /* no deletion */);
-		
+
 		// Add the streams
 		int s1_c = gather.AddComponent(&s1);
 		int s2_c = gather.AddComponent(&s2);
 		TEST_THAT(s1_c == 0);
 		TEST_THAT(s2_c == 1);
-		
+
 		// Set up some blocks
 		gather.AddBlock(s1_c, 11);
 		gather.AddBlock(s1_c, 2);
@@ -773,7 +773,7 @@ int test(int argc, const char *argv[])
 		{
 			int s = gather.Read(buffer + r, 7);
 			r += s;
-			
+
 			TEST_THAT(gather.GetPosition() == r);
 			if(r < sizeof(GATHER_RESULT) - 1)
 			{
@@ -789,7 +789,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(r == sizeof(GATHER_RESULT) - 1);
 		TEST_THAT(::memcmp(buffer, GATHER_RESULT, sizeof(GATHER_RESULT) - 1) == 0);
 	}
-	
+
 	// Test ExcludeList
 	{
 		ExcludeList elist;
