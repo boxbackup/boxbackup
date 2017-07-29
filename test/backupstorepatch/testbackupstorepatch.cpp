@@ -51,19 +51,20 @@ typedef struct
 	bool IsCompletelyDifferent;
 	bool HasBeenDeleted;
 	int64_t DepNewer, DepOlder;
+	int64_t CurrentSizeInBlocks;
 } file_info;
 
 file_info test_files[] =
 {
-//   ChPnt,	Insert,	Delete, ID, IsCDf,	BeenDel
-	{0, 	0,		0,		0,	false,	false},	// 0 dummy first entry
-	{32000,	2087,	0,		0,	false,	false}, // 1
+//	ChPnt,	Insert,	Delete, ID,	IsCDf,	BeenDel
+	{0, 	0,	0,	0,	false,	false},	// 0 dummy first entry
+	{32000,	2087,	0,	0,	false,	false}, // 1
 	{1000,	1998,	2976,	0,	false,	false}, // 2
-	{27800,	0,		288,	0,	false,	false}, // 3
-	{3208,	1087,	98,		0,	false,	false}, // 4
-	{56000,	23087,	98,		0,	false,	false}, // 5
-	{0,		98765,	9999999,0,	false,	false},	// 6 completely different, make a break in the storage
-	{9899,	9887,	2,		0,	false,	false}, // 7
+	{27800,	0,	288,	0,	false,	false}, // 3
+	{3208,	1087,	98,	0,	false,	false}, // 4 - this entry is deleted from middle of patch chain on r=1
+	{56000,	23087,	98,	0,	false,	false}, // 5
+	{0,	98765,	9999999,0,	false,	false},	// 6 completely different, make a break in the storage
+	{9899,	9887,	2,	0,	false,	false}, // 7
 	{12984,	12345,	1234,	0,	false,	false}, // 8
 	{1209,	29885,	3498,	0,	false,	false}  // 9
 };
@@ -170,8 +171,6 @@ bool files_identical(const char *file1, const char *file2)
 	
 	return true;
 }
-
-
 
 void create_test_files()
 {
@@ -532,7 +531,8 @@ int test(int argc, const char *argv[])
 				}
 			}
 			
-			// Open a connection to the server (need to do this each time, otherwise housekeeping won't delete files)
+			// Open a connection to the server (need to do this each time, otherwise
+			// housekeeping won't run on Windows, and thus won't delete any files).
 			SocketStreamTLS *pConn = new SocketStreamTLS;
 			std::auto_ptr<SocketStream> apConn(pConn);
 			pConn->Open(context, Socket::TypeINET, "localhost",
@@ -544,7 +544,8 @@ int test(int argc, const char *argv[])
 				protocol.QueryLogin(0x01234567, 0);
 			}
 
-			// Pull all the files down, and check that they match the files on disc
+			// Pull all the files down, and check that they (still) match the files
+			// that we uploaded earlier.
 			for(unsigned int f = 0; f < NUMBER_FILES; ++f)
 			{
 				::printf("r=%d, f=%d\n", deleteIndex, f);
@@ -587,7 +588,7 @@ int test(int argc, const char *argv[])
 				}
 			}
 
-			// Close the connection			
+			// Close the connection
 			protocol.QueryFinished();
 
 			// Mark one of the elements as deleted
@@ -664,7 +665,7 @@ int test(int argc, const char *argv[])
 			}
 			if(z < (int)NUMBER_FILES) test_files[z].DepOlder = test_files[todel].DepOlder;
 		}
-		
+
 		// Kill store server
 		TEST_THAT(KillServer(pid));
 		TEST_THAT(!ServerIsAlive(pid));

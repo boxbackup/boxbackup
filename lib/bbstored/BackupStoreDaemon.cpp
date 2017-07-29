@@ -331,7 +331,7 @@ void BackupStoreDaemon::Connection2(std::auto_ptr<SocketStreamTLS> apStream)
 	// Create a context, using this ID
 	BackupStoreContext context(id, this, GetConnectionDetails());
 
-	if (mpTestHook)
+	if(mpTestHook)
 	{
 		context.SetTestHook(*mpTestHook);
 	}

@@ -127,14 +127,10 @@ bool check_num_files(int files, int old, int deleted, int dirs)
 	std::auto_ptr<BackupStoreInfo> apInfo =
 		BackupStoreInfo::Load(0x1234567,
 		"backup/01234567/", 0, true);
-	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(),
-		"current files");
-	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(),
-		"old files");
-	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(),
-		"deleted files");
-	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(),
-		"directories");
+	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(), "current files");
+	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(), "old files");
+	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(), "deleted files");
+	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(), "directories");
 
 	return (files == apInfo->GetNumCurrentFiles() &&
 		old == apInfo->GetNumOldFiles() &&

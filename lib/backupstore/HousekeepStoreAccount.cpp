@@ -2,7 +2,10 @@
 //
 // File
 //		Name:    HousekeepStoreAccount.cpp
-//		Purpose:
+//		Purpose: Run housekeeping on a server-side account. Removes
+//			 files and directories which are marked as RemoveASAP,
+//			 and Old and Deleted objects as necessary to bring the
+//			 account back under its soft limit.
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
@@ -36,7 +39,8 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HousekeepStoreAccount::HousekeepStoreAccount(int, const std::string &, int, BackupStoreDaemon &)
+//		Name:    HousekeepStoreAccount::HousekeepStoreAccount(int,
+//			 const std::string &, int, BackupStoreDaemon &)
 //		Purpose: Constructor
 //		Created: 11/12/03
 //
@@ -49,7 +53,7 @@ HousekeepStoreAccount::HousekeepStoreAccount(int AccountID,
 	  mStoreDiscSet(StoreDiscSet),
 	  mpHousekeepingCallback(pHousekeepingCallback),
 	  mDeletionSizeTarget(0),
-  	  mPotentialDeletionsTotalSize(0),
+	  mPotentialDeletionsTotalSize(0),
 	  mMaxSizeInPotentialDeletions(0),
 	  mErrorCount(0),
 	  mBlocksUsed(0),
@@ -456,7 +460,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			}
 			// enVersionAge is now the age of this version.
 
-			// Potentially add it to the list if it's deleted, if it's an old version or deleted
+			// Add it to the list of potential files to remove, if it's an old version
+			// or deleted:
 			if(en->IsOld() || en->IsDeleted())
 			{
 				// Is deleted / old version.
@@ -624,7 +629,7 @@ bool HousekeepStoreAccount::DeleteFiles(BackupStoreInfo& rBackupStoreInfo)
 			// Check for having to stop
 			if(mpHousekeepingCallback && mpHousekeepingCallback->CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is now locked
 			{
-				// Need to abort now
+				// Need to abort now. Return true to signal that we were interrupted.
 				return true;
 			}
 		}
@@ -753,8 +758,9 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			return refs - 1;
 		}
 
-		// If the entry is involved in a chain of patches, it needs to be handled
-		// a bit more carefully.
+		// If the entry is involved in a chain of patches, it needs to be handled a bit
+		// more carefully.
+
 		if(pentry->GetDependsNewer() != 0 && pentry->GetDependsOlder() == 0)
 		{
 			// This entry is a patch from a newer entry. Just need to update the info on that entry.
@@ -771,26 +777,31 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 			BackupStoreDirectory::Entry *polder = rDirectory.FindEntryByID(pentry->GetDependsOlder());
 			if(pentry->GetDependsNewer() == 0)
 			{
-				// There exists an older version which depends on this one. Need to combine the two over that one.
+				// There exists an older version which depends on this
+				// one. Need to combine the two over that one.
 
 				// Adjust the other entry in the directory
 				if(polder == 0 || polder->GetDependsNewer() != ObjectID)
 				{
-					THROW_EXCEPTION(BackupStoreException, PatchChainInfoBadInDirectory);
+					THROW_EXCEPTION(BackupStoreException,
+						PatchChainInfoBadInDirectory);
 				}
-				// Change the info in the older entry so that this no longer points to this entry
+				// Change the info in the older entry so that this no
+				// longer points to this entry.
 				polder->SetDependsNewer(0);
 			}
 			else
 			{
-				// This entry is in the middle of a chain, and two patches need combining.
+				// This entry is in the middle of a chain, and two
+				// patches need combining.
 
 				// First, adjust the directory entries
 				BackupStoreDirectory::Entry *pnewer = rDirectory.FindEntryByID(pentry->GetDependsNewer());
 				if(pnewer == 0 || pnewer->GetDependsOlder() != ObjectID
 					|| polder == 0 || polder->GetDependsNewer() != ObjectID)
 				{
-					THROW_EXCEPTION(BackupStoreException, PatchChainInfoBadInDirectory);
+					THROW_EXCEPTION(BackupStoreException,
+						PatchChainInfoBadInDirectory);
 				}
 				// Remove the middle entry from the linked list by simply using the values from this entry
 				pnewer->SetDependsOlder(pentry->GetDependsOlder());
@@ -882,8 +893,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	ASSERT(!remaining_refs);
 
 	// Delete from disc
-	BOX_TRACE("Removing unreferenced object " <<
-		BOX_FORMAT_OBJECTID(ObjectID));
+	BOX_TRACE("Removing unreferenced object " << BOX_FORMAT_OBJECTID(ObjectID));
 	std::string objFilename;
 	MakeObjectFilename(ObjectID, objFilename);
 	RaidFileWrite del(mStoreDiscSet, objFilename, mapNewRefs->GetRefCount(ObjectID));
@@ -947,12 +957,14 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 
 	if(new_size_in_blocks == old_size_in_blocks)
 	{
+		// The root directory has no parent, so no entry for it that might need
+		// updating.
 		return;
 	}
 
 	rDirectory.SetUserInfo1_SizeInBlocks(new_size_in_blocks);
 
-	if (rDirectory.GetObjectID() == BACKUPSTORE_ROOT_DIRECTORY_ID)
+	if(rDirectory.GetObjectID() == BACKUPSTORE_ROOT_DIRECTORY_ID)
 	{
 		return;
 	}
@@ -968,7 +980,7 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 		parent.FindEntryByID(rDirectory.GetObjectID());
 	ASSERT(en);
 
-	if (en->GetSizeInBlocks() != old_size_in_blocks)
+	if(en->GetSizeInBlocks() != old_size_in_blocks)
 	{
 		BOX_WARNING("Directory " <<
 			BOX_FORMAT_OBJECTID(rDirectory.GetObjectID()) <<
@@ -1011,7 +1023,9 @@ bool HousekeepStoreAccount::DeleteEmptyDirectories(BackupStoreInfo& rBackupStore
 			{
 				mCountUntilNextInterprocessMsgCheck = POLL_INTERPROCESS_MSG_CHECK_FREQUENCY;
 				// Check for having to stop
-				if(mpHousekeepingCallback && mpHousekeepingCallback->CheckForInterProcessMsg(mAccountID))	// include account ID here as the specified account is now locked
+				if(mpHousekeepingCallback &&
+					// include account ID here as the specified account is now locked
+					mpHousekeepingCallback->CheckForInterProcessMsg(mAccountID))
 				{
 					// Need to abort now
 					return true;
@@ -1049,8 +1063,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 	// BLOCK
 	{
 		MakeObjectFilename(dirId, dirFilename);
-		// Check it actually exists (just in case it gets
-		// added twice to the list)
+		// Check it actually exists (just in case it gets added twice to the list)
 		if(!RaidFileRead::FileExists(mStoreDiscSet, dirFilename))
 		{
 			// doesn't exist, next!
@@ -1128,7 +1141,7 @@ void HousekeepStoreAccount::DeleteEmptyDirectory(int64_t dirId,
 			BOX_TRACE("Housekeeping spared empty deleted dir " <<
 				BOX_FORMAT_OBJECTID(dirId) << " due to " <<
 				mapNewRefs->GetRefCount(dir.GetObjectID()) <<
-				"remaining references");
+				" remaining references");
 			return;
 		}
 

@@ -48,7 +48,6 @@ public:
 private:
 	static std::string MakeAccountRootDir(int32_t ID, int DiscSet);
 
-private:
 	BackupStoreAccountDatabase &mrDatabase;
 };
 
