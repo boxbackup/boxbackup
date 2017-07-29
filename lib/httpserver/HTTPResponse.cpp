@@ -63,6 +63,10 @@ HTTPResponse::HTTPResponse(const HTTPResponse& rOther)
   mHeaders(rOther.mHeaders)
 {
 	Write(rOther.GetBuffer(), rOther.GetSize());
+	if(rOther.IsSetForReading())
+	{
+		SetForReading();
+	}
 }
 
 
@@ -74,6 +78,10 @@ HTTPResponse &HTTPResponse::operator=(const HTTPResponse &rOther)
 	mResponseIsDynamicContent = rOther.mResponseIsDynamicContent;
 	mHeaders = rOther.mHeaders;
 	mpStreamToSendTo = rOther.mpStreamToSendTo;
+	if(rOther.IsSetForReading())
+	{
+		SetForReading();
+	}
 	return *this;
 }
 

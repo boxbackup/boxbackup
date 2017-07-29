@@ -102,6 +102,9 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	const std::string& rRequestURI, IOStream* pStreamToSend,
 	const char* pStreamContentType)
 {
+	// It's very unlikely that you want to request a URI from Amazon S3 servers
+	// that doesn't start with a /. Very very unlikely.
+	ASSERT(rRequestURI[0] == '/');
 	HTTPRequest request(Method, rRequestURI);
 	request.SetHostName(mHostName);
 	
@@ -176,7 +179,8 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	}
 
 	request.AddHeader("Authorization", auth_code);
-	
+	HTTPResponse response;
+
 	if (mpSimulator)
 	{
 		if (pStreamToSend)
@@ -185,11 +189,17 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 		}
 
 		request.SetForReading();
-		CollectInBufferStream response_buffer;
-		HTTPResponse response(&response_buffer);
-	
 		mpSimulator->Handle(request, response);
-		return response;
+
+		// TODO FIXME: HTTPServer::Connection does some post-processing on every
+		// response to determine whether Connection: keep-alive is possible.
+		// We should do that here too, but currently our HTTP implementation
+		// doesn't support chunked encoding, so it's disabled there, so we don't
+		// do it here either.
+
+		// We are definitely finished writing to the HTTPResponse, so leave it
+		// ready for reading back.
+		response.SetForReading();
 	}
 	else
 	{
@@ -201,7 +211,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				mapClientSocket->Open(Socket::TypeINET,
 					mHostName, mPort);
 			}
-			return SendRequest(request, pStreamToSend,
+			response = SendRequest(request, pStreamToSend,
 				pStreamContentType);
 		}
 		catch (ConnectionException &ce)
@@ -212,7 +222,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				// try to reconnect, just once
 				mapClientSocket->Open(Socket::TypeINET,
 					mHostName, mPort);
-				return SendRequest(request, pStreamToSend,
+				response = SendRequest(request, pStreamToSend,
 					pStreamContentType);
 			}
 			else
@@ -221,7 +231,20 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				throw;
 			}
 		}
+
+		// No need to call response.SetForReading() because HTTPResponse::Receive()
+		// already did that.
 	}
+
+	// It's not valid to have a keep-alive response if the length isn't known.
+	// S3Simulator should really check this, but depending on how it's called above,
+	// it might be possible to bypass that check, so this is a double-check.
+	ASSERT(response.GetContentLength() >= 0 || !response.IsKeepAlive());
+
+	BOX_TRACE("S3Client: " << mHostName << " < " << response.GetResponseCode() <<
+		": " << response.GetContentLength() << " bytes")
+
+	return response;
 }
 
 // --------------------------------------------------------------------------

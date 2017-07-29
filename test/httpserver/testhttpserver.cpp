@@ -152,6 +152,29 @@ bool exercise_s3client(S3Client& client)
 	TEST_EQUAL(404, response.GetResponseCode());
 	TEST_THAT(!response.IsKeepAlive());
 
+	TEST_THAT(!FileExists("testfiles/store/newfile"));
+	FileStream fs("testfiles/dsfdsfs98.fd");
+	response = client.PutObject("/newfile", fs);
+	TEST_EQUAL(200, response.GetResponseCode());
+
+	// This will fail if the file was created in the wrong place:
+	TEST_THAT(FileExists("testfiles/store/newfile"));
+
+	response = client.GetObject("/newfile");
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_EQUAL(4269, response.GetSize());
+
+	fs.Seek(0, IOStream::SeekType_Absolute);
+	TEST_THAT(fs.CompareWith(response));
+
+	// Test that GET requests set the Content-Length header correctly.
+	int actual_size = TestGetFileSize("testfiles/dsfdsfs98.fd");
+	TEST_THAT(actual_size > 0);
+	TEST_EQUAL(actual_size, response.GetContentLength());
+
+	// This will fail if the file was created in the wrong place:
+	TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
+
 	// Test is successful if the number of failures has not increased.
 	return (num_failures == num_failures_initial);
 }
@@ -512,40 +535,6 @@ bool test_httpserver()
 			"Authentication code mismatch</pre>\n"
 			"<p>Please try again later.</p></body>\n"
 			"</html>\n", response_data);
-	}
-
-	// S3Client tests with S3Simulator in-process server for debugging
-	{
-		S3Simulator simulator;
-		simulator.Configure("testfiles/s3simulator.conf");
-		S3Client client(&simulator, "johnsmith.s3.amazonaws.com",
-			"0PN5J17HBGZHT7JJ3X82",
-			"uV3F3YluFJax1cknvbcGwgjvx4QpvB+leU8dUj2o");
-		
-		HTTPResponse response = client.GetObject("/photos/puppy.jpg");
-		TEST_EQUAL(200, response.GetResponseCode());
-		std::string response_data((const char *)response.GetBuffer(),
-			response.GetSize());
-		TEST_EQUAL("omgpuppies!\n", response_data);
-
-		// make sure that assigning to HTTPResponse does clear stream
-		response = client.GetObject("/photos/puppy.jpg");
-		TEST_EQUAL(200, response.GetResponseCode());
-		response_data = std::string((const char *)response.GetBuffer(),
-			response.GetSize());
-		TEST_EQUAL("omgpuppies!\n", response_data);
-
-		response = client.GetObject("/nonexist");
-		TEST_EQUAL(404, response.GetResponseCode());
-		
-		FileStream fs("testfiles/testrequests.pl");
-		response = client.PutObject("/newfile", fs);
-		TEST_EQUAL(200, response.GetResponseCode());
-
-		response = client.GetObject("/newfile");
-		TEST_EQUAL(200, response.GetResponseCode());
-		TEST_THAT(fs.CompareWith(response));
-		TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
 	}
 
 	{
