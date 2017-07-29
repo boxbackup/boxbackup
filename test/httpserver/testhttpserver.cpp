@@ -163,8 +163,21 @@ bool exercise_s3client(S3Client& client)
 
 	TEST_THAT(!FileExists("testfiles/store/newfile"));
 	FileStream fs("testfiles/dsfdsfs98.fd");
+	std::string digest;
+
+	{
+		MD5DigestStream digester;
+		fs.CopyStreamTo(digester);
+		fs.Seek(0, IOStream::SeekType_Absolute);
+		digester.Close();
+		digest = digester.DigestAsString();
+		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
+	}
+
 	response = client.PutObject("/newfile", fs);
 	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_THAT(!response.IsKeepAlive());
+	TEST_EQUAL("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"));
 
 	// This will fail if the file was created in the wrong place:
 	TEST_THAT(FileExists("testfiles/store/newfile"));
@@ -175,6 +188,7 @@ bool exercise_s3client(S3Client& client)
 
 	fs.Seek(0, IOStream::SeekType_Absolute);
 	TEST_THAT(fs.CompareWith(response));
+	TEST_EQUAL("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"));
 
 	// Test that GET requests set the Content-Length header correctly.
 	int actual_size = TestGetFileSize("testfiles/dsfdsfs98.fd");
@@ -851,7 +865,7 @@ bool test_httpserver()
 		request.AddHeader("authorization", "AWS " EXAMPLE_S3_ACCESS_KEY ":" +
 			signature);
 
-		FileStream fs("testfiles/testrequests.pl");
+		FileStream fs("testfiles/dsfdsfs98.fd");
 		request.SetDataStream(&fs);
 		request.SetForReading();
 
@@ -868,12 +882,12 @@ bool test_httpserver()
 		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
 		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
-		TEST_EQUAL("\"828ef3fdfa96f00ad9f27c383fc9ac7f\"", response.GetHeaderValue("ETag"));
+		TEST_EQUAL("\"dc3b8c5e57e71d31a0a9d7cbeee2e011\"", response.GetHeaderValue("ETag"));
 		TEST_EQUAL("", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_EQUAL(0, response.GetSize());
 
-		FileStream f1("testfiles/testrequests.pl");
+		FileStream f1("testfiles/dsfdsfs98.fd");
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
@@ -964,7 +978,7 @@ bool test_httpserver()
 		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
 		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
-		TEST_EQUAL(34, response.GetHeaderValue("ETag").size());
+		TEST_EQUAL("\"dc3b8c5e57e71d31a0a9d7cbeee2e011\"", response.GetHeaderValue("ETag"));
 		TEST_EQUAL("text/plain", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_THAT(!response.IsKeepAlive());
@@ -992,7 +1006,7 @@ bool test_httpserver()
 		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
 		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
-		TEST_EQUAL("\"828ef3fdfa96f00ad9f27c383fc9ac7f\"", response.GetHeaderValue("ETag"));
+		TEST_EQUAL("\"dc3b8c5e57e71d31a0a9d7cbeee2e011\"", response.GetHeaderValue("ETag"));
 		TEST_EQUAL("", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_EQUAL(0, response.GetSize());
