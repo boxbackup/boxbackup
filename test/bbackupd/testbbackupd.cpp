@@ -427,7 +427,7 @@ bool kill_running_daemons()
 	return success;
 }
 
-bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
+bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_files = true,
 	bool do_start_bbstored = true)
 {
 	Timers::Cleanup(false); // don't throw exception if not initialised
@@ -486,13 +486,13 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 #define SETUP_WITHOUT_FILES() \
 	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd, false), FAIL); \
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false), FAIL); \
 	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
 
 #define SETUP_WITH_BBSTORED() \
 	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd), FAIL);
 
 #define TEARDOWN_TEST_BBACKUPD() \
 	TEST_THAT(bbackupd_pid == 0 || StopClient()); \
@@ -1458,7 +1458,7 @@ bool test_ssl_keepalives()
 	KeepAliveBackupProtocolLocal connection(0x01234567, "test", "backup/01234567/",
 		0, false);
 	MockBackupDaemon bbackupd(connection);
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd), FAIL);
 
 	// Test that sending a keepalive actually works, when the timeout has expired,
 	// but doesn't send anything at the beginning:
@@ -2055,7 +2055,7 @@ bool test_bbackupd_responds_to_connection_failure()
 		MockBackupProtocolLocal client(0x01234567, "test",
 			"backup/01234567/", 0, false);
 		MockBackupDaemon bbackupd(client);
-		TEST_THAT_OR(setup_test_bbackupd(bbackupd, false, false), FAIL);
+		TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, false), FAIL);
 
 		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
 		std::auto_ptr<BackupClientContext> apClientContext;
@@ -3193,8 +3193,8 @@ bool test_excluded_files_are_not_backed_up()
 	BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/",
 		0, false);
 	MockBackupDaemon bbackupd(client);
-	
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd,
+
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd,
 		true, // do_unpack_files
 		false // do_start_bbstored
 		), FAIL);
