@@ -453,7 +453,8 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 //
 // --------------------------------------------------------------------------
 
-void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
+void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
+	bool IncludeContent)
 {
 	std::string path = GetConfiguration().GetKeyValue("StoreDirectory");
 	path += rRequest.GetRequestURI();
@@ -477,11 +478,28 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	// 2616 section 4.4, and the Amazon Simple Storage Service API
 	// Reference, section "HEAD Object" examples, which set it. Also, our
 	// S3BackupFileSystem needs it!
+	//
+	// There are no examples for 304 Not Modified responses to requests
+	// with If-None-Match (ETag match) so clients should not depend on
+	// this, so the S3Simulator should not set Content-Length or ETag, to
+	// ensure that any code which tries to use these headers will fail.
 
-	if(true)
+	std::string if_none_match = rRequest.GetHeaders().GetHeaderValue("if-none-match",
+		false); // required
+	if(digest == if_none_match)
+	{
+		rResponse.SetResponseCode(HTTPResponse::Code_NotModified);
+		rResponse.GetHeaders().SetContentLength(0);
+		IncludeContent = false;
+	}
+	else
 	{
 		rResponse.GetHeaders().SetContentLength(file_length);
 		rResponse.AddHeader("ETag", digest);
+	}
+
+	if(IncludeContent)
+	{
 		apFile->CopyStreamTo(rResponse);
 	}
 

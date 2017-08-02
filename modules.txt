@@ -42,18 +42,18 @@ bin/bbstoreaccounts	lib/backupclient
 bin/bbackupd		lib/bbackupd
 bin/bbackupquery	lib/bbackupquery
 bin/bbackupctl		lib/backupclient	qdbm	lib/bbackupd
+bin/s3simulator		lib/httpserver
 
 test/backupstore	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	lib/raidfile
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient
 test/bbackupd		bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl lib/bbackupquery lib/bbackupd lib/bbstored lib/server lib/intercept
-bin/s3simulator		lib/httpserver
 test/s3store		lib/backupclient lib/httpserver bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
 lib/httpserver          lib/server
-test/httpserver         lib/httpserver
+test/httpserver         lib/httpserver bin/s3simulator
 
 # END_IF_DISTRIBUTION
 
