@@ -277,6 +277,8 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 	}
 	else
 	{
+		// No stream, so it's always safe to enable keep-alive
+		rRequest.SetClientKeepAliveRequested(true);
 		rRequest.Send(*mapClientSocket, mNetworkTimeout);
 		response.Receive(*mapClientSocket, mNetworkTimeout);
 	}
