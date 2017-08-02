@@ -52,8 +52,9 @@ class S3Client
 	  mSecretKey(rSecretKey),
 	  mNetworkTimeout(30000)
 	{ }
-		
-	HTTPResponse GetObject(const std::string& rObjectURI);
+
+	HTTPResponse GetObject(const std::string& rObjectURI,
+		const std::string& MD5Checksum = "");
 	HTTPResponse HeadObject(const std::string& rObjectURI);
 	HTTPResponse PutObject(const std::string& rObjectURI,
 		IOStream& rStreamToSend, const char* pContentType = NULL);
@@ -75,7 +76,11 @@ class S3Client
 	HTTPResponse FinishAndSendRequest(HTTPRequest::Method Method,
 		const std::string& rRequestURI,
 		IOStream* pStreamToSend = NULL,
-		const char* pStreamContentType = NULL);
+		const char* pStreamContentType = NULL,
+		const std::string& MD5Checksum = "");
+	HTTPResponse FinishAndSendRequest(HTTPRequest request,
+		IOStream* pStreamToSend = NULL, const char* pStreamContentType = NULL,
+		const std::string& MD5Checksum = "");
 	HTTPResponse SendRequest(HTTPRequest& rRequest,
 		IOStream* pStreamToSend = NULL,
 		const char* pStreamContentType = NULL);
