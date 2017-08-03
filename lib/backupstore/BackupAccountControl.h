@@ -29,6 +29,11 @@ protected:
 	bool mMachineReadableOutput;
 	std::auto_ptr<BackupFileSystem> mapFileSystem;
 
+	virtual int GetBlockSize()
+	{
+		return mapFileSystem->GetBlockSize();
+	}
+
 public:
 	BackupAccountControl(const Configuration& config,
 		bool machineReadableOutput = false)
@@ -58,6 +63,10 @@ public:
 	  mAccountID(AccountID),
 	  mDiscSetNum(0)
 	{ }
+	virtual int GetBlockSize()
+	{
+		return BlockSizeOfDiscSet(mDiscSetNum);
+	}
 	int BlockSizeOfDiscSet(int discSetNum);
 	bool OpenAccount(NamedLock* pLock);
 	int SetLimit(const char *SoftLimitStr,
