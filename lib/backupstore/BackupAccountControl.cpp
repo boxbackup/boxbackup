@@ -127,7 +127,7 @@ int BackupStoreAccountControl::SetLimit(const char *SoftLimitStr,
 		mDiscSetNum, false /* Read/Write */));
 
 	// Change the limits
-	int blocksize = BlockSizeOfDiscSet(mDiscSetNum);
+	int blocksize = GetBlockSize();
 	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, blocksize);
 	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, blocksize);
 	CheckSoftHardLimits(softlimit, hardlimit);
@@ -182,7 +182,7 @@ int BackupStoreAccountControl::PrintAccountInfo()
 	std::auto_ptr<BackupStoreInfo> ap_info(BackupStoreInfo::Load(mAccountID,
 		mRootDir, mDiscSetNum, true /* ReadOnly */));
 	BackupStoreInfo& info(*ap_info);
-	int BlockSize = BlockSizeOfDiscSet(mDiscSetNum);
+	int BlockSize = GetBlockSize();
 
 	// Then print out lots of info
 	std::cout << FormatUsageLineStart("Account ID", mMachineReadableOutput) <<

@@ -957,10 +957,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage::DoCommand(Ba
 	// Get store info from context
 	const BackupStoreInfo &rinfo(rContext.GetBackupStoreInfo());
 
-	// Find block size
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(rinfo.GetDiscSetNumber()));
-
 	// Return info
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolAccountUsage(
 		rinfo.GetBlocksUsed(),
@@ -969,7 +965,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage::DoCommand(Ba
 		rinfo.GetBlocksInDirectories(),
 		rinfo.GetBlocksSoftLimit(),
 		rinfo.GetBlocksHardLimit(),
-		rdiscSet.GetBlockSize()
+		rContext.GetBlockSize()
 	));
 }
 
@@ -1007,10 +1003,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 	// Get store info from context
 	const BackupStoreInfo &info(rContext.GetBackupStoreInfo());
 
-	// Find block size
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(info.GetDiscSetNumber()));
-
 	// Return info
 	BackupProtocolAccountUsage2* usage = new BackupProtocolAccountUsage2();
 	std::auto_ptr<BackupProtocolMessage> reply(usage);
@@ -1018,7 +1010,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 	COPY(AccountName);
 	usage->SetAccountEnabled(info.IsAccountEnabled());
 	COPY(ClientStoreMarker);
-	usage->SetBlockSize(rdiscSet.GetBlockSize());
+	usage->SetBlockSize(rContext.GetBlockSize());
 	COPY(LastObjectIDUsed);
 	COPY(BlocksUsed);
 	COPY(BlocksInCurrentFiles);
