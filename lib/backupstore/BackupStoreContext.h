@@ -16,6 +16,7 @@
 
 #include "autogen_BackupProtocol.h"
 #include "autogen_BackupStoreException.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "NamedLock.h"
@@ -95,7 +96,7 @@ public:
 		}
 	}
 
-	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet) {mClientHasAccount = true; mAccountRootDir = rStoreRoot; mStoreDiscSet = StoreDiscSet;}
+	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet);
 	bool GetClientHasAccount() const {return mClientHasAccount;}
 	const std::string &GetAccountRoot() const {return mAccountRootDir;}
 	int GetStoreDiscSet() const {return mStoreDiscSet;}
@@ -185,6 +186,7 @@ public:
 	// Info
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
+	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
 
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
@@ -210,6 +212,17 @@ private:
 
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
+
+	// mapOwnFileSystem is initialised when we created our own BackupFileSystem,
+	// using the old constructor. It ensures that the BackupFileSystem is deleted
+	// when this BackupStoreContext is destroyed. TODO: stop using that old
+	// constructor, and remove this member.
+	std::auto_ptr<BackupFileSystem> mapOwnFileSystem;
+
+	// mpFileSystem is always initialised when SetClientHasAccount() has been called,
+	// whether or not we created it ourselves, and all internal functions use this
+	// member instead of mapOwnFileSystem.
+	BackupFileSystem* mpFileSystem;
 
 	// Non-const version for internal use:
 	BackupStoreInfo& GetBackupStoreInfoInternal() const
