@@ -93,7 +93,7 @@ bool delete_account();
 		{ \
 			TEST_EQUAL_LINE(BackupProtocolError::error, subtype, \
 				"command returned error: " << \
-				BackupProtocolError::GetMessage(subtype)); \
+				(protocol).GetLastErrorMessage()); \
 			if (subtype != BackupProtocolError::error) \
 			{ \
 				or_statements; \
@@ -101,9 +101,9 @@ bool delete_account();
 		} \
 		else \
 		{ \
-			TEST_FAIL_WITH_MESSAGE("command did not return an error, but a " \
-				"response of type " << type << ", subtype " << subtype << \
-				" instead"); \
+			TEST_FAIL_WITH_MESSAGE("command did not return an error, " \
+				"but " << (protocol).GetLastErrorMessage() << " " \
+				"instead (" << type << "/" << subtype << ")"); \
 			or_statements; \
 		} \
 	}
