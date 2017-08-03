@@ -582,12 +582,14 @@ public:
 	virtual std::auto_ptr<IOStream> ReceiveStream() = 0;
 	bool GetLastError(int &rTypeOut, int &rSubTypeOut);
 	int GetLastErrorType() { return mLastErrorSubType; }
+	const std::string& GetLastErrorMessage() { return mLastErrorMessage; }
 
 protected:
-	void SetLastError(int Type, int SubType)
+	void SetLastError(int Type, int SubType, const std::string& Message)
 	{
 		mLastErrorType = Type;
 		mLastErrorSubType = SubType;
+		mLastErrorMessage = Message;
 	}
 	std::string mPreviousCommand;
 	std::string mPreviousReply;
@@ -596,6 +598,7 @@ private:
 	$client_server_base_class(const $client_server_base_class &rToCopy); /* do not call */
 	int mLastErrorType;
 	int mLastErrorSubType;
+	std::string mLastErrorMessage;
 };
 
 class $replyable_base_class : public virtual $client_server_base_class
@@ -621,7 +624,8 @@ __E
 print CPP <<__E;
 $client_server_base_class\::$client_server_base_class()
 : mLastErrorType(Protocol::NoError),
-  mLastErrorSubType(Protocol::NoError)
+  mLastErrorSubType(Protocol::NoError),
+  mLastErrorMessage("no messages received")
 { }
 
 $client_server_base_class\::~$client_server_base_class()
@@ -684,7 +688,7 @@ void $callable_base_class\::CheckReply(const std::string& requestCommandName,
 	if(rReply.GetType() == expectedType)
 	{
 		// Correct response, do nothing
-		SetLastError(Protocol::NoError, Protocol::NoError);
+		SetLastError(Protocol::NoError, Protocol::NoError, "no error");
 	}
 	else
 	{
@@ -693,7 +697,7 @@ void $callable_base_class\::CheckReply(const std::string& requestCommandName,
 		
 		if(rReply.IsError(type, subType))
 		{
-			SetLastError(type, subType);
+			SetLastError(type, subType, (($error_class&)rReply).GetMessage());
 			THROW_EXCEPTION_MESSAGE(ConnectionException,
 				Protocol_UnexpectedReply,
 				requestCommandName << " command failed: "
@@ -702,12 +706,13 @@ void $callable_base_class\::CheckReply(const std::string& requestCommandName,
 		}
 		else
 		{
-			SetLastError(Protocol::UnknownError, Protocol::UnknownError);
+			SetLastError(Protocol::UnknownError, Protocol::UnknownError,
+				rReply.ToString());
 			THROW_EXCEPTION_MESSAGE(ConnectionException,
 				Protocol_UnexpectedReply,
 				requestCommandName << " command failed: "
-				"received unexpected response type " <<
-				rReply.GetType());
+				"received unexpected response " <<
+				rReply.ToString());
 		}
 	}
 
