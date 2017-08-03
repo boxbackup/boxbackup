@@ -70,6 +70,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mStoreDiscSet(-1),
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+  mpFileSystem(NULL),
   mpTestHook(NULL)
 // If you change the initialisers, be sure to update
 // BackupStoreContext::CleanUp as well!
@@ -187,6 +188,20 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	return gotLock;
 }
 
+
+void BackupStoreContext::SetClientHasAccount(const std::string &rStoreRoot,
+	int StoreDiscSet)
+{
+	// Check that the BackupStoreContext hasn't already been initialised, or already
+	// created its own BackupFileSystem.
+	ASSERT(!mpFileSystem);
+	mClientHasAccount = true;
+	mapOwnFileSystem.reset(
+		new RaidBackupFileSystem(mClientID, rStoreRoot, StoreDiscSet));
+	mpFileSystem = mapOwnFileSystem.get();
+	mAccountRootDir = rStoreRoot;
+	mStoreDiscSet = StoreDiscSet;
+}
 
 // --------------------------------------------------------------------------
 //
