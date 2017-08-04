@@ -35,21 +35,30 @@
 // --------------------------------------------------------------------------
 box_time_t GetCurrentBoxTime()
 {
-	#ifdef HAVE_GETTIMEOFDAY
-		struct timeval tv;
-		if (gettimeofday(&tv, NULL) != 0)
-		{
-			BOX_LOG_SYS_ERROR("Failed to gettimeofday(), "
-				"dropping precision");
-		}
-		else
-		{
-			box_time_t timeNow = (tv.tv_sec * MICRO_SEC_IN_SEC_LL)
-				+ tv.tv_usec;
-			return timeNow;
-		}
-	#endif
-	
+#ifdef HAVE_GETTIMEOFDAY
+	struct timeval tv;
+	if (gettimeofday(&tv, NULL) != 0)
+	{
+		BOX_LOG_SYS_ERROR("Failed to gettimeofday(), "
+			"dropping precision");
+	}
+	else
+	{
+		box_time_t time_now = (tv.tv_sec * MICRO_SEC_IN_SEC_LL) + tv.tv_usec;
+		return time_now;
+	}
+#elif WIN32
+	// There's no Win32 API function that returns the current time as a UNIX timestamp with
+	// sub-second precision. So we use time(0) and add the fractional part from
+	// GetSystemTime() in the hope that the difference between these two (if any) is a whole
+	// number of seconds.
+	box_time_t time_now = SecondsToBoxTime(time(0));
+	SYSTEMTIME system_time;
+	GetSystemTime(&system_time);
+	time_now += MilliSecondsToBoxTime(system_time.wMilliseconds);
+	return time_now;
+#endif
+
 	return SecondsToBoxTime(time(0));
 }
 
