@@ -52,30 +52,24 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
 		{
 			// Lookup hostname
 			struct hostent *phost = ::gethostbyname(rName.c_str());
-			if(phost != NULL)
+			if(phost != NULL && phost->h_addr_list[0] != 0)
 			{
-				if(phost->h_addr_list[0] != 0)
-				{
-					sockAddrLen = sizeof(addr.sa_inet);
+				sockAddrLen = sizeof(addr.sa_inet);
 #ifdef HAVE_STRUCT_SOCKADDR_IN_SIN_LEN
-					addr.sa_inet.sin_len = sizeof(addr.sa_inet);
+				addr.sa_inet.sin_len = sizeof(addr.sa_inet);
 #endif
-					addr.sa_inet.sin_family = PF_INET;
-					addr.sa_inet.sin_port = htons(Port);
-					addr.sa_inet.sin_addr = *((in_addr*)phost->h_addr_list[0]);
-					for(unsigned int l = 0; l < sizeof(addr.sa_inet.sin_zero); ++l)
-					{
-						addr.sa_inet.sin_zero[l] = 0;
-					}
-				}
-				else
+				addr.sa_inet.sin_family = PF_INET;
+				addr.sa_inet.sin_port = htons(Port);
+				addr.sa_inet.sin_addr = *((in_addr*)phost->h_addr_list[0]);
+				for(unsigned int l = 0; l < sizeof(addr.sa_inet.sin_zero); ++l)
 				{
-					THROW_EXCEPTION(ConnectionException, SocketNameLookupError);
+					addr.sa_inet.sin_zero[l] = 0;
 				}
 			}
 			else
 			{
-				THROW_EXCEPTION(ConnectionException, SocketNameLookupError);
+				THROW_SOCKET_ERROR("Failed to resolve hostname: " << rName,
+					ConnectionException, SocketNameLookupError);
 			}
 		}
 		break;
