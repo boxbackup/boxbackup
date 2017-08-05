@@ -126,5 +126,6 @@ ExternalProject_Add(boxbackup
 		-DDEBUG=${DEBUG}
 		${boxbackup_cmake_args}
 		${SUB_CMAKE_EXTRA_ARGS}
-	STEP_TARGETS configure build install
+	INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "No install step needed"
+	STEP_TARGETS configure build
 )
