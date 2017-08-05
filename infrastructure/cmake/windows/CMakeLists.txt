@@ -20,9 +20,9 @@ set(OPENSSL_VERSION 1.0.2j)
 set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431)
 
 # Version of PCRE to download, build, and compile Box Backup against:
-set(PCRE_VERSION    8.39)
-# Hash of pcre-${PCRE_VERSION}.tar.gz, to be verified after download:
-set(PCRE_HASH SHA256=ccdf7e788769838f8285b3ee672ed573358202305ee361cfec7a4a4fb005bbc7)
+set(PCRE_VERSION    8.41)
+# Hash of pcre-${PCRE_VERSION}.tar.bz2, to be verified after download:
+set(PCRE_HASH SHA256=e62c7eac5ae7c0e7286db61ff82912e1c0b7a0c13706616e94a7dd729321b530)
 
 # Version of Boost to download, unpack, and compile Box Backup against:
 set(BOOST_VERSION    1.62.0)
@@ -81,10 +81,8 @@ else()
 endif()
 
 ExternalProject_Add(pcre
-	# Temporarily use SVN repo until the PCRE_STATIC issue in 8.40 is fixed:
-	# https://vcs.pcre.org/pcre?view=revision&revision=1677
-	SVN_REPOSITORY svn://vcs.exim.org/pcre/code/trunk
-	SVN_REVISION -r 1677
+	URL "http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-${PCRE_VERSION}.tar.bz2"
+	URL_HASH ${PCRE_HASH}
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	-DPCRE_SUPPORT_LIBREADLINE=OFF
