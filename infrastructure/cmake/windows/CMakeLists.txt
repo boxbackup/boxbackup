@@ -15,9 +15,9 @@ set(ZLIB_VERSION    1.2.11)
 set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1)
 
 # Version of OpenSSL to download, build, and compile Box Backup against:
-set(OPENSSL_VERSION 1.0.2j)
+set(OPENSSL_VERSION 1.0.2l)
 # Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download:
-set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431)
+set(OPENSSL_HASH SHA256=ce07195b659e75f4e1db43552860070061f156a98bb37b672b101ba6e3ddf30c)
 
 # Version of PCRE to download, build, and compile Box Backup against:
 set(PCRE_VERSION    8.39)
@@ -57,7 +57,10 @@ if(WIN32)
 		# so we can link statically against them and still get a dynamic runtime.
 		BUILD_IN_SOURCE 1
 		BUILD_COMMAND   nmake /s /f ms\\nt.mak
+		TEST_BEFORE_INSTALL 1
+		TEST_COMMAND    nmake /s /f ms\\nt.mak test
 		INSTALL_COMMAND nmake /s /f ms\\nt.mak install
+		STEP_TARGETS test
 	)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	ExternalProject_Add(openssl
