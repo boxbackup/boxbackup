@@ -624,7 +624,8 @@ void RaidFileWrite::TransformToRaidStorage()
 								:blockSize;
 				if(::write(((l&1)==0)?stripe1:stripe2, writeFrom, toWrite) != toWrite)
 				{
-					THROW_EXCEPTION(RaidFileException, OSError)
+					THROW_SYS_FILE_ERROR("Failed to write to permanent RAID file",
+						writeFilename, RaidFileException, OSError);
 				}			
 
 				// Next block
@@ -637,7 +638,8 @@ void RaidFileWrite::TransformToRaidStorage()
 		// Error on read?
 		if(bytesRead == -1)
 		{
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_FILE_ERROR("Failed to read from temporary RAID file", writeFilename,
+				RaidFileException, OSError);
 		}
 		
 		// Special case for zero length files
@@ -655,9 +657,8 @@ void RaidFileWrite::TransformToRaidStorage()
 			ASSERT((::lseek(parity, 0, SEEK_CUR) % blockSize) == 0);
 			if(::write(parity, &sw, sizeof(sw)) != sizeof(sw))
 			{
-				BOX_LOG_SYS_ERROR("Failed to write to file: " <<
-					writeFilename);
-				THROW_EXCEPTION(RaidFileException, OSError)
+				THROW_SYS_FILE_ERROR("Failed to write to file", writeFilename,
+					RaidFileException, OSError);
 			}
 		}
 
@@ -688,7 +689,7 @@ void RaidFileWrite::TransformToRaidStorage()
 			|| ::rename(stripe2FilenameW.c_str(), stripe2Filename.c_str()) != 0
 			|| ::rename(parityFilenameW.c_str(), parityFilename.c_str()) != 0)
 		{
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_ERROR("Failed to rename file", RaidFileException, OSError);
 		}
 
 		// Close the write file
@@ -697,9 +698,8 @@ void RaidFileWrite::TransformToRaidStorage()
 		// Finally delete the write file
 		if(EMU_UNLINK(writeFilename.c_str()) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to delete file: " <<
-				writeFilename);
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_FILE_ERROR("Failed to delete file", writeFilename,
+				RaidFileException, OSError);
 		}
 	}
 	catch(...)
