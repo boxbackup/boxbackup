@@ -45,5 +45,10 @@ matrix:
     - os: osx
       compiler: gcc
 
+branches:
+  except:
+    # Exclude tags created by AppVeyor for releases (binary builds)
+    - /^BoxBackup-/
+
 script:
   - env EXTRA_MAKE_ARGS=-j2 ./infrastructure/travis-build.sh
