@@ -119,9 +119,22 @@ std::string HTTPRequest::GetMethodName() const
 	};
 }
 
-std::string HTTPRequest::GetRequestURI() const
+std::string HTTPRequest::GetRequestURI(bool with_parameters_for_get_request) const
 {
-	return mRequestURI;
+	if(!with_parameters_for_get_request)
+	{
+		return mRequestURI;
+	}
+
+	std::ostringstream query_string;
+	for(Query_t::const_iterator i = mQuery.begin(); i != mQuery.end(); i++)
+	{
+		query_string << ((i == mQuery.begin()) ? "?" : "&");
+		query_string << HTTPQueryDecoder::URLEncode(i->first) << "=" <<
+			HTTPQueryDecoder::URLEncode(i->second);
+	}
+
+	return mRequestURI + query_string.str();
 }
 
 // --------------------------------------------------------------------------
