@@ -97,6 +97,10 @@ public:
 	};
 
 	static const char *ResponseCodeToString(int ResponseCode);
+	const char *ResponseCodeString() const
+	{
+		return ResponseCodeToString(mResponseCode);
+	}
 
 	void WriteStringDefang(const char *String, unsigned int StringLen);
 	void WriteStringDefang(const std::string &rString) {WriteStringDefang(rString.c_str(), rString.size());}
