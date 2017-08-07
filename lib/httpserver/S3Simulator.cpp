@@ -436,7 +436,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	}
 
 	BOX_NOTICE(rResponse.GetResponseCode() << " " << rRequest.GetMethodName() << " " <<
-		rRequest.GetRequestURI());
+		rRequest.GetRequestURI(true)); // with_parameters_for_get_request
 
 	return;
 }
