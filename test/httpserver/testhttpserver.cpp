@@ -138,6 +138,18 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.Write(DEFAULT_RESPONSE_2, sizeof(DEFAULT_RESPONSE_2) - 1);
 }
 
+std::vector<std::string> get_entry_names(const std::vector<S3Client::BucketEntry> entries)
+{
+	std::vector<std::string> entry_names;
+	for(std::vector<S3Client::BucketEntry>::const_iterator i = entries.begin();
+		i != entries.end(); i++)
+	{
+		entry_names.push_back(i->name());
+
+	}
+	return entry_names;
+}
+
 bool exercise_s3client(S3Client& client)
 {
 	int num_failures_initial = num_failures;
@@ -210,7 +222,67 @@ bool exercise_s3client(S3Client& client)
 	TEST_EQUAL("", response.GetHeaders().GetHeaderValue("etag", false)); // !required
 
 	// This will fail if the file was created in the wrong place:
-	TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
+
+	// Test the ListBucket command.
+	std::vector<S3Client::BucketEntry> actual_contents;
+	std::vector<std::string> actual_common_prefixes;
+	TEST_EQUAL(3, client.ListBucket(&actual_contents, &actual_common_prefixes));
+	std::vector<std::string> actual_entry_names =
+		get_entry_names(actual_contents);
+
+	std::vector<std::string> expected_contents;
+	expected_contents.push_back("dsfdsfs98.fd");
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
+
+	std::vector<std::string> expected_common_prefixes;
+	expected_common_prefixes.push_back("photos/");
+	expected_common_prefixes.push_back("subdir/");
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test that max_keys works.
+	actual_contents.clear();
+	actual_common_prefixes.clear();
+
+	bool is_truncated;
+	TEST_EQUAL(2,
+		client.ListBucket(
+			&actual_contents, &actual_common_prefixes,
+			"", // prefix
+			"/", // delimiter
+			&is_truncated,
+			2)); // max_keys
+
+	TEST_THAT(is_truncated);
+	expected_contents.clear();
+	expected_contents.push_back("dsfdsfs98.fd");
+	actual_entry_names = get_entry_names(actual_contents);
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
+
+	expected_common_prefixes.clear();
+	expected_common_prefixes.push_back("photos/");
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test that marker works.
+	actual_contents.clear();
+	actual_common_prefixes.clear();
+
+	TEST_EQUAL(2,
+		client.ListBucket(
+			&actual_contents, &actual_common_prefixes,
+			"", // prefix
+			"/", // delimiter
+			&is_truncated,
+			2, // max_keys
+			"photos")); // marker
+
+	TEST_THAT(!is_truncated);
+	expected_contents.clear();
+	actual_entry_names = get_entry_names(actual_contents);
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
+
+	expected_common_prefixes.push_back("subdir/");
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
 
 	// Test is successful if the number of failures has not increased.
 	return (num_failures == num_failures_initial);
@@ -381,12 +453,9 @@ bool send_and_receive(HTTPRequest& request, HTTPResponse& response,
 	return (response.GetResponseCode() == expected_status_code);
 }
 
-bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
+bool parse_xml_response(HTTPResponse& response, ptree& response_tree,
 	const std::string& expected_root_element)
 {
-	HTTPResponse response;
-	TEST_THAT_OR(send_and_receive(request, response), return false);
-
 	std::string response_data((const char *)response.GetBuffer(),
 		response.GetSize());
 	std::auto_ptr<std::istringstream> ap_response_stream(
@@ -399,6 +468,14 @@ bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
 		"There should only be one item in the response tree root");
 
 	return true;
+}
+
+bool send_and_receive_xml(HTTPRequest& request, ptree& response_tree,
+	const std::string& expected_root_element)
+{
+	HTTPResponse response;
+	TEST_THAT_OR(send_and_receive(request, response), return false);
+	return parse_xml_response(response, response_tree, expected_root_element);
 }
 
 typedef std::multimap<std::string, std::string> multimap_t;
@@ -861,6 +938,87 @@ bool test_httpserver()
 			"0PN5J17HBGZHT7JJ3X82:xXjDGYUmKxnwqr5KXNPGldn5LbB=</pre>\n"
 			"<p>Please try again later.</p></body>\n"
 			"</html>\n", response_data);
+	}
+
+	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
+	{
+		FileStream in("testfiles/dsfdsfs98.fd", O_RDONLY);
+		FileStream out("testfiles/store/dsfdsfs98.fd", O_CREAT | O_WRONLY);
+		in.CopyStreamTo(out);
+	}
+
+	// Tests for the S3Simulator ListBucket implementation
+	{
+		S3Simulator simulator;
+		simulator.Configure("testfiles/s3simulator.conf");
+
+		// List contents of bucket
+		HTTPRequest request(HTTPRequest::Method_GET, "/");
+		request.SetParameter("delimiter", "/");
+		request.SetHostName("johnsmith.s3.amazonaws.com");
+		request.AddHeader("date", "Tue, 27 Mar 2007 19:36:42 +0000");
+		std::string signature = calculate_s3_signature(request,
+			EXAMPLE_S3_SECRET_KEY);
+		request.AddHeader("authorization",
+			"AWS " EXAMPLE_S3_ACCESS_KEY ":" + signature);
+
+		HTTPResponse response;
+		simulator.Handle(request, response);
+		TEST_EQUAL(HTTPResponse::Code_OK, response.GetResponseCode());
+		std::vector<std::string> expected_contents;
+
+		if(response.GetResponseCode() == HTTPResponse::Code_OK)
+		{
+			ptree response_tree;
+			TEST_THAT(parse_xml_response(response, response_tree,
+				"ListBucketResult"));
+			// A response containing a single item should not be truncated!
+			TEST_EQUAL("false",
+				response_tree.get<std::string>(
+					"ListBucketResult.IsTruncated"));
+
+			// Iterate over all the children of the ListBucketResult, looking for
+			// nodes called "Contents", and examine them.
+			std::vector<std::string> contents;
+			BOOST_FOREACH(ptree::value_type &v,
+				response_tree.get_child("ListBucketResult"))
+			{
+				if(v.first == "Contents")
+				{
+					std::string name = v.second.get<std::string>("Key");
+					contents.push_back(name);
+					if(name == "dsfdsfs98.fd")
+					{
+						TEST_EQUAL("&quot;dc3b8c5e57e71d31a0a9d7cbeee2e011&quot;",
+							v.second.get<std::string>("ETag"));
+						TEST_EQUAL("4269", v.second.get<std::string>("Size"));
+					}
+				}
+			}
+
+			expected_contents.push_back("dsfdsfs98.fd");
+			TEST_THAT(test_equal_lists(expected_contents, contents));
+
+			int num_common_prefixes = 0;
+			BOOST_FOREACH(ptree::value_type &v,
+				response_tree.get_child("ListBucketResult.CommonPrefixes"))
+			{
+				num_common_prefixes++;
+				TEST_EQUAL("Prefix", v.first);
+				std::string expected_name;
+				if(num_common_prefixes == 1)
+				{
+					expected_name = "photos/";
+				}
+				else
+				{
+					expected_name = "subdir/";
+				}
+				TEST_EQUAL_LINE(expected_name, v.second.data(),
+					"line " << num_common_prefixes);
+			}
+			TEST_EQUAL(2, num_common_prefixes);
+		}
 	}
 
 	// Test the S3Simulator's implementation of PUT file uploads
