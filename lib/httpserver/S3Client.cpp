@@ -344,9 +344,11 @@ void S3Client::CheckResponse(const HTTPResponse& response, const std::string& me
 {
 	if(response.GetResponseCode() != HTTPResponse::Code_OK)
 	{
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
 		THROW_EXCEPTION_MESSAGE(HTTPException, RequestFailedUnexpectedly,
-			message << ": " <<
-			HTTPResponse::ResponseCodeToString(response.GetResponseCode()));
+			message << ": " << response.ResponseCodeString() << ":\n" <<
+			response_data);
 	}
 }
 
