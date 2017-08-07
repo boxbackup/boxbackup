@@ -110,7 +110,7 @@ public:
 	
 	enum Method GetMethod() const {return mMethod;}
 	std::string GetMethodName() const;
-	std::string GetRequestURI() const;
+	std::string GetRequestURI(bool with_parameters_for_get_request = false) const;
 
 	const std::string &GetHostName() const {return mHeaders.GetHostName();}
 	void SetHostName(const std::string& rHostName)
