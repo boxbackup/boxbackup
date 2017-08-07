@@ -9,6 +9,12 @@
 
 #include "Box.h"
 
+#ifdef HAVE_DIRENT_H
+#	include <dirent.h>
+#endif
+
+#include <sys/types.h>
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -365,6 +371,12 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
 				"Unsupported Amazon SimpleDB Method");
 		}
+		else if(rRequest.GetMethod() == HTTPRequest::Method_GET &&
+			(rRequest.GetRequestURI() == "" ||
+			 rRequest.GetRequestURI() == "/"))
+		{
+			HandleListObjects(bucket_name, rRequest, rResponse);
+		}
 		else if(rRequest.GetMethod() == HTTPRequest::Method_GET)
 		{
 			HandleGet(rRequest, rResponse);
@@ -439,6 +451,216 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		rRequest.GetRequestURI(true)); // with_parameters_for_get_request
 
 	return;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Simulator::HandleListObjects(
+//			 const std::string& bucket_name,
+//			 HTTPRequest &rRequest,
+//			 HTTPResponse &rResponse)
+//		Purpose: Handles an S3 list objects request.
+//		Created: 15/03/2016
+//
+// --------------------------------------------------------------------------
+
+void S3Simulator::HandleListObjects(const std::string& bucket_name,
+	HTTPRequest &request, HTTPResponse &response)
+{
+	if(bucket_name.empty())
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+			"A bucket name is required");
+	}
+
+	std::string delimiter = request.GetParameterString("delimiter", "/");
+	if(delimiter != "/")
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest, "Delimiter must be /");
+	}
+
+	std::string prefix = request.GetParameterString("prefix", "");
+	if(prefix != "" && !EndsWith("/", prefix))
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+			"Prefix must be empty, or end with /, but was: '" << prefix << "'");
+	}
+
+	std::string marker = request.GetParameterString("marker", "");
+	std::string max_keys_str = request.GetParameterString("max-keys", "1000");
+	int max_keys;
+	{
+		char* p_end;
+		max_keys = strtol(max_keys_str.c_str(), &p_end, 10);
+		if(*p_end != 0)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+				"max-keys parameter must be an integer: '" <<
+				max_keys_str << "'");
+		}
+	}
+
+	std::string base_path = GetConfiguration().GetKeyValue("StoreDirectory");
+	std::string prefixed_path = base_path + "/" + prefix;
+	if(!EndsWith("/", prefixed_path))
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, Internal,
+			"Directory name must end with '/': " << prefixed_path);
+	}
+	RemoveSuffix("/", prefixed_path);
+
+	DIR *p_dir = opendir(prefixed_path.c_str());
+	if(p_dir == NULL)
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, FileNotFound,
+			"Directory not found: " << prefixed_path);
+	}
+
+	typedef std::map<std::string, int> object_name_to_type_t;
+	object_name_to_type_t object_name_to_type;
+
+	try
+	{
+		for(struct dirent* p_dirent = readdir(p_dir); p_dirent != NULL;
+			p_dirent = readdir(p_dir))
+		{
+			std::string entry_name(p_dirent->d_name);
+			if(entry_name == "." || entry_name == "..")
+			{
+				continue;
+			}
+
+			std::string entry_path = prefixed_path + DIRECTORY_SEPARATOR +
+				entry_name;
+
+			// Prefix must be empty, or end with /
+			ASSERT(prefix == "" || EndsWith("/", prefix));
+			std::string object_name = prefix + entry_name;
+
+#ifdef HAVE_VALID_DIRENT_D_TYPE
+			if(p_dirent->d_type == DT_UNKNOWN)
+#else
+			// Always use this branch if we don't have struct dirent.d_type:
+			if(true)
+#endif
+			{
+				int entry_type = ObjectExists(entry_path);
+				if(entry_type == ObjectExists_File)
+				{
+					object_name_to_type[object_name] =
+							ObjectExists_File;
+				}
+				else if(entry_type == ObjectExists_Dir)
+				{
+					object_name_to_type[object_name] =
+							ObjectExists_Dir;
+				}
+				else
+				{
+					continue;
+				}
+			}
+#ifdef HAVE_VALID_DIRENT_D_TYPE
+			else if(p_dirent->d_type == DT_REG)
+			{
+				object_name_to_type[object_name] = ObjectExists_File;
+			}
+			else if(p_dirent->d_type == DT_DIR)
+			{
+				object_name_to_type[object_name] = ObjectExists_Dir;
+			}
+#endif // HAVE_VALID_DIRENT_D_TYPE
+			else
+			{
+				continue;
+			}
+		}
+	}
+	catch(BoxException &e)
+	{
+		closedir(p_dir);
+		throw;
+	}
+
+	ptree result;
+	result.add("Name", bucket_name);
+	result.add("Prefix", prefix);
+	result.add("Marker", marker);
+	result.add("Delimiter", delimiter);
+
+	ptree common_prefixes;
+
+	bool truncated = false;
+	int result_count = 0;
+	for(object_name_to_type_t::iterator i = object_name_to_type.lower_bound(marker);
+		i != object_name_to_type.end(); i++)
+	{
+		if(result_count >= max_keys)
+		{
+			truncated = true;
+			break;
+		}
+
+		// Both Contents and CommonPrefixes count towards number of
+		// elements returned. Each CommonPrefix counts as a single return,
+		// regardless of the number of files it contains/abbreviates.
+		result_count++;
+
+		if(i->second == ObjectExists_Dir)
+		{
+			common_prefixes.add("Prefix", i->first + delimiter);
+			continue;
+		}
+
+		std::string entry_path = base_path + DIRECTORY_SEPARATOR + i->first;
+		int64_t size;
+		if(!FileExists(entry_path, &size, true)) // TreatLinksAsNotExisting
+		{
+			continue;
+		}
+
+		ptree contents;
+		contents.add("Key", i->first);
+
+		std::string digest;
+		{
+			std::auto_ptr<FileStream> ap_file;
+			ap_file.reset(new FileStream(entry_path));
+
+			MD5DigestStream digester;
+			ap_file->CopyStreamTo(digester);
+			ap_file->Seek(0, IOStream::SeekType_Absolute);
+			digester.Close();
+			digest = "&quot;" + digester.DigestAsString() + "&quot;";
+		}
+		contents.add("ETag", digest);
+
+		std::ostringstream size_stream;
+		size_stream << size;
+		contents.add("Size", size_stream.str());
+
+		result.add_child("Contents", contents);
+	}
+
+	closedir(p_dir);
+
+	result.add("IsTruncated", truncated ? "true" : "false");
+	result.add_child("CommonPrefixes", common_prefixes);
+
+	ptree response_tree;
+	response_tree.add_child("ListBucketResult", result);
+
+	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
+	response.AddHeader("x-amz-id-2", "qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY");
+	response.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
+	response.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+	response.AddHeader("Last-Modified", "Sun, 1 Jan 2006 12:00:00 GMT");
+	response.AddHeader("Server", "AmazonS3");
+
+	response.SetResponseCode(HTTPResponse::Code_OK);
+	response.Write(PtreeToXmlString(response_tree));
 }
 
 
