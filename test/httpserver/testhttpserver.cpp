@@ -138,6 +138,18 @@ void TestWebServer::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.Write(DEFAULT_RESPONSE_2, sizeof(DEFAULT_RESPONSE_2) - 1);
 }
 
+std::vector<std::string> get_entry_names(const std::vector<S3Client::BucketEntry> entries)
+{
+	std::vector<std::string> entry_names;
+	for(std::vector<S3Client::BucketEntry>::const_iterator i = entries.begin();
+		i != entries.end(); i++)
+	{
+		entry_names.push_back(i->name());
+
+	}
+	return entry_names;
+}
+
 bool exercise_s3client(S3Client& client)
 {
 	int num_failures_initial = num_failures;
@@ -210,7 +222,67 @@ bool exercise_s3client(S3Client& client)
 	TEST_EQUAL("", response.GetHeaders().GetHeaderValue("etag", false)); // !required
 
 	// This will fail if the file was created in the wrong place:
-	TEST_EQUAL(0, ::unlink("testfiles/store/newfile"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
+
+	// Test the ListBucket command.
+	std::vector<S3Client::BucketEntry> actual_contents;
+	std::vector<std::string> actual_common_prefixes;
+	TEST_EQUAL(3, client.ListBucket(&actual_contents, &actual_common_prefixes));
+	std::vector<std::string> actual_entry_names =
+		get_entry_names(actual_contents);
+
+	std::vector<std::string> expected_contents;
+	expected_contents.push_back("dsfdsfs98.fd");
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
+
+	std::vector<std::string> expected_common_prefixes;
+	expected_common_prefixes.push_back("photos/");
+	expected_common_prefixes.push_back("subdir/");
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test that max_keys works.
+	actual_contents.clear();
+	actual_common_prefixes.clear();
+
+	bool is_truncated;
+	TEST_EQUAL(2,
+		client.ListBucket(
+			&actual_contents, &actual_common_prefixes,
+			"", // prefix
+			"/", // delimiter
+			&is_truncated,
+			2)); // max_keys
+
+	TEST_THAT(is_truncated);
+	expected_contents.clear();
+	expected_contents.push_back("dsfdsfs98.fd");
+	actual_entry_names = get_entry_names(actual_contents);
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
+
+	expected_common_prefixes.clear();
+	expected_common_prefixes.push_back("photos/");
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
+
+	// Test that marker works.
+	actual_contents.clear();
+	actual_common_prefixes.clear();
+
+	TEST_EQUAL(2,
+		client.ListBucket(
+			&actual_contents, &actual_common_prefixes,
+			"", // prefix
+			"/", // delimiter
+			&is_truncated,
+			2, // max_keys
+			"photos")); // marker
+
+	TEST_THAT(!is_truncated);
+	expected_contents.clear();
+	actual_entry_names = get_entry_names(actual_contents);
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
+
+	expected_common_prefixes.push_back("subdir/");
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
 
 	// Test is successful if the number of failures has not increased.
 	return (num_failures == num_failures_initial);
