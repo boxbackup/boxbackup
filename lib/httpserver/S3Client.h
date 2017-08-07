@@ -53,6 +53,27 @@ class S3Client
 	  mNetworkTimeout(30000)
 	{ }
 
+	class BucketEntry {
+	public:
+		BucketEntry(const std::string& name, const std::string& etag,
+			int64_t size)
+		: mName(name),
+		  mEtag(etag),
+		  mSize(size)
+		{ }
+		const std::string& name() const { return mName; }
+		const std::string& etag() const { return mEtag; }
+		const int64_t size() const { return mSize; }
+	private:
+		std::string mName, mEtag;
+		int64_t mSize;
+	};
+
+	int ListBucket(std::vector<S3Client::BucketEntry>* p_contents_out,
+		std::vector<std::string>* p_common_prefixes_out,
+		const std::string& prefix = "", const std::string& delimiter = "/",
+		bool* p_truncated_out = NULL, int max_keys = -1,
+		const std::string& marker = "");
 	HTTPResponse GetObject(const std::string& rObjectURI,
 		const std::string& MD5Checksum = "");
 	HTTPResponse HeadObject(const std::string& rObjectURI);
