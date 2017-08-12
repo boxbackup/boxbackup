@@ -192,6 +192,22 @@ HTTPResponse S3Client::HeadObject(const std::string& rObjectURI)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    S3Client::DeleteObject(const std::string& rObjectURI)
+//		Purpose: Delete the object with the specified URI (key) from
+//			 your S3 bucket.
+//		Created: 27/01/2016
+//
+// --------------------------------------------------------------------------
+
+HTTPResponse S3Client::DeleteObject(const std::string& rObjectURI)
+{
+	return FinishAndSendRequest(HTTPRequest::Method_DELETE, rObjectURI);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    S3Client::PutObject(const std::string& rObjectURI,
 //			 IOStream& rStreamToSend, const char* pContentType)
 //		Purpose: Upload the stream to S3, creating or overwriting the
@@ -455,17 +471,27 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 //
 // Function
 //		Name:    S3Client::CheckResponse(HTTPResponse&,
-//			 std::string& message)
+//		         std::string& message)
 //		Purpose: Check the status code of an Amazon S3 response, and
-//			 throw an exception with a useful message (including
-//			 the supplied message) if it's not a 200 OK response.
+//		         throw an exception with a useful message (including
+//		         the supplied message) if it's not a 200 OK response
+//		         (or 204 if ExpectNoContent is true).
 //		Created: 26/07/2015
 //
 // --------------------------------------------------------------------------
 
-void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message) const
+void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message,
+	bool ExpectNoContent) const
 {
-	if(response.GetResponseCode() != HTTPResponse::Code_OK)
+	// Throw a different exception type (FileNotFound) for 404 responses, since this makes
+	// debugging easier (makes the actual cause more obvious).
+	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, FileNotFound,
+			message << ": " << response.ResponseCodeString());
+	}
+	else if(response.GetResponseCode() !=
+		(ExpectNoContent ? HTTPResponse::Code_NoContent : HTTPResponse::Code_OK))
 	{
 		std::string response_data((const char *)response.GetBuffer(),
 			response.GetSize());
