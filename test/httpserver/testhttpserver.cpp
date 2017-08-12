@@ -38,6 +38,7 @@
 #include "ServerControl.h"
 #include "SimpleDBClient.h"
 #include "Test.h"
+#include "ZeroStream.h"
 #include "decode.h"
 #include "encode.h"
 
@@ -221,8 +222,63 @@ bool exercise_s3client(S3Client& client)
 	TEST_EQUAL(0, response.GetContentLength());
 	TEST_EQUAL("", response.GetHeaders().GetHeaderValue("etag", false)); // !required
 
+	// Test that HEAD requests set the Content-Length header correctly. We need the
+	// actual object size, not 0, despite there being no content in the response.
+	// RFC 2616 section 4.4 says "1.Any response message which "MUST NOT" include a
+	// message-body (such as ... any response to a HEAD request) is always terminated
+	// by the first empty line after the header fields, regardless of the
+	// entity-header fields present in the message... If a Content-Length header field
+	// (section 14.13) is present, its decimal value in OCTETs represents both the
+	// entity-length and the transfer-length."
+	//
+	// Also the Amazon Simple Storage Service API Reference, section "HEAD Object"
+	// examples show the Content-Length being returned as non-zero for a HEAD request,
+	// and ETag being returned too.
+
+	response = client.HeadObject("/newfile");
+	TEST_EQUAL(actual_size, response.GetContentLength());
+	TEST_EQUAL(200, response.GetResponseCode());
+	// We really need the ETag header in response to HEAD requests!
+	TEST_EQUAL("\"" + digest + "\"",
+		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+	// Check that there is NO body. The request should not have been treated as a
+	// GET request!
+	ZeroStream empty(0);
+	TEST_THAT(fs.CompareWith(response));
+
+	// Replace the file contents with a smaller file, check that it works and that
+	// the file is truncated at the end of the new data.
+	CollectInBufferStream test_data;
+	test_data.Write(std::string("hello"));
+	test_data.SetForReading();
+	response = client.PutObject("/newfile", test_data);
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_EQUAL("\"5d41402abc4b2a76b9719d911017c592\"",
+		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+	TEST_EQUAL(5, TestGetFileSize("testfiles/store/newfile"));
+
 	// This will fail if the file was created in the wrong place:
-	TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
+	TEST_THAT(FileExists("testfiles/store/newfile"));
+	response = client.DeleteObject("/newfile");
+	TEST_EQUAL(HTTPResponse::Code_NoContent, response.GetResponseCode());
+	TEST_THAT(!FileExists("testfiles/store/newfile"));
+
+	// Try uploading a file in a subdirectory, which should create it implicitly
+	// and automatically.
+	TEST_EQUAL(0, ObjectExists("testfiles/store/sub"));
+	TEST_THAT(!FileExists("testfiles/store/sub/newfile"));
+	response = client.PutObject("/sub/newfile", fs);
+	TEST_EQUAL(200, response.GetResponseCode());
+	response = client.GetObject("/sub/newfile");
+	TEST_EQUAL(200, response.GetResponseCode());
+	TEST_THAT(fs.CompareWith(response));
+	response = client.DeleteObject("/sub/newfile");
+	TEST_EQUAL(HTTPResponse::Code_NoContent, response.GetResponseCode());
+	TEST_THAT(!FileExists("testfiles/store/sub/newfile"));
+
+	// There is no way to explicitly delete a directory either, so we must do that
+	// ourselves
+	TEST_THAT(rmdir("testfiles/store/sub") == 0);
 
 	// Test the ListBucket command.
 	std::vector<S3Client::BucketEntry> actual_contents;

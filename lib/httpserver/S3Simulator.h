@@ -87,6 +87,8 @@ public:
 	virtual void HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 		bool IncludeContent = true);
 	virtual void HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void HandleHead(HTTPRequest &rRequest, HTTPResponse &rResponse);
+	virtual void HandleDelete(HTTPRequest &rRequest, HTTPResponse &rResponse);
 	virtual void HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 		bool IncludeContent = true);
 	std::string GetSortedQueryString(const HTTPRequest& request);
