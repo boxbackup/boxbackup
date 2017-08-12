@@ -381,9 +381,17 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		{
 			HandleGet(rRequest, rResponse);
 		}
+		else if(rRequest.GetMethod() == HTTPRequest::Method_HEAD)
+		{
+			HandleHead(rRequest, rResponse);
+		}
 		else if(rRequest.GetMethod() == HTTPRequest::Method_PUT)
 		{
 			HandlePut(rRequest, rResponse);
+		}
+		else if(rRequest.GetMethod() == HTTPRequest::Method_DELETE)
+		{
+			HandleDelete(rRequest, rResponse);
 		}
 		else
 		{
@@ -667,6 +675,23 @@ void S3Simulator::HandleListObjects(const std::string& bucket_name,
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    S3Simulator::HandleHead(HTTPRequest &rRequest,
+//			 HTTPResponse &rResponse)
+//		Purpose: Handles an S3 HEAD request, i.e. downloading just
+//			 the headers for an existing object.
+//		Created: 15/08/2015
+//
+// --------------------------------------------------------------------------
+
+void S3Simulator::HandleHead(HTTPRequest &rRequest, HTTPResponse &rResponse)
+{
+	HandleGet(rRequest, rResponse, false); // no content
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    S3Simulator::HandleGet(HTTPRequest &rRequest,
 //			 HTTPResponse &rResponse)
 //		Purpose: Handles an S3 GET request, i.e. downloading an
@@ -733,6 +758,41 @@ void S3Simulator::HandleGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 	rResponse.AddHeader("Server", "AmazonS3");
 }
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Simulator::HandleDelete(HTTPRequest &rRequest,
+//			 HTTPResponse &rResponse)
+//		Purpose: Handles an S3 DELETE request, i.e. deleting an
+//			 existing object from the simulated store.
+//		Created: 27/01/2016
+//
+// --------------------------------------------------------------------------
+
+void S3Simulator::HandleDelete(HTTPRequest &rRequest, HTTPResponse &rResponse)
+{
+	std::string path = GetConfiguration().GetKeyValue("StoreDirectory");
+	path += rRequest.GetRequestURI();
+
+	// I think that DELETE is idempotent.
+	if(FileExists(path))
+	{
+		if(EMU_UNLINK(path.c_str()) != 0)
+		{
+			THROW_SYS_FILE_ERROR("Failed to delete file", path,
+				HTTPException, S3SimulatorError);
+		}
+	}
+
+	// http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingRESTOperations.html
+	rResponse.SetResponseCode(HTTPResponse::Code_NoContent);
+
+	rResponse.AddHeader("x-amz-id-2", "qBmKRcEWBBhH6XAqsKU/eg24V3jf/kWKN9dJip1L/FpbYr9FDy7wWFurfdQOEMcY");
+	rResponse.AddHeader("x-amz-request-id", "F2A8CCCA26B4B26D");
+	rResponse.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
+	rResponse.AddHeader("Server", "AmazonS3");
+}
 
 ptree SimpleDBSimulator::GetDomainProps(const std::string& domain_name)
 {
