@@ -429,6 +429,27 @@ BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    BackupStoreRefCountDatabaseImpl::Reopen()
+//		Purpose: Reopen a previously-opened and then closed refcount
+//			 database.
+//		Created: 2016/04/25
+//
+// --------------------------------------------------------------------------
+void BackupStoreRefCountDatabaseImpl::Reopen()
+{
+	ASSERT(!mapDatabaseFile.get());
+
+	// You cannot reopen a temporary database, so it must be the permanent filename,
+	// so no need to append an X to it.
+	ASSERT(mFilename.size() > 0 && mFilename[mFilename.size() - 1] != 'X');
+
+	mapDatabaseFile = OpenDatabaseFile(mFilename, mAccountID, mReadOnly);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupStoreRefCountDatabaseImpl::GetRefCount(int64_t
 //			 ObjectID)
 //		Purpose: Get the number of references to the specified object
