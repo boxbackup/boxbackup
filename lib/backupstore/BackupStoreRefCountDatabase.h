@@ -74,6 +74,12 @@ public:
 	virtual void Discard() = 0;
 	virtual void Close() = 0;
 
+	// I'm not sure that Reopen() is a good idea, but it's part of BackupFileSystem's
+	// API that it manages the lifetime of two BackupStoreRefCountDatabases, and
+	// Commit() changes the temporary DB to permanent, and it should not be
+	// invalidated by this, so we need a way to reopen it to make the existing object
+	// usable again.
+	virtual void Reopen() = 0;
 	virtual bool IsReadOnly() = 0;
 
 	// These static methods actually create instances of
