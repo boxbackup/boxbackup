@@ -125,7 +125,41 @@ void BackupStoreCheck::Check()
 	}
 
 	BackupStoreAccountDatabase::Entry account(mAccountID, mDiscSetNumber);
-	mapNewRefs = BackupStoreRefCountDatabase::Create(account);
+	// If we are read-only, then we should not call GetPotentialRefCountDatabase because
+	// that does actually change the store: the temporary file would conflict with any other
+	// process which wants to do the same thing at the same time (e.g. housekeeping), and if
+	// neither process locks the store, they will break each other. We can still create a
+	// refcount DB in a temporary directory, and Commit() will not really commit it in that
+	// case (it will rename it, but still in the temporary directory).
+	if(mFixErrors)
+	{
+		mapNewRefs = BackupStoreRefCountDatabase::Create(account);
+	}
+	else
+	{
+		std::string temp_file = GetTempDirPath() + "boxbackup_refcount_db_XXXXXX";
+		char temp_file_buf[PATH_MAX];
+		strncpy(temp_file_buf, temp_file.c_str(), sizeof(temp_file_buf));
+#ifdef WIN32
+		if(_mktemp_s(temp_file_buf, sizeof(temp_file_buf)) != 0)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, FailedToCreateTemporaryFile,
+				"Failed to get a temporary file name based on " << temp_file);
+		}
+#else
+		int fd = mkstemp(temp_file_buf);
+		if(fd == -1)
+		{
+			THROW_SYS_FILE_ERROR("Failed to get a temporary file name based on",
+				temp_file, BackupStoreException, FailedToCreateTemporaryFile);
+		}
+		close(fd);
+#endif
+
+		BOX_TRACE("Creating temporary refcount DB in a temporary file: " << temp_file_buf);
+		mapNewRefs = BackupStoreRefCountDatabase::Create(temp_file_buf,
+			mAccountID, true); // reuse_existing_file
+	}
 
 	// Phase 1, check objects
 	if(!mQuiet)
