@@ -138,23 +138,23 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	}
 
 	// Load the store info to find necessary info for the housekeeping
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
+	std::auto_ptr<BackupStoreInfo> pInfo(BackupStoreInfo::Load(mAccountID,
 		mStoreRoot, mStoreDiscSet, false /* Read/Write */));
 	std::auto_ptr<BackupStoreInfo> pOldInfo(
 		BackupStoreInfo::Load(mAccountID, mStoreRoot, mStoreDiscSet,
 			true /* Read Only */));
 
 	// If the account has a name, change the logging tag to include it
-	if(!(info->GetAccountName().empty()))
+	if(!(pInfo->GetAccountName().empty()))
 	{
 		std::ostringstream tag;
 		tag << "hk=" << BOX_FORMAT_ACCOUNT(mAccountID) << "/" <<
-			info->GetAccountName();
+			pInfo->GetAccountName();
 		mTagWithClientID.Change(tag.str());
 	}
 
 	// Calculate how much should be deleted
-	mDeletionSizeTarget = info->GetBlocksUsed() - info->GetBlocksSoftLimit();
+	mDeletionSizeTarget = pInfo->GetBlocksUsed() - pInfo->GetBlocksSoftLimit();
 	if(mDeletionSizeTarget < 0)
 	{
 		mDeletionSizeTarget = 0;
@@ -166,14 +166,14 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Scan the directory for potential things to delete
 	// This will also remove eligible items marked with RemoveASAP
 	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
-		*info);
+		*pInfo);
 
 	if(!continueHousekeeping)
 	{
 		// The scan was incomplete, so the new block counts are
 		// incorrect, we can't rely on them. It's better to discard
 		// the new info and adjust the old one instead.
-		info = pOldInfo;
+		pInfo = pOldInfo;
 
 		// We're about to reset counters and exit, so report what
 		// happened now.
@@ -187,9 +187,9 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 	// If housekeeping made any changes, such as deleting RemoveASAP files,
 	// the differences in block counts will be recorded in the deltas.
-	info->ChangeBlocksUsed(mBlocksUsedDelta);
-	info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
-	info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
+	pInfo->ChangeBlocksUsed(mBlocksUsedDelta);
+	pInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
+	pInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
 
 	// Reset the delta counts for files, as they will include
 	// RemoveASAP flagged files deleted during the initial scan.
@@ -210,14 +210,14 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	if(!continueHousekeeping)
 	{
 		mapNewRefs->Discard();
-		info->Save();
+		pInfo->Save();
 		return false;
 	}
 
 	// Report any UNexpected changes, and consider them to be errors.
 	// Do this before applying the expected changes below.
-	mErrorCount += info->ReportChangesTo(*pOldInfo);
-	info->Save();
+	mErrorCount += pInfo->ReportChangesTo(*pOldInfo);
+	pInfo->Save();
 
 	// Try to load the old reference count database and check whether
 	// any counts have changed. We want to compare the mapNewRefs to
@@ -239,13 +239,13 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	}
 
 	// Go and delete items from the accounts
-	bool deleteInterrupted = DeleteFiles(*info);
+	bool deleteInterrupted = DeleteFiles(*pInfo);
 
 	// If that wasn't interrupted, remove any empty directories which
 	// are also marked as deleted in their containing directory
 	if(!deleteInterrupted)
 	{
-		deleteInterrupted = DeleteEmptyDirectories(*info);
+		deleteInterrupted = DeleteEmptyDirectories(*pInfo);
 	}
 
 	// Log deletion if anything was deleted
@@ -263,31 +263,31 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	// Make sure the delta's won't cause problems if the counts are
 	// really wrong, and it wasn't fixed because the store was
 	// updated during the scan.
-	if(mBlocksUsedDelta < (0 - info->GetBlocksUsed()))
+	if(mBlocksUsedDelta < (0 - pInfo->GetBlocksUsed()))
 	{
-		mBlocksUsedDelta = (0 - info->GetBlocksUsed());
+		mBlocksUsedDelta = (0 - pInfo->GetBlocksUsed());
 	}
-	if(mBlocksInOldFilesDelta < (0 - info->GetBlocksInOldFiles()))
+	if(mBlocksInOldFilesDelta < (0 - pInfo->GetBlocksInOldFiles()))
 	{
-		mBlocksInOldFilesDelta = (0 - info->GetBlocksInOldFiles());
+		mBlocksInOldFilesDelta = (0 - pInfo->GetBlocksInOldFiles());
 	}
-	if(mBlocksInDeletedFilesDelta < (0 - info->GetBlocksInDeletedFiles()))
+	if(mBlocksInDeletedFilesDelta < (0 - pInfo->GetBlocksInDeletedFiles()))
 	{
-		mBlocksInDeletedFilesDelta = (0 - info->GetBlocksInDeletedFiles());
+		mBlocksInDeletedFilesDelta = (0 - pInfo->GetBlocksInDeletedFiles());
 	}
-	if(mBlocksInDirectoriesDelta < (0 - info->GetBlocksInDirectories()))
+	if(mBlocksInDirectoriesDelta < (0 - pInfo->GetBlocksInDirectories()))
 	{
-		mBlocksInDirectoriesDelta = (0 - info->GetBlocksInDirectories());
+		mBlocksInDirectoriesDelta = (0 - pInfo->GetBlocksInDirectories());
 	}
 
 	// Update the usage counts in the store
-	info->ChangeBlocksUsed(mBlocksUsedDelta);
-	info->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
-	info->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
-	info->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
+	pInfo->ChangeBlocksUsed(mBlocksUsedDelta);
+	pInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
+	pInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
+	pInfo->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
 
 	// Save the store info back
-	info->Save();
+	pInfo->Save();
 
 	// force file to be saved and closed before releasing the lock below
 	mapNewRefs->Commit();
