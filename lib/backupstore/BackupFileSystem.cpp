@@ -87,6 +87,125 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 }
 
 
+void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db)
+{
+	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
+	// This is the temporary database, so it is about to be committed and become the permanent
+	// database, so we need to close the current permanent database (if any) first.
+	mapPermanentRefCountDatabase.reset();
+}
+
+
+void BackupFileSystem::RefCountDatabaseAfterCommit(BackupStoreRefCountDatabase& refcount_db)
+{
+	// Can only commit a temporary database:
+	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
+
+	// This was the temporary database, but it is now permanent, and has replaced the
+	// permanent file, so we need to change the databases returned by the temporary
+	// and permanent getter functions:
+	mapPermanentRefCountDatabase = mapPotentialRefCountDatabase;
+
+	// And save it to permanent storage (TODO: avoid double Save() by AfterCommit
+	// handler and refcount DB destructor):
+	SaveRefCountDatabase(refcount_db);
+
+	// Reopen the database that was closed by Commit().
+	mapPermanentRefCountDatabase->Reopen();
+}
+
+
+void BackupFileSystem::RefCountDatabaseAfterDiscard(BackupStoreRefCountDatabase& refcount_db)
+{
+	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
+	mapPotentialRefCountDatabase.reset();
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Class
+//		Name:    BackupStoreRefCountDatabaseWrapper
+//		Purpose: Wrapper around BackupStoreRefCountDatabase that
+//			 automatically notifies the BackupFileSystem when
+//			 Commit() or Discard() is called.
+//		Created: 2016/04/16
+//
+// --------------------------------------------------------------------------
+
+typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
+
+class BackupStoreRefCountDatabaseWrapper : public BackupStoreRefCountDatabase
+{
+private:
+	// No copying allowed
+	BackupStoreRefCountDatabaseWrapper(const BackupStoreRefCountDatabase &);
+	std::auto_ptr<BackupStoreRefCountDatabase> mapUnderlying;
+	BackupFileSystem& mrFileSystem;
+
+public:
+	BackupStoreRefCountDatabaseWrapper(
+		std::auto_ptr<BackupStoreRefCountDatabase> apUnderlying,
+		BackupFileSystem& filesystem)
+	: mapUnderlying(apUnderlying),
+	  mrFileSystem(filesystem)
+	{ }
+	virtual ~BackupStoreRefCountDatabaseWrapper()
+	{
+		// If this is the permanent database, and not read-only, it to permanent
+		// storage on destruction. (TODO: avoid double Save() by AfterCommit
+		// handler and this destructor)
+		if(this == mrFileSystem.mapPermanentRefCountDatabase.get() &&
+			// ReadOnly: don't make the database read-write if it isn't already
+			!IsReadOnly())
+		{
+			mrFileSystem.SaveRefCountDatabase(*this);
+		}
+	}
+
+	virtual void Commit()
+	{
+		mrFileSystem.RefCountDatabaseBeforeCommit(*this);
+		mapUnderlying->Commit();
+		// Upload the changed file to the server.
+		mrFileSystem.RefCountDatabaseAfterCommit(*this);
+	}
+	virtual void Discard()
+	{
+		mapUnderlying->Discard();
+		mrFileSystem.RefCountDatabaseAfterDiscard(*this);
+	}
+	virtual void Close() { mapUnderlying->Close(); }
+	virtual void Reopen() { mapUnderlying->Reopen(); }
+	virtual bool IsReadOnly() { return mapUnderlying->IsReadOnly(); }
+
+	// Data access functions
+	virtual refcount_t GetRefCount(int64_t ObjectID) const
+	{
+		return mapUnderlying->GetRefCount(ObjectID);
+	}
+	virtual int64_t GetLastObjectIDUsed() const
+	{
+		return mapUnderlying->GetLastObjectIDUsed();
+	}
+
+	// Data modification functions
+	virtual void AddReference(int64_t ObjectID)
+	{
+		mapUnderlying->AddReference(ObjectID);
+	}
+	// RemoveReference returns false if refcount drops to zero
+	virtual bool RemoveReference(int64_t ObjectID)
+	{
+		return mapUnderlying->RemoveReference(ObjectID);
+	}
+	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs)
+	{
+		return mapUnderlying->ReportChangesTo(rOldRefs);
+	}
+};
+
+
 void RaidBackupFileSystem::TryGetLock()
 {
 	if(mWriteLock.GotLock())
@@ -162,14 +281,72 @@ void RaidBackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 	rInfo.Save(rf);
 
 	// Commit it to disc, converting it to RAID now
-	rf.Commit(true);
+	rf.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 }
 
-std::auto_ptr<BackupStoreRefCountDatabase> RaidBackupFileSystem::GetRefCountDatabase(
-	int32_t AccountID, bool ReadOnly)
+
+BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPermanentRefCountDatabase(
+	bool ReadOnly)
 {
-	BackupStoreAccountDatabase::Entry account(AccountID, mStoreDiscSet);
-	return BackupStoreRefCountDatabase::Load(account, ReadOnly);
+	if(mapPermanentRefCountDatabase.get())
+	{
+		return *mapPermanentRefCountDatabase;
+	}
+
+	// It's dangerous to have two read-write databases open at the same time (it would
+	// be too easy to update the refcounts in the wrong one by mistake), and temporary
+	// databases are always read-write, so if a temporary database is already open
+	// then we should only allow a read-only permanent database to be opened.
+	ASSERT(!mapPotentialRefCountDatabase.get() || ReadOnly);
+
+	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
+	mapPermanentRefCountDatabase = BackupStoreRefCountDatabase::Load(account,
+		ReadOnly);
+	return *mapPermanentRefCountDatabase;
+}
+
+
+BackupStoreRefCountDatabase& RaidBackupFileSystem::GetPotentialRefCountDatabase()
+{
+	// Creating the "official" potential refcount DB is actually a change
+	// to the store, even if you don't commit it, because it's in the same
+	// directory and would conflict with another process trying to do the
+	// same thing, so it requires that you hold the write lock.
+	ASSERT(mWriteLock.GotLock());
+
+	if(mapPotentialRefCountDatabase.get())
+	{
+		return *mapPotentialRefCountDatabase;
+	}
+
+	// It's dangerous to have two read-write databases open at the same
+	// time (it would be too easy to update the refcounts in the wrong one
+	// by mistake), and temporary databases are always read-write, so if a
+	// permanent database is already open then it must be a read-only one.
+	ASSERT(!mapPermanentRefCountDatabase.get() ||
+		mapPermanentRefCountDatabase->IsReadOnly());
+
+	// We deliberately do not give the caller control of the
+	// reuse_existing_file parameter to Create(), because that would make
+	// it easy to bypass the restriction of only one (committable)
+	// temporary database at a time, and to accidentally overwrite the main
+	// refcount DB.
+	BackupStoreAccountDatabase::Entry account(mAccountID, mStoreDiscSet);
+	std::auto_ptr<BackupStoreRefCountDatabase> ap_new_db =
+		BackupStoreRefCountDatabase::Create(account);
+	mapPotentialRefCountDatabase.reset(
+		new BackupStoreRefCountDatabaseWrapper(ap_new_db, *this));
+
+	return *mapPotentialRefCountDatabase;
+}
+
+
+void RaidBackupFileSystem::SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db)
+{
+	// You can only save the permanent database.
+	ASSERT(&refcount_db == mapPermanentRefCountDatabase.get());
+
+	// The database is already saved in the store, so we don't need to do anything.
 }
 
 
@@ -628,6 +805,25 @@ void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 	std::string info_url = GetObjectURL(S3_INFO_FILE_NAME);
 	mrClient.CheckResponse(response, std::string("Failed to upload the new "
 		"BackupStoreInfo file to this URL: ") + info_url);
+}
+
+
+BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
+	bool ReadOnly)
+{
+	return *mapPermanentRefCountDatabase;
+}
+
+
+BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
+{
+	return *mapPotentialRefCountDatabase;
+}
+
+
+void S3BackupFileSystem::SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db)
+{
+	ASSERT(false);
 }
 
 

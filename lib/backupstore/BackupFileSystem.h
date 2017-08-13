@@ -13,6 +13,8 @@
 
 #include <string>
 
+#include "autogen_BackupStoreException.h"
+#include "BackupStoreRefCountDatabase.h"
 #include "HTTPResponse.h"
 #include "NamedLock.h"
 #include "S3Client.h"
@@ -20,7 +22,6 @@
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
-class BackupStoreRefCountDatabase;
 class Configuration;
 class IOStream;
 
@@ -53,14 +54,31 @@ public:
 	virtual void ReleaseLock()
 	{
 		mapBackupStoreInfo.reset();
+		mapPotentialRefCountDatabase.reset();
+		mapPermanentRefCountDatabase.reset();
 	}
 
 	virtual bool HaveLock() = 0;
 	virtual int GetBlockSize() = 0;
 	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
-	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
-		bool ReadOnly) = 0;
+
+	// GetPotentialRefCountDatabase() returns the current potential database if it
+	// has been already obtained and not closed, otherwise creates a new one.
+	// This same database will never be returned by both this function and
+	// GetPermanentRefCountDatabase() at the same time; it must be committed to
+	// convert it to a permanent DB before GetPermanentRefCountDatabase() will
+	// return it, and GetPotentialRefCountDatabase() no longer will after that.
+	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase() = 0;
+	// GetPermanentRefCountDatabase returns the current permanent database, if already
+	// open, otherwise refreshes the cached copy, opens it, and returns it.
+	virtual BackupStoreRefCountDatabase&
+		GetPermanentRefCountDatabase(bool ReadOnly) = 0;
+	// SaveRefCountDatabase() uploads a modified database to permanent storage
+	// (if necessary). It must be called with the permanent database. Calling Commit()
+	// on the temporary database calls this function automatically.
+	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db) = 0;
+
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0) = 0;
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut) = 0;
 	virtual void PutDirectory(BackupStoreDirectory& rDir) = 0;
@@ -77,6 +95,20 @@ public:
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
 	std::auto_ptr<BackupStoreInfo> mapBackupStoreInfo;
+	// You can have one temporary and one permanent refcound DB open at any time,
+	// obtained with GetPotentialRefCountDatabase() and
+	// GetPermanentRefCountDatabase() respectively:
+	std::auto_ptr<BackupStoreRefCountDatabase> mapPotentialRefCountDatabase;
+	std::auto_ptr<BackupStoreRefCountDatabase> mapPermanentRefCountDatabase;
+
+protected:
+	friend class BackupStoreRefCountDatabaseWrapper;
+	// These should only be called by BackupStoreRefCountDatabaseWrapper::Commit():
+	virtual void RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db);
+	virtual void RefCountDatabaseAfterCommit(BackupStoreRefCountDatabase& refcount_db);
+	// AfterDiscard() destroys the temporary database object and therefore invalidates
+	// any held references to it!
+	virtual void RefCountDatabaseAfterDiscard(BackupStoreRefCountDatabase& refcount_db);
 };
 
 class RaidBackupFileSystem : public BackupFileSystem
@@ -94,10 +126,35 @@ public:
 	  mAccountID(AccountID),
 	  mAccountRootDir(AccountRootDir),
 	  mStoreDiscSet(discSet)
-	{ }
+	{
+		if(AccountRootDir.size() == 0)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
+				"Account root directory is empty");
+		}
+
+		ASSERT(AccountRootDir[AccountRootDir.size() - 1] == '/' ||
+			AccountRootDir[AccountRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
+	}
 	~RaidBackupFileSystem()
 	{
-		ReleaseLock();
+		// Close any open refcount DBs before partially destroying the
+		// BackupFileSystem that they need to close down. Need to do this in the
+		// subclass to avoid calling SaveRefCountDatabase() when the subclass
+		// has already been partially destroyed.
+		// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
+		if(mapPotentialRefCountDatabase.get())
+		{
+			mapPotentialRefCountDatabase->Discard();
+			mapPotentialRefCountDatabase.reset();
+		}
+
+		mapPermanentRefCountDatabase.reset();
+
+		if(mWriteLock.GotLock())
+		{
+			ReleaseLock();
+		}
 	}
 	virtual void TryGetLock();
 	virtual void ReleaseLock()
@@ -114,8 +171,11 @@ public:
 	}
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
-	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
-		bool ReadOnly);
+
+	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
+	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
+	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
+
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
@@ -173,11 +233,8 @@ public:
 	virtual bool HaveLock() { return false; }
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
-	virtual std::auto_ptr<BackupStoreRefCountDatabase> GetRefCountDatabase(int32_t AccountID,
-		bool ReadOnly)
-	{
-		return std::auto_ptr<BackupStoreRefCountDatabase>();
-	}
+	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
+	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
@@ -269,6 +326,7 @@ private:
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
+	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 };
 
 #endif // BACKUPFILESYSTEM__H
