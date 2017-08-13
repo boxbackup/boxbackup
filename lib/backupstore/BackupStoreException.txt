@@ -78,3 +78,4 @@ FileSystemNotInitialised	74	No BackupFileSystem has been configured for this acc
 ObjectDoesNotExist		75	The specified object ID does not exist in the store, or is not of this type
 AccountAlreadyExists		76	Tried to create an account that already exists
 FailedToCreateTemporaryFile	77	Failed to create a temporary file
+BadConfiguration		78	The configuration file contains an error or invalid value
