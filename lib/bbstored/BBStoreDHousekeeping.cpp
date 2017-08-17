@@ -129,9 +129,10 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 				// goes out of scope.
 			}
 
+			RaidBackupFileSystem fs(*i, rootDir, discSet);
+
 			// Do housekeeping on this account
-			HousekeepStoreAccount housekeeping(*i, rootDir,
-				discSet, this);
+			HousekeepStoreAccount housekeeping(fs, this);
 			housekeeping.DoHousekeeping();
 		}
 		catch(BoxException &e)

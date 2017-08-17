@@ -229,6 +229,24 @@ void RaidBackupFileSystem::TryGetLock()
 }
 
 
+std::string RaidBackupFileSystem::GetAccountIdentifier()
+{
+	std::string account_name;
+	try
+	{
+		account_name = GetBackupStoreInfo(true).GetAccountName();
+	}
+	catch(RaidFileException &e)
+	{
+		account_name = "unknown";
+	}
+
+	std::ostringstream oss;
+	oss << BOX_FORMAT_ACCOUNT(mAccountID) << " (" << account_name << ")";
+	return oss.str();
+}
+
+
 std::string RaidBackupFileSystem::GetObjectFileName(int64_t ObjectID,
 	bool EnsureDirectoryExists)
 {
@@ -414,16 +432,26 @@ class RaidPutFileCompleteTransaction : public BackupFileSystem::Transaction
 {
 private:
 	RaidFileWrite mStoreFile;
+	std::string mFileName;
+	int mDiscSet;
 	bool mCommitted;
 
 public:
-	RaidPutFileCompleteTransaction(int StoreDiscSet, const std::string& filename)
-	: mStoreFile(StoreDiscSet, filename),
-	  mCommitted(false)
+	RaidPutFileCompleteTransaction(int StoreDiscSet, const std::string& filename,
+		BackupStoreRefCountDatabase::refcount_t refcount)
+	: mStoreFile(StoreDiscSet, filename, refcount),
+	  mFileName(filename),
+	  mDiscSet(StoreDiscSet),
+	  mCommitted(false),
+	  mNumBlocks(-1)
 	{ }
 	~RaidPutFileCompleteTransaction();
 	virtual void Commit();
-	virtual int64_t GetNumBlocks() { return mNumBlocks; }
+	virtual int64_t GetNumBlocks()
+	{
+		ASSERT(mNumBlocks != -1);
+		return mNumBlocks;
+	}
 	RaidFileWrite& GetRaidFile() { return mStoreFile; }
 
 	// It doesn't matter what we return here, because this should never be called
@@ -437,31 +465,50 @@ public:
 
 void RaidPutFileCompleteTransaction::Commit()
 {
+	ASSERT(!mCommitted);
+	mStoreFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+
+#ifndef NDEBUG
+	// Verify the file -- only necessary for non-diffed versions.
+	//
+	// We cannot use VerifyEncodedFileFormat() until the file is committed. We already
+	// verified it as we were saving it, so this is a double check that should not be
+	// necessary, and thus is only done in debug builds.
+	std::auto_ptr<RaidFileRead> checkFile(RaidFileRead::Open(mDiscSet, mFileName));
+	if(!BackupStoreFile::VerifyEncodedFileFormat(*checkFile))
+	{
+		mStoreFile.Delete();
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, AddedFileDoesNotVerify,
+			"Newly saved file does not verify after write: this should not "
+			"happen: " << mFileName);
+	}
+#endif // !NDEBUG
+
 	mCommitted = true;
 }
 
 
 RaidPutFileCompleteTransaction::~RaidPutFileCompleteTransaction()
 {
-	if(mCommitted)
+	if(!mCommitted)
 	{
-		GetRaidFile().TransformToRaidStorage();
-	}
-	else
-	{
-		GetRaidFile().Delete();
+		mStoreFile.Discard();
 	}
 }
 
 
 std::auto_ptr<BackupFileSystem::Transaction>
-RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData)
+RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
+	BackupStoreRefCountDatabase::refcount_t refcount)
 {
 	// Create the containing directory if it doesn't exist.
 	std::string filename = GetObjectFileName(ObjectID, true);
 
+	// We can only do this when the file (ObjectID) doesn't already exist.
+	ASSERT(refcount == 0);
+
 	RaidPutFileCompleteTransaction* pTrans = new RaidPutFileCompleteTransaction(
-		mStoreDiscSet, filename);
+		mStoreDiscSet, filename, refcount);
 	std::auto_ptr<BackupFileSystem::Transaction> apTrans(pTrans);
 
 	RaidFileWrite& rStoreFile(pTrans->GetRaidFile());
@@ -480,22 +527,6 @@ RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData)
 
 	// Need to do this before committing the RaidFile, can't do it after.
 	pTrans->mNumBlocks = rStoreFile.GetDiscUsageInBlocks();
-
-	// Verify the file -- only necessary for non-diffed versions.
-	//
-	// Checking the file requires that we commit the RaidFile first, which
-	// is unfortunate because we're not quite ready to, and because we thus
-	// treat full and differential uploads differently. But it's not a huge
-	// issue because we can always delete the RaidFile without any harm done
-	// in the full upload case.
-	rStoreFile.Commit(false); // Don't ConvertToRaidNow
-
-	std::auto_ptr<RaidFileRead> checkFile(RaidFileRead::Open(mStoreDiscSet,
-			filename));
-	if(!BackupStoreFile::VerifyEncodedFileFormat(*checkFile))
-	{
-		THROW_EXCEPTION(BackupStoreException, AddedFileDoesNotVerify)
-	}
 
 	return apTrans;
 }
@@ -725,10 +756,81 @@ void RaidBackupFileSystem::DeleteFile(int64_t ObjectID)
 	deleteFile.Delete();
 }
 
+
+std::auto_ptr<BackupFileSystem::Transaction>
+RaidBackupFileSystem::CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch)
+{
+	// This normally only happens during housekeeping, which is using a temporary
+	// refcount database, so insist on that for now.
+	BackupStoreRefCountDatabase* pRefCount = mapPotentialRefCountDatabase.get();
+	ASSERT(pRefCount != NULL);
+	ASSERT(mapPermanentRefCountDatabase.get() == NULL ||
+		mapPermanentRefCountDatabase->IsReadOnly());
+
+	// Open the older object twice (the patch)
+	std::auto_ptr<IOStream> pdiff = GetFile(OlderPatchID);
+	std::auto_ptr<IOStream> pdiff2 = GetFile(OlderPatchID);
+
+	// Open the newer object (the file to be deleted)
+	std::auto_ptr<IOStream> pobjectBeingDeleted = GetFile(NewerObjectID);
+
+	// And open a write file to overwrite the older object (the patch)
+	std::string older_filename = GetObjectFileName(OlderPatchID,
+		false); // no need to make sure the directory it's in exists.
+
+	std::auto_ptr<RaidPutFileCompleteTransaction>
+		ap_overwrite_older(new RaidPutFileCompleteTransaction(
+			mStoreDiscSet, older_filename,
+			pRefCount->GetRefCount(OlderPatchID)));
+	RaidFileWrite& overwrite_older(ap_overwrite_older->GetRaidFile());
+	overwrite_older.Open(true /* allow overwriting */);
+
+	if(NewerIsPatch)
+	{
+		// Combine two adjacent patches (reverse diffs) into a single one object.
+		BackupStoreFile::CombineDiffs(*pobjectBeingDeleted, *pdiff, *pdiff2, overwrite_older);
+	}
+	else
+	{
+		// Combine an older patch (reverse diff) with the subsequent complete file.
+		BackupStoreFile::CombineFile(*pdiff, *pdiff2, *pobjectBeingDeleted, overwrite_older);
+	}
+
+	// Need to do this before committing the RaidFile, can't do it after.
+	ap_overwrite_older->mNumBlocks = overwrite_older.GetDiscUsageInBlocks();
+
+	// The file will be committed later when the directory is safely commited.
+	return static_cast<std::auto_ptr<BackupFileSystem::Transaction> >(ap_overwrite_older);
+}
+
+
+std::auto_ptr<BackupFileSystem::Transaction>
+RaidBackupFileSystem::CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
+{
+	return CombineFileOrDiff(OlderPatchID, NewerFileID, false); // !NewerIsPatch
+}
+
+
+std::auto_ptr<BackupFileSystem::Transaction>
+RaidBackupFileSystem::CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID)
+{
+	return CombineFileOrDiff(OlderPatchID, NewerPatchID, true); // NewerIsPatch
+}
+
+
 int S3BackupFileSystem::GetBlockSize()
 {
 	return S3_NOTIONAL_BLOCK_SIZE;
 }
+
+
+std::string S3BackupFileSystem::GetAccountIdentifier()
+{
+	std::ostringstream oss;
+	oss << "'" << GetBackupStoreInfo(true).GetAccountName() << "'";
+	return oss.str();
+}
+
 
 std::string S3BackupFileSystem::GetObjectURL(const std::string& ObjectPath) const
 {

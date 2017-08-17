@@ -520,7 +520,7 @@ int BackupStoreAccountControl::HousekeepAccountNow()
 	// Housekeeping locks the account itself, so we can't.
 	OPEN_ACCOUNT(false); // readWrite
 
-	HousekeepStoreAccount housekeeping(mAccountID, mRootDir, mDiscSetNum, NULL);
+	HousekeepStoreAccount housekeeping(*mapFileSystem, NULL);
 	bool success = housekeeping.DoHousekeeping();
 
 	if(!success)
