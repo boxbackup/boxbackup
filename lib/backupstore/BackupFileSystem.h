@@ -63,6 +63,15 @@ public:
 	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
 
+	// DiscardBackupStoreInfo() discards the active BackupStoreInfo, invalidating any
+	// references to it! It is needed to allow a BackupStoreContext to be Finished,
+	// changes made to the BackupStoreInfo by BackupStoreCheck and HousekeepStoreAccount,
+	// and the Context to be reopened.
+	virtual void DiscardBackupStoreInfo(BackupStoreInfo& rInfo)
+	{
+		ASSERT(mapBackupStoreInfo.get() == &rInfo);
+		mapBackupStoreInfo.reset();
+	}
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoUncached()
 	{
 		// Return a BackupStoreInfo freshly retrieved from storage, read-only to
@@ -91,7 +100,7 @@ public:
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut) = 0;
 	virtual void PutDirectory(BackupStoreDirectory& rDir) = 0;
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData) = 0;
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount) = 0;
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData) = 0;
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID) = 0;
@@ -99,6 +108,15 @@ public:
 		std::vector<int64_t>& rPatchChain) = 0;
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
+	virtual bool CanMergePatches() = 0;
+	virtual std::auto_ptr<BackupFileSystem::Transaction>
+		CombineFile(int64_t OlderPatchID, int64_t NewerFileID) = 0;
+	virtual std::auto_ptr<BackupFileSystem::Transaction>
+		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID) = 0;
+	virtual std::string GetAccountIdentifier() = 0;
+	// Use of GetAccountID() is not recommended. It returns S3_FAKE_ACCOUNT_ID on
+	// S3BackupFileSystem.
+	virtual int GetAccountID() = 0;
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
@@ -188,7 +206,7 @@ public:
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData);
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount);
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData);
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
@@ -199,9 +217,18 @@ public:
 	{
 		DeleteFile(ObjectID);
 	}
+	virtual bool CanMergePatches() { return true; }
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineFile(int64_t OlderPatchID, int64_t NewerFileID);
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID);
+	virtual std::string GetAccountIdentifier();
+	virtual int GetAccountID() { return mAccountID; }
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch);
 };
 
 #define S3_INFO_FILE_NAME "boxbackup.info"
@@ -247,7 +274,7 @@ public:
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData)
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount)
 	{
 		return std::auto_ptr<Transaction>();
 	}
@@ -290,6 +317,20 @@ public:
 	{
 		return GetObjectURI(ObjectID, ObjectExists_File);
 	}
+
+	virtual bool CanMergePatches() { return false; }
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
+	{
+		THROW_EXCEPTION(CommonException, NotSupported);
+	}
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID)
+	{
+		THROW_EXCEPTION(CommonException, NotSupported);
+	}
+	virtual std::string GetAccountIdentifier();
+	virtual int GetAccountID() { return S3_FAKE_ACCOUNT_ID; }
 
 private:
 	// S3BackupAccountControl wants to call some of these private APIs, but nobody else should:

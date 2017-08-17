@@ -14,6 +14,7 @@
 
 class BackupProtocolCallable;
 class BackupProtocolClient;
+class BackupFileSystem;
 class SocketStreamTLS;
 class TLSContext;
 
@@ -57,7 +58,12 @@ int check_account_for_errors(Log::Level log_level = Log::WARNING);
 bool check_account(Log::Level log_level = Log::WARNING);
 
 //! Runs housekeeping on an account, to remove old and deleted files if necessary.
+//! Old interface, only works with RaidBackupFileSystem, deprecated.
 int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount);
+
+//! Runs housekeeping on an account, to remove old and deleted files if necessary.
+//! New interface, takes a BackupFileSystem.
+int64_t run_housekeeping(BackupFileSystem& filesystem);
 
 //! Runs housekeeping and checks the account, returning true if it's OK.
 bool run_housekeeping_and_check_account();
