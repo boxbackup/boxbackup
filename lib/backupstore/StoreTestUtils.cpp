@@ -197,12 +197,19 @@ bool check_account(Log::Level log_level)
 
 int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
 {
+	// TODO FIXME remove this backward-compatibility function
 	std::string rootDir = BackupStoreAccounts::GetAccountRoot(rAccount);
 	int discSet = rAccount.GetDiscSet();
+	RaidBackupFileSystem fs(rAccount.GetID(), rootDir, discSet);
 
 	// Do housekeeping on this account
-	HousekeepStoreAccount housekeeping(rAccount.GetID(), rootDir,
-		discSet, NULL);
+	return run_housekeeping(fs);
+}
+
+int64_t run_housekeeping(BackupFileSystem& filesystem)
+{
+	// Do housekeeping on this account
+	HousekeepStoreAccount housekeeping(filesystem, NULL);
 	TEST_THAT(housekeeping.DoHousekeeping(true /* keep trying forever */));
 	return housekeeping.GetErrorCount();
 }
