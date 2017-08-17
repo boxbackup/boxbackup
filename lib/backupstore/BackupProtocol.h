@@ -59,6 +59,7 @@ public:
 		mContext.ReleaseWriteLock();
 		return finished;
 	}
+	using BackupProtocolLocal::Query;
 
 	void Reopen()
 	{

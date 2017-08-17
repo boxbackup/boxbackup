@@ -50,13 +50,7 @@ public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
-
-	// Why not inherited from IOStream? Never mind, we want to enforce
-	// supplying a timeout for network operations anyway.
-	virtual void Write(const std::string& rBuffer, int Timeout)
-	{
-		IOStream::Write(rBuffer, Timeout);
-	}
+	using IOStream::Write;
 
 	virtual void Close();
 	virtual bool StreamDataLeft();
