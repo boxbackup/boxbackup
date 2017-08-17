@@ -70,11 +70,7 @@ END_STRUCTURE_PACKING_FOR_WIRE
 class BackupStoreInfo
 {
 	friend class BackupStoreCheck;
-public:
-	~BackupStoreInfo();
-private:
-	// Creation through static functions only
-	BackupStoreInfo();
+
 	// No copying allowed
 	BackupStoreInfo(const BackupStoreInfo &);
 
@@ -82,13 +78,21 @@ public:
 	// Create a New account, saving a blank info object to the disc
 	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet,
 		int64_t BlockSoftLimit, int64_t BlockHardLimit);
-	BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
 
+private:
+
+protected:
+	BackupStoreInfo();
+
+public:
 	// Load it from the store
 	// TODO FIXME: remove this RaidFile version of Load(), let BackupFileSystem
 	// handle the RaidFile part.
 	static std::auto_ptr<BackupStoreInfo> Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID = 0);
+
+	BackupStoreInfo(int32_t AccountID, const std::string &FileName,
+		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+	~BackupStoreInfo();
 
 	// Load it from a stream (file or RaidFile)
 	static std::auto_ptr<BackupStoreInfo> Load(IOStream& rStream,
