@@ -63,6 +63,14 @@ public:
 	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
 
+	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoUncached()
+	{
+		// Return a BackupStoreInfo freshly retrieved from storage, read-only to
+		// prevent accidentally making changes to this copy, which can't be saved
+		// back to the BackupFileSystem.
+		return GetBackupStoreInfoInternal(true); // ReadOnly
+	}
+
 	// GetPotentialRefCountDatabase() returns the current potential database if it
 	// has been already obtained and not closed, otherwise creates a new one.
 	// This same database will never be returned by both this function and

@@ -26,12 +26,27 @@
 #include "Configuration.h"
 #include "HTTPResponse.h"
 #include "HousekeepStoreAccount.h"
-#include "NamedLock.h"
 #include "RaidFileController.h"
+#include "RaidFileWrite.h"
 #include "UnixUser.h"
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
+
+#define OPEN_ACCOUNT(read_write) \
+	try \
+	{ \
+		OpenAccount(read_write); \
+	} \
+	catch(BoxException &e) \
+	{ \
+		if(EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount)) \
+		{ \
+			BOX_ERROR("Failed to open account: " << e.what()); \
+			return 1; \
+		} \
+		throw; \
+	}
 
 void BackupAccountControl::CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 {
@@ -113,14 +128,7 @@ int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 int BackupStoreAccountControl::SetLimit(const char *SoftLimitStr,
 	const char *HardLimitStr)
 {
-	NamedLock writeLock;
-
-	if(!OpenAccount(&writeLock))
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " to change limits.");
-		return 1;
-	}
+	OPEN_ACCOUNT(true); // readWrite
 
 	// Load the info
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID, mRootDir,
@@ -145,14 +153,7 @@ int BackupStoreAccountControl::SetLimit(const char *SoftLimitStr,
 
 int BackupStoreAccountControl::SetAccountName(const std::string& rNewAccountName)
 {
-	NamedLock writeLock;
-
-	if(!OpenAccount(&writeLock))
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " to change name.");
-		return 1;
-	}
+	OPEN_ACCOUNT(true); // readWrite
 
 	// Load the info
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
@@ -171,17 +172,9 @@ int BackupStoreAccountControl::SetAccountName(const std::string& rNewAccountName
 
 int BackupStoreAccountControl::PrintAccountInfo()
 {
-	if(!OpenAccount(NULL /* no write lock needed for this read-only operation */))
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " to display info.");
-		return 1;
-	}
+	OPEN_ACCOUNT(false); // !readWrite
 
-	// Load it in
-	std::auto_ptr<BackupStoreInfo> ap_info(BackupStoreInfo::Load(mAccountID,
-		mRootDir, mDiscSetNum, true /* ReadOnly */));
-	BackupStoreInfo& info(*ap_info);
+	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(true)); // ReadOnly
 	int BlockSize = GetBlockSize();
 
 	// Then print out lots of info
@@ -231,14 +224,7 @@ int BackupStoreAccountControl::PrintAccountInfo()
 
 int BackupStoreAccountControl::SetAccountEnabled(bool enabled)
 {
-	NamedLock writeLock;
-
-	if(!OpenAccount(&writeLock))
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " to change enabled flag.");
-		return 1;
-	}
+	OPEN_ACCOUNT(true); // readWrite
 
 	// Load it in
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
@@ -248,17 +234,47 @@ int BackupStoreAccountControl::SetAccountEnabled(bool enabled)
 	return 0;
 }
 
+
+int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
+	int32_t HardLimit, const std::string& AccountName)
+{
+	OPEN_ACCOUNT(true); // readWrite
+
+	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
+	info.SetAccountName(AccountName);
+
+	// And an empty directory
+	BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID,
+		BACKUPSTORE_ROOT_DIRECTORY_ID);
+	mapFileSystem->PutDirectory(rootDir);
+	int64_t rootDirSize = rootDir.GetUserInfo1_SizeInBlocks();
+
+	// Update the store info to reflect the size of the root directory
+	info.ChangeBlocksUsed(rootDirSize);
+	info.ChangeBlocksInDirectories(rootDirSize);
+	info.AdjustNumDirectories(1);
+	int64_t id = info.AllocateObjectID();
+	ASSERT(id == BACKUPSTORE_ROOT_DIRECTORY_ID);
+
+	mapFileSystem->PutBackupStoreInfo(info);
+
+	// Now get the info file again, and report any differences, to check that it
+	// really worked.
+	std::auto_ptr<BackupStoreInfo> copy = mapFileSystem->GetBackupStoreInfoUncached();
+	ASSERT(info.ReportChangesTo(*copy) == 0);
+
+	// We also need to create and upload a fresh refcount DB.
+	BackupStoreRefCountDatabase& refcount(
+		mapFileSystem->GetPotentialRefCountDatabase());
+	refcount.Commit();
+
+	return 0;
+}
+
 int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 {
-	NamedLock writeLock;
-
-	// Obtain a write lock, as the daemon user
-	if(!OpenAccount(&writeLock))
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for deletion.");
-		return 1;
-	}
+	// We definitely need a lock to do something this destructive!
+	OPEN_ACCOUNT(true); // readWrite
 
 	// Check user really wants to do this
 	if(AskForConfirmation)
@@ -322,7 +338,7 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	// NamedLock will throw an exception if it can't delete the lockfile,
 	// which it can't if it doesn't exist. Now that we've deleted the account,
 	// nobody can open it anyway, so it's safe to unlock.
-	writeLock.ReleaseLock();
+	mapFileSystem->ReleaseLock();
 
 	int retcode = 0;
 
@@ -361,8 +377,21 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	return retcode;
 }
 
-bool BackupStoreAccountControl::OpenAccount(NamedLock* pLock)
+void BackupStoreAccountControl::OpenAccount(bool readWrite)
 {
+	if(mapFileSystem.get())
+	{
+		// Can use existing BackupFileSystem.
+
+		if(readWrite && !mapFileSystem->HaveLock())
+		{
+			// Need to acquire a lock first.
+			mapFileSystem->GetLock();
+		}
+
+		return;
+	}
+
 	// Load in the account database
 	std::auto_ptr<BackupStoreAccountDatabase> db(
 		BackupStoreAccountDatabase::Read(
@@ -371,9 +400,9 @@ bool BackupStoreAccountControl::OpenAccount(NamedLock* pLock)
 	// Exists?
 	if(!db->EntryExists(mAccountID))
 	{
-		BOX_ERROR("Account " << BOX_FORMAT_ACCOUNT(mAccountID) <<
-			" does not exist.");
-		return false;
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, AccountDoesNotExist,
+			"Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID) <<
+			": does not exist");
 	}
 
 	// Get info from the database
@@ -396,29 +425,22 @@ bool BackupStoreAccountControl::OpenAccount(NamedLock* pLock)
 		// Username specified, change...
 		mapChangeUser.reset(new UnixUser(username));
 		mapChangeUser->ChangeProcessUser(true /* temporary */);
-		// Change will be undone when apUser goes out of scope
-		// in the caller.
+		// Change will be undone when this BackupStoreAccountControl is destroyed
 	}
 
-	if(pLock)
+	mapFileSystem.reset(new RaidBackupFileSystem(mAccountID, mRootDir, mDiscSetNum));
+
+	if(readWrite)
 	{
-		acc.LockAccount(mAccountID, *pLock);
+		mapFileSystem->GetLock();
 	}
-
-	return true;
 }
 
 int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
-	NamedLock writeLock;
-
-	if(!OpenAccount(FixErrors ? &writeLock : NULL)) // don't need a write lock if not making changes
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for checking.");
-		return 1;
-	}
+	// Don't need a write lock if not making changes.
+	OPEN_ACCOUNT(FixErrors); // readWrite
 
 	// Check it
 	BackupStoreCheck check(mRootDir, mDiscSetNum, mAccountID, FixErrors, Quiet);
@@ -450,6 +472,11 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber,
 		return 1;
 	}
 
+	db->AddEntry(mAccountID, DiscNumber);
+
+	// As the original user, write the modified account database back
+	db->Write();
+
 	// Get the user under which the daemon runs
 	std::string username;
 	{
@@ -460,9 +487,27 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber,
 		}
 	}
 
-	// Create it.
+	// Become the user specified in the config file?
+	if(!username.empty())
+	{
+		// Username specified, change...
+		mapChangeUser.reset(new UnixUser(username));
+		mapChangeUser->ChangeProcessUser(true /* temporary */);
+		// Change will be undone when this BackupStoreAccountControl is destroyed
+	}
+
+	// Get directory name:
 	BackupStoreAccounts acc(*db);
-	acc.Create(mAccountID, DiscNumber, SoftLimit, HardLimit, username);
+	acc.GetAccountRoot(mAccountID, mRootDir, mDiscSetNum);
+
+	// Create the account root directory on disc:
+	RaidFileWrite::CreateDirectory(mDiscSetNum, mRootDir, true /* recursive */);
+
+	// Create the BackupStoreInfo and BackupStoreRefCountDatabase files:
+	BackupStoreInfo::CreateNew(mAccountID, mRootDir, mDiscSetNum, SoftLimit, HardLimit);
+
+	mapFileSystem.reset(new RaidBackupFileSystem(mAccountID, mRootDir, mDiscSetNum));
+	BackupAccountControl::CreateAccount(mAccountID, SoftLimit, HardLimit, "");
 
 	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(mAccountID) << " created.");
 
@@ -472,12 +517,8 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber,
 
 int BackupStoreAccountControl::HousekeepAccountNow()
 {
-	if(!OpenAccount(NULL /* housekeeping locks the account itself */))
-	{
-		BOX_ERROR("Failed to open account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for housekeeping.");
-		return 1;
-	}
+	// Housekeeping locks the account itself, so we can't.
+	OPEN_ACCOUNT(false); // readWrite
 
 	HousekeepStoreAccount housekeeping(mAccountID, mRootDir, mDiscSetNum, NULL);
 	bool success = housekeeping.DoHousekeeping();

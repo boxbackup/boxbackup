@@ -81,7 +81,7 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 	info.mAccountID = AccountID;
 	info.mDiscSet = DiscSet;
 	info.mReadOnly = false;
-	info.mLastObjectIDUsed = 1;
+	info.mLastObjectIDUsed = 0;
 	info.mBlocksSoftLimit = BlockSoftLimit;
 	info.mBlocksHardLimit = BlockHardLimit;
 
@@ -118,6 +118,7 @@ BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
 {
 	mExtraData.SetForReading(); // extra data is empty in this case
 }
+
 
 // --------------------------------------------------------------------------
 //
