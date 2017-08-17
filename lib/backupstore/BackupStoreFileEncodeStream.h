@@ -85,6 +85,8 @@ public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout);
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
+
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	int64_t GetBytesToUpload() { return mBytesToUpload; }
