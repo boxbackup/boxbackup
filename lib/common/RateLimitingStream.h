@@ -35,6 +35,7 @@ public:
 	{
 		mrSink.Write(pBuffer, NBytes, Timeout);
 	}
+	using IOStream::Write;
 	virtual pos_type BytesLeftToRead()
 	{
 		return mrSink.BytesLeftToRead();

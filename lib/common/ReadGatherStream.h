@@ -39,6 +39,8 @@ public:
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
+
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 	virtual pos_type GetPosition() const;
