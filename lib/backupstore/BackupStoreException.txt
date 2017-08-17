@@ -77,5 +77,6 @@ InvalidEtagHeader		73	The S3 HTTP response contain a malformed or unexpected ETa
 FileSystemNotInitialised	74	No BackupFileSystem has been configured for this account
 ObjectDoesNotExist		75	The specified object ID does not exist in the store, or is not of this type
 AccountAlreadyExists		76	Tried to create an account that already exists
-FailedToCreateTemporaryFile	77	Failed to create a temporary file
-BadConfiguration		78	The configuration file contains an error or invalid value
+AccountDoesNotExist		77	Tried to open an account that does not exist
+FailedToCreateTemporaryFile	78	Failed to create a temporary file
+BadConfiguration		79	The configuration file contains an error or invalid value

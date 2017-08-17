@@ -14,13 +14,14 @@
 
 #include "BackupStoreAccountDatabase.h"
 #include "BackupFileSystem.h"
-#include "NamedLock.h"
 #include "S3Client.h"
 #include "UnixUser.h"
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
+class NamedLock;
+class UnixUser;
 
 class BackupAccountControl
 {
@@ -29,6 +30,7 @@ protected:
 	bool mMachineReadableOutput;
 	std::auto_ptr<BackupFileSystem> mapFileSystem;
 
+	virtual void OpenAccount(bool readWrite) = 0;
 	virtual int GetBlockSize()
 	{
 		return mapFileSystem->GetBlockSize();
@@ -45,6 +47,8 @@ public:
 	int64_t SizeStringToBlocks(const char *string, int BlockSize);
 	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize);
 	int PrintAccountInfo(const BackupStoreInfo& info, int BlockSize);
+	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
+		const std::string& AccountName);
 };
 
 
@@ -55,6 +59,8 @@ private:
 	std::string mRootDir;
 	int mDiscSetNum;
 	std::auto_ptr<UnixUser> mapChangeUser; // used to reset uid when we return
+
+	virtual void OpenAccount(bool readWrite);
 
 public:
 	BackupStoreAccountControl(const Configuration& config, int32_t AccountID,
@@ -68,7 +74,6 @@ public:
 		return BlockSizeOfDiscSet(mDiscSetNum);
 	}
 	int BlockSizeOfDiscSet(int discSetNum);
-	bool OpenAccount(NamedLock* pLock);
 	int SetLimit(const char *SoftLimitStr,
 		const char *HardLimitStr);
 	int SetAccountName(const std::string& rNewAccountName);
@@ -87,6 +92,8 @@ private:
 	std::string mBasePath;
 	std::auto_ptr<S3Client> mapS3Client;
 	// mapFileSystem is inherited from BackupAccountControl
+
+	virtual void OpenAccount(bool readWrite) { }
 
 public:
 	S3BackupAccountControl(const Configuration& config,
