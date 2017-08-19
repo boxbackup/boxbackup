@@ -85,7 +85,7 @@ ConfigurationVerifyKey verifykeys1_1_2[] =
 };
 
 
-ConfigurationVerify verifysub1_1[] = 
+ConfigurationVerify verifysub1_1[] =
 {
 	{
 		"*",
@@ -110,13 +110,13 @@ ConfigurationVerifyKey verifykeys1_1[] =
 	ConfigurationVerifyKey("string2", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
-ConfigurationVerifyKey verifykeys1_2[] = 
+ConfigurationVerifyKey verifykeys1_2[] =
 {
 	ConfigurationVerifyKey("carrots", ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("string", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
-ConfigurationVerify verifysub1[] = 
+ConfigurationVerify verifysub1[] =
 {
 	{
 		"test1",
@@ -143,7 +143,7 @@ ConfigurationVerifyKey verifykeys1[] =
 		ConfigurationVerifyKey("BoolTrue2", ConfigTest_IsBool),
 		ConfigurationVerifyKey("BoolFalse1", ConfigTest_IsBool),
 		ConfigurationVerifyKey("BoolFalse2", ConfigTest_IsBool),
-		ConfigurationVerifyKey("TOPlevel", 
+		ConfigurationVerifyKey("TOPlevel",
 			ConfigTest_LastEntry | ConfigTest_Exists)
 };
 
@@ -163,12 +163,12 @@ class TestLogger : public Logger
 	Log::Level mTargetLevel;
 
 	public:
-	TestLogger(Log::Level targetLevel) 
+	TestLogger(Log::Level targetLevel)
 	: mTriggered(false), mTargetLevel(targetLevel)
-	{ 
+	{
 		Logging::Add(this);
 	}
-	~TestLogger() 
+	~TestLogger()
 	{
 		Logging::Remove(this);
 	}
@@ -510,13 +510,14 @@ int test(int argc, const char *argv[])
 		std::string dummy;
 		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
 	}
+
 	// and again without pre-processing
 	{
-		FileStream file("testfiles" DIRECTORY_SEPARATOR 
+		FileStream file("testfiles" DIRECTORY_SEPARATOR
 			"fdgetlinetest.txt", O_RDONLY);
 		IOStreamGetLine getline(file);
 
-		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR 
+		FILE *file2 = fopen("testfiles" DIRECTORY_SEPARATOR
 			"fdgetlinetest.txt", "r");
 		TEST_THAT_ABORTONFAIL(file2 != 0);
 		char ll[512];
@@ -549,8 +550,8 @@ int test(int argc, const char *argv[])
 		std::string errMsg;
 		TEST_CHECK_THROWS(std::auto_ptr<Configuration> pconfig(
 			Configuration::LoadAndVerify(
-				"testfiles" DIRECTORY_SEPARATOR "DOESNTEXIST", 
-				&verify, errMsg)), 
+				"testfiles" DIRECTORY_SEPARATOR "DOESNTEXIST",
+				&verify, errMsg)),
 			CommonException, OSFileOpenError);
 	}
 
@@ -559,7 +560,7 @@ int test(int argc, const char *argv[])
 		std::string errMsg;
 		std::auto_ptr<Configuration> pconfig(
 			Configuration::LoadAndVerify(
-				"testfiles" DIRECTORY_SEPARATOR "config1.txt", 
+				"testfiles" DIRECTORY_SEPARATOR "config1.txt",
 				&verify, errMsg));
 		if(!errMsg.empty())
 		{

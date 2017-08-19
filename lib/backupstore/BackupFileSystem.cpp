@@ -1131,7 +1131,7 @@ void RaidBackupFileSystem::EnsureObjectIsPermanent(int64_t ObjectID, bool fix_er
 		else if(existance == RaidFileUtil::AsRaidWithMissingReadable)
 		{
 			BOX_WARNING("Found damaged but repairable RAID file" <<
-				(fix_errors?", repairing: ":"") << 
+				(fix_errors?", repairing: ":"") <<
 				(fix_errors?filename:""));
 			if(fix_errors)
 			{

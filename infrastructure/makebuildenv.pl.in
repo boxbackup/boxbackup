@@ -754,7 +754,7 @@ __E
 	{
 		push @items, $test_template_file;
 	}
-		
+
 	# add in items from autogen directories, and create output directories
 	{
 		my @autogen_items;

@@ -186,6 +186,7 @@ bool exercise_s3client(S3Client& client)
 		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
 	}
 
+	// The destination file should not exist before we upload it:
 	TEST_THAT(!FileExists("testfiles/store/newfile"));
 	response = client.PutObject("/newfile", fs);
 	TEST_EQUAL(200, response.GetResponseCode());
@@ -258,6 +259,8 @@ bool exercise_s3client(S3Client& client)
 		response.GetHeaders().GetHeaderValue("etag", false)); // !required
 	TEST_EQUAL(5, TestGetFileSize("testfiles/store/newfile"));
 
+	// This will fail if the file was created in the wrong place:
+	TEST_THAT(FileExists("testfiles/store/newfile"));
 	response = client.DeleteObject("/newfile");
 	TEST_EQUAL(HTTPResponse::Code_NoContent, response.GetResponseCode());
 	TEST_THAT(!FileExists("testfiles/store/newfile"));
@@ -343,7 +346,7 @@ bool exercise_s3client(S3Client& client)
 	return (num_failures == num_failures_initial);
 }
 
-// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+
 std::string generate_query_string(const HTTPRequest& request)
 {
 	std::vector<std::string> param_names;
@@ -384,7 +387,7 @@ std::string generate_query_string(const HTTPRequest& request)
 	return out.str();
 }
 
-// http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
+
 std::string calculate_s3_signature(const HTTPRequest& request,
 	const std::string& aws_secret_access_key)
 {
@@ -442,6 +445,7 @@ std::string calculate_s3_signature(const HTTPRequest& request,
 	return auth_code;
 }
 
+
 // http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/HMACAuth.html
 std::string calculate_simpledb_signature(const HTTPRequest& request,
 	const std::string& aws_secret_access_key)
@@ -456,7 +460,7 @@ std::string calculate_simpledb_signature(const HTTPRequest& request,
 	buffer_to_sign << request.GetMethodName() << "\n" <<
 		request.GetHeaders().GetHostNameWithPort() << "\n" <<
 		// The HTTPRequestURI component is the HTTP absolute path component
-		// of the URI up to, but not including, the query string. If the 
+		// of the URI up to, but not including, the query string. If the
 		// HTTPRequestURI is empty, use a forward slash ( / ).
 		request.GetRequestURI() << "\n" <<
 		query_string;

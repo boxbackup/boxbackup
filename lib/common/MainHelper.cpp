@@ -22,11 +22,11 @@ void mainhelper_init_win32()
 {
 #ifdef WIN32
 	WSADATA info;
-	
+
 	// Under Win32 we must initialise the Winsock library
 	// before using it.
-	
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
+
+	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
 	{
 		// throw error? perhaps give it its own id in the future
 		DWORD wserrno = WSAGetLastError();
