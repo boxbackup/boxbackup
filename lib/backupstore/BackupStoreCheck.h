@@ -15,11 +15,10 @@
 #include <vector>
 #include <set>
 
-#include "NamedLock.h"
 #include "BackupStoreDirectory.h"
 
 class IOStream;
-class BackupStoreFilename;
+class BackupFileSystem;
 class BackupStoreRefCountDatabase;
 
 /*
@@ -74,7 +73,8 @@ typedef int64_t BackupStoreCheck_Size_t;
 class BackupStoreCheck
 {
 public:
-	BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNumber, int32_t AccountID, bool FixErrors, bool Quiet);
+	BackupStoreCheck(BackupFileSystem& rFileSystem, const std::string &rStoreRoot,
+		int DiscSetNumber, bool FixErrors, bool Quiet);
 	~BackupStoreCheck();
 
 private:
@@ -180,9 +180,6 @@ private:
 
 	int64_t mNumberErrorsFound;
 
-	// Lock for the store account
-	NamedLock mAccountLock;
-
 	// Storage for ID data
 	typedef std::map<BackupStoreCheck_ID_t, IDBlock*> Info_t;
 	Info_t mInfo;
@@ -201,6 +198,9 @@ private:
 
 	// The refcount database, being reconstructed as the check/fix progresses
 	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
+
+	// Abstracted interface to software-RAID filesystem
+	BackupFileSystem& mrFileSystem;
 
 	// Misc stuff
 	int32_t mLostDirNameSerial;
