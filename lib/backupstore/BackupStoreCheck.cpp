@@ -38,21 +38,25 @@
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreCheck::BackupStoreCheck(const std::string &, int, int32_t, bool, bool)
+//		Name:    BackupStoreCheck::BackupStoreCheck(const std::string &,
+//		         int, int32_t, bool, bool)
 //		Purpose: Constructor
 //		Created: 21/4/04
 //
 // --------------------------------------------------------------------------
-BackupStoreCheck::BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNumber, int32_t AccountID, bool FixErrors, bool Quiet)
+BackupStoreCheck::BackupStoreCheck(BackupFileSystem& FileSystem,
+	const std::string &rStoreRoot, int DiscSetNumber, bool FixErrors,
+	bool Quiet)
 : mStoreRoot(rStoreRoot),
   mDiscSetNumber(DiscSetNumber),
-  mAccountID(AccountID),
+  mAccountID(FileSystem.GetAccountID()), // will be 0 for S3BackupFileSystem
   mFixErrors(FixErrors),
   mQuiet(Quiet),
   mNumberErrorsFound(0),
   mLastIDInInfo(0),
   mpInfoLastBlock(0),
   mInfoLastBlockEntries(0),
+  mrFileSystem(FileSystem),
   mLostDirNameSerial(0),
   mLostAndFoundDirectoryID(0),
   mBlocksUsed(0),
@@ -114,9 +118,8 @@ void BackupStoreCheck::Check()
 {
 	if(mFixErrors)
 	{
-		std::string writeLockFilename;
-		StoreStructure::MakeWriteLockFilename(mStoreRoot, mDiscSetNumber, writeLockFilename);
-		ASSERT(FileExists(writeLockFilename));
+		// Will throw an exception if it doesn't manage to get a lock:
+		mrFileSystem.TryGetLock();
 	}
 
 	if(!mQuiet && mFixErrors)
@@ -164,8 +167,8 @@ void BackupStoreCheck::Check()
 	// Phase 1, check objects
 	if(!mQuiet)
 	{
-		BOX_INFO("Checking store account ID " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << "...");
+		BOX_INFO("Checking account " << mrFileSystem.GetAccountIdentifier() <<
+			"...");
 		BOX_INFO("Phase 1, check objects...");
 	}
 	CheckObjects();
@@ -232,8 +235,8 @@ void BackupStoreCheck::Check()
 
 	if(mNumberErrorsFound > 0)
 	{
-		BOX_WARNING("Finished checking store account ID " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << ": " <<
+		BOX_WARNING("Finished checking account " <<
+			mrFileSystem.GetAccountIdentifier() << ": " <<
 			mNumberErrorsFound << " errors found");
 
 		if(!mFixErrors)
@@ -266,8 +269,8 @@ void BackupStoreCheck::Check()
 	}
 	else
 	{
-		BOX_NOTICE("Finished checking store account ID " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << ": "
+		BOX_NOTICE("Finished checking account " <<
+			mrFileSystem.GetAccountIdentifier() << ": " <<
 			"no errors found");
 	}
 }
