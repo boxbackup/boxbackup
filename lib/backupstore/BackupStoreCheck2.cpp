@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "autogen_BackupStoreException.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
