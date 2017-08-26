@@ -16,10 +16,12 @@
 #include <set>
 
 #include "NamedLock.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreDirectory.h"
 
 class IOStream;
 class BackupStoreFilename;
+class BackupFileSystem;
 class BackupStoreRefCountDatabase;
 
 /*
@@ -201,6 +203,10 @@ private:
 
 	// The refcount database, being reconstructed as the check/fix progresses
 	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
+
+	// Abstracted interface to software-RAID filesystem
+	RaidBackupFileSystem mFileSystem;
+	BackupFileSystem& mrFileSystem;
 
 	// Misc stuff
 	int32_t mLostDirNameSerial;

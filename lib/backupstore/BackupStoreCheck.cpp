@@ -53,6 +53,8 @@ BackupStoreCheck::BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNum
   mLastIDInInfo(0),
   mpInfoLastBlock(0),
   mInfoLastBlockEntries(0),
+  mFileSystem(AccountID, rStoreRoot, DiscSetNumber),
+  mrFileSystem(mFileSystem),
   mLostDirNameSerial(0),
   mLostAndFoundDirectoryID(0),
   mBlocksUsed(0),
@@ -164,8 +166,8 @@ void BackupStoreCheck::Check()
 	// Phase 1, check objects
 	if(!mQuiet)
 	{
-		BOX_INFO("Checking store account ID " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << "...");
+		BOX_INFO("Checking account " << mrFileSystem.GetAccountIdentifier() <<
+			"...");
 		BOX_INFO("Phase 1, check objects...");
 	}
 	CheckObjects();
@@ -232,8 +234,8 @@ void BackupStoreCheck::Check()
 
 	if(mNumberErrorsFound > 0)
 	{
-		BOX_WARNING("Finished checking store account ID " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << ": " <<
+		BOX_WARNING("Finished checking account " <<
+			mrFileSystem.GetAccountIdentifier() << ": " <<
 			mNumberErrorsFound << " errors found");
 
 		if(!mFixErrors)
@@ -266,8 +268,8 @@ void BackupStoreCheck::Check()
 	}
 	else
 	{
-		BOX_NOTICE("Finished checking store account ID " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << ": "
+		BOX_NOTICE("Finished checking account " <<
+			mrFileSystem.GetAccountIdentifier() << ": " <<
 			"no errors found");
 	}
 }
