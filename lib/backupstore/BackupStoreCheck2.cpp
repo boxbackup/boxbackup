@@ -79,37 +79,25 @@ void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t Contain
 	}
 
 	BackupStoreDirectory dir(DirectoryID, ContainingDirID);
-
-	// Serialise to disc
-	std::string filename;
-	StoreStructure::MakeObjectFilename(DirectoryID, mStoreRoot, mDiscSetNumber, filename, true /* make sure the dir exists */);
-	RaidFileWrite obj(mDiscSetNumber, filename);
-	obj.Open(false /* don't allow overwriting */);
-	dir.WriteToStream(obj);
-	int64_t size = obj.GetDiscUsageInBlocks();
-	obj.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(dir);
 
 	// Record the fact we've done this
 	mDirsAdded.insert(DirectoryID);
 
 	// Add to sizes
-	mBlocksUsed += size;
-	mBlocksInDirectories += size;
+	mBlocksUsed += dir.GetUserInfo1_SizeInBlocks();
+	mBlocksInDirectories += dir.GetUserInfo1_SizeInBlocks();
 }
 
 class BackupStoreDirectoryFixer
 {
 	private:
 	BackupStoreDirectory mDirectory;
-	std::string mFilename;
-	std::string mStoreRoot;
-	int mDiscSetNumber;
+	BackupFileSystem& mrFileSystem;
 
 	public:
-	BackupStoreDirectoryFixer(std::string storeRoot, int discSetNumber,
-		int64_t ID);
-	void InsertObject(int64_t ObjectID, bool IsDirectory,
-		int32_t lostDirNameSerial);
+	BackupStoreDirectoryFixer(BackupFileSystem& rFileSystem, int64_t ID);
+	void InsertObject(int64_t ObjectID, bool IsDirectory, int32_t lostDirNameSerial);
 	~BackupStoreDirectoryFixer();
 };
 
@@ -160,15 +148,11 @@ void BackupStoreCheck::CheckUnattachedObjects()
 					// File. Only attempt to attach it somewhere if it isn't a patch
 					{
 						int64_t diffFromObjectID = 0;
-						std::string filename;
-						StoreStructure::MakeObjectFilename(ObjectID,
-							mStoreRoot, mDiscSetNumber, filename,
-							false /* don't attempt to make sure the dir exists */);
 
 						// The easiest way to do this is to verify it again. Not such a bad penalty, because
 						// this really shouldn't be done very often.
 						{
-							std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
+							std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
 							BackupStoreFile::VerifyEncodedFileFormat(*file, &diffFromObjectID);
 						}
 
@@ -181,8 +165,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 							// Delete this object instead
 							if(mFixErrors)
 							{
-								RaidFileWrite del(mDiscSetNumber, filename);
-								del.Delete();
+								mrFileSystem.DeleteFile(ObjectID);
 							}
 
 							mBlocksUsed -= pblock->mObjectSizeInBlocks[e];
@@ -239,8 +222,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				{
 					// no match, create a new one
 					pFixer = new BackupStoreDirectoryFixer(
-						mStoreRoot, mDiscSetNumber,
-						putIntoDirectoryID);
+						mrFileSystem, putIntoDirectoryID);
 					fixers.insert(fixer_pair_t(
 						putIntoDirectoryID, pFixer));
 				}
@@ -312,14 +294,7 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 
 	// Note that this directory already contains a directory entry pointing to
 	// this dir, so it doesn't have to be added.
-
-	// Serialise to disc
-	std::string filename;
-	StoreStructure::MakeObjectFilename(MissingDirectoryID, mStoreRoot, mDiscSetNumber, filename, true /* make sure the dir exists */);
-	RaidFileWrite root(mDiscSetNumber, filename);
-	root.Open(false /* don't allow overwriting */);
-	dir.WriteToStream(root);
-	root.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(dir);
 
 	// Record the fact we've done this
 	mDirsAdded.insert(MissingDirectoryID);
@@ -330,19 +305,11 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	return true;
 }
 
-BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(std::string storeRoot,
-	int discSetNumber, int64_t ID)
-: mStoreRoot(storeRoot),
-  mDiscSetNumber(discSetNumber)
+BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(BackupFileSystem& rFileSystem,
+	int64_t ID)
+: mrFileSystem(rFileSystem)
 {
-	// Generate filename
-	StoreStructure::MakeObjectFilename(ID, mStoreRoot, mDiscSetNumber,
-		mFilename, false /* don't make sure the dir exists */);
-
-	// Read it in
-	std::auto_ptr<RaidFileRead> file(
-		RaidFileRead::Open(mDiscSetNumber, mFilename));
-	mDirectory.ReadFromStream(*file, IOStream::TimeOutInfinite);
+	mrFileSystem.GetDirectory(ID, mDirectory);
 }
 
 void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
@@ -362,19 +329,11 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 	}
 	else
 	{
-		// Files require a little more work...
-		// Open file
-		std::string fileFilename;
-		StoreStructure::MakeObjectFilename(ObjectID, mStoreRoot,
-			mDiscSetNumber, fileFilename,
-			false /* don't make sure the dir exists */);
-		std::auto_ptr<RaidFileRead> file(
-			RaidFileRead::Open(mDiscSetNumber, fileFilename));
-
-		// Fill in size information
-		sizeInBlocks = file->GetDiscUsageInBlocks();
+		// Files require a little more work... Fill in size information.
+		sizeInBlocks = mrFileSystem.GetFileSizeInBlocks(ObjectID);
 
 		// Read in header
+		std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
 		file_StreamFormat hdr;
 		if(file->Read(&hdr, sizeof(hdr)) != sizeof(hdr) ||
 			(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
@@ -405,10 +364,7 @@ BackupStoreDirectoryFixer::~BackupStoreDirectoryFixer()
 	mDirectory.CheckAndFix();
 
 	// Write it out
-	RaidFileWrite root(mDiscSetNumber, mFilename);
-	root.Open(true /* allow overwriting */);
-	mDirectory.WriteToStream(root);
-	root.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(mDirectory);
 }
 
 // --------------------------------------------------------------------------
@@ -435,12 +391,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 
 	// Load up the root directory
 	BackupStoreDirectory dir;
-	std::string filename;
-	StoreStructure::MakeObjectFilename(BACKUPSTORE_ROOT_DIRECTORY_ID, mStoreRoot, mDiscSetNumber, filename, false /* don't make sure the dir exists */);
-	{
-		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-	}
+	mrFileSystem.GetDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, dir);
 
 	// Find a suitable name
 	BackupStoreFilename lostAndFound;
@@ -468,10 +419,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	dir.AddEntry(lostAndFound, 0, id, 0, BackupStoreDirectory::Entry::Flags_Dir, 0);
 
 	// Write out root dir
-	RaidFileWrite root(mDiscSetNumber, filename);
-	root.Open(true /* allow overwriting */);
-	dir.WriteToStream(root);
-	root.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(dir);
 
 	// Store
 	mLostAndFoundDirectoryID = id;
@@ -507,21 +455,13 @@ void BackupStoreCheck::FixDirsWithWrongContainerID()
 
 		// Load in
 		BackupStoreDirectory dir;
-		std::string filename;
-		StoreStructure::MakeObjectFilename(*i, mStoreRoot, mDiscSetNumber, filename, false /* don't make sure the dir exists */);
-		{
-			std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-			dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-		}
+		mrFileSystem.GetDirectory(*i, dir);
 
 		// Adjust container ID
 		dir.SetContainerID(pblock->mContainer[index]);
 
 		// Write it out
-		RaidFileWrite root(mDiscSetNumber, filename);
-		root.Open(true /* allow overwriting */);
-		dir.WriteToStream(root);
-		root.Commit(true /* convert to raid now */);
+		mrFileSystem.PutDirectory(dir);
 	}
 }
 
@@ -552,12 +492,7 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 
 		// Load in
 		BackupStoreDirectory dir;
-		std::string filename;
-		StoreStructure::MakeObjectFilename(i->second, mStoreRoot, mDiscSetNumber, filename, false /* don't make sure the dir exists */);
-		{
-			std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-			dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-		}
+		mrFileSystem.GetDirectory(i->second, dir);
 
 		// Delete the dodgy entry
 		dir.DeleteEntry(i->first);
@@ -566,10 +501,7 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 		dir.CheckAndFix();
 
 		// Write it out
-		RaidFileWrite root(mDiscSetNumber, filename);
-		root.Open(true /* allow overwriting */);
-		dir.WriteToStream(root);
-		root.Commit(true /* convert to raid now */);
+		mrFileSystem.PutDirectory(dir);
 	}
 }
 

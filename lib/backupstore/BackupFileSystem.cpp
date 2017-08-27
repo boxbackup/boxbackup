@@ -683,10 +683,17 @@ RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 	}
 }
 
-std::auto_ptr<IOStream> RaidBackupFileSystem::GetFile(int64_t ObjectID)
+
+std::auto_ptr<IOStream> RaidBackupFileSystem::GetObject(int64_t ObjectID, bool required)
 {
 	std::string filename = GetObjectFileName(ObjectID,
 		false); // no need to make sure the directory it's in exists.
+
+	if(!required && !RaidFileRead::FileExists(mStoreDiscSet, filename))
+	{
+		return std::auto_ptr<IOStream>();
+	}
+
 	std::auto_ptr<RaidFileRead> objectFile(RaidFileRead::Open(mStoreDiscSet,
 		filename));
 	return static_cast<std::auto_ptr<IOStream> >(objectFile);
@@ -815,6 +822,14 @@ std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID)
 {
 	return CombineFileOrDiff(OlderPatchID, NewerPatchID, true); // NewerIsPatch
+}
+
+
+int64_t RaidBackupFileSystem::GetFileSizeInBlocks(int64_t ObjectID)
+{
+	std::string filename = GetObjectFileName(ObjectID, false);
+	std::auto_ptr<RaidFileRead> apRead = RaidFileRead::Open(mStoreDiscSet, filename);
+	return apRead->GetDiscUsageInBlocks();
 }
 
 
@@ -1108,3 +1123,67 @@ void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 	rDir.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(out.GetSize()));
 }
 
+
+//! GetObject() can be for either a file or a directory, so we need to try both.
+// TODO FIXME use a cached directory listing to determine which it is
+std::auto_ptr<IOStream> S3BackupFileSystem::GetObject(int64_t ObjectID, bool required)
+{
+	std::string uri = GetFileURI(ObjectID);
+	std::auto_ptr<HTTPResponse> ap_response(
+		new HTTPResponse(mrClient.GetObject(uri))
+	);
+
+	if(ap_response->GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		// It's not a file, try the directory URI instead.
+		uri = GetDirectoryURI(ObjectID);
+		ap_response.reset(new HTTPResponse(mrClient.GetObject(uri)));
+	}
+
+	if(ap_response->GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		if(required)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, ObjectDoesNotExist,
+				"Requested object " << BOX_FORMAT_OBJECTID(ObjectID) << " "
+				"does not exist, or is not a file or a directory");
+		}
+		else
+		{
+			return std::auto_ptr<IOStream>();
+		}
+	}
+
+	mrClient.CheckResponse(*ap_response,
+		std::string("Failed to download requested file: " + uri));
+	return static_cast<std::auto_ptr<IOStream> >(ap_response);
+}
+
+
+std::auto_ptr<IOStream> S3BackupFileSystem::GetFile(int64_t ObjectID)
+{
+	std::string uri = GetFileURI(ObjectID);
+	std::auto_ptr<HTTPResponse> ap_response(
+		new HTTPResponse(mrClient.GetObject(uri))
+	);
+
+	if(ap_response->GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, ObjectDoesNotExist,
+			"Requested object " << BOX_FORMAT_OBJECTID(ObjectID) << " "
+			"does not exist, or is not a file.");
+	}
+
+	mrClient.CheckResponse(*ap_response,
+		std::string("Failed to download requested file: " + uri));
+	return static_cast<std::auto_ptr<IOStream> >(ap_response);
+}
+
+
+// TODO FIXME check if file is in cache and return size from there
+int64_t S3BackupFileSystem::GetFileSizeInBlocks(int64_t ObjectID)
+{
+	std::string uri = GetFileURI(ObjectID);
+	HTTPResponse response = mrClient.HeadObject(uri);
+	return GetSizeInBlocks(response.GetContentLength());
+}
