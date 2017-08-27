@@ -818,6 +818,54 @@ RaidBackupFileSystem::CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID)
 }
 
 
+void RaidBackupFileSystem::EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors)
+{
+	// If it looks like a good object, and it's non-RAID, and
+	// this is a RAID set, then convert it to RAID.
+
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mStoreDiscSet));
+	if(!rdiscSet.IsNonRaidSet())
+	{
+		// See if the file exists
+		std::string filename;
+		StoreStructure::MakeObjectFilename(ObjectID, mAccountRootDir, mStoreDiscSet,
+			filename, false /* don't make sure the dir exists */);
+
+		RaidFileUtil::ExistType existance =
+			RaidFileUtil::RaidFileExists(rdiscSet, filename);
+		if(existance == RaidFileUtil::NonRaid)
+		{
+			BOX_WARNING("Found non-RAID write file in RAID set" <<
+				(fix_errors?", transforming to RAID: ":"") <<
+				(fix_errors?filename:""));
+			if(fix_errors)
+			{
+				RaidFileWrite write(mStoreDiscSet, filename);
+				write.TransformToRaidStorage();
+			}
+		}
+		else if(existance == RaidFileUtil::AsRaidWithMissingReadable)
+		{
+			BOX_WARNING("Found damaged but repairable RAID file" <<
+				(fix_errors?", repairing: ":"") <<
+				(fix_errors?filename:""));
+			if(fix_errors)
+			{
+				std::auto_ptr<RaidFileRead> read(
+					RaidFileRead::Open(mStoreDiscSet,
+						filename));
+				RaidFileWrite write(mStoreDiscSet, filename);
+				write.Open(true /* overwrite */);
+				read->CopyStreamTo(write);
+				read.reset();
+				write.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
+			}
+		}
+	}
+}
+
+
 int S3BackupFileSystem::GetBlockSize()
 {
 	return S3_NOTIONAL_BLOCK_SIZE;
