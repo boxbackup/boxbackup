@@ -79,8 +79,6 @@ public:
 	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet,
 		int64_t BlockSoftLimit, int64_t BlockHardLimit);
 
-private:
-
 protected:
 	BackupStoreInfo();
 
@@ -96,7 +94,7 @@ public:
 
 	// Load it from a stream (file or RaidFile)
 	static std::auto_ptr<BackupStoreInfo> Load(IOStream& rStream,
-		const std::string FileName, bool ReadOnly);
+		const std::string& FileName, bool ReadOnly);
 
 	// Has info been modified?
 	bool IsModified() const {return mIsModified;}
@@ -160,8 +158,7 @@ public:
 	 * This is exposed to allow testing, do not use otherwise!
 	 */
 	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(
-		int32_t AccountID, const std::string &rAccountName,
-		const std::string &rRootDir, int DiscSet,
+		int32_t AccountID, const std::string& rAccountName,
 		int64_t LastObjectID, int64_t BlocksUsed,
 		int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
