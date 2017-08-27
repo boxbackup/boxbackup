@@ -260,7 +260,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				pFixer->InsertObject(ObjectID,
 					((flags & Flags_IsDir) == Flags_IsDir),
 					lostDirNameSerial);
-				mapNewRefs->AddReference(ObjectID);
+				mpNewRefs->AddReference(ObjectID);
 			}
 		}
 	}
