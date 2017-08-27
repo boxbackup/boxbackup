@@ -588,7 +588,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	std::auto_ptr<BackupStoreInfo> pOldInfo;
 	try
 	{
-		pOldInfo.reset(BackupStoreInfo::Load(mAccountID, mStoreRoot, mDiscSetNumber, true /* read only */).release());
+		pOldInfo = mrFileSystem.GetBackupStoreInfoUncached();
 		mAccountName = pOldInfo->GetAccountName();
 	}
 	catch(...)
@@ -653,8 +653,6 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::CreateForRegeneration(
 		mAccountID,
 		mAccountName,
-		mStoreRoot,
-		mDiscSetNumber,
 		lastObjID,
 		mBlocksUsed,
 		mBlocksInCurrentFiles,
@@ -691,7 +689,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	// Save to disc?
 	if(mFixErrors)
 	{
-		info->Save();
+		mrFileSystem.PutBackupStoreInfo(*info);
 		BOX_INFO("New store info file written successfully.");
 	}
 }
