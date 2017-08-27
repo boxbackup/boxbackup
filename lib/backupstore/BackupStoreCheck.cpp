@@ -68,7 +68,8 @@ BackupStoreCheck::BackupStoreCheck(BackupFileSystem& FileSystem,
   mNumCurrentFiles(0),
   mNumOldFiles(0),
   mNumDeletedFiles(0),
-  mNumDirectories(0)
+  mNumDirectories(0),
+  mTimeout(600) // default timeout is 10 minutes
 {
 }
 
@@ -535,7 +536,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 			char leaf[8];
 			::snprintf(leaf, sizeof(leaf),
 				DIRECTORY_SEPARATOR "o%02x", i);
-			if(CheckAndAddObject(StartID | i, dirName + leaf) == ObjectExists_Unknown)
+			if(CheckAndAddObject(StartID | i) == ObjectExists_Unknown)
 			{
 				// File was bad, delete it
 				BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(StartID | i) << " "
@@ -555,33 +556,36 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreCheck::CheckAndAddObject(int64_t,
-//			 const std::string &)
+//		Name:    BackupStoreCheck::CheckAndAddObject(int64_t)
 //		Purpose: Check a specific object and add it to the list
 //			 if it's OK. If there are any errors with the
 //			 reading, return false and it'll be deleted.
 //		Created: 21/4/04
 //
 // --------------------------------------------------------------------------
-object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
-	const std::string &rFilename)
+object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID)
 {
 	// Info on object...
-	bool isFile = true;
+	bool isFile = true, isDirectory = false;
 	int64_t containerID = -1;
-	int64_t size = -1;
+
+	std::auto_ptr<IOStream> file = mrFileSystem.GetObject(ObjectID, false); // !required
+	if(!file.get())
+	{
+		// This file just doesn't exist. Saves the caller from calling
+		// ObjectExists() before calling us, which is expensive on S3.
+		return ObjectExists_NoObject;
+	}
 
 	try
 	{
-		// Open file
-		std::auto_ptr<RaidFileRead> file(
-			RaidFileRead::Open(mDiscSetNumber, rFilename));
-		size = file->GetDiscUsageInBlocks();
-
 		// Read in first four bytes -- don't have to worry about
 		// retrying if not all bytes read as is RaidFile
 		uint32_t signature;
-		if(file->Read(&signature, sizeof(signature)) != sizeof(signature))
+		int bytes_read;
+		if(!file->ReadFullBuffer(&signature, sizeof(signature),
+			0, // don't care about number of bytes actually read
+			mTimeout))
 		{
 			// Too short, can't read signature from it
 			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is "
@@ -606,6 +610,7 @@ object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		case OBJECTMAGIC_DIR_MAGIC_VALUE:
 			// Check it as a directory.
 			isFile = false;
+			isDirectory = true;
 			containerID = CheckDirInitial(ObjectID, *file);
 			break;
 
@@ -623,6 +628,8 @@ object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 		return ObjectExists_Unknown;
 	}
 
+	ASSERT((isFile || isDirectory) && !(isFile && isDirectory));
+
 	// Got a container ID? (ie check was successful)
 	if(containerID == -1)
 	{
@@ -630,6 +637,7 @@ object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 	}
 
 	// Add to list of IDs known about
+	int64_t size = mrFileSystem.GetFileSizeInBlocks(ObjectID);
 	AddID(ObjectID, containerID, size, isFile);
 
 	// Add to usage counts
@@ -746,14 +754,9 @@ void BackupStoreCheck::CheckDirectories()
 			if(flags & Flags_IsDir)
 			{
 				// Found a directory. Read it in.
-				std::string filename;
-				StoreStructure::MakeObjectFilename(pblock->mID[e], mStoreRoot, mDiscSetNumber, filename, false /* no dir creation */);
 				BackupStoreDirectory dir;
-				{
-					std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-					dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-				}
-				
+				mrFileSystem.GetDirectory(pblock->mID[e], dir);
+
 				// Flag for modifications
 				bool isModified = CheckDirectory(dir);
 
@@ -776,12 +779,10 @@ void BackupStoreCheck::CheckDirectories()
 
 				if(isModified && mFixErrors)
 				{
-					BOX_WARNING("Writing modified directory to disk: " <<
+					BOX_WARNING("Writing modified directory back to "
+						"storage: " <<
 						BOX_FORMAT_OBJECTID(pblock->mID[e]));
-					RaidFileWrite fixed(mDiscSetNumber, filename);
-					fixed.Open(true /* allow overwriting */);
-					dir.WriteToStream(fixed);
-					fixed.Commit(true /* convert to raid representation now */);
+					mrFileSystem.PutDirectory(dir);
 				}
 
 				CountDirectoryEntries(dir);
@@ -885,7 +886,6 @@ void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 	{
 		int32_t iIndex;
 		IDBlock *piBlock = LookupID(en->GetObjectID(), iIndex);
-		bool badEntry = false;
 		bool wasAlreadyContained = false;
 
 		ASSERT(piBlock != 0 ||
@@ -923,11 +923,8 @@ void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 		{
 			// Add to sizes?
 			// If piBlock was zero, then wasAlreadyContained
-			// might be uninitialized; but we only process
-			// files here, and if a file's piBlock was zero
-			// then badEntry would be set above, so we
-			// wouldn't be here.
-			ASSERT(!badEntry)
+			// might be uninitialized.
+			ASSERT(piBlock != NULL)
 
 			// It can be both old and deleted.
 			// If neither, then it's current.
