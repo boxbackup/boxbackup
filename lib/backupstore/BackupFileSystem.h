@@ -103,6 +103,10 @@ public:
 		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount) = 0;
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData) = 0;
+	// GetObject() will retrieve either a file or directory, whichever exists.
+	// GetFile() and GetDirectory() are only guaranteed to work on objects of the
+	// correct type, but may be faster (depending on the implementation).
+	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true) = 0;
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID) = 0;
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain) = 0;
@@ -117,6 +121,7 @@ public:
 	// Use of GetAccountID() is not recommended. It returns S3_FAKE_ACCOUNT_ID on
 	// S3BackupFileSystem.
 	virtual int GetAccountID() = 0;
+	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID) = 0;
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors) = 0;
 
 protected:
@@ -204,13 +209,18 @@ public:
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
+	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true);
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
 		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount);
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData);
-	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
+	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID)
+	{
+		// For RaidBackupFileSystem, GetObject() is equivalent to GetFile().
+		return GetObject(ObjectID);
+	}
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain);
 	virtual void DeleteFile(int64_t ObjectID);
@@ -225,6 +235,7 @@ public:
 		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID);
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return mAccountID; }
+	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID);
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors);
 
 protected:
@@ -273,6 +284,7 @@ public:
 	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
 	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
+	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true);
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
@@ -285,10 +297,7 @@ public:
 	{
 		return std::auto_ptr<Transaction>();
 	}
-	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID)
-	{
-		return std::auto_ptr<IOStream>();
-	}
+	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain)
 	{
@@ -333,6 +342,7 @@ public:
 	}
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return S3_FAKE_ACCOUNT_ID; }
+	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID);
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors)
 	{
 		// Filesystem is not transactional, so nothing to do here.
